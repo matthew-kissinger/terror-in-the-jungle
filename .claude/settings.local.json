@@ -36,7 +36,8 @@
       "WebFetch(domain:www.sharpcoderblog.com)",
       "Bash(dir:*)",
       "Bash(findstr:*)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "Bash(git tag:*)"
     ],
     "deny": [],
     "ask": []

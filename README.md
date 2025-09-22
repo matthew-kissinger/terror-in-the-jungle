@@ -1,6 +1,10 @@
-# Pix3D - Open World Pixel Art Game Engine
+# Terror in the Jungle - v0.1 Alpha (Stable PC Version)
 
-A high-performance 3D pixel art battlefield game engine built with Three.js. Features a highly modular architecture with dynamic world generation, GPU-accelerated rendering of 200,000+ instances, and team-based combat in a tropical jungle environment.
+A high-performance 3D pixel art battlefield game built with Three.js. Experience intense team-based combat in a procedurally generated tropical jungle environment with GPU-accelerated rendering of 200,000+ vegetation instances.
+
+🎮 **[Play Now on GitHub Pages](https://matthew-kissinger.github.io/terror-in-the-jungle/)**
+
+> **Note**: This is the stable PC version (v0.1-alpha). For experimental WebXR/VR features, see [terror-in-the-jungle-vr-experimental](https://github.com/matthew-kissinger/terror-in-the-jungle-vr-experimental)
 
 ## Features
 
