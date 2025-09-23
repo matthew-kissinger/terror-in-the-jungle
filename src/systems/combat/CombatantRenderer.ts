@@ -2,13 +2,66 @@ import * as THREE from 'three';
 import { Combatant, CombatantState, Faction } from './types';
 import { AssetLoader } from '../assets/AssetLoader';
 
+export interface NPCShaderSettings {
+  celShadingEnabled: boolean;
+  rimLightingEnabled: boolean;
+  auraEnabled: boolean;
+  auraIntensity: number;
+}
+
+export type ShaderPreset = 'default' | 'cel-shaded' | 'minimal' | 'intense' | 'tactical';
+
 export class CombatantRenderer {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
   private assetLoader: AssetLoader;
 
   private factionMeshes: Map<string, THREE.InstancedMesh> = new Map();
+  private factionAuraMeshes: Map<string, THREE.InstancedMesh> = new Map();
+  private factionGroundMarkers: Map<string, THREE.InstancedMesh> = new Map();
   private soldierTextures: Map<string, THREE.Texture> = new Map();
+  private factionMaterials: Map<string, THREE.ShaderMaterial> = new Map();
+  private shaderSettings = {
+    celShadingEnabled: 1.0,
+    rimLightingEnabled: 1.0,
+    auraEnabled: 1.0,
+    auraIntensity: 0.5
+  };
+
+  // Preset configurations
+  private readonly presets: Record<ShaderPreset, NPCShaderSettings> = {
+    default: {
+      celShadingEnabled: true,
+      rimLightingEnabled: true,
+      auraEnabled: true,
+      auraIntensity: 0.5
+    },
+    'cel-shaded': {
+      celShadingEnabled: true,
+      rimLightingEnabled: false,
+      auraEnabled: false,
+      auraIntensity: 0.0
+    },
+    minimal: {
+      celShadingEnabled: false,
+      rimLightingEnabled: false,
+      auraEnabled: false,
+      auraIntensity: 0.0
+    },
+    intense: {
+      celShadingEnabled: true,
+      rimLightingEnabled: true,
+      auraEnabled: true,
+      auraIntensity: 1.0
+    },
+    tactical: {
+      celShadingEnabled: false,
+      rimLightingEnabled: true,
+      auraEnabled: true,
+      auraIntensity: 0.3
+    }
+  };
+  private combatantStates: Map<string, { state: number; damaged: number }> = new Map();
 
   constructor(scene: THREE.Scene, camera: THREE.Camera, assetLoader: AssetLoader) {
     this.scene = scene;
@@ -40,9 +93,12 @@ export class CombatantRenderer {
     // Create instanced meshes for each faction-state combination
     const soldierGeometry = new THREE.PlaneGeometry(5, 7);
 
-    // Helper to create mesh for faction-state
+    // Helper to create mesh for faction-state with outline effect
     const createFactionMesh = (texture: THREE.Texture, key: string, maxInstances: number = 120) => {
-      const material = new THREE.MeshBasicMaterial({
+      const faction = key.startsWith('US') ? 0.0 : 1.0;
+
+      // Main sprite material - no tinting, just the original texture
+      const spriteMaterial = new THREE.MeshBasicMaterial({
         map: texture,
         transparent: true,
         alphaTest: 0.5,
@@ -50,13 +106,62 @@ export class CombatantRenderer {
         depthWrite: true
       });
 
-      const mesh = new THREE.InstancedMesh(soldierGeometry, material, maxInstances);
+      // Create main sprite mesh
+      const mesh = new THREE.InstancedMesh(soldierGeometry, spriteMaterial, maxInstances);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.frustumCulled = false;
       mesh.count = 0;
-      mesh.renderOrder = 1;
+      mesh.renderOrder = 10; // Render on top
       this.scene.add(mesh);
       this.factionMeshes.set(key, mesh);
+
+      // Create outline material - solid color, using texture alpha
+      const outlineColor = faction < 0.5 ? new THREE.Color(0.0, 0.6, 1.0) : new THREE.Color(1.0, 0.0, 0.0);
+      const outlineMaterial = new THREE.ShaderMaterial({
+        vertexShader: this.getOutlineVertexShader(),
+        fragmentShader: this.getOutlineFragmentShader(),
+        uniforms: {
+          map: { value: texture },
+          outlineColor: { value: outlineColor },
+          combatState: { value: 0.0 },
+          time: { value: 0.0 }
+        },
+        transparent: true,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+
+      // Create outline mesh (same geometry, will be scaled in shader)
+      const outlineMesh = new THREE.InstancedMesh(soldierGeometry, outlineMaterial, maxInstances);
+      outlineMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      outlineMesh.frustumCulled = false;
+      outlineMesh.count = 0;
+      outlineMesh.renderOrder = 9; // Render just behind main sprite
+      this.scene.add(outlineMesh);
+      this.factionAuraMeshes.set(key, outlineMesh);
+
+      // Store material reference
+      this.factionMaterials.set(key, outlineMaterial);
+
+      // Create ground marker for additional visibility
+      const markerColor = faction < 0.5 ? new THREE.Color(0.0, 0.5, 1.0) : new THREE.Color(1.0, 0.0, 0.0);
+      const markerMaterial = new THREE.MeshBasicMaterial({
+        color: markerColor,
+        transparent: true,
+        opacity: 0.6,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+
+      // Create circular ground marker
+      const markerGeometry = new THREE.RingGeometry(1.5, 2.5, 16);
+      const markerMesh = new THREE.InstancedMesh(markerGeometry, markerMaterial, maxInstances);
+      markerMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      markerMesh.frustumCulled = false;
+      markerMesh.count = 0;
+      markerMesh.renderOrder = 0; // Render on ground
+      this.scene.add(markerMesh);
+      this.factionGroundMarkers.set(key, markerMesh);
     };
 
     // Create meshes for each faction-state combination
@@ -183,12 +288,147 @@ export class CombatantRenderer {
 
         mesh.setMatrixAt(index, matrix);
         combatant.billboardIndex = index;
+
+        // Set outline mesh with slightly larger scale for thick outline
+        const outlineMesh = this.factionAuraMeshes.get(key);
+        if (outlineMesh) {
+          // Create scaled matrix for outline (20% larger)
+          const outlineMatrix = matrix.clone();
+          const scaleMatrix = new THREE.Matrix4().makeScale(1.2, 1.2, 1.2);
+          outlineMatrix.multiply(scaleMatrix);
+          outlineMesh.setMatrixAt(index, outlineMatrix);
+        }
+
+        // Set ground marker at combatant's feet
+        const markerMesh = this.factionGroundMarkers.get(key);
+        if (markerMesh) {
+          const markerMatrix = new THREE.Matrix4();
+          // Rotate to lie flat on ground (90 degrees around X axis)
+          markerMatrix.makeRotationX(-Math.PI / 2);
+          // Position at combatant's feet with slight offset to avoid z-fighting
+          markerMatrix.setPosition(combatant.position.x, 0.1, combatant.position.z);
+          markerMesh.setMatrixAt(index, markerMatrix);
+        }
+
         written++;
       }
 
       mesh.count = written;
       mesh.instanceMatrix.needsUpdate = true;
+
+      // Update outline mesh instances to match
+      const outlineMesh = this.factionAuraMeshes.get(key);
+      if (outlineMesh) {
+        outlineMesh.count = written;
+        outlineMesh.instanceMatrix.needsUpdate = true;
+      }
+
+      // Update ground marker instances
+      const markerMesh = this.factionGroundMarkers.get(key);
+      if (markerMesh) {
+        markerMesh.count = written;
+        markerMesh.instanceMatrix.needsUpdate = true;
+      }
+
+      // Update outline material uniforms
+      const outlineMaterial = this.factionMaterials.get(key);
+      if (outlineMaterial && outlineMaterial instanceof THREE.ShaderMaterial) {
+        // Determine average combat state for this group
+        let avgCombatState = 0;
+        for (const combatant of combatants) {
+          if (combatant.state === CombatantState.ENGAGING || combatant.state === CombatantState.SUPPRESSING) {
+            avgCombatState = Math.max(avgCombatState, 1.0);
+          } else if (combatant.state === CombatantState.ALERT) {
+            avgCombatState = Math.max(avgCombatState, 0.5);
+          }
+        }
+        outlineMaterial.uniforms.combatState.value = avgCombatState;
+      }
     });
+  }
+
+  // Update shader time and global uniforms
+  updateShaderUniforms(deltaTime: number): void {
+    const time = performance.now() * 0.001;
+
+    this.factionMaterials.forEach(material => {
+      if (material instanceof THREE.ShaderMaterial && material.uniforms) {
+        if (material.uniforms.time) {
+          material.uniforms.time.value = time;
+        }
+        if (material.uniforms.cameraPosition) {
+          material.uniforms.cameraPosition.value = this.camera.position;
+        }
+      }
+    });
+  }
+
+  // Handle damage flash for specific combatant
+  setDamageFlash(combatantId: string, intensity: number): void {
+    this.combatantStates.set(combatantId, {
+      state: this.combatantStates.get(combatantId)?.state || 0,
+      damaged: intensity
+    });
+
+    // Decay damage flash over time
+    if (intensity > 0) {
+      setTimeout(() => {
+        const state = this.combatantStates.get(combatantId);
+        if (state && state.damaged > 0) {
+          state.damaged = Math.max(0, state.damaged - 0.1);
+        }
+      }, 100);
+    }
+  }
+
+  // Apply a preset configuration
+  applyPreset(preset: ShaderPreset): void {
+    const settings = this.presets[preset];
+    this.setShaderSettings({
+      celShadingEnabled: settings.celShadingEnabled ? 1.0 : 0.0,
+      rimLightingEnabled: settings.rimLightingEnabled ? 1.0 : 0.0,
+      auraEnabled: settings.auraEnabled ? 1.0 : 0.0,
+      auraIntensity: settings.auraIntensity
+    });
+    console.log(`🎨 Applied NPC shader preset: ${preset}`);
+  }
+
+  // Get current shader settings
+  getShaderSettings(): NPCShaderSettings {
+    return {
+      celShadingEnabled: this.shaderSettings.celShadingEnabled > 0.5,
+      rimLightingEnabled: this.shaderSettings.rimLightingEnabled > 0.5,
+      auraEnabled: this.shaderSettings.auraEnabled > 0.5,
+      auraIntensity: this.shaderSettings.auraIntensity
+    };
+  }
+
+  // Toggle specific effects
+  toggleCelShading(): void {
+    this.shaderSettings.celShadingEnabled = this.shaderSettings.celShadingEnabled > 0.5 ? 0.0 : 1.0;
+    this.updateAllMaterialUniforms();
+  }
+
+  toggleRimLighting(): void {
+    this.shaderSettings.rimLightingEnabled = this.shaderSettings.rimLightingEnabled > 0.5 ? 0.0 : 1.0;
+    this.updateAllMaterialUniforms();
+  }
+
+  toggleAura(): void {
+    this.shaderSettings.auraEnabled = this.shaderSettings.auraEnabled > 0.5 ? 0.0 : 1.0;
+    this.updateAllMaterialUniforms();
+  }
+
+  // Update shader settings
+  setShaderSettings(settings: Partial<typeof this.shaderSettings>): void {
+    Object.assign(this.shaderSettings, settings);
+    // Settings stored for future shader implementation
+  }
+
+  // Private helper to update all material uniforms
+  private updateAllMaterialUniforms(): void {
+    // Currently using basic materials
+    // This method is kept for future shader implementation
   }
 
   updateCombatantTexture(combatant: Combatant): void {
@@ -210,7 +450,127 @@ export class CombatantRenderer {
     combatant.currentTexture = this.soldierTextures.get(textureKey);
   }
 
+  private getOutlineVertexShader(): string {
+    return `
+      varying vec2 vUv;
+
+      void main() {
+        vUv = uv;
+
+        // Standard billboard transformation
+        vec4 worldPos = instanceMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * modelViewMatrix * worldPos;
+      }
+    `;
+  }
+
+  private getOutlineFragmentShader(): string {
+    return `
+      uniform sampler2D map;
+      uniform vec3 outlineColor;
+      uniform float combatState;
+      uniform float time;
+
+      varying vec2 vUv;
+
+      void main() {
+        // Sample the texture
+        vec4 texColor = texture2D(map, vUv);
+
+        // Only show outline where sprite has alpha
+        if (texColor.a < 0.3) discard;
+
+        // Pulse brightness during combat
+        float pulse = 1.0 + sin(time * 4.0) * 0.2 * combatState;
+        float brightness = 0.8 + combatState * 0.2;
+        brightness *= pulse;
+
+        // Output solid outline color
+        gl_FragColor = vec4(outlineColor * brightness, texColor.a);
+      }
+    `;
+  }
+
+  private getNPCFragmentShader(): string {
+    return `
+      uniform sampler2D map;
+      uniform float faction;
+      uniform float combatState;
+      uniform float time;
+      uniform float damaged;
+      uniform float celShadingEnabled;
+      uniform float rimLightingEnabled;
+      uniform float auraEnabled;
+      uniform float auraIntensity;
+      uniform vec3 ambientLight;
+      uniform vec3 sunDirection;
+
+      varying vec2 vUv;
+      varying vec3 vWorldPosition;
+      varying vec3 vNormal;
+      varying vec3 vViewDirection;
+
+      vec3 applyCelShading(vec3 color) {
+        float NdotL = dot(normalize(vNormal), normalize(sunDirection));
+        float lightIntensity = NdotL * 0.5 + 0.5;
+        float celBands = 3.0;
+        lightIntensity = floor(lightIntensity * celBands) / celBands;
+        vec3 shadedColor = color * (0.4 + lightIntensity * 0.6);
+        return shadedColor;
+      }
+
+      float calculateRimLight() {
+        float rim = 1.0 - max(0.0, dot(vViewDirection, vNormal));
+        rim = pow(rim, 2.0);
+        return rim;
+      }
+
+      vec3 getFactionColor() {
+        return mix(vec3(0.2, 0.4, 1.0), vec3(1.0, 0.2, 0.2), faction);
+      }
+
+      void main() {
+        vec4 texColor = texture2D(map, vUv);
+        if (texColor.a < 0.5) discard;
+
+        vec3 finalColor = texColor.rgb;
+
+        if (celShadingEnabled > 0.5) {
+          finalColor = applyCelShading(finalColor);
+        }
+
+        if (auraEnabled > 0.5) {
+          vec3 factionColor = getFactionColor();
+          float edgeAlpha = 1.0 - smoothstep(0.5, 0.9, texColor.a);
+          float pulse = 1.0 + sin(time * 3.0 + vWorldPosition.x * 0.1) * 0.3 * combatState;
+          float auraStrength = auraIntensity * (0.3 + combatState * 0.4) * pulse;
+          finalColor = mix(finalColor, finalColor + factionColor * 0.5, edgeAlpha * auraStrength);
+        }
+
+        if (rimLightingEnabled > 0.5) {
+          float rim = calculateRimLight();
+          vec3 rimColor = getFactionColor();
+          float rimIntensity = 0.3 + combatState * 0.4;
+          finalColor += rimColor * rim * rimIntensity;
+        }
+
+        if (damaged > 0.0) {
+          vec3 flashColor = vec3(1.0, 0.8, 0.8);
+          finalColor = mix(finalColor, flashColor, damaged * 0.7);
+        }
+
+        if (combatState > 0.0) {
+          vec3 combatTint = getFactionColor() * 0.15;
+          finalColor = mix(finalColor, finalColor + combatTint, combatState);
+        }
+
+        gl_FragColor = vec4(finalColor, texColor.a);
+      }
+    `;
+  }
+
   dispose(): void {
+    // Dispose main meshes
     this.factionMeshes.forEach(mesh => {
       mesh.geometry.dispose();
       if (mesh.material instanceof THREE.Material) {
@@ -219,7 +579,33 @@ export class CombatantRenderer {
       this.scene.remove(mesh);
     });
 
+    // Dispose outline meshes
+    this.factionAuraMeshes.forEach(mesh => {
+      mesh.geometry.dispose();
+      if (mesh.material instanceof THREE.Material) {
+        mesh.material.dispose();
+      }
+      this.scene.remove(mesh);
+    });
+
+    // Dispose ground markers
+    this.factionGroundMarkers.forEach(mesh => {
+      mesh.geometry.dispose();
+      if (mesh.material instanceof THREE.Material) {
+        mesh.material.dispose();
+      }
+      this.scene.remove(mesh);
+    });
+
+    this.factionMaterials.forEach(material => {
+      material.dispose();
+    });
+
     this.factionMeshes.clear();
+    this.factionAuraMeshes.clear();
+    this.factionGroundMarkers.clear();
+    this.factionMaterials.clear();
     this.soldierTextures.clear();
+    this.combatantStates.clear();
   }
 }

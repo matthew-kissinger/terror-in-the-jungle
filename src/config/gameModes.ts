@@ -74,9 +74,9 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
   respawnTime: 5,
   spawnProtectionDuration: 2,
 
-  maxCombatants: 60,
-  squadSize: { min: 3, max: 6 },
-  reinforcementInterval: 15,
+  maxCombatants: 30,  // Reduced from 60 to 30 (15v15)
+  squadSize: { min: 2, max: 4 },
+  reinforcementInterval: 20,
 
   captureRadius: 15,
   captureSpeed: 1,

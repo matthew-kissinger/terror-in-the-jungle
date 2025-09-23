@@ -8,6 +8,7 @@ import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
 import { CombatantHitDetection } from './CombatantHitDetection';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import { CombatantRenderer } from './CombatantRenderer';
 
 export interface CombatHitResult {
   hit: boolean;
@@ -28,17 +29,20 @@ export class CombatantCombat {
   private audioManager?: AudioManager;
   private hudSystem?: any;
   private chunkManager?: ImprovedChunkManager;
+  private combatantRenderer?: CombatantRenderer;
 
   constructor(
     scene: THREE.Scene,
     tracerPool: TracerPool,
     muzzleFlashPool: MuzzleFlashPool,
-    impactEffectsPool: ImpactEffectsPool
+    impactEffectsPool: ImpactEffectsPool,
+    combatantRenderer?: CombatantRenderer
   ) {
     this.tracerPool = tracerPool;
     this.muzzleFlashPool = muzzleFlashPool;
     this.impactEffectsPool = impactEffectsPool;
     this.hitDetection = new CombatantHitDetection();
+    this.combatantRenderer = combatantRenderer;
   }
 
   updateCombat(
@@ -285,6 +289,11 @@ export class CombatantCombat {
     target.health -= damage;
     target.lastHitTime = Date.now();
     target.suppressionLevel = Math.min(1.0, target.suppressionLevel + 0.3);
+
+    // Trigger damage flash effect in shader
+    if (this.combatantRenderer) {
+      this.combatantRenderer.setDamageFlash(target.id, 1.0);
+    }
 
     if (target.health <= 0) {
       target.state = CombatantState.DEAD;

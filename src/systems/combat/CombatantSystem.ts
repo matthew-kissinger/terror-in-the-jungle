@@ -53,7 +53,7 @@ export class CombatantSystem implements GameSystem {
   private playerFaction = Faction.US;
 
   // Spawn management
-  private MAX_COMBATANTS = 60;
+  private MAX_COMBATANTS = 30; // Default to Zone Control limit
   private readonly DESPAWN_DISTANCE = 150;
   private lastSpawnCheck = 0;
   private SPAWN_CHECK_INTERVAL = 3000;
@@ -118,14 +118,15 @@ export class CombatantSystem implements GameSystem {
     // Initialize modules
     this.combatantFactory = new CombatantFactory();
     this.combatantAI = new CombatantAI();
+    this.combatantRenderer = new CombatantRenderer(scene, camera, assetLoader);
     this.combatantCombat = new CombatantCombat(
       scene,
       this.tracerPool,
       this.muzzleFlashPool,
-      this.impactEffectsPool
+      this.impactEffectsPool,
+      this.combatantRenderer
     );
     this.combatantMovement = new CombatantMovement(chunkManager, undefined);
-    this.combatantRenderer = new CombatantRenderer(scene, camera, assetLoader);
     this.squadManager = new SquadManager(this.combatantFactory, chunkManager);
   }
 
@@ -236,6 +237,7 @@ export class CombatantSystem implements GameSystem {
       // Still update positions and billboards for visual consistency
       this.updateCombatants(deltaTime);
       this.combatantRenderer.updateBillboards(this.combatants, this.playerPosition);
+      this.combatantRenderer.updateShaderUniforms(deltaTime);
       return;
     }
 
@@ -273,6 +275,9 @@ export class CombatantSystem implements GameSystem {
 
     // Update billboard rotations
     this.combatantRenderer.updateBillboards(this.combatants, this.playerPosition);
+
+    // Update shader uniforms (time, camera position, etc.)
+    this.combatantRenderer.updateShaderUniforms(deltaTime);
 
     // Update effect pools
     this.tracerPool.update();
@@ -689,6 +694,11 @@ export class CombatantSystem implements GameSystem {
   enableCombat(): void {
     this.combatEnabled = true;
     console.log('⚔️ Combat AI activated');
+  }
+
+  // Get the renderer for external configuration
+  getRenderer(): CombatantRenderer {
+    return this.combatantRenderer;
   }
 
   // Distant AI simulation with proper velocity scaling
