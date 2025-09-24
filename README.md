@@ -232,7 +232,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed technical documentation incl
 - Performance optimization details
 - Debugging tips and common issues
 
-## Recent Refactoring (2024)
+## Recent Refactoring (2025)
 
 The codebase underwent a major refactoring to improve maintainability:
 
