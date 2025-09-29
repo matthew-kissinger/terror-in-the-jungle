@@ -70,6 +70,16 @@ export interface Combatant {
   lodLevel: 'high' | 'medium' | 'low' | 'culled';
   isPlayerProxy?: boolean;
   isObjectiveFocused?: boolean;
+  isRejoiningSquad?: boolean;
+}
+
+export enum SquadCommand {
+  FOLLOW_ME = 'follow_me',
+  PATROL_HERE = 'patrol_here',
+  RETREAT = 'retreat',
+  HOLD_POSITION = 'hold_position',
+  FREE_ROAM = 'free_roam',
+  NONE = 'none'
 }
 
 export interface Squad {
@@ -79,4 +89,7 @@ export interface Squad {
   leaderId?: string;
   objective?: THREE.Vector3;
   formation: 'line' | 'wedge' | 'column';
+  isPlayerControlled?: boolean;
+  currentCommand?: SquadCommand;
+  commandPosition?: THREE.Vector3;
 }

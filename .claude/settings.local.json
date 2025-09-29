@@ -37,9 +37,25 @@
       "Bash(dir:*)",
       "Bash(findstr:*)",
       "Bash(git merge:*)",
-      "Bash(git tag:*)"
+      "Bash(git tag:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "mcp__zoo-mcp__gh_search_code",
+      "Bash(find:*)",
+      "mcp__zoo-mcp__zoo_list",
+      "mcp__zoo-mcp__zoo_get",
+      "mcp__zoo-mcp__task_get",
+      "mcp__zoo-mcp__example_get_content",
+      "mcp__zoo-mcp__zoo_create",
+      "mcp__zoo-mcp__task_create",
+      "mcp__zoo-mcp__example_commit_from_content",
+      "mcp__zoo-mcp__exa_code_search"
     ],
     "deny": [],
     "ask": []
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "zoo-mcp"
+  ]
 }

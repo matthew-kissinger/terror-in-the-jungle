@@ -5,6 +5,10 @@ import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { Faction } from '../combat/types';
 import { HelicopterControls } from '../helicopter/HelicopterPhysics';
+import { InventoryManager, WeaponSlot } from './InventoryManager';
+import { GrenadeSystem } from '../weapons/GrenadeSystem';
+import { MortarSystem } from '../weapons/MortarSystem';
+import { SandbagSystem } from '../weapons/SandbagSystem';
 
 export class PlayerController implements GameSystem {
   private camera: THREE.PerspectiveCamera;
@@ -14,6 +18,12 @@ export class PlayerController implements GameSystem {
   private firstPersonWeapon?: any;
   private hudSystem?: any;
   private sandboxRenderer?: any;
+  private inventoryManager?: InventoryManager;
+  private grenadeSystem?: GrenadeSystem;
+  private mortarSystem?: MortarSystem;
+  private sandbagSystem?: SandbagSystem;
+  private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
+  private isInMortarMode = false;
   private playerState: PlayerState;
   private keys: Set<string> = new Set();
   private mouseMovement = { x: 0, y: 0 };
@@ -75,6 +85,13 @@ export class PlayerController implements GameSystem {
     // Set initial camera position
     this.camera.position.copy(this.playerState.position);
     console.log(`Player controller initialized at ${this.playerState.position.x.toFixed(1)}, ${this.playerState.position.y.toFixed(1)}, ${this.playerState.position.z.toFixed(1)}`);
+
+    // Connect inventory callback
+    if (this.inventoryManager) {
+      this.inventoryManager.onSlotChange((slot: WeaponSlot) => {
+        this.handleWeaponSlotChange(slot);
+      });
+    }
   }
 
   update(deltaTime: number): void {
@@ -88,6 +105,16 @@ export class PlayerController implements GameSystem {
 
     this.updateCamera();
     this.updateHUD();
+
+    // Update weapon-specific systems
+    if (this.currentWeaponMode === WeaponSlot.SANDBAG && this.sandbagSystem) {
+      this.sandbagSystem.updatePreviewPosition(this.camera);
+    } else if (this.currentWeaponMode === WeaponSlot.GRENADE && this.grenadeSystem && this.grenadeSystem.isCurrentlyAiming()) {
+      this.grenadeSystem.updateArc();
+    // Mortar system disabled - to be reimplemented
+    // } else if (this.currentWeaponMode === WeaponSlot.MORTAR && this.mortarSystem && this.mortarSystem.isCurrentlyAiming()) {
+    //   this.mortarSystem.updateArc();
+    }
 
     // Update chunk manager with player position
     if (this.chunkManager) {
@@ -114,6 +141,8 @@ export class PlayerController implements GameSystem {
     // Mouse events
     document.addEventListener('pointerlockchange', this.onPointerLockChange.bind(this));
     document.addEventListener('mousemove', this.onMouseMove.bind(this));
+    document.addEventListener('mousedown', this.onMouseDown.bind(this));
+    document.addEventListener('mouseup', this.onMouseUp.bind(this));
 
     // Store bound function to avoid duplicate listeners
     this.boundRequestPointerLock = this.requestPointerLock.bind(this);
@@ -125,6 +154,8 @@ export class PlayerController implements GameSystem {
   private removeEventListeners(): void {
     document.removeEventListener('keydown', this.onKeyDown.bind(this));
     document.removeEventListener('keyup', this.onKeyUp.bind(this));
+    document.removeEventListener('mousedown', this.onMouseDown.bind(this));
+    document.removeEventListener('mouseup', this.onMouseUp.bind(this));
     document.removeEventListener('click', this.requestPointerLock.bind(this));
     document.removeEventListener('pointerlockchange', this.onPointerLockChange.bind(this));
     document.removeEventListener('mousemove', this.onMouseMove.bind(this));
@@ -191,6 +222,15 @@ export class PlayerController implements GameSystem {
         }
       }
     }
+
+    // Sandbag rotation controls (when not in helicopter)
+    if (!this.playerState.isInHelicopter && this.currentWeaponMode === WeaponSlot.SANDBAG && this.sandbagSystem) {
+      if (event.code === 'KeyR') {
+        this.sandbagSystem.rotatePlacementPreview(-Math.PI / 8);
+      } else if (event.code === 'KeyT') {
+        this.sandbagSystem.rotatePlacementPreview(Math.PI / 8);
+      }
+    }
   }
 
   private onKeyUp(event: KeyboardEvent): void {
@@ -243,6 +283,45 @@ export class PlayerController implements GameSystem {
     this.mouseMovement.y = event.movementY * sensitivity;
   }
 
+  private onMouseDown(event: MouseEvent): void {
+    if (!this.isPointerLocked || !this.isControlsEnabled) return;
+
+    switch (this.currentWeaponMode) {
+      case WeaponSlot.GRENADE:
+        if (event.button === 0 && this.grenadeSystem) {
+          this.grenadeSystem.startAiming();
+        }
+        break;
+
+      case WeaponSlot.MORTAR:
+        // Mortar system disabled - to be reimplemented
+        console.log('⚠️ Mortar system is temporarily disabled');
+        break;
+
+      case WeaponSlot.SANDBAG:
+        if (event.button === 0 && this.sandbagSystem) {
+          this.sandbagSystem.placeSandbag();
+        }
+        break;
+    }
+  }
+
+  private onMouseUp(event: MouseEvent): void {
+    if (!this.isPointerLocked || !this.isControlsEnabled) return;
+
+    switch (this.currentWeaponMode) {
+      case WeaponSlot.GRENADE:
+        if (event.button === 0 && this.grenadeSystem) {
+          this.grenadeSystem.throwGrenade();
+        }
+        break;
+
+      case WeaponSlot.MORTAR:
+        // Mortar system disabled - to be reimplemented
+        break;
+    }
+  }
+
   private updateMovement(deltaTime: number): void {
     // Don't allow movement when in helicopter
     if (this.playerState.isInHelicopter) {
@@ -251,7 +330,9 @@ export class PlayerController implements GameSystem {
     }
 
     const moveVector = new THREE.Vector3();
-    const currentSpeed = this.playerState.isRunning ? this.playerState.runSpeed : this.playerState.speed;
+    const baseSpeed = this.playerState.isRunning ? this.playerState.runSpeed : this.playerState.speed;
+    const speedMultiplier = this.getMovementSpeedMultiplier();
+    const currentSpeed = baseSpeed * speedMultiplier;
 
     // Calculate movement direction based on camera orientation
     if (this.keys.has('keyw')) {
@@ -308,6 +389,33 @@ export class PlayerController implements GameSystem {
     const movement = this.playerState.velocity.clone().multiplyScalar(deltaTime);
     const newPosition = this.playerState.position.clone().add(movement);
 
+    // Check sandbag collision before applying movement
+    if (this.sandbagSystem && this.sandbagSystem.checkCollision(newPosition, 0.5)) {
+      // Try to slide along the obstacle
+      const slideX = this.playerState.position.clone();
+      slideX.x = newPosition.x;
+      const slideZ = this.playerState.position.clone();
+      slideZ.z = newPosition.z;
+
+      // Try moving only in X direction
+      if (!this.sandbagSystem.checkCollision(slideX, 0.5)) {
+        newPosition.z = this.playerState.position.z;
+        this.playerState.velocity.z = 0;
+      }
+      // Try moving only in Z direction
+      else if (!this.sandbagSystem.checkCollision(slideZ, 0.5)) {
+        newPosition.x = this.playerState.position.x;
+        this.playerState.velocity.x = 0;
+      }
+      // Can't move at all - stop completely
+      else {
+        newPosition.x = this.playerState.position.x;
+        newPosition.z = this.playerState.position.z;
+        this.playerState.velocity.x = 0;
+        this.playerState.velocity.z = 0;
+      }
+    }
+
     // No bounds clamping for infinite world
     // Remove the old terrain bounds limitation
 
@@ -317,7 +425,7 @@ export class PlayerController implements GameSystem {
       const effectiveHeight = this.chunkManager.getEffectiveHeightAt(newPosition.x, newPosition.z);
       groundHeight = effectiveHeight + 2;
     }
-    
+
     if (newPosition.y <= groundHeight) {
       // Player is on or below ground
       newPosition.y = groundHeight;
@@ -578,6 +686,58 @@ Escape - Release pointer lock / Exit helicopter
     `);
   }
 
+  private handleWeaponSlotChange(slot: WeaponSlot): void {
+    if (this.firstPersonWeapon) {
+      this.firstPersonWeapon.setWeaponVisibility(false);
+    }
+    if (this.grenadeSystem) {
+      this.grenadeSystem.showGrenadeInHand(false);
+    }
+    // Mortar system disabled - to be reimplemented
+    // if (this.mortarSystem && this.mortarSystem.isCurrentlyDeployed()) {
+    //   this.mortarSystem.undeployMortar();
+    // }
+    if (this.sandbagSystem) {
+      this.sandbagSystem.showPlacementPreview(false);
+    }
+
+    switch(slot) {
+      case WeaponSlot.PRIMARY:
+        if (this.firstPersonWeapon) {
+          this.firstPersonWeapon.setWeaponVisibility(true);
+        }
+        this.isInMortarMode = false;
+        break;
+      case WeaponSlot.MORTAR:
+        // Mortar system disabled - to be reimplemented
+        console.log('⚠️ Mortar system is temporarily disabled and will be reimplemented');
+        this.isInMortarMode = false;
+        break;
+      case WeaponSlot.GRENADE:
+        if (this.grenadeSystem) {
+          this.grenadeSystem.showGrenadeInHand(true);
+        }
+        this.isInMortarMode = false;
+        break;
+      case WeaponSlot.SANDBAG:
+        if (this.sandbagSystem) {
+          this.sandbagSystem.showPlacementPreview(true);
+        }
+        this.isInMortarMode = false;
+        break;
+    }
+
+    this.currentWeaponMode = slot;
+  }
+
+  private getMovementSpeedMultiplier(): number {
+    // Mortar system disabled - to be reimplemented
+    if (false) { // this.isInMortarMode && this.mortarSystem && this.mortarSystem.isCurrentlyDeployed()
+      return 0.0;
+    }
+    return 1.0;
+  }
+
   getPosition(): THREE.Vector3 {
     return this.playerState.position.clone();
   }
@@ -617,6 +777,22 @@ Escape - Release pointer lock / Exit helicopter
 
   setSandboxRenderer(sandboxRenderer: any): void {
     this.sandboxRenderer = sandboxRenderer;
+  }
+
+  setInventoryManager(inventoryManager: InventoryManager): void {
+    this.inventoryManager = inventoryManager;
+  }
+
+  setGrenadeSystem(grenadeSystem: GrenadeSystem): void {
+    this.grenadeSystem = grenadeSystem;
+  }
+
+  setMortarSystem(mortarSystem: MortarSystem): void {
+    this.mortarSystem = mortarSystem;
+  }
+
+  setSandbagSystem(sandbagSystem: SandbagSystem): void {
+    this.sandbagSystem = sandbagSystem;
   }
 
   equipWeapon(): void {

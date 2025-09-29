@@ -7,6 +7,7 @@ import { GameModeManager } from '../world/GameModeManager';
 import { RespawnMapView } from '../../ui/map/RespawnMapView';
 import { OpenFrontierRespawnMap } from '../../ui/map/OpenFrontierRespawnMap';
 import { GameMode } from '../../config/gameModes';
+import { InventoryManager } from './InventoryManager';
 
 export class PlayerRespawnManager implements GameSystem {
   private scene: THREE.Scene;
@@ -16,6 +17,7 @@ export class PlayerRespawnManager implements GameSystem {
   private gameModeManager?: GameModeManager;
   private playerController?: any;
   private firstPersonWeapon?: any;
+  private inventoryManager?: InventoryManager;
 
   // Respawn state
   private isRespawnUIVisible = false;
@@ -391,6 +393,10 @@ export class PlayerRespawnManager implements GameSystem {
     this.firstPersonWeapon = weapon;
   }
 
+  setInventoryManager(inventoryManager: InventoryManager): void {
+    this.inventoryManager = inventoryManager;
+  }
+
   setRespawnCallback(callback: (position: THREE.Vector3) => void): void {
     this.onRespawnCallback = callback;
   }
@@ -472,6 +478,11 @@ export class PlayerRespawnManager implements GameSystem {
       if (typeof this.playerController.enableControls === 'function') {
         this.playerController.enableControls();
       }
+    }
+
+    // Reset inventory (including grenades)
+    if (this.inventoryManager) {
+      this.inventoryManager.reset();
     }
 
     // Re-enable weapon

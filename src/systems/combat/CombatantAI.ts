@@ -1,11 +1,18 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction } from './types';
+import { Combatant, CombatantState, Faction, Squad, SquadCommand } from './types';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import { SandbagSystem } from '../weapons/SandbagSystem';
 
 export class CombatantAI {
   private readonly FRIENDLY_FIRE_ENABLED = false;
   private readonly MAX_ENGAGEMENT_RANGE = 150;
   private chunkManager?: ImprovedChunkManager;
+  private sandbagSystem?: SandbagSystem;
+  private squads: Map<string, Squad> = new Map();
+
+  setSquads(squads: Map<string, Squad>): void {
+    this.squads = squads;
+  }
 
   updateAI(
     combatant: Combatant,
@@ -35,6 +42,18 @@ export class CombatantAI {
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>
   ): void {
+    const squad = combatant.squadId ? this.squads.get(combatant.squadId) : undefined;
+
+    if (combatant.isRejoiningSquad) {
+      return;
+    }
+
+    if (squad?.isPlayerControlled && squad.currentCommand &&
+        squad.currentCommand !== SquadCommand.NONE &&
+        squad.currentCommand !== SquadCommand.FREE_ROAM) {
+      this.handleSquadCommand(combatant, squad, playerPosition, deltaTime);
+    }
+
     const enemy = this.findNearestEnemy(combatant, playerPosition, allCombatants);
     if (enemy) {
       const targetPos = enemy.id === 'PLAYER' ? playerPosition : enemy.position;
@@ -43,18 +62,92 @@ export class CombatantAI {
       combatant.rotation = Math.atan2(toTarget.z, toTarget.x);
 
       if (this.canSeeTarget(combatant, enemy, playerPosition)) {
-        // Check if should engage based on distance and objective focus
         if (this.shouldEngage(combatant, distance)) {
           combatant.state = CombatantState.ALERT;
           combatant.target = enemy;
 
-          // Add range-based reaction delay
-          const rangeDelay = Math.floor(distance / 30) * 250; // +250ms per 30 units
+          const rangeDelay = Math.floor(distance / 30) * 250;
           combatant.reactionTimer = (combatant.skillProfile.reactionDelayMs + rangeDelay) / 1000;
           combatant.alertTimer = 1.5;
           console.log(`🎯 ${combatant.faction} soldier spotted enemy at ${Math.round(distance)}m!`);
         }
       }
+    }
+  }
+
+  private handleSquadCommand(
+    combatant: Combatant,
+    squad: Squad,
+    playerPosition: THREE.Vector3,
+    deltaTime: number
+  ): void {
+    switch (squad.currentCommand) {
+      case SquadCommand.FOLLOW_ME:
+        const memberIndex = squad.members.indexOf(combatant.id);
+        const spacing = 4;
+        const angle = (memberIndex / squad.members.length) * Math.PI * 2;
+        const offset = new THREE.Vector3(
+          Math.cos(angle) * spacing,
+          0,
+          Math.sin(angle) * spacing
+        );
+        const targetPos = playerPosition.clone().add(offset);
+        const distanceToTarget = combatant.position.distanceTo(targetPos);
+
+        if (distanceToTarget > 2) {
+          combatant.destinationPoint = targetPos;
+        } else {
+          combatant.destinationPoint = undefined;
+        }
+        break;
+
+      case SquadCommand.HOLD_POSITION:
+        if (squad.commandPosition && combatant.position.distanceTo(squad.commandPosition) > 3) {
+          combatant.destinationPoint = squad.commandPosition.clone();
+        } else {
+          combatant.destinationPoint = undefined;
+        }
+        break;
+
+      case SquadCommand.PATROL_HERE:
+        if (squad.commandPosition) {
+          const patrolRadius = 20;
+          const basePos = squad.commandPosition;
+
+          if (!combatant.destinationPoint ||
+              combatant.position.distanceTo(combatant.destinationPoint) < 5) {
+            const angle = Math.random() * Math.PI * 2;
+            const distance = Math.random() * patrolRadius;
+            combatant.destinationPoint = basePos.clone().add(new THREE.Vector3(
+              Math.cos(angle) * distance,
+              0,
+              Math.sin(angle) * distance
+            ));
+          }
+        }
+        break;
+
+      case SquadCommand.RETREAT:
+        if (squad.commandPosition) {
+          const retreatDistance = 50;
+          const awayFromPlayer = new THREE.Vector3()
+            .subVectors(combatant.position, playerPosition)
+            .normalize()
+            .multiplyScalar(retreatDistance);
+          combatant.destinationPoint = squad.commandPosition.clone().add(awayFromPlayer);
+        }
+        break;
+
+      case SquadCommand.FREE_ROAM:
+        combatant.destinationPoint = undefined;
+        break;
+
+      case SquadCommand.NONE:
+        combatant.destinationPoint = undefined;
+        break;
+
+      default:
+        break;
     }
   }
 
@@ -249,6 +342,29 @@ export class CombatantAI {
       }
     }
 
+    // Check sandbag obstruction
+    if (this.sandbagSystem) {
+      const eyePos = combatant.position.clone();
+      eyePos.y += 1.7;
+
+      const targetEyePos = targetPos.clone();
+      targetEyePos.y += 1.7;
+
+      const direction = new THREE.Vector3()
+        .subVectors(targetEyePos, eyePos)
+        .normalize();
+
+      const ray = new THREE.Ray(eyePos, direction);
+      const sandbagBounds = this.sandbagSystem.getSandbagBounds();
+
+      for (const bounds of sandbagBounds) {
+        const intersection = ray.intersectBox(bounds, new THREE.Vector3());
+        if (intersection && eyePos.distanceTo(intersection) < distance) {
+          return false;
+        }
+      }
+    }
+
     return true;
   }
 
@@ -309,5 +425,9 @@ export class CombatantAI {
    */
   setChunkManager(chunkManager: ImprovedChunkManager): void {
     this.chunkManager = chunkManager;
+  }
+
+  setSandbagSystem(sandbagSystem: SandbagSystem): void {
+    this.sandbagSystem = sandbagSystem;
   }
 }

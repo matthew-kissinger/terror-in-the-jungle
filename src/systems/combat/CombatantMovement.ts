@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction, Squad } from './types';
+import { Combatant, CombatantState, Faction, Squad, SquadCommand } from './types';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { ZoneManager, ZoneState } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
@@ -41,9 +41,24 @@ export class CombatantMovement {
     squads: Map<string, Squad>,
     combatants: Map<string, Combatant>
   ): void {
+    // Check if this is a rejoining squad member
+    const squad = combatant.squadId ? squads.get(combatant.squadId) : undefined;
+
+    if (combatant.isRejoiningSquad && squad) {
+      this.handleRejoiningMovement(combatant, squad, combatants);
+      return;
+    }
+
+    // Check if this is a player-controlled squad first
+    if (squad && squad.isPlayerControlled && squad.currentCommand &&
+        squad.currentCommand !== SquadCommand.NONE &&
+        squad.currentCommand !== SquadCommand.FREE_ROAM) {
+      this.handlePlayerCommand(combatant, squad, combatants, deltaTime);
+      return;
+    }
+
     // Squad movement for followers
     if (combatant.squadId && combatant.squadRole === 'follower') {
-      const squad = squads.get(combatant.squadId);
       if (squad && squad.leaderId) {
         const leader = combatants.get(squad.leaderId);
         if (leader && leader.id !== combatant.id) {
@@ -200,6 +215,128 @@ export class CombatantMovement {
     // Normalize visual rotation
     while (combatant.visualRotation > Math.PI * 2) combatant.visualRotation -= Math.PI * 2;
     while (combatant.visualRotation < 0) combatant.visualRotation += Math.PI * 2;
+  }
+
+  private handleRejoiningMovement(
+    combatant: Combatant,
+    squad: Squad,
+    combatants: Map<string, Combatant>
+  ): void {
+    const squadCentroid = this.getSquadCentroid(squad, combatants);
+    if (!squadCentroid) {
+      combatant.isRejoiningSquad = false;
+      return;
+    }
+
+    const distanceToSquad = combatant.position.distanceTo(squadCentroid);
+
+    if (distanceToSquad < 15) {
+      combatant.isRejoiningSquad = false;
+      combatant.velocity.set(0, 0, 0);
+      console.log(`✅ Squad member successfully rejoined the squad`);
+    } else {
+      const toSquad = new THREE.Vector3().subVectors(squadCentroid, combatant.position);
+      toSquad.normalize();
+      const speed = Math.min(7, distanceToSquad / 3);
+      combatant.velocity.set(toSquad.x * speed, 0, toSquad.z * speed);
+      combatant.rotation = Math.atan2(toSquad.z, toSquad.x);
+    }
+  }
+
+  private getSquadCentroid(squad: Squad, combatants: Map<string, Combatant>): THREE.Vector3 | undefined {
+    const squadMembers = squad.members
+      .map(id => combatants.get(id))
+      .filter(c => c && !c.isRejoiningSquad);
+
+    if (squadMembers.length === 0) return undefined;
+
+    const centroid = new THREE.Vector3();
+    squadMembers.forEach(member => {
+      if (member) centroid.add(member.position);
+    });
+    centroid.divideScalar(squadMembers.length);
+
+    return centroid;
+  }
+
+  private handlePlayerCommand(
+    combatant: Combatant,
+    squad: Squad,
+    combatants: Map<string, Combatant>,
+    deltaTime: number
+  ): void {
+    const command = squad.currentCommand;
+    const commandPos = squad.commandPosition;
+
+    switch (command) {
+      case SquadCommand.FOLLOW_ME:
+        if (combatant.destinationPoint) {
+          const toDestination = new THREE.Vector3().subVectors(combatant.destinationPoint, combatant.position);
+          const distance = toDestination.length();
+          if (distance > 2) {
+            toDestination.normalize();
+            const speed = Math.min(6, distance / 2);
+            combatant.velocity.set(toDestination.x * speed, 0, toDestination.z * speed);
+            combatant.rotation = Math.atan2(toDestination.z, toDestination.x);
+          } else {
+            combatant.velocity.set(0, 0, 0);
+          }
+        } else {
+          combatant.velocity.set(0, 0, 0);
+        }
+        break;
+
+      case SquadCommand.HOLD_POSITION:
+        if (combatant.destinationPoint) {
+          const toDestination = new THREE.Vector3().subVectors(combatant.destinationPoint, combatant.position);
+          const distance = toDestination.length();
+          if (distance > 2) {
+            toDestination.normalize();
+            combatant.velocity.set(toDestination.x * 4, 0, toDestination.z * 4);
+            combatant.rotation = Math.atan2(toDestination.z, toDestination.x);
+          } else {
+            combatant.velocity.set(0, 0, 0);
+          }
+        } else {
+          combatant.velocity.set(0, 0, 0);
+        }
+        break;
+
+      case SquadCommand.PATROL_HERE:
+        if (combatant.destinationPoint) {
+          const toDestination = new THREE.Vector3().subVectors(combatant.destinationPoint, combatant.position);
+          const distance = toDestination.length();
+          if (distance > 3) {
+            toDestination.normalize();
+            combatant.velocity.set(toDestination.x * 3, 0, toDestination.z * 3);
+            combatant.rotation = Math.atan2(toDestination.z, toDestination.x);
+          } else {
+            combatant.velocity.set(0, 0, 0);
+          }
+        } else {
+          combatant.velocity.set(0, 0, 0);
+        }
+        break;
+
+      case SquadCommand.RETREAT:
+        if (combatant.destinationPoint) {
+          const toDestination = new THREE.Vector3().subVectors(combatant.destinationPoint, combatant.position);
+          const distance = toDestination.length();
+          if (distance > 5) {
+            toDestination.normalize();
+            combatant.velocity.set(toDestination.x * 8, 0, toDestination.z * 8);
+            combatant.rotation = Math.atan2(toDestination.z, toDestination.x);
+          } else {
+            combatant.velocity.set(0, 0, 0);
+          }
+        } else {
+          combatant.velocity.set(0, 0, 0);
+        }
+        break;
+
+      default:
+        break;
+    }
   }
 
   private getTerrainHeight(x: number, z: number): number {

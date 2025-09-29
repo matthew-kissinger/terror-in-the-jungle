@@ -3,7 +3,7 @@ import { GameSystem } from '../../types';
 import { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
 import { AssetLoader } from '../assets/AssetLoader';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
-import { Combatant, CombatantState, Faction } from './types';
+import { Combatant, CombatantState, Faction, SquadCommand } from './types';
 import { TracerPool } from '../effects/TracerPool';
 import { MuzzleFlashPool } from '../effects/MuzzleFlashPool';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
@@ -47,6 +47,7 @@ export class CombatantSystem implements GameSystem {
 
   // Combatant management
   private combatants: Map<string, Combatant> = new Map();
+  private pendingRespawns: Array<{squadId: string, respawnTime: number, originalId: string}> = [];
 
   // Player tracking
   private playerPosition = new THREE.Vector3();
@@ -96,6 +97,10 @@ export class CombatantSystem implements GameSystem {
 
   // Game Mode Manager
   private gameModeManager?: GameModeManager;
+
+  // Player squad
+  public shouldCreatePlayerSquad = false;
+  public playerSquadId?: string;
 
   constructor(
     scene: THREE.Scene,
@@ -149,15 +154,38 @@ export class CombatantSystem implements GameSystem {
     const avgSquadSize = this.getAverageSquadSize();
     const targetPerFaction = Math.floor(this.MAX_COMBATANTS / 2);
     const initialPerFaction = Math.max(avgSquadSize, Math.floor(targetPerFaction * 0.3));
-    const initialSquadsPerFaction = Math.max(1, Math.round(initialPerFaction / avgSquadSize));
+    let initialSquadsPerFaction = Math.max(1, Math.round(initialPerFaction / avgSquadSize));
 
     const usHQs = this.getHQZonesForFaction(Faction.US, config);
     const opforHQs = this.getHQZonesForFaction(Faction.OPFOR, config);
+    const { usBasePos, opforBasePos } = this.getBasePositions();
+
+    // Create player squad first if requested
+    if (this.shouldCreatePlayerSquad) {
+      console.log('🎖️ Creating player squad...');
+      const playerSpawnPos = usBasePos.clone().add(new THREE.Vector3(0, 0, -15));
+      const { squad, members } = this.squadManager.createSquad(Faction.US, playerSpawnPos, 6);
+      this.playerSquadId = squad.id;
+      squad.isPlayerControlled = true;
+      squad.currentCommand = SquadCommand.NONE;
+      squad.commandPosition = playerSpawnPos.clone();
+
+      // Add all squad members to combatants map
+      members.forEach(combatant => {
+        this.combatants.set(combatant.id, combatant);
+      });
+
+      console.log(`✅ Player squad created: ${squad.id} with ${squad.members.length} members at player spawn`);
+
+      // Reduce US squads by 1 since we already spawned the player squad
+      initialSquadsPerFaction = Math.max(0, initialSquadsPerFaction - 1);
+    }
 
     // Fallback to legacy base positions if no HQs configured
     if (usHQs.length === 0 || opforHQs.length === 0) {
-      const { usBasePos, opforBasePos } = this.getBasePositions();
-      this.spawnSquad(Faction.US, usBasePos, avgSquadSize);
+      if (initialSquadsPerFaction > 0) {
+        this.spawnSquad(Faction.US, usBasePos, avgSquadSize);
+      }
       this.spawnSquad(Faction.OPFOR, opforBasePos, avgSquadSize);
     } else {
       // Distribute squads evenly across HQs
@@ -170,11 +198,13 @@ export class CombatantSystem implements GameSystem {
     }
 
     // Seed a small progressive queue to get early contact
-    const { usBasePos, opforBasePos } = this.getBasePositions();
     this.progressiveSpawnQueue = [
       { faction: Faction.US, position: usBasePos.clone().add(new THREE.Vector3(10, 0, 5)), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) },
       { faction: Faction.OPFOR, position: opforBasePos.clone().add(new THREE.Vector3(-10, 0, -5)), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) }
     ];
+
+    // Update AI with all squads
+    this.combatantAI.setSquads(this.squadManager.getAllSquads());
 
     console.log(`🎖️ Initial forces deployed: ${this.combatants.size} combatants`);
   }
@@ -435,6 +465,17 @@ export class CombatantSystem implements GameSystem {
   }
 
   private manageSpawning(): void {
+    // Handle pending respawns for player squad members
+    const now = Date.now();
+    const readyToRespawn = this.pendingRespawns.filter(r => r.respawnTime <= now);
+
+    readyToRespawn.forEach(respawn => {
+      console.log(`⏰ RESPAWN TRIGGERED at ${now} (was scheduled for ${respawn.respawnTime})`);
+      this.respawnSquadMember(respawn.squadId);
+    });
+
+    this.pendingRespawns = this.pendingRespawns.filter(r => r.respawnTime > now);
+
     // Remove all dead combatants immediately - no body persistence
     const toRemove: string[] = [];
 
@@ -492,6 +533,45 @@ export class CombatantSystem implements GameSystem {
     ensureFactionStrength(Faction.OPFOR);
   }
 
+  private getBaseSpawnPosition(faction: Faction): THREE.Vector3 {
+    if (this.zoneManager) {
+      const allZones = this.zoneManager.getAllZones();
+      const ownedBases = allZones.filter(z => z.owner === faction && z.isHomeBase);
+
+      if (ownedBases.length > 0) {
+        const baseZone = ownedBases[Math.floor(Math.random() * ownedBases.length)];
+        const anchor = baseZone.position;
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 20 + Math.random() * 30;
+        const spawnPos = new THREE.Vector3(
+          anchor.x + Math.cos(angle) * radius,
+          0,
+          anchor.z + Math.sin(angle) * radius
+        );
+        console.log(`📍 Using base ${baseZone.id} for squad respawn at (${spawnPos.x.toFixed(1)}, ${spawnPos.z.toFixed(1)})`);
+        return spawnPos;
+      } else {
+        console.log(`⚠️ No owned bases found for ${faction}, using fallback spawn`);
+      }
+    } else {
+      console.log(`⚠️ No ZoneManager available, using fallback spawn`);
+    }
+
+    const { usBasePos, opforBasePos } = this.getBasePositions();
+    const basePos = faction === Faction.US ? usBasePos : opforBasePos;
+
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 20 + Math.random() * 30;
+    const spawnPos = new THREE.Vector3(
+      basePos.x + Math.cos(angle) * radius,
+      0,
+      basePos.z + Math.sin(angle) * radius
+    );
+
+    console.log(`📍 Using fallback base spawn for ${faction} at (${spawnPos.x.toFixed(1)}, ${spawnPos.z.toFixed(1)})`);
+    return spawnPos;
+  }
+
   private getSpawnPosition(faction: Faction): THREE.Vector3 {
     if (this.zoneManager) {
       const allZones = this.zoneManager.getAllZones();
@@ -507,28 +587,35 @@ export class CombatantSystem implements GameSystem {
         const anchor = anchorZone.position;
         const angle = Math.random() * Math.PI * 2;
         const radius = 20 + Math.random() * 40;
-        return new THREE.Vector3(
+        const spawnPos = new THREE.Vector3(
           anchor.x + Math.cos(angle) * radius,
           0,
           anchor.z + Math.sin(angle) * radius
         );
+        console.log(`📍 Using zone ${anchorZone.id} as spawn anchor`);
+        return spawnPos;
+      } else {
+        console.log(`⚠️ No owned zones found for ${faction}, using fallback spawn`);
       }
+    } else {
+      console.log(`⚠️ No ZoneManager available, using fallback spawn`);
     }
 
-    // Fallback: far side relative to player
-    const angle = faction === Faction.US
-      ? Math.PI + (Math.random() - 0.5) * Math.PI * 0.5
-      : (Math.random() - 0.5) * Math.PI;
-    const distance = faction === Faction.US ? 30 : 100;
-    const cameraDir = new THREE.Vector3();
-    this.camera.getWorldDirection(cameraDir);
-    const cameraAngle = Math.atan2(cameraDir.x, cameraDir.z);
-    const finalAngle = cameraAngle + angle;
-    return new THREE.Vector3(
-      this.playerPosition.x + Math.cos(finalAngle) * distance,
+    // Fallback: spawn at fixed base positions (not near player!)
+    const { usBasePos, opforBasePos } = this.getBasePositions();
+    const basePos = faction === Faction.US ? usBasePos : opforBasePos;
+
+    // Add random offset around the base
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 20 + Math.random() * 30;
+    const spawnPos = new THREE.Vector3(
+      basePos.x + Math.cos(angle) * radius,
       0,
-      this.playerPosition.z + Math.sin(finalAngle) * distance
+      basePos.z + Math.sin(angle) * radius
     );
+
+    console.log(`📍 Using fallback base spawn for ${faction} at (${spawnPos.x.toFixed(1)}, ${spawnPos.z.toFixed(1)})`);
+    return spawnPos;
   }
 
   private spawnReinforcementWave(faction: Faction): void {
@@ -596,9 +683,67 @@ export class CombatantSystem implements GameSystem {
   private removeCombatant(id: string): void {
     const combatant = this.combatants.get(id);
     if (combatant && combatant.squadId) {
+      const squad = this.squadManager.getSquad(combatant.squadId);
+
+      if (squad?.isPlayerControlled) {
+        // Check if THIS specific combatant already queued
+        const alreadyQueued = this.pendingRespawns.some(r => r.originalId === id);
+
+        if (!alreadyQueued) {
+          const now = Date.now();
+          const respawnTime = now + 5000;
+          console.log(`☠️ DEATH: Squad member ${id} died at ${now}`);
+          console.log(`⏳ Queued respawn for ${respawnTime} (in 5 seconds)`);
+          this.pendingRespawns.push({
+            squadId: combatant.squadId,
+            respawnTime: respawnTime,
+            originalId: id
+          });
+        } else {
+          console.log(`✓ Respawn already queued for ${id}`);
+        }
+      }
+
       this.squadManager.removeSquadMember(combatant.squadId, id);
     }
     this.combatants.delete(id);
+  }
+
+  private respawnSquadMember(squadId: string): void {
+    const squad = this.squadManager.getSquad(squadId);
+    if (!squad) {
+      console.log(`⚠️ Cannot respawn - squad ${squadId} no longer exists`);
+      return;
+    }
+
+    // Calculate squad centroid for reference
+    const squadMembers = squad.members.map(id => this.combatants.get(id)).filter(c => c);
+    const squadCentroid = new THREE.Vector3();
+    if (squadMembers.length > 0) {
+      squadMembers.forEach(m => squadCentroid.add(m.position));
+      squadCentroid.divideScalar(squadMembers.length);
+    }
+
+    const spawnPos = this.getBaseSpawnPosition(squad.faction);
+    const distanceFromSquad = spawnPos.distanceTo(squadCentroid);
+
+    console.log(`🔄 Respawning squad member:`);
+    console.log(`   Squad location: (${squadCentroid.x.toFixed(1)}, ${squadCentroid.z.toFixed(1)})`);
+    console.log(`   Spawn location: (${spawnPos.x.toFixed(1)}, ${spawnPos.z.toFixed(1)})`);
+    console.log(`   Distance: ${distanceFromSquad.toFixed(1)}m`);
+
+    const newMember = this.combatantFactory.createCombatant(
+      squad.faction,
+      spawnPos,
+      { squadId, squadRole: 'follower' }
+    );
+
+    newMember.isRejoiningSquad = true;
+
+    squad.members.push(newMember.id);
+    this.combatants.set(newMember.id, newMember);
+
+    console.log(`✅ Squad member ${newMember.id} spawned and moving to rejoin squad`);
   }
 
   // Public API
@@ -612,6 +757,57 @@ export class CombatantSystem implements GameSystem {
   checkPlayerHit(ray: THREE.Ray): { hit: boolean; point: THREE.Vector3; headshot: boolean } {
     // Delegate to combat module
     return this.combatantCombat.checkPlayerHit(ray, this.playerPosition);
+  }
+
+  applyExplosionDamage(center: THREE.Vector3, radius: number, maxDamage: number): void {
+    let hitCount = 0;
+
+    this.combatants.forEach(combatant => {
+      if (combatant.state === CombatantState.DEAD) return;
+
+      const distance = combatant.position.distanceTo(center);
+
+      if (distance <= radius) {
+        const damagePercent = 1.0 - (distance / radius);
+        const damage = maxDamage * damagePercent;
+
+        combatant.health -= damage;
+
+        if (combatant.health <= 0) {
+          combatant.health = 0;
+          combatant.state = CombatantState.DEAD;
+
+          if (this.ticketSystem) {
+            this.ticketSystem.onCombatantKilled(combatant.faction);
+          }
+
+          // Queue respawn for player squad members
+          if (combatant.squadId) {
+            const squad = this.squadManager.getSquad(combatant.squadId);
+            if (squad?.isPlayerControlled) {
+              console.log(`⏳ Player squad member ${combatant.id} will respawn in 5 seconds...`);
+              this.pendingRespawns.push({
+                squadId: combatant.squadId,
+                respawnTime: Date.now() + 5000,
+                originalId: combatant.id
+              });
+            }
+            this.squadManager.removeSquadMember(combatant.squadId, combatant.id);
+          }
+
+          console.log(`💥 ${combatant.faction} soldier killed by explosion (${damage.toFixed(0)} damage)`);
+        } else {
+          combatant.lastHitTime = Date.now();
+          console.log(`💥 ${combatant.faction} soldier hit by explosion (${damage.toFixed(0)} damage, ${combatant.health.toFixed(0)} HP left)`);
+        }
+
+        hitCount++;
+      }
+    });
+
+    if (hitCount > 0) {
+      console.log(`💥 Explosion hit ${hitCount} combatants`);
+    }
   }
 
   getCombatStats(): { us: number; opfor: number; total: number } {

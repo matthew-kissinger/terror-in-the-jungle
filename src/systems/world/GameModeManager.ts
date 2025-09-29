@@ -64,7 +64,11 @@ export class GameModeManager implements GameSystem {
 
   // Set game mode (called from menu)
   public setGameMode(mode: GameMode): void {
-    if (mode === this.currentMode) return;
+    if (mode === this.currentMode) {
+      console.log(`🎮 GameModeManager: Re-applying current mode: ${mode}`);
+      this.applyModeConfiguration();
+      return;
+    }
 
     console.log(`🎮 GameModeManager: Switching game mode to: ${mode}`);
     this.currentMode = mode;

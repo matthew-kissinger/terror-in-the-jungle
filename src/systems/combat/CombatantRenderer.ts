@@ -21,6 +21,8 @@ export class CombatantRenderer {
   private factionGroundMarkers: Map<string, THREE.InstancedMesh> = new Map();
   private soldierTextures: Map<string, THREE.Texture> = new Map();
   private factionMaterials: Map<string, THREE.ShaderMaterial> = new Map();
+  private playerSquadId?: string;
+  private playerSquadDetected = false;
   private shaderSettings = {
     celShadingEnabled: 1.0,
     rimLightingEnabled: 1.0,
@@ -95,7 +97,9 @@ export class CombatantRenderer {
 
     // Helper to create mesh for faction-state with outline effect
     const createFactionMesh = (texture: THREE.Texture, key: string, maxInstances: number = 120) => {
-      const faction = key.startsWith('US') ? 0.0 : 1.0;
+      const isPlayerSquad = key.startsWith('SQUAD');
+      const isOpfor = key.includes('OPFOR');
+      const isUS = key.includes('US');
 
       // Main sprite material - no tinting, just the original texture
       const spriteMaterial = new THREE.MeshBasicMaterial({
@@ -111,12 +115,20 @@ export class CombatantRenderer {
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.frustumCulled = false;
       mesh.count = 0;
-      mesh.renderOrder = 10; // Render on top
+      mesh.renderOrder = 10;
       this.scene.add(mesh);
       this.factionMeshes.set(key, mesh);
 
-      // Create outline material - solid color, using texture alpha
-      const outlineColor = faction < 0.5 ? new THREE.Color(0.0, 0.6, 1.0) : new THREE.Color(1.0, 0.0, 0.0);
+      // Create outline material with appropriate color
+      let outlineColor: THREE.Color;
+      if (isPlayerSquad) {
+        outlineColor = new THREE.Color(0.0, 1.0, 0.3);
+      } else if (isUS) {
+        outlineColor = new THREE.Color(0.0, 0.6, 1.0);
+      } else {
+        outlineColor = new THREE.Color(1.0, 0.0, 0.0);
+      }
+
       const outlineMaterial = new THREE.ShaderMaterial({
         vertexShader: this.getOutlineVertexShader(),
         fragmentShader: this.getOutlineFragmentShader(),
@@ -131,20 +143,26 @@ export class CombatantRenderer {
         depthWrite: false
       });
 
-      // Create outline mesh (same geometry, will be scaled in shader)
+      // Create outline mesh
       const outlineMesh = new THREE.InstancedMesh(soldierGeometry, outlineMaterial, maxInstances);
       outlineMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       outlineMesh.frustumCulled = false;
       outlineMesh.count = 0;
-      outlineMesh.renderOrder = 9; // Render just behind main sprite
+      outlineMesh.renderOrder = 9;
       this.scene.add(outlineMesh);
       this.factionAuraMeshes.set(key, outlineMesh);
-
-      // Store material reference
       this.factionMaterials.set(key, outlineMaterial);
 
-      // Create ground marker for additional visibility
-      const markerColor = faction < 0.5 ? new THREE.Color(0.0, 0.5, 1.0) : new THREE.Color(1.0, 0.0, 0.0);
+      // Create ground marker
+      let markerColor: THREE.Color;
+      if (isPlayerSquad) {
+        markerColor = new THREE.Color(0.0, 1.0, 0.3);
+      } else if (isUS) {
+        markerColor = new THREE.Color(0.0, 0.5, 1.0);
+      } else {
+        markerColor = new THREE.Color(1.0, 0.0, 0.0);
+      }
+
       const markerMaterial = new THREE.MeshBasicMaterial({
         color: markerColor,
         transparent: true,
@@ -153,27 +171,39 @@ export class CombatantRenderer {
         depthWrite: false
       });
 
-      // Create circular ground marker
       const markerGeometry = new THREE.RingGeometry(1.5, 2.5, 16);
       const markerMesh = new THREE.InstancedMesh(markerGeometry, markerMaterial, maxInstances);
       markerMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       markerMesh.frustumCulled = false;
       markerMesh.count = 0;
-      markerMesh.renderOrder = 0; // Render on ground
+      markerMesh.renderOrder = 0;
       this.scene.add(markerMesh);
       this.factionGroundMarkers.set(key, markerMesh);
     };
 
-    // Create meshes for each faction-state combination
+    // Create meshes for regular US forces
     if (usWalking) createFactionMesh(usWalking, 'US_walking');
     if (usAlert) createFactionMesh(usAlert, 'US_alert');
     if (usFiring) createFactionMesh(usFiring, 'US_firing');
+
+    // Create meshes for player squad (green outlines)
+    if (usWalking) createFactionMesh(usWalking, 'SQUAD_walking');
+    if (usAlert) createFactionMesh(usAlert, 'SQUAD_alert');
+    if (usFiring) createFactionMesh(usFiring, 'SQUAD_firing');
+
+    // Create meshes for OPFOR
     if (opforWalking) createFactionMesh(opforWalking, 'OPFOR_walking');
     if (opforAlert) createFactionMesh(opforAlert, 'OPFOR_alert');
     if (opforFiring) createFactionMesh(opforFiring, 'OPFOR_firing');
     if (opforBack) createFactionMesh(opforBack, 'OPFOR_back');
 
-    console.log('🎖️ Created faction-specific soldier meshes');
+    console.log('🎖️ Created faction-specific soldier meshes (with player squad support)');
+  }
+
+  setPlayerSquadId(squadId: string | undefined): void {
+    this.playerSquadId = squadId;
+    this.playerSquadDetected = false;
+    console.log(`🎨 Renderer: Player squad ID set to: ${squadId}`);
   }
 
   updateBillboards(combatants: Map<string, Combatant>, playerPosition: THREE.Vector3): void {
@@ -184,6 +214,17 @@ export class CombatantRenderer {
     const combatantGroups = new Map<string, Combatant[]>();
 
     const RENDER_DISTANCE = 400; // Do not render AI beyond this distance; simulation still runs
+
+    // Debug: Log first few US combatants and their squad IDs
+    if (!this.playerSquadDetected && this.playerSquadId) {
+      let debugCount = 0;
+      combatants.forEach(c => {
+        if (c.faction === Faction.US && debugCount < 3 && c.position.distanceTo(playerPosition) < 50) {
+          console.log(`🔍 Debug US combatant: id=${c.id}, squadId=${c.squadId}, playerSquadId=${this.playerSquadId}, match=${c.squadId === this.playerSquadId}`);
+          debugCount++;
+        }
+      });
+    }
 
     combatants.forEach(combatant => {
       if (combatant.state === CombatantState.DEAD) return;
@@ -218,11 +259,21 @@ export class CombatantRenderer {
         stateKey = 'alert';
       }
 
-      const key = `${combatant.faction}_${stateKey}`;
+      // Check if this combatant is in the player squad
+      const isPlayerSquad = combatant.squadId === this.playerSquadId && combatant.faction === Faction.US;
+      const factionPrefix = isPlayerSquad ? 'SQUAD' : combatant.faction;
+
+      const key = `${factionPrefix}_${stateKey}`;
       if (!combatantGroups.has(key)) {
         combatantGroups.set(key, []);
       }
       combatantGroups.get(key)!.push(combatant);
+
+      // Debug: Log first player squad member detection
+      if (isPlayerSquad && !this.playerSquadDetected) {
+        console.log(`✅ Player squad member detected: ${combatant.id}, squadId: ${combatant.squadId}, rendering as: ${key}`);
+        this.playerSquadDetected = true;
+      }
     });
 
     // Update each mesh

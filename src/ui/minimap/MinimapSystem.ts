@@ -8,15 +8,17 @@ export class MinimapSystem implements GameSystem {
   private camera: THREE.Camera;
   private zoneManager?: ZoneManager;
   private combatantSystem?: CombatantSystem;
+  private playerSquadId?: string;
+  private commandPosition?: THREE.Vector3;
 
   // Canvas elements
   private minimapCanvas: HTMLCanvasElement;
   private minimapContext: CanvasRenderingContext2D;
 
   // Minimap settings
-  private readonly MINIMAP_SIZE = 200; // Increased size for better visibility
-  private WORLD_SIZE = 300; // World units to display
-  private readonly UPDATE_INTERVAL = 100; // ms between updates
+  private readonly MINIMAP_SIZE = 200;
+  private WORLD_SIZE = 300;
+  private readonly UPDATE_INTERVAL = 100;
   private lastUpdateTime = 0;
 
   // Player tracking
@@ -77,6 +79,10 @@ export class MinimapSystem implements GameSystem {
     const legend = document.createElement('div');
     legend.className = 'minimap-legend';
     legend.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 3px;">
+        <div style="width: 8px; height: 8px; background: #00ff66; border-radius: 50%;"></div>
+        <span>SQUAD</span>
+      </div>
       <div style="display: flex; align-items: center; gap: 3px;">
         <div style="width: 8px; height: 8px; background: #4488ff; border-radius: 50%;"></div>
         <span>US</span>
@@ -165,6 +171,11 @@ export class MinimapSystem implements GameSystem {
 
     // Draw combatants on minimap
     this.drawCombatantIndicators(ctx);
+
+    // Draw command marker if exists
+    if (this.commandPosition) {
+      this.drawCommandMarker(ctx);
+    }
 
     // Draw player (always in center)
     this.drawPlayer(ctx);
@@ -279,8 +290,13 @@ export class MinimapSystem implements GameSystem {
       // Skip if outside minimap bounds
       if (x < 0 || x > this.MINIMAP_SIZE || y < 0 || y > this.MINIMAP_SIZE) return;
 
-      // Draw combatant dot
-      ctx.fillStyle = combatant.faction === Faction.US ? 'rgba(68, 136, 255, 0.6)' : 'rgba(255, 68, 68, 0.6)';
+      // Draw combatant dot with appropriate color
+      const isPlayerSquad = combatant.squadId === this.playerSquadId && combatant.faction === Faction.US;
+      if (isPlayerSquad) {
+        ctx.fillStyle = 'rgba(0, 255, 102, 0.8)';
+      } else {
+        ctx.fillStyle = combatant.faction === Faction.US ? 'rgba(68, 136, 255, 0.6)' : 'rgba(255, 68, 68, 0.6)';
+      }
       ctx.beginPath();
       ctx.arc(x, y, 2, 0, Math.PI * 2);
       ctx.fill();
@@ -363,6 +379,57 @@ export class MinimapSystem implements GameSystem {
     console.log(`🎮 Minimap world scale set to ${scale}`);
   }
 
+  setPlayerSquadId(squadId: string | undefined): void {
+    this.playerSquadId = squadId;
+    console.log(`🎮 Minimap tracking player squad: ${squadId}`);
+  }
+
+  setCommandPosition(position: THREE.Vector3 | undefined): void {
+    this.commandPosition = position;
+  }
+
+  private drawCommandMarker(ctx: CanvasRenderingContext2D): void {
+    if (!this.commandPosition) return;
+
+    // Convert world position to minimap position
+    const relativePos = new THREE.Vector3()
+      .subVectors(this.commandPosition, this.playerPosition);
+
+    // Rotate world -> player-local
+    const cos = Math.cos(this.playerRotation);
+    const sin = Math.sin(this.playerRotation);
+    const rotatedX = relativePos.x * cos + relativePos.z * sin;
+    const rotatedZ = -relativePos.x * sin + relativePos.z * cos;
+
+    // Scale to minimap
+    const scale = this.MINIMAP_SIZE / this.WORLD_SIZE;
+    const x = this.MINIMAP_SIZE / 2 + rotatedX * scale;
+    const y = this.MINIMAP_SIZE / 2 + rotatedZ * scale;
+
+    // Skip if outside minimap bounds
+    if (x < 0 || x > this.MINIMAP_SIZE || y < 0 || y > this.MINIMAP_SIZE) return;
+
+    // Draw crosshair marker
+    ctx.strokeStyle = '#00ff66';
+    ctx.lineWidth = 2;
+
+    // Vertical line
+    ctx.beginPath();
+    ctx.moveTo(x, y - 8);
+    ctx.lineTo(x, y + 8);
+    ctx.stroke();
+
+    // Horizontal line
+    ctx.beginPath();
+    ctx.moveTo(x - 8, y);
+    ctx.lineTo(x + 8, y);
+    ctx.stroke();
+
+    // Circle around it
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
   dispose(): void {
     const container = (this.minimapCanvas as any).containerElement;

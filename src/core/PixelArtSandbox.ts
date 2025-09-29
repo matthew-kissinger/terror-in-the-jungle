@@ -283,21 +283,48 @@ Have fun!
     // Update skybox position
     this.systemManager.skybox.updatePosition(this.sandboxRenderer.camera.position);
 
-    // Render the main scene with post-processing
-    if (this.sandboxRenderer.postProcessing) {
-      this.sandboxRenderer.postProcessing.render(deltaTime);
-    } else {
-      // Fallback to regular rendering if post-processing is disabled
+    // Check if mortar is deployed and using weapon camera
+    const usingMortarCamera = this.systemManager.mortarSystem &&
+                              this.systemManager.mortarSystem.isUsingWeaponCamera();
+
+    // Render the main scene with appropriate camera
+    if (usingMortarCamera) {
+      const mortarCamera = this.systemManager.mortarSystem!.getWeaponCamera();
       this.sandboxRenderer.renderer.render(
         this.sandboxRenderer.scene,
-        this.sandboxRenderer.camera
+        mortarCamera
       );
+    } else {
+      if (this.sandboxRenderer.postProcessing) {
+        this.sandboxRenderer.postProcessing.render(deltaTime);
+      } else {
+        this.sandboxRenderer.renderer.render(
+          this.sandboxRenderer.scene,
+          this.sandboxRenderer.camera
+        );
+      }
     }
 
-    // Render weapon overlay (after post-processing)
-    if (this.systemManager.firstPersonWeapon) {
+    // Render weapon overlay (after post-processing) - only when not using mortar camera
+    if (this.systemManager.firstPersonWeapon && !usingMortarCamera) {
       this.systemManager.firstPersonWeapon.renderWeapon(this.sandboxRenderer.renderer);
     }
+
+    // Render grenade overlays if equipped - only when not using mortar camera
+    const renderer = this.sandboxRenderer.renderer;
+    const currentAutoClear = renderer.autoClear;
+    renderer.autoClear = false;
+
+    if (this.systemManager.grenadeSystem && this.systemManager.inventoryManager && !usingMortarCamera) {
+      const grenadeScene = this.systemManager.grenadeSystem.getGrenadeOverlayScene();
+      const grenadeCamera = this.systemManager.grenadeSystem.getGrenadeOverlayCamera();
+      if (grenadeScene && grenadeCamera) {
+        renderer.clearDepth();
+        renderer.render(grenadeScene, grenadeCamera);
+      }
+    }
+
+    renderer.autoClear = currentAutoClear;
   }
 
   public dispose(): void {

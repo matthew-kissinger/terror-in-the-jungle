@@ -12,6 +12,7 @@ import { PlayerController } from './PlayerController';
 import { AudioManager } from '../audio/AudioManager';
 import { AmmoManager } from '../weapons/AmmoManager';
 import { ZoneManager } from '../world/ZoneManager';
+import { InventoryManager, WeaponSlot } from './InventoryManager';
 
 export class FirstPersonWeapon implements GameSystem {
   private scene: THREE.Scene;
@@ -71,6 +72,7 @@ export class FirstPersonWeapon implements GameSystem {
   private audioManager?: AudioManager;
   private ammoManager: AmmoManager;
   private zoneManager?: ZoneManager;
+  private inventoryManager?: InventoryManager;
 
   // Reload animation state
   private reloadAnimationProgress = 0;
@@ -235,10 +237,19 @@ export class FirstPersonWeapon implements GameSystem {
     this.combatantSystem = combatantSystem;
   }
 
+  setInventoryManager(inventoryManager: InventoryManager): void {
+    this.inventoryManager = inventoryManager;
+  }
+
   
   private onMouseDown(event: MouseEvent): void {
     // Don't process input until game has started and weapon is visible
     if (!this.gameStarted || !this.isEnabled || !this.weaponRig) return;
+
+    // Only handle gun input when PRIMARY weapon is equipped
+    if (this.inventoryManager && this.inventoryManager.getCurrentSlot() !== WeaponSlot.PRIMARY) {
+      return;
+    }
 
     if (event.button === 2) {
       // Right mouse - ADS toggle hold (can't ADS while reloading)
@@ -472,6 +483,12 @@ export class FirstPersonWeapon implements GameSystem {
     }
     // Reset ammo on respawn
     this.ammoManager.reset();
+  }
+
+  setWeaponVisibility(visible: boolean): void {
+    if (this.weaponRig) {
+      this.weaponRig.visible = visible;
+    }
   }
 
   // Set game started state

@@ -9,6 +9,7 @@ import { AudioManager } from '../audio/AudioManager';
 import { CombatantHitDetection } from './CombatantHitDetection';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { CombatantRenderer } from './CombatantRenderer';
+import { SandbagSystem } from '../weapons/SandbagSystem';
 
 export interface CombatHitResult {
   hit: boolean;
@@ -30,6 +31,7 @@ export class CombatantCombat {
   private hudSystem?: any;
   private chunkManager?: ImprovedChunkManager;
   private combatantRenderer?: CombatantRenderer;
+  private sandbagSystem?: SandbagSystem;
 
   constructor(
     scene: THREE.Scene,
@@ -325,6 +327,17 @@ export class CombatantCombat {
     damageCalculator: (distance: number, isHeadshot: boolean) => number,
     allCombatants: Map<string, Combatant>
   ): CombatHitResult {
+    if (this.sandbagSystem) {
+      const hitSandbag = this.sandbagSystem.checkRayIntersection(ray);
+      if (hitSandbag) {
+        const intersectionPoint = this.sandbagSystem.getRayIntersectionPoint(ray);
+        if (intersectionPoint) {
+          this.impactEffectsPool.spawn(intersectionPoint, ray.direction);
+          return { hit: true, point: intersectionPoint, killed: false };
+        }
+      }
+    }
+
     const hit = this.hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
 
     if (hit) {
@@ -452,5 +465,9 @@ export class CombatantCombat {
 
   setChunkManager(chunkManager: ImprovedChunkManager): void {
     this.chunkManager = chunkManager;
+  }
+
+  setSandbagSystem(sandbagSystem: SandbagSystem): void {
+    this.sandbagSystem = sandbagSystem;
   }
 }

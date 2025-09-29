@@ -21,6 +21,11 @@ import { FullMapSystem } from '../ui/map/FullMapSystem';
 import { CompassSystem } from '../ui/compass/CompassSystem';
 import { HelipadSystem } from '../systems/helicopter/HelipadSystem';
 import { HelicopterModel } from '../systems/helicopter/HelicopterModel';
+import { PlayerSquadController } from '../systems/combat/PlayerSquadController';
+import { InventoryManager } from '../systems/player/InventoryManager';
+import { GrenadeSystem } from '../systems/weapons/GrenadeSystem';
+import { MortarSystem } from '../systems/weapons/MortarSystem';
+import { SandbagSystem } from '../systems/weapons/SandbagSystem';
 
 export class SandboxSystemManager {
   private systems: GameSystem[] = [];
@@ -46,6 +51,11 @@ export class SandboxSystemManager {
   public compassSystem!: CompassSystem;
   public helipadSystem!: HelipadSystem;
   public helicopterModel!: HelicopterModel;
+  public playerSquadController!: PlayerSquadController;
+  public inventoryManager!: InventoryManager;
+  public grenadeSystem!: GrenadeSystem;
+  public mortarSystem!: MortarSystem;
+  public sandbagSystem!: SandbagSystem;
 
   async initializeSystems(
     scene: THREE.Scene,
@@ -96,6 +106,15 @@ export class SandboxSystemManager {
     this.helipadSystem = new HelipadSystem(scene);
     this.helicopterModel = new HelicopterModel(scene);
 
+    // Initialize new squad/inventory/grenade systems
+    const squadManager = (this.combatantSystem as any).squadManager;
+    this.playerSquadController = new PlayerSquadController(squadManager);
+    this.inventoryManager = new InventoryManager();
+    this.grenadeSystem = new GrenadeSystem(scene, camera, this.chunkManager);
+    // Mortar system disabled - to be reimplemented
+    this.mortarSystem = new MortarSystem(scene, camera, this.chunkManager); // Disabled but keeping instance
+    this.sandbagSystem = new SandbagSystem(scene, camera, this.chunkManager);
+
     this.connectSystems(scene, camera, sandboxRenderer);
 
     // Add systems to update list
@@ -119,7 +138,12 @@ export class SandboxSystemManager {
       this.helipadSystem,
       this.helicopterModel,
       this.skybox,
-      this.gameModeManager
+      this.gameModeManager,
+      this.playerSquadController,
+      this.inventoryManager,
+      this.grenadeSystem,
+      this.mortarSystem,
+      this.sandbagSystem
     ];
 
     onProgress('world', 0.5);
@@ -147,6 +171,7 @@ export class SandboxSystemManager {
     this.firstPersonWeapon.setCombatantSystem(this.combatantSystem);
     this.firstPersonWeapon.setHUDSystem(this.hudSystem);
     this.firstPersonWeapon.setZoneManager(this.zoneManager);
+    this.firstPersonWeapon.setInventoryManager(this.inventoryManager);
     this.hudSystem.setCombatantSystem(this.combatantSystem);
     this.hudSystem.setZoneManager(this.zoneManager);
     this.hudSystem.setTicketSystem(this.ticketSystem);
@@ -182,6 +207,7 @@ export class SandboxSystemManager {
     this.playerRespawnManager.setGameModeManager(this.gameModeManager);
     this.playerRespawnManager.setPlayerController(this.playerController);
     this.playerRespawnManager.setFirstPersonWeapon(this.firstPersonWeapon);
+    this.playerRespawnManager.setInventoryManager(this.inventoryManager);
 
     // Connect helipad system
     this.helipadSystem.setTerrainManager(this.chunkManager);
@@ -204,6 +230,36 @@ export class SandboxSystemManager {
       this.chunkManager,
       this.minimapSystem
     );
+
+    // Connect weapon systems
+    this.grenadeSystem.setCombatantSystem(this.combatantSystem);
+    this.grenadeSystem.setInventoryManager(this.inventoryManager);
+    // Mortar connections disabled - to be reimplemented
+    // this.mortarSystem.setCombatantSystem(this.combatantSystem);
+    // this.mortarSystem.setInventoryManager(this.inventoryManager);
+    this.sandbagSystem.setInventoryManager(this.inventoryManager);
+
+    const impactEffectsPool = (this.combatantSystem as any).impactEffectsPool;
+    if (impactEffectsPool) {
+      this.grenadeSystem.setImpactEffectsPool(impactEffectsPool);
+      // this.mortarSystem.setImpactEffectsPool(impactEffectsPool); // Disabled
+    }
+
+    // Connect PlayerController with all weapon systems
+    this.playerController.setInventoryManager(this.inventoryManager);
+    this.playerController.setGrenadeSystem(this.grenadeSystem);
+    // this.playerController.setMortarSystem(this.mortarSystem); // Disabled
+    this.playerController.setSandbagSystem(this.sandbagSystem);
+
+    // Connect combat systems with sandbag system
+    const combatantCombat = (this.combatantSystem as any).combatantCombat;
+    if (combatantCombat) {
+      combatantCombat.setSandbagSystem(this.sandbagSystem);
+    }
+    const combatantAI = (this.combatantSystem as any).combatantAI;
+    if (combatantAI) {
+      combatantAI.setSandbagSystem(this.sandbagSystem);
+    }
   }
 
   async preGenerateSpawnArea(spawnPos: THREE.Vector3): Promise<void> {
@@ -243,6 +299,15 @@ export class SandboxSystemManager {
   }
 
   updateSystems(deltaTime: number): void {
+    // Update player position in squad controller
+    if (this.playerSquadController && this.playerController) {
+      this.playerSquadController.updatePlayerPosition(this.playerController.getPosition());
+
+      // Update command position on minimap
+      const commandPos = this.playerSquadController.getCommandPosition();
+      this.minimapSystem.setCommandPosition(commandPos);
+    }
+
     for (const system of this.systems) {
       system.update(deltaTime);
     }
@@ -259,6 +324,62 @@ export class SandboxSystemManager {
   }
 
   setGameMode(mode: GameMode): void {
+    // Set flag for player squad creation BEFORE mode change
+    (this.combatantSystem as any).shouldCreatePlayerSquad = true;
+
+    // This will trigger reseedForcesForMode() which respawns forces
     this.gameModeManager.setGameMode(mode);
+
+    // After forces are spawned, setup the player squad controller
+    setTimeout(() => this.setupPlayerSquad(), 500);
+  }
+
+  private setupPlayerSquad(): void {
+    const squadManager = (this.combatantSystem as any).squadManager;
+    const playerSquadId = (this.combatantSystem as any).playerSquadId;
+
+    if (!squadManager || !playerSquadId) {
+      console.warn('⚠️ Squad manager or player squad not found');
+      return;
+    }
+
+    const squad = squadManager.getSquad(playerSquadId);
+    if (!squad) {
+      console.warn('⚠️ Player squad not found in squad manager');
+      return;
+    }
+
+    // Assign to player controller
+    this.playerSquadController.assignPlayerSquad(playerSquadId);
+
+    // Pass to renderer and minimap
+    const renderer = (this.combatantSystem as any).combatantRenderer;
+    if (renderer) {
+      renderer.setPlayerSquadId(playerSquadId);
+    }
+
+    this.minimapSystem.setPlayerSquadId(playerSquadId);
+
+    console.log(`✅ Player squad setup complete: ${squad.id} with ${squad.members.length} members`);
+  }
+
+  getPlayerSquadController(): PlayerSquadController {
+    return this.playerSquadController;
+  }
+
+  getInventoryManager(): InventoryManager {
+    return this.inventoryManager;
+  }
+
+  getGrenadeSystem(): GrenadeSystem {
+    return this.grenadeSystem;
+  }
+
+  getMortarSystem(): MortarSystem {
+    return this.mortarSystem;
+  }
+
+  getSandbagSystem(): SandbagSystem {
+    return this.sandbagSystem;
   }
 }
