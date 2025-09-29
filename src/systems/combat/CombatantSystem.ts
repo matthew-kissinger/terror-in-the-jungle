@@ -720,7 +720,9 @@ export class CombatantSystem implements GameSystem {
     const squadMembers = squad.members.map(id => this.combatants.get(id)).filter(c => c);
     const squadCentroid = new THREE.Vector3();
     if (squadMembers.length > 0) {
-      squadMembers.forEach(m => squadCentroid.add(m.position));
+      squadMembers.forEach(m => {
+        if (m) squadCentroid.add(m.position);
+      });
       squadCentroid.divideScalar(squadMembers.length);
     }
 
@@ -777,8 +779,8 @@ export class CombatantSystem implements GameSystem {
           combatant.health = 0;
           combatant.state = CombatantState.DEAD;
 
-          if (this.ticketSystem) {
-            this.ticketSystem.onCombatantKilled(combatant.faction);
+          if (this.ticketSystem && typeof (this.ticketSystem as any).onCombatantKilled === 'function') {
+            (this.ticketSystem as any).onCombatantKilled(combatant.faction);
           }
 
           // Queue respawn for player squad members
