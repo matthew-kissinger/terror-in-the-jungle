@@ -142,7 +142,9 @@ export class GPUBillboardVegetation {
   private rotationAttribute: THREE.InstancedBufferAttribute;
 
   private maxInstances: number;
-  private activeCount: number = 0;
+  private highWaterMark = 0;
+  private liveCount = 0;
+  private freeSlots: number[] = [];
 
   constructor(scene: THREE.Scene, config: GPUVegetationConfig) {
     this.scene = scene;
@@ -204,60 +206,49 @@ export class GPUBillboardVegetation {
   // Add instances for a chunk
   addInstances(instances: Array<{position: THREE.Vector3, scale: THREE.Vector3, rotation: number}>): number[] {
     const allocatedIndices: number[] = [];
-    const startCount = this.activeCount;
+    const startLiveCount = this.liveCount;
 
     for (const instance of instances) {
-      let index = -1;
+      let index: number;
 
-      // First, try to find a free slot (scale = 0)
-      for (let i = 0; i < this.activeCount; i++) {
-        if (this.scales[i * 2] === 0 && this.scales[i * 2 + 1] === 0) {
-          index = i;
-          break;
-        }
-      }
-
-      // If no free slot, use new index
-      if (index === -1) {
-        if (this.activeCount >= this.maxInstances) {
-          // Don't warn for every instance, just once per batch
+      if (this.freeSlots.length > 0) {
+        index = this.freeSlots.pop()!;
+      } else {
+        if (this.highWaterMark >= this.maxInstances) {
           if (allocatedIndices.length === 0) {
-            console.warn(`⚠️ GPU Billboard: Max instances reached (${this.activeCount}/${this.maxInstances})`);
+            console.warn(`⚠️ GPU Billboard: Max instances reached (${this.highWaterMark}/${this.maxInstances})`);
           }
           break;
         }
-        index = this.activeCount;
-        this.activeCount++;
+        index = this.highWaterMark;
+        this.highWaterMark++;
       }
+
       const i3 = index * 3;
       const i2 = index * 2;
 
-      // Set position
       this.positions[i3] = instance.position.x;
       this.positions[i3 + 1] = instance.position.y;
       this.positions[i3 + 2] = instance.position.z;
 
-      // Set scale
       this.scales[i2] = instance.scale.x;
       this.scales[i2 + 1] = instance.scale.y;
 
-      // Set rotation
       this.rotations[index] = instance.rotation;
 
       allocatedIndices.push(index);
+      this.liveCount++;
     }
 
-    // Update attributes
     this.positionAttribute.needsUpdate = true;
     this.scaleAttribute.needsUpdate = true;
     this.rotationAttribute.needsUpdate = true;
 
-    // Update instance count for rendering
-    this.geometry.instanceCount = this.activeCount;
+    this.geometry.instanceCount = this.highWaterMark;
 
-    const addedCount = this.activeCount - startCount;
+    const addedCount = this.liveCount - startLiveCount;
     if (addedCount > 0) {
-      console.log(`✅ GPU Vegetation allocated ${addedCount} instances (${startCount} → ${this.activeCount} / ${this.maxInstances})`);
+      console.log(`✅ GPU Vegetation allocated ${addedCount} instances (${startLiveCount} → ${this.liveCount} live / ${this.maxInstances})`);
     }
 
     return allocatedIndices;
@@ -265,21 +256,44 @@ export class GPUBillboardVegetation {
 
   // Remove instances by indices
   removeInstances(indices: number[]): void {
-    // Hide instances by setting scale to 0 instead of swapping
-    // This preserves index integrity for chunk tracking
     for (const index of indices) {
-      if (index >= this.activeCount) continue;
+      if (index >= this.highWaterMark) continue;
 
       const i2 = index * 2;
-      // Set scale to 0 to hide the instance
+      if (this.scales[i2] === 0 && this.scales[i2 + 1] === 0) {
+        continue;
+      }
+
       this.scales[i2] = 0;
       this.scales[i2 + 1] = 0;
+      this.freeSlots.push(index);
+      if (this.liveCount > 0) {
+        this.liveCount--;
+      }
     }
 
-    // Update attributes
     this.scaleAttribute.needsUpdate = true;
+    this.compactHighWaterMark();
 
-    console.log(`🔻 GPU Vegetation: Hid ${indices.length} instances`);
+    console.log(`🔻 GPU Vegetation: Hid ${indices.length} instances (live=${this.liveCount})`);
+  }
+
+  private compactHighWaterMark(): void {
+    while (this.highWaterMark > 0) {
+      const lastIndex = this.highWaterMark - 1;
+      const i2 = lastIndex * 2;
+      if (this.scales[i2] === 0 && this.scales[i2 + 1] === 0) {
+        this.highWaterMark--;
+        const freeIdx = this.freeSlots.indexOf(lastIndex);
+        if (freeIdx !== -1) {
+          this.freeSlots.splice(freeIdx, 1);
+        }
+      } else {
+        break;
+      }
+    }
+
+    this.geometry.instanceCount = this.highWaterMark;
   }
 
   // Get instance positions for area clearing
@@ -289,7 +303,9 @@ export class GPUBillboardVegetation {
 
   // Reset all instances (for full cleanup)
   reset(): void {
-    this.activeCount = 0;
+    this.highWaterMark = 0;
+    this.liveCount = 0;
+    this.freeSlots = [];
     this.geometry.instanceCount = 0;
     this.positionAttribute.needsUpdate = true;
     this.scaleAttribute.needsUpdate = true;
@@ -307,7 +323,15 @@ export class GPUBillboardVegetation {
 
   // Get current instance count
   getInstanceCount(): number {
-    return this.activeCount;
+    return this.liveCount;
+  }
+
+  getHighWaterMark(): number {
+    return this.highWaterMark;
+  }
+
+  getFreeSlotCount(): number {
+    return this.freeSlots.length;
   }
 
   // Dispose resources
@@ -455,6 +479,8 @@ export class GPUBillboardSystem {
 
     this.vegetationTypes.forEach((vegetation, type) => {
       info[`${type}Active`] = vegetation.getInstanceCount();
+      info[`${type}HighWater`] = vegetation.getHighWaterMark();
+      info[`${type}Free`] = vegetation.getFreeSlotCount();
     });
 
     info.chunksTracked = this.chunkInstances.size;

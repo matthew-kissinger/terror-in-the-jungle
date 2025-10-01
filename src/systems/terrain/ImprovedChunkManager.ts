@@ -32,14 +32,20 @@ export class ImprovedChunkManager implements GameSystem {
   // Player tracking
   private playerPosition = new THREE.Vector3();
   private lastChunkPosition = new THREE.Vector2();
+
+  // Adaptive bounds
+  private readonly minRenderDistance: number;
+  private readonly maxRenderDistance: number;
   
   // Performance settings
   private updateTimer = 0;
   private readonly UPDATE_INTERVAL = 0.25;  // Chunk system update cadence
   private readonly MAX_CHUNKS_PER_FRAME = 1; // Limit ingestion to reduce spikes
-  private readonly LOAD_DELAY = 100; // Slow background loader slightly to avoid bursts
-  private lastLoadTime = 0;
-  private isLoading = false;
+  private readonly IN_FRAME_BUDGET_MS = 2.0;
+  private readonly IDLE_BUDGET_MS = 6.0;
+  private readonly MAX_QUEUE_SIZE = 96;
+  private loaderHandle: number | null = null;
+  private readonly LOAD_DELAY_FALLBACK = 100;
 
   // Adaptive render distance
   private fpsEma = 60;
@@ -65,6 +71,8 @@ export class ImprovedChunkManager implements GameSystem {
     this.globalBillboardSystem = globalBillboardSystem;
     this.config = config;
     this.noiseGenerator = new NoiseGenerator(12345);
+    this.maxRenderDistance = config.renderDistance;
+    this.minRenderDistance = Math.max(4, config.renderDistance - 2);
   }
 
   async init(): Promise<void> {
@@ -81,9 +89,7 @@ export class ImprovedChunkManager implements GameSystem {
     }
     
     console.log('✅ ImprovedChunkManager: Ready with initial chunks');
-    
-    // Start async loading process
-    this.startAsyncLoading();
+    this.updateLoadQueue();
   }
 
   update(deltaTime: number): void {
@@ -93,12 +99,10 @@ export class ImprovedChunkManager implements GameSystem {
     // Adapt render distance gradually to maintain stability
     const nowMs = performance.now();
     if (nowMs - this.lastAdaptTime > this.ADAPT_COOLDOWN_MS) {
-      const targetMin = 6; // keep near field always loaded
-      const targetMax = Math.max(8, this.config.renderDistance); // allow growth where possible
-      if (this.fpsEma < 28 && this.config.renderDistance > targetMin) {
+      if (this.fpsEma < 28 && this.config.renderDistance > this.minRenderDistance) {
         this.setRenderDistance(this.config.renderDistance - 1);
         this.lastAdaptTime = nowMs;
-      } else if (this.fpsEma > 55 && this.config.renderDistance < 12) {
+      } else if (this.fpsEma > 55 && this.config.renderDistance < this.maxRenderDistance) {
         this.setRenderDistance(this.config.renderDistance + 1);
         this.lastAdaptTime = nowMs;
       }
@@ -114,8 +118,8 @@ export class ImprovedChunkManager implements GameSystem {
         this.lastChunkPosition.copy(currentChunkPos);
       }
       
-      // Process load queue gradually
-      this.processLoadQueue();
+      // Process load queue gradually within the frame budget
+      this.drainLoadQueue(this.IN_FRAME_BUDGET_MS, this.MAX_CHUNKS_PER_FRAME);
       
       // Update chunk visibility
       this.updateChunkVisibility();
@@ -126,6 +130,7 @@ export class ImprovedChunkManager implements GameSystem {
   }
 
   dispose(): void {
+    this.cancelBackgroundLoader();
     this.chunks.forEach(chunk => chunk.dispose());
     this.chunks.clear();
     this.loadingChunks.clear();
@@ -135,15 +140,6 @@ export class ImprovedChunkManager implements GameSystem {
 
   updatePlayerPosition(position: THREE.Vector3): void {
     this.playerPosition.copy(position);
-  }
-
-  private startAsyncLoading(): void {
-    // Start background loading process
-    setInterval(() => {
-      if (!this.isLoading && this.loadQueue.length > 0) {
-        this.processNextInQueue();
-      }
-    }, this.LOAD_DELAY);
   }
 
   private updateLoadQueue(): void {
@@ -166,34 +162,76 @@ export class ImprovedChunkManager implements GameSystem {
     
     // Sort by priority (closer chunks first)
     this.loadQueue.sort((a, b) => a.priority - b.priority);
+
+    if (this.loadQueue.length > this.MAX_QUEUE_SIZE) {
+      this.loadQueue.length = this.MAX_QUEUE_SIZE;
+    }
+
+    if (this.loadQueue.length > 0) {
+      this.scheduleBackgroundLoader();
+    }
   }
 
-  private async processLoadQueue(): Promise<void> {
-    const now = Date.now();
-    if (now - this.lastLoadTime < this.LOAD_DELAY) return;
-    
-    // Process limited chunks per frame
+  private drainLoadQueue(budgetMs: number, maxChunks: number): void {
+    if (this.loadQueue.length === 0) return;
+
+    const start = performance.now();
     let processed = 0;
-    while (this.loadQueue.length > 0 && processed < this.MAX_CHUNKS_PER_FRAME) {
-      const item = this.loadQueue.shift();
-      if (item) {
-        this.loadChunkAsync(item.x, item.z);
-        processed++;
+
+    while (this.loadQueue.length > 0 && processed < maxChunks) {
+      if (performance.now() - start > budgetMs) {
+        break;
       }
+
+      const item = this.loadQueue.shift();
+      if (!item) {
+        continue;
+      }
+
+      this.loadChunkAsync(item.x, item.z);
+      processed++;
     }
-    
-    this.lastLoadTime = now;
+
+    if (this.loadQueue.length > 0) {
+      this.scheduleBackgroundLoader();
+    }
   }
 
-  private async processNextInQueue(): Promise<void> {
-    if (this.isLoading || this.loadQueue.length === 0) return;
-    
-    const item = this.loadQueue.shift();
-    if (item) {
-      this.isLoading = true;
-      await this.loadChunkAsync(item.x, item.z);
-      this.isLoading = false;
+  private scheduleBackgroundLoader(): void {
+    if (this.loaderHandle !== null || this.loadQueue.length === 0) {
+      return;
     }
+
+    const callback = (deadline?: IdleDeadline) => {
+      this.loaderHandle = null;
+
+      const budget = deadline ? Math.min(deadline.timeRemaining(), this.IDLE_BUDGET_MS) : this.IDLE_BUDGET_MS;
+      this.drainLoadQueue(budget, this.MAX_CHUNKS_PER_FRAME);
+
+      if (this.loadQueue.length > 0) {
+        this.scheduleBackgroundLoader();
+      }
+    };
+
+    if (typeof (window as any).requestIdleCallback === 'function') {
+      this.loaderHandle = (window as any).requestIdleCallback(callback);
+    } else {
+      this.loaderHandle = window.setTimeout(() => callback(), this.LOAD_DELAY_FALLBACK);
+    }
+  }
+
+  private cancelBackgroundLoader(): void {
+    if (this.loaderHandle === null) {
+      return;
+    }
+
+    if (typeof (window as any).cancelIdleCallback === 'function') {
+      (window as any).cancelIdleCallback(this.loaderHandle);
+    } else {
+      clearTimeout(this.loaderHandle);
+    }
+
+    this.loaderHandle = null;
   }
 
   private async loadChunkImmediate(chunkX: number, chunkZ: number): Promise<void> {
@@ -269,7 +307,7 @@ export class ImprovedChunkManager implements GameSystem {
       const distance = this.getChunkDistanceFromPlayer(x, z);
       
       // Unload chunks beyond load distance
-      if (distance > this.config.loadDistance + 1) {
+      if (distance > this.config.loadDistance) {
         chunksToUnload.push(key);
       }
     });

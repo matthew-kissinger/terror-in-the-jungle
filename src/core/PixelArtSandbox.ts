@@ -5,15 +5,18 @@ import { LoadingScreen } from '../ui/loading/LoadingScreen';
 import { SandboxSystemManager } from './SandboxSystemManager';
 import { SandboxRenderer } from './SandboxRenderer';
 import { GameMode } from '../config/gameModes';
+import { PerformanceOverlay } from '../ui/debug/PerformanceOverlay';
 
 export class PixelArtSandbox {
   private loadingScreen: LoadingScreen;
   private sandboxRenderer: SandboxRenderer;
   private systemManager: SandboxSystemManager;
+  private performanceOverlay: PerformanceOverlay;
 
   private clock = new THREE.Clock();
   private isInitialized = false;
   private gameStarted = false;
+  private lastFrameDelta = 1 / 60;
 
   constructor() {
     console.log('🎮 Initializing Pixel Art Sandbox Engine...');
@@ -25,6 +28,7 @@ export class PixelArtSandbox {
     // Create renderer and system manager
     this.sandboxRenderer = new SandboxRenderer();
     this.systemManager = new SandboxSystemManager();
+    this.performanceOverlay = new PerformanceOverlay();
 
     this.setupEventListeners();
     this.setupMenuCallbacks();
@@ -42,6 +46,8 @@ export class PixelArtSandbox {
         this.togglePerformanceStats();
       } else if (event.key === 'p' || event.key === 'P') {
         this.togglePostProcessing();
+      } else if (event.key === 'F2') {
+        this.toggleRealtimeStatsOverlay();
       } else if (event.key === '[') {
         this.adjustPixelSize(-1);
       } else if (event.key === ']') {
@@ -211,16 +217,27 @@ export class PixelArtSandbox {
     const combatStats = this.systemManager.combatantSystem.getCombatStats();
 
     console.log('📊 Performance Stats:');
-    console.log(`FPS: ${Math.round(1 / this.clock.getDelta())}`);
+    const fps = 1 / Math.max(0.0001, this.lastFrameDelta);
+    console.log(`FPS: ${Math.round(fps)}`);
     console.log(`Draw calls: ${perfStats.drawCalls}`);
     console.log(`Triangles: ${perfStats.triangles}`);
-    console.log(`Fern instances: ${debugInfo.fernUsed || 0}/${this.systemManager.globalBillboardSystem.getInstanceCount('fern')}`);
-    console.log(`Palm instances: ${debugInfo.coconutUsed || 0}/${this.systemManager.globalBillboardSystem.getInstanceCount('coconut')}`);
+    const vegetationActive = Object.entries(debugInfo)
+      .filter(([key]) => key.endsWith('Active'))
+      .reduce((sum, [, value]) => sum + (value as number), 0);
+    const vegetationReserved = Object.entries(debugInfo)
+      .filter(([key]) => key.endsWith('HighWater'))
+      .reduce((sum, [, value]) => sum + (value as number), 0);
+    console.log(`Vegetation: ${vegetationActive} active / ${vegetationReserved} reserved`);
     console.log(`Combatants - US: ${combatStats.us}, OPFOR: ${combatStats.opfor}`);
     console.log(`Chunks loaded: ${this.systemManager.chunkManager.getLoadedChunkCount()}, ` +
                 `Queue: ${this.systemManager.chunkManager.getQueueSize()}, ` +
                 `Loading: ${this.systemManager.chunkManager.getLoadingCount()}`);
     console.log(`Chunks tracked: ${debugInfo.chunksTracked}`);
+  }
+
+  private toggleRealtimeStatsOverlay(): void {
+    if (!this.gameStarted) return;
+    this.performanceOverlay.toggle();
   }
 
   private togglePostProcessing(): void {
@@ -260,6 +277,7 @@ export class PixelArtSandbox {
 - Left Click: Fire
 - Right Click: Aim Down Sights
 - F1: Performance stats
+- F2: Toggle performance overlay
 - Escape: Release mouse lock
 
 Have fun!
@@ -276,6 +294,7 @@ Have fun!
     if (!this.isInitialized || !this.gameStarted) return;
 
     const deltaTime = this.clock.getDelta();
+    this.lastFrameDelta = deltaTime;
 
     // Update all systems
     this.systemManager.updateSystems(deltaTime);
@@ -325,12 +344,45 @@ Have fun!
     }
 
     renderer.autoClear = currentAutoClear;
+
+    this.updatePerformanceOverlay(deltaTime);
+  }
+
+  private updatePerformanceOverlay(deltaTime: number): void {
+    if (!this.performanceOverlay.isVisible()) return;
+
+    const perfStats = this.sandboxRenderer.getPerformanceStats();
+    const debugInfo = this.systemManager.globalBillboardSystem.getDebugInfo();
+    const combatStats = this.systemManager.combatantSystem.getCombatStats();
+    const chunkQueue = this.systemManager.chunkManager.getQueueSize();
+    const loadedChunks = this.systemManager.chunkManager.getLoadedChunkCount();
+    const fps = 1 / Math.max(0.0001, deltaTime);
+    const vegetationActive = Object.entries(debugInfo)
+      .filter(([key]) => key.endsWith('Active'))
+      .reduce((sum, [, value]) => sum + (value as number), 0);
+    const vegetationReserved = Object.entries(debugInfo)
+      .filter(([key]) => key.endsWith('HighWater'))
+      .reduce((sum, [, value]) => sum + (value as number), 0);
+
+    this.performanceOverlay.update({
+      fps,
+      frameTimeMs: deltaTime * 1000,
+      drawCalls: perfStats.drawCalls,
+      triangles: perfStats.triangles,
+      chunkQueueSize: chunkQueue,
+      loadedChunks,
+      usCombatants: combatStats.us,
+      opforCombatants: combatStats.opfor,
+      vegetationActive,
+      vegetationReserved
+    });
   }
 
   public dispose(): void {
     this.loadingScreen.dispose();
     this.sandboxRenderer.dispose();
     this.systemManager.dispose();
+    this.performanceOverlay.dispose();
     console.log('🧹 Sandbox disposed');
   }
 }
