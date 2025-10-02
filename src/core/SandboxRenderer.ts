@@ -372,7 +372,7 @@ export class SandboxRenderer {
     textures: number;
     programs: number;
   } {
-    const memory = this.renderer.info.memory;
+    const memory = this.renderer.info.memory as { geometries: number; textures: number; programs?: number };
     const render = this.renderer.info.render;
     return {
       fps: 0, // Will be calculated externally with clock
