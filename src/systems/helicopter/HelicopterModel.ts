@@ -3,6 +3,7 @@ import { GameSystem } from '../../types';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { HelipadSystem } from './HelipadSystem';
 import { HelicopterPhysics, HelicopterControls } from './HelicopterPhysics';
+import { Logger } from '../../utils/Logger';
 
 export class HelicopterModel implements GameSystem {
   private scene: THREE.Scene;
@@ -37,7 +38,7 @@ export class HelicopterModel implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('🚁 Initializing Helicopter Model System...');
+    Logger.debug('🚁 Initializing Helicopter Model System...');
   }
 
   setTerrainManager(terrainManager: ImprovedChunkManager): void {
@@ -105,7 +106,7 @@ export class HelicopterModel implements GameSystem {
     this.targetTiltQuaternion.set('us_huey', new THREE.Quaternion());
 
     // Initialize helicopter audio
-    console.log('🚁🔊 Initializing helicopter audio for us_huey');
+    Logger.debug('🚁🔊 Initializing helicopter audio for us_huey');
     this.initializeHelicopterAudio('us_huey', helicopter);
 
     // Register helicopter for collision detection
@@ -113,11 +114,11 @@ export class HelicopterModel implements GameSystem {
       (this.terrainManager as any).registerCollisionObject('us_huey', helicopter);
     }
 
-    console.log(`🚁 ✅ Created US UH-1 Huey at position (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)})`);
-    console.log(`🚁 DEBUG: Helipad position: (${helipadPosition.x.toFixed(1)}, ${helipadPosition.y.toFixed(1)}, ${helipadPosition.z.toFixed(1)})`);
-    console.log(`🚁 DEBUG: Base height: ${baseHeight.toFixed(2)}, Final height: ${helicopterPosition.y.toFixed(2)}`);
-    console.log(`🚁 DEBUG: Helicopter children count: ${helicopter.children.length}`);
-    console.log(`🚁 DEBUG: Scene children count: ${this.scene.children.length}`);
+    Logger.debug(`🚁 ✅ Created US UH-1 Huey at position (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)})`);
+    Logger.debug(`🚁 DEBUG: Helipad position: (${helipadPosition.x.toFixed(1)}, ${helipadPosition.y.toFixed(1)}, ${helipadPosition.z.toFixed(1)})`);
+    Logger.debug(`🚁 DEBUG: Base height: ${baseHeight.toFixed(2)}, Final height: ${helicopterPosition.y.toFixed(2)}`);
+    Logger.debug(`🚁 DEBUG: Helicopter children count: ${helicopter.children.length}`);
+    Logger.debug(`🚁 DEBUG: Scene children count: ${this.scene.children.length}`);
   }
 
   private createUH1HueyGeometry(): THREE.Group {
@@ -586,12 +587,12 @@ export class HelicopterModel implements GameSystem {
 
         // Create helicopter only when we have valid terrain data and chunk is loaded
         if ((terrainHeight > -100 && isChunkLoaded) || terrainHeight > 0) {
-          console.log(`🚁 ⚡ CREATING HELICOPTER NOW! Helipad at (${helipadPosition.x}, ${helipadPosition.y}, ${helipadPosition.z}), terrain: ${terrainHeight.toFixed(2)}, chunk loaded: ${isChunkLoaded}`);
+          Logger.debug(`🚁 ⚡ CREATING HELICOPTER NOW! Helipad at (${helipadPosition.x}, ${helipadPosition.y}, ${helipadPosition.z}), terrain: ${terrainHeight.toFixed(2)}, chunk loaded: ${isChunkLoaded}`);
           this.createUSHuey();
         } else {
           // Optional: Log waiting status occasionally
           if (Math.random() < 0.01) {
-            console.log(`🚁 Waiting for terrain to load at helipad location - height: ${terrainHeight.toFixed(2)}, chunk loaded: ${isChunkLoaded}`);
+            Logger.debug(`🚁 Waiting for terrain to load at helipad location - height: ${terrainHeight.toFixed(2)}, chunk loaded: ${isChunkLoaded}`);
           }
         }
       }
@@ -609,13 +610,11 @@ export class HelicopterModel implements GameSystem {
 
   private checkPlayerProximity(): void {
     if (!this.playerController || !this.hudSystem) {
-      console.log('🚁 DEBUG: Missing systems - playerController:', !!this.playerController, 'hudSystem:', !!this.hudSystem);
       return;
     }
 
     const helicopter = this.helicopters.get('us_huey');
     if (!helicopter) {
-      console.log('🚁 DEBUG: No helicopter found in map');
       return;
     }
 
@@ -631,7 +630,7 @@ export class HelicopterModel implements GameSystem {
     // Get player position from camera (PlayerController uses camera position)
     const playerPosition = this.playerController.getPosition();
     if (!playerPosition) {
-      console.log('🚁 DEBUG: No player position available');
+      Logger.debug('🚁 DEBUG: No player position available');
       return;
     }
 
@@ -646,7 +645,7 @@ export class HelicopterModel implements GameSystem {
     // Always log distance for debugging
     if (Math.random() < 0.1) { // Log 10% of the time to avoid spam
       const fullDistance = playerPosition.distanceTo(helicopterPosition);
-      console.log(`🚁 DEBUG: Player pos: (${playerPosition.x.toFixed(1)}, ${playerPosition.y.toFixed(1)}, ${playerPosition.z.toFixed(1)}), Helicopter pos: (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)}), Horizontal distance: ${horizontalDistance.toFixed(1)}m, 3D distance: ${fullDistance.toFixed(1)}m`);
+      Logger.debug(`🚁 DEBUG: Player pos: (${playerPosition.x.toFixed(1)}, ${playerPosition.y.toFixed(1)}, ${playerPosition.z.toFixed(1)}), Helicopter pos: (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)}), Horizontal distance: ${horizontalDistance.toFixed(1)}m, 3D distance: ${fullDistance.toFixed(1)}m`);
     }
 
     const isNearNow = horizontalDistance <= this.interactionRadius;
@@ -656,10 +655,10 @@ export class HelicopterModel implements GameSystem {
       this.isPlayerNearHelicopter = isNearNow;
 
       if (this.isPlayerNearHelicopter) {
-        console.log(`🚁 ⚡ Player near helicopter (${horizontalDistance.toFixed(1)}m horizontal) - SHOWING PROMPT!`);
+        Logger.debug(`🚁 ⚡ Player near helicopter (${horizontalDistance.toFixed(1)}m horizontal) - SHOWING PROMPT!`);
         this.hudSystem.showInteractionPrompt('Press E to enter helicopter');
       } else {
-        console.log('🚁 ⚡ Player left helicopter area - HIDING PROMPT!');
+        Logger.debug('🚁 ⚡ Player left helicopter area - HIDING PROMPT!');
         this.hudSystem.hideInteractionPrompt();
       }
     }
@@ -674,13 +673,13 @@ export class HelicopterModel implements GameSystem {
 
     // Check if player is already in a helicopter
     if (this.playerController.isInHelicopter()) {
-      console.log('🚁 Player is already in a helicopter');
+      Logger.debug('🚁 Player is already in a helicopter');
       return;
     }
 
     const helicopter = this.helicopters.get('us_huey');
     if (!helicopter) {
-      console.log('🚁 No helicopter available for entry');
+      Logger.debug('🚁 No helicopter available for entry');
       return;
     }
 
@@ -698,12 +697,12 @@ export class HelicopterModel implements GameSystem {
     );
 
     if (horizontalDistance > this.interactionRadius) {
-      console.log(`🚁 Player too far from helicopter (${horizontalDistance.toFixed(1)}m) - must be within ${this.interactionRadius}m`);
+      Logger.debug(`🚁 Player too far from helicopter (${horizontalDistance.toFixed(1)}m) - must be within ${this.interactionRadius}m`);
       return;
     }
 
     // Enter the helicopter
-    console.log(`🚁 ⚡ PLAYER ENTERING HELICOPTER!`);
+    Logger.debug(`🚁 ⚡ PLAYER ENTERING HELICOPTER!`);
     this.playerController.enterHelicopter('us_huey', helicopterPosition.clone());
 
     // Hide interaction prompt
@@ -719,7 +718,7 @@ export class HelicopterModel implements GameSystem {
     }
 
     if (!this.playerController.isInHelicopter()) {
-      console.log('🚁 Player is not in a helicopter');
+      Logger.debug('🚁 Player is not in a helicopter');
       return;
     }
 
@@ -743,7 +742,7 @@ export class HelicopterModel implements GameSystem {
       exitPosition.y = Math.max(exitPosition.y, terrainHeight + 1.5); // Player height above terrain
     }
 
-    console.log(`🚁 ⚡ PLAYER EXITING HELICOPTER!`);
+    Logger.debug(`🚁 ⚡ PLAYER EXITING HELICOPTER!`);
     this.playerController.exitHelicopter(exitPosition);
   }
 
@@ -868,7 +867,7 @@ export class HelicopterModel implements GameSystem {
         rotorAudio.setMaxDistance(100); // Ensure it can be heard at reasonable distance
 
         // Don't start playing immediately - wait for control
-        console.log('🚁🔊 Helicopter rotor audio loaded and ready - volume:', rotorAudio.getVolume());
+        Logger.debug('🚁🔊 Helicopter rotor audio loaded and ready - volume:', rotorAudio.getVolume());
       },
       undefined,
       (error) => {
@@ -900,7 +899,7 @@ export class HelicopterModel implements GameSystem {
       // Player is controlling - ensure audio is playing
       if (!rotorAudio.isPlaying) {
         rotorAudio.play();
-        console.log('🚁🔊 Starting helicopter rotor audio');
+        Logger.debug('🚁🔊 Starting helicopter rotor audio');
       }
 
       // Use physics data
@@ -923,13 +922,13 @@ export class HelicopterModel implements GameSystem {
 
       // Debug logging occasionally
       if (Math.random() < 0.02) { // 2% of frames
-        console.log(`🚁🔊 Controlled Audio: collective=${controls.collective.toFixed(2)}, RPM=${state.engineRPM.toFixed(2)}, volume=${targetVolume.toFixed(2)}, rate=${targetPlaybackRate.toFixed(2)}`);
+        Logger.debug(`🚁🔊 Controlled Audio: collective=${controls.collective.toFixed(2)}, RPM=${state.engineRPM.toFixed(2)}, volume=${targetVolume.toFixed(2)}, rate=${targetPlaybackRate.toFixed(2)}`);
       }
     } else {
       // Helicopter not controlled - stop audio
       if (rotorAudio.isPlaying) {
         rotorAudio.stop();
-        console.log('🚁🔊 Stopping helicopter rotor audio');
+        Logger.debug('🚁🔊 Stopping helicopter rotor audio');
       }
       targetVolume = 0.0;
       targetPlaybackRate = 0.8;
@@ -1053,6 +1052,6 @@ export class HelicopterModel implements GameSystem {
       (this.terrainManager as any).unregisterCollisionObject('us_huey');
     }
 
-    console.log('🧹 HelicopterModel disposed');
+    Logger.debug('🧹 HelicopterModel disposed');
   }
 }

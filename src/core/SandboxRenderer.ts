@@ -119,6 +119,7 @@ export class SandboxRenderer {
     }
   }
 
+
   showCrosshair(): void {
     if (this.crosshair) return;
 
@@ -367,11 +368,19 @@ export class SandboxRenderer {
     fps: number;
     drawCalls: number;
     triangles: number;
+    geometries: number;
+    textures: number;
+    programs: number;
   } {
+    const memory = this.renderer.info.memory;
+    const render = this.renderer.info.render;
     return {
       fps: 0, // Will be calculated externally with clock
-      drawCalls: this.renderer.info.render.calls,
-      triangles: this.renderer.info.render.triangles
+      drawCalls: render.calls,
+      triangles: render.triangles,
+      geometries: memory.geometries,
+      textures: memory.textures,
+      programs: memory.programs ?? 0
     };
   }
 

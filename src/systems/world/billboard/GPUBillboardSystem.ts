@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { AssetLoader } from '../../assets/AssetLoader';
+import { Logger } from '../../../utils/Logger';
 
 // Vertex shader for GPU-based billboard instancing with LOD and culling
 const BILLBOARD_VERTEX_SHADER = `
@@ -92,6 +93,8 @@ const BILLBOARD_FRAGMENT_SHADER = `
   uniform sampler2D map;
   uniform float fadeDistance;
   uniform float maxDistance;
+  uniform vec3 colorTint;
+  uniform float gammaAdjust;
 
   varying vec2 vUv;
   varying float vDistance;
@@ -112,7 +115,8 @@ const BILLBOARD_FRAGMENT_SHADER = `
     // Apply LOD-based alpha reduction for distant objects
     fadeFactor *= (1.0 - vLodFactor * 0.3);
 
-    gl_FragColor = vec4(texColor.rgb, texColor.a * fadeFactor);
+    vec3 shaded = pow(texColor.rgb * colorTint, vec3(gammaAdjust));
+    gl_FragColor = vec4(shaded, texColor.a * fadeFactor);
   }
 `;
 
@@ -145,6 +149,7 @@ export class GPUBillboardVegetation {
   private highWaterMark = 0;
   private liveCount = 0;
   private freeSlots: number[] = [];
+  private warnedCapacity = false;
 
   constructor(scene: THREE.Scene, config: GPUVegetationConfig) {
     this.scene = scene;
@@ -187,7 +192,9 @@ export class GPUBillboardVegetation {
         fadeDistance: { value: config.fadeDistance },
         maxDistance: { value: config.maxDistance },
         lodDistances: { value: new THREE.Vector2(150, 300) },
-        viewMatrix: { value: new THREE.Matrix4() }
+        viewMatrix: { value: new THREE.Matrix4() },
+        colorTint: { value: new THREE.Color(0.65, 0.7, 0.62) },
+        gammaAdjust: { value: 1.2 }
       },
       vertexShader: BILLBOARD_VERTEX_SHADER,
       fragmentShader: BILLBOARD_FRAGMENT_SHADER,
@@ -215,8 +222,9 @@ export class GPUBillboardVegetation {
         index = this.freeSlots.pop()!;
       } else {
         if (this.highWaterMark >= this.maxInstances) {
-          if (allocatedIndices.length === 0) {
-            console.warn(`⚠️ GPU Billboard: Max instances reached (${this.highWaterMark}/${this.maxInstances})`);
+          if (!this.warnedCapacity) {
+            Logger.warn('vegetation', `Max instances reached (${this.highWaterMark}/${this.maxInstances})`);
+            this.warnedCapacity = true;
           }
           break;
         }
@@ -248,7 +256,7 @@ export class GPUBillboardVegetation {
 
     const addedCount = this.liveCount - startLiveCount;
     if (addedCount > 0) {
-      console.log(`✅ GPU Vegetation allocated ${addedCount} instances (${startLiveCount} → ${this.liveCount} live / ${this.maxInstances})`);
+      Logger.debug('vegetation', `Allocated ${addedCount} instances (${startLiveCount} → ${this.liveCount} / ${this.maxInstances})`);
     }
 
     return allocatedIndices;
@@ -275,7 +283,7 @@ export class GPUBillboardVegetation {
     this.scaleAttribute.needsUpdate = true;
     this.compactHighWaterMark();
 
-    console.log(`🔻 GPU Vegetation: Hid ${indices.length} instances (live=${this.liveCount})`);
+    Logger.debug('vegetation', `Freed ${indices.length} instances (live=${this.liveCount}, reserved=${this.highWaterMark})`);
   }
 
   private compactHighWaterMark(): void {
@@ -294,6 +302,9 @@ export class GPUBillboardVegetation {
     }
 
     this.geometry.instanceCount = this.highWaterMark;
+    if (this.highWaterMark < this.maxInstances) {
+      this.warnedCapacity = false;
+    }
   }
 
   // Get instance positions for area clearing
@@ -355,7 +366,7 @@ export class GPUBillboardSystem {
   }
 
   async initialize(): Promise<void> {
-    console.log('🚀 Initializing GPU Billboard System...');
+    Logger.info('vegetation', 'Initializing GPU billboard system');
 
     // Initialize each vegetation type with GPU instancing
     const configs: Array<[string, GPUVegetationConfig]> = [
@@ -421,11 +432,11 @@ export class GPUBillboardSystem {
       if (config.texture) {
         const vegetation = new GPUBillboardVegetation(this.scene, config);
         this.vegetationTypes.set(type, vegetation);
-        console.log(`✅ GPU Billboard ${type}: ${config.maxInstances} max instances`);
+        Logger.info('vegetation', `GPU billboard ${type} configured (max ${config.maxInstances})`);
       }
     }
 
-    console.log('✅ GPU Billboard System initialized');
+    Logger.info('vegetation', 'GPU billboard system initialized');
   }
 
   // Add instances for a chunk
@@ -485,12 +496,6 @@ export class GPUBillboardSystem {
 
     info.chunksTracked = this.chunkInstances.size;
 
-    // Log chunk keys for debugging
-    if (this.chunkInstances.size > 20) {
-      const chunkKeys = Array.from(this.chunkInstances.keys());
-      console.warn(`⚠️ GPU: Tracking ${this.chunkInstances.size} chunks:`, chunkKeys.slice(0, 10), '...');
-    }
-
     return info;
   }
 
@@ -498,7 +503,7 @@ export class GPUBillboardSystem {
    * Clear vegetation instances in a specific area
    */
   clearInstancesInArea(centerX: number, centerZ: number, radius: number): void {
-    console.log(`🗑️ GPU: Clearing vegetation in ${radius}m radius around (${centerX}, ${centerZ})`);
+    Logger.info('vegetation', `Clearing vegetation radius=${radius} around (${centerX}, ${centerZ})`);
 
     let totalCleared = 0;
 
@@ -518,14 +523,14 @@ export class GPUBillboardSystem {
         }
       }
 
-      if (indicesToRemove.length > 0) {
-        vegetation.removeInstances(indicesToRemove);
-        totalCleared += indicesToRemove.length;
-        console.log(`🗑️ GPU: Removed ${indicesToRemove.length} ${type} instances`);
-      }
+        if (indicesToRemove.length > 0) {
+          vegetation.removeInstances(indicesToRemove);
+          totalCleared += indicesToRemove.length;
+          Logger.debug('vegetation', `Removed ${indicesToRemove.length} ${type} instances`);
+        }
     });
 
-    console.log(`🗑️ GPU: Total vegetation instances cleared: ${totalCleared}`);
+    Logger.info('vegetation', `Cleared ${totalCleared} vegetation instances`);
   }
 
   // Dispose all resources

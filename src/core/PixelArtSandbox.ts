@@ -6,12 +6,15 @@ import { SandboxSystemManager } from './SandboxSystemManager';
 import { SandboxRenderer } from './SandboxRenderer';
 import { GameMode } from '../config/gameModes';
 import { PerformanceOverlay } from '../ui/debug/PerformanceOverlay';
+import { LogOverlay } from '../ui/debug/LogOverlay';
+import { Logger } from '../utils/Logger';
 
 export class PixelArtSandbox {
   private loadingScreen: LoadingScreen;
   private sandboxRenderer: SandboxRenderer;
   private systemManager: SandboxSystemManager;
   private performanceOverlay: PerformanceOverlay;
+  private logOverlay: LogOverlay;
 
   private clock = new THREE.Clock();
   private isInitialized = false;
@@ -29,6 +32,7 @@ export class PixelArtSandbox {
     this.sandboxRenderer = new SandboxRenderer();
     this.systemManager = new SandboxSystemManager();
     this.performanceOverlay = new PerformanceOverlay();
+    this.logOverlay = new LogOverlay();
 
     this.setupEventListeners();
     this.setupMenuCallbacks();
@@ -52,6 +56,8 @@ export class PixelArtSandbox {
         this.adjustPixelSize(-1);
       } else if (event.key === ']') {
         this.adjustPixelSize(1);
+      } else if (event.key === 'F3') {
+        this.toggleLogOverlay();
       } else if (event.key === 'k' || event.key === 'K') {
         // Voluntary respawn with K key
         if (this.gameStarted) {
@@ -215,12 +221,27 @@ export class PixelArtSandbox {
     const debugInfo = this.systemManager.globalBillboardSystem.getDebugInfo();
     const perfStats = this.sandboxRenderer.getPerformanceStats();
     const combatStats = this.systemManager.combatantSystem.getCombatStats();
+    const logStats = Logger.getStats();
+    const combatTelemetry = this.systemManager.combatantSystem
+      ? this.systemManager.combatantSystem.getTelemetry()
+      : {
+          lastMs: 0,
+          emaMs: 0,
+          lodHigh: 0,
+          lodMedium: 0,
+          lodLow: 0,
+          lodCulled: 0,
+          combatantCount: 0
+        };
 
     console.log('📊 Performance Stats:');
     const fps = 1 / Math.max(0.0001, this.lastFrameDelta);
     console.log(`FPS: ${Math.round(fps)}`);
     console.log(`Draw calls: ${perfStats.drawCalls}`);
     console.log(`Triangles: ${perfStats.triangles}`);
+    console.log(`Memory: geometries=${perfStats.geometries}, textures=${perfStats.textures}, programs=${perfStats.programs}`);
+    console.log(`Combat update: last=${combatTelemetry.lastMs.toFixed(2)}ms avg=${combatTelemetry.emaMs.toFixed(2)}ms`);
+    console.log(`LOD counts: high=${combatTelemetry.lodHigh}, medium=${combatTelemetry.lodMedium}, low=${combatTelemetry.lodLow}, culled=${combatTelemetry.lodCulled}`);
     const vegetationActive = Object.entries(debugInfo)
       .filter(([key]) => key.endsWith('Active'))
       .reduce((sum, [, value]) => sum + (value as number), 0);
@@ -233,6 +254,7 @@ export class PixelArtSandbox {
                 `Queue: ${this.systemManager.chunkManager.getQueueSize()}, ` +
                 `Loading: ${this.systemManager.chunkManager.getLoadingCount()}`);
     console.log(`Chunks tracked: ${debugInfo.chunksTracked}`);
+    console.log(`Logs suppressed (total): ${logStats.suppressedTotal}`);
   }
 
   private toggleRealtimeStatsOverlay(): void {
@@ -246,6 +268,10 @@ export class PixelArtSandbox {
     const enabled = !this.sandboxRenderer.postProcessing.isEnabled();
     this.sandboxRenderer.postProcessing.setEnabled(enabled);
     console.log(`🎨 Post-processing ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  private toggleLogOverlay(): void {
+    this.logOverlay.toggle();
   }
 
   private currentPixelSize = 1; // Start at 1 for best quality
@@ -278,6 +304,7 @@ export class PixelArtSandbox {
 - Right Click: Aim Down Sights
 - F1: Performance stats
 - F2: Toggle performance overlay
+- F3: Toggle log overlay
 - Escape: Release mouse lock
 
 Have fun!
@@ -346,6 +373,7 @@ Have fun!
     renderer.autoClear = currentAutoClear;
 
     this.updatePerformanceOverlay(deltaTime);
+    this.updateLogOverlay();
   }
 
   private updatePerformanceOverlay(deltaTime: number): void {
@@ -357,6 +385,18 @@ Have fun!
     const chunkQueue = this.systemManager.chunkManager.getQueueSize();
     const loadedChunks = this.systemManager.chunkManager.getLoadedChunkCount();
     const fps = 1 / Math.max(0.0001, deltaTime);
+    const logStats = Logger.getStats();
+    const combatTelemetry = this.systemManager.combatantSystem
+      ? this.systemManager.combatantSystem.getTelemetry()
+      : {
+          lastMs: 0,
+          emaMs: 0,
+          lodHigh: 0,
+          lodMedium: 0,
+          lodLow: 0,
+          lodCulled: 0,
+          combatantCount: 0
+        };
     const vegetationActive = Object.entries(debugInfo)
       .filter(([key]) => key.endsWith('Active'))
       .reduce((sum, [, value]) => sum + (value as number), 0);
@@ -369,13 +409,34 @@ Have fun!
       frameTimeMs: deltaTime * 1000,
       drawCalls: perfStats.drawCalls,
       triangles: perfStats.triangles,
+      geometries: perfStats.geometries,
+      textures: perfStats.textures,
+      programs: perfStats.programs,
       chunkQueueSize: chunkQueue,
       loadedChunks,
       usCombatants: combatStats.us,
       opforCombatants: combatStats.opfor,
       vegetationActive,
-      vegetationReserved
+      vegetationReserved,
+      suppressedLogs: logStats.suppressedTotal,
+      geometries: perfStats.geometries,
+      textures: perfStats.textures,
+      programs: perfStats.programs,
+      combatLastMs: combatTelemetry.lastMs,
+      combatEmaMs: combatTelemetry.emaMs,
+      combatLodHigh: combatTelemetry.lodHigh,
+      combatLodMedium: combatTelemetry.lodMedium,
+      combatLodLow: combatTelemetry.lodLow,
+      combatLodCulled: combatTelemetry.lodCulled,
+      combatantCount: combatTelemetry.combatantCount
     });
+  }
+
+  private updateLogOverlay(): void {
+    if (!this.logOverlay.isVisible()) return;
+
+    const recent = Logger.getRecent(12);
+    this.logOverlay.update(recent);
   }
 
   public dispose(): void {
@@ -383,6 +444,7 @@ Have fun!
     this.sandboxRenderer.dispose();
     this.systemManager.dispose();
     this.performanceOverlay.dispose();
+    this.logOverlay.dispose();
     console.log('🧹 Sandbox disposed');
   }
 }

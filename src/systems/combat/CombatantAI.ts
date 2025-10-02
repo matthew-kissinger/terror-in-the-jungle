@@ -69,7 +69,6 @@ export class CombatantAI {
           const rangeDelay = Math.floor(distance / 30) * 250;
           combatant.reactionTimer = (combatant.skillProfile.reactionDelayMs + rangeDelay) / 1000;
           combatant.alertTimer = 1.5;
-          console.log(`🎯 ${combatant.faction} soldier spotted enemy at ${Math.round(distance)}m!`);
         }
       }
     }
@@ -167,7 +166,7 @@ export class CombatantAI {
       if (this.canSeeTarget(combatant, combatant.target, playerPosition)) {
         combatant.state = CombatantState.ENGAGING;
         combatant.currentBurst = 0;
-        console.log(`🔫 ${combatant.faction} soldier engaging!`);
+        
       } else {
         combatant.state = CombatantState.PATROLLING;
         combatant.target = null;

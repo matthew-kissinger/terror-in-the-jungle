@@ -12,6 +12,7 @@ import { PlayerHealthSystem } from '../player/PlayerHealthSystem';
 import { ZoneManager, ZoneState } from '../world/ZoneManager';
 import { AudioManager } from '../audio/AudioManager';
 import { GameModeManager } from '../world/GameModeManager';
+import { Logger } from '../../utils/Logger';
 
 // Refactored modules
 import { CombatantFactory } from './CombatantFactory';
@@ -47,6 +48,15 @@ export class CombatantSystem implements GameSystem {
 
   // Combatant management
   private combatants: Map<string, Combatant> = new Map();
+  private readonly scratchCombatants: Combatant[] = [];
+  private readonly scratchVector = new THREE.Vector3();
+  private lodHighCount = 0;
+  private lodMediumCount = 0;
+  private lodLowCount = 0;
+  private lodCulledCount = 0;
+  private updateLastMs = 0;
+  private updateEmaMs = 0;
+  private readonly UPDATE_EMA_ALPHA = 0.1;
   private pendingRespawns: Array<{squadId: string, respawnTime: number, originalId: string}> = [];
 
   // Player tracking
@@ -263,11 +273,16 @@ export class CombatantSystem implements GameSystem {
     // Update player position
     this.camera.getWorldPosition(this.playerPosition);
 
+    const updateStart = performance.now();
+
     if (!this.combatEnabled) {
       // Still update positions and billboards for visual consistency
       this.updateCombatants(deltaTime);
       this.combatantRenderer.updateBillboards(this.combatants, this.playerPosition);
       this.combatantRenderer.updateShaderUniforms(deltaTime);
+      const duration = performance.now() - updateStart;
+      this.updateLastMs = duration;
+      this.updateEmaMs = this.updateEmaMs * (1 - this.UPDATE_EMA_ALPHA) + duration * this.UPDATE_EMA_ALPHA;
       return;
     }
 
@@ -281,7 +296,7 @@ export class CombatantSystem implements GameSystem {
         this.progressiveSpawnTimer = 0;
         const spawn = this.progressiveSpawnQueue.shift()!;
         this.spawnSquad(spawn.faction, spawn.position, spawn.size);
-        console.log(`🎖️ Reinforcements: ${spawn.faction} squad of ${spawn.size} deployed`);
+        Logger.debug('combat', `Reinforcements deployed: ${spawn.faction} squad size ${spawn.size}`);
       }
     }
 
@@ -313,6 +328,10 @@ export class CombatantSystem implements GameSystem {
     this.tracerPool.update();
     this.muzzleFlashPool.update();
     this.impactEffectsPool.update(deltaTime);
+
+    const duration = performance.now() - updateStart;
+    this.updateLastMs = duration;
+    this.updateEmaMs = this.updateEmaMs * (1 - this.UPDATE_EMA_ALPHA) + duration * this.UPDATE_EMA_ALPHA;
   }
 
   // Reseed forces when switching game modes to honor new HQ layouts and caps
@@ -337,10 +356,15 @@ export class CombatantSystem implements GameSystem {
   }
 
   private updateCombatants(deltaTime: number): void {
-    // Sort combatants by distance for LOD
-    const sortedCombatants = Array.from(this.combatants.values()).sort((a, b) => {
-      const distA = a.position.distanceTo(this.playerPosition);
-      const distB = b.position.distanceTo(this.playerPosition);
+    // Reuse scratch array to avoid per-frame allocations
+    this.scratchCombatants.length = 0;
+    this.combatants.forEach(combatant => {
+      this.scratchCombatants.push(combatant);
+    });
+
+    this.scratchCombatants.sort((a, b) => {
+      const distA = a.position.distanceToSquared(this.playerPosition);
+      const distB = b.position.distanceToSquared(this.playerPosition);
       return distA - distB;
     });
 
@@ -348,15 +372,21 @@ export class CombatantSystem implements GameSystem {
     const worldSize = this.gameModeManager?.getWorldSize() || 4000;
     const maxProcessingDistance = worldSize > 1000 ? 800 : 500; // Scale processing distance with world size
 
-    sortedCombatants.forEach(combatant => {
+    this.lodHighCount = 0;
+    this.lodMediumCount = 0;
+    this.lodLowCount = 0;
+    this.lodCulledCount = 0;
+
+    this.scratchCombatants.forEach(combatant => {
       const distance = combatant.position.distanceTo(this.playerPosition);
 
       // Skip update entirely if off-map (chunk likely not loaded). Minimal maintenance only.
       if (Math.abs(combatant.position.x) > worldSize ||
           Math.abs(combatant.position.z) > worldSize) {
         // Nudge toward map center slowly so off-map agents don't explode simulation cost
-        const toCenter = new THREE.Vector3(-Math.sign(combatant.position.x), 0, -Math.sign(combatant.position.z));
-        combatant.position.addScaledVector(toCenter, 0.2 * deltaTime);
+        this.scratchVector.set(-Math.sign(combatant.position.x), 0, -Math.sign(combatant.position.z));
+        combatant.position.addScaledVector(this.scratchVector, 0.2 * deltaTime);
+        this.lodCulledCount++;
         return;
       }
 
@@ -365,6 +395,7 @@ export class CombatantSystem implements GameSystem {
 
       if (distance > COMBAT_RANGE) {
         combatant.lodLevel = 'culled';
+        this.lodCulledCount++;
         // Just teleport them toward random zones occasionally
         const elapsedMs = now - (combatant.lastUpdateTime || 0);
         if (elapsedMs > 30000) { // Update every 30 seconds
@@ -384,9 +415,11 @@ export class CombatantSystem implements GameSystem {
 
       if (distance < highLODRange) {
         combatant.lodLevel = 'high';
+        this.lodHighCount++;
         this.updateCombatantFull(combatant, deltaTime);
       } else if (distance < mediumLODRange) {
         combatant.lodLevel = 'medium';
+        this.lodMediumCount++;
         const elapsedMs = now - (combatant.lastUpdateTime || 0);
         if (elapsedMs > dynamicIntervalMs) {
           const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, 1.0) : deltaTime;
@@ -395,6 +428,7 @@ export class CombatantSystem implements GameSystem {
         }
       } else if (distance < lowLODRange) {
         combatant.lodLevel = 'low';
+        this.lodLowCount++;
         const elapsedMs = now - (combatant.lastUpdateTime || 0);
         if (elapsedMs > dynamicIntervalMs) {
           const maxEff = Math.min(2.0, dynamicIntervalMs / 1000 * 2);
@@ -405,6 +439,7 @@ export class CombatantSystem implements GameSystem {
       } else {
         // Very far: still update basic movement infrequently to keep world alive
         combatant.lodLevel = 'culled';
+        this.lodCulledCount++;
         const elapsedMs = now - (combatant.lastUpdateTime || 0);
         if (elapsedMs > dynamicIntervalMs) {
           // Allow larger effective delta for far agents to cover ground decisively
@@ -873,25 +908,25 @@ export class CombatantSystem implements GameSystem {
   // Game mode configuration methods
   setMaxCombatants(max: number): void {
     this.MAX_COMBATANTS = max;
-    console.log(`🎮 Max combatants set to ${max}`);
+    Logger.info('combat', `Max combatants set to ${max}`);
   }
 
   setSquadSizes(min: number, max: number): void {
     // Store for future squad spawning
     (this as any).squadSizeMin = min;
     (this as any).squadSizeMax = max;
-    console.log(`🎮 Squad sizes set to ${min}-${max}`);
+    Logger.info('combat', `Squad sizes set to ${min}-${max}`);
   }
 
   setReinforcementInterval(interval: number): void {
     this.SPAWN_CHECK_INTERVAL = Math.max(5, interval) * 1000;
     this.reinforcementWaveIntervalSeconds = Math.max(5, interval);
-    console.log(`🎮 Reinforcement interval set to ${interval} seconds`);
+    Logger.info('combat', `Reinforcement interval set to ${interval} seconds`);
   }
 
   enableCombat(): void {
     this.combatEnabled = true;
-    console.log('⚔️ Combat AI activated');
+    Logger.info('combat', 'Combat AI activated');
   }
 
   // Get the renderer for external configuration
@@ -961,6 +996,25 @@ export class CombatantSystem implements GameSystem {
       }
     }
   }
+  getTelemetry(): {
+    lastMs: number;
+    emaMs: number;
+    lodHigh: number;
+    lodMedium: number;
+    lodLow: number;
+    lodCulled: number;
+    combatantCount: number;
+  } {
+    return {
+      lastMs: this.updateLastMs,
+      emaMs: this.updateEmaMs,
+      lodHigh: this.lodHighCount,
+      lodMedium: this.lodMediumCount,
+      lodLow: this.lodLowCount,
+      lodCulled: this.lodCulledCount,
+      combatantCount: this.combatants.size
+    };
+  }
 
 
   dispose(): void {
@@ -976,6 +1030,6 @@ export class CombatantSystem implements GameSystem {
     // Clear combatants
     this.combatants.clear();
 
-    console.log('🧹 Combatant System disposed');
+    Logger.info('combat', 'Combatant system disposed');
   }
 }

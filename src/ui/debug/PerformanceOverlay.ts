@@ -9,6 +9,17 @@ export interface PerformanceStats {
   opforCombatants: number;
   vegetationActive: number;
   vegetationReserved: number;
+  suppressedLogs: number;
+  geometries: number;
+  textures: number;
+  programs: number;
+  combatLastMs: number;
+  combatEmaMs: number;
+  combatLodHigh: number;
+  combatLodMedium: number;
+  combatLodLow: number;
+  combatLodCulled: number;
+  combatantCount: number;
 }
 
 export class PerformanceOverlay {
@@ -67,7 +78,11 @@ export class PerformanceOverlay {
       `Triangles: ${stats.triangles.toLocaleString()}`,
       `Chunks: ${stats.loadedChunks} (queue ${stats.chunkQueueSize})`,
       `Combatants: US ${stats.usCombatants} / OPFOR ${stats.opforCombatants}`,
-      `Vegetation: ${stats.vegetationActive} active / ${stats.vegetationReserved} reserved`
+      `Vegetation: ${stats.vegetationActive} active / ${stats.vegetationReserved} reserved`,
+      `Combat: last ${stats.combatLastMs.toFixed(2)} ms (avg ${stats.combatEmaMs.toFixed(2)} ms)`,
+      `LOD: high ${stats.combatLodHigh} / med ${stats.combatLodMedium} / low ${stats.combatLodLow} / culled ${stats.combatLodCulled} (total ${stats.combatantCount})`,
+      `Memory: geom ${stats.geometries} / tex ${stats.textures} / prog ${stats.programs}`,
+      `Logs suppressed: ${stats.suppressedLogs}`
     ];
 
     this.container.innerText = text.join('\n');

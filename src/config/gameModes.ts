@@ -64,7 +64,7 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
   description: 'Fast-paced combat over 3 strategic zones. Control the majority to drain enemy tickets.',
 
   worldSize: 400,
-  chunkRenderDistance: 8,
+  chunkRenderDistance: 6,
 
   maxTickets: 300,
   matchDuration: 180, // 3 minutes
@@ -143,7 +143,7 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
   description: 'Large-scale warfare across 10 zones. Spawn at any controlled position and fight for map dominance.',
 
   worldSize: 3200, // ~2x2 miles
-  chunkRenderDistance: 12,
+  chunkRenderDistance: 10,
 
   maxTickets: 1000,
   matchDuration: 900, // 15 minutes

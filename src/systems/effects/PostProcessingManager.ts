@@ -7,6 +7,7 @@ import {
   SMAAPreset
 } from 'postprocessing';
 import { PixelationPass } from './PixelationPass';
+import { Logger } from '../../utils/Logger';
 
 export class PostProcessingManager {
   private composer: EffectComposer;
@@ -46,7 +47,7 @@ export class PostProcessingManager {
     smaaPass.renderToScreen = true;
     this.composer.addPass(smaaPass);
 
-    console.log('🎨 Post-processing initialized with pixelation and outline effects');
+    Logger.info('render', 'Post-processing passes configured (pixelation + SMAA)');
   }
 
   render(deltaTime: number): void {

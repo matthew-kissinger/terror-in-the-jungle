@@ -5,6 +5,7 @@ import { ImprovedChunk } from './ImprovedChunk';
 import { NoiseGenerator } from '../../utils/NoiseGenerator';
 import { AssetLoader } from '../assets/AssetLoader';
 import { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
+import { Logger } from '../../utils/Logger';
 
 export interface ChunkConfig {
   size: number;
@@ -43,7 +44,7 @@ export class ImprovedChunkManager implements GameSystem {
   private readonly MAX_CHUNKS_PER_FRAME = 1; // Limit ingestion to reduce spikes
   private readonly IN_FRAME_BUDGET_MS = 2.0;
   private readonly IDLE_BUDGET_MS = 6.0;
-  private readonly MAX_QUEUE_SIZE = 96;
+  private readonly MAX_QUEUE_SIZE = 48;
   private loaderHandle: number | null = null;
   private readonly LOAD_DELAY_FALLBACK = 100;
 
@@ -72,13 +73,13 @@ export class ImprovedChunkManager implements GameSystem {
     this.config = config;
     this.noiseGenerator = new NoiseGenerator(12345);
     this.maxRenderDistance = config.renderDistance;
-    this.minRenderDistance = Math.max(4, config.renderDistance - 2);
+    this.minRenderDistance = Math.max(3, Math.floor(config.renderDistance / 2));
   }
 
   async init(): Promise<void> {
-    console.log('🗺️ Improved ChunkManager: Initializing...');
+    Logger.info('chunks', 'Initializing improved chunk manager');
     const maxChunks = (this.config.loadDistance * 2 + 1) ** 2;
-    console.log(`Config: render=${this.config.renderDistance}, load=${this.config.loadDistance}, max chunks=${maxChunks}, chunk size=${this.config.size}`);
+    Logger.debug('chunks', `Config render=${this.config.renderDistance}, load=${this.config.loadDistance}, max=${maxChunks}, size=${this.config.size}`);
     
     // Start with smaller immediate area to reduce initial load
     const initialChunks = this.getChunksInRadius(new THREE.Vector3(0, 0, 0), 1);
@@ -88,7 +89,7 @@ export class ImprovedChunkManager implements GameSystem {
       await this.loadChunkImmediate(x, z);
     }
     
-    console.log('✅ ImprovedChunkManager: Ready with initial chunks');
+    Logger.info('chunks', 'Initial chunks generated');
     this.updateLoadQueue();
   }
 
@@ -99,10 +100,10 @@ export class ImprovedChunkManager implements GameSystem {
     // Adapt render distance gradually to maintain stability
     const nowMs = performance.now();
     if (nowMs - this.lastAdaptTime > this.ADAPT_COOLDOWN_MS) {
-      if (this.fpsEma < 28 && this.config.renderDistance > this.minRenderDistance) {
+      if (this.fpsEma < 55 && this.config.renderDistance > this.minRenderDistance) {
         this.setRenderDistance(this.config.renderDistance - 1);
         this.lastAdaptTime = nowMs;
-      } else if (this.fpsEma > 55 && this.config.renderDistance < this.maxRenderDistance) {
+      } else if (this.fpsEma > 65 && this.config.renderDistance < this.maxRenderDistance) {
         this.setRenderDistance(this.config.renderDistance + 1);
         this.lastAdaptTime = nowMs;
       }
@@ -135,7 +136,7 @@ export class ImprovedChunkManager implements GameSystem {
     this.chunks.clear();
     this.loadingChunks.clear();
     this.loadQueue = [];
-    console.log('🧹 ImprovedChunkManager: Disposed');
+    Logger.info('chunks', 'Chunk manager disposed');
   }
 
   updatePlayerPosition(position: THREE.Vector3): void {
@@ -252,7 +253,7 @@ export class ImprovedChunkManager implements GameSystem {
 
       await chunk.generate();
       this.chunks.set(chunkKey, chunk);
-      console.log(`✅ Loaded initial chunk (${chunkX}, ${chunkZ})`);
+      Logger.debug('chunks', `Loaded initial chunk (${chunkX}, ${chunkZ})`);
     } catch (error) {
       console.error(`❌ Failed to load chunk (${chunkX}, ${chunkZ}):`, error);
     }
@@ -286,10 +287,10 @@ export class ImprovedChunkManager implements GameSystem {
         // Only add if still needed (player might have moved away)
         if (currentDistance <= this.config.loadDistance) {
           this.chunks.set(chunkKey, chunk);
-          console.log(`📦 Async loaded chunk (${chunkX}, ${chunkZ})`);
+          Logger.debug('chunks', `Async loaded chunk (${chunkX}, ${chunkZ})`);
         } else {
           chunk.dispose();
-          console.log(`🗑️ Disposed unneeded chunk (${chunkX}, ${chunkZ})`);
+          Logger.debug('chunks', `Disposed unneeded chunk (${chunkX}, ${chunkZ})`);
         }
       } catch (error) {
         console.error(`❌ Failed to load chunk (${chunkX}, ${chunkZ}):`, error);
@@ -318,7 +319,7 @@ export class ImprovedChunkManager implements GameSystem {
         this.globalBillboardSystem.removeChunkInstances(key);
         chunk.dispose();
         this.chunks.delete(key);
-        console.log(`🗑️ Unloaded chunk ${key} (${this.chunks.size - 1} chunks remain)`);
+        Logger.debug('chunks', `Unloaded chunk ${key} (remaining=${this.chunks.size - 1})`);
       }
     });
   }
@@ -403,7 +404,7 @@ export class ImprovedChunkManager implements GameSystem {
    */
   registerCollisionObject(id: string, object: THREE.Object3D): void {
     this.collisionObjects.set(id, object);
-    console.log(`🔷 Registered collision object: ${id}`);
+    Logger.debug('chunks', `Registered collision object: ${id}`);
   }
 
   /**
@@ -411,7 +412,7 @@ export class ImprovedChunkManager implements GameSystem {
    */
   unregisterCollisionObject(id: string): void {
     this.collisionObjects.delete(id);
-    console.log(`🔶 Unregistered collision object: ${id}`);
+    Logger.debug('chunks', `Unregistered collision object: ${id}`);
   }
 
   /**
@@ -427,7 +428,7 @@ export class ImprovedChunkManager implements GameSystem {
       const objectHeight = this.getObjectHeightAt(object, x, z);
       if (objectHeight > 0) {
         objectContributions++;
-        console.log(`🔷 Object ${id} contributes height ${objectHeight.toFixed(2)} at (${x.toFixed(1)}, ${z.toFixed(1)})`);
+        Logger.debug('chunks', `Collision object ${id} height ${objectHeight.toFixed(2)} at (${x.toFixed(1)}, ${z.toFixed(1)})`);
       }
       if (objectHeight > maxHeight) {
         maxHeight = objectHeight;
@@ -435,7 +436,7 @@ export class ImprovedChunkManager implements GameSystem {
     });
 
     if (objectContributions > 0) {
-      console.log(`🎯 Final height at (${x.toFixed(1)}, ${z.toFixed(1)}): terrain=${terrainHeight.toFixed(2)}, final=${maxHeight.toFixed(2)}`);
+      Logger.debug('chunks', `Height sample (${x.toFixed(1)}, ${z.toFixed(1)}): terrain=${terrainHeight.toFixed(2)} final=${maxHeight.toFixed(2)}`);
     }
 
     return maxHeight;
@@ -544,7 +545,7 @@ export class ImprovedChunkManager implements GameSystem {
   setRenderDistance(distance: number): void {
     this.config.renderDistance = distance;
     this.config.loadDistance = distance + 1;
-    console.log(`🎮 Chunk render distance set to ${distance}`);
+    Logger.info('chunks', `Render distance set to ${distance}`);
     // Trigger chunk reload
     this.updateLoadQueue();
   }
