@@ -414,6 +414,14 @@ export class FirstPersonWeapon implements GameSystem {
         // Check if it's a kill or normal hit
         const hitType = (result as any).killed ? 'kill' : (result as any).headshot ? 'headshot' : 'normal';
         this.hudSystem.showHitMarker(hitType);
+
+        // Spawn damage number
+        const damageDealt = (result as any).damage || 0;
+        const isHeadshot = (result as any).headshot || false;
+        const isKill = (result as any).killed || false;
+        if (damageDealt > 0) {
+          this.hudSystem.spawnDamageNumber(result.point, damageDealt, isHeadshot, isKill);
+        }
       }
     }
 
@@ -438,7 +446,11 @@ export class FirstPersonWeapon implements GameSystem {
     // Visual recoil: kick weapon and camera slightly, and persist kick via controller
     const kick = this.gunCore.getRecoilOffsetDeg();
     // Fixed: positive pitch makes the aim go UP (as it should with recoil)
-    if (this.playerController) this.playerController.applyRecoil(THREE.MathUtils.degToRad(kick.pitch), THREE.MathUtils.degToRad(kick.yaw));
+    if (this.playerController) {
+      this.playerController.applyRecoil(THREE.MathUtils.degToRad(kick.pitch), THREE.MathUtils.degToRad(kick.yaw));
+      // Apply screen shake for impact feedback (subtle for rifle)
+      this.playerController.applyScreenShake(0.35);
+    }
     // Apply recoil impulse to weapon spring system (moderate recoil)
     if (this.weaponRig) {
       // Add impulse to velocity for spring physics

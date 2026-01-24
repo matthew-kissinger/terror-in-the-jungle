@@ -36,6 +36,12 @@ export class PlayerController implements GameSystem {
   private yaw = Math.PI; // Face toward negative X (opposite of yaw=0)
   private maxPitch = Math.PI / 2 - 0.1; // Prevent full vertical rotation
 
+  // Screen shake for impact feedback
+  private screenShakeIntensity = 0;
+  private screenShakeDecay = 0.95; // How quickly shake fades (0-1, lower = faster)
+  private screenShakeOffsetX = 0;
+  private screenShakeOffsetY = 0;
+
   // Helicopter camera settings - chase cam style
   private helicopterCameraDistance = 25; // Distance behind helicopter for full view
   private helicopterCameraHeight = 8; // Height above helicopter for good overview
@@ -109,8 +115,15 @@ export class PlayerController implements GameSystem {
     // Update weapon-specific systems
     if (this.currentWeaponMode === WeaponSlot.SANDBAG && this.sandbagSystem) {
       this.sandbagSystem.updatePreviewPosition(this.camera);
-    } else if (this.currentWeaponMode === WeaponSlot.GRENADE && this.grenadeSystem && this.grenadeSystem.isCurrentlyAiming()) {
-      this.grenadeSystem.updateArc();
+    } else if (this.currentWeaponMode === WeaponSlot.GRENADE && this.grenadeSystem) {
+      if (this.grenadeSystem.isCurrentlyAiming()) {
+        this.grenadeSystem.updateArc();
+        // Update power meter in HUD
+        if (this.hudSystem) {
+          const aimingState = this.grenadeSystem.getAimingState();
+          this.hudSystem.updateGrenadePower(aimingState.power);
+        }
+      }
     // Mortar system disabled - to be reimplemented
     // } else if (this.currentWeaponMode === WeaponSlot.MORTAR && this.mortarSystem && this.mortarSystem.isCurrentlyAiming()) {
     //   this.mortarSystem.updateArc();
@@ -290,6 +303,9 @@ export class PlayerController implements GameSystem {
       case WeaponSlot.GRENADE:
         if (event.button === 0 && this.grenadeSystem) {
           this.grenadeSystem.startAiming();
+          if (this.hudSystem) {
+            this.hudSystem.showGrenadePowerMeter();
+          }
         }
         break;
 
@@ -313,6 +329,9 @@ export class PlayerController implements GameSystem {
       case WeaponSlot.GRENADE:
         if (event.button === 0 && this.grenadeSystem) {
           this.grenadeSystem.throwGrenade();
+          if (this.hudSystem) {
+            this.hudSystem.hideGrenadePowerMeter();
+          }
         }
         break;
 
@@ -543,10 +562,26 @@ export class PlayerController implements GameSystem {
       this.mouseMovement.y = 0;
     }
 
-    // Apply rotation to camera
+    // Update and decay screen shake
+    if (this.screenShakeIntensity > 0.001) {
+      // Generate random shake offsets within current intensity bounds
+      const maxShakeRad = THREE.MathUtils.degToRad(this.screenShakeIntensity * 0.5); // Max 0.5 deg per unit intensity
+      this.screenShakeOffsetX = (Math.random() - 0.5) * 2 * maxShakeRad;
+      this.screenShakeOffsetY = (Math.random() - 0.5) * 2 * maxShakeRad;
+
+      // Decay intensity each frame
+      this.screenShakeIntensity *= this.screenShakeDecay;
+    } else {
+      // Stop shaking when intensity is negligible
+      this.screenShakeIntensity = 0;
+      this.screenShakeOffsetX = 0;
+      this.screenShakeOffsetY = 0;
+    }
+
+    // Apply rotation to camera with shake offsets
     this.camera.rotation.order = 'YXZ';
-    this.camera.rotation.y = this.yaw;
-    this.camera.rotation.x = this.pitch;
+    this.camera.rotation.y = this.yaw + this.screenShakeOffsetX;
+    this.camera.rotation.x = this.pitch + this.screenShakeOffsetY;
 
     // Update camera position
     this.camera.position.copy(this.playerState.position);
@@ -629,6 +664,12 @@ export class PlayerController implements GameSystem {
   applyRecoil(pitchDeltaRad: number, yawDeltaRad: number): void {
     this.pitch = MathUtils.clamp(this.pitch + pitchDeltaRad, -this.maxPitch, this.maxPitch);
     this.yaw += yawDeltaRad;
+  }
+
+  // Apply screen shake for impact feedback (e.g., weapon fire, explosions)
+  applyScreenShake(intensity: number): void {
+    // Accumulate shake intensity, capping at a reasonable maximum
+    this.screenShakeIntensity = Math.min(this.screenShakeIntensity + intensity, 1.0);
   }
 
   setPosition(position: THREE.Vector3): void {
