@@ -15,6 +15,7 @@ export class HUDSystem implements GameSystem {
   private zoneManager?: ZoneManager;
   private ticketSystem?: TicketSystem;
   private playerHealthSystem?: any;
+  private grenadeSystem?: any;
   private camera?: any;
 
   private styles: HUDStyles;
@@ -77,6 +78,17 @@ export class HUDSystem implements GameSystem {
         this.ticketSystem.getTickets(Faction.US),
         this.ticketSystem.getTickets(Faction.OPFOR)
       );
+    }
+
+    // Update grenade power meter
+    if (this.grenadeSystem) {
+      const aimingState = this.grenadeSystem.getAimingState();
+      if (aimingState.isAiming) {
+        this.elements.showGrenadePowerMeter();
+        this.elements.updateGrenadePower(aimingState.power);
+      } else {
+        this.elements.hideGrenadePowerMeter();
+      }
     }
 
     // Update kill feed
@@ -150,6 +162,10 @@ export class HUDSystem implements GameSystem {
     system.setGameEndCallback((winner: Faction, gameState: GameState) => {
       this.handleGameEnd(winner, gameState);
     });
+  }
+
+  setGrenadeSystem(system: any): void {
+    this.grenadeSystem = system;
   }
 
   updateTickets(usTickets: number, opforTickets: number): void {
