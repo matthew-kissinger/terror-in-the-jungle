@@ -160,30 +160,6 @@ export class HUDUpdater {
       ${timeText ? `<div class="time-remaining">${timeText}</div>` : ''}
       ${bleedText ? `<div class="bleed-indicator">${bleedText}</div>` : ''}
     `;
-
-    // Show victory screen if game ended
-    if (gameState.phase === 'ENDED' && !document.querySelector('.victory-screen')) {
-      this.showVictoryScreen(gameState.winner!, ticketSystem);
-    }
-  }
-
-  private showVictoryScreen(winner: Faction, ticketSystem: TicketSystem): void {
-    const victoryScreen = document.createElement('div');
-    victoryScreen.className = `victory-screen victory-${winner.toLowerCase()}`;
-
-    victoryScreen.innerHTML = `
-      <div style="font-size: 48px; margin-bottom: 20px;">${winner} VICTORY!</div>
-      <div style="font-size: 18px; margin-bottom: 10px;">Final Scores:</div>
-      <div style="font-size: 24px;">
-        US: ${Math.round(ticketSystem.getTickets(Faction.US))} |
-        OPFOR: ${Math.round(ticketSystem.getTickets(Faction.OPFOR))}
-      </div>
-      <div style="font-size: 14px; margin-top: 20px; opacity: 0.7;">
-        Press F5 to restart
-      </div>
-    `;
-
-    this.elements.hudContainer.appendChild(victoryScreen);
   }
 
   addKill(): void {

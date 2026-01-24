@@ -5,6 +5,7 @@ import { CombatantSystem } from '../combat/CombatantSystem';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
 import { InventoryManager } from '../player/InventoryManager';
+import { AudioManager } from '../audio/AudioManager';
 
 interface Grenade {
   id: string;
@@ -24,6 +25,7 @@ export class GrenadeSystem implements GameSystem {
   private combatantSystem?: CombatantSystem;
   private impactEffectsPool?: ImpactEffectsPool;
   private inventoryManager?: InventoryManager;
+  private audioManager?: AudioManager;
 
   private grenades: Grenade[] = [];
   private nextGrenadeId = 0;
@@ -43,6 +45,7 @@ export class GrenadeSystem implements GameSystem {
   private readonly MAX_THROW_FORCE = 50; // Increased for better forward carry
 
   private arcVisualization?: THREE.Line;
+  private landingIndicator?: THREE.Mesh;
   private isAiming = false;
   private throwPower = 1.0;
   private idleTime = 0;
@@ -159,6 +162,14 @@ export class GrenadeSystem implements GameSystem {
       }
     }
 
+    if (this.landingIndicator) {
+      this.scene.remove(this.landingIndicator);
+      this.landingIndicator.geometry.dispose();
+      if (this.landingIndicator.material instanceof THREE.Material) {
+        this.landingIndicator.material.dispose();
+      }
+    }
+
     if (this.grenadeInHand) {
       this.weaponScene.remove(this.grenadeInHand);
       this.grenadeInHand.traverse(child => {
@@ -186,6 +197,10 @@ export class GrenadeSystem implements GameSystem {
 
     if (this.arcVisualization) {
       this.arcVisualization.visible = true;
+    }
+
+    if (this.landingIndicator) {
+      this.landingIndicator.visible = true;
     }
   }
 
@@ -232,6 +247,7 @@ export class GrenadeSystem implements GameSystem {
 
     let pos = startPos.clone();
     let vel = throwVelocity.clone();
+    let landingPos = pos.clone();
 
     for (let i = 0; i < steps; i++) {
       points.push(pos.clone());
@@ -242,6 +258,7 @@ export class GrenadeSystem implements GameSystem {
       const groundHeight = this.getGroundHeight(pos.x, pos.z);
       if (pos.y <= groundHeight) {
         pos.y = groundHeight;
+        landingPos = pos.clone();
         break;
       }
     }
@@ -249,6 +266,12 @@ export class GrenadeSystem implements GameSystem {
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
     this.arcVisualization.geometry.dispose();
     this.arcVisualization.geometry = geometry;
+
+    // Update landing indicator position
+    if (this.landingIndicator) {
+      this.landingIndicator.position.copy(landingPos);
+      this.landingIndicator.position.y += 0.1; // Slightly above ground to prevent z-fighting
+    }
   }
 
   throwGrenade(): boolean {
@@ -268,6 +291,10 @@ export class GrenadeSystem implements GameSystem {
 
     if (this.arcVisualization) {
       this.arcVisualization.visible = false;
+    }
+
+    if (this.landingIndicator) {
+      this.landingIndicator.visible = false;
     }
 
     const startPos = this.camera.position.clone();
@@ -319,6 +346,10 @@ export class GrenadeSystem implements GameSystem {
     if (this.arcVisualization) {
       this.arcVisualization.visible = false;
     }
+
+    if (this.landingIndicator) {
+      this.landingIndicator.visible = false;
+    }
   }
 
   private spawnGrenade(position: THREE.Vector3, velocity: THREE.Vector3): void {
@@ -367,6 +398,10 @@ export class GrenadeSystem implements GameSystem {
       }
     }
 
+    if (this.audioManager) {
+      this.audioManager.playExplosionAt(grenade.position);
+    }
+
     if (this.combatantSystem) {
       this.combatantSystem.applyExplosionDamage(
         grenade.position,
@@ -410,6 +445,21 @@ export class GrenadeSystem implements GameSystem {
     this.arcVisualization = new THREE.Line(geometry, material);
     this.arcVisualization.visible = false;
     this.scene.add(this.arcVisualization);
+
+    // Create landing indicator - a ring showing impact point and radius
+    const ringGeometry = new THREE.RingGeometry(this.DAMAGE_RADIUS - 0.5, this.DAMAGE_RADIUS + 0.5, 32);
+    const ringMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff4444,
+      transparent: true,
+      opacity: 0.5,
+      side: THREE.DoubleSide,
+      depthTest: false
+    });
+
+    this.landingIndicator = new THREE.Mesh(ringGeometry, ringMaterial);
+    this.landingIndicator.rotation.x = -Math.PI / 2; // Lay flat on ground
+    this.landingIndicator.visible = false;
+    this.scene.add(this.landingIndicator);
   }
 
   setCombatantSystem(system: CombatantSystem): void {
@@ -424,8 +474,24 @@ export class GrenadeSystem implements GameSystem {
     this.inventoryManager = inventoryManager;
   }
 
+  setAudioManager(audioManager: AudioManager): void {
+    this.audioManager = audioManager;
+  }
+
+  setHUDSystem(hudSystem: any): void {
+    // Store HUD system reference for power meter updates
+    // Type is 'any' to avoid circular dependency with HUDSystem
+  }
+
   isCurrentlyAiming(): boolean {
     return this.isAiming;
+  }
+
+  getAimingState(): { isAiming: boolean; power: number } {
+    return {
+      isAiming: this.isAiming,
+      power: this.throwPower
+    };
   }
 
   private createGrenadeView(): void {

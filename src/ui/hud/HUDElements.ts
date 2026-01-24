@@ -1,5 +1,7 @@
 import { KillFeed } from './KillFeed';
 import { Faction } from '../../systems/combat/types';
+import { DamageNumberSystem } from './DamageNumberSystem';
+import * as THREE from 'three';
 
 export class HUDElements {
   // Main containers
@@ -18,8 +20,9 @@ export class HUDElements {
   public helicopterInstruments: HTMLDivElement;
   public grenadePowerMeter: HTMLDivElement;
   public killFeed: KillFeed;
+  public damageNumbers?: DamageNumberSystem;
 
-  constructor() {
+  constructor(camera?: THREE.Camera) {
     this.hudContainer = this.createHUDContainer();
     this.objectivesList = this.createObjectivesPanel();
     this.ticketDisplay = this.createTicketDisplay();
@@ -35,6 +38,11 @@ export class HUDElements {
     this.helicopterInstruments = this.createHelicopterInstruments();
     this.grenadePowerMeter = this.createGrenadePowerMeter();
     this.killFeed = new KillFeed();
+
+    // Initialize damage number system if camera is provided
+    if (camera) {
+      this.damageNumbers = new DamageNumberSystem(camera);
+    }
 
     // Assemble HUD structure
     this.hudContainer.appendChild(this.objectivesList);
@@ -791,10 +799,25 @@ export class HUDElements {
   attachToDOM(): void {
     document.body.appendChild(this.hudContainer);
     this.killFeed.attachToDOM(document.body);
+    if (this.damageNumbers) {
+      this.damageNumbers.attachToDOM();
+    }
   }
 
   updateKillFeed(deltaTime: number): void {
     this.killFeed.update(deltaTime);
+  }
+
+  updateDamageNumbers(): void {
+    if (this.damageNumbers) {
+      this.damageNumbers.update();
+    }
+  }
+
+  spawnDamageNumber(worldPos: THREE.Vector3, damage: number, isHeadshot: boolean = false, isKill: boolean = false): void {
+    if (this.damageNumbers) {
+      this.damageNumbers.spawn(worldPos, damage, isHeadshot, isKill);
+    }
   }
 
   addKillToFeed(
@@ -812,5 +835,8 @@ export class HUDElements {
       this.hudContainer.parentNode.removeChild(this.hudContainer);
     }
     this.killFeed.dispose();
+    if (this.damageNumbers) {
+      this.damageNumbers.dispose();
+    }
   }
 }

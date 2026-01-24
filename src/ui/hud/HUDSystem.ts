@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { Faction } from '../../systems/combat/types';
@@ -14,6 +15,7 @@ export class HUDSystem implements GameSystem {
   private zoneManager?: ZoneManager;
   private ticketSystem?: TicketSystem;
   private playerHealthSystem?: any;
+  private camera?: any;
 
   private styles: HUDStyles;
   private elements: HUDElements;
@@ -22,8 +24,9 @@ export class HUDSystem implements GameSystem {
   private matchEndScreen: MatchEndScreen;
 
   constructor(camera?: any, ticketSystem?: any, playerHealthSystem?: any, playerRespawnManager?: any) {
+    this.camera = camera;
     this.styles = HUDStyles.getInstance();
-    this.elements = new HUDElements();
+    this.elements = new HUDElements(camera);
     this.updater = new HUDUpdater(this.elements);
     this.playerHealthSystem = playerHealthSystem;
     this.statsTracker = new PlayerStatsTracker();
@@ -78,6 +81,9 @@ export class HUDSystem implements GameSystem {
 
     // Update kill feed
     this.elements.updateKillFeed(deltaTime);
+
+    // Update damage numbers
+    this.elements.updateDamageNumbers();
   }
 
   dispose(): void {
@@ -221,5 +227,10 @@ export class HUDSystem implements GameSystem {
     isHeadshot: boolean = false
   ): void {
     this.elements.addKillToFeed(killerName, killerFaction, victimName, victimFaction, isHeadshot);
+  }
+
+  // Damage number methods
+  spawnDamageNumber(worldPos: THREE.Vector3, damage: number, isHeadshot: boolean = false, isKill: boolean = false): void {
+    this.elements.spawnDamageNumber(worldPos, damage, isHeadshot, isKill);
   }
 }
