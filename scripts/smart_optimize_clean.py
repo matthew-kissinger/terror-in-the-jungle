@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Tuple
 import json
 
+
 try:
     from PIL import Image
     HAS_PIL = True
@@ -321,7 +322,7 @@ To restore these assets:
         try:
             subprocess.run(['pngquant', '--version'], capture_output=True, check=True)
             print("   pngquant found")
-        except Exception:
+        except FileNotFoundError:
             tools_needed.append('pngquant')
             print("   pngquant not found")
 
@@ -329,7 +330,7 @@ To restore these assets:
         try:
             subprocess.run(['optipng', '--version'], capture_output=True, check=True)
             print("   optipng found")
-        except Exception:
+        except FileNotFoundError:
             tools_needed.append('optipng')
             print("   optipng not found")
 
@@ -337,7 +338,7 @@ To restore these assets:
         try:
             subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
             print("   ffmpeg found")
-        except Exception:
+        except FileNotFoundError:
             tools_needed.append('ffmpeg')
             print("   ffmpeg not found")
 
@@ -456,14 +457,10 @@ To restore these assets:
 
         print("\nSize Results:")
         print(f"   Original:                {original_mb:.2f} MB")
-        print(
-            f"   Optimized (same size):   {optimized_mb:.2f} MB "
-            f"({(1-optimized_mb/original_mb)*100:.1f}% reduction)"
-        )
-        print(
-            f"   Optimized (smart resize): {resized_mb:.2f} MB "
-            f"({(1-resized_mb/original_mb)*100:.1f}% reduction)"
-        )
+        same_reduction = (1-optimized_mb/original_mb)*100
+        print(f"   Optimized (same size):   {optimized_mb:.2f} MB ({same_reduction:.1f}% reduction)")
+        resize_reduction = (1-resized_mb/original_mb)*100
+        print(f"   Optimized (smart resize): {resized_mb:.2f} MB ({resize_reduction:.1f}% reduction)")
 
         print("\nOutput Locations:")
         print(f"   Same dimensions:  {self.optimized_dir}")

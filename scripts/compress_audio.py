@@ -10,6 +10,7 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 
+
 class AudioCompressor:
     def __init__(self, project_root: str):
         self.project_root = Path(project_root)
@@ -25,7 +26,7 @@ class AudioCompressor:
             subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
             print("✓ ffmpeg found")
             return True
-        except Exception:
+        except FileNotFoundError:
             print("✗ ffmpeg not found - please install ffmpeg first")
             return False
 

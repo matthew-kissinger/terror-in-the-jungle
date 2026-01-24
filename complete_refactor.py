@@ -4,11 +4,8 @@ Quick analysis for remaining refactoring work
 """
 
 remaining_files = [
-    (
-        "GlobalBillboardSystem",
-        733,
-        "src/systems/world/billboard/GlobalBillboardSystem.ts",
-    ),
+    ("GlobalBillboardSystem", 733,
+     "src/systems/world/billboard/GlobalBillboardSystem.ts"),
     ("PlayerHealthSystem", 682, "src/systems/player/PlayerHealthSystem.ts"),
     ("HUDSystem", 621, "src/ui/hud/HUDSystem.ts"),
     ("PixelArtSandbox", 573, "src/core/PixelArtSandbox.ts"),
@@ -21,6 +18,7 @@ total_lines = sum(f[1] for f in remaining_files)
 print(f"Total lines to refactor: {total_lines}")
 print(f"Files remaining: {len(remaining_files)}")
 print("Target: All files under 400 lines\n")
+
 
 for name, lines, path in remaining_files:
     reduction_needed = lines - 400
