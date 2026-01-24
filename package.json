@@ -10,13 +10,13 @@
     "compress-textures": "node scripts/compress-textures.js"
   },
   "devDependencies": {
-    "@types/three": "^0.180.0",
+    "@types/three": "^0.182.0",
     "typescript": "^5.9.2",
     "vite": "^7.1.5"
   },
   "dependencies": {
     "postprocessing": "^6.37.8",
-    "three": "^0.180.0",
+    "three": "^0.182.0",
     "three-mesh-bvh": "^0.9.1"
   }
 }

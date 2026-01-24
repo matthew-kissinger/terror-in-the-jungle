@@ -113,7 +113,7 @@ export class AssetLoader implements GameSystem {
         asset.texture = finalTexture;
         this.loadedTextures.set(asset.name, finalTexture);
 
-        console.log(`Loaded texture: ${asset.name} (${finalTexture.image.width}x${finalTexture.image.height})`);
+        console.log(`Loaded texture: ${asset.name} (${(finalTexture.image as any).width}x${(finalTexture.image as any).height})`);
       } catch (error) {
         console.warn(`Failed to load texture: ${asset.path}`, error);
       }
