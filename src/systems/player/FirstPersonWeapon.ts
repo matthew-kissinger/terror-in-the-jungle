@@ -448,8 +448,8 @@ export class FirstPersonWeapon implements GameSystem {
     // Fixed: positive pitch makes the aim go UP (as it should with recoil)
     if (this.playerController) {
       this.playerController.applyRecoil(THREE.MathUtils.degToRad(kick.pitch), THREE.MathUtils.degToRad(kick.yaw));
-      // Apply screen shake for impact feedback (subtle for rifle)
-      this.playerController.applyScreenShake(0.35);
+      // Apply subtle recoil screen shake
+      this.playerController.applyRecoilShake();
     }
     // Apply recoil impulse to weapon spring system (moderate recoil)
     if (this.weaponRig) {

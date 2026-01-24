@@ -151,10 +151,7 @@ export class PlayerHealthSystem implements GameSystem {
 
     // Apply camera shake based on damage amount
     if (this.playerController) {
-      // Scale shake intensity: 0.4 for small hits, up to 1.2 for heavy hits
-      // Typical damage is 24-34, so we scale by ~0.015 per damage point
-      const shakeIntensity = Math.min(1.2, amount * 0.02);
-      this.playerController.applyScreenShake(shakeIntensity);
+      this.playerController.applyDamageShake(amount);
     }
 
     // Check for death

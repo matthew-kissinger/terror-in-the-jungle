@@ -9,6 +9,7 @@ import { InventoryManager, WeaponSlot } from './InventoryManager';
 import { GrenadeSystem } from '../weapons/GrenadeSystem';
 import { MortarSystem } from '../weapons/MortarSystem';
 import { SandbagSystem } from '../weapons/SandbagSystem';
+import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 
 export class PlayerController implements GameSystem {
   private camera: THREE.PerspectiveCamera;
@@ -22,6 +23,7 @@ export class PlayerController implements GameSystem {
   private grenadeSystem?: GrenadeSystem;
   private mortarSystem?: MortarSystem;
   private sandbagSystem?: SandbagSystem;
+  private cameraShakeSystem?: CameraShakeSystem;
   private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
   private isInMortarMode = false;
   private playerState: PlayerState;
@@ -35,12 +37,6 @@ export class PlayerController implements GameSystem {
   private pitch = 0;
   private yaw = Math.PI; // Face toward negative X (opposite of yaw=0)
   private maxPitch = Math.PI / 2 - 0.1; // Prevent full vertical rotation
-
-  // Screen shake for impact feedback
-  private screenShakeIntensity = 0;
-  private screenShakeDecay = 0.95; // How quickly shake fades (0-1, lower = faster)
-  private screenShakeOffsetX = 0;
-  private screenShakeOffsetY = 0;
 
   // Helicopter camera settings - chase cam style
   private helicopterCameraDistance = 25; // Distance behind helicopter for full view
@@ -102,6 +98,11 @@ export class PlayerController implements GameSystem {
 
   update(deltaTime: number): void {
     if (!this.isControlsEnabled) return; // Skip updates when dead
+
+    // Update camera shake system
+    if (this.cameraShakeSystem) {
+      this.cameraShakeSystem.update(deltaTime);
+    }
 
     if (this.playerState.isInHelicopter) {
       this.updateHelicopterControls(deltaTime);
@@ -562,26 +563,19 @@ export class PlayerController implements GameSystem {
       this.mouseMovement.y = 0;
     }
 
-    // Update and decay screen shake
-    if (this.screenShakeIntensity > 0.001) {
-      // Generate random shake offsets within current intensity bounds
-      const maxShakeRad = THREE.MathUtils.degToRad(this.screenShakeIntensity * 0.5); // Max 0.5 deg per unit intensity
-      this.screenShakeOffsetX = (Math.random() - 0.5) * 2 * maxShakeRad;
-      this.screenShakeOffsetY = (Math.random() - 0.5) * 2 * maxShakeRad;
-
-      // Decay intensity each frame
-      this.screenShakeIntensity *= this.screenShakeDecay;
-    } else {
-      // Stop shaking when intensity is negligible
-      this.screenShakeIntensity = 0;
-      this.screenShakeOffsetX = 0;
-      this.screenShakeOffsetY = 0;
+    // Get shake offset from shake system
+    let shakeOffsetPitch = 0;
+    let shakeOffsetYaw = 0;
+    if (this.cameraShakeSystem) {
+      const shake = this.cameraShakeSystem.getCurrentShakeOffset();
+      shakeOffsetPitch = shake.pitch;
+      shakeOffsetYaw = shake.yaw;
     }
 
     // Apply rotation to camera with shake offsets
     this.camera.rotation.order = 'YXZ';
-    this.camera.rotation.y = this.yaw + this.screenShakeOffsetX;
-    this.camera.rotation.x = this.pitch + this.screenShakeOffsetY;
+    this.camera.rotation.y = this.yaw + shakeOffsetYaw;
+    this.camera.rotation.x = this.pitch + shakeOffsetPitch;
 
     // Update camera position
     this.camera.position.copy(this.playerState.position);
@@ -666,10 +660,32 @@ export class PlayerController implements GameSystem {
     this.yaw += yawDeltaRad;
   }
 
-  // Apply screen shake for impact feedback (e.g., weapon fire, explosions)
-  applyScreenShake(intensity: number): void {
-    // Accumulate shake intensity, capping at a reasonable maximum
-    this.screenShakeIntensity = Math.min(this.screenShakeIntensity + intensity, 1.0);
+  // Apply screen shake for impact feedback (generic - kept for backward compatibility)
+  applyScreenShake(intensity: number, duration: number = 0.2): void {
+    if (this.cameraShakeSystem) {
+      this.cameraShakeSystem.shake(intensity, duration);
+    }
+  }
+
+  // Apply screen shake from taking damage
+  applyDamageShake(damageAmount: number): void {
+    if (this.cameraShakeSystem) {
+      this.cameraShakeSystem.shakeFromDamage(damageAmount);
+    }
+  }
+
+  // Apply screen shake from nearby explosion
+  applyExplosionShake(explosionPos: THREE.Vector3, maxRadius: number): void {
+    if (this.cameraShakeSystem) {
+      this.cameraShakeSystem.shakeFromExplosion(explosionPos, this.playerState.position, maxRadius);
+    }
+  }
+
+  // Apply subtle recoil shake
+  applyRecoilShake(): void {
+    if (this.cameraShakeSystem) {
+      this.cameraShakeSystem.shakeFromRecoil();
+    }
   }
 
   setPosition(position: THREE.Vector3): void {
@@ -834,6 +850,10 @@ Escape - Release pointer lock / Exit helicopter
 
   setSandbagSystem(sandbagSystem: SandbagSystem): void {
     this.sandbagSystem = sandbagSystem;
+  }
+
+  setCameraShakeSystem(cameraShakeSystem: CameraShakeSystem): void {
+    this.cameraShakeSystem = cameraShakeSystem;
   }
 
   equipWeapon(): void {

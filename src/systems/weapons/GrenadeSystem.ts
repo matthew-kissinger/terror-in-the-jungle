@@ -26,6 +26,7 @@ export class GrenadeSystem implements GameSystem {
   private impactEffectsPool?: ImpactEffectsPool;
   private inventoryManager?: InventoryManager;
   private audioManager?: AudioManager;
+  private playerController?: any;
 
   private grenades: Grenade[] = [];
   private nextGrenadeId = 0;
@@ -409,6 +410,11 @@ export class GrenadeSystem implements GameSystem {
         this.MAX_DAMAGE
       );
     }
+
+    // Apply camera shake from explosion
+    if (this.playerController) {
+      this.playerController.applyExplosionShake(grenade.position, this.DAMAGE_RADIUS);
+    }
   }
 
   private removeGrenade(index: number): void {
@@ -481,6 +487,10 @@ export class GrenadeSystem implements GameSystem {
   setHUDSystem(hudSystem: any): void {
     // Store HUD system reference for power meter updates
     // Type is 'any' to avoid circular dependency with HUDSystem
+  }
+
+  setPlayerController(playerController: any): void {
+    this.playerController = playerController;
   }
 
   isCurrentlyAiming(): boolean {

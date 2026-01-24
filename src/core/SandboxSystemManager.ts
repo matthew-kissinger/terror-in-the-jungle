@@ -26,6 +26,7 @@ import { InventoryManager } from '../systems/player/InventoryManager';
 import { GrenadeSystem } from '../systems/weapons/GrenadeSystem';
 import { MortarSystem } from '../systems/weapons/MortarSystem';
 import { SandbagSystem } from '../systems/weapons/SandbagSystem';
+import { CameraShakeSystem } from '../systems/effects/CameraShakeSystem';
 
 export class SandboxSystemManager {
   private systems: GameSystem[] = [];
@@ -56,6 +57,7 @@ export class SandboxSystemManager {
   public grenadeSystem!: GrenadeSystem;
   public mortarSystem!: MortarSystem;
   public sandbagSystem!: SandbagSystem;
+  public cameraShakeSystem!: CameraShakeSystem;
 
   async initializeSystems(
     scene: THREE.Scene,
@@ -114,6 +116,7 @@ export class SandboxSystemManager {
     // Mortar system disabled - to be reimplemented
     this.mortarSystem = new MortarSystem(scene, camera, this.chunkManager); // Disabled but keeping instance
     this.sandbagSystem = new SandbagSystem(scene, camera, this.chunkManager);
+    this.cameraShakeSystem = new CameraShakeSystem();
 
     this.connectSystems(scene, camera, sandboxRenderer);
 
@@ -143,7 +146,8 @@ export class SandboxSystemManager {
       this.inventoryManager,
       this.grenadeSystem,
       this.mortarSystem,
-      this.sandbagSystem
+      this.sandbagSystem,
+      this.cameraShakeSystem
     ];
 
     onProgress('world', 0.5);
@@ -231,9 +235,15 @@ export class SandboxSystemManager {
       this.minimapSystem
     );
 
+    // Connect camera shake system
+    this.playerController.setCameraShakeSystem(this.cameraShakeSystem);
+
     // Connect weapon systems
     this.grenadeSystem.setCombatantSystem(this.combatantSystem);
     this.grenadeSystem.setInventoryManager(this.inventoryManager);
+    this.grenadeSystem.setAudioManager(this.audioManager);
+    this.grenadeSystem.setPlayerController(this.playerController);
+    this.hudSystem.setGrenadeSystem(this.grenadeSystem);
     // Mortar connections disabled - to be reimplemented
     // this.mortarSystem.setCombatantSystem(this.combatantSystem);
     // this.mortarSystem.setInventoryManager(this.inventoryManager);
