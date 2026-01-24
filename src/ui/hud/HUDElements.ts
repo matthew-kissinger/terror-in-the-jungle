@@ -1,3 +1,6 @@
+import { KillFeed } from './KillFeed';
+import { Faction } from '../../systems/combat/types';
+
 export class HUDElements {
   // Main containers
   public hudContainer: HTMLDivElement;
@@ -13,6 +16,8 @@ export class HUDElements {
   public elevationSlider: HTMLDivElement;
   public helicopterMouseIndicator: HTMLDivElement;
   public helicopterInstruments: HTMLDivElement;
+  public grenadePowerMeter: HTMLDivElement;
+  public killFeed: KillFeed;
 
   constructor() {
     this.hudContainer = this.createHUDContainer();
@@ -28,6 +33,8 @@ export class HUDElements {
     this.elevationSlider = this.createElevationSlider();
     this.helicopterMouseIndicator = this.createHelicopterMouseIndicator();
     this.helicopterInstruments = this.createHelicopterInstruments();
+    this.grenadePowerMeter = this.createGrenadePowerMeter();
+    this.killFeed = new KillFeed();
 
     // Assemble HUD structure
     this.hudContainer.appendChild(this.objectivesList);
@@ -41,6 +48,7 @@ export class HUDElements {
     this.hudContainer.appendChild(this.elevationSlider);
     this.hudContainer.appendChild(this.helicopterMouseIndicator);
     this.hudContainer.appendChild(this.helicopterInstruments);
+    this.hudContainer.appendChild(this.grenadePowerMeter);
     // Removed respawn button from HUD
   }
 
@@ -520,6 +528,90 @@ export class HUDElements {
     return instruments;
   }
 
+  private createGrenadePowerMeter(): HTMLDivElement {
+    const container = document.createElement('div');
+    container.className = 'grenade-power-meter';
+    container.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, 120px);
+      width: 200px;
+      height: 30px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      pointer-events: none;
+    `;
+
+    // Label
+    const label = document.createElement('div');
+    label.style.cssText = `
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.9);
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+    `;
+    label.textContent = 'THROW POWER';
+
+    // Bar container
+    const barContainer = document.createElement('div');
+    barContainer.style.cssText = `
+      width: 100%;
+      height: 12px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 2px solid rgba(255, 255, 255, 0.5);
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    `;
+
+    // Power fill bar
+    const powerFill = document.createElement('div');
+    powerFill.className = 'power-fill';
+    powerFill.style.cssText = `
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: 30%;
+      background: linear-gradient(to right, #00ff44, #88ff44);
+      transition: width 0.05s linear, background 0.1s ease;
+      border-radius: 3px;
+    `;
+
+    // Power percentage text
+    const powerText = document.createElement('div');
+    powerText.className = 'power-text';
+    powerText.style.cssText = `
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      font-weight: bold;
+      color: white;
+      text-shadow: 0 0 3px rgba(0, 0, 0, 1);
+      z-index: 1;
+    `;
+    powerText.textContent = '30%';
+
+    barContainer.appendChild(powerFill);
+    barContainer.appendChild(powerText);
+    container.appendChild(label);
+    container.appendChild(barContainer);
+
+    return container;
+  }
+
   showMessage(message: string, duration: number = 3000): void {
     const messageElement = document.createElement('div');
     messageElement.style.cssText = `
@@ -602,6 +694,38 @@ export class HUDElements {
     this.helicopterInstruments.style.display = 'none';
   }
 
+  // Grenade power meter methods
+  showGrenadePowerMeter(): void {
+    this.grenadePowerMeter.style.display = 'flex';
+  }
+
+  hideGrenadePowerMeter(): void {
+    this.grenadePowerMeter.style.display = 'none';
+  }
+
+  updateGrenadePower(power: number): void {
+    const powerFill = this.grenadePowerMeter.querySelector('.power-fill') as HTMLElement;
+    const powerText = this.grenadePowerMeter.querySelector('.power-text') as HTMLElement;
+
+    if (powerFill && powerText) {
+      // Power ranges from 0.3 to 1.0, normalize to 0-100%
+      const normalizedPower = ((power - 0.3) / 0.7) * 100;
+      const displayPercent = Math.round(power * 100);
+
+      powerFill.style.width = `${normalizedPower}%`;
+      powerText.textContent = `${displayPercent}%`;
+
+      // Color gradient: green (low) -> yellow (mid) -> red (max)
+      if (normalizedPower < 40) {
+        powerFill.style.background = 'linear-gradient(to right, #00ff44, #88ff44)'; // Green
+      } else if (normalizedPower < 75) {
+        powerFill.style.background = 'linear-gradient(to right, #ffff44, #ffaa44)'; // Yellow
+      } else {
+        powerFill.style.background = 'linear-gradient(to right, #ff8844, #ff4444)'; // Red
+      }
+    }
+  }
+
   updateHelicopterInstruments(collective: number, rpm: number, autoHover: boolean, engineBoost: boolean): void {
     // Update collective (thrust) bar
     const collectiveFill = this.helicopterInstruments.querySelector('.collective-fill') as HTMLElement;
@@ -666,11 +790,27 @@ export class HUDElements {
 
   attachToDOM(): void {
     document.body.appendChild(this.hudContainer);
+    this.killFeed.attachToDOM(document.body);
+  }
+
+  updateKillFeed(deltaTime: number): void {
+    this.killFeed.update(deltaTime);
+  }
+
+  addKillToFeed(
+    killerName: string,
+    killerFaction: Faction,
+    victimName: string,
+    victimFaction: Faction,
+    isHeadshot: boolean = false
+  ): void {
+    this.killFeed.addKill(killerName, killerFaction, victimName, victimFaction, isHeadshot);
   }
 
   dispose(): void {
     if (this.hudContainer.parentNode) {
       this.hudContainer.parentNode.removeChild(this.hudContainer);
     }
+    this.killFeed.dispose();
   }
 }

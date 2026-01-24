@@ -2,10 +2,12 @@ import { GameSystem } from '../../types';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { Faction } from '../../systems/combat/types';
 import { ZoneManager } from '../../systems/world/ZoneManager';
-import { TicketSystem } from '../../systems/world/TicketSystem';
+import { TicketSystem, GameState } from '../../systems/world/TicketSystem';
 import { HUDStyles } from './HUDStyles';
 import { HUDElements } from './HUDElements';
 import { HUDUpdater } from './HUDUpdater';
+import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
+import { MatchEndScreen, MatchStats } from '../end/MatchEndScreen';
 
 export class HUDSystem implements GameSystem {
   private combatantSystem?: CombatantSystem;
@@ -16,12 +18,16 @@ export class HUDSystem implements GameSystem {
   private styles: HUDStyles;
   private elements: HUDElements;
   private updater: HUDUpdater;
+  private statsTracker: PlayerStatsTracker;
+  private matchEndScreen: MatchEndScreen;
 
   constructor(camera?: any, ticketSystem?: any, playerHealthSystem?: any, playerRespawnManager?: any) {
     this.styles = HUDStyles.getInstance();
     this.elements = new HUDElements();
     this.updater = new HUDUpdater(this.elements);
     this.playerHealthSystem = playerHealthSystem;
+    this.statsTracker = new PlayerStatsTracker();
+    this.matchEndScreen = new MatchEndScreen();
     // Parameters are optional for backward compatibility
   }
 
@@ -69,11 +75,15 @@ export class HUDSystem implements GameSystem {
         this.ticketSystem.getTickets(Faction.OPFOR)
       );
     }
+
+    // Update kill feed
+    this.elements.updateKillFeed(deltaTime);
   }
 
   dispose(): void {
     this.elements.dispose();
     this.styles.dispose();
+    this.matchEndScreen.dispose();
     console.log('🧹 HUD System disposed');
   }
 
@@ -85,10 +95,38 @@ export class HUDSystem implements GameSystem {
 
   addKill(): void {
     this.updater.addKill();
+    this.statsTracker.addKill();
   }
 
   addDeath(): void {
     this.updater.addDeath();
+    this.statsTracker.addDeath();
+  }
+
+  addZoneCapture(): void {
+    this.statsTracker.addZoneCapture();
+  }
+
+  startMatch(): void {
+    this.statsTracker.startMatch();
+    console.log('📊 Match statistics tracking started');
+  }
+
+  private handleGameEnd(winner: Faction, gameState: GameState): void {
+    if (!this.ticketSystem) return;
+
+    const playerStats = this.statsTracker.getStats();
+    const matchStats: MatchStats = {
+      kills: playerStats.kills,
+      deaths: playerStats.deaths,
+      zonesCaptured: playerStats.zonesCaptured,
+      matchDuration: gameState.matchDuration,
+      usTickets: this.ticketSystem.getTickets(Faction.US),
+      opforTickets: this.ticketSystem.getTickets(Faction.OPFOR)
+    };
+
+    console.log('🏆 Showing match end screen with stats:', matchStats);
+    this.matchEndScreen.show(winner, gameState, matchStats);
   }
 
   setCombatantSystem(system: CombatantSystem): void {
@@ -101,6 +139,11 @@ export class HUDSystem implements GameSystem {
 
   setTicketSystem(system: TicketSystem): void {
     this.ticketSystem = system;
+
+    // Register callback for game end
+    system.setGameEndCallback((winner: Faction, gameState: GameState) => {
+      this.handleGameEnd(winner, gameState);
+    });
   }
 
   updateTickets(usTickets: number, opforTickets: number): void {
@@ -154,5 +197,29 @@ export class HUDSystem implements GameSystem {
 
   updateHelicopterInstruments(collective: number, rpm: number, autoHover: boolean, engineBoost: boolean): void {
     this.elements.updateHelicopterInstruments(collective, rpm, autoHover, engineBoost);
+  }
+
+  // Grenade power meter methods
+  showGrenadePowerMeter(): void {
+    this.elements.showGrenadePowerMeter();
+  }
+
+  hideGrenadePowerMeter(): void {
+    this.elements.hideGrenadePowerMeter();
+  }
+
+  updateGrenadePower(power: number): void {
+    this.elements.updateGrenadePower(power);
+  }
+
+  // Kill feed methods
+  addKillToFeed(
+    killerName: string,
+    killerFaction: Faction,
+    victimName: string,
+    victimFaction: Faction,
+    isHeadshot: boolean = false
+  ): void {
+    this.elements.addKillToFeed(killerName, killerFaction, victimName, victimFaction, isHeadshot);
   }
 }

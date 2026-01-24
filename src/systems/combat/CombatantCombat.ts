@@ -283,6 +283,18 @@ export class CombatantCombat {
         );
         if (killed && this.hudSystem) {
           this.hudSystem.addDeath();
+
+          // Add player death to kill feed
+          if (attacker) {
+            const killerName = `${attacker.faction}-${attacker.id.slice(-4)}`;
+            this.hudSystem.addKillToFeed(
+              killerName,
+              attacker.faction,
+              'PLAYER',
+              Faction.US,
+              false
+            );
+          }
         }
       }
       return;
@@ -308,6 +320,19 @@ export class CombatantCombat {
 
       if (this.ticketSystem) {
         this.ticketSystem.onCombatantDeath(target.faction);
+      }
+
+      // Add to kill feed (AI-on-AI kills)
+      if (this.hudSystem && attacker && !attacker.isPlayerProxy) {
+        const killerName = `${attacker.faction}-${attacker.id.slice(-4)}`;
+        const victimName = `${target.faction}-${target.id.slice(-4)}`;
+        this.hudSystem.addKillToFeed(
+          killerName,
+          attacker.faction,
+          victimName,
+          target.faction,
+          false
+        );
       }
 
       if (target.squadId && squads) {
@@ -349,6 +374,16 @@ export class CombatantCombat {
 
       if (killed && this.hudSystem) {
         this.hudSystem.addKill();
+
+        // Add player kill to feed
+        const victimName = `${hit.combatant.faction}-${hit.combatant.id.slice(-4)}`;
+        this.hudSystem.addKillToFeed(
+          'PLAYER',
+          Faction.US,
+          victimName,
+          hit.combatant.faction,
+          hit.headshot
+        );
       }
 
       return { hit: true, point: hit.point, killed, headshot: hit.headshot };
