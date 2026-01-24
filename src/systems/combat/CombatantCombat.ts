@@ -16,6 +16,7 @@ export interface CombatHitResult {
   point: THREE.Vector3;
   killed?: boolean;
   headshot?: boolean;
+  damage?: number;
 }
 
 export class CombatantCombat {
@@ -386,7 +387,7 @@ export class CombatantCombat {
         );
       }
 
-      return { hit: true, point: hit.point, killed, headshot: hit.headshot };
+      return { hit: true, point: hit.point, killed, headshot: hit.headshot, damage };
     }
 
     const endPoint = new THREE.Vector3()
