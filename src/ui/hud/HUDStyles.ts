@@ -219,21 +219,90 @@ export class HUDStyles {
 
     .hit-marker {
       position: absolute;
-      width: 18px;
-      height: 18px;
+      width: 20px;
+      height: 20px;
       transform: translate(-50%, -50%) rotate(45deg);
-      border: 2px solid rgba(255,255,255,0.9);
       opacity: 0.0;
-      animation: hitFlash 200ms ease-out forwards;
     }
 
-    .hit-marker.kill { border-color: #ff4444; }
-    .hit-marker.headshot { border-color: #ffee55; }
+    /* Normal hit - white X */
+    .hit-marker.normal {
+      border: 2.5px solid rgba(255, 255, 255, 0.95);
+      animation: hitFlashNormal 300ms ease-out forwards;
+    }
 
-    @keyframes hitFlash {
-      0% { opacity: 0; transform: translate(-50%, -50%) rotate(45deg) scale(0.8); }
-      50% { opacity: 1; transform: translate(-50%, -50%) rotate(45deg) scale(1.0); }
-      100% { opacity: 0; transform: translate(-50%, -50%) rotate(45deg) scale(1.2); }
+    /* Headshot - yellow/gold X, larger */
+    .hit-marker.headshot {
+      border: 3px solid rgba(255, 215, 0, 1);
+      width: 24px;
+      height: 24px;
+      box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+      animation: hitFlashHeadshot 350ms ease-out forwards;
+    }
+
+    /* Kill - red X with expansion */
+    .hit-marker.kill {
+      border: 3.5px solid rgba(255, 68, 68, 1);
+      width: 26px;
+      height: 26px;
+      box-shadow: 0 0 12px rgba(255, 68, 68, 0.8);
+      animation: hitFlashKill 400ms ease-out forwards;
+    }
+
+    @keyframes hitFlashNormal {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) rotate(45deg) scale(0.7);
+      }
+      20% {
+        opacity: 1;
+        transform: translate(-50%, -50%) rotate(45deg) scale(1.1);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) rotate(45deg) scale(1.3);
+      }
+    }
+
+    @keyframes hitFlashHeadshot {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) rotate(45deg) scale(0.6);
+        box-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+      }
+      15% {
+        opacity: 1;
+        transform: translate(-50%, -50%) rotate(45deg) scale(1.15);
+        box-shadow: 0 0 16px rgba(255, 215, 0, 0.9);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) rotate(45deg) scale(1.4);
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+      }
+    }
+
+    @keyframes hitFlashKill {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) rotate(45deg) scale(0.5);
+        box-shadow: 0 0 12px rgba(255, 68, 68, 0.8);
+      }
+      12% {
+        opacity: 1;
+        transform: translate(-50%, -50%) rotate(45deg) scale(1.25);
+        box-shadow: 0 0 24px rgba(255, 68, 68, 1);
+      }
+      30% {
+        opacity: 0.9;
+        transform: translate(-50%, -50%) rotate(45deg) scale(1.15);
+        box-shadow: 0 0 20px rgba(255, 68, 68, 0.9);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) rotate(45deg) scale(1.6);
+        box-shadow: 0 0 28px rgba(255, 68, 68, 0.2);
+      }
     }
 
     /* Kill counter */

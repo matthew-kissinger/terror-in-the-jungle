@@ -161,12 +161,13 @@ export class HUDElements {
 
     this.hitMarkerContainer.appendChild(marker);
 
-    // Remove after animation completes
+    // Remove after animation completes (timing matches CSS animation duration)
+    const duration = type === 'kill' ? 400 : type === 'headshot' ? 350 : 300;
     setTimeout(() => {
       if (marker.parentNode) {
         marker.parentNode.removeChild(marker);
       }
-    }, 300);
+    }, duration);
   }
 
   private createRespawnButton(): HTMLButtonElement {
