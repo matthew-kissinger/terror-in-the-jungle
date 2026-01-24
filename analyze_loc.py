@@ -1,11 +1,10 @@
 import os
-from pathlib import Path
 
 def count_lines(file_path):
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             return len(f.readlines())
-    except:
+    except Exception:
         return 0
 
 def analyze_codebase():
@@ -36,10 +35,13 @@ def analyze_codebase():
         print(f"{lines:6d} lines: {path}")
         total_lines += lines
 
-    print(f"\n=== SUMMARY ===")
+    print("\n=== SUMMARY ===")
     print(f"Total files: {len(files_data)}")
     print(f"Total lines: {total_lines:,}")
-    print(f"Average lines per file: {total_lines // len(files_data) if files_data else 0}")
+    print(
+        f"Average lines per file: "
+        f"{total_lines // len(files_data) if files_data else 0}"
+    )
 
     print("\n=== TOP 10 FILES ===")
     for i, (path, lines) in enumerate(files_data[:10], 1):

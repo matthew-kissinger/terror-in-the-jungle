@@ -5,7 +5,6 @@ Audio Compression Script for Helicopter and Transmission Audio
 - Handles helicopter rotor blades and radio transmissions
 """
 
-import os
 import subprocess
 import shutil
 from pathlib import Path
@@ -26,7 +25,7 @@ class AudioCompressor:
             subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
             print("✓ ffmpeg found")
             return True
-        except:
+        except Exception:
             print("✗ ffmpeg not found - please install ffmpeg first")
             return False
 

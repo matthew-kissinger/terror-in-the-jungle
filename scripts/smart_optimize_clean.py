@@ -6,14 +6,12 @@ Smart Asset Optimization for Terror in the Jungle
 - Offers multiple optimization strategies
 """
 
-import os
 import subprocess
 import shutil
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Tuple
+from typing import Tuple
 import json
-import math
 
 try:
     from PIL import Image
@@ -78,7 +76,7 @@ class SmartOptimizer:
 
     def backup_all_assets(self):
         """Create a complete backup of all original assets"""
-        print("\n Creating backup archive...")
+        print("\nCreating backup archive...")
 
         # Copy all files to archive
         all_files = list(self.assets_dir.glob('*.*'))
@@ -323,7 +321,7 @@ To restore these assets:
         try:
             subprocess.run(['pngquant', '--version'], capture_output=True, check=True)
             print("   pngquant found")
-        except:
+        except Exception:
             tools_needed.append('pngquant')
             print("   pngquant not found")
 
@@ -331,7 +329,7 @@ To restore these assets:
         try:
             subprocess.run(['optipng', '--version'], capture_output=True, check=True)
             print("   optipng found")
-        except:
+        except Exception:
             tools_needed.append('optipng')
             print("   optipng not found")
 
@@ -339,7 +337,7 @@ To restore these assets:
         try:
             subprocess.run(['ffmpeg', '-version'], capture_output=True, check=True)
             print("   ffmpeg found")
-        except:
+        except Exception:
             tools_needed.append('ffmpeg')
             print("   ffmpeg not found")
 
@@ -453,15 +451,21 @@ To restore these assets:
         optimized_mb = self.stats['optimized_size'] / (1024*1024)
         resized_mb = self.stats['optimized_resize_size'] / (1024*1024)
 
-        print(f"\n Original assets backed up to:")
+        print("\nOriginal assets backed up to:")
         print(f"   {self.archive_dir}")
 
-        print(f"\n Size Results:")
+        print("\nSize Results:")
         print(f"   Original:                {original_mb:.2f} MB")
-        print(f"   Optimized (same size):   {optimized_mb:.2f} MB ({(1-optimized_mb/original_mb)*100:.1f}% reduction)")
-        print(f"   Optimized (smart resize): {resized_mb:.2f} MB ({(1-resized_mb/original_mb)*100:.1f}% reduction)")
+        print(
+            f"   Optimized (same size):   {optimized_mb:.2f} MB "
+            f"({(1-optimized_mb/original_mb)*100:.1f}% reduction)"
+        )
+        print(
+            f"   Optimized (smart resize): {resized_mb:.2f} MB "
+            f"({(1-resized_mb/original_mb)*100:.1f}% reduction)"
+        )
 
-        print(f"\n Output Locations:")
+        print("\nOutput Locations:")
         print(f"   Same dimensions:  {self.optimized_dir}")
         print(f"   Smart resized:    {self.optimized_resize_dir}")
 
