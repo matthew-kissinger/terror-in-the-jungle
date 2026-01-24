@@ -17,7 +17,10 @@ class AudioCompressor:
         self.assets_dir = self.project_root / 'public' / 'assets'
 
         # Create backup directory
-        self.backup_dir = self.project_root / 'audio_backup' / datetime.now().strftime('%Y%m%d_%H%M%S')
+        self.backup_dir = (
+            self.project_root / 'audio_backup'
+            / datetime.now().strftime('%Y%m%d_%H%M%S')
+        )
         self.backup_dir.mkdir(parents=True, exist_ok=True)
 
     def check_ffmpeg(self):
@@ -50,7 +53,11 @@ class AudioCompressor:
                 str(output_path)
             ]
 
-            result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
 
             if result.returncode == 0 and output_path.exists():
                 # Get file sizes
@@ -58,7 +65,11 @@ class AudioCompressor:
                 compressed_size = output_path.stat().st_size
                 reduction = (1 - compressed_size/original_size) * 100
 
-                print(f"  Success: {input_path.name} -> {output_path.name} ({reduction:.1f}% smaller)")
+                output_msg = (
+                    f"  Success: {input_path.name} -> {output_path.name} "
+                    f"({reduction:.1f}% smaller)"
+                )
+                print(output_msg)
 
                 # Remove original WAV file
                 input_path.unlink()
@@ -104,11 +115,16 @@ class AudioCompressor:
         success_count = 0
         for wav_file in wav_files:
             self.backup_original(wav_file)
-            # Use medium quality for transmissions (they should sound a bit compressed anyway)
+            # Use medium quality for transmissions
+            # (they should sound a bit compressed anyway)
             if self.compress_audio(wav_file, quality='5'):
                 success_count += 1
 
-        print(f"  Successfully compressed {success_count}/{len(wav_files)} transmission files")
+        success_msg = (
+            f"  Successfully compressed {success_count}/{len(wav_files)} "
+            f"transmission files"
+        )
+        print(success_msg)
         return success_count > 0
 
     def run(self):

@@ -40,7 +40,11 @@ def process_favicon(input_path, output_dir='public'):
     bbox = processed.getbbox()
     if bbox:
         processed = processed.crop(bbox)
-        print(f"Cropped image from {width}x{height} to {processed.width}x{processed.height}")
+        crop_msg = (
+            f"Cropped image from {width}x{height} to "
+            f"{processed.width}x{processed.height}"
+        )
+        print(crop_msg)
 
     # Add some padding around the content (10% of the smaller dimension)
     padding = min(processed.width, processed.height) // 10

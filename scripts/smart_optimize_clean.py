@@ -30,9 +30,16 @@ class SmartOptimizer:
         self.project_root = self.assets_dir.parent.parent
 
         # Create folder structure
-        self.archive_dir = self.project_root / 'assets_archive' / datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.optimized_dir = self.project_root / 'public' / 'assets_optimized'
-        self.optimized_resize_dir = self.project_root / 'public' / 'assets_optimized_resized'
+        self.archive_dir = (
+            self.project_root / 'assets_archive'
+            / datetime.now().strftime('%Y%m%d_%H%M%S')
+        )
+        self.optimized_dir = (
+            self.project_root / 'public' / 'assets_optimized'
+        )
+        self.optimized_resize_dir = (
+            self.project_root / 'public' / 'assets_optimized_resized'
+        )
 
         # Create directories
         self.archive_dir.mkdir(parents=True, exist_ok=True)
@@ -51,7 +58,9 @@ class SmartOptimizer:
         self.sizing_rules = {
             'soldier': {
                 'max_dimension': 1024,  # Still large for detail
-                'description': 'Character sprites need detail for combat visibility'
+                'description': (
+                    'Character sprites need detail for combat visibility'
+                )
             },
             'tree': {
                 'max_dimension': 2048,  # Trees are big in-game
@@ -120,7 +129,10 @@ To restore these assets:
 
         if any(x in name_lower for x in ['soldier', 'enemy']):
             return 'soldier'
-        elif any(x in name_lower for x in ['dipterocarp', 'banyan', 'coconut', 'palm', 'tree']):
+        elif any(
+            x in name_lower
+            for x in ['dipterocarp', 'banyan', 'coconut', 'palm', 'tree']
+        ):
             return 'tree'
         elif any(x in name_lower for x in ['fern', 'elephant', 'grass']):
             return 'foliage'
@@ -133,7 +145,9 @@ To restore these assets:
         else:
             return 'misc'
 
-    def calculate_new_dimensions(self, width: int, height: int, max_dimension: int) -> Tuple[int, int]:
+    def calculate_new_dimensions(
+        self, width: int, height: int, max_dimension: int
+    ) -> Tuple[int, int]:
         """
         Calculate new dimensions preserving aspect ratio
         Never upscale, only downscale if needed
@@ -231,10 +245,14 @@ To restore these assets:
 
                 # Determine optimal size based on content
                 content_type = self.detect_content_type(input_path.name)
-                max_dim = self.sizing_rules.get(content_type, {'max_dimension': 2048})['max_dimension']
+                max_dim = self.sizing_rules.get(
+                    content_type, {'max_dimension': 2048}
+                )['max_dimension']
 
                 # Calculate new dimensions preserving aspect ratio
-                new_width, new_height = self.calculate_new_dimensions(img.width, img.height, max_dim)
+                new_width, new_height = self.calculate_new_dimensions(
+                    img.width, img.height, max_dim
+                )
                 stats['new_dimensions'] = f"{new_width}x{new_height}"
 
                 if new_width != img.width or new_height != img.height:
@@ -242,7 +260,9 @@ To restore these assets:
 
                     # Resize with high quality
                     # Use LANCZOS for downscaling (best quality)
-                    resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                    resized = img.resize(
+                        (new_width, new_height), Image.Resampling.LANCZOS
+                    )
 
                     # Save with optimization
                     resized.save(output_path, 'PNG', optimize=True)
@@ -395,7 +415,12 @@ To restore these assets:
             reduction2 = (1 - stats2['optimized_size']/stats2['original_size']) * 100
 
             if stats2['dimensions_changed']:
-                print(f" {reduction2:.1f}% smaller ({stats2['original_dimensions']} → {stats2['new_dimensions']})")
+                dim_msg = (
+                    f" {reduction2:.1f}% smaller "
+                    f"({stats2['original_dimensions']} "
+                    f"→ {stats2['new_dimensions']})"
+                )
+                print(dim_msg)
             else:
                 print(f" {reduction2:.1f}% smaller (no resize needed)")
 
@@ -458,9 +483,17 @@ To restore these assets:
         print("\nSize Results:")
         print(f"   Original:                {original_mb:.2f} MB")
         same_reduction = (1-optimized_mb/original_mb)*100
-        print(f"   Optimized (same size):   {optimized_mb:.2f} MB ({same_reduction:.1f}% reduction)")
+        same_msg = (
+            f"   Optimized (same size):   {optimized_mb:.2f} MB "
+            f"({same_reduction:.1f}% reduction)"
+        )
+        print(same_msg)
         resize_reduction = (1-resized_mb/original_mb)*100
-        print(f"   Optimized (smart resize): {resized_mb:.2f} MB ({resize_reduction:.1f}% reduction)")
+        resize_msg = (
+            f"   Optimized (smart resize): {resized_mb:.2f} MB "
+            f"({resize_reduction:.1f}% reduction)"
+        )
+        print(resize_msg)
 
         print("\nOutput Locations:")
         print(f"   Same dimensions:  {self.optimized_dir}")
