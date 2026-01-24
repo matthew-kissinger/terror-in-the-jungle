@@ -41,6 +41,7 @@ export class PlayerHealthSystem implements GameSystem {
   private camera?: THREE.Camera;
   private ticketSystem?: TicketSystem;
   private hudSystem?: any;
+  private playerController?: any;
 
   constructor() {
     this.ui = new PlayerHealthUI();
@@ -148,6 +149,14 @@ export class PlayerHealthSystem implements GameSystem {
     }
     this.effects.addDamageIndicator(amount, sourcePosition, playerPosition, cameraDirection);
 
+    // Apply camera shake based on damage amount
+    if (this.playerController) {
+      // Scale shake intensity: 0.4 for small hits, up to 1.2 for heavy hits
+      // Typical damage is 24-34, so we scale by ~0.015 per damage point
+      const shakeIntensity = Math.min(1.2, amount * 0.02);
+      this.playerController.applyScreenShake(shakeIntensity);
+    }
+
     // Check for death
     if (this.playerState.health <= 0) {
       this.onPlayerDeath();
@@ -237,6 +246,7 @@ export class PlayerHealthSystem implements GameSystem {
   }
 
   setPlayerController(playerController: any): void {
+    this.playerController = playerController;
     if (this.respawnManager) {
       this.respawnManager.setPlayerController(playerController);
     }
