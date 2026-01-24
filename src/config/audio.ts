@@ -9,7 +9,8 @@ export interface SoundConfig {
 
 export const AUDIO_POOL_SIZES = {
   gunshot: 20,
-  death: 10
+  death: 10,
+  explosion: 8
 } as const;
 
 export const SOUND_CONFIGS: Record<string, SoundConfig> = {
@@ -51,5 +52,12 @@ export const SOUND_CONFIGS: Record<string, SoundConfig> = {
   playerReload: {
     path: 'assets/optimized/playerReload.ogg',
     volume: 0.6
+  },
+  grenadeExplosion: {
+    path: 'assets/optimized/grenadeExplosion.wav',
+    volume: 0.9,
+    refDistance: 15,
+    maxDistance: 150,
+    rolloffFactor: 1.5
   }
 };

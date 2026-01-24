@@ -16,6 +16,7 @@ export class AudioManager implements GameSystem {
     private positionalGunshotPool: THREE.PositionalAudio[] = [];
     private deathSoundPool: THREE.PositionalAudio[] = [];
     private playerReloadPool: THREE.Audio[] = [];
+    private explosionSoundPool: THREE.PositionalAudio[] = [];
 
     // Ambient sounds
     private ambientSounds: THREE.Audio[] = [];
@@ -25,6 +26,7 @@ export class AudioManager implements GameSystem {
     private readonly GUNSHOT_POOL_SIZE = AUDIO_POOL_SIZES.gunshot;
     private readonly DEATH_POOL_SIZE = AUDIO_POOL_SIZES.death;
     private readonly RELOAD_POOL_SIZE = 3; // Only need a few reload sounds
+    private readonly EXPLOSION_POOL_SIZE = AUDIO_POOL_SIZES.explosion;
 
     // Sound configurations
     private readonly soundConfigs: Record<string, SoundConfig> = SOUND_CONFIGS;
@@ -180,6 +182,21 @@ export class AudioManager implements GameSystem {
             }
             this.playerReloadPool.push(sound);
         }
+
+        // Initialize explosion sound pool
+        for (let i = 0; i < this.EXPLOSION_POOL_SIZE; i++) {
+            const sound = new THREE.PositionalAudio(this.listener);
+            const buffer = this.audioBuffers.get('grenadeExplosion');
+            if (buffer) {
+                sound.setBuffer(buffer);
+                sound.setVolume(this.soundConfigs.grenadeExplosion.volume || 0.9);
+                sound.setRefDistance(this.soundConfigs.grenadeExplosion.refDistance || 15);
+                sound.setMaxDistance(this.soundConfigs.grenadeExplosion.maxDistance || 150);
+                sound.setRolloffFactor(this.soundConfigs.grenadeExplosion.rolloffFactor || 1.5);
+                sound.setDistanceModel('linear');
+            }
+            this.explosionSoundPool.push(sound);
+        }
     }
 
     private startAmbientSounds(): void {
@@ -277,6 +294,26 @@ export class AudioManager implements GameSystem {
         }
     }
 
+    // Play explosion sound at position
+    playExplosionAt(position: THREE.Vector3): void {
+        const sound = this.getAvailablePositionalSound(this.explosionSoundPool);
+        if (sound && !sound.isPlaying) {
+            // Create temporary object at position
+            const tempObj = new THREE.Object3D();
+            tempObj.position.copy(position);
+            tempObj.add(sound);
+            this.scene.add(tempObj);
+
+            sound.play();
+
+            // Clean up after sound finishes
+            sound.onEnded = () => {
+                tempObj.remove(sound);
+                this.scene.remove(tempObj);
+            };
+        }
+    }
+
     // Helper to get available non-positional sound from pool
     private getAvailableSound(pool: THREE.Audio[]): THREE.Audio | null {
         for (const sound of pool) {
@@ -350,6 +387,10 @@ export class AudioManager implements GameSystem {
             if (sound.isPlaying) sound.stop();
         }
 
+        for (const sound of this.explosionSoundPool) {
+            if (sound.isPlaying) sound.stop();
+        }
+
         for (const sound of this.ambientSounds) {
             if (sound.isPlaying) sound.stop();
         }
@@ -359,6 +400,7 @@ export class AudioManager implements GameSystem {
         this.positionalGunshotPool = [];
         this.deathSoundPool = [];
         this.playerReloadPool = [];
+        this.explosionSoundPool = [];
         this.ambientSounds = [];
 
         // Clear buffers
