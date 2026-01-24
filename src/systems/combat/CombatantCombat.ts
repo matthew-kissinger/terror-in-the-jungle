@@ -182,7 +182,10 @@ export class CombatantCombat {
 
   private trySuppressiveFire(combatant: Combatant, playerPosition: THREE.Vector3): void {
     if (!combatant.gunCore.canFire() || combatant.burstCooldown > 0) return;
-    if (!combatant.lastKnownTargetPos) return;
+
+    // Use suppressionTarget if available, otherwise fall back to lastKnownTargetPos
+    const targetPos = combatant.suppressionTarget || combatant.lastKnownTargetPos
+    if (!targetPos) return;
 
     combatant.gunCore.registerShot();
     combatant.currentBurst++;
@@ -192,8 +195,9 @@ export class CombatantCombat {
       combatant.burstCooldown = combatant.skillProfile.burstPauseMs / 1000;
     }
 
-    const spread = combatant.skillProfile.aimJitterAmplitude * 2;
-    const shotRay = this.calculateSuppressiveShot(combatant, spread);
+    // Higher spread for suppressive fire - fire at area not point
+    const spread = combatant.skillProfile.aimJitterAmplitude * 3.5
+    const shotRay = this.calculateSuppressiveShot(combatant, spread, targetPos);
 
     const distance = combatant.position.distanceTo(playerPosition);
     if (distance < 200) {
@@ -256,11 +260,49 @@ export class CombatantCombat {
         if (hit.headshot) {
           console.log(`🎯 Headshot! ${combatant.faction} -> ${hit.combatant.faction}`);
         }
+      } else {
+        // Track near misses for suppression
+        this.trackNearMisses(shotRay, hitPoint, combatant.faction, allCombatants)
       }
     } else if (hit) {
       const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
       this.applyDamage(hit.combatant, damage, combatant, squads);
     }
+  }
+
+  private trackNearMisses(
+    shotRay: THREE.Ray,
+    hitPoint: THREE.Vector3,
+    shooterFaction: Faction,
+    allCombatants: Map<string, Combatant>
+  ): void {
+    const SUPPRESSION_RADIUS = 5.0
+
+    // Check all enemy combatants for proximity to shot
+    allCombatants.forEach(combatant => {
+      if (combatant.faction === shooterFaction) return
+      if (combatant.state === CombatantState.DEAD) return
+
+      const distanceToHit = combatant.position.distanceTo(hitPoint)
+
+      if (distanceToHit < SUPPRESSION_RADIUS) {
+        // Track near miss
+        combatant.nearMissCount = (combatant.nearMissCount || 0) + 1
+        combatant.lastSuppressedTime = Date.now()
+
+        // Increase panic based on proximity
+        const proximityFactor = 1.0 - (distanceToHit / SUPPRESSION_RADIUS)
+        combatant.panicLevel = Math.min(1.0, combatant.panicLevel + 0.2 * proximityFactor)
+        combatant.suppressionLevel = Math.min(1.0, combatant.suppressionLevel + 0.25 * proximityFactor)
+
+        // If heavily suppressed, seek cover
+        if (combatant.nearMissCount >= 3 && combatant.panicLevel > 0.6) {
+          if (combatant.state === CombatantState.ENGAGING || combatant.state === CombatantState.ADVANCING) {
+            combatant.state = CombatantState.SEEKING_COVER
+          }
+        }
+      }
+    })
   }
 
   applyDamage(
@@ -446,8 +488,9 @@ export class CombatantCombat {
     return new THREE.Ray(origin, finalDirection);
   }
 
-  private calculateSuppressiveShot(combatant: Combatant, spread: number): THREE.Ray {
-    if (!combatant.lastKnownTargetPos) {
+  private calculateSuppressiveShot(combatant: Combatant, spread: number, targetPos?: THREE.Vector3): THREE.Ray {
+    const target = targetPos || combatant.lastKnownTargetPos
+    if (!target) {
       const forward = new THREE.Vector3(
         Math.cos(combatant.rotation),
         0,
@@ -457,7 +500,7 @@ export class CombatantCombat {
     }
 
     const toTarget = new THREE.Vector3()
-      .subVectors(combatant.lastKnownTargetPos, combatant.position)
+      .subVectors(target, combatant.position)
       .normalize();
 
     const spreadRad = THREE.MathUtils.degToRad(spread);

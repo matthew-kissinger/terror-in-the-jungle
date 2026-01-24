@@ -27,6 +27,7 @@ export enum CombatantState {
   SUPPRESSING = 'suppressing',
   ADVANCING = 'advancing',
   RETREATING = 'retreating',
+  SEEKING_COVER = 'seeking_cover',
   DEAD = 'dead'
 }
 
@@ -71,6 +72,13 @@ export interface Combatant {
   isPlayerProxy?: boolean;
   isObjectiveFocused?: boolean;
   isRejoiningSquad?: boolean;
+  coverPosition?: THREE.Vector3;
+  lastCoverSeekTime?: number;
+  inCover?: boolean;
+  suppressionTarget?: THREE.Vector3;
+  suppressionEndTime?: number;
+  lastSuppressedTime?: number;
+  nearMissCount?: number;
 }
 
 export enum SquadCommand {

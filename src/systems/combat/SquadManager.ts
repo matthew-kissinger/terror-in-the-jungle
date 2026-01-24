@@ -120,6 +120,51 @@ export class SquadManager {
     this.chunkManager = chunkManager;
   }
 
+  assignSuppressionRoles(
+    squad: Squad,
+    targetPos: THREE.Vector3,
+    allCombatants: Map<string, Combatant>
+  ): { suppressors: Combatant[]; flankers: Combatant[] } {
+    const suppressors: Combatant[] = []
+    const flankers: Combatant[] = []
+
+    if (squad.members.length < 3) {
+      return { suppressors, flankers }
+    }
+
+    squad.members.forEach((memberId, index) => {
+      const combatant = allCombatants.get(memberId)
+      if (!combatant) return
+
+      // Leader and first follower become suppressors
+      if (combatant.squadRole === 'leader' || index === 1) {
+        suppressors.push(combatant)
+      } else {
+        flankers.push(combatant)
+      }
+    })
+
+    // Set flanking positions for flankers
+    flankers.forEach((flanker, index) => {
+      const angle = (index % 2 === 0 ? 45 : -45) * (Math.PI / 180)
+      const distance = 20 + Math.random() * 10
+
+      const offset = new THREE.Vector3(
+        Math.cos(angle) * distance,
+        0,
+        Math.sin(angle) * distance
+      )
+
+      flanker.destinationPoint = targetPos.clone().add(offset)
+      flanker.destinationPoint.y = this.getTerrainHeight(
+        flanker.destinationPoint.x,
+        flanker.destinationPoint.z
+      )
+    })
+
+    return { suppressors, flankers }
+  }
+
   dispose(): void {
     this.squads.clear();
   }
