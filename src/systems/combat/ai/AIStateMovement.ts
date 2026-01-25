@@ -1,0 +1,94 @@
+import * as THREE from 'three';
+import { Combatant, CombatantState } from '../types';
+import { SpatialOctree } from '../SpatialOctree';
+
+/**
+ * Handles advancing and seeking cover movement states
+ */
+export class AIStateMovement {
+  handleAdvancing(
+    combatant: Combatant,
+    deltaTime: number,
+    playerPosition: THREE.Vector3,
+    allCombatants: Map<string, Combatant>,
+    spatialGrid: SpatialOctree | undefined,
+    findNearestEnemy: (
+      combatant: Combatant,
+      playerPosition: THREE.Vector3,
+      allCombatants: Map<string, Combatant>,
+      spatialGrid?: SpatialOctree
+    ) => Combatant | null,
+    canSeeTarget: (
+      combatant: Combatant,
+      target: Combatant,
+      playerPosition: THREE.Vector3
+    ) => boolean
+  ): void {
+    if (!combatant.destinationPoint) {
+      combatant.state = CombatantState.ENGAGING;
+      return;
+    }
+
+    const distanceToDestination = combatant.position.distanceTo(combatant.destinationPoint);
+    if (distanceToDestination < 3.0) {
+      combatant.state = CombatantState.ENGAGING;
+      combatant.destinationPoint = undefined;
+      return;
+    }
+
+    const toDestination = new THREE.Vector3()
+      .subVectors(combatant.destinationPoint, combatant.position)
+      .normalize();
+    combatant.rotation = Math.atan2(toDestination.z, toDestination.x);
+
+    const enemy = findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid);
+    if (enemy) {
+      const targetPos = enemy.id === 'PLAYER' ? playerPosition : enemy.position;
+      const distance = combatant.position.distanceTo(targetPos);
+
+      if (distance < 20 && canSeeTarget(combatant, enemy, playerPosition)) {
+        combatant.state = CombatantState.ENGAGING;
+        combatant.target = enemy;
+        combatant.destinationPoint = undefined;
+      }
+    }
+  }
+
+  handleSeekingCover(
+    combatant: Combatant,
+    deltaTime: number,
+    playerPosition: THREE.Vector3,
+    allCombatants: Map<string, Combatant>,
+    canSeeTarget: (
+      combatant: Combatant,
+      target: Combatant,
+      playerPosition: THREE.Vector3
+    ) => boolean
+  ): void {
+    if (!combatant.coverPosition || !combatant.destinationPoint) {
+      combatant.state = CombatantState.ENGAGING;
+      combatant.inCover = false;
+      return;
+    }
+
+    const distanceToCover = combatant.position.distanceTo(combatant.coverPosition);
+    if (distanceToCover < 2) {
+      combatant.inCover = true;
+      combatant.state = CombatantState.ENGAGING;
+      combatant.destinationPoint = undefined;
+      console.log(`🛡️ ${combatant.faction} unit reached cover, switching to peek-and-fire`);
+      return;
+    }
+
+    const toCover = new THREE.Vector3()
+      .subVectors(combatant.coverPosition, combatant.position)
+      .normalize();
+    combatant.rotation = Math.atan2(toCover.z, toCover.x);
+
+    if (combatant.target && !canSeeTarget(combatant, combatant.target, playerPosition)) {
+      combatant.state = CombatantState.ENGAGING;
+      combatant.destinationPoint = undefined;
+      combatant.inCover = false;
+    }
+  }
+}
