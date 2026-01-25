@@ -115,8 +115,7 @@ export class SandboxSystemManager {
     this.playerSquadController = new PlayerSquadController(squadManager);
     this.inventoryManager = new InventoryManager();
     this.grenadeSystem = new GrenadeSystem(scene, camera, this.chunkManager);
-    // Mortar system disabled - to be reimplemented
-    this.mortarSystem = new MortarSystem(scene, camera, this.chunkManager); // Disabled but keeping instance
+    this.mortarSystem = new MortarSystem(scene, camera, this.chunkManager);
     this.sandbagSystem = new SandbagSystem(scene, camera, this.chunkManager);
     this.cameraShakeSystem = new CameraShakeSystem();
     this.playerSuppressionSystem = new PlayerSuppressionSystem();
@@ -201,6 +200,7 @@ export class SandboxSystemManager {
     this.fullMapSystem.setZoneManager(this.zoneManager);
     this.fullMapSystem.setCombatantSystem(this.combatantSystem);
     this.fullMapSystem.setGameModeManager(this.gameModeManager);
+    this.compassSystem.setZoneManager(this.zoneManager);
     this.zoneManager.setCombatantSystem(this.combatantSystem);
     this.zoneManager.setCamera(camera);
     this.zoneManager.setChunkManager(this.chunkManager);
@@ -254,26 +254,27 @@ export class SandboxSystemManager {
     this.grenadeSystem.setAudioManager(this.audioManager);
     this.grenadeSystem.setPlayerController(this.playerController);
     this.hudSystem.setGrenadeSystem(this.grenadeSystem);
-    // Mortar connections disabled - to be reimplemented
-    // this.mortarSystem.setCombatantSystem(this.combatantSystem);
-    // this.mortarSystem.setInventoryManager(this.inventoryManager);
+    this.mortarSystem.setCombatantSystem(this.combatantSystem);
+    this.mortarSystem.setInventoryManager(this.inventoryManager);
+    this.mortarSystem.setAudioManager(this.audioManager);
     this.sandbagSystem.setInventoryManager(this.inventoryManager);
 
     const impactEffectsPool = (this.combatantSystem as any).impactEffectsPool;
     if (impactEffectsPool) {
       this.grenadeSystem.setImpactEffectsPool(impactEffectsPool);
-      // this.mortarSystem.setImpactEffectsPool(impactEffectsPool); // Disabled
+      this.mortarSystem.setImpactEffectsPool(impactEffectsPool);
     }
 
     const explosionEffectsPool = (this.combatantSystem as any).explosionEffectsPool;
     if (explosionEffectsPool) {
       this.grenadeSystem.setExplosionEffectsPool(explosionEffectsPool);
+      this.mortarSystem.setExplosionEffectsPool(explosionEffectsPool);
     }
 
     // Connect PlayerController with all weapon systems
     this.playerController.setInventoryManager(this.inventoryManager);
     this.playerController.setGrenadeSystem(this.grenadeSystem);
-    // this.playerController.setMortarSystem(this.mortarSystem); // Disabled
+    this.playerController.setMortarSystem(this.mortarSystem);
     this.playerController.setSandbagSystem(this.sandbagSystem);
 
     // Connect combat systems with sandbag system
@@ -284,6 +285,7 @@ export class SandboxSystemManager {
     const combatantAI = (this.combatantSystem as any).combatantAI;
     if (combatantAI) {
       combatantAI.setSandbagSystem(this.sandbagSystem);
+      combatantAI.setZoneManager(this.zoneManager);
     }
   }
 

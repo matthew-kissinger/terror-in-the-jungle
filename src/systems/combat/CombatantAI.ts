@@ -212,10 +212,13 @@ export class CombatantAI {
       if (this.canSeeTarget(combatant, combatant.target, playerPosition)) {
         combatant.state = CombatantState.ENGAGING;
         combatant.currentBurst = 0;
-        
+
       } else {
-        combatant.state = CombatantState.PATROLLING;
+        // Return to previous state if was defending, else patrol
+        combatant.state = combatant.previousState === CombatantState.DEFENDING ?
+          CombatantState.DEFENDING : CombatantState.PATROLLING;
         combatant.target = null;
+        combatant.previousState = undefined;
       }
     }
   }
@@ -228,9 +231,12 @@ export class CombatantAI {
     spatialGrid?: SpatialOctree
   ): void {
     if (!combatant.target || combatant.target.state === CombatantState.DEAD) {
-      combatant.state = CombatantState.PATROLLING;
+      // Return to previous state if was defending, else patrol
+      combatant.state = combatant.previousState === CombatantState.DEFENDING ?
+        CombatantState.DEFENDING : CombatantState.PATROLLING;
       combatant.target = null;
       combatant.isFullAuto = false;
+      combatant.previousState = undefined;
       return;
     }
 

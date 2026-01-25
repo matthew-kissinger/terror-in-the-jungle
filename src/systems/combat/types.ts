@@ -28,6 +28,7 @@ export enum CombatantState {
   ADVANCING = 'advancing',
   RETREATING = 'retreating',
   SEEKING_COVER = 'seeking_cover',
+  DEFENDING = 'defending',
   DEAD = 'dead'
 }
 
@@ -82,6 +83,9 @@ export interface Combatant {
   isDying?: boolean;
   deathProgress?: number;
   deathStartTime?: number;
+  defendingZoneId?: string;
+  defensePosition?: THREE.Vector3;
+  lastDefenseReassignTime?: number;
 }
 
 export enum SquadCommand {

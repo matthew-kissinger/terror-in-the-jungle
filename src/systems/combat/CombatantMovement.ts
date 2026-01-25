@@ -27,6 +27,8 @@ export class CombatantMovement {
       this.updateCombatMovement(combatant, deltaTime);
     } else if (combatant.state === CombatantState.SEEKING_COVER) {
       this.updateCoverSeekingMovement(combatant, deltaTime);
+    } else if (combatant.state === CombatantState.DEFENDING) {
+      this.updateDefendingMovement(combatant, deltaTime);
     }
 
     // Apply velocity normally - LOD scaling handled in CombatantSystem
@@ -218,6 +220,33 @@ export class CombatantMovement {
 
     // Move quickly to cover with urgency
     const speed = 6;
+    combatant.velocity.set(
+      toDestination.x * speed,
+      0,
+      toDestination.z * speed
+    );
+  }
+
+  private updateDefendingMovement(combatant: Combatant, deltaTime: number): void {
+    if (!combatant.destinationPoint) {
+      // At defensive position, hold still
+      combatant.velocity.set(0, 0, 0);
+      return;
+    }
+
+    const toDestination = new THREE.Vector3()
+      .subVectors(combatant.destinationPoint, combatant.position);
+    const distance = toDestination.length();
+
+    if (distance < 2) {
+      combatant.velocity.set(0, 0, 0);
+      return;
+    }
+
+    toDestination.normalize();
+
+    // Move to defensive position at normal speed
+    const speed = 3;
     combatant.velocity.set(
       toDestination.x * speed,
       0,
