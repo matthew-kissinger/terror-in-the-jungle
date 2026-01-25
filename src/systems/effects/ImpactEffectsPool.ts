@@ -23,6 +23,9 @@ export class ImpactEffectsPool {
   private decalMaterial: THREE.SpriteMaterial;
   private decalTexture: THREE.Texture;
 
+  // Pre-allocated scratch vectors to avoid per-frame allocations
+  private readonly gravity = new THREE.Vector3(0, -9.8, 0);
+
   constructor(scene: THREE.Scene, maxEffects = 32) {
     this.scene = scene;
     this.maxEffects = maxEffects;
@@ -198,7 +201,6 @@ export class ImpactEffectsPool {
 
   update(deltaTime: number): void {
     const now = performance.now();
-    const gravity = new THREE.Vector3(0, -9.8, 0);
 
     for (let i = this.active.length - 1; i >= 0; i--) {
       const effect = this.active[i];
@@ -222,7 +224,7 @@ export class ImpactEffectsPool {
         // Update debris
         for (let j = 0; j < particlePositions.count; j++) {
           // Apply gravity
-          effect.velocity[j].addScaledVector(gravity, deltaTime);
+          effect.velocity[j].addScaledVector(this.gravity, deltaTime);
 
           // Update position
           const x = particlePositions.getX(j) + effect.velocity[j].x * deltaTime;
