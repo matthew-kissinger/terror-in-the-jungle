@@ -638,42 +638,90 @@ export class CombatantAI {
   }
 
   private findNearestCover(combatant: Combatant, threatPosition: THREE.Vector3): THREE.Vector3 | null {
-    if (!this.chunkManager) {
-      return null;
-    }
-
     const MAX_SEARCH_RADIUS = 30;
     const SEARCH_SAMPLES = 16;
+    const SANDBAG_PREFERRED_DISTANCE = 15; // Prefer sandbags within 15m
     let bestCoverPos: THREE.Vector3 | null = null;
     let bestCoverScore = -Infinity;
 
-    // Sample positions in a circle around the combatant
-    for (let i = 0; i < SEARCH_SAMPLES; i++) {
-      const angle = (i / SEARCH_SAMPLES) * Math.PI * 2;
+    // First, check sandbag cover positions if sandbag system available
+    if (this.sandbagSystem) {
+      const sandbagBounds = this.sandbagSystem.getSandbagBounds();
 
-      // Try multiple distances
-      for (const radius of [10, 20, 30]) {
-        const testPos = new THREE.Vector3(
-          combatant.position.x + Math.cos(angle) * radius,
-          0,
-          combatant.position.z + Math.sin(angle) * radius
-        );
+      for (const bounds of sandbagBounds) {
+        // Get center of sandbag
+        const sandbagCenter = new THREE.Vector3();
+        bounds.getCenter(sandbagCenter);
 
-        const terrainHeight = this.chunkManager.getHeightAt(testPos.x, testPos.z);
-        testPos.y = terrainHeight;
+        const distanceToSandbag = combatant.position.distanceTo(sandbagCenter);
 
-        // Check if this position provides cover
-        if (this.isPositionCover(testPos, combatant.position, threatPosition)) {
-          // Score based on distance to combatant and cover quality
-          const distanceToCombatant = combatant.position.distanceTo(testPos);
-          const heightDifference = Math.abs(testPos.y - combatant.position.y);
+        // Only consider sandbags within search radius
+        if (distanceToSandbag > MAX_SEARCH_RADIUS) continue;
 
-          // Prefer closer positions with good height difference
-          const score = (1 / (distanceToCombatant + 1)) * heightDifference;
+        // Calculate cover position behind sandbag relative to threat
+        const threatToSandbag = new THREE.Vector3()
+          .subVectors(sandbagCenter, threatPosition)
+          .normalize();
+
+        // Position 2m behind sandbag center (away from threat)
+        const coverPos = sandbagCenter.clone().add(threatToSandbag.multiplyScalar(2));
+
+        // Verify this position provides cover from threat
+        if (this.isSandbagCover(coverPos, sandbagCenter, bounds, threatPosition)) {
+          // Score sandbag cover highly, especially if within preferred distance
+          const distanceToCombatant = combatant.position.distanceTo(coverPos);
+
+          // Base score inversely proportional to distance
+          let score = 1 / (distanceToCombatant + 1);
+
+          // Bonus for sandbags within preferred distance
+          if (distanceToSandbag < SANDBAG_PREFERRED_DISTANCE) {
+            score *= 2.0; // Double score for nearby sandbags
+          }
+
+          // Additional bonus for being closer to combatant than threat
+          if (distanceToCombatant < distanceToSandbag) {
+            score *= 1.5;
+          }
 
           if (score > bestCoverScore) {
             bestCoverScore = score;
-            bestCoverPos = testPos.clone();
+            bestCoverPos = coverPos.clone();
+          }
+        }
+      }
+    }
+
+    // Then check terrain-based cover if chunk manager available
+    if (this.chunkManager) {
+      // Sample positions in a circle around the combatant
+      for (let i = 0; i < SEARCH_SAMPLES; i++) {
+        const angle = (i / SEARCH_SAMPLES) * Math.PI * 2;
+
+        // Try multiple distances
+        for (const radius of [10, 20, 30]) {
+          const testPos = new THREE.Vector3(
+            combatant.position.x + Math.cos(angle) * radius,
+            0,
+            combatant.position.z + Math.sin(angle) * radius
+          );
+
+          const terrainHeight = this.chunkManager.getHeightAt(testPos.x, testPos.z);
+          testPos.y = terrainHeight;
+
+          // Check if this position provides cover
+          if (this.isPositionCover(testPos, combatant.position, threatPosition)) {
+            // Score based on distance to combatant and cover quality
+            const distanceToCombatant = combatant.position.distanceTo(testPos);
+            const heightDifference = Math.abs(testPos.y - combatant.position.y);
+
+            // Prefer closer positions with good height difference
+            const score = (1 / (distanceToCombatant + 1)) * heightDifference;
+
+            if (score > bestCoverScore) {
+              bestCoverScore = score;
+              bestCoverPos = testPos.clone();
+            }
           }
         }
       }
@@ -719,6 +767,50 @@ export class CombatantAI {
 
     // Cover is good if terrain blocks the shot
     return terrainHit.hit && terrainHit.distance! < distance - 1;
+  }
+
+  private isSandbagCover(
+    coverPos: THREE.Vector3,
+    sandbagCenter: THREE.Vector3,
+    sandbagBounds: THREE.Box3,
+    threatPos: THREE.Vector3
+  ): boolean {
+    // Verify cover position is behind sandbag relative to threat
+    const threatToSandbag = new THREE.Vector3()
+      .subVectors(sandbagCenter, threatPos);
+    const threatToCover = new THREE.Vector3()
+      .subVectors(coverPos, threatPos);
+
+    // Cover position should be further from threat than sandbag center
+    if (threatToCover.length() < threatToSandbag.length()) {
+      return false;
+    }
+
+    // Check if sandbag blocks line of sight from threat to cover position
+    const distance = coverPos.distanceTo(threatPos);
+
+    // Ray from threat at eye height to cover position at eye height
+    const threatEyePos = threatPos.clone();
+    threatEyePos.y += 1.7;
+
+    const coverEyePos = coverPos.clone();
+    coverEyePos.y += 1.7;
+
+    const direction = new THREE.Vector3()
+      .subVectors(coverEyePos, threatEyePos)
+      .normalize();
+
+    const ray = new THREE.Ray(threatEyePos, direction);
+
+    // Check intersection with sandbag bounds
+    const intersection = ray.intersectBox(sandbagBounds, new THREE.Vector3());
+
+    // Cover is good if sandbag blocks the shot
+    if (intersection && threatEyePos.distanceTo(intersection) < distance - 0.5) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
