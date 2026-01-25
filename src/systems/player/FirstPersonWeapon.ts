@@ -320,6 +320,7 @@ export class FirstPersonWeapon implements GameSystem {
       this.gunCore = this.rifleCore;
       this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
       this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
+      this.pumpGripRef = undefined; // Rifle has no pump grip
     }
   }
 
@@ -335,6 +336,7 @@ export class FirstPersonWeapon implements GameSystem {
       this.gunCore = this.shotgunCore;
       this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
       this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
+      this.pumpGripRef = this.weaponRig.getObjectByName('pumpGrip') || undefined;
     }
   }
 
@@ -350,6 +352,7 @@ export class FirstPersonWeapon implements GameSystem {
       this.gunCore = this.smgCore;
       this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
       this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
+      this.pumpGripRef = undefined; // SMG has no pump grip
     }
   }
 
@@ -843,18 +846,28 @@ export class FirstPersonWeapon implements GameSystem {
     // Stage 1 (0-50%): Pull pump grip backward
     // Stage 2 (50-100%): Push pump grip forward
 
+    let pumpPosition = 0;
+
     if (progress < 0.5) {
       // Stage 1: Pull back
       const t = progress / 0.5;
       const ease = this.easeOutCubic(t);
-      this.pumpOffset.z = -0.15 * ease; // Pull backward
-      this.pumpOffset.x = -0.02 * ease; // Slight tilt
+      pumpPosition = -0.2 * ease; // Pull backward
     } else {
       // Stage 2: Push forward
       const t = (progress - 0.5) / 0.5;
       const ease = this.easeInOutQuad(t);
-      this.pumpOffset.z = -0.15 * (1 - ease); // Return to normal
-      this.pumpOffset.x = -0.02 * (1 - ease); // Return to normal
+      pumpPosition = -0.2 * (1 - ease); // Return to normal
+    }
+
+    // Apply to pump grip if it exists
+    if (this.pumpGripRef) {
+      // Store original position if not already stored
+      if (!this.pumpGripRef.userData.originalX) {
+        this.pumpGripRef.userData.originalX = this.pumpGripRef.position.x;
+      }
+      // Move pump grip along X axis (barrel direction)
+      this.pumpGripRef.position.x = this.pumpGripRef.userData.originalX + pumpPosition;
     }
   }
 

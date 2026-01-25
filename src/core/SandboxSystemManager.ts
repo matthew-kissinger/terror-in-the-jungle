@@ -27,6 +27,7 @@ import { GrenadeSystem } from '../systems/weapons/GrenadeSystem';
 import { MortarSystem } from '../systems/weapons/MortarSystem';
 import { SandbagSystem } from '../systems/weapons/SandbagSystem';
 import { CameraShakeSystem } from '../systems/effects/CameraShakeSystem';
+import { PlayerSuppressionSystem } from '../systems/player/PlayerSuppressionSystem';
 
 export class SandboxSystemManager {
   private systems: GameSystem[] = [];
@@ -58,6 +59,7 @@ export class SandboxSystemManager {
   public mortarSystem!: MortarSystem;
   public sandbagSystem!: SandbagSystem;
   public cameraShakeSystem!: CameraShakeSystem;
+  public playerSuppressionSystem!: PlayerSuppressionSystem;
 
   async initializeSystems(
     scene: THREE.Scene,
@@ -117,6 +119,7 @@ export class SandboxSystemManager {
     this.mortarSystem = new MortarSystem(scene, camera, this.chunkManager); // Disabled but keeping instance
     this.sandbagSystem = new SandbagSystem(scene, camera, this.chunkManager);
     this.cameraShakeSystem = new CameraShakeSystem();
+    this.playerSuppressionSystem = new PlayerSuppressionSystem();
 
     this.connectSystems(scene, camera, sandboxRenderer);
 
@@ -147,7 +150,8 @@ export class SandboxSystemManager {
       this.grenadeSystem,
       this.mortarSystem,
       this.sandbagSystem,
-      this.cameraShakeSystem
+      this.cameraShakeSystem,
+      this.playerSuppressionSystem
     ];
 
     onProgress('world', 0.5);
@@ -238,6 +242,11 @@ export class SandboxSystemManager {
 
     // Connect camera shake system
     this.playerController.setCameraShakeSystem(this.cameraShakeSystem);
+
+    // Connect player suppression system
+    this.playerSuppressionSystem.setCameraShakeSystem(this.cameraShakeSystem);
+    this.playerSuppressionSystem.setPlayerController(this.playerController);
+    this.combatantSystem.setPlayerSuppressionSystem(this.playerSuppressionSystem);
 
     // Connect weapon systems
     this.grenadeSystem.setCombatantSystem(this.combatantSystem);

@@ -11,6 +11,7 @@ import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { CombatantRenderer } from './CombatantRenderer';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { SpatialGrid } from './SpatialGrid';
+import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 
 export interface CombatHitResult {
   hit: boolean;
@@ -34,6 +35,7 @@ export class CombatantCombat {
   private chunkManager?: ImprovedChunkManager;
   private combatantRenderer?: CombatantRenderer;
   private sandbagSystem?: SandbagSystem;
+  private playerSuppressionSystem?: PlayerSuppressionSystem;
 
   constructor(
     scene: THREE.Scene,
@@ -263,7 +265,7 @@ export class CombatantCombat {
         }
       } else {
         // Track near misses for suppression
-        this.trackNearMisses(shotRay, hitPoint, combatant.faction, allCombatants)
+        this.trackNearMisses(shotRay, hitPoint, combatant.faction, allCombatants, playerPosition)
       }
     } else if (hit) {
       const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
@@ -275,9 +277,19 @@ export class CombatantCombat {
     shotRay: THREE.Ray,
     hitPoint: THREE.Vector3,
     shooterFaction: Faction,
-    allCombatants: Map<string, Combatant>
+    allCombatants: Map<string, Combatant>,
+    playerPosition?: THREE.Vector3
   ): void {
     const SUPPRESSION_RADIUS = 5.0
+
+    // Check player for suppression (if OPFOR is shooting)
+    if (playerPosition && shooterFaction === Faction.OPFOR && this.playerSuppressionSystem) {
+      const distanceToPlayer = hitPoint.distanceTo(playerPosition)
+
+      if (distanceToPlayer < SUPPRESSION_RADIUS) {
+        this.playerSuppressionSystem.registerNearMiss(hitPoint, playerPosition)
+      }
+    }
 
     // Check all enemy combatants for proximity to shot
     allCombatants.forEach(combatant => {
@@ -549,5 +561,9 @@ export class CombatantCombat {
 
   setSandbagSystem(sandbagSystem: SandbagSystem): void {
     this.sandbagSystem = sandbagSystem;
+  }
+
+  setPlayerSuppressionSystem(system: PlayerSuppressionSystem): void {
+    this.playerSuppressionSystem = system;
   }
 }

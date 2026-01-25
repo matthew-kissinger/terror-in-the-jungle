@@ -926,6 +926,10 @@ export class CombatantSystem implements GameSystem {
     this.combatantCombat.setAudioManager(audioManager);
   }
 
+  setPlayerSuppressionSystem(system: any): void {
+    this.combatantCombat.setPlayerSuppressionSystem(system);
+  }
+
   // Game mode configuration methods
   setMaxCombatants(max: number): void {
     this.MAX_COMBATANTS = max;
