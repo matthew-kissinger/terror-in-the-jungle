@@ -236,7 +236,8 @@ export class PixelArtSandbox {
           lodMedium: 0,
           lodLow: 0,
           lodCulled: 0,
-          combatantCount: 0
+          combatantCount: 0,
+          octree: { nodes: 0, maxDepth: 0, avgEntitiesPerLeaf: 0 }
         };
 
     console.log('📊 Performance Stats:');
@@ -335,16 +336,18 @@ Have fun!
     this.systemManager.skybox.updatePosition(this.sandboxRenderer.camera.position);
 
     // Check if mortar is deployed and using weapon camera
-    const usingMortarCamera = this.systemManager.mortarSystem &&
-                              this.systemManager.mortarSystem.isUsingWeaponCamera();
+    // Mortar system disabled - to be reimplemented
+    const usingMortarCamera = false;
+    // const usingMortarCamera = this.systemManager.mortarSystem &&
+    //                           this.systemManager.mortarSystem.isUsingWeaponCamera();
 
     // Render the main scene with appropriate camera
     if (usingMortarCamera) {
-      const mortarCamera = this.systemManager.mortarSystem!.getWeaponCamera();
-      this.sandboxRenderer.renderer.render(
-        this.sandboxRenderer.scene,
-        mortarCamera
-      );
+      // const mortarCamera = this.systemManager.mortarSystem!.getWeaponCamera();
+      // this.sandboxRenderer.renderer.render(
+      //   this.sandboxRenderer.scene,
+      //   mortarCamera
+      // );
     } else {
       if (this.sandboxRenderer.postProcessing) {
         this.sandboxRenderer.postProcessing.render(deltaTime);
@@ -400,7 +403,8 @@ Have fun!
           lodMedium: 0,
           lodLow: 0,
           lodCulled: 0,
-          combatantCount: 0
+          combatantCount: 0,
+          octree: { nodes: 0, maxDepth: 0, avgEntitiesPerLeaf: 0 }
         };
     const vegetationActive = Object.entries(debugInfo)
       .filter(([key]) => key.endsWith('Active'))
