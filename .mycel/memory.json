@@ -260,6 +260,20 @@
       "source": "manual",
       "created_at": "2026-01-25T09:09:45.135569",
       "tags": []
+    },
+    {
+      "id": "3d1281d7",
+      "content": "When playtesting with Playwright, wait for game to fully load after clicking - use wait_for with 15-30s timeout. Loading screen completes when game world appears.",
+      "source": "manual",
+      "created_at": "2026-01-25T09:33:13.758411",
+      "tags": []
+    },
+    {
+      "id": "98d03ac3",
+      "content": "AmmoSupplySystem spawns crates at capture zones - uses ZoneManager for positions, InventoryManager for refills. Connect in SandboxSystemManager.connectSystems()",
+      "source": "manual",
+      "created_at": "2026-01-25T09:33:19.846531",
+      "tags": []
     }
   ],
   "warnings": [
@@ -450,6 +464,14 @@
       "created_at": "2026-01-25T09:08:51.321930",
       "tags": [],
       "severity": "low"
+    },
+    {
+      "id": "7c8e24a0",
+      "content": "Task 2 (AI combat voice callouts) marked done but no evidence of implementation found - may need re-execution or the agent may have misreported completion",
+      "source": "manual",
+      "created_at": "2026-01-25T09:33:26.143328",
+      "tags": [],
+      "severity": "medium"
     }
   ],
   "context": [
@@ -503,5 +525,5 @@
       "tags": []
     }
   ],
-  "updated_at": "2026-01-25T09:09:45.135586"
+  "updated_at": "2026-01-25T09:33:26.143345"
 }

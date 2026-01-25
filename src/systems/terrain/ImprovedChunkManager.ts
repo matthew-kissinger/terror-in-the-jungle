@@ -416,6 +416,16 @@ export class ImprovedChunkManager implements GameSystem {
     return chunk ? chunk.getHeightAt(x, z) : 0;
   }
 
+  // IChunkManager implementation
+  getTerrainHeightAt(x: number, z: number): number {
+    return this.getHeightAt(x, z);
+  }
+
+  isChunkLoaded(x: number, z: number): boolean {
+    const key = this.getChunkKey(x, z);
+    return this.chunks.has(key);
+  }
+
   // Collision objects registry
   private collisionObjects: Map<string, THREE.Object3D> = new Map();
 

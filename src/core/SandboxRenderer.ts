@@ -8,6 +8,12 @@ export class SandboxRenderer {
   public camera: THREE.PerspectiveCamera;
   public postProcessing?: PostProcessingManager;
 
+  // Exposed environment properties for WeatherSystem
+  public fog?: THREE.FogExp2;
+  public ambientLight?: THREE.AmbientLight;
+  public moonLight?: THREE.DirectionalLight;
+  public jungleLight?: THREE.HemisphereLight;
+
   private spawnLoadingDiv?: HTMLDivElement;
   private crosshair?: HTMLDivElement;
 
@@ -54,41 +60,42 @@ export class SandboxRenderer {
     const fogFar = 120; // Complete fog at 120 units
 
     // Use exponential fog for more realistic density - reduced for better visibility
-    this.scene.fog = new THREE.FogExp2(fogColor, 0.008); // Reduced from 0.018 for ~2x visibility
+    this.fog = new THREE.FogExp2(fogColor, 0.008); // Reduced from 0.018 for ~2x visibility
+    this.scene.fog = this.fog;
 
     // Match background to fog for seamless blending
     this.scene.background = new THREE.Color(fogColor);
 
     // Very dim ambient light - moonlight through jungle canopy
-    const ambientLight = new THREE.AmbientLight(0x1a2f3a, 0.15); // Dark blue ambient
-    this.scene.add(ambientLight);
+    this.ambientLight = new THREE.AmbientLight(0x1a2f3a, 0.15); // Dark blue ambient
+    this.scene.add(this.ambientLight);
 
     // Moonlight - primary light source
-    const moonLight = new THREE.DirectionalLight(0x4a6b8a, 0.3); // Pale blue moonlight
-    moonLight.position.set(-30, 80, -50);
-    moonLight.castShadow = true;
-    moonLight.shadow.mapSize.width = 2048;
-    moonLight.shadow.mapSize.height = 2048;
-    moonLight.shadow.camera.near = 0.5;
-    moonLight.shadow.camera.far = 300;
-    moonLight.shadow.camera.left = -100;
-    moonLight.shadow.camera.right = 100;
-    moonLight.shadow.camera.top = 100;
-    moonLight.shadow.camera.bottom = -100;
+    this.moonLight = new THREE.DirectionalLight(0x4a6b8a, 0.3); // Pale blue moonlight
+    this.moonLight.position.set(-30, 80, -50);
+    this.moonLight.castShadow = true;
+    this.moonLight.shadow.mapSize.width = 2048;
+    this.moonLight.shadow.mapSize.height = 2048;
+    this.moonLight.shadow.camera.near = 0.5;
+    this.moonLight.shadow.camera.far = 300;
+    this.moonLight.shadow.camera.left = -100;
+    this.moonLight.shadow.camera.right = 100;
+    this.moonLight.shadow.camera.top = 100;
+    this.moonLight.shadow.camera.bottom = -100;
 
     // Softer shadows for night time
-    moonLight.shadow.radius = 4;
-    moonLight.shadow.blurSamples = 25;
+    this.moonLight.shadow.radius = 4;
+    this.moonLight.shadow.blurSamples = 25;
 
-    this.scene.add(moonLight);
+    this.scene.add(this.moonLight);
 
     // Add a subtle green tint light for jungle atmosphere
-    const jungleLight = new THREE.HemisphereLight(
+    this.jungleLight = new THREE.HemisphereLight(
       0x0a1f1a, // Dark green sky color
       0x050a08, // Very dark ground color
       0.2
     );
-    this.scene.add(jungleLight);
+    this.scene.add(this.jungleLight);
 
     console.log('🌙 Night jungle atmosphere initialized');
   }

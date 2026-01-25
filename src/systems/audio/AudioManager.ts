@@ -487,6 +487,41 @@ export class AudioManager implements GameSystem {
         this.listener.setMasterVolume(currentVolume > 0 ? 0 : 1);
     }
 
+    // IAudioManager implementation
+    play(soundName: string, position?: THREE.Vector3, volume: number = 1.0): void {
+        const buffer = this.audioBuffers.get(soundName);
+        if (!buffer) {
+            console.warn(`[AudioManager] Sound not found: ${soundName}`);
+            return;
+        }
+
+        if (position) {
+            // Play positional sound
+            const sound = new THREE.PositionalAudio(this.listener);
+            sound.setBuffer(buffer);
+            sound.setVolume(volume);
+            sound.setRefDistance(10);
+            sound.setMaxDistance(100);
+            
+            const tempObj = new THREE.Object3D();
+            tempObj.position.copy(position);
+            tempObj.add(sound);
+            this.scene.add(tempObj);
+            
+            sound.play();
+            sound.onEnded = () => {
+                tempObj.remove(sound);
+                this.scene.remove(tempObj);
+            };
+        } else {
+            // Play global sound
+            const sound = new THREE.Audio(this.listener);
+            sound.setBuffer(buffer);
+            sound.setVolume(volume);
+            sound.play();
+        }
+    }
+
     // Get the audio listener for other systems
     getListener(): THREE.AudioListener {
         return this.listener;
