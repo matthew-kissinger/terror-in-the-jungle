@@ -477,6 +477,121 @@ export class AudioManager implements GameSystem {
         // Three.js handles positional audio updates automatically
     }
 
+    /**
+     * Enhanced weapon sound playback with pitch variation
+     * @param weaponType - Type of weapon: 'rifle', 'shotgun', or 'smg'
+     */
+    playPlayerWeaponSound(weaponType: 'rifle' | 'shotgun' | 'smg' = 'rifle'): void {
+        // Get sound from pool
+        const sound = this.getAvailableSound(this.playerGunshotPool);
+        if (!sound) return;
+
+        // Apply weapon-specific pitch variation for variety
+        let pitchMin = 0.95;
+        let pitchMax = 1.05;
+
+        switch (weaponType) {
+            case 'shotgun':
+                pitchMin = 0.90;
+                pitchMax = 1.08;
+                break;
+            case 'smg':
+                pitchMin = 1.08;
+                pitchMax = 1.18;
+                break;
+        }
+
+        const pitchVariation = pitchMin + Math.random() * (pitchMax - pitchMin);
+        sound.setPlaybackRate(pitchVariation);
+        sound.play();
+    }
+
+    /**
+     * Enhanced positional weapon sound with distance-based filtering
+     * @param position - World position of the sound source
+     * @param weaponType - Type of weapon: 'rifle' or 'shotgun'
+     * @param listenerPosition - Optional camera position for distance calculation
+     */
+    playWeaponSoundAt(
+        position: THREE.Vector3,
+        weaponType: 'rifle' | 'shotgun' = 'rifle',
+        listenerPosition?: THREE.Vector3
+    ): void {
+        const sound = this.getAvailablePositionalSound(this.positionalGunshotPool);
+        if (!sound) return;
+
+        // Create temporary object at position
+        const tempObj = new THREE.Object3D();
+        tempObj.position.copy(position);
+        tempObj.add(sound);
+        this.scene.add(tempObj);
+
+        // Apply weapon-specific pitch variation
+        let pitchMin = 0.94;
+        let pitchMax = 1.06;
+        if (weaponType === 'shotgun') {
+            pitchMin = 0.88;
+            pitchMax = 1.10;
+        }
+
+        const pitchVariation = pitchMin + Math.random() * (pitchMax - pitchMin);
+        sound.setPlaybackRate(pitchVariation);
+
+        // Apply distance-based low-pass filtering if listener position is available
+        if (listenerPosition && sound.source) {
+            const distance = position.distanceTo(listenerPosition);
+            const audioContext = this.listener.context;
+            const filter = audioContext.createBiquadFilter();
+
+            if (distance < 30) {
+                // Close range - full bass and sharp attack
+                filter.type = 'lowpass';
+                filter.frequency.value = 8000;
+                filter.Q.value = 0.5;
+            } else if (distance < 80) {
+                // Mid range - reduced bass
+                filter.type = 'lowpass';
+                filter.frequency.value = 4000 - (distance - 30) * 40;
+                filter.Q.value = 1.0;
+            } else {
+                // Far range - high frequencies only
+                filter.type = 'highpass';
+                filter.frequency.value = 800;
+                filter.Q.value = 2.0;
+            }
+
+            // Connect filter to audio chain
+            const gainNode = audioContext.createGain();
+            gainNode.gain.value = 1.0;
+
+            sound.source.disconnect();
+            sound.source.connect(filter);
+            filter.connect(gainNode);
+            gainNode.connect(sound.getOutput());
+        }
+
+        sound.play();
+
+        // Clean up after sound finishes
+        sound.onEnded = () => {
+            tempObj.remove(sound);
+            this.scene.remove(tempObj);
+        };
+    }
+
+    /**
+     * Play weapon switch sound effect
+     */
+    playWeaponSwitchSound(): void {
+        const sound = this.getAvailableSound(this.playerReloadPool);
+        if (!sound) return;
+
+        // Use reload sound with pitch variation for switch
+        sound.setPlaybackRate(1.2 + Math.random() * 0.2);
+        sound.setVolume(0.4);
+        sound.play();
+    }
+
     dispose(): void {
         // Stop all sounds
         for (const sound of this.playerGunshotPool) {

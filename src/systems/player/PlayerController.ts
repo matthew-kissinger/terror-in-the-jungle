@@ -10,6 +10,7 @@ import { GrenadeSystem } from '../weapons/GrenadeSystem';
 import { MortarSystem } from '../weapons/MortarSystem';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
+import { RallyPointSystem } from '../combat/RallyPointSystem';
 
 export class PlayerController implements GameSystem {
   private camera: THREE.PerspectiveCamera;
@@ -24,6 +25,8 @@ export class PlayerController implements GameSystem {
   private mortarSystem?: MortarSystem;
   private sandbagSystem?: SandbagSystem;
   private cameraShakeSystem?: CameraShakeSystem;
+  private rallyPointSystem?: RallyPointSystem;
+  private playerSquadId?: string;
   private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
   private isInMortarMode = false;
   private playerState: PlayerState;
@@ -244,6 +247,26 @@ export class PlayerController implements GameSystem {
       } else if (event.code === 'KeyT') {
         this.sandbagSystem.rotatePlacementPreview(Math.PI / 8);
       }
+    }
+
+    // Rally point placement with V key (when not in helicopter)
+    if (!this.playerState.isInHelicopter && event.code === 'KeyV' && this.rallyPointSystem && this.playerSquadId) {
+      const result = this.rallyPointSystem.placeRallyPoint(
+        this.playerState.position.clone(),
+        this.playerSquadId,
+        Faction.US
+      );
+
+      // Show feedback in HUD
+      if (this.hudSystem) {
+        if (result.success) {
+          this.hudSystem.showMessage(result.message, 'success');
+        } else {
+          this.hudSystem.showMessage(result.message, 'error');
+        }
+      }
+
+      console.log(`🚩 Rally point placement: ${result.message}`);
     }
   }
 
@@ -854,6 +877,14 @@ Escape - Release pointer lock / Exit helicopter
 
   setCameraShakeSystem(cameraShakeSystem: CameraShakeSystem): void {
     this.cameraShakeSystem = cameraShakeSystem;
+  }
+
+  setRallyPointSystem(rallyPointSystem: RallyPointSystem): void {
+    this.rallyPointSystem = rallyPointSystem;
+  }
+
+  setPlayerSquadId(squadId: string): void {
+    this.playerSquadId = squadId;
   }
 
   equipWeapon(): void {

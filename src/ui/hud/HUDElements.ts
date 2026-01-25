@@ -3,6 +3,7 @@ import { Faction } from '../../systems/combat/types';
 import { DamageNumberSystem } from './DamageNumberSystem';
 import { ScorePopupSystem } from './ScorePopupSystem';
 import { HitMarkerFeedback } from './HitMarkerFeedback';
+import { WeaponSwitchFeedback } from './WeaponSwitchFeedback';
 import * as THREE from 'three';
 
 export class HUDElements {
@@ -27,6 +28,7 @@ export class HUDElements {
   public damageNumbers?: DamageNumberSystem;
   public scorePopups?: ScorePopupSystem;
   public hitMarkerFeedback?: HitMarkerFeedback;
+  public weaponSwitchFeedback?: WeaponSwitchFeedback;
 
   constructor(camera?: THREE.Camera) {
     this.hudContainer = this.createHUDContainer();
@@ -56,6 +58,9 @@ export class HUDElements {
 
     // Initialize hit marker feedback system
     this.hitMarkerFeedback = new HitMarkerFeedback();
+
+    // Initialize weapon switch feedback system
+    this.weaponSwitchFeedback = new WeaponSwitchFeedback();
 
     // Assemble HUD structure
     this.hudContainer.appendChild(this.objectivesList);
@@ -839,6 +844,9 @@ export class HUDElements {
     if (this.hitMarkerFeedback) {
       this.hitMarkerFeedback.attachToDOM();
     }
+    if (this.weaponSwitchFeedback) {
+      this.weaponSwitchFeedback.attachToDOM();
+    }
   }
 
   updateKillFeed(deltaTime: number): void {
@@ -857,9 +865,9 @@ export class HUDElements {
     }
   }
 
-  spawnScorePopup(type: 'capture' | 'defend' | 'secured', points: number): void {
+  spawnScorePopup(type: 'capture' | 'defend' | 'secured' | 'kill' | 'headshot' | 'assist', points: number, multiplier?: number): void {
     if (this.scorePopups) {
-      this.scorePopups.spawn(type, points);
+      this.scorePopups.spawn(type, points, multiplier);
     }
   }
 
@@ -880,6 +888,12 @@ export class HUDElements {
     this.killFeed.addKill(killerName, killerFaction, victimName, victimFaction, isHeadshot, weaponType as any);
   }
 
+  showWeaponSwitch(weaponName: string, weaponIcon: string, ammo: string): void {
+    if (this.weaponSwitchFeedback) {
+      this.weaponSwitchFeedback.show(weaponName, weaponIcon, ammo);
+    }
+  }
+
   dispose(): void {
     if (this.hudContainer.parentNode) {
       this.hudContainer.parentNode.removeChild(this.hudContainer);
@@ -893,6 +907,9 @@ export class HUDElements {
     }
     if (this.hitMarkerFeedback) {
       this.hitMarkerFeedback.dispose();
+    }
+    if (this.weaponSwitchFeedback) {
+      this.weaponSwitchFeedback.dispose();
     }
   }
 }

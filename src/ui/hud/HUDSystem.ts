@@ -124,9 +124,20 @@ export class HUDSystem implements GameSystem {
     this.elements.showHitMarker(type);
   }
 
-  addKill(): void {
+  addKill(isHeadshot: boolean = false): void {
     this.updater.addKill();
     this.statsTracker.addKill();
+
+    // Get kill streak multiplier
+    const multiplier = this.statsTracker.getKillStreakMultiplier();
+
+    // Spawn kill popup
+    this.elements.spawnScorePopup('kill', 100, multiplier);
+
+    // Spawn headshot bonus popup if applicable
+    if (isHeadshot) {
+      this.elements.spawnScorePopup('headshot', 50);
+    }
   }
 
   addDeath(): void {
@@ -137,11 +148,16 @@ export class HUDSystem implements GameSystem {
   addZoneCapture(): void {
     this.statsTracker.addZoneCapture();
     // Spawn score popup for zone capture
-    this.spawnScorePopup('capture', 50);
+    this.elements.spawnScorePopup('capture', 200);
   }
 
-  spawnScorePopup(type: 'capture' | 'defend' | 'secured', points: number): void {
-    this.elements.spawnScorePopup(type, points);
+  addCaptureAssist(): void {
+    // Spawn score popup for partial capture contribution
+    this.elements.spawnScorePopup('assist', 25);
+  }
+
+  spawnScorePopup(type: 'capture' | 'defend' | 'secured' | 'kill' | 'headshot' | 'assist', points: number, multiplier?: number): void {
+    this.elements.spawnScorePopup(type, points, multiplier);
   }
 
   startMatch(): void {
@@ -268,5 +284,10 @@ export class HUDSystem implements GameSystem {
   // Damage number methods
   spawnDamageNumber(worldPos: THREE.Vector3, damage: number, isHeadshot: boolean = false, isKill: boolean = false): void {
     this.elements.spawnDamageNumber(worldPos, damage, isHeadshot, isKill);
+  }
+
+  // Weapon switch feedback method
+  showWeaponSwitch(weaponName: string, weaponIcon: string, ammo: string): void {
+    this.elements.showWeaponSwitch(weaponName, weaponIcon, ammo);
   }
 }

@@ -24,6 +24,7 @@ import { CombatantRenderer } from './CombatantRenderer';
 import { SquadManager } from './SquadManager';
 import { SpatialOctree } from './SpatialOctree';
 import { InfluenceMapSystem } from './InfluenceMapSystem';
+import { RallyPointSystem } from './RallyPointSystem';
 
 export class CombatantSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -45,6 +46,7 @@ export class CombatantSystem implements GameSystem {
   private squadManager: SquadManager;
   private spatialGrid: SpatialOctree;
   private influenceMap?: InfluenceMapSystem;
+  private rallyPointSystem?: RallyPointSystem;
 
   // Effects pools
   private tracerPool: TracerPool;
@@ -878,12 +880,28 @@ export class CombatantSystem implements GameSystem {
       squadCentroid.divideScalar(squadMembers.length);
     }
 
-    const spawnPos = this.getBaseSpawnPosition(squad.faction);
+    // Check for rally point first
+    let spawnPos: THREE.Vector3;
+    let spawnedAtRallyPoint = false;
+
+    if (this.rallyPointSystem) {
+      const rallyPos = this.rallyPointSystem.getRallyPointPosition(squadId);
+      if (rallyPos && this.rallyPointSystem.consumeRallyPointUse(squadId)) {
+        spawnPos = rallyPos;
+        spawnedAtRallyPoint = true;
+        console.log(`🚩 Respawning at rally point`);
+      } else {
+        spawnPos = this.getBaseSpawnPosition(squad.faction);
+      }
+    } else {
+      spawnPos = this.getBaseSpawnPosition(squad.faction);
+    }
+
     const distanceFromSquad = spawnPos.distanceTo(squadCentroid);
 
     console.log(`🔄 Respawning squad member:`);
     console.log(`   Squad location: (${squadCentroid.x.toFixed(1)}, ${squadCentroid.z.toFixed(1)})`);
-    console.log(`   Spawn location: (${spawnPos.x.toFixed(1)}, ${spawnPos.z.toFixed(1)})`);
+    console.log(`   Spawn location: (${spawnPos.x.toFixed(1)}, ${spawnPos.z.toFixed(1)}) ${spawnedAtRallyPoint ? '[RALLY POINT]' : '[BASE]'}`);
     console.log(`   Distance: ${distanceFromSquad.toFixed(1)}m`);
 
     const newMember = this.combatantFactory.createCombatant(
@@ -992,6 +1010,11 @@ export class CombatantSystem implements GameSystem {
     this.squadManager.setChunkManager(chunkManager);
     this.combatantAI.setChunkManager(chunkManager);
     this.combatantCombat.setChunkManager(chunkManager);
+  }
+
+  setCamera(camera: THREE.Camera): void {
+    this.camera = camera;
+    this.combatantCombat.setCamera(camera);
   }
 
   setTicketSystem(ticketSystem: TicketSystem): void {

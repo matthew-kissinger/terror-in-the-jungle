@@ -185,6 +185,7 @@ export class SandboxSystemManager {
       this.playerController.setSandboxRenderer(sandboxRenderer);
     }
     this.combatantSystem.setChunkManager(this.chunkManager);
+    this.combatantSystem.setCamera(camera);
     this.firstPersonWeapon.setPlayerController(this.playerController);
     this.firstPersonWeapon.setCombatantSystem(this.combatantSystem);
     this.firstPersonWeapon.setHUDSystem(this.hudSystem);

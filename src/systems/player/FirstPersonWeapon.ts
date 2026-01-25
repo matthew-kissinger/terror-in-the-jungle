@@ -113,6 +113,13 @@ export class FirstPersonWeapon implements GameSystem {
   private isPumpAnimating = false;
   private readonly PUMP_ANIMATION_TIME = 0.35; // Quick pump action
   private pumpOffset = { x: 0, y: 0, z: 0 };
+
+  // Weapon switch animation state
+  private isSwitchingWeapon = false;
+  private switchAnimationProgress = 0;
+  private readonly SWITCH_ANIMATION_TIME = 0.4; // 400ms total switch time
+  private switchOffset = { y: 0, rotX: 0 };
+  private pendingWeaponSwitch?: 'rifle' | 'shotgun' | 'smg';
   
   constructor(scene: THREE.Scene, camera: THREE.Camera, assetLoader: AssetLoader) {
     this.scene = scene;
@@ -244,6 +251,11 @@ export class FirstPersonWeapon implements GameSystem {
       this.updatePumpAnimation(deltaTime);
     }
 
+    // Update weapon switch animation
+    if (this.isSwitchingWeapon) {
+      this.updateSwitchAnimation(deltaTime);
+    }
+
     // Apply overlay transform
     this.updateWeaponTransform();
 
@@ -309,51 +321,15 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   private switchToRifle(): void {
-    if (this.weaponRig === this.rifleRig) return;
-
-    console.log('🔫 Switching to Rifle');
-    if (this.rifleRig && this.shotgunRig && this.smgRig) {
-      this.rifleRig.visible = true;
-      this.shotgunRig.visible = false;
-      this.smgRig.visible = false;
-      this.weaponRig = this.rifleRig;
-      this.gunCore = this.rifleCore;
-      this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
-      this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
-      this.pumpGripRef = undefined; // Rifle has no pump grip
-    }
+    this.startWeaponSwitch('rifle');
   }
 
   private switchToShotgun(): void {
-    if (this.weaponRig === this.shotgunRig) return;
-
-    console.log('🔫 Switching to Shotgun');
-    if (this.rifleRig && this.shotgunRig && this.smgRig) {
-      this.rifleRig.visible = false;
-      this.shotgunRig.visible = true;
-      this.smgRig.visible = false;
-      this.weaponRig = this.shotgunRig;
-      this.gunCore = this.shotgunCore;
-      this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
-      this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
-      this.pumpGripRef = this.weaponRig.getObjectByName('pumpGrip') || undefined;
-    }
+    this.startWeaponSwitch('shotgun');
   }
 
   private switchToSMG(): void {
-    if (this.weaponRig === this.smgRig) return;
-
-    console.log('🔫 Switching to SMG');
-    if (this.rifleRig && this.shotgunRig && this.smgRig) {
-      this.rifleRig.visible = false;
-      this.shotgunRig.visible = false;
-      this.smgRig.visible = true;
-      this.weaponRig = this.smgRig;
-      this.gunCore = this.smgCore;
-      this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
-      this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
-      this.pumpGripRef = undefined; // SMG has no pump grip
-    }
+    this.startWeaponSwitch('smg');
   }
 
   
@@ -399,10 +375,10 @@ export class FirstPersonWeapon implements GameSystem {
     const py = THREE.MathUtils.lerp(this.basePosition.y, this.adsPosition.y, this.adsProgress);
     const pz = THREE.MathUtils.lerp(this.basePosition.z, this.adsPosition.z, this.adsProgress);
 
-    // Apply position with all offsets including recoil, reload animation, and pump animation
+    // Apply position with all offsets including recoil, reload animation, pump animation, and switch animation
     this.weaponRig.position.set(
       px + this.bobOffset.x + this.swayOffset.x + this.weaponRecoilOffset.x + this.reloadTranslation.x + this.pumpOffset.x,
-      py + this.bobOffset.y + this.swayOffset.y + this.weaponRecoilOffset.y + this.reloadTranslation.y + this.pumpOffset.y,
+      py + this.bobOffset.y + this.swayOffset.y + this.weaponRecoilOffset.y + this.reloadTranslation.y + this.pumpOffset.y + this.switchOffset.y,
       pz + this.weaponRecoilOffset.z + this.reloadTranslation.z + this.pumpOffset.z
     );
 
@@ -412,10 +388,10 @@ export class FirstPersonWeapon implements GameSystem {
     const adsYRotation = Math.PI / 2; // Straight forward for ADS
     this.weaponRig.rotation.y = THREE.MathUtils.lerp(baseYRotation, adsYRotation, this.adsProgress);
 
-    // X rotation: tilt barrel UPWARD toward crosshair + reload animation
+    // X rotation: tilt barrel UPWARD toward crosshair + reload animation + switch animation
     const baseXRotation = THREE.MathUtils.degToRad(18); // More upward tilt when not ADS
     const adsXRotation = 0; // Level for sight alignment
-    this.weaponRig.rotation.x = THREE.MathUtils.lerp(baseXRotation, adsXRotation, this.adsProgress) + this.weaponRecoilOffset.rotX + this.reloadRotation.x;
+    this.weaponRig.rotation.x = THREE.MathUtils.lerp(baseXRotation, adsXRotation, this.adsProgress) + this.weaponRecoilOffset.rotX + this.reloadRotation.x + this.switchOffset.rotX;
 
     // Z rotation: cant the gun + reload tilt
     const baseCant = THREE.MathUtils.degToRad(-8); // Negative for proper cant
@@ -507,9 +483,15 @@ export class FirstPersonWeapon implements GameSystem {
     if (!this.ammoManager.consumeRound()) return;
     this.gunCore.registerShot();
 
-    // Play player gunshot sound
+    // Play weapon-specific sound based on current weapon type
     if (this.audioManager) {
-      this.audioManager.playPlayerGunshot();
+      let weaponType: 'rifle' | 'shotgun' | 'smg' = 'rifle';
+      if (this.gunCore === this.shotgunCore) {
+        weaponType = 'shotgun';
+      } else if (this.gunCore === this.smgCore) {
+        weaponType = 'smg';
+      }
+      this.audioManager.playPlayerWeaponSound(weaponType);
     }
 
     // Check if shotgun - fire multiple pellets
@@ -909,6 +891,126 @@ export class FirstPersonWeapon implements GameSystem {
 
   getAmmoState(): any {
     return this.ammoManager.getState();
+  }
+
+  private updateSwitchAnimation(deltaTime: number): void {
+    if (!this.isSwitchingWeapon) return;
+
+    // Update switch animation progress
+    this.switchAnimationProgress += deltaTime / this.SWITCH_ANIMATION_TIME;
+
+    if (this.switchAnimationProgress >= 1) {
+      // Animation complete
+      this.switchAnimationProgress = 1;
+      this.isSwitchingWeapon = false;
+      this.switchOffset = { y: 0, rotX: 0 };
+      return;
+    }
+
+    // Calculate switch animation based on progress
+    this.calculateSwitchAnimation(this.switchAnimationProgress);
+  }
+
+  private calculateSwitchAnimation(progress: number): void {
+    // Two-stage switch animation:
+    // Stage 1 (0-50%): Lower current weapon (move down and rotate forward)
+    // Stage 2 (50-100%): Raise new weapon (move up from below)
+
+    if (progress < 0.5) {
+      // Stage 1: Lower weapon
+      const t = progress / 0.5;
+      const ease = this.easeInCubic(t);
+      this.switchOffset.y = -0.8 * ease; // Move down
+      this.switchOffset.rotX = THREE.MathUtils.degToRad(30) * ease; // Tilt forward
+
+      // At midpoint, perform the actual weapon switch
+      if (progress >= 0.49 && this.pendingWeaponSwitch) {
+        this.performWeaponSwitch(this.pendingWeaponSwitch);
+        this.pendingWeaponSwitch = undefined;
+      }
+    } else {
+      // Stage 2: Raise new weapon
+      const t = (progress - 0.5) / 0.5;
+      const ease = this.easeOutCubic(t);
+      this.switchOffset.y = -0.8 * (1 - ease); // Move up from below
+      this.switchOffset.rotX = THREE.MathUtils.degToRad(30) * (1 - ease); // Straighten
+    }
+  }
+
+  private performWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg'): void {
+    // Actually switch the visible weapon models
+    if (!this.rifleRig || !this.shotgunRig || !this.smgRig) return;
+
+    switch (weaponType) {
+      case 'rifle':
+        this.rifleRig.visible = true;
+        this.shotgunRig.visible = false;
+        this.smgRig.visible = false;
+        this.weaponRig = this.rifleRig;
+        this.gunCore = this.rifleCore;
+        this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
+        this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
+        this.pumpGripRef = undefined;
+        break;
+      case 'shotgun':
+        this.rifleRig.visible = false;
+        this.shotgunRig.visible = true;
+        this.smgRig.visible = false;
+        this.weaponRig = this.shotgunRig;
+        this.gunCore = this.shotgunCore;
+        this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
+        this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
+        this.pumpGripRef = this.weaponRig.getObjectByName('pumpGrip') || undefined;
+        break;
+      case 'smg':
+        this.rifleRig.visible = false;
+        this.shotgunRig.visible = false;
+        this.smgRig.visible = true;
+        this.weaponRig = this.smgRig;
+        this.gunCore = this.smgCore;
+        this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
+        this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
+        this.pumpGripRef = undefined;
+        break;
+    }
+
+    // Notify HUD about weapon switch
+    if (this.hudSystem && this.hudSystem.showWeaponSwitch) {
+      const weaponNames = { rifle: 'RIFLE', shotgun: 'SHOTGUN', smg: 'SMG' };
+      const weaponIcons = { rifle: '🔫', shotgun: '💥', smg: '⚡' };
+      const ammoState = this.ammoManager.getState();
+      this.hudSystem.showWeaponSwitch(
+        weaponNames[weaponType],
+        weaponIcons[weaponType],
+        `${ammoState.currentMagazine} / ${ammoState.reserveAmmo}`
+      );
+    }
+
+    // Play weapon switch sound
+    if (this.audioManager && this.audioManager.playWeaponSwitchSound) {
+      this.audioManager.playWeaponSwitchSound();
+    }
+  }
+
+  private startWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg'): void {
+    // Don't switch if already the current weapon
+    if ((weaponType === 'rifle' && this.weaponRig === this.rifleRig) ||
+        (weaponType === 'shotgun' && this.weaponRig === this.shotgunRig) ||
+        (weaponType === 'smg' && this.weaponRig === this.smgRig)) {
+      return;
+    }
+
+    // Can't switch while reloading or already switching
+    if (this.isReloadAnimating || this.isSwitchingWeapon) {
+      return;
+    }
+
+    console.log(`🔄 Switching to ${weaponType}`);
+    this.isSwitchingWeapon = true;
+    this.switchAnimationProgress = 0;
+    this.pendingWeaponSwitch = weaponType;
+    this.isFiring = false; // Stop firing during switch
+    this.isADS = false; // Exit ADS during switch
   }
 
   // Helicopter integration methods

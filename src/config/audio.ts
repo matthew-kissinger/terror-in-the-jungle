@@ -16,15 +16,15 @@ export const AUDIO_POOL_SIZES = {
 export const SOUND_CONFIGS: Record<string, SoundConfig> = {
   playerGunshot: {
     path: 'assets/optimized/playerGunshot.wav',
-    volume: 0.7
+    volume: 0.85 // Increased from 0.7 for more punch
   },
   playerShotgun: {
     path: 'assets/optimized/playerShotgun.wav',
-    volume: 0.85
+    volume: 0.95 // Increased from 0.85 for more punch
   },
   otherGunshot: {
     path: 'assets/optimized/otherGunshot.wav',
-    volume: 0.6,
+    volume: 0.7, // Increased from 0.6
     refDistance: 10,
     maxDistance: 100,
     rolloffFactor: 1.5
