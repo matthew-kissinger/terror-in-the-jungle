@@ -95,7 +95,7 @@ export class HUDSystem implements GameSystem {
       const aimingState = this.grenadeSystem.getAimingState();
       if (aimingState.isAiming) {
         this.elements.showGrenadePowerMeter();
-        this.elements.updateGrenadePower(aimingState.power, aimingState.estimatedDistance);
+        this.elements.updateGrenadePower(aimingState.power, aimingState.estimatedDistance, aimingState.cookingTime);
       } else {
         this.elements.hideGrenadePowerMeter();
       }

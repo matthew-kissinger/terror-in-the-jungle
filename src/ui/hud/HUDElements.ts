@@ -632,10 +632,27 @@ export class HUDElements {
     `;
     powerText.textContent = '30%';
 
+    // Cooking timer (initially hidden)
+    const cookingTimer = document.createElement('div');
+    cookingTimer.className = 'grenade-cooking-timer';
+    cookingTimer.style.cssText = `
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: rgba(255, 100, 100, 0.9);
+      font-weight: bold;
+      text-align: center;
+      margin-top: 6px;
+      text-transform: uppercase;
+      text-shadow: 0 0 4px rgba(255, 0, 0, 0.8);
+      display: none;
+    `;
+    cookingTimer.textContent = 'COOKING: 0.0s';
+
     barContainer.appendChild(powerFill);
     barContainer.appendChild(powerText);
     container.appendChild(label);
     container.appendChild(barContainer);
+    container.appendChild(cookingTimer);
 
     return container;
   }
@@ -731,10 +748,11 @@ export class HUDElements {
     this.grenadePowerMeter.style.display = 'none';
   }
 
-  updateGrenadePower(power: number, estimatedDistance?: number): void {
+  updateGrenadePower(power: number, estimatedDistance?: number, cookingTime?: number): void {
     const powerFill = this.grenadePowerMeter.querySelector('.power-fill') as HTMLElement;
     const powerText = this.grenadePowerMeter.querySelector('.power-text') as HTMLElement;
     const label = this.grenadePowerMeter.querySelector('div') as HTMLElement;
+    const cookingTimer = this.grenadePowerMeter.querySelector('.grenade-cooking-timer') as HTMLElement;
 
     if (powerFill && powerText) {
       // Power ranges from 0.3 to 1.0, normalize to 0-100%
@@ -766,6 +784,30 @@ export class HUDElements {
         } else {
           powerFill.style.animation = 'none';
         }
+      }
+    }
+
+    // Update cooking timer if grenade is being cooked
+    if (cookingTimer) {
+      if (cookingTime !== undefined && cookingTime > 0) {
+        cookingTimer.style.display = 'block';
+        const fuseTime = 3.5; // Match FUSE_TIME from GrenadeSystem
+        const timeLeft = fuseTime - cookingTime;
+        cookingTimer.textContent = `COOKING: ${timeLeft.toFixed(1)}s`;
+
+        // Change color based on time left
+        if (timeLeft <= 1.0) {
+          cookingTimer.style.color = 'rgba(255, 50, 50, 1)';
+          cookingTimer.style.animation = 'pulse-glow 0.3s infinite';
+        } else if (timeLeft <= 2.0) {
+          cookingTimer.style.color = 'rgba(255, 150, 50, 0.95)';
+          cookingTimer.style.animation = 'pulse-glow 0.6s infinite';
+        } else {
+          cookingTimer.style.color = 'rgba(255, 200, 100, 0.9)';
+          cookingTimer.style.animation = 'none';
+        }
+      } else {
+        cookingTimer.style.display = 'none';
       }
     }
   }

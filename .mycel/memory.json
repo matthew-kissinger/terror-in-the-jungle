@@ -232,6 +232,34 @@
         "global",
         "batch"
       ]
+    },
+    {
+      "id": "dbcdae94",
+      "content": "For SVG elements use setAttribute('class', ...) not .className which is read-only on SVGElement",
+      "source": "manual",
+      "created_at": "2026-01-25T09:08:39.354547",
+      "tags": []
+    },
+    {
+      "id": "20bbdbd8",
+      "content": "Match end stats flow: PlayerStatsTracker tracks kills/deaths/zones, HUDSystem.handleGameEnd() builds MatchStats, MatchEndScreen.show() displays with animations",
+      "source": "manual",
+      "created_at": "2026-01-25T09:08:50.270749",
+      "tags": []
+    },
+    {
+      "id": "7d68d946",
+      "content": "Camera systems (DeathCam, shake) store original transform and use phaseTimer with named phases for smooth interpolation",
+      "source": "manual",
+      "created_at": "2026-01-25T09:09:44.249663",
+      "tags": []
+    },
+    {
+      "id": "58091240",
+      "content": "Weapon switching uses InventoryManager with WeaponSlot enum - keys 1-5 map to SHOTGUN, GRENADE, RIFLE, SANDBAG, SMG",
+      "source": "manual",
+      "created_at": "2026-01-25T09:09:45.135569",
+      "tags": []
     }
   ],
   "warnings": [
@@ -406,6 +434,22 @@
         "batch"
       ],
       "severity": "medium"
+    },
+    {
+      "id": "781907e7",
+      "content": "Untracked .ts files in src/ will fail the build - TypeScript compiles all files in src/ per tsconfig.json. Either commit new files or add to .gitignore",
+      "source": "manual",
+      "created_at": "2026-01-25T09:08:37.708725",
+      "tags": [],
+      "severity": "medium"
+    },
+    {
+      "id": "2cb7ef76",
+      "content": "Several work-in-progress files exist uncommitted: DeathCamSystem, WeaponPickupSystem, SquadRadialMenu, LoadoutSelector, AICoverSystem, AIFlankingSystem. These need Combatant type extensions (isFlankingMove) to build",
+      "source": "manual",
+      "created_at": "2026-01-25T09:08:51.321930",
+      "tags": [],
+      "severity": "low"
     }
   ],
   "context": [
@@ -450,7 +494,14 @@
       "source": "manual",
       "created_at": "2026-01-25T02:32:53.481713",
       "tags": []
+    },
+    {
+      "id": "c48c850e",
+      "content": "AI state handlers are modular files in src/systems/combat/ai/ (AIStatePatrol, AIStateEngage, etc). CombatantAI imports and coordinates them",
+      "source": "manual",
+      "created_at": "2026-01-25T09:08:40.683863",
+      "tags": []
     }
   ],
-  "updated_at": "2026-01-25T09:05:57.260328"
+  "updated_at": "2026-01-25T09:09:45.135586"
 }
