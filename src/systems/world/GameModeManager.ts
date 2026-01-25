@@ -108,6 +108,12 @@ export class GameModeManager implements GameSystem {
       this.ticketSystem.setMaxTickets(config.maxTickets);
       this.ticketSystem.setMatchDuration(config.matchDuration);
       this.ticketSystem.setDeathPenalty(config.deathPenalty);
+
+      if (config.id === GameMode.TEAM_DEATHMATCH) {
+        this.ticketSystem.setTDMMode(true, config.maxTickets);
+      } else {
+        this.ticketSystem.setTDMMode(false, 0);
+      }
     }
 
     // Configure chunk manager render distance

@@ -3,6 +3,7 @@ import { Faction } from '../../systems/combat/types';
 import { ZoneManager, ZoneState, CaptureZone } from '../../systems/world/ZoneManager';
 import { TicketSystem } from '../../systems/world/TicketSystem';
 import { HUDElements } from './HUDElements';
+import { GameMode } from '../../config/gameModes';
 
 export class HUDUpdater {
   private elements: HUDElements;
@@ -13,7 +14,13 @@ export class HUDUpdater {
     this.elements = elements;
   }
 
-  updateObjectivesDisplay(zoneManager: ZoneManager): void {
+  updateObjectivesDisplay(zoneManager: ZoneManager, isTDM: boolean = false): void {
+    if (isTDM) {
+      this.elements.objectivesList.style.display = 'none';
+      return;
+    }
+    this.elements.objectivesList.style.display = 'block';
+
     const zones = zoneManager.getAllZones();
     const capturableZones = zones.filter(z => !z.isHomeBase);
 
@@ -79,7 +86,23 @@ export class HUDUpdater {
     return element;
   }
 
-  updateTicketDisplay(usTickets: number, opforTickets: number): void {
+  updateTicketDisplay(usTickets: number, opforTickets: number, isTDM: boolean = false, target: number = 0): void {
+    if (isTDM) {
+      this.elements.ticketDisplay.innerHTML = `
+        <div style="position: absolute; top: -25px; left: 50%; transform: translateX(-50%); width: 200px; text-align: center; color: #aaa; font-size: 10px; letter-spacing: 1px; font-weight: bold;">FIRST TO ${target} KILLS</div>
+        <div class="faction-tickets">
+          <div class="faction-name">US Kills</div>
+          <div class="ticket-count us-tickets">${Math.round(usTickets)}</div>
+        </div>
+        <div class="ticket-separator">VS</div>
+        <div class="faction-tickets">
+          <div class="faction-name">OPFOR Kills</div>
+          <div class="ticket-count opfor-tickets">${Math.round(opforTickets)}</div>
+        </div>
+      `;
+      return;
+    }
+
     this.elements.ticketDisplay.innerHTML = `
       <div class="faction-tickets">
         <div class="faction-name">US Forces</div>

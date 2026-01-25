@@ -20,6 +20,11 @@ export class TicketSystem implements GameSystem {
   private opforTickets = 300;
   private maxTickets = 300;
 
+  private usKills = 0;
+  private opforKills = 0;
+  private killTarget = 0;
+  private isTDM = false;
+
   private zoneManager?: ZoneManager;
   private gameState: GameState = {
     gameActive: true,
@@ -87,7 +92,7 @@ export class TicketSystem implements GameSystem {
   }
 
   private updateTicketBleed(deltaTime: number): void {
-    if (!this.zoneManager) return;
+    if (!this.zoneManager || this.isTDM) return;
 
     const bleedRates = this.calculateTicketBleed();
 
@@ -151,6 +156,18 @@ export class TicketSystem implements GameSystem {
   }
 
   private checkVictoryConditions(): void {
+    // Check TDM kill target
+    if (this.isTDM && this.killTarget > 0) {
+      if (this.usKills >= this.killTarget) {
+        this.endGame(Faction.US, 'KILL_TARGET_REACHED');
+        return;
+      }
+      if (this.opforKills >= this.killTarget) {
+        this.endGame(Faction.OPFOR, 'KILL_TARGET_REACHED');
+        return;
+      }
+    }
+
     // Check ticket depletion
     if (this.usTickets <= 0) {
       this.endGame(Faction.OPFOR, 'TICKETS_DEPLETED');
@@ -200,18 +217,35 @@ export class TicketSystem implements GameSystem {
     if (!this.gameState.gameActive) return;
 
     if (faction === Faction.US) {
+      this.opforKills++;
       this.usTickets = Math.max(0, this.usTickets - this.deathPenalty);
-      console.log(`💀 US soldier KIA, tickets: ${Math.round(this.usTickets)}`);
+      console.log(`💀 US soldier KIA, tickets: ${Math.round(this.usTickets)}, OPFOR kills: ${this.opforKills}`);
     } else {
+      this.usKills++;
       this.opforTickets = Math.max(0, this.opforTickets - this.deathPenalty);
-      console.log(`💀 OPFOR soldier KIA, tickets: ${Math.round(this.opforTickets)}`);
+      console.log(`💀 OPFOR soldier KIA, tickets: ${Math.round(this.opforTickets)}, US kills: ${this.usKills}`);
     }
   }
 
   // Getters
 
   getTickets(faction: Faction): number {
+    if (this.isTDM) {
+      return faction === Faction.US ? this.usKills : this.opforKills;
+    }
     return faction === Faction.US ? this.usTickets : this.opforTickets;
+  }
+
+  getKills(faction: Faction): number {
+    return faction === Faction.US ? this.usKills : this.opforKills;
+  }
+
+  getKillTarget(): number {
+    return this.killTarget;
+  }
+
+  isTDMMode(): boolean {
+    return this.isTDM;
   }
 
   getTicketBleedRate(): TicketBleedRate {
@@ -264,6 +298,14 @@ export class TicketSystem implements GameSystem {
     console.log(`🎮 Death penalty set to ${penalty} tickets`);
   }
 
+  setTDMMode(enabled: boolean, target: number): void {
+    this.isTDM = enabled;
+    this.killTarget = target;
+    this.usKills = 0;
+    this.opforKills = 0;
+    console.log(`🎮 TDM Mode: ${enabled ? 'ENABLED' : 'DISABLED'}, Target: ${target}`);
+  }
+
   setTicketUpdateCallback(callback: (usTickets: number, opforTickets: number) => void): void {
     this.onTicketUpdate = callback;
   }
@@ -299,6 +341,8 @@ export class TicketSystem implements GameSystem {
   restartMatch(): void {
     this.usTickets = this.maxTickets;
     this.opforTickets = this.maxTickets;
+    this.usKills = 0;
+    this.opforKills = 0;
     this.gameState = {
       gameActive: true,
       matchDuration: 0,

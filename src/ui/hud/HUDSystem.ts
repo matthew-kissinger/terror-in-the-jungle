@@ -68,9 +68,11 @@ export class HUDSystem implements GameSystem {
   }
 
   update(deltaTime: number): void {
+    const isTDM = this.ticketSystem ? this.ticketSystem.isTDMMode() : false;
+
     // Update objectives display
     if (this.zoneManager) {
-      this.updater.updateObjectivesDisplay(this.zoneManager);
+      this.updater.updateObjectivesDisplay(this.zoneManager, isTDM);
     }
 
     // Update combat statistics
@@ -83,7 +85,9 @@ export class HUDSystem implements GameSystem {
       this.updater.updateGameStatus(this.ticketSystem);
       this.updater.updateTicketDisplay(
         this.ticketSystem.getTickets(Faction.US),
-        this.ticketSystem.getTickets(Faction.OPFOR)
+        this.ticketSystem.getTickets(Faction.OPFOR),
+        isTDM,
+        this.ticketSystem.getKillTarget()
       );
       // Update match timer
       const timeRemaining = this.ticketSystem.getMatchTimeRemaining();
