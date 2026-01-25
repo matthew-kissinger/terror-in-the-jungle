@@ -33,6 +33,7 @@ import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
 import { DayNightCycle } from '../systems/environment/DayNightCycle';
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
+import { VoiceCalloutSystem } from '../systems/audio/VoiceCalloutSystem';
 import { objectPool } from '../utils/ObjectPoolManager';
 
 interface SystemTimingEntry {
@@ -80,6 +81,7 @@ export class SandboxSystemManager {
   public influenceMapSystem!: InfluenceMapSystem;
   public ammoSupplySystem!: AmmoSupplySystem;
   public footstepAudioSystem!: FootstepAudioSystem;
+  public voiceCalloutSystem!: VoiceCalloutSystem;
 
   async initializeSystems(
     scene: THREE.Scene,
@@ -146,6 +148,7 @@ export class SandboxSystemManager {
     this.playerSuppressionSystem = new PlayerSuppressionSystem();
     this.ammoSupplySystem = new AmmoSupplySystem(scene, camera);
     this.footstepAudioSystem = new FootstepAudioSystem(this.audioManager.getListener());
+    this.voiceCalloutSystem = new VoiceCalloutSystem(scene, this.audioManager.getListener());
 
     // Initialize influence map system based on game mode world size
     const worldSize = 4000; // Default, will be updated when game mode is set
@@ -185,7 +188,8 @@ export class SandboxSystemManager {
       this.cameraShakeSystem,
       this.playerSuppressionSystem,
       this.influenceMapSystem,
-      this.ammoSupplySystem
+      this.ammoSupplySystem,
+      this.voiceCalloutSystem
     ];
 
     onProgress('world', 0.5);
@@ -358,6 +362,11 @@ export class SandboxSystemManager {
     // Connect footstep audio system
     this.footstepAudioSystem.setChunkManager(this.chunkManager);
     this.playerController.setFootstepAudioSystem(this.footstepAudioSystem);
+
+    // Connect voice callout system
+    if (combatantCombat) {
+      combatantCombat.setVoiceCalloutSystem(this.voiceCalloutSystem);
+    }
   }
 
   async preGenerateSpawnArea(spawnPos: THREE.Vector3): Promise<void> {
@@ -404,6 +413,10 @@ export class SandboxSystemManager {
       // Update command position on minimap
       const commandPos = this.playerSquadController.getCommandPosition();
       this.minimapSystem.setCommandPosition(commandPos);
+
+      // Update voice callout system with player position for distance-based filtering
+      const playerPos = this.playerController.getPosition();
+      this.voiceCalloutSystem.setPlayerPosition(playerPos);
     }
 
     // Track timing for key systems

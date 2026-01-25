@@ -14,6 +14,7 @@ import { SpatialOctree } from './SpatialOctree';
 import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { objectPool } from '../../utils/ObjectPoolManager';
+import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem';
 
 export interface CombatHitResult {
   hit: boolean;
@@ -41,6 +42,7 @@ export class CombatantCombat {
   private cameraShakeSystem?: CameraShakeSystem;
   private camera?: THREE.Camera;
   private playerPosition: THREE.Vector3 = new THREE.Vector3();
+  private voiceCalloutSystem?: VoiceCalloutSystem;
 
   constructor(
     scene: THREE.Scene,
@@ -97,6 +99,11 @@ export class CombatantCombat {
     combatant.gunCore.registerShot();
     combatant.currentBurst++;
     combatant.lastShotTime = performance.now();
+
+    // Voice callout: First shot in burst - "Contact!" or "Engaging!"
+    if (combatant.currentBurst === 1 && this.voiceCalloutSystem && Math.random() < 0.3) {
+      this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.CONTACT, combatant.position);
+    }
 
     // Calculate accuracy multiplier
     let accuracyMultiplier = 1.0;
@@ -187,6 +194,11 @@ export class CombatantCombat {
         };
       } else {
         combatant.consecutiveMisses++;
+
+        // Voice callout: Taking fire (near miss on player triggers callout)
+        if (this.voiceCalloutSystem && Math.random() < 0.15) {
+          this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.TAKING_FIRE, combatant.position);
+        }
       }
     } else {
       hit = this.hitDetection.raycastCombatants(shotRay, combatant.faction, allCombatants);
@@ -205,6 +217,11 @@ export class CombatantCombat {
 
     combatant.gunCore.registerShot();
     combatant.currentBurst++;
+
+    // Voice callout: Suppressing fire
+    if (combatant.currentBurst === 1 && this.voiceCalloutSystem && Math.random() < 0.2) {
+      this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.SUPPRESSING, combatant.position);
+    }
 
     if (combatant.currentBurst >= combatant.skillProfile.burstLength) {
       combatant.currentBurst = 0;
@@ -285,7 +302,13 @@ export class CombatantCombat {
         objectPool.releaseVector3(negatedDirection);
 
         const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
-        this.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot);
+        const wasAlive = hit.combatant.health > 0;
+        this.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot, allCombatants);
+
+        // Voice callout: Target down (if kill confirmed)
+        if (wasAlive && hit.combatant.health <= 0 && this.voiceCalloutSystem && Math.random() < 0.4) {
+          this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.TARGET_DOWN, combatant.position);
+        }
 
         if (hit.headshot) {
           console.log(`🎯 Headshot! ${combatant.faction} -> ${hit.combatant.faction}`);
@@ -298,7 +321,7 @@ export class CombatantCombat {
       objectPool.releaseVector3(hitPoint);
     } else if (hit) {
       const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
-      this.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot);
+      this.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot, allCombatants);
     }
   }
 
@@ -357,7 +380,8 @@ export class CombatantCombat {
     damage: number,
     attacker?: Combatant,
     squads?: Map<string, Squad>,
-    isHeadshot: boolean = false
+    isHeadshot: boolean = false,
+    allCombatants?: Map<string, Combatant>
   ): void {
     // Check if target is valid before accessing properties
     if (!target) {
@@ -396,6 +420,11 @@ export class CombatantCombat {
     target.lastHitTime = Date.now();
     target.suppressionLevel = Math.min(1.0, target.suppressionLevel + 0.3);
 
+    // Voice callout: Taking fire when hit
+    if (this.voiceCalloutSystem && Math.random() < 0.25) {
+      this.voiceCalloutSystem.triggerCallout(target, CalloutType.TAKING_FIRE, target.position);
+    }
+
     // Trigger damage flash effect in shader
     if (this.combatantRenderer) {
       this.combatantRenderer.setDamageFlash(target.id, 1.0);
@@ -427,6 +456,26 @@ export class CombatantCombat {
       }
 
       console.log(`💀 ${target.faction} soldier eliminated${attacker ? ` by ${attacker.faction}` : ''}`);
+
+      // Voice callout: Man down (nearby allies call it out)
+      if (this.voiceCalloutSystem && attacker && allCombatants) {
+        // Find nearby allies to the deceased
+        const nearbyAllies: Combatant[] = [];
+        allCombatants.forEach(c => {
+          if (c.faction === target.faction &&
+              c.state !== CombatantState.DEAD &&
+              c.id !== target.id &&
+              c.position.distanceTo(target.position) < 30) {
+            nearbyAllies.push(c);
+          }
+        });
+
+        // One nearby ally calls out "Man down!"
+        if (nearbyAllies.length > 0 && Math.random() < 0.5) {
+          const caller = nearbyAllies[Math.floor(Math.random() * nearbyAllies.length)];
+          this.voiceCalloutSystem.triggerCallout(caller, CalloutType.MAN_DOWN, caller.position);
+        }
+      }
 
       // Death visual effects
       // 1. Blood splatter at death position
@@ -647,5 +696,9 @@ export class CombatantCombat {
 
   setCamera(camera: THREE.Camera): void {
     this.camera = camera;
+  }
+
+  setVoiceCalloutSystem(system: VoiceCalloutSystem): void {
+    this.voiceCalloutSystem = system;
   }
 }
