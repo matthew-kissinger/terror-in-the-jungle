@@ -19,6 +19,14 @@ export class AudioManager implements GameSystem {
     private playerReloadPool: THREE.Audio[] = [];
     private explosionSoundPool: THREE.PositionalAudio[] = [];
 
+    // Object3D pool for positional audio (avoids per-sound allocations)
+    private object3DPool: THREE.Object3D[] = [];
+    private readonly OBJECT3D_POOL_SIZE = 32;
+
+    // Pools for hit feedback and bullet whiz (using loaded WAV files)
+    private hitFeedbackPool: THREE.Audio[] = [];
+    private bulletWhizPool: THREE.Audio[] = [];
+
     // Ambient sounds
     private ambientSounds: THREE.Audio[] = [];
     private currentAmbientTrack?: string;
@@ -80,10 +88,69 @@ export class AudioManager implements GameSystem {
         // Initialize sound pools
         this.initializeSoundPools();
 
+        // Initialize Object3D pool for positional audio
+        this.initializeObject3DPool();
+
+        // Initialize hit feedback pool (if WAV files are loaded)
+        this.initializeHitFeedbackPool();
+
         // Don't start ambient sounds until game starts
         // this.startAmbientSounds();
 
         console.log('[AudioManager] Audio system initialized');
+    }
+
+    private initializeObject3DPool(): void {
+        for (let i = 0; i < this.OBJECT3D_POOL_SIZE; i++) {
+            this.object3DPool.push(new THREE.Object3D());
+        }
+    }
+
+    private initializeHitFeedbackPool(): void {
+        // Initialize hit feedback pool if hitMarker sound is loaded
+        const hitBuffer = this.audioBuffers.get('hitMarker');
+        if (hitBuffer) {
+            for (let i = 0; i < 8; i++) {
+                const sound = new THREE.Audio(this.listener);
+                sound.setBuffer(hitBuffer);
+                sound.setVolume(0.5);
+                this.hitFeedbackPool.push(sound);
+            }
+        }
+
+        // Initialize bullet whiz pool if bulletWhiz sound is loaded
+        const whizBuffer = this.audioBuffers.get('bulletWhiz');
+        if (whizBuffer) {
+            for (let i = 0; i < 8; i++) {
+                const sound = new THREE.Audio(this.listener);
+                sound.setBuffer(whizBuffer);
+                sound.setVolume(0.4);
+                this.bulletWhizPool.push(sound);
+            }
+        }
+    }
+
+    private getPooledObject3D(): THREE.Object3D {
+        // Find one not currently in scene
+        for (const obj of this.object3DPool) {
+            if (!obj.parent) {
+                return obj;
+            }
+        }
+        // All in use, create a new one (will be added to pool on release)
+        const newObj = new THREE.Object3D();
+        this.object3DPool.push(newObj);
+        return newObj;
+    }
+
+    private releaseObject3D(obj: THREE.Object3D): void {
+        if (obj.parent) {
+            obj.parent.remove(obj);
+        }
+        // Clear any children (like PositionalAudio)
+        while (obj.children.length > 0) {
+            obj.remove(obj.children[0]);
+        }
     }
 
     // Call this when the game actually starts
@@ -365,107 +432,31 @@ export class AudioManager implements GameSystem {
     }
 
     /**
-     * Play hit feedback sound using Web Audio API
-     * Creates procedural sounds for immediate feedback
+     * Play hit feedback sound from loaded WAV file pool
+     * Falls back gracefully if no hitMarker sound is loaded
      */
     playHitFeedback(type: 'hit' | 'headshot' | 'kill'): void {
-        const audioContext = this.listener.context;
-
-        // Create oscillator and gain nodes
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        const filterNode = audioContext.createBiquadFilter();
-
-        // Configure based on hit type
-        let frequency = 800;
-        let duration = 0.1;
-        let volume = 0.3;
-
-        switch (type) {
-            case 'headshot':
-                // Higher pitch with reverb tail
-                frequency = 1200;
-                duration = 0.15;
-                volume = 0.4;
-                filterNode.type = 'highpass';
-                filterNode.frequency.value = 800;
-                break;
-            case 'kill':
-                // Low thud with bass
-                frequency = 300;
-                duration = 0.2;
-                volume = 0.5;
-                filterNode.type = 'lowpass';
-                filterNode.frequency.value = 500;
-                break;
-            default:
-                // Normal hit - short click/snap
-                frequency = 800;
-                duration = 0.1;
-                volume = 0.3;
-                filterNode.type = 'bandpass';
-                filterNode.frequency.value = 800;
-                filterNode.Q.value = 2;
-                break;
+        // Use pooled sound if available
+        const sound = this.getAvailableSound(this.hitFeedbackPool);
+        if (sound) {
+            // Vary pitch based on hit type
+            let pitch = 1.0;
+            let volume = 0.5;
+            switch (type) {
+                case 'headshot':
+                    pitch = 1.3;
+                    volume = 0.6;
+                    break;
+                case 'kill':
+                    pitch = 0.8;
+                    volume = 0.7;
+                    break;
+            }
+            sound.setPlaybackRate(pitch);
+            sound.setVolume(volume);
+            sound.play();
         }
-
-        // Configure oscillator
-        oscillator.type = type === 'kill' ? 'sawtooth' : 'sine';
-        oscillator.frequency.value = frequency;
-
-        // Configure gain envelope (ADSR-like)
-        const now = audioContext.currentTime;
-        gainNode.gain.setValueAtTime(0, now);
-        gainNode.gain.linearRampToValueAtTime(volume, now + 0.01); // Attack
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration); // Decay/Release
-
-        // Connect nodes
-        oscillator.connect(filterNode);
-        filterNode.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-
-        // Play sound
-        oscillator.start(now);
-        oscillator.stop(now + duration);
-
-        // Add subtle white noise for headshots
-        if (type === 'headshot') {
-            this.addNoiseLayer(duration, 0.15);
-        }
-    }
-
-    /**
-     * Add white noise layer for richer hit sounds
-     */
-    private addNoiseLayer(duration: number, volume: number): void {
-        const audioContext = this.listener.context;
-        const bufferSize = audioContext.sampleRate * duration;
-        const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-        const data = buffer.getChannelData(0);
-
-        // Generate white noise
-        for (let i = 0; i < bufferSize; i++) {
-            data[i] = (Math.random() * 2 - 1) * 0.3;
-        }
-
-        const noise = audioContext.createBufferSource();
-        noise.buffer = buffer;
-
-        const noiseGain = audioContext.createGain();
-        const noiseFilter = audioContext.createBiquadFilter();
-        noiseFilter.type = 'highpass';
-        noiseFilter.frequency.value = 1000;
-
-        const now = audioContext.currentTime;
-        noiseGain.gain.setValueAtTime(volume, now);
-        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + duration);
-
-        noise.connect(noiseFilter);
-        noiseFilter.connect(noiseGain);
-        noiseGain.connect(audioContext.destination);
-
-        noise.start(now);
-        noise.stop(now + duration);
+        // If no hitMarker sound loaded, silently skip (no procedural fallback)
     }
 
     // Set master volume
@@ -619,106 +610,7 @@ export class AudioManager implements GameSystem {
         sound.setVolume((this.soundConfigs[configKey]?.volume || 0.85) * volumeVariation);
         sound.play();
 
-        // Add procedural bass layer for more punch
-        this.addWeaponBassLayer(weaponType);
-
-        // Add supersonic crack layer for rifles and SMGs
-        if (weaponType === 'rifle' || weaponType === 'smg') {
-            this.addSupersonicCrack(0.3);
-        }
-    }
-
-    /**
-     * Add procedural bass/thump layer to weapon sound for extra punch
-     */
-    private addWeaponBassLayer(weaponType: 'rifle' | 'shotgun' | 'smg'): void {
-        const audioContext = this.listener.context;
-
-        // Create oscillator for bass thump
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        const filterNode = audioContext.createBiquadFilter();
-
-        // Configure based on weapon type
-        let frequency = 80; // Base frequency
-        let duration = 0.08;
-        let volume = 0.25;
-
-        switch (weaponType) {
-            case 'shotgun':
-                frequency = 60; // Lower, heavier thump
-                duration = 0.12;
-                volume = 0.35;
-                break;
-            case 'smg':
-                frequency = 100; // Higher, snappier
-                duration = 0.06;
-                volume = 0.2;
-                break;
-        }
-
-        // Configure oscillator - sawtooth for rich harmonics
-        oscillator.type = 'sawtooth';
-        oscillator.frequency.value = frequency;
-
-        // Configure low-pass filter for bass emphasis
-        filterNode.type = 'lowpass';
-        filterNode.frequency.value = 300;
-        filterNode.Q.value = 0.5;
-
-        // Configure gain envelope
-        const now = audioContext.currentTime;
-        gainNode.gain.setValueAtTime(0, now);
-        gainNode.gain.linearRampToValueAtTime(volume, now + 0.005); // Fast attack
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration); // Decay
-
-        // Connect nodes
-        oscillator.connect(filterNode);
-        filterNode.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-
-        // Play sound
-        oscillator.start(now);
-        oscillator.stop(now + duration);
-    }
-
-    /**
-     * Add supersonic bullet crack/snap sound
-     */
-    private addSupersonicCrack(volume: number = 0.25): void {
-        const audioContext = this.listener.context;
-
-        // Create white noise for crack
-        const bufferSize = audioContext.sampleRate * 0.05; // 50ms
-        const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-        const data = buffer.getChannelData(0);
-
-        // Generate white noise
-        for (let i = 0; i < bufferSize; i++) {
-            data[i] = (Math.random() * 2 - 1) * 0.5;
-        }
-
-        const noise = audioContext.createBufferSource();
-        noise.buffer = buffer;
-
-        const noiseGain = audioContext.createGain();
-        const noiseFilter = audioContext.createBiquadFilter();
-
-        // High-pass filter for sharp crack
-        noiseFilter.type = 'highpass';
-        noiseFilter.frequency.value = 2000;
-        noiseFilter.Q.value = 2.0;
-
-        const now = audioContext.currentTime;
-        noiseGain.gain.setValueAtTime(volume, now);
-        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
-
-        noise.connect(noiseFilter);
-        noiseFilter.connect(noiseGain);
-        noiseGain.connect(audioContext.destination);
-
-        noise.start(now);
-        noise.stop(now + 0.05);
+        // Bass layer and supersonic crack removed - use better quality WAV samples instead
     }
 
     /**
@@ -812,8 +704,7 @@ export class AudioManager implements GameSystem {
 
     /**
      * Play bullet whiz/crack sound when bullets pass close to player
-     * @param bulletPosition - Position where bullet passed close
-     * @param playerPosition - Player's current position
+     * Uses loaded WAV file from pool, falls back gracefully if not loaded
      */
     playBulletWhizSound(bulletPosition: THREE.Vector3, playerPosition: THREE.Vector3): void {
         const distance = bulletPosition.distanceTo(playerPosition);
@@ -821,43 +712,17 @@ export class AudioManager implements GameSystem {
         // Only play whiz sound for very close near-misses (within 3 meters)
         if (distance > 3) return;
 
-        const audioContext = this.listener.context;
-
-        // Create white noise for bullet whiz
-        const bufferSize = audioContext.sampleRate * 0.08; // 80ms
-        const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-        const data = buffer.getChannelData(0);
-
-        // Generate white noise
-        for (let i = 0; i < bufferSize; i++) {
-            data[i] = (Math.random() * 2 - 1) * 0.3;
+        // Use pooled sound if available
+        const sound = this.getAvailableSound(this.bulletWhizPool);
+        if (sound) {
+            // Volume based on proximity - closer = louder
+            const proximityFactor = 1 - (distance / 3);
+            sound.setVolume(0.4 * proximityFactor);
+            // Slight pitch variation for variety
+            sound.setPlaybackRate(0.9 + Math.random() * 0.2);
+            sound.play();
         }
-
-        const noise = audioContext.createBufferSource();
-        noise.buffer = buffer;
-
-        const noiseGain = audioContext.createGain();
-        const noiseFilter = audioContext.createBiquadFilter();
-
-        // Band-pass filter for characteristic whiz sound
-        noiseFilter.type = 'bandpass';
-        noiseFilter.frequency.value = 1500 + Math.random() * 1000; // Vary frequency
-        noiseFilter.Q.value = 3.0;
-
-        // Volume based on proximity - closer = louder
-        const proximityFactor = 1 - (distance / 3);
-        const baseVolume = 0.4 * proximityFactor;
-
-        const now = audioContext.currentTime;
-        noiseGain.gain.setValueAtTime(baseVolume, now);
-        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
-
-        noise.connect(noiseFilter);
-        noiseFilter.connect(noiseGain);
-        noiseGain.connect(audioContext.destination);
-
-        noise.start(now);
-        noise.stop(now + 0.08);
+        // If no bulletWhiz sound loaded, silently skip
     }
 
     dispose(): void {

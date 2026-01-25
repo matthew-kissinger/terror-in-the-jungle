@@ -67,5 +67,15 @@ export const SOUND_CONFIGS: Record<string, SoundConfig> = {
     refDistance: 15,
     maxDistance: 150,
     rolloffFactor: 1.5
+  },
+  // Hit feedback sounds - add hitMarker.wav to enable
+  hitMarker: {
+    path: 'assets/optimized/hitMarker.wav',
+    volume: 0.5
+  },
+  // Bullet whiz/flyby sounds - add bulletWhiz.wav to enable
+  bulletWhiz: {
+    path: 'assets/optimized/bulletWhiz.wav',
+    volume: 0.4
   }
 };

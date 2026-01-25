@@ -443,6 +443,34 @@
         "global",
         "batch"
       ]
+    },
+    {
+      "id": "83916cba",
+      "content": "Height fog for billboards: Use fogHeightFalloff uniform with exp(-falloff * worldY) calculation. Fog dense at ground (y=0), thins with altitude. fogStartDistance prevents close-up haze.",
+      "source": "manual",
+      "created_at": "2026-01-25T19:26:08.271008+00:00",
+      "tags": []
+    },
+    {
+      "id": "e3246ab8",
+      "content": "Scratch vector pattern for Three.js: Add private readonly scratch vectors as class members (scratchVec1, scratchRay, etc.) and reuse in hot path methods. Prevents per-frame allocations that cause GC pressure.",
+      "source": "manual",
+      "created_at": "2026-01-25T19:26:09.529798+00:00",
+      "tags": []
+    },
+    {
+      "id": "84248de5",
+      "content": "ImpactEffectsPool, TracerPool, MuzzleFlashPool update() methods are per-frame - never allocate in update loops. Store gravity/temp vectors as class members.",
+      "source": "manual",
+      "created_at": "2026-01-25T19:26:11.700694+00:00",
+      "tags": []
+    },
+    {
+      "id": "d461e3bd",
+      "content": "Billboard textures: Use mipmaps (LinearMipmapLinearFilter) + anisotropic filtering for distance rendering. Prevents aliasing/shimmer on vegetation at distance. See PixelPerfect.configureBillboardTexture().",
+      "source": "manual",
+      "created_at": "2026-01-25T19:26:21.667353+00:00",
+      "tags": []
     }
   ],
   "warnings": [
@@ -780,6 +808,22 @@
         "batch"
       ],
       "severity": "medium"
+    },
+    {
+      "id": "1e3db90e",
+      "content": "CombatantCombat.calculateAIShot() and calculateSuppressiveShot() are hot paths called per-shot per-NPC. Any new Vector3()/clone() here causes frame drops when 10+ NPCs engage. Use scratch vectors.",
+      "source": "manual",
+      "created_at": "2026-01-25T19:26:10.595183+00:00",
+      "tags": [],
+      "severity": "medium"
+    },
+    {
+      "id": "38a7e29c",
+      "content": "Billboard textures were oversized (16384x16384 Fern.png = 5.8MB, 4.3GB total VRAM). Resized to 512-1024 max. Originals backed up to public/assets/originals/ (gitignored).",
+      "source": "manual",
+      "created_at": "2026-01-25T19:26:22.744890+00:00",
+      "tags": [],
+      "severity": "high"
     }
   ],
   "context": [
@@ -847,5 +891,5 @@
       "tags": []
     }
   ],
-  "updated_at": "2026-01-25T16:28:55.291971+00:00"
+  "updated_at": "2026-01-25T19:26:22.744910+00:00"
 }
