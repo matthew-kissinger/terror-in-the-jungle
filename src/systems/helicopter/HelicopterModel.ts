@@ -819,7 +819,7 @@ export class HelicopterModel implements GameSystem {
     this.playerController.updatePlayerPosition(state.position);
   }
 
-  // Calculate visual tilt quaternion based on control inputs
+  // Calculate visual tilt quaternion based on control inputs and velocity
   private calculateVisualTilt(controls: HelicopterControls): THREE.Quaternion {
     // Convert cyclic control inputs to visual tilt angles
     // cyclicPitch: forward/backward movement -> pitch tilt (rotation around X-axis)
@@ -829,9 +829,10 @@ export class HelicopterModel implements GameSystem {
     // Arrow Up (cyclicPitch +1) → should tilt forward
     // Arrow Right (cyclicRoll +1) → should tilt right
 
-    // Apply 90-degree rotation: pitch becomes roll, roll becomes pitch
-    const pitchAngle = -controls.cyclicRoll * this.MAX_TILT_ANGLE;   // Right input → forward tilt
-    const rollAngle = controls.cyclicPitch * this.MAX_TILT_ANGLE;    // Forward input → right tilt
+    // Base tilt from controls - more pronounced for better visual feedback
+    const controlTiltMultiplier = 1.2;
+    const pitchAngle = -controls.cyclicRoll * this.MAX_TILT_ANGLE * controlTiltMultiplier;
+    const rollAngle = controls.cyclicPitch * this.MAX_TILT_ANGLE * controlTiltMultiplier;
 
     // Create quaternion from euler angles
     const euler = new THREE.Euler(pitchAngle, 0, rollAngle, 'YXZ');
