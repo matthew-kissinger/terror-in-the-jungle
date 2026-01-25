@@ -119,7 +119,7 @@ export class SandboxSystemManager {
     this.playerController = new PlayerController(camera);
     this.combatantSystem = new CombatantSystem(scene, camera, this.globalBillboardSystem, this.assetLoader, this.chunkManager);
     this.skybox = new Skybox(scene);
-    this.waterSystem = new WaterSystem(scene, this.assetLoader);
+    this.waterSystem = new WaterSystem(scene, camera, this.assetLoader);
     this.weatherSystem = new WeatherSystem(scene, camera, this.chunkManager);
     this.dayNightCycle = new DayNightCycle(scene);
     this.firstPersonWeapon = new FirstPersonWeapon(scene, camera, this.assetLoader);
@@ -343,6 +343,11 @@ export class SandboxSystemManager {
       if (sandboxRenderer) {
         this.weatherSystem.setSandboxRenderer(sandboxRenderer);
       }
+    }
+    
+    // Connect water system
+    if (this.waterSystem) {
+      this.waterSystem.setWeatherSystem(this.weatherSystem);
     }
 
     // Connect day-night cycle

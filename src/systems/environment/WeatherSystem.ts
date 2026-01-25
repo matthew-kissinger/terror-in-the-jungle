@@ -34,6 +34,9 @@ export class WeatherSystem implements GameSystem {
   private flashTimer: number = 0;
   private thunderDelay: number = 0;
   
+  // Underwater state
+  private isUnderwater: boolean = false;
+  
   // Base atmosphere values (cached from renderer)
   private baseFogDensity: number = 0.008;
   private baseAmbientIntensity: number = 0.15;
@@ -65,6 +68,14 @@ export class WeatherSystem implements GameSystem {
     if (config) {
       this.setWeatherState(config.initialState, true);
       this.cycleTimer = this.getRandomCycleDuration();
+    }
+  }
+
+  setUnderwater(isUnderwater: boolean): void {
+    if (this.isUnderwater !== isUnderwater) {
+      this.isUnderwater = isUnderwater;
+      // Force immediate update to prevent lag in visual transition
+      this.updateAtmosphere();
     }
   }
 
@@ -306,6 +317,25 @@ export class WeatherSystem implements GameSystem {
   private updateAtmosphere(): void {
     if (!this.sandboxRenderer) return;
 
+    if (this.isUnderwater) {
+      // Apply underwater atmosphere immediately
+      if (this.sandboxRenderer.fog) {
+        this.sandboxRenderer.fog.density = 0.04; // Very dense fog
+        this.sandboxRenderer.fog.color.setHex(0x003344); // Deep blue-green
+      }
+      if (this.sandboxRenderer.ambientLight) {
+        this.sandboxRenderer.ambientLight.intensity = 0.5;
+        this.sandboxRenderer.ambientLight.color.setHex(0x004455);
+      }
+      if (this.sandboxRenderer.moonLight) {
+        this.sandboxRenderer.moonLight.intensity = 0.0; // No direct moonlight
+      }
+      if (this.sandboxRenderer.jungleLight) {
+        this.sandboxRenderer.jungleLight.intensity = 0.1;
+      }
+      return; // Skip normal weather atmosphere
+    }
+
     // Blend between current and target state
     const currentParams = this.getWeatherParams(this.currentState);
     const targetParams = this.getWeatherParams(this.targetState);
@@ -319,13 +349,20 @@ export class WeatherSystem implements GameSystem {
 
     // Apply (override if lightning)
     if (!this.isFlashing) {
-      if (this.sandboxRenderer.fog) this.sandboxRenderer.fog.density = fogDensity;
-      if (this.sandboxRenderer.ambientLight) this.sandboxRenderer.ambientLight.intensity = ambientInt;
+      if (this.sandboxRenderer.fog) {
+        this.sandboxRenderer.fog.density = fogDensity;
+        // Restore standard fog color
+        this.sandboxRenderer.fog.color.setHex(0x0a1012);
+      }
+      if (this.sandboxRenderer.ambientLight) {
+        this.sandboxRenderer.ambientLight.intensity = ambientInt;
+        this.sandboxRenderer.ambientLight.color.setHex(0x1a2f3a); // Restore default ambient color
+      }
       if (this.sandboxRenderer.moonLight) this.sandboxRenderer.moonLight.intensity = moonInt;
       if (this.sandboxRenderer.jungleLight) this.sandboxRenderer.jungleLight.intensity = jungleInt;
       
       // Reset fog color if it was flashed
-      if (this.sandboxRenderer.fog) this.sandboxRenderer.fog.color.setHex(0x0a1012);
+      // if (this.sandboxRenderer.fog) this.sandboxRenderer.fog.color.setHex(0x0a1012); // Done above
     }
   }
 
