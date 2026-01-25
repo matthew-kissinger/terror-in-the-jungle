@@ -1,0 +1,487 @@
+import * as THREE from 'three'
+import { Combatant, CombatantState } from './types'
+
+/**
+ * Octree node for spatial partitioning of combatants in 3D space.
+ * Provides efficient O(log n) queries for radius, frustum, ray, and k-nearest searches.
+ */
+class OctreeNode {
+  bounds: THREE.Box3
+  entities: string[] = []
+  children: OctreeNode[] | null = null
+  depth: number
+
+  constructor(bounds: THREE.Box3, depth: number = 0) {
+    this.bounds = bounds
+    this.depth = depth
+  }
+
+  /**
+   * Check if this node is a leaf (has no children)
+   */
+  isLeaf(): boolean {
+    return this.children === null
+  }
+
+  /**
+   * Subdivide this node into 8 octants
+   */
+  subdivide(): void {
+    if (!this.isLeaf()) return
+
+    const center = this.bounds.getCenter(new THREE.Vector3())
+    const min = this.bounds.min
+    const max = this.bounds.max
+
+    this.children = [
+      // Bottom quadrants (y < center.y)
+      new OctreeNode(new THREE.Box3(
+        new THREE.Vector3(min.x, min.y, min.z),
+        new THREE.Vector3(center.x, center.y, center.z)
+      ), this.depth + 1),
+      new OctreeNode(new THREE.Box3(
+        new THREE.Vector3(center.x, min.y, min.z),
+        new THREE.Vector3(max.x, center.y, center.z)
+      ), this.depth + 1),
+      new OctreeNode(new THREE.Box3(
+        new THREE.Vector3(min.x, min.y, center.z),
+        new THREE.Vector3(center.x, center.y, max.z)
+      ), this.depth + 1),
+      new OctreeNode(new THREE.Box3(
+        new THREE.Vector3(center.x, min.y, center.z),
+        new THREE.Vector3(max.x, center.y, max.z)
+      ), this.depth + 1),
+      // Top quadrants (y >= center.y)
+      new OctreeNode(new THREE.Box3(
+        new THREE.Vector3(min.x, center.y, min.z),
+        new THREE.Vector3(center.x, max.y, center.z)
+      ), this.depth + 1),
+      new OctreeNode(new THREE.Box3(
+        new THREE.Vector3(center.x, center.y, min.z),
+        new THREE.Vector3(max.x, max.y, center.z)
+      ), this.depth + 1),
+      new OctreeNode(new THREE.Box3(
+        new THREE.Vector3(min.x, center.y, center.z),
+        new THREE.Vector3(center.x, max.y, max.z)
+      ), this.depth + 1),
+      new OctreeNode(new THREE.Box3(
+        new THREE.Vector3(center.x, center.y, center.z),
+        new THREE.Vector3(max.x, max.y, max.z)
+      ), this.depth + 1)
+    ]
+
+    // Redistribute entities to children
+    for (const id of this.entities) {
+      // Children will handle insertion
+    }
+    this.entities = []
+  }
+
+  /**
+   * Find which child octant contains a point
+   */
+  getOctantIndex(position: THREE.Vector3): number {
+    const center = this.bounds.getCenter(new THREE.Vector3())
+    let index = 0
+    if (position.x >= center.x) index |= 1
+    if (position.z >= center.z) index |= 2
+    if (position.y >= center.y) index |= 4
+    return index
+  }
+}
+
+/**
+ * 3D spatial octree for fast proximity queries of combatants.
+ * Optimized for dynamic updates and various query types.
+ */
+export class SpatialOctree {
+  private root: OctreeNode
+  private entityPositions: Map<string, THREE.Vector3> = new Map()
+  private readonly maxEntitiesPerNode: number
+  private readonly maxDepth: number
+  private worldBounds: THREE.Box3
+
+  // Reusable objects for performance
+  private readonly scratchVector = new THREE.Vector3()
+  private readonly scratchBox = new THREE.Box3()
+  private readonly scratchSphere = new THREE.Sphere()
+
+  constructor(worldSize: number = 4000, maxEntitiesPerNode: number = 12, maxDepth: number = 6) {
+    this.maxEntitiesPerNode = maxEntitiesPerNode
+    this.maxDepth = maxDepth
+
+    const halfSize = worldSize / 2
+    this.worldBounds = new THREE.Box3(
+      new THREE.Vector3(-halfSize, -50, -halfSize),
+      new THREE.Vector3(halfSize, 100, halfSize)
+    )
+
+    this.root = new OctreeNode(this.worldBounds.clone(), 0)
+  }
+
+  /**
+   * Update world bounds dynamically
+   */
+  setWorldSize(worldSize: number): void {
+    const halfSize = worldSize / 2
+    this.worldBounds = new THREE.Box3(
+      new THREE.Vector3(-halfSize, -50, -halfSize),
+      new THREE.Vector3(halfSize, 100, halfSize)
+    )
+
+    // Rebuild tree with new bounds
+    const entities = Array.from(this.entityPositions.entries())
+    this.clear()
+    this.root = new OctreeNode(this.worldBounds.clone(), 0)
+
+    for (const [id, position] of entities) {
+      this.insert(id, position)
+    }
+  }
+
+  /**
+   * Insert or update entity position in octree
+   */
+  updatePosition(id: string, position: THREE.Vector3): void {
+    const oldPosition = this.entityPositions.get(id)
+
+    // If position hasn't changed significantly, skip update
+    if (oldPosition && oldPosition.distanceToSquared(position) < 0.01) {
+      return
+    }
+
+    // Remove old position if exists
+    if (oldPosition) {
+      this.remove(id)
+    }
+
+    // Insert at new position
+    this.insert(id, position)
+  }
+
+  /**
+   * Insert entity into octree
+   */
+  private insert(id: string, position: THREE.Vector3): void {
+    // Clamp position to world bounds
+    const clampedPos = position.clone().clamp(this.worldBounds.min, this.worldBounds.max)
+    this.entityPositions.set(id, clampedPos.clone())
+    this.insertIntoNode(this.root, id, clampedPos)
+  }
+
+  /**
+   * Recursively insert entity into appropriate node
+   */
+  private insertIntoNode(node: OctreeNode, id: string, position: THREE.Vector3): void {
+    // If not a leaf, insert into appropriate child
+    if (!node.isLeaf()) {
+      const octant = node.getOctantIndex(position)
+      if (node.children && node.children[octant].bounds.containsPoint(position)) {
+        this.insertIntoNode(node.children[octant], id, position)
+      } else {
+        // Position doesn't fit perfectly, store at this level
+        node.entities.push(id)
+      }
+      return
+    }
+
+    // Add to leaf node
+    node.entities.push(id)
+
+    // Subdivide if over capacity and not at max depth
+    if (node.entities.length > this.maxEntitiesPerNode && node.depth < this.maxDepth) {
+      node.subdivide()
+
+      // Redistribute entities to children
+      const entitiesToRedistribute = [...node.entities]
+      node.entities = []
+
+      for (const entityId of entitiesToRedistribute) {
+        const entityPos = this.entityPositions.get(entityId)
+        if (entityPos && node.children) {
+          const octant = node.getOctantIndex(entityPos)
+          if (node.children[octant].bounds.containsPoint(entityPos)) {
+            this.insertIntoNode(node.children[octant], entityId, entityPos)
+          } else {
+            node.entities.push(entityId)
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Remove entity from octree
+   */
+  remove(id: string): void {
+    const position = this.entityPositions.get(id)
+    if (!position) return
+
+    this.removeFromNode(this.root, id, position)
+    this.entityPositions.delete(id)
+  }
+
+  /**
+   * Recursively remove entity from node
+   */
+  private removeFromNode(node: OctreeNode, id: string, position: THREE.Vector3): boolean {
+    if (node.isLeaf()) {
+      const index = node.entities.indexOf(id)
+      if (index !== -1) {
+        node.entities.splice(index, 1)
+        return true
+      }
+      return false
+    }
+
+    // Check this node's entities first
+    const index = node.entities.indexOf(id)
+    if (index !== -1) {
+      node.entities.splice(index, 1)
+      return true
+    }
+
+    // Check children
+    if (node.children) {
+      const octant = node.getOctantIndex(position)
+      if (node.children[octant].bounds.containsPoint(position)) {
+        return this.removeFromNode(node.children[octant], id, position)
+      } else {
+        // Search all children if position doesn't match
+        for (const child of node.children) {
+          if (this.removeFromNode(child, id, position)) {
+            return true
+          }
+        }
+      }
+    }
+
+    return false
+  }
+
+  /**
+   * Query entities within radius (sphere query)
+   */
+  queryRadius(center: THREE.Vector3, radius: number): string[] {
+    const results: string[] = []
+    this.scratchSphere.set(center, radius)
+    this.queryRadiusRecursive(this.root, this.scratchSphere, results)
+    return results
+  }
+
+  /**
+   * Recursively query radius in octree
+   */
+  private queryRadiusRecursive(node: OctreeNode, sphere: THREE.Sphere, results: string[]): void {
+    // Early exit if sphere doesn't intersect node bounds
+    if (!sphere.intersectsBox(node.bounds)) {
+      return
+    }
+
+    // Add all entities in this node that are within radius
+    const radiusSq = sphere.radius * sphere.radius
+    for (const id of node.entities) {
+      const pos = this.entityPositions.get(id)
+      if (pos && pos.distanceToSquared(sphere.center) <= radiusSq) {
+        results.push(id)
+      }
+    }
+
+    // Recurse into children
+    if (!node.isLeaf() && node.children) {
+      for (const child of node.children) {
+        this.queryRadiusRecursive(child, sphere, results)
+      }
+    }
+  }
+
+  /**
+   * Query entities visible to frustum
+   */
+  queryFrustum(frustum: THREE.Frustum): string[] {
+    const results: string[] = []
+    this.queryFrustumRecursive(this.root, frustum, results)
+    return results
+  }
+
+  /**
+   * Recursively query frustum in octree
+   */
+  private queryFrustumRecursive(node: OctreeNode, frustum: THREE.Frustum, results: string[]): void {
+    // Early exit if frustum doesn't intersect node bounds
+    if (!frustum.intersectsBox(node.bounds)) {
+      return
+    }
+
+    // Add all entities in this node that are within frustum
+    for (const id of node.entities) {
+      const pos = this.entityPositions.get(id)
+      if (pos && frustum.containsPoint(pos)) {
+        results.push(id)
+      }
+    }
+
+    // Recurse into children
+    if (!node.isLeaf() && node.children) {
+      for (const child of node.children) {
+        this.queryFrustumRecursive(child, frustum, results)
+      }
+    }
+  }
+
+  /**
+   * Query entities along ray
+   */
+  queryRay(origin: THREE.Vector3, direction: THREE.Vector3, maxDistance: number): string[] {
+    const results: string[] = []
+    const ray = new THREE.Ray(origin, direction)
+    this.queryRayRecursive(this.root, ray, maxDistance, results)
+    return results
+  }
+
+  /**
+   * Recursively query ray in octree
+   */
+  private queryRayRecursive(node: OctreeNode, ray: THREE.Ray, maxDistance: number, results: string[]): void {
+    // Early exit if ray doesn't intersect node bounds
+    const intersection = ray.intersectBox(node.bounds, this.scratchVector)
+    if (!intersection || intersection.distanceTo(ray.origin) > maxDistance) {
+      return
+    }
+
+    // Check all entities in this node
+    for (const id of node.entities) {
+      const pos = this.entityPositions.get(id)
+      if (pos) {
+        const distance = ray.distanceToPoint(pos)
+        if (distance < 2.0 && ray.origin.distanceTo(pos) <= maxDistance) {
+          results.push(id)
+        }
+      }
+    }
+
+    // Recurse into children
+    if (!node.isLeaf() && node.children) {
+      for (const child of node.children) {
+        this.queryRayRecursive(child, ray, maxDistance, results)
+      }
+    }
+  }
+
+  /**
+   * Query k nearest entities to a point
+   */
+  queryNearestK(center: THREE.Vector3, k: number, maxDistance: number = Infinity): string[] {
+    const candidates: Array<{ id: string; distanceSq: number }> = []
+    const maxDistanceSq = maxDistance * maxDistance
+
+    this.queryNearestKRecursive(this.root, center, candidates, maxDistanceSq)
+
+    // Sort by distance and return top k
+    candidates.sort((a, b) => a.distanceSq - b.distanceSq)
+    return candidates.slice(0, k).map(c => c.id)
+  }
+
+  /**
+   * Recursively query k-nearest in octree
+   */
+  private queryNearestKRecursive(
+    node: OctreeNode,
+    center: THREE.Vector3,
+    candidates: Array<{ id: string; distanceSq: number }>,
+    maxDistanceSq: number
+  ): void {
+    // Check distance to node bounds
+    const distanceSq = node.bounds.distanceToPoint(center)
+    if (distanceSq > maxDistanceSq) {
+      return
+    }
+
+    // Add all entities in this node
+    for (const id of node.entities) {
+      const pos = this.entityPositions.get(id)
+      if (pos) {
+        const distSq = pos.distanceToSquared(center)
+        if (distSq <= maxDistanceSq) {
+          candidates.push({ id, distanceSq: distSq })
+        }
+      }
+    }
+
+    // Recurse into children, prioritizing closer ones
+    if (!node.isLeaf() && node.children) {
+      // Calculate distance to each child and sort
+      const childDistances = node.children.map((child, index) => ({
+        child,
+        index,
+        distance: child.bounds.distanceToPoint(center)
+      }))
+
+      childDistances.sort((a, b) => a.distance - b.distance)
+
+      for (const { child } of childDistances) {
+        this.queryNearestKRecursive(child, center, candidates, maxDistanceSq)
+      }
+    }
+  }
+
+  /**
+   * Rebuild entire octree from scratch
+   */
+  rebuild(combatants: Map<string, Combatant>): void {
+    this.clear()
+    this.root = new OctreeNode(this.worldBounds.clone(), 0)
+
+    combatants.forEach((combatant, id) => {
+      if (combatant.state !== CombatantState.DEAD) {
+        this.insert(id, combatant.position)
+      }
+    })
+  }
+
+  /**
+   * Clear all data
+   */
+  clear(): void {
+    this.entityPositions.clear()
+    this.root = new OctreeNode(this.worldBounds.clone(), 0)
+  }
+
+  /**
+   * Get statistics for debugging
+   */
+  getStats(): {
+    totalNodes: number
+    totalEntities: number
+    maxDepth: number
+    avgEntitiesPerLeaf: number
+  } {
+    let totalNodes = 0
+    let leafNodes = 0
+    let totalEntitiesInLeaves = 0
+    let maxDepthFound = 0
+
+    const traverse = (node: OctreeNode) => {
+      totalNodes++
+      maxDepthFound = Math.max(maxDepthFound, node.depth)
+
+      if (node.isLeaf()) {
+        leafNodes++
+        totalEntitiesInLeaves += node.entities.length
+      } else if (node.children) {
+        for (const child of node.children) {
+          traverse(child)
+        }
+      }
+    }
+
+    traverse(this.root)
+
+    return {
+      totalNodes,
+      totalEntities: this.entityPositions.size,
+      maxDepth: maxDepthFound,
+      avgEntitiesPerLeaf: leafNodes > 0 ? totalEntitiesInLeaves / leafNodes : 0
+    }
+  }
+}

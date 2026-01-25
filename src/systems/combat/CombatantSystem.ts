@@ -22,7 +22,7 @@ import { CombatantCombat } from './CombatantCombat';
 import { CombatantMovement } from './CombatantMovement';
 import { CombatantRenderer } from './CombatantRenderer';
 import { SquadManager } from './SquadManager';
-import { SpatialGrid } from './SpatialGrid';
+import { SpatialOctree } from './SpatialOctree';
 
 export class CombatantSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -42,7 +42,7 @@ export class CombatantSystem implements GameSystem {
   private combatantMovement: CombatantMovement;
   private combatantRenderer: CombatantRenderer;
   private squadManager: SquadManager;
-  private spatialGrid: SpatialGrid;
+  private spatialGrid: SpatialOctree;
 
   // Effects pools
   private tracerPool: TracerPool;
@@ -148,7 +148,7 @@ export class CombatantSystem implements GameSystem {
     );
     this.combatantMovement = new CombatantMovement(chunkManager, undefined);
     this.squadManager = new SquadManager(this.combatantFactory, chunkManager);
-    this.spatialGrid = new SpatialGrid(30, 4000); // 30m cell size, 4000m default world
+    this.spatialGrid = new SpatialOctree(4000, 12, 6); // 4000m world, 12 entities/node, 6 max depth
   }
 
   async init(): Promise<void> {
@@ -223,6 +223,10 @@ export class CombatantSystem implements GameSystem {
     this.combatantAI.setSquads(this.squadManager.getAllSquads());
 
     console.log(`🎖️ Initial forces deployed: ${this.combatants.size} combatants`);
+
+    // Log initial octree stats
+    const octreeStats = this.spatialGrid.getStats();
+    Logger.info('combat', `Octree initialized: ${octreeStats.totalNodes} nodes, ${octreeStats.totalEntities} entities, max depth ${octreeStats.maxDepth}`);
   }
 
   private getBasePositions(): { usBasePos: THREE.Vector3; opforBasePos: THREE.Vector3 } {
@@ -1054,7 +1058,13 @@ export class CombatantSystem implements GameSystem {
     lodLow: number;
     lodCulled: number;
     combatantCount: number;
+    octree: {
+      nodes: number;
+      maxDepth: number;
+      avgEntitiesPerLeaf: number;
+    };
   } {
+    const octreeStats = this.spatialGrid.getStats();
     return {
       lastMs: this.updateLastMs,
       emaMs: this.updateEmaMs,
@@ -1062,7 +1072,12 @@ export class CombatantSystem implements GameSystem {
       lodMedium: this.lodMediumCount,
       lodLow: this.lodLowCount,
       lodCulled: this.lodCulledCount,
-      combatantCount: this.combatants.size
+      combatantCount: this.combatants.size,
+      octree: {
+        nodes: octreeStats.totalNodes,
+        maxDepth: octreeStats.maxDepth,
+        avgEntitiesPerLeaf: Math.round(octreeStats.avgEntitiesPerLeaf * 10) / 10
+      }
     };
   }
 
