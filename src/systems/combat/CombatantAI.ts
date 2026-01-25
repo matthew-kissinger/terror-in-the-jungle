@@ -237,6 +237,7 @@ export class CombatantAI {
       combatant.target = null;
       combatant.isFullAuto = false;
       combatant.previousState = undefined;
+      combatant.inCover = false;
       return;
     }
 
@@ -247,59 +248,75 @@ export class CombatantAI {
     const targetDistance = combatant.position.distanceTo(targetPos);
     combatant.isFullAuto = false;
 
-    // Determine full auto conditions
-    if (targetDistance < 15) {
-      combatant.isFullAuto = true;
-      combatant.skillProfile.burstLength = 8;
-      combatant.skillProfile.burstPauseMs = 200;
-    }
+    // Peek-and-fire behavior when in cover
+    if (combatant.inCover) {
+      // While in cover, use controlled bursts with longer pauses
+      combatant.skillProfile.burstLength = 2; // Short, controlled bursts
+      combatant.skillProfile.burstPauseMs = 1500; // Longer pauses between bursts (ducking back)
 
-    const timeSinceHit = (Date.now() - combatant.lastHitTime) / 1000;
-    if (timeSinceHit < 2.0) {
-      combatant.panicLevel = Math.min(1.0, combatant.panicLevel + 0.3);
-      if (combatant.panicLevel > 0.5) {
-        combatant.isFullAuto = true;
-        combatant.skillProfile.burstLength = 10;
-        combatant.skillProfile.burstPauseMs = 150;
+      // If cover becomes flanked or invalid, leave cover
+      if (this.isCoverFlanked(combatant, targetPos)) {
+        console.log(`⚠️ ${combatant.faction} unit's cover is flanked, repositioning`);
+        combatant.inCover = false;
+        combatant.coverPosition = undefined;
       }
     } else {
-      combatant.panicLevel = Math.max(0, combatant.panicLevel - deltaTime * 0.2);
-    }
+      // Normal engagement behavior when not in cover
 
-    // Check if should seek cover
-    if (this.shouldSeekCover(combatant)) {
-      const coverPosition = this.findNearestCover(combatant, targetPos);
-      if (coverPosition) {
-        combatant.state = CombatantState.SEEKING_COVER;
-        combatant.coverPosition = coverPosition;
-        combatant.destinationPoint = coverPosition;
-        combatant.lastCoverSeekTime = Date.now();
-        combatant.inCover = false;
-        return;
+      // Determine full auto conditions
+      if (targetDistance < 15) {
+        combatant.isFullAuto = true;
+        combatant.skillProfile.burstLength = 8;
+        combatant.skillProfile.burstPauseMs = 200;
       }
-    }
 
-    const nearbyEnemyCount = this.countNearbyEnemies(combatant, 20, playerPosition, allCombatants, spatialGrid);
-    if (nearbyEnemyCount > 2) {
-      combatant.isFullAuto = true;
-      combatant.skillProfile.burstLength = 6;
-    }
-
-    // Check if squad should initiate suppression
-    if (this.shouldInitiateSquadSuppression(combatant, targetPos, allCombatants)) {
-      this.initiateSquadSuppression(combatant, targetPos, allCombatants)
-      return
-    }
-
-    // Reset burst params if not full auto
-    if (!combatant.isFullAuto) {
-      const isLeader = combatant.squadRole === 'leader';
-      if (combatant.faction === Faction.OPFOR) {
-        combatant.skillProfile.burstLength = isLeader ? 4 : 3;
-        combatant.skillProfile.burstPauseMs = isLeader ? 800 : 1000;
+      const timeSinceHit = (Date.now() - combatant.lastHitTime) / 1000;
+      if (timeSinceHit < 2.0) {
+        combatant.panicLevel = Math.min(1.0, combatant.panicLevel + 0.3);
+        if (combatant.panicLevel > 0.5) {
+          combatant.isFullAuto = true;
+          combatant.skillProfile.burstLength = 10;
+          combatant.skillProfile.burstPauseMs = 150;
+        }
       } else {
-        combatant.skillProfile.burstLength = 3;
-        combatant.skillProfile.burstPauseMs = isLeader ? 900 : 1100;
+        combatant.panicLevel = Math.max(0, combatant.panicLevel - deltaTime * 0.2);
+      }
+
+      // Check if should seek cover
+      if (this.shouldSeekCover(combatant)) {
+        const coverPosition = this.findNearestCover(combatant, targetPos);
+        if (coverPosition) {
+          combatant.state = CombatantState.SEEKING_COVER;
+          combatant.coverPosition = coverPosition;
+          combatant.destinationPoint = coverPosition;
+          combatant.lastCoverSeekTime = Date.now();
+          combatant.inCover = false;
+          return;
+        }
+      }
+
+      const nearbyEnemyCount = this.countNearbyEnemies(combatant, 20, playerPosition, allCombatants, spatialGrid);
+      if (nearbyEnemyCount > 2) {
+        combatant.isFullAuto = true;
+        combatant.skillProfile.burstLength = 6;
+      }
+
+      // Check if squad should initiate suppression
+      if (this.shouldInitiateSquadSuppression(combatant, targetPos, allCombatants)) {
+        this.initiateSquadSuppression(combatant, targetPos, allCombatants)
+        return
+      }
+
+      // Reset burst params if not full auto
+      if (!combatant.isFullAuto) {
+        const isLeader = combatant.squadRole === 'leader';
+        if (combatant.faction === Faction.OPFOR) {
+          combatant.skillProfile.burstLength = isLeader ? 4 : 3;
+          combatant.skillProfile.burstPauseMs = isLeader ? 800 : 1000;
+        } else {
+          combatant.skillProfile.burstLength = 3;
+          combatant.skillProfile.burstPauseMs = isLeader ? 900 : 1100;
+        }
       }
     }
 
@@ -309,6 +326,8 @@ export class CombatantAI {
       combatant.isFullAuto = true;
       combatant.skillProfile.burstLength = 12;
       combatant.skillProfile.burstPauseMs = 100;
+      // Leave cover when suppressing
+      combatant.inCover = false;
       return;
     }
 
@@ -1241,5 +1260,27 @@ export class CombatantAI {
     const flankingAngle = currentAngle + flankingOffset
 
     return flankingAngle
+  }
+
+  /**
+   * Check if cover position is flanked by threat
+   */
+  private isCoverFlanked(combatant: Combatant, threatPos: THREE.Vector3): boolean {
+    if (!combatant.coverPosition) return true;
+
+    // Calculate vector from cover to threat
+    const coverToThreat = new THREE.Vector3()
+      .subVectors(threatPos, combatant.coverPosition);
+
+    // Calculate vector from cover to combatant
+    const coverToCombatant = new THREE.Vector3()
+      .subVectors(combatant.position, combatant.coverPosition);
+
+    // If threat is behind or perpendicular to cover, it's flanked
+    const dotProduct = coverToThreat.normalize().dot(coverToCombatant.normalize());
+
+    // If dot product > 0.5, threat is on the same side as combatant (flanked)
+    // If dot product < -0.5, cover is between combatant and threat (good)
+    return dotProduct > 0.3; // Allow some angle tolerance
   }
 }

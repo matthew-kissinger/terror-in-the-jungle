@@ -31,6 +31,14 @@ export class AudioManager implements GameSystem {
     // Sound configurations
     private readonly soundConfigs: Record<string, SoundConfig> = SOUND_CONFIGS;
 
+    // Audio ducking state for combat emphasis
+    private isDucking = false;
+    private duckingProgress = 0;
+    private readonly DUCKING_AMOUNT = 0.4; // Reduce ambient to 40% during combat
+    private readonly DUCK_FADE_TIME = 0.3; // Fade in/out time in seconds
+    private lastCombatSoundTime = 0;
+    private readonly COMBAT_TIMEOUT = 2000; // 2 seconds after last shot before unduck
+
     constructor(scene: THREE.Scene, camera: THREE.Camera) {
         this.scene = scene;
         this.camera = camera;
@@ -473,15 +481,52 @@ export class AudioManager implements GameSystem {
     }
 
     update(deltaTime: number): void {
-        // Audio system doesn't need per-frame updates in this implementation
-        // Three.js handles positional audio updates automatically
+        // Update audio ducking for combat emphasis
+        this.updateAudioDucking(deltaTime);
     }
 
     /**
-     * Enhanced weapon sound playback with pitch variation
+     * Update audio ducking - reduce ambient sounds during combat
+     */
+    private updateAudioDucking(deltaTime: number): void {
+        const now = performance.now();
+        const timeSinceLastShot = now - this.lastCombatSoundTime;
+
+        // Determine if we should be ducking based on recent combat
+        const shouldDuck = timeSinceLastShot < this.COMBAT_TIMEOUT;
+
+        if (shouldDuck && !this.isDucking) {
+            this.isDucking = true;
+        } else if (!shouldDuck && this.isDucking && timeSinceLastShot > this.COMBAT_TIMEOUT + 500) {
+            this.isDucking = false;
+        }
+
+        // Smoothly transition ducking amount
+        const targetDucking = this.isDucking ? 1 : 0;
+        const duckSpeed = 1 / this.DUCK_FADE_TIME;
+
+        if (this.duckingProgress < targetDucking) {
+            this.duckingProgress = Math.min(1, this.duckingProgress + duckSpeed * deltaTime);
+        } else if (this.duckingProgress > targetDucking) {
+            this.duckingProgress = Math.max(0, this.duckingProgress - duckSpeed * deltaTime);
+        }
+
+        // Apply ducking to ambient sounds
+        const duckMultiplier = 1 - (this.duckingProgress * this.DUCKING_AMOUNT);
+        for (const sound of this.ambientSounds) {
+            const baseVolume = this.soundConfigs.jungle1?.volume || 0.3;
+            sound.setVolume(baseVolume * duckMultiplier);
+        }
+    }
+
+    /**
+     * Enhanced weapon sound playback with pitch/volume variation and layered sounds
      * @param weaponType - Type of weapon: 'rifle', 'shotgun', or 'smg'
      */
     playPlayerWeaponSound(weaponType: 'rifle' | 'shotgun' | 'smg' = 'rifle'): void {
+        // Mark combat time for audio ducking
+        this.lastCombatSoundTime = performance.now();
+
         // Get sound from pool
         const sound = this.getAvailableSound(this.playerGunshotPool);
         if (!sound) return;
@@ -489,21 +534,126 @@ export class AudioManager implements GameSystem {
         // Apply weapon-specific pitch variation for variety
         let pitchMin = 0.95;
         let pitchMax = 1.05;
+        let volumeVariation = 0.95 + Math.random() * 0.1; // 95-105% volume variation
 
         switch (weaponType) {
             case 'shotgun':
                 pitchMin = 0.90;
                 pitchMax = 1.08;
+                volumeVariation = 0.9 + Math.random() * 0.15; // More variation for shotgun
                 break;
             case 'smg':
                 pitchMin = 1.08;
                 pitchMax = 1.18;
+                volumeVariation = 0.92 + Math.random() * 0.12;
                 break;
         }
 
         const pitchVariation = pitchMin + Math.random() * (pitchMax - pitchMin);
         sound.setPlaybackRate(pitchVariation);
+        sound.setVolume((this.soundConfigs.playerGunshot.volume || 0.85) * volumeVariation);
         sound.play();
+
+        // Add procedural bass layer for more punch
+        this.addWeaponBassLayer(weaponType);
+
+        // Add supersonic crack layer for rifles and SMGs
+        if (weaponType === 'rifle' || weaponType === 'smg') {
+            this.addSupersonicCrack(0.3);
+        }
+    }
+
+    /**
+     * Add procedural bass/thump layer to weapon sound for extra punch
+     */
+    private addWeaponBassLayer(weaponType: 'rifle' | 'shotgun' | 'smg'): void {
+        const audioContext = this.listener.context;
+
+        // Create oscillator for bass thump
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        const filterNode = audioContext.createBiquadFilter();
+
+        // Configure based on weapon type
+        let frequency = 80; // Base frequency
+        let duration = 0.08;
+        let volume = 0.25;
+
+        switch (weaponType) {
+            case 'shotgun':
+                frequency = 60; // Lower, heavier thump
+                duration = 0.12;
+                volume = 0.35;
+                break;
+            case 'smg':
+                frequency = 100; // Higher, snappier
+                duration = 0.06;
+                volume = 0.2;
+                break;
+        }
+
+        // Configure oscillator - sawtooth for rich harmonics
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.value = frequency;
+
+        // Configure low-pass filter for bass emphasis
+        filterNode.type = 'lowpass';
+        filterNode.frequency.value = 300;
+        filterNode.Q.value = 0.5;
+
+        // Configure gain envelope
+        const now = audioContext.currentTime;
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(volume, now + 0.005); // Fast attack
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration); // Decay
+
+        // Connect nodes
+        oscillator.connect(filterNode);
+        filterNode.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        // Play sound
+        oscillator.start(now);
+        oscillator.stop(now + duration);
+    }
+
+    /**
+     * Add supersonic bullet crack/snap sound
+     */
+    private addSupersonicCrack(volume: number = 0.25): void {
+        const audioContext = this.listener.context;
+
+        // Create white noise for crack
+        const bufferSize = audioContext.sampleRate * 0.05; // 50ms
+        const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+        const data = buffer.getChannelData(0);
+
+        // Generate white noise
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * 0.5;
+        }
+
+        const noise = audioContext.createBufferSource();
+        noise.buffer = buffer;
+
+        const noiseGain = audioContext.createGain();
+        const noiseFilter = audioContext.createBiquadFilter();
+
+        // High-pass filter for sharp crack
+        noiseFilter.type = 'highpass';
+        noiseFilter.frequency.value = 2000;
+        noiseFilter.Q.value = 2.0;
+
+        const now = audioContext.currentTime;
+        noiseGain.gain.setValueAtTime(volume, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(audioContext.destination);
+
+        noise.start(now);
+        noise.stop(now + 0.05);
     }
 
     /**
@@ -517,6 +667,9 @@ export class AudioManager implements GameSystem {
         weaponType: 'rifle' | 'shotgun' = 'rifle',
         listenerPosition?: THREE.Vector3
     ): void {
+        // Mark combat time for audio ducking
+        this.lastCombatSoundTime = performance.now();
+
         const sound = this.getAvailablePositionalSound(this.positionalGunshotPool);
         if (!sound) return;
 
@@ -590,6 +743,56 @@ export class AudioManager implements GameSystem {
         sound.setPlaybackRate(1.2 + Math.random() * 0.2);
         sound.setVolume(0.4);
         sound.play();
+    }
+
+    /**
+     * Play bullet whiz/crack sound when bullets pass close to player
+     * @param bulletPosition - Position where bullet passed close
+     * @param playerPosition - Player's current position
+     */
+    playBulletWhizSound(bulletPosition: THREE.Vector3, playerPosition: THREE.Vector3): void {
+        const distance = bulletPosition.distanceTo(playerPosition);
+
+        // Only play whiz sound for very close near-misses (within 3 meters)
+        if (distance > 3) return;
+
+        const audioContext = this.listener.context;
+
+        // Create white noise for bullet whiz
+        const bufferSize = audioContext.sampleRate * 0.08; // 80ms
+        const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+        const data = buffer.getChannelData(0);
+
+        // Generate white noise
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * 0.3;
+        }
+
+        const noise = audioContext.createBufferSource();
+        noise.buffer = buffer;
+
+        const noiseGain = audioContext.createGain();
+        const noiseFilter = audioContext.createBiquadFilter();
+
+        // Band-pass filter for characteristic whiz sound
+        noiseFilter.type = 'bandpass';
+        noiseFilter.frequency.value = 1500 + Math.random() * 1000; // Vary frequency
+        noiseFilter.Q.value = 3.0;
+
+        // Volume based on proximity - closer = louder
+        const proximityFactor = 1 - (distance / 3);
+        const baseVolume = 0.4 * proximityFactor;
+
+        const now = audioContext.currentTime;
+        noiseGain.gain.setValueAtTime(baseVolume, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(audioContext.destination);
+
+        noise.start(now);
+        noise.stop(now + 0.08);
     }
 
     dispose(): void {

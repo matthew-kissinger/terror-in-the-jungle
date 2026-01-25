@@ -317,6 +317,11 @@ export class CombatantCombat {
 
       if (distanceToPlayer < SUPPRESSION_RADIUS) {
         this.playerSuppressionSystem.registerNearMiss(hitPoint, playerPosition)
+
+        // Play bullet whiz sound for very close misses
+        if (this.audioManager && distanceToPlayer < 3) {
+          this.audioManager.playBulletWhizSound(hitPoint, playerPosition)
+        }
       }
     }
 
