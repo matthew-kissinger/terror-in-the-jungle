@@ -37,7 +37,7 @@ export class GrenadeSystem implements GameSystem {
   private weaponCamera: THREE.OrthographicCamera;
   private grenadeInHand?: THREE.Group;
 
-  private readonly GRAVITY = -35; // Tighter gravity for more predictable arcs
+  private readonly GRAVITY = -52; // Snappier, more realistic arcs
   private readonly FUSE_TIME = 3.5; // Fuse time for cooking mechanic
   private readonly DAMAGE_RADIUS = 15;
   private readonly MAX_DAMAGE = 150;
@@ -97,6 +97,14 @@ export class GrenadeSystem implements GameSystem {
       // Power builds up over 2 seconds to max
       this.throwPower = Math.min(0.3 + (this.powerBuildupTime / 2.0) * 0.7, 1.0);
       this.updateArc();
+      
+      // Pulse landing indicator for visibility
+      if (this.landingIndicator && this.landingIndicator.visible) {
+        const pulse = 0.6 + Math.sin(this.idleTime * 4) * 0.2; // Pulse between 0.4 and 0.8
+        if (this.landingIndicator.material instanceof THREE.MeshBasicMaterial) {
+          this.landingIndicator.material.opacity = pulse;
+        }
+      }
     }
 
     // Update cooking timer
@@ -258,9 +266,8 @@ export class GrenadeSystem implements GameSystem {
   private playBeep(): void {
     // Simple beep using Web Audio API
     if (this.audioManager) {
-      // Use existing audio manager if it has a beep sound
-      // Otherwise, create a simple tone
-      const audioContext = new AudioContext();
+      // Use existing audio context from AudioManager
+      const audioContext = this.audioManager.getListener().context;
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
@@ -575,11 +582,12 @@ export class GrenadeSystem implements GameSystem {
     this.scene.add(this.arcVisualization);
 
     // Create landing indicator - a ring showing impact point and radius
-    const ringGeometry = new THREE.RingGeometry(this.DAMAGE_RADIUS - 0.5, this.DAMAGE_RADIUS + 0.5, 32);
+    // Make it larger and more visible with pulsing animation
+    const ringGeometry = new THREE.RingGeometry(this.DAMAGE_RADIUS - 1.0, this.DAMAGE_RADIUS + 1.0, 32);
     const ringMaterial = new THREE.MeshBasicMaterial({
-      color: 0xff4444,
+      color: 0x00ff00, // Bright green for better visibility
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.7, // More opaque
       side: THREE.DoubleSide,
       depthTest: false
     });
