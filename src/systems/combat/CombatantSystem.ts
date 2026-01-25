@@ -953,6 +953,19 @@ export class CombatantSystem implements GameSystem {
           combatant.health = 0;
           combatant.state = CombatantState.DEAD;
 
+          // Initialize death animation for explosion (always spinfall)
+          combatant.isDying = true;
+          combatant.deathProgress = 0;
+          combatant.deathStartTime = performance.now();
+          combatant.deathAnimationType = 'spinfall'; // Explosions cause spin fall
+
+          // Calculate death direction (away from explosion center)
+          const deathDir = new THREE.Vector3()
+            .subVectors(combatant.position, center)
+            .normalize();
+          deathDir.y = 0; // Keep horizontal
+          combatant.deathDirection = deathDir;
+
           if (this.ticketSystem && typeof (this.ticketSystem as any).onCombatantKilled === 'function') {
             (this.ticketSystem as any).onCombatantKilled(combatant.faction);
           }

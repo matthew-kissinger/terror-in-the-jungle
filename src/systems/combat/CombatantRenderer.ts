@@ -345,82 +345,181 @@ export class CombatantRenderer {
           const FADEOUT_PHASE = 1.0 / 5.7; // 1.0s fadeout / 5.7s total
 
           const progress = combatant.deathProgress;
+          const animType = combatant.deathAnimationType || 'fallback';
 
-          if (progress < FALL_PHASE) {
-            // Phase 1: Falling (0 to 0.123)
-            const fallProgress = progress / FALL_PHASE;
-            const easeOut = 1 - Math.pow(1 - fallProgress, 2); // Ease out quad
+          // Different animations based on death type
+          if (animType === 'spinfall') {
+            // SPINFALL: Rotate while falling (for explosions)
+            if (progress < FALL_PHASE) {
+              const fallProgress = progress / FALL_PHASE;
+              const easeOut = 1 - Math.pow(1 - fallProgress, 2);
 
-            // Fall backward in death direction
-            if (combatant.deathDirection) {
-              const fallDistance = 1.5; // units
-              finalPosition.x += combatant.deathDirection.x * easeOut * fallDistance;
-              finalPosition.z += combatant.deathDirection.z * easeOut * fallDistance;
+              // Fall away from explosion with spin
+              if (combatant.deathDirection) {
+                const fallDistance = 2.5; // Bigger knockback from explosion
+                finalPosition.x += combatant.deathDirection.x * easeOut * fallDistance;
+                finalPosition.z += combatant.deathDirection.z * easeOut * fallDistance;
+              }
+
+              // Faster drop
+              const dropHeight = 4.0;
+              finalPosition.y += dropHeight * (1 - easeOut) - dropHeight;
+
+              // Spinning rotation (Z axis)
+              const spinAngle = easeOut * Math.PI * 2; // Full 360 degree spin
+              const spinMatrix = new THREE.Matrix4().makeRotationZ(spinAngle);
+              matrix.multiply(spinMatrix);
+
+              finalScaleY *= 1 - (easeOut * 0.3);
+            } else if (progress < FALL_PHASE + GROUND_PHASE) {
+              const groundProgress = (progress - FALL_PHASE) / GROUND_PHASE;
+
+              if (combatant.deathDirection) {
+                finalPosition.x += combatant.deathDirection.x * 2.5;
+                finalPosition.z += combatant.deathDirection.z * 2.5;
+              }
+              finalPosition.y -= 4.0;
+
+              // Stay rotated from spin
+              const spinMatrix = new THREE.Matrix4().makeRotationZ(Math.PI * 2);
+              matrix.multiply(spinMatrix);
+
+              const settle = Math.max(0, (1 - groundProgress * 4) * 0.1);
+              finalPosition.y += settle;
+              finalScaleY *= 0.7;
+            } else {
+              const fadeProgress = (progress - FALL_PHASE - GROUND_PHASE) / FADEOUT_PHASE;
+
+              if (combatant.deathDirection) {
+                finalPosition.x += combatant.deathDirection.x * 2.5;
+                finalPosition.z += combatant.deathDirection.z * 2.5;
+              }
+              finalPosition.y -= 4.0;
+
+              const spinMatrix = new THREE.Matrix4().makeRotationZ(Math.PI * 2);
+              matrix.multiply(spinMatrix);
+
+              finalScaleY *= 0.7;
+
+              const fadeScale = 1 - fadeProgress;
+              finalScaleX *= fadeScale;
+              finalScaleY *= fadeScale;
+              finalScaleZ *= fadeScale;
             }
+          } else if (animType === 'crumple') {
+            // CRUMPLE: Collapse downward (for normal deaths)
+            if (progress < FALL_PHASE) {
+              const fallProgress = progress / FALL_PHASE;
+              const easeOut = 1 - Math.pow(1 - fallProgress, 2);
 
-            // Parabolic drop with ground impact
-            const dropHeight = 3.5;
-            finalPosition.y += dropHeight * (1 - easeOut) - dropHeight;
+              // Minimal horizontal movement
+              if (combatant.deathDirection) {
+                const fallDistance = 0.5;
+                finalPosition.x += combatant.deathDirection.x * easeOut * fallDistance;
+                finalPosition.z += combatant.deathDirection.z * easeOut * fallDistance;
+              }
 
-            // Rotate to horizontal (90 degrees)
-            const rotationAngle = easeOut * Math.PI * 0.45; // 81 degrees
-            const tiltAxis = combatant.deathDirection ?
-              new THREE.Vector3(-combatant.deathDirection.z, 0, combatant.deathDirection.x) :
-              new THREE.Vector3(1, 0, 0);
-            const tiltMatrix = new THREE.Matrix4().makeRotationAxis(tiltAxis.normalize(), rotationAngle);
-            matrix.multiply(tiltMatrix);
+              // Crumple down by scaling Y
+              finalScaleY *= 1 - (easeOut * 0.8); // Scale down to 20% height
 
-            // Slight scale compression on impact
-            finalScaleY *= 1 - (easeOut * 0.2);
-          } else if (progress < FALL_PHASE + GROUND_PHASE) {
-            // Phase 2: On ground (0.123 to 0.825)
-            const groundProgress = (progress - FALL_PHASE) / GROUND_PHASE;
+              // Lower position as crumpling
+              finalPosition.y -= easeOut * 2.5;
+            } else if (progress < FALL_PHASE + GROUND_PHASE) {
+              const groundProgress = (progress - FALL_PHASE) / GROUND_PHASE;
 
-            // Keep final fall position
-            if (combatant.deathDirection) {
-              const fallDistance = 1.5;
-              finalPosition.x += combatant.deathDirection.x * fallDistance;
-              finalPosition.z += combatant.deathDirection.z * fallDistance;
+              if (combatant.deathDirection) {
+                finalPosition.x += combatant.deathDirection.x * 0.5;
+                finalPosition.z += combatant.deathDirection.z * 0.5;
+              }
+
+              finalPosition.y -= 2.5;
+              finalScaleY *= 0.2; // Fully crumpled
+
+              const settle = Math.max(0, (1 - groundProgress * 4) * 0.05);
+              finalPosition.y += settle;
+            } else {
+              const fadeProgress = (progress - FALL_PHASE - GROUND_PHASE) / FADEOUT_PHASE;
+
+              if (combatant.deathDirection) {
+                finalPosition.x += combatant.deathDirection.x * 0.5;
+                finalPosition.z += combatant.deathDirection.z * 0.5;
+              }
+
+              finalPosition.y -= 2.5;
+              finalScaleY *= 0.2;
+
+              const fadeScale = 1 - fadeProgress;
+              finalScaleX *= fadeScale;
+              finalScaleY *= fadeScale;
+              finalScaleZ *= fadeScale;
             }
-            finalPosition.y -= 3.5;
-
-            // Stay horizontal
-            const tiltAxis = combatant.deathDirection ?
-              new THREE.Vector3(-combatant.deathDirection.z, 0, combatant.deathDirection.x) :
-              new THREE.Vector3(1, 0, 0);
-            const tiltMatrix = new THREE.Matrix4().makeRotationAxis(tiltAxis.normalize(), Math.PI * 0.45);
-            matrix.multiply(tiltMatrix);
-
-            // Slight settle effect (minimal bounce)
-            const settle = Math.max(0, (1 - groundProgress * 4) * 0.1);
-            finalPosition.y += settle;
-            finalScaleY *= 0.8;
           } else {
-            // Phase 3: Fadeout (0.825 to 1.0)
-            const fadeProgress = (progress - FALL_PHASE - GROUND_PHASE) / FADEOUT_PHASE;
+            // FALLBACK: Tilt backward (for headshots) - DEFAULT
+            if (progress < FALL_PHASE) {
+              const fallProgress = progress / FALL_PHASE;
+              const easeOut = 1 - Math.pow(1 - fallProgress, 2);
 
-            // Keep final position
-            if (combatant.deathDirection) {
-              const fallDistance = 1.5;
-              finalPosition.x += combatant.deathDirection.x * fallDistance;
-              finalPosition.z += combatant.deathDirection.z * fallDistance;
+              // Fall backward in death direction
+              if (combatant.deathDirection) {
+                const fallDistance = 1.5;
+                finalPosition.x += combatant.deathDirection.x * easeOut * fallDistance;
+                finalPosition.z += combatant.deathDirection.z * easeOut * fallDistance;
+              }
+
+              // Parabolic drop
+              const dropHeight = 3.5;
+              finalPosition.y += dropHeight * (1 - easeOut) - dropHeight;
+
+              // Rotate to horizontal (90 degrees)
+              const rotationAngle = easeOut * Math.PI * 0.45; // 81 degrees
+              const tiltAxis = combatant.deathDirection ?
+                new THREE.Vector3(-combatant.deathDirection.z, 0, combatant.deathDirection.x) :
+                new THREE.Vector3(1, 0, 0);
+              const tiltMatrix = new THREE.Matrix4().makeRotationAxis(tiltAxis.normalize(), rotationAngle);
+              matrix.multiply(tiltMatrix);
+
+              finalScaleY *= 1 - (easeOut * 0.2);
+            } else if (progress < FALL_PHASE + GROUND_PHASE) {
+              const groundProgress = (progress - FALL_PHASE) / GROUND_PHASE;
+
+              if (combatant.deathDirection) {
+                finalPosition.x += combatant.deathDirection.x * 1.5;
+                finalPosition.z += combatant.deathDirection.z * 1.5;
+              }
+              finalPosition.y -= 3.5;
+
+              // Stay horizontal
+              const tiltAxis = combatant.deathDirection ?
+                new THREE.Vector3(-combatant.deathDirection.z, 0, combatant.deathDirection.x) :
+                new THREE.Vector3(1, 0, 0);
+              const tiltMatrix = new THREE.Matrix4().makeRotationAxis(tiltAxis.normalize(), Math.PI * 0.45);
+              matrix.multiply(tiltMatrix);
+
+              const settle = Math.max(0, (1 - groundProgress * 4) * 0.1);
+              finalPosition.y += settle;
+              finalScaleY *= 0.8;
+            } else {
+              const fadeProgress = (progress - FALL_PHASE - GROUND_PHASE) / FADEOUT_PHASE;
+
+              if (combatant.deathDirection) {
+                finalPosition.x += combatant.deathDirection.x * 1.5;
+                finalPosition.z += combatant.deathDirection.z * 1.5;
+              }
+              finalPosition.y -= 3.5;
+
+              const tiltAxis = combatant.deathDirection ?
+                new THREE.Vector3(-combatant.deathDirection.z, 0, combatant.deathDirection.x) :
+                new THREE.Vector3(1, 0, 0);
+              const tiltMatrix = new THREE.Matrix4().makeRotationAxis(tiltAxis.normalize(), Math.PI * 0.45);
+              matrix.multiply(tiltMatrix);
+
+              finalScaleY *= 0.8;
+
+              const fadeScale = 1 - fadeProgress;
+              finalScaleX *= fadeScale;
+              finalScaleY *= fadeScale;
+              finalScaleZ *= fadeScale;
             }
-            finalPosition.y -= 3.5;
-
-            // Stay horizontal
-            const tiltAxis = combatant.deathDirection ?
-              new THREE.Vector3(-combatant.deathDirection.z, 0, combatant.deathDirection.x) :
-              new THREE.Vector3(1, 0, 0);
-            const tiltMatrix = new THREE.Matrix4().makeRotationAxis(tiltAxis.normalize(), Math.PI * 0.45);
-            matrix.multiply(tiltMatrix);
-
-            finalScaleY *= 0.8;
-
-            // Fade out by scaling down
-            const fadeScale = 1 - fadeProgress;
-            finalScaleX *= fadeScale;
-            finalScaleY *= fadeScale;
-            finalScaleZ *= fadeScale;
           }
         }
 

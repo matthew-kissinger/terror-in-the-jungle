@@ -1,0 +1,446 @@
+From 8903e9bf6650e0deab9ae3360bcca3dafb169d5c Mon Sep 17 00:00:00 2001
+From: codex <codex@local>
+Date: Sun, 25 Jan 2026 11:05:37 -0500
+Subject: [PATCH] feat(weapons): add shotgun with pellet spread and pump action
+
+---
+ src/systems/player/FirstPersonWeapon.ts      | 67 +++++++++++----
+ src/systems/player/PlayerController.ts       |  4 +-
+ src/systems/player/ProgrammaticGunFactory.ts | 88 ++++++++++++++++----
+ src/systems/weapons/AmmoManager.ts           | 16 +++-
+ src/systems/weapons/GunplayCore.ts           | 15 +++-
+ 5 files changed, 148 insertions(+), 42 deletions(-)
+
+diff --git a/src/systems/player/FirstPersonWeapon.ts b/src/systems/player/FirstPersonWeapon.ts
+index 32870ab..72c670f 100644
+--- a/src/systems/player/FirstPersonWeapon.ts
++++ b/src/systems/player/FirstPersonWeapon.ts
+@@ -77,11 +77,13 @@ export class FirstPersonWeapon implements GameSystem {
+ 
+   private shotgunSpec: WeaponSpec = {
+     name: 'Shotgun', rpm: 75, adsTime: 0.22, // ~0.8s between shots
+-    baseSpreadDeg: 2.5, bloomPerShotDeg: 1.0,
+-    recoilPerShotDeg: 2.5, recoilHorizontalDeg: 0.8, // Heavy recoil
+-    damageNear: 15, damageFar: 4, falloffStart: 8, falloffEnd: 25, // Per pellet
+-    headshotMultiplier: 1.5, penetrationPower: 0.5,
+-    pelletCount: 10, pelletSpreadDeg: 8 // 10 pellets in 8-degree cone
++    baseSpreadDeg: 2.2, bloomPerShotDeg: 1.1,
++    recoilPerShotDeg: 2.8, recoilHorizontalDeg: 0.9, // Heavy recoil
++    damageNear: 18, damageFar: 2, falloffStart: 12, falloffEnd: 20, // Per pellet, sharp falloff past ~15m
++    headshotMultiplier: 1.45, penetrationPower: 0.5,
++    pelletCount: 8,
++    pelletSpreadDegHip: 10,
++    pelletSpreadDegADS: 6
+   };
+ 
+   private smgSpec: WeaponSpec = {
+@@ -95,14 +97,17 @@ export class FirstPersonWeapon implements GameSystem {
+   private combatantSystem?: CombatantSystem;
+   private hudSystem?: any; // HUD system for hit markers
+   private audioManager?: AudioManager;
+-  private ammoManager: AmmoManager;
++  private rifleAmmoManager: AmmoManager;
++  private shotgunAmmoManager: AmmoManager;
++  private smgAmmoManager: AmmoManager;
++  private ammoManager: AmmoManager; // Current active weapon ammo manager
+   private zoneManager?: ZoneManager;
+   private inventoryManager?: InventoryManager;
+ 
+   // Reload animation state
+   private reloadAnimationProgress = 0;
+   private isReloadAnimating = false;
+-  private readonly RELOAD_ANIMATION_TIME = 2.5;
++  private reloadAnimationTime = 2.5;
+   private reloadRotation = { x: 0, y: 0, z: 0 };
+   private reloadTranslation = { x: 0, y: 0, z: 0 };
+   private magazineOffset = { x: 0, y: 0, z: 0 }; // Magazine animation offset
+@@ -151,10 +156,28 @@ export class FirstPersonWeapon implements GameSystem {
+     this.smgCore = new GunplayCore(this.smgSpec);
+     this.gunCore = this.rifleCore; // Start with rifle
+ 
+-    // Initialize ammo manager
+-    this.ammoManager = new AmmoManager(30, 90); // 30 rounds per mag, 90 reserve
+-    this.ammoManager.setOnReloadComplete(() => this.onReloadComplete());
+-    this.ammoManager.setOnAmmoChange((state) => this.onAmmoChange(state));
++    // Initialize per-weapon ammo managers
++    this.rifleAmmoManager = new AmmoManager(30, 90, 2.5);
++    this.shotgunAmmoManager = new AmmoManager(6, 36, 2.5);
++    this.smgAmmoManager = new AmmoManager(30, 90, 2.5);
++
++    this.attachAmmoCallbacks(this.rifleAmmoManager);
++    this.attachAmmoCallbacks(this.shotgunAmmoManager);
++    this.attachAmmoCallbacks(this.smgAmmoManager);
++
++    // Start with rifle ammo configuration active
++    this.ammoManager = this.rifleAmmoManager;
++    this.reloadAnimationTime = this.ammoManager.getReloadTime();
++  }
++
++  private attachAmmoCallbacks(ammoManager: AmmoManager): void {
++    ammoManager.setOnReloadComplete(() => this.onReloadComplete());
++    ammoManager.setOnAmmoChange((state) => {
++      // Only surface ammo changes for the currently active weapon
++      if (ammoManager === this.ammoManager) {
++        this.onAmmoChange(state);
++      }
++    });
+   }
+ 
+   async init(): Promise<void> {
+@@ -571,7 +594,7 @@ export class FirstPersonWeapon implements GameSystem {
+     if (!this.combatantSystem) return;
+ 
+     // Generate pellet rays
+-    const pelletRays = this.gunCore.computePelletRays(this.camera);
++    const pelletRays = this.gunCore.computePelletRays(this.camera, this.isADS);
+ 
+     let totalDamage = 0;
+     let anyHit = false;
+@@ -646,7 +669,9 @@ export class FirstPersonWeapon implements GameSystem {
+ 
+   setZoneManager(zoneManager: ZoneManager): void {
+     this.zoneManager = zoneManager;
+-    this.ammoManager.setZoneManager(zoneManager);
++    this.rifleAmmoManager.setZoneManager(zoneManager);
++    this.shotgunAmmoManager.setZoneManager(zoneManager);
++    this.smgAmmoManager.setZoneManager(zoneManager);
+   }
+ 
+   // Disable weapon (for death)
+@@ -666,7 +691,10 @@ export class FirstPersonWeapon implements GameSystem {
+       this.weaponRig.visible = true;
+     }
+     // Reset ammo on respawn
+-    this.ammoManager.reset();
++    this.rifleAmmoManager.reset();
++    this.shotgunAmmoManager.reset();
++    this.smgAmmoManager.reset();
++    this.onAmmoChange(this.ammoManager.getState());
+   }
+ 
+   setWeaponVisibility(visible: boolean): void {
+@@ -698,6 +726,7 @@ export class FirstPersonWeapon implements GameSystem {
+     if (this.ammoManager.startReload()) {
+       this.isReloadAnimating = true;
+       this.reloadAnimationProgress = 0;
++      this.reloadAnimationTime = this.ammoManager.getReloadTime();
+       this.isFiring = false; // Stop firing during reload
+ 
+       // Play reload sound if available
+@@ -711,7 +740,7 @@ export class FirstPersonWeapon implements GameSystem {
+     if (!this.isReloadAnimating) return;
+ 
+     // Update reload animation progress
+-    this.reloadAnimationProgress += deltaTime / this.RELOAD_ANIMATION_TIME;
++    this.reloadAnimationProgress += deltaTime / this.reloadAnimationTime;
+ 
+     if (this.reloadAnimationProgress >= 1) {
+       this.reloadAnimationProgress = 1;
+@@ -948,6 +977,7 @@ export class FirstPersonWeapon implements GameSystem {
+         this.smgRig.visible = false;
+         this.weaponRig = this.rifleRig;
+         this.gunCore = this.rifleCore;
++        this.ammoManager = this.rifleAmmoManager;
+         this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
+         this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
+         this.pumpGripRef = undefined;
+@@ -958,6 +988,7 @@ export class FirstPersonWeapon implements GameSystem {
+         this.smgRig.visible = false;
+         this.weaponRig = this.shotgunRig;
+         this.gunCore = this.shotgunCore;
++        this.ammoManager = this.shotgunAmmoManager;
+         this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
+         this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
+         this.pumpGripRef = this.weaponRig.getObjectByName('pumpGrip') || undefined;
+@@ -968,12 +999,16 @@ export class FirstPersonWeapon implements GameSystem {
+         this.smgRig.visible = true;
+         this.weaponRig = this.smgRig;
+         this.gunCore = this.smgCore;
++        this.ammoManager = this.smgAmmoManager;
+         this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
+         this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
+         this.pumpGripRef = undefined;
+         break;
+     }
+ 
++    this.reloadAnimationTime = this.ammoManager.getReloadTime();
++    this.onAmmoChange(this.ammoManager.getState());
++
+     // Notify HUD about weapon switch
+     if (this.hudSystem && this.hudSystem.showWeaponSwitch) {
+       const weaponNames = { rifle: 'RIFLE', shotgun: 'SHOTGUN', smg: 'SMG' };
+@@ -1038,4 +1073,4 @@ export class FirstPersonWeapon implements GameSystem {
+       console.log('🚁 🔫 Firing enabled (exited helicopter)');
+     }
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/src/systems/player/PlayerController.ts b/src/systems/player/PlayerController.ts
+index 30d128b..ead6386 100644
+--- a/src/systems/player/PlayerController.ts
++++ b/src/systems/player/PlayerController.ts
+@@ -805,6 +805,8 @@ Escape - Release pointer lock / Exit helicopter
+ 
+     switch(slot) {
+       case WeaponSlot.PRIMARY:
++      case WeaponSlot.SHOTGUN:
++      case WeaponSlot.SMG:
+         if (this.firstPersonWeapon) {
+           this.firstPersonWeapon.setWeaponVisibility(true);
+         }
+@@ -1018,4 +1020,4 @@ Escape - Release pointer lock / Exit helicopter
+   getHelicopterId(): string | null {
+     return this.playerState.helicopterId;
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/src/systems/player/ProgrammaticGunFactory.ts b/src/systems/player/ProgrammaticGunFactory.ts
+index 7f12255..6dd90aa 100644
+--- a/src/systems/player/ProgrammaticGunFactory.ts
++++ b/src/systems/player/ProgrammaticGunFactory.ts
+@@ -77,49 +77,104 @@ export class ProgrammaticGunFactory {
+ 
+     const defaultMaterial = material || new THREE.MeshBasicMaterial({ color: 0x2b2b2b });
+ 
+-    // Receiver - shorter and chunkier than rifle
+-    const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.22, 0.22), defaultMaterial);
++    // Receiver - compact, chunky core
++    const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.24, 0.24), defaultMaterial);
+     receiver.position.set(0, 0, 0);
+     group.add(receiver);
+ 
++    // Upper rail / sight base
++    const rail = new THREE.Mesh(
++      new THREE.BoxGeometry(0.26, 0.04, 0.12),
++      new THREE.MeshBasicMaterial({ color: 0x1c1c1c })
++    );
++    rail.position.set(0.02, 0.14, 0);
++    group.add(rail);
++
+     // Pump grip - distinctive shotgun feature (named for animation)
+-    const pumpGrip = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.2), new THREE.MeshBasicMaterial({ color: 0x1a1a1a }));
++    const pumpGrip = new THREE.Mesh(
++      new THREE.BoxGeometry(0.26, 0.2, 0.22),
++      new THREE.MeshBasicMaterial({ color: 0x1a1a1a })
++    );
+     pumpGrip.name = 'pumpGrip';
+-    pumpGrip.position.set(0.6, 0, 0);
++    pumpGrip.position.set(0.45, -0.01, 0);
+     group.add(pumpGrip);
+ 
+-    // Barrel - wider bore than rifle
+-    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.9, 8), new THREE.MeshBasicMaterial({ color: 0x202020 }));
++    // Pump rails / guide rods
++    const leftRail = new THREE.Mesh(
++      new THREE.BoxGeometry(0.34, 0.03, 0.03),
++      new THREE.MeshBasicMaterial({ color: 0x202020 })
++    );
++    leftRail.position.set(0.62, -0.09, -0.06);
++    group.add(leftRail);
++
++    const rightRail = leftRail.clone();
++    rightRail.position.z = 0.06;
++    group.add(rightRail);
++
++    // Barrel - shorter, wide bore
++    const barrel = new THREE.Mesh(
++      new THREE.CylinderGeometry(0.05, 0.05, 0.65, 8),
++      new THREE.MeshBasicMaterial({ color: 0x202020 })
++    );
+     barrel.rotation.z = Math.PI / 2;
+-    barrel.position.set(1.05, 0, 0);
++    barrel.position.set(0.88, 0.02, 0);
+     group.add(barrel);
+ 
+-    // Stock - similar to rifle but slightly thicker
+-    const stock = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.28, 0.2), new THREE.MeshBasicMaterial({ color: 0x252525 }));
+-    stock.position.set(-0.55, -0.03, 0);
++    // Tube magazine under barrel
++    const tubeMag = new THREE.Mesh(
++      new THREE.CylinderGeometry(0.035, 0.035, 0.6, 8),
++      new THREE.MeshBasicMaterial({ color: 0x181818 })
++    );
++    tubeMag.rotation.z = Math.PI / 2;
++    tubeMag.position.set(0.8, -0.07, 0);
++    group.add(tubeMag);
++
++    // Heat shield / fore-end cap
++    const heatShield = new THREE.Mesh(
++      new THREE.BoxGeometry(0.22, 0.05, 0.2),
++      new THREE.MeshBasicMaterial({ color: 0x161616 })
++    );
++    heatShield.position.set(0.78, 0.09, 0);
++    group.add(heatShield);
++
++    // Stock - thick and slightly shorter than rifle
++    const stock = new THREE.Mesh(
++      new THREE.BoxGeometry(0.5, 0.3, 0.22),
++      new THREE.MeshBasicMaterial({ color: 0x252525 })
++    );
++    stock.position.set(-0.5, -0.04, 0);
+     stock.rotation.z = -0.05;
+     group.add(stock);
+ 
+     // Grip
+-    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.28, 0.2), new THREE.MeshBasicMaterial({ color: 0x1f1f1f }));
+-    grip.position.set(0.05, -0.22, 0);
++    const grip = new THREE.Mesh(
++      new THREE.BoxGeometry(0.15, 0.3, 0.22),
++      new THREE.MeshBasicMaterial({ color: 0x1f1f1f })
++    );
++    grip.position.set(0.02, -0.23, 0);
+     grip.rotation.z = 0.4;
+     group.add(grip);
+ 
+     // Front sight
+-    const frontSight = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.14), new THREE.MeshBasicMaterial({ color: 0x111111 }));
+-    frontSight.position.set(1.3, 0.12, 0);
++    const frontSight = new THREE.Mesh(
++      new THREE.BoxGeometry(0.08, 0.08, 0.14),
++      new THREE.MeshBasicMaterial({ color: 0x111111 })
++    );
++    frontSight.position.set(1.05, 0.12, 0);
+     group.add(frontSight);
+ 
+     // Rear sight
+-    const rearSight = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.12), new THREE.MeshBasicMaterial({ color: 0x111111 }));
++    const rearSight = new THREE.Mesh(
++      new THREE.BoxGeometry(0.08, 0.06, 0.12),
++      new THREE.MeshBasicMaterial({ color: 0x111111 })
++    );
+     rearSight.position.set(-0.05, 0.12, 0);
+     group.add(rearSight);
+ 
+     // Muzzle point helper (for tracers and muzzle flash)
+     const muzzle = new THREE.Object3D();
+     muzzle.name = 'muzzle';
+-    muzzle.position.set(1.5, 0, 0); // near end of barrel
++    muzzle.position.set(1.18, 0.02, 0); // near end of short barrel
+     group.add(muzzle);
+ 
+     // Scale for better visibility
+@@ -192,4 +247,3 @@ export class ProgrammaticGunFactory {
+   }
+ }
+ 
+-
+diff --git a/src/systems/weapons/AmmoManager.ts b/src/systems/weapons/AmmoManager.ts
+index 236d183..4a577d4 100644
+--- a/src/systems/weapons/AmmoManager.ts
++++ b/src/systems/weapons/AmmoManager.ts
+@@ -7,6 +7,7 @@ export interface AmmoState {
+   reserveAmmo: number;
+   maxMagazine: number;
+   maxReserve: number;
++  reloadTime: number;
+   isReloading: boolean;
+   reloadProgress: number;
+   needsReload: boolean;
+@@ -15,7 +16,7 @@ export interface AmmoState {
+ 
+ export class AmmoManager {
+   private state: AmmoState;
+-  private readonly RELOAD_TIME = 2.5; // seconds
++  private readonly reloadTime: number;
+   private readonly RESUPPLY_RATE = 30; // rounds per second
+   private readonly LOW_AMMO_THRESHOLD = 10;
+   private reloadStartTime = 0;
+@@ -25,12 +26,14 @@ export class AmmoManager {
+   private isResupplying = false;
+   private lastResupplyZone: CaptureZone | null = null;
+ 
+-  constructor(magazineSize: number = 30, maxReserve: number = 90) {
++  constructor(magazineSize: number = 30, maxReserve: number = 90, reloadTime: number = 2.5) {
++    this.reloadTime = reloadTime;
+     this.state = {
+       currentMagazine: magazineSize,
+       reserveAmmo: maxReserve,
+       maxMagazine: magazineSize,
+       maxReserve: maxReserve,
++      reloadTime: reloadTime,
+       isReloading: false,
+       reloadProgress: 0,
+       needsReload: false,
+@@ -86,7 +89,7 @@ export class AmmoManager {
+     // Update reload progress
+     if (this.state.isReloading) {
+       const elapsed = (performance.now() - this.reloadStartTime) / 1000;
+-      this.state.reloadProgress = Math.min(1, elapsed / this.RELOAD_TIME);
++      this.state.reloadProgress = Math.min(1, elapsed / this.reloadTime);
+ 
+       if (this.state.reloadProgress >= 1) {
+         this.completeReload();
+@@ -198,6 +201,10 @@ export class AmmoManager {
+     return this.state.currentMagazine + this.state.reserveAmmo;
+   }
+ 
++  getReloadTime(): number {
++    return this.reloadTime;
++  }
++
+   setOnReloadComplete(callback: () => void): void {
+     this.onReloadComplete = callback;
+   }
+@@ -212,6 +219,7 @@ export class AmmoManager {
+       reserveAmmo: this.state.maxReserve,
+       maxMagazine: this.state.maxMagazine,
+       maxReserve: this.state.maxReserve,
++      reloadTime: this.reloadTime,
+       isReloading: false,
+       reloadProgress: 0,
+       needsReload: false,
+@@ -221,4 +229,4 @@ export class AmmoManager {
+     this.lastResupplyZone = null;
+     this.onAmmoChange?.(this.state);
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/src/systems/weapons/GunplayCore.ts b/src/systems/weapons/GunplayCore.ts
+index 36321e7..839c628 100644
+--- a/src/systems/weapons/GunplayCore.ts
++++ b/src/systems/weapons/GunplayCore.ts
+@@ -15,7 +15,9 @@ export interface WeaponSpec {
+   headshotMultiplier: number;
+   penetrationPower: number; // simple constant for through foliage later
+   pelletCount?: number;   // optional: for shotguns, number of pellets per shot
+-  pelletSpreadDeg?: number; // optional: cone angle for pellet spread
++  pelletSpreadDeg?: number; // optional: legacy cone angle for pellet spread
++  pelletSpreadDegHip?: number; // optional: cone angle when firing from hip
++  pelletSpreadDegADS?: number; // optional: cone angle when aiming down sights
+ }
+ 
+ export class RecoilPattern {
+@@ -120,9 +122,9 @@ export class GunplayCore {
+   }
+ 
+   // Generate multiple pellet rays for shotgun-type weapons
+-  computePelletRays(camera: THREE.Camera): THREE.Ray[] {
++  computePelletRays(camera: THREE.Camera, isADS: boolean): THREE.Ray[] {
+     const pelletCount = this.spec.pelletCount || 1;
+-    const pelletSpread = this.spec.pelletSpreadDeg || 0;
++    const pelletSpread = this.getPelletSpreadDeg(isADS);
+ 
+     if (pelletCount === 1 || pelletSpread === 0) {
+       // Single pellet or no spread - just return one ray
+@@ -166,9 +168,14 @@ export class GunplayCore {
+     return rays;
+   }
+ 
++  private getPelletSpreadDeg(isADS: boolean): number {
++    const hipSpread = this.spec.pelletSpreadDegHip ?? this.spec.pelletSpreadDeg ?? 0;
++    const adsSpread = this.spec.pelletSpreadDegADS ?? hipSpread;
++    return isADS ? adsSpread : hipSpread;
++  }
++
+   isShotgun(): boolean {
+     return (this.spec.pelletCount || 1) > 1;
+   }
+ }
+ 
+-
+-- 
+2.43.0
+

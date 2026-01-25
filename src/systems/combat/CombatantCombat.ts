@@ -438,6 +438,18 @@ export class CombatantCombat {
       target.deathProgress = 0;
       target.deathStartTime = performance.now();
 
+      // Choose death animation type based on damage source
+      if (isHeadshot) {
+        // Headshots cause dramatic fall back
+        target.deathAnimationType = 'fallback';
+      } else if (damage > 80) {
+        // High damage (likely explosive or shotgun) causes spin fall
+        target.deathAnimationType = 'spinfall';
+      } else {
+        // Normal damage causes crumple
+        target.deathAnimationType = 'crumple';
+      }
+
       // Calculate death direction (direction from attacker to target)
       if (attacker && attacker.position) {
         const deathDir = new THREE.Vector3()

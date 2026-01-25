@@ -84,6 +84,7 @@ export interface Combatant {
   deathProgress?: number;
   deathStartTime?: number;
   deathDirection?: THREE.Vector3;
+  deathAnimationType?: 'fallback' | 'crumple' | 'spinfall';
   defendingZoneId?: string;
   defensePosition?: THREE.Vector3;
   lastDefenseReassignTime?: number;
