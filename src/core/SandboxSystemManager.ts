@@ -31,6 +31,7 @@ import { PlayerSuppressionSystem } from '../systems/player/PlayerSuppressionSyst
 import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
+import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { objectPool } from '../utils/ObjectPoolManager';
 
 interface SystemTimingEntry {
@@ -76,6 +77,7 @@ export class SandboxSystemManager {
   public playerSuppressionSystem!: PlayerSuppressionSystem;
   public influenceMapSystem!: InfluenceMapSystem;
   public ammoSupplySystem!: AmmoSupplySystem;
+  public footstepAudioSystem!: FootstepAudioSystem;
 
   async initializeSystems(
     scene: THREE.Scene,
@@ -140,6 +142,7 @@ export class SandboxSystemManager {
     this.cameraShakeSystem = new CameraShakeSystem();
     this.playerSuppressionSystem = new PlayerSuppressionSystem();
     this.ammoSupplySystem = new AmmoSupplySystem(scene, camera);
+    this.footstepAudioSystem = new FootstepAudioSystem(this.audioManager.getListener());
 
     // Initialize influence map system based on game mode world size
     const worldSize = 4000; // Default, will be updated when game mode is set
@@ -337,6 +340,10 @@ export class SandboxSystemManager {
         this.weatherSystem.setSandboxRenderer(sandboxRenderer);
       }
     }
+
+    // Connect footstep audio system
+    this.footstepAudioSystem.setChunkManager(this.chunkManager);
+    this.playerController.setFootstepAudioSystem(this.footstepAudioSystem);
   }
 
   async preGenerateSpawnArea(spawnPos: THREE.Vector3): Promise<void> {

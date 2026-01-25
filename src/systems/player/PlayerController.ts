@@ -11,6 +11,7 @@ import { MortarSystem } from '../weapons/MortarSystem';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { RallyPointSystem } from '../combat/RallyPointSystem';
+import { FootstepAudioSystem } from '../audio/FootstepAudioSystem';
 
 export class PlayerController implements GameSystem {
   private camera: THREE.PerspectiveCamera;
@@ -26,6 +27,7 @@ export class PlayerController implements GameSystem {
   private sandbagSystem?: SandbagSystem;
   private cameraShakeSystem?: CameraShakeSystem;
   private rallyPointSystem?: RallyPointSystem;
+  private footstepAudioSystem?: FootstepAudioSystem;
   private playerSquadId?: string;
   private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
   private isInMortarMode = false;
@@ -469,9 +471,18 @@ export class PlayerController implements GameSystem {
       groundHeight = effectiveHeight + 2;
     }
 
+    // Check for landing and play landing sound
+    const wasGrounded = this.playerState.isGrounded;
+    
     if (newPosition.y <= groundHeight) {
       // Player is on or below ground
       newPosition.y = groundHeight;
+      
+      // Play landing sound if we just landed
+      if (!wasGrounded && this.playerState.velocity.y < -5 && this.footstepAudioSystem) {
+        this.footstepAudioSystem.playLandingSound(newPosition, Math.abs(this.playerState.velocity.y));
+      }
+      
       this.playerState.velocity.y = 0;
       this.playerState.isGrounded = true;
       this.playerState.isJumping = false;
@@ -481,6 +492,17 @@ export class PlayerController implements GameSystem {
     }
 
     this.playerState.position.copy(newPosition);
+    
+    // Play footstep sounds when moving on ground
+    if (this.footstepAudioSystem && !this.playerState.isInHelicopter) {
+      const isMoving = moveVector.length() > 0;
+      this.footstepAudioSystem.playPlayerFootstep(
+        this.playerState.position,
+        this.playerState.isRunning,
+        deltaTime,
+        isMoving && this.playerState.isGrounded
+      );
+    }
   }
 
   private updateHelicopterControls(deltaTime: number): void {
@@ -881,6 +903,10 @@ Escape - Release pointer lock / Exit helicopter
 
   setRallyPointSystem(rallyPointSystem: RallyPointSystem): void {
     this.rallyPointSystem = rallyPointSystem;
+  }
+
+  setFootstepAudioSystem(footstepAudioSystem: FootstepAudioSystem): void {
+    this.footstepAudioSystem = footstepAudioSystem;
   }
 
   setPlayerSquadId(squadId: string): void {
