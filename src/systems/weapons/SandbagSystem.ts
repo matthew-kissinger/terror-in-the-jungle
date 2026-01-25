@@ -21,6 +21,8 @@ export class SandbagSystem implements GameSystem {
   private nextSandbagId = 0;
   private readonly MAX_SANDBAGS = 10;
   private readonly MIN_SPACING = 3;
+  private readonly MAX_SLOPE_DEGREES = 30;
+  private readonly MAX_WATER_HEIGHT = 1.0;
 
   private placementPreview?: THREE.Mesh;
   private previewVisible = false;
@@ -28,6 +30,7 @@ export class SandbagSystem implements GameSystem {
   private previewRotation = 0;
   private additionalRotation = 0; // For manual rotation adjustments
   private placementValid = false;
+  private pulseTime = 0;
 
   private raycaster = new THREE.Raycaster();
 
@@ -50,6 +53,7 @@ export class SandbagSystem implements GameSystem {
   update(deltaTime: number): void {
     if (this.previewVisible && this.placementPreview) {
       this.updatePreviewPosition(this.camera);
+      this.updatePreviewPulse(deltaTime);
     }
   }
 
@@ -121,16 +125,77 @@ export class SandbagSystem implements GameSystem {
     this.placementPreview.rotation.y = this.previewRotation;
   }
 
+  private updatePreviewPulse(deltaTime: number): void {
+    if (!this.placementPreview || this.placementPreview.material instanceof THREE.MeshStandardMaterial === false) {
+      return;
+    }
+
+    this.pulseTime += deltaTime;
+    const material = this.placementPreview.material as THREE.MeshStandardMaterial;
+
+    // Breathing effect: opacity oscillates between 0.3 and 0.7
+    const breathe = Math.sin(this.pulseTime * 3) * 0.2 + 0.5;
+    material.opacity = breathe;
+
+    // Reset pulse time every 2 seconds to avoid floating point issues
+    if (this.pulseTime > 6.28) {
+      this.pulseTime = 0;
+    }
+  }
+
+  private getTerrainSlope(position: THREE.Vector3): number {
+    if (!this.chunkManager) return 0;
+
+    // Sample height at 4 points around the placement position
+    const sampleDistance = 0.5;
+    const h1 = this.getGroundHeight(position.x + sampleDistance, position.z);
+    const h2 = this.getGroundHeight(position.x - sampleDistance, position.z);
+    const h3 = this.getGroundHeight(position.x, position.z + sampleDistance);
+    const h4 = this.getGroundHeight(position.x, position.z - sampleDistance);
+
+    // Calculate slope vectors
+    const slopeX = Math.abs(h1 - h2) / (2 * sampleDistance);
+    const slopeZ = Math.abs(h3 - h4) / (2 * sampleDistance);
+
+    // Max slope in degrees
+    const maxSlope = Math.max(slopeX, slopeZ);
+    return Math.atan(maxSlope) * (180 / Math.PI);
+  }
+
+  private isInWater(position: THREE.Vector3): boolean {
+    // Water is simulated at y = 0 height
+    // Check if position would be underwater
+    return position.y < this.MAX_WATER_HEIGHT;
+  }
+
   private isPlacementValid(position: THREE.Vector3): boolean {
+    // Check inventory
+    if (!this.inventoryManager || !this.inventoryManager.canUseSandbag()) {
+      return false;
+    }
+
+    // Check max sandbags
     if (this.sandbags.length >= this.MAX_SANDBAGS) {
       return false;
     }
 
+    // Check spacing from existing sandbags
     for (const sandbag of this.sandbags) {
       const distance = position.distanceTo(sandbag.position);
       if (distance < this.MIN_SPACING) {
         return false;
       }
+    }
+
+    // Check slope
+    const slope = this.getTerrainSlope(position);
+    if (slope > this.MAX_SLOPE_DEGREES) {
+      return false;
+    }
+
+    // Check water
+    if (this.isInWater(position)) {
+      return false;
     }
 
     return true;
@@ -177,6 +242,7 @@ export class SandbagSystem implements GameSystem {
     }
     if (show) {
       this.additionalRotation = 0; // Reset manual rotation
+      this.pulseTime = 0; // Reset pulse animation
     }
   }
 
