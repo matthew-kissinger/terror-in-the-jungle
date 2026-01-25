@@ -135,6 +135,103 @@
         "global",
         "batch"
       ]
+    },
+    {
+      "id": "01c153a7",
+      "content": "Before implementing, search codebase - feature may already exist",
+      "source": "shepherd",
+      "created_at": "2026-01-25T09:04:59.743409",
+      "tags": [
+        "success",
+        "merge"
+      ]
+    },
+    {
+      "id": "3208b58f",
+      "content": "Verification docs useful for confirming integration points",
+      "source": "shepherd",
+      "created_at": "2026-01-25T09:04:59.746934",
+      "tags": [
+        "success",
+        "merge"
+      ]
+    },
+    {
+      "id": "39612007",
+      "content": "Always npm run build before marking task complete - catches type errors before commit",
+      "source": "shepherd",
+      "created_at": "2026-01-25T09:04:59.751733",
+      "tags": [
+        "global",
+        "batch"
+      ]
+    },
+    {
+      "id": "c9fa1a9d",
+      "content": "New UI systems (HUD elements, overlays) use fixed positioning with pointer-events: none",
+      "source": "shepherd",
+      "created_at": "2026-01-25T09:04:59.754503",
+      "tags": [
+        "global",
+        "batch"
+      ]
+    },
+    {
+      "id": "11adbcfc",
+      "content": "Match stats tracked via PlayerStatsTracker - extend interface and all consumers together",
+      "source": "shepherd",
+      "created_at": "2026-01-25T09:04:59.757531",
+      "tags": [
+        "global",
+        "batch"
+      ]
+    },
+    {
+      "id": "37db79b4",
+      "content": "Squad commands use SquadCommand enum (FOLLOW_ME, HOLD_POSITION, PATROL_HERE, RETREAT, FREE_ROAM) - see types.ts",
+      "source": "manual",
+      "created_at": "2026-01-25T09:05:41.398037",
+      "tags": []
+    },
+    {
+      "id": "572a1d1d",
+      "content": "Before implementing new features, always search codebase first - SMG and Shotgun tasks discovered features already existed",
+      "source": "shepherd",
+      "created_at": "2026-01-25T09:05:57.251201",
+      "tags": [
+        "global",
+        "batch"
+      ]
+    },
+    {
+      "id": "03eed6a5",
+      "content": "Death cam systems use phase-based animation (freeze -> transition -> orbit) with camera lerping",
+      "source": "shepherd",
+      "created_at": "2026-01-25T09:05:57.252386",
+      "tags": [
+        "global",
+        "batch"
+      ]
+    },
+    {
+      "id": "527acaf4",
+      "content": "Radial menus use SVG with segment paths calculated from angle math - see SquadRadialMenu.ts pattern",
+      "source": "shepherd",
+      "created_at": "2026-01-25T09:05:57.253562",
+      "tags": [
+        "global",
+        "batch"
+      ]
+    },
+    {
+      "id": "895ae38c",
+      "content": "When task completes, run 'git status' to verify all new files are tracked and committed",
+      "source": "shepherd",
+      "created_at": "2026-01-25T09:05:57.254837",
+      "tags": [
+        "global",
+        "batch"
+      ]
     }
   ],
   "warnings": [
@@ -224,6 +321,91 @@
       "created_at": "2026-01-25T02:33:34.466739",
       "tags": [],
       "severity": "low"
+    },
+    {
+      "id": "ffee8300",
+      "content": "Multiple tasks left untracked files without committing - 4 new systems sitting uncommitted",
+      "source": "shepherd",
+      "created_at": "2026-01-25T09:04:59.759830",
+      "tags": [
+        "global",
+        "batch"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "c68e7091",
+      "content": "SVG elements require setAttribute('class', ...) not .className assignment (readonly in TS)",
+      "source": "shepherd",
+      "created_at": "2026-01-25T09:04:59.762053",
+      "tags": [
+        "global",
+        "batch"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "622cccfb",
+      "content": "When extending interfaces (MatchStats), update all places that construct the object",
+      "source": "shepherd",
+      "created_at": "2026-01-25T09:04:59.764218",
+      "tags": [
+        "global",
+        "batch"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "cb5817dc",
+      "content": "Tasks claiming 'done' left 1000+ lines of code uncommitted (DeathCamSystem, SquadRadialMenu, WeaponPickupSystem). Verify with git status before marking done.",
+      "source": "manual",
+      "created_at": "2026-01-25T09:05:39.819158",
+      "tags": [],
+      "severity": "high"
+    },
+    {
+      "id": "09e9f5ff",
+      "content": "Tasks 1, 3, 5 marked 'done' but left significant work uncommitted - agents need to verify commits before completing",
+      "source": "shepherd",
+      "created_at": "2026-01-25T09:05:57.256101",
+      "tags": [
+        "global",
+        "batch"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "1a45afde",
+      "content": "SVG elements use setAttribute('class', value) not .className (readonly in TypeScript)",
+      "source": "shepherd",
+      "created_at": "2026-01-25T09:05:57.257561",
+      "tags": [
+        "global",
+        "batch"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "b3e019f1",
+      "content": "When adding new properties to interfaces like MatchStats, update ALL object constructors that use it",
+      "source": "shepherd",
+      "created_at": "2026-01-25T09:05:57.258880",
+      "tags": [
+        "global",
+        "batch"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "afeffcc5",
+      "content": "Current build is broken due to uncommitted type changes - fix before new work",
+      "source": "shepherd",
+      "created_at": "2026-01-25T09:05:57.260314",
+      "tags": [
+        "global",
+        "batch"
+      ],
+      "severity": "medium"
     }
   ],
   "context": [
@@ -270,5 +452,5 @@
       "tags": []
     }
   ],
-  "updated_at": "2026-01-25T02:33:34.466757"
+  "updated_at": "2026-01-25T09:05:57.260328"
 }

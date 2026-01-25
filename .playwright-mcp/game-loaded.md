@@ -1,0 +1,12 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - heading "TERROR IN THE JUNGLE" [level=1] [ref=e5]
+      - generic [ref=e6]: US Forces vs OPFOR
+    - generic [ref=e7]:
+      - generic [ref=e10]: 50%
+      - generic [ref=e11]: Loading audio...
+    - generic [ref=e12]:
+      - generic [ref=e13]: TIP
+      - generic [ref=e14]: Press ESC to release mouse lock
+  - generic [ref=e15]: "Load time: 12.6s"

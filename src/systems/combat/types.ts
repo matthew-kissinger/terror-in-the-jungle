@@ -87,6 +87,7 @@ export interface Combatant {
   defendingZoneId?: string;
   defensePosition?: THREE.Vector3;
   lastDefenseReassignTime?: number;
+  isFlankingMove?: boolean;
 }
 
 export enum SquadCommand {

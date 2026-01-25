@@ -1,43 +1,55 @@
-import * as THREE from 'three';
-import { Combatant, CombatantState, Squad } from './types';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
-import { SandbagSystem } from '../weapons/SandbagSystem';
-import { SpatialOctree } from './SpatialOctree';
-import { ZoneManager } from '../world/ZoneManager';
-import { AIStatePatrol } from './ai/AIStatePatrol';
-import { AIStateEngage } from './ai/AIStateEngage';
-import { AIStateMovement } from './ai/AIStateMovement';
-import { AIStateDefend } from './ai/AIStateDefend';
-import { AITargeting } from './ai/AITargeting';
+import * as THREE from 'three'
+import { Combatant, CombatantState, Squad } from './types'
+import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager'
+import { SandbagSystem } from '../weapons/SandbagSystem'
+import { SpatialOctree } from './SpatialOctree'
+import { ZoneManager } from '../world/ZoneManager'
+import { AIStatePatrol } from './ai/AIStatePatrol'
+import { AIStateEngage } from './ai/AIStateEngage'
+import { AIStateMovement } from './ai/AIStateMovement'
+import { AIStateDefend } from './ai/AIStateDefend'
+import { AITargeting } from './ai/AITargeting'
+import { AICoverSystem } from './ai/AICoverSystem'
+import { AIFlankingSystem } from './ai/AIFlankingSystem'
 
 /**
  * Thin orchestrator for AI state machine - delegates to focused state handler modules
  */
 export class CombatantAI {
-  private readonly FRIENDLY_FIRE_ENABLED = false;
-  private readonly MAX_ENGAGEMENT_RANGE = 150;
+  private readonly FRIENDLY_FIRE_ENABLED = false
+  private readonly MAX_ENGAGEMENT_RANGE = 150
 
   // State handler modules
-  private patrolHandler: AIStatePatrol;
-  private engageHandler: AIStateEngage;
-  private movementHandler: AIStateMovement;
-  private defendHandler: AIStateDefend;
-  private targeting: AITargeting;
+  private patrolHandler: AIStatePatrol
+  private engageHandler: AIStateEngage
+  private movementHandler: AIStateMovement
+  private defendHandler: AIStateDefend
+  private targeting: AITargeting
 
-  private squads: Map<string, Squad> = new Map();
+  // Tactical systems
+  private coverSystem: AICoverSystem
+  private flankingSystem: AIFlankingSystem
+
+  private squads: Map<string, Squad> = new Map()
 
   constructor() {
-    this.patrolHandler = new AIStatePatrol();
-    this.engageHandler = new AIStateEngage();
-    this.movementHandler = new AIStateMovement();
-    this.defendHandler = new AIStateDefend();
-    this.targeting = new AITargeting();
+    this.patrolHandler = new AIStatePatrol()
+    this.engageHandler = new AIStateEngage()
+    this.movementHandler = new AIStateMovement()
+    this.defendHandler = new AIStateDefend()
+    this.targeting = new AITargeting()
+    this.coverSystem = new AICoverSystem()
+    this.flankingSystem = new AIFlankingSystem()
+
+    // Wire tactical systems to engage handler
+    this.engageHandler.setCoverSystem(this.coverSystem)
+    this.engageHandler.setFlankingSystem(this.flankingSystem)
   }
 
   setSquads(squads: Map<string, Squad>): void {
-    this.squads = squads;
-    this.patrolHandler.setSquads(squads);
-    this.engageHandler.setSquads(squads);
+    this.squads = squads
+    this.patrolHandler.setSquads(squads)
+    this.engageHandler.setSquads(squads)
   }
 
   updateAI(
@@ -48,7 +60,18 @@ export class CombatantAI {
     spatialGrid?: SpatialOctree
   ): void {
     // Decay suppression effects over time
-    this.decaySuppressionEffects(combatant, deltaTime);
+    this.decaySuppressionEffects(combatant, deltaTime)
+
+    // Update flanking operations for squad members
+    if (combatant.squadId) {
+      const operation = this.flankingSystem.getActiveOperation(combatant.squadId)
+      if (operation) {
+        const squad = this.squads.get(combatant.squadId)
+        if (squad) {
+          this.flankingSystem.updateFlankingOperation(operation, squad, allCombatants)
+        }
+      }
+    }
 
     // Delegate to appropriate state handler
     switch (combatant.state) {
@@ -62,8 +85,8 @@ export class CombatantAI {
           this.findNearestEnemy.bind(this),
           this.canSeeTarget.bind(this),
           this.shouldEngage.bind(this)
-        );
-        break;
+        )
+        break
 
       case CombatantState.ALERT:
         this.engageHandler.handleAlert(
@@ -71,8 +94,8 @@ export class CombatantAI {
           deltaTime,
           playerPosition,
           this.canSeeTarget.bind(this)
-        );
-        break;
+        )
+        break
 
       case CombatantState.ENGAGING:
         this.engageHandler.handleEngaging(
@@ -86,12 +109,12 @@ export class CombatantAI {
           this.findNearestCover.bind(this),
           this.countNearbyEnemies.bind(this),
           this.isCoverFlanked.bind(this)
-        );
-        break;
+        )
+        break
 
       case CombatantState.SUPPRESSING:
-        this.engageHandler.handleSuppressing(combatant, deltaTime);
-        break;
+        this.engageHandler.handleSuppressing(combatant, deltaTime)
+        break
 
       case CombatantState.ADVANCING:
         this.movementHandler.handleAdvancing(
@@ -102,8 +125,8 @@ export class CombatantAI {
           spatialGrid,
           this.findNearestEnemy.bind(this),
           this.canSeeTarget.bind(this)
-        );
-        break;
+        )
+        break
 
       case CombatantState.SEEKING_COVER:
         this.movementHandler.handleSeekingCover(
@@ -112,8 +135,8 @@ export class CombatantAI {
           playerPosition,
           allCombatants,
           this.canSeeTarget.bind(this)
-        );
-        break;
+        )
+        break
 
       case CombatantState.DEFENDING:
         this.defendHandler.handleDefending(
@@ -124,24 +147,24 @@ export class CombatantAI {
           spatialGrid,
           this.findNearestEnemy.bind(this),
           this.canSeeTarget.bind(this)
-        );
-        break;
+        )
+        break
     }
   }
 
   private decaySuppressionEffects(combatant: Combatant, deltaTime: number): void {
     if (combatant.lastSuppressedTime) {
-      const timeSinceSuppressed = (Date.now() - combatant.lastSuppressedTime) / 1000;
+      const timeSinceSuppressed = (Date.now() - combatant.lastSuppressedTime) / 1000
       if (timeSinceSuppressed > 3.0) {
-        combatant.nearMissCount = Math.max(0, (combatant.nearMissCount || 0) - deltaTime * 0.5);
+        combatant.nearMissCount = Math.max(0, (combatant.nearMissCount || 0) - deltaTime * 0.5)
         if (combatant.nearMissCount <= 0) {
-          combatant.nearMissCount = 0;
-          combatant.lastSuppressedTime = undefined;
+          combatant.nearMissCount = 0
+          combatant.lastSuppressedTime = undefined
         }
       }
     }
 
-    combatant.suppressionLevel = Math.max(0, combatant.suppressionLevel - deltaTime * 0.3);
+    combatant.suppressionLevel = Math.max(0, combatant.suppressionLevel - deltaTime * 0.3)
   }
 
   // Public API methods delegated to targeting module
@@ -151,7 +174,7 @@ export class CombatantAI {
     allCombatants: Map<string, Combatant>,
     spatialGrid?: SpatialOctree
   ): Combatant | null {
-    return this.targeting.findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid);
+    return this.targeting.findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid)
   }
 
   canSeeTarget(
@@ -159,11 +182,11 @@ export class CombatantAI {
     target: Combatant,
     playerPosition: THREE.Vector3
   ): boolean {
-    return this.targeting.canSeeTarget(combatant, target, playerPosition);
+    return this.targeting.canSeeTarget(combatant, target, playerPosition)
   }
 
   private shouldEngage(combatant: Combatant, distance: number): boolean {
-    return this.targeting.shouldEngage(combatant, distance);
+    return this.targeting.shouldEngage(combatant, distance)
   }
 
   private countNearbyEnemies(
@@ -173,19 +196,19 @@ export class CombatantAI {
     allCombatants: Map<string, Combatant>,
     spatialGrid?: SpatialOctree
   ): number {
-    return this.targeting.countNearbyEnemies(combatant, radius, playerPosition, allCombatants, spatialGrid);
+    return this.targeting.countNearbyEnemies(combatant, radius, playerPosition, allCombatants, spatialGrid)
   }
 
   private shouldSeekCover(combatant: Combatant): boolean {
-    return this.targeting.shouldSeekCover(combatant);
+    return this.targeting.shouldSeekCover(combatant)
   }
 
   private findNearestCover(combatant: Combatant, threatPosition: THREE.Vector3): THREE.Vector3 | null {
-    return this.targeting.findNearestCover(combatant, threatPosition);
+    return this.targeting.findNearestCover(combatant, threatPosition)
   }
 
   private isCoverFlanked(combatant: Combatant, threatPos: THREE.Vector3): boolean {
-    return this.targeting.isCoverFlanked(combatant, threatPos);
+    return this.targeting.isCoverFlanked(combatant, threatPos)
   }
 
   // Public squad suppression initiator (called from CombatantSystem)
@@ -199,20 +222,38 @@ export class CombatantAI {
       targetPos,
       allCombatants,
       this.findNearestCover.bind(this)
-    );
+    )
   }
 
   // Dependency injection
   setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.targeting.setChunkManager(chunkManager);
+    this.targeting.setChunkManager(chunkManager)
+    this.coverSystem.setChunkManager(chunkManager)
+    this.flankingSystem.setChunkManager(chunkManager)
   }
 
   setSandbagSystem(sandbagSystem: SandbagSystem): void {
-    this.targeting.setSandbagSystem(sandbagSystem);
+    this.targeting.setSandbagSystem(sandbagSystem)
+    this.coverSystem.setSandbagSystem(sandbagSystem)
   }
 
   setZoneManager(zoneManager: ZoneManager): void {
-    this.patrolHandler.setZoneManager(zoneManager);
-    this.defendHandler.setZoneManager(zoneManager);
+    this.patrolHandler.setZoneManager(zoneManager)
+    this.defendHandler.setZoneManager(zoneManager)
+  }
+
+  // Expose tactical systems for state handlers
+  getCoverSystem(): AICoverSystem {
+    return this.coverSystem
+  }
+
+  getFlankingSystem(): AIFlankingSystem {
+    return this.flankingSystem
+  }
+
+  // Periodic cleanup of tactical system caches
+  updateTacticalSystems(allCombatants: Map<string, Combatant>): void {
+    this.coverSystem.cleanupOccupation(allCombatants)
+    this.flankingSystem.cleanupOperations(this.squads, allCombatants)
   }
 }
