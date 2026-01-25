@@ -44,18 +44,117 @@ export class ProgrammaticExplosivesFactory {
   }
 
   static createMortarTube(): THREE.Group {
-    // Mortar system disabled - returning empty group
-    // TO BE REIMPLEMENTED: Will create proper mortar tube mesh
     const mortar = new THREE.Group();
-    mortar.name = 'mortar_tube_disabled';
+    mortar.name = 'mortar_tube';
+
+    // Base plate - sits on ground
+    const basePlateGeometry = new THREE.CylinderGeometry(1.5, 1.8, 0.2, 16);
+    const basePlateMaterial = new THREE.MeshStandardMaterial({
+      color: 0x404040,
+      metalness: 0.8,
+      roughness: 0.3
+    });
+    const basePlate = new THREE.Mesh(basePlateGeometry, basePlateMaterial);
+    basePlate.position.y = 0.1;
+    basePlate.castShadow = true;
+    mortar.add(basePlate);
+
+    // Tube - angled upward
+    const tubeGeometry = new THREE.CylinderGeometry(0.4, 0.45, 3.5, 12);
+    const tubeMaterial = new THREE.MeshStandardMaterial({
+      color: 0x2a3a2a,
+      metalness: 0.7,
+      roughness: 0.4
+    });
+    const tube = new THREE.Mesh(tubeGeometry, tubeMaterial);
+    tube.position.set(0, 2.0, 0);
+    tube.rotation.x = THREE.MathUtils.degToRad(45); // Default angle
+    tube.castShadow = true;
+    tube.name = 'tube'; // For rotation control
+    mortar.add(tube);
+
+    // Support struts
+    const strutGeometry = new THREE.CylinderGeometry(0.08, 0.08, 2.0, 8);
+    const strutMaterial = new THREE.MeshStandardMaterial({
+      color: 0x505050,
+      metalness: 0.6,
+      roughness: 0.5
+    });
+
+    // Front strut
+    const frontStrut = new THREE.Mesh(strutGeometry, strutMaterial);
+    frontStrut.position.set(0, 1.0, 0.8);
+    frontStrut.rotation.x = THREE.MathUtils.degToRad(25);
+    frontStrut.castShadow = true;
+    mortar.add(frontStrut);
+
+    // Left strut
+    const leftStrut = new THREE.Mesh(strutGeometry, strutMaterial);
+    leftStrut.position.set(-0.7, 0.8, -0.4);
+    leftStrut.rotation.z = THREE.MathUtils.degToRad(20);
+    leftStrut.rotation.x = THREE.MathUtils.degToRad(-10);
+    leftStrut.castShadow = true;
+    mortar.add(leftStrut);
+
+    // Right strut
+    const rightStrut = new THREE.Mesh(strutGeometry, strutMaterial);
+    rightStrut.position.set(0.7, 0.8, -0.4);
+    rightStrut.rotation.z = THREE.MathUtils.degToRad(-20);
+    rightStrut.rotation.x = THREE.MathUtils.degToRad(-10);
+    rightStrut.castShadow = true;
+    mortar.add(rightStrut);
+
     return mortar;
   }
 
   static createMortarRound(): THREE.Group {
-    // Mortar system disabled - returning empty group
-    // TO BE REIMPLEMENTED: Will create proper mortar round mesh
     const round = new THREE.Group();
-    round.name = 'mortar_round_disabled';
+    round.name = 'mortar_round';
+
+    // Main body - cylindrical
+    const bodyGeometry = new THREE.CylinderGeometry(0.35, 0.35, 1.5, 12);
+    const bodyMaterial = new THREE.MeshStandardMaterial({
+      color: 0x4A5D23,
+      metalness: 0.5,
+      roughness: 0.6
+    });
+    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    body.castShadow = true;
+    round.add(body);
+
+    // Nose cone - pointed
+    const noseGeometry = new THREE.ConeGeometry(0.35, 0.6, 12);
+    const noseMaterial = new THREE.MeshStandardMaterial({
+      color: 0x606060,
+      metalness: 0.8,
+      roughness: 0.3
+    });
+    const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+    nose.position.y = 1.05;
+    nose.castShadow = true;
+    round.add(nose);
+
+    // Tail fins
+    const finGeometry = new THREE.BoxGeometry(0.15, 0.8, 0.05);
+    const finMaterial = new THREE.MeshStandardMaterial({
+      color: 0x505050,
+      metalness: 0.7,
+      roughness: 0.4
+    });
+
+    for (let i = 0; i < 4; i++) {
+      const fin = new THREE.Mesh(finGeometry, finMaterial);
+      const angle = (i / 4) * Math.PI * 2;
+      fin.position.set(
+        Math.cos(angle) * 0.35,
+        -0.9,
+        Math.sin(angle) * 0.35
+      );
+      fin.rotation.y = angle;
+      fin.castShadow = true;
+      round.add(fin);
+    }
+
     return round;
   }
 
