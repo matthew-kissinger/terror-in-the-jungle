@@ -5,6 +5,14 @@ export interface PlayerStats {
   matchStartTime: number;
   currentKillStreak: number;
   bestKillStreak: number;
+  // Detailed combat stats
+  headshots: number;
+  damageDealt: number;
+  shotsFired: number;
+  shotsHit: number;
+  longestKill: number;
+  grenadesThrown: number;
+  grenadeKills: number;
 }
 
 export class PlayerStatsTracker {
@@ -14,7 +22,14 @@ export class PlayerStatsTracker {
     zonesCaptured: 0,
     matchStartTime: 0,
     currentKillStreak: 0,
-    bestKillStreak: 0
+    bestKillStreak: 0,
+    headshots: 0,
+    damageDealt: 0,
+    shotsFired: 0,
+    shotsHit: 0,
+    longestKill: 0,
+    grenadesThrown: 0,
+    grenadeKills: 0
   };
 
   startMatch(): void {
@@ -24,7 +39,14 @@ export class PlayerStatsTracker {
       zonesCaptured: 0,
       matchStartTime: Date.now(),
       currentKillStreak: 0,
-      bestKillStreak: 0
+      bestKillStreak: 0,
+      headshots: 0,
+      damageDealt: 0,
+      shotsFired: 0,
+      shotsHit: 0,
+      longestKill: 0,
+      grenadesThrown: 0,
+      grenadeKills: 0
     };
     console.log('📊 Match stats tracking started');
   }
@@ -58,6 +80,37 @@ export class PlayerStatsTracker {
     this.stats.zonesCaptured++;
   }
 
+  // New tracking methods
+  addHeadshot(): void {
+    this.stats.headshots++;
+  }
+
+  addDamage(amount: number): void {
+    this.stats.damageDealt += Math.round(amount);
+  }
+
+  registerShot(hit: boolean): void {
+    this.stats.shotsFired++;
+    if (hit) {
+      this.stats.shotsHit++;
+    }
+  }
+
+  updateLongestKill(distance: number): void {
+    if (distance > this.stats.longestKill) {
+      this.stats.longestKill = parseFloat(distance.toFixed(1));
+    }
+  }
+
+  addGrenadeThrow(): void {
+    this.stats.grenadesThrown++;
+  }
+
+  addGrenadeKill(): void {
+    this.stats.grenadeKills++;
+    this.addKill(); // Grenade kills count as regular kills too
+  }
+
   getStats(): PlayerStats {
     return { ...this.stats };
   }
@@ -74,7 +127,14 @@ export class PlayerStatsTracker {
       zonesCaptured: 0,
       matchStartTime: 0,
       currentKillStreak: 0,
-      bestKillStreak: 0
+      bestKillStreak: 0,
+      headshots: 0,
+      damageDealt: 0,
+      shotsFired: 0,
+      shotsHit: 0,
+      longestKill: 0,
+      grenadesThrown: 0,
+      grenadeKills: 0
     };
   }
 }

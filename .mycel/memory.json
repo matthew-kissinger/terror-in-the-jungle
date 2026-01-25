@@ -349,6 +349,53 @@
       "source": "manual",
       "created_at": "2026-01-25T09:42:28.733994",
       "tags": []
+    },
+    {
+      "id": "2b2bd1db",
+      "content": "When connecting audio systems to combat, use AudioManager.getListener().context - never create new AudioContext() directly",
+      "source": "manual",
+      "created_at": "2026-01-25T14:32:47.652679",
+      "tags": []
+    },
+    {
+      "id": "f9ad764e",
+      "content": "Use WeatherSystem.setUnderwater() to override atmosphere - has priority flag to prevent weather cycles from interfering",
+      "source": "shepherd",
+      "created_at": "2026-01-25T14:33:36.868811",
+      "tags": [
+        "success",
+        "merge"
+      ]
+    },
+    {
+      "id": "19f3f6d9",
+      "content": "Game end flow: TicketSystem.checkVictoryConditions() -> endGame() -> onGameEnd callback -> HUDSystem.handleGameEnd() -> MatchEndScreen.show()",
+      "source": "shepherd",
+      "created_at": "2026-01-25T14:33:36.903667",
+      "tags": [
+        "success",
+        "merge"
+      ]
+    },
+    {
+      "id": "42f77421",
+      "content": "Voice callout systems should use distance-based filtering (50m reasonable) and per-combatant cooldowns to prevent audio spam",
+      "source": "shepherd",
+      "created_at": "2026-01-25T14:33:36.921260",
+      "tags": [
+        "global",
+        "batch"
+      ]
+    },
+    {
+      "id": "6d98a827",
+      "content": "Underwater effects pattern: check camera.position.y vs water level, use WeatherSystem priority override for fog/lighting",
+      "source": "shepherd",
+      "created_at": "2026-01-25T14:33:36.923578",
+      "tags": [
+        "global",
+        "batch"
+      ]
     }
   ],
   "warnings": [
@@ -604,6 +651,58 @@
       "created_at": "2026-01-25T09:42:23.060517",
       "tags": [],
       "severity": "medium"
+    },
+    {
+      "id": "36a5ca48",
+      "content": "VoiceCalloutSystem (Task 1) has uncommitted work that breaks build - applyDamage calls allCombatants without checking undefined. Fix: add guard 'if (allCombatants)' at line 464 in CombatantCombat.ts, and wire setVoiceCalloutSystem in SandboxSystemManager.connectSystems()",
+      "source": "manual",
+      "created_at": "2026-01-25T14:32:46.751951",
+      "tags": [],
+      "severity": "medium"
+    },
+    {
+      "id": "48be3d01",
+      "content": "Codex agent received wrong repo path in task dispatch - verify task creation passes correct --repo flag",
+      "source": "shepherd",
+      "created_at": "2026-01-25T14:33:36.909378",
+      "tags": [
+        "failure",
+        "reject"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "23975990",
+      "content": "When cursor agent works on existing branches, verify branch is rebased on master first",
+      "source": "shepherd",
+      "created_at": "2026-01-25T14:33:36.915350",
+      "tags": [
+        "failure",
+        "reject"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "e94f3aab",
+      "content": "Stale feature branches can cause regressions - always check git log to see if branch is behind master before evaluating",
+      "source": "shepherd",
+      "created_at": "2026-01-25T14:33:36.925396",
+      "tags": [
+        "global",
+        "batch"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "9217cee6",
+      "content": "Codex agent sandbox restrictions may cause it to write to wrong repo - verify file actually exists in target repo",
+      "source": "shepherd",
+      "created_at": "2026-01-25T14:33:36.927185",
+      "tags": [
+        "global",
+        "batch"
+      ],
+      "severity": "medium"
     }
   ],
   "context": [
@@ -655,7 +754,14 @@
       "source": "manual",
       "created_at": "2026-01-25T09:08:40.683863",
       "tags": []
+    },
+    {
+      "id": "4d430fbb",
+      "content": "WaterSystem underwater effects (Task 2) implemented: camera tracking, dense fog override via WeatherSystem.setUnderwater(), and DOM-based blur overlay. WeatherSystem has isUnderwater flag and underwaterAtmosphere config",
+      "source": "manual",
+      "created_at": "2026-01-25T14:32:54.720230",
+      "tags": []
     }
   ],
-  "updated_at": "2026-01-25T09:42:28.734012"
+  "updated_at": "2026-01-25T14:33:36.927197"
 }

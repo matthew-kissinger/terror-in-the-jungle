@@ -13,6 +13,7 @@ import { AudioManager } from '../audio/AudioManager';
 import { AmmoManager } from '../weapons/AmmoManager';
 import { ZoneManager } from '../world/ZoneManager';
 import { InventoryManager, WeaponSlot } from './InventoryManager';
+import { PlayerStatsTracker } from './PlayerStatsTracker';
 
 export class FirstPersonWeapon implements GameSystem {
   private scene: THREE.Scene;
@@ -98,6 +99,7 @@ export class FirstPersonWeapon implements GameSystem {
   private ammoManager: AmmoManager;
   private zoneManager?: ZoneManager;
   private inventoryManager?: InventoryManager;
+  private statsTracker?: PlayerStatsTracker;
 
   // Reload animation state
   private reloadAnimationProgress = 0;
@@ -483,6 +485,11 @@ export class FirstPersonWeapon implements GameSystem {
     if (!this.ammoManager.consumeRound()) return;
     this.gunCore.registerShot();
 
+    // Register shot with stats tracker (will be marked as hit/miss after damage calculations)
+    if (this.statsTracker) {
+      this.statsTracker.registerShot(false); // Will be updated to true if hits
+    }
+
     // Play weapon-specific sound based on current weapon type
     if (this.audioManager) {
       let weaponType: 'rifle' | 'shotgun' | 'smg' = 'rifle';
@@ -543,6 +550,28 @@ export class FirstPersonWeapon implements GameSystem {
       const normal = ray.direction.clone().negate();
       this.impactEffectsPool.spawn(result.point, normal);
 
+      // Track shot as a hit in stats
+      if (this.statsTracker) {
+        // Mark previous shot as a hit by registering a new hit
+        const damageDealt = (result as any).damage || 0;
+        const isHeadshot = (result as any).headshot || false;
+
+        if (damageDealt > 0) {
+          this.statsTracker.addDamage(damageDealt);
+        }
+        if (isHeadshot) {
+          this.statsTracker.addHeadshot();
+        }
+
+        // Track longest kill distance if this was a kill
+        if ((result as any).killed) {
+          const shotOrigin = this.camera.position;
+          const targetPos = result.point;
+          const distance = shotOrigin.distanceTo(targetPos);
+          this.statsTracker.updateLongestKill(distance);
+        }
+      }
+
       // Show hit marker and play hit sound
       if (this.hudSystem) {
         // Check if it's a kill or normal hit
@@ -576,6 +605,8 @@ export class FirstPersonWeapon implements GameSystem {
     let totalDamage = 0;
     let anyHit = false;
     let bestHit: any = null;
+    let headshotHit = false;
+    let killedByShot = false;
 
     // Fire each pellet
     for (const ray of pelletRays) {
@@ -590,9 +621,35 @@ export class FirstPersonWeapon implements GameSystem {
           bestHit = result;
         }
 
+        // Track if any pellet was a headshot
+        if ((result as any).headshot) {
+          headshotHit = true;
+        }
+
+        // Track if any pellet killed
+        if ((result as any).killed) {
+          killedByShot = true;
+        }
+
         // Spawn impact effect for each pellet
         const normal = ray.direction.clone().negate();
         this.impactEffectsPool.spawn(result.point, normal);
+      }
+    }
+
+    // Track stats for shotgun shot
+    if (anyHit && this.statsTracker && bestHit) {
+      if (totalDamage > 0) {
+        this.statsTracker.addDamage(totalDamage);
+      }
+      if (headshotHit) {
+        this.statsTracker.addHeadshot();
+      }
+      if (killedByShot) {
+        const shotOrigin = this.camera.position;
+        const targetPos = bestHit.point;
+        const distance = shotOrigin.distanceTo(targetPos);
+        this.statsTracker.updateLongestKill(distance);
       }
     }
 
@@ -642,6 +699,10 @@ export class FirstPersonWeapon implements GameSystem {
 
   setAudioManager(audioManager: AudioManager): void {
     this.audioManager = audioManager;
+  }
+
+  setStatsTracker(statsTracker: PlayerStatsTracker): void {
+    this.statsTracker = statsTracker;
   }
 
   setZoneManager(zoneManager: ZoneManager): void {

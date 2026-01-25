@@ -8,6 +8,13 @@ export interface MatchStats {
   matchDuration: number;
   usTickets: number;
   opforTickets: number;
+  // Detailed stats
+  headshots: number;
+  damageDealt: number;
+  accuracy: number;
+  longestKill: number;
+  grenadesThrown: number;
+  grenadeKills: number;
 }
 
 export class MatchEndScreen {
@@ -55,6 +62,8 @@ export class MatchEndScreen {
     const durationText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
     const kd = stats.deaths > 0 ? (stats.kills / stats.deaths).toFixed(2) : stats.kills.toFixed(2);
+    const headshotPct = stats.kills > 0 ? Math.round((stats.headshots / stats.kills) * 100) : 0;
+    const accuracy = Math.round(stats.accuracy * 100);
 
     container.innerHTML = `
       <style>
@@ -135,7 +144,10 @@ export class MatchEndScreen {
           border: 2px solid rgba(127, 180, 217, 0.3);
           border-radius: 12px;
           padding: 2rem;
-          min-width: 500px;
+          min-width: 800px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 2rem;
           animation: fadeInUp 0.8s ease-out 0.2s backwards;
         }
 
@@ -158,16 +170,18 @@ export class MatchEndScreen {
           border-color: rgba(244, 67, 54, 0.5);
         }
 
-        .stats-section {
-          margin-bottom: 1.5rem;
+        .stats-column {
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
         }
 
-        .stats-section:last-child {
-          margin-bottom: 0;
+        .stats-section {
+          margin-bottom: 0.5rem;
         }
 
         .stats-section-title {
-          font-size: 1.2rem;
+          font-size: 1.1rem;
           text-transform: uppercase;
           letter-spacing: 0.15em;
           margin-bottom: 0.75rem;
@@ -179,8 +193,8 @@ export class MatchEndScreen {
         .stat-row {
           display: flex;
           justify-content: space-between;
-          padding: 0.5rem 0;
-          font-size: 1.1rem;
+          padding: 0.3rem 0;
+          font-size: 1.0rem;
         }
 
         .stat-label {
@@ -281,42 +295,78 @@ export class MatchEndScreen {
       </div>
 
       <div class="stats-panel">
-        <div class="stats-section">
-          <div class="stats-section-title">Match Results</div>
-          <div class="ticket-comparison">
-            <div class="faction-score us">
-              <div class="faction-name">US Forces</div>
-              <div class="faction-tickets">${Math.round(stats.usTickets)}</div>
+        <div class="stats-column">
+          <div class="stats-section">
+            <div class="stats-section-title">Match Results</div>
+            <div class="ticket-comparison">
+              <div class="faction-score us">
+                <div class="faction-name">US Forces</div>
+                <div class="faction-tickets">${Math.round(stats.usTickets)}</div>
+              </div>
+              <div class="vs-divider">VS</div>
+              <div class="faction-score opfor">
+                <div class="faction-name">OPFOR</div>
+                <div class="faction-tickets">${Math.round(stats.opforTickets)}</div>
+              </div>
             </div>
-            <div class="vs-divider">VS</div>
-            <div class="faction-score opfor">
-              <div class="faction-name">OPFOR</div>
-              <div class="faction-tickets">${Math.round(stats.opforTickets)}</div>
+            <div class="stat-row">
+              <span class="stat-label">Match Duration</span>
+              <span class="stat-value">${durationText}</span>
             </div>
           </div>
-          <div class="stat-row">
-            <span class="stat-label">Match Duration</span>
-            <span class="stat-value">${durationText}</span>
+
+          <div class="stats-section">
+            <div class="stats-section-title">Combat Performance</div>
+            <div class="stat-row">
+              <span class="stat-label">Kills</span>
+              <span class="stat-value highlight">${stats.kills}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Deaths</span>
+              <span class="stat-value">${stats.deaths}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">K/D Ratio</span>
+              <span class="stat-value">${kd}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Zones Captured</span>
+              <span class="stat-value highlight">${stats.zonesCaptured}</span>
+            </div>
           </div>
         </div>
 
-        <div class="stats-section">
-          <div class="stats-section-title">Your Performance</div>
-          <div class="stat-row">
-            <span class="stat-label">Kills</span>
-            <span class="stat-value highlight">${stats.kills}</span>
+        <div class="stats-column">
+          <div class="stats-section">
+            <div class="stats-section-title">Accuracy & Damage</div>
+            <div class="stat-row">
+              <span class="stat-label">Total Damage</span>
+              <span class="stat-value">${stats.damageDealt.toLocaleString()}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Accuracy</span>
+              <span class="stat-value">${accuracy}%</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Headshots</span>
+              <span class="stat-value">${stats.headshots} <span style="opacity:0.6; font-size:0.9em">(${headshotPct}%)</span></span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Longest Kill</span>
+              <span class="stat-value">${stats.longestKill}m</span>
+            </div>
           </div>
-          <div class="stat-row">
-            <span class="stat-label">Deaths</span>
-            <span class="stat-value">${stats.deaths}</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-label">K/D Ratio</span>
-            <span class="stat-value">${kd}</span>
-          </div>
-          <div class="stat-row">
-            <span class="stat-label">Zones Captured</span>
-            <span class="stat-value highlight">${stats.zonesCaptured}</span>
+
+          <div class="stats-section">
+            <div class="stats-section-title">Explosives</div>
+            <div class="stat-row">
+              <span class="stat-label">Grenades Thrown</span>
+              <span class="stat-value">${stats.grenadesThrown}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Grenade Kills</span>
+              <span class="stat-value">${stats.grenadeKills}</span>
+            </div>
           </div>
         </div>
       </div>

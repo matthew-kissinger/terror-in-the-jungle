@@ -175,7 +175,14 @@ export class HUDSystem implements GameSystem {
       zonesCaptured: playerStats.zonesCaptured,
       matchDuration: gameState.matchDuration,
       usTickets: this.ticketSystem.getTickets(Faction.US),
-      opforTickets: this.ticketSystem.getTickets(Faction.OPFOR)
+      opforTickets: this.ticketSystem.getTickets(Faction.OPFOR),
+      // Detailed stats
+      headshots: playerStats.headshots,
+      damageDealt: playerStats.damageDealt,
+      accuracy: playerStats.shotsFired > 0 ? playerStats.shotsHit / playerStats.shotsFired : 0,
+      longestKill: playerStats.longestKill,
+      grenadesThrown: playerStats.grenadesThrown,
+      grenadeKills: playerStats.grenadeKills
     };
 
     console.log('🏆 Showing match end screen with stats:', matchStats);

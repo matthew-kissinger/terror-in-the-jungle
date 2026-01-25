@@ -36,6 +36,7 @@ export class CombatantSystem implements GameSystem {
   private playerHealthSystem?: PlayerHealthSystem;
   private zoneManager?: ZoneManager;
   private audioManager?: AudioManager;
+  private hudSystem?: any;
 
   // Refactored modules
   private combatantFactory: CombatantFactory;
@@ -934,6 +935,7 @@ export class CombatantSystem implements GameSystem {
 
   applyExplosionDamage(center: THREE.Vector3, radius: number, maxDamage: number): void {
     let hitCount = 0;
+    const killedCombatants: Combatant[] = [];
 
     this.combatants.forEach(combatant => {
       if (combatant.state === CombatantState.DEAD) return;
@@ -943,6 +945,7 @@ export class CombatantSystem implements GameSystem {
       if (distance <= radius) {
         const damagePercent = 1.0 - (distance / radius);
         const damage = maxDamage * damagePercent;
+        const wasAlive = combatant.health > 0;
 
         combatant.health -= damage;
 
@@ -968,6 +971,11 @@ export class CombatantSystem implements GameSystem {
             this.squadManager.removeSquadMember(combatant.squadId, combatant.id);
           }
 
+          // Track killed combatants for kill feed
+          if (wasAlive) {
+            killedCombatants.push(combatant);
+          }
+
           console.log(`💥 ${combatant.faction} soldier killed by explosion (${damage.toFixed(0)} damage)`);
         } else {
           combatant.lastHitTime = Date.now();
@@ -977,6 +985,21 @@ export class CombatantSystem implements GameSystem {
         hitCount++;
       }
     });
+
+    // Report grenade kills to kill feed (grenades are player-thrown)
+    if (this.hudSystem && killedCombatants.length > 0) {
+      killedCombatants.forEach(victim => {
+        const victimName = `${victim.faction}-${victim.id.slice(-4)}`;
+        this.hudSystem.addKillToFeed(
+          'PLAYER',
+          Faction.US,
+          victimName,
+          victim.faction,
+          false, // Explosions don't have headshot tracking
+          'grenade'
+        );
+      });
+    }
 
     if (hitCount > 0) {
       console.log(`💥 Explosion hit ${hitCount} combatants`);
@@ -1033,6 +1056,7 @@ export class CombatantSystem implements GameSystem {
   }
 
   setHUDSystem(hudSystem: any): void {
+    this.hudSystem = hudSystem;
     this.combatantCombat.setHUDSystem(hudSystem);
   }
 

@@ -7,6 +7,7 @@ import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
 import { InventoryManager } from '../player/InventoryManager';
 import { AudioManager } from '../audio/AudioManager';
+import { PlayerStatsTracker } from '../player/PlayerStatsTracker';
 
 interface Grenade {
   id: string;
@@ -29,6 +30,7 @@ export class GrenadeSystem implements GameSystem {
   private inventoryManager?: InventoryManager;
   private audioManager?: AudioManager;
   private playerController?: any;
+  private statsTracker?: PlayerStatsTracker;
 
   private grenades: Grenade[] = [];
   private nextGrenadeId = 0;
@@ -454,6 +456,11 @@ export class GrenadeSystem implements GameSystem {
 
     this.spawnGrenade(startPos, throwVelocity, remainingFuseTime);
 
+    // Track grenade throw in stats
+    if (this.statsTracker) {
+      this.statsTracker.addGrenadeThrow();
+    }
+
     const powerPercent = Math.round(this.throwPower * 100);
     const cookedTime = remainingFuseTime < this.FUSE_TIME ? ` (cooked ${(this.FUSE_TIME - remainingFuseTime).toFixed(1)}s)` : '';
     console.log(`💣 Grenade thrown at ${powerPercent}% power${cookedTime}`);
@@ -616,6 +623,10 @@ export class GrenadeSystem implements GameSystem {
 
   setAudioManager(audioManager: AudioManager): void {
     this.audioManager = audioManager;
+  }
+
+  setStatsTracker(statsTracker: PlayerStatsTracker): void {
+    this.statsTracker = statsTracker;
   }
 
   setHUDSystem(hudSystem: any): void {
