@@ -1,14 +1,17 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
+import { ZoneManager } from '../../systems/world/ZoneManager';
 
 export class CompassSystem implements GameSystem {
   private camera: THREE.Camera;
+  private zoneManager?: ZoneManager;
 
   // DOM elements
   private compassContainer!: HTMLDivElement;
   private compassRose!: HTMLDivElement;
   private headingText!: HTMLElement;
   private directionIndicator!: HTMLElement;
+  private markersContainer!: HTMLDivElement;
 
   // Player tracking
   private playerHeading = 0; // In radians, 0 = North (-Z), π/2 = East (+X)
@@ -121,6 +124,62 @@ export class CompassSystem implements GameSystem {
       top: 50%;
       transform: translateY(-50%);
     }
+
+    .compass-markers {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .compass-marker {
+      position: absolute;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      font-size: 11px;
+      border-radius: 50%;
+      border: 2px solid;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    }
+
+    .compass-marker.friendly {
+      background: rgba(0, 100, 255, 0.3);
+      border-color: rgba(0, 150, 255, 0.8);
+      color: rgba(0, 200, 255, 1);
+    }
+
+    .compass-marker.enemy {
+      background: rgba(255, 50, 50, 0.3);
+      border-color: rgba(255, 100, 100, 0.8);
+      color: rgba(255, 150, 150, 1);
+    }
+
+    .compass-marker.neutral {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.6);
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .compass-marker.contested {
+      animation: compassBlink 0.6s infinite;
+      background: rgba(255, 200, 0, 0.3);
+      border-color: rgba(255, 200, 0, 0.8);
+      color: rgba(255, 220, 100, 1);
+    }
+
+    @keyframes compassBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
   `;
 
   constructor(camera: THREE.Camera) {
@@ -200,6 +259,11 @@ export class CompassSystem implements GameSystem {
     centerMarker.className = 'compass-center-marker';
     roseContainer.appendChild(centerMarker);
 
+    // Create zone markers container
+    this.markersContainer = document.createElement('div');
+    this.markersContainer.className = 'compass-markers';
+    roseContainer.appendChild(this.markersContainer);
+
     // Add heading text
     this.headingText = document.createElement('div');
     this.headingText.className = 'compass-heading';
@@ -259,6 +323,80 @@ export class CompassSystem implements GameSystem {
     const offset = -headingDegrees * pixelsPerDegree + 720; // 720 is center of second set
 
     this.compassRose.style.transform = `translate(calc(-50% + ${offset}px), -50%)`;
+
+    // Update zone markers
+    if (this.zoneManager) {
+      this.updateZoneMarkers(headingDegrees);
+    }
+  }
+
+  private updateZoneMarkers(playerHeadingDegrees: number): void {
+    if (!this.zoneManager) return;
+
+    // Clear existing markers
+    this.markersContainer.innerHTML = '';
+
+    // Get camera position to calculate relative directions
+    const cameraPos = new THREE.Vector3();
+    (this.camera as any).getWorldPosition(cameraPos);
+
+    // Get all zones
+    const zones = (this.zoneManager as any).zones as Map<string, any>;
+    if (!zones) return;
+
+    const compassWidth = 200; // Width of the compass display
+    const centerX = compassWidth / 2; // Center of compass
+
+    zones.forEach((zone) => {
+      // Calculate direction from player to zone
+      const dirToZone = new THREE.Vector3().subVectors(zone.position, cameraPos);
+      const directionAngle = Math.atan2(-dirToZone.x, dirToZone.z) * 180 / Math.PI;
+
+      // Normalize angle
+      let angle = directionAngle;
+      while (angle < 0) angle += 360;
+      while (angle >= 360) angle -= 360;
+
+      // Calculate relative angle from player's current heading
+      let relativeAngle = angle - playerHeadingDegrees;
+      while (relativeAngle < -180) relativeAngle += 360;
+      while (relativeAngle > 180) relativeAngle -= 360;
+
+      // Only show markers within ±90 degrees of current view
+      if (Math.abs(relativeAngle) > 90) return;
+
+      // Calculate pixel position on compass (2 pixels per degree)
+      const markerX = centerX + relativeAngle * 2;
+
+      // Determine marker styling based on zone state
+      let markerClass = 'compass-marker ';
+      let displayText = zone.id.charAt(0).toUpperCase();
+
+      const state = zone.state;
+      const Faction = (this.zoneManager as any).constructor.Faction;
+
+      if (state === 'contested') {
+        markerClass += 'contested';
+      } else if (zone.owner === Faction?.US) {
+        markerClass += 'friendly';
+      } else if (zone.owner === Faction?.OPFOR) {
+        markerClass += 'enemy';
+      } else {
+        markerClass += 'neutral';
+      }
+
+      // Create marker element
+      const marker = document.createElement('div');
+      marker.className = markerClass;
+      marker.textContent = displayText;
+      marker.style.left = `${markerX}px`;
+
+      this.markersContainer.appendChild(marker);
+    });
+  }
+
+  setZoneManager(manager: ZoneManager): void {
+    this.zoneManager = manager;
   }
 
   dispose(): void {

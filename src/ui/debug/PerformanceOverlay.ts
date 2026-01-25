@@ -20,6 +20,9 @@ export interface PerformanceStats {
   combatLodLow: number;
   combatLodCulled: number;
   combatantCount: number;
+  octreeNodes?: number;
+  octreeMaxDepth?: number;
+  octreeAvgPerLeaf?: number;
 }
 
 export class PerformanceOverlay {
@@ -81,9 +84,12 @@ export class PerformanceOverlay {
       `Vegetation: ${stats.vegetationActive} active / ${stats.vegetationReserved} reserved`,
       `Combat: last ${stats.combatLastMs.toFixed(2)} ms (avg ${stats.combatEmaMs.toFixed(2)} ms)`,
       `LOD: high ${stats.combatLodHigh} / med ${stats.combatLodMedium} / low ${stats.combatLodLow} / culled ${stats.combatLodCulled} (total ${stats.combatantCount})`,
+      stats.octreeNodes !== undefined
+        ? `Octree: ${stats.octreeNodes} nodes / depth ${stats.octreeMaxDepth} / avg ${stats.octreeAvgPerLeaf?.toFixed(1)} per leaf`
+        : null,
       `Memory: geom ${stats.geometries} / tex ${stats.textures} / prog ${stats.programs}`,
       `Logs suppressed: ${stats.suppressedLogs}`
-    ];
+    ].filter(line => line !== null);
 
     this.container.innerText = text.join('\n');
   }
