@@ -808,9 +808,10 @@ export class CombatantAI {
 
     const coverPositions: THREE.Vector3[] = [];
     const VEGETATION_COVER_DISTANCE = 3;
+    const MIN_COVER_HEIGHT = 1.5; // Minimum height difference to provide cover
 
     // Sample positions in a grid pattern around the combatant
-    const gridSize = 8;
+    const gridSize = 12; // Increased density for better coverage
     const step = (searchRadius * 2) / gridSize;
 
     for (let x = -searchRadius; x <= searchRadius; x += step) {
@@ -837,8 +838,13 @@ export class CombatantAI {
         const avgHeight = surroundingHeights.reduce((a, b) => a + b, 0) / surroundingHeights.length;
         const heightVariation = Math.abs(localHeight - avgHeight);
 
-        // Positions with some height variation are likely to have vegetation/obstacles
-        if (heightVariation > 0.5 || localHeight > position.y + 2) {
+        // Improved vegetation detection:
+        // 1. Height variation indicates terrain features or vegetation
+        // 2. Elevated positions provide natural cover
+        const hasHeightVariation = heightVariation > 0.8; // Increased threshold
+        const isElevated = localHeight > position.y + MIN_COVER_HEIGHT;
+
+        if (hasHeightVariation || isElevated) {
           // Calculate cover position behind this vegetation relative to threat
           const threatToVeg = new THREE.Vector3()
             .subVectors(samplePos, threatPosition)
@@ -849,7 +855,17 @@ export class CombatantAI {
           );
           coverPos.y = this.chunkManager.getHeightAt(coverPos.x, coverPos.z);
 
-          coverPositions.push(coverPos);
+          // Verify cover position is actually behind the feature
+          const coverToSample = new THREE.Vector3()
+            .subVectors(samplePos, coverPos);
+          const coverToThreat = new THREE.Vector3()
+            .subVectors(threatPosition, coverPos);
+
+          // Cover is valid if sample is between cover position and threat
+          const dotProduct = coverToSample.normalize().dot(coverToThreat.normalize());
+          if (dotProduct > 0.5) { // Feature blocks threat from this angle
+            coverPositions.push(coverPos);
+          }
         }
       }
     }
