@@ -63,6 +63,7 @@ export class FirstPersonWeapon implements GameSystem {
   private impactEffectsPool: ImpactEffectsPool;
   private rifleCore: GunplayCore;
   private shotgunCore: GunplayCore;
+  private smgCore: GunplayCore;
   private gunCore: GunplayCore; // Current active weapon core
 
   private rifleSpec: WeaponSpec = {
@@ -80,6 +81,14 @@ export class FirstPersonWeapon implements GameSystem {
     damageNear: 15, damageFar: 4, falloffStart: 8, falloffEnd: 25, // Per pellet
     headshotMultiplier: 1.5, penetrationPower: 0.5,
     pelletCount: 10, pelletSpreadDeg: 8 // 10 pellets in 8-degree cone
+  };
+
+  private smgSpec: WeaponSpec = {
+    name: 'SMG', rpm: 900, adsTime: 0.15, // High rate of fire, fast ADS
+    baseSpreadDeg: 1.2, bloomPerShotDeg: 0.15, // Good hip-fire accuracy
+    recoilPerShotDeg: 0.35, recoilHorizontalDeg: 0.25, // Low recoil
+    damageNear: 22, damageFar: 12, falloffStart: 15, falloffEnd: 40, // Lower damage, shorter range
+    headshotMultiplier: 1.4, penetrationPower: 0.8
   };
   // private enemySystem?: EnemySystem;
   private combatantSystem?: CombatantSystem;
@@ -122,9 +131,10 @@ export class FirstPersonWeapon implements GameSystem {
     this.muzzleFlashPool = new MuzzleFlashPool(this.scene, 32);
     this.impactEffectsPool = new ImpactEffectsPool(this.scene, 32);
 
-    // Initialize both weapon cores
+    // Initialize all weapon cores
     this.rifleCore = new GunplayCore(this.rifleSpec);
     this.shotgunCore = new GunplayCore(this.shotgunSpec);
+    this.smgCore = new GunplayCore(this.smgSpec);
     this.gunCore = this.rifleCore; // Start with rifle
 
     // Initialize ammo manager
@@ -147,6 +157,12 @@ export class FirstPersonWeapon implements GameSystem {
     this.shotgunRig.visible = false; // Hidden initially
     this.weaponScene.add(this.shotgunRig);
 
+    // Build programmatic SMG
+    this.smgRig = ProgrammaticGunFactory.createSMG();
+    this.smgRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z);
+    this.smgRig.visible = false; // Hidden initially
+    this.weaponScene.add(this.smgRig);
+
     // Start with rifle active
     this.weaponRig = this.rifleRig;
     this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
@@ -157,7 +173,7 @@ export class FirstPersonWeapon implements GameSystem {
       this.baseFOV = this.camera.fov;
     }
 
-    console.log('✅ First Person Weapon initialized (rifle + shotgun)');
+    console.log('✅ First Person Weapon initialized (rifle + shotgun + SMG)');
 
     // Trigger initial ammo display
     this.onAmmoChange(this.ammoManager.getState());
@@ -273,6 +289,8 @@ export class FirstPersonWeapon implements GameSystem {
         this.switchToRifle();
       } else if (slot === WeaponSlot.SHOTGUN) {
         this.switchToShotgun();
+      } else if (slot === (WeaponSlot as any).SMG) {
+        this.switchToSMG();
       }
     });
   }
@@ -281,9 +299,10 @@ export class FirstPersonWeapon implements GameSystem {
     if (this.weaponRig === this.rifleRig) return;
 
     console.log('🔫 Switching to Rifle');
-    if (this.rifleRig && this.shotgunRig) {
+    if (this.rifleRig && this.shotgunRig && this.smgRig) {
       this.rifleRig.visible = true;
       this.shotgunRig.visible = false;
+      this.smgRig.visible = false;
       this.weaponRig = this.rifleRig;
       this.gunCore = this.rifleCore;
       this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
@@ -295,11 +314,27 @@ export class FirstPersonWeapon implements GameSystem {
     if (this.weaponRig === this.shotgunRig) return;
 
     console.log('🔫 Switching to Shotgun');
-    if (this.rifleRig && this.shotgunRig) {
+    if (this.rifleRig && this.shotgunRig && this.smgRig) {
       this.rifleRig.visible = false;
       this.shotgunRig.visible = true;
+      this.smgRig.visible = false;
       this.weaponRig = this.shotgunRig;
       this.gunCore = this.shotgunCore;
+      this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
+      this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
+    }
+  }
+
+  private switchToSMG(): void {
+    if (this.weaponRig === this.smgRig) return;
+
+    console.log('🔫 Switching to SMG');
+    if (this.rifleRig && this.shotgunRig && this.smgRig) {
+      this.rifleRig.visible = false;
+      this.shotgunRig.visible = false;
+      this.smgRig.visible = true;
+      this.weaponRig = this.smgRig;
+      this.gunCore = this.smgCore;
       this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
       this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
     }
@@ -310,9 +345,9 @@ export class FirstPersonWeapon implements GameSystem {
     // Don't process input until game has started and weapon is visible
     if (!this.gameStarted || !this.isEnabled || !this.weaponRig) return;
 
-    // Only handle gun input when PRIMARY or SHOTGUN weapon is equipped
+    // Only handle gun input when PRIMARY, SHOTGUN, or SMG weapon is equipped
     const currentSlot = this.inventoryManager?.getCurrentSlot();
-    if (this.inventoryManager && currentSlot !== WeaponSlot.PRIMARY && currentSlot !== WeaponSlot.SHOTGUN) {
+    if (this.inventoryManager && currentSlot !== WeaponSlot.PRIMARY && currentSlot !== WeaponSlot.SHOTGUN && currentSlot !== (WeaponSlot as any).SMG) {
       return;
     }
 

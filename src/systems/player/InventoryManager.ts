@@ -4,7 +4,8 @@ export enum WeaponSlot {
   PRIMARY = 0,
   SHOTGUN = 1,
   GRENADE = 2,
-  SANDBAG = 3
+  SANDBAG = 3,
+  SMG = 4
 }
 
 export interface InventoryState {
@@ -78,6 +79,11 @@ export class InventoryManager implements GameSystem {
           this.switchToSlot(WeaponSlot.SANDBAG);
         }
         break;
+      case 'Digit5':
+        if (!event.shiftKey && !event.ctrlKey && !event.altKey) {
+          this.switchToSlot(WeaponSlot.SMG);
+        }
+        break;
       case 'KeyQ':
         this.cycleWeapon();
         break;
@@ -98,7 +104,7 @@ export class InventoryManager implements GameSystem {
   }
 
   private cycleWeapon(): void {
-    const nextSlot = (this.currentSlot + 1) % 4;
+    const nextSlot = (this.currentSlot + 1) % 5;
     this.switchToSlot(nextSlot);
   }
 
@@ -233,6 +239,11 @@ export class InventoryManager implements GameSystem {
         <div class="slot-icon">🟫</div>
         <div class="slot-label">SANDBAG</div>
         <div class="slot-count" id="sandbag-count">${this.sandbags}</div>
+      </div>
+      <div id="slot-smg" class="hotbar-slot" data-slot="4">
+        <div class="slot-key">[5]</div>
+        <div class="slot-icon">⚡</div>
+        <div class="slot-label">SMG</div>
       </div>
     `;
 
