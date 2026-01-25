@@ -162,25 +162,18 @@ export class HUDUpdater {
         break;
     }
 
-    let timeText = '';
-    if (timeRemaining > 0) {
-      const minutes = Math.floor(timeRemaining / 60);
-      const seconds = Math.floor(timeRemaining % 60);
-      timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
-
+    // Note: Time is shown in the main match-timer, not duplicated here
     let bleedText = '';
     if (bleedRate.bleedPerSecond > 0) {
       if (bleedRate.usTickets > bleedRate.opforTickets) {
-        bleedText = `US bleeding ${bleedRate.usTickets.toFixed(1)}/sec`;
+        bleedText = `US -${bleedRate.usTickets.toFixed(1)}/s`;
       } else if (bleedRate.opforTickets > bleedRate.usTickets) {
-        bleedText = `OPFOR bleeding ${bleedRate.opforTickets.toFixed(1)}/sec`;
+        bleedText = `OPFOR -${bleedRate.opforTickets.toFixed(1)}/s`;
       }
     }
 
     this.elements.gameStatus.innerHTML = `
       <div>${statusText}</div>
-      ${timeText ? `<div class="time-remaining">${timeText}</div>` : ''}
       ${bleedText ? `<div class="bleed-indicator">${bleedText}</div>` : ''}
     `;
   }

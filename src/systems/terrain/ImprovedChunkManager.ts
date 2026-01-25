@@ -7,12 +7,16 @@ import { AssetLoader } from '../assets/AssetLoader';
 import { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
 import { Logger } from '../../utils/Logger';
 import { LOSAccelerator } from '../combat/LOSAccelerator';
+import { getHeightQueryCache } from './HeightQueryCache';
+import { ChunkWorkerPool, ChunkGeometryResult } from './ChunkWorkerPool';
+import { ViteBVHWorker } from '../../workers/BVHWorker';
 
 export interface ChunkConfig {
   size: number;
   renderDistance: number;
   loadDistance: number;
   lodLevels: number;
+  skipTerrainMesh?: boolean; // When true, chunks only spawn vegetation (GPU terrain handles visuals)
 }
 
 /**
@@ -33,7 +37,12 @@ export class ImprovedChunkManager implements GameSystem {
 
   // LOS acceleration
   private losAccelerator: LOSAccelerator = new LOSAccelerator();
-  
+
+  // Web worker pool for parallel chunk generation
+  private workerPool: ChunkWorkerPool | null = null;
+  private bvhWorker: ViteBVHWorker | null = null;
+  private readonly USE_WORKERS = true;
+
   // Player tracking
   private playerPosition = new THREE.Vector3();
   private lastChunkPosition = new THREE.Vector2();
@@ -78,6 +87,26 @@ export class ImprovedChunkManager implements GameSystem {
     this.noiseGenerator = new NoiseGenerator(12345);
     this.maxRenderDistance = config.renderDistance;
     this.minRenderDistance = Math.max(3, Math.floor(config.renderDistance / 2));
+
+    // Initialize worker pool for parallel chunk generation
+    if (this.USE_WORKERS) {
+      try {
+        this.workerPool = new ChunkWorkerPool(
+          navigator.hardwareConcurrency || 4,
+          12345, // Same seed as noiseGenerator
+          32     // segments
+        );
+        Logger.info('chunks', `Worker pool initialized with ${navigator.hardwareConcurrency || 4} workers`);
+
+        // Initialize BVH worker for off-thread collision tree building
+        this.bvhWorker = new ViteBVHWorker();
+        Logger.info('chunks', 'BVH worker initialized (Vite-compatible)');
+      } catch (error) {
+        Logger.warn('chunks', `Failed to create worker pool, falling back to main thread: ${error}`);
+        this.workerPool = null;
+        this.bvhWorker = null;
+      }
+    }
   }
 
   async init(): Promise<void> {
@@ -141,6 +170,19 @@ export class ImprovedChunkManager implements GameSystem {
     this.loadingChunks.clear();
     this.loadQueue = [];
     this.losAccelerator.clear();
+
+    // Dispose worker pool
+    if (this.workerPool) {
+      this.workerPool.dispose();
+      this.workerPool = null;
+    }
+
+    // Dispose BVH worker
+    if (this.bvhWorker) {
+      this.bvhWorker.dispose();
+      this.bvhWorker = null;
+    }
+
     Logger.info('chunks', 'Chunk manager disposed');
   }
 
@@ -253,16 +295,19 @@ export class ImprovedChunkManager implements GameSystem {
         chunkZ,
         this.config.size,
         this.noiseGenerator,
-        this.globalBillboardSystem
+        this.globalBillboardSystem,
+        this.config.skipTerrainMesh ?? false
       );
 
       await chunk.generate();
       this.chunks.set(chunkKey, chunk);
 
-      // Register chunk terrain mesh with LOS accelerator
-      const terrainMesh = chunk.getTerrainMesh();
-      if (terrainMesh) {
-        this.losAccelerator.registerChunk(chunkKey, terrainMesh);
+      // Register chunk terrain mesh with LOS accelerator (if not skipped)
+      if (!this.config.skipTerrainMesh) {
+        const terrainMesh = chunk.getTerrainMesh();
+        if (terrainMesh) {
+          this.losAccelerator.registerChunk(chunkKey, terrainMesh);
+        }
       }
 
       Logger.debug('chunks', `Loaded initial chunk (${chunkX}, ${chunkZ})`);
@@ -273,13 +318,100 @@ export class ImprovedChunkManager implements GameSystem {
 
   private async loadChunkAsync(chunkX: number, chunkZ: number): Promise<void> {
     const chunkKey = this.getChunkKey(chunkX, chunkZ);
-    
+
     if (this.chunks.has(chunkKey) || this.loadingChunks.has(chunkKey)) {
       return;
     }
 
     this.loadingChunks.add(chunkKey);
 
+    // Use web worker if available for parallel terrain generation
+    if (this.workerPool) {
+      this.loadChunkWithWorker(chunkX, chunkZ, chunkKey);
+    } else {
+      // Fallback to main thread generation
+      this.loadChunkMainThread(chunkX, chunkZ, chunkKey);
+    }
+  }
+
+  /**
+   * Load chunk using web worker for parallel terrain generation
+   */
+  private async loadChunkWithWorker(chunkX: number, chunkZ: number, chunkKey: string): Promise<void> {
+    if (!this.workerPool) return;
+
+    const priority = this.getChunkDistanceFromPlayer(chunkX, chunkZ);
+
+    try {
+      // Request geometry from worker pool
+      const result = await this.workerPool.generateChunk(
+        chunkX,
+        chunkZ,
+        this.config.size,
+        priority
+      );
+
+      // Check if still needed (player might have moved)
+      const currentDistance = this.getChunkDistanceFromPlayer(chunkX, chunkZ);
+      if (currentDistance > this.config.loadDistance) {
+        result.geometry.dispose();
+        Logger.debug('chunks', `Disposed unneeded worker chunk (${chunkX}, ${chunkZ})`);
+        return;
+      }
+
+      // Compute BVH in worker (off main thread) if BVH worker available
+      let bvhComputed = false;
+      if (this.bvhWorker && !this.config.skipTerrainMesh) {
+        try {
+          const bvh = await this.bvhWorker.generate(result.geometry, {});
+          (result.geometry as any).boundsTree = bvh;
+          bvhComputed = true;
+          Logger.debug('chunks', `BVH computed in worker for chunk (${chunkX}, ${chunkZ})`);
+        } catch (bvhError) {
+          Logger.warn('chunks', `BVH worker failed for chunk (${chunkX}, ${chunkZ}), will compute on main thread`);
+        }
+      }
+
+      // Create chunk and populate with worker data
+      const chunk = new ImprovedChunk(
+        this.scene,
+        this.assetLoader,
+        chunkX,
+        chunkZ,
+        this.config.size,
+        this.noiseGenerator,
+        this.globalBillboardSystem,
+        this.config.skipTerrainMesh ?? false
+      );
+
+      // Use worker-generated geometry, height data, and vegetation
+      // Pass bvhComputed flag to skip redundant BVH computation
+      await chunk.generateFromWorker(result.geometry, result.heightData, result.vegetation, bvhComputed);
+
+      this.chunks.set(chunkKey, chunk);
+
+      // Register chunk terrain mesh with LOS accelerator (if not skipped)
+      if (!this.config.skipTerrainMesh) {
+        const terrainMesh = chunk.getTerrainMesh();
+        if (terrainMesh) {
+          this.losAccelerator.registerChunk(chunkKey, terrainMesh);
+        }
+      }
+
+      Logger.debug('chunks', `Worker loaded chunk (${chunkX}, ${chunkZ})`);
+    } catch (error) {
+      console.error(`❌ Worker failed for chunk (${chunkX}, ${chunkZ}):`, error);
+      // Fall back to main thread
+      this.loadChunkMainThread(chunkX, chunkZ, chunkKey);
+    } finally {
+      this.loadingChunks.delete(chunkKey);
+    }
+  }
+
+  /**
+   * Load chunk on main thread (fallback when workers unavailable)
+   */
+  private loadChunkMainThread(chunkX: number, chunkZ: number, chunkKey: string): void {
     // Use setTimeout to make it truly async and not block
     setTimeout(async () => {
       try {
@@ -290,7 +422,8 @@ export class ImprovedChunkManager implements GameSystem {
           chunkZ,
           this.config.size,
           this.noiseGenerator,
-          this.globalBillboardSystem
+          this.globalBillboardSystem,
+          this.config.skipTerrainMesh ?? false
         );
 
         await chunk.generate();
@@ -300,13 +433,15 @@ export class ImprovedChunkManager implements GameSystem {
         if (currentDistance <= this.config.loadDistance) {
           this.chunks.set(chunkKey, chunk);
 
-          // Register chunk terrain mesh with LOS accelerator
-          const terrainMesh = chunk.getTerrainMesh();
-          if (terrainMesh) {
-            this.losAccelerator.registerChunk(chunkKey, terrainMesh);
+          // Register chunk terrain mesh with LOS accelerator (if not skipped)
+          if (!this.config.skipTerrainMesh) {
+            const terrainMesh = chunk.getTerrainMesh();
+            if (terrainMesh) {
+              this.losAccelerator.registerChunk(chunkKey, terrainMesh);
+            }
           }
 
-          Logger.debug('chunks', `Async loaded chunk (${chunkX}, ${chunkZ})`);
+          Logger.debug('chunks', `Main thread loaded chunk (${chunkX}, ${chunkZ})`);
         } else {
           chunk.dispose();
           Logger.debug('chunks', `Disposed unneeded chunk (${chunkX}, ${chunkZ})`);
@@ -413,7 +548,11 @@ export class ImprovedChunkManager implements GameSystem {
 
   getHeightAt(x: number, z: number): number {
     const chunk = this.getChunkAt(new THREE.Vector3(x, 0, z));
-    return chunk ? chunk.getHeightAt(x, z) : 0;
+    if (chunk) {
+      return chunk.getHeightAt(x, z);
+    }
+    // Fallback to HeightQueryCache when chunk not loaded
+    return getHeightQueryCache().getHeightAt(x, z);
   }
 
   // IChunkManager implementation
@@ -558,6 +697,42 @@ export class ImprovedChunkManager implements GameSystem {
 
   getLoadingCount(): number {
     return this.loadingChunks.size;
+  }
+
+  /**
+   * Get worker pool statistics for debugging
+   */
+  getWorkerStats(): { enabled: boolean; queueLength: number; busyWorkers: number; totalWorkers: number } | null {
+    if (!this.workerPool) {
+      return null;
+    }
+    return {
+      enabled: true,
+      ...this.workerPool.getStats()
+    };
+  }
+
+  /**
+   * Get detailed worker telemetry for debugging
+   * Call from console: game.chunkManager.getWorkerTelemetry()
+   */
+  getWorkerTelemetry(): {
+    enabled: boolean;
+    chunksGenerated: number;
+    avgGenerationTimeMs: number;
+    workersReady: number;
+    duplicatesAvoided: number;
+    queueLength: number;
+    busyWorkers: number;
+    inFlightChunks: number;
+  } | null {
+    if (!this.workerPool) {
+      console.log('[ChunkManager] Workers disabled, using main thread');
+      return null;
+    }
+    const telemetry = this.workerPool.getTelemetry();
+    console.log('[ChunkManager] Worker Telemetry:', telemetry);
+    return { enabled: true, ...telemetry };
   }
 
   // Game mode configuration

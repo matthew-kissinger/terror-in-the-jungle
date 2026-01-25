@@ -19,22 +19,22 @@ export class CompassSystem implements GameSystem {
   private readonly COMPASS_STYLES = `
     .compass-container {
       position: fixed;
-      top: 120px; /* Further below ticket HUD */
+      top: 120px;
       left: 50%;
       transform: translateX(-50%);
-      width: 200px;
-      height: 100px;
+      width: 180px;
+      height: 80px;
       z-index: 115;
       pointer-events: none;
     }
 
     .compass-rose-container {
       position: relative;
-      width: 200px;
-      height: 60px;
-      background: linear-gradient(to bottom, rgba(10, 10, 14, 0.6), rgba(10, 10, 14, 0.3));
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 8px;
+      width: 180px;
+      height: 50px;
+      background: linear-gradient(to bottom, rgba(10, 10, 14, 0.5), rgba(10, 10, 14, 0.2));
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
       backdrop-filter: blur(4px);
       -webkit-backdrop-filter: blur(4px);
       overflow: hidden;

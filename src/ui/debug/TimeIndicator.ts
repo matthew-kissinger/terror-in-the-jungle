@@ -36,7 +36,7 @@ export class TimeIndicator {
     this.timeText.style.fontWeight = 'bold';
     this.timeText.innerText = '12:00';
 
-    this.container.style.display = 'flex';
+    // Keep hidden by default - toggle with F4
     this.container.appendChild(this.iconContainer);
     this.container.appendChild(this.timeText);
 
@@ -50,7 +50,7 @@ export class TimeIndicator {
 
   show(): void {
     this.visible = true;
-    this.container.style.display = 'flex';
+    this.container.style.display = 'flex'; // Use flex for icon + text layout
   }
 
   hide(): void {

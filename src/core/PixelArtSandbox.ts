@@ -9,6 +9,7 @@ import { PerformanceOverlay } from '../ui/debug/PerformanceOverlay';
 import { TimeIndicator } from '../ui/debug/TimeIndicator';
 import { LogOverlay } from '../ui/debug/LogOverlay';
 import { Logger } from '../utils/Logger';
+import { getHeightQueryCache } from '../systems/terrain/HeightQueryCache';
 
 export class PixelArtSandbox {
   private loadingScreen: LoadingScreen;
@@ -184,7 +185,8 @@ export class PixelArtSandbox {
         const spawn = cfg.zones.find((z: any) => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
         if (spawn) {
           const pos = spawn.position.clone();
-          pos.y = 5;
+          // Get actual terrain height at spawn location + player height offset
+          pos.y = getHeightQueryCache().getHeightAt(pos.x, pos.z) + 2;
           this.systemManager.playerController.setPosition(pos);
         }
       } catch { /* ignore */ }

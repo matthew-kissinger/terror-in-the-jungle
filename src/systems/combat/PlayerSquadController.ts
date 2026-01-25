@@ -214,15 +214,15 @@ export class PlayerSquadController implements GameSystem {
     this.commandIndicatorElement = document.createElement('div');
     this.commandIndicatorElement.style.cssText = `
       position: fixed;
-      top: 90px;
+      top: 120px;
       left: 20px;
       background: rgba(100, 100, 100, 0.2);
       border: 1px solid rgba(100, 100, 100, 0.6);
       border-radius: 6px;
-      padding: 6px 10px;
+      padding: 5px 8px;
       color: #aaaaaa;
       font-family: 'Courier New', monospace;
-      font-size: 10px;
+      font-size: 9px;
       font-weight: bold;
       z-index: 1000;
       backdrop-filter: blur(6px);

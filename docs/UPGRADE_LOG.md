@@ -1,5 +1,69 @@
 # Pix3D Upgrade Log
 
+## Weapon System Overhaul (2025-01-25)
+
+### What Changed
+
+#### 1. Multi-Weapon System with Proper Switching
+- Fixed weapon switching animation timing bug (narrow 0.49-0.5 window was being skipped)
+- Switch now triggers reliably when crossing 50% progress threshold
+- Fixed visibility bug in PlayerController - SHOTGUN and SMG slots now properly show weapon
+- InventoryManager now supports multiple callbacks for slot changes
+
+#### 2. Per-Weapon Ammo Tracking
+- Each weapon now has independent ammo state:
+  - **Rifle**: 30 round magazine, 90 reserve
+  - **Shotgun**: 8 shell tube, 24 reserve
+  - **SMG**: 32 round magazine, 128 reserve
+- HUD updates to show correct ammo when switching weapons
+- All ammo managers share zone resupply functionality
+
+#### 3. Shotgun Model Redesign
+- Completely redesigned to look like proper pump-action shotgun
+- Tube magazine under barrel (removed box magazine)
+- Wooden stock and pump grip with brown wood colors (0x3d2817)
+- Small brass front bead sight
+- Trigger guard and proper forend
+
+#### 4. SMG Model Improvements
+- Brightened colors to match rifle visibility
+- Compact design with folding stock
+- Extended magazine for high-capacity look
+
+#### 5. HUD Layout Fixes
+- Removed duplicate timer display
+- Moved kill feed below objectives panel (top: 220px)
+- Moved compass to top: 120px (below tickets)
+- Moved squad indicator to top: 120px, left: 20px
+- Timer repositioned to top-left
+- Fixed TimeIndicator visibility bug (was showing by default)
+
+#### 6. Technical Fixes
+- BVH worker pool (4 workers) for parallel chunk generation
+- Rain frustumCulled = false to fix visibility in all directions
+- Post-processing using built-in PixelationEffect instead of broken custom pass
+
+### Weapon Keybinds
+| Key | Weapon | Ammo |
+|-----|--------|------|
+| 1 | Shotgun | 8/24 |
+| 2 | Grenade | - |
+| 3 | Rifle | 30/90 |
+| 4 | Sandbag | - |
+| 5 | SMG | 32/128 |
+
+### Files Modified
+- `src/systems/player/FirstPersonWeapon.ts` - Per-weapon ammo managers
+- `src/systems/player/PlayerController.ts` - Fixed weapon slot visibility
+- `src/systems/player/InventoryManager.ts` - Multiple callback support
+- `src/systems/player/ProgrammaticGunFactory.ts` - Shotgun/SMG models
+- `src/systems/player/weapon/WeaponRigManager.ts` - Fixed switch timing
+- `src/ui/hud/*` - HUD layout fixes
+- `src/ui/compass/CompassSystem.ts` - Repositioned
+- `src/systems/combat/PlayerSquadController.ts` - Repositioned
+
+---
+
 ## Step 2: AI Gunplay - AI Fights Under Same Rules as Player (2025-01-13)
 
 ### What Changed

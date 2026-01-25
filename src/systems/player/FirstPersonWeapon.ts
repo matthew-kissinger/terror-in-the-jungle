@@ -47,10 +47,15 @@ export class FirstPersonWeapon implements GameSystem {
   private combatantSystem?: CombatantSystem
   private hudSystem?: any
   private audioManager?: AudioManager
-  private ammoManager: AmmoManager
   private zoneManager?: ZoneManager
   private inventoryManager?: InventoryManager
   private statsTracker?: PlayerStatsTracker
+
+  // Per-weapon ammo managers
+  private rifleAmmo: AmmoManager
+  private shotgunAmmo: AmmoManager
+  private smgAmmo: AmmoManager
+  private currentAmmoManager: AmmoManager
 
   // Firing state
   private isFiring = false
@@ -84,10 +89,24 @@ export class FirstPersonWeapon implements GameSystem {
     )
     this.reload = new WeaponReload()
 
-    // Initialize ammo manager
-    this.ammoManager = new AmmoManager(30, 90) // 30 rounds per mag, 90 reserve
-    this.ammoManager.setOnReloadComplete(() => this.onReloadComplete())
-    this.ammoManager.setOnAmmoChange((state) => this.onAmmoChange(state))
+    // Initialize per-weapon ammo managers
+    // Rifle: 30 round mag, 90 reserve
+    this.rifleAmmo = new AmmoManager(30, 90)
+    this.rifleAmmo.setOnReloadComplete(() => this.onReloadComplete())
+    this.rifleAmmo.setOnAmmoChange((state) => this.onAmmoChange(state))
+
+    // Shotgun: 8 shell tube, 24 reserve
+    this.shotgunAmmo = new AmmoManager(8, 24)
+    this.shotgunAmmo.setOnReloadComplete(() => this.onReloadComplete())
+    this.shotgunAmmo.setOnAmmoChange((state) => this.onAmmoChange(state))
+
+    // SMG: 32 round mag, 128 reserve (high capacity)
+    this.smgAmmo = new AmmoManager(32, 128)
+    this.smgAmmo.setOnReloadComplete(() => this.onReloadComplete())
+    this.smgAmmo.setOnAmmoChange((state) => this.onAmmoChange(state))
+
+    // Start with rifle ammo active
+    this.currentAmmoManager = this.rifleAmmo
 
     // Input handlers
     window.addEventListener('mousedown', this.onMouseDown.bind(this))
@@ -112,7 +131,7 @@ export class FirstPersonWeapon implements GameSystem {
     console.log('✅ First Person Weapon initialized (rifle + shotgun + SMG)')
 
     // Trigger initial ammo display
-    this.onAmmoChange(this.ammoManager.getState())
+    this.onAmmoChange(this.currentAmmoManager.getState())
   }
 
   update(deltaTime: number): void {
@@ -121,7 +140,7 @@ export class FirstPersonWeapon implements GameSystem {
 
     // Update ammo manager with player position for zone resupply
     const playerPos = this.playerController?.getPosition()
-    this.ammoManager.update(deltaTime, playerPos)
+    this.currentAmmoManager.update(deltaTime, playerPos)
 
     // Get player movement state
     const isMoving = this.playerController?.isMoving() || false
@@ -135,7 +154,7 @@ export class FirstPersonWeapon implements GameSystem {
 
     // Update weapon switch animation
     if (this.rigManager.isSwitching()) {
-      this.rigManager.updateSwitchAnimation(deltaTime, this.hudSystem, this.audioManager, this.ammoManager)
+      this.rigManager.updateSwitchAnimation(deltaTime, this.hudSystem, this.audioManager, this.currentAmmoManager)
       // Update references after switch completes
       if (!this.rigManager.isSwitching()) {
         this.updateWeaponReferences()
@@ -209,23 +228,32 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   private switchToRifle(): void {
-    if (this.rigManager.startWeaponSwitch('rifle', this.hudSystem, this.audioManager, this.ammoManager)) {
+    if (this.rigManager.startWeaponSwitch('rifle', this.hudSystem, this.audioManager, this.rifleAmmo)) {
       this.isFiring = false
       this.animations.setADS(false)
+      this.currentAmmoManager = this.rifleAmmo
+      // Update HUD with new weapon's ammo
+      this.onAmmoChange(this.currentAmmoManager.getState())
     }
   }
 
   private switchToShotgun(): void {
-    if (this.rigManager.startWeaponSwitch('shotgun', this.hudSystem, this.audioManager, this.ammoManager)) {
+    if (this.rigManager.startWeaponSwitch('shotgun', this.hudSystem, this.audioManager, this.shotgunAmmo)) {
       this.isFiring = false
       this.animations.setADS(false)
+      this.currentAmmoManager = this.shotgunAmmo
+      // Update HUD with new weapon's ammo
+      this.onAmmoChange(this.currentAmmoManager.getState())
     }
   }
 
   private switchToSMG(): void {
-    if (this.rigManager.startWeaponSwitch('smg', this.hudSystem, this.audioManager, this.ammoManager)) {
+    if (this.rigManager.startWeaponSwitch('smg', this.hudSystem, this.audioManager, this.smgAmmo)) {
       this.isFiring = false
       this.animations.setADS(false)
+      this.currentAmmoManager = this.smgAmmo
+      // Update HUD with new weapon's ammo
+      this.onAmmoChange(this.currentAmmoManager.getState())
     }
   }
 
@@ -332,12 +360,12 @@ export class FirstPersonWeapon implements GameSystem {
     if (!this.combatantSystem || !gunCore.canFire() || !this.isEnabled) return
 
     // Check ammo
-    if (!this.ammoManager.canFire()) {
-      if (this.ammoManager.isEmpty()) {
+    if (!this.currentAmmoManager.canFire()) {
+      if (this.currentAmmoManager.isEmpty()) {
         // Play empty click sound
         console.log('🔫 *click* - Empty magazine!')
         // Auto-reload if we have reserve ammo
-        if (this.ammoManager.getState().reserveAmmo > 0) {
+        if (this.currentAmmoManager.getState().reserveAmmo > 0) {
           this.startReload()
         }
       }
@@ -345,7 +373,7 @@ export class FirstPersonWeapon implements GameSystem {
     }
 
     // All validation passed - consume ammo and register shot BEFORE creating command
-    if (!this.ammoManager.consumeRound()) return
+    if (!this.currentAmmoManager.consumeRound()) return
     gunCore.registerShot()
 
     // Determine weapon type
@@ -440,7 +468,10 @@ export class FirstPersonWeapon implements GameSystem {
 
   setZoneManager(zoneManager: ZoneManager): void {
     this.zoneManager = zoneManager
-    this.ammoManager.setZoneManager(zoneManager)
+    // Set zone manager for all ammo managers (for resupply)
+    this.rifleAmmo.setZoneManager(zoneManager)
+    this.shotgunAmmo.setZoneManager(zoneManager)
+    this.smgAmmo.setZoneManager(zoneManager)
   }
 
   // Disable weapon (for death)
@@ -455,8 +486,12 @@ export class FirstPersonWeapon implements GameSystem {
   enable(): void {
     this.isEnabled = true
     this.rigManager.setWeaponVisibility(true)
-    // Reset ammo on respawn
-    this.ammoManager.reset()
+    // Reset all ammo on respawn
+    this.rifleAmmo.reset()
+    this.shotgunAmmo.reset()
+    this.smgAmmo.reset()
+    // Update HUD with current weapon's ammo
+    this.onAmmoChange(this.currentAmmoManager.getState())
   }
 
   setWeaponVisibility(visible: boolean): void {
@@ -483,7 +518,7 @@ export class FirstPersonWeapon implements GameSystem {
       return
     }
 
-    if (this.reload.startReload(() => this.ammoManager.startReload())) {
+    if (this.reload.startReload(() => this.currentAmmoManager.startReload())) {
       this.isFiring = false // Stop firing during reload
     }
   }
@@ -500,13 +535,13 @@ export class FirstPersonWeapon implements GameSystem {
     }
 
     // Check for low ammo warning
-    if (this.ammoManager.isLowAmmo()) {
+    if (this.currentAmmoManager.isLowAmmo()) {
       console.log('⚠️ Low ammo!')
     }
   }
 
   getAmmoState(): any {
-    return this.ammoManager.getState()
+    return this.currentAmmoManager.getState()
   }
 
   // Update weapon references after switch

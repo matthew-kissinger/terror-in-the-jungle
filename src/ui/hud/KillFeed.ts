@@ -29,16 +29,16 @@ export class KillFeed {
     container.className = 'kill-feed';
     container.style.cssText = `
       position: fixed;
-      top: 80px;
+      top: 220px;
       right: 20px;
-      width: 280px;
+      width: 260px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
       z-index: 100;
       pointer-events: none;
       font-family: 'Courier New', monospace;
-      font-size: 12px;
+      font-size: 11px;
     `;
     return container;
   }

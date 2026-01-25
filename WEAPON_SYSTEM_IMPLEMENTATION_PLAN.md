@@ -21,16 +21,26 @@ Currently **disabled** due to camera/physics issues:
 - Satisfying **impact effects**
 - Camera stays usable during aiming
 
-### New Weapons Needed
+### New Weapons - IMPLEMENTED (2025-01-25)
 1. **Shotgun** - Close-range option for jungle combat
-   - 8-12 pellet spread pattern
-   - High damage close, falloff at distance
-   - Pump action animation
+   - 10 pellet spread pattern (8 degree spread)
+   - High damage close (15), falloff at distance (4)
+   - Pump action animation with wooden furniture
+   - 8 shell tube magazine, 24 reserve
+   - Key: 1
 
-2. **SMG/PDW** - Spray option
-   - High ROF, lower damage per shot
-   - Good hip-fire accuracy
-   - Suppression effect on enemies
+2. **SMG** - Spray option
+   - High ROF (900 rpm), lower damage (22/12)
+   - Good hip-fire accuracy (1.2 base spread)
+   - Compact folding stock design
+   - 32 round magazine, 128 reserve
+   - Key: 5
+
+### Per-Weapon Ammo System - IMPLEMENTED
+Each weapon now tracks its own ammo independently:
+- Rifle: 30/90, Shotgun: 8/24, SMG: 32/128
+- HUD updates on weapon switch
+- All weapons share zone resupply
 
 ---
 

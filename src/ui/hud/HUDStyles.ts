@@ -170,15 +170,15 @@ export class HUDStyles {
 
     .game-status {
       position: absolute;
-      top: 20px;
+      top: 70px;
       left: 20px;
       background: rgba(10, 10, 14, 0.28);
       backdrop-filter: blur(6px) saturate(1.1);
       -webkit-backdrop-filter: blur(6px) saturate(1.1);
-      padding: 8px 12px;
+      padding: 6px 10px;
       border: 1px solid rgba(255, 255, 255, 0.18);
-      border-radius: 8px;
-      font-size: 14px;
+      border-radius: 6px;
+      font-size: 12px;
     }
 
     .phase-setup { border-color: #ffaa00; color: #ffaa00; }
@@ -200,26 +200,25 @@ export class HUDStyles {
 
     .match-timer {
       position: absolute;
-      top: 80px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(10, 10, 14, 0.6);
-      backdrop-filter: blur(8px) saturate(1.2);
-      -webkit-backdrop-filter: blur(8px) saturate(1.2);
-      padding: 12px 24px;
-      border: 2px solid rgba(255, 255, 255, 0.4);
-      border-radius: 12px;
+      top: 20px;
+      left: 20px;
+      background: rgba(10, 10, 14, 0.5);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      padding: 8px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 6px;
       pointer-events: none;
       z-index: 105;
     }
 
     .timer-display {
       font-family: 'Courier New', monospace;
-      font-size: 32px;
+      font-size: 22px;
       font-weight: bold;
       color: white;
       text-align: center;
-      letter-spacing: 2px;
+      letter-spacing: 1px;
       transition: color 0.3s ease, text-shadow 0.3s ease;
     }
 

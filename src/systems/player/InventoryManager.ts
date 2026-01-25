@@ -27,7 +27,7 @@ export class InventoryManager implements GameSystem {
   private sandbags: number = 5;
   private maxSandbags: number = 5;
 
-  private onSlotChangeCallback?: (slot: WeaponSlot) => void;
+  private onSlotChangeCallbacks: ((slot: WeaponSlot) => void)[] = [];
   private onInventoryChangeCallback?: (state: InventoryState) => void;
 
   private uiElement?: HTMLElement;
@@ -96,8 +96,9 @@ export class InventoryManager implements GameSystem {
     this.currentSlot = slot;
     console.log(`🎒 Switched to: ${WeaponSlot[slot]}`);
 
-    if (this.onSlotChangeCallback) {
-      this.onSlotChangeCallback(slot);
+    // Notify all registered callbacks
+    for (const callback of this.onSlotChangeCallbacks) {
+      callback(slot);
     }
 
     this.updateUI();
@@ -195,7 +196,7 @@ export class InventoryManager implements GameSystem {
   }
 
   onSlotChange(callback: (slot: WeaponSlot) => void): void {
-    this.onSlotChangeCallback = callback;
+    this.onSlotChangeCallbacks.push(callback);
   }
 
   onInventoryChange(callback: (state: InventoryState) => void): void {

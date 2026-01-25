@@ -173,13 +173,13 @@ export class WeaponRigManager {
       const ease = this.easeInCubic(t)
       this.switchOffset.y = -0.8 * ease // Move down
       this.switchOffset.rotX = THREE.MathUtils.degToRad(30) * ease // Tilt forward
-
-      // At midpoint, perform the actual weapon switch
-      if (progress >= 0.49 && this.pendingWeaponSwitch) {
+    } else {
+      // At midpoint (when we first cross 0.5), perform the actual weapon switch
+      if (this.pendingWeaponSwitch) {
         this.performWeaponSwitch(this.pendingWeaponSwitch, hudSystem, audioManager, ammoManager)
         this.pendingWeaponSwitch = undefined
       }
-    } else {
+
       // Stage 2: Raise new weapon
       const t = (progress - 0.5) / 0.5
       const ease = this.easeOutCubic(t)

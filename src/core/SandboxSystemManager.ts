@@ -5,6 +5,7 @@ import { PlayerController } from '../systems/player/PlayerController';
 import { CombatantSystem } from '../systems/combat/CombatantSystem';
 import { Skybox } from '../systems/environment/Skybox';
 import { ImprovedChunkManager } from '../systems/terrain/ImprovedChunkManager';
+import { GPUTerrain } from '../systems/terrain/GPUTerrain';
 import { GlobalBillboardSystem } from '../systems/world/billboard/GlobalBillboardSystem';
 import { WaterSystem } from '../systems/environment/WaterSystem';
 import { FirstPersonWeapon } from '../systems/player/FirstPersonWeapon';
@@ -56,6 +57,7 @@ export class SandboxSystemManager {
   // Game systems
   public assetLoader!: AssetLoader;
   public chunkManager!: ImprovedChunkManager;
+  public gpuTerrain!: GPUTerrain;
   public globalBillboardSystem!: GlobalBillboardSystem;
   public playerController!: PlayerController;
   public combatantSystem!: CombatantSystem;
@@ -107,6 +109,8 @@ export class SandboxSystemManager {
 
     this.globalBillboardSystem = new GlobalBillboardSystem(scene, camera, this.assetLoader);
     this.chunkManager = new ImprovedChunkManager(scene, camera, this.assetLoader, this.globalBillboardSystem);
+    // GPUTerrain disabled - going with web workers approach instead
+    // this.gpuTerrain = new GPUTerrain(scene, camera, this.assetLoader);
     onProgress('core', 1);
 
     // Phase 2: Load textures
@@ -171,6 +175,7 @@ export class SandboxSystemManager {
       this.audioManager,
       this.globalBillboardSystem,
       this.chunkManager,
+      // this.gpuTerrain, // Disabled
       this.waterSystem,
       this.weatherSystem,
       // this.dayNightCycle, // DISABLED: Conflicts with WeatherSystem lighting

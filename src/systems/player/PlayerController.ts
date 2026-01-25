@@ -805,6 +805,8 @@ Escape - Release pointer lock / Exit helicopter
 
     switch(slot) {
       case WeaponSlot.PRIMARY:
+      case WeaponSlot.SHOTGUN:
+      case WeaponSlot.SMG:
         if (this.firstPersonWeapon) {
           this.firstPersonWeapon.setWeaponVisibility(true);
         }

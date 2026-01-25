@@ -6,6 +6,7 @@ import { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem'
 import { BillboardInstance } from '../../types';
 import { MathUtils } from '../../utils/Math';
 import { PixelPerfectUtils } from '../../utils/PixelPerfect';
+import { VegetationData } from './ChunkWorkerPool';
 
 // Extend Three.js BufferGeometry with BVH methods
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
@@ -45,6 +46,9 @@ export class ImprovedChunk {
   // Debug
   private debugMode = false;
 
+  // Skip terrain mesh rendering (GPU terrain handles visuals)
+  private skipTerrainMesh: boolean;
+
   constructor(
     scene: THREE.Scene,
     assetLoader: AssetLoader,
@@ -52,7 +56,8 @@ export class ImprovedChunk {
     chunkZ: number,
     size: number,
     noiseGenerator: NoiseGenerator,
-    globalBillboardSystem: GlobalBillboardSystem
+    globalBillboardSystem: GlobalBillboardSystem,
+    skipTerrainMesh: boolean = false
   ) {
     this.scene = scene;
     this.assetLoader = assetLoader;
@@ -61,7 +66,8 @@ export class ImprovedChunk {
     this.size = size;
     this.noiseGenerator = noiseGenerator;
     this.globalBillboardSystem = globalBillboardSystem;
-    
+    this.skipTerrainMesh = skipTerrainMesh;
+
     // Initialize height data array
     const dataSize = (this.segments + 1) * (this.segments + 1);
     this.heightData = new Float32Array(dataSize);
@@ -70,15 +76,17 @@ export class ImprovedChunk {
   async generate(): Promise<void> {
     if (this.isGenerated) return;
 
-    // Generate height data first
+    // Generate height data first (always needed for vegetation placement)
     this.generateHeightData();
 
-    // Create terrain mesh with proper vertex order
-    await this.createTerrainMesh();
+    // Create terrain mesh (skip if GPU terrain handles visuals)
+    if (!this.skipTerrainMesh) {
+      await this.createTerrainMesh();
+    }
 
     // Generate vegetation positioned on terrain
     await this.generateVegetation();
-    
+
     // Register instances with global system
     const chunkKey = `${this.chunkX},${this.chunkZ}`;
     this.globalBillboardSystem.addChunkInstances(
@@ -91,10 +99,166 @@ export class ImprovedChunk {
       this.dipterocarpInstances,
       this.banyanInstances
     );
-    
-    
+
+
     this.isGenerated = true;
     console.log(`✅ ImprovedChunk (${this.chunkX}, ${this.chunkZ}) generated`);
+  }
+
+  /**
+   * Generate chunk from worker-provided geometry data
+   * Used when web workers are available for parallel terrain generation
+   * @param bvhAlreadyComputed - If true, skip BVH computation (already done in worker)
+   */
+  async generateFromWorker(
+    workerGeometry: THREE.BufferGeometry,
+    workerHeightData: Float32Array,
+    workerVegetation?: VegetationData,
+    bvhAlreadyComputed: boolean = false
+  ): Promise<void> {
+    if (this.isGenerated) return;
+
+    // Use worker-provided height data
+    this.heightData = workerHeightData;
+
+    // Create terrain mesh from worker geometry (skip if GPU terrain handles visuals)
+    if (!this.skipTerrainMesh) {
+      await this.createTerrainMeshFromGeometry(workerGeometry, bvhAlreadyComputed);
+    } else {
+      // Even if we skip the mesh, dispose the geometry since we won't use it
+      workerGeometry.dispose();
+    }
+
+    // Use worker-provided vegetation positions (much faster than main thread)
+    if (workerVegetation) {
+      this.applyWorkerVegetation(workerVegetation);
+    } else {
+      // Fallback to main thread vegetation generation
+      await this.generateVegetation();
+    }
+
+    // Register instances with global system
+    const chunkKey = `${this.chunkX},${this.chunkZ}`;
+    this.globalBillboardSystem.addChunkInstances(
+      chunkKey,
+      this.fernInstances,
+      this.elephantEarInstances,
+      this.fanPalmInstances,
+      this.coconutInstances,
+      this.arecaInstances,
+      this.dipterocarpInstances,
+      this.banyanInstances
+    );
+
+    this.isGenerated = true;
+    console.log(`✅ ImprovedChunk (${this.chunkX}, ${this.chunkZ}) generated from worker`);
+  }
+
+  /**
+   * Apply vegetation positions computed by worker
+   */
+  private applyWorkerVegetation(veg: VegetationData): void {
+    // Convert worker data to BillboardInstance format
+    for (const p of veg.fern) {
+      this.fernInstances.push({
+        position: new THREE.Vector3(p.x, p.y, p.z),
+        scale: new THREE.Vector3(p.sx, p.sy, 1),
+        rotation: 0
+      });
+    }
+    for (const p of veg.elephantEar) {
+      this.elephantEarInstances.push({
+        position: new THREE.Vector3(p.x, p.y, p.z),
+        scale: new THREE.Vector3(p.sx, p.sy, 1),
+        rotation: 0
+      });
+    }
+    for (const p of veg.fanPalm) {
+      this.fanPalmInstances.push({
+        position: new THREE.Vector3(p.x, p.y, p.z),
+        scale: new THREE.Vector3(p.sx, p.sy, 1),
+        rotation: 0
+      });
+    }
+    for (const p of veg.coconut) {
+      this.coconutInstances.push({
+        position: new THREE.Vector3(p.x, p.y, p.z),
+        scale: new THREE.Vector3(p.sx, p.sy, 1),
+        rotation: 0
+      });
+    }
+    for (const p of veg.areca) {
+      this.arecaInstances.push({
+        position: new THREE.Vector3(p.x, p.y, p.z),
+        scale: new THREE.Vector3(p.sx, p.sy, 1),
+        rotation: 0
+      });
+    }
+    for (const p of veg.dipterocarp) {
+      this.dipterocarpInstances.push({
+        position: new THREE.Vector3(p.x, p.y, p.z),
+        scale: new THREE.Vector3(p.sx, p.sy, 1),
+        rotation: 0
+      });
+    }
+    for (const p of veg.banyan) {
+      this.banyanInstances.push({
+        position: new THREE.Vector3(p.x, p.y, p.z),
+        scale: new THREE.Vector3(p.sx, p.sy, 1),
+        rotation: 0
+      });
+    }
+  }
+
+  /**
+   * Create terrain mesh from pre-computed geometry (from web worker)
+   * @param bvhAlreadyComputed - If true, skip BVH computation (already done in BVH worker)
+   */
+  private async createTerrainMeshFromGeometry(geometry: THREE.BufferGeometry, bvhAlreadyComputed: boolean = false): Promise<void> {
+    // Compute BVH for accurate collision detection (skip if already computed in worker)
+    if (!bvhAlreadyComputed) {
+      (geometry as any).computeBoundsTree();
+    }
+
+    // Create material
+    let material: THREE.Material;
+    if (this.debugMode) {
+      material = new THREE.MeshBasicMaterial({
+        color: 0x00ff00,
+        wireframe: true,
+        side: THREE.DoubleSide
+      });
+    } else {
+      const texture = this.assetLoader.getTexture('forestfloor');
+      if (texture) {
+        material = PixelPerfectUtils.createPixelPerfectLitMaterial(texture);
+        texture.repeat.set(8, 8);
+      } else {
+        material = new THREE.MeshLambertMaterial({
+          color: 0x4a7c59,
+          side: THREE.DoubleSide
+        });
+      }
+    }
+
+    // Create and position mesh
+    this.terrainMesh = new THREE.Mesh(geometry, material);
+    this.terrainMesh.position.set(
+      this.chunkX * this.size + this.size / 2,
+      0,
+      this.chunkZ * this.size + this.size / 2
+    );
+    this.terrainMesh.name = `chunk_${this.chunkX},${this.chunkZ}_terrain`;
+    this.terrainMesh.receiveShadow = true;
+
+    // Store geometry reference for collision
+    this.terrainGeometry = geometry;
+
+    this.scene.add(this.terrainMesh);
+
+    // Debug verification
+    const testHeight = this.getHeightAtLocal(this.size / 2, this.size / 2);
+    console.log(`📐 Chunk (${this.chunkX}, ${this.chunkZ}) worker center height: ${testHeight.toFixed(2)}`);
   }
 
   private generateHeightData(): void {
@@ -417,21 +581,19 @@ export class ImprovedChunk {
   }
 
   /**
-   * Get height at world coordinates using raycasting with BVH
+   * Get height at world coordinates using height data
    */
   getHeightAt(worldX: number, worldZ: number): number {
-    if (!this.terrainMesh || !this.terrainGeometry) return 0;
-    
     // Convert to local coordinates
     const localX = worldX - (this.chunkX * this.size);
     const localZ = worldZ - (this.chunkZ * this.size);
-    
+
     // Check bounds
     if (localX < 0 || localX > this.size || localZ < 0 || localZ > this.size) {
       return 0;
     }
-    
-    // Use direct height data lookup for best accuracy
+
+    // Use direct height data lookup (works even without terrain mesh)
     return this.getHeightAtLocal(localX, localZ);
   }
 

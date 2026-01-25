@@ -4,16 +4,17 @@ import {
   RenderPass,
   EffectPass,
   SMAAEffect,
-  SMAAPreset
+  SMAAPreset,
+  PixelationEffect
 } from 'postprocessing';
-import { PixelationPass } from './PixelationPass';
 import { Logger } from '../../utils/Logger';
 
 export class PostProcessingManager {
   private composer: EffectComposer;
   private renderPass: RenderPass;
-  private pixelationPass: PixelationPass;
-  private enabled: boolean = false; // SALVAGE DEBUG: Disabled to test raw scene rendering
+  private pixelationEffect: PixelationEffect;
+  private pixelationPass: EffectPass;
+  private enabled: boolean = true;
   private renderer: THREE.WebGLRenderer;
   private scene: THREE.Scene;
   private camera: THREE.Camera;
@@ -37,12 +38,10 @@ export class PostProcessingManager {
     this.renderPass = new RenderPass(scene, camera);
     this.composer.addPass(this.renderPass);
 
-    // Add pixelation with outline pass
-    this.pixelationPass = new PixelationPass(
-      1,     // Pixel size (1 for minimal pixelation, best quality)
-      0.7,   // Outline strength (0.7 for visible but not overwhelming)
-      0.25   // Outline threshold (0.25 to catch sprite edges and white fringes)
-    );
+    // Add pixelation effect using postprocessing's built-in effect
+    // Granularity is the pixel size (higher = more pixelated)
+    this.pixelationEffect = new PixelationEffect(2);
+    this.pixelationPass = new EffectPass(camera, this.pixelationEffect);
     this.composer.addPass(this.pixelationPass);
 
     // Optional: Add very subtle anti-aliasing for the pixelated edges
@@ -55,7 +54,7 @@ export class PostProcessingManager {
     smaaPass.renderToScreen = true;
     this.composer.addPass(smaaPass);
 
-    Logger.info('render', 'Post-processing passes configured (pixelation + SMAA)');
+    Logger.info('render', 'Post-processing: pixelation (granularity 2) + SMAA');
   }
 
   render(deltaTime: number): void {
@@ -72,15 +71,11 @@ export class PostProcessingManager {
   }
 
   setPixelSize(size: number): void {
-    this.pixelationPass.setPixelSize(size);
+    this.pixelationEffect.granularity = size;
   }
 
-  setOutlineStrength(strength: number): void {
-    this.pixelationPass.setOutlineStrength(strength);
-  }
-
-  setOutlineThreshold(threshold: number): void {
-    this.pixelationPass.setOutlineThreshold(threshold);
+  getPixelSize(): number {
+    return this.pixelationEffect.granularity;
   }
 
   setEnabled(enabled: boolean): void {

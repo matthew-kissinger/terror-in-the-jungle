@@ -7,5 +7,8 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
   },
-  assetsInclude: ['**/*.glsl']
+  assetsInclude: ['**/*.glsl'],
+  worker: {
+    format: 'es'
+  }
 })

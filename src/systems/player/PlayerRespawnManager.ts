@@ -8,6 +8,7 @@ import { RespawnMapView } from '../../ui/map/RespawnMapView';
 import { OpenFrontierRespawnMap } from '../../ui/map/OpenFrontierRespawnMap';
 import { GameMode } from '../../config/gameModes';
 import { InventoryManager } from './InventoryManager';
+import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 
 export class PlayerRespawnManager implements GameSystem {
   private scene: THREE.Scene;
@@ -470,6 +471,10 @@ export class PlayerRespawnManager implements GameSystem {
   }
 
   private respawn(position: THREE.Vector3): void {
+    // Ensure spawn position is at correct terrain height
+    const terrainHeight = getHeightQueryCache().getHeightAt(position.x, position.z);
+    position.y = terrainHeight + 2; // Add player height offset
+
     // Move player to spawn position
     if (this.playerController) {
       if (typeof this.playerController.setPosition === 'function') {

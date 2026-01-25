@@ -68,6 +68,18 @@ export class CombatantSystem implements GameSystem {
   private updateLastMs = 0;
   private updateEmaMs = 0;
   private readonly UPDATE_EMA_ALPHA = 0.1;
+
+  // Detailed profiling for combat bottleneck analysis
+  private profiling = {
+    aiUpdateMs: 0,
+    spatialSyncMs: 0,
+    billboardUpdateMs: 0,
+    effectPoolsMs: 0,
+    influenceMapMs: 0,
+    totalMs: 0,
+    engagingCount: 0,
+    firingCount: 0
+  };
   private pendingRespawns: Array<{squadId: string, respawnTime: number, originalId: string}> = [];
 
   // Player tracking
@@ -180,7 +192,37 @@ export class CombatantSystem implements GameSystem {
     // Spawn initial forces
     this.spawnInitialForces();
 
+    // Expose profiling to console for debugging
+    if (typeof window !== 'undefined') {
+      (window as any).combatProfile = () => this.getCombatProfile();
+    }
+
     console.log('✅ Combatant System initialized');
+    console.log('💡 Use window.combatProfile() in console to see combat performance breakdown');
+  }
+
+  /**
+   * Get detailed combat profiling info for debugging performance
+   */
+  getCombatProfile(): {
+    timing: { aiUpdateMs: number; spatialSyncMs: number; billboardUpdateMs: number; effectPoolsMs: number; influenceMapMs: number; totalMs: number; engagingCount: number; firingCount: number };
+    counts: { total: number; high: number; medium: number; low: number; culled: number };
+    lod: { engaging: number; firing: number };
+  } {
+    return {
+      timing: { ...this.profiling },
+      counts: {
+        total: this.combatants.size,
+        high: this.lodHighCount,
+        medium: this.lodMediumCount,
+        low: this.lodLowCount,
+        culled: this.lodCulledCount
+      },
+      lod: {
+        engaging: this.profiling.engagingCount,
+        firing: this.profiling.firingCount
+      }
+    };
   }
 
   private spawnInitialForces(): void {
@@ -347,6 +389,7 @@ export class CombatantSystem implements GameSystem {
     }
 
     // Update influence map with current game state
+    let t0 = performance.now();
     if (this.influenceMap && this.zoneManager) {
       this.influenceMap.setCombatants(this.combatants);
       this.influenceMap.setZones(this.zoneManager.getAllZones());
@@ -357,6 +400,7 @@ export class CombatantSystem implements GameSystem {
         this.influenceMap.setSandbagBounds(sandbagSystem.getSandbagBounds());
       }
     }
+    this.profiling.influenceMapMs = performance.now() - t0;
 
     // Periodic cleanup
     const now = Date.now();
@@ -365,25 +409,40 @@ export class CombatantSystem implements GameSystem {
       this.lastSpawnCheck = now;
     }
 
-    // Update combatants
+    // Update combatants (AI, movement, combat)
+    t0 = performance.now();
     this.updateCombatants(deltaTime);
+    this.profiling.aiUpdateMs = performance.now() - t0;
+
+    // Count engaging combatants
+    this.profiling.engagingCount = 0;
+    this.profiling.firingCount = 0;
+    this.combatants.forEach(c => {
+      if (c.state === CombatantState.ENGAGING || c.state === CombatantState.SUPPRESSING) {
+        this.profiling.engagingCount++;
+      }
+    });
 
     // Sync spatial grid manager with all combatant positions
-    // Uses LOD-based frequency for efficient updates
+    t0 = performance.now();
     spatialGridManager.syncAllPositions(this.combatants, this.playerPosition);
+    this.profiling.spatialSyncMs = performance.now() - t0;
 
     // Update billboard rotations
+    t0 = performance.now();
     this.combatantRenderer.updateBillboards(this.combatants, this.playerPosition);
-
-    // Update shader uniforms (time, camera position, etc.)
     this.combatantRenderer.updateShaderUniforms(deltaTime);
+    this.profiling.billboardUpdateMs = performance.now() - t0;
 
     // Update effect pools
+    t0 = performance.now();
     this.tracerPool.update();
     this.muzzleFlashPool.update();
     this.impactEffectsPool.update(deltaTime);
+    this.profiling.effectPoolsMs = performance.now() - t0;
 
     const duration = performance.now() - updateStart;
+    this.profiling.totalMs = duration;
     this.updateLastMs = duration;
     this.updateEmaMs = this.updateEmaMs * (1 - this.UPDATE_EMA_ALPHA) + duration * this.UPDATE_EMA_ALPHA;
   }

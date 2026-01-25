@@ -31,7 +31,9 @@ npm run build                  # Production build
 ## Controls
 
 **Movement**: WASD, Shift (sprint), Space (jump)
-**Combat**: Click (fire), RClick (ADS), R (reload), G (grenade), E (sandbag)
+**Combat**: Click (fire), RClick (ADS), R (reload)
+**Weapons**: 1 (shotgun 8/24), 2 (grenade), 3 (rifle 30/90), 4 (sandbag), 5 (SMG 32/128), Q (cycle)
+**Squad**: Z (toggle UI), Shift+1-5 (commands)
 **Debug**: F1 (stats), F2 (overlay), F3 (logs), P (post-proc), K (respawn)
 
 ## Architecture
