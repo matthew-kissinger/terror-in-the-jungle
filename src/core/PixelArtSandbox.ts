@@ -413,6 +413,9 @@ Have fun!
       .filter(([key]) => key.endsWith('HighWater'))
       .reduce((sum, [, value]) => sum + (value as number), 0);
 
+    // Get system timings from system manager
+    const systemTimings = this.systemManager.getSystemTimings();
+
     this.performanceOverlay.update({
       fps,
       frameTimeMs: deltaTime * 1000,
@@ -434,7 +437,8 @@ Have fun!
       combatLodMedium: combatTelemetry.lodMedium,
       combatLodLow: combatTelemetry.lodLow,
       combatLodCulled: combatTelemetry.lodCulled,
-      combatantCount: combatTelemetry.combatantCount
+      combatantCount: combatTelemetry.combatantCount,
+      systemTimings
     });
   }
 

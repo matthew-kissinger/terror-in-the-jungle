@@ -13,6 +13,7 @@ export class AudioManager implements GameSystem {
 
     // Sound pools for frequently used sounds
     private playerGunshotPool: THREE.Audio[] = [];
+    private playerSMGPool: THREE.Audio[] = [];
     private positionalGunshotPool: THREE.PositionalAudio[] = [];
     private deathSoundPool: THREE.PositionalAudio[] = [];
     private playerReloadPool: THREE.Audio[] = [];
@@ -189,6 +190,17 @@ export class AudioManager implements GameSystem {
                 sound.setVolume(this.soundConfigs.playerReload?.volume || 0.6);
             }
             this.playerReloadPool.push(sound);
+        }
+
+        // Initialize SMG gunshot pool
+        for (let i = 0; i < this.GUNSHOT_POOL_SIZE; i++) {
+            const sound = new THREE.Audio(this.listener);
+            const buffer = this.audioBuffers.get('playerSMG');
+            if (buffer) {
+                sound.setBuffer(buffer);
+                sound.setVolume(this.soundConfigs.playerSMG.volume || 0.75);
+            }
+            this.playerSMGPool.push(sound);
         }
 
         // Initialize explosion sound pool
@@ -527,8 +539,26 @@ export class AudioManager implements GameSystem {
         // Mark combat time for audio ducking
         this.lastCombatSoundTime = performance.now();
 
+        // Select appropriate pool and config based on weapon type
+        let pool: THREE.Audio[];
+        let configKey: string;
+
+        switch (weaponType) {
+            case 'shotgun':
+                pool = this.playerGunshotPool;
+                configKey = 'playerShotgun';
+                break;
+            case 'smg':
+                pool = this.playerSMGPool;
+                configKey = 'playerSMG';
+                break;
+            default: // rifle
+                pool = this.playerGunshotPool;
+                configKey = 'playerGunshot';
+        }
+
         // Get sound from pool
-        const sound = this.getAvailableSound(this.playerGunshotPool);
+        const sound = this.getAvailableSound(pool);
         if (!sound) return;
 
         // Apply weapon-specific pitch variation for variety
@@ -551,7 +581,7 @@ export class AudioManager implements GameSystem {
 
         const pitchVariation = pitchMin + Math.random() * (pitchMax - pitchMin);
         sound.setPlaybackRate(pitchVariation);
-        sound.setVolume((this.soundConfigs.playerGunshot.volume || 0.85) * volumeVariation);
+        sound.setVolume((this.soundConfigs[configKey]?.volume || 0.85) * volumeVariation);
         sound.play();
 
         // Add procedural bass layer for more punch
@@ -801,6 +831,10 @@ export class AudioManager implements GameSystem {
             if (sound.isPlaying) sound.stop();
         }
 
+        for (const sound of this.playerSMGPool) {
+            if (sound.isPlaying) sound.stop();
+        }
+
         for (const sound of this.positionalGunshotPool) {
             if (sound.isPlaying) sound.stop();
         }
@@ -819,6 +853,7 @@ export class AudioManager implements GameSystem {
 
         // Clear pools
         this.playerGunshotPool = [];
+        this.playerSMGPool = [];
         this.positionalGunshotPool = [];
         this.deathSoundPool = [];
         this.playerReloadPool = [];

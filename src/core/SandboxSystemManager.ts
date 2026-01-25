@@ -31,8 +31,17 @@ import { PlayerSuppressionSystem } from '../systems/player/PlayerSuppressionSyst
 import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { objectPool } from '../utils/ObjectPoolManager';
 
+interface SystemTimingEntry {
+  name: string;
+  budgetMs: number;
+  lastMs: number;
+  emaMs: number;
+}
+
 export class SandboxSystemManager {
   private systems: GameSystem[] = [];
+  private systemTimings: Map<string, SystemTimingEntry> = new Map();
+  private readonly EMA_ALPHA = 0.1;
 
   // Game systems
   public assetLoader!: AssetLoader;
@@ -355,9 +364,90 @@ export class SandboxSystemManager {
       this.minimapSystem.setCommandPosition(commandPos);
     }
 
+    // Track timing for key systems
+    this.trackSystemUpdate('Combat', 5.0, () => {
+      if (this.combatantSystem) this.combatantSystem.update(deltaTime);
+    });
+
+    this.trackSystemUpdate('Terrain', 2.0, () => {
+      if (this.chunkManager) this.chunkManager.update(deltaTime);
+    });
+
+    this.trackSystemUpdate('Billboards', 2.0, () => {
+      if (this.globalBillboardSystem) this.globalBillboardSystem.update(deltaTime);
+    });
+
+    this.trackSystemUpdate('Player', 1.0, () => {
+      if (this.playerController) this.playerController.update(deltaTime);
+      if (this.firstPersonWeapon) this.firstPersonWeapon.update(deltaTime);
+    });
+
+    this.trackSystemUpdate('Weapons', 1.0, () => {
+      if (this.grenadeSystem) this.grenadeSystem.update(deltaTime);
+      if (this.mortarSystem) this.mortarSystem.update(deltaTime);
+      if (this.sandbagSystem) this.sandbagSystem.update(deltaTime);
+    });
+
+    this.trackSystemUpdate('UI', 1.0, () => {
+      if (this.hudSystem) this.hudSystem.update(deltaTime);
+      if (this.minimapSystem) this.minimapSystem.update(deltaTime);
+      if (this.fullMapSystem) this.fullMapSystem.update(deltaTime);
+      if (this.compassSystem) this.compassSystem.update(deltaTime);
+    });
+
+    this.trackSystemUpdate('World', 1.0, () => {
+      if (this.zoneManager) this.zoneManager.update(deltaTime);
+      if (this.ticketSystem) this.ticketSystem.update(deltaTime);
+      if (this.waterSystem) this.waterSystem.update(deltaTime);
+    });
+
+    // Update remaining systems without tracking (lightweight systems)
+    const trackedSystems = new Set<GameSystem>([
+      this.combatantSystem,
+      this.chunkManager,
+      this.globalBillboardSystem,
+      this.playerController,
+      this.firstPersonWeapon,
+      this.grenadeSystem,
+      this.mortarSystem,
+      this.sandbagSystem,
+      this.hudSystem,
+      this.minimapSystem,
+      this.fullMapSystem,
+      this.compassSystem,
+      this.zoneManager,
+      this.ticketSystem,
+      this.waterSystem
+    ]);
+
     for (const system of this.systems) {
-      system.update(deltaTime);
+      if (!trackedSystems.has(system)) {
+        system.update(deltaTime);
+      }
     }
+  }
+
+  private trackSystemUpdate(name: string, budgetMs: number, updateFn: () => void): void {
+    const start = performance.now();
+    updateFn();
+    const duration = performance.now() - start;
+
+    let entry = this.systemTimings.get(name);
+    if (!entry) {
+      entry = { name, budgetMs, lastMs: duration, emaMs: duration };
+      this.systemTimings.set(name, entry);
+    } else {
+      entry.lastMs = duration;
+      entry.emaMs = entry.emaMs * (1 - this.EMA_ALPHA) + duration * this.EMA_ALPHA;
+    }
+  }
+
+  getSystemTimings(): Array<{ name: string; timeMs: number; budgetMs: number }> {
+    return Array.from(this.systemTimings.values()).map(entry => ({
+      name: entry.name,
+      timeMs: entry.emaMs,
+      budgetMs: entry.budgetMs
+    }));
   }
 
   getSystems(): GameSystem[] {

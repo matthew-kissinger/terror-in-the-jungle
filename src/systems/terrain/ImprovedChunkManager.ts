@@ -6,6 +6,7 @@ import { NoiseGenerator } from '../../utils/NoiseGenerator';
 import { AssetLoader } from '../assets/AssetLoader';
 import { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
 import { Logger } from '../../utils/Logger';
+import { LOSAccelerator } from '../combat/LOSAccelerator';
 
 export interface ChunkConfig {
   size: number;
@@ -24,11 +25,14 @@ export class ImprovedChunkManager implements GameSystem {
   private config: ChunkConfig;
   private noiseGenerator: NoiseGenerator;
   private globalBillboardSystem: GlobalBillboardSystem;
-  
+
   // Chunk storage
   private chunks: Map<string, ImprovedChunk> = new Map();
   private loadingChunks: Set<string> = new Set();
   private loadQueue: Array<{x: number, z: number, priority: number}> = [];
+
+  // LOS acceleration
+  private losAccelerator: LOSAccelerator = new LOSAccelerator();
   
   // Player tracking
   private playerPosition = new THREE.Vector3();
@@ -136,6 +140,7 @@ export class ImprovedChunkManager implements GameSystem {
     this.chunks.clear();
     this.loadingChunks.clear();
     this.loadQueue = [];
+    this.losAccelerator.clear();
     Logger.info('chunks', 'Chunk manager disposed');
   }
 
@@ -253,6 +258,13 @@ export class ImprovedChunkManager implements GameSystem {
 
       await chunk.generate();
       this.chunks.set(chunkKey, chunk);
+
+      // Register chunk terrain mesh with LOS accelerator
+      const terrainMesh = chunk.getTerrainMesh();
+      if (terrainMesh) {
+        this.losAccelerator.registerChunk(chunkKey, terrainMesh);
+      }
+
       Logger.debug('chunks', `Loaded initial chunk (${chunkX}, ${chunkZ})`);
     } catch (error) {
       console.error(`❌ Failed to load chunk (${chunkX}, ${chunkZ}):`, error);
@@ -287,6 +299,13 @@ export class ImprovedChunkManager implements GameSystem {
         // Only add if still needed (player might have moved away)
         if (currentDistance <= this.config.loadDistance) {
           this.chunks.set(chunkKey, chunk);
+
+          // Register chunk terrain mesh with LOS accelerator
+          const terrainMesh = chunk.getTerrainMesh();
+          if (terrainMesh) {
+            this.losAccelerator.registerChunk(chunkKey, terrainMesh);
+          }
+
           Logger.debug('chunks', `Async loaded chunk (${chunkX}, ${chunkZ})`);
         } else {
           chunk.dispose();
@@ -317,6 +336,7 @@ export class ImprovedChunkManager implements GameSystem {
       const chunk = this.chunks.get(key);
       if (chunk) {
         this.globalBillboardSystem.removeChunkInstances(key);
+        this.losAccelerator.unregisterChunk(key);
         chunk.dispose();
         this.chunks.delete(key);
         Logger.debug('chunks', `Unloaded chunk ${key} (remaining=${this.chunks.size - 1})`);
@@ -495,38 +515,27 @@ export class ImprovedChunkManager implements GameSystem {
 
   /**
    * Raycast against terrain to check for obstructions
+   * Now using BVH-accelerated LOS checks for better performance
    * @param origin Starting point of the ray
    * @param direction Direction of the ray (should be normalized)
    * @param maxDistance Maximum distance to check
    * @returns {hit: boolean, point?: THREE.Vector3, distance?: number}
    */
   raycastTerrain(origin: THREE.Vector3, direction: THREE.Vector3, maxDistance: number): {hit: boolean, point?: THREE.Vector3, distance?: number} {
-    const raycaster = new THREE.Raycaster();
-    raycaster.set(origin, direction);
-    raycaster.far = maxDistance;
+    // Calculate target point from origin and direction
+    const target = new THREE.Vector3()
+      .copy(direction)
+      .multiplyScalar(maxDistance)
+      .add(origin);
 
-    // Collect all loaded terrain meshes
-    const terrainMeshes: THREE.Mesh[] = [];
-    this.chunks.forEach(chunk => {
-      const mesh = chunk.getTerrainMesh();
-      if (mesh) {
-        terrainMeshes.push(mesh);
-      }
-    });
+    // Use BVH-accelerated LOS check
+    const result = this.losAccelerator.checkLineOfSight(origin, target, maxDistance);
 
-    if (terrainMeshes.length === 0) {
-      return { hit: false };
-    }
-
-    // Perform raycast against all terrain meshes
-    const intersects = raycaster.intersectObjects(terrainMeshes);
-
-    if (intersects.length > 0) {
-      const closest = intersects[0];
+    if (!result.clear && result.hitPoint && result.distance !== undefined) {
       return {
         hit: true,
-        point: closest.point,
-        distance: closest.distance
+        point: result.hitPoint,
+        distance: result.distance
       };
     }
 
@@ -548,5 +557,12 @@ export class ImprovedChunkManager implements GameSystem {
     Logger.info('chunks', `Render distance set to ${distance}`);
     // Trigger chunk reload
     this.updateLoadQueue();
+  }
+
+  /**
+   * Get the LOS accelerator for direct access (e.g., for batch queries)
+   */
+  getLOSAccelerator(): LOSAccelerator {
+    return this.losAccelerator;
   }
 }

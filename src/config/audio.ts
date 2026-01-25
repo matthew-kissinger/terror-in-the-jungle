@@ -22,6 +22,10 @@ export const SOUND_CONFIGS: Record<string, SoundConfig> = {
     path: 'assets/optimized/playerShotgun.wav',
     volume: 0.95 // Increased from 0.85 for more punch
   },
+  playerSMG: {
+    path: 'assets/optimized/playerSMG.wav',
+    volume: 0.75 // Lower than rifle, adjusts for rapid fire
+  },
   otherGunshot: {
     path: 'assets/optimized/otherGunshot.wav',
     volume: 0.7, // Increased from 0.6
