@@ -59,8 +59,8 @@ export class GameModeSelection {
 
         .game-modes-grid {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 40px;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 20px;
           margin-bottom: 40px;
         }
 
@@ -222,6 +222,35 @@ export class GameModeSelection {
         <p class="mode-selection-subtitle">Choose your battlefield experience</p>
 
         <div class="game-modes-grid">
+          <!-- Team Deathmatch Mode -->
+          <div class="game-mode-card" data-mode="tdm" style="border-color: rgba(76, 175, 80, 0.3);">
+            <div class="mode-card-header">
+              <div class="mode-card-title">Team Deathmatch</div>
+              <div class="mode-card-badge" style="background: rgba(76, 175, 80, 0.2); color: #4CAF50;">Tactical</div>
+            </div>
+            <div class="mode-card-description">
+              Pure tactical combat. First team to reach 75 kills wins. Fast-paced 15v15 infantry combat in a compact jungle arena.
+            </div>
+            <div class="mode-card-features">
+              <div class="mode-feature">
+                <div class="mode-feature-icon">✓</div>
+                <span>75 Kill Target</span>
+              </div>
+              <div class="mode-feature">
+                <div class="mode-feature-icon">✓</div>
+                <span>30 Combatants</span>
+              </div>
+              <div class="mode-feature">
+                <div class="mode-feature-icon">✓</div>
+                <span>5 Min Matches</span>
+              </div>
+              <div class="mode-feature">
+                <div class="mode-feature-icon">✓</div>
+                <span>Infantry Only</span>
+              </div>
+            </div>
+          </div>
+
           <!-- Zone Control Mode -->
           <div class="game-mode-card zone-control-card" data-mode="zone_control">
             <div class="mode-card-header">

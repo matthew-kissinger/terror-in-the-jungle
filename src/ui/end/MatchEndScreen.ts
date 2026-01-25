@@ -300,12 +300,12 @@ export class MatchEndScreen {
             <div class="stats-section-title">Match Results</div>
             <div class="ticket-comparison">
               <div class="faction-score us">
-                <div class="faction-name">US Forces</div>
+                <div class="faction-name">US ${gameState.isTDM ? 'Kills' : 'Tickets'}</div>
                 <div class="faction-tickets">${Math.round(stats.usTickets)}</div>
               </div>
               <div class="vs-divider">VS</div>
               <div class="faction-score opfor">
-                <div class="faction-name">OPFOR</div>
+                <div class="faction-name">OPFOR ${gameState.isTDM ? 'Kills' : 'Tickets'}</div>
                 <div class="faction-tickets">${Math.round(stats.opforTickets)}</div>
               </div>
             </div>
@@ -329,10 +329,12 @@ export class MatchEndScreen {
               <span class="stat-label">K/D Ratio</span>
               <span class="stat-value">${kd}</span>
             </div>
+            ${!gameState.isTDM ? `
             <div class="stat-row">
               <span class="stat-label">Zones Captured</span>
               <span class="stat-value highlight">${stats.zonesCaptured}</span>
             </div>
+            ` : ''}
           </div>
         </div>
 

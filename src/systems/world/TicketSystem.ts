@@ -13,6 +13,8 @@ export interface GameState {
   winner?: Faction;
   matchDuration: number;
   phase: 'SETUP' | 'COMBAT' | 'OVERTIME' | 'ENDED';
+  isTDM: boolean;
+  killTarget?: number;
 }
 
 export class TicketSystem implements GameSystem {
@@ -29,7 +31,8 @@ export class TicketSystem implements GameSystem {
   private gameState: GameState = {
     gameActive: true,
     matchDuration: 0,
-    phase: 'SETUP'
+    phase: 'SETUP',
+    isTDM: false
   };
 
   // Ticket bleed configuration
@@ -303,6 +306,8 @@ export class TicketSystem implements GameSystem {
     this.killTarget = target;
     this.usKills = 0;
     this.opforKills = 0;
+    this.gameState.isTDM = enabled;
+    this.gameState.killTarget = target;
     console.log(`🎮 TDM Mode: ${enabled ? 'ENABLED' : 'DISABLED'}, Target: ${target}`);
   }
 
@@ -346,7 +351,9 @@ export class TicketSystem implements GameSystem {
     this.gameState = {
       gameActive: true,
       matchDuration: 0,
-      phase: 'SETUP'
+      phase: 'SETUP',
+      isTDM: this.isTDM,
+      killTarget: this.killTarget
     };
     console.log('🔄 Match restarted');
   }
