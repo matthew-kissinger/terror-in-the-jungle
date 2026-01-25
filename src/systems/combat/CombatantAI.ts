@@ -660,14 +660,22 @@ export class CombatantAI {
     const timeSinceHit = (Date.now() - combatant.lastHitTime) / 1000;
     const recentlyHit = timeSinceHit < 2.0;
     const lowHealth = combatant.health < combatant.maxHealth * 0.5;
+    const highSuppression = combatant.suppressionLevel > 0.6;
+    const inBurstCooldown = combatant.burstCooldown > 0.5; // Between bursts, good time for cover
 
-    return recentlyHit || lowHealth;
+    // Seek cover when:
+    // 1. Recently hit or low health (existing)
+    // 2. Under heavy suppression (new)
+    // 3. In burst cooldown with enemies nearby (new - safe moment to reposition)
+    return recentlyHit || lowHealth || highSuppression ||
+           (inBurstCooldown && !!combatant.target && timeSinceHit < 5.0);
   }
 
   private findNearestCover(combatant: Combatant, threatPosition: THREE.Vector3): THREE.Vector3 | null {
     const MAX_SEARCH_RADIUS = 30;
     const SEARCH_SAMPLES = 16;
     const SANDBAG_PREFERRED_DISTANCE = 15; // Prefer sandbags within 15m
+    const VEGETATION_COVER_DISTANCE = 3; // Distance to position behind vegetation
     let bestCoverPos: THREE.Vector3 | null = null;
     let bestCoverScore = -Infinity;
 
@@ -719,6 +727,37 @@ export class CombatantAI {
       }
     }
 
+    // Check vegetation-based cover (trees, large ferns)
+    if (this.chunkManager) {
+      // Query nearby vegetation from global billboard system
+      const vegetationCover = this.findVegetationCover(combatant.position, threatPosition, MAX_SEARCH_RADIUS);
+
+      for (const vegPos of vegetationCover) {
+        const distanceToCombatant = combatant.position.distanceTo(vegPos);
+        const distanceToThreat = vegPos.distanceTo(threatPosition);
+
+        // Calculate flanking angle score (perpendicular is better)
+        const toThreat = new THREE.Vector3().subVectors(threatPosition, vegPos).normalize();
+        const toCombatant = new THREE.Vector3().subVectors(combatant.position, vegPos).normalize();
+        const flankingAngle = Math.abs(toThreat.dot(toCombatant));
+        const flankingScore = 1 - flankingAngle; // Higher score for perpendicular positions
+
+        // Score based on distance, LOS blocking, and flanking angle
+        let score = (1 / (distanceToCombatant + 1)) * 1.5; // Base score, higher than terrain
+        score *= (1 + flankingScore * 0.5); // Bonus for good flanking angle
+
+        // Bonus if vegetation is between combatant and threat
+        if (distanceToCombatant < distanceToThreat) {
+          score *= 1.3;
+        }
+
+        if (score > bestCoverScore) {
+          bestCoverScore = score;
+          bestCoverPos = vegPos.clone();
+        }
+      }
+    }
+
     // Then check terrain-based cover if chunk manager available
     if (this.chunkManager) {
       // Sample positions in a circle around the combatant
@@ -755,6 +794,67 @@ export class CombatantAI {
     }
 
     return bestCoverPos;
+  }
+
+  /**
+   * Find vegetation positions that can provide cover
+   */
+  private findVegetationCover(
+    position: THREE.Vector3,
+    threatPosition: THREE.Vector3,
+    searchRadius: number
+  ): THREE.Vector3[] {
+    if (!this.chunkManager) return [];
+
+    const coverPositions: THREE.Vector3[] = [];
+    const VEGETATION_COVER_DISTANCE = 3;
+
+    // Sample positions in a grid pattern around the combatant
+    const gridSize = 8;
+    const step = (searchRadius * 2) / gridSize;
+
+    for (let x = -searchRadius; x <= searchRadius; x += step) {
+      for (let z = -searchRadius; z <= searchRadius; z += step) {
+        const samplePos = new THREE.Vector3(
+          position.x + x,
+          0,
+          position.z + z
+        );
+
+        const distance = position.distanceTo(samplePos);
+        if (distance > searchRadius || distance < 3) continue;
+
+        // Check if there's significant vegetation density at this position
+        // We use terrain height variation as a proxy for vegetation
+        const localHeight = this.chunkManager.getHeightAt(samplePos.x, samplePos.z);
+        const surroundingHeights = [
+          this.chunkManager.getHeightAt(samplePos.x + 2, samplePos.z),
+          this.chunkManager.getHeightAt(samplePos.x - 2, samplePos.z),
+          this.chunkManager.getHeightAt(samplePos.x, samplePos.z + 2),
+          this.chunkManager.getHeightAt(samplePos.x, samplePos.z - 2)
+        ];
+
+        const avgHeight = surroundingHeights.reduce((a, b) => a + b, 0) / surroundingHeights.length;
+        const heightVariation = Math.abs(localHeight - avgHeight);
+
+        // Positions with some height variation are likely to have vegetation/obstacles
+        if (heightVariation > 0.5 || localHeight > position.y + 2) {
+          // Calculate cover position behind this vegetation relative to threat
+          const threatToVeg = new THREE.Vector3()
+            .subVectors(samplePos, threatPosition)
+            .normalize();
+
+          const coverPos = samplePos.clone().add(
+            threatToVeg.multiplyScalar(VEGETATION_COVER_DISTANCE)
+          );
+          coverPos.y = this.chunkManager.getHeightAt(coverPos.x, coverPos.z);
+
+          coverPositions.push(coverPos);
+        }
+      }
+    }
+
+    return coverPositions;
   }
 
   private isPositionCover(
@@ -1069,18 +1169,30 @@ export class CombatantAI {
         member.skillProfile.burstLength = 8
         member.skillProfile.burstPauseMs = 150
       } else {
-        // Become flanker - set advancing state with destination
+        // Become flanker - calculate smart flanking position using cover
         member.state = CombatantState.ADVANCING
-        const angle = (index % 2 === 0 ? 45 : -45) * (Math.PI / 180)
-        const distance = 20 + Math.random() * 10
 
-        const offset = new THREE.Vector3(
-          Math.cos(angle) * distance,
+        // Determine flanking direction based on index (alternate left/right)
+        const flankLeft = index % 2 === 0
+        const flankingAngle = this.calculateFlankingAngle(member.position, targetPos, flankLeft)
+        const flankingDistance = 25 + Math.random() * 15 // 25-40m flanking arc
+
+        // Calculate flanking position at perpendicular angle
+        const flankingPos = new THREE.Vector3(
+          targetPos.x + Math.cos(flankingAngle) * flankingDistance,
           0,
-          Math.sin(angle) * distance
+          targetPos.z + Math.sin(flankingAngle) * flankingDistance
         )
 
-        member.destinationPoint = targetPos.clone().add(offset)
+        // Try to find cover near the flanking position
+        const coverNearFlank = this.findNearestCover(
+          { ...member, position: flankingPos } as Combatant,
+          targetPos
+        )
+
+        // Use cover position if found, otherwise use calculated flanking position
+        member.destinationPoint = coverNearFlank || flankingPos
+
         if (this.chunkManager) {
           member.destinationPoint.y = this.chunkManager.getHeightAt(
             member.destinationPoint.x,
@@ -1090,6 +1202,25 @@ export class CombatantAI {
       }
     })
 
-    console.log(`🎯 Squad ${combatant.squadId} initiating suppression on target at (${Math.floor(targetPos.x)}, ${Math.floor(targetPos.z)})`)
+    console.log(`🎯 Squad ${combatant.squadId} initiating coordinated suppression & flank on target at (${Math.floor(targetPos.x)}, ${Math.floor(targetPos.z)})`)
+  }
+
+  /**
+   * Calculate optimal flanking angle relative to target
+   */
+  private calculateFlankingAngle(
+    attackerPos: THREE.Vector3,
+    targetPos: THREE.Vector3,
+    flankLeft: boolean
+  ): number {
+    // Get vector from target to attacker
+    const toAttacker = new THREE.Vector3().subVectors(attackerPos, targetPos)
+    const currentAngle = Math.atan2(toAttacker.z, toAttacker.x)
+
+    // Add 90 degrees (perpendicular) for flanking, either left or right
+    const flankingOffset = flankLeft ? Math.PI / 2 : -Math.PI / 2
+    const flankingAngle = currentAngle + flankingOffset
+
+    return flankingAngle
   }
 }
