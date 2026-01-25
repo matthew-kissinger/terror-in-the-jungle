@@ -41,6 +41,53 @@
       "source": "manual",
       "created_at": "2026-01-25T01:44:08.926433",
       "tags": []
+    },
+    {
+      "id": "d6ce650a",
+      "content": "DOM overlay effects use fixed positioning with pointer-events: none - avoids blocking game input",
+      "source": "shepard",
+      "created_at": "2026-01-25T01:44:37.141675",
+      "tags": [
+        "global",
+        "batch"
+      ]
+    },
+    {
+      "id": "e8d53b14",
+      "content": "Object pooling for transient UI elements (popups, damage numbers) prevents GC spikes in render loop",
+      "source": "shepard",
+      "created_at": "2026-01-25T01:44:37.142676",
+      "tags": [
+        "global",
+        "batch"
+      ]
+    },
+    {
+      "id": "2f74e5cc",
+      "content": "CSS animations should inject styles once with unique IDs and clean up on dispose()",
+      "source": "shepard",
+      "created_at": "2026-01-25T01:44:37.143605",
+      "tags": [
+        "global",
+        "batch"
+      ]
+    },
+    {
+      "id": "c24a1fc6",
+      "content": "Weapon systems require 6 integration points: WeaponSpec, GunplayCore, 3D model, WeaponSlot, key binding, InventoryManager",
+      "source": "shepard",
+      "created_at": "2026-01-25T01:44:37.144429",
+      "tags": [
+        "global",
+        "batch"
+      ]
+    },
+    {
+      "id": "f3f02dbb",
+      "content": "Suppression systems integrate via setter pattern: setPlayerSuppressionSystem() called in connectSystems()",
+      "source": "manual",
+      "created_at": "2026-01-25T01:55:41.200609",
+      "tags": []
     }
   ],
   "warnings": [
@@ -67,6 +114,17 @@
       "created_at": "2026-01-25T01:42:19.233630",
       "tags": [],
       "severity": "low"
+    },
+    {
+      "id": "ec10cea2",
+      "content": "Build produces 1.16MB bundle (warning threshold 500KB) - acceptable for Three.js game but monitor growth",
+      "source": "shepard",
+      "created_at": "2026-01-25T01:44:37.145080",
+      "tags": [
+        "global",
+        "batch"
+      ],
+      "severity": "medium"
     }
   ],
   "context": [
@@ -97,7 +155,14 @@
       "source": "manual",
       "created_at": "2026-01-25T01:44:08.067188",
       "tags": []
+    },
+    {
+      "id": "c2698e7a",
+      "content": "Near-miss detection uses distance threshold (2.5m) and triggers in CombatantCombat.ts during enemy fire logic at line 290",
+      "source": "manual",
+      "created_at": "2026-01-25T01:55:42.480196",
+      "tags": []
     }
   ],
-  "updated_at": "2026-01-25T01:44:08.926453"
+  "updated_at": "2026-01-25T01:55:42.480213"
 }
