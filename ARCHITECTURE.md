@@ -13,7 +13,7 @@ Pix3D is a modular 3D pixel art game engine built on Three.js. Following a recen
 5. **GPU-First Rendering**: Heavy use of instanced meshes and GPU computations
 6. **Chunk-Based World**: Dynamic loading/unloading based on player position
 
-## Refactored Architecture (2024)
+## Refactored Architecture (2025)
 
 The codebase has been extensively refactored to improve maintainability. All major systems are now split into modules under 400 lines each:
 
@@ -68,6 +68,12 @@ main.ts (Entry Point)
 ├── TicketSystem (Score Management)
 ├── PlayerController (First-Person Controls)
 ├── FirstPersonWeapon (Weapon System)
+│   ├── WeaponRigManager (Model Switching)
+│   ├── WeaponFiring (Fire/Reload/Effects)
+│   ├── WeaponRecoil (Recoil Mechanics)
+│   ├── AmmoManager (Per-Weapon Ammo)
+│   └── ProgrammaticGunFactory (3D Models)
+├── InventoryManager (Weapon Slots)
 ├── WaterSystem (Water Rendering)
 ├── AudioManager (Sound Management)
 ├── MinimapSystem (Tactical Overview)
@@ -242,7 +248,11 @@ GPUBillboardSystem uses height-based fog in fragment shader:
 ### Player Systems (`/src/systems/player/`)
 - `PlayerController.ts`: Movement and input
 - `PlayerHealthSystem.ts`: Health management
-- `FirstPersonWeapon.ts`: Weapon mechanics
+- `FirstPersonWeapon.ts`: Weapon orchestrator with per-weapon ammo
+- `InventoryManager.ts`: Weapon slot management
+- `ProgrammaticGunFactory.ts`: 3D weapon model generation
+- `weapon/WeaponRigManager.ts`: Weapon switching animations
+- `weapon/WeaponFiring.ts`: Fire mechanics, tracers, hit effects
 
 ### UI Systems (`/src/ui/`)
 - `hud/`: HUD system modules
@@ -318,7 +328,11 @@ The combat system is the #1 priority. Current issues:
 ### Weapons Priority
 - **Grenade Overhaul**: Floaty physics, weak explosions, no arc preview
 - **Mortar Reimplementation**: Currently disabled - needs ballistic physics from scratch
-- **New Weapons**: Add shotgun (close-range) and SMG (spray option)
+
+### Implemented Weapons (Jan 2025)
+- **Rifle**: 30-round magazine, 90 reserve, balanced performance
+- **Shotgun**: 8-shell tube magazine, 24 reserve, pump-action model, high close-range damage
+- **SMG**: 32-round magazine, 128 reserve, high rate of fire, compact model
 
 ### Game Loop
 - Match endings feel abrupt - need end-game sequence

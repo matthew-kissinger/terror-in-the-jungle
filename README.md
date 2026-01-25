@@ -18,7 +18,6 @@ A high-performance 3D pixel art battlefield game built with Three.js. Experience
 ### Weapons
 - **Grenade Overhaul**: Floaty physics, weak explosions, unclear arc preview
 - **Mortar Reimplementation**: Currently disabled - needs ballistic physics
-- **New Weapons Needed**: Shotgun (close-range), SMG (spray option)
 
 ### Game Loop
 - **Match Flow**: Abrupt endings, no stats screen, missing kill feed
@@ -45,8 +44,10 @@ See `CLAUDE.md` for full priority list with implementation details.
 - **Advanced Combat AI**: Squad-based tactical AI with multiple behavior states
 - **Territory Control**: Zone capture system with dynamic frontlines
 - **Team-Based Warfare**: US vs OPFOR factions with ticket system
-- **First-Person Combat**: Weapon system with ADS, recoil, and hit detection
+- **Multi-Weapon System**: Rifle, Shotgun, and SMG with per-weapon ammo tracking
+- **First-Person Combat**: Weapon switching animations, ADS, recoil, and hit detection
 - **Player Health System**: Damage effects, death/respawn mechanics
+- **Grenades & Equipment**: Frag grenades with damage falloff, deployable sandbags
 
 ### World Systems
 - **Procedural Generation**: Noise-based terrain with tropical jungle biome
@@ -92,15 +93,35 @@ npm run preview
 
 ## Controls
 
+### Movement
 - **WASD**: Move around
-- **Shift**: Run
+- **Shift**: Sprint
 - **Space**: Jump
 - **Mouse**: Look around (click to enable pointer lock)
+- **Escape**: Release pointer lock
+
+### Combat
 - **Left Click**: Fire weapon
 - **Right Click**: Aim down sights (ADS)
 - **R**: Reload weapon
-- **Escape**: Release pointer lock
+- **G**: Throw grenade
+- **E**: Deploy sandbag
+
+### Weapons
+| Key | Weapon | Magazine | Reserve |
+|-----|--------|----------|---------|
+| 1 | Shotgun | 8 shells | 24 |
+| 2 | Grenade | - | - |
+| 3 | Rifle | 30 rounds | 90 |
+| 4 | Sandbag | - | - |
+| 5 | SMG | 32 rounds | 128 |
+
+### Debug
 - **F1**: Toggle performance stats
+- **F2**: Debug overlay
+- **F3**: Console logs
+- **P**: Toggle post-processing
+- **K**: Force respawn
 
 ## Project Structure
 
