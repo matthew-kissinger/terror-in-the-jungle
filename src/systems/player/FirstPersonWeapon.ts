@@ -302,7 +302,7 @@ export class FirstPersonWeapon implements GameSystem {
         this.switchToRifle();
       } else if (slot === WeaponSlot.SHOTGUN) {
         this.switchToShotgun();
-      } else if (slot === (WeaponSlot as any).SMG) {
+      } else if (slot === WeaponSlot.SMG) {
         this.switchToSMG();
       }
     });
@@ -363,7 +363,7 @@ export class FirstPersonWeapon implements GameSystem {
 
     // Only handle gun input when PRIMARY, SHOTGUN, or SMG weapon is equipped
     const currentSlot = this.inventoryManager?.getCurrentSlot();
-    if (this.inventoryManager && currentSlot !== WeaponSlot.PRIMARY && currentSlot !== WeaponSlot.SHOTGUN && currentSlot !== (WeaponSlot as any).SMG) {
+    if (this.inventoryManager && currentSlot !== WeaponSlot.PRIMARY && currentSlot !== WeaponSlot.SHOTGUN && currentSlot !== WeaponSlot.SMG) {
       return;
     }
 

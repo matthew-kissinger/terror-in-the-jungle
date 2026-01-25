@@ -1,11 +1,11 @@
 import { GameSystem } from '../../types';
 
 export enum WeaponSlot {
-  PRIMARY = 0,
-  SHOTGUN = 1,
-  GRENADE = 2,
-  SANDBAG = 3,
-  SMG = 4
+  SHOTGUN = 0,   // Key 1
+  GRENADE = 1,   // Key 2
+  PRIMARY = 2,   // Key 3 (Rifle)
+  SANDBAG = 3,   // Key 4
+  SMG = 4        // Key 5
 }
 
 export interface InventoryState {
@@ -19,7 +19,7 @@ export interface InventoryState {
 }
 
 export class InventoryManager implements GameSystem {
-  private currentSlot: WeaponSlot = WeaponSlot.PRIMARY;
+  private currentSlot: WeaponSlot = WeaponSlot.PRIMARY; // Start with Rifle (key 3)
   private grenades: number = 3;
   private maxGrenades: number = 3;
   private mortarRounds: number = 3;
@@ -61,17 +61,17 @@ export class InventoryManager implements GameSystem {
     switch (event.code) {
       case 'Digit1':
         if (!event.shiftKey && !event.ctrlKey && !event.altKey) {
-          this.switchToSlot(WeaponSlot.PRIMARY);
+          this.switchToSlot(WeaponSlot.SHOTGUN);
         }
         break;
       case 'Digit2':
         if (!event.shiftKey && !event.ctrlKey && !event.altKey) {
-          this.switchToSlot(WeaponSlot.SHOTGUN);
+          this.switchToSlot(WeaponSlot.GRENADE);
         }
         break;
       case 'Digit3':
         if (!event.shiftKey && !event.ctrlKey && !event.altKey) {
-          this.switchToSlot(WeaponSlot.GRENADE);
+          this.switchToSlot(WeaponSlot.PRIMARY);
         }
         break;
       case 'Digit4':
@@ -126,14 +126,16 @@ export class InventoryManager implements GameSystem {
   }
 
   canUseMortarRound(): boolean {
-    // Mortar system disabled - to be reimplemented
-    return false;
+    return this.mortarRounds > 0;
   }
 
   useMortarRound(): boolean {
-    // Mortar system disabled - to be reimplemented
-    console.log('⚠️ Mortar system is temporarily disabled');
-    return false;
+    if (!this.canUseMortarRound()) return false;
+
+    this.mortarRounds--;
+    console.log(`💣 Mortar round used. Remaining: ${this.mortarRounds}`);
+    this.notifyInventoryChange();
+    return true;
   }
 
   addGrenades(count: number): void {
@@ -143,8 +145,9 @@ export class InventoryManager implements GameSystem {
   }
 
   addMortarRounds(count: number): void {
-    // Mortar system disabled - to be reimplemented
-    console.log('⚠️ Mortar system is temporarily disabled - rounds not added');
+    this.mortarRounds = Math.min(this.mortarRounds + count, this.maxMortarRounds);
+    console.log(`💣 Mortar rounds restocked: ${this.mortarRounds}/${this.maxMortarRounds}`);
+    this.notifyInventoryChange();
   }
 
   canUseSandbag(): boolean {
@@ -218,21 +221,21 @@ export class InventoryManager implements GameSystem {
     `;
 
     this.uiElement.innerHTML = `
-      <div id="slot-primary" class="hotbar-slot active" data-slot="0">
+      <div id="slot-shotgun" class="hotbar-slot" data-slot="0">
         <div class="slot-key">[1]</div>
-        <div class="slot-icon">🔫</div>
-        <div class="slot-label">RIFLE</div>
-      </div>
-      <div id="slot-shotgun" class="hotbar-slot" data-slot="1">
-        <div class="slot-key">[2]</div>
         <div class="slot-icon">💥</div>
         <div class="slot-label">SHOTGUN</div>
       </div>
-      <div id="slot-grenade" class="hotbar-slot" data-slot="2">
-        <div class="slot-key">[3]</div>
+      <div id="slot-grenade" class="hotbar-slot" data-slot="1">
+        <div class="slot-key">[2]</div>
         <div class="slot-icon">💣</div>
         <div class="slot-label">GRENADE</div>
         <div class="slot-count" id="grenade-count">${this.grenades}</div>
+      </div>
+      <div id="slot-primary" class="hotbar-slot active" data-slot="2">
+        <div class="slot-key">[3]</div>
+        <div class="slot-icon">🔫</div>
+        <div class="slot-label">RIFLE</div>
       </div>
       <div id="slot-sandbag" class="hotbar-slot" data-slot="3">
         <div class="slot-key">[4]</div>
@@ -320,6 +323,11 @@ export class InventoryManager implements GameSystem {
     const grenadeCount = this.uiElement.querySelector('#grenade-count');
     if (grenadeCount) {
       grenadeCount.textContent = String(this.grenades);
+    }
+
+    const mortarCount = this.uiElement.querySelector('#mortar-count');
+    if (mortarCount) {
+      mortarCount.textContent = String(this.mortarRounds);
     }
 
     const sandbagCount = this.uiElement.querySelector('#sandbag-count');

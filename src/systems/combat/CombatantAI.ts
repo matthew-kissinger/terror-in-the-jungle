@@ -2,15 +2,18 @@ import * as THREE from 'three';
 import { Combatant, CombatantState, Faction, Squad, SquadCommand } from './types';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { SandbagSystem } from '../weapons/SandbagSystem';
-import { SpatialGrid } from './SpatialGrid';
+import { SpatialOctree } from './SpatialOctree';
+import { ZoneManager, CaptureZone } from '../world/ZoneManager';
 
 export class CombatantAI {
   private readonly FRIENDLY_FIRE_ENABLED = false;
   private readonly MAX_ENGAGEMENT_RANGE = 150;
   private chunkManager?: ImprovedChunkManager;
   private sandbagSystem?: SandbagSystem;
+  private zoneManager?: ZoneManager;
   private squads: Map<string, Squad> = new Map();
   private squadSuppressionCooldown: Map<string, number> = new Map();
+  private zoneDefenders: Map<string, Set<string>> = new Map(); // zoneId -> set of defender IDs
 
   setSquads(squads: Map<string, Squad>): void {
     this.squads = squads;
@@ -21,7 +24,7 @@ export class CombatantAI {
     deltaTime: number,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid?: SpatialGrid
+    spatialGrid?: SpatialOctree
   ): void {
     // Decay suppression effects over time
     this.decaySuppressionEffects(combatant, deltaTime)
@@ -44,6 +47,9 @@ export class CombatantAI {
         break;
       case CombatantState.SEEKING_COVER:
         this.handleSeekingCover(combatant, deltaTime, playerPosition, allCombatants);
+        break;
+      case CombatantState.DEFENDING:
+        this.handleDefending(combatant, deltaTime, playerPosition, allCombatants, spatialGrid);
         break;
     }
   }
@@ -71,7 +77,7 @@ export class CombatantAI {
     deltaTime: number,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid?: SpatialGrid
+    spatialGrid?: SpatialOctree
   ): void {
     const squad = combatant.squadId ? this.squads.get(combatant.squadId) : undefined;
 
@@ -84,6 +90,15 @@ export class CombatantAI {
         squad.currentCommand !== SquadCommand.FREE_ROAM) {
       this.handleSquadCommand(combatant, squad, playerPosition, deltaTime);
     }
+
+    // Check if should transition to zone defense
+    // TODO: Implement shouldAssignZoneDefense and assignZoneDefense methods
+    // if (this.shouldAssignZoneDefense(combatant)) {
+    //   this.assignZoneDefense(combatant);
+    //   if (combatant.state === CombatantState.DEFENDING) {
+    //     return;
+    //   }
+    // }
 
     const enemy = this.findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid);
     if (enemy) {
@@ -210,7 +225,7 @@ export class CombatantAI {
     deltaTime: number,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid?: SpatialGrid
+    spatialGrid?: SpatialOctree
   ): void {
     if (!combatant.target || combatant.target.state === CombatantState.DEAD) {
       combatant.state = CombatantState.PATROLLING;
@@ -320,7 +335,7 @@ export class CombatantAI {
     deltaTime: number,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid?: SpatialGrid
+    spatialGrid?: SpatialOctree
   ): void {
     // If reached destination, switch to engaging
     if (!combatant.destinationPoint) {
@@ -360,7 +375,7 @@ export class CombatantAI {
     combatant: Combatant,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid?: SpatialGrid
+    spatialGrid?: SpatialOctree
   ): Combatant | null {
     let nearestEnemy: Combatant | null = null;
     let minDistance = combatant.skillProfile.visualRange;
@@ -521,7 +536,7 @@ export class CombatantAI {
     radius: number,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid?: SpatialGrid
+    spatialGrid?: SpatialOctree
   ): number {
     let count = 0;
 
@@ -710,6 +725,161 @@ export class CombatantAI {
 
   setSandbagSystem(sandbagSystem: SandbagSystem): void {
     this.sandbagSystem = sandbagSystem;
+  }
+
+  setZoneManager(zoneManager: ZoneManager): void {
+    this.zoneManager = zoneManager;
+  }
+
+  private handleDefending(
+    combatant: Combatant,
+    deltaTime: number,
+    playerPosition: THREE.Vector3,
+    allCombatants: Map<string, Combatant>,
+    spatialGrid?: SpatialOctree
+  ): void {
+    // Check for nearby enemies - defenders engage if threatened
+    const enemy = this.findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid);
+    if (enemy) {
+      const targetPos = enemy.id === 'PLAYER' ? playerPosition : enemy.position;
+      const distance = combatant.position.distanceTo(targetPos);
+
+      // If enemy is within 50m and visible, engage
+      if (distance < 50 && this.canSeeTarget(combatant, enemy, playerPosition)) {
+        combatant.state = CombatantState.ALERT;
+        combatant.target = enemy;
+        combatant.previousState = CombatantState.DEFENDING;
+
+        const rangeDelay = Math.floor(distance / 30) * 250;
+        combatant.reactionTimer = (combatant.skillProfile.reactionDelayMs + rangeDelay) / 1000;
+        combatant.alertTimer = 1.5;
+        return;
+      }
+    }
+
+    // Hold defensive position
+    if (!combatant.defensePosition) {
+      // Lost defense position, return to patrolling
+      combatant.state = CombatantState.PATROLLING;
+      combatant.defendingZoneId = undefined;
+      return;
+    }
+
+    // Check if still at defense position
+    const distanceToDefensePos = combatant.position.distanceTo(combatant.defensePosition);
+    if (distanceToDefensePos > 3) {
+      // Move to defense position
+      combatant.destinationPoint = combatant.defensePosition.clone();
+      const toDefensePos = new THREE.Vector3()
+        .subVectors(combatant.defensePosition, combatant.position)
+        .normalize();
+      combatant.rotation = Math.atan2(toDefensePos.z, toDefensePos.x);
+    } else {
+      // At position, face outward from zone
+      combatant.destinationPoint = undefined;
+      if (combatant.defendingZoneId && this.zoneManager) {
+        const zone = this.zoneManager.getAllZones()
+          .find(z => z.id === combatant.defendingZoneId);
+        if (zone) {
+          const toZone = new THREE.Vector3()
+            .subVectors(zone.position, combatant.position);
+          const outwardAngle = Math.atan2(toZone.z, toZone.x) + Math.PI;
+          combatant.rotation = outwardAngle;
+        }
+      }
+    }
+  }
+
+  private shouldAssignZoneDefense(combatant: Combatant): boolean {
+    if (!this.zoneManager) return false;
+    if (combatant.squadRole === 'leader') return false; // Leaders stay mobile
+    if (combatant.isObjectiveFocused) return false;
+    if (!combatant.squadId) return false;
+
+    const squad = this.squads.get(combatant.squadId);
+    if (!squad || squad.isPlayerControlled) return false;
+
+    // Only reassign every 5 seconds
+    const now = Date.now();
+    if (combatant.lastDefenseReassignTime &&
+        (now - combatant.lastDefenseReassignTime) < 5000) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private assignZoneDefense(combatant: Combatant): void {
+    if (!this.zoneManager) return;
+
+    combatant.lastDefenseReassignTime = Date.now();
+
+    // Find nearby zones owned by this faction
+    const nearbyOwnedZones = this.zoneManager.getAllZones()
+      .filter(zone => {
+        if (zone.owner !== combatant.faction) return false;
+        if (zone.isHomeBase) return false; // Don't defend home bases
+
+        const distance = combatant.position.distanceTo(zone.position);
+        return distance < 60; // Within 60m
+      })
+      .sort((a, b) => {
+        const distA = combatant.position.distanceTo(a.position);
+        const distB = combatant.position.distanceTo(b.position);
+        return distA - distB;
+      });
+
+    if (nearbyOwnedZones.length === 0) return;
+
+    // Pick a zone that needs defenders
+    for (const zone of nearbyOwnedZones) {
+      const defenders = this.zoneDefenders.get(zone.id) || new Set();
+      const squad = combatant.squadId ? this.squads.get(combatant.squadId) : undefined;
+      const squadSize = squad ? squad.members.length : 1;
+
+      // Assign 1-2 defenders per zone based on squad size
+      const maxDefenders = Math.min(2, Math.floor(squadSize / 2));
+
+      if (defenders.size < maxDefenders) {
+        // Assign this combatant to defend this zone
+        defenders.add(combatant.id);
+        this.zoneDefenders.set(zone.id, defenders);
+
+        combatant.state = CombatantState.DEFENDING;
+        combatant.defendingZoneId = zone.id;
+        combatant.defensePosition = this.calculateDefensePosition(zone, combatant, defenders.size - 1);
+        combatant.destinationPoint = combatant.defensePosition.clone();
+
+        console.log(`🛡️ ${combatant.faction} defender assigned to zone ${zone.id} (${defenders.size}/${maxDefenders} defenders)`);
+        return;
+      }
+    }
+  }
+
+  private calculateDefensePosition(
+    zone: CaptureZone,
+    combatant: Combatant,
+    defenderIndex: number
+  ): THREE.Vector3 {
+    // Position defenders around zone perimeter facing outward
+    const radius = zone.radius + 8; // 8m beyond zone edge
+    const numPositions = 4; // 4 defensive positions per zone (N, S, E, W)
+
+    const angle = (defenderIndex / numPositions) * Math.PI * 2;
+    const position = new THREE.Vector3(
+      zone.position.x + Math.cos(angle) * radius,
+      0,
+      zone.position.z + Math.sin(angle) * radius
+    );
+
+    // Get terrain height
+    if (this.chunkManager) {
+      position.y = this.chunkManager.getHeightAt(position.x, position.z);
+    } else {
+      position.y = zone.position.y;
+    }
+
+    return position;
   }
 
   private shouldInitiateSquadSuppression(
