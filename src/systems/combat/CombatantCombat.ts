@@ -12,6 +12,7 @@ import { CombatantRenderer } from './CombatantRenderer';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { SpatialOctree } from './SpatialOctree';
 import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
+import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { objectPool } from '../../utils/ObjectPoolManager';
 
 export interface CombatHitResult {
@@ -37,6 +38,9 @@ export class CombatantCombat {
   private combatantRenderer?: CombatantRenderer;
   private sandbagSystem?: SandbagSystem;
   private playerSuppressionSystem?: PlayerSuppressionSystem;
+  private cameraShakeSystem?: CameraShakeSystem;
+  private camera?: THREE.Camera;
+  private playerPosition: THREE.Vector3 = new THREE.Vector3();
 
   constructor(
     scene: THREE.Scene,
@@ -59,6 +63,9 @@ export class CombatantCombat {
     allCombatants: Map<string, Combatant>,
     squads: Map<string, Squad>
   ): void {
+    // Track player position for death effects
+    this.playerPosition.copy(playerPosition);
+
     // Handle weapon cooldowns
     combatant.gunCore.cooldown(deltaTime);
     combatant.burstCooldown -= deltaTime;
@@ -416,6 +423,18 @@ export class CombatantCombat {
 
       console.log(`💀 ${target.faction} soldier eliminated${attacker ? ` by ${attacker.faction}` : ''}`);
 
+      // Death visual effects
+      // 1. Blood splatter at death position
+      const bloodPosition = target.position.clone();
+      bloodPosition.y += 1.5; // Chest height
+      const splatterDirection = target.deathDirection ? target.deathDirection.clone().negate() : new THREE.Vector3(0, 0, 1);
+      this.impactEffectsPool.spawn(bloodPosition, splatterDirection);
+
+      // 2. Camera shake for nearby deaths
+      if (this.cameraShakeSystem) {
+        this.cameraShakeSystem.shakeFromNearbyDeath(target.position, this.playerPosition);
+      }
+
       if (this.audioManager) {
         const isAlly = target.faction === Faction.US;
         this.audioManager.playDeathSound(target.position, isAlly);
@@ -478,7 +497,7 @@ export class CombatantCombat {
       const killed = targetHealth > 0 && hit.combatant.health <= 0;
 
       if (killed && this.hudSystem) {
-        this.hudSystem.addKill();
+        this.hudSystem.addKill(hit.headshot);
 
         // Add player kill to feed with weapon type
         const victimName = `${hit.combatant.faction}-${hit.combatant.id.slice(-4)}`;
@@ -615,5 +634,13 @@ export class CombatantCombat {
 
   setPlayerSuppressionSystem(system: PlayerSuppressionSystem): void {
     this.playerSuppressionSystem = system;
+  }
+
+  setCameraShakeSystem(system: CameraShakeSystem): void {
+    this.cameraShakeSystem = system;
+  }
+
+  setCamera(camera: THREE.Camera): void {
+    this.camera = camera;
   }
 }

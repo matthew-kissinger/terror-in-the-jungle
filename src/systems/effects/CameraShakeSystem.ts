@@ -85,6 +85,25 @@ export class CameraShakeSystem implements GameSystem {
   }
 
   /**
+   * Apply shake from nearby combatant death
+   * @param deathPos Position of death
+   * @param playerPos Player camera position
+   */
+  shakeFromNearbyDeath(deathPos: THREE.Vector3, playerPos: THREE.Vector3): void {
+    const distance = deathPos.distanceTo(playerPos);
+    const MAX_DEATH_SHAKE_DISTANCE = 20; // Only shake if death is within 20 units
+
+    if (distance > MAX_DEATH_SHAKE_DISTANCE) return;
+
+    // Falloff: full intensity at 0, zero at max distance
+    const falloff = Math.max(0, 1 - (distance / MAX_DEATH_SHAKE_DISTANCE));
+    const intensity = 0.15 * falloff; // Subtle shake
+    const duration = 0.2;
+
+    this.shake(intensity, duration, 15); // Low frequency for body impact
+  }
+
+  /**
    * Apply subtle recoil shake from weapon firing
    */
   shakeFromRecoil(): void {
