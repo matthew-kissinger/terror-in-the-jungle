@@ -22,27 +22,21 @@ export interface HelicopterState {
 export class HelicopterPhysics {
   private state: HelicopterState;
   private controls: HelicopterControls;
-  private wasGrounded: boolean = true; // Track takeoff transition
-  private takeoffTime: number = 0; // Time since liftoff
 
-  // Physics constants (tuned for realistic feel without full sim)
-  private readonly MASS = 2200; // kg (more realistic UH-1 Huey weight)
+  // Physics constants (tuned for arcade feel with good ground handling)
+  private readonly MASS = 1500; // kg (lighter for snappy response)
   private readonly GRAVITY = -9.81; // m/s²
   private readonly MAX_LIFT_FORCE = 30000; // N (balanced thrust-to-weight ratio)
-  private readonly MAX_CYCLIC_FORCE = 6000; // N (reduced for more inertia feel)
-  private readonly MAX_YAW_RATE = 1.5; // rad/s (slower turning)
-  private readonly ENGINE_SPOOL_RATE = 1.2; // How fast engine responds (slower for realism)
+  private readonly MAX_CYCLIC_FORCE = 8000; // N (responsive horizontal movement)
+  private readonly MAX_YAW_RATE = 2.0; // rad/s
+  private readonly ENGINE_SPOOL_RATE = 2.0; // How fast engine responds
 
-  // Realistic damping with momentum
-  private readonly VELOCITY_DAMPING = 0.98; // Higher = more momentum
+  // Arcade-style damping for stability
+  private readonly VELOCITY_DAMPING = 0.95; // Less drift
   private readonly ANGULAR_DAMPING = 0.85; // Prevents spinning out but allows banking
-  private readonly AUTO_LEVEL_STRENGTH = 2.0; // Gentler auto-stabilization
-  private readonly GROUND_EFFECT_HEIGHT = 8.0; // Stronger ground effect zone
-  private readonly GROUND_EFFECT_STRENGTH = 0.25; // More pronounced ground effect
-
-  // Turn dynamics
-  private readonly TURN_ALTITUDE_LOSS = 0.15; // Collective bleeding in sharp turns
-  private readonly MIN_TURN_SPEED = 5.0; // m/s minimum speed for altitude loss
+  private readonly AUTO_LEVEL_STRENGTH = 3.0; // Strong auto-stabilization
+  private readonly GROUND_EFFECT_HEIGHT = 8.0; // Good ground effect zone
+  private readonly GROUND_EFFECT_STRENGTH = 0.25; // Helps with hovering near ground
 
   // Input smoothing for better feel
   private readonly INPUT_SMOOTH_RATE = 8.0; // How fast inputs respond
@@ -166,16 +160,6 @@ export class HelicopterPhysics {
       liftForce += groundEffect * this.GROUND_EFFECT_STRENGTH * this.MAX_LIFT_FORCE;
     }
 
-    // Calculate turn intensity for altitude loss
-    const horizontalSpeed = Math.sqrt(this.state.velocity.x * this.state.velocity.x + this.state.velocity.z * this.state.velocity.z);
-    const cyclicInput = Math.sqrt(this.smoothedControls.cyclicPitch ** 2 + this.smoothedControls.cyclicRoll ** 2);
-
-    // Collective bleeding during sharp turns (pilot must compensate)
-    if (horizontalSpeed > this.MIN_TURN_SPEED && cyclicInput > 0.5) {
-      const turnPenalty = cyclicInput * this.TURN_ALTITUDE_LOSS;
-      liftForce *= (1.0 - turnPenalty);
-    }
-
     const lift = new THREE.Vector3(0, liftForce, 0);
 
     // Horizontal forces from cyclic (relative to helicopter orientation)
@@ -205,31 +189,12 @@ export class HelicopterPhysics {
   }
 
   private applyAutoStabilization(deltaTime: number): void {
-    // Track takeoff transition for wobble effect
-    if (this.wasGrounded && !this.state.isGrounded) {
-      this.takeoffTime = 0; // Just lifted off
-    }
-    this.wasGrounded = this.state.isGrounded;
-
-    if (!this.state.isGrounded) {
-      this.takeoffTime += deltaTime;
-    }
-
     // Extract roll and pitch from current quaternion
     const euler = new THREE.Euler().setFromQuaternion(this.state.quaternion, 'YXZ');
 
     // Auto-level forces (stronger when tilted more)
     const rollCorrection = -euler.z * this.AUTO_LEVEL_STRENGTH;
     const pitchCorrection = -euler.x * this.AUTO_LEVEL_STRENGTH;
-
-    // Takeoff wobble - subtle instability during first 2 seconds of flight
-    if (this.takeoffTime < 2.0) {
-      const wobbleStrength = 0.3 * (1.0 - this.takeoffTime / 2.0); // Fades over 2 seconds
-      const wobbleFreq = 3.0; // Hz
-      const wobble = Math.sin(this.takeoffTime * wobbleFreq * Math.PI * 2) * wobbleStrength;
-      this.state.angularVelocity.z += wobble * deltaTime;
-      this.state.angularVelocity.x += wobble * 0.7 * deltaTime;
-    }
 
     // Apply corrections to angular velocity
     this.state.angularVelocity.z += rollCorrection * deltaTime;
@@ -323,10 +288,6 @@ export class HelicopterPhysics {
     this.controls.yaw = 0;
     this.controls.engineBoost = false;
     this.smoothedControls = { ...this.controls };
-
-    // Reset takeoff tracking
-    this.wasGrounded = true;
-    this.takeoffTime = 0;
   }
 
   // Get engine sound parameters
