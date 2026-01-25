@@ -187,6 +187,59 @@ export class HUDStyles {
       opacity: 0.7;
     }
 
+    .match-timer {
+      position: absolute;
+      top: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10, 10, 14, 0.6);
+      backdrop-filter: blur(8px) saturate(1.2);
+      -webkit-backdrop-filter: blur(8px) saturate(1.2);
+      padding: 12px 24px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-radius: 12px;
+      pointer-events: none;
+      z-index: 105;
+    }
+
+    .timer-display {
+      font-family: 'Courier New', monospace;
+      font-size: 32px;
+      font-weight: bold;
+      color: white;
+      text-align: center;
+      letter-spacing: 2px;
+      transition: color 0.3s ease, text-shadow 0.3s ease;
+    }
+
+    .match-timer.timer-warning {
+      border-color: rgba(255, 255, 0, 0.6);
+      animation: timerWarningPulse 1s ease-in-out infinite;
+    }
+
+    .match-timer.timer-critical {
+      border-color: rgba(255, 0, 0, 0.8);
+      animation: timerCriticalPulse 0.5s ease-in-out infinite;
+    }
+
+    @keyframes timerWarningPulse {
+      0%, 100% {
+        box-shadow: 0 0 10px rgba(255, 255, 0, 0.3);
+      }
+      50% {
+        box-shadow: 0 0 20px rgba(255, 255, 0, 0.6);
+      }
+    }
+
+    @keyframes timerCriticalPulse {
+      0%, 100% {
+        box-shadow: 0 0 15px rgba(255, 0, 0, 0.4);
+      }
+      50% {
+        box-shadow: 0 0 30px rgba(255, 0, 0, 0.8);
+      }
+    }
+
     .victory-screen {
       position: absolute;
       top: 50%;

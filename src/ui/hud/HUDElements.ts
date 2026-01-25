@@ -10,6 +10,7 @@ export class HUDElements {
   public ticketDisplay: HTMLDivElement;
   public combatStats: HTMLDivElement;
   public gameStatus: HTMLDivElement;
+  public timerElement: HTMLDivElement;
   public hitMarkerContainer: HTMLDivElement;
   public killCounter: HTMLDivElement;
   public ammoDisplay: HTMLDivElement;
@@ -28,6 +29,7 @@ export class HUDElements {
     this.ticketDisplay = this.createTicketDisplay();
     this.combatStats = this.createCombatStats();
     this.gameStatus = this.createGameStatus();
+    this.timerElement = this.createTimerElement();
     this.hitMarkerContainer = this.createHitMarkerContainer();
     this.killCounter = this.createKillCounter();
     this.ammoDisplay = this.createAmmoDisplay();
@@ -49,6 +51,7 @@ export class HUDElements {
     this.hudContainer.appendChild(this.ticketDisplay);
     this.hudContainer.appendChild(this.combatStats);
     this.hudContainer.appendChild(this.gameStatus);
+    this.hudContainer.appendChild(this.timerElement);
     this.hudContainer.appendChild(this.hitMarkerContainer);
     this.hudContainer.appendChild(this.killCounter);
     this.hudContainer.appendChild(this.ammoDisplay);
@@ -89,6 +92,13 @@ export class HUDElements {
     const status = document.createElement('div');
     status.className = 'game-status';
     return status;
+  }
+
+  private createTimerElement(): HTMLDivElement {
+    const timer = document.createElement('div');
+    timer.className = 'match-timer';
+    timer.innerHTML = '<div class="timer-display">0:00</div>';
+    return timer;
   }
 
   private createHitMarkerContainer(): HTMLDivElement {

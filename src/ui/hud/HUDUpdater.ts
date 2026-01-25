@@ -173,6 +173,34 @@ export class HUDUpdater {
     this.updateKillCounter();
   }
 
+  updateTimer(timeRemaining: number): void {
+    const timerDisplay = this.elements.timerElement.querySelector('.timer-display') as HTMLElement;
+    if (!timerDisplay) return;
+
+    const minutes = Math.floor(Math.max(0, timeRemaining) / 60);
+    const seconds = Math.floor(Math.max(0, timeRemaining) % 60);
+    const timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+    timerDisplay.textContent = timeText;
+
+    // Update color based on time remaining
+    if (timeRemaining <= 0) {
+      timerDisplay.style.color = '#ff0000';
+      this.elements.timerElement.classList.add('timer-critical');
+    } else if (timeRemaining <= 30) {
+      timerDisplay.style.color = '#ff0000';
+      this.elements.timerElement.classList.add('timer-critical');
+      this.elements.timerElement.classList.remove('timer-warning');
+    } else if (timeRemaining <= 60) {
+      timerDisplay.style.color = '#ffff00';
+      this.elements.timerElement.classList.add('timer-warning');
+      this.elements.timerElement.classList.remove('timer-critical');
+    } else {
+      timerDisplay.style.color = '#ffffff';
+      this.elements.timerElement.classList.remove('timer-warning', 'timer-critical');
+    }
+  }
+
   getPlayerKills(): number {
     return this.playerKills;
   }

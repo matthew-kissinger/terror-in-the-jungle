@@ -85,6 +85,9 @@ export class HUDSystem implements GameSystem {
         this.ticketSystem.getTickets(Faction.US),
         this.ticketSystem.getTickets(Faction.OPFOR)
       );
+      // Update match timer
+      const timeRemaining = this.ticketSystem.getMatchTimeRemaining();
+      this.updater.updateTimer(timeRemaining);
     }
 
     // Update grenade power meter
