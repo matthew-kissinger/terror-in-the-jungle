@@ -29,6 +29,7 @@ import { SandbagSystem } from '../systems/weapons/SandbagSystem';
 import { CameraShakeSystem } from '../systems/effects/CameraShakeSystem';
 import { PlayerSuppressionSystem } from '../systems/player/PlayerSuppressionSystem';
 import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
+import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { objectPool } from '../utils/ObjectPoolManager';
 
 interface SystemTimingEntry {
@@ -72,6 +73,7 @@ export class SandboxSystemManager {
   public cameraShakeSystem!: CameraShakeSystem;
   public playerSuppressionSystem!: PlayerSuppressionSystem;
   public influenceMapSystem!: InfluenceMapSystem;
+  public ammoSupplySystem!: AmmoSupplySystem;
 
   async initializeSystems(
     scene: THREE.Scene,
@@ -134,6 +136,7 @@ export class SandboxSystemManager {
     this.sandbagSystem = new SandbagSystem(scene, camera, this.chunkManager);
     this.cameraShakeSystem = new CameraShakeSystem();
     this.playerSuppressionSystem = new PlayerSuppressionSystem();
+    this.ammoSupplySystem = new AmmoSupplySystem(scene, camera);
 
     // Initialize influence map system based on game mode world size
     const worldSize = 4000; // Default, will be updated when game mode is set
@@ -170,7 +173,8 @@ export class SandboxSystemManager {
       this.sandbagSystem,
       this.cameraShakeSystem,
       this.playerSuppressionSystem,
-      this.influenceMapSystem
+      this.influenceMapSystem,
+      this.ammoSupplySystem
     ];
 
     onProgress('world', 0.5);
@@ -316,6 +320,11 @@ export class SandboxSystemManager {
     }
     (this.combatantSystem as any).influenceMap = this.influenceMapSystem;
     (this.combatantSystem as any).sandbagSystem = this.sandbagSystem;
+
+    // Connect ammo supply system
+    this.ammoSupplySystem.setZoneManager(this.zoneManager);
+    this.ammoSupplySystem.setInventoryManager(this.inventoryManager);
+    this.ammoSupplySystem.setFirstPersonWeapon(this.firstPersonWeapon);
   }
 
   async preGenerateSpawnArea(spawnPos: THREE.Vector3): Promise<void> {
@@ -386,6 +395,7 @@ export class SandboxSystemManager {
       if (this.grenadeSystem) this.grenadeSystem.update(deltaTime);
       if (this.mortarSystem) this.mortarSystem.update(deltaTime);
       if (this.sandbagSystem) this.sandbagSystem.update(deltaTime);
+      if (this.ammoSupplySystem) this.ammoSupplySystem.update(deltaTime);
     });
 
     this.trackSystemUpdate('UI', 1.0, () => {
@@ -411,6 +421,7 @@ export class SandboxSystemManager {
       this.grenadeSystem,
       this.mortarSystem,
       this.sandbagSystem,
+      this.ammoSupplySystem,
       this.hudSystem,
       this.minimapSystem,
       this.fullMapSystem,
