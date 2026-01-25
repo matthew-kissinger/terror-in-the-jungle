@@ -94,7 +94,7 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
   description: 'Fast-paced combat over 3 strategic zones. Control the majority to drain enemy tickets.',
 
   worldSize: 500,  // Slightly larger to accommodate spread
-  chunkRenderDistance: 7,
+  chunkRenderDistance: 8,  // Increased to push terrain edge further with height fog
   weather: {
     enabled: true,
     initialState: WeatherState.LIGHT_RAIN,

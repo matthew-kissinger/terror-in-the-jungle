@@ -50,6 +50,7 @@ export class SandboxSystemManager {
   private systems: GameSystem[] = [];
   private systemTimings: Map<string, SystemTimingEntry> = new Map();
   private readonly EMA_ALPHA = 0.1;
+  private scene?: THREE.Scene;
 
   // Game systems
   public assetLoader!: AssetLoader;
@@ -156,6 +157,9 @@ export class SandboxSystemManager {
     // Initialize influence map system based on game mode world size
     const worldSize = 4000; // Default, will be updated when game mode is set
     this.influenceMapSystem = new InfluenceMapSystem(worldSize);
+
+    // Store scene reference for fog access
+    this.scene = scene;
 
     this.connectSystems(scene, camera, sandboxRenderer);
 
@@ -443,7 +447,10 @@ export class SandboxSystemManager {
 
     this.trackSystemUpdate('Billboards', 2.0, () => {
       performanceTelemetry.beginSystem('Billboards');
-      if (this.globalBillboardSystem) this.globalBillboardSystem.update(deltaTime);
+      if (this.globalBillboardSystem) {
+        const fog = this.scene?.fog as THREE.FogExp2 | undefined;
+        this.globalBillboardSystem.update(deltaTime, fog);
+      }
       performanceTelemetry.endSystem('Billboards');
     });
 

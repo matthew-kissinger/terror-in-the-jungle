@@ -25,6 +25,7 @@ const BILLBOARD_VERTEX_SHADER = `
   varying vec2 vUv;
   varying float vDistance;
   varying float vLodFactor;
+  varying float vWorldY;
 
   void main() {
     vUv = uv;
@@ -80,13 +81,16 @@ const BILLBOARD_VERTEX_SHADER = `
     // Transform to world position
     vec3 finalPosition = worldPos + rotatedPosition;
 
+    // Pass world Y for height fog
+    vWorldY = finalPosition.y;
+
     // Project to screen
     vec4 mvPosition = modelViewMatrix * vec4(finalPosition, 1.0);
     gl_Position = projectionMatrix * mvPosition;
   }
 `;
 
-// Fragment shader with distance-based alpha fade and LOD
+// Fragment shader with distance-based alpha fade, LOD, and height fog
 const BILLBOARD_FRAGMENT_SHADER = `
   precision highp float;
 
@@ -96,9 +100,17 @@ const BILLBOARD_FRAGMENT_SHADER = `
   uniform vec3 colorTint;
   uniform float gammaAdjust;
 
+  // Height fog uniforms
+  uniform vec3 fogColor;
+  uniform float fogDensity;        // Base fog density
+  uniform float fogHeightFalloff;  // How quickly fog thins with altitude
+  uniform float fogStartDistance;  // Distance before fog begins
+  uniform bool fogEnabled;
+
   varying vec2 vUv;
   varying float vDistance;
   varying float vLodFactor;
+  varying float vWorldY;
 
   void main() {
     vec4 texColor = texture2D(map, vUv);
@@ -116,6 +128,24 @@ const BILLBOARD_FRAGMENT_SHADER = `
     fadeFactor *= (1.0 - vLodFactor * 0.3);
 
     vec3 shaded = pow(texColor.rgb * colorTint, vec3(gammaAdjust));
+
+    // Apply height-based fog (dense at ground, thin at altitude)
+    if (fogEnabled) {
+      // Height factor: fog is densest at y=0, exponentially thins with height
+      // Using max(0, y) so underground objects still get full fog
+      float heightFactor = exp(-fogHeightFalloff * max(0.0, vWorldY));
+
+      // Distance factor: fog increases with distance, but only past start distance
+      float effectiveDistance = max(0.0, vDistance - fogStartDistance);
+      float distanceFactor = 1.0 - exp(-fogDensity * effectiveDistance);
+
+      // Combine: distant ground-level objects get most fog
+      float fogFactor = heightFactor * distanceFactor;
+      fogFactor = clamp(fogFactor, 0.0, 1.0);
+
+      shaded = mix(shaded, fogColor, fogFactor);
+    }
+
     gl_FragColor = vec4(shaded, texColor.a * fadeFactor);
   }
 `;
@@ -183,7 +213,7 @@ export class GPUBillboardVegetation {
     this.geometry.setAttribute('instanceScale', this.scaleAttribute);
     this.geometry.setAttribute('instanceRotation', this.rotationAttribute);
 
-    // Create shader material
+    // Create shader material with height fog support
     this.material = new THREE.RawShaderMaterial({
       uniforms: {
         map: { value: config.texture },
@@ -194,7 +224,13 @@ export class GPUBillboardVegetation {
         lodDistances: { value: new THREE.Vector2(150, 300) },
         viewMatrix: { value: new THREE.Matrix4() },
         colorTint: { value: new THREE.Color(0.65, 0.7, 0.62) },
-        gammaAdjust: { value: 1.2 }
+        gammaAdjust: { value: 1.2 },
+        // Height fog uniforms - creates ground-level mist effect
+        fogColor: { value: new THREE.Color(0x5a7a6a) },
+        fogDensity: { value: 0.006 },        // How much fog accumulates with distance
+        fogHeightFalloff: { value: 0.03 },   // How quickly fog thins with altitude (lower = thicker at height)
+        fogStartDistance: { value: 100.0 },  // Fog doesn't appear until this distance
+        fogEnabled: { value: false }
       },
       vertexShader: BILLBOARD_VERTEX_SHADER,
       fragmentShader: BILLBOARD_FRAGMENT_SHADER,
@@ -324,11 +360,20 @@ export class GPUBillboardVegetation {
   }
 
   // Update uniforms (called every frame)
-  update(camera: THREE.Camera, time: number): void {
+  update(camera: THREE.Camera, time: number, fog?: THREE.FogExp2 | null): void {
     this.material.uniforms.cameraPosition.value.copy(camera.position);
     this.material.uniforms.time.value = time;
     if (camera instanceof THREE.PerspectiveCamera) {
       this.material.uniforms.viewMatrix.value.copy(camera.matrixWorldInverse);
+    }
+
+    // Enable height fog when scene has fog (use our custom height fog parameters)
+    if (fog) {
+      this.material.uniforms.fogEnabled.value = true;
+      this.material.uniforms.fogColor.value.copy(fog.color);
+      // Height fog uses its own density/falloff, not the scene's FogExp2 density
+    } else {
+      this.material.uniforms.fogEnabled.value = false;
     }
   }
 
@@ -476,11 +521,11 @@ export class GPUBillboardSystem {
   }
 
   // Update all vegetation (called every frame)
-  update(camera: THREE.Camera, deltaTime: number): void {
+  update(camera: THREE.Camera, deltaTime: number, fog?: THREE.FogExp2 | null): void {
     const time = performance.now() * 0.001; // Convert to seconds
 
     this.vegetationTypes.forEach(vegetation => {
-      vegetation.update(camera, time);
+      vegetation.update(camera, time, fog);
     });
   }
 

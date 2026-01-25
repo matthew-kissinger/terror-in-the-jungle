@@ -51,9 +51,9 @@ export class GlobalBillboardSystem implements GameSystem {
     }
   }
 
-  update(deltaTime: number): void {
+  update(deltaTime: number, fog?: THREE.FogExp2 | null): void {
     if (this.useGPUForVegetation) {
-      this.gpuVegetationSystem.update(this.camera, deltaTime);
+      this.gpuVegetationSystem.update(this.camera, deltaTime, fog);
     } else if (this.renderer) {
       this.renderer.update(deltaTime);
     }

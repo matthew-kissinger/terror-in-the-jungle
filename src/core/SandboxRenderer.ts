@@ -52,18 +52,17 @@ export class SandboxRenderer {
 
   private setupLighting(): void {
     // === JUNGLE ATMOSPHERE ===
-    // SALVAGE FIX: Fog disabled - was causing inconsistent tinting
-    // Three.js fog only affects materials with fog:true (terrain) but not
-    // custom shaders (vegetation), creating a mismatch. Dense jungle
-    // provides natural visibility limits via vegetation occlusion.
+    // Fog re-enabled with matching support in GPU billboard shader
+    // Both terrain and vegetation now fade consistently to fog color
 
-    // Background color - visible at far distances/skybox gaps
-    const backgroundColor = 0x5a7a6a; // Muted jungle green
-    this.scene.background = new THREE.Color(backgroundColor);
+    // Background color - matches fog for seamless distance fade
+    const fogColor = 0x5a7a6a; // Muted jungle green
+    this.scene.background = new THREE.Color(fogColor);
 
-    // Fog disabled - set to null to prevent any fog effects
-    this.fog = undefined;
-    this.scene.fog = null;
+    // Exponential fog - density tuned to hide terrain edge (~400-500m)
+    // Lower density = fog starts further away
+    this.fog = new THREE.FogExp2(fogColor, 0.004);
+    this.scene.fog = this.fog;
 
     // Ambient light - general scene illumination
     // Reduced intensity for moody jungle atmosphere
