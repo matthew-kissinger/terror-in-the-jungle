@@ -1,10 +1,36 @@
-# Terror in the Jungle - v0.1 Alpha (Stable PC Version)
+# Terror in the Jungle - v0.1 Alpha
 
 A high-performance 3D pixel art battlefield game built with Three.js. Experience intense team-based combat in a procedurally generated tropical jungle environment with GPU-accelerated rendering of 200,000+ vegetation instances.
 
-🎮 **[Play Now on GitHub Pages](https://matthew-kissinger.github.io/terror-in-the-jungle/)**
+**[Play Now on GitHub Pages](https://matthew-kissinger.github.io/terror-in-the-jungle/)**
 
-> **Note**: This is the stable PC version (v0.1-alpha). For experimental WebXR/VR features, see [terror-in-the-jungle-vr-experimental](https://github.com/matthew-kissinger/terror-in-the-jungle-vr-experimental)
+---
+
+## Current Development Priorities
+
+**This repo is actively developed.** Key areas needing improvement:
+
+### Combat & NPC (Critical)
+- **NPC Performance**: Enemies tank FPS when clustered - need ECS migration, spatial culling
+- **Combat AI**: NPCs are too predictable - add flanking, cover-seeking, suppression
+- **Combat Feel**: Gunplay lacks punch - better hit feedback, death animations, audio
+
+### Weapons
+- **Grenade Overhaul**: Floaty physics, weak explosions, unclear arc preview
+- **Mortar Reimplementation**: Currently disabled - needs ballistic physics
+- **New Weapons Needed**: Shotgun (close-range), SMG (spray option)
+
+### Game Loop
+- **Match Flow**: Abrupt endings, no stats screen, missing kill feed
+- **Squad UX**: Commands confusing, can't identify your units
+
+### Performance
+- **Loading Time**: Too slow - needs asset optimization
+- **Frame Budget**: Need better profiling tools
+
+See `CLAUDE.md` for full priority list with implementation details.
+
+---
 
 ## Features
 

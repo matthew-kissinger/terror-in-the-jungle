@@ -21,6 +21,7 @@ import { CombatantCombat } from './CombatantCombat';
 import { CombatantMovement } from './CombatantMovement';
 import { CombatantRenderer } from './CombatantRenderer';
 import { SquadManager } from './SquadManager';
+import { SpatialGrid } from './SpatialGrid';
 
 export class CombatantSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -40,6 +41,7 @@ export class CombatantSystem implements GameSystem {
   private combatantMovement: CombatantMovement;
   private combatantRenderer: CombatantRenderer;
   private squadManager: SquadManager;
+  private spatialGrid: SpatialGrid;
 
   // Effects pools
   private tracerPool: TracerPool;
@@ -143,6 +145,7 @@ export class CombatantSystem implements GameSystem {
     );
     this.combatantMovement = new CombatantMovement(chunkManager, undefined);
     this.squadManager = new SquadManager(this.combatantFactory, chunkManager);
+    this.spatialGrid = new SpatialGrid(30, 4000); // 30m cell size, 4000m default world
   }
 
   async init(): Promise<void> {
@@ -251,9 +254,10 @@ export class CombatantSystem implements GameSystem {
   private spawnSquad(faction: Faction, centerPos: THREE.Vector3, size: number): void {
     const { squad, members } = this.squadManager.createSquad(faction, centerPos, size);
 
-    // Add all squad members to our combatants map
+    // Add all squad members to our combatants map and spatial grid
     members.forEach(combatant => {
       this.combatants.set(combatant.id, combatant);
+      this.spatialGrid.updatePosition(combatant.id, combatant.position);
     });
   }
 
@@ -338,6 +342,7 @@ export class CombatantSystem implements GameSystem {
   public reseedForcesForMode(): void {
     console.log('🔁 Reseeding forces for new game mode configuration...');
     this.combatants.clear();
+    this.spatialGrid.clear();
     this.progressiveSpawnQueue = [];
     this.progressiveSpawnTimer = 0;
     this.reinforcementWaveTimer = 0;
@@ -349,9 +354,11 @@ export class CombatantSystem implements GameSystem {
     if (!proxy) {
       proxy = this.combatantFactory.createPlayerProxy(this.playerPosition);
       this.combatants.set(this.playerProxyId, proxy);
+      this.spatialGrid.updatePosition(this.playerProxyId, this.playerPosition);
     } else {
       proxy.position.copy(this.playerPosition);
       proxy.state = CombatantState.ENGAGING;
+      this.spatialGrid.updatePosition(this.playerProxyId, this.playerPosition);
     }
   }
 
@@ -453,7 +460,7 @@ export class CombatantSystem implements GameSystem {
   }
 
   private updateCombatantFull(combatant: Combatant, deltaTime: number): void {
-    this.combatantAI.updateAI(combatant, deltaTime, this.playerPosition, this.combatants);
+    this.combatantAI.updateAI(combatant, deltaTime, this.playerPosition, this.combatants, this.spatialGrid);
     this.combatantMovement.updateMovement(
       combatant,
       deltaTime,
@@ -469,10 +476,12 @@ export class CombatantSystem implements GameSystem {
     );
     this.combatantRenderer.updateCombatantTexture(combatant);
     this.combatantMovement.updateRotation(combatant, deltaTime);
+    // Update spatial grid after movement
+    this.spatialGrid.updatePosition(combatant.id, combatant.position);
   }
 
   private updateCombatantMedium(combatant: Combatant, deltaTime: number): void {
-    this.combatantAI.updateAI(combatant, deltaTime, this.playerPosition, this.combatants);
+    this.combatantAI.updateAI(combatant, deltaTime, this.playerPosition, this.combatants, this.spatialGrid);
     this.combatantMovement.updateMovement(
       combatant,
       deltaTime,
@@ -487,6 +496,8 @@ export class CombatantSystem implements GameSystem {
       this.squadManager.getAllSquads()
     );
     this.combatantMovement.updateRotation(combatant, deltaTime);
+    // Update spatial grid after movement
+    this.spatialGrid.updatePosition(combatant.id, combatant.position);
   }
 
   private updateCombatantBasic(combatant: Combatant, deltaTime: number): void {
@@ -497,6 +508,8 @@ export class CombatantSystem implements GameSystem {
       this.combatants
     );
     this.combatantMovement.updateRotation(combatant, deltaTime);
+    // Update spatial grid after movement
+    this.spatialGrid.updatePosition(combatant.id, combatant.position);
   }
 
   private manageSpawning(): void {
@@ -741,6 +754,7 @@ export class CombatantSystem implements GameSystem {
 
       this.squadManager.removeSquadMember(combatant.squadId, id);
     }
+    this.spatialGrid.remove(id);
     this.combatants.delete(id);
   }
 
@@ -779,6 +793,7 @@ export class CombatantSystem implements GameSystem {
 
     squad.members.push(newMember.id);
     this.combatants.set(newMember.id, newMember);
+    this.spatialGrid.updatePosition(newMember.id, newMember.position);
 
     console.log(`✅ Squad member ${newMember.id} spawned and moving to rejoin squad`);
   }
@@ -898,6 +913,9 @@ export class CombatantSystem implements GameSystem {
   setGameModeManager(gameModeManager: GameModeManager): void {
     this.gameModeManager = gameModeManager;
     this.combatantMovement.setGameModeManager(gameModeManager);
+    // Update spatial grid world size
+    const worldSize = gameModeManager.getWorldSize();
+    this.spatialGrid.setWorldSize(worldSize);
   }
 
   setAudioManager(audioManager: AudioManager): void {

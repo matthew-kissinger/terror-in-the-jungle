@@ -18,6 +18,10 @@ export const SOUND_CONFIGS: Record<string, SoundConfig> = {
     path: 'assets/optimized/playerGunshot.wav',
     volume: 0.7
   },
+  playerShotgun: {
+    path: 'assets/optimized/playerShotgun.wav',
+    volume: 0.85
+  },
   otherGunshot: {
     path: 'assets/optimized/otherGunshot.wav',
     volume: 0.6,

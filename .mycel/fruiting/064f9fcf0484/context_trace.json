@@ -1,0 +1,20 @@
+{
+  "session_id": "064f9fcf0484",
+  "task_id": "bdda85dd-25dc-4426-9ae1-d31cfaefcc28",
+  "agent": "claude",
+  "model": "haiku",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T18:53:56.740290",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "# Context\nYou are working on Terror in the Jungle, a 3D pixel art battlefield game. The CLAUDE.md mentions: \"Grenade System Overhaul - Throw power UX confusing - visual power meter\". The grenade system has a power buildup mechanic but no visual indicator showing the current throw power level.\n\n# Goal\nAdd a visual power meter that shows the grenade throw power while aiming (holding G key).\n\n# Discovery Phase\nRead these files:\n1. src/systems/weapons/GrenadeSystem.ts - Grenade throwing logic, getAimingState()\n2. src/ui/hud/HUDSystem.ts - Main HUD system\n3. src/ui/hud/HUDStyles.ts - Existing HUD styles\n\n# Implementation\n\n1. In HUDSystem.ts, add a power meter element:\n   - Create a small vertical or horizontal bar near crosshair\n   - Show only when grenade is being aimed (isAiming from GrenadeSystem)\n   - Fill percentage = throwPower from GrenadeSystem.getAimingState()\n   - Color gradient: green (low) -> yellow (mid) -> red (max)\n   - Style to match military/pixel art HUD aesthetic\n\n2. In HUDUpdater.ts or similar, poll GrenadeSystem.getAimingState() each frame:\n   - If isAiming, show and update meter\n   - If not aiming, hide meter\n\n3. Design specs:\n   - Position: bottom-right of crosshair, offset ~30-50px\n   - Size: ~8px wide x 60px tall (or 60x8 horizontal)\n   - Border: 1px solid white with black shadow\n   - Fill: gradient fill showing current power\n   - Add small text label \"PWR\" above/beside\n\n# Technical Notes\n- GrenadeSystem already has getAimingState() returning { isAiming: boolean, power: number }\n- Power ranges from 0.3 to 1.0 (30% minimum, 100% max)\n- Keep DOM manipulation minimal for performance\n- TypeScript strict mode, no semicolons\n\n# Validation\n- npm run dev\n- Press G to aim grenade\n- Verify power meter appears and fills as you hold\n- Release G - meter should hide\n- No grenades? Meter should not appear\n\n# Completion\n1. Test in browser\n2. Commit: \"feat(hud): add grenade throw power meter\"\n3. Brief summary",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

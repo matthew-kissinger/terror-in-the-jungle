@@ -1,0 +1,20 @@
+{
+  "session_id": "dd9eb17df7f1",
+  "task_id": "87ed47c8-ce52-4ad8-8c77-aa381f5c768b",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T19:14:48.484411",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "You are working on Terror in the Jungle, a 3D pixel art battlefield game with Three.js.\n\n## Context\nThe NPC performance is a critical priority. The game struggles with 60+ NPCs because hit detection and AI queries iterate over all combatants. Spatial partitioning would dramatically reduce the O(n^2) complexity.\n\n## Task\nImplement spatial partitioning (grid-based hash map) for combatant queries to improve NPC performance.\n\n## Discovery\nRead these files to understand the current system:\n1. src/systems/combat/CombatantSystem.ts - Main combatant orchestrator\n2. src/systems/combat/CombatantHitDetection.ts - Hit detection (likely O(n) per query)\n3. src/systems/combat/CombatantAI.ts - AI queries for nearby enemies\n4. src/systems/combat/types.ts - Combatant data structures\n\n## Implementation Requirements\n\n### Spatial Grid System:\n1. Create new file: src/systems/combat/SpatialGrid.ts\n2. Implement a 2D grid-based spatial hash:\n   - Cell size: ~30m (reasonable engagement range)\n   - Map bounds: Dynamic based on world size\n   - Store combatant IDs in cells based on position\n\n### Core API:\n```typescript\nclass SpatialGrid {\n  // Insert/update combatant position\n  updatePosition(id: string, position: Vector3): void\n  \n  // Remove combatant from grid\n  remove(id: string): void\n  \n  // Query nearby combatants within radius\n  queryRadius(position: Vector3, radius: number): string[]\n  \n  // Query single cell (fast path)\n  queryCell(position: Vector3): string[]\n  \n  // Clear and rebuild (for debugging)\n  rebuild(combatants: Map<string, Combatant>): void\n}\n```\n\n### Integration Points:\n1. CombatantSystem.update():\n   - Update spatial grid when combatants move\n   - Use updatePosition() after position changes\n\n2. CombatantHitDetection:\n   - Replace full iteration with spatial query\n   - Only check combatants in nearby cells for hit detection\n\n3. CombatantAI.findNearestEnemy():\n   - Query only nearby cells instead of all combatants\n   - Expand search radius if no enemies in nearby cells\n\n### Performance Targets:\n- Reduce hit detection time by 50%+ with 60 NPCs\n- AI enemy queries should check <20 combatants instead of 60+\n- Grid update overhead should be minimal (~0.1ms per frame)\n\n## Validation\n1. npm run build - must compile\n2. Test in browser with F1 performance overlay:\n   - Play Zone Control mode (15v15 = 30 NPCs)\n   - Note FPS before and after (compare with git stash)\n   - Combat should still work correctly\n3. Add console.log for query stats during development (remove before commit)\n\n## Conventions\n- Keep SpatialGrid.ts under 200 lines\n- TypeScript strict mode, no semicolons\n- Use simple Map/Set data structures (no external deps)\n- Commit: \"perf(combat): add spatial partitioning for NPC queries\"\n\nWhen complete: test in browser, verify FPS improvement, commit with descriptive message, provide before/after metrics if possible.",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

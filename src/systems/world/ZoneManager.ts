@@ -63,6 +63,8 @@ export class ZoneManager implements GameSystem {
 
   // Zone tracking
   private occupants: Map<string, { us: number; opfor: number }> = new Map();
+  private previousZoneState: Map<string, Faction | null> = new Map();
+  private hudSystem?: any;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -235,8 +237,21 @@ export class ZoneManager implements GameSystem {
       const occupants = this.occupants.get(zone.id);
       if (!occupants) return;
 
+      // Track previous state to detect captures
+      const previousOwner = this.previousZoneState.get(zone.id);
+
       // Update capture state
       this.captureLogic.updateZoneCaptureState(zone, occupants, deltaTime);
+
+      // Detect capture by US (player faction)
+      if (previousOwner !== Faction.US && zone.owner === Faction.US && !zone.isHomeBase) {
+        if (this.hudSystem && typeof this.hudSystem.addZoneCapture === 'function') {
+          this.hudSystem.addZoneCapture();
+        }
+      }
+
+      // Update previous state for next frame
+      this.previousZoneState.set(zone.id, zone.owner);
 
       // Update visuals
       this.zoneRenderer.updateZoneVisuals(zone, occupants);
@@ -357,6 +372,10 @@ export class ZoneManager implements GameSystem {
     this.chunkManager = chunkManager;
     this.terrainAdapter.setChunkManager(chunkManager);
     console.log('🔗 ChunkManager connected to ZoneManager');
+  }
+
+  setHUDSystem(hudSystem: any): void {
+    this.hudSystem = hudSystem;
   }
 
   dispose(): void {

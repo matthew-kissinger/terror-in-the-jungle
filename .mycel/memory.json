@@ -1,0 +1,45 @@
+{
+  "conventions": [
+    {
+      "id": "1f6db6e1",
+      "content": "All tasks commit directly to master - no feature branches used. Verify build passes before committing with npm run build",
+      "source": "manual",
+      "created_at": "2026-01-24T23:59:48.704200",
+      "tags": []
+    },
+    {
+      "id": "a40e16cc",
+      "content": "Three.js game - textures typed as unknown in recent versions. Cast texture.image when accessing for dimension calculations",
+      "source": "manual",
+      "created_at": "2026-01-24T23:59:50.156611",
+      "tags": []
+    },
+    {
+      "id": "8d9174c6",
+      "content": "HUD elements connect via setter methods like setGrenadeSystem(). New HUD features need explicit wiring in PixelArtSandbox.ts",
+      "source": "manual",
+      "created_at": "2026-01-24T23:59:59.212304",
+      "tags": []
+    }
+  ],
+  "warnings": [
+    {
+      "id": "ca69bb6b",
+      "content": "Uncommitted MatchEndScreen work exists in src/ui/end/ and PlayerStatsTracker.ts - complete integration before shipping match flow improvements",
+      "source": "manual",
+      "created_at": "2026-01-24T23:59:58.306569",
+      "tags": [],
+      "severity": "medium"
+    }
+  ],
+  "context": [
+    {
+      "id": "7af53727",
+      "content": "Combat AI uses state machine: PATROLLING, ALERT, ENGAGING, SUPPRESSING, ADVANCING, SEEKING_COVER, DEAD. Add new states to CombatantState enum in types.ts",
+      "source": "manual",
+      "created_at": "2026-01-24T23:59:51.149635",
+      "tags": []
+    }
+  ],
+  "updated_at": "2026-01-24T23:59:59.212321"
+}

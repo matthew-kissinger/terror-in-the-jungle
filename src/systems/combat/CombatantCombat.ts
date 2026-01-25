@@ -10,6 +10,7 @@ import { CombatantHitDetection } from './CombatantHitDetection';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { CombatantRenderer } from './CombatantRenderer';
 import { SandbagSystem } from '../weapons/SandbagSystem';
+import { SpatialGrid } from './SpatialGrid';
 
 export interface CombatHitResult {
   hit: boolean;

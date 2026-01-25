@@ -1,5 +1,33 @@
 # AI System Analysis - Complete Documentation
 
+## CRITICAL: Current Issues & Priorities
+
+**The AI system is the #1 development priority.** Current problems:
+
+### Performance Crisis
+- **15v15 combat tanks FPS** - AI update loop too expensive
+- 100ms throttle not aggressive enough when clustered
+- No spatial partitioning for hit detection
+- Billboard updates not batched
+- **Target**: 60+ NPCs at stable 60fps
+
+### Behavior Improvements Needed
+- NPCs are **too predictable** - just charge or stand still
+- No **flanking** or **suppression** tactics
+- No **cover-seeking** behavior
+- Squad coordination is basic
+- Pathfinding gets stuck on terrain
+- Need **influence maps** for strategic positioning
+
+### Recommended Fixes
+1. **ECS Migration** (bitecs) - struct-of-arrays for cache-friendly iteration
+2. **Distance-based LOD** - 60Hz near, 5Hz far field
+3. **Spatial hashing** for O(1) neighbor queries
+4. **Influence maps** computed in Web Worker
+5. **Behavior trees** instead of simple state machine
+
+---
+
 ## Overview
 The game features a sophisticated AI combat system with two factions: **US Forces** and **OPFOR** (Opposing Forces). NPCs engage in dynamic squad-based combat with realistic behaviors, vision systems, and skill variations.
 

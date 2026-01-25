@@ -24,7 +24,10 @@ export class FirstPersonWeapon implements GameSystem {
   // Weapon sprite
   private weaponScene: THREE.Scene;
   private weaponCamera: THREE.OrthographicCamera;
-  private weaponRig?: THREE.Group; // rig root
+  private rifleRig?: THREE.Group; // rifle model
+  private shotgunRig?: THREE.Group; // shotgun model
+  private smgRig?: THREE.Group; // SMG model
+  private weaponRig?: THREE.Group; // current active weapon rig root
   private muzzleRef?: THREE.Object3D;
   private magazineRef?: THREE.Object3D; // Magazine for reload animation
   
@@ -58,13 +61,25 @@ export class FirstPersonWeapon implements GameSystem {
   private tracerPool: TracerPool;
   private muzzleFlashPool: MuzzleFlashPool;
   private impactEffectsPool: ImpactEffectsPool;
-  private gunCore: GunplayCore;
-  private weaponSpec: WeaponSpec = {
+  private rifleCore: GunplayCore;
+  private shotgunCore: GunplayCore;
+  private gunCore: GunplayCore; // Current active weapon core
+
+  private rifleSpec: WeaponSpec = {
     name: 'Rifle', rpm: 700, adsTime: 0.18,
     baseSpreadDeg: 0.8, bloomPerShotDeg: 0.25,
-    recoilPerShotDeg: 0.65, recoilHorizontalDeg: 0.35, // Moderate recoil
+    recoilPerShotDeg: 0.65, recoilHorizontalDeg: 0.35,
     damageNear: 34, damageFar: 24, falloffStart: 20, falloffEnd: 60,
     headshotMultiplier: 1.7, penetrationPower: 1
+  };
+
+  private shotgunSpec: WeaponSpec = {
+    name: 'Shotgun', rpm: 75, adsTime: 0.22, // ~0.8s between shots
+    baseSpreadDeg: 2.5, bloomPerShotDeg: 1.0,
+    recoilPerShotDeg: 2.5, recoilHorizontalDeg: 0.8, // Heavy recoil
+    damageNear: 15, damageFar: 4, falloffStart: 8, falloffEnd: 25, // Per pellet
+    headshotMultiplier: 1.5, penetrationPower: 0.5,
+    pelletCount: 10, pelletSpreadDeg: 8 // 10 pellets in 8-degree cone
   };
   // private enemySystem?: EnemySystem;
   private combatantSystem?: CombatantSystem;
@@ -106,7 +121,11 @@ export class FirstPersonWeapon implements GameSystem {
     this.tracerPool = new TracerPool(this.scene, 96);
     this.muzzleFlashPool = new MuzzleFlashPool(this.scene, 32);
     this.impactEffectsPool = new ImpactEffectsPool(this.scene, 32);
-    this.gunCore = new GunplayCore(this.weaponSpec);
+
+    // Initialize both weapon cores
+    this.rifleCore = new GunplayCore(this.rifleSpec);
+    this.shotgunCore = new GunplayCore(this.shotgunSpec);
+    this.gunCore = this.rifleCore; // Start with rifle
 
     // Initialize ammo manager
     this.ammoManager = new AmmoManager(30, 90); // 30 rounds per mag, 90 reserve
@@ -118,10 +137,18 @@ export class FirstPersonWeapon implements GameSystem {
     console.log('⚔️ Initializing First Person Weapon...');
 
     // Build programmatic rifle
-    this.weaponRig = ProgrammaticGunFactory.createRifle();
-    this.weaponRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z);
-    // Don't set rotation here - it will be handled in updateWeaponTransform
-    this.weaponScene.add(this.weaponRig);
+    this.rifleRig = ProgrammaticGunFactory.createRifle();
+    this.rifleRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z);
+    this.weaponScene.add(this.rifleRig);
+
+    // Build programmatic shotgun
+    this.shotgunRig = ProgrammaticGunFactory.createShotgun();
+    this.shotgunRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z);
+    this.shotgunRig.visible = false; // Hidden initially
+    this.weaponScene.add(this.shotgunRig);
+
+    // Start with rifle active
+    this.weaponRig = this.rifleRig;
     this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
     this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
 
@@ -130,7 +157,7 @@ export class FirstPersonWeapon implements GameSystem {
       this.baseFOV = this.camera.fov;
     }
 
-    console.log('✅ First Person Weapon initialized (programmatic rifle)');
+    console.log('✅ First Person Weapon initialized (rifle + shotgun)');
 
     // Trigger initial ammo display
     this.onAmmoChange(this.ammoManager.getState());
@@ -239,6 +266,43 @@ export class FirstPersonWeapon implements GameSystem {
 
   setInventoryManager(inventoryManager: InventoryManager): void {
     this.inventoryManager = inventoryManager;
+
+    // Listen for weapon slot changes
+    inventoryManager.onSlotChange((slot) => {
+      if (slot === WeaponSlot.PRIMARY) {
+        this.switchToRifle();
+      } else if (slot === WeaponSlot.SHOTGUN) {
+        this.switchToShotgun();
+      }
+    });
+  }
+
+  private switchToRifle(): void {
+    if (this.weaponRig === this.rifleRig) return;
+
+    console.log('🔫 Switching to Rifle');
+    if (this.rifleRig && this.shotgunRig) {
+      this.rifleRig.visible = true;
+      this.shotgunRig.visible = false;
+      this.weaponRig = this.rifleRig;
+      this.gunCore = this.rifleCore;
+      this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
+      this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
+    }
+  }
+
+  private switchToShotgun(): void {
+    if (this.weaponRig === this.shotgunRig) return;
+
+    console.log('🔫 Switching to Shotgun');
+    if (this.rifleRig && this.shotgunRig) {
+      this.rifleRig.visible = false;
+      this.shotgunRig.visible = true;
+      this.weaponRig = this.shotgunRig;
+      this.gunCore = this.shotgunCore;
+      this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
+      this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
+    }
   }
 
   
@@ -246,8 +310,9 @@ export class FirstPersonWeapon implements GameSystem {
     // Don't process input until game has started and weapon is visible
     if (!this.gameStarted || !this.isEnabled || !this.weaponRig) return;
 
-    // Only handle gun input when PRIMARY weapon is equipped
-    if (this.inventoryManager && this.inventoryManager.getCurrentSlot() !== WeaponSlot.PRIMARY) {
+    // Only handle gun input when PRIMARY or SHOTGUN weapon is equipped
+    const currentSlot = this.inventoryManager?.getCurrentSlot();
+    if (this.inventoryManager && currentSlot !== WeaponSlot.PRIMARY && currentSlot !== WeaponSlot.SHOTGUN) {
       return;
     }
 
@@ -396,6 +461,39 @@ export class FirstPersonWeapon implements GameSystem {
       this.audioManager.playPlayerGunshot();
     }
 
+    // Check if shotgun - fire multiple pellets
+    if (this.gunCore.isShotgun()) {
+      this.fireShotgunPellets();
+    } else {
+      this.fireSingleShot();
+    }
+
+    // Visual recoil: kick weapon and camera slightly, and persist kick via controller
+    const kick = this.gunCore.getRecoilOffsetDeg();
+    // Fixed: positive pitch makes the aim go UP (as it should with recoil)
+    if (this.playerController) {
+      this.playerController.applyRecoil(THREE.MathUtils.degToRad(kick.pitch), THREE.MathUtils.degToRad(kick.yaw));
+      // Apply subtle recoil screen shake
+      this.playerController.applyRecoilShake();
+    }
+
+    // Apply recoil impulse to weapon spring system
+    if (this.weaponRig) {
+      // Shotgun has heavier recoil
+      const recoilMultiplier = this.gunCore.isShotgun() ? 1.8 : 1.0;
+      this.weaponRecoilVelocity.z -= 2.2 * recoilMultiplier; // Backward kick
+      this.weaponRecoilVelocity.y += 1.2 * recoilMultiplier; // Upward kick
+      this.weaponRecoilVelocity.rotX += 0.12 * recoilMultiplier; // Rotation kick
+
+      // Small random horizontal kick for variety
+      this.weaponRecoilVelocity.x += (Math.random() - 0.5) * 0.4;
+    }
+    (this as any).lastShotVisualTime = performance.now();
+  }
+
+  private fireSingleShot(): void {
+    if (!this.combatantSystem) return;
+
     // Spread and recoil
     const spread = this.gunCore.getSpreadDeg();
     const ray = this.gunCore.computeShotRay(this.camera, spread);
@@ -425,7 +523,53 @@ export class FirstPersonWeapon implements GameSystem {
       }
     }
 
-    // Spawn muzzle flash at the muzzle position
+    this.spawnMuzzleFlash();
+  }
+
+  private fireShotgunPellets(): void {
+    if (!this.combatantSystem) return;
+
+    // Generate pellet rays
+    const pelletRays = this.gunCore.computePelletRays(this.camera);
+
+    let totalDamage = 0;
+    let anyHit = false;
+    let bestHit: any = null;
+
+    // Fire each pellet
+    for (const ray of pelletRays) {
+      const result = this.combatantSystem.handlePlayerShot(ray, (d, head) => this.gunCore.computeDamage(d, head));
+
+      if (result.hit) {
+        anyHit = true;
+        totalDamage += (result as any).damage || 0;
+
+        // Track best hit for visual feedback
+        if (!bestHit || (result as any).killed) {
+          bestHit = result;
+        }
+
+        // Spawn impact effect for each pellet
+        const normal = ray.direction.clone().negate();
+        this.impactEffectsPool.spawn(result.point, normal);
+      }
+    }
+
+    // Show consolidated feedback for the shot
+    if (anyHit && this.hudSystem && bestHit) {
+      const hitType = (bestHit as any).killed ? 'kill' : (bestHit as any).headshot ? 'headshot' : 'normal';
+      this.hudSystem.showHitMarker(hitType);
+
+      // Show total damage dealt
+      if (totalDamage > 0) {
+        this.hudSystem.spawnDamageNumber(bestHit.point, totalDamage, (bestHit as any).headshot, (bestHit as any).killed);
+      }
+    }
+
+    this.spawnMuzzleFlash();
+  }
+
+  private spawnMuzzleFlash(): void {
     const muzzlePos = new THREE.Vector3();
     const cameraPos = new THREE.Vector3();
     this.camera.getWorldPosition(cameraPos);
@@ -441,27 +585,9 @@ export class FirstPersonWeapon implements GameSystem {
       muzzlePos.copy(cameraPos).addScaledVector(forward, 1);
     }
 
-    this.muzzleFlashPool.spawn(muzzlePos, forward, 1.2);
-
-    // Visual recoil: kick weapon and camera slightly, and persist kick via controller
-    const kick = this.gunCore.getRecoilOffsetDeg();
-    // Fixed: positive pitch makes the aim go UP (as it should with recoil)
-    if (this.playerController) {
-      this.playerController.applyRecoil(THREE.MathUtils.degToRad(kick.pitch), THREE.MathUtils.degToRad(kick.yaw));
-      // Apply subtle recoil screen shake
-      this.playerController.applyRecoilShake();
-    }
-    // Apply recoil impulse to weapon spring system (moderate recoil)
-    if (this.weaponRig) {
-      // Add impulse to velocity for spring physics
-      this.weaponRecoilVelocity.z -= 2.2; // Backward kick
-      this.weaponRecoilVelocity.y += 1.2; // Upward kick
-      this.weaponRecoilVelocity.rotX += 0.12; // Rotation kick
-
-      // Small random horizontal kick for variety
-      this.weaponRecoilVelocity.x += (Math.random() - 0.5) * 0.4;
-    }
-    (this as any).lastShotVisualTime = performance.now();
+    // Shotgun has a bigger muzzle flash
+    const flashSize = this.gunCore.isShotgun() ? 1.6 : 1.2;
+    this.muzzleFlashPool.spawn(muzzlePos, forward, flashSize);
   }
 
   setHUDSystem(hudSystem: any): void {

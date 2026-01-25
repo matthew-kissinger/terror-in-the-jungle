@@ -1,0 +1,20 @@
+{
+  "session_id": "3f77eb124ea4",
+  "task_id": "cdce29bb-58b1-45be-bcbd-8a0da37ef946",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T19:28:08.198244",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "You are working on Terror in the Jungle, a 3D pixel art battlefield game built with Three.js.\n\n## Context\n\nThe game lacks a kill feed - a scrolling list showing recent kills/deaths that appears in the corner of the screen. This is a key match flow improvement listed in CLAUDE.md. The KillFeed.ts file exists but may not be integrated.\n\n## Discovery\n\nRead these files first:\n- src/ui/hud/KillFeed.ts - Check if kill feed already exists\n- src/ui/hud/HUDSystem.ts - Main HUD orchestrator\n- src/systems/combat/CombatantSystem.ts - Where kills are detected\n- src/systems/combat/CombatantCombat.ts - Combat handling\n- src/systems/player/FirstPersonWeapon.ts - Player shooting\n- CLAUDE.md - Priority work areas section\n\n## Implementation\n\nIf KillFeed.ts exists but is not integrated:\n1. Instantiate KillFeed in HUDSystem\n2. Connect it to kill events from CombatantSystem\n3. Call KillFeed.addEntry() when kills happen\n\nIf KillFeed.ts needs implementation:\n1. Create a KillFeed class with:\n   - Container div positioned top-right corner\n   - addEntry(killerName: string, victimName: string, isHeadshot: boolean) method\n   - Entries fade out after 5 seconds\n   - Maximum 5 entries visible at once\n   - Different styling for player kills vs NPC kills\n   - Headshot kills highlighted\n\n2. Style should match existing HUD (Courier New font, military/tactical aesthetic)\n\n3. Integration points:\n   - CombatantCombat.ts handleDeath or similar\n   - FirstPersonWeapon.ts when player gets a kill\n   - HUDSystem to hold the KillFeed instance\n\n## Code Conventions\n\n- TypeScript strict mode\n- No semicolons\n- No emojis in commit messages\n- Modules under 400 lines\n- Match HUD styling in src/ui/hud/HUDStyles.ts\n\n## Validation\n\n- npm run build must pass\n- Kill feed should show when NPCs die\n- Player kills should be highlighted\n- Entries should auto-remove after delay\n- Should not block gameplay or other UI\n\n## When complete\n\n1. Test by playing and getting kills\n2. Commit: feat(ui): add kill feed to HUD\n3. Provide summary of the implementation",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "session_id": "16314f9a3886",
+  "task_id": "c0ad6343-6d3d-4a18-98e6-f1ae1fb55054",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T18:22:59.758364",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "## Context\nYou are working on 'Terror in the Jungle', a 3D pixel art battlefield game built with Three.js. The game has combat where players take damage from enemy NPCs. Currently, when the player is hit, the feedback is weak - there's a health reduction and vignette effect but no camera shake to convey impact.\n\n## Goal\nImplement a camera shake effect that triggers when the player takes damage. This complements the existing muzzle flash screen shake (which triggers on firing) by adding shake on incoming damage.\n\n## Discovery - Read These Files First\n1. src/systems/player/PlayerHealthSystem.ts - Main health system that handles damage events\n2. src/systems/player/PlayerHealthEffects.ts - Visual effects for damage (vignette, flash)\n3. src/systems/player/PlayerController.ts - Camera control, look for existing shake/recoil patterns\n4. src/systems/player/FirstPersonWeapon.ts - Reference for how applyRecoil works with the camera\n\n## Implementation Steps\n1. Add a camera shake system to PlayerController.ts:\n   - Add properties: shakeIntensity, shakeDuration, shakeTime, shakeOffset (Vector3)\n   - Add method applyDamageShake(intensity: number) that starts a shake\n   - Modify the update loop to apply decaying shake offset to camera rotation\n   - Use perlin noise or sine-based random for natural-feeling shake\n\n2. Connect damage events to camera shake:\n   - In PlayerHealthSystem.ts, when damage is taken, call controller.applyDamageShake()\n   - Scale intensity based on damage amount (small damage = light shake, big damage = heavy shake)\n\n3. Tuning suggestions:\n   - Base duration: 150-300ms\n   - Max rotation offset: 2-4 degrees\n   - Decay: exponential falloff\n   - Direction: primarily vertical with some horizontal\n\n## Validation\n- Run the game with 'npm run dev'\n- Take damage from enemies and verify camera shakes\n- Verify shake intensity scales with damage amount\n- Ensure shake doesn't conflict with existing weapon recoil\n- Test that shake recovers smoothly (no jitter at end)\n\n## When Complete\nTest the implementation in browser, commit with a descriptive message, and provide a summary of changes made.",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

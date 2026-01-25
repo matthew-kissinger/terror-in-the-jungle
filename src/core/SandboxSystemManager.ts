@@ -200,6 +200,7 @@ export class SandboxSystemManager {
     this.zoneManager.setCombatantSystem(this.combatantSystem);
     this.zoneManager.setCamera(camera);
     this.zoneManager.setChunkManager(this.chunkManager);
+    this.zoneManager.setHUDSystem(this.hudSystem);
 
     // Connect audio manager
     this.firstPersonWeapon.setAudioManager(this.audioManager);

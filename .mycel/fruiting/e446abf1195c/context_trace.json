@@ -1,0 +1,20 @@
+{
+  "session_id": "e446abf1195c",
+  "task_id": "0c12af70-38c2-4873-9a15-53e636a8737e",
+  "agent": "claude",
+  "model": "haiku",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T18:54:48.490069",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "# Context\nTerror in the Jungle uses Three.js for 3D rendering. The scan detected outdated dependencies:\n- three: 0.180.0 -> 0.182.0\n- @types/three: 0.180.0 -> 0.182.0\n\n# Goal\nUpdate Three.js and its types to version 0.182.0, ensuring the build passes and the game runs correctly.\n\n# Steps\n\n1. Update dependencies:\n   npm install three@0.182.0 @types/three@0.182.0\n\n2. Run TypeScript build to check for breaking changes:\n   npm run build\n\n3. If there are type errors, review the Three.js changelog for v0.181.0 and v0.182.0:\n   - Check for renamed/removed APIs\n   - Update any deprecated usage\n   - Focus on: WebGLRenderer, Scene, Camera, InstancedMesh, ShaderMaterial\n\n4. Test the game runs:\n   npm run dev\n   - Verify terrain renders\n   - Verify vegetation billboards work\n   - Verify NPCs display correctly\n   - Verify post-processing effects work\n\n5. Common breaking changes to watch for:\n   - Geometry deprecated methods\n   - Material property changes\n   - Renderer API changes\n\n# Files most likely affected (if any issues):\n- src/core/SandboxRenderer.ts\n- src/systems/world/billboard/*.ts\n- src/systems/terrain/*.ts\n- src/systems/effects/*.ts\n- src/materials/*.ts\n\n# Validation\n- npm run build passes with no errors\n- npm run dev runs the game\n- Visual inspection confirms no rendering regressions\n\n# Completion\n1. Verify build and runtime\n2. Commit: \"chore(deps): update three.js to v0.182.0\"\n3. Note any breaking changes encountered",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

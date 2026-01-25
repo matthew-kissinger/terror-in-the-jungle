@@ -1,0 +1,20 @@
+{
+  "session_id": "d2bba089d698",
+  "task_id": "e76523c5-8ba0-4b53-aba9-80e65114847d",
+  "agent": "claude",
+  "model": "haiku",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T18:02:28.179750",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "## Context\nYou are working on Terror in the Jungle, a 3D pixel art FPS game built with Three.js. The game has an existing audio system (AudioManager) that handles gunshots, death sounds, and ambient jungle sounds. However, grenade explosions currently have NO audio - they only show visual effects.\n\n## Discovery\n1. Read src/systems/audio/AudioManager.ts to understand the current audio pooling system\n2. Read src/config/audio.ts to see the sound configuration structure\n3. Read src/systems/weapons/GrenadeSystem.ts lines 355-377 to see the explodeGrenade method that needs audio\n\n## Implementation\n1. Add grenade explosion sound configuration to src/config/audio.ts:\n   - Add 'explosion' or 'grenadeExplosion' to SOUND_CONFIGS with appropriate settings\n   - Set refDistance around 15, maxDistance around 150 for good audibility\n   - Volume around 0.8-1.0 for impactful explosions\n\n2. Update AudioManager to support explosion sounds:\n   - Add an explosion sound pool (similar to deathSoundPool)\n   - Add a playExplosionAt(position: Vector3) method that plays positional audio\n\n3. Connect the explosion audio in GrenadeSystem.explodeGrenade():\n   - The system already has access to impactEffectsPool, add audioManager reference\n   - Add setAudioManager() method if needed\n   - Call audioManager.playExplosionAt(grenade.position) in explodeGrenade()\n\n4. Wire up the audio manager in SandboxSystemManager's connectSystems() method\n\n## Audio Files\nIf an explosion sound file doesn't exist in public/assets/audio/, you may need to note that one should be added, but still wire up the code so it's ready.\n\n## Validation\n- Run npm run dev and verify the game loads without errors\n- Throw a grenade (G key) and verify audio plays when it explodes\n- Test that distant explosions are quieter than nearby ones (positional audio)\n\n## Completion\nWhen complete: test in browser, commit with descriptive message (no emojis), provide summary of changes.",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

@@ -272,18 +272,35 @@ class MainSystem {
 - Consistent patterns across systems
 - Self-documenting structure
 
-## Future Improvements
+## Current Development Priorities
 
-### Planned Enhancements
-- Module lazy loading
-- Dynamic system registration
-- Event bus for loose coupling
-- Plugin architecture
-- Hot module reloading
+### CRITICAL: Combat & NPC Performance
+The combat system is the #1 priority. Current issues:
+- **NPC Performance Crisis**: 15v15 combat tanks FPS - need ECS migration (bitecs), spatial culling
+- **AI Behavior**: NPCs too predictable - need flanking, cover-seeking, suppression mechanics
+- **Combat Feel**: Weak hit feedback, sprite-swap deaths, underwhelming audio
+
+### Weapons Priority
+- **Grenade Overhaul**: Floaty physics, weak explosions, no arc preview
+- **Mortar Reimplementation**: Currently disabled - needs ballistic physics from scratch
+- **New Weapons**: Add shotgun (close-range) and SMG (spray option)
+
+### Game Loop
+- Match endings feel abrupt - need end-game sequence
+- Missing kill feed and post-match stats
+- Squad UX is confusing - simplify commands
 
 ### Performance Goals
-- Texture atlasing
-- Occlusion culling
-- Level-of-detail improvements
-- Web Workers for AI
-- WASM modules for intensive calculations
+- Loading time optimization (asset strategy, lazy loading)
+- Per-system frame budget tracking
+- ECS for NPC data (struct-of-arrays, cache-friendly)
+- Spatial partitioning for hit detection
+- Web Workers for AI calculations
+- Distance-based update throttling
+
+### Future Enhancements
+- Module lazy loading
+- Event bus for loose coupling
+- Multiplayer networking foundation
+- New game modes (TDM, Survival)
+- Weather/time-of-day effects

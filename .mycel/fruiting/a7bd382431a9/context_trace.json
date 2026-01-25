@@ -1,0 +1,20 @@
+{
+  "session_id": "a7bd382431a9",
+  "task_id": "73d4c64e-849c-4380-9ace-42f95917aa18",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T19:11:21.797990",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "You are working on Terror in the Jungle, a 3D pixel art battlefield game with Three.js.\n\n## Context  \nThe game needs a high fire rate weapon option (SMG/PDW) as specified in the GDD. This provides a \"spray and pray\" alternative to the precision rifle.\n\n## Task\nImplement an SMG weapon with high rate of fire and suppression capabilities.\n\n## Discovery\nRead these files first:\n1. src/systems/player/ProgrammaticGunFactory.ts - Weapon creation\n2. src/systems/weapons/GunplayCore.ts - Core shooting mechanics  \n3. src/systems/player/InventoryManager.ts - Weapon inventory\n4. src/systems/combat/CombatantAI.ts - Check how suppression works (suppressionLevel field)\n5. src/config/audio.ts - Audio configuration\n\n## Implementation Requirements\n\n### SMG Characteristics (from GDD):\n- High rate of fire: 800-900 RPM (compare to rifle ~600 RPM)\n- Lower damage per shot: ~18 damage vs rifle ~25\n- Good hip-fire accuracy (tighter spread when not ADS)\n- Fast reload: ~1.5s vs rifle ~2.2s\n- Magazine: 30 rounds\n- Suppression effect on enemies hit\n\n### Technical Implementation:\n1. Create SMG weapon definition\n2. Configure fire rate and damage:\n   - Fire interval: ~70ms between shots\n   - Damage: 18 per hit\n   - Range falloff starts at 40m (vs rifle 60m)\n3. Recoil pattern:\n   - Less per-shot recoil than rifle\n   - More cumulative climb during sustained fire\n4. Hip-fire bonus:\n   - SMG has tighter hip-fire spread than rifle\n   - Faster ADS transition\n5. Suppression effect:\n   - Hits on enemies increase their suppressionLevel\n   - This affects their accuracy and behavior (already implemented in AI)\n6. Add weapon switching (key 3 or weapon wheel)\n\n### Integration:\n- Add to player loadout\n- Add key binding (key \"3\" for tertiary weapon)\n- Update HUD ammo display\n- Ensure muzzle flash and tracers work\n\n## Validation\n1. npm run build - must compile\n2. Test in browser:\n   - High fire rate is noticeable vs rifle\n   - Magazine depletes quickly during sustained fire\n   - Enemies show suppression behavior when hit repeatedly\n   - Fast reload animation\n   - Hip-fire is viable at close range\n\n## Conventions\n- Keep modules under 400 lines\n- TypeScript strict mode, no semicolons\n- Test in browser before committing\n- Commit: \"feat(weapons): add SMG with high fire rate and suppression\"\n\nWhen complete: test in browser, commit with descriptive message, provide summary.",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

@@ -2,7 +2,7 @@ import { GameSystem } from '../../types';
 
 export enum WeaponSlot {
   PRIMARY = 0,
-  MORTAR = 1,
+  SHOTGUN = 1,
   GRENADE = 2,
   SANDBAG = 3
 }
@@ -65,8 +65,7 @@ export class InventoryManager implements GameSystem {
         break;
       case 'Digit2':
         if (!event.shiftKey && !event.ctrlKey && !event.altKey) {
-          // Mortar disabled - show warning instead
-          console.log('⚠️ Mortar system is temporarily disabled');
+          this.switchToSlot(WeaponSlot.SHOTGUN);
         }
         break;
       case 'Digit3':
@@ -218,11 +217,10 @@ export class InventoryManager implements GameSystem {
         <div class="slot-icon">🔫</div>
         <div class="slot-label">RIFLE</div>
       </div>
-      <div id="slot-mortar" class="hotbar-slot" data-slot="1">
+      <div id="slot-shotgun" class="hotbar-slot" data-slot="1">
         <div class="slot-key">[2]</div>
         <div class="slot-icon">💥</div>
-        <div class="slot-label" style="opacity: 0.5">MORTAR</div>
-        <div class="slot-count" id="mortar-count" style="opacity: 0.5">-</div>
+        <div class="slot-label">SHOTGUN</div>
       </div>
       <div id="slot-grenade" class="hotbar-slot" data-slot="2">
         <div class="slot-key">[3]</div>
@@ -311,13 +309,6 @@ export class InventoryManager implements GameSystem {
     const grenadeCount = this.uiElement.querySelector('#grenade-count');
     if (grenadeCount) {
       grenadeCount.textContent = String(this.grenades);
-    }
-
-    // Mortar count disabled - to be reimplemented
-    const mortarCount = this.uiElement.querySelector('#mortar-count');
-    if (mortarCount) {
-      mortarCount.textContent = '-';
-      (mortarCount as HTMLElement).style.opacity = '0.5';
     }
 
     const sandbagCount = this.uiElement.querySelector('#sandbag-count');

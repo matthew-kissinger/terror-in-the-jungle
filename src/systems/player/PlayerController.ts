@@ -310,10 +310,10 @@ export class PlayerController implements GameSystem {
         }
         break;
 
-      case WeaponSlot.MORTAR:
-        // Mortar system disabled - to be reimplemented
-        console.log('⚠️ Mortar system is temporarily disabled');
-        break;
+      // case WeaponSlot.MORTAR:
+      //   // Mortar system disabled - to be reimplemented
+      //   console.log('⚠️ Mortar system is temporarily disabled');
+      //   break;
 
       case WeaponSlot.SANDBAG:
         if (event.button === 0 && this.sandbagSystem) {
@@ -336,9 +336,9 @@ export class PlayerController implements GameSystem {
         }
         break;
 
-      case WeaponSlot.MORTAR:
-        // Mortar system disabled - to be reimplemented
-        break;
+      // case WeaponSlot.MORTAR:
+      //   // Mortar system disabled - to be reimplemented
+      //   break;
     }
   }
 
@@ -765,11 +765,11 @@ Escape - Release pointer lock / Exit helicopter
         }
         this.isInMortarMode = false;
         break;
-      case WeaponSlot.MORTAR:
-        // Mortar system disabled - to be reimplemented
-        console.log('⚠️ Mortar system is temporarily disabled and will be reimplemented');
-        this.isInMortarMode = false;
-        break;
+      // case WeaponSlot.MORTAR:
+      //   // Mortar system disabled - to be reimplemented
+      //   console.log('⚠️ Mortar system is temporarily disabled and will be reimplemented');
+      //   this.isInMortarMode = false;
+      //   break;
       case WeaponSlot.GRENADE:
         if (this.grenadeSystem) {
           this.grenadeSystem.showGrenadeInHand(true);

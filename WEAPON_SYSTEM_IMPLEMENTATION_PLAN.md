@@ -1,11 +1,40 @@
 # Weapon System Implementation Plan
 ## Terror in the Jungle - Explosive Weapons & Sandbags
 
-**Zoo Reference:** `terror-in-the-jungle-weapons` (ID: 3aba8d1e)
+---
+
+## CURRENT PRIORITIES
+
+### Grenade Overhaul (High Priority)
+Current grenade system is **poorly implemented**:
+- Throwing arc/preview is unclear - **add trajectory line**
+- Physics feel floaty - **tighten up gravity/drag**
+- Explosion effect is weak - **bigger, louder, more particles**
+- Damage radius inconsistent - **fix hitbox detection**
+- No cooking mechanic - **add hold-to-cook timer**
+- Throw power UX confusing - **visual power meter**
+
+### Mortar System (High Priority)
+Currently **disabled** due to camera/physics issues:
+- Needs proper **ballistic arc physics** from scratch
+- **Trajectory preview** with landing indicator
+- Satisfying **impact effects**
+- Camera stays usable during aiming
+
+### New Weapons Needed
+1. **Shotgun** - Close-range option for jungle combat
+   - 8-12 pellet spread pattern
+   - High damage close, falloff at distance
+   - Pump action animation
+
+2. **SMG/PDW** - Spray option
+   - High ROF, lower damage per shot
+   - Good hip-fire accuracy
+   - Suppression effect on enemies
 
 ---
 
-## Overview
+## Original Implementation Plan
 
 This plan details the implementation of:
 - **Sandbag placement system** with bullet/vision blocking

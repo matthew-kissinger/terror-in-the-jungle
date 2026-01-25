@@ -1,0 +1,20 @@
+{
+  "session_id": "889947b812ab",
+  "task_id": "76fdd9a3-232d-4dc9-a9f3-977bfa67f82c",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T18:22:59.770593",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "## Context\nYou are working on 'Terror in the Jungle', a 3D pixel art battlefield game built with Three.js. The CLAUDE.md file explicitly calls out that 'Hit feedback is weak (need hit markers, damage numbers)'. While hit markers exist, there are no floating damage numbers when the player damages enemies.\n\n## Goal\nImplement floating damage numbers that appear above enemies when they take damage. Numbers should pop up, float upward, and fade out - a common FPS feedback pattern.\n\n## Discovery - Read These Files First\n1. src/ui/hud/HUDElements.ts - Existing HUD system, reference for DOM-based UI patterns\n2. src/systems/combat/CombatantSystem.ts - Where damage is applied to combatants\n3. src/systems/combat/CombatantHitDetection.ts - Hit detection, find where damage events occur\n4. src/systems/player/FirstPersonWeapon.ts - Look at tryFire() for how hits are processed\n5. src/core/SandboxRenderer.ts - For world-to-screen projection if using CSS positioning\n\n## Implementation Options\nChoose ONE approach:\n\n### Option A: DOM-based (Recommended for pixel art style)\n- Create DamageNumberPool class in src/ui/hud/\n- Pool of pre-created div elements for performance\n- On hit: grab element from pool, position at screen coords, animate with CSS\n- World-to-screen projection: camera.project() + viewport transform\n\n### Option B: Three.js Sprite-based\n- Create DamageNumberPool using THREE.Sprite with canvas textures\n- Billboarded sprites that always face camera\n- More complex but integrated into 3D scene\n\n## Implementation Steps (Option A)\n1. Create src/ui/hud/DamageNumberSystem.ts:\n   - Class with spawn(worldPos: Vector3, damage: number, isHeadshot: boolean, isKill: boolean)\n   - Pool of 20-30 div elements\n   - CSS animation: scale up, float up, fade out over 800ms\n   - Different colors: white=normal, yellow=headshot, red=kill\n\n2. Add CSS styles for damage numbers (add to HUDStyles.ts or inline):\n   - Font: bold, monospace\n   - Text shadow for visibility\n   - CSS animation keyframes\n\n3. Connect to damage events:\n   - In FirstPersonWeapon.ts tryFire(), after result.hit:\n     - Get world position of hit\n     - Call damageNumberSystem.spawn(result.point, damage, isHeadshot, isKill)\n   - Pass DamageNumberSystem to FirstPersonWeapon via setter\n\n4. Handle screen projection:\n   - In spawn(): project worldPos to screen coords using camera\n   - Update positions each frame for active numbers (they move in world space)\n\n## Validation\n- Run game with 'npm run dev'\n- Shoot enemies and verify damage numbers appear\n- Verify headshots show different color/style\n- Verify kills show different feedback\n- Ensure numbers don't cause performance issues (check console for pool exhaustion)\n- Numbers should be readable and not obstruct gameplay\n\n## When Complete\nTest the implementation in browser, commit with a descriptive message, and provide a summary of changes made.",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

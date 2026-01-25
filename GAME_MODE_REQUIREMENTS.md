@@ -1,5 +1,22 @@
 # Game Mode Requirements
 
+## Development Status
+
+**Current Issues:**
+- Zone Control works but combat performance suffers with 15v15
+- Open Frontier is implemented but needs balancing
+- Match endings feel abrupt - need victory/defeat sequences
+- No post-match stats screen
+- Missing kill feed during gameplay
+
+**Priorities:**
+1. Fix NPC performance before scaling to larger modes
+2. Add end-game sequence with stats
+3. Implement kill feed
+4. Balance zone layouts
+
+---
+
 ## Overview
 We have one game mode - I want us to be able to select from two game modes on the start screen.
 

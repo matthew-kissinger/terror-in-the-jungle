@@ -1,0 +1,20 @@
+{
+  "session_id": "848d1f650499",
+  "task_id": "c2f16293-06a4-4817-9540-b524a6b71c5d",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T18:54:48.488612",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "# Context\nTerror in the Jungle is a 3D pixel art battlefield game. The CLAUDE.md identifies that \"Combat AI Behavior - NPCs feel dumb and predictable\" and specifically mentions \"Squad coordination is basic (no flanking, suppression)\".\n\n# Goal\nImplement a suppression fire mechanic where NPCs lay down covering fire to pin enemies while squadmates maneuver. This will make combat feel more tactical and dangerous.\n\n# Discovery Phase\nRead these files to understand the AI system:\n1. src/systems/combat/CombatantAI.ts - Main AI logic and state machine\n2. src/systems/combat/CombatantCombat.ts - Combat/shooting logic\n3. src/systems/combat/SquadManager.ts - Squad coordination\n4. src/systems/combat/types.ts - Combatant/Squad types\n\n# Implementation\n\n1. In types.ts, add new state and fields:\n   - Add CombatantState.SUPPRESSING if not exists (check first)\n   - Add to Combatant: suppressionTarget?: THREE.Vector3, suppressionEndTime?: number\n\n2. In CombatantAI.ts, add suppression trigger logic:\n   - When squad has 3+ members and engages enemy:\n     - 1-2 members become \"suppressors\" (based on squadRole or random)\n     - Suppressors enter SUPPRESSING state\n     - Other members get ADVANCING or FLANKING destination\n   - Suppression triggers when:\n     - Squad leader spots enemy at mid-range (30-80m)\n     - Multiple enemies clustered together\n     - Squadmate is low health and retreating\n\n3. In CombatantCombat.ts, modify shooting for SUPPRESSING state:\n   - Higher fire rate (shorter burst pause)\n   - Lower accuracy (add spread to target point)\n   - Fire toward area, not pinpoint at target\n   - Limited duration (3-5 seconds), then re-evaluate\n\n4. Suppression effect on enemies:\n   - In CombatantAI.ts, track incoming fire near combatant\n   - If bullets landing within 5m: increase panicLevel\n   - High panic makes AI seek cover, reduces accuracy\n   - Add lastSuppressedTime to track suppression state\n\n5. Squad coordination:\n   - In SquadManager.ts, add method: assignSuppressionRoles(squad, targetPos)\n   - Leader/machine-gunner role = suppressor\n   - Others = flankers (move to targetPos offset by angle)\n\n# Design Guidelines\n- Suppression should feel tactical, not just spray-and-pray\n- Keep changes focused - don't refactor entire AI\n- Maintain existing state machine structure\n- TypeScript strict, no semicolons\n- Test with Zone Control mode (15v15)\n\n# Validation\n- npm run dev\n- Observe squad combat:\n  - Some NPCs should lay suppressing fire (high rate, area targeting)\n  - Other squadmates should move/flank during suppression\n  - Player should feel \"pinned\" when under suppressing fire\n- Performance: No FPS drop from additional logic\n\n# Completion\n1. Test combat feels more dynamic and tactical\n2. Commit: \"feat(ai): add NPC suppression fire and squad coordination\"\n3. Summary of behavior changes",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

@@ -14,6 +14,8 @@ export interface WeaponSpec {
   falloffEnd: number;     // meters
   headshotMultiplier: number;
   penetrationPower: number; // simple constant for through foliage later
+  pelletCount?: number;   // optional: for shotguns, number of pellets per shot
+  pelletSpreadDeg?: number; // optional: cone angle for pellet spread
 }
 
 export class RecoilPattern {
@@ -115,6 +117,57 @@ export class GunplayCore {
       base = THREE.MathUtils.lerp(damageNear, damageFar, t);
     }
     return isHeadshot ? base * headshotMultiplier : base;
+  }
+
+  // Generate multiple pellet rays for shotgun-type weapons
+  computePelletRays(camera: THREE.Camera): THREE.Ray[] {
+    const pelletCount = this.spec.pelletCount || 1;
+    const pelletSpread = this.spec.pelletSpreadDeg || 0;
+
+    if (pelletCount === 1 || pelletSpread === 0) {
+      // Single pellet or no spread - just return one ray
+      return [this.computeShotRay(camera, 0)];
+    }
+
+    const rays: THREE.Ray[] = [];
+    const spreadRad = THREE.MathUtils.degToRad(pelletSpread);
+
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    dir.normalize();
+
+    const origin = new THREE.Vector3();
+    camera.getWorldPosition(origin);
+
+    // Build basis vectors for spread
+    const up = new THREE.Vector3(0, 1, 0);
+    const right = new THREE.Vector3().crossVectors(up, dir).normalize();
+    const realUp = new THREE.Vector3().crossVectors(dir, right).normalize();
+
+    // Generate pellets in a circular pattern
+    for (let i = 0; i < pelletCount; i++) {
+      // Random position within cone
+      const u = Math.random();
+      const v = Math.random();
+      const theta = 2 * Math.PI * u;
+      const r = spreadRad * Math.sqrt(v);
+
+      const offset = new THREE.Vector3(Math.cos(theta) * r, Math.sin(theta) * r, 0);
+
+      const perturbed = new THREE.Vector3()
+        .copy(dir)
+        .addScaledVector(right, offset.x)
+        .addScaledVector(realUp, offset.y)
+        .normalize();
+
+      rays.push(new THREE.Ray(origin.clone(), perturbed));
+    }
+
+    return rays;
+  }
+
+  isShotgun(): boolean {
+    return (this.spec.pelletCount || 1) > 1;
   }
 }
 

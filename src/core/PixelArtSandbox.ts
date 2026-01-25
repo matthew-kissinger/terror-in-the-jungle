@@ -207,6 +207,11 @@ export class PixelArtSandbox {
           this.systemManager.combatantSystem.enableCombat();
           console.log('⚔️ Combat AI activated!');
         }
+
+        // Start match statistics tracking
+        if (this.systemManager.hudSystem && typeof (this.systemManager.hudSystem as any).startMatch === 'function') {
+          (this.systemManager.hudSystem as any).startMatch();
+        }
       }, 200);
     }, 300);
 

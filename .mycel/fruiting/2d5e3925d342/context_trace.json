@@ -1,0 +1,20 @@
+{
+  "session_id": "2d5e3925d342",
+  "task_id": "c94a1cc2-41c3-4523-9e2f-e97c0c0cfed4",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T18:53:56.775335",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "# Context\nYou are working on Terror in the Jungle, a 3D pixel art battlefield game built with Three.js. The combat feedback is weak - when the player gets hit or explosions happen nearby, there's no screen shake to convey impact. The CLAUDE.md explicitly mentions: \"Screen shake and impact effects underwhelming.\"\n\n# Goal\nAdd a camera shake system that triggers on:\n1. Player taking damage (intensity scales with damage amount)\n2. Nearby explosions (intensity scales with proximity and explosion size)\n3. Player firing weapons (subtle recoil shake)\n\n# Discovery Phase\nFirst, read these files to understand the camera and effects setup:\n1. src/core/PixelArtSandbox.ts - Main game orchestrator, camera setup\n2. src/systems/player/PlayerController.ts - Player camera control\n3. src/systems/player/PlayerHealthSystem.ts - Damage events\n4. src/systems/weapons/GrenadeSystem.ts - Explosion events\n5. src/systems/effects/PostProcessingManager.ts - Existing effects pipeline\n\n# Implementation\n\n1. Create src/systems/effects/CameraShakeSystem.ts:\n   - Implements GameSystem interface\n   - Stores shake state: intensity, duration, decay rate\n   - Multiple simultaneous shakes can stack (additively with cap)\n   - Uses noise-based displacement for organic feel\n   - Exposes methods:\n     - `shake(intensity: number, duration: number)` - generic shake\n     - `shakeFromExplosion(explosionPos: Vector3, playerPos: Vector3, maxRadius: number)` - distance-scaled\n     - `shakeFromDamage(damageAmount: number)` - damage-scaled\n     - `shakeFromRecoil()` - subtle weapon recoil\n   - Update method applies current shake offset to camera\n\n2. Integrate with PlayerController.ts:\n   - After applying camera rotation, add shake offset\n   - Keep original rotation separate from shake displacement\n\n3. Wire up events:\n   - PlayerHealthSystem: Call shakeFromDamage when player takes damage\n   - GrenadeSystem: Call shakeFromExplosion when grenades explode\n   - FirstPersonWeapon: Call shakeFromRecoil when firing\n\n4. Shake parameters (tune these):\n   - Damage shake: intensity = damage/50, duration = 0.15-0.3s\n   - Explosion shake: intensity = 0.5-2.0 based on distance, duration = 0.3-0.5s\n   - Recoil shake: intensity = 0.05, duration = 0.05s\n\n# Design Guidelines\n- Use smooth noise (Perlin-like) not random jitter\n- Apply shake as rotation offset (pitch/yaw), not position\n- Cap maximum shake intensity to prevent nausea\n- Shake should decay smoothly, not cut off abruptly\n- Keep module under 150 lines\n- TypeScript strict mode, no semicolons\n\n# Validation\n- Run npm run dev and test in browser\n- Verify:\n  - Taking damage causes proportional screen shake\n  - Grenade explosions cause distance-based shake\n  - Weapon firing has subtle recoil feel\n  - Multiple simultaneous explosions feel impactful but not nauseating\n  - No interference with normal camera controls\n\n# Completion\nWhen complete:\n1. Test thoroughly in browser\n2. Commit with message: \"feat(effects): add camera shake system for combat feedback\"\n3. Provide summary of what was implemented",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

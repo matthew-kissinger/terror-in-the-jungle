@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Combatant, CombatantState, Faction, Squad, SquadCommand } from './types';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { SandbagSystem } from '../weapons/SandbagSystem';
+import { SpatialGrid } from './SpatialGrid';
 
 export class CombatantAI {
   private readonly FRIENDLY_FIRE_ENABLED = false;
@@ -19,26 +20,27 @@ export class CombatantAI {
     combatant: Combatant,
     deltaTime: number,
     playerPosition: THREE.Vector3,
-    allCombatants: Map<string, Combatant>
+    allCombatants: Map<string, Combatant>,
+    spatialGrid?: SpatialGrid
   ): void {
     // Decay suppression effects over time
     this.decaySuppressionEffects(combatant, deltaTime)
 
     switch (combatant.state) {
       case CombatantState.PATROLLING:
-        this.handlePatrolling(combatant, deltaTime, playerPosition, allCombatants);
+        this.handlePatrolling(combatant, deltaTime, playerPosition, allCombatants, spatialGrid);
         break;
       case CombatantState.ALERT:
         this.handleAlert(combatant, deltaTime, playerPosition);
         break;
       case CombatantState.ENGAGING:
-        this.handleEngaging(combatant, deltaTime, playerPosition, allCombatants);
+        this.handleEngaging(combatant, deltaTime, playerPosition, allCombatants, spatialGrid);
         break;
       case CombatantState.SUPPRESSING:
         this.handleSuppressing(combatant, deltaTime);
         break;
       case CombatantState.ADVANCING:
-        this.handleAdvancing(combatant, deltaTime, playerPosition, allCombatants);
+        this.handleAdvancing(combatant, deltaTime, playerPosition, allCombatants, spatialGrid);
         break;
       case CombatantState.SEEKING_COVER:
         this.handleSeekingCover(combatant, deltaTime, playerPosition, allCombatants);
@@ -68,7 +70,8 @@ export class CombatantAI {
     combatant: Combatant,
     deltaTime: number,
     playerPosition: THREE.Vector3,
-    allCombatants: Map<string, Combatant>
+    allCombatants: Map<string, Combatant>,
+    spatialGrid?: SpatialGrid
   ): void {
     const squad = combatant.squadId ? this.squads.get(combatant.squadId) : undefined;
 
@@ -82,7 +85,7 @@ export class CombatantAI {
       this.handleSquadCommand(combatant, squad, playerPosition, deltaTime);
     }
 
-    const enemy = this.findNearestEnemy(combatant, playerPosition, allCombatants);
+    const enemy = this.findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid);
     if (enemy) {
       const targetPos = enemy.id === 'PLAYER' ? playerPosition : enemy.position;
       const distance = combatant.position.distanceTo(targetPos);
@@ -206,7 +209,8 @@ export class CombatantAI {
     combatant: Combatant,
     deltaTime: number,
     playerPosition: THREE.Vector3,
-    allCombatants: Map<string, Combatant>
+    allCombatants: Map<string, Combatant>,
+    spatialGrid?: SpatialGrid
   ): void {
     if (!combatant.target || combatant.target.state === CombatantState.DEAD) {
       combatant.state = CombatantState.PATROLLING;
@@ -254,7 +258,7 @@ export class CombatantAI {
       }
     }
 
-    const nearbyEnemyCount = this.countNearbyEnemies(combatant, 20, playerPosition, allCombatants);
+    const nearbyEnemyCount = this.countNearbyEnemies(combatant, 20, playerPosition, allCombatants, spatialGrid);
     if (nearbyEnemyCount > 2) {
       combatant.isFullAuto = true;
       combatant.skillProfile.burstLength = 6;
@@ -315,7 +319,8 @@ export class CombatantAI {
     combatant: Combatant,
     deltaTime: number,
     playerPosition: THREE.Vector3,
-    allCombatants: Map<string, Combatant>
+    allCombatants: Map<string, Combatant>,
+    spatialGrid?: SpatialGrid
   ): void {
     // If reached destination, switch to engaging
     if (!combatant.destinationPoint) {
@@ -337,7 +342,7 @@ export class CombatantAI {
     combatant.rotation = Math.atan2(toDestination.z, toDestination.x)
 
     // Still check for enemies while advancing - can engage opportunistically
-    const enemy = this.findNearestEnemy(combatant, playerPosition, allCombatants)
+    const enemy = this.findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid)
     if (enemy) {
       const targetPos = enemy.id === 'PLAYER' ? playerPosition : enemy.position
       const distance = combatant.position.distanceTo(targetPos)
@@ -354,7 +359,8 @@ export class CombatantAI {
   findNearestEnemy(
     combatant: Combatant,
     playerPosition: THREE.Vector3,
-    allCombatants: Map<string, Combatant>
+    allCombatants: Map<string, Combatant>,
+    spatialGrid?: SpatialGrid
   ): Combatant | null {
     let nearestEnemy: Combatant | null = null;
     let minDistance = combatant.skillProfile.visualRange;
@@ -375,17 +381,35 @@ export class CombatantAI {
       }
     }
 
-    // Check other combatants
-    allCombatants.forEach(other => {
-      if (other.faction === combatant.faction) return;
-      if (other.state === CombatantState.DEAD) return;
+    // Use spatial grid if available for optimized queries
+    if (spatialGrid) {
+      const nearbyIds = spatialGrid.queryRadius(combatant.position, combatant.skillProfile.visualRange);
 
-      const distance = combatant.position.distanceTo(other.position);
-      if (distance < minDistance) {
-        minDistance = distance;
-        nearestEnemy = other;
+      for (const id of nearbyIds) {
+        const other = allCombatants.get(id);
+        if (!other) continue;
+        if (other.faction === combatant.faction) continue;
+        if (other.state === CombatantState.DEAD) continue;
+
+        const distance = combatant.position.distanceTo(other.position);
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestEnemy = other;
+        }
       }
-    });
+    } else {
+      // Fallback to full iteration if spatial grid unavailable
+      allCombatants.forEach(other => {
+        if (other.faction === combatant.faction) return;
+        if (other.state === CombatantState.DEAD) return;
+
+        const distance = combatant.position.distanceTo(other.position);
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestEnemy = other;
+        }
+      });
+    }
 
     return nearestEnemy;
   }
@@ -496,7 +520,8 @@ export class CombatantAI {
     combatant: Combatant,
     radius: number,
     playerPosition: THREE.Vector3,
-    allCombatants: Map<string, Combatant>
+    allCombatants: Map<string, Combatant>,
+    spatialGrid?: SpatialGrid
   ): number {
     let count = 0;
 
@@ -506,13 +531,29 @@ export class CombatantAI {
       }
     }
 
-    allCombatants.forEach(other => {
-      if (other.faction !== combatant.faction &&
-          other.state !== CombatantState.DEAD &&
-          other.position.distanceTo(combatant.position) < radius) {
-        count++;
+    // Use spatial grid if available for optimized queries
+    if (spatialGrid) {
+      const nearbyIds = spatialGrid.queryRadius(combatant.position, radius);
+
+      for (const id of nearbyIds) {
+        const other = allCombatants.get(id);
+        if (!other) continue;
+        if (other.faction !== combatant.faction &&
+            other.state !== CombatantState.DEAD &&
+            other.position.distanceTo(combatant.position) < radius) {
+          count++;
+        }
       }
-    });
+    } else {
+      // Fallback to full iteration if spatial grid unavailable
+      allCombatants.forEach(other => {
+        if (other.faction !== combatant.faction &&
+            other.state !== CombatantState.DEAD &&
+            other.position.distanceTo(combatant.position) < radius) {
+          count++;
+        }
+      });
+    }
 
     return count;
   }
