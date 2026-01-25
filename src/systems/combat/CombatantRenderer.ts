@@ -209,6 +209,8 @@ export class CombatantRenderer {
   updateBillboards(combatants: Map<string, Combatant>, playerPosition: THREE.Vector3): void {
     // Reset all mesh counts
     this.factionMeshes.forEach(mesh => mesh.count = 0);
+    this.factionAuraMeshes.forEach(mesh => mesh.count = 0);
+    this.factionGroundMarkers.forEach(mesh => mesh.count = 0);
 
     // Group combatants by faction and state
     const combatantGroups = new Map<string, Combatant[]>();
