@@ -92,13 +92,12 @@ export class CombatantAI {
     }
 
     // Check if should transition to zone defense
-    // TODO: Implement shouldAssignZoneDefense and assignZoneDefense methods
-    // if (this.shouldAssignZoneDefense(combatant)) {
-    //   this.assignZoneDefense(combatant);
-    //   if (combatant.state === CombatantState.DEFENDING) {
-    //     return;
-    //   }
-    // }
+    if (this.shouldAssignZoneDefense(combatant)) {
+      this.assignZoneDefense(combatant);
+      if (combatant.state === CombatantState.DEFENDING) {
+        return;
+      }
+    }
 
     const enemy = this.findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid);
     if (enemy) {
