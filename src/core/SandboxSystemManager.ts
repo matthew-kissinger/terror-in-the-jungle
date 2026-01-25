@@ -31,6 +31,7 @@ import { PlayerSuppressionSystem } from '../systems/player/PlayerSuppressionSyst
 import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
+import { DayNightCycle } from '../systems/environment/DayNightCycle';
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { objectPool } from '../utils/ObjectPoolManager';
 
@@ -55,6 +56,7 @@ export class SandboxSystemManager {
   public skybox!: Skybox;
   public waterSystem!: WaterSystem;
   public weatherSystem!: WeatherSystem;
+  public dayNightCycle!: DayNightCycle;
   public firstPersonWeapon!: FirstPersonWeapon;
   public zoneManager!: ZoneManager;
   public hudSystem!: HUDSystem;
@@ -119,6 +121,7 @@ export class SandboxSystemManager {
     this.skybox = new Skybox(scene);
     this.waterSystem = new WaterSystem(scene, this.assetLoader);
     this.weatherSystem = new WeatherSystem(scene, camera, this.chunkManager);
+    this.dayNightCycle = new DayNightCycle(scene);
     this.firstPersonWeapon = new FirstPersonWeapon(scene, camera, this.assetLoader);
     this.zoneManager = new ZoneManager(scene);
     this.ticketSystem = new TicketSystem();
@@ -158,6 +161,7 @@ export class SandboxSystemManager {
       this.chunkManager,
       this.waterSystem,
       this.weatherSystem,
+      this.dayNightCycle,
       this.playerController,
       this.firstPersonWeapon,
       this.combatantSystem,
@@ -339,6 +343,11 @@ export class SandboxSystemManager {
       if (sandboxRenderer) {
         this.weatherSystem.setSandboxRenderer(sandboxRenderer);
       }
+    }
+
+    // Connect day-night cycle
+    if (this.dayNightCycle && sandboxRenderer) {
+      this.dayNightCycle.setSandboxRenderer(sandboxRenderer);
     }
 
     // Connect footstep audio system

@@ -6,6 +6,7 @@ import { SandboxSystemManager } from './SandboxSystemManager';
 import { SandboxRenderer } from './SandboxRenderer';
 import { GameMode } from '../config/gameModes';
 import { PerformanceOverlay } from '../ui/debug/PerformanceOverlay';
+import { TimeIndicator } from '../ui/debug/TimeIndicator';
 import { LogOverlay } from '../ui/debug/LogOverlay';
 import { Logger } from '../utils/Logger';
 
@@ -14,6 +15,7 @@ export class PixelArtSandbox {
   private sandboxRenderer: SandboxRenderer;
   private systemManager: SandboxSystemManager;
   private performanceOverlay: PerformanceOverlay;
+  private timeIndicator: TimeIndicator;
   private logOverlay: LogOverlay;
 
   private clock = new THREE.Clock();
@@ -32,6 +34,7 @@ export class PixelArtSandbox {
     this.sandboxRenderer = new SandboxRenderer();
     this.systemManager = new SandboxSystemManager();
     this.performanceOverlay = new PerformanceOverlay();
+    this.timeIndicator = new TimeIndicator();
     this.logOverlay = new LogOverlay();
 
     this.setupEventListeners();
@@ -58,6 +61,8 @@ export class PixelArtSandbox {
         this.adjustPixelSize(1);
       } else if (event.key === 'F3') {
         this.toggleLogOverlay();
+      } else if (event.key === 'F4') {
+        this.toggleTimeIndicator();
       } else if (event.key === 'k' || event.key === 'K') {
         // Voluntary respawn with K key
         if (this.gameStarted) {
@@ -280,6 +285,10 @@ export class PixelArtSandbox {
     this.logOverlay.toggle();
   }
 
+  private toggleTimeIndicator(): void {
+    this.timeIndicator.toggle();
+  }
+
   private currentPixelSize = 1; // Start at 1 for best quality
   private adjustPixelSize(delta: number): void {
     if (!this.gameStarted || !this.sandboxRenderer.postProcessing) return;
@@ -382,6 +391,7 @@ Have fun!
 
     this.updatePerformanceOverlay(deltaTime);
     this.updateLogOverlay();
+    this.updateTimeIndicator();
   }
 
   private updatePerformanceOverlay(deltaTime: number): void {
@@ -449,11 +459,23 @@ Have fun!
     this.logOverlay.update(recent);
   }
 
+  private updateTimeIndicator(): void {
+    if (!this.timeIndicator.isVisible()) return;
+
+    const dayNightCycle = this.systemManager.dayNightCycle;
+    if (dayNightCycle) {
+      const timeString = dayNightCycle.getFormattedTime();
+      const nightFactor = dayNightCycle.getNightFactor();
+      this.timeIndicator.update(timeString, nightFactor);
+    }
+  }
+
   public dispose(): void {
     this.loadingScreen.dispose();
     this.sandboxRenderer.dispose();
     this.systemManager.dispose();
     this.performanceOverlay.dispose();
+    this.timeIndicator.dispose();
     this.logOverlay.dispose();
     console.log('🧹 Sandbox disposed');
   }
