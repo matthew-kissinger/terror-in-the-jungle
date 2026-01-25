@@ -3,6 +3,7 @@ import { Combatant, CombatantState, Faction } from '../types'
 import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager'
 import { SandbagSystem } from '../../weapons/SandbagSystem'
 import { objectPool } from '../../../utils/ObjectPoolManager'
+import { getHeightQueryCache } from '../../terrain/HeightQueryCache'
 
 /**
  * Cover position with quality score and metadata
@@ -209,8 +210,8 @@ export class AICoverSystem {
   getCoverQuality(coverPosition: THREE.Vector3, threatPosition: THREE.Vector3): number {
     if (!this.chunkManager) return 0.5
 
-    const coverHeight = this.chunkManager.getHeightAt(coverPosition.x, coverPosition.z)
-    const threatHeight = this.chunkManager.getHeightAt(threatPosition.x, threatPosition.z)
+    const coverHeight = getHeightQueryCache().getHeightAt(coverPosition.x, coverPosition.z)
+    const threatHeight = getHeightQueryCache().getHeightAt(threatPosition.x, threatPosition.z)
 
     // Height advantage score
     const heightAdvantage = Math.max(0, Math.min(1, (coverHeight - threatHeight) / 5))
@@ -274,14 +275,14 @@ export class AICoverSystem {
         const worldX = chunkX + x
         const worldZ = chunkZ + z
 
-        const height = this.chunkManager.getHeightAt(worldX, worldZ)
+        const height = getHeightQueryCache().getHeightAt(worldX, worldZ)
 
         // Check surrounding heights for elevation changes
         const heights = [
-          this.chunkManager.getHeightAt(worldX + 3, worldZ),
-          this.chunkManager.getHeightAt(worldX - 3, worldZ),
-          this.chunkManager.getHeightAt(worldX, worldZ + 3),
-          this.chunkManager.getHeightAt(worldX, worldZ - 3)
+          getHeightQueryCache().getHeightAt(worldX + 3, worldZ),
+          getHeightQueryCache().getHeightAt(worldX - 3, worldZ),
+          getHeightQueryCache().getHeightAt(worldX, worldZ + 3),
+          getHeightQueryCache().getHeightAt(worldX, worldZ - 3)
         ]
 
         const avgHeight = heights.reduce((a, b) => a + b, 0) / heights.length

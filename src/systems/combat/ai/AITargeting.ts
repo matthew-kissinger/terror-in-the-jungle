@@ -5,6 +5,7 @@ import { SandbagSystem } from '../../weapons/SandbagSystem';
 import { SpatialOctree } from '../SpatialOctree';
 import { objectPool } from '../../../utils/ObjectPoolManager';
 import { clusterManager } from '../ClusterManager';
+import { getHeightQueryCache } from '../../terrain/HeightQueryCache';
 
 /**
  * Handles target acquisition, line of sight checks, and cover finding
@@ -366,7 +367,7 @@ export class AITargeting {
             combatant.position.z + Math.sin(angle) * radius
           );
 
-          const terrainHeight = this.chunkManager.getHeightAt(testPos.x, testPos.z);
+          const terrainHeight = getHeightQueryCache().getHeightAt(testPos.x, testPos.z);
           testPos.y = terrainHeight;
 
           if (this.isPositionCover(testPos, combatant.position, threatPosition)) {
@@ -426,12 +427,12 @@ export class AITargeting {
         const distance = position.distanceTo(samplePos);
         if (distance > searchRadius || distance < 3) continue;
 
-        const localHeight = this.chunkManager.getHeightAt(samplePos.x, samplePos.z);
+        const localHeight = getHeightQueryCache().getHeightAt(samplePos.x, samplePos.z);
         const surroundingHeights = [
-          this.chunkManager.getHeightAt(samplePos.x + 2, samplePos.z),
-          this.chunkManager.getHeightAt(samplePos.x - 2, samplePos.z),
-          this.chunkManager.getHeightAt(samplePos.x, samplePos.z + 2),
-          this.chunkManager.getHeightAt(samplePos.x, samplePos.z - 2)
+          getHeightQueryCache().getHeightAt(samplePos.x + 2, samplePos.z),
+          getHeightQueryCache().getHeightAt(samplePos.x - 2, samplePos.z),
+          getHeightQueryCache().getHeightAt(samplePos.x, samplePos.z + 2),
+          getHeightQueryCache().getHeightAt(samplePos.x, samplePos.z - 2)
         ];
 
         const avgHeight = surroundingHeights.reduce((a, b) => a + b, 0) / surroundingHeights.length;
@@ -448,7 +449,7 @@ export class AITargeting {
           const coverPos = samplePos.clone().add(
             threatToVeg.multiplyScalar(VEGETATION_COVER_DISTANCE)
           );
-          coverPos.y = this.chunkManager.getHeightAt(coverPos.x, coverPos.z);
+          coverPos.y = getHeightQueryCache().getHeightAt(coverPos.x, coverPos.z);
 
           const coverToSample = new THREE.Vector3()
             .subVectors(samplePos, coverPos);

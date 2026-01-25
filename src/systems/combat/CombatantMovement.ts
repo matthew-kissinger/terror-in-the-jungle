@@ -5,6 +5,7 @@ import { ZoneManager, ZoneState } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { objectPool } from '../../utils/ObjectPoolManager';
 import { clusterManager } from './ClusterManager';
+import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 
 export class CombatantMovement {
   private chunkManager?: ImprovedChunkManager;
@@ -431,15 +432,8 @@ export class CombatantMovement {
   }
 
   private getTerrainHeight(x: number, z: number): number {
-    if (this.chunkManager) {
-      const height = this.chunkManager.getHeightAt(x, z);
-      // If chunk isn't loaded, use a reasonable default height
-      if (height === 0 && (Math.abs(x) > 50 || Math.abs(z) > 50)) {
-        return 5; // Assume flat terrain at y=5 for unloaded chunks
-      }
-      return height;
-    }
-    return 5; // Default terrain height
+    // Use HeightQueryCache - always returns valid height from noise
+    return getHeightQueryCache().getHeightAt(x, z);
   }
 
   setChunkManager(chunkManager: ImprovedChunkManager): void {

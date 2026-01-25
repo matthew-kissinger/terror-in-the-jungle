@@ -4,6 +4,7 @@ import { CombatantFactory } from './CombatantFactory';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { InfluenceMapSystem } from './InfluenceMapSystem';
 import { CaptureZone } from '../world/ZoneManager';
+import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 
 export class SquadManager {
   private squads: Map<string, Squad> = new Map();
@@ -109,14 +110,8 @@ export class SquadManager {
   }
 
   private getTerrainHeight(x: number, z: number): number {
-    if (this.chunkManager) {
-      const height = this.chunkManager.getHeightAt(x, z);
-      if (height === 0 && (Math.abs(x) > 50 || Math.abs(z) > 50)) {
-        return 5; // Default for unloaded chunks
-      }
-      return height;
-    }
-    return 5;
+    // Use HeightQueryCache - always returns valid height from noise
+    return getHeightQueryCache().getHeightAt(x, z);
   }
 
   setChunkManager(chunkManager: ImprovedChunkManager): void {

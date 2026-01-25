@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 
 /**
  * Terrain types for footstep sound variation
@@ -217,7 +218,7 @@ export class FootstepAudioSystem implements GameSystem {
       return TerrainType.GRASS; // Default
     }
     
-    const height = this.chunkManager.getHeightAt(position.x, position.z);
+    const height = getHeightQueryCache().getHeightAt(position.x, position.z);
     const waterLevel = 1.0; // Water surface level
     const nearWaterThreshold = 2.0; // Muddy area near water
     
@@ -233,10 +234,10 @@ export class FootstepAudioSystem implements GameSystem {
     
     // Calculate slope to detect rocky areas
     const sampleDist = 1.0;
-    const h1 = this.chunkManager.getHeightAt(position.x + sampleDist, position.z);
-    const h2 = this.chunkManager.getHeightAt(position.x - sampleDist, position.z);
-    const h3 = this.chunkManager.getHeightAt(position.x, position.z + sampleDist);
-    const h4 = this.chunkManager.getHeightAt(position.x, position.z - sampleDist);
+    const h1 = getHeightQueryCache().getHeightAt(position.x + sampleDist, position.z);
+    const h2 = getHeightQueryCache().getHeightAt(position.x - sampleDist, position.z);
+    const h3 = getHeightQueryCache().getHeightAt(position.x, position.z + sampleDist);
+    const h4 = getHeightQueryCache().getHeightAt(position.x, position.z - sampleDist);
     
     const slopeX = Math.abs(h1 - h2) / (sampleDist * 2);
     const slopeZ = Math.abs(h3 - h4) / (sampleDist * 2);

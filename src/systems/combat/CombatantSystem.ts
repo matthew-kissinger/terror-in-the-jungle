@@ -14,6 +14,7 @@ import { ZoneManager, ZoneState } from '../world/ZoneManager';
 import { AudioManager } from '../audio/AudioManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { Logger } from '../../utils/Logger';
+import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 
 // Refactored modules
 import { CombatantFactory } from './CombatantFactory';
@@ -1191,7 +1192,7 @@ export class CombatantSystem implements GameSystem {
 
       // Keep on terrain
       if (this.chunkManager) {
-        const terrainHeight = this.chunkManager.getHeightAt(combatant.position.x, combatant.position.z);
+        const terrainHeight = getHeightQueryCache().getHeightAt(combatant.position.x, combatant.position.z);
         combatant.position.y = terrainHeight + 3;
       } else {
         combatant.position.y = 5;

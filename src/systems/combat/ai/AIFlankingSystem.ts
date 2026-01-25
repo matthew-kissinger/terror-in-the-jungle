@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { Combatant, CombatantState, Faction, Squad } from '../types'
 import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager'
 import { objectPool } from '../../../utils/ObjectPoolManager'
+import { getHeightQueryCache } from '../../terrain/HeightQueryCache'
 
 /**
  * Flanking operation status
@@ -366,8 +367,8 @@ export class AIFlankingSystem {
         const leftPos = centroid.clone().add(leftDir.clone().multiplyScalar(dist))
         const rightPos = centroid.clone().add(rightDir.clone().multiplyScalar(dist))
 
-        const leftHeight = this.chunkManager.getHeightAt(leftPos.x, leftPos.z)
-        const rightHeight = this.chunkManager.getHeightAt(rightPos.x, rightPos.z)
+        const leftHeight = getHeightQueryCache().getHeightAt(leftPos.x, leftPos.z)
+        const rightHeight = getHeightQueryCache().getHeightAt(rightPos.x, rightPos.z)
 
         // Prefer elevated positions
         leftScore += leftHeight
@@ -410,7 +411,7 @@ export class AIFlankingSystem {
 
     // Set terrain height
     if (this.chunkManager) {
-      waypoint.y = this.chunkManager.getHeightAt(waypoint.x, waypoint.z)
+      waypoint.y = getHeightQueryCache().getHeightAt(waypoint.x, waypoint.z)
     }
 
     return waypoint
@@ -463,7 +464,7 @@ export class AIFlankingSystem {
 
       const flankerDestination = operation.flankWaypoint.clone().add(spreadOffset)
       if (this.chunkManager) {
-        flankerDestination.y = this.chunkManager.getHeightAt(flankerDestination.x, flankerDestination.z)
+        flankerDestination.y = getHeightQueryCache().getHeightAt(flankerDestination.x, flankerDestination.z)
       }
 
       combatant.state = CombatantState.ADVANCING
