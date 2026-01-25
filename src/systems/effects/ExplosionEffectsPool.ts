@@ -234,7 +234,7 @@ export class ExplosionEffectsPool {
     effect.shockwaveRing.position.copy(position);
     effect.shockwaveRing.position.y += 0.1; // Slightly above ground
     effect.shockwaveRing.scale.set(0.1, 0.1, 1);
-    effect.shockwaveRing.material.opacity = 0.6;
+    (effect.shockwaveRing.material as THREE.MeshBasicMaterial).opacity = 0.6;
     effect.shockwaveRing.visible = true;
 
     // Set timing - explosion lasts 3 seconds (smoke lingers)
@@ -336,7 +336,7 @@ export class ExplosionEffectsPool {
           const shockProgress = elapsed / 500;
           const scale = 0.1 + shockProgress * 15; // Expand to radius 15
           effect.shockwaveRing.scale.set(scale, scale, 1);
-          effect.shockwaveRing.material.opacity = 0.6 * (1 - shockProgress);
+          (effect.shockwaveRing.material as THREE.MeshBasicMaterial).opacity = 0.6 * (1 - shockProgress);
         } else {
           effect.shockwaveRing.visible = false;
         }
