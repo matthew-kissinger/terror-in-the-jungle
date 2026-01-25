@@ -6,6 +6,20 @@ export enum GameMode {
   OPEN_FRONTIER = 'open_frontier'
 }
 
+export enum WeatherState {
+  CLEAR = 'clear',
+  LIGHT_RAIN = 'light_rain',
+  HEAVY_RAIN = 'heavy_rain',
+  STORM = 'storm'
+}
+
+export interface WeatherConfig {
+  enabled: boolean;
+  initialState: WeatherState;
+  transitionChance: number; // 0-1 chance per minute
+  cycleDuration: { min: number; max: number }; // minutes
+}
+
 export interface ZoneConfig {
   id: string;
   name: string;
@@ -31,6 +45,7 @@ export interface GameModeConfig {
   // World settings
   worldSize: number;
   chunkRenderDistance: number;
+  weather?: WeatherConfig;
 
   // Match settings
   maxTickets: number;
@@ -65,6 +80,12 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
 
   worldSize: 400,
   chunkRenderDistance: 6,
+  weather: {
+    enabled: true,
+    initialState: WeatherState.LIGHT_RAIN,
+    transitionChance: 0.3,
+    cycleDuration: { min: 2, max: 5 }
+  },
 
   maxTickets: 300,
   matchDuration: 180, // 3 minutes
@@ -144,6 +165,12 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
 
   worldSize: 3200, // ~2x2 miles
   chunkRenderDistance: 10,
+  weather: {
+    enabled: true,
+    initialState: WeatherState.CLEAR,
+    transitionChance: 0.2,
+    cycleDuration: { min: 5, max: 15 }
+  },
 
   maxTickets: 1000,
   matchDuration: 900, // 15 minutes

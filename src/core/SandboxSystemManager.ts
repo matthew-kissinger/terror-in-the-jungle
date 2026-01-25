@@ -15,7 +15,7 @@ import { PlayerHealthSystem } from '../systems/player/PlayerHealthSystem';
 import { MinimapSystem } from '../ui/minimap/MinimapSystem';
 import { AudioManager } from '../systems/audio/AudioManager';
 import { GameModeManager } from '../systems/world/GameModeManager';
-import { GameMode } from '../config/gameModes';
+import { GameMode, getGameModeConfig } from '../config/gameModes';
 import { PlayerRespawnManager } from '../systems/player/PlayerRespawnManager';
 import { FullMapSystem } from '../ui/map/FullMapSystem';
 import { CompassSystem } from '../ui/compass/CompassSystem';
@@ -30,6 +30,7 @@ import { CameraShakeSystem } from '../systems/effects/CameraShakeSystem';
 import { PlayerSuppressionSystem } from '../systems/player/PlayerSuppressionSystem';
 import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
+import { WeatherSystem } from '../systems/environment/WeatherSystem';
 import { objectPool } from '../utils/ObjectPoolManager';
 
 interface SystemTimingEntry {
@@ -52,6 +53,7 @@ export class SandboxSystemManager {
   public combatantSystem!: CombatantSystem;
   public skybox!: Skybox;
   public waterSystem!: WaterSystem;
+  public weatherSystem!: WeatherSystem;
   public firstPersonWeapon!: FirstPersonWeapon;
   public zoneManager!: ZoneManager;
   public hudSystem!: HUDSystem;
@@ -114,6 +116,7 @@ export class SandboxSystemManager {
     this.combatantSystem = new CombatantSystem(scene, camera, this.globalBillboardSystem, this.assetLoader, this.chunkManager);
     this.skybox = new Skybox(scene);
     this.waterSystem = new WaterSystem(scene, this.assetLoader);
+    this.weatherSystem = new WeatherSystem(scene, camera, this.chunkManager);
     this.firstPersonWeapon = new FirstPersonWeapon(scene, camera, this.assetLoader);
     this.zoneManager = new ZoneManager(scene);
     this.ticketSystem = new TicketSystem();
@@ -151,6 +154,7 @@ export class SandboxSystemManager {
       this.globalBillboardSystem,
       this.chunkManager,
       this.waterSystem,
+      this.weatherSystem,
       this.playerController,
       this.firstPersonWeapon,
       this.combatantSystem,
@@ -325,6 +329,14 @@ export class SandboxSystemManager {
     this.ammoSupplySystem.setZoneManager(this.zoneManager);
     this.ammoSupplySystem.setInventoryManager(this.inventoryManager);
     this.ammoSupplySystem.setFirstPersonWeapon(this.firstPersonWeapon);
+
+    // Connect weather system
+    if (this.weatherSystem) {
+      this.weatherSystem.setAudioManager(this.audioManager);
+      if (sandboxRenderer) {
+        this.weatherSystem.setSandboxRenderer(sandboxRenderer);
+      }
+    }
   }
 
   async preGenerateSpawnArea(spawnPos: THREE.Vector3): Promise<void> {
@@ -409,6 +421,7 @@ export class SandboxSystemManager {
       if (this.zoneManager) this.zoneManager.update(deltaTime);
       if (this.ticketSystem) this.ticketSystem.update(deltaTime);
       if (this.waterSystem) this.waterSystem.update(deltaTime);
+      if (this.weatherSystem) this.weatherSystem.update(deltaTime);
     });
 
     // Update remaining systems without tracking (lightweight systems)
@@ -474,6 +487,12 @@ export class SandboxSystemManager {
   setGameMode(mode: GameMode): void {
     // Set flag for player squad creation BEFORE mode change
     (this.combatantSystem as any).shouldCreatePlayerSquad = true;
+
+    // Set weather config for mode
+    const config = getGameModeConfig(mode);
+    if (this.weatherSystem) {
+      this.weatherSystem.setWeatherConfig(config.weather);
+    }
 
     // This will trigger reseedForcesForMode() which respawns forces
     this.gameModeManager.setGameMode(mode);

@@ -97,7 +97,7 @@ export interface IFirstPersonWeapon {
  */
 export interface IChunkManager {
   getTerrainHeightAt(x: number, z: number): number;
-  getChunkAt(x: number, z: number): any;
+  getChunkAt(worldPos: THREE.Vector3): any;
   isChunkLoaded(x: number, z: number): boolean;
 }
 
@@ -152,6 +152,10 @@ export interface ISandboxRenderer {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   postProcessing?: any;
+  fog?: THREE.FogExp2;
+  ambientLight?: THREE.AmbientLight;
+  moonLight?: THREE.DirectionalLight;
+  jungleLight?: THREE.HemisphereLight;
   getPerformanceStats(): any;
   showSpawnLoadingIndicator(): void;
   hideSpawnLoadingIndicator(): void;
