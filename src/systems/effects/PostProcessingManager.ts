@@ -13,13 +13,21 @@ export class PostProcessingManager {
   private composer: EffectComposer;
   private renderPass: RenderPass;
   private pixelationPass: PixelationPass;
-  private enabled: boolean = true;
+  private enabled: boolean = false; // SALVAGE DEBUG: Disabled to test raw scene rendering
+  private renderer: THREE.WebGLRenderer;
+  private scene: THREE.Scene;
+  private camera: THREE.Camera;
 
   constructor(
     renderer: THREE.WebGLRenderer,
     scene: THREE.Scene,
     camera: THREE.Camera
   ) {
+    // Store references for fallback rendering
+    this.renderer = renderer;
+    this.scene = scene;
+    this.camera = camera;
+
     // Initialize composer
     this.composer = new EffectComposer(renderer, {
       frameBufferType: THREE.HalfFloatType
@@ -53,6 +61,9 @@ export class PostProcessingManager {
   render(deltaTime: number): void {
     if (this.enabled) {
       this.composer.render(deltaTime);
+    } else {
+      // Fallback: render scene directly without post-processing
+      this.renderer.render(this.scene, this.camera);
     }
   }
 

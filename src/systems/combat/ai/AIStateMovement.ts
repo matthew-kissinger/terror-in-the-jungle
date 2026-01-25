@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Combatant, CombatantState } from '../types';
 import { SpatialOctree } from '../SpatialOctree';
+import { clusterManager } from '../ClusterManager';
 
 /**
  * Handles advancing and seeking cover movement states
@@ -46,10 +47,24 @@ export class AIStateMovement {
       const targetPos = enemy.id === 'PLAYER' ? playerPosition : enemy.position;
       const distance = combatant.position.distanceTo(targetPos);
 
-      if (distance < 20 && canSeeTarget(combatant, enemy, playerPosition)) {
-        combatant.state = CombatantState.ENGAGING;
-        combatant.target = enemy;
-        combatant.destinationPoint = undefined;
+      // At very close range, ALWAYS react - can't ignore enemy right next to you
+      const veryCloseRange = distance < 15;
+
+      if (distance < 30) {
+        // Turn toward enemy before LOS check
+        const toTarget = new THREE.Vector3().subVectors(targetPos, combatant.position).normalize();
+        const savedRotation = combatant.rotation;
+        combatant.rotation = Math.atan2(toTarget.z, toTarget.x);
+
+        if (veryCloseRange || canSeeTarget(combatant, enemy, playerPosition)) {
+          combatant.state = CombatantState.ENGAGING;
+          combatant.target = enemy;
+          combatant.destinationPoint = undefined;
+          combatant.isFlankingMove = false;
+        } else {
+          // Restore rotation if didn't engage
+          combatant.rotation = savedRotation;
+        }
       }
     }
   }

@@ -23,6 +23,7 @@ import { CombatantMovement } from './CombatantMovement';
 import { CombatantRenderer } from './CombatantRenderer';
 import { SquadManager } from './SquadManager';
 import { SpatialOctree } from './SpatialOctree';
+import { spatialGridManager, SpatialGridManager } from './SpatialGridManager';
 import { InfluenceMapSystem } from './InfluenceMapSystem';
 import { RallyPointSystem } from './RallyPointSystem';
 
@@ -157,7 +158,16 @@ export class CombatantSystem implements GameSystem {
     );
     this.combatantMovement = new CombatantMovement(chunkManager, undefined);
     this.squadManager = new SquadManager(this.combatantFactory, chunkManager);
+
+    // Use legacy spatial grid for internal queries (AI, etc.)
+    // SpatialGridManager (singleton) is used for hit detection
     this.spatialGrid = new SpatialOctree(4000, 12, 6); // 4000m world, 12 entities/node, 6 max depth
+
+    // Initialize the singleton spatial grid manager (will be reinitialized when game mode is set)
+    spatialGridManager.initialize(4000);
+
+    // PERF: Wire spatial grid manager to hit detection for O(log n) queries
+    // Hit detection now uses SpatialGridManager singleton
   }
 
   async init(): Promise<void> {
@@ -356,6 +366,10 @@ export class CombatantSystem implements GameSystem {
 
     // Update combatants
     this.updateCombatants(deltaTime);
+
+    // Sync spatial grid manager with all combatant positions
+    // Uses LOD-based frequency for efficient updates
+    spatialGridManager.syncAllPositions(this.combatants, this.playerPosition);
 
     // Update billboard rotations
     this.combatantRenderer.updateBillboards(this.combatants, this.playerPosition);
@@ -1079,6 +1093,9 @@ export class CombatantSystem implements GameSystem {
     // Update spatial grid world size
     const worldSize = gameModeManager.getWorldSize();
     this.spatialGrid.setWorldSize(worldSize);
+    // Reinitialize spatial grid manager with correct world size
+    spatialGridManager.reinitialize(worldSize);
+    Logger.info('combat', `Spatial grid reinitialized with world size ${worldSize}`);
   }
 
   setAudioManager(audioManager: AudioManager): void {

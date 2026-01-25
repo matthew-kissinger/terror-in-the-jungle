@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Combatant, CombatantState, Squad, SquadCommand } from '../types';
 import { SpatialOctree } from '../SpatialOctree';
 import { ZoneManager } from '../../world/ZoneManager';
+import { clusterManager } from '../ClusterManager';
 
 /**
  * Handles patrol state behavior including squad commands and zone defense assignment
@@ -69,13 +70,27 @@ export class AIStatePatrol {
       const toTarget = new THREE.Vector3().subVectors(targetPos, combatant.position).normalize();
       combatant.rotation = Math.atan2(toTarget.z, toTarget.x);
 
-      if (canSeeTarget(combatant, enemy, playerPosition)) {
-        if (shouldEngage(combatant, distance)) {
+      // At very close range (<15m), NPCs should ALWAYS detect and engage
+      // regardless of LOS checks - they would hear footsteps, see peripheral movement, etc.
+      const veryCloseRange = distance < 15;
+
+      if (veryCloseRange || canSeeTarget(combatant, enemy, playerPosition)) {
+        // At close range, always engage. At longer range, use probability
+        if (veryCloseRange || shouldEngage(combatant, distance)) {
           combatant.state = CombatantState.ALERT;
           combatant.target = enemy;
 
-          const rangeDelay = Math.floor(distance / 30) * 250;
-          combatant.reactionTimer = (combatant.skillProfile.reactionDelayMs + rangeDelay) / 1000;
+          // Calculate base reaction delay
+          const rangeDelay = veryCloseRange ? 0 : Math.floor(distance / 30) * 250;
+          let baseDelay = (combatant.skillProfile.reactionDelayMs * (veryCloseRange ? 0.3 : 1) + rangeDelay);
+
+          // In clusters, stagger reactions to prevent synchronized behavior
+          const clusterDensity = clusterManager.getClusterDensity(combatant, allCombatants);
+          if (clusterDensity > 0.3) {
+            baseDelay = clusterManager.getStaggeredReactionDelay(baseDelay, clusterDensity);
+          }
+
+          combatant.reactionTimer = baseDelay / 1000;
           combatant.alertTimer = 1.5;
         }
       }

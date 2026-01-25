@@ -6,9 +6,14 @@ import { MuzzleFlashPool } from '../../effects/MuzzleFlashPool'
 import { ImpactEffectsPool } from '../../effects/ImpactEffectsPool'
 import { AudioManager } from '../../audio/AudioManager'
 import { PlayerStatsTracker } from '../PlayerStatsTracker'
+import { ShotCommand, ShotResult } from './ShotCommand'
+import { performanceTelemetry } from '../../debug/PerformanceTelemetry'
 
 /**
- * Handles weapon firing logic: spread calculation, hit detection, pellet handling
+ * Handles weapon firing execution. Uses command pattern to avoid temporal coupling.
+ *
+ * IMPORTANT: executeShot() performs NO validation. All checks (canFire, ammo, etc.)
+ * must happen BEFORE creating the ShotCommand.
  */
 export class WeaponFiring {
   private camera: THREE.Camera
@@ -60,8 +65,48 @@ export class WeaponFiring {
     this.gunCore = gunCore
   }
 
+  /**
+   * Execute a shot command. NO VALIDATION - command is assumed valid.
+   * All checks (canFire, ammo) happen before command creation.
+   */
+  executeShot(command: ShotCommand): ShotResult {
+    if (!this.combatantSystem) {
+      return { hit: false, killed: false, headshot: false, damageDealt: 0 }
+    }
+
+    // Register shot with stats tracker
+    if (this.statsTracker) {
+      this.statsTracker.registerShot(false)
+    }
+
+    // Play weapon-specific sound
+    if (this.audioManager) {
+      this.audioManager.playPlayerWeaponSound(command.weaponType)
+    }
+
+    // Execute based on weapon type
+    let result: ShotResult
+    if (command.weaponType === 'shotgun' && command.pelletRays) {
+      result = this.executeShotgunShot(command)
+    } else {
+      result = this.executeSingleShot(command)
+    }
+
+    // Spawn muzzle flash
+    this.spawnMuzzleFlash()
+
+    // Record in telemetry
+    performanceTelemetry.recordShot(result.hit)
+
+    return result
+  }
+
+  /**
+   * Legacy fire method - wraps executeShot for backward compatibility
+   * @deprecated Use executeShot with ShotCommand instead
+   */
   fire(isShotgun: boolean, weaponType: 'rifle' | 'shotgun' | 'smg' = 'rifle'): void {
-    if (!this.combatantSystem || !this.gunCore.canFire()) return
+    if (!this.combatantSystem) return
 
     // Register shot with stats tracker (will be marked as hit/miss after damage calculations)
     if (this.statsTracker) {
@@ -81,6 +126,139 @@ export class WeaponFiring {
     }
 
     this.spawnMuzzleFlash()
+  }
+
+  private executeSingleShot(command: ShotCommand): ShotResult {
+    if (!this.combatantSystem) {
+      return { hit: false, killed: false, headshot: false, damageDealt: 0 }
+    }
+
+    // Use the ray from the command - no recalculation
+    const result = this.combatantSystem.handlePlayerShot(command.ray, command.damage)
+
+    if (result.hit) {
+      // Spawn impact effect
+      const normal = command.ray.direction.clone().negate()
+      this.impactEffectsPool.spawn(result.point, normal)
+
+      const damageDealt = (result as any).damage || 0
+      const isHeadshot = (result as any).headshot || false
+      const isKill = (result as any).killed || false
+
+      // Track stats
+      if (this.statsTracker) {
+        if (damageDealt > 0) {
+          this.statsTracker.addDamage(damageDealt)
+        }
+        if (isHeadshot) {
+          this.statsTracker.addHeadshot()
+        }
+        if (isKill) {
+          const distance = this.camera.position.distanceTo(result.point)
+          this.statsTracker.updateLongestKill(distance)
+        }
+      }
+
+      // Show HUD feedback
+      if (this.hudSystem) {
+        const hitType = isKill ? 'kill' : isHeadshot ? 'headshot' : 'hit'
+        this.hudSystem.showHitMarker(hitType)
+
+        if (this.audioManager) {
+          this.audioManager.playHitFeedback(hitType as 'hit' | 'headshot' | 'kill')
+        }
+
+        if (damageDealt > 0) {
+          this.hudSystem.spawnDamageNumber(result.point, damageDealt, isHeadshot, isKill)
+        }
+      }
+
+      return {
+        hit: true,
+        hitPoint: result.point,
+        killed: isKill,
+        headshot: isHeadshot,
+        damageDealt,
+        distance: this.camera.position.distanceTo(result.point)
+      }
+    }
+
+    return { hit: false, killed: false, headshot: false, damageDealt: 0 }
+  }
+
+  private executeShotgunShot(command: ShotCommand): ShotResult {
+    if (!this.combatantSystem || !command.pelletRays) {
+      return { hit: false, killed: false, headshot: false, damageDealt: 0 }
+    }
+
+    let totalDamage = 0
+    let anyHit = false
+    let bestHit: any = null
+    let headshotHit = false
+    let killedByShot = false
+
+    // Fire each pellet
+    for (const pelletRay of command.pelletRays) {
+      const result = this.combatantSystem.handlePlayerShot(pelletRay, command.damage)
+
+      if (result.hit) {
+        anyHit = true
+        totalDamage += (result as any).damage || 0
+
+        if (!bestHit || (result as any).killed) {
+          bestHit = result
+        }
+
+        if ((result as any).headshot) {
+          headshotHit = true
+        }
+
+        if ((result as any).killed) {
+          killedByShot = true
+        }
+
+        // Spawn impact effect for each pellet
+        const normal = pelletRay.direction.clone().negate()
+        this.impactEffectsPool.spawn(result.point, normal)
+      }
+    }
+
+    // Track stats
+    if (anyHit && this.statsTracker && bestHit) {
+      if (totalDamage > 0) {
+        this.statsTracker.addDamage(totalDamage)
+      }
+      if (headshotHit) {
+        this.statsTracker.addHeadshot()
+      }
+      if (killedByShot) {
+        const distance = this.camera.position.distanceTo(bestHit.point)
+        this.statsTracker.updateLongestKill(distance)
+      }
+    }
+
+    // Show HUD feedback
+    if (anyHit && this.hudSystem && bestHit) {
+      const hitType: 'hit' | 'headshot' | 'kill' = killedByShot ? 'kill' : headshotHit ? 'headshot' : 'hit'
+      this.hudSystem.showHitMarker(hitType)
+
+      if (this.audioManager) {
+        this.audioManager.playHitFeedback(hitType)
+      }
+
+      if (totalDamage > 0) {
+        this.hudSystem.spawnDamageNumber(bestHit.point, totalDamage, headshotHit, killedByShot)
+      }
+    }
+
+    return {
+      hit: anyHit,
+      hitPoint: bestHit?.point,
+      killed: killedByShot,
+      headshot: headshotHit,
+      damageDealt: totalDamage,
+      distance: bestHit ? this.camera.position.distanceTo(bestHit.point) : undefined
+    }
   }
 
   private fireSingleShot(): void {

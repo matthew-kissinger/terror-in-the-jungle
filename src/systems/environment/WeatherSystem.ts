@@ -37,11 +37,15 @@ export class WeatherSystem implements GameSystem {
   // Underwater state
   private isUnderwater: boolean = false;
   
-  // Base atmosphere values (cached from renderer)
-  private baseFogDensity: number = 0.008;
-  private baseAmbientIntensity: number = 0.15;
-  private baseMoonIntensity: number = 0.3;
-  private baseJungleIntensity: number = 0.2;
+  // Base atmosphere values (cached from renderer on init)
+  // SALVAGE FIX: Updated defaults to match brighter SandboxRenderer values
+  // Note: These are overwritten by actual renderer values in setSandboxRenderer()
+  private baseFogDensity: number = 0.005;
+  private baseAmbientIntensity: number = 0.6;
+  private baseMoonIntensity: number = 0.8;
+  private baseJungleIntensity: number = 0.4;
+  private baseFogColor: number = 0x3a5a4a; // Green-gray jungle fog
+  private baseAmbientColor: number = 0x6a8a7a; // Warm green ambient
 
   constructor(scene: THREE.Scene, camera: THREE.Camera, chunkManager: IChunkManager) {
     this.scene = scene;
@@ -56,9 +60,15 @@ export class WeatherSystem implements GameSystem {
 
   setSandboxRenderer(renderer: ISandboxRenderer): void {
     this.sandboxRenderer = renderer;
-    // Cache initial values
-    if (renderer.fog) this.baseFogDensity = renderer.fog.density;
-    if (renderer.ambientLight) this.baseAmbientIntensity = renderer.ambientLight.intensity;
+    // Cache initial values from renderer
+    if (renderer.fog) {
+      this.baseFogDensity = renderer.fog.density;
+      this.baseFogColor = renderer.fog.color.getHex();
+    }
+    if (renderer.ambientLight) {
+      this.baseAmbientIntensity = renderer.ambientLight.intensity;
+      this.baseAmbientColor = renderer.ambientLight.color.getHex();
+    }
     if (renderer.moonLight) this.baseMoonIntensity = renderer.moonLight.intensity;
     if (renderer.jungleLight) this.baseJungleIntensity = renderer.jungleLight.intensity;
   }
@@ -351,18 +361,16 @@ export class WeatherSystem implements GameSystem {
     if (!this.isFlashing) {
       if (this.sandboxRenderer.fog) {
         this.sandboxRenderer.fog.density = fogDensity;
-        // Restore standard fog color
-        this.sandboxRenderer.fog.color.setHex(0x0a1012);
+        // Restore fog color from cached base (not hardcoded)
+        this.sandboxRenderer.fog.color.setHex(this.baseFogColor);
       }
       if (this.sandboxRenderer.ambientLight) {
         this.sandboxRenderer.ambientLight.intensity = ambientInt;
-        this.sandboxRenderer.ambientLight.color.setHex(0x1a2f3a); // Restore default ambient color
+        // Restore ambient color from cached base (not hardcoded)
+        this.sandboxRenderer.ambientLight.color.setHex(this.baseAmbientColor);
       }
       if (this.sandboxRenderer.moonLight) this.sandboxRenderer.moonLight.intensity = moonInt;
       if (this.sandboxRenderer.jungleLight) this.sandboxRenderer.jungleLight.intensity = jungleInt;
-      
-      // Reset fog color if it was flashed
-      // if (this.sandboxRenderer.fog) this.sandboxRenderer.fog.color.setHex(0x0a1012); // Done above
     }
   }
 

@@ -10,7 +10,7 @@ import { CombatantHitDetection } from './CombatantHitDetection';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { CombatantRenderer } from './CombatantRenderer';
 import { SandbagSystem } from '../weapons/SandbagSystem';
-import { SpatialOctree } from './SpatialOctree';
+// SpatialOctree import removed - CombatantHitDetection uses SpatialGridManager singleton
 import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { objectPool } from '../../utils/ObjectPoolManager';
@@ -57,6 +57,9 @@ export class CombatantCombat {
     this.hitDetection = new CombatantHitDetection();
     this.combatantRenderer = combatantRenderer;
   }
+
+  // NOTE: Spatial grid is now managed by SpatialGridManager singleton
+  // CombatantHitDetection uses it automatically
 
   updateCombat(
     combatant: Combatant,

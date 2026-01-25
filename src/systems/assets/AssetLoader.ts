@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { AssetInfo, AssetCategory, GameSystem } from '../../types';
 import { getAssetPath } from '../../config/paths';
+import { PixelPerfectUtils } from '../../utils/PixelPerfect';
 
 export class AssetLoader implements GameSystem {
   private assets: Map<string, AssetInfo> = new Map();
@@ -99,13 +100,22 @@ export class AssetLoader implements GameSystem {
     const loadPromises = Array.from(this.assets.values()).map(async (asset) => {
       try {
         const texture = await this.loadTexture(asset.path);
-        
-        // Configure for pixel-perfect rendering
-        texture.magFilter = THREE.NearestFilter;
-        texture.minFilter = THREE.NearestFilter;
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        // Note: flipY will be handled by PixelPerfectUtils.configureTexture()
+
+        // Configure texture based on category
+        // Billboards (foliage, enemies) use mipmapping for better distance rendering
+        // Other textures use pixel-perfect nearest filtering
+        if (asset.category === AssetCategory.FOLIAGE || asset.category === AssetCategory.ENEMY) {
+          // Billboard textures: mipmaps + anisotropic filtering for distance
+          PixelPerfectUtils.configureBillboardTexture(texture);
+        } else {
+          // Standard pixel-perfect: nearest filtering, no mipmaps
+          texture.magFilter = THREE.NearestFilter;
+          texture.minFilter = THREE.NearestFilter;
+          texture.wrapS = THREE.RepeatWrapping;
+          texture.wrapT = THREE.RepeatWrapping;
+          texture.generateMipmaps = false;
+        }
+
         // Downscale extremely large textures to avoid GPU memory exhaustion
         const resized = this.downscaleIfNeeded(asset.name, texture);
         const finalTexture = resized || texture;

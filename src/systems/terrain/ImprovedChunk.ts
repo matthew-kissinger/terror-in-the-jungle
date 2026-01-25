@@ -203,7 +203,7 @@ export class ImprovedChunk {
     // Compute BVH for accurate collision detection
     (geometry as any).computeBoundsTree();
     
-    // Create material
+    // Create material - use lit material so terrain responds to scene lighting
     let material: THREE.Material;
     if (this.debugMode) {
       material = new THREE.MeshBasicMaterial({
@@ -214,10 +214,12 @@ export class ImprovedChunk {
     } else {
       const texture = this.assetLoader.getTexture('forestfloor');
       if (texture) {
-        material = PixelPerfectUtils.createPixelPerfectMaterial(texture, false);
+        // Use lit material for natural shading based on scene lights
+        material = PixelPerfectUtils.createPixelPerfectLitMaterial(texture);
         texture.repeat.set(8, 8);
       } else {
-        material = new THREE.MeshBasicMaterial({
+        // Fallback: lit material with color
+        material = new THREE.MeshLambertMaterial({
           color: 0x4a7c59,
           side: THREE.DoubleSide
         });

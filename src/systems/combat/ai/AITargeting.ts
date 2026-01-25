@@ -4,6 +4,7 @@ import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
 import { SpatialOctree } from '../SpatialOctree';
 import { objectPool } from '../../../utils/ObjectPoolManager';
+import { clusterManager } from '../ClusterManager';
 
 /**
  * Handles target acquisition, line of sight checks, and cover finding
@@ -26,13 +27,14 @@ export class AITargeting {
     allCombatants: Map<string, Combatant>,
     spatialGrid?: SpatialOctree
   ): Combatant | null {
-    let nearestEnemy: Combatant | null = null;
-    let minDistance = combatant.skillProfile.visualRange;
+    const visualRange = combatant.skillProfile.visualRange;
+    const potentialTargets: Combatant[] = [];
 
+    // Check player as potential target for OPFOR
     if (combatant.faction === Faction.OPFOR) {
       const playerDistance = combatant.position.distanceTo(playerPosition);
-      if (playerDistance < combatant.skillProfile.visualRange) {
-        return {
+      if (playerDistance < visualRange) {
+        potentialTargets.push({
           id: 'PLAYER',
           faction: Faction.US,
           position: playerPosition.clone(),
@@ -40,12 +42,13 @@ export class AITargeting {
           state: CombatantState.ENGAGING,
           health: 100,
           maxHealth: 100
-        } as Combatant;
+        } as Combatant);
       }
     }
 
+    // Collect all enemy combatants within visual range
     if (spatialGrid) {
-      const nearbyIds = spatialGrid.queryRadius(combatant.position, combatant.skillProfile.visualRange);
+      const nearbyIds = spatialGrid.queryRadius(combatant.position, visualRange);
 
       for (const id of nearbyIds) {
         const other = allCombatants.get(id);
@@ -54,9 +57,8 @@ export class AITargeting {
         if (other.state === CombatantState.DEAD) continue;
 
         const distance = combatant.position.distanceTo(other.position);
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearestEnemy = other;
+        if (distance < visualRange) {
+          potentialTargets.push(other);
         }
       }
     } else {
@@ -65,11 +67,32 @@ export class AITargeting {
         if (other.state === CombatantState.DEAD) return;
 
         const distance = combatant.position.distanceTo(other.position);
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearestEnemy = other;
+        if (distance < visualRange) {
+          potentialTargets.push(other);
         }
       });
+    }
+
+    // Use cluster-aware target distribution when in a cluster
+    // This prevents all NPCs from focusing the same enemy
+    if (clusterManager.isInCluster(combatant, allCombatants)) {
+      return clusterManager.assignDistributedTarget(combatant, potentialTargets, allCombatants);
+    }
+
+    // Not in cluster - just pick nearest target
+    if (potentialTargets.length === 0) return null;
+    if (potentialTargets.length === 1) return potentialTargets[0];
+
+    let nearestEnemy: Combatant | null = null;
+    let minDistance = Infinity;
+
+    for (const target of potentialTargets) {
+      const targetPos = target.id === 'PLAYER' ? playerPosition : target.position;
+      const distance = combatant.position.distanceTo(targetPos);
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestEnemy = target;
+      }
     }
 
     return nearestEnemy;

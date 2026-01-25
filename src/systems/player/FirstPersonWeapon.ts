@@ -15,6 +15,7 @@ import { WeaponRigManager } from './weapon/WeaponRigManager'
 import { WeaponAnimations } from './weapon/WeaponAnimations'
 import { WeaponFiring } from './weapon/WeaponFiring'
 import { WeaponReload } from './weapon/WeaponReload'
+import { ShotCommand, ShotCommandFactory } from './weapon/ShotCommand'
 
 /**
  * Thin orchestrator for first-person weapon system
@@ -343,21 +344,26 @@ export class FirstPersonWeapon implements GameSystem {
       return
     }
 
-    // Consume ammo
+    // All validation passed - consume ammo and register shot BEFORE creating command
     if (!this.ammoManager.consumeRound()) return
     gunCore.registerShot()
 
-    // Check if shotgun - fire multiple pellets
+    // Determine weapon type
     const isShotgun = gunCore.isShotgun()
-    // Determine weapon type for audio
     let weaponType: 'rifle' | 'shotgun' | 'smg' = 'rifle'
     if (isShotgun) {
       weaponType = 'shotgun'
     } else if (gunCore === this.rigManager.getSMGCore()) {
       weaponType = 'smg'
     }
+
+    // Create shot command with all needed data
+    const isADS = this.animations.getADS()
+    const command = this.createShotCommand(gunCore, weaponType, isShotgun, isADS)
+
+    // Execute shot - NO RE-VALIDATION inside executeShot
     this.firing.setGunCore(gunCore)
-    this.firing.fire(isShotgun, weaponType)
+    this.firing.executeShot(command)
 
     // Start pump animation for shotgun
     if (isShotgun) {
@@ -366,16 +372,54 @@ export class FirstPersonWeapon implements GameSystem {
 
     // Visual recoil: kick weapon and camera slightly, and persist kick via controller
     const kick = gunCore.getRecoilOffsetDeg()
-    // Fixed: positive pitch makes the aim go UP (as it should with recoil)
     if (this.playerController) {
       this.playerController.applyRecoil(THREE.MathUtils.degToRad(kick.pitch), THREE.MathUtils.degToRad(kick.yaw))
-      // Apply subtle recoil screen shake
       this.playerController.applyRecoilShake()
     }
 
     // Apply recoil impulse to weapon spring system
     const recoilMultiplier = gunCore.isShotgun() ? 1.8 : 1.0
     this.animations.applyRecoilImpulse(recoilMultiplier)
+  }
+
+  /**
+   * Create a ShotCommand with all firing data captured at validation time
+   */
+  private createShotCommand(
+    gunCore: any,
+    weaponType: 'rifle' | 'shotgun' | 'smg',
+    isShotgun: boolean,
+    isADS: boolean
+  ): ShotCommand {
+    const spread = gunCore.getSpreadDeg()
+
+    if (isShotgun) {
+      // Get pellet rays from gunplay core
+      const pelletRays = gunCore.computePelletRays(this.camera)
+      const origin = new THREE.Vector3()
+      this.camera.getWorldPosition(origin)
+      const direction = new THREE.Vector3()
+      this.camera.getWorldDirection(direction)
+
+      return ShotCommandFactory.createShotgunShot(
+        origin,
+        direction,
+        pelletRays.map((r: THREE.Ray) => r.direction.clone()),
+        (d: number, head: boolean) => gunCore.computeDamage(d, head),
+        isADS
+      )
+    } else {
+      // Single shot - compute ray with spread
+      const ray = gunCore.computeShotRay(this.camera, spread)
+
+      return ShotCommandFactory.createSingleShot(
+        ray.origin.clone(),
+        ray.direction.clone(),
+        weaponType === 'shotgun' ? 'rifle' : weaponType,
+        (d: number, head: boolean) => gunCore.computeDamage(d, head),
+        isADS
+      )
+    }
   }
 
   setHUDSystem(hudSystem: any): void {

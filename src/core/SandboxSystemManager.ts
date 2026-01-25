@@ -35,6 +35,9 @@ import { DayNightCycle } from '../systems/environment/DayNightCycle';
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { VoiceCalloutSystem } from '../systems/audio/VoiceCalloutSystem';
 import { objectPool } from '../utils/ObjectPoolManager';
+import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
+import { spatialGridManager } from '../systems/combat/SpatialGridManager';
+import { ShotCommandFactory } from '../systems/player/weapon/ShotCommand';
 
 interface SystemTimingEntry {
   name: string;
@@ -157,6 +160,7 @@ export class SandboxSystemManager {
     this.connectSystems(scene, camera, sandboxRenderer);
 
     // Add systems to update list
+    // NOTE: dayNightCycle removed - conflicts with weatherSystem for lighting control
     this.systems = [
       this.assetLoader,
       this.audioManager,
@@ -164,7 +168,7 @@ export class SandboxSystemManager {
       this.chunkManager,
       this.waterSystem,
       this.weatherSystem,
-      this.dayNightCycle,
+      // this.dayNightCycle, // DISABLED: Conflicts with WeatherSystem lighting
       this.playerController,
       this.firstPersonWeapon,
       this.combatantSystem,
@@ -406,6 +410,11 @@ export class SandboxSystemManager {
   }
 
   updateSystems(deltaTime: number): void {
+    // Begin frame telemetry
+    performanceTelemetry.beginFrame();
+    spatialGridManager.resetFrameTelemetry();
+    ShotCommandFactory.resetPool();
+
     // Update player position in squad controller
     if (this.playerSquadController && this.playerController) {
       this.playerSquadController.updatePlayerPosition(this.playerController.getPosition());
@@ -419,43 +428,57 @@ export class SandboxSystemManager {
       this.voiceCalloutSystem.setPlayerPosition(playerPos);
     }
 
-    // Track timing for key systems
+    // Track timing for key systems (both local tracking and performance telemetry)
     this.trackSystemUpdate('Combat', 5.0, () => {
+      performanceTelemetry.beginSystem('Combat');
       if (this.combatantSystem) this.combatantSystem.update(deltaTime);
+      performanceTelemetry.endSystem('Combat');
     });
 
     this.trackSystemUpdate('Terrain', 2.0, () => {
+      performanceTelemetry.beginSystem('Terrain');
       if (this.chunkManager) this.chunkManager.update(deltaTime);
+      performanceTelemetry.endSystem('Terrain');
     });
 
     this.trackSystemUpdate('Billboards', 2.0, () => {
+      performanceTelemetry.beginSystem('Billboards');
       if (this.globalBillboardSystem) this.globalBillboardSystem.update(deltaTime);
+      performanceTelemetry.endSystem('Billboards');
     });
 
     this.trackSystemUpdate('Player', 1.0, () => {
+      performanceTelemetry.beginSystem('Player');
       if (this.playerController) this.playerController.update(deltaTime);
       if (this.firstPersonWeapon) this.firstPersonWeapon.update(deltaTime);
+      performanceTelemetry.endSystem('Player');
     });
 
     this.trackSystemUpdate('Weapons', 1.0, () => {
+      performanceTelemetry.beginSystem('Weapons');
       if (this.grenadeSystem) this.grenadeSystem.update(deltaTime);
       if (this.mortarSystem) this.mortarSystem.update(deltaTime);
       if (this.sandbagSystem) this.sandbagSystem.update(deltaTime);
       if (this.ammoSupplySystem) this.ammoSupplySystem.update(deltaTime);
+      performanceTelemetry.endSystem('Weapons');
     });
 
     this.trackSystemUpdate('UI', 1.0, () => {
+      performanceTelemetry.beginSystem('UI');
       if (this.hudSystem) this.hudSystem.update(deltaTime);
       if (this.minimapSystem) this.minimapSystem.update(deltaTime);
       if (this.fullMapSystem) this.fullMapSystem.update(deltaTime);
       if (this.compassSystem) this.compassSystem.update(deltaTime);
+      performanceTelemetry.endSystem('UI');
     });
 
     this.trackSystemUpdate('World', 1.0, () => {
+      performanceTelemetry.beginSystem('World');
       if (this.zoneManager) this.zoneManager.update(deltaTime);
       if (this.ticketSystem) this.ticketSystem.update(deltaTime);
       if (this.waterSystem) this.waterSystem.update(deltaTime);
       if (this.weatherSystem) this.weatherSystem.update(deltaTime);
+      performanceTelemetry.endSystem('World');
     });
 
     // Update remaining systems without tracking (lightweight systems)
@@ -475,14 +498,20 @@ export class SandboxSystemManager {
       this.compassSystem,
       this.zoneManager,
       this.ticketSystem,
-      this.waterSystem
+      this.waterSystem,
+      this.weatherSystem // FIX: Was missing - caused double-update bug
     ]);
 
+    performanceTelemetry.beginSystem('Other');
     for (const system of this.systems) {
       if (!trackedSystems.has(system)) {
         system.update(deltaTime);
       }
     }
+    performanceTelemetry.endSystem('Other');
+
+    // End frame telemetry
+    performanceTelemetry.endFrame();
   }
 
   private trackSystemUpdate(name: string, budgetMs: number, updateFn: () => void): void {

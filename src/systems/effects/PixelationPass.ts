@@ -139,16 +139,13 @@ export class PixelationPass extends Pass {
     deltaTime?: number,
     stencilTest?: boolean
   ): void {
-    const size = renderer.getSize(this.resolution);
-    this.material.uniforms.resolution.value = this.resolution;
+    renderer.getSize(this.resolution);
+    this.material.uniforms.resolution.value.copy(this.resolution);
     this.material.uniforms.tDiffuse.value = inputBuffer.texture;
 
-    if (outputBuffer) {
-      renderer.setRenderTarget(outputBuffer);
-    } else {
-      renderer.setRenderTarget(null);
-    }
-
+    // Use the Pass base class's fullscreen quad rendering
+    // Set render target before calling parent render
+    renderer.setRenderTarget(this.renderToScreen ? null : outputBuffer);
     renderer.render(this.scene, this.camera);
   }
 

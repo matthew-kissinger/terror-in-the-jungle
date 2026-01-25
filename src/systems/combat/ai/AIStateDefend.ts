@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Combatant, CombatantState } from '../types';
 import { SpatialOctree } from '../SpatialOctree';
 import { ZoneManager } from '../../world/ZoneManager';
+import { clusterManager } from '../ClusterManager';
 
 /**
  * Handles defensive zone holding behavior
@@ -37,15 +38,36 @@ export class AIStateDefend {
       const targetPos = enemy.id === 'PLAYER' ? playerPosition : enemy.position;
       const distance = combatant.position.distanceTo(targetPos);
 
-      if (distance < 50 && canSeeTarget(combatant, enemy, playerPosition)) {
-        combatant.state = CombatantState.ALERT;
-        combatant.target = enemy;
-        combatant.previousState = CombatantState.DEFENDING;
+      // At very close range (<15m), defenders should ALWAYS react regardless of facing
+      // This prevents the "standing right next to them" issue
+      const veryCloseRange = distance < 15;
 
-        const rangeDelay = Math.floor(distance / 30) * 250;
-        combatant.reactionTimer = (combatant.skillProfile.reactionDelayMs + rangeDelay) / 1000;
-        combatant.alertTimer = 1.5;
-        return;
+      if (distance < 50) {
+        // Turn to face the enemy BEFORE checking LOS
+        // This fixes the bug where defenders facing outward wouldn't see approaching enemies
+        const toTarget = new THREE.Vector3().subVectors(targetPos, combatant.position).normalize();
+        combatant.rotation = Math.atan2(toTarget.z, toTarget.x);
+
+        // At very close range, skip LOS check entirely - they would hear/sense you
+        if (veryCloseRange || canSeeTarget(combatant, enemy, playerPosition)) {
+          combatant.state = CombatantState.ALERT;
+          combatant.target = enemy;
+          combatant.previousState = CombatantState.DEFENDING;
+
+          // Calculate base reaction delay
+          const rangeDelay = veryCloseRange ? 0 : Math.floor(distance / 30) * 250;
+          let baseDelay = (combatant.skillProfile.reactionDelayMs * (veryCloseRange ? 0.3 : 1) + rangeDelay);
+
+          // In clusters, stagger reactions to prevent synchronized behavior
+          const clusterDensity = clusterManager.getClusterDensity(combatant, allCombatants);
+          if (clusterDensity > 0.3) {
+            baseDelay = clusterManager.getStaggeredReactionDelay(baseDelay, clusterDensity);
+          }
+
+          combatant.reactionTimer = baseDelay / 1000;
+          combatant.alertTimer = 1.5;
+          return;
+        }
       }
     }
 

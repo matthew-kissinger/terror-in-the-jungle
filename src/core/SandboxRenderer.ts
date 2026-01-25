@@ -51,27 +51,28 @@ export class SandboxRenderer {
   }
 
   private setupLighting(): void {
-    // === JUNGLE NIGHT TERROR ATMOSPHERE ===
+    // === JUNGLE ATMOSPHERE ===
+    // SALVAGE FIX: Fog disabled - was causing inconsistent tinting
+    // Three.js fog only affects materials with fog:true (terrain) but not
+    // custom shaders (vegetation), creating a mismatch. Dense jungle
+    // provides natural visibility limits via vegetation occlusion.
 
-    // Set dark fog for limited visibility (jungle at night)
-    // Use dark blue-green tint for night jungle atmosphere
-    const fogColor = 0x0a1012; // Very dark blue-green
-    const fogNear = 15; // Fog starts at 15 units
-    const fogFar = 120; // Complete fog at 120 units
+    // Background color - visible at far distances/skybox gaps
+    const backgroundColor = 0x5a7a6a; // Muted jungle green
+    this.scene.background = new THREE.Color(backgroundColor);
 
-    // Use exponential fog for more realistic density - reduced for better visibility
-    this.fog = new THREE.FogExp2(fogColor, 0.008); // Reduced from 0.018 for ~2x visibility
-    this.scene.fog = this.fog;
+    // Fog disabled - set to null to prevent any fog effects
+    this.fog = undefined;
+    this.scene.fog = null;
 
-    // Match background to fog for seamless blending
-    this.scene.background = new THREE.Color(fogColor);
-
-    // Very dim ambient light - moonlight through jungle canopy
-    this.ambientLight = new THREE.AmbientLight(0x1a2f3a, 0.15); // Dark blue ambient
+    // Ambient light - general scene illumination
+    // Reduced intensity for moody jungle atmosphere
+    this.ambientLight = new THREE.AmbientLight(0x4a5a4a, 0.4); // Muted green, lower intensity
     this.scene.add(this.ambientLight);
 
-    // Moonlight - primary light source
-    this.moonLight = new THREE.DirectionalLight(0x4a6b8a, 0.3); // Pale blue moonlight
+    // Directional light - filtered sunlight through canopy
+    // Reduced intensity, slightly green-tinted for jungle feel
+    this.moonLight = new THREE.DirectionalLight(0xeef8ee, 0.5); // Soft filtered light
     this.moonLight.position.set(-30, 80, -50);
     this.moonLight.castShadow = true;
     this.moonLight.shadow.mapSize.width = 2048;
@@ -89,15 +90,17 @@ export class SandboxRenderer {
 
     this.scene.add(this.moonLight);
 
-    // Add a subtle green tint light for jungle atmosphere
+    // Hemisphere light for jungle atmosphere
+    // Sky: filtered canopy light from above
+    // Ground: dark forest floor bounce light
     this.jungleLight = new THREE.HemisphereLight(
-      0x0a1f1a, // Dark green sky color
-      0x050a08, // Very dark ground color
-      0.2
+      0x667766, // Muted green-gray canopy light
+      0x332211, // Dark brown ground bounce
+      0.3 // Subtle fill
     );
     this.scene.add(this.jungleLight);
 
-    console.log('🌙 Night jungle atmosphere initialized');
+    console.log('Jungle atmosphere initialized');
   }
 
   private setupPostProcessing(): void {
@@ -389,6 +392,24 @@ export class SandboxRenderer {
       textures: memory.textures,
       programs: memory.programs ?? 0
     };
+  }
+
+  /**
+   * Pre-compile all shaders in the scene to prevent first-use frame drops.
+   * Call this after all systems are initialized but before gameplay starts.
+   */
+  precompileShaders(): void {
+    console.log('🔧 Pre-compiling shaders...');
+    const startTime = performance.now();
+
+    // Force shader compilation for all materials in the scene
+    this.renderer.compile(this.scene, this.camera);
+
+    // Also trigger a render to warm up any lazy-initialized shaders
+    this.renderer.render(this.scene, this.camera);
+
+    const elapsed = performance.now() - startTime;
+    console.log(`✅ Shader pre-compilation complete (${elapsed.toFixed(1)}ms)`);
   }
 
   dispose(): void {

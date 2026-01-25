@@ -164,6 +164,10 @@ export class PixelArtSandbox {
     this.sandboxRenderer.showSpawnLoadingIndicator();
     this.sandboxRenderer.showRenderer();
 
+    // Pre-compile all shaders while loading indicator is visible
+    // This prevents frame drops on first shot/hit/combat
+    this.sandboxRenderer.precompileShaders();
+
     const startTime = performance.now();
 
     setTimeout(() => {

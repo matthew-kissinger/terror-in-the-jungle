@@ -74,13 +74,27 @@ export interface GameModeConfig {
 }
 
 // Zone Control - Current smaller scale mode
+// Map layout redesigned to reduce center funneling:
+//
+//            US Base (0, -100)
+//           /              \
+//      Alpha                Charlie    (staggered forward)
+//    (-150, 0)              (150, 0)
+//           \              /
+//            \            /
+//              Bravo       (pushed forward, offset from direct center path)
+//             (0, 100)
+//           /              \
+//      OPFOR Base (0, 220)
+//
+// This creates multiple approach routes and prevents everything flowing through middle
 export const ZONE_CONTROL_CONFIG: GameModeConfig = {
   id: GameMode.ZONE_CONTROL,
   name: 'Zone Control',
   description: 'Fast-paced combat over 3 strategic zones. Control the majority to drain enemy tickets.',
 
-  worldSize: 400,
-  chunkRenderDistance: 6,
+  worldSize: 500,  // Slightly larger to accommodate spread
+  chunkRenderDistance: 7,
   weather: {
     enabled: true,
     initialState: WeatherState.LIGHT_RAIN,
@@ -96,43 +110,43 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
   respawnTime: 5,
   spawnProtectionDuration: 2,
 
-  maxCombatants: 30,  // Reduced from 60 to 30 (15v15)
+  maxCombatants: 30,  // 15v15
   squadSize: { min: 2, max: 4 },
   reinforcementInterval: 20,
 
-  captureRadius: 15,
+  captureRadius: 18,  // Slightly larger zones
   captureSpeed: 1,
 
-  minimapScale: 300,
-  viewDistance: 150,
+  minimapScale: 400,
+  viewDistance: 180,
 
   zones: [
-    // US Base
+    // US Base - pushed back further
     {
       id: 'us_base',
       name: 'US Base',
-      position: new THREE.Vector3(0, 0, -50),
-      radius: 20,
+      position: new THREE.Vector3(0, 0, -100),
+      radius: 25,
       isHomeBase: true,
       owner: Faction.US,
       ticketBleedRate: 0
     },
-    // OPFOR Base
+    // OPFOR Base - pushed back further
     {
       id: 'opfor_base',
       name: 'OPFOR Base',
-      position: new THREE.Vector3(0, 0, 145),
-      radius: 20,
+      position: new THREE.Vector3(0, 0, 220),
+      radius: 25,
       isHomeBase: true,
       owner: Faction.OPFOR,
       ticketBleedRate: 0
     },
-    // Capture Zones
+    // Capture Zones - staggered layout, wider apart
     {
       id: 'zone_alpha',
       name: 'Alpha',
-      position: new THREE.Vector3(-120, 0, 50),
-      radius: 15,
+      position: new THREE.Vector3(-150, 0, 0),  // West flank, closer to US
+      radius: 18,
       isHomeBase: false,
       owner: null,
       ticketBleedRate: 1
@@ -140,8 +154,8 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
     {
       id: 'zone_bravo',
       name: 'Bravo',
-      position: new THREE.Vector3(0, 0, 50),
-      radius: 15,
+      position: new THREE.Vector3(0, 0, 100),   // Center but pushed forward toward OPFOR
+      radius: 18,
       isHomeBase: false,
       owner: null,
       ticketBleedRate: 2
@@ -149,8 +163,8 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
     {
       id: 'zone_charlie',
       name: 'Charlie',
-      position: new THREE.Vector3(120, 0, 50),
-      radius: 15,
+      position: new THREE.Vector3(150, 0, 0),   // East flank, closer to US
+      radius: 18,
       isHomeBase: false,
       owner: null,
       ticketBleedRate: 1

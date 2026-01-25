@@ -4,6 +4,7 @@ import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { ZoneManager, ZoneState } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { objectPool } from '../../utils/ObjectPoolManager';
+import { clusterManager } from './ClusterManager';
 
 export class CombatantMovement {
   private chunkManager?: ImprovedChunkManager;
@@ -31,6 +32,11 @@ export class CombatantMovement {
     } else if (combatant.state === CombatantState.DEFENDING) {
       this.updateDefendingMovement(combatant, deltaTime);
     }
+
+    // Apply friendly spacing force to prevent bunching
+    // This gently pushes NPCs apart when they get too close to friendlies
+    const spacingForce = clusterManager.calculateSpacingForce(combatant, combatants);
+    combatant.velocity.add(spacingForce);
 
     // Apply velocity normally - LOD scaling handled in CombatantSystem
     const velocityDelta = objectPool.getVector3();

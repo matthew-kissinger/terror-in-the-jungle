@@ -65,6 +65,17 @@ export class CombatantRenderer {
   };
   private combatantStates: Map<string, { state: number; damaged: number }> = new Map();
 
+  // Scratch objects to avoid per-frame allocations
+  private readonly scratchMatrix = new THREE.Matrix4();
+  private readonly scratchSpinMatrix = new THREE.Matrix4();
+  private readonly scratchCameraDir = new THREE.Vector3();
+  private readonly scratchCameraRight = new THREE.Vector3();
+  private readonly scratchCameraForward = new THREE.Vector3();
+  private readonly scratchCombatantForward = new THREE.Vector3();
+  private readonly scratchToCombatant = new THREE.Vector3();
+  private readonly scratchPosition = new THREE.Vector3();
+  private readonly scratchUp = new THREE.Vector3(0, 1, 0);
+
   constructor(scene: THREE.Scene, camera: THREE.Camera, assetLoader: AssetLoader) {
     this.scene = scene;
     this.camera = camera;
@@ -101,8 +112,8 @@ export class CombatantRenderer {
       const isOpfor = key.includes('OPFOR');
       const isUS = key.includes('US');
 
-      // Main sprite material - no tinting, just the original texture
-      const spriteMaterial = new THREE.MeshBasicMaterial({
+      // Main sprite material - use lit material to respond to scene lighting
+      const spriteMaterial = new THREE.MeshLambertMaterial({
         map: texture,
         transparent: true,
         alphaTest: 0.5,
@@ -279,15 +290,13 @@ export class CombatantRenderer {
       }
     });
 
-    // Update each mesh
-    const matrix = new THREE.Matrix4();
-    const cameraDirection = new THREE.Vector3();
-    this.camera.getWorldDirection(cameraDirection);
-    const cameraAngle = Math.atan2(cameraDirection.x, cameraDirection.z);
+    // Update each mesh - using scratch objects to avoid allocations
+    const matrix = this.scratchMatrix;
+    this.camera.getWorldDirection(this.scratchCameraDir);
+    const cameraAngle = Math.atan2(this.scratchCameraDir.x, this.scratchCameraDir.z);
 
-    const cameraRight = new THREE.Vector3();
-    cameraRight.crossVectors(cameraDirection, new THREE.Vector3(0, 1, 0)).normalize();
-    const cameraForward = new THREE.Vector3(cameraDirection.x, 0, cameraDirection.z).normalize();
+    this.scratchCameraRight.crossVectors(this.scratchCameraDir, this.scratchUp).normalize();
+    this.scratchCameraForward.set(this.scratchCameraDir.x, 0, this.scratchCameraDir.z).normalize();
 
     combatantGroups.forEach((combatants, key) => {
       const mesh = this.factionMeshes.get(key);
@@ -298,17 +307,17 @@ export class CombatantRenderer {
         const combatant = combatants[index];
         const isBackTexture = key.includes('_back');
 
-        const combatantForward = new THREE.Vector3(
+        this.scratchCombatantForward.set(
           Math.cos(combatant.visualRotation),
           0,
           Math.sin(combatant.visualRotation)
         );
 
-        const toCombatant = new THREE.Vector3()
+        this.scratchToCombatant
           .subVectors(combatant.position, playerPosition)
           .normalize();
 
-        const viewAngle = toCombatant.dot(cameraRight);
+        const viewAngle = this.scratchToCombatant.dot(this.scratchCameraRight);
 
         let finalRotation: number;
         let scaleX = combatant.scale.x;
@@ -320,11 +329,11 @@ export class CombatantRenderer {
           finalRotation = cameraAngle;
           scaleX = Math.abs(scaleX);
         } else {
-          const facingDot = Math.abs(combatantForward.dot(cameraForward));
+          const facingDot = Math.abs(this.scratchCombatantForward.dot(this.scratchCameraForward));
           const billboardBlend = 0.3 + facingDot * 0.4;
           finalRotation = cameraAngle * billboardBlend + combatant.visualRotation * (1 - billboardBlend);
 
-          const combatantDotRight = combatantForward.dot(cameraRight);
+          const combatantDotRight = this.scratchCombatantForward.dot(this.scratchCameraRight);
           const shouldFlip = (viewAngle > 0 && combatantDotRight < 0) ||
                             (viewAngle < 0 && combatantDotRight > 0);
           scaleX = shouldFlip ? -Math.abs(scaleX) : Math.abs(scaleX);
@@ -332,8 +341,9 @@ export class CombatantRenderer {
 
         matrix.makeRotationY(finalRotation);
 
-        // Apply death animation effects
-        let finalPosition = combatant.position.clone();
+        // Apply death animation effects - use scratch position to avoid allocation
+        this.scratchPosition.copy(combatant.position);
+        let finalPosition = this.scratchPosition;
         let finalScaleX = scaleX;
         let finalScaleY = combatant.scale.y;
         let finalScaleZ = combatant.scale.z;
@@ -367,8 +377,8 @@ export class CombatantRenderer {
 
               // Spinning rotation (Z axis)
               const spinAngle = easeOut * Math.PI * 2; // Full 360 degree spin
-              const spinMatrix = new THREE.Matrix4().makeRotationZ(spinAngle);
-              matrix.multiply(spinMatrix);
+              this.scratchSpinMatrix.makeRotationZ(spinAngle);
+              matrix.multiply(this.scratchSpinMatrix);
 
               finalScaleY *= 1 - (easeOut * 0.3);
             } else if (progress < FALL_PHASE + GROUND_PHASE) {
