@@ -32,6 +32,13 @@ export class HUDSystem implements GameSystem {
     this.playerHealthSystem = playerHealthSystem;
     this.statsTracker = new PlayerStatsTracker();
     this.matchEndScreen = new MatchEndScreen();
+
+    // Setup return to menu callback
+    this.matchEndScreen.onReturnToMenu(() => {
+      console.log('🔄 Returning to main menu (reloading page)');
+      window.location.reload();
+    });
+
     // Parameters are optional for backward compatibility
   }
 
