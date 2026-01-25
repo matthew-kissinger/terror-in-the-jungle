@@ -188,6 +188,41 @@ class MainSystem {
 - Zone captures: Real-time
 - Billboard rotation: Every frame
 
+### Scratch Vector Pattern
+Hot paths (update loops, hit detection) MUST avoid per-frame allocations:
+```typescript
+// DO: Pre-allocate as class members
+class CombatSystem {
+  private readonly scratchVec1 = new THREE.Vector3();
+  private readonly scratchVec2 = new THREE.Vector3();
+  private readonly scratchRay = new THREE.Ray();
+
+  update() {
+    // Reuse scratch vectors
+    this.scratchVec1.copy(target).sub(origin);
+  }
+}
+
+// DON'T: Allocate in loops
+update() {
+  const direction = new THREE.Vector3(); // GC pressure!
+}
+```
+
+### Audio System
+- WAV files for sound effects (16-bit, 44.1kHz, mono)
+- Object3D pooling for positional audio (32 pooled)
+- Audio buffer pools per sound type (10-20 instances)
+- VoiceCalloutSystem disabled for performance
+- All audio files in `public/assets/optimized/`
+
+### Height Fog (Billboard System)
+GPUBillboardSystem uses height-based fog in fragment shader:
+- Dense at ground level (y=0), exponentially thins with altitude
+- `fogHeightFalloff`: Controls vertical thinning rate
+- `fogStartDistance`: Close objects remain unfogged
+- Fog color sampled from scene.fog
+
 ## File Structure
 
 ### Core Systems (`/src/core/`)
