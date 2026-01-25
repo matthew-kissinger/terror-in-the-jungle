@@ -20,6 +20,27 @@
       "source": "manual",
       "created_at": "2026-01-24T23:59:59.212304",
       "tags": []
+    },
+    {
+      "id": "56c6def1",
+      "content": "New weapon types require: WeaponSpec definition, GunplayCore instance, 3D model in ProgrammaticGunFactory, WeaponSlot enum value, key binding in onKeyDown, and InventoryManager slot",
+      "source": "manual",
+      "created_at": "2026-01-25T01:31:04.902960",
+      "tags": []
+    },
+    {
+      "id": "3f30ccd1",
+      "content": "Score/feedback popups use CSS animations with object pooling - see ScorePopupSystem.ts and DamageNumberSystem.ts for patterns",
+      "source": "manual",
+      "created_at": "2026-01-25T01:42:25.116262",
+      "tags": []
+    },
+    {
+      "id": "b6769715",
+      "content": "CSS animations should be injected once with unique style IDs and checked for existence before creating. Dispose methods must clean up injected styles",
+      "source": "manual",
+      "created_at": "2026-01-25T01:44:08.926433",
+      "tags": []
     }
   ],
   "warnings": [
@@ -30,6 +51,22 @@
       "created_at": "2026-01-24T23:59:58.306569",
       "tags": [],
       "severity": "medium"
+    },
+    {
+      "id": "7648aa09",
+      "content": "Uncommitted MatchEndScreen warning is now resolved - all match flow improvements are integrated",
+      "source": "manual",
+      "created_at": "2026-01-25T01:31:11.638306",
+      "tags": [],
+      "severity": "low"
+    },
+    {
+      "id": "092410fb",
+      "content": "Shotgun weapon system already exists in codebase since initial commit - verify feature existence before creating tasks",
+      "source": "manual",
+      "created_at": "2026-01-25T01:42:19.233630",
+      "tags": [],
+      "severity": "low"
     }
   ],
   "context": [
@@ -39,7 +76,28 @@
       "source": "manual",
       "created_at": "2026-01-24T23:59:51.149635",
       "tags": []
+    },
+    {
+      "id": "ef87f95a",
+      "content": "Player feedback systems: CameraShakeSystem for visual impact, PlayerSuppressionSystem for near-miss effects. Both integrate via SandboxSystemManager.connectSystems()",
+      "source": "manual",
+      "created_at": "2026-01-25T01:31:06.200095",
+      "tags": []
+    },
+    {
+      "id": "1c4c8de6",
+      "content": "Weapon inventory uses hotbar keys 1-5: 1=Shotgun, 2=Grenades, 3=Rifle (primary), 4=Sandbags, 5=SMG. Switch via WeaponSlot enum",
+      "source": "manual",
+      "created_at": "2026-01-25T01:42:20.676061",
+      "tags": []
+    },
+    {
+      "id": "a2222fe9",
+      "content": "DOM overlay systems (vignette, suppression) use fixed positioning with pointer-events: none and z-index layering. See PlayerSuppressionSystem.ts for pattern",
+      "source": "manual",
+      "created_at": "2026-01-25T01:44:08.067188",
+      "tags": []
     }
   ],
-  "updated_at": "2026-01-24T23:59:59.212321"
+  "updated_at": "2026-01-25T01:44:08.926453"
 }
