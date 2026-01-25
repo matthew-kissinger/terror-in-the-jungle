@@ -23,6 +23,7 @@ import { CombatantMovement } from './CombatantMovement';
 import { CombatantRenderer } from './CombatantRenderer';
 import { SquadManager } from './SquadManager';
 import { SpatialOctree } from './SpatialOctree';
+import { InfluenceMapSystem } from './InfluenceMapSystem';
 
 export class CombatantSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -43,6 +44,7 @@ export class CombatantSystem implements GameSystem {
   private combatantRenderer: CombatantRenderer;
   private squadManager: SquadManager;
   private spatialGrid: SpatialOctree;
+  private influenceMap?: InfluenceMapSystem;
 
   // Effects pools
   private tracerPool: TracerPool;
@@ -78,6 +80,10 @@ export class CombatantSystem implements GameSystem {
   private reinforcementWaveTimer = 0;
   private reinforcementWaveIntervalSeconds = 15;
   private readonly CORPSE_CLEANUP_DISTANCE = 600;
+
+  // Squad objective management
+  private squadObjectiveTimer = 0;
+  private readonly SQUAD_OBJECTIVE_REASSIGN_INTERVAL = 10; // seconds
 
   // Adaptive update timing
   private frameDeltaEma = 1 / 60; // seconds
@@ -319,6 +325,25 @@ export class CombatantSystem implements GameSystem {
       this.spawnReinforcementWave(Faction.OPFOR);
     }
 
+    // Periodic squad objective reassignment using influence map
+    this.squadObjectiveTimer += deltaTime;
+    if (this.squadObjectiveTimer >= this.SQUAD_OBJECTIVE_REASSIGN_INTERVAL) {
+      this.squadObjectiveTimer = 0;
+      this.updateSquadObjectives();
+    }
+
+    // Update influence map with current game state
+    if (this.influenceMap && this.zoneManager) {
+      this.influenceMap.setCombatants(this.combatants);
+      this.influenceMap.setZones(this.zoneManager.getAllZones());
+      this.influenceMap.setPlayerPosition(this.playerPosition);
+      // Update sandbag bounds if available
+      const sandbagSystem = (this as any).sandbagSystem;
+      if (sandbagSystem && typeof sandbagSystem.getSandbagBounds === 'function') {
+        this.influenceMap.setSandbagBounds(sandbagSystem.getSandbagBounds());
+      }
+    }
+
     // Periodic cleanup
     const now = Date.now();
     if (now - this.lastSpawnCheck > this.SPAWN_CHECK_INTERVAL) {
@@ -370,24 +395,36 @@ export class CombatantSystem implements GameSystem {
   }
 
   private updateDeathAnimations(deltaTime: number): void {
-    const DEATH_DURATION = 1.5; // 1.5 seconds for death animation
+    const FALL_DURATION = 0.7; // 0.7 seconds for fall animation
+    const GROUND_TIME = 4.0; // 4 seconds on ground before fadeout
+    const FADEOUT_DURATION = 1.0; // 1 second fadeout
+    const TOTAL_DEATH_TIME = FALL_DURATION + GROUND_TIME + FADEOUT_DURATION;
 
-    this.combatants.forEach(combatant => {
+    const toRemove: string[] = [];
+
+    this.combatants.forEach((combatant, id) => {
       if (combatant.isDying) {
         // Progress death animation
         if (combatant.deathProgress === undefined) {
           combatant.deathProgress = 0;
         }
 
-        combatant.deathProgress += deltaTime / DEATH_DURATION;
+        combatant.deathProgress += deltaTime / TOTAL_DEATH_TIME;
 
-        // When animation completes, mark as fully dead
+        // When animation completes, mark for cleanup
         if (combatant.deathProgress >= 1.0) {
           combatant.isDying = false;
           combatant.state = CombatantState.DEAD;
           combatant.deathProgress = 1.0;
+          toRemove.push(id);
         }
       }
+    });
+
+    // Remove fully dead combatants
+    toRemove.forEach(id => {
+      this.combatants.delete(id);
+      this.spatialGrid.remove(id);
     });
   }
 
@@ -725,6 +762,40 @@ export class CombatantSystem implements GameSystem {
       const pos = anchor.clone().add(this.randomSpawnOffset(20, 50));
       this.spawnSquad(faction, pos, this.randomSquadSize());
     }
+  }
+
+  private updateSquadObjectives(): void {
+    if (!this.zoneManager) return;
+
+    const zones = this.zoneManager.getAllZones();
+    const squads = this.squadManager.getAllSquads();
+
+    squads.forEach(squad => {
+      // Skip player-controlled squads
+      if (squad.isPlayerControlled) return;
+
+      // Get squad leader position
+      let leaderPos: THREE.Vector3 | null = null;
+      if (squad.leaderId) {
+        const leader = this.combatants.get(squad.leaderId);
+        if (leader) {
+          leaderPos = leader.position.clone();
+        }
+      }
+
+      // Fallback to first member if no leader
+      if (!leaderPos && squad.members.length > 0) {
+        const firstMember = this.combatants.get(squad.members[0]);
+        if (firstMember) {
+          leaderPos = firstMember.position.clone();
+        }
+      }
+
+      if (!leaderPos) return;
+
+      // Use influence map to assign best objective
+      this.squadManager.assignSquadObjective(squad, leaderPos, zones);
+    });
   }
 
   private getFactionAnchors(faction: Faction): THREE.Vector3[] {

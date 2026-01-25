@@ -1,0 +1,20 @@
+{
+  "session_id": "93f2d95f44a0",
+  "task_id": "a9da4124-251b-4618-a4ce-4b4bb7ceb15b",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T22:40:51.354739",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "# Task: Improve NPC Death Animations\n\n## Context\nCurrently when NPCs die, the death is just a sprite swap (the billboard texture changes). This lacks visual impact and makes kills feel unsatisfying. The GDD explicitly mentions \"Death animations are just sprite swaps - need proper death animations\" under Combat Feel & Feedback.\n\n## Discovery - Read These Files First\n1. src/systems/combat/CombatantRenderer.ts - How NPCs are rendered\n2. src/systems/combat/CombatantCombat.ts - Where death is handled\n3. src/types/Combatant.ts - Combatant data structure\n4. src/systems/world/billboard/BillboardInstanceManager.ts - Billboard rendering\n\n## Memory Context (from repo conventions)\n- Death animations use isDying flag and deathProgress (0-1) on Combatant\n- Renderer interprets deathProgress to drive visual effects\n- The pattern is already established, just needs implementation\n\n## Requirements\n1. **Ragdoll-style fall**: When NPC dies, animate falling backward/forward\n   - Direction based on hit direction (shot from front = fall back)\n   - Duration: 0.6-0.8 seconds\n   - Include rotation (tipping over)\n\n2. **Ground impact**: When hitting ground, slight bounce/settle\n   - Final position slightly offset from death point\n   - Body stays on ground (don't despawn immediately)\n\n3. **Fade out**: After 3-5 seconds on ground, fade out\n   - Opacity transition over 1 second\n   - Then remove from scene\n\n## Implementation Steps\n1. Add to Combatant type (if not present):\n   - isDying: boolean\n   - deathProgress: number (0-1)\n   - deathDirection: Vector3 (direction of killing shot)\n   - deathStartTime: number\n\n2. In CombatantCombat.ts - onDeath:\n   - Set isDying = true\n   - Capture death direction from damage source\n   - Start death animation timer\n\n3. In CombatantRenderer.ts - update loop:\n   - If isDying, interpolate deathProgress (0 to 1 over 0.7s)\n   - Apply rotation based on deathProgress (tip 0 to 90 degrees)\n   - Apply Y position (arc down to ground)\n   - At progress 1.0, start fadeout timer\n\n4. Billboard modifications:\n   - Support opacity/alpha for fadeout\n   - Support rotation for falling\n\n## Animation Curve\n- Use easeOutQuad for natural fall acceleration\n- Position: start Y -> ground Y (parabolic arc)\n- Rotation: 0 -> 75-90 degrees (based on direction)\n\n## Validation\n- Kill an NPC from the front -> falls backward\n- Kill an NPC from behind -> falls forward\n- Death takes ~0.7 seconds to complete\n- Body stays on ground for 3-5 seconds\n- Body fades out smoothly\n- No visual glitches during animation\n\n## Completion\nWhen done: test extensively, commit with descriptive message (no emojis), provide summary.",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

@@ -5,9 +5,11 @@ interface ExplosionEffect {
   flashSprite: THREE.Sprite;
   smokeParticles: THREE.Points;
   fireParticles: THREE.Points;
+  debrisParticles: THREE.Points;
   shockwaveRing: THREE.Mesh;
   smokeVelocities: THREE.Vector3[];
   fireVelocities: THREE.Vector3[];
+  debrisVelocities: THREE.Vector3[];
   aliveUntil: number;
   startTime: number;
 }
@@ -23,6 +25,7 @@ export class ExplosionEffectsPool {
 
   private smokeTexture: THREE.Texture;
   private flashTexture: THREE.Texture;
+  private debrisTexture: THREE.Texture;
 
   constructor(scene: THREE.Scene, maxEffects = 16) {
     this.scene = scene;
@@ -31,6 +34,7 @@ export class ExplosionEffectsPool {
     // Create textures
     this.smokeTexture = this.createSmokeTexture();
     this.flashTexture = this.createFlashTexture();
+    this.debrisTexture = this.createDebrisTexture();
 
     // Pre-allocate pool
     for (let i = 0; i < maxEffects; i++) {
@@ -65,11 +69,12 @@ export class ExplosionEffectsPool {
     canvas.height = 256;
     const ctx = canvas.getContext('2d')!;
 
-    // Create bright flash
+    // Create bright flash with more intense core
     const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-    gradient.addColorStop(0, 'rgba(255, 255, 200, 1)');
-    gradient.addColorStop(0.2, 'rgba(255, 180, 100, 0.9)');
-    gradient.addColorStop(0.5, 'rgba(255, 120, 0, 0.6)');
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    gradient.addColorStop(0.1, 'rgba(255, 255, 200, 1)');
+    gradient.addColorStop(0.3, 'rgba(255, 200, 100, 0.9)');
+    gradient.addColorStop(0.6, 'rgba(255, 120, 0, 0.6)');
     gradient.addColorStop(1, 'rgba(200, 60, 0, 0)');
 
     ctx.fillStyle = gradient;
@@ -80,13 +85,33 @@ export class ExplosionEffectsPool {
     return texture;
   }
 
+  private createDebrisTexture(): THREE.Texture {
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
+    const ctx = canvas.getContext('2d')!;
+
+    // Create dark debris particle
+    const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    gradient.addColorStop(0, 'rgba(40, 30, 20, 1)');
+    gradient.addColorStop(0.5, 'rgba(30, 20, 10, 0.8)');
+    gradient.addColorStop(1, 'rgba(20, 15, 10, 0)');
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 32, 32);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+    return texture;
+  }
+
   private createExplosionEffect(): ExplosionEffect {
-    // Bright flash light
-    const flash = new THREE.PointLight(0xff8800, 0, 50);
+    // Bright flash light - brighter and larger radius
+    const flash = new THREE.PointLight(0xffaa44, 0, 80);
     flash.visible = false;
     this.scene.add(flash);
 
-    // Flash sprite for visual burst
+    // Flash sprite for visual burst - larger initial size
     const flashSpriteMaterial = new THREE.SpriteMaterial({
       map: this.flashTexture,
       blending: THREE.AdditiveBlending,
@@ -94,21 +119,21 @@ export class ExplosionEffectsPool {
       opacity: 1
     });
     const flashSprite = new THREE.Sprite(flashSpriteMaterial);
-    flashSprite.scale.set(8, 8, 1);
+    flashSprite.scale.set(12, 12, 1);
     flashSprite.visible = false;
     this.scene.add(flashSprite);
 
-    // Smoke particles (40 particles that linger)
-    const smokeCount = 40;
+    // Smoke particles (80 particles for denser cloud)
+    const smokeCount = 80;
     const smokeGeometry = new THREE.BufferGeometry();
     const smokePositions = new Float32Array(smokeCount * 3);
     smokeGeometry.setAttribute('position', new THREE.BufferAttribute(smokePositions, 3));
 
     const smokeMaterial = new THREE.PointsMaterial({
       map: this.smokeTexture,
-      size: 3,
+      size: 4,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.8,
       blending: THREE.NormalBlending,
       depthWrite: false
     });
@@ -116,15 +141,15 @@ export class ExplosionEffectsPool {
     smokeParticles.visible = false;
     this.scene.add(smokeParticles);
 
-    // Fire particles (30 bright particles, short-lived)
-    const fireCount = 30;
+    // Fire particles (60 bright particles for more intensity)
+    const fireCount = 60;
     const fireGeometry = new THREE.BufferGeometry();
     const firePositions = new Float32Array(fireCount * 3);
     fireGeometry.setAttribute('position', new THREE.BufferAttribute(firePositions, 3));
 
     const fireMaterial = new THREE.PointsMaterial({
       color: 0xff6600,
-      size: 0.8,
+      size: 1.2,
       transparent: true,
       opacity: 1,
       blending: THREE.AdditiveBlending,
@@ -133,6 +158,24 @@ export class ExplosionEffectsPool {
     const fireParticles = new THREE.Points(fireGeometry, fireMaterial);
     fireParticles.visible = false;
     this.scene.add(fireParticles);
+
+    // Debris particles (50 dark particles flying outward)
+    const debrisCount = 50;
+    const debrisGeometry = new THREE.BufferGeometry();
+    const debrisPositions = new Float32Array(debrisCount * 3);
+    debrisGeometry.setAttribute('position', new THREE.BufferAttribute(debrisPositions, 3));
+
+    const debrisMaterial = new THREE.PointsMaterial({
+      map: this.debrisTexture,
+      size: 0.5,
+      transparent: true,
+      opacity: 1,
+      blending: THREE.NormalBlending,
+      depthWrite: false
+    });
+    const debrisParticles = new THREE.Points(debrisGeometry, debrisMaterial);
+    debrisParticles.visible = false;
+    this.scene.add(debrisParticles);
 
     // Shockwave ring on ground
     const ringGeometry = new THREE.RingGeometry(0.1, 0.5, 32);
@@ -152,6 +195,7 @@ export class ExplosionEffectsPool {
     // Velocity arrays
     const smokeVelocities: THREE.Vector3[] = [];
     const fireVelocities: THREE.Vector3[] = [];
+    const debrisVelocities: THREE.Vector3[] = [];
 
     for (let i = 0; i < smokeCount; i++) {
       smokeVelocities.push(new THREE.Vector3());
@@ -159,15 +203,20 @@ export class ExplosionEffectsPool {
     for (let i = 0; i < fireCount; i++) {
       fireVelocities.push(new THREE.Vector3());
     }
+    for (let i = 0; i < debrisCount; i++) {
+      debrisVelocities.push(new THREE.Vector3());
+    }
 
     return {
       flash,
       flashSprite,
       smokeParticles,
       fireParticles,
+      debrisParticles,
       shockwaveRing,
       smokeVelocities,
       fireVelocities,
+      debrisVelocities,
       aliveUntil: 0,
       startTime: 0
     };
@@ -179,14 +228,14 @@ export class ExplosionEffectsPool {
 
     const now = performance.now();
 
-    // Position flash
+    // Position flash - much brighter and larger
     effect.flash.position.copy(position);
-    effect.flash.intensity = 3;
+    effect.flash.intensity = 8;
     effect.flash.visible = true;
 
-    // Position flash sprite
+    // Position flash sprite - larger
     effect.flashSprite.position.copy(position);
-    effect.flashSprite.scale.set(8, 8, 1);
+    effect.flashSprite.scale.set(15, 15, 1);
     effect.flashSprite.material.opacity = 1;
     effect.flashSprite.visible = true;
 
@@ -230,6 +279,26 @@ export class ExplosionEffectsPool {
     effect.fireParticles.visible = true;
     (effect.fireParticles.material as THREE.PointsMaterial).opacity = 1;
 
+    // Initialize debris particles
+    const debrisPositions = effect.debrisParticles.geometry.attributes.position as THREE.BufferAttribute;
+    for (let i = 0; i < debrisPositions.count; i++) {
+      debrisPositions.setXYZ(i, position.x, position.y, position.z);
+
+      // Debris flies out in all directions with parabolic trajectory
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.random() * Math.PI * 0.5; // Favor upward/outward
+      const speed = 10 + Math.random() * 15;
+
+      effect.debrisVelocities[i].set(
+        Math.sin(phi) * Math.cos(theta) * speed,
+        Math.cos(phi) * speed + 5, // Initial upward velocity
+        Math.sin(phi) * Math.sin(theta) * speed
+      );
+    }
+    debrisPositions.needsUpdate = true;
+    effect.debrisParticles.visible = true;
+    (effect.debrisParticles.material as THREE.PointsMaterial).opacity = 1;
+
     // Initialize shockwave ring
     effect.shockwaveRing.position.copy(position);
     effect.shockwaveRing.position.y += 0.1; // Slightly above ground
@@ -259,6 +328,7 @@ export class ExplosionEffectsPool {
         effect.flashSprite.visible = false;
         effect.smokeParticles.visible = false;
         effect.fireParticles.visible = false;
+        effect.debrisParticles.visible = false;
         effect.shockwaveRing.visible = false;
         this.active.splice(i, 1);
         if (this.pool.length < this.maxEffects) {
@@ -267,13 +337,13 @@ export class ExplosionEffectsPool {
       } else {
         const progress = elapsed / 3000;
 
-        // Flash fades very quickly (first 300ms)
-        if (elapsed < 300) {
-          const flashProgress = elapsed / 300;
-          effect.flash.intensity = 3 * (1 - flashProgress);
+        // Flash fades very quickly (first 200ms for more punch)
+        if (elapsed < 200) {
+          const flashProgress = elapsed / 200;
+          effect.flash.intensity = 8 * (1 - flashProgress);
           effect.flashSprite.material.opacity = 1 - flashProgress;
           // Flash expands rapidly
-          const scale = 8 + flashProgress * 4;
+          const scale = 15 + flashProgress * 8;
           effect.flashSprite.scale.set(scale, scale, 1);
         } else {
           effect.flash.visible = false;
@@ -303,6 +373,31 @@ export class ExplosionEffectsPool {
           effect.fireParticles.visible = false;
         }
 
+        // Debris particles (fade after 1500ms)
+        if (elapsed < 1500) {
+          const debrisPositions = effect.debrisParticles.geometry.attributes.position as THREE.BufferAttribute;
+          for (let j = 0; j < debrisPositions.count; j++) {
+            // Apply strong gravity to debris
+            effect.debrisVelocities[j].addScaledVector(gravity, deltaTime * 3);
+
+            // Update position
+            const x = debrisPositions.getX(j) + effect.debrisVelocities[j].x * deltaTime;
+            const y = debrisPositions.getY(j) + effect.debrisVelocities[j].y * deltaTime;
+            const z = debrisPositions.getZ(j) + effect.debrisVelocities[j].z * deltaTime;
+
+            debrisPositions.setXYZ(j, x, y, z);
+          }
+          debrisPositions.needsUpdate = true;
+
+          // Fade debris in last 500ms
+          if (elapsed > 1000) {
+            const debrisFade = (elapsed - 1000) / 500;
+            (effect.debrisParticles.material as THREE.PointsMaterial).opacity = 1 - debrisFade;
+          }
+        } else {
+          effect.debrisParticles.visible = false;
+        }
+
         // Smoke lingers for full duration
         const smokePositions = effect.smokeParticles.geometry.attributes.position as THREE.BufferAttribute;
         for (let j = 0; j < smokePositions.count; j++) {
@@ -321,14 +416,14 @@ export class ExplosionEffectsPool {
         }
         smokePositions.needsUpdate = true;
 
-        // Smoke expands and fades
-        const smokeSize = 3 + progress * 5; // Grow to 8 units
+        // Smoke expands and fades - larger growth
+        const smokeSize = 4 + progress * 8; // Grow to 12 units
         (effect.smokeParticles.material as THREE.PointsMaterial).size = smokeSize;
 
         // Fade smoke in last 1 second
         if (elapsed > 2000) {
           const smokeFade = (elapsed - 2000) / 1000;
-          (effect.smokeParticles.material as THREE.PointsMaterial).opacity = 0.7 * (1 - smokeFade);
+          (effect.smokeParticles.material as THREE.PointsMaterial).opacity = 0.8 * (1 - smokeFade);
         }
 
         // Shockwave expands rapidly (first 500ms)
@@ -350,13 +445,16 @@ export class ExplosionEffectsPool {
       this.scene.remove(e.flashSprite);
       this.scene.remove(e.smokeParticles);
       this.scene.remove(e.fireParticles);
+      this.scene.remove(e.debrisParticles);
       this.scene.remove(e.shockwaveRing);
       e.smokeParticles.geometry.dispose();
       e.fireParticles.geometry.dispose();
+      e.debrisParticles.geometry.dispose();
       e.shockwaveRing.geometry.dispose();
       (e.flashSprite.material as THREE.SpriteMaterial).dispose();
       (e.smokeParticles.material as THREE.PointsMaterial).dispose();
       (e.fireParticles.material as THREE.PointsMaterial).dispose();
+      (e.debrisParticles.material as THREE.PointsMaterial).dispose();
       (e.shockwaveRing.material as THREE.MeshBasicMaterial).dispose();
     });
 
@@ -365,18 +463,22 @@ export class ExplosionEffectsPool {
       this.scene.remove(e.flashSprite);
       this.scene.remove(e.smokeParticles);
       this.scene.remove(e.fireParticles);
+      this.scene.remove(e.debrisParticles);
       this.scene.remove(e.shockwaveRing);
       e.smokeParticles.geometry.dispose();
       e.fireParticles.geometry.dispose();
+      e.debrisParticles.geometry.dispose();
       e.shockwaveRing.geometry.dispose();
       (e.flashSprite.material as THREE.SpriteMaterial).dispose();
       (e.smokeParticles.material as THREE.PointsMaterial).dispose();
       (e.fireParticles.material as THREE.PointsMaterial).dispose();
+      (e.debrisParticles.material as THREE.PointsMaterial).dispose();
       (e.shockwaveRing.material as THREE.MeshBasicMaterial).dispose();
     });
 
     this.smokeTexture.dispose();
     this.flashTexture.dispose();
+    this.debrisTexture.dispose();
 
     this.active.length = 0;
     this.pool.length = 0;

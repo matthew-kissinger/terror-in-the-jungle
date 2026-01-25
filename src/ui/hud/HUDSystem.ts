@@ -95,7 +95,7 @@ export class HUDSystem implements GameSystem {
       const aimingState = this.grenadeSystem.getAimingState();
       if (aimingState.isAiming) {
         this.elements.showGrenadePowerMeter();
-        this.elements.updateGrenadePower(aimingState.power);
+        this.elements.updateGrenadePower(aimingState.power, aimingState.estimatedDistance);
       } else {
         this.elements.hideGrenadePowerMeter();
       }
@@ -120,7 +120,7 @@ export class HUDSystem implements GameSystem {
 
   // Public API
 
-  showHitMarker(type: 'normal' | 'kill' | 'headshot' = 'normal'): void {
+  showHitMarker(type: 'hit' | 'kill' | 'headshot' = 'hit'): void {
     this.elements.showHitMarker(type);
   }
 
@@ -259,9 +259,10 @@ export class HUDSystem implements GameSystem {
     killerFaction: Faction,
     victimName: string,
     victimFaction: Faction,
-    isHeadshot: boolean = false
+    isHeadshot: boolean = false,
+    weaponType: string = 'unknown'
   ): void {
-    this.elements.addKillToFeed(killerName, killerFaction, victimName, victimFaction, isHeadshot);
+    this.elements.addKillToFeed(killerName, killerFaction, victimName, victimFaction, isHeadshot, weaponType);
   }
 
   // Damage number methods

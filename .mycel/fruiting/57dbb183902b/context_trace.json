@@ -1,0 +1,20 @@
+{
+  "session_id": "57dbb183902b",
+  "task_id": "9fd29dbd-d837-4bcd-bf34-bac52b542577",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T22:03:55.978761",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "## Task: AI Cover-Seeking with Deployed Sandbags\n\n### Context\nTerror in the Jungle is a 3D pixel art battlefield game built with Three.js. The game has an AI system with a SEEKING_COVER state, but currently it only uses terrain elevation changes for cover. The SandbagSystem allows players to deploy sandbags, but AI combatants don't recognize or use them as cover.\n\n### Current State\n- CombatantAI.ts has 'findNearestCover()' method (line ~640) that only searches for terrain-based cover\n- SandbagSystem.ts exists with getSandbagBounds() and getRayIntersectionPoint() methods\n- AI already checks sandbags for line-of-sight in canSeeTarget() method\n- SEEKING_COVER state exists and works for terrain cover\n\n### Files to Modify\n1. src/systems/combat/CombatantAI.ts - Update findNearestCover() to also consider sandbags\n2. src/systems/combat/types.ts - May need new fields for sandbag cover positions\n\n### Implementation Steps\n\n1. **Read existing code first**:\n   - Read CombatantAI.ts to understand the current cover-seeking logic\n   - Read SandbagSystem.ts to understand how sandbags are stored and queried\n   - Read types.ts to see the Combatant interface\n\n2. **Update findNearestCover() in CombatantAI.ts**:\n   - Query sandbagSystem.getSandbagBounds() to get all sandbag positions\n   - For each sandbag, calculate a cover position behind it (relative to threat)\n   - Score sandbag cover positions along with terrain positions\n   - Prefer sandbags within 15m (they're deployed for a reason)\n\n3. **Add sandbag cover scoring logic**:\n   - Check if position is behind sandbag relative to threat direction\n   - Verify line of sight from threat to cover position is blocked by sandbag\n   - Score based on distance to combatant and cover quality\n\n4. **Test the changes**:\n   - npm run dev\n   - Place sandbags with E key\n   - Observe if enemy AI moves toward sandbags when taking fire\n\n### Validation Criteria\n- AI combatants should prefer nearby sandbags over distant terrain cover\n- Cover positions should be on the opposite side of sandbag from threat\n- Line of sight check should confirm sandbag blocks incoming fire\n- No performance regression (sandbag query should be O(n) where n is small)\n\n### Constraints\n- Don't refactor unrelated code\n- Keep changes focused on cover-seeking enhancement\n- Follow existing code style (no semicolons, TypeScript)\n- Keep module under 400 lines if possible\n\nWhen complete: test in browser, commit with message like 'feat(ai): integrate sandbags into cover-seeking behavior', provide summary of changes made.",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

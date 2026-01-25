@@ -28,6 +28,8 @@ import { MortarSystem } from '../systems/weapons/MortarSystem';
 import { SandbagSystem } from '../systems/weapons/SandbagSystem';
 import { CameraShakeSystem } from '../systems/effects/CameraShakeSystem';
 import { PlayerSuppressionSystem } from '../systems/player/PlayerSuppressionSystem';
+import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
+import { objectPool } from '../utils/ObjectPoolManager';
 
 export class SandboxSystemManager {
   private systems: GameSystem[] = [];
@@ -60,6 +62,7 @@ export class SandboxSystemManager {
   public sandbagSystem!: SandbagSystem;
   public cameraShakeSystem!: CameraShakeSystem;
   public playerSuppressionSystem!: PlayerSuppressionSystem;
+  public influenceMapSystem!: InfluenceMapSystem;
 
   async initializeSystems(
     scene: THREE.Scene,
@@ -68,6 +71,9 @@ export class SandboxSystemManager {
     sandboxRenderer?: any
   ): Promise<void> {
     console.log('🔧 Initializing game systems...');
+
+    // Warmup object pools to prevent allocations during gameplay
+    objectPool.warmup(50, 20, 10, 30);
 
     // Phase 1: Core systems
     onProgress('core', 0);
@@ -120,6 +126,10 @@ export class SandboxSystemManager {
     this.cameraShakeSystem = new CameraShakeSystem();
     this.playerSuppressionSystem = new PlayerSuppressionSystem();
 
+    // Initialize influence map system based on game mode world size
+    const worldSize = 4000; // Default, will be updated when game mode is set
+    this.influenceMapSystem = new InfluenceMapSystem(worldSize);
+
     this.connectSystems(scene, camera, sandboxRenderer);
 
     // Add systems to update list
@@ -150,7 +160,8 @@ export class SandboxSystemManager {
       this.mortarSystem,
       this.sandbagSystem,
       this.cameraShakeSystem,
-      this.playerSuppressionSystem
+      this.playerSuppressionSystem,
+      this.influenceMapSystem
     ];
 
     onProgress('world', 0.5);
@@ -287,6 +298,14 @@ export class SandboxSystemManager {
       combatantAI.setSandbagSystem(this.sandbagSystem);
       combatantAI.setZoneManager(this.zoneManager);
     }
+
+    // Connect influence map system
+    const squadManager = (this.combatantSystem as any).squadManager;
+    if (squadManager) {
+      squadManager.setInfluenceMap(this.influenceMapSystem);
+    }
+    (this.combatantSystem as any).influenceMap = this.influenceMapSystem;
+    (this.combatantSystem as any).sandbagSystem = this.sandbagSystem;
   }
 
   async preGenerateSpawnArea(spawnPos: THREE.Vector3): Promise<void> {

@@ -1,0 +1,20 @@
+{
+  "session_id": "e1eab2d33ab4",
+  "task_id": "c9fc6c95-eac0-48cf-b208-e2acbeba1e8e",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T22:03:56.002794",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "## Task: Enhance Combat Hit Feedback\n\n### Context\nTerror in the Jungle is a 3D pixel art battlefield game. Per CLAUDE.md priorities, combat feel lacks punch and hit feedback is weak. The game has DamageNumberSystem for floating damage numbers and basic hit markers, but they need more impact.\n\n### Current State\n- DamageNumberSystem.ts exists and shows floating damage numbers (white/gold/red for normal/headshot/kill)\n- FirstPersonWeapon.ts calls hudSystem.spawnDamageNumber() when player hits enemies\n- HUDElements.ts has basic hit marker creation\n- AudioManager.ts handles sounds but hit feedback sounds are basic\n\n### Files to Analyze\n1. src/ui/hud/HUDElements.ts - Find where hit markers are created\n2. src/ui/hud/DamageNumberSystem.ts - Understand current damage number system\n3. src/systems/player/FirstPersonWeapon.ts - See how hits are registered (line ~575)\n4. src/systems/audio/AudioManager.ts - Check existing hit sounds\n5. src/config/audio.ts - Audio configuration\n\n### Implementation Goals\n\n1. **Enhanced Hit Markers**:\n   - Make hit marker flash brighter and last longer (currently too subtle)\n   - Add distinct kill marker (X shape or skull) vs regular hit marker\n   - Add headshot marker with gold color\n   - Hit marker should scale up briefly on impact then shrink\n\n2. **Hit Sounds**:\n   - Add distinct 'hit confirm' sound when bullet connects\n   - Add headshot hit sound (satisfying 'ding' or 'crack')\n   - Add kill confirm sound (distinct from hit)\n   - Layer these over the gunshot audio\n\n3. **Screen Effects**:\n   - Subtle screen flash on kill (brief vignette pulse)\n   - Headshot should have gold screen flash\n\n### Implementation Steps\n\n1. **Read the existing code**:\n   - Read HUDElements.ts to find hit marker code\n   - Read AudioManager.ts to understand sound playing\n   - Read FirstPersonWeapon.ts handleShot method to see hit flow\n\n2. **Enhance hit markers in HUDElements.ts**:\n   - Find/create showHitMarker() method\n   - Add animation: scale 1.0 -> 1.3 -> 1.0 over 200ms\n   - Add kill marker style (X shape or different color)\n   - Add headshot style (gold color)\n\n3. **Add hit sounds to AudioManager.ts**:\n   - Add hitConfirm, headshotConfirm, killConfirm sound entries\n   - Add playHitFeedback(type: 'hit' | 'headshot' | 'kill') method\n   - Use procedural audio or placeholder sounds (can be short beeps)\n\n4. **Wire up hit feedback in FirstPersonWeapon.ts**:\n   - After spawning damage number, call hit marker and sound\n   - Pass correct type (hit/headshot/kill) to feedback systems\n\n5. **Test thoroughly**:\n   - npm run dev\n   - Shoot enemies and verify feedback\n   - Confirm headshots and kills have distinct feedback\n\n### Audio Approach (if no sound files)\nCreate simple procedural hit sounds using Web Audio API:\n- Hit: Short click/snap (100ms)\n- Headshot: Higher pitch with reverb tail (150ms)  \n- Kill: Low thud with bass (200ms)\n\n### Validation Criteria\n- Every hit should have visible marker AND audio feedback\n- Headshots clearly distinguishable from body shots\n- Kills have satisfying distinct feedback\n- No performance issues from effects\n\nWhen complete: test in browser, commit with message like 'feat(combat): enhance hit feedback with improved markers and audio', provide summary.",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "session_id": "927f7cfb8b6b",
+  "task_id": "83d13fe1-5c34-4abe-bbbe-8bee73c021fd",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T21:28:00.194206",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "You are implementing weapon switching for Terror in the Jungle, a 3D pixel art FPS game.\n\n## Context\nAll three weapons (Rifle, Shotgun, SMG) are already implemented in FirstPersonWeapon.ts but weapon switching is not exposed to player controls. The memory context says: 'Weapon inventory uses hotbar keys 1-5: 1=Shotgun, 2=Grenades, 3=Rifle (primary), 4=SMG, 5=Sandbags' - we need to make this work.\n\n## Discovery\nRead these files to understand the weapon system:\n1. src/systems/player/FirstPersonWeapon.ts - Weapon rigs at lines 156-171, weapon specs at lines 70-93\n2. src/systems/player/InventoryManager.ts - Current inventory state\n3. src/systems/player/PlayerController.ts - Where to add key bindings\n4. src/ui/hud/HUDElements.ts - For hotbar UI\n\n## Implementation\n1. Add key listeners for 1, 2, 3, 4, 5 in PlayerController or FirstPersonWeapon\n2. Map keys to weapons:\n   - 1 = Shotgun (close range)\n   - 2 = Grenades (already handled by G key, but show as selected)\n   - 3 = Rifle (primary, default)\n   - 4 = SMG (spray)\n   - 5 = Sandbags (already handled by E key, but show as selected)\n3. Implement weapon swap animation:\n   - Current weapon lowers (150ms)\n   - Switch active rig (hide old, show new)\n   - New weapon raises (150ms)\n4. Add hotbar UI showing current weapon selection\n5. Prevent switching during reload or mid-swap\n\n## Technical Notes\n- FirstPersonWeapon already has rifleRig, shotgunRig, smgRig defined\n- Use CSS/DOM for hotbar UI (follow HUD patterns)\n- Grenades and Sandbags are special equipment, not primary weapons\n\n## Validation\n- Build: npm run build (must succeed)\n- Test: npm run dev\n  - Press 1 - shotgun equips with swap animation\n  - Press 3 - rifle equips (default)\n  - Press 4 - SMG equips\n  - Hotbar shows current selection highlighted\n  - Cannot switch during reload\n\n## Completion\nWhen complete: test all weapon swaps in browser, commit with descriptive message, provide summary.",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { SpatialOctree } from './SpatialOctree';
 import { ZoneManager, CaptureZone } from '../world/ZoneManager';
+import { objectPool } from '../../utils/ObjectPoolManager';
 
 export class CombatantAI {
   private readonly FRIENDLY_FIRE_ENABLED = false;
@@ -445,11 +446,11 @@ export class CombatantAI {
     if (distance > combatant.skillProfile.visualRange) return false;
 
     // Check FOV
-    const toTarget = new THREE.Vector3()
-      .subVectors(targetPos, combatant.position)
-      .normalize();
+    const toTarget = objectPool.getVector3();
+    toTarget.subVectors(targetPos, combatant.position).normalize();
 
-    const forward = new THREE.Vector3(
+    const forward = objectPool.getVector3();
+    forward.set(
       Math.cos(combatant.rotation),
       0,
       Math.sin(combatant.rotation)
@@ -458,54 +459,80 @@ export class CombatantAI {
     const angle = Math.acos(forward.dot(toTarget));
     const halfFov = THREE.MathUtils.degToRad(combatant.skillProfile.fieldOfView / 2);
 
-    if (angle > halfFov) return false;
+    if (angle > halfFov) {
+      objectPool.releaseVector3(toTarget);
+      objectPool.releaseVector3(forward);
+      return false;
+    }
 
     // Check terrain obstruction - only for high/medium LOD combatants for performance
     if (this.chunkManager && combatant.lodLevel &&
         (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium')) {
 
       // Create ray from combatant eye position to target
-      const eyePos = combatant.position.clone();
+      const eyePos = objectPool.getVector3();
+      eyePos.copy(combatant.position);
       eyePos.y += 1.7; // Eye height
 
-      const targetEyePos = targetPos.clone();
+      const targetEyePos = objectPool.getVector3();
+      targetEyePos.copy(targetPos);
       targetEyePos.y += 1.7; // Target eye height
 
-      const direction = new THREE.Vector3()
-        .subVectors(targetEyePos, eyePos)
-        .normalize();
+      const direction = objectPool.getVector3();
+      direction.subVectors(targetEyePos, eyePos).normalize();
 
       const terrainHit = this.chunkManager.raycastTerrain(eyePos, direction, distance);
 
+      objectPool.releaseVector3(direction);
+      objectPool.releaseVector3(targetEyePos);
+      objectPool.releaseVector3(eyePos);
+
       if (terrainHit.hit && terrainHit.distance! < distance - 1) {
         // Terrain blocks line of sight (with small buffer to avoid edge cases)
+        objectPool.releaseVector3(toTarget);
+        objectPool.releaseVector3(forward);
         return false;
       }
     }
 
     // Check sandbag obstruction
     if (this.sandbagSystem) {
-      const eyePos = combatant.position.clone();
+      const eyePos = objectPool.getVector3();
+      eyePos.copy(combatant.position);
       eyePos.y += 1.7;
 
-      const targetEyePos = targetPos.clone();
+      const targetEyePos = objectPool.getVector3();
+      targetEyePos.copy(targetPos);
       targetEyePos.y += 1.7;
 
-      const direction = new THREE.Vector3()
-        .subVectors(targetEyePos, eyePos)
-        .normalize();
+      const direction = objectPool.getVector3();
+      direction.subVectors(targetEyePos, eyePos).normalize();
 
       const ray = new THREE.Ray(eyePos, direction);
       const sandbagBounds = this.sandbagSystem.getSandbagBounds();
 
       for (const bounds of sandbagBounds) {
-        const intersection = ray.intersectBox(bounds, new THREE.Vector3());
+        const intersectionPoint = objectPool.getVector3();
+        const intersection = ray.intersectBox(bounds, intersectionPoint);
         if (intersection && eyePos.distanceTo(intersection) < distance) {
+          objectPool.releaseVector3(intersectionPoint);
+          objectPool.releaseVector3(direction);
+          objectPool.releaseVector3(targetEyePos);
+          objectPool.releaseVector3(eyePos);
+          objectPool.releaseVector3(toTarget);
+          objectPool.releaseVector3(forward);
           return false;
         }
+        objectPool.releaseVector3(intersectionPoint);
       }
+
+      objectPool.releaseVector3(direction);
+      objectPool.releaseVector3(targetEyePos);
+      objectPool.releaseVector3(eyePos);
     }
 
+    objectPool.releaseVector3(toTarget);
+    objectPool.releaseVector3(forward);
     return true;
   }
 

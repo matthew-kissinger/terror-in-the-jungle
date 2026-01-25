@@ -12,6 +12,7 @@ import { CombatantRenderer } from './CombatantRenderer';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { SpatialOctree } from './SpatialOctree';
 import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
+import { objectPool } from '../../utils/ObjectPoolManager';
 
 export interface CombatHitResult {
   hit: boolean;
@@ -119,17 +120,22 @@ export class CombatantCombat {
       if (this.chunkManager && combatant.lodLevel &&
           (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium')) {
 
-        const muzzlePos = combatant.position.clone();
+        const muzzlePos = objectPool.getVector3();
+        muzzlePos.copy(combatant.position);
         muzzlePos.y += 1.5; // Muzzle height
 
-        const targetFirePos = targetPos.clone();
+        const targetFirePos = objectPool.getVector3();
+        targetFirePos.copy(targetPos);
         targetFirePos.y += 1.2; // Target center mass
 
-        const fireDirection = new THREE.Vector3()
-          .subVectors(targetFirePos, muzzlePos)
-          .normalize();
+        const fireDirection = objectPool.getVector3();
+        fireDirection.subVectors(targetFirePos, muzzlePos).normalize();
 
         const terrainHit = this.chunkManager.raycastTerrain(muzzlePos, fireDirection, distance);
+
+        objectPool.releaseVector3(fireDirection);
+        objectPool.releaseVector3(targetFirePos);
+        objectPool.releaseVector3(muzzlePos);
 
         if (terrainHit.hit && terrainHit.distance! < distance - 0.5) {
           // Terrain blocks shot, don't fire
@@ -236,27 +242,41 @@ export class CombatantCombat {
   ): void {
     const distance = combatant.position.distanceTo(playerPosition);
     if (distance < 200) {
-      const hitPoint = hit ? hit.point : new THREE.Vector3()
-        .copy(shotRay.origin)
-        .addScaledVector(shotRay.direction, 80 + Math.random() * 40);
+      const hitPoint = objectPool.getVector3();
+      if (hit) {
+        hitPoint.copy(hit.point);
+      } else {
+        hitPoint.copy(shotRay.origin).addScaledVector(shotRay.direction, 80 + Math.random() * 40);
+      }
 
-      this.tracerPool.spawn(
-        shotRay.origin.clone().add(new THREE.Vector3(0, 1.5, 0)),
-        hitPoint,
-        0.3
-      );
+      const tracerStart = objectPool.getVector3();
+      const tracerOffset = objectPool.getVector3();
+      tracerOffset.set(0, 1.5, 0);
+      tracerStart.copy(shotRay.origin).add(tracerOffset);
+      this.tracerPool.spawn(tracerStart, hitPoint, 0.3);
+      objectPool.releaseVector3(tracerOffset);
+      objectPool.releaseVector3(tracerStart);
 
-      const muzzlePos = combatant.position.clone();
+      const muzzlePos = objectPool.getVector3();
+      muzzlePos.copy(combatant.position);
       muzzlePos.y += 1.5;
-      muzzlePos.add(shotRay.direction.clone().multiplyScalar(2));
+      const muzzleOffset = objectPool.getVector3();
+      muzzleOffset.copy(shotRay.direction).multiplyScalar(2);
+      muzzlePos.add(muzzleOffset);
       this.muzzleFlashPool.spawn(muzzlePos, shotRay.direction, 1.2);
+      objectPool.releaseVector3(muzzleOffset);
+      objectPool.releaseVector3(muzzlePos);
 
       if (this.audioManager) {
         this.audioManager.playGunshotAt(combatant.position);
       }
 
       if (hit) {
-        this.impactEffectsPool.spawn(hit.point, shotRay.direction.clone().negate());
+        const negatedDirection = objectPool.getVector3();
+        negatedDirection.copy(shotRay.direction).negate();
+        this.impactEffectsPool.spawn(hit.point, negatedDirection);
+        objectPool.releaseVector3(negatedDirection);
+
         const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
         this.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot);
 
@@ -267,6 +287,8 @@ export class CombatantCombat {
         // Track near misses for suppression
         this.trackNearMisses(shotRay, hitPoint, combatant.faction, allCombatants, playerPosition)
       }
+
+      objectPool.releaseVector3(hitPoint);
     } else if (hit) {
       const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
       this.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot);
@@ -349,7 +371,8 @@ export class CombatantCombat {
               attacker.faction,
               'PLAYER',
               Faction.US,
-              isHeadshot
+              isHeadshot,
+              'rifle' // AI combatants use rifles
             );
           }
         }
@@ -368,6 +391,29 @@ export class CombatantCombat {
 
     if (target.health <= 0) {
       target.state = CombatantState.DEAD;
+
+      // Initialize death animation
+      target.isDying = true;
+      target.deathProgress = 0;
+      target.deathStartTime = performance.now();
+
+      // Calculate death direction (direction from attacker to target)
+      if (attacker && attacker.position) {
+        const deathDir = new THREE.Vector3()
+          .subVectors(target.position, attacker.position)
+          .normalize();
+        deathDir.y = 0; // Keep horizontal
+        target.deathDirection = deathDir;
+      } else {
+        // Default to falling backward
+        const fallbackDir = new THREE.Vector3(
+          Math.cos(target.rotation),
+          0,
+          Math.sin(target.rotation)
+        ).multiplyScalar(-1);
+        target.deathDirection = fallbackDir;
+      }
+
       console.log(`💀 ${target.faction} soldier eliminated${attacker ? ` by ${attacker.faction}` : ''}`);
 
       if (this.audioManager) {
@@ -388,7 +434,8 @@ export class CombatantCombat {
           attacker.faction,
           victimName,
           target.faction,
-          isHeadshot
+          isHeadshot,
+          'rifle' // AI combatants use rifles
         );
       }
 
@@ -407,7 +454,8 @@ export class CombatantCombat {
   handlePlayerShot(
     ray: THREE.Ray,
     damageCalculator: (distance: number, isHeadshot: boolean) => number,
-    allCombatants: Map<string, Combatant>
+    allCombatants: Map<string, Combatant>,
+    weaponType: string = 'rifle'
   ): CombatHitResult {
     if (this.sandbagSystem) {
       const hitSandbag = this.sandbagSystem.checkRayIntersection(ray);
@@ -432,14 +480,15 @@ export class CombatantCombat {
       if (killed && this.hudSystem) {
         this.hudSystem.addKill();
 
-        // Add player kill to feed
+        // Add player kill to feed with weapon type
         const victimName = `${hit.combatant.faction}-${hit.combatant.id.slice(-4)}`;
         this.hudSystem.addKillToFeed(
           'PLAYER',
           Faction.US,
           victimName,
           hit.combatant.faction,
-          hit.headshot
+          hit.headshot,
+          weaponType
         );
       }
 

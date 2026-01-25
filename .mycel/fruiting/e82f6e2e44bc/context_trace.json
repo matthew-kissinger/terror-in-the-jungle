@@ -1,0 +1,20 @@
+{
+  "session_id": "e82f6e2e44bc",
+  "task_id": "a1e732a4-b26e-4061-ac17-9b1a45fb6b36",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T22:05:19.127338",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "## Task: Enhance Kill Feed System\n\n### Context\nTerror in the Jungle is a 3D pixel art battlefield game. The game has a kill feed system but it's basic. Per CLAUDE.md, the kill feed is missing weapon info and could be enhanced.\n\n### Current State\n- KillFeed.ts exists in src/ui/hud/ (100 lines)\n- HUDSystem.ts has addKillToFeed() method\n- CombatantCombat.ts calls kill feed when combatants die\n- Kills show killer name, faction, victim name, victim faction, headshot status\n\n### Files to Read First\n1. src/ui/hud/KillFeed.ts - Current kill feed implementation\n2. src/ui/hud/HUDSystem.ts - See how kill feed is called\n3. src/systems/combat/CombatantCombat.ts - See what data is available at kill time\n\n### Implementation Goals\n\n1. **Weapon Information**:\n   - Show weapon type used for kill (rifle, shotgun, SMG, grenade, mortar)\n   - Add simple weapon icon or text indicator\n   - Different styling for explosive kills vs bullet kills\n\n2. **Enhanced Formatting**:\n   - Color-coded team names (US = blue, OPFOR = red)\n   - Headshot indicator (skull icon or 'HS' badge)\n   - Grenade/explosive kills get explosion icon\n   - Multi-kill indicator (double kill, triple kill if rapid)\n\n3. **Visual Polish**:\n   - Smooth slide-in animation from right\n   - Fade out over time (3-4 seconds visible)\n   - Stack multiple kills with newest at top\n   - Maximum 5 visible entries\n\n### Implementation Steps\n\n1. **Read existing code**:\n   - Read KillFeed.ts to understand current structure\n   - Read HUDSystem.ts to see call sites\n   - Trace back to CombatantCombat.ts to see available data\n\n2. **Modify kill feed data flow**:\n   - Add weapon type parameter to addKillToFeed()\n   - Pass weapon info from CombatantCombat and FirstPersonWeapon\n   - For AI kills, track their equipped weapon type\n\n3. **Enhance KillFeed.ts rendering**:\n   - Add weapon icon/text to entry format\n   - Style: '[Killer] [weapon_icon] [Victim] (HS)'\n   - Add CSS for team colors and icons\n   - Implement slide-in animation\n\n4. **Track multi-kills**:\n   - Track kill timestamps per player\n   - If multiple kills within 3 seconds, show 'Double Kill!' etc\n   - Add special styling for multi-kill entries\n\n5. **Test kill feed**:\n   - npm run dev\n   - Kill enemies with different weapons\n   - Verify weapon shows correctly\n   - Test headshots and explosive kills\n\n### Kill Entry Format Example\n\n\n### Validation Criteria\n- Every kill shows weapon type used\n- Team colors are clearly distinguishable  \n- Headshots have distinct indicator\n- Explosive kills (grenade/mortar) look different from bullet kills\n- Kill feed doesn't spam (max 5 entries visible)\n\nWhen complete: test with multiple weapon types, commit with message like 'feat(ui): enhance kill feed with weapon info and improved formatting', provide summary.",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

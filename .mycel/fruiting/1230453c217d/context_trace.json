@@ -1,0 +1,20 @@
+{
+  "session_id": "1230453c217d",
+  "task_id": "baf8d635-cb8f-432e-8fda-d969b8b55046",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T22:22:48.565508",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "# Implement Influence Map System for Strategic Squad AI\n\n## Context\nYou are working on Terror in the Jungle, a 3D pixel art battlefield game with team-based combat (15v15 in Zone Control, 60v60 in Open Frontier). The current AI uses simple state machines and NPCs are predictable - they don't coordinate strategically.\n\n## Objective\nCreate an InfluenceMapSystem that computes threat/opportunity scores across the battlefield, enabling squads to make strategic positioning decisions rather than random movements.\n\n## Discovery - Read These Files First\n1. `CLAUDE.md` - Project overview and architecture\n2. `src/systems/combat/CombatantAI.ts` - Current AI behavior states\n3. `src/systems/combat/SquadManager.ts` - Squad coordination system\n4. `src/systems/world/ZoneManager.ts` - Zone capture mechanics\n5. `src/types/Combatant.ts` - NPC data structures\n\n## Implementation Steps\n\n### Step 1: Create InfluenceMapSystem\nCreate `src/systems/combat/InfluenceMapSystem.ts`:\n- Compute a 64x64 grid covering the battlefield\n- Update every 500ms (not per frame - this is expensive)\n- Calculate influence values based on:\n  - Zone positions and ownership (friendly zones = positive, contested = high value)\n  - Enemy positions (threat zones)\n  - Friendly positions (support zones)\n  - Player location (high priority target area)\n  - Cover/sandbag positions (tactical value)\n\n### Step 2: Influence Calculation\nFor each grid cell, compute:\n- `threatLevel` (0-1): Based on enemy density and line of sight\n- `opportunityLevel` (0-1): Based on uncontested zones, flanking routes\n- `coverValue` (0-1): Based on nearby sandbags and terrain features\n- `squadSupport` (0-1): Friendly unit density for mutual support\n\n### Step 3: Integrate with Squad Manager\nModify SquadManager to:\n- Query influence map when assigning squad objectives\n- Replace random zone picks with influence-driven targeting\n- Select zones with highest opportunity and lowest threat\n- Position defenders at zone entrances (high threat, high value spots)\n\n### Step 4: Implement Squad Tactics\nAdd tactical behaviors:\n- **Coordinated Advance**: Squad moves together toward high-opportunity zones\n- **Flanking Route**: When direct path has high threat, find lower-threat approach\n- **Defensive Formation**: Spread around zone entrances with overlapping fields of fire\n- **Retreat Logic**: Fall back when local threat exceeds threshold\n\n### Step 5: Add Debug Visualization\nCreate optional debug overlay (toggle with key):\n- Color-coded grid showing influence values\n- Red = high threat, Green = high opportunity\n- Lines showing squad planned movements\n\n## Validation\n- [ ] InfluenceMapSystem updates every 500ms without frame drops\n- [ ] Squads prefer high-opportunity zones over random picks\n- [ ] NPCs approach contested zones via lower-threat routes\n- [ ] Defenders position at zone entrances, not randomly\n- [ ] Debug overlay clearly shows influence distribution\n\n## Technical Constraints\n- Must integrate with existing GameSystem interface (init, update, dispose)\n- Use Web Worker if computation exceeds 2ms per update\n- Do not allocate new objects in hot path - pre-allocate grid\n- Keep module under 400 lines (split if needed)\n\n## Completion\nWhen complete:\n1. Test in browser with `npm run dev`\n2. Play Zone Control mode and observe improved squad coordination\n3. Commit with descriptive message: 'feat(ai): add influence map system for strategic squad positioning'\n4. Provide summary of what was implemented",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

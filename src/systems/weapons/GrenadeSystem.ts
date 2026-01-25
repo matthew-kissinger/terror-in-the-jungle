@@ -37,15 +37,20 @@ export class GrenadeSystem implements GameSystem {
   private weaponCamera: THREE.OrthographicCamera;
   private grenadeInHand?: THREE.Group;
 
-  private readonly GRAVITY = -20; // Reduced gravity for flatter trajectory
-  private readonly FUSE_TIME = 3.5; // Slightly shorter fuse
+  private readonly GRAVITY = -35; // Tighter gravity for more predictable arcs
+  private readonly FUSE_TIME = 3.5; // Fuse time for cooking mechanic
   private readonly DAMAGE_RADIUS = 15;
   private readonly MAX_DAMAGE = 150;
-  private readonly GROUND_FRICTION = 0.65; // Reduced friction for more rolling
-  private readonly BOUNCE_DAMPING = 0.35; // Increased bounce for more dynamic behavior
-  private readonly AIR_RESISTANCE = 0.992; // Much less drag to maintain forward momentum
-  private readonly MIN_THROW_FORCE = 18; // Increased minimum throw velocity
-  private readonly MAX_THROW_FORCE = 50; // Increased for better forward carry
+
+  // Surface-specific friction coefficients
+  private readonly FRICTION_MUD = 0.7; // High friction for soft terrain
+  private readonly FRICTION_ROCK = 0.3; // Low friction for hard surfaces (more bounce)
+  private readonly FRICTION_WATER = 1.0; // Immediate stop in water
+
+  private readonly BOUNCE_DAMPING = 0.4; // Tighter bounce control
+  private readonly AIR_RESISTANCE = 0.995; // Reduced air resistance for snappier throws
+  private readonly MIN_THROW_FORCE = 18;
+  private readonly MAX_THROW_FORCE = 50;
 
   private arcVisualization?: THREE.Line;
   private landingIndicator?: THREE.Mesh;
@@ -54,6 +59,11 @@ export class GrenadeSystem implements GameSystem {
   private idleTime = 0;
   private aimStartTime = 0;
   private powerBuildupTime = 0;
+
+  // Cooking mechanic
+  private isCooking = false;
+  private cookingTime = 0;
+  private lastBeepTime = 0;
 
   constructor(
     scene: THREE.Scene,
@@ -87,6 +97,26 @@ export class GrenadeSystem implements GameSystem {
       // Power builds up over 2 seconds to max
       this.throwPower = Math.min(0.3 + (this.powerBuildupTime / 2.0) * 0.7, 1.0);
       this.updateArc();
+    }
+
+    // Update cooking timer
+    if (this.isCooking) {
+      this.cookingTime += deltaTime;
+
+      // Audio beeps at critical times
+      const timeLeft = this.FUSE_TIME - this.cookingTime;
+      if (timeLeft <= 2.0 && this.cookingTime - this.lastBeepTime >= 1.0) {
+        this.playBeep();
+        this.lastBeepTime = this.cookingTime;
+      } else if (timeLeft <= 1.0 && this.cookingTime - this.lastBeepTime >= 0.5) {
+        this.playBeep();
+        this.lastBeepTime = this.cookingTime;
+      }
+
+      // Explode in hand if cooked too long
+      if (this.cookingTime >= this.FUSE_TIME) {
+        this.explodeInHand();
+      }
     }
 
     // Update explosion effects
@@ -123,21 +153,25 @@ export class GrenadeSystem implements GameSystem {
       if (nextPosition.y <= groundHeight) {
         nextPosition.y = groundHeight;
 
+        // Determine surface type based on height (simple heuristic)
+        // Water level is around 0-1m, rocks might be on slopes
+        const surfaceFriction = groundHeight < 1.0 ? this.FRICTION_WATER : this.FRICTION_MUD;
+
         // Only bounce if falling fast enough
-        if (Math.abs(grenade.velocity.y) > 2.5) { // Lowered threshold for more bounces
+        if (Math.abs(grenade.velocity.y) > 2.0) {
           grenade.velocity.y = -grenade.velocity.y * this.BOUNCE_DAMPING;
-          // Also reduce horizontal velocity on bounce, but less than before
-          grenade.velocity.x *= 0.8; // Less reduction for more rolling
-          grenade.velocity.z *= 0.8;
+          // Reduce horizontal velocity on bounce
+          grenade.velocity.x *= (1.0 - surfaceFriction * 0.3);
+          grenade.velocity.z *= (1.0 - surfaceFriction * 0.3);
           // Reduce rotation on bounce
-          grenade.rotationVelocity.multiplyScalar(0.85);
+          grenade.rotationVelocity.multiplyScalar(0.8);
         } else {
           // Stop bouncing, just roll
           grenade.velocity.y = 0;
-          grenade.velocity.x *= this.GROUND_FRICTION;
-          grenade.velocity.z *= this.GROUND_FRICTION;
+          grenade.velocity.x *= (1.0 - surfaceFriction);
+          grenade.velocity.z *= (1.0 - surfaceFriction);
           // Slow rotation when rolling
-          grenade.rotationVelocity.multiplyScalar(0.92); // Slower decay for more rolling
+          grenade.rotationVelocity.multiplyScalar(0.9);
         }
       }
 
@@ -212,14 +246,76 @@ export class GrenadeSystem implements GameSystem {
     }
   }
 
+  startCooking(): void {
+    if (!this.isAiming || this.isCooking) return;
+
+    console.log('💣 Started cooking grenade!');
+    this.isCooking = true;
+    this.cookingTime = 0;
+    this.lastBeepTime = 0;
+  }
+
+  private playBeep(): void {
+    // Simple beep using Web Audio API
+    if (this.audioManager) {
+      // Use existing audio manager if it has a beep sound
+      // Otherwise, create a simple tone
+      const audioContext = new AudioContext();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.frequency.value = 800; // High-pitched beep
+      oscillator.type = 'sine';
+
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.1);
+    }
+  }
+
+  private explodeInHand(): void {
+    console.log('💥 Grenade exploded in hand!');
+
+    // Apply damage to player (suicide)
+    const explosionPos = this.camera.position.clone();
+
+    // Trigger explosion effect at player position
+    if (this.explosionEffectsPool) {
+      this.explosionEffectsPool.spawn(explosionPos);
+    }
+
+    if (this.audioManager) {
+      this.audioManager.playExplosionAt(explosionPos);
+    }
+
+    // Apply massive screen shake
+    if (this.playerController) {
+      this.playerController.applyExplosionShake(explosionPos, 1.0);
+    }
+
+    // Damage player (simulate suicide) - this would need PlayerHealthSystem
+    // For now, just log it
+    console.log('💀 Player killed by own grenade!');
+
+    // Reset cooking state
+    this.isCooking = false;
+    this.cookingTime = 0;
+    this.cancelThrow();
+  }
+
   adjustPower(delta: number): void {
     if (!this.isAiming) return;
 
     this.throwPower = THREE.MathUtils.clamp(this.throwPower + delta, 0.3, 2.0);
   }
 
-  updateArc(): void {
-    if (!this.isAiming || !this.arcVisualization) return;
+  updateArc(): number {
+    if (!this.isAiming || !this.arcVisualization) return 0;
 
     const startPos = this.camera.position.clone();
     const direction = new THREE.Vector3();
@@ -274,12 +370,17 @@ export class GrenadeSystem implements GameSystem {
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
     this.arcVisualization.geometry.dispose();
     this.arcVisualization.geometry = geometry;
+    this.arcVisualization.computeLineDistances(); // Required for dashed lines
 
     // Update landing indicator position
     if (this.landingIndicator) {
       this.landingIndicator.position.copy(landingPos);
       this.landingIndicator.position.y += 0.1; // Slightly above ground to prevent z-fighting
     }
+
+    // Calculate distance from start to landing position
+    const distance = startPos.distanceTo(landingPos);
+    return distance;
   }
 
   throwGrenade(): boolean {
@@ -296,6 +397,11 @@ export class GrenadeSystem implements GameSystem {
 
     this.isAiming = false;
     this.powerBuildupTime = 0;
+
+    // Store cooking time for spawning grenade with reduced fuse
+    const remainingFuseTime = this.isCooking ? Math.max(0.1, this.FUSE_TIME - this.cookingTime) : this.FUSE_TIME;
+    this.isCooking = false;
+    this.cookingTime = 0;
 
     if (this.arcVisualization) {
       this.arcVisualization.visible = false;
@@ -339,10 +445,11 @@ export class GrenadeSystem implements GameSystem {
     const lookUpBoost = Math.max(0, direction.y * 3); // Only boost if looking up
     throwVelocity.y += lookUpBoost * this.throwPower;
 
-    this.spawnGrenade(startPos, throwVelocity);
+    this.spawnGrenade(startPos, throwVelocity, remainingFuseTime);
 
     const powerPercent = Math.round(this.throwPower * 100);
-    console.log(`💣 Grenade thrown at ${powerPercent}% power`);
+    const cookedTime = remainingFuseTime < this.FUSE_TIME ? ` (cooked ${(this.FUSE_TIME - remainingFuseTime).toFixed(1)}s)` : '';
+    console.log(`💣 Grenade thrown at ${powerPercent}% power${cookedTime}`);
     return true;
   }
 
@@ -360,7 +467,7 @@ export class GrenadeSystem implements GameSystem {
     }
   }
 
-  private spawnGrenade(position: THREE.Vector3, velocity: THREE.Vector3): void {
+  private spawnGrenade(position: THREE.Vector3, velocity: THREE.Vector3, fuseTime: number = this.FUSE_TIME): void {
     const geometry = new THREE.SphereGeometry(0.3, 8, 8);
     const material = new THREE.MeshStandardMaterial({
       color: 0x2a4a2a,
@@ -379,12 +486,12 @@ export class GrenadeSystem implements GameSystem {
       velocity: velocity.clone(),
       rotation: new THREE.Vector3(0, 0, 0),
       rotationVelocity: new THREE.Vector3(
-        Math.random() * 5 - 2.5, // Reduced rotation speed
+        Math.random() * 5 - 2.5,
         Math.random() * 5 - 2.5,
         Math.random() * 5 - 2.5
       ),
       mesh,
-      fuseTime: this.FUSE_TIME,
+      fuseTime: fuseTime, // Use provided fuse time (may be reduced from cooking)
       isActive: true
     };
 
@@ -453,12 +560,14 @@ export class GrenadeSystem implements GameSystem {
 
   private createArcVisualization(): void {
     const geometry = new THREE.BufferGeometry();
-    const material = new THREE.LineBasicMaterial({
+    const material = new THREE.LineDashedMaterial({
       color: 0x00ff00,
       linewidth: 2,
       transparent: true,
-      opacity: 0.6,
-      depthTest: false // Always visible through objects
+      opacity: 0.7,
+      depthTest: false, // Always visible through objects
+      dashSize: 0.5,
+      gapSize: 0.3
     });
 
     this.arcVisualization = new THREE.Line(geometry, material);
@@ -514,10 +623,15 @@ export class GrenadeSystem implements GameSystem {
     return this.isAiming;
   }
 
-  getAimingState(): { isAiming: boolean; power: number } {
+  getAimingState(): { isAiming: boolean; power: number; estimatedDistance: number; cookingTime: number } {
+    // Calculate current estimated distance if aiming
+    const estimatedDistance = this.isAiming ? this.updateArc() : 0;
+
     return {
       isAiming: this.isAiming,
-      power: this.throwPower
+      power: this.throwPower,
+      estimatedDistance,
+      cookingTime: this.cookingTime
     };
   }
 

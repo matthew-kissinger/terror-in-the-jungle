@@ -1,0 +1,20 @@
+{
+  "session_id": "f9c29365292d",
+  "task_id": "704fccbe-a692-4b32-845b-e0bf8431d062",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T22:40:19.191084",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "# Task: Integrate and Commit Pending Combat/UI Systems\n\n## Context\nThere are 14 modified files and 3 new untracked files that represent significant improvements to combat, audio, HUD, and effects systems. These need to be reviewed, integrated properly, and committed.\n\n## New Untracked Files to Integrate\n1. **src/systems/combat/InfluenceMapSystem.ts** - Tactical influence grid for AI positioning\n2. **src/ui/hud/HitMarkerFeedback.ts** - Enhanced hit marker system with crosshair-style markers\n3. **src/utils/ObjectPoolManager.ts** - Memory pooling singleton for Vector3/Quaternion/Matrix4\n\n## Modified Files to Review\n- src/systems/combat/CombatantAI.ts - Object pooling for LOS checks\n- src/systems/combat/CombatantCombat.ts - Combat balance improvements\n- src/systems/combat/CombatantMovement.ts - Movement improvements\n- src/systems/combat/CombatantSystem.ts - NPC management enhancements\n- src/systems/combat/SquadManager.ts - Squad coordination improvements\n- src/systems/weapons/GrenadeSystem.ts - Arc visualization, power meter\n- src/systems/effects/ExplosionEffectsPool.ts - Explosion enhancements\n- src/systems/player/FirstPersonWeapon.ts - Weapon system integration\n- src/systems/audio/AudioManager.ts - 3D sound improvements\n- src/ui/hud/*.ts - HUD improvements and kill feed enhancements\n\n## Steps\n1. Read each new untracked file to understand what it does\n2. Read the SandboxSystemManager.ts to see how systems are initialized\n3. Ensure the new systems are properly imported and initialized:\n   - ObjectPoolManager should be a singleton, used where needed\n   - InfluenceMapSystem needs to be added to combat system initialization\n   - HitMarkerFeedback needs to be connected to combat hit events\n4. Run `npm run dev` to verify the game still works\n5. Run `npm run build` to check for type errors\n6. Commit with a descriptive message covering all the improvements\n\n## Validation\n- Build succeeds without errors\n- Game runs at http://localhost:5173\n- No console errors\n- New systems function (hit markers appear, object pools used)\n\n## Completion\nWhen done: commit with descriptive message (no emojis), provide summary of what was integrated.",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

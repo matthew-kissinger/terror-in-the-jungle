@@ -561,11 +561,16 @@ export class FirstPersonWeapon implements GameSystem {
       const normal = ray.direction.clone().negate();
       this.impactEffectsPool.spawn(result.point, normal);
 
-      // Show hit marker
+      // Show hit marker and play hit sound
       if (this.hudSystem) {
         // Check if it's a kill or normal hit
-        const hitType = (result as any).killed ? 'kill' : (result as any).headshot ? 'headshot' : 'normal';
+        const hitType = (result as any).killed ? 'kill' : (result as any).headshot ? 'headshot' : 'hit';
         this.hudSystem.showHitMarker(hitType);
+
+        // Play hit feedback sound
+        if (this.audioManager) {
+          this.audioManager.playHitFeedback(hitType as 'hit' | 'headshot' | 'kill');
+        }
 
         // Spawn damage number
         const damageDealt = (result as any).damage || 0;
@@ -611,8 +616,13 @@ export class FirstPersonWeapon implements GameSystem {
 
     // Show consolidated feedback for the shot
     if (anyHit && this.hudSystem && bestHit) {
-      const hitType = (bestHit as any).killed ? 'kill' : (bestHit as any).headshot ? 'headshot' : 'normal';
+      const hitType: 'hit' | 'headshot' | 'kill' = (bestHit as any).killed ? 'kill' : (bestHit as any).headshot ? 'headshot' : 'hit';
       this.hudSystem.showHitMarker(hitType);
+
+      // Play hit feedback sound
+      if (this.audioManager) {
+        this.audioManager.playHitFeedback(hitType);
+      }
 
       // Show total damage dealt
       if (totalDamage > 0) {

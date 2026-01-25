@@ -344,6 +344,110 @@ export class AudioManager implements GameSystem {
         return null;
     }
 
+    /**
+     * Play hit feedback sound using Web Audio API
+     * Creates procedural sounds for immediate feedback
+     */
+    playHitFeedback(type: 'hit' | 'headshot' | 'kill'): void {
+        const audioContext = this.listener.context;
+
+        // Create oscillator and gain nodes
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        const filterNode = audioContext.createBiquadFilter();
+
+        // Configure based on hit type
+        let frequency = 800;
+        let duration = 0.1;
+        let volume = 0.3;
+
+        switch (type) {
+            case 'headshot':
+                // Higher pitch with reverb tail
+                frequency = 1200;
+                duration = 0.15;
+                volume = 0.4;
+                filterNode.type = 'highpass';
+                filterNode.frequency.value = 800;
+                break;
+            case 'kill':
+                // Low thud with bass
+                frequency = 300;
+                duration = 0.2;
+                volume = 0.5;
+                filterNode.type = 'lowpass';
+                filterNode.frequency.value = 500;
+                break;
+            default:
+                // Normal hit - short click/snap
+                frequency = 800;
+                duration = 0.1;
+                volume = 0.3;
+                filterNode.type = 'bandpass';
+                filterNode.frequency.value = 800;
+                filterNode.Q.value = 2;
+                break;
+        }
+
+        // Configure oscillator
+        oscillator.type = type === 'kill' ? 'sawtooth' : 'sine';
+        oscillator.frequency.value = frequency;
+
+        // Configure gain envelope (ADSR-like)
+        const now = audioContext.currentTime;
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(volume, now + 0.01); // Attack
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration); // Decay/Release
+
+        // Connect nodes
+        oscillator.connect(filterNode);
+        filterNode.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        // Play sound
+        oscillator.start(now);
+        oscillator.stop(now + duration);
+
+        // Add subtle white noise for headshots
+        if (type === 'headshot') {
+            this.addNoiseLayer(duration, 0.15);
+        }
+    }
+
+    /**
+     * Add white noise layer for richer hit sounds
+     */
+    private addNoiseLayer(duration: number, volume: number): void {
+        const audioContext = this.listener.context;
+        const bufferSize = audioContext.sampleRate * duration;
+        const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+        const data = buffer.getChannelData(0);
+
+        // Generate white noise
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * 0.3;
+        }
+
+        const noise = audioContext.createBufferSource();
+        noise.buffer = buffer;
+
+        const noiseGain = audioContext.createGain();
+        const noiseFilter = audioContext.createBiquadFilter();
+        noiseFilter.type = 'highpass';
+        noiseFilter.frequency.value = 1000;
+
+        const now = audioContext.currentTime;
+        noiseGain.gain.setValueAtTime(volume, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(audioContext.destination);
+
+        noise.start(now);
+        noise.stop(now + duration);
+    }
+
     // Set master volume
     setMasterVolume(volume: number): void {
         this.listener.setMasterVolume(Math.max(0, Math.min(1, volume)));

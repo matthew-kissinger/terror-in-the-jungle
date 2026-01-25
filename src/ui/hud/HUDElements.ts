@@ -2,6 +2,7 @@ import { KillFeed } from './KillFeed';
 import { Faction } from '../../systems/combat/types';
 import { DamageNumberSystem } from './DamageNumberSystem';
 import { ScorePopupSystem } from './ScorePopupSystem';
+import { HitMarkerFeedback } from './HitMarkerFeedback';
 import * as THREE from 'three';
 
 export class HUDElements {
@@ -21,9 +22,11 @@ export class HUDElements {
   public helicopterMouseIndicator: HTMLDivElement;
   public helicopterInstruments: HTMLDivElement;
   public grenadePowerMeter: HTMLDivElement;
+  public grenadeCookingTimer?: HTMLDivElement;
   public killFeed: KillFeed;
   public damageNumbers?: DamageNumberSystem;
   public scorePopups?: ScorePopupSystem;
+  public hitMarkerFeedback?: HitMarkerFeedback;
 
   constructor(camera?: THREE.Camera) {
     this.hudContainer = this.createHUDContainer();
@@ -50,6 +53,9 @@ export class HUDElements {
 
     // Initialize score popup system
     this.scorePopups = new ScorePopupSystem();
+
+    // Initialize hit marker feedback system
+    this.hitMarkerFeedback = new HitMarkerFeedback();
 
     // Assemble HUD structure
     this.hudContainer.appendChild(this.objectivesList);
@@ -164,25 +170,18 @@ export class HUDElements {
     }
   }
 
-  showHitMarker(type: 'normal' | 'kill' | 'headshot' = 'normal'): void {
-    const marker = document.createElement('div');
-    marker.className = `hit-marker ${type}`;
+  showHitMarker(type: 'hit' | 'kill' | 'headshot' = 'hit'): void {
+    // Use new hit marker feedback system
+    if (this.hitMarkerFeedback) {
+      this.hitMarkerFeedback.showHitMarker(type);
+    }
 
+    // Legacy logging
     if (type === 'kill') {
       console.log('💀 Kill confirmed!');
     } else if (type === 'headshot') {
       console.log('🎯 Headshot!');
     }
-
-    this.hitMarkerContainer.appendChild(marker);
-
-    // Remove after animation completes (timing matches CSS animation duration)
-    const duration = type === 'kill' ? 400 : type === 'headshot' ? 350 : 300;
-    setTimeout(() => {
-      if (marker.parentNode) {
-        marker.parentNode.removeChild(marker);
-      }
-    }, duration);
   }
 
   private createRespawnButton(): HTMLButtonElement {
@@ -727,9 +726,10 @@ export class HUDElements {
     this.grenadePowerMeter.style.display = 'none';
   }
 
-  updateGrenadePower(power: number): void {
+  updateGrenadePower(power: number, estimatedDistance?: number): void {
     const powerFill = this.grenadePowerMeter.querySelector('.power-fill') as HTMLElement;
     const powerText = this.grenadePowerMeter.querySelector('.power-text') as HTMLElement;
+    const label = this.grenadePowerMeter.querySelector('div') as HTMLElement;
 
     if (powerFill && powerText) {
       // Power ranges from 0.3 to 1.0, normalize to 0-100%
@@ -737,15 +737,30 @@ export class HUDElements {
       const displayPercent = Math.round(power * 100);
 
       powerFill.style.width = `${normalizedPower}%`;
-      powerText.textContent = `${displayPercent}%`;
+
+      // Show distance estimate if available
+      if (estimatedDistance !== undefined) {
+        powerText.textContent = `~${Math.round(estimatedDistance)}m`;
+      } else {
+        powerText.textContent = `${displayPercent}%`;
+      }
 
       // Color gradient: green (low) -> yellow (mid) -> red (max)
       if (normalizedPower < 40) {
         powerFill.style.background = 'linear-gradient(to right, #00ff44, #88ff44)'; // Green
+        if (label) label.style.color = 'rgba(100, 255, 100, 0.9)';
       } else if (normalizedPower < 75) {
         powerFill.style.background = 'linear-gradient(to right, #ffff44, #ffaa44)'; // Yellow
+        if (label) label.style.color = 'rgba(255, 255, 100, 0.9)';
       } else {
         powerFill.style.background = 'linear-gradient(to right, #ff8844, #ff4444)'; // Red
+        if (label) label.style.color = 'rgba(255, 100, 100, 0.9)';
+        // Pulse animation at max power
+        if (normalizedPower >= 95) {
+          powerFill.style.animation = 'pulse-glow 0.5s infinite';
+        } else {
+          powerFill.style.animation = 'none';
+        }
       }
     }
   }
@@ -821,6 +836,9 @@ export class HUDElements {
     if (this.scorePopups) {
       this.scorePopups.attachToDOM();
     }
+    if (this.hitMarkerFeedback) {
+      this.hitMarkerFeedback.attachToDOM();
+    }
   }
 
   updateKillFeed(deltaTime: number): void {
@@ -856,9 +874,10 @@ export class HUDElements {
     killerFaction: Faction,
     victimName: string,
     victimFaction: Faction,
-    isHeadshot: boolean = false
+    isHeadshot: boolean = false,
+    weaponType: string = 'unknown'
   ): void {
-    this.killFeed.addKill(killerName, killerFaction, victimName, victimFaction, isHeadshot);
+    this.killFeed.addKill(killerName, killerFaction, victimName, victimFaction, isHeadshot, weaponType as any);
   }
 
   dispose(): void {
@@ -871,6 +890,9 @@ export class HUDElements {
     }
     if (this.scorePopups) {
       this.scorePopups.dispose();
+    }
+    if (this.hitMarkerFeedback) {
+      this.hitMarkerFeedback.dispose();
     }
   }
 }

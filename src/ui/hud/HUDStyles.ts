@@ -78,6 +78,17 @@ export class HUDStyles {
       50% { opacity: 1; }
     }
 
+    @keyframes pulse-glow {
+      0%, 100% {
+        box-shadow: 0 0 5px rgba(255, 100, 100, 0.5);
+        opacity: 1;
+      }
+      50% {
+        box-shadow: 0 0 15px rgba(255, 100, 100, 0.9);
+        opacity: 0.9;
+      }
+    }
+
     .capture-progress {
       width: 100px;
       height: 4px;

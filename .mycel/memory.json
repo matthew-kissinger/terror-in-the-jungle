@@ -108,6 +108,33 @@
         "global",
         "batch"
       ]
+    },
+    {
+      "id": "5f1800cb",
+      "content": "Death animations use isDying flag and deathProgress (0-1) on Combatant. Renderer checks these in updateBillboards() around line 339",
+      "source": "manual",
+      "created_at": "2026-01-25T02:32:52.019835",
+      "tags": []
+    },
+    {
+      "id": "74080795",
+      "content": "Before implementing features, search codebase first - grenade trajectory preview was already implemented (Task 2 discovered this)",
+      "source": "shepard",
+      "created_at": "2026-01-25T02:32:58.935221",
+      "tags": [
+        "global",
+        "batch"
+      ]
+    },
+    {
+      "id": "6ed70f26",
+      "content": "Death animation uses isDying flag + deathProgress (0-1) in Combatant type to drive procedural effects in renderer",
+      "source": "shepard",
+      "created_at": "2026-01-25T02:32:58.937901",
+      "tags": [
+        "global",
+        "batch"
+      ]
     }
   ],
   "warnings": [
@@ -156,6 +183,47 @@
         "batch"
       ],
       "severity": "medium"
+    },
+    {
+      "id": "34e2cd8b",
+      "content": "Tasks 3+4 merged into single commit (588625c) - harder to rollback individual features",
+      "source": "shepard",
+      "created_at": "2026-01-25T02:32:58.940558",
+      "tags": [
+        "global",
+        "batch"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "68b60a0e",
+      "content": "Task 5 was a test task (hello world) - should be filtered before batch evaluation",
+      "source": "shepard",
+      "created_at": "2026-01-25T02:32:58.943194",
+      "tags": [
+        "global",
+        "batch"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "873f39e8",
+      "content": "Uncommitted files accumulating (SpatialOctree.ts, mortar files) - clean up or commit",
+      "source": "shepard",
+      "created_at": "2026-01-25T02:32:58.946650",
+      "tags": [
+        "global",
+        "batch"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "67fff655",
+      "content": "Uncommitted work exists: SpatialOctree, MortarSystem reimplementation, CompassSystem zone markers - 667 lines of changes. Investigate and commit or discard.",
+      "source": "manual",
+      "created_at": "2026-01-25T02:33:34.466739",
+      "tags": [],
+      "severity": "low"
     }
   ],
   "context": [
@@ -193,7 +261,14 @@
       "source": "manual",
       "created_at": "2026-01-25T01:55:42.480196",
       "tags": []
+    },
+    {
+      "id": "5d01b46f",
+      "content": "GrenadeSystem already has trajectory preview with arc line and landing indicator. Check before implementing - search for 'trajectory' or 'preview'",
+      "source": "manual",
+      "created_at": "2026-01-25T02:32:53.481713",
+      "tags": []
     }
   ],
-  "updated_at": "2026-01-25T01:55:53.092415"
+  "updated_at": "2026-01-25T02:33:34.466757"
 }

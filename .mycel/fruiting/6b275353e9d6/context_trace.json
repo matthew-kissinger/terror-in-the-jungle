@@ -1,0 +1,20 @@
+{
+  "session_id": "6b275353e9d6",
+  "task_id": "e1bf1cf7-38f8-4fca-83e6-e6798c29d7d0",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T21:28:00.163422",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "You are improving combat AI for Terror in the Jungle, a 3D pixel art battlefield game.\n\n## Context\nNPCs have sophisticated flanking and suppression behaviors (CombatantAI.ts lines 715-800) but they don't actively defend captured zones. When a faction holds a zone, NPCs should position themselves defensively rather than just patrolling.\n\n## Discovery\nRead these files to understand the systems:\n1. src/systems/combat/CombatantAI.ts - AI state machine (lines 19-49), existing behaviors\n2. src/systems/combat/types.ts - CombatantState enum, Squad interface\n3. src/systems/world/ZoneManager.ts - Zone ownership, capture state\n4. src/systems/combat/SquadManager.ts - Squad coordination patterns\n5. src/systems/combat/CombatantMovement.ts - Movement patterns\n\n## Implementation\n1. Add new AI state: DEFENDING (in types.ts CombatantState enum)\n2. In CombatantAI, add zone defense logic:\n   - When squad's faction owns a nearby zone, some members switch to DEFENDING\n   - Defenders position at zone perimeter facing outward\n   - Defenders don't wander - they hold position and watch for threats\n   - When enemies approach, switch to ENGAGING but return to defense position after threat cleared\n3. Integration with ZoneManager:\n   - Query nearby zones owned by NPC's faction\n   - Assign 1-2 squad members as defenders per zone\n4. Defense positioning:\n   - Calculate defensive positions around zone center (spread at radius 10-15m)\n   - Face outward from zone center\n   - Prefer positions with terrain elevation advantage\n\n## Technical Notes\n- Follow existing state machine patterns in CombatantAI.ts\n- Use spatial queries that already exist (SpatialOctree)\n- Keep update costs low - only reassess defense assignments every 5 seconds\n- Leaders should stay mobile for flanking; assign non-leaders to defense\n\n## Validation\n- Build: npm run build (must succeed)\n- Test: npm run dev\n  - Capture a zone\n  - Observe friendly NPCs taking defensive positions around it\n  - When enemies approach, defenders engage then return to positions\n  - Zone feels 'guarded' rather than just 'owned'\n\n## Completion\nWhen complete: test zone defense in browser, commit with descriptive message, provide summary.",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

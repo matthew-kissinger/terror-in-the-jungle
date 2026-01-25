@@ -83,6 +83,7 @@ export interface Combatant {
   isDying?: boolean;
   deathProgress?: number;
   deathStartTime?: number;
+  deathDirection?: THREE.Vector3;
   defendingZoneId?: string;
   defensePosition?: THREE.Vector3;
   lastDefenseReassignTime?: number;

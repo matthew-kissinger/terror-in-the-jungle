@@ -1,0 +1,20 @@
+{
+  "session_id": "28c9e03946c3",
+  "task_id": "90f26ad5-0f3c-4bde-9613-2295ed667028",
+  "agent": "claude",
+  "model": "haiku",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T21:44:43.360451",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "## Task: Clean Up and Commit Pending Work\n\n### Context\nThe terror-in-the-jungle repo has several uncommitted files from previous work sessions that need to be reviewed, integrated properly, and committed. This includes SpatialOctree for NPC optimization and MortarSystem improvements.\n\n### Discovery\n1. Run: git status to see all uncommitted files\n2. Read the uncommitted files:\n   - src/systems/combat/SpatialOctree.ts (new file)\n   - src/systems/weapons/MortarBallistics.ts (new file)\n   - src/systems/weapons/MortarVisuals.ts (new file)\n   - src/systems/weapons/MortarSystem.ts (modified)\n   - src/systems/combat/CombatantSystem.ts (modified)\n   - src/systems/combat/CombatantCombat.ts (modified)\n3. Run npm run build to check current state\n\n### Implementation\n1. If build passes:\n   - Review each file briefly for completeness\n   - Stage and commit related files together in logical commits:\n     a. SpatialOctree + CombatantSystem changes as 'feat(perf): add spatial octree for NPC queries'\n     b. Mortar files as 'feat(weapons): improve mortar system ballistics and visuals'\n     c. Other files separately with appropriate messages\n2. If build fails:\n   - Fix any type errors or missing imports\n   - Ensure all new files are properly exported/imported\n\n### Validation\n- npm run build succeeds\n- git log shows clean commits\n- No uncommitted work remains except .mycel/ directory\n\n### Completion\nWhen complete: verify clean git status, provide summary of commits made",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

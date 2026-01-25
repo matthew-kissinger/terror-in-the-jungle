@@ -13,6 +13,7 @@ export interface MatchStats {
 export class MatchEndScreen {
   private container?: HTMLDivElement;
   private onReturnToMenuCallback?: () => void;
+  private onPlayAgainCallback?: () => void;
 
   constructor() {
     // Screen will be created on demand
@@ -38,6 +39,10 @@ export class MatchEndScreen {
 
   onReturnToMenu(callback: () => void): void {
     this.onReturnToMenuCallback = callback;
+  }
+
+  onPlayAgain(callback: () => void): void {
+    this.onPlayAgainCallback = callback;
   }
 
   private createEndScreen(winner: Faction, gameState: GameState, stats: MatchStats): HTMLDivElement {
@@ -317,7 +322,8 @@ export class MatchEndScreen {
       </div>
 
       <div class="end-screen-actions">
-        <button class="end-screen-button primary return-menu-btn">Return to Menu</button>
+        <button class="end-screen-button primary play-again-btn">Play Again</button>
+        <button class="end-screen-button return-menu-btn">Return to Menu</button>
       </div>
     `;
 
@@ -325,6 +331,20 @@ export class MatchEndScreen {
     container.classList.add(isVictory ? 'victory' : 'defeat');
 
     // Setup button handlers
+    const playAgainBtn = container.querySelector('.play-again-btn') as HTMLButtonElement;
+    if (playAgainBtn) {
+      playAgainBtn.addEventListener('click', () => {
+        if (this.onPlayAgainCallback) {
+          this.hide();
+          this.onPlayAgainCallback();
+        } else {
+          // Default action: reload the page
+          console.log('🔄 Restarting match (reloading page)');
+          window.location.reload();
+        }
+      });
+    }
+
     const returnBtn = container.querySelector('.return-menu-btn') as HTMLButtonElement;
     if (returnBtn) {
       returnBtn.addEventListener('click', () => {

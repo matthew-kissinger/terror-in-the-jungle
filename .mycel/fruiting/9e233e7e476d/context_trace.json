@@ -1,0 +1,20 @@
+{
+  "session_id": "9e233e7e476d",
+  "task_id": "acce4b36-3ee8-4d7b-8803-9b3e8945cf13",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T21:45:19.223936",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "## Task: Add SMG/PDW Weapon Type\n\n### Context\nThis is a 3D pixel art battlefield game built with Three.js. Per CLAUDE.md priority list, an SMG is needed for spray-and-pray gameplay. The game has existing rifle and potentially shotgun weapons.\n\n### Discovery\n1. Read src/systems/player/FirstPersonWeapon.ts - understand weapon system\n2. Read src/systems/player/ProgrammaticGunFactory.ts - weapon visuals\n3. Read src/systems/player/InventoryManager.ts - weapon/ammo management\n4. Check if shotgun was added (may need to follow similar pattern)\n\n### Implementation\n1. Add SMG weapon type to weapon enums/types\n2. Create SMG visual in ProgrammaticGunFactory.ts:\n   - Compact design with vertical foregrip\n   - Shorter than rifle, longer than pistol\n   - Extended magazine visual\n3. Implement SMG firing mechanics:\n   - High fire rate: ~800 RPM (0.075s between shots)\n   - Lower damage per shot: 18-22\n   - Good hip-fire accuracy (tighter spread than rifle when not ADS)\n   - Wider spread when ADS compared to rifle\n   - Effective range: 30-40m\n   - Magazine: 30 rounds\n   - Fast reload: ~1.8s\n4. Add suppression effect on enemies hit\n5. Weapon switching: key 3 for SMG\n\n### Design Notes\n- SMG excels at medium range sustained fire\n- Lower recoil per shot but more shots = more cumulative recoil\n- Good for suppression and area denial\n- Audio: higher pitched, faster rate than rifle\n\n### Validation\n- npm run build succeeds\n- Test in browser\n- SMG fires rapidly with appropriate spread\n- Damage output balanced vs rifle (similar DPS, different feel)\n\n### Completion\nWhen complete: test in browser, commit with message like 'feat(weapons): add SMG with high fire rate and suppression', provide summary",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

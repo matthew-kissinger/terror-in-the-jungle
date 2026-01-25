@@ -2,12 +2,15 @@ import * as THREE from 'three';
 import { Combatant, Faction, Squad } from './types';
 import { CombatantFactory } from './CombatantFactory';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import { InfluenceMapSystem } from './InfluenceMapSystem';
+import { CaptureZone } from '../world/ZoneManager';
 
 export class SquadManager {
   private squads: Map<string, Squad> = new Map();
   private nextSquadId = 0;
   private combatantFactory: CombatantFactory;
   private chunkManager?: ImprovedChunkManager;
+  private influenceMap?: InfluenceMapSystem;
 
   constructor(combatantFactory: CombatantFactory, chunkManager?: ImprovedChunkManager) {
     this.combatantFactory = combatantFactory;
@@ -118,6 +121,53 @@ export class SquadManager {
 
   setChunkManager(chunkManager: ImprovedChunkManager): void {
     this.chunkManager = chunkManager;
+  }
+
+  setInfluenceMap(influenceMap: InfluenceMapSystem): void {
+    this.influenceMap = influenceMap;
+  }
+
+  /**
+   * Assign best zone objective to a squad based on influence map
+   */
+  assignSquadObjective(
+    squad: Squad,
+    squadLeaderPos: THREE.Vector3,
+    zones: CaptureZone[]
+  ): CaptureZone | null {
+    if (!this.influenceMap) {
+      // Fallback to random zone selection
+      const validZones = zones.filter(z => !z.isHomeBase && z.owner !== squad.faction);
+      if (validZones.length === 0) return null;
+      return validZones[Math.floor(Math.random() * validZones.length)];
+    }
+
+    // Use influence map to find best zone target
+    const bestZone = this.influenceMap.findBestZoneTarget(squadLeaderPos, squad.faction);
+    if (bestZone) {
+      squad.objective = bestZone.position.clone();
+      console.log(`🎯 Squad ${squad.id} assigned to zone ${bestZone.name} via influence map`);
+    }
+
+    return bestZone;
+  }
+
+  /**
+   * Find best tactical approach position to a target using influence map
+   */
+  findBestApproachPosition(
+    currentPos: THREE.Vector3,
+    targetPos: THREE.Vector3,
+    faction: Faction,
+    searchRadius: number = 50
+  ): THREE.Vector3 | null {
+    if (!this.influenceMap) {
+      return null; // No influence map, use direct path
+    }
+
+    // Find low-threat position near target
+    const bestPos = this.influenceMap.findBestPositionNear(targetPos, searchRadius, faction);
+    return bestPos;
   }
 
   assignSuppressionRoles(

@@ -1,0 +1,20 @@
+{
+  "session_id": "7b1326ec9e96",
+  "task_id": "4b011670-705b-4123-9ea5-61cbc07a0781",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T22:22:48.574909",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "# Grenade System Overhaul - Physics and UX Improvements\n\n## Context\nYou are working on Terror in the Jungle, a 3D pixel art battlefield game. The grenade system exists but feels 'floaty' with unclear trajectory preview and missing key features like cooking mechanics. This task improves grenade combat feel significantly.\n\n## Objective\nRefine grenade physics for tighter, more predictable arcs and add UX improvements including a visual power meter, clearer trajectory preview, and cooking mechanic.\n\n## Discovery - Read These Files First\n1. `CLAUDE.md` - Project overview\n2. `src/systems/weapons/GrenadeSystem.ts` - Current grenade implementation\n3. `src/systems/weapons/GrenadePhysics.ts` - Physics calculations (if exists)\n4. `src/ui/hud/HUDSystem.ts` - HUD integration\n5. `src/systems/weapons/GrenadeTypes.ts` - Grenade configuration\n6. `WEAPON_SYSTEM_IMPLEMENTATION_PLAN.md` - Original design notes\n\n## Implementation Steps\n\n### Step 1: Tighten Physics\nModify grenade physics for more realistic feel:\n- Increase gravity (try -35 instead of -20) for faster, more predictable arcs\n- Add surface friction coefficients:\n  - Mud/grass: 0.7 friction\n  - Rock/concrete: 0.3 friction (more bounce)\n  - Water: immediate stop\n- Implement rolling momentum decay (exponential decay over 1-2 seconds)\n- Reduce air resistance for snappier throws\n\n### Step 2: Visual Power Meter\nCreate clear power indicator during throw charge:\n- Show 0-100% fill bar near crosshair\n- Color coding: Green (short) -> Yellow (medium) -> Red (max power)\n- Numeric distance estimate (e.g., '~15m', '~30m', '~45m')\n- Pulse animation at max power to indicate ready\n\n### Step 3: Trajectory Preview Enhancement\nImprove the arc visualization:\n- Draw dashed line showing predicted arc (sample 20 points)\n- Show landing indicator (circle or X) at predicted impact point\n- Account for current power level in real-time\n- Fade trajectory when obstructed by terrain\n\n### Step 4: Implement Cooking Mechanic\nAdd ability to cook grenades:\n- Hold G to start cooking (fuse begins countdown)\n- Press G again to throw mid-cook\n- Visual fuse countdown on screen (3.5s, 3.0s, 2.5s...)\n- Audio beeps at critical times: 2s, 1s, 0.5s remaining\n- If held too long, explodes in hand (suicide mechanic)\n- Show danger warning at <1s remaining\n\n### Step 5: Improve Explosion Effects\nEnhance explosion impact:\n- Larger explosion sphere with particle cascades\n- Radial shockwave effect on ground\n- Screen shake scaled by proximity (closer = stronger)\n- Distinct bass-heavy boom audio\n- Camera push-back from blast\n\n## Validation\n- [ ] Grenades feel 'snappy' with predictable arcs\n- [ ] Power meter clearly shows throw distance\n- [ ] Trajectory preview updates in real-time as you aim\n- [ ] Cooking mechanic works with audio feedback\n- [ ] Explosions feel impactful with proper screen shake\n\n## Technical Constraints\n- Maintain 60fps during grenade actions\n- Keep GrenadeSystem module under 400 lines\n- Reuse existing UI patterns from HUDSystem\n- No new dependencies required\n\n## Completion\nWhen complete:\n1. Test in browser with `npm run dev`\n2. Throw grenades at various distances and surfaces\n3. Test cooking mechanic (try letting one explode in hand)\n4. Commit with descriptive message: 'feat(weapons): overhaul grenade physics and UX for better combat feel'\n5. Provide summary of changes made",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

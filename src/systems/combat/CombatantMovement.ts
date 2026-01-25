@@ -3,6 +3,7 @@ import { Combatant, CombatantState, Faction, Squad, SquadCommand } from './types
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { ZoneManager, ZoneState } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
+import { objectPool } from '../../utils/ObjectPoolManager';
 
 export class CombatantMovement {
   private chunkManager?: ImprovedChunkManager;
@@ -32,7 +33,10 @@ export class CombatantMovement {
     }
 
     // Apply velocity normally - LOD scaling handled in CombatantSystem
-    combatant.position.add(combatant.velocity.clone().multiplyScalar(deltaTime));
+    const velocityDelta = objectPool.getVector3();
+    velocityDelta.copy(combatant.velocity).multiplyScalar(deltaTime);
+    combatant.position.add(velocityDelta);
+    objectPool.releaseVector3(velocityDelta);
 
     // Keep on terrain
     const terrainHeight = this.getTerrainHeight(combatant.position.x, combatant.position.z);
@@ -66,8 +70,8 @@ export class CombatantMovement {
       if (squad && squad.leaderId) {
         const leader = combatants.get(squad.leaderId);
         if (leader && leader.id !== combatant.id) {
-          const toLeader = new THREE.Vector3()
-            .subVectors(leader.position, combatant.position);
+          const toLeader = objectPool.getVector3();
+          toLeader.subVectors(leader.position, combatant.position);
 
           if (toLeader.length() > 6) {
             toLeader.normalize();
@@ -77,8 +81,10 @@ export class CombatantMovement {
               toLeader.z * 3
             );
             combatant.rotation = Math.atan2(toLeader.z, toLeader.x);
+            objectPool.releaseVector3(toLeader);
             return;
           }
+          objectPool.releaseVector3(toLeader);
         }
       }
     }
@@ -127,7 +133,8 @@ export class CombatantMovement {
         }
 
         // Move toward the selected zone
-        const toZone = new THREE.Vector3().subVectors(combatant.destinationPoint, combatant.position);
+        const toZone = objectPool.getVector3();
+        toZone.subVectors(combatant.destinationPoint, combatant.position);
         const distance = toZone.length();
         toZone.normalize();
 
@@ -138,6 +145,7 @@ export class CombatantMovement {
 
         combatant.velocity.set(toZone.x * speed, 0, toZone.z * speed);
         if (speed > 0.1) combatant.rotation = Math.atan2(toZone.z, toZone.x);
+        objectPool.releaseVector3(toZone);
         return;
       }
     }
@@ -146,9 +154,8 @@ export class CombatantMovement {
     if (combatant.squadRole === 'leader') {
       const enemyBasePos = this.getEnemyBasePosition(combatant.faction);
 
-      const toEnemyBase = new THREE.Vector3()
-        .subVectors(enemyBasePos, combatant.position)
-        .normalize();
+      const toEnemyBase = objectPool.getVector3();
+      toEnemyBase.subVectors(enemyBasePos, combatant.position).normalize();
 
       combatant.velocity.set(
         toEnemyBase.x * 3,
@@ -156,6 +163,7 @@ export class CombatantMovement {
         toEnemyBase.z * 3
       );
       combatant.rotation = Math.atan2(toEnemyBase.z, toEnemyBase.x);
+      objectPool.releaseVector3(toEnemyBase);
     } else {
       // Followers: limited wander near leader
       combatant.timeToDirectionChange -= deltaTime;
@@ -180,8 +188,8 @@ export class CombatantMovement {
   private updateCombatMovement(combatant: Combatant, deltaTime: number): void {
     if (!combatant.target) return;
 
-    const toTarget = new THREE.Vector3()
-      .subVectors(combatant.target.position, combatant.position);
+    const toTarget = objectPool.getVector3();
+    toTarget.subVectors(combatant.target.position, combatant.position);
     const distance = toTarget.length();
     toTarget.normalize();
 
@@ -196,9 +204,13 @@ export class CombatantMovement {
     } else {
       // Strafe
       const strafeAngle = Math.sin(Date.now() * 0.001) * 0.5;
-      const strafeDirection = new THREE.Vector3(-toTarget.z, 0, toTarget.x);
+      const strafeDirection = objectPool.getVector3();
+      strafeDirection.set(-toTarget.z, 0, toTarget.x);
       combatant.velocity.copy(strafeDirection).multiplyScalar(strafeAngle * 2);
+      objectPool.releaseVector3(strafeDirection);
     }
+
+    objectPool.releaseVector3(toTarget);
   }
 
   private updateCoverSeekingMovement(combatant: Combatant, deltaTime: number): void {
@@ -207,12 +219,13 @@ export class CombatantMovement {
       return;
     }
 
-    const toDestination = new THREE.Vector3()
-      .subVectors(combatant.destinationPoint, combatant.position);
+    const toDestination = objectPool.getVector3();
+    toDestination.subVectors(combatant.destinationPoint, combatant.position);
     const distance = toDestination.length();
 
     if (distance < 2) {
       combatant.velocity.set(0, 0, 0);
+      objectPool.releaseVector3(toDestination);
       return;
     }
 
@@ -225,6 +238,7 @@ export class CombatantMovement {
       0,
       toDestination.z * speed
     );
+    objectPool.releaseVector3(toDestination);
   }
 
   private updateDefendingMovement(combatant: Combatant, deltaTime: number): void {
@@ -234,12 +248,13 @@ export class CombatantMovement {
       return;
     }
 
-    const toDestination = new THREE.Vector3()
-      .subVectors(combatant.destinationPoint, combatant.position);
+    const toDestination = objectPool.getVector3();
+    toDestination.subVectors(combatant.destinationPoint, combatant.position);
     const distance = toDestination.length();
 
     if (distance < 2) {
       combatant.velocity.set(0, 0, 0);
+      objectPool.releaseVector3(toDestination);
       return;
     }
 
@@ -252,6 +267,7 @@ export class CombatantMovement {
       0,
       toDestination.z * speed
     );
+    objectPool.releaseVector3(toDestination);
   }
 
   updateRotation(combatant: Combatant, deltaTime: number): void {
@@ -291,12 +307,16 @@ export class CombatantMovement {
       combatant.isRejoiningSquad = false;
       combatant.velocity.set(0, 0, 0);
       console.log(`✅ Squad member successfully rejoined the squad`);
+      objectPool.releaseVector3(squadCentroid);
     } else {
-      const toSquad = new THREE.Vector3().subVectors(squadCentroid, combatant.position);
+      const toSquad = objectPool.getVector3();
+      toSquad.subVectors(squadCentroid, combatant.position);
       toSquad.normalize();
       const speed = Math.min(7, distanceToSquad / 3);
       combatant.velocity.set(toSquad.x * speed, 0, toSquad.z * speed);
       combatant.rotation = Math.atan2(toSquad.z, toSquad.x);
+      objectPool.releaseVector3(toSquad);
+      objectPool.releaseVector3(squadCentroid);
     }
   }
 
@@ -307,7 +327,7 @@ export class CombatantMovement {
 
     if (squadMembers.length === 0) return undefined;
 
-    const centroid = new THREE.Vector3();
+    const centroid = objectPool.getVector3();
     squadMembers.forEach(member => {
       if (member) centroid.add(member.position);
     });
@@ -328,7 +348,8 @@ export class CombatantMovement {
     switch (command) {
       case SquadCommand.FOLLOW_ME:
         if (combatant.destinationPoint) {
-          const toDestination = new THREE.Vector3().subVectors(combatant.destinationPoint, combatant.position);
+          const toDestination = objectPool.getVector3();
+          toDestination.subVectors(combatant.destinationPoint, combatant.position);
           const distance = toDestination.length();
           if (distance > 2) {
             toDestination.normalize();
@@ -338,6 +359,7 @@ export class CombatantMovement {
           } else {
             combatant.velocity.set(0, 0, 0);
           }
+          objectPool.releaseVector3(toDestination);
         } else {
           combatant.velocity.set(0, 0, 0);
         }
@@ -345,7 +367,8 @@ export class CombatantMovement {
 
       case SquadCommand.HOLD_POSITION:
         if (combatant.destinationPoint) {
-          const toDestination = new THREE.Vector3().subVectors(combatant.destinationPoint, combatant.position);
+          const toDestination = objectPool.getVector3();
+          toDestination.subVectors(combatant.destinationPoint, combatant.position);
           const distance = toDestination.length();
           if (distance > 2) {
             toDestination.normalize();
@@ -354,6 +377,7 @@ export class CombatantMovement {
           } else {
             combatant.velocity.set(0, 0, 0);
           }
+          objectPool.releaseVector3(toDestination);
         } else {
           combatant.velocity.set(0, 0, 0);
         }
@@ -361,7 +385,8 @@ export class CombatantMovement {
 
       case SquadCommand.PATROL_HERE:
         if (combatant.destinationPoint) {
-          const toDestination = new THREE.Vector3().subVectors(combatant.destinationPoint, combatant.position);
+          const toDestination = objectPool.getVector3();
+          toDestination.subVectors(combatant.destinationPoint, combatant.position);
           const distance = toDestination.length();
           if (distance > 3) {
             toDestination.normalize();
@@ -370,6 +395,7 @@ export class CombatantMovement {
           } else {
             combatant.velocity.set(0, 0, 0);
           }
+          objectPool.releaseVector3(toDestination);
         } else {
           combatant.velocity.set(0, 0, 0);
         }
@@ -377,7 +403,8 @@ export class CombatantMovement {
 
       case SquadCommand.RETREAT:
         if (combatant.destinationPoint) {
-          const toDestination = new THREE.Vector3().subVectors(combatant.destinationPoint, combatant.position);
+          const toDestination = objectPool.getVector3();
+          toDestination.subVectors(combatant.destinationPoint, combatant.position);
           const distance = toDestination.length();
           if (distance > 5) {
             toDestination.normalize();
@@ -386,6 +413,7 @@ export class CombatantMovement {
           } else {
             combatant.velocity.set(0, 0, 0);
           }
+          objectPool.releaseVector3(toDestination);
         } else {
           combatant.velocity.set(0, 0, 0);
         }

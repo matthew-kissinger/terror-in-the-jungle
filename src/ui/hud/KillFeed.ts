@@ -1,11 +1,14 @@
 import { Faction } from '../../systems/combat/types';
 
+export type WeaponType = 'rifle' | 'shotgun' | 'smg' | 'grenade' | 'mortar' | 'melee' | 'unknown';
+
 interface KillEntry {
   killerName: string;
   killerFaction: Faction;
   victimName: string;
   victimFaction: Faction;
   isHeadshot: boolean;
+  weaponType: WeaponType;
   timestamp: number;
   opacity: number;
 }
@@ -45,7 +48,8 @@ export class KillFeed {
     killerFaction: Faction,
     victimName: string,
     victimFaction: Faction,
-    isHeadshot: boolean = false
+    isHeadshot: boolean = false,
+    weaponType: WeaponType = 'unknown'
   ): void {
     const entry: KillEntry = {
       killerName,
@@ -53,6 +57,7 @@ export class KillFeed {
       victimName,
       victimFaction,
       isHeadshot,
+      weaponType,
       timestamp: Date.now(),
       opacity: 1.0
     };
@@ -107,6 +112,8 @@ export class KillFeed {
 
   private createEntryElement(entry: KillEntry): HTMLDivElement {
     const element = document.createElement('div');
+    const isExplosive = entry.weaponType === 'grenade' || entry.weaponType === 'mortar';
+
     element.style.cssText = `
       display: flex;
       align-items: center;
@@ -114,11 +121,12 @@ export class KillFeed {
       gap: 6px;
       padding: 4px 8px;
       background: rgba(0, 0, 0, ${0.6 * entry.opacity});
-      border: 1px solid rgba(255, 255, 255, ${0.2 * entry.opacity});
+      border: 1px solid ${isExplosive ? `rgba(255, 100, 50, ${0.3 * entry.opacity})` : `rgba(255, 255, 255, ${0.2 * entry.opacity})`};
       border-radius: 3px;
       opacity: ${entry.opacity};
       transition: opacity 0.3s ease;
       backdrop-filter: blur(3px);
+      animation: slideIn 0.2s ease-out;
     `;
 
     // Killer name
@@ -130,19 +138,26 @@ export class KillFeed {
       text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
     `;
 
-    // Weapon/kill icon
-    const iconSpan = document.createElement('span');
+    // Weapon icon
+    const weaponSpan = document.createElement('span');
+    const weaponIcon = this.getWeaponIcon(entry.weaponType);
+    weaponSpan.textContent = weaponIcon.text;
+    weaponSpan.style.cssText = `
+      color: ${weaponIcon.color};
+      font-size: ${weaponIcon.size};
+      font-weight: bold;
+      text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+    `;
+
+    // Headshot indicator (after weapon, before victim)
+    let headshotSpan: HTMLSpanElement | null = null;
     if (entry.isHeadshot) {
-      iconSpan.textContent = '[HS]';
-      iconSpan.style.cssText = `
+      headshotSpan = document.createElement('span');
+      headshotSpan.textContent = '☠';
+      headshotSpan.style.cssText = `
         color: #ff6b6b;
-        font-weight: bold;
-        font-size: 10px;
-      `;
-    } else {
-      iconSpan.textContent = '>';
-      iconSpan.style.cssText = `
-        color: rgba(255, 255, 255, 0.6);
+        font-size: 14px;
+        filter: drop-shadow(0 0 3px #ff0000);
       `;
     }
 
@@ -156,10 +171,32 @@ export class KillFeed {
     `;
 
     element.appendChild(killerSpan);
-    element.appendChild(iconSpan);
+    element.appendChild(weaponSpan);
+    if (headshotSpan) {
+      element.appendChild(headshotSpan);
+    }
     element.appendChild(victimSpan);
 
     return element;
+  }
+
+  private getWeaponIcon(weaponType: WeaponType): { text: string; color: string; size: string } {
+    switch (weaponType) {
+      case 'rifle':
+        return { text: '▸', color: 'rgba(255, 255, 255, 0.8)', size: '12px' };
+      case 'shotgun':
+        return { text: '◈', color: '#ff9933', size: '14px' };
+      case 'smg':
+        return { text: '≫', color: '#ffcc33', size: '12px' };
+      case 'grenade':
+        return { text: '💥', color: '#ff6b35', size: '14px' };
+      case 'mortar':
+        return { text: '💣', color: '#ff3333', size: '14px' };
+      case 'melee':
+        return { text: '⚔', color: '#cccccc', size: '14px' };
+      default:
+        return { text: '•', color: 'rgba(255, 255, 255, 0.6)', size: '12px' };
+    }
   }
 
   private getFactionColor(faction: Faction): string {
@@ -175,12 +212,41 @@ export class KillFeed {
 
   attachToDOM(parent: HTMLElement): void {
     parent.appendChild(this.container);
+    this.injectStyles();
+  }
+
+  private injectStyles(): void {
+    // Check if styles already exist
+    if (document.getElementById('kill-feed-styles')) return;
+
+    const style = document.createElement('style');
+    style.id = 'kill-feed-styles';
+    style.textContent = `
+      @keyframes slideIn {
+        from {
+          transform: translateX(100px);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   dispose(): void {
     if (this.container.parentNode) {
       this.container.parentNode.removeChild(this.container);
     }
+
+    // Clean up injected styles
+    const styleElement = document.getElementById('kill-feed-styles');
+    if (styleElement && styleElement.parentNode) {
+      styleElement.parentNode.removeChild(styleElement);
+    }
+
     this.entries = [];
   }
 }

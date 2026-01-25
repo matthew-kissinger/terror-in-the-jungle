@@ -1,0 +1,20 @@
+{
+  "session_id": "2c55b2b5a2e7",
+  "task_id": "9af03dd7-8070-4cbd-aec5-7989869df15c",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T22:40:19.160609",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "# Task: Implement Post-Match Stats Screen\n\n## Context\nWhen a match ends (tickets reach 0), the game just ends abruptly. There's no summary of player performance. The GDD lists this under \"Match Flow Improvements\" - post-match stats screen is missing.\n\n## Discovery - Read These Files First\n1. src/systems/world/TicketSystem.ts - Handles match end detection\n2. src/systems/player/PlayerStatsTracker.ts - Tracks player kills/deaths\n3. src/ui/hud/HUDSystem.ts - Main HUD orchestrator\n4. src/ui/hud/KillFeed.ts - For styling reference\n5. src/config/GameModes.ts or similar - Game mode settings\n\n## Requirements\nDisplay a post-match stats overlay when match ends:\n- VICTORY or DEFEAT banner (based on team ticket comparison)\n- Player stats:\n  - Kills / Deaths / K:D ratio\n  - Zones captured\n  - Damage dealt\n  - Accuracy (shots hit / shots fired)\n  - Time alive / Respawns\n- Team summary:\n  - Final ticket count for both teams\n  - Total team kills\n- \"Play Again\" button to restart\n- \"Main Menu\" button to return to game mode selection\n\n## Implementation Steps\n1. Create src/ui/hud/PostMatchStats.ts:\n   - DOM overlay (similar to loading screen)\n   - Animate in when match ends\n   - Styled consistently with HUDStyles.ts\n\n2. Connect to TicketSystem:\n   - Listen for match end event\n   - Determine winning team\n   - Show overlay with stats\n\n3. Get stats from PlayerStatsTracker:\n   - Ensure kills, deaths, captures are tracked\n   - Add accuracy tracking if missing (shots fired vs hits)\n\n4. Add restart/menu actions:\n   - \"Play Again\" resets and starts same mode\n   - \"Main Menu\" returns to LoadingScreen mode select\n\n## Visual Design\n- Semi-transparent dark overlay (rgba(0,0,0,0.85))\n- Large centered panel (600px wide max)\n- Victory = green glow/accent, Defeat = red\n- Stats in two columns (label : value)\n- Buttons at bottom with hover states\n\n## Validation\n- Play a full match (or use debug to end early)\n- Stats screen appears on match end\n- Correct win/loss determination\n- Stats accurate (test with known kill count)\n- Buttons work (restart, menu)\n\n## Completion\nWhen done: test full flow, commit with descriptive message (no emojis), provide summary.",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}
