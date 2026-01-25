@@ -1,0 +1,20 @@
+{
+  "session_id": "deba58f61e96",
+  "task_id": "48da6296-4640-4064-b8df-065909953981",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T21:12:58.681515",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "# Task: Wire Kill Feed to Combat System\n\n## Context\nYou are working on Terror in the Jungle, a 3D pixel art battlefield game built with Three.js. The game has a working KillFeed UI component at `src/ui/hud/KillFeed.ts` that can display kills, but it's not connected to the actual combat system. When NPCs kill each other or the player kills an NPC, the kill feed should show the event.\n\n## Goal\nConnect the KillFeed to the CombatantSystem so that all kills (NPC vs NPC, Player vs NPC) are displayed in the kill feed UI.\n\n## Files to Read First\n1. `src/ui/hud/KillFeed.ts` - The existing kill feed component with `addKill()` method\n2. `src/ui/hud/HUDSystem.ts` - The HUD orchestrator that owns the KillFeed\n3. `src/systems/combat/CombatantSystem.ts` - Where kills happen (look for damage/death handling)\n4. `src/systems/combat/types.ts` - Faction enum and Combatant interface\n\n## Implementation Steps\n\n1. **In CombatantSystem**: Add a callback/event mechanism for when a combatant dies:\n   - Track who killed whom (killer faction, victim faction)\n   - Include whether it was a headshot\n   - Expose a method like `onCombatantKilled(callback)` or use an event emitter pattern\n\n2. **In HUDSystem**: \n   - Get reference to CombatantSystem\n   - Subscribe to kill events\n   - Call `killFeed.addKill()` with appropriate data\n   - Generate appropriate names (e.g., \"US-Alpha-1\", \"OPFOR-3\", \"Player\")\n\n3. **For player kills**: The player shooting logic is in `FirstPersonWeapon.ts`. When the player kills an NPC:\n   - The result from `combatantSystem.handlePlayerShot()` already returns `killed` boolean\n   - Need to report this kill to the HUD/KillFeed\n\n4. **For NPC kills**: In CombatantCombat.ts, NPC vs NPC combat results need to report kills.\n\n## Code Patterns\nThe game uses dependency injection via setter methods:\n```typescript\nsetHUDSystem(hudSystem: HUDSystem): void { this.hudSystem = hudSystem; }\n```\n\nThe KillFeed addKill signature:\n```typescript\naddKill(killerName: string, killerFaction: Faction, victimName: string, victimFaction: Faction, isHeadshot: boolean): void\n```\n\n## Validation\n- Run `npm run dev` and play the game\n- Engage in combat - kills should appear in the top-right corner\n- Verify both player kills and NPC vs NPC kills appear\n- Headshots should show [HS] marker\n- Entries should fade after 5 seconds\n\n## Completion\nWhen complete: test thoroughly in browser, commit with descriptive message, provide summary of changes made.",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

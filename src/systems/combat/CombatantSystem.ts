@@ -365,7 +365,32 @@ export class CombatantSystem implements GameSystem {
     }
   }
 
+  private updateDeathAnimations(deltaTime: number): void {
+    const DEATH_DURATION = 1.5; // 1.5 seconds for death animation
+
+    this.combatants.forEach(combatant => {
+      if (combatant.isDying) {
+        // Progress death animation
+        if (combatant.deathProgress === undefined) {
+          combatant.deathProgress = 0;
+        }
+
+        combatant.deathProgress += deltaTime / DEATH_DURATION;
+
+        // When animation completes, mark as fully dead
+        if (combatant.deathProgress >= 1.0) {
+          combatant.isDying = false;
+          combatant.state = CombatantState.DEAD;
+          combatant.deathProgress = 1.0;
+        }
+      }
+    });
+  }
+
   private updateCombatants(deltaTime: number): void {
+    // Update death animations first
+    this.updateDeathAnimations(deltaTime);
+
     // Reuse scratch array to avoid per-frame allocations
     this.scratchCombatants.length = 0;
     this.combatants.forEach(combatant => {

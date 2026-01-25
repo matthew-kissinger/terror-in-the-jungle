@@ -258,7 +258,7 @@ export class CombatantCombat {
       if (hit) {
         this.impactEffectsPool.spawn(hit.point, shotRay.direction.clone().negate());
         const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
-        this.applyDamage(hit.combatant, damage, combatant, squads);
+        this.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot);
 
         if (hit.headshot) {
           console.log(`🎯 Headshot! ${combatant.faction} -> ${hit.combatant.faction}`);
@@ -269,7 +269,7 @@ export class CombatantCombat {
       }
     } else if (hit) {
       const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
-      this.applyDamage(hit.combatant, damage, combatant, squads);
+      this.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot);
     }
   }
 
@@ -322,7 +322,8 @@ export class CombatantCombat {
     target: Combatant,
     damage: number,
     attacker?: Combatant,
-    squads?: Map<string, Squad>
+    squads?: Map<string, Squad>,
+    isHeadshot: boolean = false
   ): void {
     // Check if target is valid before accessing properties
     if (!target) {
@@ -348,7 +349,7 @@ export class CombatantCombat {
               attacker.faction,
               'PLAYER',
               Faction.US,
-              false
+              isHeadshot
             );
           }
         }
@@ -387,7 +388,7 @@ export class CombatantCombat {
           attacker.faction,
           victimName,
           target.faction,
-          false
+          isHeadshot
         );
       }
 
@@ -424,7 +425,7 @@ export class CombatantCombat {
     if (hit) {
       const damage = damageCalculator(hit.distance, hit.headshot);
       const targetHealth = hit.combatant.health;
-      this.applyDamage(hit.combatant, damage);
+      this.applyDamage(hit.combatant, damage, undefined, undefined, hit.headshot);
 
       const killed = targetHealth > 0 && hit.combatant.health <= 0;
 

@@ -227,7 +227,8 @@ export class CombatantRenderer {
     }
 
     combatants.forEach(combatant => {
-      if (combatant.state === CombatantState.DEAD) return;
+      // Skip fully dead combatants, but allow dying ones to render during animation
+      if (combatant.state === CombatantState.DEAD && !combatant.isDying) return;
       if (combatant.isPlayerProxy) return;
 
       // Skip rendering if far from player
@@ -328,12 +329,35 @@ export class CombatantRenderer {
         }
 
         matrix.makeRotationY(finalRotation);
-        matrix.setPosition(combatant.position);
+
+        // Apply death animation effects
+        let finalPosition = combatant.position.clone();
+        let finalScaleX = scaleX;
+        let finalScaleY = combatant.scale.y;
+        let finalScaleZ = combatant.scale.z;
+
+        if (combatant.isDying && combatant.deathProgress !== undefined) {
+          // Procedural death effects
+          const progress = combatant.deathProgress;
+
+          // Fall/sink effect - lower Y position
+          finalPosition.y -= progress * 2.0;
+
+          // Shrink/crumple effect - compress Y scale
+          finalScaleY *= (1 - progress * 0.5);
+
+          // Slight rotation tilt (applied to the matrix after positioning)
+          const tilt = progress * Math.PI * 0.2; // 36 degrees max tilt
+          const tiltMatrix = new THREE.Matrix4().makeRotationZ(tilt);
+          matrix.multiply(tiltMatrix);
+        }
+
+        matrix.setPosition(finalPosition);
 
         const scaleMatrix = new THREE.Matrix4().makeScale(
-          scaleX,
-          combatant.scale.y,
-          combatant.scale.z
+          finalScaleX,
+          finalScaleY,
+          finalScaleZ
         );
         matrix.multiply(scaleMatrix);
 

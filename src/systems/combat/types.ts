@@ -79,6 +79,9 @@ export interface Combatant {
   suppressionEndTime?: number;
   lastSuppressedTime?: number;
   nearMissCount?: number;
+  isDying?: boolean;
+  deathProgress?: number;
+  deathStartTime?: number;
 }
 
 export enum SquadCommand {

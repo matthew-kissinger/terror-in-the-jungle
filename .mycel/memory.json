@@ -88,6 +88,26 @@
       "source": "manual",
       "created_at": "2026-01-25T01:55:41.200609",
       "tags": []
+    },
+    {
+      "id": "970e1264",
+      "content": "Suppression systems integrate via setter pattern: setPlayerSuppressionSystem() called in connectSystems()",
+      "source": "shepard",
+      "created_at": "2026-01-25T01:55:53.089951",
+      "tags": [
+        "global",
+        "batch"
+      ]
+    },
+    {
+      "id": "feb1c924",
+      "content": "Near-miss detection uses distance threshold (2.5m) and registers hits in CombatantCombat.ts during enemy fire logic",
+      "source": "shepard",
+      "created_at": "2026-01-25T01:55:53.091267",
+      "tags": [
+        "global",
+        "batch"
+      ]
     }
   ],
   "warnings": [
@@ -120,6 +140,17 @@
       "content": "Build produces 1.16MB bundle (warning threshold 500KB) - acceptable for Three.js game but monitor growth",
       "source": "shepard",
       "created_at": "2026-01-25T01:44:37.145080",
+      "tags": [
+        "global",
+        "batch"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "7a3ff212",
+      "content": "Build size at 1.16MB - acceptable for Three.js game but monitor for growth",
+      "source": "shepard",
+      "created_at": "2026-01-25T01:55:53.092399",
       "tags": [
         "global",
         "batch"
@@ -164,5 +195,5 @@
       "tags": []
     }
   ],
-  "updated_at": "2026-01-25T01:55:42.480213"
+  "updated_at": "2026-01-25T01:55:53.092415"
 }

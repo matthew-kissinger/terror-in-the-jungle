@@ -1,0 +1,20 @@
+{
+  "session_id": "c2ce51f0fe24",
+  "task_id": "25e69ccd-362d-4f9a-adc8-92cff174429c",
+  "agent": "claude",
+  "model": "haiku",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T21:03:54.570736",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "Just say hello world",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

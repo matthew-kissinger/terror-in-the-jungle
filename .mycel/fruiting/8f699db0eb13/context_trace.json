@@ -1,0 +1,20 @@
+{
+  "session_id": "8f699db0eb13",
+  "task_id": "6770e688-b1c0-40ef-8060-eefa223861ff",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T21:12:58.652655",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "# Task: Add NPC Death Animations\n\n## Context\nYou are working on Terror in the Jungle, a 3D pixel art battlefield game. NPCs are rendered as billboards (flat sprites that always face the camera). Currently when an NPC dies, the sprite just disappears or switches instantly - there's no death animation. The GDD notes: \"Death animations are just sprite swaps\" as something needing improvement.\n\n## Goal\nImplement death animations for NPCs that make kills feel more impactful:\n- Death animation sequence before removal\n- Possible ragdoll-like fall effect\n- Brief corpse persistence before fade-out\n\n## Files to Read First\n1. `src/systems/combat/CombatantRenderer.ts` - How NPCs are rendered as billboards\n2. `src/systems/combat/CombatantSystem.ts` - Death/removal logic\n3. `src/systems/combat/CombatantCombat.ts` - Where damage and death are handled\n4. `src/systems/world/billboard/` - Billboard system architecture\n\n## Implementation Approach\n\n### Option A: Sprite-Based Animation\n1. Add death animation frames to the sprite system\n2. When NPC dies, trigger death animation sequence\n3. Scale/rotate sprite during death (e.g., fall backward)\n4. Fade out over 1-2 seconds after animation\n\n### Option B: Procedural Death Effect\n1. When NPC dies, apply procedural effects to the billboard:\n   - Scale Y compression (crumple effect)\n   - Rotation tilt (falling)\n   - Color fade to darker/redder\n   - Position drop (sink into ground)\n2. Keep corpse visible for 2-3 seconds\n3. Fade out and remove\n\n### Recommended: Option B\nSince the game doesn't have death animation sprites, procedural effects are more practical:\n\n```typescript\n// Example death state in Combatant\ndeathProgress: number; // 0-1 over death duration\nisDying: boolean;\n\n// In update loop\nif (combatant.isDying) {\n  combatant.deathProgress += deltaTime / DEATH_DURATION;\n  // Apply visual effects based on progress\n  const scale = 1 - combatant.deathProgress * 0.3; // Shrink slightly\n  const tilt = combatant.deathProgress * Math.PI * 0.15; // Tilt backward\n  const yOffset = -combatant.deathProgress * 0.5; // Sink down\n}\n```\n\n## Integration Points\n\n1. **In CombatantCombat.ts**: When handling death, set `isDying = true` instead of immediate removal\n\n2. **In CombatantRenderer.ts**: Apply death visual effects during render:\n   - Modify billboard transform based on death progress\n   - Apply color/opacity changes to material\n\n3. **In CombatantSystem.ts**: Only remove combatant after death animation completes\n\n## Validation\n- Run `npm run dev`\n- Shoot enemies and watch them die\n- Death should have visible animation (fall/crumple)\n- Corpses should be briefly visible before fading\n- Performance should not degrade with multiple simultaneous deaths\n\n## Completion\nWhen complete: test in browser, commit with descriptive message, provide summary of visual improvements.",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}
