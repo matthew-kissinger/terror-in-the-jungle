@@ -256,6 +256,11 @@ export class SandboxSystemManager {
       // this.mortarSystem.setImpactEffectsPool(impactEffectsPool); // Disabled
     }
 
+    const explosionEffectsPool = (this.combatantSystem as any).explosionEffectsPool;
+    if (explosionEffectsPool) {
+      this.grenadeSystem.setExplosionEffectsPool(explosionEffectsPool);
+    }
+
     // Connect PlayerController with all weapon systems
     this.playerController.setInventoryManager(this.inventoryManager);
     this.playerController.setGrenadeSystem(this.grenadeSystem);

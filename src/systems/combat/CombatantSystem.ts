@@ -7,6 +7,7 @@ import { Combatant, CombatantState, Faction, SquadCommand } from './types';
 import { TracerPool } from '../effects/TracerPool';
 import { MuzzleFlashPool } from '../effects/MuzzleFlashPool';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
+import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { TicketSystem } from '../world/TicketSystem';
 import { PlayerHealthSystem } from '../player/PlayerHealthSystem';
 import { ZoneManager, ZoneState } from '../world/ZoneManager';
@@ -47,6 +48,7 @@ export class CombatantSystem implements GameSystem {
   private tracerPool: TracerPool;
   private muzzleFlashPool: MuzzleFlashPool;
   private impactEffectsPool: ImpactEffectsPool;
+  private explosionEffectsPool: ExplosionEffectsPool;
 
   // Combatant management
   private combatants: Map<string, Combatant> = new Map();
@@ -131,6 +133,7 @@ export class CombatantSystem implements GameSystem {
     this.tracerPool = new TracerPool(this.scene, 256);
     this.muzzleFlashPool = new MuzzleFlashPool(this.scene, 128);
     this.impactEffectsPool = new ImpactEffectsPool(this.scene, 128);
+    this.explosionEffectsPool = new ExplosionEffectsPool(this.scene, 16);
 
     // Initialize modules
     this.combatantFactory = new CombatantFactory();

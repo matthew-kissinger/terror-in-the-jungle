@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
+import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { CombatantSystem } from '../combat/CombatantSystem';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
@@ -24,6 +25,7 @@ export class GrenadeSystem implements GameSystem {
   private chunkManager?: ImprovedChunkManager;
   private combatantSystem?: CombatantSystem;
   private impactEffectsPool?: ImpactEffectsPool;
+  private explosionEffectsPool?: ExplosionEffectsPool;
   private inventoryManager?: InventoryManager;
   private audioManager?: AudioManager;
   private playerController?: any;
@@ -85,6 +87,11 @@ export class GrenadeSystem implements GameSystem {
       // Power builds up over 2 seconds to max
       this.throwPower = Math.min(0.3 + (this.powerBuildupTime / 2.0) * 0.7, 1.0);
       this.updateArc();
+    }
+
+    // Update explosion effects
+    if (this.explosionEffectsPool) {
+      this.explosionEffectsPool.update(deltaTime);
     }
 
     // Update active grenades
@@ -387,12 +394,18 @@ export class GrenadeSystem implements GameSystem {
   private explodeGrenade(grenade: Grenade): void {
     console.log(`💥 Grenade exploded at (${grenade.position.x.toFixed(1)}, ${grenade.position.y.toFixed(1)}, ${grenade.position.z.toFixed(1)})`);
 
+    // Main explosion effect - big flash, smoke, fire, shockwave
+    if (this.explosionEffectsPool) {
+      this.explosionEffectsPool.spawn(grenade.position);
+    }
+
+    // Additional debris/impact effects for more detail
     if (this.impactEffectsPool) {
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 15; i++) {
         const offset = new THREE.Vector3(
-          (Math.random() - 0.5) * 2,
-          Math.random(),
-          (Math.random() - 0.5) * 2
+          (Math.random() - 0.5) * 3,
+          Math.random() * 1.5,
+          (Math.random() - 0.5) * 3
         );
         const effectPos = grenade.position.clone().add(offset);
         this.impactEffectsPool.spawn(effectPos, new THREE.Vector3(0, 1, 0));
@@ -411,7 +424,7 @@ export class GrenadeSystem implements GameSystem {
       );
     }
 
-    // Apply camera shake from explosion
+    // Apply enhanced camera shake from explosion
     if (this.playerController) {
       this.playerController.applyExplosionShake(grenade.position, this.DAMAGE_RADIUS);
     }
@@ -474,6 +487,10 @@ export class GrenadeSystem implements GameSystem {
 
   setImpactEffectsPool(pool: ImpactEffectsPool): void {
     this.impactEffectsPool = pool;
+  }
+
+  setExplosionEffectsPool(pool: ExplosionEffectsPool): void {
+    this.explosionEffectsPool = pool;
   }
 
   setInventoryManager(inventoryManager: InventoryManager): void {
