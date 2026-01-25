@@ -613,6 +613,7 @@ export class CombatantAI {
   ): void {
     if (!combatant.coverPosition || !combatant.destinationPoint) {
       combatant.state = CombatantState.ENGAGING;
+      combatant.inCover = false;
       return;
     }
 
@@ -622,6 +623,7 @@ export class CombatantAI {
       combatant.inCover = true;
       combatant.state = CombatantState.ENGAGING;
       combatant.destinationPoint = undefined;
+      console.log(`🛡️ ${combatant.faction} unit reached cover, switching to peek-and-fire`);
       return;
     }
 
@@ -635,6 +637,7 @@ export class CombatantAI {
     if (combatant.target && !this.canSeeTarget(combatant, combatant.target, playerPosition)) {
       combatant.state = CombatantState.ENGAGING;
       combatant.destinationPoint = undefined;
+      combatant.inCover = false;
     }
   }
 
