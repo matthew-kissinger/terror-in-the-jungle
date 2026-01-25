@@ -1,0 +1,20 @@
+{
+  "session_id": "830fe5bf7436",
+  "task_id": "d5586a23-55c9-471e-ad93-0964019e910d",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T19:44:47.314107",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "## Task: Implement SMG/PDW Weapon\n\nYou are working on Terror in the Jungle, a 3D pixel art battlefield game built with Three.js.\n\n## Context\nThe game has a weapon slot system with Rifle (slot 1), Shotgun (slot 2), Grenade (slot 3), and Sandbag (slot 4). The CLAUDE.md roadmap explicitly requests an SMG/PDW weapon with:\n- High rate of fire, lower damage per shot\n- Good hip-fire accuracy\n- Fast reload\n- Suppression effect on enemies\n\n## Files to Read First\n1. src/systems/player/FirstPersonWeapon.ts - Main weapon system with rifle and shotgun\n2. src/systems/player/ProgrammaticGunFactory.ts - Creates weapon models programmatically\n3. src/systems/weapons/GunplayCore.ts - Weapon specs and gunplay mechanics\n4. src/systems/player/InventoryManager.ts - Weapon slot management\n5. CLAUDE.md - Project conventions and architecture\n\n## Implementation Steps\n\n1. **Add SMG WeaponSpec in FirstPersonWeapon.ts:**\n   - name: 'SMG'\n   - rpm: 900 (high rate of fire)\n   - baseSpreadDeg: 1.2 (better hip fire than rifle)\n   - bloomPerShotDeg: 0.15 (manageable bloom)\n   - recoilPerShotDeg: 0.35 (lower recoil)\n   - damageNear: 22, damageFar: 12 (lower than rifle)\n   - falloffStart: 15, falloffEnd: 40 (shorter range)\n   - headshotMultiplier: 1.4\n\n2. **Add SMG slot to InventoryManager.ts:**\n   - Add SMG = 5 to WeaponSlot enum (after SANDBAG)\n   - Add Digit5 key binding\n   - Update UI to show SMG slot\n\n3. **Create SMG model in ProgrammaticGunFactory.ts:**\n   - Create createSMG() method\n   - Compact body, shorter than rifle\n   - Vertical foregrip\n   - Folding stock visual\n\n4. **Integrate in FirstPersonWeapon.ts:**\n   - Add smgRig and smgCore properties\n   - Create switchToSMG() method\n   - Handle slot switching from InventoryManager\n\n5. **Optional: Add suppression effect**\n   - When SMG fires near enemy (miss but close), increase enemy suppressionLevel\n   - Already supported in CombatantAI via nearMissCount and suppressionLevel\n\n## Validation\n- Press 5 to switch to SMG\n- SMG fires faster than rifle with visible difference\n- Hip-fire spread is tighter than rifle\n- Damage is lower but ROF compensates\n- Build passes: npm run build\n\n## When Complete\nTest the SMG in browser (npm run dev), commit with descriptive message, provide summary of what was implemented.",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

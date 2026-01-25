@@ -106,6 +106,9 @@ export class HUDSystem implements GameSystem {
 
     // Update damage numbers
     this.elements.updateDamageNumbers();
+
+    // Update score popups
+    this.elements.updateScorePopups();
   }
 
   dispose(): void {
@@ -133,6 +136,12 @@ export class HUDSystem implements GameSystem {
 
   addZoneCapture(): void {
     this.statsTracker.addZoneCapture();
+    // Spawn score popup for zone capture
+    this.spawnScorePopup('capture', 50);
+  }
+
+  spawnScorePopup(type: 'capture' | 'defend' | 'secured', points: number): void {
+    this.elements.spawnScorePopup(type, points);
   }
 
   startMatch(): void {

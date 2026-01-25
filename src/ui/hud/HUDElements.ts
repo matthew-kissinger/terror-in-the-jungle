@@ -1,6 +1,7 @@
 import { KillFeed } from './KillFeed';
 import { Faction } from '../../systems/combat/types';
 import { DamageNumberSystem } from './DamageNumberSystem';
+import { ScorePopupSystem } from './ScorePopupSystem';
 import * as THREE from 'three';
 
 export class HUDElements {
@@ -22,6 +23,7 @@ export class HUDElements {
   public grenadePowerMeter: HTMLDivElement;
   public killFeed: KillFeed;
   public damageNumbers?: DamageNumberSystem;
+  public scorePopups?: ScorePopupSystem;
 
   constructor(camera?: THREE.Camera) {
     this.hudContainer = this.createHUDContainer();
@@ -45,6 +47,9 @@ export class HUDElements {
     if (camera) {
       this.damageNumbers = new DamageNumberSystem(camera);
     }
+
+    // Initialize score popup system
+    this.scorePopups = new ScorePopupSystem();
 
     // Assemble HUD structure
     this.hudContainer.appendChild(this.objectivesList);
@@ -813,6 +818,9 @@ export class HUDElements {
     if (this.damageNumbers) {
       this.damageNumbers.attachToDOM();
     }
+    if (this.scorePopups) {
+      this.scorePopups.attachToDOM();
+    }
   }
 
   updateKillFeed(deltaTime: number): void {
@@ -822,6 +830,18 @@ export class HUDElements {
   updateDamageNumbers(): void {
     if (this.damageNumbers) {
       this.damageNumbers.update();
+    }
+  }
+
+  updateScorePopups(): void {
+    if (this.scorePopups) {
+      this.scorePopups.update();
+    }
+  }
+
+  spawnScorePopup(type: 'capture' | 'defend' | 'secured', points: number): void {
+    if (this.scorePopups) {
+      this.scorePopups.spawn(type, points);
     }
   }
 
@@ -848,6 +868,9 @@ export class HUDElements {
     this.killFeed.dispose();
     if (this.damageNumbers) {
       this.damageNumbers.dispose();
+    }
+    if (this.scorePopups) {
+      this.scorePopups.dispose();
     }
   }
 }

@@ -30,6 +30,7 @@ export class FirstPersonWeapon implements GameSystem {
   private weaponRig?: THREE.Group; // current active weapon rig root
   private muzzleRef?: THREE.Object3D;
   private magazineRef?: THREE.Object3D; // Magazine for reload animation
+  private pumpGripRef?: THREE.Object3D; // Pump grip for shotgun animation
   
   // Animation state
   private isADS = false;
@@ -106,6 +107,12 @@ export class FirstPersonWeapon implements GameSystem {
   private reloadTranslation = { x: 0, y: 0, z: 0 };
   private magazineOffset = { x: 0, y: 0, z: 0 }; // Magazine animation offset
   private magazineRotation = { x: 0, y: 0, z: 0 }; // Magazine rotation during reload
+
+  // Pump-action animation state (for shotgun)
+  private pumpAnimationProgress = 0;
+  private isPumpAnimating = false;
+  private readonly PUMP_ANIMATION_TIME = 0.35; // Quick pump action
+  private pumpOffset = { x: 0, y: 0, z: 0 };
   
   constructor(scene: THREE.Scene, camera: THREE.Camera, assetLoader: AssetLoader) {
     this.scene = scene;
@@ -167,6 +174,7 @@ export class FirstPersonWeapon implements GameSystem {
     this.weaponRig = this.rifleRig;
     this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined;
     this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined;
+    this.pumpGripRef = undefined; // Only shotgun has pump grip
 
     // Store base FOV from camera
     if (this.camera instanceof THREE.PerspectiveCamera) {
@@ -229,6 +237,11 @@ export class FirstPersonWeapon implements GameSystem {
     // Update reload animation
     if (this.isReloadAnimating) {
       this.updateReloadAnimation(deltaTime);
+    }
+
+    // Update pump animation (shotgun)
+    if (this.isPumpAnimating) {
+      this.updatePumpAnimation(deltaTime);
     }
 
     // Apply overlay transform
@@ -383,11 +396,11 @@ export class FirstPersonWeapon implements GameSystem {
     const py = THREE.MathUtils.lerp(this.basePosition.y, this.adsPosition.y, this.adsProgress);
     const pz = THREE.MathUtils.lerp(this.basePosition.z, this.adsPosition.z, this.adsProgress);
 
-    // Apply position with all offsets including recoil and reload animation
+    // Apply position with all offsets including recoil, reload animation, and pump animation
     this.weaponRig.position.set(
-      px + this.bobOffset.x + this.swayOffset.x + this.weaponRecoilOffset.x + this.reloadTranslation.x,
-      py + this.bobOffset.y + this.swayOffset.y + this.weaponRecoilOffset.y + this.reloadTranslation.y,
-      pz + this.weaponRecoilOffset.z + this.reloadTranslation.z
+      px + this.bobOffset.x + this.swayOffset.x + this.weaponRecoilOffset.x + this.reloadTranslation.x + this.pumpOffset.x,
+      py + this.bobOffset.y + this.swayOffset.y + this.weaponRecoilOffset.y + this.reloadTranslation.y + this.pumpOffset.y,
+      pz + this.weaponRecoilOffset.z + this.reloadTranslation.z + this.pumpOffset.z
     );
 
     // Set up base rotations to point barrel toward crosshair
@@ -497,8 +510,11 @@ export class FirstPersonWeapon implements GameSystem {
     }
 
     // Check if shotgun - fire multiple pellets
-    if (this.gunCore.isShotgun()) {
+    const isShotgun = this.gunCore.isShotgun();
+    if (isShotgun) {
       this.fireShotgunPellets();
+      // Start pump animation for shotgun
+      this.startPumpAnimation();
     } else {
       this.fireSingleShot();
     }
@@ -802,6 +818,53 @@ export class FirstPersonWeapon implements GameSystem {
 
   private easeInCubic(t: number): number {
     return t * t * t;
+  }
+
+  private updatePumpAnimation(deltaTime: number): void {
+    if (!this.isPumpAnimating) return;
+
+    // Update pump animation progress
+    this.pumpAnimationProgress += deltaTime / this.PUMP_ANIMATION_TIME;
+
+    if (this.pumpAnimationProgress >= 1) {
+      this.pumpAnimationProgress = 1;
+      this.isPumpAnimating = false;
+      // Reset animation values
+      this.pumpOffset = { x: 0, y: 0, z: 0 };
+      return;
+    }
+
+    // Calculate pump animation based on progress
+    this.calculatePumpAnimation(this.pumpAnimationProgress);
+  }
+
+  private calculatePumpAnimation(progress: number): void {
+    // Two-stage pump animation:
+    // Stage 1 (0-50%): Pull pump grip backward
+    // Stage 2 (50-100%): Push pump grip forward
+
+    if (progress < 0.5) {
+      // Stage 1: Pull back
+      const t = progress / 0.5;
+      const ease = this.easeOutCubic(t);
+      this.pumpOffset.z = -0.15 * ease; // Pull backward
+      this.pumpOffset.x = -0.02 * ease; // Slight tilt
+    } else {
+      // Stage 2: Push forward
+      const t = (progress - 0.5) / 0.5;
+      const ease = this.easeInOutQuad(t);
+      this.pumpOffset.z = -0.15 * (1 - ease); // Return to normal
+      this.pumpOffset.x = -0.02 * (1 - ease); // Return to normal
+    }
+  }
+
+  private startPumpAnimation(): void {
+    // Don't start a new pump animation if one is already playing
+    if (this.isPumpAnimating) return;
+
+    this.isPumpAnimating = true;
+    this.pumpAnimationProgress = 0;
+    console.log('🔫 Pump action!');
   }
 
   private onReloadComplete(): void {

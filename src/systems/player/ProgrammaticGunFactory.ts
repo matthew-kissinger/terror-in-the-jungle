@@ -82,8 +82,9 @@ export class ProgrammaticGunFactory {
     receiver.position.set(0, 0, 0);
     group.add(receiver);
 
-    // Pump grip - distinctive shotgun feature
+    // Pump grip - distinctive shotgun feature (named for animation)
     const pumpGrip = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.18, 0.2), new THREE.MeshBasicMaterial({ color: 0x1a1a1a }));
+    pumpGrip.name = 'pumpGrip';
     pumpGrip.position.set(0.6, 0, 0);
     group.add(pumpGrip);
 

@@ -1,0 +1,20 @@
+{
+  "session_id": "ec8a190b4614",
+  "task_id": "2fd42247-567b-4e61-a3b2-9374918a821f",
+  "agent": "claude",
+  "model": "sonnet",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T20:01:39.576047",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "You are implementing a new Shotgun weapon for Terror in the Jungle, a Three.js pixel art battlefield game.\n\n## Context\nThis is a first-person 3D game with team-based combat. The player already has a rifle and SMG. The shotgun adds a close-range tactical option for jungle combat.\n\n## Discovery - Read These First\n1. src/systems/player/FirstPersonWeapon.ts - Main weapon system, see how current weapons work\n2. src/systems/player/ProgrammaticGunFactory.ts - How weapons are generated procedurally\n3. src/systems/weapons/GunplayCore.ts - Shooting mechanics, bullet spread, damage\n4. src/systems/player/InventoryManager.ts - Weapon switching and inventory\n5. CLAUDE.md - Project conventions and architecture guidelines\n\n## Implementation Requirements\n\n### 1. Shotgun Specifications\n- Pump-action shotgun with satisfying cycle animation\n- 8-12 pellets per shot with spread pattern\n- High damage at close range (< 15m), rapidly decreasing with distance\n- 6 round tube magazine, slow reload (shell by shell)\n- Distinct chunky audio profile\n\n### 2. Pellet Spread System\n- Implement cone-based spread pattern (not random scatter)\n- Each pellet does individual hit detection\n- Damage falloff: 100% at 0-5m, 50% at 10m, 15% at 20m+\n- Spread angle: ~8 degrees cone\n\n### 3. Integration Points\n- Add to ProgrammaticGunFactory.createShotgun() method\n- Register in InventoryManager weapon slots\n- Wire up to player controls (should use same fire/reload bindings)\n- Add pump-action animation between shots\n\n### 4. Visual Requirements\n- Procedural model like other weapons (no external assets needed)\n- Pump-action animation after each shot\n- Large muzzle flash appropriate for shotgun\n- Shell ejection effect if possible\n\n### 5. Audio\n- Use existing AudioManager methods\n- Distinctive 'boom' sound different from rifle/SMG\n- Pump-action 'chunk-chunk' sound\n\n## Validation\n1. Test close-range damage is high (should kill enemy in 1-2 shots)\n2. Test long-range damage is very weak (should take 5+ shots)\n3. Verify pump animation plays between shots\n4. Confirm weapon switching works correctly\n5. Run npm run build - must pass with no errors\n\n## Completion\nWhen done:\n1. Test thoroughly in browser with npm run dev\n2. Commit with descriptive message: 'feat(weapons): implement pump-action shotgun'\n3. Provide summary of what was implemented",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}

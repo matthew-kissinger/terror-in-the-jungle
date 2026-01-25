@@ -1,0 +1,20 @@
+{
+  "session_id": "c9b41a40fc80",
+  "task_id": "2f8d8d5b-3122-4248-a401-c678bd5ba444",
+  "agent": "claude",
+  "model": "haiku",
+  "repo_path": "/home/mkagent/repos/terror-in-the-jungle",
+  "timestamp": "2026-01-24T20:01:39.595734",
+  "layers": [
+    {
+      "name": "prompt",
+      "content": "You are adding score popup notifications when the player captures zones in Terror in the Jungle.\n\n## Context\nThis Three.js game has a zone control mode where players capture territories. The kill feed and damage numbers already exist, but there's no visual feedback when zones are captured.\n\n## Discovery - Read These First\n1. src/ui/hud/HUDElements.ts - HUD components, see DamageNumberSystem for reference\n2. src/ui/hud/DamageNumberSystem.ts - Floating numbers implementation to use as template\n3. src/systems/world/ZoneCaptureLogic.ts - Zone capture events\n4. src/systems/world/ZoneManager.ts - Zone management, find where captures happen\n5. src/ui/hud/HUDSystem.ts - HUD orchestrator, wire things together here\n\n## Implementation\n\n### 1. Score Popup Component\nCreate a simple score popup that appears when:\n- Player contributes to zone capture: '+50 CAPTURE'\n- Player defends a zone from capture: '+25 DEFEND'\n- Zone fully secured: '+100 ZONE SECURED'\n\n### 2. Visual Style\n- Floating text in center-bottom area of screen\n- Fade in, float up, fade out animation (similar to damage numbers)\n- Use team color (blue for US captures)\n- Military-style font (Courier New matches existing HUD)\n\n### 3. Integration\n- Hook into ZoneManager or ZoneCaptureLogic capture events\n- Track player's zone to detect if they contributed\n- Wire through HUDSystem.addScorePopup() method\n\n### 4. Keep It Simple\n- This is a small UX improvement, not a major feature\n- Reuse existing animation patterns from DamageNumberSystem\n- Don't over-engineer - a single ScorePopup class is sufficient\n\n## Validation\n1. Start zone control game mode\n2. Stand in enemy zone until capture\n3. Verify popup appears with appropriate text\n4. Check animations are smooth\n\n## Completion\nWhen done:\n1. Test in browser\n2. Commit: 'feat(hud): add score popups for zone captures'\n3. Brief summary of changes",
+      "source": "task.prompt"
+    },
+    {
+      "name": "output_format",
+      "content": "Required output format: <task_result> block with commit, pr_url, branch, summary",
+      "source": "generated"
+    }
+  ]
+}
