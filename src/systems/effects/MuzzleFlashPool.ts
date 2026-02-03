@@ -151,7 +151,9 @@ export class MuzzleFlashPool {
         // Hide and return to pool
         flash.sprite.visible = false;
         flash.light.visible = false;
-        this.active.splice(i, 1);
+        const last = this.active[this.active.length - 1];
+        this.active[i] = last;
+        this.active.pop();
         if (this.pool.length < this.maxFlashes) {
           this.pool.push(flash);
         }

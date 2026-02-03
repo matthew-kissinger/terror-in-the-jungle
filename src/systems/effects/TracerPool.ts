@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 
 interface Tracer {
-  mesh: THREE.Line;
+  group: THREE.Group;
+  coreLine: THREE.Line;
+  glowLine: THREE.Line;
   aliveUntil: number;
 }
 
@@ -44,16 +46,18 @@ export class TracerPool {
       const group = new THREE.Group();
 
       // Core tracer line - share geometry with glow line within same tracer
-      const line = new THREE.Line(geometry, this.tracerMaterial);
-      group.add(line);
+      const coreMaterial = this.tracerMaterial.clone();
+      const coreLine = new THREE.Line(geometry, coreMaterial);
+      group.add(coreLine);
 
       // Glow effect line (slightly larger) - shares same geometry as core line
-      const glowLine = new THREE.Line(geometry, this.glowMaterial);
+      const glowMaterial = this.glowMaterial.clone();
+      const glowLine = new THREE.Line(geometry, glowMaterial);
       glowLine.scale.set(1.1, 1.1, 1.1);
       group.add(glowLine);
 
       group.visible = false;
-      this.pool.push({ mesh: group as any, aliveUntil: 0 });
+      this.pool.push({ group, coreLine, glowLine, aliveUntil: 0 });
       this.scene.add(group);
     }
   }
@@ -62,18 +66,14 @@ export class TracerPool {
     const tracer = this.pool.pop() || this.active.shift();
     if (!tracer) return;
 
-    // Update all lines in the group
-    const group = tracer.mesh as unknown as THREE.Group;
-    group.children.forEach((child) => {
-      if (child instanceof THREE.Line) {
-        const positions = (child.geometry as THREE.BufferGeometry).attributes.position as THREE.BufferAttribute;
-        positions.setXYZ(0, start.x, start.y, start.z);
-        positions.setXYZ(1, end.x, end.y, end.z);
-        positions.needsUpdate = true;
-      }
-    });
+    const positions = (tracer.coreLine.geometry as THREE.BufferGeometry).attributes.position as THREE.BufferAttribute;
+    positions.setXYZ(0, start.x, start.y, start.z);
+    positions.setXYZ(1, end.x, end.y, end.z);
+    positions.needsUpdate = true;
 
-    group.visible = true;
+    (tracer.coreLine.material as THREE.LineBasicMaterial).opacity = 0.9;
+    (tracer.glowLine.material as THREE.LineBasicMaterial).opacity = 0.5;
+    tracer.group.visible = true;
     tracer.aliveUntil = performance.now() + lifetimeMs;
     this.active.push(tracer);
   }
@@ -85,21 +85,18 @@ export class TracerPool {
       const timeLeft = tracer.aliveUntil - now;
 
       if (timeLeft <= 0) {
-        tracer.mesh.visible = false;
-        this.active.splice(i, 1);
+        tracer.group.visible = false;
+        const last = this.active[this.active.length - 1];
+        this.active[i] = last;
+        this.active.pop();
         if (this.pool.length < this.maxTracers) this.pool.push(tracer);
       } else {
         // Fade out effect for last 50ms
         const fadeTime = 50;
         if (timeLeft < fadeTime) {
           const opacity = timeLeft / fadeTime;
-          const group = tracer.mesh as unknown as THREE.Group;
-          group.children.forEach((child) => {
-            if (child instanceof THREE.Line) {
-              (child.material as THREE.LineBasicMaterial).opacity =
-                child === group.children[0] ? opacity * 0.9 : opacity * 0.3;
-            }
-          });
+          (tracer.coreLine.material as THREE.LineBasicMaterial).opacity = opacity * 0.9;
+          (tracer.glowLine.material as THREE.LineBasicMaterial).opacity = opacity * 0.3;
         }
       }
     }
@@ -111,17 +108,14 @@ export class TracerPool {
     const disposedGeometries = new Set<THREE.BufferGeometry>();
     
     allTracers.forEach(t => {
-      this.scene.remove(t.mesh);
-      const group = t.mesh as unknown as THREE.Group;
-      group.children.forEach((child) => {
-        if (child instanceof THREE.Line && child.geometry instanceof THREE.BufferGeometry) {
-          // Dispose geometry once per tracer (core and glow share it)
-          if (!disposedGeometries.has(child.geometry)) {
-            child.geometry.dispose();
-            disposedGeometries.add(child.geometry);
-          }
-        }
-      });
+      this.scene.remove(t.group);
+      const geometry = t.coreLine.geometry as THREE.BufferGeometry;
+      if (!disposedGeometries.has(geometry)) {
+        geometry.dispose();
+        disposedGeometries.add(geometry);
+      }
+      (t.coreLine.material as THREE.Material).dispose();
+      (t.glowLine.material as THREE.Material).dispose();
     });
     
     this.active.length = 0;
@@ -130,5 +124,3 @@ export class TracerPool {
     this.glowMaterial.dispose();
   }
 }
-
-

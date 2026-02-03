@@ -212,7 +212,9 @@ export class ImpactEffectsPool {
         effect.particles.visible = false;
         effect.sparks.visible = false;
         effect.decal.visible = false;
-        this.active.splice(i, 1);
+        const last = this.active[this.active.length - 1];
+        this.active[i] = last;
+        this.active.pop();
         if (this.pool.length < this.maxEffects) {
           this.pool.push(effect);
         }
