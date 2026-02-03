@@ -10,6 +10,12 @@ import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
 import { MortarBallistics, MortarRound } from './MortarBallistics';
 import { MortarVisuals } from './MortarVisuals';
 
+const UP_NORMAL = new THREE.Vector3(0, 1, 0);
+const _offset = new THREE.Vector3();
+const _effectPos = new THREE.Vector3();
+const _deployPos = new THREE.Vector3();
+const _direction = new THREE.Vector3();
+
 export class MortarSystem implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
@@ -136,22 +142,27 @@ export class MortarSystem implements GameSystem {
     }
 
     // Calculate deployment position (in front of player)
-    const deployPos = playerPosition.clone();
-    deployPos.add(playerDirection.clone().multiplyScalar(3));
-    deployPos.y = this.getGroundHeight(deployPos.x, deployPos.z);
+    _deployPos.copy(playerPosition);
+    _direction.copy(playerDirection).multiplyScalar(3);
+    _deployPos.add(_direction);
+    _deployPos.y = this.getGroundHeight(_deployPos.x, _deployPos.z);
 
     // Create mortar tube mesh
     this.mortarTube = ProgrammaticExplosivesFactory.createMortarTube();
-    this.mortarTube.position.copy(deployPos);
+    this.mortarTube.position.copy(_deployPos);
     this.scene.add(this.mortarTube);
 
-    this.tubePosition = deployPos.clone();
+    if (this.tubePosition) {
+      this.tubePosition.copy(_deployPos);
+    } else {
+      this.tubePosition = _deployPos.clone();
+    }
     this.isDeployed = true;
 
     // Initialize yaw to face player's direction
     this.yaw = Math.atan2(playerDirection.x, playerDirection.z) * 180 / Math.PI;
 
-    console.log(`💣 Mortar deployed at (${deployPos.x.toFixed(1)}, ${deployPos.y.toFixed(1)}, ${deployPos.z.toFixed(1)})`);
+    console.log(`💣 Mortar deployed at (${_deployPos.x.toFixed(1)}, ${_deployPos.y.toFixed(1)}, ${_deployPos.z.toFixed(1)})`);
     return true;
   }
 
@@ -245,14 +256,14 @@ export class MortarSystem implements GameSystem {
     );
 
     // Spawn mortar round
-    const startPos = this.tubePosition.clone();
-    startPos.y += 2.5; // Launch from top of tube
+    _deployPos.copy(this.tubePosition);
+    _deployPos.y += 2.5; // Launch from top of tube
 
-    this.spawnMortarRound(startPos, velocity);
+    this.spawnMortarRound(_deployPos, velocity);
 
     // Play audio
     if (this.audioManager) {
-      this.audioManager.playExplosionAt(startPos); // Use explosion sound for mortar fire
+      this.audioManager.playExplosionAt(_deployPos); // Use explosion sound for mortar fire
     }
 
     console.log(`💣 Mortar fired! Pitch: ${this.pitch.toFixed(1)}°, Yaw: ${this.yaw.toFixed(1)}°, Power: ${(this.power * 100).toFixed(0)}%`);
@@ -287,13 +298,13 @@ export class MortarSystem implements GameSystem {
     // Debris effects
     if (this.impactEffectsPool) {
       for (let i = 0; i < 20; i++) {
-        const offset = new THREE.Vector3(
+        _offset.set(
           (Math.random() - 0.5) * 5,
           Math.random() * 2,
           (Math.random() - 0.5) * 5
         );
-        const effectPos = round.position.clone().add(offset);
-        this.impactEffectsPool.spawn(effectPos, new THREE.Vector3(0, 1, 0));
+        _effectPos.copy(round.position).add(_offset);
+        this.impactEffectsPool.spawn(_effectPos, UP_NORMAL);
       }
     }
 
@@ -333,8 +344,8 @@ export class MortarSystem implements GameSystem {
   private updateTrajectoryPreview(): void {
     if (!this.tubePosition) return;
 
-    const startPos = this.tubePosition.clone();
-    startPos.y += 2.5; // Top of tube
+    _deployPos.copy(this.tubePosition);
+    _deployPos.y += 2.5; // Top of tube
 
     const velocity = this.ballistics.computeVelocityVector(
       this.pitch,
@@ -343,7 +354,7 @@ export class MortarSystem implements GameSystem {
     );
 
     const trajectory = this.ballistics.computeTrajectory(
-      startPos,
+      _deployPos,
       velocity,
       (x, z) => this.getGroundHeight(x, z)
     );
