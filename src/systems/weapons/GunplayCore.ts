@@ -1,5 +1,15 @@
 import * as THREE from 'three';
 
+// Module-level scratch objects for performance
+const _dir = new THREE.Vector3();
+const _origin = new THREE.Vector3();
+const _offset = new THREE.Vector3();
+const _up = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _realUp = new THREE.Vector3();
+const _perturbed = new THREE.Vector3();
+const _scratchRay = new THREE.Ray();
+
 export interface WeaponSpec {
   name: string;
   rpm: number;            // rounds per minute
@@ -73,9 +83,12 @@ export class GunplayCore {
 
   // Returns world-space ray from camera with spread applied
   computeShotRay(camera: THREE.Camera, spreadDeg: number): THREE.Ray {
-    const dir = new THREE.Vector3();
-    camera.getWorldDirection(dir);
-    dir.normalize();
+    _dir.set(0, 0, 0);
+    camera.getWorldDirection(_dir);
+    _dir.normalize();
+
+    _origin.set(0, 0, 0);
+    camera.getWorldPosition(_origin);
 
     // For perfect accuracy at center of screen, use no spread
     // Only apply spread if explicitly requested
@@ -86,27 +99,23 @@ export class GunplayCore {
       const v = Math.random();
       const theta = 2 * Math.PI * u;
       const r = spreadRad * Math.sqrt(v);
-      const offset = new THREE.Vector3(Math.cos(theta) * r, Math.sin(theta) * r, 0);
+      _offset.set(Math.cos(theta) * r, Math.sin(theta) * r, 0);
 
       // build basis around forward
-      const up = new THREE.Vector3(0, 1, 0);
-      const right = new THREE.Vector3().crossVectors(up, dir).normalize();
-      const realUp = new THREE.Vector3().crossVectors(dir, right).normalize();
-      const perturbed = new THREE.Vector3()
-        .copy(dir)
-        .addScaledVector(right, offset.x)
-        .addScaledVector(realUp, offset.y)
+      _up.set(0, 1, 0);
+      _right.crossVectors(_up, _dir).normalize();
+      _realUp.crossVectors(_dir, _right).normalize();
+      _perturbed
+        .copy(_dir)
+        .addScaledVector(_right, _offset.x)
+        .addScaledVector(_realUp, _offset.y)
         .normalize();
 
-      const origin = new THREE.Vector3();
-      camera.getWorldPosition(origin);
-      return new THREE.Ray(origin, perturbed);
+      return _scratchRay.set(_origin, _perturbed);
     }
 
     // No spread - perfect accuracy
-    const origin = new THREE.Vector3();
-    camera.getWorldPosition(origin);
-    return new THREE.Ray(origin, dir);
+    return _scratchRay.set(_origin, _dir);
   }
 
   computeDamage(distance: number, isHeadshot: boolean): number {
@@ -126,23 +135,24 @@ export class GunplayCore {
 
     if (pelletCount === 1 || pelletSpread === 0) {
       // Single pellet or no spread - just return one ray
-      return [this.computeShotRay(camera, 0)];
+      // Clone from scratch ray since it will be stored in an array
+      return [this.computeShotRay(camera, 0).clone()];
     }
 
     const rays: THREE.Ray[] = [];
     const spreadRad = THREE.MathUtils.degToRad(pelletSpread);
 
-    const dir = new THREE.Vector3();
-    camera.getWorldDirection(dir);
-    dir.normalize();
+    _dir.set(0, 0, 0);
+    camera.getWorldDirection(_dir);
+    _dir.normalize();
 
-    const origin = new THREE.Vector3();
-    camera.getWorldPosition(origin);
+    _origin.set(0, 0, 0);
+    camera.getWorldPosition(_origin);
 
     // Build basis vectors for spread
-    const up = new THREE.Vector3(0, 1, 0);
-    const right = new THREE.Vector3().crossVectors(up, dir).normalize();
-    const realUp = new THREE.Vector3().crossVectors(dir, right).normalize();
+    _up.set(0, 1, 0);
+    _right.crossVectors(_up, _dir).normalize();
+    _realUp.crossVectors(_dir, _right).normalize();
 
     // Generate pellets in a circular pattern
     for (let i = 0; i < pelletCount; i++) {
@@ -152,15 +162,17 @@ export class GunplayCore {
       const theta = 2 * Math.PI * u;
       const r = spreadRad * Math.sqrt(v);
 
-      const offset = new THREE.Vector3(Math.cos(theta) * r, Math.sin(theta) * r, 0);
+      _offset.set(Math.cos(theta) * r, Math.sin(theta) * r, 0);
 
-      const perturbed = new THREE.Vector3()
-        .copy(dir)
-        .addScaledVector(right, offset.x)
-        .addScaledVector(realUp, offset.y)
+      _perturbed
+        .copy(_dir)
+        .addScaledVector(_right, _offset.x)
+        .addScaledVector(_realUp, _offset.y)
         .normalize();
 
-      rays.push(new THREE.Ray(origin.clone(), perturbed));
+      // Individual Ray allocation is necessary here as they are stored in an array,
+      // but we reuse the vectors for initialization.
+      rays.push(new THREE.Ray(_origin, _perturbed));
     }
 
     return rays;

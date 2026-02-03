@@ -1,110 +1,15 @@
 import * as THREE from 'three'
 import { Combatant, CombatantState } from './types'
+import { OctreeNode } from './SpatialOctreeNode'
+import { SpatialOctreeQueries } from './SpatialOctreeQueries'
 
-/**
- * Octree node for spatial partitioning of combatants in 3D space.
- * Provides efficient O(log n) queries for radius, frustum, ray, and k-nearest searches.
- */
-class OctreeNode {
-  bounds: THREE.Box3
-  entities: string[] = []
-  children: OctreeNode[] | null = null
-  depth: number
-
-  constructor(bounds: THREE.Box3, depth: number = 0) {
-    this.bounds = bounds
-    this.depth = depth
-  }
-
-  /**
-   * Check if this node is a leaf (has no children)
-   */
-  isLeaf(): boolean {
-    return this.children === null
-  }
-
-  /**
-   * Subdivide this node into 8 octants
-   */
-  subdivide(): void {
-    if (!this.isLeaf()) return
-
-    const center = this.bounds.getCenter(new THREE.Vector3())
-    const min = this.bounds.min
-    const max = this.bounds.max
-
-    this.children = [
-      // Bottom quadrants (y < center.y)
-      new OctreeNode(new THREE.Box3(
-        new THREE.Vector3(min.x, min.y, min.z),
-        new THREE.Vector3(center.x, center.y, center.z)
-      ), this.depth + 1),
-      new OctreeNode(new THREE.Box3(
-        new THREE.Vector3(center.x, min.y, min.z),
-        new THREE.Vector3(max.x, center.y, center.z)
-      ), this.depth + 1),
-      new OctreeNode(new THREE.Box3(
-        new THREE.Vector3(min.x, min.y, center.z),
-        new THREE.Vector3(center.x, center.y, max.z)
-      ), this.depth + 1),
-      new OctreeNode(new THREE.Box3(
-        new THREE.Vector3(center.x, min.y, center.z),
-        new THREE.Vector3(max.x, center.y, max.z)
-      ), this.depth + 1),
-      // Top quadrants (y >= center.y)
-      new OctreeNode(new THREE.Box3(
-        new THREE.Vector3(min.x, center.y, min.z),
-        new THREE.Vector3(center.x, max.y, center.z)
-      ), this.depth + 1),
-      new OctreeNode(new THREE.Box3(
-        new THREE.Vector3(center.x, center.y, min.z),
-        new THREE.Vector3(max.x, max.y, center.z)
-      ), this.depth + 1),
-      new OctreeNode(new THREE.Box3(
-        new THREE.Vector3(min.x, center.y, center.z),
-        new THREE.Vector3(center.x, max.y, max.z)
-      ), this.depth + 1),
-      new OctreeNode(new THREE.Box3(
-        new THREE.Vector3(center.x, center.y, center.z),
-        new THREE.Vector3(max.x, max.y, max.z)
-      ), this.depth + 1)
-    ]
-
-    // Redistribute entities to children
-    for (const id of this.entities) {
-      // Children will handle insertion
-    }
-    this.entities = []
-  }
-
-  /**
-   * Find which child octant contains a point
-   */
-  getOctantIndex(position: THREE.Vector3): number {
-    const center = this.bounds.getCenter(new THREE.Vector3())
-    let index = 0
-    if (position.x >= center.x) index |= 1
-    if (position.z >= center.z) index |= 2
-    if (position.y >= center.y) index |= 4
-    return index
-  }
-}
-
-/**
- * 3D spatial octree for fast proximity queries of combatants.
- * Optimized for dynamic updates and various query types.
- */
 export class SpatialOctree {
   private root: OctreeNode
   private entityPositions: Map<string, THREE.Vector3> = new Map()
   private readonly maxEntitiesPerNode: number
   private readonly maxDepth: number
   private worldBounds: THREE.Box3
-
-  // Reusable objects for performance
-  private readonly scratchVector = new THREE.Vector3()
-  private readonly scratchBox = new THREE.Box3()
-  private readonly scratchSphere = new THREE.Sphere()
+  private queries: SpatialOctreeQueries
 
   constructor(worldSize: number = 4000, maxEntitiesPerNode: number = 12, maxDepth: number = 6) {
     this.maxEntitiesPerNode = maxEntitiesPerNode
@@ -117,6 +22,7 @@ export class SpatialOctree {
     )
 
     this.root = new OctreeNode(this.worldBounds.clone(), 0)
+    this.queries = new SpatialOctreeQueries(this.entityPositions)
   }
 
   /**
@@ -263,166 +169,28 @@ export class SpatialOctree {
    * Query entities within radius (sphere query)
    */
   queryRadius(center: THREE.Vector3, radius: number): string[] {
-    const results: string[] = []
-    this.scratchSphere.set(center, radius)
-    this.queryRadiusRecursive(this.root, this.scratchSphere, results)
-    return results
-  }
-
-  /**
-   * Recursively query radius in octree
-   */
-  private queryRadiusRecursive(node: OctreeNode, sphere: THREE.Sphere, results: string[]): void {
-    // Early exit if sphere doesn't intersect node bounds
-    if (!sphere.intersectsBox(node.bounds)) {
-      return
-    }
-
-    // Add all entities in this node that are within radius
-    const radiusSq = sphere.radius * sphere.radius
-    for (const id of node.entities) {
-      const pos = this.entityPositions.get(id)
-      if (pos && pos.distanceToSquared(sphere.center) <= radiusSq) {
-        results.push(id)
-      }
-    }
-
-    // Recurse into children
-    if (!node.isLeaf() && node.children) {
-      for (const child of node.children) {
-        this.queryRadiusRecursive(child, sphere, results)
-      }
-    }
+    return this.queries.queryRadius(this.root, center, radius)
   }
 
   /**
    * Query entities visible to frustum
    */
   queryFrustum(frustum: THREE.Frustum): string[] {
-    const results: string[] = []
-    this.queryFrustumRecursive(this.root, frustum, results)
-    return results
-  }
-
-  /**
-   * Recursively query frustum in octree
-   */
-  private queryFrustumRecursive(node: OctreeNode, frustum: THREE.Frustum, results: string[]): void {
-    // Early exit if frustum doesn't intersect node bounds
-    if (!frustum.intersectsBox(node.bounds)) {
-      return
-    }
-
-    // Add all entities in this node that are within frustum
-    for (const id of node.entities) {
-      const pos = this.entityPositions.get(id)
-      if (pos && frustum.containsPoint(pos)) {
-        results.push(id)
-      }
-    }
-
-    // Recurse into children
-    if (!node.isLeaf() && node.children) {
-      for (const child of node.children) {
-        this.queryFrustumRecursive(child, frustum, results)
-      }
-    }
+    return this.queries.queryFrustum(this.root, frustum)
   }
 
   /**
    * Query entities along ray
    */
   queryRay(origin: THREE.Vector3, direction: THREE.Vector3, maxDistance: number): string[] {
-    const results: string[] = []
-    const ray = new THREE.Ray(origin, direction)
-    this.queryRayRecursive(this.root, ray, maxDistance, results)
-    return results
-  }
-
-  /**
-   * Recursively query ray in octree
-   */
-  private queryRayRecursive(node: OctreeNode, ray: THREE.Ray, maxDistance: number, results: string[]): void {
-    // Early exit if ray doesn't intersect node bounds
-    const intersection = ray.intersectBox(node.bounds, this.scratchVector)
-    if (!intersection || intersection.distanceTo(ray.origin) > maxDistance) {
-      return
-    }
-
-    // Check all entities in this node
-    for (const id of node.entities) {
-      const pos = this.entityPositions.get(id)
-      if (pos) {
-        const distance = ray.distanceToPoint(pos)
-        if (distance < 2.0 && ray.origin.distanceTo(pos) <= maxDistance) {
-          results.push(id)
-        }
-      }
-    }
-
-    // Recurse into children
-    if (!node.isLeaf() && node.children) {
-      for (const child of node.children) {
-        this.queryRayRecursive(child, ray, maxDistance, results)
-      }
-    }
+    return this.queries.queryRay(this.root, origin, direction, maxDistance)
   }
 
   /**
    * Query k nearest entities to a point
    */
   queryNearestK(center: THREE.Vector3, k: number, maxDistance: number = Infinity): string[] {
-    const candidates: Array<{ id: string; distanceSq: number }> = []
-    const maxDistanceSq = maxDistance * maxDistance
-
-    this.queryNearestKRecursive(this.root, center, candidates, maxDistanceSq)
-
-    // Sort by distance and return top k
-    candidates.sort((a, b) => a.distanceSq - b.distanceSq)
-    return candidates.slice(0, k).map(c => c.id)
-  }
-
-  /**
-   * Recursively query k-nearest in octree
-   */
-  private queryNearestKRecursive(
-    node: OctreeNode,
-    center: THREE.Vector3,
-    candidates: Array<{ id: string; distanceSq: number }>,
-    maxDistanceSq: number
-  ): void {
-    // Check distance to node bounds
-    const distanceSq = node.bounds.distanceToPoint(center)
-    if (distanceSq > maxDistanceSq) {
-      return
-    }
-
-    // Add all entities in this node
-    for (const id of node.entities) {
-      const pos = this.entityPositions.get(id)
-      if (pos) {
-        const distSq = pos.distanceToSquared(center)
-        if (distSq <= maxDistanceSq) {
-          candidates.push({ id, distanceSq: distSq })
-        }
-      }
-    }
-
-    // Recurse into children, prioritizing closer ones
-    if (!node.isLeaf() && node.children) {
-      // Calculate distance to each child and sort
-      const childDistances = node.children.map((child, index) => ({
-        child,
-        index,
-        distance: child.bounds.distanceToPoint(center)
-      }))
-
-      childDistances.sort((a, b) => a.distance - b.distance)
-
-      for (const { child } of childDistances) {
-        this.queryNearestKRecursive(child, center, candidates, maxDistanceSq)
-      }
-    }
+    return this.queries.queryNearestK(this.root, center, k, maxDistance)
   }
 
   /**
@@ -445,6 +213,8 @@ export class SpatialOctree {
   clear(): void {
     this.entityPositions.clear()
     this.root = new OctreeNode(this.worldBounds.clone(), 0)
+    // Recreate queries instance to update entityPositions reference
+    this.queries = new SpatialOctreeQueries(this.entityPositions)
   }
 
   /**
