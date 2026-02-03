@@ -79,10 +79,10 @@ CombatantSystem has distance-based LOD:
 
 | File | Lines | Location |
 |------|-------|----------|
+| CombatantCombat.ts | 806 | systems/combat/ |
 | AudioManager.ts | 767 | systems/audio/ |
 | ImprovedChunkManager.ts | 753 | systems/terrain/ |
 | PlayerRespawnManager.ts | 749 | systems/player/ |
-| CombatantCombat.ts | 745 | systems/combat/ |
 | GrenadeSystem.ts | 731 | systems/weapons/ |
 | ChunkWorkerPool.ts | 715 | systems/terrain/ |
 | ImprovedChunk.ts | 672 | systems/terrain/ |
@@ -101,6 +101,7 @@ CombatantSystem has distance-based LOD:
 | InfluenceMapSystem.ts | 497 | systems/combat/ |
 | CombatantMovement.ts | 496 | systems/combat/ |
 | gameModes.ts | 496 | config/ |
+| SpatialOctree.ts | 487 | systems/combat/ |
 | ExplosionEffectsPool.ts | 486 | systems/effects/ |
 | HUDStyles.ts | 483 | ui/hud/ |
 | WeatherSystem.ts | 447 | systems/environment/ |
@@ -115,7 +116,7 @@ CombatantSystem has distance-based LOD:
 | CompassSystem.ts | 414 | ui/compass/ |
 | MortarSystem.ts | 409 | systems/weapons/ |
 
-**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311). 35 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311). 36 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -129,6 +130,9 @@ Use the profiling to identify actual bottlenecks, then:
 
 Known hotspots:
 - **CombatantMovement zone evaluation** - FIXED. Throttled to 3-5s intervals with single-loop top-3 selection instead of per-frame sort.
+- **CombatantCombat suppression scan** - FIXED. Replaced O(n) allCombatants.forEach with spatialGridManager.queryRadius() for suppression and ally search. Uses distanceToSquared. Module-level scratch vectors replace pool allocation.
+- **ClusterManager O(n) per NPC** - Three methods (calculateSpacingForce, isInCluster, getClusterDensity) iterate ALL combatants per call. Called per-NPC per-frame from CombatantMovement and AITargeting. Should use spatialGridManager.queryRadius() instead.
+- **AITargeting cluster check** - Line 79 calls clusterManager.isInCluster() which does O(n) even when spatialGrid was already used for target finding above it.
 
 Possible areas (confirm with profiling):
 - AI update frequency tuning
@@ -185,7 +189,7 @@ perf.benchmark(1000)  // Runs 1000 raycast iterations, returns timing stats
 
 ## Architecture
 
-~45k lines across 144 files. Orchestrator pattern but some files got big.
+~46k lines across 164 files. Orchestrator pattern but some files got big.
 
 ```
 src/
