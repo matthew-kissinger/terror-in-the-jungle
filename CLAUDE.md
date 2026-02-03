@@ -16,7 +16,7 @@ The game has performance issues. The infrastructure to diagnose and fix them alr
 ```javascript
 perf.report()    // Full telemetry report
 perf.validate()  // Check spatial grid, hit detection, frame budget
-perf.benchmark(1000)  // Run benchmark (needs implementation)
+perf.benchmark(1000)  // Run 1000-iteration raycast/hit detection benchmark
 perf.reset()     // Reset all telemetry
 ```
 
@@ -165,7 +165,7 @@ src/
 ├── systems/
 │   ├── combat/             # AI, spatial, rendering (6800 lines total)
 │   │   ├── ai/             # AITargeting, AIFlanking
-│   │   ├── CombatantSystem.ts   # Main orchestrator (1308 lines - needs split)
+│   │   ├── CombatantSystem.ts   # Main orchestrator (538 lines)
 │   │   ├── SpatialOctree.ts     # Spatial queries
 │   │   ├── InfluenceMapSystem.ts
 │   │   └── ...

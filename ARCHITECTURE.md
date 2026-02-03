@@ -82,9 +82,9 @@ main.ts (Entry Point)
 
 ## Key Refactored Systems
 
-### CombatantSystem (1,308 lines)
+### CombatantSystem (Refactored: 1,308 -> 538 lines)
 **Modules**:
-- `CombatantSystem.ts`: Main orchestrator (1,308 lines)
+- `CombatantSystem.ts`: Main orchestrator (538 lines)
 - `CombatantFactory.ts`: Entity creation and initialization
 - `CombatantAI.ts`: AI state machines and decision making
 - `CombatantCombat.ts`: Combat mechanics and damage
