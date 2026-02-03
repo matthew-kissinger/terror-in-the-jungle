@@ -34,25 +34,22 @@ import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
 import { DayNightCycle } from '../systems/environment/DayNightCycle';
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
-// VoiceCalloutSystem disabled for performance - creates 12+ Web Audio nodes per callout
-// import { VoiceCalloutSystem } from '../systems/audio/VoiceCalloutSystem';
-import { objectPool } from '../utils/ObjectPoolManager';
-import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
-import { spatialGridManager } from '../systems/combat/SpatialGridManager';
-import { ShotCommandFactory } from '../systems/player/weapon/ShotCommand';
-
-interface SystemTimingEntry {
-  name: string;
-  budgetMs: number;
-  lastMs: number;
-  emaMs: number;
-}
+import { SystemInitializer, SystemReferences } from './SystemInitializer';
+import { SystemConnector } from './SystemConnector';
+import { SystemUpdater } from './SystemUpdater';
+import { SystemDisposer } from './SystemDisposer';
 
 export class SandboxSystemManager {
   private systems: GameSystem[] = [];
-  private systemTimings: Map<string, SystemTimingEntry> = new Map();
-  private readonly EMA_ALPHA = 0.1;
   private scene?: THREE.Scene;
+  
+  private initializer = new SystemInitializer();
+  private connector = new SystemConnector();
+  private updater = new SystemUpdater();
+  private disposer = new SystemDisposer();
+  
+  // System references object for passing to modules
+  private refs: SystemReferences = {} as SystemReferences;
 
   // Game systems
   public assetLoader!: AssetLoader;
@@ -96,300 +93,55 @@ export class SandboxSystemManager {
     onProgress: (phase: string, progress: number) => void,
     sandboxRenderer?: any
   ): Promise<void> {
-    console.log('🔧 Initializing game systems...');
-
-    // Warmup object pools to prevent allocations during gameplay
-    objectPool.warmup(50, 20, 10, 30);
-
-    // Phase 1: Core systems
-    onProgress('core', 0);
-
-    this.assetLoader = new AssetLoader();
-    onProgress('core', 0.5);
-
-    this.globalBillboardSystem = new GlobalBillboardSystem(scene, camera, this.assetLoader);
-    this.chunkManager = new ImprovedChunkManager(scene, camera, this.assetLoader, this.globalBillboardSystem);
-    // GPUTerrain disabled - going with web workers approach instead
-    // this.gpuTerrain = new GPUTerrain(scene, camera, this.assetLoader);
-    onProgress('core', 1);
-
-    // Phase 2: Load textures
-    onProgress('textures', 0);
-    await this.assetLoader.init();
-    onProgress('textures', 1);
-
-    // Phase 3: Load audio
-    onProgress('audio', 0);
-    this.audioManager = new AudioManager(scene, camera);
-    await this.audioManager.init();
-    onProgress('audio', 1);
-
-    // Phase 4: Initialize world systems
-    onProgress('world', 0);
-
-    this.playerController = new PlayerController(camera);
-    this.combatantSystem = new CombatantSystem(scene, camera, this.globalBillboardSystem, this.assetLoader, this.chunkManager);
-    this.skybox = new Skybox(scene);
-    this.waterSystem = new WaterSystem(scene, camera, this.assetLoader);
-    this.weatherSystem = new WeatherSystem(scene, camera, this.chunkManager);
-    this.dayNightCycle = new DayNightCycle(scene);
-    this.firstPersonWeapon = new FirstPersonWeapon(scene, camera, this.assetLoader);
-    this.zoneManager = new ZoneManager(scene);
-    this.ticketSystem = new TicketSystem();
-    this.playerHealthSystem = new PlayerHealthSystem();
-    this.playerRespawnManager = new PlayerRespawnManager(scene, camera);
-    this.hudSystem = new HUDSystem(camera, this.ticketSystem, this.playerHealthSystem, this.playerRespawnManager);
-    this.minimapSystem = new MinimapSystem(camera);
-    this.fullMapSystem = new FullMapSystem(camera);
-    this.compassSystem = new CompassSystem(camera);
-    this.gameModeManager = new GameModeManager();
-    this.helipadSystem = new HelipadSystem(scene);
-    this.helicopterModel = new HelicopterModel(scene);
-
-    // Initialize new squad/inventory/grenade systems
-    const squadManager = (this.combatantSystem as any).squadManager;
-    this.playerSquadController = new PlayerSquadController(squadManager);
-    this.inventoryManager = new InventoryManager();
-    this.grenadeSystem = new GrenadeSystem(scene, camera, this.chunkManager);
-    this.mortarSystem = new MortarSystem(scene, camera, this.chunkManager);
-    this.sandbagSystem = new SandbagSystem(scene, camera, this.chunkManager);
-    this.cameraShakeSystem = new CameraShakeSystem();
-    this.playerSuppressionSystem = new PlayerSuppressionSystem();
-    this.ammoSupplySystem = new AmmoSupplySystem(scene, camera);
-    this.footstepAudioSystem = new FootstepAudioSystem(this.audioManager.getListener());
-    // this.voiceCalloutSystem = new VoiceCalloutSystem(scene, this.audioManager.getListener()); // Disabled for performance
-
-    // Initialize influence map system based on game mode world size
-    const worldSize = 4000; // Default, will be updated when game mode is set
-    this.influenceMapSystem = new InfluenceMapSystem(worldSize);
-
-    // Store scene reference for fog access
-    this.scene = scene;
-
-    this.connectSystems(scene, camera, sandboxRenderer);
-
-    // Add systems to update list
-    // NOTE: dayNightCycle removed - conflicts with weatherSystem for lighting control
-    this.systems = [
-      this.assetLoader,
-      this.audioManager,
-      this.globalBillboardSystem,
-      this.chunkManager,
-      // this.gpuTerrain, // Disabled
-      this.waterSystem,
-      this.weatherSystem,
-      // this.dayNightCycle, // DISABLED: Conflicts with WeatherSystem lighting
-      this.playerController,
-      this.firstPersonWeapon,
-      this.combatantSystem,
-      this.zoneManager,
-      this.ticketSystem,
-      this.playerHealthSystem,
-      this.playerRespawnManager,
-      this.minimapSystem,
-      this.fullMapSystem,
-      this.compassSystem,
-      this.hudSystem,
-      this.helipadSystem,
-      this.helicopterModel,
-      this.skybox,
-      this.gameModeManager,
-      this.playerSquadController,
-      this.inventoryManager,
-      this.grenadeSystem,
-      this.mortarSystem,
-      this.sandbagSystem,
-      this.cameraShakeSystem,
-      this.playerSuppressionSystem,
-      this.influenceMapSystem,
-      this.ammoSupplySystem
-      // this.voiceCalloutSystem // Disabled for performance
-    ];
-
-    onProgress('world', 0.5);
-
     // Initialize all systems
-    for (const system of this.systems) {
-      await system.init();
-    }
-
-    onProgress('world', 1);
-  }
-
-  private connectSystems(scene: THREE.Scene, camera: THREE.PerspectiveCamera, sandboxRenderer?: any): void {
-    // Connect systems with chunk manager
-    this.playerController.setChunkManager(this.chunkManager);
-    this.playerController.setGameModeManager(this.gameModeManager);
-    this.playerController.setHelicopterModel(this.helicopterModel);
-    this.playerController.setFirstPersonWeapon(this.firstPersonWeapon);
-    this.playerController.setHUDSystem(this.hudSystem);
-    if (sandboxRenderer) {
-      this.playerController.setSandboxRenderer(sandboxRenderer);
-    }
-    this.combatantSystem.setChunkManager(this.chunkManager);
-    this.combatantSystem.setCamera(camera);
-    this.firstPersonWeapon.setPlayerController(this.playerController);
-    this.firstPersonWeapon.setCombatantSystem(this.combatantSystem);
-    this.firstPersonWeapon.setHUDSystem(this.hudSystem);
-    this.firstPersonWeapon.setZoneManager(this.zoneManager);
-    this.firstPersonWeapon.setInventoryManager(this.inventoryManager);
-    this.hudSystem.setCombatantSystem(this.combatantSystem);
-    this.hudSystem.setZoneManager(this.zoneManager);
-    this.hudSystem.setTicketSystem(this.ticketSystem);
-    this.ticketSystem.setZoneManager(this.zoneManager);
-    this.combatantSystem.setTicketSystem(this.ticketSystem);
-    this.combatantSystem.setPlayerHealthSystem(this.playerHealthSystem);
-    this.combatantSystem.setZoneManager(this.zoneManager);
-    this.combatantSystem.setGameModeManager(this.gameModeManager);
-    this.combatantSystem.setHUDSystem(this.hudSystem);
-    this.playerHealthSystem.setZoneManager(this.zoneManager);
-    this.playerHealthSystem.setTicketSystem(this.ticketSystem);
-    this.playerHealthSystem.setPlayerController(this.playerController);
-    this.playerHealthSystem.setFirstPersonWeapon(this.firstPersonWeapon);
-    this.playerHealthSystem.setCamera(camera);
-    this.playerHealthSystem.setRespawnManager(this.playerRespawnManager);
-    this.playerHealthSystem.setHUDSystem(this.hudSystem);
-    this.minimapSystem.setZoneManager(this.zoneManager);
-    this.minimapSystem.setCombatantSystem(this.combatantSystem);
-    this.fullMapSystem.setZoneManager(this.zoneManager);
-    this.fullMapSystem.setCombatantSystem(this.combatantSystem);
-    this.fullMapSystem.setGameModeManager(this.gameModeManager);
-    this.compassSystem.setZoneManager(this.zoneManager);
-    this.zoneManager.setCombatantSystem(this.combatantSystem);
-    this.zoneManager.setCamera(camera);
-    this.zoneManager.setChunkManager(this.chunkManager);
-    this.zoneManager.setHUDSystem(this.hudSystem);
-
-    // Connect audio manager
-    this.firstPersonWeapon.setAudioManager(this.audioManager);
-    this.combatantSystem.setAudioManager(this.audioManager);
-
-    // Connect respawn manager
-    this.playerRespawnManager.setPlayerHealthSystem(this.playerHealthSystem);
-    this.playerRespawnManager.setZoneManager(this.zoneManager);
-    this.playerRespawnManager.setGameModeManager(this.gameModeManager);
-    this.playerRespawnManager.setPlayerController(this.playerController);
-    this.playerRespawnManager.setFirstPersonWeapon(this.firstPersonWeapon);
-    this.playerRespawnManager.setInventoryManager(this.inventoryManager);
-
-    // Connect helipad system
-    this.helipadSystem.setTerrainManager(this.chunkManager);
-    this.helipadSystem.setVegetationSystem(this.globalBillboardSystem);
-    this.helipadSystem.setGameModeManager(this.gameModeManager);
-
-    // Connect helicopter model
-    this.helicopterModel.setTerrainManager(this.chunkManager);
-    this.helicopterModel.setHelipadSystem(this.helipadSystem);
-    this.helicopterModel.setPlayerController(this.playerController);
-    this.helicopterModel.setHUDSystem(this.hudSystem);
-    this.helicopterModel.setAudioListener(this.audioManager.getListener());
-
-
-    // Connect game mode manager to systems
-    this.gameModeManager.connectSystems(
-      this.zoneManager,
-      this.combatantSystem,
-      this.ticketSystem,
-      this.chunkManager,
-      this.minimapSystem
+    const result = await this.initializer.initializeSystems(
+      this.refs,
+      scene,
+      camera,
+      onProgress,
+      sandboxRenderer
     );
 
-    // Connect camera shake system
-    this.playerController.setCameraShakeSystem(this.cameraShakeSystem);
+    // Store systems and scene
+    this.systems = result.systems;
+    this.scene = result.scene;
 
-    // Connect player suppression system
-    this.playerSuppressionSystem.setCameraShakeSystem(this.cameraShakeSystem);
-    this.playerSuppressionSystem.setPlayerController(this.playerController);
-    this.combatantSystem.setPlayerSuppressionSystem(this.playerSuppressionSystem);
+    // Copy initialized references to public properties
+    this.assetLoader = this.refs.assetLoader;
+    this.chunkManager = this.refs.chunkManager;
+    this.globalBillboardSystem = this.refs.globalBillboardSystem;
+    this.playerController = this.refs.playerController;
+    this.combatantSystem = this.refs.combatantSystem;
+    this.skybox = this.refs.skybox;
+    this.waterSystem = this.refs.waterSystem;
+    this.weatherSystem = this.refs.weatherSystem;
+    this.dayNightCycle = this.refs.dayNightCycle;
+    this.firstPersonWeapon = this.refs.firstPersonWeapon;
+    this.zoneManager = this.refs.zoneManager;
+    this.hudSystem = this.refs.hudSystem;
+    this.ticketSystem = this.refs.ticketSystem;
+    this.playerHealthSystem = this.refs.playerHealthSystem;
+    this.minimapSystem = this.refs.minimapSystem;
+    this.audioManager = this.refs.audioManager;
+    this.gameModeManager = this.refs.gameModeManager;
+    this.playerRespawnManager = this.refs.playerRespawnManager;
+    this.fullMapSystem = this.refs.fullMapSystem;
+    this.compassSystem = this.refs.compassSystem;
+    this.helipadSystem = this.refs.helipadSystem;
+    this.helicopterModel = this.refs.helicopterModel;
+    this.playerSquadController = this.refs.playerSquadController;
+    this.inventoryManager = this.refs.inventoryManager;
+    this.grenadeSystem = this.refs.grenadeSystem;
+    this.mortarSystem = this.refs.mortarSystem;
+    this.sandbagSystem = this.refs.sandbagSystem;
+    this.cameraShakeSystem = this.refs.cameraShakeSystem;
+    this.playerSuppressionSystem = this.refs.playerSuppressionSystem;
+    this.influenceMapSystem = this.refs.influenceMapSystem;
+    this.ammoSupplySystem = this.refs.ammoSupplySystem;
+    this.footstepAudioSystem = this.refs.footstepAudioSystem;
 
-    // Connect weapon systems
-    this.grenadeSystem.setCombatantSystem(this.combatantSystem);
-    this.grenadeSystem.setInventoryManager(this.inventoryManager);
-    this.grenadeSystem.setAudioManager(this.audioManager);
-    this.grenadeSystem.setPlayerController(this.playerController);
-    this.hudSystem.setGrenadeSystem(this.grenadeSystem);
-    this.mortarSystem.setCombatantSystem(this.combatantSystem);
-    this.mortarSystem.setInventoryManager(this.inventoryManager);
-    this.mortarSystem.setAudioManager(this.audioManager);
-    this.sandbagSystem.setInventoryManager(this.inventoryManager);
-
-    const impactEffectsPool = (this.combatantSystem as any).impactEffectsPool;
-    if (impactEffectsPool) {
-      this.grenadeSystem.setImpactEffectsPool(impactEffectsPool);
-      this.mortarSystem.setImpactEffectsPool(impactEffectsPool);
-    }
-
-    const explosionEffectsPool = (this.combatantSystem as any).explosionEffectsPool;
-    if (explosionEffectsPool) {
-      this.grenadeSystem.setExplosionEffectsPool(explosionEffectsPool);
-      this.mortarSystem.setExplosionEffectsPool(explosionEffectsPool);
-    }
-
-    // Connect PlayerController with all weapon systems
-    this.playerController.setInventoryManager(this.inventoryManager);
-    this.playerController.setGrenadeSystem(this.grenadeSystem);
-    this.playerController.setMortarSystem(this.mortarSystem);
-    this.playerController.setSandbagSystem(this.sandbagSystem);
-
-    // Connect combat systems with sandbag system
-    const combatantCombat = (this.combatantSystem as any).combatantCombat;
-    if (combatantCombat) {
-      combatantCombat.setSandbagSystem(this.sandbagSystem);
-    }
-    const combatantAI = (this.combatantSystem as any).combatantAI;
-    if (combatantAI) {
-      combatantAI.setSandbagSystem(this.sandbagSystem);
-      combatantAI.setZoneManager(this.zoneManager);
-    }
-
-    // Connect influence map system
-    const squadManager = (this.combatantSystem as any).squadManager;
-    if (squadManager) {
-      squadManager.setInfluenceMap(this.influenceMapSystem);
-    }
-    (this.combatantSystem as any).influenceMap = this.influenceMapSystem;
-    (this.combatantSystem as any).sandbagSystem = this.sandbagSystem;
-
-    // Connect ammo supply system
-    this.ammoSupplySystem.setZoneManager(this.zoneManager);
-    this.ammoSupplySystem.setInventoryManager(this.inventoryManager);
-    this.ammoSupplySystem.setFirstPersonWeapon(this.firstPersonWeapon);
-
-    // Connect weather system
-    if (this.weatherSystem) {
-      this.weatherSystem.setAudioManager(this.audioManager);
-      if (sandboxRenderer) {
-        this.weatherSystem.setSandboxRenderer(sandboxRenderer);
-      }
-    }
-    
-    // Connect water system
-    if (this.waterSystem) {
-      this.waterSystem.setWeatherSystem(this.weatherSystem);
-    }
-
-    // Connect day-night cycle
-    if (this.dayNightCycle && sandboxRenderer) {
-      this.dayNightCycle.setSandboxRenderer(sandboxRenderer);
-    }
-
-    // Connect footstep audio system
-    this.footstepAudioSystem.setChunkManager(this.chunkManager);
-    this.playerController.setFootstepAudioSystem(this.footstepAudioSystem);
-
-    // Inject benchmark dependencies
-    performanceTelemetry.injectBenchmarkDependencies({
-      hitDetection: (this.combatantSystem as any).combatantCombat?.hitDetection,
-      chunkManager: this.chunkManager,
-      combatants: (this.combatantSystem as any).combatants,
-      spatialGridManager: spatialGridManager
-    });
-
-    // Connect voice callout system
-    // VoiceCalloutSystem disabled for performance
-    // if (combatantCombat) {
-    //   combatantCombat.setVoiceCalloutSystem(this.voiceCalloutSystem);
-    // }
+    // Connect systems together
+    this.connector.connectSystems(this.refs, scene, camera, sandboxRenderer);
   }
 
   async preGenerateSpawnArea(spawnPos: THREE.Vector3): Promise<void> {
@@ -429,135 +181,11 @@ export class SandboxSystemManager {
   }
 
   updateSystems(deltaTime: number): void {
-    // Begin frame telemetry
-    performanceTelemetry.beginFrame();
-    spatialGridManager.resetFrameTelemetry();
-    ShotCommandFactory.resetPool();
-
-    // Update player position in squad controller
-    if (this.playerSquadController && this.playerController) {
-      this.playerSquadController.updatePlayerPosition(this.playerController.getPosition());
-
-      // Update command position on minimap
-      const commandPos = this.playerSquadController.getCommandPosition();
-      this.minimapSystem.setCommandPosition(commandPos);
-
-      // Update voice callout system with player position for distance-based filtering
-      // VoiceCalloutSystem disabled for performance
-      // const playerPos = this.playerController.getPosition();
-      // this.voiceCalloutSystem.setPlayerPosition(playerPos);
-    }
-
-    // Track timing for key systems (both local tracking and performance telemetry)
-    this.trackSystemUpdate('Combat', 5.0, () => {
-      performanceTelemetry.beginSystem('Combat');
-      if (this.combatantSystem) this.combatantSystem.update(deltaTime);
-      performanceTelemetry.endSystem('Combat');
-    });
-
-    this.trackSystemUpdate('Terrain', 2.0, () => {
-      performanceTelemetry.beginSystem('Terrain');
-      if (this.chunkManager) this.chunkManager.update(deltaTime);
-      performanceTelemetry.endSystem('Terrain');
-    });
-
-    this.trackSystemUpdate('Billboards', 2.0, () => {
-      performanceTelemetry.beginSystem('Billboards');
-      if (this.globalBillboardSystem) {
-        const fog = this.scene?.fog as THREE.FogExp2 | undefined;
-        this.globalBillboardSystem.update(deltaTime, fog);
-      }
-      performanceTelemetry.endSystem('Billboards');
-    });
-
-    this.trackSystemUpdate('Player', 1.0, () => {
-      performanceTelemetry.beginSystem('Player');
-      if (this.playerController) this.playerController.update(deltaTime);
-      if (this.firstPersonWeapon) this.firstPersonWeapon.update(deltaTime);
-      performanceTelemetry.endSystem('Player');
-    });
-
-    this.trackSystemUpdate('Weapons', 1.0, () => {
-      performanceTelemetry.beginSystem('Weapons');
-      if (this.grenadeSystem) this.grenadeSystem.update(deltaTime);
-      if (this.mortarSystem) this.mortarSystem.update(deltaTime);
-      if (this.sandbagSystem) this.sandbagSystem.update(deltaTime);
-      if (this.ammoSupplySystem) this.ammoSupplySystem.update(deltaTime);
-      performanceTelemetry.endSystem('Weapons');
-    });
-
-    this.trackSystemUpdate('UI', 1.0, () => {
-      performanceTelemetry.beginSystem('UI');
-      if (this.hudSystem) this.hudSystem.update(deltaTime);
-      if (this.minimapSystem) this.minimapSystem.update(deltaTime);
-      if (this.fullMapSystem) this.fullMapSystem.update(deltaTime);
-      if (this.compassSystem) this.compassSystem.update(deltaTime);
-      performanceTelemetry.endSystem('UI');
-    });
-
-    this.trackSystemUpdate('World', 1.0, () => {
-      performanceTelemetry.beginSystem('World');
-      if (this.zoneManager) this.zoneManager.update(deltaTime);
-      if (this.ticketSystem) this.ticketSystem.update(deltaTime);
-      if (this.waterSystem) this.waterSystem.update(deltaTime);
-      if (this.weatherSystem) this.weatherSystem.update(deltaTime);
-      performanceTelemetry.endSystem('World');
-    });
-
-    // Update remaining systems without tracking (lightweight systems)
-    const trackedSystems = new Set<GameSystem>([
-      this.combatantSystem,
-      this.chunkManager,
-      this.globalBillboardSystem,
-      this.playerController,
-      this.firstPersonWeapon,
-      this.grenadeSystem,
-      this.mortarSystem,
-      this.sandbagSystem,
-      this.ammoSupplySystem,
-      this.hudSystem,
-      this.minimapSystem,
-      this.fullMapSystem,
-      this.compassSystem,
-      this.zoneManager,
-      this.ticketSystem,
-      this.waterSystem,
-      this.weatherSystem // FIX: Was missing - caused double-update bug
-    ]);
-
-    performanceTelemetry.beginSystem('Other');
-    for (const system of this.systems) {
-      if (!trackedSystems.has(system)) {
-        system.update(deltaTime);
-      }
-    }
-    performanceTelemetry.endSystem('Other');
-
-    // End frame telemetry
-    performanceTelemetry.endFrame();
-  }
-
-  private trackSystemUpdate(name: string, budgetMs: number, updateFn: () => void): void {
-    const start = performance.now();
-    updateFn();
-    const duration = performance.now() - start;
-
-    let entry = this.systemTimings.get(name);
-    if (!entry) {
-      entry = { name, budgetMs, lastMs: duration, emaMs: duration };
-      this.systemTimings.set(name, entry);
-    } else {
-      entry.lastMs = duration;
-      entry.emaMs = entry.emaMs * (1 - this.EMA_ALPHA) + duration * this.EMA_ALPHA;
-    }
+    this.updater.updateSystems(this.refs, this.systems, this.scene, deltaTime);
   }
 
   getSystemTimings(): Array<{ name: string; timeMs: number; budgetMs: number }> {
-    return Array.from(this.systemTimings.values()).map(entry => ({
-      name: entry.name,
-      timeMs: entry.emaMs,
-      budgetMs: entry.budgetMs
-    }));
+    return this.updater.getSystemTimings();
   }
 
   getSystems(): GameSystem[] {
@@ -565,9 +193,7 @@ export class SandboxSystemManager {
   }
 
   dispose(): void {
-    for (const system of this.systems) {
-      system.dispose();
-    }
+    this.disposer.dispose(this.systems);
   }
 
   setGameMode(mode: GameMode, options?: { createPlayerSquad?: boolean }): void {
