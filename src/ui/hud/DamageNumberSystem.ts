@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 
+const _scratchProjection = new THREE.Vector3();
+const _screenResult = { x: 0, y: 0, z: 0 };
+
 interface DamageNumber {
   element: HTMLDivElement;
   active: boolean;
@@ -195,14 +198,14 @@ export class DamageNumberSystem {
   }
 
   private worldToScreen(worldPos: THREE.Vector3): { x: number; y: number; z: number } {
-    const vector = worldPos.clone();
-    vector.project(this.camera);
+    _scratchProjection.copy(worldPos);
+    _scratchProjection.project(this.camera);
 
-    return {
-      x: (vector.x * 0.5 + 0.5) * window.innerWidth,
-      y: (-vector.y * 0.5 + 0.5) * window.innerHeight,
-      z: vector.z
-    };
+    _screenResult.x = (_scratchProjection.x * 0.5 + 0.5) * window.innerWidth;
+    _screenResult.y = (-_scratchProjection.y * 0.5 + 0.5) * window.innerHeight;
+    _screenResult.z = _scratchProjection.z;
+
+    return _screenResult;
   }
 
   attachToDOM(): void {
