@@ -6,7 +6,6 @@ import { CombatantShaderSettingsManager, setDamageFlash, updateShaderUniforms, t
 
 const _enemyForward = new THREE.Vector3();
 const _toPlayer = new THREE.Vector3();
-const _tiltAxis = new THREE.Vector3();
 
 export type { NPCShaderSettings, ShaderPreset } from './CombatantShaders';
 
@@ -33,6 +32,11 @@ export class CombatantRenderer {
   private readonly scratchToCombatant = new THREE.Vector3();
   private readonly scratchPosition = new THREE.Vector3();
   private readonly scratchUp = new THREE.Vector3(0, 1, 0);
+  private readonly scratchTiltAxis = new THREE.Vector3();
+  private readonly scratchTiltMatrix = new THREE.Matrix4();
+  private readonly scratchScaleMatrix = new THREE.Matrix4();
+  private readonly scratchOutlineMatrix = new THREE.Matrix4();
+  private readonly scratchMarkerMatrix = new THREE.Matrix4();
   constructor(scene: THREE.Scene, camera: THREE.Camera, assetLoader: AssetLoader) {
     this.scene = scene;
     this.camera = camera;
@@ -174,8 +178,8 @@ export class CombatantRenderer {
                 finalPosition.z += combatant.deathDirection.z * 2.5;
               }
               finalPosition.y -= 4.0;
-              const spinMatrix = new THREE.Matrix4().makeRotationZ(Math.PI * 2);
-              matrix.multiply(spinMatrix);
+              this.scratchSpinMatrix.makeRotationZ(Math.PI * 2);
+              matrix.multiply(this.scratchSpinMatrix);
               const settle = Math.max(0, (1 - groundProgress * 4) * 0.1);
               finalPosition.y += settle;
               finalScaleY *= 0.7;
@@ -186,8 +190,8 @@ export class CombatantRenderer {
                 finalPosition.z += combatant.deathDirection.z * 2.5;
               }
               finalPosition.y -= 4.0;
-              const spinMatrix = new THREE.Matrix4().makeRotationZ(Math.PI * 2);
-              matrix.multiply(spinMatrix);
+              this.scratchSpinMatrix.makeRotationZ(Math.PI * 2);
+              matrix.multiply(this.scratchSpinMatrix);
               finalScaleY *= 0.7;
               const fadeScale = 1 - fadeProgress;
               finalScaleX *= fadeScale;
@@ -241,12 +245,12 @@ export class CombatantRenderer {
               finalPosition.y += dropHeight * (1 - easeOut) - dropHeight;
               const rotationAngle = easeOut * Math.PI * 0.45;
               if (combatant.deathDirection) {
-                _tiltAxis.set(-combatant.deathDirection.z, 0, combatant.deathDirection.x);
+                this.scratchTiltAxis.set(-combatant.deathDirection.z, 0, combatant.deathDirection.x);
               } else {
-                _tiltAxis.set(1, 0, 0);
+                this.scratchTiltAxis.set(1, 0, 0);
               }
-              const tiltMatrix = new THREE.Matrix4().makeRotationAxis(_tiltAxis.normalize(), rotationAngle);
-              matrix.multiply(tiltMatrix);
+              this.scratchTiltMatrix.makeRotationAxis(this.scratchTiltAxis.normalize(), rotationAngle);
+              matrix.multiply(this.scratchTiltMatrix);
               finalScaleY *= 1 - (easeOut * 0.2);
             } else if (progress < FALL_PHASE + GROUND_PHASE) {
               const groundProgress = (progress - FALL_PHASE) / GROUND_PHASE;
@@ -256,12 +260,12 @@ export class CombatantRenderer {
               }
               finalPosition.y -= 3.5;
               if (combatant.deathDirection) {
-                _tiltAxis.set(-combatant.deathDirection.z, 0, combatant.deathDirection.x);
+                this.scratchTiltAxis.set(-combatant.deathDirection.z, 0, combatant.deathDirection.x);
               } else {
-                _tiltAxis.set(1, 0, 0);
+                this.scratchTiltAxis.set(1, 0, 0);
               }
-              const tiltMatrix = new THREE.Matrix4().makeRotationAxis(_tiltAxis.normalize(), Math.PI * 0.45);
-              matrix.multiply(tiltMatrix);
+              this.scratchTiltMatrix.makeRotationAxis(this.scratchTiltAxis.normalize(), Math.PI * 0.45);
+              matrix.multiply(this.scratchTiltMatrix);
               const settle = Math.max(0, (1 - groundProgress * 4) * 0.1);
               finalPosition.y += settle;
               finalScaleY *= 0.8;
@@ -273,12 +277,12 @@ export class CombatantRenderer {
               }
               finalPosition.y -= 3.5;
               if (combatant.deathDirection) {
-                _tiltAxis.set(-combatant.deathDirection.z, 0, combatant.deathDirection.x);
+                this.scratchTiltAxis.set(-combatant.deathDirection.z, 0, combatant.deathDirection.x);
               } else {
-                _tiltAxis.set(1, 0, 0);
+                this.scratchTiltAxis.set(1, 0, 0);
               }
-              const tiltMatrix = new THREE.Matrix4().makeRotationAxis(_tiltAxis.normalize(), Math.PI * 0.45);
-              matrix.multiply(tiltMatrix);
+              this.scratchTiltMatrix.makeRotationAxis(this.scratchTiltAxis.normalize(), Math.PI * 0.45);
+              matrix.multiply(this.scratchTiltMatrix);
               finalScaleY *= 0.8;
               const fadeScale = 1 - fadeProgress;
               finalScaleX *= fadeScale;
@@ -289,23 +293,22 @@ export class CombatantRenderer {
         }
 
         matrix.setPosition(finalPosition);
-        const scaleMatrix = new THREE.Matrix4().makeScale(finalScaleX, finalScaleY, finalScaleZ);
-        matrix.multiply(scaleMatrix);
+        this.scratchScaleMatrix.makeScale(finalScaleX, finalScaleY, finalScaleZ);
+        matrix.multiply(this.scratchScaleMatrix);
         mesh.setMatrixAt(index, matrix);
         combatant.billboardIndex = index;
         const outlineMesh = this.factionAuraMeshes.get(key);
         if (outlineMesh) {
-          const outlineMatrix = matrix.clone();
-          const scaleMatrix = new THREE.Matrix4().makeScale(1.2, 1.2, 1.2);
-          outlineMatrix.multiply(scaleMatrix);
-          outlineMesh.setMatrixAt(index, outlineMatrix);
+          this.scratchOutlineMatrix.copy(matrix);
+          this.scratchScaleMatrix.makeScale(1.2, 1.2, 1.2);
+          this.scratchOutlineMatrix.multiply(this.scratchScaleMatrix);
+          outlineMesh.setMatrixAt(index, this.scratchOutlineMatrix);
         }
         const markerMesh = this.factionGroundMarkers.get(key);
         if (markerMesh) {
-          const markerMatrix = new THREE.Matrix4();
-          markerMatrix.makeRotationX(-Math.PI / 2);
-          markerMatrix.setPosition(combatant.position.x, 0.1, combatant.position.z);
-          markerMesh.setMatrixAt(index, markerMatrix);
+          this.scratchMarkerMatrix.makeRotationX(-Math.PI / 2);
+          this.scratchMarkerMatrix.setPosition(combatant.position.x, 0.1, combatant.position.z);
+          markerMesh.setMatrixAt(index, this.scratchMarkerMatrix);
         }
         written++;
       }
