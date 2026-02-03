@@ -9,6 +9,11 @@ export const BILLBOARD_VERTEX_SHADER = `
   uniform vec2 lodDistances; // x = LOD1 distance, y = LOD2 distance
   uniform mat4 viewMatrix;
   uniform float maxDistance;
+  uniform vec3 fogColor;
+  uniform float fogDensity;        // Base fog density
+  uniform float fogHeightFalloff;  // How quickly fog thins with altitude
+  uniform float fogStartDistance;  // Distance before fog begins
+  uniform bool fogEnabled;
 
   attribute vec3 position;
   attribute vec2 uv;
@@ -22,6 +27,7 @@ export const BILLBOARD_VERTEX_SHADER = `
   varying float vDistance;
   varying float vLodFactor;
   varying float vWorldY;
+  varying float vFogFactor;
 
   void main() {
     vUv = uv;
@@ -79,6 +85,14 @@ export const BILLBOARD_VERTEX_SHADER = `
 
     // Pass world Y for height fog
     vWorldY = finalPosition.y;
+    if (fogEnabled) {
+      float heightFactor = exp(-fogHeightFalloff * max(0.0, vWorldY));
+      float effectiveDistance = max(0.0, vDistance - fogStartDistance);
+      float distanceFactor = 1.0 - exp(-fogDensity * effectiveDistance);
+      vFogFactor = clamp(heightFactor * distanceFactor, 0.0, 1.0);
+    } else {
+      vFogFactor = 0.0;
+    }
 
     // Project to screen
     vec4 mvPosition = modelViewMatrix * vec4(finalPosition, 1.0);
@@ -107,6 +121,7 @@ export const BILLBOARD_FRAGMENT_SHADER = `
   varying float vDistance;
   varying float vLodFactor;
   varying float vWorldY;
+  varying float vFogFactor;
 
   void main() {
     vec4 texColor = texture2D(map, vUv);
@@ -127,19 +142,7 @@ export const BILLBOARD_FRAGMENT_SHADER = `
 
     // Apply height-based fog (dense at ground, thin at altitude)
     if (fogEnabled) {
-      // Height factor: fog is densest at y=0, exponentially thins with height
-      // Using max(0, y) so underground objects still get full fog
-      float heightFactor = exp(-fogHeightFalloff * max(0.0, vWorldY));
-
-      // Distance factor: fog increases with distance, but only past start distance
-      float effectiveDistance = max(0.0, vDistance - fogStartDistance);
-      float distanceFactor = 1.0 - exp(-fogDensity * effectiveDistance);
-
-      // Combine: distant ground-level objects get most fog
-      float fogFactor = heightFactor * distanceFactor;
-      fogFactor = clamp(fogFactor, 0.0, 1.0);
-
-      shaded = mix(shaded, fogColor, fogFactor);
+      shaded = mix(shaded, fogColor, vFogFactor);
     }
 
     gl_FragColor = vec4(shaded, texColor.a * fadeFactor);
