@@ -14,6 +14,10 @@ import { Logger } from '../../utils/Logger';
 const _spawnPos = new THREE.Vector3();
 const _anchorPos = new THREE.Vector3();
 const _offsetVec = new THREE.Vector3();
+const _scratchVec = new THREE.Vector3();
+const _squadCentroid = new THREE.Vector3();
+const _usBasePos = new THREE.Vector3(0, 0, -50);
+const _opforBasePos = new THREE.Vector3(0, 0, 145);
 
 /**
  * Manages spawning, respawning, and reinforcement waves for combatants
@@ -104,7 +108,7 @@ export class CombatantSpawnManager {
     // Create player squad first if requested
     if (shouldCreatePlayerSquad) {
       console.log('🎖️ Creating player squad...');
-      const playerSpawnPos = usBasePos.clone().add(new THREE.Vector3(0, 0, -15));
+      const playerSpawnPos = _scratchVec.copy(usBasePos).add(_offsetVec.set(0, 0, -15));
       const { squad, members } = this.squadManager.createSquad(Faction.US, playerSpawnPos, 6);
       createdPlayerSquadId = squad.id;
       squad.isPlayerControlled = true;
@@ -357,19 +361,19 @@ export class CombatantSpawnManager {
     }
 
     // Calculate squad centroid for reference
-    const squadCentroid = new THREE.Vector3();
+    _squadCentroid.set(0, 0, 0);
     let validMemberCount = 0;
     
     for (const id of squad.members) {
       const m = this.combatants.get(id);
       if (m) {
-        squadCentroid.add(m.position);
+        _squadCentroid.add(m.position);
         validMemberCount++;
       }
     }
     
     if (validMemberCount > 0) {
-      squadCentroid.divideScalar(validMemberCount);
+      _squadCentroid.divideScalar(validMemberCount);
     }
 
     // Check for rally point first
@@ -389,10 +393,10 @@ export class CombatantSpawnManager {
       spawnPos = this.getBaseSpawnPosition(squad.faction);
     }
 
-    const distanceFromSquad = spawnPos.distanceTo(squadCentroid);
+    const distanceFromSquad = spawnPos.distanceTo(_squadCentroid);
 
     console.log(`🔄 Respawning squad member:`);
-    console.log(`   Squad location: (${squadCentroid.x.toFixed(1)}, ${squadCentroid.z.toFixed(1)})`);
+    console.log(`   Squad location: (${_squadCentroid.x.toFixed(1)}, ${_squadCentroid.z.toFixed(1)})`);
     console.log(`   Spawn location: (${spawnPos.x.toFixed(1)}, ${spawnPos.z.toFixed(1)}) ${spawnedAtRallyPoint ? '[RALLY POINT]' : '[BASE]'}`);
     console.log(`   Distance: ${distanceFromSquad.toFixed(1)}m`);
 
@@ -439,18 +443,16 @@ export class CombatantSpawnManager {
       );
 
       if (usBase && opforBase) {
-        return {
-          usBasePos: new THREE.Vector3(usBase.position.x, usBase.position.y, usBase.position.z),
-          opforBasePos: new THREE.Vector3(opforBase.position.x, opforBase.position.y, opforBase.position.z)
-        };
+        _usBasePos.set(usBase.position.x, usBase.position.y, usBase.position.z);
+        _opforBasePos.set(opforBase.position.x, opforBase.position.y, opforBase.position.z);
+        return { usBasePos: _usBasePos, opforBasePos: _opforBasePos };
       }
     }
 
     // Fallback to default positions
-    return {
-      usBasePos: new THREE.Vector3(0, 0, -50),
-      opforBasePos: new THREE.Vector3(0, 0, 145)
-    };
+    _usBasePos.set(0, 0, -50);
+    _opforBasePos.set(0, 0, 145);
+    return { usBasePos: _usBasePos, opforBasePos: _opforBasePos };
   }
 
   private getBaseSpawnPosition(faction: Faction): THREE.Vector3 {
@@ -474,7 +476,7 @@ export class CombatantSpawnManager {
           anchor.z + Math.sin(angle) * radius
         );
         console.log(`📍 Using base ${baseZone.id} for squad respawn at (${_spawnPos.x.toFixed(1)}, ${_spawnPos.z.toFixed(1)})`);
-        return new THREE.Vector3(_spawnPos.x, _spawnPos.y, _spawnPos.z);
+        return _spawnPos;
       } else {
         console.log(`⚠️ No owned bases found for ${faction}, using fallback spawn`);
       }
@@ -494,7 +496,7 @@ export class CombatantSpawnManager {
     );
 
     console.log(`📍 Using fallback base spawn for ${faction} at (${_spawnPos.x.toFixed(1)}, ${_spawnPos.z.toFixed(1)})`);
-    return new THREE.Vector3(_spawnPos.x, _spawnPos.y, _spawnPos.z);
+    return _spawnPos;
   }
 
   private getSpawnPosition(faction: Faction): THREE.Vector3 {
@@ -528,7 +530,7 @@ export class CombatantSpawnManager {
           anchor.z + Math.sin(angle) * radius
         );
         console.log(`📍 Using zone ${anchorZone.id} as spawn anchor`);
-        return new THREE.Vector3(_spawnPos.x, _spawnPos.y, _spawnPos.z);
+        return _spawnPos;
       } else {
         console.log(`⚠️ No owned zones found for ${faction}, using fallback spawn`);
       }
@@ -550,7 +552,7 @@ export class CombatantSpawnManager {
     );
 
     console.log(`📍 Using fallback base spawn for ${faction} at (${_spawnPos.x.toFixed(1)}, ${_spawnPos.z.toFixed(1)})`);
-    return new THREE.Vector3(_spawnPos.x, _spawnPos.y, _spawnPos.z);
+    return _spawnPos;
   }
 
   private getFactionAnchors(faction: Faction): THREE.Vector3[] {
@@ -599,7 +601,7 @@ export class CombatantSpawnManager {
   private randomSpawnOffset(minRadius: number, maxRadius: number): THREE.Vector3 {
     const angle = Math.random() * Math.PI * 2;
     const radius = minRadius + Math.random() * (maxRadius - minRadius);
-    return new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+    return _offsetVec.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
   }
 
   private countLivingByFaction(): { us: number; opfor: number } {
