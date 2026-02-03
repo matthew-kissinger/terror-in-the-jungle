@@ -80,18 +80,17 @@ CombatantSystem has distance-based LOD:
 | File | Lines | Location |
 |------|-------|----------|
 | ImprovedChunk.ts | 672 | systems/terrain/ |
-| GPUBillboardSystem.ts | 669 | systems/world/billboard/ |
-| CombatantSpawnManager.ts | 614 | systems/combat/ |
+| CombatantSpawnManager.ts | 615 | systems/combat/ |
+| PerformanceTelemetry.ts | 612 | systems/debug/ |
 | AIFlankingSystem.ts | 606 | systems/combat/ai/ |
 | FullMapSystem.ts | 574 | ui/map/ |
 | AITargeting.ts | 571 | systems/combat/ai/ |
 | InfluenceMapSystem.ts | 570 | systems/combat/ |
+| PixelArtSandbox.ts | 551 | core/ |
 | CombatantSystem.ts | 541 | systems/combat/ |
-| PixelArtSandbox.ts | 536 | core/ |
+| OpenFrontierRespawnMap.ts | 531 | ui/map/ |
 | ImprovedChunkManager.ts | 524 | systems/terrain/ |
 | CombatantMovement.ts | 504 | systems/combat/ |
-| OpenFrontierRespawnMap.ts | 503 | ui/map/ |
-| PerformanceTelemetry.ts | 497 | systems/debug/ |
 | gameModes.ts | 496 | config/ |
 | ExplosionEffectsPool.ts | 487 | systems/effects/ |
 | SpatialOctree.ts | 487 | systems/combat/ |
@@ -103,6 +102,7 @@ CombatantSystem has distance-based LOD:
 | FirstPersonWeapon.ts | 445 | systems/player/ |
 | MinimapSystem.ts | 440 | ui/minimap/ |
 | AICoverSystem.ts | 437 | systems/combat/ai/ |
+| MatchEndScreen.ts | 434 | ui/end/ |
 | HelicopterModel.ts | 433 | systems/helicopter/ |
 | HelicopterGeometry.ts | 433 | systems/helicopter/ |
 | HUDUpdater.ts | 431 | ui/hud/ |
@@ -110,11 +110,10 @@ CombatantSystem has distance-based LOD:
 | WeaponFiring.ts | 425 | systems/player/weapon/ |
 | GPUTerrain.ts | 421 | systems/terrain/ |
 | MortarSystem.ts | 420 | systems/weapons/ |
-| MatchEndScreen.ts | 419 | ui/end/ |
 | ChunkWorkerCode.ts | 418 | systems/terrain/ |
 | DeathCamSystem.ts | 405 | systems/player/ |
 
-**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->524, extracted ChunkPriorityManager + ChunkLifecycleManager), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue). 34 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->524, extracted ChunkPriorityManager + ChunkLifecycleManager), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders). 33 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -144,7 +143,7 @@ Known hotspots:
 - **AIFlankingSystem per-call allocations** - FIXED. Module-level scratch vectors replace per-call Vector3 clones throughout.
 - **MortarSystem detonation allocations** - FIXED. Module-level scratch vectors and static UP_NORMAL constant replace per-detonation allocations.
 - **DamageNumberSystem worldToScreen() clone** - FIXED. Eliminated per-frame Vector3 clone and object allocation using module-level scratch vector.
-- **HelicopterInstrumentsPanel per-frame querySelector** - BROKEN. Attempted to cache element references but left compilation errors (27 TS errors). Element refs stored as local vars in createHelicopterInstruments() but accessed as instance properties in updateHelicopterInstruments(). Needs fix: store as private class properties.
+- **HelicopterInstrumentsPanel per-frame querySelector** - FIXED. Element refs stored as private class properties, initialized in createHelicopterInstruments(), referenced in updateHelicopterInstruments().
 - **CombatantLODManager.simulateDistantAI() allocations** - FIXED. Module-level scratch vectors for direction and random offset.
 - **DeathCamSystem per-frame Vector3 allocations** - FIXED. Pre-allocated scratch vectors for offset, direction, and up axis.
 - **WeaponFiring per-shot allocations** - FIXED. Module-level scratch vectors for ray direction, muzzle flash positions.
@@ -157,31 +156,23 @@ Possible areas (confirm with profiling):
 
 ### Event Listener Leaks (Memory)
 
-**`.bind()` bug** - Multiple files use `addEventListener('keydown', this.onKeyDown.bind(this))` then try `removeEventListener('keydown', this.onKeyDown.bind(this))`. Each `.bind()` call creates a NEW function instance, so removal silently fails. Affected files:
-- `src/systems/player/PlayerInput.ts` - 7 listeners
-- `src/systems/player/weapon/WeaponInput.ts` - 3 listeners
-- `src/systems/player/weapon/WeaponModel.ts` - 1 listener (resize)
-- `src/systems/player/InventoryManager.ts` - 1 listener
-- `src/systems/combat/PlayerSquadController.ts` - 1 listener
-- `src/systems/weapons/WeaponPickupSystem.ts` - 1 listener
-Fix: Store bound function as property (`this.boundOnKeyDown = this.onKeyDown.bind(this)`), use that for both add and remove.
+**MOSTLY FIXED.** The `.bind()` bug and missing dispose cleanup have been addressed across most files.
 
-**Missing dispose cleanup** - These files add listeners but never remove them:
-- `src/core/PixelArtSandbox.ts` - window resize + keydown (lines 58, 61)
-- `src/ui/map/FullMapSystem.ts` - keydown + keyup (lines 297, 307)
-- `src/ui/map/OpenFrontierRespawnMap.ts` - 6 canvas events, NO dispose() method
-- `src/ui/map/RespawnMapView.ts` - click + mousemove, NO dispose() method
-- `src/ui/end/MatchEndScreen.ts` - 2 button click listeners
-- `src/ui/loading/GameModeSelection.ts` - 2 click listeners
-- `src/ui/loading/LoadingPanels.ts` - 2 click listeners
+**Fixed** (stored bound refs, added dispose):
+- PlayerInput, WeaponInput, WeaponModel, InventoryManager, PlayerSquadController, WeaponPickupSystem - bound function properties
+- MatchEndScreen, GameModeSelection, LoadingPanels - added dispose()
+- OpenFrontierRespawnMap, RespawnMapView - added dispose()
+
+**Remaining issues:**
+- `src/ui/loadout/LoadoutSelector.ts:204` - uses `.bind(this)` in addEventListener (will fail on removal)
 - `src/ui/hud/SquadRadialMenu.ts` - window mousemove never removed
 
 ### Missing Pieces
 
-- **GPU timing** - Currently only CPU-side timing
+- **GPU timing** - ADDED. renderer.info stats (draw calls, triangles, geometries, textures) and EXT_disjoint_timer_query instrumentation in PerformanceTelemetry. Visible in F2 overlay.
 - **Memory profiling** - No heap snapshot automation
 - **Playwright test harness** - Infrastructure set up but perf regression tests not yet working
-- **Bundle code-splitting** - Vite manual chunks configured (three.js, postprocessing, UI, BVH). Main chunk ~455 kB (116 kB gzipped). Circular chunk warnings from three.js internals remain.
+- **Bundle code-splitting** - Vite manual chunks configured (three.js, postprocessing, UI, BVH). Main chunk ~457 kB (117 kB gzipped). Circular chunk warnings from three.js internals remain.
 
 ## COMPLETED: AI Sandbox Mode
 
