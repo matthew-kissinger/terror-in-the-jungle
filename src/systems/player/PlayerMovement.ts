@@ -6,6 +6,13 @@ import { SandbagSystem } from '../weapons/SandbagSystem';
 import { FootstepAudioSystem } from '../audio/FootstepAudioSystem';
 import { PlayerInput } from './PlayerInput';
 
+const _moveVector = new THREE.Vector3();
+const _cameraDirection = new THREE.Vector3();
+const _cameraRight = new THREE.Vector3();
+const _worldMoveVector = new THREE.Vector3();
+const _horizontalVelocity = new THREE.Vector3();
+const _upVector = new THREE.Vector3(0, 1, 0);
+
 export class PlayerMovement {
   private playerState: PlayerState;
   private chunkManager?: ImprovedChunkManager;
@@ -76,7 +83,7 @@ export class PlayerMovement {
       return;
     }
 
-    const moveVector = new THREE.Vector3();
+    const moveVector = _moveVector.set(0, 0, 0);
     const baseSpeed = this.playerState.isRunning ? this.playerState.runSpeed : this.playerState.speed;
     const speedMultiplier = 1.0; // Could be extended for different states
     const currentSpeed = baseSpeed * speedMultiplier;
@@ -100,22 +107,22 @@ export class PlayerMovement {
       moveVector.normalize();
 
       // Apply camera rotation to movement
-      const cameraDirection = new THREE.Vector3();
+      const cameraDirection = _cameraDirection;
       camera.getWorldDirection(cameraDirection);
       cameraDirection.y = 0; // Keep movement horizontal
       cameraDirection.normalize();
 
-      const cameraRight = new THREE.Vector3();
-      cameraRight.crossVectors(cameraDirection, new THREE.Vector3(0, 1, 0));
+      const cameraRight = _cameraRight;
+      cameraRight.crossVectors(cameraDirection, _upVector);
 
-      const worldMoveVector = new THREE.Vector3();
+      const worldMoveVector = _worldMoveVector.set(0, 0, 0);
       worldMoveVector.addScaledVector(cameraDirection, -moveVector.z);
       worldMoveVector.addScaledVector(cameraRight, moveVector.x);
 
       // Apply movement with acceleration (only horizontal components)
       const acceleration = currentSpeed * 5; // Acceleration factor
       const targetVelocity = worldMoveVector.multiplyScalar(currentSpeed);
-      const horizontalVelocity = new THREE.Vector3(this.playerState.velocity.x, 0, this.playerState.velocity.z);
+      const horizontalVelocity = _horizontalVelocity.set(this.playerState.velocity.x, 0, this.playerState.velocity.z);
 
       horizontalVelocity.lerp(targetVelocity, Math.min(deltaTime * acceleration, 1));
 
@@ -133,15 +140,15 @@ export class PlayerMovement {
     this.playerState.velocity.y += this.playerState.gravity * deltaTime;
 
     // Update position
-    const movement = this.playerState.velocity.clone().multiplyScalar(deltaTime);
-    const newPosition = this.playerState.position.clone().add(movement);
+    const movement = _cameraRight.copy(this.playerState.velocity).multiplyScalar(deltaTime);
+    const newPosition = _cameraDirection.copy(this.playerState.position).add(movement);
 
     // Check sandbag collision before applying movement
     if (this.sandbagSystem && this.sandbagSystem.checkCollision(newPosition, 0.5)) {
       // Try to slide along the obstacle
-      const slideX = this.playerState.position.clone();
+      const slideX = _worldMoveVector.copy(this.playerState.position);
       slideX.x = newPosition.x;
-      const slideZ = this.playerState.position.clone();
+      const slideZ = _horizontalVelocity.copy(this.playerState.position);
       slideZ.z = newPosition.z;
 
       // Try moving only in X direction

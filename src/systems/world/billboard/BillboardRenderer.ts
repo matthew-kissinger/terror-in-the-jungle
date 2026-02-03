@@ -2,12 +2,16 @@ import * as THREE from 'three';
 import { VegetationMeshes } from './BillboardVegetationTypes';
 import { ChunkInstances, VegetationType, BillboardInstanceManager } from './BillboardInstanceManager';
 
+const _cameraPosition = new THREE.Vector3();
+const _chunkCenter = new THREE.Vector3();
+const _direction = new THREE.Vector3();
+
 export class BillboardRenderer {
   private camera: THREE.Camera;
   private meshes: VegetationMeshes;
   private instanceManager: BillboardInstanceManager;
 
-  private lastCameraPosition = new THREE.Vector3();
+  private lastCameraPosition: THREE.Vector3;
   private readonly updateThreshold = 0.1;
   private dummy = new THREE.Object3D();
 
@@ -19,10 +23,11 @@ export class BillboardRenderer {
     this.camera = camera;
     this.meshes = meshes;
     this.instanceManager = instanceManager;
+    this.lastCameraPosition = _cameraPosition.clone();
   }
 
   update(deltaTime: number): void {
-    const cameraPosition = new THREE.Vector3();
+    const cameraPosition = _cameraPosition;
     this.camera.getWorldPosition(cameraPosition);
 
     // Only update if camera moved significantly
@@ -38,7 +43,7 @@ export class BillboardRenderer {
     chunkInstances.forEach((chunkData, chunkKey) => {
       // Parse chunk position for distance check
       const [chunkX, chunkZ] = chunkKey.split(',').map(Number);
-      const chunkCenter = new THREE.Vector3(
+      const chunkCenter = _chunkCenter.set(
         chunkX * 64 + 32, // Assuming chunk size 64
         0,
         chunkZ * 64 + 32
@@ -87,8 +92,7 @@ export class BillboardRenderer {
       }
 
       // Calculate rotation to face camera (Y-axis only for vertical billboards)
-      const direction = new THREE.Vector3()
-        .subVectors(cameraPosition, instance.position);
+      const direction = _direction.subVectors(cameraPosition, instance.position);
       direction.y = 0; // Keep billboards vertical
       direction.normalize();
 
