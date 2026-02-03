@@ -26,6 +26,7 @@ export class WeatherSystem implements GameSystem {
   private rainCount: number = 8000;
   private rainDummy: THREE.Object3D = new THREE.Object3D();
   private rainVelocities: Float32Array;
+  private rainPositions: Float32Array;
 
   // Lightning
   private lightningTimer: number = 0;
@@ -52,6 +53,7 @@ export class WeatherSystem implements GameSystem {
     this.camera = camera;
     this.chunkManager = chunkManager;
     this.rainVelocities = new Float32Array(this.rainCount);
+    this.rainPositions = new Float32Array(this.rainCount * 3);
   }
 
   setAudioManager(audioManager: IAudioManager): void {
@@ -123,6 +125,11 @@ export class WeatherSystem implements GameSystem {
     const z = (Math.random() - 0.5) * range * 2;
     // Keep Y relative to camera later
     const y = randomY ? (Math.random() * 30) : 30;
+
+    const idx = index * 3;
+    this.rainPositions[idx] = x;
+    this.rainPositions[idx + 1] = y;
+    this.rainPositions[idx + 2] = z;
 
     this.rainDummy.position.set(x, y, z);
     this.rainDummy.updateMatrix();
@@ -220,47 +227,42 @@ export class WeatherSystem implements GameSystem {
     (this.rainMesh.material as THREE.MeshBasicMaterial).opacity = 0.6 * intensity;
 
     const cameraPos = this.camera.position;
+    const windX = (this.currentState === WeatherState.STORM ? 5 : 2) * deltaTime;
     
-    // Optimization: Only update a subset if performant, but instanced mesh is fast
-    // We update all for smooth wrapping
+    // Optimization: Use direct position tracking to avoid expensive matrix decomposition
     for (let i = 0; i < this.rainCount; i++) {
-      this.rainMesh.getMatrixAt(i, this.rainDummy.matrix);
-      this.rainDummy.matrix.decompose(this.rainDummy.position, this.rainDummy.quaternion, this.rainDummy.scale);
+      const idx = i * 3;
+      let x = this.rainPositions[idx];
+      let y = this.rainPositions[idx + 1];
+      let z = this.rainPositions[idx + 2];
 
       // Move down
-      this.rainDummy.position.y -= this.rainVelocities[i] * deltaTime;
+      y -= this.rainVelocities[i] * deltaTime;
+      
+      // Wind effect
+      x += windX;
 
-      // Wrap around camera
-      const dx = this.rainDummy.position.x - cameraPos.x;
-      const dz = this.rainDummy.position.z - cameraPos.z;
+      // Wrap around camera logic
+      const dx = x - cameraPos.x;
+      const dz = z - cameraPos.z;
       
       // Simple toroidal wrapping logic relative to camera
-      if (this.rainDummy.position.y < cameraPos.y - 10) {
-        this.rainDummy.position.y = cameraPos.y + 20;
+      if (y < cameraPos.y - 10) {
+        y = cameraPos.y + 20;
         // Randomize X/Z again slightly to break patterns
-        this.rainDummy.position.x = cameraPos.x + (Math.random() - 0.5) * 40;
-        this.rainDummy.position.z = cameraPos.z + (Math.random() - 0.5) * 40;
+        x = cameraPos.x + (Math.random() - 0.5) * 40;
+        z = cameraPos.z + (Math.random() - 0.5) * 40;
       } else {
         // Keep x/z relative to camera if it moved too far
-        if (Math.abs(dx) > 20) this.rainDummy.position.x = cameraPos.x - Math.sign(dx) * 19;
-        if (Math.abs(dz) > 20) this.rainDummy.position.z = cameraPos.z - Math.sign(dz) * 19;
+        if (Math.abs(dx) > 20) x = cameraPos.x - Math.sign(dx) * 19.9;
+        if (Math.abs(dz) > 20) z = cameraPos.z - Math.sign(dz) * 19.9;
       }
 
-      // Check collision with terrain
-      // const terrainHeight = this.chunkManager.getTerrainHeightAt(this.rainDummy.position.x, this.rainDummy.position.z);
-      // if (this.rainDummy.position.y < terrainHeight) {
-         // Could spawn splash effect here
-      //   this.rainDummy.position.y = cameraPos.y + 20;
-      // }
+      this.rainPositions[idx] = x;
+      this.rainPositions[idx + 1] = y;
+      this.rainPositions[idx + 2] = z;
 
-      // Wind effect
-      const windX = (this.currentState === WeatherState.STORM ? 5 : 2) * deltaTime;
-      this.rainDummy.position.x += windX;
-
-      // Face camera (billboard-ish)
-      // Actually for lines, just vertical is fine, maybe slight tilt
-      // this.rainDummy.rotation.z = -0.1; 
-
+      this.rainDummy.position.set(x, y, z);
       this.rainDummy.updateMatrix();
       this.rainMesh.setMatrixAt(i, this.rainDummy.matrix);
     }
