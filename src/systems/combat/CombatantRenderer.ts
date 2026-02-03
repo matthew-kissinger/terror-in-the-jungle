@@ -4,6 +4,10 @@ import { AssetLoader } from '../assets/AssetLoader';
 import { CombatantMeshFactory, disposeCombatantMeshes, updateCombatantTexture } from './CombatantMeshFactory';
 import { CombatantShaderSettingsManager, setDamageFlash, updateShaderUniforms, type NPCShaderSettings, type ShaderPreset, type ShaderUniformSettings } from './CombatantShaders';
 
+const _enemyForward = new THREE.Vector3();
+const _toPlayer = new THREE.Vector3();
+const _tiltAxis = new THREE.Vector3();
+
 export type { NPCShaderSettings, ShaderPreset } from './CombatantShaders';
 
 export class CombatantRenderer {
@@ -72,9 +76,9 @@ export class CombatantRenderer {
 
       let isShowingBack = false;
       if (combatant.faction === Faction.OPFOR) {
-        const enemyForward = new THREE.Vector3(Math.cos(combatant.visualRotation), 0, Math.sin(combatant.visualRotation));
-        const toPlayer = new THREE.Vector3().subVectors(playerPosition, combatant.position).normalize();
-        const behindDot = enemyForward.dot(toPlayer);
+        _enemyForward.set(Math.cos(combatant.visualRotation), 0, Math.sin(combatant.visualRotation));
+        _toPlayer.subVectors(playerPosition, combatant.position).normalize();
+        const behindDot = _enemyForward.dot(_toPlayer);
         isShowingBack = behindDot < -0.2 && (!combatant.target || combatant.target.id !== 'PLAYER');
       }
       let stateKey = 'walking';
@@ -236,8 +240,12 @@ export class CombatantRenderer {
               const dropHeight = 3.5;
               finalPosition.y += dropHeight * (1 - easeOut) - dropHeight;
               const rotationAngle = easeOut * Math.PI * 0.45;
-              const tiltAxis = combatant.deathDirection ? new THREE.Vector3(-combatant.deathDirection.z, 0, combatant.deathDirection.x) : new THREE.Vector3(1, 0, 0);
-              const tiltMatrix = new THREE.Matrix4().makeRotationAxis(tiltAxis.normalize(), rotationAngle);
+              if (combatant.deathDirection) {
+                _tiltAxis.set(-combatant.deathDirection.z, 0, combatant.deathDirection.x);
+              } else {
+                _tiltAxis.set(1, 0, 0);
+              }
+              const tiltMatrix = new THREE.Matrix4().makeRotationAxis(_tiltAxis.normalize(), rotationAngle);
               matrix.multiply(tiltMatrix);
               finalScaleY *= 1 - (easeOut * 0.2);
             } else if (progress < FALL_PHASE + GROUND_PHASE) {
@@ -247,8 +255,12 @@ export class CombatantRenderer {
                 finalPosition.z += combatant.deathDirection.z * 1.5;
               }
               finalPosition.y -= 3.5;
-              const tiltAxis = combatant.deathDirection ? new THREE.Vector3(-combatant.deathDirection.z, 0, combatant.deathDirection.x) : new THREE.Vector3(1, 0, 0);
-              const tiltMatrix = new THREE.Matrix4().makeRotationAxis(tiltAxis.normalize(), Math.PI * 0.45);
+              if (combatant.deathDirection) {
+                _tiltAxis.set(-combatant.deathDirection.z, 0, combatant.deathDirection.x);
+              } else {
+                _tiltAxis.set(1, 0, 0);
+              }
+              const tiltMatrix = new THREE.Matrix4().makeRotationAxis(_tiltAxis.normalize(), Math.PI * 0.45);
               matrix.multiply(tiltMatrix);
               const settle = Math.max(0, (1 - groundProgress * 4) * 0.1);
               finalPosition.y += settle;
@@ -260,8 +272,12 @@ export class CombatantRenderer {
                 finalPosition.z += combatant.deathDirection.z * 1.5;
               }
               finalPosition.y -= 3.5;
-              const tiltAxis = combatant.deathDirection ? new THREE.Vector3(-combatant.deathDirection.z, 0, combatant.deathDirection.x) : new THREE.Vector3(1, 0, 0);
-              const tiltMatrix = new THREE.Matrix4().makeRotationAxis(tiltAxis.normalize(), Math.PI * 0.45);
+              if (combatant.deathDirection) {
+                _tiltAxis.set(-combatant.deathDirection.z, 0, combatant.deathDirection.x);
+              } else {
+                _tiltAxis.set(1, 0, 0);
+              }
+              const tiltMatrix = new THREE.Matrix4().makeRotationAxis(_tiltAxis.normalize(), Math.PI * 0.45);
               matrix.multiply(tiltMatrix);
               finalScaleY *= 0.8;
               const fadeScale = 1 - fadeProgress;

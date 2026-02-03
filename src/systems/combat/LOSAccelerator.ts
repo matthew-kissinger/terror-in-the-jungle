@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { ImprovedChunk } from '../terrain/ImprovedChunk';
 import { Logger } from '../../utils/Logger';
 
+const _losDirection = new THREE.Vector3();
+
 /**
  * Accelerates line-of-sight checks using BVH-accelerated raycasting
  *
@@ -52,9 +54,9 @@ export class LOSAccelerator {
     const startTime = performance.now();
 
     // Calculate direction and distance
-    const direction = new THREE.Vector3().subVectors(target, origin);
-    const distance = direction.length();
-    direction.normalize();
+    _losDirection.subVectors(target, origin);
+    const distance = _losDirection.length();
+    _losDirection.normalize();
 
     // Early out if target is beyond max distance
     if (distance > maxDistance) {
@@ -72,7 +74,7 @@ export class LOSAccelerator {
 
     // Perform raycast using BVH acceleration
     const raycaster = new THREE.Raycaster();
-    raycaster.set(origin, direction);
+    raycaster.set(origin, _losDirection);
     raycaster.far = distance;
 
     // Raycast against relevant meshes (BVH acceleration happens automatically)
