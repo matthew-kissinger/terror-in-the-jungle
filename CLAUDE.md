@@ -81,29 +81,27 @@ CombatantSystem has distance-based LOD:
 |------|-------|----------|
 | CombatantCombat.ts | 806 | systems/combat/ |
 | ImprovedChunkManager.ts | 753 | systems/terrain/ |
-| PlayerRespawnManager.ts | 749 | systems/player/ |
-| GrenadeSystem.ts | 731 | systems/weapons/ |
 | ChunkWorkerPool.ts | 715 | systems/terrain/ |
 | ImprovedChunk.ts | 672 | systems/terrain/ |
+| GPUBillboardSystem.ts | 669 | systems/world/billboard/ |
 | SandboxSystemManager.ts | 644 | core/ |
 | AIFlankingSystem.ts | 595 | systems/combat/ai/ |
-| GPUBillboardSystem.ts | 587 | systems/world/billboard/ |
 | FootstepAudioSystem.ts | 587 | systems/audio/ |
 | FirstPersonWeapon.ts | 576 | systems/player/ |
 | FullMapSystem.ts | 573 | ui/map/ |
+| AITargeting.ts | 571 | systems/combat/ai/ |
+| InfluenceMapSystem.ts | 569 | systems/combat/ |
 | CombatantSpawnManager.ts | 557 | systems/combat/ |
-| AITargeting.ts | 542 | systems/combat/ai/ |
-| CombatantSystem.ts | 538 | systems/combat/ |
+| CombatantSystem.ts | 541 | systems/combat/ |
 | PixelArtSandbox.ts | 536 | core/ |
+| CombatantMovement.ts | 504 | systems/combat/ |
 | OpenFrontierRespawnMap.ts | 503 | ui/map/ |
 | PerformanceTelemetry.ts | 497 | systems/debug/ |
-| AudioManager.ts | 453 | systems/audio/ |
-| InfluenceMapSystem.ts | 497 | systems/combat/ |
-| CombatantMovement.ts | 496 | systems/combat/ |
 | gameModes.ts | 496 | config/ |
 | SpatialOctree.ts | 487 | systems/combat/ |
 | ExplosionEffectsPool.ts | 486 | systems/effects/ |
 | HUDStyles.ts | 483 | ui/hud/ |
+| AudioManager.ts | 453 | systems/audio/ |
 | WeatherSystem.ts | 447 | systems/environment/ |
 | MinimapSystem.ts | 441 | ui/minimap/ |
 | AICoverSystem.ts | 437 | systems/combat/ai/ |
@@ -116,7 +114,7 @@ CombatantSystem has distance-based LOD:
 | CompassSystem.ts | 414 | ui/compass/ |
 | MortarSystem.ts | 409 | systems/weapons/ |
 
-**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453). 35 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331). 34 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -131,15 +129,16 @@ Use the profiling to identify actual bottlenecks, then:
 Known hotspots:
 - **CombatantMovement zone evaluation** - FIXED. Throttled to 3-5s intervals with single-loop top-3 selection instead of per-frame sort.
 - **CombatantCombat suppression scan** - FIXED. Replaced O(n) allCombatants.forEach with spatialGridManager.queryRadius() for suppression and ally search. Uses distanceToSquared. Module-level scratch vectors replace pool allocation.
-- **ClusterManager O(n) per NPC** - Three methods (calculateSpacingForce, isInCluster, getClusterDensity) iterate ALL combatants per call. Called per-NPC per-frame from CombatantMovement and AITargeting. Should use spatialGridManager.queryRadius() instead.
-- **AITargeting cluster check** - Line 79 calls clusterManager.isInCluster() which does O(n) even when spatialGrid was already used for target finding above it.
+- **ClusterManager O(n) per NPC** - FIXED. All three methods (calculateSpacingForce, isInCluster, getClusterDensity) now use spatialGridManager.queryRadius() with early exit. O(n) -> O(log n).
+- **AITargeting cluster check** - FIXED. Combined spatial query handles both target finding and cluster detection in single pass. Module-level scratch vectors throughout.
+- **GPUBillboardSystem** - FIXED. O(1) compaction, spatial chunk bounds for area clearing, batched buffer updates.
+- **CompassSystem DOM rebuild** - `updateZoneMarkers()` calls `innerHTML = ''` and rebuilds all DOM zone markers every frame. Should cache marker elements and update positions only.
+- **MinimapSystem per-frame Vector3 allocations** - `drawCombatantIndicators()` creates `new THREE.Vector3()` per combatant per frame (~60 allocations/frame with 30v30). Should use scratch vectors.
+- **ExplosionEffectsPool gravity allocation** - `update()` creates `new THREE.Vector3(0, -3, 0)` every frame. Should be a static constant.
+- **FullMapSystem allocations** - Creates `new THREE.Vector3()` in update loop, font string concatenation per zone.
 
 Possible areas (confirm with profiling):
-- AI update frequency tuning
-- Spatial query optimization
-- Billboard batching improvements
 - Worker utilization (are they saturated?)
-- Memory allocation patterns (GC pauses?)
 - Draw call reduction
 - Shader complexity
 
