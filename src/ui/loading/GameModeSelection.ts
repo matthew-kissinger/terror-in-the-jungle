@@ -2,11 +2,24 @@ import { GameMode } from '../../config/gameModes';
 
 export class GameModeSelection {
   private container: HTMLDivElement;
+  private cardHandlers: Map<HTMLElement, () => void> = new Map();
+  private backButtonHandler?: () => void;
   private onModeSelected?: (mode: GameMode) => void;
 
   constructor() {
     this.container = this.createSelectionPanel();
   }
+
+  private handleCardClick = (mode: GameMode) => {
+    if (this.onModeSelected) {
+      this.onModeSelected(mode);
+      this.hide();
+    }
+  };
+
+  private handleBackClick = () => {
+    this.hide();
+  };
 
   private createSelectionPanel(): HTMLDivElement {
     const container = document.createElement('div');
@@ -317,20 +330,18 @@ export class GameModeSelection {
     // Add event listeners
     const cards = container.querySelectorAll('.game-mode-card');
     cards.forEach(card => {
-      card.addEventListener('click', () => {
-        const mode = card.getAttribute('data-mode') as GameMode;
-        if (mode && this.onModeSelected) {
-          this.onModeSelected(mode);
-          this.hide();
-        }
-      });
+      const mode = card.getAttribute('data-mode') as GameMode;
+      if (mode) {
+        const handler = () => this.handleCardClick(mode);
+        card.addEventListener('click', handler);
+        this.cardHandlers.set(card as HTMLElement, handler);
+      }
     });
 
     const backButton = container.querySelector('.mode-back-button');
     if (backButton) {
-      backButton.addEventListener('click', () => {
-        this.hide();
-      });
+      this.backButtonHandler = this.handleBackClick;
+      backButton.addEventListener('click', this.backButtonHandler);
     }
 
     return container;
@@ -354,8 +365,22 @@ export class GameModeSelection {
   }
 
   public dispose(): void {
+    // Remove card listeners
+    this.cardHandlers.forEach((handler, card) => {
+      card.removeEventListener('click', handler);
+    });
+    this.cardHandlers.clear();
+
+    // Remove back button listener
+    const backButton = this.container.querySelector('.mode-back-button');
+    if (backButton && this.backButtonHandler) {
+      backButton.removeEventListener('click', this.backButtonHandler);
+    }
+
     if (this.container.parentElement) {
       this.container.parentElement.removeChild(this.container);
     }
+
+    this.onModeSelected = undefined;
   }
 }

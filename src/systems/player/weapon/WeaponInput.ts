@@ -20,6 +20,9 @@ export class WeaponInput {
   private onFireStart?: () => void
   private onFireStop?: () => void
   private onReloadStart?: () => void
+  private boundOnMouseDown!: (event: MouseEvent) => void
+  private boundOnMouseUp!: (event: MouseEvent) => void
+  private boundOnKeyDown!: (event: KeyboardEvent) => void
 
   constructor(
     animations: WeaponAnimations,
@@ -31,10 +34,14 @@ export class WeaponInput {
     this.rigManager = rigManager
 
     // Input handlers
-    window.addEventListener('mousedown', this.onMouseDown.bind(this))
-    window.addEventListener('mouseup', this.onMouseUp.bind(this))
+    this.boundOnMouseDown = this.onMouseDown.bind(this)
+    this.boundOnMouseUp = this.onMouseUp.bind(this)
+    this.boundOnKeyDown = this.onKeyDown.bind(this)
+
+    window.addEventListener('mousedown', this.boundOnMouseDown)
+    window.addEventListener('mouseup', this.boundOnMouseUp)
     window.addEventListener('contextmenu', (e) => e.preventDefault())
-    window.addEventListener('keydown', this.onKeyDown.bind(this))
+    window.addEventListener('keydown', this.boundOnKeyDown)
   }
 
   setInventoryManager(inventoryManager: InventoryManager): void {
@@ -124,8 +131,8 @@ export class WeaponInput {
   }
 
   dispose(): void {
-    window.removeEventListener('mousedown', this.onMouseDown.bind(this))
-    window.removeEventListener('mouseup', this.onMouseUp.bind(this))
-    window.removeEventListener('keydown', this.onKeyDown.bind(this))
+    window.removeEventListener('mousedown', this.boundOnMouseDown)
+    window.removeEventListener('mouseup', this.boundOnMouseUp)
+    window.removeEventListener('keydown', this.boundOnKeyDown)
   }
 }

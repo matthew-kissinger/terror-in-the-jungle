@@ -45,6 +45,7 @@ export class WeaponPickupSystem implements GameSystem {
 
   // Weapon change callback
   private onWeaponPickedUp?: (type: WeaponType, oldType: WeaponType) => void;
+  private boundOnKeyDown!: (event: KeyboardEvent) => void;
 
   // Materials for each weapon type
   private materials: Map<WeaponType, THREE.MeshBasicMaterial> = new Map();
@@ -65,7 +66,8 @@ export class WeaponPickupSystem implements GameSystem {
     this.createPromptUI();
 
     // Listen for E key
-    window.addEventListener('keydown', this.onKeyDown.bind(this));
+    this.boundOnKeyDown = this.onKeyDown.bind(this);
+    window.addEventListener('keydown', this.boundOnKeyDown);
 
     console.log('✅ Weapon Pickup System initialized');
   }
@@ -302,7 +304,7 @@ export class WeaponPickupSystem implements GameSystem {
       this.promptElement.parentNode.removeChild(this.promptElement);
     }
 
-    window.removeEventListener('keydown', this.onKeyDown.bind(this));
+    window.removeEventListener('keydown', this.boundOnKeyDown);
 
     console.log('🧹 Weapon Pickup System disposed');
   }

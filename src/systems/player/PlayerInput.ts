@@ -24,6 +24,12 @@ export class PlayerInput {
   private pointerLockEnabled = true;
   private gameStarted = false;
   private boundRequestPointerLock?: () => void;
+  private boundOnKeyDown!: (event: KeyboardEvent) => void;
+  private boundOnKeyUp!: (event: KeyboardEvent) => void;
+  private boundOnPointerLockChange!: () => void;
+  private boundOnMouseMove!: (event: MouseEvent) => void;
+  private boundOnMouseDown!: (event: MouseEvent) => void;
+  private boundOnMouseUp!: (event: MouseEvent) => void;
   private callbacks: InputCallbacks = {};
   private isControlsEnabled = true;
   private isInHelicopter = false;
@@ -96,15 +102,22 @@ export class PlayerInput {
   }
 
   private setupEventListeners(): void {
+    this.boundOnKeyDown = this.onKeyDown.bind(this);
+    this.boundOnKeyUp = this.onKeyUp.bind(this);
+    this.boundOnPointerLockChange = this.onPointerLockChange.bind(this);
+    this.boundOnMouseMove = this.onMouseMove.bind(this);
+    this.boundOnMouseDown = this.onMouseDown.bind(this);
+    this.boundOnMouseUp = this.onMouseUp.bind(this);
+
     // Keyboard events
-    document.addEventListener('keydown', this.onKeyDown.bind(this));
-    document.addEventListener('keyup', this.onKeyUp.bind(this));
+    document.addEventListener('keydown', this.boundOnKeyDown);
+    document.addEventListener('keyup', this.boundOnKeyUp);
 
     // Mouse events
-    document.addEventListener('pointerlockchange', this.onPointerLockChange.bind(this));
-    document.addEventListener('mousemove', this.onMouseMove.bind(this));
-    document.addEventListener('mousedown', this.onMouseDown.bind(this));
-    document.addEventListener('mouseup', this.onMouseUp.bind(this));
+    document.addEventListener('pointerlockchange', this.boundOnPointerLockChange);
+    document.addEventListener('mousemove', this.boundOnMouseMove);
+    document.addEventListener('mousedown', this.boundOnMouseDown);
+    document.addEventListener('mouseup', this.boundOnMouseUp);
 
     // Store bound function to avoid duplicate listeners
     this.boundRequestPointerLock = this.requestPointerLock.bind(this);
@@ -114,13 +127,15 @@ export class PlayerInput {
   }
 
   dispose(): void {
-    document.removeEventListener('keydown', this.onKeyDown.bind(this));
-    document.removeEventListener('keyup', this.onKeyUp.bind(this));
-    document.removeEventListener('mousedown', this.onMouseDown.bind(this));
-    document.removeEventListener('mouseup', this.onMouseUp.bind(this));
-    document.removeEventListener('click', this.requestPointerLock.bind(this));
-    document.removeEventListener('pointerlockchange', this.onPointerLockChange.bind(this));
-    document.removeEventListener('mousemove', this.onMouseMove.bind(this));
+    document.removeEventListener('keydown', this.boundOnKeyDown);
+    document.removeEventListener('keyup', this.boundOnKeyUp);
+    document.removeEventListener('mousedown', this.boundOnMouseDown);
+    document.removeEventListener('mouseup', this.boundOnMouseUp);
+    if (this.boundRequestPointerLock) {
+      document.removeEventListener('click', this.boundRequestPointerLock);
+    }
+    document.removeEventListener('pointerlockchange', this.boundOnPointerLockChange);
+    document.removeEventListener('mousemove', this.boundOnMouseMove);
   }
 
   private onKeyDown(event: KeyboardEvent): void {

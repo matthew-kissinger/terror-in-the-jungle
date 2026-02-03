@@ -24,6 +24,23 @@ export class RespawnMapView {
   // Spawn zones
   private spawnableZones: CaptureZone[] = [];
 
+  // Event handler references for cleanup
+  private handleClick = (e: MouseEvent) => {
+    const rect = this.mapCanvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (this.MAP_SIZE / rect.width);
+    const y = (e.clientY - rect.top) * (this.MAP_SIZE / rect.height);
+    this.handleMapClick(x, y);
+  };
+
+  private handleMouseMove = (e: MouseEvent) => {
+    const rect = this.mapCanvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (this.MAP_SIZE / rect.width);
+    const y = (e.clientY - rect.top) * (this.MAP_SIZE / rect.height);
+
+    const zone = this.getZoneAtPosition(x, y);
+    this.mapCanvas.style.cursor = zone && this.isZoneSpawnable(zone) ? 'pointer' : 'default';
+  };
+
   constructor() {
     this.mapCanvas = document.createElement('canvas');
     this.mapCanvas.width = this.MAP_SIZE;
@@ -34,22 +51,10 @@ export class RespawnMapView {
   }
 
   private setupEventListeners(): void {
-    this.mapCanvas.addEventListener('click', (e) => {
-      const rect = this.mapCanvas.getBoundingClientRect();
-      const x = (e.clientX - rect.left) * (this.MAP_SIZE / rect.width);
-      const y = (e.clientY - rect.top) * (this.MAP_SIZE / rect.height);
-      this.handleMapClick(x, y);
-    });
+    this.mapCanvas.addEventListener('click', this.handleClick);
 
     // Hover effect
-    this.mapCanvas.addEventListener('mousemove', (e) => {
-      const rect = this.mapCanvas.getBoundingClientRect();
-      const x = (e.clientX - rect.left) * (this.MAP_SIZE / rect.width);
-      const y = (e.clientY - rect.top) * (this.MAP_SIZE / rect.height);
-
-      const zone = this.getZoneAtPosition(x, y);
-      this.mapCanvas.style.cursor = zone && this.isZoneSpawnable(zone) ? 'pointer' : 'default';
-    });
+    this.mapCanvas.addEventListener('mousemove', this.handleMouseMove);
   }
 
   private handleMapClick(canvasX: number, canvasY: number): void {
@@ -351,5 +356,18 @@ export class RespawnMapView {
 
   getSelectedZoneId(): string | undefined {
     return this.selectedZoneId;
+  }
+
+  dispose(): void {
+    this.mapCanvas.removeEventListener('click', this.handleClick);
+    this.mapCanvas.removeEventListener('mousemove', this.handleMouseMove);
+
+    if (this.mapCanvas.parentElement) {
+      this.mapCanvas.parentElement.removeChild(this.mapCanvas);
+    }
+
+    this.onZoneSelected = undefined;
+    this.zoneManager = undefined;
+    this.gameModeManager = undefined;
   }
 }

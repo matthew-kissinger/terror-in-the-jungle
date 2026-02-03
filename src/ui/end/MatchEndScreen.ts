@@ -19,6 +19,8 @@ export interface MatchStats {
 
 export class MatchEndScreen {
   private container?: HTMLDivElement;
+  private playAgainBtn?: HTMLButtonElement;
+  private returnBtn?: HTMLButtonElement;
   private onReturnToMenuCallback?: () => void;
   private onPlayAgainCallback?: () => void;
 
@@ -38,11 +40,41 @@ export class MatchEndScreen {
   }
 
   hide(): void {
+    if (this.playAgainBtn) {
+      this.playAgainBtn.removeEventListener('click', this.handlePlayAgain);
+      this.playAgainBtn = undefined;
+    }
+    if (this.returnBtn) {
+      this.returnBtn.removeEventListener('click', this.handleReturnToMenu);
+      this.returnBtn = undefined;
+    }
+
     if (this.container?.parentElement) {
       this.container.parentElement.removeChild(this.container);
       this.container = undefined;
     }
   }
+
+  private handlePlayAgain = () => {
+    if (this.onPlayAgainCallback) {
+      this.hide();
+      this.onPlayAgainCallback();
+    } else {
+      // Default action: reload the page
+      console.log('🔄 Restarting match (reloading page)');
+      window.location.reload();
+    }
+  };
+
+  private handleReturnToMenu = () => {
+    if (this.onReturnToMenuCallback) {
+      this.onReturnToMenuCallback();
+    } else {
+      // Default action: reload the page to return to menu
+      console.log('🔄 Returning to main menu (reloading page)');
+      window.location.reload();
+    }
+  };
 
   onReturnToMenu(callback: () => void): void {
     this.onReturnToMenuCallback = callback;
@@ -383,31 +415,14 @@ export class MatchEndScreen {
     container.classList.add(isVictory ? 'victory' : 'defeat');
 
     // Setup button handlers
-    const playAgainBtn = container.querySelector('.play-again-btn') as HTMLButtonElement;
-    if (playAgainBtn) {
-      playAgainBtn.addEventListener('click', () => {
-        if (this.onPlayAgainCallback) {
-          this.hide();
-          this.onPlayAgainCallback();
-        } else {
-          // Default action: reload the page
-          console.log('🔄 Restarting match (reloading page)');
-          window.location.reload();
-        }
-      });
+    this.playAgainBtn = container.querySelector('.play-again-btn') as HTMLButtonElement;
+    if (this.playAgainBtn) {
+      this.playAgainBtn.addEventListener('click', this.handlePlayAgain);
     }
 
-    const returnBtn = container.querySelector('.return-menu-btn') as HTMLButtonElement;
-    if (returnBtn) {
-      returnBtn.addEventListener('click', () => {
-        if (this.onReturnToMenuCallback) {
-          this.onReturnToMenuCallback();
-        } else {
-          // Default action: reload the page to return to menu
-          console.log('🔄 Returning to main menu (reloading page)');
-          window.location.reload();
-        }
-      });
+    this.returnBtn = container.querySelector('.return-menu-btn') as HTMLButtonElement;
+    if (this.returnBtn) {
+      this.returnBtn.addEventListener('click', this.handleReturnToMenu);
     }
 
     return container;

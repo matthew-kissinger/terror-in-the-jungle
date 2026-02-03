@@ -31,6 +31,7 @@ export class InventoryManager implements GameSystem {
   private onInventoryChangeCallback?: (state: InventoryState) => void;
 
   private uiElement?: HTMLElement;
+  private boundOnKeyDown!: (event: KeyboardEvent) => void;
 
   async init(): Promise<void> {
     console.log('🎒 Initializing Inventory Manager...');
@@ -50,11 +51,12 @@ export class InventoryManager implements GameSystem {
   }
 
   private setupEventListeners(): void {
-    window.addEventListener('keydown', this.onKeyDown.bind(this));
+    this.boundOnKeyDown = this.onKeyDown.bind(this);
+    window.addEventListener('keydown', this.boundOnKeyDown);
   }
 
   private removeEventListeners(): void {
-    window.removeEventListener('keydown', this.onKeyDown.bind(this));
+    window.removeEventListener('keydown', this.boundOnKeyDown);
   }
 
   private onKeyDown(event: KeyboardEvent): void {

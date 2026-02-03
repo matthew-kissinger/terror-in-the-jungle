@@ -11,6 +11,7 @@ export class PlayerSquadController implements GameSystem {
   private commandUIElement?: HTMLElement;
   private commandIndicatorElement?: HTMLElement;
   private isUIVisible = false;
+  private boundOnKeyDown!: (event: KeyboardEvent) => void;
 
   constructor(squadManager: SquadManager) {
     this.squadManager = squadManager;
@@ -53,11 +54,12 @@ export class PlayerSquadController implements GameSystem {
   }
 
   private setupEventListeners(): void {
-    window.addEventListener('keydown', this.onKeyDown.bind(this));
+    this.boundOnKeyDown = this.onKeyDown.bind(this);
+    window.addEventListener('keydown', this.boundOnKeyDown);
   }
 
   private removeEventListeners(): void {
-    window.removeEventListener('keydown', this.onKeyDown.bind(this));
+    window.removeEventListener('keydown', this.boundOnKeyDown);
   }
 
   private onKeyDown(event: KeyboardEvent): void {

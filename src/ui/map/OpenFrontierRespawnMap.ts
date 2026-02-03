@@ -28,6 +28,62 @@ export class OpenFrontierRespawnMap {
   private isPanning = false;
   private lastMousePos = { x: 0, y: 0 };
 
+  // Event handler references for cleanup
+  private handleClick = (e: MouseEvent) => {
+    if (this.isPanning) return; // Don't select while panning
+
+    const rect = this.mapCanvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (this.MAP_SIZE / rect.width);
+    const y = (e.clientY - rect.top) * (this.MAP_SIZE / rect.height);
+    this.handleMapClick(x, y);
+  };
+
+  private handleMouseMove = (e: MouseEvent) => {
+    const rect = this.mapCanvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (this.MAP_SIZE / rect.width);
+    const y = (e.clientY - rect.top) * (this.MAP_SIZE / rect.height);
+
+    if (this.isPanning) {
+      const dx = x - this.lastMousePos.x;
+      const dy = y - this.lastMousePos.y;
+      this.panOffset.x += dx;
+      this.panOffset.y += dy;
+      this.lastMousePos = { x, y };
+      this.render();
+    } else {
+      const zone = this.getZoneAtPosition(x, y);
+      this.mapCanvas.style.cursor = zone && this.isZoneSpawnable(zone) ? 'pointer' : 'default';
+    }
+  };
+
+  private handleWheel = (e: WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    this.zoomLevel = Math.max(0.5, Math.min(2, this.zoomLevel * delta));
+    this.render();
+  };
+
+  private handleMouseDown = (e: MouseEvent) => {
+    if (e.button === 1 || (e.button === 0 && e.shiftKey)) { // Middle mouse or shift+left
+      this.isPanning = true;
+      const rect = this.mapCanvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (this.MAP_SIZE / rect.width);
+      const y = (e.clientY - rect.top) * (this.MAP_SIZE / rect.height);
+      this.lastMousePos = { x, y };
+      this.mapCanvas.style.cursor = 'move';
+    }
+  };
+
+  private handleMouseUp = () => {
+    this.isPanning = false;
+    this.mapCanvas.style.cursor = 'default';
+  };
+
+  private handleMouseLeave = () => {
+    this.isPanning = false;
+    this.mapCanvas.style.cursor = 'default';
+  };
+
   constructor() {
     this.mapCanvas = document.createElement('canvas');
     this.mapCanvas.width = this.MAP_SIZE;
@@ -39,63 +95,18 @@ export class OpenFrontierRespawnMap {
 
   private setupEventListeners(): void {
     // Click to select zone
-    this.mapCanvas.addEventListener('click', (e) => {
-      if (this.isPanning) return; // Don't select while panning
-
-      const rect = this.mapCanvas.getBoundingClientRect();
-      const x = (e.clientX - rect.left) * (this.MAP_SIZE / rect.width);
-      const y = (e.clientY - rect.top) * (this.MAP_SIZE / rect.height);
-      this.handleMapClick(x, y);
-    });
+    this.mapCanvas.addEventListener('click', this.handleClick);
 
     // Hover effect
-    this.mapCanvas.addEventListener('mousemove', (e) => {
-      const rect = this.mapCanvas.getBoundingClientRect();
-      const x = (e.clientX - rect.left) * (this.MAP_SIZE / rect.width);
-      const y = (e.clientY - rect.top) * (this.MAP_SIZE / rect.height);
-
-      if (this.isPanning) {
-        const dx = x - this.lastMousePos.x;
-        const dy = y - this.lastMousePos.y;
-        this.panOffset.x += dx;
-        this.panOffset.y += dy;
-        this.lastMousePos = { x, y };
-        this.render();
-      } else {
-        const zone = this.getZoneAtPosition(x, y);
-        this.mapCanvas.style.cursor = zone && this.isZoneSpawnable(zone) ? 'pointer' : 'default';
-      }
-    });
+    this.mapCanvas.addEventListener('mousemove', this.handleMouseMove);
 
     // Mouse wheel zoom
-    this.mapCanvas.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      this.zoomLevel = Math.max(0.5, Math.min(2, this.zoomLevel * delta));
-      this.render();
-    });
+    this.mapCanvas.addEventListener('wheel', this.handleWheel);
 
     // Pan controls
-    this.mapCanvas.addEventListener('mousedown', (e) => {
-      if (e.button === 1 || (e.button === 0 && e.shiftKey)) { // Middle mouse or shift+left
-        this.isPanning = true;
-        const rect = this.mapCanvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * (this.MAP_SIZE / rect.width);
-        const y = (e.clientY - rect.top) * (this.MAP_SIZE / rect.height);
-        this.lastMousePos = { x, y };
-        this.mapCanvas.style.cursor = 'move';
-      }
-    });
-
-    this.mapCanvas.addEventListener('mouseup', () => {
-      this.isPanning = false;
-      this.mapCanvas.style.cursor = 'default';
-    });
-
-    this.mapCanvas.addEventListener('mouseleave', () => {
-      this.isPanning = false;
-      this.mapCanvas.style.cursor = 'default';
-    });
+    this.mapCanvas.addEventListener('mousedown', this.handleMouseDown);
+    this.mapCanvas.addEventListener('mouseup', this.handleMouseUp);
+    this.mapCanvas.addEventListener('mouseleave', this.handleMouseLeave);
   }
 
   private handleMapClick(canvasX: number, canvasY: number): void {
@@ -500,5 +511,22 @@ export class OpenFrontierRespawnMap {
     this.zoomLevel = 1;
     this.panOffset = { x: 0, y: 0 };
     this.render();
+  }
+
+  dispose(): void {
+    this.mapCanvas.removeEventListener('click', this.handleClick);
+    this.mapCanvas.removeEventListener('mousemove', this.handleMouseMove);
+    this.mapCanvas.removeEventListener('wheel', this.handleWheel);
+    this.mapCanvas.removeEventListener('mousedown', this.handleMouseDown);
+    this.mapCanvas.removeEventListener('mouseup', this.handleMouseUp);
+    this.mapCanvas.removeEventListener('mouseleave', this.handleMouseLeave);
+
+    if (this.mapCanvas.parentElement) {
+      this.mapCanvas.parentElement.removeChild(this.mapCanvas);
+    }
+
+    this.onZoneSelected = undefined;
+    this.zoneManager = undefined;
+    this.gameModeManager = undefined;
   }
 }

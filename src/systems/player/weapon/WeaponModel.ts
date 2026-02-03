@@ -11,6 +11,7 @@ export class WeaponModel {
   private weaponCamera: THREE.OrthographicCamera
   private animations: WeaponAnimations
   private reload: WeaponReload
+  private boundOnWindowResize!: () => void
 
   constructor(
     animations: WeaponAnimations,
@@ -28,7 +29,8 @@ export class WeaponModel {
     this.weaponCamera.position.z = 1
 
     // Handle window resize
-    window.addEventListener('resize', this.onWindowResize.bind(this))
+    this.boundOnWindowResize = this.onWindowResize.bind(this)
+    window.addEventListener('resize', this.boundOnWindowResize)
   }
 
   getWeaponScene(): THREE.Scene {
@@ -114,6 +116,6 @@ export class WeaponModel {
   }
 
   dispose(): void {
-    window.removeEventListener('resize', this.onWindowResize.bind(this))
+    window.removeEventListener('resize', this.boundOnWindowResize)
   }
 }
