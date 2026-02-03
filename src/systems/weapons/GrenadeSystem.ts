@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
+import { objectPool } from '../../utils/ObjectPoolManager';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { CombatantSystem } from '../combat/CombatantSystem';
@@ -53,7 +54,9 @@ export class GrenadeSystem implements GameSystem {
   private readonly AIR_RESISTANCE = 0.995; // Reduced air resistance for snappier throws
   private readonly MIN_THROW_FORCE = 18;
   private readonly MAX_THROW_FORCE = 50;
+  private readonly MAX_ARC_POINTS = 50;
 
+  private arcPositions = new Float32Array(this.MAX_ARC_POINTS * 3);
   private arcVisualization?: THREE.Line;
   private landingIndicator?: THREE.Mesh;
   private isAiming = false;
@@ -154,9 +157,9 @@ export class GrenadeSystem implements GameSystem {
       // Apply air resistance to all components
       grenade.velocity.multiplyScalar(this.AIR_RESISTANCE);
 
-      const nextPosition = grenade.position.clone().add(
-        grenade.velocity.clone().multiplyScalar(deltaTime)
-      );
+      const nextPosition = objectPool.getVector3().copy(grenade.position);
+      const velocityDelta = objectPool.getVector3().copy(grenade.velocity).multiplyScalar(deltaTime);
+      nextPosition.add(velocityDelta);
 
       const groundHeight = this.getGroundHeight(nextPosition.x, nextPosition.z) + 0.3;
 
@@ -186,8 +189,12 @@ export class GrenadeSystem implements GameSystem {
       }
 
       grenade.position.copy(nextPosition);
+      objectPool.releaseVector3(nextPosition);
+      objectPool.releaseVector3(velocityDelta);
 
-      grenade.rotation.add(grenade.rotationVelocity.clone().multiplyScalar(deltaTime));
+      const rotDelta = objectPool.getVector3().copy(grenade.rotationVelocity).multiplyScalar(deltaTime);
+      grenade.rotation.add(rotDelta);
+      objectPool.releaseVector3(rotDelta);
 
       grenade.mesh.position.copy(grenade.position);
       grenade.mesh.rotation.set(grenade.rotation.x, grenade.rotation.y, grenade.rotation.z);
@@ -326,8 +333,8 @@ export class GrenadeSystem implements GameSystem {
   updateArc(): number {
     if (!this.isAiming || !this.arcVisualization) return 0;
 
-    const startPos = this.camera.position.clone();
-    const direction = new THREE.Vector3();
+    const startPos = objectPool.getVector3().copy(this.camera.position);
+    const direction = objectPool.getVector3();
     this.camera.getWorldDirection(direction);
 
     // Variable throw force based on power buildup
@@ -338,47 +345,63 @@ export class GrenadeSystem implements GameSystem {
     const baseThrowAngle = 0.25 + (0.15 * this.throwPower); // 0.25 to 0.4 radians (14 to 23 degrees)
 
     // Maintain more forward momentum regardless of vertical look angle
-    const forwardDir = direction.clone();
+    const forwardDir = objectPool.getVector3().copy(direction);
     forwardDir.y = 0; // Remove vertical component
     forwardDir.normalize();
 
     // Combine forward direction with upward angle
-    const finalDirection = new THREE.Vector3();
+    const finalDirection = objectPool.getVector3();
     finalDirection.x = forwardDir.x * Math.cos(baseThrowAngle);
     finalDirection.z = forwardDir.z * Math.cos(baseThrowAngle);
     finalDirection.y = Math.sin(baseThrowAngle);
 
-    const throwVelocity = finalDirection.multiplyScalar(throwForce);
+    const throwVelocity = objectPool.getVector3().copy(finalDirection).multiplyScalar(throwForce);
 
     // Add moderate upward boost based on look angle (but not too much)
     const lookUpBoost = Math.max(0, direction.y * 3); // Only boost if looking up
     throwVelocity.y += lookUpBoost * this.throwPower;
 
-    const points: THREE.Vector3[] = [];
     const steps = 30;
     const timeStep = 0.1;
 
-    let pos = startPos.clone();
-    let vel = throwVelocity.clone();
-    let landingPos = pos.clone();
+    const pos = objectPool.getVector3().copy(startPos);
+    const vel = objectPool.getVector3().copy(throwVelocity);
+    const landingPos = objectPool.getVector3().copy(pos);
+    const velDelta = objectPool.getVector3();
 
+    let pointCount = 0;
     for (let i = 0; i < steps; i++) {
-      points.push(pos.clone());
+      // Write to Float32Array
+      if (pointCount < this.MAX_ARC_POINTS) {
+        this.arcPositions[pointCount * 3] = pos.x;
+        this.arcPositions[pointCount * 3 + 1] = pos.y;
+        this.arcPositions[pointCount * 3 + 2] = pos.z;
+        pointCount++;
+      }
 
       vel.y += this.GRAVITY * timeStep;
-      pos.add(vel.clone().multiplyScalar(timeStep));
+      
+      velDelta.copy(vel).multiplyScalar(timeStep);
+      pos.add(velDelta);
 
       const groundHeight = this.getGroundHeight(pos.x, pos.z);
       if (pos.y <= groundHeight) {
         pos.y = groundHeight;
-        landingPos = pos.clone();
+        landingPos.copy(pos);
+        
+        // Add final point
+        if (pointCount < this.MAX_ARC_POINTS) {
+          this.arcPositions[pointCount * 3] = pos.x;
+          this.arcPositions[pointCount * 3 + 1] = pos.y;
+          this.arcPositions[pointCount * 3 + 2] = pos.z;
+          pointCount++;
+        }
         break;
       }
     }
 
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    this.arcVisualization.geometry.dispose();
-    this.arcVisualization.geometry = geometry;
+    this.arcVisualization.geometry.attributes.position.needsUpdate = true;
+    this.arcVisualization.geometry.setDrawRange(0, pointCount);
     this.arcVisualization.computeLineDistances(); // Required for dashed lines
 
     // Update landing indicator position
@@ -389,6 +412,18 @@ export class GrenadeSystem implements GameSystem {
 
     // Calculate distance from start to landing position
     const distance = startPos.distanceTo(landingPos);
+
+    // Release all borrowed vectors
+    objectPool.releaseVector3(startPos);
+    objectPool.releaseVector3(direction);
+    objectPool.releaseVector3(forwardDir);
+    objectPool.releaseVector3(finalDirection);
+    objectPool.releaseVector3(throwVelocity);
+    objectPool.releaseVector3(pos);
+    objectPool.releaseVector3(vel);
+    objectPool.releaseVector3(landingPos);
+    objectPool.releaseVector3(velDelta);
+
     return distance;
   }
 
@@ -574,6 +609,8 @@ export class GrenadeSystem implements GameSystem {
 
   private createArcVisualization(): void {
     const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(this.arcPositions, 3));
+    
     const material = new THREE.LineDashedMaterial({
       color: 0x00ff00,
       linewidth: 2,
@@ -586,6 +623,7 @@ export class GrenadeSystem implements GameSystem {
 
     this.arcVisualization = new THREE.Line(geometry, material);
     this.arcVisualization.visible = false;
+    this.arcVisualization.frustumCulled = false; // Ensure it's always rendered if visible
     this.scene.add(this.arcVisualization);
 
     // Create landing indicator - a ring showing impact point and radius
