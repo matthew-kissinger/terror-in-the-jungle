@@ -127,7 +127,12 @@ export class GrenadeSystem implements GameSystem {
       if (grenade.fuseTime <= 0) {
         this.explodeGrenade(grenade);
         this.spawner.removeGrenade(grenade);
-        this.grenades.splice(i, 1);
+        
+        const last = this.grenades.length - 1;
+        if (i !== last) {
+          this.grenades[i] = this.grenades[last];
+        }
+        this.grenades.pop();
         continue;
       }
 

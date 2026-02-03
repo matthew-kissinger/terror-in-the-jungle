@@ -27,7 +27,11 @@ export class CameraShakeSystem implements GameSystem {
       shake.elapsed += deltaTime;
 
       if (shake.elapsed >= shake.duration) {
-        this.activeShakes.splice(i, 1);
+        const last = this.activeShakes.length - 1;
+        if (i !== last) {
+          this.activeShakes[i] = this.activeShakes[last];
+        }
+        this.activeShakes.pop();
       }
     }
   }

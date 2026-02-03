@@ -338,7 +338,11 @@ export class MortarSystem implements GameSystem {
       });
     }
 
-    this.activeRounds.splice(index, 1);
+    const last = this.activeRounds.length - 1;
+    if (index !== last) {
+      this.activeRounds[index] = this.activeRounds[last];
+    }
+    this.activeRounds.pop();
   }
 
   private updateTrajectoryPreview(): void {
