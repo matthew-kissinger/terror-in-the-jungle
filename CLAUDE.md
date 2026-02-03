@@ -79,7 +79,7 @@ CombatantSystem has distance-based LOD:
 
 | File | Lines | Location |
 |------|-------|----------|
-| CombatantSystem.ts | 541 | systems/combat/ |
+| CombatantSystem.ts | 428 | systems/combat/ |
 | ImprovedChunkManager.ts | 529 | systems/terrain/ |
 | gameModes.ts | 496 | config/ |
 | SpatialOctree.ts | 487 | systems/combat/ |
@@ -99,11 +99,11 @@ CombatantSystem has distance-based LOD:
 | WeaponFiring.ts | 425 | systems/player/weapon/ |
 | ChunkWorkerCode.ts | 421 | systems/terrain/ |
 | GPUTerrain.ts | 421 | systems/terrain/ |
-| MortarSystem.ts | 420 | systems/weapons/ |
+| MortarSystem.ts | 424 | systems/weapons/ |
 | ZoneManager.ts | 412 | systems/world/ |
 | DeathCamSystem.ts | 405 | systems/player/ |
 
-**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->524, extracted ChunkPriorityManager + ChunkLifecycleManager), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer), AIFlankingSystem (606->359, extracted FlankingRoleManager + FlankingTacticsResolver), FullMapSystem (574->365, extracted FullMapDOMHelpers + FullMapInput + FullMapStyles), AITargeting (571->94, extracted AITargetAcquisition + AILineOfSight), CombatantMovement (504->129, extracted CombatantMovementStates + CombatantMovementCommands), PixelArtSandbox (551->144, extracted PixelArtSandboxInit + PixelArtSandboxInput + PixelArtSandboxLoop), InfluenceMapSystem (570->329, extracted InfluenceMapComputations + InfluenceMapGrid), ExplosionEffectsPool (489->161, extracted ExplosionEffectFactory + ExplosionParticleUpdater + ExplosionSpawnInitializer + ExplosionTextures), OpenFrontierRespawnMap (531->194, extracted OpenFrontierRespawnMapUtils + OpenFrontierRespawnMapRenderer). 23 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538->428, extracted CombatantSystemDamage + CombatantSystemSetters + CombatantSystemUpdate), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->524, extracted ChunkPriorityManager + ChunkLifecycleManager), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer), AIFlankingSystem (606->359, extracted FlankingRoleManager + FlankingTacticsResolver), FullMapSystem (574->365, extracted FullMapDOMHelpers + FullMapInput + FullMapStyles), AITargeting (571->94, extracted AITargetAcquisition + AILineOfSight), CombatantMovement (504->129, extracted CombatantMovementStates + CombatantMovementCommands), PixelArtSandbox (551->144, extracted PixelArtSandboxInit + PixelArtSandboxInput + PixelArtSandboxLoop), InfluenceMapSystem (570->329, extracted InfluenceMapComputations + InfluenceMapGrid), ExplosionEffectsPool (489->161, extracted ExplosionEffectFactory + ExplosionParticleUpdater + ExplosionSpawnInitializer + ExplosionTextures), OpenFrontierRespawnMap (531->194, extracted OpenFrontierRespawnMapUtils + OpenFrontierRespawnMapRenderer). 23 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -153,11 +153,12 @@ Known hotspots:
 - **ImprovedChunkManager getObjectHeightAt() allocations** - FIXED. Module-level `_heightBox`, `_heightTestPoint`, `_heightRaycaster`, `_heightRayOrigin`, `_heightRayDir` replace per-call allocations.
 - **ImprovedChunkManager checkObjectCollision() Box3 loop** - FIXED. Module-level `_collisionBox` replaces per-iteration Box3.
 
+- **Array.splice() in weapon/grenade update loops** - FIXED. MortarSystem, GrenadeSystem, CameraShakeSystem now use swap-and-pop.
+- **OpenFrontierRespawnMapRenderer debug console.log** - FIXED. Debug logging removed from render path.
+
 Discovered hotspots (not yet fixed):
 - **MortarBallistics computeTrajectory() clones** - Lines 60-80. Still creates 100+ Vector3 via `.clone()` per trajectory computation (builds output array, not per-frame). Lower priority.
 - **LOSAccelerator checkLineOfSight() Raycaster allocation** - Line 78. Creates `new THREE.Raycaster()` per LOS check. Should be module-level scratch.
-- **Array.splice() in weapon/grenade update loops** - MortarSystem:341, GrenadeSystem:130, CameraShakeSystem:30. Should use swap-and-pop.
-- **OpenFrontierRespawnMapRenderer debug console.log** - Lines 34, 39, 130. Debug logging left in render path, creates string allocations per render.
 
 Possible areas (confirm with profiling):
 - Worker utilization (are they saturated?)
@@ -255,7 +256,7 @@ src/
 |------|---------|-------|
 | `src/systems/debug/PerformanceTelemetry.ts` | Frame budget tracking | Use this |
 | `src/ui/debug/PerformanceOverlay.ts` | F2 visual overlay | Shows everything |
-| `src/systems/combat/CombatantSystem.ts` | NPC orchestrator | Split to 538 lines |
+| `src/systems/combat/CombatantSystem.ts` | NPC orchestrator | Split to 428 lines |
 | `src/systems/combat/SpatialOctree.ts` | Spatial queries | Check query times |
 | `src/workers/BVHWorker.ts` | Parallel BVH | Pool of 4 workers |
 | `src/core/PixelArtSandbox.ts` | Main game loop | Where systems update (144 lines, split into 3 modules) |
