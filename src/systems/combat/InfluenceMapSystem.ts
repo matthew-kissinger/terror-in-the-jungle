@@ -2,22 +2,17 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { Combatant, Faction } from './types';
 import { CaptureZone } from '../world/ZoneManager';
+import { InfluenceCell, InfluenceMapGrid } from './InfluenceMapGrid';
+import {
+  computeThreatLevel,
+  computeOpportunityLevel,
+  computeCoverValue,
+  computeSquadSupport,
+  computeCombinedScores,
+  type ComputationParams
+} from './InfluenceMapComputations';
 
-const _v2a = new THREE.Vector2();
-const _v2b = new THREE.Vector2();
 const _v3a = new THREE.Vector3();
-
-/**
- * Grid cell data representing tactical influence at a position
- */
-export interface InfluenceCell {
-  position: THREE.Vector2;
-  threatLevel: number;          // 0-1: Based on enemy density and LOS
-  opportunityLevel: number;      // 0-1: Based on uncontested zones, flanking routes
-  coverValue: number;            // 0-1: Based on nearby sandbags and terrain features
-  squadSupport: number;          // 0-1: Friendly unit density for mutual support
-  combinedScore: number;         // Overall tactical value
-}
 
 /**
  * InfluenceMapSystem computes threat/opportunity scores across the battlefield
@@ -61,22 +56,11 @@ export class InfluenceMapSystem implements GameSystem {
   }
 
   private initializeGrid(): void {
-    for (let x = 0; x < this.gridSize; x++) {
-      this.grid[x] = [];
-      for (let z = 0; z < this.gridSize; z++) {
-        const worldX = this.worldOffset.x + x * this.cellSize;
-        const worldZ = this.worldOffset.y + z * this.cellSize;
-
-        this.grid[x][z] = {
-          position: new THREE.Vector2(worldX, worldZ),
-          threatLevel: 0,
-          opportunityLevel: 0,
-          coverValue: 0,
-          squadSupport: 0,
-          combinedScore: 0
-        };
-      }
-    }
+    this.grid = InfluenceMapGrid.initializeGrid(
+      this.gridSize,
+      this.worldSize,
+      this.worldOffset
+    );
   }
 
   update(deltaTime: number): void {
@@ -97,253 +81,28 @@ export class InfluenceMapSystem implements GameSystem {
 
   private computeInfluenceMap(): void {
     // Reset all values
-    for (let x = 0; x < this.gridSize; x++) {
-      for (let z = 0; z < this.gridSize; z++) {
-        const cell = this.grid[x][z];
-        cell.threatLevel = 0;
-        cell.opportunityLevel = 0;
-        cell.coverValue = 0;
-        cell.squadSupport = 0;
-        cell.combinedScore = 0;
-      }
-    }
+    InfluenceMapGrid.resetGrid(this.grid, this.gridSize);
 
-    // Compute threat level from enemies
-    this.computeThreatLevel();
+    // Build params object for computation functions
+    const params: ComputationParams = {
+      grid: this.grid,
+      gridSize: this.gridSize,
+      cellSize: this.cellSize,
+      worldOffset: this.worldOffset,
+      combatants: this.combatants,
+      zones: this.zones,
+      playerPosition: this.playerPosition,
+      sandbagBounds: this.sandbagBounds
+    };
 
-    // Compute opportunity level from zones
-    this.computeOpportunityLevel();
-
-    // Compute cover value
-    this.computeCoverValue();
-
-    // Compute squad support from friendlies
-    this.computeSquadSupport();
-
-    // Combine scores
-    this.computeCombinedScores();
+    // Compute all influence factors
+    computeThreatLevel(params);
+    computeOpportunityLevel(params);
+    computeCoverValue(params);
+    computeSquadSupport(params);
+    computeCombinedScores(params);
   }
 
-  private getCellBounds(centerX: number, centerZ: number, radius: number): {
-    minX: number;
-    maxX: number;
-    minZ: number;
-    maxZ: number;
-  } {
-    const minX = Math.max(
-      0,
-      Math.floor((centerX - radius - this.worldOffset.x) / this.cellSize)
-    );
-    const maxX = Math.min(
-      this.gridSize - 1,
-      Math.floor((centerX + radius - this.worldOffset.x) / this.cellSize)
-    );
-    const minZ = Math.max(
-      0,
-      Math.floor((centerZ - radius - this.worldOffset.y) / this.cellSize)
-    );
-    const maxZ = Math.min(
-      this.gridSize - 1,
-      Math.floor((centerZ + radius - this.worldOffset.y) / this.cellSize)
-    );
-
-    return { minX, maxX, minZ, maxZ };
-  }
-
-  private computeThreatLevel(): void {
-    const THREAT_RADIUS = 50; // meters
-    const THREAT_RADIUS_SQ = THREAT_RADIUS * THREAT_RADIUS;
-    const THREAT_FALLOFF = 0.02; // per meter
-
-    this.combatants.forEach(combatant => {
-      // Only enemies contribute to threat
-      if (combatant.faction === Faction.US) return;
-      if (combatant.state === 'dead') return;
-
-      _v2a.set(combatant.position.x, combatant.position.z);
-      const { minX, maxX, minZ, maxZ } = this.getCellBounds(
-        _v2a.x,
-        _v2a.y,
-        THREAT_RADIUS
-      );
-
-      // Apply threat influence in radius around enemy
-      for (let x = minX; x <= maxX; x++) {
-        for (let z = minZ; z <= maxZ; z++) {
-          const cell = this.grid[x][z];
-          const dx = cell.position.x - _v2a.x;
-          const dz = cell.position.y - _v2a.y;
-          const distanceSq = dx * dx + dz * dz;
-
-          if (distanceSq < THREAT_RADIUS_SQ) {
-            const distance = Math.sqrt(distanceSq);
-            const threat = Math.max(0, 1 - distance * THREAT_FALLOFF);
-            cell.threatLevel = Math.min(1, cell.threatLevel + threat);
-          }
-        }
-      }
-    });
-
-    // Player position is high-priority threat target for OPFOR
-    _v2b.set(this.playerPosition.x, this.playerPosition.z);
-    const { minX, maxX, minZ, maxZ } = this.getCellBounds(
-      _v2b.x,
-      _v2b.y,
-      THREAT_RADIUS
-    );
-    for (let x = minX; x <= maxX; x++) {
-      for (let z = minZ; z <= maxZ; z++) {
-        const cell = this.grid[x][z];
-        const dx = cell.position.x - _v2b.x;
-        const dz = cell.position.y - _v2b.y;
-        const distanceSq = dx * dx + dz * dz;
-
-        if (distanceSq < THREAT_RADIUS_SQ) {
-          const distance = Math.sqrt(distanceSq);
-          const threat = Math.max(0, 1.2 - distance * THREAT_FALLOFF); // 20% higher than normal
-          cell.threatLevel = Math.min(1, cell.threatLevel + threat);
-        }
-      }
-    }
-  }
-
-  private computeOpportunityLevel(): void {
-    const ZONE_RADIUS = 30; // meters
-    const ZONE_RADIUS_SQ = ZONE_RADIUS * ZONE_RADIUS;
-    const ZONE_FALLOFF = 0.033; // per meter
-
-    this.zones.forEach(zone => {
-      // Skip home bases
-      if (zone.isHomeBase) return;
-
-      _v2a.set(zone.position.x, zone.position.z);
-      let zoneValue = 0;
-
-      // Contested zones are highest priority
-      if (zone.state === 'contested') {
-        zoneValue = 1.5;
-      }
-      // Enemy-owned zones are high priority
-      else if (zone.owner === Faction.OPFOR) {
-        zoneValue = 1.2;
-      }
-      // Neutral zones are medium priority
-      else if (zone.owner === null) {
-        zoneValue = 0.8;
-      }
-      // Friendly zones are low priority (already captured)
-      else if (zone.owner === Faction.US) {
-        zoneValue = 0.3;
-      }
-
-      // Apply opportunity influence in radius around zone
-      const { minX, maxX, minZ, maxZ } = this.getCellBounds(
-        _v2a.x,
-        _v2a.y,
-        ZONE_RADIUS
-      );
-      for (let x = minX; x <= maxX; x++) {
-        for (let z = minZ; z <= maxZ; z++) {
-          const cell = this.grid[x][z];
-          const dx = cell.position.x - _v2a.x;
-          const dz = cell.position.y - _v2a.y;
-          const distanceSq = dx * dx + dz * dz;
-
-          if (distanceSq < ZONE_RADIUS_SQ) {
-            const distance = Math.sqrt(distanceSq);
-            const opportunity = Math.max(0, zoneValue - distance * ZONE_FALLOFF);
-            cell.opportunityLevel = Math.min(1, cell.opportunityLevel + opportunity);
-          }
-        }
-      }
-    });
-  }
-
-  private computeCoverValue(): void {
-    const COVER_RADIUS = 15; // meters
-    const COVER_RADIUS_SQ = COVER_RADIUS * COVER_RADIUS;
-    const COVER_FALLOFF = 0.067; // per meter
-
-    // Compute cover from sandbags
-    this.sandbagBounds.forEach(bounds => {
-      bounds.getCenter(_v3a);
-      _v2a.set(_v3a.x, _v3a.z);
-
-      const { minX, maxX, minZ, maxZ } = this.getCellBounds(
-        _v2a.x,
-        _v2a.y,
-        COVER_RADIUS
-      );
-      for (let x = minX; x <= maxX; x++) {
-        for (let z = minZ; z <= maxZ; z++) {
-          const cell = this.grid[x][z];
-          const dx = cell.position.x - _v2a.x;
-          const dz = cell.position.y - _v2a.y;
-          const distanceSq = dx * dx + dz * dz;
-
-          if (distanceSq < COVER_RADIUS_SQ) {
-            const distance = Math.sqrt(distanceSq);
-            const cover = Math.max(0, 1 - distance * COVER_FALLOFF);
-            cell.coverValue = Math.min(1, cell.coverValue + cover);
-          }
-        }
-      }
-    });
-  }
-
-  private computeSquadSupport(): void {
-    const SUPPORT_RADIUS = 40; // meters
-    const SUPPORT_RADIUS_SQ = SUPPORT_RADIUS * SUPPORT_RADIUS;
-    const SUPPORT_FALLOFF = 0.025; // per meter
-
-    this.combatants.forEach(combatant => {
-      // Only friendlies contribute to support
-      if (combatant.faction === Faction.OPFOR) return;
-      if (combatant.state === 'dead') return;
-
-      _v2a.set(combatant.position.x, combatant.position.z);
-      const { minX, maxX, minZ, maxZ } = this.getCellBounds(
-        _v2a.x,
-        _v2a.y,
-        SUPPORT_RADIUS
-      );
-
-      // Apply support influence in radius around friendly
-      for (let x = minX; x <= maxX; x++) {
-        for (let z = minZ; z <= maxZ; z++) {
-          const cell = this.grid[x][z];
-          const dx = cell.position.x - _v2a.x;
-          const dz = cell.position.y - _v2a.y;
-          const distanceSq = dx * dx + dz * dz;
-
-          if (distanceSq < SUPPORT_RADIUS_SQ) {
-            const distance = Math.sqrt(distanceSq);
-            const support = Math.max(0, 1 - distance * SUPPORT_FALLOFF);
-            cell.squadSupport = Math.min(1, cell.squadSupport + support);
-          }
-        }
-      }
-    });
-  }
-
-  private computeCombinedScores(): void {
-    for (let x = 0; x < this.gridSize; x++) {
-      for (let z = 0; z < this.gridSize; z++) {
-        const cell = this.grid[x][z];
-
-        // Combined score formula:
-        // High opportunity + low threat + cover + squad support = best positions
-        cell.combinedScore =
-          cell.opportunityLevel * 2.0 +     // Opportunity is most important
-          (1 - cell.threatLevel) * 1.5 +    // Low threat is valuable
-          cell.coverValue * 0.8 +           // Cover adds safety
-          cell.squadSupport * 0.5;          // Support is helpful but less critical
-
-        // Normalize to 0-1 range (max possible = 4.8)
-        cell.combinedScore = Math.min(1, cell.combinedScore / 4.8);
-      }
-    }
-  }
 
   /**
    * Query influence at a specific world position
