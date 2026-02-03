@@ -16,6 +16,15 @@ export class CompassSystem implements GameSystem {
   // Player tracking
   private playerHeading = 0; // In radians, 0 = North (-Z), π/2 = East (+X)
 
+  // Scratch vectors to avoid per-frame allocations
+  private readonly cameraDir = new THREE.Vector3();
+  private readonly cameraPos = new THREE.Vector3();
+  private readonly dirToZone = new THREE.Vector3();
+
+  // Cached zone markers
+  private readonly zoneMarkers = new Map<string, HTMLDivElement>();
+  private readonly seenZones = new Set<string>();
+
   private readonly COMPASS_STYLES = `
     .compass-container {
       position: fixed;
@@ -290,8 +299,7 @@ export class CompassSystem implements GameSystem {
 
   update(deltaTime: number): void {
     // Get camera direction
-    const cameraDir = new THREE.Vector3();
-    this.camera.getWorldDirection(cameraDir);
+    this.camera.getWorldDirection(this.cameraDir);
 
     // Calculate heading from true north
     // IMPORTANT: In our game world after the map flip:
@@ -301,7 +309,7 @@ export class CompassSystem implements GameSystem {
     // - West is +X direction
     // This is because we flipped both axes on the map
     // So we need to calculate heading accordingly
-    this.playerHeading = Math.atan2(-cameraDir.x, cameraDir.z);
+    this.playerHeading = Math.atan2(-this.cameraDir.x, this.cameraDir.z);
 
     // Convert to degrees (0-360)
     let headingDegrees = this.playerHeading * 180 / Math.PI;
@@ -333,12 +341,8 @@ export class CompassSystem implements GameSystem {
   private updateZoneMarkers(playerHeadingDegrees: number): void {
     if (!this.zoneManager) return;
 
-    // Clear existing markers
-    this.markersContainer.innerHTML = '';
-
     // Get camera position to calculate relative directions
-    const cameraPos = new THREE.Vector3();
-    (this.camera as any).getWorldPosition(cameraPos);
+    (this.camera as any).getWorldPosition(this.cameraPos);
 
     // Get all zones
     const zones = (this.zoneManager as any).zones as Map<string, any>;
@@ -346,11 +350,15 @@ export class CompassSystem implements GameSystem {
 
     const compassWidth = 200; // Width of the compass display
     const centerX = compassWidth / 2; // Center of compass
+    this.seenZones.clear();
 
     zones.forEach((zone) => {
+      const zoneId = zone.id as string;
+      this.seenZones.add(zoneId);
+
       // Calculate direction from player to zone
-      const dirToZone = new THREE.Vector3().subVectors(zone.position, cameraPos);
-      const directionAngle = Math.atan2(-dirToZone.x, dirToZone.z) * 180 / Math.PI;
+      this.dirToZone.subVectors(zone.position, this.cameraPos);
+      const directionAngle = Math.atan2(-this.dirToZone.x, this.dirToZone.z) * 180 / Math.PI;
 
       // Normalize angle
       let angle = directionAngle;
@@ -363,14 +371,14 @@ export class CompassSystem implements GameSystem {
       while (relativeAngle > 180) relativeAngle -= 360;
 
       // Only show markers within ±90 degrees of current view
-      if (Math.abs(relativeAngle) > 90) return;
+      const isVisible = Math.abs(relativeAngle) <= 90;
 
       // Calculate pixel position on compass (2 pixels per degree)
       const markerX = centerX + relativeAngle * 2;
 
       // Determine marker styling based on zone state
       let markerClass = 'compass-marker ';
-      let displayText = zone.id.charAt(0).toUpperCase();
+      const displayText = zoneId.charAt(0).toUpperCase();
 
       const state = zone.state;
       const Faction = (this.zoneManager as any).constructor.Faction;
@@ -385,13 +393,35 @@ export class CompassSystem implements GameSystem {
         markerClass += 'neutral';
       }
 
-      // Create marker element
-      const marker = document.createElement('div');
+      // Create marker element if needed
+      let marker = this.zoneMarkers.get(zoneId);
+      if (!marker) {
+        marker = document.createElement('div');
+        marker.className = 'compass-marker neutral';
+        marker.style.display = 'none';
+        this.zoneMarkers.set(zoneId, marker);
+        this.markersContainer.appendChild(marker);
+      }
+
+      if (isVisible) {
+        marker.style.display = 'flex';
+        marker.style.left = `${markerX}px`;
+      } else {
+        marker.style.display = 'none';
+      }
+
       marker.className = markerClass;
       marker.textContent = displayText;
-      marker.style.left = `${markerX}px`;
+    });
 
-      this.markersContainer.appendChild(marker);
+    // Remove markers for zones that no longer exist
+    this.zoneMarkers.forEach((marker, zoneId) => {
+      if (!this.seenZones.has(zoneId)) {
+        if (marker.parentNode) {
+          marker.parentNode.removeChild(marker);
+        }
+        this.zoneMarkers.delete(zoneId);
+      }
     });
   }
 
@@ -403,6 +433,8 @@ export class CompassSystem implements GameSystem {
     if (this.compassContainer.parentNode) {
       this.compassContainer.parentNode.removeChild(this.compassContainer);
     }
+
+    this.zoneMarkers.clear();
 
     // Remove styles
     const styleSheet = (this.compassContainer as any).styleSheet;
