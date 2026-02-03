@@ -176,62 +176,58 @@ export class HelicopterInstrumentsPanel {
 
   updateHelicopterInstruments(collective: number, rpm: number, autoHover: boolean, engineBoost: boolean): void {
     // Update collective (thrust) bar
-    const collectiveFill = this.helicopterInstruments.querySelector('.collective-fill') as HTMLElement;
-    if (collectiveFill) {
+    if (this.collectiveFill) {
       const percentage = Math.round(collective * 100);
-      collectiveFill.style.height = `${percentage}%`;
+      this.collectiveFill.style.height = `${percentage}%`;
 
       // Color coding for collective
       if (percentage > 80) {
-        collectiveFill.style.background = 'linear-gradient(to top, #ff4444, #ff8844)'; // Red for high thrust
+        this.collectiveFill.style.background = HelicopterInstrumentsPanel.GRADIENT_HIGH; // Red for high thrust
       } else if (percentage > 50) {
-        collectiveFill.style.background = 'linear-gradient(to top, #ffff44, #88ff44)'; // Yellow for medium
+        this.collectiveFill.style.background = HelicopterInstrumentsPanel.GRADIENT_MED; // Yellow for medium
       } else {
-        collectiveFill.style.background = 'linear-gradient(to top, #00ff44, #88ff44)'; // Green for normal
+        this.collectiveFill.style.background = HelicopterInstrumentsPanel.GRADIENT_NORMAL; // Green for normal
       }
     }
 
     // Update RPM display
-    const rpmValue = this.helicopterInstruments.querySelector('.rpm-value') as HTMLElement;
-    if (rpmValue) {
+    if (this.rpmValue) {
       const rpmPercentage = Math.round(rpm * 100);
-      rpmValue.textContent = `${rpmPercentage}%`;
+      this.rpmValue.textContent = `${rpmPercentage}%`;
 
       // Color coding for RPM
       if (rpmPercentage < 30) {
-        rpmValue.style.color = 'rgba(255, 100, 100, 0.9)'; // Red for low RPM
+        this.rpmValue.style.color = 'rgba(255, 100, 100, 0.9)'; // Red for low RPM
       } else if (rpmPercentage > 90) {
-        rpmValue.style.color = 'rgba(255, 255, 100, 0.9)'; // Yellow for high RPM
+        this.rpmValue.style.color = 'rgba(255, 255, 100, 0.9)'; // Yellow for high RPM
       } else {
-        rpmValue.style.color = 'rgba(255, 255, 255, 0.9)'; // White for normal
+        this.rpmValue.style.color = 'rgba(255, 255, 255, 0.9)'; // White for normal
       }
     }
 
     // Update hover assist indicator
-    const hoverIndicator = this.helicopterInstruments.querySelector('.hover-indicator') as HTMLElement;
-    if (hoverIndicator) {
+    if (this.hoverIndicator) {
       if (autoHover) {
-        hoverIndicator.style.background = 'rgba(0, 200, 0, 0.6)';
-        hoverIndicator.style.borderColor = 'rgba(0, 255, 0, 0.8)';
-        hoverIndicator.style.color = 'rgba(255, 255, 255, 1)';
+        this.hoverIndicator.style.background = 'rgba(0, 200, 0, 0.6)';
+        this.hoverIndicator.style.borderColor = 'rgba(0, 255, 0, 0.8)';
+        this.hoverIndicator.style.color = 'rgba(255, 255, 255, 1)';
       } else {
-        hoverIndicator.style.background = 'rgba(100, 100, 100, 0.3)';
-        hoverIndicator.style.borderColor = 'rgba(255, 255, 255, 0.4)';
-        hoverIndicator.style.color = 'rgba(255, 255, 255, 0.5)';
+        this.hoverIndicator.style.background = 'rgba(100, 100, 100, 0.3)';
+        this.hoverIndicator.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+        this.hoverIndicator.style.color = 'rgba(255, 255, 255, 0.5)';
       }
     }
 
     // Update boost indicator
-    const boostIndicator = this.helicopterInstruments.querySelector('.boost-indicator') as HTMLElement;
-    if (boostIndicator) {
+    if (this.boostIndicator) {
       if (engineBoost) {
-        boostIndicator.style.background = 'rgba(255, 150, 0, 0.6)';
-        boostIndicator.style.borderColor = 'rgba(255, 200, 0, 0.8)';
-        boostIndicator.style.color = 'rgba(255, 255, 255, 1)';
+        this.boostIndicator.style.background = 'rgba(255, 150, 0, 0.6)';
+        this.boostIndicator.style.borderColor = 'rgba(255, 200, 0, 0.8)';
+        this.boostIndicator.style.color = 'rgba(255, 255, 255, 1)';
       } else {
-        boostIndicator.style.background = 'rgba(100, 100, 100, 0.3)';
-        boostIndicator.style.borderColor = 'rgba(255, 255, 255, 0.4)';
-        boostIndicator.style.color = 'rgba(255, 255, 255, 0.5)';
+        this.boostIndicator.style.background = 'rgba(100, 100, 100, 0.3)';
+        this.boostIndicator.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+        this.boostIndicator.style.color = 'rgba(255, 255, 255, 0.5)';
       }
     }
   }
