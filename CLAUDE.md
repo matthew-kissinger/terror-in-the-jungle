@@ -49,7 +49,7 @@ perf.reset()     // Reset all telemetry
 
 - **BVHWorker** - Pool of 4 workers for parallel BVH computation (`src/workers/BVHWorker.ts`, 212 lines)
 - **ChunkWorker** - Terrain chunk generation (`src/workers/ChunkWorker.ts`, 314 lines)
-- **ChunkWorkerPool** - Manages pool of chunk generation workers (`src/systems/terrain/ChunkWorkerPool.ts`, 715 lines)
+- **ChunkWorkerPool** - Manages pool of chunk generation workers (`src/systems/terrain/ChunkWorkerPool.ts`, 270 lines, split into ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue)
 
 ### Terrain Optimization (Recent)
 
@@ -79,16 +79,13 @@ CombatantSystem has distance-based LOD:
 
 | File | Lines | Location |
 |------|-------|----------|
-| ChunkWorkerPool.ts | 715 | systems/terrain/ |
 | ImprovedChunk.ts | 672 | systems/terrain/ |
 | GPUBillboardSystem.ts | 669 | systems/world/billboard/ |
-| SandboxSystemManager.ts | 644 | core/ |
+| CombatantSpawnManager.ts | 614 | systems/combat/ |
 | AIFlankingSystem.ts | 606 | systems/combat/ai/ |
 | FullMapSystem.ts | 574 | ui/map/ |
 | AITargeting.ts | 571 | systems/combat/ai/ |
 | InfluenceMapSystem.ts | 570 | systems/combat/ |
-| ChunkWorkerLifecycle.ts | 567 | systems/terrain/ |
-| CombatantSpawnManager.ts | 562 | systems/combat/ |
 | CombatantSystem.ts | 541 | systems/combat/ |
 | PixelArtSandbox.ts | 536 | core/ |
 | ImprovedChunkManager.ts | 524 | systems/terrain/ |
@@ -110,12 +107,14 @@ CombatantSystem has distance-based LOD:
 | HelicopterGeometry.ts | 433 | systems/helicopter/ |
 | HUDUpdater.ts | 431 | ui/hud/ |
 | SandboxRenderer.ts | 431 | core/ |
-| WeaponFiring.ts | 428 | systems/player/weapon/ |
+| WeaponFiring.ts | 425 | systems/player/weapon/ |
 | GPUTerrain.ts | 421 | systems/terrain/ |
+| MortarSystem.ts | 420 | systems/weapons/ |
 | MatchEndScreen.ts | 419 | ui/end/ |
-| MortarSystem.ts | 409 | systems/weapons/ |
+| ChunkWorkerCode.ts | 418 | systems/terrain/ |
+| DeathCamSystem.ts | 405 | systems/player/ |
 
-**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->524, extracted ChunkPriorityManager + ChunkLifecycleManager), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel). 35 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->524, extracted ChunkPriorityManager + ChunkLifecycleManager), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue). 34 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -143,13 +142,13 @@ Known hotspots:
 - **CombatantLODManager full sort every frame** - FIXED. Replaced O(n log n) sort with distance bucketing.
 - **WeatherSystem rain particle loop** - FIXED. Eliminated per-particle matrix decomposition for 8000 rain particles per frame.
 - **AIFlankingSystem per-call allocations** - FIXED. Module-level scratch vectors replace per-call Vector3 clones throughout.
-- **MortarSystem detonation allocations** - Detonation loop creates 60+ Vector3 allocations (offset, position clone, normal) across 20 debris particles. Normal `new THREE.Vector3(0, 1, 0)` should be static constant.
+- **MortarSystem detonation allocations** - FIXED. Module-level scratch vectors and static UP_NORMAL constant replace per-detonation allocations.
 - **DamageNumberSystem worldToScreen() clone** - FIXED. Eliminated per-frame Vector3 clone and object allocation using module-level scratch vector.
-- **HelicopterInstrumentsPanel per-frame querySelector** - FIXED. Cached element references at construction instead of calling querySelector() 4 times per frame.
-- **CombatantLODManager.simulateDistantAI() allocations** - Creates `new THREE.Vector3()` for direction and random offset per distant combatant per call. Should use module-level scratch vectors.
-- **DeathCamSystem per-frame Vector3 allocations** - `updateOrbit()` creates new Vector3 for offset, direction, and up axis every frame during death cam sequence. Should use pre-allocated scratch vectors.
-- **WeaponFiring per-shot allocations** - `executeSingleShot()` and `executeShotgunShot()` call `ray.direction.clone().negate()` per bullet/pellet (8+ clones per shotgun shot). `spawnMuzzleFlash()` creates 3 new Vector3 every shot. Should use module-level scratch vectors.
-- **CombatantSpawnManager clone chains** - `manageSpawning()` and `spawnReinforcementWave()` call `anchor.clone().add()` in loops. `getBasePositions()` clones positions on every call. Multiple `new THREE.Vector3()` in position calculation helpers. Should use module-level scratch vectors and cache base positions.
+- **HelicopterInstrumentsPanel per-frame querySelector** - BROKEN. Attempted to cache element references but left compilation errors (27 TS errors). Element refs stored as local vars in createHelicopterInstruments() but accessed as instance properties in updateHelicopterInstruments(). Needs fix: store as private class properties.
+- **CombatantLODManager.simulateDistantAI() allocations** - FIXED. Module-level scratch vectors for direction and random offset.
+- **DeathCamSystem per-frame Vector3 allocations** - FIXED. Pre-allocated scratch vectors for offset, direction, and up axis.
+- **WeaponFiring per-shot allocations** - FIXED. Module-level scratch vectors for ray direction, muzzle flash positions.
+- **CombatantSpawnManager clone chains** - FIXED. Eliminated clone chains in manageSpawning() and spawnReinforcementWave().
 
 Possible areas (confirm with profiling):
 - Worker utilization (are they saturated?)
@@ -202,11 +201,11 @@ perf.benchmark(1000)  // Runs 1000 raycast iterations, returns timing stats
 
 ## Architecture
 
-~48k lines across 182 files. Orchestrator pattern but some files got big.
+~48k lines across 187 files. Orchestrator pattern but some files got big.
 
 ```
 src/
-├── core/                    # Game loop, renderer (644 lines in SandboxSystemManager)
+├── core/                    # Game loop, renderer (270 lines in SandboxSystemManager, split into 4 modules)
 ├── systems/
 │   ├── combat/             # AI, spatial, rendering
 │   │   ├── ai/             # AITargeting, AIFlanking, AICover
@@ -238,9 +237,9 @@ src/
 | `src/systems/combat/SpatialOctree.ts` | Spatial queries | Check query times |
 | `src/workers/BVHWorker.ts` | Parallel BVH | Pool of 4 workers |
 | `src/core/PixelArtSandbox.ts` | Main game loop | Where systems update (536 lines) |
-| `src/core/SandboxSystemManager.ts` | System orchestrator | 644 lines |
+| `src/core/SandboxSystemManager.ts` | System orchestrator | 270 lines (split into 4 modules) |
 | `src/systems/terrain/HeightQueryCache.ts` | Cached height lookups | Performance optimization |
-| `src/systems/terrain/ChunkWorkerPool.ts` | Worker pool management | 715 lines, has saturation telemetry |
+| `src/systems/terrain/ChunkWorkerPool.ts` | Worker pool management | 270 lines (split into 5 modules), has saturation telemetry |
 
 ## Game Modes
 
