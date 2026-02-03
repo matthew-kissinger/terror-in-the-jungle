@@ -1,17 +1,35 @@
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
-import { Faction } from '../../systems/combat/types';
 import { ZoneManager, ZoneState, CaptureZone } from '../../systems/world/ZoneManager';
 import { TicketSystem } from '../../systems/world/TicketSystem';
 import { HUDElements } from './HUDElements';
-import { GameMode } from '../../config/gameModes';
 
 export class HUDUpdater {
   private elements: HUDElements;
   private playerKills = 0;
   private playerDeaths = 0;
+  private readonly zoneElements = new Map<string, ZoneElementRefs>();
+  private zoneOrder: string[] = [];
+
+  private ticketHeader!: HTMLDivElement;
+  private usTicketName!: HTMLDivElement;
+  private usTicketCount!: HTMLDivElement;
+  private opforTicketName!: HTMLDivElement;
+  private opforTicketCount!: HTMLDivElement;
+  private ticketDisplayMode: 'tdm' | 'standard' | null = null;
+
+  private combatStatsLines: HTMLDivElement[] = [];
+  private killCountEl?: HTMLSpanElement;
+  private deathCountEl?: HTMLSpanElement;
+  private kdRatioEl?: HTMLDivElement;
+  private gameStatusTextEl?: HTMLDivElement;
+  private bleedIndicatorEl?: HTMLDivElement;
 
   constructor(elements: HUDElements) {
     this.elements = elements;
+    this.initializeTicketDisplay();
+    this.initializeCombatStats();
+    this.initializeKillCounter();
+    this.initializeGameStatus();
   }
 
   updateObjectivesDisplay(zoneManager: ZoneManager, isTDM: boolean = false): void {
@@ -23,107 +41,152 @@ export class HUDUpdater {
 
     const zones = zoneManager.getAllZones();
     const capturableZones = zones.filter(z => !z.isHomeBase);
+    const zoneIds = capturableZones.map(zone => zone.id);
 
-    // Clear current display (keep title)
-    while (this.elements.objectivesList.children.length > 1) {
-      this.elements.objectivesList.removeChild(this.elements.objectivesList.lastChild!);
+    for (const [zoneId, element] of this.zoneElements.entries()) {
+      if (!zoneIds.includes(zoneId)) {
+        if (element.root.parentElement === this.elements.objectivesList) {
+          this.elements.objectivesList.removeChild(element.root);
+        }
+        this.zoneElements.delete(zoneId);
+      }
     }
 
-    // Add each zone
     capturableZones.forEach(zone => {
-      const zoneElement = this.createZoneElement(zone);
-      this.elements.objectivesList.appendChild(zoneElement);
+      let zoneElement = this.zoneElements.get(zone.id);
+      if (!zoneElement) {
+        zoneElement = this.createZoneElement(zone);
+        this.zoneElements.set(zone.id, zoneElement);
+      }
+      this.updateZoneElement(zoneElement, zone);
     });
+
+    const orderChanged = zoneIds.length !== this.zoneOrder.length
+      || zoneIds.some((zoneId, index) => zoneId !== this.zoneOrder[index]);
+
+    if (orderChanged) {
+      const titleElement = this.elements.objectivesList.querySelector('.objectives-title');
+      Array.from(this.elements.objectivesList.children).forEach(child => {
+        if (child !== titleElement) {
+          this.elements.objectivesList.removeChild(child);
+        }
+      });
+
+      const fragment = document.createDocumentFragment();
+      zoneIds.forEach(zoneId => {
+        const zoneElement = this.zoneElements.get(zoneId);
+        if (zoneElement) {
+          fragment.appendChild(zoneElement.root);
+        }
+      });
+      this.elements.objectivesList.appendChild(fragment);
+      this.zoneOrder = zoneIds;
+    }
   }
 
-  private createZoneElement(zone: CaptureZone): HTMLDivElement {
-    const element = document.createElement('div');
-    element.className = 'zone-item';
+  private createZoneElement(zone: CaptureZone): ZoneElementRefs {
+    const root = document.createElement('div');
+    root.className = 'zone-item';
 
-    // Determine zone class
+    const nameRow = document.createElement('div');
+    const nameEl = document.createElement('span');
+    nameEl.className = 'zone-name';
+    const distanceEl = document.createElement('span');
+    distanceEl.className = 'zone-distance';
+    nameRow.appendChild(nameEl);
+    nameRow.appendChild(distanceEl);
+
+    const statusContainer = document.createElement('div');
+    statusContainer.className = 'zone-status';
+    const iconEl = document.createElement('div');
+    iconEl.className = 'zone-icon zone-neutral';
+    statusContainer.appendChild(iconEl);
+
+    const progressContainer = document.createElement('div');
+    progressContainer.className = 'capture-progress';
+    const progressBar = document.createElement('div');
+    progressBar.className = 'capture-bar';
+    progressContainer.appendChild(progressBar);
+    progressContainer.style.display = 'none';
+
+    root.appendChild(nameRow);
+    root.appendChild(statusContainer);
+    root.appendChild(progressContainer);
+
+    const elementRefs: ZoneElementRefs = {
+      root,
+      nameEl,
+      distanceEl,
+      iconEl,
+      progressContainer,
+      progressBar
+    };
+
+    this.updateZoneElement(elementRefs, zone);
+    return elementRefs;
+  }
+
+  private updateZoneElement(element: ZoneElementRefs, zone: CaptureZone): void {
     let zoneClass = 'zone-neutral';
-    let statusText = 'Neutral';
 
     switch (zone.state) {
       case ZoneState.US_CONTROLLED:
         zoneClass = 'zone-us';
-        statusText = 'US';
         break;
       case ZoneState.OPFOR_CONTROLLED:
         zoneClass = 'zone-opfor';
-        statusText = 'OPFOR';
         break;
       case ZoneState.CONTESTED:
         zoneClass = 'zone-contested';
-        statusText = 'Contested';
         break;
     }
 
-    // Calculate distance to player
     const distance = Math.round(zone.position.length());
+    element.nameEl.textContent = zone.name;
+    element.distanceEl.textContent = `${distance}m`;
+    element.iconEl.className = `zone-icon ${zoneClass}`;
 
-    element.innerHTML = `
-      <div>
-        <span class="zone-name">${zone.name}</span>
-        <span class="zone-distance">${distance}m</span>
-      </div>
-      <div class="zone-status">
-        <div class="zone-icon ${zoneClass}"></div>
-      </div>
-    `;
-
-    // Add capture progress bar if contested
     if (zone.state === ZoneState.CONTESTED) {
-      const progressContainer = document.createElement('div');
-      progressContainer.className = 'capture-progress';
-      const progressBar = document.createElement('div');
-      progressBar.className = 'capture-bar';
-      progressBar.style.width = `${zone.captureProgress}%`;
-      progressContainer.appendChild(progressBar);
-      element.appendChild(progressContainer);
+      element.progressContainer.style.display = 'block';
+      element.progressBar.style.width = `${zone.captureProgress}%`;
+    } else {
+      element.progressContainer.style.display = 'none';
     }
-
-    return element;
   }
 
   updateTicketDisplay(usTickets: number, opforTickets: number, isTDM: boolean = false, target: number = 0): void {
-    if (isTDM) {
-      this.elements.ticketDisplay.innerHTML = `
-        <div style="position: absolute; top: -25px; left: 50%; transform: translateX(-50%); width: 200px; text-align: center; color: #aaa; font-size: 10px; letter-spacing: 1px; font-weight: bold;">FIRST TO ${target} KILLS</div>
-        <div class="faction-tickets">
-          <div class="faction-name">US Kills</div>
-          <div class="ticket-count us-tickets">${Math.round(usTickets)}</div>
-        </div>
-        <div class="ticket-separator">VS</div>
-        <div class="faction-tickets">
-          <div class="faction-name">OPFOR Kills</div>
-          <div class="ticket-count opfor-tickets">${Math.round(opforTickets)}</div>
-        </div>
-      `;
-      return;
+    const mode: 'tdm' | 'standard' = isTDM ? 'tdm' : 'standard';
+    if (this.ticketDisplayMode !== mode) {
+      this.ticketDisplayMode = mode;
+      if (isTDM) {
+        this.ticketHeader.style.display = 'block';
+        this.usTicketName.textContent = 'US Kills';
+        this.opforTicketName.textContent = 'OPFOR Kills';
+      } else {
+        this.ticketHeader.style.display = 'none';
+        this.usTicketName.textContent = 'US Forces';
+        this.opforTicketName.textContent = 'OPFOR';
+      }
     }
 
-    this.elements.ticketDisplay.innerHTML = `
-      <div class="faction-tickets">
-        <div class="faction-name">US Forces</div>
-        <div class="ticket-count us-tickets">${Math.round(usTickets)}</div>
-      </div>
-      <div class="ticket-separator">VS</div>
-      <div class="faction-tickets">
-        <div class="faction-name">OPFOR</div>
-        <div class="ticket-count opfor-tickets">${Math.round(opforTickets)}</div>
-      </div>
-    `;
+    if (isTDM) {
+      this.ticketHeader.textContent = `FIRST TO ${target} KILLS`;
+    }
+
+    this.usTicketCount.textContent = `${Math.round(usTickets)}`;
+    this.opforTicketCount.textContent = `${Math.round(opforTickets)}`;
   }
 
   updateCombatStats(combatantSystem: CombatantSystem): void {
     const stats = combatantSystem.getCombatStats();
 
-    this.elements.combatStats.innerHTML = `
-      <div class="stat-line">Allies: ${stats.us}</div>
-      <div class="stat-line">Enemies: ${stats.opfor}</div>
-      <div class="stat-line">Total: ${stats.total}</div>
-    `;
+    if (this.combatStatsLines.length === 0) {
+      return;
+    }
+
+    this.combatStatsLines[0].textContent = `Allies: ${stats.us}`;
+    this.combatStatsLines[1].textContent = `Enemies: ${stats.opfor}`;
+    this.combatStatsLines[2].textContent = `Total: ${stats.total}`;
   }
 
   updateKillCounter(): void {
@@ -131,11 +194,13 @@ export class HUDUpdater {
       ? (this.playerKills / this.playerDeaths).toFixed(2)
       : this.playerKills.toFixed(2);
 
-    this.elements.killCounter.innerHTML = `
-      <div><span class="kill-count">${this.playerKills}</span> Kills</div>
-      <div><span class="death-count">${this.playerDeaths}</span> Deaths</div>
-      <div class="kd-ratio">K/D: ${kd}</div>
-    `;
+    if (!this.killCountEl || !this.deathCountEl || !this.kdRatioEl) {
+      return;
+    }
+
+    this.killCountEl.textContent = `${this.playerKills}`;
+    this.deathCountEl.textContent = `${this.playerDeaths}`;
+    this.kdRatioEl.textContent = `K/D: ${kd}`;
   }
 
   updateGameStatus(ticketSystem: TicketSystem): void {
@@ -172,10 +237,19 @@ export class HUDUpdater {
       }
     }
 
-    this.elements.gameStatus.innerHTML = `
-      <div>${statusText}</div>
-      ${bleedText ? `<div class="bleed-indicator">${bleedText}</div>` : ''}
-    `;
+    if (this.gameStatusTextEl) {
+      this.gameStatusTextEl.textContent = statusText;
+    }
+
+    if (this.bleedIndicatorEl) {
+      if (bleedText) {
+        this.bleedIndicatorEl.textContent = bleedText;
+        this.bleedIndicatorEl.style.display = 'block';
+      } else {
+        this.bleedIndicatorEl.textContent = '';
+        this.bleedIndicatorEl.style.display = 'none';
+      }
+    }
   }
 
   addKill(): void {
@@ -224,4 +298,134 @@ export class HUDUpdater {
   getPlayerDeaths(): number {
     return this.playerDeaths;
   }
+
+  private initializeTicketDisplay(): void {
+    while (this.elements.ticketDisplay.firstChild) {
+      this.elements.ticketDisplay.removeChild(this.elements.ticketDisplay.firstChild);
+    }
+
+    this.ticketHeader = document.createElement('div');
+    this.ticketHeader.style.cssText = [
+      'position: absolute',
+      'top: -25px',
+      'left: 50%',
+      'transform: translateX(-50%)',
+      'width: 200px',
+      'text-align: center',
+      'color: #aaa',
+      'font-size: 10px',
+      'letter-spacing: 1px',
+      'font-weight: bold'
+    ].join('; ');
+
+    const usContainer = document.createElement('div');
+    usContainer.className = 'faction-tickets';
+    this.usTicketName = document.createElement('div');
+    this.usTicketName.className = 'faction-name';
+    this.usTicketCount = document.createElement('div');
+    this.usTicketCount.className = 'ticket-count us-tickets';
+    usContainer.appendChild(this.usTicketName);
+    usContainer.appendChild(this.usTicketCount);
+
+    const separator = document.createElement('div');
+    separator.className = 'ticket-separator';
+    separator.textContent = 'VS';
+
+    const opforContainer = document.createElement('div');
+    opforContainer.className = 'faction-tickets';
+    this.opforTicketName = document.createElement('div');
+    this.opforTicketName.className = 'faction-name';
+    this.opforTicketCount = document.createElement('div');
+    this.opforTicketCount.className = 'ticket-count opfor-tickets';
+    opforContainer.appendChild(this.opforTicketName);
+    opforContainer.appendChild(this.opforTicketCount);
+
+    this.elements.ticketDisplay.appendChild(this.ticketHeader);
+    this.elements.ticketDisplay.appendChild(usContainer);
+    this.elements.ticketDisplay.appendChild(separator);
+    this.elements.ticketDisplay.appendChild(opforContainer);
+  }
+
+  private initializeCombatStats(): void {
+    while (this.elements.combatStats.firstChild) {
+      this.elements.combatStats.removeChild(this.elements.combatStats.firstChild);
+    }
+
+    this.combatStatsLines = [
+      document.createElement('div'),
+      document.createElement('div'),
+      document.createElement('div')
+    ];
+
+    this.combatStatsLines.forEach(line => {
+      line.className = 'stat-line';
+      this.elements.combatStats.appendChild(line);
+    });
+  }
+
+  private initializeKillCounter(): void {
+    const killCount = this.elements.killCounter.querySelector('.kill-count') as HTMLSpanElement | null;
+    const deathCount = this.elements.killCounter.querySelector('.death-count') as HTMLSpanElement | null;
+    const kdRatio = this.elements.killCounter.querySelector('.kd-ratio') as HTMLDivElement | null;
+
+    if (killCount && deathCount && kdRatio) {
+      this.killCountEl = killCount;
+      this.deathCountEl = deathCount;
+      this.kdRatioEl = kdRatio;
+      return;
+    }
+
+    while (this.elements.killCounter.firstChild) {
+      this.elements.killCounter.removeChild(this.elements.killCounter.firstChild);
+    }
+
+    const killsLine = document.createElement('div');
+    const killsSpan = document.createElement('span');
+    killsSpan.className = 'kill-count';
+    killsSpan.textContent = '0';
+    killsLine.appendChild(killsSpan);
+    killsLine.append(' Kills');
+
+    const deathsLine = document.createElement('div');
+    const deathsSpan = document.createElement('span');
+    deathsSpan.className = 'death-count';
+    deathsSpan.textContent = '0';
+    deathsLine.appendChild(deathsSpan);
+    deathsLine.append(' Deaths');
+
+    const kdLine = document.createElement('div');
+    kdLine.className = 'kd-ratio';
+    kdLine.textContent = 'K/D: 0.00';
+
+    this.elements.killCounter.appendChild(killsLine);
+    this.elements.killCounter.appendChild(deathsLine);
+    this.elements.killCounter.appendChild(kdLine);
+
+    this.killCountEl = killsSpan;
+    this.deathCountEl = deathsSpan;
+    this.kdRatioEl = kdLine;
+  }
+
+  private initializeGameStatus(): void {
+    while (this.elements.gameStatus.firstChild) {
+      this.elements.gameStatus.removeChild(this.elements.gameStatus.firstChild);
+    }
+
+    this.gameStatusTextEl = document.createElement('div');
+    this.bleedIndicatorEl = document.createElement('div');
+    this.bleedIndicatorEl.className = 'bleed-indicator';
+    this.bleedIndicatorEl.style.display = 'none';
+
+    this.elements.gameStatus.appendChild(this.gameStatusTextEl);
+    this.elements.gameStatus.appendChild(this.bleedIndicatorEl);
+  }
+}
+
+interface ZoneElementRefs {
+  root: HTMLDivElement;
+  nameEl: HTMLSpanElement;
+  distanceEl: HTMLSpanElement;
+  iconEl: HTMLDivElement;
+  progressContainer: HTMLDivElement;
+  progressBar: HTMLDivElement;
 }
