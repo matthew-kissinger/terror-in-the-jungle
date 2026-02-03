@@ -4,6 +4,14 @@ import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager'
 import { objectPool } from '../../../utils/ObjectPoolManager'
 import { getHeightQueryCache } from '../../terrain/HeightQueryCache'
 
+const _leftDir = new THREE.Vector3()
+const _rightDir = new THREE.Vector3()
+const _leftPos = new THREE.Vector3()
+const _rightPos = new THREE.Vector3()
+const _toTarget = new THREE.Vector3()
+const _spreadOffset = new THREE.Vector3()
+const _centroidCopy = new THREE.Vector3()
+
 /**
  * Flanking operation status
  */
@@ -355,8 +363,8 @@ export class AIFlankingSystem {
     toTarget.subVectors(targetPosition, centroid).normalize()
 
     // Check terrain heights on both sides
-    const leftDir = new THREE.Vector3(-toTarget.z, 0, toTarget.x)
-    const rightDir = new THREE.Vector3(toTarget.z, 0, -toTarget.x)
+    _leftDir.set(-toTarget.z, 0, toTarget.x)
+    _rightDir.set(toTarget.z, 0, -toTarget.x)
 
     let leftScore = 0
     let rightScore = 0
@@ -364,11 +372,11 @@ export class AIFlankingSystem {
     if (this.chunkManager) {
       // Sample terrain along flank routes
       for (let dist = 10; dist <= this.FLANK_DISTANCE; dist += 10) {
-        const leftPos = centroid.clone().add(leftDir.clone().multiplyScalar(dist))
-        const rightPos = centroid.clone().add(rightDir.clone().multiplyScalar(dist))
+        _leftPos.copy(centroid).add(_centroidCopy.copy(_leftDir).multiplyScalar(dist))
+        _rightPos.copy(centroid).add(_centroidCopy.copy(_rightDir).multiplyScalar(dist))
 
-        const leftHeight = getHeightQueryCache().getHeightAt(leftPos.x, leftPos.z)
-        const rightHeight = getHeightQueryCache().getHeightAt(rightPos.x, rightPos.z)
+        const leftHeight = getHeightQueryCache().getHeightAt(_leftPos.x, _leftPos.z)
+        const rightHeight = getHeightQueryCache().getHeightAt(_rightPos.x, _rightPos.z)
 
         // Prefer elevated positions
         leftScore += leftHeight
@@ -426,7 +434,11 @@ export class AIFlankingSystem {
       if (!combatant || combatant.state === CombatantState.DEAD) continue
 
       combatant.state = CombatantState.SUPPRESSING
-      combatant.suppressionTarget = operation.targetPosition.clone()
+      if (combatant.suppressionTarget) {
+        combatant.suppressionTarget.copy(operation.targetPosition)
+      } else {
+        combatant.suppressionTarget = operation.targetPosition
+      }
       combatant.suppressionEndTime = Date.now() + this.SUPPRESSION_DURATION_MS + 2000
       combatant.isFullAuto = true
       combatant.skillProfile.burstLength = 8
@@ -434,10 +446,8 @@ export class AIFlankingSystem {
       combatant.alertTimer = 10
 
       // Face target
-      const toTarget = new THREE.Vector3()
-        .subVectors(operation.targetPosition, combatant.position)
-        .normalize()
-      combatant.rotation = Math.atan2(toTarget.z, toTarget.x)
+      _toTarget.subVectors(operation.targetPosition, combatant.position).normalize()
+      combatant.rotation = Math.atan2(_toTarget.z, _toTarget.x)
     }
   }
 
@@ -456,13 +466,14 @@ export class AIFlankingSystem {
       const offsetAngle = ((i / flankerCount) - 0.5) * (Math.PI / 6)  // +/- 15 degrees spread
       const spreadDistance = 5
 
-      const spreadOffset = new THREE.Vector3(
+      _spreadOffset.set(
         Math.cos(offsetAngle) * spreadDistance,
         0,
         Math.sin(offsetAngle) * spreadDistance
       )
 
-      const flankerDestination = operation.flankWaypoint.clone().add(spreadOffset)
+      const flankerDestination = combatant.destinationPoint || objectPool.getVector3()
+      flankerDestination.copy(operation.flankWaypoint).add(_spreadOffset)
       if (this.chunkManager) {
         flankerDestination.y = getHeightQueryCache().getHeightAt(flankerDestination.x, flankerDestination.z)
       }
