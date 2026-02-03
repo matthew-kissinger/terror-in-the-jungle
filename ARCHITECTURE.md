@@ -82,9 +82,9 @@ main.ts (Entry Point)
 
 ## Key Refactored Systems
 
-### CombatantSystem (Refactored: 1,764 → 438 lines)
+### CombatantSystem (1,308 lines)
 **Modules**:
-- `CombatantSystem.ts`: Main orchestrator
+- `CombatantSystem.ts`: Main orchestrator (1,308 lines)
 - `CombatantFactory.ts`: Entity creation and initialization
 - `CombatantAI.ts`: AI state machines and decision making
 - `CombatantCombat.ts`: Combat mechanics and damage
@@ -108,6 +108,17 @@ main.ts (Entry Point)
 - `areca`: Common mid-size plants (15,000 max)
 - `dipterocarp`: Giant canopy trees (3,000 max)
 - `banyan`: Giant twisted trees (3,000 max)
+
+### Terrain Systems
+**New Additions (2025)**:
+- `HeightQueryCache.ts`: Cached terrain height lookups (197 lines) - Performance optimization for frequent height queries
+- `GPUTerrain.ts`: GPU-accelerated terrain rendering (421 lines) - Efficient terrain mesh generation and LOD
+- `ChunkWorkerPool.ts`: Manages pool of chunk generation workers (715 lines) - Parallel chunk processing coordination
+
+### Web Worker Systems
+**Modules** (`/src/workers/`):
+- `BVHWorker.ts`: Parallel BVH computation (212 lines) - Pool of 4 workers for accelerated spatial queries
+- `ChunkWorker.ts`: Terrain chunk generation (314 lines) - Offload heavy chunk processing to background threads
 
 ### ZoneManager (Refactored: 824 → 332 lines)
 **Modules**:
@@ -265,6 +276,13 @@ GPUBillboardSystem uses height-based fog in fragment shader:
 - `Chunk.ts`: Legacy chunk system (refactored)
 - `ChunkTerrain.ts`: Terrain generation
 - `ChunkVegetation.ts`: Vegetation placement
+- `HeightQueryCache.ts`: Cached height lookups (197 lines)
+- `GPUTerrain.ts`: GPU-accelerated terrain rendering (421 lines)
+- `ChunkWorkerPool.ts`: Worker pool management (715 lines)
+
+### Web Workers (`/src/workers/`)
+- `BVHWorker.ts`: Parallel BVH computation (212 lines)
+- `ChunkWorker.ts`: Chunk generation worker (314 lines)
 
 ## Adding New Features
 
