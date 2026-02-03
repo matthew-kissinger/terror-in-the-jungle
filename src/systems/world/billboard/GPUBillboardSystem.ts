@@ -436,6 +436,7 @@ export class GPUBillboardVegetation {
 export class GPUBillboardSystem {
   private vegetationTypes: Map<string, GPUBillboardVegetation> = new Map();
   private chunkInstances: Map<string, Map<string, number[]>> = new Map();
+  private chunkBounds: Map<string, THREE.Box2> = new Map();
   private scene: THREE.Scene;
   private assetLoader: AssetLoader;
 
@@ -534,6 +535,17 @@ export class GPUBillboardSystem {
     }
 
     this.chunkInstances.get(chunkKey)!.set(type, indices);
+
+    // Update chunk bounds for spatial optimization
+    let bounds = this.chunkBounds.get(chunkKey);
+    if (!bounds) {
+      bounds = new THREE.Box2();
+      this.chunkBounds.set(chunkKey, bounds);
+    }
+    
+    for (const instance of instances) {
+      bounds.expandByPoint(new THREE.Vector2(instance.position.x, instance.position.z));
+    }
   }
 
   // Remove all instances for a chunk
@@ -551,6 +563,7 @@ export class GPUBillboardSystem {
     });
 
     this.chunkInstances.delete(chunkKey);
+    this.chunkBounds.delete(chunkKey);
     console.log(`🗑️ GPU: Removed ${totalRemoved} vegetation instances for chunk ${chunkKey}`);
   }
 
@@ -586,33 +599,61 @@ export class GPUBillboardSystem {
 
     let totalCleared = 0;
     const radiusSq = radius * radius;
+    const center = new THREE.Vector2(centerX, centerZ);
 
-    // Go through each vegetation type
-    this.vegetationTypes.forEach((vegetation, type) => {
-      const indicesToRemove: number[] = [];
-
-      // Check each instance position up to highWaterMark
-      const positions = vegetation.getInstancePositions();
-      const highWaterMark = vegetation.getHighWaterMark();
-      
-      for (let i = 0; i < highWaterMark; i++) {
-        const i3 = i * 3;
-        const x = positions[i3];
-        const z = positions[i3 + 2];
-
-        const dx = x - centerX;
-        const dz = z - centerZ;
-        const distSq = dx * dx + dz * dz;
-        
-        if (distSq <= radiusSq) {
-          indicesToRemove.push(i);
-        }
+    // Use chunk bounds to skip chunks that are out of range
+    this.chunkBounds.forEach((bounds, chunkKey) => {
+      // Check if this chunk's bounding box is within range of the clearing circle
+      // Distance from point to box
+      const distSq = bounds.distanceToPoint(center) ** 2;
+      if (distSq > radiusSq) {
+        return; // Skip this chunk
       }
 
-      if (indicesToRemove.length > 0) {
-        vegetation.removeInstances(indicesToRemove);
-        totalCleared += indicesToRemove.length;
-        Logger.debug('vegetation', `Removed ${indicesToRemove.length} ${type} instances`);
+      const chunkData = this.chunkInstances.get(chunkKey);
+      if (!chunkData) return;
+
+      chunkData.forEach((indices, type) => {
+        const vegetation = this.vegetationTypes.get(type);
+        if (!vegetation) return;
+
+        const positions = vegetation.getInstancePositions();
+        const indicesToRemove: number[] = [];
+        
+        // Filter the indices in this chunk
+        const remainingIndices: number[] = [];
+
+        for (const index of indices) {
+          const i3 = index * 3;
+          const x = positions[i3];
+          const z = positions[i3 + 2];
+
+          const dx = x - centerX;
+          const dz = z - centerZ;
+          if (dx * dx + dz * dz <= radiusSq) {
+            indicesToRemove.push(index);
+          } else {
+            remainingIndices.push(index);
+          }
+        }
+
+        if (indicesToRemove.length > 0) {
+          vegetation.removeInstances(indicesToRemove);
+          totalCleared += indicesToRemove.length;
+          
+          // Update the chunk's instance list
+          if (remainingIndices.length === 0) {
+            chunkData.delete(type);
+          } else {
+            chunkData.set(type, remainingIndices);
+          }
+        }
+      });
+
+      // If all types are cleared for this chunk, remove chunk data
+      if (chunkData.size === 0) {
+        this.chunkInstances.delete(chunkKey);
+        this.chunkBounds.delete(chunkKey);
       }
     });
 
