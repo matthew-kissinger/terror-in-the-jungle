@@ -155,12 +155,33 @@ Possible areas (confirm with profiling):
 - Draw call reduction
 - Shader complexity
 
+### Event Listener Leaks (Memory)
+
+**`.bind()` bug** - Multiple files use `addEventListener('keydown', this.onKeyDown.bind(this))` then try `removeEventListener('keydown', this.onKeyDown.bind(this))`. Each `.bind()` call creates a NEW function instance, so removal silently fails. Affected files:
+- `src/systems/player/PlayerInput.ts` - 7 listeners
+- `src/systems/player/weapon/WeaponInput.ts` - 3 listeners
+- `src/systems/player/weapon/WeaponModel.ts` - 1 listener (resize)
+- `src/systems/player/InventoryManager.ts` - 1 listener
+- `src/systems/combat/PlayerSquadController.ts` - 1 listener
+- `src/systems/weapons/WeaponPickupSystem.ts` - 1 listener
+Fix: Store bound function as property (`this.boundOnKeyDown = this.onKeyDown.bind(this)`), use that for both add and remove.
+
+**Missing dispose cleanup** - These files add listeners but never remove them:
+- `src/core/PixelArtSandbox.ts` - window resize + keydown (lines 58, 61)
+- `src/ui/map/FullMapSystem.ts` - keydown + keyup (lines 297, 307)
+- `src/ui/map/OpenFrontierRespawnMap.ts` - 6 canvas events, NO dispose() method
+- `src/ui/map/RespawnMapView.ts` - click + mousemove, NO dispose() method
+- `src/ui/end/MatchEndScreen.ts` - 2 button click listeners
+- `src/ui/loading/GameModeSelection.ts` - 2 click listeners
+- `src/ui/loading/LoadingPanels.ts` - 2 click listeners
+- `src/ui/hud/SquadRadialMenu.ts` - window mousemove never removed
+
 ### Missing Pieces
 
 - **GPU timing** - Currently only CPU-side timing
 - **Memory profiling** - No heap snapshot automation
 - **Playwright test harness** - Infrastructure set up but perf regression tests not yet working
-- **Bundle code-splitting** - Vite manual chunks configured (three.js, postprocessing, UI, BVH). Main chunk ~449 kB (115 kB gzipped). Circular chunk warnings from three.js internals remain.
+- **Bundle code-splitting** - Vite manual chunks configured (three.js, postprocessing, UI, BVH). Main chunk ~455 kB (116 kB gzipped). Circular chunk warnings from three.js internals remain.
 
 ## COMPLETED: AI Sandbox Mode
 
