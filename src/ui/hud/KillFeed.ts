@@ -3,6 +3,7 @@ import { Faction } from '../../systems/combat/types';
 export type WeaponType = 'rifle' | 'shotgun' | 'smg' | 'grenade' | 'mortar' | 'melee' | 'unknown';
 
 interface KillEntry {
+  id: string;
   killerName: string;
   killerFaction: Faction;
   victimName: string;
@@ -16,6 +17,8 @@ interface KillEntry {
 export class KillFeed {
   private container: HTMLDivElement;
   private entries: KillEntry[] = [];
+  private entryElements: Map<string, HTMLElement> = new Map();
+  private entryIdCounter: number = 0;
   private readonly MAX_ENTRIES = 6;
   private readonly ENTRY_LIFETIME = 5000; // 5 seconds
   private readonly FADE_START = 3000; // Start fading after 3 seconds
@@ -52,6 +55,7 @@ export class KillFeed {
     weaponType: WeaponType = 'unknown'
   ): void {
     const entry: KillEntry = {
+      id: `kill-${Date.now()}-${++this.entryIdCounter}`,
       killerName,
       killerFaction,
       victimName,
@@ -66,7 +70,15 @@ export class KillFeed {
 
     // Remove oldest entries if we exceed max
     if (this.entries.length > this.MAX_ENTRIES) {
-      this.entries.shift();
+      const removed = this.entries.shift();
+      if (removed) {
+        // Clean up DOM element for removed entry
+        const element = this.entryElements.get(removed.id);
+        if (element && element.parentNode) {
+          element.parentNode.removeChild(element);
+        }
+        this.entryElements.delete(removed.id);
+      }
     }
 
     this.render();
@@ -89,9 +101,23 @@ export class KillFeed {
 
     // Remove expired entries
     const originalLength = this.entries.length;
+    const expiredIds: string[] = [];
     this.entries = this.entries.filter(entry => {
       const age = now - entry.timestamp;
-      return age < this.ENTRY_LIFETIME;
+      if (age >= this.ENTRY_LIFETIME) {
+        expiredIds.push(entry.id);
+        return false;
+      }
+      return true;
+    });
+
+    // Clean up DOM elements for expired entries
+    expiredIds.forEach(id => {
+      const element = this.entryElements.get(id);
+      if (element && element.parentNode) {
+        element.parentNode.removeChild(element);
+      }
+      this.entryElements.delete(id);
     });
 
     if (this.entries.length !== originalLength || needsRender) {
@@ -100,13 +126,56 @@ export class KillFeed {
   }
 
   private render(): void {
-    // Clear container
-    this.container.innerHTML = '';
+    // Build set of current entry IDs
+    const currentIds = new Set(this.entries.map(entry => entry.id));
 
-    // Render each entry (newest at bottom)
-    this.entries.forEach(entry => {
-      const entryElement = this.createEntryElement(entry);
-      this.container.appendChild(entryElement);
+    // Remove DOM elements for entries that no longer exist
+    const idsToRemove: string[] = [];
+    this.entryElements.forEach((element, id) => {
+      if (!currentIds.has(id)) {
+        if (element.parentNode) {
+          element.parentNode.removeChild(element);
+        }
+        idsToRemove.push(id);
+      }
+    });
+    idsToRemove.forEach(id => this.entryElements.delete(id));
+
+    // Update or create elements for each entry (newest at bottom)
+    this.entries.forEach((entry, index) => {
+      const existingElement = this.entryElements.get(entry.id);
+
+      if (existingElement) {
+        // Update existing element opacity and styles
+        this.updateEntryElement(existingElement, entry);
+        
+        // Ensure correct order - move element if needed
+        const currentIndex = Array.from(this.container.children).indexOf(existingElement);
+        if (currentIndex !== index) {
+          // Insert at correct position
+          if (index === this.container.children.length) {
+            this.container.appendChild(existingElement);
+          } else {
+            const referenceNode = this.container.children[index];
+            if (referenceNode !== existingElement) {
+              this.container.insertBefore(existingElement, referenceNode);
+            }
+          }
+        }
+      } else {
+        // Create new element
+        const entryElement = this.createEntryElement(entry);
+        entryElement.setAttribute('data-entry-id', entry.id);
+        
+        // Insert at correct position (newest at bottom)
+        if (index === this.container.children.length) {
+          this.container.appendChild(entryElement);
+        } else {
+          this.container.insertBefore(entryElement, this.container.children[index]);
+        }
+        
+        this.entryElements.set(entry.id, entryElement);
+      }
     });
   }
 
@@ -180,6 +249,15 @@ export class KillFeed {
     return element;
   }
 
+  private updateEntryElement(element: HTMLElement, entry: KillEntry): void {
+    const isExplosive = entry.weaponType === 'grenade' || entry.weaponType === 'mortar';
+    
+    // Update opacity and styles
+    element.style.opacity = `${entry.opacity}`;
+    element.style.background = `rgba(0, 0, 0, ${0.6 * entry.opacity})`;
+    element.style.border = `1px solid ${isExplosive ? `rgba(255, 100, 50, ${0.3 * entry.opacity})` : `rgba(255, 255, 255, ${0.2 * entry.opacity})`}`;
+  }
+
   private getWeaponIcon(weaponType: WeaponType): { text: string; color: string; size: string } {
     switch (weaponType) {
       case 'rifle':
@@ -247,6 +325,8 @@ export class KillFeed {
       styleElement.parentNode.removeChild(styleElement);
     }
 
+    // Clean up DOM elements map
+    this.entryElements.clear();
     this.entries = [];
   }
 }

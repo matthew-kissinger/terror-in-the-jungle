@@ -7,7 +7,6 @@ import { CombatantSystem } from '../combat/CombatantSystem'
 import { AssetLoader } from '../assets/AssetLoader'
 import { PlayerController } from './PlayerController'
 import { AudioManager } from '../audio/AudioManager'
-import { AmmoManager } from '../weapons/AmmoManager'
 import { ZoneManager } from '../world/ZoneManager'
 import { InventoryManager, WeaponSlot } from './InventoryManager'
 import { PlayerStatsTracker } from './PlayerStatsTracker'
@@ -15,28 +14,31 @@ import { WeaponRigManager } from './weapon/WeaponRigManager'
 import { WeaponAnimations } from './weapon/WeaponAnimations'
 import { WeaponFiring } from './weapon/WeaponFiring'
 import { WeaponReload } from './weapon/WeaponReload'
+import { WeaponModel } from './weapon/WeaponModel'
+import { WeaponInput } from './weapon/WeaponInput'
+import { WeaponAmmo } from './weapon/WeaponAmmo'
 import { ShotCommand, ShotCommandFactory } from './weapon/ShotCommand'
 
 /**
  * Thin orchestrator for first-person weapon system
- * Delegates to focused modules: WeaponRigManager, WeaponAnimations, WeaponFiring, WeaponReload
+ * Delegates to focused modules: WeaponRigManager, WeaponAnimations, WeaponFiring, WeaponReload,
+ * WeaponModel, WeaponInput, WeaponAmmo
  */
 export class FirstPersonWeapon implements GameSystem {
   private scene: THREE.Scene
   private camera: THREE.Camera
   private assetLoader: AssetLoader
   private playerController?: PlayerController
-  private gameStarted: boolean = false
-
-  // Weapon rendering
-  private weaponScene: THREE.Scene
-  private weaponCamera: THREE.OrthographicCamera
+  private isEnabled = true
 
   // Focused modules
   private rigManager: WeaponRigManager
   private animations: WeaponAnimations
   private firing: WeaponFiring
   private reload: WeaponReload
+  private model: WeaponModel
+  private input: WeaponInput
+  private ammo: WeaponAmmo
 
   // Effects pools
   private tracerPool: TracerPool
@@ -51,35 +53,27 @@ export class FirstPersonWeapon implements GameSystem {
   private inventoryManager?: InventoryManager
   private statsTracker?: PlayerStatsTracker
 
-  // Per-weapon ammo managers
-  private rifleAmmo: AmmoManager
-  private shotgunAmmo: AmmoManager
-  private smgAmmo: AmmoManager
-  private currentAmmoManager: AmmoManager
-
-  // Firing state
-  private isFiring = false
-  private isEnabled = true
-
   constructor(scene: THREE.Scene, camera: THREE.Camera, assetLoader: AssetLoader) {
     this.scene = scene
     this.camera = camera
     this.assetLoader = assetLoader
 
-    // Create separate scene for weapon overlay
-    this.weaponScene = new THREE.Scene()
-
-    // Create orthographic camera for weapon rendering
-    const aspect = window.innerWidth / window.innerHeight
-    this.weaponCamera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, 0.1, 10)
-    this.weaponCamera.position.z = 1
-
-    // Initialize modules
-    this.rigManager = new WeaponRigManager(this.weaponScene)
+    // Initialize animations and reload first
     this.animations = new WeaponAnimations(camera)
+    this.reload = new WeaponReload()
+    
+    // Create model (which creates weapon scene/camera)
+    this.model = new WeaponModel(this.animations, this.reload)
+
+    // Initialize rig manager with model's scene
+    this.rigManager = new WeaponRigManager(this.model.getWeaponScene())
+
+    // Initialize effects pools
     this.tracerPool = new TracerPool(this.scene, 96)
     this.muzzleFlashPool = new MuzzleFlashPool(this.scene, 32)
     this.impactEffectsPool = new ImpactEffectsPool(this.scene, 32)
+    
+    // Initialize firing module
     this.firing = new WeaponFiring(
       camera,
       this.rigManager.getCurrentCore(),
@@ -87,33 +81,17 @@ export class FirstPersonWeapon implements GameSystem {
       this.muzzleFlashPool,
       this.impactEffectsPool
     )
-    this.reload = new WeaponReload()
 
-    // Initialize per-weapon ammo managers
-    // Rifle: 30 round mag, 90 reserve
-    this.rifleAmmo = new AmmoManager(30, 90)
-    this.rifleAmmo.setOnReloadComplete(() => this.onReloadComplete())
-    this.rifleAmmo.setOnAmmoChange((state) => this.onAmmoChange(state))
+    // Initialize ammo management
+    this.ammo = new WeaponAmmo(
+      () => this.onReloadComplete(),
+      (state) => this.onAmmoChange(state)
+    )
 
-    // Shotgun: 8 shell tube, 24 reserve
-    this.shotgunAmmo = new AmmoManager(8, 24)
-    this.shotgunAmmo.setOnReloadComplete(() => this.onReloadComplete())
-    this.shotgunAmmo.setOnAmmoChange((state) => this.onAmmoChange(state))
-
-    // SMG: 32 round mag, 128 reserve (high capacity)
-    this.smgAmmo = new AmmoManager(32, 128)
-    this.smgAmmo.setOnReloadComplete(() => this.onReloadComplete())
-    this.smgAmmo.setOnAmmoChange((state) => this.onAmmoChange(state))
-
-    // Start with rifle ammo active
-    this.currentAmmoManager = this.rifleAmmo
-
-    // Input handlers
-    window.addEventListener('mousedown', this.onMouseDown.bind(this))
-    window.addEventListener('mouseup', this.onMouseUp.bind(this))
-    window.addEventListener('contextmenu', (e) => e.preventDefault())
-    window.addEventListener('resize', this.onWindowResize.bind(this))
-    window.addEventListener('keydown', this.onKeyDown.bind(this))
+    // Initialize input handling
+    this.input = new WeaponInput(this.animations, this.reload, this.rigManager)
+    this.input.setOnFireStart(() => this.tryFire())
+    this.input.setOnReloadStart(() => this.startReload())
   }
 
   async init(): Promise<void> {
@@ -131,7 +109,7 @@ export class FirstPersonWeapon implements GameSystem {
     console.log('✅ First Person Weapon initialized (rifle + shotgun + SMG)')
 
     // Trigger initial ammo display
-    this.onAmmoChange(this.currentAmmoManager.getState())
+    this.onAmmoChange(this.ammo.getAmmoState())
   }
 
   update(deltaTime: number): void {
@@ -140,7 +118,7 @@ export class FirstPersonWeapon implements GameSystem {
 
     // Update ammo manager with player position for zone resupply
     const playerPos = this.playerController?.getPosition()
-    this.currentAmmoManager.update(deltaTime, playerPos)
+    this.ammo.getCurrentAmmoManager().update(deltaTime, playerPos)
 
     // Get player movement state
     const isMoving = this.playerController?.isMoving() || false
@@ -154,7 +132,7 @@ export class FirstPersonWeapon implements GameSystem {
 
     // Update weapon switch animation
     if (this.rigManager.isSwitching()) {
-      this.rigManager.updateSwitchAnimation(deltaTime, this.hudSystem, this.audioManager, this.currentAmmoManager)
+      this.rigManager.updateSwitchAnimation(deltaTime, this.hudSystem, this.audioManager, this.ammo.getCurrentAmmoManager())
       // Update references after switch completes
       if (!this.rigManager.isSwitching()) {
         this.updateWeaponReferences()
@@ -162,14 +140,14 @@ export class FirstPersonWeapon implements GameSystem {
     }
 
     // Apply weapon transform
-    this.updateWeaponTransform()
+    this.model.updateTransform(this.rigManager)
 
     // Gunplay cooldown
     const gunCore = this.rigManager.getCurrentCore()
     gunCore.cooldown(deltaTime)
 
     // Auto-fire while mouse is held
-    if (this.isFiring) {
+    if (this.input.isFiringActive()) {
       this.tryFire()
     }
 
@@ -180,22 +158,13 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   dispose(): void {
-    window.removeEventListener('mousedown', this.onMouseDown.bind(this))
-    window.removeEventListener('mouseup', this.onMouseUp.bind(this))
-    window.removeEventListener('resize', this.onWindowResize.bind(this))
-    window.removeEventListener('keydown', this.onKeyDown.bind(this))
+    this.input.dispose()
+    this.model.dispose()
     this.tracerPool.dispose()
     this.muzzleFlashPool.dispose()
     this.impactEffectsPool.dispose()
 
     console.log('🧹 First Person Weapon disposed')
-  }
-
-  private onWindowResize(): void {
-    const aspect = window.innerWidth / window.innerHeight
-    this.weaponCamera.left = -aspect
-    this.weaponCamera.right = aspect
-    this.weaponCamera.updateProjectionMatrix()
   }
 
   setPlayerController(controller: PlayerController): void {
@@ -214,6 +183,7 @@ export class FirstPersonWeapon implements GameSystem {
 
   setInventoryManager(inventoryManager: InventoryManager): void {
     this.inventoryManager = inventoryManager
+    this.input.setInventoryManager(inventoryManager)
 
     // Listen for weapon slot changes
     inventoryManager.onSlotChange((slot) => {
@@ -228,144 +198,53 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   private switchToRifle(): void {
-    if (this.rigManager.startWeaponSwitch('rifle', this.hudSystem, this.audioManager, this.rifleAmmo)) {
-      this.isFiring = false
+    if (this.rigManager.startWeaponSwitch('rifle', this.hudSystem, this.audioManager, this.ammo.getRifleAmmo())) {
+      this.input.setFiringActive(false)
       this.animations.setADS(false)
-      this.currentAmmoManager = this.rifleAmmo
+      this.ammo.setCurrentAmmoManager(this.ammo.getRifleAmmo())
       // Update HUD with new weapon's ammo
-      this.onAmmoChange(this.currentAmmoManager.getState())
+      this.onAmmoChange(this.ammo.getAmmoState())
     }
   }
 
   private switchToShotgun(): void {
-    if (this.rigManager.startWeaponSwitch('shotgun', this.hudSystem, this.audioManager, this.shotgunAmmo)) {
-      this.isFiring = false
+    if (this.rigManager.startWeaponSwitch('shotgun', this.hudSystem, this.audioManager, this.ammo.getShotgunAmmo())) {
+      this.input.setFiringActive(false)
       this.animations.setADS(false)
-      this.currentAmmoManager = this.shotgunAmmo
+      this.ammo.setCurrentAmmoManager(this.ammo.getShotgunAmmo())
       // Update HUD with new weapon's ammo
-      this.onAmmoChange(this.currentAmmoManager.getState())
+      this.onAmmoChange(this.ammo.getAmmoState())
     }
   }
 
   private switchToSMG(): void {
-    if (this.rigManager.startWeaponSwitch('smg', this.hudSystem, this.audioManager, this.smgAmmo)) {
-      this.isFiring = false
+    if (this.rigManager.startWeaponSwitch('smg', this.hudSystem, this.audioManager, this.ammo.getSMGAmmo())) {
+      this.input.setFiringActive(false)
       this.animations.setADS(false)
-      this.currentAmmoManager = this.smgAmmo
+      this.ammo.setCurrentAmmoManager(this.ammo.getSMGAmmo())
       // Update HUD with new weapon's ammo
-      this.onAmmoChange(this.currentAmmoManager.getState())
+      this.onAmmoChange(this.ammo.getAmmoState())
     }
-  }
-
-  private onMouseDown(event: MouseEvent): void {
-    // Don't process input until game has started and weapon is visible
-    if (!this.gameStarted || !this.isEnabled || !this.rigManager.getCurrentRig()) return
-
-    // Only handle gun input when PRIMARY, SHOTGUN, or SMG weapon is equipped
-    const currentSlot = this.inventoryManager?.getCurrentSlot()
-    if (this.inventoryManager && currentSlot !== WeaponSlot.PRIMARY && currentSlot !== WeaponSlot.SHOTGUN && currentSlot !== WeaponSlot.SMG) {
-      return
-    }
-
-    if (event.button === 2) {
-      // Right mouse - ADS toggle hold (can't ADS while reloading)
-      if (!this.reload.isAnimating()) {
-        this.animations.setADS(true)
-      }
-      return
-    }
-    if (event.button === 0) {
-      // Left mouse - start firing (can't fire while reloading)
-      if (!this.reload.isAnimating()) {
-        this.isFiring = true
-        this.tryFire()
-      }
-    }
-  }
-
-  private onMouseUp(event: MouseEvent): void {
-    if (event.button === 2) {
-      this.animations.setADS(false)
-    }
-    if (event.button === 0) {
-      // Stop firing when left mouse is released
-      this.isFiring = false
-    }
-  }
-
-  private updateWeaponTransform(): void {
-    const weaponRig = this.rigManager.getCurrentRig()
-    if (!weaponRig) return
-
-    const adsProgress = this.animations.getADSProgress()
-    const basePos = this.animations.getBasePosition()
-    const adsPos = this.animations.getADSPosition()
-
-    const px = THREE.MathUtils.lerp(basePos.x, adsPos.x, adsProgress)
-    const py = THREE.MathUtils.lerp(basePos.y, adsPos.y, adsProgress)
-    const pz = THREE.MathUtils.lerp(basePos.z, adsPos.z, adsProgress)
-
-    // Get offsets from modules
-    const recoilOffset = this.animations.getRecoilOffset()
-    const bobOffset = this.animations.getBobOffset()
-    const swayOffset = this.animations.getSwayOffset()
-    const reloadTranslation = this.reload.getReloadTranslation()
-    const switchOffset = this.rigManager.getSwitchOffset()
-
-    // Apply position with all offsets
-    weaponRig.position.set(
-      px + bobOffset.x + swayOffset.x + recoilOffset.x + reloadTranslation.x,
-      py + bobOffset.y + swayOffset.y + recoilOffset.y + reloadTranslation.y + switchOffset.y,
-      pz + recoilOffset.z + reloadTranslation.z
-    )
-
-    // Set up base rotations to point barrel toward crosshair
-    // Y rotation: turn gun to face forward and LEFT toward center
-    const baseYRotation = Math.PI / 2 + THREE.MathUtils.degToRad(15) // ADD to rotate LEFT
-    const adsYRotation = Math.PI / 2 // Straight forward for ADS
-    weaponRig.rotation.y = THREE.MathUtils.lerp(baseYRotation, adsYRotation, adsProgress)
-
-    // X rotation: tilt barrel UPWARD toward crosshair + reload animation + switch animation
-    const baseXRotation = THREE.MathUtils.degToRad(18) // More upward tilt when not ADS
-    const adsXRotation = 0 // Level for sight alignment
-    const reloadRotation = this.reload.getReloadRotation()
-    weaponRig.rotation.x = THREE.MathUtils.lerp(baseXRotation, adsXRotation, adsProgress) + recoilOffset.rotX + reloadRotation.x + switchOffset.rotX
-
-    // Z rotation: cant the gun + reload tilt
-    const baseCant = THREE.MathUtils.degToRad(-8) // Negative for proper cant
-    const adsCant = 0 // No cant in ADS
-    weaponRig.rotation.z = THREE.MathUtils.lerp(baseCant, adsCant, adsProgress) + reloadRotation.z
   }
 
   // Called by main game loop to render weapon overlay
   renderWeapon(renderer: THREE.WebGLRenderer): void {
-    if (!this.rigManager.getCurrentRig()) return
-
-    // Save current renderer state
-    const currentAutoClear = renderer.autoClear
-    renderer.autoClear = false
-
-    // Clear depth buffer to render on top
-    renderer.clearDepth()
-
-    // Render weapon scene
-    renderer.render(this.weaponScene, this.weaponCamera)
-
-    // Restore renderer state
-    renderer.autoClear = currentAutoClear
+    this.model.render(renderer, this.rigManager)
   }
 
   private tryFire(): void {
     const gunCore = this.rigManager.getCurrentCore()
     if (!this.combatantSystem || !gunCore.canFire() || !this.isEnabled) return
 
+    const currentAmmo = this.ammo.getCurrentAmmoManager()
+    
     // Check ammo
-    if (!this.currentAmmoManager.canFire()) {
-      if (this.currentAmmoManager.isEmpty()) {
+    if (!currentAmmo.canFire()) {
+      if (currentAmmo.isEmpty()) {
         // Play empty click sound
         console.log('🔫 *click* - Empty magazine!')
         // Auto-reload if we have reserve ammo
-        if (this.currentAmmoManager.getState().reserveAmmo > 0) {
+        if (currentAmmo.getState().reserveAmmo > 0) {
           this.startReload()
         }
       }
@@ -373,7 +252,7 @@ export class FirstPersonWeapon implements GameSystem {
     }
 
     // All validation passed - consume ammo and register shot BEFORE creating command
-    if (!this.currentAmmoManager.consumeRound()) return
+    if (!currentAmmo.consumeRound()) return
     gunCore.registerShot()
 
     // Determine weapon type
@@ -468,15 +347,13 @@ export class FirstPersonWeapon implements GameSystem {
 
   setZoneManager(zoneManager: ZoneManager): void {
     this.zoneManager = zoneManager
-    // Set zone manager for all ammo managers (for resupply)
-    this.rifleAmmo.setZoneManager(zoneManager)
-    this.shotgunAmmo.setZoneManager(zoneManager)
-    this.smgAmmo.setZoneManager(zoneManager)
+    this.ammo.setZoneManager(zoneManager)
   }
 
   // Disable weapon (for death)
   disable(): void {
     this.isEnabled = false
+    this.input.setEnabled(false)
     this.animations.setADS(false)
     this.animations.reset()
     this.rigManager.setWeaponVisibility(false)
@@ -485,13 +362,12 @@ export class FirstPersonWeapon implements GameSystem {
   // Enable weapon (for respawn)
   enable(): void {
     this.isEnabled = true
+    this.input.setEnabled(true)
     this.rigManager.setWeaponVisibility(true)
     // Reset all ammo on respawn
-    this.rifleAmmo.reset()
-    this.shotgunAmmo.reset()
-    this.smgAmmo.reset()
+    this.ammo.resetAll()
     // Update HUD with current weapon's ammo
-    this.onAmmoChange(this.currentAmmoManager.getState())
+    this.onAmmoChange(this.ammo.getAmmoState())
   }
 
   setWeaponVisibility(visible: boolean): void {
@@ -500,15 +376,7 @@ export class FirstPersonWeapon implements GameSystem {
 
   // Set game started state
   setGameStarted(started: boolean): void {
-    this.gameStarted = started
-  }
-
-  private onKeyDown(event: KeyboardEvent): void {
-    if (!this.gameStarted || !this.isEnabled) return
-
-    if (event.key.toLowerCase() === 'r') {
-      this.startReload()
-    }
+    this.input.setGameStarted(started)
   }
 
   private startReload(): void {
@@ -518,8 +386,8 @@ export class FirstPersonWeapon implements GameSystem {
       return
     }
 
-    if (this.reload.startReload(() => this.currentAmmoManager.startReload())) {
-      this.isFiring = false // Stop firing during reload
+    if (this.reload.startReload(() => this.ammo.getCurrentAmmoManager().startReload())) {
+      this.input.setFiringActive(false) // Stop firing during reload
     }
   }
 
@@ -535,13 +403,13 @@ export class FirstPersonWeapon implements GameSystem {
     }
 
     // Check for low ammo warning
-    if (this.currentAmmoManager.isLowAmmo()) {
+    if (this.ammo.getCurrentAmmoManager().isLowAmmo()) {
       console.log('⚠️ Low ammo!')
     }
   }
 
   getAmmoState(): any {
-    return this.currentAmmoManager.getState()
+    return this.ammo.getAmmoState()
   }
 
   // Update weapon references after switch
@@ -565,9 +433,10 @@ export class FirstPersonWeapon implements GameSystem {
 
   setFireingEnabled(enabled: boolean): void {
     this.isEnabled = enabled
+    this.input.setEnabled(enabled)
     if (!enabled) {
       // Stop any current firing
-      this.isFiring = false
+      this.input.setFiringActive(false)
       console.log('🚁 🔫 Firing disabled (in helicopter)')
     } else {
       console.log('🚁 🔫 Firing enabled (exited helicopter)')

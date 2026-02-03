@@ -71,6 +71,7 @@ export interface Combatant {
   lastZoneEvalTime?: number;
   updatePriority: number;
   lodLevel: 'high' | 'medium' | 'low' | 'culled';
+  distanceSq?: number;
   isPlayerProxy?: boolean;
   isObjectiveFocused?: boolean;
   isRejoiningSquad?: boolean;

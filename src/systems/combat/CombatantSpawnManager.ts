@@ -3,9 +3,11 @@ import { Combatant, CombatantState, Faction, SquadCommand } from './types';
 import { CombatantFactory } from './CombatantFactory';
 import { SquadManager } from './SquadManager';
 import { SpatialOctree } from './SpatialOctree';
-import { ZoneManager, ZoneState } from '../world/ZoneManager';
+import { ZoneManager, ZoneState, CaptureZone } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
+import { GameModeConfig, ZoneConfig } from '../../config/gameModes';
 import { RallyPointSystem } from './RallyPointSystem';
+import { TicketSystem } from '../world/TicketSystem';
 import { Logger } from '../../utils/Logger';
 
 // Module-level scratch vectors to avoid per-call allocations
@@ -167,7 +169,7 @@ export class CombatantSpawnManager {
   /**
    * Update spawning logic - progressive spawns, reinforcement waves, respawns
    */
-  update(deltaTime: number, combatEnabled: boolean, ticketSystem?: any): void {
+  update(deltaTime: number, combatEnabled: boolean, ticketSystem?: TicketSystem): void {
     // Progressive spawning (short early trickle)
     if (this.progressiveSpawnQueue.length > 0) {
       this.progressiveSpawnTimer += deltaTime * 1000;
@@ -198,7 +200,7 @@ export class CombatantSpawnManager {
   /**
    * Handle pending respawns and maintain force strength
    */
-  private manageSpawning(combatEnabled: boolean, ticketSystem?: any): void {
+  private manageSpawning(combatEnabled: boolean, ticketSystem?: TicketSystem): void {
     // Handle pending respawns for player squad members
     const now = Date.now();
     const readyToRespawn = this.pendingRespawns.filter(r => r.respawnTime <= now);
@@ -227,10 +229,9 @@ export class CombatantSpawnManager {
 
     const targetPerFaction = Math.floor(this.MAX_COMBATANTS / 2);
     const avgSquadSize = this.getAverageSquadSize();
+    const counts = this.countLivingByFaction();
 
-    const ensureFactionStrength = (faction: Faction) => {
-      const living = Array.from(this.combatants.values())
-        .filter(c => c.faction === faction && c.state !== CombatantState.DEAD).length;
+    const ensureFactionStrength = (faction: Faction, living: number) => {
       const missing = Math.max(0, targetPerFaction - living);
 
       // More aggressive refill when strength is very low
@@ -263,8 +264,8 @@ export class CombatantSpawnManager {
       }
     };
 
-    ensureFactionStrength(Faction.US);
-    ensureFactionStrength(Faction.OPFOR);
+    ensureFactionStrength(Faction.US, counts.us);
+    ensureFactionStrength(Faction.OPFOR, counts.opfor);
   }
 
   /**
@@ -285,8 +286,8 @@ export class CombatantSpawnManager {
    */
   private spawnReinforcementWave(faction: Faction): void {
     const targetPerFaction = Math.floor(this.MAX_COMBATANTS / 2);
-    const currentFactionCount = Array.from(this.combatants.values())
-      .filter(c => c.faction === faction && c.state !== CombatantState.DEAD).length;
+    const counts = this.countLivingByFaction();
+    const currentFactionCount = faction === Faction.US ? counts.us : counts.opfor;
     const missing = Math.max(0, targetPerFaction - currentFactionCount);
     if (missing === 0) return;
 
@@ -356,13 +357,19 @@ export class CombatantSpawnManager {
     }
 
     // Calculate squad centroid for reference
-    const squadMembers = squad.members.map(id => this.combatants.get(id)).filter(c => c);
     const squadCentroid = new THREE.Vector3();
-    if (squadMembers.length > 0) {
-      squadMembers.forEach(m => {
-        if (m) squadCentroid.add(m.position);
-      });
-      squadCentroid.divideScalar(squadMembers.length);
+    let validMemberCount = 0;
+    
+    for (const id of squad.members) {
+      const m = this.combatants.get(id);
+      if (m) {
+        squadCentroid.add(m.position);
+        validMemberCount++;
+      }
+    }
+    
+    if (validMemberCount > 0) {
+      squadCentroid.divideScalar(validMemberCount);
     }
 
     // Check for rally point first
@@ -449,7 +456,12 @@ export class CombatantSpawnManager {
   private getBaseSpawnPosition(faction: Faction): THREE.Vector3 {
     if (this.zoneManager) {
       const allZones = this.zoneManager.getAllZones();
-      const ownedBases = allZones.filter(z => z.owner === faction && z.isHomeBase);
+      const ownedBases: CaptureZone[] = [];
+      for (const z of allZones) {
+        if (z.owner === faction && z.isHomeBase) {
+          ownedBases.push(z);
+        }
+      }
 
       if (ownedBases.length > 0) {
         const baseZone = ownedBases[Math.floor(Math.random() * ownedBases.length)];
@@ -488,14 +500,24 @@ export class CombatantSpawnManager {
   private getSpawnPosition(faction: Faction): THREE.Vector3 {
     if (this.zoneManager) {
       const allZones = this.zoneManager.getAllZones();
-      const owned = allZones.filter(z => z.owner === faction);
+      
+      let contestedAnchor: CaptureZone | null = null;
+      let capturedAnchor: CaptureZone | null = null;
+      let hqAnchor: CaptureZone | null = null;
 
-      // Prioritize contested friendly zones
-      const contested = owned.filter(z => !z.isHomeBase && z.state === ZoneState.CONTESTED);
-      const captured = owned.filter(z => !z.isHomeBase && z.state !== ZoneState.CONTESTED);
-      const hqs = owned.filter(z => z.isHomeBase);
+      for (const z of allZones) {
+        if (z.owner !== faction) continue;
 
-      const anchorZone = (contested[0] || captured[0] || hqs[0]);
+        if (z.isHomeBase) {
+          if (!hqAnchor) hqAnchor = z;
+        } else if (z.state === ZoneState.CONTESTED) {
+          if (!contestedAnchor) contestedAnchor = z;
+        } else {
+          if (!capturedAnchor) capturedAnchor = z;
+        }
+      }
+
+      const anchorZone = contestedAnchor || capturedAnchor || hqAnchor;
       if (anchorZone) {
         const anchor = anchorZone.position;
         const angle = Math.random() * Math.PI * 2;
@@ -533,17 +555,37 @@ export class CombatantSpawnManager {
 
   private getFactionAnchors(faction: Faction): THREE.Vector3[] {
     if (!this.zoneManager) return [];
-    const zones = this.zoneManager.getAllZones().filter(z => z.owner === faction);
-    const contested = zones.filter(z => !z.isHomeBase && z.state === ZoneState.CONTESTED).map(z => z.position);
-    const captured = zones.filter(z => !z.isHomeBase && z.state !== ZoneState.CONTESTED).map(z => z.position);
-    const hqs = zones.filter(z => z.isHomeBase).map(z => z.position);
+    
+    const contested: THREE.Vector3[] = [];
+    const captured: THREE.Vector3[] = [];
+    const hqs: THREE.Vector3[] = [];
+
+    for (const z of this.zoneManager.getAllZones()) {
+      if (z.owner !== faction) continue;
+      
+      if (z.isHomeBase) {
+        hqs.push(z.position);
+      } else if (z.state === ZoneState.CONTESTED) {
+        contested.push(z.position);
+      } else {
+        captured.push(z.position);
+      }
+    }
+
     return [...contested, ...captured, ...hqs];
   }
 
-  private getHQZonesForFaction(faction: Faction, config?: any): Array<{ position: THREE.Vector3 }> {
-    const zones = config?.zones as Array<{ isHomeBase: boolean; owner: Faction; position: THREE.Vector3 }> | undefined;
+  private getHQZonesForFaction(faction: Faction, config?: GameModeConfig): Array<{ position: THREE.Vector3 }> {
+    const zones = config?.zones;
     if (!zones) return [];
-    return zones.filter(z => z.isHomeBase && z.owner === faction).map(z => ({ position: z.position }));
+    
+    const hqs: Array<{ position: THREE.Vector3 }> = [];
+    for (const z of zones) {
+      if (z.isHomeBase && z.owner === faction) {
+        hqs.push({ position: z.position });
+      }
+    }
+    return hqs;
   }
 
   private randomSquadSize(): number {
@@ -558,5 +600,15 @@ export class CombatantSpawnManager {
     const angle = Math.random() * Math.PI * 2;
     const radius = minRadius + Math.random() * (maxRadius - minRadius);
     return new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+  }
+
+  private countLivingByFaction(): { us: number; opfor: number } {
+    let us = 0, opfor = 0;
+    for (const c of this.combatants.values()) {
+      if (c.state === CombatantState.DEAD) continue;
+      if (c.faction === Faction.US) us++;
+      else if (c.faction === Faction.OPFOR) opfor++;
+    }
+    return { us, opfor };
   }
 }
