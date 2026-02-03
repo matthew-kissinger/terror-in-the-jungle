@@ -28,17 +28,6 @@ export class OpenFrontierRespawnMapRenderer {
     ctx.fillStyle = '#0a0f0a';
     ctx.fillRect(0, 0, size, size);
 
-    // Debug: Check if we have zones
-    if (zoneManager) {
-      const zones = zoneManager.getAllZones();
-      console.log(`🗺️ OpenFrontierRespawnMap: Rendering ${zones.length} zones`);
-      if (zones.length > 0) {
-        console.log('Zone names:', zones.map(z => z.name).join(', '));
-      }
-    } else {
-      console.log('⚠️ OpenFrontierRespawnMap: No zone manager set');
-    }
-
     // Save state for transformations
     ctx.save();
 
@@ -124,11 +113,6 @@ export class OpenFrontierRespawnMapRenderer {
     const { x, y } = worldToMap(zone.position.x, zone.position.z);
     const radius = getMapZoneRadius(zone);
     const isSpawnable = isZoneSpawnable(zone, gameModeManager);
-
-    // Debug first zone
-    if (zone.name === 'US Main HQ' || zone.name === 'Crossroads') {
-      console.log(`Drawing ${zone.name}: pos(${zone.position.x}, ${zone.position.z}) -> canvas(${x}, ${y}) radius:${radius}`);
-    }
 
     // Zone area fill
     ctx.fillStyle = getZoneColor(zone, 0.2, isSpawnable);
