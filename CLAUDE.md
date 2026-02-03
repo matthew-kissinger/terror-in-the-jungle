@@ -79,7 +79,6 @@ CombatantSystem has distance-based LOD:
 
 | File | Lines | Location |
 |------|-------|----------|
-| CombatantSpawnManager.ts | 615 | systems/combat/ |
 | AIFlankingSystem.ts | 606 | systems/combat/ai/ |
 | FullMapSystem.ts | 574 | ui/map/ |
 | AITargeting.ts | 571 | systems/combat/ai/ |
@@ -111,7 +110,7 @@ CombatantSystem has distance-based LOD:
 | MortarSystem.ts | 420 | systems/weapons/ |
 | DeathCamSystem.ts | 405 | systems/player/ |
 
-**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->524, extracted ChunkPriorityManager + ChunkLifecycleManager), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory). 31 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->524, extracted ChunkPriorityManager + ChunkLifecycleManager), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer). 30 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -147,6 +146,13 @@ Known hotspots:
 - **WeaponFiring per-shot allocations** - FIXED. Module-level scratch vectors for ray direction, muzzle flash positions.
 - **CombatantSpawnManager clone chains** - FIXED. Eliminated clone chains in manageSpawning() and spawnReinforcementWave().
 
+Discovered hotspots (not yet fixed):
+- **CombatantRenderer death animation allocations** - Lines 176, 188, 242-243, 253-254, 266-267, 279, 285-286, 292. Multiple `new THREE.Matrix4()`, `new THREE.Vector3()`, and `.clone()` per dying combatant per frame. Class has `scratchSpinMatrix` but only uses it in one branch. Other branches create new instances.
+- **PerformanceOverlay per-frame DOM rebuild** - Line 86: `innerHTML = ''` then full `createElement` rebuild every frame when F2 overlay is visible. Should cache DOM nodes like HUDUpdater fix.
+- **MortarBallistics clone chains** - Lines 56-75, 99. `computeTrajectory()` creates 100+ Vector3 via `.clone()` per call. `updateRoundPhysics()` clones velocity every frame per active round.
+- **TracerPool geometry leak** - Lines 105-112. `dispose()` disposes materials but not the 128 cloned geometries (2 per tracer x 64 tracers). Should share single geometry instead of cloning.
+- **ImpactEffectsPool material leak** - `dispose()` doesn't dispose individually cloned decal materials (32 clones).
+
 Possible areas (confirm with profiling):
 - Worker utilization (are they saturated?)
 - Draw call reduction
@@ -162,8 +168,7 @@ Possible areas (confirm with profiling):
 - OpenFrontierRespawnMap, RespawnMapView - added dispose()
 
 **Remaining issues:**
-- `src/ui/loadout/LoadoutSelector.ts:204` - uses `.bind(this)` in addEventListener (will fail on removal)
-- `src/ui/hud/SquadRadialMenu.ts` - window mousemove never removed
+- None known. LoadoutSelector and SquadRadialMenu were fixed (stored bound refs, dispose cleanup).
 
 ### Missing Pieces
 
