@@ -1,12 +1,18 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction, Squad, SquadCommand } from './types';
+import { Combatant, CombatantState, Faction, Squad } from './types';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
-import { ZoneManager, ZoneState } from '../world/ZoneManager';
+import { ZoneManager } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { objectPool } from '../../utils/ObjectPoolManager';
 import { clusterManager } from './ClusterManager';
 import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 import { SpatialGridManager } from './SpatialGridManager';
+import {
+  updateCombatMovement,
+  updateCoverSeekingMovement,
+  updateDefendingMovement,
+  updatePatrolMovement
+} from './CombatantMovementStates';
 
 export class CombatantMovement {
   private chunkManager?: ImprovedChunkManager;
@@ -31,13 +37,16 @@ export class CombatantMovement {
   ): void {
     // Movement based on state
     if (combatant.state === CombatantState.PATROLLING) {
-      this.updatePatrolMovement(combatant, deltaTime, squads, combatants);
+      updatePatrolMovement(combatant, deltaTime, squads, combatants, {
+        zoneManager: this.zoneManager,
+        getEnemyBasePosition: (faction: Faction) => this.getEnemyBasePosition(faction)
+      });
     } else if (combatant.state === CombatantState.ENGAGING) {
-      this.updateCombatMovement(combatant, deltaTime);
+      updateCombatMovement(combatant, deltaTime);
     } else if (combatant.state === CombatantState.SEEKING_COVER) {
-      this.updateCoverSeekingMovement(combatant, deltaTime);
+      updateCoverSeekingMovement(combatant, deltaTime);
     } else if (combatant.state === CombatantState.DEFENDING) {
-      this.updateDefendingMovement(combatant, deltaTime);
+      updateDefendingMovement(combatant, deltaTime);
     }
 
     // Apply friendly spacing force to prevent bunching
@@ -56,259 +65,6 @@ export class CombatantMovement {
     // Keep on terrain
     const terrainHeight = this.getTerrainHeight(combatant.position.x, combatant.position.z);
     combatant.position.y = terrainHeight + 3;
-  }
-
-  private updatePatrolMovement(
-    combatant: Combatant,
-    deltaTime: number,
-    squads: Map<string, Squad>,
-    combatants: Map<string, Combatant>
-  ): void {
-    // Check if this is a rejoining squad member
-    const squad = combatant.squadId ? squads.get(combatant.squadId) : undefined;
-
-    if (combatant.isRejoiningSquad && squad) {
-      this.handleRejoiningMovement(combatant, squad, combatants);
-      return;
-    }
-
-    // Check if this is a player-controlled squad first
-    if (squad && squad.isPlayerControlled && squad.currentCommand &&
-        squad.currentCommand !== SquadCommand.NONE &&
-        squad.currentCommand !== SquadCommand.FREE_ROAM) {
-      this.handlePlayerCommand(combatant, squad, combatants, deltaTime);
-      return;
-    }
-
-    // Squad movement for followers
-    if (combatant.squadId && combatant.squadRole === 'follower') {
-      if (squad && squad.leaderId) {
-        const leader = combatants.get(squad.leaderId);
-        if (leader && leader.id !== combatant.id) {
-          const toLeader = objectPool.getVector3();
-          toLeader.subVectors(leader.position, combatant.position);
-
-          if (toLeader.length() > 6) {
-            toLeader.normalize();
-            combatant.velocity.set(
-              toLeader.x * 3, // Normal squad following speed
-              0,
-              toLeader.z * 3
-            );
-            combatant.rotation = Math.atan2(toLeader.z, toLeader.x);
-            objectPool.releaseVector3(toLeader);
-            return;
-          }
-          objectPool.releaseVector3(toLeader);
-        }
-      }
-    }
-
-    // Leaders: head toward strategic capturable zones
-    if (combatant.squadRole === 'leader' && this.zoneManager) {
-      const now = performance.now();
-
-      // Throttle re-evaluation: only if we reached destination or enough time passed
-      const reachedDestination = !combatant.destinationPoint ||
-        combatant.position.distanceTo(combatant.destinationPoint) < 15;
-
-      const shouldReevaluate = reachedDestination ||
-        !combatant.lastZoneEvalTime ||
-        (now - combatant.lastZoneEvalTime > 3000 + Math.random() * 2000);
-
-      if (shouldReevaluate) {
-        combatant.lastZoneEvalTime = now;
-        const allZones = this.zoneManager.getAllZones();
-
-        let top1Zone = null, top1Score = -1;
-        let top2Zone = null, top2Score = -1;
-        let top3Zone = null, top3Score = -1;
-
-        // Optimized evaluation in a single loop to avoid multiple array allocations
-        for (let i = 0; i < allZones.length; i++) {
-          const zone = allZones[i];
-          const isCapturable = !zone.isHomeBase && zone.owner !== combatant.faction;
-          const isContestedOwned = !zone.isHomeBase && zone.owner === combatant.faction && zone.state === ZoneState.CONTESTED;
-
-          if (isCapturable || isContestedOwned) {
-            const distance = combatant.position.distanceTo(zone.position);
-            const distanceScore = Math.max(0, 300 - distance) / 300; // Closer is better
-            const bleedScore = (zone.ticketBleedRate || 1) / 3; // Higher bleed is better
-            const contestedScore = zone.state === ZoneState.CONTESTED ? 0.5 : 0; // Contested zones need help
-            const score = distanceScore * 0.5 + bleedScore * 0.3 + contestedScore * 0.2;
-
-            if (score > top1Score) {
-              top3Score = top2Score; top3Zone = top2Zone;
-              top2Score = top1Score; top2Zone = top1Zone;
-              top1Score = score; top1Zone = zone;
-            } else if (score > top2Score) {
-              top3Score = top2Score; top3Zone = top2Zone;
-              top2Score = score; top2Zone = zone;
-            } else if (score > top3Score) {
-              top3Score = score; top3Zone = zone;
-            }
-          }
-        }
-
-        // Pick from top 3 with some randomness
-        let selectedZone = null;
-        const count = (top1Zone ? 1 : 0) + (top2Zone ? 1 : 0) + (top3Zone ? 1 : 0);
-        if (count > 0) {
-          const rand = Math.floor(Math.random() * count);
-          if (rand === 0) selectedZone = top1Zone;
-          else if (rand === 1) selectedZone = top2Zone;
-          else selectedZone = top3Zone;
-        }
-
-        if (selectedZone) {
-          if (!combatant.destinationPoint) {
-            combatant.destinationPoint = selectedZone.position.clone();
-          } else {
-            combatant.destinationPoint.copy(selectedZone.position);
-          }
-        } else if (reachedDestination) {
-          // If we reached our destination and there are no new strategic zones, clear it
-          combatant.destinationPoint = undefined;
-        }
-      }
-
-      if (combatant.destinationPoint) {
-        // Move toward the selected zone
-        const toZone = objectPool.getVector3();
-        toZone.subVectors(combatant.destinationPoint, combatant.position);
-        const distance = toZone.length();
-        toZone.normalize();
-
-        // Variable speed based on distance
-        let speed = 4; // Normal speed
-        if (distance < 20) speed = 2; // Slow down when near zone
-        if (distance > 100) speed = 6; // Speed up for long distances
-
-        combatant.velocity.set(toZone.x * speed, 0, toZone.z * speed);
-        if (speed > 0.1) combatant.rotation = Math.atan2(toZone.z, toZone.x);
-        objectPool.releaseVector3(toZone);
-        return;
-      }
-    }
-
-    // Fallback: advance toward enemy territory
-    if (combatant.squadRole === 'leader') {
-      const enemyBasePos = this.getEnemyBasePosition(combatant.faction);
-
-      const toEnemyBase = objectPool.getVector3();
-      toEnemyBase.subVectors(enemyBasePos, combatant.position).normalize();
-
-      combatant.velocity.set(
-        toEnemyBase.x * 3,
-        0,
-        toEnemyBase.z * 3
-      );
-      combatant.rotation = Math.atan2(toEnemyBase.z, toEnemyBase.x);
-      objectPool.releaseVector3(toEnemyBase);
-    } else {
-      // Followers: limited wander near leader
-      combatant.timeToDirectionChange -= deltaTime;
-      if (combatant.timeToDirectionChange <= 0) {
-        combatant.wanderAngle = Math.random() * Math.PI * 2;
-        combatant.timeToDirectionChange = 2 + Math.random() * 2;
-      }
-
-      combatant.velocity.set(
-        Math.cos(combatant.wanderAngle) * 2,
-        0,
-        Math.sin(combatant.wanderAngle) * 2
-      );
-    }
-
-    // Update rotation to match movement direction
-    if (combatant.velocity.length() > 0.1) {
-      combatant.rotation = Math.atan2(combatant.velocity.z, combatant.velocity.x);
-    }
-  }
-
-  private updateCombatMovement(combatant: Combatant, deltaTime: number): void {
-    if (!combatant.target) return;
-
-    const toTarget = objectPool.getVector3();
-    toTarget.subVectors(combatant.target.position, combatant.position);
-    const distance = toTarget.length();
-    toTarget.normalize();
-
-    const idealEngagementDistance = 30;
-
-    if (distance > idealEngagementDistance + 10) {
-      // Move closer
-      combatant.velocity.copy(toTarget).multiplyScalar(3);
-    } else if (distance < idealEngagementDistance - 10) {
-      // Back up
-      combatant.velocity.copy(toTarget).multiplyScalar(-2);
-    } else {
-      // Strafe
-      const strafeAngle = Math.sin(Date.now() * 0.001) * 0.5;
-      const strafeDirection = objectPool.getVector3();
-      strafeDirection.set(-toTarget.z, 0, toTarget.x);
-      combatant.velocity.copy(strafeDirection).multiplyScalar(strafeAngle * 2);
-      objectPool.releaseVector3(strafeDirection);
-    }
-
-    objectPool.releaseVector3(toTarget);
-  }
-
-  private updateCoverSeekingMovement(combatant: Combatant, deltaTime: number): void {
-    if (!combatant.destinationPoint) {
-      combatant.velocity.set(0, 0, 0);
-      return;
-    }
-
-    const toDestination = objectPool.getVector3();
-    toDestination.subVectors(combatant.destinationPoint, combatant.position);
-    const distance = toDestination.length();
-
-    if (distance < 2) {
-      combatant.velocity.set(0, 0, 0);
-      objectPool.releaseVector3(toDestination);
-      return;
-    }
-
-    toDestination.normalize();
-
-    // Move quickly to cover with urgency
-    const speed = 6;
-    combatant.velocity.set(
-      toDestination.x * speed,
-      0,
-      toDestination.z * speed
-    );
-    objectPool.releaseVector3(toDestination);
-  }
-
-  private updateDefendingMovement(combatant: Combatant, deltaTime: number): void {
-    if (!combatant.destinationPoint) {
-      // At defensive position, hold still
-      combatant.velocity.set(0, 0, 0);
-      return;
-    }
-
-    const toDestination = objectPool.getVector3();
-    toDestination.subVectors(combatant.destinationPoint, combatant.position);
-    const distance = toDestination.length();
-
-    if (distance < 2) {
-      combatant.velocity.set(0, 0, 0);
-      objectPool.releaseVector3(toDestination);
-      return;
-    }
-
-    toDestination.normalize();
-
-    // Move to defensive position at normal speed
-    const speed = 3;
-    combatant.velocity.set(
-      toDestination.x * speed,
-      0,
-      toDestination.z * speed
-    );
-    objectPool.releaseVector3(toDestination);
   }
 
   updateRotation(combatant: Combatant, deltaTime: number): void {
@@ -331,138 +87,6 @@ export class CombatantMovement {
     while (combatant.visualRotation < 0) combatant.visualRotation += Math.PI * 2;
   }
 
-  private handleRejoiningMovement(
-    combatant: Combatant,
-    squad: Squad,
-    combatants: Map<string, Combatant>
-  ): void {
-    const squadCentroid = this.getSquadCentroid(squad, combatants);
-    if (!squadCentroid) {
-      combatant.isRejoiningSquad = false;
-      return;
-    }
-
-    const distanceToSquad = combatant.position.distanceTo(squadCentroid);
-
-    if (distanceToSquad < 15) {
-      combatant.isRejoiningSquad = false;
-      combatant.velocity.set(0, 0, 0);
-      objectPool.releaseVector3(squadCentroid);
-    } else {
-      const toSquad = objectPool.getVector3();
-      toSquad.subVectors(squadCentroid, combatant.position);
-      toSquad.normalize();
-      const speed = Math.min(7, distanceToSquad / 3);
-      combatant.velocity.set(toSquad.x * speed, 0, toSquad.z * speed);
-      combatant.rotation = Math.atan2(toSquad.z, toSquad.x);
-      objectPool.releaseVector3(toSquad);
-      objectPool.releaseVector3(squadCentroid);
-    }
-  }
-
-  private getSquadCentroid(squad: Squad, combatants: Map<string, Combatant>): THREE.Vector3 | undefined {
-    const squadMembers = squad.members
-      .map(id => combatants.get(id))
-      .filter(c => c && !c.isRejoiningSquad);
-
-    if (squadMembers.length === 0) return undefined;
-
-    const centroid = objectPool.getVector3();
-    squadMembers.forEach(member => {
-      if (member) centroid.add(member.position);
-    });
-    centroid.divideScalar(squadMembers.length);
-
-    return centroid;
-  }
-
-  private handlePlayerCommand(
-    combatant: Combatant,
-    squad: Squad,
-    combatants: Map<string, Combatant>,
-    deltaTime: number
-  ): void {
-    const command = squad.currentCommand;
-    const commandPos = squad.commandPosition;
-
-    switch (command) {
-      case SquadCommand.FOLLOW_ME:
-        if (combatant.destinationPoint) {
-          const toDestination = objectPool.getVector3();
-          toDestination.subVectors(combatant.destinationPoint, combatant.position);
-          const distance = toDestination.length();
-          if (distance > 2) {
-            toDestination.normalize();
-            const speed = Math.min(6, distance / 2);
-            combatant.velocity.set(toDestination.x * speed, 0, toDestination.z * speed);
-            combatant.rotation = Math.atan2(toDestination.z, toDestination.x);
-          } else {
-            combatant.velocity.set(0, 0, 0);
-          }
-          objectPool.releaseVector3(toDestination);
-        } else {
-          combatant.velocity.set(0, 0, 0);
-        }
-        break;
-
-      case SquadCommand.HOLD_POSITION:
-        if (combatant.destinationPoint) {
-          const toDestination = objectPool.getVector3();
-          toDestination.subVectors(combatant.destinationPoint, combatant.position);
-          const distance = toDestination.length();
-          if (distance > 2) {
-            toDestination.normalize();
-            combatant.velocity.set(toDestination.x * 4, 0, toDestination.z * 4);
-            combatant.rotation = Math.atan2(toDestination.z, toDestination.x);
-          } else {
-            combatant.velocity.set(0, 0, 0);
-          }
-          objectPool.releaseVector3(toDestination);
-        } else {
-          combatant.velocity.set(0, 0, 0);
-        }
-        break;
-
-      case SquadCommand.PATROL_HERE:
-        if (combatant.destinationPoint) {
-          const toDestination = objectPool.getVector3();
-          toDestination.subVectors(combatant.destinationPoint, combatant.position);
-          const distance = toDestination.length();
-          if (distance > 3) {
-            toDestination.normalize();
-            combatant.velocity.set(toDestination.x * 3, 0, toDestination.z * 3);
-            combatant.rotation = Math.atan2(toDestination.z, toDestination.x);
-          } else {
-            combatant.velocity.set(0, 0, 0);
-          }
-          objectPool.releaseVector3(toDestination);
-        } else {
-          combatant.velocity.set(0, 0, 0);
-        }
-        break;
-
-      case SquadCommand.RETREAT:
-        if (combatant.destinationPoint) {
-          const toDestination = objectPool.getVector3();
-          toDestination.subVectors(combatant.destinationPoint, combatant.position);
-          const distance = toDestination.length();
-          if (distance > 5) {
-            toDestination.normalize();
-            combatant.velocity.set(toDestination.x * 8, 0, toDestination.z * 8);
-            combatant.rotation = Math.atan2(toDestination.z, toDestination.x);
-          } else {
-            combatant.velocity.set(0, 0, 0);
-          }
-          objectPool.releaseVector3(toDestination);
-        } else {
-          combatant.velocity.set(0, 0, 0);
-        }
-        break;
-
-      default:
-        break;
-    }
-  }
 
   private getTerrainHeight(x: number, z: number): number {
     // Use HeightQueryCache - always returns valid height from noise
