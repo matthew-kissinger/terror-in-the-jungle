@@ -79,15 +79,19 @@ CombatantSystem has distance-based LOD:
 
 | File | Lines | Should be |
 |------|-------|-----------|
-| CombatantSystem.ts | 1308 | Split into more modules |
 | HelicopterModel.ts | 1058 | Split |
-| PlayerController.ts | 1022 | Split |
+| PlayerController.ts | 1043 | Split |
 | HUDElements.ts | 956 | Split |
 | CombatantRenderer.ts | 866 | Split |
 | AudioManager.ts | 767 | Split |
 | ImprovedChunkManager.ts | 753 | Split |
+| PlayerRespawnManager.ts | 749 | Split |
 | CombatantCombat.ts | 745 | Split |
 | ChunkWorkerPool.ts | 715 | Split |
+| GrenadeSystem.ts | 693 | Split |
+| ImprovedChunk.ts | 672 | Split |
+
+**Note**: CombatantSystem.ts was successfully split (1308 -> 538 lines).
 
 ### Optimization Targets
 
@@ -110,22 +114,37 @@ Possible areas (confirm with profiling):
 
 ### Missing Pieces
 
-- **Benchmark implementation** - `perf.benchmark()` is a stub
 - **GPU timing** - Currently only CPU-side timing
 - **Memory profiling** - No heap snapshot automation
+- **Playwright test harness** - Playwright not installed, automated perf regression tests needed
 
-## BUILD THIS: AI Sandbox Mode
+## COMPLETED: AI Sandbox Mode
 
-Create a test harness for stress testing the combat/AI systems. The goal:
+AI Sandbox mode is now implemented and can be used for automated performance testing:
 
-- Spawn a bunch of NPCs (20v20 or configurable) in a small area
-- Player in the middle, doesn't need to do anything
-- No menus, no pointer lock, no user interaction required
-- Can be driven by Playwright for automated testing
-- Expose metrics so scripts can measure performance
-- Use this to find bottlenecks, test optimizations, validate fixes
+**URL Params**:
+- `?sandbox=true` - Enable sandbox mode (auto-starts, no pointer lock required)
+- `?npcs=40` - Set NPC count (default: 40, range: 2-400)
+- `?duration=60` - Set test duration in seconds (0 = unlimited)
+- `?autostart=true` - Auto-start without user interaction
 
-Figure out the best way to implement this. Look at how game modes work, how the loading screen works, what URL params already exist. Build something that lets you run automated perf tests and iterate on optimizations without manual gameplay.
+**Metrics API** (`window.sandboxMetrics`):
+```javascript
+sandboxMetrics.frameCount      // Total frames rendered
+sandboxMetrics.avgFrameMs      // Average frame time
+sandboxMetrics.p95FrameMs      // 95th percentile frame time
+sandboxMetrics.combatantCount  // Active NPCs
+sandboxMetrics.firingCount     // NPCs currently firing
+sandboxMetrics.engagingCount   // NPCs in combat
+sandboxMetrics.getSnapshot()   // Get all metrics as object
+```
+
+**Example stress test URL**: `http://localhost:5173/?sandbox=true&npcs=80&autostart=true`
+
+**Benchmark API** (`perf.benchmark(iterations)`):
+```javascript
+perf.benchmark(1000)  // Runs 1000 raycast iterations, returns timing stats
+// Returns: { totalTimeMs, avgPerRayMs, p95Ms, p99Ms, iterations, details }
 
 ## Stack
 
@@ -167,7 +186,7 @@ src/
 |------|---------|-------|
 | `src/systems/debug/PerformanceTelemetry.ts` | Frame budget tracking | Use this |
 | `src/ui/debug/PerformanceOverlay.ts` | F2 visual overlay | Shows everything |
-| `src/systems/combat/CombatantSystem.ts` | NPC orchestrator | Likely bottleneck, 1308 lines |
+| `src/systems/combat/CombatantSystem.ts` | NPC orchestrator | Split to 538 lines |
 | `src/systems/combat/SpatialOctree.ts` | Spatial queries | Check query times |
 | `src/workers/BVHWorker.ts` | Parallel BVH | Pool of 4 workers |
 | `src/core/PixelArtSandbox.ts` | Main game loop | Where systems update |
