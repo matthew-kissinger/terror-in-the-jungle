@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { Chunk } from './Chunk';
 import { ImprovedChunk } from './ImprovedChunk';
 import { NoiseGenerator } from '../../utils/NoiseGenerator';
 import { AssetLoader } from '../assets/AssetLoader';
@@ -8,8 +7,10 @@ import { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem'
 import { Logger } from '../../utils/Logger';
 import { LOSAccelerator } from '../combat/LOSAccelerator';
 import { getHeightQueryCache } from './HeightQueryCache';
-import { ChunkWorkerPool, ChunkGeometryResult } from './ChunkWorkerPool';
+import { ChunkWorkerPool } from './ChunkWorkerPool';
 import { ViteBVHWorker } from '../../workers/BVHWorker';
+import { ChunkPriorityManager } from './ChunkPriorityManager';
+import { ChunkLifecycleManager } from './ChunkLifecycleManager';
 
 export interface ChunkConfig {
   size: number;
@@ -21,6 +22,7 @@ export interface ChunkConfig {
 
 /**
  * Improved ChunkManager with async loading and performance optimizations
+ * Orchestrates chunk priority and lifecycle management
  */
 export class ImprovedChunkManager implements GameSystem {
   private scene: THREE.Scene;
@@ -30,10 +32,9 @@ export class ImprovedChunkManager implements GameSystem {
   private noiseGenerator: NoiseGenerator;
   private globalBillboardSystem: GlobalBillboardSystem;
 
-  // Chunk storage
-  private chunks: Map<string, ImprovedChunk> = new Map();
-  private loadingChunks: Set<string> = new Set();
-  private loadQueue: Array<{x: number, z: number, priority: number}> = [];
+  // Sub-managers
+  private priorityManager: ChunkPriorityManager;
+  private lifecycleManager: ChunkLifecycleManager;
 
   // LOS acceleration
   private losAccelerator: LOSAccelerator = new LOSAccelerator();
@@ -45,7 +46,6 @@ export class ImprovedChunkManager implements GameSystem {
 
   // Player tracking
   private playerPosition = new THREE.Vector3();
-  private lastChunkPosition = new THREE.Vector2();
 
   // Adaptive bounds
   private readonly minRenderDistance: number;
@@ -107,6 +107,30 @@ export class ImprovedChunkManager implements GameSystem {
         this.bvhWorker = null;
       }
     }
+
+    // Initialize sub-managers
+    this.priorityManager = new ChunkPriorityManager({
+      loadDistance: config.loadDistance,
+      renderDistance: config.renderDistance,
+      maxQueueSize: this.MAX_QUEUE_SIZE,
+      chunkSize: config.size
+    });
+
+    this.lifecycleManager = new ChunkLifecycleManager(
+      scene,
+      assetLoader,
+      globalBillboardSystem,
+      {
+        size: config.size,
+        loadDistance: config.loadDistance,
+        renderDistance: config.renderDistance,
+        skipTerrainMesh: config.skipTerrainMesh
+      },
+      this.noiseGenerator,
+      this.losAccelerator,
+      this.workerPool,
+      this.bvhWorker
+    );
   }
 
   async init(): Promise<void> {
@@ -115,11 +139,11 @@ export class ImprovedChunkManager implements GameSystem {
     Logger.debug('chunks', `Config render=${this.config.renderDistance}, load=${this.config.loadDistance}, max=${maxChunks}, size=${this.config.size}`);
     
     // Start with smaller immediate area to reduce initial load
-    const initialChunks = this.getChunksInRadius(new THREE.Vector3(0, 0, 0), 1);
+    const initialChunks = this.priorityManager.getChunksInRadius(new THREE.Vector3(0, 0, 0), 1);
     
     // Load initial chunks synchronously for immediate playability
     for (const {x, z} of initialChunks) {
-      await this.loadChunkImmediate(x, z);
+      await this.lifecycleManager.loadChunkImmediate(x, z);
     }
     
     Logger.info('chunks', 'Initial chunks generated');
@@ -145,11 +169,13 @@ export class ImprovedChunkManager implements GameSystem {
     if (this.updateTimer >= this.UPDATE_INTERVAL) {
       this.updateTimer = 0;
       
+      // Update player position in managers
+      this.priorityManager.updatePlayerPosition(this.playerPosition);
+      this.lifecycleManager.updatePlayerPosition(this.playerPosition);
+      
       // Check if player moved to different chunk
-      const currentChunkPos = this.worldToChunkCoord(this.playerPosition);
-      if (!currentChunkPos.equals(this.lastChunkPosition)) {
+      if (this.priorityManager.hasPlayerMovedChunk()) {
         this.updateLoadQueue();
-        this.lastChunkPosition.copy(currentChunkPos);
       }
       
       // Process load queue gradually within the frame budget
@@ -165,10 +191,8 @@ export class ImprovedChunkManager implements GameSystem {
 
   dispose(): void {
     this.cancelBackgroundLoader();
-    this.chunks.forEach(chunk => chunk.dispose());
-    this.chunks.clear();
-    this.loadingChunks.clear();
-    this.loadQueue = [];
+    this.lifecycleManager.dispose();
+    this.priorityManager.clearQueue();
     this.losAccelerator.clear();
 
     // Dispose worker pool
@@ -188,65 +212,43 @@ export class ImprovedChunkManager implements GameSystem {
 
   updatePlayerPosition(position: THREE.Vector3): void {
     this.playerPosition.copy(position);
+    this.priorityManager.updatePlayerPosition(position);
+    this.lifecycleManager.updatePlayerPosition(position);
   }
 
   private updateLoadQueue(): void {
-    // Clear existing queue
-    this.loadQueue = [];
+    const chunks = this.lifecycleManager.getChunks();
+    const loadingChunks = this.lifecycleManager.getLoadingChunks();
     
-    const centerChunk = this.worldToChunkCoord(this.playerPosition);
+    // Build sets for priority manager
+    const existingChunks = new Set<string>();
+    const loadingChunksSet = new Set<string>();
     
-    // Build priority queue based on distance
-    for (let x = centerChunk.x - this.config.loadDistance; x <= centerChunk.x + this.config.loadDistance; x++) {
-      for (let z = centerChunk.y - this.config.loadDistance; z <= centerChunk.y + this.config.loadDistance; z++) {
-        const chunkKey = this.getChunkKey(x, z);
-        
-        if (!this.chunks.has(chunkKey) && !this.loadingChunks.has(chunkKey)) {
-          const distance = Math.max(Math.abs(x - centerChunk.x), Math.abs(z - centerChunk.y));
-          this.loadQueue.push({ x, z, priority: distance });
-        }
-      }
-    }
+    chunks.forEach((_, key) => existingChunks.add(key));
+    loadingChunks.forEach(key => loadingChunksSet.add(key));
     
-    // Sort by priority (closer chunks first)
-    this.loadQueue.sort((a, b) => a.priority - b.priority);
+    // Update priority queue
+    this.priorityManager.updateLoadQueue(existingChunks, loadingChunksSet);
 
-    if (this.loadQueue.length > this.MAX_QUEUE_SIZE) {
-      this.loadQueue.length = this.MAX_QUEUE_SIZE;
-    }
-
-    if (this.loadQueue.length > 0) {
+    if (this.priorityManager.getQueueSize() > 0) {
       this.scheduleBackgroundLoader();
     }
   }
 
   private drainLoadQueue(budgetMs: number, maxChunks: number): void {
-    if (this.loadQueue.length === 0) return;
-
-    const start = performance.now();
-    let processed = 0;
-
-    while (this.loadQueue.length > 0 && processed < maxChunks) {
-      if (performance.now() - start > budgetMs) {
-        break;
-      }
-
-      const item = this.loadQueue.shift();
-      if (!item) {
-        continue;
-      }
-
-      this.loadChunkAsync(item.x, item.z);
-      processed++;
+    const items = this.priorityManager.drainLoadQueue(budgetMs, maxChunks);
+    
+    if (items.length > 0) {
+      this.lifecycleManager.loadChunksAsync(items);
     }
 
-    if (this.loadQueue.length > 0) {
+    if (this.priorityManager.getQueueSize() > 0) {
       this.scheduleBackgroundLoader();
     }
   }
 
   private scheduleBackgroundLoader(): void {
-    if (this.loaderHandle !== null || this.loadQueue.length === 0) {
+    if (this.loaderHandle !== null || this.priorityManager.getQueueSize() === 0) {
       return;
     }
 
@@ -256,7 +258,7 @@ export class ImprovedChunkManager implements GameSystem {
       const budget = deadline ? Math.min(deadline.timeRemaining(), this.IDLE_BUDGET_MS) : this.IDLE_BUDGET_MS;
       this.drainLoadQueue(budget, this.MAX_CHUNKS_PER_FRAME);
 
-      if (this.loadQueue.length > 0) {
+      if (this.priorityManager.getQueueSize() > 0) {
         this.scheduleBackgroundLoader();
       }
     };
@@ -282,268 +284,27 @@ export class ImprovedChunkManager implements GameSystem {
     this.loaderHandle = null;
   }
 
-  private async loadChunkImmediate(chunkX: number, chunkZ: number): Promise<void> {
-    const chunkKey = this.getChunkKey(chunkX, chunkZ);
-    
-    if (this.chunks.has(chunkKey)) return;
-    
-    try {
-      const chunk = new ImprovedChunk(
-        this.scene,
-        this.assetLoader,
-        chunkX,
-        chunkZ,
-        this.config.size,
-        this.noiseGenerator,
-        this.globalBillboardSystem,
-        this.config.skipTerrainMesh ?? false
-      );
-
-      await chunk.generate();
-      this.chunks.set(chunkKey, chunk);
-
-      // Register chunk terrain mesh with LOS accelerator (if not skipped)
-      if (!this.config.skipTerrainMesh) {
-        const terrainMesh = chunk.getTerrainMesh();
-        if (terrainMesh) {
-          this.losAccelerator.registerChunk(chunkKey, terrainMesh);
-        }
-      }
-
-      Logger.debug('chunks', `Loaded initial chunk (${chunkX}, ${chunkZ})`);
-    } catch (error) {
-      console.error(`❌ Failed to load chunk (${chunkX}, ${chunkZ}):`, error);
-    }
-  }
-
-  private async loadChunkAsync(chunkX: number, chunkZ: number): Promise<void> {
-    const chunkKey = this.getChunkKey(chunkX, chunkZ);
-
-    if (this.chunks.has(chunkKey) || this.loadingChunks.has(chunkKey)) {
-      return;
-    }
-
-    this.loadingChunks.add(chunkKey);
-
-    // Use web worker if available for parallel terrain generation
-    if (this.workerPool) {
-      this.loadChunkWithWorker(chunkX, chunkZ, chunkKey);
-    } else {
-      // Fallback to main thread generation
-      this.loadChunkMainThread(chunkX, chunkZ, chunkKey);
-    }
-  }
-
-  /**
-   * Load chunk using web worker for parallel terrain generation
-   */
-  private async loadChunkWithWorker(chunkX: number, chunkZ: number, chunkKey: string): Promise<void> {
-    if (!this.workerPool) return;
-
-    const priority = this.getChunkDistanceFromPlayer(chunkX, chunkZ);
-
-    try {
-      // Request geometry from worker pool
-      const result = await this.workerPool.generateChunk(
-        chunkX,
-        chunkZ,
-        this.config.size,
-        priority
-      );
-
-      // Check if still needed (player might have moved)
-      const currentDistance = this.getChunkDistanceFromPlayer(chunkX, chunkZ);
-      if (currentDistance > this.config.loadDistance) {
-        result.geometry.dispose();
-        Logger.debug('chunks', `Disposed unneeded worker chunk (${chunkX}, ${chunkZ})`);
-        return;
-      }
-
-      // Compute BVH in worker (off main thread) if BVH worker available
-      let bvhComputed = false;
-      if (this.bvhWorker && !this.config.skipTerrainMesh) {
-        try {
-          const bvh = await this.bvhWorker.generate(result.geometry, {});
-          (result.geometry as any).boundsTree = bvh;
-          bvhComputed = true;
-          Logger.debug('chunks', `BVH computed in worker for chunk (${chunkX}, ${chunkZ})`);
-        } catch (bvhError) {
-          Logger.warn('chunks', `BVH worker failed for chunk (${chunkX}, ${chunkZ}), will compute on main thread`);
-        }
-      }
-
-      // Create chunk and populate with worker data
-      const chunk = new ImprovedChunk(
-        this.scene,
-        this.assetLoader,
-        chunkX,
-        chunkZ,
-        this.config.size,
-        this.noiseGenerator,
-        this.globalBillboardSystem,
-        this.config.skipTerrainMesh ?? false
-      );
-
-      // Use worker-generated geometry, height data, and vegetation
-      // Pass bvhComputed flag to skip redundant BVH computation
-      await chunk.generateFromWorker(result.geometry, result.heightData, result.vegetation, bvhComputed);
-
-      this.chunks.set(chunkKey, chunk);
-
-      // Register chunk terrain mesh with LOS accelerator (if not skipped)
-      if (!this.config.skipTerrainMesh) {
-        const terrainMesh = chunk.getTerrainMesh();
-        if (terrainMesh) {
-          this.losAccelerator.registerChunk(chunkKey, terrainMesh);
-        }
-      }
-
-      Logger.debug('chunks', `Worker loaded chunk (${chunkX}, ${chunkZ})`);
-    } catch (error) {
-      console.error(`❌ Worker failed for chunk (${chunkX}, ${chunkZ}):`, error);
-      // Fall back to main thread
-      this.loadChunkMainThread(chunkX, chunkZ, chunkKey);
-    } finally {
-      this.loadingChunks.delete(chunkKey);
-    }
-  }
-
-  /**
-   * Load chunk on main thread (fallback when workers unavailable)
-   */
-  private loadChunkMainThread(chunkX: number, chunkZ: number, chunkKey: string): void {
-    // Use setTimeout to make it truly async and not block
-    setTimeout(async () => {
-      try {
-        const chunk = new ImprovedChunk(
-          this.scene,
-          this.assetLoader,
-          chunkX,
-          chunkZ,
-          this.config.size,
-          this.noiseGenerator,
-          this.globalBillboardSystem,
-          this.config.skipTerrainMesh ?? false
-        );
-
-        await chunk.generate();
-        const currentDistance = this.getChunkDistanceFromPlayer(chunkX, chunkZ);
-
-        // Only add if still needed (player might have moved away)
-        if (currentDistance <= this.config.loadDistance) {
-          this.chunks.set(chunkKey, chunk);
-
-          // Register chunk terrain mesh with LOS accelerator (if not skipped)
-          if (!this.config.skipTerrainMesh) {
-            const terrainMesh = chunk.getTerrainMesh();
-            if (terrainMesh) {
-              this.losAccelerator.registerChunk(chunkKey, terrainMesh);
-            }
-          }
-
-          Logger.debug('chunks', `Main thread loaded chunk (${chunkX}, ${chunkZ})`);
-        } else {
-          chunk.dispose();
-          Logger.debug('chunks', `Disposed unneeded chunk (${chunkX}, ${chunkZ})`);
-        }
-      } catch (error) {
-        console.error(`❌ Failed to load chunk (${chunkX}, ${chunkZ}):`, error);
-      } finally {
-        this.loadingChunks.delete(chunkKey);
-      }
-    }, 0);
-  }
-
   private unloadDistantChunks(): void {
-    const chunksToUnload: string[] = [];
-    
-    this.chunks.forEach((chunk, key) => {
-      const [x, z] = key.split(',').map(Number);
-      const distance = this.getChunkDistanceFromPlayer(x, z);
-      
-      // Unload chunks beyond load distance
-      if (distance > this.config.loadDistance) {
-        chunksToUnload.push(key);
-      }
-    });
-
-    chunksToUnload.forEach(key => {
-      const chunk = this.chunks.get(key);
-      if (chunk) {
-        this.globalBillboardSystem.removeChunkInstances(key);
-        this.losAccelerator.unregisterChunk(key);
-        chunk.dispose();
-        this.chunks.delete(key);
-        Logger.debug('chunks', `Unloaded chunk ${key} (remaining=${this.chunks.size - 1})`);
-      }
+    this.lifecycleManager.unloadDistantChunks((chunkX, chunkZ) => {
+      return this.priorityManager.shouldChunkBeUnloaded(chunkX, chunkZ);
     });
   }
 
   private updateChunkVisibility(): void {
-    this.chunks.forEach((chunk) => {
-      const distance = this.getChunkDistance(chunk.getPosition(), this.playerPosition);
-      // Keep chunks visible with a buffer to prevent pop-in
-      const isVisible = distance <= this.config.renderDistance + 1;
-      const lodLevel = this.calculateLOD(distance);
-      
-      chunk.setVisible(isVisible);
-      chunk.setLODLevel(lodLevel);
-    });
-  }
-
-  private getChunksInRadius(center: THREE.Vector3, radius: number): Array<{x: number, z: number}> {
-    const centerChunk = this.worldToChunkCoord(center);
-    const chunks: Array<{x: number, z: number}> = [];
-    
-    for (let x = centerChunk.x - radius; x <= centerChunk.x + radius; x++) {
-      for (let z = centerChunk.y - radius; z <= centerChunk.y + radius; z++) {
-        chunks.push({x, z});
-      }
-    }
-    
-    return chunks;
-  }
-
-  private getChunkDistanceFromPlayer(chunkX: number, chunkZ: number): number {
-    const playerChunk = this.worldToChunkCoord(this.playerPosition);
-    return Math.max(Math.abs(chunkX - playerChunk.x), Math.abs(chunkZ - playerChunk.y));
-  }
-
-  private calculateLOD(distance: number): number {
-    // Balanced LOD for performance while maintaining visual quality
-    if (distance <= 3) return 0;      // Full detail for nearby chunks (radius 3)
-    if (distance <= 5) return 1;      // 50% detail for medium range
-    if (distance <= 7) return 2;      // 25% detail for far chunks
-    return 3;                         // 10% detail for very far chunks
-  }
-
-  private getChunkDistance(chunkWorldPos: THREE.Vector3, playerPos: THREE.Vector3): number {
-    return Math.max(
-      Math.abs(chunkWorldPos.x - playerPos.x) / this.config.size,
-      Math.abs(chunkWorldPos.z - playerPos.z) / this.config.size
+    this.lifecycleManager.updateChunkVisibility(
+      (chunkWorldPos, playerPos) => this.priorityManager.getChunkDistance(chunkWorldPos, playerPos),
+      (distance) => this.priorityManager.calculateLOD(distance),
+      (distance) => this.priorityManager.shouldChunkBeVisible(distance)
     );
-  }
-
-  private worldToChunkCoord(worldPos: THREE.Vector3): THREE.Vector2 {
-    return new THREE.Vector2(
-      Math.floor(worldPos.x / this.config.size),
-      Math.floor(worldPos.z / this.config.size)
-    );
-  }
-
-  private getChunkKey(chunkX: number, chunkZ: number): string {
-    return `${chunkX},${chunkZ}`;
   }
 
   // Public accessors
   getLoadedChunkCount(): number {
-    return this.chunks.size;
+    return this.lifecycleManager.getLoadedChunkCount();
   }
 
   getChunkAt(worldPos: THREE.Vector3): ImprovedChunk | undefined {
-    const chunkCoord = this.worldToChunkCoord(worldPos);
-    const key = this.getChunkKey(chunkCoord.x, chunkCoord.y);
-    return this.chunks.get(key);
+    return this.lifecycleManager.getChunkAt(worldPos);
   }
 
   getHeightAt(x: number, z: number): number {
@@ -561,8 +322,7 @@ export class ImprovedChunkManager implements GameSystem {
   }
 
   isChunkLoaded(x: number, z: number): boolean {
-    const key = this.getChunkKey(x, z);
-    return this.chunks.has(key);
+    return this.lifecycleManager.isChunkLoaded(x, z);
   }
 
   // Collision objects registry
@@ -692,11 +452,11 @@ export class ImprovedChunkManager implements GameSystem {
   }
 
   getQueueSize(): number {
-    return this.loadQueue.length;
+    return this.priorityManager.getQueueSize();
   }
 
   getLoadingCount(): number {
-    return this.loadingChunks.size;
+    return this.lifecycleManager.getLoadingCount();
   }
 
   /**
@@ -740,6 +500,17 @@ export class ImprovedChunkManager implements GameSystem {
     this.config.renderDistance = distance;
     this.config.loadDistance = distance + 1;
     Logger.info('chunks', `Render distance set to ${distance}`);
+    
+    // Update sub-managers
+    this.priorityManager.updateConfig({
+      renderDistance: distance,
+      loadDistance: distance + 1
+    });
+    this.lifecycleManager.updateConfig({
+      renderDistance: distance,
+      loadDistance: distance + 1
+    });
+    
     // Trigger chunk reload
     this.updateLoadQueue();
   }
