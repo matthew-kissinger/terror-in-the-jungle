@@ -31,6 +31,9 @@ import { RallyPointSystem } from './RallyPointSystem';
 import { CombatantSpawnManager } from './CombatantSpawnManager';
 import { CombatantLODManager } from './CombatantLODManager';
 import { CombatantProfiler } from './CombatantProfiler';
+import { CombatantSystemDamage } from './CombatantSystemDamage';
+import { CombatantSystemSetters } from './CombatantSystemSetters';
+import { CombatantSystemUpdate } from './CombatantSystemUpdate';
 
 export class CombatantSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -60,6 +63,9 @@ export class CombatantSystem implements GameSystem {
   private spawnManager: CombatantSpawnManager;
   private lodManager: CombatantLODManager;
   private profiler: CombatantProfiler;
+  private damageHandler: CombatantSystemDamage;
+  private setters: CombatantSystemSetters;
+  private updateHelpers: CombatantSystemUpdate;
 
   // Effects pools
   private tracerPool: TracerPool;
@@ -78,10 +84,6 @@ export class CombatantSystem implements GameSystem {
   // Player squad
   public shouldCreatePlayerSquad = false;
   public playerSquadId?: string;
-
-  // Squad objective management
-  private squadObjectiveTimer = 0;
-  private readonly SQUAD_OBJECTIVE_REASSIGN_INTERVAL = 10; // seconds
 
   constructor(
     scene: THREE.Scene,
@@ -149,6 +151,32 @@ export class CombatantSystem implements GameSystem {
       this.combatants,
       this.spatialGrid
     );
+
+    // Initialize extracted modules
+    this.damageHandler = new CombatantSystemDamage(
+      this.combatants,
+      this.squadManager,
+      this.spawnManager
+    );
+
+    this.setters = new CombatantSystemSetters(
+      this.combatantMovement,
+      this.combatantCombat,
+      this.combatantAI,
+      this.squadManager,
+      this.spawnManager,
+      this.lodManager,
+      this.spatialGrid
+    );
+
+    this.updateHelpers = new CombatantSystemUpdate(
+      this.combatants,
+      this.playerProxyId,
+      this.playerPosition,
+      this.combatantFactory,
+      this.squadManager,
+      this.spatialGrid
+    );
   }
 
   async init(): Promise<void> {
@@ -203,17 +231,13 @@ export class CombatantSystem implements GameSystem {
     }
 
     // Ensure player proxy exists
-    this.ensurePlayerProxy();
+    this.updateHelpers.ensurePlayerProxy();
 
     // Update spawn manager (progressive spawns, reinforcement waves, respawns)
     this.spawnManager.update(deltaTime, this.combatEnabled, this.ticketSystem);
 
     // Periodic squad objective reassignment using influence map
-    this.squadObjectiveTimer += deltaTime;
-    if (this.squadObjectiveTimer >= this.SQUAD_OBJECTIVE_REASSIGN_INTERVAL) {
-      this.squadObjectiveTimer = 0;
-      this.updateSquadObjectives();
-    }
+    this.updateHelpers.updateSquadObjectives(deltaTime);
 
     // Update influence map with current game state
     let t0 = performance.now();
@@ -274,52 +298,6 @@ export class CombatantSystem implements GameSystem {
     this.combatantAI.setSquads(this.squadManager.getAllSquads());
   }
 
-  private ensurePlayerProxy(): void {
-    let proxy = this.combatants.get(this.playerProxyId);
-    if (!proxy) {
-      proxy = this.combatantFactory.createPlayerProxy(this.playerPosition);
-      this.combatants.set(this.playerProxyId, proxy);
-      this.spatialGrid.updatePosition(this.playerProxyId, this.playerPosition);
-    } else {
-      proxy.position.copy(this.playerPosition);
-      proxy.state = CombatantState.ENGAGING;
-      this.spatialGrid.updatePosition(this.playerProxyId, this.playerPosition);
-    }
-  }
-
-  private updateSquadObjectives(): void {
-    if (!this.zoneManager) return;
-
-    const zones = this.zoneManager.getAllZones();
-    const squads = this.squadManager.getAllSquads();
-
-    squads.forEach(squad => {
-      // Skip player-controlled squads
-      if (squad.isPlayerControlled) return;
-
-      // Get squad leader position
-      let leaderPos: THREE.Vector3 | null = null;
-      if (squad.leaderId) {
-        const leader = this.combatants.get(squad.leaderId);
-        if (leader) {
-          leaderPos = leader.position.clone();
-        }
-      }
-
-      // Fallback to first member if no leader
-      if (!leaderPos && squad.members.length > 0) {
-        const firstMember = this.combatants.get(squad.members[0]);
-        if (firstMember) {
-          leaderPos = firstMember.position.clone();
-        }
-      }
-
-      if (!leaderPos) return;
-
-      // Use influence map to assign best objective
-      this.squadManager.assignSquadObjective(squad, leaderPos, zones);
-    });
-  }
 
   // Public API
   handlePlayerShot(
@@ -334,85 +312,7 @@ export class CombatantSystem implements GameSystem {
   }
 
   applyExplosionDamage(center: THREE.Vector3, radius: number, maxDamage: number): void {
-    let hitCount = 0;
-    const killedCombatants: Combatant[] = [];
-
-    this.combatants.forEach(combatant => {
-      if (combatant.state === CombatantState.DEAD) return;
-
-      const distance = combatant.position.distanceTo(center);
-
-      if (distance <= radius) {
-        const damagePercent = 1.0 - (distance / radius);
-        const damage = maxDamage * damagePercent;
-        const wasAlive = combatant.health > 0;
-
-        combatant.health -= damage;
-
-        if (combatant.health <= 0) {
-          combatant.health = 0;
-          combatant.state = CombatantState.DEAD;
-
-          // Initialize death animation for explosion (always spinfall)
-          combatant.isDying = true;
-          combatant.deathProgress = 0;
-          combatant.deathStartTime = performance.now();
-          combatant.deathAnimationType = 'spinfall'; // Explosions cause spin fall
-
-          // Calculate death direction (away from explosion center)
-          const deathDir = new THREE.Vector3()
-            .subVectors(combatant.position, center)
-            .normalize();
-          deathDir.y = 0; // Keep horizontal
-          combatant.deathDirection = deathDir;
-
-          if (this.ticketSystem && typeof (this.ticketSystem as any).onCombatantKilled === 'function') {
-            (this.ticketSystem as any).onCombatantKilled(combatant.faction);
-          }
-
-          // Queue respawn for player squad members
-          if (combatant.squadId) {
-            const squad = this.squadManager.getSquad(combatant.squadId);
-            if (squad?.isPlayerControlled) {
-              console.log(`⏳ Player squad member ${combatant.id} will respawn in 5 seconds...`);
-              this.spawnManager.queueRespawn(combatant.squadId, combatant.id);
-            }
-            this.squadManager.removeSquadMember(combatant.squadId, combatant.id);
-          }
-
-          // Track killed combatants for kill feed
-          if (wasAlive) {
-            killedCombatants.push(combatant);
-          }
-
-          console.log(`💥 ${combatant.faction} soldier killed by explosion (${damage.toFixed(0)} damage)`);
-        } else {
-          combatant.lastHitTime = Date.now();
-          console.log(`💥 ${combatant.faction} soldier hit by explosion (${damage.toFixed(0)} damage, ${combatant.health.toFixed(0)} HP left)`);
-        }
-
-        hitCount++;
-      }
-    });
-
-    // Report grenade kills to kill feed (grenades are player-thrown)
-    if (this.hudSystem && killedCombatants.length > 0) {
-      killedCombatants.forEach(victim => {
-        const victimName = `${victim.faction}-${victim.id.slice(-4)}`;
-        this.hudSystem.addKillToFeed(
-          'PLAYER',
-          Faction.US,
-          victimName,
-          victim.faction,
-          false, // Explosions don't have headshot tracking
-          'grenade'
-        );
-      });
-    }
-
-    if (hitCount > 0) {
-      console.log(`💥 Explosion hit ${hitCount} combatants`);
-    }
+    this.damageHandler.applyExplosionDamage(center, radius, maxDamage);
   }
 
   getCombatStats(): { us: number; opfor: number; total: number } {
@@ -438,75 +338,62 @@ export class CombatantSystem implements GameSystem {
   // Setters for external systems
   setChunkManager(chunkManager: ImprovedChunkManager): void {
     this.chunkManager = chunkManager;
-    this.combatantMovement.setChunkManager(chunkManager);
-    this.squadManager.setChunkManager(chunkManager);
-    this.combatantAI.setChunkManager(chunkManager);
-    this.combatantCombat.setChunkManager(chunkManager);
+    this.setters.setChunkManager(chunkManager);
   }
 
   setCamera(camera: THREE.Camera): void {
     this.camera = camera;
-    this.combatantCombat.setCamera(camera);
+    this.setters.setCamera(camera);
   }
 
   setTicketSystem(ticketSystem: TicketSystem): void {
     this.ticketSystem = ticketSystem;
-    this.combatantCombat.setTicketSystem(ticketSystem);
+    this.damageHandler.setTicketSystem(ticketSystem);
+    this.setters.setTicketSystem(ticketSystem);
   }
 
   setPlayerHealthSystem(playerHealthSystem: PlayerHealthSystem): void {
     this.playerHealthSystem = playerHealthSystem;
-    this.combatantCombat.setPlayerHealthSystem(playerHealthSystem);
+    this.setters.setPlayerHealthSystem(playerHealthSystem);
   }
 
   setZoneManager(zoneManager: ZoneManager): void {
     this.zoneManager = zoneManager;
-    this.combatantMovement.setZoneManager(zoneManager);
-    this.spawnManager.setZoneManager(zoneManager);
-    this.lodManager.setZoneManager(zoneManager);
+    this.updateHelpers.setZoneManager(zoneManager);
+    this.setters.setZoneManager(zoneManager);
   }
 
   setHUDSystem(hudSystem: any): void {
     this.hudSystem = hudSystem;
-    this.combatantCombat.setHUDSystem(hudSystem);
+    this.damageHandler.setHUDSystem(hudSystem);
+    this.setters.setHUDSystem(hudSystem);
   }
 
   setGameModeManager(gameModeManager: GameModeManager): void {
     this.gameModeManager = gameModeManager;
-    this.combatantMovement.setGameModeManager(gameModeManager);
-    this.spawnManager.setGameModeManager(gameModeManager);
-    this.lodManager.setGameModeManager(gameModeManager);
-    // Update spatial grid world size
-    const worldSize = gameModeManager.getWorldSize();
-    this.spatialGrid.setWorldSize(worldSize);
-    // Reinitialize spatial grid manager with correct world size
-    spatialGridManager.reinitialize(worldSize);
-    Logger.info('combat', `Spatial grid reinitialized with world size ${worldSize}`);
+    this.setters.setGameModeManager(gameModeManager);
   }
 
   setAudioManager(audioManager: AudioManager): void {
     this.audioManager = audioManager;
-    this.combatantCombat.setAudioManager(audioManager);
+    this.setters.setAudioManager(audioManager);
   }
 
   setPlayerSuppressionSystem(system: any): void {
-    this.combatantCombat.setPlayerSuppressionSystem(system);
+    this.setters.setPlayerSuppressionSystem(system);
   }
 
   // Game mode configuration methods
   setMaxCombatants(max: number): void {
-    this.spawnManager.setMaxCombatants(max);
-    Logger.info('combat', `Max combatants set to ${max}`);
+    this.setters.setMaxCombatants(max);
   }
 
   setSquadSizes(min: number, max: number): void {
-    this.spawnManager.setSquadSizes(min, max);
-    Logger.info('combat', `Squad sizes set to ${min}-${max}`);
+    this.setters.setSquadSizes(min, max);
   }
 
   setReinforcementInterval(interval: number): void {
-    this.spawnManager.setReinforcementInterval(interval);
-    Logger.info('combat', `Reinforcement interval set to ${interval} seconds`);
+    this.setters.setReinforcementInterval(interval);
   }
 
   enableCombat(): void {
