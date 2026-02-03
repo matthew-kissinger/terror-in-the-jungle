@@ -84,11 +84,11 @@ CombatantSystem has distance-based LOD:
 | GPUBillboardSystem.ts | 669 | systems/world/billboard/ |
 | SandboxSystemManager.ts | 644 | core/ |
 | AIFlankingSystem.ts | 606 | systems/combat/ai/ |
-| FirstPersonWeapon.ts | 568 | systems/player/ |
 | FullMapSystem.ts | 574 | ui/map/ |
 | AITargeting.ts | 571 | systems/combat/ai/ |
 | InfluenceMapSystem.ts | 570 | systems/combat/ |
-| CombatantSpawnManager.ts | 557 | systems/combat/ |
+| ChunkWorkerLifecycle.ts | 567 | systems/terrain/ |
+| CombatantSpawnManager.ts | 562 | systems/combat/ |
 | CombatantSystem.ts | 541 | systems/combat/ |
 | PixelArtSandbox.ts | 536 | core/ |
 | ImprovedChunkManager.ts | 524 | systems/terrain/ |
@@ -103,17 +103,19 @@ CombatantSystem has distance-based LOD:
 | AudioManager.ts | 453 | systems/audio/ |
 | WeatherSystem.ts | 449 | systems/environment/ |
 | CompassSystem.ts | 447 | ui/compass/ |
+| FirstPersonWeapon.ts | 445 | systems/player/ |
 | MinimapSystem.ts | 440 | ui/minimap/ |
 | AICoverSystem.ts | 437 | systems/combat/ai/ |
 | HelicopterModel.ts | 433 | systems/helicopter/ |
 | HelicopterGeometry.ts | 433 | systems/helicopter/ |
+| HUDUpdater.ts | 431 | ui/hud/ |
 | SandboxRenderer.ts | 431 | core/ |
-| WeaponFiring.ts | 422 | systems/player/weapon/ |
+| WeaponFiring.ts | 428 | systems/player/weapon/ |
 | GPUTerrain.ts | 421 | systems/terrain/ |
 | MatchEndScreen.ts | 419 | ui/end/ |
 | MortarSystem.ts | 409 | systems/weapons/ |
 
-**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->524, extracted ChunkPriorityManager + ChunkLifecycleManager). 33 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->524, extracted ChunkPriorityManager + ChunkLifecycleManager), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel). 35 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -142,8 +144,8 @@ Known hotspots:
 - **WeatherSystem rain particle loop** - FIXED. Eliminated per-particle matrix decomposition for 8000 rain particles per frame.
 - **AIFlankingSystem per-call allocations** - FIXED. Module-level scratch vectors replace per-call Vector3 clones throughout.
 - **MortarSystem detonation allocations** - Detonation loop creates 60+ Vector3 allocations (offset, position clone, normal) across 20 debris particles. Normal `new THREE.Vector3(0, 1, 0)` should be static constant.
-- **DamageNumberSystem worldToScreen() clone** - `worldToScreen()` calls `worldPos.clone()` for every active damage number every frame (up to 30 clones per frame). Should use a module-level scratch vector.
-- **HelicopterInstrumentsPanel per-frame querySelector** - `updateHelicopterInstruments()` calls `querySelector()` 4 times per frame for `.collective-fill`, `.rpm-value`, `.hover-indicator`, `.boost-indicator`. Should cache element references at construction. Also reconstructs gradient strings per frame - should use static constants.
+- **DamageNumberSystem worldToScreen() clone** - FIXED. Eliminated per-frame Vector3 clone and object allocation using module-level scratch vector.
+- **HelicopterInstrumentsPanel per-frame querySelector** - FIXED. Cached element references at construction instead of calling querySelector() 4 times per frame.
 - **CombatantLODManager.simulateDistantAI() allocations** - Creates `new THREE.Vector3()` for direction and random offset per distant combatant per call. Should use module-level scratch vectors.
 - **DeathCamSystem per-frame Vector3 allocations** - `updateOrbit()` creates new Vector3 for offset, direction, and up axis every frame during death cam sequence. Should use pre-allocated scratch vectors.
 - **WeaponFiring per-shot allocations** - `executeSingleShot()` and `executeShotgunShot()` call `ray.direction.clone().negate()` per bullet/pellet (8+ clones per shotgun shot). `spawnMuzzleFlash()` creates 3 new Vector3 every shot. Should use module-level scratch vectors.
@@ -200,7 +202,7 @@ perf.benchmark(1000)  // Runs 1000 raycast iterations, returns timing stats
 
 ## Architecture
 
-~46k lines across 164 files. Orchestrator pattern but some files got big.
+~48k lines across 182 files. Orchestrator pattern but some files got big.
 
 ```
 src/
