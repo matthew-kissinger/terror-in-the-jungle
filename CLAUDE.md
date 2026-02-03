@@ -132,10 +132,11 @@ Known hotspots:
 - **ClusterManager O(n) per NPC** - FIXED. All three methods (calculateSpacingForce, isInCluster, getClusterDensity) now use spatialGridManager.queryRadius() with early exit. O(n) -> O(log n).
 - **AITargeting cluster check** - FIXED. Combined spatial query handles both target finding and cluster detection in single pass. Module-level scratch vectors throughout.
 - **GPUBillboardSystem** - FIXED. O(1) compaction, spatial chunk bounds for area clearing, batched buffer updates.
-- **CompassSystem DOM rebuild** - `updateZoneMarkers()` calls `innerHTML = ''` and rebuilds all DOM zone markers every frame. Should cache marker elements and update positions only.
-- **MinimapSystem per-frame Vector3 allocations** - `drawCombatantIndicators()` creates `new THREE.Vector3()` per combatant per frame (~60 allocations/frame with 30v30). Should use scratch vectors.
+- **CompassSystem DOM rebuild** - FIXED. Caches zone marker DOM elements in a Map, reuses nodes, updates positions only instead of innerHTML rebuild every frame.
+- **MinimapSystem per-frame Vector3 allocations** - FIXED. Uses module-level scratch vectors instead of per-combatant per-frame allocations.
+- **FullMapSystem allocations** - FIXED. Uses module-level scratch vector instead of per-frame Vector3 allocations.
 - **ExplosionEffectsPool gravity allocation** - `update()` creates `new THREE.Vector3(0, -3, 0)` every frame. Should be a static constant.
-- **FullMapSystem allocations** - Creates `new THREE.Vector3()` in update loop, font string concatenation per zone.
+- **InfluenceMapSystem per-call Vector2/Vector3 allocations** - `computeThreatLevel()`, `computeOpportunityLevel()`, `computeCoverValue()`, `computeSquadSupport()` all create `new THREE.Vector2()`/`Vector3()` per entity in loops. Should use module-level scratch vectors. Runs every 500ms but accumulates with many entities.
 
 Possible areas (confirm with profiling):
 - Worker utilization (are they saturated?)
