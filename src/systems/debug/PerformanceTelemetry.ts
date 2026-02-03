@@ -1,64 +1,22 @@
 import * as THREE from 'three'
+import { GPUTimingTelemetry, GPUTelemetry } from './GPUTimingTelemetry'
+import { PerformanceBenchmark, BenchmarkResult, BenchmarkDependencies } from './PerformanceBenchmark'
+import {
+  SystemTiming,
+  FrameData,
+  SpatialGridTelemetry,
+  TelemetryReport
+} from './PerformanceTypes'
 
-export interface SystemTiming {
-  name: string
-  budgetMs: number
-  lastMs: number
-  emaMs: number
-  peakMs: number
-}
-
-export interface FrameData {
-  timestamp: number
-  duration: number
-  overBudget: boolean
-  systems: Record<string, number>
-}
-
-export interface SpatialGridTelemetry {
-  initialized: boolean
-  entityCount: number
-  queriesThisFrame: number
-  avgQueryTimeMs: number
-  fallbackCount: number
-  lastSyncMs: number
-}
-
-export interface GPUTelemetry {
-  available: boolean
-  gpuTimeMs: number
-  drawCalls: number
-  triangles: number
-  geometries: number
-  textures: number
-  programs: number
-}
-
-export interface TelemetryReport {
-  fps: number
-  avgFrameMs: number
-  overBudgetPercent: number
-  systemBreakdown: SystemTiming[]
-  spatialGrid: SpatialGridTelemetry
-  hitDetection: {
-    shotsThisSession: number
-    hitsThisSession: number
-    hitRate: number
-  }
-  gpu: GPUTelemetry
-}
-
-export interface BenchmarkResult {
-  totalTimeMs: number
-  avgPerRayMs: number
-  p95Ms: number
-  p99Ms: number
-  iterations: number
-  details?: {
-    gridQueryTimeMs: number
-    hitDetectionTimeMs: number
-    terrainTimeMs: number
-  }
+// Re-export types for convenience
+export type {
+  SystemTiming,
+  FrameData,
+  SpatialGridTelemetry,
+  TelemetryReport,
+  GPUTelemetry,
+  BenchmarkResult,
+  BenchmarkDependencies
 }
 
 export class PerformanceTelemetry {
@@ -95,20 +53,9 @@ export class PerformanceTelemetry {
   private lastSlowFrameLog = 0
   private readonly SLOW_FRAME_LOG_INTERVAL_MS = 1000 // Max 1 log per second
 
-  // Dependencies for benchmark (injected at runtime)
-  private benchmarkDeps: {
-    hitDetection?: any
-    chunkManager?: any
-    combatants?: Map<string, any>
-    spatialGridManager?: any
-  } = {}
-
-  // GPU timing (EXT_disjoint_timer_query_webgl2)
-  private gpuTimerExt: any = null
-  private gpuQuery: WebGLQuery | null = null
-  private gpuTimeMs: number = 0
-  private gpuTimingAvailable: boolean = false
-  private renderer: THREE.WebGLRenderer | null = null
+  // Sub-modules
+  private gpuTiming = new GPUTimingTelemetry()
+  private benchmark = new PerformanceBenchmark()
 
   private constructor() {
     // Expose to window for console debugging
@@ -132,59 +79,29 @@ export class PerformanceTelemetry {
   /**
    * Inject dependencies required for benchmarking
    */
-  injectBenchmarkDependencies(deps: {
-    hitDetection?: any
-    chunkManager?: any
-    combatants?: Map<string, any>
-    spatialGridManager?: any
-  }): void {
-    this.benchmarkDeps = { ...this.benchmarkDeps, ...deps }
+  injectBenchmarkDependencies(deps: BenchmarkDependencies): void {
+    this.benchmark.injectDependencies(deps)
   }
 
   /**
    * Initialize GPU timing (call once with renderer)
    */
   initGPUTiming(renderer: THREE.WebGLRenderer): void {
-    this.renderer = renderer
-    const gl = renderer.getContext() as WebGL2RenderingContext
-
-    if (!gl) {
-      console.warn('[Perf] WebGL2 context not available for GPU timing')
-      return
-    }
-
-    this.gpuTimerExt = gl.getExtension('EXT_disjoint_timer_query_webgl2')
-
-    if (this.gpuTimerExt) {
-      this.gpuTimingAvailable = true
-      console.log('[Perf] GPU timing enabled (EXT_disjoint_timer_query_webgl2)')
-    } else {
-      console.log('[Perf] GPU timing unavailable (extension not supported)')
-    }
+    this.gpuTiming.init(renderer)
   }
 
   /**
    * Begin GPU timing measurement (call before renderer.render())
    */
   beginGPUTimer(): void {
-    if (!this.gpuTimingAvailable || !this.renderer || this.gpuQuery) return
-
-    const gl = this.renderer.getContext() as WebGL2RenderingContext
-    this.gpuQuery = gl.createQuery()
-
-    if (this.gpuQuery) {
-      gl.beginQuery(this.gpuTimerExt.TIME_ELAPSED_EXT, this.gpuQuery)
-    }
+    this.gpuTiming.beginTimer()
   }
 
   /**
    * End GPU timing measurement (call after renderer.render())
    */
   endGPUTimer(): void {
-    if (!this.gpuTimingAvailable || !this.renderer || !this.gpuQuery) return
-
-    const gl = this.renderer.getContext() as WebGL2RenderingContext
-    gl.endQuery(this.gpuTimerExt.TIME_ELAPSED_EXT)
+    this.gpuTiming.endTimer()
   }
 
   /**
@@ -192,49 +109,14 @@ export class PerformanceTelemetry {
    * Call once per frame after endGPUTimer()
    */
   collectGPUTime(): void {
-    if (!this.gpuQuery || !this.renderer) return
-
-    const gl = this.renderer.getContext() as WebGL2RenderingContext
-    const available = gl.getQueryParameter(this.gpuQuery, gl.QUERY_RESULT_AVAILABLE)
-    const disjoint = gl.getParameter(this.gpuTimerExt.GPU_DISJOINT_EXT)
-
-    if (available && !disjoint) {
-      const ns = gl.getQueryParameter(this.gpuQuery, gl.QUERY_RESULT)
-      this.gpuTimeMs = ns / 1e6 // Convert nanoseconds to milliseconds
-    }
-
-    if (available || disjoint) {
-      gl.deleteQuery(this.gpuQuery)
-      this.gpuQuery = null
-    }
+    this.gpuTiming.collectTime()
   }
 
   /**
    * Get current GPU telemetry
    */
   getGPUTelemetry(): GPUTelemetry {
-    if (!this.renderer) {
-      return {
-        available: false,
-        gpuTimeMs: 0,
-        drawCalls: 0,
-        triangles: 0,
-        geometries: 0,
-        textures: 0,
-        programs: 0
-      }
-    }
-
-    const info = this.renderer.info
-    return {
-      available: this.gpuTimingAvailable,
-      gpuTimeMs: this.gpuTimeMs,
-      drawCalls: info.render.calls,
-      triangles: info.render.triangles,
-      geometries: info.memory.geometries,
-      textures: info.memory.textures,
-      programs: (info.memory as any).programs ?? 0
-    }
+    return this.gpuTiming.getTelemetry()
   }
 
   /**
@@ -459,113 +341,7 @@ export class PerformanceTelemetry {
    * Run a comprehensive benchmark for raycasting and hit detection
    */
   runBenchmark(iterations: number): BenchmarkResult {
-    console.log(`[Perf] Starting benchmark with ${iterations} iterations...`)
-
-    const rays = this.generateRandomRays(iterations)
-    const samples: number[] = []
-
-    const startTotal = performance.now()
-
-    // 1. Benchmark Octree specifically if available
-    const gridTime = this.benchmarkOctreeQueries(rays)
-
-    // 2. Benchmark Full Hit Detection if available
-    const hitTime = this.benchmarkHitDetection(rays, samples)
-
-    // 3. Benchmark Terrain Raycast if available
-    const terrainTime = this.benchmarkTerrainRaycast(rays)
-
-    const totalTimeMs = performance.now() - startTotal
-
-    const result: BenchmarkResult = {
-      totalTimeMs,
-      avgPerRayMs: samples.length > 0 ? samples.reduce((a, b) => a + b, 0) / samples.length : 0,
-      p95Ms: this.percentile(samples, 0.95),
-      p99Ms: this.percentile(samples, 0.99),
-      iterations,
-      details: {
-        gridQueryTimeMs: gridTime,
-        hitDetectionTimeMs: hitTime,
-        terrainTimeMs: terrainTime
-      }
-    }
-
-    console.log('[Perf] Benchmark complete:', result)
-    return result
-  }
-
-  private generateRandomRays(count: number): THREE.Ray[] {
-    const rays: THREE.Ray[] = []
-    const { spatialGridManager } = this.benchmarkDeps
-    
-    // Get world size from manager if available, otherwise default to 4000
-    let worldSize = 4000
-
-    for (let i = 0; i < count; i++) {
-      const origin = new THREE.Vector3(
-        (Math.random() - 0.5) * worldSize,
-        2 + Math.random() * 20, // 2-22m height
-        (Math.random() - 0.5) * worldSize
-      )
-
-      const direction = new THREE.Vector3(
-        Math.random() - 0.5,
-        (Math.random() - 0.5) * 0.2, // Shallow angles mostly
-        Math.random() - 0.5
-      ).normalize()
-
-      rays.push(new THREE.Ray(origin, direction))
-    }
-
-    return rays
-  }
-
-  private benchmarkOctreeQueries(rays: THREE.Ray[]): number {
-    const { spatialGridManager } = this.benchmarkDeps
-
-    if (!spatialGridManager || !spatialGridManager.getIsInitialized()) {
-      return 0
-    }
-
-    const start = performance.now()
-    for (const ray of rays) {
-      spatialGridManager.queryRay(ray.origin, ray.direction, 150)
-    }
-    return performance.now() - start
-  }
-
-  private benchmarkHitDetection(rays: THREE.Ray[], samples: number[]): number {
-    const { hitDetection, combatants } = this.benchmarkDeps
-    if (!hitDetection || !combatants) return 0
-
-    // Faction for testing
-    const Faction = { US: 'US', OPFOR: 'OPFOR' } as any
-
-    const start = performance.now()
-    for (const ray of rays) {
-      const rayStart = performance.now()
-      hitDetection.raycastCombatants(ray, Faction.US, combatants)
-      samples.push(performance.now() - rayStart)
-    }
-    return performance.now() - start
-  }
-
-  private benchmarkTerrainRaycast(rays: THREE.Ray[]): number {
-    const { chunkManager } = this.benchmarkDeps
-    if (!chunkManager) return 0
-
-    const start = performance.now()
-    for (const ray of rays) {
-      chunkManager.raycastTerrain(ray.origin, ray.direction, 150)
-    }
-    return performance.now() - start
-  }
-
-  private percentile(samples: number[], p: number): number {
-    if (samples.length === 0) return 0
-    const sorted = [...samples].sort((a, b) => a - b)
-    const index = Math.ceil(p * sorted.length) - 1
-    return sorted[index]
+    return this.benchmark.run(iterations)
   }
 
   /**
