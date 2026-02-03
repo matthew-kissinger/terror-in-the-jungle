@@ -79,7 +79,6 @@ CombatantSystem has distance-based LOD:
 
 | File | Lines | Location |
 |------|-------|----------|
-| AIFlankingSystem.ts | 606 | systems/combat/ai/ |
 | FullMapSystem.ts | 574 | ui/map/ |
 | AITargeting.ts | 571 | systems/combat/ai/ |
 | InfluenceMapSystem.ts | 570 | systems/combat/ |
@@ -110,7 +109,7 @@ CombatantSystem has distance-based LOD:
 | MortarSystem.ts | 420 | systems/weapons/ |
 | DeathCamSystem.ts | 405 | systems/player/ |
 
-**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->524, extracted ChunkPriorityManager + ChunkLifecycleManager), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer). 30 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->524, extracted ChunkPriorityManager + ChunkLifecycleManager), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer), AIFlankingSystem (606->359, extracted FlankingRoleManager + FlankingTacticsResolver). 29 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -146,12 +145,17 @@ Known hotspots:
 - **WeaponFiring per-shot allocations** - FIXED. Module-level scratch vectors for ray direction, muzzle flash positions.
 - **CombatantSpawnManager clone chains** - FIXED. Eliminated clone chains in manageSpawning() and spawnReinforcementWave().
 
+- **TracerPool geometry leak** - FIXED. Geometry shared within tracer groups, dispose() uses Set to handle shared refs.
+- **ImpactEffectsPool material leak** - FIXED. Cloned decal materials now disposed in dispose().
+- **MortarBallistics updateRoundPhysics() clone** - FIXED. Module-level scratch vectors `_velStep` and `_roundVelStep` replace per-call clones.
+
 Discovered hotspots (not yet fixed):
 - **CombatantRenderer death animation allocations** - Lines 176, 188, 242-243, 253-254, 266-267, 279, 285-286, 292. Multiple `new THREE.Matrix4()`, `new THREE.Vector3()`, and `.clone()` per dying combatant per frame. Class has `scratchSpinMatrix` but only uses it in one branch. Other branches create new instances.
 - **PerformanceOverlay per-frame DOM rebuild** - Line 86: `innerHTML = ''` then full `createElement` rebuild every frame when F2 overlay is visible. Should cache DOM nodes like HUDUpdater fix.
-- **MortarBallistics clone chains** - Lines 56-75, 99. `computeTrajectory()` creates 100+ Vector3 via `.clone()` per call. `updateRoundPhysics()` clones velocity every frame per active round.
-- **TracerPool geometry leak** - Lines 105-112. `dispose()` disposes materials but not the 128 cloned geometries (2 per tracer x 64 tracers). Should share single geometry instead of cloning.
-- **ImpactEffectsPool material leak** - `dispose()` doesn't dispose individually cloned decal materials (32 clones).
+- **MortarBallistics computeTrajectory() clones** - Lines 60-80. Still creates 100+ Vector3 via `.clone()` per trajectory computation (builds output array, not per-frame). Lower priority.
+- **Effect pools Array.splice() in update loops** - TracerPool:89, ExplosionEffectsPool:334, MuzzleFlashPool:154, ImpactEffectsPool:215. O(n) splice in per-frame update loops. Should use swap-and-pop or deferred compaction.
+- **TracerPool shared material opacity bug** - Lines 99-100. Mutates opacity on shared `tracerMaterial`/`glowMaterial`, causing all tracers to fade in sync instead of independently. Needs per-tracer material clones or opacity via vertex colors.
+- **ZoneManager O(n*m) occupant check** - Lines 202-220. Nested forEach over combatants * zones every frame. 120 combatants * 7 zones = 840 distance checks per frame. Should use spatial queries.
 
 Possible areas (confirm with profiling):
 - Worker utilization (are they saturated?)
