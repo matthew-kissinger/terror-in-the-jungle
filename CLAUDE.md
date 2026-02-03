@@ -79,18 +79,16 @@ CombatantSystem has distance-based LOD:
 
 | File | Lines | Location |
 |------|-------|----------|
-| CombatantCombat.ts | 806 | systems/combat/ |
 | ImprovedChunkManager.ts | 753 | systems/terrain/ |
 | ChunkWorkerPool.ts | 715 | systems/terrain/ |
 | ImprovedChunk.ts | 672 | systems/terrain/ |
 | GPUBillboardSystem.ts | 669 | systems/world/billboard/ |
 | SandboxSystemManager.ts | 644 | core/ |
 | AIFlankingSystem.ts | 595 | systems/combat/ai/ |
-| FootstepAudioSystem.ts | 587 | systems/audio/ |
 | FirstPersonWeapon.ts | 576 | systems/player/ |
 | FullMapSystem.ts | 574 | ui/map/ |
 | AITargeting.ts | 571 | systems/combat/ai/ |
-| InfluenceMapSystem.ts | 569 | systems/combat/ |
+| InfluenceMapSystem.ts | 570 | systems/combat/ |
 | CombatantSpawnManager.ts | 557 | systems/combat/ |
 | CombatantSystem.ts | 541 | systems/combat/ |
 | PixelArtSandbox.ts | 536 | core/ |
@@ -98,10 +96,12 @@ CombatantSystem has distance-based LOD:
 | OpenFrontierRespawnMap.ts | 503 | ui/map/ |
 | PerformanceTelemetry.ts | 497 | systems/debug/ |
 | gameModes.ts | 496 | config/ |
+| ExplosionEffectsPool.ts | 487 | systems/effects/ |
 | SpatialOctree.ts | 487 | systems/combat/ |
-| ExplosionEffectsPool.ts | 486 | systems/effects/ |
 | HUDStyles.ts | 483 | ui/hud/ |
+| CombatantCombat.ts | 468 | systems/combat/ |
 | AudioManager.ts | 453 | systems/audio/ |
+| CompassSystem.ts | 447 | ui/compass/ |
 | WeatherSystem.ts | 447 | systems/environment/ |
 | MinimapSystem.ts | 440 | ui/minimap/ |
 | AICoverSystem.ts | 437 | systems/combat/ai/ |
@@ -111,10 +111,9 @@ CombatantSystem has distance-based LOD:
 | WeaponFiring.ts | 422 | systems/player/weapon/ |
 | GPUTerrain.ts | 421 | systems/terrain/ |
 | MatchEndScreen.ts | 419 | ui/end/ |
-| CompassSystem.ts | 447 | ui/compass/ |
 | MortarSystem.ts | 409 | systems/weapons/ |
 
-**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331). 34 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326). 30 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -135,11 +134,14 @@ Known hotspots:
 - **CompassSystem DOM rebuild** - FIXED. Caches zone marker DOM elements in a Map, reuses nodes, updates positions only instead of innerHTML rebuild every frame.
 - **MinimapSystem per-frame Vector3 allocations** - FIXED. Uses module-level scratch vectors instead of per-combatant per-frame allocations.
 - **FullMapSystem allocations** - FIXED. Uses module-level scratch vector instead of per-frame Vector3 allocations.
-- **ExplosionEffectsPool gravity allocation** - `update()` creates `new THREE.Vector3(0, -3, 0)` every frame. Should be a static constant.
-- **InfluenceMapSystem per-call Vector2/Vector3 allocations** - `computeThreatLevel()`, `computeOpportunityLevel()`, `computeCoverValue()`, `computeSquadSupport()` all create `new THREE.Vector2()`/`Vector3()` per entity in loops. Should use module-level scratch vectors. Runs every 500ms but accumulates with many entities.
+- **ExplosionEffectsPool gravity allocation** - FIXED. Static `GRAVITY` constant at module level.
+- **InfluenceMapSystem per-call Vector2/Vector3 allocations** - FIXED. Module-level scratch vectors `_v2a`, `_v2b`, `_v3a` reused throughout compute methods.
 - **HUDUpdater per-frame DOM rebuild** - `updateObjectivesDisplay()`, `updateTicketDisplay()`, `updateCombatStats()`, `updateKillCounter()` all use innerHTML to rebuild DOM subtrees every frame from HUDSystem.update(). Should cache DOM nodes and update textContent only.
 - **KillFeed DOM rebuild** - `render()` clears innerHTML and recreates all entry elements on every update. Should track entries by ID and only add/remove changed entries.
 - **CombatantLODManager full sort every frame** - Sorts all combatants by distance O(n log n) every frame via `scratchCombatants.sort()`. With 120 NPCs this is 240+ distance calculations per frame. Could use distance bucketing or partial sort.
+- **WeatherSystem rain particle loop** - `updateRain()` calls `getMatrixAt()`/`decompose()` for each of 8000 rain particles every frame. Decompose is expensive. Should store position/velocity separately or use scratch vectors for decomposition.
+- **AIFlankingSystem per-call allocations** - `chooseBestFlankDirection()` creates 18+ Vector3 clones per flank evaluation via `centroid.clone()`, `leftDir.clone()`, `rightDir.clone()`. `assignSuppressionBehavior()` and `assignFlankingBehavior()` also create `new THREE.Vector3()` per call. Should use module-level scratch vectors.
+- **MortarSystem detonation allocations** - Detonation loop creates 60+ Vector3 allocations (offset, position clone, normal) across 20 debris particles. Normal `new THREE.Vector3(0, 1, 0)` should be static constant.
 
 Possible areas (confirm with profiling):
 - Worker utilization (are they saturated?)
@@ -151,7 +153,7 @@ Possible areas (confirm with profiling):
 - **GPU timing** - Currently only CPU-side timing
 - **Memory profiling** - No heap snapshot automation
 - **Playwright test harness** - Infrastructure set up but perf regression tests not yet working
-- **Bundle code-splitting** - Vite manual chunks configured (three.js, postprocessing, UI, BVH). Main chunk ~440 kB (112 kB gzipped). Circular chunk warnings from three.js internals remain.
+- **Bundle code-splitting** - Vite manual chunks configured (three.js, postprocessing, UI, BVH). Main chunk ~449 kB (115 kB gzipped). Circular chunk warnings from three.js internals remain.
 
 ## COMPLETED: AI Sandbox Mode
 
