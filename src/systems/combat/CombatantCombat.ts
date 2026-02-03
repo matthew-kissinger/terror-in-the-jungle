@@ -10,12 +10,14 @@ import { CombatantHitDetection } from './CombatantHitDetection';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { CombatantRenderer } from './CombatantRenderer';
 import { SandbagSystem } from '../weapons/SandbagSystem';
-// SpatialOctree import removed - CombatantHitDetection uses SpatialGridManager singleton
-import { spatialGridManager } from './SpatialGridManager';
 import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { objectPool } from '../../utils/ObjectPoolManager';
 import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem';
+// Extracted modules
+import { CombatantBallistics } from './CombatantBallistics';
+import { CombatantDamage } from './CombatantDamage';
+import { CombatantSuppression } from './CombatantSuppression';
 
 export interface CombatHitResult {
   hit: boolean;
@@ -45,22 +47,16 @@ export class CombatantCombat {
   private playerPosition: THREE.Vector3 = new THREE.Vector3();
   private voiceCalloutSystem?: VoiceCalloutSystem;
 
+  // Extracted modules
+  private ballistics: CombatantBallistics;
+  private damage: CombatantDamage;
+  private suppression: CombatantSuppression;
+
   // Pre-allocated scratch vectors to avoid per-frame allocations in hot paths
   private readonly scratchEndPoint = new THREE.Vector3();
   private readonly scratchMuzzlePos = new THREE.Vector3();
   private readonly scratchMuzzleFlashPos = new THREE.Vector3();
-  private readonly scratchToTarget = new THREE.Vector3();
-  private readonly scratchUp = new THREE.Vector3(0, 1, 0);
-  private readonly scratchRight = new THREE.Vector3();
-  private readonly scratchRealUp = new THREE.Vector3();
-  private readonly scratchFinalDir = new THREE.Vector3();
-  private readonly scratchOrigin = new THREE.Vector3();
-  private readonly scratchForward = new THREE.Vector3();
-  private readonly scratchDeathDir = new THREE.Vector3();
-  private readonly scratchBloodPos = new THREE.Vector3();
   private readonly scratchSplatterDir = new THREE.Vector3();
-  private readonly scratchTargetPos = new THREE.Vector3();
-  private readonly scratchRay = new THREE.Ray();
   // Module-level scratch vectors for fire loop (replaces pool allocations)
   private readonly _muzzlePos = new THREE.Vector3();
   private readonly _targetFirePos = new THREE.Vector3();
@@ -78,6 +74,12 @@ export class CombatantCombat {
     this.impactEffectsPool = impactEffectsPool;
     this.hitDetection = new CombatantHitDetection();
     this.combatantRenderer = combatantRenderer;
+
+    // Initialize extracted modules
+    this.ballistics = new CombatantBallistics();
+    this.damage = new CombatantDamage();
+    this.damage.setImpactEffectsPool(impactEffectsPool);
+    this.suppression = new CombatantSuppression();
   }
 
   // NOTE: Spatial grid is now managed by SpatialGridManager singleton
@@ -92,6 +94,7 @@ export class CombatantCombat {
   ): void {
     // Track player position for death effects
     this.playerPosition.copy(playerPosition);
+    this.damage.updatePlayerPosition(playerPosition);
 
     // Handle weapon cooldowns
     combatant.gunCore.cooldown(deltaTime);
@@ -178,7 +181,7 @@ export class CombatantCombat {
       }
     }
 
-    const shotRay = this.calculateAIShot(combatant, playerPosition, accuracyMultiplier);
+    const shotRay = this.ballistics.calculateAIShot(combatant, playerPosition, accuracyMultiplier);
 
     // Check hit results
     let hit: any = null;
@@ -231,7 +234,7 @@ export class CombatantCombat {
     if (!combatant.gunCore.canFire() || combatant.burstCooldown > 0) return;
 
     // Use suppressionTarget if available, otherwise fall back to lastKnownTargetPos
-    const targetPos = combatant.suppressionTarget || combatant.lastKnownTargetPos
+    const targetPos = combatant.suppressionTarget || combatant.lastKnownTargetPos;
     if (!targetPos) return;
 
     combatant.gunCore.registerShot();
@@ -248,8 +251,8 @@ export class CombatantCombat {
     }
 
     // Higher spread for suppressive fire - fire at area not point
-    const spread = combatant.skillProfile.aimJitterAmplitude * 3.5
-    const shotRay = this.calculateSuppressiveShot(combatant, spread, targetPos);
+    const spread = combatant.skillProfile.aimJitterAmplitude * 3.5;
+    const shotRay = this.ballistics.calculateSuppressiveShot(combatant, spread, targetPos);
 
     const distance = combatant.position.distanceTo(playerPosition);
     if (distance < 200) {
@@ -323,7 +326,7 @@ export class CombatantCombat {
 
         const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
         const wasAlive = hit.combatant.health > 0;
-        this.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot, allCombatants);
+        this.damage.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot, allCombatants);
 
         // Voice callout: Target down (if kill confirmed)
         if (wasAlive && hit.combatant.health <= 0 && this.voiceCalloutSystem && Math.random() < 0.4) {
@@ -335,291 +338,16 @@ export class CombatantCombat {
         }
       } else {
         // Track near misses for suppression
-        this.trackNearMisses(shotRay, hitPoint, combatant.faction, allCombatants, playerPosition)
+        this.suppression.trackNearMisses(shotRay, hitPoint, combatant.faction, allCombatants, playerPosition);
       }
 
       objectPool.releaseVector3(hitPoint);
     } else if (hit) {
       const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
-      this.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot, allCombatants);
+      this.damage.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot, allCombatants);
     }
   }
 
-  private trackNearMisses(
-    shotRay: THREE.Ray,
-    hitPoint: THREE.Vector3,
-    shooterFaction: Faction,
-    allCombatants: Map<string, Combatant>,
-    playerPosition?: THREE.Vector3
-  ): void {
-    const SUPPRESSION_RADIUS = 5.0
-    const SUPPRESSION_RADIUS_SQ = SUPPRESSION_RADIUS * SUPPRESSION_RADIUS
-
-    // Check player for suppression (if OPFOR is shooting)
-    if (playerPosition && shooterFaction === Faction.OPFOR && this.playerSuppressionSystem) {
-      const distanceToPlayerSq = hitPoint.distanceToSquared(playerPosition)
-
-      if (distanceToPlayerSq < SUPPRESSION_RADIUS_SQ) {
-        const distanceToPlayer = Math.sqrt(distanceToPlayerSq)
-        this.playerSuppressionSystem.registerNearMiss(hitPoint, playerPosition)
-
-        // Play bullet whiz sound for very close misses
-        if (this.audioManager && distanceToPlayer < 3) {
-          this.audioManager.playBulletWhizSound(hitPoint, playerPosition)
-        }
-      }
-    }
-
-    // Use spatial query to find only nearby combatants instead of O(n) scan
-    if (!spatialGridManager.getIsInitialized()) {
-      // Fallback to old behavior if spatial grid not initialized (shouldn't happen)
-      allCombatants.forEach(combatant => {
-        if (combatant.faction === shooterFaction) return
-        if (combatant.state === CombatantState.DEAD) return
-
-        const distanceToHitSq = combatant.position.distanceToSquared(hitPoint)
-
-        if (distanceToHitSq < SUPPRESSION_RADIUS_SQ) {
-          const distanceToHit = Math.sqrt(distanceToHitSq)
-          // Track near miss
-          combatant.nearMissCount = (combatant.nearMissCount || 0) + 1
-          combatant.lastSuppressedTime = Date.now()
-
-          // Increase panic based on proximity
-          const proximityFactor = 1.0 - (distanceToHit / SUPPRESSION_RADIUS)
-          combatant.panicLevel = Math.min(1.0, combatant.panicLevel + 0.2 * proximityFactor)
-          combatant.suppressionLevel = Math.min(1.0, combatant.suppressionLevel + 0.25 * proximityFactor)
-
-          // If heavily suppressed, seek cover
-          if (combatant.nearMissCount >= 3 && combatant.panicLevel > 0.6) {
-            if (combatant.state === CombatantState.ENGAGING || combatant.state === CombatantState.ADVANCING) {
-              combatant.state = CombatantState.SEEKING_COVER
-            }
-          }
-        }
-      })
-      return
-    }
-
-    // Spatial query: only check combatants within SUPPRESSION_RADIUS
-    const nearbyCombatantIds = spatialGridManager.queryRadius(hitPoint, SUPPRESSION_RADIUS)
-
-    for (const id of nearbyCombatantIds) {
-      const combatant = allCombatants.get(id)
-      if (!combatant) continue
-      if (combatant.faction === shooterFaction) continue
-      if (combatant.state === CombatantState.DEAD) continue
-
-      // Use squared distance for comparison (faster)
-      const distanceToHitSq = combatant.position.distanceToSquared(hitPoint)
-
-      if (distanceToHitSq < SUPPRESSION_RADIUS_SQ) {
-        const distanceToHit = Math.sqrt(distanceToHitSq)
-
-        // Track near miss
-        combatant.nearMissCount = (combatant.nearMissCount || 0) + 1
-        combatant.lastSuppressedTime = Date.now()
-
-        // Increase panic based on proximity
-        const proximityFactor = 1.0 - (distanceToHit / SUPPRESSION_RADIUS)
-        combatant.panicLevel = Math.min(1.0, combatant.panicLevel + 0.2 * proximityFactor)
-        combatant.suppressionLevel = Math.min(1.0, combatant.suppressionLevel + 0.25 * proximityFactor)
-
-        // If heavily suppressed, seek cover
-        if (combatant.nearMissCount >= 3 && combatant.panicLevel > 0.6) {
-          if (combatant.state === CombatantState.ENGAGING || combatant.state === CombatantState.ADVANCING) {
-            combatant.state = CombatantState.SEEKING_COVER
-          }
-        }
-      }
-    }
-  }
-
-  applyDamage(
-    target: Combatant,
-    damage: number,
-    attacker?: Combatant,
-    squads?: Map<string, Squad>,
-    isHeadshot: boolean = false,
-    allCombatants?: Map<string, Combatant>
-  ): void {
-    // Check if target is valid before accessing properties
-    if (!target) {
-      console.warn('⚠️ applyDamage called with undefined target');
-      return;
-    }
-
-    if ((target as any).isPlayerProxy) {
-      if (this.playerHealthSystem) {
-        const killed = this.playerHealthSystem.takeDamage(
-          damage,
-          attacker?.position,
-          target.position
-        );
-        if (killed && this.hudSystem) {
-          this.hudSystem.addDeath();
-
-          // Add player death to kill feed
-          if (attacker) {
-            const killerName = `${attacker.faction}-${attacker.id.slice(-4)}`;
-            this.hudSystem.addKillToFeed(
-              killerName,
-              attacker.faction,
-              'PLAYER',
-              Faction.US,
-              isHeadshot,
-              'rifle' // AI combatants use rifles
-            );
-          }
-        }
-      }
-      return;
-    }
-
-    target.health -= damage;
-    target.lastHitTime = Date.now();
-    target.suppressionLevel = Math.min(1.0, target.suppressionLevel + 0.3);
-
-    // Voice callout: Taking fire when hit
-    if (this.voiceCalloutSystem && Math.random() < 0.25) {
-      this.voiceCalloutSystem.triggerCallout(target, CalloutType.TAKING_FIRE, target.position);
-    }
-
-    // Trigger damage flash effect in shader
-    if (this.combatantRenderer) {
-      this.combatantRenderer.setDamageFlash(target.id, 1.0);
-    }
-
-    if (target.health <= 0) {
-      target.state = CombatantState.DEAD;
-
-      // Initialize death animation
-      target.isDying = true;
-      target.deathProgress = 0;
-      target.deathStartTime = performance.now();
-
-      // Choose death animation type based on damage source
-      if (isHeadshot) {
-        // Headshots cause dramatic fall back
-        target.deathAnimationType = 'fallback';
-      } else if (damage > 80) {
-        // High damage (likely explosive or shotgun) causes spin fall
-        target.deathAnimationType = 'spinfall';
-      } else {
-        // Normal damage causes crumple
-        target.deathAnimationType = 'crumple';
-      }
-
-      // Calculate death direction (direction from attacker to target)
-      if (attacker && attacker.position) {
-        this.scratchDeathDir.subVectors(target.position, attacker.position).normalize();
-        this.scratchDeathDir.y = 0; // Keep horizontal
-        // Clone for storage since this persists on the combatant
-        target.deathDirection = this.scratchDeathDir.clone();
-      } else {
-        // Default to falling backward
-        this.scratchDeathDir.set(
-          Math.cos(target.rotation),
-          0,
-          Math.sin(target.rotation)
-        ).multiplyScalar(-1);
-        target.deathDirection = this.scratchDeathDir.clone();
-      }
-
-      console.log(`💀 ${target.faction} soldier eliminated${attacker ? ` by ${attacker.faction}` : ''}`);
-
-      // Voice callout: Man down (nearby allies call it out)
-      if (this.voiceCalloutSystem && attacker && allCombatants) {
-        // Use spatial query to find nearby allies instead of O(n) scan
-        const ALLY_SEARCH_RADIUS = 30
-        const ALLY_SEARCH_RADIUS_SQ = ALLY_SEARCH_RADIUS * ALLY_SEARCH_RADIUS
-        const nearbyAllies: Combatant[] = []
-
-        if (spatialGridManager.getIsInitialized()) {
-          // Spatial query: only check combatants within 30 units
-          const nearbyIds = spatialGridManager.queryRadius(target.position, ALLY_SEARCH_RADIUS)
-
-          for (const id of nearbyIds) {
-            const c = allCombatants.get(id)
-            if (!c) continue
-            if (c.faction !== target.faction) continue
-            if (c.state === CombatantState.DEAD) continue
-            if (c.id === target.id) continue
-
-            // Use squared distance for comparison (faster)
-            if (c.position.distanceToSquared(target.position) < ALLY_SEARCH_RADIUS_SQ) {
-              nearbyAllies.push(c)
-            }
-          }
-        } else {
-          // Fallback to old behavior if spatial grid not initialized
-          allCombatants.forEach(c => {
-            if (c.faction === target.faction &&
-                c.state !== CombatantState.DEAD &&
-                c.id !== target.id &&
-                c.position.distanceToSquared(target.position) < ALLY_SEARCH_RADIUS_SQ) {
-              nearbyAllies.push(c)
-            }
-          })
-        }
-
-        // One nearby ally calls out "Man down!"
-        if (nearbyAllies.length > 0 && Math.random() < 0.5) {
-          const caller = nearbyAllies[Math.floor(Math.random() * nearbyAllies.length)]
-          this.voiceCalloutSystem.triggerCallout(caller, CalloutType.MAN_DOWN, caller.position)
-        }
-      }
-
-      // Death visual effects
-      // 1. Blood splatter at death position
-      this.scratchBloodPos.copy(target.position);
-      this.scratchBloodPos.y += 1.5; // Chest height
-      if (target.deathDirection) {
-        this.scratchSplatterDir.copy(target.deathDirection).negate();
-      } else {
-        this.scratchSplatterDir.set(0, 0, 1);
-      }
-      this.impactEffectsPool.spawn(this.scratchBloodPos, this.scratchSplatterDir);
-
-      // 2. Camera shake for nearby deaths
-      if (this.cameraShakeSystem) {
-        this.cameraShakeSystem.shakeFromNearbyDeath(target.position, this.playerPosition);
-      }
-
-      if (this.audioManager) {
-        const isAlly = target.faction === Faction.US;
-        this.audioManager.playDeathSound(target.position, isAlly);
-      }
-
-      if (this.ticketSystem) {
-        this.ticketSystem.onCombatantDeath(target.faction);
-      }
-
-      // Add to kill feed (AI-on-AI kills)
-      if (this.hudSystem && attacker && !attacker.isPlayerProxy) {
-        const killerName = `${attacker.faction}-${attacker.id.slice(-4)}`;
-        const victimName = `${target.faction}-${target.id.slice(-4)}`;
-        this.hudSystem.addKillToFeed(
-          killerName,
-          attacker.faction,
-          victimName,
-          target.faction,
-          isHeadshot,
-          'rifle' // AI combatants use rifles
-        );
-      }
-
-      if (target.squadId && squads) {
-        const squad = squads.get(target.squadId);
-        if (squad) {
-          const index = squad.members.indexOf(target.id);
-          if (index > -1) {
-            squad.members.splice(index, 1);
-          }
-        }
-      }
-    }
-  }
 
   handlePlayerShot(
     ray: THREE.Ray,
@@ -643,7 +371,7 @@ export class CombatantCombat {
     if (hit) {
       const damage = damageCalculator(hit.distance, hit.headshot);
       const targetHealth = hit.combatant.health;
-      this.applyDamage(hit.combatant, damage, undefined, undefined, hit.headshot);
+      this.damage.applyDamage(hit.combatant, damage, undefined, undefined, hit.headshot);
 
       const killed = targetHealth > 0 && hit.combatant.health <= 0;
 
@@ -670,95 +398,16 @@ export class CombatantCombat {
     return { hit: false, point: this.scratchEndPoint };
   }
 
-  private calculateAIShot(
-    combatant: Combatant,
-    playerPosition: THREE.Vector3,
-    accuracyMultiplier: number = 1.0
-  ): THREE.Ray {
-    if (!combatant.target) {
-      this.scratchForward.set(
-        Math.cos(combatant.rotation),
-        0,
-        Math.sin(combatant.rotation)
-      );
-      this.scratchOrigin.copy(combatant.position);
-      this.scratchRay.set(this.scratchOrigin, this.scratchForward);
-      return this.scratchRay;
-    }
-
-    // Use scratch for target position
-    if (combatant.target.id === 'PLAYER') {
-      this.scratchTargetPos.copy(playerPosition);
-      this.scratchTargetPos.y -= 0.6;
-    } else {
-      this.scratchTargetPos.copy(combatant.target.position);
-    }
-
-    this.scratchToTarget.subVectors(this.scratchTargetPos, combatant.position);
-
-    if (combatant.target.id !== 'PLAYER' && combatant.target.velocity.length() > 0.1) {
-      const timeToTarget = this.scratchToTarget.length() / 800;
-      const leadAmount = combatant.skillProfile.leadingErrorFactor;
-      this.scratchToTarget.addScaledVector(combatant.target.velocity, timeToTarget * leadAmount);
-    }
-
-    this.scratchToTarget.normalize();
-
-    const jitter = combatant.skillProfile.aimJitterAmplitude * accuracyMultiplier;
-    const jitterRad = THREE.MathUtils.degToRad(jitter);
-
-    this.scratchUp.set(0, 1, 0);
-    this.scratchRight.crossVectors(this.scratchToTarget, this.scratchUp).normalize();
-    this.scratchRealUp.crossVectors(this.scratchRight, this.scratchToTarget).normalize();
-
-    const jitterX = (Math.random() - 0.5) * jitterRad;
-    const jitterY = (Math.random() - 0.5) * jitterRad;
-
-    this.scratchFinalDir.copy(this.scratchToTarget)
-      .addScaledVector(this.scratchRight, Math.sin(jitterX))
-      .addScaledVector(this.scratchRealUp, Math.sin(jitterY))
-      .normalize();
-
-    this.scratchOrigin.copy(combatant.position);
-    this.scratchOrigin.y += 1.5;
-
-    this.scratchRay.set(this.scratchOrigin, this.scratchFinalDir);
-    return this.scratchRay;
-  }
-
-  private calculateSuppressiveShot(combatant: Combatant, spread: number, targetPos?: THREE.Vector3): THREE.Ray {
-    const target = targetPos || combatant.lastKnownTargetPos
-    if (!target) {
-      this.scratchForward.set(
-        Math.cos(combatant.rotation),
-        0,
-        Math.sin(combatant.rotation)
-      );
-      this.scratchOrigin.copy(combatant.position);
-      this.scratchRay.set(this.scratchOrigin, this.scratchForward);
-      return this.scratchRay;
-    }
-
-    this.scratchToTarget.subVectors(target, combatant.position).normalize();
-
-    const spreadRad = THREE.MathUtils.degToRad(spread);
-    const theta = Math.random() * Math.PI * 2;
-    const r = Math.random() * spreadRad;
-
-    this.scratchUp.set(0, 1, 0);
-    this.scratchRight.crossVectors(this.scratchToTarget, this.scratchUp).normalize();
-    this.scratchRealUp.crossVectors(this.scratchRight, this.scratchToTarget).normalize();
-
-    this.scratchFinalDir.copy(this.scratchToTarget)
-      .addScaledVector(this.scratchRight, Math.cos(theta) * r)
-      .addScaledVector(this.scratchRealUp, Math.sin(theta) * r)
-      .normalize();
-
-    this.scratchOrigin.copy(combatant.position);
-    this.scratchOrigin.y += 1.5;
-
-    this.scratchRay.set(this.scratchOrigin, this.scratchFinalDir);
-    return this.scratchRay;
+  // Public API maintained for backward compatibility
+  applyDamage(
+    target: Combatant,
+    damage: number,
+    attacker?: Combatant,
+    squads?: Map<string, Squad>,
+    isHeadshot: boolean = false,
+    allCombatants?: Map<string, Combatant>
+  ): void {
+    this.damage.applyDamage(target, damage, attacker, squads, isHeadshot, allCombatants);
   }
 
   checkPlayerHit(ray: THREE.Ray, playerPosition: THREE.Vector3): { hit: boolean; point: THREE.Vector3; headshot: boolean } {
@@ -767,18 +416,23 @@ export class CombatantCombat {
 
   setPlayerHealthSystem(system: PlayerHealthSystem): void {
     this.playerHealthSystem = system;
+    this.damage.setPlayerHealthSystem(system);
   }
 
   setTicketSystem(system: TicketSystem): void {
     this.ticketSystem = system;
+    this.damage.setTicketSystem(system);
   }
 
   setHUDSystem(system: any): void {
     this.hudSystem = system;
+    this.damage.setHUDSystem(system);
   }
 
   setAudioManager(manager: AudioManager): void {
     this.audioManager = manager;
+    this.damage.setAudioManager(manager);
+    this.suppression.setAudioManager(manager);
   }
 
   setChunkManager(chunkManager: ImprovedChunkManager): void {
@@ -791,10 +445,12 @@ export class CombatantCombat {
 
   setPlayerSuppressionSystem(system: PlayerSuppressionSystem): void {
     this.playerSuppressionSystem = system;
+    this.suppression.setPlayerSuppressionSystem(system);
   }
 
   setCameraShakeSystem(system: CameraShakeSystem): void {
     this.cameraShakeSystem = system;
+    this.damage.setCameraShakeSystem(system);
   }
 
   setCamera(camera: THREE.Camera): void {
@@ -803,5 +459,11 @@ export class CombatantCombat {
 
   setVoiceCalloutSystem(system: VoiceCalloutSystem): void {
     this.voiceCalloutSystem = system;
+    this.damage.setVoiceCalloutSystem(system);
+  }
+
+  setCombatantRenderer(renderer: CombatantRenderer): void {
+    this.combatantRenderer = renderer;
+    this.damage.setCombatantRenderer(renderer);
   }
 }
