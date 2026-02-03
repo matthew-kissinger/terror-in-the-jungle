@@ -79,16 +79,14 @@ CombatantSystem has distance-based LOD:
 
 | File | Lines | Location |
 |------|-------|----------|
-| HelicopterModel.ts | 1058 | systems/helicopter/ |
-| PlayerController.ts | 1043 | systems/player/ |
 | HUDElements.ts | 956 | ui/hud/ |
 | CombatantRenderer.ts | 866 | systems/combat/ |
 | AudioManager.ts | 767 | systems/audio/ |
 | ImprovedChunkManager.ts | 753 | systems/terrain/ |
 | PlayerRespawnManager.ts | 749 | systems/player/ |
 | CombatantCombat.ts | 745 | systems/combat/ |
+| GrenadeSystem.ts | 731 | systems/weapons/ |
 | ChunkWorkerPool.ts | 715 | systems/terrain/ |
-| GrenadeSystem.ts | 693 | systems/weapons/ |
 | ImprovedChunk.ts | 672 | systems/terrain/ |
 | SandboxSystemManager.ts | 644 | core/ |
 | AIFlankingSystem.ts | 595 | systems/combat/ai/ |
@@ -110,13 +108,16 @@ CombatantSystem has distance-based LOD:
 | WeatherSystem.ts | 447 | systems/environment/ |
 | MinimapSystem.ts | 441 | ui/minimap/ |
 | AICoverSystem.ts | 437 | systems/combat/ai/ |
+| HelicopterModel.ts | 433 | systems/helicopter/ |
+| HelicopterGeometry.ts | 433 | systems/helicopter/ |
 | SandboxRenderer.ts | 431 | core/ |
 | WeaponFiring.ts | 422 | systems/player/weapon/ |
+| GPUTerrain.ts | 421 | systems/terrain/ |
 | MatchEndScreen.ts | 419 | ui/end/ |
 | CompassSystem.ts | 414 | ui/compass/ |
 | MortarSystem.ts | 409 | systems/weapons/ |
 
-**Note**: CombatantSystem.ts was successfully split (1308 -> 538 lines). 36 files total exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433). 37 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -127,6 +128,9 @@ Use the profiling to identify actual bottlenecks, then:
 3. **Isolate** - Toggle systems to find the culprit
 4. **Fix** - Apply targeted optimizations
 5. **Validate** - Measure again, confirm improvement
+
+Known hotspots:
+- **CombatantMovement zone evaluation** - Squad leaders evaluate ALL zones EVERY frame (getAllZones + 2 filters + map + sort). In Open Frontier with 20-30 squad leaders this is significant. Needs throttling/caching.
 
 Possible areas (confirm with profiling):
 - AI update frequency tuning
@@ -142,7 +146,7 @@ Possible areas (confirm with profiling):
 - **GPU timing** - Currently only CPU-side timing
 - **Memory profiling** - No heap snapshot automation
 - **Playwright test harness** - Infrastructure set up but perf regression tests not yet working
-- **Bundle code-splitting** - Main chunk is 1,341 kB (369 kB gzipped), Vite warns about size
+- **Bundle code-splitting** - Vite manual chunks configured (three.js, postprocessing, UI, BVH). Main chunk ~440 kB (112 kB gzipped). Circular chunk warnings from three.js internals remain.
 
 ## COMPLETED: AI Sandbox Mode
 
@@ -195,7 +199,8 @@ src/
 │   │   ├── SpatialOctree.ts     # Spatial queries
 │   │   ├── InfluenceMapSystem.ts
 │   │   └── ...
-│   ├── player/             # Controller, weapons, health
+│   ├── player/             # Controller (split: Input, Movement, Camera), weapons, health
+│   ├── helicopter/         # HelicopterModel (split: Geometry, Animation, Audio, Physics)
 │   ├── terrain/            # Chunks, workers, vegetation
 │   ├── world/              # Zones, billboards, tickets
 │   ├── debug/              # PerformanceTelemetry
