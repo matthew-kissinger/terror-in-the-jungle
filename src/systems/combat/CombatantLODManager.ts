@@ -15,8 +15,13 @@ import { getHeightQueryCache } from '../terrain/HeightQueryCache';
  */
 export class CombatantLODManager {
   private combatants: Map<string, Combatant>;
-  private readonly scratchCombatants: Combatant[] = [];
+  private readonly highBucket: Combatant[] = [];
+  private readonly mediumBucket: Combatant[] = [];
+  private readonly lowBucket: Combatant[] = [];
+  private readonly culledBucket: Combatant[] = [];
   private readonly scratchVector = new THREE.Vector3();
+  private readonly _scratchDirection = new THREE.Vector3();
+  private readonly _scratchOffset = new THREE.Vector3();
   private playerPosition: THREE.Vector3;
   private gameModeManager?: GameModeManager;
   private zoneManager?: ZoneManager;
@@ -119,93 +124,115 @@ export class CombatantLODManager {
     // Update death animations first
     this.updateDeathAnimations(deltaTime);
 
-    // Reuse scratch array to avoid per-frame allocations
-    this.scratchCombatants.length = 0;
-    this.combatants.forEach(combatant => {
-      this.scratchCombatants.push(combatant);
-    });
-
-    this.scratchCombatants.sort((a, b) => {
-      const distA = a.position.distanceToSquared(this.playerPosition);
-      const distB = b.position.distanceToSquared(this.playerPosition);
-      return distA - distB;
-    });
-
     const now = Date.now();
     const worldSize = this.gameModeManager?.getWorldSize() || 4000;
-    const maxProcessingDistance = worldSize > 1000 ? 800 : 500; // Scale processing distance with world size
 
     this.lodHighCount = 0;
     this.lodMediumCount = 0;
     this.lodLowCount = 0;
     this.lodCulledCount = 0;
 
-    this.scratchCombatants.forEach(combatant => {
-      const distance = combatant.position.distanceTo(this.playerPosition);
+    // Determine LOD level thresholds - scale distances based on world size
+    const isLargeWorld = worldSize > 1000;
+    const highLODRange = isLargeWorld ? 200 : 150;
+    const mediumLODRange = isLargeWorld ? 400 : 300;
+    const lowLODRange = isLargeWorld ? 600 : 500;
 
+    const highLODRangeSq = highLODRange * highLODRange;
+    const mediumLODRangeSq = mediumLODRange * mediumLODRange;
+    const lowLODRangeSq = lowLODRange * lowLODRange;
+
+    // Clear buckets
+    this.highBucket.length = 0;
+    this.mediumBucket.length = 0;
+    this.lowBucket.length = 0;
+    this.culledBucket.length = 0;
+
+    // Single pass to bucket combatants by distance
+    this.combatants.forEach(combatant => {
       // Skip update entirely if off-map (chunk likely not loaded). Minimal maintenance only.
       if (Math.abs(combatant.position.x) > worldSize ||
           Math.abs(combatant.position.z) > worldSize) {
         // Nudge toward map center slowly so off-map agents don't explode simulation cost
         this.scratchVector.set(-Math.sign(combatant.position.x), 0, -Math.sign(combatant.position.z));
         combatant.position.addScaledVector(this.scratchVector, 0.2 * deltaTime);
+        combatant.lodLevel = 'culled';
         this.lodCulledCount++;
         return;
       }
 
-      // Only care about AI that can actually affect gameplay
-      const COMBAT_RANGE = 200; // Max engagement range + buffer
+      const distSq = combatant.position.distanceToSquared(this.playerPosition);
+      combatant.distanceSq = distSq;
 
-      if (distance > COMBAT_RANGE) {
-        combatant.lodLevel = 'culled';
-        this.lodCulledCount++;
-        // Just teleport them toward random zones occasionally
-        const elapsedMs = now - (combatant.lastUpdateTime || 0);
+      if (distSq < highLODRangeSq) {
+        this.highBucket.push(combatant);
+      } else if (distSq < mediumLODRangeSq) {
+        this.mediumBucket.push(combatant);
+      } else if (distSq < lowLODRangeSq) {
+        this.lowBucket.push(combatant);
+      } else {
+        this.culledBucket.push(combatant);
+      }
+    });
+
+    // Process buckets in priority order (high first)
+    
+    // High LOD: full updates every frame
+    this.highBucket.forEach(combatant => {
+      combatant.lodLevel = 'high';
+      this.lodHighCount++;
+      this.updateCombatantFull(combatant, deltaTime);
+    });
+
+    // Medium LOD: scheduled updates
+    this.mediumBucket.forEach(combatant => {
+      combatant.lodLevel = 'medium';
+      this.lodMediumCount++;
+      const distance = Math.sqrt(combatant.distanceSq!);
+      const dynamicIntervalMs = this.computeDynamicIntervalMs(distance) * this.intervalScale;
+      const elapsedMs = now - (combatant.lastUpdateTime || 0);
+      
+      if (elapsedMs > dynamicIntervalMs) {
+        const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, 1.0) : deltaTime;
+        this.updateCombatantMedium(combatant, effectiveDelta);
+        combatant.lastUpdateTime = now;
+      }
+    });
+
+    // Low LOD: basic updates
+    this.lowBucket.forEach(combatant => {
+      combatant.lodLevel = 'low';
+      this.lodLowCount++;
+      const distance = Math.sqrt(combatant.distanceSq!);
+      const dynamicIntervalMs = this.computeDynamicIntervalMs(distance) * this.intervalScale;
+      const elapsedMs = now - (combatant.lastUpdateTime || 0);
+      
+      if (elapsedMs > dynamicIntervalMs) {
+        const maxEff = Math.min(2.0, dynamicIntervalMs / 1000 * 2);
+        const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, maxEff) : deltaTime;
+        this.updateCombatantBasic(combatant, effectiveDelta);
+        combatant.lastUpdateTime = now;
+      }
+    });
+
+    // Culled: minimal maintenance or distant simulation
+    this.culledBucket.forEach(combatant => {
+      combatant.lodLevel = 'culled';
+      this.lodCulledCount++;
+      const distance = Math.sqrt(combatant.distanceSq!);
+      
+      // Use original engagement range buffer logic for teleport simulation vs basic movement
+      const SIMULATION_THRESHOLD = 800; // Beyond low LOD range, switch to infrequent simulation
+      
+      const elapsedMs = now - (combatant.lastUpdateTime || 0);
+      if (distance > SIMULATION_THRESHOLD) {
         if (elapsedMs > 30000) { // Update every 30 seconds
           this.simulateDistantAI(combatant);
           combatant.lastUpdateTime = now;
         }
-        return;
-      }
-
-      const dynamicIntervalMs = this.computeDynamicIntervalMs(distance) * this.intervalScale;
-
-      // Determine LOD level - scale distances based on world size
-      const isLargeWorld = worldSize > 1000;
-      const highLODRange = isLargeWorld ? 200 : 150;
-      const mediumLODRange = isLargeWorld ? 400 : 300;
-      const lowLODRange = isLargeWorld ? 600 : 500;
-
-      if (distance < highLODRange) {
-        combatant.lodLevel = 'high';
-        this.lodHighCount++;
-        this.updateCombatantFull(combatant, deltaTime);
-      } else if (distance < mediumLODRange) {
-        combatant.lodLevel = 'medium';
-        this.lodMediumCount++;
-        const elapsedMs = now - (combatant.lastUpdateTime || 0);
-        if (elapsedMs > dynamicIntervalMs) {
-          const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, 1.0) : deltaTime;
-          this.updateCombatantMedium(combatant, effectiveDelta);
-          combatant.lastUpdateTime = now;
-        }
-      } else if (distance < lowLODRange) {
-        combatant.lodLevel = 'low';
-        this.lodLowCount++;
-        const elapsedMs = now - (combatant.lastUpdateTime || 0);
-        if (elapsedMs > dynamicIntervalMs) {
-          const maxEff = Math.min(2.0, dynamicIntervalMs / 1000 * 2);
-          const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, maxEff) : deltaTime;
-          this.updateCombatantBasic(combatant, effectiveDelta);
-          combatant.lastUpdateTime = now;
-        }
       } else {
-        // Very far: still update basic movement infrequently to keep world alive
-        combatant.lodLevel = 'culled';
-        this.lodCulledCount++;
-        const elapsedMs = now - (combatant.lastUpdateTime || 0);
+        const dynamicIntervalMs = this.computeDynamicIntervalMs(distance) * this.intervalScale;
         if (elapsedMs > dynamicIntervalMs) {
-          // Allow larger effective delta for far agents to cover ground decisively
           const maxEff = Math.min(3.0, dynamicIntervalMs / 1000 * 3);
           const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, maxEff) : deltaTime;
           this.updateCombatantBasic(combatant, effectiveDelta);
@@ -338,7 +365,7 @@ export class CombatantLODManager {
       }
 
       // Move toward the target zone at realistic speed
-      const direction = new THREE.Vector3()
+      const direction = this._scratchDirection
         .subVectors(nearestZone.position, combatant.position)
         .normalize();
 
@@ -350,7 +377,7 @@ export class CombatantLODManager {
       combatant.rotation = Math.atan2(direction.z, direction.x);
 
       // Add some randomness to avoid all AI clustering
-      const randomOffset = new THREE.Vector3(
+      const randomOffset = this._scratchOffset.set(
         (Math.random() - 0.5) * 20,
         0,
         (Math.random() - 0.5) * 20

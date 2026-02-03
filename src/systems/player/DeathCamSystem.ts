@@ -12,10 +12,16 @@ export interface KillerInfo {
 }
 
 export class DeathCamSystem implements GameSystem {
+  private static readonly UP_AXIS = new THREE.Vector3(0, 1, 0);
   private camera: THREE.PerspectiveCamera;
   private isActive = false;
   private deathPosition?: THREE.Vector3;
   private killerInfo?: KillerInfo;
+
+  private readonly _scratchOffset = new THREE.Vector3();
+  private readonly _scratchDir = new THREE.Vector3();
+  private readonly _scratchLookTarget = new THREE.Vector3();
+  private readonly _scratchCurrentLookAt = new THREE.Vector3();
 
   // Camera animation state
   private cameraPhase: 'freeze' | 'transition' | 'orbit' | 'done' = 'freeze';
@@ -128,17 +134,17 @@ export class DeathCamSystem implements GameSystem {
 
     // Calculate third-person death cam position
     // Position camera behind and above the death location
-    const offset = new THREE.Vector3(0, this.ORBIT_HEIGHT, this.ORBIT_RADIUS);
+    const offset = this._scratchOffset.set(0, this.ORBIT_HEIGHT, this.ORBIT_RADIUS);
 
     // If we have killer info, position camera to look toward killer
     if (this.killerInfo) {
-      const directionToKiller = new THREE.Vector3()
+      const directionToKiller = this._scratchDir
         .subVectors(this.killerInfo.position, this.deathPosition)
         .normalize();
 
       // Position camera opposite of killer direction (behind death position, looking toward killer)
       const angle = Math.atan2(directionToKiller.x, directionToKiller.z);
-      offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), angle + Math.PI);
+      offset.applyAxisAngle(DeathCamSystem.UP_AXIS, angle + Math.PI);
     }
 
     this.targetPosition = this.deathPosition.clone().add(offset);
@@ -161,11 +167,11 @@ export class DeathCamSystem implements GameSystem {
     this.camera.position.lerpVectors(this.originalPosition, this.targetPosition, t);
 
     // Smoothly look at death position
-    const currentLookAt = new THREE.Vector3();
+    const currentLookAt = this._scratchCurrentLookAt;
     this.camera.getWorldDirection(currentLookAt);
     currentLookAt.multiplyScalar(10).add(this.originalPosition);
 
-    const lerpedLookAt = new THREE.Vector3().lerpVectors(currentLookAt, this.targetLookAt, t);
+    const lerpedLookAt = this._scratchLookTarget.lerpVectors(currentLookAt, this.targetLookAt, t);
     this.camera.lookAt(lerpedLookAt);
   }
 
@@ -174,7 +180,7 @@ export class DeathCamSystem implements GameSystem {
 
     // Initialize orbit angle based on current camera position
     if (this.deathPosition) {
-      const offset = new THREE.Vector3().subVectors(this.camera.position, this.deathPosition);
+      const offset = this._scratchOffset.subVectors(this.camera.position, this.deathPosition);
       this.orbitAngle = Math.atan2(offset.x, offset.z);
     }
   }
@@ -195,12 +201,12 @@ export class DeathCamSystem implements GameSystem {
     );
 
     // Look at death position (with slight look-toward-killer if available)
-    const lookTarget = this.deathPosition.clone();
+    const lookTarget = this._scratchLookTarget.copy(this.deathPosition);
     lookTarget.y += 1;
 
     if (this.killerInfo) {
       // Blend look direction slightly toward killer
-      const toKiller = new THREE.Vector3()
+      const toKiller = this._scratchDir
         .subVectors(this.killerInfo.position, this.deathPosition)
         .normalize()
         .multiplyScalar(2);
