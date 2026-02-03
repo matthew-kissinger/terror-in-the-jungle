@@ -88,7 +88,7 @@ CombatantSystem has distance-based LOD:
 | AIFlankingSystem.ts | 595 | systems/combat/ai/ |
 | FootstepAudioSystem.ts | 587 | systems/audio/ |
 | FirstPersonWeapon.ts | 576 | systems/player/ |
-| FullMapSystem.ts | 573 | ui/map/ |
+| FullMapSystem.ts | 574 | ui/map/ |
 | AITargeting.ts | 571 | systems/combat/ai/ |
 | InfluenceMapSystem.ts | 569 | systems/combat/ |
 | CombatantSpawnManager.ts | 557 | systems/combat/ |
@@ -103,7 +103,7 @@ CombatantSystem has distance-based LOD:
 | HUDStyles.ts | 483 | ui/hud/ |
 | AudioManager.ts | 453 | systems/audio/ |
 | WeatherSystem.ts | 447 | systems/environment/ |
-| MinimapSystem.ts | 441 | ui/minimap/ |
+| MinimapSystem.ts | 440 | ui/minimap/ |
 | AICoverSystem.ts | 437 | systems/combat/ai/ |
 | HelicopterModel.ts | 433 | systems/helicopter/ |
 | HelicopterGeometry.ts | 433 | systems/helicopter/ |
@@ -111,7 +111,7 @@ CombatantSystem has distance-based LOD:
 | WeaponFiring.ts | 422 | systems/player/weapon/ |
 | GPUTerrain.ts | 421 | systems/terrain/ |
 | MatchEndScreen.ts | 419 | ui/end/ |
-| CompassSystem.ts | 414 | ui/compass/ |
+| CompassSystem.ts | 447 | ui/compass/ |
 | MortarSystem.ts | 409 | systems/weapons/ |
 
 **Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331). 34 files exceed the 400-line target.
@@ -137,6 +137,9 @@ Known hotspots:
 - **FullMapSystem allocations** - FIXED. Uses module-level scratch vector instead of per-frame Vector3 allocations.
 - **ExplosionEffectsPool gravity allocation** - `update()` creates `new THREE.Vector3(0, -3, 0)` every frame. Should be a static constant.
 - **InfluenceMapSystem per-call Vector2/Vector3 allocations** - `computeThreatLevel()`, `computeOpportunityLevel()`, `computeCoverValue()`, `computeSquadSupport()` all create `new THREE.Vector2()`/`Vector3()` per entity in loops. Should use module-level scratch vectors. Runs every 500ms but accumulates with many entities.
+- **HUDUpdater per-frame DOM rebuild** - `updateObjectivesDisplay()`, `updateTicketDisplay()`, `updateCombatStats()`, `updateKillCounter()` all use innerHTML to rebuild DOM subtrees every frame from HUDSystem.update(). Should cache DOM nodes and update textContent only.
+- **KillFeed DOM rebuild** - `render()` clears innerHTML and recreates all entry elements on every update. Should track entries by ID and only add/remove changed entries.
+- **CombatantLODManager full sort every frame** - Sorts all combatants by distance O(n log n) every frame via `scratchCombatants.sort()`. With 120 NPCs this is 240+ distance calculations per frame. Could use distance bucketing or partial sort.
 
 Possible areas (confirm with profiling):
 - Worker utilization (are they saturated?)
