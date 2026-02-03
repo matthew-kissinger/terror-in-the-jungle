@@ -12,6 +12,13 @@ import { ViteBVHWorker } from '../../workers/BVHWorker';
 import { ChunkPriorityManager } from './ChunkPriorityManager';
 import { ChunkLifecycleManager } from './ChunkLifecycleManager';
 
+const _heightBox = new THREE.Box3();
+const _heightTestPoint = new THREE.Vector3();
+const _heightRaycaster = new THREE.Raycaster();
+const _heightRayOrigin = new THREE.Vector3();
+const _heightRayDir = new THREE.Vector3(0, -1, 0);
+const _collisionBox = new THREE.Box3();
+
 export interface ChunkConfig {
   size: number;
   renderDistance: number;
@@ -376,19 +383,17 @@ export class ImprovedChunkManager implements GameSystem {
    */
   private getObjectHeightAt(object: THREE.Object3D, x: number, z: number): number {
     // Get object bounding box
-    const box = new THREE.Box3().setFromObject(object);
+    _heightBox.setFromObject(object);
 
     // Check if X,Z position is within object's horizontal bounds
-    const testPoint = new THREE.Vector3(x, 0, z);
+    _heightTestPoint.set(x, 0, z);
 
-    if (x >= box.min.x && x <= box.max.x && z >= box.min.z && z <= box.max.z) {
+    if (x >= _heightBox.min.x && x <= _heightBox.max.x && z >= _heightBox.min.z && z <= _heightBox.max.z) {
       // Position is within bounds - use raycasting from above to find top surface
-      const raycaster = new THREE.Raycaster();
-      const rayOrigin = new THREE.Vector3(x, box.max.y + 10, z);
-      const rayDirection = new THREE.Vector3(0, -1, 0);
-      raycaster.set(rayOrigin, rayDirection);
+      _heightRayOrigin.set(x, _heightBox.max.y + 10, z);
+      _heightRaycaster.set(_heightRayOrigin, _heightRayDir);
 
-      const intersects = raycaster.intersectObject(object, true);
+      const intersects = _heightRaycaster.intersectObject(object, true);
       if (intersects.length > 0) {
         // Return the highest intersection point
         let maxY = -Infinity;
@@ -401,7 +406,7 @@ export class ImprovedChunkManager implements GameSystem {
       }
 
       // Fallback to bounding box max height if raycasting fails
-      return box.max.y;
+      return _heightBox.max.y;
     }
 
     return 0;
@@ -412,8 +417,8 @@ export class ImprovedChunkManager implements GameSystem {
    */
   checkObjectCollision(position: THREE.Vector3, radius: number = 0.5): boolean {
     for (const [id, object] of this.collisionObjects) {
-      const box = new THREE.Box3().setFromObject(object);
-      const expandedBox = box.expandByScalar(radius);
+      _collisionBox.setFromObject(object);
+      const expandedBox = _collisionBox.expandByScalar(radius);
 
       if (expandedBox.containsPoint(position)) {
         return true;

@@ -3,6 +3,8 @@ import { ImprovedChunk } from '../terrain/ImprovedChunk';
 import { Logger } from '../../utils/Logger';
 
 const _losDirection = new THREE.Vector3();
+const _rayBox = new THREE.Box3();
+const _meshBox = new THREE.Box3();
 
 /**
  * Accelerates line-of-sight checks using BVH-accelerated raycasting
@@ -115,17 +117,16 @@ export class LOSAccelerator {
     const meshes: THREE.Mesh[] = [];
 
     // Calculate bounding box of the ray
-    const rayBox = new THREE.Box3();
-    rayBox.setFromPoints([origin, target]);
-    rayBox.expandByScalar(2); // Small buffer for edge cases
+    _rayBox.setFromPoints([origin, target]);
+    _rayBox.expandByScalar(2); // Small buffer for edge cases
 
     // Check each cached chunk
     for (const [key, mesh] of this.chunkCache.entries()) {
       // Get mesh bounding box
-      const meshBox = new THREE.Box3().setFromObject(mesh);
+      _meshBox.setFromObject(mesh);
 
       // Only include if ray box intersects chunk box
-      if (rayBox.intersectsBox(meshBox)) {
+      if (_rayBox.intersectsBox(_meshBox)) {
         meshes.push(mesh);
       }
     }
