@@ -4,12 +4,11 @@ import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { CombatantSystem } from '../combat/CombatantSystem';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
-import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
 import { InventoryManager } from '../player/InventoryManager';
 import { AudioManager } from '../audio/AudioManager';
 import { PlayerStatsTracker } from '../player/PlayerStatsTracker';
-import { Grenade, GrenadePhysics } from './GrenadePhysics';
-import { GrenadeArcRenderer } from './GrenadeArcRenderer';
+import { Grenade, GrenadePhysics, GrenadeSpawner } from './GrenadePhysics';
+import { GrenadeArcRenderer, GrenadeHandView, GrenadeCooking } from './GrenadeArcRenderer';
 
 export class GrenadeSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -25,10 +24,9 @@ export class GrenadeSystem implements GameSystem {
 
   private grenades: Grenade[] = [];
   private nextGrenadeId = 0;
+  private spawner: GrenadeSpawner;
 
-  private weaponScene: THREE.Scene;
-  private weaponCamera: THREE.OrthographicCamera;
-  private grenadeInHand?: THREE.Group;
+  private handView: GrenadeHandView;
 
   private readonly GRAVITY = -52; // Snappier, more realistic arcs
   private readonly FUSE_TIME = 3.5; // Fuse time for cooking mechanic
@@ -53,11 +51,7 @@ export class GrenadeSystem implements GameSystem {
   private idleTime = 0;
   private aimStartTime = 0;
   private powerBuildupTime = 0;
-
-  // Cooking mechanic
-  private isCooking = false;
-  private cookingTime = 0;
-  private lastBeepTime = 0;
+  private cooking: GrenadeCooking;
 
   constructor(
     scene: THREE.Scene,
@@ -68,11 +62,6 @@ export class GrenadeSystem implements GameSystem {
     this.camera = camera;
     this.chunkManager = chunkManager;
 
-    this.weaponScene = new THREE.Scene();
-    const aspect = window.innerWidth / window.innerHeight;
-    this.weaponCamera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, 0.1, 10);
-    this.weaponCamera.position.z = 1;
-
     this.physics = new GrenadePhysics(
       this.GRAVITY,
       this.AIR_RESISTANCE,
@@ -81,7 +70,9 @@ export class GrenadeSystem implements GameSystem {
       this.FRICTION_WATER
     );
     this.arcRenderer = new GrenadeArcRenderer(this.scene, this.MAX_ARC_POINTS, this.DAMAGE_RADIUS);
-    this.createGrenadeView();
+    this.handView = new GrenadeHandView();
+    this.cooking = new GrenadeCooking(this.FUSE_TIME);
+    this.spawner = new GrenadeSpawner(this.scene);
   }
 
   async init(): Promise<void> {
@@ -90,7 +81,7 @@ export class GrenadeSystem implements GameSystem {
 
   update(deltaTime: number): void {
     this.idleTime += deltaTime;
-    this.updateHandAnimation(deltaTime);
+    this.handView.updateHandAnimation(this.isAiming, this.throwPower, this.idleTime);
 
     // Update throw power while aiming (builds up over time)
     if (this.isAiming) {
@@ -110,23 +101,14 @@ export class GrenadeSystem implements GameSystem {
     }
 
     // Update cooking timer
-    if (this.isCooking) {
-      this.cookingTime += deltaTime;
-
-      // Audio beeps at critical times
-      const timeLeft = this.FUSE_TIME - this.cookingTime;
-      if (timeLeft <= 2.0 && this.cookingTime - this.lastBeepTime >= 1.0) {
-        this.playBeep();
-        this.lastBeepTime = this.cookingTime;
-      } else if (timeLeft <= 1.0 && this.cookingTime - this.lastBeepTime >= 0.5) {
-        this.playBeep();
-        this.lastBeepTime = this.cookingTime;
-      }
-
-      // Explode in hand if cooked too long
-      if (this.cookingTime >= this.FUSE_TIME) {
-        this.explodeInHand();
-      }
+    if (this.cooking.update(
+      deltaTime,
+      this.camera,
+      this.explosionEffectsPool,
+      this.audioManager,
+      this.playerController
+    )) {
+      this.cancelThrow();
     }
 
     // Update explosion effects
@@ -144,7 +126,8 @@ export class GrenadeSystem implements GameSystem {
 
       if (grenade.fuseTime <= 0) {
         this.explodeGrenade(grenade);
-        this.removeGrenade(i);
+        this.spawner.removeGrenade(grenade);
+        this.grenades.splice(i, 1);
         continue;
       }
 
@@ -166,17 +149,7 @@ export class GrenadeSystem implements GameSystem {
 
     this.arcRenderer.dispose();
 
-    if (this.grenadeInHand) {
-      this.weaponScene.remove(this.grenadeInHand);
-      this.grenadeInHand.traverse(child => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-          if (child.material instanceof THREE.Material) {
-            child.material.dispose();
-          }
-        }
-      });
-    }
+    this.handView.dispose();
   }
 
   startAiming(): void {
@@ -195,64 +168,9 @@ export class GrenadeSystem implements GameSystem {
   }
 
   startCooking(): void {
-    if (!this.isAiming || this.isCooking) return;
+    if (!this.isAiming || this.cooking.isCurrentlyCooking()) return;
 
-    console.log('💣 Started cooking grenade!');
-    this.isCooking = true;
-    this.cookingTime = 0;
-    this.lastBeepTime = 0;
-  }
-
-  private playBeep(): void {
-    // Simple beep using Web Audio API
-    if (this.audioManager) {
-      // Use existing audio context from AudioManager
-      const audioContext = this.audioManager.getListener().context;
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-
-      oscillator.frequency.value = 800; // High-pitched beep
-      oscillator.type = 'sine';
-
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.1);
-    }
-  }
-
-  private explodeInHand(): void {
-    console.log('💥 Grenade exploded in hand!');
-
-    // Apply damage to player (suicide)
-    const explosionPos = this.camera.position.clone();
-
-    // Trigger explosion effect at player position
-    if (this.explosionEffectsPool) {
-      this.explosionEffectsPool.spawn(explosionPos);
-    }
-
-    if (this.audioManager) {
-      this.audioManager.playExplosionAt(explosionPos);
-    }
-
-    // Apply massive screen shake
-    if (this.playerController) {
-      this.playerController.applyExplosionShake(explosionPos, 1.0);
-    }
-
-    // Damage player (simulate suicide) - this would need PlayerHealthSystem
-    // For now, just log it
-    console.log('💀 Player killed by own grenade!');
-
-    // Reset cooking state
-    this.isCooking = false;
-    this.cookingTime = 0;
-    this.cancelThrow();
+    this.cooking.startCooking();
   }
 
   adjustPower(delta: number): void {
@@ -290,9 +208,8 @@ export class GrenadeSystem implements GameSystem {
     this.powerBuildupTime = 0;
 
     // Store cooking time for spawning grenade with reduced fuse
-    const remainingFuseTime = this.isCooking ? Math.max(0.1, this.FUSE_TIME - this.cookingTime) : this.FUSE_TIME;
-    this.isCooking = false;
-    this.cookingTime = 0;
+    const remainingFuseTime = this.cooking.getRemainingFuseTime();
+    this.cooking.stopCooking();
 
     this.arcRenderer.showArc(false);
 
@@ -330,7 +247,9 @@ export class GrenadeSystem implements GameSystem {
     const lookUpBoost = Math.max(0, direction.y * 3); // Only boost if looking up
     throwVelocity.y += lookUpBoost * this.throwPower;
 
-    this.spawnGrenade(startPos, throwVelocity, remainingFuseTime);
+    this.grenades.push(
+      this.spawner.spawnGrenade(startPos, throwVelocity, remainingFuseTime, this.nextGrenadeId++)
+    );
 
     // Track grenade throw in stats
     if (this.statsTracker) {
@@ -349,37 +268,6 @@ export class GrenadeSystem implements GameSystem {
     this.throwPower = 0.3;
 
     this.arcRenderer.showArc(false);
-  }
-
-  private spawnGrenade(position: THREE.Vector3, velocity: THREE.Vector3, fuseTime: number = this.FUSE_TIME): void {
-    const geometry = new THREE.SphereGeometry(0.3, 8, 8);
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x2a4a2a,
-      metalness: 0.6,
-      roughness: 0.4
-    });
-
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.copy(position);
-    mesh.castShadow = true;
-    this.scene.add(mesh);
-
-    const grenade: Grenade = {
-      id: `grenade_${this.nextGrenadeId++}`,
-      position: position.clone(),
-      velocity: velocity.clone(),
-      rotation: new THREE.Vector3(0, 0, 0),
-      rotationVelocity: new THREE.Vector3(
-        Math.random() * 5 - 2.5,
-        Math.random() * 5 - 2.5,
-        Math.random() * 5 - 2.5
-      ),
-      mesh,
-      fuseTime: fuseTime, // Use provided fuse time (may be reduced from cooking)
-      isActive: true
-    };
-
-    this.grenades.push(grenade);
   }
 
   private explodeGrenade(grenade: Grenade): void {
@@ -419,20 +307,6 @@ export class GrenadeSystem implements GameSystem {
     if (this.playerController) {
       this.playerController.applyExplosionShake(grenade.position, this.DAMAGE_RADIUS);
     }
-  }
-
-  private removeGrenade(index: number): void {
-    const grenade = this.grenades[index];
-
-    if (grenade.mesh) {
-      this.scene.remove(grenade.mesh);
-      grenade.mesh.geometry.dispose();
-      if (grenade.mesh.material instanceof THREE.Material) {
-        grenade.mesh.material.dispose();
-      }
-    }
-
-    this.grenades.splice(index, 1);
   }
 
   private getGroundHeight(x: number, z: number): number {
@@ -487,45 +361,19 @@ export class GrenadeSystem implements GameSystem {
       isAiming: this.isAiming,
       power: this.throwPower,
       estimatedDistance,
-      cookingTime: this.cookingTime
+      cookingTime: this.cooking.getCookingTime()
     };
   }
 
-  private createGrenadeView(): void {
-    this.grenadeInHand = ProgrammaticExplosivesFactory.createGrenade();
-    this.grenadeInHand.position.set(0.4, -0.6, -0.5);
-    this.grenadeInHand.rotation.set(0.2, 0.3, 0.1);
-    this.grenadeInHand.scale.setScalar(0.4);
-    this.grenadeInHand.visible = false;
-    this.weaponScene.add(this.grenadeInHand);
-  }
-
   showGrenadeInHand(show: boolean): void {
-    if (this.grenadeInHand) {
-      this.grenadeInHand.visible = show;
-    }
-  }
-
-  updateHandAnimation(deltaTime: number): void {
-    if (!this.grenadeInHand || !this.grenadeInHand.visible) return;
-
-    if (this.isAiming) {
-      // Pull back animation based on power
-      const pullback = -0.1 * this.throwPower;
-      this.grenadeInHand.position.y = -0.5 + pullback + Math.sin(this.idleTime * 3) * 0.01;
-      this.grenadeInHand.position.z = -0.5 + pullback;
-      this.grenadeInHand.rotation.x = 0.1 - this.throwPower * 0.3;
-    } else {
-      this.grenadeInHand.position.y = -0.6 + Math.sin(this.idleTime * 2) * 0.03;
-      this.grenadeInHand.rotation.x = 0.2 + Math.sin(this.idleTime * 2) * 0.05;
-    }
+    this.handView.showGrenadeInHand(show);
   }
 
   getGrenadeOverlayScene(): THREE.Scene {
-    return this.weaponScene;
+    return this.handView.getOverlayScene();
   }
 
   getGrenadeOverlayCamera(): THREE.Camera {
-    return this.weaponCamera;
+    return this.handView.getOverlayCamera();
   }
 }

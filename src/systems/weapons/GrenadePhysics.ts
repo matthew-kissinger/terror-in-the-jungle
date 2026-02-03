@@ -85,3 +85,50 @@ export class GrenadePhysics {
     grenade.mesh.rotation.set(grenade.rotation.x, grenade.rotation.y, grenade.rotation.z);
   }
 }
+
+export class GrenadeSpawner {
+  private scene: THREE.Scene;
+
+  constructor(scene: THREE.Scene) {
+    this.scene = scene;
+  }
+
+  spawnGrenade(position: THREE.Vector3, velocity: THREE.Vector3, fuseTime: number, id: number): Grenade {
+    const geometry = new THREE.SphereGeometry(0.3, 8, 8);
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x2a4a2a,
+      metalness: 0.6,
+      roughness: 0.4
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.copy(position);
+    mesh.castShadow = true;
+    this.scene.add(mesh);
+
+    return {
+      id: `grenade_${id}`,
+      position: position.clone(),
+      velocity: velocity.clone(),
+      rotation: new THREE.Vector3(0, 0, 0),
+      rotationVelocity: new THREE.Vector3(
+        Math.random() * 5 - 2.5,
+        Math.random() * 5 - 2.5,
+        Math.random() * 5 - 2.5
+      ),
+      mesh,
+      fuseTime: fuseTime,
+      isActive: true
+    };
+  }
+
+  removeGrenade(grenade: Grenade): void {
+    if (grenade.mesh) {
+      this.scene.remove(grenade.mesh);
+      grenade.mesh.geometry.dispose();
+      if (grenade.mesh.material instanceof THREE.Material) {
+        grenade.mesh.material.dispose();
+      }
+    }
+  }
+}

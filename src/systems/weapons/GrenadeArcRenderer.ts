@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { objectPool } from '../../utils/ObjectPoolManager';
+import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
+import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
+import { AudioManager } from '../audio/AudioManager';
 
 type GroundHeightFn = (x: number, z: number) => number;
 
@@ -192,5 +195,191 @@ export class GrenadeArcRenderer {
     this.landingIndicator.rotation.x = -Math.PI / 2; // Lay flat on ground
     this.landingIndicator.visible = false;
     this.scene.add(this.landingIndicator);
+  }
+}
+
+export class GrenadeHandView {
+  private weaponScene: THREE.Scene;
+  private weaponCamera: THREE.OrthographicCamera;
+  private grenadeInHand?: THREE.Group;
+
+  constructor() {
+    this.weaponScene = new THREE.Scene();
+    const aspect = window.innerWidth / window.innerHeight;
+    this.weaponCamera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, 0.1, 10);
+    this.weaponCamera.position.z = 1;
+
+    this.createGrenadeView();
+  }
+
+  dispose(): void {
+    if (this.grenadeInHand) {
+      this.weaponScene.remove(this.grenadeInHand);
+      this.grenadeInHand.traverse(child => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry.dispose();
+          if (child.material instanceof THREE.Material) {
+            child.material.dispose();
+          }
+        }
+      });
+    }
+  }
+
+  showGrenadeInHand(show: boolean): void {
+    if (this.grenadeInHand) {
+      this.grenadeInHand.visible = show;
+    }
+  }
+
+  updateHandAnimation(isAiming: boolean, throwPower: number, idleTime: number): void {
+    if (!this.grenadeInHand || !this.grenadeInHand.visible) return;
+
+    if (isAiming) {
+      // Pull back animation based on power
+      const pullback = -0.1 * throwPower;
+      this.grenadeInHand.position.y = -0.5 + pullback + Math.sin(idleTime * 3) * 0.01;
+      this.grenadeInHand.position.z = -0.5 + pullback;
+      this.grenadeInHand.rotation.x = 0.1 - throwPower * 0.3;
+    } else {
+      this.grenadeInHand.position.y = -0.6 + Math.sin(idleTime * 2) * 0.03;
+      this.grenadeInHand.rotation.x = 0.2 + Math.sin(idleTime * 2) * 0.05;
+    }
+  }
+
+  getOverlayScene(): THREE.Scene {
+    return this.weaponScene;
+  }
+
+  getOverlayCamera(): THREE.Camera {
+    return this.weaponCamera;
+  }
+
+  private createGrenadeView(): void {
+    this.grenadeInHand = ProgrammaticExplosivesFactory.createGrenade();
+    this.grenadeInHand.position.set(0.4, -0.6, -0.5);
+    this.grenadeInHand.rotation.set(0.2, 0.3, 0.1);
+    this.grenadeInHand.scale.setScalar(0.4);
+    this.grenadeInHand.visible = false;
+    this.weaponScene.add(this.grenadeInHand);
+  }
+}
+
+export class GrenadeCooking {
+  private fuseTime: number;
+  private isCooking = false;
+  private cookingTime = 0;
+  private lastBeepTime = 0;
+
+  constructor(fuseTime: number) {
+    this.fuseTime = fuseTime;
+  }
+
+  startCooking(): void {
+    if (this.isCooking) return;
+
+    console.log('💣 Started cooking grenade!');
+    this.isCooking = true;
+    this.cookingTime = 0;
+    this.lastBeepTime = 0;
+  }
+
+  stopCooking(): void {
+    this.isCooking = false;
+    this.cookingTime = 0;
+    this.lastBeepTime = 0;
+  }
+
+  isCurrentlyCooking(): boolean {
+    return this.isCooking;
+  }
+
+  getCookingTime(): number {
+    return this.cookingTime;
+  }
+
+  getRemainingFuseTime(): number {
+    return this.isCooking ? Math.max(0.1, this.fuseTime - this.cookingTime) : this.fuseTime;
+  }
+
+  update(
+    deltaTime: number,
+    camera: THREE.Camera,
+    explosionEffectsPool?: ExplosionEffectsPool,
+    audioManager?: AudioManager,
+    playerController?: any
+  ): boolean {
+    if (!this.isCooking) return false;
+
+    this.cookingTime += deltaTime;
+
+    const timeLeft = this.fuseTime - this.cookingTime;
+    if (timeLeft <= 2.0 && this.cookingTime - this.lastBeepTime >= 1.0) {
+      this.playBeep(audioManager);
+      this.lastBeepTime = this.cookingTime;
+    } else if (timeLeft <= 1.0 && this.cookingTime - this.lastBeepTime >= 0.5) {
+      this.playBeep(audioManager);
+      this.lastBeepTime = this.cookingTime;
+    }
+
+    if (this.cookingTime >= this.fuseTime) {
+      this.explodeInHand(camera, explosionEffectsPool, audioManager, playerController);
+      this.stopCooking();
+      return true;
+    }
+
+    return false;
+  }
+
+  private playBeep(audioManager?: AudioManager): void {
+    // Simple beep using Web Audio API
+    if (audioManager) {
+      // Use existing audio context from AudioManager
+      const audioContext = audioManager.getListener().context;
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      oscillator.frequency.value = 800; // High-pitched beep
+      oscillator.type = 'sine';
+
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.1);
+    }
+  }
+
+  private explodeInHand(
+    camera: THREE.Camera,
+    explosionEffectsPool?: ExplosionEffectsPool,
+    audioManager?: AudioManager,
+    playerController?: any
+  ): void {
+    console.log('💥 Grenade exploded in hand!');
+
+    // Apply damage to player (suicide)
+    const explosionPos = camera.position.clone();
+
+    // Trigger explosion effect at player position
+    if (explosionEffectsPool) {
+      explosionEffectsPool.spawn(explosionPos);
+    }
+
+    if (audioManager) {
+      audioManager.playExplosionAt(explosionPos);
+    }
+
+    // Apply massive screen shake
+    if (playerController) {
+      playerController.applyExplosionShake(explosionPos, 1.0);
+    }
+
+    // Damage player (simulate suicide) - this would need PlayerHealthSystem
+    // For now, just log it
+    console.log('💀 Player killed by own grenade!');
   }
 }
