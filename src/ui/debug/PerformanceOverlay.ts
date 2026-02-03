@@ -34,8 +34,21 @@ export interface PerformanceStats {
   gpuTimingAvailable?: boolean;
 }
 
+interface BudgetBarRefs {
+  row: HTMLDivElement;
+  nameSpan: HTMLSpanElement;
+  timeSpan: HTMLSpanElement;
+  barFill: HTMLDivElement;
+}
+
 export class PerformanceOverlay {
   private container: HTMLDivElement;
+  private header: HTMLDivElement;
+  private budgetSection: HTMLDivElement;
+  private systemBarsContainer: HTMLDivElement;
+  private overallBar: BudgetBarRefs;
+  private systemBars: BudgetBarRefs[] = [];
+
   private visible = false;
   private fpsHistory: number[] = [];
   private readonly maxHistory = 60;
@@ -59,6 +72,42 @@ export class PerformanceOverlay {
     this.container.style.backdropFilter = 'blur(6px)';
     this.container.style.display = 'none';
 
+    // Create header section
+    this.header = document.createElement('div');
+    this.header.style.marginBottom = '12px';
+    this.header.style.paddingBottom = '8px';
+    this.header.style.borderBottom = '1px solid rgba(79, 148, 120, 0.3)';
+    this.header.style.whiteSpace = 'pre';
+    this.container.appendChild(this.header);
+
+    // Create budget section
+    this.budgetSection = document.createElement('div');
+    this.budgetSection.style.marginTop = '12px';
+    this.budgetSection.style.display = 'none';
+
+    const title = document.createElement('div');
+    title.innerText = 'FRAME BUDGET (16.67ms target)';
+    title.style.marginBottom = '8px';
+    title.style.fontWeight = 'bold';
+    title.style.color = '#4f9478';
+    this.budgetSection.appendChild(title);
+
+    // Overall budget bar
+    this.overallBar = this.createBudgetBarElements('TOTAL');
+    this.budgetSection.appendChild(this.overallBar.row);
+
+    // Separator
+    const separator = document.createElement('div');
+    separator.style.height = '1px';
+    separator.style.background = 'rgba(79, 148, 120, 0.2)';
+    separator.style.margin = '6px 0';
+    this.budgetSection.appendChild(separator);
+
+    // Container for individual system bars
+    this.systemBarsContainer = document.createElement('div');
+    this.budgetSection.appendChild(this.systemBarsContainer);
+
+    this.container.appendChild(this.budgetSection);
     document.body.appendChild(this.container);
   }
 
@@ -82,15 +131,6 @@ export class PerformanceOverlay {
     this.pushFps(stats.fps);
     const avgFps = this.getAverageFps();
 
-    // Clear and rebuild container
-    this.container.innerHTML = '';
-
-    // Create header section
-    const header = document.createElement('div');
-    header.style.marginBottom = '12px';
-    header.style.paddingBottom = '8px';
-    header.style.borderBottom = '1px solid rgba(79, 148, 120, 0.3)';
-
     const text = [
       'PERFORMANCE',
       `FPS: ${stats.fps.toFixed(0)} (avg ${avgFps.toFixed(0)})`,
@@ -112,52 +152,45 @@ export class PerformanceOverlay {
       `Logs suppressed: ${stats.suppressedLogs}`
     ].filter(line => line !== null);
 
-    header.innerText = text.join('\n');
-    this.container.appendChild(header);
+    this.header.textContent = text.join('\n');
 
     // Add frame budget visualization if system timings are provided
     if (stats.systemTimings && stats.systemTimings.length > 0) {
-      this.renderFrameBudget(stats.systemTimings);
+      this.budgetSection.style.display = 'block';
+      this.updateFrameBudget(stats.systemTimings);
+    } else {
+      this.budgetSection.style.display = 'none';
     }
   }
 
-  private renderFrameBudget(timings: SystemTiming[]): void {
-    const budgetSection = document.createElement('div');
-    budgetSection.style.marginTop = '12px';
-
-    // Section title
-    const title = document.createElement('div');
-    title.innerText = 'FRAME BUDGET (16.67ms target)';
-    title.style.marginBottom = '8px';
-    title.style.fontWeight = 'bold';
-    title.style.color = '#4f9478';
-    budgetSection.appendChild(title);
-
+  private updateFrameBudget(timings: SystemTiming[]): void {
     // Calculate total time
     const totalTime = timings.reduce((sum, t) => sum + t.timeMs, 0);
     const targetBudget = 16.67; // 60 FPS
 
-    // Overall budget bar
-    const overallBar = this.createBudgetBar('TOTAL', totalTime, targetBudget);
-    budgetSection.appendChild(overallBar);
+    // Update overall budget bar
+    this.updateBudgetBar(this.overallBar, 'TOTAL', totalTime, targetBudget);
 
-    // Separator
-    const separator = document.createElement('div');
-    separator.style.height = '1px';
-    separator.style.background = 'rgba(79, 148, 120, 0.2)';
-    separator.style.margin = '6px 0';
-    budgetSection.appendChild(separator);
+    // Update individual system bars
+    for (let i = 0; i < timings.length; i++) {
+      const timing = timings[i];
+      if (!this.systemBars[i]) {
+        const barRefs = this.createBudgetBarElements(timing.name);
+        this.systemBars[i] = barRefs;
+        this.systemBarsContainer.appendChild(barRefs.row);
+      }
 
-    // Individual system bars
-    for (const timing of timings) {
-      const bar = this.createBudgetBar(timing.name, timing.timeMs, timing.budgetMs);
-      budgetSection.appendChild(bar);
+      this.systemBars[i].row.style.display = 'block';
+      this.updateBudgetBar(this.systemBars[i], timing.name, timing.timeMs, timing.budgetMs);
     }
 
-    this.container.appendChild(budgetSection);
+    // Hide unused bars
+    for (let i = timings.length; i < this.systemBars.length; i++) {
+      this.systemBars[i].row.style.display = 'none';
+    }
   }
 
-  private createBudgetBar(label: string, timeMs: number, budgetMs: number): HTMLDivElement {
+  private createBudgetBarElements(label: string): BudgetBarRefs {
     const row = document.createElement('div');
     row.style.marginBottom = '4px';
 
@@ -173,8 +206,6 @@ export class PerformanceOverlay {
     labelDiv.appendChild(nameSpan);
 
     const timeSpan = document.createElement('span');
-    const percentage = budgetMs > 0 ? (timeMs / budgetMs) * 100 : 0;
-    timeSpan.innerText = `${timeMs.toFixed(2)}ms (${percentage.toFixed(0)}%)`;
     labelDiv.appendChild(timeSpan);
 
     row.appendChild(labelDiv);
@@ -188,25 +219,38 @@ export class PerformanceOverlay {
     barContainer.style.overflow = 'hidden';
 
     const barFill = document.createElement('div');
-    const fillPercentage = Math.min((timeMs / budgetMs) * 100, 100);
-    barFill.style.width = `${fillPercentage}%`;
     barFill.style.height = '100%';
     barFill.style.transition = 'width 0.1s ease-out, background-color 0.2s ease-out';
-
-    // Color coding based on budget usage
-    const usage = timeMs / budgetMs;
-    if (usage < 0.5) {
-      barFill.style.background = '#4ade80'; // Green
-    } else if (usage < 0.8) {
-      barFill.style.background = '#fbbf24'; // Yellow
-    } else {
-      barFill.style.background = '#ef4444'; // Red
-    }
 
     barContainer.appendChild(barFill);
     row.appendChild(barContainer);
 
-    return row;
+    return {
+      row,
+      nameSpan,
+      timeSpan,
+      barFill
+    };
+  }
+
+  private updateBudgetBar(refs: BudgetBarRefs, label: string, timeMs: number, budgetMs: number): void {
+    const percentage = budgetMs > 0 ? (timeMs / budgetMs) * 100 : 0;
+    
+    refs.nameSpan.textContent = label;
+    refs.timeSpan.textContent = `${timeMs.toFixed(2)}ms (${percentage.toFixed(0)}%)`;
+
+    const fillPercentage = Math.min((timeMs / budgetMs) * 100, 100);
+    refs.barFill.style.width = `${fillPercentage}%`;
+
+    // Color coding based on budget usage
+    const usage = timeMs / budgetMs;
+    if (usage < 0.5) {
+      refs.barFill.style.background = '#4ade80'; // Green
+    } else if (usage < 0.8) {
+      refs.barFill.style.background = '#fbbf24'; // Yellow
+    } else {
+      refs.barFill.style.background = '#ef4444'; // Red
+    }
   }
 
   dispose(): void {
