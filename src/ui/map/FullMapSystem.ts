@@ -5,6 +5,9 @@ import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { Faction } from '../../systems/combat/types';
 import { GameModeManager } from '../../systems/world/GameModeManager';
 
+// Reusable scratch vector to avoid per-frame allocations
+const _v1 = new THREE.Vector3();
+
 export class FullMapSystem implements GameSystem {
   private camera: THREE.Camera;
   private zoneManager?: ZoneManager;
@@ -326,10 +329,9 @@ export class FullMapSystem implements GameSystem {
     this.playerPosition.copy(this.camera.position);
 
     // Get camera direction for rotation
-    const cameraDir = new THREE.Vector3();
-    this.camera.getWorldDirection(cameraDir);
+    this.camera.getWorldDirection(_v1);
     // Heading from true north (-Z), turning clockwise toward +X (east)
-    this.playerRotation = Math.atan2(cameraDir.x, -cameraDir.z);
+    this.playerRotation = Math.atan2(_v1.x, -_v1.z);
 
     // Update world size from game mode if needed
     if (this.gameModeManager) {
@@ -535,12 +537,11 @@ export class FullMapSystem implements GameSystem {
     ctx.fill();
 
     // Player direction indicator (just the line arrow)
-    const forward = new THREE.Vector3();
-    this.camera.getWorldDirection(forward);
+    this.camera.getWorldDirection(_v1);
     const lineLength = 18;
     // On the double-flipped map: -X is right, -Z is up
-    const endX = x - forward.x * lineLength; // Negative because X is flipped
-    const endY = y - forward.z * lineLength; // Negative because +Z goes down
+    const endX = x - _v1.x * lineLength; // Negative because X is flipped
+    const endY = y - _v1.z * lineLength; // Negative because +Z goes down
 
     ctx.strokeStyle = '#00ff00';
     ctx.lineWidth = 3;

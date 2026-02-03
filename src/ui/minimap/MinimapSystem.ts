@@ -4,6 +4,10 @@ import { ZoneManager, CaptureZone, ZoneState } from '../../systems/world/ZoneMan
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { Faction } from '../../systems/combat/types';
 
+// Reusable scratch vectors to avoid per-frame allocations
+const _v1 = new THREE.Vector3();
+const _v2 = new THREE.Vector3();
+
 export class MinimapSystem implements GameSystem {
   private camera: THREE.Camera;
   private zoneManager?: ZoneManager;
@@ -122,10 +126,9 @@ export class MinimapSystem implements GameSystem {
     this.playerPosition.copy(this.camera.position);
 
     // Get camera direction for rotation
-    const cameraDir = new THREE.Vector3();
-    this.camera.getWorldDirection(cameraDir);
+    this.camera.getWorldDirection(_v1);
     // Yaw measured from true north (-Z) turning clockwise toward +X (east)
-    this.playerRotation = Math.atan2(cameraDir.x, -cameraDir.z);
+    this.playerRotation = Math.atan2(_v1.x, -_v1.z);
 
     // Throttle updates
     const now = Date.now();
@@ -186,14 +189,13 @@ export class MinimapSystem implements GameSystem {
 
   private drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone): void {
     // Convert world position to minimap position
-    const relativePos = new THREE.Vector3()
-      .subVectors(zone.position, this.playerPosition);
+    _v1.subVectors(zone.position, this.playerPosition);
 
     // Rotate world -> player-local by -heading so forward points up
     const cos = Math.cos(this.playerRotation);
     const sin = Math.sin(this.playerRotation);
-    const rotatedX = relativePos.x * cos + relativePos.z * sin;
-    const rotatedZ = -relativePos.x * sin + relativePos.z * cos;
+    const rotatedX = _v1.x * cos + _v1.z * sin;
+    const rotatedZ = -_v1.x * sin + _v1.z * cos;
 
     // Scale to minimap
     const scale = this.MINIMAP_SIZE / this.WORLD_SIZE;
@@ -274,14 +276,13 @@ export class MinimapSystem implements GameSystem {
       if (combatant.state === 'dead') return;
 
       // Convert world position to minimap position relative to player
-      const relativePos = new THREE.Vector3()
-        .subVectors(combatant.position, this.playerPosition);
+      _v1.subVectors(combatant.position, this.playerPosition);
 
       // Rotate world -> player-local by -heading so forward points up
       const cos = Math.cos(this.playerRotation);
       const sin = Math.sin(this.playerRotation);
-      const rotatedX = relativePos.x * cos + relativePos.z * sin;
-      const rotatedZ = -relativePos.x * sin + relativePos.z * cos;
+      const rotatedX = _v1.x * cos + _v1.z * sin;
+      const rotatedZ = -_v1.x * sin + _v1.z * cos;
 
       // Scale to minimap
       const x = this.MINIMAP_SIZE / 2 + rotatedX * scale;
@@ -324,8 +325,7 @@ export class MinimapSystem implements GameSystem {
     const centerY = this.MINIMAP_SIZE / 2;
 
     // Calculate player facing direction in world space (not rotated minimap space)
-    const cameraDir = new THREE.Vector3();
-    this.camera.getWorldDirection(cameraDir);
+    this.camera.getWorldDirection(_v1);
 
     // Use the same heading angle used elsewhere
     // In rotated minimap space, forward is up: use 0 angle
@@ -392,14 +392,13 @@ export class MinimapSystem implements GameSystem {
     if (!this.commandPosition) return;
 
     // Convert world position to minimap position
-    const relativePos = new THREE.Vector3()
-      .subVectors(this.commandPosition, this.playerPosition);
+    _v1.subVectors(this.commandPosition, this.playerPosition);
 
     // Rotate world -> player-local
     const cos = Math.cos(this.playerRotation);
     const sin = Math.sin(this.playerRotation);
-    const rotatedX = relativePos.x * cos + relativePos.z * sin;
-    const rotatedZ = -relativePos.x * sin + relativePos.z * cos;
+    const rotatedX = _v1.x * cos + _v1.z * sin;
+    const rotatedZ = -_v1.x * sin + _v1.z * cos;
 
     // Scale to minimap
     const scale = this.MINIMAP_SIZE / this.WORLD_SIZE;
