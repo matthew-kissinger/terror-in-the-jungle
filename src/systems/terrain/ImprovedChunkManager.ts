@@ -6,18 +6,12 @@ import { AssetLoader } from '../assets/AssetLoader';
 import { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
 import { Logger } from '../../utils/Logger';
 import { LOSAccelerator } from '../combat/LOSAccelerator';
-import { getHeightQueryCache } from './HeightQueryCache';
 import { ChunkWorkerPool } from './ChunkWorkerPool';
 import { ViteBVHWorker } from '../../workers/BVHWorker';
 import { ChunkPriorityManager } from './ChunkPriorityManager';
 import { ChunkLifecycleManager } from './ChunkLifecycleManager';
-
-const _heightBox = new THREE.Box3();
-const _heightTestPoint = new THREE.Vector3();
-const _heightRaycaster = new THREE.Raycaster();
-const _heightRayOrigin = new THREE.Vector3();
-const _heightRayDir = new THREE.Vector3(0, -1, 0);
-const _collisionBox = new THREE.Box3();
+import { ChunkTerrainQueries } from './ChunkTerrainQueries';
+import { ChunkLoadQueueManager } from './ChunkLoadQueueManager';
 
 export interface ChunkConfig {
   size: number;
@@ -42,6 +36,8 @@ export class ImprovedChunkManager implements GameSystem {
   // Sub-managers
   private priorityManager: ChunkPriorityManager;
   private lifecycleManager: ChunkLifecycleManager;
+  private terrainQueries: ChunkTerrainQueries;
+  private loadQueueManager: ChunkLoadQueueManager;
 
   // LOS acceleration
   private losAccelerator: LOSAccelerator = new LOSAccelerator();
@@ -65,7 +61,6 @@ export class ImprovedChunkManager implements GameSystem {
   private readonly IN_FRAME_BUDGET_MS = 2.0;
   private readonly IDLE_BUDGET_MS = 6.0;
   private readonly MAX_QUEUE_SIZE = 48;
-  private loaderHandle: number | null = null;
   private readonly LOAD_DELAY_FALLBACK = 100;
 
   // Adaptive render distance
@@ -138,6 +133,24 @@ export class ImprovedChunkManager implements GameSystem {
       this.workerPool,
       this.bvhWorker
     );
+
+    // Initialize terrain queries manager
+    this.terrainQueries = new ChunkTerrainQueries(
+      this.losAccelerator,
+      (worldPos: THREE.Vector3) => this.lifecycleManager.getChunkAt(worldPos)
+    );
+
+    // Initialize load queue manager
+    this.loadQueueManager = new ChunkLoadQueueManager(
+      this.priorityManager,
+      this.lifecycleManager,
+      {
+        maxChunksPerFrame: this.MAX_CHUNKS_PER_FRAME,
+        inFrameBudgetMs: this.IN_FRAME_BUDGET_MS,
+        idleBudgetMs: this.IDLE_BUDGET_MS,
+        loadDelayFallback: this.LOAD_DELAY_FALLBACK
+      }
+    );
   }
 
   async init(): Promise<void> {
@@ -154,7 +167,7 @@ export class ImprovedChunkManager implements GameSystem {
     }
     
     Logger.info('chunks', 'Initial chunks generated');
-    this.updateLoadQueue();
+    this.loadQueueManager.updateLoadQueue();
   }
 
   update(deltaTime: number): void {
@@ -182,11 +195,11 @@ export class ImprovedChunkManager implements GameSystem {
       
       // Check if player moved to different chunk
       if (this.priorityManager.hasPlayerMovedChunk()) {
-        this.updateLoadQueue();
+        this.loadQueueManager.updateLoadQueue();
       }
       
       // Process load queue gradually within the frame budget
-      this.drainLoadQueue(this.IN_FRAME_BUDGET_MS, this.MAX_CHUNKS_PER_FRAME);
+      this.loadQueueManager.drainLoadQueue(this.IN_FRAME_BUDGET_MS, this.MAX_CHUNKS_PER_FRAME);
       
       // Update chunk visibility
       this.updateChunkVisibility();
@@ -197,7 +210,7 @@ export class ImprovedChunkManager implements GameSystem {
   }
 
   dispose(): void {
-    this.cancelBackgroundLoader();
+    this.loadQueueManager.cancelBackgroundLoader();
     this.lifecycleManager.dispose();
     this.priorityManager.clearQueue();
     this.losAccelerator.clear();
@@ -221,74 +234,6 @@ export class ImprovedChunkManager implements GameSystem {
     this.playerPosition.copy(position);
     this.priorityManager.updatePlayerPosition(position);
     this.lifecycleManager.updatePlayerPosition(position);
-  }
-
-  private updateLoadQueue(): void {
-    const chunks = this.lifecycleManager.getChunks();
-    const loadingChunks = this.lifecycleManager.getLoadingChunks();
-    
-    // Build sets for priority manager
-    const existingChunks = new Set<string>();
-    const loadingChunksSet = new Set<string>();
-    
-    chunks.forEach((_, key) => existingChunks.add(key));
-    loadingChunks.forEach(key => loadingChunksSet.add(key));
-    
-    // Update priority queue
-    this.priorityManager.updateLoadQueue(existingChunks, loadingChunksSet);
-
-    if (this.priorityManager.getQueueSize() > 0) {
-      this.scheduleBackgroundLoader();
-    }
-  }
-
-  private drainLoadQueue(budgetMs: number, maxChunks: number): void {
-    const items = this.priorityManager.drainLoadQueue(budgetMs, maxChunks);
-    
-    if (items.length > 0) {
-      this.lifecycleManager.loadChunksAsync(items);
-    }
-
-    if (this.priorityManager.getQueueSize() > 0) {
-      this.scheduleBackgroundLoader();
-    }
-  }
-
-  private scheduleBackgroundLoader(): void {
-    if (this.loaderHandle !== null || this.priorityManager.getQueueSize() === 0) {
-      return;
-    }
-
-    const callback = (deadline?: IdleDeadline) => {
-      this.loaderHandle = null;
-
-      const budget = deadline ? Math.min(deadline.timeRemaining(), this.IDLE_BUDGET_MS) : this.IDLE_BUDGET_MS;
-      this.drainLoadQueue(budget, this.MAX_CHUNKS_PER_FRAME);
-
-      if (this.priorityManager.getQueueSize() > 0) {
-        this.scheduleBackgroundLoader();
-      }
-    };
-
-    if (typeof (window as any).requestIdleCallback === 'function') {
-      this.loaderHandle = (window as any).requestIdleCallback(callback);
-    } else {
-      this.loaderHandle = window.setTimeout(() => callback(), this.LOAD_DELAY_FALLBACK);
-    }
-  }
-
-  private cancelBackgroundLoader(): void {
-    if (this.loaderHandle === null) {
-      return;
-    }
-
-    if (typeof (window as any).cancelIdleCallback === 'function') {
-      (window as any).cancelIdleCallback(this.loaderHandle);
-    } else {
-      clearTimeout(this.loaderHandle);
-    }
-
-    this.loaderHandle = null;
   }
 
   private unloadDistantChunks(): void {
@@ -315,12 +260,7 @@ export class ImprovedChunkManager implements GameSystem {
   }
 
   getHeightAt(x: number, z: number): number {
-    const chunk = this.getChunkAt(new THREE.Vector3(x, 0, z));
-    if (chunk) {
-      return chunk.getHeightAt(x, z);
-    }
-    // Fallback to HeightQueryCache when chunk not loaded
-    return getHeightQueryCache().getHeightAt(x, z);
+    return this.terrainQueries.getHeightAt(x, z);
   }
 
   // IChunkManager implementation
@@ -332,99 +272,32 @@ export class ImprovedChunkManager implements GameSystem {
     return this.lifecycleManager.isChunkLoaded(x, z);
   }
 
-  // Collision objects registry
-  private collisionObjects: Map<string, THREE.Object3D> = new Map();
-
   /**
    * Register an object for collision detection
    */
   registerCollisionObject(id: string, object: THREE.Object3D): void {
-    this.collisionObjects.set(id, object);
-    Logger.debug('chunks', `Registered collision object: ${id}`);
+    this.terrainQueries.registerCollisionObject(id, object);
   }
 
   /**
    * Unregister a collision object
    */
   unregisterCollisionObject(id: string): void {
-    this.collisionObjects.delete(id);
-    Logger.debug('chunks', `Unregistered collision object: ${id}`);
+    this.terrainQueries.unregisterCollisionObject(id);
   }
 
   /**
    * Get effective height at position, considering both terrain and collision objects
    */
   getEffectiveHeightAt(x: number, z: number): number {
-    let maxHeight = this.getHeightAt(x, z);
-    const terrainHeight = maxHeight;
-
-    // Check collision objects for higher surfaces
-    let objectContributions = 0;
-    this.collisionObjects.forEach((object, id) => {
-      const objectHeight = this.getObjectHeightAt(object, x, z);
-      if (objectHeight > 0) {
-        objectContributions++;
-        Logger.debug('chunks', `Collision object ${id} height ${objectHeight.toFixed(2)} at (${x.toFixed(1)}, ${z.toFixed(1)})`);
-      }
-      if (objectHeight > maxHeight) {
-        maxHeight = objectHeight;
-      }
-    });
-
-    if (objectContributions > 0) {
-      Logger.debug('chunks', `Height sample (${x.toFixed(1)}, ${z.toFixed(1)}): terrain=${terrainHeight.toFixed(2)} final=${maxHeight.toFixed(2)}`);
-    }
-
-    return maxHeight;
-  }
-
-  /**
-   * Get height of a specific object at given world position
-   */
-  private getObjectHeightAt(object: THREE.Object3D, x: number, z: number): number {
-    // Get object bounding box
-    _heightBox.setFromObject(object);
-
-    // Check if X,Z position is within object's horizontal bounds
-    _heightTestPoint.set(x, 0, z);
-
-    if (x >= _heightBox.min.x && x <= _heightBox.max.x && z >= _heightBox.min.z && z <= _heightBox.max.z) {
-      // Position is within bounds - use raycasting from above to find top surface
-      _heightRayOrigin.set(x, _heightBox.max.y + 10, z);
-      _heightRaycaster.set(_heightRayOrigin, _heightRayDir);
-
-      const intersects = _heightRaycaster.intersectObject(object, true);
-      if (intersects.length > 0) {
-        // Return the highest intersection point
-        let maxY = -Infinity;
-        for (const intersect of intersects) {
-          if (intersect.point.y > maxY) {
-            maxY = intersect.point.y;
-          }
-        }
-        return maxY;
-      }
-
-      // Fallback to bounding box max height if raycasting fails
-      return _heightBox.max.y;
-    }
-
-    return 0;
+    return this.terrainQueries.getEffectiveHeightAt(x, z);
   }
 
   /**
    * Check for collision with objects at given position
    */
   checkObjectCollision(position: THREE.Vector3, radius: number = 0.5): boolean {
-    for (const [id, object] of this.collisionObjects) {
-      _collisionBox.setFromObject(object);
-      const expandedBox = _collisionBox.expandByScalar(radius);
-
-      if (expandedBox.containsPoint(position)) {
-        return true;
-      }
-    }
-    return false;
+    return this.terrainQueries.checkObjectCollision(position, radius);
   }
 
   /**
@@ -436,28 +309,11 @@ export class ImprovedChunkManager implements GameSystem {
    * @returns {hit: boolean, point?: THREE.Vector3, distance?: number}
    */
   raycastTerrain(origin: THREE.Vector3, direction: THREE.Vector3, maxDistance: number): {hit: boolean, point?: THREE.Vector3, distance?: number} {
-    // Calculate target point from origin and direction
-    const target = new THREE.Vector3()
-      .copy(direction)
-      .multiplyScalar(maxDistance)
-      .add(origin);
-
-    // Use BVH-accelerated LOS check
-    const result = this.losAccelerator.checkLineOfSight(origin, target, maxDistance);
-
-    if (!result.clear && result.hitPoint && result.distance !== undefined) {
-      return {
-        hit: true,
-        point: result.hitPoint,
-        distance: result.distance
-      };
-    }
-
-    return { hit: false };
+    return this.terrainQueries.raycastTerrain(origin, direction, maxDistance);
   }
 
   getQueueSize(): number {
-    return this.priorityManager.getQueueSize();
+    return this.loadQueueManager.getQueueSize();
   }
 
   getLoadingCount(): number {
@@ -517,7 +373,7 @@ export class ImprovedChunkManager implements GameSystem {
     });
     
     // Trigger chunk reload
-    this.updateLoadQueue();
+    this.loadQueueManager.updateLoadQueue();
   }
 
   /**
