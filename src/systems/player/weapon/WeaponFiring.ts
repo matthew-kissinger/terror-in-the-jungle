@@ -9,6 +9,12 @@ import { PlayerStatsTracker } from '../PlayerStatsTracker'
 import { ShotCommand, ShotResult } from './ShotCommand'
 import { performanceTelemetry } from '../../debug/PerformanceTelemetry'
 
+// Module-level scratch vectors to avoid per-shot allocations
+const _negDirection = new THREE.Vector3()
+const _muzzlePos = new THREE.Vector3()
+const _cameraPos = new THREE.Vector3()
+const _forward = new THREE.Vector3()
+
 /**
  * Handles weapon firing execution. Uses command pattern to avoid temporal coupling.
  *
@@ -138,8 +144,8 @@ export class WeaponFiring {
 
     if (result.hit) {
       // Spawn impact effect
-      const normal = command.ray.direction.clone().negate()
-      this.impactEffectsPool.spawn(result.point, normal)
+      _negDirection.copy(command.ray.direction).negate()
+      this.impactEffectsPool.spawn(result.point, _negDirection)
 
       const damageDealt = (result as any).damage || 0
       const isHeadshot = (result as any).headshot || false
@@ -218,8 +224,8 @@ export class WeaponFiring {
         }
 
         // Spawn impact effect for each pellet
-        const normal = pelletRay.direction.clone().negate()
-        this.impactEffectsPool.spawn(result.point, normal)
+        _negDirection.copy(pelletRay.direction).negate()
+        this.impactEffectsPool.spawn(result.point, _negDirection)
       }
     }
 
@@ -274,8 +280,8 @@ export class WeaponFiring {
     // Spawn impact effect at hit point
     if (result.hit) {
       // Calculate impact normal (opposite of ray direction for now)
-      const normal = ray.direction.clone().negate()
-      this.impactEffectsPool.spawn(result.point, normal)
+      _negDirection.copy(ray.direction).negate()
+      this.impactEffectsPool.spawn(result.point, _negDirection)
 
       // Track shot as a hit in stats
       if (this.statsTracker) {
@@ -357,8 +363,8 @@ export class WeaponFiring {
         }
 
         // Spawn impact effect for each pellet
-        const normal = ray.direction.clone().negate()
-        this.impactEffectsPool.spawn(result.point, normal)
+        _negDirection.copy(ray.direction).negate()
+        this.impactEffectsPool.spawn(result.point, _negDirection)
       }
     }
 
@@ -396,24 +402,21 @@ export class WeaponFiring {
   }
 
   private spawnMuzzleFlash(): void {
-    const muzzlePos = new THREE.Vector3()
-    const cameraPos = new THREE.Vector3()
-    this.camera.getWorldPosition(cameraPos)
-    const forward = new THREE.Vector3()
-    this.camera.getWorldDirection(forward)
+    this.camera.getWorldPosition(_cameraPos)
+    this.camera.getWorldDirection(_forward)
 
     if (this.muzzleRef) {
       // Get muzzle world position for 3D scene flash
-      this.muzzleRef.getWorldPosition(muzzlePos)
+      this.muzzleRef.getWorldPosition(_muzzlePos)
       // Offset forward from camera position
-      muzzlePos.copy(cameraPos).addScaledVector(forward, 1.5)
+      _muzzlePos.copy(_cameraPos).addScaledVector(_forward, 1.5)
     } else {
-      muzzlePos.copy(cameraPos).addScaledVector(forward, 1)
+      _muzzlePos.copy(_cameraPos).addScaledVector(_forward, 1)
     }
 
     // Shotgun has a bigger muzzle flash
     const flashSize = this.gunCore.isShotgun() ? 1.6 : 1.2
-    this.muzzleFlashPool.spawn(muzzlePos, forward, flashSize)
+    this.muzzleFlashPool.spawn(_muzzlePos, _forward, flashSize)
   }
 
   getGunCore(): GunplayCore {
