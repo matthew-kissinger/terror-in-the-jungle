@@ -79,7 +79,6 @@ CombatantSystem has distance-based LOD:
 
 | File | Lines | Location |
 |------|-------|----------|
-| FullMapSystem.ts | 574 | ui/map/ |
 | AITargeting.ts | 571 | systems/combat/ai/ |
 | InfluenceMapSystem.ts | 570 | systems/combat/ |
 | PixelArtSandbox.ts | 551 | core/ |
@@ -109,7 +108,7 @@ CombatantSystem has distance-based LOD:
 | MortarSystem.ts | 420 | systems/weapons/ |
 | DeathCamSystem.ts | 405 | systems/player/ |
 
-**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->524, extracted ChunkPriorityManager + ChunkLifecycleManager), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer), AIFlankingSystem (606->359, extracted FlankingRoleManager + FlankingTacticsResolver). 29 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->524, extracted ChunkPriorityManager + ChunkLifecycleManager), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer), AIFlankingSystem (606->359, extracted FlankingRoleManager + FlankingTacticsResolver), FullMapSystem (574->365, extracted FullMapDOMHelpers + FullMapInput + FullMapStyles). 28 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -149,13 +148,14 @@ Known hotspots:
 - **ImpactEffectsPool material leak** - FIXED. Cloned decal materials now disposed in dispose().
 - **MortarBallistics updateRoundPhysics() clone** - FIXED. Module-level scratch vectors `_velStep` and `_roundVelStep` replace per-call clones.
 
+- **CombatantRenderer death animation allocations** - FIXED. Pre-allocated scratch matrices and vectors reused across all death animation branches.
+- **PerformanceOverlay per-frame DOM rebuild** - FIXED. DOM nodes cached and updated via textContent instead of innerHTML rebuild.
+- **Effect pools Array.splice() in update loops** - FIXED. All four pools (TracerPool, ExplosionEffectsPool, MuzzleFlashPool, ImpactEffectsPool) use swap-and-pop compaction.
+- **TracerPool shared material opacity bug** - FIXED. Per-tracer material clones prevent shared state mutations.
+- **ZoneManager O(n*m) occupant check** - FIXED. Uses spatialGridManager.queryRadius() with 100ms throttle interval.
+
 Discovered hotspots (not yet fixed):
-- **CombatantRenderer death animation allocations** - Lines 176, 188, 242-243, 253-254, 266-267, 279, 285-286, 292. Multiple `new THREE.Matrix4()`, `new THREE.Vector3()`, and `.clone()` per dying combatant per frame. Class has `scratchSpinMatrix` but only uses it in one branch. Other branches create new instances.
-- **PerformanceOverlay per-frame DOM rebuild** - Line 86: `innerHTML = ''` then full `createElement` rebuild every frame when F2 overlay is visible. Should cache DOM nodes like HUDUpdater fix.
 - **MortarBallistics computeTrajectory() clones** - Lines 60-80. Still creates 100+ Vector3 via `.clone()` per trajectory computation (builds output array, not per-frame). Lower priority.
-- **Effect pools Array.splice() in update loops** - TracerPool:89, ExplosionEffectsPool:334, MuzzleFlashPool:154, ImpactEffectsPool:215. O(n) splice in per-frame update loops. Should use swap-and-pop or deferred compaction.
-- **TracerPool shared material opacity bug** - Lines 99-100. Mutates opacity on shared `tracerMaterial`/`glowMaterial`, causing all tracers to fade in sync instead of independently. Needs per-tracer material clones or opacity via vertex colors.
-- **ZoneManager O(n*m) occupant check** - Lines 202-220. Nested forEach over combatants * zones every frame. 120 combatants * 7 zones = 840 distance checks per frame. Should use spatial queries.
 
 Possible areas (confirm with profiling):
 - Worker utilization (are they saturated?)
@@ -241,6 +241,7 @@ src/
 │   └── effects/            # Pools (tracers, muzzle, impact, explosion)
 ├── ui/
 │   ├── hud/               # HUDElements (split: 11 focused modules)
+│   ├── map/               # FullMapSystem (split: DOMHelpers, Input, Styles)
 │   └── debug/              # PerformanceOverlay
 ├── workers/                # BVHWorker, ChunkWorker
 └── utils/                  # Logger, ObjectPoolManager
@@ -255,7 +256,7 @@ src/
 | `src/systems/combat/CombatantSystem.ts` | NPC orchestrator | Split to 538 lines |
 | `src/systems/combat/SpatialOctree.ts` | Spatial queries | Check query times |
 | `src/workers/BVHWorker.ts` | Parallel BVH | Pool of 4 workers |
-| `src/core/PixelArtSandbox.ts` | Main game loop | Where systems update (536 lines) |
+| `src/core/PixelArtSandbox.ts` | Main game loop | Where systems update (551 lines) |
 | `src/core/SandboxSystemManager.ts` | System orchestrator | 270 lines (split into 4 modules) |
 | `src/systems/terrain/HeightQueryCache.ts` | Cached height lookups | Performance optimization |
 | `src/systems/terrain/ChunkWorkerPool.ts` | Worker pool management | 270 lines (split into 5 modules), has saturation telemetry |
