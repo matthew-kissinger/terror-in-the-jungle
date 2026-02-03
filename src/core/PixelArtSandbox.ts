@@ -10,6 +10,8 @@ import { TimeIndicator } from '../ui/debug/TimeIndicator';
 import { LogOverlay } from '../ui/debug/LogOverlay';
 import { Logger } from '../utils/Logger';
 import { getHeightQueryCache } from '../systems/terrain/HeightQueryCache';
+import { SandboxMetrics } from './SandboxMetrics';
+import { SandboxConfig, getSandboxConfig, isSandboxMode } from './SandboxModeDetector';
 
 export class PixelArtSandbox {
   private loadingScreen: LoadingScreen;
@@ -18,6 +20,9 @@ export class PixelArtSandbox {
   private performanceOverlay: PerformanceOverlay;
   private timeIndicator: TimeIndicator;
   private logOverlay: LogOverlay;
+  private sandboxMetrics: SandboxMetrics;
+  private sandboxConfig: SandboxConfig | null;
+  private readonly sandboxEnabled: boolean;
 
   private clock = new THREE.Clock();
   private isInitialized = false;
@@ -28,6 +33,9 @@ export class PixelArtSandbox {
     console.log('🎮 Initializing Pixel Art Sandbox Engine...');
     console.log('Three.js version:', THREE.REVISION);
 
+    this.sandboxEnabled = isSandboxMode();
+    this.sandboxConfig = this.sandboxEnabled ? getSandboxConfig() : null;
+
     // Create loading screen immediately
     this.loadingScreen = new LoadingScreen();
 
@@ -37,6 +45,7 @@ export class PixelArtSandbox {
     this.performanceOverlay = new PerformanceOverlay();
     this.timeIndicator = new TimeIndicator();
     this.logOverlay = new LogOverlay();
+    this.sandboxMetrics = new SandboxMetrics();
 
     this.setupEventListeners();
     this.setupMenuCallbacks();
@@ -119,7 +128,9 @@ export class PixelArtSandbox {
 
       // Pre-generate spawn area chunks
       console.log('🌍 Pre-generating spawn area...');
-      const spawnPosition = new THREE.Vector3(0, 5, -50);
+      const spawnPosition = this.sandboxEnabled
+        ? new THREE.Vector3(0, 5, 0)
+        : new THREE.Vector3(0, 5, -50);
       await this.systemManager.preGenerateSpawnArea(spawnPosition);
 
       console.log('🌍 World system ready!');
@@ -128,8 +139,12 @@ export class PixelArtSandbox {
       this.isInitialized = true;
       console.log('🚀 Pixel Art Sandbox ready!');
 
-      // Show main menu
-      this.loadingScreen.showMainMenu();
+      // Auto-start sandbox or show main menu
+      if (this.sandboxEnabled && this.sandboxConfig?.autoStart) {
+        this.startGameWithMode(GameMode.AI_SANDBOX);
+      } else {
+        this.loadingScreen.showMainMenu();
+      }
 
     } catch (error) {
       console.error('❌ Failed to initialize sandbox:', error);
@@ -147,18 +162,25 @@ export class PixelArtSandbox {
   private startGameWithMode(mode: GameMode): void {
     if (!this.isInitialized || this.gameStarted) return;
 
-    console.log(`🎮 PixelArtSandbox: Starting game with mode: ${mode} (${mode === GameMode.OPEN_FRONTIER ? 'OPEN_FRONTIER' : 'ZONE_CONTROL'})`);
+    console.log(`🎮 PixelArtSandbox: Starting game with mode: ${mode}`);
     this.gameStarted = true;
 
     // Set the game mode in the system manager
     console.log(`🎮 PixelArtSandbox: Calling systemManager.setGameMode(${mode})`);
-    this.systemManager.setGameMode(mode);
+    this.systemManager.setGameMode(mode, { createPlayerSquad: mode !== GameMode.AI_SANDBOX });
 
     this.startGame();
   }
 
   private startGame(): void {
     if (!this.gameStarted) return;
+
+    if (this.sandboxEnabled) {
+      const controller = this.systemManager.playerController as any;
+      if (controller && typeof controller.setPointerLockEnabled === 'function') {
+        controller.setPointerLockEnabled(false);
+      }
+    }
 
     // Hide menu and show loading
     this.loadingScreen.hide();
@@ -181,13 +203,19 @@ export class PixelArtSandbox {
       try {
         const gm = (this.systemManager as any).gameModeManager;
         const cfg = gm.getCurrentConfig();
-        const Faction = { US: 'US', OPFOR: 'OPFOR' } as any;
-        const spawn = cfg.zones.find((z: any) => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
-        if (spawn) {
-          const pos = spawn.position.clone();
-          // Get actual terrain height at spawn location + player height offset
+        if (cfg.id === GameMode.AI_SANDBOX) {
+          const pos = new THREE.Vector3(0, 0, 0);
           pos.y = getHeightQueryCache().getHeightAt(pos.x, pos.z) + 2;
           this.systemManager.playerController.setPosition(pos);
+        } else {
+          const Faction = { US: 'US', OPFOR: 'OPFOR' } as any;
+          const spawn = cfg.zones.find((z: any) => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
+          if (spawn) {
+            const pos = spawn.position.clone();
+            // Get actual terrain height at spawn location + player height offset
+            pos.y = getHeightQueryCache().getHeightAt(pos.x, pos.z) + 2;
+            this.systemManager.playerController.setPosition(pos);
+          }
         }
       } catch { /* ignore */ }
 
@@ -205,7 +233,9 @@ export class PixelArtSandbox {
           controller.setGameStarted(true);
         }
 
-        console.log('🖱️ Click anywhere to enable mouse look!');
+        if (!this.sandboxEnabled) {
+          console.log('🖱️ Click anywhere to enable mouse look!');
+        }
 
         // Start ambient audio
         if (this.systemManager.audioManager) {
@@ -228,7 +258,9 @@ export class PixelArtSandbox {
 
     // Show crosshair
     this.sandboxRenderer.showCrosshair();
-    this.showWelcomeMessage();
+    if (!this.sandboxEnabled) {
+      this.showWelcomeMessage();
+    }
   }
 
   private togglePerformanceStats(): void {
@@ -395,9 +427,25 @@ Have fun!
 
     renderer.autoClear = currentAutoClear;
 
+    this.updateSandboxMetrics(deltaTime);
     this.updatePerformanceOverlay(deltaTime);
     this.updateLogOverlay();
     this.updateTimeIndicator();
+  }
+
+  private updateSandboxMetrics(deltaTime: number): void {
+    this.sandboxMetrics.updateFrame(deltaTime);
+
+    const combatSystem = this.systemManager.combatantSystem;
+    if (!combatSystem) return;
+
+    const combatStats = combatSystem.getCombatStats();
+    const combatProfile = combatSystem.getCombatProfile();
+    this.sandboxMetrics.updateCombatStats({
+      combatantCount: combatStats.total,
+      firingCount: combatProfile.timing.firingCount,
+      engagingCount: combatProfile.timing.engagingCount
+    });
   }
 
   private updatePerformanceOverlay(deltaTime: number): void {

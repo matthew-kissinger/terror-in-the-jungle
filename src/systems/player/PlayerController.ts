@@ -35,6 +35,7 @@ export class PlayerController implements GameSystem {
   private keys: Set<string> = new Set();
   private mouseMovement = { x: 0, y: 0 };
   private isPointerLocked = false;
+  private pointerLockEnabled = true;
   private isControlsEnabled = true; // For death system
   private gameStarted = false; // Don't lock pointer until game starts
 
@@ -288,6 +289,7 @@ export class PlayerController implements GameSystem {
 
   private requestPointerLock(): void {
     // Don't lock if controls are disabled (dead/respawning)
+    if (!this.pointerLockEnabled) return;
     if (this.gameStarted && !this.isPointerLocked && this.isControlsEnabled) {
       document.body.requestPointerLock();
     }
@@ -295,7 +297,7 @@ export class PlayerController implements GameSystem {
 
   setGameStarted(started: boolean): void {
     this.gameStarted = started;
-    if (started && this.boundRequestPointerLock) {
+    if (started && this.boundRequestPointerLock && this.pointerLockEnabled) {
       // Remove any existing listener first
       document.removeEventListener('click', this.boundRequestPointerLock);
       // Add click listener for pointer lock
@@ -766,7 +768,7 @@ export class PlayerController implements GameSystem {
     this.isControlsEnabled = true;
 
     // Re-lock mouse cursor after respawn
-    if (this.gameStarted && !document.pointerLockElement) {
+    if (this.gameStarted && this.pointerLockEnabled && !document.pointerLockElement) {
       // Small delay to avoid conflict with UI interaction
       setTimeout(() => {
         document.body.requestPointerLock();
@@ -774,7 +776,25 @@ export class PlayerController implements GameSystem {
     }
   }
 
+  setPointerLockEnabled(enabled: boolean): void {
+    this.pointerLockEnabled = enabled;
+
+    if (!enabled) {
+      if (this.boundRequestPointerLock) {
+        document.removeEventListener('click', this.boundRequestPointerLock);
+      }
+      if (document.pointerLockElement === document.body) {
+        document.exitPointerLock();
+      }
+    } else if (this.gameStarted && this.boundRequestPointerLock) {
+      document.addEventListener('click', this.boundRequestPointerLock);
+    }
+  }
+
   private showControls(): void {
+    const pointerLockHint = this.pointerLockEnabled
+      ? 'Mouse - Look around (click to enable pointer lock)'
+      : 'Mouse - Look around (pointer lock disabled)';
     console.log(`
 🎮 CONTROLS:
 WASD - Move / Helicopter Controls (W/S = Collective, A/D = Yaw)
@@ -783,7 +803,7 @@ Shift - Run / Engine Boost (in helicopter)
 Space - Jump / Toggle Auto-Hover (in helicopter)
 Right Ctrl - Toggle Mouse Control Mode (helicopter: control vs free look)
 E - Enter/Exit Helicopter
-Mouse - Look around (click to enable pointer lock)
+${pointerLockHint}
 Escape - Release pointer lock / Exit helicopter
     `);
   }

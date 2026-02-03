@@ -112,6 +112,10 @@ export class TicketSystem implements GameSystem {
     const zones = this.zoneManager.getAllZones();
     const capturableZones = zones.filter(z => !z.isHomeBase);
 
+    if (capturableZones.length === 0) {
+      return { usTickets: 0, opforTickets: 0, bleedPerSecond: 0 };
+    }
+
     let usControlled = 0;
     let opforControlled = 0;
 

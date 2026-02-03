@@ -570,9 +570,13 @@ export class SandboxSystemManager {
     }
   }
 
-  setGameMode(mode: GameMode): void {
+  setGameMode(mode: GameMode, options?: { createPlayerSquad?: boolean }): void {
+    const createPlayerSquad = options?.createPlayerSquad ?? true;
     // Set flag for player squad creation BEFORE mode change
-    (this.combatantSystem as any).shouldCreatePlayerSquad = true;
+    (this.combatantSystem as any).shouldCreatePlayerSquad = createPlayerSquad;
+    if (!createPlayerSquad) {
+      (this.combatantSystem as any).playerSquadId = undefined;
+    }
 
     // Set weather config for mode
     const config = getGameModeConfig(mode);
@@ -584,7 +588,9 @@ export class SandboxSystemManager {
     this.gameModeManager.setGameMode(mode);
 
     // After forces are spawned, setup the player squad controller
-    setTimeout(() => this.setupPlayerSquad(), 500);
+    if (createPlayerSquad) {
+      setTimeout(() => this.setupPlayerSquad(), 500);
+    }
   }
 
   private setupPlayerSquad(): void {
