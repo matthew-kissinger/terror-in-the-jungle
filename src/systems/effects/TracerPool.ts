@@ -36,16 +36,19 @@ export class TracerPool {
     });
 
     for (let i = 0; i < maxTracers; i++) {
+      // Create shared geometry per tracer - core and glow lines share it
+      // All tracers update vertex positions via setAttribute anyway
       const geometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]);
+      
       // Create a group with multiple lines for enhanced visibility
       const group = new THREE.Group();
 
-      // Core tracer line
-      const line = new THREE.Line(geometry.clone(), this.tracerMaterial);
+      // Core tracer line - share geometry with glow line within same tracer
+      const line = new THREE.Line(geometry, this.tracerMaterial);
       group.add(line);
 
-      // Glow effect line (slightly larger)
-      const glowLine = new THREE.Line(geometry.clone(), this.glowMaterial);
+      // Glow effect line (slightly larger) - shares same geometry as core line
+      const glowLine = new THREE.Line(geometry, this.glowMaterial);
       glowLine.scale.set(1.1, 1.1, 1.1);
       group.add(glowLine);
 
@@ -103,8 +106,24 @@ export class TracerPool {
   }
 
   dispose(): void {
-    this.active.forEach(t => this.scene.remove(t.mesh));
-    this.pool.forEach(t => this.scene.remove(t.mesh));
+    // Dispose geometries from all tracers (active and pool)
+    const allTracers = [...this.active, ...this.pool];
+    const disposedGeometries = new Set<THREE.BufferGeometry>();
+    
+    allTracers.forEach(t => {
+      this.scene.remove(t.mesh);
+      const group = t.mesh as unknown as THREE.Group;
+      group.children.forEach((child) => {
+        if (child instanceof THREE.Line && child.geometry instanceof THREE.BufferGeometry) {
+          // Dispose geometry once per tracer (core and glow share it)
+          if (!disposedGeometries.has(child.geometry)) {
+            child.geometry.dispose();
+            disposedGeometries.add(child.geometry);
+          }
+        }
+      });
+    });
+    
     this.active.length = 0;
     this.pool.length = 0;
     this.tracerMaterial.dispose();

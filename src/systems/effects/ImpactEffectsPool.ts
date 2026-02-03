@@ -274,6 +274,8 @@ export class ImpactEffectsPool {
       this.scene.remove(e.decal);
       e.particles.geometry.dispose();
       e.sparks.geometry.dispose();
+      // Dispose cloned decal material
+      e.decal.material.dispose();
     });
 
     this.pool.forEach(e => {
@@ -282,6 +284,8 @@ export class ImpactEffectsPool {
       this.scene.remove(e.decal);
       e.particles.geometry.dispose();
       e.sparks.geometry.dispose();
+      // Dispose cloned decal material
+      e.decal.material.dispose();
     });
 
     this.particleMaterial.dispose();

@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 
+// Module-level scratch vectors to avoid per-call allocations
+const _velStep = new THREE.Vector3();
+const _roundVelStep = new THREE.Vector3();
+
 export interface MortarRound {
   id: string;
   position: THREE.Vector3;
@@ -64,8 +68,9 @@ export class MortarBallistics {
       // Update velocity (gravity only)
       vel.y += this.GRAVITY * timeStep;
 
-      // Update position
-      pos.add(vel.clone().multiplyScalar(timeStep));
+      // Update position using scratch vector instead of clone
+      _velStep.copy(vel).multiplyScalar(timeStep);
+      pos.add(_velStep);
       timeToImpact += timeStep;
 
       // Check ground collision
@@ -95,8 +100,9 @@ export class MortarBallistics {
     // Apply gravity
     round.velocity.y += this.GRAVITY * deltaTime;
 
-    // Update position
-    round.position.add(round.velocity.clone().multiplyScalar(deltaTime));
+    // Update position using scratch vector instead of clone
+    _roundVelStep.copy(round.velocity).multiplyScalar(deltaTime);
+    round.position.add(_roundVelStep);
 
     // Update mesh
     round.mesh.position.copy(round.position);
