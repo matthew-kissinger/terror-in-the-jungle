@@ -1,5 +1,13 @@
 export class HelicopterInstrumentsPanel {
   public helicopterInstruments: HTMLDivElement;
+  private collectiveFill: HTMLDivElement | null = null;
+  private rpmValue: HTMLDivElement | null = null;
+  private hoverIndicator: HTMLDivElement | null = null;
+  private boostIndicator: HTMLDivElement | null = null;
+
+  static readonly GRADIENT_HIGH = 'linear-gradient(to top, #ff4444, #ff8844)';
+  static readonly GRADIENT_MED = 'linear-gradient(to top, #ffaa44, #ffdd44)';
+  static readonly GRADIENT_NORMAL = 'linear-gradient(to top, #00ff44, #88ff44)';
 
   constructor() {
     this.helicopterInstruments = this.createHelicopterInstruments();
@@ -76,6 +84,7 @@ export class HelicopterInstrumentsPanel {
     collectiveBar.appendChild(collectiveFill);
     collectiveContainer.appendChild(collectiveLabel);
     collectiveContainer.appendChild(collectiveBar);
+    this.collectiveFill = collectiveFill;
 
     // RPM Indicator
     const rpmContainer = document.createElement('div');
@@ -110,6 +119,7 @@ export class HelicopterInstrumentsPanel {
 
     rpmContainer.appendChild(rpmLabel);
     rpmContainer.appendChild(rpmValue);
+    this.rpmValue = rpmValue;
 
     // Status Indicators
     const statusContainer = document.createElement('div');
@@ -158,6 +168,8 @@ export class HelicopterInstrumentsPanel {
 
     statusContainer.appendChild(hoverIndicator);
     statusContainer.appendChild(boostIndicator);
+    this.hoverIndicator = hoverIndicator;
+    this.boostIndicator = boostIndicator;
 
     instruments.appendChild(collectiveContainer);
     instruments.appendChild(rpmContainer);
