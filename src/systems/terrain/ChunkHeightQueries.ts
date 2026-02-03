@@ -1,5 +1,10 @@
 import * as THREE from 'three';
 
+// Module-level scratch objects to avoid per-call allocations
+const _heightRaycaster = new THREE.Raycaster();
+const _heightOrigin = new THREE.Vector3();
+const _heightDirection = new THREE.Vector3(0, -1, 0);
+
 /**
  * Height query utilities for terrain chunks
  */
@@ -100,15 +105,12 @@ export class ChunkHeightQueries {
   ): number {
     if (!terrainMesh) return 0;
 
-    // Create downward ray from above the terrain
-    const raycaster = new THREE.Raycaster();
-    const origin = new THREE.Vector3(worldX, 1000, worldZ);
-    const direction = new THREE.Vector3(0, -1, 0);
-
-    raycaster.set(origin, direction);
+    // Reuse scratch objects instead of allocating per call
+    _heightOrigin.set(worldX, 1000, worldZ);
+    _heightRaycaster.set(_heightOrigin, _heightDirection);
 
     // Intersect with terrain mesh (uses BVH for speed)
-    const intersects = raycaster.intersectObject(terrainMesh);
+    const intersects = _heightRaycaster.intersectObject(terrainMesh);
 
     if (intersects.length > 0) {
       return intersects[0].point.y;

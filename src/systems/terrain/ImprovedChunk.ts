@@ -14,6 +14,11 @@ THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
 THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
 THREE.Mesh.prototype.raycast = acceleratedRaycast;
 
+// Module-level scratch objects to avoid per-call allocations
+const _raycastRaycaster = new THREE.Raycaster();
+const _raycastOrigin = new THREE.Vector3();
+const _raycastDirection = new THREE.Vector3(0, -1, 0);
+
 export class ImprovedChunk {
   private scene: THREE.Scene;
   private assetLoader: AssetLoader;
@@ -329,21 +334,18 @@ export class ImprovedChunk {
    */
   getHeightAtRaycast(worldX: number, worldZ: number): number {
     if (!this.terrainMesh) return 0;
-    
-    // Create downward ray from above the terrain
-    const raycaster = new THREE.Raycaster();
-    const origin = new THREE.Vector3(worldX, 1000, worldZ);
-    const direction = new THREE.Vector3(0, -1, 0);
-    
-    raycaster.set(origin, direction);
-    
+
+    // Reuse scratch objects instead of allocating per call
+    _raycastOrigin.set(worldX, 1000, worldZ);
+    _raycastRaycaster.set(_raycastOrigin, _raycastDirection);
+
     // Intersect with terrain mesh (uses BVH for speed)
-    const intersects = raycaster.intersectObject(this.terrainMesh);
-    
+    const intersects = _raycastRaycaster.intersectObject(this.terrainMesh);
+
     if (intersects.length > 0) {
       return intersects[0].point.y;
     }
-    
+
     return 0;
   }
 

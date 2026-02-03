@@ -5,6 +5,7 @@ import { Logger } from '../../utils/Logger';
 const _losDirection = new THREE.Vector3();
 const _rayBox = new THREE.Box3();
 const _meshBox = new THREE.Box3();
+const _losRaycaster = new THREE.Raycaster();
 
 /**
  * Accelerates line-of-sight checks using BVH-accelerated raycasting
@@ -75,12 +76,11 @@ export class LOSAccelerator {
     }
 
     // Perform raycast using BVH acceleration
-    const raycaster = new THREE.Raycaster();
-    raycaster.set(origin, _losDirection);
-    raycaster.far = distance;
+    _losRaycaster.set(origin, _losDirection);
+    _losRaycaster.far = distance;
 
     // Raycast against relevant meshes (BVH acceleration happens automatically)
-    const intersects = raycaster.intersectObjects(relevantMeshes, false);
+    const intersects = _losRaycaster.intersectObjects(relevantMeshes, false);
 
     this.recordQuery(performance.now() - startTime);
 
