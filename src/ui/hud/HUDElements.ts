@@ -4,11 +4,21 @@ import { DamageNumberSystem } from './DamageNumberSystem';
 import { ScorePopupSystem } from './ScorePopupSystem';
 import { HitMarkerFeedback } from './HitMarkerFeedback';
 import { WeaponSwitchFeedback } from './WeaponSwitchFeedback';
+import { WeaponAmmoDisplay } from './WeaponAmmoDisplay';
+import { ObjectiveDisplay } from './ObjectiveDisplay';
+import { CombatStatsDisplay } from './CombatStatsDisplay';
+import { GameStatusDisplay } from './GameStatusDisplay';
+import { HelicopterInstruments } from './HelicopterInstruments';
+import { GrenadePowerMeter } from './GrenadePowerMeter';
+import { InteractionPrompt } from './InteractionPrompt';
+import { RespawnButton } from './RespawnButton';
 import * as THREE from 'three';
 
 export class HUDElements {
   // Main containers
   public hudContainer: HTMLDivElement;
+  
+  // Extracted modules - expose their public properties for backward compatibility
   public objectivesList: HTMLDivElement;
   public ticketDisplay: HTMLDivElement;
   public combatStats: HTMLDivElement;
@@ -24,28 +34,57 @@ export class HUDElements {
   public helicopterInstruments: HTMLDivElement;
   public grenadePowerMeter: HTMLDivElement;
   public grenadeCookingTimer?: HTMLDivElement;
+  
+  // Feedback systems
   public killFeed: KillFeed;
   public damageNumbers?: DamageNumberSystem;
   public scorePopups?: ScorePopupSystem;
   public hitMarkerFeedback?: HitMarkerFeedback;
   public weaponSwitchFeedback?: WeaponSwitchFeedback;
 
+  // Module instances
+  private weaponAmmoDisplay: WeaponAmmoDisplay;
+  private objectiveDisplay: ObjectiveDisplay;
+  private combatStatsDisplay: CombatStatsDisplay;
+  private gameStatusDisplay: GameStatusDisplay;
+  private helicopterInstrumentsModule: HelicopterInstruments;
+  private grenadePowerMeterModule: GrenadePowerMeter;
+  private interactionPromptModule: InteractionPrompt;
+  private respawnButtonModule: RespawnButton;
+
   constructor(camera?: THREE.Camera) {
     this.hudContainer = this.createHUDContainer();
-    this.objectivesList = this.createObjectivesPanel();
-    this.ticketDisplay = this.createTicketDisplay();
-    this.combatStats = this.createCombatStats();
-    this.gameStatus = this.createGameStatus();
-    this.timerElement = this.createTimerElement();
+    
+    // Initialize extracted modules
+    this.weaponAmmoDisplay = new WeaponAmmoDisplay();
+    this.objectiveDisplay = new ObjectiveDisplay();
+    this.combatStatsDisplay = new CombatStatsDisplay();
+    this.gameStatusDisplay = new GameStatusDisplay();
+    this.helicopterInstrumentsModule = new HelicopterInstruments();
+    this.grenadePowerMeterModule = new GrenadePowerMeter();
+    this.interactionPromptModule = new InteractionPrompt();
+    this.respawnButtonModule = new RespawnButton();
+    
+    // Expose module properties for backward compatibility
+    this.objectivesList = this.objectiveDisplay.objectivesList;
+    this.ticketDisplay = this.objectiveDisplay.ticketDisplay;
+    this.combatStats = this.combatStatsDisplay.combatStats;
+    this.gameStatus = this.gameStatusDisplay.gameStatus;
+    this.timerElement = this.gameStatusDisplay.timerElement;
+    this.killCounter = this.combatStatsDisplay.killCounter;
+    this.ammoDisplay = this.weaponAmmoDisplay.ammoDisplay;
+    this.respawnButton = this.respawnButtonModule.respawnButton;
+    this.interactionPrompt = this.interactionPromptModule.interactionPrompt;
+    this.elevationSlider = this.helicopterInstrumentsModule.elevationSlider;
+    this.helicopterMouseIndicator = this.helicopterInstrumentsModule.helicopterMouseIndicator;
+    this.helicopterInstruments = this.helicopterInstrumentsModule.helicopterInstruments;
+    this.grenadePowerMeter = this.grenadePowerMeterModule.grenadePowerMeter;
+    this.grenadeCookingTimer = this.grenadePowerMeterModule.grenadeCookingTimer;
+    
+    // Create hit marker container (simple, no module needed)
     this.hitMarkerContainer = this.createHitMarkerContainer();
-    this.killCounter = this.createKillCounter();
-    this.ammoDisplay = this.createAmmoDisplay();
-    this.respawnButton = this.createRespawnButton();
-    this.interactionPrompt = this.createInteractionPrompt();
-    this.elevationSlider = this.createElevationSlider();
-    this.helicopterMouseIndicator = this.createHelicopterMouseIndicator();
-    this.helicopterInstruments = this.createHelicopterInstruments();
-    this.grenadePowerMeter = this.createGrenadePowerMeter();
+    
+    // Initialize feedback systems
     this.killFeed = new KillFeed();
 
     // Initialize damage number system if camera is provided
@@ -85,94 +124,14 @@ export class HUDElements {
     return container;
   }
 
-  private createObjectivesPanel(): HTMLDivElement {
-    const panel = document.createElement('div');
-    panel.className = 'objectives-panel';
-    panel.innerHTML = '<div class="objectives-title">Objectives</div>';
-    return panel;
-  }
-
-  private createTicketDisplay(): HTMLDivElement {
-    const display = document.createElement('div');
-    display.className = 'ticket-display';
-    return display;
-  }
-
-  private createCombatStats(): HTMLDivElement {
-    const stats = document.createElement('div');
-    stats.className = 'combat-stats';
-    return stats;
-  }
-
-  private createGameStatus(): HTMLDivElement {
-    const status = document.createElement('div');
-    status.className = 'game-status';
-    return status;
-  }
-
-  private createTimerElement(): HTMLDivElement {
-    const timer = document.createElement('div');
-    timer.className = 'match-timer';
-    timer.innerHTML = '<div class="timer-display">0:00</div>';
-    return timer;
-  }
-
   private createHitMarkerContainer(): HTMLDivElement {
     const container = document.createElement('div');
     container.className = 'hit-marker-container';
     return container;
   }
 
-  private createKillCounter(): HTMLDivElement {
-    const counter = document.createElement('div');
-    counter.className = 'kill-counter';
-    counter.innerHTML = `
-      <div><span class="kill-count">0</span> Kills</div>
-      <div><span class="death-count">0</span> Deaths</div>
-      <div class="kd-ratio">K/D: 0.00</div>
-    `;
-    return counter;
-  }
-
-  private createAmmoDisplay(): HTMLDivElement {
-    const display = document.createElement('div');
-    display.className = 'ammo-display';
-    display.innerHTML = `
-      <div class="ammo-counter">
-        <span class="ammo-magazine">30</span>
-        <span class="ammo-separator">/</span>
-        <span class="ammo-reserve">90</span>
-      </div>
-      <div class="ammo-status"></div>
-    `;
-    return display;
-  }
-
   updateAmmoDisplay(magazine: number, reserve: number): void {
-    const magElement = this.ammoDisplay.querySelector('.ammo-magazine') as HTMLElement;
-    const resElement = this.ammoDisplay.querySelector('.ammo-reserve') as HTMLElement;
-    const statusElement = this.ammoDisplay.querySelector('.ammo-status') as HTMLElement;
-
-    if (magElement) magElement.textContent = magazine.toString();
-    if (resElement) resElement.textContent = reserve.toString();
-
-    // Show status messages
-    if (magazine === 0 && reserve > 0) {
-      statusElement.textContent = 'Press R to reload';
-      statusElement.style.color = '#ff6b6b';
-      magElement.style.color = '#ff6b6b';
-    } else if (magazine <= 10 && magazine > 0) {
-      statusElement.textContent = 'Low ammo';
-      statusElement.style.color = '#ffd93d';
-      magElement.style.color = '#ffd93d';
-    } else if (magazine === 0 && reserve === 0) {
-      statusElement.textContent = 'No ammo!';
-      statusElement.style.color = '#ff0000';
-      magElement.style.color = '#ff0000';
-    } else {
-      statusElement.textContent = '';
-      magElement.style.color = 'white';
-    }
+    this.weaponAmmoDisplay.updateAmmoDisplay(magazine, reserve);
   }
 
   showHitMarker(type: 'hit' | 'kill' | 'headshot' = 'hit'): void {
@@ -187,474 +146,6 @@ export class HUDElements {
     } else if (type === 'headshot') {
       console.log('🎯 Headshot!');
     }
-  }
-
-  private createRespawnButton(): HTMLButtonElement {
-    const button = document.createElement('button');
-    button.className = 'respawn-button';
-    button.innerHTML = '🔄 RESPAWN<br><span style="font-size: 10px;">Press K</span>';
-    button.style.cssText = `
-      position: fixed;
-      bottom: 120px;
-      right: 20px;
-      padding: 12px 20px;
-      background: rgba(255, 0, 0, 0.1);
-      border: 2px solid rgba(255, 0, 0, 0.5);
-      color: #ff6b6b;
-      font-family: 'Courier New', monospace;
-      font-size: 14px;
-      font-weight: bold;
-      text-transform: uppercase;
-      cursor: pointer;
-      border-radius: 4px;
-      transition: all 0.3s;
-      z-index: 100;
-      text-align: center;
-      backdrop-filter: blur(5px);
-    `;
-
-    button.onmouseover = () => {
-      button.style.background = 'rgba(255, 0, 0, 0.2)';
-      button.style.borderColor = 'rgba(255, 0, 0, 0.8)';
-      button.style.transform = 'scale(1.05)';
-    };
-
-    button.onmouseout = () => {
-      button.style.background = 'rgba(255, 0, 0, 0.1)';
-      button.style.borderColor = 'rgba(255, 0, 0, 0.5)';
-      button.style.transform = 'scale(1)';
-    };
-
-    return button;
-  }
-
-  private createInteractionPrompt(): HTMLDivElement {
-    const prompt = document.createElement('div');
-    prompt.className = 'interaction-prompt';
-    prompt.style.cssText = `
-      position: fixed;
-      bottom: 50%;
-      left: 50%;
-      transform: translate(-50%, 50%);
-      background: rgba(0, 0, 0, 0.8);
-      border: 2px solid rgba(255, 255, 255, 0.6);
-      color: white;
-      padding: 15px 25px;
-      font-family: 'Courier New', monospace;
-      font-size: 16px;
-      font-weight: bold;
-      text-align: center;
-      border-radius: 8px;
-      z-index: 1000;
-      backdrop-filter: blur(5px);
-      display: none;
-      animation: pulse 2s infinite;
-    `;
-    return prompt;
-  }
-
-
-  private createElevationSlider(): HTMLDivElement {
-    const slider = document.createElement('div');
-    slider.className = 'elevation-slider';
-    slider.style.cssText = `
-      position: fixed;
-      left: 20px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 60px;
-      height: auto;
-      background: linear-gradient(to bottom, rgba(10, 10, 14, 0.6), rgba(10, 10, 14, 0.3));
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 8px;
-      backdrop-filter: blur(6px) saturate(1.1);
-      -webkit-backdrop-filter: blur(6px) saturate(1.1);
-      z-index: 110;
-      pointer-events: none;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 8px 6px;
-    `;
-
-    // Current elevation display (center)
-    const elevationDisplay = document.createElement('div');
-    elevationDisplay.className = 'elevation-display';
-    elevationDisplay.style.cssText = `
-      font-family: 'Courier New', monospace;
-      font-size: 12px;
-      color: rgba(255, 255, 255, 0.9);
-      font-weight: bold;
-      text-align: center;
-      background: rgba(255, 255, 255, 0.1);
-      padding: 4px 6px;
-      border-radius: 4px;
-      min-width: 40px;
-    `;
-    elevationDisplay.textContent = '5m';
-
-    // Simple elevation label
-    const label = document.createElement('div');
-    label.style.cssText = `
-      font-family: 'Courier New', monospace;
-      font-size: 9px;
-      color: rgba(255, 255, 255, 0.6);
-      text-align: center;
-      margin-top: 4px;
-      text-transform: uppercase;
-    `;
-    label.textContent = 'ELEV';
-
-    slider.appendChild(elevationDisplay);
-    slider.appendChild(label);
-
-    return slider;
-  }
-
-  private createHelicopterMouseIndicator(): HTMLDivElement {
-    const indicator = document.createElement('div');
-    indicator.className = 'helicopter-mouse-indicator';
-    indicator.style.cssText = `
-      position: fixed;
-      left: 20px;
-      top: calc(50% + 120px);
-      width: 60px;
-      height: auto;
-      background: linear-gradient(to bottom, rgba(10, 10, 14, 0.6), rgba(10, 10, 14, 0.3));
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 8px;
-      backdrop-filter: blur(6px) saturate(1.1);
-      -webkit-backdrop-filter: blur(6px) saturate(1.1);
-      z-index: 110;
-      pointer-events: none;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 8px 6px;
-    `;
-
-    // Mouse icon (simple representation)
-    const mouseIcon = document.createElement('div');
-    mouseIcon.className = 'mouse-icon';
-    mouseIcon.style.cssText = `
-      width: 20px;
-      height: 26px;
-      border: 2px solid rgba(255, 255, 255, 0.7);
-      border-radius: 8px 8px 12px 12px;
-      position: relative;
-      margin-bottom: 4px;
-      background: rgba(255, 255, 255, 0.1);
-    `;
-
-    // Mouse scroll wheel
-    const scrollWheel = document.createElement('div');
-    scrollWheel.style.cssText = `
-      position: absolute;
-      top: 4px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 2px;
-      height: 6px;
-      background: rgba(255, 255, 255, 0.7);
-      border-radius: 1px;
-    `;
-    mouseIcon.appendChild(scrollWheel);
-
-    // Status text
-    const statusText = document.createElement('div');
-    statusText.className = 'mouse-status-text';
-    statusText.style.cssText = `
-      font-family: 'Courier New', monospace;
-      font-size: 9px;
-      color: rgba(255, 255, 255, 0.9);
-      font-weight: bold;
-      text-align: center;
-      text-transform: uppercase;
-      line-height: 1.2;
-    `;
-    statusText.textContent = 'CONTROL';
-
-    // Mode label
-    const modeLabel = document.createElement('div');
-    modeLabel.style.cssText = `
-      font-family: 'Courier New', monospace;
-      font-size: 8px;
-      color: rgba(255, 255, 255, 0.6);
-      text-align: center;
-      margin-top: 2px;
-      text-transform: uppercase;
-    `;
-    modeLabel.textContent = 'RCTRL';
-
-    indicator.appendChild(mouseIcon);
-    indicator.appendChild(statusText);
-    indicator.appendChild(modeLabel);
-
-    return indicator;
-  }
-
-  private createHelicopterInstruments(): HTMLDivElement {
-    const instruments = document.createElement('div');
-    instruments.className = 'helicopter-instruments';
-    instruments.style.cssText = `
-      position: fixed;
-      left: 20px;
-      top: calc(50% + 200px);
-      width: 60px;
-      height: auto;
-      background: linear-gradient(to bottom, rgba(10, 10, 14, 0.6), rgba(10, 10, 14, 0.3));
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 8px;
-      backdrop-filter: blur(6px) saturate(1.1);
-      -webkit-backdrop-filter: blur(6px) saturate(1.1);
-      z-index: 110;
-      pointer-events: none;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 8px 6px;
-      gap: 6px;
-    `;
-
-    // Collective (Thrust) Indicator
-    const collectiveContainer = document.createElement('div');
-    collectiveContainer.style.cssText = `
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      width: 100%;
-    `;
-
-    const collectiveLabel = document.createElement('div');
-    collectiveLabel.style.cssText = `
-      font-family: 'Courier New', monospace;
-      font-size: 8px;
-      color: rgba(255, 255, 255, 0.6);
-      text-align: center;
-      margin-bottom: 2px;
-      text-transform: uppercase;
-    `;
-    collectiveLabel.textContent = 'THRU';
-
-    const collectiveBar = document.createElement('div');
-    collectiveBar.className = 'collective-bar';
-    collectiveBar.style.cssText = `
-      width: 12px;
-      height: 30px;
-      border: 1px solid rgba(255, 255, 255, 0.4);
-      position: relative;
-      border-radius: 2px;
-      background: rgba(0, 0, 0, 0.3);
-    `;
-
-    const collectiveFill = document.createElement('div');
-    collectiveFill.className = 'collective-fill';
-    collectiveFill.style.cssText = `
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      width: 100%;
-      height: 0%;
-      background: linear-gradient(to top, #00ff44, #88ff44);
-      border-radius: 1px;
-      transition: height 0.1s ease;
-    `;
-
-    collectiveBar.appendChild(collectiveFill);
-    collectiveContainer.appendChild(collectiveLabel);
-    collectiveContainer.appendChild(collectiveBar);
-
-    // RPM Indicator
-    const rpmContainer = document.createElement('div');
-    rpmContainer.style.cssText = `
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      width: 100%;
-    `;
-
-    const rpmLabel = document.createElement('div');
-    rpmLabel.style.cssText = `
-      font-family: 'Courier New', monospace;
-      font-size: 8px;
-      color: rgba(255, 255, 255, 0.6);
-      text-align: center;
-      margin-bottom: 2px;
-      text-transform: uppercase;
-    `;
-    rpmLabel.textContent = 'RPM';
-
-    const rpmValue = document.createElement('div');
-    rpmValue.className = 'rpm-value';
-    rpmValue.style.cssText = `
-      font-family: 'Courier New', monospace;
-      font-size: 10px;
-      color: rgba(255, 255, 255, 0.9);
-      font-weight: bold;
-      text-align: center;
-    `;
-    rpmValue.textContent = '0%';
-
-    rpmContainer.appendChild(rpmLabel);
-    rpmContainer.appendChild(rpmValue);
-
-    // Status Indicators
-    const statusContainer = document.createElement('div');
-    statusContainer.style.cssText = `
-      display: flex;
-      gap: 4px;
-      width: 100%;
-      justify-content: center;
-    `;
-
-    const hoverIndicator = document.createElement('div');
-    hoverIndicator.className = 'hover-indicator';
-    hoverIndicator.style.cssText = `
-      width: 12px;
-      height: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.4);
-      border-radius: 2px;
-      background: rgba(0, 100, 0, 0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: 'Courier New', monospace;
-      font-size: 8px;
-      color: rgba(255, 255, 255, 0.7);
-      font-weight: bold;
-    `;
-    hoverIndicator.textContent = 'H';
-
-    const boostIndicator = document.createElement('div');
-    boostIndicator.className = 'boost-indicator';
-    boostIndicator.style.cssText = `
-      width: 12px;
-      height: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.4);
-      border-radius: 2px;
-      background: rgba(100, 50, 0, 0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: 'Courier New', monospace;
-      font-size: 8px;
-      color: rgba(255, 255, 255, 0.7);
-      font-weight: bold;
-    `;
-    boostIndicator.textContent = 'B';
-
-    statusContainer.appendChild(hoverIndicator);
-    statusContainer.appendChild(boostIndicator);
-
-    instruments.appendChild(collectiveContainer);
-    instruments.appendChild(rpmContainer);
-    instruments.appendChild(statusContainer);
-
-    return instruments;
-  }
-
-  private createGrenadePowerMeter(): HTMLDivElement {
-    const container = document.createElement('div');
-    container.className = 'grenade-power-meter';
-    container.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, 120px);
-      width: 200px;
-      height: 30px;
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      pointer-events: none;
-    `;
-
-    // Label
-    const label = document.createElement('div');
-    label.style.cssText = `
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-      color: rgba(255, 255, 255, 0.9);
-      font-weight: bold;
-      text-align: center;
-      margin-bottom: 4px;
-      text-transform: uppercase;
-      text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
-    `;
-    label.textContent = 'THROW POWER';
-
-    // Bar container
-    const barContainer = document.createElement('div');
-    barContainer.style.cssText = `
-      width: 100%;
-      height: 12px;
-      background: rgba(0, 0, 0, 0.6);
-      border: 2px solid rgba(255, 255, 255, 0.5);
-      border-radius: 6px;
-      position: relative;
-      overflow: hidden;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-    `;
-
-    // Power fill bar
-    const powerFill = document.createElement('div');
-    powerFill.className = 'power-fill';
-    powerFill.style.cssText = `
-      position: absolute;
-      left: 0;
-      top: 0;
-      height: 100%;
-      width: 30%;
-      background: linear-gradient(to right, #00ff44, #88ff44);
-      transition: width 0.05s linear, background 0.1s ease;
-      border-radius: 3px;
-    `;
-
-    // Power percentage text
-    const powerText = document.createElement('div');
-    powerText.className = 'power-text';
-    powerText.style.cssText = `
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-family: 'Courier New', monospace;
-      font-size: 10px;
-      font-weight: bold;
-      color: white;
-      text-shadow: 0 0 3px rgba(0, 0, 0, 1);
-      z-index: 1;
-    `;
-    powerText.textContent = '30%';
-
-    // Cooking timer (initially hidden)
-    const cookingTimer = document.createElement('div');
-    cookingTimer.className = 'grenade-cooking-timer';
-    cookingTimer.style.cssText = `
-      font-family: 'Courier New', monospace;
-      font-size: 12px;
-      color: rgba(255, 100, 100, 0.9);
-      font-weight: bold;
-      text-align: center;
-      margin-top: 6px;
-      text-transform: uppercase;
-      text-shadow: 0 0 4px rgba(255, 0, 0, 0.8);
-      display: none;
-    `;
-    cookingTimer.textContent = 'COOKING: 0.0s';
-
-    barContainer.appendChild(powerFill);
-    barContainer.appendChild(powerText);
-    container.appendChild(label);
-    container.appendChild(barContainer);
-    container.appendChild(cookingTimer);
-
-    return container;
   }
 
   showMessage(message: string, duration: number = 3000): void {
@@ -687,191 +178,54 @@ export class HUDElements {
   }
 
   showInteractionPrompt(text: string): void {
-    console.log('🎮 HUD: SHOWING interaction prompt:', text);
-    this.interactionPrompt.textContent = text;
-    this.interactionPrompt.style.display = 'block';
-    console.log('🎮 HUD: Prompt display style set to:', this.interactionPrompt.style.display);
+    this.interactionPromptModule.showInteractionPrompt(text);
   }
 
   hideInteractionPrompt(): void {
-    console.log('🎮 HUD: HIDING interaction prompt');
-    this.interactionPrompt.style.display = 'none';
+    this.interactionPromptModule.hideInteractionPrompt();
   }
 
-
   updateElevation(elevation: number): void {
-    const elevationDisplay = this.elevationSlider.querySelector('.elevation-display') as HTMLElement;
-    if (elevationDisplay) {
-      elevationDisplay.textContent = `${Math.round(elevation)}m`;
-    }
+    this.helicopterInstrumentsModule.updateElevation(elevation);
   }
 
   // Helicopter mouse control indicator methods
   showHelicopterMouseIndicator(): void {
-    this.helicopterMouseIndicator.style.display = 'flex';
+    this.helicopterInstrumentsModule.showHelicopterMouseIndicator();
   }
 
   hideHelicopterMouseIndicator(): void {
-    this.helicopterMouseIndicator.style.display = 'none';
+    this.helicopterInstrumentsModule.hideHelicopterMouseIndicator();
   }
 
   updateHelicopterMouseMode(controlMode: boolean): void {
-    const statusText = this.helicopterMouseIndicator.querySelector('.mouse-status-text') as HTMLElement;
-    const mouseIcon = this.helicopterMouseIndicator.querySelector('.mouse-icon') as HTMLElement;
-
-    if (statusText) {
-      statusText.textContent = controlMode ? 'CONTROL' : 'FREE LOOK';
-      statusText.style.color = controlMode ? 'rgba(255, 255, 255, 0.9)' : 'rgba(100, 200, 255, 0.9)';
-    }
-
-    if (mouseIcon) {
-      mouseIcon.style.borderColor = controlMode ? 'rgba(255, 255, 255, 0.7)' : 'rgba(100, 200, 255, 0.7)';
-      mouseIcon.style.background = controlMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(100, 200, 255, 0.1)';
-    }
+    this.helicopterInstrumentsModule.updateHelicopterMouseMode(controlMode);
   }
 
   // Helicopter instruments methods (only visible in helicopter)
   showHelicopterInstruments(): void {
-    this.helicopterInstruments.style.display = 'flex';
+    this.helicopterInstrumentsModule.showHelicopterInstruments();
   }
 
   hideHelicopterInstruments(): void {
-    this.helicopterInstruments.style.display = 'none';
+    this.helicopterInstrumentsModule.hideHelicopterInstruments();
+  }
+
+  updateHelicopterInstruments(collective: number, rpm: number, autoHover: boolean, engineBoost: boolean): void {
+    this.helicopterInstrumentsModule.updateHelicopterInstruments(collective, rpm, autoHover, engineBoost);
   }
 
   // Grenade power meter methods
   showGrenadePowerMeter(): void {
-    this.grenadePowerMeter.style.display = 'flex';
+    this.grenadePowerMeterModule.showGrenadePowerMeter();
   }
 
   hideGrenadePowerMeter(): void {
-    this.grenadePowerMeter.style.display = 'none';
+    this.grenadePowerMeterModule.hideGrenadePowerMeter();
   }
 
   updateGrenadePower(power: number, estimatedDistance?: number, cookingTime?: number): void {
-    const powerFill = this.grenadePowerMeter.querySelector('.power-fill') as HTMLElement;
-    const powerText = this.grenadePowerMeter.querySelector('.power-text') as HTMLElement;
-    const label = this.grenadePowerMeter.querySelector('div') as HTMLElement;
-    const cookingTimer = this.grenadePowerMeter.querySelector('.grenade-cooking-timer') as HTMLElement;
-
-    if (powerFill && powerText) {
-      // Power ranges from 0.3 to 1.0, normalize to 0-100%
-      const normalizedPower = ((power - 0.3) / 0.7) * 100;
-      const displayPercent = Math.round(power * 100);
-
-      powerFill.style.width = `${normalizedPower}%`;
-
-      // Show distance estimate if available
-      if (estimatedDistance !== undefined) {
-        powerText.textContent = `~${Math.round(estimatedDistance)}m`;
-      } else {
-        powerText.textContent = `${displayPercent}%`;
-      }
-
-      // Color gradient: green (low) -> yellow (mid) -> red (max)
-      if (normalizedPower < 40) {
-        powerFill.style.background = 'linear-gradient(to right, #00ff44, #88ff44)'; // Green
-        if (label) label.style.color = 'rgba(100, 255, 100, 0.9)';
-      } else if (normalizedPower < 75) {
-        powerFill.style.background = 'linear-gradient(to right, #ffff44, #ffaa44)'; // Yellow
-        if (label) label.style.color = 'rgba(255, 255, 100, 0.9)';
-      } else {
-        powerFill.style.background = 'linear-gradient(to right, #ff8844, #ff4444)'; // Red
-        if (label) label.style.color = 'rgba(255, 100, 100, 0.9)';
-        // Pulse animation at max power
-        if (normalizedPower >= 95) {
-          powerFill.style.animation = 'pulse-glow 0.5s infinite';
-        } else {
-          powerFill.style.animation = 'none';
-        }
-      }
-    }
-
-    // Update cooking timer if grenade is being cooked
-    if (cookingTimer) {
-      if (cookingTime !== undefined && cookingTime > 0) {
-        cookingTimer.style.display = 'block';
-        const fuseTime = 3.5; // Match FUSE_TIME from GrenadeSystem
-        const timeLeft = fuseTime - cookingTime;
-        cookingTimer.textContent = `COOKING: ${timeLeft.toFixed(1)}s`;
-
-        // Change color based on time left
-        if (timeLeft <= 1.0) {
-          cookingTimer.style.color = 'rgba(255, 50, 50, 1)';
-          cookingTimer.style.animation = 'pulse-glow 0.3s infinite';
-        } else if (timeLeft <= 2.0) {
-          cookingTimer.style.color = 'rgba(255, 150, 50, 0.95)';
-          cookingTimer.style.animation = 'pulse-glow 0.6s infinite';
-        } else {
-          cookingTimer.style.color = 'rgba(255, 200, 100, 0.9)';
-          cookingTimer.style.animation = 'none';
-        }
-      } else {
-        cookingTimer.style.display = 'none';
-      }
-    }
-  }
-
-  updateHelicopterInstruments(collective: number, rpm: number, autoHover: boolean, engineBoost: boolean): void {
-    // Update collective (thrust) bar
-    const collectiveFill = this.helicopterInstruments.querySelector('.collective-fill') as HTMLElement;
-    if (collectiveFill) {
-      const percentage = Math.round(collective * 100);
-      collectiveFill.style.height = `${percentage}%`;
-
-      // Color coding for collective
-      if (percentage > 80) {
-        collectiveFill.style.background = 'linear-gradient(to top, #ff4444, #ff8844)'; // Red for high thrust
-      } else if (percentage > 50) {
-        collectiveFill.style.background = 'linear-gradient(to top, #ffff44, #88ff44)'; // Yellow for medium
-      } else {
-        collectiveFill.style.background = 'linear-gradient(to top, #00ff44, #88ff44)'; // Green for normal
-      }
-    }
-
-    // Update RPM display
-    const rpmValue = this.helicopterInstruments.querySelector('.rpm-value') as HTMLElement;
-    if (rpmValue) {
-      const rpmPercentage = Math.round(rpm * 100);
-      rpmValue.textContent = `${rpmPercentage}%`;
-
-      // Color coding for RPM
-      if (rpmPercentage < 30) {
-        rpmValue.style.color = 'rgba(255, 100, 100, 0.9)'; // Red for low RPM
-      } else if (rpmPercentage > 90) {
-        rpmValue.style.color = 'rgba(255, 255, 100, 0.9)'; // Yellow for high RPM
-      } else {
-        rpmValue.style.color = 'rgba(255, 255, 255, 0.9)'; // White for normal
-      }
-    }
-
-    // Update hover assist indicator
-    const hoverIndicator = this.helicopterInstruments.querySelector('.hover-indicator') as HTMLElement;
-    if (hoverIndicator) {
-      if (autoHover) {
-        hoverIndicator.style.background = 'rgba(0, 200, 0, 0.6)';
-        hoverIndicator.style.borderColor = 'rgba(0, 255, 0, 0.8)';
-        hoverIndicator.style.color = 'rgba(255, 255, 255, 1)';
-      } else {
-        hoverIndicator.style.background = 'rgba(100, 100, 100, 0.3)';
-        hoverIndicator.style.borderColor = 'rgba(255, 255, 255, 0.4)';
-        hoverIndicator.style.color = 'rgba(255, 255, 255, 0.5)';
-      }
-    }
-
-    // Update boost indicator
-    const boostIndicator = this.helicopterInstruments.querySelector('.boost-indicator') as HTMLElement;
-    if (boostIndicator) {
-      if (engineBoost) {
-        boostIndicator.style.background = 'rgba(255, 150, 0, 0.6)';
-        boostIndicator.style.borderColor = 'rgba(255, 200, 0, 0.8)';
-        boostIndicator.style.color = 'rgba(255, 255, 255, 1)';
-      } else {
-        boostIndicator.style.background = 'rgba(100, 100, 100, 0.3)';
-        boostIndicator.style.borderColor = 'rgba(255, 255, 255, 0.4)';
-        boostIndicator.style.color = 'rgba(255, 255, 255, 0.5)';
-      }
-    }
+    this.grenadePowerMeterModule.updateGrenadePower(power, estimatedDistance, cookingTime);
   }
 
   attachToDOM(): void {
