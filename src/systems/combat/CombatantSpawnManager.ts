@@ -3,24 +3,22 @@ import { Combatant, CombatantState, Faction, SquadCommand } from './types';
 import { CombatantFactory } from './CombatantFactory';
 import { SquadManager } from './SquadManager';
 import { SpatialOctree } from './SpatialOctree';
-import { ZoneManager, ZoneState, CaptureZone } from '../world/ZoneManager';
+import { ZoneManager } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
-import { GameModeConfig, ZoneConfig } from '../../config/gameModes';
 import { RallyPointSystem } from './RallyPointSystem';
 import { TicketSystem } from '../world/TicketSystem';
 import { Logger } from '../../utils/Logger';
+import { SpawnPositionCalculator } from './SpawnPositionCalculator';
+import { RespawnManager, PendingRespawn } from './RespawnManager';
 
 // Module-level scratch vectors to avoid per-call allocations
 const _spawnPos = new THREE.Vector3();
-const _anchorPos = new THREE.Vector3();
 const _offsetVec = new THREE.Vector3();
 const _scratchVec = new THREE.Vector3();
-const _squadCentroid = new THREE.Vector3();
-const _usBasePos = new THREE.Vector3(0, 0, -50);
-const _opforBasePos = new THREE.Vector3(0, 0, 145);
 
 /**
  * Manages spawning, respawning, and reinforcement waves for combatants
+ * Orchestrates delegation to SpawnPositionCalculator and RespawnManager
  */
 export class CombatantSpawnManager {
   private combatants: Map<string, Combatant>;
@@ -30,6 +28,7 @@ export class CombatantSpawnManager {
   private zoneManager?: ZoneManager;
   private gameModeManager?: GameModeManager;
   private rallyPointSystem?: RallyPointSystem;
+  private respawnManager: RespawnManager;
 
   // Spawn configuration
   private MAX_COMBATANTS = 30;
@@ -40,9 +39,6 @@ export class CombatantSpawnManager {
   private reinforcementWaveTimer = 0;
   private reinforcementWaveIntervalSeconds = 15;
   private lastSpawnCheck = 0;
-
-  // Respawn tracking
-  private pendingRespawns: Array<{squadId: string, respawnTime: number, originalId: string}> = [];
 
   // Squad size configuration
   private squadSizeMin = 3;
@@ -58,6 +54,12 @@ export class CombatantSpawnManager {
     this.spatialGrid = spatialGrid;
     this.combatantFactory = combatantFactory;
     this.squadManager = squadManager;
+    this.respawnManager = new RespawnManager(
+      combatants,
+      spatialGrid,
+      squadManager,
+      combatantFactory
+    );
   }
 
   setZoneManager(zoneManager: ZoneManager): void {
@@ -88,20 +90,19 @@ export class CombatantSpawnManager {
 
   /**
    * Spawn initial forces for both factions
-   * Returns the player squad ID if created
    */
   spawnInitialForces(shouldCreatePlayerSquad: boolean, playerSquadId?: string): string | undefined {
     console.log('🎖️ Deploying initial forces across HQs...');
 
     const config = this.gameModeManager?.getCurrentConfig();
-    const avgSquadSize = this.getAverageSquadSize();
+    const avgSquadSize = SpawnPositionCalculator.getAverageSquadSize(this.squadSizeMin, this.squadSizeMax);
     const targetPerFaction = Math.floor(this.MAX_COMBATANTS / 2);
     const initialPerFaction = Math.max(avgSquadSize, Math.floor(targetPerFaction * 0.3));
     let initialSquadsPerFaction = Math.max(1, Math.round(initialPerFaction / avgSquadSize));
 
-    const usHQs = this.getHQZonesForFaction(Faction.US, config);
-    const opforHQs = this.getHQZonesForFaction(Faction.OPFOR, config);
-    const { usBasePos, opforBasePos } = this.getBasePositions();
+    const usHQs = SpawnPositionCalculator.getHQZonesForFaction(Faction.US, config);
+    const opforHQs = SpawnPositionCalculator.getHQZonesForFaction(Faction.OPFOR, config);
+    const { usBasePos, opforBasePos } = SpawnPositionCalculator.getBasePositions(config);
 
     let createdPlayerSquadId: string | undefined;
 
@@ -135,10 +136,10 @@ export class CombatantSpawnManager {
     } else {
       // Distribute squads evenly across HQs
       for (let i = 0; i < initialSquadsPerFaction; i++) {
-        const posUS = _spawnPos.copy(usHQs[i % usHQs.length].position).add(this.randomSpawnOffset(20, 40));
-        const posOP = _anchorPos.copy(opforHQs[i % opforHQs.length].position).add(this.randomSpawnOffset(20, 40));
-        this.spawnSquad(Faction.US, posUS, this.randomSquadSize());
-        this.spawnSquad(Faction.OPFOR, posOP, this.randomSquadSize());
+        const posUS = _spawnPos.copy(usHQs[i % usHQs.length].position).add(SpawnPositionCalculator.randomSpawnOffset(20, 40));
+        const posOP = _scratchVec.copy(opforHQs[i % opforHQs.length].position).add(SpawnPositionCalculator.randomSpawnOffset(20, 40));
+        this.spawnSquad(Faction.US, posUS, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
+        this.spawnSquad(Faction.OPFOR, posOP, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
       }
     }
 
@@ -206,15 +207,7 @@ export class CombatantSpawnManager {
    */
   private manageSpawning(combatEnabled: boolean, ticketSystem?: TicketSystem): void {
     // Handle pending respawns for player squad members
-    const now = Date.now();
-    const readyToRespawn = this.pendingRespawns.filter(r => r.respawnTime <= now);
-
-    readyToRespawn.forEach(respawn => {
-      console.log(`⏰ RESPAWN TRIGGERED at ${now} (was scheduled for ${respawn.respawnTime})`);
-      this.respawnSquadMember(respawn.squadId);
-    });
-
-    this.pendingRespawns = this.pendingRespawns.filter(r => r.respawnTime > now);
+    this.respawnManager.handlePendingRespawns(this.rallyPointSystem, this.zoneManager, this.gameModeManager);
 
     // Remove all dead combatants immediately - no body persistence
     const toRemove: string[] = [];
@@ -232,7 +225,7 @@ export class CombatantSpawnManager {
     if (phase !== 'COMBAT' && !combatEnabled) return;
 
     const targetPerFaction = Math.floor(this.MAX_COMBATANTS / 2);
-    const avgSquadSize = this.getAverageSquadSize();
+    const avgSquadSize = SpawnPositionCalculator.getAverageSquadSize(this.squadSizeMin, this.squadSizeMax);
     const counts = this.countLivingByFaction();
 
     const ensureFactionStrength = (faction: Faction, living: number) => {
@@ -245,7 +238,7 @@ export class CombatantSpawnManager {
       if (missing <= 0) return;
 
       // Spawn up to two squads immediately to refill strength, respecting global cap
-      const anchors = this.getFactionAnchors(faction);
+      const anchors = SpawnPositionCalculator.getFactionAnchors(faction, this.zoneManager);
       let squadsToSpawn = Math.min(2, Math.ceil(missing / Math.max(1, avgSquadSize)));
 
       // Emergency refill: spawn more aggressively
@@ -259,11 +252,11 @@ export class CombatantSpawnManager {
         let pos: THREE.Vector3;
         if (anchors.length > 0) {
           const anchor = anchors[(i + Math.floor(Math.random() * anchors.length)) % anchors.length];
-          pos = _spawnPos.copy(anchor).add(this.randomSpawnOffset(20, 50));
+          pos = _spawnPos.copy(anchor).add(SpawnPositionCalculator.randomSpawnOffset(20, 50));
         } else {
-          pos = this.getSpawnPosition(faction);
+          pos = SpawnPositionCalculator.getSpawnPosition(faction, this.zoneManager, this.gameModeManager?.getCurrentConfig());
         }
-        this.spawnSquad(faction, pos, this.randomSquadSize());
+        this.spawnSquad(faction, pos, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
         console.log(`🎖️ Refill spawn: ${faction} squad of ${this.randomSquadSize()} deployed (${living + (i+1)*avgSquadSize}/${targetPerFaction})`);
       }
     };
@@ -289,319 +282,47 @@ export class CombatantSpawnManager {
    * Spawn reinforcement wave for a faction
    */
   private spawnReinforcementWave(faction: Faction): void {
-    const targetPerFaction = Math.floor(this.MAX_COMBATANTS / 2);
-    const counts = this.countLivingByFaction();
-    const currentFactionCount = faction === Faction.US ? counts.us : counts.opfor;
-    const missing = Math.max(0, targetPerFaction - currentFactionCount);
-    if (missing === 0) return;
-
-    const avgSquadSize = this.getAverageSquadSize();
-    const maxSquadsThisWave = Math.max(1, Math.min(3, Math.ceil(missing / avgSquadSize / 2)));
-
-    // Choose anchors across owned zones (contested first)
-    const anchors = this.getFactionAnchors(faction);
-    if (anchors.length === 0) {
-      // Fallback: spawn near default base pos
-      const pos = this.getSpawnPosition(faction);
-      if (this.combatants.size < this.MAX_COMBATANTS) {
-        this.spawnSquad(faction, pos, this.randomSquadSize());
-      }
-      return;
-    }
-
-    for (let i = 0; i < maxSquadsThisWave; i++) {
-      if (this.combatants.size >= this.MAX_COMBATANTS) break;
-      const anchor = anchors[i % anchors.length];
-      const pos = _spawnPos.copy(anchor).add(this.randomSpawnOffset(20, 50));
-      this.spawnSquad(faction, pos, this.randomSquadSize());
-    }
+    this.respawnManager.spawnReinforcementWave(
+      faction,
+      this.MAX_COMBATANTS,
+      this.squadSizeMin,
+      this.squadSizeMax,
+      (f, p, s) => this.spawnSquad(f, p, s),
+      this.zoneManager,
+      this.gameModeManager
+    );
   }
 
   /**
    * Remove a combatant and queue respawn if needed
    */
   removeCombatant(id: string): void {
-    const combatant = this.combatants.get(id);
-    if (combatant && combatant.squadId) {
-      const squad = this.squadManager.getSquad(combatant.squadId);
-
-      if (squad?.isPlayerControlled) {
-        // Check if THIS specific combatant already queued
-        const alreadyQueued = this.pendingRespawns.some(r => r.originalId === id);
-
-        if (!alreadyQueued) {
-          const now = Date.now();
-          const respawnTime = now + 5000;
-          console.log(`☠️ DEATH: Squad member ${id} died at ${now}`);
-          console.log(`⏳ Queued respawn for ${respawnTime} (in 5 seconds)`);
-          this.pendingRespawns.push({
-            squadId: combatant.squadId,
-            respawnTime: respawnTime,
-            originalId: id
-          });
-        } else {
-          console.log(`✓ Respawn already queued for ${id}`);
-        }
-      }
-
-      this.squadManager.removeSquadMember(combatant.squadId, id);
-    }
-    this.spatialGrid.remove(id);
-    this.combatants.delete(id);
+    this.respawnManager.removeCombatant(id);
   }
 
   /**
    * Respawn a squad member
    */
   respawnSquadMember(squadId: string): void {
-    const squad = this.squadManager.getSquad(squadId);
-    if (!squad) {
-      console.log(`⚠️ Cannot respawn - squad ${squadId} no longer exists`);
-      return;
-    }
-
-    // Calculate squad centroid for reference
-    _squadCentroid.set(0, 0, 0);
-    let validMemberCount = 0;
-    
-    for (const id of squad.members) {
-      const m = this.combatants.get(id);
-      if (m) {
-        _squadCentroid.add(m.position);
-        validMemberCount++;
-      }
-    }
-    
-    if (validMemberCount > 0) {
-      _squadCentroid.divideScalar(validMemberCount);
-    }
-
-    // Check for rally point first
-    let spawnPos: THREE.Vector3;
-    let spawnedAtRallyPoint = false;
-
-    if (this.rallyPointSystem) {
-      const rallyPos = this.rallyPointSystem.getRallyPointPosition(squadId);
-      if (rallyPos && this.rallyPointSystem.consumeRallyPointUse(squadId)) {
-        spawnPos = rallyPos;
-        spawnedAtRallyPoint = true;
-        console.log(`🚩 Respawning at rally point`);
-      } else {
-        spawnPos = this.getBaseSpawnPosition(squad.faction);
-      }
-    } else {
-      spawnPos = this.getBaseSpawnPosition(squad.faction);
-    }
-
-    const distanceFromSquad = spawnPos.distanceTo(_squadCentroid);
-
-    console.log(`🔄 Respawning squad member:`);
-    console.log(`   Squad location: (${_squadCentroid.x.toFixed(1)}, ${_squadCentroid.z.toFixed(1)})`);
-    console.log(`   Spawn location: (${spawnPos.x.toFixed(1)}, ${spawnPos.z.toFixed(1)}) ${spawnedAtRallyPoint ? '[RALLY POINT]' : '[BASE]'}`);
-    console.log(`   Distance: ${distanceFromSquad.toFixed(1)}m`);
-
-    const newMember = this.combatantFactory.createCombatant(
-      squad.faction,
-      spawnPos,
-      { squadId, squadRole: 'follower' }
+    this.respawnManager.respawnSquadMember(
+      squadId, 
+      this.rallyPointSystem, 
+      this.zoneManager, 
+      this.gameModeManager
     );
-
-    newMember.isRejoiningSquad = true;
-
-    squad.members.push(newMember.id);
-    this.combatants.set(newMember.id, newMember);
-    this.spatialGrid.updatePosition(newMember.id, newMember.position);
-
-    console.log(`✅ Squad member ${newMember.id} spawned and moving to rejoin squad`);
   }
 
   /**
    * Queue respawn for a combatant (called from explosion damage)
    */
   queueRespawn(squadId: string, originalId: string): void {
-    this.pendingRespawns.push({
-      squadId,
-      respawnTime: Date.now() + 5000,
-      originalId
-    });
+    this.respawnManager.queueRespawn(squadId, originalId);
   }
 
   // Helper methods
 
-  private getBasePositions(): { usBasePos: THREE.Vector3; opforBasePos: THREE.Vector3 } {
-    if (this.gameModeManager) {
-      const config = this.gameModeManager.getCurrentConfig();
-
-      // Find main bases for each faction
-      const usBase = config.zones.find(z =>
-        z.isHomeBase && z.owner === Faction.US &&
-        (z.id.includes('main') || z.id === 'us_base')
-      );
-      const opforBase = config.zones.find(z =>
-        z.isHomeBase && z.owner === Faction.OPFOR &&
-        (z.id.includes('main') || z.id === 'opfor_base')
-      );
-
-      if (usBase && opforBase) {
-        _usBasePos.set(usBase.position.x, usBase.position.y, usBase.position.z);
-        _opforBasePos.set(opforBase.position.x, opforBase.position.y, opforBase.position.z);
-        return { usBasePos: _usBasePos, opforBasePos: _opforBasePos };
-      }
-    }
-
-    // Fallback to default positions
-    _usBasePos.set(0, 0, -50);
-    _opforBasePos.set(0, 0, 145);
-    return { usBasePos: _usBasePos, opforBasePos: _opforBasePos };
-  }
-
-  private getBaseSpawnPosition(faction: Faction): THREE.Vector3 {
-    if (this.zoneManager) {
-      const allZones = this.zoneManager.getAllZones();
-      const ownedBases: CaptureZone[] = [];
-      for (const z of allZones) {
-        if (z.owner === faction && z.isHomeBase) {
-          ownedBases.push(z);
-        }
-      }
-
-      if (ownedBases.length > 0) {
-        const baseZone = ownedBases[Math.floor(Math.random() * ownedBases.length)];
-        const anchor = baseZone.position;
-        const angle = Math.random() * Math.PI * 2;
-        const radius = 20 + Math.random() * 30;
-        _spawnPos.set(
-          anchor.x + Math.cos(angle) * radius,
-          0,
-          anchor.z + Math.sin(angle) * radius
-        );
-        console.log(`📍 Using base ${baseZone.id} for squad respawn at (${_spawnPos.x.toFixed(1)}, ${_spawnPos.z.toFixed(1)})`);
-        return _spawnPos;
-      } else {
-        console.log(`⚠️ No owned bases found for ${faction}, using fallback spawn`);
-      }
-    } else {
-      console.log(`⚠️ No ZoneManager available, using fallback spawn`);
-    }
-
-    const { usBasePos, opforBasePos } = this.getBasePositions();
-    const basePos = faction === Faction.US ? usBasePos : opforBasePos;
-
-    const angle = Math.random() * Math.PI * 2;
-    const radius = 20 + Math.random() * 30;
-    _spawnPos.set(
-      basePos.x + Math.cos(angle) * radius,
-      0,
-      basePos.z + Math.sin(angle) * radius
-    );
-
-    console.log(`📍 Using fallback base spawn for ${faction} at (${_spawnPos.x.toFixed(1)}, ${_spawnPos.z.toFixed(1)})`);
-    return _spawnPos;
-  }
-
-  private getSpawnPosition(faction: Faction): THREE.Vector3 {
-    if (this.zoneManager) {
-      const allZones = this.zoneManager.getAllZones();
-      
-      let contestedAnchor: CaptureZone | null = null;
-      let capturedAnchor: CaptureZone | null = null;
-      let hqAnchor: CaptureZone | null = null;
-
-      for (const z of allZones) {
-        if (z.owner !== faction) continue;
-
-        if (z.isHomeBase) {
-          if (!hqAnchor) hqAnchor = z;
-        } else if (z.state === ZoneState.CONTESTED) {
-          if (!contestedAnchor) contestedAnchor = z;
-        } else {
-          if (!capturedAnchor) capturedAnchor = z;
-        }
-      }
-
-      const anchorZone = contestedAnchor || capturedAnchor || hqAnchor;
-      if (anchorZone) {
-        const anchor = anchorZone.position;
-        const angle = Math.random() * Math.PI * 2;
-        const radius = 20 + Math.random() * 40;
-        _spawnPos.set(
-          anchor.x + Math.cos(angle) * radius,
-          0,
-          anchor.z + Math.sin(angle) * radius
-        );
-        console.log(`📍 Using zone ${anchorZone.id} as spawn anchor`);
-        return _spawnPos;
-      } else {
-        console.log(`⚠️ No owned zones found for ${faction}, using fallback spawn`);
-      }
-    } else {
-      console.log(`⚠️ No ZoneManager available, using fallback spawn`);
-    }
-
-    // Fallback: spawn at fixed base positions (not near player!)
-    const { usBasePos, opforBasePos } = this.getBasePositions();
-    const basePos = faction === Faction.US ? usBasePos : opforBasePos;
-
-    // Add random offset around the base
-    const angle = Math.random() * Math.PI * 2;
-    const radius = 20 + Math.random() * 30;
-    _spawnPos.set(
-      basePos.x + Math.cos(angle) * radius,
-      0,
-      basePos.z + Math.sin(angle) * radius
-    );
-
-    console.log(`📍 Using fallback base spawn for ${faction} at (${_spawnPos.x.toFixed(1)}, ${_spawnPos.z.toFixed(1)})`);
-    return _spawnPos;
-  }
-
-  private getFactionAnchors(faction: Faction): THREE.Vector3[] {
-    if (!this.zoneManager) return [];
-    
-    const contested: THREE.Vector3[] = [];
-    const captured: THREE.Vector3[] = [];
-    const hqs: THREE.Vector3[] = [];
-
-    for (const z of this.zoneManager.getAllZones()) {
-      if (z.owner !== faction) continue;
-      
-      if (z.isHomeBase) {
-        hqs.push(z.position);
-      } else if (z.state === ZoneState.CONTESTED) {
-        contested.push(z.position);
-      } else {
-        captured.push(z.position);
-      }
-    }
-
-    return [...contested, ...captured, ...hqs];
-  }
-
-  private getHQZonesForFaction(faction: Faction, config?: GameModeConfig): Array<{ position: THREE.Vector3 }> {
-    const zones = config?.zones;
-    if (!zones) return [];
-    
-    const hqs: Array<{ position: THREE.Vector3 }> = [];
-    for (const z of zones) {
-      if (z.isHomeBase && z.owner === faction) {
-        hqs.push({ position: z.position });
-      }
-    }
-    return hqs;
-  }
-
   private randomSquadSize(): number {
-    return Math.floor(this.squadSizeMin + Math.random() * (this.squadSizeMax - this.squadSizeMin + 1));
-  }
-
-  private getAverageSquadSize(): number {
-    return Math.round((this.squadSizeMin + this.squadSizeMax) / 2);
-  }
-
-  private randomSpawnOffset(minRadius: number, maxRadius: number): THREE.Vector3 {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = minRadius + Math.random() * (maxRadius - minRadius);
-    return _offsetVec.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+    return SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax);
   }
 
   private countLivingByFaction(): { us: number; opfor: number } {
