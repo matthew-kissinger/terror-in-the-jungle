@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+const GRAVITY = new THREE.Vector3(0, -3, 0);
+
 interface ExplosionEffect {
   flash: THREE.PointLight;
   flashSprite: THREE.Sprite;
@@ -315,7 +317,6 @@ export class ExplosionEffectsPool {
 
   update(deltaTime: number): void {
     const now = performance.now();
-    const gravity = new THREE.Vector3(0, -3, 0);
 
     for (let i = this.active.length - 1; i >= 0; i--) {
       const effect = this.active[i];
@@ -355,7 +356,7 @@ export class ExplosionEffectsPool {
           const firePositions = effect.fireParticles.geometry.attributes.position as THREE.BufferAttribute;
           for (let j = 0; j < firePositions.count; j++) {
             // Apply gravity
-            effect.fireVelocities[j].addScaledVector(gravity, deltaTime * 2);
+            effect.fireVelocities[j].addScaledVector(GRAVITY, deltaTime * 2);
 
             // Update position
             const x = firePositions.getX(j) + effect.fireVelocities[j].x * deltaTime;
@@ -378,7 +379,7 @@ export class ExplosionEffectsPool {
           const debrisPositions = effect.debrisParticles.geometry.attributes.position as THREE.BufferAttribute;
           for (let j = 0; j < debrisPositions.count; j++) {
             // Apply strong gravity to debris
-            effect.debrisVelocities[j].addScaledVector(gravity, deltaTime * 3);
+            effect.debrisVelocities[j].addScaledVector(GRAVITY, deltaTime * 3);
 
             // Update position
             const x = debrisPositions.getX(j) + effect.debrisVelocities[j].x * deltaTime;
