@@ -180,8 +180,8 @@ export class SandboxSystemManager {
     }
   }
 
-  updateSystems(deltaTime: number): void {
-    this.updater.updateSystems(this.refs, this.systems, this.scene, deltaTime);
+  updateSystems(deltaTime: number, gameStarted: boolean = true): void {
+    this.updater.updateSystems(this.refs, this.systems, this.scene, deltaTime, gameStarted);
   }
 
   getSystemTimings(): Array<{ name: string; timeMs: number; budgetMs: number }> {

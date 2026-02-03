@@ -23,7 +23,8 @@ export class SystemUpdater {
     refs: SystemReferences,
     systems: GameSystem[],
     scene: THREE.Scene | undefined,
-    deltaTime: number
+    deltaTime: number,
+    gameStarted: boolean = true
   ): void {
     // Begin frame telemetry
     performanceTelemetry.beginFrame();
@@ -80,21 +81,38 @@ export class SystemUpdater {
       performanceTelemetry.endSystem('Weapons');
     });
 
+    // Gate UI systems - skip if game hasn't started or full map is visible
+    const fullMapVisible = (refs.fullMapSystem as any).isVisible || false;
+    const shouldUpdateUI = gameStarted && !fullMapVisible;
+
     this.trackSystemUpdate('UI', 1.0, () => {
       performanceTelemetry.beginSystem('UI');
+      // HUD always updates (handles its own visibility)
       if (refs.hudSystem) refs.hudSystem.update(deltaTime);
-      if (refs.minimapSystem) refs.minimapSystem.update(deltaTime);
+
+      // Gate minimap, compass when full map is open or game not started
+      if (shouldUpdateUI) {
+        if (refs.minimapSystem) refs.minimapSystem.update(deltaTime);
+        if (refs.compassSystem) refs.compassSystem.update(deltaTime);
+      }
+
+      // Full map updates when visible
       if (refs.fullMapSystem) refs.fullMapSystem.update(deltaTime);
-      if (refs.compassSystem) refs.compassSystem.update(deltaTime);
       performanceTelemetry.endSystem('UI');
     });
 
+    // Gate World systems - skip weather and tickets during menu/loading
     this.trackSystemUpdate('World', 1.0, () => {
       performanceTelemetry.beginSystem('World');
       if (refs.zoneManager) refs.zoneManager.update(deltaTime);
-      if (refs.ticketSystem) refs.ticketSystem.update(deltaTime);
+
+      // Gate ticket and weather systems before game starts
+      if (gameStarted) {
+        if (refs.ticketSystem) refs.ticketSystem.update(deltaTime);
+        if (refs.weatherSystem) refs.weatherSystem.update(deltaTime);
+      }
+
       if (refs.waterSystem) refs.waterSystem.update(deltaTime);
-      if (refs.weatherSystem) refs.weatherSystem.update(deltaTime);
       performanceTelemetry.endSystem('World');
     });
 

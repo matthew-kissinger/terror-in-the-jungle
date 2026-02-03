@@ -377,8 +377,8 @@ Have fun!
     const deltaTime = this.clock.getDelta();
     this.lastFrameDelta = deltaTime;
 
-    // Update all systems
-    this.systemManager.updateSystems(deltaTime);
+    // Update all systems (pass gameStarted for visibility gating)
+    this.systemManager.updateSystems(deltaTime, this.gameStarted);
 
     // Update skybox position
     this.systemManager.skybox.updatePosition(this.sandboxRenderer.camera.position);
