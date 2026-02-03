@@ -80,7 +80,6 @@ CombatantSystem has distance-based LOD:
 | File | Lines | Location |
 |------|-------|----------|
 | CombatantCombat.ts | 806 | systems/combat/ |
-| AudioManager.ts | 767 | systems/audio/ |
 | ImprovedChunkManager.ts | 753 | systems/terrain/ |
 | PlayerRespawnManager.ts | 749 | systems/player/ |
 | GrenadeSystem.ts | 731 | systems/weapons/ |
@@ -98,6 +97,7 @@ CombatantSystem has distance-based LOD:
 | PixelArtSandbox.ts | 536 | core/ |
 | OpenFrontierRespawnMap.ts | 503 | ui/map/ |
 | PerformanceTelemetry.ts | 497 | systems/debug/ |
+| AudioManager.ts | 453 | systems/audio/ |
 | InfluenceMapSystem.ts | 497 | systems/combat/ |
 | CombatantMovement.ts | 496 | systems/combat/ |
 | gameModes.ts | 496 | config/ |
@@ -116,7 +116,7 @@ CombatantSystem has distance-based LOD:
 | CompassSystem.ts | 414 | ui/compass/ |
 | MortarSystem.ts | 409 | systems/weapons/ |
 
-**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311). 36 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453). 35 files exceed the 400-line target.
 
 ### Optimization Targets
 
