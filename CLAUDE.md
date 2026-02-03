@@ -79,8 +79,6 @@ CombatantSystem has distance-based LOD:
 
 | File | Lines | Location |
 |------|-------|----------|
-| HUDElements.ts | 956 | ui/hud/ |
-| CombatantRenderer.ts | 866 | systems/combat/ |
 | AudioManager.ts | 767 | systems/audio/ |
 | ImprovedChunkManager.ts | 753 | systems/terrain/ |
 | PlayerRespawnManager.ts | 749 | systems/player/ |
@@ -101,10 +99,10 @@ CombatantSystem has distance-based LOD:
 | OpenFrontierRespawnMap.ts | 503 | ui/map/ |
 | PerformanceTelemetry.ts | 497 | systems/debug/ |
 | InfluenceMapSystem.ts | 497 | systems/combat/ |
+| CombatantMovement.ts | 496 | systems/combat/ |
 | gameModes.ts | 496 | config/ |
 | ExplosionEffectsPool.ts | 486 | systems/effects/ |
 | HUDStyles.ts | 483 | ui/hud/ |
-| CombatantMovement.ts | 471 | systems/combat/ |
 | WeatherSystem.ts | 447 | systems/environment/ |
 | MinimapSystem.ts | 441 | ui/minimap/ |
 | AICoverSystem.ts | 437 | systems/combat/ai/ |
@@ -117,7 +115,7 @@ CombatantSystem has distance-based LOD:
 | CompassSystem.ts | 414 | ui/compass/ |
 | MortarSystem.ts | 409 | systems/weapons/ |
 
-**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433). 37 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311). 35 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -130,7 +128,7 @@ Use the profiling to identify actual bottlenecks, then:
 5. **Validate** - Measure again, confirm improvement
 
 Known hotspots:
-- **CombatantMovement zone evaluation** - Squad leaders evaluate ALL zones EVERY frame (getAllZones + 2 filters + map + sort). In Open Frontier with 20-30 squad leaders this is significant. Needs throttling/caching.
+- **CombatantMovement zone evaluation** - FIXED. Throttled to 3-5s intervals with single-loop top-3 selection instead of per-frame sort.
 
 Possible areas (confirm with profiling):
 - AI update frequency tuning
@@ -193,8 +191,9 @@ perf.benchmark(1000)  // Runs 1000 raycast iterations, returns timing stats
 src/
 ├── core/                    # Game loop, renderer (644 lines in SandboxSystemManager)
 ├── systems/
-│   ├── combat/             # AI, spatial, rendering (9477 lines total)
-│   │   ├── ai/             # AITargeting, AIFlanking
+│   ├── combat/             # AI, spatial, rendering
+│   │   ├── ai/             # AITargeting, AIFlanking, AICover
+│   │   ├── renderer/       # CombatantRenderer (split: LOD, Animation, Geometry, Materials)
 │   │   ├── CombatantSystem.ts   # Main orchestrator (538 lines)
 │   │   ├── SpatialOctree.ts     # Spatial queries
 │   │   ├── InfluenceMapSystem.ts
@@ -206,6 +205,7 @@ src/
 │   ├── debug/              # PerformanceTelemetry
 │   └── effects/            # Pools (tracers, muzzle, impact, explosion)
 ├── ui/
+│   ├── hud/               # HUDElements (split: 11 focused modules)
 │   └── debug/              # PerformanceOverlay
 ├── workers/                # BVHWorker, ChunkWorker
 └── utils/                  # Logger, ObjectPoolManager
