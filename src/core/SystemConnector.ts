@@ -54,6 +54,7 @@ export class SystemConnector {
     refs.zoneManager.setCombatantSystem(refs.combatantSystem);
     refs.zoneManager.setCamera(camera);
     refs.zoneManager.setChunkManager(refs.chunkManager);
+    refs.zoneManager.setSpatialGridManager(spatialGridManager);
     refs.zoneManager.setHUDSystem(refs.hudSystem);
 
     // Connect audio manager

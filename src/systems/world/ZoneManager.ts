@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { CombatantSystem } from '../combat/CombatantSystem';
 import { Faction, CombatantState } from '../combat/types';
+import { spatialGridManager, SpatialGridManager } from '../combat/SpatialGridManager';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { ZoneRenderer } from './ZoneRenderer';
 import { ZoneCaptureLogic } from './ZoneCaptureLogic';
@@ -50,6 +51,7 @@ export class ZoneManager implements GameSystem {
   private zones: Map<string, CaptureZone> = new Map();
   private combatantSystem?: CombatantSystem;
   private chunkManager?: ImprovedChunkManager;
+  private spatialGridManager: SpatialGridManager = spatialGridManager;
   private playerPosition = new THREE.Vector3();
   private camera?: THREE.Camera;
 
@@ -65,6 +67,10 @@ export class ZoneManager implements GameSystem {
   private occupants: Map<string, { us: number; opfor: number }> = new Map();
   private previousZoneState: Map<string, Faction | null> = new Map();
   private hudSystem?: any;
+
+  // Optimization: Throttle occupant updates
+  private lastOccupantUpdateTime = 0;
+  private readonly OCCUPANT_UPDATE_INTERVAL = 0.1; // 100ms update rate for zone occupants
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -184,39 +190,43 @@ export class ZoneManager implements GameSystem {
   }
 
   private updateZoneOccupants(): void {
-    // Clear occupant counts
-    this.zones.forEach(zone => {
-      this.occupants.set(zone.id, { us: 0, opfor: 0 });
-    });
-
-    // Check player position
-    this.zones.forEach(zone => {
-      const distance = this.playerPosition.distanceTo(zone.position);
-      if (distance <= zone.radius) {
-        const occupants = this.occupants.get(zone.id)!;
-        occupants.us += 1; // Player is always US
+    if (!this.combatantSystem) {
+      // Fallback: Check only player position if combatant system not connected
+      for (const zone of this.zones.values()) {
+        const occupants = { us: 0, opfor: 0 };
+        if (this.playerPosition.distanceTo(zone.position) <= zone.radius) {
+          occupants.us = 1;
+        }
+        this.occupants.set(zone.id, occupants);
       }
-    });
+      return;
+    }
 
-    // Check combatant positions
-    if (this.combatantSystem) {
-      const combatants = this.combatantSystem.getAllCombatants();
-      combatants.forEach(combatant => {
-        // Skip dead combatants only
-        if ((combatant as any).state === CombatantState.DEAD || (combatant as any).state === 'dead') return;
+    const combatants = this.combatantSystem.combatants;
 
-        this.zones.forEach(zone => {
-          const distance = combatant.position.distanceTo(zone.position);
-          if (distance <= zone.radius) {
-            const occupants = this.occupants.get(zone.id)!;
-            if (combatant.faction === Faction.US) {
-              occupants.us += 1;
-            } else if (combatant.faction === Faction.OPFOR) {
-              occupants.opfor += 1;
-            }
-          }
-        });
-      });
+    // Use spatial grid to query combatants near each zone - O(zones * nearby_entities)
+    for (const zone of this.zones.values()) {
+      const occupants = { us: 0, opfor: 0 };
+
+      // Optimized spatial query: find combatant IDs within zone radius
+      // Note: This includes the 'player_proxy' which correctly counts the player as Faction.US
+      const nearbyIds = this.spatialGridManager.queryRadius(zone.position, zone.radius);
+      
+      for (const id of nearbyIds) {
+        const combatant = combatants.get(id);
+        if (!combatant) continue;
+
+        // Skip dead combatants (state can be enum or string depending on version)
+        if (combatant.state === CombatantState.DEAD || (combatant as any).state === 'dead') continue;
+
+        if (combatant.faction === Faction.US) {
+          occupants.us++;
+        } else if (combatant.faction === Faction.OPFOR) {
+          occupants.opfor++;
+        }
+      }
+
+      this.occupants.set(zone.id, occupants);
     }
   }
 
@@ -229,8 +239,12 @@ export class ZoneManager implements GameSystem {
     // Update zone positions to match terrain height
     this.updateZonePositions();
 
-    // Update who's in each zone
-    this.updateZoneOccupants();
+    // Update who's in each zone (throttled for performance)
+    this.lastOccupantUpdateTime += deltaTime;
+    if (this.lastOccupantUpdateTime >= this.OCCUPANT_UPDATE_INTERVAL) {
+      this.updateZoneOccupants();
+      this.lastOccupantUpdateTime = 0;
+    }
 
     // Update each zone based on occupants
     this.zones.forEach(zone => {
@@ -372,6 +386,10 @@ export class ZoneManager implements GameSystem {
     this.chunkManager = chunkManager;
     this.terrainAdapter.setChunkManager(chunkManager);
     console.log('🔗 ChunkManager connected to ZoneManager');
+  }
+
+  setSpatialGridManager(manager: SpatialGridManager): void {
+    this.spatialGridManager = manager;
   }
 
   setHUDSystem(hudSystem: any): void {
