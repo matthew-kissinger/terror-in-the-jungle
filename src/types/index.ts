@@ -71,8 +71,33 @@ export interface ChunkCoordinate {
 }
 
 export interface NoiseConfig {
+
   seed: number;
+
   octaves: number;
+
   persistence: number;
+
   scale: number;
+
+}
+
+
+
+/**
+
+ * Terrain types for footstep sound variation
+
+ */
+
+export enum TerrainType {
+
+  GRASS = 'grass',
+
+  MUD = 'mud',
+
+  WATER = 'water',
+
+  ROCK = 'rock'
+
 }
