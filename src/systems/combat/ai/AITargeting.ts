@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Combatant, CombatantState, Faction } from '../types';
 import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
-import { SpatialGridManager } from '../SpatialGridManager';
+import { SpatialOctree } from '../SpatialOctree';
 import { objectPool } from '../../../utils/ObjectPoolManager';
 import { clusterManager } from '../ClusterManager';
 import { getHeightQueryCache } from '../../terrain/HeightQueryCache';
@@ -47,7 +47,7 @@ export class AITargeting {
     combatant: Combatant,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid?: SpatialGridManager
+    spatialGrid?: SpatialOctree
   ): Combatant | null {
     const visualRange = combatant.skillProfile.visualRange;
     const visualRangeSq = visualRange * visualRange;
@@ -247,7 +247,7 @@ export class AITargeting {
     radius: number,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid?: SpatialGridManager
+    spatialGrid?: SpatialOctree
   ): number {
     let count = 0;
     const radiusSq = radius * radius;
