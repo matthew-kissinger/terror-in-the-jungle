@@ -136,9 +136,9 @@ Known hotspots:
 - **FullMapSystem allocations** - FIXED. Uses module-level scratch vector instead of per-frame Vector3 allocations.
 - **ExplosionEffectsPool gravity allocation** - FIXED. Static `GRAVITY` constant at module level.
 - **InfluenceMapSystem per-call Vector2/Vector3 allocations** - FIXED. Module-level scratch vectors `_v2a`, `_v2b`, `_v3a` reused throughout compute methods.
-- **HUDUpdater per-frame DOM rebuild** - `updateObjectivesDisplay()`, `updateTicketDisplay()`, `updateCombatStats()`, `updateKillCounter()` all use innerHTML to rebuild DOM subtrees every frame from HUDSystem.update(). Should cache DOM nodes and update textContent only.
+- **HUDUpdater per-frame DOM rebuild** - FIXED. DOM nodes cached, uses textContent updates instead of innerHTML rebuild.
 - **KillFeed DOM rebuild** - `render()` clears innerHTML and recreates all entry elements on every update. Should track entries by ID and only add/remove changed entries.
-- **CombatantLODManager full sort every frame** - Sorts all combatants by distance O(n log n) every frame via `scratchCombatants.sort()`. With 120 NPCs this is 240+ distance calculations per frame. Could use distance bucketing or partial sort.
+- **CombatantLODManager full sort every frame** - FIXED. Replaced O(n log n) sort with distance bucketing.
 - **WeatherSystem rain particle loop** - `updateRain()` calls `getMatrixAt()`/`decompose()` for each of 8000 rain particles every frame. Decompose is expensive. Should store position/velocity separately or use scratch vectors for decomposition.
 - **AIFlankingSystem per-call allocations** - `chooseBestFlankDirection()` creates 18+ Vector3 clones per flank evaluation via `centroid.clone()`, `leftDir.clone()`, `rightDir.clone()`. `assignSuppressionBehavior()` and `assignFlankingBehavior()` also create `new THREE.Vector3()` per call. Should use module-level scratch vectors.
 - **MortarSystem detonation allocations** - Detonation loop creates 60+ Vector3 allocations (offset, position clone, normal) across 20 debris particles. Normal `new THREE.Vector3(0, 1, 0)` should be static constant.
