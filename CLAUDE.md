@@ -83,8 +83,8 @@ CombatantSystem has distance-based LOD:
 | ImprovedChunk.ts | 672 | systems/terrain/ |
 | GPUBillboardSystem.ts | 669 | systems/world/billboard/ |
 | SandboxSystemManager.ts | 644 | core/ |
-| AIFlankingSystem.ts | 595 | systems/combat/ai/ |
-| FirstPersonWeapon.ts | 576 | systems/player/ |
+| AIFlankingSystem.ts | 606 | systems/combat/ai/ |
+| FirstPersonWeapon.ts | 568 | systems/player/ |
 | FullMapSystem.ts | 574 | ui/map/ |
 | AITargeting.ts | 571 | systems/combat/ai/ |
 | InfluenceMapSystem.ts | 570 | systems/combat/ |
@@ -137,15 +137,17 @@ Known hotspots:
 - **ExplosionEffectsPool gravity allocation** - FIXED. Static `GRAVITY` constant at module level.
 - **InfluenceMapSystem per-call Vector2/Vector3 allocations** - FIXED. Module-level scratch vectors `_v2a`, `_v2b`, `_v3a` reused throughout compute methods.
 - **HUDUpdater per-frame DOM rebuild** - FIXED. DOM nodes cached, uses textContent updates instead of innerHTML rebuild.
-- **KillFeed DOM rebuild** - `render()` clears innerHTML and recreates all entry elements on every update. Should track entries by ID and only add/remove changed entries.
+- **KillFeed DOM rebuild** - FIXED. Incremental DOM updates with entry tracking by ID, only adds/removes changed entries.
 - **CombatantLODManager full sort every frame** - FIXED. Replaced O(n log n) sort with distance bucketing.
-- **WeatherSystem rain particle loop** - `updateRain()` calls `getMatrixAt()`/`decompose()` for each of 8000 rain particles every frame. Decompose is expensive. Should store position/velocity separately or use scratch vectors for decomposition.
-- **AIFlankingSystem per-call allocations** - `chooseBestFlankDirection()` creates 18+ Vector3 clones per flank evaluation via `centroid.clone()`, `leftDir.clone()`, `rightDir.clone()`. `assignSuppressionBehavior()` and `assignFlankingBehavior()` also create `new THREE.Vector3()` per call. Should use module-level scratch vectors.
+- **WeatherSystem rain particle loop** - FIXED. Eliminated per-particle matrix decomposition for 8000 rain particles per frame.
+- **AIFlankingSystem per-call allocations** - FIXED. Module-level scratch vectors replace per-call Vector3 clones throughout.
 - **MortarSystem detonation allocations** - Detonation loop creates 60+ Vector3 allocations (offset, position clone, normal) across 20 debris particles. Normal `new THREE.Vector3(0, 1, 0)` should be static constant.
 - **DamageNumberSystem worldToScreen() clone** - `worldToScreen()` calls `worldPos.clone()` for every active damage number every frame (up to 30 clones per frame). Should use a module-level scratch vector.
 - **HelicopterInstrumentsPanel per-frame querySelector** - `updateHelicopterInstruments()` calls `querySelector()` 4 times per frame for `.collective-fill`, `.rpm-value`, `.hover-indicator`, `.boost-indicator`. Should cache element references at construction. Also reconstructs gradient strings per frame - should use static constants.
 - **CombatantLODManager.simulateDistantAI() allocations** - Creates `new THREE.Vector3()` for direction and random offset per distant combatant per call. Should use module-level scratch vectors.
 - **DeathCamSystem per-frame Vector3 allocations** - `updateOrbit()` creates new Vector3 for offset, direction, and up axis every frame during death cam sequence. Should use pre-allocated scratch vectors.
+- **WeaponFiring per-shot allocations** - `executeSingleShot()` and `executeShotgunShot()` call `ray.direction.clone().negate()` per bullet/pellet (8+ clones per shotgun shot). `spawnMuzzleFlash()` creates 3 new Vector3 every shot. Should use module-level scratch vectors.
+- **CombatantSpawnManager clone chains** - `manageSpawning()` and `spawnReinforcementWave()` call `anchor.clone().add()` in loops. `getBasePositions()` clones positions on every call. Multiple `new THREE.Vector3()` in position calculation helpers. Should use module-level scratch vectors and cache base positions.
 
 Possible areas (confirm with profiling):
 - Worker utilization (are they saturated?)
