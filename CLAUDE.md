@@ -79,7 +79,6 @@ CombatantSystem has distance-based LOD:
 
 | File | Lines | Location |
 |------|-------|----------|
-| ImprovedChunkManager.ts | 753 | systems/terrain/ |
 | ChunkWorkerPool.ts | 715 | systems/terrain/ |
 | ImprovedChunk.ts | 672 | systems/terrain/ |
 | GPUBillboardSystem.ts | 669 | systems/world/billboard/ |
@@ -92,6 +91,7 @@ CombatantSystem has distance-based LOD:
 | CombatantSpawnManager.ts | 557 | systems/combat/ |
 | CombatantSystem.ts | 541 | systems/combat/ |
 | PixelArtSandbox.ts | 536 | core/ |
+| ImprovedChunkManager.ts | 524 | systems/terrain/ |
 | CombatantMovement.ts | 504 | systems/combat/ |
 | OpenFrontierRespawnMap.ts | 503 | ui/map/ |
 | PerformanceTelemetry.ts | 497 | systems/debug/ |
@@ -101,8 +101,8 @@ CombatantSystem has distance-based LOD:
 | HUDStyles.ts | 483 | ui/hud/ |
 | CombatantCombat.ts | 468 | systems/combat/ |
 | AudioManager.ts | 453 | systems/audio/ |
+| WeatherSystem.ts | 449 | systems/environment/ |
 | CompassSystem.ts | 447 | ui/compass/ |
-| WeatherSystem.ts | 447 | systems/environment/ |
 | MinimapSystem.ts | 440 | ui/minimap/ |
 | AICoverSystem.ts | 437 | systems/combat/ai/ |
 | HelicopterModel.ts | 433 | systems/helicopter/ |
@@ -113,7 +113,7 @@ CombatantSystem has distance-based LOD:
 | MatchEndScreen.ts | 419 | ui/end/ |
 | MortarSystem.ts | 409 | systems/weapons/ |
 
-**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326). 30 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->524, extracted ChunkPriorityManager + ChunkLifecycleManager). 33 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -142,6 +142,10 @@ Known hotspots:
 - **WeatherSystem rain particle loop** - `updateRain()` calls `getMatrixAt()`/`decompose()` for each of 8000 rain particles every frame. Decompose is expensive. Should store position/velocity separately or use scratch vectors for decomposition.
 - **AIFlankingSystem per-call allocations** - `chooseBestFlankDirection()` creates 18+ Vector3 clones per flank evaluation via `centroid.clone()`, `leftDir.clone()`, `rightDir.clone()`. `assignSuppressionBehavior()` and `assignFlankingBehavior()` also create `new THREE.Vector3()` per call. Should use module-level scratch vectors.
 - **MortarSystem detonation allocations** - Detonation loop creates 60+ Vector3 allocations (offset, position clone, normal) across 20 debris particles. Normal `new THREE.Vector3(0, 1, 0)` should be static constant.
+- **DamageNumberSystem worldToScreen() clone** - `worldToScreen()` calls `worldPos.clone()` for every active damage number every frame (up to 30 clones per frame). Should use a module-level scratch vector.
+- **HelicopterInstrumentsPanel per-frame querySelector** - `updateHelicopterInstruments()` calls `querySelector()` 4 times per frame for `.collective-fill`, `.rpm-value`, `.hover-indicator`, `.boost-indicator`. Should cache element references at construction. Also reconstructs gradient strings per frame - should use static constants.
+- **CombatantLODManager.simulateDistantAI() allocations** - Creates `new THREE.Vector3()` for direction and random offset per distant combatant per call. Should use module-level scratch vectors.
+- **DeathCamSystem per-frame Vector3 allocations** - `updateOrbit()` creates new Vector3 for offset, direction, and up axis every frame during death cam sequence. Should use pre-allocated scratch vectors.
 
 Possible areas (confirm with profiling):
 - Worker utilization (are they saturated?)
