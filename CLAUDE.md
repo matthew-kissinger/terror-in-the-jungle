@@ -77,21 +77,46 @@ CombatantSystem has distance-based LOD:
 
 ### Large Files (violate 400-line target)
 
-| File | Lines | Should be |
-|------|-------|-----------|
-| HelicopterModel.ts | 1058 | Split |
-| PlayerController.ts | 1043 | Split |
-| HUDElements.ts | 956 | Split |
-| CombatantRenderer.ts | 866 | Split |
-| AudioManager.ts | 767 | Split |
-| ImprovedChunkManager.ts | 753 | Split |
-| PlayerRespawnManager.ts | 749 | Split |
-| CombatantCombat.ts | 745 | Split |
-| ChunkWorkerPool.ts | 715 | Split |
-| GrenadeSystem.ts | 693 | Split |
-| ImprovedChunk.ts | 672 | Split |
+| File | Lines | Location |
+|------|-------|----------|
+| HelicopterModel.ts | 1058 | systems/helicopter/ |
+| PlayerController.ts | 1043 | systems/player/ |
+| HUDElements.ts | 956 | ui/hud/ |
+| CombatantRenderer.ts | 866 | systems/combat/ |
+| AudioManager.ts | 767 | systems/audio/ |
+| ImprovedChunkManager.ts | 753 | systems/terrain/ |
+| PlayerRespawnManager.ts | 749 | systems/player/ |
+| CombatantCombat.ts | 745 | systems/combat/ |
+| ChunkWorkerPool.ts | 715 | systems/terrain/ |
+| GrenadeSystem.ts | 693 | systems/weapons/ |
+| ImprovedChunk.ts | 672 | systems/terrain/ |
+| SandboxSystemManager.ts | 644 | core/ |
+| AIFlankingSystem.ts | 595 | systems/combat/ai/ |
+| GPUBillboardSystem.ts | 587 | systems/world/billboard/ |
+| FootstepAudioSystem.ts | 587 | systems/audio/ |
+| FirstPersonWeapon.ts | 576 | systems/player/ |
+| FullMapSystem.ts | 573 | ui/map/ |
+| CombatantSpawnManager.ts | 557 | systems/combat/ |
+| AITargeting.ts | 542 | systems/combat/ai/ |
+| CombatantSystem.ts | 538 | systems/combat/ |
+| PixelArtSandbox.ts | 536 | core/ |
+| OpenFrontierRespawnMap.ts | 503 | ui/map/ |
+| PerformanceTelemetry.ts | 497 | systems/debug/ |
+| InfluenceMapSystem.ts | 497 | systems/combat/ |
+| gameModes.ts | 496 | config/ |
+| ExplosionEffectsPool.ts | 486 | systems/effects/ |
+| HUDStyles.ts | 483 | ui/hud/ |
+| CombatantMovement.ts | 471 | systems/combat/ |
+| WeatherSystem.ts | 447 | systems/environment/ |
+| MinimapSystem.ts | 441 | ui/minimap/ |
+| AICoverSystem.ts | 437 | systems/combat/ai/ |
+| SandboxRenderer.ts | 431 | core/ |
+| WeaponFiring.ts | 422 | systems/player/weapon/ |
+| MatchEndScreen.ts | 419 | ui/end/ |
+| CompassSystem.ts | 414 | ui/compass/ |
+| MortarSystem.ts | 409 | systems/weapons/ |
 
-**Note**: CombatantSystem.ts was successfully split (1308 -> 538 lines).
+**Note**: CombatantSystem.ts was successfully split (1308 -> 538 lines). 36 files total exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -116,7 +141,8 @@ Possible areas (confirm with profiling):
 
 - **GPU timing** - Currently only CPU-side timing
 - **Memory profiling** - No heap snapshot automation
-- **Playwright test harness** - Playwright not installed, automated perf regression tests needed
+- **Playwright test harness** - Infrastructure set up but perf regression tests not yet working
+- **Bundle code-splitting** - Main chunk is 1,341 kB (369 kB gzipped), Vite warns about size
 
 ## COMPLETED: AI Sandbox Mode
 
@@ -157,13 +183,13 @@ perf.benchmark(1000)  // Runs 1000 raycast iterations, returns timing stats
 
 ## Architecture
 
-~45k lines across ~100 files. Orchestrator pattern but some files got big.
+~45k lines across 144 files. Orchestrator pattern but some files got big.
 
 ```
 src/
-├── core/                    # Game loop, renderer (629 lines in SystemManager)
+├── core/                    # Game loop, renderer (644 lines in SandboxSystemManager)
 ├── systems/
-│   ├── combat/             # AI, spatial, rendering (6800 lines total)
+│   ├── combat/             # AI, spatial, rendering (9477 lines total)
 │   │   ├── ai/             # AITargeting, AIFlanking
 │   │   ├── CombatantSystem.ts   # Main orchestrator (538 lines)
 │   │   ├── SpatialOctree.ts     # Spatial queries
@@ -189,9 +215,10 @@ src/
 | `src/systems/combat/CombatantSystem.ts` | NPC orchestrator | Split to 538 lines |
 | `src/systems/combat/SpatialOctree.ts` | Spatial queries | Check query times |
 | `src/workers/BVHWorker.ts` | Parallel BVH | Pool of 4 workers |
-| `src/core/PixelArtSandbox.ts` | Main game loop | Where systems update |
+| `src/core/PixelArtSandbox.ts` | Main game loop | Where systems update (536 lines) |
+| `src/core/SandboxSystemManager.ts` | System orchestrator | 644 lines |
 | `src/systems/terrain/HeightQueryCache.ts` | Cached height lookups | Performance optimization |
-| `src/systems/terrain/ChunkWorkerPool.ts` | Worker pool management | 715 lines - needs split |
+| `src/systems/terrain/ChunkWorkerPool.ts` | Worker pool management | 715 lines, has saturation telemetry |
 
 ## Game Modes
 
