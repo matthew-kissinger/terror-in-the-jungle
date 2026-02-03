@@ -178,8 +178,13 @@ export class GPUBillboardVegetation {
   private maxInstances: number;
   private highWaterMark = 0;
   private liveCount = 0;
-  private freeSlots: number[] = [];
+  private freeSlots: Set<number> = new Set();
   private warnedCapacity = false;
+
+  // Pending update flags for batching
+  private pendingPositionUpdate = false;
+  private pendingScaleUpdate = false;
+  private pendingRotationUpdate = false;
 
   constructor(scene: THREE.Scene, config: GPUVegetationConfig) {
     this.scene = scene;
@@ -248,14 +253,19 @@ export class GPUBillboardVegetation {
 
   // Add instances for a chunk
   addInstances(instances: Array<{position: THREE.Vector3, scale: THREE.Vector3, rotation: number}>): number[] {
+    if (instances.length === 0) return [];
+    
     const allocatedIndices: number[] = [];
     const startLiveCount = this.liveCount;
 
     for (const instance of instances) {
       let index: number;
 
-      if (this.freeSlots.length > 0) {
-        index = this.freeSlots.pop()!;
+      if (this.freeSlots.size > 0) {
+        // Get any free slot (Set iteration is efficient for this)
+        const it = this.freeSlots.values();
+        index = it.next().value as number;
+        this.freeSlots.delete(index);
       } else {
         if (this.highWaterMark >= this.maxInstances) {
           if (!this.warnedCapacity) {
@@ -284,9 +294,11 @@ export class GPUBillboardVegetation {
       this.liveCount++;
     }
 
-    this.positionAttribute.needsUpdate = true;
-    this.scaleAttribute.needsUpdate = true;
-    this.rotationAttribute.needsUpdate = true;
+    if (allocatedIndices.length > 0) {
+      this.pendingPositionUpdate = true;
+      this.pendingScaleUpdate = true;
+      this.pendingRotationUpdate = true;
+    }
 
     this.geometry.instanceCount = this.highWaterMark;
 
@@ -300,6 +312,9 @@ export class GPUBillboardVegetation {
 
   // Remove instances by indices
   removeInstances(indices: number[]): void {
+    if (indices.length === 0) return;
+    
+    let removedCount = 0;
     for (const index of indices) {
       if (index >= this.highWaterMark) continue;
 
@@ -310,34 +325,39 @@ export class GPUBillboardVegetation {
 
       this.scales[i2] = 0;
       this.scales[i2 + 1] = 0;
-      this.freeSlots.push(index);
+      this.freeSlots.add(index);
       if (this.liveCount > 0) {
         this.liveCount--;
       }
+      removedCount++;
     }
 
-    this.scaleAttribute.needsUpdate = true;
-    this.compactHighWaterMark();
+    if (removedCount > 0) {
+      this.pendingScaleUpdate = true;
+      this.compactHighWaterMark();
+    }
 
     Logger.debug('vegetation', `Freed ${indices.length} instances (live=${this.liveCount}, reserved=${this.highWaterMark})`);
   }
 
   private compactHighWaterMark(): void {
+    let compacted = false;
     while (this.highWaterMark > 0) {
       const lastIndex = this.highWaterMark - 1;
       const i2 = lastIndex * 2;
       if (this.scales[i2] === 0 && this.scales[i2 + 1] === 0) {
         this.highWaterMark--;
-        const freeIdx = this.freeSlots.indexOf(lastIndex);
-        if (freeIdx !== -1) {
-          this.freeSlots.splice(freeIdx, 1);
-        }
+        this.freeSlots.delete(lastIndex);
+        compacted = true;
       } else {
         break;
       }
     }
 
-    this.geometry.instanceCount = this.highWaterMark;
+    if (compacted) {
+      this.geometry.instanceCount = this.highWaterMark;
+    }
+    
     if (this.highWaterMark < this.maxInstances) {
       this.warnedCapacity = false;
     }
@@ -352,15 +372,29 @@ export class GPUBillboardVegetation {
   reset(): void {
     this.highWaterMark = 0;
     this.liveCount = 0;
-    this.freeSlots = [];
+    this.freeSlots.clear();
     this.geometry.instanceCount = 0;
-    this.positionAttribute.needsUpdate = true;
-    this.scaleAttribute.needsUpdate = true;
-    this.rotationAttribute.needsUpdate = true;
+    this.pendingPositionUpdate = true;
+    this.pendingScaleUpdate = true;
+    this.pendingRotationUpdate = true;
   }
 
   // Update uniforms (called every frame)
   update(camera: THREE.Camera, time: number, fog?: THREE.FogExp2 | null): void {
+    // Apply batched buffer updates
+    if (this.pendingPositionUpdate) {
+      this.positionAttribute.needsUpdate = true;
+      this.pendingPositionUpdate = false;
+    }
+    if (this.pendingScaleUpdate) {
+      this.scaleAttribute.needsUpdate = true;
+      this.pendingScaleUpdate = false;
+    }
+    if (this.pendingRotationUpdate) {
+      this.rotationAttribute.needsUpdate = true;
+      this.pendingRotationUpdate = false;
+    }
+
     this.material.uniforms.cameraPosition.value.copy(camera.position);
     this.material.uniforms.time.value = time;
     if (camera instanceof THREE.PerspectiveCamera) {
@@ -387,7 +421,7 @@ export class GPUBillboardVegetation {
   }
 
   getFreeSlotCount(): number {
-    return this.freeSlots.length;
+    return this.freeSlots.size;
   }
 
   // Dispose resources
@@ -551,28 +585,35 @@ export class GPUBillboardSystem {
     Logger.info('vegetation', `Clearing vegetation radius=${radius} around (${centerX}, ${centerZ})`);
 
     let totalCleared = 0;
+    const radiusSq = radius * radius;
 
     // Go through each vegetation type
     this.vegetationTypes.forEach((vegetation, type) => {
       const indicesToRemove: number[] = [];
 
-      // Check each instance position
-      const positions = vegetation.getInstancePositions(); // We'll need to implement this
-      for (let i = 0; i < positions.length; i += 3) { // x, y, z
-        const x = positions[i];
-        const z = positions[i + 2];
+      // Check each instance position up to highWaterMark
+      const positions = vegetation.getInstancePositions();
+      const highWaterMark = vegetation.getHighWaterMark();
+      
+      for (let i = 0; i < highWaterMark; i++) {
+        const i3 = i * 3;
+        const x = positions[i3];
+        const z = positions[i3 + 2];
 
-        const distance = Math.sqrt((x - centerX) ** 2 + (z - centerZ) ** 2);
-        if (distance <= radius) {
-          indicesToRemove.push(i / 3); // Convert back to instance index
+        const dx = x - centerX;
+        const dz = z - centerZ;
+        const distSq = dx * dx + dz * dz;
+        
+        if (distSq <= radiusSq) {
+          indicesToRemove.push(i);
         }
       }
 
-        if (indicesToRemove.length > 0) {
-          vegetation.removeInstances(indicesToRemove);
-          totalCleared += indicesToRemove.length;
-          Logger.debug('vegetation', `Removed ${indicesToRemove.length} ${type} instances`);
-        }
+      if (indicesToRemove.length > 0) {
+        vegetation.removeInstances(indicesToRemove);
+        totalCleared += indicesToRemove.length;
+        Logger.debug('vegetation', `Removed ${indicesToRemove.length} ${type} instances`);
+      }
     });
 
     Logger.info('vegetation', `Cleared ${totalCleared} vegetation instances`);

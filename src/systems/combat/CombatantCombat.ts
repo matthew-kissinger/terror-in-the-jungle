@@ -11,6 +11,7 @@ import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { CombatantRenderer } from './CombatantRenderer';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 // SpatialOctree import removed - CombatantHitDetection uses SpatialGridManager singleton
+import { spatialGridManager } from './SpatialGridManager';
 import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { objectPool } from '../../utils/ObjectPoolManager';
@@ -60,6 +61,10 @@ export class CombatantCombat {
   private readonly scratchSplatterDir = new THREE.Vector3();
   private readonly scratchTargetPos = new THREE.Vector3();
   private readonly scratchRay = new THREE.Ray();
+  // Module-level scratch vectors for fire loop (replaces pool allocations)
+  private readonly _muzzlePos = new THREE.Vector3();
+  private readonly _targetFirePos = new THREE.Vector3();
+  private readonly _fireDirection = new THREE.Vector3();
 
   constructor(
     scene: THREE.Scene,
@@ -154,22 +159,16 @@ export class CombatantCombat {
       if (this.chunkManager && combatant.lodLevel &&
           (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium')) {
 
-        const muzzlePos = objectPool.getVector3();
-        muzzlePos.copy(combatant.position);
-        muzzlePos.y += 1.5; // Muzzle height
+        // Use module-level scratch vectors instead of pool allocation
+        this._muzzlePos.copy(combatant.position);
+        this._muzzlePos.y += 1.5; // Muzzle height
 
-        const targetFirePos = objectPool.getVector3();
-        targetFirePos.copy(targetPos);
-        targetFirePos.y += 1.2; // Target center mass
+        this._targetFirePos.copy(targetPos);
+        this._targetFirePos.y += 1.2; // Target center mass
 
-        const fireDirection = objectPool.getVector3();
-        fireDirection.subVectors(targetFirePos, muzzlePos).normalize();
+        this._fireDirection.subVectors(this._targetFirePos, this._muzzlePos).normalize();
 
-        const terrainHit = this.chunkManager.raycastTerrain(muzzlePos, fireDirection, distance);
-
-        objectPool.releaseVector3(fireDirection);
-        objectPool.releaseVector3(targetFirePos);
-        objectPool.releaseVector3(muzzlePos);
+        const terrainHit = this.chunkManager.raycastTerrain(this._muzzlePos, this._fireDirection, distance);
 
         if (terrainHit.hit && terrainHit.distance! < distance - 0.5) {
           // Terrain blocks shot, don't fire
@@ -354,12 +353,14 @@ export class CombatantCombat {
     playerPosition?: THREE.Vector3
   ): void {
     const SUPPRESSION_RADIUS = 5.0
+    const SUPPRESSION_RADIUS_SQ = SUPPRESSION_RADIUS * SUPPRESSION_RADIUS
 
     // Check player for suppression (if OPFOR is shooting)
     if (playerPosition && shooterFaction === Faction.OPFOR && this.playerSuppressionSystem) {
-      const distanceToPlayer = hitPoint.distanceTo(playerPosition)
+      const distanceToPlayerSq = hitPoint.distanceToSquared(playerPosition)
 
-      if (distanceToPlayer < SUPPRESSION_RADIUS) {
+      if (distanceToPlayerSq < SUPPRESSION_RADIUS_SQ) {
+        const distanceToPlayer = Math.sqrt(distanceToPlayerSq)
         this.playerSuppressionSystem.registerNearMiss(hitPoint, playerPosition)
 
         // Play bullet whiz sound for very close misses
@@ -369,14 +370,52 @@ export class CombatantCombat {
       }
     }
 
-    // Check all enemy combatants for proximity to shot
-    allCombatants.forEach(combatant => {
-      if (combatant.faction === shooterFaction) return
-      if (combatant.state === CombatantState.DEAD) return
+    // Use spatial query to find only nearby combatants instead of O(n) scan
+    if (!spatialGridManager.getIsInitialized()) {
+      // Fallback to old behavior if spatial grid not initialized (shouldn't happen)
+      allCombatants.forEach(combatant => {
+        if (combatant.faction === shooterFaction) return
+        if (combatant.state === CombatantState.DEAD) return
 
-      const distanceToHit = combatant.position.distanceTo(hitPoint)
+        const distanceToHitSq = combatant.position.distanceToSquared(hitPoint)
 
-      if (distanceToHit < SUPPRESSION_RADIUS) {
+        if (distanceToHitSq < SUPPRESSION_RADIUS_SQ) {
+          const distanceToHit = Math.sqrt(distanceToHitSq)
+          // Track near miss
+          combatant.nearMissCount = (combatant.nearMissCount || 0) + 1
+          combatant.lastSuppressedTime = Date.now()
+
+          // Increase panic based on proximity
+          const proximityFactor = 1.0 - (distanceToHit / SUPPRESSION_RADIUS)
+          combatant.panicLevel = Math.min(1.0, combatant.panicLevel + 0.2 * proximityFactor)
+          combatant.suppressionLevel = Math.min(1.0, combatant.suppressionLevel + 0.25 * proximityFactor)
+
+          // If heavily suppressed, seek cover
+          if (combatant.nearMissCount >= 3 && combatant.panicLevel > 0.6) {
+            if (combatant.state === CombatantState.ENGAGING || combatant.state === CombatantState.ADVANCING) {
+              combatant.state = CombatantState.SEEKING_COVER
+            }
+          }
+        }
+      })
+      return
+    }
+
+    // Spatial query: only check combatants within SUPPRESSION_RADIUS
+    const nearbyCombatantIds = spatialGridManager.queryRadius(hitPoint, SUPPRESSION_RADIUS)
+
+    for (const id of nearbyCombatantIds) {
+      const combatant = allCombatants.get(id)
+      if (!combatant) continue
+      if (combatant.faction === shooterFaction) continue
+      if (combatant.state === CombatantState.DEAD) continue
+
+      // Use squared distance for comparison (faster)
+      const distanceToHitSq = combatant.position.distanceToSquared(hitPoint)
+
+      if (distanceToHitSq < SUPPRESSION_RADIUS_SQ) {
+        const distanceToHit = Math.sqrt(distanceToHitSq)
+
         // Track near miss
         combatant.nearMissCount = (combatant.nearMissCount || 0) + 1
         combatant.lastSuppressedTime = Date.now()
@@ -393,7 +432,7 @@ export class CombatantCombat {
           }
         }
       }
-    })
+    }
   }
 
   applyDamage(
@@ -491,21 +530,43 @@ export class CombatantCombat {
 
       // Voice callout: Man down (nearby allies call it out)
       if (this.voiceCalloutSystem && attacker && allCombatants) {
-        // Find nearby allies to the deceased
-        const nearbyAllies: Combatant[] = [];
-        allCombatants.forEach(c => {
-          if (c.faction === target.faction &&
-              c.state !== CombatantState.DEAD &&
-              c.id !== target.id &&
-              c.position.distanceTo(target.position) < 30) {
-            nearbyAllies.push(c);
+        // Use spatial query to find nearby allies instead of O(n) scan
+        const ALLY_SEARCH_RADIUS = 30
+        const ALLY_SEARCH_RADIUS_SQ = ALLY_SEARCH_RADIUS * ALLY_SEARCH_RADIUS
+        const nearbyAllies: Combatant[] = []
+
+        if (spatialGridManager.getIsInitialized()) {
+          // Spatial query: only check combatants within 30 units
+          const nearbyIds = spatialGridManager.queryRadius(target.position, ALLY_SEARCH_RADIUS)
+
+          for (const id of nearbyIds) {
+            const c = allCombatants.get(id)
+            if (!c) continue
+            if (c.faction !== target.faction) continue
+            if (c.state === CombatantState.DEAD) continue
+            if (c.id === target.id) continue
+
+            // Use squared distance for comparison (faster)
+            if (c.position.distanceToSquared(target.position) < ALLY_SEARCH_RADIUS_SQ) {
+              nearbyAllies.push(c)
+            }
           }
-        });
+        } else {
+          // Fallback to old behavior if spatial grid not initialized
+          allCombatants.forEach(c => {
+            if (c.faction === target.faction &&
+                c.state !== CombatantState.DEAD &&
+                c.id !== target.id &&
+                c.position.distanceToSquared(target.position) < ALLY_SEARCH_RADIUS_SQ) {
+              nearbyAllies.push(c)
+            }
+          })
+        }
 
         // One nearby ally calls out "Man down!"
         if (nearbyAllies.length > 0 && Math.random() < 0.5) {
-          const caller = nearbyAllies[Math.floor(Math.random() * nearbyAllies.length)];
-          this.voiceCalloutSystem.triggerCallout(caller, CalloutType.MAN_DOWN, caller.position);
+          const caller = nearbyAllies[Math.floor(Math.random() * nearbyAllies.length)]
+          this.voiceCalloutSystem.triggerCallout(caller, CalloutType.MAN_DOWN, caller.position)
         }
       }
 
