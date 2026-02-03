@@ -8,6 +8,11 @@ import { GameModeManager } from '../world/GameModeManager';
 import { RallyPointSystem } from './RallyPointSystem';
 import { Logger } from '../../utils/Logger';
 
+// Module-level scratch vectors to avoid per-call allocations
+const _spawnPos = new THREE.Vector3();
+const _anchorPos = new THREE.Vector3();
+const _offsetVec = new THREE.Vector3();
+
 /**
  * Manages spawning, respawning, and reinforcement waves for combatants
  */
@@ -124,8 +129,8 @@ export class CombatantSpawnManager {
     } else {
       // Distribute squads evenly across HQs
       for (let i = 0; i < initialSquadsPerFaction; i++) {
-        const posUS = usHQs[i % usHQs.length].position.clone().add(this.randomSpawnOffset(20, 40));
-        const posOP = opforHQs[i % opforHQs.length].position.clone().add(this.randomSpawnOffset(20, 40));
+        const posUS = _spawnPos.copy(usHQs[i % usHQs.length].position).add(this.randomSpawnOffset(20, 40));
+        const posOP = _anchorPos.copy(opforHQs[i % opforHQs.length].position).add(this.randomSpawnOffset(20, 40));
         this.spawnSquad(Faction.US, posUS, this.randomSquadSize());
         this.spawnSquad(Faction.OPFOR, posOP, this.randomSquadSize());
       }
@@ -133,8 +138,8 @@ export class CombatantSpawnManager {
 
     // Seed a small progressive queue to get early contact
     this.progressiveSpawnQueue = [
-      { faction: Faction.US, position: usBasePos.clone().add(new THREE.Vector3(10, 0, 5)), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) },
-      { faction: Faction.OPFOR, position: opforBasePos.clone().add(new THREE.Vector3(-10, 0, -5)), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) }
+      { faction: Faction.US, position: new THREE.Vector3(usBasePos.x + 10, usBasePos.y, usBasePos.z + 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) },
+      { faction: Faction.OPFOR, position: new THREE.Vector3(opforBasePos.x - 10, opforBasePos.y, opforBasePos.z - 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) }
     ];
 
     console.log(`🎖️ Initial forces deployed: ${this.combatants.size} combatants`);
@@ -249,7 +254,7 @@ export class CombatantSpawnManager {
         let pos: THREE.Vector3;
         if (anchors.length > 0) {
           const anchor = anchors[(i + Math.floor(Math.random() * anchors.length)) % anchors.length];
-          pos = anchor.clone().add(this.randomSpawnOffset(20, 50));
+          pos = _spawnPos.copy(anchor).add(this.randomSpawnOffset(20, 50));
         } else {
           pos = this.getSpawnPosition(faction);
         }
@@ -302,7 +307,7 @@ export class CombatantSpawnManager {
     for (let i = 0; i < maxSquadsThisWave; i++) {
       if (this.combatants.size >= this.MAX_COMBATANTS) break;
       const anchor = anchors[i % anchors.length];
-      const pos = anchor.clone().add(this.randomSpawnOffset(20, 50));
+      const pos = _spawnPos.copy(anchor).add(this.randomSpawnOffset(20, 50));
       this.spawnSquad(faction, pos, this.randomSquadSize());
     }
   }
@@ -428,8 +433,8 @@ export class CombatantSpawnManager {
 
       if (usBase && opforBase) {
         return {
-          usBasePos: usBase.position.clone(),
-          opforBasePos: opforBase.position.clone()
+          usBasePos: new THREE.Vector3(usBase.position.x, usBase.position.y, usBase.position.z),
+          opforBasePos: new THREE.Vector3(opforBase.position.x, opforBase.position.y, opforBase.position.z)
         };
       }
     }
@@ -451,13 +456,13 @@ export class CombatantSpawnManager {
         const anchor = baseZone.position;
         const angle = Math.random() * Math.PI * 2;
         const radius = 20 + Math.random() * 30;
-        const spawnPos = new THREE.Vector3(
+        _spawnPos.set(
           anchor.x + Math.cos(angle) * radius,
           0,
           anchor.z + Math.sin(angle) * radius
         );
-        console.log(`📍 Using base ${baseZone.id} for squad respawn at (${spawnPos.x.toFixed(1)}, ${spawnPos.z.toFixed(1)})`);
-        return spawnPos;
+        console.log(`📍 Using base ${baseZone.id} for squad respawn at (${_spawnPos.x.toFixed(1)}, ${_spawnPos.z.toFixed(1)})`);
+        return new THREE.Vector3(_spawnPos.x, _spawnPos.y, _spawnPos.z);
       } else {
         console.log(`⚠️ No owned bases found for ${faction}, using fallback spawn`);
       }
@@ -470,14 +475,14 @@ export class CombatantSpawnManager {
 
     const angle = Math.random() * Math.PI * 2;
     const radius = 20 + Math.random() * 30;
-    const spawnPos = new THREE.Vector3(
+    _spawnPos.set(
       basePos.x + Math.cos(angle) * radius,
       0,
       basePos.z + Math.sin(angle) * radius
     );
 
-    console.log(`📍 Using fallback base spawn for ${faction} at (${spawnPos.x.toFixed(1)}, ${spawnPos.z.toFixed(1)})`);
-    return spawnPos;
+    console.log(`📍 Using fallback base spawn for ${faction} at (${_spawnPos.x.toFixed(1)}, ${_spawnPos.z.toFixed(1)})`);
+    return new THREE.Vector3(_spawnPos.x, _spawnPos.y, _spawnPos.z);
   }
 
   private getSpawnPosition(faction: Faction): THREE.Vector3 {
@@ -495,13 +500,13 @@ export class CombatantSpawnManager {
         const anchor = anchorZone.position;
         const angle = Math.random() * Math.PI * 2;
         const radius = 20 + Math.random() * 40;
-        const spawnPos = new THREE.Vector3(
+        _spawnPos.set(
           anchor.x + Math.cos(angle) * radius,
           0,
           anchor.z + Math.sin(angle) * radius
         );
         console.log(`📍 Using zone ${anchorZone.id} as spawn anchor`);
-        return spawnPos;
+        return new THREE.Vector3(_spawnPos.x, _spawnPos.y, _spawnPos.z);
       } else {
         console.log(`⚠️ No owned zones found for ${faction}, using fallback spawn`);
       }
@@ -516,14 +521,14 @@ export class CombatantSpawnManager {
     // Add random offset around the base
     const angle = Math.random() * Math.PI * 2;
     const radius = 20 + Math.random() * 30;
-    const spawnPos = new THREE.Vector3(
+    _spawnPos.set(
       basePos.x + Math.cos(angle) * radius,
       0,
       basePos.z + Math.sin(angle) * radius
     );
 
-    console.log(`📍 Using fallback base spawn for ${faction} at (${spawnPos.x.toFixed(1)}, ${spawnPos.z.toFixed(1)})`);
-    return spawnPos;
+    console.log(`📍 Using fallback base spawn for ${faction} at (${_spawnPos.x.toFixed(1)}, ${_spawnPos.z.toFixed(1)})`);
+    return new THREE.Vector3(_spawnPos.x, _spawnPos.y, _spawnPos.z);
   }
 
   private getFactionAnchors(faction: Faction): THREE.Vector3[] {
