@@ -1,5 +1,7 @@
 # Terror in the Jungle — Alpha Upgrade Roadmap
 
+> **PRIORITY ORDER**: Start with **Section 6 (Tooling, Diagnostics & Observability)** before optimizing anything else. We need to understand what's actually broken before fixing it. Build the profiler, build the stress test mode, then use data to guide the rest.
+
 This living document groups the meta‑level tasks required to evolve the prototype into an alpha-ready build. Each block contains:
 
 - **Outcome** — what success looks like.

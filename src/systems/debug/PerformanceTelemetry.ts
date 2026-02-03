@@ -1,7 +1,4 @@
-/**
- * Centralized performance telemetry system for frame budget tracking,
- * per-system timing, and automatic slow-frame detection.
- */
+import * as THREE from 'three'
 
 export interface SystemTiming {
   name: string
@@ -40,6 +37,19 @@ export interface TelemetryReport {
   }
 }
 
+export interface BenchmarkResult {
+  totalTimeMs: number
+  avgPerRayMs: number
+  p95Ms: number
+  p99Ms: number
+  iterations: number
+  details?: {
+    gridQueryTimeMs: number
+    hitDetectionTimeMs: number
+    terrainTimeMs: number
+  }
+}
+
 export class PerformanceTelemetry {
   private static instance: PerformanceTelemetry | null = null
 
@@ -74,13 +84,21 @@ export class PerformanceTelemetry {
   private lastSlowFrameLog = 0
   private readonly SLOW_FRAME_LOG_INTERVAL_MS = 1000 // Max 1 log per second
 
+  // Dependencies for benchmark (injected at runtime)
+  private benchmarkDeps: {
+    hitDetection?: any
+    chunkManager?: any
+    combatants?: Map<string, any>
+    spatialGridManager?: any
+  } = {}
+
   private constructor() {
     // Expose to window for console debugging
     if (typeof window !== 'undefined') {
       (window as any).perf = {
         report: () => this.getReport(),
         validate: () => this.validate(),
-        benchmark: (iterations: number) => this.runBenchmark(iterations),
+        benchmark: (iterations: number = 1000) => this.runBenchmark(iterations),
         reset: () => this.reset()
       }
     }
@@ -91,6 +109,18 @@ export class PerformanceTelemetry {
       PerformanceTelemetry.instance = new PerformanceTelemetry()
     }
     return PerformanceTelemetry.instance
+  }
+
+  /**
+   * Inject dependencies required for benchmarking
+   */
+  injectBenchmarkDependencies(deps: {
+    hitDetection?: any
+    chunkManager?: any
+    combatants?: Map<string, any>
+    spatialGridManager?: any
+  }): void {
+    this.benchmarkDeps = { ...this.benchmarkDeps, ...deps }
   }
 
   /**
@@ -311,15 +341,116 @@ export class PerformanceTelemetry {
   }
 
   /**
-   * Run a benchmark (placeholder for ray casting perf test)
+   * Run a comprehensive benchmark for raycasting and hit detection
    */
-  runBenchmark(iterations: number): { totalTimeMs: number; avgPerRayMs: number; p99Ms: number } {
-    console.log(`[Perf] Benchmark requested with ${iterations} iterations - implement in hit detection`)
-    return {
-      totalTimeMs: 0,
-      avgPerRayMs: 0,
-      p99Ms: 0
+  runBenchmark(iterations: number): BenchmarkResult {
+    console.log(`[Perf] Starting benchmark with ${iterations} iterations...`)
+
+    const rays = this.generateRandomRays(iterations)
+    const samples: number[] = []
+
+    const startTotal = performance.now()
+
+    // 1. Benchmark Octree specifically if available
+    const gridTime = this.benchmarkOctreeQueries(rays)
+
+    // 2. Benchmark Full Hit Detection if available
+    const hitTime = this.benchmarkHitDetection(rays, samples)
+
+    // 3. Benchmark Terrain Raycast if available
+    const terrainTime = this.benchmarkTerrainRaycast(rays)
+
+    const totalTimeMs = performance.now() - startTotal
+
+    const result: BenchmarkResult = {
+      totalTimeMs,
+      avgPerRayMs: samples.length > 0 ? samples.reduce((a, b) => a + b, 0) / samples.length : 0,
+      p95Ms: this.percentile(samples, 0.95),
+      p99Ms: this.percentile(samples, 0.99),
+      iterations,
+      details: {
+        gridQueryTimeMs: gridTime,
+        hitDetectionTimeMs: hitTime,
+        terrainTimeMs: terrainTime
+      }
     }
+
+    console.log('[Perf] Benchmark complete:', result)
+    return result
+  }
+
+  private generateRandomRays(count: number): THREE.Ray[] {
+    const rays: THREE.Ray[] = []
+    const { spatialGridManager } = this.benchmarkDeps
+    
+    // Get world size from manager if available, otherwise default to 4000
+    let worldSize = 4000
+
+    for (let i = 0; i < count; i++) {
+      const origin = new THREE.Vector3(
+        (Math.random() - 0.5) * worldSize,
+        2 + Math.random() * 20, // 2-22m height
+        (Math.random() - 0.5) * worldSize
+      )
+
+      const direction = new THREE.Vector3(
+        Math.random() - 0.5,
+        (Math.random() - 0.5) * 0.2, // Shallow angles mostly
+        Math.random() - 0.5
+      ).normalize()
+
+      rays.push(new THREE.Ray(origin, direction))
+    }
+
+    return rays
+  }
+
+  private benchmarkOctreeQueries(rays: THREE.Ray[]): number {
+    const { spatialGridManager } = this.benchmarkDeps
+
+    if (!spatialGridManager || !spatialGridManager.getIsInitialized()) {
+      return 0
+    }
+
+    const start = performance.now()
+    for (const ray of rays) {
+      spatialGridManager.queryRay(ray.origin, ray.direction, 150)
+    }
+    return performance.now() - start
+  }
+
+  private benchmarkHitDetection(rays: THREE.Ray[], samples: number[]): number {
+    const { hitDetection, combatants } = this.benchmarkDeps
+    if (!hitDetection || !combatants) return 0
+
+    // Faction for testing
+    const Faction = { US: 'US', OPFOR: 'OPFOR' } as any
+
+    const start = performance.now()
+    for (const ray of rays) {
+      const rayStart = performance.now()
+      hitDetection.raycastCombatants(ray, Faction.US, combatants)
+      samples.push(performance.now() - rayStart)
+    }
+    return performance.now() - start
+  }
+
+  private benchmarkTerrainRaycast(rays: THREE.Ray[]): number {
+    const { chunkManager } = this.benchmarkDeps
+    if (!chunkManager) return 0
+
+    const start = performance.now()
+    for (const ray of rays) {
+      chunkManager.raycastTerrain(ray.origin, ray.direction, 150)
+    }
+    return performance.now() - start
+  }
+
+  private percentile(samples: number[], p: number): number {
+    if (samples.length === 0) return 0
+    const sorted = [...samples].sort((a, b) => a - b)
+    const index = Math.ceil(p * sorted.length) - 1
+    return sorted[index]
   }
 
   /**

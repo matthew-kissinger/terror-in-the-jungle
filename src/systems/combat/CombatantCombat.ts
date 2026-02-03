@@ -30,7 +30,7 @@ export class CombatantCombat {
   private tracerPool: TracerPool;
   private muzzleFlashPool: MuzzleFlashPool;
   private impactEffectsPool: ImpactEffectsPool;
-  private hitDetection: CombatantHitDetection;
+  public hitDetection: CombatantHitDetection;
   private playerHealthSystem?: PlayerHealthSystem;
   private ticketSystem?: TicketSystem;
   private audioManager?: AudioManager;

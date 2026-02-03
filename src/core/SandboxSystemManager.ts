@@ -377,6 +377,14 @@ export class SandboxSystemManager {
     this.footstepAudioSystem.setChunkManager(this.chunkManager);
     this.playerController.setFootstepAudioSystem(this.footstepAudioSystem);
 
+    // Inject benchmark dependencies
+    performanceTelemetry.injectBenchmarkDependencies({
+      hitDetection: (this.combatantSystem as any).combatantCombat?.hitDetection,
+      chunkManager: this.chunkManager,
+      combatants: (this.combatantSystem as any).combatants,
+      spatialGridManager: spatialGridManager
+    });
+
     // Connect voice callout system
     // VoiceCalloutSystem disabled for performance
     // if (combatantCombat) {

@@ -10,11 +10,10 @@ import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { TicketSystem } from '../world/TicketSystem';
 import { PlayerHealthSystem } from '../player/PlayerHealthSystem';
-import { ZoneManager, ZoneState } from '../world/ZoneManager';
+import { ZoneManager } from '../world/ZoneManager';
 import { AudioManager } from '../audio/AudioManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { Logger } from '../../utils/Logger';
-import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 
 // Refactored modules
 import { CombatantFactory } from './CombatantFactory';
@@ -24,9 +23,14 @@ import { CombatantMovement } from './CombatantMovement';
 import { CombatantRenderer } from './CombatantRenderer';
 import { SquadManager } from './SquadManager';
 import { SpatialOctree } from './SpatialOctree';
-import { spatialGridManager, SpatialGridManager } from './SpatialGridManager';
+import { spatialGridManager } from './SpatialGridManager';
 import { InfluenceMapSystem } from './InfluenceMapSystem';
 import { RallyPointSystem } from './RallyPointSystem';
+
+// New focused modules
+import { CombatantSpawnManager } from './CombatantSpawnManager';
+import { CombatantLODManager } from './CombatantLODManager';
+import { CombatantProfiler } from './CombatantProfiler';
 
 export class CombatantSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -39,17 +43,23 @@ export class CombatantSystem implements GameSystem {
   private zoneManager?: ZoneManager;
   private audioManager?: AudioManager;
   private hudSystem?: any;
+  private gameModeManager?: GameModeManager;
 
   // Refactored modules
   private combatantFactory: CombatantFactory;
   private combatantAI: CombatantAI;
-  private combatantCombat: CombatantCombat;
+  public combatantCombat: CombatantCombat;
   private combatantMovement: CombatantMovement;
   private combatantRenderer: CombatantRenderer;
   private squadManager: SquadManager;
   private spatialGrid: SpatialOctree;
   private influenceMap?: InfluenceMapSystem;
   private rallyPointSystem?: RallyPointSystem;
+
+  // New focused modules
+  private spawnManager: CombatantSpawnManager;
+  private lodManager: CombatantLODManager;
+  private profiler: CombatantProfiler;
 
   // Effects pools
   private tracerPool: TracerPool;
@@ -58,86 +68,20 @@ export class CombatantSystem implements GameSystem {
   private explosionEffectsPool: ExplosionEffectsPool;
 
   // Combatant management
-  private combatants: Map<string, Combatant> = new Map();
-  private readonly scratchCombatants: Combatant[] = [];
-  private readonly scratchVector = new THREE.Vector3();
-  private lodHighCount = 0;
-  private lodMediumCount = 0;
-  private lodLowCount = 0;
-  private lodCulledCount = 0;
-  private updateLastMs = 0;
-  private updateEmaMs = 0;
-  private readonly UPDATE_EMA_ALPHA = 0.1;
-
-  // Detailed profiling for combat bottleneck analysis
-  private profiling = {
-    aiUpdateMs: 0,
-    spatialSyncMs: 0,
-    billboardUpdateMs: 0,
-    effectPoolsMs: 0,
-    influenceMapMs: 0,
-    totalMs: 0,
-    engagingCount: 0,
-    firingCount: 0
-  };
-  private pendingRespawns: Array<{squadId: string, respawnTime: number, originalId: string}> = [];
-
-  // Player tracking
+  public combatants: Map<string, Combatant> = new Map();
   private playerPosition = new THREE.Vector3();
-  private playerFaction = Faction.US;
-
-  // Spawn management
-  private MAX_COMBATANTS = 30; // Default to Zone Control limit
-  private readonly DESPAWN_DISTANCE = 150;
-  private lastSpawnCheck = 0;
-  private SPAWN_CHECK_INTERVAL = 3000;
-  private readonly PROGRESSIVE_SPAWN_DELAY = 1000;
-  private progressiveSpawnTimer = 0;
-  private progressiveSpawnQueue: Array<{faction: Faction, position: THREE.Vector3, size: number}> = [];
-  private reinforcementWaveTimer = 0;
-  private reinforcementWaveIntervalSeconds = 15;
-  private readonly CORPSE_CLEANUP_DISTANCE = 600;
-
-  // Squad objective management
-  private squadObjectiveTimer = 0;
-  private readonly SQUAD_OBJECTIVE_REASSIGN_INTERVAL = 10; // seconds
-
-  // Adaptive update timing
-  private frameDeltaEma = 1 / 60; // seconds
-  private readonly FRAME_EMA_ALPHA = 0.1;
-  private intervalScale = 1.0; // Scales min update intervals when FPS is low
-  private readonly BASE_MEDIUM_MS = 50;  // ~20 Hz
-  private readonly BASE_LOW_MS = 100;    // ~10 Hz
-  private readonly BASE_CULLED_MS = 300; // ~3 Hz
-
-  // Compute a smooth, distance-based update interval (milliseconds)
-  private computeDynamicIntervalMs(distance: number): number {
-    // Scale parameters based on world size for better performance in large worlds
-    const worldSize = this.gameModeManager?.getWorldSize() || 4000;
-    const isLargeWorld = worldSize > 1000;
-
-    const startScaleAt = isLargeWorld ? 120 : 80; // units
-    const maxScaleAt = isLargeWorld ? 600 : 1000; // units
-    const minMs = isLargeWorld ? 33 : 16;         // ~30Hz vs 60Hz near for large worlds
-    const maxMs = isLargeWorld ? 1000 : 500;      // More aggressive scaling in large worlds
-
-    const d = Math.max(0, distance - startScaleAt);
-    const t = Math.min(1, d / Math.max(1, maxScaleAt - startScaleAt));
-    // Quadratic ease for smoother falloff
-    const curve = t * t;
-    return minMs + curve * (maxMs - minMs);
-  }
 
   // Player proxy
   private playerProxyId: string = 'player_proxy';
   private combatEnabled = false;
 
-  // Game Mode Manager
-  private gameModeManager?: GameModeManager;
-
   // Player squad
   public shouldCreatePlayerSquad = false;
   public playerSquadId?: string;
+
+  // Squad objective management
+  private squadObjectiveTimer = 0;
+  private readonly SQUAD_OBJECTIVE_REASSIGN_INTERVAL = 10; // seconds
 
   constructor(
     scene: THREE.Scene,
@@ -179,8 +123,29 @@ export class CombatantSystem implements GameSystem {
     // Initialize the singleton spatial grid manager (will be reinitialized when game mode is set)
     spatialGridManager.initialize(4000);
 
-    // PERF: Wire spatial grid manager to hit detection for O(log n) queries
-    // Hit detection now uses SpatialGridManager singleton
+    // Initialize new focused modules
+    this.spawnManager = new CombatantSpawnManager(
+      this.combatants,
+      this.spatialGrid,
+      this.combatantFactory,
+      this.squadManager
+    );
+
+    this.lodManager = new CombatantLODManager(
+      this.combatants,
+      this.playerPosition,
+      this.combatantAI,
+      this.combatantCombat,
+      this.combatantMovement,
+      this.combatantRenderer,
+      this.squadManager,
+      this.spatialGrid
+    );
+
+    this.profiler = new CombatantProfiler(
+      this.combatants,
+      this.spatialGrid
+    );
   }
 
   async init(): Promise<void> {
@@ -190,7 +155,13 @@ export class CombatantSystem implements GameSystem {
     await this.combatantRenderer.createFactionBillboards();
 
     // Spawn initial forces
-    this.spawnInitialForces();
+    const createdPlayerSquadId = this.spawnManager.spawnInitialForces(this.shouldCreatePlayerSquad, this.playerSquadId);
+    if (createdPlayerSquadId) {
+      this.playerSquadId = createdPlayerSquadId;
+    }
+
+    // Update AI with all squads
+    this.combatantAI.setSquads(this.squadManager.getAllSquads());
 
     // Expose profiling to console for debugging
     if (typeof window !== 'undefined') {
@@ -204,182 +175,35 @@ export class CombatantSystem implements GameSystem {
   /**
    * Get detailed combat profiling info for debugging performance
    */
-  getCombatProfile(): {
-    timing: { aiUpdateMs: number; spatialSyncMs: number; billboardUpdateMs: number; effectPoolsMs: number; influenceMapMs: number; totalMs: number; engagingCount: number; firingCount: number };
-    counts: { total: number; high: number; medium: number; low: number; culled: number };
-    lod: { engaging: number; firing: number };
-  } {
-    return {
-      timing: { ...this.profiling },
-      counts: {
-        total: this.combatants.size,
-        high: this.lodHighCount,
-        medium: this.lodMediumCount,
-        low: this.lodLowCount,
-        culled: this.lodCulledCount
-      },
-      lod: {
-        engaging: this.profiling.engagingCount,
-        firing: this.profiling.firingCount
-      }
-    };
-  }
-
-  private spawnInitialForces(): void {
-    console.log('🎖️ Deploying initial forces across HQs...');
-
-    const config = this.gameModeManager?.getCurrentConfig();
-    const avgSquadSize = this.getAverageSquadSize();
-    const targetPerFaction = Math.floor(this.MAX_COMBATANTS / 2);
-    const initialPerFaction = Math.max(avgSquadSize, Math.floor(targetPerFaction * 0.3));
-    let initialSquadsPerFaction = Math.max(1, Math.round(initialPerFaction / avgSquadSize));
-
-    const usHQs = this.getHQZonesForFaction(Faction.US, config);
-    const opforHQs = this.getHQZonesForFaction(Faction.OPFOR, config);
-    const { usBasePos, opforBasePos } = this.getBasePositions();
-
-    // Create player squad first if requested
-    if (this.shouldCreatePlayerSquad) {
-      console.log('🎖️ Creating player squad...');
-      const playerSpawnPos = usBasePos.clone().add(new THREE.Vector3(0, 0, -15));
-      const { squad, members } = this.squadManager.createSquad(Faction.US, playerSpawnPos, 6);
-      this.playerSquadId = squad.id;
-      squad.isPlayerControlled = true;
-      squad.currentCommand = SquadCommand.NONE;
-      squad.commandPosition = playerSpawnPos.clone();
-
-      // Add all squad members to combatants map
-      members.forEach(combatant => {
-        this.combatants.set(combatant.id, combatant);
-      });
-
-      console.log(`✅ Player squad created: ${squad.id} with ${squad.members.length} members at player spawn`);
-
-      // Reduce US squads by 1 since we already spawned the player squad
-      initialSquadsPerFaction = Math.max(0, initialSquadsPerFaction - 1);
-    }
-
-    // Fallback to legacy base positions if no HQs configured
-    if (usHQs.length === 0 || opforHQs.length === 0) {
-      if (initialSquadsPerFaction > 0) {
-        this.spawnSquad(Faction.US, usBasePos, avgSquadSize);
-      }
-      this.spawnSquad(Faction.OPFOR, opforBasePos, avgSquadSize);
-    } else {
-      // Distribute squads evenly across HQs
-      for (let i = 0; i < initialSquadsPerFaction; i++) {
-        const posUS = usHQs[i % usHQs.length].position.clone().add(this.randomSpawnOffset(20, 40));
-        const posOP = opforHQs[i % opforHQs.length].position.clone().add(this.randomSpawnOffset(20, 40));
-        this.spawnSquad(Faction.US, posUS, this.randomSquadSize());
-        this.spawnSquad(Faction.OPFOR, posOP, this.randomSquadSize());
-      }
-    }
-
-    // Seed a small progressive queue to get early contact
-    this.progressiveSpawnQueue = [
-      { faction: Faction.US, position: usBasePos.clone().add(new THREE.Vector3(10, 0, 5)), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) },
-      { faction: Faction.OPFOR, position: opforBasePos.clone().add(new THREE.Vector3(-10, 0, -5)), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) }
-    ];
-
-    // Update AI with all squads
-    this.combatantAI.setSquads(this.squadManager.getAllSquads());
-
-    console.log(`🎖️ Initial forces deployed: ${this.combatants.size} combatants`);
-
-    // Log initial octree stats
-    const octreeStats = this.spatialGrid.getStats();
-    Logger.info('combat', `Octree initialized: ${octreeStats.totalNodes} nodes, ${octreeStats.totalEntities} entities, max depth ${octreeStats.maxDepth}`);
-  }
-
-  private getBasePositions(): { usBasePos: THREE.Vector3; opforBasePos: THREE.Vector3 } {
-    if (this.gameModeManager) {
-      const config = this.gameModeManager.getCurrentConfig();
-
-      // Find main bases for each faction
-      const usBase = config.zones.find(z =>
-        z.isHomeBase && z.owner === Faction.US &&
-        (z.id.includes('main') || z.id === 'us_base')
-      );
-      const opforBase = config.zones.find(z =>
-        z.isHomeBase && z.owner === Faction.OPFOR &&
-        (z.id.includes('main') || z.id === 'opfor_base')
-      );
-
-      if (usBase && opforBase) {
-        return {
-          usBasePos: usBase.position.clone(),
-          opforBasePos: opforBase.position.clone()
-        };
-      }
-    }
-
-    // Fallback to default positions
-    return {
-      usBasePos: new THREE.Vector3(0, 0, -50),
-      opforBasePos: new THREE.Vector3(0, 0, 145)
-    };
-  }
-
-  private spawnSquad(faction: Faction, centerPos: THREE.Vector3, size: number): void {
-    const { squad, members } = this.squadManager.createSquad(faction, centerPos, size);
-
-    // Add all squad members to our combatants map and spatial grid
-    members.forEach(combatant => {
-      this.combatants.set(combatant.id, combatant);
-      this.spatialGrid.updatePosition(combatant.id, combatant.position);
-    });
+  getCombatProfile() {
+    return this.profiler.getCombatProfile();
   }
 
   update(deltaTime: number): void {
-    // Update FPS EMA and adjust interval scaling to target 30+ FPS
-    this.frameDeltaEma = this.frameDeltaEma * (1 - this.FRAME_EMA_ALPHA) + deltaTime * this.FRAME_EMA_ALPHA;
-    const fps = 1 / Math.max(0.001, this.frameDeltaEma);
-    if (fps < 30) {
-      // Scale intervals up when under target FPS (cap to 3x)
-      this.intervalScale = Math.min(3.0, 30 / Math.max(10, fps));
-    } else if (fps > 90) {
-      // Slightly reduce intervals to feel more responsive on high FPS
-      this.intervalScale = Math.max(0.75, 90 / fps);
-    } else {
-      this.intervalScale = 1.0;
-    }
     // Update player position
     this.camera.getWorldPosition(this.playerPosition);
+    this.lodManager.setPlayerPosition(this.playerPosition);
+
+    // Update FPS EMA and adjust interval scaling
+    this.lodManager.updateFrameTiming(deltaTime);
 
     const updateStart = performance.now();
 
     if (!this.combatEnabled) {
       // Still update positions and billboards for visual consistency
-      this.updateCombatants(deltaTime);
+      this.lodManager.updateCombatants(deltaTime);
       this.combatantRenderer.updateBillboards(this.combatants, this.playerPosition);
       this.combatantRenderer.updateShaderUniforms(deltaTime);
       const duration = performance.now() - updateStart;
-      this.updateLastMs = duration;
-      this.updateEmaMs = this.updateEmaMs * (1 - this.UPDATE_EMA_ALPHA) + duration * this.UPDATE_EMA_ALPHA;
+      this.profiler.updateTiming(duration);
       return;
     }
 
     // Ensure player proxy exists
     this.ensurePlayerProxy();
 
-    // Progressive spawning (short early trickle)
-    if (this.progressiveSpawnQueue.length > 0) {
-      this.progressiveSpawnTimer += deltaTime * 1000;
-      if (this.progressiveSpawnTimer >= this.PROGRESSIVE_SPAWN_DELAY) {
-        this.progressiveSpawnTimer = 0;
-        const spawn = this.progressiveSpawnQueue.shift()!;
-        this.spawnSquad(spawn.faction, spawn.position, spawn.size);
-        Logger.debug('combat', `Reinforcements deployed: ${spawn.faction} squad size ${spawn.size}`);
-      }
-    }
-
-    // Wave-based reinforcements at owned zones (no spawn throttling; stability handled by maxCombatants)
-    this.reinforcementWaveTimer += deltaTime;
-    if (this.reinforcementWaveTimer >= this.reinforcementWaveIntervalSeconds) {
-      this.reinforcementWaveTimer = 0;
-      this.spawnReinforcementWave(Faction.US);
-      this.spawnReinforcementWave(Faction.OPFOR);
-    }
+    // Update spawn manager (progressive spawns, reinforcement waves, respawns)
+    this.spawnManager.update(deltaTime, this.combatEnabled, this.ticketSystem);
 
     // Periodic squad objective reassignment using influence map
     this.squadObjectiveTimer += deltaTime;
@@ -400,62 +224,51 @@ export class CombatantSystem implements GameSystem {
         this.influenceMap.setSandbagBounds(sandbagSystem.getSandbagBounds());
       }
     }
-    this.profiling.influenceMapMs = performance.now() - t0;
+    this.profiler.profiling.influenceMapMs = performance.now() - t0;
 
-    // Periodic cleanup
-    const now = Date.now();
-    if (now - this.lastSpawnCheck > this.SPAWN_CHECK_INTERVAL) {
-      this.manageSpawning();
-      this.lastSpawnCheck = now;
-    }
-
-    // Update combatants (AI, movement, combat)
+    // Update combatants (AI, movement, combat) with LOD scheduling
     t0 = performance.now();
-    this.updateCombatants(deltaTime);
-    this.profiling.aiUpdateMs = performance.now() - t0;
+    this.lodManager.updateCombatants(deltaTime);
+    this.profiler.profiling.aiUpdateMs = performance.now() - t0;
+
+    // Update LOD counts in profiler
+    this.profiler.setLODCounts(
+      this.lodManager.lodHighCount,
+      this.lodManager.lodMediumCount,
+      this.lodManager.lodLowCount,
+      this.lodManager.lodCulledCount
+    );
 
     // Count engaging combatants
-    this.profiling.engagingCount = 0;
-    this.profiling.firingCount = 0;
-    this.combatants.forEach(c => {
-      if (c.state === CombatantState.ENGAGING || c.state === CombatantState.SUPPRESSING) {
-        this.profiling.engagingCount++;
-      }
-    });
+    this.profiler.updateEngagementCounts();
 
     // Sync spatial grid manager with all combatant positions
     t0 = performance.now();
     spatialGridManager.syncAllPositions(this.combatants, this.playerPosition);
-    this.profiling.spatialSyncMs = performance.now() - t0;
+    this.profiler.profiling.spatialSyncMs = performance.now() - t0;
 
     // Update billboard rotations
     t0 = performance.now();
     this.combatantRenderer.updateBillboards(this.combatants, this.playerPosition);
     this.combatantRenderer.updateShaderUniforms(deltaTime);
-    this.profiling.billboardUpdateMs = performance.now() - t0;
+    this.profiler.profiling.billboardUpdateMs = performance.now() - t0;
 
     // Update effect pools
     t0 = performance.now();
     this.tracerPool.update();
     this.muzzleFlashPool.update();
     this.impactEffectsPool.update(deltaTime);
-    this.profiling.effectPoolsMs = performance.now() - t0;
+    this.profiler.profiling.effectPoolsMs = performance.now() - t0;
 
     const duration = performance.now() - updateStart;
-    this.profiling.totalMs = duration;
-    this.updateLastMs = duration;
-    this.updateEmaMs = this.updateEmaMs * (1 - this.UPDATE_EMA_ALPHA) + duration * this.UPDATE_EMA_ALPHA;
+    this.profiler.profiling.totalMs = duration;
+    this.profiler.updateTiming(duration);
   }
 
   // Reseed forces when switching game modes to honor new HQ layouts and caps
   public reseedForcesForMode(): void {
-    console.log('🔁 Reseeding forces for new game mode configuration...');
-    this.combatants.clear();
-    this.spatialGrid.clear();
-    this.progressiveSpawnQueue = [];
-    this.progressiveSpawnTimer = 0;
-    this.reinforcementWaveTimer = 0;
-    this.spawnInitialForces();
+    this.spawnManager.reseedForcesForMode();
+    this.combatantAI.setSquads(this.squadManager.getAllSquads());
   }
 
   private ensurePlayerProxy(): void {
@@ -468,376 +281,6 @@ export class CombatantSystem implements GameSystem {
       proxy.position.copy(this.playerPosition);
       proxy.state = CombatantState.ENGAGING;
       this.spatialGrid.updatePosition(this.playerProxyId, this.playerPosition);
-    }
-  }
-
-  private updateDeathAnimations(deltaTime: number): void {
-    const FALL_DURATION = 0.7; // 0.7 seconds for fall animation
-    const GROUND_TIME = 4.0; // 4 seconds on ground before fadeout
-    const FADEOUT_DURATION = 1.0; // 1 second fadeout
-    const TOTAL_DEATH_TIME = FALL_DURATION + GROUND_TIME + FADEOUT_DURATION;
-
-    const toRemove: string[] = [];
-
-    this.combatants.forEach((combatant, id) => {
-      if (combatant.isDying) {
-        // Progress death animation
-        if (combatant.deathProgress === undefined) {
-          combatant.deathProgress = 0;
-        }
-
-        combatant.deathProgress += deltaTime / TOTAL_DEATH_TIME;
-
-        // When animation completes, mark for cleanup
-        if (combatant.deathProgress >= 1.0) {
-          combatant.isDying = false;
-          combatant.state = CombatantState.DEAD;
-          combatant.deathProgress = 1.0;
-          toRemove.push(id);
-        }
-      }
-    });
-
-    // Remove fully dead combatants
-    toRemove.forEach(id => {
-      this.combatants.delete(id);
-      this.spatialGrid.remove(id);
-    });
-  }
-
-  private updateCombatants(deltaTime: number): void {
-    // Update death animations first
-    this.updateDeathAnimations(deltaTime);
-
-    // Reuse scratch array to avoid per-frame allocations
-    this.scratchCombatants.length = 0;
-    this.combatants.forEach(combatant => {
-      this.scratchCombatants.push(combatant);
-    });
-
-    this.scratchCombatants.sort((a, b) => {
-      const distA = a.position.distanceToSquared(this.playerPosition);
-      const distB = b.position.distanceToSquared(this.playerPosition);
-      return distA - distB;
-    });
-
-    const now = Date.now();
-    const worldSize = this.gameModeManager?.getWorldSize() || 4000;
-    const maxProcessingDistance = worldSize > 1000 ? 800 : 500; // Scale processing distance with world size
-
-    this.lodHighCount = 0;
-    this.lodMediumCount = 0;
-    this.lodLowCount = 0;
-    this.lodCulledCount = 0;
-
-    this.scratchCombatants.forEach(combatant => {
-      const distance = combatant.position.distanceTo(this.playerPosition);
-
-      // Skip update entirely if off-map (chunk likely not loaded). Minimal maintenance only.
-      if (Math.abs(combatant.position.x) > worldSize ||
-          Math.abs(combatant.position.z) > worldSize) {
-        // Nudge toward map center slowly so off-map agents don't explode simulation cost
-        this.scratchVector.set(-Math.sign(combatant.position.x), 0, -Math.sign(combatant.position.z));
-        combatant.position.addScaledVector(this.scratchVector, 0.2 * deltaTime);
-        this.lodCulledCount++;
-        return;
-      }
-
-      // Only care about AI that can actually affect gameplay
-      const COMBAT_RANGE = 200; // Max engagement range + buffer
-
-      if (distance > COMBAT_RANGE) {
-        combatant.lodLevel = 'culled';
-        this.lodCulledCount++;
-        // Just teleport them toward random zones occasionally
-        const elapsedMs = now - (combatant.lastUpdateTime || 0);
-        if (elapsedMs > 30000) { // Update every 30 seconds
-          this.simulateDistantAI(combatant);
-          combatant.lastUpdateTime = now;
-        }
-        return;
-      }
-
-      const dynamicIntervalMs = this.computeDynamicIntervalMs(distance) * this.intervalScale;
-
-      // Determine LOD level - scale distances based on world size
-      const isLargeWorld = worldSize > 1000;
-      const highLODRange = isLargeWorld ? 200 : 150;
-      const mediumLODRange = isLargeWorld ? 400 : 300;
-      const lowLODRange = isLargeWorld ? 600 : 500;
-
-      if (distance < highLODRange) {
-        combatant.lodLevel = 'high';
-        this.lodHighCount++;
-        this.updateCombatantFull(combatant, deltaTime);
-      } else if (distance < mediumLODRange) {
-        combatant.lodLevel = 'medium';
-        this.lodMediumCount++;
-        const elapsedMs = now - (combatant.lastUpdateTime || 0);
-        if (elapsedMs > dynamicIntervalMs) {
-          const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, 1.0) : deltaTime;
-          this.updateCombatantMedium(combatant, effectiveDelta);
-          combatant.lastUpdateTime = now;
-        }
-      } else if (distance < lowLODRange) {
-        combatant.lodLevel = 'low';
-        this.lodLowCount++;
-        const elapsedMs = now - (combatant.lastUpdateTime || 0);
-        if (elapsedMs > dynamicIntervalMs) {
-          const maxEff = Math.min(2.0, dynamicIntervalMs / 1000 * 2);
-          const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, maxEff) : deltaTime;
-          this.updateCombatantBasic(combatant, effectiveDelta);
-          combatant.lastUpdateTime = now;
-        }
-      } else {
-        // Very far: still update basic movement infrequently to keep world alive
-        combatant.lodLevel = 'culled';
-        this.lodCulledCount++;
-        const elapsedMs = now - (combatant.lastUpdateTime || 0);
-        if (elapsedMs > dynamicIntervalMs) {
-          // Allow larger effective delta for far agents to cover ground decisively
-          const maxEff = Math.min(3.0, dynamicIntervalMs / 1000 * 3);
-          const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, maxEff) : deltaTime;
-          this.updateCombatantBasic(combatant, effectiveDelta);
-          combatant.lastUpdateTime = now;
-        }
-      }
-    });
-  }
-
-  private updateCombatantFull(combatant: Combatant, deltaTime: number): void {
-    this.combatantAI.updateAI(combatant, deltaTime, this.playerPosition, this.combatants, this.spatialGrid);
-    this.combatantMovement.updateMovement(
-      combatant,
-      deltaTime,
-      this.squadManager.getAllSquads(),
-      this.combatants
-    );
-    this.combatantCombat.updateCombat(
-      combatant,
-      deltaTime,
-      this.playerPosition,
-      this.combatants,
-      this.squadManager.getAllSquads()
-    );
-    this.combatantRenderer.updateCombatantTexture(combatant);
-    this.combatantMovement.updateRotation(combatant, deltaTime);
-    // Update spatial grid after movement
-    this.spatialGrid.updatePosition(combatant.id, combatant.position);
-  }
-
-  private updateCombatantMedium(combatant: Combatant, deltaTime: number): void {
-    this.combatantAI.updateAI(combatant, deltaTime, this.playerPosition, this.combatants, this.spatialGrid);
-    this.combatantMovement.updateMovement(
-      combatant,
-      deltaTime,
-      this.squadManager.getAllSquads(),
-      this.combatants
-    );
-    this.combatantCombat.updateCombat(
-      combatant,
-      deltaTime,
-      this.playerPosition,
-      this.combatants,
-      this.squadManager.getAllSquads()
-    );
-    this.combatantMovement.updateRotation(combatant, deltaTime);
-    // Update spatial grid after movement
-    this.spatialGrid.updatePosition(combatant.id, combatant.position);
-  }
-
-  private updateCombatantBasic(combatant: Combatant, deltaTime: number): void {
-    this.combatantMovement.updateMovement(
-      combatant,
-      deltaTime,
-      this.squadManager.getAllSquads(),
-      this.combatants
-    );
-    this.combatantMovement.updateRotation(combatant, deltaTime);
-    // Update spatial grid after movement
-    this.spatialGrid.updatePosition(combatant.id, combatant.position);
-  }
-
-  private manageSpawning(): void {
-    // Handle pending respawns for player squad members
-    const now = Date.now();
-    const readyToRespawn = this.pendingRespawns.filter(r => r.respawnTime <= now);
-
-    readyToRespawn.forEach(respawn => {
-      console.log(`⏰ RESPAWN TRIGGERED at ${now} (was scheduled for ${respawn.respawnTime})`);
-      this.respawnSquadMember(respawn.squadId);
-    });
-
-    this.pendingRespawns = this.pendingRespawns.filter(r => r.respawnTime > now);
-
-    // Remove all dead combatants immediately - no body persistence
-    const toRemove: string[] = [];
-
-    this.combatants.forEach((combatant, id) => {
-      if (combatant.state === CombatantState.DEAD) {
-        toRemove.push(id);
-      }
-    });
-
-    toRemove.forEach(id => this.removeCombatant(id));
-
-    // Maintain minimum force strength during COMBAT phase OR when combat is enabled
-    const phase = this.ticketSystem?.getGameState().phase;
-    if (phase !== 'COMBAT' && !this.combatEnabled) return;
-
-    const targetPerFaction = Math.floor(this.MAX_COMBATANTS / 2);
-    const avgSquadSize = this.getAverageSquadSize();
-
-    const ensureFactionStrength = (faction: Faction) => {
-      const living = Array.from(this.combatants.values())
-        .filter(c => c.faction === faction && c.state !== CombatantState.DEAD).length;
-      const missing = Math.max(0, targetPerFaction - living);
-
-      // More aggressive refill when strength is very low
-      const criticalThreshold = Math.floor(targetPerFaction * 0.3);
-      const isEmergencyRefill = living < criticalThreshold;
-
-      if (missing <= 0) return;
-
-      // Spawn up to two squads immediately to refill strength, respecting global cap
-      const anchors = this.getFactionAnchors(faction);
-      let squadsToSpawn = Math.min(2, Math.ceil(missing / Math.max(1, avgSquadSize)));
-
-      // Emergency refill: spawn more aggressively
-      if (isEmergencyRefill) {
-        squadsToSpawn = Math.min(3, Math.ceil(missing / Math.max(1, avgSquadSize)));
-        console.log(`🚨 Emergency refill for ${faction}: ${living}/${targetPerFaction} remaining`);
-      }
-
-      for (let i = 0; i < squadsToSpawn; i++) {
-        if (this.combatants.size >= this.MAX_COMBATANTS) break;
-        let pos: THREE.Vector3;
-        if (anchors.length > 0) {
-          const anchor = anchors[(i + Math.floor(Math.random() * anchors.length)) % anchors.length];
-          pos = anchor.clone().add(this.randomSpawnOffset(20, 50));
-        } else {
-          pos = this.getSpawnPosition(faction);
-        }
-        this.spawnSquad(faction, pos, this.randomSquadSize());
-        console.log(`🎖️ Refill spawn: ${faction} squad of ${this.randomSquadSize()} deployed (${living + (i+1)*avgSquadSize}/${targetPerFaction})`);
-      }
-    };
-
-    ensureFactionStrength(Faction.US);
-    ensureFactionStrength(Faction.OPFOR);
-  }
-
-  private getBaseSpawnPosition(faction: Faction): THREE.Vector3 {
-    if (this.zoneManager) {
-      const allZones = this.zoneManager.getAllZones();
-      const ownedBases = allZones.filter(z => z.owner === faction && z.isHomeBase);
-
-      if (ownedBases.length > 0) {
-        const baseZone = ownedBases[Math.floor(Math.random() * ownedBases.length)];
-        const anchor = baseZone.position;
-        const angle = Math.random() * Math.PI * 2;
-        const radius = 20 + Math.random() * 30;
-        const spawnPos = new THREE.Vector3(
-          anchor.x + Math.cos(angle) * radius,
-          0,
-          anchor.z + Math.sin(angle) * radius
-        );
-        console.log(`📍 Using base ${baseZone.id} for squad respawn at (${spawnPos.x.toFixed(1)}, ${spawnPos.z.toFixed(1)})`);
-        return spawnPos;
-      } else {
-        console.log(`⚠️ No owned bases found for ${faction}, using fallback spawn`);
-      }
-    } else {
-      console.log(`⚠️ No ZoneManager available, using fallback spawn`);
-    }
-
-    const { usBasePos, opforBasePos } = this.getBasePositions();
-    const basePos = faction === Faction.US ? usBasePos : opforBasePos;
-
-    const angle = Math.random() * Math.PI * 2;
-    const radius = 20 + Math.random() * 30;
-    const spawnPos = new THREE.Vector3(
-      basePos.x + Math.cos(angle) * radius,
-      0,
-      basePos.z + Math.sin(angle) * radius
-    );
-
-    console.log(`📍 Using fallback base spawn for ${faction} at (${spawnPos.x.toFixed(1)}, ${spawnPos.z.toFixed(1)})`);
-    return spawnPos;
-  }
-
-  private getSpawnPosition(faction: Faction): THREE.Vector3 {
-    if (this.zoneManager) {
-      const allZones = this.zoneManager.getAllZones();
-      const owned = allZones.filter(z => z.owner === faction);
-
-      // Prioritize contested friendly zones
-      const contested = owned.filter(z => !z.isHomeBase && z.state === ZoneState.CONTESTED);
-      const captured = owned.filter(z => !z.isHomeBase && z.state !== ZoneState.CONTESTED);
-      const hqs = owned.filter(z => z.isHomeBase);
-
-      const anchorZone = (contested[0] || captured[0] || hqs[0]);
-      if (anchorZone) {
-        const anchor = anchorZone.position;
-        const angle = Math.random() * Math.PI * 2;
-        const radius = 20 + Math.random() * 40;
-        const spawnPos = new THREE.Vector3(
-          anchor.x + Math.cos(angle) * radius,
-          0,
-          anchor.z + Math.sin(angle) * radius
-        );
-        console.log(`📍 Using zone ${anchorZone.id} as spawn anchor`);
-        return spawnPos;
-      } else {
-        console.log(`⚠️ No owned zones found for ${faction}, using fallback spawn`);
-      }
-    } else {
-      console.log(`⚠️ No ZoneManager available, using fallback spawn`);
-    }
-
-    // Fallback: spawn at fixed base positions (not near player!)
-    const { usBasePos, opforBasePos } = this.getBasePositions();
-    const basePos = faction === Faction.US ? usBasePos : opforBasePos;
-
-    // Add random offset around the base
-    const angle = Math.random() * Math.PI * 2;
-    const radius = 20 + Math.random() * 30;
-    const spawnPos = new THREE.Vector3(
-      basePos.x + Math.cos(angle) * radius,
-      0,
-      basePos.z + Math.sin(angle) * radius
-    );
-
-    console.log(`📍 Using fallback base spawn for ${faction} at (${spawnPos.x.toFixed(1)}, ${spawnPos.z.toFixed(1)})`);
-    return spawnPos;
-  }
-
-  private spawnReinforcementWave(faction: Faction): void {
-    const targetPerFaction = Math.floor(this.MAX_COMBATANTS / 2);
-    const currentFactionCount = Array.from(this.combatants.values())
-      .filter(c => c.faction === faction && c.state !== CombatantState.DEAD).length;
-    const missing = Math.max(0, targetPerFaction - currentFactionCount);
-    if (missing === 0) return;
-
-    const avgSquadSize = this.getAverageSquadSize();
-    const maxSquadsThisWave = Math.max(1, Math.min(3, Math.ceil(missing / avgSquadSize / 2)));
-
-    // Choose anchors across owned zones (contested first)
-    const anchors = this.getFactionAnchors(faction);
-    if (anchors.length === 0) {
-      // Fallback: spawn near default base pos
-      const pos = this.getSpawnPosition(faction);
-      if (this.combatants.size < this.MAX_COMBATANTS) {
-        this.spawnSquad(faction, pos, this.randomSquadSize());
-      }
-      return;
-    }
-
-    for (let i = 0; i < maxSquadsThisWave; i++) {
-      if (this.combatants.size >= this.MAX_COMBATANTS) break;
-      const anchor = anchors[i % anchors.length];
-      const pos = anchor.clone().add(this.randomSpawnOffset(20, 50));
-      this.spawnSquad(faction, pos, this.randomSquadSize());
     }
   }
 
@@ -875,125 +318,6 @@ export class CombatantSystem implements GameSystem {
     });
   }
 
-  private getFactionAnchors(faction: Faction): THREE.Vector3[] {
-    if (!this.zoneManager) return [];
-    const zones = this.zoneManager.getAllZones().filter(z => z.owner === faction);
-    const contested = zones.filter(z => !z.isHomeBase && z.state === ZoneState.CONTESTED).map(z => z.position);
-    const captured = zones.filter(z => !z.isHomeBase && z.state !== ZoneState.CONTESTED).map(z => z.position);
-    const hqs = zones.filter(z => z.isHomeBase).map(z => z.position);
-    return [...contested, ...captured, ...hqs];
-  }
-
-  private getHQZonesForFaction(faction: Faction, config?: any): Array<{ position: THREE.Vector3 }> {
-    const zones = config?.zones as Array<{ isHomeBase: boolean; owner: Faction; position: THREE.Vector3 }> | undefined;
-    if (!zones) return [];
-    return zones.filter(z => z.isHomeBase && z.owner === faction).map(z => ({ position: z.position }));
-  }
-
-  private randomSquadSize(): number {
-    const min = (this as any).squadSizeMin || 3;
-    const max = (this as any).squadSizeMax || 6;
-    return Math.floor(min + Math.random() * (max - min + 1));
-  }
-
-  private getAverageSquadSize(): number {
-    const min = (this as any).squadSizeMin || 3;
-    const max = (this as any).squadSizeMax || 6;
-    return Math.round((min + max) / 2);
-  }
-
-  private randomSpawnOffset(minRadius: number, maxRadius: number): THREE.Vector3 {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = minRadius + Math.random() * (maxRadius - minRadius);
-    return new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
-  }
-
-  private removeCombatant(id: string): void {
-    const combatant = this.combatants.get(id);
-    if (combatant && combatant.squadId) {
-      const squad = this.squadManager.getSquad(combatant.squadId);
-
-      if (squad?.isPlayerControlled) {
-        // Check if THIS specific combatant already queued
-        const alreadyQueued = this.pendingRespawns.some(r => r.originalId === id);
-
-        if (!alreadyQueued) {
-          const now = Date.now();
-          const respawnTime = now + 5000;
-          console.log(`☠️ DEATH: Squad member ${id} died at ${now}`);
-          console.log(`⏳ Queued respawn for ${respawnTime} (in 5 seconds)`);
-          this.pendingRespawns.push({
-            squadId: combatant.squadId,
-            respawnTime: respawnTime,
-            originalId: id
-          });
-        } else {
-          console.log(`✓ Respawn already queued for ${id}`);
-        }
-      }
-
-      this.squadManager.removeSquadMember(combatant.squadId, id);
-    }
-    this.spatialGrid.remove(id);
-    this.combatants.delete(id);
-  }
-
-  private respawnSquadMember(squadId: string): void {
-    const squad = this.squadManager.getSquad(squadId);
-    if (!squad) {
-      console.log(`⚠️ Cannot respawn - squad ${squadId} no longer exists`);
-      return;
-    }
-
-    // Calculate squad centroid for reference
-    const squadMembers = squad.members.map(id => this.combatants.get(id)).filter(c => c);
-    const squadCentroid = new THREE.Vector3();
-    if (squadMembers.length > 0) {
-      squadMembers.forEach(m => {
-        if (m) squadCentroid.add(m.position);
-      });
-      squadCentroid.divideScalar(squadMembers.length);
-    }
-
-    // Check for rally point first
-    let spawnPos: THREE.Vector3;
-    let spawnedAtRallyPoint = false;
-
-    if (this.rallyPointSystem) {
-      const rallyPos = this.rallyPointSystem.getRallyPointPosition(squadId);
-      if (rallyPos && this.rallyPointSystem.consumeRallyPointUse(squadId)) {
-        spawnPos = rallyPos;
-        spawnedAtRallyPoint = true;
-        console.log(`🚩 Respawning at rally point`);
-      } else {
-        spawnPos = this.getBaseSpawnPosition(squad.faction);
-      }
-    } else {
-      spawnPos = this.getBaseSpawnPosition(squad.faction);
-    }
-
-    const distanceFromSquad = spawnPos.distanceTo(squadCentroid);
-
-    console.log(`🔄 Respawning squad member:`);
-    console.log(`   Squad location: (${squadCentroid.x.toFixed(1)}, ${squadCentroid.z.toFixed(1)})`);
-    console.log(`   Spawn location: (${spawnPos.x.toFixed(1)}, ${spawnPos.z.toFixed(1)}) ${spawnedAtRallyPoint ? '[RALLY POINT]' : '[BASE]'}`);
-    console.log(`   Distance: ${distanceFromSquad.toFixed(1)}m`);
-
-    const newMember = this.combatantFactory.createCombatant(
-      squad.faction,
-      spawnPos,
-      { squadId, squadRole: 'follower' }
-    );
-
-    newMember.isRejoiningSquad = true;
-
-    squad.members.push(newMember.id);
-    this.combatants.set(newMember.id, newMember);
-    this.spatialGrid.updatePosition(newMember.id, newMember.position);
-
-    console.log(`✅ Squad member ${newMember.id} spawned and moving to rejoin squad`);
-  }
-
   // Public API
   handlePlayerShot(
     ray: THREE.Ray,
@@ -1003,7 +327,6 @@ export class CombatantSystem implements GameSystem {
   }
 
   checkPlayerHit(ray: THREE.Ray): { hit: boolean; point: THREE.Vector3; headshot: boolean } {
-    // Delegate to combat module
     return this.combatantCombat.checkPlayerHit(ray, this.playerPosition);
   }
 
@@ -1049,11 +372,7 @@ export class CombatantSystem implements GameSystem {
             const squad = this.squadManager.getSquad(combatant.squadId);
             if (squad?.isPlayerControlled) {
               console.log(`⏳ Player squad member ${combatant.id} will respawn in 5 seconds...`);
-              this.pendingRespawns.push({
-                squadId: combatant.squadId,
-                respawnTime: Date.now() + 5000,
-                originalId: combatant.id
-              });
+              this.spawnManager.queueRespawn(combatant.squadId, combatant.id);
             }
             this.squadManager.removeSquadMember(combatant.squadId, combatant.id);
           }
@@ -1140,6 +459,8 @@ export class CombatantSystem implements GameSystem {
   setZoneManager(zoneManager: ZoneManager): void {
     this.zoneManager = zoneManager;
     this.combatantMovement.setZoneManager(zoneManager);
+    this.spawnManager.setZoneManager(zoneManager);
+    this.lodManager.setZoneManager(zoneManager);
   }
 
   setHUDSystem(hudSystem: any): void {
@@ -1150,6 +471,8 @@ export class CombatantSystem implements GameSystem {
   setGameModeManager(gameModeManager: GameModeManager): void {
     this.gameModeManager = gameModeManager;
     this.combatantMovement.setGameModeManager(gameModeManager);
+    this.spawnManager.setGameModeManager(gameModeManager);
+    this.lodManager.setGameModeManager(gameModeManager);
     // Update spatial grid world size
     const worldSize = gameModeManager.getWorldSize();
     this.spatialGrid.setWorldSize(worldSize);
@@ -1169,20 +492,17 @@ export class CombatantSystem implements GameSystem {
 
   // Game mode configuration methods
   setMaxCombatants(max: number): void {
-    this.MAX_COMBATANTS = max;
+    this.spawnManager.setMaxCombatants(max);
     Logger.info('combat', `Max combatants set to ${max}`);
   }
 
   setSquadSizes(min: number, max: number): void {
-    // Store for future squad spawning
-    (this as any).squadSizeMin = min;
-    (this as any).squadSizeMax = max;
+    this.spawnManager.setSquadSizes(min, max);
     Logger.info('combat', `Squad sizes set to ${min}-${max}`);
   }
 
   setReinforcementInterval(interval: number): void {
-    this.SPAWN_CHECK_INTERVAL = Math.max(5, interval) * 1000;
-    this.reinforcementWaveIntervalSeconds = Math.max(5, interval);
+    this.spawnManager.setReinforcementInterval(interval);
     Logger.info('combat', `Reinforcement interval set to ${interval} seconds`);
   }
 
@@ -1196,99 +516,9 @@ export class CombatantSystem implements GameSystem {
     return this.combatantRenderer;
   }
 
-  // Distant AI simulation with proper velocity scaling
-  private simulateDistantAI(combatant: Combatant): void {
-    if (!this.zoneManager) return;
-
-    // Calculate how much time passed since last update (30 seconds)
-    const simulationTimeStep = 30; // seconds
-    const normalMovementSpeed = 4; // units per second (normal AI walking speed)
-
-    // Scale movement to cover realistic distance over the simulation interval
-    const distanceToMove = normalMovementSpeed * simulationTimeStep; // 120 units over 30 seconds
-
-    // Find strategic target for this combatant
-    const zones = this.zoneManager.getAllZones();
-    const targetZones = zones.filter(zone => {
-      // Target capturable zones or defend contested ones
-      return !zone.isHomeBase && (
-        zone.owner !== combatant.faction || zone.state === 'contested'
-      );
-    });
-
-    if (targetZones.length > 0) {
-      // Pick closest strategic zone
-      let nearestZone = targetZones[0];
-      let minDistance = combatant.position.distanceTo(nearestZone.position);
-
-      for (const zone of targetZones) {
-        const distance = combatant.position.distanceTo(zone.position);
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearestZone = zone;
-        }
-      }
-
-      // Move toward the target zone at realistic speed
-      const direction = new THREE.Vector3()
-        .subVectors(nearestZone.position, combatant.position)
-        .normalize();
-
-      // Apply scaled movement
-      const movement = direction.multiplyScalar(distanceToMove);
-      combatant.position.add(movement);
-
-      // Update rotation to face movement direction
-      combatant.rotation = Math.atan2(direction.z, direction.x);
-
-      // Add some randomness to avoid all AI clustering
-      const randomOffset = new THREE.Vector3(
-        (Math.random() - 0.5) * 20,
-        0,
-        (Math.random() - 0.5) * 20
-      );
-      combatant.position.add(randomOffset);
-
-      // Keep on terrain
-      if (this.chunkManager) {
-        const terrainHeight = getHeightQueryCache().getHeightAt(combatant.position.x, combatant.position.z);
-        combatant.position.y = terrainHeight + 3;
-      } else {
-        combatant.position.y = 5;
-      }
-    }
+  getTelemetry() {
+    return this.profiler.getTelemetry();
   }
-  getTelemetry(): {
-    lastMs: number;
-    emaMs: number;
-    lodHigh: number;
-    lodMedium: number;
-    lodLow: number;
-    lodCulled: number;
-    combatantCount: number;
-    octree: {
-      nodes: number;
-      maxDepth: number;
-      avgEntitiesPerLeaf: number;
-    };
-  } {
-    const octreeStats = this.spatialGrid.getStats();
-    return {
-      lastMs: this.updateLastMs,
-      emaMs: this.updateEmaMs,
-      lodHigh: this.lodHighCount,
-      lodMedium: this.lodMediumCount,
-      lodLow: this.lodLowCount,
-      lodCulled: this.lodCulledCount,
-      combatantCount: this.combatants.size,
-      octree: {
-        nodes: octreeStats.totalNodes,
-        maxDepth: octreeStats.maxDepth,
-        avgEntitiesPerLeaf: Math.round(octreeStats.avgEntitiesPerLeaf * 10) / 10
-      }
-    };
-  }
-
 
   dispose(): void {
     // Clean up modules
