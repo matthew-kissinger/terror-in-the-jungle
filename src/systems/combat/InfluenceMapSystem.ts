@@ -120,8 +120,35 @@ export class InfluenceMapSystem implements GameSystem {
     this.computeCombinedScores();
   }
 
+  private getCellBounds(centerX: number, centerZ: number, radius: number): {
+    minX: number;
+    maxX: number;
+    minZ: number;
+    maxZ: number;
+  } {
+    const minX = Math.max(
+      0,
+      Math.floor((centerX - radius - this.worldOffset.x) / this.cellSize)
+    );
+    const maxX = Math.min(
+      this.gridSize - 1,
+      Math.floor((centerX + radius - this.worldOffset.x) / this.cellSize)
+    );
+    const minZ = Math.max(
+      0,
+      Math.floor((centerZ - radius - this.worldOffset.y) / this.cellSize)
+    );
+    const maxZ = Math.min(
+      this.gridSize - 1,
+      Math.floor((centerZ + radius - this.worldOffset.y) / this.cellSize)
+    );
+
+    return { minX, maxX, minZ, maxZ };
+  }
+
   private computeThreatLevel(): void {
     const THREAT_RADIUS = 50; // meters
+    const THREAT_RADIUS_SQ = THREAT_RADIUS * THREAT_RADIUS;
     const THREAT_FALLOFF = 0.02; // per meter
 
     this.combatants.forEach(combatant => {
@@ -130,14 +157,22 @@ export class InfluenceMapSystem implements GameSystem {
       if (combatant.state === 'dead') return;
 
       const combatantPos = new THREE.Vector2(combatant.position.x, combatant.position.z);
+      const { minX, maxX, minZ, maxZ } = this.getCellBounds(
+        combatantPos.x,
+        combatantPos.y,
+        THREAT_RADIUS
+      );
 
       // Apply threat influence in radius around enemy
-      for (let x = 0; x < this.gridSize; x++) {
-        for (let z = 0; z < this.gridSize; z++) {
+      for (let x = minX; x <= maxX; x++) {
+        for (let z = minZ; z <= maxZ; z++) {
           const cell = this.grid[x][z];
-          const distance = cell.position.distanceTo(combatantPos);
+          const dx = cell.position.x - combatantPos.x;
+          const dz = cell.position.y - combatantPos.y;
+          const distanceSq = dx * dx + dz * dz;
 
-          if (distance < THREAT_RADIUS) {
+          if (distanceSq < THREAT_RADIUS_SQ) {
+            const distance = Math.sqrt(distanceSq);
             const threat = Math.max(0, 1 - distance * THREAT_FALLOFF);
             cell.threatLevel = Math.min(1, cell.threatLevel + threat);
           }
@@ -147,12 +182,20 @@ export class InfluenceMapSystem implements GameSystem {
 
     // Player position is high-priority threat target for OPFOR
     const playerPos2D = new THREE.Vector2(this.playerPosition.x, this.playerPosition.z);
-    for (let x = 0; x < this.gridSize; x++) {
-      for (let z = 0; z < this.gridSize; z++) {
+    const { minX, maxX, minZ, maxZ } = this.getCellBounds(
+      playerPos2D.x,
+      playerPos2D.y,
+      THREAT_RADIUS
+    );
+    for (let x = minX; x <= maxX; x++) {
+      for (let z = minZ; z <= maxZ; z++) {
         const cell = this.grid[x][z];
-        const distance = cell.position.distanceTo(playerPos2D);
+        const dx = cell.position.x - playerPos2D.x;
+        const dz = cell.position.y - playerPos2D.y;
+        const distanceSq = dx * dx + dz * dz;
 
-        if (distance < THREAT_RADIUS) {
+        if (distanceSq < THREAT_RADIUS_SQ) {
+          const distance = Math.sqrt(distanceSq);
           const threat = Math.max(0, 1.2 - distance * THREAT_FALLOFF); // 20% higher than normal
           cell.threatLevel = Math.min(1, cell.threatLevel + threat);
         }
@@ -162,6 +205,7 @@ export class InfluenceMapSystem implements GameSystem {
 
   private computeOpportunityLevel(): void {
     const ZONE_RADIUS = 30; // meters
+    const ZONE_RADIUS_SQ = ZONE_RADIUS * ZONE_RADIUS;
     const ZONE_FALLOFF = 0.033; // per meter
 
     this.zones.forEach(zone => {
@@ -189,12 +233,20 @@ export class InfluenceMapSystem implements GameSystem {
       }
 
       // Apply opportunity influence in radius around zone
-      for (let x = 0; x < this.gridSize; x++) {
-        for (let z = 0; z < this.gridSize; z++) {
+      const { minX, maxX, minZ, maxZ } = this.getCellBounds(
+        zonePos.x,
+        zonePos.y,
+        ZONE_RADIUS
+      );
+      for (let x = minX; x <= maxX; x++) {
+        for (let z = minZ; z <= maxZ; z++) {
           const cell = this.grid[x][z];
-          const distance = cell.position.distanceTo(zonePos);
+          const dx = cell.position.x - zonePos.x;
+          const dz = cell.position.y - zonePos.y;
+          const distanceSq = dx * dx + dz * dz;
 
-          if (distance < ZONE_RADIUS) {
+          if (distanceSq < ZONE_RADIUS_SQ) {
+            const distance = Math.sqrt(distanceSq);
             const opportunity = Math.max(0, zoneValue - distance * ZONE_FALLOFF);
             cell.opportunityLevel = Math.min(1, cell.opportunityLevel + opportunity);
           }
@@ -205,6 +257,7 @@ export class InfluenceMapSystem implements GameSystem {
 
   private computeCoverValue(): void {
     const COVER_RADIUS = 15; // meters
+    const COVER_RADIUS_SQ = COVER_RADIUS * COVER_RADIUS;
     const COVER_FALLOFF = 0.067; // per meter
 
     // Compute cover from sandbags
@@ -213,12 +266,20 @@ export class InfluenceMapSystem implements GameSystem {
       bounds.getCenter(center);
       const coverPos = new THREE.Vector2(center.x, center.z);
 
-      for (let x = 0; x < this.gridSize; x++) {
-        for (let z = 0; z < this.gridSize; z++) {
+      const { minX, maxX, minZ, maxZ } = this.getCellBounds(
+        coverPos.x,
+        coverPos.y,
+        COVER_RADIUS
+      );
+      for (let x = minX; x <= maxX; x++) {
+        for (let z = minZ; z <= maxZ; z++) {
           const cell = this.grid[x][z];
-          const distance = cell.position.distanceTo(coverPos);
+          const dx = cell.position.x - coverPos.x;
+          const dz = cell.position.y - coverPos.y;
+          const distanceSq = dx * dx + dz * dz;
 
-          if (distance < COVER_RADIUS) {
+          if (distanceSq < COVER_RADIUS_SQ) {
+            const distance = Math.sqrt(distanceSq);
             const cover = Math.max(0, 1 - distance * COVER_FALLOFF);
             cell.coverValue = Math.min(1, cell.coverValue + cover);
           }
@@ -229,6 +290,7 @@ export class InfluenceMapSystem implements GameSystem {
 
   private computeSquadSupport(): void {
     const SUPPORT_RADIUS = 40; // meters
+    const SUPPORT_RADIUS_SQ = SUPPORT_RADIUS * SUPPORT_RADIUS;
     const SUPPORT_FALLOFF = 0.025; // per meter
 
     this.combatants.forEach(combatant => {
@@ -237,14 +299,22 @@ export class InfluenceMapSystem implements GameSystem {
       if (combatant.state === 'dead') return;
 
       const combatantPos = new THREE.Vector2(combatant.position.x, combatant.position.z);
+      const { minX, maxX, minZ, maxZ } = this.getCellBounds(
+        combatantPos.x,
+        combatantPos.y,
+        SUPPORT_RADIUS
+      );
 
       // Apply support influence in radius around friendly
-      for (let x = 0; x < this.gridSize; x++) {
-        for (let z = 0; z < this.gridSize; z++) {
+      for (let x = minX; x <= maxX; x++) {
+        for (let z = minZ; z <= maxZ; z++) {
           const cell = this.grid[x][z];
-          const distance = cell.position.distanceTo(combatantPos);
+          const dx = cell.position.x - combatantPos.x;
+          const dz = cell.position.y - combatantPos.y;
+          const distanceSq = dx * dx + dz * dz;
 
-          if (distance < SUPPORT_RADIUS) {
+          if (distanceSq < SUPPORT_RADIUS_SQ) {
+            const distance = Math.sqrt(distanceSq);
             const support = Math.max(0, 1 - distance * SUPPORT_FALLOFF);
             cell.squadSupport = Math.min(1, cell.squadSupport + support);
           }
@@ -297,6 +367,8 @@ export class InfluenceMapSystem implements GameSystem {
     const centerX = Math.floor((targetPos.x - this.worldOffset.x) / this.cellSize);
     const centerZ = Math.floor((targetPos.z - this.worldOffset.y) / this.cellSize);
     const cellRadius = Math.ceil(searchRadius / this.cellSize);
+    const searchRadiusSq = searchRadius * searchRadius;
+    const scratchWorldPos = new THREE.Vector3();
 
     let bestCell: InfluenceCell | null = null;
     let bestScore = -Infinity;
@@ -309,13 +381,13 @@ export class InfluenceMapSystem implements GameSystem {
         if (x < 0 || x >= this.gridSize || z < 0 || z >= this.gridSize) continue;
 
         const cell = this.grid[x][z];
-        const worldPos = new THREE.Vector3(
+        scratchWorldPos.set(
           cell.position.x + this.cellSize / 2,
           0,
           cell.position.y + this.cellSize / 2
         );
 
-        if (worldPos.distanceTo(targetPos) > searchRadius) continue;
+        if (scratchWorldPos.distanceToSquared(targetPos) > searchRadiusSq) continue;
 
         // For US faction, high combined score is good
         // For OPFOR, invert threat level preference
