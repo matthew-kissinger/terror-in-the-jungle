@@ -3,6 +3,7 @@ import { Combatant, CombatantState, Squad, SquadCommand } from '../types';
 import { SpatialOctree } from '../SpatialOctree';
 import { ZoneManager } from '../../world/ZoneManager';
 import { clusterManager } from '../ClusterManager';
+import { spatialGridManager } from '../SpatialGridManager';
 
 /**
  * Handles patrol state behavior including squad commands and zone defense assignment
@@ -85,9 +86,11 @@ export class AIStatePatrol {
           let baseDelay = (combatant.skillProfile.reactionDelayMs * (veryCloseRange ? 0.3 : 1) + rangeDelay);
 
           // In clusters, stagger reactions to prevent synchronized behavior
-          const clusterDensity = clusterManager.getClusterDensity(combatant, allCombatants);
-          if (clusterDensity > 0.3) {
-            baseDelay = clusterManager.getStaggeredReactionDelay(baseDelay, clusterDensity);
+          if (spatialGridManager.getIsInitialized()) {
+            const clusterDensity = clusterManager.getClusterDensity(combatant, allCombatants, spatialGridManager);
+            if (clusterDensity > 0.3) {
+              baseDelay = clusterManager.getStaggeredReactionDelay(baseDelay, clusterDensity);
+            }
           }
 
           combatant.reactionTimer = baseDelay / 1000;

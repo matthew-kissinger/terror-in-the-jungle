@@ -6,15 +6,21 @@ import { GameModeManager } from '../world/GameModeManager';
 import { objectPool } from '../../utils/ObjectPoolManager';
 import { clusterManager } from './ClusterManager';
 import { getHeightQueryCache } from '../terrain/HeightQueryCache';
+import { SpatialGridManager } from './SpatialGridManager';
 
 export class CombatantMovement {
   private chunkManager?: ImprovedChunkManager;
   private zoneManager?: ZoneManager;
   private gameModeManager?: GameModeManager;
+  private spatialGridManager?: SpatialGridManager;
 
   constructor(chunkManager?: ImprovedChunkManager, zoneManager?: ZoneManager) {
     this.chunkManager = chunkManager;
     this.zoneManager = zoneManager;
+  }
+
+  setSpatialGridManager(spatialGridManager: SpatialGridManager): void {
+    this.spatialGridManager = spatialGridManager;
   }
 
   updateMovement(
@@ -36,8 +42,10 @@ export class CombatantMovement {
 
     // Apply friendly spacing force to prevent bunching
     // This gently pushes NPCs apart when they get too close to friendlies
-    const spacingForce = clusterManager.calculateSpacingForce(combatant, combatants);
-    combatant.velocity.add(spacingForce);
+    if (this.spatialGridManager) {
+      const spacingForce = clusterManager.calculateSpacingForce(combatant, combatants, this.spatialGridManager);
+      combatant.velocity.add(spacingForce);
+    }
 
     // Apply velocity normally - LOD scaling handled in CombatantSystem
     const velocityDelta = objectPool.getVector3();

@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { Combatant, CombatantState, Faction } from './types'
+import { SpatialGridManager } from './SpatialGridManager'
 
 /**
  * Manages clustered NPC behavior to improve performance and gameplay experience.
@@ -21,6 +22,7 @@ export class ClusterManager {
   // Scratch vectors to avoid allocations
   private readonly scratchVec1 = new THREE.Vector3()
   private readonly scratchVec2 = new THREE.Vector3()
+  private readonly scratchVec3 = new THREE.Vector3()
 
   // Target assignment tracking - which enemies are being targeted by how many
   private targetCounts: Map<string, number> = new Map()
@@ -29,22 +31,36 @@ export class ClusterManager {
   /**
    * Calculate spacing force to push combatant away from nearby friendlies.
    * Returns a velocity offset to apply during movement.
+   * Uses spatial grid for O(log n) instead of O(n) complexity.
    */
   calculateSpacingForce(
     combatant: Combatant,
-    allCombatants: Map<string, Combatant>
+    allCombatants: Map<string, Combatant>,
+    spatialGrid: SpatialGridManager,
+    outputVector?: THREE.Vector3
   ): THREE.Vector3 {
-    const force = this.scratchVec1.set(0, 0, 0)
+    const force = outputVector || this.scratchVec1
+    force.set(0, 0, 0)
     let nearbyCount = 0
 
-    allCombatants.forEach((other, id) => {
-      if (id === combatant.id) return
-      if (other.faction !== combatant.faction) return
-      if (other.state === CombatantState.DEAD) return
+    // Use spatial grid to find only nearby combatants within spacing radius
+    const nearbyIds = spatialGrid.queryRadius(combatant.position, this.MIN_FRIENDLY_SPACING)
 
-      const distance = combatant.position.distanceTo(other.position)
+    for (const id of nearbyIds) {
+      if (id === combatant.id) continue
 
-      if (distance < this.MIN_FRIENDLY_SPACING && distance > 0.1) {
+      const other = allCombatants.get(id)
+      if (!other) continue
+      if (other.faction !== combatant.faction) continue
+      if (other.state === CombatantState.DEAD) continue
+
+      // Use distanceToSquared for comparison (faster than distanceTo)
+      const distanceSq = combatant.position.distanceToSquared(other.position)
+      const minSpacingSq = this.MIN_FRIENDLY_SPACING * this.MIN_FRIENDLY_SPACING
+
+      if (distanceSq < minSpacingSq && distanceSq > 0.01) {
+        const distance = Math.sqrt(distanceSq)
+
         // Calculate repulsion direction (away from other)
         this.scratchVec2
           .subVectors(combatant.position, other.position)
@@ -55,60 +71,88 @@ export class ClusterManager {
         force.addScaledVector(this.scratchVec2, strength)
         nearbyCount++
       }
-    })
+    }
 
     // Normalize if multiple forces applied
     if (nearbyCount > 1) {
       force.divideScalar(nearbyCount)
     }
 
-    // Return a new vector (don't return scratch)
-    return new THREE.Vector3().copy(force)
+    // If no output vector provided, return a new vector (don't return scratch)
+    if (!outputVector) {
+      return new THREE.Vector3().copy(force)
+    }
+
+    return force
   }
 
   /**
-   * Check if combatant is in a clustered situation
+   * Check if combatant is in a clustered situation.
+   * Uses spatial grid for O(log n) instead of O(n) complexity.
    */
   isInCluster(
     combatant: Combatant,
-    allCombatants: Map<string, Combatant>
+    allCombatants: Map<string, Combatant>,
+    spatialGrid: SpatialGridManager
   ): boolean {
     let nearbyFriendlies = 0
+    const radiusSq = this.CLUSTER_RADIUS * this.CLUSTER_RADIUS
 
-    allCombatants.forEach((other, id) => {
-      if (id === combatant.id) return
-      if (other.faction !== combatant.faction) return
-      if (other.state === CombatantState.DEAD) return
+    // Use spatial grid to find only nearby combatants within cluster radius
+    const nearbyIds = spatialGrid.queryRadius(combatant.position, this.CLUSTER_RADIUS)
 
-      const distance = combatant.position.distanceTo(other.position)
-      if (distance < this.CLUSTER_RADIUS) {
+    for (const id of nearbyIds) {
+      if (id === combatant.id) continue
+
+      const other = allCombatants.get(id)
+      if (!other) continue
+      if (other.faction !== combatant.faction) continue
+      if (other.state === CombatantState.DEAD) continue
+
+      // Use distanceToSquared for faster comparison
+      const distanceSq = combatant.position.distanceToSquared(other.position)
+      if (distanceSq < radiusSq) {
         nearbyFriendlies++
+        // Early exit if we've found enough friendlies
+        if (nearbyFriendlies >= this.CLUSTER_THRESHOLD) {
+          return true
+        }
       }
-    })
+    }
 
-    return nearbyFriendlies >= this.CLUSTER_THRESHOLD
+    return false
   }
 
   /**
-   * Get cluster density (0-1) for performance scaling
-   * Higher density = more NPCs nearby = should simplify AI
+   * Get cluster density (0-1) for performance scaling.
+   * Higher density = more NPCs nearby = should simplify AI.
+   * Uses spatial grid for O(log n) instead of O(n) complexity.
    */
   getClusterDensity(
     combatant: Combatant,
-    allCombatants: Map<string, Combatant>
+    allCombatants: Map<string, Combatant>,
+    spatialGrid: SpatialGridManager
   ): number {
     let nearbyCount = 0
     const maxExpected = 10 // Normalize against this
+    const radiusSq = this.CLUSTER_RADIUS * this.CLUSTER_RADIUS
 
-    allCombatants.forEach((other, id) => {
-      if (id === combatant.id) return
-      if (other.state === CombatantState.DEAD) return
+    // Use spatial grid to find only nearby combatants within cluster radius
+    const nearbyIds = spatialGrid.queryRadius(combatant.position, this.CLUSTER_RADIUS)
 
-      const distance = combatant.position.distanceTo(other.position)
-      if (distance < this.CLUSTER_RADIUS) {
+    for (const id of nearbyIds) {
+      if (id === combatant.id) continue
+
+      const other = allCombatants.get(id)
+      if (!other) continue
+      if (other.state === CombatantState.DEAD) continue
+
+      // Use distanceToSquared for faster comparison
+      const distanceSq = combatant.position.distanceToSquared(other.position)
+      if (distanceSq < radiusSq) {
         nearbyCount++
       }
-    })
+    }
 
     return Math.min(1, nearbyCount / maxExpected)
   }

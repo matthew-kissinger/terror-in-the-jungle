@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { objectPool } from '../../utils/ObjectPoolManager';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { CombatantSystem } from '../combat/CombatantSystem';
@@ -9,17 +8,8 @@ import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
 import { InventoryManager } from '../player/InventoryManager';
 import { AudioManager } from '../audio/AudioManager';
 import { PlayerStatsTracker } from '../player/PlayerStatsTracker';
-
-interface Grenade {
-  id: string;
-  position: THREE.Vector3;
-  velocity: THREE.Vector3;
-  rotation: THREE.Vector3;
-  rotationVelocity: THREE.Vector3;
-  mesh: THREE.Mesh;
-  fuseTime: number;
-  isActive: boolean;
-}
+import { Grenade, GrenadePhysics } from './GrenadePhysics';
+import { GrenadeArcRenderer } from './GrenadeArcRenderer';
 
 export class GrenadeSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -56,9 +46,8 @@ export class GrenadeSystem implements GameSystem {
   private readonly MAX_THROW_FORCE = 50;
   private readonly MAX_ARC_POINTS = 50;
 
-  private arcPositions = new Float32Array(this.MAX_ARC_POINTS * 3);
-  private arcVisualization?: THREE.Line;
-  private landingIndicator?: THREE.Mesh;
+  private physics: GrenadePhysics;
+  private arcRenderer: GrenadeArcRenderer;
   private isAiming = false;
   private throwPower = 1.0;
   private idleTime = 0;
@@ -84,7 +73,14 @@ export class GrenadeSystem implements GameSystem {
     this.weaponCamera = new THREE.OrthographicCamera(-aspect, aspect, 1, -1, 0.1, 10);
     this.weaponCamera.position.z = 1;
 
-    this.createArcVisualization();
+    this.physics = new GrenadePhysics(
+      this.GRAVITY,
+      this.AIR_RESISTANCE,
+      this.BOUNCE_DAMPING,
+      this.FRICTION_MUD,
+      this.FRICTION_WATER
+    );
+    this.arcRenderer = new GrenadeArcRenderer(this.scene, this.MAX_ARC_POINTS, this.DAMAGE_RADIUS);
     this.createGrenadeView();
   }
 
@@ -104,10 +100,11 @@ export class GrenadeSystem implements GameSystem {
       this.updateArc();
       
       // Pulse landing indicator for visibility
-      if (this.landingIndicator && this.landingIndicator.visible) {
+      const landingIndicator = this.arcRenderer.getLandingIndicator();
+      if (landingIndicator && landingIndicator.visible) {
         const pulse = 0.6 + Math.sin(this.idleTime * 4) * 0.2; // Pulse between 0.4 and 0.8
-        if (this.landingIndicator.material instanceof THREE.MeshBasicMaterial) {
-          this.landingIndicator.material.opacity = pulse;
+        if (landingIndicator.material instanceof THREE.MeshBasicMaterial) {
+          landingIndicator.material.opacity = pulse;
         }
       }
     }
@@ -151,53 +148,7 @@ export class GrenadeSystem implements GameSystem {
         continue;
       }
 
-      // Apply gravity
-      grenade.velocity.y += this.GRAVITY * deltaTime;
-
-      // Apply air resistance to all components
-      grenade.velocity.multiplyScalar(this.AIR_RESISTANCE);
-
-      const nextPosition = objectPool.getVector3().copy(grenade.position);
-      const velocityDelta = objectPool.getVector3().copy(grenade.velocity).multiplyScalar(deltaTime);
-      nextPosition.add(velocityDelta);
-
-      const groundHeight = this.getGroundHeight(nextPosition.x, nextPosition.z) + 0.3;
-
-      if (nextPosition.y <= groundHeight) {
-        nextPosition.y = groundHeight;
-
-        // Determine surface type based on height (simple heuristic)
-        // Water level is around 0-1m, rocks might be on slopes
-        const surfaceFriction = groundHeight < 1.0 ? this.FRICTION_WATER : this.FRICTION_MUD;
-
-        // Only bounce if falling fast enough
-        if (Math.abs(grenade.velocity.y) > 2.0) {
-          grenade.velocity.y = -grenade.velocity.y * this.BOUNCE_DAMPING;
-          // Reduce horizontal velocity on bounce
-          grenade.velocity.x *= (1.0 - surfaceFriction * 0.3);
-          grenade.velocity.z *= (1.0 - surfaceFriction * 0.3);
-          // Reduce rotation on bounce
-          grenade.rotationVelocity.multiplyScalar(0.8);
-        } else {
-          // Stop bouncing, just roll
-          grenade.velocity.y = 0;
-          grenade.velocity.x *= (1.0 - surfaceFriction);
-          grenade.velocity.z *= (1.0 - surfaceFriction);
-          // Slow rotation when rolling
-          grenade.rotationVelocity.multiplyScalar(0.9);
-        }
-      }
-
-      grenade.position.copy(nextPosition);
-      objectPool.releaseVector3(nextPosition);
-      objectPool.releaseVector3(velocityDelta);
-
-      const rotDelta = objectPool.getVector3().copy(grenade.rotationVelocity).multiplyScalar(deltaTime);
-      grenade.rotation.add(rotDelta);
-      objectPool.releaseVector3(rotDelta);
-
-      grenade.mesh.position.copy(grenade.position);
-      grenade.mesh.rotation.set(grenade.rotation.x, grenade.rotation.y, grenade.rotation.z);
+      this.physics.updateGrenade(grenade, deltaTime, (x, z) => this.getGroundHeight(x, z));
     }
   }
 
@@ -213,21 +164,7 @@ export class GrenadeSystem implements GameSystem {
     });
     this.grenades = [];
 
-    if (this.arcVisualization) {
-      this.scene.remove(this.arcVisualization);
-      this.arcVisualization.geometry.dispose();
-      if (this.arcVisualization.material instanceof THREE.Material) {
-        this.arcVisualization.material.dispose();
-      }
-    }
-
-    if (this.landingIndicator) {
-      this.scene.remove(this.landingIndicator);
-      this.landingIndicator.geometry.dispose();
-      if (this.landingIndicator.material instanceof THREE.Material) {
-        this.landingIndicator.material.dispose();
-      }
-    }
+    this.arcRenderer.dispose();
 
     if (this.grenadeInHand) {
       this.weaponScene.remove(this.grenadeInHand);
@@ -254,13 +191,7 @@ export class GrenadeSystem implements GameSystem {
     this.throwPower = 0.3; // Start with minimum power
     this.powerBuildupTime = 0;
 
-    if (this.arcVisualization) {
-      this.arcVisualization.visible = true;
-    }
-
-    if (this.landingIndicator) {
-      this.landingIndicator.visible = true;
-    }
+    this.arcRenderer.showArc(true);
   }
 
   startCooking(): void {
@@ -331,100 +262,16 @@ export class GrenadeSystem implements GameSystem {
   }
 
   updateArc(): number {
-    if (!this.isAiming || !this.arcVisualization) return 0;
+    if (!this.isAiming) return 0;
 
-    const startPos = objectPool.getVector3().copy(this.camera.position);
-    const direction = objectPool.getVector3();
-    this.camera.getWorldDirection(direction);
-
-    // Variable throw force based on power buildup
-    const throwForce = this.MIN_THROW_FORCE + (this.MAX_THROW_FORCE - this.MIN_THROW_FORCE) * this.throwPower;
-
-    // Angle the throw upward for a proper arc (like a real grenade throw)
-    // Use a flatter angle for more forward carry, less affected by looking angle
-    const baseThrowAngle = 0.25 + (0.15 * this.throwPower); // 0.25 to 0.4 radians (14 to 23 degrees)
-
-    // Maintain more forward momentum regardless of vertical look angle
-    const forwardDir = objectPool.getVector3().copy(direction);
-    forwardDir.y = 0; // Remove vertical component
-    forwardDir.normalize();
-
-    // Combine forward direction with upward angle
-    const finalDirection = objectPool.getVector3();
-    finalDirection.x = forwardDir.x * Math.cos(baseThrowAngle);
-    finalDirection.z = forwardDir.z * Math.cos(baseThrowAngle);
-    finalDirection.y = Math.sin(baseThrowAngle);
-
-    const throwVelocity = objectPool.getVector3().copy(finalDirection).multiplyScalar(throwForce);
-
-    // Add moderate upward boost based on look angle (but not too much)
-    const lookUpBoost = Math.max(0, direction.y * 3); // Only boost if looking up
-    throwVelocity.y += lookUpBoost * this.throwPower;
-
-    const steps = 30;
-    const timeStep = 0.1;
-
-    const pos = objectPool.getVector3().copy(startPos);
-    const vel = objectPool.getVector3().copy(throwVelocity);
-    const landingPos = objectPool.getVector3().copy(pos);
-    const velDelta = objectPool.getVector3();
-
-    let pointCount = 0;
-    for (let i = 0; i < steps; i++) {
-      // Write to Float32Array
-      if (pointCount < this.MAX_ARC_POINTS) {
-        this.arcPositions[pointCount * 3] = pos.x;
-        this.arcPositions[pointCount * 3 + 1] = pos.y;
-        this.arcPositions[pointCount * 3 + 2] = pos.z;
-        pointCount++;
-      }
-
-      vel.y += this.GRAVITY * timeStep;
-      
-      velDelta.copy(vel).multiplyScalar(timeStep);
-      pos.add(velDelta);
-
-      const groundHeight = this.getGroundHeight(pos.x, pos.z);
-      if (pos.y <= groundHeight) {
-        pos.y = groundHeight;
-        landingPos.copy(pos);
-        
-        // Add final point
-        if (pointCount < this.MAX_ARC_POINTS) {
-          this.arcPositions[pointCount * 3] = pos.x;
-          this.arcPositions[pointCount * 3 + 1] = pos.y;
-          this.arcPositions[pointCount * 3 + 2] = pos.z;
-          pointCount++;
-        }
-        break;
-      }
-    }
-
-    this.arcVisualization.geometry.attributes.position.needsUpdate = true;
-    this.arcVisualization.geometry.setDrawRange(0, pointCount);
-    this.arcVisualization.computeLineDistances(); // Required for dashed lines
-
-    // Update landing indicator position
-    if (this.landingIndicator) {
-      this.landingIndicator.position.copy(landingPos);
-      this.landingIndicator.position.y += 0.1; // Slightly above ground to prevent z-fighting
-    }
-
-    // Calculate distance from start to landing position
-    const distance = startPos.distanceTo(landingPos);
-
-    // Release all borrowed vectors
-    objectPool.releaseVector3(startPos);
-    objectPool.releaseVector3(direction);
-    objectPool.releaseVector3(forwardDir);
-    objectPool.releaseVector3(finalDirection);
-    objectPool.releaseVector3(throwVelocity);
-    objectPool.releaseVector3(pos);
-    objectPool.releaseVector3(vel);
-    objectPool.releaseVector3(landingPos);
-    objectPool.releaseVector3(velDelta);
-
-    return distance;
+    return this.arcRenderer.updateArc(
+      this.camera,
+      this.throwPower,
+      this.GRAVITY,
+      this.MIN_THROW_FORCE,
+      this.MAX_THROW_FORCE,
+      (x, z) => this.getGroundHeight(x, z)
+    );
   }
 
   throwGrenade(): boolean {
@@ -447,13 +294,7 @@ export class GrenadeSystem implements GameSystem {
     this.isCooking = false;
     this.cookingTime = 0;
 
-    if (this.arcVisualization) {
-      this.arcVisualization.visible = false;
-    }
-
-    if (this.landingIndicator) {
-      this.landingIndicator.visible = false;
-    }
+    this.arcRenderer.showArc(false);
 
     const startPos = this.camera.position.clone();
     // Offset slightly forward and down from camera
@@ -507,13 +348,7 @@ export class GrenadeSystem implements GameSystem {
     this.powerBuildupTime = 0;
     this.throwPower = 0.3;
 
-    if (this.arcVisualization) {
-      this.arcVisualization.visible = false;
-    }
-
-    if (this.landingIndicator) {
-      this.landingIndicator.visible = false;
-    }
+    this.arcRenderer.showArc(false);
   }
 
   private spawnGrenade(position: THREE.Vector3, velocity: THREE.Vector3, fuseTime: number = this.FUSE_TIME): void {
@@ -605,42 +440,6 @@ export class GrenadeSystem implements GameSystem {
       return this.chunkManager.getEffectiveHeightAt(x, z);
     }
     return 0;
-  }
-
-  private createArcVisualization(): void {
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(this.arcPositions, 3));
-    
-    const material = new THREE.LineDashedMaterial({
-      color: 0x00ff00,
-      linewidth: 2,
-      transparent: true,
-      opacity: 0.7,
-      depthTest: false, // Always visible through objects
-      dashSize: 0.5,
-      gapSize: 0.3
-    });
-
-    this.arcVisualization = new THREE.Line(geometry, material);
-    this.arcVisualization.visible = false;
-    this.arcVisualization.frustumCulled = false; // Ensure it's always rendered if visible
-    this.scene.add(this.arcVisualization);
-
-    // Create landing indicator - a ring showing impact point and radius
-    // Make it larger and more visible with pulsing animation
-    const ringGeometry = new THREE.RingGeometry(this.DAMAGE_RADIUS - 1.0, this.DAMAGE_RADIUS + 1.0, 32);
-    const ringMaterial = new THREE.MeshBasicMaterial({
-      color: 0x00ff00, // Bright green for better visibility
-      transparent: true,
-      opacity: 0.7, // More opaque
-      side: THREE.DoubleSide,
-      depthTest: false
-    });
-
-    this.landingIndicator = new THREE.Mesh(ringGeometry, ringMaterial);
-    this.landingIndicator.rotation.x = -Math.PI / 2; // Lay flat on ground
-    this.landingIndicator.visible = false;
-    this.scene.add(this.landingIndicator);
   }
 
   setCombatantSystem(system: CombatantSystem): void {

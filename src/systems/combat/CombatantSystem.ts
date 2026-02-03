@@ -123,6 +123,9 @@ export class CombatantSystem implements GameSystem {
     // Initialize the singleton spatial grid manager (will be reinitialized when game mode is set)
     spatialGridManager.initialize(4000);
 
+    // Set spatial grid manager on CombatantMovement for cluster manager optimizations
+    this.combatantMovement.setSpatialGridManager(spatialGridManager);
+
     // Initialize new focused modules
     this.spawnManager = new CombatantSpawnManager(
       this.combatants,
