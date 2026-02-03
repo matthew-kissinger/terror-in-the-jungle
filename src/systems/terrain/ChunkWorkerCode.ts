@@ -78,6 +78,9 @@ class WorkerNoise {
 
 let noiseGenerator = null;
 
+// NOTE: This calculateHeight function duplicates the logic from ChunkHeightGenerator.generateHeightAt()
+// They must match exactly to ensure seamless terrain generation between main thread and workers.
+// See src/systems/terrain/ChunkHeightGenerator.ts for the canonical implementation.
 function calculateHeight(worldX, worldZ, noise) {
   let continentalHeight = noise.noise(worldX * 0.001, worldZ * 0.001);
   let ridgeNoise = 1 - Math.abs(noise.noise(worldX * 0.003, worldZ * 0.003));
