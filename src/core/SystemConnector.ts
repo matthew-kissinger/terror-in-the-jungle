@@ -180,6 +180,11 @@ export class SystemConnector {
       spatialGridManager: spatialGridManager
     });
 
+    // Initialize GPU timing if renderer is available
+    if (sandboxRenderer && sandboxRenderer.renderer) {
+      performanceTelemetry.initGPUTiming(sandboxRenderer.renderer);
+    }
+
     // Connect voice callout system
     // VoiceCalloutSystem disabled for performance
     // if (combatantCombat) {

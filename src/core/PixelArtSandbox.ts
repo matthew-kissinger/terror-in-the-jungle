@@ -12,6 +12,7 @@ import { Logger } from '../utils/Logger';
 import { getHeightQueryCache } from '../systems/terrain/HeightQueryCache';
 import { SandboxMetrics } from './SandboxMetrics';
 import { SandboxConfig, getSandboxConfig, isSandboxMode } from './SandboxModeDetector';
+import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 
 export class PixelArtSandbox {
   private loadingScreen: LoadingScreen;
@@ -388,6 +389,12 @@ Have fun!
     // const usingMortarCamera = this.systemManager.mortarSystem &&
     //                           this.systemManager.mortarSystem.isUsingWeaponCamera();
 
+    // Collect GPU timing from previous frame (async, non-blocking)
+    performanceTelemetry.collectGPUTime();
+
+    // Begin GPU timing for this frame
+    performanceTelemetry.beginGPUTimer();
+
     // Render the main scene with appropriate camera
     if (usingMortarCamera) {
       // const mortarCamera = this.systemManager.mortarSystem!.getWeaponCamera();
@@ -405,6 +412,9 @@ Have fun!
         );
       }
     }
+
+    // End GPU timing measurement
+    performanceTelemetry.endGPUTimer();
 
     // Render weapon overlay (after post-processing) - only when not using mortar camera
     if (this.systemManager.firstPersonWeapon && !usingMortarCamera) {
@@ -480,6 +490,9 @@ Have fun!
     // Get system timings from system manager
     const systemTimings = this.systemManager.getSystemTimings();
 
+    // Get GPU telemetry
+    const gpuTelemetry = performanceTelemetry.getGPUTelemetry();
+
     this.performanceOverlay.update({
       fps,
       frameTimeMs: deltaTime * 1000,
@@ -502,7 +515,9 @@ Have fun!
       combatLodLow: combatTelemetry.lodLow,
       combatLodCulled: combatTelemetry.lodCulled,
       combatantCount: combatTelemetry.combatantCount,
-      systemTimings
+      systemTimings,
+      gpuTimeMs: gpuTelemetry.gpuTimeMs,
+      gpuTimingAvailable: gpuTelemetry.available
     });
   }
 

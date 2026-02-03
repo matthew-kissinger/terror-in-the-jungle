@@ -30,6 +30,8 @@ export interface PerformanceStats {
   octreeMaxDepth?: number;
   octreeAvgPerLeaf?: number;
   systemTimings?: SystemTiming[];
+  gpuTimeMs?: number;
+  gpuTimingAvailable?: boolean;
 }
 
 export class PerformanceOverlay {
@@ -93,6 +95,9 @@ export class PerformanceOverlay {
       'PERFORMANCE',
       `FPS: ${stats.fps.toFixed(0)} (avg ${avgFps.toFixed(0)})`,
       `Frame: ${stats.frameTimeMs.toFixed(2)} ms`,
+      stats.gpuTimingAvailable
+        ? `GPU: ${stats.gpuTimeMs?.toFixed(2) ?? 0} ms`
+        : `GPU: N/A (extension not supported)`,
       `Draw Calls: ${stats.drawCalls}`,
       `Triangles: ${stats.triangles.toLocaleString()}`,
       `Chunks: ${stats.loadedChunks} (queue ${stats.chunkQueueSize})`,
