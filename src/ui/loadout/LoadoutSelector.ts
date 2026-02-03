@@ -18,6 +18,7 @@ export class LoadoutSelector implements GameSystem {
   private overlayElement?: HTMLElement;
   private selectedWeapon: LoadoutWeapon = LoadoutWeapon.RIFLE;
   private isVisible = false;
+  private boundOnKeyDown = this.onKeyDown.bind(this);
 
   private onLoadoutSelected?: (weapon: LoadoutWeapon) => void;
 
@@ -201,7 +202,7 @@ export class LoadoutSelector implements GameSystem {
     });
 
     // Spacebar to confirm
-    window.addEventListener('keydown', this.onKeyDown.bind(this));
+    window.addEventListener('keydown', this.boundOnKeyDown);
   }
 
   private onKeyDown(event: KeyboardEvent): void {
@@ -302,7 +303,7 @@ export class LoadoutSelector implements GameSystem {
       this.overlayElement.parentNode.removeChild(this.overlayElement);
     }
 
-    window.removeEventListener('keydown', this.onKeyDown.bind(this));
+    window.removeEventListener('keydown', this.boundOnKeyDown);
 
     console.log('🧹 Loadout Selector disposed');
   }

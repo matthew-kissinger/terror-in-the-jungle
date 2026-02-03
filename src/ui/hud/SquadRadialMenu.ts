@@ -51,6 +51,7 @@ export class SquadRadialMenu {
   private centerX = 0
   private centerY = 0
   private radius = 100
+  private boundMouseMoveHandler = this.onMouseMove.bind(this)
 
   constructor() {
     this.setupMouseListener()
@@ -223,26 +224,28 @@ export class SquadRadialMenu {
   }
 
   private setupMouseListener(): void {
-    window.addEventListener('mousemove', (e) => {
-      this.mouseX = e.clientX
-      this.mouseY = e.clientY
+    window.addEventListener('mousemove', this.boundMouseMoveHandler)
+  }
 
-      if (this.isVisible && this.container) {
-        // Track mouse position relative to menu center
-        const rect = this.container.getBoundingClientRect()
-        const centerX = rect.left + rect.width / 2
-        const centerY = rect.top + rect.height / 2
-        const angle = Math.atan2(this.mouseY - centerY, this.mouseX - centerX)
-        const segmentCount = this.menuItems.length
-        const anglePerSegment = (Math.PI * 2) / segmentCount
-        const normalizedAngle = angle + Math.PI / 2 + anglePerSegment / 2
+  private onMouseMove(event: MouseEvent): void {
+    this.mouseX = event.clientX
+    this.mouseY = event.clientY
 
-        let index = Math.floor(normalizedAngle / anglePerSegment) % segmentCount
-        if (index < 0) index += segmentCount
+    if (this.isVisible && this.container) {
+      // Track mouse position relative to menu center
+      const rect = this.container.getBoundingClientRect()
+      const centerX = rect.left + rect.width / 2
+      const centerY = rect.top + rect.height / 2
+      const angle = Math.atan2(this.mouseY - centerY, this.mouseX - centerX)
+      const segmentCount = this.menuItems.length
+      const anglePerSegment = (Math.PI * 2) / segmentCount
+      const normalizedAngle = angle + Math.PI / 2 + anglePerSegment / 2
 
-        this.selectSegment(index)
-      }
-    })
+      let index = Math.floor(normalizedAngle / anglePerSegment) % segmentCount
+      if (index < 0) index += segmentCount
+
+      this.selectSegment(index)
+    }
   }
 
   private selectSegment(index: number): void {
@@ -332,6 +335,8 @@ export class SquadRadialMenu {
   }
 
   dispose(): void {
+    window.removeEventListener('mousemove', this.boundMouseMoveHandler)
+
     if (this.container && this.container.parentNode) {
       this.container.parentNode.removeChild(this.container)
     }
