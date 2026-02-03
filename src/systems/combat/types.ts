@@ -68,6 +68,7 @@ export interface Combatant {
   currentTexture?: THREE.Texture;
   billboardIndex?: number;
   lastUpdateTime: number;
+  lastZoneEvalTime?: number;
   updatePriority: number;
   lodLevel: 'high' | 'medium' | 'low' | 'culled';
   isPlayerProxy?: boolean;

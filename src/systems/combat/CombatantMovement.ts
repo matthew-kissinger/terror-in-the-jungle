@@ -98,47 +98,73 @@ export class CombatantMovement {
 
     // Leaders: head toward strategic capturable zones
     if (combatant.squadRole === 'leader' && this.zoneManager) {
-      // Get all zones and evaluate strategic value
-      const allZones = this.zoneManager.getAllZones();
-      const capturableZones = allZones.filter(zone => {
-        // Can capture if neutral or enemy-owned (not home bases)
-        return !zone.isHomeBase && zone.owner !== combatant.faction;
-      });
+      const now = performance.now();
 
-      // Also consider defending contested zones
-      const contestedOwnedZones = allZones.filter(zone => {
-        return !zone.isHomeBase && zone.owner === combatant.faction && zone.state === ZoneState.CONTESTED;
-      });
+      // Throttle re-evaluation: only if we reached destination or enough time passed
+      const reachedDestination = !combatant.destinationPoint ||
+        combatant.position.distanceTo(combatant.destinationPoint) < 15;
 
-      const targetZones = [...capturableZones, ...contestedOwnedZones];
+      const shouldReevaluate = reachedDestination ||
+        !combatant.lastZoneEvalTime ||
+        (now - combatant.lastZoneEvalTime > 3000 + Math.random() * 2000);
 
-      if (targetZones.length > 0) {
-        // Select a strategic zone if we don't have a destination or reached it
-        if (!combatant.destinationPoint ||
-            combatant.position.distanceTo(combatant.destinationPoint) < 15) {
+      if (shouldReevaluate) {
+        combatant.lastZoneEvalTime = now;
+        const allZones = this.zoneManager.getAllZones();
 
-          // Evaluate zones by strategic value
-          const evaluatedZones = targetZones.map(zone => {
+        let top1Zone = null, top1Score = -1;
+        let top2Zone = null, top2Score = -1;
+        let top3Zone = null, top3Score = -1;
+
+        // Optimized evaluation in a single loop to avoid multiple array allocations
+        for (let i = 0; i < allZones.length; i++) {
+          const zone = allZones[i];
+          const isCapturable = !zone.isHomeBase && zone.owner !== combatant.faction;
+          const isContestedOwned = !zone.isHomeBase && zone.owner === combatant.faction && zone.state === ZoneState.CONTESTED;
+
+          if (isCapturable || isContestedOwned) {
             const distance = combatant.position.distanceTo(zone.position);
             const distanceScore = Math.max(0, 300 - distance) / 300; // Closer is better
             const bleedScore = (zone.ticketBleedRate || 1) / 3; // Higher bleed is better
-            const contestedScore = zone.state === 'contested' ? 0.5 : 0; // Contested zones need help
+            const contestedScore = zone.state === ZoneState.CONTESTED ? 0.5 : 0; // Contested zones need help
+            const score = distanceScore * 0.5 + bleedScore * 0.3 + contestedScore * 0.2;
 
-            return {
-              zone,
-              score: distanceScore * 0.5 + bleedScore * 0.3 + contestedScore * 0.2
-            };
-          });
-
-          // Sort by score and pick from top 3 with some randomness
-          evaluatedZones.sort((a, b) => b.score - a.score);
-          const topChoices = evaluatedZones.slice(0, Math.min(3, evaluatedZones.length));
-          const selectedZone = topChoices[Math.floor(Math.random() * topChoices.length)];
-
-          combatant.destinationPoint = selectedZone.zone.position.clone();
-          console.log(`🎯 ${combatant.faction} squad targeting ${selectedZone.zone.state === 'contested' ? 'defend' : 'capture'} zone: ${selectedZone.zone.id} (score: ${selectedZone.score.toFixed(2)})`);
+            if (score > top1Score) {
+              top3Score = top2Score; top3Zone = top2Zone;
+              top2Score = top1Score; top2Zone = top1Zone;
+              top1Score = score; top1Zone = zone;
+            } else if (score > top2Score) {
+              top3Score = top2Score; top3Zone = top2Zone;
+              top2Score = score; top2Zone = zone;
+            } else if (score > top3Score) {
+              top3Score = score; top3Zone = zone;
+            }
+          }
         }
 
+        // Pick from top 3 with some randomness
+        let selectedZone = null;
+        const count = (top1Zone ? 1 : 0) + (top2Zone ? 1 : 0) + (top3Zone ? 1 : 0);
+        if (count > 0) {
+          const rand = Math.floor(Math.random() * count);
+          if (rand === 0) selectedZone = top1Zone;
+          else if (rand === 1) selectedZone = top2Zone;
+          else selectedZone = top3Zone;
+        }
+
+        if (selectedZone) {
+          if (!combatant.destinationPoint) {
+            combatant.destinationPoint = selectedZone.position.clone();
+          } else {
+            combatant.destinationPoint.copy(selectedZone.position);
+          }
+        } else if (reachedDestination) {
+          // If we reached our destination and there are no new strategic zones, clear it
+          combatant.destinationPoint = undefined;
+        }
+      }
+
+      if (combatant.destinationPoint) {
         // Move toward the selected zone
         const toZone = objectPool.getVector3();
         toZone.subVectors(combatant.destinationPoint, combatant.position);
@@ -313,7 +339,6 @@ export class CombatantMovement {
     if (distanceToSquad < 15) {
       combatant.isRejoiningSquad = false;
       combatant.velocity.set(0, 0, 0);
-      console.log(`✅ Squad member successfully rejoined the squad`);
       objectPool.releaseVector3(squadCentroid);
     } else {
       const toSquad = objectPool.getVector3();
