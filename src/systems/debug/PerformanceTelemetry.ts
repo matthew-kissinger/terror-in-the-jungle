@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { GPUTimingTelemetry, GPUTelemetry } from './GPUTimingTelemetry'
 import { PerformanceBenchmark, BenchmarkResult, BenchmarkDependencies } from './PerformanceBenchmark'
+import { FrameTimingTracker } from './FrameTimingTracker'
 import { Logger } from '../../utils/Logger'
 import {
   SystemTiming,
@@ -25,17 +26,6 @@ export type {
 export class PerformanceTelemetry {
   private static instance: PerformanceTelemetry | null = null
 
-  private systems: Map<string, SystemTiming> = new Map()
-  private frameHistory: FrameData[] = []
-  private readonly FRAME_BUDGET_MS = 16.67 // 60fps target
-  private readonly HISTORY_SIZE = 120 // 2 seconds at 60fps
-  private readonly EMA_ALPHA = 0.1
-
-  private currentFrame: {
-    start: number
-    systems: Record<string, { start: number; duration?: number }>
-  } | null = null
-
   // Spatial grid telemetry (updated by SpatialGridManager)
   private spatialGridTelemetry: SpatialGridTelemetry = {
     initialized: false,
@@ -55,13 +45,10 @@ export class PerformanceTelemetry {
   // Terrain merger telemetry (updated externally by chunk manager)
   private terrainMergerTelemetry: TerrainMergerTelemetry | null = null
 
-  // Slow frame logging
-  private lastSlowFrameLog = 0
-  private readonly SLOW_FRAME_LOG_INTERVAL_MS = 1000 // Max 1 log per second
-
   // Sub-modules
   private gpuTiming = new GPUTimingTelemetry()
   private benchmark = new PerformanceBenchmark()
+  private frameTiming = new FrameTimingTracker()
 
   private constructor() {
     // Expose to window for console debugging
@@ -129,10 +116,7 @@ export class PerformanceTelemetry {
    * Call at the start of each frame
    */
   beginFrame(): void {
-    this.currentFrame = {
-      start: performance.now(),
-      systems: {}
-    }
+    this.frameTiming.beginFrame()
     // Reset per-frame counters
     this.spatialGridTelemetry.queriesThisFrame = 0
   }
@@ -141,105 +125,28 @@ export class PerformanceTelemetry {
    * Call before updating a system
    */
   beginSystem(name: string): void {
-    if (!this.currentFrame) return
-    this.currentFrame.systems[name] = { start: performance.now() }
+    this.frameTiming.beginSystem(name)
   }
 
   /**
    * Call after updating a system
    */
   endSystem(name: string): void {
-    if (!this.currentFrame) return
-    const sys = this.currentFrame.systems[name]
-    if (!sys) return
-
-    sys.duration = performance.now() - sys.start
-    this.updateSystemEMA(name, sys.duration)
+    this.frameTiming.endSystem(name)
   }
 
   /**
    * Call at the end of each frame
    */
   endFrame(): void {
-    if (!this.currentFrame) return
-
-    const duration = performance.now() - this.currentFrame.start
-    const overBudget = duration > this.FRAME_BUDGET_MS
-
-    // Record frame data
-    const frameData: FrameData = {
-      timestamp: this.currentFrame.start,
-      duration,
-      overBudget,
-      systems: {}
-    }
-
-    for (const [name, data] of Object.entries(this.currentFrame.systems)) {
-      if (data.duration !== undefined) {
-        frameData.systems[name] = data.duration
-      }
-    }
-
-    this.frameHistory.push(frameData)
-    if (this.frameHistory.length > this.HISTORY_SIZE) {
-      this.frameHistory.shift()
-    }
-
-    // Log slow frames (throttled)
-    if (duration > this.FRAME_BUDGET_MS * 1.5) {
-      const now = performance.now()
-      if (now - this.lastSlowFrameLog > this.SLOW_FRAME_LOG_INTERVAL_MS) {
-        this.lastSlowFrameLog = now
-        const slowSystems = this.getSlowSystemsThisFrame()
-        if (slowSystems.length > 0) {
-          Logger.warn('performance',
-            `[Perf] Slow frame: ${duration.toFixed(1)}ms - Heavy systems: ${slowSystems.join(', ')}`
-          )
-        }
-      }
-    }
-
-    this.currentFrame = null
-  }
-
-  private updateSystemEMA(name: string, duration: number): void {
-    let entry = this.systems.get(name)
-    if (!entry) {
-      entry = {
-        name,
-        budgetMs: this.FRAME_BUDGET_MS / 4, // Default budget per system
-        lastMs: duration,
-        emaMs: duration,
-        peakMs: duration
-      }
-      this.systems.set(name, entry)
-    } else {
-      entry.lastMs = duration
-      entry.emaMs = entry.emaMs * (1 - this.EMA_ALPHA) + duration * this.EMA_ALPHA
-      entry.peakMs = Math.max(entry.peakMs, duration)
-    }
-  }
-
-  private getSlowSystemsThisFrame(): string[] {
-    if (!this.currentFrame) return []
-
-    const slow: string[] = []
-    for (const [name, data] of Object.entries(this.currentFrame.systems)) {
-      if (data.duration && data.duration > 2.0) {
-        slow.push(`${name}(${data.duration.toFixed(1)}ms)`)
-      }
-    }
-    return slow
+    this.frameTiming.endFrame()
   }
 
   /**
    * Set the budget for a specific system
    */
   setSystemBudget(name: string, budgetMs: number): void {
-    const entry = this.systems.get(name)
-    if (entry) {
-      entry.budgetMs = budgetMs
-    }
+    this.frameTiming.setSystemBudget(name, budgetMs)
   }
 
   /**
@@ -277,25 +184,21 @@ export class PerformanceTelemetry {
    * Get average frame time over history
    */
   getAvgFrameTime(): number {
-    if (this.frameHistory.length === 0) return 16.67
-    const sum = this.frameHistory.reduce((acc, f) => acc + f.duration, 0)
-    return sum / this.frameHistory.length
+    return this.frameTiming.getAvgFrameTime()
   }
 
   /**
    * Get percentage of frames over budget
    */
   getOverBudgetPercent(): number {
-    if (this.frameHistory.length === 0) return 0
-    const overCount = this.frameHistory.filter(f => f.overBudget).length
-    return (overCount / this.frameHistory.length) * 100
+    return this.frameTiming.getOverBudgetPercent()
   }
 
   /**
    * Get system breakdown for display
    */
   getSystemBreakdown(): SystemTiming[] {
-    return Array.from(this.systems.values()).sort((a, b) => b.emaMs - a.emaMs)
+    return this.frameTiming.getSystemBreakdown()
   }
 
   /**
@@ -368,8 +271,7 @@ export class PerformanceTelemetry {
    * Reset all telemetry data
    */
   reset(): void {
-    this.systems.clear()
-    this.frameHistory = []
+    this.frameTiming.reset()
     this.hitDetectionStats = { shotsThisSession: 0, hitsThisSession: 0 }
     this.spatialGridTelemetry = {
       initialized: false,
