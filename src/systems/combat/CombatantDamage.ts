@@ -10,6 +10,7 @@ import { spatialGridManager } from './SpatialGridManager';
 import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem';
 import { Logger } from '../../utils/Logger';
 import { KillAssistTracker } from './KillAssistTracker';
+import { IHUDSystem } from '../../types/SystemInterfaces';
 
 /**
  * Handles damage application and death processing for combatants.
@@ -19,7 +20,7 @@ export class CombatantDamage {
   private playerHealthSystem?: PlayerHealthSystem;
   private ticketSystem?: TicketSystem;
   private audioManager?: AudioManager;
-  private hudSystem?: any;
+  private hudSystem?: IHUDSystem;
   private combatantRenderer?: CombatantRenderer;
   private cameraShakeSystem?: CameraShakeSystem;
   private impactEffectsPool?: ImpactEffectsPool;

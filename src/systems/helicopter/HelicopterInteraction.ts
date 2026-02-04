@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { Logger } from '../../utils/Logger';
+import { IHUDSystem } from '../../types/SystemInterfaces';
 
 export class HelicopterInteraction {
   private helicopters: Map<string, THREE.Group>;
   private playerController?: any;
-  private hudSystem?: any;
+  private hudSystem?: IHUDSystem;
   private terrainManager?: ImprovedChunkManager;
   private interactionRadius: number;
   private isPlayerNearHelicopter = false;
@@ -22,7 +23,7 @@ export class HelicopterInteraction {
     this.playerController = playerController;
   }
 
-  setHUDSystem(hudSystem: any): void {
+  setHUDSystem(hudSystem: IHUDSystem): void {
     this.hudSystem = hudSystem;
   }
 

@@ -10,6 +10,7 @@ import { ZoneCaptureLogic } from './ZoneCaptureLogic';
 import { ZoneTerrainAdapter } from './ZoneTerrainAdapter';
 import { ZoneInitializer } from './ZoneInitializer';
 import { GameModeConfig } from '../../config/gameModes';
+import { IHUDSystem } from '../../types/SystemInterfaces';
 
 export enum ZoneState {
   NEUTRAL = 'neutral',
@@ -69,7 +70,7 @@ export class ZoneManager implements GameSystem {
   // Zone tracking
   private occupants: Map<string, { us: number; opfor: number }> = new Map();
   private previousZoneState: Map<string, Faction | null> = new Map();
-  private hudSystem?: any;
+  private hudSystem?: IHUDSystem;
 
   // Optimization: Throttle occupant updates
   private lastOccupantUpdateTime = 0;
@@ -278,7 +279,7 @@ export class ZoneManager implements GameSystem {
     this.spatialGridManager = manager;
   }
 
-  setHUDSystem(hudSystem: any): void {
+  setHUDSystem(hudSystem: IHUDSystem): void {
     this.hudSystem = hudSystem;
   }
 

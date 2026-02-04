@@ -12,8 +12,9 @@ import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
 import { MatchEndScreen, MatchStats } from '../end/MatchEndScreen';
 import type { GrenadeSystem } from '../../systems/weapons/GrenadeSystem';
 import type { PlayerHealthSystem } from '../../systems/player/PlayerHealthSystem';
+import { IHUDSystem } from '../../types/SystemInterfaces';
 
-export class HUDSystem implements GameSystem {
+export class HUDSystem implements GameSystem, IHUDSystem {
   private combatantSystem?: CombatantSystem;
   private zoneManager?: ZoneManager;
   private ticketSystem?: TicketSystem;
@@ -323,5 +324,11 @@ export class HUDSystem implements GameSystem {
   // Weapon switch feedback method
   showWeaponSwitch(weaponName: string, weaponIcon: string, ammo: string): void {
     this.elements.showWeaponSwitch(weaponName, weaponIcon, ammo);
+  }
+
+  // Scoreboard toggle (stub - not yet implemented)
+  toggleScoreboard(visible: boolean): void {
+    // TODO: Implement scoreboard toggle
+    Logger.info('hud', `Scoreboard toggle requested: ${visible}`);
   }
 }

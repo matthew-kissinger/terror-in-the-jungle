@@ -14,6 +14,7 @@ import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem';
 import { Logger } from '../../utils/Logger';
+import { IHUDSystem } from '../../types/SystemInterfaces';
 // Extracted modules
 import { CombatantBallistics } from './CombatantBallistics';
 import { CombatantDamage } from './CombatantDamage';
@@ -36,7 +37,7 @@ export class CombatantCombat {
   private playerHealthSystem?: PlayerHealthSystem;
   private ticketSystem?: TicketSystem;
   private audioManager?: AudioManager;
-  private hudSystem?: any;
+  private hudSystem?: IHUDSystem;
   private chunkManager?: ImprovedChunkManager;
   private combatantRenderer?: CombatantRenderer;
   private sandbagSystem?: SandbagSystem;

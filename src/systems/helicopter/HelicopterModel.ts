@@ -8,13 +8,14 @@ import { createUH1HueyGeometry } from './HelicopterGeometry';
 import { HelicopterAnimation } from './HelicopterAnimation';
 import { HelicopterAudio } from './HelicopterAudio';
 import { HelicopterInteraction } from './HelicopterInteraction';
+import { IHUDSystem } from '../../types/SystemInterfaces';
 
 export class HelicopterModel implements GameSystem {
   private scene: THREE.Scene;
   private terrainManager?: ImprovedChunkManager;
   private helipadSystem?: HelipadSystem;
   private playerController?: any;
-  private hudSystem?: any;
+  private hudSystem?: IHUDSystem;
   private helicopters: Map<string, THREE.Group> = new Map();
   private helicopterPhysics: Map<string, HelicopterPhysics> = new Map();
   private interactionRadius = 5.0; // Distance from helicopter to show prompt (around helicopter size)
@@ -49,7 +50,7 @@ export class HelicopterModel implements GameSystem {
     this.interaction.setPlayerController(playerController);
   }
 
-  setHUDSystem(hudSystem: any): void {
+  setHUDSystem(hudSystem: IHUDSystem): void {
     this.hudSystem = hudSystem;
     this.interaction.setHUDSystem(hudSystem);
   }

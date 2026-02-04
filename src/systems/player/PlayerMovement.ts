@@ -6,6 +6,7 @@ import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { FootstepAudioSystem } from '../audio/FootstepAudioSystem';
 import { PlayerInput } from './PlayerInput';
+import { IHUDSystem } from '../../types/SystemInterfaces';
 
 const _moveVector = new THREE.Vector3();
 const _cameraDirection = new THREE.Vector3();
@@ -212,7 +213,7 @@ export class PlayerMovement {
     }
   }
 
-  updateHelicopterControls(deltaTime: number, input: PlayerInput, hudSystem?: any): void {
+  updateHelicopterControls(deltaTime: number, input: PlayerInput, hudSystem?: IHUDSystem): void {
     // Update helicopter controls based on keyboard input
 
     // Collective (W/S) - vertical thrust

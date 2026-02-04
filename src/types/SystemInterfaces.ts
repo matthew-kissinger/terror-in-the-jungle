@@ -4,29 +4,39 @@
  */
 
 import * as THREE from 'three';
+import { Faction } from '../systems/combat/types';
 
 /**
  * HUD System interface - handles all UI display and feedback
  */
 export interface IHUDSystem {
-  addKill(): void;
+  addKill(isHeadshot?: boolean): void;
   addDeath(): void;
   addZoneCapture(): void;
-  addKillToFeed(killerName: string, victimName: string, weaponType?: string): void;
+  addAssist(): void;
+  addCaptureAssist(): void;
+  addKillToFeed(killerName: string, killerFaction: Faction, victimName: string, victimFaction: Faction, isHeadshot?: boolean, weaponType?: string): void;
   showHitMarker(type: 'hit' | 'kill' | 'headshot'): void;
-  updateGrenadePower(power: number, distance?: number): void;
+  updateGrenadePower(power: number, distance?: number, cookingTime?: number): void;
   updateElevation(elevation: number): void;
   updateHelicopterMouseMode(enabled: boolean): void;
   showGrenadePowerMeter(): void;
   hideGrenadePowerMeter(): void;
-  updateHelicopterInstruments(pitch: number, yaw: number, altitude: number, speed: number): void;
+  updateHelicopterInstruments(collective: number, rpm: number, autoHover: boolean, engineBoost: boolean): void;
   showHelicopterMouseIndicator(): void;
   hideHelicopterMouseIndicator(): void;
   showHelicopterInstruments(): void;
   hideHelicopterInstruments(): void;
-  spawnScorePopup(type: 'capture' | 'defend' | 'secured', points: number): void;
+  spawnScorePopup(type: 'capture' | 'defend' | 'secured' | 'kill' | 'headshot' | 'assist', points: number, multiplier?: number): void;
   startMatch(): void;
   toggleScoreboard(visible: boolean): void;
+  updateTickets(usTickets: number, opforTickets: number): void;
+  showMessage(message: string, duration?: number): void;
+  updateAmmoDisplay(magazine: number, reserve: number): void;
+  showInteractionPrompt(text: string): void;
+  hideInteractionPrompt(): void;
+  spawnDamageNumber(worldPos: THREE.Vector3, damage: number, isHeadshot?: boolean, isKill?: boolean): void;
+  showWeaponSwitch(weaponName: string, weaponIcon: string, ammo: string): void;
 }
 
 /**

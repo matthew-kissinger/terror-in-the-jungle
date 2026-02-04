@@ -14,6 +14,7 @@ import { Grenade, GrenadePhysics, GrenadeSpawner } from './GrenadePhysics';
 import { GrenadeArcRenderer, GrenadeHandView, GrenadeCooking } from './GrenadeArcRenderer';
 import { triggerGrenadeCallout } from './GrenadeCallout';
 import { GrenadeEffects } from './GrenadeEffects';
+import { IHUDSystem } from '../../types/SystemInterfaces';
 
 export class GrenadeSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -330,7 +331,7 @@ export class GrenadeSystem implements GameSystem {
     this.statsTracker = statsTracker;
   }
 
-  setHUDSystem(hudSystem: any): void {
+  setHUDSystem(hudSystem: IHUDSystem): void {
     // Store HUD system reference for power meter updates
     // Type is 'any' to avoid circular dependency with HUDSystem
   }

@@ -15,6 +15,7 @@ import { SquadManager } from './SquadManager';
 import { CombatantSpawnManager } from './CombatantSpawnManager';
 import { CombatantLODManager } from './CombatantLODManager';
 import { SpatialOctree } from './SpatialOctree';
+import { IHUDSystem } from '../../types/SystemInterfaces';
 
 /**
  * Manages setter methods for external system dependencies
@@ -56,7 +57,7 @@ export class CombatantSystemSetters {
     this.lodManager.setZoneManager(zoneManager);
   }
 
-  setHUDSystem(hudSystem: any): void {
+  setHUDSystem(hudSystem: IHUDSystem): void {
     this.combatantCombat.setHUDSystem(hudSystem);
   }
 
