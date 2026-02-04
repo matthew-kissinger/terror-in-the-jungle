@@ -14,15 +14,19 @@ import { PlayerInput } from './PlayerInput';
 import { PlayerMovement } from './PlayerMovement';
 import { PlayerCamera } from './PlayerCamera';
 import { Logger } from '../../utils/Logger';
+import type { HelicopterModel } from '../helicopter/HelicopterModel';
+import type { FirstPersonWeapon } from './FirstPersonWeapon';
+import type { HUDSystem } from '../../ui/hud/HUDSystem';
+import type { SandboxRenderer } from '../../core/SandboxRenderer';
 
 export class PlayerController implements GameSystem {
   private camera: THREE.PerspectiveCamera;
   private chunkManager?: ImprovedChunkManager;
   private gameModeManager?: GameModeManager;
-  private helicopterModel?: any;
-  private firstPersonWeapon?: any;
-  private hudSystem?: any;
-  private sandboxRenderer?: any;
+  private helicopterModel?: HelicopterModel;
+  private firstPersonWeapon?: FirstPersonWeapon;
+  private hudSystem?: HUDSystem;
+  private sandboxRenderer?: SandboxRenderer;
   private inventoryManager?: InventoryManager;
   private grenadeSystem?: GrenadeSystem;
   private mortarSystem?: MortarSystem;
@@ -132,9 +136,9 @@ export class PlayerController implements GameSystem {
 
     if (this.hudSystem) {
       if (result.success) {
-        this.hudSystem.showMessage(result.message, 'success');
+        this.hudSystem.showMessage(result.message, 3000);
       } else {
-        this.hudSystem.showMessage(result.message, 'error');
+        this.hudSystem.showMessage(result.message, 3000);
       }
     }
 
@@ -355,10 +359,10 @@ export class PlayerController implements GameSystem {
   // Dependency setters
   setChunkManager(chunkManager: ImprovedChunkManager): void { this.chunkManager = chunkManager; this.movement.setChunkManager(chunkManager); }
   setGameModeManager(gameModeManager: GameModeManager): void { this.gameModeManager = gameModeManager; }
-  setHelicopterModel(helicopterModel: any): void { this.helicopterModel = helicopterModel; this.movement.setHelicopterModel(helicopterModel); this.cameraController.setHelicopterModel(helicopterModel); }
-  setFirstPersonWeapon(firstPersonWeapon: any): void { this.firstPersonWeapon = firstPersonWeapon; }
-  setHUDSystem(hudSystem: any): void { this.hudSystem = hudSystem; }
-  setSandboxRenderer(sandboxRenderer: any): void { this.sandboxRenderer = sandboxRenderer; }
+  setHelicopterModel(helicopterModel: HelicopterModel): void { this.helicopterModel = helicopterModel; this.movement.setHelicopterModel(helicopterModel); this.cameraController.setHelicopterModel(helicopterModel); }
+  setFirstPersonWeapon(firstPersonWeapon: FirstPersonWeapon): void { this.firstPersonWeapon = firstPersonWeapon; }
+  setHUDSystem(hudSystem: HUDSystem): void { this.hudSystem = hudSystem; }
+  setSandboxRenderer(sandboxRenderer: SandboxRenderer): void { this.sandboxRenderer = sandboxRenderer; }
   setInventoryManager(inventoryManager: InventoryManager): void { this.inventoryManager = inventoryManager; }
   setGrenadeSystem(grenadeSystem: GrenadeSystem): void { this.grenadeSystem = grenadeSystem; }
   setMortarSystem(mortarSystem: MortarSystem): void { this.mortarSystem = mortarSystem; }

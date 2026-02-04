@@ -2,11 +2,15 @@ import * as THREE from 'three';
 import { GameMode } from '../config/gameModes';
 import { getHeightQueryCache } from '../systems/terrain/HeightQueryCache';
 import { Logger } from '../utils/Logger';
+import { LoadoutWeapon } from '../ui/loadout/LoadoutSelector';
+import { GrenadeType } from '../systems/combat/types';
+import { isSandboxMode } from './SandboxModeDetector';
+import type { PixelArtSandbox } from './PixelArtSandbox';
 
 /**
  * Handles initialization of game systems and assets
  */
-export async function initializeSystems(sandbox: any): Promise<void> {
+export async function initializeSystems(sandbox: PixelArtSandbox): Promise<void> {
   try {
     await sandbox.systemManager.initializeSystems(
       sandbox.sandboxRenderer.scene, sandbox.sandboxRenderer.camera,
@@ -46,7 +50,7 @@ export async function initializeSystems(sandbox: any): Promise<void> {
 /**
  * Minimal asset check before starting
  */
-export async function loadGameAssets(sandbox: any): Promise<void> {
+export async function loadGameAssets(sandbox: PixelArtSandbox): Promise<void> {
   if (!sandbox.systemManager.assetLoader.getTexture('skybox')) {
     Logger.warn('sandbox-init', 'Skybox texture missing; proceeding without skybox.');
   }
@@ -56,18 +60,77 @@ export async function loadGameAssets(sandbox: any): Promise<void> {
 /**
  * Sets game mode and prepares for game start
  */
-export function startGameWithMode(sandbox: any, mode: GameMode): void {
+export function startGameWithMode(sandbox: PixelArtSandbox, mode: GameMode): void {
   if (!sandbox.isInitialized || sandbox.gameStarted) return;
   Logger.info('sandbox-init', `PixelArtSandbox: Starting game with mode: ${mode}`);
   sandbox.gameStarted = true;
   sandbox.systemManager.setGameMode(mode, { createPlayerSquad: mode !== GameMode.AI_SANDBOX });
-  startGame(sandbox);
+  
+  // Show loadout selector before starting game (skip in sandbox mode)
+  if (!isSandboxMode() && mode !== GameMode.AI_SANDBOX) {
+    showLoadoutSelector(sandbox, mode);
+  } else {
+    // Sandbox mode or AI sandbox - use defaults and start immediately
+    applyDefaultLoadout(sandbox);
+    startGame(sandbox);
+  }
+}
+
+/**
+ * Shows loadout selector and waits for player confirmation
+ */
+function showLoadoutSelector(sandbox: PixelArtSandbox, mode: GameMode): void {
+  const loadoutSelector = sandbox.systemManager.loadoutSelector;
+  
+  // Hide loading screen
+  sandbox.loadingScreen.hide();
+  
+  // Set up callback to apply selections and start game
+  loadoutSelector.onConfirm((weapon: LoadoutWeapon, grenadeType: GrenadeType) => {
+    applyLoadout(sandbox, weapon, grenadeType);
+    startGame(sandbox);
+  });
+  
+  // Show loadout selector
+  loadoutSelector.show();
+  Logger.info('sandbox-init', 'Loadout selector shown');
+}
+
+/**
+ * Apply selected loadout to game systems
+ */
+function applyLoadout(sandbox: PixelArtSandbox, weapon: LoadoutWeapon, grenadeType: GrenadeType): void {
+  // Map LoadoutWeapon enum to weapon type string
+  const weaponTypeMap: Record<LoadoutWeapon, 'rifle' | 'shotgun' | 'smg'> = {
+    [LoadoutWeapon.RIFLE]: 'rifle',
+    [LoadoutWeapon.SHOTGUN]: 'shotgun',
+    [LoadoutWeapon.SMG]: 'smg'
+  };
+  
+  const weaponType = weaponTypeMap[weapon];
+  
+  // Set primary weapon
+  sandbox.systemManager.firstPersonWeapon.setPrimaryWeapon(weaponType);
+  Logger.info('sandbox-init', `Primary weapon set to: ${weaponType}`);
+  
+  // Set grenade type
+  sandbox.systemManager.grenadeSystem.setGrenadeType(grenadeType);
+  Logger.info('sandbox-init', `Grenade type set to: ${grenadeType}`);
+}
+
+/**
+ * Apply default loadout (rifle + frag) for sandbox mode
+ */
+function applyDefaultLoadout(sandbox: PixelArtSandbox): void {
+  sandbox.systemManager.firstPersonWeapon.setPrimaryWeapon('rifle');
+  sandbox.systemManager.grenadeSystem.setGrenadeType(GrenadeType.FRAG);
+  Logger.info('sandbox-init', 'Default loadout applied (rifle + frag)');
 }
 
 /**
  * Main game start logic, pointer lock, shader compilation, and spawn positioning
  */
-export function startGame(sandbox: any): void {
+export function startGame(sandbox: PixelArtSandbox): void {
   if (!sandbox.gameStarted) return;
   if (sandbox.sandboxEnabled) {
     const controller = sandbox.systemManager.playerController as any;
@@ -129,7 +192,7 @@ export function startGame(sandbox: any): void {
 /**
  * Displays welcome message with controls in console
  */
-export function showWelcomeMessage(sandbox: any): void {
+export function showWelcomeMessage(sandbox: PixelArtSandbox): void {
   const debugInfo = sandbox.systemManager.globalBillboardSystem.getDebugInfo();
   const combatStats = sandbox.systemManager.combatantSystem.getCombatStats();
   Logger.info('sandbox-init', `

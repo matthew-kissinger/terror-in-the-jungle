@@ -2,7 +2,9 @@ import { WeaponRigManager } from './WeaponRigManager'
 import { WeaponInput } from './WeaponInput'
 import { WeaponAnimations } from './WeaponAnimations'
 import { WeaponAmmo } from './WeaponAmmo'
-import { AmmoManager } from '../../weapons/AmmoManager'
+import { AmmoManager, AmmoState } from '../../weapons/AmmoManager'
+import type { HUDSystem } from '../../../ui/hud/HUDSystem'
+import type { AudioManager } from '../../audio/AudioManager'
 
 /**
  * Handles weapon switching logic for rifle, shotgun, and SMG
@@ -13,8 +15,8 @@ export class WeaponSwitching {
   private input: WeaponInput
   private animations: WeaponAnimations
   private ammo: WeaponAmmo
-  private hudSystem?: any
-  private audioManager?: any
+  private hudSystem?: HUDSystem
+  private audioManager?: AudioManager
 
   // Weapon type to ammo manager mapping
   private readonly weaponAmmoMap: Record<'rifle' | 'shotgun' | 'smg' | 'pistol', () => AmmoManager> = {
@@ -36,11 +38,11 @@ export class WeaponSwitching {
     this.ammo = ammo
   }
 
-  setHUDSystem(hudSystem: any): void {
+  setHUDSystem(hudSystem: HUDSystem): void {
     this.hudSystem = hudSystem
   }
 
-  setAudioManager(audioManager: any): void {
+  setAudioManager(audioManager: AudioManager): void {
     this.audioManager = audioManager
   }
 
@@ -52,7 +54,7 @@ export class WeaponSwitching {
    */
   switchWeapon(
     weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol',
-    onAmmoChange: (state: any) => void
+    onAmmoChange: (state: AmmoState) => void
   ): boolean {
     const ammoManager = this.weaponAmmoMap[weaponType]()
     

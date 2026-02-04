@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { Logger } from '../utils/Logger';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
+import type { PixelArtSandbox } from './PixelArtSandbox';
 
 /**
  * Main game loop animation frame
  */
-export function animate(sandbox: any): void {
+export function animate(sandbox: PixelArtSandbox): void {
   requestAnimationFrame(() => animate(sandbox));
 
   if (!sandbox.isInitialized || !sandbox.gameStarted) return;
@@ -75,7 +76,7 @@ export function animate(sandbox: any): void {
 /**
  * Updates sandbox-level metrics
  */
-export function updateSandboxMetrics(sandbox: any, deltaTime: number): void {
+export function updateSandboxMetrics(sandbox: PixelArtSandbox, deltaTime: number): void {
   sandbox.sandboxMetrics.updateFrame(deltaTime);
 
   const combatSystem = sandbox.systemManager.combatantSystem;
@@ -93,7 +94,7 @@ export function updateSandboxMetrics(sandbox: any, deltaTime: number): void {
 /**
  * Updates the real-time performance overlay data
  */
-export function updatePerformanceOverlay(sandbox: any, deltaTime: number): void {
+export function updatePerformanceOverlay(sandbox: PixelArtSandbox, deltaTime: number): void {
   if (!sandbox.performanceOverlay.isVisible()) return;
 
   const perfStats = sandbox.sandboxRenderer.getPerformanceStats();
@@ -166,7 +167,7 @@ export function updatePerformanceOverlay(sandbox: any, deltaTime: number): void 
 /**
  * Updates the log overlay with recent log entries
  */
-export function updateLogOverlay(sandbox: any): void {
+export function updateLogOverlay(sandbox: PixelArtSandbox): void {
   if (!sandbox.logOverlay.isVisible()) return;
 
   const recent = Logger.getRecent(12);
@@ -176,7 +177,7 @@ export function updateLogOverlay(sandbox: any): void {
 /**
  * Updates the time indicator overlay
  */
-export function updateTimeIndicator(sandbox: any): void {
+export function updateTimeIndicator(sandbox: PixelArtSandbox): void {
   if (!sandbox.timeIndicator.isVisible()) return;
 
   const dayNightCycle = sandbox.systemManager.dayNightCycle;

@@ -1,6 +1,7 @@
 import { Logger } from '../utils/Logger';
+import type { PixelArtSandbox } from './PixelArtSandbox';
 
-let sandboxRef: any | null = null;
+let sandboxRef: PixelArtSandbox | null = null;
 let listenersAttached = false;
 
 function handleResize(): void {
@@ -40,7 +41,7 @@ function handleKeyDown(event: KeyboardEvent): void {
 /**
  * Sets up key event listeners for the sandbox
  */
-export function setupEventListeners(sandbox: any): void {
+export function setupEventListeners(sandbox: PixelArtSandbox): void {
   sandboxRef = sandbox;
   if (listenersAttached) return;
 
@@ -61,7 +62,7 @@ export function disposeEventListeners(): void {
 /**
  * Toggles console performance statistics (F1)
  */
-export function togglePerformanceStats(sandbox: any): void {
+export function togglePerformanceStats(sandbox: PixelArtSandbox): void {
   if (!sandbox.gameStarted) return;
 
   const debugInfo = sandbox.systemManager.globalBillboardSystem.getDebugInfo();
@@ -107,7 +108,7 @@ export function togglePerformanceStats(sandbox: any): void {
 /**
  * Toggles the real-time performance overlay (F2)
  */
-export function toggleRealtimeStatsOverlay(sandbox: any): void {
+export function toggleRealtimeStatsOverlay(sandbox: PixelArtSandbox): void {
   if (!sandbox.gameStarted) return;
   sandbox.performanceOverlay.toggle();
 }
@@ -115,7 +116,7 @@ export function toggleRealtimeStatsOverlay(sandbox: any): void {
 /**
  * Toggles post-processing effects (P)
  */
-export function togglePostProcessing(sandbox: any): void {
+export function togglePostProcessing(sandbox: PixelArtSandbox): void {
   if (!sandbox.gameStarted || !sandbox.sandboxRenderer.postProcessing) return;
 
   const enabled = !sandbox.sandboxRenderer.postProcessing.isEnabled();
@@ -126,21 +127,21 @@ export function togglePostProcessing(sandbox: any): void {
 /**
  * Toggles the log overlay (F3)
  */
-export function toggleLogOverlay(sandbox: any): void {
+export function toggleLogOverlay(sandbox: PixelArtSandbox): void {
   sandbox.logOverlay.toggle();
 }
 
 /**
  * Toggles the time indicator overlay (F4)
  */
-export function toggleTimeIndicator(sandbox: any): void {
+export function toggleTimeIndicator(sandbox: PixelArtSandbox): void {
   sandbox.timeIndicator.toggle();
 }
 
 /**
  * Adjusts the pixel size for the pixelation effect ([ and ])
  */
-export function adjustPixelSize(sandbox: any, delta: number): void {
+export function adjustPixelSize(sandbox: PixelArtSandbox, delta: number): void {
   if (!sandbox.gameStarted || !sandbox.sandboxRenderer.postProcessing) return;
 
   sandbox.currentPixelSize = Math.max(1, Math.min(8, sandbox.currentPixelSize + delta));

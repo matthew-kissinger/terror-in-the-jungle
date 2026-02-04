@@ -7,6 +7,9 @@ import { PlayerHealthUI } from './PlayerHealthUI';
 import { PlayerHealthEffects } from './PlayerHealthEffects';
 import { PlayerRespawnManager } from './PlayerRespawnManager';
 import { Logger } from '../../utils/Logger';
+import type { PlayerController } from './PlayerController';
+import type { HUDSystem } from '../../ui/hud/HUDSystem';
+import type { FirstPersonWeapon } from './FirstPersonWeapon';
 
 const _cameraDir = new THREE.Vector3();
 
@@ -43,8 +46,8 @@ export class PlayerHealthSystem implements GameSystem {
   // Camera reference for damage indicators
   private camera?: THREE.Camera;
   private ticketSystem?: TicketSystem;
-  private hudSystem?: any;
-  private playerController?: any;
+  private hudSystem?: HUDSystem;
+  private playerController?: PlayerController;
 
   constructor() {
     this.ui = new PlayerHealthUI();
@@ -245,14 +248,14 @@ export class PlayerHealthSystem implements GameSystem {
     this.ticketSystem = system;
   }
 
-  setPlayerController(playerController: any): void {
+  setPlayerController(playerController: PlayerController): void {
     this.playerController = playerController;
     if (this.respawnManager) {
       this.respawnManager.setPlayerController(playerController);
     }
   }
 
-  setFirstPersonWeapon(weapon: any): void {
+  setFirstPersonWeapon(weapon: FirstPersonWeapon): void {
     if (this.respawnManager) {
       this.respawnManager.setFirstPersonWeapon(weapon);
     }
@@ -267,7 +270,7 @@ export class PlayerHealthSystem implements GameSystem {
     this.camera = camera;
   }
 
-  setHUDSystem(hudSystem: any): void {
+  setHUDSystem(hudSystem: HUDSystem): void {
     this.hudSystem = hudSystem;
   }
 

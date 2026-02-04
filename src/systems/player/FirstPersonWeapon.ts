@@ -21,6 +21,8 @@ import { WeaponSwitching } from './weapon/WeaponSwitching'
 import { ShotCommand, ShotCommandFactory } from './weapon/ShotCommand'
 import { WeaponShotCommandBuilder } from './weapon/WeaponShotCommandBuilder'
 import { Logger } from '../../utils/Logger'
+import type { HUDSystem } from '../../ui/hud/HUDSystem'
+import { AmmoState } from '../weapons/AmmoManager'
 
 /**
  * Thin orchestrator for first-person weapon system
@@ -51,7 +53,7 @@ export class FirstPersonWeapon implements GameSystem {
 
   // Dependencies
   private combatantSystem?: CombatantSystem
-  private hudSystem?: any
+  private hudSystem?: HUDSystem
   private audioManager?: AudioManager
   private zoneManager?: ZoneManager
   private inventoryManager?: InventoryManager
@@ -268,7 +270,7 @@ export class FirstPersonWeapon implements GameSystem {
     this.animations.applyRecoilImpulse(recoilMultiplier)
   }
 
-  setHUDSystem(hudSystem: any): void {
+  setHUDSystem(hudSystem: HUDSystem): void {
     this.hudSystem = hudSystem
     this.firing.setHUDSystem(hudSystem)
     this.switching.setHUDSystem(hudSystem)
@@ -320,6 +322,14 @@ export class FirstPersonWeapon implements GameSystem {
     this.input.setGameStarted(started)
   }
 
+  /**
+   * Set the primary weapon (rifle, shotgun, or SMG)
+   * Used for loadout selection at game start
+   */
+  setPrimaryWeapon(weaponType: 'rifle' | 'shotgun' | 'smg'): void {
+    this.switching.switchWeapon(weaponType, (state) => this.onAmmoChange(state))
+  }
+
   private startReload(): void {
     // Can't reload while ADS
     if (this.animations.getADS()) {
@@ -337,7 +347,7 @@ export class FirstPersonWeapon implements GameSystem {
     // Reload animation will finish independently
   }
 
-  private onAmmoChange(state: any): void {
+  private onAmmoChange(state: AmmoState): void {
     // Update HUD if available
     if (this.hudSystem) {
       this.hudSystem.updateAmmoDisplay(state.currentMagazine, state.reserveAmmo)
@@ -349,7 +359,7 @@ export class FirstPersonWeapon implements GameSystem {
     }
   }
 
-  getAmmoState(): any {
+  getAmmoState(): AmmoState {
     return this.ammo.getAmmoState()
   }
 

@@ -10,14 +10,16 @@ import { HUDElements } from './HUDElements';
 import { HUDUpdater } from './HUDUpdater';
 import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
 import { MatchEndScreen, MatchStats } from '../end/MatchEndScreen';
+import type { GrenadeSystem } from '../../systems/weapons/GrenadeSystem';
+import type { PlayerHealthSystem } from '../../systems/player/PlayerHealthSystem';
 
 export class HUDSystem implements GameSystem {
   private combatantSystem?: CombatantSystem;
   private zoneManager?: ZoneManager;
   private ticketSystem?: TicketSystem;
-  private playerHealthSystem?: any;
-  private grenadeSystem?: any;
-  private camera?: any;
+  private playerHealthSystem?: PlayerHealthSystem;
+  private grenadeSystem?: GrenadeSystem;
+  private camera?: THREE.Camera;
 
   private styles: HUDStyles;
   private elements: HUDElements;
@@ -25,7 +27,7 @@ export class HUDSystem implements GameSystem {
   private statsTracker: PlayerStatsTracker;
   private matchEndScreen: MatchEndScreen;
 
-  constructor(camera?: any, ticketSystem?: any, playerHealthSystem?: any, playerRespawnManager?: any) {
+  constructor(camera?: THREE.Camera, ticketSystem?: TicketSystem, playerHealthSystem?: PlayerHealthSystem, playerRespawnManager?: unknown) {
     this.camera = camera;
     this.styles = HUDStyles.getInstance();
     this.elements = new HUDElements(camera);
@@ -231,7 +233,7 @@ export class HUDSystem implements GameSystem {
     });
   }
 
-  setGrenadeSystem(system: any): void {
+  setGrenadeSystem(system: GrenadeSystem): void {
     this.grenadeSystem = system;
   }
 

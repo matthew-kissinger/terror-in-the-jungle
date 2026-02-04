@@ -34,6 +34,7 @@ import { WeatherSystem } from '../systems/environment/WeatherSystem';
 import { DayNightCycle } from '../systems/environment/DayNightCycle';
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { VoiceCalloutSystem } from '../systems/audio/VoiceCalloutSystem';
+import { LoadoutSelector } from '../ui/loadout/LoadoutSelector';
 import { objectPool } from '../utils/ObjectPoolManager';
 
 export interface SystemReferences {
@@ -70,6 +71,7 @@ export interface SystemReferences {
   ammoSupplySystem: AmmoSupplySystem;
   footstepAudioSystem: FootstepAudioSystem;
   voiceCalloutSystem: VoiceCalloutSystem;
+  loadoutSelector: LoadoutSelector;
 }
 
 export interface InitializationResult {
@@ -149,6 +151,7 @@ export class SystemInitializer {
     refs.ammoSupplySystem = new AmmoSupplySystem(scene, camera);
     refs.footstepAudioSystem = new FootstepAudioSystem(refs.audioManager.getListener());
     refs.voiceCalloutSystem = new VoiceCalloutSystem(scene, refs.audioManager.getListener());
+    refs.loadoutSelector = new LoadoutSelector();
 
     // Initialize influence map system based on game mode world size
     const worldSize = 4000; // Default, will be updated when game mode is set
@@ -189,7 +192,8 @@ export class SystemInitializer {
       refs.playerSuppressionSystem,
       refs.influenceMapSystem,
       refs.ammoSupplySystem,
-      refs.voiceCalloutSystem
+      refs.voiceCalloutSystem,
+      refs.loadoutSelector
     ];
 
     onProgress('world', 0.5);
