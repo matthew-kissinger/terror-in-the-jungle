@@ -185,7 +185,7 @@ Possible areas (confirm with profiling):
 
 **Fixed** (stored bound refs, added dispose):
 - PlayerInput, WeaponInput, WeaponModel, InventoryManager, PlayerSquadController, WeaponPickupSystem - bound function properties
-- MatchEndScreen, GameModeSelection, LoadingPanels - added dispose()
+- MatchEndScreen, LoadingPanels - added dispose()
 - OpenFrontierRespawnMap, RespawnMapView - added dispose()
 - WeaponInput.ts contextmenu listener - stored bound ref, removed in dispose()
 - SquadRadialMenu.ts mouseenter listeners - stored handlers, removed in dispose()
@@ -197,7 +197,7 @@ Possible areas (confirm with profiling):
 ### Known Tech Debt
 
 - **96 `any` type annotations** across 35 files (heaviest: SystemInterfaces.ts with 19 - intentional). Reduced from 135 via targeted refactoring in player and core modules.
-- **Logger emoji removal COMPLETE** - All Logger calls cleaned. Remaining ~35 emoji characters across 8 UI files (KillFeed, LoadingPanels, GameModeSelection, etc.) are intentional UI icons, not Logger calls.
+- **Logger emoji removal COMPLETE** - All Logger calls cleaned. Remaining ~35 emoji characters across 8 UI files (KillFeed, LoadingPanels, etc.) are intentional UI icons, not Logger calls.
 - **NPC-to-NPC assists not tracked** - Scoreboard shows NPC assists as 0. Player assists tracked via KillAssistTracker, but per-NPC assist display would need additional wiring.
 - **No unit/integration tests** - No test framework installed (Vitest, Jest, etc.). No *.test.ts or *.spec.ts files.
 
