@@ -5,6 +5,7 @@ import { AudioPoolManager } from './AudioPoolManager';
 import { AudioDuckingSystem } from './AudioDuckingSystem';
 import { AmbientSoundManager } from './AmbientSoundManager';
 import { AudioWeaponSounds } from './AudioWeaponSounds';
+import { Logger } from '../../utils/Logger';
 
 export class AudioManager implements GameSystem {
     private scene: THREE.Scene;
@@ -48,7 +49,7 @@ export class AudioManager implements GameSystem {
         const resumeAudio = () => {
             if (this.listener.context.state === 'suspended') {
                 this.listener.context.resume().then(() => {
-                    console.log('[AudioManager] AudioContext resumed');
+                    Logger.info('Audio', 'AudioContext resumed');
                 });
             }
             // Remove listeners after first interaction
@@ -62,7 +63,7 @@ export class AudioManager implements GameSystem {
     }
 
     async init(): Promise<void> {
-        console.log('[AudioManager] Initializing audio system...');
+        Logger.info('Audio', 'Initializing audio system...');
 
         // Load all audio buffers
         await this.loadAllAudio();
@@ -70,7 +71,7 @@ export class AudioManager implements GameSystem {
         // Initialize sound pools
         this.poolManager.initializePools();
 
-        console.log('[AudioManager] Audio system initialized');
+        Logger.info('Audio', 'Audio system initialized');
     }
 
     // Call this when the game actually starts
@@ -94,14 +95,14 @@ export class AudioManager implements GameSystem {
                 path,
                 (buffer) => {
                     this.audioBuffers.set(key, buffer);
-                    console.log(`[AudioManager] Loaded: ${key}`);
+                    Logger.debug('Audio', `Loaded: ${key}`);
                     resolve();
                 },
                 (progress) => {
                     // Progress callback
                 },
                 (error) => {
-                    console.error(`[AudioManager] Failed to load ${key}:`, error);
+                    Logger.error('Audio', `Failed to load ${key}:`, error);
                     reject(error);
                 }
             );
@@ -181,7 +182,7 @@ export class AudioManager implements GameSystem {
     play(soundName: string, position?: THREE.Vector3, volume: number = 1.0): void {
         const buffer = this.audioBuffers.get(soundName);
         if (!buffer) {
-            console.warn(`[AudioManager] Sound not found: ${soundName}`);
+            Logger.warn('Audio', `Sound not found: ${soundName}`);
             return;
         }
 
@@ -267,6 +268,6 @@ export class AudioManager implements GameSystem {
         // Clear buffers
         this.audioBuffers.clear();
 
-        console.log('[AudioManager] Disposed');
+        Logger.info('Audio', 'Disposed');
     }
 }

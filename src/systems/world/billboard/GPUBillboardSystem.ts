@@ -138,7 +138,7 @@ export class GPUBillboardSystem {
 
     this.chunkInstances.delete(chunkKey);
     this.chunkBounds.delete(chunkKey);
-    console.log(`🗑️ GPU: Removed ${totalRemoved} vegetation instances for chunk ${chunkKey}`);
+    Logger.debug('vegetation', `GPU: Removed ${totalRemoved} vegetation instances for chunk ${chunkKey}`);
   }
 
   // Update all vegetation (called every frame)

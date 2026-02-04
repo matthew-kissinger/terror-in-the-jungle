@@ -180,7 +180,7 @@ export class CombatantSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('🎖️ Initializing Combatant System (US vs OPFOR)...');
+    Logger.info('Combat', 'Initializing Combatant System (US vs OPFOR)...');
 
     // Create billboard meshes for each faction and state
     await this.combatantRenderer.createFactionBillboards();
@@ -199,8 +199,8 @@ export class CombatantSystem implements GameSystem {
       (window as any).combatProfile = () => this.getCombatProfile();
     }
 
-    console.log('✅ Combatant System initialized');
-    console.log('💡 Use window.combatProfile() in console to see combat performance breakdown');
+    Logger.info('Combat', 'Combatant System initialized');
+    Logger.info('Combat', 'Use window.combatProfile() in console to see combat performance breakdown');
   }
 
   /**

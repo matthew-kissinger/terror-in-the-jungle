@@ -3,6 +3,7 @@ import { Combatant, CombatantState, Faction } from './types';
 import { SquadManager } from './SquadManager';
 import { TicketSystem } from '../world/TicketSystem';
 import { CombatantSpawnManager } from './CombatantSpawnManager';
+import { Logger } from '../../utils/Logger';
 
 // Module-level scratch vector to avoid per-call allocations
 const _deathDir = new THREE.Vector3();
@@ -76,7 +77,7 @@ export class CombatantSystemDamage {
           if (combatant.squadId) {
             const squad = this.squadManager.getSquad(combatant.squadId);
             if (squad?.isPlayerControlled) {
-              console.log(`⏳ Player squad member ${combatant.id} will respawn in 5 seconds...`);
+              Logger.info('Combat', `Player squad member ${combatant.id} will respawn in 5 seconds...`);
               this.spawnManager.queueRespawn(combatant.squadId, combatant.id);
             }
             this.squadManager.removeSquadMember(combatant.squadId, combatant.id);
@@ -87,10 +88,10 @@ export class CombatantSystemDamage {
             killedCombatants.push(combatant);
           }
 
-          console.log(`💥 ${combatant.faction} soldier killed by explosion (${damage.toFixed(0)} damage)`);
+          Logger.info('Combat', `${combatant.faction} soldier killed by explosion (${damage.toFixed(0)} damage)`);
         } else {
           combatant.lastHitTime = Date.now();
-          console.log(`💥 ${combatant.faction} soldier hit by explosion (${damage.toFixed(0)} damage, ${combatant.health.toFixed(0)} HP left)`);
+          Logger.debug('Combat', `${combatant.faction} soldier hit by explosion (${damage.toFixed(0)} damage, ${combatant.health.toFixed(0)} HP left)`);
         }
 
         hitCount++;
@@ -113,7 +114,7 @@ export class CombatantSystemDamage {
     }
 
     if (hitCount > 0) {
-      console.log(`💥 Explosion hit ${hitCount} combatants`);
+      Logger.debug('Combat', `Explosion hit ${hitCount} combatants`);
     }
   }
 }

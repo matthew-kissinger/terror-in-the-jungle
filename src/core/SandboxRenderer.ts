@@ -3,6 +3,7 @@ import { PixelPerfectUtils } from '../utils/PixelPerfect';
 import { PostProcessingManager } from '../systems/effects/PostProcessingManager';
 import { SandboxCrosshairUI } from './SandboxCrosshairUI';
 import { SandboxLoadingUI } from './SandboxLoadingUI';
+import { Logger } from '../utils/Logger';
 
 export class SandboxRenderer {
   public renderer: THREE.WebGLRenderer;
@@ -101,7 +102,7 @@ export class SandboxRenderer {
     );
     this.scene.add(this.jungleLight);
 
-    console.log('Jungle atmosphere initialized');
+    Logger.info('Renderer', 'Jungle atmosphere initialized');
   }
 
   private setupPostProcessing(): void {
@@ -176,7 +177,7 @@ export class SandboxRenderer {
    * Call this after all systems are initialized but before gameplay starts.
    */
   precompileShaders(): void {
-    console.log('🔧 Pre-compiling shaders...');
+    Logger.info('Renderer', 'Pre-compiling shaders...');
     const startTime = performance.now();
 
     // Force shader compilation for all materials in the scene
@@ -186,7 +187,7 @@ export class SandboxRenderer {
     this.renderer.render(this.scene, this.camera);
 
     const elapsed = performance.now() - startTime;
-    console.log(`✅ Shader pre-compilation complete (${elapsed.toFixed(1)}ms)`);
+    Logger.info('Renderer', `Shader pre-compilation complete (${elapsed.toFixed(1)}ms)`);
   }
 
   dispose(): void {

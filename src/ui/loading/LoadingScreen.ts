@@ -367,7 +367,6 @@ export class LoadingScreen {
     manager.onStart = (url, loaded, total) => {
       itemsLoaded = loaded;
       itemsTotal = total;
-      console.log(`Loading started: ${loaded}/${total} items`);
     };
 
     manager.onProgress = (url, loaded, total) => {
@@ -381,16 +380,12 @@ export class LoadingScreen {
       } else if (url.includes('.wav') || url.includes('.ogg')) {
         this.updateProgress('audio', loaded / total);
       }
-
-      console.log(`Loading: ${url} (${loaded}/${total})`);
     };
 
     manager.onLoad = () => {
-      console.log('All items loaded!');
     };
 
     manager.onError = (url) => {
-      console.error(`Error loading: ${url}`);
     };
 
     return manager;

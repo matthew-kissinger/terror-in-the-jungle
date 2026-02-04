@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import { ChunkWorkerLifecycle, WorkerState, ChunkRequest, WorkerMessageData } from './ChunkWorkerLifecycle';
 import { ChunkTaskQueue } from './ChunkTaskQueue';
 import { ChunkWorkerTelemetry } from './ChunkWorkerTelemetry';
+import { Logger } from '../../utils/Logger';
 
 export interface VegetationPosition {
   x: number;
@@ -71,7 +72,7 @@ export class ChunkWorkerPool {
         onWorkerReady: () => {
           this.telemetry.recordWorkerReady();
           const workers = this.lifecycle.getWorkers();
-          console.log(`[ChunkWorkerPool] Worker ready (${this.telemetry.getTelemetry().workersReady}/${workers.length})`);
+          Logger.debug('Terrain', `Worker ready (${this.telemetry.getTelemetry().workersReady}/${workers.length})`);
           this.processQueue();
         },
         onWorkerResult: (state: WorkerState, data: WorkerMessageData) => {
@@ -133,7 +134,7 @@ export class ChunkWorkerPool {
    * Handle worker error
    */
   private handleWorkerError(state: WorkerState, error: ErrorEvent): void {
-    console.error('[ChunkWorkerPool] Worker error:', error);
+    Logger.error('Terrain', 'Worker error:', error);
 
     if (state.currentRequest) {
       state.currentRequest.reject(new Error(error.message));
@@ -267,6 +268,6 @@ export class ChunkWorkerPool {
     this.pendingRequests.clear();
     this.lifecycle.dispose();
 
-    console.log('[ChunkWorkerPool] Disposed');
+    Logger.info('Terrain', 'Disposed');
   }
 }

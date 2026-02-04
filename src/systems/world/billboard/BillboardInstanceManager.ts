@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { BillboardInstance } from '../../../types';
 import { VegetationMeshes } from './BillboardVegetationTypes';
+import { Logger } from '../../../utils/Logger';
 
 export interface ChunkInstances {
   start: number;
@@ -90,7 +91,7 @@ export class BillboardInstanceManager {
     const counts = instanceSets
       .map(([type, inst]) => `${inst?.length || 0} ${type}`)
       .join(', ');
-    console.log(`📍 Added instances for chunk ${chunkKey}: ${counts}`);
+    Logger.debug('vegetation', `Added instances for chunk ${chunkKey}: ${counts}`);
   }
 
   removeChunkInstances(chunkKey: string): void {
@@ -111,7 +112,7 @@ export class BillboardInstanceManager {
       }
     }
 
-    console.log(`🗑️ Removed instances for chunk ${chunkKey}`);
+    Logger.debug('vegetation', `Removed instances for chunk ${chunkKey}`);
   }
 
   private allocateInstances(
@@ -247,7 +248,7 @@ export class BillboardInstanceManager {
     const freeSlots = this.freeSlots.get(type)!;
     if (freeSlots.length === 0) return;
 
-    console.log(`🔧 Compacting ${type}: ${freeSlots.length} free slots`);
+    Logger.info('vegetation', `Compacting ${type}: ${freeSlots.length} free slots`);
 
     // Reset allocation to 0 and clear free slots
     // This forces new allocations to start from the beginning

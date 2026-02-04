@@ -13,6 +13,7 @@ import { SandbagSystem } from '../weapons/SandbagSystem';
 import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem';
+import { Logger } from '../../utils/Logger';
 // Extracted modules
 import { CombatantBallistics } from './CombatantBallistics';
 import { CombatantDamage } from './CombatantDamage';
@@ -195,7 +196,7 @@ export class CombatantCombat {
         );
 
         if (playerHit.headshot || damage > 30) {
-          console.log(`⚠️ Player hit by ${combatant.faction} for ${damage} damage!${playerHit.headshot ? ' (HEADSHOT!)' : ''}`);
+          Logger.debug('Combat', `Player hit by ${combatant.faction} for ${damage} damage!${playerHit.headshot ? ' (HEADSHOT!)' : ''}`);
         }
 
         if (this.playerHealthSystem) {
@@ -205,7 +206,7 @@ export class CombatantCombat {
             playerPosition
           );
           if (playerDied) {
-            console.log(`💀 Player eliminated by ${combatant.faction}!`);
+            Logger.info('Combat', `Player eliminated by ${combatant.faction}!`);
           }
         }
 

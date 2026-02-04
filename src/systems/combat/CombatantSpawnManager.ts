@@ -92,7 +92,7 @@ export class CombatantSpawnManager {
    * Spawn initial forces for both factions
    */
   spawnInitialForces(shouldCreatePlayerSquad: boolean, playerSquadId?: string): string | undefined {
-    console.log('🎖️ Deploying initial forces across HQs...');
+    Logger.info('Combat', 'Deploying initial forces across HQs...');
 
     const config = this.gameModeManager?.getCurrentConfig();
     const avgSquadSize = SpawnPositionCalculator.getAverageSquadSize(this.squadSizeMin, this.squadSizeMax);
@@ -108,7 +108,7 @@ export class CombatantSpawnManager {
 
     // Create player squad first if requested
     if (shouldCreatePlayerSquad) {
-      console.log('🎖️ Creating player squad...');
+      Logger.info('Combat', 'Creating player squad...');
       const playerSpawnPos = _scratchVec.copy(usBasePos).add(_offsetVec.set(0, 0, -15));
       const { squad, members } = this.squadManager.createSquad(Faction.US, playerSpawnPos, 6);
       createdPlayerSquadId = squad.id;
@@ -121,7 +121,7 @@ export class CombatantSpawnManager {
         this.combatants.set(combatant.id, combatant);
       });
 
-      console.log(`✅ Player squad created: ${squad.id} with ${squad.members.length} members at player spawn`);
+      Logger.info('Combat', `Player squad created: ${squad.id} with ${squad.members.length} members at player spawn`);
 
       // Reduce US squads by 1 since we already spawned the player squad
       initialSquadsPerFaction = Math.max(0, initialSquadsPerFaction - 1);
@@ -149,11 +149,11 @@ export class CombatantSpawnManager {
       { faction: Faction.OPFOR, position: new THREE.Vector3(opforBasePos.x - 10, opforBasePos.y, opforBasePos.z - 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) }
     ];
 
-    console.log(`🎖️ Initial forces deployed: ${this.combatants.size} combatants`);
+    Logger.info('Combat', `Initial forces deployed: ${this.combatants.size} combatants`);
 
     // Log initial octree stats
     const octreeStats = this.spatialGrid.getStats();
-    Logger.info('combat', `Octree initialized: ${octreeStats.totalNodes} nodes, ${octreeStats.totalEntities} entities, max depth ${octreeStats.maxDepth}`);
+    Logger.info('Combat', `Octree initialized: ${octreeStats.totalNodes} nodes, ${octreeStats.totalEntities} entities, max depth ${octreeStats.maxDepth}`);
 
     return createdPlayerSquadId;
   }
@@ -162,7 +162,7 @@ export class CombatantSpawnManager {
    * Reseed forces when switching game modes
    */
   reseedForcesForMode(): void {
-    console.log('🔁 Reseeding forces for new game mode configuration...');
+    Logger.info('Combat', 'Reseed forces for new game mode configuration...');
     this.combatants.clear();
     this.spatialGrid.clear();
     this.progressiveSpawnQueue = [];
@@ -244,7 +244,7 @@ export class CombatantSpawnManager {
       // Emergency refill: spawn more aggressively
       if (isEmergencyRefill) {
         squadsToSpawn = Math.min(3, Math.ceil(missing / Math.max(1, avgSquadSize)));
-        console.log(`🚨 Emergency refill for ${faction}: ${living}/${targetPerFaction} remaining`);
+        Logger.info('Combat', `Emergency refill for ${faction}: ${living}/${targetPerFaction} remaining`);
       }
 
       for (let i = 0; i < squadsToSpawn; i++) {
@@ -257,7 +257,7 @@ export class CombatantSpawnManager {
           pos = SpawnPositionCalculator.getSpawnPosition(faction, this.zoneManager, this.gameModeManager?.getCurrentConfig());
         }
         this.spawnSquad(faction, pos, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
-        console.log(`🎖️ Refill spawn: ${faction} squad of ${this.randomSquadSize()} deployed (${living + (i+1)*avgSquadSize}/${targetPerFaction})`);
+        Logger.debug('Combat', `Refill spawn: ${faction} squad of ${this.randomSquadSize()} deployed (${living + (i+1)*avgSquadSize}/${targetPerFaction})`);
       }
     };
 

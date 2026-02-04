@@ -5,6 +5,7 @@ import { GPUBillboardSystem } from './GPUBillboardSystem';
 import { BillboardVegetationTypes } from './BillboardVegetationTypes';
 import { BillboardInstanceManager } from './BillboardInstanceManager';
 import { BillboardRenderer } from './BillboardRenderer';
+import { Logger } from '../../../utils/Logger';
 
 export class GlobalBillboardSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -41,13 +42,13 @@ export class GlobalBillboardSystem implements GameSystem {
     if (this.useGPUForVegetation) {
       // Use GPU for vegetation (high performance)
       await this.gpuVegetationSystem.initialize();
-      console.log('✅ Using GPU billboard system for vegetation');
+      Logger.info('World', 'Using GPU billboard system for vegetation');
     } else {
       // Fallback to CPU system if needed
       const meshes = await this.vegetationTypes.initializeAll();
       this.instanceManager = new BillboardInstanceManager(meshes);
       this.renderer = new BillboardRenderer(this.camera, meshes, this.instanceManager);
-      console.log('✅ Using CPU billboard system');
+      Logger.info('World', 'Using CPU billboard system');
     }
   }
 
@@ -65,7 +66,7 @@ export class GlobalBillboardSystem implements GameSystem {
     } else if (this.vegetationTypes) {
       this.vegetationTypes.dispose();
     }
-    console.log('🧹 Global Billboard System disposed');
+    Logger.info('World', 'Global Billboard System disposed');
   }
 
   /**
@@ -111,7 +112,7 @@ export class GlobalBillboardSystem implements GameSystem {
       }
 
       if (totalAdded > 0) {
-        console.log(`🌿 GPU: Added ${totalAdded} vegetation instances for chunk ${chunkKey}`);
+        Logger.debug('World', `GPU: Added ${totalAdded} vegetation instances for chunk ${chunkKey}`);
       }
     } else if (this.instanceManager) {
       // Filter vegetation for CPU system too
@@ -144,7 +145,7 @@ export class GlobalBillboardSystem implements GameSystem {
    */
   addExclusionZone(x: number, z: number, radius: number): void {
     this.exclusionZones.push({ x, z, radius });
-    console.log(`🚁 Added vegetation exclusion zone at (${x}, ${z}) with radius ${radius}`);
+    Logger.info('World', `Added vegetation exclusion zone at (${x}, ${z}) with radius ${radius}`);
 
     // Clear existing vegetation in this area by regenerating affected chunks
     this.clearVegetationInArea(x, z, radius);
@@ -155,7 +156,7 @@ export class GlobalBillboardSystem implements GameSystem {
    */
   private clearVegetationInArea(x: number, z: number, radius: number): void {
     if (this.useGPUForVegetation) {
-      console.log(`🚁 Clearing existing vegetation in ${radius}m radius around (${x}, ${z})`);
+      Logger.info('World', `Clearing existing vegetation in ${radius}m radius around (${x}, ${z})`);
       this.gpuVegetationSystem.clearInstancesInArea(x, z, radius);
     }
   }

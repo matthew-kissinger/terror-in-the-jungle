@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
+import { Logger } from '../../utils/Logger';
 
 export interface NearMissEvent {
   direction: THREE.Vector3; // Direction from player to bullet
@@ -39,11 +40,11 @@ export class PlayerSuppressionSystem implements GameSystem {
   private playerController?: any;
 
   async init(): Promise<void> {
-    console.log('🎯 Initializing Player Suppression System...');
+    Logger.info('Combat', 'Initializing Player Suppression System...');
     this.createVignetteOverlay();
     this.createDirectionalOverlay();
     this.createDesaturationOverlay();
-    console.log('✅ Player Suppression System initialized');
+    Logger.info('Combat', 'Player Suppression System initialized');
   }
 
   update(deltaTime: number): void {
@@ -83,7 +84,7 @@ export class PlayerSuppressionSystem implements GameSystem {
     if (this.desaturationElement) {
       this.desaturationElement.remove();
     }
-    console.log('🧹 Player Suppression System disposed');
+    Logger.info('Combat', 'Player Suppression System disposed');
   }
 
   /**
@@ -136,7 +137,7 @@ export class PlayerSuppressionSystem implements GameSystem {
       this.cameraShakeSystem.shake(shakeIntensity, 0.2, 25);
     }
 
-    console.log(`🔥 Near miss! Distance: ${distance.toFixed(1)}m, Suppression: ${(this.suppressionState.level * 100).toFixed(0)}%`);
+    Logger.debug('Combat', `Near miss! Distance: ${distance.toFixed(1)}m, Suppression: ${(this.suppressionState.level * 100).toFixed(0)}%`);
   }
 
   /**

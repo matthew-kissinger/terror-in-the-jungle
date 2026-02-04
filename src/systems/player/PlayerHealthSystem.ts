@@ -6,6 +6,7 @@ import { TicketSystem } from '../world/TicketSystem';
 import { PlayerHealthUI } from './PlayerHealthUI';
 import { PlayerHealthEffects } from './PlayerHealthEffects';
 import { PlayerRespawnManager } from './PlayerRespawnManager';
+import { Logger } from '../../utils/Logger';
 
 export interface PlayerState {
   health: number;
@@ -70,13 +71,13 @@ export class PlayerHealthSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('❤️ Initializing Player Health System...');
+    Logger.info('Combat', 'Initializing Player Health System...');
 
     this.ui.init();
     this.effects.init();
     this.updateHealthDisplay();
 
-    console.log('✅ Player Health System initialized');
+    Logger.info('Combat', 'Player Health System initialized');
   }
 
   update(deltaTime: number): void {
@@ -90,7 +91,7 @@ export class PlayerHealthSystem implements GameSystem {
       this.playerState.invulnerabilityTime -= deltaTime;
       if (this.playerState.invulnerabilityTime <= 0) {
         this.ui.setSpawnProtection(false);
-        console.log('🛡️ Spawn protection ended');
+        Logger.debug('Combat', 'Spawn protection ended');
       }
     }
 
@@ -139,7 +140,7 @@ export class PlayerHealthSystem implements GameSystem {
     this.playerState.health = Math.max(0, this.playerState.health - amount);
     this.lastDamageTime = Date.now();
 
-    console.log(`💥 Player took ${amount} damage, health: ${Math.round(this.playerState.health)}`);
+    Logger.debug('Combat', `Player took ${amount} damage, health: ${Math.round(this.playerState.health)}`);
 
     // Add damage effects with camera direction
     let cameraDirection: THREE.Vector3 | undefined;
@@ -169,7 +170,7 @@ export class PlayerHealthSystem implements GameSystem {
     if (durationSeconds <= 0) return;
     this.playerState.invulnerabilityTime = durationSeconds;
     this.ui.setSpawnProtection(true);
-    console.log(`🛡️ Spawn protection applied for ${durationSeconds}s`);
+    Logger.info('Combat', `Spawn protection applied for ${durationSeconds}s`);
   }
 
   private onPlayerDeath(): void {
@@ -192,7 +193,7 @@ export class PlayerHealthSystem implements GameSystem {
   voluntaryRespawn(): void {
     if (this.playerState.isDead) return;
 
-    console.log('🔄 Player initiated voluntary respawn');
+    Logger.info('Combat', 'Player initiated voluntary respawn');
 
     // Kill the player by setting health to 0
     this.playerState.health = 0;
@@ -271,6 +272,6 @@ export class PlayerHealthSystem implements GameSystem {
   dispose(): void {
     this.ui.dispose();
     this.effects.dispose();
-    console.log('🧹 Player Health System disposed');
+    Logger.info('Combat', 'Player Health System disposed');
   }
 }
