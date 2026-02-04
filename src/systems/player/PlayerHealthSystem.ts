@@ -8,6 +8,8 @@ import { PlayerHealthEffects } from './PlayerHealthEffects';
 import { PlayerRespawnManager } from './PlayerRespawnManager';
 import { Logger } from '../../utils/Logger';
 
+const _cameraDir = new THREE.Vector3();
+
 export interface PlayerState {
   health: number;
   maxHealth: number;
@@ -145,8 +147,8 @@ export class PlayerHealthSystem implements GameSystem {
     // Add damage effects with camera direction
     let cameraDirection: THREE.Vector3 | undefined;
     if (this.camera) {
-      cameraDirection = new THREE.Vector3();
-      this.camera.getWorldDirection(cameraDirection);
+      this.camera.getWorldDirection(_cameraDir);
+      cameraDirection = _cameraDir;
     }
     this.effects.addDamageIndicator(amount, sourcePosition, playerPosition, cameraDirection);
 
