@@ -1,5 +1,13 @@
 import * as THREE from 'three';
 
+const _gravity = new THREE.Vector3();
+const _lift = new THREE.Vector3();
+const _cyclicForce = new THREE.Vector3();
+const _euler = new THREE.Euler();
+const _deltaPosition = new THREE.Vector3();
+const _axis = new THREE.Vector3();
+const _deltaQ = new THREE.Quaternion();
+
 export interface HelicopterControls {
   collective: number;     // Vertical thrust (0-1)
   cyclicPitch: number;    // Forward/backward (-1 to 1)
@@ -143,7 +151,7 @@ export class HelicopterPhysics {
 
   private calculateForces(deltaTime: number): void {
     // Gravity (always present)
-    const gravity = new THREE.Vector3(0, this.GRAVITY * this.MASS, 0);
+    _gravity.set(0, this.GRAVITY * this.MASS, 0);
 
     // Vertical lift from collective
     let liftForce = this.smoothedControls.collective * this.MAX_LIFT_FORCE;
@@ -160,21 +168,21 @@ export class HelicopterPhysics {
       liftForce += groundEffect * this.GROUND_EFFECT_STRENGTH * this.MAX_LIFT_FORCE;
     }
 
-    const lift = new THREE.Vector3(0, liftForce, 0);
+    _lift.set(0, liftForce, 0);
 
     // Horizontal forces from cyclic (relative to helicopter orientation)
     // With 90-degree model rotation, forward is -X, right is -Z in local space
-    const cyclicForce = new THREE.Vector3(
+    _cyclicForce.set(
       -this.smoothedControls.cyclicPitch * this.MAX_CYCLIC_FORCE, // Forward/backward on -X-axis
       0,
       -this.smoothedControls.cyclicRoll * this.MAX_CYCLIC_FORCE   // Left/right on -Z-axis
     );
 
     // Transform cyclic forces to world space
-    cyclicForce.applyQuaternion(this.state.quaternion);
+    _cyclicForce.applyQuaternion(this.state.quaternion);
 
     // Total force
-    const totalForce = gravity.add(lift).add(cyclicForce);
+    const totalForce = _gravity.add(_lift).add(_cyclicForce);
 
     // Apply force to velocity (F = ma, so a = F/m)
     const acceleration = totalForce.divideScalar(this.MASS);
@@ -190,11 +198,11 @@ export class HelicopterPhysics {
 
   private applyAutoStabilization(deltaTime: number): void {
     // Extract roll and pitch from current quaternion
-    const euler = new THREE.Euler().setFromQuaternion(this.state.quaternion, 'YXZ');
+    _euler.setFromQuaternion(this.state.quaternion, 'YXZ');
 
     // Auto-level forces (stronger when tilted more)
-    const rollCorrection = -euler.z * this.AUTO_LEVEL_STRENGTH;
-    const pitchCorrection = -euler.x * this.AUTO_LEVEL_STRENGTH;
+    const rollCorrection = -_euler.z * this.AUTO_LEVEL_STRENGTH;
+    const pitchCorrection = -_euler.x * this.AUTO_LEVEL_STRENGTH;
 
     // Apply corrections to angular velocity
     this.state.angularVelocity.z += rollCorrection * deltaTime;
@@ -208,15 +216,15 @@ export class HelicopterPhysics {
 
   private integrate(deltaTime: number): void {
     // Update position from velocity
-    const deltaPosition = this.state.velocity.clone().multiplyScalar(deltaTime);
-    this.state.position.add(deltaPosition);
+    _deltaPosition.copy(this.state.velocity).multiplyScalar(deltaTime);
+    this.state.position.add(_deltaPosition);
 
     // Update rotation from angular velocity (using quaternions)
     if (this.state.angularVelocity.length() > 0.001) {
-      const axis = this.state.angularVelocity.clone().normalize();
+      _axis.copy(this.state.angularVelocity).normalize();
       const angle = this.state.angularVelocity.length() * deltaTime;
-      const deltaQ = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-      this.state.quaternion.multiplyQuaternions(deltaQ, this.state.quaternion);
+      _deltaQ.setFromAxisAngle(_axis, angle);
+      this.state.quaternion.multiplyQuaternions(_deltaQ, this.state.quaternion);
       this.state.quaternion.normalize();
     }
   }
