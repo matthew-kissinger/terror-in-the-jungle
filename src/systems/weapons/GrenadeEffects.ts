@@ -7,6 +7,7 @@ import { CombatantSystem } from '../combat/CombatantSystem';
 import { AudioManager } from '../audio/AudioManager';
 import { Grenade } from './GrenadePhysics';
 import { FlashbangScreenEffect } from '../player/FlashbangScreenEffect';
+import { spawnSmokeCloud } from '../effects/SmokeCloudSystem';
 
 // Module-level scratch vector for direction calculations
 const _lookDirection = new THREE.Vector3();
@@ -104,6 +105,8 @@ export class GrenadeEffects {
         impactEffectsPool.spawn(effectPos, new THREE.Vector3(0, 0.5, 0));
       }
     }
+
+    spawnSmokeCloud(grenade.position);
 
     // No damage for smoke grenades
     Logger.info('weapons', 'Smoke grenade deployed - no damage');

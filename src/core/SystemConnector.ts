@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SystemReferences } from './SystemInitializer';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import { spatialGridManager } from '../systems/combat/SpatialGridManager';
+import { setSmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
 
 /**
  * Handles wiring up dependencies between game systems
@@ -100,6 +101,7 @@ export class SystemConnector {
 
     // Connect flashbang screen effect system
     refs.flashbangScreenEffect.setPlayerController(refs.playerController);
+    setSmokeCloudSystem(refs.smokeCloudSystem);
 
     // Connect weapon systems
     refs.grenadeSystem.setCombatantSystem(refs.combatantSystem);

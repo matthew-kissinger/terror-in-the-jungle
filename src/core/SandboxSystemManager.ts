@@ -30,6 +30,7 @@ import { MortarSystem } from '../systems/weapons/MortarSystem';
 import { SandbagSystem } from '../systems/weapons/SandbagSystem';
 import { CameraShakeSystem } from '../systems/effects/CameraShakeSystem';
 import { PlayerSuppressionSystem } from '../systems/player/PlayerSuppressionSystem';
+import { SmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
 import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
@@ -85,6 +86,7 @@ export class SandboxSystemManager {
   public sandbagSystem!: SandbagSystem;
   public cameraShakeSystem!: CameraShakeSystem;
   public playerSuppressionSystem!: PlayerSuppressionSystem;
+  public smokeCloudSystem!: SmokeCloudSystem;
   public influenceMapSystem!: InfluenceMapSystem;
   public ammoSupplySystem!: AmmoSupplySystem;
   public footstepAudioSystem!: FootstepAudioSystem;
@@ -140,6 +142,7 @@ export class SandboxSystemManager {
     this.sandbagSystem = this.refs.sandbagSystem;
     this.cameraShakeSystem = this.refs.cameraShakeSystem;
     this.playerSuppressionSystem = this.refs.playerSuppressionSystem;
+    this.smokeCloudSystem = this.refs.smokeCloudSystem;
     this.influenceMapSystem = this.refs.influenceMapSystem;
     this.ammoSupplySystem = this.refs.ammoSupplySystem;
     this.footstepAudioSystem = this.refs.footstepAudioSystem;
