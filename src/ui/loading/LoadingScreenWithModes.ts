@@ -33,6 +33,17 @@ export class LoadingScreen {
   private onSettingsCallback?: () => void;
   private onHowToPlayCallback?: () => void;
 
+  // Handler references for cleanup
+  private handleZoneControlClick = () => this.selectGameMode(GameMode.ZONE_CONTROL);
+  private handleOpenFrontierClick = () => this.selectGameMode(GameMode.OPEN_FRONTIER);
+  private handlePlayClick = () => {
+    if (this.onPlayCallback) {
+      this.onPlayCallback(this.selectedGameMode);
+    }
+  };
+  private handleSettingsClick = () => this.panels.showSettingsPanel();
+  private handleHowToPlayClick = () => this.panels.showHowToPlayPanel();
+
   constructor() {
     this.container = this.createLoadingScreen();
     this.progressBar = this.container.querySelector('.loading-bar') as HTMLDivElement;
@@ -237,28 +248,14 @@ export class LoadingScreen {
 
   private setupEventListeners(): void {
     // Game mode selection
-    this.zoneControlCard.addEventListener('click', () => {
-      this.selectGameMode(GameMode.ZONE_CONTROL);
-    });
-
-    this.openFrontierCard.addEventListener('click', () => {
-      this.selectGameMode(GameMode.OPEN_FRONTIER);
-    });
+    this.zoneControlCard.addEventListener('click', this.handleZoneControlClick);
+    this.openFrontierCard.addEventListener('click', this.handleOpenFrontierClick);
 
     // Play button
-    this.playButton.addEventListener('click', () => {
-      if (this.onPlayCallback) {
-        this.onPlayCallback(this.selectedGameMode);
-      }
-    });
+    this.playButton.addEventListener('click', this.handlePlayClick);
 
-    this.settingsButton.addEventListener('click', () => {
-      this.panels.showSettingsPanel();
-    });
-
-    this.howToPlayButton.addEventListener('click', () => {
-      this.panels.showHowToPlayPanel();
-    });
+    this.settingsButton.addEventListener('click', this.handleSettingsClick);
+    this.howToPlayButton.addEventListener('click', this.handleHowToPlayClick);
   }
 
   private selectGameMode(mode: GameMode): void {
@@ -321,6 +318,13 @@ export class LoadingScreen {
   }
 
   public dispose(): void {
+    // Remove event listeners
+    this.zoneControlCard.removeEventListener('click', this.handleZoneControlClick);
+    this.openFrontierCard.removeEventListener('click', this.handleOpenFrontierClick);
+    this.playButton.removeEventListener('click', this.handlePlayClick);
+    this.settingsButton.removeEventListener('click', this.handleSettingsClick);
+    this.howToPlayButton.removeEventListener('click', this.handleHowToPlayClick);
+
     if (this.container?.parentElement) {
       this.container.parentElement.removeChild(this.container);
     }
