@@ -32,6 +32,11 @@ export interface PerformanceStats {
   systemTimings?: SystemTiming[];
   gpuTimeMs?: number;
   gpuTimingAvailable?: boolean;
+  // Terrain mesh merger stats
+  terrainMergerRings?: number;
+  terrainMergerChunks?: number;
+  terrainMergerSavings?: number;
+  terrainMergerPending?: boolean;
 }
 
 interface BudgetBarRefs {
@@ -141,6 +146,9 @@ export class PerformanceOverlay {
       `Draw Calls: ${stats.drawCalls}`,
       `Triangles: ${stats.triangles.toLocaleString()}`,
       `Chunks: ${stats.loadedChunks} (queue ${stats.chunkQueueSize})`,
+      stats.terrainMergerRings !== undefined
+        ? `Terrain Merger: ${stats.terrainMergerChunks} chunks -> ${stats.terrainMergerRings} rings (saves ${stats.terrainMergerSavings} draw calls)${stats.terrainMergerPending ? ' [PENDING]' : ''}`
+        : null,
       `Combatants: US ${stats.usCombatants} / OPFOR ${stats.opforCombatants}`,
       `Vegetation: ${stats.vegetationActive} active / ${stats.vegetationReserved} reserved`,
       `Combat: last ${stats.combatLastMs.toFixed(2)} ms (avg ${stats.combatEmaMs.toFixed(2)} ms)`,

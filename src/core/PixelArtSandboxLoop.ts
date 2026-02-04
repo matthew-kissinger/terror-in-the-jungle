@@ -122,6 +122,9 @@ export function updatePerformanceOverlay(sandbox: any, deltaTime: number): void 
     .filter(([key]) => key.endsWith('HighWater'))
     .reduce((sum, [, value]) => sum + (value as number), 0);
 
+  // Get terrain merger stats
+  const mergerStats = sandbox.systemManager.chunkManager.getMergerStats();
+
   // Get system timings from system manager
   const systemTimings = sandbox.systemManager.getSystemTimings();
 
@@ -152,7 +155,11 @@ export function updatePerformanceOverlay(sandbox: any, deltaTime: number): void 
     combatantCount: combatTelemetry.combatantCount,
     systemTimings,
     gpuTimeMs: gpuTelemetry.gpuTimeMs,
-    gpuTimingAvailable: gpuTelemetry.available
+    gpuTimingAvailable: gpuTelemetry.available,
+    terrainMergerRings: mergerStats?.activeRings,
+    terrainMergerChunks: mergerStats?.totalChunks,
+    terrainMergerSavings: mergerStats?.estimatedDrawCallSavings,
+    terrainMergerPending: mergerStats?.pendingMerge
   });
 }
 

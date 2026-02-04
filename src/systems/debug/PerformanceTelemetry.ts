@@ -5,7 +5,8 @@ import {
   SystemTiming,
   FrameData,
   SpatialGridTelemetry,
-  TelemetryReport
+  TelemetryReport,
+  TerrainMergerTelemetry
 } from './PerformanceTypes'
 
 // Re-export types for convenience
@@ -16,7 +17,8 @@ export type {
   TelemetryReport,
   GPUTelemetry,
   BenchmarkResult,
-  BenchmarkDependencies
+  BenchmarkDependencies,
+  TerrainMergerTelemetry
 }
 
 export class PerformanceTelemetry {
@@ -48,6 +50,9 @@ export class PerformanceTelemetry {
     shotsThisSession: 0,
     hitsThisSession: 0
   }
+
+  // Terrain merger telemetry (updated externally by chunk manager)
+  private terrainMergerTelemetry: TerrainMergerTelemetry | null = null
 
   // Slow frame logging
   private lastSlowFrameLog = 0
@@ -261,6 +266,13 @@ export class PerformanceTelemetry {
   }
 
   /**
+   * Update terrain merger telemetry (called by chunk manager)
+   */
+  updateTerrainMergerTelemetry(telemetry: TerrainMergerTelemetry | null): void {
+    this.terrainMergerTelemetry = telemetry
+  }
+
+  /**
    * Get average frame time over history
    */
   getAvgFrameTime(): number {
@@ -290,7 +302,7 @@ export class PerformanceTelemetry {
    */
   getReport(): TelemetryReport {
     const avgFrameMs = this.getAvgFrameTime()
-    return {
+    const report: TelemetryReport = {
       fps: avgFrameMs > 0 ? 1000 / avgFrameMs : 0,
       avgFrameMs,
       overBudgetPercent: this.getOverBudgetPercent(),
@@ -306,6 +318,13 @@ export class PerformanceTelemetry {
       },
       gpu: this.getGPUTelemetry()
     }
+
+    // Add terrain merger telemetry if available
+    if (this.terrainMergerTelemetry) {
+      report.terrainMerger = { ...this.terrainMergerTelemetry }
+    }
+
+    return report
   }
 
   /**

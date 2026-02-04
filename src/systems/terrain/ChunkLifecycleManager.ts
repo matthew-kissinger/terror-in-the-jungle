@@ -9,6 +9,7 @@ import { ViteBVHWorker } from '../../workers/BVHWorker';
 import { Logger } from '../../utils/Logger';
 import { ChunkQueueItem } from './ChunkPriorityManager';
 import { TerrainMeshMerger } from './TerrainMeshMerger';
+import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 
 export interface ChunkLifecycleConfig {
   size: number;
@@ -375,13 +376,26 @@ export class ChunkLifecycleManager {
         this.playerPosition,
         this.config.size
       );
+
+      // Update telemetry with latest merger stats
+      const stats = this.meshMerger.getStats();
+      performanceTelemetry.updateTerrainMergerTelemetry({
+        activeRings: stats.activeRings,
+        totalChunks: stats.totalChunks,
+        pendingMerge: stats.pendingMerge,
+        estimatedDrawCallSavings: stats.estimatedDrawCallSavings,
+        enabled: true
+      });
+    } else {
+      // Clear telemetry if merger is not enabled
+      performanceTelemetry.updateTerrainMergerTelemetry(null);
     }
   }
 
   /**
    * Get mesh merger stats for debugging
    */
-  getMergerStats(): { activeRings: number; totalChunks: number; pendingMerge: boolean } | null {
+  getMergerStats(): { activeRings: number; totalChunks: number; pendingMerge: boolean; estimatedDrawCallSavings: number } | null {
     return this.meshMerger ? this.meshMerger.getStats() : null;
   }
 

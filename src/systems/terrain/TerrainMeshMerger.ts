@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { ImprovedChunk } from './ImprovedChunk';
 import { Logger } from '../../utils/Logger';
+import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 
 /**
  * Merges individual chunk terrain meshes into larger combined meshes by distance rings.
@@ -52,6 +53,9 @@ export class TerrainMeshMerger {
   ): void {
     const startTime = performance.now();
 
+    // Begin timing for telemetry
+    performanceTelemetry.beginSystem('terrain_merger');
+
     // Group chunks by ring
     const chunksByRing = this.groupChunksByRing(chunks, playerPosition, chunkSize);
 
@@ -76,6 +80,9 @@ export class TerrainMeshMerger {
         Logger.debug('terrain-merger', `Disposed ring ${ring} merged mesh`);
       }
     });
+
+    // End timing for telemetry
+    performanceTelemetry.endSystem('terrain_merger');
 
     const elapsed = performance.now() - startTime;
     Logger.info('terrain-merger', `Merged ${chunks.size} chunks into ${activeRings.size} rings in ${elapsed.toFixed(2)}ms`);
@@ -193,11 +200,21 @@ export class TerrainMeshMerger {
     activeRings: number;
     totalChunks: number;
     pendingMerge: boolean;
+    estimatedDrawCallSavings: number;
   } {
+    const totalChunks = this.ringAssignments.size;
+    const activeRings = this.mergedMeshes.size;
+    
+    // Estimated draw call savings: without merging = 1 draw call per chunk
+    // with merging = 1 draw call per ring
+    // Savings = chunks - rings (only if merging is active)
+    const estimatedDrawCallSavings = activeRings > 0 ? totalChunks - activeRings : 0;
+    
     return {
-      activeRings: this.mergedMeshes.size,
-      totalChunks: this.ringAssignments.size,
-      pendingMerge: this.pendingMerge
+      activeRings,
+      totalChunks,
+      pendingMerge: this.pendingMerge,
+      estimatedDrawCallSavings
     };
   }
 

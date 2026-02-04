@@ -388,7 +388,7 @@ export class ImprovedChunkManager implements GameSystem {
    * Get terrain mesh merger stats (for debugging draw call reduction)
    * Call from console: game.chunkManager.getMergerStats()
    */
-  getMergerStats(): { activeRings: number; totalChunks: number; pendingMerge: boolean } | null {
+  getMergerStats(): { activeRings: number; totalChunks: number; pendingMerge: boolean; estimatedDrawCallSavings: number } | null {
     return this.lifecycleManager.getMergerStats();
   }
 }
