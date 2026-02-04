@@ -79,14 +79,12 @@ CombatantSystem has distance-based LOD:
 
 | File | Lines | Location |
 |------|-------|----------|
-| HUDStyles.ts | 483 | ui/hud/ |
-| CombatantCombat.ts | 468 | systems/combat/ |
+| AICoverSystem.ts | 458 | systems/combat/ai/ |
 | AudioManager.ts | 453 | systems/audio/ |
 | WeatherSystem.ts | 449 | systems/environment/ |
 | CompassSystem.ts | 447 | ui/compass/ |
 | FirstPersonWeapon.ts | 445 | systems/player/ |
 | MinimapSystem.ts | 440 | ui/minimap/ |
-| AICoverSystem.ts | 437 | systems/combat/ai/ |
 | MatchEndScreen.ts | 434 | ui/end/ |
 | HelicopterModel.ts | 433 | systems/helicopter/ |
 | HelicopterGeometry.ts | 433 | systems/helicopter/ |
@@ -101,7 +99,7 @@ CombatantSystem has distance-based LOD:
 | DeathCamSystem.ts | 405 | systems/player/ |
 | ImprovedChunk.ts | 401 | systems/terrain/ |
 
-**Completed splits**: CombatantSystem (1308->538->428, extracted CombatantSystemDamage + CombatantSystemSetters + CombatantSystemUpdate), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->529->385, extracted ChunkPriorityManager + ChunkLifecycleManager + ChunkLoadQueueManager + ChunkTerrainQueries), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer), AIFlankingSystem (606->359, extracted FlankingRoleManager + FlankingTacticsResolver), FullMapSystem (574->365, extracted FullMapDOMHelpers + FullMapInput + FullMapStyles), AITargeting (571->94, extracted AITargetAcquisition + AILineOfSight), CombatantMovement (504->129, extracted CombatantMovementStates + CombatantMovementCommands), PixelArtSandbox (551->144, extracted PixelArtSandboxInit + PixelArtSandboxInput + PixelArtSandboxLoop), InfluenceMapSystem (570->329, extracted InfluenceMapComputations + InfluenceMapGrid), ExplosionEffectsPool (489->161, extracted ExplosionEffectFactory + ExplosionParticleUpdater + ExplosionSpawnInitializer + ExplosionTextures), OpenFrontierRespawnMap (531->194, extracted OpenFrontierRespawnMapUtils + OpenFrontierRespawnMapRenderer), gameModes (496->40, extracted GameModeZoneControl + GameModeOpenFrontier + GameModeCommon), SpatialOctree (487->257, extracted SpatialOctreeNode + SpatialOctreeQuery). 21 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538->428, extracted CombatantSystemDamage + CombatantSystemSetters + CombatantSystemUpdate), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468->380, extracted CombatantCombatEffects), FootstepAudioSystem (587->326), ImprovedChunkManager (753->529->385, extracted ChunkPriorityManager + ChunkLifecycleManager + ChunkLoadQueueManager + ChunkTerrainQueries), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer), AIFlankingSystem (606->359, extracted FlankingRoleManager + FlankingTacticsResolver), FullMapSystem (574->365, extracted FullMapDOMHelpers + FullMapInput + FullMapStyles), AITargeting (571->94, extracted AITargetAcquisition + AILineOfSight), CombatantMovement (504->129, extracted CombatantMovementStates + CombatantMovementCommands), PixelArtSandbox (551->144, extracted PixelArtSandboxInit + PixelArtSandboxInput + PixelArtSandboxLoop), InfluenceMapSystem (570->329, extracted InfluenceMapComputations + InfluenceMapGrid), ExplosionEffectsPool (489->161, extracted ExplosionEffectFactory + ExplosionParticleUpdater + ExplosionSpawnInitializer + ExplosionTextures), OpenFrontierRespawnMap (531->194, extracted OpenFrontierRespawnMapUtils + OpenFrontierRespawnMapRenderer), gameModes (496->40, extracted GameModeZoneControl + GameModeOpenFrontier + GameModeCommon), SpatialOctree (487->257, extracted SpatialOctreeNode + SpatialOctreeQuery), HUDStyles (483->40, extracted HUDBaseStyles + HUDStatusStyles + HUDWeaponStyles + HUDZoneStyles). 19 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -159,8 +157,9 @@ Known hotspots:
 - **GunplayCore Ray allocations** - FIXED. Module-level `_scratchRay`, `_origin`, `_perturbed` reused in `computeShotRay()`. Pellet array builds still allocate (necessary for output array).
 - **SpatialOctree Ray allocation** - FIXED. SpatialOctree split to 257 lines (SpatialOctreeNode + SpatialOctreeQuery). Module-level scratch ray replaces per-query allocation.
 
+- **AICoverSystem per-call Vector3 allocations** - FIXED. Module-level scratch vectors `_coverToThreat`, `_coverToCombatant`, `_sandbagCenter`, `_threatToSandbag`, `_sandbagOffset` replace per-call allocations in `evaluateCoverQuality()` and `evaluateSandbagCover()`.
+
 Discovered hotspots (not yet fixed):
-- **AICoverSystem per-call Vector3 allocations** - `src/systems/combat/ai/AICoverSystem.ts:378-379,336,342-346`. Creates new Vector3 per cover evaluation in `evaluateCoverQuality()` and `evaluateSandbagCover()`. Should use module-level scratch vectors.
 - **MortarBallistics computeTrajectory() clones** - Lines 60-80. Still creates 100+ Vector3 via `.clone()` per trajectory computation (builds output array, not per-frame). Lower priority.
 
 Possible areas (confirm with profiling):
