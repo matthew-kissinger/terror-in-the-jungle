@@ -55,7 +55,7 @@ export class CombatantSystem implements GameSystem {
   public readonly combatantAI: CombatantAI;
   public readonly combatantCombat: CombatantCombat;
   private combatantMovement: CombatantMovement;
-  private combatantRenderer: CombatantRenderer;
+  public readonly combatantRenderer: CombatantRenderer;
   public readonly squadManager: SquadManager;
   private spatialGrid: SpatialOctree;
   public influenceMap?: InfluenceMapSystem;

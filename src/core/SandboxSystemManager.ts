@@ -208,9 +208,9 @@ export class SandboxSystemManager {
   setGameMode(mode: GameMode, options?: { createPlayerSquad?: boolean }): void {
     const createPlayerSquad = options?.createPlayerSquad ?? true;
     // Set flag for player squad creation BEFORE mode change
-    (this.combatantSystem as any).shouldCreatePlayerSquad = createPlayerSquad;
+    this.combatantSystem.shouldCreatePlayerSquad = createPlayerSquad;
     if (!createPlayerSquad) {
-      (this.combatantSystem as any).playerSquadId = undefined;
+      this.combatantSystem.playerSquadId = undefined;
     }
 
     // Set weather config for mode
@@ -229,8 +229,8 @@ export class SandboxSystemManager {
   }
 
   private setupPlayerSquad(): void {
-    const squadManager = (this.combatantSystem as any).squadManager;
-    const playerSquadId = (this.combatantSystem as any).playerSquadId;
+    const squadManager = this.combatantSystem.squadManager;
+    const playerSquadId = this.combatantSystem.playerSquadId;
 
     if (!squadManager || !playerSquadId) {
       Logger.warn('core', ' Squad manager or player squad not found');
@@ -247,7 +247,7 @@ export class SandboxSystemManager {
     this.playerSquadController.assignPlayerSquad(playerSquadId);
 
     // Pass to renderer and minimap
-    const renderer = (this.combatantSystem as any).combatantRenderer;
+    const renderer = this.combatantSystem.combatantRenderer;
     if (renderer) {
       renderer.setPlayerSquadId(playerSquadId);
     }

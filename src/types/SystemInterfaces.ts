@@ -4,7 +4,7 @@
  */
 
 import * as THREE from 'three';
-import { Faction } from '../systems/combat/types';
+import { Combatant, Faction, Squad } from '../systems/combat/types';
 
 /**
  * Impact Effects Pool interface - blood/debris effects on hit
@@ -46,6 +46,8 @@ export interface ICombatantAI {
  */
 export interface ISquadManager {
   setInfluenceMap(map: IInfluenceMapSystem): void;
+  getSquad(squadId: string): Squad | undefined;
+  getAllSquads(): Map<string, Squad>;
 }
 
 /**
@@ -182,7 +184,12 @@ export interface ICombatantSystem {
   readonly combatantCombat: ICombatantCombat;
   readonly combatantAI: ICombatantAI;
   readonly squadManager: ISquadManager;
+  readonly combatantRenderer: ICombatantRenderer;
   readonly combatants: Map<string, any>;
+
+  // Player squad controls
+  shouldCreatePlayerSquad: boolean;
+  playerSquadId?: string;
 
   // Internal properties for influence map and sandbag system wiring
   influenceMap?: IInfluenceMapSystem;
@@ -263,7 +270,8 @@ export interface IPlayerSuppressionSystem {
  * Combatant Renderer interface
  */
 export interface ICombatantRenderer {
-  updateBillboards(combatants: any[], camera: THREE.Camera): void;
+  setPlayerSquadId(squadId: string | undefined): void;
+  updateBillboards(combatants: Map<string, Combatant>, playerPosition: THREE.Vector3): void;
 }
 
 /**
