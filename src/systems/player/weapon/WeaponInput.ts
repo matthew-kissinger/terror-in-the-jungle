@@ -23,6 +23,7 @@ export class WeaponInput {
   private boundOnMouseDown!: (event: MouseEvent) => void
   private boundOnMouseUp!: (event: MouseEvent) => void
   private boundOnKeyDown!: (event: KeyboardEvent) => void
+  private boundOnContextMenu!: (event: Event) => void
 
   constructor(
     animations: WeaponAnimations,
@@ -37,10 +38,11 @@ export class WeaponInput {
     this.boundOnMouseDown = this.onMouseDown.bind(this)
     this.boundOnMouseUp = this.onMouseUp.bind(this)
     this.boundOnKeyDown = this.onKeyDown.bind(this)
+    this.boundOnContextMenu = (e: Event) => e.preventDefault()
 
     window.addEventListener('mousedown', this.boundOnMouseDown)
     window.addEventListener('mouseup', this.boundOnMouseUp)
-    window.addEventListener('contextmenu', (e) => e.preventDefault())
+    window.addEventListener('contextmenu', this.boundOnContextMenu)
     window.addEventListener('keydown', this.boundOnKeyDown)
   }
 
@@ -133,6 +135,7 @@ export class WeaponInput {
   dispose(): void {
     window.removeEventListener('mousedown', this.boundOnMouseDown)
     window.removeEventListener('mouseup', this.boundOnMouseUp)
+    window.removeEventListener('contextmenu', this.boundOnContextMenu)
     window.removeEventListener('keydown', this.boundOnKeyDown)
   }
 }
