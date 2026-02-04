@@ -1,0 +1,54 @@
+name: Performance Regression Check
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  perf-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+      
+      - name: Build
+        run: npm run build
+      
+      - name: Establish baseline (first run)
+        run: npm run perf:baseline
+        continue-on-error: true
+      
+      - name: Check for regression (second run)
+        run: npm run perf:baseline
+      
+      - name: Upload results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-baseline-results
+          path: perf-baselines.json
+          retention-days: 7
+      
+      - name: Upload full results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-baseline-json
+          path: perf-baselines.json
+          retention-days: 7
