@@ -21,6 +21,9 @@ export class CompassSystem implements GameSystem {
   private readonly cameraPos = new THREE.Vector3();
   private readonly dirToZone = new THREE.Vector3();
 
+  private zoneUpdateTimer = 0;
+  private static readonly ZONE_UPDATE_INTERVAL = 100; // ms
+
   // Cached zone markers
   private readonly zoneMarkers = new Map<string, HTMLDivElement>();
   private readonly seenZones = new Set<string>();
@@ -334,7 +337,11 @@ export class CompassSystem implements GameSystem {
 
     // Update zone markers
     if (this.zoneManager) {
-      this.updateZoneMarkers(headingDegrees);
+      this.zoneUpdateTimer += deltaTime * 1000;
+      if (this.zoneUpdateTimer >= CompassSystem.ZONE_UPDATE_INTERVAL) {
+        this.updateZoneMarkers(headingDegrees);
+        this.zoneUpdateTimer = 0;
+      }
     }
   }
 
