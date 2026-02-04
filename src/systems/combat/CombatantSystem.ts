@@ -19,7 +19,7 @@ import { VoiceCalloutSystem } from '../audio/VoiceCalloutSystem';
 // Refactored modules
 import { CombatantFactory } from './CombatantFactory';
 import { CombatantAI } from './CombatantAI';
-import { CombatantCombat } from './CombatantCombat';
+import { CombatantCombat, CombatHitResult } from './CombatantCombat';
 import { CombatantMovement } from './CombatantMovement';
 import { CombatantRenderer } from './CombatantRenderer';
 import { SquadManager } from './SquadManager';
@@ -27,6 +27,7 @@ import { SpatialOctree } from './SpatialOctree';
 import { spatialGridManager } from './SpatialGridManager';
 import { InfluenceMapSystem } from './InfluenceMapSystem';
 import { RallyPointSystem } from './RallyPointSystem';
+import { IHUDSystem } from '../../types/SystemInterfaces';
 
 // New focused modules
 import { CombatantSpawnManager } from './CombatantSpawnManager';
@@ -46,7 +47,7 @@ export class CombatantSystem implements GameSystem {
   private playerHealthSystem?: PlayerHealthSystem;
   private zoneManager?: ZoneManager;
   private audioManager?: AudioManager;
-  private hudSystem?: any;
+  private hudSystem?: IHUDSystem;
   private gameModeManager?: GameModeManager;
 
   // Refactored modules
@@ -299,7 +300,7 @@ export class CombatantSystem implements GameSystem {
   handlePlayerShot(
     ray: THREE.Ray,
     damageCalculator: (distance: number, isHeadshot: boolean) => number
-  ): { hit: boolean; point: THREE.Vector3; killed?: boolean; headshot?: boolean } {
+  ): CombatHitResult {
     return this.combatantCombat.handlePlayerShot(ray, damageCalculator, this.combatants);
   }
 
@@ -371,7 +372,7 @@ export class CombatantSystem implements GameSystem {
     this.setters.setZoneManager(zoneManager);
   }
 
-  setHUDSystem(hudSystem: any): void {
+  setHUDSystem(hudSystem: IHUDSystem): void {
     this.hudSystem = hudSystem;
     this.damageHandler.setHUDSystem(hudSystem);
     this.setters.setHUDSystem(hudSystem);

@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { GunplayCore } from '../../weapons/GunplayCore'
 import { CombatantSystem } from '../../combat/CombatantSystem'
+import { CombatHitResult } from '../../combat/CombatantCombat'
 import { TracerPool } from '../../effects/TracerPool'
 import { MuzzleFlashPool } from '../../effects/MuzzleFlashPool'
 import { ImpactEffectsPool } from '../../effects/ImpactEffectsPool'
@@ -9,6 +10,7 @@ import { PlayerStatsTracker } from '../PlayerStatsTracker'
 import { ShotCommand, ShotResult } from './ShotCommand'
 import { performanceTelemetry } from '../../debug/PerformanceTelemetry'
 import { WeaponShotExecutor } from './WeaponShotExecutor'
+import type { HUDSystem } from '../../../ui/hud/HUDSystem'
 
 // Module-level scratch vectors to avoid per-shot allocations
 const _negDirection = new THREE.Vector3()
@@ -31,7 +33,7 @@ export class WeaponFiring {
   private impactEffectsPool: ImpactEffectsPool
   private audioManager?: AudioManager
   private statsTracker?: PlayerStatsTracker
-  private hudSystem?: any
+  private hudSystem?: HUDSystem
   private muzzleRef?: THREE.Object3D
   private shotExecutor?: WeaponShotExecutor
 
@@ -64,7 +66,7 @@ export class WeaponFiring {
     this.initializeShotExecutor()
   }
 
-  setHUDSystem(hudSystem: any): void {
+  setHUDSystem(hudSystem: HUDSystem): void {
     this.hudSystem = hudSystem
     this.initializeShotExecutor()
   }
@@ -173,8 +175,8 @@ export class WeaponFiring {
       // Track shot as a hit in stats
       if (this.statsTracker) {
         // Mark previous shot as a hit by registering a new hit
-        const damageDealt = (result as any).damage || 0
-        const isHeadshot = (result as any).headshot || false
+        const damageDealt = result.damage || 0
+        const isHeadshot = result.headshot || false
 
         if (damageDealt > 0) {
           this.statsTracker.addDamage(damageDealt)
@@ -184,7 +186,7 @@ export class WeaponFiring {
         }
 
         // Track longest kill distance if this was a kill
-        if ((result as any).killed) {
+        if (result.killed) {
           const shotOrigin = this.camera.position
           const targetPos = result.point
           const distance = shotOrigin.distanceTo(targetPos)
@@ -195,7 +197,7 @@ export class WeaponFiring {
       // Show hit marker and play hit sound
       if (this.hudSystem) {
         // Check if it's a kill or normal hit
-        const hitType = (result as any).killed ? 'kill' : (result as any).headshot ? 'headshot' : 'hit'
+        const hitType = result.killed ? 'kill' : result.headshot ? 'headshot' : 'hit'
         this.hudSystem.showHitMarker(hitType)
 
         // Play hit feedback sound
@@ -204,9 +206,9 @@ export class WeaponFiring {
         }
 
         // Spawn damage number
-        const damageDealt = (result as any).damage || 0
-        const isHeadshot = (result as any).headshot || false
-        const isKill = (result as any).killed || false
+        const damageDealt = result.damage || 0
+        const isHeadshot = result.headshot || false
+        const isKill = result.killed || false
         if (damageDealt > 0) {
           this.hudSystem.spawnDamageNumber(result.point, damageDealt, isHeadshot, isKill)
         }
@@ -222,7 +224,7 @@ export class WeaponFiring {
 
     let totalDamage = 0
     let anyHit = false
-    let bestHit: any = null
+    let bestHit: CombatHitResult | null = null
     let headshotHit = false
     let killedByShot = false
 
@@ -232,20 +234,20 @@ export class WeaponFiring {
 
       if (result.hit) {
         anyHit = true
-        totalDamage += (result as any).damage || 0
+        totalDamage += result.damage || 0
 
         // Track best hit for visual feedback
-        if (!bestHit || (result as any).killed) {
+        if (!bestHit || result.killed) {
           bestHit = result
         }
 
         // Track if any pellet was a headshot
-        if ((result as any).headshot) {
+        if (result.headshot) {
           headshotHit = true
         }
 
         // Track if any pellet killed
-        if ((result as any).killed) {
+        if (result.killed) {
           killedByShot = true
         }
 
@@ -273,7 +275,7 @@ export class WeaponFiring {
 
     // Show consolidated feedback for the shot
     if (anyHit && this.hudSystem && bestHit) {
-      const hitType: 'hit' | 'headshot' | 'kill' = (bestHit as any).killed ? 'kill' : (bestHit as any).headshot ? 'headshot' : 'hit'
+      const hitType: 'hit' | 'headshot' | 'kill' = bestHit.killed ? 'kill' : bestHit.headshot ? 'headshot' : 'hit'
       this.hudSystem.showHitMarker(hitType)
 
       // Play hit feedback sound
@@ -283,7 +285,7 @@ export class WeaponFiring {
 
       // Show total damage dealt
       if (totalDamage > 0) {
-        this.hudSystem.spawnDamageNumber(bestHit.point, totalDamage, (bestHit as any).headshot, (bestHit as any).killed)
+        this.hudSystem.spawnDamageNumber(bestHit.point, totalDamage, bestHit.headshot || false, bestHit.killed || false)
       }
     }
   }

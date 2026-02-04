@@ -1,9 +1,11 @@
 import * as THREE from 'three'
 import { CombatantSystem } from '../../combat/CombatantSystem'
+import { CombatHitResult } from '../../combat/CombatantCombat'
 import { ImpactEffectsPool } from '../../effects/ImpactEffectsPool'
 import { AudioManager } from '../../audio/AudioManager'
 import { PlayerStatsTracker } from '../PlayerStatsTracker'
 import { ShotCommand, ShotResult } from './ShotCommand'
+import type { HUDSystem } from '../../../ui/hud/HUDSystem'
 
 // Module-level scratch vectors to avoid per-shot allocations
 const _negDirection = new THREE.Vector3()
@@ -19,7 +21,7 @@ export class WeaponShotExecutor {
     private camera: THREE.Camera,
     private audioManager?: AudioManager,
     private statsTracker?: PlayerStatsTracker,
-    private hudSystem?: any
+    private hudSystem?: HUDSystem
   ) {}
 
   executeSingleShot(command: ShotCommand): ShotResult {
@@ -31,9 +33,9 @@ export class WeaponShotExecutor {
       _negDirection.copy(command.ray.direction).negate()
       this.impactEffectsPool.spawn(result.point, _negDirection)
 
-      const damageDealt = (result as any).damage || 0
-      const isHeadshot = (result as any).headshot || false
-      const isKill = (result as any).killed || false
+      const damageDealt = result.damage || 0
+      const isHeadshot = result.headshot || false
+      const isKill = result.killed || false
 
       // Track stats
       if (this.statsTracker) {
@@ -83,7 +85,7 @@ export class WeaponShotExecutor {
 
     let totalDamage = 0
     let anyHit = false
-    let bestHit: any = null
+    let bestHit: CombatHitResult | null = null
     let headshotHit = false
     let killedByShot = false
 
@@ -93,17 +95,17 @@ export class WeaponShotExecutor {
 
       if (result.hit) {
         anyHit = true
-        totalDamage += (result as any).damage || 0
+        totalDamage += result.damage || 0
 
-        if (!bestHit || (result as any).killed) {
+        if (!bestHit || result.killed) {
           bestHit = result
         }
 
-        if ((result as any).headshot) {
+        if (result.headshot) {
           headshotHit = true
         }
 
-        if ((result as any).killed) {
+        if (result.killed) {
           killedByShot = true
         }
 

@@ -5,6 +5,7 @@ import { TicketSystem } from '../world/TicketSystem';
 import { CombatantSpawnManager } from './CombatantSpawnManager';
 import { Logger } from '../../utils/Logger';
 import { KillAssistTracker } from './KillAssistTracker';
+import { IHUDSystem } from '../../types/SystemInterfaces';
 
 // Module-level scratch vector to avoid per-call allocations
 const _deathDir = new THREE.Vector3();
@@ -15,14 +16,14 @@ const _deathDir = new THREE.Vector3();
  */
 export class CombatantSystemDamage {
   private ticketSystem?: TicketSystem;
-  private hudSystem?: any;
+  private hudSystem?: IHUDSystem;
 
   constructor(
     private combatants: Map<string, Combatant>,
     private squadManager: SquadManager,
     private spawnManager: CombatantSpawnManager,
     ticketSystem?: TicketSystem,
-    hudSystem?: any
+    hudSystem?: IHUDSystem
   ) {
     this.ticketSystem = ticketSystem;
     this.hudSystem = hudSystem;
@@ -32,7 +33,7 @@ export class CombatantSystemDamage {
     this.ticketSystem = ticketSystem;
   }
 
-  setHUDSystem(hudSystem: any): void {
+  setHUDSystem(hudSystem: IHUDSystem): void {
     this.hudSystem = hudSystem;
   }
 
@@ -120,11 +121,12 @@ export class CombatantSystemDamage {
       }
     });
 
+    const hudSystem = this.hudSystem;
     // Report grenade kills to kill feed (grenades are player-thrown)
-    if (this.hudSystem && killedCombatants.length > 0) {
+    if (hudSystem && killedCombatants.length > 0) {
       killedCombatants.forEach(victim => {
         const victimName = `${victim.faction}-${victim.id.slice(-4)}`;
-        this.hudSystem.addKillToFeed(
+        hudSystem.addKillToFeed(
           'PLAYER',
           Faction.US,
           victimName,
