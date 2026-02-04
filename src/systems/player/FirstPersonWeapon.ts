@@ -17,6 +17,7 @@ import { WeaponReload } from './weapon/WeaponReload'
 import { WeaponModel } from './weapon/WeaponModel'
 import { WeaponInput } from './weapon/WeaponInput'
 import { WeaponAmmo } from './weapon/WeaponAmmo'
+import { WeaponSwitching } from './weapon/WeaponSwitching'
 import { ShotCommand, ShotCommandFactory } from './weapon/ShotCommand'
 
 /**
@@ -39,6 +40,7 @@ export class FirstPersonWeapon implements GameSystem {
   private model: WeaponModel
   private input: WeaponInput
   private ammo: WeaponAmmo
+  private switching: WeaponSwitching
 
   // Effects pools
   private tracerPool: TracerPool
@@ -92,6 +94,9 @@ export class FirstPersonWeapon implements GameSystem {
     this.input = new WeaponInput(this.animations, this.reload, this.rigManager)
     this.input.setOnFireStart(() => this.tryFire())
     this.input.setOnReloadStart(() => this.startReload())
+
+    // Initialize weapon switching
+    this.switching = new WeaponSwitching(this.rigManager, this.input, this.animations, this.ammo)
   }
 
   async init(): Promise<void> {
@@ -184,47 +189,15 @@ export class FirstPersonWeapon implements GameSystem {
   setInventoryManager(inventoryManager: InventoryManager): void {
     this.inventoryManager = inventoryManager
     this.input.setInventoryManager(inventoryManager)
-
-    // Listen for weapon slot changes
     inventoryManager.onSlotChange((slot) => {
       if (slot === WeaponSlot.PRIMARY) {
-        this.switchToRifle()
+        this.switching.switchWeapon('rifle', (state) => this.onAmmoChange(state))
       } else if (slot === WeaponSlot.SHOTGUN) {
-        this.switchToShotgun()
+        this.switching.switchWeapon('shotgun', (state) => this.onAmmoChange(state))
       } else if (slot === WeaponSlot.SMG) {
-        this.switchToSMG()
+        this.switching.switchWeapon('smg', (state) => this.onAmmoChange(state))
       }
     })
-  }
-
-  private switchToRifle(): void {
-    if (this.rigManager.startWeaponSwitch('rifle', this.hudSystem, this.audioManager, this.ammo.getRifleAmmo())) {
-      this.input.setFiringActive(false)
-      this.animations.setADS(false)
-      this.ammo.setCurrentAmmoManager(this.ammo.getRifleAmmo())
-      // Update HUD with new weapon's ammo
-      this.onAmmoChange(this.ammo.getAmmoState())
-    }
-  }
-
-  private switchToShotgun(): void {
-    if (this.rigManager.startWeaponSwitch('shotgun', this.hudSystem, this.audioManager, this.ammo.getShotgunAmmo())) {
-      this.input.setFiringActive(false)
-      this.animations.setADS(false)
-      this.ammo.setCurrentAmmoManager(this.ammo.getShotgunAmmo())
-      // Update HUD with new weapon's ammo
-      this.onAmmoChange(this.ammo.getAmmoState())
-    }
-  }
-
-  private switchToSMG(): void {
-    if (this.rigManager.startWeaponSwitch('smg', this.hudSystem, this.audioManager, this.ammo.getSMGAmmo())) {
-      this.input.setFiringActive(false)
-      this.animations.setADS(false)
-      this.ammo.setCurrentAmmoManager(this.ammo.getSMGAmmo())
-      // Update HUD with new weapon's ammo
-      this.onAmmoChange(this.ammo.getAmmoState())
-    }
   }
 
   // Called by main game loop to render weapon overlay
@@ -332,12 +305,14 @@ export class FirstPersonWeapon implements GameSystem {
   setHUDSystem(hudSystem: any): void {
     this.hudSystem = hudSystem
     this.firing.setHUDSystem(hudSystem)
+    this.switching.setHUDSystem(hudSystem)
   }
 
   setAudioManager(audioManager: AudioManager): void {
     this.audioManager = audioManager
     this.firing.setAudioManager(audioManager)
     this.reload.setAudioManager(audioManager)
+    this.switching.setAudioManager(audioManager)
   }
 
   setStatsTracker(statsTracker: PlayerStatsTracker): void {
