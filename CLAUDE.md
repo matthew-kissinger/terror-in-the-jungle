@@ -171,10 +171,11 @@ Known hotspots:
 
 - **GrenadeEffects per-detonation Vector3 allocations** - FIXED. Module-level scratch vectors `_lookDirection`, `_toCombatant`, `_offset`, `_spawnPos`, `_velocity` replace per-detonation allocations.
 
+- **ImprovedChunk.getPosition() per-call Vector3** - FIXED. Cached `_position` in constructor, `getPosition()` returns pre-allocated vector (uncommitted - task 214d0956).
+- **PlayerController.getPosition()/getVelocity() clone** - FIXED. Target-vector pattern: `getPosition(target?: THREE.Vector3)` avoids allocation when caller provides target (uncommitted - task 214d0956).
+- **WeaponShotCommandBuilder per-shot clones** - FIXED. Removed unnecessary `.clone()` on `_origin` and `_direction` scratch vectors (uncommitted - task 214d0956).
+
 Discovered hotspots (not yet fixed):
-- **ImprovedChunk.getPosition() per-call Vector3** - Line 378. Creates `new THREE.Vector3()` every call. Called once per active chunk per frame from ChunkLifecycleManager and TerrainMeshMerger.
-- **PlayerController.getPosition()/getVelocity() clone** - Lines 290-291. Returns `.clone()` every call. Called 10+ times per frame from SystemUpdater, WeaponPickupSystem, and AI systems.
-- **WeaponShotCommandBuilder per-shot clones** - Lines 32-44. `.clone()` on origin/direction for every shot despite module-level scratch vectors existing.
 - **MortarBallistics computeTrajectory() clones** - Lines 60-80. Still creates 100+ Vector3 via `.clone()` per trajectory computation (builds output array, not per-frame). Lower priority.
 - **DeathCamSystem innerHTML in showOverlay()** - Uses innerHTML for kill details. One-time call per death (not per-frame), low impact.
 
@@ -185,13 +186,7 @@ Possible areas (confirm with profiling):
 
 ### Event Listener Leaks (Memory)
 
-**Not all fixed.** LoadingScreen and LoadingScreenWithModes still have untracked event listeners.
-
-**Unfixed:**
-- LoadingScreen.ts (lines 270-289) - Click handlers on zoneControlCard, openFrontierCard, playButton, settingsButton, howToPlayButton added as arrow functions, not stored for removal in dispose().
-- LoadingScreenWithModes.ts (lines 240-259) - Same pattern, click handlers not stored for removal.
-
-**Fixed** (stored bound refs, added dispose):
+**All tracked event listeners now have cleanup.** No known leaks remaining.
 
 **Fixed** (stored bound refs, added dispose):
 - PlayerInput, WeaponInput, WeaponModel, InventoryManager, PlayerSquadController, WeaponPickupSystem - bound function properties
@@ -201,12 +196,14 @@ Possible areas (confirm with profiling):
 - SquadRadialMenu.ts mouseenter listeners - stored handlers, removed in dispose()
 - LoadoutSelector.ts click listeners - stored handlers, removed in dispose()
 - PixelArtSandboxInput.ts resize/keydown listeners - exports disposeEventListeners()
+- LoadingScreen.ts click listeners - stored handlers, removed in dispose() (commit c042666)
+- LoadingScreenWithModes.ts click listeners - stored handlers, removed in dispose() (commit c042666)
 
 **Console.log migration: COMPLETE.** All calls migrated to Logger. Only ChunkWorkerCode.ts (worker context, no Logger access) retains console.log.
 
 ### Known Tech Debt
 
-- **73 `: any` type annotations** across ~30 files + 49 `as any` casts across ~16 files (heaviest: SystemInterfaces.ts with 18 `: any` - intentional). Reduced from 135 via targeted refactoring. WeaponFiring.ts `as any` casts eliminated. CombatantSystem.handlePlayerShot() return type fixed (commit ababb6f). IHUDSystem expanded to 28 methods (commit d449418). ICombatantSystem expanded to eliminate all SystemConnector `as any` casts (commit 24fcb35). ISandboxRenderer typing fixed (commit 60c8930). SandboxSystemManager `as any` casts eliminated (commit bcba4c6). Remaining `as any` heaviest: ChunkLoadQueueManager.ts (4), WaterSystem.ts (4), AssetLoader.ts (4), CompassZoneMarkers.ts (3).
+- **47 `: any` type annotations** across ~19 files + 44 `as any` casts across ~24 files (heaviest: SystemInterfaces.ts with 18 `: any` - intentional). Reduced from 135 via targeted refactoring. WeaponFiring.ts `as any` casts eliminated. CombatantSystem.handlePlayerShot() return type fixed (commit ababb6f). IHUDSystem expanded to 28 methods (commit d449418). ICombatantSystem expanded to eliminate all SystemConnector `as any` casts (commit 24fcb35). ISandboxRenderer typing fixed (commit 60c8930). SandboxSystemManager `as any` casts eliminated (commit bcba4c6). CompassZoneMarkers `as any` casts eliminated via IZoneManager expansion (task 0d899703). Interfaces expanded to eliminate weapon/respawn `any` types (commit c4f4b26). Remaining `as any` heaviest: ChunkLoadQueueManager.ts (4), WaterSystem.ts (4), AssetLoader.ts (4) - all expected patterns (feature detection, shader uniforms, image elements).
 - **Logger emoji removal COMPLETE** - All Logger calls cleaned. Remaining ~35 emoji characters across 8 UI files (KillFeed, LoadingPanels, etc.) are intentional UI icons, not Logger calls.
 - **NPC-to-NPC assists not tracked** - Scoreboard shows NPC assists as 0. Player assists tracked via KillAssistTracker, but per-NPC assist display would need additional wiring.
 - **Scoreboard toggle** - FIXED. TAB key wired to toggleScoreboard() (commit 48169fa).
@@ -214,6 +211,9 @@ Possible areas (confirm with profiling):
 - **TicketSystem.restartMatch() unused** - In-memory match reset method exists (lines 351-364) but UI uses `window.location.reload()` instead.
 - **IPlayerController interface incorrect** - Has `tryEnterHelicopter()`, `position`, `camera` that don't match PlayerController class (tryEnterHelicopter is on HelicopterModel, position/camera are private). Interface is unused currently but blocks any-reduction work that tries to use it.
 - **No unit/integration tests** - No test framework installed (Vitest, Jest, etc.). No *.test.ts or *.spec.ts files.
+- **Missing audio** - Grenade throw/pin pull, mortar launch sounds not configured in audio.ts. Weapon pickup feedback also absent.
+- **Mortar camera disabled** - `PixelArtSandboxLoop.ts` line 34 has mortar camera logic disabled. MortarSystem fully implemented but camera view switching not integrated.
+- **Weapon balance asymmetry** - OPFOR AK-74 deals 38 damage/shot vs US M16A4 26 damage/shot (46% advantage). See CombatantFactory.ts lines 106-140.
 
 ### Missing Pieces
 
@@ -314,7 +314,9 @@ src/
 - **WASD** Move, **Shift** Sprint, **Space** Jump
 - **Click** Fire, **RClick** ADS, **R** Reload
 - **1-6** Weapons (1-3 Primary, 4 Sandbag, 5 Grenade, 6 Pistol), **G** Grenade
-- **F1** Console stats, **F2** Performance overlay
+- **TAB** Scoreboard, **F1** Console stats, **F2** Performance overlay
+- **Z** Toggle squad command UI
+- **Shift+1-5** Squad commands (Follow Me, Hold Position, Patrol Here, Retreat, Free Roam)
 
 ## Development
 
