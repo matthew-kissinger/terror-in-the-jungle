@@ -161,6 +161,12 @@ export class HUDSystem implements GameSystem {
     this.elements.spawnScorePopup('assist', 25);
   }
 
+  addAssist(): void {
+    this.statsTracker.addAssist();
+    // Spawn score popup for kill assist
+    this.elements.spawnScorePopup('assist', 50);
+  }
+
   spawnScorePopup(type: 'capture' | 'defend' | 'secured' | 'kill' | 'headshot' | 'assist', points: number, multiplier?: number): void {
     this.elements.spawnScorePopup(type, points, multiplier);
   }
@@ -177,6 +183,7 @@ export class HUDSystem implements GameSystem {
     const matchStats: MatchStats = {
       kills: playerStats.kills,
       deaths: playerStats.deaths,
+      assists: playerStats.assists,
       zonesCaptured: playerStats.zonesCaptured,
       matchDuration: gameState.matchDuration,
       usTickets: this.ticketSystem.getTickets(Faction.US),

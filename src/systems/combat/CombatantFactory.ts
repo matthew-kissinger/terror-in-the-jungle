@@ -56,6 +56,9 @@ export class CombatantFactory {
       // 40% of OPFOR are objective-focused (less aggressive)
       isObjectiveFocused: faction === Faction.OPFOR && Math.random() < 0.4,
 
+      kills: 0,
+      deaths: 0,
+
       ...squadData
     };
 
@@ -93,7 +96,9 @@ export class CombatantFactory {
       lastUpdateTime: 0,
       updatePriority: 0,
       lodLevel: 'high',
-      isPlayerProxy: true
+      isPlayerProxy: true,
+      kills: 0,
+      deaths: 0
     };
     return proxy;
   }

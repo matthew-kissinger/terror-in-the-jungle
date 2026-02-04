@@ -15,6 +15,7 @@ export interface PlayerStats {
   longestKill: number;
   grenadesThrown: number;
   grenadeKills: number;
+  assists: number;
 }
 
 export class PlayerStatsTracker {
@@ -31,7 +32,8 @@ export class PlayerStatsTracker {
     shotsHit: 0,
     longestKill: 0,
     grenadesThrown: 0,
-    grenadeKills: 0
+    grenadeKills: 0,
+    assists: 0
   };
 
   startMatch(): void {
@@ -48,7 +50,8 @@ export class PlayerStatsTracker {
       shotsHit: 0,
       longestKill: 0,
       grenadesThrown: 0,
-      grenadeKills: 0
+      grenadeKills: 0,
+      assists: 0
     };
     Logger.info('stats', '📊 Match stats tracking started');
   }
@@ -61,6 +64,10 @@ export class PlayerStatsTracker {
     if (this.stats.currentKillStreak > this.stats.bestKillStreak) {
       this.stats.bestKillStreak = this.stats.currentKillStreak;
     }
+  }
+
+  addAssist(): void {
+    this.stats.assists++;
   }
 
   addDeath(): void {
@@ -136,7 +143,8 @@ export class PlayerStatsTracker {
       shotsHit: 0,
       longestKill: 0,
       grenadesThrown: 0,
-      grenadeKills: 0
+      grenadeKills: 0,
+      assists: 0
     };
   }
 }

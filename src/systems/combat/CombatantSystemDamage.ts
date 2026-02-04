@@ -64,6 +64,17 @@ export class CombatantSystemDamage {
           combatant.health = 0;
           combatant.state = CombatantState.DEAD;
 
+          // Increment death count for killed combatant
+          combatant.deaths++;
+
+          // Increment kill count for attacker (if exists and is not player proxy)
+          if (attackerId) {
+            const attacker = this.combatants.get(attackerId);
+            if (attacker && !attacker.isPlayerProxy) {
+              attacker.kills++;
+            }
+          }
+
           // Process kill assists
           if (combatant.damageHistory && combatant.damageHistory.length > 0) {
             KillAssistTracker.processKillAssists(combatant, attackerId);

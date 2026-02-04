@@ -7,6 +7,7 @@ import { createMatchEndScreenHTML } from './MatchEndScreenDOM';
 export interface MatchStats {
   kills: number;
   deaths: number;
+  assists: number;
   zonesCaptured: number;
   matchDuration: number;
   usTickets: number;

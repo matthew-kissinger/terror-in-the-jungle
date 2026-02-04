@@ -11,7 +11,9 @@ const _playerProxy: Combatant = {
   velocity: new THREE.Vector3(),
   state: CombatantState.ENGAGING,
   health: 100,
-  maxHealth: 100
+  maxHealth: 100,
+  kills: 0,
+  deaths: 0
 } as Combatant;
 
 /**

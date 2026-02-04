@@ -149,9 +149,22 @@ export class CombatantDamage {
   ): void {
     target.state = CombatantState.DEAD;
 
+    // Increment death count for target
+    target.deaths++;
+
+    // Increment kill count for attacker (if exists and is not player proxy)
+    if (attacker && !attacker.isPlayerProxy) {
+      attacker.kills++;
+    }
+
     // Process kill assists
     if (target.damageHistory && target.damageHistory.length > 0) {
-      KillAssistTracker.processKillAssists(target, attacker?.id);
+      const assisters = KillAssistTracker.processKillAssists(target, attacker?.id);
+      
+      // Check if player gets an assist
+      if (this.hudSystem && assisters.has('PLAYER')) {
+        this.hudSystem.addAssist();
+      }
     }
 
     // Initialize death animation

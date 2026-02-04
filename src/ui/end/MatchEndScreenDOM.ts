@@ -55,6 +55,10 @@ export function createMatchEndScreenHTML(
             <span class="stat-value highlight">${stats.kills}</span>
           </div>
           <div class="stat-row">
+            <span class="stat-label">Assists</span>
+            <span class="stat-value highlight">${stats.assists}</span>
+          </div>
+          <div class="stat-row">
             <span class="stat-label">Deaths</span>
             <span class="stat-value">${stats.deaths}</span>
           </div>

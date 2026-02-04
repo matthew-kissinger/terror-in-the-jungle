@@ -5,6 +5,7 @@ import { Faction } from '../../systems/combat/types';
 interface PlayerScore {
   name: string;
   kills: number;
+  assists: number;
   deaths: number;
   score: number;
   isPlayer: boolean;
@@ -75,8 +76,9 @@ export class Scoreboard {
     const playerScore: PlayerScore = {
       name: 'You',
       kills: playerStats.kills,
+      assists: playerStats.assists,
       deaths: playerStats.deaths,
-      score: playerStats.kills * 100 + playerStats.zonesCaptured * 50,
+      score: playerStats.kills * 100 + playerStats.assists * 50 + playerStats.zonesCaptured * 50,
       isPlayer: true
     };
 
@@ -125,6 +127,7 @@ export class Scoreboard {
           <td style="padding: 8px; text-align: center;">${index + 1}</td>
           <td style="padding: 8px; ${player.isPlayer ? 'font-weight: bold; color: #ffd700;' : ''}">${player.name}</td>
           <td style="padding: 8px; text-align: center; color: #4ade80;">${player.kills}</td>
+          <td style="padding: 8px; text-align: center; color: #60a5fa;">${player.assists}</td>
           <td style="padding: 8px; text-align: center; color: #f87171;">${player.deaths}</td>
           <td style="padding: 8px; text-align: center; color: #fbbf24;">${kdRatio}</td>
           <td style="padding: 8px; text-align: center; font-weight: bold;">${player.score}</td>
@@ -139,6 +142,7 @@ export class Scoreboard {
             <th style="padding: 8px; text-align: center; opacity: 0.7; font-size: 11px;">#</th>
             <th style="padding: 8px; text-align: left; opacity: 0.7; font-size: 11px;">Name</th>
             <th style="padding: 8px; text-align: center; opacity: 0.7; font-size: 11px;">K</th>
+            <th style="padding: 8px; text-align: center; opacity: 0.7; font-size: 11px;">A</th>
             <th style="padding: 8px; text-align: center; opacity: 0.7; font-size: 11px;">D</th>
             <th style="padding: 8px; text-align: center; opacity: 0.7; font-size: 11px;">K/D</th>
             <th style="padding: 8px; text-align: center; opacity: 0.7; font-size: 11px;">Score</th>
@@ -157,16 +161,18 @@ export class Scoreboard {
     const npcScores: PlayerScore[] = [];
 
     combatants.forEach(combatant => {
-      // Estimate kills/deaths from combatant state
-      // In a real implementation, you'd track these stats per combatant
-      const estimatedKills = Math.floor(Math.random() * 10);
-      const estimatedDeaths = combatant.health <= 0 ? 1 : 0;
+      // Use real tracked stats per combatant
+      const kills = combatant.kills || 0;
+      const deaths = combatant.deaths || 0;
+      // Assists are not yet tracked per-combatant (only player assists tracked)
+      const assists = 0;
 
       npcScores.push({
         name: `${combatant.faction}-${combatant.id.slice(-4)}`,
-        kills: estimatedKills,
-        deaths: estimatedDeaths,
-        score: estimatedKills * 100,
+        kills: kills,
+        assists: assists,
+        deaths: deaths,
+        score: kills * 100 + assists * 50,
         isPlayer: false
       });
     });

@@ -92,6 +92,8 @@ export interface Combatant {
   lastDefenseReassignTime?: number;
   isFlankingMove?: boolean;
   damageHistory?: Array<{ attackerId: string; damage: number; timestamp: number }>;
+  kills: number;
+  deaths: number;
 }
 
 export enum SquadCommand {
