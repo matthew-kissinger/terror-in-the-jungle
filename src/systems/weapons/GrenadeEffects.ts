@@ -13,6 +13,9 @@ import { spatialGridManager } from '../combat/SpatialGridManager';
 // Module-level scratch vectors for direction calculations
 const _lookDirection = new THREE.Vector3();
 const _toCombatant = new THREE.Vector3();
+const _offset = new THREE.Vector3();
+const _spawnPos = new THREE.Vector3();
+const _velocity = new THREE.Vector3();
 
 /**
  * Handles different grenade type explosion effects
@@ -61,13 +64,14 @@ export class GrenadeEffects {
     // Additional debris/impact effects for more detail
     if (impactEffectsPool) {
       for (let i = 0; i < 15; i++) {
-        const offset = new THREE.Vector3(
+        _offset.set(
           (Math.random() - 0.5) * 3,
           Math.random() * 1.5,
           (Math.random() - 0.5) * 3
         );
-        const effectPos = grenade.position.clone().add(offset);
-        impactEffectsPool.spawn(effectPos, new THREE.Vector3(0, 1, 0));
+        _spawnPos.copy(grenade.position).add(_offset);
+        _velocity.set(0, 1, 0);
+        impactEffectsPool.spawn(_spawnPos, _velocity);
       }
     }
 
@@ -98,13 +102,14 @@ export class GrenadeEffects {
     // Spawn multiple smoke particles for a smoke cloud
     if (impactEffectsPool) {
       for (let i = 0; i < 30; i++) {
-        const offset = new THREE.Vector3(
+        _offset.set(
           (Math.random() - 0.5) * 5,
           Math.random() * 3,
           (Math.random() - 0.5) * 5
         );
-        const effectPos = grenade.position.clone().add(offset);
-        impactEffectsPool.spawn(effectPos, new THREE.Vector3(0, 0.5, 0));
+        _spawnPos.copy(grenade.position).add(_offset);
+        _velocity.set(0, 0.5, 0);
+        impactEffectsPool.spawn(_spawnPos, _velocity);
       }
     }
 
