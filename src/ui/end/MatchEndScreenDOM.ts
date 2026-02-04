@@ -6,6 +6,58 @@ import { Faction } from '../../systems/combat/types';
 import { GameState } from '../../systems/world/TicketSystem';
 import { MatchStats } from './MatchEndScreen';
 
+interface Award {
+  name: string;
+  value: string;
+}
+
+function generateAwards(stats: MatchStats): Award[] {
+  const awards: Award[] = [];
+
+  // Kill Streak - Show if bestKillStreak >= 3
+  if (stats.bestKillStreak >= 3) {
+    awards.push({
+      name: 'Kill Streak',
+      value: `${stats.bestKillStreak} kills`
+    });
+  }
+
+  // Sharpshooter - Show if accuracy >= 40%
+  const accuracy = Math.round(stats.accuracy * 100);
+  if (accuracy >= 40) {
+    awards.push({
+      name: 'Sharpshooter',
+      value: `${accuracy}% accuracy`
+    });
+  }
+
+  // Long Range - Show if longestKill >= 50m
+  if (stats.longestKill >= 50) {
+    awards.push({
+      name: 'Long Range',
+      value: `${stats.longestKill}m`
+    });
+  }
+
+  // Grenade Expert - Show if grenadeKills >= 2
+  if (stats.grenadeKills >= 2) {
+    awards.push({
+      name: 'Grenade Expert',
+      value: `${stats.grenadeKills} grenade kills`
+    });
+  }
+
+  // Untouchable - Show if deaths == 0
+  if (stats.deaths === 0) {
+    awards.push({
+      name: 'Untouchable',
+      value: 'No deaths'
+    });
+  }
+
+  return awards;
+}
+
 export function createMatchEndScreenHTML(
   winner: Faction,
   gameState: GameState,
@@ -20,6 +72,21 @@ export function createMatchEndScreenHTML(
   const kd = stats.deaths > 0 ? (stats.kills / stats.deaths).toFixed(2) : stats.kills.toFixed(2);
   const headshotPct = stats.kills > 0 ? Math.round((stats.headshots / stats.kills) * 100) : 0;
   const accuracy = Math.round(stats.accuracy * 100);
+
+  const awards = generateAwards(stats);
+  const awardsHTML = awards.length > 0 ? `
+    <div class="awards-section">
+      <div class="awards-title">Match Awards</div>
+      <div class="awards-container">
+        ${awards.map(award => `
+          <div class="award-badge">
+            <div class="award-name">${award.name}</div>
+            <div class="award-value">${award.value}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  ` : '';
 
   return `
     <div class="end-screen-header">
@@ -109,6 +176,8 @@ export function createMatchEndScreenHTML(
         </div>
       </div>
     </div>
+
+    ${awardsHTML}
 
     <div class="end-screen-actions">
       <button class="end-screen-button primary play-again-btn">Play Again</button>

@@ -19,6 +19,9 @@ export interface MatchStats {
   longestKill: number;
   grenadesThrown: number;
   grenadeKills: number;
+  bestKillStreak: number;
+  shotsFired: number;
+  shotsHit: number;
 }
 
 export class MatchEndScreen {

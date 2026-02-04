@@ -120,7 +120,7 @@ export class HUDSystem implements GameSystem {
     this.elements.dispose();
     this.styles.dispose();
     this.matchEndScreen.dispose();
-    Logger.info('hud', '🧹 HUD System disposed');
+    Logger.info('hud', 'HUD System disposed');
   }
 
   // Public API
@@ -194,7 +194,10 @@ export class HUDSystem implements GameSystem {
       accuracy: playerStats.shotsFired > 0 ? playerStats.shotsHit / playerStats.shotsFired : 0,
       longestKill: playerStats.longestKill,
       grenadesThrown: playerStats.grenadesThrown,
-      grenadeKills: playerStats.grenadeKills
+      grenadeKills: playerStats.grenadeKills,
+      bestKillStreak: playerStats.bestKillStreak,
+      shotsFired: playerStats.shotsFired,
+      shotsHit: playerStats.shotsHit
     };
 
     Logger.info('hud', ' Showing match end screen with stats:', matchStats);

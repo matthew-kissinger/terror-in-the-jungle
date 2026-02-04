@@ -223,4 +223,80 @@ export const MATCH_END_SCREEN_STYLES = `
   .end-screen-button.primary:hover {
     background: rgba(127, 180, 217, 0.6);
   }
+
+  .awards-section {
+    margin-top: 2rem;
+    animation: fadeInUp 1s ease-out 0.6s backwards;
+  }
+
+  .awards-title {
+    text-align: center;
+    font-size: 1.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 1rem;
+    color: #7FB4D9;
+  }
+
+  .awards-container {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .award-badge {
+    background: rgba(127, 180, 217, 0.2);
+    border: 2px solid rgba(127, 180, 217, 0.5);
+    border-radius: 8px;
+    padding: 1rem 1.5rem;
+    min-width: 150px;
+    text-align: center;
+    transition: all 0.3s ease;
+  }
+
+  .victory .award-badge {
+    border-color: rgba(76, 175, 80, 0.5);
+  }
+
+  .defeat .award-badge {
+    border-color: rgba(244, 67, 54, 0.5);
+  }
+
+  .award-badge:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(127, 180, 217, 0.3);
+  }
+
+  .victory .award-badge:hover {
+    box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+  }
+
+  .defeat .award-badge:hover {
+    box-shadow: 0 5px 15px rgba(244, 67, 54, 0.4);
+  }
+
+  .award-name {
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.5rem;
+    color: #fff;
+    font-weight: bold;
+  }
+
+  .award-value {
+    font-size: 1.2rem;
+    color: #7FB4D9;
+    font-weight: bold;
+  }
+
+  .victory .award-value {
+    color: #4CAF50;
+  }
+
+  .defeat .award-value {
+    color: #F44336;
+  }
 `;
+
