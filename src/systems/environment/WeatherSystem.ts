@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { IChunkManager, IAudioManager, ISandboxRenderer } from '../../types/SystemInterfaces';
 import { WeatherState, WeatherConfig } from '../../config/gameModes';
+import { updateLightning, LightningState } from './WeatherLightning';
+import { updateAtmosphere, getBlendedRainIntensity, AtmosphereBaseValues } from './WeatherAtmosphere';
 
 export class WeatherSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -29,11 +31,11 @@ export class WeatherSystem implements GameSystem {
   private rainPositions: Float32Array;
 
   // Lightning
-  private lightningTimer: number = 0;
-  private isFlashing: boolean = false;
-  private flashDuration: number = 0.15;
-  private flashTimer: number = 0;
-  private thunderDelay: number = 0;
+  private lightningState: LightningState = {
+    isFlashing: false,
+    flashTimer: 0,
+    thunderDelay: 0
+  };
   
   // Underwater state
   private isUnderwater: boolean = false;
@@ -195,10 +197,9 @@ export class WeatherSystem implements GameSystem {
     if (instant) {
       this.currentState = state;
       this.transitionProgress = 1.0;
-      this.applyAtmosphere(state, 1.0);
+      this.updateAtmosphere();
     } else {
       this.transitionProgress = 0.0;
-      // Start transition
     }
   }
 
@@ -216,7 +217,7 @@ export class WeatherSystem implements GameSystem {
     if (!this.rainMesh) return;
 
     // Determine rain intensity based on blended state
-    const intensity = this.getBlendedRainIntensity();
+    const intensity = getBlendedRainIntensity(this.currentState, this.targetState, this.transitionProgress);
     
     if (intensity <= 0.01) {
       this.rainMesh.visible = false;
@@ -270,173 +271,37 @@ export class WeatherSystem implements GameSystem {
   }
 
   private updateLightning(deltaTime: number): void {
-    if (this.isFlashing) {
-      this.flashTimer -= deltaTime;
-      if (this.flashTimer <= 0) {
-        this.isFlashing = false;
-        // Restore lights
-        this.updateAtmosphere(); // Will reset to current weather state
-      }
-    } else {
-      // Check for thunder audio trigger
-      if (this.thunderDelay > 0) {
-        this.thunderDelay -= deltaTime;
-        if (this.thunderDelay <= 0) {
-           this.playThunderSound();
-        }
-      }
-
-      // Only storm generates lightning
-      if (this.currentState === WeatherState.STORM || this.targetState === WeatherState.STORM) {
-        const stormIntensity = this.transitionProgress; // Simplified
-        if (Math.random() < 0.005 * stormIntensity) { // Chance per frame
-           this.triggerLightning();
-        }
-      }
-    }
-  }
-
-  private triggerLightning(): void {
-    this.isFlashing = true;
-    this.flashTimer = this.flashDuration;
-    
-    // Flash visual
-    if (this.sandboxRenderer && this.sandboxRenderer.moonLight && this.sandboxRenderer.ambientLight) {
-       this.sandboxRenderer.moonLight.intensity = 2.0;
-       this.sandboxRenderer.ambientLight.intensity = 1.0;
-       if (this.sandboxRenderer.fog) {
-         // Brighten fog momentarily
-         const originalColor = this.sandboxRenderer.fog.color.getHex();
-         this.sandboxRenderer.fog.color.setHex(0x4a6b8a); // Blue-white flash
-         // Timeout to reset color is handled by updateAtmosphere being called every frame
-       }
-    }
-
-    // Schedule thunder
-    const distance = 500 + Math.random() * 1000; // Simulated distance
-    this.thunderDelay = distance / 343; // Speed of sound roughly
-  }
-
-  private playThunderSound(): void {
-    if (this.audioManager) {
-      // Play thunder sound - assuming 'thunder' asset exists or fallback
-      // Since we don't know if asset exists, we might need to check or add it
-      // For now, logging
-      // console.log('⚡ Thunderclap!');
-      // this.audioManager.play('thunder'); 
-    }
+    updateLightning(
+      deltaTime,
+      this.lightningState,
+      this.currentState,
+      this.targetState,
+      this.transitionProgress,
+      this.sandboxRenderer,
+      this.audioManager,
+      () => this.updateAtmosphere()
+    );
   }
 
   private updateAtmosphere(): void {
-    if (!this.sandboxRenderer) return;
+    const baseValues: AtmosphereBaseValues = {
+      fogDensity: this.baseFogDensity,
+      ambientIntensity: this.baseAmbientIntensity,
+      moonIntensity: this.baseMoonIntensity,
+      jungleIntensity: this.baseJungleIntensity,
+      fogColor: this.baseFogColor,
+      ambientColor: this.baseAmbientColor
+    };
 
-    if (this.isUnderwater) {
-      // Apply underwater atmosphere immediately
-      if (this.sandboxRenderer.fog) {
-        this.sandboxRenderer.fog.density = 0.04; // Very dense fog
-        this.sandboxRenderer.fog.color.setHex(0x003344); // Deep blue-green
-      }
-      if (this.sandboxRenderer.ambientLight) {
-        this.sandboxRenderer.ambientLight.intensity = 0.5;
-        this.sandboxRenderer.ambientLight.color.setHex(0x004455);
-      }
-      if (this.sandboxRenderer.moonLight) {
-        this.sandboxRenderer.moonLight.intensity = 0.0; // No direct moonlight
-      }
-      if (this.sandboxRenderer.jungleLight) {
-        this.sandboxRenderer.jungleLight.intensity = 0.1;
-      }
-      return; // Skip normal weather atmosphere
-    }
-
-    // Blend between current and target state
-    const currentParams = this.getWeatherParams(this.currentState);
-    const targetParams = this.getWeatherParams(this.targetState);
-    const t = this.transitionProgress;
-
-    // Lerp values
-    const fogDensity = currentParams.fogDensity * (1 - t) + targetParams.fogDensity * t;
-    const ambientInt = currentParams.ambientIntensity * (1 - t) + targetParams.ambientIntensity * t;
-    const moonInt = currentParams.moonIntensity * (1 - t) + targetParams.moonIntensity * t;
-    const jungleInt = currentParams.jungleIntensity * (1 - t) + targetParams.jungleIntensity * t;
-
-    // Apply (override if lightning)
-    if (!this.isFlashing) {
-      if (this.sandboxRenderer.fog) {
-        this.sandboxRenderer.fog.density = fogDensity;
-        // Restore fog color from cached base (not hardcoded)
-        this.sandboxRenderer.fog.color.setHex(this.baseFogColor);
-      }
-      if (this.sandboxRenderer.ambientLight) {
-        this.sandboxRenderer.ambientLight.intensity = ambientInt;
-        // Restore ambient color from cached base (not hardcoded)
-        this.sandboxRenderer.ambientLight.color.setHex(this.baseAmbientColor);
-      }
-      if (this.sandboxRenderer.moonLight) this.sandboxRenderer.moonLight.intensity = moonInt;
-      if (this.sandboxRenderer.jungleLight) this.sandboxRenderer.jungleLight.intensity = jungleInt;
-    }
-  }
-
-  private getWeatherParams(state: WeatherState) {
-    switch (state) {
-      case WeatherState.CLEAR:
-        return {
-          fogDensity: this.baseFogDensity,
-          ambientIntensity: this.baseAmbientIntensity,
-          moonIntensity: this.baseMoonIntensity,
-          jungleIntensity: this.baseJungleIntensity
-        };
-      case WeatherState.LIGHT_RAIN:
-        return {
-          fogDensity: this.baseFogDensity * 1.5,
-          ambientIntensity: this.baseAmbientIntensity * 0.8,
-          moonIntensity: this.baseMoonIntensity * 0.7,
-          jungleIntensity: this.baseJungleIntensity * 0.8
-        };
-      case WeatherState.HEAVY_RAIN:
-        return {
-          fogDensity: this.baseFogDensity * 2.5,
-          ambientIntensity: this.baseAmbientIntensity * 0.6,
-          moonIntensity: this.baseMoonIntensity * 0.5,
-          jungleIntensity: this.baseJungleIntensity * 0.6
-        };
-      case WeatherState.STORM:
-        return {
-          fogDensity: this.baseFogDensity * 3.5,
-          ambientIntensity: this.baseAmbientIntensity * 0.4,
-          moonIntensity: this.baseMoonIntensity * 0.3,
-          jungleIntensity: this.baseJungleIntensity * 0.4
-        };
-      default:
-        return {
-          fogDensity: this.baseFogDensity,
-          ambientIntensity: this.baseAmbientIntensity,
-          moonIntensity: this.baseMoonIntensity,
-          jungleIntensity: this.baseJungleIntensity
-        };
-    }
-  }
-
-  private getBlendedRainIntensity(): number {
-    const current = this.getRainIntensity(this.currentState);
-    const target = this.getRainIntensity(this.targetState);
-    return current * (1 - this.transitionProgress) + target * this.transitionProgress;
-  }
-
-  private getRainIntensity(state: WeatherState): number {
-    switch (state) {
-      case WeatherState.CLEAR: return 0.0;
-      case WeatherState.LIGHT_RAIN: return 0.3;
-      case WeatherState.HEAVY_RAIN: return 0.8;
-      case WeatherState.STORM: return 1.0;
-      default: return 0.0;
-    }
-  }
-
-  // Used by instant apply
-  private applyAtmosphere(state: WeatherState, progress: number): void {
-      // Just force update
-      this.updateAtmosphere();
+    updateAtmosphere(
+      this.sandboxRenderer,
+      this.isUnderwater,
+      this.currentState,
+      this.targetState,
+      this.transitionProgress,
+      baseValues,
+      this.lightningState.isFlashing
+    );
   }
 
   dispose(): void {
