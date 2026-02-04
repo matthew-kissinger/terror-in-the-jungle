@@ -87,15 +87,14 @@ CombatantSystem has distance-based LOD:
 | CombatantSystem.ts | 428 | systems/combat/ |
 | WeaponFiring.ts | 425 | systems/player/weapon/ |
 | MortarSystem.ts | 425 | systems/weapons/ |
-| FirstPersonWeapon.ts | 421 | systems/player/ |
-| ChunkWorkerCode.ts | 421 | systems/terrain/ |
 | GPUTerrain.ts | 422 | systems/terrain/ |
+| ChunkWorkerCode.ts | 421 | systems/terrain/ |
 | ZoneManager.ts | 413 | systems/world/ |
-| PerformanceTelemetry.ts | 407 | systems/debug/ |
+| PerformanceTelemetry.ts | 408 | systems/debug/ |
 | DeathCamSystem.ts | 406 | systems/player/ |
 | ImprovedChunk.ts | 402 | systems/terrain/ |
 
-**Completed splits**: CombatantSystem (1308->538->428, extracted CombatantSystemDamage + CombatantSystemSetters + CombatantSystemUpdate), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453->272, extracted AudioWeaponSounds), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468->380, extracted CombatantCombatEffects), FootstepAudioSystem (587->326), ImprovedChunkManager (753->529->385, extracted ChunkPriorityManager + ChunkLifecycleManager + ChunkLoadQueueManager + ChunkTerrainQueries), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer), AIFlankingSystem (606->359, extracted FlankingRoleManager + FlankingTacticsResolver), FullMapSystem (574->365, extracted FullMapDOMHelpers + FullMapInput + FullMapStyles), AITargeting (571->94, extracted AITargetAcquisition + AILineOfSight), CombatantMovement (504->129, extracted CombatantMovementStates + CombatantMovementCommands), PixelArtSandbox (551->144, extracted PixelArtSandboxInit + PixelArtSandboxInput + PixelArtSandboxLoop), InfluenceMapSystem (570->329, extracted InfluenceMapComputations + InfluenceMapGrid), ExplosionEffectsPool (489->161, extracted ExplosionEffectFactory + ExplosionParticleUpdater + ExplosionSpawnInitializer + ExplosionTextures), OpenFrontierRespawnMap (531->194, extracted OpenFrontierRespawnMapUtils + OpenFrontierRespawnMapRenderer), gameModes (496->40, extracted GameModeZoneControl + GameModeOpenFrontier + GameModeCommon), SpatialOctree (487->257, extracted SpatialOctreeNode + SpatialOctreeQuery), HUDStyles (483->40, extracted HUDBaseStyles + HUDStatusStyles + HUDWeaponStyles + HUDZoneStyles), AICoverSystem (458->371, extracted AICoverEvaluation), SandboxRenderer (431->203, extracted SandboxCrosshairUI + SandboxLoadingUI), WeatherSystem (449->314, extracted WeatherAtmosphere + WeatherLightning), CompassSystem (454->95, extracted CompassStyles + CompassDOMBuilder + CompassZoneMarkers), ChunkLifecycleManager (448->287, extracted ChunkLoadingStrategy + ChunkSpatialUtils), FirstPersonWeapon (445->421, extracted WeaponSwitching), MatchEndScreen (434->120, extracted MatchEndScreenDOM + MatchEndScreenStyles), MinimapSystem (440->117, extracted MinimapDOMBuilder + MinimapRenderer + MinimapStyles). 13 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538->428, extracted CombatantSystemDamage + CombatantSystemSetters + CombatantSystemUpdate), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453->272, extracted AudioWeaponSounds), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468->380, extracted CombatantCombatEffects), FootstepAudioSystem (587->326), ImprovedChunkManager (753->529->385, extracted ChunkPriorityManager + ChunkLifecycleManager + ChunkLoadQueueManager + ChunkTerrainQueries), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer), AIFlankingSystem (606->359, extracted FlankingRoleManager + FlankingTacticsResolver), FullMapSystem (574->365, extracted FullMapDOMHelpers + FullMapInput + FullMapStyles), AITargeting (571->94, extracted AITargetAcquisition + AILineOfSight), CombatantMovement (504->129, extracted CombatantMovementStates + CombatantMovementCommands), PixelArtSandbox (551->144, extracted PixelArtSandboxInit + PixelArtSandboxInput + PixelArtSandboxLoop), InfluenceMapSystem (570->329, extracted InfluenceMapComputations + InfluenceMapGrid), ExplosionEffectsPool (489->161, extracted ExplosionEffectFactory + ExplosionParticleUpdater + ExplosionSpawnInitializer + ExplosionTextures), OpenFrontierRespawnMap (531->194, extracted OpenFrontierRespawnMapUtils + OpenFrontierRespawnMapRenderer), gameModes (496->40, extracted GameModeZoneControl + GameModeOpenFrontier + GameModeCommon), SpatialOctree (487->257, extracted SpatialOctreeNode + SpatialOctreeQuery), HUDStyles (483->40, extracted HUDBaseStyles + HUDStatusStyles + HUDWeaponStyles + HUDZoneStyles), AICoverSystem (458->371, extracted AICoverEvaluation), SandboxRenderer (431->203, extracted SandboxCrosshairUI + SandboxLoadingUI), WeatherSystem (449->314, extracted WeatherAtmosphere + WeatherLightning), CompassSystem (454->95, extracted CompassStyles + CompassDOMBuilder + CompassZoneMarkers), ChunkLifecycleManager (448->287, extracted ChunkLoadingStrategy + ChunkSpatialUtils), FirstPersonWeapon (568->445->382, extracted WeaponAmmo + WeaponInput + WeaponModel + WeaponSwitching + WeaponShotCommandBuilder), MatchEndScreen (434->120, extracted MatchEndScreenDOM + MatchEndScreenStyles), MinimapSystem (440->117, extracted MinimapDOMBuilder + MinimapRenderer + MinimapStyles). 12 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -157,8 +156,10 @@ Known hotspots:
 
 Discovered hotspots (not yet fixed):
 - **MortarBallistics computeTrajectory() clones** - Lines 60-80. Still creates 100+ Vector3 via `.clone()` per trajectory computation (builds output array, not per-frame). Lower priority.
-- **DeathCamSystem per-frame innerHTML rebuild** - Line 362. kill details panel innerHTML rebuilt every frame during death cam. Should cache DOM nodes and use textContent updates.
-- **FirstPersonWeapon per-frame Vector3 fallback** - Line 131. Allocates new Vector3() every frame when playerController is null. Should use module-level scratch vector.
+- **DeathCamSystem innerHTML in showOverlay()** - Line 362. Uses innerHTML for kill details. One-time call per death (not per-frame), low impact.
+
+Fixed since last update:
+- **FirstPersonWeapon per-frame Vector3 fallback** - FIXED. Uses module-level scratch vector.
 
 Possible areas (confirm with profiling):
 - Worker utilization (are they saturated?)
@@ -167,20 +168,18 @@ Possible areas (confirm with profiling):
 
 ### Event Listener Leaks (Memory)
 
-**MOSTLY FIXED.** The `.bind()` bug and missing dispose cleanup have been addressed across most files.
+**ALL FIXED.** The `.bind()` bug and missing dispose cleanup have been addressed across all files.
 
 **Fixed** (stored bound refs, added dispose):
 - PlayerInput, WeaponInput, WeaponModel, InventoryManager, PlayerSquadController, WeaponPickupSystem - bound function properties
 - MatchEndScreen, GameModeSelection, LoadingPanels - added dispose()
 - OpenFrontierRespawnMap, RespawnMapView - added dispose()
+- WeaponInput.ts contextmenu listener - stored bound ref, removed in dispose()
+- SquadRadialMenu.ts mouseenter listeners - stored handlers, removed in dispose()
+- LoadoutSelector.ts click listeners - stored handlers, removed in dispose()
+- PixelArtSandboxInput.ts resize/keydown listeners - exports disposeEventListeners()
 
-**Remaining issues:**
-- WeaponInput.ts line 43: anonymous `contextmenu` listener added but never removed in dispose() (cannot removeEventListener on anonymous function).
-- SquadRadialMenu.ts line 136: anonymous `mouseenter` listeners on SVG paths never removed in dispose() - accumulates on each dialog open.
-- LoadoutSelector.ts line 198: anonymous `click` listeners on weapon options never removed in dispose() - accumulates on each loadout visit.
-- PixelArtSandboxInput.ts lines 7, 10: global `resize` and `keydown` listeners with no dispose/cleanup function - persist indefinitely.
-
-**Remaining console.log calls (24):** HelicopterModel.ts (6), HelicopterAudio.ts (2), CombatantDamage.ts (1), CombatantHitDetection.ts (1), ChunkLoadingStrategy.ts (2), ChunkLifecycleManager.ts (1), BillboardInstanceManager.ts (1), PerformanceTelemetry.ts (2), GPUTimingTelemetry.ts (3), PerformanceBenchmark.ts (2), ScorePopupSystem.ts (1), DamageNumberSystem.ts (1), PlayerHealthEffects.ts (1). Excludes ChunkWorkerCode.ts and Logger.ts.
+**Console.log migration: COMPLETE.** All calls migrated to Logger. Only ChunkWorkerCode.ts (worker context, no Logger access) and LoadingScreen.old.ts (dead code) retain console.log.
 
 ### Missing Pieces
 
@@ -228,7 +227,7 @@ perf.benchmark(1000)  // Runs 1000 raycast iterations, returns timing stats
 
 ## Architecture
 
-~51k lines across 258 files. Orchestrator pattern with ongoing split refactors.
+~51k lines across 259 files. Orchestrator pattern with ongoing split refactors.
 
 ```
 src/
