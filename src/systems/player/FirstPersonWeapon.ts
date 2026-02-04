@@ -24,6 +24,8 @@ import { Logger } from '../../utils/Logger'
 import type { HUDSystem } from '../../ui/hud/HUDSystem'
 import { AmmoState } from '../weapons/AmmoManager'
 
+const _zeroVelocity = new THREE.Vector3()
+
 /**
  * Thin orchestrator for first-person weapon system
  * Delegates to focused modules: WeaponRigManager, WeaponAnimations, WeaponFiring, WeaponReload,
@@ -131,7 +133,7 @@ export class FirstPersonWeapon implements GameSystem {
 
     // Get player movement state
     const isMoving = this.playerController?.isMoving() || false
-    const lookVelocity = this.playerController ? this.playerController.getVelocity() : new THREE.Vector3()
+    const lookVelocity = this.playerController ? this.playerController.getVelocity() : _zeroVelocity
 
     // Update animations (ADS, recoil, idle bob, sway, pump)
     this.animations.update(deltaTime, isMoving, lookVelocity)
