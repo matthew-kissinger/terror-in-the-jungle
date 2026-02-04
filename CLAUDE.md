@@ -196,11 +196,11 @@ Possible areas (confirm with profiling):
 
 ### Known Tech Debt
 
-- **75 `: any` type annotations** across 32 files + 70 `as any` casts across 33 files (heaviest: SystemInterfaces.ts with 19 - intentional). Reduced from 135 via targeted refactoring. WeaponFiring.ts `as any` casts eliminated. CombatantSystem.handlePlayerShot() return type fixed (commit ababb6f). IHUDSystem expanded to 28 methods (commit d449418).
+- **73 `: any` type annotations** across ~30 files + 63 `as any` casts across ~21 files (heaviest: SystemInterfaces.ts with 19 `: any` - intentional). Reduced from 135 via targeted refactoring. WeaponFiring.ts `as any` casts eliminated. CombatantSystem.handlePlayerShot() return type fixed (commit ababb6f). IHUDSystem expanded to 28 methods (commit d449418). SystemConnector.ts has 9 `as any` casts accessing internal CombatantSystem subsystems.
 - **Logger emoji removal COMPLETE** - All Logger calls cleaned. Remaining ~35 emoji characters across 8 UI files (KillFeed, LoadingPanels, etc.) are intentional UI icons, not Logger calls.
 - **NPC-to-NPC assists not tracked** - Scoreboard shows NPC assists as 0. Player assists tracked via KillAssistTracker, but per-NPC assist display would need additional wiring.
-- **Scoreboard toggle not wired** - `HUDSystem.toggleScoreboard()` is a stub (line 330). `Scoreboard.ts` is fully implemented (220 lines) but never instantiated. TAB key binding missing.
-- **Blob URL leak in ChunkWorkerLifecycle** - `URL.createObjectURL(blob)` called for worker creation but never revoked. `URL.revokeObjectURL()` needed in dispose().
+- **Scoreboard toggle** - FIXED. TAB key wired to toggleScoreboard() (commit 48169fa).
+- **Blob URL leak in ChunkWorkerLifecycle** - FIXED. URL.revokeObjectURL() added in dispose() (commit 3cc8a99).
 - **TicketSystem.restartMatch() unused** - In-memory match reset method exists (lines 351-364) but UI uses `window.location.reload()` instead.
 - **No unit/integration tests** - No test framework installed (Vitest, Jest, etc.). No *.test.ts or *.spec.ts files.
 
