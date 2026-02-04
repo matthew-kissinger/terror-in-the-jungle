@@ -152,6 +152,12 @@ export class CombatantCombat {
       accuracyMultiplier *= 2.0; // Increased full auto penalty
     }
 
+    // Apply flashbang disorientation penalty
+    if (combatant.flashDisorientedUntil && Date.now() < combatant.flashDisorientedUntil) {
+      // Severe accuracy penalty while disoriented (4x inaccuracy)
+      accuracyMultiplier *= 4.0;
+    }
+
     // Add distance-based accuracy degradation
     const targetPos = combatant.target?.id === 'PLAYER' ? playerPosition : combatant.target?.position;
     if (targetPos) {

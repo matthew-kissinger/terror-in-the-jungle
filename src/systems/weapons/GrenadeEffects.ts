@@ -1,6 +1,6 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
-import { GrenadeType } from '../combat/types';
+import { GrenadeType, Combatant, CombatantState } from '../combat/types';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { CombatantSystem } from '../combat/CombatantSystem';
@@ -8,9 +8,11 @@ import { AudioManager } from '../audio/AudioManager';
 import { Grenade } from './GrenadePhysics';
 import { FlashbangScreenEffect } from '../player/FlashbangScreenEffect';
 import { spawnSmokeCloud } from '../effects/SmokeCloudSystem';
+import { spatialGridManager } from '../combat/SpatialGridManager';
 
-// Module-level scratch vector for direction calculations
+// Module-level scratch vectors for direction calculations
 const _lookDirection = new THREE.Vector3();
+const _toCombatant = new THREE.Vector3();
 
 /**
  * Handles different grenade type explosion effects
@@ -154,7 +156,87 @@ export class GrenadeEffects {
       this.flashbangEffect.triggerFlash(grenade.position, playerPosition, _lookDirection);
     }
 
+    // Apply disorientation to nearby NPCs
+    this.applyNPCDisorientation(grenade.position, combatantSystem);
+
     Logger.info('weapons', 'Flashbang deployed - minimal damage, disorientation effect');
+  }
+
+  /**
+   * Apply disorientation effects to NPCs within range of flashbang.
+   * Uses distance-based duration: <15m = 3s severe, 15-25m = 1.5s moderate.
+   */
+  private applyNPCDisorientation(
+    flashPosition: THREE.Vector3,
+    combatantSystem: CombatantSystem | undefined
+  ): void {
+    if (!combatantSystem) return;
+
+    const FULL_DISORIENT_DISTANCE = 15;
+    const PARTIAL_DISORIENT_DISTANCE = 25;
+    const FULL_DISORIENT_DURATION_MS = 3000; // 3 seconds
+    const PARTIAL_DISORIENT_DURATION_MS = 1500; // 1.5 seconds
+
+    // Access combatants map directly
+    const allCombatants = combatantSystem.combatants;
+
+    let affectedCount = 0;
+
+    if (spatialGridManager.getIsInitialized()) {
+      // Efficient spatial query - only check NPCs within max range
+      const nearbyCombatantIds = spatialGridManager.queryRadius(flashPosition, PARTIAL_DISORIENT_DISTANCE);
+
+      for (const id of nearbyCombatantIds) {
+        const combatant = allCombatants.get(id);
+        if (!combatant) continue;
+        if (combatant.state === CombatantState.DEAD) continue;
+
+        _toCombatant.subVectors(combatant.position, flashPosition);
+        const distance = _toCombatant.length();
+
+        if (distance > PARTIAL_DISORIENT_DISTANCE) continue;
+
+        // Determine duration based on distance
+        let durationMs = 0;
+        if (distance <= FULL_DISORIENT_DISTANCE) {
+          durationMs = FULL_DISORIENT_DURATION_MS;
+        } else {
+          durationMs = PARTIAL_DISORIENT_DURATION_MS;
+        }
+
+        // Set disorientation timestamp
+        const currentTime = Date.now();
+        combatant.flashDisorientedUntil = currentTime + durationMs;
+        affectedCount++;
+      }
+    } else {
+      // Fallback: iterate all combatants (shouldn't happen, but safe)
+      allCombatants.forEach(combatant => {
+        if (combatant.state === CombatantState.DEAD) return;
+
+        _toCombatant.subVectors(combatant.position, flashPosition);
+        const distance = _toCombatant.length();
+
+        if (distance > PARTIAL_DISORIENT_DISTANCE) return;
+
+        // Determine duration based on distance
+        let durationMs = 0;
+        if (distance <= FULL_DISORIENT_DISTANCE) {
+          durationMs = FULL_DISORIENT_DURATION_MS;
+        } else {
+          durationMs = PARTIAL_DISORIENT_DURATION_MS;
+        }
+
+        // Set disorientation timestamp
+        const currentTime = Date.now();
+        combatant.flashDisorientedUntil = currentTime + durationMs;
+        affectedCount++;
+      });
+    }
+
+    if (affectedCount > 0) {
+      Logger.info('weapons', `Flashbang disoriented ${affectedCount} NPCs`);
+    }
   }
 
   /**

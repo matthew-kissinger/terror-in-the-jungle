@@ -94,6 +94,7 @@ export interface Combatant {
   damageHistory?: Array<{ attackerId: string; damage: number; timestamp: number }>;
   kills: number;
   deaths: number;
+  flashDisorientedUntil?: number; // Timestamp when flashbang disorientation ends
 }
 
 export enum SquadCommand {
