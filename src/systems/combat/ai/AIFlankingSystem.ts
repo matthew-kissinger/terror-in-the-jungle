@@ -3,6 +3,7 @@ import { Combatant, CombatantState, Faction, Squad } from '../types'
 import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager'
 import { FlankingTacticsResolver } from './FlankingTacticsResolver'
 import { FlankingRoleManager } from './FlankingRoleManager'
+import { Logger } from '../../../utils/Logger'
 
 /**
  * Flanking operation status
@@ -182,8 +183,8 @@ export class AIFlankingSystem {
     this.activeOperations.set(squad.id, operation)
     this.flankingCooldowns.set(squad.id, Date.now())
 
-    console.log(`🎯 Squad ${squad.id} initiating ${flankDirection} flank on target at (${Math.floor(targetPosition.x)}, ${Math.floor(targetPosition.z)})`)
-    console.log(`  Suppressors: ${suppressors.length}, Flankers: ${flankers.length}`)
+    Logger.info('combat-ai', `🎯 Squad ${squad.id} initiating ${flankDirection} flank on target at (${Math.floor(targetPosition.x)}, ${Math.floor(targetPosition.z)})`)
+    Logger.info('combat-ai', `  Suppressors: ${suppressors.length}, Flankers: ${flankers.length}`)
 
     return operation
   }
@@ -231,7 +232,7 @@ export class AIFlankingSystem {
           operation.status = FlankingStatus.FLANKING
           operation.lastStatusUpdate = now
           this.roleManager.assignFlankingBehavior(operation, allCombatants)
-          console.log(`⚔️ Squad ${squad.id} flankers moving to position`)
+          Logger.info('combat-ai', `⚔️ Squad ${squad.id} flankers moving to position`)
         }
         break
 
@@ -242,7 +243,7 @@ export class AIFlankingSystem {
           operation.status = FlankingStatus.ENGAGING
           operation.lastStatusUpdate = now
           this.roleManager.assignEngageBehavior(operation, allCombatants)
-          console.log(`✅ Squad ${squad.id} flank complete, engaging from ${operation.flankDirection}`)
+          Logger.info('combat-ai', `✅ Squad ${squad.id} flank complete, engaging from ${operation.flankDirection}`)
         }
         break
 

@@ -3,6 +3,7 @@ import { GameSystem } from '../../types';
 import { Combatant, Faction } from './types';
 import { CaptureZone } from '../world/ZoneManager';
 import { InfluenceCell, InfluenceMapGrid } from './InfluenceMapGrid';
+import { Logger } from '../../utils/Logger';
 import {
   computeThreatLevel,
   computeOpportunityLevel,
@@ -51,8 +52,8 @@ export class InfluenceMapSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('🗺️ Initializing Influence Map System...');
-    console.log(`   Grid: ${this.gridSize}x${this.gridSize}, Cell size: ${this.cellSize.toFixed(1)}m, World: ${this.worldSize}m`);
+    Logger.info('influence-map', '🗺️ Initializing Influence Map System...');
+    Logger.info('influence-map', `   Grid: ${this.gridSize}x${this.gridSize}, Cell size: ${this.cellSize.toFixed(1)}m, World: ${this.worldSize}m`);
   }
 
   private initializeGrid(): void {
@@ -248,7 +249,7 @@ export class InfluenceMapSystem implements GameSystem {
       this.debugCanvas.style.display = this.debugEnabled ? 'block' : 'none';
     }
 
-    console.log(`🗺️ Influence map debug: ${this.debugEnabled ? 'ON' : 'OFF'}`);
+    Logger.info('influence-map', `🗺️ Influence map debug: ${this.debugEnabled ? 'ON' : 'OFF'}`);
   }
 
   private createDebugCanvas(): void {
@@ -324,6 +325,6 @@ export class InfluenceMapSystem implements GameSystem {
       this.debugContext = undefined;
     }
 
-    console.log('🧹 Influence Map System disposed');
+    Logger.info('influence-map', '🧹 Influence Map System disposed');
   }
 }

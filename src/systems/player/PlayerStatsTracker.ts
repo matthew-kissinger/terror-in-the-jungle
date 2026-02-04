@@ -1,3 +1,5 @@
+import { Logger } from '../../utils/Logger';
+
 export interface PlayerStats {
   kills: number;
   deaths: number;
@@ -48,7 +50,7 @@ export class PlayerStatsTracker {
       grenadesThrown: 0,
       grenadeKills: 0
     };
-    console.log('📊 Match stats tracking started');
+    Logger.info('stats', '📊 Match stats tracking started');
   }
 
   addKill(): void {

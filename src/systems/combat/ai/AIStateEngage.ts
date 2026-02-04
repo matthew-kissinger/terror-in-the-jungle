@@ -3,6 +3,7 @@ import { Combatant, CombatantState, Faction, Squad } from '../types'
 import { SpatialOctree } from '../SpatialOctree'
 import { AICoverSystem } from './AICoverSystem'
 import { AIFlankingSystem } from './AIFlankingSystem'
+import { Logger } from '../../../utils/Logger'
 
 /**
  * Handles engaging and suppressing combat states
@@ -77,7 +78,7 @@ export class AIStateEngage {
       if (this.coverSystem && combatant.coverPosition) {
         const coverEval = this.coverSystem.evaluateCurrentCover(combatant, targetPos)
         if (!coverEval.effective) {
-          console.log(`⚠️ ${combatant.faction} unit's cover is compromised, repositioning`)
+          Logger.warn('combat-ai', `⚠️ ${combatant.faction} unit's cover is compromised, repositioning`)
           this.coverSystem.releaseCover(combatant.id)
           combatant.inCover = false
           combatant.coverPosition = undefined
@@ -97,7 +98,7 @@ export class AIStateEngage {
         }
       } else if (isCoverFlanked(combatant, targetPos)) {
         // Fallback to old method if no cover system
-        console.log(`⚠️ ${combatant.faction} unit's cover is flanked, repositioning`)
+        Logger.warn('combat-ai', `⚠️ ${combatant.faction} unit's cover is flanked, repositioning`)
         combatant.inCover = false
         combatant.coverPosition = undefined
       }
@@ -337,7 +338,7 @@ export class AIStateEngage {
       }
     })
 
-    console.log(`🎯 Squad ${combatant.squadId} initiating coordinated suppression & flank on target at (${Math.floor(targetPos.x)}, ${Math.floor(targetPos.z)})`)
+    Logger.info('combat-ai', `🎯 Squad ${combatant.squadId} initiating coordinated suppression & flank on target at (${Math.floor(targetPos.x)}, ${Math.floor(targetPos.z)})`)
   }
 
   private calculateFlankingAngle(

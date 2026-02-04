@@ -1,11 +1,12 @@
 import * as THREE from 'three';
-import { GameMode } from '../../config/gameModes';
-import { RespawnMapView } from '../../ui/map/RespawnMapView';
-import { OpenFrontierRespawnMap } from '../../ui/map/OpenFrontierRespawnMap';
-import { ZoneManager } from '../world/ZoneManager';
-import { GameModeManager } from '../world/GameModeManager';
+import { GameSystem } from '../../types';
+import { GameModeConfig } from '../../config/gameModes';
+import { Logger } from '../../utils/Logger';
 
-export class RespawnMapController {
+/**
+ * Coordinates between the main game and the respawn map view.
+ */
+export class RespawnMapController implements GameSystem {
   private respawnMapView: RespawnMapView;
   private openFrontierRespawnMap: OpenFrontierRespawnMap;
   private currentGameMode: GameMode = GameMode.ZONE_CONTROL;
@@ -28,7 +29,7 @@ export class RespawnMapController {
     if (manager) {
       this.currentGameMode = manager.currentMode;
       const worldSize = manager.getWorldSize();
-      console.log(`🗺️ RespawnMapController: Game mode detected as ${this.currentGameMode} (world size: ${worldSize})`);
+      Logger.info('respawn-map', `🗺️ RespawnMapController: Game mode detected as ${this.currentGameMode} (world size: ${worldSize})`);
     }
     this.respawnMapView.setGameModeManager(manager);
     this.openFrontierRespawnMap.setGameModeManager(manager);
@@ -50,13 +51,13 @@ export class RespawnMapController {
     if (this.gameModeManager) {
       this.currentGameMode = this.gameModeManager.currentMode;
       const worldSize = this.gameModeManager.getWorldSize();
-      console.log(`🗺️ Showing respawn map for mode: ${this.currentGameMode}, world size: ${worldSize}`);
+      Logger.info('respawn-map', `🗺️ Showing respawn map for mode: ${this.currentGameMode}, world size: ${worldSize}`);
     }
 
     mapContainer.innerHTML = '';
 
     const isOpenFrontier = this.currentGameMode === GameMode.OPEN_FRONTIER;
-    console.log(`🗺️ Using map: ${isOpenFrontier ? 'OpenFrontierRespawnMap' : 'RespawnMapView'}`);
+    Logger.info('respawn-map', `🗺️ Using map: ${isOpenFrontier ? 'OpenFrontierRespawnMap' : 'RespawnMapView'}`);
 
     const activeMap = isOpenFrontier ? this.openFrontierRespawnMap : this.respawnMapView;
     const mapCanvas = activeMap.getCanvas();

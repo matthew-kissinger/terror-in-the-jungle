@@ -1,4 +1,5 @@
 import { GameSystem } from '../../types';
+import { Logger } from '../../utils/Logger';
 
 export enum WeaponSlot {
   SHOTGUN = 0,   // Key 1
@@ -34,7 +35,7 @@ export class InventoryManager implements GameSystem {
   private boundOnKeyDown!: (event: KeyboardEvent) => void;
 
   async init(): Promise<void> {
-    console.log('🎒 Initializing Inventory Manager...');
+    Logger.info('inventory', '🎒 Initializing Inventory Manager...');
     this.setupEventListeners();
     this.createUI();
     this.notifyInventoryChange();
@@ -96,7 +97,7 @@ export class InventoryManager implements GameSystem {
     if (this.currentSlot === slot) return;
 
     this.currentSlot = slot;
-    console.log(`🎒 Switched to: ${WeaponSlot[slot]}`);
+    Logger.info('inventory', `🎒 Switched to: ${WeaponSlot[slot]}`);
 
     // Notify all registered callbacks
     for (const callback of this.onSlotChangeCallbacks) {
@@ -123,7 +124,7 @@ export class InventoryManager implements GameSystem {
     if (!this.canUseGrenade()) return false;
 
     this.grenades--;
-    console.log(`💣 Grenade used. Remaining: ${this.grenades}`);
+    Logger.info('inventory', `💣 Grenade used. Remaining: ${this.grenades}`);
     this.notifyInventoryChange();
     return true;
   }
@@ -136,20 +137,20 @@ export class InventoryManager implements GameSystem {
     if (!this.canUseMortarRound()) return false;
 
     this.mortarRounds--;
-    console.log(`💣 Mortar round used. Remaining: ${this.mortarRounds}`);
+    Logger.info('inventory', `💣 Mortar round used. Remaining: ${this.mortarRounds}`);
     this.notifyInventoryChange();
     return true;
   }
 
   addGrenades(count: number): void {
     this.grenades = Math.min(this.grenades + count, this.maxGrenades);
-    console.log(`💣 Grenades restocked: ${this.grenades}/${this.maxGrenades}`);
+    Logger.info('inventory', `💣 Grenades restocked: ${this.grenades}/${this.maxGrenades}`);
     this.notifyInventoryChange();
   }
 
   addMortarRounds(count: number): void {
     this.mortarRounds = Math.min(this.mortarRounds + count, this.maxMortarRounds);
-    console.log(`💣 Mortar rounds restocked: ${this.mortarRounds}/${this.maxMortarRounds}`);
+    Logger.info('inventory', `💣 Mortar rounds restocked: ${this.mortarRounds}/${this.maxMortarRounds}`);
     this.notifyInventoryChange();
   }
 
@@ -161,14 +162,14 @@ export class InventoryManager implements GameSystem {
     if (!this.canUseSandbag()) return false;
 
     this.sandbags--;
-    console.log(`🟫 Sandbag placed. Remaining: ${this.sandbags}`);
+    Logger.info('inventory', `🟫 Sandbag placed. Remaining: ${this.sandbags}`);
     this.notifyInventoryChange();
     return true;
   }
 
   addSandbags(count: number): void {
     this.sandbags = Math.min(this.sandbags + count, this.maxSandbags);
-    console.log(`🟫 Sandbags restocked: ${this.sandbags}/${this.maxSandbags}`);
+    Logger.info('inventory', `🟫 Sandbags restocked: ${this.sandbags}/${this.maxSandbags}`);
     this.notifyInventoryChange();
   }
 
@@ -181,7 +182,7 @@ export class InventoryManager implements GameSystem {
     this.mortarRounds = this.maxMortarRounds;
     this.sandbags = this.maxSandbags;
     this.currentSlot = WeaponSlot.PRIMARY;
-    console.log('🎒 Inventory reset');
+    Logger.info('inventory', '🎒 Inventory reset');
     this.notifyInventoryChange();
   }
 
