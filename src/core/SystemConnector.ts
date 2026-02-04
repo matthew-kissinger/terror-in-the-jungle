@@ -116,15 +116,14 @@ export class SystemConnector {
     refs.mortarSystem.setAudioManager(refs.audioManager);
     refs.sandbagSystem.setInventoryManager(refs.inventoryManager);
 
-    // Access internal effect pools - these are implementation details not exposed via interface
-    // TODO: Consider exposing these via ICombatantSystem interface if needed for cleaner typing
-    const impactEffectsPool = (refs.combatantSystem as any).impactEffectsPool;
+    // Access internal effect pools via typed interface
+    const impactEffectsPool = refs.combatantSystem.impactEffectsPool;
     if (impactEffectsPool) {
       refs.grenadeSystem.setImpactEffectsPool(impactEffectsPool);
       refs.mortarSystem.setImpactEffectsPool(impactEffectsPool);
     }
 
-    const explosionEffectsPool = (refs.combatantSystem as any).explosionEffectsPool;
+    const explosionEffectsPool = refs.combatantSystem.explosionEffectsPool;
     if (explosionEffectsPool) {
       refs.grenadeSystem.setExplosionEffectsPool(explosionEffectsPool);
       refs.mortarSystem.setExplosionEffectsPool(explosionEffectsPool);
@@ -136,28 +135,26 @@ export class SystemConnector {
     refs.playerController.setMortarSystem(refs.mortarSystem);
     refs.playerController.setSandbagSystem(refs.sandbagSystem);
 
-    // Connect combat systems with sandbag system
-    // Access internal subsystems - these are implementation details not exposed via interface
-    // TODO: Consider exposing these via ICombatantSystem interface if needed for cleaner typing
-    const combatantCombat = (refs.combatantSystem as any).combatantCombat;
+    // Connect combat systems with sandbag system via typed interface
+    const combatantCombat = refs.combatantSystem.combatantCombat;
     if (combatantCombat) {
       combatantCombat.setSandbagSystem(refs.sandbagSystem);
     }
-    const combatantAI = (refs.combatantSystem as any).combatantAI;
+    const combatantAI = refs.combatantSystem.combatantAI;
     if (combatantAI) {
       combatantAI.setSandbagSystem(refs.sandbagSystem);
       combatantAI.setZoneManager(refs.zoneManager);
       combatantAI.setSmokeCloudSystem(refs.smokeCloudSystem);
     }
 
-    // Connect influence map system
-    const squadManager = (refs.combatantSystem as any).squadManager;
+    // Connect influence map system via typed interface
+    const squadManager = refs.combatantSystem.squadManager;
     if (squadManager) {
       squadManager.setInfluenceMap(refs.influenceMapSystem);
     }
-    // Direct property assignment for internal state - implementation detail
-    (refs.combatantSystem as any).influenceMap = refs.influenceMapSystem;
-    (refs.combatantSystem as any).sandbagSystem = refs.sandbagSystem;
+    // Direct property assignment for internal state
+    refs.combatantSystem.influenceMap = refs.influenceMapSystem;
+    refs.combatantSystem.sandbagSystem = refs.sandbagSystem;
 
     // Connect ammo supply system
     refs.ammoSupplySystem.setZoneManager(refs.zoneManager);
@@ -186,13 +183,11 @@ export class SystemConnector {
     refs.footstepAudioSystem.setChunkManager(refs.chunkManager);
     refs.playerController.setFootstepAudioSystem(refs.footstepAudioSystem);
 
-    // Inject benchmark dependencies
-    // Access internal properties for telemetry - these are implementation details not exposed via interface
-    // TODO: Consider exposing these via ICombatantSystem interface if needed for cleaner typing
+    // Inject benchmark dependencies via typed interface
     performanceTelemetry.injectBenchmarkDependencies({
-      hitDetection: (refs.combatantSystem as any).combatantCombat?.hitDetection,
+      hitDetection: refs.combatantSystem.combatantCombat?.hitDetection,
       chunkManager: refs.chunkManager,
-      combatants: (refs.combatantSystem as any).combatants,
+      combatants: refs.combatantSystem.combatants,
       spatialGridManager: spatialGridManager
     });
 

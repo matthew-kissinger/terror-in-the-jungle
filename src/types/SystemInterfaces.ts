@@ -7,6 +7,63 @@ import * as THREE from 'three';
 import { Faction } from '../systems/combat/types';
 
 /**
+ * Impact Effects Pool interface - blood/debris effects on hit
+ */
+export interface IImpactEffectsPool {
+  spawn(position: THREE.Vector3): void;
+  update(deltaTime: number): void;
+  dispose(): void;
+}
+
+/**
+ * Explosion Effects Pool interface - explosion visual effects
+ */
+export interface IExplosionEffectsPool {
+  spawn(position: THREE.Vector3): void;
+  update(deltaTime: number): void;
+  dispose(): void;
+}
+
+/**
+ * Combatant Combat interface - handles NPC combat behavior
+ */
+export interface ICombatantCombat {
+  hitDetection: IHitDetection;
+  setSandbagSystem(system: ISandbagSystem): void;
+}
+
+/**
+ * Combatant AI interface - handles NPC AI behavior
+ */
+export interface ICombatantAI {
+  setSandbagSystem(system: ISandbagSystem): void;
+  setZoneManager(manager: IZoneManager): void;
+  setSmokeCloudSystem(system: ISmokeCloudSystem): void;
+}
+
+/**
+ * Squad Manager interface - manages NPC squads
+ */
+export interface ISquadManager {
+  setInfluenceMap(map: IInfluenceMapSystem): void;
+}
+
+/**
+ * Influence Map System interface - strategic AI targeting
+ */
+export interface IInfluenceMapSystem {
+  update(deltaTime: number): void;
+}
+
+/**
+ * Smoke Cloud System interface - smoke grenade effects
+ */
+export interface ISmokeCloudSystem {
+  isLineBlocked(start: THREE.Vector3, end: THREE.Vector3): boolean;
+  update(deltaTime: number): void;
+}
+
+/**
  * HUD System interface - handles all UI display and feedback
  */
 export interface IHUDSystem {
@@ -118,6 +175,18 @@ export interface ICombatantSystem {
   getCombatants(): Map<string, any>;
   getCombatantAt(id: string): any;
   getClosestEnemy(position: THREE.Vector3, faction: string): any;
+
+  // Internal subsystems exposed for system wiring
+  readonly impactEffectsPool: IImpactEffectsPool;
+  readonly explosionEffectsPool: IExplosionEffectsPool;
+  readonly combatantCombat: ICombatantCombat;
+  readonly combatantAI: ICombatantAI;
+  readonly squadManager: ISquadManager;
+  readonly combatants: Map<string, any>;
+
+  // Internal properties for influence map and sandbag system wiring
+  influenceMap?: IInfluenceMapSystem;
+  sandbagSystem?: ISandbagSystem;
 }
 
 /**

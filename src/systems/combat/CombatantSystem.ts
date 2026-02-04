@@ -52,13 +52,14 @@ export class CombatantSystem implements GameSystem {
 
   // Refactored modules
   private combatantFactory: CombatantFactory;
-  private combatantAI: CombatantAI;
-  public combatantCombat: CombatantCombat;
+  public readonly combatantAI: CombatantAI;
+  public readonly combatantCombat: CombatantCombat;
   private combatantMovement: CombatantMovement;
   private combatantRenderer: CombatantRenderer;
-  private squadManager: SquadManager;
+  public readonly squadManager: SquadManager;
   private spatialGrid: SpatialOctree;
-  private influenceMap?: InfluenceMapSystem;
+  public influenceMap?: InfluenceMapSystem;
+  public sandbagSystem?: any; // SandbagSystem - type not imported to avoid circular dependency
   private rallyPointSystem?: RallyPointSystem;
 
   // New focused modules
@@ -72,11 +73,11 @@ export class CombatantSystem implements GameSystem {
   // Effects pools
   private tracerPool: TracerPool;
   private muzzleFlashPool: MuzzleFlashPool;
-  private impactEffectsPool: ImpactEffectsPool;
-  private explosionEffectsPool: ExplosionEffectsPool;
+  public readonly impactEffectsPool: ImpactEffectsPool;
+  public readonly explosionEffectsPool: ExplosionEffectsPool;
 
   // Combatant management
-  public combatants: Map<string, Combatant> = new Map();
+  public readonly combatants: Map<string, Combatant> = new Map();
   private playerPosition = new THREE.Vector3();
 
   // Player proxy
