@@ -3,6 +3,8 @@ import { HelicopterControls } from './HelicopterPhysics';
 import { HelicopterPhysics } from './HelicopterPhysics';
 
 const _finalQuaternion = new THREE.Quaternion();
+const _scratchEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+const _scratchQuaternion = new THREE.Quaternion();
 
 /**
  * Manages helicopter rotor animations and visual tilt effects.
@@ -97,8 +99,9 @@ export class HelicopterAnimation {
     const rollAngle = controls.cyclicPitch * this.MAX_TILT_ANGLE * controlTiltMultiplier;
 
     // Create quaternion from euler angles
-    const euler = new THREE.Euler(pitchAngle, 0, rollAngle, 'YXZ');
-    return new THREE.Quaternion().setFromEuler(euler);
+    _scratchEuler.set(pitchAngle, 0, rollAngle, 'YXZ');
+    _scratchQuaternion.setFromEuler(_scratchEuler);
+    return _scratchQuaternion;
   }
 
   /**
@@ -114,7 +117,10 @@ export class HelicopterAnimation {
 
     // Calculate target visual tilt based on current controls
     const targetTilt = this.calculateVisualTilt(currentControls);
-    this.targetTiltQuaternion.set(helicopterId, targetTilt);
+    const storedTarget = this.targetTiltQuaternion.get(helicopterId);
+    if (storedTarget) {
+      storedTarget.copy(targetTilt);
+    }
 
     // Smooth interpolation of visual tilt
     const currentVisualTilt = this.visualTiltQuaternion.get(helicopterId)!;
