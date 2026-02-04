@@ -43,6 +43,7 @@ export interface WorkerMessageData {
  */
 export class ChunkWorkerLifecycle {
   private workers: WorkerState[] = [];
+  private workerUrls: string[] = [];
   private readonly seed: number;
   private readonly segments: number;
   private pendingRequests: Map<number, ChunkRequest>;
@@ -85,6 +86,7 @@ export class ChunkWorkerLifecycle {
     const workerCode = this.getWorkerCode();
     const blob = new Blob([workerCode], { type: 'application/javascript' });
     const workerUrl = URL.createObjectURL(blob);
+    this.workerUrls.push(workerUrl);
 
     const worker = new Worker(workerUrl);
     const state: WorkerState = { worker, busy: false };
@@ -159,5 +161,10 @@ export class ChunkWorkerLifecycle {
       state.worker.terminate();
     }
     this.workers = [];
+
+    for (const url of this.workerUrls) {
+      URL.revokeObjectURL(url);
+    }
+    this.workerUrls = [];
   }
 }
