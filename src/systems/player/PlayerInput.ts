@@ -21,6 +21,7 @@ export interface InputCallbacks {
 export class PlayerInput {
   private keys: Set<string> = new Set();
   private mouseMovement = { x: 0, y: 0 };
+  private mouseResult = { x: 0, y: 0 }; // Cached return object to avoid per-frame allocation
   private isPointerLocked = false;
   private pointerLockEnabled = true;
   private gameStarted = false;
@@ -90,7 +91,9 @@ export class PlayerInput {
   }
 
   getMouseMovement(): { x: number; y: number } {
-    return { ...this.mouseMovement };
+    this.mouseResult.x = this.mouseMovement.x;
+    this.mouseResult.y = this.mouseMovement.y;
+    return this.mouseResult;
   }
 
   clearMouseMovement(): void {

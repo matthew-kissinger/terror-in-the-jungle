@@ -134,7 +134,10 @@ export class SpatialOctree {
     if (node.isLeaf()) {
       const index = node.entities.indexOf(id)
       if (index !== -1) {
-        node.entities.splice(index, 1)
+        // Swap-and-pop: O(1) instead of splice's O(n)
+        const last = node.entities[node.entities.length - 1]
+        node.entities[index] = last
+        node.entities.pop()
         return true
       }
       return false
@@ -143,7 +146,10 @@ export class SpatialOctree {
     // Check this node's entities first
     const index = node.entities.indexOf(id)
     if (index !== -1) {
-      node.entities.splice(index, 1)
+      // Swap-and-pop: O(1) instead of splice's O(n)
+      const last = node.entities[node.entities.length - 1]
+      node.entities[index] = last
+      node.entities.pop()
       return true
     }
 
