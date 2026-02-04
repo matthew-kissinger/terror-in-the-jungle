@@ -20,6 +20,8 @@ export class LoadoutSelector implements GameSystem {
   private selectedWeapon: LoadoutWeapon = LoadoutWeapon.RIFLE;
   private isVisible = false;
   private boundOnKeyDown = this.onKeyDown.bind(this);
+  private weaponOptionElements: HTMLElement[] = [];
+  private weaponOptionHandlers: Array<(event: MouseEvent) => void> = [];
 
   private onLoadoutSelected?: (weapon: LoadoutWeapon) => void;
 
@@ -195,11 +197,15 @@ export class LoadoutSelector implements GameSystem {
     // Click on weapon options
     const options = this.overlayElement.querySelectorAll('.loadout-option');
     options.forEach(option => {
-      option.addEventListener('click', () => {
-        const weapon = (option as HTMLElement).dataset.weapon as LoadoutWeapon;
+      const optionElement = option as HTMLElement;
+      const clickHandler = () => {
+        const weapon = optionElement.dataset.weapon as LoadoutWeapon;
         this.selectedWeapon = weapon;
         this.updateSelection();
-      });
+      };
+      this.weaponOptionElements.push(optionElement);
+      this.weaponOptionHandlers.push(clickHandler);
+      optionElement.addEventListener('click', clickHandler);
     });
 
     // Spacebar to confirm
@@ -300,6 +306,15 @@ export class LoadoutSelector implements GameSystem {
   }
 
   dispose(): void {
+    this.weaponOptionElements.forEach((option, index) => {
+      const handler = this.weaponOptionHandlers[index];
+      if (handler) {
+        option.removeEventListener('click', handler);
+      }
+    });
+    this.weaponOptionElements = [];
+    this.weaponOptionHandlers = [];
+
     if (this.overlayElement && this.overlayElement.parentNode) {
       this.overlayElement.parentNode.removeChild(this.overlayElement);
     }

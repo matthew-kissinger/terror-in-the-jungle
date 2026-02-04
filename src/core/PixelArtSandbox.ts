@@ -135,6 +135,7 @@ export class PixelArtSandbox {
   }
 
   public dispose(): void {
+    Input.disposeEventListeners();
     this.loadingScreen.dispose();
     this.sandboxRenderer.dispose();
     this.systemManager.dispose();

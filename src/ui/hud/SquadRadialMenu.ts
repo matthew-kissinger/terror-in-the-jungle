@@ -52,6 +52,8 @@ export class SquadRadialMenu {
   private centerY = 0
   private radius = 100
   private boundMouseMoveHandler = this.onMouseMove.bind(this)
+  private segmentPaths: SVGPathElement[] = []
+  private segmentEnterHandlers: Array<(event: MouseEvent) => void> = []
 
   constructor() {
     this.setupMouseListener()
@@ -133,7 +135,10 @@ export class SquadRadialMenu {
       path.setAttribute('stroke', item.color)
       path.setAttribute('stroke-width', '2')
       path.setAttribute('data-index', String(index))
-      path.addEventListener('mouseenter', () => this.selectSegment(index))
+      const enterHandler = () => this.selectSegment(index)
+      this.segmentPaths.push(path)
+      this.segmentEnterHandlers.push(enterHandler)
+      path.addEventListener('mouseenter', enterHandler)
       svg.appendChild(path)
 
       // Add text label
@@ -336,6 +341,14 @@ export class SquadRadialMenu {
 
   dispose(): void {
     window.removeEventListener('mousemove', this.boundMouseMoveHandler)
+    this.segmentPaths.forEach((path, index) => {
+      const handler = this.segmentEnterHandlers[index]
+      if (handler) {
+        path.removeEventListener('mouseenter', handler)
+      }
+    })
+    this.segmentPaths = []
+    this.segmentEnterHandlers = []
 
     if (this.container && this.container.parentNode) {
       this.container.parentNode.removeChild(this.container)

@@ -1,38 +1,61 @@
 import { Logger } from '../utils/Logger';
 
+let sandboxRef: any | null = null;
+let listenersAttached = false;
+
+function handleResize(): void {
+  if (!sandboxRef) return;
+  sandboxRef.sandboxRenderer.onWindowResize();
+}
+
+function handleKeyDown(event: KeyboardEvent): void {
+  if (!sandboxRef) return;
+
+  if (event.key === 'F1') {
+    togglePerformanceStats(sandboxRef);
+  } else if (event.key === 'p' || event.key === 'P') {
+    togglePostProcessing(sandboxRef);
+  } else if (event.key === 'F2') {
+    toggleRealtimeStatsOverlay(sandboxRef);
+  } else if (event.key === '[') {
+    adjustPixelSize(sandboxRef, -1);
+  } else if (event.key === ']') {
+    adjustPixelSize(sandboxRef, 1);
+  } else if (event.key === 'F3') {
+    toggleLogOverlay(sandboxRef);
+  } else if (event.key === 'F4') {
+    toggleTimeIndicator(sandboxRef);
+  } else if (event.key === 'k' || event.key === 'K') {
+    // Voluntary respawn with K key
+    if (sandboxRef.gameStarted) {
+      const healthSystem = (sandboxRef.systemManager as any).playerHealthSystem;
+      if (healthSystem && healthSystem.isAlive()) {
+        Logger.info('sandbox-input', '🔄 Initiating voluntary respawn (K pressed)');
+        healthSystem.voluntaryRespawn();
+      }
+    }
+  }
+}
+
 /**
  * Sets up key event listeners for the sandbox
  */
 export function setupEventListeners(sandbox: any): void {
-  window.addEventListener('resize', () => sandbox.sandboxRenderer.onWindowResize());
+  sandboxRef = sandbox;
+  if (listenersAttached) return;
 
-  // Performance monitoring and post-processing controls
-  window.addEventListener('keydown', (event) => {
-    if (event.key === 'F1') {
-      togglePerformanceStats(sandbox);
-    } else if (event.key === 'p' || event.key === 'P') {
-      togglePostProcessing(sandbox);
-    } else if (event.key === 'F2') {
-      toggleRealtimeStatsOverlay(sandbox);
-    } else if (event.key === '[') {
-      adjustPixelSize(sandbox, -1);
-    } else if (event.key === ']') {
-      adjustPixelSize(sandbox, 1);
-    } else if (event.key === 'F3') {
-      toggleLogOverlay(sandbox);
-    } else if (event.key === 'F4') {
-      toggleTimeIndicator(sandbox);
-    } else if (event.key === 'k' || event.key === 'K') {
-      // Voluntary respawn with K key
-      if (sandbox.gameStarted) {
-        const healthSystem = (sandbox.systemManager as any).playerHealthSystem;
-        if (healthSystem && healthSystem.isAlive()) {
-          Logger.info('sandbox-input', '🔄 Initiating voluntary respawn (K pressed)');
-          healthSystem.voluntaryRespawn();
-        }
-      }
-    }
-  });
+  window.addEventListener('resize', handleResize);
+  window.addEventListener('keydown', handleKeyDown);
+  listenersAttached = true;
+}
+
+export function disposeEventListeners(): void {
+  if (!listenersAttached) return;
+
+  window.removeEventListener('resize', handleResize);
+  window.removeEventListener('keydown', handleKeyDown);
+  listenersAttached = false;
+  sandboxRef = null;
 }
 
 /**
