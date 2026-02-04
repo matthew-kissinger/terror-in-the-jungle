@@ -186,6 +186,11 @@ export class GrenadeSystem implements GameSystem {
     if (!this.isAiming || this.cooking.isCurrentlyCooking()) return;
 
     this.cooking.startCooking();
+
+    // Play pin pull sound (non-positional - player always hears their own pin pull)
+    if (this.audioManager) {
+      this.audioManager.play('grenadePinPull');
+    }
   }
 
   adjustPower(delta: number): void {
@@ -264,6 +269,11 @@ export class GrenadeSystem implements GameSystem {
 
     const grenade = this.spawner.spawnGrenade(startPos, throwVelocity, remainingFuseTime, this.nextGrenadeId++, this.currentGrenadeType);
     this.grenades.push(grenade);
+
+    // Play throw sound at throw position (3D positional sound)
+    if (this.audioManager) {
+      this.audioManager.play('grenadeThrow', startPos);
+    }
 
     // Track grenade throw in stats
     if (this.statsTracker) {

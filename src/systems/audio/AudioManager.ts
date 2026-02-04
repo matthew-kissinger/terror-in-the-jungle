@@ -186,13 +186,18 @@ export class AudioManager implements GameSystem {
             return;
         }
 
+        const config = this.soundConfigs[soundName];
+
         if (position) {
             // Play positional sound
             const sound = new THREE.PositionalAudio(this.listener);
             sound.setBuffer(buffer);
-            sound.setVolume(volume);
-            sound.setRefDistance(10);
-            sound.setMaxDistance(100);
+            sound.setVolume((config?.volume || 1.0) * volume);
+            sound.setRefDistance(config?.refDistance || 10);
+            sound.setMaxDistance(config?.maxDistance || 100);
+            if (config?.rolloffFactor !== undefined) {
+                sound.setRolloffFactor(config.rolloffFactor);
+            }
 
             const tempObj = new THREE.Object3D();
             tempObj.position.copy(position);
@@ -208,7 +213,7 @@ export class AudioManager implements GameSystem {
             // Play global sound
             const sound = new THREE.Audio(this.listener);
             sound.setBuffer(buffer);
-            sound.setVolume(volume);
+            sound.setVolume((config?.volume || 1.0) * volume);
             sound.play();
         }
     }
