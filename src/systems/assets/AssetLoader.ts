@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { AssetInfo, AssetCategory, GameSystem } from '../../types';
 import { getAssetPath } from '../../config/paths';
 import { PixelPerfectUtils } from '../../utils/PixelPerfect';
+import { Logger } from '../../utils/Logger';
 
 export class AssetLoader implements GameSystem {
   private assets: Map<string, AssetInfo> = new Map();
@@ -68,7 +69,7 @@ export class AssetLoader implements GameSystem {
       this.assets.set(assetInfo.name, assetInfo);
     }
 
-    console.log(`Discovered ${this.assets.size} assets:`, 
+    Logger.info('assets', `Discovered ${this.assets.size} assets:`, 
       Array.from(this.assets.values()).map(a => `${a.name} (${a.category})`));
   }
 
@@ -123,9 +124,9 @@ export class AssetLoader implements GameSystem {
         asset.texture = finalTexture;
         this.loadedTextures.set(asset.name, finalTexture);
 
-        console.log(`Loaded texture: ${asset.name} (${(finalTexture.image as any).width}x${(finalTexture.image as any).height})`);
+        Logger.debug('assets', `Loaded texture: ${asset.name} (${(finalTexture.image as any).width}x${(finalTexture.image as any).height})`);
       } catch (error) {
-        console.warn(`Failed to load texture: ${asset.path}`, error);
+        Logger.warn('assets', `Failed to load texture: ${asset.path}`, error);
       }
     });
 
@@ -167,7 +168,7 @@ export class AssetLoader implements GameSystem {
       texture.dispose();
       return canvasTex;
     } catch (e) {
-      console.warn(`Texture downscale failed for ${name}:`, e);
+      Logger.warn('assets', `Texture downscale failed for ${name}:`, e);
       return null;
     }
   }

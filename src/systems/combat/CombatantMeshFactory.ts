@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { AssetLoader } from '../assets/AssetLoader';
 import { Combatant, CombatantState } from './types';
 import { createOutlineMaterial } from './CombatantShaders';
+import { Logger } from '../../utils/Logger';
 
 export interface CombatantMeshAssets {
   factionMeshes: Map<string, THREE.InstancedMesh>;
@@ -143,7 +144,7 @@ export class CombatantMeshFactory {
     if (opforFiring) createFactionMesh(opforFiring, 'OPFOR_firing');
     if (opforBack) createFactionMesh(opforBack, 'OPFOR_back');
 
-    console.log('🎖️ Created faction-specific soldier meshes (with player squad support)');
+    Logger.info('combat', '🎖️ Created faction-specific soldier meshes (with player squad support)');
 
     return {
       factionMeshes,

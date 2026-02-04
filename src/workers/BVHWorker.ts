@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
 // Import worker using Vite's native worker syntax
 import BVHWorkerScript from './bvh.worker.js?worker';
+import { Logger } from '../utils/Logger';
 
 export interface BVHWorkerOptions {
   maxLeafTris?: number;
@@ -49,14 +50,14 @@ export class ViteBVHWorker {
         const worker = new BVHWorkerScript();
         this.workers.push({ worker, busy: false });
       } catch (error) {
-        console.error(`[ViteBVHWorker] Failed to create worker ${i}:`, error);
+        Logger.error('workers', `[ViteBVHWorker] Failed to create worker ${i}:`, error);
       }
     }
 
     if (this.workers.length > 0) {
-      console.log(`[ViteBVHWorker] Pool initialized with ${this.workers.length} workers`);
+      Logger.info('workers', `[ViteBVHWorker] Pool initialized with ${this.workers.length} workers`);
     } else {
-      console.error('[ViteBVHWorker] No workers could be created');
+      Logger.error('workers', '[ViteBVHWorker] No workers could be created');
     }
   }
 
