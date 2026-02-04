@@ -1,12 +1,14 @@
-import * as THREE from 'three';
-import { GameSystem } from '../../types';
-import { GameModeConfig } from '../../config/gameModes';
+import { GameMode } from '../../config/gameModes';
+import { RespawnMapView } from '../../ui/map/RespawnMapView';
+import { OpenFrontierRespawnMap } from '../../ui/map/OpenFrontierRespawnMap';
+import { ZoneManager } from '../world/ZoneManager';
+import { GameModeManager } from '../world/GameModeManager';
 import { Logger } from '../../utils/Logger';
 
 /**
  * Coordinates between the main game and the respawn map view.
  */
-export class RespawnMapController implements GameSystem {
+export class RespawnMapController {
   private respawnMapView: RespawnMapView;
   private openFrontierRespawnMap: OpenFrontierRespawnMap;
   private currentGameMode: GameMode = GameMode.ZONE_CONTROL;
