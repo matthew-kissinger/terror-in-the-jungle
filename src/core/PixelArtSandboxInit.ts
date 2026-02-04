@@ -101,10 +101,11 @@ function showLoadoutSelector(sandbox: PixelArtSandbox, mode: GameMode): void {
  */
 function applyLoadout(sandbox: PixelArtSandbox, weapon: LoadoutWeapon, grenadeType: GrenadeType): void {
   // Map LoadoutWeapon enum to weapon type string
-  const weaponTypeMap: Record<LoadoutWeapon, 'rifle' | 'shotgun' | 'smg'> = {
+  const weaponTypeMap: Record<LoadoutWeapon, 'rifle' | 'shotgun' | 'smg' | 'pistol'> = {
     [LoadoutWeapon.RIFLE]: 'rifle',
     [LoadoutWeapon.SHOTGUN]: 'shotgun',
-    [LoadoutWeapon.SMG]: 'smg'
+    [LoadoutWeapon.SMG]: 'smg',
+    [LoadoutWeapon.PISTOL]: 'pistol'
   };
   
   const weaponType = weaponTypeMap[weapon];

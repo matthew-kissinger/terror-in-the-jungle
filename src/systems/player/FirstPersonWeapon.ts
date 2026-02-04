@@ -323,10 +323,10 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   /**
-   * Set the primary weapon (rifle, shotgun, or SMG)
+   * Set the primary weapon (rifle, shotgun, SMG, or pistol)
    * Used for loadout selection at game start
    */
-  setPrimaryWeapon(weaponType: 'rifle' | 'shotgun' | 'smg'): void {
+  setPrimaryWeapon(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol'): void {
     this.switching.switchWeapon(weaponType, (state) => this.onAmmoChange(state))
   }
 

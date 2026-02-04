@@ -3,18 +3,13 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { GrenadeType } from '../../systems/combat/types';
 import { renderGrenadePanel } from './LoadoutGrenadePanel';
+import { renderWeaponPanel } from './LoadoutWeaponPanel';
 
 export enum LoadoutWeapon {
   RIFLE = 'rifle',
   SHOTGUN = 'shotgun',
-  SMG = 'smg'
-}
-
-interface WeaponStats {
-  damage: string;
-  range: string;
-  fireRate: string;
-  description: string;
+  SMG = 'smg',
+  PISTOL = 'pistol'
 }
 
 export class LoadoutSelector implements GameSystem {
@@ -29,27 +24,6 @@ export class LoadoutSelector implements GameSystem {
   private grenadeOptionHandlers: Array<(event: MouseEvent) => void> = [];
 
   private onLoadoutSelected?: (weapon: LoadoutWeapon, grenadeType: GrenadeType) => void;
-
-  private readonly WEAPON_STATS: Record<LoadoutWeapon, WeaponStats> = {
-    [LoadoutWeapon.RIFLE]: {
-      damage: '●●●○○',
-      range: '●●●●●',
-      fireRate: '●●●●○',
-      description: 'Balanced assault rifle - accurate at range'
-    },
-    [LoadoutWeapon.SHOTGUN]: {
-      damage: '●●●●●',
-      range: '●●○○○',
-      fireRate: '●●○○○',
-      description: 'Devastating close-range powerhouse'
-    },
-    [LoadoutWeapon.SMG]: {
-      damage: '●●○○○',
-      range: '●●●○○',
-      fireRate: '●●●●●',
-      description: 'High fire rate - spray and pray'
-    }
-  };
 
   async init(): Promise<void> {
     Logger.info('ui', 'Initializing Loadout Selector...');
@@ -89,76 +63,7 @@ export class LoadoutSelector implements GameSystem {
           Choose your primary weapon and grenade type
         </p>
 
-        <div style="display: flex; gap: 24px; justify-content: center; margin-bottom: 40px;">
-          <!-- Rifle Option -->
-          <div class="loadout-option" data-weapon="rifle" style="
-            flex: 1;
-            max-width: 260px;
-            background: rgba(20, 20, 30, 0.6);
-            border: 3px solid rgba(0, 255, 100, 0.4);
-            border-radius: 12px;
-            padding: 24px;
-            cursor: pointer;
-            transition: all 0.2s;
-          ">
-            <div style="font-size: 48px; margin-bottom: 12px;">🔫</div>
-            <h2 style="font-size: 24px; margin-bottom: 8px; text-transform: uppercase;">Rifle</h2>
-            <div style="font-size: 12px; color: rgba(255, 255, 255, 0.5); margin-bottom: 16px;">
-              ${this.WEAPON_STATS.rifle.description}
-            </div>
-            <div style="text-align: left; font-size: 13px; line-height: 1.8;">
-              <div><strong>Damage:</strong> ${this.WEAPON_STATS.rifle.damage}</div>
-              <div><strong>Range:</strong> ${this.WEAPON_STATS.rifle.range}</div>
-              <div><strong>Fire Rate:</strong> ${this.WEAPON_STATS.rifle.fireRate}</div>
-            </div>
-          </div>
-
-          <!-- Shotgun Option -->
-          <div class="loadout-option" data-weapon="shotgun" style="
-            flex: 1;
-            max-width: 260px;
-            background: rgba(20, 20, 30, 0.6);
-            border: 3px solid rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            padding: 24px;
-            cursor: pointer;
-            transition: all 0.2s;
-          ">
-            <div style="font-size: 48px; margin-bottom: 12px;">💥</div>
-            <h2 style="font-size: 24px; margin-bottom: 8px; text-transform: uppercase;">Shotgun</h2>
-            <div style="font-size: 12px; color: rgba(255, 255, 255, 0.5); margin-bottom: 16px;">
-              ${this.WEAPON_STATS.shotgun.description}
-            </div>
-            <div style="text-align: left; font-size: 13px; line-height: 1.8;">
-              <div><strong>Damage:</strong> ${this.WEAPON_STATS.shotgun.damage}</div>
-              <div><strong>Range:</strong> ${this.WEAPON_STATS.shotgun.range}</div>
-              <div><strong>Fire Rate:</strong> ${this.WEAPON_STATS.shotgun.fireRate}</div>
-            </div>
-          </div>
-
-          <!-- SMG Option -->
-          <div class="loadout-option" data-weapon="smg" style="
-            flex: 1;
-            max-width: 260px;
-            background: rgba(20, 20, 30, 0.6);
-            border: 3px solid rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            padding: 24px;
-            cursor: pointer;
-            transition: all 0.2s;
-          ">
-            <div style="font-size: 48px; margin-bottom: 12px;"></div>
-            <h2 style="font-size: 24px; margin-bottom: 8px; text-transform: uppercase;">SMG</h2>
-            <div style="font-size: 12px; color: rgba(255, 255, 255, 0.5); margin-bottom: 16px;">
-              ${this.WEAPON_STATS.smg.description}
-            </div>
-            <div style="text-align: left; font-size: 13px; line-height: 1.8;">
-              <div><strong>Damage:</strong> ${this.WEAPON_STATS.smg.damage}</div>
-              <div><strong>Range:</strong> ${this.WEAPON_STATS.smg.range}</div>
-              <div><strong>Fire Rate:</strong> ${this.WEAPON_STATS.smg.fireRate}</div>
-            </div>
-          </div>
-        </div>
+        ${renderWeaponPanel()}
 
         ${renderGrenadePanel()}
 
@@ -253,7 +158,7 @@ export class LoadoutSelector implements GameSystem {
       this.confirmSelection();
     }
 
-    // Number keys 1-3 for quick select
+    // Number keys 1-4 for quick select
     if (event.code === 'Digit1') {
       this.selectedWeapon = LoadoutWeapon.RIFLE;
       this.updateSelection();
@@ -262,6 +167,9 @@ export class LoadoutSelector implements GameSystem {
       this.updateSelection();
     } else if (event.code === 'Digit3') {
       this.selectedWeapon = LoadoutWeapon.SMG;
+      this.updateSelection();
+    } else if (event.code === 'Digit4') {
+      this.selectedWeapon = LoadoutWeapon.PISTOL;
       this.updateSelection();
     }
   }
