@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Logger } from '../../utils/Logger';
 
 export interface DamageIndicator {
   direction: number;
@@ -42,7 +43,7 @@ export class PlayerHealthEffects {
       this.heartbeatGain.connect(this.audioContext.destination);
       this.heartbeatGain.gain.value = 0;
     } catch (e) {
-      console.warn('Audio context not available for heartbeat effect');
+      Logger.warn('audio', 'Audio context not available for heartbeat effect');
     }
   }
 

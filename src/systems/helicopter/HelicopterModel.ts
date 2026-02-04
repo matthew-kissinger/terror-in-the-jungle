@@ -61,14 +61,14 @@ export class HelicopterModel implements GameSystem {
 
   private createUSHuey(): void {
     if (!this.helipadSystem || !this.terrainManager) {
-      console.warn('⚠️ Cannot create helicopter - required systems not available');
+      Logger.warn('helicopter', '⚠️ Cannot create helicopter - required systems not available');
       return;
     }
 
     // Get helipad position
     const helipadPosition = this.helipadSystem.getHelipadPosition('us_helipad');
     if (!helipadPosition) {
-      console.warn('⚠️ Cannot create helicopter - helipad not found');
+      Logger.warn('helicopter', '⚠️ Cannot create helicopter - helipad not found');
       return;
     }
 
@@ -234,9 +234,9 @@ export class HelicopterModel implements GameSystem {
   }
 
   // Helicopter entry/exit methods
-  tryEnterHelicopter(): void {
+    tryEnterHelicopter(): void {
     if (!this.playerController) {
-      console.warn('🚁 Cannot enter helicopter - no player controller');
+      Logger.warn('helicopter', '🚁 Cannot enter helicopter - no player controller');
       return;
     }
 
@@ -255,7 +255,7 @@ export class HelicopterModel implements GameSystem {
     // Check if player is close enough
     const playerPosition = this.playerController.getPosition();
     if (!playerPosition) {
-      console.warn('🚁 Cannot get player position for helicopter entry');
+      Logger.warn('helicopter', '🚁 Cannot get player position for helicopter entry');
       return;
     }
 
@@ -282,7 +282,7 @@ export class HelicopterModel implements GameSystem {
 
   exitHelicopter(): void {
     if (!this.playerController) {
-      console.warn('🚁 Cannot exit helicopter - no player controller');
+      Logger.warn('helicopter', '🚁 Cannot exit helicopter - no player controller');
       return;
     }
 
@@ -295,7 +295,7 @@ export class HelicopterModel implements GameSystem {
     const helicopter = helicopterId ? this.helicopters.get(helicopterId) : null;
 
     if (!helicopter) {
-      console.warn('🚁 Cannot find helicopter for exit');
+      Logger.warn('helicopter', '🚁 Cannot find helicopter for exit');
       return;
     }
 

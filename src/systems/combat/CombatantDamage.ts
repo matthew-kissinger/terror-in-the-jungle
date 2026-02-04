@@ -80,7 +80,7 @@ export class CombatantDamage {
   ): void {
     // Check if target is valid before accessing properties
     if (!target) {
-      console.warn('⚠️ applyDamage called with undefined target');
+      Logger.warn('combat', '⚠️ applyDamage called with undefined target');
       return;
     }
 

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { Logger } from '../../utils/Logger'
 
 export interface BenchmarkResult {
   totalTimeMs: number
@@ -31,7 +32,7 @@ export class PerformanceBenchmark {
    * Run a comprehensive benchmark for raycasting and hit detection
    */
   run(iterations: number): BenchmarkResult {
-    console.log(`[Perf] Starting benchmark with ${iterations} iterations...`)
+    Logger.info('performance', `[Perf] Starting benchmark with ${iterations} iterations...`)
 
     const rays = this.generateRandomRays(iterations)
     const samples: number[] = []
@@ -62,7 +63,7 @@ export class PerformanceBenchmark {
       }
     }
 
-    console.log('[Perf] Benchmark complete:', result)
+    Logger.info('performance', '[Perf] Benchmark complete:', result)
     return result
   }
 

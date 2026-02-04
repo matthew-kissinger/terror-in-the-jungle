@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { GPUTimingTelemetry, GPUTelemetry } from './GPUTimingTelemetry'
 import { PerformanceBenchmark, BenchmarkResult, BenchmarkDependencies } from './PerformanceBenchmark'
+import { Logger } from '../../utils/Logger'
 import {
   SystemTiming,
   FrameData,
@@ -191,7 +192,7 @@ export class PerformanceTelemetry {
         this.lastSlowFrameLog = now
         const slowSystems = this.getSlowSystemsThisFrame()
         if (slowSystems.length > 0) {
-          console.warn(
+          Logger.warn('performance',
             `[Perf] Slow frame: ${duration.toFixed(1)}ms - Heavy systems: ${slowSystems.join(', ')}`
           )
         }
@@ -378,7 +379,7 @@ export class PerformanceTelemetry {
       fallbackCount: 0,
       lastSyncMs: 0
     }
-    console.log('[Perf] Telemetry reset')
+    Logger.info('performance', '[Perf] Telemetry reset')
   }
 
   /**

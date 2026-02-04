@@ -154,7 +154,7 @@ export class ChunkLoadingStrategy {
       // Trigger mesh merge update
       this.updateMergedMeshes();
     } catch (error) {
-      console.error(`❌ Worker failed for chunk (${chunkX}, ${chunkZ}):`, error);
+      Logger.error('chunks', `❌ Worker failed for chunk (${chunkX}, ${chunkZ}):`, error);
       // Fall back to main thread
       this.loadChunkMainThread(chunkX, chunkZ, chunkKey);
     } finally {
@@ -210,7 +210,7 @@ export class ChunkLoadingStrategy {
           Logger.debug('chunks', `Disposed unneeded chunk (${chunkX}, ${chunkZ})`);
         }
       } catch (error) {
-        console.error(`❌ Failed to load chunk (${chunkX}, ${chunkZ}):`, error);
+        Logger.error('chunks', `❌ Failed to load chunk (${chunkX}, ${chunkZ}):`, error);
       } finally {
         this.loadingChunks.delete(chunkKey);
       }

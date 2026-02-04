@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { Combatant, CombatantState, Faction } from './types'
 import { SpatialGridManager, spatialGridManager } from './SpatialGridManager'
 import { performanceTelemetry } from '../debug/PerformanceTelemetry'
+import { Logger } from '../../utils/Logger'
 
 /**
  * Hit zone definition for combatant body parts
@@ -117,7 +118,7 @@ export class CombatantHitDetection {
     // REQUIRED: Use spatial grid for O(log n) query
     // NO FALLBACK - grid must be initialized
     if (!this.gridManager.getIsInitialized()) {
-      console.error('[HitDetection] Grid not initialized! Call spatialGridManager.initialize() first.')
+      Logger.error('combat', '[HitDetection] Grid not initialized! Call spatialGridManager.initialize() first.')
       performanceTelemetry.recordFallback()
       return null
     }

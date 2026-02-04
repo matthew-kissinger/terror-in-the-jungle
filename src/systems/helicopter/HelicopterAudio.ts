@@ -23,7 +23,7 @@ export class HelicopterAudio {
    */
   initialize(helicopterId: string, helicopter: THREE.Group): void {
     if (!this.audioListener) {
-      console.warn('🚁🔊 No audio listener available for helicopter audio');
+      Logger.warn('helicopter', '🚁🔊 No audio listener available for helicopter audio');
       return;
     }
 
@@ -46,7 +46,7 @@ export class HelicopterAudio {
       },
       undefined,
       (error) => {
-        console.error('🚁🔊 Failed to load helicopter rotor audio:', error);
+        Logger.error('helicopter', '🚁🔊 Failed to load helicopter rotor audio:', error);
       }
     );
 

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { Logger } from '../../utils/Logger'
 
 export interface GPUTelemetry {
   available: boolean
@@ -25,7 +26,7 @@ export class GPUTimingTelemetry {
     const gl = renderer.getContext() as WebGL2RenderingContext
 
     if (!gl) {
-      console.warn('[Perf] WebGL2 context not available for GPU timing')
+      Logger.warn('performance', '[Perf] WebGL2 context not available for GPU timing')
       return
     }
 
@@ -33,9 +34,9 @@ export class GPUTimingTelemetry {
 
     if (this.gpuTimerExt) {
       this.gpuTimingAvailable = true
-      console.log('[Perf] GPU timing enabled (EXT_disjoint_timer_query_webgl2)')
+      Logger.info('performance', '[Perf] GPU timing enabled (EXT_disjoint_timer_query_webgl2)')
     } else {
-      console.log('[Perf] GPU timing unavailable (extension not supported)')
+      Logger.info('performance', '[Perf] GPU timing unavailable (extension not supported)')
     }
   }
 

@@ -1,3 +1,5 @@
+import { Logger } from '../../utils/Logger';
+
 interface ScorePopup {
   element: HTMLDivElement;
   active: boolean;
@@ -152,7 +154,7 @@ export class ScorePopupSystem {
     let popup = this.pool.find(p => !p.active);
 
     if (!popup) {
-      console.warn('⚠️ Score popup pool exhausted');
+      Logger.warn('ui', '⚠️ Score popup pool exhausted');
       return;
     }
 

@@ -136,7 +136,7 @@ export class BillboardInstanceManager {
     } else {
       // Check if we have enough space at the end
       if (allocationIndex + requiredSlots > maxInstances) {
-        console.warn(`⚠️ Not enough ${type} instances available: need ${requiredSlots}, have ${maxInstances - allocationIndex} (max: ${maxInstances})`);
+        Logger.warn('vegetation', `⚠️ Not enough ${type} instances available: need ${requiredSlots}, have ${maxInstances - allocationIndex} (max: ${maxInstances})`);
         // Try to compact free slots first
         this.compactFreeSlots(type);
         const compactedIndex = this.allocationIndices.get(type)!;

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Logger } from '../../utils/Logger';
 
 const _scratchProjection = new THREE.Vector3();
 const _screenResult = { x: 0, y: 0, z: 0 };
@@ -128,7 +129,7 @@ export class DamageNumberSystem {
     let damageNumber = this.pool.find(dn => !dn.active);
 
     if (!damageNumber) {
-      console.warn('⚠️ Damage number pool exhausted');
+      Logger.warn('ui', '⚠️ Damage number pool exhausted');
       return;
     }
 
