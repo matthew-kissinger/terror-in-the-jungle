@@ -160,6 +160,7 @@ Discovered hotspots (not yet fixed):
 - **MortarBallistics computeTrajectory() clones** - Lines 60-80. Still creates 100+ Vector3 via `.clone()` per trajectory computation (builds output array, not per-frame). Lower priority.
 - **DeathCamSystem innerHTML in showOverlay()** - Uses innerHTML for kill details. One-time call per death (not per-frame), low impact.
 - **PlayerHealthEffects resize listener** - Anonymous arrow function in init() line 53; not removed in dispose(). Single instance so no runtime leak, but violates cleanup pattern.
+- **PlayerSuppressionSystem resize listener** - Anonymous arrow function in createDirectionalOverlay() line 192; not removed in dispose(). Same pattern as PlayerHealthEffects.
 
 Possible areas (confirm with profiling):
 - Worker utilization (are they saturated?)
@@ -168,7 +169,7 @@ Possible areas (confirm with profiling):
 
 ### Event Listener Leaks (Memory)
 
-**ALL FIXED.** The `.bind()` bug and missing dispose cleanup have been addressed across all files.
+**Nearly all fixed.** The `.bind()` bug and missing dispose cleanup have been addressed across most files. Remaining: PlayerHealthEffects and PlayerSuppressionSystem resize listeners (see Discovered hotspots).
 
 **Fixed** (stored bound refs, added dispose):
 - PlayerInput, WeaponInput, WeaponModel, InventoryManager, PlayerSquadController, WeaponPickupSystem - bound function properties
@@ -185,8 +186,8 @@ Possible areas (confirm with profiling):
 
 - **GPU timing** - ADDED. renderer.info stats (draw calls, triangles, geometries, textures) and EXT_disjoint_timer_query instrumentation in PerformanceTelemetry. Visible in F2 overlay.
 - **Memory profiling** - No heap snapshot automation
-- **Perf regression testing** - `scripts/perf-baseline.ts` (323 lines) is fully implemented (Playwright browser, sandbox mode, metric collection) but not wired to CI. No baseline storage or threshold comparison.
-- **Bundle code-splitting** - Vite manual chunks configured (three.js, postprocessing, UI, BVH). Main chunk ~453 kB (116 kB gzipped). Circular chunk warnings from three.js internals remain. No compression plugins (gzip/brotli).
+- **Perf regression testing** - `scripts/perf-baseline.ts` (571 lines) is fully implemented (Playwright browser, sandbox mode, metric collection, baseline storage and comparison) but not wired to CI.
+- **Bundle code-splitting** - Vite manual chunks configured (three.js, postprocessing, UI, BVH). Main chunk ~458 kB (115 kB gzipped). Gzip and Brotli compression plugins configured via vite-plugin-compression. Brotli total ~363 kB.
 
 ## COMPLETED: AI Sandbox Mode
 
