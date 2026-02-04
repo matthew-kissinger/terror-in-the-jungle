@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { AssetLoader } from '../assets/AssetLoader';
 import { getHeightQueryCache } from './HeightQueryCache';
+import { getGPUTerrainVertexShader, getGPUTerrainFragmentShader } from './GPUTerrainShaders';
+import { createLODRingGeometry } from './GPUTerrainGeometry';
 
 /**
  * GPU-based terrain renderer using heightmap texture displacement.
@@ -113,7 +115,11 @@ export class GPUTerrain implements GameSystem {
 
   private createTerrainMesh(): void {
     // Create concentric ring geometry for LOD
-    const geometry = this.createLODRingGeometry();
+    const geometry = createLODRingGeometry(
+      this.TERRAIN_RADIUS,
+      this.LOD_RINGS,
+      this.RING_SEGMENTS
+    );
 
     // Create shader material
     this.terrainMaterial = new THREE.ShaderMaterial({
@@ -128,8 +134,8 @@ export class GPUTerrain implements GameSystem {
         fogNear: { value: 50 },
         fogFar: { value: 500 },
       },
-      vertexShader: this.getVertexShader(),
-      fragmentShader: this.getFragmentShader(),
+      vertexShader: getGPUTerrainVertexShader(),
+      fragmentShader: getGPUTerrainFragmentShader(),
       side: THREE.DoubleSide,
       fog: false, // We handle fog manually in the shader
     });
@@ -142,196 +148,6 @@ export class GPUTerrain implements GameSystem {
     this.scene.add(this.terrainMesh);
   }
 
-  private createLODRingGeometry(): THREE.BufferGeometry {
-    const positions: number[] = [];
-    const uvs: number[] = [];
-    const indices: number[] = [];
-
-    // Create concentric rings with increasing vertex spacing (LOD)
-    let vertexIndex = 0;
-    const ringRadii: number[] = [];
-
-    // Calculate ring radii with exponential spacing
-    for (let ring = 0; ring <= this.LOD_RINGS; ring++) {
-      const t = ring / this.LOD_RINGS;
-      // Exponential spacing: more detail near camera
-      const radius = this.TERRAIN_RADIUS * Math.pow(t, 1.5);
-      ringRadii.push(radius);
-    }
-
-    // Generate vertices for each ring
-    for (let ring = 0; ring <= this.LOD_RINGS; ring++) {
-      const radius = ringRadii[ring];
-      const segments = Math.max(8, Math.floor(this.RING_SEGMENTS / (ring + 1)));
-
-      for (let seg = 0; seg <= segments; seg++) {
-        const theta = (seg / segments) * Math.PI * 2;
-        const x = Math.cos(theta) * radius;
-        const z = Math.sin(theta) * radius;
-
-        positions.push(x, 0, z); // Y will be set by vertex shader
-        uvs.push(x, z); // World-space UVs for heightmap lookup
-      }
-    }
-
-    // Generate indices connecting rings
-    let ringStartIndex = 0;
-    for (let ring = 0; ring < this.LOD_RINGS; ring++) {
-      const innerSegments = Math.max(8, Math.floor(this.RING_SEGMENTS / (ring + 1)));
-      const outerSegments = Math.max(8, Math.floor(this.RING_SEGMENTS / (ring + 2)));
-
-      const innerStart = ringStartIndex;
-      const outerStart = ringStartIndex + innerSegments + 1;
-
-      // Connect inner ring to outer ring
-      // This is tricky because rings have different segment counts
-      for (let i = 0; i < innerSegments; i++) {
-        const innerCurrent = innerStart + i;
-        const innerNext = innerStart + i + 1;
-
-        // Find corresponding outer vertices
-        const outerRatio = i / innerSegments;
-        const outerIndex = Math.floor(outerRatio * outerSegments);
-        const outerCurrent = outerStart + outerIndex;
-        const outerNext = outerStart + Math.min(outerIndex + 1, outerSegments);
-
-        // Triangle 1
-        indices.push(innerCurrent, outerCurrent, innerNext);
-        // Triangle 2
-        indices.push(innerNext, outerCurrent, outerNext);
-      }
-
-      ringStartIndex += innerSegments + 1;
-    }
-
-    // Also fill the center with a simple disc
-    const centerSegments = this.RING_SEGMENTS;
-    const centerVertexStart = positions.length / 3;
-
-    // Center vertex
-    positions.push(0, 0, 0);
-    uvs.push(0, 0);
-
-    // First ring vertices for center disc
-    const firstRingRadius = ringRadii[1] || 10;
-    for (let i = 0; i <= centerSegments; i++) {
-      const theta = (i / centerSegments) * Math.PI * 2;
-      positions.push(
-        Math.cos(theta) * firstRingRadius,
-        0,
-        Math.sin(theta) * firstRingRadius
-      );
-      uvs.push(
-        Math.cos(theta) * firstRingRadius,
-        Math.sin(theta) * firstRingRadius
-      );
-    }
-
-    // Center disc triangles
-    for (let i = 0; i < centerSegments; i++) {
-      indices.push(
-        centerVertexStart,
-        centerVertexStart + 1 + i,
-        centerVertexStart + 1 + i + 1
-      );
-    }
-
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-    geometry.setIndex(indices);
-
-    return geometry;
-  }
-
-  private getVertexShader(): string {
-    return `
-      uniform sampler2D heightmap;
-      uniform float heightmapSize;
-      uniform float terrainScale;
-      uniform vec2 heightmapCenter;
-
-      varying vec2 vWorldUV;
-      varying vec3 vWorldPosition;
-      varying vec3 vNormal;
-      varying float vFogDepth;
-
-      void main() {
-        // World position (mesh follows camera)
-        vec3 worldPos = position + vec3(cameraPosition.x, 0.0, cameraPosition.z);
-        vWorldPosition = worldPos;
-        vWorldUV = worldPos.xz;
-
-        // Calculate UV for heightmap sampling
-        vec2 heightmapUV = (worldPos.xz - heightmapCenter) / (heightmapSize * terrainScale) + 0.5;
-
-        // Sample height from heightmap
-        float height = 0.0;
-        if (heightmapUV.x >= 0.0 && heightmapUV.x <= 1.0 &&
-            heightmapUV.y >= 0.0 && heightmapUV.y <= 1.0) {
-          height = texture2D(heightmap, heightmapUV).r;
-        }
-
-        // Apply height displacement
-        worldPos.y = height;
-
-        // Calculate normal from heightmap (central difference)
-        float texelSize = 1.0 / heightmapSize;
-        float hL = texture2D(heightmap, heightmapUV + vec2(-texelSize, 0.0)).r;
-        float hR = texture2D(heightmap, heightmapUV + vec2(texelSize, 0.0)).r;
-        float hD = texture2D(heightmap, heightmapUV + vec2(0.0, -texelSize)).r;
-        float hU = texture2D(heightmap, heightmapUV + vec2(0.0, texelSize)).r;
-
-        vec3 normal = normalize(vec3(hL - hR, 2.0 * terrainScale, hD - hU));
-        vNormal = normal;
-
-        // Transform to clip space
-        vec4 mvPosition = modelViewMatrix * vec4(worldPos, 1.0);
-        vFogDepth = -mvPosition.z;
-        gl_Position = projectionMatrix * mvPosition;
-      }
-    `;
-  }
-
-  private getFragmentShader(): string {
-    return `
-      uniform sampler2D groundTexture;
-      uniform float textureRepeat;
-      uniform vec3 fogColor;
-      uniform float fogNear;
-      uniform float fogFar;
-
-      varying vec2 vWorldUV;
-      varying vec3 vWorldPosition;
-      varying vec3 vNormal;
-      varying float vFogDepth;
-
-      void main() {
-        // Sample ground texture with world-space tiling
-        vec2 texCoord = vWorldUV * textureRepeat;
-        vec4 texColor = texture2D(groundTexture, texCoord);
-
-        // Basic lighting
-        vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
-        float diffuse = max(dot(vNormal, lightDir), 0.0);
-        float ambient = 0.4;
-        float lighting = ambient + diffuse * 0.6;
-
-        vec3 color = texColor.rgb * lighting;
-
-        // Height-based coloring (grass -> rock at higher elevations)
-        float heightFactor = smoothstep(20.0, 60.0, vWorldPosition.y);
-        vec3 rockColor = vec3(0.4, 0.35, 0.3);
-        color = mix(color, rockColor * lighting, heightFactor * 0.5);
-
-        // Fog
-        float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
-        color = mix(color, fogColor, fogFactor);
-
-        gl_FragColor = vec4(color, 1.0);
-      }
-    `;
-  }
 
   private updateHeightmap(centerX: number, centerZ: number): void {
     if (!this.heightmapData || !this.heightmapTexture) return;
