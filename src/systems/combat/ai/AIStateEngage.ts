@@ -5,6 +5,10 @@ import { AICoverSystem } from './AICoverSystem'
 import { AIFlankingSystem } from './AIFlankingSystem'
 import { Logger } from '../../../utils/Logger'
 
+const _toTarget = new THREE.Vector3()
+const _flankingPos = new THREE.Vector3()
+const _toAttacker = new THREE.Vector3()
+
 /**
  * Handles engaging and suppressing combat states
  */
@@ -63,7 +67,7 @@ export class AIStateEngage {
     }
 
     const targetPos = combatant.target.id === 'PLAYER' ? playerPosition : combatant.target.position
-    const toTargetDir = new THREE.Vector3().subVectors(targetPos, combatant.position).normalize()
+    const toTargetDir = _toTarget.subVectors(targetPos, combatant.position).normalize()
     combatant.rotation = Math.atan2(toTargetDir.z, toTargetDir.x)
 
     const targetDistance = combatant.position.distanceTo(targetPos)
@@ -235,7 +239,7 @@ export class AIStateEngage {
 
     if (combatant.reactionTimer <= 0 && combatant.target) {
       const targetPos = combatant.target.id === 'PLAYER' ? playerPosition : combatant.target.position
-      const toTarget = new THREE.Vector3().subVectors(targetPos, combatant.position).normalize()
+      const toTarget = _toTarget.subVectors(targetPos, combatant.position).normalize()
       combatant.rotation = Math.atan2(toTarget.z, toTarget.x)
 
       if (canSeeTarget(combatant, combatant.target, playerPosition)) {
@@ -322,7 +326,7 @@ export class AIStateEngage {
         const flankingAngle = this.calculateFlankingAngle(member.position, targetPos, flankLeft)
         const flankingDistance = 25 + Math.random() * 15
 
-        const flankingPos = new THREE.Vector3(
+        const flankingPos = _flankingPos.set(
           targetPos.x + Math.cos(flankingAngle) * flankingDistance,
           0,
           targetPos.z + Math.sin(flankingAngle) * flankingDistance
@@ -333,7 +337,13 @@ export class AIStateEngage {
           targetPos
         )
 
-        member.destinationPoint = coverNearFlank || flankingPos
+        if (coverNearFlank) {
+          member.destinationPoint = coverNearFlank
+        } else if (member.destinationPoint) {
+          member.destinationPoint.copy(flankingPos)
+        } else {
+          member.destinationPoint = flankingPos.clone()
+        }
         member.isFlankingMove = true
       }
     })
@@ -346,7 +356,7 @@ export class AIStateEngage {
     targetPos: THREE.Vector3,
     flankLeft: boolean
   ): number {
-    const toAttacker = new THREE.Vector3().subVectors(attackerPos, targetPos)
+    const toAttacker = _toAttacker.subVectors(attackerPos, targetPos)
     const currentAngle = Math.atan2(toAttacker.z, toAttacker.x)
     const flankingOffset = flankLeft ? Math.PI / 2 : -Math.PI / 2
     return currentAngle + flankingOffset
