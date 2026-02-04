@@ -288,6 +288,7 @@ export class PlayerController implements GameSystem {
   applyRecoilShake(): void { if (this.cameraShakeSystem) this.cameraShakeSystem.shakeFromRecoil(); }
   getPosition(): THREE.Vector3 { return this.playerState.position.clone(); }
   getVelocity(): THREE.Vector3 { return this.playerState.velocity.clone(); }
+  getCamera(): THREE.PerspectiveCamera { return this.camera; }
   isMoving(): boolean { return this.playerState.velocity.length() > 0.1; }
   teleport(position: THREE.Vector3): void { this.playerState.position.copy(position); this.playerState.velocity.set(0, 0, 0); }
 

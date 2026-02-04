@@ -339,6 +339,10 @@ export class GrenadeSystem implements GameSystem {
     this.playerController = playerController;
   }
 
+  setFlashbangEffect(flashbangEffect: any): void {
+    this.effects.setFlashbangEffect(flashbangEffect);
+  }
+
   isCurrentlyAiming(): boolean {
     return this.isAiming;
   }

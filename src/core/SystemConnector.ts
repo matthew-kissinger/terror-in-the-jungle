@@ -98,11 +98,15 @@ export class SystemConnector {
     refs.playerSuppressionSystem.setPlayerController(refs.playerController);
     refs.combatantSystem.setPlayerSuppressionSystem(refs.playerSuppressionSystem);
 
+    // Connect flashbang screen effect system
+    refs.flashbangScreenEffect.setPlayerController(refs.playerController);
+
     // Connect weapon systems
     refs.grenadeSystem.setCombatantSystem(refs.combatantSystem);
     refs.grenadeSystem.setInventoryManager(refs.inventoryManager);
     refs.grenadeSystem.setAudioManager(refs.audioManager);
     refs.grenadeSystem.setPlayerController(refs.playerController);
+    refs.grenadeSystem.setFlashbangEffect(refs.flashbangScreenEffect);
     refs.hudSystem.setGrenadeSystem(refs.grenadeSystem);
     refs.mortarSystem.setCombatantSystem(refs.combatantSystem);
     refs.mortarSystem.setInventoryManager(refs.inventoryManager);

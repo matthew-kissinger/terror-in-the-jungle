@@ -28,6 +28,7 @@ import { MortarSystem } from '../systems/weapons/MortarSystem';
 import { SandbagSystem } from '../systems/weapons/SandbagSystem';
 import { CameraShakeSystem } from '../systems/effects/CameraShakeSystem';
 import { PlayerSuppressionSystem } from '../systems/player/PlayerSuppressionSystem';
+import { FlashbangScreenEffect } from '../systems/player/FlashbangScreenEffect';
 import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
@@ -67,6 +68,7 @@ export interface SystemReferences {
   sandbagSystem: SandbagSystem;
   cameraShakeSystem: CameraShakeSystem;
   playerSuppressionSystem: PlayerSuppressionSystem;
+  flashbangScreenEffect: FlashbangScreenEffect;
   influenceMapSystem: InfluenceMapSystem;
   ammoSupplySystem: AmmoSupplySystem;
   footstepAudioSystem: FootstepAudioSystem;
@@ -148,6 +150,7 @@ export class SystemInitializer {
     refs.sandbagSystem = new SandbagSystem(scene, camera, refs.chunkManager);
     refs.cameraShakeSystem = new CameraShakeSystem();
     refs.playerSuppressionSystem = new PlayerSuppressionSystem();
+    refs.flashbangScreenEffect = new FlashbangScreenEffect();
     refs.ammoSupplySystem = new AmmoSupplySystem(scene, camera);
     refs.footstepAudioSystem = new FootstepAudioSystem(refs.audioManager.getListener());
     refs.voiceCalloutSystem = new VoiceCalloutSystem(scene, refs.audioManager.getListener());
@@ -190,6 +193,7 @@ export class SystemInitializer {
       refs.sandbagSystem,
       refs.cameraShakeSystem,
       refs.playerSuppressionSystem,
+      refs.flashbangScreenEffect,
       refs.influenceMapSystem,
       refs.ammoSupplySystem,
       refs.voiceCalloutSystem,

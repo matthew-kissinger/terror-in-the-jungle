@@ -6,6 +6,10 @@ import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { CombatantSystem } from '../combat/CombatantSystem';
 import { AudioManager } from '../audio/AudioManager';
 import { Grenade } from './GrenadePhysics';
+import { FlashbangScreenEffect } from '../player/FlashbangScreenEffect';
+
+// Module-level scratch vector for direction calculations
+const _lookDirection = new THREE.Vector3();
 
 /**
  * Handles different grenade type explosion effects
@@ -13,6 +17,7 @@ import { Grenade } from './GrenadePhysics';
 export class GrenadeEffects {
   private readonly DAMAGE_RADIUS = 15;
   private readonly MAX_DAMAGE = 150;
+  private flashbangEffect?: FlashbangScreenEffect;
 
   explodeGrenade(
     grenade: Grenade,
@@ -136,6 +141,23 @@ export class GrenadeEffects {
       playerController.applyExplosionShake(grenade.position, 10);
     }
 
+    // Trigger screen whiteout effect for player
+    if (this.flashbangEffect && playerController) {
+      const playerPosition = playerController.getPosition();
+      const camera = playerController.getCamera();
+
+      // Get camera look direction
+      camera.getWorldDirection(_lookDirection);
+      this.flashbangEffect.triggerFlash(grenade.position, playerPosition, _lookDirection);
+    }
+
     Logger.info('weapons', 'Flashbang deployed - minimal damage, disorientation effect');
+  }
+
+  /**
+   * Set the flashbang screen effect system
+   */
+  setFlashbangEffect(effect: FlashbangScreenEffect): void {
+    this.flashbangEffect = effect;
   }
 }
