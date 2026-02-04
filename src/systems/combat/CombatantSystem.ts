@@ -14,6 +14,7 @@ import { ZoneManager } from '../world/ZoneManager';
 import { AudioManager } from '../audio/AudioManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { Logger } from '../../utils/Logger';
+import { VoiceCalloutSystem } from '../audio/VoiceCalloutSystem';
 
 // Refactored modules
 import { CombatantFactory } from './CombatantFactory';
@@ -377,6 +378,10 @@ export class CombatantSystem implements GameSystem {
   setAudioManager(audioManager: AudioManager): void {
     this.audioManager = audioManager;
     this.setters.setAudioManager(audioManager);
+  }
+
+  setVoiceCalloutSystem(voiceCalloutSystem: VoiceCalloutSystem): void {
+    this.setters.setVoiceCalloutSystem(voiceCalloutSystem);
   }
 
   setPlayerSuppressionSystem(system: any): void {

@@ -39,8 +39,9 @@ export class SystemUpdater {
       const commandPos = refs.playerSquadController.getCommandPosition();
       refs.minimapSystem.setCommandPosition(commandPos);
 
-      // Update voice callout system with player position for distance-based filtering
-      // VoiceCalloutSystem disabled for performance
+      if (refs.voiceCalloutSystem) {
+        refs.voiceCalloutSystem.setPlayerPosition(refs.playerController.getPosition());
+      }
     }
 
     // Track timing for key systems (both local tracking and performance telemetry)

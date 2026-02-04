@@ -4,10 +4,12 @@ import { GameSystem } from '../../types';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { CombatantSystem } from '../combat/CombatantSystem';
+import { CombatantState } from '../combat/types';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { InventoryManager } from '../player/InventoryManager';
 import { AudioManager } from '../audio/AudioManager';
 import { PlayerStatsTracker } from '../player/PlayerStatsTracker';
+import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem';
 import { Grenade, GrenadePhysics, GrenadeSpawner } from './GrenadePhysics';
 import { GrenadeArcRenderer, GrenadeHandView, GrenadeCooking } from './GrenadeArcRenderer';
 
@@ -20,6 +22,7 @@ export class GrenadeSystem implements GameSystem {
   private explosionEffectsPool?: ExplosionEffectsPool;
   private inventoryManager?: InventoryManager;
   private audioManager?: AudioManager;
+  private voiceCalloutSystem?: VoiceCalloutSystem;
   private playerController?: any;
   private statsTracker?: PlayerStatsTracker;
 
@@ -253,9 +256,8 @@ export class GrenadeSystem implements GameSystem {
     const lookUpBoost = Math.max(0, direction.y * 3); // Only boost if looking up
     throwVelocity.y += lookUpBoost * this.throwPower;
 
-    this.grenades.push(
-      this.spawner.spawnGrenade(startPos, throwVelocity, remainingFuseTime, this.nextGrenadeId++)
-    );
+    const grenade = this.spawner.spawnGrenade(startPos, throwVelocity, remainingFuseTime, this.nextGrenadeId++);
+    this.grenades.push(grenade);
 
     // Track grenade throw in stats
     if (this.statsTracker) {
@@ -265,6 +267,7 @@ export class GrenadeSystem implements GameSystem {
     const powerPercent = Math.round(this.throwPower * 100);
     const cookedTime = remainingFuseTime < this.FUSE_TIME ? ` (cooked ${(this.FUSE_TIME - remainingFuseTime).toFixed(1)}s)` : '';
     Logger.info('weapons', `💣 Grenade thrown at ${powerPercent}% power${cookedTime}`);
+    this.triggerGrenadeCallout(grenade.position);
     return true;
   }
 
@@ -343,6 +346,10 @@ export class GrenadeSystem implements GameSystem {
     this.audioManager = audioManager;
   }
 
+  setVoiceCalloutSystem(voiceCalloutSystem: VoiceCalloutSystem): void {
+    this.voiceCalloutSystem = voiceCalloutSystem;
+  }
+
   setStatsTracker(statsTracker: PlayerStatsTracker): void {
     this.statsTracker = statsTracker;
   }
@@ -382,5 +389,23 @@ export class GrenadeSystem implements GameSystem {
 
   getGrenadeOverlayCamera(): THREE.Camera {
     return this.handView.getOverlayCamera();
+  }
+
+  private triggerGrenadeCallout(position: THREE.Vector3): void {
+    if (!this.voiceCalloutSystem || !this.combatantSystem) return;
+    if (Math.random() >= 0.4) return;
+
+    const DETECTION_RADIUS = 30;
+    const detectionRadiusSq = DETECTION_RADIUS * DETECTION_RADIUS;
+    const nearbyCombatants = this.combatantSystem.getAllCombatants().filter(combatant => {
+      if (combatant.state === CombatantState.DEAD) return false;
+      if (combatant.isPlayerProxy) return false;
+      return combatant.position.distanceToSquared(position) <= detectionRadiusSq;
+    });
+
+    if (nearbyCombatants.length === 0) return;
+
+    const caller = nearbyCombatants[Math.floor(Math.random() * nearbyCombatants.length)];
+    this.voiceCalloutSystem.triggerCallout(caller, CalloutType.GRENADE, caller.position);
   }
 }

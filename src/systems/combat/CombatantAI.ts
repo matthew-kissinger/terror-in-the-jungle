@@ -11,6 +11,7 @@ import { AIStateDefend } from './ai/AIStateDefend'
 import { AITargeting } from './ai/AITargeting'
 import { AICoverSystem } from './ai/AICoverSystem'
 import { AIFlankingSystem } from './ai/AIFlankingSystem'
+import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem'
 
 /**
  * Thin orchestrator for AI state machine - delegates to focused state handler modules
@@ -29,6 +30,8 @@ export class CombatantAI {
   // Tactical systems
   private coverSystem: AICoverSystem
   private flankingSystem: AIFlankingSystem
+  private voiceCalloutSystem?: VoiceCalloutSystem
+  private lastStateById: Map<string, CombatantState> = new Map()
 
   private squads: Map<string, Squad> = new Map()
 
@@ -52,6 +55,10 @@ export class CombatantAI {
     this.engageHandler.setSquads(squads)
   }
 
+  setVoiceCalloutSystem(system: VoiceCalloutSystem): void {
+    this.voiceCalloutSystem = system
+  }
+
   updateAI(
     combatant: Combatant,
     deltaTime: number,
@@ -59,6 +66,8 @@ export class CombatantAI {
     allCombatants: Map<string, Combatant>,
     spatialGrid?: SpatialOctree
   ): void {
+    const lastState = this.lastStateById.get(combatant.id) ?? combatant.state
+
     // Decay suppression effects over time
     this.decaySuppressionEffects(combatant, deltaTime)
 
@@ -150,6 +159,9 @@ export class CombatantAI {
         )
         break
     }
+
+    this.maybeTriggerMovementCallout(combatant, lastState)
+    this.lastStateById.set(combatant.id, combatant.state)
   }
 
   private decaySuppressionEffects(combatant: Combatant, deltaTime: number): void {
@@ -209,6 +221,16 @@ export class CombatantAI {
 
   private isCoverFlanked(combatant: Combatant, threatPos: THREE.Vector3): boolean {
     return this.targeting.isCoverFlanked(combatant, threatPos)
+  }
+
+  private maybeTriggerMovementCallout(combatant: Combatant, previousState: CombatantState): void {
+    if (!this.voiceCalloutSystem) return
+    if (combatant.state === CombatantState.DEAD) return
+    if (combatant.state !== CombatantState.ADVANCING && combatant.state !== CombatantState.RETREATING) return
+    if (combatant.state === previousState) return
+    if (Math.random() >= 0.2) return
+
+    this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.MOVING, combatant.position)
   }
 
   // Public squad suppression initiator (called from CombatantSystem)

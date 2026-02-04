@@ -122,6 +122,9 @@ export class CombatantCombat {
     if (combatant.currentBurst >= combatant.skillProfile.burstLength) {
       combatant.currentBurst = 0;
       combatant.burstCooldown = combatant.skillProfile.burstPauseMs / 1000;
+      if (this.voiceCalloutSystem && Math.random() < 0.15) {
+        this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.RELOADING, combatant.position);
+      }
       return;
     }
 
@@ -250,6 +253,9 @@ export class CombatantCombat {
     if (combatant.currentBurst >= combatant.skillProfile.burstLength) {
       combatant.currentBurst = 0;
       combatant.burstCooldown = combatant.skillProfile.burstPauseMs / 1000;
+      if (this.voiceCalloutSystem && Math.random() < 0.15) {
+        this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.RELOADING, combatant.position);
+      }
     }
 
     // Higher spread for suppressive fire - fire at area not point

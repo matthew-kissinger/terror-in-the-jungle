@@ -187,9 +187,9 @@ export class SystemConnector {
     }
 
     // Connect voice callout system
-    // VoiceCalloutSystem disabled for performance
-    // if (combatantCombat) {
-    //   combatantCombat.setVoiceCalloutSystem(refs.voiceCalloutSystem);
-    // }
+    if (refs.voiceCalloutSystem) {
+      refs.combatantSystem.setVoiceCalloutSystem(refs.voiceCalloutSystem);
+      refs.grenadeSystem.setVoiceCalloutSystem(refs.voiceCalloutSystem);
+    }
   }
 }

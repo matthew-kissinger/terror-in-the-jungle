@@ -35,6 +35,7 @@ import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
 import { DayNightCycle } from '../systems/environment/DayNightCycle';
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
+import { VoiceCalloutSystem } from '../systems/audio/VoiceCalloutSystem';
 import { SystemInitializer, SystemReferences } from './SystemInitializer';
 import { SystemConnector } from './SystemConnector';
 import { SystemUpdater } from './SystemUpdater';
@@ -86,7 +87,7 @@ export class SandboxSystemManager {
   public influenceMapSystem!: InfluenceMapSystem;
   public ammoSupplySystem!: AmmoSupplySystem;
   public footstepAudioSystem!: FootstepAudioSystem;
-  // public voiceCalloutSystem!: VoiceCalloutSystem; // Disabled for performance
+  public voiceCalloutSystem!: VoiceCalloutSystem;
 
   async initializeSystems(
     scene: THREE.Scene,
@@ -140,6 +141,7 @@ export class SandboxSystemManager {
     this.influenceMapSystem = this.refs.influenceMapSystem;
     this.ammoSupplySystem = this.refs.ammoSupplySystem;
     this.footstepAudioSystem = this.refs.footstepAudioSystem;
+    this.voiceCalloutSystem = this.refs.voiceCalloutSystem;
 
     // Connect systems together
     this.connector.connectSystems(this.refs, scene, camera, sandboxRenderer);
