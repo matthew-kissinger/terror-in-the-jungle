@@ -8,6 +8,7 @@ import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { ZoneRenderer } from './ZoneRenderer';
 import { ZoneCaptureLogic } from './ZoneCaptureLogic';
 import { ZoneTerrainAdapter } from './ZoneTerrainAdapter';
+import { ZoneInitializer } from './ZoneInitializer';
 import { GameModeConfig } from '../../config/gameModes';
 
 export enum ZoneState {
@@ -60,6 +61,7 @@ export class ZoneManager implements GameSystem {
   private zoneRenderer: ZoneRenderer;
   private captureLogic: ZoneCaptureLogic;
   private terrainAdapter: ZoneTerrainAdapter;
+  private zoneInitializer: ZoneInitializer;
 
   // Zone configuration
   private gameModeConfig?: GameModeConfig;
@@ -78,6 +80,7 @@ export class ZoneManager implements GameSystem {
     this.zoneRenderer = new ZoneRenderer(scene);
     this.captureLogic = new ZoneCaptureLogic();
     this.terrainAdapter = new ZoneTerrainAdapter();
+    this.zoneInitializer = new ZoneInitializer(this.terrainAdapter, this.zoneRenderer);
   }
 
   async init(): Promise<void> {
@@ -85,101 +88,6 @@ export class ZoneManager implements GameSystem {
     Logger.info('world', '⏳ Zone Manager initialized, waiting for ChunkManager connection...');
   }
 
-  private createDefaultZones(): void {
-    if (!this.gameModeConfig) {
-      // Default Zone Control configuration if no mode is set
-      const usBasePos = this.terrainAdapter.findSuitableZonePosition(new THREE.Vector3(0, 0, -50), 30);
-      const opforBasePos = this.terrainAdapter.findSuitableZonePosition(new THREE.Vector3(0, 0, 145), 30);
-
-      // US Home Base (uncapturable)
-      this.createZone({
-        id: 'us_base',
-        name: 'US Base',
-        position: usBasePos,
-        owner: Faction.US,
-        isHomeBase: true,
-        ticketBleedRate: 0
-      });
-
-    // OPFOR Home Base (uncapturable)
-    this.createZone({
-      id: 'opfor_base',
-      name: 'OPFOR Base',
-      position: opforBasePos,
-      owner: Faction.OPFOR,
-      isHomeBase: true,
-      ticketBleedRate: 0
-    });
-
-    // Capturable zones
-    const alphaPos = this.terrainAdapter.findSuitableZonePosition(new THREE.Vector3(-120, 0, 50), 40);
-    this.createZone({
-      id: 'zone_alpha',
-      name: 'Alpha',
-      position: alphaPos,
-      owner: null,
-      isHomeBase: false,
-      ticketBleedRate: 1
-    });
-
-    const bravoPos = this.terrainAdapter.findSuitableZonePosition(new THREE.Vector3(0, 0, 50), 40);
-    this.createZone({
-      id: 'zone_bravo',
-      name: 'Bravo',
-      position: bravoPos,
-      owner: null,
-      isHomeBase: false,
-      ticketBleedRate: 2 // Center zone more valuable
-    });
-
-    const charliePos = this.terrainAdapter.findSuitableZonePosition(new THREE.Vector3(120, 0, 50), 40);
-    this.createZone({
-      id: 'zone_charlie',
-      name: 'Charlie',
-      position: charliePos,
-      owner: null,
-      isHomeBase: false,
-      ticketBleedRate: 1
-    });
-    }
-  }
-
-  private createZone(config: {
-    id: string;
-    name: string;
-    position: THREE.Vector3;
-    radius?: number;
-    owner: Faction | null;
-    isHomeBase: boolean;
-    ticketBleedRate: number;
-  }): void {
-    const zone: CaptureZone = {
-      id: config.id,
-      name: config.name,
-      position: config.position.clone(),
-      radius: config.radius || (this.gameModeConfig?.captureRadius || 15),
-      height: 20,
-      owner: config.owner,
-      state: config.owner ?
-        (config.owner === Faction.US ? ZoneState.US_CONTROLLED : ZoneState.OPFOR_CONTROLLED) :
-        ZoneState.NEUTRAL,
-      captureProgress: config.owner ? 100 : 0,
-      captureSpeed: this.gameModeConfig?.captureSpeed || 1,
-      isHomeBase: config.isHomeBase,
-      ticketBleedRate: config.ticketBleedRate,
-      currentFlagHeight: 0
-    };
-
-    Logger.info('world', `📍 Creating zone "${zone.name}" at position (${zone.position.x.toFixed(1)}, ${zone.position.y.toFixed(1)}, ${zone.position.z.toFixed(1)})`);
-
-    // Create visual representation
-    this.zoneRenderer.createZoneVisuals(zone);
-
-    // Initialize occupant tracking
-    this.occupants.set(zone.id, { us: 0, opfor: 0 });
-
-    this.zones.set(zone.id, zone);
-  }
 
   private updateZonePositions(): void {
     if (!this.chunkManager) return;
@@ -329,7 +237,7 @@ export class ZoneManager implements GameSystem {
   initializeZones(): void {
     if (this.zones.size === 0 && this.chunkManager) {
       Logger.info('world', '🚩 Creating zones with terrain mapping...');
-      this.createDefaultZones();
+      this.zoneInitializer.createDefaultZones(this.zones, this.occupants);
       Logger.info('world', `✅ Zones created with terrain mapping: ${this.zones.size} zones`);
     }
   }
@@ -338,8 +246,9 @@ export class ZoneManager implements GameSystem {
 
   setGameModeConfig(config: GameModeConfig): void {
     this.gameModeConfig = config;
+    this.zoneInitializer.setGameModeConfig(config);
     this.clearAllZones();
-    this.createZonesFromConfig();
+    this.zoneInitializer.createZonesFromConfig(this.zones, this.occupants);
   }
 
   private clearAllZones(): void {
@@ -350,30 +259,6 @@ export class ZoneManager implements GameSystem {
     this.occupants.clear();
   }
 
-  private createZonesFromConfig(): void {
-    if (!this.gameModeConfig) return;
-
-    Logger.info('world', `🎮 Creating zones for game mode: ${this.gameModeConfig.name}`);
-
-    for (const zoneConfig of this.gameModeConfig.zones) {
-      const position = this.terrainAdapter.findSuitableZonePosition(
-        zoneConfig.position,
-        zoneConfig.radius
-      );
-
-      this.createZone({
-        id: zoneConfig.id,
-        name: zoneConfig.name,
-        position: position,
-        radius: zoneConfig.radius,
-        owner: zoneConfig.owner,
-        isHomeBase: zoneConfig.isHomeBase,
-        ticketBleedRate: zoneConfig.ticketBleedRate
-      });
-    }
-
-    Logger.info('world', `✅ Created ${this.zones.size} zones for ${this.gameModeConfig.name}`);
-  }
 
   setCombatantSystem(system: CombatantSystem): void {
     this.combatantSystem = system;
