@@ -14,7 +14,7 @@ import { Grenade, GrenadePhysics, GrenadeSpawner } from './GrenadePhysics';
 import { GrenadeArcRenderer, GrenadeHandView, GrenadeCooking } from './GrenadeArcRenderer';
 import { triggerGrenadeCallout } from './GrenadeCallout';
 import { GrenadeEffects } from './GrenadeEffects';
-import { IHUDSystem } from '../../types/SystemInterfaces';
+import type { IFlashbangScreenEffect, IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
 
 export class GrenadeSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -26,7 +26,7 @@ export class GrenadeSystem implements GameSystem {
   private inventoryManager?: InventoryManager;
   private audioManager?: AudioManager;
   private voiceCalloutSystem?: VoiceCalloutSystem;
-  private playerController?: any;
+  private playerController?: IPlayerController;
   private statsTracker?: PlayerStatsTracker;
 
   private grenades: Grenade[] = [];
@@ -336,11 +336,11 @@ export class GrenadeSystem implements GameSystem {
     // Type is 'any' to avoid circular dependency with HUDSystem
   }
 
-  setPlayerController(playerController: any): void {
+  setPlayerController(playerController: IPlayerController): void {
     this.playerController = playerController;
   }
 
-  setFlashbangEffect(flashbangEffect: any): void {
+  setFlashbangEffect(flashbangEffect: IFlashbangScreenEffect): void {
     this.effects.setFlashbangEffect(flashbangEffect);
   }
 

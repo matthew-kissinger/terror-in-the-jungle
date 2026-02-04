@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { Combatant, Faction, Squad } from '../systems/combat/types';
+import type { PlayerController } from '../systems/player/PlayerController';
 
 /**
  * Impact Effects Pool interface - blood/debris effects on hit
@@ -129,10 +130,12 @@ export interface IGrenadeSystem {
  */
 export interface IPlayerController {
   applyExplosionShake(position: THREE.Vector3, magnitude: number): void;
-  tryEnterHelicopter(): void;
-  exitHelicopter(): void;
-  position: THREE.Vector3;
-  camera: THREE.PerspectiveCamera;
+  exitHelicopter(exitPosition: THREE.Vector3): void;
+  setPosition(position: THREE.Vector3): void;
+  enableControls(): void;
+  disableControls(): void;
+  getPosition(): THREE.Vector3;
+  getCamera(): THREE.PerspectiveCamera;
 }
 
 /**
@@ -152,13 +155,15 @@ export interface IHelicopterModel {
  * First Person Weapon interface
  */
 export interface IFirstPersonWeapon {
-  setPlayerController(controller: IPlayerController): void;
+  setPlayerController(controller: PlayerController): void;
   setCombatantSystem(system: any): void;
   setHUDSystem(system: IHUDSystem): void;
   setZoneManager(system: any): void;
   setInventoryManager(system: any): void;
   setAudioManager(manager: any): void;
   renderWeapon(renderer: THREE.WebGLRenderer): void;
+  enable(): void;
+  disable(): void;
 }
 
 /**
@@ -219,6 +224,28 @@ export interface ITicketSystem {
 export interface IAudioManager {
   getListener(): THREE.AudioListener;
   play(soundName: string, position?: THREE.Vector3, volume?: number): void;
+  playWeaponSwitchSound(): void;
+}
+
+/**
+ * Ammo Manager interface
+ */
+export interface IAmmoManager {
+  getState(): {
+    currentMagazine: number;
+    reserveAmmo: number;
+  };
+}
+
+/**
+ * Flashbang Screen Effect interface
+ */
+export interface IFlashbangScreenEffect {
+  triggerFlash(
+    flashPosition: THREE.Vector3,
+    playerPosition: THREE.Vector3,
+    playerLookDirection: THREE.Vector3
+  ): void;
 }
 
 /**

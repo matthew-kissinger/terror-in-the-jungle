@@ -2,7 +2,7 @@ import { Logger } from '../../../utils/Logger';
 import * as THREE from 'three'
 import { ProgrammaticGunFactory } from '../ProgrammaticGunFactory'
 import { GunplayCore, WeaponSpec } from '../../weapons/GunplayCore'
-import type { IHUDSystem } from '../../../types/SystemInterfaces'
+import type { IAmmoManager, IAudioManager, IHUDSystem } from '../../../types/SystemInterfaces'
 
 /**
  * Manages weapon model creation and switching between rifle/shotgun/SMG
@@ -147,7 +147,7 @@ export class WeaponRigManager {
     return this.pistolCore
   }
 
-  startWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol', hudSystem?: IHUDSystem, audioManager?: any, ammoManager?: any): boolean {
+  startWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol', hudSystem?: IHUDSystem, audioManager?: IAudioManager, ammoManager?: IAmmoManager): boolean {
     // Don't switch if already the current weapon
     if ((weaponType === 'rifle' && this.weaponRig === this.rifleRig) ||
         (weaponType === 'shotgun' && this.weaponRig === this.shotgunRig) ||
@@ -168,7 +168,7 @@ export class WeaponRigManager {
     return true
   }
 
-  updateSwitchAnimation(deltaTime: number, hudSystem?: IHUDSystem, audioManager?: any, ammoManager?: any): void {
+  updateSwitchAnimation(deltaTime: number, hudSystem?: IHUDSystem, audioManager?: IAudioManager, ammoManager?: IAmmoManager): void {
     if (!this.isSwitchingWeapon) return
 
     // Update switch animation progress
@@ -186,7 +186,7 @@ export class WeaponRigManager {
     this.calculateSwitchAnimation(this.switchAnimationProgress, hudSystem, audioManager, ammoManager)
   }
 
-  private calculateSwitchAnimation(progress: number, hudSystem?: IHUDSystem, audioManager?: any, ammoManager?: any): void {
+  private calculateSwitchAnimation(progress: number, hudSystem?: IHUDSystem, audioManager?: IAudioManager, ammoManager?: IAmmoManager): void {
     // Two-stage switch animation:
     // Stage 1 (0-50%): Lower current weapon (move down and rotate forward)
     // Stage 2 (50-100%): Raise new weapon (move up from below)
@@ -212,7 +212,7 @@ export class WeaponRigManager {
     }
   }
 
-  private performWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol', hudSystem?: IHUDSystem, audioManager?: any, ammoManager?: any): void {
+  private performWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol', hudSystem?: IHUDSystem, audioManager?: IAudioManager, ammoManager?: IAmmoManager): void {
     // Actually switch the visible weapon models
     if (!this.rifleRig || !this.shotgunRig || !this.smgRig || !this.pistolRig) return
 

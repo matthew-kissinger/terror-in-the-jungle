@@ -6,9 +6,9 @@ import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { CombatantSystem } from '../combat/CombatantSystem';
 import { AudioManager } from '../audio/AudioManager';
 import { Grenade } from './GrenadePhysics';
-import { FlashbangScreenEffect } from '../player/FlashbangScreenEffect';
 import { spawnSmokeCloud } from '../effects/SmokeCloudSystem';
 import { spatialGridManager } from '../combat/SpatialGridManager';
+import type { IFlashbangScreenEffect, IPlayerController } from '../../types/SystemInterfaces';
 
 // Module-level scratch vectors for direction calculations
 const _lookDirection = new THREE.Vector3();
@@ -23,7 +23,7 @@ const _velocity = new THREE.Vector3();
 export class GrenadeEffects {
   private readonly DAMAGE_RADIUS = 15;
   private readonly MAX_DAMAGE = 150;
-  private flashbangEffect?: FlashbangScreenEffect;
+  private flashbangEffect?: IFlashbangScreenEffect;
 
   explodeGrenade(
     grenade: Grenade,
@@ -31,7 +31,7 @@ export class GrenadeEffects {
     explosionEffectsPool: ExplosionEffectsPool | undefined,
     audioManager: AudioManager | undefined,
     combatantSystem: CombatantSystem | undefined,
-    playerController: any
+    playerController: IPlayerController | undefined
   ): void {
     Logger.info('weapons', `${grenade.type.toUpperCase()} grenade exploded at (${grenade.position.x.toFixed(1)}, ${grenade.position.y.toFixed(1)}, ${grenade.position.z.toFixed(1)})`);
 
@@ -54,7 +54,7 @@ export class GrenadeEffects {
     explosionEffectsPool: ExplosionEffectsPool | undefined,
     audioManager: AudioManager | undefined,
     combatantSystem: CombatantSystem | undefined,
-    playerController: any
+    playerController: IPlayerController | undefined
   ): void {
     // Main explosion effect - big flash, smoke, fire, shockwave
     if (explosionEffectsPool) {
@@ -124,7 +124,7 @@ export class GrenadeEffects {
     explosionEffectsPool: ExplosionEffectsPool | undefined,
     audioManager: AudioManager | undefined,
     combatantSystem: CombatantSystem | undefined,
-    playerController: any
+    playerController: IPlayerController | undefined
   ): void {
     // Flashbang - bright flash effect and minimal damage
     if (explosionEffectsPool) {
@@ -247,7 +247,7 @@ export class GrenadeEffects {
   /**
    * Set the flashbang screen effect system
    */
-  setFlashbangEffect(effect: FlashbangScreenEffect): void {
+  setFlashbangEffect(effect: IFlashbangScreenEffect): void {
     this.flashbangEffect = effect;
   }
 }

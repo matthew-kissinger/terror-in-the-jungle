@@ -9,6 +9,7 @@ import { InventoryManager } from './InventoryManager';
 import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 import { RespawnUI } from './RespawnUI';
 import { RespawnMapController } from './RespawnMapController';
+import type { IFirstPersonWeapon, IPlayerController } from '../../types/SystemInterfaces';
 
 export class PlayerRespawnManager implements GameSystem {
   private scene: THREE.Scene;
@@ -16,8 +17,8 @@ export class PlayerRespawnManager implements GameSystem {
   private zoneManager?: ZoneManager;
   private playerHealthSystem?: PlayerHealthSystem;
   private gameModeManager?: GameModeManager;
-  private playerController?: any;
-  private firstPersonWeapon?: any;
+  private playerController?: IPlayerController;
+  private firstPersonWeapon?: IFirstPersonWeapon;
   private inventoryManager?: InventoryManager;
 
   // Respawn state
@@ -84,11 +85,11 @@ export class PlayerRespawnManager implements GameSystem {
     this.mapController.setGameModeManager(manager);
   }
 
-  setPlayerController(controller: any): void {
+  setPlayerController(controller: IPlayerController): void {
     this.playerController = controller;
   }
 
-  setFirstPersonWeapon(weapon: any): void {
+  setFirstPersonWeapon(weapon: IFirstPersonWeapon): void {
     this.firstPersonWeapon = weapon;
   }
 
