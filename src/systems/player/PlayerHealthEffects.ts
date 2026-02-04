@@ -13,6 +13,7 @@ export class PlayerHealthEffects {
   private damageOverlay: HTMLCanvasElement;
   private damageContext: CanvasRenderingContext2D;
   private cameraDirection: THREE.Vector3 = new THREE.Vector3(0, 0, -1);
+  private boundOnResize: (() => void) | null = null;
 
   // Audio for heartbeat effect
   private audioContext?: AudioContext;
@@ -50,7 +51,8 @@ export class PlayerHealthEffects {
   init(): void {
     document.body.appendChild(this.damageOverlay);
     this.resizeCanvas();
-    window.addEventListener('resize', () => this.resizeCanvas());
+    this.boundOnResize = () => this.resizeCanvas();
+    window.addEventListener('resize', this.boundOnResize);
 
     // Add damage flash animation styles
     const damageFlashStyle = document.createElement('style');
@@ -260,6 +262,10 @@ export class PlayerHealthEffects {
 
   dispose(): void {
     this.stopHeartbeat();
+    if (this.boundOnResize) {
+      window.removeEventListener('resize', this.boundOnResize);
+      this.boundOnResize = null;
+    }
     if (this.damageOverlay.parentNode) {
       this.damageOverlay.parentNode.removeChild(this.damageOverlay);
     }

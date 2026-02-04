@@ -36,8 +36,10 @@ export class PlayerSuppressionSystem implements GameSystem {
   private cameraShakeSystem?: CameraShakeSystem;
   private vignetteElement?: HTMLDivElement;
   private directionalOverlayElement?: HTMLDivElement;
+  private directionalCanvas?: HTMLCanvasElement;
   private desaturationElement?: HTMLDivElement;
   private playerController?: any;
+  private boundOnResize: (() => void) | null = null;
 
   async init(): Promise<void> {
     Logger.info('Combat', 'Initializing Player Suppression System...');
@@ -75,6 +77,10 @@ export class PlayerSuppressionSystem implements GameSystem {
   }
 
   dispose(): void {
+    if (this.boundOnResize) {
+      window.removeEventListener('resize', this.boundOnResize);
+      this.boundOnResize = null;
+    }
     if (this.vignetteElement) {
       this.vignetteElement.remove();
     }
@@ -189,10 +195,13 @@ export class PlayerSuppressionSystem implements GameSystem {
     document.body.appendChild(this.directionalOverlayElement);
 
     // Handle window resize
-    window.addEventListener('resize', () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    });
+    this.directionalCanvas = canvas;
+    this.boundOnResize = () => {
+      if (!this.directionalCanvas) return;
+      this.directionalCanvas.width = window.innerWidth;
+      this.directionalCanvas.height = window.innerHeight;
+    };
+    window.addEventListener('resize', this.boundOnResize);
   }
 
   /**
