@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { MathUtils } from '../../utils/Math';
 import { PlayerState } from '../../types';
@@ -43,7 +44,7 @@ export class PlayerCamera {
 
   toggleHelicopterMouseControl(): boolean {
     this.helicopterMouseControlEnabled = !this.helicopterMouseControlEnabled;
-    console.log(`🚁 Mouse control ${this.helicopterMouseControlEnabled ? 'enabled (affects controls)' : 'disabled (free orbital look)'}`);
+    Logger.info('player', `🚁 Mouse control ${this.helicopterMouseControlEnabled ? 'enabled (affects controls)' : 'disabled (free orbital look)'}`);
     return this.helicopterMouseControlEnabled;
   }
 

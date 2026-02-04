@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { PixelPerfectUtils } from '../../utils/PixelPerfect';
@@ -100,7 +101,7 @@ export class Skybox implements GameSystem {
     // Add to scene
     this.scene.add(this.skyboxMesh);
 
-    console.log('Equirectangular skybox created with proper mapping');
+    Logger.info('environment', 'Equirectangular skybox created with proper mapping');
   }
 
   // Alternative method using THREE.js built-in cube texture approach

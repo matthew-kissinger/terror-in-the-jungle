@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { LOADING_PHASES } from '../../config/loading';
 import { LoadingStyles } from './LoadingStyles';
@@ -336,7 +337,7 @@ export class LoadingScreen {
     manager.onStart = (url, loaded, total) => {
       itemsLoaded = loaded;
       itemsTotal = total;
-      console.log(`Loading started: ${loaded}/${total} items`);
+      Logger.info('loading', `Loading started: ${loaded}/${total} items`);
     };
 
     manager.onProgress = (url, loaded, total) => {
@@ -351,15 +352,15 @@ export class LoadingScreen {
         this.updateProgress('audio', loaded / total);
       }
 
-      console.log(`Loading: ${url} (${loaded}/${total})`);
+      Logger.info('loading', `Loading: ${url} (${loaded}/${total})`);
     };
 
     manager.onLoad = () => {
-      console.log('All items loaded!');
+      Logger.info('loading', 'All items loaded!');
     };
 
     manager.onError = (url) => {
-      console.error(`Error loading: ${url}`);
+      Logger.error('loading', `Error loading: ${url}`);
     };
 
     return manager;

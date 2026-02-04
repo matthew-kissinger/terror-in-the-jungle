@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import { KillFeed } from './KillFeed';
 import { Faction } from '../../systems/combat/types';
 import { DamageNumberSystem } from './DamageNumberSystem';
@@ -142,9 +143,9 @@ export class HUDElements {
 
     // Legacy logging
     if (type === 'kill') {
-      console.log('💀 Kill confirmed!');
+      Logger.info('hud', '💀 Kill confirmed!');
     } else if (type === 'headshot') {
-      console.log('🎯 Headshot!');
+      Logger.info('hud', '🎯 Headshot!');
     }
   }
 

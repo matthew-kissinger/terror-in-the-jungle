@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { ZoneManager } from '../../systems/world/ZoneManager';
@@ -42,12 +43,12 @@ export class MinimapSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('🗺️ Initializing Minimap System...');
+    Logger.info('minimap', '🗺️ Initializing Minimap System...');
 
     // Add to DOM
     document.body.appendChild(this.minimapContainer);
 
-    console.log('✅ Minimap System initialized');
+    Logger.info('minimap', '✅ Minimap System initialized');
   }
 
   update(deltaTime: number): void {
@@ -80,12 +81,12 @@ export class MinimapSystem implements GameSystem {
   // Game mode configuration
   setWorldScale(scale: number): void {
     this.WORLD_SIZE = scale;
-    console.log(`🎮 Minimap world scale set to ${scale}`);
+    Logger.info('minimap', `🎮 Minimap world scale set to ${scale}`);
   }
 
   setPlayerSquadId(squadId: string | undefined): void {
     this.playerSquadId = squadId;
-    console.log(`🎮 Minimap tracking player squad: ${squadId}`);
+    Logger.info('minimap', `🎮 Minimap tracking player squad: ${squadId}`);
   }
 
   setCommandPosition(position: THREE.Vector3 | undefined): void {
@@ -112,6 +113,6 @@ export class MinimapSystem implements GameSystem {
       this.minimapContainer.parentNode.removeChild(this.minimapContainer);
     }
 
-    console.log('🧹 Minimap System disposed');
+    Logger.info('minimap', '🧹 Minimap System disposed');
   }
 }

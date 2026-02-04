@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { Combatant } from '../combat/types';
@@ -50,7 +51,7 @@ export class DeathCamSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('💀 DeathCamSystem initialized');
+    Logger.info('player', '💀 DeathCamSystem initialized');
     this.createOverlay();
   }
 
@@ -97,7 +98,7 @@ export class DeathCamSystem implements GameSystem {
 
   // Start death cam sequence
   startDeathCam(deathPosition: THREE.Vector3, killerInfo?: KillerInfo): void {
-    console.log('💀 Starting death cam sequence');
+    Logger.info('player', '💀 Starting death cam sequence');
 
     this.isActive = true;
     this.deathPosition = deathPosition.clone();

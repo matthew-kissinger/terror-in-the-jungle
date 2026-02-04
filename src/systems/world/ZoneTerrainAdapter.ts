@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 
@@ -36,14 +37,14 @@ export class ZoneTerrainAdapter {
       }
     }
 
-    console.log(`🚩 Zone placed at (${bestPosition.x.toFixed(1)}, ${bestPosition.y.toFixed(1)}, ${bestPosition.z.toFixed(1)}) with slope ${bestSlope.toFixed(2)}`);
+    Logger.info('world', `🚩 Zone placed at (${bestPosition.x.toFixed(1)}, ${bestPosition.y.toFixed(1)}, ${bestPosition.z.toFixed(1)}) with slope ${bestSlope.toFixed(2)}`);
 
     // Special handling for problematic zones (like Alpha zone)
     if (Math.abs(bestPosition.x + 120) < 10) {
-      console.warn(`⚠️ Alpha zone terrain check: desired=(${desiredPosition.x}, ${desiredPosition.z}), final=(${bestPosition.x}, ${bestPosition.y}, ${bestPosition.z})`);
+      Logger.warn('world', `⚠️ Alpha zone terrain check: desired=(${desiredPosition.x}, ${desiredPosition.z}), final=(${bestPosition.x}, ${bestPosition.y}, ${bestPosition.z})`);
 
       if (bestPosition.y < -5 || bestPosition.y > 50) {
-        console.warn(`⚠️ Alpha zone height ${bestPosition.y} seems problematic, adjusting...`);
+        Logger.warn('world', `⚠️ Alpha zone height ${bestPosition.y} seems problematic, adjusting...`);
 
         // Try positions closer to center
         for (let attempt = 0; attempt < 5; attempt++) {
@@ -53,7 +54,7 @@ export class ZoneTerrainAdapter {
 
           if (testHeight > -2 && testHeight < 30) {
             bestPosition = new THREE.Vector3(testX, testHeight, testZ);
-            console.log(`🔧 Alpha zone relocated to (${testX}, ${testHeight.toFixed(1)}, ${testZ})`);
+            Logger.info('world', `🔧 Alpha zone relocated to (${testX}, ${testHeight.toFixed(1)}, ${testZ})`);
             break;
           }
         }

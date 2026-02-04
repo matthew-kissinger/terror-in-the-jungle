@@ -1,3 +1,4 @@
+import { Logger } from '../utils/Logger';
 import * as THREE from 'three';
 import '../style.css';
 
@@ -36,8 +37,8 @@ export class PixelArtSandbox {
   public currentPixelSize = 1;
 
   constructor() {
-    console.log('🎮 Initializing Pixel Art Sandbox Engine...');
-    console.log('Three.js version:', THREE.REVISION);
+    Logger.info('core', '🎮 Initializing Pixel Art Sandbox Engine...');
+    Logger.info('core', 'Three.js version:', THREE.REVISION);
 
     this.sandboxEnabled = isSandboxMode();
     this.sandboxConfig = this.sandboxEnabled ? getSandboxConfig() : null;
@@ -72,12 +73,12 @@ export class PixelArtSandbox {
 
     // Settings button (placeholder)
     this.loadingScreen.onSettings(() => {
-      console.log('Settings menu not yet implemented');
+      Logger.info('core', 'Settings menu not yet implemented');
     });
 
     // How to play button (placeholder)
     this.loadingScreen.onHowToPlay(() => {
-      console.log('How to play not yet implemented');
+      Logger.info('core', 'How to play not yet implemented');
     });
   }
 
@@ -140,6 +141,6 @@ export class PixelArtSandbox {
     this.performanceOverlay.dispose();
     this.timeIndicator.dispose();
     this.logOverlay.dispose();
-    console.log('🧹 Sandbox disposed');
+    Logger.info('core', '🧹 Sandbox disposed');
   }
 }

@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { AssetLoader } from '../assets/AssetLoader';
@@ -57,7 +58,7 @@ export class WeaponPickupSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('🎯 Initializing Weapon Pickup System...');
+    Logger.info('weapons', '🎯 Initializing Weapon Pickup System...');
 
     // Create materials for each weapon type
     this.createWeaponMaterials();
@@ -69,7 +70,7 @@ export class WeaponPickupSystem implements GameSystem {
     this.boundOnKeyDown = this.onKeyDown.bind(this);
     window.addEventListener('keydown', this.boundOnKeyDown);
 
-    console.log('✅ Weapon Pickup System initialized');
+    Logger.info('weapons', '✅ Weapon Pickup System initialized');
   }
 
   private createWeaponMaterials(): void {
@@ -194,7 +195,7 @@ export class WeaponPickupSystem implements GameSystem {
     // Remove pickup
     this.removePickup(pickup.id);
 
-    console.log(`🎯 Picked up ${pickup.type.toUpperCase()}`);
+    Logger.info('weapons', `🎯 Picked up ${pickup.type.toUpperCase()}`);
   }
 
   private spawnPickupEffect(position: THREE.Vector3): void {
@@ -220,7 +221,7 @@ export class WeaponPickupSystem implements GameSystem {
     const material = this.materials.get(type);
 
     if (!material) {
-      console.error(`No material for weapon type: ${type}`);
+      Logger.error('weapons', `No material for weapon type: ${type}`);
       return undefined;
     }
 
@@ -242,7 +243,7 @@ export class WeaponPickupSystem implements GameSystem {
 
     this.pickups.set(id, pickup);
 
-    console.log(`🎯 Spawned ${type} pickup at (${position.x.toFixed(1)}, ${position.z.toFixed(1)})`);
+    Logger.info('weapons', `🎯 Spawned ${type} pickup at (${position.x.toFixed(1)}, ${position.z.toFixed(1)})`);
 
     return id;
   }
@@ -306,6 +307,6 @@ export class WeaponPickupSystem implements GameSystem {
 
     window.removeEventListener('keydown', this.boundOnKeyDown);
 
-    console.log('🧹 Weapon Pickup System disposed');
+    Logger.info('weapons', '🧹 Weapon Pickup System disposed');
   }
 }

@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import { Faction } from '../../systems/combat/types';
 import { GameState } from '../../systems/world/TicketSystem';
 import { MATCH_END_SCREEN_STYLES } from './MatchEndScreenStyles';
@@ -38,7 +39,7 @@ export class MatchEndScreen {
     this.container = this.createEndScreen(winner, gameState, stats);
     document.body.appendChild(this.container);
 
-    console.log(`🏆 Match end screen shown: ${winner} wins`);
+    Logger.info('ui', `🏆 Match end screen shown: ${winner} wins`);
   }
 
   hide(): void {
@@ -63,7 +64,7 @@ export class MatchEndScreen {
       this.onPlayAgainCallback();
     } else {
       // Default action: reload the page
-      console.log('🔄 Restarting match (reloading page)');
+      Logger.info('ui', '🔄 Restarting match (reloading page)');
       window.location.reload();
     }
   };
@@ -73,7 +74,7 @@ export class MatchEndScreen {
       this.onReturnToMenuCallback();
     } else {
       // Default action: reload the page to return to menu
-      console.log('🔄 Returning to main menu (reloading page)');
+      Logger.info('ui', '🔄 Returning to main menu (reloading page)');
       window.location.reload();
     }
   };

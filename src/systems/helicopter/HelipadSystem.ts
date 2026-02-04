@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
@@ -15,7 +16,7 @@ export class HelipadSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('🚁 Initializing Helipad System...');
+    Logger.info('helicopter', '🚁 Initializing Helipad System...');
     // Helipads will be created when terrain manager is set
   }
 
@@ -42,7 +43,7 @@ export class HelipadSystem implements GameSystem {
 
   private createOpenFrontierHelipad(): void {
     if (!this.terrainManager) {
-      console.warn('⚠️ Cannot create helipad - terrain manager not available');
+      Logger.warn('helicopter', '⚠️ Cannot create helipad - terrain manager not available');
       return;
     }
 
@@ -68,7 +69,7 @@ export class HelipadSystem implements GameSystem {
     // Clear vegetation in helipad area
     this.clearVegetationArea(helipadPosition.x, helipadPosition.z, platformRadius + 2);
 
-    console.log(`🚁 Created Open Frontier helipad at position (${helipadPosition.x}, ${helipadPosition.y}, ${helipadPosition.z}) - max terrain height: ${maxHeight.toFixed(2)}`);
+    Logger.info('helicopter', `🚁 Created Open Frontier helipad at position (${helipadPosition.x}, ${helipadPosition.y}, ${helipadPosition.z}) - max terrain height: ${maxHeight.toFixed(2)}`);
   }
 
   private findMaxTerrainHeight(centerX: number, centerZ: number, radius: number): number {
@@ -112,19 +113,19 @@ export class HelipadSystem implements GameSystem {
 
   private clearVegetationArea(centerX: number, centerZ: number, radius: number): void {
     if (!this.vegetationSystem) {
-      console.log('🚁 No vegetation system available for clearing');
+      Logger.info('helicopter', '🚁 No vegetation system available for clearing');
       return;
     }
 
     // Try to clear vegetation if the system supports it
     if (typeof this.vegetationSystem.clearArea === 'function') {
       this.vegetationSystem.clearArea(centerX, centerZ, radius);
-      console.log(`🚁 Cleared vegetation in ${radius}m radius around helipad`);
+      Logger.info('helicopter', `🚁 Cleared vegetation in ${radius}m radius around helipad`);
     } else if (typeof this.vegetationSystem.addExclusionZone === 'function') {
       this.vegetationSystem.addExclusionZone(centerX, centerZ, radius);
-      console.log(`🚁 Added vegetation exclusion zone around helipad`);
+      Logger.info('helicopter', `🚁 Added vegetation exclusion zone around helipad`);
     } else {
-      console.log('🚁 Vegetation system does not support area clearing');
+      Logger.info('helicopter', '🚁 Vegetation system does not support area clearing');
     }
   }
 
@@ -274,7 +275,7 @@ export class HelipadSystem implements GameSystem {
 
         // Create helipad when terrain is properly loaded (height > -100 indicates valid terrain data)
         if ((testHeight > -100 && isChunkLoaded) || testHeight > 0) {
-          console.log(`🚁 Open Frontier mode detected - creating helipad at (${openFrontierX}, ${openFrontierZ}) - terrain height: ${testHeight.toFixed(2)}, chunk loaded: ${isChunkLoaded}`);
+          Logger.info('helicopter', `🚁 Open Frontier mode detected - creating helipad at (${openFrontierX}, ${openFrontierZ}) - terrain height: ${testHeight.toFixed(2)}, chunk loaded: ${isChunkLoaded}`);
           this.createOpenFrontierHelipad();
         }
       }
@@ -300,6 +301,6 @@ export class HelipadSystem implements GameSystem {
       });
     });
     this.helipads.clear();
-    console.log('🧹 HelipadSystem disposed');
+    Logger.info('helicopter', '🧹 HelipadSystem disposed');
   }
 }

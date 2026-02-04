@@ -1,3 +1,4 @@
+import { Logger } from '../../../utils/Logger';
 import * as THREE from 'three'
 
 /**
@@ -140,7 +141,7 @@ export class WeaponAnimations {
 
     this.isPumpAnimating = true
     this.pumpAnimationProgress = 0
-    console.log('🔫 Pump action!')
+    Logger.info('player', '🔫 Pump action!')
   }
 
   getPumpOffset(): { x: number; y: number; z: number } {

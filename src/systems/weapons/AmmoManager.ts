@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { ZoneManager, CaptureZone, ZoneState } from '../world/ZoneManager';
 import { Faction } from '../combat/types';
@@ -70,7 +71,7 @@ export class AmmoManager {
     this.state.reloadProgress = 0;
     this.reloadStartTime = performance.now();
 
-    console.log('🔄 Reloading...');
+    Logger.info('weapons', '🔄 Reloading...');
     return true;
   }
 
@@ -78,7 +79,7 @@ export class AmmoManager {
     if (this.state.isReloading) {
       this.state.isReloading = false;
       this.state.reloadProgress = 0;
-      console.log('❌ Reload cancelled');
+      Logger.info('weapons', '❌ Reload cancelled');
     }
   }
 
@@ -113,7 +114,7 @@ export class AmmoManager {
     this.state.reloadProgress = 0;
     this.state.needsReload = false;
 
-    console.log(`✅ Reload complete! Ammo: ${this.state.currentMagazine}/${this.state.reserveAmmo}`);
+    Logger.info('weapons', `✅ Reload complete! Ammo: ${this.state.currentMagazine}/${this.state.reserveAmmo}`);
 
     // Trigger callbacks
     this.onReloadComplete?.();
@@ -138,7 +139,7 @@ export class AmmoManager {
         if (!this.isResupplying || this.lastResupplyZone !== currentZone) {
           this.isResupplying = true;
           this.lastResupplyZone = currentZone;
-          console.log(`📦 Resupplying ammo at ${currentZone.name}...`);
+          Logger.info('weapons', `📦 Resupplying ammo at ${currentZone.name}...`);
         }
 
         // Resupply ammo gradually
@@ -167,14 +168,14 @@ export class AmmoManager {
         // Check if fully resupplied
         if (this.state.currentMagazine === this.state.maxMagazine &&
             this.state.reserveAmmo === this.state.maxReserve) {
-          console.log('✅ Fully resupplied!');
+          Logger.info('weapons', '✅ Fully resupplied!');
           this.isResupplying = false;
         }
       }
     } else {
       // Left resupply zone
       if (this.isResupplying) {
-        console.log('📦 Left resupply zone');
+        Logger.info('weapons', '📦 Left resupply zone');
         this.isResupplying = false;
         this.lastResupplyZone = null;
       }

@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { objectPool } from '../../utils/ObjectPoolManager';
 import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
@@ -278,7 +279,7 @@ export class GrenadeCooking {
   startCooking(): void {
     if (this.isCooking) return;
 
-    console.log('💣 Started cooking grenade!');
+    Logger.info('weapons', '💣 Started cooking grenade!');
     this.isCooking = true;
     this.cookingTime = 0;
     this.lastBeepTime = 0;
@@ -359,7 +360,7 @@ export class GrenadeCooking {
     audioManager?: AudioManager,
     playerController?: any
   ): void {
-    console.log('💥 Grenade exploded in hand!');
+    Logger.info('weapons', '💥 Grenade exploded in hand!');
 
     // Apply damage to player (suicide)
     const explosionPos = camera.position.clone();
@@ -380,6 +381,6 @@ export class GrenadeCooking {
 
     // Damage player (simulate suicide) - this would need PlayerHealthSystem
     // For now, just log it
-    console.log('💀 Player killed by own grenade!');
+    Logger.info('weapons', '💀 Player killed by own grenade!');
   }
 }

@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 /**
  * Worker lifecycle management for ChunkWorkerPool
  * Handles worker creation, message handling, error handling, and worker code generation
@@ -69,7 +70,7 @@ export class ChunkWorkerLifecycle {
 
     // Limit workers to reasonable count
     const count = Math.min(Math.max(2, workerCount), 8);
-    console.log(`[ChunkWorkerPool] Creating ${count} workers`);
+    Logger.info('terrain', `[ChunkWorkerPool] Creating ${count} workers`);
 
     for (let i = 0; i < count; i++) {
       this.createWorker();
@@ -121,7 +122,7 @@ export class ChunkWorkerLifecycle {
    * Handle worker error
    */
   private handleWorkerError(state: WorkerState, error: ErrorEvent): void {
-    console.error('[ChunkWorkerPool] Worker error:', error);
+    Logger.error('terrain', '[ChunkWorkerPool] Worker error:', error);
     this.onWorkerError(state, error);
   }
 

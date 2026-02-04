@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { AssetLoader } from '../assets/AssetLoader';
@@ -57,7 +58,7 @@ export class GPUTerrain implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('[GPUTerrain] Initializing GPU terrain system...');
+    Logger.info('terrain', '[GPUTerrain] Initializing GPU terrain system...');
 
     // Load ground texture with fallback
     this.groundTexture = this.assetLoader.getTexture('forestfloor');
@@ -72,7 +73,7 @@ export class GPUTerrain implements GameSystem {
         data[i * 4 + 3] = 255; // A
       }
       this.groundTexture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
-      console.warn('[GPUTerrain] forestfloor texture not found, using placeholder');
+      Logger.warn('terrain', '[GPUTerrain] forestfloor texture not found, using placeholder');
     }
     this.groundTexture.wrapS = THREE.RepeatWrapping;
     this.groundTexture.wrapT = THREE.RepeatWrapping;
@@ -88,7 +89,7 @@ export class GPUTerrain implements GameSystem {
     this.updateHeightmap(0, 0);
 
     this.isInitialized = true;
-    console.log('[GPUTerrain] GPU terrain initialized');
+    Logger.info('terrain', '[GPUTerrain] GPU terrain initialized');
   }
 
   private createHeightmapTexture(): void {

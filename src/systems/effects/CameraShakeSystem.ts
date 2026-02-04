@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 
@@ -15,7 +16,7 @@ export class CameraShakeSystem implements GameSystem {
   private readonly DEFAULT_FREQUENCY = 20; // Default shake frequency (Hz)
 
   async init(): Promise<void> {
-    console.log('📳 Initializing Camera Shake System...');
+    Logger.info('effects', '📳 Initializing Camera Shake System...');
   }
 
   update(deltaTime: number): void {

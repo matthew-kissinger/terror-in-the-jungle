@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
@@ -35,7 +36,7 @@ export class HUDSystem implements GameSystem {
 
     // Setup return to menu callback
     this.matchEndScreen.onReturnToMenu(() => {
-      console.log('🔄 Returning to main menu (reloading page)');
+      Logger.info('hud', '🔄 Returning to main menu (reloading page)');
       window.location.reload();
     });
 
@@ -43,7 +44,7 @@ export class HUDSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('📊 Initializing HUD System...');
+    Logger.info('hud', '📊 Initializing HUD System...');
 
     // Inject styles
     this.styles.inject();
@@ -58,13 +59,13 @@ export class HUDSystem implements GameSystem {
     if (this.elements.respawnButton) {
       this.elements.respawnButton.onclick = () => {
         if (this.playerHealthSystem && this.playerHealthSystem.isAlive()) {
-          console.log('🔄 Respawn button clicked');
+          Logger.info('hud', '🔄 Respawn button clicked');
           this.playerHealthSystem.voluntaryRespawn();
         }
       };
     }
 
-    console.log('✅ HUD System initialized');
+    Logger.info('hud', '✅ HUD System initialized');
   }
 
   update(deltaTime: number): void {
@@ -119,7 +120,7 @@ export class HUDSystem implements GameSystem {
     this.elements.dispose();
     this.styles.dispose();
     this.matchEndScreen.dispose();
-    console.log('🧹 HUD System disposed');
+    Logger.info('hud', '🧹 HUD System disposed');
   }
 
   // Public API
@@ -166,7 +167,7 @@ export class HUDSystem implements GameSystem {
 
   startMatch(): void {
     this.statsTracker.startMatch();
-    console.log('📊 Match statistics tracking started');
+    Logger.info('hud', '📊 Match statistics tracking started');
   }
 
   private handleGameEnd(winner: Faction, gameState: GameState): void {
@@ -189,7 +190,7 @@ export class HUDSystem implements GameSystem {
       grenadeKills: playerStats.grenadeKills
     };
 
-    console.log('🏆 Showing match end screen with stats:', matchStats);
+    Logger.info('hud', '🏆 Showing match end screen with stats:', matchStats);
     this.matchEndScreen.show(winner, gameState, matchStats);
   }
 
@@ -227,12 +228,12 @@ export class HUDSystem implements GameSystem {
   }
 
   showInteractionPrompt(text: string): void {
-    console.log('🎮 HUDSystem: showInteractionPrompt called with:', text);
+    Logger.info('hud', '🎮 HUDSystem: showInteractionPrompt called with:', text);
     this.elements.showInteractionPrompt(text);
   }
 
   hideInteractionPrompt(): void {
-    console.log('🎮 HUDSystem: hideInteractionPrompt called');
+    Logger.info('hud', '🎮 HUDSystem: hideInteractionPrompt called');
     this.elements.hideInteractionPrompt();
   }
 

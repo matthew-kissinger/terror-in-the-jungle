@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
@@ -76,7 +77,7 @@ export class GrenadeSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('💣 Initializing Grenade System...');
+    Logger.info('weapons', '💣 Initializing Grenade System...');
   }
 
   update(deltaTime: number): void {
@@ -160,7 +161,7 @@ export class GrenadeSystem implements GameSystem {
   startAiming(): void {
     // Check if we have grenades first
     if (this.inventoryManager && !this.inventoryManager.canUseGrenade()) {
-      console.log('⚠️ No grenades remaining!');
+      Logger.info('weapons', '⚠️ No grenades remaining!');
       return;
     }
 
@@ -203,7 +204,7 @@ export class GrenadeSystem implements GameSystem {
     // Check inventory and use grenade
     if (this.inventoryManager) {
       if (!this.inventoryManager.useGrenade()) {
-        console.log('⚠️ Failed to use grenade - no inventory!');
+        Logger.info('weapons', '⚠️ Failed to use grenade - no inventory!');
         this.cancelThrow();
         return false;
       }
@@ -263,7 +264,7 @@ export class GrenadeSystem implements GameSystem {
 
     const powerPercent = Math.round(this.throwPower * 100);
     const cookedTime = remainingFuseTime < this.FUSE_TIME ? ` (cooked ${(this.FUSE_TIME - remainingFuseTime).toFixed(1)}s)` : '';
-    console.log(`💣 Grenade thrown at ${powerPercent}% power${cookedTime}`);
+    Logger.info('weapons', `💣 Grenade thrown at ${powerPercent}% power${cookedTime}`);
     return true;
   }
 
@@ -276,7 +277,7 @@ export class GrenadeSystem implements GameSystem {
   }
 
   private explodeGrenade(grenade: Grenade): void {
-    console.log(`💥 Grenade exploded at (${grenade.position.x.toFixed(1)}, ${grenade.position.y.toFixed(1)}, ${grenade.position.z.toFixed(1)})`);
+    Logger.info('weapons', `💥 Grenade exploded at (${grenade.position.x.toFixed(1)}, ${grenade.position.y.toFixed(1)}, ${grenade.position.z.toFixed(1)})`);
 
     // Main explosion effect - big flash, smoke, fire, shockwave
     if (this.explosionEffectsPool) {

@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { BillboardInstance } from '../../types';
 import { AssetLoader } from '../assets/AssetLoader';
@@ -72,7 +73,7 @@ export class Chunk {
 
       // Mark terrain as ready
       this.isGenerated = true;
-      console.log(`🌍 Generated chunk terrain (${this.chunkX}, ${this.chunkZ})`);
+      Logger.info('terrain', `🌍 Generated chunk terrain (${this.chunkX}, ${this.chunkZ})`);
 
       // Add vegetation after a small delay
       setTimeout(async () => {
@@ -88,14 +89,14 @@ export class Chunk {
           // Generate enemies (sparse)
           await this.generateEnemies();
 
-          console.log(`🌳 Added vegetation to chunk (${this.chunkX}, ${this.chunkZ})`);
+          Logger.info('terrain', `🌳 Added vegetation to chunk (${this.chunkX}, ${this.chunkZ})`);
         } catch (error) {
-          console.error(`Failed to add vegetation to chunk (${this.chunkX}, ${this.chunkZ}):`, error);
+          Logger.error('terrain', `Failed to add vegetation to chunk (${this.chunkX}, ${this.chunkZ}):`, error);
         }
       }, 100);
 
     } catch (error) {
-      console.error(`❌ Failed to generate chunk (${this.chunkX}, ${this.chunkZ}):`, error);
+      Logger.error('terrain', `❌ Failed to generate chunk (${this.chunkX}, ${this.chunkZ}):`, error);
       throw error;
     }
   }
@@ -174,7 +175,7 @@ export class Chunk {
 
     // Validate that we're within this chunk
     if (localX < 0 || localX > this.size || localZ < 0 || localZ > this.size) {
-      console.warn(`Height requested outside chunk bounds: (${localX}, ${localZ})`);
+      Logger.warn('terrain', `Height requested outside chunk bounds: (${localX}, ${localZ})`);
       return 0;
     }
 

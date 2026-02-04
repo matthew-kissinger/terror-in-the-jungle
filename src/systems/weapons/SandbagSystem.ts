@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
@@ -47,7 +48,7 @@ export class SandbagSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('🟫 Initializing Sandbag System...');
+    Logger.info('weapons', '🟫 Initializing Sandbag System...');
   }
 
   update(deltaTime: number): void {
@@ -203,12 +204,12 @@ export class SandbagSystem implements GameSystem {
 
   placeSandbag(): boolean {
     if (!this.placementValid || !this.inventoryManager) {
-      console.log('⚠️ Cannot place sandbag: invalid position or no inventory');
+      Logger.info('weapons', '⚠️ Cannot place sandbag: invalid position or no inventory');
       return false;
     }
 
     if (!this.inventoryManager.canUseSandbag()) {
-      console.log('⚠️ No sandbags remaining');
+      Logger.info('weapons', '⚠️ No sandbags remaining');
       return false;
     }
 
@@ -230,7 +231,7 @@ export class SandbagSystem implements GameSystem {
 
     this.inventoryManager.useSandbag();
 
-    console.log(`🟫 Sandbag placed at (${this.previewPosition.x.toFixed(1)}, ${this.previewPosition.z.toFixed(1)}). Total: ${this.sandbags.length}/${this.MAX_SANDBAGS}`);
+    Logger.info('weapons', `🟫 Sandbag placed at (${this.previewPosition.x.toFixed(1)}, ${this.previewPosition.z.toFixed(1)}). Total: ${this.sandbags.length}/${this.MAX_SANDBAGS}`);
 
     return true;
   }

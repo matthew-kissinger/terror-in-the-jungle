@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { ZoneManager, CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
@@ -108,9 +109,9 @@ export class FullMapSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('🗺️ Initializing Full Map System...');
+    Logger.info('ui', '🗺️ Initializing Full Map System...');
     document.body.appendChild(this.mapContainer);
-    console.log('✅ Full Map System initialized');
+    Logger.info('ui', '✅ Full Map System initialized');
   }
 
   update(deltaTime: number): void {
@@ -361,6 +362,6 @@ export class FullMapSystem implements GameSystem {
     if (this.mapContainer.parentNode) {
       this.mapContainer.parentNode.removeChild(this.mapContainer);
     }
-    console.log('🧹 Full Map System disposed');
+    Logger.info('ui', '🧹 Full Map System disposed');
   }
 }

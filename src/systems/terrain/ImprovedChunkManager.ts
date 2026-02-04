@@ -349,11 +349,11 @@ export class ImprovedChunkManager implements GameSystem {
     inFlightChunks: number;
   } | null {
     if (!this.workerPool) {
-      console.log('[ChunkManager] Workers disabled, using main thread');
+      Logger.info('terrain', '[ChunkManager] Workers disabled, using main thread');
       return null;
     }
     const telemetry = this.workerPool.getTelemetry();
-    console.log('[ChunkManager] Worker Telemetry:', telemetry);
+    Logger.info('terrain', '[ChunkManager] Worker Telemetry:', telemetry);
     return { enabled: true, ...telemetry };
   }
 

@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { ZoneManager, CaptureZone } from '../world/ZoneManager';
@@ -41,9 +42,9 @@ export class AmmoSupplySystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('📦 Initializing Ammo Supply System...');
+    Logger.info('weapons', '📦 Initializing Ammo Supply System...');
     this.createPopupElement();
-    console.log('✅ Ammo Supply System initialized');
+    Logger.info('weapons', '✅ Ammo Supply System initialized');
   }
 
   update(deltaTime: number): void {
@@ -89,7 +90,7 @@ export class AmmoSupplySystem implements GameSystem {
       this.popupElement.parentNode.removeChild(this.popupElement);
     }
 
-    console.log('🧹 Ammo Supply System disposed');
+    Logger.info('weapons', '🧹 Ammo Supply System disposed');
   }
 
   setZoneManager(zoneManager: ZoneManager): void {
@@ -291,7 +292,7 @@ export class AmmoSupplySystem implements GameSystem {
     // Show feedback
     if (resupplyItems.length > 0) {
       this.showResupplyPopup(resupplyItems.join(' + '));
-      console.log(`📦 Resupplied at ${crate.zone.name}: ${resupplyItems.join(', ')}`);
+      Logger.info('weapons', `📦 Resupplied at ${crate.zone.name}: ${resupplyItems.join(', ')}`);
       return true;
     }
 

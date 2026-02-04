@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { IChunkManager, IAudioManager, ISandboxRenderer } from '../../types/SystemInterfaces';
@@ -192,7 +193,7 @@ export class WeatherSystem implements GameSystem {
   }
 
   setWeatherState(state: WeatherState, instant: boolean = false): void {
-    console.log(`Weather changing: ${this.currentState} -> ${state}`);
+    Logger.info('weather', `Weather changing: ${this.currentState} -> ${state}`);
     this.targetState = state;
     if (instant) {
       this.currentState = state;

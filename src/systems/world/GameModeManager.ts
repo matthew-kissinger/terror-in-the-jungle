@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import { GameSystem } from '../../types';
 import { GameMode, GameModeConfig, getGameModeConfig } from '../../config/gameModes';
 import { ZoneManager } from './ZoneManager';
@@ -25,8 +26,8 @@ export class GameModeManager implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('🎮 Initializing Game Mode Manager...');
-    console.log(`Default mode: ${this.currentConfig.name}`);
+    Logger.info('world', '🎮 Initializing Game Mode Manager...');
+    Logger.info('world', `Default mode: ${this.currentConfig.name}`);
   }
 
   update(deltaTime: number): void {
@@ -65,15 +66,15 @@ export class GameModeManager implements GameSystem {
   // Set game mode (called from menu)
   public setGameMode(mode: GameMode): void {
     if (mode === this.currentMode) {
-      console.log(`🎮 GameModeManager: Re-applying current mode: ${mode}`);
+      Logger.info('world', `🎮 GameModeManager: Re-applying current mode: ${mode}`);
       this.applyModeConfiguration();
       return;
     }
 
-    console.log(`🎮 GameModeManager: Switching game mode to: ${mode}`);
+    Logger.info('world', `🎮 GameModeManager: Switching game mode to: ${mode}`);
     this.currentMode = mode;
     this.currentConfig = getGameModeConfig(mode);
-    console.log(`🎮 GameModeManager: World size is now ${this.currentConfig.worldSize}, zones: ${this.currentConfig.zones.length}`);
+    Logger.info('world', `🎮 GameModeManager: World size is now ${this.currentConfig.worldSize}, zones: ${this.currentConfig.zones.length}`);
 
     // Notify listeners
     if (this.onModeChange) {
@@ -126,7 +127,7 @@ export class GameModeManager implements GameSystem {
       this.minimapSystem.setWorldScale(config.minimapScale);
     }
 
-    console.log(`✅ Applied ${config.name} configuration`);
+    Logger.info('world', `✅ Applied ${config.name} configuration`);
   }
 
   // Register mode change callback

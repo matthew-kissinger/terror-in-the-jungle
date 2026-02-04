@@ -1,3 +1,4 @@
+import { Logger } from './Logger';
 import * as THREE from 'three';
 
 /**
@@ -50,7 +51,7 @@ class ObjectPoolManager {
    * Recommended: 50 Vector3, 20 Quaternion, 10 Raycaster, 30 Matrix4
    */
   warmup(vector3Count: number, quaternionCount: number, raycasterCount: number, matrix4Count: number = 30): void {
-    console.log(`🔥 Warming up object pools: Vector3=${vector3Count}, Quaternion=${quaternionCount}, Raycaster=${raycasterCount}, Matrix4=${matrix4Count}`);
+    Logger.info('utils', `🔥 Warming up object pools: Vector3=${vector3Count}, Quaternion=${quaternionCount}, Raycaster=${raycasterCount}, Matrix4=${matrix4Count}`);
 
     for (let i = 0; i < vector3Count; i++) {
       this.vector3Pool.push(new THREE.Vector3());
@@ -68,7 +69,7 @@ class ObjectPoolManager {
       this.matrix4Pool.push(new THREE.Matrix4());
     }
 
-    console.log(`✅ Object pools warmed up and ready`);
+    Logger.info('utils', `✅ Object pools warmed up and ready`);
   }
 
   // Vector3 Pool
@@ -85,7 +86,7 @@ class ObjectPoolManager {
     // Pool exhausted, create new (fallback)
     this.stats.vector3Created++;
     if (this.stats.vector3Created % 10 === 0) {
-      console.warn(`⚠️ Vector3 pool exhausted, created ${this.stats.vector3Created} additional vectors`);
+      Logger.warn('utils', `⚠️ Vector3 pool exhausted, created ${this.stats.vector3Created} additional vectors`);
     }
     const v = new THREE.Vector3();
     this.vector3InUse.add(v);
@@ -113,7 +114,7 @@ class ObjectPoolManager {
     // Pool exhausted, create new (fallback)
     this.stats.quaternionCreated++;
     if (this.stats.quaternionCreated % 5 === 0) {
-      console.warn(`⚠️ Quaternion pool exhausted, created ${this.stats.quaternionCreated} additional quaternions`);
+      Logger.warn('utils', `⚠️ Quaternion pool exhausted, created ${this.stats.quaternionCreated} additional quaternions`);
     }
     const q = new THREE.Quaternion();
     this.quaternionInUse.add(q);
@@ -141,7 +142,7 @@ class ObjectPoolManager {
     // Pool exhausted, create new (fallback)
     this.stats.raycasterCreated++;
     if (this.stats.raycasterCreated % 3 === 0) {
-      console.warn(`⚠️ Raycaster pool exhausted, created ${this.stats.raycasterCreated} additional raycasters`);
+      Logger.warn('utils', `⚠️ Raycaster pool exhausted, created ${this.stats.raycasterCreated} additional raycasters`);
     }
     const r = new THREE.Raycaster();
     this.raycasterInUse.add(r);
@@ -169,7 +170,7 @@ class ObjectPoolManager {
     // Pool exhausted, create new (fallback)
     this.stats.matrix4Created++;
     if (this.stats.matrix4Created % 10 === 0) {
-      console.warn(`⚠️ Matrix4 pool exhausted, created ${this.stats.matrix4Created} additional matrices`);
+      Logger.warn('utils', `⚠️ Matrix4 pool exhausted, created ${this.stats.matrix4Created} additional matrices`);
     }
     const m = new THREE.Matrix4();
     this.matrix4InUse.add(m);

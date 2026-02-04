@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem, TerrainType } from '../../types';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
@@ -76,7 +77,7 @@ export class FootstepAudioSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('[FootstepAudioSystem] Initialized');
+    Logger.info('audio', '[FootstepAudioSystem] Initialized');
   }
 
   update(deltaTime: number): void {
@@ -97,7 +98,7 @@ export class FootstepAudioSystem implements GameSystem {
     this.playerFootstepPool = [];
     this.aiFootstepPool = [];
     
-    console.log('[FootstepAudioSystem] Disposed');
+    Logger.info('audio', '[FootstepAudioSystem] Disposed');
   }
 
   /**

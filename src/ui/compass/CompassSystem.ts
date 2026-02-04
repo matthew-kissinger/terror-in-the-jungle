@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { ZoneManager } from '../../systems/world/ZoneManager';
@@ -38,9 +39,9 @@ export class CompassSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('🧭 Initializing Compass System...');
+    Logger.info('compass', '🧭 Initializing Compass System...');
     document.body.appendChild(this.compassContainer);
-    console.log('✅ Compass System initialized');
+    Logger.info('compass', '✅ Compass System initialized');
   }
 
   update(deltaTime: number): void {
@@ -90,6 +91,6 @@ export class CompassSystem implements GameSystem {
       this.styleSheet.parentNode.removeChild(this.styleSheet);
     }
 
-    console.log('🧹 Compass System disposed');
+    Logger.info('compass', '🧹 Compass System disposed');
   }
 }

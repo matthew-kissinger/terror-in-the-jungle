@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import { WeaponSlot } from './InventoryManager';
 import { Faction } from '../combat/types';
 
@@ -72,7 +73,7 @@ export class PlayerInput {
       document.removeEventListener('click', this.boundRequestPointerLock);
       // Add click listener for pointer lock
       document.addEventListener('click', this.boundRequestPointerLock);
-      console.log('🎮 Game started - click to enable mouse look');
+      Logger.info('player', '🎮 Game started - click to enable mouse look');
     }
   }
 
@@ -209,9 +210,9 @@ export class PlayerInput {
     this.isPointerLocked = document.pointerLockElement === document.body;
 
     if (this.isPointerLocked) {
-      console.log('Pointer locked - mouse look enabled');
+      Logger.info('player', 'Pointer locked - mouse look enabled');
     } else {
-      console.log('Pointer lock released - click to re-enable mouse look');
+      Logger.info('player', 'Pointer lock released - click to re-enable mouse look');
     }
   }
 
@@ -237,7 +238,7 @@ export class PlayerInput {
     const pointerLockHint = this.pointerLockEnabled
       ? 'Mouse - Look around (click to enable pointer lock)'
       : 'Mouse - Look around (pointer lock disabled)';
-    console.log(`
+    Logger.info('player', `
 🎮 CONTROLS:
 WASD - Move / Helicopter Controls (W/S = Collective, A/D = Yaw)
 Arrow Keys - Helicopter Cyclic (↑↓ = Pitch, ←→ = Roll)

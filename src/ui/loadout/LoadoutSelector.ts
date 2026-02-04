@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 
@@ -44,10 +45,10 @@ export class LoadoutSelector implements GameSystem {
   };
 
   async init(): Promise<void> {
-    console.log('🎯 Initializing Loadout Selector...');
+    Logger.info('ui', '🎯 Initializing Loadout Selector...');
     this.createUI();
     this.setupEventListeners();
-    console.log('✅ Loadout Selector initialized');
+    Logger.info('ui', '✅ Loadout Selector initialized');
   }
 
   update(deltaTime: number): void {
@@ -241,7 +242,7 @@ export class LoadoutSelector implements GameSystem {
   }
 
   private confirmSelection(): void {
-    console.log(`🎯 Loadout selected: ${this.selectedWeapon.toUpperCase()}`);
+    Logger.info('ui', `🎯 Loadout selected: ${this.selectedWeapon.toUpperCase()}`);
 
     if (this.onLoadoutSelected) {
       this.onLoadoutSelected(this.selectedWeapon);
@@ -262,7 +263,7 @@ export class LoadoutSelector implements GameSystem {
     // Lock pointer
     document.exitPointerLock();
 
-    console.log('🎯 Loadout selector shown');
+    Logger.info('ui', '🎯 Loadout selector shown');
   }
 
   /**
@@ -274,7 +275,7 @@ export class LoadoutSelector implements GameSystem {
     this.overlayElement.style.display = 'none';
     this.isVisible = false;
 
-    console.log('🎯 Loadout selector hidden');
+    Logger.info('ui', '🎯 Loadout selector hidden');
   }
 
   /**
@@ -305,6 +306,6 @@ export class LoadoutSelector implements GameSystem {
 
     window.removeEventListener('keydown', this.boundOnKeyDown);
 
-    console.log('🧹 Loadout Selector disposed');
+    Logger.info('ui', '🧹 Loadout Selector disposed');
   }
 }

@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { Combatant, CombatantState, Faction } from '../combat/types';
 import { GameSystem } from '../../types';
@@ -64,7 +65,7 @@ export class VoiceCalloutSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('[VoiceCalloutSystem] Initialized');
+    Logger.info('audio', '[VoiceCalloutSystem] Initialized');
   }
 
   /**
@@ -100,7 +101,7 @@ export class VoiceCalloutSystem implements GameSystem {
 
     // Debug logging for nearby callouts
     if (distanceToPlayer < 20) {
-      console.log(`🗣️ ${combatant.faction} callout: ${type} at ${Math.floor(distanceToPlayer)}m`);
+      Logger.info('audio', `🗣️ ${combatant.faction} callout: ${type} at ${Math.floor(distanceToPlayer)}m`);
     }
   }
 
@@ -299,6 +300,6 @@ export class VoiceCalloutSystem implements GameSystem {
 
   dispose(): void {
     this.cooldowns.clear();
-    console.log('[VoiceCalloutSystem] Disposed');
+    Logger.info('audio', '[VoiceCalloutSystem] Disposed');
   }
 }

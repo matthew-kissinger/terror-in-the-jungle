@@ -1,3 +1,4 @@
+import { Logger } from '../../../utils/Logger';
 import * as THREE from 'three'
 import { ProgrammaticGunFactory } from '../ProgrammaticGunFactory'
 import { GunplayCore, WeaponSpec } from '../../weapons/GunplayCore'
@@ -137,7 +138,7 @@ export class WeaponRigManager {
       return false
     }
 
-    console.log(`🔄 Switching to ${weaponType}`)
+    Logger.info('player', `🔄 Switching to ${weaponType}`)
     this.isSwitchingWeapon = true
     this.switchAnimationProgress = 0
     this.pendingWeaponSwitch = weaponType

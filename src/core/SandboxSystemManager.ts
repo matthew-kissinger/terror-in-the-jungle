@@ -1,3 +1,4 @@
+import { Logger } from '../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../types';
 import { AssetLoader } from '../systems/assets/AssetLoader';
@@ -145,26 +146,26 @@ export class SandboxSystemManager {
   }
 
   async preGenerateSpawnArea(spawnPos: THREE.Vector3): Promise<void> {
-    console.log(`Pre-generating spawn areas for both factions...`);
+    Logger.info('core', `Pre-generating spawn areas for both factions...`);
 
     if (this.chunkManager) {
       // Generate US base chunks
       const usBasePos = new THREE.Vector3(0, 0, -50);
-      console.log('🇺🇸 Generating US base chunks...');
+      Logger.info('core', '🇺🇸 Generating US base chunks...');
       this.chunkManager.updatePlayerPosition(usBasePos);
       this.chunkManager.update(0.01);
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Generate OPFOR base chunks
       const opforBasePos = new THREE.Vector3(0, 0, 145);
-      console.log('🚩 Generating OPFOR base chunks...');
+      Logger.info('core', '🚩 Generating OPFOR base chunks...');
       this.chunkManager.updatePlayerPosition(opforBasePos);
       this.chunkManager.update(0.01);
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Generate middle battlefield chunks
       const centerPos = new THREE.Vector3(0, 0, 50);
-      console.log('⚔️ Generating battlefield chunks...');
+      Logger.info('core', '⚔️ Generating battlefield chunks...');
       this.chunkManager.updatePlayerPosition(centerPos);
       this.chunkManager.update(0.01);
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -175,7 +176,7 @@ export class SandboxSystemManager {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Initialize zones after chunk generation
-      console.log('🚩 Initializing zones after chunk generation...');
+      Logger.info('core', '🚩 Initializing zones after chunk generation...');
       this.zoneManager.initializeZones();
     }
   }
@@ -224,13 +225,13 @@ export class SandboxSystemManager {
     const playerSquadId = (this.combatantSystem as any).playerSquadId;
 
     if (!squadManager || !playerSquadId) {
-      console.warn('⚠️ Squad manager or player squad not found');
+      Logger.warn('core', '⚠️ Squad manager or player squad not found');
       return;
     }
 
     const squad = squadManager.getSquad(playerSquadId);
     if (!squad) {
-      console.warn('⚠️ Player squad not found in squad manager');
+      Logger.warn('core', '⚠️ Player squad not found in squad manager');
       return;
     }
 
@@ -245,7 +246,7 @@ export class SandboxSystemManager {
 
     this.minimapSystem.setPlayerSquadId(playerSquadId);
 
-    console.log(`✅ Player squad setup complete: ${squad.id} with ${squad.members.length} members`);
+    Logger.info('core', `✅ Player squad setup complete: ${squad.id} with ${squad.members.length} members`);
   }
 
   getPlayerSquadController(): PlayerSquadController {

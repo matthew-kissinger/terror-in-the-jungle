@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { BillboardInstance } from '../../types';
 import { AssetLoader } from '../assets/AssetLoader';
@@ -111,7 +112,7 @@ export class ChunkVegetation {
       this.grassInstances.push(instance);
     }
 
-    console.log(`✅ Generated ${maxInstances} grass instances for chunk (${this.chunkX}, ${this.chunkZ})`);
+    Logger.info('terrain', `✅ Generated ${maxInstances} grass instances for chunk (${this.chunkX}, ${this.chunkZ})`);
   }
 
   private async generateTreeInstances(sampleHeight: (x: number, z: number) => number): Promise<void> {
@@ -262,7 +263,7 @@ export class ChunkVegetation {
       }
     }
 
-    console.log(`✅ Generated ${actualCount} trees (${this.biomeType}) for chunk (${this.chunkX}, ${this.chunkZ})`);
+    Logger.info('terrain', `✅ Generated ${actualCount} trees (${this.biomeType}) for chunk (${this.chunkX}, ${this.chunkZ})`);
   }
 
   private async generateMushroomInstances(sampleHeight: (x: number, z: number) => number): Promise<void> {
@@ -322,7 +323,7 @@ export class ChunkVegetation {
       this.mushroomInstances.push(instance);
     }
 
-    console.log(`🍄 Generated ${this.mushroomInstances.length} mushrooms for chunk (${this.chunkX}, ${this.chunkZ})`);
+    Logger.info('terrain', `🍄 Generated ${this.mushroomInstances.length} mushrooms for chunk (${this.chunkX}, ${this.chunkZ})`);
   }
 
   private async generateWheatPatches(sampleHeight: (x: number, z: number) => number): Promise<void> {
@@ -378,7 +379,7 @@ export class ChunkVegetation {
     }
 
     if (this.wheatInstances.length > 0) {
-      console.log(`🌾 Generated ${this.wheatInstances.length} wheat in ${numPatches} patches for chunk (${this.chunkX}, ${this.chunkZ})`);
+      Logger.info('terrain', `🌾 Generated ${this.wheatInstances.length} wheat in ${numPatches} patches for chunk (${this.chunkX}, ${this.chunkZ})`);
     }
   }
 

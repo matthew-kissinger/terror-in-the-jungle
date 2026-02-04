@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { Combatant, Squad } from './types';
 import { TracerPool } from '../effects/TracerPool';
@@ -114,7 +115,7 @@ export class CombatantCombatEffects {
         }
 
         if (hit.headshot) {
-          console.log(`🎯 Headshot! ${combatant.faction} -> ${hit.combatant.faction}`);
+          Logger.info('combat', `🎯 Headshot! ${combatant.faction} -> ${hit.combatant.faction}`);
         }
       } else {
         // Track near misses for suppression

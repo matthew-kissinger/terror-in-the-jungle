@@ -1,3 +1,4 @@
+import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { CombatantSystem } from '../combat/CombatantSystem';
@@ -80,8 +81,8 @@ export class ZoneManager implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('🚩 Initializing Zone Manager...');
-    console.log('⏳ Zone Manager initialized, waiting for ChunkManager connection...');
+    Logger.info('world', '🚩 Initializing Zone Manager...');
+    Logger.info('world', '⏳ Zone Manager initialized, waiting for ChunkManager connection...');
   }
 
   private createDefaultZones(): void {
@@ -169,7 +170,7 @@ export class ZoneManager implements GameSystem {
       currentFlagHeight: 0
     };
 
-    console.log(`📍 Creating zone "${zone.name}" at position (${zone.position.x.toFixed(1)}, ${zone.position.y.toFixed(1)}, ${zone.position.z.toFixed(1)})`);
+    Logger.info('world', `📍 Creating zone "${zone.name}" at position (${zone.position.x.toFixed(1)}, ${zone.position.y.toFixed(1)}, ${zone.position.z.toFixed(1)})`);
 
     // Create visual representation
     this.zoneRenderer.createZoneVisuals(zone);
@@ -327,9 +328,9 @@ export class ZoneManager implements GameSystem {
 
   initializeZones(): void {
     if (this.zones.size === 0 && this.chunkManager) {
-      console.log('🚩 Creating zones with terrain mapping...');
+      Logger.info('world', '🚩 Creating zones with terrain mapping...');
       this.createDefaultZones();
-      console.log(`✅ Zones created with terrain mapping: ${this.zones.size} zones`);
+      Logger.info('world', `✅ Zones created with terrain mapping: ${this.zones.size} zones`);
     }
   }
 
@@ -352,7 +353,7 @@ export class ZoneManager implements GameSystem {
   private createZonesFromConfig(): void {
     if (!this.gameModeConfig) return;
 
-    console.log(`🎮 Creating zones for game mode: ${this.gameModeConfig.name}`);
+    Logger.info('world', `🎮 Creating zones for game mode: ${this.gameModeConfig.name}`);
 
     for (const zoneConfig of this.gameModeConfig.zones) {
       const position = this.terrainAdapter.findSuitableZonePosition(
@@ -371,7 +372,7 @@ export class ZoneManager implements GameSystem {
       });
     }
 
-    console.log(`✅ Created ${this.zones.size} zones for ${this.gameModeConfig.name}`);
+    Logger.info('world', `✅ Created ${this.zones.size} zones for ${this.gameModeConfig.name}`);
   }
 
   setCombatantSystem(system: CombatantSystem): void {
@@ -385,7 +386,7 @@ export class ZoneManager implements GameSystem {
   setChunkManager(chunkManager: ImprovedChunkManager): void {
     this.chunkManager = chunkManager;
     this.terrainAdapter.setChunkManager(chunkManager);
-    console.log('🔗 ChunkManager connected to ZoneManager');
+    Logger.info('world', '🔗 ChunkManager connected to ZoneManager');
   }
 
   setSpatialGridManager(manager: SpatialGridManager): void {
@@ -408,6 +409,6 @@ export class ZoneManager implements GameSystem {
     this.zones.clear();
     this.occupants.clear();
 
-    console.log('🧹 Zone Manager disposed');
+    Logger.info('world', '🧹 Zone Manager disposed');
   }
 }

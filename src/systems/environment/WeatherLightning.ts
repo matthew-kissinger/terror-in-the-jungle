@@ -68,7 +68,6 @@ function playThunderSound(audioManager?: IAudioManager): void {
     // Play thunder sound - assuming 'thunder' asset exists or fallback
     // Since we don't know if asset exists, we might need to check or add it
     // For now, logging
-    // console.log('⚡ Thunderclap!');
     // this.audioManager.play('thunder');
   }
 }
