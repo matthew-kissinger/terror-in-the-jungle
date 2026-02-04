@@ -191,7 +191,7 @@ Possible areas (confirm with profiling):
 ### Known Tech Debt
 
 - **135 `any` type annotations** across 39 files (heaviest: SystemInterfaces.ts with 19, WeaponFiring.ts, SystemConnector.ts). SystemInterfaces `any`s are structural - cross-system dependencies without shared type definitions.
-- **~193 emoji characters in Logger calls** across 51 files - cosmetic inconsistency with no-emoji style guide. Partial removal done (20 files cleaned). Low priority (debug log aesthetics only).
+- **Logger emoji removal COMPLETE** - All Logger calls cleaned. Remaining ~35 emoji characters across 8 UI files (KillFeed, LoadingPanels, GameModeSelection, etc.) are intentional UI icons, not Logger calls.
 - **NPC-to-NPC assists not tracked** - Scoreboard shows NPC assists as 0. Player assists tracked via KillAssistTracker, but per-NPC assist display would need additional wiring.
 - **No unit/integration tests** - No test framework installed (Vitest, Jest, etc.). No *.test.ts or *.spec.ts files.
 
@@ -241,7 +241,7 @@ perf.benchmark(1000)  // Runs 1000 raycast iterations, returns timing stats
 
 ## Architecture
 
-~51.7k lines across 269 files. Orchestrator pattern with ongoing split refactors.
+~52k lines across 269 files. Orchestrator pattern with ongoing split refactors.
 
 ```
 src/
