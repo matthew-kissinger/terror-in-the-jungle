@@ -4,6 +4,10 @@ import { SpatialGridManager, spatialGridManager } from './SpatialGridManager'
 import { performanceTelemetry } from '../debug/PerformanceTelemetry'
 import { Logger } from '../../utils/Logger'
 
+const _tmp = new THREE.Vector3()
+const _zoneCenter = new THREE.Vector3()
+const _closestPoint = new THREE.Vector3()
+
 /**
  * Hit zone definition for combatant body parts
  */
@@ -12,6 +16,14 @@ interface HitZone {
   radius: number
   isHead: boolean
 }
+
+const PLAYER_HIT_ZONES: HitZone[] = [
+  { offset: new THREE.Vector3(0, 0.0, 0), radius: 0.35, isHead: true },
+  { offset: new THREE.Vector3(0.2, -1.1, 0), radius: 0.65, isHead: false },
+  { offset: new THREE.Vector3(0, -2.1, 0), radius: 0.55, isHead: false },
+  { offset: new THREE.Vector3(-0.2, -3.1, 0), radius: 0.35, isHead: false },
+  { offset: new THREE.Vector3(0.2, -3.1, 0), radius: 0.35, isHead: false }
+]
 
 export class CombatantHitDetection {
   private readonly MAX_ENGAGEMENT_RANGE = 150
@@ -24,6 +36,8 @@ export class CombatantHitDetection {
   private scratchVec1 = new THREE.Vector3()
   private scratchVec2 = new THREE.Vector3()
   private scratchVec3 = new THREE.Vector3()
+  private readonly playerHitPoint = new THREE.Vector3()
+  private readonly playerMissPoint = new THREE.Vector3()
 
   // Cached hit zones to avoid per-call allocations
   private readonly hitZonesEngaging: HitZone[] = [
@@ -66,42 +80,29 @@ export class CombatantHitDetection {
     ray: THREE.Ray,
     playerPosition: THREE.Vector3
   ): { hit: boolean; point: THREE.Vector3; headshot: boolean } {
-    const playerHitZones = [
-      { offset: new THREE.Vector3(0, 0.0, 0), radius: 0.35, isHead: true },
-      { offset: new THREE.Vector3(0.2, -1.1, 0), radius: 0.65, isHead: false },
-      { offset: new THREE.Vector3(0, -2.1, 0), radius: 0.55, isHead: false },
-      { offset: new THREE.Vector3(-0.2, -3.1, 0), radius: 0.35, isHead: false },
-      { offset: new THREE.Vector3(0.2, -3.1, 0), radius: 0.35, isHead: false }
-    ];
+    for (const zone of PLAYER_HIT_ZONES) {
+      _zoneCenter.copy(playerPosition).add(zone.offset)
+      _tmp.subVectors(_zoneCenter, ray.origin)
+      const t = _tmp.dot(ray.direction)
 
-    const tmp = new THREE.Vector3();
+      if (t < 0 || t > this.MAX_ENGAGEMENT_RANGE) continue
 
-    for (const zone of playerHitZones) {
-      const zoneCenter = playerPosition.clone().add(zone.offset);
-      const toCenter = tmp.subVectors(zoneCenter, ray.origin);
-      const t = toCenter.dot(ray.direction);
-
-      if (t < 0 || t > this.MAX_ENGAGEMENT_RANGE) continue;
-
-      const closestPoint = new THREE.Vector3()
-        .copy(ray.origin)
-        .addScaledVector(ray.direction, t);
-
-      const distSq = closestPoint.distanceToSquared(zoneCenter);
+      _closestPoint.copy(ray.origin).addScaledVector(ray.direction, t)
+      const distSq = _closestPoint.distanceToSquared(_zoneCenter)
 
       if (distSq <= zone.radius * zone.radius) {
-        const hitDir = closestPoint.clone().sub(zoneCenter).normalize();
-        const actualHitPoint = zoneCenter.clone().add(hitDir.multiplyScalar(zone.radius));
+        _tmp.copy(_closestPoint).sub(_zoneCenter).normalize()
+        this.playerHitPoint.copy(_zoneCenter).addScaledVector(_tmp, zone.radius)
 
         return {
           hit: true,
-          point: actualHitPoint,
+          point: this.playerHitPoint,
           headshot: zone.isHead
-        };
+        }
       }
     }
 
-    return { hit: false, point: new THREE.Vector3(), headshot: false };
+    return { hit: false, point: this.playerMissPoint.set(0, 0, 0), headshot: false }
   }
 
   /**
