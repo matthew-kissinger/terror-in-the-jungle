@@ -169,8 +169,9 @@ Known hotspots:
 - **AIStatePatrol per-frame Vector3 allocations** - FIXED. Module-level scratch vectors `_toTarget`, `_offset`, `_awayDir`, `_defensePos` replace per-frame allocations (commit da4f97a).
 - **AIStateMovement per-frame Vector3 allocations** - FIXED. Module-level scratch vectors `_toDestination`, `_toTarget`, `_toCover` replace per-frame allocations (commit 75af883).
 
+- **GrenadeEffects per-detonation Vector3 allocations** - FIXED. Module-level scratch vectors `_lookDirection`, `_toCombatant`, `_offset`, `_spawnPos`, `_velocity` replace per-detonation allocations.
+
 Discovered hotspots (not yet fixed):
-- **GrenadeEffects.ts explodeFrag()/explodeSmoke() allocations** - Creates 15-30 Vector3 per detonation via `new Vector3()` and `.clone()`. Not per-frame but fixable with module-level scratch vectors.
 - **MortarBallistics computeTrajectory() clones** - Lines 60-80. Still creates 100+ Vector3 via `.clone()` per trajectory computation (builds output array, not per-frame). Lower priority.
 - **DeathCamSystem innerHTML in showOverlay()** - Uses innerHTML for kill details. One-time call per death (not per-frame), low impact.
 
@@ -196,7 +197,7 @@ Possible areas (confirm with profiling):
 
 ### Known Tech Debt
 
-- **74 `: any` type annotations** across ~30 files + 54 `as any` casts across ~18 files (heaviest: SystemInterfaces.ts with 19 `: any` - intentional). Reduced from 135 via targeted refactoring. WeaponFiring.ts `as any` casts eliminated. CombatantSystem.handlePlayerShot() return type fixed (commit ababb6f). IHUDSystem expanded to 28 methods (commit d449418). ICombatantSystem expanded to eliminate all SystemConnector `as any` casts (commit 24fcb35). ISandboxRenderer typing fixed (commit 60c8930). Remaining `as any` heaviest: SandboxSystemManager.ts (5), ChunkLoadQueueManager.ts (4), WaterSystem.ts (4), AssetLoader.ts (4).
+- **73 `: any` type annotations** across ~30 files + 49 `as any` casts across ~16 files (heaviest: SystemInterfaces.ts with 18 `: any` - intentional). Reduced from 135 via targeted refactoring. WeaponFiring.ts `as any` casts eliminated. CombatantSystem.handlePlayerShot() return type fixed (commit ababb6f). IHUDSystem expanded to 28 methods (commit d449418). ICombatantSystem expanded to eliminate all SystemConnector `as any` casts (commit 24fcb35). ISandboxRenderer typing fixed (commit 60c8930). SandboxSystemManager `as any` casts eliminated (commit bcba4c6). Remaining `as any` heaviest: ChunkLoadQueueManager.ts (4), WaterSystem.ts (4), AssetLoader.ts (4), CompassZoneMarkers.ts (3).
 - **Logger emoji removal COMPLETE** - All Logger calls cleaned. Remaining ~35 emoji characters across 8 UI files (KillFeed, LoadingPanels, etc.) are intentional UI icons, not Logger calls.
 - **NPC-to-NPC assists not tracked** - Scoreboard shows NPC assists as 0. Player assists tracked via KillAssistTracker, but per-NPC assist display would need additional wiring.
 - **Scoreboard toggle** - FIXED. TAB key wired to toggleScoreboard() (commit 48169fa).
