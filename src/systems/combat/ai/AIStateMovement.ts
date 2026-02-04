@@ -3,6 +3,10 @@ import { Combatant, CombatantState, Faction } from '../types'
 import { SpatialOctree } from '../SpatialOctree'
 import { Logger } from '../../../utils/Logger'
 
+const _toDestination = new THREE.Vector3()
+const _toTarget = new THREE.Vector3()
+const _toCover = new THREE.Vector3()
+
 /**
  * Handles movement-related AI states (advancing, seeking cover)
  */
@@ -37,9 +41,7 @@ export class AIStateMovement {
       return;
     }
 
-    const toDestination = new THREE.Vector3()
-      .subVectors(combatant.destinationPoint, combatant.position)
-      .normalize();
+    const toDestination = _toDestination.subVectors(combatant.destinationPoint, combatant.position).normalize();
     combatant.rotation = Math.atan2(toDestination.z, toDestination.x);
 
     const enemy = findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid);
@@ -52,7 +54,7 @@ export class AIStateMovement {
 
       if (distance < 30) {
         // Turn toward enemy before LOS check
-        const toTarget = new THREE.Vector3().subVectors(targetPos, combatant.position).normalize();
+        const toTarget = _toTarget.subVectors(targetPos, combatant.position).normalize();
         const savedRotation = combatant.rotation;
         combatant.rotation = Math.atan2(toTarget.z, toTarget.x);
 
@@ -93,9 +95,7 @@ export class AIStateMovement {
       Logger.info('combat-ai', `🛡️ ${combatant.faction} unit reached cover, switching to peek-and-fire`);
     }
 
-    const toCover = new THREE.Vector3()
-      .subVectors(combatant.coverPosition, combatant.position)
-      .normalize();
+    const toCover = _toCover.subVectors(combatant.coverPosition, combatant.position).normalize();
     combatant.rotation = Math.atan2(toCover.z, toCover.x);
 
     if (combatant.target && !canSeeTarget(combatant, combatant.target, playerPosition)) {
