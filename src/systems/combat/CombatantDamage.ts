@@ -9,6 +9,7 @@ import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { spatialGridManager } from './SpatialGridManager';
 import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem';
 import { Logger } from '../../utils/Logger';
+import { KillAssistTracker } from './KillAssistTracker';
 
 /**
  * Handles damage application and death processing for combatants.
@@ -80,7 +81,7 @@ export class CombatantDamage {
   ): void {
     // Check if target is valid before accessing properties
     if (!target) {
-      Logger.warn('combat', '⚠️ applyDamage called with undefined target');
+      Logger.warn('combat', 'applyDamage called with undefined target');
       return;
     }
 
@@ -127,16 +128,7 @@ export class CombatantDamage {
 
     // Track damage for assist system
     if (attacker) {
-      if (!target.damageHistory) target.damageHistory = [];
-      target.damageHistory.push({
-        attackerId: attacker.id,
-        damage: damage,
-        timestamp: performance.now()
-      });
-      // Cap at 10 entries
-      if (target.damageHistory.length > 10) {
-        target.damageHistory.shift();
-      }
+      KillAssistTracker.trackDamage(target, attacker.id, damage);
     }
 
     if (target.health <= 0) {
@@ -159,23 +151,7 @@ export class CombatantDamage {
 
     // Process kill assists
     if (target.damageHistory && target.damageHistory.length > 0) {
-      const now = performance.now();
-      const assists = target.damageHistory.filter(entry => 
-        // Within last 10 seconds
-        (now - entry.timestamp < 10000) && 
-        // Not the killer
-        (!attacker || entry.attackerId !== attacker.id)
-      );
-      
-      // Deduplicate assists by attackerId
-      const uniqueAssisters = new Set(assists.map(a => a.attackerId));
-      
-      if (uniqueAssisters.size > 0) {
-        Logger.info('combat', `🤝 ${uniqueAssisters.size} assists recorded for kill on ${target.id}`);
-      }
-      
-      // Clear history
-      target.damageHistory = [];
+      KillAssistTracker.processKillAssists(target, attacker?.id);
     }
 
     // Initialize death animation
@@ -211,7 +187,7 @@ export class CombatantDamage {
       target.deathDirection = this.scratchDeathDir.clone();
     }
 
-    Logger.info('combat', `💀 ${target.faction} soldier eliminated${attacker ? ` by ${attacker.faction}` : ''}`);
+    Logger.info('combat', `${target.faction} soldier eliminated${attacker ? ` by ${attacker.faction}` : ''}`);
 
     // Voice callout: Man down (nearby allies call it out)
     if (this.voiceCalloutSystem && attacker && allCombatants) {

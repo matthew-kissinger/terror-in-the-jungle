@@ -4,6 +4,7 @@ import { SquadManager } from './SquadManager';
 import { TicketSystem } from '../world/TicketSystem';
 import { CombatantSpawnManager } from './CombatantSpawnManager';
 import { Logger } from '../../utils/Logger';
+import { KillAssistTracker } from './KillAssistTracker';
 
 // Module-level scratch vector to avoid per-call allocations
 const _deathDir = new THREE.Vector3();
@@ -54,16 +55,7 @@ export class CombatantSystemDamage {
 
         // Track damage for assist system
         if (attackerId) {
-          if (!combatant.damageHistory) combatant.damageHistory = [];
-          combatant.damageHistory.push({
-            attackerId: attackerId,
-            damage: damage,
-            timestamp: performance.now()
-          });
-          // Cap at 10 entries
-          if (combatant.damageHistory.length > 10) {
-            combatant.damageHistory.shift();
-          }
+          KillAssistTracker.trackDamage(combatant, attackerId, damage);
         }
 
         combatant.health -= damage;
@@ -74,23 +66,7 @@ export class CombatantSystemDamage {
 
           // Process kill assists
           if (combatant.damageHistory && combatant.damageHistory.length > 0) {
-            const now = performance.now();
-            const assists = combatant.damageHistory.filter(entry => 
-              // Within last 10 seconds
-              (now - entry.timestamp < 10000) && 
-              // Not the killer
-              (!attackerId || entry.attackerId !== attackerId)
-            );
-            
-            // Deduplicate assists by attackerId
-            const uniqueAssisters = new Set(assists.map(a => a.attackerId));
-            
-            if (uniqueAssisters.size > 0) {
-              Logger.info('combat', `🤝 ${uniqueAssisters.size} assists recorded for explosion kill on ${combatant.id}`);
-            }
-            
-            // Clear history
-            combatant.damageHistory = [];
+            KillAssistTracker.processKillAssists(combatant, attackerId);
           }
 
           // Initialize death animation for explosion (always spinfall)
