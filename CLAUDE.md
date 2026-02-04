@@ -164,9 +164,9 @@ Known hotspots:
 - **AIStateMovement per-frame Vector3 allocations** - FIXED. Module-level scratch vectors `_toDestination`, `_toTarget`, `_toCover` replace per-frame allocations (commit 75af883).
 
 Discovered hotspots (not yet fixed):
-- **PlayerHealthSystem onPlayerDamage() allocation** - Line 148: `new THREE.Vector3()` per damage event for camera direction. Not per-frame but high frequency during combat.
 - **MortarBallistics computeTrajectory() clones** - Lines 60-80. Still creates 100+ Vector3 via `.clone()` per trajectory computation (builds output array, not per-frame). Lower priority.
 - **DeathCamSystem innerHTML in showOverlay()** - Uses innerHTML for kill details. One-time call per death (not per-frame), low impact.
+- **Scoreboard getNPCScores() uses Math.random()** - Lines 162-163. NPC kills/deaths are randomized, not tracked. Needs real per-NPC stat tracking.
 
 Possible areas (confirm with profiling):
 - Worker utilization (are they saturated?)
@@ -188,12 +188,21 @@ Possible areas (confirm with profiling):
 
 **Console.log migration: COMPLETE.** All calls migrated to Logger. Only ChunkWorkerCode.ts (worker context, no Logger access) retains console.log.
 
+### Known Tech Debt
+
+- **Kill assist logic duplicated** between CombatantDamage.ts (lines 128-178) and CombatantSystemDamage.ts (lines 55-93). Extract shared KillAssistTracker helper.
+- **Kill assist logs use emoji** in Logger.info (CombatantDamage.ts:174, CombatantSystemDamage.ts:89). Inconsistent with no-emoji style.
+- **Scoreboard NPC stats are fake** - getNPCScores() in Scoreboard.ts uses Math.random() for NPC kills (line 162). Needs real per-NPC stat tracking.
+- **Kill assist data not surfaced in UI** - damageHistory tracking exists but Scoreboard, PlayerStatsTracker, and MatchEndScreen have no assists field.
+- **134 `any` type annotations** across 39 files (heaviest: SystemInterfaces.ts, WeaponFiring.ts, SystemConnector.ts).
+
 ### Missing Pieces
 
 - **GPU timing** - ADDED. renderer.info stats (draw calls, triangles, geometries, textures) and EXT_disjoint_timer_query instrumentation in PerformanceTelemetry. Visible in F2 overlay.
 - **Memory profiling** - No heap snapshot automation
-- **Perf regression testing** - `scripts/perf-baseline.ts` (571 lines) is fully implemented (Playwright browser, sandbox mode, metric collection, baseline storage and comparison) but not wired to CI.
+- **Perf regression testing** - `scripts/perf-baseline.ts` (571 lines) is fully implemented (Playwright browser, sandbox mode, metric collection, baseline storage and comparison) but not wired to CI. Only CI is `.github/workflows/deploy.yml` (build + GitHub Pages deploy).
 - **Bundle code-splitting** - Vite manual chunks configured (three.js, postprocessing, UI, BVH). Main chunk ~458 kB (115 kB gzipped). Gzip and Brotli compression plugins configured via vite-plugin-compression. Brotli total ~363 kB.
+- **No unit/integration tests** - No test framework installed (Vitest, Jest, etc.). No *.test.ts or *.spec.ts files.
 
 ## COMPLETED: AI Sandbox Mode
 
