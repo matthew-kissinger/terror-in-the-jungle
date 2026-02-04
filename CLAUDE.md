@@ -159,11 +159,12 @@ Known hotspots:
 - **PlayerHealthEffects resize listener** - FIXED. Stored bound ref, removed in dispose() (commit c226f60).
 - **PlayerSuppressionSystem resize listener** - FIXED. Stored bound ref, removed in dispose() (commit c226f60).
 - **HelicopterAnimation.calculateTargetTilt() per-frame allocs** - FIXED. Module-level scratch Euler and Quaternion replace per-frame allocations (commit a21696b).
+- **AIStateEngage per-frame Vector3 allocations** - FIXED. Module-level scratch vectors `_toTarget`, `_flankingPos`, `_toAttacker` replace per-frame allocations (commit 0be935b).
+- **AIStatePatrol per-frame Vector3 allocations** - FIXED. Module-level scratch vectors `_toTarget`, `_offset`, `_awayDir`, `_defensePos` replace per-frame allocations (commit da4f97a).
+- **AIStateMovement per-frame Vector3 allocations** - FIXED. Module-level scratch vectors `_toDestination`, `_toTarget`, `_toCover` replace per-frame allocations (commit 75af883).
 
 Discovered hotspots (not yet fixed):
-- **AIStateEngage per-frame Vector3 allocations** - Line 66: `new THREE.Vector3()` every frame for every engaging combatant. Line 238: same in handleAlert(). Lines 325, 349: event-driven (lower priority). High impact with 100+ combatants.
-- **AIStatePatrol per-frame Vector3 allocations** - Line 72: `new THREE.Vector3()` every frame for every patrolling combatant detecting enemies. Lines 115-120: per-frame for FOLLOW_ME squads (Vector3 + clone). Lines 132, 147, 159: squad commands (medium frequency).
-- **AIStateMovement per-frame Vector3 allocations** - Lines 40, 55, 96: `new THREE.Vector3()` every frame for advancing/seeking-cover combatants.
+- **PlayerHealthSystem onPlayerDamage() allocation** - Line 148: `new THREE.Vector3()` per damage event for camera direction. Not per-frame but high frequency during combat.
 - **MortarBallistics computeTrajectory() clones** - Lines 60-80. Still creates 100+ Vector3 via `.clone()` per trajectory computation (builds output array, not per-frame). Lower priority.
 - **DeathCamSystem innerHTML in showOverlay()** - Uses innerHTML for kill details. One-time call per death (not per-frame), low impact.
 
