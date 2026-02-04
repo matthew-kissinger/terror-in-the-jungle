@@ -80,29 +80,40 @@ export class AudioManager implements GameSystem {
     }
 
     private async loadAllAudio(): Promise<void> {
-        const loadPromises: Promise<void>[] = [];
+        const loadPromises: Promise<{key: string, buffer?: AudioBuffer}>[] = [];
 
         for (const [key, config] of Object.entries(this.soundConfigs)) {
-            loadPromises.push(this.loadAudio(key, config.path));
+            loadPromises.push(
+                this.loadAudio(key, config.path)
+                    .then(buffer => ({ key, buffer }))
+                    .catch(error => {
+                        Logger.warn('Audio', `Optional audio ${key} not found: ${config.path}`);
+                        return { key, buffer: undefined };
+                    })
+            );
         }
 
-        await Promise.all(loadPromises);
+        const results = await Promise.all(loadPromises);
+        for (const result of results) {
+            if (result.buffer) {
+                this.audioBuffers.set(result.key, result.buffer);
+            }
+        }
     }
 
-    private loadAudio(key: string, path: string): Promise<void> {
+    private loadAudio(key: string, path: string): Promise<AudioBuffer> {
         return new Promise((resolve, reject) => {
             this.audioLoader.load(
                 path,
                 (buffer) => {
-                    this.audioBuffers.set(key, buffer);
                     Logger.debug('Audio', `Loaded: ${key}`);
-                    resolve();
+                    resolve(buffer);
                 },
                 (progress) => {
                     // Progress callback
                 },
                 (error) => {
-                    Logger.error('Audio', `Failed to load ${key}:`, error);
+                    Logger.error('Audio', `Failed to load ${key}: ${path}`, error);
                     reject(error);
                 }
             );
