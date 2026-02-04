@@ -79,16 +79,14 @@ CombatantSystem has distance-based LOD:
 
 ### Large Files (violate 400-line target)
 
-| File | Lines | Location |
-|------|-------|----------|
-| CombatantSystem.ts | 428 | systems/combat/ |
-| ChunkWorkerCode.ts | 421 | systems/terrain/ |
-| ZoneManager.ts | 413 | systems/world/ |
-| PerformanceTelemetry.ts | 408 | systems/debug/ |
-| DeathCamSystem.ts | 406 | systems/player/ |
-| ImprovedChunk.ts | 402 | systems/terrain/ |
+| File | Lines | Location | Notes |
+|------|-------|----------|-------|
+| CombatantSystem.ts | 428 | systems/combat/ | Orchestrator - skip |
+| ChunkWorkerCode.ts | 421 | systems/terrain/ | Worker boundary |
+| PerformanceTelemetry.ts | 408 | systems/debug/ | Extract frame timing |
+| ImprovedChunk.ts | 402 | systems/terrain/ | Extract worker adapter |
 
-**Completed splits**: CombatantSystem (1308->538->428, extracted CombatantSystemDamage + CombatantSystemSetters + CombatantSystemUpdate), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453->272, extracted AudioWeaponSounds), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468->380, extracted CombatantCombatEffects), FootstepAudioSystem (587->326), ImprovedChunkManager (753->529->385, extracted ChunkPriorityManager + ChunkLifecycleManager + ChunkLoadQueueManager + ChunkTerrainQueries), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer), AIFlankingSystem (606->359, extracted FlankingRoleManager + FlankingTacticsResolver), FullMapSystem (574->365, extracted FullMapDOMHelpers + FullMapInput + FullMapStyles), AITargeting (571->94, extracted AITargetAcquisition + AILineOfSight), CombatantMovement (504->129, extracted CombatantMovementStates + CombatantMovementCommands), PixelArtSandbox (551->144, extracted PixelArtSandboxInit + PixelArtSandboxInput + PixelArtSandboxLoop), InfluenceMapSystem (570->329, extracted InfluenceMapComputations + InfluenceMapGrid), ExplosionEffectsPool (489->161, extracted ExplosionEffectFactory + ExplosionParticleUpdater + ExplosionSpawnInitializer + ExplosionTextures), OpenFrontierRespawnMap (531->194, extracted OpenFrontierRespawnMapUtils + OpenFrontierRespawnMapRenderer), gameModes (496->40, extracted GameModeZoneControl + GameModeOpenFrontier + GameModeCommon), SpatialOctree (487->257, extracted SpatialOctreeNode + SpatialOctreeQuery), HUDStyles (483->40, extracted HUDBaseStyles + HUDStatusStyles + HUDWeaponStyles + HUDZoneStyles), AICoverSystem (458->371, extracted AICoverEvaluation), SandboxRenderer (431->203, extracted SandboxCrosshairUI + SandboxLoadingUI), WeatherSystem (449->314, extracted WeatherAtmosphere + WeatherLightning), CompassSystem (454->95, extracted CompassStyles + CompassDOMBuilder + CompassZoneMarkers), ChunkLifecycleManager (448->287, extracted ChunkLoadingStrategy + ChunkSpatialUtils), FirstPersonWeapon (568->445->382, extracted WeaponAmmo + WeaponInput + WeaponModel + WeaponSwitching + WeaponShotCommandBuilder), MatchEndScreen (434->120, extracted MatchEndScreenDOM + MatchEndScreenStyles), MinimapSystem (440->117, extracted MinimapDOMBuilder + MinimapRenderer + MinimapStyles), HelicopterGeometry (433->170, extracted HelicopterGeometryParts), HUDUpdater (431->305, extracted HUDZoneDisplay), HelicopterModel (433->329, extracted HelicopterInteraction), WeaponFiring (425->312, extracted WeaponShotExecutor), GPUTerrain (422->238, extracted GPUTerrainShaders + GPUTerrainGeometry), MortarSystem (425->321, extracted MortarRoundManager). 6 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538->428, extracted CombatantSystemDamage + CombatantSystemSetters + CombatantSystemUpdate), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453->272, extracted AudioWeaponSounds), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468->380, extracted CombatantCombatEffects), FootstepAudioSystem (587->326), ImprovedChunkManager (753->529->385, extracted ChunkPriorityManager + ChunkLifecycleManager + ChunkLoadQueueManager + ChunkTerrainQueries), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer), AIFlankingSystem (606->359, extracted FlankingRoleManager + FlankingTacticsResolver), FullMapSystem (574->365, extracted FullMapDOMHelpers + FullMapInput + FullMapStyles), AITargeting (571->94, extracted AITargetAcquisition + AILineOfSight), CombatantMovement (504->129, extracted CombatantMovementStates + CombatantMovementCommands), PixelArtSandbox (551->144, extracted PixelArtSandboxInit + PixelArtSandboxInput + PixelArtSandboxLoop), InfluenceMapSystem (570->329, extracted InfluenceMapComputations + InfluenceMapGrid), ExplosionEffectsPool (489->161, extracted ExplosionEffectFactory + ExplosionParticleUpdater + ExplosionSpawnInitializer + ExplosionTextures), OpenFrontierRespawnMap (531->194, extracted OpenFrontierRespawnMapUtils + OpenFrontierRespawnMapRenderer), gameModes (496->40, extracted GameModeZoneControl + GameModeOpenFrontier + GameModeCommon), SpatialOctree (487->257, extracted SpatialOctreeNode + SpatialOctreeQuery), HUDStyles (483->40, extracted HUDBaseStyles + HUDStatusStyles + HUDWeaponStyles + HUDZoneStyles), AICoverSystem (458->371, extracted AICoverEvaluation), SandboxRenderer (431->203, extracted SandboxCrosshairUI + SandboxLoadingUI), WeatherSystem (449->314, extracted WeatherAtmosphere + WeatherLightning), CompassSystem (454->95, extracted CompassStyles + CompassDOMBuilder + CompassZoneMarkers), ChunkLifecycleManager (448->287, extracted ChunkLoadingStrategy + ChunkSpatialUtils), FirstPersonWeapon (568->445->382, extracted WeaponAmmo + WeaponInput + WeaponModel + WeaponSwitching + WeaponShotCommandBuilder), MatchEndScreen (434->120, extracted MatchEndScreenDOM + MatchEndScreenStyles), MinimapSystem (440->117, extracted MinimapDOMBuilder + MinimapRenderer + MinimapStyles), HelicopterGeometry (433->170, extracted HelicopterGeometryParts), HUDUpdater (431->305, extracted HUDZoneDisplay), HelicopterModel (433->329, extracted HelicopterInteraction), WeaponFiring (425->312, extracted WeaponShotExecutor), GPUTerrain (422->238, extracted GPUTerrainShaders + GPUTerrainGeometry), MortarSystem (425->321, extracted MortarRoundManager), DeathCamSystem (406->221, extracted DeathCamOverlay), ZoneManager (413->298, extracted ZoneInitializer). 4 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -153,11 +151,14 @@ Known hotspots:
 - **HelicopterModel getter clones** - FIXED. Target-vector pattern replaces per-frame clones in getHelicopterPosition(), getHelicopterQuaternion().
 - **FirstPersonWeapon per-frame Vector3 fallback** - FIXED. Uses module-level scratch vector.
 
+- **HelicopterPhysics getState()/getControls() spread** - FIXED. Eliminated shallow copy spread operators.
+
 Discovered hotspots (not yet fixed):
-- **HelicopterPhysics getState() spread** - Line 277. `{ ...this.state }` creates shallow copy every call. Consider returning state directly (read-only convention) or caching.
-- **HelicopterPhysics getControls() spread** - Line 281. `{ ...this.controls }` creates shallow copy every call.
+- **CombatantHitDetection checkPlayerHit() allocations** - Multiple `new THREE.Vector3()` and `.clone()` calls per shot. Module-level scratch vectors needed.
+- **PlayerInput getMouseMovement() spread** - `return { ...this.mouseMovement }` creates object copy every frame.
+- **SpatialOctree Array.splice() in remove/updatePosition** - Lines 137, 146. Should use swap-and-pop for per-frame entity updates.
 - **MortarBallistics computeTrajectory() clones** - Lines 60-80. Still creates 100+ Vector3 via `.clone()` per trajectory computation (builds output array, not per-frame). Lower priority.
-- **DeathCamSystem innerHTML in showOverlay()** - Line 362. Uses innerHTML for kill details. One-time call per death (not per-frame), low impact.
+- **DeathCamSystem innerHTML in showOverlay()** - Uses innerHTML for kill details. One-time call per death (not per-frame), low impact.
 
 Possible areas (confirm with profiling):
 - Worker utilization (are they saturated?)
@@ -225,7 +226,7 @@ perf.benchmark(1000)  // Runs 1000 raycast iterations, returns timing stats
 
 ## Architecture
 
-~51k lines across 265 files. Orchestrator pattern with ongoing split refactors.
+~51.5k lines across 267 files. Orchestrator pattern with ongoing split refactors.
 
 ```
 src/
