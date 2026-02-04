@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { SpatialOctree } from './SpatialOctree'
 import { Combatant, CombatantState } from './types'
 import { performanceTelemetry } from '../debug/PerformanceTelemetry'
+import { Logger } from '../../utils/Logger'
 
 /**
  * LOD-based sync frequency for spatial grid updates.
@@ -57,7 +58,7 @@ export class SpatialGridManager {
    */
   initialize(worldSize: number): void {
     if (this.isInitialized && this.worldSize === worldSize) {
-      console.log(`[SpatialGrid] Already initialized with world size ${worldSize}`)
+      Logger.info('spatial-grid', `Already initialized with world size ${worldSize}`)
       return
     }
 
@@ -71,7 +72,7 @@ export class SpatialGridManager {
     this.telemetry.initialized = true
     this.telemetry.lastRebuildMs = duration
 
-    console.log(`[SpatialGrid] Initialized with world size ${worldSize} in ${duration.toFixed(1)}ms`)
+    Logger.info('spatial-grid', `Initialized with world size ${worldSize} in ${duration.toFixed(1)}ms`)
 
     // Update performance telemetry
     performanceTelemetry.updateSpatialGridTelemetry({
@@ -85,7 +86,7 @@ export class SpatialGridManager {
    * Reinitialize with new world size (e.g., on game mode change)
    */
   reinitialize(worldSize: number): void {
-    console.log(`[SpatialGrid] Reinitializing with new world size ${worldSize}`)
+    Logger.info('spatial-grid', `Reinitializing with new world size ${worldSize}`)
     this.isInitialized = false
     this.grid = null
     this.telemetry.entityCount = 0
@@ -108,7 +109,7 @@ export class SpatialGridManager {
     playerPosition: THREE.Vector3
   ): void {
     if (!this.isInitialized || !this.grid) {
-      console.error('[SpatialGrid] syncAllPositions called before initialization!')
+      Logger.error('spatial-grid', 'syncAllPositions called before initialization!')
       this.telemetry.fallbackCount++
       performanceTelemetry.recordFallback()
       return
@@ -166,7 +167,7 @@ export class SpatialGridManager {
    */
   syncEntity(id: string, position: THREE.Vector3): void {
     if (!this.isInitialized || !this.grid) {
-      console.error('[SpatialGrid] syncEntity called before initialization!')
+      Logger.error('spatial-grid', 'syncEntity called before initialization!')
       this.telemetry.fallbackCount++
       performanceTelemetry.recordFallback()
       return
@@ -188,7 +189,7 @@ export class SpatialGridManager {
    */
   queryRadius(center: THREE.Vector3, radius: number): string[] {
     if (!this.isInitialized || !this.grid) {
-      console.error('[SpatialGrid] queryRadius called before initialization!')
+      Logger.error('spatial-grid', 'queryRadius called before initialization!')
       this.telemetry.fallbackCount++
       performanceTelemetry.recordFallback()
       return []
@@ -223,7 +224,7 @@ export class SpatialGridManager {
    */
   queryNearestK(center: THREE.Vector3, k: number, maxDistance: number = Infinity): string[] {
     if (!this.isInitialized || !this.grid) {
-      console.error('[SpatialGrid] queryNearestK called before initialization!')
+      Logger.error('spatial-grid', 'queryNearestK called before initialization!')
       this.telemetry.fallbackCount++
       performanceTelemetry.recordFallback()
       return []
@@ -247,7 +248,7 @@ export class SpatialGridManager {
    */
   queryRay(origin: THREE.Vector3, direction: THREE.Vector3, maxDistance: number): string[] {
     if (!this.isInitialized || !this.grid) {
-      console.error('[SpatialGrid] queryRay called before initialization!')
+      Logger.error('spatial-grid', 'queryRay called before initialization!')
       this.telemetry.fallbackCount++
       performanceTelemetry.recordFallback()
       return []

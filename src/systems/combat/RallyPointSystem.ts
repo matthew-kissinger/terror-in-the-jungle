@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { Faction, Squad } from './types';
 import { ZoneManager } from '../world/ZoneManager';
+import { Logger } from '../../utils/Logger';
 
 interface RallyPoint {
   position: THREE.Vector3;
@@ -39,7 +40,7 @@ export class RallyPointSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('🚩 Rally Point System initialized');
+    Logger.info('rally-point', '🚩 Rally Point System initialized');
   }
 
   update(deltaTime: number): void {
@@ -51,7 +52,7 @@ export class RallyPointSystem implements GameSystem {
     for (const [squadId, rallyPoint] of this.rallyPoints.entries()) {
       // Check expiration
       if (rallyPoint.active && currentTime - rallyPoint.creationTime > rallyPoint.lifetime) {
-        console.log(`🚩 Rally point for squad ${squadId} expired`);
+        Logger.info('rally-point', `🚩 Rally point for squad ${squadId} expired`);
         this.deactivateRallyPoint(squadId);
         continue;
       }
@@ -59,7 +60,7 @@ export class RallyPointSystem implements GameSystem {
       // Check regeneration
       if (!rallyPoint.active && rallyPoint.lastDepletedTime) {
         if (currentTime - rallyPoint.lastDepletedTime > rallyPoint.regenerationTime) {
-          console.log(`🚩 Rally point for squad ${squadId} regenerated`);
+          Logger.info('rally-point', `🚩 Rally point for squad ${squadId} regenerated`);
           rallyPoint.active = true;
           rallyPoint.usesRemaining = rallyPoint.maxUses;
           rallyPoint.creationTime = currentTime;
@@ -143,8 +144,8 @@ export class RallyPointSystem implements GameSystem {
 
     this.rallyPoints.set(squadId, rallyPoint);
 
-    console.log(`🚩 Rally point placed for squad ${squadId} at (${position.x.toFixed(1)}, ${position.z.toFixed(1)})`);
-    console.log(`   Uses: ${rallyPoint.usesRemaining}/${rallyPoint.maxUses}, Lifetime: ${rallyPoint.lifetime}s`);
+    Logger.info('rally-point', `🚩 Rally point placed for squad ${squadId} at (${position.x.toFixed(1)}, ${position.z.toFixed(1)})`);
+    Logger.info('rally-point', `   Uses: ${rallyPoint.usesRemaining}/${rallyPoint.maxUses}, Lifetime: ${rallyPoint.lifetime}s`);
 
     return {
       success: true,
@@ -178,11 +179,11 @@ export class RallyPointSystem implements GameSystem {
     }
 
     rallyPoint.usesRemaining--;
-    console.log(`🚩 Rally point use consumed for squad ${squadId}: ${rallyPoint.usesRemaining}/${rallyPoint.maxUses} remaining`);
+    Logger.info('rally-point', `🚩 Rally point use consumed for squad ${squadId}: ${rallyPoint.usesRemaining}/${rallyPoint.maxUses} remaining`);
 
     // Deactivate if depleted
     if (rallyPoint.usesRemaining <= 0) {
-      console.log(`🚩 Rally point depleted for squad ${squadId}, will regenerate in ${rallyPoint.regenerationTime}s`);
+      Logger.info('rally-point', `🚩 Rally point depleted for squad ${squadId}, will regenerate in ${rallyPoint.regenerationTime}s`);
       rallyPoint.lastDepletedTime = performance.now() / 1000;
       this.deactivateRallyPoint(squadId);
     }
