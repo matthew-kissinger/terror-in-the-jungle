@@ -8,12 +8,14 @@ import { ChunkWorkerPool, ChunkGeometryResult } from './ChunkWorkerPool';
 import { ViteBVHWorker } from '../../workers/BVHWorker';
 import { Logger } from '../../utils/Logger';
 import { ChunkQueueItem } from './ChunkPriorityManager';
+import { TerrainMeshMerger } from './TerrainMeshMerger';
 
 export interface ChunkLifecycleConfig {
   size: number;
   loadDistance: number;
   renderDistance: number;
   skipTerrainMesh?: boolean;
+  enableMeshMerging?: boolean; // Enable chunk mesh merging for reduced draw calls
 }
 
 /**
@@ -37,6 +39,9 @@ export class ChunkLifecycleManager {
   // Player tracking for distance checks
   private playerPosition = new THREE.Vector3();
 
+  // Mesh merging system
+  private meshMerger: TerrainMeshMerger | null = null;
+
   constructor(
     scene: THREE.Scene,
     assetLoader: AssetLoader,
@@ -55,6 +60,12 @@ export class ChunkLifecycleManager {
     this.losAccelerator = losAccelerator;
     this.workerPool = workerPool;
     this.bvhWorker = bvhWorker;
+
+    // Initialize mesh merger if enabled
+    if (config.enableMeshMerging && !config.skipTerrainMesh) {
+      this.meshMerger = new TerrainMeshMerger(scene);
+      Logger.info('chunks', 'Terrain mesh merging enabled');
+    }
   }
 
   /**
@@ -96,6 +107,9 @@ export class ChunkLifecycleManager {
       }
 
       Logger.debug('chunks', `Loaded initial chunk (${chunkX}, ${chunkZ})`);
+
+      // Trigger mesh merge update
+      this.updateMergedMeshes();
     } catch (error) {
       console.error(`❌ Failed to load chunk (${chunkX}, ${chunkZ}):`, error);
     }
@@ -196,6 +210,9 @@ export class ChunkLifecycleManager {
       }
 
       Logger.debug('chunks', `Worker loaded chunk (${chunkX}, ${chunkZ})`);
+
+      // Trigger mesh merge update
+      this.updateMergedMeshes();
     } catch (error) {
       console.error(`❌ Worker failed for chunk (${chunkX}, ${chunkZ}):`, error);
       // Fall back to main thread
@@ -239,6 +256,9 @@ export class ChunkLifecycleManager {
           }
 
           Logger.debug('chunks', `Main thread loaded chunk (${chunkX}, ${chunkZ})`);
+
+          // Trigger mesh merge update
+          this.updateMergedMeshes();
         } else {
           chunk.dispose();
           Logger.debug('chunks', `Disposed unneeded chunk (${chunkX}, ${chunkZ})`);
@@ -275,6 +295,11 @@ export class ChunkLifecycleManager {
         Logger.debug('chunks', `Unloaded chunk ${key} (remaining=${this.chunks.size - 1})`);
       }
     });
+
+    // Trigger mesh merge update if chunks were unloaded
+    if (chunksToUnload.length > 0) {
+      this.updateMergedMeshes();
+    }
   }
 
   /**
@@ -341,12 +366,38 @@ export class ChunkLifecycleManager {
   }
 
   /**
+   * Update merged terrain meshes (reduces draw calls)
+   */
+  private updateMergedMeshes(): void {
+    if (this.meshMerger) {
+      this.meshMerger.updateMergedMeshes(
+        this.chunks,
+        this.playerPosition,
+        this.config.size
+      );
+    }
+  }
+
+  /**
+   * Get mesh merger stats for debugging
+   */
+  getMergerStats(): { activeRings: number; totalChunks: number; pendingMerge: boolean } | null {
+    return this.meshMerger ? this.meshMerger.getStats() : null;
+  }
+
+  /**
    * Dispose all chunks
    */
   dispose(): void {
     this.chunks.forEach(chunk => chunk.dispose());
     this.chunks.clear();
     this.loadingChunks.clear();
+
+    // Dispose mesh merger
+    if (this.meshMerger) {
+      this.meshMerger.dispose();
+      this.meshMerger = null;
+    }
   }
 
   /**

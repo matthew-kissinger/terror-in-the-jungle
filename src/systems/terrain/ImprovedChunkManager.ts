@@ -126,7 +126,8 @@ export class ImprovedChunkManager implements GameSystem {
         size: config.size,
         loadDistance: config.loadDistance,
         renderDistance: config.renderDistance,
-        skipTerrainMesh: config.skipTerrainMesh
+        skipTerrainMesh: config.skipTerrainMesh,
+        enableMeshMerging: true // Enable chunk mesh merging to reduce draw calls
       },
       this.noiseGenerator,
       this.losAccelerator,
@@ -381,5 +382,13 @@ export class ImprovedChunkManager implements GameSystem {
    */
   getLOSAccelerator(): LOSAccelerator {
     return this.losAccelerator;
+  }
+
+  /**
+   * Get terrain mesh merger stats (for debugging draw call reduction)
+   * Call from console: game.chunkManager.getMergerStats()
+   */
+  getMergerStats(): { activeRings: number; totalChunks: number; pendingMerge: boolean } | null {
+    return this.lifecycleManager.getMergerStats();
   }
 }
