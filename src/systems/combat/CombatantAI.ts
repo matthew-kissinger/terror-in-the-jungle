@@ -57,6 +57,7 @@ export class CombatantAI {
 
   setVoiceCalloutSystem(system: VoiceCalloutSystem): void {
     this.voiceCalloutSystem = system
+    this.movementHandler.setVoiceCalloutSystem(system)
   }
 
   updateAI(
