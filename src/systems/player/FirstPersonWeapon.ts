@@ -171,7 +171,7 @@ export class FirstPersonWeapon implements GameSystem {
     this.muzzleFlashPool.dispose()
     this.impactEffectsPool.dispose()
 
-    Logger.info('weapon', '🧹 First Person Weapon disposed')
+    Logger.info('weapon', 'First Person Weapon disposed')
   }
 
   setPlayerController(controller: PlayerController): void {

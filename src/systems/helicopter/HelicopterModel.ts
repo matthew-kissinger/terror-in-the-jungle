@@ -324,6 +324,6 @@ export class HelicopterModel implements GameSystem {
       (this.terrainManager as any).unregisterCollisionObject('us_huey');
     }
 
-    Logger.debug('helicopter', '🧹 HelicopterModel disposed');
+    Logger.debug('helicopter', 'HelicopterModel disposed');
   }
 }

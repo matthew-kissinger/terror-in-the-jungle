@@ -142,6 +142,6 @@ export class PixelArtSandbox {
     this.performanceOverlay.dispose();
     this.timeIndicator.dispose();
     this.logOverlay.dispose();
-    Logger.info('core', '🧹 Sandbox disposed');
+    Logger.info('core', 'Sandbox disposed');
   }
 }

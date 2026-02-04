@@ -16,7 +16,7 @@ export class CameraShakeSystem implements GameSystem {
   private readonly DEFAULT_FREQUENCY = 20; // Default shake frequency (Hz)
 
   async init(): Promise<void> {
-    Logger.info('effects', '📳 Initializing Camera Shake System...');
+    Logger.info('effects', 'Initializing Camera Shake System...');
   }
 
   update(deltaTime: number): void {

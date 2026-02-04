@@ -325,6 +325,6 @@ export class InfluenceMapSystem implements GameSystem {
       this.debugContext = undefined;
     }
 
-    Logger.info('influence-map', '🧹 Influence Map System disposed');
+    Logger.info('influence-map', 'Influence Map System disposed');
   }
 }

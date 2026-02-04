@@ -307,6 +307,6 @@ export class WeaponPickupSystem implements GameSystem {
 
     window.removeEventListener('keydown', this.boundOnKeyDown);
 
-    Logger.info('weapons', '🧹 Weapon Pickup System disposed');
+    Logger.info('weapons', 'Weapon Pickup System disposed');
   }
 }

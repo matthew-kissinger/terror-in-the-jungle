@@ -113,6 +113,6 @@ export class MinimapSystem implements GameSystem {
       this.minimapContainer.parentNode.removeChild(this.minimapContainer);
     }
 
-    Logger.info('minimap', '🧹 Minimap System disposed');
+    Logger.info('minimap', 'Minimap System disposed');
   }
 }

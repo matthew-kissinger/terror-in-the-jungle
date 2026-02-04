@@ -139,7 +139,7 @@ export class AmmoManager {
         if (!this.isResupplying || this.lastResupplyZone !== currentZone) {
           this.isResupplying = true;
           this.lastResupplyZone = currentZone;
-          Logger.info('weapons', `📦 Resupplying ammo at ${currentZone.name}...`);
+          Logger.info('weapons', `Resupplying ammo at ${currentZone.name}...`);
         }
 
         // Resupply ammo gradually
@@ -175,7 +175,7 @@ export class AmmoManager {
     } else {
       // Left resupply zone
       if (this.isResupplying) {
-        Logger.info('weapons', '📦 Left resupply zone');
+        Logger.info('weapons', 'Left resupply zone');
         this.isResupplying = false;
         this.lastResupplyZone = null;
       }

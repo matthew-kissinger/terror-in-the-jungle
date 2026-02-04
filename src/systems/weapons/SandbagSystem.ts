@@ -48,7 +48,7 @@ export class SandbagSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('weapons', '🟫 Initializing Sandbag System...');
+    Logger.info('weapons', 'Initializing Sandbag System...');
   }
 
   update(deltaTime: number): void {
@@ -231,7 +231,7 @@ export class SandbagSystem implements GameSystem {
 
     this.inventoryManager.useSandbag();
 
-    Logger.info('weapons', `🟫 Sandbag placed at (${this.previewPosition.x.toFixed(1)}, ${this.previewPosition.z.toFixed(1)}). Total: ${this.sandbags.length}/${this.MAX_SANDBAGS}`);
+    Logger.info('weapons', `Sandbag placed at (${this.previewPosition.x.toFixed(1)}, ${this.previewPosition.z.toFixed(1)}). Total: ${this.sandbags.length}/${this.MAX_SANDBAGS}`);
 
     return true;
   }

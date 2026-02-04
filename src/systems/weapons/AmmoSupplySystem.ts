@@ -42,7 +42,7 @@ export class AmmoSupplySystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('weapons', '📦 Initializing Ammo Supply System...');
+    Logger.info('weapons', 'Initializing Ammo Supply System...');
     this.createPopupElement();
     Logger.info('weapons', ' Ammo Supply System initialized');
   }
@@ -90,7 +90,7 @@ export class AmmoSupplySystem implements GameSystem {
       this.popupElement.parentNode.removeChild(this.popupElement);
     }
 
-    Logger.info('weapons', '🧹 Ammo Supply System disposed');
+    Logger.info('weapons', 'Ammo Supply System disposed');
   }
 
   setZoneManager(zoneManager: ZoneManager): void {
@@ -292,7 +292,7 @@ export class AmmoSupplySystem implements GameSystem {
     // Show feedback
     if (resupplyItems.length > 0) {
       this.showResupplyPopup(resupplyItems.join(' + '));
-      Logger.info('weapons', `📦 Resupplied at ${crate.zone.name}: ${resupplyItems.join(', ')}`);
+      Logger.info('weapons', `Resupplied at ${crate.zone.name}: ${resupplyItems.join(', ')}`);
       return true;
     }
 

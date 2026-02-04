@@ -29,7 +29,7 @@ export class RadioTransmissionSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('radio', '📻 Initializing Radio Transmission System...');
+    Logger.info('radio', 'Initializing Radio Transmission System...');
 
     // Discover all transmission files
     await this.discoverTransmissions();
@@ -37,7 +37,7 @@ export class RadioTransmissionSystem implements GameSystem {
     // Load transmission audio files
     await this.loadTransmissions();
 
-    Logger.info('radio', `📻 Radio Transmission System initialized with ${this.transmissions.length} transmissions`);
+    Logger.info('radio', `Radio Transmission System initialized with ${this.transmissions.length} transmissions`);
   }
 
   setAudioListener(listener: THREE.AudioListener): void {
@@ -72,12 +72,12 @@ export class RadioTransmissionSystem implements GameSystem {
           `${import.meta.env.BASE_URL}assets/transmissions/${transmission.filename}`,
           (buffer) => {
             transmission.buffer = buffer;
-            Logger.info('radio', `📻 Loaded transmission: ${transmission.filename}`);
+            Logger.info('radio', `Loaded transmission: ${transmission.filename}`);
             resolve();
           },
           undefined,
           (error) => {
-            Logger.warn('radio', `📻 Failed to load transmission ${transmission.filename}:`, error);
+            Logger.warn('radio', `Failed to load transmission ${transmission.filename}:`, error);
             resolve(); // Don't fail the entire system for one file
           }
         );
@@ -87,14 +87,14 @@ export class RadioTransmissionSystem implements GameSystem {
     await Promise.all(loadPromises);
 
     const loadedCount = this.transmissions.filter(t => t.buffer).length;
-    Logger.info('radio', `📻 Successfully loaded ${loadedCount}/${this.transmissions.length} transmissions`);
+    Logger.info('radio', `Successfully loaded ${loadedCount}/${this.transmissions.length} transmissions`);
   }
 
   private scheduleNextTransmission(): void {
     const randomDelay = Math.random() * (this.maxInterval - this.minInterval) + this.minInterval;
     this.nextTransmissionTime = Date.now() + randomDelay;
 
-    Logger.info('radio', `📻 Next transmission scheduled in ${(randomDelay / 1000).toFixed(1)} seconds`);
+    Logger.info('radio', `Next transmission scheduled in ${(randomDelay / 1000).toFixed(1)} seconds`);
   }
 
   private selectRandomTransmission(): RadioTransmission | null {
@@ -104,7 +104,7 @@ export class RadioTransmissionSystem implements GameSystem {
 
     if (availableTransmissions.length === 0) {
       // If all have been played recently, reset and use any
-      Logger.info('radio', '📻 All transmissions played recently, resetting cooldowns');
+      Logger.info('radio', 'All transmissions played recently, resetting cooldowns');
       return this.transmissions.find(t => t.buffer) || null;
     }
 
@@ -114,7 +114,7 @@ export class RadioTransmissionSystem implements GameSystem {
 
   private playTransmission(transmission: RadioTransmission): void {
     if (!this.audioListener || !transmission.buffer) {
-      Logger.warn('radio', '📻 Cannot play transmission - missing audio listener or buffer');
+      Logger.warn('radio', 'Cannot play transmission - missing audio listener or buffer');
       return;
     }
 
@@ -136,11 +136,11 @@ export class RadioTransmissionSystem implements GameSystem {
     transmission.lastPlayed = Date.now();
     this.lastTransmissionTime = Date.now();
 
-    Logger.info('radio', `📻 Playing transmission: ${transmission.filename} at volume ${this.currentAudio.getVolume().toFixed(2)}`);
+    Logger.info('radio', `Playing transmission: ${transmission.filename} at volume ${this.currentAudio.getVolume().toFixed(2)}`);
 
     // Clean up when finished
     this.currentAudio.onEnded = () => {
-      Logger.info('radio', `📻 Transmission ended: ${transmission.filename}`);
+      Logger.info('radio', `Transmission ended: ${transmission.filename}`);
       this.scheduleNextTransmission();
     };
   }
@@ -157,7 +157,7 @@ export class RadioTransmissionSystem implements GameSystem {
       if (transmission) {
         this.playTransmission(transmission);
       } else {
-        Logger.warn('radio', '📻 No transmissions available to play');
+        Logger.warn('radio', 'No transmissions available to play');
         this.scheduleNextTransmission(); // Try again later
       }
     }
@@ -174,11 +174,11 @@ export class RadioTransmissionSystem implements GameSystem {
   // Control methods
   setEnabled(enabled: boolean): void {
     this.isEnabled = enabled;
-    Logger.info('radio', `📻 Radio transmissions ${enabled ? 'enabled' : 'disabled'}`);
+    Logger.info('radio', `Radio transmissions ${enabled ? 'enabled' : 'disabled'}`);
 
     if (!enabled && this.currentAudio && this.currentAudio.isPlaying) {
       this.currentAudio.stop();
-      Logger.info('radio', '📻 Stopped current transmission due to disable');
+      Logger.info('radio', 'Stopped current transmission due to disable');
     }
   }
 
@@ -193,7 +193,7 @@ export class RadioTransmissionSystem implements GameSystem {
   setTransmissionInterval(minSeconds: number, maxSeconds: number): void {
     this.minInterval = minSeconds * 1000;
     this.maxInterval = maxSeconds * 1000;
-    Logger.info('radio', `📻 Transmission interval set to ${minSeconds}-${maxSeconds} seconds`);
+    Logger.info('radio', `Transmission interval set to ${minSeconds}-${maxSeconds} seconds`);
   }
 
   // Get status info
@@ -213,6 +213,6 @@ export class RadioTransmissionSystem implements GameSystem {
     this.transmissions = [];
     this.currentAudio = undefined;
 
-    Logger.info('radio', '🧹 RadioTransmissionSystem disposed');
+    Logger.info('radio', 'RadioTransmissionSystem disposed');
   }
 }

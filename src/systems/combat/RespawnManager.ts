@@ -72,7 +72,7 @@ export class RespawnManager {
             originalId: id
           });
         } else {
-          Logger.info('combat', `✓ Respawn already queued for ${id}`);
+          Logger.info('combat', `Respawn already queued for ${id}`);
         }
       }
 
@@ -101,7 +101,7 @@ export class RespawnManager {
     const readyToRespawn = this.pendingRespawns.filter(r => r.respawnTime <= now);
 
     readyToRespawn.forEach(respawn => {
-      Logger.info('combat', `⏰ RESPAWN TRIGGERED at ${now} (was scheduled for ${respawn.respawnTime})`);
+      Logger.info('combat', `RESPAWN TRIGGERED at ${now} (was scheduled for ${respawn.respawnTime})`);
       this.respawnSquadMember(respawn.squadId, rallyPointSystem, zoneManager, gameModeManager);
     });
 

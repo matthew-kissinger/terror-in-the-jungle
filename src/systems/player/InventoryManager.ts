@@ -35,7 +35,7 @@ export class InventoryManager implements GameSystem {
   private boundOnKeyDown!: (event: KeyboardEvent) => void;
 
   async init(): Promise<void> {
-    Logger.info('inventory', '🎒 Initializing Inventory Manager...');
+    Logger.info('inventory', 'Initializing Inventory Manager...');
     this.setupEventListeners();
     this.createUI();
     this.notifyInventoryChange();
@@ -97,7 +97,7 @@ export class InventoryManager implements GameSystem {
     if (this.currentSlot === slot) return;
 
     this.currentSlot = slot;
-    Logger.info('inventory', `🎒 Switched to: ${WeaponSlot[slot]}`);
+    Logger.info('inventory', `Switched to: ${WeaponSlot[slot]}`);
 
     // Notify all registered callbacks
     for (const callback of this.onSlotChangeCallbacks) {
@@ -162,14 +162,14 @@ export class InventoryManager implements GameSystem {
     if (!this.canUseSandbag()) return false;
 
     this.sandbags--;
-    Logger.info('inventory', `🟫 Sandbag placed. Remaining: ${this.sandbags}`);
+    Logger.info('inventory', `Sandbag placed. Remaining: ${this.sandbags}`);
     this.notifyInventoryChange();
     return true;
   }
 
   addSandbags(count: number): void {
     this.sandbags = Math.min(this.sandbags + count, this.maxSandbags);
-    Logger.info('inventory', `🟫 Sandbags restocked: ${this.sandbags}/${this.maxSandbags}`);
+    Logger.info('inventory', `Sandbags restocked: ${this.sandbags}/${this.maxSandbags}`);
     this.notifyInventoryChange();
   }
 
@@ -182,7 +182,7 @@ export class InventoryManager implements GameSystem {
     this.mortarRounds = this.maxMortarRounds;
     this.sandbags = this.maxSandbags;
     this.currentSlot = WeaponSlot.PRIMARY;
-    Logger.info('inventory', '🎒 Inventory reset');
+    Logger.info('inventory', 'Inventory reset');
     this.notifyInventoryChange();
   }
 

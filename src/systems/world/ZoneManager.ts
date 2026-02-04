@@ -271,7 +271,7 @@ export class ZoneManager implements GameSystem {
   setChunkManager(chunkManager: ImprovedChunkManager): void {
     this.chunkManager = chunkManager;
     this.terrainAdapter.setChunkManager(chunkManager);
-    Logger.info('world', '🔗 ChunkManager connected to ZoneManager');
+    Logger.info('world', 'ChunkManager connected to ZoneManager');
   }
 
   setSpatialGridManager(manager: SpatialGridManager): void {
@@ -294,6 +294,6 @@ export class ZoneManager implements GameSystem {
     this.zones.clear();
     this.occupants.clear();
 
-    Logger.info('world', '🧹 Zone Manager disposed');
+    Logger.info('world', 'Zone Manager disposed');
   }
 }
