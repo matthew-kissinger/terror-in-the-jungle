@@ -7,13 +7,11 @@ import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { InventoryManager } from '../player/InventoryManager';
 import { AudioManager } from '../audio/AudioManager';
 import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
-import { MortarBallistics, MortarRound } from './MortarBallistics';
+import { MortarBallistics } from './MortarBallistics';
 import { MortarVisuals } from './MortarVisuals';
+import { MortarRoundManager } from './MortarRoundManager';
 import { Logger } from '../../utils/Logger';
 
-const UP_NORMAL = new THREE.Vector3(0, 1, 0);
-const _offset = new THREE.Vector3();
-const _effectPos = new THREE.Vector3();
 const _deployPos = new THREE.Vector3();
 const _direction = new THREE.Vector3();
 
@@ -38,17 +36,12 @@ export class MortarSystem implements GameSystem {
   private yaw = 0; // degrees (relative to world)
   private power = 0.5; // 0-1
 
-  // Active mortar rounds
-  private activeRounds: MortarRound[] = [];
-  private nextRoundId = 0;
-
   // Modules
   private ballistics: MortarBallistics;
   private visuals: MortarVisuals;
+  private roundManager: MortarRoundManager;
 
   // Constants
-  private readonly DAMAGE_RADIUS = 20;
-  private readonly MAX_DAMAGE = 200;
   private readonly FUSE_TIME = 15; // Maximum flight time before auto-detonation
 
   constructor(
@@ -62,6 +55,7 @@ export class MortarSystem implements GameSystem {
 
     this.ballistics = new MortarBallistics();
     this.visuals = new MortarVisuals(scene);
+    this.roundManager = new MortarRoundManager(scene);
   }
 
   async init(): Promise<void> {
@@ -75,31 +69,14 @@ export class MortarSystem implements GameSystem {
     }
 
     // Update active mortar rounds
-    for (let i = this.activeRounds.length - 1; i >= 0; i--) {
-      const round = this.activeRounds[i];
-
-      if (!round.isActive) continue;
-
-      // Update fuse timer
-      round.fuseTime -= deltaTime;
-      if (round.fuseTime <= 0) {
-        this.detonateRound(round);
-        this.removeRound(i);
-        continue;
-      }
-
-      // Update physics
-      const impacted = this.ballistics.updateRoundPhysics(
+    this.roundManager.updateRounds(
+      deltaTime,
+      (round, dt) => this.ballistics.updateRoundPhysics(
         round,
-        deltaTime,
+        dt,
         (x, z) => this.getGroundHeight(x, z)
-      );
-
-      if (impacted) {
-        this.detonateRound(round);
-        this.removeRound(i);
-      }
-    }
+      )
+    );
   }
 
   dispose(): void {
@@ -116,23 +93,8 @@ export class MortarSystem implements GameSystem {
       });
     }
 
-    // Remove active rounds
-    this.activeRounds.forEach(round => {
-      if (round.mesh) {
-        this.scene.remove(round.mesh);
-        round.mesh.traverse(child => {
-          if (child instanceof THREE.Mesh) {
-            child.geometry.dispose();
-            if (child.material instanceof THREE.Material) {
-              child.material.dispose();
-            }
-          }
-        });
-      }
-    });
-    this.activeRounds = [];
-
-    // Dispose visuals
+    // Dispose modules
+    this.roundManager.dispose();
     this.visuals.dispose();
   }
 
@@ -273,77 +235,7 @@ export class MortarSystem implements GameSystem {
 
   private spawnMortarRound(position: THREE.Vector3, velocity: THREE.Vector3): void {
     const mesh = ProgrammaticExplosivesFactory.createMortarRound();
-    mesh.position.copy(position);
-    this.scene.add(mesh);
-
-    const round: MortarRound = {
-      id: `mortar_${this.nextRoundId++}`,
-      position: position.clone(),
-      velocity: velocity.clone(),
-      mesh,
-      isActive: true,
-      fuseTime: this.FUSE_TIME
-    };
-
-    this.activeRounds.push(round);
-  }
-
-  private detonateRound(round: MortarRound): void {
-    Logger.info('mortar', `💥 Mortar detonated at (${round.position.x.toFixed(1)}, ${round.position.y.toFixed(1)}, ${round.position.z.toFixed(1)})`);
-
-    // Explosion visual effect
-    if (this.explosionEffectsPool) {
-      this.explosionEffectsPool.spawn(round.position);
-    }
-
-    // Debris effects
-    if (this.impactEffectsPool) {
-      for (let i = 0; i < 20; i++) {
-        _offset.set(
-          (Math.random() - 0.5) * 5,
-          Math.random() * 2,
-          (Math.random() - 0.5) * 5
-        );
-        _effectPos.copy(round.position).add(_offset);
-        this.impactEffectsPool.spawn(_effectPos, UP_NORMAL);
-      }
-    }
-
-    // Audio
-    if (this.audioManager) {
-      this.audioManager.playExplosionAt(round.position);
-    }
-
-    // Damage
-    if (this.combatantSystem) {
-      this.combatantSystem.applyExplosionDamage(
-        round.position,
-        this.DAMAGE_RADIUS,
-        this.MAX_DAMAGE
-      );
-    }
-  }
-
-  private removeRound(index: number): void {
-    const round = this.activeRounds[index];
-
-    if (round.mesh) {
-      this.scene.remove(round.mesh);
-      round.mesh.traverse(child => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-          if (child.material instanceof THREE.Material) {
-            child.material.dispose();
-          }
-        }
-      });
-    }
-
-    const last = this.activeRounds.length - 1;
-    if (index !== last) {
-      this.activeRounds[index] = this.activeRounds[last];
-    }
-    this.activeRounds.pop();
+    this.roundManager.spawnRound(mesh, position, velocity, this.FUSE_TIME);
   }
 
   private updateTrajectoryPreview(): void {
@@ -389,14 +281,17 @@ export class MortarSystem implements GameSystem {
 
   setCombatantSystem(system: CombatantSystem): void {
     this.combatantSystem = system;
+    this.roundManager.setCombatantSystem(system);
   }
 
   setImpactEffectsPool(pool: ImpactEffectsPool): void {
     this.impactEffectsPool = pool;
+    this.roundManager.setImpactEffectsPool(pool);
   }
 
   setExplosionEffectsPool(pool: ExplosionEffectsPool): void {
     this.explosionEffectsPool = pool;
+    this.roundManager.setExplosionEffectsPool(pool);
   }
 
   setInventoryManager(inventoryManager: InventoryManager): void {
@@ -405,6 +300,7 @@ export class MortarSystem implements GameSystem {
 
   setAudioManager(audioManager: AudioManager): void {
     this.audioManager = audioManager;
+    this.roundManager.setAudioManager(audioManager);
   }
 
   isCurrentlyAiming(): boolean {
