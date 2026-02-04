@@ -15,7 +15,8 @@
     "@types/three": "^0.182.0",
     "playwright": "^1.58.1",
     "typescript": "^5.9.2",
-    "vite": "^7.1.5"
+    "vite": "^7.1.5",
+    "vite-plugin-compression": "^0.5.1"
   },
   "dependencies": {
     "postprocessing": "^6.37.8",

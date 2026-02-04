@@ -1,8 +1,21 @@
 import { defineConfig } from 'vite'
+import compression from 'vite-plugin-compression'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   base: '/terror-in-the-jungle/',
+  plugins: [
+    compression({
+      algorithm: 'gzip',
+      ext: '.gz',
+      deleteOriginFile: false
+    }),
+    compression({
+      algorithm: 'brotliCompress',
+      ext: '.br',
+      deleteOriginFile: false
+    })
+  ],
   resolve: {
     alias: [
       { find: /^three$/, replacement: 'three/src/Three.js' }
@@ -11,6 +24,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
+    target: 'es2020',
+    reportCompressedSize: true,
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks(id) {
