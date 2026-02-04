@@ -7,12 +7,18 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
     "compress-textures": "node scripts/compress-textures.js",
     "perf:baseline": "npx tsx scripts/perf-baseline.ts"
   },
   "devDependencies": {
     "@types/node": "^25.2.0",
     "@types/three": "^0.182.0",
+    "@typescript-eslint/eslint-plugin": "latest",
+    "@typescript-eslint/parser": "latest",
+    "eslint": "latest",
+    "eslint-plugin-import": "latest",
     "playwright": "^1.58.1",
     "typescript": "^5.9.2",
     "vite": "^7.1.5",
