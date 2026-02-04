@@ -8,6 +8,7 @@ import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { spatialGridManager } from './SpatialGridManager';
 import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem';
+import { Logger } from '../../utils/Logger';
 
 /**
  * Handles damage application and death processing for combatants.
@@ -175,7 +176,7 @@ export class CombatantDamage {
       target.deathDirection = this.scratchDeathDir.clone();
     }
 
-    console.log(`💀 ${target.faction} soldier eliminated${attacker ? ` by ${attacker.faction}` : ''}`);
+    Logger.info('combat', `💀 ${target.faction} soldier eliminated${attacker ? ` by ${attacker.faction}` : ''}`);
 
     // Voice callout: Man down (nearby allies call it out)
     if (this.voiceCalloutSystem && attacker && allCombatants) {
