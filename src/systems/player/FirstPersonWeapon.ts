@@ -19,6 +19,7 @@ import { WeaponInput } from './weapon/WeaponInput'
 import { WeaponAmmo } from './weapon/WeaponAmmo'
 import { WeaponSwitching } from './weapon/WeaponSwitching'
 import { ShotCommand, ShotCommandFactory } from './weapon/ShotCommand'
+import { WeaponShotCommandBuilder } from './weapon/WeaponShotCommandBuilder'
 import { Logger } from '../../utils/Logger'
 
 /**
@@ -240,7 +241,7 @@ export class FirstPersonWeapon implements GameSystem {
 
     // Create shot command with all needed data
     const isADS = this.animations.getADS()
-    const command = this.createShotCommand(gunCore, weaponType, isShotgun, isADS)
+    const command = WeaponShotCommandBuilder.createShotCommand(gunCore, this.camera, weaponType, isShotgun, isADS)
 
     // Execute shot - NO RE-VALIDATION inside executeShot
     this.firing.setGunCore(gunCore)
@@ -261,46 +262,6 @@ export class FirstPersonWeapon implements GameSystem {
     // Apply recoil impulse to weapon spring system
     const recoilMultiplier = gunCore.isShotgun() ? 1.8 : 1.0
     this.animations.applyRecoilImpulse(recoilMultiplier)
-  }
-
-  /**
-   * Create a ShotCommand with all firing data captured at validation time
-   */
-  private createShotCommand(
-    gunCore: any,
-    weaponType: 'rifle' | 'shotgun' | 'smg',
-    isShotgun: boolean,
-    isADS: boolean
-  ): ShotCommand {
-    const spread = gunCore.getSpreadDeg()
-
-    if (isShotgun) {
-      // Get pellet rays from gunplay core
-      const pelletRays = gunCore.computePelletRays(this.camera)
-      const origin = new THREE.Vector3()
-      this.camera.getWorldPosition(origin)
-      const direction = new THREE.Vector3()
-      this.camera.getWorldDirection(direction)
-
-      return ShotCommandFactory.createShotgunShot(
-        origin,
-        direction,
-        pelletRays.map((r: THREE.Ray) => r.direction.clone()),
-        (d: number, head: boolean) => gunCore.computeDamage(d, head),
-        isADS
-      )
-    } else {
-      // Single shot - compute ray with spread
-      const ray = gunCore.computeShotRay(this.camera, spread)
-
-      return ShotCommandFactory.createSingleShot(
-        ray.origin.clone(),
-        ray.direction.clone(),
-        weaponType === 'shotgun' ? 'rifle' : weaponType,
-        (d: number, head: boolean) => gunCore.computeDamage(d, head),
-        isADS
-      )
-    }
   }
 
   setHUDSystem(hudSystem: any): void {
