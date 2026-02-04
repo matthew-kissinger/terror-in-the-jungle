@@ -287,8 +287,12 @@ export class PlayerController implements GameSystem {
   applyDamageShake(damageAmount: number): void { if (this.cameraShakeSystem) this.cameraShakeSystem.shakeFromDamage(damageAmount); }
   applyExplosionShake(explosionPos: THREE.Vector3, maxRadius: number): void { if (this.cameraShakeSystem) this.cameraShakeSystem.shakeFromExplosion(explosionPos, this.playerState.position, maxRadius); }
   applyRecoilShake(): void { if (this.cameraShakeSystem) this.cameraShakeSystem.shakeFromRecoil(); }
-  getPosition(): THREE.Vector3 { return this.playerState.position.clone(); }
-  getVelocity(): THREE.Vector3 { return this.playerState.velocity.clone(); }
+  getPosition(target?: THREE.Vector3): THREE.Vector3 {
+    return (target ?? new THREE.Vector3()).copy(this.playerState.position);
+  }
+  getVelocity(target?: THREE.Vector3): THREE.Vector3 {
+    return (target ?? new THREE.Vector3()).copy(this.playerState.velocity);
+  }
   getCamera(): THREE.PerspectiveCamera { return this.camera; }
   isMoving(): boolean { return this.playerState.velocity.length() > 0.1; }
   teleport(position: THREE.Vector3): void { this.playerState.position.copy(position); this.playerState.velocity.set(0, 0, 0); }

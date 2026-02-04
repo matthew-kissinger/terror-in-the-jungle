@@ -56,6 +56,9 @@ export class ImprovedChunk {
   // Skip terrain mesh rendering (GPU terrain handles visuals)
   private skipTerrainMesh: boolean;
 
+  // Cached position (computed once, never changes)
+  private _position: THREE.Vector3;
+
   constructor(
     scene: THREE.Scene,
     assetLoader: AssetLoader,
@@ -78,6 +81,13 @@ export class ImprovedChunk {
     // Initialize height data array
     const dataSize = (this.segments + 1) * (this.segments + 1);
     this.heightData = new Float32Array(dataSize);
+
+    // Cache position (chunk position never changes after construction)
+    this._position = new THREE.Vector3(
+      this.chunkX * this.size + this.size / 2,
+      0,
+      this.chunkZ * this.size + this.size / 2
+    );
   }
 
   async generate(): Promise<void> {
@@ -376,11 +386,7 @@ export class ImprovedChunk {
   }
 
   getPosition(): THREE.Vector3 {
-    return new THREE.Vector3(
-      this.chunkX * this.size + this.size / 2,
-      0,
-      this.chunkZ * this.size + this.size / 2
-    );
+    return this._position;
   }
 
   isInBounds(worldX: number, worldZ: number): boolean {

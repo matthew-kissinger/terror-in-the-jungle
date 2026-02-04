@@ -29,8 +29,8 @@ export class WeaponShotCommandBuilder {
       camera.getWorldDirection(_direction)
 
       return ShotCommandFactory.createShotgunShot(
-        _origin.clone(),
-        _direction.clone(),
+        _origin,
+        _direction,
         pelletRays.map((r: THREE.Ray) => r.direction.clone()),
         (d: number, head: boolean) => gunCore.computeDamage(d, head),
         isADS
@@ -40,8 +40,8 @@ export class WeaponShotCommandBuilder {
       const ray = gunCore.computeShotRay(camera, spread)
 
       return ShotCommandFactory.createSingleShot(
-        ray.origin.clone(),
-        ray.direction.clone(),
+        ray.origin,
+        ray.direction,
         weaponType === 'shotgun' ? 'rifle' : weaponType,
         (d: number, head: boolean) => gunCore.computeDamage(d, head),
         isADS
