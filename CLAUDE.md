@@ -156,11 +156,16 @@ Known hotspots:
 - **PlayerInput getMouseMovement() spread** - FIXED. Cached mouseResult object eliminates per-frame spread (commit 2e81787).
 - **SpatialOctree Array.splice() in remove/updatePosition** - FIXED. Swap-and-pop in removeFromNode (commit 2e81787).
 
+- **PlayerHealthEffects resize listener** - FIXED. Stored bound ref, removed in dispose() (commit c226f60).
+- **PlayerSuppressionSystem resize listener** - FIXED. Stored bound ref, removed in dispose() (commit c226f60).
+- **HelicopterAnimation.calculateTargetTilt() per-frame allocs** - FIXED. Module-level scratch Euler and Quaternion replace per-frame allocations (commit a21696b).
+
 Discovered hotspots (not yet fixed):
+- **AIStateEngage per-frame Vector3 allocations** - Line 66: `new THREE.Vector3()` every frame for every engaging combatant. Line 238: same in handleAlert(). Lines 325, 349: event-driven (lower priority). High impact with 100+ combatants.
+- **AIStatePatrol per-frame Vector3 allocations** - Line 72: `new THREE.Vector3()` every frame for every patrolling combatant detecting enemies. Lines 115-120: per-frame for FOLLOW_ME squads (Vector3 + clone). Lines 132, 147, 159: squad commands (medium frequency).
+- **AIStateMovement per-frame Vector3 allocations** - Lines 40, 55, 96: `new THREE.Vector3()` every frame for advancing/seeking-cover combatants.
 - **MortarBallistics computeTrajectory() clones** - Lines 60-80. Still creates 100+ Vector3 via `.clone()` per trajectory computation (builds output array, not per-frame). Lower priority.
 - **DeathCamSystem innerHTML in showOverlay()** - Uses innerHTML for kill details. One-time call per death (not per-frame), low impact.
-- **PlayerHealthEffects resize listener** - Anonymous arrow function in init() line 53; not removed in dispose(). Single instance so no runtime leak, but violates cleanup pattern.
-- **PlayerSuppressionSystem resize listener** - Anonymous arrow function in createDirectionalOverlay() line 192; not removed in dispose(). Same pattern as PlayerHealthEffects.
 
 Possible areas (confirm with profiling):
 - Worker utilization (are they saturated?)
@@ -169,7 +174,7 @@ Possible areas (confirm with profiling):
 
 ### Event Listener Leaks (Memory)
 
-**Nearly all fixed.** The `.bind()` bug and missing dispose cleanup have been addressed across most files. Remaining: PlayerHealthEffects and PlayerSuppressionSystem resize listeners (see Discovered hotspots).
+**All fixed.** The `.bind()` bug and missing dispose cleanup have been addressed across all files. PlayerHealthEffects and PlayerSuppressionSystem resize listeners fixed in commit c226f60.
 
 **Fixed** (stored bound refs, added dispose):
 - PlayerInput, WeaponInput, WeaponModel, InventoryManager, PlayerSquadController, WeaponPickupSystem - bound function properties
