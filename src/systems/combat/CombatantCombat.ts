@@ -12,12 +12,12 @@ import { CombatantRenderer } from './CombatantRenderer';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
-import { objectPool } from '../../utils/ObjectPoolManager';
 import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem';
 // Extracted modules
 import { CombatantBallistics } from './CombatantBallistics';
 import { CombatantDamage } from './CombatantDamage';
 import { CombatantSuppression } from './CombatantSuppression';
+import { CombatantCombatEffects } from './CombatantCombatEffects';
 
 export interface CombatHitResult {
   hit: boolean;
@@ -30,8 +30,6 @@ export interface CombatHitResult {
 export class CombatantCombat {
   private readonly MAX_ENGAGEMENT_RANGE = 150;
 
-  private tracerPool: TracerPool;
-  private muzzleFlashPool: MuzzleFlashPool;
   private impactEffectsPool: ImpactEffectsPool;
   public hitDetection: CombatantHitDetection;
   private playerHealthSystem?: PlayerHealthSystem;
@@ -51,12 +49,10 @@ export class CombatantCombat {
   private ballistics: CombatantBallistics;
   private damage: CombatantDamage;
   private suppression: CombatantSuppression;
+  private effects: CombatantCombatEffects;
 
   // Pre-allocated scratch vectors to avoid per-frame allocations in hot paths
   private readonly scratchEndPoint = new THREE.Vector3();
-  private readonly scratchMuzzlePos = new THREE.Vector3();
-  private readonly scratchMuzzleFlashPos = new THREE.Vector3();
-  private readonly scratchSplatterDir = new THREE.Vector3();
   // Module-level scratch vectors for fire loop (replaces pool allocations)
   private readonly _muzzlePos = new THREE.Vector3();
   private readonly _targetFirePos = new THREE.Vector3();
@@ -69,8 +65,6 @@ export class CombatantCombat {
     impactEffectsPool: ImpactEffectsPool,
     combatantRenderer?: CombatantRenderer
   ) {
-    this.tracerPool = tracerPool;
-    this.muzzleFlashPool = muzzleFlashPool;
     this.impactEffectsPool = impactEffectsPool;
     this.hitDetection = new CombatantHitDetection();
     this.combatantRenderer = combatantRenderer;
@@ -80,6 +74,13 @@ export class CombatantCombat {
     this.damage = new CombatantDamage();
     this.damage.setImpactEffectsPool(impactEffectsPool);
     this.suppression = new CombatantSuppression();
+    this.effects = new CombatantCombatEffects(
+      tracerPool,
+      muzzleFlashPool,
+      impactEffectsPool,
+      this.damage,
+      this.suppression
+    );
   }
 
   // NOTE: Spatial grid is now managed by SpatialGridManager singleton
@@ -227,7 +228,7 @@ export class CombatantCombat {
     }
 
     // Spawn visual effects
-    this.spawnCombatEffects(combatant, shotRay, hit, playerPosition, allCombatants, squads);
+    this.effects.spawnCombatEffects(combatant, shotRay, hit, playerPosition, allCombatants, squads);
   }
 
   private trySuppressiveFire(combatant: Combatant, playerPosition: THREE.Vector3): void {
@@ -254,98 +255,7 @@ export class CombatantCombat {
     const spread = combatant.skillProfile.aimJitterAmplitude * 3.5;
     const shotRay = this.ballistics.calculateSuppressiveShot(combatant, spread, targetPos);
 
-    const distance = combatant.position.distanceTo(playerPosition);
-    if (distance < 200) {
-      // Use scratch vectors to avoid allocations
-      this.scratchEndPoint.copy(shotRay.origin)
-        .addScaledVector(shotRay.direction, 60 + Math.random() * 40);
-
-      this.scratchMuzzlePos.copy(combatant.position);
-      this.scratchMuzzlePos.y += 1.5;
-      this.tracerPool.spawn(this.scratchMuzzlePos, this.scratchEndPoint, 0.3);
-
-      this.scratchMuzzleFlashPos.copy(this.scratchMuzzlePos);
-      this.scratchMuzzleFlashPos.addScaledVector(shotRay.direction, 2);
-      this.muzzleFlashPool.spawn(this.scratchMuzzleFlashPos, shotRay.direction, 1.2);
-
-      if (this.audioManager) {
-        this.audioManager.playGunshotAt(combatant.position);
-      }
-
-      if (Math.random() < 0.3) {
-        this.scratchSplatterDir.copy(shotRay.direction).negate();
-        this.impactEffectsPool.spawn(this.scratchEndPoint, this.scratchSplatterDir);
-      }
-    }
-  }
-
-  private spawnCombatEffects(
-    combatant: Combatant,
-    shotRay: THREE.Ray,
-    hit: any,
-    playerPosition: THREE.Vector3,
-    allCombatants: Map<string, Combatant>,
-    squads: Map<string, Squad>
-  ): void {
-    const distance = combatant.position.distanceTo(playerPosition);
-    if (distance < 200) {
-      const hitPoint = objectPool.getVector3();
-      if (hit) {
-        hitPoint.copy(hit.point);
-      } else {
-        hitPoint.copy(shotRay.origin).addScaledVector(shotRay.direction, 80 + Math.random() * 40);
-      }
-
-      const tracerStart = objectPool.getVector3();
-      const tracerOffset = objectPool.getVector3();
-      tracerOffset.set(0, 1.5, 0);
-      tracerStart.copy(shotRay.origin).add(tracerOffset);
-      this.tracerPool.spawn(tracerStart, hitPoint, 0.3);
-      objectPool.releaseVector3(tracerOffset);
-      objectPool.releaseVector3(tracerStart);
-
-      const muzzlePos = objectPool.getVector3();
-      muzzlePos.copy(combatant.position);
-      muzzlePos.y += 1.5;
-      const muzzleOffset = objectPool.getVector3();
-      muzzleOffset.copy(shotRay.direction).multiplyScalar(2);
-      muzzlePos.add(muzzleOffset);
-      this.muzzleFlashPool.spawn(muzzlePos, shotRay.direction, 1.2);
-      objectPool.releaseVector3(muzzleOffset);
-      objectPool.releaseVector3(muzzlePos);
-
-      if (this.audioManager) {
-        this.audioManager.playGunshotAt(combatant.position);
-      }
-
-      if (hit) {
-        const negatedDirection = objectPool.getVector3();
-        negatedDirection.copy(shotRay.direction).negate();
-        this.impactEffectsPool.spawn(hit.point, negatedDirection);
-        objectPool.releaseVector3(negatedDirection);
-
-        const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
-        const wasAlive = hit.combatant.health > 0;
-        this.damage.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot, allCombatants);
-
-        // Voice callout: Target down (if kill confirmed)
-        if (wasAlive && hit.combatant.health <= 0 && this.voiceCalloutSystem && Math.random() < 0.4) {
-          this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.TARGET_DOWN, combatant.position);
-        }
-
-        if (hit.headshot) {
-          console.log(`🎯 Headshot! ${combatant.faction} -> ${hit.combatant.faction}`);
-        }
-      } else {
-        // Track near misses for suppression
-        this.suppression.trackNearMisses(shotRay, hitPoint, combatant.faction, allCombatants, playerPosition);
-      }
-
-      objectPool.releaseVector3(hitPoint);
-    } else if (hit) {
-      const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
-      this.damage.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot, allCombatants);
-    }
+    this.effects.spawnSuppressiveFireEffects(combatant, shotRay, playerPosition);
   }
 
 
@@ -433,6 +343,7 @@ export class CombatantCombat {
     this.audioManager = manager;
     this.damage.setAudioManager(manager);
     this.suppression.setAudioManager(manager);
+    this.effects.setAudioManager(manager);
   }
 
   setChunkManager(chunkManager: ImprovedChunkManager): void {
@@ -460,6 +371,7 @@ export class CombatantCombat {
   setVoiceCalloutSystem(system: VoiceCalloutSystem): void {
     this.voiceCalloutSystem = system;
     this.damage.setVoiceCalloutSystem(system);
+    this.effects.setVoiceCalloutSystem(system);
   }
 
   setCombatantRenderer(renderer: CombatantRenderer): void {

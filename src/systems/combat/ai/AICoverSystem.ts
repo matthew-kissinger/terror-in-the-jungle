@@ -5,6 +5,12 @@ import { SandbagSystem } from '../../weapons/SandbagSystem'
 import { objectPool } from '../../../utils/ObjectPoolManager'
 import { getHeightQueryCache } from '../../terrain/HeightQueryCache'
 
+const _coverToThreat = new THREE.Vector3()
+const _coverToCombatant = new THREE.Vector3()
+const _sandbagCenter = new THREE.Vector3()
+const _threatToSandbag = new THREE.Vector3()
+const _sandbagOffset = new THREE.Vector3()
+
 /**
  * Cover position with quality score and metadata
  */
@@ -77,8 +83,9 @@ export class AICoverSystem {
     }
 
     // Also add dynamically placed sandbags
+    let sandbagSpots: CoverSpot[] | null = null
     if (this.sandbagSystem) {
-      const sandbagSpots = this.evaluateSandbagCover(combatant.position, threatPosition, maxSearchRadius)
+      sandbagSpots = this.evaluateSandbagCover(combatant.position, threatPosition, maxSearchRadius)
       candidates.push(...sandbagSpots)
     }
 
@@ -116,6 +123,20 @@ export class AICoverSystem {
       if (score > bestScore) {
         bestScore = score
         bestSpot = spot
+      }
+    }
+
+    if (sandbagSpots && sandbagSpots.length > 0) {
+      if (bestSpot && bestSpot.coverType === 'sandbag') {
+        const pooledPosition = bestSpot.position
+        bestSpot.position = new THREE.Vector3().copy(pooledPosition)
+        objectPool.releaseVector3(pooledPosition)
+      }
+
+      for (const spot of sandbagSpots) {
+        if (spot !== bestSpot) {
+          objectPool.releaseVector3(spot.position)
+        }
       }
     }
 
@@ -333,17 +354,17 @@ export class AICoverSystem {
     const sandbagBounds = this.sandbagSystem.getSandbagBounds()
 
     for (const bounds of sandbagBounds) {
-      const center = new THREE.Vector3()
+      const center = _sandbagCenter
       bounds.getCenter(center)
 
       if (combatantPos.distanceTo(center) > maxRadius) continue
 
       // Position behind sandbag relative to threat
-      const threatToSandbag = new THREE.Vector3()
-        .subVectors(center, threatPos)
-        .normalize()
+      const threatToSandbag = _threatToSandbag.subVectors(center, threatPos).normalize()
 
-      const coverPos = center.clone().add(threatToSandbag.multiplyScalar(2))
+      const coverPos = objectPool.getVector3().copy(
+        _sandbagOffset.copy(center).add(threatToSandbag.multiplyScalar(2))
+      )
 
       spots.push({
         position: coverPos,
@@ -375,8 +396,8 @@ export class AICoverSystem {
 
     // 3. Angle of protection
     // Cover should be between combatant's current position and threat
-    const coverToThreat = new THREE.Vector3().subVectors(threatPos, spot.position)
-    const coverToCombatant = new THREE.Vector3().subVectors(combatantPos, spot.position)
+    const coverToThreat = _coverToThreat.subVectors(threatPos, spot.position)
+    const coverToCombatant = _coverToCombatant.subVectors(combatantPos, spot.position)
 
     // Normalize and compute dot product
     coverToThreat.normalize()
