@@ -1,10 +1,10 @@
-import * as THREE from 'three';
-import { Combatant, CombatantState } from '../types';
-import { SpatialOctree } from '../SpatialOctree';
-import { clusterManager } from '../ClusterManager';
+import * as THREE from 'three'
+import { Combatant, CombatantState, Faction } from '../types'
+import { SpatialOctree } from '../SpatialOctree'
+import { Logger } from '../../../utils/Logger'
 
 /**
- * Handles advancing and seeking cover movement states
+ * Handles movement-related AI states (advancing, seeking cover)
  */
 export class AIStateMovement {
   handleAdvancing(
@@ -87,12 +87,10 @@ export class AIStateMovement {
     }
 
     const distanceToCover = combatant.position.distanceTo(combatant.coverPosition);
-    if (distanceToCover < 2) {
+    if (distanceToCover < 1.5) {
       combatant.inCover = true;
       combatant.state = CombatantState.ENGAGING;
-      combatant.destinationPoint = undefined;
-      console.log(`🛡️ ${combatant.faction} unit reached cover, switching to peek-and-fire`);
-      return;
+      Logger.info('combat-ai', `🛡️ ${combatant.faction} unit reached cover, switching to peek-and-fire`);
     }
 
     const toCover = new THREE.Vector3()

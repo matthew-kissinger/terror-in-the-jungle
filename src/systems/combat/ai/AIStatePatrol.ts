@@ -1,12 +1,13 @@
-import * as THREE from 'three';
-import { Combatant, CombatantState, Squad, SquadCommand } from '../types';
-import { SpatialOctree } from '../SpatialOctree';
-import { ZoneManager } from '../../world/ZoneManager';
-import { clusterManager } from '../ClusterManager';
-import { spatialGridManager } from '../SpatialGridManager';
+import * as THREE from 'three'
+import { Combatant, CombatantState, Faction, Squad, SquadCommand } from '../types'
+import { ZoneManager } from '../../world/ZoneManager'
+import { Logger } from '../../../utils/Logger'
+import { SpatialOctree } from '../SpatialOctree'
+import { clusterManager } from '../ClusterManager'
+import { spatialGridManager } from '../SpatialGridManager'
 
 /**
- * Handles patrol state behavior including squad commands and zone defense assignment
+ * Handles patrolling and defending AI states
  */
 export class AIStatePatrol {
   private zoneManager?: ZoneManager;
@@ -236,7 +237,7 @@ export class AIStatePatrol {
         combatant.defensePosition = this.calculateDefensePosition(zone, combatant, defenders.size - 1);
         combatant.destinationPoint = combatant.defensePosition.clone();
 
-        console.log(`🛡️ ${combatant.faction} defender assigned to zone ${zone.id} (${defenders.size}/${maxDefenders} defenders)`);
+        Logger.info('combat-ai', `🛡️ ${combatant.faction} defender assigned to zone ${zone.id} (${defenders.size}/${maxDefenders} defenders)`);
         return;
       }
     }

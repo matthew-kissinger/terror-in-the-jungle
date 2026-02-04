@@ -1,16 +1,17 @@
 import * as THREE from 'three'
 import { Combatant, CombatantState, Squad } from '../types'
 import { FlankingOperation, FlankingStatus } from './AIFlankingSystem'
+import { Logger } from '../../../utils/Logger'
 import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager'
 import { objectPool } from '../../../utils/ObjectPoolManager'
 import { getHeightQueryCache } from '../../terrain/HeightQueryCache'
 
-// Module-level scratch vectors for behavior assignment
+// Reusable scratch vectors to avoid per-frame allocations
 const _toTarget = new THREE.Vector3()
 const _spreadOffset = new THREE.Vector3()
 
 /**
- * Manages role assignment and behavior application for flanking operations
+ * Manages combatant role assignments and behaviors during flanking
  */
 export class FlankingRoleManager {
   private chunkManager?: ImprovedChunkManager
@@ -183,7 +184,7 @@ export class FlankingRoleManager {
     squad: Squad,
     allCombatants: Map<string, Combatant>
   ): void {
-    console.log(`❌ Squad ${squad.id} flanking aborted`)
+    Logger.info('combat-ai', `❌ Squad ${squad.id} flanking aborted`)
 
     operation.status = FlankingStatus.ABORTED
 
@@ -211,7 +212,7 @@ export class FlankingRoleManager {
     squad: Squad,
     allCombatants: Map<string, Combatant>
   ): void {
-    console.log(`✅ Squad ${squad.id} flanking operation complete`)
+    Logger.info('combat-ai', `✅ Squad ${squad.id} flanking operation complete`)
 
     // Clean up combatant state
     const allParticipants = [...operation.suppressors, ...operation.flankers]
