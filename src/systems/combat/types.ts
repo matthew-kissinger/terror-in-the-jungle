@@ -116,3 +116,9 @@ export interface Squad {
   currentCommand?: SquadCommand;
   commandPosition?: THREE.Vector3;
 }
+
+export enum GrenadeType {
+  FRAG = 'frag',
+  SMOKE = 'smoke',
+  FLASHBANG = 'flashbang'
+}

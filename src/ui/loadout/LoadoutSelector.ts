@@ -1,6 +1,7 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
+import { GrenadeType } from '../../systems/combat/types';
 
 export enum LoadoutWeapon {
   RIFLE = 'rifle',
@@ -18,12 +19,15 @@ interface WeaponStats {
 export class LoadoutSelector implements GameSystem {
   private overlayElement?: HTMLElement;
   private selectedWeapon: LoadoutWeapon = LoadoutWeapon.RIFLE;
+  private selectedGrenade: GrenadeType = GrenadeType.FRAG;
   private isVisible = false;
   private boundOnKeyDown = this.onKeyDown.bind(this);
   private weaponOptionElements: HTMLElement[] = [];
   private weaponOptionHandlers: Array<(event: MouseEvent) => void> = [];
+  private grenadeOptionElements: HTMLElement[] = [];
+  private grenadeOptionHandlers: Array<(event: MouseEvent) => void> = [];
 
-  private onLoadoutSelected?: (weapon: LoadoutWeapon) => void;
+  private onLoadoutSelected?: (weapon: LoadoutWeapon, grenadeType: GrenadeType) => void;
 
   private readonly WEAPON_STATS: Record<LoadoutWeapon, WeaponStats> = {
     [LoadoutWeapon.RIFLE]: {
@@ -81,7 +85,7 @@ export class LoadoutSelector implements GameSystem {
           Select Loadout
         </h1>
         <p style="font-size: 14px; color: rgba(255, 255, 255, 0.6); margin-bottom: 40px;">
-          Choose your primary weapon - includes pistol secondary and 2 grenades
+          Choose your primary weapon and grenade type
         </p>
 
         <div style="display: flex; gap: 24px; justify-content: center; margin-bottom: 40px;">
@@ -155,6 +159,67 @@ export class LoadoutSelector implements GameSystem {
           </div>
         </div>
 
+        <div style="text-align: center; margin-bottom: 40px;">
+          <h2 style="font-size: 20px; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px;">
+            Grenade Type
+          </h2>
+          <div style="display: flex; gap: 20px; justify-content: center;">
+            <!-- Frag Grenade Option -->
+            <div class="grenade-option" data-grenade="frag" style="
+              flex: 1;
+              max-width: 200px;
+              background: rgba(20, 20, 30, 0.6);
+              border: 3px solid rgba(255, 0, 0, 0.4);
+              border-radius: 12px;
+              padding: 20px;
+              cursor: pointer;
+              transition: all 0.2s;
+            ">
+              <div style="font-size: 36px; margin-bottom: 8px;">💣</div>
+              <h3 style="font-size: 18px; margin-bottom: 6px; text-transform: uppercase;">Frag</h3>
+              <div style="font-size: 11px; color: rgba(255, 255, 255, 0.5);">
+                Lethal explosion with shrapnel
+              </div>
+            </div>
+
+            <!-- Smoke Grenade Option -->
+            <div class="grenade-option" data-grenade="smoke" style="
+              flex: 1;
+              max-width: 200px;
+              background: rgba(20, 20, 30, 0.6);
+              border: 3px solid rgba(255, 255, 255, 0.2);
+              border-radius: 12px;
+              padding: 20px;
+              cursor: pointer;
+              transition: all 0.2s;
+            ">
+              <div style="font-size: 36px; margin-bottom: 8px;">💨</div>
+              <h3 style="font-size: 18px; margin-bottom: 6px; text-transform: uppercase;">Smoke</h3>
+              <div style="font-size: 11px; color: rgba(255, 255, 255, 0.5);">
+                Blocks line of sight, no damage
+              </div>
+            </div>
+
+            <!-- Flashbang Option -->
+            <div class="grenade-option" data-grenade="flashbang" style="
+              flex: 1;
+              max-width: 200px;
+              background: rgba(20, 20, 30, 0.6);
+              border: 3px solid rgba(255, 255, 255, 0.2);
+              border-radius: 12px;
+              padding: 20px;
+              cursor: pointer;
+              transition: all 0.2s;
+            ">
+              <div style="font-size: 36px; margin-bottom: 8px;">⚡</div>
+              <h3 style="font-size: 18px; margin-bottom: 6px; text-transform: uppercase;">Flashbang</h3>
+              <div style="font-size: 11px; color: rgba(255, 255, 255, 0.5);">
+                Disorients nearby combatants
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div style="font-size: 14px; color: rgba(255, 255, 255, 0.7);">
           <span style="background: rgba(255, 255, 255, 0.1); padding: 6px 12px; border-radius: 4px; margin: 0 8px;">
             CLICK
@@ -182,6 +247,18 @@ export class LoadoutSelector implements GameSystem {
         background: rgba(0, 255, 100, 0.15) !important;
         box-shadow: 0 0 20px rgba(0, 255, 100, 0.4);
       }
+
+      .grenade-option:hover {
+        border-color: rgba(255, 0, 0, 0.6) !important;
+        background: rgba(30, 30, 40, 0.8) !important;
+        transform: scale(1.05);
+      }
+
+      .grenade-option.selected {
+        border-color: rgba(255, 0, 0, 0.8) !important;
+        background: rgba(255, 0, 0, 0.15) !important;
+        box-shadow: 0 0 20px rgba(255, 0, 0, 0.4);
+      }
     `;
     document.head.appendChild(style);
 
@@ -205,6 +282,20 @@ export class LoadoutSelector implements GameSystem {
       };
       this.weaponOptionElements.push(optionElement);
       this.weaponOptionHandlers.push(clickHandler);
+      optionElement.addEventListener('click', clickHandler);
+    });
+
+    // Click on grenade options
+    const grenadeOptions = this.overlayElement.querySelectorAll('.grenade-option');
+    grenadeOptions.forEach(option => {
+      const optionElement = option as HTMLElement;
+      const clickHandler = () => {
+        const grenade = optionElement.dataset.grenade as GrenadeType;
+        this.selectedGrenade = grenade;
+        this.updateSelection();
+      };
+      this.grenadeOptionElements.push(optionElement);
+      this.grenadeOptionHandlers.push(clickHandler);
       optionElement.addEventListener('click', clickHandler);
     });
 
@@ -236,6 +327,7 @@ export class LoadoutSelector implements GameSystem {
   private updateSelection(): void {
     if (!this.overlayElement) return;
 
+    // Update weapon selection
     const options = this.overlayElement.querySelectorAll('.loadout-option');
     options.forEach(option => {
       const weapon = (option as HTMLElement).dataset.weapon;
@@ -245,13 +337,24 @@ export class LoadoutSelector implements GameSystem {
         option.classList.remove('selected');
       }
     });
+
+    // Update grenade selection
+    const grenadeOptions = this.overlayElement.querySelectorAll('.grenade-option');
+    grenadeOptions.forEach(option => {
+      const grenade = (option as HTMLElement).dataset.grenade;
+      if (grenade === this.selectedGrenade) {
+        option.classList.add('selected');
+      } else {
+        option.classList.remove('selected');
+      }
+    });
   }
 
   private confirmSelection(): void {
-    Logger.info('ui', `Loadout selected: ${this.selectedWeapon.toUpperCase()}`);
+    Logger.info('ui', `Loadout selected: ${this.selectedWeapon.toUpperCase()}, Grenade: ${this.selectedGrenade.toUpperCase()}`);
 
     if (this.onLoadoutSelected) {
-      this.onLoadoutSelected(this.selectedWeapon);
+      this.onLoadoutSelected(this.selectedWeapon, this.selectedGrenade);
     }
 
     this.hide();
@@ -299,9 +402,16 @@ export class LoadoutSelector implements GameSystem {
   }
 
   /**
+   * Get currently selected grenade type
+   */
+  getSelectedGrenade(): GrenadeType {
+    return this.selectedGrenade;
+  }
+
+  /**
    * Set callback for when loadout is confirmed
    */
-  onConfirm(callback: (weapon: LoadoutWeapon) => void): void {
+  onConfirm(callback: (weapon: LoadoutWeapon, grenadeType: GrenadeType) => void): void {
     this.onLoadoutSelected = callback;
   }
 
@@ -314,6 +424,15 @@ export class LoadoutSelector implements GameSystem {
     });
     this.weaponOptionElements = [];
     this.weaponOptionHandlers = [];
+
+    this.grenadeOptionElements.forEach((option, index) => {
+      const handler = this.grenadeOptionHandlers[index];
+      if (handler) {
+        option.removeEventListener('click', handler);
+      }
+    });
+    this.grenadeOptionElements = [];
+    this.grenadeOptionHandlers = [];
 
     if (this.overlayElement && this.overlayElement.parentNode) {
       this.overlayElement.parentNode.removeChild(this.overlayElement);

@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 import { objectPool } from '../../utils/ObjectPoolManager';
+import { GrenadeType } from '../combat/types';
 
 export interface Grenade {
   id: string;
+  type: GrenadeType;
   position: THREE.Vector3;
   velocity: THREE.Vector3;
   rotation: THREE.Vector3;
@@ -93,10 +95,26 @@ export class GrenadeSpawner {
     this.scene = scene;
   }
 
-  spawnGrenade(position: THREE.Vector3, velocity: THREE.Vector3, fuseTime: number, id: number): Grenade {
+  spawnGrenade(position: THREE.Vector3, velocity: THREE.Vector3, fuseTime: number, id: number, type: GrenadeType): Grenade {
     const geometry = new THREE.SphereGeometry(0.3, 8, 8);
+
+    // Different colors for different grenade types
+    let color: number;
+    switch (type) {
+      case GrenadeType.SMOKE:
+        color = 0x808080; // Gray for smoke
+        break;
+      case GrenadeType.FLASHBANG:
+        color = 0xFFFFAA; // Yellow for flashbang
+        break;
+      case GrenadeType.FRAG:
+      default:
+        color = 0x2a4a2a; // Dark green for frag
+        break;
+    }
+
     const material = new THREE.MeshStandardMaterial({
-      color: 0x2a4a2a,
+      color,
       metalness: 0.6,
       roughness: 0.4
     });
@@ -108,6 +126,7 @@ export class GrenadeSpawner {
 
     return {
       id: `grenade_${id}`,
+      type,
       position: position.clone(),
       velocity: velocity.clone(),
       rotation: new THREE.Vector3(0, 0, 0),

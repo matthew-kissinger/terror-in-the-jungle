@@ -1,6 +1,7 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
+import { GrenadeType } from '../combat/types';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { CombatantSystem } from '../combat/CombatantSystem';
@@ -12,6 +13,7 @@ import { VoiceCalloutSystem } from '../audio/VoiceCalloutSystem';
 import { Grenade, GrenadePhysics, GrenadeSpawner } from './GrenadePhysics';
 import { GrenadeArcRenderer, GrenadeHandView, GrenadeCooking } from './GrenadeArcRenderer';
 import { triggerGrenadeCallout } from './GrenadeCallout';
+import { GrenadeEffects } from './GrenadeEffects';
 
 export class GrenadeSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -29,6 +31,8 @@ export class GrenadeSystem implements GameSystem {
   private grenades: Grenade[] = [];
   private nextGrenadeId = 0;
   private spawner: GrenadeSpawner;
+  private currentGrenadeType: GrenadeType = GrenadeType.FRAG;
+  private effects: GrenadeEffects;
 
   private handView: GrenadeHandView;
 
@@ -77,6 +81,7 @@ export class GrenadeSystem implements GameSystem {
     this.handView = new GrenadeHandView();
     this.cooking = new GrenadeCooking(this.FUSE_TIME);
     this.spawner = new GrenadeSpawner(this.scene);
+    this.effects = new GrenadeEffects();
   }
 
   async init(): Promise<void> {
@@ -256,7 +261,7 @@ export class GrenadeSystem implements GameSystem {
     const lookUpBoost = Math.max(0, direction.y * 3); // Only boost if looking up
     throwVelocity.y += lookUpBoost * this.throwPower;
 
-    const grenade = this.spawner.spawnGrenade(startPos, throwVelocity, remainingFuseTime, this.nextGrenadeId++);
+    const grenade = this.spawner.spawnGrenade(startPos, throwVelocity, remainingFuseTime, this.nextGrenadeId++, this.currentGrenadeType);
     this.grenades.push(grenade);
 
     // Track grenade throw in stats
@@ -280,43 +285,14 @@ export class GrenadeSystem implements GameSystem {
   }
 
   private explodeGrenade(grenade: Grenade): void {
-    Logger.info('weapons', `Grenade exploded at (${grenade.position.x.toFixed(1)}, ${grenade.position.y.toFixed(1)}, ${grenade.position.z.toFixed(1)})`);
-
-    // Main explosion effect - big flash, smoke, fire, shockwave
-    if (this.explosionEffectsPool) {
-      this.explosionEffectsPool.spawn(grenade.position);
-    }
-
-    // Additional debris/impact effects for more detail
-    if (this.impactEffectsPool) {
-      for (let i = 0; i < 15; i++) {
-        const offset = new THREE.Vector3(
-          (Math.random() - 0.5) * 3,
-          Math.random() * 1.5,
-          (Math.random() - 0.5) * 3
-        );
-        const effectPos = grenade.position.clone().add(offset);
-        this.impactEffectsPool.spawn(effectPos, new THREE.Vector3(0, 1, 0));
-      }
-    }
-
-    if (this.audioManager) {
-      this.audioManager.playExplosionAt(grenade.position);
-    }
-
-    if (this.combatantSystem) {
-      this.combatantSystem.applyExplosionDamage(
-        grenade.position,
-        this.DAMAGE_RADIUS,
-        this.MAX_DAMAGE,
-        'PLAYER'
-      );
-    }
-
-    // Apply enhanced camera shake from explosion
-    if (this.playerController) {
-      this.playerController.applyExplosionShake(grenade.position, this.DAMAGE_RADIUS);
-    }
+    this.effects.explodeGrenade(
+      grenade,
+      this.impactEffectsPool,
+      this.explosionEffectsPool,
+      this.audioManager,
+      this.combatantSystem,
+      this.playerController
+    );
   }
 
   private getGroundHeight(x: number, z: number): number {
@@ -389,6 +365,15 @@ export class GrenadeSystem implements GameSystem {
 
   getGrenadeOverlayCamera(): THREE.Camera {
     return this.handView.getOverlayCamera();
+  }
+
+  setGrenadeType(type: GrenadeType): void {
+    this.currentGrenadeType = type;
+    Logger.info('weapons', `Grenade type set to: ${type.toUpperCase()}`);
+  }
+
+  getGrenadeType(): GrenadeType {
+    return this.currentGrenadeType;
   }
 
 }
