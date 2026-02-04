@@ -3,6 +3,7 @@ import { SystemReferences } from './SystemInitializer';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import { spatialGridManager } from '../systems/combat/SpatialGridManager';
 import { setSmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
+import { ISandboxRenderer } from '../types/SystemInterfaces';
 
 /**
  * Handles wiring up dependencies between game systems
@@ -12,7 +13,7 @@ export class SystemConnector {
     refs: SystemReferences,
     scene: THREE.Scene,
     camera: THREE.PerspectiveCamera,
-    sandboxRenderer?: any
+    sandboxRenderer?: ISandboxRenderer
   ): void {
     // Connect systems with chunk manager
     refs.playerController.setChunkManager(refs.chunkManager);
@@ -115,6 +116,8 @@ export class SystemConnector {
     refs.mortarSystem.setAudioManager(refs.audioManager);
     refs.sandbagSystem.setInventoryManager(refs.inventoryManager);
 
+    // Access internal effect pools - these are implementation details not exposed via interface
+    // TODO: Consider exposing these via ICombatantSystem interface if needed for cleaner typing
     const impactEffectsPool = (refs.combatantSystem as any).impactEffectsPool;
     if (impactEffectsPool) {
       refs.grenadeSystem.setImpactEffectsPool(impactEffectsPool);
@@ -134,6 +137,8 @@ export class SystemConnector {
     refs.playerController.setSandbagSystem(refs.sandbagSystem);
 
     // Connect combat systems with sandbag system
+    // Access internal subsystems - these are implementation details not exposed via interface
+    // TODO: Consider exposing these via ICombatantSystem interface if needed for cleaner typing
     const combatantCombat = (refs.combatantSystem as any).combatantCombat;
     if (combatantCombat) {
       combatantCombat.setSandbagSystem(refs.sandbagSystem);
@@ -150,6 +155,7 @@ export class SystemConnector {
     if (squadManager) {
       squadManager.setInfluenceMap(refs.influenceMapSystem);
     }
+    // Direct property assignment for internal state - implementation detail
     (refs.combatantSystem as any).influenceMap = refs.influenceMapSystem;
     (refs.combatantSystem as any).sandbagSystem = refs.sandbagSystem;
 
@@ -181,6 +187,8 @@ export class SystemConnector {
     refs.playerController.setFootstepAudioSystem(refs.footstepAudioSystem);
 
     // Inject benchmark dependencies
+    // Access internal properties for telemetry - these are implementation details not exposed via interface
+    // TODO: Consider exposing these via ICombatantSystem interface if needed for cleaner typing
     performanceTelemetry.injectBenchmarkDependencies({
       hitDetection: (refs.combatantSystem as any).combatantCombat?.hitDetection,
       chunkManager: refs.chunkManager,

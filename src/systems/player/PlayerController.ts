@@ -17,7 +17,7 @@ import { Logger } from '../../utils/Logger';
 import type { HelicopterModel } from '../helicopter/HelicopterModel';
 import type { FirstPersonWeapon } from './FirstPersonWeapon';
 import type { HUDSystem } from '../../ui/hud/HUDSystem';
-import type { SandboxRenderer } from '../../core/SandboxRenderer';
+import type { ISandboxRenderer } from '../../types/SystemInterfaces';
 
 export class PlayerController implements GameSystem {
   private camera: THREE.PerspectiveCamera;
@@ -26,7 +26,7 @@ export class PlayerController implements GameSystem {
   private helicopterModel?: HelicopterModel;
   private firstPersonWeapon?: FirstPersonWeapon;
   private hudSystem?: HUDSystem;
-  private sandboxRenderer?: SandboxRenderer;
+  private sandboxRenderer?: ISandboxRenderer;
   private inventoryManager?: InventoryManager;
   private grenadeSystem?: GrenadeSystem;
   private mortarSystem?: MortarSystem;
@@ -299,7 +299,7 @@ export class PlayerController implements GameSystem {
       this.firstPersonWeapon.setFireingEnabled(true);
     }
     if (this.sandboxRenderer) {
-      this.sandboxRenderer.showCrosshairAgain();
+      this.sandboxRenderer.showCrosshair();
     }
   }
 
@@ -307,9 +307,6 @@ export class PlayerController implements GameSystem {
     if (this.firstPersonWeapon) {
       this.firstPersonWeapon.hideWeapon();
       this.firstPersonWeapon.setFireingEnabled(false);
-    }
-    if (this.sandboxRenderer) {
-      this.sandboxRenderer.hideCrosshair();
     }
   }
 
@@ -364,7 +361,7 @@ export class PlayerController implements GameSystem {
   setHelicopterModel(helicopterModel: HelicopterModel): void { this.helicopterModel = helicopterModel; this.movement.setHelicopterModel(helicopterModel); this.cameraController.setHelicopterModel(helicopterModel); }
   setFirstPersonWeapon(firstPersonWeapon: FirstPersonWeapon): void { this.firstPersonWeapon = firstPersonWeapon; }
   setHUDSystem(hudSystem: HUDSystem): void { this.hudSystem = hudSystem; }
-  setSandboxRenderer(sandboxRenderer: SandboxRenderer): void { this.sandboxRenderer = sandboxRenderer; }
+  setSandboxRenderer(sandboxRenderer: ISandboxRenderer): void { this.sandboxRenderer = sandboxRenderer; }
   setInventoryManager(inventoryManager: InventoryManager): void { this.inventoryManager = inventoryManager; }
   setGrenadeSystem(grenadeSystem: GrenadeSystem): void { this.grenadeSystem = grenadeSystem; }
   setMortarSystem(mortarSystem: MortarSystem): void { this.mortarSystem = mortarSystem; }

@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { GameMode } from '../config/gameModes';
+import { GameMode, ZoneConfig } from '../config/gameModes';
 import { getHeightQueryCache } from '../systems/terrain/HeightQueryCache';
 import { Logger } from '../utils/Logger';
 import { LoadoutWeapon } from '../ui/loadout/LoadoutSelector';
-import { GrenadeType } from '../systems/combat/types';
+import { GrenadeType, Faction } from '../systems/combat/types';
 import { isSandboxMode } from './SandboxModeDetector';
 import type { PixelArtSandbox } from './PixelArtSandbox';
 
@@ -133,10 +133,7 @@ function applyDefaultLoadout(sandbox: PixelArtSandbox): void {
 export function startGame(sandbox: PixelArtSandbox): void {
   if (!sandbox.gameStarted) return;
   if (sandbox.sandboxEnabled) {
-    const controller = sandbox.systemManager.playerController as any;
-    if (controller && typeof controller.setPointerLockEnabled === 'function') {
-      controller.setPointerLockEnabled(false);
-    }
+    sandbox.systemManager.playerController.setPointerLockEnabled(false);
   }
 
   sandbox.loadingScreen.hide();
@@ -150,15 +147,13 @@ export function startGame(sandbox: PixelArtSandbox): void {
     sandbox.sandboxRenderer.hideSpawnLoadingIndicator();
 
     try {
-      const gm = (sandbox.systemManager as any).gameModeManager;
-      const cfg = gm.getCurrentConfig();
+      const cfg = sandbox.systemManager.gameModeManager.getCurrentConfig();
       if (cfg.id === GameMode.AI_SANDBOX) {
         const pos = new THREE.Vector3(0, 0, 0);
         pos.y = getHeightQueryCache().getHeightAt(pos.x, pos.z) + 2;
         sandbox.systemManager.playerController.setPosition(pos);
       } else {
-        const Faction = { US: 'US', OPFOR: 'OPFOR' } as any;
-        const spawn = cfg.zones.find((z: any) => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
+        const spawn = cfg.zones.find((z: ZoneConfig) => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
         if (spawn) {
           const pos = spawn.position.clone();
           pos.y = getHeightQueryCache().getHeightAt(pos.x, pos.z) + 2;
@@ -168,10 +163,8 @@ export function startGame(sandbox: PixelArtSandbox): void {
     } catch { /* ignore */ }
 
     setTimeout(() => {
-      const weapon = sandbox.systemManager.firstPersonWeapon as any;
-      if (weapon && typeof weapon.setGameStarted === 'function') weapon.setGameStarted(true);
-      const controller = sandbox.systemManager.playerController as any;
-      if (controller && typeof controller.setGameStarted === 'function') controller.setGameStarted(true);
+      sandbox.systemManager.firstPersonWeapon.setGameStarted(true);
+      sandbox.systemManager.playerController.setGameStarted(true);
 
       if (!sandbox.sandboxEnabled) Logger.info('sandbox-init', 'Click anywhere to enable mouse look!');
       if (sandbox.systemManager.audioManager) sandbox.systemManager.audioManager.startAmbient();
@@ -179,9 +172,7 @@ export function startGame(sandbox: PixelArtSandbox): void {
         sandbox.systemManager.combatantSystem.enableCombat();
         Logger.info('sandbox-init', 'Combat AI activated!');
       }
-      if (sandbox.systemManager.hudSystem && typeof (sandbox.systemManager.hudSystem as any).startMatch === 'function') {
-        (sandbox.systemManager.hudSystem as any).startMatch();
-      }
+      sandbox.systemManager.hudSystem.startMatch();
     }, 200);
   }, 300);
 
