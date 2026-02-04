@@ -143,9 +143,9 @@ export class HUDElements {
 
     // Legacy logging
     if (type === 'kill') {
-      Logger.info('hud', '💀 Kill confirmed!');
+      Logger.info('hud', ' Kill confirmed!');
     } else if (type === 'headshot') {
-      Logger.info('hud', '🎯 Headshot!');
+      Logger.info('hud', ' Headshot!');
     }
   }
 

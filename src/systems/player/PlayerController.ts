@@ -138,7 +138,7 @@ export class PlayerController implements GameSystem {
       }
     }
 
-    Logger.info('player', `🚩 Rally point placement: ${result.message}`);
+    Logger.info('player', ` Rally point placement: ${result.message}`);
   }
 
   private handleMouseDown(button: number): void {
@@ -253,7 +253,7 @@ export class PlayerController implements GameSystem {
     if (usMainHQ) {
       const spawnPos = usMainHQ.position.clone();
       spawnPos.y = 5;
-      Logger.info('player', `🎯 Spawning at US main HQ: ${spawnPos.x.toFixed(1)}, ${spawnPos.y.toFixed(1)}, ${spawnPos.z.toFixed(1)}`);
+      Logger.info('player', ` Spawning at US main HQ: ${spawnPos.x.toFixed(1)}, ${spawnPos.y.toFixed(1)}, ${spawnPos.z.toFixed(1)}`);
       return spawnPos;
     }
 
@@ -308,7 +308,7 @@ export class PlayerController implements GameSystem {
   }
 
   enterHelicopter(helicopterId: string, helicopterPosition: THREE.Vector3): void {
-    Logger.info('player', `🚁 ⚡ ENTERING HELICOPTER: ${helicopterId}`);
+    Logger.info('player', `  ENTERING HELICOPTER: ${helicopterId}`);
     this.playerState.isInHelicopter = true;
     this.playerState.helicopterId = helicopterId;
 
@@ -325,13 +325,13 @@ export class PlayerController implements GameSystem {
       this.hudSystem.showHelicopterInstruments();
     }
 
-    Logger.info('player', `🚁 Player entered helicopter at position (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)})`);
-    Logger.info('player', `🚁 📹 CAMERA MODE: Switched to helicopter camera (flight sim style)`);
+    Logger.info('player', ` Player entered helicopter at position (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)})`);
+    Logger.info('player', `  CAMERA MODE: Switched to helicopter camera (flight sim style)`);
   }
 
   exitHelicopter(exitPosition: THREE.Vector3): void {
     const helicopterId = this.playerState.helicopterId;
-    Logger.info('player', `🚁 ⚡ EXITING HELICOPTER: ${helicopterId}`);
+    Logger.info('player', `  EXITING HELICOPTER: ${helicopterId}`);
 
     this.playerState.isInHelicopter = false;
     this.playerState.helicopterId = null;
@@ -345,8 +345,8 @@ export class PlayerController implements GameSystem {
       this.hudSystem.hideHelicopterInstruments();
     }
 
-    Logger.info('player', `🚁 Player exited helicopter to position (${exitPosition.x.toFixed(1)}, ${exitPosition.y.toFixed(1)}, ${exitPosition.z.toFixed(1)})`);
-    Logger.info('player', `🚁 📹 CAMERA MODE: Switched to first-person camera`);
+    Logger.info('player', ` Player exited helicopter to position (${exitPosition.x.toFixed(1)}, ${exitPosition.y.toFixed(1)}, ${exitPosition.z.toFixed(1)})`);
+    Logger.info('player', `  CAMERA MODE: Switched to first-person camera`);
   }
 
   isInHelicopter(): boolean { return this.playerState.isInHelicopter; }

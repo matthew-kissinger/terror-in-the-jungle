@@ -36,7 +36,7 @@ export class HUDSystem implements GameSystem {
 
     // Setup return to menu callback
     this.matchEndScreen.onReturnToMenu(() => {
-      Logger.info('hud', '🔄 Returning to main menu (reloading page)');
+      Logger.info('hud', ' Returning to main menu (reloading page)');
       window.location.reload();
     });
 
@@ -44,7 +44,7 @@ export class HUDSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('hud', '📊 Initializing HUD System...');
+    Logger.info('hud', ' Initializing HUD System...');
 
     // Inject styles
     this.styles.inject();
@@ -59,13 +59,13 @@ export class HUDSystem implements GameSystem {
     if (this.elements.respawnButton) {
       this.elements.respawnButton.onclick = () => {
         if (this.playerHealthSystem && this.playerHealthSystem.isAlive()) {
-          Logger.info('hud', '🔄 Respawn button clicked');
+          Logger.info('hud', ' Respawn button clicked');
           this.playerHealthSystem.voluntaryRespawn();
         }
       };
     }
 
-    Logger.info('hud', '✅ HUD System initialized');
+    Logger.info('hud', ' HUD System initialized');
   }
 
   update(deltaTime: number): void {
@@ -173,7 +173,7 @@ export class HUDSystem implements GameSystem {
 
   startMatch(): void {
     this.statsTracker.startMatch();
-    Logger.info('hud', '📊 Match statistics tracking started');
+    Logger.info('hud', ' Match statistics tracking started');
   }
 
   private handleGameEnd(winner: Faction, gameState: GameState): void {
@@ -197,7 +197,7 @@ export class HUDSystem implements GameSystem {
       grenadeKills: playerStats.grenadeKills
     };
 
-    Logger.info('hud', '🏆 Showing match end screen with stats:', matchStats);
+    Logger.info('hud', ' Showing match end screen with stats:', matchStats);
     this.matchEndScreen.show(winner, gameState, matchStats);
   }
 
@@ -235,12 +235,12 @@ export class HUDSystem implements GameSystem {
   }
 
   showInteractionPrompt(text: string): void {
-    Logger.info('hud', '🎮 HUDSystem: showInteractionPrompt called with:', text);
+    Logger.info('hud', ' HUDSystem: showInteractionPrompt called with:', text);
     this.elements.showInteractionPrompt(text);
   }
 
   hideInteractionPrompt(): void {
-    Logger.info('hud', '🎮 HUDSystem: hideInteractionPrompt called');
+    Logger.info('hud', ' HUDSystem: hideInteractionPrompt called');
     this.elements.hideInteractionPrompt();
   }
 

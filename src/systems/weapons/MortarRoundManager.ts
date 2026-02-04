@@ -82,7 +82,7 @@ export class MortarRoundManager {
    * Detonate a mortar round
    */
   private detonateRound(round: MortarRound): void {
-    Logger.info('mortar', `💥 Mortar detonated at (${round.position.x.toFixed(1)}, ${round.position.y.toFixed(1)}, ${round.position.z.toFixed(1)})`);
+    Logger.info('mortar', `Mortar detonated at (${round.position.x.toFixed(1)}, ${round.position.y.toFixed(1)}, ${round.position.z.toFixed(1)})`);
 
     // Explosion visual effect
     if (this.explosionEffectsPool) {

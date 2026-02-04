@@ -43,12 +43,12 @@ export class MinimapSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('minimap', '🗺️ Initializing Minimap System...');
+    Logger.info('minimap', ' Initializing Minimap System...');
 
     // Add to DOM
     document.body.appendChild(this.minimapContainer);
 
-    Logger.info('minimap', '✅ Minimap System initialized');
+    Logger.info('minimap', ' Minimap System initialized');
   }
 
   update(deltaTime: number): void {
@@ -81,12 +81,12 @@ export class MinimapSystem implements GameSystem {
   // Game mode configuration
   setWorldScale(scale: number): void {
     this.WORLD_SIZE = scale;
-    Logger.info('minimap', `🎮 Minimap world scale set to ${scale}`);
+    Logger.info('minimap', ` Minimap world scale set to ${scale}`);
   }
 
   setPlayerSquadId(squadId: string | undefined): void {
     this.playerSquadId = squadId;
-    Logger.info('minimap', `🎮 Minimap tracking player squad: ${squadId}`);
+    Logger.info('minimap', ` Minimap tracking player squad: ${squadId}`);
   }
 
   setCommandPosition(position: THREE.Vector3 | undefined): void {

@@ -73,7 +73,7 @@ export class Chunk {
 
       // Mark terrain as ready
       this.isGenerated = true;
-      Logger.info('terrain', `🌍 Generated chunk terrain (${this.chunkX}, ${this.chunkZ})`);
+      Logger.info('terrain', ` Generated chunk terrain (${this.chunkX}, ${this.chunkZ})`);
 
       // Add vegetation after a small delay
       setTimeout(async () => {
@@ -89,14 +89,14 @@ export class Chunk {
           // Generate enemies (sparse)
           await this.generateEnemies();
 
-          Logger.info('terrain', `🌳 Added vegetation to chunk (${this.chunkX}, ${this.chunkZ})`);
+          Logger.info('terrain', ` Added vegetation to chunk (${this.chunkX}, ${this.chunkZ})`);
         } catch (error) {
           Logger.error('terrain', `Failed to add vegetation to chunk (${this.chunkX}, ${this.chunkZ}):`, error);
         }
       }, 100);
 
     } catch (error) {
-      Logger.error('terrain', `❌ Failed to generate chunk (${this.chunkX}, ${this.chunkZ}):`, error);
+      Logger.error('terrain', ` Failed to generate chunk (${this.chunkX}, ${this.chunkZ}):`, error);
       throw error;
     }
   }

@@ -115,7 +115,7 @@ export class CombatantCombatEffects {
         }
 
         if (hit.headshot) {
-          Logger.info('combat', `🎯 Headshot! ${combatant.faction} -> ${hit.combatant.faction}`);
+          Logger.info('combat', ` Headshot! ${combatant.faction} -> ${hit.combatant.faction}`);
         }
       } else {
         // Track near misses for suppression

@@ -154,7 +154,7 @@ export class ScorePopupSystem {
     let popup = this.pool.find(p => !p.active);
 
     if (!popup) {
-      Logger.warn('ui', '⚠️ Score popup pool exhausted');
+      Logger.warn('ui', ' Score popup pool exhausted');
       return;
     }
 

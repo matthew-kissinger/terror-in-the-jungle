@@ -23,7 +23,7 @@ export class HelicopterAudio {
    */
   initialize(helicopterId: string, helicopter: THREE.Group): void {
     if (!this.audioListener) {
-      Logger.warn('helicopter', '🚁🔊 No audio listener available for helicopter audio');
+      Logger.warn('helicopter', ' No audio listener available for helicopter audio');
       return;
     }
 
@@ -42,11 +42,11 @@ export class HelicopterAudio {
         rotorAudio.setMaxDistance(100); // Ensure it can be heard at reasonable distance
 
         // Don't start playing immediately - wait for control
-        Logger.debug('helicopter', '🚁🔊 Helicopter rotor audio loaded and ready - volume:', rotorAudio.getVolume());
+        Logger.debug('helicopter', ' Helicopter rotor audio loaded and ready - volume:', rotorAudio.getVolume());
       },
       undefined,
       (error) => {
-        Logger.error('helicopter', '🚁🔊 Failed to load helicopter rotor audio:', error);
+        Logger.error('helicopter', ' Failed to load helicopter rotor audio:', error);
       }
     );
 
@@ -74,7 +74,7 @@ export class HelicopterAudio {
       // Player is controlling - ensure audio is playing
       if (!rotorAudio.isPlaying) {
         rotorAudio.play();
-        Logger.debug('helicopter', '🚁🔊 Starting helicopter rotor audio');
+        Logger.debug('helicopter', ' Starting helicopter rotor audio');
       }
 
       // Use physics data
@@ -97,13 +97,13 @@ export class HelicopterAudio {
 
       // Debug logging occasionally
       if (Math.random() < 0.02) { // 2% of frames
-        Logger.debug('helicopter', `🚁🔊 Controlled Audio: collective=${controls.collective.toFixed(2)}, RPM=${state.engineRPM.toFixed(2)}, volume=${targetVolume.toFixed(2)}, rate=${targetPlaybackRate.toFixed(2)}`);
+        Logger.debug('helicopter', ` Controlled Audio: collective=${controls.collective.toFixed(2)}, RPM=${state.engineRPM.toFixed(2)}, volume=${targetVolume.toFixed(2)}, rate=${targetPlaybackRate.toFixed(2)}`);
       }
     } else {
       // Helicopter not controlled - stop audio
       if (rotorAudio.isPlaying) {
         rotorAudio.stop();
-        Logger.debug('helicopter', '🚁🔊 Stopping helicopter rotor audio');
+        Logger.debug('helicopter', ' Stopping helicopter rotor audio');
       }
       targetVolume = 0.0;
       targetPlaybackRate = 0.8;

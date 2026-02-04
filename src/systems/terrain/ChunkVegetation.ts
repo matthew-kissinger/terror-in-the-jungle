@@ -323,7 +323,7 @@ export class ChunkVegetation {
       this.mushroomInstances.push(instance);
     }
 
-    Logger.info('terrain', `🍄 Generated ${this.mushroomInstances.length} mushrooms for chunk (${this.chunkX}, ${this.chunkZ})`);
+    Logger.info('terrain', ` Generated ${this.mushroomInstances.length} mushrooms for chunk (${this.chunkX}, ${this.chunkZ})`);
   }
 
   private async generateWheatPatches(sampleHeight: (x: number, z: number) => number): Promise<void> {
@@ -379,7 +379,7 @@ export class ChunkVegetation {
     }
 
     if (this.wheatInstances.length > 0) {
-      Logger.info('terrain', `🌾 Generated ${this.wheatInstances.length} wheat in ${numPatches} patches for chunk (${this.chunkX}, ${this.chunkZ})`);
+      Logger.info('terrain', ` Generated ${this.wheatInstances.length} wheat in ${numPatches} patches for chunk (${this.chunkX}, ${this.chunkZ})`);
     }
   }
 

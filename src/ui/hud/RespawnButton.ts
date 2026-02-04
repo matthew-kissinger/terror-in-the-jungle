@@ -8,7 +8,7 @@ export class RespawnButton {
   private createRespawnButton(): HTMLButtonElement {
     const button = document.createElement('button');
     button.className = 'respawn-button';
-    button.innerHTML = '🔄 RESPAWN<br><span style="font-size: 10px;">Press K</span>';
+    button.innerHTML = ' RESPAWN<br><span style="font-size: 10px;">Press K</span>';
     button.style.cssText = `
       position: fixed;
       bottom: 120px;

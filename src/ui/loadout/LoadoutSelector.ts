@@ -142,7 +142,7 @@ export class LoadoutSelector implements GameSystem {
             cursor: pointer;
             transition: all 0.2s;
           ">
-            <div style="font-size: 48px; margin-bottom: 12px;">⚡</div>
+            <div style="font-size: 48px; margin-bottom: 12px;"></div>
             <h2 style="font-size: 24px; margin-bottom: 8px; text-transform: uppercase;">SMG</h2>
             <div style="font-size: 12px; color: rgba(255, 255, 255, 0.5); margin-bottom: 16px;">
               ${this.WEAPON_STATS.smg.description}

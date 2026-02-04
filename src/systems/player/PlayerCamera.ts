@@ -50,7 +50,7 @@ export class PlayerCamera {
 
   toggleHelicopterMouseControl(): boolean {
     this.helicopterMouseControlEnabled = !this.helicopterMouseControlEnabled;
-    Logger.info('player', `🚁 Mouse control ${this.helicopterMouseControlEnabled ? 'enabled (affects controls)' : 'disabled (free orbital look)'}`);
+    Logger.info('player', ` Mouse control ${this.helicopterMouseControlEnabled ? 'enabled (affects controls)' : 'disabled (free orbital look)'}`);
     return this.helicopterMouseControlEnabled;
   }
 

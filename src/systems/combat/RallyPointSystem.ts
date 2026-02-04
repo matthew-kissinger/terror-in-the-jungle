@@ -40,7 +40,7 @@ export class RallyPointSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('rally-point', '🚩 Rally Point System initialized');
+    Logger.info('rally-point', ' Rally Point System initialized');
   }
 
   update(deltaTime: number): void {
@@ -52,7 +52,7 @@ export class RallyPointSystem implements GameSystem {
     for (const [squadId, rallyPoint] of this.rallyPoints.entries()) {
       // Check expiration
       if (rallyPoint.active && currentTime - rallyPoint.creationTime > rallyPoint.lifetime) {
-        Logger.info('rally-point', `🚩 Rally point for squad ${squadId} expired`);
+        Logger.info('rally-point', ` Rally point for squad ${squadId} expired`);
         this.deactivateRallyPoint(squadId);
         continue;
       }
@@ -60,7 +60,7 @@ export class RallyPointSystem implements GameSystem {
       // Check regeneration
       if (!rallyPoint.active && rallyPoint.lastDepletedTime) {
         if (currentTime - rallyPoint.lastDepletedTime > rallyPoint.regenerationTime) {
-          Logger.info('rally-point', `🚩 Rally point for squad ${squadId} regenerated`);
+          Logger.info('rally-point', ` Rally point for squad ${squadId} regenerated`);
           rallyPoint.active = true;
           rallyPoint.usesRemaining = rallyPoint.maxUses;
           rallyPoint.creationTime = currentTime;
@@ -144,7 +144,7 @@ export class RallyPointSystem implements GameSystem {
 
     this.rallyPoints.set(squadId, rallyPoint);
 
-    Logger.info('rally-point', `🚩 Rally point placed for squad ${squadId} at (${position.x.toFixed(1)}, ${position.z.toFixed(1)})`);
+    Logger.info('rally-point', ` Rally point placed for squad ${squadId} at (${position.x.toFixed(1)}, ${position.z.toFixed(1)})`);
     Logger.info('rally-point', `   Uses: ${rallyPoint.usesRemaining}/${rallyPoint.maxUses}, Lifetime: ${rallyPoint.lifetime}s`);
 
     return {
@@ -179,11 +179,11 @@ export class RallyPointSystem implements GameSystem {
     }
 
     rallyPoint.usesRemaining--;
-    Logger.info('rally-point', `🚩 Rally point use consumed for squad ${squadId}: ${rallyPoint.usesRemaining}/${rallyPoint.maxUses} remaining`);
+    Logger.info('rally-point', ` Rally point use consumed for squad ${squadId}: ${rallyPoint.usesRemaining}/${rallyPoint.maxUses} remaining`);
 
     // Deactivate if depleted
     if (rallyPoint.usesRemaining <= 0) {
-      Logger.info('rally-point', `🚩 Rally point depleted for squad ${squadId}, will regenerate in ${rallyPoint.regenerationTime}s`);
+      Logger.info('rally-point', ` Rally point depleted for squad ${squadId}, will regenerate in ${rallyPoint.regenerationTime}s`);
       rallyPoint.lastDepletedTime = performance.now() / 1000;
       this.deactivateRallyPoint(squadId);
     }

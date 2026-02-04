@@ -92,7 +92,7 @@ export class AIStateMovement {
     if (distanceToCover < 1.5) {
       combatant.inCover = true;
       combatant.state = CombatantState.ENGAGING;
-      Logger.info('combat-ai', `🛡️ ${combatant.faction} unit reached cover, switching to peek-and-fire`);
+      Logger.info('combat-ai', ` ${combatant.faction} unit reached cover, switching to peek-and-fire`);
     }
 
     const toCover = _toCover.subVectors(combatant.coverPosition, combatant.position).normalize();

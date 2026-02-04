@@ -58,7 +58,7 @@ export class WeaponPickupSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('weapons', '🎯 Initializing Weapon Pickup System...');
+    Logger.info('weapons', ' Initializing Weapon Pickup System...');
 
     // Create materials for each weapon type
     this.createWeaponMaterials();
@@ -70,7 +70,7 @@ export class WeaponPickupSystem implements GameSystem {
     this.boundOnKeyDown = this.onKeyDown.bind(this);
     window.addEventListener('keydown', this.boundOnKeyDown);
 
-    Logger.info('weapons', '✅ Weapon Pickup System initialized');
+    Logger.info('weapons', ' Weapon Pickup System initialized');
   }
 
   private createWeaponMaterials(): void {
@@ -195,7 +195,7 @@ export class WeaponPickupSystem implements GameSystem {
     // Remove pickup
     this.removePickup(pickup.id);
 
-    Logger.info('weapons', `🎯 Picked up ${pickup.type.toUpperCase()}`);
+    Logger.info('weapons', ` Picked up ${pickup.type.toUpperCase()}`);
   }
 
   private spawnPickupEffect(position: THREE.Vector3): void {
@@ -243,7 +243,7 @@ export class WeaponPickupSystem implements GameSystem {
 
     this.pickups.set(id, pickup);
 
-    Logger.info('weapons', `🎯 Spawned ${type} pickup at (${position.x.toFixed(1)}, ${position.z.toFixed(1)})`);
+    Logger.info('weapons', ` Spawned ${type} pickup at (${position.x.toFixed(1)}, ${position.z.toFixed(1)})`);
 
     return id;
   }

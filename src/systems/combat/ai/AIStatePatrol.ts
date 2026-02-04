@@ -246,7 +246,7 @@ export class AIStatePatrol {
         combatant.defensePosition = this.calculateDefensePosition(zone, combatant, defenders.size - 1);
         combatant.destinationPoint = combatant.defensePosition.clone();
 
-        Logger.info('combat-ai', `🛡️ ${combatant.faction} defender assigned to zone ${zone.id} (${defenders.size}/${maxDefenders} defenders)`);
+        Logger.info('combat-ai', ` ${combatant.faction} defender assigned to zone ${zone.id} (${defenders.size}/${maxDefenders} defenders)`);
         return;
       }
     }

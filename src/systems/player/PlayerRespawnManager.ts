@@ -41,7 +41,7 @@ export class PlayerRespawnManager implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('player', '🏥 Initializing Player Respawn Manager...');
+    Logger.info('player', ' Initializing Player Respawn Manager...');
     this.setupUICallbacks();
   }
 
@@ -121,7 +121,7 @@ export class PlayerRespawnManager implements GameSystem {
       return false;
     });
 
-    Logger.info('player', `🚩 Found ${zones.length} spawnable zones:`, zones.map(z => `${z.name} (${z.state})`));
+    Logger.info('player', ` Found ${zones.length} spawnable zones:`, zones.map(z => `${z.name} (${z.state})`));
 
     return zones.map(z => ({
       id: z.id,
@@ -199,7 +199,7 @@ export class PlayerRespawnManager implements GameSystem {
       (this.playerHealthSystem as any).applySpawnProtection(protection);
     }
 
-    Logger.info('player', `🏥 Player respawned at ${position.x}, ${position.y}, ${position.z}`);
+    Logger.info('player', ` Player respawned at ${position.x}, ${position.y}, ${position.z}`);
 
     // Trigger callback
     if (this.onRespawnCallback) {
@@ -208,13 +208,13 @@ export class PlayerRespawnManager implements GameSystem {
   }
 
   onPlayerDeath(): void {
-    Logger.info('player', '💀 Player eliminated!');
+    Logger.info('player', ' Player eliminated!');
 
     // Re-check game mode when player dies in case it changed
     if (this.gameModeManager) {
       const currentGameMode = this.gameModeManager.currentMode;
       const worldSize = this.gameModeManager.getWorldSize();
-      Logger.info('player', `🗺️ Death screen: Current game mode is ${currentGameMode}, world size: ${worldSize}`);
+      Logger.info('player', ` Death screen: Current game mode is ${currentGameMode}, world size: ${worldSize}`);
     }
 
     // Disable player controls
@@ -304,7 +304,7 @@ export class PlayerRespawnManager implements GameSystem {
     const spawnPoint = this.availableSpawnPoints.find(p => p.id === this.selectedSpawnPoint);
     if (!spawnPoint) return;
 
-    Logger.info('player', `🎯 Deploying at ${spawnPoint.name}`);
+    Logger.info('player', ` Deploying at ${spawnPoint.name}`);
     this.hideRespawnUI();
 
     // Add slight randomization to avoid spawn camping

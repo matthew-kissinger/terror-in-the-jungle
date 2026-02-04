@@ -44,7 +44,7 @@ export class AmmoSupplySystem implements GameSystem {
   async init(): Promise<void> {
     Logger.info('weapons', '📦 Initializing Ammo Supply System...');
     this.createPopupElement();
-    Logger.info('weapons', '✅ Ammo Supply System initialized');
+    Logger.info('weapons', ' Ammo Supply System initialized');
   }
 
   update(deltaTime: number): void {

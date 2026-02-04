@@ -29,7 +29,7 @@ export class TimeIndicator {
     this.iconContainer = document.createElement('div');
     this.iconContainer.style.fontSize = '18px';
     this.iconContainer.style.lineHeight = '1';
-    this.iconContainer.innerText = '☀️';
+    this.iconContainer.innerText = '';
 
     // Time text
     this.timeText = document.createElement('div');
@@ -75,7 +75,7 @@ export class TimeIndicator {
     // Update icon based on time
     if (nightFactor > 0.7) {
       // Night
-      this.iconContainer.innerText = '🌙';
+      this.iconContainer.innerText = '';
       this.container.style.color = '#6b9bd8'; // Blue tint for night
     } else if (nightFactor > 0.4) {
       // Dusk/Dawn
@@ -83,7 +83,7 @@ export class TimeIndicator {
       this.container.style.color = '#f0b070'; // Orange tint
     } else {
       // Day
-      this.iconContainer.innerText = '☀️';
+      this.iconContainer.innerText = '';
       this.container.style.color = '#a9f1d8'; // Default green
     }
   }

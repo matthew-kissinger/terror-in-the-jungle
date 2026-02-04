@@ -80,7 +80,7 @@ export class GrenadeSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('weapons', '💣 Initializing Grenade System...');
+    Logger.info('weapons', 'Initializing Grenade System...');
   }
 
   update(deltaTime: number): void {
@@ -164,7 +164,7 @@ export class GrenadeSystem implements GameSystem {
   startAiming(): void {
     // Check if we have grenades first
     if (this.inventoryManager && !this.inventoryManager.canUseGrenade()) {
-      Logger.info('weapons', '⚠️ No grenades remaining!');
+      Logger.info('weapons', ' No grenades remaining!');
       return;
     }
 
@@ -207,7 +207,7 @@ export class GrenadeSystem implements GameSystem {
     // Check inventory and use grenade
     if (this.inventoryManager) {
       if (!this.inventoryManager.useGrenade()) {
-        Logger.info('weapons', '⚠️ Failed to use grenade - no inventory!');
+        Logger.info('weapons', ' Failed to use grenade - no inventory!');
         this.cancelThrow();
         return false;
       }
@@ -266,7 +266,7 @@ export class GrenadeSystem implements GameSystem {
 
     const powerPercent = Math.round(this.throwPower * 100);
     const cookedTime = remainingFuseTime < this.FUSE_TIME ? ` (cooked ${(this.FUSE_TIME - remainingFuseTime).toFixed(1)}s)` : '';
-    Logger.info('weapons', `💣 Grenade thrown at ${powerPercent}% power${cookedTime}`);
+    Logger.info('weapons', `Grenade thrown at ${powerPercent}% power${cookedTime}`);
     this.triggerGrenadeCallout(grenade.position);
     return true;
   }
@@ -280,7 +280,7 @@ export class GrenadeSystem implements GameSystem {
   }
 
   private explodeGrenade(grenade: Grenade): void {
-    Logger.info('weapons', `💥 Grenade exploded at (${grenade.position.x.toFixed(1)}, ${grenade.position.y.toFixed(1)}, ${grenade.position.z.toFixed(1)})`);
+    Logger.info('weapons', `Grenade exploded at (${grenade.position.x.toFixed(1)}, ${grenade.position.y.toFixed(1)}, ${grenade.position.z.toFixed(1)})`);
 
     // Main explosion effect - big flash, smoke, fire, shockwave
     if (this.explosionEffectsPool) {

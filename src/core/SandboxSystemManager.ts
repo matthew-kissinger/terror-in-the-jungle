@@ -227,13 +227,13 @@ export class SandboxSystemManager {
     const playerSquadId = (this.combatantSystem as any).playerSquadId;
 
     if (!squadManager || !playerSquadId) {
-      Logger.warn('core', '⚠️ Squad manager or player squad not found');
+      Logger.warn('core', ' Squad manager or player squad not found');
       return;
     }
 
     const squad = squadManager.getSquad(playerSquadId);
     if (!squad) {
-      Logger.warn('core', '⚠️ Player squad not found in squad manager');
+      Logger.warn('core', ' Player squad not found in squad manager');
       return;
     }
 
@@ -248,7 +248,7 @@ export class SandboxSystemManager {
 
     this.minimapSystem.setPlayerSquadId(playerSquadId);
 
-    Logger.info('core', `✅ Player squad setup complete: ${squad.id} with ${squad.members.length} members`);
+    Logger.info('core', ` Player squad setup complete: ${squad.id} with ${squad.members.length} members`);
   }
 
   getPlayerSquadController(): PlayerSquadController {

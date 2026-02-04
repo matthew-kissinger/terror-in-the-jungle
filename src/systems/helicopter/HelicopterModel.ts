@@ -32,7 +32,7 @@ export class HelicopterModel implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.debug('helicopter', '🚁 Initializing Helicopter Model System...');
+    Logger.debug('helicopter', ' Initializing Helicopter Model System...');
   }
 
   setTerrainManager(terrainManager: ImprovedChunkManager): void {
@@ -66,14 +66,14 @@ export class HelicopterModel implements GameSystem {
 
   private createUSHuey(): void {
     if (!this.helipadSystem || !this.terrainManager) {
-      Logger.warn('helicopter', '⚠️ Cannot create helicopter - required systems not available');
+      Logger.warn('helicopter', ' Cannot create helicopter - required systems not available');
       return;
     }
 
     // Get helipad position
     const helipadPosition = this.helipadSystem.getHelipadPosition('us_helipad');
     if (!helipadPosition) {
-      Logger.warn('helicopter', '⚠️ Cannot create helicopter - helipad not found');
+      Logger.warn('helicopter', ' Cannot create helicopter - helipad not found');
       return;
     }
 
@@ -98,7 +98,7 @@ export class HelicopterModel implements GameSystem {
     this.animation.initialize('us_huey');
 
     // Initialize helicopter audio
-    Logger.debug('helicopter', '🚁🔊 Initializing helicopter audio for us_huey');
+    Logger.debug('helicopter', ' Initializing helicopter audio for us_huey');
     this.audio.initialize('us_huey', helicopter);
 
     // Register helicopter for collision detection
@@ -106,11 +106,11 @@ export class HelicopterModel implements GameSystem {
       (this.terrainManager as any).registerCollisionObject('us_huey', helicopter);
     }
 
-    Logger.debug('helicopter', `🚁 ✅ Created US UH-1 Huey at position (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)})`);
-    Logger.debug('helicopter', `🚁 DEBUG: Helipad position: (${helipadPosition.x.toFixed(1)}, ${helipadPosition.y.toFixed(1)}, ${helipadPosition.z.toFixed(1)})`);
-    Logger.debug('helicopter', `🚁 DEBUG: Base height: ${baseHeight.toFixed(2)}, Final height: ${helicopterPosition.y.toFixed(2)}`);
-    Logger.debug('helicopter', `🚁 DEBUG: Helicopter children count: ${helicopter.children.length}`);
-    Logger.debug('helicopter', `🚁 DEBUG: Scene children count: ${this.scene.children.length}`);
+    Logger.debug('helicopter', `  Created US UH-1 Huey at position (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)})`);
+    Logger.debug('helicopter', ` DEBUG: Helipad position: (${helipadPosition.x.toFixed(1)}, ${helipadPosition.y.toFixed(1)}, ${helipadPosition.z.toFixed(1)})`);
+    Logger.debug('helicopter', ` DEBUG: Base height: ${baseHeight.toFixed(2)}, Final height: ${helicopterPosition.y.toFixed(2)}`);
+    Logger.debug('helicopter', ` DEBUG: Helicopter children count: ${helicopter.children.length}`);
+    Logger.debug('helicopter', ` DEBUG: Scene children count: ${this.scene.children.length}`);
   }
 
 
@@ -172,12 +172,12 @@ export class HelicopterModel implements GameSystem {
 
         // Create helicopter only when we have valid terrain data and chunk is loaded
         if ((terrainHeight > -100 && isChunkLoaded) || terrainHeight > 0) {
-          Logger.debug('helicopter', `🚁 ⚡ CREATING HELICOPTER NOW! Helipad at (${helipadPosition.x}, ${helipadPosition.y}, ${helipadPosition.z}), terrain: ${terrainHeight.toFixed(2)}, chunk loaded: ${isChunkLoaded}`);
+          Logger.debug('helicopter', `  CREATING HELICOPTER NOW! Helipad at (${helipadPosition.x}, ${helipadPosition.y}, ${helipadPosition.z}), terrain: ${terrainHeight.toFixed(2)}, chunk loaded: ${isChunkLoaded}`);
           this.createUSHuey();
         } else {
           // Optional: Log waiting status occasionally
           if (Math.random() < 0.01) {
-            Logger.debug('helicopter', `🚁 Waiting for terrain to load at helipad location - height: ${terrainHeight.toFixed(2)}, chunk loaded: ${isChunkLoaded}`);
+            Logger.debug('helicopter', ` Waiting for terrain to load at helipad location - height: ${terrainHeight.toFixed(2)}, chunk loaded: ${isChunkLoaded}`);
           }
         }
       }

@@ -37,7 +37,7 @@ export class PixelArtSandbox {
   public currentPixelSize = 1;
 
   constructor() {
-    Logger.info('core', '🎮 Initializing Pixel Art Sandbox Engine...');
+    Logger.info('core', ' Initializing Pixel Art Sandbox Engine...');
     Logger.info('core', 'Three.js version:', THREE.REVISION);
 
     this.sandboxEnabled = isSandboxMode();

@@ -69,13 +69,13 @@ export class SpawnPositionCalculator {
           0,
           anchor.z + Math.sin(angle) * radius
         );
-        Logger.info('combat', `📍 Using base ${baseZone.id} for squad respawn at (${_spawnPos.x.toFixed(1)}, ${_spawnPos.z.toFixed(1)})`);
+        Logger.info('combat', ` Using base ${baseZone.id} for squad respawn at (${_spawnPos.x.toFixed(1)}, ${_spawnPos.z.toFixed(1)})`);
         return _spawnPos;
       } else {
-        Logger.warn('combat', `⚠️ No owned bases found for ${faction}, using fallback spawn`);
+        Logger.warn('combat', ` No owned bases found for ${faction}, using fallback spawn`);
       }
     } else {
-      Logger.warn('combat', `⚠️ No ZoneManager available, using fallback spawn`);
+      Logger.warn('combat', ` No ZoneManager available, using fallback spawn`);
     }
 
     const { usBasePos, opforBasePos } = this.getBasePositions(gameModeConfig);
@@ -89,7 +89,7 @@ export class SpawnPositionCalculator {
       basePos.z + Math.sin(angle) * radius
     );
 
-    Logger.info('combat', `📍 Using fallback base spawn for ${faction} at (${_spawnPos.x.toFixed(1)}, ${_spawnPos.z.toFixed(1)})`);
+    Logger.info('combat', ` Using fallback base spawn for ${faction} at (${_spawnPos.x.toFixed(1)}, ${_spawnPos.z.toFixed(1)})`);
     return _spawnPos;
   }
 
@@ -130,13 +130,13 @@ export class SpawnPositionCalculator {
           0,
           anchor.z + Math.sin(angle) * radius
         );
-        Logger.info('combat', `📍 Using zone ${anchorZone.id} as spawn anchor`);
+        Logger.info('combat', ` Using zone ${anchorZone.id} as spawn anchor`);
         return _spawnPos;
       } else {
-        Logger.warn('combat', `⚠️ No owned zones found for ${faction}, using fallback spawn`);
+        Logger.warn('combat', ` No owned zones found for ${faction}, using fallback spawn`);
       }
     } else {
-      Logger.warn('combat', `⚠️ No ZoneManager available, using fallback spawn`);
+      Logger.warn('combat', ` No ZoneManager available, using fallback spawn`);
     }
 
     // Fallback: spawn at fixed base positions
@@ -152,7 +152,7 @@ export class SpawnPositionCalculator {
       basePos.z + Math.sin(angle) * radius
     );
 
-    Logger.info('combat', `📍 Using fallback base spawn for ${faction} at (${_spawnPos.x.toFixed(1)}, ${_spawnPos.z.toFixed(1)})`);
+    Logger.info('combat', ` Using fallback base spawn for ${faction} at (${_spawnPos.x.toFixed(1)}, ${_spawnPos.z.toFixed(1)})`);
     return _spawnPos;
   }
 

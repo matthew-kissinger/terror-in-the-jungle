@@ -21,7 +21,7 @@ export class PlayerSquadController implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('squad', '🎖️ Initializing Player Squad Controller...');
+    Logger.info('squad', ' Initializing Player Squad Controller...');
     this.createCommandIndicator();
   }
 
@@ -45,7 +45,7 @@ export class PlayerSquadController implements GameSystem {
       squad.isPlayerControlled = true;
       squad.currentCommand = SquadCommand.NONE;
       this.currentCommand = SquadCommand.NONE;
-      Logger.info('squad', `🎖️ Player now commanding squad: ${squadId} (${squad.members.length} members)`);
+      Logger.info('squad', ` Player now commanding squad: ${squadId} (${squad.members.length} members)`);
       this.updateCommandIndicator();
     }
   }
@@ -113,7 +113,7 @@ export class PlayerSquadController implements GameSystem {
       [SquadCommand.NONE]: 'AUTO (NPC)'
     };
 
-    Logger.info('squad', `🎖️ Squad Command Issued: ${commandNames[command]}`);
+    Logger.info('squad', ` Squad Command Issued: ${commandNames[command]}`);
     this.showCommandFeedback(commandNames[command]);
     this.updateCommandIndicator();
   }
@@ -201,7 +201,7 @@ export class PlayerSquadController implements GameSystem {
     this.commandUIElement.style.display = this.isUIVisible ? 'block' : 'none';
 
     if (this.isUIVisible) {
-      Logger.info('squad', '🎖️ Squad command UI opened');
+      Logger.info('squad', ' Squad command UI opened');
     }
   }
 

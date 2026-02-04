@@ -138,7 +138,7 @@ export class WeaponRigManager {
       return false
     }
 
-    Logger.info('player', `🔄 Switching to ${weaponType}`)
+    Logger.info('player', ` Switching to ${weaponType}`)
     this.isSwitchingWeapon = true
     this.switchAnimationProgress = 0
     this.pendingWeaponSwitch = weaponType
@@ -229,7 +229,7 @@ export class WeaponRigManager {
     // Notify HUD about weapon switch
     if (hudSystem && hudSystem.showWeaponSwitch) {
       const weaponNames = { rifle: 'RIFLE', shotgun: 'SHOTGUN', smg: 'SMG' }
-      const weaponIcons = { rifle: '🔫', shotgun: '💥', smg: '⚡' }
+      const weaponIcons = { rifle: '🔫', shotgun: '💥', smg: '' }
       const ammoState = ammoManager?.getState() || { currentMagazine: 0, reserveAmmo: 0 }
       hudSystem.showWeaponSwitch(
         weaponNames[weaponType],

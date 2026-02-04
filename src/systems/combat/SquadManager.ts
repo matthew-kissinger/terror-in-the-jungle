@@ -54,7 +54,7 @@ export class SquadManager {
     }
 
     this.squads.set(squadId, squad);
-    Logger.info('combat', `🎖️ Deployed ${faction} squad ${squadId} with ${squadSize} soldiers`);
+    Logger.info('combat', ` Deployed ${faction} squad ${squadId} with ${squadSize} soldiers`);
 
     return { squad, members };
   }
@@ -142,7 +142,7 @@ export class SquadManager {
     const bestZone = this.influenceMap.findBestZoneTarget(squadLeaderPos, squad.faction);
     if (bestZone) {
       squad.objective = bestZone.position.clone();
-      Logger.debug('combat', `🎯 Squad ${squad.id} assigned to zone ${bestZone.name} via influence map`);
+      Logger.debug('combat', ` Squad ${squad.id} assigned to zone ${bestZone.name} via influence map`);
     }
 
     return bestZone;

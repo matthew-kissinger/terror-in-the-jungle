@@ -52,7 +52,7 @@ export class InfluenceMapSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('influence-map', '🗺️ Initializing Influence Map System...');
+    Logger.info('influence-map', ' Initializing Influence Map System...');
     Logger.info('influence-map', `   Grid: ${this.gridSize}x${this.gridSize}, Cell size: ${this.cellSize.toFixed(1)}m, World: ${this.worldSize}m`);
   }
 
@@ -249,7 +249,7 @@ export class InfluenceMapSystem implements GameSystem {
       this.debugCanvas.style.display = this.debugEnabled ? 'block' : 'none';
     }
 
-    Logger.info('influence-map', `🗺️ Influence map debug: ${this.debugEnabled ? 'ON' : 'OFF'}`);
+    Logger.info('influence-map', ` Influence map debug: ${this.debugEnabled ? 'ON' : 'OFF'}`);
   }
 
   private createDebugCanvas(): void {

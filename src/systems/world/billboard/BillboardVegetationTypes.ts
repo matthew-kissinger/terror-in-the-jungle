@@ -49,11 +49,11 @@ export class BillboardVegetationTypes {
   }
 
   async initializeAll(): Promise<VegetationMeshes> {
-    Logger.info('world', '🌴 Initializing Terror in the Jungle Billboard System...');
+    Logger.info('world', ' Initializing Terror in the Jungle Billboard System...');
 
     await this.initializeJungleFoliage();
 
-    Logger.info('world', `✅ Jungle Billboard System ready with all tropical foliage types`);
+    Logger.info('world', ` Jungle Billboard System ready with all tropical foliage types`);
     return this.meshes;
   }
 
@@ -99,7 +99,7 @@ export class BillboardVegetationTypes {
   ): Promise<THREE.InstancedMesh | undefined> {
     const texture = this.assetLoader.getTexture(textureName);
     if (!texture) {
-      Logger.warn('world', `❌ ${textureName} texture not found`);
+      Logger.warn('world', ` ${textureName} texture not found`);
       return undefined;
     }
 
@@ -109,7 +109,7 @@ export class BillboardVegetationTypes {
     const mesh = new THREE.InstancedMesh(geometry, material, maxInstances);
     this.setupInstancedMesh(mesh, `global_${instanceName}`, true);
 
-    Logger.info('world', `🌳 ${textureName} canopy mesh created: ${maxInstances} max instances`);
+    Logger.info('world', ` ${textureName} canopy mesh created: ${maxInstances} max instances`);
     return mesh;
   }
 
@@ -122,7 +122,7 @@ export class BillboardVegetationTypes {
   ): Promise<THREE.InstancedMesh | undefined> {
     const texture = this.assetLoader.getTexture(textureName);
     if (!texture) {
-      Logger.warn('world', `❌ ${textureName} texture not found`);
+      Logger.warn('world', ` ${textureName} texture not found`);
       return undefined;
     }
 
@@ -132,7 +132,7 @@ export class BillboardVegetationTypes {
     const mesh = new THREE.InstancedMesh(geometry, material, maxInstances);
     this.setupInstancedMesh(mesh, `global_${instanceName}`, true);
 
-    Logger.info('world', `🌴 ${textureName} palm mesh created: ${maxInstances} max instances`);
+    Logger.info('world', ` ${textureName} palm mesh created: ${maxInstances} max instances`);
     return mesh;
   }
 
@@ -145,7 +145,7 @@ export class BillboardVegetationTypes {
   ): Promise<THREE.InstancedMesh | undefined> {
     const texture = this.assetLoader.getTexture(textureName);
     if (!texture) {
-      Logger.warn('world', `❌ ${textureName} texture not found`);
+      Logger.warn('world', ` ${textureName} texture not found`);
       return undefined;
     }
 
@@ -155,7 +155,7 @@ export class BillboardVegetationTypes {
     const mesh = new THREE.InstancedMesh(geometry, material, maxInstances);
     this.setupInstancedMesh(mesh, `global_${instanceName}`, false);
 
-    Logger.info('world', `🌿 ${textureName} undergrowth mesh created: ${maxInstances} max instances`);
+    Logger.info('world', ` ${textureName} undergrowth mesh created: ${maxInstances} max instances`);
     return mesh;
   }
 

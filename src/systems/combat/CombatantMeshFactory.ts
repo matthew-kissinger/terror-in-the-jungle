@@ -144,7 +144,7 @@ export class CombatantMeshFactory {
     if (opforFiring) createFactionMesh(opforFiring, 'OPFOR_firing');
     if (opforBack) createFactionMesh(opforBack, 'OPFOR_back');
 
-    Logger.info('combat', '🎖️ Created faction-specific soldier meshes (with player squad support)');
+    Logger.info('combat', ' Created faction-specific soldier meshes (with player squad support)');
 
     return {
       factionMeshes,

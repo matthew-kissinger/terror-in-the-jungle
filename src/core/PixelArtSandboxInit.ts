@@ -133,15 +133,15 @@ export function showWelcomeMessage(sandbox: any): void {
   const debugInfo = sandbox.systemManager.globalBillboardSystem.getDebugInfo();
   const combatStats = sandbox.systemManager.combatantSystem.getCombatStats();
   Logger.info('sandbox-init', `
-🎮 TERROR IN THE JUNGLE - GAME STARTED!
+ TERROR IN THE JUNGLE - GAME STARTED!
 
-🌍 World Features:
+ World Features:
 - ${debugInfo.grassUsed} grass instances allocated
 - ${debugInfo.treeUsed} tree instances allocated
 - ${sandbox.systemManager.chunkManager.getLoadedChunkCount()} chunks loaded
 - ${combatStats.us} US, ${combatStats.opfor} OPFOR combatants in battle
 
-🎯 Controls:
+ Controls:
 - WASD: Move around
 - Shift: Run
 - Mouse: Look around (click to enable)

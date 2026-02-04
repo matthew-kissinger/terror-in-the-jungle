@@ -59,7 +59,7 @@ export class MortarSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('mortar', '💣 Initializing Mortar System...');
+    Logger.info('mortar', 'Initializing Mortar System...');
   }
 
   update(deltaTime: number): void {
@@ -100,7 +100,7 @@ export class MortarSystem implements GameSystem {
 
   deployMortar(playerPosition: THREE.Vector3, playerDirection: THREE.Vector3): boolean {
     if (this.isDeployed) {
-      Logger.warn('mortar', '⚠️ Mortar already deployed');
+      Logger.warn('mortar', ' Mortar already deployed');
       return false;
     }
 
@@ -125,7 +125,7 @@ export class MortarSystem implements GameSystem {
     // Initialize yaw to face player's direction
     this.yaw = Math.atan2(playerDirection.x, playerDirection.z) * 180 / Math.PI;
 
-    Logger.info('mortar', `💣 Mortar deployed at (${_deployPos.x.toFixed(1)}, ${_deployPos.y.toFixed(1)}, ${_deployPos.z.toFixed(1)})`);
+    Logger.info('mortar', `Mortar deployed at (${_deployPos.x.toFixed(1)}, ${_deployPos.y.toFixed(1)}, ${_deployPos.z.toFixed(1)})`);
     return true;
   }
 
@@ -151,19 +151,19 @@ export class MortarSystem implements GameSystem {
     this.isAiming = false;
     this.visuals.showTrajectory(false);
 
-    Logger.info('mortar', '💣 Mortar undeployed');
+    Logger.info('mortar', 'Mortar undeployed');
   }
 
   startAiming(): void {
     if (!this.isDeployed) {
-      Logger.warn('mortar', '⚠️ Deploy mortar first (press E)');
+      Logger.warn('mortar', ' Deploy mortar first (press E)');
       return;
     }
 
     this.isAiming = true;
     this.visuals.showTrajectory(true);
     this.updateTrajectoryPreview();
-    Logger.info('mortar', '💣 Mortar aiming started');
+    Logger.info('mortar', 'Mortar aiming started');
   }
 
   cancelAiming(): void {
@@ -201,13 +201,13 @@ export class MortarSystem implements GameSystem {
 
   fireMortarRound(): boolean {
     if (!this.isAiming || !this.isDeployed || !this.tubePosition) {
-      Logger.warn('mortar', '⚠️ Cannot fire - mortar not ready');
+      Logger.warn('mortar', ' Cannot fire - mortar not ready');
       return false;
     }
 
     // Check inventory
     if (this.inventoryManager && !this.inventoryManager.useMortarRound()) {
-      Logger.warn('mortar', '⚠️ No mortar rounds remaining!');
+      Logger.warn('mortar', ' No mortar rounds remaining!');
       return false;
     }
 
@@ -229,7 +229,7 @@ export class MortarSystem implements GameSystem {
       this.audioManager.playExplosionAt(_deployPos); // Use explosion sound for mortar fire
     }
 
-    Logger.info('mortar', `💣 Mortar fired! Pitch: ${this.pitch.toFixed(1)}°, Yaw: ${this.yaw.toFixed(1)}°, Power: ${(this.power * 100).toFixed(0)}%`);
+    Logger.info('mortar', `Mortar fired! Pitch: ${this.pitch.toFixed(1)}°, Yaw: ${this.yaw.toFixed(1)}°, Power: ${(this.power * 100).toFixed(0)}%`);
     return true;
   }
 

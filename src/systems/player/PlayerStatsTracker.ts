@@ -53,7 +53,7 @@ export class PlayerStatsTracker {
       grenadeKills: 0,
       assists: 0
     };
-    Logger.info('stats', '📊 Match stats tracking started');
+    Logger.info('stats', ' Match stats tracking started');
   }
 
   addKill(): void {

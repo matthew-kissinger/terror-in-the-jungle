@@ -108,7 +108,7 @@ export class ImprovedChunk {
 
       // Debug verification
       const testHeight = this.getHeightAtLocal(this.size / 2, this.size / 2);
-      Logger.info('terrain', `📐 Chunk (${this.chunkX}, ${this.chunkZ}) center height: ${testHeight.toFixed(2)}`);
+      Logger.info('terrain', ` Chunk (${this.chunkX}, ${this.chunkZ}) center height: ${testHeight.toFixed(2)}`);
     }
 
     // Generate vegetation positioned on terrain
@@ -141,7 +141,7 @@ export class ImprovedChunk {
 
 
     this.isGenerated = true;
-    Logger.info('terrain', `✅ ImprovedChunk (${this.chunkX}, ${this.chunkZ}) generated`);
+    Logger.info('terrain', ` ImprovedChunk (${this.chunkX}, ${this.chunkZ}) generated`);
   }
 
   /**
@@ -176,7 +176,7 @@ export class ImprovedChunk {
 
       // Debug verification
       const testHeight = this.getHeightAtLocal(this.size / 2, this.size / 2);
-      Logger.info('terrain', `📐 Chunk (${this.chunkX}, ${this.chunkZ}) worker center height: ${testHeight.toFixed(2)}`);
+      Logger.info('terrain', ` Chunk (${this.chunkX}, ${this.chunkZ}) worker center height: ${testHeight.toFixed(2)}`);
     } else {
       // Even if we skip the mesh, dispose the geometry since we won't use it
       workerGeometry.dispose();
@@ -216,7 +216,7 @@ export class ImprovedChunk {
     );
 
     this.isGenerated = true;
-    Logger.info('terrain', `✅ ImprovedChunk (${this.chunkX}, ${this.chunkZ}) generated from worker`);
+    Logger.info('terrain', ` ImprovedChunk (${this.chunkX}, ${this.chunkZ}) generated from worker`);
   }
 
   /**

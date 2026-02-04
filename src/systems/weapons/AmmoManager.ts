@@ -71,7 +71,7 @@ export class AmmoManager {
     this.state.reloadProgress = 0;
     this.reloadStartTime = performance.now();
 
-    Logger.info('weapons', '🔄 Reloading...');
+    Logger.info('weapons', ' Reloading...');
     return true;
   }
 
@@ -79,7 +79,7 @@ export class AmmoManager {
     if (this.state.isReloading) {
       this.state.isReloading = false;
       this.state.reloadProgress = 0;
-      Logger.info('weapons', '❌ Reload cancelled');
+      Logger.info('weapons', ' Reload cancelled');
     }
   }
 
@@ -114,7 +114,7 @@ export class AmmoManager {
     this.state.reloadProgress = 0;
     this.state.needsReload = false;
 
-    Logger.info('weapons', `✅ Reload complete! Ammo: ${this.state.currentMagazine}/${this.state.reserveAmmo}`);
+    Logger.info('weapons', ` Reload complete! Ammo: ${this.state.currentMagazine}/${this.state.reserveAmmo}`);
 
     // Trigger callbacks
     this.onReloadComplete?.();
@@ -168,7 +168,7 @@ export class AmmoManager {
         // Check if fully resupplied
         if (this.state.currentMagazine === this.state.maxMagazine &&
             this.state.reserveAmmo === this.state.maxReserve) {
-          Logger.info('weapons', '✅ Fully resupplied!');
+          Logger.info('weapons', ' Fully resupplied!');
           this.isResupplying = false;
         }
       }

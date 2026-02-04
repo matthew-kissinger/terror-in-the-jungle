@@ -52,7 +52,7 @@ export class HelicopterInteraction {
     // Get player position from camera (PlayerController uses camera position)
     const playerPosition = this.playerController.getPosition();
     if (!playerPosition) {
-      Logger.debug('helicopter', '🚁 DEBUG: No player position available');
+      Logger.debug('helicopter', ' DEBUG: No player position available');
       return;
     }
 
@@ -67,7 +67,7 @@ export class HelicopterInteraction {
     // Always log distance for debugging
     if (Math.random() < 0.1) { // Log 10% of the time to avoid spam
       const fullDistance = playerPosition.distanceTo(helicopterPosition);
-      Logger.debug('helicopter', `🚁 DEBUG: Player pos: (${playerPosition.x.toFixed(1)}, ${playerPosition.y.toFixed(1)}, ${playerPosition.z.toFixed(1)}), Helicopter pos: (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)}), Horizontal distance: ${horizontalDistance.toFixed(1)}m, 3D distance: ${fullDistance.toFixed(1)}m`);
+      Logger.debug('helicopter', ` DEBUG: Player pos: (${playerPosition.x.toFixed(1)}, ${playerPosition.y.toFixed(1)}, ${playerPosition.z.toFixed(1)}), Helicopter pos: (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)}), Horizontal distance: ${horizontalDistance.toFixed(1)}m, 3D distance: ${fullDistance.toFixed(1)}m`);
     }
 
     const isNearNow = horizontalDistance <= this.interactionRadius;
@@ -77,10 +77,10 @@ export class HelicopterInteraction {
       this.isPlayerNearHelicopter = isNearNow;
 
       if (this.isPlayerNearHelicopter) {
-        Logger.debug('helicopter', `🚁 ⚡ Player near helicopter (${horizontalDistance.toFixed(1)}m horizontal) - SHOWING PROMPT!`);
+        Logger.debug('helicopter', `  Player near helicopter (${horizontalDistance.toFixed(1)}m horizontal) - SHOWING PROMPT!`);
         this.hudSystem.showInteractionPrompt('Press E to enter helicopter');
       } else {
-        Logger.debug('helicopter', '🚁 ⚡ Player left helicopter area - HIDING PROMPT!');
+        Logger.debug('helicopter', '  Player left helicopter area - HIDING PROMPT!');
         this.hudSystem.hideInteractionPrompt();
       }
     }
@@ -88,26 +88,26 @@ export class HelicopterInteraction {
 
   tryEnterHelicopter(): void {
     if (!this.playerController) {
-      Logger.warn('helicopter', '🚁 Cannot enter helicopter - no player controller');
+      Logger.warn('helicopter', ' Cannot enter helicopter - no player controller');
       return;
     }
 
     // Check if player is already in a helicopter
     if (this.playerController.isInHelicopter()) {
-      Logger.debug('helicopter', '🚁 Player is already in a helicopter');
+      Logger.debug('helicopter', ' Player is already in a helicopter');
       return;
     }
 
     const helicopter = this.helicopters.get('us_huey');
     if (!helicopter) {
-      Logger.debug('helicopter', '🚁 No helicopter available for entry');
+      Logger.debug('helicopter', ' No helicopter available for entry');
       return;
     }
 
     // Check if player is close enough
     const playerPosition = this.playerController.getPosition();
     if (!playerPosition) {
-      Logger.warn('helicopter', '🚁 Cannot get player position for helicopter entry');
+      Logger.warn('helicopter', ' Cannot get player position for helicopter entry');
       return;
     }
 
@@ -118,12 +118,12 @@ export class HelicopterInteraction {
     );
 
     if (horizontalDistance > this.interactionRadius) {
-      Logger.debug('helicopter', `🚁 Player too far from helicopter (${horizontalDistance.toFixed(1)}m) - must be within ${this.interactionRadius}m`);
+      Logger.debug('helicopter', ` Player too far from helicopter (${horizontalDistance.toFixed(1)}m) - must be within ${this.interactionRadius}m`);
       return;
     }
 
     // Enter the helicopter
-    Logger.debug('helicopter', `🚁 ⚡ PLAYER ENTERING HELICOPTER!`);
+    Logger.debug('helicopter', `  PLAYER ENTERING HELICOPTER!`);
     this.playerController.enterHelicopter('us_huey', helicopterPosition.clone());
 
     // Hide interaction prompt
@@ -134,12 +134,12 @@ export class HelicopterInteraction {
 
   exitHelicopter(): void {
     if (!this.playerController) {
-      Logger.warn('helicopter', '🚁 Cannot exit helicopter - no player controller');
+      Logger.warn('helicopter', ' Cannot exit helicopter - no player controller');
       return;
     }
 
     if (!this.playerController.isInHelicopter()) {
-      Logger.debug('helicopter', '🚁 Player is not in a helicopter');
+      Logger.debug('helicopter', ' Player is not in a helicopter');
       return;
     }
 
@@ -147,7 +147,7 @@ export class HelicopterInteraction {
     const helicopter = helicopterId ? this.helicopters.get(helicopterId) : null;
 
     if (!helicopter) {
-      Logger.warn('helicopter', '🚁 Cannot find helicopter for exit');
+      Logger.warn('helicopter', ' Cannot find helicopter for exit');
       return;
     }
 
@@ -163,7 +163,7 @@ export class HelicopterInteraction {
       exitPosition.y = Math.max(exitPosition.y, terrainHeight + 1.5); // Player height above terrain
     }
 
-    Logger.debug('helicopter', `🚁 ⚡ PLAYER EXITING HELICOPTER!`);
+    Logger.debug('helicopter', `  PLAYER EXITING HELICOPTER!`);
     this.playerController.exitHelicopter(exitPosition);
   }
 }

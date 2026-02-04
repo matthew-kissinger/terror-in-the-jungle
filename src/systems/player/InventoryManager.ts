@@ -124,7 +124,7 @@ export class InventoryManager implements GameSystem {
     if (!this.canUseGrenade()) return false;
 
     this.grenades--;
-    Logger.info('inventory', `💣 Grenade used. Remaining: ${this.grenades}`);
+    Logger.info('inventory', `Grenade used. Remaining: ${this.grenades}`);
     this.notifyInventoryChange();
     return true;
   }
@@ -137,20 +137,20 @@ export class InventoryManager implements GameSystem {
     if (!this.canUseMortarRound()) return false;
 
     this.mortarRounds--;
-    Logger.info('inventory', `💣 Mortar round used. Remaining: ${this.mortarRounds}`);
+    Logger.info('inventory', `Mortar round used. Remaining: ${this.mortarRounds}`);
     this.notifyInventoryChange();
     return true;
   }
 
   addGrenades(count: number): void {
     this.grenades = Math.min(this.grenades + count, this.maxGrenades);
-    Logger.info('inventory', `💣 Grenades restocked: ${this.grenades}/${this.maxGrenades}`);
+    Logger.info('inventory', `Grenades restocked: ${this.grenades}/${this.maxGrenades}`);
     this.notifyInventoryChange();
   }
 
   addMortarRounds(count: number): void {
     this.mortarRounds = Math.min(this.mortarRounds + count, this.maxMortarRounds);
-    Logger.info('inventory', `💣 Mortar rounds restocked: ${this.mortarRounds}/${this.maxMortarRounds}`);
+    Logger.info('inventory', `Mortar rounds restocked: ${this.mortarRounds}/${this.maxMortarRounds}`);
     this.notifyInventoryChange();
   }
 
@@ -249,7 +249,7 @@ export class InventoryManager implements GameSystem {
       </div>
       <div id="slot-smg" class="hotbar-slot" data-slot="4">
         <div class="slot-key">[5]</div>
-        <div class="slot-icon">⚡</div>
+        <div class="slot-icon"></div>
         <div class="slot-label">SMG</div>
       </div>
     `;

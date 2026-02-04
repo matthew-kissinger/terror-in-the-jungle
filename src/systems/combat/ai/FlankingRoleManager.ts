@@ -184,7 +184,7 @@ export class FlankingRoleManager {
     squad: Squad,
     allCombatants: Map<string, Combatant>
   ): void {
-    Logger.info('combat-ai', `❌ Squad ${squad.id} flanking aborted`)
+    Logger.info('combat-ai', ` Squad ${squad.id} flanking aborted`)
 
     operation.status = FlankingStatus.ABORTED
 
@@ -212,7 +212,7 @@ export class FlankingRoleManager {
     squad: Squad,
     allCombatants: Map<string, Combatant>
   ): void {
-    Logger.info('combat-ai', `✅ Squad ${squad.id} flanking operation complete`)
+    Logger.info('combat-ai', ` Squad ${squad.id} flanking operation complete`)
 
     // Clean up combatant state
     const allParticipants = [...operation.suppressors, ...operation.flankers]

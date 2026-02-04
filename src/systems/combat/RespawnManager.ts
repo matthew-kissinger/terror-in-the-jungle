@@ -64,8 +64,8 @@ export class RespawnManager {
         if (!alreadyQueued) {
           const now = Date.now();
           const respawnTime = now + 5000;
-          Logger.info('combat', `☠️ DEATH: Squad member ${id} died at ${now}`);
-          Logger.info('combat', `⏳ Queued respawn for ${respawnTime} (in 5 seconds)`);
+          Logger.info('combat', ` DEATH: Squad member ${id} died at ${now}`);
+          Logger.info('combat', ` Queued respawn for ${respawnTime} (in 5 seconds)`);
           this.pendingRespawns.push({
             squadId: combatant.squadId,
             respawnTime: respawnTime,
@@ -119,7 +119,7 @@ export class RespawnManager {
   ): void {
     const squad = this.squadManager.getSquad(squadId);
     if (!squad) {
-      Logger.warn('combat', `⚠️ Cannot respawn - squad ${squadId} no longer exists`);
+      Logger.warn('combat', ` Cannot respawn - squad ${squadId} no longer exists`);
       return;
     }
 
@@ -148,7 +148,7 @@ export class RespawnManager {
       if (rallyPos && rallyPointSystem.consumeRallyPointUse(squadId)) {
         spawnPos = rallyPos;
         spawnedAtRallyPoint = true;
-        Logger.info('combat', `🚩 Respawning at rally point`);
+        Logger.info('combat', ` Respawning at rally point`);
       } else {
         spawnPos = SpawnPositionCalculator.getBaseSpawnPosition(squad.faction, zoneManager, gameModeManager?.getCurrentConfig());
       }
@@ -158,7 +158,7 @@ export class RespawnManager {
 
     const distanceFromSquad = spawnPos.distanceTo(_squadCentroid);
 
-    Logger.info('combat', `🔄 Respawning squad member:`);
+    Logger.info('combat', ` Respawning squad member:`);
     Logger.info('combat', `   Squad location: (${_squadCentroid.x.toFixed(1)}, ${_squadCentroid.z.toFixed(1)})`);
     Logger.info('combat', `   Spawn location: (${spawnPos.x.toFixed(1)}, ${spawnPos.z.toFixed(1)}) ${spawnedAtRallyPoint ? '[RALLY POINT]' : '[BASE]'}`);
     Logger.info('combat', `   Distance: ${distanceFromSquad.toFixed(1)}m`);
@@ -175,7 +175,7 @@ export class RespawnManager {
     this.combatants.set(newMember.id, newMember);
     this.spatialGrid.updatePosition(newMember.id, newMember.position);
 
-    Logger.info('combat', `✅ Squad member ${newMember.id} spawned and moving to rejoin squad`);
+    Logger.info('combat', ` Squad member ${newMember.id} spawned and moving to rejoin squad`);
   }
 
   /**

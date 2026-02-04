@@ -31,7 +31,7 @@ export class RespawnMapController {
     if (manager) {
       this.currentGameMode = manager.currentMode;
       const worldSize = manager.getWorldSize();
-      Logger.info('respawn-map', `🗺️ RespawnMapController: Game mode detected as ${this.currentGameMode} (world size: ${worldSize})`);
+      Logger.info('respawn-map', ` RespawnMapController: Game mode detected as ${this.currentGameMode} (world size: ${worldSize})`);
     }
     this.respawnMapView.setGameModeManager(manager);
     this.openFrontierRespawnMap.setGameModeManager(manager);
@@ -53,13 +53,13 @@ export class RespawnMapController {
     if (this.gameModeManager) {
       this.currentGameMode = this.gameModeManager.currentMode;
       const worldSize = this.gameModeManager.getWorldSize();
-      Logger.info('respawn-map', `🗺️ Showing respawn map for mode: ${this.currentGameMode}, world size: ${worldSize}`);
+      Logger.info('respawn-map', ` Showing respawn map for mode: ${this.currentGameMode}, world size: ${worldSize}`);
     }
 
     mapContainer.innerHTML = '';
 
     const isOpenFrontier = this.currentGameMode === GameMode.OPEN_FRONTIER;
-    Logger.info('respawn-map', `🗺️ Using map: ${isOpenFrontier ? 'OpenFrontierRespawnMap' : 'RespawnMapView'}`);
+    Logger.info('respawn-map', ` Using map: ${isOpenFrontier ? 'OpenFrontierRespawnMap' : 'RespawnMapView'}`);
 
     const activeMap = isOpenFrontier ? this.openFrontierRespawnMap : this.respawnMapView;
     const mapCanvas = activeMap.getCanvas();

@@ -88,7 +88,7 @@ export class SystemInitializer {
     onProgress: (phase: string, progress: number) => void,
     sandboxRenderer?: any
   ): Promise<InitializationResult> {
-    Logger.info('core', '🔧 Initializing game systems...');
+    Logger.info('core', ' Initializing game systems...');
 
     // Warmup object pools to prevent allocations during gameplay
     objectPool.warmup(50, 20, 10, 30);

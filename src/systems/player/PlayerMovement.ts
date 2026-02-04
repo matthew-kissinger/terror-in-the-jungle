@@ -70,7 +70,7 @@ export class PlayerMovement {
 
   toggleAutoHover(): void {
     this.helicopterControls.autoHover = !this.helicopterControls.autoHover;
-    Logger.info('player', `🚁 Auto-hover ${this.helicopterControls.autoHover ? 'enabled' : 'disabled'}`);
+    Logger.info('player', ` Auto-hover ${this.helicopterControls.autoHover ? 'enabled' : 'disabled'}`);
   }
 
   getHelicopterControls(): HelicopterControls {

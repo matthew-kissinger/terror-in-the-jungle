@@ -32,14 +32,14 @@ export class InteractionPrompt {
   }
 
   showInteractionPrompt(text: string): void {
-    Logger.info('hud', '🎮 HUD: SHOWING interaction prompt:', text);
+    Logger.info('hud', ' HUD: SHOWING interaction prompt:', text);
     this.interactionPrompt.textContent = text;
     this.interactionPrompt.style.display = 'block';
-    Logger.info('hud', '🎮 HUD: Prompt display style set to:', this.interactionPrompt.style.display);
+    Logger.info('hud', ' HUD: Prompt display style set to:', this.interactionPrompt.style.display);
   }
 
   hideInteractionPrompt(): void {
-    Logger.info('hud', '🎮 HUD: HIDING interaction prompt');
+    Logger.info('hud', ' HUD: HIDING interaction prompt');
     this.interactionPrompt.style.display = 'none';
   }
 }

@@ -173,7 +173,7 @@ export class LoadingPanels {
 
         <h3 style="color: #9fcfeb; margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1rem; font-weight: 500; letter-spacing: 0.05em;">COMBAT TIPS</h3>
         <ul style="list-style: none; padding: 0; color: #b8d4e3; line-height: 1.8;">
-          <li>🎯 Headshots deal 70% more damage</li>
+          <li> Headshots deal 70% more damage</li>
           <li>🌲 Use vegetation for cover</li>
           <li>👂 Listen for enemy gunfire</li>
           <li>🏃 Stay mobile to avoid being hit</li>

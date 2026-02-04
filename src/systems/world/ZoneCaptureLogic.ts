@@ -40,7 +40,7 @@ export class ZoneCaptureLogic {
           zone.captureProgress = 100;
           zone.owner = Faction.US;
           zone.state = ZoneState.US_CONTROLLED;
-          Logger.info('world', `🚩 Zone ${zone.name} captured by US!`);
+          Logger.info('world', ` Zone ${zone.name} captured by US!`);
         }
       } else {
         zone.state = ZoneState.US_CONTROLLED;
@@ -55,7 +55,7 @@ export class ZoneCaptureLogic {
           zone.captureProgress = 100;
           zone.owner = Faction.OPFOR;
           zone.state = ZoneState.OPFOR_CONTROLLED;
-          Logger.info('world', `🚩 Zone ${zone.name} captured by OPFOR!`);
+          Logger.info('world', ` Zone ${zone.name} captured by OPFOR!`);
         }
       } else {
         zone.state = ZoneState.OPFOR_CONTROLLED;

@@ -81,7 +81,7 @@ export function togglePerformanceStats(sandbox: any): void {
         octree: { nodes: 0, maxDepth: 0, avgEntitiesPerLeaf: 0 }
       };
 
-  Logger.info('sandbox-input', '📊 Performance Stats:');
+  Logger.info('sandbox-input', ' Performance Stats:');
   const fps = 1 / Math.max(0.0001, sandbox.lastFrameDelta);
   Logger.info('sandbox-input', `FPS: ${Math.round(fps)}`);
   Logger.info('sandbox-input', `Draw calls: ${perfStats.drawCalls}`);

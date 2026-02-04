@@ -74,7 +74,7 @@ export class PlayerInput {
       document.removeEventListener('click', this.boundRequestPointerLock);
       // Add click listener for pointer lock
       document.addEventListener('click', this.boundRequestPointerLock);
-      Logger.info('player', '🎮 Game started - click to enable mouse look');
+      Logger.info('player', ' Game started - click to enable mouse look');
     }
   }
 
@@ -242,7 +242,7 @@ export class PlayerInput {
       ? 'Mouse - Look around (click to enable pointer lock)'
       : 'Mouse - Look around (pointer lock disabled)';
     Logger.info('player', `
-🎮 CONTROLS:
+ CONTROLS:
 WASD - Move / Helicopter Controls (W/S = Collective, A/D = Yaw)
 Arrow Keys - Helicopter Cyclic (↑↓ = Pitch, ←→ = Roll)
 Shift - Run / Engine Boost (in helicopter)

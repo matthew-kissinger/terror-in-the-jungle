@@ -44,7 +44,7 @@ export class DeathCamOverlay {
     this.headshotEl = document.createElement('div');
     this.headshotEl.id = 'headshot-indicator';
     this.headshotEl.style.cssText = 'color: #ffaa00; font-size: 18px; font-weight: bold; margin-top: 10px; text-transform: uppercase; display: none;';
-    this.headshotEl.textContent = '💀 HEADSHOT 💀';
+    this.headshotEl.textContent = ' HEADSHOT ';
     infoPanel.appendChild(this.headshotEl);
 
     this.overlayElement.appendChild(infoPanel);

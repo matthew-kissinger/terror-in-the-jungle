@@ -65,7 +65,7 @@ export class MatchEndScreen {
       this.onPlayAgainCallback();
     } else {
       // Default action: reload the page
-      Logger.info('ui', '🔄 Restarting match (reloading page)');
+      Logger.info('ui', ' Restarting match (reloading page)');
       window.location.reload();
     }
   };
@@ -75,7 +75,7 @@ export class MatchEndScreen {
       this.onReturnToMenuCallback();
     } else {
       // Default action: reload the page to return to menu
-      Logger.info('ui', '🔄 Returning to main menu (reloading page)');
+      Logger.info('ui', ' Returning to main menu (reloading page)');
       window.location.reload();
     }
   };

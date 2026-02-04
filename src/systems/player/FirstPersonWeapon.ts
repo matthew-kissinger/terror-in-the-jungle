@@ -102,7 +102,7 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('weapon', '⚔️ Initializing First Person Weapon...')
+    Logger.info('weapon', ' Initializing First Person Weapon...')
 
     // Initialize rig manager (creates weapon models)
     await this.rigManager.init()
@@ -113,7 +113,7 @@ export class FirstPersonWeapon implements GameSystem {
     this.firing.setMuzzleRef(this.rigManager.getMuzzleRef())
     this.firing.setGunCore(this.rigManager.getCurrentCore())
 
-    Logger.info('weapon', '✅ First Person Weapon initialized (rifle + shotgun + SMG)')
+    Logger.info('weapon', ' First Person Weapon initialized (rifle + shotgun + SMG)')
 
     // Trigger initial ammo display
     this.onAmmoChange(this.ammo.getAmmoState())
@@ -217,7 +217,7 @@ export class FirstPersonWeapon implements GameSystem {
     if (!currentAmmo.canFire()) {
       if (currentAmmo.isEmpty()) {
         // Play empty click sound
-        Logger.info('weapon', '🔫 *click* - Empty magazine!')
+        Logger.info('weapon', '*click* - Empty magazine!')
         // Auto-reload if we have reserve ammo
         if (currentAmmo.getState().reserveAmmo > 0) {
           this.startReload()
@@ -319,7 +319,7 @@ export class FirstPersonWeapon implements GameSystem {
   private startReload(): void {
     // Can't reload while ADS
     if (this.animations.getADS()) {
-      Logger.info('weapon', '⚠️ Cannot reload while aiming')
+      Logger.info('weapon', ' Cannot reload while aiming')
       return
     }
 
@@ -329,7 +329,7 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   private onReloadComplete(): void {
-    Logger.info('weapon', '✅ Weapon reloaded!')
+    Logger.info('weapon', ' Weapon reloaded!')
     // Reload animation will finish independently
   }
 
@@ -341,7 +341,7 @@ export class FirstPersonWeapon implements GameSystem {
 
     // Check for low ammo warning
     if (this.ammo.getCurrentAmmoManager().isLowAmmo()) {
-      Logger.info('weapon', '⚠️ Low ammo!')
+      Logger.info('weapon', ' Low ammo!')
     }
   }
 
@@ -360,12 +360,12 @@ export class FirstPersonWeapon implements GameSystem {
   // Helicopter integration methods
   hideWeapon(): void {
     this.rigManager.setWeaponVisibility(false)
-    Logger.info('weapon', '🚁 🔫 Weapon hidden (in helicopter)')
+    Logger.info('weapon', 'Weapon hidden (in helicopter)')
   }
 
   showWeapon(): void {
     this.rigManager.setWeaponVisibility(true)
-    Logger.info('weapon', '🚁 🔫 Weapon shown (exited helicopter)')
+    Logger.info('weapon', 'Weapon shown (exited helicopter)')
   }
 
   setFireingEnabled(enabled: boolean): void {
@@ -374,9 +374,9 @@ export class FirstPersonWeapon implements GameSystem {
     if (!enabled) {
       // Stop any current firing
       this.input.setFiringActive(false)
-      Logger.info('weapon', '🚁 🔫 Firing disabled (in helicopter)')
+      Logger.info('weapon', 'Firing disabled (in helicopter)')
     } else {
-      Logger.info('weapon', '🚁 🔫 Firing enabled (exited helicopter)')
+      Logger.info('weapon', 'Firing enabled (exited helicopter)')
     }
   }
 }

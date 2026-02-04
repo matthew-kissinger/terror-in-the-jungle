@@ -204,12 +204,12 @@ export class SandbagSystem implements GameSystem {
 
   placeSandbag(): boolean {
     if (!this.placementValid || !this.inventoryManager) {
-      Logger.info('weapons', '⚠️ Cannot place sandbag: invalid position or no inventory');
+      Logger.info('weapons', ' Cannot place sandbag: invalid position or no inventory');
       return false;
     }
 
     if (!this.inventoryManager.canUseSandbag()) {
-      Logger.info('weapons', '⚠️ No sandbags remaining');
+      Logger.info('weapons', ' No sandbags remaining');
       return false;
     }
 

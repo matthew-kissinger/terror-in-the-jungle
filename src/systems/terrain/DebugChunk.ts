@@ -37,7 +37,7 @@ export class DebugChunk {
   }
 
   async generate(): Promise<void> {
-    Logger.info('debug-chunk', `🔍 DEBUG CHUNK (${this.chunkX}, ${this.chunkZ}) - Starting generation`);
+    Logger.info('debug-chunk', ` DEBUG CHUNK (${this.chunkX}, ${this.chunkZ}) - Starting generation`);
     
     // Generate simple test pattern for height
     this.generateTestHeightData();
@@ -48,11 +48,11 @@ export class DebugChunk {
     // Add debug markers
     this.addDebugMarkers();
     
-    Logger.info('debug-chunk', `✅ DEBUG CHUNK complete`);
+    Logger.info('debug-chunk', ` DEBUG CHUNK complete`);
   }
 
   private generateTestHeightData(): void {
-    Logger.info('debug-chunk', `📊 Generating test height data...`);
+    Logger.info('debug-chunk', ` Generating test height data...`);
     
     // Create a simple ramp pattern for easy debugging
     // Height increases from 0 to 20 as we go from z=0 to z=size
@@ -72,7 +72,7 @@ export class DebugChunk {
   }
 
   private async createDebugTerrainMesh(): Promise<void> {
-    Logger.info('debug-chunk', `🏗️ Creating debug terrain mesh...`);
+    Logger.info('debug-chunk', ` Creating debug terrain mesh...`);
     
     // Create plane geometry
     const geometry = new THREE.PlaneGeometry(
@@ -133,7 +133,7 @@ export class DebugChunk {
   }
 
   private addDebugMarkers(): void {
-    Logger.info('debug-chunk', `🎯 Adding debug markers...`);
+    Logger.info('debug-chunk', ` Adding debug markers...`);
     
     // Add spheres at key points to visualize height sampling
     const testPoints = [
@@ -206,10 +206,10 @@ export class DebugChunk {
     const localX = worldX - (this.chunkX * this.size);
     const localZ = worldZ - (this.chunkZ * this.size);
     
-    Logger.info('debug-chunk', `🔍 getHeightAt world (${worldX.toFixed(1)}, ${worldZ.toFixed(1)}) -> local (${localX.toFixed(1)}, ${localZ.toFixed(1)})`);
+    Logger.info('debug-chunk', ` getHeightAt world (${worldX.toFixed(1)}, ${worldZ.toFixed(1)}) -> local (${localX.toFixed(1)}, ${localZ.toFixed(1)})`);
     
     if (localX < 0 || localX > this.size || localZ < 0 || localZ > this.size) {
-      Logger.info('debug-chunk', `  ❌ Out of bounds!`);
+      Logger.info('debug-chunk', `   Out of bounds!`);
       return 0;
     }
     

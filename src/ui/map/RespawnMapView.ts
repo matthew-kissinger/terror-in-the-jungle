@@ -313,9 +313,9 @@ export class RespawnMapView {
     this.gameModeManager = manager;
     if (manager) {
       this.worldSize = manager.getWorldSize();
-      Logger.info('ui', `📐 RespawnMapView: Setting world size to ${this.worldSize}`);
+      Logger.info('ui', ` RespawnMapView: Setting world size to ${this.worldSize}`);
       this.updateMapScale();
-      Logger.info('ui', `📐 RespawnMapView: Map scale set to ${this.mapScale}`);
+      Logger.info('ui', ` RespawnMapView: Map scale set to ${this.mapScale}`);
     }
     this.updateSpawnableZones();
     this.render(); // Re-render with new scale

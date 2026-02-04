@@ -141,7 +141,7 @@ export class WeaponAnimations {
 
     this.isPumpAnimating = true
     this.pumpAnimationProgress = 0
-    Logger.info('player', '🔫 Pump action!')
+    Logger.info('player', 'Pump action!')
   }
 
   getPumpOffset(): { x: number; y: number; z: number } {

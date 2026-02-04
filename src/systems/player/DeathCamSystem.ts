@@ -42,7 +42,7 @@ export class DeathCamSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('player', '💀 DeathCamSystem initialized');
+    Logger.info('player', ' DeathCamSystem initialized');
     this.overlay.createOverlay();
   }
 
@@ -86,7 +86,7 @@ export class DeathCamSystem implements GameSystem {
 
   // Start death cam sequence
   startDeathCam(deathPosition: THREE.Vector3, killerInfo?: KillerInfo): void {
-    Logger.info('player', '💀 Starting death cam sequence');
+    Logger.info('player', ' Starting death cam sequence');
 
     this.isActive = true;
     this.deathPosition = deathPosition.clone();

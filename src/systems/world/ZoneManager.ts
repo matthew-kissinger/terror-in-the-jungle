@@ -84,8 +84,8 @@ export class ZoneManager implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('world', '🚩 Initializing Zone Manager...');
-    Logger.info('world', '⏳ Zone Manager initialized, waiting for ChunkManager connection...');
+    Logger.info('world', ' Initializing Zone Manager...');
+    Logger.info('world', ' Zone Manager initialized, waiting for ChunkManager connection...');
   }
 
 
@@ -236,9 +236,9 @@ export class ZoneManager implements GameSystem {
 
   initializeZones(): void {
     if (this.zones.size === 0 && this.chunkManager) {
-      Logger.info('world', '🚩 Creating zones with terrain mapping...');
+      Logger.info('world', ' Creating zones with terrain mapping...');
       this.zoneInitializer.createDefaultZones(this.zones, this.occupants);
-      Logger.info('world', `✅ Zones created with terrain mapping: ${this.zones.size} zones`);
+      Logger.info('world', ` Zones created with terrain mapping: ${this.zones.size} zones`);
     }
   }
 

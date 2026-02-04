@@ -56,7 +56,7 @@ export class CombatantRenderer {
   setPlayerSquadId(squadId: string | undefined): void {
     this.playerSquadId = squadId;
     this.playerSquadDetected = false;
-    Logger.info('combat-renderer', `🎨 Renderer: Player squad ID set to: ${squadId}`);
+    Logger.info('combat-renderer', ` Renderer: Player squad ID set to: ${squadId}`);
   }
 
   updateBillboards(combatants: Map<string, Combatant>, playerPosition: THREE.Vector3): void {
@@ -69,7 +69,7 @@ export class CombatantRenderer {
       let debugCount = 0;
       combatants.forEach(c => {
         if (c.faction === Faction.US && debugCount < 3 && c.position.distanceTo(playerPosition) < 50) {
-          Logger.info('combat-renderer', `🔍 Debug US combatant: id=${c.id}, squadId=${c.squadId}, playerSquadId=${this.playerSquadId}, match=${c.squadId === this.playerSquadId}`);
+          Logger.info('combat-renderer', ` Debug US combatant: id=${c.id}, squadId=${c.squadId}, playerSquadId=${this.playerSquadId}, match=${c.squadId === this.playerSquadId}`);
           debugCount++;
         }
       });
@@ -104,7 +104,7 @@ export class CombatantRenderer {
       combatantGroups.get(key)!.push(combatant);
 
       if (isPlayerSquad && !this.playerSquadDetected) {
-        Logger.info('combat-renderer', `✅ Player squad member detected: ${combatant.id}, squadId: ${combatant.squadId}, rendering as: ${key}`);
+        Logger.info('combat-renderer', ` Player squad member detected: ${combatant.id}, squadId: ${combatant.squadId}, rendering as: ${key}`);
         this.playerSquadDetected = true;
       }
     });
@@ -353,7 +353,7 @@ export class CombatantRenderer {
   // Apply a preset configuration
   applyPreset(preset: ShaderPreset): void {
     this.shaderSettings.applyPreset(preset);
-    Logger.info('combat-renderer', `🎨 Applied NPC shader preset: ${preset}`);
+    Logger.info('combat-renderer', ` Applied NPC shader preset: ${preset}`);
   }
 
   // Get current shader settings
