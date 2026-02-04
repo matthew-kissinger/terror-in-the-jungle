@@ -1,297 +1,40 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { ZoneManager } from '../../systems/world/ZoneManager';
+import { createCompassDOM } from './CompassDOMBuilder';
+import { updateZoneMarkers, type ZoneMarkerState } from './CompassZoneMarkers';
 
 export class CompassSystem implements GameSystem {
   private camera: THREE.Camera;
   private zoneManager?: ZoneManager;
 
-  // DOM elements
   private compassContainer!: HTMLDivElement;
   private compassRose!: HTMLDivElement;
   private headingText!: HTMLElement;
-  private directionIndicator!: HTMLElement;
   private markersContainer!: HTMLDivElement;
+  private styleSheet!: HTMLStyleElement;
 
-  // Player tracking
-  private playerHeading = 0; // In radians, 0 = North (-Z), π/2 = East (+X)
+  private playerHeading = 0;
 
-  // Scratch vectors to avoid per-frame allocations
   private readonly cameraDir = new THREE.Vector3();
-  private readonly cameraPos = new THREE.Vector3();
-  private readonly dirToZone = new THREE.Vector3();
 
   private zoneUpdateTimer = 0;
-  private static readonly ZONE_UPDATE_INTERVAL = 100; // ms
+  private static readonly ZONE_UPDATE_INTERVAL = 100;
 
-  // Cached zone markers
-  private readonly zoneMarkers = new Map<string, HTMLDivElement>();
-  private readonly seenZones = new Set<string>();
-
-  private readonly COMPASS_STYLES = `
-    .compass-container {
-      position: fixed;
-      top: 120px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 180px;
-      height: 80px;
-      z-index: 115;
-      pointer-events: none;
-    }
-
-    .compass-rose-container {
-      position: relative;
-      width: 180px;
-      height: 50px;
-      background: linear-gradient(to bottom, rgba(10, 10, 14, 0.5), rgba(10, 10, 14, 0.2));
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 6px;
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
-      overflow: hidden;
-    }
-
-    .compass-rose {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 1440px; /* Quadruple width for better seamless rotation */
-      height: 40px;
-      transform: translate(-50%, -50%);
-      transition: none;
-    }
-
-    .compass-marks {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .compass-cardinal {
-      position: absolute;
-      color: rgba(255, 255, 255, 0.9);
-      font-family: 'Courier New', monospace;
-      font-weight: bold;
-      font-size: 18px;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    .compass-cardinal.north { color: #ff4444; }
-    .compass-cardinal.east { color: rgba(255, 255, 255, 0.7); }
-    .compass-cardinal.south { color: rgba(255, 255, 255, 0.7); }
-    .compass-cardinal.west { color: rgba(255, 255, 255, 0.7); }
-
-    .compass-degree {
-      position: absolute;
-      color: rgba(255, 255, 255, 0.4);
-      font-family: 'Courier New', monospace;
-      font-size: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-    }
-
-    .compass-center-marker {
-      position: absolute;
-      top: 0;
-      left: 50%;
-      width: 2px;
-      height: 100%;
-      background: linear-gradient(to bottom,
-        rgba(255, 255, 255, 0.8) 0%,
-        rgba(255, 255, 255, 0.6) 20%,
-        transparent 40%,
-        transparent 60%,
-        rgba(255, 255, 255, 0.6) 80%,
-        rgba(255, 255, 255, 0.8) 100%
-      );
-      transform: translateX(-50%);
-      z-index: 10;
-      pointer-events: none;
-    }
-
-    .compass-heading {
-      position: absolute;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      color: rgba(255, 255, 255, 0.9);
-      font-family: 'Courier New', monospace;
-      font-size: 14px;
-      font-weight: bold;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-      padding: 2px 8px;
-      background: rgba(0, 0, 0, 0.4);
-      border-radius: 4px;
-    }
-
-    .compass-tick {
-      position: absolute;
-      width: 1px;
-      height: 10px;
-      background: rgba(255, 255, 255, 0.3);
-      top: 50%;
-      transform: translateY(-50%);
-    }
-
-    .compass-markers {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
-
-    .compass-marker {
-      position: absolute;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      width: 20px;
-      height: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: 'Courier New', monospace;
-      font-weight: bold;
-      font-size: 11px;
-      border-radius: 50%;
-      border: 2px solid;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-    }
-
-    .compass-marker.friendly {
-      background: rgba(0, 100, 255, 0.3);
-      border-color: rgba(0, 150, 255, 0.8);
-      color: rgba(0, 200, 255, 1);
-    }
-
-    .compass-marker.enemy {
-      background: rgba(255, 50, 50, 0.3);
-      border-color: rgba(255, 100, 100, 0.8);
-      color: rgba(255, 150, 150, 1);
-    }
-
-    .compass-marker.neutral {
-      background: rgba(255, 255, 255, 0.2);
-      border-color: rgba(255, 255, 255, 0.6);
-      color: rgba(255, 255, 255, 0.9);
-    }
-
-    .compass-marker.contested {
-      animation: compassBlink 0.6s infinite;
-      background: rgba(255, 200, 0, 0.3);
-      border-color: rgba(255, 200, 0, 0.8);
-      color: rgba(255, 220, 100, 1);
-    }
-
-    @keyframes compassBlink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }
-  `;
+  private readonly zoneMarkerState: ZoneMarkerState = {
+    zoneMarkers: new Map<string, HTMLDivElement>(),
+    seenZones: new Set<string>()
+  };
 
   constructor(camera: THREE.Camera) {
     this.camera = camera;
 
-    // Create compass container
-    this.compassContainer = document.createElement('div');
-    this.compassContainer.className = 'compass-container';
-
-    // Create rose container
-    const roseContainer = document.createElement('div');
-    roseContainer.className = 'compass-rose-container';
-
-    // Create rotating compass rose
-    this.compassRose = document.createElement('div');
-    this.compassRose.className = 'compass-rose';
-
-    // Create compass marks
-    const marks = document.createElement('div');
-    marks.className = 'compass-marks';
-
-    // Add cardinal directions (we'll add two sets for seamless scrolling)
-    const directions = [
-      { text: 'N', deg: 0, cardinal: true, isNorth: true },
-      { text: '30', deg: 30, cardinal: false },
-      { text: '60', deg: 60, cardinal: false },
-      { text: 'E', deg: 90, cardinal: true },
-      { text: '120', deg: 120, cardinal: false },
-      { text: '150', deg: 150, cardinal: false },
-      { text: 'S', deg: 180, cardinal: true },
-      { text: '210', deg: 210, cardinal: false },
-      { text: '240', deg: 240, cardinal: false },
-      { text: 'W', deg: 270, cardinal: true },
-      { text: '300', deg: 300, cardinal: false },
-      { text: '330', deg: 330, cardinal: false }
-    ];
-
-    // Add four sets of directions for better seamless rotation
-    for (let setIndex = 0; setIndex < 4; setIndex++) {
-      directions.forEach(dir => {
-        const elem = document.createElement('div');
-        if (dir.cardinal) {
-          elem.className = `compass-cardinal ${dir.text.toLowerCase()}`;
-          elem.textContent = dir.text;
-        } else {
-          elem.className = 'compass-degree';
-          elem.textContent = dir.text;
-        }
-
-        // Position around the compass (2 pixels per degree)
-        const position = (dir.deg + setIndex * 360) * 2;
-        elem.style.left = `${position}px`;
-        elem.style.transform = 'translateX(-50%) translateY(-50%)';
-        elem.style.top = '50%';
-
-        marks.appendChild(elem);
-      });
-
-      // Add tick marks
-      for (let deg = 0; deg < 360; deg += 10) {
-        if (deg % 30 !== 0) { // Skip positions where we have text
-          const tick = document.createElement('div');
-          tick.className = 'compass-tick';
-          const position = (deg + setIndex * 360) * 2;
-          tick.style.left = `${position}px`;
-          tick.style.transform = 'translateX(-50%)';
-          marks.appendChild(tick);
-        }
-      }
-    }
-
-    this.compassRose.appendChild(marks);
-    roseContainer.appendChild(this.compassRose);
-
-    // Add center marker (stays fixed)
-    const centerMarker = document.createElement('div');
-    centerMarker.className = 'compass-center-marker';
-    roseContainer.appendChild(centerMarker);
-
-    // Create zone markers container
-    this.markersContainer = document.createElement('div');
-    this.markersContainer.className = 'compass-markers';
-    roseContainer.appendChild(this.markersContainer);
-
-    // Add heading text
-    this.headingText = document.createElement('div');
-    this.headingText.className = 'compass-heading';
-    this.headingText.textContent = '000°';
-
-    // Assemble
-    this.compassContainer.appendChild(roseContainer);
-    this.compassContainer.appendChild(this.headingText);
-
-    // Add styles
-    const styleSheet = document.createElement('style');
-    styleSheet.textContent = this.COMPASS_STYLES;
-    document.head.appendChild(styleSheet);
-
-    // Store style reference for disposal
-    (this.compassContainer as any).styleSheet = styleSheet;
+    const dom = createCompassDOM();
+    this.compassContainer = dom.compassContainer;
+    this.compassRose = dom.compassRose;
+    this.headingText = dom.headingText;
+    this.markersContainer = dom.markersContainer;
+    this.styleSheet = dom.styleSheet;
   }
 
   async init(): Promise<void> {
@@ -301,135 +44,34 @@ export class CompassSystem implements GameSystem {
   }
 
   update(deltaTime: number): void {
-    // Get camera direction
     this.camera.getWorldDirection(this.cameraDir);
 
-    // Calculate heading from true north
-    // IMPORTANT: In our game world after the map flip:
-    // - North (towards OPFOR) is actually +Z direction
-    // - South (towards US) is -Z direction
-    // - East is -X direction
-    // - West is +X direction
-    // This is because we flipped both axes on the map
-    // So we need to calculate heading accordingly
     this.playerHeading = Math.atan2(-this.cameraDir.x, this.cameraDir.z);
 
-    // Convert to degrees (0-360)
     let headingDegrees = this.playerHeading * 180 / Math.PI;
-    // Normalize to 0-360 range
     while (headingDegrees < 0) headingDegrees += 360;
     while (headingDegrees >= 360) headingDegrees -= 360;
 
-    // Update heading text
     const displayDegrees = Math.round(headingDegrees);
     this.headingText.textContent = `${displayDegrees.toString().padStart(3, '0')}°`;
 
-    // Slide the compass strip horizontally so current heading appears at center
-    // The strip has markings at 2 pixels per degree
-    // We slide LEFT when turning right (heading increases) to show higher degrees at center
     const pixelsPerDegree = 2;
-    // Start with north (0°) at center when heading is 0
-    // The strip has 4 sets of 360° (1440° total)
-    // We want the current heading to appear at center
-    const offset = -headingDegrees * pixelsPerDegree + 720; // 720 is center of second set
-
+    const offset = -headingDegrees * pixelsPerDegree + 720;
     this.compassRose.style.transform = `translate(calc(-50% + ${offset}px), -50%)`;
 
-    // Update zone markers
     if (this.zoneManager) {
       this.zoneUpdateTimer += deltaTime * 1000;
       if (this.zoneUpdateTimer >= CompassSystem.ZONE_UPDATE_INTERVAL) {
-        this.updateZoneMarkers(headingDegrees);
+        updateZoneMarkers({
+          camera: this.camera,
+          zoneManager: this.zoneManager,
+          markersContainer: this.markersContainer,
+          playerHeadingDegrees: headingDegrees,
+          state: this.zoneMarkerState
+        });
         this.zoneUpdateTimer = 0;
       }
     }
-  }
-
-  private updateZoneMarkers(playerHeadingDegrees: number): void {
-    if (!this.zoneManager) return;
-
-    // Get camera position to calculate relative directions
-    (this.camera as any).getWorldPosition(this.cameraPos);
-
-    // Get all zones
-    const zones = (this.zoneManager as any).zones as Map<string, any>;
-    if (!zones) return;
-
-    const compassWidth = 200; // Width of the compass display
-    const centerX = compassWidth / 2; // Center of compass
-    this.seenZones.clear();
-
-    zones.forEach((zone) => {
-      const zoneId = zone.id as string;
-      this.seenZones.add(zoneId);
-
-      // Calculate direction from player to zone
-      this.dirToZone.subVectors(zone.position, this.cameraPos);
-      const directionAngle = Math.atan2(-this.dirToZone.x, this.dirToZone.z) * 180 / Math.PI;
-
-      // Normalize angle
-      let angle = directionAngle;
-      while (angle < 0) angle += 360;
-      while (angle >= 360) angle -= 360;
-
-      // Calculate relative angle from player's current heading
-      let relativeAngle = angle - playerHeadingDegrees;
-      while (relativeAngle < -180) relativeAngle += 360;
-      while (relativeAngle > 180) relativeAngle -= 360;
-
-      // Only show markers within ±90 degrees of current view
-      const isVisible = Math.abs(relativeAngle) <= 90;
-
-      // Calculate pixel position on compass (2 pixels per degree)
-      const markerX = centerX + relativeAngle * 2;
-
-      // Determine marker styling based on zone state
-      let markerClass = 'compass-marker ';
-      const displayText = zoneId.charAt(0).toUpperCase();
-
-      const state = zone.state;
-      const Faction = (this.zoneManager as any).constructor.Faction;
-
-      if (state === 'contested') {
-        markerClass += 'contested';
-      } else if (zone.owner === Faction?.US) {
-        markerClass += 'friendly';
-      } else if (zone.owner === Faction?.OPFOR) {
-        markerClass += 'enemy';
-      } else {
-        markerClass += 'neutral';
-      }
-
-      // Create marker element if needed
-      let marker = this.zoneMarkers.get(zoneId);
-      if (!marker) {
-        marker = document.createElement('div');
-        marker.className = 'compass-marker neutral';
-        marker.style.display = 'none';
-        this.zoneMarkers.set(zoneId, marker);
-        this.markersContainer.appendChild(marker);
-      }
-
-      if (isVisible) {
-        marker.style.display = 'flex';
-        marker.style.left = `${markerX}px`;
-      } else {
-        marker.style.display = 'none';
-      }
-
-      marker.className = markerClass;
-      marker.textContent = displayText;
-    });
-
-    // Remove markers for zones that no longer exist
-    this.zoneMarkers.forEach((marker, zoneId) => {
-      if (!this.seenZones.has(zoneId)) {
-        if (marker.parentNode) {
-          marker.parentNode.removeChild(marker);
-        }
-        this.zoneMarkers.delete(zoneId);
-      }
-    });
   }
 
   setZoneManager(manager: ZoneManager): void {
@@ -441,12 +83,11 @@ export class CompassSystem implements GameSystem {
       this.compassContainer.parentNode.removeChild(this.compassContainer);
     }
 
-    this.zoneMarkers.clear();
+    this.zoneMarkerState.zoneMarkers.clear();
+    this.zoneMarkerState.seenZones.clear();
 
-    // Remove styles
-    const styleSheet = (this.compassContainer as any).styleSheet;
-    if (styleSheet && styleSheet.parentNode) {
-      styleSheet.parentNode.removeChild(styleSheet);
+    if (this.styleSheet && this.styleSheet.parentNode) {
+      this.styleSheet.parentNode.removeChild(this.styleSheet);
     }
 
     console.log('🧹 Compass System disposed');

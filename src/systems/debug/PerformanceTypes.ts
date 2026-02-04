@@ -25,6 +25,14 @@ export interface SpatialGridTelemetry {
   lastSyncMs: number
 }
 
+export interface TerrainMergerTelemetry {
+  activeRings: number
+  totalChunks: number
+  pendingMerge: boolean
+  estimatedDrawCallSavings: number
+  enabled: boolean
+}
+
 export interface TelemetryReport {
   fps: number
   avgFrameMs: number
@@ -37,6 +45,7 @@ export interface TelemetryReport {
     hitRate: number
   }
   gpu: GPUTelemetry
+  terrainMerger?: TerrainMergerTelemetry
 }
 
 export type { GPUTelemetry, BenchmarkResult }
