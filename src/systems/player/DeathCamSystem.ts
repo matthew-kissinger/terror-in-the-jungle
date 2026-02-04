@@ -1,16 +1,7 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { Combatant } from '../combat/types';
-
-export interface KillerInfo {
-  name: string;
-  position: THREE.Vector3;
-  weaponName: string;
-  faction: string;
-  distance: number;
-  wasHeadshot?: boolean;
-}
+import { DeathCamOverlay, type KillerInfo } from './DeathCamOverlay';
 
 export class DeathCamSystem implements GameSystem {
   private static readonly UP_AXIS = new THREE.Vector3(0, 1, 0);
@@ -43,16 +34,16 @@ export class DeathCamSystem implements GameSystem {
   private readonly ORBIT_HEIGHT = 4;
   private readonly ORBIT_SPEED = 0.3; // radians per second
 
-  // UI overlay
-  private overlayElement?: HTMLDivElement;
+  private readonly overlay: DeathCamOverlay;
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
+    this.overlay = new DeathCamOverlay();
   }
 
   async init(): Promise<void> {
     Logger.info('player', '💀 DeathCamSystem initialized');
-    this.createOverlay();
+    this.overlay.createOverlay();
   }
 
   update(deltaTime: number): void {
@@ -90,10 +81,7 @@ export class DeathCamSystem implements GameSystem {
 
   dispose(): void {
     this.hideOverlay();
-    if (this.overlayElement?.parentElement) {
-      this.overlayElement.parentElement.removeChild(this.overlayElement);
-      this.overlayElement = undefined;
-    }
+    this.overlay.dispose();
   }
 
   // Start death cam sequence
@@ -217,190 +205,17 @@ export class DeathCamSystem implements GameSystem {
     this.camera.lookAt(lookTarget);
   }
 
-  private createOverlay(): void {
-    this.overlayElement = document.createElement('div');
-    this.overlayElement.id = 'death-cam-overlay';
-    this.overlayElement.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      pointer-events: none;
-      z-index: 9000;
-      display: none;
-      font-family: 'Courier New', monospace;
-    `;
-
-    // Vignette effect
-    const vignette = document.createElement('div');
-    vignette.style.cssText = `
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: radial-gradient(circle, transparent 30%, rgba(0,0,0,0.7) 100%);
-      pointer-events: none;
-    `;
-    this.overlayElement.appendChild(vignette);
-
-    // Death info panel (top center)
-    const infoPanel = document.createElement('div');
-    infoPanel.id = 'death-info-panel';
-    infoPanel.style.cssText = `
-      position: absolute;
-      top: 20%;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.85);
-      border: 2px solid #ff0000;
-      border-radius: 4px;
-      padding: 20px 40px;
-      text-align: center;
-      animation: fadeSlideIn 0.5s ease-out;
-    `;
-
-    // Killer name
-    const killerText = document.createElement('div');
-    killerText.id = 'killer-name';
-    killerText.style.cssText = `
-      color: #ff0000;
-      font-size: 32px;
-      font-weight: bold;
-      text-transform: uppercase;
-      margin-bottom: 10px;
-      text-shadow: 0 0 10px rgba(255,0,0,0.5);
-    `;
-    infoPanel.appendChild(killerText);
-
-    // Weapon and distance info
-    const detailsText = document.createElement('div');
-    detailsText.id = 'kill-details';
-    detailsText.style.cssText = `
-      color: #ffffff;
-      font-size: 16px;
-      margin-top: 10px;
-    `;
-    infoPanel.appendChild(detailsText);
-
-    // Headshot indicator
-    const headshotText = document.createElement('div');
-    headshotText.id = 'headshot-indicator';
-    headshotText.style.cssText = `
-      color: #ffaa00;
-      font-size: 18px;
-      font-weight: bold;
-      margin-top: 10px;
-      text-transform: uppercase;
-      display: none;
-    `;
-    headshotText.textContent = '💀 HEADSHOT 💀';
-    infoPanel.appendChild(headshotText);
-
-    this.overlayElement.appendChild(infoPanel);
-
-    // Respawn timer (bottom center)
-    const timerText = document.createElement('div');
-    timerText.id = 'death-respawn-timer';
-    timerText.style.cssText = `
-      position: absolute;
-      bottom: 30%;
-      left: 50%;
-      transform: translateX(-50%);
-      color: #888888;
-      font-size: 16px;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-    `;
-    this.overlayElement.appendChild(timerText);
-
-    // Add CSS animation
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes fadeSlideIn {
-        from {
-          opacity: 0;
-          transform: translateX(-50%) translateY(-20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(-50%) translateY(0);
-        }
-      }
-
-      @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-      }
-
-      #death-respawn-timer {
-        animation: pulse 2s infinite;
-      }
-    `;
-    this.overlayElement.appendChild(style);
-
-    document.body.appendChild(this.overlayElement);
-  }
-
   private showOverlay(): void {
-    if (!this.overlayElement) return;
-
-    this.overlayElement.style.display = 'block';
-
-    // Update killer info
-    const killerNameEl = document.getElementById('killer-name');
-    const killDetailsEl = document.getElementById('kill-details');
-    const headshotEl = document.getElementById('headshot-indicator');
-
-    if (this.killerInfo) {
-      if (killerNameEl) {
-        killerNameEl.textContent = `KILLED BY ${this.killerInfo.name}`;
-      }
-
-      if (killDetailsEl) {
-        killDetailsEl.innerHTML = `
-          <div style="margin-bottom: 5px;">Weapon: ${this.killerInfo.weaponName}</div>
-          <div>Distance: ${Math.round(this.killerInfo.distance)}m</div>
-        `;
-      }
-
-      if (headshotEl && this.killerInfo.wasHeadshot) {
-        headshotEl.style.display = 'block';
-      }
-    } else {
-      if (killerNameEl) {
-        killerNameEl.textContent = 'K.I.A.';
-      }
-      if (killDetailsEl) {
-        killDetailsEl.textContent = 'Killed in Action';
-      }
-    }
-
-    // Update respawn timer
-    const timerEl = document.getElementById('death-respawn-timer');
-    if (timerEl) {
-      timerEl.textContent = 'Preparing respawn...';
-    }
+    this.overlay.showOverlay(this.killerInfo);
   }
 
   private hideOverlay(): void {
-    if (this.overlayElement) {
-      this.overlayElement.style.display = 'none';
-    }
+    this.overlay.hideOverlay();
   }
 
   // Update respawn countdown (called externally)
   updateRespawnTimer(secondsRemaining: number): void {
     if (!this.isActive) return;
-
-    const timerEl = document.getElementById('death-respawn-timer');
-    if (timerEl) {
-      if (secondsRemaining > 0) {
-        timerEl.textContent = `Respawn available in ${Math.ceil(secondsRemaining)}s`;
-      } else {
-        timerEl.textContent = 'Press to respawn';
-      }
-    }
+    this.overlay.updateRespawnTimer(secondsRemaining);
   }
 }
