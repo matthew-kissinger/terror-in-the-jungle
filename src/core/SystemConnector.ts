@@ -142,6 +142,7 @@ export class SystemConnector {
     if (combatantAI) {
       combatantAI.setSandbagSystem(refs.sandbagSystem);
       combatantAI.setZoneManager(refs.zoneManager);
+      combatantAI.setSmokeCloudSystem(refs.smokeCloudSystem);
     }
 
     // Connect influence map system

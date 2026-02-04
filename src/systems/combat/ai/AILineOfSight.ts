@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Combatant } from '../types';
 import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
+import { SmokeCloudSystem } from '../../effects/SmokeCloudSystem';
 
 // Module-level scratch vectors for LOS checks
 const _toTarget = new THREE.Vector3();
@@ -18,6 +19,7 @@ const _ray = new THREE.Ray();
 export class AILineOfSight {
   private chunkManager?: ImprovedChunkManager;
   private sandbagSystem?: SandbagSystem;
+  private smokeCloudSystem?: SmokeCloudSystem;
 
   setChunkManager(chunkManager: ImprovedChunkManager): void {
     this.chunkManager = chunkManager;
@@ -25,6 +27,10 @@ export class AILineOfSight {
 
   setSandbagSystem(sandbagSystem: SandbagSystem): void {
     this.sandbagSystem = sandbagSystem;
+  }
+
+  setSmokeCloudSystem(smokeCloudSystem: SmokeCloudSystem): void {
+    this.smokeCloudSystem = smokeCloudSystem;
   }
 
   /**
@@ -97,6 +103,23 @@ export class AILineOfSight {
         if (intersection && _eyePos.distanceTo(intersection) < distance) {
           return false;
         }
+      }
+    }
+
+    // Smoke cloud LOS check
+    if (this.smokeCloudSystem) {
+      // Use already-computed eye positions from above checks
+      // If not computed yet (low LOD), compute them now
+      if (!combatant.lodLevel || (combatant.lodLevel !== 'high' && combatant.lodLevel !== 'medium')) {
+        _eyePos.copy(combatant.position);
+        _eyePos.y += 1.7;
+
+        _targetEyePos.copy(targetPos);
+        _targetEyePos.y += 1.7;
+      }
+
+      if (this.smokeCloudSystem.isLineBlocked(_eyePos, _targetEyePos)) {
+        return false;
       }
     }
 

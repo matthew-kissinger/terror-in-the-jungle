@@ -16,6 +16,11 @@ interface SmokeCloud {
   age: number;
 }
 
+// Module-level scratch vectors for LOS calculations
+const _closestPoint = new THREE.Vector3();
+const _lineDir = new THREE.Vector3();
+const _toPoint = new THREE.Vector3();
+
 let smokeCloudSystem: SmokeCloudSystem | undefined;
 
 export function setSmokeCloudSystem(system?: SmokeCloudSystem): void {
@@ -188,6 +193,58 @@ export class SmokeCloudSystem implements GameSystem {
     }
 
     this.clouds.push(cloud);
+  }
+
+  /**
+   * Check if a line segment passes through any active smoke cloud
+   * Returns true if the line is blocked by smoke
+   */
+  isLineBlocked(from: THREE.Vector3, to: THREE.Vector3): boolean {
+    if (this.clouds.length === 0) return false;
+
+    _lineDir.subVectors(to, from);
+    const lineLength = _lineDir.length();
+    if (lineLength === 0) return false;
+
+    _lineDir.divideScalar(lineLength);
+
+    for (const cloud of this.clouds) {
+      // Calculate effective radius based on cloud lifecycle
+      const expandEnd = cloud.expandDuration;
+      const dissipateStart = expandEnd + cloud.lingerDuration;
+
+      let effectiveRadius: number;
+      if (cloud.age < expandEnd) {
+        // During expansion
+        const t = cloud.age / expandEnd;
+        const eased = t * t * (3 - 2 * t);
+        effectiveRadius = cloud.maxRadius * eased;
+      } else if (cloud.age >= dissipateStart) {
+        // During dissipation
+        const t = (cloud.age - dissipateStart) / cloud.dissipateDuration;
+        effectiveRadius = cloud.maxRadius * (1 + 0.2 * t);
+      } else {
+        // During linger
+        effectiveRadius = cloud.maxRadius;
+      }
+
+      // Find closest point on line segment to cloud center
+      _toPoint.subVectors(cloud.group.position, from);
+      const dot = _toPoint.dot(_lineDir);
+      const clampedT = Math.max(0, Math.min(lineLength, dot));
+
+      _closestPoint.copy(from).addScaledVector(_lineDir, clampedT);
+
+      // Check if closest point is within cloud radius
+      const distSq = _closestPoint.distanceToSquared(cloud.group.position);
+      const radiusSq = effectiveRadius * effectiveRadius;
+
+      if (distSq < radiusSq) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private createCloud(): SmokeCloud {

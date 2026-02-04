@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { Combatant, CombatantState, Squad } from './types'
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager'
 import { SandbagSystem } from '../weapons/SandbagSystem'
+import { SmokeCloudSystem } from '../effects/SmokeCloudSystem'
 import { SpatialOctree } from './SpatialOctree'
 import { ZoneManager } from '../world/ZoneManager'
 import { AIStatePatrol } from './ai/AIStatePatrol'
@@ -263,6 +264,10 @@ export class CombatantAI {
   setZoneManager(zoneManager: ZoneManager): void {
     this.patrolHandler.setZoneManager(zoneManager)
     this.defendHandler.setZoneManager(zoneManager)
+  }
+
+  setSmokeCloudSystem(smokeCloudSystem: SmokeCloudSystem): void {
+    this.targeting.setSmokeCloudSystem(smokeCloudSystem)
   }
 
   // Expose tactical systems for state handlers

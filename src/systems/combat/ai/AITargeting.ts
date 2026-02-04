@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Combatant } from '../types';
 import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
+import { SmokeCloudSystem } from '../../effects/SmokeCloudSystem';
 import { SpatialOctree } from '../SpatialOctree';
 import { AITargetAcquisition } from './AITargetAcquisition';
 import { AILineOfSight } from './AILineOfSight';
@@ -36,6 +37,10 @@ export class AITargeting {
     this.sandbagSystem = sandbagSystem;
     this.lineOfSight.setSandbagSystem(sandbagSystem);
     this.coverFinding.setSandbagSystem(sandbagSystem);
+  }
+
+  setSmokeCloudSystem(smokeCloudSystem: SmokeCloudSystem): void {
+    this.lineOfSight.setSmokeCloudSystem(smokeCloudSystem);
   }
 
   findNearestEnemy(
