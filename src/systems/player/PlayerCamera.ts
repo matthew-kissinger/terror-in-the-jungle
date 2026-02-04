@@ -4,6 +4,7 @@ import { MathUtils } from '../../utils/Math';
 import { PlayerState } from '../../types';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { PlayerInput } from './PlayerInput';
+import { IHelicopterModel } from '../../types/SystemInterfaces';
 
 const _helicopterPosition = new THREE.Vector3();
 const _helicopterQuaternion = new THREE.Quaternion();
@@ -15,7 +16,7 @@ export class PlayerCamera {
   private camera: THREE.PerspectiveCamera;
   private playerState: PlayerState;
   private cameraShakeSystem?: CameraShakeSystem;
-  private helicopterModel?: any;
+  private helicopterModel?: IHelicopterModel;
 
   // Camera settings
   private pitch = 0;
@@ -36,7 +37,7 @@ export class PlayerCamera {
     this.cameraShakeSystem = cameraShakeSystem;
   }
 
-  setHelicopterModel(helicopterModel: any): void {
+  setHelicopterModel(helicopterModel: IHelicopterModel): void {
     this.helicopterModel = helicopterModel;
   }
 

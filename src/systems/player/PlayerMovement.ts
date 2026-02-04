@@ -6,7 +6,7 @@ import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { FootstepAudioSystem } from '../audio/FootstepAudioSystem';
 import { PlayerInput } from './PlayerInput';
-import { IHUDSystem } from '../../types/SystemInterfaces';
+import { IHUDSystem, IHelicopterModel } from '../../types/SystemInterfaces';
 
 const _moveVector = new THREE.Vector3();
 const _cameraDirection = new THREE.Vector3();
@@ -20,7 +20,7 @@ export class PlayerMovement {
   private chunkManager?: ImprovedChunkManager;
   private sandbagSystem?: SandbagSystem;
   private footstepAudioSystem?: FootstepAudioSystem;
-  private helicopterModel?: any;
+  private helicopterModel?: IHelicopterModel;
   private helicopterControls: HelicopterControls = {
     collective: 0,
     cyclicPitch: 0,
@@ -47,7 +47,7 @@ export class PlayerMovement {
     this.footstepAudioSystem = footstepAudioSystem;
   }
 
-  setHelicopterModel(helicopterModel: any): void {
+  setHelicopterModel(helicopterModel: IHelicopterModel): void {
     this.helicopterModel = helicopterModel;
   }
 

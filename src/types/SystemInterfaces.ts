@@ -200,6 +200,9 @@ export interface IHelicopterModel {
   setAudioListener(listener: THREE.AudioListener): void;
   exitHelicopter(): void;
   tryEnterHelicopter(): void;
+  getHelicopterPositionTo(id: string, target: THREE.Vector3): boolean;
+  getHelicopterQuaternionTo(id: string, target: THREE.Quaternion): boolean;
+  setHelicopterControls(helicopterId: string, controls: any): void;
 }
 
 /**
