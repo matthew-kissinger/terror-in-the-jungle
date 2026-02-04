@@ -33,6 +33,19 @@ assets_backup_*/
 assets_archive/
 assets_optimized/
 
+# Agent task artifacts (scratch files left by automated agents)
+CHANGES_SUMMARY.txt
+IMPLEMENTATION_SUMMARY.md
+TASK_COMPLETE.md
+VALIDATION_CHECKLIST.md
+DO_COMMIT.md
+TELEMETRY_FLOW_DIAGRAM.txt
+TERRAIN_MERGER_TELEMETRY.md
+commit_*.sh
+run_*.sh
+test_build.sh
+test_telemetry.html
+
 # Python
 __pycache__/
 *.py[cod]
