@@ -63,6 +63,12 @@ perf.reset()     // Reset all telemetry
 - TracerPool, MuzzleFlashPool, ImpactEffectsPool, ExplosionEffectsPool
 - Object pooling to avoid GC
 
+### Grenade Effects
+
+- **SmokeCloudSystem** (`src/systems/effects/SmokeCloudSystem.ts`, 286 lines) - Pooled smoke cloud sprites with screen obscuration overlay. Distance-based opacity when player enters cloud.
+- **FlashbangScreenEffect** (`src/systems/player/FlashbangScreenEffect.ts`, 150 lines) - Full-screen white overlay with distance and angle-based intensity. 3s full blind at <15m, 1.5s partial at 15-25m.
+- **GrenadeEffects** (`src/systems/weapons/GrenadeEffects.ts`, 167 lines) - Dispatches frag/smoke/flashbang explosion logic.
+
 ### LOD System
 
 CombatantSystem has distance-based LOD:
@@ -190,7 +196,7 @@ Possible areas (confirm with profiling):
 
 ### Known Tech Debt
 
-- **93 `any` type annotations** across 34 files (heaviest: SystemInterfaces.ts with 19 - intentional). Reduced from 135 via targeted refactoring in player and core modules.
+- **96 `any` type annotations** across 35 files (heaviest: SystemInterfaces.ts with 19 - intentional). Reduced from 135 via targeted refactoring in player and core modules.
 - **Logger emoji removal COMPLETE** - All Logger calls cleaned. Remaining ~35 emoji characters across 8 UI files (KillFeed, LoadingPanels, GameModeSelection, etc.) are intentional UI icons, not Logger calls.
 - **NPC-to-NPC assists not tracked** - Scoreboard shows NPC assists as 0. Player assists tracked via KillAssistTracker, but per-NPC assist display would need additional wiring.
 - **No unit/integration tests** - No test framework installed (Vitest, Jest, etc.). No *.test.ts or *.spec.ts files.
@@ -241,7 +247,7 @@ perf.benchmark(1000)  // Runs 1000 raycast iterations, returns timing stats
 
 ## Architecture
 
-~52.5k lines across 271 files. Orchestrator pattern with ongoing split refactors.
+~53k lines across 273 files. Orchestrator pattern with ongoing split refactors.
 
 ```
 src/
@@ -254,12 +260,12 @@ src/
 │   │   ├── SpatialOctree.ts     # Spatial queries
 │   │   ├── InfluenceMapSystem.ts
 │   │   └── ...
-│   ├── player/             # Controller (split: Input, Movement, Camera), weapons, health
+│   ├── player/             # Controller (split: Input, Movement, Camera), weapons, health, FlashbangScreenEffect
 │   ├── helicopter/         # HelicopterModel (split: Geometry, Animation, Audio, Physics, Interaction)
 │   ├── terrain/            # Chunks, workers, vegetation
 │   ├── world/              # Zones, billboards, tickets
 │   ├── debug/              # PerformanceTelemetry
-│   └── effects/            # Pools (tracers, muzzle, impact, explosion)
+│   └── effects/            # Pools (tracers, muzzle, impact, explosion), SmokeCloudSystem
 ├── ui/
 │   ├── hud/               # HUDElements (split: 11 focused modules)
 │   ├── map/               # FullMapSystem (split: DOMHelpers, Input, Styles)
@@ -274,7 +280,7 @@ src/
 |------|---------|-------|
 | `src/systems/debug/PerformanceTelemetry.ts` | Frame budget tracking | Use this |
 | `src/ui/debug/PerformanceOverlay.ts` | F2 visual overlay | Shows everything |
-| `src/systems/combat/CombatantSystem.ts` | NPC orchestrator | Split to 433 lines |
+| `src/systems/combat/CombatantSystem.ts` | NPC orchestrator | 440 lines (orchestrator, tolerable) |
 | `src/systems/combat/SpatialOctree.ts` | Spatial queries | 257 lines (split into Node + Query modules) |
 | `src/workers/BVHWorker.ts` | Parallel BVH | Pool of 4 workers |
 | `src/core/PixelArtSandbox.ts` | Main game loop | Where systems update (144 lines, split into 3 modules) |
