@@ -21,6 +21,6 @@
   "dependencies": {
     "postprocessing": "^6.37.8",
     "three": "^0.182.0",
-    "three-mesh-bvh": "^0.9.7"
+    "three-mesh-bvh": "^0.9.8"
   }
 }
