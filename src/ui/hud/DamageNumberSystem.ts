@@ -129,7 +129,7 @@ export class DamageNumberSystem {
     let damageNumber = this.pool.find(dn => !dn.active);
 
     if (!damageNumber) {
-      Logger.warn('ui', '⚠️ Damage number pool exhausted');
+      Logger.warn('ui', 'Damage number pool exhausted');
       return;
     }
 

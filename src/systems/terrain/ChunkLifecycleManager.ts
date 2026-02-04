@@ -123,7 +123,7 @@ export class ChunkLifecycleManager {
       // Trigger mesh merge update
       this.updateMergedMeshes();
     } catch (error) {
-      Logger.error('chunks', `❌ Failed to load chunk (${chunkX}, ${chunkZ}):`, error);
+      Logger.error('chunks', `Failed to load chunk (${chunkX}, ${chunkZ}):`, error);
     }
   }
 

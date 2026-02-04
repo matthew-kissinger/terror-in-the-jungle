@@ -132,14 +132,14 @@ export class ChunkTerrain {
         // Use lit material for natural shading based on scene lights
         material = PixelPerfectUtils.createPixelPerfectLitMaterial(texture);
         texture.repeat.set(8, 8);
-        Logger.info('terrain', `🎨 Using forestfloor texture for chunk (${this.chunkX}, ${this.chunkZ})`);
+        Logger.info('terrain', `Using forestfloor texture for chunk (${this.chunkX}, ${this.chunkZ})`);
       } else {
         // Fallback: lit material with color
         material = new THREE.MeshLambertMaterial({
           color: 0x4a7c59,
           side: THREE.DoubleSide
         });
-        Logger.warn('terrain', `⚠️ Using fallback color for chunk (${this.chunkX}, ${this.chunkZ})`);
+        Logger.warn('terrain', `Using fallback color for chunk (${this.chunkX}, ${this.chunkZ})`);
       }
     }
 

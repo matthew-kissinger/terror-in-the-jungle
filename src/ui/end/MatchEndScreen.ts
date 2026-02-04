@@ -40,7 +40,7 @@ export class MatchEndScreen {
     this.container = this.createEndScreen(winner, gameState, stats);
     document.body.appendChild(this.container);
 
-    Logger.info('ui', `🏆 Match end screen shown: ${winner} wins`);
+    Logger.info('ui', `Match end screen shown: ${winner} wins`);
   }
 
   hide(): void {

@@ -40,7 +40,7 @@ export class DayNightCycle implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('environment', '🌅 Day-Night Cycle System initialized');
+    Logger.info('environment', 'Day-Night Cycle System initialized');
   }
 
   setSandboxRenderer(renderer: ISandboxRenderer): void {
@@ -265,7 +265,7 @@ export class DayNightCycle implements GameSystem {
    */
   setTimeOfDay(hour: number): void {
     this.currentTime = hour % 24;
-    Logger.info('environment', `🕐 Time set to ${hour.toFixed(1)}:00`);
+    Logger.info('environment', `Time set to ${hour.toFixed(1)}:00`);
   }
 
   /**
@@ -282,7 +282,7 @@ export class DayNightCycle implements GameSystem {
    */
   setTimeScale(scale: number): void {
     this.timeScale = Math.max(0, scale);
-    Logger.info('environment', `⏱️ Time scale set to ${scale}x`);
+    Logger.info('environment', `Time scale set to ${scale}x`);
   }
 
   /**
@@ -301,9 +301,9 @@ export class DayNightCycle implements GameSystem {
     if (enabled) {
       // Set to midnight
       this.setTimeOfDay(0);
-      Logger.info('environment', '🌙 Night mode ENABLED - time locked to midnight');
+      Logger.info('environment', 'Night mode ENABLED - time locked to midnight');
     } else {
-      Logger.info('environment', '☀️ Night mode DISABLED - time cycle resumed');
+      Logger.info('environment', 'Night mode DISABLED - time cycle resumed');
     }
   }
 

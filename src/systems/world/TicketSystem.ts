@@ -48,11 +48,11 @@ export class TicketSystem implements GameSystem {
   private onGameEnd?: (winner: Faction, gameState: GameState) => void;
 
   constructor() {
-    Logger.info('tickets', '🎫 Initializing Ticket System...');
+    Logger.info('tickets', 'Initializing Ticket System...');
   }
 
   async init(): Promise<void> {
-    Logger.info('tickets', '🎫 Ticket System initialized');
+    Logger.info('tickets', 'Ticket System initialized');
     Logger.info('tickets', `Starting tickets: US ${this.usTickets}, OPFOR ${this.opforTickets}`);
   }
 
@@ -88,7 +88,7 @@ export class TicketSystem implements GameSystem {
       const ticketDifference = Math.abs(this.usTickets - this.opforTickets);
       if (ticketDifference < 50 && this.gameState.phase !== 'OVERTIME') {
         this.gameState.phase = 'OVERTIME';
-        Logger.info('tickets', '⚡ OVERTIME! Close match detected');
+        Logger.info('tickets', 'OVERTIME! Close match detected');
       } else if (duration > this.setupDuration + this.combatDuration + this.overtimeDuration) {
         this.endGame(this.usTickets > this.opforTickets ? Faction.US : Faction.OPFOR, 'TIME_LIMIT');
       }
@@ -210,7 +210,7 @@ export class TicketSystem implements GameSystem {
     this.gameState.winner = winner;
     this.gameState.phase = 'ENDED';
 
-    Logger.info('tickets', `🏆 GAME OVER! ${winner} wins by ${reason}`);
+    Logger.info('tickets', `GAME OVER! ${winner} wins by ${reason}`);
     Logger.info('tickets', `Final scores: US ${Math.round(this.usTickets)}, OPFOR ${Math.round(this.opforTickets)}`);
     Logger.info('tickets', `Match duration: ${Math.round(this.gameState.matchDuration)}s`);
 
@@ -227,11 +227,11 @@ export class TicketSystem implements GameSystem {
     if (faction === Faction.US) {
       this.opforKills++;
       this.usTickets = Math.max(0, this.usTickets - this.deathPenalty);
-      Logger.info('tickets', `💀 US soldier KIA, tickets: ${Math.round(this.usTickets)}, OPFOR kills: ${this.opforKills}`);
+      Logger.info('tickets', `US soldier KIA, tickets: ${Math.round(this.usTickets)}, OPFOR kills: ${this.opforKills}`);
     } else {
       this.usKills++;
       this.opforTickets = Math.max(0, this.opforTickets - this.deathPenalty);
-      Logger.info('tickets', `💀 OPFOR soldier KIA, tickets: ${Math.round(this.opforTickets)}, US kills: ${this.usKills}`);
+      Logger.info('tickets', `OPFOR soldier KIA, tickets: ${Math.round(this.opforTickets)}, US kills: ${this.usKills}`);
     }
   }
 
@@ -293,17 +293,17 @@ export class TicketSystem implements GameSystem {
     this.maxTickets = tickets;
     this.usTickets = tickets;
     this.opforTickets = tickets;
-    Logger.info('tickets', `🎮 Ticket count set to ${tickets} per team`);
+    Logger.info('tickets', `Ticket count set to ${tickets} per team`);
   }
 
   setMatchDuration(duration: number): void {
     this.combatDuration = duration;
-    Logger.info('tickets', `🎮 Match duration set to ${duration} seconds`);
+    Logger.info('tickets', `Match duration set to ${duration} seconds`);
   }
 
   setDeathPenalty(penalty: number): void {
     this.deathPenalty = penalty;
-    Logger.info('tickets', `🎮 Death penalty set to ${penalty} tickets`);
+    Logger.info('tickets', `Death penalty set to ${penalty} tickets`);
   }
 
   setTDMMode(enabled: boolean, target: number): void {
@@ -313,7 +313,7 @@ export class TicketSystem implements GameSystem {
     this.opforKills = 0;
     this.gameState.isTDM = enabled;
     this.gameState.killTarget = target;
-    Logger.info('tickets', `🎮 TDM Mode: ${enabled ? 'ENABLED' : 'DISABLED'}, Target: ${target}`);
+    Logger.info('tickets', `TDM Mode: ${enabled ? 'ENABLED' : 'DISABLED'}, Target: ${target}`);
   }
 
   setTicketUpdateCallback(callback: (usTickets: number, opforTickets: number) => void): void {
@@ -332,7 +332,7 @@ export class TicketSystem implements GameSystem {
     } else {
       this.opforTickets = Math.min(this.maxTickets, this.opforTickets + amount);
     }
-    Logger.info('tickets', `🎫 Added ${amount} tickets to ${faction}`);
+    Logger.info('tickets', `Added ${amount} tickets to ${faction}`);
   }
 
   removeTickets(faction: Faction, amount: number): void {
@@ -341,7 +341,7 @@ export class TicketSystem implements GameSystem {
     } else {
       this.opforTickets = Math.max(0, this.opforTickets - amount);
     }
-    Logger.info('tickets', `🎫 Removed ${amount} tickets from ${faction}. New totals: US ${this.usTickets}, OPFOR ${this.opforTickets}`);
+    Logger.info('tickets', `Removed ${amount} tickets from ${faction}. New totals: US ${this.usTickets}, OPFOR ${this.opforTickets}`);
   }
 
   forceEndGame(winner: Faction): void {
@@ -360,10 +360,10 @@ export class TicketSystem implements GameSystem {
       isTDM: this.isTDM,
       killTarget: this.killTarget
     };
-    Logger.info('tickets', '🔄 Match restarted');
+    Logger.info('tickets', 'Match restarted');
   }
 
   dispose(): void {
-    Logger.info('tickets', '🧹 Ticket System disposed');
+    Logger.info('tickets', 'Ticket System disposed');
   }
 }

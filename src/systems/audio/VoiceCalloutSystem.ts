@@ -101,7 +101,7 @@ export class VoiceCalloutSystem implements GameSystem {
 
     // Debug logging for nearby callouts
     if (distanceToPlayer < 20) {
-      Logger.info('audio', `🗣️ ${combatant.faction} callout: ${type} at ${Math.floor(distanceToPlayer)}m`);
+      Logger.info('audio', `${combatant.faction} callout: ${type} at ${Math.floor(distanceToPlayer)}m`);
     }
   }
 

@@ -30,7 +30,7 @@ function handleKeyDown(event: KeyboardEvent): void {
     if (sandboxRef.gameStarted) {
       const healthSystem = (sandboxRef.systemManager as any).playerHealthSystem;
       if (healthSystem && healthSystem.isAlive()) {
-        Logger.info('sandbox-input', '🔄 Initiating voluntary respawn (K pressed)');
+        Logger.info('sandbox-input', 'Initiating voluntary respawn (K pressed)');
         healthSystem.voluntaryRespawn();
       }
     }
@@ -120,7 +120,7 @@ export function togglePostProcessing(sandbox: any): void {
 
   const enabled = !sandbox.sandboxRenderer.postProcessing.isEnabled();
   sandbox.sandboxRenderer.postProcessing.setEnabled(enabled);
-  Logger.info('sandbox-input', `🎨 Post-processing ${enabled ? 'enabled' : 'disabled'}`);
+  Logger.info('sandbox-input', `Post-processing ${enabled ? 'enabled' : 'disabled'}`);
 }
 
 /**
@@ -145,5 +145,5 @@ export function adjustPixelSize(sandbox: any, delta: number): void {
 
   sandbox.currentPixelSize = Math.max(1, Math.min(8, sandbox.currentPixelSize + delta));
   sandbox.sandboxRenderer.postProcessing.setPixelSize(sandbox.currentPixelSize);
-  Logger.info('sandbox-input', `🎮 Pixel size: ${sandbox.currentPixelSize}`);
+  Logger.info('sandbox-input', `Pixel size: ${sandbox.currentPixelSize}`);
 }

@@ -35,7 +35,7 @@ export class WaterSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('environment', '💧 Initializing Water System...');
+    Logger.info('environment', 'Initializing Water System...');
     
     // Create water geometry - large plane
     const waterGeometry = new THREE.PlaneGeometry(
@@ -49,7 +49,7 @@ export class WaterSystem implements GameSystem {
     let waterNormals = this.assetLoader.getTexture('waternormals');
     if (!waterNormals) {
       // Fallback: try to load it directly
-      Logger.info('environment', '⏳ Loading water normal texture directly...');
+      Logger.info('environment', 'Loading water normal texture directly...');
       waterNormals = await new THREE.TextureLoader().loadAsync(getAssetPath('waternormals.jpg'));
     }
     
@@ -84,7 +84,7 @@ export class WaterSystem implements GameSystem {
     // Create underwater overlay
     this.createUnderwaterOverlay();
     
-    Logger.info('environment', `✅ Water System initialized at Y=${this.WATER_LEVEL}`);
+    Logger.info('environment', `Water System initialized at Y=${this.WATER_LEVEL}`);
   }
 
   private createUnderwaterOverlay(): void {
@@ -162,7 +162,7 @@ export class WaterSystem implements GameSystem {
       this.overlay.parentNode.removeChild(this.overlay);
     }
     
-    Logger.info('environment', '🧹 Water System disposed');
+    Logger.info('environment', 'Water System disposed');
   }
 
   /**

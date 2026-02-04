@@ -112,7 +112,7 @@ export class ChunkVegetation {
       this.grassInstances.push(instance);
     }
 
-    Logger.info('terrain', `✅ Generated ${maxInstances} grass instances for chunk (${this.chunkX}, ${this.chunkZ})`);
+    Logger.info('terrain', `Generated ${maxInstances} grass instances for chunk (${this.chunkX}, ${this.chunkZ})`);
   }
 
   private async generateTreeInstances(sampleHeight: (x: number, z: number) => number): Promise<void> {
@@ -263,7 +263,7 @@ export class ChunkVegetation {
       }
     }
 
-    Logger.info('terrain', `✅ Generated ${actualCount} trees (${this.biomeType}) for chunk (${this.chunkX}, ${this.chunkZ})`);
+    Logger.info('terrain', `Generated ${actualCount} trees (${this.biomeType}) for chunk (${this.chunkX}, ${this.chunkZ})`);
   }
 
   private async generateMushroomInstances(sampleHeight: (x: number, z: number) => number): Promise<void> {

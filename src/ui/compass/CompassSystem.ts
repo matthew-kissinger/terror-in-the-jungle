@@ -39,9 +39,9 @@ export class CompassSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('compass', '🧭 Initializing Compass System...');
+    Logger.info('compass', 'Initializing Compass System...');
     document.body.appendChild(this.compassContainer);
-    Logger.info('compass', '✅ Compass System initialized');
+    Logger.info('compass', 'Compass System initialized');
   }
 
   update(deltaTime: number): void {
@@ -91,6 +91,6 @@ export class CompassSystem implements GameSystem {
       this.styleSheet.parentNode.removeChild(this.styleSheet);
     }
 
-    Logger.info('compass', '🧹 Compass System disposed');
+    Logger.info('compass', 'Compass System disposed');
   }
 }

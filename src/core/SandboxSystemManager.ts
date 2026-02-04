@@ -151,21 +151,21 @@ export class SandboxSystemManager {
     if (this.chunkManager) {
       // Generate US base chunks
       const usBasePos = new THREE.Vector3(0, 0, -50);
-      Logger.info('core', '🇺🇸 Generating US base chunks...');
+      Logger.info('core', 'Generating US base chunks...');
       this.chunkManager.updatePlayerPosition(usBasePos);
       this.chunkManager.update(0.01);
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Generate OPFOR base chunks
       const opforBasePos = new THREE.Vector3(0, 0, 145);
-      Logger.info('core', '🚩 Generating OPFOR base chunks...');
+      Logger.info('core', 'Generating OPFOR base chunks...');
       this.chunkManager.updatePlayerPosition(opforBasePos);
       this.chunkManager.update(0.01);
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Generate middle battlefield chunks
       const centerPos = new THREE.Vector3(0, 0, 50);
-      Logger.info('core', '⚔️ Generating battlefield chunks...');
+      Logger.info('core', 'Generating battlefield chunks...');
       this.chunkManager.updatePlayerPosition(centerPos);
       this.chunkManager.update(0.01);
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -176,7 +176,7 @@ export class SandboxSystemManager {
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Initialize zones after chunk generation
-      Logger.info('core', '🚩 Initializing zones after chunk generation...');
+      Logger.info('core', 'Initializing zones after chunk generation...');
       this.zoneManager.initializeZones();
     }
   }

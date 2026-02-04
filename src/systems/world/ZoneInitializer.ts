@@ -140,7 +140,7 @@ export class ZoneInitializer {
       currentFlagHeight: 0
     };
 
-    Logger.info('world', `📍 Creating zone "${zone.name}" at position (${zone.position.x.toFixed(1)}, ${zone.position.y.toFixed(1)}, ${zone.position.z.toFixed(1)})`);
+    Logger.info('world', `Creating zone "${zone.name}" at position (${zone.position.x.toFixed(1)}, ${zone.position.y.toFixed(1)}, ${zone.position.z.toFixed(1)})`);
 
     // Create visual representation
     this.zoneRenderer.createZoneVisuals(zone);
@@ -157,7 +157,7 @@ export class ZoneInitializer {
   ): void {
     if (!this.gameModeConfig) return;
 
-    Logger.info('world', `🎮 Creating zones for game mode: ${this.gameModeConfig.name}`);
+    Logger.info('world', `Creating zones for game mode: ${this.gameModeConfig.name}`);
 
     for (const zoneConfig of this.gameModeConfig.zones) {
       const position = this.terrainAdapter.findSuitableZonePosition(
@@ -180,6 +180,6 @@ export class ZoneInitializer {
       );
     }
 
-    Logger.info('world', `✅ Created ${zones.size} zones for ${this.gameModeConfig.name}`);
+    Logger.info('world', `Created ${zones.size} zones for ${this.gameModeConfig.name}`);
   }
 }

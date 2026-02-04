@@ -109,9 +109,9 @@ export class FullMapSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('ui', '🗺️ Initializing Full Map System...');
+    Logger.info('ui', 'Initializing Full Map System...');
     document.body.appendChild(this.mapContainer);
-    Logger.info('ui', '✅ Full Map System initialized');
+    Logger.info('ui', 'Full Map System initialized');
   }
 
   update(deltaTime: number): void {
@@ -362,6 +362,6 @@ export class FullMapSystem implements GameSystem {
     if (this.mapContainer.parentNode) {
       this.mapContainer.parentNode.removeChild(this.mapContainer);
     }
-    Logger.info('ui', '🧹 Full Map System disposed');
+    Logger.info('ui', 'Full Map System disposed');
   }
 }
