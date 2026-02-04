@@ -9,10 +9,22 @@
 
 import { chromium, type Browser, type Page } from 'playwright';
 import { spawn, type ChildProcess } from 'child_process';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { join } from 'path';
 
 const DEV_SERVER_PORT = 9100;
 const TEST_DURATION_SECONDS = 30;
 const NPC_COUNT = 40;
+const BASELINE_FILE = join(process.cwd(), 'perf-baselines.json');
+
+// Regression thresholds
+const THRESHOLDS = {
+  avgFrameMs: { warn: 0.10, fail: 0.25 },      // 10% warn, 25% fail
+  p95FrameMs: { warn: 0.15, fail: 0.30 },      // 15% warn, 30% fail
+  drawCalls: { warn: 0.15, fail: 0.30 },       // 15% warn, 30% fail
+  triangles: { warn: 0.15, fail: 0.30 },       // 15% warn, 30% fail
+  overBudgetPercent: { warn: 0.20, fail: 0.50 }, // 20% warn, 50% fail (absolute increase)
+};
 
 interface SandboxMetrics {
   frameCount: number;
@@ -61,6 +73,29 @@ interface RendererStats {
   geometries: number;
   textures: number;
   programs: number;
+}
+
+interface BaselineMetrics {
+  lastRun: string;
+  metrics: {
+    avgFrameMs: number;
+    p95FrameMs: number;
+    overBudgetPercent: number;
+    drawCalls: number;
+    triangles: number;
+    frameCount: number;
+    combatantCount: number;
+  };
+}
+
+interface ComparisonResult {
+  metric: string;
+  baseline: number;
+  current: number;
+  change: number;
+  changePercent: number;
+  status: 'pass' | 'warn' | 'fail';
+  threshold?: { warn: number; fail: number };
 }
 
 async function startDevServer(): Promise<ChildProcess> {
@@ -233,8 +268,20 @@ async function runBenchmark(): Promise<void> {
       return renderer.getPerformanceStats();
     }) as RendererStats | null;
 
+    // Load previous baseline
+    const previousBaseline = loadBaseline();
+
     // Print report
     printReport(sandboxMetrics, perfReport, rendererStats);
+
+    // Compare with baseline and save new baseline
+    const hasRegression = compareAndSaveBaseline(sandboxMetrics, perfReport, rendererStats, previousBaseline);
+
+    // Exit with error code if regression detected
+    if (hasRegression) {
+      console.log('\n❌ Performance regression detected! Exiting with code 1.\n');
+      process.exit(1);
+    }
 
   } catch (error) {
     console.error('\n❌ Benchmark failed:', error);
@@ -309,6 +356,208 @@ function printReport(
   console.log('\n' + '='.repeat(70));
   console.log('✅ Baseline measurement complete');
   console.log('='.repeat(70) + '\n');
+}
+
+function loadBaseline(): BaselineMetrics | null {
+  if (!existsSync(BASELINE_FILE)) {
+    console.log('📝 No previous baseline found - this will be the first baseline\n');
+    return null;
+  }
+
+  try {
+    const data = readFileSync(BASELINE_FILE, 'utf-8');
+    const baseline = JSON.parse(data) as BaselineMetrics;
+    console.log(`📊 Loaded baseline from ${new Date(baseline.lastRun).toLocaleString()}\n`);
+    return baseline;
+  } catch (error) {
+    console.error('⚠️  Failed to load baseline file:', error);
+    return null;
+  }
+}
+
+function compareAndSaveBaseline(
+  sandbox: SandboxMetrics,
+  perf: PerformanceReport,
+  renderer: RendererStats | null,
+  previousBaseline: BaselineMetrics | null
+): boolean {
+  const currentMetrics: BaselineMetrics = {
+    lastRun: new Date().toISOString(),
+    metrics: {
+      avgFrameMs: sandbox.avgFrameMs,
+      p95FrameMs: sandbox.p95FrameMs,
+      overBudgetPercent: perf.overBudgetPercent,
+      drawCalls: renderer?.drawCalls ?? 0,
+      triangles: renderer?.triangles ?? 0,
+      frameCount: sandbox.frameCount,
+      combatantCount: sandbox.combatantCount,
+    }
+  };
+
+  // Save current metrics as new baseline
+  try {
+    writeFileSync(BASELINE_FILE, JSON.stringify(currentMetrics, null, 2), 'utf-8');
+    console.log(`💾 Saved new baseline to ${BASELINE_FILE}\n`);
+  } catch (error) {
+    console.error('⚠️  Failed to save baseline file:', error);
+  }
+
+  // If no previous baseline, we're done
+  if (!previousBaseline) {
+    return false;
+  }
+
+  // Compare metrics
+  console.log('='.repeat(70));
+  console.log('REGRESSION ANALYSIS');
+  console.log('='.repeat(70) + '\n');
+
+  const comparisons: ComparisonResult[] = [];
+
+  // Compare avgFrameMs
+  comparisons.push(compareMetric(
+    'Average Frame Time (ms)',
+    previousBaseline.metrics.avgFrameMs,
+    currentMetrics.metrics.avgFrameMs,
+    THRESHOLDS.avgFrameMs,
+    true // higher is worse
+  ));
+
+  // Compare p95FrameMs
+  comparisons.push(compareMetric(
+    'P95 Frame Time (ms)',
+    previousBaseline.metrics.p95FrameMs,
+    currentMetrics.metrics.p95FrameMs,
+    THRESHOLDS.p95FrameMs,
+    true
+  ));
+
+  // Compare overBudgetPercent (absolute change)
+  comparisons.push(compareMetricAbsolute(
+    'Over Budget Frames (%)',
+    previousBaseline.metrics.overBudgetPercent,
+    currentMetrics.metrics.overBudgetPercent,
+    THRESHOLDS.overBudgetPercent
+  ));
+
+  if (renderer) {
+    // Compare drawCalls
+    comparisons.push(compareMetric(
+      'Draw Calls',
+      previousBaseline.metrics.drawCalls,
+      currentMetrics.metrics.drawCalls,
+      THRESHOLDS.drawCalls,
+      true
+    ));
+
+    // Compare triangles
+    comparisons.push(compareMetric(
+      'Triangles',
+      previousBaseline.metrics.triangles,
+      currentMetrics.metrics.triangles,
+      THRESHOLDS.triangles,
+      true
+    ));
+  }
+
+  // Print comparison table
+  console.log('Metric'.padEnd(30) + 'Baseline'.padStart(12) + 'Current'.padStart(12) + 'Change'.padStart(12) + 'Status'.padStart(10));
+  console.log('-'.repeat(76));
+
+  let hasFailure = false;
+  let hasWarning = false;
+
+  for (const comp of comparisons) {
+    const statusIcon = comp.status === 'pass' ? '✓' : comp.status === 'warn' ? '⚠️' : '❌';
+    const changeStr = comp.changePercent !== undefined
+      ? `${comp.change >= 0 ? '+' : ''}${comp.changePercent.toFixed(1)}%`
+      : `${comp.change >= 0 ? '+' : ''}${comp.change.toFixed(2)}`;
+
+    console.log(
+      comp.metric.padEnd(30) +
+      comp.baseline.toFixed(2).padStart(12) +
+      comp.current.toFixed(2).padStart(12) +
+      changeStr.padStart(12) +
+      ` ${statusIcon} ${comp.status.toUpperCase()}`.padStart(10)
+    );
+
+    if (comp.status === 'fail') hasFailure = true;
+    if (comp.status === 'warn') hasWarning = true;
+  }
+
+  console.log('\n' + '='.repeat(70));
+
+  if (hasFailure) {
+    console.log('❌ FAIL: One or more metrics exceeded failure threshold');
+  } else if (hasWarning) {
+    console.log('⚠️  WARN: One or more metrics exceeded warning threshold');
+  } else {
+    console.log('✅ PASS: All metrics within acceptable range');
+  }
+
+  console.log('='.repeat(70) + '\n');
+
+  return hasFailure;
+}
+
+function compareMetric(
+  name: string,
+  baseline: number,
+  current: number,
+  threshold: { warn: number; fail: number },
+  higherIsWorse: boolean
+): ComparisonResult {
+  const change = current - baseline;
+  const changePercent = baseline !== 0 ? (change / baseline) * 100 : 0;
+
+  let status: 'pass' | 'warn' | 'fail' = 'pass';
+
+  // Determine regression (only if metric got worse)
+  const regression = higherIsWorse ? change / baseline : -change / baseline;
+
+  if (regression > threshold.fail) {
+    status = 'fail';
+  } else if (regression > threshold.warn) {
+    status = 'warn';
+  }
+
+  return {
+    metric: name,
+    baseline,
+    current,
+    change,
+    changePercent,
+    status,
+    threshold
+  };
+}
+
+function compareMetricAbsolute(
+  name: string,
+  baseline: number,
+  current: number,
+  threshold: { warn: number; fail: number }
+): ComparisonResult {
+  const change = current - baseline;
+
+  let status: 'pass' | 'warn' | 'fail' = 'pass';
+
+  // Absolute change (not percentage)
+  if (change > threshold.fail) {
+    status = 'fail';
+  } else if (change > threshold.warn) {
+    status = 'warn';
+  }
+
+  return {
+    metric: name,
+    baseline,
+    current,
+    change,
+    changePercent: undefined,
+    status,
+    threshold
+  };
 }
 
 // Run benchmark

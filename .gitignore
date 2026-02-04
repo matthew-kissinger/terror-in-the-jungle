@@ -55,3 +55,6 @@ env/
 venv/
 .mycel/
 public/assets/originals/
+
+# Performance baselines (machine-specific, should not be committed)
+perf-baselines.json
