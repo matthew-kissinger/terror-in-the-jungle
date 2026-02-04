@@ -210,6 +210,70 @@ export class ProgrammaticGunFactory {
 
     return group;
   }
+
+  static createPistol(material?: THREE.Material): THREE.Group {
+    const group = new THREE.Group();
+
+    // Compact handgun materials
+    const metalMaterial = material || new THREE.MeshBasicMaterial({ color: 0x1c1c1c });
+
+    // Slide - top portion of pistol
+    const slide = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.12, 0.12), metalMaterial);
+    slide.position.set(0.1, 0.02, 0);
+    group.add(slide);
+
+    // Frame/receiver - slightly larger than slide
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.14, 0.14), new THREE.MeshBasicMaterial({ color: 0x252525 }));
+    frame.position.set(0, -0.01, 0);
+    group.add(frame);
+
+    // Short barrel - protruding from slide
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.15, 8), new THREE.MeshBasicMaterial({ color: 0x161616 }));
+    barrel.rotation.z = Math.PI / 2;
+    barrel.position.set(0.35, 0.02, 0);
+    group.add(barrel);
+
+    // Pistol grip - angled downward
+    const grip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.18, 0.12), new THREE.MeshBasicMaterial({ color: 0x1e1e1e }));
+    grip.position.set(-0.05, -0.15, 0);
+    grip.rotation.z = 0.15;
+    group.add(grip);
+
+    // Magazine - smaller than rifle/SMG
+    const magazine = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.16, 0.1),
+      new THREE.MeshBasicMaterial({ color: 0x191919 })
+    );
+    magazine.name = 'magazine';
+    magazine.position.set(-0.03, -0.22, 0);
+    group.add(magazine);
+
+    // Trigger guard
+    const triggerGuard = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.08), metalMaterial);
+    triggerGuard.position.set(-0.02, -0.08, 0);
+    group.add(triggerGuard);
+
+    // Front sight
+    const frontSight = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.08), new THREE.MeshBasicMaterial({ color: 0x0f0f0f }));
+    frontSight.position.set(0.22, 0.08, 0);
+    group.add(frontSight);
+
+    // Rear sight
+    const rearSight = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.08), new THREE.MeshBasicMaterial({ color: 0x0f0f0f }));
+    rearSight.position.set(-0.05, 0.08, 0);
+    group.add(rearSight);
+
+    // Muzzle point helper (for tracers)
+    const muzzle = new THREE.Object3D();
+    muzzle.name = 'muzzle';
+    muzzle.position.set(0.43, 0.02, 0);
+    group.add(muzzle);
+
+    // Scale for visibility - slightly larger than other weapons for compensation
+    group.scale.set(0.85, 0.85, 0.85);
+
+    return group;
+  }
 }
 
 

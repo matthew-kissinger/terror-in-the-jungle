@@ -17,10 +17,11 @@ export class WeaponSwitching {
   private audioManager?: any
 
   // Weapon type to ammo manager mapping
-  private readonly weaponAmmoMap: Record<'rifle' | 'shotgun' | 'smg', () => AmmoManager> = {
+  private readonly weaponAmmoMap: Record<'rifle' | 'shotgun' | 'smg' | 'pistol', () => AmmoManager> = {
     rifle: () => this.ammo.getRifleAmmo(),
     shotgun: () => this.ammo.getShotgunAmmo(),
-    smg: () => this.ammo.getSMGAmmo()
+    smg: () => this.ammo.getSMGAmmo(),
+    pistol: () => this.ammo.getPistolAmmo()
   }
 
   constructor(
@@ -45,12 +46,12 @@ export class WeaponSwitching {
 
   /**
    * Switch to the specified weapon type
-   * @param weaponType - 'rifle', 'shotgun', or 'smg'
+   * @param weaponType - 'rifle', 'shotgun', 'smg', or 'pistol'
    * @param onAmmoChange - Callback to update HUD with new ammo state
    * @returns true if switch was initiated, false if already on that weapon or switching
    */
   switchWeapon(
-    weaponType: 'rifle' | 'shotgun' | 'smg',
+    weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol',
     onAmmoChange: (state: any) => void
   ): boolean {
     const ammoManager = this.weaponAmmoMap[weaponType]()

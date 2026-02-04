@@ -198,6 +198,8 @@ export class FirstPersonWeapon implements GameSystem {
         this.switching.switchWeapon('shotgun', (state) => this.onAmmoChange(state))
       } else if (slot === WeaponSlot.SMG) {
         this.switching.switchWeapon('smg', (state) => this.onAmmoChange(state))
+      } else if (slot === WeaponSlot.PISTOL) {
+        this.switching.switchWeapon('pistol', (state) => this.onAmmoChange(state))
       }
     })
   }
@@ -232,11 +234,13 @@ export class FirstPersonWeapon implements GameSystem {
 
     // Determine weapon type
     const isShotgun = gunCore.isShotgun()
-    let weaponType: 'rifle' | 'shotgun' | 'smg' = 'rifle'
+    let weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' = 'rifle'
     if (isShotgun) {
       weaponType = 'shotgun'
     } else if (gunCore === this.rigManager.getSMGCore()) {
       weaponType = 'smg'
+    } else if (gunCore === this.rigManager.getPistolCore()) {
+      weaponType = 'pistol'
     }
 
     // Create shot command with all needed data

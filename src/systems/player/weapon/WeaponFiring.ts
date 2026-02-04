@@ -130,7 +130,7 @@ export class WeaponFiring {
    * Legacy fire method - wraps executeShot for backward compatibility
    * @deprecated Use executeShot with ShotCommand instead
    */
-  fire(isShotgun: boolean, weaponType: 'rifle' | 'shotgun' | 'smg' = 'rifle'): void {
+  fire(isShotgun: boolean, weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' = 'rifle'): void {
     if (!this.combatantSystem) return
 
     // Register shot with stats tracker (will be marked as hit/miss after damage calculations)

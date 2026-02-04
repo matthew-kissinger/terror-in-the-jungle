@@ -16,7 +16,7 @@ export class WeaponShotCommandBuilder {
   static createShotCommand(
     gunCore: any,
     camera: THREE.Camera,
-    weaponType: 'rifle' | 'shotgun' | 'smg',
+    weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol',
     isShotgun: boolean,
     isADS: boolean
   ): ShotCommand {
