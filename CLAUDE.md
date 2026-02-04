@@ -172,6 +172,9 @@ Known hotspots:
 - **GrenadeEffects per-detonation Vector3 allocations** - FIXED. Module-level scratch vectors `_lookDirection`, `_toCombatant`, `_offset`, `_spawnPos`, `_velocity` replace per-detonation allocations.
 
 Discovered hotspots (not yet fixed):
+- **ImprovedChunk.getPosition() per-call Vector3** - Line 378. Creates `new THREE.Vector3()` every call. Called once per active chunk per frame from ChunkLifecycleManager and TerrainMeshMerger.
+- **PlayerController.getPosition()/getVelocity() clone** - Lines 290-291. Returns `.clone()` every call. Called 10+ times per frame from SystemUpdater, WeaponPickupSystem, and AI systems.
+- **WeaponShotCommandBuilder per-shot clones** - Lines 32-44. `.clone()` on origin/direction for every shot despite module-level scratch vectors existing.
 - **MortarBallistics computeTrajectory() clones** - Lines 60-80. Still creates 100+ Vector3 via `.clone()` per trajectory computation (builds output array, not per-frame). Lower priority.
 - **DeathCamSystem innerHTML in showOverlay()** - Uses innerHTML for kill details. One-time call per death (not per-frame), low impact.
 
@@ -182,7 +185,13 @@ Possible areas (confirm with profiling):
 
 ### Event Listener Leaks (Memory)
 
-**All fixed.** The `.bind()` bug and missing dispose cleanup have been addressed across all files. PlayerHealthEffects and PlayerSuppressionSystem resize listeners fixed in commit c226f60.
+**Not all fixed.** LoadingScreen and LoadingScreenWithModes still have untracked event listeners.
+
+**Unfixed:**
+- LoadingScreen.ts (lines 270-289) - Click handlers on zoneControlCard, openFrontierCard, playButton, settingsButton, howToPlayButton added as arrow functions, not stored for removal in dispose().
+- LoadingScreenWithModes.ts (lines 240-259) - Same pattern, click handlers not stored for removal.
+
+**Fixed** (stored bound refs, added dispose):
 
 **Fixed** (stored bound refs, added dispose):
 - PlayerInput, WeaponInput, WeaponModel, InventoryManager, PlayerSquadController, WeaponPickupSystem - bound function properties
@@ -203,6 +212,7 @@ Possible areas (confirm with profiling):
 - **Scoreboard toggle** - FIXED. TAB key wired to toggleScoreboard() (commit 48169fa).
 - **Blob URL leak in ChunkWorkerLifecycle** - FIXED. URL.revokeObjectURL() added in dispose() (commit 3cc8a99).
 - **TicketSystem.restartMatch() unused** - In-memory match reset method exists (lines 351-364) but UI uses `window.location.reload()` instead.
+- **IPlayerController interface incorrect** - Has `tryEnterHelicopter()`, `position`, `camera` that don't match PlayerController class (tryEnterHelicopter is on HelicopterModel, position/camera are private). Interface is unused currently but blocks any-reduction work that tries to use it.
 - **No unit/integration tests** - No test framework installed (Vitest, Jest, etc.). No *.test.ts or *.spec.ts files.
 
 ### Missing Pieces
