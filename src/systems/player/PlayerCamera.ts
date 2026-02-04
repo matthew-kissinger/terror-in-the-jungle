@@ -5,6 +5,12 @@ import { PlayerState } from '../../types';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { PlayerInput } from './PlayerInput';
 
+const _helicopterPosition = new THREE.Vector3();
+const _helicopterQuaternion = new THREE.Quaternion();
+const _cameraPosition = new THREE.Vector3();
+const _helicopterForward = new THREE.Vector3();
+const _lookTarget = new THREE.Vector3();
+
 export class PlayerCamera {
   private camera: THREE.PerspectiveCamera;
   private playerState: PlayerState;
@@ -95,9 +101,9 @@ export class PlayerCamera {
       return;
     }
 
-    const helicopterPosition = this.helicopterModel.getHelicopterPosition(helicopterId);
-    const helicopterQuaternion = this.helicopterModel.getHelicopterQuaternion(helicopterId);
-    if (!helicopterPosition || !helicopterQuaternion) {
+    const hasHelicopterPosition = this.helicopterModel.getHelicopterPositionTo(helicopterId, _helicopterPosition);
+    const hasHelicopterQuaternion = this.helicopterModel.getHelicopterQuaternionTo(helicopterId, _helicopterQuaternion);
+    if (!hasHelicopterPosition || !hasHelicopterQuaternion) {
       // Fallback to first-person if helicopter data not found
       this.updateFirstPersonCamera(input);
       return;
@@ -128,31 +134,29 @@ export class PlayerCamera {
       const z = radius * Math.cos(this.pitch) * Math.cos(this.yaw);
 
       // Position camera in orbit around helicopter
-      const cameraPosition = new THREE.Vector3(x, y, z);
-      cameraPosition.add(helicopterPosition);
-
-      this.camera.position.copy(cameraPosition);
+      _cameraPosition.set(x, y, z);
+      _cameraPosition.add(_helicopterPosition);
+      this.camera.position.copy(_cameraPosition);
 
       // Always look at helicopter center
-      const lookTarget = helicopterPosition.clone();
-      lookTarget.y += 2;
-      this.camera.lookAt(lookTarget);
+      _lookTarget.copy(_helicopterPosition);
+      _lookTarget.y += 2;
+      this.camera.lookAt(_lookTarget);
     } else {
       // Following mode - camera follows behind helicopter based on its rotation
-      const helicopterForward = new THREE.Vector3(-1, 0, 0);
-      helicopterForward.applyQuaternion(helicopterQuaternion);
+      _helicopterForward.set(-1, 0, 0);
+      _helicopterForward.applyQuaternion(_helicopterQuaternion);
 
       // Camera position: behind helicopter
-      const cameraPosition = helicopterPosition.clone();
-      cameraPosition.add(helicopterForward.clone().multiplyScalar(-distanceBack));
-      cameraPosition.y += heightAbove;
-
-      this.camera.position.copy(cameraPosition);
+      _cameraPosition.copy(_helicopterPosition);
+      _cameraPosition.addScaledVector(_helicopterForward, -distanceBack);
+      _cameraPosition.y += heightAbove;
+      this.camera.position.copy(_cameraPosition);
 
       // Look at helicopter center
-      const lookTarget = helicopterPosition.clone();
-      lookTarget.y += 2;
-      this.camera.lookAt(lookTarget);
+      _lookTarget.copy(_helicopterPosition);
+      _lookTarget.y += 2;
+      this.camera.lookAt(_lookTarget);
     }
   }
 

@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { HelicopterControls } from './HelicopterPhysics';
 import { HelicopterPhysics } from './HelicopterPhysics';
 
+const _finalQuaternion = new THREE.Quaternion();
+
 /**
  * Manages helicopter rotor animations and visual tilt effects.
  * Handles rotor speed interpolation and banking/tilting visual feedback.
@@ -126,10 +128,10 @@ export class HelicopterAnimation {
 
     // Combine physics rotation with visual tilt
     const state = physics.getState();
-    const finalQuaternion = state.quaternion.clone();
-    finalQuaternion.multiply(currentVisualTilt);
+    _finalQuaternion.copy(state.quaternion);
+    _finalQuaternion.multiply(currentVisualTilt);
 
-    return finalQuaternion;
+    return _finalQuaternion;
   }
 
   /**

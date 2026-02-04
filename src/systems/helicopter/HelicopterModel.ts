@@ -114,9 +114,29 @@ export class HelicopterModel implements GameSystem {
     return helicopter ? helicopter.position.clone() : null;
   }
 
+  getHelicopterPositionTo(id: string, target: THREE.Vector3): boolean {
+    const helicopter = this.helicopters.get(id);
+    if (!helicopter) {
+      return false;
+    }
+
+    target.copy(helicopter.position);
+    return true;
+  }
+
   getHelicopterQuaternion(id: string): THREE.Quaternion | null {
     const helicopter = this.helicopters.get(id);
     return helicopter ? helicopter.quaternion.clone() : null;
+  }
+
+  getHelicopterQuaternionTo(id: string, target: THREE.Quaternion): boolean {
+    const helicopter = this.helicopters.get(id);
+    if (!helicopter) {
+      return false;
+    }
+
+    target.copy(helicopter.quaternion);
+    return true;
   }
 
   getAllHelicopters(): Array<{ id: string; position: THREE.Vector3; model: string }> {
