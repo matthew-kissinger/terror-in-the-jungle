@@ -27,7 +27,7 @@ export function setupEventListeners(sandbox: any): void {
       if (sandbox.gameStarted) {
         const healthSystem = (sandbox.systemManager as any).playerHealthSystem;
         if (healthSystem && healthSystem.isAlive()) {
-          console.log('🔄 Initiating voluntary respawn (K pressed)');
+          Logger.info('sandbox-input', '🔄 Initiating voluntary respawn (K pressed)');
           healthSystem.voluntaryRespawn();
         }
       }
@@ -58,27 +58,27 @@ export function togglePerformanceStats(sandbox: any): void {
         octree: { nodes: 0, maxDepth: 0, avgEntitiesPerLeaf: 0 }
       };
 
-  console.log('📊 Performance Stats:');
+  Logger.info('sandbox-input', '📊 Performance Stats:');
   const fps = 1 / Math.max(0.0001, sandbox.lastFrameDelta);
-  console.log(`FPS: ${Math.round(fps)}`);
-  console.log(`Draw calls: ${perfStats.drawCalls}`);
-  console.log(`Triangles: ${perfStats.triangles}`);
-  console.log(`Memory: geometries=${perfStats.geometries}, textures=${perfStats.textures}, programs=${perfStats.programs}`);
-  console.log(`Combat update: last=${combatTelemetry.lastMs.toFixed(2)}ms avg=${combatTelemetry.emaMs.toFixed(2)}ms`);
-  console.log(`LOD counts: high=${combatTelemetry.lodHigh}, medium=${combatTelemetry.lodMedium}, low=${combatTelemetry.lodLow}, culled=${combatTelemetry.lodCulled}`);
+  Logger.info('sandbox-input', `FPS: ${Math.round(fps)}`);
+  Logger.info('sandbox-input', `Draw calls: ${perfStats.drawCalls}`);
+  Logger.info('sandbox-input', `Triangles: ${perfStats.triangles}`);
+  Logger.info('sandbox-input', `Memory: geometries=${perfStats.geometries}, textures=${perfStats.textures}, programs=${perfStats.programs}`);
+  Logger.info('sandbox-input', `Combat update: last=${combatTelemetry.lastMs.toFixed(2)}ms avg=${combatTelemetry.emaMs.toFixed(2)}ms`);
+  Logger.info('sandbox-input', `LOD counts: high=${combatTelemetry.lodHigh}, medium=${combatTelemetry.lodMedium}, low=${combatTelemetry.lodLow}, culled=${combatTelemetry.lodCulled}`);
   const vegetationActive = Object.entries(debugInfo)
     .filter(([key]) => key.endsWith('Active'))
     .reduce((sum, [, value]) => sum + (value as number), 0);
   const vegetationReserved = Object.entries(debugInfo)
     .filter(([key]) => key.endsWith('HighWater'))
     .reduce((sum, [, value]) => sum + (value as number), 0);
-  console.log(`Vegetation: ${vegetationActive} active / ${vegetationReserved} reserved`);
-  console.log(`Combatants - US: ${combatStats.us}, OPFOR: ${combatStats.opfor}`);
-  console.log(`Chunks loaded: ${sandbox.systemManager.chunkManager.getLoadedChunkCount()}, ` +
+  Logger.info('sandbox-input', `Vegetation: ${vegetationActive} active / ${vegetationReserved} reserved`);
+  Logger.info('sandbox-input', `Combatants - US: ${combatStats.us}, OPFOR: ${combatStats.opfor}`);
+  Logger.info('sandbox-input', `Chunks loaded: ${sandbox.systemManager.chunkManager.getLoadedChunkCount()}, ` +
               `Queue: ${sandbox.systemManager.chunkManager.getQueueSize()}, ` +
               `Loading: ${sandbox.systemManager.chunkManager.getLoadingCount()}`);
-  console.log(`Chunks tracked: ${debugInfo.chunksTracked}`);
-  console.log(`Logs suppressed (total): ${logStats.suppressedTotal}`);
+  Logger.info('sandbox-input', `Chunks tracked: ${debugInfo.chunksTracked}`);
+  Logger.info('sandbox-input', `Logs suppressed (total): ${logStats.suppressedTotal}`);
 }
 
 /**
@@ -97,7 +97,7 @@ export function togglePostProcessing(sandbox: any): void {
 
   const enabled = !sandbox.sandboxRenderer.postProcessing.isEnabled();
   sandbox.sandboxRenderer.postProcessing.setEnabled(enabled);
-  console.log(`🎨 Post-processing ${enabled ? 'enabled' : 'disabled'}`);
+  Logger.info('sandbox-input', `🎨 Post-processing ${enabled ? 'enabled' : 'disabled'}`);
 }
 
 /**
@@ -122,5 +122,5 @@ export function adjustPixelSize(sandbox: any, delta: number): void {
 
   sandbox.currentPixelSize = Math.max(1, Math.min(8, sandbox.currentPixelSize + delta));
   sandbox.sandboxRenderer.postProcessing.setPixelSize(sandbox.currentPixelSize);
-  console.log(`🎮 Pixel size: ${sandbox.currentPixelSize}`);
+  Logger.info('sandbox-input', `🎮 Pixel size: ${sandbox.currentPixelSize}`);
 }

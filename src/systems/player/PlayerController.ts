@@ -13,6 +13,7 @@ import { FootstepAudioSystem } from '../audio/FootstepAudioSystem';
 import { PlayerInput } from './PlayerInput';
 import { PlayerMovement } from './PlayerMovement';
 import { PlayerCamera } from './PlayerCamera';
+import { Logger } from '../../utils/Logger';
 
 export class PlayerController implements GameSystem {
   private camera: THREE.PerspectiveCamera;
@@ -68,7 +69,7 @@ export class PlayerController implements GameSystem {
   async init(): Promise<void> {
     if (this.gameModeManager) this.playerState.position.copy(this.getSpawnPosition());
     this.camera.position.copy(this.playerState.position);
-    console.log(`Player controller initialized at ${this.playerState.position.x.toFixed(1)}, ${this.playerState.position.y.toFixed(1)}, ${this.playerState.position.z.toFixed(1)}`);
+    Logger.info('player', `Player controller initialized at ${this.playerState.position.x.toFixed(1)}, ${this.playerState.position.y.toFixed(1)}, ${this.playerState.position.z.toFixed(1)}`);
     if (this.inventoryManager) this.inventoryManager.onSlotChange((slot: WeaponSlot) => this.handleWeaponSlotChange(slot));
   }
 
@@ -137,7 +138,7 @@ export class PlayerController implements GameSystem {
       }
     }
 
-    console.log(`🚩 Rally point placement: ${result.message}`);
+    Logger.info('player', `🚩 Rally point placement: ${result.message}`);
   }
 
   private handleMouseDown(button: number): void {
@@ -252,11 +253,11 @@ export class PlayerController implements GameSystem {
     if (usMainHQ) {
       const spawnPos = usMainHQ.position.clone();
       spawnPos.y = 5;
-      console.log(`🎯 Spawning at US main HQ: ${spawnPos.x.toFixed(1)}, ${spawnPos.y.toFixed(1)}, ${spawnPos.z.toFixed(1)}`);
+      Logger.info('player', `🎯 Spawning at US main HQ: ${spawnPos.x.toFixed(1)}, ${spawnPos.y.toFixed(1)}, ${spawnPos.z.toFixed(1)}`);
       return spawnPos;
     }
 
-    console.warn('Could not find US main HQ, using default spawn');
+    Logger.warn('player', 'Could not find US main HQ, using default spawn');
     return new THREE.Vector3(0, 5, -50);
   }
 
@@ -267,7 +268,7 @@ export class PlayerController implements GameSystem {
     this.camera.position.copy(position);
     this.playerState.velocity.set(0, 0, 0);
     this.playerState.isGrounded = false;
-    console.log(`Player teleported to ${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)}`);
+    Logger.info('player', `Player teleported to ${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)}`);
   }
 
   updatePlayerPosition(position: THREE.Vector3): void { this.playerState.position.copy(position); }
@@ -307,7 +308,7 @@ export class PlayerController implements GameSystem {
   }
 
   enterHelicopter(helicopterId: string, helicopterPosition: THREE.Vector3): void {
-    console.log(`🚁 ⚡ ENTERING HELICOPTER: ${helicopterId}`);
+    Logger.info('player', `🚁 ⚡ ENTERING HELICOPTER: ${helicopterId}`);
     this.playerState.isInHelicopter = true;
     this.playerState.helicopterId = helicopterId;
 
@@ -324,13 +325,13 @@ export class PlayerController implements GameSystem {
       this.hudSystem.showHelicopterInstruments();
     }
 
-    console.log(`🚁 Player entered helicopter at position (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)})`);
-    console.log(`🚁 📹 CAMERA MODE: Switched to helicopter camera (flight sim style)`);
+    Logger.info('player', `🚁 Player entered helicopter at position (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)})`);
+    Logger.info('player', `🚁 📹 CAMERA MODE: Switched to helicopter camera (flight sim style)`);
   }
 
   exitHelicopter(exitPosition: THREE.Vector3): void {
     const helicopterId = this.playerState.helicopterId;
-    console.log(`🚁 ⚡ EXITING HELICOPTER: ${helicopterId}`);
+    Logger.info('player', `🚁 ⚡ EXITING HELICOPTER: ${helicopterId}`);
 
     this.playerState.isInHelicopter = false;
     this.playerState.helicopterId = null;
@@ -344,8 +345,8 @@ export class PlayerController implements GameSystem {
       this.hudSystem.hideHelicopterInstruments();
     }
 
-    console.log(`🚁 Player exited helicopter to position (${exitPosition.x.toFixed(1)}, ${exitPosition.y.toFixed(1)}, ${exitPosition.z.toFixed(1)})`);
-    console.log(`🚁 📹 CAMERA MODE: Switched to first-person camera`);
+    Logger.info('player', `🚁 Player exited helicopter to position (${exitPosition.x.toFixed(1)}, ${exitPosition.y.toFixed(1)}, ${exitPosition.z.toFixed(1)})`);
+    Logger.info('player', `🚁 📹 CAMERA MODE: Switched to first-person camera`);
   }
 
   isInHelicopter(): boolean { return this.playerState.isInHelicopter; }

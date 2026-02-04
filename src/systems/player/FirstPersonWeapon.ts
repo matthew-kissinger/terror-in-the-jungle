@@ -19,6 +19,7 @@ import { WeaponInput } from './weapon/WeaponInput'
 import { WeaponAmmo } from './weapon/WeaponAmmo'
 import { WeaponSwitching } from './weapon/WeaponSwitching'
 import { ShotCommand, ShotCommandFactory } from './weapon/ShotCommand'
+import { Logger } from '../../utils/Logger'
 
 /**
  * Thin orchestrator for first-person weapon system
@@ -100,7 +101,7 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   async init(): Promise<void> {
-    console.log('⚔️ Initializing First Person Weapon...')
+    Logger.info('weapon', '⚔️ Initializing First Person Weapon...')
 
     // Initialize rig manager (creates weapon models)
     await this.rigManager.init()
@@ -111,7 +112,7 @@ export class FirstPersonWeapon implements GameSystem {
     this.firing.setMuzzleRef(this.rigManager.getMuzzleRef())
     this.firing.setGunCore(this.rigManager.getCurrentCore())
 
-    console.log('✅ First Person Weapon initialized (rifle + shotgun + SMG)')
+    Logger.info('weapon', '✅ First Person Weapon initialized (rifle + shotgun + SMG)')
 
     // Trigger initial ammo display
     this.onAmmoChange(this.ammo.getAmmoState())
@@ -169,7 +170,7 @@ export class FirstPersonWeapon implements GameSystem {
     this.muzzleFlashPool.dispose()
     this.impactEffectsPool.dispose()
 
-    console.log('🧹 First Person Weapon disposed')
+    Logger.info('weapon', '🧹 First Person Weapon disposed')
   }
 
   setPlayerController(controller: PlayerController): void {
@@ -178,7 +179,7 @@ export class FirstPersonWeapon implements GameSystem {
 
   // Deprecated: Use setCombatantSystem instead
   setEnemySystem(enemy: any): void {
-    console.warn('setEnemySystem is deprecated, use setCombatantSystem')
+    Logger.warn('weapon', 'setEnemySystem is deprecated, use setCombatantSystem')
   }
 
   setCombatantSystem(combatantSystem: CombatantSystem): void {
@@ -215,7 +216,7 @@ export class FirstPersonWeapon implements GameSystem {
     if (!currentAmmo.canFire()) {
       if (currentAmmo.isEmpty()) {
         // Play empty click sound
-        console.log('🔫 *click* - Empty magazine!')
+        Logger.info('weapon', '🔫 *click* - Empty magazine!')
         // Auto-reload if we have reserve ammo
         if (currentAmmo.getState().reserveAmmo > 0) {
           this.startReload()
@@ -357,7 +358,7 @@ export class FirstPersonWeapon implements GameSystem {
   private startReload(): void {
     // Can't reload while ADS
     if (this.animations.getADS()) {
-      console.log('⚠️ Cannot reload while aiming')
+      Logger.info('weapon', '⚠️ Cannot reload while aiming')
       return
     }
 
@@ -367,7 +368,7 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   private onReloadComplete(): void {
-    console.log('✅ Weapon reloaded!')
+    Logger.info('weapon', '✅ Weapon reloaded!')
     // Reload animation will finish independently
   }
 
@@ -379,7 +380,7 @@ export class FirstPersonWeapon implements GameSystem {
 
     // Check for low ammo warning
     if (this.ammo.getCurrentAmmoManager().isLowAmmo()) {
-      console.log('⚠️ Low ammo!')
+      Logger.info('weapon', '⚠️ Low ammo!')
     }
   }
 
@@ -398,12 +399,12 @@ export class FirstPersonWeapon implements GameSystem {
   // Helicopter integration methods
   hideWeapon(): void {
     this.rigManager.setWeaponVisibility(false)
-    console.log('🚁 🔫 Weapon hidden (in helicopter)')
+    Logger.info('weapon', '🚁 🔫 Weapon hidden (in helicopter)')
   }
 
   showWeapon(): void {
     this.rigManager.setWeaponVisibility(true)
-    console.log('🚁 🔫 Weapon shown (exited helicopter)')
+    Logger.info('weapon', '🚁 🔫 Weapon shown (exited helicopter)')
   }
 
   setFireingEnabled(enabled: boolean): void {
@@ -412,9 +413,9 @@ export class FirstPersonWeapon implements GameSystem {
     if (!enabled) {
       // Stop any current firing
       this.input.setFiringActive(false)
-      console.log('🚁 🔫 Firing disabled (in helicopter)')
+      Logger.info('weapon', '🚁 🔫 Firing disabled (in helicopter)')
     } else {
-      console.log('🚁 🔫 Firing enabled (exited helicopter)')
+      Logger.info('weapon', '🚁 🔫 Firing enabled (exited helicopter)')
     }
   }
 }

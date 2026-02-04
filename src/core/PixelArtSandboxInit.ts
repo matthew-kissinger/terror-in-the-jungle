@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GameMode } from '../config/gameModes';
 import { getHeightQueryCache } from '../systems/terrain/HeightQueryCache';
+import { Logger } from '../utils/Logger';
 
 /**
  * Handles initialization of game systems and assets
@@ -14,23 +15,23 @@ export async function initializeSystems(sandbox: any): Promise<void> {
     );
 
     sandbox.loadingScreen.updateProgress('entities', 0);
-    console.log('🎯 Systems initialized, loading assets...');
+    Logger.info('sandbox-init', '🎯 Systems initialized, loading assets...');
     await loadGameAssets(sandbox);
 
     const skyboxTexture = sandbox.systemManager.assetLoader.getTexture('skybox');
     if (skyboxTexture) {
       sandbox.systemManager.skybox.createSkybox(skyboxTexture);
-      console.log('☁️ Skybox created');
+      Logger.info('sandbox-init', '☁️ Skybox created');
     }
 
-    console.log('🌍 Pre-generating spawn area...');
+    Logger.info('sandbox-init', '🌍 Pre-generating spawn area...');
     const spawnPosition = sandbox.sandboxEnabled ? new THREE.Vector3(0, 5, 0) : new THREE.Vector3(0, 5, -50);
     await sandbox.systemManager.preGenerateSpawnArea(spawnPosition);
 
-    console.log('🌍 World system ready!');
+    Logger.info('sandbox-init', '🌍 World system ready!');
     sandbox.loadingScreen.updateProgress('entities', 1);
     sandbox.isInitialized = true;
-    console.log('🚀 Pixel Art Sandbox ready!');
+    Logger.info('sandbox-init', '🚀 Pixel Art Sandbox ready!');
 
     if (sandbox.sandboxEnabled && sandbox.sandboxConfig?.autoStart) {
       startGameWithMode(sandbox, GameMode.AI_SANDBOX);
@@ -38,7 +39,7 @@ export async function initializeSystems(sandbox: any): Promise<void> {
       sandbox.loadingScreen.showMainMenu();
     }
   } catch (error) {
-    console.error('❌ Failed to initialize sandbox:', error);
+    Logger.error('sandbox-init', '❌ Failed to initialize sandbox:', error);
   }
 }
 
@@ -47,9 +48,9 @@ export async function initializeSystems(sandbox: any): Promise<void> {
  */
 export async function loadGameAssets(sandbox: any): Promise<void> {
   if (!sandbox.systemManager.assetLoader.getTexture('skybox')) {
-    console.warn('Skybox texture missing; proceeding without skybox.');
+    Logger.warn('sandbox-init', 'Skybox texture missing; proceeding without skybox.');
   }
-  console.log('📦 Asset check complete');
+  Logger.info('sandbox-init', '📦 Asset check complete');
 }
 
 /**
@@ -57,7 +58,7 @@ export async function loadGameAssets(sandbox: any): Promise<void> {
  */
 export function startGameWithMode(sandbox: any, mode: GameMode): void {
   if (!sandbox.isInitialized || sandbox.gameStarted) return;
-  console.log(`🎮 PixelArtSandbox: Starting game with mode: ${mode}`);
+  Logger.info('sandbox-init', `🎮 PixelArtSandbox: Starting game with mode: ${mode}`);
   sandbox.gameStarted = true;
   sandbox.systemManager.setGameMode(mode, { createPlayerSquad: mode !== GameMode.AI_SANDBOX });
   startGame(sandbox);
@@ -82,7 +83,7 @@ export function startGame(sandbox: any): void {
 
   const startTime = performance.now();
   setTimeout(() => {
-    console.log(`Game ready in ${performance.now() - startTime}ms`);
+    Logger.info('sandbox-init', `Game ready in ${performance.now() - startTime}ms`);
     sandbox.sandboxRenderer.hideSpawnLoadingIndicator();
 
     try {
@@ -109,11 +110,11 @@ export function startGame(sandbox: any): void {
       const controller = sandbox.systemManager.playerController as any;
       if (controller && typeof controller.setGameStarted === 'function') controller.setGameStarted(true);
 
-      if (!sandbox.sandboxEnabled) console.log('🖱️ Click anywhere to enable mouse look!');
+      if (!sandbox.sandboxEnabled) Logger.info('sandbox-init', '🖱️ Click anywhere to enable mouse look!');
       if (sandbox.systemManager.audioManager) sandbox.systemManager.audioManager.startAmbient();
       if (sandbox.systemManager.combatantSystem && typeof sandbox.systemManager.combatantSystem.enableCombat === 'function') {
         sandbox.systemManager.combatantSystem.enableCombat();
-        console.log('⚔️ Combat AI activated!');
+        Logger.info('sandbox-init', '⚔️ Combat AI activated!');
       }
       if (sandbox.systemManager.hudSystem && typeof (sandbox.systemManager.hudSystem as any).startMatch === 'function') {
         (sandbox.systemManager.hudSystem as any).startMatch();
@@ -131,7 +132,7 @@ export function startGame(sandbox: any): void {
 export function showWelcomeMessage(sandbox: any): void {
   const debugInfo = sandbox.systemManager.globalBillboardSystem.getDebugInfo();
   const combatStats = sandbox.systemManager.combatantSystem.getCombatStats();
-  console.log(`
+  Logger.info('sandbox-init', `
 🎮 TERROR IN THE JUNGLE - GAME STARTED!
 
 🌍 World Features:

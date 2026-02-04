@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { AssetLoader } from '../assets/AssetLoader';
 import { NoiseGenerator } from '../../utils/NoiseGenerator';
 import { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
+import { Logger } from '../../utils/Logger';
 
 /**
  * Debug chunk to identify collision mismatch issues
@@ -36,7 +37,7 @@ export class DebugChunk {
   }
 
   async generate(): Promise<void> {
-    console.log(`🔍 DEBUG CHUNK (${this.chunkX}, ${this.chunkZ}) - Starting generation`);
+    Logger.info('debug-chunk', `🔍 DEBUG CHUNK (${this.chunkX}, ${this.chunkZ}) - Starting generation`);
     
     // Generate simple test pattern for height
     this.generateTestHeightData();
@@ -47,11 +48,11 @@ export class DebugChunk {
     // Add debug markers
     this.addDebugMarkers();
     
-    console.log(`✅ DEBUG CHUNK complete`);
+    Logger.info('debug-chunk', `✅ DEBUG CHUNK complete`);
   }
 
   private generateTestHeightData(): void {
-    console.log(`📊 Generating test height data...`);
+    Logger.info('debug-chunk', `📊 Generating test height data...`);
     
     // Create a simple ramp pattern for easy debugging
     // Height increases from 0 to 20 as we go from z=0 to z=size
@@ -63,7 +64,7 @@ export class DebugChunk {
         this.heightData[index] = height;
         
         if (z === 0 || z === this.segments || x === 0 || x === this.segments) {
-          console.log(`  Height[${x},${z}] (index ${index}) = ${height.toFixed(2)}`);
+          Logger.info('debug-chunk', `  Height[${x},${z}] (index ${index}) = ${height.toFixed(2)}`);
         }
         index++;
       }
@@ -71,7 +72,7 @@ export class DebugChunk {
   }
 
   private async createDebugTerrainMesh(): Promise<void> {
-    console.log(`🏗️ Creating debug terrain mesh...`);
+    Logger.info('debug-chunk', `🏗️ Creating debug terrain mesh...`);
     
     // Create plane geometry
     const geometry = new THREE.PlaneGeometry(
@@ -81,29 +82,29 @@ export class DebugChunk {
       this.segments
     );
     
-    console.log(`  Geometry created: ${this.segments}x${this.segments} segments`);
-    console.log(`  Vertices before rotation: ${geometry.attributes.position.count}`);
+    Logger.info('debug-chunk', `  Geometry created: ${this.segments}x${this.segments} segments`);
+    Logger.info('debug-chunk', `  Vertices before rotation: ${geometry.attributes.position.count}`);
     
     // Log first few vertices before rotation
     const verticesBefore = geometry.attributes.position.array as Float32Array;
-    console.log(`  First vertex before: (${verticesBefore[0]}, ${verticesBefore[1]}, ${verticesBefore[2]})`);
+    Logger.info('debug-chunk', `  First vertex before: (${verticesBefore[0]}, ${verticesBefore[1]}, ${verticesBefore[2]})`);
     
     // Rotate to horizontal
     geometry.rotateX(-Math.PI / 2);
     
     // Log first few vertices after rotation
     const vertices = geometry.attributes.position.array as Float32Array;
-    console.log(`  First vertex after rotation: (${vertices[0]}, ${vertices[1]}, ${vertices[2]})`);
+    Logger.info('debug-chunk', `  First vertex after rotation: (${vertices[0]}, ${vertices[1]}, ${vertices[2]})`);
     
     // Apply height data
-    console.log(`  Applying heights to vertices...`);
+    Logger.info('debug-chunk', `  Applying heights to vertices...`);
     for (let i = 0; i < this.heightData.length; i++) {
       const vertexIndex = i * 3;
       const oldY = vertices[vertexIndex + 1];
       vertices[vertexIndex + 1] = this.heightData[i];
       
       if (i < 3 || i === this.heightData.length - 1) {
-        console.log(`    Vertex ${i}: Y ${oldY} -> ${this.heightData[i]}`);
+        Logger.info('debug-chunk', `    Vertex ${i}: Y ${oldY} -> ${this.heightData[i]}`);
       }
     }
     
@@ -126,13 +127,13 @@ export class DebugChunk {
       this.chunkZ * this.size
     );
     
-    console.log(`  Mesh positioned at: (${this.chunkX * this.size}, 0, ${this.chunkZ * this.size})`);
+    Logger.info('debug-chunk', `  Mesh positioned at: (${this.chunkX * this.size}, 0, ${this.chunkZ * this.size})`);
     
     this.scene.add(this.terrainMesh);
   }
 
   private addDebugMarkers(): void {
-    console.log(`🎯 Adding debug markers...`);
+    Logger.info('debug-chunk', `🎯 Adding debug markers...`);
     
     // Add spheres at key points to visualize height sampling
     const testPoints = [
@@ -156,7 +157,7 @@ export class DebugChunk {
       this.scene.add(sphere);
       this.debugSpheres.push(sphere);
       
-      console.log(`  Marker at local (${point.x}, ${point.z}) -> world (${worldX}, ${worldZ}) height: ${height.toFixed(2)}`);
+      Logger.info('debug-chunk', `  Marker at local (${point.x}, ${point.z}) -> world (${worldX}, ${worldZ}) height: ${height.toFixed(2)}`);
     });
   }
 
@@ -187,16 +188,16 @@ export class DebugChunk {
     const h01 = this.heightData[getIndex(x0, z1)];
     const h11 = this.heightData[getIndex(x1, z1)];
     
-    console.log(`    Sampling at local (${localX.toFixed(1)}, ${localZ.toFixed(1)})`);
-    console.log(`    Grid coords: (${gridX.toFixed(2)}, ${gridZ.toFixed(2)})`);
-    console.log(`    Corner heights: ${h00.toFixed(2)}, ${h10.toFixed(2)}, ${h01.toFixed(2)}, ${h11.toFixed(2)}`);
+    Logger.info('debug-chunk', `    Sampling at local (${localX.toFixed(1)}, ${localZ.toFixed(1)})`);
+    Logger.info('debug-chunk', `    Grid coords: (${gridX.toFixed(2)}, ${gridZ.toFixed(2)})`);
+    Logger.info('debug-chunk', `    Corner heights: ${h00.toFixed(2)}, ${h10.toFixed(2)}, ${h01.toFixed(2)}, ${h11.toFixed(2)}`);
     
     // Bilinear interpolation
     const h0 = h00 * (1 - fx) + h10 * fx;
     const h1 = h01 * (1 - fx) + h11 * fx;
     const result = h0 * (1 - fz) + h1 * fz;
     
-    console.log(`    Interpolated height: ${result.toFixed(2)}`);
+    Logger.info('debug-chunk', `    Interpolated height: ${result.toFixed(2)}`);
     
     return result;
   }
@@ -205,10 +206,10 @@ export class DebugChunk {
     const localX = worldX - (this.chunkX * this.size);
     const localZ = worldZ - (this.chunkZ * this.size);
     
-    console.log(`🔍 getHeightAt world (${worldX.toFixed(1)}, ${worldZ.toFixed(1)}) -> local (${localX.toFixed(1)}, ${localZ.toFixed(1)})`);
+    Logger.info('debug-chunk', `🔍 getHeightAt world (${worldX.toFixed(1)}, ${worldZ.toFixed(1)}) -> local (${localX.toFixed(1)}, ${localZ.toFixed(1)})`);
     
     if (localX < 0 || localX > this.size || localZ < 0 || localZ > this.size) {
-      console.log(`  ❌ Out of bounds!`);
+      Logger.info('debug-chunk', `  ❌ Out of bounds!`);
       return 0;
     }
     
