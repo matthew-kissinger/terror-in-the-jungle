@@ -273,12 +273,12 @@ export class HelicopterPhysics {
     Object.assign(this.controls, controls);
   }
 
-  getState(): HelicopterState {
-    return { ...this.state };
+  getState(): Readonly<HelicopterState> {
+    return this.state;
   }
 
-  getControls(): HelicopterControls {
-    return { ...this.controls };
+  getControls(): Readonly<HelicopterControls> {
+    return this.controls;
   }
 
   // Reset helicopter to stable state
