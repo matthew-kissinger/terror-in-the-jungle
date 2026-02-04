@@ -206,9 +206,11 @@ export class ChunkWorkerPool {
       };
 
       this.taskQueue.enqueue(request);
-      this.taskQueue.trackInFlight(chunkX, chunkZ, promise);
       this.processQueue();
     });
+
+    // Track in-flight after promise is created
+    this.taskQueue.trackInFlight(chunkX, chunkZ, promise);
 
     return promise;
   }
