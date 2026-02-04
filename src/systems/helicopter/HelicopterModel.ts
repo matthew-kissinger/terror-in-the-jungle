@@ -8,13 +8,13 @@ import { createUH1HueyGeometry } from './HelicopterGeometry';
 import { HelicopterAnimation } from './HelicopterAnimation';
 import { HelicopterAudio } from './HelicopterAudio';
 import { HelicopterInteraction } from './HelicopterInteraction';
-import { IHUDSystem } from '../../types/SystemInterfaces';
+import { IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
 
 export class HelicopterModel implements GameSystem {
   private scene: THREE.Scene;
   private terrainManager?: ImprovedChunkManager;
   private helipadSystem?: HelipadSystem;
-  private playerController?: any;
+  private playerController?: IPlayerController;
   private hudSystem?: IHUDSystem;
   private helicopters: Map<string, THREE.Group> = new Map();
   private helicopterPhysics: Map<string, HelicopterPhysics> = new Map();
@@ -45,7 +45,7 @@ export class HelicopterModel implements GameSystem {
     this.helipadSystem = helipadSystem;
   }
 
-  setPlayerController(playerController: any): void {
+  setPlayerController(playerController: IPlayerController): void {
     this.playerController = playerController;
     this.interaction.setPlayerController(playerController);
   }
@@ -193,7 +193,7 @@ export class HelicopterModel implements GameSystem {
       this.animation.updateRotors(helicopter, id, physics, deltaTime);
 
       // Update audio
-      const isPlayerControlling = this.playerController &&
+      const isPlayerControlling = !!this.playerController &&
                                  this.playerController.isInHelicopter() &&
                                  this.playerController.getHelicopterId() === id;
       this.audio.update(id, deltaTime, physics, isPlayerControlling);

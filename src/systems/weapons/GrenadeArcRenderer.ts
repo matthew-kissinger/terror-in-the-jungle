@@ -4,6 +4,7 @@ import { objectPool } from '../../utils/ObjectPoolManager';
 import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { AudioManager } from '../audio/AudioManager';
+import type { IPlayerController } from '../../types/SystemInterfaces';
 
 type GroundHeightFn = (x: number, z: number) => number;
 
@@ -308,7 +309,7 @@ export class GrenadeCooking {
     camera: THREE.Camera,
     explosionEffectsPool?: ExplosionEffectsPool,
     audioManager?: AudioManager,
-    playerController?: any
+    playerController?: IPlayerController
   ): boolean {
     if (!this.isCooking) return false;
 
@@ -358,7 +359,7 @@ export class GrenadeCooking {
     camera: THREE.Camera,
     explosionEffectsPool?: ExplosionEffectsPool,
     audioManager?: AudioManager,
-    playerController?: any
+    playerController?: IPlayerController
   ): void {
     Logger.info('weapons', 'Grenade exploded in hand!');
 

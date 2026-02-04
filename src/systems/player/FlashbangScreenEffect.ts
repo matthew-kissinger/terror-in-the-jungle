@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { Logger } from '../../utils/Logger';
+import type { IPlayerController } from '../../types/SystemInterfaces';
 
 /**
  * Manages flashbang screen whiteout effect for the player.
@@ -10,7 +11,7 @@ export class FlashbangScreenEffect implements GameSystem {
   private overlayElement?: HTMLDivElement;
   private flashIntensity: number = 0;
   private flashDecayRate: number = 0; // Set per flash
-  private playerController?: any;
+  private playerController?: IPlayerController;
 
   // Tuning parameters
   private readonly FULL_BLIND_DISTANCE = 15; // Within 15m = full whiteout
@@ -144,7 +145,7 @@ export class FlashbangScreenEffect implements GameSystem {
 
   // System connections
 
-  setPlayerController(controller: any): void {
+  setPlayerController(controller: IPlayerController): void {
     this.playerController = controller;
   }
 }

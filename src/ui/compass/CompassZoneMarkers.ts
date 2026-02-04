@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { ZoneManager } from '../../systems/world/ZoneManager';
+import { Faction } from '../../systems/combat/types';
+import { CaptureZone, ZoneManager, ZoneState } from '../../systems/world/ZoneManager';
 
 const _cameraPos = new THREE.Vector3();
 const _dirToZone = new THREE.Vector3();
@@ -24,16 +25,16 @@ export function updateZoneMarkers({
   playerHeadingDegrees,
   state
 }: UpdateZoneMarkersParams): void {
-  (camera as any).getWorldPosition(_cameraPos);
+  camera.getWorldPosition(_cameraPos);
 
-  const zones = (zoneManager as any).zones as Map<string, any>;
-  if (!zones) return;
+  const zones = zoneManager.getAllZones();
+  if (!zones.length) return;
 
   const compassWidth = 200;
   const centerX = compassWidth / 2;
   state.seenZones.clear();
 
-  zones.forEach((zone) => {
+  zones.forEach((zone: CaptureZone) => {
     const zoneId = zone.id as string;
     state.seenZones.add(zoneId);
 
@@ -55,13 +56,12 @@ export function updateZoneMarkers({
     const displayText = zoneId.charAt(0).toUpperCase();
 
     const stateValue = zone.state;
-    const Faction = (zoneManager as any).constructor.Faction;
 
-    if (stateValue === 'contested') {
+    if (stateValue === ZoneState.CONTESTED) {
       markerClass += 'contested';
-    } else if (zone.owner === Faction?.US) {
+    } else if (zone.owner === Faction.US) {
       markerClass += 'friendly';
-    } else if (zone.owner === Faction?.OPFOR) {
+    } else if (zone.owner === Faction.OPFOR) {
       markerClass += 'enemy';
     } else {
       markerClass += 'neutral';

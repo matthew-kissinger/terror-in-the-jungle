@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { Logger } from '../../utils/Logger';
-import { IHUDSystem } from '../../types/SystemInterfaces';
+import { IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
 
 export class HelicopterInteraction {
   private helicopters: Map<string, THREE.Group>;
-  private playerController?: any;
+  private playerController?: IPlayerController;
   private hudSystem?: IHUDSystem;
   private terrainManager?: ImprovedChunkManager;
   private interactionRadius: number;
@@ -19,7 +19,7 @@ export class HelicopterInteraction {
     this.interactionRadius = interactionRadius;
   }
 
-  setPlayerController(playerController: any): void {
+  setPlayerController(playerController: IPlayerController): void {
     this.playerController = playerController;
   }
 

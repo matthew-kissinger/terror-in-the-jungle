@@ -196,8 +196,8 @@ export class PlayerRespawnManager implements GameSystem {
 
     // Apply spawn protection per game mode
     const protection = this.gameModeManager?.getSpawnProtectionDuration() ?? 0;
-    if (this.playerHealthSystem && protection > 0 && typeof (this.playerHealthSystem as any).applySpawnProtection === 'function') {
-      (this.playerHealthSystem as any).applySpawnProtection(protection);
+    if (this.playerHealthSystem && protection > 0) {
+      this.playerHealthSystem.applySpawnProtection(protection);
     }
 
     Logger.info('player', ` Player respawned at ${position.x}, ${position.y}, ${position.z}`);

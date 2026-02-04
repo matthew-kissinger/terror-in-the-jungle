@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { Logger } from '../../utils/Logger';
+import type { IPlayerController } from '../../types/SystemInterfaces';
 
 export interface NearMissEvent {
   direction: THREE.Vector3; // Direction from player to bullet
@@ -38,7 +39,7 @@ export class PlayerSuppressionSystem implements GameSystem {
   private directionalOverlayElement?: HTMLDivElement;
   private directionalCanvas?: HTMLCanvasElement;
   private desaturationElement?: HTMLDivElement;
-  private playerController?: any;
+  private playerController?: IPlayerController;
   private boundOnResize: (() => void) | null = null;
 
   async init(): Promise<void> {
@@ -358,7 +359,7 @@ export class PlayerSuppressionSystem implements GameSystem {
     this.cameraShakeSystem = system;
   }
 
-  setPlayerController(controller: any): void {
+  setPlayerController(controller: IPlayerController): void {
     this.playerController = controller;
   }
 }

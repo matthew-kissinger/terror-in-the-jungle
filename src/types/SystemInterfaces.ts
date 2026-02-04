@@ -5,6 +5,18 @@
 
 import * as THREE from 'three';
 import { Combatant, Faction, Squad } from '../systems/combat/types';
+import type { CameraShakeSystem } from '../systems/effects/CameraShakeSystem';
+import type { ImprovedChunkManager } from '../systems/terrain/ImprovedChunkManager';
+import type { GameModeManager } from '../systems/world/GameModeManager';
+import type { HelicopterModel } from '../systems/helicopter/HelicopterModel';
+import type { GrenadeSystem } from '../systems/weapons/GrenadeSystem';
+import type { MortarSystem } from '../systems/weapons/MortarSystem';
+import type { SandbagSystem } from '../systems/weapons/SandbagSystem';
+import type { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
+import type { RallyPointSystem } from '../systems/combat/RallyPointSystem';
+import type { HUDSystem } from '../ui/hud/HUDSystem';
+import type { InventoryManager } from '../systems/player/InventoryManager';
+import type { FirstPersonWeapon } from '../systems/player/FirstPersonWeapon';
 import type { PlayerController } from '../systems/player/PlayerController';
 
 /**
@@ -107,6 +119,7 @@ export interface IPlayerHealthSystem {
   heal(amount: number): void;
   isAlive(): boolean;
   voluntaryRespawn(): void;
+  applySpawnProtection(durationSeconds: number): void;
 }
 
 /**
@@ -129,13 +142,51 @@ export interface IGrenadeSystem {
  * Player Controller interface - main player control system
  */
 export interface IPlayerController {
-  applyExplosionShake(position: THREE.Vector3, magnitude: number): void;
-  exitHelicopter(exitPosition: THREE.Vector3): void;
+  // Movement / state
   setPosition(position: THREE.Vector3): void;
-  enableControls(): void;
+  updatePlayerPosition(position: THREE.Vector3): void;
   disableControls(): void;
-  getPosition(): THREE.Vector3;
+  enableControls(): void;
+  setPointerLockEnabled(enabled: boolean): void;
+  setGameStarted(started: boolean): void;
+
+  // Camera / feedback
+  applyRecoil(pitchDeltaRad: number, yawDeltaRad: number): void;
+  applyScreenShake(intensity: number, duration?: number): void;
+  applyDamageShake(damageAmount: number): void;
+  applyExplosionShake(position: THREE.Vector3, magnitude: number): void;
+  applyRecoilShake(): void;
+  getPosition(target?: THREE.Vector3): THREE.Vector3;
+  getVelocity(target?: THREE.Vector3): THREE.Vector3;
   getCamera(): THREE.PerspectiveCamera;
+  isMoving(): boolean;
+  teleport(position: THREE.Vector3): void;
+
+  // Weapon handling
+  equipWeapon(): void;
+  unequipWeapon(): void;
+
+  // Helicopter lifecycle
+  enterHelicopter(helicopterId: string, helicopterPosition: THREE.Vector3): void;
+  exitHelicopter(exitPosition: THREE.Vector3): void;
+  isInHelicopter(): boolean;
+  getHelicopterId(): string | null;
+
+  // Dependency setters
+  setChunkManager(chunkManager: ImprovedChunkManager): void;
+  setGameModeManager(gameModeManager: GameModeManager): void;
+  setHelicopterModel(helicopterModel: HelicopterModel): void;
+  setFirstPersonWeapon(firstPersonWeapon: FirstPersonWeapon): void;
+  setHUDSystem(hudSystem: HUDSystem): void;
+  setSandboxRenderer(sandboxRenderer: ISandboxRenderer): void;
+  setInventoryManager(inventoryManager: InventoryManager): void;
+  setGrenadeSystem(grenadeSystem: GrenadeSystem): void;
+  setMortarSystem(mortarSystem: MortarSystem): void;
+  setSandbagSystem(sandbagSystem: SandbagSystem): void;
+  setCameraShakeSystem(cameraShakeSystem: CameraShakeSystem): void;
+  setRallyPointSystem(rallyPointSystem: RallyPointSystem): void;
+  setFootstepAudioSystem(footstepAudioSystem: FootstepAudioSystem): void;
+  setPlayerSquadId(squadId: string): void;
 }
 
 /**
@@ -205,8 +256,8 @@ export interface ICombatantSystem {
  * Zone Manager interface
  */
 export interface IZoneManager {
-  getZones(): any[];
-  getZoneAt(position: THREE.Vector3): any;
+  getAllZones(): any[];
+  getZoneAtPosition(position: THREE.Vector3): any;
 }
 
 /**

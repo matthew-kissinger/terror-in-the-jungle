@@ -2,6 +2,7 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { AssetLoader } from '../assets/AssetLoader';
+import type { IPlayerController } from '../../types/SystemInterfaces';
 
 export enum WeaponType {
   RIFLE = 'rifle',
@@ -37,7 +38,7 @@ export class WeaponPickupSystem implements GameSystem {
 
   // Player tracking
   private playerPosition = new THREE.Vector3();
-  private playerController?: any;
+  private playerController?: IPlayerController;
 
   // Interaction state
   private nearestPickup?: WeaponPickup;
@@ -280,7 +281,7 @@ export class WeaponPickupSystem implements GameSystem {
     this.pickups.delete(id);
   }
 
-  setPlayerController(controller: any): void {
+  setPlayerController(controller: IPlayerController): void {
     this.playerController = controller;
   }
 
