@@ -55,6 +55,7 @@ perf.reset()     // Reset all telemetry
 
 - **HeightQueryCache** - Cached terrain height lookups (`src/systems/terrain/HeightQueryCache.ts`, 197 lines)
 - **GPUTerrain** - GPU-accelerated terrain rendering (`src/systems/terrain/GPUTerrain.ts`, 421 lines)
+- **TerrainMeshMerger** - Merges per-chunk terrain meshes into distance-ring groups to reduce draw calls (`src/systems/terrain/TerrainMeshMerger.ts`, 223 lines). Integrated into ChunkLifecycleManager. Not yet validated in-game.
 
 ### Effect Pools
 
@@ -79,11 +80,11 @@ CombatantSystem has distance-based LOD:
 
 | File | Lines | Location |
 |------|-------|----------|
-| WeatherSystem.ts | 449 | systems/environment/ |
-| CompassSystem.ts | 447 | ui/compass/ |
+| CompassSystem.ts | 454 | ui/compass/ |
 | FirstPersonWeapon.ts | 445 | systems/player/ |
 | MinimapSystem.ts | 440 | ui/minimap/ |
 | MatchEndScreen.ts | 434 | ui/end/ |
+| ChunkLifecycleManager.ts | 434 | systems/terrain/ |
 | HelicopterModel.ts | 433 | systems/helicopter/ |
 | HelicopterGeometry.ts | 433 | systems/helicopter/ |
 | HUDUpdater.ts | 431 | ui/hud/ |
@@ -96,7 +97,7 @@ CombatantSystem has distance-based LOD:
 | DeathCamSystem.ts | 405 | systems/player/ |
 | ImprovedChunk.ts | 401 | systems/terrain/ |
 
-**Completed splits**: CombatantSystem (1308->538->428, extracted CombatantSystemDamage + CombatantSystemSetters + CombatantSystemUpdate), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453->272, extracted AudioWeaponSounds), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468->380, extracted CombatantCombatEffects), FootstepAudioSystem (587->326), ImprovedChunkManager (753->529->385, extracted ChunkPriorityManager + ChunkLifecycleManager + ChunkLoadQueueManager + ChunkTerrainQueries), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer), AIFlankingSystem (606->359, extracted FlankingRoleManager + FlankingTacticsResolver), FullMapSystem (574->365, extracted FullMapDOMHelpers + FullMapInput + FullMapStyles), AITargeting (571->94, extracted AITargetAcquisition + AILineOfSight), CombatantMovement (504->129, extracted CombatantMovementStates + CombatantMovementCommands), PixelArtSandbox (551->144, extracted PixelArtSandboxInit + PixelArtSandboxInput + PixelArtSandboxLoop), InfluenceMapSystem (570->329, extracted InfluenceMapComputations + InfluenceMapGrid), ExplosionEffectsPool (489->161, extracted ExplosionEffectFactory + ExplosionParticleUpdater + ExplosionSpawnInitializer + ExplosionTextures), OpenFrontierRespawnMap (531->194, extracted OpenFrontierRespawnMapUtils + OpenFrontierRespawnMapRenderer), gameModes (496->40, extracted GameModeZoneControl + GameModeOpenFrontier + GameModeCommon), SpatialOctree (487->257, extracted SpatialOctreeNode + SpatialOctreeQuery), HUDStyles (483->40, extracted HUDBaseStyles + HUDStatusStyles + HUDWeaponStyles + HUDZoneStyles), AICoverSystem (458->371, extracted AICoverEvaluation), SandboxRenderer (431->203, extracted SandboxCrosshairUI + SandboxLoadingUI). 16 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538->428, extracted CombatantSystemDamage + CombatantSystemSetters + CombatantSystemUpdate), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453->272, extracted AudioWeaponSounds), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468->380, extracted CombatantCombatEffects), FootstepAudioSystem (587->326), ImprovedChunkManager (753->529->385, extracted ChunkPriorityManager + ChunkLifecycleManager + ChunkLoadQueueManager + ChunkTerrainQueries), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer), AIFlankingSystem (606->359, extracted FlankingRoleManager + FlankingTacticsResolver), FullMapSystem (574->365, extracted FullMapDOMHelpers + FullMapInput + FullMapStyles), AITargeting (571->94, extracted AITargetAcquisition + AILineOfSight), CombatantMovement (504->129, extracted CombatantMovementStates + CombatantMovementCommands), PixelArtSandbox (551->144, extracted PixelArtSandboxInit + PixelArtSandboxInput + PixelArtSandboxLoop), InfluenceMapSystem (570->329, extracted InfluenceMapComputations + InfluenceMapGrid), ExplosionEffectsPool (489->161, extracted ExplosionEffectFactory + ExplosionParticleUpdater + ExplosionSpawnInitializer + ExplosionTextures), OpenFrontierRespawnMap (531->194, extracted OpenFrontierRespawnMapUtils + OpenFrontierRespawnMapRenderer), gameModes (496->40, extracted GameModeZoneControl + GameModeOpenFrontier + GameModeCommon), SpatialOctree (487->257, extracted SpatialOctreeNode + SpatialOctreeQuery), HUDStyles (483->40, extracted HUDBaseStyles + HUDStatusStyles + HUDWeaponStyles + HUDZoneStyles), AICoverSystem (458->371, extracted AICoverEvaluation), SandboxRenderer (431->203, extracted SandboxCrosshairUI + SandboxLoadingUI), WeatherSystem (449->314, extracted WeatherAtmosphere + WeatherLightning). 16 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -181,7 +182,7 @@ Possible areas (confirm with profiling):
 - **GPU timing** - ADDED. renderer.info stats (draw calls, triangles, geometries, textures) and EXT_disjoint_timer_query instrumentation in PerformanceTelemetry. Visible in F2 overlay.
 - **Memory profiling** - No heap snapshot automation
 - **Playwright test harness** - Infrastructure set up but perf regression tests not yet working
-- **Bundle code-splitting** - Vite manual chunks configured (three.js, postprocessing, UI, BVH). Main chunk ~449 kB (115 kB gzipped). Circular chunk warnings from three.js internals remain.
+- **Bundle code-splitting** - Vite manual chunks configured (three.js, postprocessing, UI, BVH). Main chunk ~453 kB (116 kB gzipped). Circular chunk warnings from three.js internals remain.
 
 ## COMPLETED: AI Sandbox Mode
 
@@ -222,7 +223,7 @@ perf.benchmark(1000)  // Runs 1000 raycast iterations, returns timing stats
 
 ## Architecture
 
-~50k lines across 240+ files. Orchestrator pattern with ongoing split refactors.
+~51k lines across 246 files. Orchestrator pattern with ongoing split refactors.
 
 ```
 src/
