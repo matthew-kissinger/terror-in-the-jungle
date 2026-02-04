@@ -91,6 +91,7 @@ export interface Combatant {
   defensePosition?: THREE.Vector3;
   lastDefenseReassignTime?: number;
   isFlankingMove?: boolean;
+  damageHistory?: Array<{ attackerId: string; damage: number; timestamp: number }>;
 }
 
 export enum SquadCommand {

@@ -305,7 +305,8 @@ export class GrenadeSystem implements GameSystem {
       this.combatantSystem.applyExplosionDamage(
         grenade.position,
         this.DAMAGE_RADIUS,
-        this.MAX_DAMAGE
+        this.MAX_DAMAGE,
+        'PLAYER'
       );
     }
 

@@ -38,7 +38,7 @@ export class CombatantSystemDamage {
   /**
    * Apply explosion damage to all combatants within radius
    */
-  applyExplosionDamage(center: THREE.Vector3, radius: number, maxDamage: number): void {
+  applyExplosionDamage(center: THREE.Vector3, radius: number, maxDamage: number, attackerId?: string): void {
     let hitCount = 0;
     const killedCombatants: Combatant[] = [];
 
@@ -52,11 +52,46 @@ export class CombatantSystemDamage {
         const damage = maxDamage * damagePercent;
         const wasAlive = combatant.health > 0;
 
+        // Track damage for assist system
+        if (attackerId) {
+          if (!combatant.damageHistory) combatant.damageHistory = [];
+          combatant.damageHistory.push({
+            attackerId: attackerId,
+            damage: damage,
+            timestamp: performance.now()
+          });
+          // Cap at 10 entries
+          if (combatant.damageHistory.length > 10) {
+            combatant.damageHistory.shift();
+          }
+        }
+
         combatant.health -= damage;
 
         if (combatant.health <= 0) {
           combatant.health = 0;
           combatant.state = CombatantState.DEAD;
+
+          // Process kill assists
+          if (combatant.damageHistory && combatant.damageHistory.length > 0) {
+            const now = performance.now();
+            const assists = combatant.damageHistory.filter(entry => 
+              // Within last 10 seconds
+              (now - entry.timestamp < 10000) && 
+              // Not the killer
+              (!attackerId || entry.attackerId !== attackerId)
+            );
+            
+            // Deduplicate assists by attackerId
+            const uniqueAssisters = new Set(assists.map(a => a.attackerId));
+            
+            if (uniqueAssisters.size > 0) {
+              Logger.info('combat', `🤝 ${uniqueAssisters.size} assists recorded for explosion kill on ${combatant.id}`);
+            }
+            
+            // Clear history
+            combatant.damageHistory = [];
+          }
 
           // Initialize death animation for explosion (always spinfall)
           combatant.isDying = true;

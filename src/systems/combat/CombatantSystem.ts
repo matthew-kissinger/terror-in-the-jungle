@@ -311,8 +311,8 @@ export class CombatantSystem implements GameSystem {
     return this.combatantCombat.checkPlayerHit(ray, this.playerPosition);
   }
 
-  applyExplosionDamage(center: THREE.Vector3, radius: number, maxDamage: number): void {
-    this.damageHandler.applyExplosionDamage(center, radius, maxDamage);
+  applyExplosionDamage(center: THREE.Vector3, radius: number, maxDamage: number, attackerId?: string): void {
+    this.damageHandler.applyExplosionDamage(center, radius, maxDamage, attackerId);
   }
 
   getCombatStats(): { us: number; opfor: number; total: number } {
