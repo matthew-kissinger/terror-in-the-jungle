@@ -6,6 +6,11 @@ import { SpatialOctree } from '../SpatialOctree'
 import { clusterManager } from '../ClusterManager'
 import { spatialGridManager } from '../SpatialGridManager'
 
+const _toTarget = new THREE.Vector3()
+const _offset = new THREE.Vector3()
+const _awayDir = new THREE.Vector3()
+const _defensePos = new THREE.Vector3()
+
 /**
  * Handles patrolling and defending AI states
  */
@@ -69,7 +74,7 @@ export class AIStatePatrol {
     if (enemy) {
       const targetPos = enemy.id === 'PLAYER' ? playerPosition : enemy.position;
       const distance = combatant.position.distanceTo(targetPos);
-      const toTarget = new THREE.Vector3().subVectors(targetPos, combatant.position).normalize();
+      const toTarget = _toTarget.subVectors(targetPos, combatant.position).normalize();
       combatant.rotation = Math.atan2(toTarget.z, toTarget.x);
 
       // At very close range (<15m), NPCs should ALWAYS detect and engage
@@ -112,16 +117,18 @@ export class AIStatePatrol {
         const memberIndex = squad.members.indexOf(combatant.id);
         const spacing = 4;
         const angle = (memberIndex / squad.members.length) * Math.PI * 2;
-        const offset = new THREE.Vector3(
-          Math.cos(angle) * spacing,
-          0,
-          Math.sin(angle) * spacing
+        
+        _offset.set(
+          playerPosition.x + Math.cos(angle) * spacing,
+          playerPosition.y,
+          playerPosition.z + Math.sin(angle) * spacing
         );
-        const targetPos = playerPosition.clone().add(offset);
+        
+        const targetPos = _offset;
         const distanceToTarget = combatant.position.distanceTo(targetPos);
 
         if (distanceToTarget > 2) {
-          combatant.destinationPoint = targetPos;
+          combatant.destinationPoint = targetPos.clone();
         } else {
           combatant.destinationPoint = undefined;
         }
@@ -144,11 +151,13 @@ export class AIStatePatrol {
               combatant.position.distanceTo(combatant.destinationPoint) < 5) {
             const angle = Math.random() * Math.PI * 2;
             const distance = Math.random() * patrolRadius;
-            combatant.destinationPoint = basePos.clone().add(new THREE.Vector3(
-              Math.cos(angle) * distance,
-              0,
-              Math.sin(angle) * distance
-            ));
+            
+            _offset.set(
+              basePos.x + Math.cos(angle) * distance,
+              basePos.y,
+              basePos.z + Math.sin(angle) * distance
+            );
+            combatant.destinationPoint = _offset.clone();
           }
         }
         break;
@@ -156,11 +165,11 @@ export class AIStatePatrol {
       case SquadCommand.RETREAT:
         if (squad.commandPosition) {
           const retreatDistance = 50;
-          const awayFromPlayer = new THREE.Vector3()
+          _awayDir
             .subVectors(combatant.position, playerPosition)
             .normalize()
             .multiplyScalar(retreatDistance);
-          combatant.destinationPoint = squad.commandPosition.clone().add(awayFromPlayer);
+          combatant.destinationPoint = squad.commandPosition.clone().add(_awayDir);
         }
         break;
 
