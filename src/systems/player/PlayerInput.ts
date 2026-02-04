@@ -7,6 +7,7 @@ export interface InputCallbacks {
   onRunStart?: () => void;
   onRunStop?: () => void;
   onEscape?: () => void;
+  onScoreboardToggle?: (visible: boolean) => void;
   onEnterExitHelicopter?: () => void;
   onToggleAutoHover?: () => void;
   onToggleMouseControl?: () => void;
@@ -147,6 +148,13 @@ export class PlayerInput {
     this.keys.add(event.code.toLowerCase());
 
     // Handle special keys
+    if (event.code === 'Tab') {
+      event.preventDefault();
+      if (!event.repeat) {
+        this.callbacks.onScoreboardToggle?.(true);
+      }
+    }
+
     if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
       this.callbacks.onRunStart?.();
     }
@@ -195,6 +203,11 @@ export class PlayerInput {
 
   private onKeyUp(event: KeyboardEvent): void {
     this.keys.delete(event.code.toLowerCase());
+
+    if (event.code === 'Tab') {
+      event.preventDefault();
+      this.callbacks.onScoreboardToggle?.(false);
+    }
 
     if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
       this.callbacks.onRunStop?.();

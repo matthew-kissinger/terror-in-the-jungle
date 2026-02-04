@@ -10,6 +10,7 @@ import { HUDElements } from './HUDElements';
 import { HUDUpdater } from './HUDUpdater';
 import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
 import { MatchEndScreen, MatchStats } from '../end/MatchEndScreen';
+import { Scoreboard } from './Scoreboard';
 import type { GrenadeSystem } from '../../systems/weapons/GrenadeSystem';
 import type { PlayerHealthSystem } from '../../systems/player/PlayerHealthSystem';
 import { IHUDSystem } from '../../types/SystemInterfaces';
@@ -27,6 +28,9 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private updater: HUDUpdater;
   private statsTracker: PlayerStatsTracker;
   private matchEndScreen: MatchEndScreen;
+  private scoreboard: Scoreboard;
+  private scoreboardCombatantProxy: CombatantSystem;
+  private isScoreboardVisible = false;
 
   constructor(camera?: THREE.Camera, ticketSystem?: TicketSystem, playerHealthSystem?: PlayerHealthSystem, playerRespawnManager?: unknown) {
     this.camera = camera;
@@ -36,6 +40,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.playerHealthSystem = playerHealthSystem;
     this.statsTracker = new PlayerStatsTracker();
     this.matchEndScreen = new MatchEndScreen();
+    this.scoreboardCombatantProxy = this.createScoreboardCombatantProxy();
+    this.scoreboard = new Scoreboard(this.statsTracker, this.scoreboardCombatantProxy);
 
     // Setup return to menu callback
     this.matchEndScreen.onReturnToMenu(() => {
@@ -54,6 +60,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
     // Add HUD to DOM
     this.elements.attachToDOM();
+    this.scoreboard.attachToDOM();
 
     // Initialize ticket display
     this.updater.updateTicketDisplay(300, 300);
@@ -117,9 +124,14 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
     // Update score popups
     this.elements.updateScorePopups();
+
+    if (this.isScoreboardVisible) {
+      this.scoreboard.toggle(true);
+    }
   }
 
   dispose(): void {
+    this.scoreboard.dispose();
     this.elements.dispose();
     this.styles.dispose();
     this.matchEndScreen.dispose();
@@ -215,6 +227,19 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
     Logger.info('hud', ' Showing match end screen with stats:', matchStats);
     this.matchEndScreen.show(winner, gameState, matchStats);
+  }
+
+  private createScoreboardCombatantProxy(): CombatantSystem {
+    return {
+      getAllCombatants: () => this.combatantSystem?.getAllCombatants() ?? [],
+      getTeamKillStats: () =>
+        this.combatantSystem?.getTeamKillStats() ?? {
+          usKills: 0,
+          usDeaths: 0,
+          opforKills: 0,
+          opforDeaths: 0
+        }
+    } as CombatantSystem;
   }
 
   setCombatantSystem(system: CombatantSystem): void {
@@ -326,9 +351,9 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.showWeaponSwitch(weaponName, weaponIcon, ammo);
   }
 
-  // Scoreboard toggle (stub - not yet implemented)
+  // Scoreboard toggle
   toggleScoreboard(visible: boolean): void {
-    // TODO: Implement scoreboard toggle
-    Logger.info('hud', `Scoreboard toggle requested: ${visible}`);
+    this.isScoreboardVisible = visible;
+    this.scoreboard.toggle(visible);
   }
 }
