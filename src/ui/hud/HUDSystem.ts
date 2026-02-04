@@ -180,6 +180,12 @@ export class HUDSystem implements GameSystem {
     if (!this.ticketSystem) return;
 
     const playerStats = this.statsTracker.getStats();
+    const teamKillStats = this.combatantSystem?.getTeamKillStats() ?? {
+      usKills: 0,
+      usDeaths: 0,
+      opforKills: 0,
+      opforDeaths: 0
+    };
     const matchStats: MatchStats = {
       kills: playerStats.kills,
       deaths: playerStats.deaths,
@@ -188,6 +194,10 @@ export class HUDSystem implements GameSystem {
       matchDuration: gameState.matchDuration,
       usTickets: this.ticketSystem.getTickets(Faction.US),
       opforTickets: this.ticketSystem.getTickets(Faction.OPFOR),
+      usTeamKills: teamKillStats.usKills + playerStats.kills,
+      usTeamDeaths: teamKillStats.usDeaths + playerStats.deaths,
+      opforTeamKills: teamKillStats.opforKills,
+      opforTeamDeaths: teamKillStats.opforDeaths,
       // Detailed stats
       headshots: playerStats.headshots,
       damageDealt: playerStats.damageDealt,

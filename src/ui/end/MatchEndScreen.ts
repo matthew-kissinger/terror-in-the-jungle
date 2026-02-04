@@ -12,6 +12,10 @@ export interface MatchStats {
   matchDuration: number;
   usTickets: number;
   opforTickets: number;
+  usTeamKills: number;
+  usTeamDeaths: number;
+  opforTeamKills: number;
+  opforTeamDeaths: number;
   // Detailed stats
   headshots: number;
   damageDealt: number;

@@ -116,6 +116,21 @@ export function createMatchEndScreenHTML(
         </div>
 
         <div class="stats-section">
+          <div class="stats-section-title">Team Combat Totals</div>
+          <div class="ticket-comparison team-kd-comparison">
+            <div class="faction-score us">
+              <div class="faction-name">US K/D</div>
+              <div class="faction-tickets">${stats.usTeamKills} / ${stats.usTeamDeaths}</div>
+            </div>
+            <div class="vs-divider">VS</div>
+            <div class="faction-score opfor">
+              <div class="faction-name">OPFOR K/D</div>
+              <div class="faction-tickets">${stats.opforTeamKills} / ${stats.opforTeamDeaths}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stats-section">
           <div class="stats-section-title">Combat Performance</div>
           <div class="stat-row">
             <span class="stat-label">Kills</span>

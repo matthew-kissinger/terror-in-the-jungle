@@ -9,6 +9,7 @@ interface PlayerScore {
   deaths: number;
   score: number;
   isPlayer: boolean;
+  faction: Faction;
 }
 
 export class Scoreboard {
@@ -79,18 +80,33 @@ export class Scoreboard {
       assists: playerStats.assists,
       deaths: playerStats.deaths,
       score: playerStats.kills * 100 + playerStats.assists * 50 + playerStats.zonesCaptured * 50,
-      isPlayer: true
+      isPlayer: true,
+      faction: Faction.US
     };
 
     // Get NPC stats from combatant system
     const npcScores = this.getNPCScores();
 
-    // Combine and sort by score
-    const allScores = [playerScore, ...npcScores].sort((a, b) => b.score - a.score);
+    // Combine and split by faction
+    const allScores = [playerScore, ...npcScores];
 
     // Split into factions
-    const usScores = allScores.filter((_, index) => index % 2 === 0);
-    const opforScores = allScores.filter((_, index) => index % 2 === 1);
+    const usScores = allScores
+      .filter(score => score.faction === Faction.US)
+      .sort((a, b) => b.score - a.score);
+    const opforScores = allScores
+      .filter(score => score.faction === Faction.OPFOR)
+      .sort((a, b) => b.score - a.score);
+
+    const teamKillStats = this.combatantSystem.getTeamKillStats();
+    const usTotals = {
+      kills: teamKillStats.usKills + playerStats.kills,
+      deaths: teamKillStats.usDeaths + playerStats.deaths
+    };
+    const opforTotals = {
+      kills: teamKillStats.opforKills,
+      deaths: teamKillStats.opforDeaths
+    };
 
     // Build HTML
     content.innerHTML = `
@@ -102,13 +118,13 @@ export class Scoreboard {
           <div style="font-size: 16px; font-weight: bold; color: #4488ff; margin-bottom: 15px; text-align: center; text-transform: uppercase;">
             US Forces
           </div>
-          ${this.renderTeamTable(usScores)}
+          ${this.renderTeamTable(usScores, usTotals)}
         </div>
         <div>
           <div style="font-size: 16px; font-weight: bold; color: #ff4444; margin-bottom: 15px; text-align: center; text-transform: uppercase;">
             OPFOR
           </div>
-          ${this.renderTeamTable(opforScores)}
+          ${this.renderTeamTable(opforScores, opforTotals)}
         </div>
       </div>
       <div style="text-align: center; margin-top: 25px; font-size: 12px; opacity: 0.6; border-top: 1px solid rgba(255, 255, 255, 0.2); padding-top: 15px;">
@@ -117,7 +133,7 @@ export class Scoreboard {
     `;
   }
 
-  private renderTeamTable(scores: PlayerScore[]): string {
+  private renderTeamTable(scores: PlayerScore[], totals: { kills: number; deaths: number }): string {
     const rows = scores.map((player, index) => {
       const kdRatio = player.deaths === 0 ? player.kills.toFixed(2) : (player.kills / player.deaths).toFixed(2);
       const highlightStyle = player.isPlayer ? 'background: rgba(255, 215, 0, 0.15); border-left: 3px solid #ffd700;' : '';
@@ -135,6 +151,8 @@ export class Scoreboard {
       `;
     }).join('');
 
+    const totalKd = totals.deaths === 0 ? totals.kills.toFixed(2) : (totals.kills / totals.deaths).toFixed(2);
+
     return `
       <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
         <thead>
@@ -150,6 +168,15 @@ export class Scoreboard {
         </thead>
         <tbody>
           ${rows}
+          <tr style="border-top: 2px solid rgba(255, 255, 255, 0.2); font-weight: bold;">
+            <td style="padding: 8px; text-align: center;">-</td>
+            <td style="padding: 8px;">Team Total</td>
+            <td style="padding: 8px; text-align: center; color: #4ade80;">${totals.kills}</td>
+            <td style="padding: 8px; text-align: center; color: #60a5fa;">-</td>
+            <td style="padding: 8px; text-align: center; color: #f87171;">${totals.deaths}</td>
+            <td style="padding: 8px; text-align: center; color: #fbbf24;">${totalKd}</td>
+            <td style="padding: 8px; text-align: center;">-</td>
+          </tr>
         </tbody>
       </table>
     `;
@@ -173,7 +200,8 @@ export class Scoreboard {
         assists: assists,
         deaths: deaths,
         score: kills * 100 + assists * 50,
-        isPlayer: false
+        isPlayer: false,
+        faction: combatant.faction
       });
     });
 

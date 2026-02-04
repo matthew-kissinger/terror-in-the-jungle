@@ -203,14 +203,12 @@ export class CombatantSystem implements GameSystem {
     Logger.info('Combat', 'Combatant System initialized');
     Logger.info('Combat', 'Use window.combatProfile() in console to see combat performance breakdown');
   }
-
   /**
    * Get detailed combat profiling info for debugging performance
    */
   getCombatProfile() {
     return this.profiler.getCombatProfile();
   }
-
   update(deltaTime: number): void {
     // Update player position
     this.camera.getWorldPosition(this.playerPosition);
@@ -218,9 +216,7 @@ export class CombatantSystem implements GameSystem {
 
     // Update FPS EMA and adjust interval scaling
     this.lodManager.updateFrameTiming(deltaTime);
-
     const updateStart = performance.now();
-
     if (!this.combatEnabled) {
       // Still update positions and billboards for visual consistency
       this.lodManager.updateCombatants(deltaTime);
@@ -299,7 +295,6 @@ export class CombatantSystem implements GameSystem {
     this.combatantAI.setSquads(this.squadManager.getAllSquads());
   }
 
-
   // Public API
   handlePlayerShot(
     ray: THREE.Ray,
@@ -319,7 +314,6 @@ export class CombatantSystem implements GameSystem {
   getCombatStats(): { us: number; opfor: number; total: number } {
     let us = 0;
     let opfor = 0;
-
     this.combatants.forEach(combatant => {
       if (combatant.state === CombatantState.DEAD) return;
       if (combatant.faction === Faction.US) {
@@ -328,8 +322,21 @@ export class CombatantSystem implements GameSystem {
         opfor++;
       }
     });
-
     return { us, opfor, total: us + opfor };
+  }
+
+  getTeamKillStats(): { usKills: number; usDeaths: number; opforKills: number; opforDeaths: number } {
+    let usKills = 0; let usDeaths = 0; let opforKills = 0; let opforDeaths = 0;
+    this.combatants.forEach(combatant => {
+      if (combatant.faction === Faction.US) {
+        usKills += combatant.kills || 0;
+        usDeaths += combatant.deaths || 0;
+      } else {
+        opforKills += combatant.kills || 0;
+        opforDeaths += combatant.deaths || 0;
+      }
+    });
+    return { usKills, usDeaths, opforKills, opforDeaths };
   }
 
   getAllCombatants(): Combatant[] {
