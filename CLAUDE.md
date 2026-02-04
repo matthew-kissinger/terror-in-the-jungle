@@ -40,7 +40,7 @@ perf.reset()     // Reset all telemetry
 
 ### Spatial Systems
 
-- **SpatialOctree** - 487 lines, used for combatant queries
+- **SpatialOctree** - 257 lines (split: SpatialOctreeNode + SpatialOctreeQuery), used for combatant queries
 - **SpatialGrid** - Alternative grid-based spatial
 - **SpatialGridManager** - Coordinates spatial queries
 - **LOSAccelerator** - Line-of-sight caching
@@ -79,7 +79,6 @@ CombatantSystem has distance-based LOD:
 
 | File | Lines | Location |
 |------|-------|----------|
-| SpatialOctree.ts | 487 | systems/combat/ |
 | HUDStyles.ts | 483 | ui/hud/ |
 | CombatantCombat.ts | 468 | systems/combat/ |
 | AudioManager.ts | 453 | systems/audio/ |
@@ -102,7 +101,7 @@ CombatantSystem has distance-based LOD:
 | DeathCamSystem.ts | 405 | systems/player/ |
 | ImprovedChunk.ts | 401 | systems/terrain/ |
 
-**Completed splits**: CombatantSystem (1308->538->428, extracted CombatantSystemDamage + CombatantSystemSetters + CombatantSystemUpdate), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->529->385, extracted ChunkPriorityManager + ChunkLifecycleManager + ChunkLoadQueueManager + ChunkTerrainQueries), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer), AIFlankingSystem (606->359, extracted FlankingRoleManager + FlankingTacticsResolver), FullMapSystem (574->365, extracted FullMapDOMHelpers + FullMapInput + FullMapStyles), AITargeting (571->94, extracted AITargetAcquisition + AILineOfSight), CombatantMovement (504->129, extracted CombatantMovementStates + CombatantMovementCommands), PixelArtSandbox (551->144, extracted PixelArtSandboxInit + PixelArtSandboxInput + PixelArtSandboxLoop), InfluenceMapSystem (570->329, extracted InfluenceMapComputations + InfluenceMapGrid), ExplosionEffectsPool (489->161, extracted ExplosionEffectFactory + ExplosionParticleUpdater + ExplosionSpawnInitializer + ExplosionTextures), OpenFrontierRespawnMap (531->194, extracted OpenFrontierRespawnMapUtils + OpenFrontierRespawnMapRenderer), gameModes (496->40, extracted GameModeZoneControl + GameModeOpenFrontier + GameModeCommon). 22 files exceed the 400-line target.
+**Completed splits**: CombatantSystem (1308->538->428, extracted CombatantSystemDamage + CombatantSystemSetters + CombatantSystemUpdate), PlayerController (1043->369), HelicopterModel (1058->433), CombatantRenderer (866->376), HUDElements (956->311), AudioManager (767->453), GrenadeSystem (731->379), PlayerRespawnManager (749->331), CombatantCombat (806->468), FootstepAudioSystem (587->326), ImprovedChunkManager (753->529->385, extracted ChunkPriorityManager + ChunkLifecycleManager + ChunkLoadQueueManager + ChunkTerrainQueries), FirstPersonWeapon (568->445, extracted WeaponAmmo + WeaponInput + WeaponModel), SandboxSystemManager (644->270, extracted SystemInitializer + SystemConnector + SystemUpdater + SystemDisposer), ChunkWorkerPool (715->270, extracted ChunkWorkerLifecycle + ChunkWorkerTelemetry + ChunkWorkerCode + ChunkTaskQueue), GPUBillboardSystem (669->243, extracted BillboardBufferManager + BillboardShaders), PerformanceTelemetry (612->388, extracted FrameBudgetTracker + SpatialTelemetry + HitDetectionTelemetry), ImprovedChunk (672->399, extracted ChunkVegetationGenerator + TerrainMeshFactory), CombatantSpawnManager (615->337, extracted SpawnPointManager + ReinforcementManager + SpawnBalancer), AIFlankingSystem (606->359, extracted FlankingRoleManager + FlankingTacticsResolver), FullMapSystem (574->365, extracted FullMapDOMHelpers + FullMapInput + FullMapStyles), AITargeting (571->94, extracted AITargetAcquisition + AILineOfSight), CombatantMovement (504->129, extracted CombatantMovementStates + CombatantMovementCommands), PixelArtSandbox (551->144, extracted PixelArtSandboxInit + PixelArtSandboxInput + PixelArtSandboxLoop), InfluenceMapSystem (570->329, extracted InfluenceMapComputations + InfluenceMapGrid), ExplosionEffectsPool (489->161, extracted ExplosionEffectFactory + ExplosionParticleUpdater + ExplosionSpawnInitializer + ExplosionTextures), OpenFrontierRespawnMap (531->194, extracted OpenFrontierRespawnMapUtils + OpenFrontierRespawnMapRenderer), gameModes (496->40, extracted GameModeZoneControl + GameModeOpenFrontier + GameModeCommon), SpatialOctree (487->257, extracted SpatialOctreeNode + SpatialOctreeQuery). 21 files exceed the 400-line target.
 
 ### Optimization Targets
 
@@ -155,11 +154,13 @@ Known hotspots:
 - **Array.splice() in weapon/grenade update loops** - FIXED. MortarSystem, GrenadeSystem, CameraShakeSystem now use swap-and-pop.
 - **OpenFrontierRespawnMapRenderer debug console.log** - FIXED. Debug logging removed from render path.
 
+- **PlayerMovement per-frame allocations** - FIXED. Module-level scratch vectors `_moveVector`, `_cameraDirection`, `_cameraRight`, `_worldMoveVector`, `_horizontalVelocity`, `_upVector` replace per-frame allocations.
+- **BillboardRenderer per-frame allocations** - FIXED. Module-level scratch vectors `_cameraPosition`, `_chunkCenter`, `_direction` replace per-frame and per-chunk allocations.
+- **GunplayCore Ray allocations** - FIXED. Module-level `_scratchRay`, `_origin`, `_perturbed` reused in `computeShotRay()`. Pellet array builds still allocate (necessary for output array).
+- **SpatialOctree Ray allocation** - FIXED. SpatialOctree split to 257 lines (SpatialOctreeNode + SpatialOctreeQuery). Module-level scratch ray replaces per-query allocation.
+
 Discovered hotspots (not yet fixed):
-- **PlayerMovement per-frame allocations** - `src/systems/player/PlayerMovement.ts:79-118`. Creates 4-5 new Vector3 per frame in `applyMovement()`. Should use module-level scratch vectors.
-- **BillboardRenderer per-frame allocations** - `src/systems/world/billboard/BillboardRenderer.ts:25,41,90`. Creates new Vector3 per frame and per-chunk in update loop for 200k+ billboard rotations.
-- **GunplayCore Ray allocations** - `src/systems/weapons/GunplayCore.ts:103,109,163`. Creates `new THREE.Ray()` per shot and per pellet for shotgun spread.
-- **SpatialOctree Ray allocation** - `src/systems/combat/SpatialOctree.ts:337`. Creates `new THREE.Ray()` per spatial query.
+- **AICoverSystem per-call Vector3 allocations** - `src/systems/combat/ai/AICoverSystem.ts:378-379,336,342-346`. Creates new Vector3 per cover evaluation in `evaluateCoverQuality()` and `evaluateSandbagCover()`. Should use module-level scratch vectors.
 - **MortarBallistics computeTrajectory() clones** - Lines 60-80. Still creates 100+ Vector3 via `.clone()` per trajectory computation (builds output array, not per-frame). Lower priority.
 
 Possible areas (confirm with profiling):
@@ -184,7 +185,7 @@ Possible areas (confirm with profiling):
 - **GPU timing** - ADDED. renderer.info stats (draw calls, triangles, geometries, textures) and EXT_disjoint_timer_query instrumentation in PerformanceTelemetry. Visible in F2 overlay.
 - **Memory profiling** - No heap snapshot automation
 - **Playwright test harness** - Infrastructure set up but perf regression tests not yet working
-- **Bundle code-splitting** - Vite manual chunks configured (three.js, postprocessing, UI, BVH). Main chunk ~457 kB (117 kB gzipped). Circular chunk warnings from three.js internals remain.
+- **Bundle code-splitting** - Vite manual chunks configured (three.js, postprocessing, UI, BVH). Main chunk ~449 kB (115 kB gzipped). Circular chunk warnings from three.js internals remain.
 
 ## COMPLETED: AI Sandbox Mode
 
@@ -259,7 +260,7 @@ src/
 | `src/systems/debug/PerformanceTelemetry.ts` | Frame budget tracking | Use this |
 | `src/ui/debug/PerformanceOverlay.ts` | F2 visual overlay | Shows everything |
 | `src/systems/combat/CombatantSystem.ts` | NPC orchestrator | Split to 428 lines |
-| `src/systems/combat/SpatialOctree.ts` | Spatial queries | Check query times |
+| `src/systems/combat/SpatialOctree.ts` | Spatial queries | 257 lines (split into Node + Query modules) |
 | `src/workers/BVHWorker.ts` | Parallel BVH | Pool of 4 workers |
 | `src/core/PixelArtSandbox.ts` | Main game loop | Where systems update (144 lines, split into 3 modules) |
 | `src/core/SandboxSystemManager.ts` | System orchestrator | 270 lines (split into 4 modules) |
