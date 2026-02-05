@@ -124,7 +124,12 @@ export class AssetLoader implements GameSystem {
         asset.texture = finalTexture;
         this.loadedTextures.set(asset.name, finalTexture);
 
-        Logger.debug('assets', `Loaded texture: ${asset.name} (${(finalTexture.image as any).width}x${(finalTexture.image as any).height})`);
+        const img = finalTexture.image as HTMLImageElement | HTMLCanvasElement | undefined;
+        if (img && img.width && img.height) {
+          Logger.debug('assets', `Loaded texture: ${asset.name} (${img.width}x${img.height})`);
+        } else {
+          Logger.debug('assets', `Loaded texture: ${asset.name}`);
+        }
       } catch (error) {
         Logger.warn('assets', `Failed to load texture: ${asset.path}`, error);
       }
@@ -135,8 +140,9 @@ export class AssetLoader implements GameSystem {
 
   // Heuristically clamp texture size by asset type to keep WebGL stable
   private downscaleIfNeeded(name: string, texture: THREE.Texture): THREE.Texture | null {
-    const w = (texture.image as any)?.width || 0;
-    const h = (texture.image as any)?.height || 0;
+    const img = texture.image as HTMLImageElement | HTMLCanvasElement | undefined;
+    const w = img?.width || 0;
+    const h = img?.height || 0;
     if (!w || !h) return null;
 
     const lower = name.toLowerCase();
@@ -159,7 +165,13 @@ export class AssetLoader implements GameSystem {
     try {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'medium';
-      ctx.drawImage(texture.image as any, 0, 0, newW, newH);
+      const img = texture.image as HTMLImageElement | HTMLCanvasElement | undefined;
+      if (img) {
+        ctx.drawImage(img, 0, 0, newW, newH);
+      } else {
+        Logger.warn('assets', `Cannot downscale texture ${name}: image is undefined`);
+        return null;
+      }
       const canvasTex = new THREE.CanvasTexture(canvas);
       canvasTex.magFilter = THREE.NearestFilter;
       canvasTex.minFilter = THREE.NearestFilter;
