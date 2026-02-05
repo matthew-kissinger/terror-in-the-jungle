@@ -262,13 +262,13 @@ describe('CombatantDamage', () => {
     });
 
     it('should set death animation type based on high damage', () => {
-      const target = createMockCombatant('target-1', Faction.US, 100);
+      const target = createMockCombatant('target-1', Faction.US, 85);
       combatantDamage.applyDamage(target, 85); // damage > 80
       expect(target.deathAnimationType).toBe('spinfall');
     });
 
     it('should set death animation type to crumple for normal damage', () => {
-      const target = createMockCombatant('target-1', Faction.US, 100);
+      const target = createMockCombatant('target-1', Faction.US, 20);
       combatantDamage.applyDamage(target, 20); // normal damage
       expect(target.deathAnimationType).toBe('crumple');
     });
