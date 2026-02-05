@@ -9,11 +9,12 @@ import { NoiseGenerator } from '../../utils/NoiseGenerator';
 export class HeightQueryCache {
   private noiseGenerator: NoiseGenerator;
   private cache: Map<string, number> = new Map();
-  private readonly MAX_CACHE_SIZE = 10000;
+  private readonly maxCacheSize: number;
   private readonly CACHE_RESOLUTION = 0.5; // Snap queries to 0.5m grid for cache hits
 
-  constructor(seed: number = 12345) {
+  constructor(seed: number = 12345, maxCacheSize: number = 10000) {
     this.noiseGenerator = new NoiseGenerator(seed);
+    this.maxCacheSize = maxCacheSize;
   }
 
   /**
@@ -42,7 +43,7 @@ export class HeightQueryCache {
     this.cache.set(key, height);
 
     // Evict oldest if over limit
-    if (this.cache.size > this.MAX_CACHE_SIZE) {
+    if (this.cache.size > this.maxCacheSize) {
       const firstKey = this.cache.keys().next().value;
       if (firstKey) this.cache.delete(firstKey);
     }
@@ -164,7 +165,7 @@ export class HeightQueryCache {
   getCacheStats(): { size: number; maxSize: number } {
     return {
       size: this.cache.size,
-      maxSize: this.MAX_CACHE_SIZE
+      maxSize: this.maxCacheSize
     };
   }
 

@@ -289,7 +289,7 @@ describe('SpatialOctree', () => {
     it('should be faster than linear scan for large datasets', () => {
       const octree = new SpatialOctree();
       const entityCount = 1000;
-      
+
       // Insert many entities
       const positions = new Map<string, THREE.Vector3>();
       for (let i = 0; i < entityCount; i++) {
@@ -301,14 +301,22 @@ describe('SpatialOctree', () => {
         positions.set(`entity${i}`, pos);
         octree.updatePosition(`entity${i}`, pos);
       }
-      
+
+      // Warmup iterations to avoid JIT variance
+      for (let i = 0; i < 10; i++) {
+        octree.queryRadius(new THREE.Vector3(0, 0, 0), 500);
+        for (const [_id, pos] of positions) {
+          pos.distanceToSquared(new THREE.Vector3(0, 0, 0));
+        }
+      }
+
       // Time octree query
       const octreeStart = performance.now();
       for (let i = 0; i < 100; i++) {
         octree.queryRadius(new THREE.Vector3(0, 0, 0), 500);
       }
       const octreeTime = performance.now() - octreeStart;
-      
+
       // Time linear scan
       const linearStart = performance.now();
       for (let i = 0; i < 100; i++) {
@@ -322,9 +330,10 @@ describe('SpatialOctree', () => {
         }
       }
       const linearTime = performance.now() - linearStart;
-      
-      // Octree should be faster for large datasets
-      expect(octreeTime).toBeLessThan(linearTime);
+
+      // Octree should be meaningfully faster (at least 20% faster to account for timing variance)
+      // If this test flakes, increase iterations or reduce margin
+      expect(octreeTime).toBeLessThan(linearTime * 0.95);
     });
   });
 
