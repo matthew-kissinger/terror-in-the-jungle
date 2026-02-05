@@ -103,8 +103,8 @@ export class HelicopterModel implements GameSystem {
     this.audio.initialize('us_huey', helicopter);
 
     // Register helicopter for collision detection
-    if ('registerCollisionObject' in this.terrainManager) {
-      (this.terrainManager as any).registerCollisionObject('us_huey', helicopter);
+    if (this.terrainManager) {
+      this.terrainManager.registerCollisionObject('us_huey', helicopter);
     }
 
     Logger.debug('helicopter', `  Created US UH-1 Huey at position (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)})`);
@@ -321,8 +321,8 @@ export class HelicopterModel implements GameSystem {
     this.helicopterPhysics.clear();
 
     // Unregister collision objects
-    if (this.terrainManager && 'unregisterCollisionObject' in this.terrainManager) {
-      (this.terrainManager as any).unregisterCollisionObject('us_huey');
+    if (this.terrainManager) {
+      this.terrainManager.unregisterCollisionObject('us_huey');
     }
 
     Logger.debug('helicopter', 'HelicopterModel disposed');

@@ -62,8 +62,8 @@ export class HelipadSystem implements GameSystem {
     this.helipads.set('us_helipad', helipad);
 
     // Register helipad for collision detection
-    if (this.terrainManager && 'registerCollisionObject' in this.terrainManager) {
-      (this.terrainManager as any).registerCollisionObject('us_helipad', helipad);
+    if (this.terrainManager) {
+      this.terrainManager.registerCollisionObject('us_helipad', helipad);
     }
 
     // Clear vegetation in helipad area
