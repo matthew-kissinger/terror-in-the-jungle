@@ -6,6 +6,14 @@ import { AssetLoader } from '../assets/AssetLoader';
 import { getAssetPath } from '../../config/paths';
 import { WeatherSystem } from './WeatherSystem';
 
+interface WaterUniforms {
+  time?: { value: number };
+  sunDirection?: { value: THREE.Vector3 };
+  waterColor?: { value: THREE.Color };
+  distortionScale?: { value: number };
+  [key: string]: { value: any } | undefined;
+}
+
 export class WaterSystem implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
@@ -111,7 +119,7 @@ export class WaterSystem implements GameSystem {
     if (!this.water) return;
     
     // Update water time for wave animation
-    const waterUniforms = (this.water.material as any).uniforms;
+    const waterUniforms = (this.water.material as THREE.ShaderMaterial).uniforms as WaterUniforms;
     if (waterUniforms && waterUniforms.time) {
       waterUniforms.time.value += deltaTime * 0.5; // Slower wave speed
     }
@@ -173,7 +181,7 @@ export class WaterSystem implements GameSystem {
     this.sun.normalize();
     
     if (this.water) {
-      const waterUniforms = (this.water.material as any).uniforms;
+      const waterUniforms = (this.water.material as THREE.ShaderMaterial).uniforms as WaterUniforms;
       if (waterUniforms && waterUniforms.sunDirection) {
         waterUniforms.sunDirection.value.copy(this.sun);
       }
@@ -199,7 +207,7 @@ export class WaterSystem implements GameSystem {
    */
   setWaterColor(color: number): void {
     if (this.water) {
-      const waterUniforms = (this.water.material as any).uniforms;
+      const waterUniforms = (this.water.material as THREE.ShaderMaterial).uniforms as WaterUniforms;
       if (waterUniforms && waterUniforms.waterColor) {
         waterUniforms.waterColor.value = new THREE.Color(color);
       }
@@ -211,7 +219,7 @@ export class WaterSystem implements GameSystem {
    */
   setDistortionScale(scale: number): void {
     if (this.water) {
-      const waterUniforms = (this.water.material as any).uniforms;
+      const waterUniforms = (this.water.material as THREE.ShaderMaterial).uniforms as WaterUniforms;
       if (waterUniforms && waterUniforms.distortionScale) {
         waterUniforms.distortionScale.value = scale;
       }
