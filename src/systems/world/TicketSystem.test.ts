@@ -426,7 +426,8 @@ describe('TicketSystem', () => {
       ticketSystem.setGameEndCallback(gameEndCallback);
 
       // Advance game to COMBAT phase
-      ticketSystem.update(ticketSystem['setupDuration'] + 0.1);
+      const setupDuration = ticketSystem['phaseManager']['setupDuration'];
+      ticketSystem.update(setupDuration + 0.1);
 
       ticketSystem['usTickets'] = 1;
       ticketSystem.onCombatantDeath(Faction.US); // Deduct last 2 tickets (triggers checkVictoryConditions -> endGame)
@@ -442,7 +443,8 @@ describe('TicketSystem', () => {
       ticketSystem.setGameEndCallback(gameEndCallback);
 
       // Advance game to COMBAT phase
-      ticketSystem.update(ticketSystem['setupDuration'] + 0.1);
+      const setupDuration = ticketSystem['phaseManager']['setupDuration'];
+      ticketSystem.update(setupDuration + 0.1);
 
       ticketSystem['opforTickets'] = 1;
       ticketSystem.onCombatantDeath(Faction.OPFOR); // Deduct last 2 tickets (triggers checkVictoryConditions -> endGame)
@@ -465,7 +467,8 @@ describe('TicketSystem', () => {
       ticketSystem.setZoneManager(mockZoneManager);
 
       // Ensure game is in COMBAT phase for win condition to apply
-      ticketSystem['gameState'].matchDuration = ticketSystem['setupDuration'] + 0.1; // Set duration to combat phase
+      const setupDuration = ticketSystem['phaseManager']['setupDuration'];
+      ticketSystem['gameState'].matchDuration = setupDuration + 0.1; // Set duration to combat phase
       ticketSystem['gameState'].phase = 'COMBAT'; // Explicitly set to COMBAT
 
       ticketSystem.update(0); // Trigger checkVictoryConditions
@@ -488,7 +491,8 @@ describe('TicketSystem', () => {
       ticketSystem.setZoneManager(mockZoneManager);
 
       // Ensure game is in COMBAT phase for win condition to apply
-      ticketSystem['gameState'].matchDuration = ticketSystem['setupDuration'] + 0.1; // Set duration to combat phase
+      const setupDuration = ticketSystem['phaseManager']['setupDuration'];
+      ticketSystem['gameState'].matchDuration = setupDuration + 0.1; // Set duration to combat phase
       ticketSystem['gameState'].phase = 'COMBAT'; // Explicitly set to COMBAT
 
       ticketSystem.update(0); // Trigger checkVictoryConditions
@@ -505,7 +509,9 @@ describe('TicketSystem', () => {
       ticketSystem['opforTickets'] = 120; // Difference is 20, less than 50
 
       // Advance time to just before combatDuration ends
-      const timeToOvertime = ticketSystem['setupDuration'] + ticketSystem['combatDuration'] - 0.1;
+      const setupDuration = ticketSystem['phaseManager']['setupDuration'];
+      const combatDuration = ticketSystem['phaseManager']['combatDuration'];
+      const timeToOvertime = setupDuration + combatDuration - 0.1;
       ticketSystem.update(timeToOvertime);
       expect(ticketSystem.getGameState().phase).toBe('COMBAT');
 
@@ -522,7 +528,9 @@ describe('TicketSystem', () => {
       ticketSystem['opforTickets'] = 50; // Difference is 150, more than 50
 
       // Advance time to just before combatDuration ends
-      const timeToGameEnd = ticketSystem['setupDuration'] + ticketSystem['combatDuration'] - 0.1;
+      const setupDuration = ticketSystem['phaseManager']['setupDuration'];
+      const combatDuration = ticketSystem['phaseManager']['combatDuration'];
+      const timeToGameEnd = setupDuration + combatDuration - 0.1;
       ticketSystem.update(timeToGameEnd);
       expect(ticketSystem.getGameState().phase).toBe('COMBAT');
 
@@ -540,11 +548,14 @@ describe('TicketSystem', () => {
       ticketSystem['opforTickets'] = 120; // Difference is 20, less than 50
 
       // Advance time to enter OVERTIME
-      ticketSystem.update(ticketSystem['setupDuration'] + ticketSystem['combatDuration'] + 0.1);
+      const setupDuration = ticketSystem['phaseManager']['setupDuration'];
+      const combatDuration = ticketSystem['phaseManager']['combatDuration'];
+      ticketSystem.update(setupDuration + combatDuration + 0.1);
       expect(ticketSystem.getGameState().phase).toBe('OVERTIME');
 
       // Advance time past overtimeDuration
-      ticketSystem.update(ticketSystem['overtimeDuration']);
+      const overtimeDuration = ticketSystem['phaseManager']['overtimeDuration'];
+      ticketSystem.update(overtimeDuration);
 
       expect(ticketSystem.getGameState().phase).toBe('ENDED');
       expect(ticketSystem.isGameActive()).toBe(false);
@@ -554,7 +565,8 @@ describe('TicketSystem', () => {
 
     it('should not end game if conditions are not met', () => {
       // Game active, combat phase, plenty of tickets for both, no total control
-      ticketSystem.update(ticketSystem['setupDuration'] + 1);
+      const setupDuration = ticketSystem['phaseManager']['setupDuration'];
+      ticketSystem.update(setupDuration + 1);
       ticketSystem['gameState'].phase = 'COMBAT';
       ticketSystem.update(0); // Trigger checkVictoryConditions
 
@@ -566,40 +578,47 @@ describe('TicketSystem', () => {
 
   describe('Edge Cases and Durations', () => {
     it('should correctly transition through game phases based on duration', () => {
+      const setupDuration = ticketSystem['phaseManager']['setupDuration'];
+      const combatDuration = ticketSystem['phaseManager']['combatDuration'];
+
       // SETUP phase
-      ticketSystem.update(ticketSystem['setupDuration'] / 2);
+      ticketSystem.update(setupDuration / 2);
       expect(ticketSystem.getGameState().phase).toBe('SETUP');
 
       // Transition to COMBAT
-      ticketSystem.update(ticketSystem['setupDuration'] / 2 + 0.1); // Just past setup
+      ticketSystem.update(setupDuration / 2 + 0.1); // Just past setup
       expect(ticketSystem.getGameState().phase).toBe('COMBAT');
 
       // Stay in COMBAT
-      ticketSystem.update(ticketSystem['combatDuration'] / 2);
+      ticketSystem.update(combatDuration / 2);
       expect(ticketSystem.getGameState().phase).toBe('COMBAT');
 
       // Transition to OVERTIME or ENDED handled by other tests
     });
 
     it('getMatchTimeRemaining should reflect current phase', () => {
+      const setupDuration = ticketSystem['phaseManager']['setupDuration'];
+      const combatDuration = ticketSystem['phaseManager']['combatDuration'];
+      const overtimeDuration = ticketSystem['phaseManager']['overtimeDuration'];
+
       // SETUP
       ticketSystem.update(1);
       expect(ticketSystem.getGameState().phase).toBe('SETUP');
-      expect(ticketSystem.getMatchTimeRemaining()).toBeCloseTo(ticketSystem['setupDuration'] - 1);
+      expect(ticketSystem.getMatchTimeRemaining()).toBeCloseTo(setupDuration - 1);
 
       // COMBAT
-      ticketSystem.update(ticketSystem['setupDuration']); // Advances to duration = setupDuration + 1 = 11, which is 1s into COMBAT
+      ticketSystem.update(setupDuration); // Advances to duration = 1 + setupDuration = 11, which is 1s into COMBAT
       ticketSystem.update(1); // Now duration = 12, which is 2s into COMBAT
       expect(ticketSystem.getGameState().phase).toBe('COMBAT');
-      expect(ticketSystem.getMatchTimeRemaining()).toBeCloseTo(ticketSystem['combatDuration'] - 2); // 2 seconds into combat phase
+      expect(ticketSystem.getMatchTimeRemaining()).toBeCloseTo(combatDuration - 2); // 2 seconds into combat phase
 
       // OVERTIME
       ticketSystem['usTickets'] = 100;
       ticketSystem['opforTickets'] = 120; // Close score
-      ticketSystem.update(ticketSystem['combatDuration'] - 2); // Advances to end of combat (duration = setupDuration + combatDuration)
+      ticketSystem.update(combatDuration - 2); // Advances to end of combat (duration = setupDuration + combatDuration)
       ticketSystem.update(1); // 1 sec into overtime
       expect(ticketSystem.getGameState().phase).toBe('OVERTIME');
-      expect(ticketSystem.getMatchTimeRemaining()).toBeCloseTo(ticketSystem['overtimeDuration'] - 1);
+      expect(ticketSystem.getMatchTimeRemaining()).toBeCloseTo(overtimeDuration - 1);
 
       // ENDED
       ticketSystem.forceEndGame(Faction.US);
@@ -607,13 +626,17 @@ describe('TicketSystem', () => {
     });
 
     it('should handle large deltaTime values gracefully', () => {
+      const setupDuration = ticketSystem['phaseManager']['setupDuration'];
+      const combatDuration = ticketSystem['phaseManager']['combatDuration'];
+      const overtimeDuration = ticketSystem['phaseManager']['overtimeDuration'];
+
       const largeDeltaTime = 2000; // Much larger than total duration (setup 10 + combat 900 + overtime 120 = 1030)
       ticketSystem.update(largeDeltaTime);
 
       // The game should have ended by time limit
       expect(ticketSystem.isGameActive()).toBe(false);
       expect(ticketSystem.getGameState().phase).toBe('ENDED');
-      expect(ticketSystem.getGameState().matchDuration).toBeGreaterThan(ticketSystem['setupDuration'] + ticketSystem['combatDuration'] + ticketSystem['overtimeDuration']);
+      expect(ticketSystem.getGameState().matchDuration).toBeGreaterThan(setupDuration + combatDuration + overtimeDuration);
       expect(ticketSystem.getGameState().winner).toBeDefined(); // A winner should be determined
     });
 
@@ -664,7 +687,7 @@ describe('TicketSystem', () => {
     it('setMatchDuration should update combatDuration', () => {
       const newDuration = 600;
       ticketSystem.setMatchDuration(newDuration);
-      expect(ticketSystem['combatDuration']).toBe(newDuration);
+      expect(ticketSystem['phaseManager']['combatDuration']).toBe(newDuration);
     });
 
     it('setDeathPenalty should update deathPenalty', () => {
