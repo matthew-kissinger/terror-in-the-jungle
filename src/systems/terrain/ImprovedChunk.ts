@@ -9,6 +9,7 @@ import { VegetationData } from './ChunkWorkerPool';
 import { ChunkHeightGenerator } from './ChunkHeightGenerator';
 import { ChunkVegetationGenerator } from './ChunkVegetationGenerator';
 import { TerrainMeshFactory } from './TerrainMeshFactory';
+import { ChunkWorkerAdapter } from './ChunkWorkerAdapter';
 
 // Extend Three.js BufferGeometry with BVH methods
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
@@ -170,119 +171,35 @@ export class ImprovedChunk {
     // Use worker-provided height data
     this.heightData = workerHeightData;
 
-    // Create terrain mesh from worker geometry (skip if GPU terrain handles visuals)
-    if (!this.skipTerrainMesh) {
-      this.terrainMesh = TerrainMeshFactory.createTerrainMeshFromGeometry(
-        workerGeometry,
-        this.chunkX,
-        this.chunkZ,
-        this.size,
-        this.assetLoader,
-        this.debugMode,
-        bvhAlreadyComputed
-      );
-      this.terrainGeometry = workerGeometry;
-      this.scene.add(this.terrainMesh);
-
-      // Debug verification
-      const testHeight = this.getHeightAtLocal(this.size / 2, this.size / 2);
-      Logger.info('terrain', ` Chunk (${this.chunkX}, ${this.chunkZ}) worker center height: ${testHeight.toFixed(2)}`);
-    } else {
-      // Even if we skip the mesh, dispose the geometry since we won't use it
-      workerGeometry.dispose();
-    }
-
-    // Use worker-provided vegetation positions (much faster than main thread)
-    if (workerVegetation) {
-      this.applyWorkerVegetation(workerVegetation);
-    } else {
-      // Fallback to main thread vegetation generation
-      const vegetation = ChunkVegetationGenerator.generateVegetation(
-        this.chunkX,
-        this.chunkZ,
-        this.size,
-        (localX, localZ) => this.getHeightAtLocal(localX, localZ)
-      );
-      this.fernInstances = vegetation.fernInstances;
-      this.elephantEarInstances = vegetation.elephantEarInstances;
-      this.fanPalmInstances = vegetation.fanPalmInstances;
-      this.coconutInstances = vegetation.coconutInstances;
-      this.arecaInstances = vegetation.arecaInstances;
-      this.dipterocarpInstances = vegetation.dipterocarpInstances;
-      this.banyanInstances = vegetation.banyanInstances;
-    }
-
-    // Register instances with global system
-    const chunkKey = `${this.chunkX},${this.chunkZ}`;
-    this.globalBillboardSystem.addChunkInstances(
-      chunkKey,
-      this.fernInstances,
-      this.elephantEarInstances,
-      this.fanPalmInstances,
-      this.coconutInstances,
-      this.arecaInstances,
-      this.dipterocarpInstances,
-      this.banyanInstances
+    // Delegate to ChunkWorkerAdapter for worker data processing
+    const result = await ChunkWorkerAdapter.applyWorkerData(
+      this.scene,
+      this.assetLoader,
+      this.chunkX,
+      this.chunkZ,
+      this.size,
+      this.globalBillboardSystem,
+      this.debugMode,
+      this.skipTerrainMesh,
+      workerGeometry,
+      workerHeightData,
+      workerVegetation,
+      bvhAlreadyComputed,
+      (localX, localZ) => this.getHeightAtLocal(localX, localZ)
     );
 
-    this.isGenerated = true;
-    Logger.info('terrain', ` ImprovedChunk (${this.chunkX}, ${this.chunkZ}) generated from worker`);
-  }
+    // Apply results
+    this.terrainMesh = result.terrainMesh;
+    this.terrainGeometry = result.terrainGeometry;
+    this.fernInstances = result.fernInstances;
+    this.elephantEarInstances = result.elephantEarInstances;
+    this.fanPalmInstances = result.fanPalmInstances;
+    this.coconutInstances = result.coconutInstances;
+    this.arecaInstances = result.arecaInstances;
+    this.dipterocarpInstances = result.dipterocarpInstances;
+    this.banyanInstances = result.banyanInstances;
 
-  /**
-   * Apply vegetation positions computed by worker
-   */
-  private applyWorkerVegetation(veg: VegetationData): void {
-    // Convert worker data to BillboardInstance format
-    for (const p of veg.fern) {
-      this.fernInstances.push({
-        position: new THREE.Vector3(p.x, p.y, p.z),
-        scale: new THREE.Vector3(p.sx, p.sy, 1),
-        rotation: 0
-      });
-    }
-    for (const p of veg.elephantEar) {
-      this.elephantEarInstances.push({
-        position: new THREE.Vector3(p.x, p.y, p.z),
-        scale: new THREE.Vector3(p.sx, p.sy, 1),
-        rotation: 0
-      });
-    }
-    for (const p of veg.fanPalm) {
-      this.fanPalmInstances.push({
-        position: new THREE.Vector3(p.x, p.y, p.z),
-        scale: new THREE.Vector3(p.sx, p.sy, 1),
-        rotation: 0
-      });
-    }
-    for (const p of veg.coconut) {
-      this.coconutInstances.push({
-        position: new THREE.Vector3(p.x, p.y, p.z),
-        scale: new THREE.Vector3(p.sx, p.sy, 1),
-        rotation: 0
-      });
-    }
-    for (const p of veg.areca) {
-      this.arecaInstances.push({
-        position: new THREE.Vector3(p.x, p.y, p.z),
-        scale: new THREE.Vector3(p.sx, p.sy, 1),
-        rotation: 0
-      });
-    }
-    for (const p of veg.dipterocarp) {
-      this.dipterocarpInstances.push({
-        position: new THREE.Vector3(p.x, p.y, p.z),
-        scale: new THREE.Vector3(p.sx, p.sy, 1),
-        rotation: 0
-      });
-    }
-    for (const p of veg.banyan) {
-      this.banyanInstances.push({
-        position: new THREE.Vector3(p.x, p.y, p.z),
-        scale: new THREE.Vector3(p.sx, p.sy, 1),
-        rotation: 0
-      });
-    }
+    this.isGenerated = true;
   }
 
 
