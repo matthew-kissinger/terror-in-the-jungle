@@ -210,7 +210,7 @@ Possible areas (confirm with profiling):
 - **Scoreboard toggle** - FIXED. TAB key wired to toggleScoreboard() (commit 48169fa).
 - **Blob URL leak in ChunkWorkerLifecycle** - FIXED. URL.revokeObjectURL() added in dispose() (commit 3cc8a99).
 - **TicketSystem.restartMatch() unused** - In-memory match reset method exists (lines 351-364) but UI uses `window.location.reload()` instead.
-- **Unit tests (Vitest)** - 20 test files, 608 tests passing. Coverage: Logger, MathUtils, NoiseGenerator, ObjectPoolManager, SpatialOctree, SpatialGrid, HeightQueryCache, ChunkWorkerPool, InfluenceMapComputations, InfluenceMapGrid, TerrainMeshMerger, CombatantDamage, CombatantLODManager, TicketSystem, CombatantCombat, AICoverSystem, AIStatePatrol, AIStateDefend, AIFlankingSystem, GunplayCore. Run `npm run test:run` to execute.
+- **Unit tests (Vitest)** - 24 test files, 738 tests passing. Coverage: Logger, MathUtils, NoiseGenerator, ObjectPoolManager, SpatialOctree, SpatialGrid, HeightQueryCache, ChunkWorkerPool, InfluenceMapComputations, InfluenceMapGrid, TerrainMeshMerger, CombatantDamage, CombatantLODManager, TicketSystem, CombatantCombat, AICoverSystem, AIStatePatrol, AIStateDefend, AIStateEngage, AIFlankingSystem, GunplayCore, GrenadeSystem, MortarSystem, PlayerMovement. Run `npm run test:run` to execute.
 - **Missing audio** - Grenade throw/pin pull, mortar launch sounds not configured in audio.ts. Weapon pickup feedback also absent.
 - **Weapon balance** - BALANCED. M16A4 (US): damageNear 26, damageFar 18. AK-74 (OPFOR): damageNear 30, damageFar 16. OPFOR has ~15% near advantage, US wins at range. (commit a08ca65)
 
