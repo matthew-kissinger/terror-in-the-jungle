@@ -142,6 +142,11 @@ export interface IGrenadeSystem {
  * Player Controller interface - main player control system
  */
 export interface IPlayerController {
+  // Lifecycle
+  init(): Promise<void>;
+  update(deltaTime: number): void;
+  dispose(): void;
+
   // Movement / state
   setPosition(position: THREE.Vector3): void;
   updatePlayerPosition(position: THREE.Vector3): void;
@@ -154,7 +159,7 @@ export interface IPlayerController {
   applyRecoil(pitchDeltaRad: number, yawDeltaRad: number): void;
   applyScreenShake(intensity: number, duration?: number): void;
   applyDamageShake(damageAmount: number): void;
-  applyExplosionShake(position: THREE.Vector3, magnitude: number): void;
+  applyExplosionShake(explosionPos: THREE.Vector3, maxRadius: number): void;
   applyRecoilShake(): void;
   getPosition(target?: THREE.Vector3): THREE.Vector3;
   getVelocity(target?: THREE.Vector3): THREE.Vector3;
