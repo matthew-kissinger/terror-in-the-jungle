@@ -626,11 +626,11 @@ describe('CombatantRenderer', () => {
       }).not.toThrow();
 
       expect(() => {
-        renderer.applyPreset('toon');
+        renderer.applyPreset('cel-shaded');
       }).not.toThrow();
 
       expect(() => {
-        renderer.applyPreset('realistic');
+        renderer.applyPreset('minimal');
       }).not.toThrow();
     });
 
@@ -664,25 +664,25 @@ describe('CombatantRenderer', () => {
 
     it('should toggle aura', () => {
       const initialSettings = renderer.getShaderSettings();
-      const initialAura = initialSettings.aura;
+      const initialAura = initialSettings.auraEnabled;
 
       renderer.toggleAura();
 
       const newSettings = renderer.getShaderSettings();
-      expect(newSettings.aura).toBe(!initialAura);
+      expect(newSettings.auraEnabled).toBe(!initialAura);
     });
 
     it('should set shader settings', () => {
       renderer.setShaderSettings({
-        celShading: true,
-        rimLighting: false,
-        aura: true,
+        celShadingEnabled: 1.0,
+        rimLightingEnabled: 0.0,
+        auraEnabled: 1.0,
       });
 
       const settings = renderer.getShaderSettings();
-      expect(settings.celShading).toBe(true);
-      expect(settings.rimLighting).toBe(false);
-      expect(settings.aura).toBe(true);
+      expect(settings.celShadingEnabled).toBe(true);
+      expect(settings.rimLightingEnabled).toBe(false);
+      expect(settings.auraEnabled).toBe(true);
     });
   });
 
