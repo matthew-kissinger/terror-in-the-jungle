@@ -20,6 +20,23 @@ function createMockCombatant(id: string, position: THREE.Vector3, state: Combata
     weaponSpec: {} as any,
     gunCore: {} as any,
     skillProfile: {} as any,
+    lastShotTime: 0,
+    currentBurst: 0,
+    burstCooldown: 0,
+    reactionTimer: 0,
+    suppressionLevel: 0,
+    alertTimer: 0,
+    isFullAuto: false,
+    panicLevel: 0,
+    lastHitTime: 0,
+    consecutiveMisses: 0,
+    wanderAngle: 0,
+    timeToDirectionChange: 0,
+    lastUpdateTime: Date.now(),
+    updatePriority: 0,
+    lodLevel: 'high',
+    kills: 0,
+    deaths: 0,
   };
 }
 
