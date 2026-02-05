@@ -172,7 +172,7 @@ export class GunplayCore {
 
       // Individual Ray allocation is necessary here as they are stored in an array,
       // but we reuse the vectors for initialization.
-      rays.push(new THREE.Ray(_origin, _perturbed));
+      rays.push(new THREE.Ray(_origin.clone(), _perturbed.clone()));
     }
 
     return rays;
