@@ -204,14 +204,14 @@ Possible areas (confirm with profiling):
 
 ### Known Tech Debt
 
-- **47 `: any` type annotations** across ~19 files + 44 `as any` casts across ~24 files (heaviest: SystemInterfaces.ts with 18 `: any` - intentional). Reduced from 135 via targeted refactoring. WeaponFiring.ts `as any` casts eliminated. CombatantSystem.handlePlayerShot() return type fixed (commit ababb6f). IHUDSystem expanded to 28 methods (commit d449418). ICombatantSystem expanded to eliminate all SystemConnector `as any` casts (commit 24fcb35). ISandboxRenderer typing fixed (commit 60c8930). SandboxSystemManager `as any` casts eliminated (commit bcba4c6). CompassZoneMarkers `as any` casts eliminated via IZoneManager expansion (task 0d899703). Interfaces expanded to eliminate weapon/respawn `any` types (commit c4f4b26). Remaining `as any` heaviest: ChunkLoadQueueManager.ts (4), WaterSystem.ts (4), AssetLoader.ts (4) - all expected patterns (feature detection, shader uniforms, image elements).
+- **44 `: any` type annotations** across ~15 files + 30 `as any` casts across ~18 files (heaviest: SystemInterfaces.ts with 19 `: any` - intentional). Reduced from 135 via targeted refactoring. Remaining `as any` heaviest: ChunkLoadQueueManager.ts (4), AssetLoader.ts (4), CombatantSystemDamage.ts (2), BVHWorker.ts (2) - all expected patterns (feature detection, image elements, dynamic type checks).
 - **Logger emoji removal COMPLETE** - All Logger calls cleaned. Remaining ~35 emoji characters across 8 UI files (KillFeed, LoadingPanels, etc.) are intentional UI icons, not Logger calls.
 - **NPC-to-NPC assists not tracked** - Scoreboard shows NPC assists as 0. Player assists tracked via KillAssistTracker, but per-NPC assist display would need additional wiring.
 - **Scoreboard toggle** - FIXED. TAB key wired to toggleScoreboard() (commit 48169fa).
 - **Blob URL leak in ChunkWorkerLifecycle** - FIXED. URL.revokeObjectURL() added in dispose() (commit 3cc8a99).
 - **TicketSystem.restartMatch() unused** - In-memory match reset method exists (lines 351-364) but UI uses `window.location.reload()` instead.
 - **IPlayerController interface incorrect** - Has `tryEnterHelicopter()`, `position`, `camera` that don't match PlayerController class (tryEnterHelicopter is on HelicopterModel, position/camera are private). Interface is unused currently but blocks any-reduction work that tries to use it.
-- **No unit/integration tests** - No test framework installed (Vitest, Jest, etc.). No *.test.ts or *.spec.ts files.
+- **Unit tests (Vitest)** - 8 test files, 258 tests passing. Coverage: Logger, MathUtils, NoiseGenerator, ObjectPoolManager, SpatialOctree, SpatialGrid, HeightQueryCache, ChunkWorkerPool. Run `npm run test:run` to execute.
 - **Missing audio** - Grenade throw/pin pull, mortar launch sounds not configured in audio.ts. Weapon pickup feedback also absent.
 - **Weapon balance** - BALANCED. M16A4 (US): damageNear 26, damageFar 18. AK-74 (OPFOR): damageNear 30, damageFar 16. OPFOR has ~15% near advantage, US wins at range. (commit a08ca65)
 
