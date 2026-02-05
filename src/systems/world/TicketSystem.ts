@@ -59,16 +59,24 @@ export class TicketSystem implements GameSystem {
   update(deltaTime: number): void {
     this.gameState.matchDuration += deltaTime;
 
-    // Handle game phases
     this.updateGamePhase();
 
-    if (this.gameState.gameActive && this.gameState.phase === 'COMBAT') {
-      // Calculate and apply ticket bleed
-      this.updateTicketBleed(deltaTime);
-
-      // Check victory conditions
-      this.checkVictoryConditions();
+    // If game was ended by phase update (e.g., time limit in checkVictoryConditions)
+    if (!this.gameState.gameActive) {
+      // Notify listeners of ticket changes only if the game has ended for consistent final state reporting
+      if (this.onTicketUpdate) {
+        this.onTicketUpdate(this.usTickets, this.opforTickets);
+      }
+      return;
     }
+
+    // Apply ticket bleed only if game is active, not in TDM mode, and in COMBAT or OVERTIME phase
+    if (!this.isTDM && (this.gameState.phase === 'COMBAT' || this.gameState.phase === 'OVERTIME')) {
+      this.updateTicketBleed(deltaTime);
+    }
+
+    // Always check victory conditions if game is still active
+    this.checkVictoryConditions();
 
     // Notify listeners of ticket changes
     if (this.onTicketUpdate) {
@@ -78,25 +86,35 @@ export class TicketSystem implements GameSystem {
 
   private updateGamePhase(): void {
     const duration = this.gameState.matchDuration;
+    const totalCombatDuration = this.setupDuration + this.combatDuration;
+    const totalOvertimeDuration = totalCombatDuration + this.overtimeDuration;
 
     if (duration < this.setupDuration) {
       this.gameState.phase = 'SETUP';
-    } else if (duration < this.setupDuration + this.combatDuration) {
+    } else if (duration < totalCombatDuration) {
       this.gameState.phase = 'COMBAT';
-    } else {
-      // Check if overtime is needed (close score)
+    } else if (duration < totalOvertimeDuration) {
+      // Combat duration is over. Check if overtime is needed.
       const ticketDifference = Math.abs(this.usTickets - this.opforTickets);
       if (ticketDifference < 50 && this.gameState.phase !== 'OVERTIME') {
         this.gameState.phase = 'OVERTIME';
         Logger.info('tickets', 'OVERTIME! Close match detected');
-      } else if (duration > this.setupDuration + this.combatDuration + this.overtimeDuration) {
-        this.endGame(this.usTickets > this.opforTickets ? Faction.US : Faction.OPFOR, 'TIME_LIMIT');
+      } else if (this.gameState.phase !== 'OVERTIME' && this.gameState.phase !== 'ENDED') {
+        // If combat duration is past and tickets are not close, stay in COMBAT
+        // checkVictoryConditions will end the game by time limit
+        this.gameState.phase = 'COMBAT';
+      }
+    } else {
+      // Past overtime duration - checkVictoryConditions will end the game if still in OVERTIME
+      // Don't change phase here if already ENDED
+      if (this.gameState.phase !== 'ENDED') {
+        this.gameState.phase = 'OVERTIME';
       }
     }
   }
 
   private updateTicketBleed(deltaTime: number): void {
-    if (!this.zoneManager || this.isTDM) return;
+    if (!this.zoneManager) return;
 
     const bleedRates = this.calculateTicketBleed();
 
@@ -164,6 +182,8 @@ export class TicketSystem implements GameSystem {
   }
 
   private checkVictoryConditions(): void {
+    if (!this.gameState.gameActive) return; // Game already ended by another condition
+
     // Check TDM kill target
     if (this.isTDM && this.killTarget > 0) {
       if (this.usKills >= this.killTarget) {
@@ -176,29 +196,64 @@ export class TicketSystem implements GameSystem {
       }
     }
 
-    // Check ticket depletion
-    if (this.usTickets <= 0) {
-      this.endGame(Faction.OPFOR, 'TICKETS_DEPLETED');
-      return;
+    // Check ticket depletion (only if not in TDM, where getTickets returns kills)
+    // Note: in TDM mode, usTickets and opforTickets fields are still used for internal state,
+    // but the getTickets() getter returns kills. The win condition is kill-based.
+    if (!this.isTDM) {
+        if (this.usTickets <= 0) {
+            this.endGame(Faction.OPFOR, 'TICKETS_DEPLETED');
+            return;
+        }
+
+        if (this.opforTickets <= 0) {
+            this.endGame(Faction.US, 'TICKETS_DEPLETED');
+            return;
+        }
     }
 
-    if (this.opforTickets <= 0) {
-      this.endGame(Faction.US, 'TICKETS_DEPLETED');
-      return;
-    }
-
-    // Check total zone control (instant win)
-    if (this.zoneManager) {
+    // Check total zone control (instant win, only if not in TDM)
+    if (!this.isTDM && this.zoneManager) {
       const zones = this.zoneManager.getAllZones();
       const capturableZones = zones.filter(z => !z.isHomeBase);
 
-      const usControlled = capturableZones.filter(z => z.state === ZoneState.US_CONTROLLED).length;
-      const opforControlled = capturableZones.filter(z => z.state === ZoneState.OPFOR_CONTROLLED).length;
+      // Only check total control if there are capturable zones
+      if (capturableZones.length > 0) {
+          const usControlled = capturableZones.filter(z => z.state === ZoneState.US_CONTROLLED).length;
+          const opforControlled = capturableZones.filter(z => z.state === ZoneState.OPFOR_CONTROLLED).length;
 
-      if (usControlled === capturableZones.length && capturableZones.length > 0) {
-        this.endGame(Faction.US, 'TOTAL_CONTROL');
-      } else if (opforControlled === capturableZones.length && capturableZones.length > 0) {
-        this.endGame(Faction.OPFOR, 'TOTAL_CONTROL');
+          if (usControlled === capturableZones.length) {
+            this.endGame(Faction.US, 'TOTAL_CONTROL');
+            return;
+          } else if (opforControlled === capturableZones.length) {
+            this.endGame(Faction.OPFOR, 'TOTAL_CONTROL');
+            return;
+          }
+      }
+    }
+
+    // Time-based win conditions (only if game is still active after other checks)
+    if (this.gameState.gameActive) {
+      const duration = this.gameState.matchDuration;
+      const totalCombatDuration = this.setupDuration + this.combatDuration;
+      const totalOvertimeDuration = totalCombatDuration + this.overtimeDuration;
+
+      // If in COMBAT phase and combat duration is reached
+      if (this.gameState.phase === 'COMBAT' && duration >= totalCombatDuration) {
+          const ticketDifference = Math.abs(this.usTickets - this.opforTickets);
+          if (ticketDifference < 50) {
+              this.gameState.phase = 'OVERTIME'; // Transition to overtime
+              Logger.info('tickets', 'OVERTIME! Close match detected');
+          } else {
+              // If not close, end game by time limit
+              this.endGame(this.usTickets > this.opforTickets ? Faction.US : Faction.OPFOR, 'TIME_LIMIT');
+              return;
+          }
+      }
+
+      // If in OVERTIME phase and overtime duration is reached
+      if (this.gameState.phase === 'OVERTIME' && duration >= totalOvertimeDuration) {
+          this.endGame(this.usTickets > this.opforTickets ? Faction.US : Faction.OPFOR, 'TIME_LIMIT');
+          return;
       }
     }
   }
@@ -233,6 +288,7 @@ export class TicketSystem implements GameSystem {
       this.opforTickets = Math.max(0, this.opforTickets - this.deathPenalty);
       Logger.info('tickets', `OPFOR soldier KIA, tickets: ${Math.round(this.opforTickets)}, US kills: ${this.usKills}`);
     }
+    this.checkVictoryConditions();
   }
 
   // Getters
