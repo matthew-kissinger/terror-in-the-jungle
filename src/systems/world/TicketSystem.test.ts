@@ -380,7 +380,8 @@ describe('TicketSystem', () => {
 
       // Ensure game is in COMBAT phase for bleed calculation
       // Directly set phase and matchDuration to avoid applying bleed during setup
-      ticketSystem['gameState'].matchDuration = ticketSystem['setupDuration'] + 0.1;
+      const setupDuration = ticketSystem['phaseManager']['setupDuration'];
+      ticketSystem['gameState'].matchDuration = setupDuration + 0.1;
       ticketSystem['gameState'].phase = 'COMBAT';
 
       ticketSystem['usTickets'] = 1; // Set US tickets low (bleeds at 2x rate = 2 tickets/sec)
@@ -402,7 +403,8 @@ describe('TicketSystem', () => {
       // US control ratio = 0.333, OPFOR control ratio = 0.333
       // US bleed = (0.5 - 0.333) * 2 * baseBleedRate = 0.333 * baseBleedRate
       // OPFOR bleed = (0.5 - 0.333) * 2 * baseBleedRate = 0.333 * baseBleedRate
-      const expectedBleed = (0.5 - (1/3)) * 2 * ticketSystem['baseBleedRate'];
+      const baseBleedRate = ticketSystem['bleedCalculator']['baseBleedRate'];
+      const expectedBleed = (0.5 - (1/3)) * 2 * baseBleedRate;
 
       const bleedRates = ticketSystem.getTicketBleedRate();
       expect(bleedRates.usTickets).toBeCloseTo(expectedBleed);
