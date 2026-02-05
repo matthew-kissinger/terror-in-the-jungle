@@ -204,13 +204,13 @@ Possible areas (confirm with profiling):
 
 ### Known Tech Debt
 
-- **44 `: any` type annotations** across ~15 files + 30 `as any` casts across ~18 files (heaviest: SystemInterfaces.ts with 19 `: any` - intentional). Reduced from 135 via targeted refactoring. Remaining `as any` heaviest: ChunkLoadQueueManager.ts (4), AssetLoader.ts (4), CombatantSystemDamage.ts (2), BVHWorker.ts (2) - all expected patterns (feature detection, image elements, dynamic type checks).
+- **44 `: any` type annotations** across ~15 files + 22 `as any` casts across ~14 files (heaviest: SystemInterfaces.ts with 19 `: any` - intentional). Reduced from 135 via targeted refactoring. Remaining `as any` heaviest: ChunkLoadQueueManager.ts (4), CombatantSystemDamage.ts (2), BVHWorker.ts (2) - all expected patterns (feature detection, dynamic type checks). AssetLoader.ts cleaned (commit 2e783a1).
 - **Logger emoji removal COMPLETE** - All Logger calls cleaned. Remaining ~35 emoji characters across 8 UI files (KillFeed, LoadingPanels, etc.) are intentional UI icons, not Logger calls.
 - **NPC-to-NPC assists not tracked** - Scoreboard shows NPC assists as 0. Player assists tracked via KillAssistTracker, but per-NPC assist display would need additional wiring.
 - **Scoreboard toggle** - FIXED. TAB key wired to toggleScoreboard() (commit 48169fa).
 - **Blob URL leak in ChunkWorkerLifecycle** - FIXED. URL.revokeObjectURL() added in dispose() (commit 3cc8a99).
 - **TicketSystem.restartMatch() unused** - In-memory match reset method exists (lines 351-364) but UI uses `window.location.reload()` instead.
-- **Unit tests (Vitest)** - 8 test files, 258 tests passing. Coverage: Logger, MathUtils, NoiseGenerator, ObjectPoolManager, SpatialOctree, SpatialGrid, HeightQueryCache, ChunkWorkerPool. Run `npm run test:run` to execute.
+- **Unit tests (Vitest)** - 13 test files, 395+ tests passing. Coverage: Logger, MathUtils, NoiseGenerator, ObjectPoolManager, SpatialOctree, SpatialGrid, HeightQueryCache, ChunkWorkerPool, InfluenceMapComputations, InfluenceMapGrid, TerrainMeshMerger, CombatantDamage, CombatantLODManager. Run `npm run test:run` to execute.
 - **Missing audio** - Grenade throw/pin pull, mortar launch sounds not configured in audio.ts. Weapon pickup feedback also absent.
 - **Weapon balance** - BALANCED. M16A4 (US): damageNear 26, damageFar 18. AK-74 (OPFOR): damageNear 30, damageFar 16. OPFOR has ~15% near advantage, US wins at range. (commit a08ca65)
 
