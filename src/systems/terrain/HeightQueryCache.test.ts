@@ -74,7 +74,7 @@ describe('HeightQueryCache', () => {
       
       mockNoise.mockClear();
       mockNoise.mockReturnValue(0.6); // Change return value to ensure it's different if called
-      const height3 = cache.getHeightAt(10.4, 20.4); // Snaps to 10.5, 20.5
+      cache.getHeightAt(10.4, 20.4); // Snaps to 10.5, 20.5
       
       expect(mockNoise).toHaveBeenCalled();
       expect(cache.getCacheStats().size).toBe(2);
