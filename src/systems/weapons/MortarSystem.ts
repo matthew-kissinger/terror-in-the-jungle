@@ -10,6 +10,7 @@ import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
 import { MortarBallistics } from './MortarBallistics';
 import { MortarVisuals } from './MortarVisuals';
 import { MortarRoundManager } from './MortarRoundManager';
+import { MortarCamera } from './MortarCamera';
 import { Logger } from '../../utils/Logger';
 
 const _deployPos = new THREE.Vector3();
@@ -37,10 +38,8 @@ export class MortarSystem implements GameSystem {
   private power = 0.5; // 0-1
 
   // Mortar camera view
-  private mortarCamera?: THREE.OrthographicCamera;
+  private mortarCameraModule?: MortarCamera;
   private usingMortarCamera = false;
-  private readonly CAMERA_HEIGHT = 100; // Height above ground for top-down view
-  private readonly CAMERA_SIZE = 200; // View size in world units
 
   // Modules
   private ballistics: MortarBallistics;
@@ -66,20 +65,7 @@ export class MortarSystem implements GameSystem {
 
   async init(): Promise<void> {
     Logger.info('mortar', 'Initializing Mortar System...');
-    this.createMortarCamera();
-  }
-
-  private createMortarCamera(): void {
-    const aspect = window.innerWidth / window.innerHeight;
-    const size = this.CAMERA_SIZE;
-    this.mortarCamera = new THREE.OrthographicCamera(
-      -size * aspect,
-      size * aspect,
-      size,
-      -size,
-      0.1,
-      1000
-    );
+    this.mortarCameraModule = new MortarCamera();
   }
 
   update(deltaTime: number): void {
@@ -89,8 +75,8 @@ export class MortarSystem implements GameSystem {
     }
 
     // Update mortar camera position if using mortar camera view
-    if (this.usingMortarCamera && this.mortarCamera && this.tubePosition) {
-      this.updateMortarCamera();
+    if (this.usingMortarCamera && this.mortarCameraModule && this.tubePosition) {
+      this.mortarCameraModule.update(this.tubePosition);
     }
 
     // Update active mortar rounds
@@ -104,28 +90,6 @@ export class MortarSystem implements GameSystem {
     );
   }
 
-  private updateMortarCamera(): void {
-    if (!this.mortarCamera || !this.tubePosition) return;
-
-    // Position camera directly above mortar tube
-    this.mortarCamera.position.set(
-      this.tubePosition.x,
-      this.tubePosition.y + this.CAMERA_HEIGHT,
-      this.tubePosition.z
-    );
-
-    // Look straight down
-    this.mortarCamera.lookAt(this.tubePosition);
-
-    // Update projection matrix for window resize
-    const aspect = window.innerWidth / window.innerHeight;
-    const size = this.CAMERA_SIZE;
-    this.mortarCamera.left = -size * aspect;
-    this.mortarCamera.right = size * aspect;
-    this.mortarCamera.top = size;
-    this.mortarCamera.bottom = -size;
-    this.mortarCamera.updateProjectionMatrix();
-  }
 
   dispose(): void {
     // Remove mortar tube
@@ -398,6 +362,6 @@ export class MortarSystem implements GameSystem {
    * Get the mortar camera for rendering
    */
   getMortarCamera(): THREE.OrthographicCamera | undefined {
-    return this.isUsingMortarCamera() ? this.mortarCamera : undefined;
+    return this.isUsingMortarCamera() && this.mortarCameraModule ? this.mortarCameraModule.getCamera() : undefined;
   }
 }
