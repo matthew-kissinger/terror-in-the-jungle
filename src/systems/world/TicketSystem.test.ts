@@ -138,7 +138,7 @@ describe('TicketSystem', () => {
       ticketSystem.setGameEndCallback(gameEndCallback);
 
       // Advance game to COMBAT phase
-      ticketSystem.update(ticketSystem['setupDuration'] + 0.1);
+      ticketSystem.update(ticketSystem['phaseManager']['setupDuration'] + 0.1);
 
       for (let i = 0; i < 49; i++) {
         ticketSystem.onCombatantDeath(Faction.OPFOR); // US gets 49 kills
@@ -158,7 +158,7 @@ describe('TicketSystem', () => {
       ticketSystem.setGameEndCallback(gameEndCallback);
 
       // Advance game to COMBAT phase
-      ticketSystem.update(ticketSystem['setupDuration'] + 0.1);
+      ticketSystem.update(ticketSystem['phaseManager']['setupDuration'] + 0.1);
 
       for (let i = 0; i < 49; i++) {
         ticketSystem.onCombatantDeath(Faction.US); // OPFOR gets 49 kills
@@ -198,13 +198,13 @@ describe('TicketSystem', () => {
       ticketSystem['opforTickets'] = initialOpforTickets; // Explicitly set current tickets
 
       // Advance matchDuration past setupDuration to enter COMBAT phase
-      ticketSystem['gameState'].matchDuration = ticketSystem['setupDuration'] + 0.1;
+      ticketSystem['gameState'].matchDuration = ticketSystem['phaseManager']['setupDuration'] + 0.1;
       ticketSystem['gameState'].phase = 'COMBAT';
     };
 
     it('should have no ticket bleed if no zones are managed', () => {
       ticketSystem.setZoneManager(undefined); // Explicitly remove zone manager
-      ticketSystem.update(ticketSystem['setupDuration'] + 1); // Move to combat phase
+      ticketSystem.update(ticketSystem['phaseManager']['setupDuration'] + 1); // Move to combat phase
       ticketSystem['gameState'].phase = 'COMBAT';
 
       const initialUSTickets = ticketSystem.getTickets(Faction.US);
@@ -226,10 +226,11 @@ describe('TicketSystem', () => {
 
       // 0/2 US controlled (0%), 0/2 OPFOR controlled (0%)
       // Both bleed: (0.5 - 0) * 2 * baseBleedRate = 1.0 * baseBleedRate
-      expect(ticketSystem.getTickets(Faction.US)).toBeCloseTo(initialUSTickets - 1.0 * ticketSystem['baseBleedRate']);
-      expect(ticketSystem.getTickets(Faction.OPFOR)).toBeCloseTo(initialOpforTickets - 1.0 * ticketSystem['baseBleedRate']);
-      expect(ticketSystem.getTicketBleedRate().usTickets).toBeCloseTo(1.0 * ticketSystem['baseBleedRate']);
-      expect(ticketSystem.getTicketBleedRate().opforTickets).toBeCloseTo(1.0 * ticketSystem['baseBleedRate']);
+      const baseBleedRate = ticketSystem['bleedCalculator']['baseBleedRate'];
+      expect(ticketSystem.getTickets(Faction.US)).toBeCloseTo(initialUSTickets - 1.0 * baseBleedRate);
+      expect(ticketSystem.getTickets(Faction.OPFOR)).toBeCloseTo(initialOpforTickets - 1.0 * baseBleedRate);
+      expect(ticketSystem.getTicketBleedRate().usTickets).toBeCloseTo(1.0 * baseBleedRate);
+      expect(ticketSystem.getTicketBleedRate().opforTickets).toBeCloseTo(1.0 * baseBleedRate);
     });
 
     it('should have no ticket bleed if zones are equally controlled', () => {
@@ -262,9 +263,10 @@ describe('TicketSystem', () => {
 
       // 2/3 OPFOR controlled (66%), 0/3 US controlled (0%)
       // US bleed rate: (0.5 - 0) * 2 * baseBleedRate = 1.0 * baseBleedRate
-      expect(ticketSystem.getTickets(Faction.US)).toBeCloseTo(initialUSTickets - 1.0 * ticketSystem['baseBleedRate']);
+      const baseBleedRate = ticketSystem['bleedCalculator']['baseBleedRate'];
+      expect(ticketSystem.getTickets(Faction.US)).toBeCloseTo(initialUSTickets - 1.0 * baseBleedRate);
       expect(ticketSystem.getTickets(Faction.OPFOR)).toBeCloseTo(initialOpforTickets);
-      expect(ticketSystem.getTicketBleedRate().usTickets).toBeCloseTo(1.0 * ticketSystem['baseBleedRate']);
+      expect(ticketSystem.getTicketBleedRate().usTickets).toBeCloseTo(1.0 * baseBleedRate);
       expect(ticketSystem.getTicketBleedRate().opforTickets).toBeCloseTo(0);
     });
 
@@ -282,10 +284,11 @@ describe('TicketSystem', () => {
 
       // 2/3 US controlled (66%), 0/3 OPFOR controlled (0%)
       // OPFOR bleed rate: (0.5 - 0) * 2 * baseBleedRate = 1.0 * baseBleedRate
+      const baseBleedRate = ticketSystem['bleedCalculator']['baseBleedRate'];
       expect(ticketSystem.getTickets(Faction.US)).toBeCloseTo(initialUSTickets);
-      expect(ticketSystem.getTickets(Faction.OPFOR)).toBeCloseTo(initialOpforTickets - 1.0 * ticketSystem['baseBleedRate']);
+      expect(ticketSystem.getTickets(Faction.OPFOR)).toBeCloseTo(initialOpforTickets - 1.0 * baseBleedRate);
       expect(ticketSystem.getTicketBleedRate().usTickets).toBeCloseTo(0);
-      expect(ticketSystem.getTicketBleedRate().opforTickets).toBeCloseTo(1.0 * ticketSystem['baseBleedRate']);
+      expect(ticketSystem.getTicketBleedRate().opforTickets).toBeCloseTo(1.0 * baseBleedRate);
     });
 
     it('should apply accelerated ticket bleed if US controls all zones', () => {
@@ -300,9 +303,10 @@ describe('TicketSystem', () => {
       ticketSystem.update(1); // 1 second passes
 
       // OPFOR bleed rate should be baseBleedRate * 2
+      const baseBleedRate = ticketSystem['bleedCalculator']['baseBleedRate'];
       expect(ticketSystem.getTickets(Faction.US)).toBeCloseTo(initialUSTickets);
-      expect(ticketSystem.getTickets(Faction.OPFOR)).toBeCloseTo(initialOpforTickets - 2 * ticketSystem['baseBleedRate']);
-      expect(ticketSystem.getTicketBleedRate().opforTickets).toBeCloseTo(2 * ticketSystem['baseBleedRate']);
+      expect(ticketSystem.getTickets(Faction.OPFOR)).toBeCloseTo(initialOpforTickets - 2 * baseBleedRate);
+      expect(ticketSystem.getTicketBleedRate().opforTickets).toBeCloseTo(2 * baseBleedRate);
     });
 
     it('should apply accelerated ticket bleed if OPFOR controls all zones', () => {
@@ -317,9 +321,10 @@ describe('TicketSystem', () => {
       ticketSystem.update(1); // 1 second passes
 
       // US bleed rate should be baseBleedRate * 2
-      expect(ticketSystem.getTickets(Faction.US)).toBeCloseTo(initialUSTickets - 2 * ticketSystem['baseBleedRate']);
+      const baseBleedRate = ticketSystem['bleedCalculator']['baseBleedRate'];
+      expect(ticketSystem.getTickets(Faction.US)).toBeCloseTo(initialUSTickets - 2 * baseBleedRate);
       expect(ticketSystem.getTickets(Faction.OPFOR)).toBeCloseTo(initialOpforTickets);
-      expect(ticketSystem.getTicketBleedRate().usTickets).toBeCloseTo(2 * ticketSystem['baseBleedRate']);
+      expect(ticketSystem.getTicketBleedRate().usTickets).toBeCloseTo(2 * baseBleedRate);
     });
 
     it('should not apply ticket bleed if in SETUP phase', () => {
@@ -330,7 +335,8 @@ describe('TicketSystem', () => {
       ticketSystem.setZoneManager(mockZoneManager);
 
       // Force SETUP phase by ensuring matchDuration is less than setupDuration
-      ticketSystem['gameState'].matchDuration = ticketSystem['setupDuration'] / 2;
+      const setupDuration = ticketSystem['phaseManager']['setupDuration'];
+      ticketSystem['gameState'].matchDuration = setupDuration / 2;
       ticketSystem['gameState'].phase = 'SETUP'; // Explicitly set to SETUP
 
       const initialUSTickets = ticketSystem.getTickets(Faction.US);
@@ -351,7 +357,8 @@ describe('TicketSystem', () => {
       ticketSystem.setTDMMode(true, 50); // Enable TDM
 
       // Ensure game is in COMBAT phase for bleed calculation
-      ticketSystem.update(ticketSystem['setupDuration'] + 0.1);
+      const setupDuration = ticketSystem['phaseManager']['setupDuration'];
+      ticketSystem.update(setupDuration + 0.1);
       ticketSystem['gameState'].phase = 'COMBAT';
 
       const initialUSTickets = ticketSystem.getTickets(Faction.US);
