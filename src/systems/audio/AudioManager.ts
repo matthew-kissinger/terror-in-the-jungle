@@ -86,7 +86,7 @@ export class AudioManager implements GameSystem {
             loadPromises.push(
                 this.loadAudio(key, config.path)
                     .then(buffer => ({ key, buffer }))
-                    .catch(error => {
+                    .catch(() => {
                         Logger.warn('Audio', `Optional audio ${key} not found: ${config.path}`);
                         return { key, buffer: undefined };
                     })
@@ -109,7 +109,7 @@ export class AudioManager implements GameSystem {
                     Logger.debug('Audio', `Loaded: ${key}`);
                     resolve(buffer);
                 },
-                (progress) => {
+                () => {
                     // Progress callback
                 },
                 (error) => {

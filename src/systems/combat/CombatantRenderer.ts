@@ -341,7 +341,7 @@ export class CombatantRenderer {
   }
 
   // Update shader time and global uniforms
-  updateShaderUniforms(deltaTime: number): void {
+  updateShaderUniforms(_deltaTime: number): void {
     updateShaderUniforms(this.factionMaterials, this.camera);
   }
 

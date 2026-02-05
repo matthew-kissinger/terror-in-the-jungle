@@ -1,6 +1,4 @@
-import { PlayerState } from './PlayerHealthSystem';
-import { Faction } from '../combat/types';
-import { ZoneManager, ZoneState } from '../world/ZoneManager';
+
 
 export class PlayerHealthUI {
   private healthDisplay: HTMLDivElement;

@@ -123,7 +123,7 @@ export class ChunkTerrainQueries {
    * Check for collision with objects at given position
    */
   checkObjectCollision(position: THREE.Vector3, radius: number = 0.5): boolean {
-    for (const [id, object] of this.collisionObjects) {
+    for (const [_id, object] of this.collisionObjects) {
       _collisionBox.setFromObject(object);
       const expandedBox = _collisionBox.expandByScalar(radius);
 

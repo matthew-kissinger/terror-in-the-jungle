@@ -64,7 +64,7 @@ export class InfluenceMapSystem implements GameSystem {
     );
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
     const now = Date.now();
 
     // Throttle updates to 500ms

@@ -61,7 +61,7 @@ export class PlayerHealthSystem implements GameSystem {
   private setupCallbacks(): void {
     // Setup respawn callbacks
     if (this.respawnManager) {
-      this.respawnManager.setRespawnCallback((position: THREE.Vector3) => {
+      this.respawnManager.setRespawnCallback((_position: THREE.Vector3) => {
       this.playerState.health = this.playerState.maxHealth;
       this.playerState.isAlive = true;
       this.playerState.isDead = false;

@@ -18,7 +18,7 @@ import { WeaponModel } from './weapon/WeaponModel'
 import { WeaponInput } from './weapon/WeaponInput'
 import { WeaponAmmo } from './weapon/WeaponAmmo'
 import { WeaponSwitching } from './weapon/WeaponSwitching'
-import { ShotCommand, ShotCommandFactory } from './weapon/ShotCommand'
+import { ShotCommandFactory } from './weapon/ShotCommand'
 import { WeaponShotCommandBuilder } from './weapon/WeaponShotCommandBuilder'
 import { Logger } from '../../utils/Logger'
 import type { HUDSystem } from '../../ui/hud/HUDSystem'
@@ -183,7 +183,7 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   // Deprecated: Use setCombatantSystem instead
-  setEnemySystem(enemy: any): void {
+  setEnemySystem(_enemy: any): void {
     Logger.warn('weapon', 'setEnemySystem is deprecated, use setCombatantSystem')
   }
 

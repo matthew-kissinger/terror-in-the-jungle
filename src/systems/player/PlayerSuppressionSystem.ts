@@ -100,7 +100,7 @@ export class PlayerSuppressionSystem implements GameSystem {
    * @param playerPosition Current player position
    * @param cameraDirection Optional camera direction for directional effects
    */
-  registerNearMiss(bulletPosition: THREE.Vector3, playerPosition: THREE.Vector3, cameraDirection?: THREE.Vector3): void {
+  registerNearMiss(bulletPosition: THREE.Vector3, playerPosition: THREE.Vector3, _cameraDirection?: THREE.Vector3): void {
     const distance = bulletPosition.distanceTo(playerPosition);
 
     // Only count if within suppression radius

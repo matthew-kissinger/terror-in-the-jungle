@@ -118,7 +118,7 @@ export class ChunkLoadingStrategy {
           (result.geometry as any).boundsTree = bvh;
           bvhComputed = true;
           Logger.debug('chunks', `BVH computed in worker for chunk (${chunkX}, ${chunkZ})`);
-        } catch (bvhError) {
+        } catch (_bvhError) {
           Logger.warn('chunks', `BVH worker failed for chunk (${chunkX}, ${chunkZ}), will compute on main thread`);
         }
       }

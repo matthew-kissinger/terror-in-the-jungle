@@ -9,7 +9,7 @@ import { RallyPointSystem } from './RallyPointSystem';
 import { TicketSystem } from '../world/TicketSystem';
 import { Logger } from '../../utils/Logger';
 import { SpawnPositionCalculator } from './SpawnPositionCalculator';
-import { RespawnManager, PendingRespawn } from './RespawnManager';
+import { RespawnManager } from './RespawnManager';
 
 // Module-level scratch vectors to avoid per-call allocations
 const _spawnPos = new THREE.Vector3();
@@ -91,7 +91,7 @@ export class CombatantSpawnManager {
   /**
    * Spawn initial forces for both factions
    */
-  spawnInitialForces(shouldCreatePlayerSquad: boolean, playerSquadId?: string): string | undefined {
+  spawnInitialForces(shouldCreatePlayerSquad: boolean, _playerSquadId?: string): string | undefined {
     Logger.info('Combat', 'Deploying initial forces across HQs...');
 
     const config = this.gameModeManager?.getCurrentConfig();
@@ -110,18 +110,19 @@ export class CombatantSpawnManager {
     if (shouldCreatePlayerSquad) {
       Logger.info('Combat', 'Creating player squad...');
       const playerSpawnPos = _scratchVec.copy(usBasePos).add(_offsetVec.set(0, 0, -15));
-      const { squad, members } = this.squadManager.createSquad(Faction.US, playerSpawnPos, 6);
-      createdPlayerSquadId = squad.id;
-      squad.isPlayerControlled = true;
-      squad.currentCommand = SquadCommand.NONE;
-      squad.commandPosition = playerSpawnPos.clone();
+      const { squad: playerSquad, members } = this.squadManager.createSquad(Faction.US, playerSpawnPos, 6);
+      createdPlayerSquadId = playerSquad.id;
+      playerSquad.isPlayerControlled = true;
+      playerSquad.currentCommand = SquadCommand.NONE;
+      playerSquad.commandPosition = playerSpawnPos.clone();
 
       // Add all squad members to combatants map
       members.forEach(combatant => {
         this.combatants.set(combatant.id, combatant);
       });
 
-      Logger.info('Combat', `Player squad created: ${squad.id} with ${squad.members.length} members at player spawn`);
+      const playerSquad = this.squadManager.getSquad(createdPlayerSquadId);
+      Logger.info('Combat', `Player squad created: ${createdPlayerSquadId} with ${playerSquad?.members.length ?? 0} members at player spawn`);
 
       // Reduce US squads by 1 since we already spawned the player squad
       initialSquadsPerFaction = Math.max(0, initialSquadsPerFaction - 1);

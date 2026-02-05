@@ -133,7 +133,7 @@ export class VoiceCalloutSystem implements GameSystem {
     type: CalloutType,
     position: THREE.Vector3,
     faction: Faction,
-    distanceToPlayer: number
+    _distanceToPlayer: number
   ): void {
     const frequencies = this.calloutFrequencies[type];
     const duration = 0.08 * frequencies.length; // 80ms per tone segment
@@ -286,7 +286,7 @@ export class VoiceCalloutSystem implements GameSystem {
     noise.stop(startTime + duration);
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
     // Decay suppression levels and clean up old cooldowns
     const now = Date.now();
     const staleTime = 60000; // Remove cooldowns older than 1 minute

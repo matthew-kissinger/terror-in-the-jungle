@@ -79,7 +79,7 @@ export function startGameWithMode(sandbox: PixelArtSandbox, mode: GameMode): voi
 /**
  * Shows loadout selector and waits for player confirmation
  */
-function showLoadoutSelector(sandbox: PixelArtSandbox, mode: GameMode): void {
+function showLoadoutSelector(sandbox: PixelArtSandbox, _mode: GameMode): void {
   const loadoutSelector = sandbox.systemManager.loadoutSelector;
   
   // Hide loading screen

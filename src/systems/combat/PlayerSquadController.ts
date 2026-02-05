@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { Squad, SquadCommand, Faction } from './types';
+import { SquadCommand } from './types';
 import { SquadManager } from './SquadManager';
 import { Logger } from '../../utils/Logger';
 
@@ -25,7 +25,7 @@ export class PlayerSquadController implements GameSystem {
     this.createCommandIndicator();
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
   }
 
   dispose(): void {

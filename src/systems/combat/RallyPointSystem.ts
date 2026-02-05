@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { Faction, Squad } from './types';
+import { Faction } from './types';
 import { ZoneManager } from '../world/ZoneManager';
 import { Logger } from '../../utils/Logger';
 
@@ -293,7 +293,7 @@ export class RallyPointSystem implements GameSystem {
 
     for (let i = 0; i < positions.count; i++) {
       const x = positions.getX(i);
-      const y = positions.getY(i);
+      const _y = positions.getY(i);
 
       // Wave effect: amplitude decreases toward pole (x=0)
       const waveAmplitude = (x / this.FLAG_WIDTH) * 0.3;

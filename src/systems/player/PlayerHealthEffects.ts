@@ -43,7 +43,7 @@ export class PlayerHealthEffects {
       this.heartbeatGain = this.audioContext.createGain();
       this.heartbeatGain.connect(this.audioContext.destination);
       this.heartbeatGain.gain.value = 0;
-    } catch (e) {
+    } catch (_e) {
       Logger.warn('audio', 'Audio context not available for heartbeat effect');
     }
   }
@@ -122,7 +122,7 @@ export class PlayerHealthEffects {
     }, 10);
   }
 
-  updateDamageIndicators(deltaTime: number): void {
+  updateDamageIndicators(_deltaTime: number): void {
     // Remove expired indicators
     this.damageIndicators = this.damageIndicators.filter(indicator => {
       const age = (Date.now() - indicator.timestamp) / 1000;
@@ -130,7 +130,7 @@ export class PlayerHealthEffects {
     });
   }
 
-  renderDamageOverlay(health: number, maxHealth: number): void {
+  renderDamageOverlay(health: number, _maxHealth: number): void {
     this.damageContext.clearRect(0, 0, this.damageOverlay.width, this.damageOverlay.height);
 
     // Render damage indicators as partial circle arcs

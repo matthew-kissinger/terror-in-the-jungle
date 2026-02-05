@@ -49,12 +49,9 @@ export function getSquadCentroid(squad: Squad, combatants: Map<string, Combatant
 
 export function handlePlayerCommand(
   combatant: Combatant,
-  squad: Squad,
-  combatants: Map<string, Combatant>,
-  deltaTime: number
+  squad: Squad
 ): void {
   const command = squad.currentCommand;
-  const commandPos = squad.commandPosition;
 
   switch (command) {
     case SquadCommand.FOLLOW_ME:

@@ -147,7 +147,7 @@ export class WeaponRigManager {
     return this.pistolCore
   }
 
-  startWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol', hudSystem?: IHUDSystem, audioManager?: IAudioManager, ammoManager?: IAmmoManager): boolean {
+  startWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol', _hudSystem?: IHUDSystem, _audioManager?: IAudioManager, _ammoManager?: IAmmoManager): boolean {
     // Don't switch if already the current weapon
     if ((weaponType === 'rifle' && this.weaponRig === this.rifleRig) ||
         (weaponType === 'shotgun' && this.weaponRig === this.shotgunRig) ||

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Combatant, CombatantState, Faction } from './types'
+import { Combatant, CombatantState } from './types'
 import { SpatialGridManager } from './SpatialGridManager'
 
 /**

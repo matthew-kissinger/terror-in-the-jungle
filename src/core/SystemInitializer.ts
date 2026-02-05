@@ -92,7 +92,7 @@ export class SystemInitializer {
     scene: THREE.Scene,
     camera: THREE.PerspectiveCamera,
     onProgress: (phase: string, progress: number) => void,
-    sandboxRenderer?: any
+    _sandboxRenderer?: any
   ): Promise<InitializationResult> {
     Logger.info('core', ' Initializing game systems...');
 

@@ -1,5 +1,5 @@
-import * as THREE from 'three';
-import { TerrainType } from '../../types';
+// Note: THREE and TerrainType imports removed as they were unused
+// These may be needed for future features
 
 /**
  * Interface for a function that starts a synthesized sound

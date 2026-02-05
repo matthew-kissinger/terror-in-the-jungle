@@ -118,8 +118,6 @@ export class SpatialGridManager {
     const start = performance.now()
     this.frameCounter++
 
-    let syncCount = 0
-
     combatants.forEach((combatant, id) => {
       if (combatant.state === CombatantState.DEAD) {
         // Remove dead entities from grid
@@ -147,7 +145,6 @@ export class SpatialGridManager {
       // Only sync if this frame matches the frequency
       if (this.frameCounter % syncFreq === 0) {
         this.grid!.updatePosition(id, combatant.position)
-        syncCount++
       }
     })
 

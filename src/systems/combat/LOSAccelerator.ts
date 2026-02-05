@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { ImprovedChunk } from '../terrain/ImprovedChunk';
 import { Logger } from '../../utils/Logger';
 
 const _losDirection = new THREE.Vector3();
@@ -121,7 +120,7 @@ export class LOSAccelerator {
     _rayBox.expandByScalar(2); // Small buffer for edge cases
 
     // Check each cached chunk
-    for (const [key, mesh] of this.chunkCache.entries()) {
+    for (const [, mesh] of this.chunkCache.entries()) {
       // Get mesh bounding box
       _meshBox.setFromObject(mesh);
 

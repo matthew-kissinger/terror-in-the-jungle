@@ -80,7 +80,7 @@ export class FootstepAudioSystem implements GameSystem {
     Logger.info('audio', '[FootstepAudioSystem] Initialized');
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
     // Player footstep updates handled externally via playPlayerFootstep
     // AI footsteps handled externally via playAIFootstep
   }
@@ -170,7 +170,7 @@ export class FootstepAudioSystem implements GameSystem {
   playAIFootstep(
     position: THREE.Vector3,
     playerPosition: THREE.Vector3,
-    isRunning: boolean = false
+    _isRunning: boolean = false
   ): boolean {
     // Check distance - don't play if too far
     const distance = position.distanceTo(playerPosition);
@@ -179,8 +179,8 @@ export class FootstepAudioSystem implements GameSystem {
     }
     
     // Check concurrent limit
-    const playingSounds = this.aiFootstepPool.filter(s => s.isPlaying).length;
-    if (playingSounds >= this.MAX_CONCURRENT_AI_FOOTSTEPS) {
+    const playingCount = this.aiFootstepPool.filter(s => s.isPlaying).length;
+    if (playingCount >= this.MAX_CONCURRENT_AI_FOOTSTEPS) {
       return false;
     }
     

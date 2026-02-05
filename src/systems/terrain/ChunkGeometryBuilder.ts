@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { computeBoundsTree } from 'three-mesh-bvh';
+
 import { ChunkMaterials } from './ChunkMaterials';
 import { AssetLoader } from '../assets/AssetLoader';
 

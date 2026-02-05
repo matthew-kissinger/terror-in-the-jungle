@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Combatant, Faction } from './types';
 import { CaptureZone } from '../world/ZoneManager';
-import { InfluenceCell, GridBounds } from './InfluenceMapGrid';
+import { InfluenceCell } from './InfluenceMapGrid';
 import { InfluenceMapGrid } from './InfluenceMapGrid';
 
 // Module-level scratch vectors for computation reuse

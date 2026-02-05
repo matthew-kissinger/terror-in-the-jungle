@@ -1,6 +1,5 @@
 import { ChunkPriorityManager } from './ChunkPriorityManager';
 import { ChunkLifecycleManager } from './ChunkLifecycleManager';
-import { ChunkQueueItem } from './ChunkPriorityManager';
 
 /**
  * Manages chunk load queue processing and background loading

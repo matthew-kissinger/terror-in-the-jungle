@@ -24,7 +24,7 @@ export function updatePatrolMovement(
   if (squad && squad.isPlayerControlled && squad.currentCommand &&
       squad.currentCommand !== SquadCommand.NONE &&
       squad.currentCommand !== SquadCommand.FREE_ROAM) {
-    handlePlayerCommand(combatant, squad, combatants, deltaTime);
+    handlePlayerCommand(combatant, squad);
     return;
   }
   // Squad movement for followers
@@ -153,7 +153,7 @@ export function updatePatrolMovement(
     combatant.rotation = Math.atan2(combatant.velocity.z, combatant.velocity.x);
   }
 }
-export function updateCombatMovement(combatant: Combatant, deltaTime: number): void {
+export function updateCombatMovement(combatant: Combatant): void {
   if (!combatant.target) return;
   const toTarget = objectPool.getVector3();
   toTarget.subVectors(combatant.target.position, combatant.position);
@@ -176,7 +176,7 @@ export function updateCombatMovement(combatant: Combatant, deltaTime: number): v
   }
   objectPool.releaseVector3(toTarget);
 }
-export function updateCoverSeekingMovement(combatant: Combatant, deltaTime: number): void {
+export function updateCoverSeekingMovement(combatant: Combatant): void {
   if (!combatant.destinationPoint) {
     combatant.velocity.set(0, 0, 0);
     return;
@@ -199,7 +199,7 @@ export function updateCoverSeekingMovement(combatant: Combatant, deltaTime: numb
   );
   objectPool.releaseVector3(toDestination);
 }
-export function updateDefendingMovement(combatant: Combatant, deltaTime: number): void {
+export function updateDefendingMovement(combatant: Combatant): void {
   if (!combatant.destinationPoint) {
     // At defensive position, hold still
     combatant.velocity.set(0, 0, 0);

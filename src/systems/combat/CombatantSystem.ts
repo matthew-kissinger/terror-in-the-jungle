@@ -3,7 +3,7 @@ import { GameSystem } from '../../types';
 import { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
 import { AssetLoader } from '../assets/AssetLoader';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
-import { Combatant, CombatantState, Faction, SquadCommand } from './types';
+import { Combatant, CombatantState, Faction } from './types';
 import { TracerPool } from '../effects/TracerPool';
 import { MuzzleFlashPool } from '../effects/MuzzleFlashPool';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';

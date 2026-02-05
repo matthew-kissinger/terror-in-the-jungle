@@ -42,7 +42,7 @@ export class InventoryManager implements GameSystem {
     this.notifyInventoryChange();
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
   }
 
   dispose(): void {

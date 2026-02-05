@@ -136,8 +136,8 @@ export class PixelationPass extends Pass {
     renderer: THREE.WebGLRenderer,
     inputBuffer: any,
     outputBuffer: any,
-    deltaTime?: number,
-    stencilTest?: boolean
+    _deltaTime?: number,
+    _stencilTest?: boolean
   ): void {
     renderer.getSize(this.resolution);
     this.material.uniforms.resolution.value.copy(this.resolution);

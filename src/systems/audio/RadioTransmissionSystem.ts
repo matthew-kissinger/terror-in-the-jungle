@@ -67,7 +67,7 @@ export class RadioTransmissionSystem implements GameSystem {
 
   private async loadTransmissions(): Promise<void> {
     const loadPromises = this.transmissions.map(transmission => {
-      return new Promise<void>((resolve, reject) => {
+      return new Promise<void>((resolve) => {
         this.audioLoader.load(
           `${import.meta.env.BASE_URL}assets/transmissions/${transmission.filename}`,
           (buffer) => {
@@ -145,7 +145,7 @@ export class RadioTransmissionSystem implements GameSystem {
     };
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
     if (!this.isEnabled || !this.audioListener) {
       return;
     }
