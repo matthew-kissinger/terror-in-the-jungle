@@ -10,7 +10,9 @@
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "compress-textures": "node scripts/compress-textures.js",
-    "perf:baseline": "npx tsx scripts/perf-baseline.ts"
+    "perf:baseline": "npx tsx scripts/perf-baseline.ts",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "devDependencies": {
     "@types/node": "^25.2.0",
@@ -22,7 +24,8 @@
     "playwright": "^1.58.1",
     "typescript": "^5.9.2",
     "vite": "^7.1.5",
-    "vite-plugin-compression": "^0.5.1"
+    "vite-plugin-compression": "^0.5.1",
+    "vitest": "^4.0.18"
   },
   "dependencies": {
     "postprocessing": "^6.37.8",
