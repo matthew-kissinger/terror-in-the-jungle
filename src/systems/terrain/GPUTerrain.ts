@@ -154,7 +154,6 @@ export class GPUTerrain implements GameSystem {
 
     const size = this.HEIGHTMAP_SIZE;
     const scale = this.TERRAIN_SCALE;
-    const halfSize = (size * scale) / 2;
 
     // Generate heightmap data from noise
     for (let y = 0; y < size; y++) {
@@ -184,7 +183,7 @@ export class GPUTerrain implements GameSystem {
     return getHeightQueryCache().getHeightAt(worldX, worldZ);
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
     if (!this.isInitialized || !this.terrainMesh || !this.terrainMaterial) return;
 
     // Check if heightmap needs updating (camera moved far enough)

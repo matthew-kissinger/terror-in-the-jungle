@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Combatant, CombatantState, Faction, Squad } from '../types'
+import { Combatant, CombatantState, Squad } from '../types'
 import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager'
 import { FlankingTacticsResolver } from './FlankingTacticsResolver'
 import { FlankingRoleManager } from './FlankingRoleManager'

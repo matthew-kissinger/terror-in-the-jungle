@@ -271,7 +271,7 @@ export class ZoneManager implements GameSystem {
 
   setChunkManager(chunkManager: ImprovedChunkManager): void {
     this.chunkManager = chunkManager;
-    this.terrainAdapter.setChunkManager(chunkManager);
+    this.terrainAdapter.setChunkManager();
     Logger.info('world', 'ChunkManager connected to ZoneManager');
   }
 

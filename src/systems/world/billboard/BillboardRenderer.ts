@@ -26,7 +26,7 @@ export class BillboardRenderer {
     this.lastCameraPosition = _cameraPosition.clone();
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
     const cameraPosition = _cameraPosition;
     this.camera.getWorldPosition(cameraPosition);
 

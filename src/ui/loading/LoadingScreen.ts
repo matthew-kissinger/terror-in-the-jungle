@@ -368,14 +368,14 @@ export class LoadingScreen {
     let itemsLoaded = 0;
     let itemsTotal = 0;
 
-    manager.onStart = (url, loaded, total) => {
-      itemsLoaded = loaded;
-      itemsTotal = total;
+    manager.onStart = (_url, loaded, total) => {
+      void loaded;
+      void total;
     };
 
     manager.onProgress = (url, loaded, total) => {
-      itemsLoaded = loaded;
-      itemsTotal = total;
+      void loaded;
+      void total;
 
       // Update texture loading phase
       const currentPhase = this.progress.getCurrentPhase();
@@ -389,7 +389,7 @@ export class LoadingScreen {
     manager.onLoad = () => {
     };
 
-    manager.onError = (url) => {
+    manager.onError = (_url) => {
     };
 
     return manager;

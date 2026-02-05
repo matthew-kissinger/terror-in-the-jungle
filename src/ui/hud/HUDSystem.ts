@@ -32,7 +32,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private scoreboardCombatantProxy: CombatantSystem;
   private isScoreboardVisible = false;
 
-  constructor(camera?: THREE.Camera, ticketSystem?: TicketSystem, playerHealthSystem?: PlayerHealthSystem, playerRespawnManager?: unknown) {
+  constructor(camera?: THREE.Camera, ticketSystem?: TicketSystem, playerHealthSystem?: PlayerHealthSystem, _playerRespawnManager?: unknown) {
     this.camera = camera;
     this.styles = HUDStyles.getInstance();
     this.elements = new HUDElements(camera);

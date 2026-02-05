@@ -121,8 +121,7 @@ export class CombatantSpawnManager {
         this.combatants.set(combatant.id, combatant);
       });
 
-      const playerSquad = this.squadManager.getSquad(createdPlayerSquadId);
-      Logger.info('Combat', `Player squad created: ${createdPlayerSquadId} with ${playerSquad?.members.length ?? 0} members at player spawn`);
+      Logger.info('Combat', `Player squad created: ${createdPlayerSquadId} with ${playerSquad.members.length} members at player spawn`);
 
       // Reduce US squads by 1 since we already spawned the player squad
       initialSquadsPerFaction = Math.max(0, initialSquadsPerFaction - 1);
@@ -270,7 +269,7 @@ export class CombatantSpawnManager {
    * Spawn a squad at the given position
    */
   spawnSquad(faction: Faction, centerPos: THREE.Vector3, size: number): void {
-    const { squad, members } = this.squadManager.createSquad(faction, centerPos, size);
+    const { members } = this.squadManager.createSquad(faction, centerPos, size);
 
     // Add all squad members to our combatants map and spatial grid
     members.forEach(combatant => {

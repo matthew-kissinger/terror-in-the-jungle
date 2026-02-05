@@ -42,11 +42,11 @@ export class CombatantMovement {
         getEnemyBasePosition: (faction: Faction) => this.getEnemyBasePosition(faction)
       });
     } else if (combatant.state === CombatantState.ENGAGING) {
-      updateCombatMovement(combatant, deltaTime);
+      updateCombatMovement(combatant);
     } else if (combatant.state === CombatantState.SEEKING_COVER) {
-      updateCoverSeekingMovement(combatant, deltaTime);
+      updateCoverSeekingMovement(combatant);
     } else if (combatant.state === CombatantState.DEFENDING) {
-      updateDefendingMovement(combatant, deltaTime);
+      updateDefendingMovement(combatant);
     }
 
     // Apply friendly spacing force to prevent bunching

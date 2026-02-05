@@ -20,12 +20,12 @@ export class DebugChunk {
   
   constructor(
     scene: THREE.Scene,
-    assetLoader: AssetLoader,
+    _assetLoader: AssetLoader,
     chunkX: number,
     chunkZ: number,
     size: number,
-    noiseGenerator: NoiseGenerator,
-    globalBillboardSystem: GlobalBillboardSystem
+    _noiseGenerator: NoiseGenerator,
+    _globalBillboardSystem: GlobalBillboardSystem
   ) {
     this.scene = scene;
     this.chunkX = chunkX;
@@ -255,7 +255,7 @@ export class DebugChunk {
            worldZ >= baseZ && worldZ < baseZ + this.size;
   }
 
-  setLODLevel(level: number): void {
+  setLODLevel(_level: number): void {
     // Not needed for debug
   }
 }

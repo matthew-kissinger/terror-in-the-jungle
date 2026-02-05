@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Combatant, CombatantState, Faction } from '../types'
+import { Combatant, CombatantState } from '../types'
 import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager'
 import { SandbagSystem } from '../../weapons/SandbagSystem'
 import { objectPool } from '../../../utils/ObjectPoolManager'
@@ -66,7 +66,6 @@ export class AICoverSystem {
     allCombatants: Map<string, Combatant>,
     maxSearchRadius: number = 30
   ): CoverSpot | null {
-    const now = Date.now()
     const candidates: CoverSpot[] = []
 
     // Get chunks to search
@@ -214,7 +213,6 @@ export class AICoverSystem {
     }
 
     // Check if threat has moved significantly
-    const distanceToThreat = combatant.position.distanceTo(threatPosition)
     const distanceFromCoverToThreat = combatant.coverPosition.distanceTo(threatPosition)
 
     // If threat is closer to cover than we are to cover, reposition
@@ -261,7 +259,7 @@ export class AICoverSystem {
     return keys
   }
 
-  private getCachedCoverSpots(chunkKey: string, searchOrigin: THREE.Vector3): CoverSpot[] {
+  private getCachedCoverSpots(chunkKey: string, _searchOrigin: THREE.Vector3): CoverSpot[] {
     const now = Date.now()
     const cached = this.coverCache.get(chunkKey)
 

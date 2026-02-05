@@ -91,7 +91,7 @@ export class ZoneTerrainAdapter {
   }
 
   // Keep for backwards compatibility but no longer needed
-  setChunkManager(_chunkManager: any): void {
+  setChunkManager(): void {
     // No-op - using HeightQueryCache now
   }
 }

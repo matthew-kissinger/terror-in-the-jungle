@@ -121,7 +121,6 @@ export class HeightQueryCache {
    * Get terrain normal at world coordinates (for slope calculations)
    */
   getNormalAt(worldX: number, worldZ: number, sampleDistance: number = 1.0): THREE.Vector3 {
-    const centerHeight = this.getHeightAt(worldX, worldZ);
     const northHeight = this.getHeightAt(worldX, worldZ + sampleDistance);
     const southHeight = this.getHeightAt(worldX, worldZ - sampleDistance);
     const eastHeight = this.getHeightAt(worldX + sampleDistance, worldZ);

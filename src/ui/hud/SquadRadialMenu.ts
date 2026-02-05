@@ -1,4 +1,3 @@
-import * as THREE from 'three'
 import { SquadCommand } from '../../systems/combat/types'
 
 export interface RadialMenuItem {

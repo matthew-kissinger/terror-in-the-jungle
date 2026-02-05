@@ -89,7 +89,6 @@ export class HUDUpdater {
   updateGameStatus(ticketSystem: TicketSystem): void {
     const gameState = ticketSystem.getGameState();
     const bleedRate = ticketSystem.getTicketBleedRate();
-    const timeRemaining = ticketSystem.getMatchTimeRemaining();
 
     // Update game status class
     this.elements.gameStatus.className = `game-status phase-${gameState.phase.toLowerCase()}`;

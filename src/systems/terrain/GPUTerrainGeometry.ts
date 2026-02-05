@@ -25,7 +25,6 @@ export function createLODRingGeometry(
   const indices: number[] = [];
 
   // Create concentric rings with increasing vertex spacing (LOD)
-  let vertexIndex = 0;
   const ringRadii: number[] = [];
 
   // Calculate ring radii with exponential spacing

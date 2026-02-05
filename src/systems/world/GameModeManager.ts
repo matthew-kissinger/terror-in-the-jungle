@@ -30,7 +30,7 @@ export class GameModeManager implements GameSystem {
     Logger.info('world', `Default mode: ${this.currentConfig.name}`);
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
     // Game mode manager doesn't need regular updates
   }
 

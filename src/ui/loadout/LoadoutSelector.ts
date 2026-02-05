@@ -1,5 +1,4 @@
 import { Logger } from '../../utils/Logger';
-import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { GrenadeType } from '../../systems/combat/types';
 import { renderGrenadePanel } from './LoadoutGrenadePanel';

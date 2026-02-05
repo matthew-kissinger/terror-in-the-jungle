@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Combatant, CombatantState, Faction } from '../types'
+import { Combatant, CombatantState } from '../types'
 import { SpatialOctree } from '../SpatialOctree'
 import { Logger } from '../../../utils/Logger'
 import { VoiceCalloutSystem, CalloutType } from '../../audio/VoiceCalloutSystem'

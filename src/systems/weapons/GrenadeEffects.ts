@@ -1,6 +1,6 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
-import { GrenadeType, Combatant, CombatantState } from '../combat/types';
+import { GrenadeType, CombatantState } from '../combat/types';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { CombatantSystem } from '../combat/CombatantSystem';

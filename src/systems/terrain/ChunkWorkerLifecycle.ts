@@ -4,8 +4,7 @@ import { Logger } from '../../utils/Logger';
  * Handles worker creation, message handling, error handling, and worker code generation
  */
 
-import * as THREE from 'three';
-import { ChunkGeometryResult } from './ChunkWorkerPool';
+import type { ChunkGeometryResult } from './ChunkWorkerPool';
 import { getChunkWorkerCode } from './ChunkWorkerCode';
 
 export interface ChunkRequest {

@@ -70,7 +70,7 @@ export class OctreeNode {
     ]
 
     // Redistribute entities to children
-    for (const id of this.entities) {
+    for (const _id of this.entities) {
       // Children will handle insertion
     }
     this.entities = []

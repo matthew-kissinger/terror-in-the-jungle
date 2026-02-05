@@ -341,7 +341,7 @@ export class GrenadeSystem implements GameSystem {
     this.statsTracker = statsTracker;
   }
 
-  setHUDSystem(hudSystem: IHUDSystem): void {
+  setHUDSystem(_hudSystem: IHUDSystem): void {
     // Store HUD system reference for power meter updates
     // Type is 'any' to avoid circular dependency with HUDSystem
   }

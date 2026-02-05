@@ -84,7 +84,7 @@ export class KillFeed {
     this.render();
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
     const now = Date.now();
     let needsRender = false;
 

@@ -396,7 +396,7 @@ export class ImprovedChunk {
            worldZ >= baseZ && worldZ < baseZ + this.size;
   }
 
-  setLODLevel(level: number): void {
+  setLODLevel(_level: number): void {
     // Future: Implement LOD switching
   }
 

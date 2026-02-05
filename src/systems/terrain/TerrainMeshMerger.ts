@@ -127,7 +127,6 @@ export class TerrainMeshMerger {
   private mergeRing(ring: number, chunks: ImprovedChunk[]): void {
     // Collect geometries and materials from chunks
     const geometries: THREE.BufferGeometry[] = [];
-    const matrices: THREE.Matrix4[] = [];
     let sharedMaterial: THREE.Material | null = null;
 
     for (const chunk of chunks) {

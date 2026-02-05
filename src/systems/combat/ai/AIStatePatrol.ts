@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Combatant, CombatantState, Faction, Squad, SquadCommand } from '../types'
+import { Combatant, CombatantState, Squad, SquadCommand } from '../types'
 import { ZoneManager } from '../../world/ZoneManager'
 import { Logger } from '../../../utils/Logger'
 import { SpatialOctree } from '../SpatialOctree'
@@ -9,7 +9,6 @@ import { spatialGridManager } from '../SpatialGridManager'
 const _toTarget = new THREE.Vector3()
 const _offset = new THREE.Vector3()
 const _awayDir = new THREE.Vector3()
-const _defensePos = new THREE.Vector3()
 
 /**
  * Handles patrolling and defending AI states
@@ -110,7 +109,7 @@ export class AIStatePatrol {
     combatant: Combatant,
     squad: Squad,
     playerPosition: THREE.Vector3,
-    deltaTime: number
+    _deltaTime: number
   ): void {
     switch (squad.currentCommand) {
       case SquadCommand.FOLLOW_ME:

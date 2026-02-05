@@ -105,7 +105,7 @@ export class AmmoSupplySystem implements GameSystem {
     this.firstPersonWeapon = weapon;
   }
 
-  private updateCrate(zone: CaptureZone, deltaTime: number): void {
+  private updateCrate(zone: CaptureZone, _deltaTime: number): void {
     const crateId = zone.id;
     let crate = this.crates.get(crateId);
 
@@ -208,7 +208,7 @@ export class AmmoSupplySystem implements GameSystem {
     return crate;
   }
 
-  private checkProximity(deltaTime: number): void {
+  private checkProximity(_deltaTime: number): void {
     const now = performance.now() / 1000;
     const playerId = 'player'; // Single player for now
 
@@ -252,7 +252,7 @@ export class AmmoSupplySystem implements GameSystem {
     }
   }
 
-  private tryResupply(crate: AmmoCrate, playerId: string): boolean {
+  private tryResupply(crate: AmmoCrate, _playerId: string): boolean {
     if (!this.inventoryManager || !this.firstPersonWeapon) return false;
 
     // Check if player needs any supplies

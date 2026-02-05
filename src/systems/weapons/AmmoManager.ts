@@ -1,6 +1,6 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
-import { ZoneManager, CaptureZone, ZoneState } from '../world/ZoneManager';
+import { ZoneManager, CaptureZone } from '../world/ZoneManager';
 import { Faction } from '../combat/types';
 
 export interface AmmoState {
