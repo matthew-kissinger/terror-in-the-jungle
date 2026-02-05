@@ -210,7 +210,6 @@ Possible areas (confirm with profiling):
 - **Scoreboard toggle** - FIXED. TAB key wired to toggleScoreboard() (commit 48169fa).
 - **Blob URL leak in ChunkWorkerLifecycle** - FIXED. URL.revokeObjectURL() added in dispose() (commit 3cc8a99).
 - **TicketSystem.restartMatch() unused** - In-memory match reset method exists (lines 351-364) but UI uses `window.location.reload()` instead.
-- **IPlayerController interface incorrect** - Has `tryEnterHelicopter()`, `position`, `camera` that don't match PlayerController class (tryEnterHelicopter is on HelicopterModel, position/camera are private). Interface is unused currently but blocks any-reduction work that tries to use it.
 - **Unit tests (Vitest)** - 8 test files, 258 tests passing. Coverage: Logger, MathUtils, NoiseGenerator, ObjectPoolManager, SpatialOctree, SpatialGrid, HeightQueryCache, ChunkWorkerPool. Run `npm run test:run` to execute.
 - **Missing audio** - Grenade throw/pin pull, mortar launch sounds not configured in audio.ts. Weapon pickup feedback also absent.
 - **Weapon balance** - BALANCED. M16A4 (US): damageNear 26, damageFar 18. AK-74 (OPFOR): damageNear 30, damageFar 16. OPFOR has ~15% near advantage, US wins at range. (commit a08ca65)
