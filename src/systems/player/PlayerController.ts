@@ -79,7 +79,11 @@ export class PlayerController implements GameSystem {
 
   update(deltaTime: number): void {
     if (this.cameraShakeSystem) this.cameraShakeSystem.update(deltaTime);
-    this.playerState.isInHelicopter ? this.updateHelicopterMode(deltaTime) : this.movement.updateMovement(deltaTime, this.input, this.camera);
+    if (this.playerState.isInHelicopter) {
+      this.updateHelicopterMode(deltaTime);
+    } else {
+      this.movement.updateMovement(deltaTime, this.input, this.camera);
+    }
     this.cameraController.updateCamera(this.input);
     this.updateHUD();
     this.updateWeaponSystems();
@@ -119,7 +123,11 @@ export class PlayerController implements GameSystem {
 
   private handleEnterExitHelicopter(): void {
     if (!this.helicopterModel) return;
-    this.playerState.isInHelicopter ? this.helicopterModel.exitHelicopter() : this.helicopterModel.tryEnterHelicopter();
+    if (this.playerState.isInHelicopter) {
+      this.helicopterModel.exitHelicopter();
+    } else {
+      this.helicopterModel.tryEnterHelicopter();
+    }
   }
 
   private handleToggleMouseControl(): void {
