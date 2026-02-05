@@ -167,7 +167,7 @@ export class TerrainMeshMerger {
     }
 
     // Compute BVH for merged geometry (important for raycasting!)
-    (mergedGeometry as any).computeBoundsTree();
+    mergedGeometry.computeBoundsTree();
 
     // Create merged mesh
     const mergedMesh = new THREE.Mesh(

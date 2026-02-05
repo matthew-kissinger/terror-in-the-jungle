@@ -53,7 +53,7 @@ export class TerrainMeshFactory {
     geometry.attributes.position.needsUpdate = true;
     
     // Compute BVH for accurate collision detection
-    (geometry as any).computeBoundsTree();
+    geometry.computeBoundsTree();
     
     // Create material - use lit material so terrain responds to scene lighting
     const material = this.createTerrainMaterial(assetLoader, debugMode);
@@ -94,7 +94,7 @@ export class TerrainMeshFactory {
   ): THREE.Mesh {
     // Compute BVH for accurate collision detection (skip if already computed in worker)
     if (!bvhAlreadyComputed) {
-      (geometry as any).computeBoundsTree();
+      geometry.computeBoundsTree();
     }
 
     // Create material

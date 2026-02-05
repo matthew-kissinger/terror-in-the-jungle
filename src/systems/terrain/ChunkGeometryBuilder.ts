@@ -45,7 +45,7 @@ export class ChunkGeometryBuilder {
     geometry.attributes.position.needsUpdate = true;
 
     // Compute BVH for accurate collision detection
-    (geometry as any).computeBoundsTree();
+    geometry.computeBoundsTree();
 
     return geometry;
   }
@@ -74,7 +74,7 @@ export class ChunkGeometryBuilder {
   ): { mesh: THREE.Mesh; geometry: THREE.BufferGeometry } {
     // Compute BVH for accurate collision detection (skip if already computed in worker)
     if (!bvhAlreadyComputed) {
-      (geometry as any).computeBoundsTree();
+      geometry.computeBoundsTree();
     }
 
     // Create material
