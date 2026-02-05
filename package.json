@@ -15,8 +15,8 @@
   "devDependencies": {
     "@types/node": "^25.2.0",
     "@types/three": "^0.182.0",
-    "@typescript-eslint/eslint-plugin": "latest",
-    "@typescript-eslint/parser": "latest",
+    "@typescript-eslint/eslint-plugin": "^8.54.0",
+    "@typescript-eslint/parser": "^8.54.0",
     "eslint": "latest",
     "eslint-plugin-import": "latest",
     "playwright": "^1.58.1",
