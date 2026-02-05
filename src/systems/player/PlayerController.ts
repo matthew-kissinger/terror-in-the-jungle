@@ -103,6 +103,7 @@ export class PlayerController implements GameSystem {
       onSandbagRotateLeft: () => this.sandbagSystem?.rotatePlacementPreview(-Math.PI / 8),
       onSandbagRotateRight: () => this.sandbagSystem?.rotatePlacementPreview(Math.PI / 8),
       onRallyPointPlace: () => this.handleRallyPointPlacement(),
+      onToggleMortarCamera: () => this.handleToggleMortarCamera(),
       onMouseDown: (button: number) => this.handleMouseDown(button),
       onMouseUp: (button: number) => this.handleMouseUp(button)
     });
@@ -144,6 +145,12 @@ export class PlayerController implements GameSystem {
     }
 
     Logger.info('player', ` Rally point placement: ${result.message}`);
+  }
+
+  private handleToggleMortarCamera(): void {
+    if (this.mortarSystem) {
+      this.mortarSystem.toggleMortarCamera();
+    }
   }
 
   private handleMouseDown(button: number): void {

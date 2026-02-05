@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import { Logger } from '../utils/Logger';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import type { PixelArtSandbox } from './PixelArtSandbox';
@@ -20,8 +19,10 @@ export function animate(sandbox: PixelArtSandbox): void {
   // Update skybox position
   sandbox.systemManager.skybox.updatePosition(sandbox.sandboxRenderer.camera.position);
 
-  // Check if mortar is deployed and using weapon camera
-  const usingMortarCamera = false;
+  // Check if mortar is deployed and using mortar camera view
+  const mortarSystem = sandbox.systemManager.mortarSystem;
+  const usingMortarCamera = mortarSystem?.isUsingMortarCamera() ?? false;
+  const mortarCamera = mortarSystem?.getMortarCamera();
 
   // Collect GPU timing from previous frame
   performanceTelemetry.collectGPUTime();
@@ -30,8 +31,13 @@ export function animate(sandbox: PixelArtSandbox): void {
   performanceTelemetry.beginGPUTimer();
 
   // Render the main scene
-  if (usingMortarCamera) {
-    // Mortar camera logic (disabled)
+  if (usingMortarCamera && mortarCamera) {
+    // Render with mortar camera (top-down view)
+    // Note: Mortar camera renders directly without post-processing for tactical view clarity
+    sandbox.sandboxRenderer.renderer.render(
+      sandbox.sandboxRenderer.scene,
+      mortarCamera
+    );
   } else {
     if (sandbox.sandboxRenderer.postProcessing) {
       sandbox.sandboxRenderer.postProcessing.render(deltaTime);

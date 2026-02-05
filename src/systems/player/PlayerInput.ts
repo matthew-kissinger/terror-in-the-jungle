@@ -1,6 +1,5 @@
 import { Logger } from '../../utils/Logger';
 import { WeaponSlot } from './InventoryManager';
-import { Faction } from '../combat/types';
 
 export interface InputCallbacks {
   onJump?: () => void;
@@ -14,6 +13,7 @@ export interface InputCallbacks {
   onSandbagRotateLeft?: () => void;
   onSandbagRotateRight?: () => void;
   onRallyPointPlace?: () => void;
+  onToggleMortarCamera?: () => void;
   onWeaponSlotChange?: (slot: WeaponSlot) => void;
   onMouseDown?: (button: number) => void;
   onMouseUp?: (button: number) => void;
@@ -199,6 +199,11 @@ export class PlayerInput {
     if (!this.isInHelicopter && event.code === 'KeyV') {
       this.callbacks.onRallyPointPlace?.();
     }
+
+    // Mortar camera toggle with M key (when not in helicopter)
+    if (!this.isInHelicopter && event.code === 'KeyM') {
+      this.callbacks.onToggleMortarCamera?.();
+    }
   }
 
   private onKeyUp(event: KeyboardEvent): void {
@@ -262,6 +267,7 @@ Shift - Run / Engine Boost (in helicopter)
 Space - Jump / Toggle Auto-Hover (in helicopter)
 Right Ctrl - Toggle Mouse Control Mode (helicopter: control vs free look)
 E - Enter/Exit Helicopter
+M - Toggle Mortar Camera View (when mortar deployed)
 ${pointerLockHint}
 Escape - Release pointer lock / Exit helicopter
     `);
