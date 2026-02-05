@@ -212,5 +212,6 @@ class ObjectPoolManager {
   }
 }
 
-// Export singleton instance
+// Export class for testing and singleton instance
+export { ObjectPoolManager };
 export const objectPool = ObjectPoolManager.getInstance();
