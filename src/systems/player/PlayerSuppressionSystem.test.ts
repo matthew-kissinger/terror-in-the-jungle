@@ -403,14 +403,16 @@ describe('PlayerSuppressionSystem', () => {
       );
     });
 
-    it('should not count near miss at exact radius boundary', () => {
+    it('should count near miss at exact radius boundary but no suppression increase', () => {
       const bulletPos = new THREE.Vector3(2.5, 0, 0); // Exactly at radius
       const playerPos = new THREE.Vector3(0, 0, 0);
 
       system.registerNearMiss(bulletPos, playerPos);
 
-      // Source uses > not >=, so exact boundary is excluded
-      expect(system.getNearMissCount()).toBe(0);
+      // Source uses > which means distance <= radius counts
+      expect(system.getNearMissCount()).toBe(1);
+      // At exact boundary, proximityFactor = 0, so no suppression increase
+      expect(system.getSuppressionLevel()).toBe(0);
     });
 
     it('should normalize direction correctly', () => {
