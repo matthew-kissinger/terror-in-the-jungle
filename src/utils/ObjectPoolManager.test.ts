@@ -438,8 +438,8 @@ describe('ObjectPoolManager', () => {
     });
 
     it('should not reset available/in-use counts', () => {
-      const v = manager.getVector3();
-      const q = manager.getQuaternion();
+      const _v = manager.getVector3();
+      const _q = manager.getQuaternion();
 
       manager.resetStats();
 
