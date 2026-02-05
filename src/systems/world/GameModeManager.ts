@@ -99,9 +99,7 @@ export class GameModeManager implements GameSystem {
       this.combatantSystem.setMaxCombatants(config.maxCombatants);
       this.combatantSystem.setSquadSizes(config.squadSize.min, config.squadSize.max);
       this.combatantSystem.setReinforcementInterval(config.reinforcementInterval);
-      if (typeof (this.combatantSystem as any).reseedForcesForMode === 'function') {
-        (this.combatantSystem as any).reseedForcesForMode();
-      }
+      this.combatantSystem.reseedForcesForMode();
     }
 
     // Configure ticket system

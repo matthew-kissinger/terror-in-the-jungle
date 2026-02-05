@@ -241,6 +241,7 @@ export interface ICombatantSystem {
   getCombatants(): Map<string, any>;
   getCombatantAt(id: string): any;
   getClosestEnemy(position: THREE.Vector3, faction: string): any;
+  reseedForcesForMode(): void;
 
   // Internal subsystems exposed for system wiring
   readonly impactEffectsPool: IImpactEffectsPool;
