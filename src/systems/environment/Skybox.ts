@@ -16,7 +16,7 @@ export class Skybox implements GameSystem {
     // Skybox will be created when texture is provided
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
     // Skybox is static, no updates needed
   }
 

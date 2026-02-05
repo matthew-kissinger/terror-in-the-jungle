@@ -125,7 +125,7 @@ export class HelicopterAudio {
         const newRate = THREE.MathUtils.lerp(currentRate, targetPlaybackRate, rateTransitionSpeed);
         rotorAudio.setPlaybackRate(newRate);
       }
-    } catch (error) {
+    } catch (_error) {
       // Playback rate control not supported or not ready, skip
     }
   }

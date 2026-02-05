@@ -157,8 +157,8 @@ export class HelipadSystem implements GameSystem {
     border.position.y = 0.16;
     helipadGroup.add(border);
 
-    // Center 'H' marking
-    const hGeometry = new THREE.PlaneGeometry(6, 8);
+    // Center 'H' marking (hGeometry reserved for future H outline)
+    const _hGeometry = new THREE.PlaneGeometry(6, 8);
     const hMaterial = new THREE.MeshBasicMaterial({
       color: 0xffffff,
       transparent: false,
@@ -256,7 +256,7 @@ export class HelipadSystem implements GameSystem {
     return result;
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
     // Create helipad ONLY in Open Frontier mode
     if (!this.helipads.has('us_helipad') && this.terrainManager && this.gameModeManager) {
       const currentConfig = this.gameModeManager.getCurrentConfig();

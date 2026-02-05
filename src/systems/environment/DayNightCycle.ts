@@ -202,8 +202,9 @@ export class DayNightCycle implements GameSystem {
     if (!this.scene) return;
 
     const time = this.currentTime;
-    const nightFactor = this.getNightFactor();
-    
+    // nightFactor reserved for future ambient light adjustments
+    const _nightFactor = this.getNightFactor();
+
     let skyColor: THREE.Color;
     
     if (time >= 5 && time < 7) {

@@ -14,7 +14,7 @@ export class AssetLoader implements GameSystem {
     await this.loadTextures();
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
     // AssetLoader doesn't need frame updates
   }
 

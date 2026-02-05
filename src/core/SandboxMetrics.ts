@@ -17,29 +17,23 @@ export class SandboxMetrics {
 
   constructor() {
     if (typeof window !== 'undefined') {
-      const self = this;
+      // Use arrow functions to capture 'this' lexically instead of aliasing
+      const getFrameCount = () => this.frameCount;
+      const getAvgFrameMs = () => this.getAvgFrameMs();
+      const getP95FrameMs = () => this.getP95FrameMs();
+      const getCombatantCount = () => this.combatantCount;
+      const getFiringCount = () => this.firingCount;
+      const getEngagingCount = () => this.engagingCount;
+      const getSnapshot = () => this.getSnapshot();
+
       (window as any).sandboxMetrics = {
-        get frameCount() {
-          return self.frameCount;
-        },
-        get avgFrameMs() {
-          return self.getAvgFrameMs();
-        },
-        get p95FrameMs() {
-          return self.getP95FrameMs();
-        },
-        get combatantCount() {
-          return self.combatantCount;
-        },
-        get firingCount() {
-          return self.firingCount;
-        },
-        get engagingCount() {
-          return self.engagingCount;
-        },
-        getSnapshot() {
-          return self.getSnapshot();
-        }
+        get frameCount() { return getFrameCount(); },
+        get avgFrameMs() { return getAvgFrameMs(); },
+        get p95FrameMs() { return getP95FrameMs(); },
+        get combatantCount() { return getCombatantCount(); },
+        get firingCount() { return getFiringCount(); },
+        get engagingCount() { return getEngagingCount(); },
+        getSnapshot
       };
     }
   }
