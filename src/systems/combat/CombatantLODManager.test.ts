@@ -506,7 +506,7 @@ describe('CombatantLODManager', () => {
       // Create a single combatant at far distance to trigger simulateDistantAI
       // Position at (900, 0, 900) - distance ~1273, which is > 600 LOD threshold for 400-size world
       const farCombatant = createMockCombatant('far', new THREE.Vector3(900, 0, 900));
-      farCombatant.lastUpdateTime = undefined; // Trigger simulation on first update
+      farCombatant.lastUpdateTime = 0; // Trigger simulation on first update
       combatants.set('far', farCombatant);
 
       const originalX = farCombatant.position.x;

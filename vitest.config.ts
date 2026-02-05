@@ -6,5 +6,8 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.{test,spec}.ts'],
     passWithNoTests: true,
+    typecheck: {
+      enabled: true,
+    },
   },
 });

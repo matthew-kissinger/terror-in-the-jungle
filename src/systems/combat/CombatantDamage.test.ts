@@ -83,15 +83,14 @@ function createMockCombatant(
     isPlayerProxy,
     lastHitTime: 0,
     suppressionLevel: 0,
-    deaths: 0, // Ensure deaths is initialized
-    kills: 0, // Ensure kills is initialized
-    isDying: false, // Ensure isDying is initialized
-    deathProgress: 0, // Ensure deathProgress is initialized
-    deathStartTime: 0, // Ensure deathStartTime is initialized
-    deathAnimationType: null, // Initialize to null instead of undefined for better test observability
-    deathDirection: undefined, // Ensure deathDirection is initialized
+    deaths: 0,
+    kills: 0,
+    isDying: false,
+    deathProgress: 0,
+    deathStartTime: 0,
+    deathAnimationType: null as any,
+    deathDirection: undefined,
     squadId,
-    // Minimal required fields to prevent errors
     velocity: new THREE.Vector3(),
     rotation: 0,
     visualRotation: 0,
@@ -100,7 +99,20 @@ function createMockCombatant(
     weaponSpec: {} as any,
     gunCore: {} as any,
     skillProfile: {} as any,
-    damageHistory: []
+    damageHistory: [],
+    lastShotTime: 0,
+    currentBurst: 0,
+    burstCooldown: 0,
+    reactionTimer: 0,
+    alertTimer: 0,
+    isFullAuto: false,
+    panicLevel: 0,
+    consecutiveMisses: 0,
+    wanderAngle: 0,
+    timeToDirectionChange: 0,
+    lastUpdateTime: 0,
+    updatePriority: 0,
+    lodLevel: 'high',
   } as Combatant;
 }
 
@@ -232,7 +244,7 @@ describe('CombatantDamage', () => {
 
     it('should process kill assists via KillAssistTracker', () => {
       const target = createMockCombatant('target-0002', Faction.US, 10);
-      target.damageHistory = [{ attackerId: 'some-attacker', damage: 1 }]; // Ensure damageHistory is not empty
+      target.damageHistory = [{ attackerId: 'some-attacker', damage: 1, timestamp: Date.now() }];
       const attacker = createMockCombatant('attacker-0001', Faction.OPFOR, 100);
       combatantDamage.applyDamage(target, 20, attacker);
       expect(KillAssistTracker.processKillAssists).toHaveBeenCalledWith(target, 'attacker-0001');
@@ -240,7 +252,7 @@ describe('CombatantDamage', () => {
 
     it('should call hudSystem.addAssist if player gets an assist', () => {
       const target = createMockCombatant('target-0003', Faction.US, 10);
-      target.damageHistory = [{ attackerId: 'some-attacker', damage: 1 }]; // Ensure damageHistory is not empty
+      target.damageHistory = [{ attackerId: 'some-attacker', damage: 1, timestamp: Date.now() }];
       const attacker = createMockCombatant('attacker-0004', Faction.OPFOR, 100);
       (KillAssistTracker.processKillAssists as vi.Mock).mockReturnValue(new Set<string>(['PLAYER']));
       combatantDamage.applyDamage(target, 20, attacker);
@@ -379,7 +391,7 @@ describe('CombatantDamage', () => {
 
     it('should remove dead combatant from squad', () => {
       const target = createMockCombatant('target-1', Faction.US, 10, CombatantState.IDLE, false, 'squad-A');
-      const squadA: Squad = { id: 'squad-A', faction: Faction.US, members: ['target-1', 'member-2'] };
+      const squadA: Squad = { id: 'squad-A', faction: Faction.US, members: ['target-1', 'member-2'], formation: 'line' };
       const squads = new Map<string, Squad>([['squad-A', squadA]]);
 
       combatantDamage.applyDamage(target, 20, undefined, squads);
