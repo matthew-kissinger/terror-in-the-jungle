@@ -329,7 +329,7 @@ export class SquadRadialMenu {
     this.onCommandSelected = callback
   }
 
-  private slowTime(factor: number): void {
+  private slowTime(_factor: number): void {
     // Optional: implement game speed slowdown
     // For now, this is a placeholder for future implementation
   }

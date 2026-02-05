@@ -114,7 +114,7 @@ export class FullMapSystem implements GameSystem {
     Logger.info('ui', 'Full Map System initialized');
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
     // Update player position
     this.playerPosition.copy(this.camera.position);
 

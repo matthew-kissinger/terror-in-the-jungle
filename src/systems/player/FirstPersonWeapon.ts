@@ -18,7 +18,7 @@ import { WeaponModel } from './weapon/WeaponModel'
 import { WeaponInput } from './weapon/WeaponInput'
 import { WeaponAmmo } from './weapon/WeaponAmmo'
 import { WeaponSwitching } from './weapon/WeaponSwitching'
-import { ShotCommandFactory } from './weapon/ShotCommand'
+
 import { WeaponShotCommandBuilder } from './weapon/WeaponShotCommandBuilder'
 import { Logger } from '../../utils/Logger'
 import type { HUDSystem } from '../../ui/hud/HUDSystem'

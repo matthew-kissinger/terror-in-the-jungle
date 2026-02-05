@@ -9,7 +9,6 @@ import { renderMinimap } from './MinimapRenderer';
 
 // Reusable scratch vectors to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
-const _v2 = new THREE.Vector3();
 
 export class MinimapSystem implements GameSystem {
   private camera: THREE.Camera;
@@ -51,7 +50,7 @@ export class MinimapSystem implements GameSystem {
     Logger.info('minimap', ' Minimap System initialized');
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
     // Update player position and rotation
     this.playerPosition.copy(this.camera.position);
 

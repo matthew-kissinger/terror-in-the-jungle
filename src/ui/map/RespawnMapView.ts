@@ -1,5 +1,4 @@
 import { Logger } from '../../utils/Logger';
-import * as THREE from 'three';
 import { ZoneManager, CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
 import { Faction } from '../../systems/combat/types';
 import { GameModeManager } from '../../systems/world/GameModeManager';

@@ -335,9 +335,6 @@ export class LoadingScreen {
   public createLoadingManager(): THREE.LoadingManager {
     const manager = new THREE.LoadingManager();
 
-    let itemsLoaded = 0;
-    let itemsTotal = 0;
-
     manager.onStart = (_url, loaded, total) => {
       void loaded;
       void total;

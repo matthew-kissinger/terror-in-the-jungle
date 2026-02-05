@@ -31,7 +31,7 @@ export class LoadoutSelector implements GameSystem {
     Logger.info('ui', 'Loadout Selector initialized');
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
     // No per-frame updates needed
   }
 
