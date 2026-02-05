@@ -88,8 +88,8 @@ export class ChunkLoadQueueManager {
       }
     };
 
-    if (typeof (window as any).requestIdleCallback === 'function') {
-      this.loaderHandle = (window as any).requestIdleCallback(callback);
+    if (typeof window.requestIdleCallback === 'function') {
+      this.loaderHandle = window.requestIdleCallback(callback);
     } else {
       this.loaderHandle = window.setTimeout(() => callback(), this.LOAD_DELAY_FALLBACK);
     }
@@ -103,8 +103,8 @@ export class ChunkLoadQueueManager {
       return;
     }
 
-    if (typeof (window as any).cancelIdleCallback === 'function') {
-      (window as any).cancelIdleCallback(this.loaderHandle);
+    if (typeof window.cancelIdleCallback === 'function') {
+      window.cancelIdleCallback(this.loaderHandle);
     } else {
       clearTimeout(this.loaderHandle);
     }
