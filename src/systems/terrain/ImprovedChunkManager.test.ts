@@ -132,6 +132,11 @@ describe('ImprovedChunkManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Mock performance.now to return stable values so the adaptive render distance
+    // cooldown (1500ms) never elapses during tests. Constructor captures lastAdaptTime
+    // from performance.now(), and update() checks elapsed time against ADAPT_COOLDOWN_MS.
+    const baseTime = 1000;
+    vi.spyOn(performance, 'now').mockReturnValue(baseTime);
 
     scene = createMockScene();
     camera = createMockCamera();
@@ -198,6 +203,7 @@ describe('ImprovedChunkManager', () => {
     if (manager) {
       manager.dispose();
     }
+    vi.restoreAllMocks();
   });
 
   describe('Constructor', () => {
@@ -281,10 +287,17 @@ describe('ImprovedChunkManager', () => {
       mockPriorityManager.hasPlayerMovedChunk.mockReturnValue(false);
       mockLoadQueueManager.updateLoadQueue.mockClear();
 
+      // Use a fixed performance.now to prevent adaptive render distance
+      // from triggering updateLoadQueue via setRenderDistance()
+      const fixedTime = performance.now();
+      const spy = vi.spyOn(performance, 'now').mockReturnValue(fixedTime);
+
       manager.update(0.3);
 
       // Should not be called during update (only during init)
       expect(mockLoadQueueManager.updateLoadQueue).not.toHaveBeenCalled();
+
+      spy.mockRestore();
     });
 
     it('should drain load queue after interval', () => {
