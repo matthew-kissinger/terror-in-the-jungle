@@ -233,7 +233,7 @@ describe('SpawnPositionCalculator', () => {
   describe('getSpawnPosition', () => {
     it('should prefer contested zones over captured zones', () => {
       const contestedPos = new THREE.Vector3(50, 0, 50);
-      const capturedPos = new THREE.Vector3(100, 0, 100);
+      const capturedPos = new THREE.Vector3(500, 0, 500);
       const zones = [
         createMockZone('captured', Faction.US, capturedPos, false, ZoneState.US_CONTROLLED),
         createMockZone('contested', Faction.US, contestedPos, false, ZoneState.CONTESTED),
@@ -241,14 +241,14 @@ describe('SpawnPositionCalculator', () => {
       const zoneManager = createMockZoneManager(zones);
 
       const result = SpawnPositionCalculator.getSpawnPosition(Faction.US, zoneManager);
-      
+
       const distContested = result.distanceTo(contestedPos);
       const distCaptured = result.distanceTo(capturedPos);
       expect(distContested).toBeLessThan(distCaptured);
     });
 
     it('should prefer captured zones over HQ zones', () => {
-      const hqPos = new THREE.Vector3(50, 0, 50);
+      const hqPos = new THREE.Vector3(500, 0, 500);
       const capturedPos = new THREE.Vector3(100, 0, 100);
       const zones = [
         createMockZone('hq', Faction.US, hqPos, true, ZoneState.US_CONTROLLED),
@@ -257,7 +257,7 @@ describe('SpawnPositionCalculator', () => {
       const zoneManager = createMockZoneManager(zones);
 
       const result = SpawnPositionCalculator.getSpawnPosition(Faction.US, zoneManager);
-      
+
       const distHq = result.distanceTo(hqPos);
       const distCaptured = result.distanceTo(capturedPos);
       expect(distCaptured).toBeLessThan(distHq);
