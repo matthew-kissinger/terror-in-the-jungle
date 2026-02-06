@@ -133,6 +133,10 @@ export class HelicopterPhysics {
       this.controls.yaw,
       smoothRate
     );
+
+    // Booleans don't need smoothing but need to be updated
+    this.smoothedControls.engineBoost = this.controls.engineBoost;
+    this.smoothedControls.autoHover = this.controls.autoHover;
   }
 
   private updateEngine(deltaTime: number): void {
