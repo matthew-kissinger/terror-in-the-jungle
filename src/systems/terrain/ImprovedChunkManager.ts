@@ -66,7 +66,7 @@ export class ImprovedChunkManager implements GameSystem {
   // Adaptive render distance
   private fpsEma = 60;
   private readonly FPS_EMA_ALPHA = 0.1;
-  private lastAdaptTime = 0;
+  private lastAdaptTime = performance.now();
   private readonly ADAPT_COOLDOWN_MS = 1500;
 
   constructor(
