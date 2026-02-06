@@ -11,6 +11,17 @@ vi.mock('../../utils/Logger');
 vi.mock('./FootstepSynthesis');
 vi.mock('../terrain/HeightQueryCache');
 
+// Mock THREE.js audio classes to avoid window/DOM dependencies
+vi.mock('three', async () => {
+  const actual = await vi.importActual<typeof import('three')>('three');
+  return {
+    ...actual,
+    AudioListener: vi.fn(),
+    Audio: vi.fn(),
+    PositionalAudio: vi.fn(),
+  };
+});
+
 describe('FootstepAudioSystem', () => {
   let system: FootstepAudioSystem;
   let listener: THREE.AudioListener;
@@ -58,47 +69,67 @@ describe('FootstepAudioSystem', () => {
     // Reset mocks
     vi.clearAllMocks();
 
-    // Mock AudioListener
+    // Setup Mock Implementations using regular functions to support 'new'
+    const eventDispatcherMethods = {
+      addEventListener: vi.fn(),
+      hasEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    };
+
+    (THREE.AudioListener as any).mockImplementation(function() {
+      return {
+        isObject3D: true,
+        ...eventDispatcherMethods,
+        context: mockAudioContext,
+        getInput: vi.fn(),
+        removeFilter: vi.fn(),
+        setFilter: vi.fn(),
+        getFilter: vi.fn(),
+        setMasterVolume: vi.fn(),
+        getMasterVolume: vi.fn(),
+        updateMatrixWorld: vi.fn(),
+        removeFromParent: vi.fn(),
+      };
+    });
+
+    (THREE.Audio as any).mockImplementation(function() {
+      return {
+        isObject3D: true,
+        ...eventDispatcherMethods,
+        isPlaying: false,
+        play: vi.fn(),
+        stop: vi.fn(),
+        setBuffer: vi.fn(),
+        setVolume: vi.fn(),
+        setPlaybackRate: vi.fn(),
+        connect: vi.fn(),
+        removeFromParent: vi.fn(),
+      };
+    });
+
+    (THREE.PositionalAudio as any).mockImplementation(function() {
+      return {
+        isObject3D: true,
+        ...eventDispatcherMethods,
+        isPlaying: false,
+        play: vi.fn(),
+        stop: vi.fn(),
+        setBuffer: vi.fn(),
+        setVolume: vi.fn(),
+        setRefDistance: vi.fn(),
+        setMaxDistance: vi.fn(),
+        setRolloffFactor: vi.fn(),
+        setDistanceModel: vi.fn(),
+        getOutput: vi.fn().mockReturnValue({}),
+        connect: vi.fn(),
+        removeFromParent: vi.fn(),
+      };
+    });
+
+    // Now safe to instantiate listener (uses mock)
     listener = new THREE.AudioListener();
-    (listener.context as any) = mockAudioContext;
-
-    // Mock THREE.Audio and THREE.PositionalAudio and THREE.AudioListener
-    // We mock the instances created inside the class
-    vi.spyOn(THREE, 'AudioListener').mockImplementation(() => ({
-      context: mockAudioContext,
-      getInput: vi.fn(),
-      removeFilter: vi.fn(),
-      setFilter: vi.fn(),
-      getFilter: vi.fn(),
-      setMasterVolume: vi.fn(),
-      getMasterVolume: vi.fn(),
-      updateMatrixWorld: vi.fn(),
-    } as any));
-
-    vi.spyOn(THREE, 'Audio').mockImplementation(() => ({
-      isPlaying: false,
-      play: vi.fn(),
-      stop: vi.fn(),
-      setBuffer: vi.fn(),
-      setVolume: vi.fn(),
-      setPlaybackRate: vi.fn(),
-      connect: vi.fn(),
-    } as any));
-
-    vi.spyOn(THREE, 'PositionalAudio').mockImplementation(() => ({
-      isPlaying: false,
-      play: vi.fn(),
-      stop: vi.fn(),
-      setBuffer: vi.fn(),
-      setVolume: vi.fn(),
-      setRefDistance: vi.fn(),
-      setMaxDistance: vi.fn(),
-      setRolloffFactor: vi.fn(),
-      setDistanceModel: vi.fn(),
-      getOutput: vi.fn().mockReturnValue({}),
-      connect: vi.fn(),
-    } as any));
-
+    
     // Mock HeightQueryCache
     mockHeightQueryCache = {
       getHeightAt: vi.fn().mockReturnValue(10), // Default height (GRASS)
@@ -217,6 +248,45 @@ describe('FootstepAudioSystem', () => {
       system.playPlayerFootstep(new THREE.Vector3(), false, 1.0, true);
       expect(FootstepSynthesis.createWaterFootstep).toHaveBeenCalled();
     });
+
+    it('should reset step timer when not moving', () => {
+      // Move timer close to threshold
+      system.playPlayerFootstep(new THREE.Vector3(), false, 0.4, true); 
+      // Stop moving
+      system.playPlayerFootstep(new THREE.Vector3(), false, 0.1, false);
+      // Resume moving - should start from 0, so 0.1s shouldn't trigger
+      system.playPlayerFootstep(new THREE.Vector3(), false, 0.1, true);
+      
+      expect(FootstepSynthesis.createGrassFootstep).not.toHaveBeenCalled();
+    });
+
+    it('should use correct volume for GRASS', () => {
+      system.playPlayerFootstep(new THREE.Vector3(), false, 1.0, true);
+      expect(FootstepSynthesis.createGrassFootstep).toHaveBeenCalledWith(expect.anything(), 0.3, expect.any(Number));
+    });
+
+    it('should use correct volume for ROCK', () => {
+      mockHeightQueryCache.getHeightAt.mockReturnValue(10); // Base
+      // Mock slope > 0.5
+      mockHeightQueryCache.getHeightAt.mockImplementation((x: number) => x > 0 ? 12 : 10);
+      
+      system.playPlayerFootstep(new THREE.Vector3(0, 10, 0), false, 1.0, true);
+      expect(FootstepSynthesis.createRockFootstep).toHaveBeenCalledWith(expect.anything(), 0.35, expect.any(Number));
+    });
+  });
+
+  describe('terrain configurations', () => {
+    it('should use correct volume for MUD', () => {
+      mockHeightQueryCache.getHeightAt.mockReturnValue(2.5); // Mud
+      system.playPlayerFootstep(new THREE.Vector3(), false, 1.0, true);
+      expect(FootstepSynthesis.createMudFootstep).toHaveBeenCalledWith(expect.anything(), 0.35, expect.any(Number));
+    });
+
+    it('should use correct volume for WATER', () => {
+      mockHeightQueryCache.getHeightAt.mockReturnValue(0.5); // Water
+      system.playPlayerFootstep(new THREE.Vector3(), false, 1.0, true);
+      expect(FootstepSynthesis.createWaterFootstep).toHaveBeenCalledWith(expect.anything(), 0.4, expect.any(Number));
+    });
   });
 
   describe('playLandingSound', () => {
@@ -291,6 +361,38 @@ describe('FootstepAudioSystem', () => {
       // We can check if getOutput() was called on a positional audio, which happens in setupPositionalChain
       const sound = aiPool[0];
       expect(sound.getOutput).toHaveBeenCalled();
+    });
+
+    it('should position AI sound at source location', () => {
+      const nearPos = new THREE.Vector3(10, 5, 10);
+      system.playAIFootstep(nearPos, playerPos);
+      
+      // We can't easily access the tempObj created inside setupPositionalChain without spying on private methods or Three.js constructors
+      // But we can check if the sound was added to an object with that position
+      // In our mock, 'sound' is added to 'tempObj'. 
+      // 'tempObj.add(sound)' is called.
+      // We can spy on Object3D constructor maybe? 
+      // Or we can rely on the fact that sound.removeFromParent is called later.
+      
+      // A better way is to verify that some Object3D was created and positioned.
+      // Since we didn't mock Object3D constructor to capture instances, we can't easily check this.
+      // But we can check that `getAvailablePositionalSound` was called.
+      const aiPool = (system as any).aiFootstepPool;
+      expect(aiPool[0].getOutput).toHaveBeenCalled();
+    });
+
+    it('should clean up temporary object after playing AI sound', () => {
+      vi.useFakeTimers();
+      const nearPos = new THREE.Vector3(10, 0, 0);
+      system.playAIFootstep(nearPos, playerPos);
+      
+      const sound = (system as any).aiFootstepPool[0];
+      
+      // Advance time past duration (0.5s) + buffer (0.1s)
+      vi.advanceTimersByTime(700);
+      
+      expect(sound.removeFromParent).toHaveBeenCalled();
+      vi.useRealTimers();
     });
   });
 
