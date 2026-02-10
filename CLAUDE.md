@@ -81,3 +81,6 @@ src/
 - 26 `: any` annotations across source files (excluding tests and SystemInterfaces)
 - Missing audio: grenade throw/pin pull, mortar launch, weapon pickup
 - `TicketSystem.restartMatch()` unused - UI uses `window.location.reload()` instead
+- `SystemUpdater.ts:86` uses `as any` to access `FullMapSystem.isVisible` (private field)
+- `PixelArtSandboxInit.ts:45` catches init errors but swallows them silently (no user feedback)
+- `SystemUpdater.updateSystems()` has no try/catch - a throwing system crashes the frame loop
