@@ -134,6 +134,13 @@ export class FullMapSystem implements GameSystem {
     }
   }
 
+  /**
+   * Returns whether the full map is currently visible
+   */
+  getIsVisible(): boolean {
+    return this.isVisible;
+  }
+
   private show(): void {
     this.isVisible = true;
     this.inputHandler.setIsVisible(true);

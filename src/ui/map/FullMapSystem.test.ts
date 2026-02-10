@@ -372,6 +372,18 @@ describe('FullMapSystem', () => {
     });
   });
 
+  describe('getIsVisible', () => {
+    it('should return the current visibility state', () => {
+      expect(system.getIsVisible()).toBe(false);
+      
+      (system as any).show();
+      expect(system.getIsVisible()).toBe(true);
+      
+      (system as any).hide();
+      expect(system.getIsVisible()).toBe(false);
+    });
+  });
+
   describe('render', () => {
     beforeEach(() => {
       system.setZoneManager(mockZoneManager);

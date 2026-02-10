@@ -83,7 +83,7 @@ export class SystemUpdater {
     });
 
     // Gate UI systems - skip if game hasn't started or full map is visible
-    const fullMapVisible = (refs.fullMapSystem as any).isVisible || false;
+    const fullMapVisible = refs.fullMapSystem?.getIsVisible() || false;
     const shouldUpdateUI = gameStarted && !fullMapVisible;
 
     this.trackSystemUpdate('UI', 1.0, () => {
