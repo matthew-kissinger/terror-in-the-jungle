@@ -10,7 +10,7 @@
 npm install
 npm run dev        # Dev server on localhost:5173
 npm run build      # Production build
-npm run test:run   # 2965 tests (all passing)
+npm run test:run   # 3028 tests (all passing)
 ```
 
 ## Stack
@@ -21,11 +21,11 @@ npm run test:run   # 2965 tests (all passing)
 | Spatial | three-mesh-bvh, custom octree/grid |
 | Build | Vite 7, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 76 files, 2965 tests |
+| Tests | Vitest - 78 files, 3028 tests |
 
 ## Architecture
 
-~54k lines across 281 files. Systems-based architecture with orchestrator pattern.
+~54k lines across 281 source files. Systems-based architecture with orchestrator pattern.
 
 ```
 src/
@@ -78,7 +78,7 @@ src/
 
 ## Known Tech Debt
 
-- 26 `: any` annotations across source files (excluding tests and SystemInterfaces)
+- 24 `: any` annotations across source files (excluding tests and SystemInterfaces)
 - Missing audio: grenade throw/pin pull, mortar launch, weapon pickup
 - `TicketSystem.restartMatch()` unused - UI uses `window.location.reload()` instead
 - `SystemUpdater.ts:86` uses `as any` to access `FullMapSystem.isVisible` (private field)
