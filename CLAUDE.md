@@ -10,7 +10,7 @@
 npm install
 npm run dev        # Dev server on localhost:5173
 npm run build      # Production build
-npm run test:run   # 2832 tests (all passing)
+npm run test:run   # 2879 tests (all passing)
 ```
 
 ## Critical Bug: Game Won't Start
@@ -43,7 +43,7 @@ export async function bootstrapGame(): Promise<void> {
 | Spatial | three-mesh-bvh, custom octree/grid |
 | Build | Vite 7, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 73 files, 2832 tests |
+| Tests | Vitest - 74 files, 2879 tests |
 
 ## Architecture
 
