@@ -1,7 +1,8 @@
 import { PixelArtSandbox } from './PixelArtSandbox';
 
-export function bootstrapGame(): void {
+export async function bootstrapGame(): Promise<void> {
   const sandbox = new PixelArtSandbox();
+  await sandbox.initialize();
   sandbox.start();
 
   // Expose sandbox renderer for performance measurement scripts

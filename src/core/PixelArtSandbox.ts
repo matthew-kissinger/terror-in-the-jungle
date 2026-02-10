@@ -56,9 +56,14 @@ export class PixelArtSandbox {
 
     this.setupEventListeners();
     this.setupMenuCallbacks();
+  }
 
-    // Start initialization process
-    this.initializeSystems();
+  /**
+   * Async initialization - must be awaited before start().
+   * Extracted from constructor since constructors cannot be async.
+   */
+  public async initialize(): Promise<void> {
+    await this.initializeSystems();
   }
 
   private setupEventListeners(): void {

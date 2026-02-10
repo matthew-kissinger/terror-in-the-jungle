@@ -1,3 +1,5 @@
 import { bootstrapGame } from './core/bootstrap';
 
-bootstrapGame();
+bootstrapGame().catch((err) => {
+  console.error('[bootstrap]', err);
+});
