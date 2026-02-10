@@ -84,3 +84,4 @@ src/
 - `SystemUpdater.ts:86` uses `as any` to access `FullMapSystem.isVisible` (private field)
 - `PixelArtSandboxInit.ts:45` catches init errors but swallows them silently (no user feedback)
 - `SystemUpdater.updateSystems()` has no try/catch - a throwing system crashes the frame loop
+- `AmbientSoundManager.stop()` doesn't cancel pending `setTimeout` from `playNextTrack()` - audio can restart after stop
