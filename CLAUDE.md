@@ -10,30 +10,8 @@
 npm install
 npm run dev        # Dev server on localhost:5173
 npm run build      # Production build
-npm run test:run   # 2915 tests (all passing)
+npm run test:run   # 2965 tests (all passing)
 ```
-
-## Critical Bug: Game Won't Start
-
-**The game builds and tests pass, but is NOT playable.**
-
-In `src/core/PixelArtSandbox.ts` line 61, `this.initializeSystems()` is called from the constructor without `await`. Since constructors can't be async, the promise runs in the background. If any error occurs during async initialization (`systemManager.initializeSystems`, `loadGameAssets`, `preGenerateSpawnArea`), it's silently caught and `isInitialized` never becomes `true`. The `startGameWithMode()` guard (`if (!sandbox.isInitialized) return`) blocks the game from starting.
-
-**Fix approach**: Restructure bootstrap to await initialization:
-```typescript
-// bootstrap.ts - make async
-export async function bootstrapGame(): Promise<void> {
-  const sandbox = new PixelArtSandbox();
-  await sandbox.initialize();  // Extract async init from constructor
-  sandbox.start();
-}
-```
-
-**Key files**:
-- `src/core/PixelArtSandbox.ts` - Main game class (144 lines, split into 3 modules)
-- `src/core/PixelArtSandboxInit.ts` - Async initialization + `startGameWithMode()`
-- `src/core/bootstrap.ts` - Entry point that creates and starts the sandbox
-- `src/ui/loading/LoadingScreen.ts` - Loading screen with mode selection
 
 ## Stack
 
@@ -43,7 +21,7 @@ export async function bootstrapGame(): Promise<void> {
 | Spatial | three-mesh-bvh, custom octree/grid |
 | Build | Vite 7, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 75 files, 2915 tests |
+| Tests | Vitest - 76 files, 2965 tests |
 
 ## Architecture
 
@@ -70,6 +48,13 @@ src/
 └── utils/          # Logger, ObjectPoolManager, math
 ```
 
+## Key Files
+
+- `src/core/PixelArtSandbox.ts` - Main game class (split into 3 modules)
+- `src/core/PixelArtSandboxInit.ts` - Async initialization + `startGameWithMode()`
+- `src/core/bootstrap.ts` - Entry point (async, awaits initialization)
+- `src/ui/loading/LoadingScreen.ts` - Loading screen with mode selection
+
 ## Game Modes
 
 | Mode | Map | NPCs | Duration |
@@ -94,6 +79,5 @@ src/
 ## Known Tech Debt
 
 - 26 `: any` annotations across source files (excluding tests and SystemInterfaces)
-- `window.game` global fully migrated to module singletons
 - Missing audio: grenade throw/pin pull, mortar launch, weapon pickup
 - `TicketSystem.restartMatch()` unused - UI uses `window.location.reload()` instead
