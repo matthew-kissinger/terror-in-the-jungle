@@ -388,7 +388,25 @@ describe('ZoneManager', () => {
       
       zoneManager.update(0.1);
       
-      expect(mockHUD.addZoneCapture).toHaveBeenCalled();
+      expect(mockHUD.addZoneCapture).toHaveBeenCalledWith(zone.name, false);
+    });
+
+    it('should notify HUD when US loses a zone', () => {
+      const mockHUD = {
+        addZoneCapture: vi.fn(),
+      };
+      zoneManager.setHUDSystem(mockHUD as any);
+
+      const zone = zoneManager['zones'].get('test_zone')!;
+      zoneManager['previousZoneState'].set('test_zone', Faction.US);
+      
+      // Simulate OPFOR capturing zone from US
+      zone.owner = Faction.OPFOR;
+      zone.state = ZoneState.OPFOR_CONTROLLED;
+      
+      zoneManager.update(0.1);
+      
+      expect(mockHUD.addZoneCapture).toHaveBeenCalledWith(zone.name, true);
     });
 
     it('should not notify HUD for home base captures', () => {
@@ -409,7 +427,7 @@ describe('ZoneManager', () => {
       expect(mockHUD.addZoneCapture).not.toHaveBeenCalled();
     });
 
-    it('should not notify HUD when OPFOR captures zone', () => {
+    it('should not notify HUD when OPFOR captures neutral zone', () => {
       const mockHUD = {
         addZoneCapture: vi.fn(),
       };

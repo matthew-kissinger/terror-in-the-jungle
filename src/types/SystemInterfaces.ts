@@ -84,7 +84,7 @@ export interface ISmokeCloudSystem {
 export interface IHUDSystem {
   addKill(isHeadshot?: boolean): void;
   addDeath(): void;
-  addZoneCapture(): void;
+  addZoneCapture(zoneName?: string, isLost?: boolean): void;
   addAssist(): void;
   addCaptureAssist(): void;
   addKillToFeed(killerName: string, killerFaction: Faction, victimName: string, victimFaction: Faction, isHeadshot?: boolean, weaponType?: string): void;

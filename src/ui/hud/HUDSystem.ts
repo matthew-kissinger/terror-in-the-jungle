@@ -191,10 +191,18 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.personalStatsPanel.onDeath();
   }
 
-  addZoneCapture(): void {
+  addZoneCapture(zoneName?: string, isLost?: boolean): void {
     this.statsTracker.addZoneCapture();
     // Spawn score popup for zone capture
     this.elements.spawnScorePopup('capture', 200);
+    // Show zone capture notification
+    if (zoneName && this.elements.zoneCaptureNotification) {
+      if (isLost) {
+        this.elements.zoneCaptureNotification.showLost(zoneName);
+      } else {
+        this.elements.zoneCaptureNotification.showCapture(zoneName);
+      }
+    }
   }
 
   addCaptureAssist(): void {

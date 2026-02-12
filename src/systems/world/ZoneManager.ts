@@ -170,7 +170,14 @@ export class ZoneManager implements GameSystem {
       // Detect capture by US (player faction)
       if (previousOwner !== Faction.US && zone.owner === Faction.US && !zone.isHomeBase) {
         if (this.hudSystem && typeof this.hudSystem.addZoneCapture === 'function') {
-          this.hudSystem.addZoneCapture();
+          this.hudSystem.addZoneCapture(zone.name, false);
+        }
+      }
+
+      // Detect zone lost by US (captured by OPFOR)
+      if (previousOwner === Faction.US && zone.owner === Faction.OPFOR && !zone.isHomeBase) {
+        if (this.hudSystem && typeof this.hudSystem.addZoneCapture === 'function') {
+          this.hudSystem.addZoneCapture(zone.name, true);
         }
       }
 
