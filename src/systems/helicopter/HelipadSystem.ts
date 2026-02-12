@@ -7,7 +7,7 @@ import { GameModeManager } from '../world/GameModeManager';
 export class HelipadSystem implements GameSystem {
   private scene: THREE.Scene;
   private terrainManager?: ImprovedChunkManager;
-  private vegetationSystem?: any;
+  private vegetationSystem?: { clearArea?: (x: number, z: number, radius: number) => void; addExclusionZone?: (x: number, z: number, radius: number) => void };
   private gameModeManager?: GameModeManager;
   private helipads: Map<string, THREE.Group> = new Map();
 
@@ -26,7 +26,7 @@ export class HelipadSystem implements GameSystem {
     // Will be created when needed
   }
 
-  setVegetationSystem(vegetationSystem: any): void {
+  setVegetationSystem(vegetationSystem: { clearArea?: (x: number, z: number, radius: number) => void; addExclusionZone?: (x: number, z: number, radius: number) => void }): void {
     this.vegetationSystem = vegetationSystem;
   }
 

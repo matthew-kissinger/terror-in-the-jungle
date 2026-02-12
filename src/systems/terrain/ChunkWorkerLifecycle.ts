@@ -34,7 +34,7 @@ export interface WorkerMessageData {
   uvs?: Float32Array;
   indices?: Uint32Array;
   heightData?: Float32Array;
-  vegetation?: any;
+  vegetation?: import('./ChunkWorkerPool').VegetationData;
 }
 
 /**

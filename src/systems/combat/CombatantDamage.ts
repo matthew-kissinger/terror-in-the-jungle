@@ -44,7 +44,7 @@ export class CombatantDamage {
     this.audioManager = manager;
   }
 
-  setHUDSystem(system: any): void {
+  setHUDSystem(system: import('../../types/SystemInterfaces').IHUDSystem): void {
     this.hudSystem = system;
   }
 

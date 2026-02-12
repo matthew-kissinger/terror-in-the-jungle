@@ -63,7 +63,7 @@ export class CombatantCombatEffects {
   spawnCombatEffects(
     combatant: Combatant,
     shotRay: THREE.Ray,
-    hit: any,
+    hit: { combatant: Combatant; distance: number; point: THREE.Vector3; headshot: boolean } | { point: THREE.Vector3; distance: number; headshot: boolean } | null,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
     squads: Map<string, Squad>
@@ -105,17 +105,20 @@ export class CombatantCombatEffects {
         this.impactEffectsPool.spawn(hit.point, negatedDirection);
         objectPool.releaseVector3(negatedDirection);
 
-        const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
-        const wasAlive = hit.combatant.health > 0;
-        this.damage.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot, allCombatants);
+        // Only apply damage if hit has a combatant (not a player hit)
+        if ('combatant' in hit) {
+          const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
+          const wasAlive = hit.combatant.health > 0;
+          this.damage.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot, allCombatants);
 
-        // Voice callout: Target down (if kill confirmed)
-        if (wasAlive && hit.combatant.health <= 0 && this.voiceCalloutSystem && Math.random() < 0.4) {
-          this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.TARGET_DOWN, combatant.position);
-        }
+          // Voice callout: Target down (if kill confirmed)
+          if (wasAlive && hit.combatant.health <= 0 && this.voiceCalloutSystem && Math.random() < 0.4) {
+            this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.TARGET_DOWN, combatant.position);
+          }
 
-        if (hit.headshot) {
-          Logger.info('combat', ` Headshot! ${combatant.faction} -> ${hit.combatant.faction}`);
+          if (hit.headshot) {
+            Logger.info('combat', ` Headshot! ${combatant.faction} -> ${hit.combatant.faction}`);
+          }
         }
       } else {
         // Track near misses for suppression
@@ -123,7 +126,7 @@ export class CombatantCombatEffects {
       }
 
       objectPool.releaseVector3(hitPoint);
-    } else if (hit) {
+    } else if (hit && 'combatant' in hit) {
       const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
       this.damage.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot, allCombatants);
     }

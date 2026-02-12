@@ -82,7 +82,7 @@ export class CombatantSystemSetters {
     this.combatantAI.setVoiceCalloutSystem(voiceCalloutSystem);
   }
 
-  setPlayerSuppressionSystem(system: any): void {
+  setPlayerSuppressionSystem(system: import('../player/PlayerSuppressionSystem').PlayerSuppressionSystem): void {
     this.combatantCombat.setPlayerSuppressionSystem(system);
   }
 

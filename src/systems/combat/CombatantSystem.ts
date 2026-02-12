@@ -59,7 +59,7 @@ export class CombatantSystem implements GameSystem {
   public readonly squadManager: SquadManager;
   private spatialGrid: SpatialOctree;
   public influenceMap?: InfluenceMapSystem;
-  public sandbagSystem?: any; // SandbagSystem - type not imported to avoid circular dependency
+  public sandbagSystem?: import('../weapons/SandbagSystem').SandbagSystem;
   private rallyPointSystem?: RallyPointSystem;
 
   // New focused modules
@@ -393,7 +393,7 @@ export class CombatantSystem implements GameSystem {
     this.setters.setVoiceCalloutSystem(voiceCalloutSystem);
   }
 
-  setPlayerSuppressionSystem(system: any): void {
+  setPlayerSuppressionSystem(system: import('../player/PlayerSuppressionSystem').PlayerSuppressionSystem): void {
     this.setters.setPlayerSuppressionSystem(system);
   }
 

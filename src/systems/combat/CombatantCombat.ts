@@ -196,7 +196,7 @@ export class CombatantCombat {
     const shotRay = this.ballistics.calculateAIShot(combatant, playerPosition, accuracyMultiplier);
 
     // Check hit results
-    let hit: any = null;
+    let hit: { combatant: Combatant; distance: number; point: THREE.Vector3; headshot: boolean } | { point: THREE.Vector3; distance: number; headshot: boolean } | null = null;
     if (combatant.target && combatant.target.id === 'PLAYER') {
       const playerHit = this.hitDetection.checkPlayerHit(shotRay, playerPosition);
       if (playerHit.hit) {
@@ -348,7 +348,7 @@ export class CombatantCombat {
     this.damage.setTicketSystem(system);
   }
 
-  setHUDSystem(system: any): void {
+  setHUDSystem(system: import('../../types/SystemInterfaces').IHUDSystem): void {
     this.hudSystem = system;
     this.damage.setHUDSystem(system);
   }
