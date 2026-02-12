@@ -105,9 +105,9 @@ function playTone(
 
 export class PersonalStatsPanel {
   private container: HTMLDivElement;
-  private killsElement: HTMLSpanElement;
-  private deathsElement: HTMLSpanElement;
-  private kdRatioElement: HTMLSpanElement;
+  private killsElements: NodeListOf<HTMLSpanElement>;
+  private deathsElements: NodeListOf<HTMLSpanElement>;
+  private kdRatioElements: NodeListOf<HTMLSpanElement>;
   private killStreakElement: HTMLDivElement;
   private lastKillTime = 0;
   private currentStreak = 0;
@@ -115,9 +115,9 @@ export class PersonalStatsPanel {
 
   constructor(private statsTracker: PlayerStatsTracker) {
     this.container = this.createPanel();
-    this.killsElement = this.container.querySelector('.stat-kills') as HTMLSpanElement;
-    this.deathsElement = this.container.querySelector('.stat-deaths') as HTMLSpanElement;
-    this.kdRatioElement = this.container.querySelector('.stat-kd') as HTMLSpanElement;
+    this.killsElements = this.container.querySelectorAll('.stat-kills');
+    this.deathsElements = this.container.querySelectorAll('.stat-deaths');
+    this.kdRatioElements = this.container.querySelectorAll('.stat-kd');
     this.killStreakElement = this.createKillStreakElement();
   }
 
@@ -126,18 +126,25 @@ export class PersonalStatsPanel {
     panel.className = 'personal-stats-panel';
 
     panel.innerHTML = `
-      <div style="font-weight: bold; margin-bottom: 8px; text-transform: uppercase; font-size: 11px; opacity: 0.7; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">Your Stats</div>
-      <div style="margin: 5px 0; display: flex; justify-content: space-between;">
-        <span>Kills:</span>
-        <span class="stat-kills" style="color: #4ade80; font-weight: bold;">0</span>
+      <div class="stats-desktop">
+        <div style="font-weight: bold; margin-bottom: 8px; text-transform: uppercase; font-size: 11px; opacity: 0.7; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">Your Stats</div>
+        <div style="margin: 5px 0; display: flex; justify-content: space-between;">
+          <span>Kills:</span>
+          <span class="stat-kills" style="color: #4ade80; font-weight: bold;">0</span>
+        </div>
+        <div style="margin: 5px 0; display: flex; justify-content: space-between;">
+          <span>Deaths:</span>
+          <span class="stat-deaths" style="color: #f87171; font-weight: bold;">0</span>
+        </div>
+        <div style="margin: 5px 0; display: flex; justify-content: space-between;">
+          <span>K/D:</span>
+          <span class="stat-kd" style="color: #fbbf24; font-weight: bold;">0.00</span>
+        </div>
       </div>
-      <div style="margin: 5px 0; display: flex; justify-content: space-between;">
-        <span>Deaths:</span>
-        <span class="stat-deaths" style="color: #f87171; font-weight: bold;">0</span>
-      </div>
-      <div style="margin: 5px 0; display: flex; justify-content: space-between;">
-        <span>K/D:</span>
-        <span class="stat-kd" style="color: #fbbf24; font-weight: bold;">0.00</span>
+      <div class="stats-mobile">
+        <span style="color: #4ade80; font-weight: bold;">K:<span class="stat-kills">0</span></span>
+        <span style="color: #f87171; font-weight: bold; margin-left: 8px;">D:<span class="stat-deaths">0</span></span>
+        <span style="color: #fbbf24; font-weight: bold; margin-left: 8px;">K/D:<span class="stat-kd">0.00</span></span>
       </div>
     `;
 
@@ -175,9 +182,9 @@ export class PersonalStatsPanel {
     const stats = this.statsTracker.getStats();
     const kdRatio = stats.deaths === 0 ? stats.kills : stats.kills / stats.deaths;
 
-    this.killsElement.textContent = stats.kills.toString();
-    this.deathsElement.textContent = stats.deaths.toString();
-    this.kdRatioElement.textContent = kdRatio.toFixed(2);
+    this.killsElements.forEach(el => el.textContent = stats.kills.toString());
+    this.deathsElements.forEach(el => el.textContent = stats.deaths.toString());
+    this.kdRatioElements.forEach(el => el.textContent = kdRatio.toFixed(2));
 
     // Check for kill streak timeout
     if (this.currentStreak > 0 && Date.now() - this.lastKillTime > this.KILL_STREAK_TIMEOUT) {
@@ -287,6 +294,10 @@ export class PersonalStatsPanel {
         z-index: 105;
       }
 
+      .stats-mobile {
+        display: none;
+      }
+
       @media (max-width: 768px) {
         .personal-stats-panel {
           right: 10px;
@@ -298,7 +309,31 @@ export class PersonalStatsPanel {
 
       @media (max-width: 480px) {
         .personal-stats-panel {
+          top: 100px; /* Below compass */
+          left: 10px;
+          right: auto;
+          background: rgba(10, 10, 14, 0.6);
+          padding: 4px 10px;
+          min-width: 0;
+          border-radius: 4px;
+          border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .stats-desktop {
           display: none;
+        }
+
+        .stats-mobile {
+          display: flex;
+          align-items: center;
+          font-size: 11px;
+          white-space: nowrap;
+        }
+
+        .kill-streak-notification {
+          font-size: 18px !important;
+          padding: 10px 20px !important;
+          transform: translate(-50%, -80px) !important;
         }
       }
 

@@ -220,10 +220,7 @@ export const HUDWeaponStyles = `
     }
 
     .kill-counter {
-      bottom: 170px;
-      padding: 6px 8px;
-      font-size: 11px;
-      min-width: 90px;
+      display: none;
     }
   }
 `;

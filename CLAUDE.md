@@ -95,4 +95,3 @@ src/
 - `HUDSystem` respawn button uses `onclick` instead of `addEventListener('pointerdown')`
 - `RespawnMapView` uses mixed click/touchend pattern (acceptable for this use case)
 - `OpenFrontierRespawnMap` uses separate mouse/touch handlers (correct - do not change)
-- `PersonalStatsPanel` is completely hidden on mobile (<480px) - could show compact form
