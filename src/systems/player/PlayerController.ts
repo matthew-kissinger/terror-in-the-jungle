@@ -109,8 +109,47 @@ export class PlayerController implements GameSystem {
       onRallyPointPlace: () => this.handleRallyPointPlacement(),
       onToggleMortarCamera: () => this.handleToggleMortarCamera(),
       onMouseDown: (button: number) => this.handleMouseDown(button),
-      onMouseUp: (button: number) => this.handleMouseUp(button)
+      onMouseUp: (button: number) => this.handleMouseUp(button),
+      onReload: () => this.handleTouchReload(),
+      onGrenadeSwitch: () => this.handleTouchGrenadeSwitch(),
     });
+  }
+
+  /** Wire touch fire/reload to WeaponInput when both are available */
+  private wireTouchToWeapon(): void {
+    if (!this.input.getIsTouchMode() || !this.firstPersonWeapon) return;
+
+    const touchControls = this.input.getTouchControls();
+    if (!touchControls) return;
+
+    const weaponInput = this.firstPersonWeapon.getWeaponInput();
+    touchControls.fireButton.setCallbacks(
+      () => {
+        // Trigger both PlayerController mouse-down (grenades/sandbags) and WeaponInput fire
+        this.handleMouseDown(0);
+        weaponInput.triggerFireStart();
+      },
+      () => {
+        this.handleMouseUp(0);
+        weaponInput.triggerFireStop();
+      }
+    );
+  }
+
+  private handleTouchReload(): void {
+    if (this.firstPersonWeapon) {
+      this.firstPersonWeapon.getWeaponInput().triggerReload();
+    }
+  }
+
+  private handleTouchGrenadeSwitch(): void {
+    // Dispatch synthetic keyboard event to switch to grenade slot via InventoryManager
+    const event = new KeyboardEvent('keydown', {
+      code: 'Digit2',
+      key: '2',
+      bubbles: true,
+    });
+    window.dispatchEvent(event);
   }
 
   private handleEscape(): void {
@@ -378,7 +417,11 @@ export class PlayerController implements GameSystem {
   setChunkManager(chunkManager: ImprovedChunkManager): void { this.chunkManager = chunkManager; this.movement.setChunkManager(chunkManager); }
   setGameModeManager(gameModeManager: GameModeManager): void { this.gameModeManager = gameModeManager; }
   setHelicopterModel(helicopterModel: HelicopterModel): void { this.helicopterModel = helicopterModel; this.movement.setHelicopterModel(helicopterModel); this.cameraController.setHelicopterModel(helicopterModel); }
-  setFirstPersonWeapon(firstPersonWeapon: FirstPersonWeapon): void { this.firstPersonWeapon = firstPersonWeapon; }
+  setFirstPersonWeapon(firstPersonWeapon: FirstPersonWeapon): void {
+    this.firstPersonWeapon = firstPersonWeapon;
+    // Wire touch controls to weapon input for fire/reload
+    this.wireTouchToWeapon();
+  }
   setHUDSystem(hudSystem: HUDSystem): void { this.hudSystem = hudSystem; }
   setSandboxRenderer(sandboxRenderer: ISandboxRenderer): void { this.sandboxRenderer = sandboxRenderer; }
   setInventoryManager(inventoryManager: InventoryManager): void { this.inventoryManager = inventoryManager; }

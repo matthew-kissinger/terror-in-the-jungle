@@ -61,6 +61,7 @@ describe('PlayerMovement', () => {
     mockInput = {
       isKeyPressed: vi.fn().mockReturnValue(false),
       getMouseMovement: vi.fn().mockReturnValue({ x: 0, y: 0 }),
+      getTouchMovementVector: vi.fn().mockReturnValue({ x: 0, z: 0 }),
       dispose: vi.fn()
     } as any;
 

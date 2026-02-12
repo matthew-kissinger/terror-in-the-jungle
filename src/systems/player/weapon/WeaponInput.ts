@@ -132,6 +132,33 @@ export class WeaponInput {
     }
   }
 
+  /** Programmatic fire start – used by touch controls */
+  triggerFireStart(): void {
+    if (!this.gameStarted || !this.isEnabled || !this.rigManager.getCurrentRig()) return
+
+    const currentSlot = this.inventoryManager?.getCurrentSlot()
+    if (this.inventoryManager && currentSlot !== WeaponSlot.PRIMARY && currentSlot !== WeaponSlot.SHOTGUN && currentSlot !== WeaponSlot.SMG) {
+      return
+    }
+
+    if (!this.reload.isAnimating()) {
+      this.isFiring = true
+      this.onFireStart?.()
+    }
+  }
+
+  /** Programmatic fire stop – used by touch controls */
+  triggerFireStop(): void {
+    this.isFiring = false
+    this.onFireStop?.()
+  }
+
+  /** Programmatic reload – used by touch controls */
+  triggerReload(): void {
+    if (!this.gameStarted || !this.isEnabled) return
+    this.onReloadStart?.()
+  }
+
   dispose(): void {
     window.removeEventListener('mousedown', this.boundOnMouseDown)
     window.removeEventListener('mouseup', this.boundOnMouseUp)

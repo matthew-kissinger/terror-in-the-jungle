@@ -395,4 +395,9 @@ export class FirstPersonWeapon implements GameSystem {
       Logger.info('weapon', 'Firing enabled (exited helicopter)')
     }
   }
+
+  /** Expose WeaponInput for touch control wiring */
+  getWeaponInput(): WeaponInput {
+    return this.input
+  }
 }
