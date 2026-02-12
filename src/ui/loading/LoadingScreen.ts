@@ -4,6 +4,7 @@ import { LoadingStyles } from './LoadingStyles';
 import { LoadingPanels } from './LoadingPanels';
 import { LoadingProgress } from './LoadingProgress';
 import { GameMode } from '../../config/gameModes';
+import { isTouchDevice } from '../../utils/DeviceDetector';
 
 export class LoadingScreen {
   private container: HTMLDivElement;
@@ -24,6 +25,9 @@ export class LoadingScreen {
   private zoneControlCard: HTMLDivElement;
   private openFrontierCard: HTMLDivElement;
   private selectedModeDisplay: HTMLDivElement;
+
+  // Mobile fullscreen prompt (shown after main menu on touch devices)
+  private fullscreenPrompt: HTMLDivElement | null = null;
 
   // Refactored modules
   private panels: LoadingPanels;
@@ -117,6 +121,9 @@ export class LoadingScreen {
           cursor: pointer;
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           width: 240px;
+          min-height: 44px;
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
           position: relative;
           overflow: hidden;
           flex: 0 1 240px;
@@ -420,6 +427,73 @@ export class LoadingScreen {
     this.modeSelectionContainer.classList.add('visible');
 
     this.progress.showComplete();
+
+    // On touch devices, show optional fullscreen prompt (does not block game start)
+    if (isTouchDevice()) {
+      this.showFullscreenPrompt();
+    }
+  }
+
+  /**
+   * Show a "Tap to go fullscreen" prompt on touch devices. Tapping requests fullscreen
+   * but does not block starting the game if the user declines.
+   */
+  private showFullscreenPrompt(): void {
+    if (this.fullscreenPrompt) return;
+    const prompt = document.createElement('div');
+    prompt.className = 'fullscreen-prompt';
+    prompt.setAttribute('role', 'button');
+    prompt.tabIndex = 0;
+    prompt.innerHTML = `
+      <span class="fullscreen-prompt-text">Tap to go fullscreen</span>
+      <span class="fullscreen-prompt-hint">(optional — you can start without it)</span>
+    `;
+    prompt.style.cssText = `
+      position: absolute;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 0.6rem 1.2rem;
+      min-height: 44px;
+      min-width: 160px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(20, 35, 50, 0.85);
+      border: 1px solid rgba(127, 180, 217, 0.4);
+      border-radius: 12px;
+      color: var(--primary-color);
+      font-size: 0.85rem;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      z-index: 10;
+      transition: opacity 0.2s, background 0.2s;
+    `;
+    const hint = prompt.querySelector('.fullscreen-prompt-hint') as HTMLElement;
+    if (hint) hint.style.cssText = 'font-size: 0.7rem; opacity: 0.8; margin-top: 0.2rem;';
+    const handleTap = () => {
+      const el = document.documentElement;
+      if (el.requestFullscreen) {
+        el.requestFullscreen().catch(() => { /* user declined or not allowed */ }).finally(() => {
+          this.dismissFullscreenPrompt();
+        });
+      } else {
+        this.dismissFullscreenPrompt();
+      }
+    };
+    prompt.addEventListener('click', handleTap);
+    prompt.addEventListener('touchend', (e) => { e.preventDefault(); handleTap(); }, { passive: false });
+    this.container.appendChild(prompt);
+    this.fullscreenPrompt = prompt;
+  }
+
+  private dismissFullscreenPrompt(): void {
+    if (this.fullscreenPrompt && this.fullscreenPrompt.parentElement) {
+      this.fullscreenPrompt.remove();
+      this.fullscreenPrompt = null;
+    }
   }
 
   public hide(): void {
@@ -534,6 +608,7 @@ export class LoadingScreen {
   }
 
   public dispose(): void {
+    this.dismissFullscreenPrompt();
     // Remove event listeners
     this.zoneControlCard.removeEventListener('click', this.handleZoneControlClick);
     this.openFrontierCard.removeEventListener('click', this.handleOpenFrontierClick);

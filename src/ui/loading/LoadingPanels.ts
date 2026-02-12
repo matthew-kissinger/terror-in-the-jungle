@@ -43,6 +43,7 @@ export class LoadingPanels {
       z-index: 10001;
       justify-content: center;
       align-items: center;
+      touch-action: manipulation;
     `;
 
     panel.innerHTML = `
@@ -96,6 +97,9 @@ export class LoadingPanels {
         <button class="close-settings" style="
           margin-top: 1.5rem;
           padding: 0.75rem 2rem;
+          min-height: 44px;
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
           background: linear-gradient(135deg, #5a8fb5, #7fb4d9);
           color: white;
           border: 1px solid rgba(127, 180, 217, 0.3);
@@ -139,6 +143,7 @@ export class LoadingPanels {
       justify-content: center;
       align-items: center;
       overflow-y: auto;
+      touch-action: manipulation;
     `;
 
     panel.innerHTML = `
@@ -186,6 +191,9 @@ export class LoadingPanels {
         <button class="close-how-to-play" style="
           margin-top: 1.5rem;
           padding: 0.75rem 2rem;
+          min-height: 44px;
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
           background: linear-gradient(135deg, #5a8fb5, #7fb4d9);
           color: white;
           border: 1px solid rgba(127, 180, 217, 0.3);

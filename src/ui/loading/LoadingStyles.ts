@@ -218,6 +218,9 @@ export class LoadingStyles {
         text-transform: uppercase;
         letter-spacing: 0.1em;
         min-width: 220px;
+        min-height: 44px;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
         position: relative;
@@ -253,6 +256,7 @@ export class LoadingStyles {
       .play-button {
         font-size: 1rem;
         padding: 1rem 3rem;
+        min-height: 48px;
         background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
         background-size: 200% 200%;
         animation: gradientShift 3s ease infinite;
@@ -268,6 +272,7 @@ export class LoadingStyles {
       .secondary-button {
         font-size: 0.875rem;
         padding: 0.75rem 2rem;
+        min-height: 44px;
         background: rgba(255, 255, 255, 0.05);
         border-color: rgba(255, 255, 255, 0.1);
       }

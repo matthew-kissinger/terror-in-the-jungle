@@ -1,6 +1,7 @@
 import { Logger } from '../../utils/Logger';
 import { GameSystem } from '../../types';
 import { GrenadeType } from '../../systems/combat/types';
+import { shouldUseTouchControls } from '../../utils/DeviceDetector';
 import { renderGrenadePanel } from './LoadoutGrenadePanel';
 import { renderWeaponPanel } from './LoadoutWeaponPanel';
 
@@ -76,6 +77,25 @@ export class LoadoutSelector implements GameSystem {
           </span>
           to spawn
         </div>
+        ${shouldUseTouchControls() ? `
+        <button class="loadout-spawn-button" style="
+          margin-top: 24px;
+          padding: 1rem 2.5rem;
+          min-height: 48px;
+          min-width: 200px;
+          font-size: 1.1rem;
+          font-family: inherit;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          color: #fff;
+          background: linear-gradient(135deg, rgba(0, 150, 80, 0.9), rgba(0, 200, 100, 0.9));
+          border: 2px solid rgba(0, 255, 100, 0.6);
+          border-radius: 12px;
+          cursor: pointer;
+          touch-action: manipulation;
+          -webkit-tap-highlight-color: transparent;
+        ">TAP TO SPAWN</button>
+        ` : ''}
       </div>
     `;
 
@@ -145,8 +165,14 @@ export class LoadoutSelector implements GameSystem {
       optionElement.addEventListener('click', clickHandler);
     });
 
-    // Spacebar to confirm
+    // Spacebar to confirm (desktop)
     window.addEventListener('keydown', this.boundOnKeyDown);
+
+    // Touch: Tap to spawn button
+    const spawnButton = this.overlayElement.querySelector('.loadout-spawn-button');
+    if (spawnButton) {
+      spawnButton.addEventListener('click', () => this.confirmSelection());
+    }
   }
 
   private onKeyDown(event: KeyboardEvent): void {
