@@ -248,7 +248,15 @@ export class PlayerMovement {
     }
 
     // Cyclic Pitch (Arrow Up/Down) - forward/backward movement
-    if (input.isKeyPressed('arrowup')) {
+    // Touch cyclic overrides keyboard when active
+    const touchCyclic = input.getTouchCyclicInput();
+    const hasTouchCyclic = Math.abs(touchCyclic.pitch) > 0.05 || Math.abs(touchCyclic.roll) > 0.05;
+
+    if (hasTouchCyclic) {
+      // Direct mapping from touch pad position
+      this.helicopterControls.cyclicPitch = touchCyclic.pitch;
+      this.helicopterControls.cyclicRoll = touchCyclic.roll;
+    } else if (input.isKeyPressed('arrowup')) {
       this.helicopterControls.cyclicPitch = Math.min(1.0, this.helicopterControls.cyclicPitch + 2.0 * deltaTime); // Forward
     } else if (input.isKeyPressed('arrowdown')) {
       this.helicopterControls.cyclicPitch = Math.max(-1.0, this.helicopterControls.cyclicPitch - 2.0 * deltaTime); // Backward
@@ -258,13 +266,16 @@ export class PlayerMovement {
     }
 
     // Cyclic Roll (Arrow Left/Right) - left/right banking
-    if (input.isKeyPressed('arrowleft')) {
-      this.helicopterControls.cyclicRoll = Math.max(-1.0, this.helicopterControls.cyclicRoll - 2.0 * deltaTime);
-    } else if (input.isKeyPressed('arrowright')) {
-      this.helicopterControls.cyclicRoll = Math.min(1.0, this.helicopterControls.cyclicRoll + 2.0 * deltaTime);
-    } else {
-      // Auto-level roll
-      this.helicopterControls.cyclicRoll = THREE.MathUtils.lerp(this.helicopterControls.cyclicRoll, 0, deltaTime * 4.0);
+    // Skip keyboard roll when touch cyclic is active (already set above)
+    if (!hasTouchCyclic) {
+      if (input.isKeyPressed('arrowleft')) {
+        this.helicopterControls.cyclicRoll = Math.max(-1.0, this.helicopterControls.cyclicRoll - 2.0 * deltaTime);
+      } else if (input.isKeyPressed('arrowright')) {
+        this.helicopterControls.cyclicRoll = Math.min(1.0, this.helicopterControls.cyclicRoll + 2.0 * deltaTime);
+      } else {
+        // Auto-level roll
+        this.helicopterControls.cyclicRoll = THREE.MathUtils.lerp(this.helicopterControls.cyclicRoll, 0, deltaTime * 4.0);
+      }
     }
 
     // Send controls to helicopter model

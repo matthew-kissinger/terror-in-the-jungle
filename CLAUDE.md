@@ -90,7 +90,6 @@ src/
 ## Known Tech Debt
 
 - 9 `: any` annotations in source (excluding tests, SystemInterfaces, and .d.ts files)
-- Helicopter cyclic controls (pitch/roll) have no touch equivalent - players can enter/exit helicopter and control collective/yaw via joystick, but cannot pitch forward/backward or bank left/right on mobile. Arrow key controls in `PlayerMovement.ts` lines 250-268 are desktop-only.
 - Mortar camera toggle (M key) has no touch button - `TouchMortarButton.ts` has deploy/fire/aim but no camera view toggle.
 - `RespawnUI.ts` respawn button uses `onclick` (line 272) instead of `pointerdown` - causes 300ms touch delay on respawn.
 - `MobilePauseOverlay` uses `'click'` + `'touchend'` (2 listeners) - could use `pointerdown`.

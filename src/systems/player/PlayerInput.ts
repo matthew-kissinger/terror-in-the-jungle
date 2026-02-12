@@ -235,6 +235,17 @@ export class PlayerInput {
     return this.touchMoveResult;
   }
 
+  /**
+   * Get touch helicopter cyclic input.
+   * Returns {pitch, roll} in [-1, 1] range, or {0, 0} on desktop / no input.
+   */
+  getTouchCyclicInput(): { pitch: number; roll: number } {
+    if (!this.touchControls) {
+      return { pitch: 0, roll: 0 };
+    }
+    return this.touchControls.helicopterCyclic.getCyclicInput();
+  }
+
   private setupEventListeners(): void {
     this.boundOnKeyDown = this.onKeyDown.bind(this);
     this.boundOnKeyUp = this.onKeyUp.bind(this);
