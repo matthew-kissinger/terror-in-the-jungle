@@ -98,6 +98,7 @@ export class PlayerInput {
             callbacks.onMouseUp?.(2);
           }
         },
+        onEnterExitHelicopter: () => callbacks.onEnterExitHelicopter?.(),
       });
     }
   }

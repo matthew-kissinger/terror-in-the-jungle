@@ -10,6 +10,7 @@ import { TouchFireButton } from './TouchFireButton';
 import { TouchActionButtons } from './TouchActionButtons';
 import { TouchWeaponBar } from './TouchWeaponBar';
 import { TouchADSButton } from './TouchADSButton';
+import { TouchInteractionButton } from './TouchInteractionButton';
 
 export interface TouchControlCallbacks {
   onFireStart: () => void;
@@ -21,6 +22,7 @@ export interface TouchControlCallbacks {
   onSprintStop: () => void;
   onWeaponSelect: (slotIndex: number) => void;
   onADSToggle: (active: boolean) => void;
+  onEnterExitHelicopter: () => void;
 }
 
 export class TouchControls {
@@ -30,6 +32,7 @@ export class TouchControls {
   readonly actionButtons: TouchActionButtons;
   readonly weaponBar: TouchWeaponBar;
   readonly adsButton: TouchADSButton;
+  readonly interactionButton: TouchInteractionButton;
 
   private visible = false;
 
@@ -40,6 +43,7 @@ export class TouchControls {
     this.actionButtons = new TouchActionButtons();
     this.weaponBar = new TouchWeaponBar();
     this.adsButton = new TouchADSButton();
+    this.interactionButton = new TouchInteractionButton();
 
     // Start hidden until game starts
     this.hide();
@@ -69,6 +73,7 @@ export class TouchControls {
 
     this.weaponBar.setOnWeaponSelect(callbacks.onWeaponSelect);
     this.adsButton.setOnADSToggle(callbacks.onADSToggle);
+    this.interactionButton.setCallback(callbacks.onEnterExitHelicopter);
   }
 
   /**
@@ -95,6 +100,7 @@ export class TouchControls {
     this.actionButtons.show();
     this.weaponBar.show();
     this.adsButton.show();
+    this.interactionButton.show();
   }
 
   hide(): void {
@@ -106,6 +112,7 @@ export class TouchControls {
     this.actionButtons.hide();
     this.weaponBar.hide();
     this.adsButton.hide();
+    this.interactionButton.hide();
   }
 
   isVisible(): boolean {
@@ -119,5 +126,6 @@ export class TouchControls {
     this.actionButtons.dispose();
     this.weaponBar.dispose();
     this.adsButton.dispose();
+    this.interactionButton.dispose();
   }
 }

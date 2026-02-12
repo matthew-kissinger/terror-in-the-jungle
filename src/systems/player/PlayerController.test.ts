@@ -115,6 +115,7 @@ describe('PlayerController', () => {
     mockHelicopterModel = {
       tryEnterHelicopter: vi.fn(),
       exitHelicopter: vi.fn(),
+      setPlayerInput: vi.fn(),
     } as any;
 
     mockFirstPersonWeapon = {

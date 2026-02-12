@@ -9,6 +9,7 @@ import { HelicopterAnimation } from './HelicopterAnimation';
 import { HelicopterAudio } from './HelicopterAudio';
 import { HelicopterInteraction } from './HelicopterInteraction';
 import { IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
+import type { PlayerInput } from '../player/PlayerInput';
 
 export class HelicopterModel implements GameSystem {
   private scene: THREE.Scene;
@@ -53,6 +54,10 @@ export class HelicopterModel implements GameSystem {
   setHUDSystem(hudSystem: IHUDSystem): void {
     this.hudSystem = hudSystem;
     this.interaction.setHUDSystem(hudSystem);
+  }
+
+  setPlayerInput(playerInput: PlayerInput): void {
+    this.interaction.setPlayerInput(playerInput);
   }
 
   setAudioListener(listener: THREE.AudioListener): void {
