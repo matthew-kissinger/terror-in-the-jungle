@@ -21,23 +21,6 @@ export class PersonalStatsPanel {
   private createPanel(): HTMLDivElement {
     const panel = document.createElement('div');
     panel.className = 'personal-stats-panel';
-    panel.style.cssText = `
-      position: fixed;
-      top: 120px;
-      right: 20px;
-      background: rgba(10, 10, 14, 0.4);
-      backdrop-filter: blur(6px) saturate(1.1);
-      -webkit-backdrop-filter: blur(6px) saturate(1.1);
-      padding: 12px 16px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 8px;
-      font-family: 'Courier New', monospace;
-      font-size: 13px;
-      color: white;
-      min-width: 140px;
-      pointer-events: none;
-      z-index: 105;
-    `;
 
     panel.innerHTML = `
       <div style="font-weight: bold; margin-bottom: 8px; text-transform: uppercase; font-size: 11px; opacity: 0.7; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">Your Stats</div>
@@ -181,6 +164,39 @@ export class PersonalStatsPanel {
     const style = document.createElement('style');
     style.id = styleId;
     style.textContent = `
+      .personal-stats-panel {
+        position: fixed;
+        top: 120px;
+        right: 20px;
+        background: rgba(10, 10, 14, 0.4);
+        backdrop-filter: blur(6px) saturate(1.1);
+        -webkit-backdrop-filter: blur(6px) saturate(1.1);
+        padding: 12px 16px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        color: white;
+        min-width: 140px;
+        pointer-events: none;
+        z-index: 105;
+      }
+
+      @media (max-width: 768px) {
+        .personal-stats-panel {
+          right: 10px;
+          font-size: 11px;
+          padding: 8px 12px;
+          min-width: 120px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .personal-stats-panel {
+          display: none;
+        }
+      }
+
       @keyframes streakPulse {
         0% {
           transform: translate(-50%, -100px) scale(0.5);

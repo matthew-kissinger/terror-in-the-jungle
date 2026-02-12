@@ -30,19 +30,6 @@ export class KillFeed {
   private createContainer(): HTMLDivElement {
     const container = document.createElement('div');
     container.className = 'kill-feed';
-    container.style.cssText = `
-      position: fixed;
-      top: 220px;
-      right: 20px;
-      width: 260px;
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      z-index: 100;
-      pointer-events: none;
-      font-family: 'Courier New', monospace;
-      font-size: 11px;
-    `;
     return container;
   }
 
@@ -300,6 +287,35 @@ export class KillFeed {
     const style = document.createElement('style');
     style.id = 'kill-feed-styles';
     style.textContent = `
+      .kill-feed {
+        position: fixed;
+        top: 220px;
+        right: 20px;
+        width: 260px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        z-index: 100;
+        pointer-events: none;
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+      }
+
+      @media (max-width: 768px) {
+        .kill-feed {
+          top: 10px;
+          right: 10px;
+          width: 200px;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .kill-feed {
+          width: 180px;
+          font-size: 10px;
+        }
+      }
+
       @keyframes slideIn {
         from {
           transform: translateX(100px);

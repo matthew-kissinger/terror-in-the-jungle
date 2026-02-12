@@ -18,6 +18,26 @@ export const MINIMAP_STYLES = `
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
   }
 
+  @media (max-width: 768px) {
+    .minimap-container {
+      width: 150px;
+      height: 150px;
+      bottom: 16px;
+      right: 16px;
+      border-radius: 10px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .minimap-container {
+      width: 120px;
+      height: 120px;
+      bottom: 12px;
+      right: 12px;
+      border-radius: 8px;
+    }
+  }
+
   .minimap-canvas {
     width: 100%;
     height: 100%;
