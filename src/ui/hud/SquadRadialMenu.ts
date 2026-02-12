@@ -53,6 +53,7 @@ export class SquadRadialMenu {
   private boundMouseMoveHandler = this.onMouseMove.bind(this)
   private boundTouchMoveHandler = this.onTouchMove.bind(this)
   private boundTouchEndHandler = this.onTouchEnd.bind(this)
+  private boundTouchStartHandler = (e: TouchEvent) => e.preventDefault()
   private segmentPaths: SVGPathElement[] = []
   private segmentTexts: SVGTextElement[] = []
   private segmentEnterHandlers: Array<(event: MouseEvent) => void> = []
@@ -240,6 +241,7 @@ export class SquadRadialMenu {
   }
 
   private onTouchMove(event: TouchEvent): void {
+    if (!this.isVisible) return
     if (event.touches.length > 0) {
       const touch = event.touches[0]
       this.updateSelection(touch.clientX, touch.clientY)
@@ -247,10 +249,9 @@ export class SquadRadialMenu {
   }
 
   private onTouchEnd(event: TouchEvent): void {
+    if (!this.isVisible) return
     event.preventDefault()
-    if (this.isVisible) {
-      this.executeCommand()
-    }
+    this.executeCommand()
   }
 
   private updateSelection(clientX: number, clientY: number): void {
@@ -307,12 +308,10 @@ export class SquadRadialMenu {
     this.isVisible = true
     this.selectedIndex = -1
 
-    // Add touch listeners when menu is shown
-    if (this.container) {
-      this.container.addEventListener('touchmove', this.boundTouchMoveHandler, { passive: false })
-      this.container.addEventListener('touchend', this.boundTouchEndHandler, { passive: false })
-      this.container.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false })
-    }
+    // Add touch listeners on document (container has pointer-events: none)
+    document.addEventListener('touchmove', this.boundTouchMoveHandler, { passive: false })
+    document.addEventListener('touchend', this.boundTouchEndHandler, { passive: false })
+    document.addEventListener('touchstart', this.boundTouchStartHandler, { passive: false })
 
     // Slow time slightly (optional - remove if not desired)
     this.slowTime(0.6)
@@ -324,11 +323,10 @@ export class SquadRadialMenu {
     this.isVisible = false
     this.selectedIndex = -1
 
-    // Remove touch listeners when menu is hidden
-    if (this.container) {
-      this.container.removeEventListener('touchmove', this.boundTouchMoveHandler)
-      this.container.removeEventListener('touchend', this.boundTouchEndHandler)
-    }
+    // Remove touch listeners from document
+    document.removeEventListener('touchmove', this.boundTouchMoveHandler)
+    document.removeEventListener('touchend', this.boundTouchEndHandler)
+    document.removeEventListener('touchstart', this.boundTouchStartHandler)
 
     this.restoreTime()
   }
@@ -368,10 +366,9 @@ export class SquadRadialMenu {
   dispose(): void {
     window.removeEventListener('mousemove', this.boundMouseMoveHandler)
     
-    if (this.container) {
-      this.container.removeEventListener('touchmove', this.boundTouchMoveHandler)
-      this.container.removeEventListener('touchend', this.boundTouchEndHandler)
-    }
+    document.removeEventListener('touchmove', this.boundTouchMoveHandler)
+    document.removeEventListener('touchend', this.boundTouchEndHandler)
+    document.removeEventListener('touchstart', this.boundTouchStartHandler)
 
     this.segmentPaths.forEach((path, index) => {
       const handler = this.segmentEnterHandlers[index]
