@@ -10,6 +10,10 @@ import { Logger } from '../../utils/Logger';
 vi.mock('../../utils/Logger');
 vi.mock('./WeatherLightning');
 vi.mock('./WeatherAtmosphere');
+vi.mock('../../utils/DeviceDetector', () => ({
+  estimateGPUTier: () => 'high',
+  isMobileGPU: () => false
+}));
 
 type WeatherSystemAny = WeatherSystem & {
   currentState: WeatherState;
