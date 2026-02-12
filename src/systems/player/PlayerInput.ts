@@ -76,6 +76,14 @@ export class PlayerInput {
         onGrenade: () => callbacks.onGrenadeSwitch?.(),
         onSprintStart: () => callbacks.onRunStart?.(),
         onSprintStop: () => callbacks.onRunStop?.(),
+        onWeaponSelect: (slotIndex: number) => callbacks.onWeaponSlotChange?.(slotIndex as WeaponSlot),
+        onADSToggle: (active: boolean) => {
+          if (active) {
+            callbacks.onMouseDown?.(2);
+          } else {
+            callbacks.onMouseUp?.(2);
+          }
+        },
       });
     }
   }

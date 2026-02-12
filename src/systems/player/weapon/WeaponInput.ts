@@ -159,6 +159,24 @@ export class WeaponInput {
     this.onReloadStart?.()
   }
 
+  /** Programmatic ADS toggle – used by touch controls */
+  triggerADS(active: boolean): void {
+    if (!this.gameStarted || !this.isEnabled || !this.rigManager.getCurrentRig()) return
+
+    const currentSlot = this.inventoryManager?.getCurrentSlot()
+    if (this.inventoryManager && currentSlot !== WeaponSlot.PRIMARY && currentSlot !== WeaponSlot.SHOTGUN && currentSlot !== WeaponSlot.SMG) {
+      return
+    }
+
+    if (active) {
+      if (!this.reload.isAnimating()) {
+        this.animations.setADS(true)
+      }
+    } else {
+      this.animations.setADS(false)
+    }
+  }
+
   dispose(): void {
     window.removeEventListener('mousedown', this.boundOnMouseDown)
     window.removeEventListener('mouseup', this.boundOnMouseUp)
