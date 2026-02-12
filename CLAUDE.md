@@ -85,18 +85,15 @@ src/
 - **1-6** Weapons, **G** Grenade, **Z** Squad UI, **TAB** Scoreboard
 - **B** Deploy/undeploy mortar, **F** Fire mortar, **Arrows** Aim mortar (pitch/yaw), **Mouse wheel** Adjust pitch
 - **F1** Console stats, **F2** Performance overlay, **M** Mortar camera
-- **Mobile**: Virtual joystick, touch-drag look, fire/ADS/reload/grenade/scoreboard buttons, weapon bar, helicopter entry, mortar deploy/fire/aim pad, sandbag rotate, rally point, landscape lock
+- **Mobile**: Virtual joystick, touch-drag look, fire/ADS/reload/grenade/scoreboard buttons, weapon bar, helicopter entry/cyclic, mortar deploy/fire/aim pad/camera, sandbag rotate, rally point, squad menu, landscape lock
 
 ## Known Tech Debt
 
 - 9 `: any` annotations in source (excluding tests, SystemInterfaces, and .d.ts files)
-- Mortar camera toggle (M key) has no touch button - `TouchMortarButton.ts` has deploy/fire/aim but no camera view toggle.
-- `RespawnUI.ts` respawn button uses `onclick` (line 272) instead of `pointerdown` - causes 300ms touch delay on respawn.
 - `FullMapDOMHelpers.ts` zoom buttons use `onclick` (lines 42, 47, 52) instead of `pointerdown` - 300ms delay on mobile map controls.
 - `bootstrap.ts` error recovery button uses `onclick` (line 35) instead of `pointerdown`.
 - `OpenFrontierRespawnMap` uses separate mouse/touch handlers (correct - do not change)
-- `FirstPersonWeapon.ts` blocks reload while ADS (line 344) - player must exit ADS before reloading, breaks combat flow.
-- No zone capture celebration - `ZoneManager.ts` only increments stat counter, no audio callout or screen notification.
 - No weapon switch feedback - `FirstPersonWeapon.ts` silently ignores fire input during switch (line 223).
 - Full map (M key hold-to-view) has no touch button - mobile players cannot open the tactical map. `FullMapInput.ts` only listens for keyboard events.
-- Unmerged branches: `mycel/task-315f7324` has helicopter cyclic touch controls (commit e495052), `mycel/task-65efcfd0` has RespawnUI pointerdown fix + mortar camera button (commit b7e8e45). Both tested and passing but need cherry-pick to master.
+- Helicopter auto-hover toggle (Space key in helicopter) has no touch button - mobile pilots cannot toggle hover mode.
+- Unmerged branches: `mycel/task-bcab2aff` has reload-while-ADS fix (commit 3b92565), `mycel/task-7976102b` has zone capture celebration (commit 86ebf39). Both tested and passing but need cherry-pick to master.
