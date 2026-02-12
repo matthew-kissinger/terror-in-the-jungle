@@ -5,6 +5,7 @@ import { Logger } from '../utils/Logger';
 import { LoadoutWeapon } from '../ui/loadout/LoadoutSelector';
 import { GrenadeType, Faction } from '../systems/combat/types';
 import { isSandboxMode } from './SandboxModeDetector';
+import { SettingsManager } from '../config/SettingsManager';
 import type { PixelArtSandbox } from './PixelArtSandbox';
 
 /**
@@ -169,6 +170,11 @@ export function startGame(sandbox: PixelArtSandbox): void {
 
       if (!sandbox.sandboxEnabled) Logger.info('sandbox-init', 'Click anywhere to enable mouse look!');
       if (sandbox.systemManager.audioManager) sandbox.systemManager.audioManager.startAmbient();
+      // Apply saved volume setting
+      if (sandbox.systemManager.audioManager) {
+        const settings = SettingsManager.getInstance();
+        sandbox.systemManager.audioManager.setMasterVolume(settings.getMasterVolumeNormalized());
+      }
       if (sandbox.systemManager.combatantSystem && typeof sandbox.systemManager.combatantSystem.enableCombat === 'function') {
         sandbox.systemManager.combatantSystem.enableCombat();
         Logger.info('sandbox-init', 'Combat AI activated!');
@@ -179,6 +185,12 @@ export function startGame(sandbox: PixelArtSandbox): void {
 
   sandbox.sandboxRenderer.showCrosshair();
   if (!sandbox.sandboxEnabled) showWelcomeMessage(sandbox);
+
+  // Apply FPS overlay visibility from settings
+  const showFPS = SettingsManager.getInstance().get('showFPS');
+  if (showFPS && !sandbox.performanceOverlay.isVisible()) {
+    sandbox.performanceOverlay.toggle();
+  }
 }
 
 /**

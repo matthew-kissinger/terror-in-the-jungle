@@ -11,6 +11,7 @@ import { TimeIndicator } from '../ui/debug/TimeIndicator';
 import { LogOverlay } from '../ui/debug/LogOverlay';
 import { SandboxMetrics } from './SandboxMetrics';
 import { SandboxConfig, getSandboxConfig, isSandboxMode } from './SandboxModeDetector';
+import { SettingsManager } from '../config/SettingsManager';
 
 // Import split modules
 import * as Init from './PixelArtSandboxInit';
@@ -35,6 +36,7 @@ export class PixelArtSandbox {
   public gameStarted = false;
   public lastFrameDelta = 1 / 60;
   public currentPixelSize = 1;
+  private settingsUnsubscribe?: () => void;
 
   constructor() {
     Logger.info('core', ' Initializing Pixel Art Sandbox Engine...');
@@ -76,15 +78,119 @@ export class PixelArtSandbox {
       this.startGameWithMode(mode);
     });
 
-    // Settings button (placeholder)
+    // Settings button opens settings panel (handled in LoadingScreen)
     this.loadingScreen.onSettings(() => {
-      Logger.info('core', 'Settings menu not yet implemented');
+      // Panel show/hide handled by LoadingScreen.handleSettingsClick
     });
 
-    // How to play button (placeholder)
+    // How to play button opens how-to-play panel (handled in LoadingScreen)
     this.loadingScreen.onHowToPlay(() => {
-      Logger.info('core', 'How to play not yet implemented');
+      // Panel show/hide handled by LoadingScreen.handleHowToPlayClick
     });
+
+    // Subscribe to settings changes and apply to game systems in real time
+    const settings = SettingsManager.getInstance();
+    this.settingsUnsubscribe = settings.onChange((key, value) => {
+      this.applySettingChange(key, value);
+    });
+
+    // Apply initial settings that affect pre-game state
+    this.applyInitialSettings();
+  }
+
+  private applyInitialSettings(): void {
+    const settings = SettingsManager.getInstance();
+
+    // Apply shadow setting to renderer immediately
+    const shadowsEnabled = settings.get('enableShadows');
+    this.sandboxRenderer.renderer.shadowMap.enabled = shadowsEnabled;
+
+    // Apply FPS overlay visibility
+    if (settings.get('showFPS')) {
+      // Will be shown when game starts; default state handled in togglePerformanceStats
+    }
+  }
+
+  private applySettingChange(key: string, value: unknown): void {
+    switch (key) {
+      case 'masterVolume': {
+        const settings = SettingsManager.getInstance();
+        if (this.systemManager.audioManager) {
+          this.systemManager.audioManager.setMasterVolume(settings.getMasterVolumeNormalized());
+        }
+        break;
+      }
+      case 'enableShadows': {
+        const enabled = value as boolean;
+        this.sandboxRenderer.renderer.shadowMap.enabled = enabled;
+        // Mark all materials as needing update for shadow change
+        this.sandboxRenderer.renderer.shadowMap.needsUpdate = true;
+        if (this.sandboxRenderer.moonLight) {
+          this.sandboxRenderer.moonLight.castShadow = enabled;
+        }
+        Logger.info('settings', `Shadows ${enabled ? 'enabled' : 'disabled'}`);
+        break;
+      }
+      case 'showFPS': {
+        const show = value as boolean;
+        if (show && !this.performanceOverlay.isVisible()) {
+          this.performanceOverlay.toggle();
+        } else if (!show && this.performanceOverlay.isVisible()) {
+          this.performanceOverlay.toggle();
+        }
+        break;
+      }
+      case 'graphicsQuality': {
+        this.applyGraphicsQuality(value as string);
+        break;
+      }
+      // mouseSensitivity is read directly by PlayerInput each frame
+    }
+  }
+
+  private applyGraphicsQuality(quality: string): void {
+    const renderer = this.sandboxRenderer.renderer;
+    const moonLight = this.sandboxRenderer.moonLight;
+
+    switch (quality) {
+      case 'low':
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
+        if (moonLight) {
+          moonLight.shadow.mapSize.width = 512;
+          moonLight.shadow.mapSize.height = 512;
+        }
+        break;
+      case 'medium':
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        if (moonLight) {
+          moonLight.shadow.mapSize.width = 2048;
+          moonLight.shadow.mapSize.height = 2048;
+        }
+        break;
+      case 'high':
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        if (moonLight) {
+          moonLight.shadow.mapSize.width = 4096;
+          moonLight.shadow.mapSize.height = 4096;
+        }
+        break;
+      case 'ultra':
+        renderer.setPixelRatio(window.devicePixelRatio);
+        if (moonLight) {
+          moonLight.shadow.mapSize.width = 4096;
+          moonLight.shadow.mapSize.height = 4096;
+        }
+        break;
+    }
+
+    // Force shadow map update
+    if (moonLight) {
+      moonLight.shadow.map?.dispose();
+      moonLight.shadow.map = null;
+    }
+    renderer.shadowMap.needsUpdate = true;
+
+    Logger.info('settings', `Graphics quality set to: ${quality}`);
   }
 
   private async initializeSystems(): Promise<void> {
@@ -140,6 +246,9 @@ export class PixelArtSandbox {
   }
 
   public dispose(): void {
+    if (this.settingsUnsubscribe) {
+      this.settingsUnsubscribe();
+    }
     Input.disposeEventListeners();
     this.loadingScreen.dispose();
     this.sandboxRenderer.dispose();
