@@ -80,11 +80,99 @@ export const MATCH_END_SCREEN_STYLES = `
     border: 2px solid rgba(127, 180, 217, 0.3);
     border-radius: 12px;
     padding: 2rem;
-    min-width: 800px;
+    width: 90%;
+    max-width: 800px;
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 2rem;
     animation: fadeInUp 0.8s ease-out 0.2s backwards;
+  }
+
+  /* Responsive Adjustments */
+  @media (max-width: 768px) {
+    .end-screen-title {
+      font-size: 2.5rem;
+      letter-spacing: 0.1em;
+    }
+
+    .end-screen-subtitle {
+      font-size: 1.2rem;
+    }
+
+    .stats-panel {
+      grid-template-columns: 1fr;
+      padding: 1.5rem;
+      gap: 1.5rem;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+
+    .stats-column {
+      gap: 1rem;
+    }
+
+    .faction-tickets {
+      font-size: 1.5rem;
+    }
+
+    .ticket-comparison {
+      padding: 0.5rem;
+      gap: 0.5rem;
+    }
+
+    .vs-divider {
+      font-size: 1rem;
+    }
+
+    .end-screen-actions {
+      flex-direction: column;
+      width: 90%;
+      max-width: 300px;
+    }
+
+    .end-screen-button {
+      width: 100%;
+      padding: 0.8rem 1.5rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .end-screen-title {
+      font-size: 1.5rem;
+      letter-spacing: 0.05em;
+    }
+
+    .end-screen-subtitle {
+      font-size: 0.9rem;
+    }
+
+    .stats-panel {
+      padding: 0.75rem;
+      width: 95%;
+      gap: 1rem;
+    }
+
+    .stats-section-title {
+      font-size: 0.85rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-row {
+      font-size: 0.9rem;
+    }
+
+    .award-badge {
+      padding: 0.8rem;
+      min-width: 120px;
+    }
+
+    .award-name {
+      font-size: 0.8rem;
+    }
+
+    .award-value {
+      font-size: 1rem;
+    }
   }
 
   @keyframes fadeInUp {
