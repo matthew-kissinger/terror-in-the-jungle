@@ -1,7 +1,7 @@
 import { Logger } from '../../utils/Logger';
 import { SettingsManager } from '../../config/SettingsManager';
 import { WeaponSlot } from './InventoryManager';
-import { shouldUseTouchControls } from '../../utils/DeviceDetector';
+import { shouldUseTouchControls, isTouchDevice } from '../../utils/DeviceDetector';
 import { TouchControls } from '../../ui/controls/TouchControls';
 
 export interface InputCallbacks {
@@ -438,6 +438,12 @@ export class PlayerInput {
   }
 
   private showControls(): void {
+    // Skip keyboard hints on touch devices
+    if (isTouchDevice()) {
+      Logger.info('player', 'Touch controls enabled - use on-screen buttons');
+      return;
+    }
+
     const pointerLockHint = this.pointerLockEnabled
       ? 'Mouse - Look around (click to enable pointer lock)'
       : 'Mouse - Look around (pointer lock disabled)';
@@ -450,6 +456,13 @@ Space - Jump / Toggle Auto-Hover (in helicopter)
 Right Ctrl - Toggle Mouse Control Mode (helicopter: control vs free look)
 E - Enter/Exit Helicopter
 M - Toggle Mortar Camera View (when mortar deployed)
+1-6 - Switch Weapons
+R - Reload
+G - Throw Grenade
+B - Deploy/Undeploy Mortar
+F - Fire Mortar (when deployed)
+Z - Squad Commands
+TAB - Scoreboard
 ${pointerLockHint}
 Escape - Release pointer lock / Exit helicopter
     `);
