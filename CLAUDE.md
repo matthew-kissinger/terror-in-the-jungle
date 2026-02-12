@@ -25,7 +25,7 @@ npm run test:run   # 3318 tests (all passing)
 
 ## Architecture
 
-~58k lines across 293 source files. Systems-based architecture with orchestrator pattern.
+~58k lines across 296 source files. Systems-based architecture with orchestrator pattern.
 
 ```
 src/
@@ -88,24 +88,26 @@ src/
 
 ## Known Tech Debt
 
-- 14 `: any` annotations in source (excluding tests and SystemInterfaces)
-- Mortar system only has camera toggle (M key) - no deploy/aim/fire UI on desktop or mobile
+- 16 `: any` annotations in source (excluding tests and SystemInterfaces)
+- Mortar system only has camera toggle (M key) - deploy/aim/fire wiring was reverted in 4749be6
 - TicketSystem.restartMatch() does not reset player health, ammo, weapons, or respawn queue
-- Master is 95 commits ahead of origin - live GitHub Pages site is significantly behind
+- No in-game pause/menu button on mobile - players cannot exit a match
+- LoadingScreen and MatchEndScreen buttons use 'click' instead of 'pointerdown' (300ms delay on mobile)
+- Master is 96 commits ahead of origin - live GitHub Pages site is significantly behind
 - `audio_backup/` directory tracked in git (22 WAV files, 17MB) - should be removed
 - 4 agent-generated scripts tracked in git: `analyze_loc.py`, `complete_refactor.py`, `count_lines.py`, `commit_changes.sh`
 
 ### Unmerged Feature Branches
 
-8 `mycel/*` branches with unique work, all heavily diverged from master. Cherry-pick of specific changes is the safe merge strategy.
+8 `mycel/*` branches with 1 unique commit each (except 75b4d187 with 3). Cherry-pick is the safe merge strategy.
 
-| Feature | Branch suffix | Unique change |
-|---------|--------------|---------------|
-| Mortar deploy/aim/fire controls | task-0930d0dc | TouchMortarButton + PlayerInput/Controller wiring |
-| Settings device-aware | task-62f7bfd2 | LoadingPanels label changes |
-| Weather rain GPU scaling | task-642bca99 | WeatherSystem rain particle scaling |
-| Compass responsive | task-678e18fa | CompassStyles changes |
-| Settings + RespawnMap touch | task-75b4d187 | LoadingPanels + OpenFrontierRespawnMap touch |
-| TouchWeaponBar dispose fix | task-fa59cd92 | Memory leak fix in TouchWeaponBar |
-| SquadRadialMenu touch | task-d4a64fc2 | Touch wiring (squad already on master via Z key) |
-| Kill streak audio | task-fa40bc2b | Kill streak audio stings + PersonalStatsPanel |
+| Feature | Branch suffix | Merge status | Unique change |
+|---------|--------------|--------------|---------------|
+| Mortar deploy/aim/fire controls | task-0930d0dc | Clean merge | TouchMortarButton + PlayerInput/Controller wiring (was merged then reverted) |
+| Settings device-aware | task-62f7bfd2 | Clean merge | LoadingPanels label changes |
+| Weather rain GPU scaling | task-642bca99 | Clean merge | WeatherSystem rain particle scaling |
+| Compass responsive | task-678e18fa | Clean merge | CompassStyles changes |
+| Settings + RespawnMap touch | task-75b4d187 | 1 conflict (CLAUDE.md) | LoadingPanels + OpenFrontierRespawnMap touch |
+| TouchWeaponBar dispose fix | task-fa59cd92 | Clean merge | Memory leak fix in TouchWeaponBar |
+| SquadRadialMenu touch | task-d4a64fc2 | 2 conflicts (PlayerInput, TouchControls) | Touch wiring (squad already on master via Z key) |
+| Kill streak audio | task-fa40bc2b | Clean merge | Kill streak audio stings + PersonalStatsPanel |
