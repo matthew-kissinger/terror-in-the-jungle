@@ -10,7 +10,7 @@
 npm install
 npm run dev        # Dev server on localhost:5173
 npm run build      # Production build
-npm run test:run   # 3258 tests (all passing)
+npm run test:run   # 3294 tests (all passing)
 ```
 
 ## Stack
@@ -21,7 +21,7 @@ npm run test:run   # 3258 tests (all passing)
 | Spatial | three-mesh-bvh, custom octree/grid |
 | Build | Vite 7, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 91 files, 3258 tests |
+| Tests | Vitest - 91 files, 3294 tests |
 
 ## Architecture
 
@@ -44,16 +44,16 @@ src/
 ├── ui/
 │   ├── compass/    # Compass bearing + zone markers
 │   ├── controls/   # Touch controls (joystick, fire, look, ADS, weapon bar, actions)
-│   ├── end/        # Match end screen
+│   ├── end/        # Match end screen (responsive)
 │   ├── hud/        # HUD elements, scoreboard, kill feed
-│   ├── loading/    # Loading screen, mode selection
-│   ├── loadout/    # Weapon + grenade loadout selector
-│   ├── map/        # Fullscreen map, minimap
+│   ├── loading/    # Loading screen, mode selection (touch-to-start)
+│   ├── loadout/    # Weapon + grenade loadout selector (touch deploy button)
+│   ├── map/        # Fullscreen map (pinch-zoom, drag-pan), respawn map (touch)
 │   └── minimap/    # Minimap styles + rendering
 ├── workers/        # BVHWorker, ChunkWorker
 ├── shaders/        # GLSL shaders
-├── config/         # Game modes, loading phases
-└── utils/          # Logger, ObjectPoolManager, math
+├── config/         # Game modes, loading phases, settings
+└── utils/          # Logger, ObjectPoolManager, math, DeviceDetector
 ```
 
 ## Key Files
@@ -84,14 +84,14 @@ src/
 - **Click** Fire, **RClick** ADS, **R** Reload
 - **1-6** Weapons, **G** Grenade, **Z** Squad UI, **TAB** Scoreboard
 - **F1** Console stats, **F2** Performance overlay, **M** Mortar camera
+- **Mobile**: Virtual joystick, touch-drag look, fire/ADS/reload/grenade buttons, weapon bar
 
 ## Known Tech Debt
 
-- 14 `: any` annotations across source files (excluding tests and SystemInterfaces)
-- Touch controls: 5 of 7 files have tests; TouchADSButton and TouchWeaponBar still untested
+- 15 `: any` annotations in source (excluding tests and SystemInterfaces)
 - HUD uses hard-coded pixel positions/sizes - not responsive for mobile viewports
-- MatchEndScreen has `min-width: 800px` stats panel - overflows on mobile
-- `TicketSystem.restartMatch()` unused - UI uses `window.location.reload()` instead
-- Squad radial menu UI exists but commands are non-functional placeholders
-- TouchWeaponBar slot event listeners not cleaned up in dispose() - minor memory leak
+- Helicopter entry/exit is keyboard-only (E key) - no touch button
 - OpenFrontierRespawnMap only handles mouse events - no touch pan/zoom/select
+- `TicketSystem.restartMatch()` unused - UI uses `window.location.reload()` instead
+- TouchWeaponBar slot event listeners not cleaned up in dispose() - minor memory leak
+- Touch controls: TouchADSButton and TouchWeaponBar still untested
