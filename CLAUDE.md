@@ -89,3 +89,10 @@ src/
 - `PixelArtSandboxInit.ts:45` catches init errors but swallows them silently (no user feedback)
 - `SystemUpdater.updateSystems()` has no try/catch - a throwing system crashes the frame loop
 - `AmbientSoundManager.stop()` doesn't cancel pending `setTimeout` from `playNextTrack()` - audio can restart after stop
+
+## Unmerged Feature Branches (completed, awaiting merge)
+
+These branches contain tested, working code that needs merge + validation against latest master:
+- `mycel/task-fa8fbe43` - Mobile touch controls (virtual joystick, fire, look, action buttons)
+- `mycel/task-f891a854` - Settings menu wired to game systems (SettingsManager + localStorage)
+- `mycel/task-8304c732` - AmbientSoundManager setTimeout fix + SystemUpdater try/catch
