@@ -48,11 +48,15 @@ test_telemetry.html
 
 # Python
 __pycache__/
+*.py
 *.py[cod]
 *$py.class
 .Python
 env/
 venv/
+
+# Audio backups
+audio_backup/
 .mycel/
 public/assets/originals/
 

@@ -25,11 +25,11 @@ npm run test:run   # 3318 tests (all passing)
 
 ## Architecture
 
-~57k lines across 292 source files. Systems-based architecture with orchestrator pattern.
+~58k lines across 293 source files. Systems-based architecture with orchestrator pattern.
 
 ```
 src/
-├── core/           # Game loop, renderer, bootstrap
+├── core/           # Game loop, renderer, bootstrap, WebGL recovery
 ├── systems/
 │   ├── audio/      # Ambient, radio, footsteps, weapon sounds, voice callouts
 │   ├── combat/     # AI targeting, flanking, cover, spatial octree, influence maps
@@ -45,7 +45,7 @@ src/
 │   ├── compass/    # Compass bearing + zone markers
 │   ├── controls/   # Touch controls (joystick, fire, look, ADS, weapon bar, actions)
 │   ├── end/        # Match end screen (responsive)
-│   ├── hud/        # HUD elements, scoreboard, kill feed
+│   ├── hud/        # HUD elements, scoreboard, kill feed, squad radial menu
 │   ├── loading/    # Loading screen, mode selection (touch-to-start)
 │   ├── loadout/    # Weapon + grenade loadout selector (touch deploy button)
 │   ├── map/        # Fullscreen map (pinch-zoom, drag-pan), respawn map
@@ -88,24 +88,24 @@ src/
 
 ## Known Tech Debt
 
-- 16 `: any` annotations in source (excluding tests and SystemInterfaces)
-- Mortar deploy/aim/fire controls exist on branch (task-0930d0dc) - pending merge to master
-- SquadRadialMenu touch support exists on branch (task-d4a64fc2) but NOT yet on master - squad commands inaccessible
+- 14 `: any` annotations in source (excluding tests and SystemInterfaces)
+- Mortar system only has camera toggle (M key) - no deploy/aim/fire UI on desktop or mobile
 - TicketSystem.restartMatch() does not reset player health, ammo, weapons, or respawn queue
-- Master is 93 commits ahead of origin - live GitHub Pages site is significantly behind
+- Master is 95 commits ahead of origin - live GitHub Pages site is significantly behind
+- `audio_backup/` directory tracked in git (22 WAV files, 17MB) - should be removed
+- 4 agent-generated scripts tracked in git: `analyze_loc.py`, `complete_refactor.py`, `count_lines.py`, `commit_changes.sh`
 
 ### Unmerged Feature Branches
 
-9 features remain on `mycel/*` branches, not yet on master. Merge task (cbfd9b2d) is running. 7 merge cleanly; 2 have minor conflicts.
+8 `mycel/*` branches with unique work, all heavily diverged from master. Cherry-pick of specific changes is the safe merge strategy.
 
-| Feature | Branch suffix | Merge status |
-|---------|--------------|--------------|
-| Mortar deploy/aim/fire controls | task-0930d0dc | Clean |
-| Settings device-aware | task-62f7bfd2 | Clean |
-| Weather rain GPU scaling | task-642bca99 | Clean |
-| Compass responsive | task-678e18fa | Clean |
-| OpenFrontierRespawnMap touch | task-dc892cad | Clean |
-| TouchWeaponBar dispose fix | task-fa59cd92 | Clean |
-| SquadRadialMenu touch | task-d4a64fc2 | Conflicts: PlayerInput.ts, TouchControls.ts |
-| Kill streak audio | task-fa40bc2b | Clean |
-| Multi-feature (settings + respawn) | task-75b4d187 | Conflicts: CLAUDE.md only |
+| Feature | Branch suffix | Unique change |
+|---------|--------------|---------------|
+| Mortar deploy/aim/fire controls | task-0930d0dc | TouchMortarButton + PlayerInput/Controller wiring |
+| Settings device-aware | task-62f7bfd2 | LoadingPanels label changes |
+| Weather rain GPU scaling | task-642bca99 | WeatherSystem rain particle scaling |
+| Compass responsive | task-678e18fa | CompassStyles changes |
+| Settings + RespawnMap touch | task-75b4d187 | LoadingPanels + OpenFrontierRespawnMap touch |
+| TouchWeaponBar dispose fix | task-fa59cd92 | Memory leak fix in TouchWeaponBar |
+| SquadRadialMenu touch | task-d4a64fc2 | Touch wiring (squad already on master via Z key) |
+| Kill streak audio | task-fa40bc2b | Kill streak audio stings + PersonalStatsPanel |
