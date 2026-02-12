@@ -24,6 +24,8 @@ export interface InputCallbacks {
   onReload?: () => void;
   onGrenadeSwitch?: () => void;
   onSquadCommand?: () => void;
+  onMenuPause?: () => void;
+  onMenuResume?: () => void;
 }
 
 export class PlayerInput {
@@ -115,6 +117,8 @@ export class PlayerInput {
           window.dispatchEvent(event);
         },
         onSquadCommand: () => callbacks.onSquadCommand?.(),
+        onMenuPause: () => callbacks.onMenuPause?.(),
+        onMenuResume: () => callbacks.onMenuResume?.(),
       });
     }
   }

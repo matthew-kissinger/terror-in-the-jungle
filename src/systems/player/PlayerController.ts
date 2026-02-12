@@ -116,6 +116,8 @@ export class PlayerController implements GameSystem {
       onReload: () => this.handleTouchReload(),
       onGrenadeSwitch: () => this.handleTouchGrenadeSwitch(),
       onSquadCommand: () => this.playerSquadController?.toggleRadialMenu(),
+      onMenuPause: () => this.handleMenuPause(),
+      onMenuResume: () => this.handleMenuResume(),
     });
   }
 
@@ -172,6 +174,16 @@ export class PlayerController implements GameSystem {
       bubbles: true,
     });
     window.dispatchEvent(event);
+  }
+
+  private handleMenuPause(): void {
+    this.input.setControlsEnabled(false);
+    this.playerState.velocity.set(0, 0, 0);
+    this.playerState.isRunning = false;
+  }
+
+  private handleMenuResume(): void {
+    this.input.setControlsEnabled(true);
   }
 
   private handleEscape(): void {
