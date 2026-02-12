@@ -13,6 +13,7 @@ import { TouchADSButton } from './TouchADSButton';
 import { TouchInteractionButton } from './TouchInteractionButton';
 import { TouchSandbagButtons } from './TouchSandbagButtons';
 import { TouchRallyPointButton } from './TouchRallyPointButton';
+import { TouchMenuButton } from './TouchMenuButton';
 
 export interface TouchControlCallbacks {
   onFireStart: () => void;
@@ -30,6 +31,8 @@ export interface TouchControlCallbacks {
   onSandbagRotateRight: () => void;
   onRallyPointPlace: () => void;
   onSquadCommand?: () => void;
+  onMenuPause?: () => void;
+  onMenuResume?: () => void;
 }
 
 export class TouchControls {
@@ -42,6 +45,7 @@ export class TouchControls {
   readonly interactionButton: TouchInteractionButton;
   readonly sandbagButtons: TouchSandbagButtons;
   readonly rallyPointButton: TouchRallyPointButton;
+  readonly menuButton: TouchMenuButton;
 
   private visible = false;
 
@@ -55,6 +59,7 @@ export class TouchControls {
     this.interactionButton = new TouchInteractionButton();
     this.sandbagButtons = new TouchSandbagButtons();
     this.rallyPointButton = new TouchRallyPointButton();
+    this.menuButton = new TouchMenuButton();
 
     // Start hidden until game starts
     this.hide();
@@ -93,6 +98,10 @@ export class TouchControls {
     this.interactionButton.setCallback(callbacks.onEnterExitHelicopter);
     this.sandbagButtons.setCallbacks(callbacks.onSandbagRotateLeft, callbacks.onSandbagRotateRight);
     this.rallyPointButton.setCallback(callbacks.onRallyPointPlace);
+    this.menuButton.setCallbacks(
+      () => callbacks.onMenuPause?.(),
+      () => callbacks.onMenuResume?.(),
+    );
   }
 
   /**
@@ -122,6 +131,7 @@ export class TouchControls {
     this.interactionButton.show();
     this.sandbagButtons.show();
     this.rallyPointButton.show();
+    this.menuButton.show();
   }
 
   hide(): void {
@@ -136,6 +146,7 @@ export class TouchControls {
     this.interactionButton.hide();
     this.sandbagButtons.hide();
     this.rallyPointButton.hide();
+    this.menuButton.hide();
   }
 
   isVisible(): boolean {
@@ -152,5 +163,6 @@ export class TouchControls {
     this.interactionButton.dispose();
     this.sandbagButtons.dispose();
     this.rallyPointButton.dispose();
+    this.menuButton.dispose();
   }
 }
