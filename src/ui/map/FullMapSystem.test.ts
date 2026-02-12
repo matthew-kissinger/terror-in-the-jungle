@@ -19,11 +19,17 @@ vi.mock('./FullMapInput', () => ({
     this.setDefaultZoomLevel = vi.fn();
     this.zoom = vi.fn();
     this.resetZoom = vi.fn();
+    this.getPanOffset = vi.fn(() => ({ x: 0, y: 0 }));
+    this.resetPan = vi.fn();
+    this.toggle = vi.fn();
     this.dispose = vi.fn();
     return this;
   })
 }));
 vi.mock('../../utils/Logger');
+vi.mock('../../utils/DeviceDetector', () => ({
+  shouldUseTouchControls: vi.fn(() => false),
+}));
 vi.mock('../../systems/world/ZoneManager');
 vi.mock('../../systems/combat/CombatantSystem');
 vi.mock('../../systems/world/GameModeManager');
@@ -213,6 +219,9 @@ describe('FullMapSystem', () => {
       setDefaultZoomLevel: vi.fn(),
       zoom: vi.fn(),
       resetZoom: vi.fn(),
+      getPanOffset: vi.fn(() => ({ x: 0, y: 0 })),
+      resetPan: vi.fn(),
+      toggle: vi.fn(),
       dispose: vi.fn(),
     } as any;
 
