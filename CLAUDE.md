@@ -99,3 +99,5 @@ src/
 - `FirstPersonWeapon.ts` blocks reload while ADS (line 344) - player must exit ADS before reloading, breaks combat flow.
 - No zone capture celebration - `ZoneManager.ts` only increments stat counter, no audio callout or screen notification.
 - No weapon switch feedback - `FirstPersonWeapon.ts` silently ignores fire input during switch (line 223).
+- Full map (M key hold-to-view) has no touch button - mobile players cannot open the tactical map. `FullMapInput.ts` only listens for keyboard events.
+- Unmerged branches: `mycel/task-315f7324` has helicopter cyclic touch controls (commit e495052), `mycel/task-65efcfd0` has RespawnUI pointerdown fix + mortar camera button (commit b7e8e45). Both tested and passing but need cherry-pick to master.
