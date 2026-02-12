@@ -102,6 +102,7 @@ export interface IHUDSystem {
   spawnScorePopup(type: 'capture' | 'defend' | 'secured' | 'kill' | 'headshot' | 'assist', points: number, multiplier?: number): void;
   startMatch(): void;
   toggleScoreboard(visible: boolean): void;
+  toggleScoreboardVisibility(): void;
   updateTickets(usTickets: number, opforTickets: number): void;
   showMessage(message: string, duration?: number): void;
   updateAmmoDisplay(magazine: number, reserve: number): void;

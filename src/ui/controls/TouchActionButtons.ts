@@ -1,5 +1,5 @@
 /**
- * Small action buttons for mobile: Reload, Jump, Grenade.
+ * Small action buttons for mobile: Scoreboard, Jump, Reload, Grenade.
  * Positioned in a column above the fire button on the right side.
  */
 
@@ -30,7 +30,8 @@ export class TouchActionButtons {
       pointerEvents: 'auto',
     } as Partial<CSSStyleDeclaration>);
 
-    // Create buttons from bottom to top
+    // Create buttons from bottom to top (scoreboard at top for easy reach)
+    this.addButton('scoreboard', 'SCORE');
     this.addButton('jump', 'JUMP');
     this.addButton('reload', 'R');
     this.addButton('grenade', 'G');

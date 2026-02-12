@@ -10,6 +10,7 @@ export interface InputCallbacks {
   onRunStop?: () => void;
   onEscape?: () => void;
   onScoreboardToggle?: (visible: boolean) => void;
+  onScoreboardTap?: () => void;
   onEnterExitHelicopter?: () => void;
   onToggleAutoHover?: () => void;
   onToggleMouseControl?: () => void;
@@ -98,6 +99,7 @@ export class PlayerInput {
             callbacks.onMouseUp?.(2);
           }
         },
+        onScoreboardTap: () => callbacks.onScoreboardTap?.(),
       });
     }
   }

@@ -23,10 +23,10 @@ describe('TouchActionButtons', () => {
     buttons = Array.from(container.children) as HTMLDivElement[];
   });
 
-  it('creates Jump, Reload, and Grenade buttons', () => {
+  it('creates Scoreboard, Jump, Reload, and Grenade buttons', () => {
     expect(container).toBeTruthy();
-    expect(buttons).toHaveLength(3);
-    expect(buttons.map((b) => b.textContent)).toEqual(['JUMP', 'R', 'G']);
+    expect(buttons).toHaveLength(4);
+    expect(buttons.map((b) => b.textContent)).toEqual(['SCORE', 'JUMP', 'R', 'G']);
   });
 
   it('arranges buttons in a column layout', () => {
@@ -35,17 +35,19 @@ describe('TouchActionButtons', () => {
     expect(container.style.gap).toBe('12px');
   });
 
-  it('triggers callbacks for jump, reload, and grenade actions', () => {
+  it('triggers callbacks for scoreboard, jump, reload, and grenade actions', () => {
     const onAction = vi.fn();
     actions.setOnAction(onAction);
 
     buttons[0].dispatchEvent(touchEvent('touchstart'));
     buttons[1].dispatchEvent(touchEvent('touchstart'));
     buttons[2].dispatchEvent(touchEvent('touchstart'));
+    buttons[3].dispatchEvent(touchEvent('touchstart'));
 
-    expect(onAction).toHaveBeenNthCalledWith(1, 'jump');
-    expect(onAction).toHaveBeenNthCalledWith(2, 'reload');
-    expect(onAction).toHaveBeenNthCalledWith(3, 'grenade');
+    expect(onAction).toHaveBeenNthCalledWith(1, 'scoreboard');
+    expect(onAction).toHaveBeenNthCalledWith(2, 'jump');
+    expect(onAction).toHaveBeenNthCalledWith(3, 'reload');
+    expect(onAction).toHaveBeenNthCalledWith(4, 'grenade');
   });
 
   it('show and hide toggle visibility', () => {

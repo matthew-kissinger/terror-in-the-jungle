@@ -356,4 +356,9 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.isScoreboardVisible = visible;
     this.scoreboard.toggle(visible);
   }
+
+  /** Toggle scoreboard visibility (for touch: tap to show, tap again to hide). */
+  toggleScoreboardVisibility(): void {
+    this.toggleScoreboard(!this.isScoreboardVisible);
+  }
 }

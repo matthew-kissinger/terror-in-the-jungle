@@ -21,6 +21,7 @@ export interface TouchControlCallbacks {
   onSprintStop: () => void;
   onWeaponSelect: (slotIndex: number) => void;
   onADSToggle: (active: boolean) => void;
+  onScoreboardTap?: () => void;
 }
 
 export class TouchControls {
@@ -63,6 +64,9 @@ export class TouchControls {
           break;
         case 'grenade':
           callbacks.onGrenade();
+          break;
+        case 'scoreboard':
+          callbacks.onScoreboardTap?.();
           break;
       }
     });

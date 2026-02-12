@@ -101,6 +101,7 @@ export class PlayerController implements GameSystem {
       onRunStop: () => this.movement.setRunning(false),
       onEscape: () => this.handleEscape(),
       onScoreboardToggle: (visible: boolean) => this.hudSystem?.toggleScoreboard(visible),
+      onScoreboardTap: () => this.hudSystem?.toggleScoreboardVisibility(),
       onEnterExitHelicopter: () => this.handleEnterExitHelicopter(),
       onToggleAutoHover: () => this.movement.toggleAutoHover(),
       onToggleMouseControl: () => this.handleToggleMouseControl(),
