@@ -1,3 +1,5 @@
+import { isTouchDevice } from '../../utils/DeviceDetector';
+
 export class WeaponAmmoDisplay {
   public ammoDisplay: HTMLDivElement;
 
@@ -29,7 +31,8 @@ export class WeaponAmmoDisplay {
 
     // Show status messages
     if (magazine === 0 && reserve > 0) {
-      statusElement.textContent = 'Press R to reload';
+      const reloadText = isTouchDevice() ? 'Tap reload' : 'Press R to reload';
+      statusElement.textContent = reloadText;
       statusElement.style.color = '#ff6b6b';
       magElement.style.color = '#ff6b6b';
     } else if (magazine <= 10 && magazine > 0) {

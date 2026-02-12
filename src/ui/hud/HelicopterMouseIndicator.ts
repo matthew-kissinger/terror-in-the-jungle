@@ -1,3 +1,5 @@
+import { isTouchDevice } from '../../utils/DeviceDetector';
+
 export class HelicopterMouseIndicator {
   public helicopterMouseIndicator: HTMLDivElement;
 
@@ -6,6 +8,13 @@ export class HelicopterMouseIndicator {
   }
 
   private createHelicopterMouseIndicator(): HTMLDivElement {
+    // Hide on mobile - helicopter keyboard controls not accessible
+    if (isTouchDevice()) {
+      const dummy = document.createElement('div');
+      dummy.style.display = 'none';
+      return dummy;
+    }
+
     const indicator = document.createElement('div');
     indicator.className = 'helicopter-mouse-indicator';
     indicator.style.cssText = `
