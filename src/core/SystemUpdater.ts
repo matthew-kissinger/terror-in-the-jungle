@@ -4,6 +4,7 @@ import { SystemReferences } from './SystemInitializer';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import { spatialGridManager } from '../systems/combat/SpatialGridManager';
 import { ShotCommandFactory } from '../systems/player/weapon/ShotCommand';
+import { Logger } from '../utils/Logger';
 
 interface SystemTimingEntry {
   name: string;
@@ -141,7 +142,11 @@ export class SystemUpdater {
     performanceTelemetry.beginSystem('Other');
     for (const system of systems) {
       if (!trackedSystems.has(system)) {
-        system.update(deltaTime);
+        try {
+          system.update(deltaTime);
+        } catch (error) {
+          Logger.error('SystemUpdater', 'Untracked system threw error:', error);
+        }
       }
     }
     performanceTelemetry.endSystem('Other');
@@ -152,7 +157,11 @@ export class SystemUpdater {
 
   private trackSystemUpdate(name: string, budgetMs: number, updateFn: () => void): void {
     const start = performance.now();
-    updateFn();
+    try {
+      updateFn();
+    } catch (error) {
+      Logger.error('SystemUpdater', `System "${name}" threw error:`, error);
+    }
     const duration = performance.now() - start;
 
     let entry = this.systemTimings.get(name);
