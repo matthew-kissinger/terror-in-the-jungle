@@ -34,6 +34,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private scoreboardCombatantProxy: CombatantSystem;
   private isScoreboardVisible = false;
   private onPlayAgainCallback?: () => void;
+  private respawnButtonPointerDownHandler?: (e: PointerEvent) => void;
 
   constructor(camera?: THREE.Camera, ticketSystem?: TicketSystem, playerHealthSystem?: PlayerHealthSystem, _playerRespawnManager?: unknown) {
     this.camera = camera;
@@ -80,14 +81,16 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     // Initialize ticket display
     this.updater.updateTicketDisplay(300, 300);
 
-    // Setup respawn button click handler
+    // Setup respawn button pointerdown handler (reliable on mobile, no 300ms delay)
     if (this.elements.respawnButton) {
-      this.elements.respawnButton.onclick = () => {
+      this.respawnButtonPointerDownHandler = (e: PointerEvent) => {
+        e.preventDefault();
         if (this.playerHealthSystem && this.playerHealthSystem.isAlive()) {
           Logger.info('hud', ' Respawn button clicked');
           this.playerHealthSystem.voluntaryRespawn();
         }
       };
+      this.elements.respawnButton.addEventListener('pointerdown', this.respawnButtonPointerDownHandler);
     }
 
     Logger.info('hud', ' HUD System initialized');
@@ -148,6 +151,9 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   }
 
   dispose(): void {
+    if (this.elements.respawnButton && this.respawnButtonPointerDownHandler) {
+      this.elements.respawnButton.removeEventListener('pointerdown', this.respawnButtonPointerDownHandler);
+    }
     this.scoreboard.dispose();
     this.personalStatsPanel.dispose();
     this.elements.dispose();
