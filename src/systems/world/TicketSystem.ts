@@ -46,6 +46,7 @@ export class TicketSystem implements GameSystem {
   // Event callbacks
   private onTicketUpdate?: (usTickets: number, opforTickets: number) => void;
   private onGameEnd?: (winner: Faction, gameState: GameState) => void;
+  private onMatchRestart?: () => void;
 
   constructor() {
     Logger.info('tickets', 'Initializing Ticket System...');
@@ -263,6 +264,10 @@ export class TicketSystem implements GameSystem {
     this.onGameEnd = callback;
   }
 
+  setMatchRestartCallback(callback: () => void): void {
+    this.onMatchRestart = callback;
+  }
+
   // Admin/debug methods
 
   addTickets(faction: Faction, amount: number): void {
@@ -299,6 +304,12 @@ export class TicketSystem implements GameSystem {
       isTDM: this.isTDM,
       killTarget: this.killTarget
     };
+
+    // Reset player state (health, ammo, respawn, position)
+    if (this.onMatchRestart) {
+      this.onMatchRestart();
+    }
+
     Logger.info('tickets', 'Match restarted');
   }
 

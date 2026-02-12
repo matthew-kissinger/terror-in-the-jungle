@@ -498,5 +498,24 @@ describe('TicketSystem', () => {
       expect(ticketSystem.getTickets(Faction.US)).toBe(300);
       expect(ticketSystem.getGameState().phase).toBe('SETUP');
     });
+
+    it('restartMatch should invoke match restart callback for player state reset', () => {
+      const restartCallback = vi.fn();
+      ticketSystem.setMatchRestartCallback(restartCallback);
+
+      // Damage some state first
+      ticketSystem.onCombatantDeath(Faction.US);
+      ticketSystem.onCombatantDeath(Faction.OPFOR);
+
+      ticketSystem.restartMatch();
+
+      expect(restartCallback).toHaveBeenCalledTimes(1);
+      // Verify ticket state is also reset
+      expect(ticketSystem.getTickets(Faction.US)).toBe(300);
+      expect(ticketSystem.getTickets(Faction.OPFOR)).toBe(300);
+      expect(ticketSystem.getKills(Faction.US)).toBe(0);
+      expect(ticketSystem.getKills(Faction.OPFOR)).toBe(0);
+      expect(ticketSystem.isGameActive()).toBe(true);
+    });
   });
 });

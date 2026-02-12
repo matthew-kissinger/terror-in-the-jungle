@@ -274,6 +274,24 @@ export class PlayerHealthSystem implements GameSystem {
     this.hudSystem = hudSystem;
   }
 
+  /** Reset all player health state for a new match */
+  resetForNewMatch(): void {
+    this.playerState.health = this.playerState.maxHealth;
+    this.playerState.isAlive = true;
+    this.playerState.isDead = false;
+    this.playerState.deathTime = 0;
+    this.playerState.invulnerabilityTime = 0;
+    this.lastDamageTime = 0;
+
+    this.effects.clearDamageIndicators();
+    this.effects.stopHeartbeat();
+    this.ui.setLowHealthEffect(false);
+    this.ui.setSpawnProtection(false);
+    this.updateHealthDisplay();
+
+    Logger.info('Combat', 'Player health reset for new match');
+  }
+
   dispose(): void {
     this.ui.dispose();
     this.effects.dispose();

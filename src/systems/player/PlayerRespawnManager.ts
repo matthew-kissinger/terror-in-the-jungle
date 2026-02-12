@@ -65,6 +65,14 @@ export class PlayerRespawnManager implements GameSystem {
     }
   }
 
+  /** Cancel any pending respawn and hide UI (for match restart) */
+  cancelPendingRespawn(): void {
+    this.respawnTimer = 0;
+    if (this.isRespawnUIVisible) {
+      this.hideRespawnUI();
+    }
+  }
+
   dispose(): void {
     this.hideRespawnUI();
     this.respawnUI.dispose();

@@ -35,6 +35,15 @@ export class SystemConnector {
     refs.hudSystem.setZoneManager(refs.zoneManager);
     refs.hudSystem.setTicketSystem(refs.ticketSystem);
     refs.ticketSystem.setZoneManager(refs.zoneManager);
+
+    // Wire match restart to reset player state
+    refs.ticketSystem.setMatchRestartCallback(() => {
+      refs.playerRespawnManager.cancelPendingRespawn();
+      refs.playerHealthSystem.resetForNewMatch();
+      refs.firstPersonWeapon.enable();
+      refs.playerRespawnManager.respawnAtBase();
+    });
+
     refs.combatantSystem.setTicketSystem(refs.ticketSystem);
     refs.combatantSystem.setPlayerHealthSystem(refs.playerHealthSystem);
     refs.combatantSystem.setZoneManager(refs.zoneManager);
