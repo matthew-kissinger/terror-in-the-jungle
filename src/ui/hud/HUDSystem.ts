@@ -11,6 +11,7 @@ import { HUDUpdater } from './HUDUpdater';
 import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
 import { MatchEndScreen, MatchStats } from '../end/MatchEndScreen';
 import { Scoreboard } from './Scoreboard';
+import { PersonalStatsPanel } from './PersonalStatsPanel';
 import type { GrenadeSystem } from '../../systems/weapons/GrenadeSystem';
 import type { PlayerHealthSystem } from '../../systems/player/PlayerHealthSystem';
 import { IHUDSystem } from '../../types/SystemInterfaces';
@@ -29,6 +30,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private statsTracker: PlayerStatsTracker;
   private matchEndScreen: MatchEndScreen;
   private scoreboard: Scoreboard;
+  private personalStatsPanel: PersonalStatsPanel;
   private scoreboardCombatantProxy: CombatantSystem;
   private isScoreboardVisible = false;
 
@@ -42,6 +44,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.matchEndScreen = new MatchEndScreen();
     this.scoreboardCombatantProxy = this.createScoreboardCombatantProxy();
     this.scoreboard = new Scoreboard(this.statsTracker, this.scoreboardCombatantProxy);
+    this.personalStatsPanel = new PersonalStatsPanel(this.statsTracker);
 
     // Setup return to menu callback
     this.matchEndScreen.onReturnToMenu(() => {
@@ -61,6 +64,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     // Add HUD to DOM
     this.elements.attachToDOM();
     this.scoreboard.attachToDOM();
+    this.personalStatsPanel.attachToDOM();
 
     // Initialize ticket display
     this.updater.updateTicketDisplay(300, 300);
@@ -125,6 +129,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     // Update score popups
     this.elements.updateScorePopups();
 
+    this.personalStatsPanel.update();
+
     if (this.isScoreboardVisible) {
       this.scoreboard.toggle(true);
     }
@@ -132,6 +138,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
   dispose(): void {
     this.scoreboard.dispose();
+    this.personalStatsPanel.dispose();
     this.elements.dispose();
     this.styles.dispose();
     this.matchEndScreen.dispose();
@@ -147,6 +154,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   addKill(isHeadshot: boolean = false): void {
     this.updater.addKill();
     this.statsTracker.addKill();
+    this.personalStatsPanel.onKill();
 
     // Get kill streak multiplier
     const multiplier = this.statsTracker.getKillStreakMultiplier();
@@ -163,6 +171,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   addDeath(): void {
     this.updater.addDeath();
     this.statsTracker.addDeath();
+    this.personalStatsPanel.onDeath();
   }
 
   addZoneCapture(): void {
