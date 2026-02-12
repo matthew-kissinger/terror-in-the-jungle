@@ -504,6 +504,7 @@ export class PlayerController implements GameSystem {
     const touchControls = this.input.getTouchControls();
     if (touchControls) {
       touchControls.rallyPointButton.hideButton();
+      touchControls.helicopterCyclic.show();
     }
 
     Logger.info('player', ` Player entered helicopter at position (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)})`);
@@ -530,6 +531,7 @@ export class PlayerController implements GameSystem {
     const touchControls = this.input.getTouchControls();
     if (touchControls) {
       touchControls.rallyPointButton.showButton();
+      touchControls.helicopterCyclic.hide();
     }
 
     Logger.info('player', ` Player exited helicopter to position (${exitPosition.x.toFixed(1)}, ${exitPosition.y.toFixed(1)}, ${exitPosition.z.toFixed(1)})`);
