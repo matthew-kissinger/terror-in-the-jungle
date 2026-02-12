@@ -162,4 +162,29 @@ export const COMPASS_STYLES = `
       0%, 100% { opacity: 1; }
       50% { opacity: 0.4; }
     }
+
+    @media (max-width: 768px) {
+      .compass-container {
+        top: 60px;
+        width: 140px;
+        height: 60px;
+      }
+
+      .compass-rose-container {
+        width: 140px;
+        height: 40px;
+      }
+
+      .compass-cardinal {
+        font-size: 14px;
+      }
+
+      .compass-degree {
+        font-size: 8px;
+      }
+
+      .compass-heading {
+        font-size: 11px;
+      }
+    }
   `;
