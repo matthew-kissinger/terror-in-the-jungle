@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Combatant, CombatantState, Squad } from './types'
+import { Combatant, CombatantState, Faction, Squad, SquadCommand } from './types'
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager'
 import { SandbagSystem } from '../weapons/SandbagSystem'
 import { SmokeCloudSystem } from '../effects/SmokeCloudSystem'
@@ -69,6 +69,9 @@ export class CombatantAI {
     spatialGrid?: SpatialOctree
   ): void {
     const lastState = this.lastStateById.get(combatant.id) ?? combatant.state
+
+    // Apply squad command overrides before state machine processing
+    this.applySquadCommandOverride(combatant, playerPosition)
 
     // Decay suppression effects over time
     this.decaySuppressionEffects(combatant, deltaTime)
@@ -164,6 +167,87 @@ export class CombatantAI {
 
     this.maybeTriggerMovementCallout(combatant, lastState)
     this.lastStateById.set(combatant.id, combatant.state)
+  }
+
+  /**
+   * Check if a player-controlled squad's currentCommand should override the combatant's
+   * current AI state. Only affects US faction combatants in player squads.
+   *
+   * - FOLLOW_ME / RETREAT: interrupt combat states (ENGAGING, SUPPRESSING, ALERT, SEEKING_COVER)
+   * - HOLD_POSITION: transition non-combat states to DEFENDING (does NOT override active combat)
+   * - PATROL_HERE: ensure non-combat states stay in PATROLLING (does NOT override active combat)
+   * - FREE_ROAM / NONE: clear command-driven overrides, return to normal AI
+   */
+  private applySquadCommandOverride(combatant: Combatant, playerPosition: THREE.Vector3): void {
+    // Only affect US faction (player's team)
+    if (combatant.faction !== Faction.US) return
+    if (!combatant.squadId) return
+
+    const squad = this.squads.get(combatant.squadId)
+    if (!squad || !squad.isPlayerControlled) return
+
+    const command = squad.currentCommand
+    if (!command || command === SquadCommand.NONE) return
+
+    // FREE_ROAM: clear any command-driven state overrides and let normal AI take over
+    if (command === SquadCommand.FREE_ROAM) {
+      // If combatant was forced into DEFENDING by HOLD_POSITION (no zone assignment),
+      // transition back to PATROLLING so normal AI resumes
+      if (combatant.state === CombatantState.DEFENDING && !combatant.defendingZoneId) {
+        combatant.state = CombatantState.PATROLLING
+        combatant.defensePosition = undefined
+        combatant.destinationPoint = undefined
+      }
+      return
+    }
+
+    const isInCombat =
+      combatant.state === CombatantState.ENGAGING ||
+      combatant.state === CombatantState.SUPPRESSING ||
+      combatant.state === CombatantState.ALERT ||
+      combatant.state === CombatantState.SEEKING_COVER
+
+    switch (command) {
+      case SquadCommand.FOLLOW_ME:
+      case SquadCommand.RETREAT:
+        // These commands interrupt active combat - pull the combatant out
+        if (isInCombat) {
+          combatant.state = CombatantState.PATROLLING
+          combatant.target = null
+          combatant.inCover = false
+          combatant.isFullAuto = false
+          combatant.previousState = undefined
+          combatant.suppressionTarget = undefined
+          combatant.suppressionEndTime = undefined
+        }
+        // Also pull out of DEFENDING (e.g. from a prior HOLD_POSITION)
+        if (combatant.state === CombatantState.DEFENDING) {
+          combatant.state = CombatantState.PATROLLING
+          combatant.defensePosition = undefined
+          combatant.defendingZoneId = undefined
+        }
+        break
+
+      case SquadCommand.HOLD_POSITION:
+        // Does NOT interrupt active combat - only redirect non-combat states
+        if (!isInCombat && combatant.state !== CombatantState.DEFENDING) {
+          combatant.state = CombatantState.DEFENDING
+          combatant.defensePosition = squad.commandPosition?.clone() ?? combatant.position.clone()
+          combatant.destinationPoint = combatant.defensePosition.clone()
+          // Clear zone-based defense ID so FREE_ROAM can unset this later
+          combatant.defendingZoneId = undefined
+        }
+        break
+
+      case SquadCommand.PATROL_HERE:
+        // Does NOT interrupt active combat - ensure non-combat states are PATROLLING
+        if (!isInCombat && combatant.state === CombatantState.DEFENDING) {
+          combatant.state = CombatantState.PATROLLING
+          combatant.defensePosition = undefined
+          combatant.defendingZoneId = undefined
+        }
+        break
+    }
   }
 
   private decaySuppressionEffects(combatant: Combatant, deltaTime: number): void {

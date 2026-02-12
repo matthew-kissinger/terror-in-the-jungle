@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { CombatantAI } from './CombatantAI'
-import { Combatant, CombatantState, Faction, Squad } from './types'
+import { Combatant, CombatantState, Faction, Squad, SquadCommand } from './types'
 import { CalloutType } from '../audio/VoiceCalloutSystem'
 
 // Mock Three.js Vector3
@@ -730,6 +730,316 @@ describe('CombatantAI', () => {
       ai.updateTacticalSystems(mockAllCombatants)
 
       expect(flankingSystem.cleanupOperations).toHaveBeenCalledWith(squads, mockAllCombatants)
+    })
+  })
+
+  describe('applySquadCommandOverride', () => {
+    let squad: Squad
+
+    beforeEach(() => {
+      squad = {
+        id: 'squad1',
+        faction: Faction.US,
+        members: ['c1'],
+        formation: 'wedge',
+        isPlayerControlled: true,
+        currentCommand: SquadCommand.NONE,
+      } as Squad
+      const squads = new Map([['squad1', squad]])
+      ai.setSquads(squads)
+      mockCombatant.faction = Faction.US
+      mockCombatant.squadId = 'squad1'
+    })
+
+    describe('FOLLOW_ME command', () => {
+      beforeEach(() => {
+        squad.currentCommand = SquadCommand.FOLLOW_ME
+      })
+
+      it('should interrupt ENGAGING state and transition to PATROLLING', () => {
+        mockCombatant.state = CombatantState.ENGAGING
+        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.OPFOR })
+        mockCombatant.inCover = true
+        mockCombatant.isFullAuto = true
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+        expect(mockCombatant.target).toBeNull()
+        expect(mockCombatant.inCover).toBe(false)
+        expect(mockCombatant.isFullAuto).toBe(false)
+      })
+
+      it('should interrupt SUPPRESSING state and transition to PATROLLING', () => {
+        mockCombatant.state = CombatantState.SUPPRESSING
+        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.OPFOR })
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+        expect(mockCombatant.target).toBeNull()
+      })
+
+      it('should interrupt ALERT state and transition to PATROLLING', () => {
+        mockCombatant.state = CombatantState.ALERT
+        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.OPFOR })
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+        expect(mockCombatant.target).toBeNull()
+      })
+
+      it('should interrupt SEEKING_COVER state and transition to PATROLLING', () => {
+        mockCombatant.state = CombatantState.SEEKING_COVER
+        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.OPFOR })
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+        expect(mockCombatant.target).toBeNull()
+      })
+
+      it('should pull combatant out of DEFENDING state', () => {
+        mockCombatant.state = CombatantState.DEFENDING
+        const THREE = require('three')
+        mockCombatant.defensePosition = new THREE.Vector3(50, 0, 50)
+        mockCombatant.defendingZoneId = 'zone-1'
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+        expect(mockCombatant.defensePosition).toBeUndefined()
+        expect(mockCombatant.defendingZoneId).toBeUndefined()
+      })
+    })
+
+    describe('RETREAT command', () => {
+      beforeEach(() => {
+        squad.currentCommand = SquadCommand.RETREAT
+        const THREE = require('three')
+        squad.commandPosition = new THREE.Vector3(-100, 0, -100)
+      })
+
+      it('should interrupt ENGAGING state and transition to PATROLLING', () => {
+        mockCombatant.state = CombatantState.ENGAGING
+        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.OPFOR })
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+        expect(mockCombatant.target).toBeNull()
+      })
+
+      it('should interrupt SUPPRESSING state and clear suppression data', () => {
+        const THREE = require('three')
+        mockCombatant.state = CombatantState.SUPPRESSING
+        mockCombatant.suppressionTarget = new THREE.Vector3(10, 0, 10)
+        mockCombatant.suppressionEndTime = Date.now() + 5000
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+        expect(mockCombatant.suppressionTarget).toBeUndefined()
+        expect(mockCombatant.suppressionEndTime).toBeUndefined()
+      })
+
+      it('should pull combatant out of DEFENDING state', () => {
+        mockCombatant.state = CombatantState.DEFENDING
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+      })
+    })
+
+    describe('HOLD_POSITION command', () => {
+      beforeEach(() => {
+        squad.currentCommand = SquadCommand.HOLD_POSITION
+        const THREE = require('three')
+        squad.commandPosition = new THREE.Vector3(50, 0, 50)
+      })
+
+      it('should transition PATROLLING combatant to DEFENDING', () => {
+        mockCombatant.state = CombatantState.PATROLLING
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(mockCombatant.state).toBe(CombatantState.DEFENDING)
+        expect(mockCombatant.defensePosition).toBeDefined()
+        expect(mockCombatant.destinationPoint).toBeDefined()
+      })
+
+      it('should NOT interrupt ENGAGING state', () => {
+        mockCombatant.state = CombatantState.ENGAGING
+        const engageHandler = (ai as any).engageHandler
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        // State should remain ENGAGING, and engageHandler should have been called
+        expect(engageHandler.handleEngaging).toHaveBeenCalled()
+      })
+
+      it('should NOT interrupt ALERT state', () => {
+        mockCombatant.state = CombatantState.ALERT
+        const engageHandler = (ai as any).engageHandler
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(engageHandler.handleAlert).toHaveBeenCalled()
+      })
+
+      it('should NOT interrupt SUPPRESSING state', () => {
+        mockCombatant.state = CombatantState.SUPPRESSING
+        const engageHandler = (ai as any).engageHandler
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(engageHandler.handleSuppressing).toHaveBeenCalled()
+      })
+
+      it('should not re-assign if already DEFENDING', () => {
+        const THREE = require('three')
+        const originalDefPos = new THREE.Vector3(99, 0, 99)
+        mockCombatant.state = CombatantState.DEFENDING
+        mockCombatant.defensePosition = originalDefPos
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        // Should still be defending, defense position should not be overwritten
+        expect(mockCombatant.state).toBe(CombatantState.DEFENDING)
+        expect(mockCombatant.defensePosition).toBe(originalDefPos)
+      })
+
+      it('should transition ADVANCING combatant to DEFENDING', () => {
+        mockCombatant.state = CombatantState.ADVANCING
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(mockCombatant.state).toBe(CombatantState.DEFENDING)
+      })
+    })
+
+    describe('PATROL_HERE command', () => {
+      beforeEach(() => {
+        squad.currentCommand = SquadCommand.PATROL_HERE
+        const THREE = require('three')
+        squad.commandPosition = new THREE.Vector3(50, 0, 50)
+      })
+
+      it('should transition DEFENDING combatant to PATROLLING', () => {
+        const THREE = require('three')
+        mockCombatant.state = CombatantState.DEFENDING
+        mockCombatant.defensePosition = new THREE.Vector3(50, 0, 50)
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+        expect(mockCombatant.defensePosition).toBeUndefined()
+      })
+
+      it('should NOT interrupt ENGAGING state', () => {
+        mockCombatant.state = CombatantState.ENGAGING
+        const engageHandler = (ai as any).engageHandler
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(engageHandler.handleEngaging).toHaveBeenCalled()
+      })
+
+      it('should keep PATROLLING combatant in PATROLLING state', () => {
+        mockCombatant.state = CombatantState.PATROLLING
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+      })
+    })
+
+    describe('FREE_ROAM command', () => {
+      beforeEach(() => {
+        squad.currentCommand = SquadCommand.FREE_ROAM
+      })
+
+      it('should clear command-driven DEFENDING and transition to PATROLLING', () => {
+        const THREE = require('three')
+        mockCombatant.state = CombatantState.DEFENDING
+        mockCombatant.defensePosition = new THREE.Vector3(50, 0, 50)
+        // No defendingZoneId means this was set by HOLD_POSITION, not zone defense
+        mockCombatant.defendingZoneId = undefined
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+        expect(mockCombatant.defensePosition).toBeUndefined()
+        expect(mockCombatant.destinationPoint).toBeUndefined()
+      })
+
+      it('should NOT clear zone-based DEFENDING', () => {
+        const THREE = require('three')
+        mockCombatant.state = CombatantState.DEFENDING
+        mockCombatant.defensePosition = new THREE.Vector3(50, 0, 50)
+        mockCombatant.defendingZoneId = 'zone-1' // Zone-based, not command-based
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        // Should remain DEFENDING because it was zone-assigned, not command-assigned
+        expect(mockCombatant.state).toBe(CombatantState.DEFENDING)
+      })
+
+      it('should not affect PATROLLING combatants', () => {
+        mockCombatant.state = CombatantState.PATROLLING
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+      })
+    })
+
+    describe('faction and squad filtering', () => {
+      it('should NOT affect OPFOR faction combatants', () => {
+        mockCombatant.faction = Faction.OPFOR
+        mockCombatant.state = CombatantState.ENGAGING
+        squad.currentCommand = SquadCommand.FOLLOW_ME
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        // OPFOR should be unaffected - engageHandler should be called normally
+        const engageHandler = (ai as any).engageHandler
+        expect(engageHandler.handleEngaging).toHaveBeenCalled()
+      })
+
+      it('should NOT affect combatants not in a squad', () => {
+        mockCombatant.squadId = undefined
+        mockCombatant.state = CombatantState.ENGAGING
+        squad.currentCommand = SquadCommand.FOLLOW_ME
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        const engageHandler = (ai as any).engageHandler
+        expect(engageHandler.handleEngaging).toHaveBeenCalled()
+      })
+
+      it('should NOT affect combatants in non-player-controlled squads', () => {
+        squad.isPlayerControlled = false
+        mockCombatant.state = CombatantState.ENGAGING
+        squad.currentCommand = SquadCommand.FOLLOW_ME
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        const engageHandler = (ai as any).engageHandler
+        expect(engageHandler.handleEngaging).toHaveBeenCalled()
+      })
+
+      it('should NOT affect combatants when command is NONE', () => {
+        squad.currentCommand = SquadCommand.NONE
+        mockCombatant.state = CombatantState.ENGAGING
+
+        ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
+
+        const engageHandler = (ai as any).engageHandler
+        expect(engageHandler.handleEngaging).toHaveBeenCalled()
+      })
     })
   })
 })
