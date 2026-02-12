@@ -25,7 +25,7 @@ npm run test:run   # 3256 tests (all passing)
 
 ## Architecture
 
-~55k lines across 288 source files. Systems-based architecture with orchestrator pattern.
+~55k lines across 285 source files. Systems-based architecture with orchestrator pattern.
 
 ```
 src/
@@ -42,10 +42,14 @@ src/
 │   ├── effects/    # Pools (tracers, muzzle, impact, explosion), smoke
 │   └── environment/# Day/night, weather, water, skybox
 ├── ui/
+│   ├── compass/    # Compass bearing + zone markers
 │   ├── controls/   # Touch controls (joystick, fire, look, action buttons)
-│   ├── hud/        # HUD elements (11 modules)
+│   ├── end/        # Match end screen
+│   ├── hud/        # HUD elements, scoreboard, kill feed
 │   ├── loading/    # Loading screen, mode selection
-│   └── map/        # Fullscreen map, minimap
+│   ├── loadout/    # Weapon + grenade loadout selector
+│   ├── map/        # Fullscreen map, minimap
+│   └── minimap/    # Minimap styles + rendering
 ├── workers/        # BVHWorker, ChunkWorker
 ├── shaders/        # GLSL shaders
 ├── config/         # Game modes, loading phases
@@ -82,13 +86,14 @@ src/
 
 ## Known Tech Debt
 
-- 15 `: any` annotations across source files (excluding tests and SystemInterfaces)
+- 14 `: any` annotations across source files (excluding tests and SystemInterfaces)
 - Mobile touch controls are MVP - no ADS, weapon switching, or helicopter controls on touch yet
 - Touch controls (5 files in `src/ui/controls/`) have zero test coverage
 - HUD uses hard-coded pixel positions/sizes - not responsive for mobile viewports
 - RespawnUI has `min-width: 600px` map panel - overflows on phones
+- RespawnMapView only handles mouse events - mobile players cannot select spawn zones
+- LoadoutSelector requires Space key to confirm - no touch-friendly spawn button
 - `TicketSystem.restartMatch()` unused - UI uses `window.location.reload()` instead
-- `PixelArtSandboxInit.ts:45` catches init errors but swallows them silently (no user feedback)
 - TouchLook sensitivity hardcoded to 0.004 - not connected to SettingsManager
 - No mobile GPU detection or auto-quality scaling for touch devices
 - Squad radial menu UI exists but commands are non-functional placeholders

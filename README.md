@@ -8,11 +8,14 @@
 
 ```bash
 npm install
-npm run dev     # localhost:5173
-npm run build   # Production
+npm run dev        # localhost:5173
+npm run build      # Production
+npm run test:run   # 3256 tests
 ```
 
 ## Controls
+
+**Desktop**
 
 | Action | Key |
 |--------|-----|
@@ -26,6 +29,8 @@ npm run build   # Production
 | Grenade | G |
 | **Perf Overlay** | **F2** |
 | Console Stats | F1 |
+
+**Mobile/Touch** - Virtual joystick (move), touch-drag (look), fire button, action buttons (jump/reload/grenade)
 
 ## Performance Tools
 
@@ -53,7 +58,7 @@ perf.validate()  // System checks
 - three-mesh-bvh for spatial queries
 - Web workers (BVH pool, chunk generation)
 - TypeScript, Vite 7
-- ~55k lines, ~290 files
+- ~55k lines, 285 source files, 85 test files (3256 tests)
 
 ## Documentation
 
