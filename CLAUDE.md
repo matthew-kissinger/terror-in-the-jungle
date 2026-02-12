@@ -95,6 +95,7 @@ src/
 - Desktop keyboard hints shown on mobile: "Press R to reload", "Press K", "RCTRL", "Press TAB" (5+ locations)
 - PersonalStatsPanel/KillFeed overlap on mobile right side (fixed pixel positions)
 - Scoreboard 2-column grid not responsive for portrait mobile
+- LoadoutSelector weapon/grenade options use click-only (no touch optimization, shows "CLICK to select" on mobile)
 - SquadRadialMenu has no touch support (mouse-only)
 - OpenFrontierRespawnMap has no touch support (mouse pan only, no touch handlers)
 - WeatherSystem rain particles not scaled by GPU tier on mobile
@@ -106,15 +107,16 @@ src/
 
 ### Unmerged Feature Branches
 
-8 completed features exist on `mycel/*` branches but are NOT on master. Previous merge attempts failed due to branch overlap in shared files. Cherry-pick recommended.
+9 completed features exist on `mycel/*` branches but are NOT on master. All merge cleanly individually; risk is sequential conflicts in 4 shared files (PlayerController, PlayerInput, TouchControls, HUDSystem).
 
 | Feature | Branch suffix | Files touched |
 |---------|--------------|---------------|
+| Settings device-aware | task-62f7bfd2 | SettingsManager.ts |
 | Weather rain GPU scaling | task-642bca99 | WeatherSystem.ts |
 | Compass responsive | task-678e18fa | CompassStyles.ts |
-| Sandbag/rally touch buttons | task-a37eca58 | new TouchSandbagButtons, TouchRallyPointButton |
-| OpenFrontierRespawnMap touch | task-75b4d187 or task-dc892cad | OpenFrontierRespawnMap.ts |
-| SquadRadialMenu touch | task-d4a64fc2 | SquadRadialMenu.ts |
-| Settings device-aware | task-62f7bfd2 | SettingsManager.ts |
+| OpenFrontierRespawnMap touch | task-dc892cad | OpenFrontierRespawnMap.ts |
 | TouchWeaponBar dispose fix | task-fa59cd92 | TouchWeaponBar.ts |
-| Kill streak audio | task-fa40bc2b | new files |
+| Sandbag/rally touch buttons | task-a37eca58 | new TouchSandbagButtons, TouchRallyPointButton + PlayerController, PlayerInput, TouchControls |
+| SquadRadialMenu touch | task-d4a64fc2 | SquadRadialMenu.ts + PlayerController, PlayerInput, TouchControls |
+| TicketSystem restartMatch | task-0fd4fd6c | TicketSystem.ts, HUDSystem.ts + 3 others |
+| Kill streak audio | task-fa40bc2b | new files + HUDSystem.ts |
