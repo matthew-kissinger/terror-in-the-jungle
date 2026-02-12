@@ -10,7 +10,7 @@
 npm install
 npm run dev        # Dev server on localhost:5173
 npm run build      # Production build
-npm run test:run   # 3305 tests (all passing)
+npm run test:run   # 3316 tests (all passing)
 ```
 
 ## Stack
@@ -21,7 +21,7 @@ npm run test:run   # 3305 tests (all passing)
 | Spatial | three-mesh-bvh, custom octree/grid |
 | Build | Vite 7, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 92 files, 3305 tests |
+| Tests | Vitest - 94 files, 3316 tests |
 
 ## Architecture
 
@@ -90,20 +90,19 @@ src/
 
 - 15 `: any` annotations in source (excluding tests and SystemInterfaces)
 - Players can fire during weapon switch animation (no `isSwitching()` guard in `FirstPersonWeapon.tryFire()`)
-- WeatherSystem rain always renders 8000 particles regardless of GPU tier - should scale for mobile
 - Mortar system has no touch controls - completely inaccessible on mobile (no weapon slot, no touch aiming)
-- Sandbag rotation (R/T keys) and rally point placement (V key) have no touch equivalents
-- Compass `top: 120px` and minimap `200x200px` are hardcoded - not responsive for mobile viewports
+- Minimap `200x200px` is hardcoded - not responsive for mobile viewports
 - Desktop keyboard hints shown on mobile: "Press R to reload", "Press K", "RCTRL", "Press TAB" (5+ locations)
 - PersonalStatsPanel/KillFeed overlap on mobile right side (fixed pixel positions)
 - Scoreboard 2-column grid not responsive for portrait mobile
 
-### Fixed on branches (pending merge)
+### Fixed on branches (9 branches pending merge - blocked on merge task)
+- ~~WeatherSystem rain scaling by GPU tier~~ (branch scales particles for mobile)
+- ~~Compass responsive for mobile~~ (branch has media queries)
+- ~~Sandbag rotation + rally point touch buttons~~ (branch has TouchSandbagButtons, TouchRallyPointButton)
 - ~~OpenFrontierRespawnMap touch support~~ (branch has pan/zoom/select)
 - ~~TicketSystem.restartMatch() wired~~ (branch has graceful restart)
 - ~~TouchWeaponBar dispose() leak~~ (branch fixes event listener cleanup)
-- ~~TouchADSButton and TouchWeaponBar untested~~ (branch has tests)
-- ~~HUD responsive for mobile~~ (branch has media queries)
 - ~~SquadRadialMenu touch support~~ (branch has touch events)
 - ~~Settings labels device-aware~~ (branch has mobile-friendly labels)
 - ~~Kill streak audio~~ (branch has procedural audio stings)
