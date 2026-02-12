@@ -10,6 +10,7 @@ export class AmbientSoundManager {
     private ambientSounds: THREE.Audio[] = [];
     private currentAmbientTrack?: string;
     private isPlaying = false;
+    private nextTrackTimeout: ReturnType<typeof setTimeout> | null = null;
 
     constructor(listener: THREE.AudioListener, audioBuffers: Map<string, AudioBuffer>) {
         this.listener = listener;
@@ -71,7 +72,7 @@ export class AmbientSoundManager {
         // Schedule next track when this one ends
         sound.onEnded = () => {
             // Small gap between tracks for natural feel
-            setTimeout(() => this.playNextTrack(), 2000);
+            this.nextTrackTimeout = setTimeout(() => this.playNextTrack(), 2000);
         };
 
         sound.play();
@@ -83,6 +84,10 @@ export class AmbientSoundManager {
      */
     stop(): void {
         this.isPlaying = false;
+        if (this.nextTrackTimeout) {
+            clearTimeout(this.nextTrackTimeout);
+            this.nextTrackTimeout = null;
+        }
         this.ambientSounds.forEach(sound => {
             if (sound.isPlaying) sound.stop();
         });
@@ -94,5 +99,9 @@ export class AmbientSoundManager {
      */
     dispose(): void {
         this.stop();
+        if (this.nextTrackTimeout) {
+            clearTimeout(this.nextTrackTimeout);
+            this.nextTrackTimeout = null;
+        }
     }
 }
