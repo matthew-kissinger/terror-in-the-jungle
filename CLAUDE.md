@@ -21,11 +21,11 @@ npm run test:run   # 3256 tests (all passing)
 | Spatial | three-mesh-bvh, custom octree/grid |
 | Build | Vite 7, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 85 files, 3256 tests |
+| Tests | Vitest - 85 files, 3258 tests |
 
 ## Architecture
 
-~55k lines across 285 source files. Systems-based architecture with orchestrator pattern.
+~56k lines across 287 source files. Systems-based architecture with orchestrator pattern.
 
 ```
 src/
@@ -43,7 +43,7 @@ src/
 │   └── environment/# Day/night, weather, water, skybox
 ├── ui/
 │   ├── compass/    # Compass bearing + zone markers
-│   ├── controls/   # Touch controls (joystick, fire, look, action buttons)
+│   ├── controls/   # Touch controls (joystick, fire, look, ADS, weapon bar, actions)
 │   ├── end/        # Match end screen
 │   ├── hud/        # HUD elements, scoreboard, kill feed
 │   ├── loading/    # Loading screen, mode selection
@@ -87,13 +87,14 @@ src/
 ## Known Tech Debt
 
 - 14 `: any` annotations across source files (excluding tests and SystemInterfaces)
-- Mobile touch controls are MVP - no ADS, weapon switching, or helicopter controls on touch yet
-- Touch controls (5 files in `src/ui/controls/`) have zero test coverage
+- Touch controls (7 files in `src/ui/controls/`) have zero test coverage
 - HUD uses hard-coded pixel positions/sizes - not responsive for mobile viewports
 - RespawnUI has `min-width: 600px` map panel - overflows on phones
 - RespawnMapView only handles mouse events - mobile players cannot select spawn zones
 - LoadoutSelector requires Space key to confirm - no touch-friendly spawn button
+- FullMapSystem has no touch support (no pinch-zoom, no drag-pan)
+- MatchEndScreen has `min-width: 800px` stats panel - overflows on mobile
+- Helicopter entry/exit is keyboard-only (E key) - no touch button
 - `TicketSystem.restartMatch()` unused - UI uses `window.location.reload()` instead
 - TouchLook sensitivity hardcoded to 0.004 - not connected to SettingsManager
-- No mobile GPU detection or auto-quality scaling for touch devices
 - Squad radial menu UI exists but commands are non-functional placeholders
