@@ -3,7 +3,52 @@ export class RespawnUI {
   private onRespawnClick?: () => void;
 
   constructor() {
+    this.injectResponsiveStyles();
     this.createRespawnUI();
+  }
+
+  private injectResponsiveStyles(): void {
+    const styleId = 'respawn-ui-responsive-styles';
+    if (!document.head || document.getElementById(styleId)) return;
+
+    const style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      @media (max-width: 768px) {
+        #respawn-ui .content-area {
+          flex-direction: column !important;
+          padding: 15px !important;
+          gap: 15px !important;
+        }
+        #respawn-ui .map-panel {
+          min-width: 0 !important;
+        }
+        #respawn-ui .map-container {
+          min-height: 40vh !important;
+        }
+        #respawn-ui .info-panel {
+          max-width: 100% !important;
+        }
+        #respawn-ui .header {
+          padding: 15px !important;
+        }
+      }
+      @media (max-width: 480px) {
+        #respawn-ui .map-title {
+          font-size: 16px !important;
+        }
+        #respawn-ui .selected-title {
+          font-size: 14px !important;
+        }
+        #respawn-ui .legend-title {
+          font-size: 12px !important;
+        }
+        #respawn-ui .legend-item span {
+          font-size: 11px !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   private createRespawnUI(): void {
@@ -30,6 +75,7 @@ export class RespawnUI {
     `;
 
     const header = document.createElement('div');
+    header.className = 'header';
     header.style.cssText = `
       background: linear-gradient(180deg, rgba(20,0,0,0.95) 0%, rgba(10,0,0,0.8) 100%);
       border-bottom: 2px solid #ff0000;
@@ -40,11 +86,11 @@ export class RespawnUI {
     const kiaText = document.createElement('h1');
     kiaText.style.cssText = `
       color: #ff0000;
-      font-size: 48px;
+      font-size: clamp(24px, 6vw, 48px);
       font-weight: bold;
       text-transform: uppercase;
       margin: 0;
-      letter-spacing: 8px;
+      letter-spacing: clamp(2px, 1vw, 8px);
       text-shadow: 0 0 20px rgba(255,0,0,0.5);
     `;
     kiaText.textContent = 'K.I.A.';
@@ -62,23 +108,26 @@ export class RespawnUI {
     header.appendChild(statusText);
 
     const contentArea = document.createElement('div');
+    contentArea.className = 'content-area';
     contentArea.style.cssText = `
       flex: 1;
       display: flex;
       padding: 30px;
       gap: 30px;
-      overflow: hidden;
+      overflow: auto;
     `;
 
     const mapPanel = document.createElement('div');
+    mapPanel.className = 'map-panel';
     mapPanel.style.cssText = `
       flex: 1;
       display: flex;
       flex-direction: column;
-      min-width: 600px;
+      min-width: 0;
     `;
 
     const mapTitle = document.createElement('h2');
+    mapTitle.className = 'map-title';
     mapTitle.style.cssText = `
       color: #00ff00;
       font-size: 20px;
@@ -91,6 +140,7 @@ export class RespawnUI {
 
     const mapContainer = document.createElement('div');
     mapContainer.id = 'respawn-map';
+    mapContainer.className = 'map-container';
     mapContainer.style.cssText = `
       flex: 1;
       background: #0a0a0a;
@@ -108,7 +158,8 @@ export class RespawnUI {
 
     const infoPanel = document.createElement('div');
     infoPanel.style.cssText = `
-      width: 350px;
+      width: 100%;
+      max-width: 350px;
       display: flex;
       flex-direction: column;
       gap: 20px;
@@ -123,6 +174,7 @@ export class RespawnUI {
     `;
 
     const selectedTitle = document.createElement('h3');
+    selectedTitle.className = 'selected-title';
     selectedTitle.style.cssText = `
       color: #00ff00;
       font-size: 16px;
@@ -190,7 +242,9 @@ export class RespawnUI {
       letter-spacing: 2px;
       transition: all 0.2s;
       width: 100%;
+      min-height: 44px;
       box-shadow: 0 4px 10px rgba(0,255,0,0.3);
+      touch-action: manipulation;
     `;
     respawnButton.textContent = 'DEPLOY';
     respawnButton.disabled = true;
@@ -205,6 +259,14 @@ export class RespawnUI {
     respawnButton.onmouseout = () => {
       respawnButton.style.transform = 'scale(1)';
       respawnButton.style.boxShadow = '0 4px 10px rgba(0,255,0,0.3)';
+    };
+    respawnButton.ontouchstart = () => {
+      if (!respawnButton.disabled) {
+        respawnButton.style.transform = 'scale(0.95)';
+      }
+    };
+    respawnButton.ontouchend = () => {
+      respawnButton.style.transform = 'scale(1)';
     };
 
     respawnButton.onclick = () => {
@@ -224,6 +286,7 @@ export class RespawnUI {
     `;
 
     const legendTitle = document.createElement('h4');
+    legendTitle.className = 'legend-title';
     legendTitle.style.cssText = `
       color: #888;
       font-size: 14px;
@@ -243,6 +306,7 @@ export class RespawnUI {
 
     legendItems.forEach(item => {
       const legendItem = document.createElement('div');
+      legendItem.className = 'legend-item';
       legendItem.style.cssText = `
         display: flex;
         align-items: center;
@@ -252,8 +316,9 @@ export class RespawnUI {
 
       const colorBox = document.createElement('div');
       colorBox.style.cssText = `
-        width: 16px;
-        height: 16px;
+        width: 24px;
+        height: 24px;
+        min-width: 24px;
         background: ${item.color};
         border: 1px solid rgba(255,255,255,0.3);
       `;
