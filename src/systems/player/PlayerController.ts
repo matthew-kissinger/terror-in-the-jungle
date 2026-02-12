@@ -319,6 +319,13 @@ export class PlayerController implements GameSystem {
     if (touchControls) {
       touchControls.weaponBar.setActiveSlot(slot as number);
       touchControls.adsButton.resetADS();
+
+      // Show/hide sandbag rotation buttons
+      if (slot === WeaponSlot.SANDBAG) {
+        touchControls.sandbagButtons.showButton();
+      } else {
+        touchControls.sandbagButtons.hideButton();
+      }
     }
   }
 
@@ -412,6 +419,12 @@ export class PlayerController implements GameSystem {
       this.hudSystem.showHelicopterInstruments();
     }
 
+    // Hide rally point button when in helicopter
+    const touchControls = this.input.getTouchControls();
+    if (touchControls) {
+      touchControls.rallyPointButton.hideButton();
+    }
+
     Logger.info('player', ` Player entered helicopter at position (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)})`);
     Logger.info('player', `  CAMERA MODE: Switched to helicopter camera (flight sim style)`);
   }
@@ -430,6 +443,12 @@ export class PlayerController implements GameSystem {
     if (this.hudSystem) {
       this.hudSystem.hideHelicopterMouseIndicator();
       this.hudSystem.hideHelicopterInstruments();
+    }
+
+    // Show rally point button when exiting helicopter
+    const touchControls = this.input.getTouchControls();
+    if (touchControls) {
+      touchControls.rallyPointButton.showButton();
     }
 
     Logger.info('player', ` Player exited helicopter to position (${exitPosition.x.toFixed(1)}, ${exitPosition.y.toFixed(1)}, ${exitPosition.z.toFixed(1)})`);

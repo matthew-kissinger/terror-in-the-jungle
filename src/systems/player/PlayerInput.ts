@@ -101,6 +101,18 @@ export class PlayerInput {
         },
         onScoreboardTap: () => callbacks.onScoreboardTap?.(),
         onEnterExitHelicopter: () => callbacks.onEnterExitHelicopter?.(),
+        onSandbagRotateLeft: () => {
+          const event = new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true });
+          window.dispatchEvent(event);
+        },
+        onSandbagRotateRight: () => {
+          const event = new KeyboardEvent('keydown', { code: 'KeyT', key: 't', bubbles: true });
+          window.dispatchEvent(event);
+        },
+        onRallyPointPlace: () => {
+          const event = new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true });
+          window.dispatchEvent(event);
+        },
       });
     }
   }
@@ -141,6 +153,8 @@ export class PlayerInput {
     if (this.touchControls) {
       if (started) {
         this.touchControls.show();
+        // Show rally point button when game starts (player is on foot)
+        this.touchControls.rallyPointButton.showButton();
       } else {
         this.touchControls.hide();
       }
