@@ -324,6 +324,15 @@ export class DayNightCycle implements GameSystem {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   }
 
+  /**
+   * Reset to initial state (for match restart)
+   */
+  reset(): void {
+    this.currentTime = 12.0; // Reset to noon
+    this.timeScale = 1.0;
+    Logger.info('environment', 'Day-Night Cycle reset to noon');
+  }
+
   dispose(): void {
     // Clean up if needed
   }

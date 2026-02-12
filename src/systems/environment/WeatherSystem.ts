@@ -326,6 +326,18 @@ export class WeatherSystem implements GameSystem {
     );
   }
 
+  /**
+   * Reset weather state to clear (for match restart)
+   */
+  resetState(): void {
+    this.currentState = WeatherState.CLEAR;
+    this.targetState = WeatherState.CLEAR;
+    this.transitionProgress = 1.0;
+    this.transitionTimer = 0;
+    this.cycleTimer = this.getRandomCycleDuration();
+    Logger.info('weather', 'Weather system reset to clear state');
+  }
+
   dispose(): void {
     if (this.rainMesh) {
       this.scene.remove(this.rainMesh);
