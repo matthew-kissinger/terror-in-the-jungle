@@ -13,6 +13,7 @@ import { SandboxMetrics } from './SandboxMetrics';
 import { SandboxConfig, getSandboxConfig, isSandboxMode } from './SandboxModeDetector';
 import { SettingsManager } from '../config/SettingsManager';
 import { MobilePauseOverlay } from '../ui/MobilePauseOverlay';
+import { WebGLContextRecovery } from './WebGLContextRecovery';
 
 // Import split modules
 import * as Init from './PixelArtSandboxInit';
@@ -39,6 +40,7 @@ export class PixelArtSandbox {
   public currentPixelSize = 1;
   private settingsUnsubscribe?: () => void;
   private mobilePauseOverlay?: MobilePauseOverlay;
+  private contextRecovery: WebGLContextRecovery;
 
   constructor() {
     Logger.info('core', ' Initializing Pixel Art Sandbox Engine...');
@@ -58,6 +60,7 @@ export class PixelArtSandbox {
     this.logOverlay = new LogOverlay();
     this.sandboxMetrics = new SandboxMetrics();
 
+    this.contextRecovery = new WebGLContextRecovery(this.sandboxRenderer);
     this.setupEventListeners();
     this.setupMenuCallbacks();
     this.mobilePauseOverlay = new MobilePauseOverlay(this);
@@ -249,10 +252,16 @@ export class PixelArtSandbox {
     Loop.animate(this);
   }
 
+  /** True while WebGL context is lost (checked by game loop to skip rendering) */
+  public get contextLost(): boolean {
+    return this.contextRecovery.contextLost;
+  }
+
   public dispose(): void {
     if (this.settingsUnsubscribe) {
       this.settingsUnsubscribe();
     }
+    this.contextRecovery.dispose();
     this.mobilePauseOverlay?.dispose();
     Input.disposeEventListeners();
     this.loadingScreen.dispose();
