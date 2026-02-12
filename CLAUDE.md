@@ -10,7 +10,7 @@
 npm install
 npm run dev        # Dev server on localhost:5173
 npm run build      # Production build
-npm run test:run   # 3250 tests (all passing)
+npm run test:run   # 3256 tests (all passing)
 ```
 
 ## Stack
@@ -21,11 +21,11 @@ npm run test:run   # 3250 tests (all passing)
 | Spatial | three-mesh-bvh, custom octree/grid |
 | Build | Vite 7, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 84 files, 3250 tests |
+| Tests | Vitest - 85 files, 3256 tests |
 
 ## Architecture
 
-~54k lines across 281 source files. Systems-based architecture with orchestrator pattern.
+~55k lines across 288 source files. Systems-based architecture with orchestrator pattern.
 
 ```
 src/
@@ -42,6 +42,7 @@ src/
 │   ├── effects/    # Pools (tracers, muzzle, impact, explosion), smoke
 │   └── environment/# Day/night, weather, water, skybox
 ├── ui/
+│   ├── controls/   # Touch controls (joystick, fire, look, action buttons)
 │   ├── hud/        # HUD elements (11 modules)
 │   ├── loading/    # Loading screen, mode selection
 │   └── map/        # Fullscreen map, minimap
@@ -81,18 +82,13 @@ src/
 
 ## Known Tech Debt
 
-- 14 `: any` annotations across source files (excluding tests and SystemInterfaces)
-- Missing audio: mortar launch, weapon pickup (grenade throw/pin pull are implemented)
+- 15 `: any` annotations across source files (excluding tests and SystemInterfaces)
 - Mobile touch controls are MVP - no ADS, weapon switching, or helicopter controls on touch yet
-- Settings menu UI exists but callbacks are placeholder (volume, sensitivity, graphics do nothing)
+- Touch controls (5 files in `src/ui/controls/`) have zero test coverage
+- HUD uses hard-coded pixel positions/sizes - not responsive for mobile viewports
+- RespawnUI has `min-width: 600px` map panel - overflows on phones
 - `TicketSystem.restartMatch()` unused - UI uses `window.location.reload()` instead
 - `PixelArtSandboxInit.ts:45` catches init errors but swallows them silently (no user feedback)
-- `SystemUpdater.updateSystems()` has no try/catch - a throwing system crashes the frame loop
-- `AmbientSoundManager.stop()` doesn't cancel pending `setTimeout` from `playNextTrack()` - audio can restart after stop
-
-## Unmerged Feature Branches (completed, awaiting merge)
-
-These branches contain tested, working code that needs merge + validation against latest master:
-- `mycel/task-fa8fbe43` - Mobile touch controls (virtual joystick, fire, look, action buttons)
-- `mycel/task-f891a854` - Settings menu wired to game systems (SettingsManager + localStorage)
-- `mycel/task-8304c732` - AmbientSoundManager setTimeout fix + SystemUpdater try/catch
+- TouchLook sensitivity hardcoded to 0.004 - not connected to SettingsManager
+- No mobile GPU detection or auto-quality scaling for touch devices
+- Squad radial menu UI exists but commands are non-functional placeholders
