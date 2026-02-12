@@ -58,6 +58,20 @@ export class PlayerInput {
       // Disable pointer lock on touch devices
       this.pointerLockEnabled = false;
       Logger.info('player', 'Touch device detected – touch controls enabled');
+
+      // Initialize touch look sensitivity based on mouse sensitivity setting
+      const rawMouseSensitivity = SettingsManager.getInstance().getMouseSensitivityRaw();
+      const touchSensitivity = rawMouseSensitivity * 2; // Convert to touch range (approx 0.002-0.01)
+      this.touchControls.look.setSensitivity(touchSensitivity);
+
+      // Listen for changes to mouseSensitivity to update touch sensitivity
+      SettingsManager.getInstance().onChange((key, value) => {
+        if (key === 'mouseSensitivity' && this.touchControls) {
+          const newRaw = SettingsManager.getInstance().getMouseSensitivityRaw();
+          const newTouch = newRaw * 2;
+          this.touchControls.look.setSensitivity(newTouch);
+        }
+      });
     }
 
     this.setupEventListeners();
