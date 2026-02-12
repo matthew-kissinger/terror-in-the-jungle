@@ -10,7 +10,7 @@
 npm install
 npm run dev        # localhost:5173
 npm run build      # Production
-npm run test:run   # 3363 tests
+npm run test:run   # 3366 tests
 ```
 
 ## Controls
@@ -59,7 +59,7 @@ perf.validate()  // System checks
 - three-mesh-bvh for spatial queries
 - Web workers (BVH pool, chunk generation)
 - TypeScript, Vite 7
-- ~58k lines, 297 source files, 96 test files (3363 tests)
+- ~58k lines, 294 source files, 96 test files (3366 tests)
 
 ## Documentation
 

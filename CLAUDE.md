@@ -25,7 +25,7 @@ npm run test:run   # 3366 tests (all passing)
 
 ## Architecture
 
-~58k lines across 296 source files. Systems-based architecture with orchestrator pattern.
+~58k lines across 294 source files. Systems-based architecture with orchestrator pattern.
 
 ```
 src/
@@ -90,25 +90,14 @@ src/
 ## Known Tech Debt
 
 - 16 `: any` annotations in source (excluding tests and SystemInterfaces)
-- ~25 UI 'click' listeners should be 'pointerdown' for mobile (LoadingScreen, MatchEndScreen, LoadingPanels) - 300ms tap delay
-- Mortar has no touch controls - completely inaccessible on mobile (no TouchMortarButton exists)
-- `showControls()` in PlayerInput.ts is incomplete - missing B/F/Z/G key hints
-- SquadRadialMenu has no touch support - touch events on pointer-events:none overlay are silently swallowed
+- `LoadingScreenWithModes` still uses `'click'` (10 listeners) - needs pointerdown conversion. `MobilePauseOverlay` also uses click (1 listener). LoadingScreen/LoadingPanels/MatchEndScreen/LoadoutSelector already converted.
+- Mortar has no touch controls - completely inaccessible on mobile. TouchMortarButton exists on branch task-0930d0dc but not on master.
+- `showControls()` in `PlayerInput.ts:440` is incomplete - missing B/F/Z/G key hints
 
 ### Unmerged Feature Branches
 
-4 `mycel/*` branches remain (6 consumed branches pruned). Cherry-pick is the only safe merge strategy.
+1 `mycel/*` branch has unique work. Cherry-pick is the only safe merge strategy.
 
-**Has unique value (cherry-pick carefully):**
-
-| Feature | Branch suffix | Status |
-|---------|--------------|--------|
-| Mortar touch controls | task-0930d0dc | Conflicts in PlayerController/PlayerInput/TouchControls. New TouchMortarButton.ts is clean. Manual merge needed. |
-| UI click-to-pointerdown | task-ab94ebfb | 2 commits cherry-pick cleanly. Converts LoadingScreen/MatchEndScreen/LoadingPanels click to pointerdown. |
-
-**DANGEROUS (do not merge):**
-
-| Branch suffix | Reason |
-|--------------|--------|
-| task-d4a64fc2 | Deletes 9 source files, adds 30+ junk files across 77 changes. Only SquadRadialMenu.ts touch handlers are useful - rewrite manually. |
-| task-18dd6c83 | Combat halt feature already merged (commit ed0ec3c). Branch has stale PlayerInput/Controller removals. No remaining value. |
+| Feature | Branch suffix | Notes |
+|---------|--------------|-------|
+| Mortar touch controls | task-0930d0dc | New TouchMortarButton.ts + PlayerInput/Controller/TouchControls wiring. Cherry-pick carefully - PlayerController/PlayerInput have diverged from master. |
