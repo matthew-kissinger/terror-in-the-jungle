@@ -55,11 +55,13 @@ export class AudioManager implements GameSystem {
             // Remove listeners after first interaction
             document.removeEventListener('click', resumeAudio);
             document.removeEventListener('keydown', resumeAudio);
+            document.removeEventListener('touchend', resumeAudio);
         };
 
-        // Add listeners for user interaction
+        // Add listeners for user interaction (touchend for mobile)
         document.addEventListener('click', resumeAudio);
         document.addEventListener('keydown', resumeAudio);
+        document.addEventListener('touchend', resumeAudio);
     }
 
     async init(): Promise<void> {

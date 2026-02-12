@@ -12,6 +12,7 @@ import { LogOverlay } from '../ui/debug/LogOverlay';
 import { SandboxMetrics } from './SandboxMetrics';
 import { SandboxConfig, getSandboxConfig, isSandboxMode } from './SandboxModeDetector';
 import { SettingsManager } from '../config/SettingsManager';
+import { MobilePauseOverlay } from '../ui/MobilePauseOverlay';
 
 // Import split modules
 import * as Init from './PixelArtSandboxInit';
@@ -37,6 +38,7 @@ export class PixelArtSandbox {
   public lastFrameDelta = 1 / 60;
   public currentPixelSize = 1;
   private settingsUnsubscribe?: () => void;
+  private mobilePauseOverlay?: MobilePauseOverlay;
 
   constructor() {
     Logger.info('core', ' Initializing Pixel Art Sandbox Engine...');
@@ -58,6 +60,8 @@ export class PixelArtSandbox {
 
     this.setupEventListeners();
     this.setupMenuCallbacks();
+    this.mobilePauseOverlay = new MobilePauseOverlay(this);
+    this.mobilePauseOverlay.setup();
   }
 
   /**
@@ -249,6 +253,7 @@ export class PixelArtSandbox {
     if (this.settingsUnsubscribe) {
       this.settingsUnsubscribe();
     }
+    this.mobilePauseOverlay?.dispose();
     Input.disposeEventListeners();
     this.loadingScreen.dispose();
     this.sandboxRenderer.dispose();

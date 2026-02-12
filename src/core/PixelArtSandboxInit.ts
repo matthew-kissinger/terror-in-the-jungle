@@ -6,6 +6,7 @@ import { LoadoutWeapon } from '../ui/loadout/LoadoutSelector';
 import { GrenadeType, Faction } from '../systems/combat/types';
 import { isSandboxMode } from './SandboxModeDetector';
 import { SettingsManager } from '../config/SettingsManager';
+import { shouldUseTouchControls } from '../utils/DeviceDetector';
 import type { PixelArtSandbox } from './PixelArtSandbox';
 
 /**
@@ -175,7 +176,9 @@ export function startGame(sandbox: PixelArtSandbox): void {
       sandbox.systemManager.firstPersonWeapon.setGameStarted(true);
       sandbox.systemManager.playerController.setGameStarted(true);
 
-      if (!sandbox.sandboxEnabled) Logger.info('sandbox-init', 'Click anywhere to enable mouse look!');
+      if (!sandbox.sandboxEnabled && !shouldUseTouchControls()) {
+        Logger.info('sandbox-init', 'Click anywhere to enable mouse look!');
+      }
       if (sandbox.systemManager.audioManager) sandbox.systemManager.audioManager.startAmbient();
       // Apply saved volume setting
       if (sandbox.systemManager.audioManager) {
