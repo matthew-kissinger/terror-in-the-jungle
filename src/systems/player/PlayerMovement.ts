@@ -91,17 +91,26 @@ export class PlayerMovement {
     const currentSpeed = baseSpeed * speedMultiplier;
 
     // Calculate movement direction based on camera orientation
-    if (input.isKeyPressed('keyw')) {
-      moveVector.z -= 1;
-    }
-    if (input.isKeyPressed('keys')) {
-      moveVector.z += 1;
-    }
-    if (input.isKeyPressed('keya')) {
-      moveVector.x -= 1;
-    }
-    if (input.isKeyPressed('keyd')) {
-      moveVector.x += 1;
+    // Check touch joystick first, then fall back to keyboard
+    const touchMove = input.getTouchMovementVector();
+    if (Math.abs(touchMove.x) > 0.1 || Math.abs(touchMove.z) > 0.1) {
+      // Use touch joystick values directly
+      moveVector.x = touchMove.x;
+      moveVector.z = touchMove.z;
+    } else {
+      // Keyboard input
+      if (input.isKeyPressed('keyw')) {
+        moveVector.z -= 1;
+      }
+      if (input.isKeyPressed('keys')) {
+        moveVector.z += 1;
+      }
+      if (input.isKeyPressed('keya')) {
+        moveVector.x -= 1;
+      }
+      if (input.isKeyPressed('keyd')) {
+        moveVector.x += 1;
+      }
     }
 
     // Normalize movement vector

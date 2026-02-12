@@ -64,7 +64,8 @@ export class PlayerCamera {
   }
 
   private updateFirstPersonCamera(input: PlayerInput): void {
-    // Update camera rotation from mouse movement
+    // Update camera rotation from mouse/touch movement
+    // On touch devices getIsPointerLocked() returns true when game is started
     if (input.getIsPointerLocked()) {
       const mouseMovement = input.getMouseMovement();
       this.yaw -= mouseMovement.x;

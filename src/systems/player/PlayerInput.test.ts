@@ -67,6 +67,18 @@ vi.mock('../../utils/Logger', () => ({
   }
 }));
 
+// Mock DeviceDetector - always report desktop in tests
+vi.mock('../../utils/DeviceDetector', () => ({
+  shouldUseTouchControls: vi.fn().mockReturnValue(false),
+  isTouchDevice: vi.fn().mockReturnValue(false),
+  isMobileViewport: vi.fn().mockReturnValue(false)
+}));
+
+// Mock TouchControls to avoid DOM side effects
+vi.mock('../../ui/controls/TouchControls', () => ({
+  TouchControls: vi.fn()
+}));
+
 describe('PlayerInput', () => {
   let playerInput: PlayerInput;
   let addEventListenerSpy: any;

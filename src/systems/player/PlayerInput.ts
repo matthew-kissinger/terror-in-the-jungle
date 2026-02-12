@@ -1,6 +1,8 @@
 import { Logger } from '../../utils/Logger';
 import { SettingsManager } from '../../config/SettingsManager';
 import { WeaponSlot } from './InventoryManager';
+import { shouldUseTouchControls } from '../../utils/DeviceDetector';
+import { TouchControls } from '../../ui/controls/TouchControls';
 
 export interface InputCallbacks {
   onJump?: () => void;
@@ -18,6 +20,8 @@ export interface InputCallbacks {
   onWeaponSlotChange?: (slot: WeaponSlot) => void;
   onMouseDown?: (button: number) => void;
   onMouseUp?: (button: number) => void;
+  onReload?: () => void;
+  onGrenadeSwitch?: () => void;
 }
 
 export class PlayerInput {
@@ -39,12 +43,41 @@ export class PlayerInput {
   private isInHelicopter = false;
   private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
 
+  /** Touch controls – only created on touch-capable devices */
+  private touchControls: TouchControls | null = null;
+  private readonly isTouchMode: boolean;
+
+  /** Cached touch movement vector to avoid per-frame allocation */
+  private touchMoveResult = { x: 0, z: 0 };
+
   constructor() {
+    this.isTouchMode = shouldUseTouchControls();
+
+    if (this.isTouchMode) {
+      this.touchControls = new TouchControls();
+      // Disable pointer lock on touch devices
+      this.pointerLockEnabled = false;
+      Logger.info('player', 'Touch device detected – touch controls enabled');
+    }
+
     this.setupEventListeners();
   }
 
   setCallbacks(callbacks: InputCallbacks): void {
     this.callbacks = callbacks;
+
+    // Wire touch controls to the same callbacks
+    if (this.touchControls) {
+      this.touchControls.setCallbacks({
+        onFireStart: () => callbacks.onMouseDown?.(0),
+        onFireStop: () => callbacks.onMouseUp?.(0),
+        onJump: () => callbacks.onJump?.(),
+        onReload: () => callbacks.onReload?.(),
+        onGrenade: () => callbacks.onGrenadeSwitch?.(),
+        onSprintStart: () => callbacks.onRunStart?.(),
+        onSprintStop: () => callbacks.onRunStop?.(),
+      });
+    }
   }
 
   setControlsEnabled(enabled: boolean): void {
@@ -78,6 +111,15 @@ export class PlayerInput {
       document.addEventListener('click', this.boundRequestPointerLock);
       Logger.info('player', ' Game started - click to enable mouse look');
     }
+
+    // Show/hide touch controls when game starts/stops
+    if (this.touchControls) {
+      if (started) {
+        this.touchControls.show();
+      } else {
+        this.touchControls.hide();
+      }
+    }
   }
 
   setInHelicopter(inHelicopter: boolean): void {
@@ -95,6 +137,14 @@ export class PlayerInput {
   getMouseMovement(): { x: number; y: number } {
     this.mouseResult.x = this.mouseMovement.x;
     this.mouseResult.y = this.mouseMovement.y;
+
+    // Add touch look delta on touch devices
+    if (this.touchControls) {
+      const touchDelta = this.touchControls.consumeLookDelta();
+      this.mouseResult.x += touchDelta.x;
+      this.mouseResult.y += touchDelta.y;
+    }
+
     return this.mouseResult;
   }
 
@@ -104,7 +154,35 @@ export class PlayerInput {
   }
 
   getIsPointerLocked(): boolean {
+    // On touch devices, always report as "locked" so camera updates apply
+    if (this.isTouchMode && this.gameStarted) return true;
     return this.isPointerLocked;
+  }
+
+  /** Whether touch controls are active */
+  getIsTouchMode(): boolean {
+    return this.isTouchMode;
+  }
+
+  /** Touch controls instance (null on desktop) */
+  getTouchControls(): TouchControls | null {
+    return this.touchControls;
+  }
+
+  /**
+   * Get touch joystick movement vector.
+   * Returns {x, z} in [-1, 1] range, or {0, 0} on desktop / no input.
+   */
+  getTouchMovementVector(): { x: number; z: number } {
+    if (!this.touchControls) {
+      this.touchMoveResult.x = 0;
+      this.touchMoveResult.z = 0;
+    } else {
+      const v = this.touchControls.getMovementVector();
+      this.touchMoveResult.x = v.x;
+      this.touchMoveResult.z = v.z;
+    }
+    return this.touchMoveResult;
   }
 
   private setupEventListeners(): void {
@@ -142,6 +220,11 @@ export class PlayerInput {
     }
     document.removeEventListener('pointerlockchange', this.boundOnPointerLockChange);
     document.removeEventListener('mousemove', this.boundOnMouseMove);
+
+    if (this.touchControls) {
+      this.touchControls.dispose();
+      this.touchControls = null;
+    }
   }
 
   private onKeyDown(event: KeyboardEvent): void {
