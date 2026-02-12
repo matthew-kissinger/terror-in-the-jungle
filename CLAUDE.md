@@ -81,8 +81,10 @@ src/
 
 ## Known Tech Debt
 
-- 15 `: any` annotations across source files (excluding tests and SystemInterfaces)
-- Missing audio: grenade throw/pin pull, mortar launch, weapon pickup
+- 14 `: any` annotations across source files (excluding tests and SystemInterfaces)
+- Missing audio: mortar launch, weapon pickup (grenade throw/pin pull are implemented)
+- No mobile/touch controls - game is desktop-only (keyboard + mouse with pointer lock)
+- Settings menu UI exists but callbacks are placeholder (volume, sensitivity, graphics do nothing)
 - `TicketSystem.restartMatch()` unused - UI uses `window.location.reload()` instead
 - `PixelArtSandboxInit.ts:45` catches init errors but swallows them silently (no user feedback)
 - `SystemUpdater.updateSystems()` has no try/catch - a throwing system crashes the frame loop
