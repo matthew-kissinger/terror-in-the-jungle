@@ -17,6 +17,7 @@ import {
   GRID_LINE_WIDTH,
 } from './FullMapStyles';
 import { createLegend, createControls, createCompass } from './FullMapDOMHelpers';
+import { shouldUseTouchControls } from '../../utils/DeviceDetector';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -31,6 +32,10 @@ export class FullMapSystem implements GameSystem {
   private mapCanvas: HTMLCanvasElement;
   private mapContext: CanvasRenderingContext2D;
   private mapContainer: HTMLDivElement;
+
+  // Mobile toggle button
+  private mapToggleButton: HTMLDivElement | null = null;
+  private mapCloseButton: HTMLDivElement | null = null;
 
   // Map settings
   private worldSize = 3200; // Will be updated based on game mode
@@ -84,11 +89,19 @@ export class FullMapSystem implements GameSystem {
     // Create instructions
     const instructions = document.createElement('div');
     instructions.className = 'map-instructions';
-    instructions.innerHTML = `
-      Hold <strong>M</strong> to view map<br>
-      <strong>Scroll</strong> to zoom<br>
-      <strong>ESC</strong> to close
-    `;
+    if (shouldUseTouchControls()) {
+      instructions.innerHTML = `
+        <strong>Drag</strong> to pan<br>
+        <strong>Pinch</strong> to zoom<br>
+        Tap <strong>✕</strong> to close
+      `;
+    } else {
+      instructions.innerHTML = `
+        Hold <strong>M</strong> to view map<br>
+        <strong>Scroll</strong> to zoom<br>
+        <strong>ESC</strong> to close
+      `;
+    }
 
     // Assemble
     mapContent.appendChild(header);
@@ -97,6 +110,20 @@ export class FullMapSystem implements GameSystem {
     mapContent.appendChild(controls);
     mapContent.appendChild(compass);
     mapContent.appendChild(instructions);
+
+    // Add mobile close button inside map content
+    if (shouldUseTouchControls()) {
+      this.mapCloseButton = document.createElement('div');
+      this.mapCloseButton.className = 'map-close-button';
+      this.mapCloseButton.textContent = '✕';
+      this.mapCloseButton.addEventListener('touchstart', (e: TouchEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.inputHandler.toggle();
+      }, { passive: false });
+      mapContent.appendChild(this.mapCloseButton);
+    }
+
     this.mapContainer.appendChild(mapContent);
 
     // Add styles
@@ -111,6 +138,20 @@ export class FullMapSystem implements GameSystem {
   async init(): Promise<void> {
     Logger.info('ui', 'Initializing Full Map System...');
     document.body.appendChild(this.mapContainer);
+
+    // Create mobile map toggle button (tap-to-toggle)
+    if (shouldUseTouchControls()) {
+      this.mapToggleButton = document.createElement('div');
+      this.mapToggleButton.className = 'map-toggle-button';
+      this.mapToggleButton.textContent = 'M';
+      this.mapToggleButton.addEventListener('touchstart', (e: TouchEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.inputHandler.toggle();
+      }, { passive: false });
+      document.body.appendChild(this.mapToggleButton);
+    }
+
     Logger.info('ui', 'Full Map System initialized');
   }
 
@@ -145,6 +186,12 @@ export class FullMapSystem implements GameSystem {
     this.isVisible = true;
     this.inputHandler.setIsVisible(true);
     this.mapContainer.classList.add('visible');
+    // Hide the mobile toggle button when map is open
+    if (this.mapToggleButton) {
+      this.mapToggleButton.style.display = 'none';
+    }
+    // Reset pan when opening
+    this.inputHandler.resetPan();
     // Auto-fit to show all zones when opening the map
     this.autoFitView();
     this.render();
@@ -180,20 +227,25 @@ export class FullMapSystem implements GameSystem {
     this.isVisible = false;
     this.inputHandler.setIsVisible(false);
     this.mapContainer.classList.remove('visible');
+    // Show the mobile toggle button when map is closed
+    if (this.mapToggleButton) {
+      this.mapToggleButton.style.display = 'flex';
+    }
   }
 
   private render(): void {
     const ctx = this.mapContext;
     const size = MAP_SIZE;
     const zoomLevel = this.inputHandler.getZoomLevel();
+    const pan = this.inputHandler.getPanOffset();
 
     // Clear canvas
     ctx.fillStyle = 'rgba(10, 10, 15, 0.95)';
     ctx.fillRect(0, 0, size, size);
 
-    // Apply zoom transformation
+    // Apply zoom + pan transformation
     ctx.save();
-    ctx.translate(size / 2, size / 2);
+    ctx.translate(size / 2 + pan.x, size / 2 + pan.y);
     ctx.scale(zoomLevel, zoomLevel);
     ctx.translate(-size / 2, -size / 2);
 
@@ -368,6 +420,9 @@ export class FullMapSystem implements GameSystem {
     this.inputHandler.dispose();
     if (this.mapContainer.parentNode) {
       this.mapContainer.parentNode.removeChild(this.mapContainer);
+    }
+    if (this.mapToggleButton && this.mapToggleButton.parentNode) {
+      this.mapToggleButton.parentNode.removeChild(this.mapToggleButton);
     }
     Logger.info('ui', 'Full Map System disposed');
   }

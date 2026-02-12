@@ -133,6 +133,106 @@ export const MAP_STYLES = `
   .compass-s { bottom: 0; left: 50%; transform: translateX(-50%); }
   .compass-e { right: 0; top: 50%; transform: translateY(-50%); }
   .compass-w { left: 0; top: 50%; transform: translateY(-50%); }
+
+  /* Mobile map toggle button */
+  .map-toggle-button {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1002;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 20px;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+    pointer-events: auto;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: pointer;
+  }
+
+  .map-toggle-button:active {
+    background: rgba(255, 255, 255, 0.35);
+    transform: translateX(-50%) scale(0.9);
+  }
+
+  /* Mobile close button inside the map */
+  .map-close-button {
+    position: absolute;
+    top: 10px;
+    right: 60px;
+    z-index: 210;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: rgba(255, 80, 80, 0.3);
+    border: 1px solid rgba(255, 80, 80, 0.5);
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 20px;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+    pointer-events: auto;
+    cursor: pointer;
+  }
+
+  .map-close-button:active {
+    background: rgba(255, 80, 80, 0.6);
+  }
+
+  /* Touch-action on map canvas for gesture handling */
+  .map-canvas {
+    touch-action: none;
+  }
+
+  /* Responsive map content for mobile */
+  @media (max-width: 900px) {
+    .map-content {
+      width: 95vw;
+      height: 95vw;
+      max-width: 800px;
+      max-height: 800px;
+    }
+
+    .map-legend {
+      padding: 8px;
+      font-size: 10px;
+      bottom: 10px;
+      right: 10px;
+    }
+
+    .map-instructions {
+      font-size: 10px;
+      bottom: 10px;
+      left: 10px;
+    }
+
+    .compass-rose {
+      width: 50px;
+      height: 50px;
+      top: 10px;
+      left: 10px;
+    }
+
+    .compass-direction {
+      font-size: 12px;
+    }
+
+    .map-header {
+      font-size: 16px;
+      top: -36px;
+    }
+  }
 `;
 
 // Map size constants
