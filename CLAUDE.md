@@ -95,32 +95,25 @@ src/
 - No WebGL context loss recovery - game shows blank screen if GPU context lost (common on mobile tab switch)
 - Bootstrap failure shows blank screen with no user-visible error message
 - playerSquadId assigned via 500ms setTimeout race condition (SandboxSystemManager line 227)
-- Minimap `200x200px` is hardcoded - not responsive for mobile viewports
-- Desktop keyboard hints shown on mobile: "Press R to reload", "Press K", "RCTRL", "Press TAB" (5+ locations)
-- PersonalStatsPanel/KillFeed overlap on mobile right side (fixed pixel positions)
-- Scoreboard 2-column grid not responsive for portrait mobile
 - LoadoutSelector weapon/grenade options use click-only (no touch optimization, shows "CLICK to select" on mobile)
-- SquadRadialMenu has no touch support (mouse-only, and never wired into game - see above)
-- OpenFrontierRespawnMap has no touch support (mouse pan only, no touch handlers)
-- WeatherSystem rain particles not scaled by GPU tier on mobile
-- Compass not responsive for mobile viewports (no media queries)
-- Settings labels not device-aware (show desktop-specific labels on mobile)
-- TouchWeaponBar dispose() doesn't clean up event listeners (memory leak)
-- No touch buttons for sandbag rotation or rally point placement
-- No kill streak audio feedback
+- TicketSystem.restartMatch() does not reset player health, ammo, weapons, or respawn queue
+- Master is 63 commits ahead of origin - live GitHub Pages site is significantly behind
 
 ### Unmerged Feature Branches
 
-9 completed features exist on `mycel/*` branches but are NOT on master. All merge cleanly individually; risk is sequential conflicts in 4 shared files (PlayerController, PlayerInput, TouchControls, HUDSystem).
+12 completed features exist on `mycel/*` branches but are NOT on master. A merge task (cbfd9b2d) has been created to cherry-pick them all in dependency-safe order.
 
 | Feature | Branch suffix | Files touched |
 |---------|--------------|---------------|
-| Settings device-aware | task-62f7bfd2 | SettingsManager.ts |
+| Settings device-aware | task-62f7bfd2 | SettingsManager.ts, LoadingPanels.ts |
 | Weather rain GPU scaling | task-642bca99 | WeatherSystem.ts |
 | Compass responsive | task-678e18fa | CompassStyles.ts |
 | OpenFrontierRespawnMap touch | task-dc892cad | OpenFrontierRespawnMap.ts |
 | TouchWeaponBar dispose fix | task-fa59cd92 | TouchWeaponBar.ts |
-| Sandbag/rally touch buttons | task-a37eca58 | new TouchSandbagButtons, TouchRallyPointButton + PlayerController, PlayerInput, TouchControls |
+| DeathCam camera restore | task-2b52030b | DeathCamSystem.ts |
+| Keyboard hints device-aware | task-b21be059 | Multiple HUD files |
+| Minimap responsive + panel overlap | task-cb81f260 | MinimapStyles.ts, HUD files |
+| Scoreboard responsive | task-f04c697c | Scoreboard.ts |
+| Sandbag/rally touch buttons | task-a37eca58 | new files + PlayerController, PlayerInput, TouchControls |
 | SquadRadialMenu touch | task-d4a64fc2 | SquadRadialMenu.ts + PlayerController, PlayerInput, TouchControls |
-| TicketSystem restartMatch | task-0fd4fd6c | TicketSystem.ts, HUDSystem.ts + 3 others |
 | Kill streak audio | task-fa40bc2b | new files + HUDSystem.ts |
