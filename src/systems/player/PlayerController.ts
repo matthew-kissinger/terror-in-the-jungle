@@ -186,6 +186,7 @@ export class PlayerController implements GameSystem {
       onFire: () => this.handleMortarFire(),
       onAdjustPitch: (delta: number) => this.handleMortarAdjustPitch(delta),
       onAdjustYaw: (delta: number) => this.handleMortarAdjustYaw(delta),
+      onToggleMortarCamera: () => this.handleToggleMortarCamera(),
     });
   }
 
