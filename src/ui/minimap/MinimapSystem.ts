@@ -6,6 +6,7 @@ import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { createMinimapDOM } from './MinimapDOMBuilder';
 import { DEFAULT_WORLD_SIZE, MINIMAP_SIZE } from './MinimapStyles';
 import { renderMinimap } from './MinimapRenderer';
+import { isMobileViewport } from '../../utils/DeviceDetector';
 
 // Reusable scratch vectors to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -23,7 +24,7 @@ export class MinimapSystem implements GameSystem {
   private minimapContainer: HTMLDivElement;
 
   // Minimap settings
-  private readonly MINIMAP_SIZE = MINIMAP_SIZE;
+  private MINIMAP_SIZE = MINIMAP_SIZE;
   private WORLD_SIZE = DEFAULT_WORLD_SIZE;
   private readonly UPDATE_INTERVAL = 100;
   private lastUpdateTime = 0;
@@ -34,6 +35,11 @@ export class MinimapSystem implements GameSystem {
 
   constructor(camera: THREE.Camera) {
     this.camera = camera;
+
+    // Adjust size for mobile viewports
+    if (isMobileViewport()) {
+      this.MINIMAP_SIZE = 120;
+    }
 
     const dom = createMinimapDOM(this.MINIMAP_SIZE);
     this.minimapCanvas = dom.canvas;

@@ -26,31 +26,32 @@ type MinimapPosition = {
 
 export function renderMinimap(state: MinimapRenderState): void {
   const { ctx, size } = state;
+  const renderScale = size / 200;
 
   ctx.fillStyle = 'rgba(20, 20, 30, 0.9)';
   ctx.fillRect(0, 0, size, size);
 
-  drawGrid(ctx, size);
+  drawGrid(ctx, size, renderScale);
 
   if (state.zoneManager) {
     const zones = state.zoneManager.getAllZones();
-    zones.forEach(zone => drawZone(ctx, zone, state));
+    zones.forEach(zone => drawZone(ctx, zone, state, renderScale));
   }
 
-  drawCombatantIndicators(ctx, state);
+  drawCombatantIndicators(ctx, state, renderScale);
 
   if (state.commandPosition) {
-    drawCommandMarker(ctx, state);
+    drawCommandMarker(ctx, state, renderScale);
   }
 
-  drawPlayer(ctx, size);
-  drawViewCone(ctx, state.camera, size);
+  drawPlayer(ctx, size, renderScale);
+  drawViewCone(ctx, state.camera, size, renderScale);
 }
 
-function drawGrid(ctx: CanvasRenderingContext2D, size: number): void {
+function drawGrid(ctx: CanvasRenderingContext2D, size: number, renderScale: number): void {
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-  ctx.lineWidth = 1;
-  const gridSize = 20;
+  ctx.lineWidth = 1 * renderScale;
+  const gridSize = 20 * renderScale;
   for (let i = 0; i <= size; i += gridSize) {
     ctx.beginPath();
     ctx.moveTo(i, 0);
@@ -63,11 +64,11 @@ function drawGrid(ctx: CanvasRenderingContext2D, size: number): void {
   }
 }
 
-function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: MinimapRenderState): void {
+function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: MinimapRenderState, renderScale: number): void {
   const scale = state.size / state.worldSize;
   const { x, y } = worldToMinimap(zone.position, state, scale);
 
-  if (x < -20 || x > state.size + 20 || y < -20 || y > state.size + 20) return;
+  if (x < -20 * renderScale || x > state.size + 20 * renderScale || y < -20 * renderScale || y > state.size + 20 * renderScale) return;
 
   const zoneRadius = zone.radius * scale;
 
@@ -92,16 +93,17 @@ function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: Minim
   ctx.beginPath();
   ctx.arc(x, y, zoneRadius, 0, Math.PI * 2);
   ctx.fill();
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2 * renderScale;
   ctx.stroke();
 
   if (zone.isHomeBase) {
     ctx.fillStyle = zone.state === ZoneState.US_CONTROLLED ? '#4488ff' : '#ff4444';
-    ctx.fillRect(x - 6, y - 6, 12, 12);
+    const baseSize = 12 * renderScale;
+    ctx.fillRect(x - baseSize / 2, y - baseSize / 2, baseSize, baseSize);
   } else {
     ctx.beginPath();
-    ctx.moveTo(x, y - 8);
-    ctx.lineTo(x + 8, y - 4);
+    ctx.moveTo(x, y - 8 * renderScale);
+    ctx.lineTo(x + 8 * renderScale, y - 4 * renderScale);
     ctx.lineTo(x, y);
     ctx.closePath();
     ctx.fillStyle = ctx.strokeStyle;
@@ -109,19 +111,19 @@ function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: Minim
   }
 
   ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-  ctx.font = '10px Courier New';
+  ctx.font = `${Math.round(10 * renderScale)}px Courier New`;
   ctx.textAlign = 'center';
-  ctx.fillText(zone.name, x, y + zoneRadius + 12);
+  ctx.fillText(zone.name, x, y + zoneRadius + 12 * renderScale);
 
   if (zone.state === ZoneState.CONTESTED) {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.fillRect(x - 15, y + zoneRadius + 15, 30, 3);
+    ctx.fillRect(x - 15 * renderScale, y + zoneRadius + 15 * renderScale, 30 * renderScale, 3 * renderScale);
     ctx.fillStyle = '#ffff44';
-    ctx.fillRect(x - 15, y + zoneRadius + 15, 30 * (zone.captureProgress / 100), 3);
+    ctx.fillRect(x - 15 * renderScale, y + zoneRadius + 15 * renderScale, 30 * renderScale * (zone.captureProgress / 100), 3 * renderScale);
   }
 }
 
-function drawCombatantIndicators(ctx: CanvasRenderingContext2D, state: MinimapRenderState): void {
+function drawCombatantIndicators(ctx: CanvasRenderingContext2D, state: MinimapRenderState, renderScale: number): void {
   if (!state.combatantSystem) return;
 
   const combatants = state.combatantSystem.getAllCombatants();
@@ -141,26 +143,26 @@ function drawCombatantIndicators(ctx: CanvasRenderingContext2D, state: MinimapRe
       ctx.fillStyle = combatant.faction === Faction.US ? 'rgba(68, 136, 255, 0.6)' : 'rgba(255, 68, 68, 0.6)';
     }
     ctx.beginPath();
-    ctx.arc(x, y, 2, 0, Math.PI * 2);
+    ctx.arc(x, y, 2 * renderScale, 0, Math.PI * 2);
     ctx.fill();
   });
 }
 
-function drawPlayer(ctx: CanvasRenderingContext2D, size: number): void {
+function drawPlayer(ctx: CanvasRenderingContext2D, size: number, renderScale: number): void {
   const centerX = size / 2;
   const centerY = size / 2;
 
   ctx.fillStyle = '#00ff00';
   ctx.beginPath();
-  ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+  ctx.arc(centerX, centerY, 4 * renderScale, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = '#00ff00';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2 * renderScale;
   ctx.stroke();
 }
 
-function drawViewCone(ctx: CanvasRenderingContext2D, camera: THREE.Camera, size: number): void {
+function drawViewCone(ctx: CanvasRenderingContext2D, camera: THREE.Camera, size: number, renderScale: number): void {
   const centerX = size / 2;
   const centerY = size / 2;
 
@@ -169,18 +171,18 @@ function drawViewCone(ctx: CanvasRenderingContext2D, camera: THREE.Camera, size:
   const angle = 0;
 
   ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 3 * renderScale;
   ctx.beginPath();
   ctx.moveTo(centerX, centerY);
 
-  const lineLength = 25;
+  const lineLength = 25 * renderScale;
   const endX = centerX + Math.sin(angle) * lineLength;
   const endY = centerY - Math.cos(angle) * lineLength;
   ctx.lineTo(endX, endY);
   ctx.stroke();
 
   const fovAngle = Math.PI / 4;
-  const coneLength = 30;
+  const coneLength = 30 * renderScale;
 
   const leftAngle = angle - fovAngle;
   const rightAngle = angle + fovAngle;
@@ -198,7 +200,7 @@ function drawViewCone(ctx: CanvasRenderingContext2D, camera: THREE.Camera, size:
   ctx.fill();
 }
 
-function drawCommandMarker(ctx: CanvasRenderingContext2D, state: MinimapRenderState): void {
+function drawCommandMarker(ctx: CanvasRenderingContext2D, state: MinimapRenderState, renderScale: number): void {
   if (!state.commandPosition) return;
 
   const scale = state.size / state.worldSize;
@@ -207,20 +209,20 @@ function drawCommandMarker(ctx: CanvasRenderingContext2D, state: MinimapRenderSt
   if (x < 0 || x > state.size || y < 0 || y > state.size) return;
 
   ctx.strokeStyle = '#00ff66';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 2 * renderScale;
 
   ctx.beginPath();
-  ctx.moveTo(x, y - 8);
-  ctx.lineTo(x, y + 8);
+  ctx.moveTo(x, y - 8 * renderScale);
+  ctx.lineTo(x, y + 8 * renderScale);
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.moveTo(x - 8, y);
-  ctx.lineTo(x + 8, y);
+  ctx.moveTo(x - 8 * renderScale, y);
+  ctx.lineTo(x + 8 * renderScale, y);
   ctx.stroke();
 
   ctx.beginPath();
-  ctx.arc(x, y, 6, 0, Math.PI * 2);
+  ctx.arc(x, y, 6 * renderScale, 0, Math.PI * 2);
   ctx.stroke();
 }
 

@@ -5,7 +5,7 @@
 export const HUDZoneStyles = `
   .objectives-panel {
     position: absolute;
-    top: 20px;
+    top: 236px;
     right: 20px;
     background: rgba(10, 10, 14, 0.28);
     backdrop-filter: blur(6px) saturate(1.1);
@@ -83,11 +83,11 @@ export const HUDZoneStyles = `
   }
 
   /* Mobile responsive adjustments */
-  @media (max-width: 768px) {
+  @media (max-width: 1024px) {
     .objectives-panel {
       min-width: 180px;
       right: 12px;
-      top: 12px;
+      top: 176px;
       padding: 8px;
     }
 
@@ -106,7 +106,7 @@ export const HUDZoneStyles = `
       min-width: 140px;
       max-width: 45vw;
       right: 8px;
-      top: 8px;
+      top: 142px;
       padding: 6px;
       font-size: 11px;
     }
