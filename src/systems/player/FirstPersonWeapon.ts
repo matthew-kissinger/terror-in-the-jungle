@@ -342,10 +342,9 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   private startReload(): void {
-    // Can't reload while ADS
+    // Auto-exit ADS if aiming to allow reload
     if (this.animations.getADS()) {
-      Logger.info('weapon', ' Cannot reload while aiming')
-      return
+      this.animations.setADS(false)
     }
 
     if (this.reload.startReload(() => this.ammo.getCurrentAmmoManager().startReload())) {
