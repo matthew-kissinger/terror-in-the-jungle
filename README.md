@@ -22,7 +22,7 @@ npm run build   # Production
 | Fire | Left Click |
 | ADS | Right Click |
 | Reload | R |
-| Weapons | 1-5 |
+| Weapons | 1-6 |
 | Grenade | G |
 | **Perf Overlay** | **F2** |
 | Console Stats | F1 |
@@ -53,13 +53,11 @@ perf.validate()  // System checks
 - three-mesh-bvh for spatial queries
 - Web workers (BVH pool, chunk generation)
 - TypeScript, Vite 7
-- ~45k lines, ~100 files
+- ~55k lines, ~290 files
 
 ## Documentation
 
 - `CLAUDE.md` - Development guide, what exists, what needs work
-- `ARCHITECTURE.md` - System hierarchy
-- `docs/UPGRADE_ROADMAP.md` - Technical upgrade plan
 
 ## License
 
