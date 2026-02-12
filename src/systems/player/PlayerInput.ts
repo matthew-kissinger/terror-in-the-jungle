@@ -100,6 +100,7 @@ export class PlayerInput {
           }
         },
         onScoreboardTap: () => callbacks.onScoreboardTap?.(),
+        onEnterExitHelicopter: () => callbacks.onEnterExitHelicopter?.(),
       });
     }
   }

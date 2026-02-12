@@ -2,12 +2,15 @@ import * as THREE from 'three';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { Logger } from '../../utils/Logger';
 import { IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
+import { shouldUseTouchControls } from '../../utils/DeviceDetector';
+import type { PlayerInput } from '../player/PlayerInput';
 
 export class HelicopterInteraction {
   private helicopters: Map<string, THREE.Group>;
   private playerController?: IPlayerController;
   private hudSystem?: IHUDSystem;
   private terrainManager?: ImprovedChunkManager;
+  private playerInput?: PlayerInput;
   private interactionRadius: number;
   private isPlayerNearHelicopter = false;
 
@@ -21,6 +24,10 @@ export class HelicopterInteraction {
 
   setPlayerController(playerController: IPlayerController): void {
     this.playerController = playerController;
+  }
+
+  setPlayerInput(playerInput: PlayerInput): void {
+    this.playerInput = playerInput;
   }
 
   setHUDSystem(hudSystem: IHUDSystem): void {
@@ -79,10 +86,26 @@ export class HelicopterInteraction {
 
       if (this.isPlayerNearHelicopter) {
         Logger.debug('helicopter', `  Player near helicopter (${horizontalDistance.toFixed(1)}m horizontal) - SHOWING PROMPT!`);
-        this.hudSystem.showInteractionPrompt('Press E to enter helicopter');
+
+        // Show appropriate prompt and button based on device
+        const isTouchDevice = shouldUseTouchControls();
+        const promptText = isTouchDevice ? 'Tap button to enter helicopter' : 'Press E to enter helicopter';
+        this.hudSystem.showInteractionPrompt(promptText);
+
+        // Show touch interaction button if on touch device
+        if (isTouchDevice && this.playerInput) {
+          const touchControls = this.playerInput.getTouchControls();
+          touchControls?.interactionButton.showButton();
+        }
       } else {
         Logger.debug('helicopter', '  Player left helicopter area - HIDING PROMPT!');
         this.hudSystem.hideInteractionPrompt();
+
+        // Hide touch interaction button if on touch device
+        if (shouldUseTouchControls() && this.playerInput) {
+          const touchControls = this.playerInput.getTouchControls();
+          touchControls?.interactionButton.hideButton();
+        }
       }
     }
   }
@@ -127,9 +150,13 @@ export class HelicopterInteraction {
     Logger.debug('helicopter', `  PLAYER ENTERING HELICOPTER!`);
     this.playerController.enterHelicopter('us_huey', helicopterPosition.clone());
 
-    // Hide interaction prompt
+    // Hide interaction prompt and touch button
     if (this.hudSystem) {
       this.hudSystem.hideInteractionPrompt();
+    }
+    if (shouldUseTouchControls() && this.playerInput) {
+      const touchControls = this.playerInput.getTouchControls();
+      touchControls?.interactionButton.hideButton();
     }
   }
 

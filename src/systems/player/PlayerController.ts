@@ -442,7 +442,7 @@ export class PlayerController implements GameSystem {
   // Dependency setters
   setChunkManager(chunkManager: ImprovedChunkManager): void { this.chunkManager = chunkManager; this.movement.setChunkManager(chunkManager); }
   setGameModeManager(gameModeManager: GameModeManager): void { this.gameModeManager = gameModeManager; }
-  setHelicopterModel(helicopterModel: HelicopterModel): void { this.helicopterModel = helicopterModel; this.movement.setHelicopterModel(helicopterModel); this.cameraController.setHelicopterModel(helicopterModel); }
+  setHelicopterModel(helicopterModel: HelicopterModel): void { this.helicopterModel = helicopterModel; this.movement.setHelicopterModel(helicopterModel); this.cameraController.setHelicopterModel(helicopterModel); helicopterModel.setPlayerInput(this.input); }
   setFirstPersonWeapon(firstPersonWeapon: FirstPersonWeapon): void {
     this.firstPersonWeapon = firstPersonWeapon;
     // Wire touch controls to weapon input for fire/reload
