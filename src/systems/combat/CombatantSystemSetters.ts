@@ -45,6 +45,8 @@ export class CombatantSystemSetters {
 
   setTicketSystem(ticketSystem: TicketSystem): void {
     this.combatantCombat.setTicketSystem(ticketSystem);
+    this.combatantAI.setTicketSystem(ticketSystem);
+    this.combatantMovement.setTicketSystem(ticketSystem);
   }
 
   setPlayerHealthSystem(playerHealthSystem: PlayerHealthSystem): void {

@@ -5,6 +5,7 @@ import { SandbagSystem } from '../weapons/SandbagSystem'
 import { SmokeCloudSystem } from '../effects/SmokeCloudSystem'
 import { SpatialOctree } from './SpatialOctree'
 import { ZoneManager } from '../world/ZoneManager'
+import { TicketSystem } from '../world/TicketSystem'
 import { AIStatePatrol } from './ai/AIStatePatrol'
 import { AIStateEngage } from './ai/AIStateEngage'
 import { AIStateMovement } from './ai/AIStateMovement'
@@ -32,6 +33,7 @@ export class CombatantAI {
   private coverSystem: AICoverSystem
   private flankingSystem: AIFlankingSystem
   private voiceCalloutSystem?: VoiceCalloutSystem
+  private ticketSystem?: TicketSystem
   private lastStateById: Map<string, CombatantState> = new Map()
 
   private squads: Map<string, Squad> = new Map()
@@ -61,6 +63,10 @@ export class CombatantAI {
     this.movementHandler.setVoiceCalloutSystem(system)
   }
 
+  setTicketSystem(ticketSystem: TicketSystem): void {
+    this.ticketSystem = ticketSystem
+  }
+
   updateAI(
     combatant: Combatant,
     deltaTime: number,
@@ -68,6 +74,11 @@ export class CombatantAI {
     allCombatants: Map<string, Combatant>,
     spatialGrid?: SpatialOctree
   ): void {
+    // Stop AI updates if game is not active
+    if (this.ticketSystem && !this.ticketSystem.isGameActive()) {
+      return
+    }
+
     const lastState = this.lastStateById.get(combatant.id) ?? combatant.state
 
     // Apply squad command overrides before state machine processing

@@ -36,6 +36,7 @@ const mockPlayerHealthSystem: PlayerHealthSystem = {
 
 const mockTicketSystem: TicketSystem = {
   onCombatantDeath: vi.fn(),
+  isGameActive: vi.fn(() => true),
 } as any;
 
 const mockAudioManager: AudioManager = {

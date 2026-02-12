@@ -4,6 +4,7 @@ import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { Faction } from '../combat/types';
 import { InventoryManager, WeaponSlot } from './InventoryManager';
+import { TicketSystem } from '../world/TicketSystem';
 import { GrenadeSystem } from '../weapons/GrenadeSystem';
 import { MortarSystem } from '../weapons/MortarSystem';
 import { SandbagSystem } from '../weapons/SandbagSystem';
@@ -27,6 +28,7 @@ export class PlayerController implements GameSystem {
   private helicopterModel?: HelicopterModel;
   private firstPersonWeapon?: FirstPersonWeapon;
   private hudSystem?: HUDSystem;
+  private ticketSystem?: TicketSystem;
   private sandboxRenderer?: ISandboxRenderer;
   private inventoryManager?: InventoryManager;
   private grenadeSystem?: GrenadeSystem;
@@ -235,6 +237,9 @@ export class PlayerController implements GameSystem {
   }
 
   private handleMouseDown(button: number): void {
+    const isGameActive = this.ticketSystem ? this.ticketSystem.isGameActive() : true;
+    if (!isGameActive) return;
+
     switch (this.currentWeaponMode) {
       case WeaponSlot.GRENADE:
         if (button === 0 && this.grenadeSystem) {
@@ -476,6 +481,7 @@ export class PlayerController implements GameSystem {
   // Dependency setters
   setChunkManager(chunkManager: ImprovedChunkManager): void { this.chunkManager = chunkManager; this.movement.setChunkManager(chunkManager); }
   setGameModeManager(gameModeManager: GameModeManager): void { this.gameModeManager = gameModeManager; }
+  setTicketSystem(ticketSystem: TicketSystem): void { this.ticketSystem = ticketSystem; }
   setHelicopterModel(helicopterModel: HelicopterModel): void { this.helicopterModel = helicopterModel; this.movement.setHelicopterModel(helicopterModel); this.cameraController.setHelicopterModel(helicopterModel); helicopterModel.setPlayerInput(this.input); }
   setFirstPersonWeapon(firstPersonWeapon: FirstPersonWeapon): void {
     this.firstPersonWeapon = firstPersonWeapon;

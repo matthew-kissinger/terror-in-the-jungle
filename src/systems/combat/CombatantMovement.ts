@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Combatant, CombatantState, Faction, Squad } from './types';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { ZoneManager } from '../world/ZoneManager';
+import { TicketSystem } from '../world/TicketSystem';
 import { GameModeManager } from '../world/GameModeManager';
 import { objectPool } from '../../utils/ObjectPoolManager';
 import { clusterManager } from './ClusterManager';
@@ -17,6 +18,7 @@ import {
 export class CombatantMovement {
   private chunkManager?: ImprovedChunkManager;
   private zoneManager?: ZoneManager;
+  private ticketSystem?: TicketSystem;
   private gameModeManager?: GameModeManager;
   private spatialGridManager?: SpatialGridManager;
 
@@ -29,12 +31,22 @@ export class CombatantMovement {
     this.spatialGridManager = spatialGridManager;
   }
 
+  setTicketSystem(ticketSystem: TicketSystem): void {
+    this.ticketSystem = ticketSystem;
+  }
+
   updateMovement(
     combatant: Combatant,
     deltaTime: number,
     squads: Map<string, Squad>,
     combatants: Map<string, Combatant>
   ): void {
+    // Stop movement if game is not active
+    if (this.ticketSystem && !this.ticketSystem.isGameActive()) {
+      combatant.velocity.set(0, 0, 0);
+      return;
+    }
+
     // Movement based on state
     if (combatant.state === CombatantState.PATROLLING) {
       updatePatrolMovement(combatant, deltaTime, squads, combatants, {

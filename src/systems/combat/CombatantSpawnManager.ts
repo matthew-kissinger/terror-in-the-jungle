@@ -175,6 +175,11 @@ export class CombatantSpawnManager {
    * Update spawning logic - progressive spawns, reinforcement waves, respawns
    */
   update(deltaTime: number, combatEnabled: boolean, ticketSystem?: TicketSystem): void {
+    // Stop all spawning logic if game is not active
+    if (ticketSystem && !ticketSystem.isGameActive()) {
+      return;
+    }
+
     // Progressive spawning (short early trickle)
     if (this.progressiveSpawnQueue.length > 0) {
       this.progressiveSpawnTimer += deltaTime * 1000;
@@ -206,6 +211,11 @@ export class CombatantSpawnManager {
    * Handle pending respawns and maintain force strength
    */
   private manageSpawning(combatEnabled: boolean, ticketSystem?: TicketSystem): void {
+    // Stop all spawning logic if game is not active
+    if (ticketSystem && !ticketSystem.isGameActive()) {
+      return;
+    }
+
     // Handle pending respawns for player squad members
     this.respawnManager.handlePendingRespawns(this.rallyPointSystem, this.zoneManager, this.gameModeManager);
 
