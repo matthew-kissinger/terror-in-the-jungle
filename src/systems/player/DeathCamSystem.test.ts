@@ -193,6 +193,27 @@ describe('DeathCamSystem', () => {
       deathCamSystem.startDeathCam(deathPosition);
       expect(deathCamSystem.isDeathCamActive()).toBe(true);
     });
+
+    it('should restore camera position and quaternion after death cam', () => {
+      const originalPos = new THREE.Vector3(10, 5, 10);
+      const originalQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.1, 0.2, 0));
+      mockCamera.position.copy(originalPos);
+      mockCamera.quaternion.copy(originalQuat);
+
+      deathCamSystem.startDeathCam(deathPosition);
+      // Move through phases so camera is no longer at original position
+      deathCamSystem.update(0.5);
+      deathCamSystem.update(0.1);
+      deathCamSystem.update(1.0);
+      deathCamSystem.update(0.5);
+
+      expect(mockCamera.position.equals(originalPos)).toBe(false);
+
+      deathCamSystem.endDeathCam();
+
+      expect(mockCamera.position.equals(originalPos)).toBe(true);
+      expect(mockCamera.quaternion.equals(originalQuat)).toBe(true);
+    });
   });
 
   describe('update - phase transitions', () => {
