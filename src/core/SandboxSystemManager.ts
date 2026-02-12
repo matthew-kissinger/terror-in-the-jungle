@@ -213,6 +213,14 @@ export class SandboxSystemManager {
       this.combatantSystem.playerSquadId = undefined;
     }
 
+    // Reset environment systems for new match
+    if (this.dayNightCycle) {
+      this.dayNightCycle.reset();
+    }
+    if (this.weatherSystem) {
+      this.weatherSystem.resetState();
+    }
+
     // Set weather config for mode
     const config = getGameModeConfig(mode);
     if (this.weatherSystem) {
