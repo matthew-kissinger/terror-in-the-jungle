@@ -4,6 +4,7 @@ import { BillboardInstance } from '../../types';
 import { AssetLoader } from '../assets/AssetLoader';
 import { NoiseGenerator } from '../../utils/NoiseGenerator';
 import { MathUtils } from '../../utils/Math';
+import { getVegetationDensityMultiplier } from '../../utils/DeviceDetector';
 
 export type BiomeType = 'pine_forest' | 'oak_woods' | 'mixed_forest' | 'sparse_plains' | 'farmland';
 
@@ -14,6 +15,7 @@ export class ChunkVegetation {
   private chunkX: number;
   private chunkZ: number;
   private biomeType: BiomeType = 'mixed_forest';
+  private densityMultiplier: number = 1.0;
 
   // Instance arrays
   grassInstances: BillboardInstance[] = [];
@@ -36,6 +38,7 @@ export class ChunkVegetation {
     this.size = size;
     this.chunkX = chunkX;
     this.chunkZ = chunkZ;
+    this.densityMultiplier = getVegetationDensityMultiplier();
   }
 
   async generateVegetation(sampleHeightFunc: (x: number, z: number) => number): Promise<void> {
@@ -86,7 +89,7 @@ export class ChunkVegetation {
       case 'farmland': density = 0.3; break;
     }
 
-    const maxInstances = Math.floor(this.size * this.size * density / 10);
+    const maxInstances = Math.floor(this.size * this.size * density * this.densityMultiplier / 10);
     const baseX = this.chunkX * this.size;
     const baseZ = this.chunkZ * this.size;
 
@@ -112,7 +115,7 @@ export class ChunkVegetation {
       this.grassInstances.push(instance);
     }
 
-    Logger.info('terrain', `Generated ${maxInstances} grass instances for chunk (${this.chunkX}, ${this.chunkZ})`);
+    Logger.info('terrain', `Generated ${this.grassInstances.length} grass instances for chunk (${this.chunkX}, ${this.chunkZ})`);
   }
 
   private async generateTreeInstances(sampleHeight: (x: number, z: number) => number): Promise<void> {
@@ -185,7 +188,14 @@ export class ChunkVegetation {
         break;
     }
 
-    const density = baseDensity * forestDensity;
+    // Apply density multiplier to base density
+    const density = baseDensity * forestDensity * this.densityMultiplier;
+    
+    // Increase min distance on lower density to keep trees sparse but well-distributed
+    if (this.densityMultiplier < 1.0) {
+      minDistance /= Math.sqrt(this.densityMultiplier);
+    }
+
     minDistance = Math.max(5, minDistance * (2 - forestDensity));
 
     const maxInstances = Math.floor(this.size * this.size * density / 10);
@@ -263,7 +273,8 @@ export class ChunkVegetation {
       }
     }
 
-    Logger.info('terrain', `Generated ${actualCount} trees (${this.biomeType}) for chunk (${this.chunkX}, ${this.chunkZ})`);
+    const totalTrees = this.treeInstances.length + this.tree1Instances.length + this.tree2Instances.length + this.tree3Instances.length;
+    Logger.info('terrain', `Generated ${totalTrees} trees (${this.biomeType}) for chunk (${this.chunkX}, ${this.chunkZ})`);
   }
 
   private async generateMushroomInstances(sampleHeight: (x: number, z: number) => number): Promise<void> {
@@ -279,13 +290,17 @@ export class ChunkVegetation {
       case 'farmland': density = 0.02; break;
     }
 
-    const maxInstances = Math.floor(this.size * this.size * density / 10);
+    const maxInstances = Math.floor(this.size * this.size * density * this.densityMultiplier / 10);
     if (maxInstances === 0) return;
 
     const baseX = this.chunkX * this.size;
     const baseZ = this.chunkZ * this.size;
 
-    const minDistance = 3;
+    let minDistance = 3;
+    if (this.densityMultiplier < 1.0) {
+      minDistance /= Math.sqrt(this.densityMultiplier);
+    }
+    
     const mushroomPoints = MathUtils.poissonDiskSampling(this.size, this.size, minDistance);
     const actualCount = Math.min(mushroomPoints.length, maxInstances);
 
@@ -293,7 +308,9 @@ export class ChunkVegetation {
       const point = mushroomPoints[i];
 
       let nearTree = false;
-      for (const tree of this.treeInstances) {
+      // Combine all tree arrays for checking
+      const allTrees = [...this.treeInstances, ...this.tree1Instances, ...this.tree2Instances, ...this.tree3Instances];
+      for (const tree of allTrees) {
         const dx = (baseX + point.x) - tree.position.x;
         const dz = (baseZ + point.y) - tree.position.z;
         if (Math.sqrt(dx * dx + dz * dz) < 8) {
@@ -333,16 +350,19 @@ export class ChunkVegetation {
     const baseX = this.chunkX * this.size;
     const baseZ = this.chunkZ * this.size;
 
-    const numPatches = this.biomeType === 'farmland' ?
+    let numPatches = this.biomeType === 'farmland' ?
       MathUtils.randomInRange(3, 5) :
       MathUtils.randomInRange(1, 3);
+    
+    // Scale number of patches on weaker devices
+    numPatches = Math.max(1, Math.floor(numPatches * this.densityMultiplier));
 
     for (let p = 0; p < numPatches; p++) {
       const patchCenterX = Math.random() * this.size * 0.8 + this.size * 0.1;
       const patchCenterZ = Math.random() * this.size * 0.8 + this.size * 0.1;
       const patchRadius = MathUtils.randomInRange(12, 20);
 
-      const wheatCount = Math.floor(patchRadius * patchRadius * 0.3);
+      const wheatCount = Math.floor(patchRadius * patchRadius * 0.3 * this.densityMultiplier);
 
       for (let i = 0; i < wheatCount; i++) {
         const angle = Math.random() * Math.PI * 2;
