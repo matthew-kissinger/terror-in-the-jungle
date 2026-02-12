@@ -4,7 +4,10 @@ import { LoadingStyles } from './LoadingStyles';
 import { LoadingPanels } from './LoadingPanels';
 import { LoadingProgress } from './LoadingProgress';
 import { GameMode } from '../../config/gameModes';
-import { isTouchDevice } from '../../utils/DeviceDetector';
+import { isTouchDevice, isMobileViewport } from '../../utils/DeviceDetector';
+import { isPortraitViewport, tryLockLandscapeOrientation } from '../../utils/Orientation';
+
+let landscapePromptDismissedForSession = false;
 
 export class LoadingScreen {
   private container: HTMLDivElement;
@@ -29,6 +32,13 @@ export class LoadingScreen {
 
   // Mobile fullscreen prompt (shown after main menu on touch devices)
   private fullscreenPrompt: HTMLDivElement | null = null;
+  private landscapePrompt: HTMLDivElement | null = null;
+  private readonly handleOrientationOrResize = () => {
+    if (!this.landscapePrompt) return;
+    if (!isPortraitViewport()) {
+      this.dismissLandscapePrompt();
+    }
+  };
 
   // Refactored modules
   private panels: LoadingPanels;
@@ -220,6 +230,66 @@ export class LoadingScreen {
         .selected-mode-display strong {
           color: var(--primary-color);
           font-weight: 500;
+        }
+
+        .landscape-orientation-prompt {
+          position: absolute;
+          inset: 0;
+          z-index: 9;
+          display: none;
+          align-items: center;
+          justify-content: center;
+          pointer-events: none;
+        }
+
+        .landscape-orientation-card {
+          pointer-events: auto;
+          width: min(92vw, 360px);
+          background: rgba(12, 22, 34, 0.92);
+          border: 1px solid rgba(127, 180, 217, 0.45);
+          border-radius: 14px;
+          box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
+          padding: 0.9rem 1rem;
+          text-align: center;
+          color: var(--text-primary);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+        }
+
+        .landscape-orientation-icon {
+          font-size: 1.4rem;
+          line-height: 1;
+          color: var(--primary-color);
+          margin-bottom: 0.4rem;
+          text-shadow: 0 0 12px rgba(127, 180, 217, 0.35);
+        }
+
+        .landscape-orientation-text {
+          font-size: 0.85rem;
+          letter-spacing: 0.04em;
+          margin-bottom: 0.6rem;
+        }
+
+        .landscape-orientation-dismiss {
+          appearance: none;
+          border: 1px solid rgba(127, 180, 217, 0.45);
+          background: rgba(127, 180, 217, 0.15);
+          color: var(--primary-color);
+          border-radius: 999px;
+          min-height: 44px;
+          padding: 0.35rem 0.95rem;
+          cursor: pointer;
+          touch-action: manipulation;
+          font: inherit;
+          font-size: 0.78rem;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+
+        @media (orientation: portrait) and (max-width: 768px) {
+          .landscape-orientation-prompt.visible {
+            display: flex;
+          }
         }
 
         /* Error Panel Styles */
@@ -469,6 +539,10 @@ export class LoadingScreen {
     if (isTouchDevice()) {
       this.showFullscreenPrompt();
     }
+
+    if (isTouchDevice() && isMobileViewport() && isPortraitViewport()) {
+      this.showLandscapePrompt();
+    }
   }
 
   /**
@@ -483,7 +557,7 @@ export class LoadingScreen {
     prompt.tabIndex = 0;
     prompt.innerHTML = `
       <span class="fullscreen-prompt-text">Tap to go fullscreen</span>
-      <span class="fullscreen-prompt-hint">(optional — you can start without it)</span>
+      <span class="fullscreen-prompt-hint">(optional — fullscreen + landscape works best)</span>
     `;
     prompt.style.cssText = `
       position: absolute;
@@ -513,17 +587,61 @@ export class LoadingScreen {
     const handleTap = () => {
       const el = document.documentElement;
       if (el.requestFullscreen) {
-        el.requestFullscreen().catch(() => { /* user declined or not allowed */ }).finally(() => {
-          this.dismissFullscreenPrompt();
-        });
+        el.requestFullscreen()
+          .then(() => {
+            tryLockLandscapeOrientation();
+          })
+          .catch(() => { /* user declined or not allowed */ })
+          .finally(() => {
+            this.dismissFullscreenPrompt();
+          });
       } else {
         this.dismissFullscreenPrompt();
       }
     };
-    prompt.addEventListener('click', handleTap);
-    prompt.addEventListener('touchend', (e) => { e.preventDefault(); handleTap(); }, { passive: false });
+    prompt.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      handleTap();
+    });
+    prompt.addEventListener('click', (e) => e.preventDefault());
     this.container.appendChild(prompt);
     this.fullscreenPrompt = prompt;
+  }
+
+  private showLandscapePrompt(): void {
+    if (landscapePromptDismissedForSession || this.landscapePrompt || !isPortraitViewport()) return;
+
+    const prompt = document.createElement('div');
+    prompt.className = 'landscape-orientation-prompt visible';
+    prompt.innerHTML = `
+      <div class="landscape-orientation-card" role="status" aria-live="polite">
+        <div class="landscape-orientation-icon" aria-hidden="true">↻ 📱</div>
+        <div class="landscape-orientation-text">Rotate your device for the best experience</div>
+        <button class="landscape-orientation-dismiss" type="button">Continue anyway</button>
+      </div>
+    `;
+
+    const dismissButton = prompt.querySelector('.landscape-orientation-dismiss');
+    dismissButton?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      landscapePromptDismissedForSession = true;
+      this.dismissLandscapePrompt();
+    });
+    dismissButton?.addEventListener('click', (e) => e.preventDefault());
+
+    window.addEventListener('orientationchange', this.handleOrientationOrResize);
+    window.addEventListener('resize', this.handleOrientationOrResize);
+    this.container.appendChild(prompt);
+    this.landscapePrompt = prompt;
+  }
+
+  private dismissLandscapePrompt(): void {
+    window.removeEventListener('orientationchange', this.handleOrientationOrResize);
+    window.removeEventListener('resize', this.handleOrientationOrResize);
+    if (this.landscapePrompt && this.landscapePrompt.parentElement) {
+      this.landscapePrompt.remove();
+      this.landscapePrompt = null;
+    }
   }
 
   private dismissFullscreenPrompt(): void {
@@ -648,6 +766,7 @@ export class LoadingScreen {
 
   public dispose(): void {
     this.dismissFullscreenPrompt();
+    this.dismissLandscapePrompt();
     // Remove event listeners
     this.zoneControlCard.removeEventListener('pointerdown', this.handleZoneControlClick);
     this.openFrontierCard.removeEventListener('pointerdown', this.handleOpenFrontierClick);

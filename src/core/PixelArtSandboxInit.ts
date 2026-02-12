@@ -7,6 +7,7 @@ import { GrenadeType, Faction } from '../systems/combat/types';
 import { isSandboxMode } from './SandboxModeDetector';
 import { SettingsManager } from '../config/SettingsManager';
 import { shouldUseTouchControls } from '../utils/DeviceDetector';
+import { tryLockLandscapeOrientation } from '../utils/Orientation';
 import type { PixelArtSandbox } from './PixelArtSandbox';
 
 /**
@@ -87,6 +88,11 @@ export function restartMatch(sandbox: PixelArtSandbox): void {
 export function startGameWithMode(sandbox: PixelArtSandbox, mode: GameMode): void {
   if (!sandbox.isInitialized || sandbox.gameStarted) return;
   Logger.info('sandbox-init', `PixelArtSandbox: Starting game with mode: ${mode}`);
+
+  if (shouldUseTouchControls()) {
+    tryLockLandscapeOrientation();
+  }
+
   sandbox.gameStarted = true;
   sandbox.systemManager.setGameMode(mode, { createPlayerSquad: mode !== GameMode.AI_SANDBOX });
   
