@@ -183,4 +183,47 @@ export const HUDWeaponStyles = `
     50% { border-color: rgba(255, 255, 255, 1.0); }
     100% { border-color: rgba(255, 255, 255, 0.6); }
   }
+
+  /* Mobile responsive adjustments */
+  @media (max-width: 768px) {
+    .ammo-display {
+      right: 50%;
+      transform: translateX(50%);
+      bottom: 160px;
+      min-width: 100px;
+    }
+
+    .kill-counter {
+      bottom: 160px;
+      left: 12px;
+      min-width: 100px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .ammo-display {
+      bottom: 170px;
+      padding: 8px 12px;
+      min-width: 90px;
+    }
+
+    .ammo-magazine {
+      font-size: 22px;
+    }
+
+    .ammo-separator {
+      font-size: 16px;
+    }
+
+    .ammo-reserve {
+      font-size: 16px;
+    }
+
+    .kill-counter {
+      bottom: 170px;
+      padding: 6px 8px;
+      font-size: 11px;
+      min-width: 90px;
+    }
+  }
 `;

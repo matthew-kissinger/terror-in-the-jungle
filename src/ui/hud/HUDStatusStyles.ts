@@ -160,4 +160,89 @@ export const HUDStatusStyles = `
 
   .victory-us { border-color: #4488ff; color: #4488ff; }
   .victory-opfor { border-color: #ff4444; color: #ff4444; }
+
+  /* Mobile responsive adjustments */
+  @media (max-width: 768px) {
+    .combat-stats {
+      bottom: 160px;
+      right: 12px;
+      font-size: 11px;
+      padding: 6px;
+    }
+
+    .game-status {
+      top: 60px;
+      left: 12px;
+      font-size: 11px;
+      padding: 4px 8px;
+    }
+
+    .match-timer {
+      top: 12px;
+      left: 12px;
+      padding: 6px 10px;
+    }
+
+    .timer-display {
+      font-size: 18px;
+    }
+
+    .victory-screen {
+      padding: 24px;
+      font-size: 24px;
+      width: 85vw;
+      max-width: 400px;
+    }
+
+    .ticket-display {
+      padding: 6px 12px;
+      gap: 16px;
+    }
+
+    .ticket-count {
+      font-size: 22px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .combat-stats {
+      display: none;
+    }
+
+    .game-status {
+      top: 50px;
+      left: 8px;
+      font-size: 10px;
+    }
+
+    .match-timer {
+      top: 8px;
+      left: 8px;
+      padding: 4px 8px;
+    }
+
+    .timer-display {
+      font-size: 16px;
+    }
+
+    .victory-screen {
+      padding: 16px;
+      font-size: 20px;
+      width: 90vw;
+      border-radius: 8px;
+    }
+
+    .ticket-display {
+      padding: 4px 8px;
+      gap: 12px;
+    }
+
+    .ticket-count {
+      font-size: 18px;
+    }
+
+    .faction-name {
+      font-size: 10px;
+    }
+  }
 `;
