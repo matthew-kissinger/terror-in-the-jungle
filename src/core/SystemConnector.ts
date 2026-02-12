@@ -134,6 +134,7 @@ export class SystemConnector {
     refs.playerController.setGrenadeSystem(refs.grenadeSystem);
     refs.playerController.setMortarSystem(refs.mortarSystem);
     refs.playerController.setSandbagSystem(refs.sandbagSystem);
+    refs.playerController.setPlayerSquadController(refs.playerSquadController);
 
     // Connect combat systems with sandbag system via typed interface
     const combatantCombat = refs.combatantSystem.combatantCombat;

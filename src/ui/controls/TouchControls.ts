@@ -11,6 +11,8 @@ import { TouchActionButtons } from './TouchActionButtons';
 import { TouchWeaponBar } from './TouchWeaponBar';
 import { TouchADSButton } from './TouchADSButton';
 import { TouchInteractionButton } from './TouchInteractionButton';
+import { TouchSandbagButtons } from './TouchSandbagButtons';
+import { TouchRallyPointButton } from './TouchRallyPointButton';
 
 export interface TouchControlCallbacks {
   onFireStart: () => void;
@@ -24,6 +26,10 @@ export interface TouchControlCallbacks {
   onADSToggle: (active: boolean) => void;
   onScoreboardTap?: () => void;
   onEnterExitHelicopter: () => void;
+  onSandbagRotateLeft: () => void;
+  onSandbagRotateRight: () => void;
+  onRallyPointPlace: () => void;
+  onSquadCommand?: () => void;
 }
 
 export class TouchControls {
@@ -34,6 +40,8 @@ export class TouchControls {
   readonly weaponBar: TouchWeaponBar;
   readonly adsButton: TouchADSButton;
   readonly interactionButton: TouchInteractionButton;
+  readonly sandbagButtons: TouchSandbagButtons;
+  readonly rallyPointButton: TouchRallyPointButton;
 
   private visible = false;
 
@@ -45,6 +53,8 @@ export class TouchControls {
     this.weaponBar = new TouchWeaponBar();
     this.adsButton = new TouchADSButton();
     this.interactionButton = new TouchInteractionButton();
+    this.sandbagButtons = new TouchSandbagButtons();
+    this.rallyPointButton = new TouchRallyPointButton();
 
     // Start hidden until game starts
     this.hide();
@@ -60,6 +70,9 @@ export class TouchControls {
 
     this.actionButtons.setOnAction((action: string) => {
       switch (action) {
+        case 'squad':
+          callbacks.onSquadCommand?.();
+          break;
         case 'jump':
           callbacks.onJump();
           break;
@@ -78,6 +91,8 @@ export class TouchControls {
     this.weaponBar.setOnWeaponSelect(callbacks.onWeaponSelect);
     this.adsButton.setOnADSToggle(callbacks.onADSToggle);
     this.interactionButton.setCallback(callbacks.onEnterExitHelicopter);
+    this.sandbagButtons.setCallbacks(callbacks.onSandbagRotateLeft, callbacks.onSandbagRotateRight);
+    this.rallyPointButton.setCallback(callbacks.onRallyPointPlace);
   }
 
   /**
@@ -105,6 +120,8 @@ export class TouchControls {
     this.weaponBar.show();
     this.adsButton.show();
     this.interactionButton.show();
+    this.sandbagButtons.show();
+    this.rallyPointButton.show();
   }
 
   hide(): void {
@@ -117,6 +134,8 @@ export class TouchControls {
     this.weaponBar.hide();
     this.adsButton.hide();
     this.interactionButton.hide();
+    this.sandbagButtons.hide();
+    this.rallyPointButton.hide();
   }
 
   isVisible(): boolean {
@@ -131,5 +150,7 @@ export class TouchControls {
     this.weaponBar.dispose();
     this.adsButton.dispose();
     this.interactionButton.dispose();
+    this.sandbagButtons.dispose();
+    this.rallyPointButton.dispose();
   }
 }

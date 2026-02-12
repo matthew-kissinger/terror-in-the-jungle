@@ -1,5 +1,108 @@
 import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
 
+/** Frequencies in Hz: C4, G4, C5, E5, G5, C6, E6 */
+const C4 = 261.63;
+const G4 = 392;
+const C5 = 523.25;
+const E5 = 659.25;
+const G5 = 783.99;
+const C6 = 1046.5;
+const E6 = 1318.5;
+
+const KILL_STREAK_GAIN = 0.2;
+
+/**
+ * Procedural audio stings for kill streak milestones.
+ * Uses Web Audio API with lazy AudioContext (user gesture required in browsers).
+ */
+function playKillStreakSting(streak: number): void {
+  let ctx: AudioContext | undefined;
+  try {
+    ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+  } catch {
+    return;
+  }
+
+  const resumeAndPlay = (): void => {
+    if (ctx!.state === 'suspended') {
+      ctx!.resume().then(() => playSting(ctx!, streak)).catch(() => {});
+    } else {
+      playSting(ctx!, streak);
+    }
+  };
+
+  resumeAndPlay();
+}
+
+function playSting(ctx: AudioContext, streak: number): void {
+  const now = ctx.currentTime;
+
+  if (streak === 3) {
+    // KILLING SPREE: Quick rising two-tone (C5 -> E5, 100ms)
+    playTone(ctx, C5, now, 0.05, 0.05, KILL_STREAK_GAIN);
+    playTone(ctx, E5, now + 0.05, 0.05, 0.05, KILL_STREAK_GAIN);
+  } else if (streak === 5) {
+    // RAMPAGE: Three-tone ascending (C5 -> E5 -> G5, 150ms)
+    const seg = 0.05;
+    playTone(ctx, C5, now, seg * 0.3, seg * 0.7, KILL_STREAK_GAIN);
+    playTone(ctx, E5, now + seg, seg * 0.3, seg * 0.7, KILL_STREAK_GAIN);
+    playTone(ctx, G5, now + seg * 2, seg * 0.3, seg * 0.7, KILL_STREAK_GAIN);
+  } else if (streak === 7) {
+    // DOMINATING: Four-tone ascending (C5 -> E5 -> G5 -> C6, 200ms)
+    const seg = 0.05;
+    playTone(ctx, C5, now, seg * 0.25, seg * 0.75, KILL_STREAK_GAIN);
+    playTone(ctx, E5, now + seg, seg * 0.25, seg * 0.75, KILL_STREAK_GAIN);
+    playTone(ctx, G5, now + seg * 2, seg * 0.25, seg * 0.75, KILL_STREAK_GAIN);
+    playTone(ctx, C6, now + seg * 3, seg * 0.25, seg * 0.75, KILL_STREAK_GAIN);
+  } else if (streak === 10) {
+    // UNSTOPPABLE: Power chord C4+G4 -> C5+G5, 250ms with slight sweep
+    const dur = 0.125;
+    playTone(ctx, C4, now, 0.02, dur - 0.02, KILL_STREAK_GAIN * 0.9);
+    playTone(ctx, G4, now, 0.02, dur - 0.02, KILL_STREAK_GAIN * 0.7);
+    playTone(ctx, C5, now + dur, 0.02, dur - 0.02, KILL_STREAK_GAIN);
+    playTone(ctx, G5, now + dur, 0.02, dur - 0.02, KILL_STREAK_GAIN * 0.8);
+  } else if (streak === 15) {
+    // GODLIKE: Ascending arpeggio with harmonic (300ms)
+    const seg = 0.06;
+    const gain = KILL_STREAK_GAIN;
+    playTone(ctx, C5, now, seg * 0.2, seg * 0.8, gain);
+    playTone(ctx, E5, now + seg, seg * 0.2, seg * 0.8, gain);
+    playTone(ctx, G5, now + seg * 2, seg * 0.2, seg * 0.8, gain);
+    playTone(ctx, C6, now + seg * 3, seg * 0.2, seg * 0.8, gain);
+    // Harmonic overtone
+    playTone(ctx, E6, now + seg * 2.5, seg * 0.15, seg * 1.5, gain * 0.4);
+  }
+}
+
+function playTone(
+  ctx: AudioContext,
+  frequency: number,
+  startTime: number,
+  attack: number,
+  release: number,
+  volume: number
+): void {
+  const osc = ctx.createOscillator();
+  const gainNode = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+
+  osc.type = 'sine';
+  osc.frequency.value = frequency;
+  filter.type = 'lowpass';
+  filter.frequency.value = Math.min(frequency * 3, 4000);
+  filter.Q.value = 0.5;
+
+  gainNode.gain.setValueAtTime(0, startTime);
+  gainNode.gain.linearRampToValueAtTime(volume, startTime + attack);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + attack + release);
+
+  osc.connect(filter);
+  filter.connect(gainNode);
+  gainNode.connect(ctx.destination);
+  osc.start(startTime);
+  osc.stop(startTime + attack + release);
+}
+
 export class PersonalStatsPanel {
   private container: HTMLDivElement;
   private killsElement: HTMLSpanElement;
@@ -149,15 +252,17 @@ export class PersonalStatsPanel {
         return; // No milestone
     }
 
-    this.showKillStreakNotification(message, color);
+    this.showKillStreakNotification(message, color, this.currentStreak);
   }
 
-  private showKillStreakNotification(message: string, color: string): void {
+  private showKillStreakNotification(message: string, color: string, streak: number): void {
     this.killStreakElement.textContent = message;
     this.killStreakElement.style.color = color;
     this.killStreakElement.style.borderColor = color;
     this.killStreakElement.style.display = 'block';
     this.killStreakElement.style.animation = 'streakPulse 0.5s ease-out';
+
+    playKillStreakSting(streak);
 
     // Hide after 3 seconds
     setTimeout(() => {

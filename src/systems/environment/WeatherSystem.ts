@@ -5,6 +5,7 @@ import { IChunkManager, IAudioManager, ISandboxRenderer } from '../../types/Syst
 import { WeatherState, WeatherConfig } from '../../config/gameModes';
 import { updateLightning, LightningState } from './WeatherLightning';
 import { updateAtmosphere, getBlendedRainIntensity, AtmosphereBaseValues } from './WeatherAtmosphere';
+import { estimateGPUTier, isMobileGPU } from '../../utils/DeviceDetector';
 
 export class WeatherSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -26,7 +27,7 @@ export class WeatherSystem implements GameSystem {
 
   // Rain Rendering
   private rainMesh?: THREE.InstancedMesh;
-  private rainCount: number = 8000;
+  private rainCount: number;
   private rainDummy: THREE.Object3D = new THREE.Object3D();
   private rainVelocities: Float32Array;
   private rainPositions: Float32Array;
@@ -55,8 +56,28 @@ export class WeatherSystem implements GameSystem {
     this.scene = scene;
     this.camera = camera;
     this.chunkManager = chunkManager;
+    this.rainCount = this.calculateRainCount();
     this.rainVelocities = new Float32Array(this.rainCount);
     this.rainPositions = new Float32Array(this.rainCount * 3);
+  }
+
+  private calculateRainCount(): number {
+    const gpuTier = estimateGPUTier();
+    const mobile = isMobileGPU();
+
+    let count: number;
+    if (mobile) {
+      count = gpuTier === 'low' ? 2000 : 4000;
+    } else {
+      switch (gpuTier) {
+        case 'low': count = 4000; break;
+        case 'medium': count = 6000; break;
+        case 'high': default: count = 8000; break;
+      }
+    }
+
+    Logger.info('weather', `Rain particle count: ${count} (GPU: ${gpuTier}, mobile: ${mobile})`);
+    return count;
   }
 
   setAudioManager(audioManager: IAudioManager): void {

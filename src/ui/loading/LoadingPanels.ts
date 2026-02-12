@@ -1,4 +1,5 @@
 import { SettingsManager, GraphicsQuality } from '../../config/SettingsManager';
+import { isTouchDevice } from '../../utils/DeviceDetector';
 
 export class LoadingPanels {
   private settingsPanel: HTMLDivElement;
@@ -54,8 +55,9 @@ export class LoadingPanels {
         border: 1px solid rgba(127, 180, 217, 0.3);
         border-radius: 20px;
         padding: 2rem;
-        max-width: 500px;
-        width: 90%;
+        max-width: min(500px, 90vw);
+        width: 100%;
+        box-sizing: border-box;
         color: #e8f4f8;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
@@ -78,7 +80,7 @@ export class LoadingPanels {
         </div>
 
         <div style="margin: 1rem 0;">
-          <label style="display: block; margin-bottom: 0.5rem; color: #b8d4e3; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;">Mouse Sensitivity <span data-sensitivity-label>5</span></label>
+          <label style="display: block; margin-bottom: 0.5rem; color: #b8d4e3; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;">${isTouchDevice() ? 'Look' : 'Mouse'} Sensitivity <span data-sensitivity-label>5</span></label>
           <input type="range" min="1" max="10" value="5" data-setting="mouseSensitivity" style="width: 100%; appearance: none; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; outline: none;">
         </div>
 
@@ -154,8 +156,9 @@ export class LoadingPanels {
         border: 1px solid rgba(127, 180, 217, 0.3);
         border-radius: 20px;
         padding: 2rem;
-        max-width: 600px;
-        width: 90%;
+        max-width: min(600px, 90vw);
+        width: 100%;
+        box-sizing: border-box;
         color: #e8f4f8;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
         margin: 20px;
@@ -165,13 +168,22 @@ export class LoadingPanels {
 
         <h3 style="color: #9fcfeb; margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1rem; font-weight: 500; letter-spacing: 0.05em;">CONTROLS</h3>
         <ul style="list-style: none; padding: 0; color: #b8d4e3; line-height: 1.8;">
-          <li>⌨️ WASD - Move</li>
-          <li>⌨️ SHIFT - Sprint</li>
-          <li>⌨️ SPACE - Jump</li>
-          <li>🖱️ MOUSE - Look around</li>
-          <li>🖱️ LEFT CLICK - Fire weapon</li>
-          <li>🖱️ RIGHT CLICK - Aim down sights</li>
-          <li>⌨️ ESC - Release mouse lock</li>
+          ${isTouchDevice() ? `
+            <li>🕹️ Left Joystick - Move</li>
+            <li>🏃 Sprint Button - Sprint</li>
+            <li>⬆️ Jump Button - Jump</li>
+            <li>👆 Drag Screen - Look around</li>
+            <li>🔫 Fire Button - Fire weapon</li>
+            <li>🔍 Aim Button - Aim down sights</li>
+          ` : `
+            <li>⌨️ WASD - Move</li>
+            <li>⌨️ SHIFT - Sprint</li>
+            <li>⌨️ SPACE - Jump</li>
+            <li>🖱️ MOUSE - Look around</li>
+            <li>🖱️ LEFT CLICK - Fire weapon</li>
+            <li>🖱️ RIGHT CLICK - Aim down sights</li>
+            <li>⌨️ ESC - Release mouse lock</li>
+          `}
         </ul>
 
         <h3 style="color: #9fcfeb; margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1rem; font-weight: 500; letter-spacing: 0.05em;">OBJECTIVE</h3>
