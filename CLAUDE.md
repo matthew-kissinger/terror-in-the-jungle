@@ -89,8 +89,21 @@ src/
 ## Known Tech Debt
 
 - 15 `: any` annotations in source (excluding tests and SystemInterfaces)
-- HUD uses hard-coded pixel positions/sizes - not responsive for mobile viewports
-- OpenFrontierRespawnMap only handles mouse events - no touch pan/zoom/select
-- `TicketSystem.restartMatch()` unused - UI uses `window.location.reload()` instead
-- TouchWeaponBar slot event listeners not cleaned up in dispose() - minor memory leak
-- Touch controls: TouchADSButton and TouchWeaponBar still untested
+- Players can fire during weapon switch animation (no `isSwitching()` guard in `FirstPersonWeapon.tryFire()`)
+- WeatherSystem rain always renders 8000 particles regardless of GPU tier - should scale for mobile
+- Mortar system has no touch controls - completely inaccessible on mobile (no weapon slot, no touch aiming)
+- Sandbag rotation (R/T keys) and rally point placement (V key) have no touch equivalents
+- Compass `top: 120px` and minimap `200x200px` are hardcoded - not responsive for mobile viewports
+- Desktop keyboard hints shown on mobile: "Press R to reload", "Press K", "RCTRL", "Press TAB" (5+ locations)
+- PersonalStatsPanel/KillFeed overlap on mobile right side (fixed pixel positions)
+- Scoreboard 2-column grid not responsive for portrait mobile
+
+### Fixed on branches (pending merge)
+- ~~OpenFrontierRespawnMap touch support~~ (branch has pan/zoom/select)
+- ~~TicketSystem.restartMatch() wired~~ (branch has graceful restart)
+- ~~TouchWeaponBar dispose() leak~~ (branch fixes event listener cleanup)
+- ~~TouchADSButton and TouchWeaponBar untested~~ (branch has tests)
+- ~~HUD responsive for mobile~~ (branch has media queries)
+- ~~SquadRadialMenu touch support~~ (branch has touch events)
+- ~~Settings labels device-aware~~ (branch has mobile-friendly labels)
+- ~~Kill streak audio~~ (branch has procedural audio stings)
