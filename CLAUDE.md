@@ -89,9 +89,9 @@ src/
 
 ## Known Tech Debt
 
-- 15 `: any` annotations in source (excluding tests and SystemInterfaces)
+- 16 `: any` annotations in source (excluding tests and SystemInterfaces)
 - Mortar has no touch controls - completely inaccessible on mobile. TouchMortarButton exists on branch task-0930d0dc but not on master.
-- `SquadRadialMenu` touch listeners are on container element which has `pointer-events: none` - touch events don't fire on mobile. Must move listeners to document level with visibility guards.
+- `SquadRadialMenu` touch listeners are on container element which has `pointer-events: none` - touch events don't fire on mobile. Fix ready on branch task-c6ba09e0 (moves to document listeners with visibility guards).
 - `MobilePauseOverlay` uses `'click'` (1 listener) - should use `pointerdown`. `LoadingScreenWithModes` also uses click but is deprecated/unused.
 - `RespawnMapView` and `OpenFrontierRespawnMap` use mixed click/touchend pattern instead of unified `pointerdown`
 - `HUDSystem` respawn button uses `onclick` instead of `addEventListener('pointerdown')`
@@ -99,8 +99,9 @@ src/
 
 ### Unmerged Feature Branches
 
-1 `mycel/*` branch has unique work. 2 branches (task-03c60d37, task-5a51ae1c) are consumed and can be deleted.
+2 `mycel/*` branches have unique work, each with an active worktree.
 
 | Feature | Branch suffix | Notes |
 |---------|--------------|-------|
 | Mortar touch controls | task-0930d0dc | New TouchMortarButton.ts + PlayerInput/Controller/TouchControls wiring. Cherry-pick carefully - PlayerController/PlayerInput have diverged from master. |
+| SquadRadialMenu touch fix | task-c6ba09e0 | Moves touch listeners from container (pointer-events:none) to document with visibility guards. Clean fix, ready to merge. |
