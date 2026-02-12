@@ -17,6 +17,9 @@ export function animate(sandbox: PixelArtSandbox): void {
 
   if (!sandbox.isInitialized || !sandbox.gameStarted) return;
 
+  // Skip rendering while WebGL context is lost
+  if (sandbox.contextLost) return;
+
   const deltaTime = sandbox.clock.getDelta();
   sandbox.lastFrameDelta = deltaTime;
 
