@@ -39,6 +39,9 @@ export async function initializeSystems(sandbox: PixelArtSandbox): Promise<void>
     sandbox.isInitialized = true;
     Logger.info('sandbox-init', 'Pixel Art Sandbox ready!');
 
+    // Wire Play Again to programmatic restart so it does not reload the page
+    sandbox.systemManager.hudSystem.setPlayAgainCallback(() => restartMatch(sandbox));
+
     if (sandbox.sandboxEnabled && sandbox.sandboxConfig?.autoStart) {
       startGameWithMode(sandbox, GameMode.AI_SANDBOX);
     } else {
@@ -64,6 +67,18 @@ export async function loadGameAssets(sandbox: PixelArtSandbox): Promise<void> {
     Logger.warn('sandbox-init', 'Skybox texture missing; proceeding without skybox.');
   }
   Logger.info('sandbox-init', 'Asset check complete');
+}
+
+/**
+ * Restarts the current match in-place (same mode). Resets tickets, combatants, player, day/night, weather.
+ * Used by the Match End "Play Again" button.
+ */
+export function restartMatch(sandbox: PixelArtSandbox): void {
+  const mode = sandbox.systemManager.gameModeManager.getCurrentMode();
+  Logger.info('sandbox-init', `Restarting match with mode: ${mode}`);
+  sandbox.systemManager.setGameMode(mode, { createPlayerSquad: true });
+  sandbox.systemManager.ticketSystem.restartMatch();
+  sandbox.systemManager.hudSystem.startMatch();
 }
 
 /**

@@ -33,6 +33,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private personalStatsPanel: PersonalStatsPanel;
   private scoreboardCombatantProxy: CombatantSystem;
   private isScoreboardVisible = false;
+  private onPlayAgainCallback?: () => void;
 
   constructor(camera?: THREE.Camera, ticketSystem?: TicketSystem, playerHealthSystem?: PlayerHealthSystem, _playerRespawnManager?: unknown) {
     this.camera = camera;
@@ -52,7 +53,17 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       window.location.reload();
     });
 
+    // Play Again uses callback when set (e.g. by PixelArtSandboxInit); otherwise MatchEndScreen falls back to reload
+    this.matchEndScreen.onPlayAgain(() => {
+      if (this.onPlayAgainCallback) this.onPlayAgainCallback();
+    });
+
     // Parameters are optional for backward compatibility
+  }
+
+  /** Set callback for Play Again button (programmatic match restart). Called from bootstrap. */
+  setPlayAgainCallback(callback: () => void): void {
+    this.onPlayAgainCallback = callback;
   }
 
   async init(): Promise<void> {
