@@ -10,7 +10,7 @@
 npm install
 npm run dev        # Dev server on localhost:5173
 npm run build      # Production build
-npm run test:run   # 3366 tests (all passing)
+npm run test:run   # 3370 tests (all passing)
 ```
 
 ## Stack
@@ -21,7 +21,7 @@ npm run test:run   # 3366 tests (all passing)
 | Spatial | three-mesh-bvh, custom octree/grid |
 | Build | Vite 7, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 96 files, 3366 tests |
+| Tests | Vitest - 96 files, 3370 tests |
 
 ## Architecture
 
@@ -85,13 +85,13 @@ src/
 - **1-6** Weapons, **G** Grenade, **Z** Squad UI, **TAB** Scoreboard
 - **B** Deploy/undeploy mortar, **F** Fire mortar, **Arrows** Aim mortar (pitch/yaw), **Mouse wheel** Adjust pitch
 - **F1** Console stats, **F2** Performance overlay, **M** Mortar camera
-- **Mobile**: Virtual joystick, touch-drag look, fire/ADS/reload/grenade/scoreboard buttons, weapon bar, helicopter entry
+- **Mobile**: Virtual joystick, touch-drag look, fire/ADS/reload/grenade/scoreboard buttons, weapon bar, helicopter entry, mortar deploy/fire/aim pad, sandbag rotate, rally point, landscape lock
 
 ## Known Tech Debt
 
-- 16 `: any` annotations in source (excluding tests and SystemInterfaces)
-- Mortar has no touch controls - completely inaccessible on mobile. No TouchMortarButton on master. Needs deploy, fire, and aim (pitch/yaw) controls.
-- `MobilePauseOverlay` uses `'click'` + `'touchend'` (2 listeners) - could use `pointerdown`. `LoadingScreenWithModes` also uses click but is deprecated/unused.
-- `HUDSystem` respawn button uses `onclick` instead of `addEventListener('pointerdown')`
-- `RespawnMapView` uses mixed click/touchend pattern (acceptable for this use case)
+- 9 `: any` annotations in source (excluding tests, SystemInterfaces, and .d.ts files)
+- Helicopter cyclic controls (pitch/roll) have no touch equivalent - players can enter/exit helicopter and control collective/yaw via joystick, but cannot pitch forward/backward or bank left/right on mobile. Arrow key controls in `PlayerMovement.ts` lines 250-268 are desktop-only.
+- Mortar camera toggle (M key) has no touch button - `TouchMortarButton.ts` has deploy/fire/aim but no camera view toggle.
+- `RespawnUI.ts` respawn button uses `onclick` (line 272) instead of `pointerdown` - causes 300ms touch delay on respawn.
+- `MobilePauseOverlay` uses `'click'` + `'touchend'` (2 listeners) - could use `pointerdown`.
 - `OpenFrontierRespawnMap` uses separate mouse/touch handlers (correct - do not change)
