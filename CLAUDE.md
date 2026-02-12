@@ -10,7 +10,7 @@
 npm install
 npm run dev        # Dev server on localhost:5173
 npm run build      # Production build
-npm run test:run   # 3193 tests (all passing)
+npm run test:run   # 3250 tests (all passing)
 ```
 
 ## Stack
@@ -21,7 +21,7 @@ npm run test:run   # 3193 tests (all passing)
 | Spatial | three-mesh-bvh, custom octree/grid |
 | Build | Vite 7, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 81 files, 3193 tests |
+| Tests | Vitest - 84 files, 3250 tests |
 
 ## Architecture
 
