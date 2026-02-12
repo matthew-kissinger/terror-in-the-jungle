@@ -7,6 +7,7 @@ import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { CombatantSystem } from '../combat/CombatantSystem';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { InventoryManager } from '../player/InventoryManager';
+import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
 import { PlayerStatsTracker } from '../player/PlayerStatsTracker';
 import { VoiceCalloutSystem } from '../audio/VoiceCalloutSystem';
@@ -24,6 +25,7 @@ export class GrenadeSystem implements GameSystem {
   private impactEffectsPool?: ImpactEffectsPool;
   private explosionEffectsPool?: ExplosionEffectsPool;
   private inventoryManager?: InventoryManager;
+  private ticketSystem?: TicketSystem;
   private audioManager?: AudioManager;
   private voiceCalloutSystem?: VoiceCalloutSystem;
   private playerController?: IPlayerController;
@@ -168,6 +170,7 @@ export class GrenadeSystem implements GameSystem {
   }
 
   startAiming(): void {
+    if (this.ticketSystem && !this.ticketSystem.isGameActive()) return;
     // Check if we have grenades first
     if (this.inventoryManager && !this.inventoryManager.canUseGrenade()) {
       Logger.info('weapons', ' No grenades remaining!');
@@ -213,6 +216,10 @@ export class GrenadeSystem implements GameSystem {
   }
 
   throwGrenade(): boolean {
+    if (this.ticketSystem && !this.ticketSystem.isGameActive()) {
+      this.cancelThrow();
+      return false;
+    }
     if (!this.isAiming) return false;
 
     // Check inventory and use grenade
@@ -327,6 +334,10 @@ export class GrenadeSystem implements GameSystem {
 
   setInventoryManager(inventoryManager: InventoryManager): void {
     this.inventoryManager = inventoryManager;
+  }
+
+  setTicketSystem(ticketSystem: TicketSystem): void {
+    this.ticketSystem = ticketSystem;
   }
 
   setAudioManager(audioManager: AudioManager): void {

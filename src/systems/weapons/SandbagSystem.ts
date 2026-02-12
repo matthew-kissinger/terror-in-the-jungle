@@ -4,6 +4,7 @@ import { GameSystem } from '../../types';
 import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { InventoryManager } from '../player/InventoryManager';
+import { TicketSystem } from '../world/TicketSystem';
 
 interface PlacedSandbag {
   id: string;
@@ -17,6 +18,7 @@ export class SandbagSystem implements GameSystem {
   private camera: THREE.Camera;
   private chunkManager?: ImprovedChunkManager;
   private inventoryManager?: InventoryManager;
+  private ticketSystem?: TicketSystem;
 
   private sandbags: PlacedSandbag[] = [];
   private nextSandbagId = 0;
@@ -203,6 +205,7 @@ export class SandbagSystem implements GameSystem {
   }
 
   placeSandbag(): boolean {
+    if (this.ticketSystem && !this.ticketSystem.isGameActive()) return false;
     if (!this.placementValid || !this.inventoryManager) {
       Logger.info('weapons', ' Cannot place sandbag: invalid position or no inventory');
       return false;
@@ -318,6 +321,10 @@ export class SandbagSystem implements GameSystem {
 
   setInventoryManager(inventoryManager: InventoryManager): void {
     this.inventoryManager = inventoryManager;
+  }
+
+  setTicketSystem(ticketSystem: TicketSystem): void {
+    this.ticketSystem = ticketSystem;
   }
 
   getSandbagCount(): number {

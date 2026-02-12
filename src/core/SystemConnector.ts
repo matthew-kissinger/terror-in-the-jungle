@@ -18,6 +18,7 @@ export class SystemConnector {
     // Connect systems with chunk manager
     refs.playerController.setChunkManager(refs.chunkManager);
     refs.playerController.setGameModeManager(refs.gameModeManager);
+    refs.playerController.setTicketSystem(refs.ticketSystem);
     refs.playerController.setHelicopterModel(refs.helicopterModel);
     refs.playerController.setFirstPersonWeapon(refs.firstPersonWeapon);
     refs.playerController.setHUDSystem(refs.hudSystem);
@@ -28,6 +29,7 @@ export class SystemConnector {
     refs.combatantSystem.setCamera(camera);
     refs.firstPersonWeapon.setPlayerController(refs.playerController);
     refs.firstPersonWeapon.setCombatantSystem(refs.combatantSystem);
+    refs.firstPersonWeapon.setTicketSystem(refs.ticketSystem);
     refs.firstPersonWeapon.setHUDSystem(refs.hudSystem);
     refs.firstPersonWeapon.setZoneManager(refs.zoneManager);
     refs.firstPersonWeapon.setInventoryManager(refs.inventoryManager);
@@ -116,6 +118,7 @@ export class SystemConnector {
     // Connect weapon systems
     refs.grenadeSystem.setCombatantSystem(refs.combatantSystem);
     refs.grenadeSystem.setInventoryManager(refs.inventoryManager);
+    refs.grenadeSystem.setTicketSystem(refs.ticketSystem);
     refs.grenadeSystem.setAudioManager(refs.audioManager);
     refs.grenadeSystem.setPlayerController(refs.playerController);
     refs.grenadeSystem.setFlashbangEffect(refs.flashbangScreenEffect);
@@ -123,7 +126,9 @@ export class SystemConnector {
     refs.mortarSystem.setCombatantSystem(refs.combatantSystem);
     refs.mortarSystem.setInventoryManager(refs.inventoryManager);
     refs.mortarSystem.setAudioManager(refs.audioManager);
+    refs.mortarSystem.setTicketSystem(refs.ticketSystem);
     refs.sandbagSystem.setInventoryManager(refs.inventoryManager);
+    refs.sandbagSystem.setTicketSystem(refs.ticketSystem);
 
     // Access internal effect pools via typed interface
     const impactEffectsPool = refs.combatantSystem.impactEffectsPool;

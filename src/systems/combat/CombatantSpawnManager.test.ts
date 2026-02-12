@@ -129,6 +129,7 @@ function createMockTicketSystem(): TicketSystem {
       usTickets: 100,
       opforTickets: 100,
     })),
+    isGameActive: vi.fn(() => true),
     onCombatantDeath: vi.fn(),
   } as unknown as TicketSystem;
 }
@@ -632,6 +633,58 @@ describe('CombatantSpawnManager', () => {
 
       // Emergency refill should spawn up to 3 squads
       expect(spawnManager).toBeDefined();
+    });
+  });
+
+  describe('Match End Behavior', () => {
+    it('should stop progressive spawning when game is not active', () => {
+      // Setup progressive queue
+      spawnManager.spawnInitialForces(false);
+      const initialCount = combatants.size;
+
+      // Mock ticket system to show game is inactive
+      vi.mocked(ticketSystem.isGameActive).mockReturnValue(false);
+
+      // Try to update progressive spawn
+      spawnManager.update(1.1, true, ticketSystem);
+
+      // Count should NOT have increased
+      expect(combatants.size).toBe(initialCount);
+    });
+
+    it('should stop reinforcement waves when game is not active', () => {
+      spawnManager.setReinforcementInterval(5);
+      const initialCount = combatants.size;
+
+      // Mock ticket system to show game is inactive
+      vi.mocked(ticketSystem.isGameActive).mockReturnValue(false);
+
+      // Trigger reinforcement wave interval
+      spawnManager.update(5.1, true, ticketSystem);
+
+      // Count should NOT have increased
+      expect(combatants.size).toBe(initialCount);
+    });
+
+    it('should stop periodic refill when game is not active', () => {
+      // Mock ticket system to show game is inactive
+      vi.mocked(ticketSystem.isGameActive).mockReturnValue(false);
+      vi.mocked(ticketSystem.getGameState).mockReturnValue({
+        phase: 'COMBAT',
+        usTickets: 100,
+        opforTickets: 100,
+      } as any);
+
+      combatants.clear();
+
+      // Fast-forward past spawn check interval
+      const futureDate = Date.now() + 4000;
+      vi.spyOn(Date, 'now').mockReturnValue(futureDate);
+
+      spawnManager.update(4.0, true, ticketSystem);
+
+      // Should NOT have refilled
+      expect(combatants.size).toBe(0);
     });
   });
 

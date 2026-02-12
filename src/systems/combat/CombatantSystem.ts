@@ -219,7 +219,9 @@ export class CombatantSystem implements GameSystem {
     // Update FPS EMA and adjust interval scaling
     this.lodManager.updateFrameTiming(deltaTime);
     const updateStart = performance.now();
-    if (!this.combatEnabled) {
+    const isGameActive = this.ticketSystem ? this.ticketSystem.isGameActive() : true;
+
+    if (!this.combatEnabled || !isGameActive) {
       // Still update positions and billboards for visual consistency
       this.lodManager.updateCombatants(deltaTime);
       this.combatantRenderer.updateBillboards(this.combatants, this.playerPosition);

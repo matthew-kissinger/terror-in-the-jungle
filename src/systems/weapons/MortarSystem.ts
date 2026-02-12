@@ -5,6 +5,7 @@ import { CombatantSystem } from '../combat/CombatantSystem';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { InventoryManager } from '../player/InventoryManager';
+import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
 import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
 import { MortarBallistics } from './MortarBallistics';
@@ -24,6 +25,7 @@ export class MortarSystem implements GameSystem {
   private impactEffectsPool?: ImpactEffectsPool;
   private explosionEffectsPool?: ExplosionEffectsPool;
   private inventoryManager?: InventoryManager;
+  private ticketSystem?: TicketSystem;
   private audioManager?: AudioManager;
 
   // Mortar tube placement
@@ -111,6 +113,7 @@ export class MortarSystem implements GameSystem {
   }
 
   deployMortar(playerPosition: THREE.Vector3, playerDirection: THREE.Vector3): boolean {
+    if (this.ticketSystem && !this.ticketSystem.isGameActive()) return false;
     if (this.isDeployed) {
       Logger.warn('mortar', ' Mortar already deployed');
       return false;
@@ -217,6 +220,7 @@ export class MortarSystem implements GameSystem {
   }
 
   fireMortarRound(): boolean {
+    if (this.ticketSystem && !this.ticketSystem.isGameActive()) return false;
     if (!this.isAiming || !this.isDeployed || !this.tubePosition) {
       Logger.warn('mortar', ' Cannot fire - mortar not ready');
       return false;
@@ -313,6 +317,10 @@ export class MortarSystem implements GameSystem {
 
   setInventoryManager(inventoryManager: InventoryManager): void {
     this.inventoryManager = inventoryManager;
+  }
+
+  setTicketSystem(ticketSystem: TicketSystem): void {
+    this.ticketSystem = ticketSystem;
   }
 
   setAudioManager(audioManager: AudioManager): void {

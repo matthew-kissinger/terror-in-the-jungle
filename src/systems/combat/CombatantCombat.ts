@@ -95,6 +95,11 @@ export class CombatantCombat {
     allCombatants: Map<string, Combatant>,
     squads: Map<string, Squad>
   ): void {
+    // Stop combat if game is not active
+    if (this.ticketSystem && !this.ticketSystem.isGameActive()) {
+      return;
+    }
+
     // Track player position for death effects
     this.playerPosition.copy(playerPosition);
     this.damage.updatePlayerPosition(playerPosition);

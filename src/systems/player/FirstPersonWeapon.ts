@@ -8,6 +8,7 @@ import { AssetLoader } from '../assets/AssetLoader'
 import { PlayerController } from './PlayerController'
 import { AudioManager } from '../audio/AudioManager'
 import { ZoneManager } from '../world/ZoneManager'
+import { TicketSystem } from '../world/TicketSystem'
 import { InventoryManager, WeaponSlot } from './InventoryManager'
 import { PlayerStatsTracker } from './PlayerStatsTracker'
 import { WeaponRigManager } from './weapon/WeaponRigManager'
@@ -55,11 +56,12 @@ export class FirstPersonWeapon implements GameSystem {
 
   // Dependencies
   private combatantSystem?: CombatantSystem
+  private ticketSystem?: TicketSystem
   private hudSystem?: HUDSystem
   private audioManager?: AudioManager
-  private zoneManager?: ZoneManager
-  private inventoryManager?: InventoryManager
-  private statsTracker?: PlayerStatsTracker
+  private zoneManager?: ZoneManager;
+  private inventoryManager?: InventoryManager;
+  private statsTracker?: PlayerStatsTracker;
 
   constructor(scene: THREE.Scene, camera: THREE.Camera, assetLoader: AssetLoader) {
     this.scene = scene
@@ -192,6 +194,10 @@ export class FirstPersonWeapon implements GameSystem {
     this.firing.setCombatantSystem(combatantSystem)
   }
 
+  setTicketSystem(ticketSystem: TicketSystem): void {
+    this.ticketSystem = ticketSystem
+  }
+
   setInventoryManager(inventoryManager: InventoryManager): void {
     this.inventoryManager = inventoryManager
     this.input.setInventoryManager(inventoryManager)
@@ -217,7 +223,8 @@ export class FirstPersonWeapon implements GameSystem {
     if (this.rigManager.isSwitching()) return
 
     const gunCore = this.rigManager.getCurrentCore()
-    if (!this.combatantSystem || !gunCore.canFire() || !this.isEnabled) return
+    const isGameActive = this.ticketSystem ? this.ticketSystem.isGameActive() : true
+    if (!this.combatantSystem || !gunCore.canFire() || !this.isEnabled || !isGameActive) return
 
     const currentAmmo = this.ammo.getCurrentAmmoManager()
     
