@@ -91,17 +91,8 @@ src/
 
 - 16 `: any` annotations in source (excluding tests and SystemInterfaces)
 - Mortar has no touch controls - completely inaccessible on mobile. No TouchMortarButton on master. Needs deploy, fire, and aim (pitch/yaw) controls.
-- Team Deathmatch mode config exists but is not shown in mode selection UI. A branch (task-69f3364c) has the UI but also regresses SquadRadialMenu touch - cherry-pick only LoadingScreen.ts changes.
 - `MobilePauseOverlay` uses `'click'` + `'touchend'` (2 listeners) - could use `pointerdown`. `LoadingScreenWithModes` also uses click but is deprecated/unused.
 - `HUDSystem` respawn button uses `onclick` instead of `addEventListener('pointerdown')`
 - `RespawnMapView` uses mixed click/touchend pattern (acceptable for this use case)
 - `OpenFrontierRespawnMap` uses separate mouse/touch handlers (correct - do not change)
-
-### Unmerged Feature Branches
-
-2 `mycel/*` branches have active worktrees. Both regress the SquadRadialMenu touch fix - do NOT merge directly.
-
-| Feature | Branch suffix | Notes |
-|---------|--------------|-------|
-| Team Deathmatch UI | task-69f3364c | Adds TDM card to LoadingScreen mode selection. Cherry-pick only LoadingScreen.ts changes - the SquadRadialMenu changes revert the touch fix. |
-| Branch cleanup + docs | task-b4afb36a | CLAUDE.md updates + SquadRadialMenu regression. Stale - discard after cherry-picking any useful doc changes. |
+- `PersonalStatsPanel` is completely hidden on mobile (<480px) - could show compact form
