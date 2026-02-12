@@ -25,7 +25,7 @@ npm run test:run   # 3366 tests (all passing)
 
 ## Architecture
 
-~58k lines across 294 source files. Systems-based architecture with orchestrator pattern.
+~58k lines across 297 source files. Systems-based architecture with orchestrator pattern.
 
 ```
 src/
@@ -89,15 +89,19 @@ src/
 
 ## Known Tech Debt
 
-- 16 `: any` annotations in source (excluding tests and SystemInterfaces)
-- `LoadingScreenWithModes` still uses `'click'` (10 listeners) - needs pointerdown conversion. `MobilePauseOverlay` also uses click (1 listener). LoadingScreen/LoadingPanels/MatchEndScreen/LoadoutSelector already converted.
+- 15 `: any` annotations in source (excluding tests and SystemInterfaces)
 - Mortar has no touch controls - completely inaccessible on mobile. TouchMortarButton exists on branch task-0930d0dc but not on master.
+- `MobilePauseOverlay` uses `'click'` (1 listener) - should use `pointerdown`. `LoadingScreenWithModes` also uses click but is deprecated/unused.
 - `showControls()` in `PlayerInput.ts:440` is incomplete - missing B/F/Z/G key hints
+- `MatchEndScreen` "Play Again" callback is never set in `HUDSystem` - always reloads page instead of programmatic restart
+- `SquadRadialMenu` touch listeners are on container element which has `pointer-events: none` - touch events don't fire. Fix exists on branch task-a56de881 (moves listeners to document level).
+- `RespawnMapView` and `OpenFrontierRespawnMap` use mixed click/touchend pattern instead of unified `pointerdown`
 
 ### Unmerged Feature Branches
 
-1 `mycel/*` branch has unique work. Cherry-pick is the only safe merge strategy.
+2 `mycel/*` branches have unique work. 1 branch (task-6de0fa15) is consumed and can be deleted.
 
 | Feature | Branch suffix | Notes |
 |---------|--------------|-------|
 | Mortar touch controls | task-0930d0dc | New TouchMortarButton.ts + PlayerInput/Controller/TouchControls wiring. Cherry-pick carefully - PlayerController/PlayerInput have diverged from master. |
+| SquadRadialMenu touch fix | task-a56de881 | Moves touch listeners from container to document level, adds visibility guards. Clean 1-file cherry-pick. |
