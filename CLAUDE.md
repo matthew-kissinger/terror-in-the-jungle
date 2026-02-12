@@ -91,17 +91,16 @@ src/
 
 - 15 `: any` annotations in source (excluding tests and SystemInterfaces)
 - Mortar has no touch controls - completely inaccessible on mobile. TouchMortarButton exists on branch task-0930d0dc but not on master.
+- `SquadRadialMenu` touch listeners are on container element which has `pointer-events: none` - touch events don't fire on mobile. Must move listeners to document level with visibility guards.
 - `MobilePauseOverlay` uses `'click'` (1 listener) - should use `pointerdown`. `LoadingScreenWithModes` also uses click but is deprecated/unused.
-- `showControls()` in `PlayerInput.ts:440` is incomplete - missing B/F/Z/G key hints
-- `MatchEndScreen` "Play Again" callback is never set in `HUDSystem` - always reloads page instead of programmatic restart
-- `SquadRadialMenu` touch listeners are on container element which has `pointer-events: none` - touch events don't fire. Fix exists on branch task-a56de881 (moves listeners to document level).
 - `RespawnMapView` and `OpenFrontierRespawnMap` use mixed click/touchend pattern instead of unified `pointerdown`
+- `HUDSystem` respawn button uses `onclick` instead of `addEventListener('pointerdown')`
+- Team Deathmatch mode config exists but is not shown in mode selection UI
 
 ### Unmerged Feature Branches
 
-2 `mycel/*` branches have unique work. 1 branch (task-6de0fa15) is consumed and can be deleted.
+1 `mycel/*` branch has unique work. 2 branches (task-03c60d37, task-5a51ae1c) are consumed and can be deleted.
 
 | Feature | Branch suffix | Notes |
 |---------|--------------|-------|
 | Mortar touch controls | task-0930d0dc | New TouchMortarButton.ts + PlayerInput/Controller/TouchControls wiring. Cherry-pick carefully - PlayerController/PlayerInput have diverged from master. |
-| SquadRadialMenu touch fix | task-a56de881 | Moves touch listeners from container to document level, adds visibility guards. Clean 1-file cherry-pick. |
