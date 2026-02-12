@@ -164,6 +164,29 @@ export class PlayerController implements GameSystem {
       // Reset ADS when switching weapons
       touchControls.adsButton.resetADS();
     });
+
+    // Wire mortar button callbacks
+    touchControls.mortarButton.setCallbacks({
+      onDeploy: () => {
+        this.handleDeployMortar();
+        // Auto-start aiming after deploy on mobile
+        if (this.mortarSystem?.isCurrentlyDeployed()) {
+          this.mortarSystem.startAiming();
+          touchControls.mortarButton.setDeployed(true);
+          touchControls.fireButton.hide();
+        }
+      },
+      onUndeploy: () => {
+        this.handleDeployMortar(); // toggles undeploy
+        touchControls.mortarButton.setDeployed(false);
+        if (touchControls.isVisible()) {
+          touchControls.fireButton.show();
+        }
+      },
+      onFire: () => this.handleMortarFire(),
+      onAdjustPitch: (delta: number) => this.handleMortarAdjustPitch(delta),
+      onAdjustYaw: (delta: number) => this.handleMortarAdjustYaw(delta),
+    });
   }
 
   private handleTouchReload(): void {

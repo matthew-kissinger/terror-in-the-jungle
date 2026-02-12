@@ -14,6 +14,7 @@ import { TouchInteractionButton } from './TouchInteractionButton';
 import { TouchSandbagButtons } from './TouchSandbagButtons';
 import { TouchRallyPointButton } from './TouchRallyPointButton';
 import { TouchMenuButton } from './TouchMenuButton';
+import { TouchMortarButton } from './TouchMortarButton';
 
 export interface TouchControlCallbacks {
   onFireStart: () => void;
@@ -46,6 +47,7 @@ export class TouchControls {
   readonly sandbagButtons: TouchSandbagButtons;
   readonly rallyPointButton: TouchRallyPointButton;
   readonly menuButton: TouchMenuButton;
+  readonly mortarButton: TouchMortarButton;
 
   private visible = false;
 
@@ -60,6 +62,7 @@ export class TouchControls {
     this.sandbagButtons = new TouchSandbagButtons();
     this.rallyPointButton = new TouchRallyPointButton();
     this.menuButton = new TouchMenuButton();
+    this.mortarButton = new TouchMortarButton();
 
     // Start hidden until game starts
     this.hide();
@@ -132,6 +135,7 @@ export class TouchControls {
     this.sandbagButtons.show();
     this.rallyPointButton.show();
     this.menuButton.show();
+    this.mortarButton.show();
   }
 
   hide(): void {
@@ -147,6 +151,7 @@ export class TouchControls {
     this.sandbagButtons.hide();
     this.rallyPointButton.hide();
     this.menuButton.hide();
+    this.mortarButton.hide();
   }
 
   isVisible(): boolean {
@@ -164,5 +169,6 @@ export class TouchControls {
     this.sandbagButtons.dispose();
     this.rallyPointButton.dispose();
     this.menuButton.dispose();
+    this.mortarButton.dispose();
   }
 }
