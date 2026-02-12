@@ -78,10 +78,8 @@ export class PlayerSquadController implements GameSystem {
     const squad = this.squadManager.getSquad(this.playerSquadId);
     if (!squad) return;
 
-    if (event.code === 'KeyZ' && !this.radialMenu.isOpen()) {
-      this.radialMenu.show();
-      return;
-    }
+    // Note: Z key is now handled via PlayerInput callback -> toggleRadialMenu()
+    // This handler only processes Shift+Digit shortcuts for direct command issuing
 
     if (event.shiftKey) {
       switch (event.code) {
@@ -105,9 +103,8 @@ export class PlayerSquadController implements GameSystem {
   }
 
   private onKeyUp(event: KeyboardEvent): void {
-    if (event.code === 'KeyZ' && this.radialMenu.isOpen()) {
-      this.radialMenu.executeCommand();
-    }
+    // Z key release is now handled via toggleRadialMenu()
+    // This method can be kept for future key-up events if needed
   }
 
   private issueCommand(command: SquadCommand): void {
