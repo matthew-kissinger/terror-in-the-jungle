@@ -522,14 +522,27 @@ describe('FirstPersonWeapon', () => {
       await weapon.init();
     });
 
-    it('should not reload while ADS', () => {
+    it('should auto-exit ADS and reload when ADS is active', () => {
       mockAnimations.getADS.mockReturnValue(true);
+      mockReload.startReload.mockReturnValue(true);
 
       // Trigger reload via callback
       const reloadCallback = mockInput.setOnReloadStart.mock.calls[0][0];
       reloadCallback();
 
-      expect(mockReload.startReload).not.toHaveBeenCalled();
+      // Should exit ADS and start reload
+      expect(mockAnimations.setADS).toHaveBeenCalledWith(false);
+      expect(mockReload.startReload).toHaveBeenCalled();
+    });
+
+    it('should reload normally when not ADS', () => {
+      mockAnimations.getADS.mockReturnValue(false);
+      mockReload.startReload.mockReturnValue(true);
+
+      const reloadCallback = mockInput.setOnReloadStart.mock.calls[0][0];
+      reloadCallback();
+
+      expect(mockReload.startReload).toHaveBeenCalled();
     });
 
     it('should stop firing during reload', () => {
