@@ -93,5 +93,9 @@ src/
 - Helicopter cyclic controls (pitch/roll) have no touch equivalent - players can enter/exit helicopter and control collective/yaw via joystick, but cannot pitch forward/backward or bank left/right on mobile. Arrow key controls in `PlayerMovement.ts` lines 250-268 are desktop-only.
 - Mortar camera toggle (M key) has no touch button - `TouchMortarButton.ts` has deploy/fire/aim but no camera view toggle.
 - `RespawnUI.ts` respawn button uses `onclick` (line 272) instead of `pointerdown` - causes 300ms touch delay on respawn.
-- `MobilePauseOverlay` uses `'click'` + `'touchend'` (2 listeners) - could use `pointerdown`.
+- `FullMapDOMHelpers.ts` zoom buttons use `onclick` (lines 42, 47, 52) instead of `pointerdown` - 300ms delay on mobile map controls.
+- `bootstrap.ts` error recovery button uses `onclick` (line 35) instead of `pointerdown`.
 - `OpenFrontierRespawnMap` uses separate mouse/touch handlers (correct - do not change)
+- `FirstPersonWeapon.ts` blocks reload while ADS (line 344) - player must exit ADS before reloading, breaks combat flow.
+- No zone capture celebration - `ZoneManager.ts` only increments stat counter, no audio callout or screen notification.
+- No weapon switch feedback - `FirstPersonWeapon.ts` silently ignores fire input during switch (line 223).
