@@ -90,18 +90,18 @@ src/
 ## Known Tech Debt
 
 - 16 `: any` annotations in source (excluding tests and SystemInterfaces)
-- Mortar has no touch controls - completely inaccessible on mobile. TouchMortarButton exists on branch task-0930d0dc but not on master.
-- `SquadRadialMenu` touch listeners are on container element which has `pointer-events: none` - touch events don't fire on mobile. Fix ready on branch task-c6ba09e0 (moves to document listeners with visibility guards).
-- `MobilePauseOverlay` uses `'click'` (1 listener) - should use `pointerdown`. `LoadingScreenWithModes` also uses click but is deprecated/unused.
-- `RespawnMapView` and `OpenFrontierRespawnMap` use mixed click/touchend pattern instead of unified `pointerdown`
+- Mortar has no touch controls - completely inaccessible on mobile. No TouchMortarButton on master. Needs deploy, fire, and aim (pitch/yaw) controls.
+- Team Deathmatch mode config exists but is not shown in mode selection UI. A branch (task-69f3364c) has the UI but also regresses SquadRadialMenu touch - cherry-pick only LoadingScreen.ts changes.
+- `MobilePauseOverlay` uses `'click'` + `'touchend'` (2 listeners) - could use `pointerdown`. `LoadingScreenWithModes` also uses click but is deprecated/unused.
 - `HUDSystem` respawn button uses `onclick` instead of `addEventListener('pointerdown')`
-- Team Deathmatch mode config exists but is not shown in mode selection UI
+- `RespawnMapView` uses mixed click/touchend pattern (acceptable for this use case)
+- `OpenFrontierRespawnMap` uses separate mouse/touch handlers (correct - do not change)
 
 ### Unmerged Feature Branches
 
-2 `mycel/*` branches have unique work, each with an active worktree.
+2 `mycel/*` branches have active worktrees. Both regress the SquadRadialMenu touch fix - do NOT merge directly.
 
 | Feature | Branch suffix | Notes |
 |---------|--------------|-------|
-| Mortar touch controls | task-0930d0dc | New TouchMortarButton.ts + PlayerInput/Controller/TouchControls wiring. Cherry-pick carefully - PlayerController/PlayerInput have diverged from master. |
-| SquadRadialMenu touch fix | task-c6ba09e0 | Moves touch listeners from container (pointer-events:none) to document with visibility guards. Clean fix, ready to merge. |
+| Team Deathmatch UI | task-69f3364c | Adds TDM card to LoadingScreen mode selection. Cherry-pick only LoadingScreen.ts changes - the SquadRadialMenu changes revert the touch fix. |
+| Branch cleanup + docs | task-b4afb36a | CLAUDE.md updates + SquadRadialMenu regression. Stale - discard after cherry-picking any useful doc changes. |
