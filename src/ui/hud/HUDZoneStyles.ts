@@ -81,4 +81,49 @@ export const HUDZoneStyles = `
     color: #aaa;
     margin-left: 5px;
   }
+
+  /* Mobile responsive adjustments */
+  @media (max-width: 768px) {
+    .objectives-panel {
+      min-width: 180px;
+      right: 12px;
+      top: 12px;
+      padding: 8px;
+    }
+
+    .objectives-title {
+      font-size: 14px;
+      margin-bottom: 6px;
+    }
+
+    .capture-progress {
+      width: 70px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .objectives-panel {
+      min-width: 140px;
+      max-width: 45vw;
+      right: 8px;
+      top: 8px;
+      padding: 6px;
+      font-size: 11px;
+    }
+
+    .objectives-title {
+      font-size: 12px;
+      margin-bottom: 4px;
+      padding-bottom: 3px;
+    }
+
+    .zone-item {
+      margin: 4px 0;
+      padding: 3px;
+    }
+
+    .capture-progress {
+      width: 50px;
+    }
+  }
 `;
