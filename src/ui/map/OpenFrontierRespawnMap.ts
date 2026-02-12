@@ -28,6 +28,14 @@ export class OpenFrontierRespawnMap {
   private isPanning = false;
   private lastMousePos = { x: 0, y: 0 };
 
+  // Touch state
+  private touchIdentifier: number | null = null;
+  private touchStartPos = { x: 0, y: 0 };
+  private lastTouchPos = { x: 0, y: 0 };
+  private isTouchPanning = false;
+  private pinchStartDistance = 0;
+  private pinchStartZoom = 1;
+
   // Event handler references
   private handleClick = (e: MouseEvent) => {
     if (this.isPanning) return;
@@ -84,6 +92,101 @@ export class OpenFrontierRespawnMap {
     this.mapCanvas.style.cursor = 'default';
   };
 
+  // Touch event handlers
+  private handleTouchStart = (e: TouchEvent) => {
+    e.preventDefault();
+
+    if (e.touches.length === 2) {
+      // Start pinch zoom
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      this.pinchStartDistance = Math.sqrt(dx * dx + dy * dy);
+      this.pinchStartZoom = this.zoomLevel;
+      this.isTouchPanning = false;
+      return;
+    }
+
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      this.touchIdentifier = touch.identifier;
+      const rect = this.mapCanvas.getBoundingClientRect();
+      const x = (touch.clientX - rect.left) * (MAP_SIZE / rect.width);
+      const y = (touch.clientY - rect.top) * (MAP_SIZE / rect.height);
+      this.touchStartPos = { x, y };
+      this.lastTouchPos = { x, y };
+      this.isTouchPanning = false;
+    }
+  };
+
+  private handleTouchMove = (e: TouchEvent) => {
+    e.preventDefault();
+
+    if (e.touches.length === 2) {
+      // Pinch zoom
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (this.pinchStartDistance > 0) {
+        const scale = distance / this.pinchStartDistance;
+        this.zoomLevel = Math.max(0.5, Math.min(2, this.pinchStartZoom * scale));
+        this.render();
+      }
+      return;
+    }
+
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const rect = this.mapCanvas.getBoundingClientRect();
+      const x = (touch.clientX - rect.left) * (MAP_SIZE / rect.width);
+      const y = (touch.clientY - rect.top) * (MAP_SIZE / rect.height);
+
+      const dx = x - this.touchStartPos.x;
+      const dy = y - this.touchStartPos.y;
+      const moved = Math.sqrt(dx * dx + dy * dy);
+
+      if (moved > 5 || this.isTouchPanning) {
+        // Pan the map
+        this.isTouchPanning = true;
+        const panDx = x - this.lastTouchPos.x;
+        const panDy = y - this.lastTouchPos.y;
+        this.panOffset.x += panDx;
+        this.panOffset.y += panDy;
+        this.lastTouchPos = { x, y };
+        this.render();
+      } else {
+        // Hover zone detection
+        const zone = getZoneAtPosition(x, y, this.zoomLevel, this.panOffset, this.zoneManager);
+        this.mapCanvas.style.cursor = zone && isZoneSpawnable(zone, this.gameModeManager) ? 'pointer' : 'default';
+      }
+    }
+  };
+
+  private handleTouchEnd = (e: TouchEvent) => {
+    e.preventDefault();
+
+    // If fingers still down (e.g. lifting one finger from pinch), reset state
+    if (e.touches.length > 0) {
+      this.isTouchPanning = false;
+      this.pinchStartDistance = 0;
+      return;
+    }
+
+    if (!this.isTouchPanning) {
+      // Tap — treat as click for spawn selection
+      const touch = e.changedTouches[0];
+      if (touch) {
+        const rect = this.mapCanvas.getBoundingClientRect();
+        const x = (touch.clientX - rect.left) * (MAP_SIZE / rect.width);
+        const y = (touch.clientY - rect.top) * (MAP_SIZE / rect.height);
+        this.handleMapClick(x, y);
+      }
+    }
+
+    this.isTouchPanning = false;
+    this.touchIdentifier = null;
+    this.pinchStartDistance = 0;
+  };
+
   constructor() {
     this.mapCanvas = document.createElement('canvas');
     this.mapCanvas.width = MAP_SIZE;
@@ -100,6 +203,12 @@ export class OpenFrontierRespawnMap {
     this.mapCanvas.addEventListener('mousedown', this.handleMouseDown);
     this.mapCanvas.addEventListener('mouseup', this.handleMouseUp);
     this.mapCanvas.addEventListener('mouseleave', this.handleMouseLeave);
+
+    // Touch events for mobile support
+    this.mapCanvas.addEventListener('touchstart', this.handleTouchStart, { passive: false });
+    this.mapCanvas.addEventListener('touchmove', this.handleTouchMove, { passive: false });
+    this.mapCanvas.addEventListener('touchend', this.handleTouchEnd, { passive: false });
+    this.mapCanvas.addEventListener('touchcancel', this.handleTouchEnd, { passive: false });
   }
 
   private handleMapClick(canvasX: number, canvasY: number): void {
@@ -181,6 +290,12 @@ export class OpenFrontierRespawnMap {
     this.mapCanvas.removeEventListener('mousedown', this.handleMouseDown);
     this.mapCanvas.removeEventListener('mouseup', this.handleMouseUp);
     this.mapCanvas.removeEventListener('mouseleave', this.handleMouseLeave);
+
+    // Touch events
+    this.mapCanvas.removeEventListener('touchstart', this.handleTouchStart);
+    this.mapCanvas.removeEventListener('touchmove', this.handleTouchMove);
+    this.mapCanvas.removeEventListener('touchend', this.handleTouchEnd);
+    this.mapCanvas.removeEventListener('touchcancel', this.handleTouchEnd);
 
     if (this.mapCanvas.parentElement) {
       this.mapCanvas.parentElement.removeChild(this.mapCanvas);
