@@ -23,6 +23,7 @@ export interface InputCallbacks {
   onMouseUp?: (button: number) => void;
   onReload?: () => void;
   onGrenadeSwitch?: () => void;
+  onSquadCommand?: () => void;
 }
 
 export class PlayerInput {
@@ -113,6 +114,7 @@ export class PlayerInput {
           const event = new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true });
           window.dispatchEvent(event);
         },
+        onSquadCommand: () => callbacks.onSquadCommand?.(),
       });
     }
   }

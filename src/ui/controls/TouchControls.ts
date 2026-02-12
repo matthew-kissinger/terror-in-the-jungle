@@ -29,6 +29,7 @@ export interface TouchControlCallbacks {
   onSandbagRotateLeft: () => void;
   onSandbagRotateRight: () => void;
   onRallyPointPlace: () => void;
+  onSquadCommand?: () => void;
 }
 
 export class TouchControls {
@@ -69,6 +70,9 @@ export class TouchControls {
 
     this.actionButtons.setOnAction((action: string) => {
       switch (action) {
+        case 'squad':
+          callbacks.onSquadCommand?.();
+          break;
         case 'jump':
           callbacks.onJump();
           break;

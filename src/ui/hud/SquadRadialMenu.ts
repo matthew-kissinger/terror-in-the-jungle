@@ -51,7 +51,10 @@ export class SquadRadialMenu {
   private centerY = 0
   private radius = 100
   private boundMouseMoveHandler = this.onMouseMove.bind(this)
+  private boundTouchMoveHandler = this.onTouchMove.bind(this)
+  private boundTouchEndHandler = this.onTouchEnd.bind(this)
   private segmentPaths: SVGPathElement[] = []
+  private segmentTexts: SVGTextElement[] = []
   private segmentEnterHandlers: Array<(event: MouseEvent) => void> = []
 
   constructor() {
@@ -156,6 +159,7 @@ export class SquadRadialMenu {
       text.setAttribute('pointer-events', 'none')
       text.setAttribute('data-index', String(index))
       text.textContent = item.label
+      this.segmentTexts.push(text)
       svg.appendChild(text)
 
       // Add icon
@@ -232,11 +236,29 @@ export class SquadRadialMenu {
   }
 
   private onMouseMove(event: MouseEvent): void {
-    this.mouseX = event.clientX
-    this.mouseY = event.clientY
+    this.updateSelection(event.clientX, event.clientY)
+  }
+
+  private onTouchMove(event: TouchEvent): void {
+    if (event.touches.length > 0) {
+      const touch = event.touches[0]
+      this.updateSelection(touch.clientX, touch.clientY)
+    }
+  }
+
+  private onTouchEnd(event: TouchEvent): void {
+    event.preventDefault()
+    if (this.isVisible) {
+      this.executeCommand()
+    }
+  }
+
+  private updateSelection(clientX: number, clientY: number): void {
+    this.mouseX = clientX
+    this.mouseY = clientY
 
     if (this.isVisible && this.container) {
-      // Track mouse position relative to menu center
+      // Track position relative to menu center
       const rect = this.container.getBoundingClientRect()
       const centerX = rect.left + rect.width / 2
       const centerY = rect.top + rect.height / 2
@@ -255,35 +277,26 @@ export class SquadRadialMenu {
   private selectSegment(index: number): void {
     if (index === this.selectedIndex) return
 
-    // Update segment highlighting
-    const paths = this.container?.querySelectorAll('path[data-index]')
-    const labels = this.container?.querySelectorAll('text[data-index]')
+    // Use cached elements for better performance
+    this.segmentPaths.forEach((path, i) => {
+      if (i === index) {
+        path.setAttribute('opacity', '0.4')
+        path.setAttribute('stroke-width', '3')
+      } else {
+        path.setAttribute('opacity', '0.15')
+        path.setAttribute('stroke-width', '2')
+      }
+    })
 
-    if (paths) {
-      paths.forEach((path) => {
-        const pathIndex = parseInt(path.getAttribute('data-index') || '-1')
-        if (pathIndex === index) {
-          path.setAttribute('opacity', '0.4')
-          path.setAttribute('stroke-width', '3')
-        } else {
-          path.setAttribute('opacity', '0.15')
-          path.setAttribute('stroke-width', '2')
-        }
-      })
-    }
-
-    if (labels) {
-      labels.forEach((text) => {
-        const textIndex = parseInt(text.getAttribute('data-index') || '-1')
-        if (textIndex === index) {
-          text.setAttribute('font-size', '12')
-          text.setAttribute('font-weight', 'bold')
-          text.setAttribute('opacity', '1')
-        } else {
-          text.setAttribute('opacity', '1')
-        }
-      })
-    }
+    this.segmentTexts.forEach((text, i) => {
+      if (i === index) {
+        text.setAttribute('font-size', '12')
+        text.setAttribute('font-weight', 'bold')
+        text.setAttribute('opacity', '1')
+      } else {
+        text.setAttribute('opacity', '1')
+      }
+    })
 
     this.selectedIndex = index
   }
@@ -294,6 +307,13 @@ export class SquadRadialMenu {
     this.isVisible = true
     this.selectedIndex = -1
 
+    // Add touch listeners when menu is shown
+    if (this.container) {
+      this.container.addEventListener('touchmove', this.boundTouchMoveHandler, { passive: false })
+      this.container.addEventListener('touchend', this.boundTouchEndHandler, { passive: false })
+      this.container.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false })
+    }
+
     // Slow time slightly (optional - remove if not desired)
     this.slowTime(0.6)
   }
@@ -303,6 +323,13 @@ export class SquadRadialMenu {
     this.container.style.display = 'none'
     this.isVisible = false
     this.selectedIndex = -1
+
+    // Remove touch listeners when menu is hidden
+    if (this.container) {
+      this.container.removeEventListener('touchmove', this.boundTouchMoveHandler)
+      this.container.removeEventListener('touchend', this.boundTouchEndHandler)
+    }
+
     this.restoreTime()
   }
 
@@ -340,6 +367,12 @@ export class SquadRadialMenu {
 
   dispose(): void {
     window.removeEventListener('mousemove', this.boundMouseMoveHandler)
+    
+    if (this.container) {
+      this.container.removeEventListener('touchmove', this.boundTouchMoveHandler)
+      this.container.removeEventListener('touchend', this.boundTouchEndHandler)
+    }
+
     this.segmentPaths.forEach((path, index) => {
       const handler = this.segmentEnterHandlers[index]
       if (handler) {
@@ -347,6 +380,7 @@ export class SquadRadialMenu {
       }
     })
     this.segmentPaths = []
+    this.segmentTexts = []
     this.segmentEnterHandlers = []
 
     if (this.container && this.container.parentNode) {

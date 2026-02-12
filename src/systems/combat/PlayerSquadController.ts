@@ -3,6 +3,7 @@ import { GameSystem } from '../../types';
 import { SquadCommand } from './types';
 import { SquadManager } from './SquadManager';
 import { Logger } from '../../utils/Logger';
+import { SquadRadialMenu } from '../../ui/hud/SquadRadialMenu';
 
 export class PlayerSquadController implements GameSystem {
   private squadManager: SquadManager;
@@ -13,9 +14,13 @@ export class PlayerSquadController implements GameSystem {
   private commandIndicatorElement?: HTMLElement;
   private isUIVisible = false;
   private boundOnKeyDown!: (event: KeyboardEvent) => void;
+  private boundOnKeyUp!: (event: KeyboardEvent) => void;
+  private radialMenu: SquadRadialMenu;
 
   constructor(squadManager: SquadManager) {
     this.squadManager = squadManager;
+    this.radialMenu = new SquadRadialMenu();
+    this.radialMenu.setCommandSelectedCallback((command) => this.issueCommand(command));
     this.setupEventListeners();
     this.createCommandUI();
   }
@@ -30,6 +35,7 @@ export class PlayerSquadController implements GameSystem {
 
   dispose(): void {
     this.removeEventListeners();
+    this.radialMenu.dispose();
     if (this.commandUIElement && this.commandUIElement.parentNode) {
       this.commandUIElement.parentNode.removeChild(this.commandUIElement);
     }
@@ -56,11 +62,14 @@ export class PlayerSquadController implements GameSystem {
 
   private setupEventListeners(): void {
     this.boundOnKeyDown = this.onKeyDown.bind(this);
+    this.boundOnKeyUp = this.onKeyUp.bind(this);
     window.addEventListener('keydown', this.boundOnKeyDown);
+    window.addEventListener('keyup', this.boundOnKeyUp);
   }
 
   private removeEventListeners(): void {
     window.removeEventListener('keydown', this.boundOnKeyDown);
+    window.removeEventListener('keyup', this.boundOnKeyUp);
   }
 
   private onKeyDown(event: KeyboardEvent): void {
@@ -68,6 +77,11 @@ export class PlayerSquadController implements GameSystem {
 
     const squad = this.squadManager.getSquad(this.playerSquadId);
     if (!squad) return;
+
+    if (event.code === 'KeyZ' && !this.radialMenu.isOpen()) {
+      this.radialMenu.show();
+      return;
+    }
 
     if (event.shiftKey) {
       switch (event.code) {
@@ -88,9 +102,11 @@ export class PlayerSquadController implements GameSystem {
           break;
       }
     }
+  }
 
-    if (event.code === 'KeyZ') {
-      this.toggleCommandUI();
+  private onKeyUp(event: KeyboardEvent): void {
+    if (event.code === 'KeyZ' && this.radialMenu.isOpen()) {
+      this.radialMenu.executeCommand();
     }
   }
 
@@ -211,6 +227,14 @@ export class PlayerSquadController implements GameSystem {
 
   getCurrentCommand(): SquadCommand {
     return this.currentCommand;
+  }
+
+  toggleRadialMenu(): void {
+    if (this.radialMenu.isOpen()) {
+      this.radialMenu.executeCommand();
+    } else {
+      this.radialMenu.show();
+    }
   }
 
   private createCommandIndicator(): void {

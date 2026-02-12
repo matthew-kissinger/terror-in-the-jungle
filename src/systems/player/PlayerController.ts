@@ -18,6 +18,7 @@ import type { HelicopterModel } from '../helicopter/HelicopterModel';
 import type { FirstPersonWeapon } from './FirstPersonWeapon';
 import type { HUDSystem } from '../../ui/hud/HUDSystem';
 import type { ISandboxRenderer } from '../../types/SystemInterfaces';
+import type { PlayerSquadController } from '../combat/PlayerSquadController';
 
 export class PlayerController implements GameSystem {
   private camera: THREE.PerspectiveCamera;
@@ -34,6 +35,7 @@ export class PlayerController implements GameSystem {
   private cameraShakeSystem?: CameraShakeSystem;
   private rallyPointSystem?: RallyPointSystem;
   private footstepAudioSystem?: FootstepAudioSystem;
+  private playerSquadController?: PlayerSquadController;
   private playerSquadId?: string;
   private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
   private playerState: PlayerState;
@@ -113,6 +115,7 @@ export class PlayerController implements GameSystem {
       onMouseUp: (button: number) => this.handleMouseUp(button),
       onReload: () => this.handleTouchReload(),
       onGrenadeSwitch: () => this.handleTouchGrenadeSwitch(),
+      onSquadCommand: () => this.playerSquadController?.toggleRadialMenu(),
     });
   }
 
@@ -477,4 +480,5 @@ export class PlayerController implements GameSystem {
   setRallyPointSystem(rallyPointSystem: RallyPointSystem): void { this.rallyPointSystem = rallyPointSystem; }
   setFootstepAudioSystem(footstepAudioSystem: FootstepAudioSystem): void { this.footstepAudioSystem = footstepAudioSystem; this.movement.setFootstepAudioSystem(footstepAudioSystem); }
   setPlayerSquadId(squadId: string): void { this.playerSquadId = squadId; }
+  setPlayerSquadController(playerSquadController: PlayerSquadController): void { this.playerSquadController = playerSquadController; }
 }
