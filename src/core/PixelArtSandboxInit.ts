@@ -45,6 +45,13 @@ export async function initializeSystems(sandbox: PixelArtSandbox): Promise<void>
     }
   } catch (error) {
     Logger.error('sandbox-init', 'Failed to initialize sandbox:', error);
+
+    // Show error to user
+    const errorMessage = error instanceof Error
+      ? error.message
+      : 'An unexpected error occurred during initialization';
+
+    sandbox.loadingScreen.showError('Initialization Failed', errorMessage);
   }
 }
 

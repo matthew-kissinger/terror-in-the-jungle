@@ -16,6 +16,9 @@ export class LoadingScreen {
   private settingsButton: HTMLButtonElement;
   private howToPlayButton: HTMLButtonElement;
 
+  // Error panel elements
+  private errorPanel: HTMLDivElement | null = null;
+
   // Game mode selection elements
   private modeSelectionContainer: HTMLDivElement;
   private zoneControlCard: HTMLDivElement;
@@ -31,6 +34,7 @@ export class LoadingScreen {
   private onPlayCallback?: (mode: GameMode) => void;
   private onSettingsCallback?: () => void;
   private onHowToPlayCallback?: () => void;
+  private initTimeoutId: number | null = null;
 
   // Handler references for cleanup
   private handleZoneControlClick = () => this.selectGameMode(GameMode.ZONE_CONTROL);
@@ -72,6 +76,9 @@ export class LoadingScreen {
     this.initializePhases();
     this.setupEventListeners();
     this.progress.initializeTips();
+
+    // Start initialization timeout
+    this.startInitTimeout();
   }
 
   private createLoadingScreen(): HTMLDivElement {
@@ -196,6 +203,96 @@ export class LoadingScreen {
           color: var(--primary-color);
           font-weight: 500;
         }
+
+        /* Error Panel Styles */
+        .error-panel {
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          background: rgba(20, 35, 50, 0.95);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+          border: 2px solid #ff6b6b;
+          border-radius: 20px;
+          padding: 2rem;
+          max-width: 500px;
+          width: 90%;
+          z-index: 10001;
+          box-shadow: 0 20px 60px rgba(255, 107, 107, 0.3);
+          animation: errorFadeIn 0.3s ease-out;
+        }
+
+        @keyframes errorFadeIn {
+          from {
+            opacity: 0;
+            transform: translate(-50%, -45%);
+          }
+          to {
+            opacity: 1;
+            transform: translate(-50%, -50%);
+          }
+        }
+
+        .error-panel-title {
+          color: #ff6b6b;
+          font-size: 1.5rem;
+          font-weight: 500;
+          margin-bottom: 1rem;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          text-align: center;
+        }
+
+        .error-panel-message {
+          color: var(--text-primary);
+          font-size: 0.95rem;
+          line-height: 1.6;
+          margin-bottom: 1.5rem;
+          text-align: center;
+        }
+
+        .error-panel-actions {
+          display: flex;
+          gap: 1rem;
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+
+        .error-panel-button {
+          background: rgba(127, 180, 217, 0.2);
+          border: 1px solid var(--primary-color);
+          color: var(--primary-color);
+          padding: 0.75rem 1.5rem;
+          border-radius: 15px;
+          cursor: pointer;
+          font-family: inherit;
+          font-size: 0.9rem;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .error-panel-button:hover {
+          background: rgba(127, 180, 217, 0.3);
+          border-color: #ffffff;
+          color: #ffffff;
+          transform: translateY(-2px);
+          box-shadow: 0 5px 15px rgba(127, 180, 217, 0.2);
+        }
+
+        .error-panel-button.primary {
+          background: rgba(255, 107, 107, 0.2);
+          border-color: #ff6b6b;
+          color: #ff6b6b;
+        }
+
+        .error-panel-button.primary:hover {
+          background: rgba(255, 107, 107, 0.3);
+          border-color: #ff8787;
+          color: #ff8787;
+        }
       </style>
 
       <div class="loading-content">
@@ -310,6 +407,9 @@ export class LoadingScreen {
   }
 
   public showMainMenu(): void {
+    // Mark initialization as complete
+    this.markInitialized();
+
     // Hide loading bar and show menu buttons
     const buttons = this.container.querySelector('.menu-buttons');
     if (buttons) {
@@ -347,6 +447,92 @@ export class LoadingScreen {
     this.onHowToPlayCallback = callback;
   }
 
+  /**
+   * Show an error panel with title, message, and actions
+   */
+  public showError(title: string, message: string): void {
+    // Clear any existing error panel
+    if (this.errorPanel) {
+      this.errorPanel.remove();
+    }
+
+    // Clear initialization timeout if running
+    if (this.initTimeoutId !== null) {
+      clearTimeout(this.initTimeoutId);
+      this.initTimeoutId = null;
+    }
+
+    // Create error panel
+    this.errorPanel = document.createElement('div');
+    this.errorPanel.className = 'error-panel';
+    this.errorPanel.innerHTML = `
+      <div class="error-panel-title">${this.escapeHtml(title)}</div>
+      <div class="error-panel-message">${this.escapeHtml(message)}</div>
+      <div class="error-panel-actions">
+        <button class="error-panel-button primary retry-button">Retry</button>
+        <button class="error-panel-button report-button">Report Issue</button>
+      </div>
+    `;
+
+    // Add event listeners
+    const retryButton = this.errorPanel.querySelector('.retry-button');
+    const reportButton = this.errorPanel.querySelector('.report-button');
+
+    retryButton?.addEventListener('click', () => {
+      window.location.reload();
+    });
+
+    reportButton?.addEventListener('click', () => {
+      window.open('https://github.com/matthew-kissinger/terror-in-the-jungle/issues', '_blank');
+    });
+
+    // Add to DOM
+    document.body.appendChild(this.errorPanel);
+  }
+
+  /**
+   * Start a timeout that warns the user if initialization takes too long
+   */
+  public startInitTimeout(): void {
+    // Clear any existing timeout
+    if (this.initTimeoutId !== null) {
+      clearTimeout(this.initTimeoutId);
+    }
+
+    // Set 30 second timeout
+    this.initTimeoutId = window.setTimeout(() => {
+      if (!this.isInitialized) {
+        this.showError(
+          'Initialization Taking Too Long',
+          'The game is taking longer than expected to initialize. This may be due to slow network, browser issues, or device limitations. You can try refreshing the page.'
+        );
+      }
+    }, 30000);
+  }
+
+  /**
+   * Clear the initialization timeout (called when init succeeds)
+   */
+  public clearInitTimeout(): void {
+    if (this.initTimeoutId !== null) {
+      clearTimeout(this.initTimeoutId);
+      this.initTimeoutId = null;
+    }
+  }
+
+  private escapeHtml(text: string): string {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // Track initialization state for timeout
+  private isInitialized = false;
+  public markInitialized(): void {
+    this.isInitialized = true;
+    this.clearInitTimeout();
+  }
+
   public dispose(): void {
     // Remove event listeners
     this.zoneControlCard.removeEventListener('click', this.handleZoneControlClick);
@@ -354,6 +540,15 @@ export class LoadingScreen {
     this.playButton.removeEventListener('click', this.handlePlayClick);
     this.settingsButton.removeEventListener('click', this.handleSettingsClick);
     this.howToPlayButton.removeEventListener('click', this.handleHowToPlayClick);
+
+    // Clear timeout
+    this.clearInitTimeout();
+
+    // Remove error panel if exists
+    if (this.errorPanel) {
+      this.errorPanel.remove();
+      this.errorPanel = null;
+    }
 
     if (this.container?.parentElement) {
       this.container.parentElement.removeChild(this.container);
