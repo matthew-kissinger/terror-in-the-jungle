@@ -104,6 +104,12 @@ export class DeathCamSystem implements GameSystem {
 
   // End death cam sequence (when respawning)
   endDeathCam(): void {
+    // Restore camera to original position before death cam started
+    if (this.originalPosition && this.originalQuaternion) {
+      this.camera.position.copy(this.originalPosition);
+      this.camera.quaternion.copy(this.originalQuaternion);
+    }
+
     this.isActive = false;
     this.hideOverlay();
     this.deathPosition = undefined;
