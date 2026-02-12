@@ -67,11 +67,7 @@ export class MobilePauseOverlay {
     this.overlay.style.justifyContent = 'center';
     document.body.appendChild(this.overlay);
 
-    this.overlay.addEventListener('click', this.boundResumeTap);
-    this.overlay.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      this.onResumeTap(e);
-    }, { passive: false });
+    this.overlay.addEventListener('pointerdown', this.boundResumeTap, { passive: false });
     document.addEventListener('visibilitychange', this.boundVisibilityChange);
   }
 
@@ -102,6 +98,8 @@ export class MobilePauseOverlay {
   }
 
   private onResumeTap(e: Event): void {
+    const pe = e as PointerEvent;
+    if (pe.pointerType === 'mouse' && pe.button !== 0) return;
     e.preventDefault();
     if (!this.needsResume || !this.overlay) return;
 
@@ -118,7 +116,7 @@ export class MobilePauseOverlay {
 
   dispose(): void {
     if (this.overlay) {
-      this.overlay.removeEventListener('click', this.boundResumeTap);
+      this.overlay.removeEventListener('pointerdown', this.boundResumeTap);
       this.overlay.remove();
       this.overlay = null;
     }

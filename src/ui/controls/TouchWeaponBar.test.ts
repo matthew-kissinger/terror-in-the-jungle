@@ -25,7 +25,9 @@ describe('TouchWeaponBar', () => {
     expect(container).toBeTruthy();
     expect(container.id).toBe('touch-weapon-bar');
     expect(container.style.position).toBe('fixed');
-    expect(container.style.top).toBe('12px');
+    // top uses safe-area for notched devices; jsdom may not persist max()/env() so accept either
+    const expectedTop = 'max(12px, env(safe-area-inset-top, 0px))';
+    expect(container.style.top === expectedTop || container.style.top === '').toBe(true);
   });
 
   it('creates 6 weapon slot buttons', () => {

@@ -20,8 +20,8 @@ export class TouchActionButtons {
     this.container.id = 'touch-action-buttons';
     Object.assign(this.container.style, {
       position: 'fixed',
-      right: '30px',
-      bottom: '130px', // above fire button (80px + 30px bottom + 20px gap)
+      right: 'max(30px, env(safe-area-inset-right, 0px))',
+      bottom: 'calc(130px + env(safe-area-inset-bottom, 0px))', // above fire button (80px + 30px bottom + 20px gap)
       display: 'flex',
       flexDirection: 'column',
       gap: '12px',
@@ -65,26 +65,33 @@ export class TouchActionButtons {
     } as Partial<CSSStyleDeclaration>);
     btn.textContent = label;
 
-    btn.addEventListener('touchstart', (e: TouchEvent) => {
+    const onPointerDown = (e: PointerEvent): void => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
       btn.style.background = 'rgba(255,255,255,0.35)';
       btn.style.transform = 'scale(0.9)';
+      if (typeof btn.setPointerCapture === 'function') btn.setPointerCapture(e.pointerId);
       this.onAction?.(key);
-    }, { passive: false });
+    };
 
-    btn.addEventListener('touchend', (e: TouchEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      btn.style.background = 'rgba(255,255,255,0.15)';
-      btn.style.transform = 'scale(1)';
-    }, { passive: false });
-
-    btn.addEventListener('touchcancel', (e: TouchEvent) => {
+    const onPointerUp = (e: PointerEvent): void => {
       e.preventDefault();
       btn.style.background = 'rgba(255,255,255,0.15)';
       btn.style.transform = 'scale(1)';
-    }, { passive: false });
+      if (typeof btn.releasePointerCapture === 'function' && btn.hasPointerCapture(e.pointerId)) btn.releasePointerCapture(e.pointerId);
+    };
+
+    const onPointerCancel = (e: PointerEvent): void => {
+      e.preventDefault();
+      btn.style.background = 'rgba(255,255,255,0.15)';
+      btn.style.transform = 'scale(1)';
+      if (typeof btn.releasePointerCapture === 'function' && btn.hasPointerCapture(e.pointerId)) btn.releasePointerCapture(e.pointerId);
+    };
+
+    btn.addEventListener('pointerdown', onPointerDown, { passive: false });
+    btn.addEventListener('pointerup', onPointerUp, { passive: false });
+    btn.addEventListener('pointercancel', onPointerCancel, { passive: false });
 
     this.buttons.push({ element: btn, key, label });
     this.container.appendChild(btn);

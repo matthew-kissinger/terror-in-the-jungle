@@ -14,8 +14,8 @@ export class TouchFireButton {
     this.button.id = 'touch-fire-btn';
     Object.assign(this.button.style, {
       position: 'fixed',
-      right: '30px',
-      bottom: '30px',
+      right: 'max(30px, env(safe-area-inset-right, 0px))',
+      bottom: 'max(30px, env(safe-area-inset-bottom, 0px))',
       width: '80px',
       height: '80px',
       borderRadius: '50%',

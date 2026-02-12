@@ -4,11 +4,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TouchActionButtons } from './TouchActionButtons';
 
-function touchEvent(type: string): TouchEvent {
-  const event = new Event(type, { bubbles: true, cancelable: true }) as TouchEvent;
-  Object.defineProperty(event, 'changedTouches', { value: [] });
-  Object.defineProperty(event, 'touches', { value: [] });
-  return event;
+function pointerDownEvent(): PointerEvent {
+  return new PointerEvent('pointerdown', {
+    bubbles: true,
+    cancelable: true,
+    button: 0,
+    pointerId: 1,
+    pointerType: 'touch',
+  });
 }
 
 describe('TouchActionButtons', () => {
@@ -39,11 +42,11 @@ describe('TouchActionButtons', () => {
     const onAction = vi.fn();
     actions.setOnAction(onAction);
 
-    buttons[0].dispatchEvent(touchEvent('touchstart'));
-    buttons[1].dispatchEvent(touchEvent('touchstart'));
-    buttons[2].dispatchEvent(touchEvent('touchstart'));
-    buttons[3].dispatchEvent(touchEvent('touchstart'));
-    buttons[4].dispatchEvent(touchEvent('touchstart'));
+    buttons[0].dispatchEvent(pointerDownEvent());
+    buttons[1].dispatchEvent(pointerDownEvent());
+    buttons[2].dispatchEvent(pointerDownEvent());
+    buttons[3].dispatchEvent(pointerDownEvent());
+    buttons[4].dispatchEvent(pointerDownEvent());
 
     expect(onAction).toHaveBeenNthCalledWith(1, 'squad');
     expect(onAction).toHaveBeenNthCalledWith(2, 'scoreboard');

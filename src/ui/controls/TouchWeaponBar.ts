@@ -26,7 +26,7 @@ export class TouchWeaponBar {
     this.container.id = 'touch-weapon-bar';
     Object.assign(this.container.style, {
       position: 'fixed',
-      top: '12px',
+      top: 'max(12px, env(safe-area-inset-top, 0px))',
       left: '50%',
       transform: 'translateX(-50%)',
       display: 'flex',
