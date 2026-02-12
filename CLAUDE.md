@@ -25,7 +25,7 @@ npm run test:run   # 3316 tests (all passing)
 
 ## Architecture
 
-~56k lines across 288 source files. Systems-based architecture with orchestrator pattern.
+~57k lines across 292 source files. Systems-based architecture with orchestrator pattern.
 
 ```
 src/
@@ -48,7 +48,7 @@ src/
 │   ├── hud/        # HUD elements, scoreboard, kill feed
 │   ├── loading/    # Loading screen, mode selection (touch-to-start)
 │   ├── loadout/    # Weapon + grenade loadout selector (touch deploy button)
-│   ├── map/        # Fullscreen map (pinch-zoom, drag-pan), respawn map (touch)
+│   ├── map/        # Fullscreen map (pinch-zoom, drag-pan), respawn map
 │   └── minimap/    # Minimap styles + rendering
 ├── workers/        # BVHWorker, ChunkWorker
 ├── shaders/        # GLSL shaders
@@ -88,21 +88,33 @@ src/
 
 ## Known Tech Debt
 
-- 15 `: any` annotations in source (excluding tests and SystemInterfaces)
+- 16 `: any` annotations in source (excluding tests and SystemInterfaces)
 - Players can fire during weapon switch animation (no `isSwitching()` guard in `FirstPersonWeapon.tryFire()`)
-- Mortar system has no touch controls - completely inaccessible on mobile (no weapon slot, no touch aiming)
+- Mortar system has no touch controls - completely inaccessible on mobile
 - Minimap `200x200px` is hardcoded - not responsive for mobile viewports
 - Desktop keyboard hints shown on mobile: "Press R to reload", "Press K", "RCTRL", "Press TAB" (5+ locations)
 - PersonalStatsPanel/KillFeed overlap on mobile right side (fixed pixel positions)
 - Scoreboard 2-column grid not responsive for portrait mobile
+- SquadRadialMenu has no touch support (mouse-only)
+- OpenFrontierRespawnMap has no touch support (mouse pan only, no touch handlers)
+- WeatherSystem rain particles not scaled by GPU tier on mobile
+- Compass not responsive for mobile viewports (no media queries)
+- Settings labels not device-aware (show desktop-specific labels on mobile)
+- TouchWeaponBar dispose() doesn't clean up event listeners (memory leak)
+- No touch buttons for sandbag rotation or rally point placement
+- No kill streak audio feedback
 
-### Fixed on branches (9 branches pending merge - blocked on merge task)
-- ~~WeatherSystem rain scaling by GPU tier~~ (branch scales particles for mobile)
-- ~~Compass responsive for mobile~~ (branch has media queries)
-- ~~Sandbag rotation + rally point touch buttons~~ (branch has TouchSandbagButtons, TouchRallyPointButton)
-- ~~OpenFrontierRespawnMap touch support~~ (branch has pan/zoom/select)
-- ~~TicketSystem.restartMatch() wired~~ (branch has graceful restart)
-- ~~TouchWeaponBar dispose() leak~~ (branch fixes event listener cleanup)
-- ~~SquadRadialMenu touch support~~ (branch has touch events)
-- ~~Settings labels device-aware~~ (branch has mobile-friendly labels)
-- ~~Kill streak audio~~ (branch has procedural audio stings)
+### Unmerged Feature Branches
+
+8 completed features exist on `mycel/*` branches but are NOT on master. Previous merge attempts failed due to branch overlap in shared files. Cherry-pick recommended.
+
+| Feature | Branch suffix | Files touched |
+|---------|--------------|---------------|
+| Weather rain GPU scaling | task-642bca99 | WeatherSystem.ts |
+| Compass responsive | task-678e18fa | CompassStyles.ts |
+| Sandbag/rally touch buttons | task-a37eca58 | new TouchSandbagButtons, TouchRallyPointButton |
+| OpenFrontierRespawnMap touch | task-75b4d187 or task-dc892cad | OpenFrontierRespawnMap.ts |
+| SquadRadialMenu touch | task-d4a64fc2 | SquadRadialMenu.ts |
+| Settings device-aware | task-62f7bfd2 | SettingsManager.ts |
+| TouchWeaponBar dispose fix | task-fa59cd92 | TouchWeaponBar.ts |
+| Kill streak audio | task-fa40bc2b | new files |

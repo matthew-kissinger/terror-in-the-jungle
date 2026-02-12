@@ -10,7 +10,7 @@
 npm install
 npm run dev        # localhost:5173
 npm run build      # Production
-npm run test:run   # 3294 tests
+npm run test:run   # 3316 tests
 ```
 
 ## Controls
@@ -51,6 +51,7 @@ perf.validate()  // System checks
 
 - **Zone Control** - 400x400, 15v15, 3 min
 - **Open Frontier** - 3200x3200, 60v60, 15 min
+- **Team Deathmatch** - 400x400, 15v15, 5 min
 
 ## Tech
 
@@ -58,7 +59,7 @@ perf.validate()  // System checks
 - three-mesh-bvh for spatial queries
 - Web workers (BVH pool, chunk generation)
 - TypeScript, Vite 7
-- ~56k lines, 288 source files, 91 test files (3294 tests)
+- ~57k lines, 289 source files, 94 test files (3316 tests)
 
 ## Documentation
 
