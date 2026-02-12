@@ -8,6 +8,8 @@ interface WeaponBarSlot {
   element: HTMLDivElement;
   index: number;
   label: string;
+  onTouchStart: (e: TouchEvent) => void;
+  onTouchEnd: (e: TouchEvent) => void;
 }
 
 export class TouchWeaponBar {
@@ -80,20 +82,23 @@ export class TouchWeaponBar {
     } as Partial<CSSStyleDeclaration>);
     btn.innerHTML = `<span style="font-size:8px;opacity:0.5">${index + 1}</span>${label}`;
 
-    btn.addEventListener('touchstart', (e: TouchEvent) => {
+    const onTouchStart = (e: TouchEvent): void => {
       e.preventDefault();
       e.stopPropagation();
       this.activeIndex = index;
       this.updateHighlight();
       this.onWeaponSelect?.(index);
-    }, { passive: false });
-
-    btn.addEventListener('touchend', (e: TouchEvent) => {
+    };
+    const onTouchEnd = (e: TouchEvent): void => {
       e.preventDefault();
       e.stopPropagation();
-    }, { passive: false });
+    };
 
-    this.slots.push({ element: btn, index, label });
+    btn.addEventListener('touchstart', onTouchStart, { passive: false });
+    btn.addEventListener('touchend', onTouchEnd, { passive: false });
+    btn.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+    this.slots.push({ element: btn, index, label, onTouchStart, onTouchEnd });
     this.container.appendChild(btn);
   }
 
@@ -120,6 +125,15 @@ export class TouchWeaponBar {
   }
 
   dispose(): void {
+    // Remove event listeners for each slot
+    for (const slot of this.slots) {
+      slot.element.removeEventListener('touchstart', slot.onTouchStart);
+      slot.element.removeEventListener('touchend', slot.onTouchEnd);
+      slot.element.removeEventListener('touchcancel', slot.onTouchEnd);
+    }
+    // Clear slots array
+    this.slots = [];
+    // Remove container from DOM
     this.container.remove();
   }
 }
