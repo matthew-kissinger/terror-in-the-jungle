@@ -329,6 +329,11 @@ export class PlayerInput {
     if (!this.isInHelicopter && event.code === 'KeyM') {
       this.callbacks.onToggleMortarCamera?.();
     }
+
+    // Squad command menu with Z key (when not in helicopter)
+    if (!this.isInHelicopter && event.code === 'KeyZ') {
+      this.callbacks.onSquadCommand?.();
+    }
   }
 
   private onKeyUp(event: KeyboardEvent): void {
@@ -341,6 +346,11 @@ export class PlayerInput {
 
     if (event.code === 'ShiftLeft' || event.code === 'ShiftRight') {
       this.callbacks.onRunStop?.();
+    }
+
+    // Squad command menu - toggle on release to execute command
+    if (event.code === 'KeyZ' && !this.isInHelicopter) {
+      this.callbacks.onSquadCommand?.();
     }
   }
 
