@@ -24,6 +24,7 @@ export class LoadingScreen {
   private modeSelectionContainer: HTMLDivElement;
   private zoneControlCard: HTMLDivElement;
   private openFrontierCard: HTMLDivElement;
+  private teamDeathmatchCard: HTMLDivElement;
   private selectedModeDisplay: HTMLDivElement;
 
   // Mobile fullscreen prompt (shown after main menu on touch devices)
@@ -43,6 +44,7 @@ export class LoadingScreen {
   // Handler references for cleanup
   private handleZoneControlClick = () => this.selectGameMode(GameMode.ZONE_CONTROL);
   private handleOpenFrontierClick = () => this.selectGameMode(GameMode.OPEN_FRONTIER);
+  private handleTeamDeathmatchClick = () => this.selectGameMode(GameMode.TEAM_DEATHMATCH);
   private handlePlayClick = () => {
     if (this.onPlayCallback) {
       this.onPlayCallback(this.selectedGameMode);
@@ -66,6 +68,7 @@ export class LoadingScreen {
     this.modeSelectionContainer = this.container.querySelector('.mode-selection-container') as HTMLDivElement;
     this.zoneControlCard = this.container.querySelector('.zone-control-card') as HTMLDivElement;
     this.openFrontierCard = this.container.querySelector('.open-frontier-card') as HTMLDivElement;
+    this.teamDeathmatchCard = this.container.querySelector('.team-deathmatch-card') as HTMLDivElement;
     this.selectedModeDisplay = this.container.querySelector('.selected-mode-display') as HTMLDivElement;
 
     // Initialize modules
@@ -197,6 +200,14 @@ export class LoadingScreen {
           color: var(--text-primary);
           letter-spacing: 0.03em;
         }
+
+        /* Team Deathmatch card - red/aggressive accent */
+        .mode-card.team-deathmatch-card .mode-card-title { color: #e85a5a; }
+        .mode-card.team-deathmatch-card { border-color: rgba(232, 90, 90, 0.25); }
+        .mode-card.team-deathmatch-card::before { background: linear-gradient(135deg, transparent, rgba(232, 90, 90, 0.06)); }
+        .mode-card.team-deathmatch-card:hover { border-color: #e85a5a; box-shadow: 0 10px 30px rgba(232, 90, 90, 0.15); }
+        .mode-card.team-deathmatch-card.selected { border-color: #e85a5a; background: rgba(232, 90, 90, 0.08); box-shadow: 0 0 30px rgba(232, 90, 90, 0.2); }
+        .mode-card.team-deathmatch-card .mode-feature { background: rgba(232, 90, 90, 0.15); border-color: rgba(232, 90, 90, 0.3); }
 
         .selected-mode-display {
           text-align: center;
@@ -351,6 +362,19 @@ export class LoadingScreen {
                 <div class="mode-feature">1000 Tickets</div>
               </div>
             </div>
+
+            <div class="mode-card team-deathmatch-card" data-mode="tdm">
+              <div class="mode-card-title">Team Deathmatch</div>
+              <div class="mode-card-subtitle">Pure Combat</div>
+              <div class="mode-card-description">
+                Eliminate the enemy team - pure combat, no objectives
+              </div>
+              <div class="mode-card-features">
+                <div class="mode-feature">400x400</div>
+                <div class="mode-feature">15v15</div>
+                <div class="mode-feature">5 Min</div>
+              </div>
+            </div>
           </div>
 
           <div class="selected-mode-display">
@@ -386,6 +410,8 @@ export class LoadingScreen {
     this.zoneControlCard.addEventListener('click', (e) => e.preventDefault());
     this.openFrontierCard.addEventListener('pointerdown', this.handleOpenFrontierClick);
     this.openFrontierCard.addEventListener('click', (e) => e.preventDefault());
+    this.teamDeathmatchCard.addEventListener('pointerdown', this.handleTeamDeathmatchClick);
+    this.teamDeathmatchCard.addEventListener('click', (e) => e.preventDefault());
 
     // Play button
     this.playButton.addEventListener('pointerdown', this.handlePlayClick);
@@ -403,9 +429,15 @@ export class LoadingScreen {
     // Update selected state
     this.zoneControlCard.classList.toggle('selected', mode === GameMode.ZONE_CONTROL);
     this.openFrontierCard.classList.toggle('selected', mode === GameMode.OPEN_FRONTIER);
+    this.teamDeathmatchCard.classList.toggle('selected', mode === GameMode.TEAM_DEATHMATCH);
 
     // Update display text
-    const modeName = mode === GameMode.ZONE_CONTROL ? 'ZONE CONTROL' : 'OPEN FRONTIER';
+    const modeName =
+      mode === GameMode.ZONE_CONTROL
+        ? 'ZONE CONTROL'
+        : mode === GameMode.OPEN_FRONTIER
+          ? 'OPEN FRONTIER'
+          : 'TEAM DEATHMATCH';
     this.selectedModeDisplay.innerHTML = `Selected Mode: <strong>${modeName}</strong>`;
     this.playButton.textContent = `PLAY ${modeName}`;
   }
@@ -619,6 +651,7 @@ export class LoadingScreen {
     // Remove event listeners
     this.zoneControlCard.removeEventListener('pointerdown', this.handleZoneControlClick);
     this.openFrontierCard.removeEventListener('pointerdown', this.handleOpenFrontierClick);
+    this.teamDeathmatchCard.removeEventListener('pointerdown', this.handleTeamDeathmatchClick);
     this.playButton.removeEventListener('pointerdown', this.handlePlayClick);
     this.settingsButton.removeEventListener('pointerdown', this.handleSettingsClick);
     this.howToPlayButton.removeEventListener('pointerdown', this.handleHowToPlayClick);
