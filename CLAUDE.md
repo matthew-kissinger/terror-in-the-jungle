@@ -10,7 +10,7 @@
 npm install
 npm run dev        # Dev server on localhost:5173
 npm run build      # Production build
-npm run test:run   # 3028 tests (all passing)
+npm run test:run   # 3193 tests (all passing)
 ```
 
 ## Stack
@@ -21,7 +21,7 @@ npm run test:run   # 3028 tests (all passing)
 | Spatial | three-mesh-bvh, custom octree/grid |
 | Build | Vite 7, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 78 files, 3028 tests |
+| Tests | Vitest - 81 files, 3193 tests |
 
 ## Architecture
 
@@ -31,13 +31,16 @@ npm run test:run   # 3028 tests (all passing)
 src/
 ├── core/           # Game loop, renderer, bootstrap
 ├── systems/
+│   ├── audio/      # Ambient, radio, footsteps, weapon sounds, voice callouts
 │   ├── combat/     # AI targeting, flanking, cover, spatial octree, influence maps
 │   ├── player/     # Controller, weapons, health, flashbang
 │   ├── helicopter/ # Model, physics, animation, audio
 │   ├── terrain/    # Chunks, workers, vegetation, GPU terrain
+│   ├── weapons/    # Gunplay, grenades, mortars, ammo, sandbags, pickups
 │   ├── world/      # Zones, billboards, tickets
 │   ├── debug/      # PerformanceTelemetry
-│   └── effects/    # Pools (tracers, muzzle, impact, explosion), smoke
+│   ├── effects/    # Pools (tracers, muzzle, impact, explosion), smoke
+│   └── environment/# Day/night, weather, water, skybox
 ├── ui/
 │   ├── hud/        # HUD elements (11 modules)
 │   ├── loading/    # Loading screen, mode selection
@@ -78,10 +81,9 @@ src/
 
 ## Known Tech Debt
 
-- 24 `: any` annotations across source files (excluding tests and SystemInterfaces)
+- 15 `: any` annotations across source files (excluding tests and SystemInterfaces)
 - Missing audio: grenade throw/pin pull, mortar launch, weapon pickup
 - `TicketSystem.restartMatch()` unused - UI uses `window.location.reload()` instead
-- `SystemUpdater.ts:86` uses `as any` to access `FullMapSystem.isVisible` (private field)
 - `PixelArtSandboxInit.ts:45` catches init errors but swallows them silently (no user feedback)
 - `SystemUpdater.updateSystems()` has no try/catch - a throwing system crashes the frame loop
 - `AmbientSoundManager.stop()` doesn't cancel pending `setTimeout` from `playNextTrack()` - audio can restart after stop
