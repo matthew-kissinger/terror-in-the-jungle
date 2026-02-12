@@ -28,6 +28,7 @@ import { MortarSystem } from '../systems/weapons/MortarSystem';
 import { SandbagSystem } from '../systems/weapons/SandbagSystem';
 import { CameraShakeSystem } from '../systems/effects/CameraShakeSystem';
 import { PlayerSuppressionSystem } from '../systems/player/PlayerSuppressionSystem';
+import { getRenderDistanceMultiplier } from '../utils/DeviceDetector';
 import { FlashbangScreenEffect } from '../systems/player/FlashbangScreenEffect';
 import { SmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
 import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
@@ -106,7 +107,19 @@ export class SystemInitializer {
     onProgress('core', 0.5);
 
     refs.globalBillboardSystem = new GlobalBillboardSystem(scene, camera, refs.assetLoader);
-    refs.chunkManager = new ImprovedChunkManager(scene, camera, refs.assetLoader, refs.globalBillboardSystem);
+    
+    // Apply device-adaptive render distance
+    const baseRenderDistance = 6;
+    const renderDistanceMultiplier = getRenderDistanceMultiplier();
+    const adaptiveRenderDistance = Math.max(3, Math.round(baseRenderDistance * renderDistanceMultiplier));
+    
+    refs.chunkManager = new ImprovedChunkManager(scene, camera, refs.assetLoader, refs.globalBillboardSystem, {
+      size: 64,
+      renderDistance: adaptiveRenderDistance,
+      loadDistance: adaptiveRenderDistance + 1,
+      lodLevels: 4
+    });
+    Logger.info('init', `Chunk render distance: ${adaptiveRenderDistance} (multiplier: ${renderDistanceMultiplier.toFixed(2)})`);
     // GPUTerrain disabled - going with web workers approach instead
     onProgress('core', 1);
 

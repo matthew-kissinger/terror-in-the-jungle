@@ -89,4 +89,29 @@ describe('DeviceDetector', () => {
     Object.defineProperty(window, 'innerHeight', { value: 900, configurable: true });
     expect(isMobileViewport()).toBe(false);
   });
+
+  it('shouldEnableShadows returns false for low tier', async () => {
+    const { shouldEnableShadows } = await loadDeviceDetector();
+    expect(typeof shouldEnableShadows()).toBe('boolean');
+  });
+
+  it('getShadowMapSize returns valid power-of-2 sizes', async () => {
+    const { getShadowMapSize } = await loadDeviceDetector();
+    const size = getShadowMapSize();
+    expect([512, 1024, 2048]).toContain(size);
+  });
+
+  it('getRenderDistanceMultiplier returns value between 0.5 and 1.0', async () => {
+    const { getRenderDistanceMultiplier } = await loadDeviceDetector();
+    const multiplier = getRenderDistanceMultiplier();
+    expect(multiplier).toBeGreaterThanOrEqual(0.5);
+    expect(multiplier).toBeLessThanOrEqual(1.0);
+  });
+
+  it('getMaxPixelRatio returns capped value', async () => {
+    const { getMaxPixelRatio } = await loadDeviceDetector();
+    const ratio = getMaxPixelRatio();
+    expect(ratio).toBeGreaterThan(0);
+    expect(ratio).toBeLessThanOrEqual(2);
+  });
 });

@@ -125,3 +125,43 @@ export function getVegetationDensityMultiplier(): number {
     default: return 1.0;
   }
 }
+
+/**
+ * Returns whether shadows should be enabled based on device capabilities.
+ */
+export function shouldEnableShadows(): boolean {
+  const tier = estimateGPUTier();
+  return tier !== 'low';
+}
+
+/**
+ * Returns appropriate shadow map size based on device capabilities.
+ */
+export function getShadowMapSize(): number {
+  const tier = estimateGPUTier();
+  const mobile = isMobileGPU();
+
+  if (mobile || tier === 'low') return 512;
+  if (tier === 'medium') return 1024;
+  return 2048;
+}
+
+/**
+ * Returns render distance multiplier based on device capabilities.
+ */
+export function getRenderDistanceMultiplier(): number {
+  const tier = estimateGPUTier();
+  const mobile = isMobileGPU();
+
+  if (mobile) return tier === 'low' ? 0.5 : 0.6;
+  if (tier === 'low') return 0.7;
+  return 1.0;
+}
+
+/**
+ * Returns maximum pixel ratio based on device capabilities.
+ */
+export function getMaxPixelRatio(): number {
+  const mobile = isMobileGPU();
+  return mobile ? 2 : Math.min(window.devicePixelRatio, 2);
+}

@@ -4,7 +4,7 @@ import { PostProcessingManager } from '../systems/effects/PostProcessingManager'
 import { SandboxCrosshairUI } from './SandboxCrosshairUI';
 import { SandboxLoadingUI } from './SandboxLoadingUI';
 import { Logger } from '../utils/Logger';
-import { estimateGPUTier, isMobileGPU } from '../utils/DeviceDetector';
+import { estimateGPUTier, isMobileGPU, shouldEnableShadows, getShadowMapSize, getMaxPixelRatio } from '../utils/DeviceDetector';
 
 export class SandboxRenderer {
   public renderer: THREE.WebGLRenderer;
@@ -49,15 +49,13 @@ export class SandboxRenderer {
     // Configure for pixel-perfect rendering
     PixelPerfectUtils.configureRenderer(this.renderer);
     
-    // Scale resolution on weaker devices
-    if (isMobile || gpuTier === 'low') {
-      this.renderer.setPixelRatio(0.75);
-    } else {
-      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    }
+    // Device-adaptive pixel ratio
+    this.renderer.setPixelRatio(getMaxPixelRatio());
 
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = gpuTier !== 'low'; // Disable shadows on low tier
+    
+    // Device-adaptive shadow settings
+    this.renderer.shadowMap.enabled = shouldEnableShadows();
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
@@ -92,10 +90,10 @@ export class SandboxRenderer {
     // Reduced intensity, slightly green-tinted for jungle feel
     this.moonLight = new THREE.DirectionalLight(0xeef8ee, 0.5); // Soft filtered light
     this.moonLight.position.set(-30, 80, -50);
-    this.moonLight.castShadow = gpuTier !== 'low';
+    this.moonLight.castShadow = shouldEnableShadows();
 
-    // Scale shadow map size based on performance
-    const shadowMapSize = gpuTier === 'high' ? 2048 : 1024;
+    // Device-adaptive shadow map size
+    const shadowMapSize = getShadowMapSize();
     this.moonLight.shadow.mapSize.width = shadowMapSize;
     this.moonLight.shadow.mapSize.height = shadowMapSize;
 
