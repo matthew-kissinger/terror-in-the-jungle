@@ -96,19 +96,16 @@ src/
 
 ### Unmerged Feature Branches
 
-12 completed features exist on `mycel/*` branches but are NOT on master. A merge task (cbfd9b2d) has been created to cherry-pick them all in dependency-safe order.
+9 features remain on `mycel/*` branches, not yet on master. Merge task (cbfd9b2d) is running. 7 merge cleanly; 2 have minor conflicts.
 
-| Feature | Branch suffix | Files touched |
-|---------|--------------|---------------|
-| Settings device-aware | task-62f7bfd2 | SettingsManager.ts, LoadingPanels.ts |
-| Weather rain GPU scaling | task-642bca99 | WeatherSystem.ts |
-| Compass responsive | task-678e18fa | CompassStyles.ts |
-| OpenFrontierRespawnMap touch | task-dc892cad | OpenFrontierRespawnMap.ts |
-| TouchWeaponBar dispose fix | task-fa59cd92 | TouchWeaponBar.ts |
-| DeathCam camera restore | task-2b52030b | DeathCamSystem.ts |
-| Keyboard hints device-aware | task-b21be059 | Multiple HUD files |
-| Minimap responsive + panel overlap | task-cb81f260 | MinimapStyles.ts, HUD files |
-| Scoreboard responsive | task-f04c697c | Scoreboard.ts |
-| Sandbag/rally touch buttons | task-a37eca58 | new files + PlayerController, PlayerInput, TouchControls |
-| SquadRadialMenu touch | task-d4a64fc2 | SquadRadialMenu.ts + PlayerController, PlayerInput, TouchControls |
-| Kill streak audio | task-fa40bc2b | new files + HUDSystem.ts |
+| Feature | Branch suffix | Merge status |
+|---------|--------------|--------------|
+| Mortar deploy/aim/fire controls | task-0930d0dc | Clean |
+| Settings device-aware | task-62f7bfd2 | Clean |
+| Weather rain GPU scaling | task-642bca99 | Clean |
+| Compass responsive | task-678e18fa | Clean |
+| OpenFrontierRespawnMap touch | task-dc892cad | Clean |
+| TouchWeaponBar dispose fix | task-fa59cd92 | Clean |
+| SquadRadialMenu touch | task-d4a64fc2 | Conflicts: PlayerInput.ts, TouchControls.ts |
+| Kill streak audio | task-fa40bc2b | Clean |
+| Multi-feature (settings + respawn) | task-75b4d187 | Conflicts: CLAUDE.md only |
