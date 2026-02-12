@@ -10,7 +10,7 @@
 npm install
 npm run dev        # Dev server on localhost:5173
 npm run build      # Production build
-npm run test:run   # 3318 tests (all passing)
+npm run test:run   # 3329 tests (all passing)
 ```
 
 ## Stack
@@ -21,7 +21,7 @@ npm run test:run   # 3318 tests (all passing)
 | Spatial | three-mesh-bvh, custom octree/grid |
 | Build | Vite 7, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 94 files, 3318 tests |
+| Tests | Vitest - 95 files, 3329 tests |
 
 ## Architecture
 
@@ -88,18 +88,18 @@ src/
 
 ## Known Tech Debt
 
-- 16 `: any` annotations in source (excluding tests and SystemInterfaces)
+- 14 `: any` annotations in source (excluding tests and SystemInterfaces)
 - Mortar system only has camera toggle (M key) - deploy/aim/fire wiring was reverted in 4749be6
-- TicketSystem.restartMatch() does not reset player health, ammo, weapons, or respawn queue
-- No in-game pause/menu button on mobile - players cannot exit a match
+- Squad commands are issued via UI (Z key) but CombatantAI has zero code to read or respond to `squad.currentCommand` - AI ignores all commands
+- Combat continues after match ends - no system halts AI, firing, or spawning when tickets reach 0
+- TicketSystem.restartMatch() does not reset player health, ammo, weapons, or respawn queue (fix in progress on branch)
 - LoadingScreen and MatchEndScreen buttons use 'click' instead of 'pointerdown' (300ms delay on mobile)
-- Master is 96 commits ahead of origin - live GitHub Pages site is significantly behind
 - `audio_backup/` directory tracked in git (22 WAV files, 17MB) - should be removed
 - 4 agent-generated scripts tracked in git: `analyze_loc.py`, `complete_refactor.py`, `count_lines.py`, `commit_changes.sh`
 
 ### Unmerged Feature Branches
 
-8 `mycel/*` branches with 1 unique commit each (except 75b4d187 with 3). Cherry-pick is the safe merge strategy.
+9 `mycel/*` branches with unique commits (plus 2 stale branches). Cherry-pick is the safe merge strategy.
 
 | Feature | Branch suffix | Merge status | Unique change |
 |---------|--------------|--------------|---------------|
@@ -111,3 +111,4 @@ src/
 | TouchWeaponBar dispose fix | task-fa59cd92 | Clean merge | Memory leak fix in TouchWeaponBar |
 | SquadRadialMenu touch | task-d4a64fc2 | 2 conflicts (PlayerInput, TouchControls) | Touch wiring (squad already on master via Z key) |
 | Kill streak audio | task-fa40bc2b | Clean merge | Kill streak audio stings + PersonalStatsPanel |
+| Mobile pause/menu button | task-438ba741 | Clean merge | MobilePauseButton + TouchControls integration |
