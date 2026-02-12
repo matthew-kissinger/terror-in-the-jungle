@@ -8,6 +8,8 @@ import { VirtualJoystick } from './VirtualJoystick';
 import { TouchLook } from './TouchLook';
 import { TouchFireButton } from './TouchFireButton';
 import { TouchActionButtons } from './TouchActionButtons';
+import { TouchWeaponBar } from './TouchWeaponBar';
+import { TouchADSButton } from './TouchADSButton';
 
 export interface TouchControlCallbacks {
   onFireStart: () => void;
@@ -17,6 +19,8 @@ export interface TouchControlCallbacks {
   onGrenade: () => void;
   onSprintStart: () => void;
   onSprintStop: () => void;
+  onWeaponSelect: (slotIndex: number) => void;
+  onADSToggle: (active: boolean) => void;
 }
 
 export class TouchControls {
@@ -24,6 +28,8 @@ export class TouchControls {
   readonly look: TouchLook;
   readonly fireButton: TouchFireButton;
   readonly actionButtons: TouchActionButtons;
+  readonly weaponBar: TouchWeaponBar;
+  readonly adsButton: TouchADSButton;
 
   private visible = false;
 
@@ -32,6 +38,8 @@ export class TouchControls {
     this.look = new TouchLook();
     this.fireButton = new TouchFireButton();
     this.actionButtons = new TouchActionButtons();
+    this.weaponBar = new TouchWeaponBar();
+    this.adsButton = new TouchADSButton();
 
     // Start hidden until game starts
     this.hide();
@@ -58,6 +66,9 @@ export class TouchControls {
           break;
       }
     });
+
+    this.weaponBar.setOnWeaponSelect(callbacks.onWeaponSelect);
+    this.adsButton.setOnADSToggle(callbacks.onADSToggle);
   }
 
   /**
@@ -82,6 +93,8 @@ export class TouchControls {
     this.look.show();
     this.fireButton.show();
     this.actionButtons.show();
+    this.weaponBar.show();
+    this.adsButton.show();
   }
 
   hide(): void {
@@ -91,6 +104,8 @@ export class TouchControls {
     this.look.hide();
     this.fireButton.hide();
     this.actionButtons.hide();
+    this.weaponBar.hide();
+    this.adsButton.hide();
   }
 
   isVisible(): boolean {
@@ -102,5 +117,7 @@ export class TouchControls {
     this.look.dispose();
     this.fireButton.dispose();
     this.actionButtons.dispose();
+    this.weaponBar.dispose();
+    this.adsButton.dispose();
   }
 }

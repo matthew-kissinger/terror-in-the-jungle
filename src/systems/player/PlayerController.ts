@@ -115,7 +115,7 @@ export class PlayerController implements GameSystem {
     });
   }
 
-  /** Wire touch fire/reload to WeaponInput when both are available */
+  /** Wire touch fire/reload/ADS/weapons to WeaponInput when both are available */
   private wireTouchToWeapon(): void {
     if (!this.input.getIsTouchMode() || !this.firstPersonWeapon) return;
 
@@ -134,6 +134,24 @@ export class PlayerController implements GameSystem {
         weaponInput.triggerFireStop();
       }
     );
+
+    // Wire ADS button to WeaponInput
+    touchControls.adsButton.setOnADSToggle((active: boolean) => {
+      weaponInput.triggerADS(active);
+    });
+
+    // Wire weapon bar to dispatch synthetic key events (same as InventoryManager expects)
+    touchControls.weaponBar.setOnWeaponSelect((slotIndex: number) => {
+      const digitCode = `Digit${slotIndex + 1}`;
+      const event = new KeyboardEvent('keydown', {
+        code: digitCode,
+        key: `${slotIndex + 1}`,
+        bubbles: true,
+      });
+      window.dispatchEvent(event);
+      // Reset ADS when switching weapons
+      touchControls.adsButton.resetADS();
+    });
   }
 
   private handleTouchReload(): void {
@@ -294,6 +312,13 @@ export class PlayerController implements GameSystem {
 
     this.currentWeaponMode = slot;
     this.input.setCurrentWeaponMode(slot);
+
+    // Update touch weapon bar highlight
+    const touchControls = this.input.getTouchControls();
+    if (touchControls) {
+      touchControls.weaponBar.setActiveSlot(slot as number);
+      touchControls.adsButton.resetADS();
+    }
   }
 
   private getSpawnPosition(): THREE.Vector3 {
