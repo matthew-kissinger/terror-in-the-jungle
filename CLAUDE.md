@@ -10,7 +10,7 @@
 npm install
 npm run dev        # Dev server on localhost:5173
 npm run build      # Production build
-npm run test:run   # 3294 tests (all passing)
+npm run test:run   # 3305 tests (all passing)
 ```
 
 ## Stack
@@ -21,7 +21,7 @@ npm run test:run   # 3294 tests (all passing)
 | Spatial | three-mesh-bvh, custom octree/grid |
 | Build | Vite 7, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 91 files, 3294 tests |
+| Tests | Vitest - 92 files, 3305 tests |
 
 ## Architecture
 
@@ -84,13 +84,12 @@ src/
 - **Click** Fire, **RClick** ADS, **R** Reload
 - **1-6** Weapons, **G** Grenade, **Z** Squad UI, **TAB** Scoreboard
 - **F1** Console stats, **F2** Performance overlay, **M** Mortar camera
-- **Mobile**: Virtual joystick, touch-drag look, fire/ADS/reload/grenade buttons, weapon bar
+- **Mobile**: Virtual joystick, touch-drag look, fire/ADS/reload/grenade/scoreboard buttons, weapon bar, helicopter entry
 
 ## Known Tech Debt
 
 - 15 `: any` annotations in source (excluding tests and SystemInterfaces)
 - HUD uses hard-coded pixel positions/sizes - not responsive for mobile viewports
-- Helicopter entry/exit is keyboard-only (E key) - no touch button
 - OpenFrontierRespawnMap only handles mouse events - no touch pan/zoom/select
 - `TicketSystem.restartMatch()` unused - UI uses `window.location.reload()` instead
 - TouchWeaponBar slot event listeners not cleaned up in dispose() - minor memory leak
