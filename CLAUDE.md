@@ -10,7 +10,7 @@
 npm install
 npm run dev        # Dev server on localhost:5173
 npm run build      # Production build
-npm run test:run   # 3316 tests (all passing)
+npm run test:run   # 3318 tests (all passing)
 ```
 
 ## Stack
@@ -21,7 +21,7 @@ npm run test:run   # 3316 tests (all passing)
 | Spatial | three-mesh-bvh, custom octree/grid |
 | Build | Vite 7, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 94 files, 3316 tests |
+| Tests | Vitest - 94 files, 3318 tests |
 
 ## Architecture
 
@@ -89,15 +89,12 @@ src/
 ## Known Tech Debt
 
 - 16 `: any` annotations in source (excluding tests and SystemInterfaces)
-- Players can fire during weapon switch animation (no `isSwitching()` guard in `FirstPersonWeapon.tryFire()`)
 - Mortar system only has camera toggle (M key) - no deploy/aim/fire UI on desktop or mobile
 - SquadRadialMenu class exists but is never instantiated or imported anywhere - squad commands inaccessible
-- No WebGL context loss recovery - game shows blank screen if GPU context lost (common on mobile tab switch)
 - Bootstrap failure shows blank screen with no user-visible error message
 - playerSquadId assigned via 500ms setTimeout race condition (SandboxSystemManager line 227)
-- LoadoutSelector weapon/grenade options use click-only (no touch optimization, shows "CLICK to select" on mobile)
 - TicketSystem.restartMatch() does not reset player health, ammo, weapons, or respawn queue
-- Master is 63 commits ahead of origin - live GitHub Pages site is significantly behind
+- Master is 86 commits ahead of origin - live GitHub Pages site is significantly behind
 
 ### Unmerged Feature Branches
 
