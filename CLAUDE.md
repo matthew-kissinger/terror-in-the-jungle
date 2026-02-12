@@ -90,13 +90,17 @@ src/
 
 - 16 `: any` annotations in source (excluding tests and SystemInterfaces)
 - Players can fire during weapon switch animation (no `isSwitching()` guard in `FirstPersonWeapon.tryFire()`)
-- Mortar system has no touch controls - completely inaccessible on mobile
+- Mortar system only has camera toggle (M key) - no deploy/aim/fire UI on desktop or mobile
+- SquadRadialMenu class exists but is never instantiated or imported anywhere - squad commands inaccessible
+- No WebGL context loss recovery - game shows blank screen if GPU context lost (common on mobile tab switch)
+- Bootstrap failure shows blank screen with no user-visible error message
+- playerSquadId assigned via 500ms setTimeout race condition (SandboxSystemManager line 227)
 - Minimap `200x200px` is hardcoded - not responsive for mobile viewports
 - Desktop keyboard hints shown on mobile: "Press R to reload", "Press K", "RCTRL", "Press TAB" (5+ locations)
 - PersonalStatsPanel/KillFeed overlap on mobile right side (fixed pixel positions)
 - Scoreboard 2-column grid not responsive for portrait mobile
 - LoadoutSelector weapon/grenade options use click-only (no touch optimization, shows "CLICK to select" on mobile)
-- SquadRadialMenu has no touch support (mouse-only)
+- SquadRadialMenu has no touch support (mouse-only, and never wired into game - see above)
 - OpenFrontierRespawnMap has no touch support (mouse pan only, no touch handlers)
 - WeatherSystem rain particles not scaled by GPU tier on mobile
 - Compass not responsive for mobile viewports (no media queries)
