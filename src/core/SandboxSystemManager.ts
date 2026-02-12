@@ -232,8 +232,33 @@ export class SandboxSystemManager {
 
     // After forces are spawned, setup the player squad controller
     if (createPlayerSquad) {
-      setTimeout(() => this.setupPlayerSquad(), 500);
+      this.waitForPlayerSquad();
     }
+  }
+
+  private waitForPlayerSquad(maxRetries = 20, interval = 100): void {
+    let attempts = 0;
+
+    const check = () => {
+      attempts++;
+      const squadManager = this.combatantSystem.squadManager;
+      const playerSquadId = this.combatantSystem.playerSquadId;
+      const squad = playerSquadId ? squadManager?.getSquad(playerSquadId) : undefined;
+
+      if (playerSquadId && squad) {
+        this.setupPlayerSquad();
+        return;
+      }
+
+      if (attempts < maxRetries) {
+        setTimeout(check, interval);
+        return;
+      }
+
+      Logger.warn('core', `Player squad not ready after ${maxRetries} retries`);
+    };
+
+    check();
   }
 
   private setupPlayerSquad(): void {
