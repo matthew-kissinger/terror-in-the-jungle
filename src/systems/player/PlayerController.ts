@@ -111,6 +111,10 @@ export class PlayerController implements GameSystem {
       onSandbagRotateRight: () => this.sandbagSystem?.rotatePlacementPreview(Math.PI / 8),
       onRallyPointPlace: () => this.handleRallyPointPlacement(),
       onToggleMortarCamera: () => this.handleToggleMortarCamera(),
+      onDeployMortar: () => this.handleDeployMortar(),
+      onMortarFire: () => this.handleMortarFire(),
+      onMortarAdjustPitch: (delta: number) => this.handleMortarAdjustPitch(delta),
+      onMortarAdjustYaw: (delta: number) => this.handleMortarAdjustYaw(delta),
       onMouseDown: (button: number) => this.handleMouseDown(button),
       onMouseUp: (button: number) => this.handleMouseUp(button),
       onReload: () => this.handleTouchReload(),
@@ -231,6 +235,40 @@ export class PlayerController implements GameSystem {
   private handleToggleMortarCamera(): void {
     if (this.mortarSystem) {
       this.mortarSystem.toggleMortarCamera();
+    }
+  }
+
+  private handleDeployMortar(): void {
+    if (!this.mortarSystem) return;
+
+    if (this.mortarSystem.isCurrentlyDeployed()) {
+      this.mortarSystem.undeployMortar();
+    } else {
+      // Get player direction from camera
+      const direction = new THREE.Vector3();
+      this.camera.getWorldDirection(direction);
+      direction.y = 0; // Keep horizontal
+      direction.normalize();
+
+      this.mortarSystem.deployMortar(this.playerState.position, direction);
+    }
+  }
+
+  private handleMortarFire(): void {
+    if (this.mortarSystem) {
+      this.mortarSystem.fireMortarRound();
+    }
+  }
+
+  private handleMortarAdjustPitch(delta: number): void {
+    if (this.mortarSystem && this.mortarSystem.isCurrentlyDeployed()) {
+      this.mortarSystem.adjustPitch(delta * 2);
+    }
+  }
+
+  private handleMortarAdjustYaw(delta: number): void {
+    if (this.mortarSystem && this.mortarSystem.isCurrentlyDeployed()) {
+      this.mortarSystem.adjustYaw(delta * 2);
     }
   }
 

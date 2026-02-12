@@ -18,6 +18,10 @@ export interface InputCallbacks {
   onSandbagRotateRight?: () => void;
   onRallyPointPlace?: () => void;
   onToggleMortarCamera?: () => void;
+  onDeployMortar?: () => void;
+  onMortarFire?: () => void;
+  onMortarAdjustPitch?: (delta: number) => void;
+  onMortarAdjustYaw?: (delta: number) => void;
   onWeaponSlotChange?: (slot: WeaponSlot) => void;
   onMouseDown?: (button: number) => void;
   onMouseUp?: (button: number) => void;
@@ -42,6 +46,7 @@ export class PlayerInput {
   private boundOnMouseMove!: (event: MouseEvent) => void;
   private boundOnMouseDown!: (event: MouseEvent) => void;
   private boundOnMouseUp!: (event: MouseEvent) => void;
+  private boundOnWheel!: (event: WheelEvent) => void;
   private callbacks: InputCallbacks = {};
   private isControlsEnabled = true;
   private isInHelicopter = false;
@@ -237,6 +242,7 @@ export class PlayerInput {
     this.boundOnMouseMove = this.onMouseMove.bind(this);
     this.boundOnMouseDown = this.onMouseDown.bind(this);
     this.boundOnMouseUp = this.onMouseUp.bind(this);
+    this.boundOnWheel = this.onWheel.bind(this);
 
     // Keyboard events
     document.addEventListener('keydown', this.boundOnKeyDown);
@@ -247,6 +253,7 @@ export class PlayerInput {
     document.addEventListener('mousemove', this.boundOnMouseMove);
     document.addEventListener('mousedown', this.boundOnMouseDown);
     document.addEventListener('mouseup', this.boundOnMouseUp);
+    document.addEventListener('wheel', this.boundOnWheel, { passive: false });
 
     // Store bound function to avoid duplicate listeners
     this.boundRequestPointerLock = this.requestPointerLock.bind(this);
@@ -260,6 +267,7 @@ export class PlayerInput {
     document.removeEventListener('keyup', this.boundOnKeyUp);
     document.removeEventListener('mousedown', this.boundOnMouseDown);
     document.removeEventListener('mouseup', this.boundOnMouseUp);
+    document.removeEventListener('wheel', this.boundOnWheel);
     if (this.boundRequestPointerLock) {
       document.removeEventListener('click', this.boundRequestPointerLock);
     }
@@ -334,6 +342,29 @@ export class PlayerInput {
       this.callbacks.onToggleMortarCamera?.();
     }
 
+    // Mortar deploy/undeploy with B key (when not in helicopter)
+    if (!this.isInHelicopter && event.code === 'KeyB') {
+      this.callbacks.onDeployMortar?.();
+    }
+
+    // Mortar fire with F key (when not in helicopter)
+    if (!this.isInHelicopter && event.code === 'KeyF') {
+      this.callbacks.onMortarFire?.();
+    }
+
+    // Mortar aiming with arrow keys (when not in helicopter)
+    if (!this.isInHelicopter) {
+      if (event.code === 'ArrowUp') {
+        this.callbacks.onMortarAdjustPitch?.(1);
+      } else if (event.code === 'ArrowDown') {
+        this.callbacks.onMortarAdjustPitch?.(-1);
+      } else if (event.code === 'ArrowLeft') {
+        this.callbacks.onMortarAdjustYaw?.(-1);
+      } else if (event.code === 'ArrowRight') {
+        this.callbacks.onMortarAdjustYaw?.(1);
+      }
+    }
+
     // Squad command menu with Z key (when not in helicopter)
     if (!this.isInHelicopter && event.code === 'KeyZ') {
       this.callbacks.onSquadCommand?.();
@@ -392,6 +423,18 @@ export class PlayerInput {
   private onMouseUp(event: MouseEvent): void {
     if (!this.isPointerLocked || !this.isControlsEnabled) return;
     this.callbacks.onMouseUp?.(event.button);
+  }
+
+  private onWheel(event: WheelEvent): void {
+    if (!this.isControlsEnabled || this.isInHelicopter) return;
+
+    // Only handle wheel for mortar pitch adjustment if mortar is deployed
+    // The callback will check if mortar is deployed before applying
+    const delta = event.deltaY > 0 ? -0.5 : 0.5; // Scroll down = decrease pitch, scroll up = increase pitch
+    this.callbacks.onMortarAdjustPitch?.(delta);
+
+    // Only prevent default if the callback consumed the event (mortar is deployed)
+    // This check is done in PlayerController
   }
 
   private showControls(): void {
