@@ -289,7 +289,7 @@ export class KillFeed {
     style.textContent = `
       .kill-feed {
         position: fixed;
-        top: 220px;
+        top: 400px;
         right: 20px;
         width: 260px;
         display: flex;
@@ -301,16 +301,18 @@ export class KillFeed {
         font-size: 11px;
       }
 
-      @media (max-width: 768px) {
+      @media (max-width: 1024px) {
         .kill-feed {
-          top: 10px;
-          right: 10px;
+          top: 320px;
+          right: 12px;
           width: 200px;
         }
       }
 
       @media (max-width: 480px) {
         .kill-feed {
+          top: 250px;
+          right: 10px;
           width: 180px;
           font-size: 10px;
         }

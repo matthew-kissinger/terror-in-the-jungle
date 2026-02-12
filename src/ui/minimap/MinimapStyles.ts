@@ -4,7 +4,7 @@ export const DEFAULT_WORLD_SIZE = 300;
 export const MINIMAP_STYLES = `
   .minimap-container {
     position: fixed;
-    bottom: 24px;
+    top: 24px;
     right: 24px;
     width: 200px;
     height: 200px;
@@ -16,13 +16,14 @@ export const MINIMAP_STYLES = `
     -webkit-backdrop-filter: blur(6px) saturate(1.1);
     z-index: 120;
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+    transition: all 0.3s ease-in-out;
   }
 
-  @media (max-width: 768px) {
+  @media (max-width: 1024px) {
     .minimap-container {
       width: 150px;
       height: 150px;
-      bottom: 16px;
+      top: 16px;
       right: 16px;
       border-radius: 10px;
     }
@@ -32,7 +33,7 @@ export const MINIMAP_STYLES = `
     .minimap-container {
       width: 120px;
       height: 120px;
-      bottom: 12px;
+      top: 12px;
       right: 12px;
       border-radius: 8px;
     }
@@ -54,5 +55,11 @@ export const MINIMAP_STYLES = `
     font-size: 9px;
     font-family: 'Courier New', monospace;
     pointer-events: none;
+  }
+  
+  @media (max-width: 480px) {
+    .minimap-legend {
+      display: none;
+    }
   }
 `;
