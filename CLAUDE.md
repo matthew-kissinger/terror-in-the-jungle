@@ -89,12 +89,10 @@ src/
 ## Known Tech Debt
 
 - 16 `: any` annotations in source (excluding tests and SystemInterfaces)
-- Mortar system only has camera toggle (M key) - no deploy/aim/fire UI on desktop or mobile
-- SquadRadialMenu class exists but is never instantiated or imported anywhere - squad commands inaccessible
-- Bootstrap failure shows blank screen with no user-visible error message
-- playerSquadId assigned via 500ms setTimeout race condition (SandboxSystemManager line 227)
+- Mortar deploy/aim/fire controls exist on branch (task-0930d0dc) - pending merge to master
+- SquadRadialMenu touch support exists on branch (task-d4a64fc2) but NOT yet on master - squad commands inaccessible
 - TicketSystem.restartMatch() does not reset player health, ammo, weapons, or respawn queue
-- Master is 86 commits ahead of origin - live GitHub Pages site is significantly behind
+- Master is 93 commits ahead of origin - live GitHub Pages site is significantly behind
 
 ### Unmerged Feature Branches
 
