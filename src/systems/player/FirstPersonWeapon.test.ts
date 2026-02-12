@@ -440,6 +440,17 @@ describe('FirstPersonWeapon', () => {
       expect(mockGunCore.registerShot).not.toHaveBeenCalled();
     });
 
+    it('should not fire while weapon switch animation is in progress', () => {
+      mockRigManager.isSwitching.mockReturnValue(true);
+      mockInput.isFiringActive.mockReturnValue(true);
+
+      weapon.update(0.016);
+
+      expect(mockAmmoManager.consumeRound).not.toHaveBeenCalled();
+      expect(mockGunCore.registerShot).not.toHaveBeenCalled();
+      expect(mockFiring.executeShot).not.toHaveBeenCalled();
+    });
+
     it('should not fire when ammo is empty', () => {
       mockAmmoManager.canFire.mockReturnValue(false);
       mockAmmoManager.isEmpty.mockReturnValue(true);

@@ -214,6 +214,8 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   private tryFire(): void {
+    if (this.rigManager.isSwitching()) return
+
     const gunCore = this.rigManager.getCurrentCore()
     if (!this.combatantSystem || !gunCore.canFire() || !this.isEnabled) return
 
