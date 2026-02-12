@@ -13,6 +13,7 @@ import { HelicopterInstruments } from './HelicopterInstruments';
 import { GrenadePowerMeter } from './GrenadePowerMeter';
 import { InteractionPrompt } from './InteractionPrompt';
 import { RespawnButton } from './RespawnButton';
+import { ZoneCaptureNotification } from './ZoneCaptureNotification';
 import * as THREE from 'three';
 
 export class HUDElements {
@@ -42,6 +43,7 @@ export class HUDElements {
   public scorePopups?: ScorePopupSystem;
   public hitMarkerFeedback?: HitMarkerFeedback;
   public weaponSwitchFeedback?: WeaponSwitchFeedback;
+  public zoneCaptureNotification?: ZoneCaptureNotification;
 
   // Module instances
   private weaponAmmoDisplay: WeaponAmmoDisplay;
@@ -101,6 +103,9 @@ export class HUDElements {
 
     // Initialize weapon switch feedback system
     this.weaponSwitchFeedback = new WeaponSwitchFeedback();
+
+    // Initialize zone capture notification system
+    this.zoneCaptureNotification = new ZoneCaptureNotification();
 
     // Assemble HUD structure
     this.hudContainer.appendChild(this.objectivesList);
@@ -243,6 +248,9 @@ export class HUDElements {
     }
     if (this.weaponSwitchFeedback) {
       this.weaponSwitchFeedback.attachToDOM();
+    }
+    if (this.zoneCaptureNotification) {
+      this.zoneCaptureNotification.mount(document.body);
     }
   }
 
