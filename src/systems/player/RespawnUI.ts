@@ -269,11 +269,11 @@ export class RespawnUI {
       respawnButton.style.transform = 'scale(1)';
     };
 
-    respawnButton.onclick = () => {
+    respawnButton.addEventListener('pointerdown', () => {
       if (!respawnButton.disabled && this.onRespawnClick) {
         this.onRespawnClick();
       }
-    };
+    });
 
     infoPanel.appendChild(controlsContainer);
 

@@ -15,9 +15,35 @@ class MockHTMLElement {
   onclick: (() => void) | null = null;
   onmouseover: (() => void) | null = null;
   onmouseout: (() => void) | null = null;
+  private eventListeners: Map<string, Array<EventListener>> = new Map();
 
   constructor(tagName: string) {
     this.tagName = tagName.toUpperCase();
+  }
+
+  addEventListener(event: string, handler: EventListener) {
+    if (!this.eventListeners.has(event)) {
+      this.eventListeners.set(event, []);
+    }
+    this.eventListeners.get(event)!.push(handler);
+  }
+
+  removeEventListener(event: string, handler: EventListener) {
+    const handlers = this.eventListeners.get(event);
+    if (handlers) {
+      const index = handlers.indexOf(handler);
+      if (index > -1) {
+        handlers.splice(index, 1);
+      }
+    }
+  }
+
+  dispatchEvent(event: Event): boolean {
+    const handlers = this.eventListeners.get(event.type);
+    if (handlers) {
+      handlers.forEach(handler => handler(event));
+    }
+    return true;
   }
 
   appendChild(child: MockHTMLElement) {
@@ -182,9 +208,9 @@ describe('RespawnUI', () => {
       ui.updateTimerDisplay(0, true);
       const btn = elementMap.get('respawn-button');
       
-      // Simulate click
-      if (btn && btn.onclick) {
-        btn.onclick();
+      // Simulate pointerdown
+      if (btn) {
+        btn.dispatchEvent(new Event('pointerdown'));
       }
       
       expect(callback).toHaveBeenCalled();

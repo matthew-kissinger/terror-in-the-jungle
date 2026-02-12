@@ -11,6 +11,7 @@ export interface TouchMortarCallbacks {
   onFire: () => void;
   onAdjustPitch: (delta: number) => void;
   onAdjustYaw: (delta: number) => void;
+  onToggleMortarCamera: () => void;
 }
 
 export class TouchMortarButton {
@@ -23,6 +24,7 @@ export class TouchMortarButton {
   private deployedContainer: HTMLDivElement;
   private fireButton: HTMLDivElement;
   private undeployButton: HTMLDivElement;
+  private cameraButton: HTMLDivElement;
   private aimPad: HTMLDivElement;
 
   private isVisible = false;
@@ -217,8 +219,36 @@ export class TouchMortarButton {
       this.undeployButton.style.transform = 'scale(1)';
     }, { passive: false });
 
+    // Camera toggle button
+    this.cameraButton = this.createButton('CAM', 'mortar-camera', {
+      width: '50px',
+      height: '50px',
+      background: 'rgba(60, 150, 255, 0.3)',
+      border: '2px solid rgba(100, 170, 255, 0.5)',
+      fontSize: '10px',
+    });
+    this.cameraButton.addEventListener('touchstart', (e: TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.cameraButton.style.background = 'rgba(60, 150, 255, 0.6)';
+      this.cameraButton.style.transform = 'scale(0.9)';
+      this.callbacks?.onToggleMortarCamera();
+    }, { passive: false });
+    this.cameraButton.addEventListener('touchend', (e: TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.cameraButton.style.background = 'rgba(60, 150, 255, 0.3)';
+      this.cameraButton.style.transform = 'scale(1)';
+    }, { passive: false });
+    this.cameraButton.addEventListener('touchcancel', (e: TouchEvent) => {
+      e.preventDefault();
+      this.cameraButton.style.background = 'rgba(60, 150, 255, 0.3)';
+      this.cameraButton.style.transform = 'scale(1)';
+    }, { passive: false });
+
     buttonRow.appendChild(this.fireButton);
     buttonRow.appendChild(this.undeployButton);
+    buttonRow.appendChild(this.cameraButton);
     this.deployedContainer.appendChild(buttonRow);
     this.container.appendChild(this.deployedContainer);
 
