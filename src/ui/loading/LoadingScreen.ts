@@ -382,14 +382,19 @@ export class LoadingScreen {
 
   private setupEventListeners(): void {
     // Game mode selection
-    this.zoneControlCard.addEventListener('click', this.handleZoneControlClick);
-    this.openFrontierCard.addEventListener('click', this.handleOpenFrontierClick);
+    this.zoneControlCard.addEventListener('pointerdown', this.handleZoneControlClick);
+    this.zoneControlCard.addEventListener('click', (e) => e.preventDefault());
+    this.openFrontierCard.addEventListener('pointerdown', this.handleOpenFrontierClick);
+    this.openFrontierCard.addEventListener('click', (e) => e.preventDefault());
 
     // Play button
-    this.playButton.addEventListener('click', this.handlePlayClick);
+    this.playButton.addEventListener('pointerdown', this.handlePlayClick);
+    this.playButton.addEventListener('click', (e) => e.preventDefault());
 
-    this.settingsButton.addEventListener('click', this.handleSettingsClick);
-    this.howToPlayButton.addEventListener('click', this.handleHowToPlayClick);
+    this.settingsButton.addEventListener('pointerdown', this.handleSettingsClick);
+    this.settingsButton.addEventListener('click', (e) => e.preventDefault());
+    this.howToPlayButton.addEventListener('pointerdown', this.handleHowToPlayClick);
+    this.howToPlayButton.addEventListener('click', (e) => e.preventDefault());
   }
 
   private selectGameMode(mode: GameMode): void {
@@ -552,13 +557,15 @@ export class LoadingScreen {
     const retryButton = this.errorPanel.querySelector('.retry-button');
     const reportButton = this.errorPanel.querySelector('.report-button');
 
-    retryButton?.addEventListener('click', () => {
+    retryButton?.addEventListener('pointerdown', () => {
       window.location.reload();
     });
+    retryButton?.addEventListener('click', (e) => e.preventDefault());
 
-    reportButton?.addEventListener('click', () => {
+    reportButton?.addEventListener('pointerdown', () => {
       window.open('https://github.com/matthew-kissinger/terror-in-the-jungle/issues', '_blank');
     });
+    reportButton?.addEventListener('click', (e) => e.preventDefault());
 
     // Add to DOM
     document.body.appendChild(this.errorPanel);
@@ -610,11 +617,11 @@ export class LoadingScreen {
   public dispose(): void {
     this.dismissFullscreenPrompt();
     // Remove event listeners
-    this.zoneControlCard.removeEventListener('click', this.handleZoneControlClick);
-    this.openFrontierCard.removeEventListener('click', this.handleOpenFrontierClick);
-    this.playButton.removeEventListener('click', this.handlePlayClick);
-    this.settingsButton.removeEventListener('click', this.handleSettingsClick);
-    this.howToPlayButton.removeEventListener('click', this.handleHowToPlayClick);
+    this.zoneControlCard.removeEventListener('pointerdown', this.handleZoneControlClick);
+    this.openFrontierCard.removeEventListener('pointerdown', this.handleOpenFrontierClick);
+    this.playButton.removeEventListener('pointerdown', this.handlePlayClick);
+    this.settingsButton.removeEventListener('pointerdown', this.handleSettingsClick);
+    this.howToPlayButton.removeEventListener('pointerdown', this.handleHowToPlayClick);
 
     // Clear timeout
     this.clearInitTimeout();

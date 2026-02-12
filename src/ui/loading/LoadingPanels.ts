@@ -119,11 +119,13 @@ export class LoadingPanels {
 
     const closeBtn = panel.querySelector('.close-settings');
     if (closeBtn) {
-      closeBtn.addEventListener('click', this.handleSettingsClose);
+      closeBtn.addEventListener('pointerdown', this.handleSettingsClose);
+      closeBtn.addEventListener('click', (e) => e.preventDefault());
     }
 
     // Close on background click
-    panel.addEventListener('click', this.handleSettingsBgClick);
+    panel.addEventListener('pointerdown', this.handleSettingsBgClick);
+    panel.addEventListener('click', (e) => e.preventDefault());
 
     return panel;
   }
@@ -223,11 +225,13 @@ export class LoadingPanels {
 
     const closeBtn = panel.querySelector('.close-how-to-play');
     if (closeBtn) {
-      closeBtn.addEventListener('click', this.handleHowToPlayClose);
+      closeBtn.addEventListener('pointerdown', this.handleHowToPlayClose);
+      closeBtn.addEventListener('click', (e) => e.preventDefault());
     }
 
     // Close on background click
-    panel.addEventListener('click', this.handleHowToPlayBgClick);
+    panel.addEventListener('pointerdown', this.handleHowToPlayBgClick);
+    panel.addEventListener('click', (e) => e.preventDefault());
 
     return panel;
   }
@@ -388,16 +392,16 @@ export class LoadingPanels {
     // Remove listeners from settings panel
     const settingsCloseBtn = this.settingsPanel.querySelector('.close-settings');
     if (settingsCloseBtn) {
-      settingsCloseBtn.removeEventListener('click', this.handleSettingsClose);
+      settingsCloseBtn.removeEventListener('pointerdown', this.handleSettingsClose);
     }
-    this.settingsPanel.removeEventListener('click', this.handleSettingsBgClick);
+    this.settingsPanel.removeEventListener('pointerdown', this.handleSettingsBgClick);
 
     // Remove listeners from how to play panel
     const howToPlayCloseBtn = this.howToPlayPanel.querySelector('.close-how-to-play');
     if (howToPlayCloseBtn) {
-      howToPlayCloseBtn.removeEventListener('click', this.handleHowToPlayClose);
+      howToPlayCloseBtn.removeEventListener('pointerdown', this.handleHowToPlayClose);
     }
-    this.howToPlayPanel.removeEventListener('click', this.handleHowToPlayBgClick);
+    this.howToPlayPanel.removeEventListener('pointerdown', this.handleHowToPlayBgClick);
 
     if (this.settingsPanel?.parentElement) {
       this.settingsPanel.parentElement.removeChild(this.settingsPanel);

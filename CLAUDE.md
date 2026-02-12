@@ -10,7 +10,7 @@
 npm install
 npm run dev        # Dev server on localhost:5173
 npm run build      # Production build
-npm run test:run   # 3363 tests (all passing)
+npm run test:run   # 3366 tests (all passing)
 ```
 
 ## Stack
@@ -21,7 +21,7 @@ npm run test:run   # 3363 tests (all passing)
 | Spatial | three-mesh-bvh, custom octree/grid |
 | Build | Vite 7, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 96 files, 3363 tests |
+| Tests | Vitest - 96 files, 3366 tests |
 
 ## Architecture
 
@@ -90,31 +90,25 @@ src/
 ## Known Tech Debt
 
 - 16 `: any` annotations in source (excluding tests and SystemInterfaces)
-- Combat continues after match ends - CombatantSystem only checks `combatEnabled`, never calls `ticketSystem.isGameActive()`. Fix on branch task-18dd6c83 but has stale PlayerInput/Controller changes - cherry-pick combat files only.
-- ~25 UI 'click' listeners should be 'pointerdown' for mobile (LoadingScreen, MatchEndScreen, LoadingPanels, RespawnMaps, MobilePauseOverlay)
+- ~25 UI 'click' listeners should be 'pointerdown' for mobile (LoadingScreen, MatchEndScreen, LoadingPanels) - 300ms tap delay
 - Mortar has no touch controls - completely inaccessible on mobile (no TouchMortarButton exists)
 - `showControls()` in PlayerInput.ts is incomplete - missing B/F/Z/G key hints
+- SquadRadialMenu has no touch support - touch events on pointer-events:none overlay are silently swallowed
 
 ### Unmerged Feature Branches
 
-10 `mycel/*` branches remain. Cherry-pick is the only safe merge strategy.
+4 `mycel/*` branches remain (6 consumed branches pruned). Cherry-pick is the only safe merge strategy.
 
-**Safe to cherry-pick (unique work not on master):**
+**Has unique value (cherry-pick carefully):**
 
-| Feature | Branch suffix | Files changed |
-|---------|--------------|---------------|
-| Mortar touch controls | task-0930d0dc | TouchMortarButton (new), PlayerInput, PlayerController, TouchControls |
-| Settings device-aware | task-62f7bfd2 | LoadingPanels label changes |
-| Rain GPU scaling | task-642bca99 | WeatherSystem rain particle scaling |
-| Compass responsive | task-678e18fa | CompassStyles changes |
-| RespawnMap touch | task-75b4d187 | OpenFrontierRespawnMap + LoadingPanels (overlaps task-62f7bfd2) |
-| TouchWeaponBar leak fix | task-fa59cd92 | TouchWeaponBar dispose cleanup |
-| SquadRadialMenu touch | task-d4a64fc2 | SquadRadialMenu, TouchControls, PlayerInput, PlayerController |
-| Kill streak audio | task-fa40bc2b | Kill streak audio stings + PersonalStatsPanel |
-| Combat halt at match end | task-18dd6c83 | CombatantSystem, CombatantAI, SpawnManager, weapons - BUT has stale PlayerInput/Controller removals, cherry-pick combat files only |
+| Feature | Branch suffix | Status |
+|---------|--------------|--------|
+| Mortar touch controls | task-0930d0dc | Conflicts in PlayerController/PlayerInput/TouchControls. New TouchMortarButton.ts is clean. Manual merge needed. |
+| UI click-to-pointerdown | task-ab94ebfb | 2 commits cherry-pick cleanly. Converts LoadingScreen/MatchEndScreen/LoadingPanels click to pointerdown. |
 
-**DANGEROUS (do not full-merge):**
+**DANGEROUS (do not merge):**
 
 | Branch suffix | Reason |
 |--------------|--------|
-| task-ab94ebfb | Stale base reverts 577 lines (CombatantAI, TicketSystem, SystemConnector). Only the UI click-to-pointerdown files (MatchEndScreen, LoadingPanels, LoadingScreen) are useful. |
+| task-d4a64fc2 | Deletes 9 source files, adds 30+ junk files across 77 changes. Only SquadRadialMenu.ts touch handlers are useful - rewrite manually. |
+| task-18dd6c83 | Combat halt feature already merged (commit ed0ec3c). Branch has stale PlayerInput/Controller removals. No remaining value. |
