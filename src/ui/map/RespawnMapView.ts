@@ -41,6 +41,17 @@ export class RespawnMapView {
     this.mapCanvas.style.cursor = zone && this.isZoneSpawnable(zone) ? 'pointer' : 'default';
   };
 
+  private handleTouch = (e: TouchEvent) => {
+    e.preventDefault();
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+
+    const rect = this.mapCanvas.getBoundingClientRect();
+    const x = (touch.clientX - rect.left) * (this.MAP_SIZE / rect.width);
+    const y = (touch.clientY - rect.top) * (this.MAP_SIZE / rect.height);
+    this.handleMapClick(x, y);
+  };
+
   constructor() {
     this.mapCanvas = document.createElement('canvas');
     this.mapCanvas.width = this.MAP_SIZE;
@@ -52,6 +63,7 @@ export class RespawnMapView {
 
   private setupEventListeners(): void {
     this.mapCanvas.addEventListener('click', this.handleClick);
+    this.mapCanvas.addEventListener('touchend', this.handleTouch);
 
     // Hover effect
     this.mapCanvas.addEventListener('mousemove', this.handleMouseMove);
@@ -360,6 +372,7 @@ export class RespawnMapView {
 
   dispose(): void {
     this.mapCanvas.removeEventListener('click', this.handleClick);
+    this.mapCanvas.removeEventListener('touchend', this.handleTouch);
     this.mapCanvas.removeEventListener('mousemove', this.handleMouseMove);
 
     if (this.mapCanvas.parentElement) {
