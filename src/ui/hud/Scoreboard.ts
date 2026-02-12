@@ -1,6 +1,7 @@
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
 import { Faction } from '../../systems/combat/types';
+import { isTouchDevice } from '../../utils/DeviceDetector';
 
 interface PlayerScore {
   name: string;
@@ -108,27 +109,29 @@ export class Scoreboard {
       deaths: teamKillStats.opforDeaths
     };
 
+    const closeHint = isTouchDevice() ? 'Tap outside to close' : 'Press TAB to close';
+
     // Build HTML
     content.innerHTML = `
-      <div style="text-align: center; font-size: 24px; font-weight: bold; margin-bottom: 30px; text-transform: uppercase; border-bottom: 2px solid rgba(255, 255, 255, 0.3); padding-bottom: 15px;">
+      <div class="scoreboard-title">
         Match Scoreboard
       </div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+      <div class="scoreboard-grid">
         <div>
-          <div style="font-size: 16px; font-weight: bold; color: #4488ff; margin-bottom: 15px; text-align: center; text-transform: uppercase;">
+          <div class="scoreboard-team-label" style="font-weight: bold; color: #4488ff; text-align: center; text-transform: uppercase;">
             US Forces
           </div>
           ${this.renderTeamTable(usScores, usTotals)}
         </div>
         <div>
-          <div style="font-size: 16px; font-weight: bold; color: #ff4444; margin-bottom: 15px; text-align: center; text-transform: uppercase;">
+          <div class="scoreboard-team-label" style="font-weight: bold; color: #ff4444; text-align: center; text-transform: uppercase;">
             OPFOR
           </div>
           ${this.renderTeamTable(opforScores, opforTotals)}
         </div>
       </div>
-      <div style="text-align: center; margin-top: 25px; font-size: 12px; opacity: 0.6; border-top: 1px solid rgba(255, 255, 255, 0.2); padding-top: 15px;">
-        Press TAB to close
+      <div class="scoreboard-hint">
+        ${closeHint}
       </div>
     `;
   }

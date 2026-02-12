@@ -2,6 +2,7 @@ import { HUDBaseStyles } from './HUDBaseStyles';
 import { HUDZoneStyles } from './HUDZoneStyles';
 import { HUDStatusStyles } from './HUDStatusStyles';
 import { HUDWeaponStyles } from './HUDWeaponStyles';
+import { ScoreboardStyles } from './ScoreboardStyles';
 
 /**
  * Main HUD styles singleton - combines all style modules
@@ -15,6 +16,7 @@ export class HUDStyles {
     HUDZoneStyles,
     HUDStatusStyles,
     HUDWeaponStyles,
+    ScoreboardStyles,
   ].join('\n');
 
   static getInstance(): HUDStyles {
