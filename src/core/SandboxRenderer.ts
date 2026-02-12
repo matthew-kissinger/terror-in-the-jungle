@@ -4,6 +4,7 @@ import { PostProcessingManager } from '../systems/effects/PostProcessingManager'
 import { SandboxCrosshairUI } from './SandboxCrosshairUI';
 import { SandboxLoadingUI } from './SandboxLoadingUI';
 import { Logger } from '../utils/Logger';
+import { estimateGPUTier, isMobileGPU } from '../utils/DeviceDetector';
 
 export class SandboxRenderer {
   public renderer: THREE.WebGLRenderer;
@@ -40,10 +41,23 @@ export class SandboxRenderer {
   }
 
   private setupRenderer(): void {
+    const gpuTier = estimateGPUTier();
+    const isMobile = isMobileGPU();
+
+    Logger.info('Renderer', `Initializing renderer (Tier: ${gpuTier}, Mobile: ${isMobile})`);
+
     // Configure for pixel-perfect rendering
     PixelPerfectUtils.configureRenderer(this.renderer);
+    
+    // Scale resolution on weaker devices
+    if (isMobile || gpuTier === 'low') {
+      this.renderer.setPixelRatio(0.75);
+    } else {
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    }
+
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = gpuTier !== 'low'; // Disable shadows on low tier
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
@@ -54,6 +68,8 @@ export class SandboxRenderer {
   }
 
   private setupLighting(): void {
+    const gpuTier = estimateGPUTier();
+
     // === JUNGLE ATMOSPHERE ===
     // Fog re-enabled with matching support in GPU billboard shader
     // Both terrain and vegetation now fade consistently to fog color
@@ -76,19 +92,26 @@ export class SandboxRenderer {
     // Reduced intensity, slightly green-tinted for jungle feel
     this.moonLight = new THREE.DirectionalLight(0xeef8ee, 0.5); // Soft filtered light
     this.moonLight.position.set(-30, 80, -50);
-    this.moonLight.castShadow = true;
-    this.moonLight.shadow.mapSize.width = 2048;
-    this.moonLight.shadow.mapSize.height = 2048;
+    this.moonLight.castShadow = gpuTier !== 'low';
+
+    // Scale shadow map size based on performance
+    const shadowMapSize = gpuTier === 'high' ? 2048 : 1024;
+    this.moonLight.shadow.mapSize.width = shadowMapSize;
+    this.moonLight.shadow.mapSize.height = shadowMapSize;
+
     this.moonLight.shadow.camera.near = 0.5;
     this.moonLight.shadow.camera.far = 300;
-    this.moonLight.shadow.camera.left = -100;
-    this.moonLight.shadow.camera.right = 100;
-    this.moonLight.shadow.camera.top = 100;
-    this.moonLight.shadow.camera.bottom = -100;
+    
+    // Smaller shadow frustum on weaker devices to keep resolution up
+    const shadowRange = gpuTier === 'high' ? 100 : 70;
+    this.moonLight.shadow.camera.left = -shadowRange;
+    this.moonLight.shadow.camera.right = shadowRange;
+    this.moonLight.shadow.camera.top = shadowRange;
+    this.moonLight.shadow.camera.bottom = -shadowRange;
 
     // Softer shadows for night time
-    this.moonLight.shadow.radius = 4;
-    this.moonLight.shadow.blurSamples = 25;
+    this.moonLight.shadow.radius = gpuTier === 'high' ? 4 : 2;
+    this.moonLight.shadow.blurSamples = gpuTier === 'high' ? 25 : 10;
 
     this.scene.add(this.moonLight);
 

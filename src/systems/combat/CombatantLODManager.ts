@@ -9,6 +9,7 @@ import { SpatialOctree } from './SpatialOctree';
 import { ZoneManager } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { getHeightQueryCache } from '../terrain/HeightQueryCache';
+import { estimateGPUTier, isMobileGPU } from '../../utils/DeviceDetector';
 
 /**
  * Manages LOD (Level of Detail) calculations and update scheduling for combatants
@@ -26,6 +27,11 @@ export class CombatantLODManager {
   private gameModeManager?: GameModeManager;
   private zoneManager?: ZoneManager;
 
+  // Performance scaling parameters
+  private highLODRange = 200;
+  private mediumLODRange = 400;
+  private lowLODRange = 600;
+
   // LOD counts
   lodHighCount = 0;
   lodMediumCount = 0;
@@ -36,9 +42,6 @@ export class CombatantLODManager {
   private frameDeltaEma = 1 / 60; // seconds
   private readonly FRAME_EMA_ALPHA = 0.1;
   intervalScale = 1.0; // Scales min update intervals when FPS is low
-  private readonly BASE_MEDIUM_MS = 50;  // ~20 Hz
-  private readonly BASE_LOW_MS = 100;    // ~10 Hz
-  private readonly BASE_CULLED_MS = 300; // ~3 Hz
 
   // Module dependencies
   private combatantAI: CombatantAI;
@@ -66,6 +69,29 @@ export class CombatantLODManager {
     this.combatantRenderer = combatantRenderer;
     this.squadManager = squadManager;
     this.spatialGrid = spatialGrid;
+
+    this.applyPerformanceScaling();
+  }
+
+  private applyPerformanceScaling(): void {
+    const gpuTier = estimateGPUTier();
+    const isMobile = isMobileGPU();
+
+    // Default desktop high settings
+    this.highLODRange = 200;
+    this.mediumLODRange = 400;
+    this.lowLODRange = 600;
+
+    if (isMobile || gpuTier === 'low') {
+      // Aggressive mobile/low-tier scaling
+      this.highLODRange = 60;
+      this.mediumLODRange = 120;
+      this.lowLODRange = 250;
+    } else if (gpuTier === 'medium') {
+      this.highLODRange = 120;
+      this.mediumLODRange = 250;
+      this.lowLODRange = 450;
+    }
   }
 
   setPlayerPosition(position: THREE.Vector3): void {
@@ -74,6 +100,7 @@ export class CombatantLODManager {
 
   setGameModeManager(gameModeManager: GameModeManager): void {
     this.gameModeManager = gameModeManager;
+    this.applyPerformanceScaling();
   }
 
   setZoneManager(zoneManager: ZoneManager): void {
@@ -86,9 +113,14 @@ export class CombatantLODManager {
   updateFrameTiming(deltaTime: number): void {
     this.frameDeltaEma = this.frameDeltaEma * (1 - this.FRAME_EMA_ALPHA) + deltaTime * this.FRAME_EMA_ALPHA;
     const fps = 1 / Math.max(0.001, this.frameDeltaEma);
-    if (fps < 30) {
-      // Scale intervals up when under target FPS (cap to 3x)
-      this.intervalScale = Math.min(3.0, 30 / Math.max(10, fps));
+    
+    // Target higher FPS for scaling on mobile
+    const targetFps = isMobileGPU() ? 45 : 30;
+
+    if (fps < targetFps) {
+      // Scale intervals up when under target FPS
+      const maxScale = isMobileGPU() ? 4.0 : 3.0;
+      this.intervalScale = Math.min(maxScale, targetFps / Math.max(10, fps));
     } else if (fps > 90) {
       // Slightly reduce intervals to feel more responsive on high FPS
       this.intervalScale = Math.max(0.75, 90 / fps);
@@ -101,18 +133,24 @@ export class CombatantLODManager {
    * Compute a smooth, distance-based update interval (milliseconds)
    */
   computeDynamicIntervalMs(distance: number): number {
-    // Scale parameters based on world size for better performance in large worlds
     const worldSize = this.gameModeManager?.getWorldSize() || 4000;
     const isLargeWorld = worldSize > 1000;
+    const gpuTier = estimateGPUTier();
+    const isMobile = isMobileGPU();
 
-    const startScaleAt = isLargeWorld ? 120 : 80; // units
-    const maxScaleAt = isLargeWorld ? 600 : 1000; // units
-    const minMs = isLargeWorld ? 33 : 16;         // ~30Hz vs 60Hz near for large worlds
-    const maxMs = isLargeWorld ? 1000 : 500;      // More aggressive scaling in large worlds
+    const startScaleAt = isMobile ? 40 : (isLargeWorld ? 120 : 80);
+    const maxScaleAt = isMobile ? 300 : (isLargeWorld ? 600 : 1000);
+    
+    let minMs = isLargeWorld ? 33 : 16;
+    let maxMs = isLargeWorld ? 1000 : 500;
+
+    if (isMobile || gpuTier === 'low') {
+      minMs *= 2;
+      maxMs *= 1.5;
+    }
 
     const d = Math.max(0, distance - startScaleAt);
     const t = Math.min(1, d / Math.max(1, maxScaleAt - startScaleAt));
-    // Quadratic ease for smoother falloff
     const curve = t * t;
     return minMs + curve * (maxMs - minMs);
   }
@@ -121,7 +159,6 @@ export class CombatantLODManager {
    * Update all combatants with LOD-based scheduling
    */
   updateCombatants(deltaTime: number): void {
-    // Update death animations first
     this.updateDeathAnimations(deltaTime);
 
     const now = Date.now();
@@ -132,28 +169,18 @@ export class CombatantLODManager {
     this.lodLowCount = 0;
     this.lodCulledCount = 0;
 
-    // Determine LOD level thresholds - scale distances based on world size
-    const isLargeWorld = worldSize > 1000;
-    const highLODRange = isLargeWorld ? 200 : 150;
-    const mediumLODRange = isLargeWorld ? 400 : 300;
-    const lowLODRange = isLargeWorld ? 600 : 500;
+    const highLODRangeSq = this.highLODRange * this.highLODRange;
+    const mediumLODRangeSq = this.mediumLODRange * this.mediumLODRange;
+    const lowLODRangeSq = this.lowLODRange * this.lowLODRange;
 
-    const highLODRangeSq = highLODRange * highLODRange;
-    const mediumLODRangeSq = mediumLODRange * mediumLODRange;
-    const lowLODRangeSq = lowLODRange * lowLODRange;
-
-    // Clear buckets
     this.highBucket.length = 0;
     this.mediumBucket.length = 0;
     this.lowBucket.length = 0;
     this.culledBucket.length = 0;
 
-    // Single pass to bucket combatants by distance
     this.combatants.forEach(combatant => {
-      // Skip update entirely if off-map (chunk likely not loaded). Minimal maintenance only.
       if (Math.abs(combatant.position.x) > worldSize ||
           Math.abs(combatant.position.z) > worldSize) {
-        // Nudge toward map center slowly so off-map agents don't explode simulation cost
         this.scratchVector.set(-Math.sign(combatant.position.x), 0, -Math.sign(combatant.position.z));
         combatant.position.addScaledVector(this.scratchVector, 0.2 * deltaTime);
         combatant.lodLevel = 'culled';
@@ -175,16 +202,12 @@ export class CombatantLODManager {
       }
     });
 
-    // Process buckets in priority order (high first)
-    
-    // High LOD: full updates every frame
     this.highBucket.forEach(combatant => {
       combatant.lodLevel = 'high';
       this.lodHighCount++;
       this.updateCombatantFull(combatant, deltaTime);
     });
 
-    // Medium LOD: scheduled updates
     this.mediumBucket.forEach(combatant => {
       combatant.lodLevel = 'medium';
       this.lodMediumCount++;
@@ -199,7 +222,6 @@ export class CombatantLODManager {
       }
     });
 
-    // Low LOD: basic updates
     this.lowBucket.forEach(combatant => {
       combatant.lodLevel = 'low';
       this.lodLowCount++;
@@ -215,18 +237,15 @@ export class CombatantLODManager {
       }
     });
 
-    // Culled: minimal maintenance or distant simulation
     this.culledBucket.forEach(combatant => {
       combatant.lodLevel = 'culled';
       this.lodCulledCount++;
       const distance = Math.sqrt(combatant.distanceSq!);
-      
-      // Use original engagement range buffer logic for teleport simulation vs basic movement
-      const SIMULATION_THRESHOLD = 800; // Beyond low LOD range, switch to infrequent simulation
+      const SIMULATION_THRESHOLD = this.lowLODRange + 200;
       
       const elapsedMs = now - (combatant.lastUpdateTime || 0);
       if (distance > SIMULATION_THRESHOLD) {
-        if (elapsedMs > 30000) { // Update every 30 seconds
+        if (elapsedMs > 30000) {
           this.simulateDistantAI(combatant);
           combatant.lastUpdateTime = now;
         }
@@ -259,7 +278,6 @@ export class CombatantLODManager {
     );
     this.combatantRenderer.updateCombatantTexture(combatant);
     this.combatantMovement.updateRotation(combatant, deltaTime);
-    // Update spatial grid after movement
     this.spatialGrid.updatePosition(combatant.id, combatant.position);
   }
 
@@ -279,7 +297,6 @@ export class CombatantLODManager {
       this.squadManager.getAllSquads()
     );
     this.combatantMovement.updateRotation(combatant, deltaTime);
-    // Update spatial grid after movement
     this.spatialGrid.updatePosition(combatant.id, combatant.position);
   }
 
@@ -291,28 +308,23 @@ export class CombatantLODManager {
       this.combatants
     );
     this.combatantMovement.updateRotation(combatant, deltaTime);
-    // Update spatial grid after movement
     this.spatialGrid.updatePosition(combatant.id, combatant.position);
   }
 
   private updateDeathAnimations(deltaTime: number): void {
-    const FALL_DURATION = 0.7; // 0.7 seconds for fall animation
-    const GROUND_TIME = 4.0; // 4 seconds on ground before fadeout
-    const FADEOUT_DURATION = 1.0; // 1 second fadeout
+    const FALL_DURATION = 0.7;
+    const GROUND_TIME = 4.0;
+    const FADEOUT_DURATION = 1.0;
     const TOTAL_DEATH_TIME = FALL_DURATION + GROUND_TIME + FADEOUT_DURATION;
 
     const toRemove: string[] = [];
 
     this.combatants.forEach((combatant, id) => {
       if (combatant.isDying) {
-        // Progress death animation
         if (combatant.deathProgress === undefined) {
           combatant.deathProgress = 0;
         }
-
         combatant.deathProgress += deltaTime / TOTAL_DEATH_TIME;
-
-        // When animation completes, mark for cleanup
         if (combatant.deathProgress >= 1.0) {
           combatant.isDying = false;
           combatant.state = CombatantState.DEAD;
@@ -322,37 +334,26 @@ export class CombatantLODManager {
       }
     });
 
-    // Remove fully dead combatants
     toRemove.forEach(id => {
       this.combatants.delete(id);
       this.spatialGrid.remove(id);
     });
   }
 
-  /**
-   * Distant AI simulation with proper velocity scaling
-   */
   private simulateDistantAI(combatant: Combatant): void {
     if (!this.zoneManager) return;
+    const simulationTimeStep = 30;
+    const normalMovementSpeed = 4;
+    const distanceToMove = normalMovementSpeed * simulationTimeStep;
 
-    // Calculate how much time passed since last update (30 seconds)
-    const simulationTimeStep = 30; // seconds
-    const normalMovementSpeed = 4; // units per second (normal AI walking speed)
-
-    // Scale movement to cover realistic distance over the simulation interval
-    const distanceToMove = normalMovementSpeed * simulationTimeStep; // 120 units over 30 seconds
-
-    // Find strategic target for this combatant
     const zones = this.zoneManager.getAllZones();
     const targetZones = zones.filter(zone => {
-      // Target capturable zones or defend contested ones
       return !zone.isHomeBase && (
         zone.owner !== combatant.faction || zone.state === 'contested'
       );
     });
 
     if (targetZones.length > 0) {
-      // Pick closest strategic zone
       let nearestZone = targetZones[0];
       let minDistance = combatant.position.distanceTo(nearestZone.position);
 
@@ -364,19 +365,14 @@ export class CombatantLODManager {
         }
       }
 
-      // Move toward the target zone at realistic speed
       const direction = this._scratchDirection
         .subVectors(nearestZone.position, combatant.position)
         .normalize();
 
-      // Apply scaled movement
       const movement = direction.multiplyScalar(distanceToMove);
       combatant.position.add(movement);
-
-      // Update rotation to face movement direction
       combatant.rotation = Math.atan2(direction.z, direction.x);
 
-      // Add some randomness to avoid all AI clustering
       const randomOffset = this._scratchOffset.set(
         (Math.random() - 0.5) * 20,
         0,
@@ -384,7 +380,6 @@ export class CombatantLODManager {
       );
       combatant.position.add(randomOffset);
 
-      // Keep on terrain
       const terrainHeight = getHeightQueryCache().getHeightAt(combatant.position.x, combatant.position.z);
       combatant.position.y = terrainHeight + 3;
     }

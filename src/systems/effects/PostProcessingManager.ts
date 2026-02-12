@@ -8,6 +8,7 @@ import {
   PixelationEffect
 } from 'postprocessing';
 import { Logger } from '../../utils/Logger';
+import { estimateGPUTier, isMobileGPU } from '../../utils/DeviceDetector';
 
 export class PostProcessingManager {
   private composer: EffectComposer;
@@ -29,9 +30,12 @@ export class PostProcessingManager {
     this.scene = scene;
     this.camera = camera;
 
+    const gpuTier = estimateGPUTier();
+    const isMobile = isMobileGPU();
+
     // Initialize composer
     this.composer = new EffectComposer(renderer, {
-      frameBufferType: THREE.HalfFloatType
+      frameBufferType: gpuTier === 'high' ? THREE.HalfFloatType : THREE.UnsignedByteType
     });
 
     // Add render pass
@@ -44,17 +48,20 @@ export class PostProcessingManager {
     this.pixelationPass = new EffectPass(camera, this.pixelationEffect);
     this.composer.addPass(this.pixelationPass);
 
-    // Optional: Add very subtle anti-aliasing for the pixelated edges
-    // This helps smooth the outlines without losing the pixel art feel
-    const smaaEffect = new SMAAEffect({
-      preset: SMAAPreset.LOW,
-      edgeDetectionMode: 1
-    });
-    const smaaPass = new EffectPass(camera, smaaEffect);
-    smaaPass.renderToScreen = true;
-    this.composer.addPass(smaaPass);
-
-    Logger.info('render', 'Post-processing: pixelation (granularity 2) + SMAA');
+    // Only add SMAA on medium/high desktop GPUs
+    if (!isMobile && gpuTier !== 'low') {
+      const smaaEffect = new SMAAEffect({
+        preset: gpuTier === 'high' ? SMAAPreset.MEDIUM : SMAAPreset.LOW,
+        edgeDetectionMode: 1
+      });
+      const smaaPass = new EffectPass(camera, smaaEffect);
+      smaaPass.renderToScreen = true;
+      this.composer.addPass(smaaPass);
+      Logger.info('render', `Post-processing: pixelation (granularity 2) + SMAA (${gpuTier === 'high' ? 'MEDIUM' : 'LOW'})`);
+    } else {
+      this.pixelationPass.renderToScreen = true;
+      Logger.info('render', 'Post-processing: pixelation only (mobile/low-tier optimized)');
+    }
   }
 
   render(deltaTime: number): void {
