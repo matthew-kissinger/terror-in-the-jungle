@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PlayerInput } from './PlayerInput';
+import { SettingsManager } from '../../config/SettingsManager';
 import { WeaponSlot } from './InventoryManager';
 
 // Mock browser globals for Node.js environment
@@ -155,8 +156,9 @@ describe('PlayerInput', () => {
 
       document.dispatchEvent(event);
       const movement = playerInput.getMouseMovement();
-      expect(movement.x).toBeCloseTo(100 * 0.002);
-      expect(movement.y).toBeCloseTo(50 * 0.002);
+      const sensitivity = SettingsManager.getInstance().getMouseSensitivityRaw();
+      expect(movement.x).toBeCloseTo(100 * sensitivity);
+      expect(movement.y).toBeCloseTo(50 * sensitivity);
     });
 
     it('should clear mouse movement', () => {

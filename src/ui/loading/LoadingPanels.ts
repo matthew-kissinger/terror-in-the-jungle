@@ -1,7 +1,10 @@
+import { SettingsManager, GraphicsQuality } from '../../config/SettingsManager';
+
 export class LoadingPanels {
   private settingsPanel: HTMLDivElement;
   private howToPlayPanel: HTMLDivElement;
   private transitionOverlay: HTMLDivElement;
+  private settingsCleanup?: () => void;
 
   // Handler references for cleanup
   private handleSettingsClose = () => this.hideSettingsPanel();
@@ -21,6 +24,7 @@ export class LoadingPanels {
     this.settingsPanel = this.createSettingsPanel();
     this.howToPlayPanel = this.createHowToPlayPanel();
     this.transitionOverlay = this.createTransitionOverlay();
+    this.bindSettingsControls();
   }
 
   private createSettingsPanel(): HTMLDivElement {
@@ -59,33 +63,33 @@ export class LoadingPanels {
 
         <div style="margin: 1rem 0;">
           <label style="display: block; margin-bottom: 0.5rem; color: #b8d4e3; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;">Graphics Quality</label>
-          <select style="width: 100%; padding: 0.75rem; background: rgba(255, 255, 255, 0.05); color: #e8f4f8; border: 1px solid rgba(127, 180, 217, 0.3); border-radius: 8px; font-family: inherit;">
-            <option>Low</option>
-            <option selected>Medium</option>
-            <option>High</option>
-            <option>Ultra</option>
+          <select data-setting="graphicsQuality" style="width: 100%; padding: 0.75rem; background: rgba(255, 255, 255, 0.05); color: #e8f4f8; border: 1px solid rgba(127, 180, 217, 0.3); border-radius: 8px; font-family: inherit;">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+            <option value="ultra">Ultra</option>
           </select>
         </div>
 
         <div style="margin: 1rem 0;">
-          <label style="display: block; margin-bottom: 0.5rem; color: #b8d4e3; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;">Master Volume</label>
-          <input type="range" min="0" max="100" value="70" style="width: 100%; appearance: none; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; outline: none;">
+          <label style="display: block; margin-bottom: 0.5rem; color: #b8d4e3; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;">Master Volume <span data-volume-label>70</span>%</label>
+          <input type="range" min="0" max="100" value="70" data-setting="masterVolume" style="width: 100%; appearance: none; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; outline: none;">
         </div>
 
         <div style="margin: 1rem 0;">
-          <label style="display: block; margin-bottom: 0.5rem; color: #b8d4e3; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;">Mouse Sensitivity</label>
-          <input type="range" min="1" max="10" value="5" style="width: 100%; appearance: none; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; outline: none;">
+          <label style="display: block; margin-bottom: 0.5rem; color: #b8d4e3; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;">Mouse Sensitivity <span data-sensitivity-label>5</span></label>
+          <input type="range" min="1" max="10" value="5" data-setting="mouseSensitivity" style="width: 100%; appearance: none; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; outline: none;">
         </div>
 
         <div style="margin: 1rem 0;">
           <label style="color: #b8d4e3; cursor: pointer; display: flex; align-items: center;">
-            <input type="checkbox" checked style="margin-right: 0.5rem;"> Show FPS Counter
+            <input type="checkbox" checked data-setting="showFPS" style="margin-right: 0.5rem;"> Show FPS Counter
           </label>
         </div>
 
         <div style="margin: 1rem 0;">
           <label style="color: #b8d4e3; cursor: pointer; display: flex; align-items: center;">
-            <input type="checkbox" checked style="margin-right: 0.5rem;"> Enable Shadows
+            <input type="checkbox" checked data-setting="enableShadows" style="margin-right: 0.5rem;"> Enable Shadows
           </label>
         </div>
 
@@ -283,7 +287,84 @@ export class LoadingPanels {
     }, 500);
   }
 
+  private bindSettingsControls(): void {
+    const settings = SettingsManager.getInstance();
+    const panel = this.settingsPanel;
+
+    // Populate controls from saved settings
+    const volumeSlider = panel.querySelector('[data-setting="masterVolume"]') as HTMLInputElement | null;
+    const sensitivitySlider = panel.querySelector('[data-setting="mouseSensitivity"]') as HTMLInputElement | null;
+    const fpsCheckbox = panel.querySelector('[data-setting="showFPS"]') as HTMLInputElement | null;
+    const shadowsCheckbox = panel.querySelector('[data-setting="enableShadows"]') as HTMLInputElement | null;
+    const qualitySelect = panel.querySelector('[data-setting="graphicsQuality"]') as HTMLSelectElement | null;
+    const volumeLabel = panel.querySelector('[data-volume-label]') as HTMLSpanElement | null;
+    const sensitivityLabel = panel.querySelector('[data-sensitivity-label]') as HTMLSpanElement | null;
+
+    const currentSettings = settings.getAll();
+
+    if (volumeSlider) {
+      volumeSlider.value = String(currentSettings.masterVolume);
+      if (volumeLabel) volumeLabel.textContent = String(currentSettings.masterVolume);
+    }
+    if (sensitivitySlider) {
+      sensitivitySlider.value = String(currentSettings.mouseSensitivity);
+      if (sensitivityLabel) sensitivityLabel.textContent = String(currentSettings.mouseSensitivity);
+    }
+    if (fpsCheckbox) fpsCheckbox.checked = currentSettings.showFPS;
+    if (shadowsCheckbox) shadowsCheckbox.checked = currentSettings.enableShadows;
+    if (qualitySelect) qualitySelect.value = currentSettings.graphicsQuality;
+
+    // Bind event listeners
+    const onVolumeChange = () => {
+      if (!volumeSlider) return;
+      const val = Number(volumeSlider.value);
+      if (volumeLabel) volumeLabel.textContent = String(val);
+      settings.set('masterVolume', val);
+    };
+
+    const onSensitivityChange = () => {
+      if (!sensitivitySlider) return;
+      const val = Number(sensitivitySlider.value);
+      if (sensitivityLabel) sensitivityLabel.textContent = String(val);
+      settings.set('mouseSensitivity', val);
+    };
+
+    const onFPSChange = () => {
+      if (!fpsCheckbox) return;
+      settings.set('showFPS', fpsCheckbox.checked);
+    };
+
+    const onShadowsChange = () => {
+      if (!shadowsCheckbox) return;
+      settings.set('enableShadows', shadowsCheckbox.checked);
+    };
+
+    const onQualityChange = () => {
+      if (!qualitySelect) return;
+      settings.set('graphicsQuality', qualitySelect.value as GraphicsQuality);
+    };
+
+    volumeSlider?.addEventListener('input', onVolumeChange);
+    sensitivitySlider?.addEventListener('input', onSensitivityChange);
+    fpsCheckbox?.addEventListener('change', onFPSChange);
+    shadowsCheckbox?.addEventListener('change', onShadowsChange);
+    qualitySelect?.addEventListener('change', onQualityChange);
+
+    this.settingsCleanup = () => {
+      volumeSlider?.removeEventListener('input', onVolumeChange);
+      sensitivitySlider?.removeEventListener('input', onSensitivityChange);
+      fpsCheckbox?.removeEventListener('change', onFPSChange);
+      shadowsCheckbox?.removeEventListener('change', onShadowsChange);
+      qualitySelect?.removeEventListener('change', onQualityChange);
+    };
+  }
+
   dispose(): void {
+    // Clean up settings control listeners
+    if (this.settingsCleanup) {
+      this.settingsCleanup();
+    }
+
     // Remove listeners from settings panel
     const settingsCloseBtn = this.settingsPanel.querySelector('.close-settings');
     if (settingsCloseBtn) {

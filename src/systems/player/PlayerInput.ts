@@ -1,4 +1,5 @@
 import { Logger } from '../../utils/Logger';
+import { SettingsManager } from '../../config/SettingsManager';
 import { WeaponSlot } from './InventoryManager';
 
 export interface InputCallbacks {
@@ -240,7 +241,7 @@ export class PlayerInput {
   private onMouseMove(event: MouseEvent): void {
     if (!this.isPointerLocked) return;
 
-    const sensitivity = 0.002;
+    const sensitivity = SettingsManager.getInstance().getMouseSensitivityRaw();
     this.mouseMovement.x = event.movementX * sensitivity;
     this.mouseMovement.y = event.movementY * sensitivity;
   }
