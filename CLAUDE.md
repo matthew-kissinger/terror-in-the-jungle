@@ -10,7 +10,7 @@
 npm install
 npm run dev        # Dev server on localhost:5173
 npm run build      # Production build
-npm run test:run   # 3256 tests (all passing)
+npm run test:run   # 3258 tests (all passing)
 ```
 
 ## Stack
@@ -21,11 +21,11 @@ npm run test:run   # 3256 tests (all passing)
 | Spatial | three-mesh-bvh, custom octree/grid |
 | Build | Vite 7, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 85 files, 3258 tests |
+| Tests | Vitest - 91 files, 3258 tests |
 
 ## Architecture
 
-~56k lines across 287 source files. Systems-based architecture with orchestrator pattern.
+~56k lines across 288 source files. Systems-based architecture with orchestrator pattern.
 
 ```
 src/
@@ -69,6 +69,7 @@ src/
 |------|-----|------|----------|
 | Zone Control | 400x400 | 15v15 | 3 min |
 | Open Frontier | 3200x3200 | 60v60 | 15 min |
+| Team Deathmatch | 400x400 | 15v15 | 5 min |
 
 ## Profiling Tools
 
@@ -87,14 +88,10 @@ src/
 ## Known Tech Debt
 
 - 14 `: any` annotations across source files (excluding tests and SystemInterfaces)
-- Touch controls (7 files in `src/ui/controls/`) have zero test coverage
+- Touch controls: 5 of 7 files have tests; TouchADSButton and TouchWeaponBar still untested
 - HUD uses hard-coded pixel positions/sizes - not responsive for mobile viewports
-- RespawnUI has `min-width: 600px` map panel - overflows on phones
-- RespawnMapView only handles mouse events - mobile players cannot select spawn zones
-- LoadoutSelector requires Space key to confirm - no touch-friendly spawn button
-- FullMapSystem has no touch support (no pinch-zoom, no drag-pan)
 - MatchEndScreen has `min-width: 800px` stats panel - overflows on mobile
-- Helicopter entry/exit is keyboard-only (E key) - no touch button
 - `TicketSystem.restartMatch()` unused - UI uses `window.location.reload()` instead
-- TouchLook sensitivity hardcoded to 0.004 - not connected to SettingsManager
 - Squad radial menu UI exists but commands are non-functional placeholders
+- TouchWeaponBar slot event listeners not cleaned up in dispose() - minor memory leak
+- OpenFrontierRespawnMap only handles mouse events - no touch pan/zoom/select
