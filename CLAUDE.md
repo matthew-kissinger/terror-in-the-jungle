@@ -21,7 +21,7 @@ npm run test:run   # 3363 tests (all passing)
 | Spatial | three-mesh-bvh, custom octree/grid |
 | Build | Vite 7, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 95 files, 3363 tests |
+| Tests | Vitest - 96 files, 3363 tests |
 
 ## Architecture
 
@@ -89,26 +89,32 @@ src/
 
 ## Known Tech Debt
 
-- 14 `: any` annotations in source (excluding tests and SystemInterfaces)
-- Combat continues after match ends - no system halts AI, firing, or spawning when tickets reach 0 (fix in progress)
-- 21 UI 'click' listeners should be 'pointerdown' for mobile (LoadingScreen, MatchEndScreen, LoadingPanels, RespawnMaps, MobilePauseOverlay)
-- Mortar has no touch controls - completely inaccessible on mobile (deploy/aim/fire need TouchMortarButton)
-- showControls() hint text is incomplete - missing B/F/Arrow/Z/G key documentation
-- Mortar wheel handler dispatches pitch adjustment on every scroll even when mortar not deployed (no-op but wasteful)
+- 16 `: any` annotations in source (excluding tests and SystemInterfaces)
+- Combat continues after match ends - CombatantSystem only checks `combatEnabled`, never calls `ticketSystem.isGameActive()`. Fix on branch task-18dd6c83 but has stale PlayerInput/Controller changes - cherry-pick combat files only.
+- ~25 UI 'click' listeners should be 'pointerdown' for mobile (LoadingScreen, MatchEndScreen, LoadingPanels, RespawnMaps, MobilePauseOverlay)
+- Mortar has no touch controls - completely inaccessible on mobile (no TouchMortarButton exists)
+- `showControls()` in PlayerInput.ts is incomplete - missing B/F/Z/G key hints
 
 ### Unmerged Feature Branches
 
-7 `mycel/*` branches with unique commits (plus 1 stale). Cherry-pick is the safe merge strategy. Two additional branches (task-ab94ebfb, task-bb6ac128) have stale bases that would revert recent master work - cherry-pick only their specific file changes.
+10 `mycel/*` branches remain. Cherry-pick is the only safe merge strategy.
 
-| Feature | Branch suffix | Merge status | Unique change |
-|---------|--------------|--------------|---------------|
-| Mortar deploy/aim/fire controls | task-0930d0dc | Clean merge | TouchMortarButton + PlayerInput/Controller wiring (was merged then reverted) |
-| Settings device-aware | task-62f7bfd2 | Clean merge | LoadingPanels label changes |
-| Weather rain GPU scaling | task-642bca99 | Clean merge | WeatherSystem rain particle scaling |
-| Compass responsive | task-678e18fa | Clean merge | CompassStyles changes |
-| Settings + RespawnMap touch | task-75b4d187 | 1 conflict (CLAUDE.md) | LoadingPanels + OpenFrontierRespawnMap touch |
-| TouchWeaponBar dispose fix | task-fa59cd92 | Clean merge | Memory leak fix in TouchWeaponBar |
-| SquadRadialMenu touch | task-d4a64fc2 | 2 conflicts (PlayerInput, TouchControls) | Touch wiring (squad already on master via Z key) |
-| Kill streak audio | task-fa40bc2b | Clean merge | Kill streak audio stings + PersonalStatsPanel |
-| Click-to-pointerdown conversion | task-ab94ebfb | DANGEROUS base | Stale base reverts squad/restart fixes - cherry-pick UI files only |
-| Mortar re-wire (keyboard) | task-bb6ac128 | DANGEROUS base | Stale base reverts squad/restart fixes - staged changes already on master |
+**Safe to cherry-pick (unique work not on master):**
+
+| Feature | Branch suffix | Files changed |
+|---------|--------------|---------------|
+| Mortar touch controls | task-0930d0dc | TouchMortarButton (new), PlayerInput, PlayerController, TouchControls |
+| Settings device-aware | task-62f7bfd2 | LoadingPanels label changes |
+| Rain GPU scaling | task-642bca99 | WeatherSystem rain particle scaling |
+| Compass responsive | task-678e18fa | CompassStyles changes |
+| RespawnMap touch | task-75b4d187 | OpenFrontierRespawnMap + LoadingPanels (overlaps task-62f7bfd2) |
+| TouchWeaponBar leak fix | task-fa59cd92 | TouchWeaponBar dispose cleanup |
+| SquadRadialMenu touch | task-d4a64fc2 | SquadRadialMenu, TouchControls, PlayerInput, PlayerController |
+| Kill streak audio | task-fa40bc2b | Kill streak audio stings + PersonalStatsPanel |
+| Combat halt at match end | task-18dd6c83 | CombatantSystem, CombatantAI, SpawnManager, weapons - BUT has stale PlayerInput/Controller removals, cherry-pick combat files only |
+
+**DANGEROUS (do not full-merge):**
+
+| Branch suffix | Reason |
+|--------------|--------|
+| task-ab94ebfb | Stale base reverts 577 lines (CombatantAI, TicketSystem, SystemConnector). Only the UI click-to-pointerdown files (MatchEndScreen, LoadingPanels, LoadingScreen) are useful. |
