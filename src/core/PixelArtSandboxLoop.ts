@@ -2,6 +2,13 @@ import { Logger } from '../utils/Logger';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import type { PixelArtSandbox } from './PixelArtSandbox';
 
+// Crash tracking for frame loop resilience
+let crashCount = 0;
+let lastCrashTime = 0;
+const CRASH_WINDOW_MS = 5000; // 5 seconds
+const MAX_CRASHES = 3;
+let errorOverlayShown = false;
+
 /**
  * Main game loop animation frame
  */
@@ -13,70 +20,107 @@ export function animate(sandbox: PixelArtSandbox): void {
   const deltaTime = sandbox.clock.getDelta();
   sandbox.lastFrameDelta = deltaTime;
 
-  // Update all systems
-  sandbox.systemManager.updateSystems(deltaTime, sandbox.gameStarted);
+  try {
+    // Update all systems
+    sandbox.systemManager.updateSystems(deltaTime, sandbox.gameStarted);
 
-  // Update skybox position
-  sandbox.systemManager.skybox.updatePosition(sandbox.sandboxRenderer.camera.position);
+    // Update skybox position
+    sandbox.systemManager.skybox.updatePosition(sandbox.sandboxRenderer.camera.position);
 
-  // Check if mortar is deployed and using mortar camera view
-  const mortarSystem = sandbox.systemManager.mortarSystem;
-  const usingMortarCamera = mortarSystem?.isUsingMortarCamera() ?? false;
-  const mortarCamera = mortarSystem?.getMortarCamera();
+    // Check if mortar is deployed and using mortar camera view
+    const mortarSystem = sandbox.systemManager.mortarSystem;
+    const usingMortarCamera = mortarSystem?.isUsingMortarCamera() ?? false;
+    const mortarCamera = mortarSystem?.getMortarCamera();
 
-  // Collect GPU timing from previous frame
-  performanceTelemetry.collectGPUTime();
+    // Collect GPU timing from previous frame
+    performanceTelemetry.collectGPUTime();
 
-  // Begin GPU timing for this frame
-  performanceTelemetry.beginGPUTimer();
+    // Begin GPU timing for this frame
+    performanceTelemetry.beginGPUTimer();
 
-  // Render the main scene
-  if (usingMortarCamera && mortarCamera) {
-    // Render with mortar camera (top-down view)
-    // Note: Mortar camera renders directly without post-processing for tactical view clarity
-    sandbox.sandboxRenderer.renderer.render(
-      sandbox.sandboxRenderer.scene,
-      mortarCamera
-    );
-  } else {
-    if (sandbox.sandboxRenderer.postProcessing) {
-      sandbox.sandboxRenderer.postProcessing.render(deltaTime);
-    } else {
+    // Render the main scene
+    if (usingMortarCamera && mortarCamera) {
+      // Render with mortar camera (top-down view)
+      // Note: Mortar camera renders directly without post-processing for tactical view clarity
       sandbox.sandboxRenderer.renderer.render(
         sandbox.sandboxRenderer.scene,
-        sandbox.sandboxRenderer.camera
+        mortarCamera
       );
+    } else {
+      if (sandbox.sandboxRenderer.postProcessing) {
+        sandbox.sandboxRenderer.postProcessing.render(deltaTime);
+      } else {
+        sandbox.sandboxRenderer.renderer.render(
+          sandbox.sandboxRenderer.scene,
+          sandbox.sandboxRenderer.camera
+        );
+      }
     }
-  }
 
-  // End GPU timing measurement
-  performanceTelemetry.endGPUTimer();
+    // End GPU timing measurement
+    performanceTelemetry.endGPUTimer();
 
-  // Render weapon overlay
-  if (sandbox.systemManager.firstPersonWeapon && !usingMortarCamera) {
-    sandbox.systemManager.firstPersonWeapon.renderWeapon(sandbox.sandboxRenderer.renderer);
-  }
-
-  // Render grenade overlays
-  const renderer = sandbox.sandboxRenderer.renderer;
-  const currentAutoClear = renderer.autoClear;
-  renderer.autoClear = false;
-
-  if (sandbox.systemManager.grenadeSystem && sandbox.systemManager.inventoryManager && !usingMortarCamera) {
-    const grenadeScene = sandbox.systemManager.grenadeSystem.getGrenadeOverlayScene();
-    const grenadeCamera = sandbox.systemManager.grenadeSystem.getGrenadeOverlayCamera();
-    if (grenadeScene && grenadeCamera) {
-      renderer.clearDepth();
-      renderer.render(grenadeScene, grenadeCamera);
+    // Render weapon overlay
+    if (sandbox.systemManager.firstPersonWeapon && !usingMortarCamera) {
+      sandbox.systemManager.firstPersonWeapon.renderWeapon(sandbox.sandboxRenderer.renderer);
     }
+
+    // Render grenade overlays
+    const renderer = sandbox.sandboxRenderer.renderer;
+    const currentAutoClear = renderer.autoClear;
+    renderer.autoClear = false;
+
+    if (sandbox.systemManager.grenadeSystem && sandbox.systemManager.inventoryManager && !usingMortarCamera) {
+      const grenadeScene = sandbox.systemManager.grenadeSystem.getGrenadeOverlayScene();
+      const grenadeCamera = sandbox.systemManager.grenadeSystem.getGrenadeOverlayCamera();
+      if (grenadeScene && grenadeCamera) {
+        renderer.clearDepth();
+        renderer.render(grenadeScene, grenadeCamera);
+      }
+    }
+
+    renderer.autoClear = currentAutoClear;
+
+    updateSandboxMetrics(sandbox, deltaTime);
+    updatePerformanceOverlay(sandbox, deltaTime);
+    updateLogOverlay(sandbox);
+    updateTimeIndicator(sandbox);
+  } catch (error) {
+    // Handle frame loop crash
+    Logger.error('frame-loop', 'Frame loop error:', error);
+
+    const now = Date.now();
+
+    // Reset crash count if outside crash window
+    if (now - lastCrashTime > CRASH_WINDOW_MS) {
+      crashCount = 0;
+    }
+
+    crashCount++;
+    lastCrashTime = now;
+
+    // If too many crashes in short time, show error overlay
+    if (crashCount >= MAX_CRASHES && !errorOverlayShown) {
+      errorOverlayShown = true;
+      showFrameLoopError(sandbox, error);
+    }
+
+    // Continue the loop - don't let a single crash stop the game
   }
+}
 
-  renderer.autoClear = currentAutoClear;
+/**
+ * Show an error overlay for repeated frame loop crashes
+ */
+function showFrameLoopError(sandbox: PixelArtSandbox, error: unknown): void {
+  const errorMessage = error instanceof Error
+    ? `${error.message}\n\nThe game encountered ${crashCount} errors within ${CRASH_WINDOW_MS / 1000} seconds.`
+    : `The game encountered ${crashCount} errors within ${CRASH_WINDOW_MS / 1000} seconds.`;
 
-  updateSandboxMetrics(sandbox, deltaTime);
-  updatePerformanceOverlay(sandbox, deltaTime);
-  updateLogOverlay(sandbox);
-  updateTimeIndicator(sandbox);
+  sandbox.loadingScreen.showError(
+    'Game Error - Multiple Crashes',
+    errorMessage
+  );
 }
 
 /**
