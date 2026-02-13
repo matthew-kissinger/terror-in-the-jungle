@@ -4,13 +4,9 @@ import { GrenadeType } from '../../systems/combat/types';
 import { shouldUseTouchControls } from '../../utils/DeviceDetector';
 import { renderGrenadePanel } from './LoadoutGrenadePanel';
 import { renderWeaponPanel } from './LoadoutWeaponPanel';
+import { LoadoutWeapon } from './LoadoutTypes';
 
-export enum LoadoutWeapon {
-  RIFLE = 'rifle',
-  SHOTGUN = 'shotgun',
-  SMG = 'smg',
-  PISTOL = 'pistol'
-}
+export { LoadoutWeapon };
 
 export class LoadoutSelector implements GameSystem {
   private overlayElement?: HTMLElement;

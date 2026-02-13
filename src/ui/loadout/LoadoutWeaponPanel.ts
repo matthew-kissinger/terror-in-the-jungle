@@ -1,4 +1,4 @@
-import { LoadoutWeapon } from './LoadoutSelector';
+import { LoadoutWeapon } from './LoadoutTypes';
 
 interface WeaponStats {
   damage: string;
