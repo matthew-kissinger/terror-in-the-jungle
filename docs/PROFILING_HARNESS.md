@@ -5,6 +5,14 @@ Last updated: 2026-02-14
 Mission linkage:
 - Frontier iteration protocol: `docs/PERFORMANCE_FRONTIER_MISSION.md`
 
+## Read This First
+
+- Use headed capture as primary signal on this machine.
+- Compare like-for-like scenarios (same mode, NPC count, warmup, duration).
+- Prioritize tail metrics over averages.
+- Keep deep CDP tracing off for standard regression loops (observer effect).
+- Treat harness output as production-critical feedback data.
+
 ## Installed Tooling
 
 - `playwright` (latest) with Chromium
@@ -150,6 +158,12 @@ Reason:
 4. Re-run capture and compare validation + sample metrics.
 5. Keep change only if frame budget and stall checks improve.
 
+Recommended quick loop:
+1. `npm run perf:capture`
+2. `npm run perf:analyze:latest`
+3. change one thing
+4. repeat with the same capture config
+
 ## Open Frontier Long-Run Capture
 
 Use this for streaming/memory/stability behavior in larger maps:
@@ -209,6 +223,9 @@ Notes:
 - `zone_control`: zone-objective behavior (contested/non-US zone preference), strict hit validation.
 - `team_deathmatch`: enemy-mass collapse behavior (faster decision cadence), strict hit validation.
 - `open_frontier`: zone-objective behavior for large map traversal, relaxed hit validation for short sweeps (tail-latency checks remain strict).
+
+Open Frontier note:
+- If shots/hits remain zero while close to combat, treat as a gameplay bug first (hit-reg/LOS/occlusion), not only a harness issue.
 
 Latest mode sweep artifacts:
 - Zone Control: `artifacts/perf/2026-02-14T20-38-29-583Z` (validation pass, active hits recorded).

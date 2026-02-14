@@ -1,81 +1,88 @@
 # Terror in the Jungle
 
-Browser-based 3D combined-arms FPS. GPU-accelerated billboard rendering of 200k+ procedural vegetation. Faction-based AI combat with squad tactics, influence maps, and spatial acceleration.
+Browser-based 3D FPS focused on large-scale jungle combat, AI squad behavior, and stable frame pacing under high combatant counts.
 
-**[Play Now](https://matthew-kissinger.github.io/terror-in-the-jungle/)**
+Live build:
+- https://matthew-kissinger.github.io/terror-in-the-jungle/
+
+## Current Focus
+
+- Target: stable 120+ active combatants.
+- Priority: frame-time tail stability (`p95`/`p99`), not only average FPS.
+- Active workstream: Open Frontier reliability, objective flow, and combat plausibility.
 
 ## Quick Start
 
 ```bash
 npm install
-npm run dev        # localhost:5173
-npm run build      # Production build
-npm run test:run   # 3363 tests
+npm run dev
 ```
 
-## Game Modes
+Common commands:
 
-| Mode | Map Size | Teams | Duration |
-|------|----------|-------|----------|
+```bash
+npm run build
+npm run test:run
+npm run perf:capture
+npm run perf:analyze:latest
+```
+
+## Modes
+
+| Mode | Map | Teams | Match Length |
+|---|---:|---:|---:|
 | Zone Control | 400x400 | 15v15 | 3 min |
 | Open Frontier | 3200x3200 | 60v60 | 15 min |
 | Team Deathmatch | 400x400 | 15v15 | 5 min |
+| AI Sandbox | configurable | configurable | configurable |
 
 ## Controls
 
-**Desktop** - WASD move, Shift sprint, Space jump, Click fire, Right-click ADS, R reload, 1-6 weapons, G grenade, B mortar deploy, F mortar fire, Z squad menu, TAB scoreboard, F2 perf overlay
+Desktop:
+- `WASD` move, `Shift` sprint, `Space` jump
+- `LMB` fire, `RMB` ADS, `R` reload
+- `1-6` weapon slots, `G` grenade, `B` mortar deploy, `F` mortar fire
+- `Z` squad menu, `Tab` scoreboard, `F2` perf overlay
 
-**Mobile** - Virtual joystick, touch-drag look, on-screen fire/ADS/reload/grenade/scoreboard, weapon bar, helicopter/mortar/sandbag touch controls, squad menu
+Mobile:
+- virtual joystick + touch look
+- on-screen fire/ADS/reload/grenade/scoreboard
+- touch controls for helicopter, mortar, and sandbags
 
-## Tech Stack
+## Performance Harness
 
-| Layer | Tech |
-|-------|------|
-| Runtime | Three.js r182 + postprocessing v6.38 |
-| Spatial | three-mesh-bvh v0.9, custom octree + grid |
-| Build | Vite 7.3, TypeScript 5.9 |
-| Workers | BVH pool, chunk generation workers |
-| Tests | Vitest 4.0 - 98 files, 3363 tests |
+Primary loop commands:
 
-~61k lines source, ~50k lines tests across 406 files.
-
-## Performance Profiling
-
-**In-game**: F2 overlay (FPS, draw calls, triangles, combat timing, memory)
-
-**Console API**:
-```javascript
-perf.report()        // Full telemetry
-perf.validate()      // System checks
-perf.benchmark(1000) // Raycast benchmark
-```
-
-**Automated harness** (Playwright CDP):
 ```bash
-npm run perf:capture              # Headed capture (default, trusted)
-npm run perf:capture:headless     # Headless (secondary signal)
-npm run perf:capture:devtools     # With Chrome DevTools
-npm run perf:analyze:latest       # Analyze latest artifacts
+npm run perf:capture
+npm run perf:capture:combat120
+npm run perf:capture:openfrontier:short
+npm run perf:capture:frontier30m
+npm run perf:analyze:latest
 ```
 
-**AI Sandbox** for stress testing: `?sandbox=true&npcs=80&autostart=true`
+Harness artifacts are written to `artifacts/perf/<timestamp>/`.
 
-See `docs/PROFILING_HARNESS.md` for full harness documentation.
+For full usage and flags, see:
+- `docs/PROFILING_HARNESS.md`
 
-## Documentation
+## Documentation Map
 
-| Doc | Purpose |
-|-----|---------|
-| `CLAUDE.md` | Development guide, architecture, key files, tech debt |
-| `docs/PROFILING_HARNESS.md` | Perf harness commands, artifacts, validation checks |
-| `docs/ARCHITECTURE_RECOVERY_PLAN.md` | Optimization workstreams, experiment log, discovery loop |
-| `docs/AUDIO_ASSETS_NEEDED.md` | Audio asset specifications |
+Start here:
+- `docs/README.md`
+
+Core docs:
+- `docs/PERFORMANCE_FRONTIER_MISSION.md` - autonomous performance frontier operating model
+- `docs/ARCHITECTURE_RECOVERY_PLAN.md` - experiment ledger and keep/revert decisions
+- `docs/PROFILING_HARNESS.md` - profiling workflow, validation gates, harness flags
+- `CLAUDE.md` - implementation notes and repo-level dev guidance
+- `docs/AUDIO_ASSETS_NEEDED.md` - audio production backlog/spec
 
 ## CI/CD
 
-- **ci.yml** - Lint, build, test on push/PR
-- **deploy.yml** - GitHub Pages deploy on push to master
-- **perf-check.yml** - Automated perf regression capture (control + combat profiles)
+- `.github/workflows/ci.yml` - lint/build/test on push and PR
+- `.github/workflows/deploy.yml` - GitHub Pages deploy on push to `master`
+- `.github/workflows/perf-check.yml` - perf regression capture checks
 
 ## License
 

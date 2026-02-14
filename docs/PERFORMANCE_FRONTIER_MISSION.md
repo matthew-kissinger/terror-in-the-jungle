@@ -1,35 +1,41 @@
 # Performance Frontier Mission
 
 Last updated: 2026-02-14
-Status: Active operating mode for autonomous agent iterations.
-Target: Stable 120+ simultaneous combatants with controlled frame tails.
+Mode: Active
+Primary target: stable 120+ combatants with controlled frame tails and believable combat.
 
-## Mission Override
+## Intent
 
-This mode replaces incremental optimization as default behavior.
+This mission treats the current codebase as a baseline reference, not a final architecture.
 
-Rules:
-- Treat current architecture as reference implementation, not destination.
-- Search for order-of-magnitude gains.
-- Prefer paradigm replacement over local tuning.
-- Do not stop at "optimize this function"; ask "should this run on CPU at all?"
+Default stance:
+- challenge CPU ownership of expensive simulation work
+- prefer batched/field-based/asynchronous designs
+- prioritize order-of-magnitude wins over local percentage gains
 
-Non-goals:
-- Constant tweaking only.
-- Additional local caches without paradigm change.
-- Per-object micro-optimization in the same update model.
+## Guardrails
 
-## Problem Decomposition (Mandatory)
+Do:
+- keep every experiment reversible behind clear flags
+- measure before/after on the same scenario
+- protect gameplay plausibility while scaling
 
-Evaluate these blocks independently every cycle:
+Do not:
+- ship optimization guesses without captures
+- keep changes that only improve average FPS while tail latency worsens
+- allow harness or telemetry overhead to poison measurements
+
+## Mandatory Decomposition
+
+Every frontier cycle must evaluate these blocks independently:
 - AI decision making
-- Perception (LOS, awareness, threat)
-- Spatial queries
-- Movement and collision avoidance
-- Combat resolution
-- Rendering synchronization
+- perception (LOS, awareness, threat)
+- spatial queries
+- movement/collision avoidance
+- combat resolution
+- render synchronization
 
-For each block, produce this template:
+Use this record format:
 
 ```text
 Subsystem:
@@ -42,113 +48,90 @@ Migration Difficulty:
 How to Benchmark:
 ```
 
-## Preferred Paradigms (Default Candidates)
+## Paradigm Defaults
 
-CPU / Data:
-- Structure-of-Arrays layouts.
-- Worker job graph with fixed simulation tick.
-- SharedArrayBuffer + Atomics queues.
-- Triple-buffered state handoff (sim write, render read, transfer).
+CPU/data-oriented:
+- SoA combat state
+- fixed-tick worker simulation
+- SAB + Atomics queues
+- triple-buffered render/sim handoff
 
 WASM:
-- Rust/C++ kernels for batch spatial queries, influence propagation, steering, LOS approximations.
-- SIMD-enabled WASM where branch reduction is possible.
+- batch spatial query kernels
+- influence/flow propagation
+- steering/visibility approximations
 
-GPU Compute (WebGPU):
-- Visibility confidence fields.
-- Influence/threat diffusion.
-- Crowd steering fields.
-- Projectile integration batches.
+GPU compute:
+- visibility confidence fields
+- influence/threat diffusion
+- crowd steering fields
+- batched projectile integration
 
-Algorithmic Substitution:
-- Pairwise checks -> sampled fields.
-- Precise per-agent LOS -> probabilistic visibility confidence.
-- Per-frame full updates -> fixed-tick asynchronous simulation.
-- Query-heavy nearest-target logic -> cell-level top-k candidate lists.
+Algorithmic substitutions:
+- pairwise checks -> sampled fields
+- precise frequent LOS -> probabilistic confidence + selective confirm
+- per-frame full updates -> staggered fixed-tick updates
 
-## Architectural End-State Hypothesis
+## Working End-State Hypothesis
 
-Working target architecture:
-- Main thread: render/input/UI only.
-- Simulation worker(s): authoritative combat simulation at fixed 20-30Hz.
-- SoA combat state in SAB, triple-buffered exchange.
-- GPU compute generates fields; CPU/worker consumes compact summaries.
-- Deterministic simulation island independent of render FPS.
+- Main thread: rendering/input/UI orchestration only
+- Simulation worker(s): authoritative fixed-step combat state
+- Shared SoA state, versioned/triple-buffered
+- GPU/WASM produce compact summaries consumed by sim
+- Render FPS decoupled from simulation tick rate
 
-## Autonomy Loop (Unsupervised)
+## Frontier Loop
 
-Each cycle must execute:
-1. Baseline capture for the active frontier scenario.
-2. Select one subsystem and one paradigm replacement experiment.
-3. Implement behind a feature flag with rollback path.
-4. Capture before/after with same scenario and seeds.
-5. Decide keep/revert using strict gates.
-6. Append results to docs and experiment ledger.
+1. Capture baseline for active scenario.
+2. Choose one subsystem and one replacement candidate.
+3. Implement behind flag with rollback path.
+4. Capture before/after.
+5. Keep or revert using hard gates.
+6. Log outcome in docs.
 
-Hard requirement:
-- Only one frontier experiment can be "in flight" per branch unless they are independent and benchmarked separately.
+Constraint:
+- only one non-independent frontier experiment in flight per branch.
 
-## Experiment Gate (Keep / Revert)
+## Keep/Revert Gates
 
 Keep only if:
-- Tail latency improves materially (p95/p99 frame or sim tick).
-- No major gameplay fairness regressions (cover, detection plausibility, freeze artifacts).
-- Harness overhead remains controlled.
+- tail latency improves materially (`p95/p99`, hitch ratios, max stall)
+- no major behavior regressions (cover fairness, detection plausibility, freeze artifacts)
+- harness overhead remains in control
 
 Revert if:
-- Improvement is only average FPS while tails worsen.
-- Behavior quality degrades in obvious player-facing ways.
-- Instrumentation overhead contaminates measurements.
+- improvement is average-only while tail worsens
+- behavior degrades materially
+- measurement quality is contaminated
 
-## Required Scenarios
+## Required Benchmarks
 
-Use these as standard frontier benchmarks:
-- Combat throughput: `npm run perf:capture:combat120`
+- Throughput: `npm run perf:capture:combat120`
 - Long soak: `npm run perf:capture:frontier30m`
 
-Optional deep investigation:
-- Add `--deep-cdp` only for diagnosis, not for final pass/fail.
+Use deep CDP only for diagnosis, not primary pass/fail.
 
-## Metrics Priority (In Order)
+## Metrics Priority
 
-1. Tail stability: `p95/p99`, `hitch50`, `hitch100`, max stall.
-2. Simulation throughput: AI budget starvation, perception denial, sim tick duration.
-3. Plausibility: hit validation, LOS fairness, no persistent freeze states.
-4. Overhead hygiene: harness probe RTT, sample cadence, detail probe interval.
+1. Tail stability: `p95/p99`, `hitch50`, `hitch100`, max frame stall
+2. Simulation throughput: AI starvation, LOS/raycast denial, sim budget pressure
+3. Plausibility: shot/hit validity, LOS fairness, no persistent freeze states
+4. Measurement hygiene: harness overhead RTT/cadence/detail probe cost
 
-## Frontier Backlog (Next 5)
+## Next Frontier Tracks
 
-F1. Worker-owned SoA combat core:
-- Migrate combatant state to packed arrays in a simulation worker.
-- Keep existing OOP system as fallback (`legacy` mode).
+F1. Worker-owned SoA combat core (legacy fallback retained)
+F2. Visibility confidence field replacing frequent CPU LOS checks
+F3. Single authoritative spatial ownership (remove duplicate sync paths)
+F4. Flow-field steering replacing local pairwise steering
+F5. Two-tier combat validation (coarse batch + selective narrowphase)
 
-F2. Replace CPU LOS with visibility confidence field:
-- GPU or WASM field pass.
-- CPU agent logic consumes sampled confidence + occasional confirm checks.
+## Documentation Contract
 
-F3. Replace dual spatial ownership:
-- Single authoritative uniform hashed grid.
-- Remove duplicate octree/grid synchronization path.
-
-F4. Flow-field steering:
-- Replace local pairwise steering with field gradient sampling.
-
-F5. Two-tier combat validation:
-- Batch coarse ballistic/hit checks for all combatants.
-- Reserve expensive narrowphase for player-near or high-importance events.
-
-## Documentation Protocol
-
-After every cycle update:
-- `docs/ARCHITECTURE_RECOVERY_PLAN.md`:
-  - short cycle summary
-  - keep/revert decision
-  - evidence artifact paths
-- `docs/PROFILING_HARNESS.md`:
-  - any new harness flags/scenarios
-  - overhead notes
+After each experiment cycle:
+- update `docs/ARCHITECTURE_RECOVERY_PLAN.md` with hypothesis, result, keep/revert, artifact paths
+- update `docs/PROFILING_HARNESS.md` for any flag/scenario/overhead changes
 
 If no measurable gain:
-- Document failed hypothesis and why it is invalid.
-- Do not carry dead-end changes forward.
-
+- document failed hypothesis and why
+- do not carry dead-end complexity forward
