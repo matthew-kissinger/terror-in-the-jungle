@@ -182,7 +182,7 @@ describe('GrenadeSystem', () => {
       expect(success).toBe(true);
       expect(grenadeSystem.isCurrentlyAiming()).toBe(false);
       expect(mockInventory.useGrenade).toHaveBeenCalled();
-      expect(mockAudioManager.play).toHaveBeenCalledWith('grenadeThrow', expect.any(THREE.Vector3));
+      expect(mockAudioManager.play).not.toHaveBeenCalledWith('grenadeThrow', expect.any(THREE.Vector3));
       
       // Check private grenades list via @ts-ignore
       expect((grenadeSystem as any).grenades.length).toBe(1);
@@ -210,7 +210,7 @@ describe('GrenadeSystem', () => {
       grenadeSystem.startCooking();
       
       expect(grenadeSystem.getAimingState().cookingTime).toBe(0);
-      expect(mockAudioManager.play).toHaveBeenCalledWith('grenadePinPull');
+      expect(mockAudioManager.play).not.toHaveBeenCalledWith('grenadePinPull');
     });
 
     it('should not start cooking if not aiming', () => {

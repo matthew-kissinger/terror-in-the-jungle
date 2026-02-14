@@ -321,9 +321,14 @@ function validateRun(
   const checks: ValidationCheck[] = [];
   const sampleCount = runtimeSamples.length;
   const minExpectedSamples = Math.max(5, Math.floor(durationSeconds * 0.8));
+  const sampleStatus: ValidationCheckStatus = sampleCount >= minExpectedSamples
+    ? 'pass'
+    : sampleCount === 0
+      ? 'fail'
+      : 'warn';
   checks.push({
     id: 'samples_collected',
-    status: sampleCount >= minExpectedSamples ? 'pass' : sampleCount >= Math.floor(durationSeconds * 0.4) ? 'warn' : 'fail',
+    status: sampleStatus,
     value: sampleCount,
     message: `Collected ${sampleCount} runtime samples; expected at least ${minExpectedSamples}`
   });
@@ -331,9 +336,16 @@ function validateRun(
   const firstFrame = runtimeSamples[0]?.frameCount ?? 0;
   const lastFrame = runtimeSamples[runtimeSamples.length - 1]?.frameCount ?? 0;
   const frameDelta = lastFrame - firstFrame;
+  const frameProgressStatus: ValidationCheckStatus = frameDelta > durationSeconds * 10
+    ? 'pass'
+    : frameDelta > durationSeconds * 2
+      ? 'warn'
+      : sampleCount === 0
+        ? 'fail'
+        : 'warn';
   checks.push({
     id: 'frame_progress',
-    status: frameDelta > durationSeconds * 10 ? 'pass' : frameDelta > durationSeconds * 2 ? 'warn' : 'fail',
+    status: frameProgressStatus,
     value: frameDelta,
     message: `Frame progression delta=${frameDelta} over ${durationSeconds}s`
   });

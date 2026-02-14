@@ -12,6 +12,7 @@ describe('ObjectPoolManager', () => {
     vi.spyOn(console, 'info').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    process.env.LOG_LEVEL = 'info';
     Logger.clearBuffer();
 
     // Clear module cache to reset singleton
