@@ -14,7 +14,14 @@ export interface RuntimeMetricsSnapshot {
 
 export class RuntimeMetrics {
   private readonly maxSamples = 300;
-  private frameTimes: number[] = [];
+  // Ring buffer for O(1) push instead of Array.shift() O(n)
+  private readonly ringBuffer = new Float64Array(300);
+  private ringHead = 0;
+  private ringCount = 0;
+  // Cache for percentile calculations - invalidated on each push
+  private percentileCacheDirty = true;
+  private cachedP95 = 0;
+  private cachedP99 = 0;
   private frameCount = 0;
   private maxFrameMs = 0;
   private hitch33Count = 0;
@@ -68,11 +75,12 @@ export class RuntimeMetrics {
     if (frameMs > 33.33) this.hitch33Count += 1;
     if (frameMs > 50) this.hitch50Count += 1;
     if (frameMs > 100) this.hitch100Count += 1;
-    this.frameTimes.push(frameMs);
 
-    if (this.frameTimes.length > this.maxSamples) {
-      this.frameTimes.shift();
-    }
+    // Ring buffer: O(1) insert, no shift needed
+    this.ringBuffer[this.ringHead] = frameMs;
+    this.ringHead = (this.ringHead + 1) % this.maxSamples;
+    if (this.ringCount < this.maxSamples) this.ringCount++;
+    this.percentileCacheDirty = true;
   }
 
   updateCombatStats(stats: { combatantCount: number; firingCount: number; engagingCount: number }): void {
@@ -98,7 +106,11 @@ export class RuntimeMetrics {
   }
 
   reset(): void {
-    this.frameTimes = [];
+    this.ringHead = 0;
+    this.ringCount = 0;
+    this.percentileCacheDirty = true;
+    this.cachedP95 = 0;
+    this.cachedP99 = 0;
     this.frameCount = 0;
     this.maxFrameMs = 0;
     this.hitch33Count = 0;
@@ -110,22 +122,42 @@ export class RuntimeMetrics {
   }
 
   private getAvgFrameMs(): number {
-    if (this.frameTimes.length === 0) return 0;
-    const sum = this.frameTimes.reduce((acc, value) => acc + value, 0);
-    return sum / this.frameTimes.length;
+    if (this.ringCount === 0) return 0;
+    let sum = 0;
+    for (let i = 0; i < this.ringCount; i++) {
+      sum += this.ringBuffer[i];
+    }
+    return sum / this.ringCount;
+  }
+
+  private computePercentiles(): void {
+    if (!this.percentileCacheDirty) return;
+    this.percentileCacheDirty = false;
+
+    if (this.ringCount === 0) {
+      this.cachedP95 = 0;
+      this.cachedP99 = 0;
+      return;
+    }
+
+    // Copy active portion and sort
+    const sorted = new Float64Array(this.ringCount);
+    for (let i = 0; i < this.ringCount; i++) {
+      sorted[i] = this.ringBuffer[i];
+    }
+    sorted.sort();
+
+    this.cachedP95 = sorted[Math.floor((this.ringCount - 1) * 0.95)];
+    this.cachedP99 = sorted[Math.floor((this.ringCount - 1) * 0.99)];
   }
 
   private getP95FrameMs(): number {
-    if (this.frameTimes.length === 0) return 0;
-    const sorted = [...this.frameTimes].sort((a, b) => a - b);
-    const index = Math.floor((sorted.length - 1) * 0.95);
-    return sorted[index];
+    this.computePercentiles();
+    return this.cachedP95;
   }
 
   private getP99FrameMs(): number {
-    if (this.frameTimes.length === 0) return 0;
-    const sorted = [...this.frameTimes].sort((a, b) => a - b);
-    const index = Math.floor((sorted.length - 1) * 0.99);
-    return sorted[index];
+    this.computePercentiles();
+    return this.cachedP99;
   }
 }

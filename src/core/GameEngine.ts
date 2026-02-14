@@ -20,6 +20,7 @@ import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import * as Init from './GameEngineInit';
 import * as Input from './GameEngineInput';
 import * as Loop from './GameEngineLoop';
+import { markStartup } from './StartupTelemetry';
 
 export class GameEngine {
   // Core components (Public for split module access)
@@ -73,7 +74,9 @@ export class GameEngine {
    * Extracted from constructor since constructors cannot be async.
    */
   public async initialize(): Promise<void> {
+    markStartup('engine.initialize.begin');
     await this.initializeSystems();
+    markStartup('engine.initialize.end');
   }
 
   private setupEventListeners(): void {

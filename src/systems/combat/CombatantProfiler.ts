@@ -25,7 +25,35 @@ export class CombatantProfiler {
     influenceMapMs: 0,
     totalMs: 0,
     engagingCount: 0,
-    firingCount: 0
+    firingCount: 0,
+    losCache: {
+      hits: 0,
+      misses: 0,
+      hitRate: 0,
+      budgetDenials: 0
+    },
+    raycastBudget: {
+      maxPerFrame: 0,
+      usedThisFrame: 0,
+      deniedThisFrame: 0,
+      totalExhaustedFrames: 0,
+      totalRequested: 0,
+      totalDenied: 0,
+      saturationRate: 0,
+      denialRate: 0
+    },
+    aiScheduling: {
+      frameCounter: 0,
+      intervalScale: 1,
+      aiBudgetMs: 0,
+      staggeredSkips: 0,
+      highFullUpdates: 0,
+      mediumFullUpdates: 0,
+      maxHighFullUpdatesPerFrame: 0,
+      maxMediumFullUpdatesPerFrame: 0,
+      aiBudgetExceededEvents: 0,
+      aiSevereOverBudgetEvents: 0
+    }
   };
 
   constructor(
@@ -71,7 +99,40 @@ export class CombatantProfiler {
    * Get detailed combat profiling info for debugging performance
    */
   getCombatProfile(): {
-    timing: { aiUpdateMs: number; aiStateMs: Record<string, number>; spatialSyncMs: number; billboardUpdateMs: number; effectPoolsMs: number; influenceMapMs: number; totalMs: number; engagingCount: number; firingCount: number };
+    timing: {
+      aiUpdateMs: number;
+      aiStateMs: Record<string, number>;
+      spatialSyncMs: number;
+      billboardUpdateMs: number;
+      effectPoolsMs: number;
+      influenceMapMs: number;
+      totalMs: number;
+      engagingCount: number;
+      firingCount: number;
+      losCache: { hits: number; misses: number; hitRate: number; budgetDenials: number };
+      raycastBudget: {
+        maxPerFrame: number;
+        usedThisFrame: number;
+        deniedThisFrame: number;
+        totalExhaustedFrames: number;
+        totalRequested: number;
+        totalDenied: number;
+        saturationRate: number;
+        denialRate: number;
+      };
+      aiScheduling: {
+        frameCounter: number;
+        intervalScale: number;
+        aiBudgetMs: number;
+        staggeredSkips: number;
+        highFullUpdates: number;
+        mediumFullUpdates: number;
+        maxHighFullUpdatesPerFrame: number;
+        maxMediumFullUpdatesPerFrame: number;
+        aiBudgetExceededEvents: number;
+        aiSevereOverBudgetEvents: number;
+      };
+    };
     counts: { total: number; high: number; medium: number; low: number; culled: number };
     lod: { engaging: number; firing: number };
   } {

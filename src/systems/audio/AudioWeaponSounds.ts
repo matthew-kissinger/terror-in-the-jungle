@@ -16,6 +16,21 @@ export class AudioWeaponSounds {
     private soundConfigs: Record<string, SoundConfig> = SOUND_CONFIGS;
     private bulletWhizMissingLogged = false;
 
+    // Reusable Object3D pool to avoid per-call allocations
+    private readonly obj3dPool: THREE.Object3D[] = [];
+    private readonly OBJ3D_POOL_SIZE = 16;
+
+    private getPooledObject3D(): THREE.Object3D {
+        return this.obj3dPool.pop() || new THREE.Object3D();
+    }
+
+    private returnPooledObject3D(obj: THREE.Object3D): void {
+        obj.position.set(0, 0, 0);
+        if (this.obj3dPool.length < this.OBJ3D_POOL_SIZE) {
+            this.obj3dPool.push(obj);
+        }
+    }
+
     constructor(
         scene: THREE.Scene,
         listener: THREE.AudioListener,
@@ -102,18 +117,17 @@ export class AudioWeaponSounds {
     playGunshotAt(position: THREE.Vector3): void {
         const sound = this.poolManager.getAvailablePositionalSound(this.poolManager.getPositionalGunshotPool());
         if (sound && !sound.isPlaying) {
-            // Create temporary object at position
-            const tempObj = new THREE.Object3D();
+            const tempObj = this.getPooledObject3D();
             tempObj.position.copy(position);
             tempObj.add(sound);
             this.scene.add(tempObj);
 
             sound.play();
 
-            // Clean up after sound finishes
             sound.onEnded = () => {
                 tempObj.remove(sound);
                 this.scene.remove(tempObj);
+                this.returnPooledObject3D(tempObj);
             };
         }
     }
@@ -126,18 +140,17 @@ export class AudioWeaponSounds {
 
         const sound = this.poolManager.getAvailablePositionalSound(soundPool);
         if (sound && !sound.isPlaying) {
-            // Create temporary object at position
-            const tempObj = new THREE.Object3D();
+            const tempObj = this.getPooledObject3D();
             tempObj.position.copy(position);
             tempObj.add(sound);
             this.scene.add(tempObj);
 
             sound.play();
 
-            // Clean up after sound finishes
             sound.onEnded = () => {
                 tempObj.remove(sound);
                 this.scene.remove(tempObj);
+                this.returnPooledObject3D(tempObj);
             };
         }
     }
@@ -146,18 +159,17 @@ export class AudioWeaponSounds {
     playExplosionAt(position: THREE.Vector3): void {
         const sound = this.poolManager.getAvailablePositionalSound(this.poolManager.getExplosionSoundPool());
         if (sound && !sound.isPlaying) {
-            // Create temporary object at position
-            const tempObj = new THREE.Object3D();
+            const tempObj = this.getPooledObject3D();
             tempObj.position.copy(position);
             tempObj.add(sound);
             this.scene.add(tempObj);
 
             sound.play();
 
-            // Clean up after sound finishes
             sound.onEnded = () => {
                 tempObj.remove(sound);
                 this.scene.remove(tempObj);
+                this.returnPooledObject3D(tempObj);
             };
         }
     }
@@ -179,8 +191,7 @@ export class AudioWeaponSounds {
         const sound = this.poolManager.getAvailablePositionalSound(this.poolManager.getPositionalGunshotPool());
         if (!sound) return;
 
-        // Create temporary object at position
-        const tempObj = new THREE.Object3D();
+        const tempObj = this.getPooledObject3D();
         tempObj.position.copy(position);
         tempObj.add(sound);
         this.scene.add(tempObj);
@@ -197,10 +208,12 @@ export class AudioWeaponSounds {
         sound.setPlaybackRate(pitchVariation);
 
         // Apply distance-based low-pass filtering if listener position is available
+        let filter: BiquadFilterNode | null = null;
+        let gainNode: GainNode | null = null;
         if (listenerPosition && sound.source) {
             const distance = position.distanceTo(listenerPosition);
             const audioContext = this.listener.context;
-            const filter = audioContext.createBiquadFilter();
+            filter = audioContext.createBiquadFilter();
 
             if (distance < 30) {
                 // Close range - full bass and sharp attack
@@ -220,7 +233,7 @@ export class AudioWeaponSounds {
             }
 
             // Connect filter to audio chain
-            const gainNode = audioContext.createGain();
+            gainNode = audioContext.createGain();
             gainNode.gain.value = 1.0;
 
             sound.source.disconnect();
@@ -231,10 +244,19 @@ export class AudioWeaponSounds {
 
         sound.play();
 
-        // Clean up after sound finishes
+        // Clean up after sound finishes - disconnect filter/gain nodes to prevent audio leak
+        const capturedFilter = filter;
+        const capturedGain = gainNode;
         sound.onEnded = () => {
+            if (capturedFilter) {
+                capturedFilter.disconnect();
+            }
+            if (capturedGain) {
+                capturedGain.disconnect();
+            }
             tempObj.remove(sound);
             this.scene.remove(tempObj);
+            this.returnPooledObject3D(tempObj);
         };
     }
 

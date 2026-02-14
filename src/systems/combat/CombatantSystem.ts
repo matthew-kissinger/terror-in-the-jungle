@@ -36,6 +36,8 @@ import { CombatantProfiler } from './CombatantProfiler';
 import { CombatantSystemDamage } from './CombatantSystemDamage';
 import { CombatantSystemSetters } from './CombatantSystemSetters';
 import { CombatantSystemUpdate } from './CombatantSystemUpdate';
+import { AILineOfSight } from './ai/AILineOfSight';
+import { getRaycastBudgetStats } from './ai/RaycastBudget';
 
 export class CombatantSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -255,6 +257,9 @@ export class CombatantSystem implements GameSystem {
     this.lodManager.updateCombatants(deltaTime);
     this.profiler.profiling.aiUpdateMs = performance.now() - t0;
     this.profiler.profiling.aiStateMs = this.combatantAI.getFrameStateProfile();
+    this.profiler.profiling.aiScheduling = this.lodManager.getFrameSchedulingStats();
+    this.profiler.profiling.losCache = AILineOfSight.getCacheStats();
+    this.profiler.profiling.raycastBudget = getRaycastBudgetStats();
 
     // Update LOD counts in profiler
     this.profiler.setLODCounts(

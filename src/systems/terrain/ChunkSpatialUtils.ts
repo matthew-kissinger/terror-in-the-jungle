@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 
+const _chunkCoord = new THREE.Vector2();
+
 export function worldToChunkCoord(worldPos: THREE.Vector3, chunkSize: number): THREE.Vector2 {
-  return new THREE.Vector2(
+  return _chunkCoord.set(
     Math.floor(worldPos.x / chunkSize),
     Math.floor(worldPos.z / chunkSize)
   );

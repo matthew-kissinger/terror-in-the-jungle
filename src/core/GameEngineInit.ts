@@ -8,12 +8,14 @@ import { shouldUseTouchControls } from '../utils/DeviceDetector';
 import { tryLockLandscapeOrientation } from '../utils/Orientation';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import type { GameEngine } from './GameEngine';
+import { markStartup } from './StartupTelemetry';
 
 /**
  * Handles initialization of game systems and assets
  */
 export async function initializeSystems(engine: GameEngine): Promise<void> {
   try {
+    markStartup('engine-init.initialize-systems.begin');
     await engine.systemManager.initializeSystems(
       engine.renderer.scene, engine.renderer.camera,
       (phase: string, progress: number) => engine.loadingScreen.updateProgress(phase, progress),
@@ -32,9 +34,11 @@ export async function initializeSystems(engine: GameEngine): Promise<void> {
 
     const shouldPreGenerateNow = !(engine.sandboxEnabled && engine.sandboxConfig?.autoStart);
     if (shouldPreGenerateNow) {
+      markStartup('engine-init.pre-generate.begin');
       Logger.info('engine-init', 'Pre-generating spawn area...');
       const spawnPosition = engine.sandboxEnabled ? new THREE.Vector3(0, 5, 0) : new THREE.Vector3(0, 5, -50);
       await engine.systemManager.preGenerateSpawnArea(spawnPosition);
+      markStartup('engine-init.pre-generate.end');
     } else {
       Logger.info('engine-init', 'Skipping initial spawn pre-generation (autostart will pre-generate mode-specific spawn).');
     }
@@ -48,6 +52,7 @@ export async function initializeSystems(engine: GameEngine): Promise<void> {
     engine.systemManager.hudSystem.setPlayAgainCallback(() => restartMatch(engine));
 
     if (engine.sandboxEnabled && engine.sandboxConfig?.autoStart) {
+      markStartup('engine-init.autostart.begin');
       startGameWithMode(engine, GameMode.AI_SANDBOX);
     } else {
       engine.loadingScreen.showMainMenu();
@@ -91,6 +96,7 @@ export function restartMatch(engine: GameEngine): void {
  */
 export async function startGameWithMode(engine: GameEngine, mode: GameMode): Promise<void> {
   if (!engine.isInitialized || engine.gameStarted) return;
+  markStartup(`engine-init.start-game.${mode}.begin`);
   Logger.info('engine-init', `Starting game with mode: ${mode}`);
 
   if (shouldUseTouchControls()) {
@@ -106,10 +112,12 @@ export async function startGameWithMode(engine: GameEngine, mode: GameMode): Pro
   const spawnPos = usHQ ? usHQ.position.clone() : new THREE.Vector3(0, 0, -50);
   spawnPos.y = 5;
   await engine.systemManager.preGenerateSpawnArea(spawnPos);
+  markStartup(`engine-init.start-game.${mode}.post-pre-generate`);
 
   // Skip loadout selector - all weapons available via hotbar, default frag grenades
   applyDefaultLoadout(engine);
   startGame(engine);
+  markStartup(`engine-init.start-game.${mode}.end`);
 }
 
 /**
@@ -144,6 +152,7 @@ export function startGame(engine: GameEngine): void {
 }
 
 async function runStartupFlow(engine: GameEngine): Promise<void> {
+  markStartup('engine-init.startup-flow.begin');
   const startTime = performance.now();
   const markPhase = (phase: string) => Logger.info('engine-init', `[startup] ${phase}`);
 
@@ -205,6 +214,7 @@ async function runStartupFlow(engine: GameEngine): Promise<void> {
   requestBackgroundTask(() => engine.renderer.precompileShaders(), 1000);
   requestBackgroundTask(() => engine.systemManager.startDeferredInitialization(), 500);
   markPhase(`interactive-ready (${(performance.now() - startTime).toFixed(1)}ms)`);
+  markStartup('engine-init.startup-flow.interactive-ready');
 }
 
 function nextFrame(): Promise<void> {
@@ -249,3 +259,4 @@ export function showWelcomeMessage(engine: GameEngine): void {
 Have fun!
     `);
 }
+    markStartup('engine-init.initialize-systems.end');

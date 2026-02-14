@@ -158,16 +158,23 @@ export class ImprovedChunkManager implements GameSystem {
     Logger.info('chunks', 'Initializing improved chunk manager');
     const maxChunks = (this.config.loadDistance * 2 + 1) ** 2;
     Logger.debug('chunks', `Config render=${this.config.renderDistance}, load=${this.config.loadDistance}, max=${maxChunks}, size=${this.config.size}`);
-    
-    // Start with smaller immediate area to reduce initial load
-    const initialChunks = this.priorityManager.getChunksInRadius(new THREE.Vector3(0, 0, 0), 1);
-    
-    // Load initial chunks synchronously for immediate playability
-    for (const {x, z} of initialChunks) {
-      await this.lifecycleManager.loadChunkImmediate(x, z);
+
+    // Keep startup bounded but avoid spawn-hole visuals:
+    // sync-load center chunk plus cardinal neighbors (5 chunks total).
+    const centerX = Math.floor(this.playerPosition.x / this.config.size);
+    const centerZ = Math.floor(this.playerPosition.z / this.config.size);
+    const startupCoords: Array<[number, number]> = [
+      [centerX, centerZ],
+      [centerX + 1, centerZ],
+      [centerX - 1, centerZ],
+      [centerX, centerZ + 1],
+      [centerX, centerZ - 1]
+    ];
+    for (const [chunkX, chunkZ] of startupCoords) {
+      await this.lifecycleManager.loadChunkImmediate(chunkX, chunkZ);
     }
-    
-    Logger.info('chunks', 'Initial chunks generated');
+
+    Logger.info('chunks', `Initial startup chunks generated around (${centerX}, ${centerZ})`);
     this.loadQueueManager.updateLoadQueue();
   }
 

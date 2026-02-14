@@ -38,6 +38,29 @@ type RuntimeSample = {
     effectPoolsMs: number;
     influenceMapMs: number;
     aiStateMs?: Record<string, number>;
+    losCache?: { hits: number; misses: number; hitRate: number; budgetDenials: number };
+    raycastBudget?: {
+      maxPerFrame: number;
+      usedThisFrame: number;
+      deniedThisFrame: number;
+      totalExhaustedFrames: number;
+      totalRequested: number;
+      totalDenied: number;
+      saturationRate: number;
+      denialRate: number;
+    };
+    aiScheduling?: {
+      frameCounter: number;
+      intervalScale: number;
+      aiBudgetMs: number;
+      staggeredSkips: number;
+      highFullUpdates: number;
+      mediumFullUpdates: number;
+      maxHighFullUpdatesPerFrame: number;
+      maxMediumFullUpdatesPerFrame: number;
+      aiBudgetExceededEvents: number;
+      aiSevereOverBudgetEvents: number;
+    };
   };
   systemTop: Array<{ name: string; emaMs: number; peakMs: number }>;
 };
@@ -57,6 +80,7 @@ type CaptureSummary = {
   lastStage?: string;
   scenario: {
     mode: string;
+    requestedMode: string;
     playerExperience: string;
     systemsEmphasized: string[];
   };
@@ -64,6 +88,23 @@ type CaptureSummary = {
     probeRoundTripAvgMs: number;
     probeRoundTripP95Ms: number;
     sampleCount: number;
+    sampleIntervalMs: number;
+    detailEverySamples: number;
+  };
+  startupTiming?: {
+    firstEngineSeenSec?: number;
+    firstMetricsSeenSec?: number;
+    thresholdReachedSec?: number;
+    lastStartupMark?: string;
+    lastStartupMarkMs?: number;
+  };
+  toolchain?: {
+    prewarmEnabled: boolean;
+    prewarmTotalMs: number;
+    prewarmAllOk: boolean;
+    runtimePreflightEnabled: boolean;
+    runtimePreflightMs: number;
+    runtimePreflightOk: boolean;
   };
 };
 
@@ -98,11 +139,17 @@ const DEFAULT_NPCS = 60;
 const DEFAULT_STARTUP_TIMEOUT_SECONDS = 60;
 const DEFAULT_STARTUP_FRAME_THRESHOLD = 30;
 const DEFAULT_ACTIVE_PLAYER = true;
+const DEFAULT_GAME_MODE = 'ai_sandbox';
 const DEFAULT_COMPRESS_FRONTLINE = true;
+const DEFAULT_ALLOW_WARP_RECOVERY = false;
+const DEFAULT_MOVEMENT_DECISION_INTERVAL_MS = 450;
+const DEFAULT_PREWARM = true;
+const DEFAULT_RUNTIME_PREFLIGHT = true;
 const DEFAULT_FRONTLINE_TRIGGER_DISTANCE = 500;
 const DEFAULT_MAX_COMPRESSED_PER_FACTION = 28;
+const DEFAULT_SAMPLE_INTERVAL_MS = 1000;
+const DEFAULT_DETAIL_EVERY_SAMPLES = 1;
 const STEP_TIMEOUT_MS = 30_000;
-const SAMPLE_INTERVAL_MS = 1000;
 const ARTIFACT_ROOT = join(process.cwd(), 'artifacts', 'perf');
 const RUN_HARD_TIMEOUT_MS = 120_000;
 const LOCK_FILE = join(process.cwd(), 'tmp', 'perf-capture.lock');
@@ -267,6 +314,42 @@ function hasFlag(name: string): boolean {
   return process.argv.includes(`--${name}`);
 }
 
+function parseStringFlag(name: string, fallback: string): string {
+  const envName = name.toUpperCase().replace(/-/g, '_');
+  const envKeys = [
+    `PERF_${envName}`,
+    `npm_config_${name}`
+  ];
+  for (const key of envKeys) {
+    const raw = process.env[key];
+    if (raw !== undefined) return String(raw);
+  }
+
+  const eqArg = process.argv.find(a => a.startsWith(`--${name}=`));
+  if (eqArg) return String(eqArg.split('=')[1] ?? fallback);
+
+  const key = `--${name}`;
+  const index = process.argv.indexOf(key);
+  if (index >= 0 && index + 1 < process.argv.length) {
+    return String(process.argv[index + 1]);
+  }
+
+  return fallback;
+}
+
+function normalizeGameMode(mode: string): 'ai_sandbox' | 'open_frontier' | 'zone_control' | 'team_deathmatch' {
+  const normalized = String(mode ?? '').trim().toLowerCase();
+  if (
+    normalized === 'open_frontier' ||
+    normalized === 'zone_control' ||
+    normalized === 'team_deathmatch' ||
+    normalized === 'ai_sandbox'
+  ) {
+    return normalized;
+  }
+  return 'ai_sandbox';
+}
+
 function makeArtifactDir(): string {
   const stamp = nowIso().replace(/[:.]/g, '-');
   const dir = join(ARTIFACT_ROOT, stamp);
@@ -316,11 +399,13 @@ function validateRun(
   runtimeSamples: RuntimeSample[],
   consoleEntries: ConsoleEntry[],
   durationSeconds: number,
-  options?: { requireHitValidation?: boolean }
+  options?: { requireHitValidation?: boolean; sampleIntervalMs?: number }
 ): ValidationReport {
   const checks: ValidationCheck[] = [];
   const sampleCount = runtimeSamples.length;
-  const minExpectedSamples = Math.max(5, Math.floor(durationSeconds * 0.8));
+  const sampleIntervalMs = Math.max(100, Number(options?.sampleIntervalMs ?? DEFAULT_SAMPLE_INTERVAL_MS));
+  const expectedSamples = durationSeconds * (1000 / sampleIntervalMs);
+  const minExpectedSamples = Math.max(5, Math.floor(expectedSamples * 0.8));
   const sampleStatus: ValidationCheckStatus = sampleCount >= minExpectedSamples
     ? 'pass'
     : sampleCount === 0
@@ -445,6 +530,28 @@ function validateRun(
     value: combatHeavyRatio,
     message: `Combat was top >16.67ms in ${(combatHeavyRatio * 100).toFixed(1)}% of samples`
   });
+
+  const withRaycastStats = runtimeSamples.filter(s => s.combatBreakdown?.raycastBudget);
+  if (withRaycastStats.length > 0) {
+    const avgRaycastDenialRate = average(withRaycastStats.map(s => Number(s.combatBreakdown?.raycastBudget?.denialRate ?? 0)));
+    checks.push({
+      id: 'raycast_denial_rate',
+      status: avgRaycastDenialRate < 0.15 ? 'pass' : avgRaycastDenialRate < 0.4 ? 'warn' : 'fail',
+      value: avgRaycastDenialRate,
+      message: `Average LOS raycast denial rate ${(avgRaycastDenialRate * 100).toFixed(1)}%`
+    });
+  }
+
+  const withAiSchedulingStats = runtimeSamples.filter(s => s.combatBreakdown?.aiScheduling);
+  if (withAiSchedulingStats.length > 0) {
+    const avgAIBudgetExceededEvents = average(withAiSchedulingStats.map(s => Number(s.combatBreakdown?.aiScheduling?.aiBudgetExceededEvents ?? 0)));
+    checks.push({
+      id: 'ai_budget_starvation_events',
+      status: avgAIBudgetExceededEvents < 4 ? 'pass' : avgAIBudgetExceededEvents < 12 ? 'warn' : 'fail',
+      value: avgAIBudgetExceededEvents,
+      message: `Average per-sample AI budget starvation events ${avgAIBudgetExceededEvents.toFixed(2)}`
+    });
+  }
 
   if (options?.requireHitValidation) {
     const shotSamples = runtimeSamples.filter(s => typeof s.shotsThisSession === 'number');
@@ -612,6 +719,72 @@ async function killDevServer(server: ChildProcess): Promise<void> {
   logStep('✅ Dev server stopped');
 }
 
+async function prewarmDevServer(port: number): Promise<{ totalMs: number; allOk: boolean }> {
+  const start = Date.now();
+  const paths = ['/', '/?sandbox=true&autostart=false'];
+  let allOk = true;
+
+  for (const path of paths) {
+    const url = `http://localhost:${port}${path}`;
+    const stepStart = Date.now();
+    try {
+      const res = await withTimeout(
+        `prewarm ${path}`,
+        fetch(url, { cache: 'no-store' as RequestCache }),
+        STEP_TIMEOUT_MS
+      );
+      if (!res.ok) {
+        allOk = false;
+        logStep(`⚠ prewarm ${path} -> HTTP ${res.status}`);
+      } else {
+        logStep(`🔥 prewarm ${path} in ${Date.now() - stepStart}ms`);
+      }
+    } catch (error) {
+      allOk = false;
+      logStep(`⚠ prewarm ${path} failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  return { totalMs: Date.now() - start, allOk };
+}
+
+async function preflightRuntimePage(
+  page: Page,
+  preflightUrl: string,
+  startupTimeoutSeconds: number
+): Promise<{ totalMs: number; ok: boolean; reason?: string }> {
+  const start = Date.now();
+  try {
+    logStep(`🧪 Runtime preflight navigate ${preflightUrl}`);
+    await withTimeout('preflight page.goto', page.goto(preflightUrl, { waitUntil: 'commit' }), STEP_TIMEOUT_MS);
+    await withTimeout(
+      'preflight wait runtime',
+      page.waitForFunction(
+        () => Boolean((window as any).__startupTelemetry?.getSnapshot?.() && (window as any).__metrics),
+        undefined,
+        { timeout: startupTimeoutSeconds * 1000 }
+      ),
+      startupTimeoutSeconds * 1000 + 1000
+    );
+    const snapshot = await safeAwait(
+      'preflight startup snapshot',
+      page.evaluate(() => (window as any).__startupTelemetry?.getSnapshot?.() ?? null),
+      3000
+    );
+    if (snapshot?.marks?.length) {
+      const last = snapshot.marks[snapshot.marks.length - 1];
+      logStep(`🧪 Runtime preflight ready at ${Number(last?.sinceStartMs ?? 0).toFixed(0)}ms (mark=${String(last?.name ?? 'unknown')})`);
+    }
+    return { totalMs: Date.now() - start, ok: true };
+  } catch (error) {
+    return {
+      totalMs: Date.now() - start,
+      ok: false,
+      reason: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+
 async function getFrameCount(page: Page): Promise<number> {
   return withTimeout('frame count', page.evaluate(() => {
     const metrics = (window as any).__metrics;
@@ -619,9 +792,26 @@ async function getFrameCount(page: Page): Promise<number> {
   }), 8000);
 }
 
-async function getStartupProbe(page: Page): Promise<{ frameCount: number; combatTotalMs?: number; combatAiMs?: number; combatSpatialMs?: number; combatBillboardMs?: number; combatAiStateTop?: string; combatAiStateTopMs?: number }> {
+async function getStartupProbe(page: Page): Promise<{
+  frameCount: number;
+  hasEngine: boolean;
+  hasMetrics: boolean;
+  readyState: string;
+  uiErrorPanelVisible: boolean;
+  startupElapsedMs?: number;
+  startupLastMark?: string;
+  startupLastMarkMs?: number;
+  combatTotalMs?: number;
+  combatAiMs?: number;
+  combatSpatialMs?: number;
+  combatBillboardMs?: number;
+  combatAiStateTop?: string;
+  combatAiStateTopMs?: number;
+}> {
   return withTimeout('startup probe', page.evaluate(() => {
     const metrics = (window as any).__metrics;
+    const engine = (window as any).__engine;
+    const startup = (window as any).__startupTelemetry?.getSnapshot?.();
     const combatProfile = (window as any).combatProfile?.();
     let combatAiStateTop: string | undefined;
     let combatAiStateTopMs: number | undefined;
@@ -635,6 +825,13 @@ async function getStartupProbe(page: Page): Promise<{ frameCount: number; combat
     }
     return {
       frameCount: metrics ? Number(metrics.frameCount ?? 0) : 0,
+      hasEngine: Boolean(engine),
+      hasMetrics: Boolean(metrics),
+      readyState: document.readyState,
+      uiErrorPanelVisible: Boolean(document.querySelector('.error-panel')),
+      startupElapsedMs: startup ? Number(startup.totalElapsedMs ?? 0) : undefined,
+      startupLastMark: startup?.marks?.length ? String(startup.marks[startup.marks.length - 1].name ?? '') : undefined,
+      startupLastMarkMs: startup?.marks?.length ? Number(startup.marks[startup.marks.length - 1].sinceStartMs ?? 0) : undefined,
       combatTotalMs: combatProfile?.timing ? Number(combatProfile.timing.totalMs ?? 0) : undefined,
       combatAiMs: combatProfile?.timing ? Number(combatProfile.timing.aiUpdateMs ?? 0) : undefined,
       combatSpatialMs: combatProfile?.timing ? Number(combatProfile.timing.spatialSyncMs ?? 0) : undefined,
@@ -649,28 +846,70 @@ async function waitForRendering(
   page: Page,
   maxStartupSeconds: number,
   frameThreshold: number
-): Promise<{ started: boolean; lastFrameCount: number; reason?: string }> {
+): Promise<{
+  started: boolean;
+  lastFrameCount: number;
+  reason?: string;
+  firstEngineSeenSec?: number;
+  firstMetricsSeenSec?: number;
+  thresholdReachedSec?: number;
+  lastStartupMark?: string;
+  lastStartupMarkMs?: number;
+}> {
   logStep('⏳ Waiting for startup frame progression');
 
   const probeIntervalSeconds = 3;
   const maxSamples = Math.max(1, Math.ceil(maxStartupSeconds / probeIntervalSeconds));
   let count = 0;
+  let firstEngineSeenSec: number | undefined;
+  let firstMetricsSeenSec: number | undefined;
+  let lastStartupMark: string | undefined;
+  let lastStartupMarkMs: number | undefined;
   for (let i = 0; i < maxSamples; i++) {
     await sleep(probeIntervalSeconds * 1000);
     try {
       const probe = await getStartupProbe(page);
       count = probe.frameCount;
+      if (probe.hasEngine && firstEngineSeenSec === undefined) {
+        firstEngineSeenSec = (i + 1) * probeIntervalSeconds;
+      }
+      if (probe.hasMetrics && firstMetricsSeenSec === undefined) {
+        firstMetricsSeenSec = (i + 1) * probeIntervalSeconds;
+      }
+      lastStartupMark = probe.startupLastMark;
+      lastStartupMarkMs = probe.startupLastMarkMs;
       const combatMsg = probe.combatTotalMs !== undefined
         ? ` combat(total=${probe.combatTotalMs.toFixed(1)} ai=${(probe.combatAiMs ?? 0).toFixed(1)} spatial=${(probe.combatSpatialMs ?? 0).toFixed(1)} billboard=${(probe.combatBillboardMs ?? 0).toFixed(1)} aiTop=${probe.combatAiStateTop ?? 'n/a'}:${(probe.combatAiStateTopMs ?? 0).toFixed(1)})`
         : '';
-      logStep(`Startup frame sample ${((i + 1) * probeIntervalSeconds)}s -> ${count}${combatMsg}`);
+      const startupMsg = probe.startupLastMark
+        ? ` startup(mark=${probe.startupLastMark}@${Number(probe.startupLastMarkMs ?? 0).toFixed(0)}ms total=${Number(probe.startupElapsedMs ?? 0).toFixed(0)}ms)`
+        : '';
+      logStep(`Startup frame sample ${((i + 1) * probeIntervalSeconds)}s -> ${count} (ready=${probe.readyState} engine=${probe.hasEngine ? 1 : 0} metrics=${probe.hasMetrics ? 1 : 0} errPanel=${probe.uiErrorPanelVisible ? 1 : 0})${startupMsg}${combatMsg}`);
     } catch {
       // If early runtime globals are not available yet, keep probing until timeout.
       count = 0;
     }
-    if (count > frameThreshold) return { started: true, lastFrameCount: count };
+    if (count > frameThreshold) {
+      return {
+        started: true,
+        lastFrameCount: count,
+        firstEngineSeenSec,
+        firstMetricsSeenSec,
+        thresholdReachedSec: (i + 1) * probeIntervalSeconds,
+        lastStartupMark,
+        lastStartupMarkMs
+      };
+    }
   }
-  return { started: false, lastFrameCount: count, reason: `Rendering did not start (frameCount=${count}, threshold=${frameThreshold}, timeout=${maxStartupSeconds}s)` };
+  return {
+    started: false,
+    lastFrameCount: count,
+    reason: `Rendering did not start (frameCount=${count}, threshold=${frameThreshold}, timeout=${maxStartupSeconds}s)`,
+    firstEngineSeenSec,
+    firstMetricsSeenSec,
+    lastStartupMark,
+    lastStartupMarkMs
+  };
 }
 
 async function warmupRuntime(page: Page, warmupSeconds: number): Promise<void> {
@@ -688,7 +927,10 @@ async function warmupRuntime(page: Page, warmupSeconds: number): Promise<void> {
 
 type ActiveScenarioOptions = {
   enabled: boolean;
+  mode: string;
   compressFrontline: boolean;
+  allowWarpRecovery: boolean;
+  movementDecisionIntervalMs: number;
   frontlineTriggerDistance: number;
   maxCompressedPerFaction: number;
 };
@@ -709,7 +951,7 @@ async function setupActiveScenarioDriver(page: Page, options: ActiveScenarioOpti
   );
 
   logStep(
-    `🎮 Active scenario driver enabled (patterns=${Number(setupResult?.movementPatternCount ?? 0)}, compressFrontline=${Boolean(setupResult?.compressFrontline)})`
+    `🎮 Active scenario driver enabled (patterns=${Number(setupResult?.movementPatternCount ?? 0)}, mode=${String(setupResult?.mode ?? options.mode)}, compressFrontline=${Boolean(setupResult?.compressFrontline)}, allowWarpRecovery=${Boolean(setupResult?.allowWarpRecovery)})`
   );
 }
 
@@ -786,8 +1028,21 @@ async function runCapture(): Promise<void> {
   const playwrightTrace = hasFlag('playwright-trace') || process.env.PERF_PLAYWRIGHT_TRACE === '1';
   const deepCdp = hasFlag('deep-cdp') || process.env.PERF_DEEP_CDP === '1';
   const enableCombat = parseBooleanFlag('combat', true);
+  const requestedMode = normalizeGameMode(parseStringFlag('mode', DEFAULT_GAME_MODE));
   const activePlayerScenario = parseBooleanFlag('active-player', DEFAULT_ACTIVE_PLAYER);
   const compressFrontline = parseBooleanFlag('compress-frontline', DEFAULT_COMPRESS_FRONTLINE);
+  const allowWarpRecovery = parseBooleanFlag('allow-warp-recovery', DEFAULT_ALLOW_WARP_RECOVERY);
+  const movementDecisionIntervalMs = parseNumberFlag('movement-decision-interval-ms', DEFAULT_MOVEMENT_DECISION_INTERVAL_MS);
+  const sampleIntervalMs = Math.max(250, parseNumberFlag('sample-interval-ms', DEFAULT_SAMPLE_INTERVAL_MS));
+  const detailEverySamples = Math.max(
+    1,
+    parseNumberFlag(
+      'detail-every-samples',
+      durationSeconds >= 900 ? 5 : DEFAULT_DETAIL_EVERY_SAMPLES
+    )
+  );
+  const prewarm = parseBooleanFlag('prewarm', DEFAULT_PREWARM);
+  const runtimePreflight = parseBooleanFlag('runtime-preflight', DEFAULT_RUNTIME_PREFLIGHT);
   const frontlineTriggerDistance = parseNumberFlag('frontline-trigger-distance', DEFAULT_FRONTLINE_TRIGGER_DISTANCE);
   const maxCompressedPerFaction = parseNumberFlag('frontline-compressed-per-faction', DEFAULT_MAX_COMPRESSED_PER_FACTION);
   const logLevel = String(process.env.PERF_LOG_LEVEL ?? process.argv.find(a => a.startsWith('--log-level='))?.split('=')[1] ?? 'warn');
@@ -796,7 +1051,7 @@ async function runCapture(): Promise<void> {
   const artifactDir = makeArtifactDir();
   const browserProfileDir = join(artifactDir, 'browser-profile');
   mkdirSync(browserProfileDir, { recursive: true });
-  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} reuseDevServer=${reuseDevServer}`);
+  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} movementDecisionIntervalMs=${movementDecisionIntervalMs} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} prewarm=${prewarm} runtimePreflight=${runtimePreflight} reuseDevServer=${reuseDevServer}`);
 
   let server: ChildProcess | null = null;
   let context: BrowserContext | null = null;
@@ -809,11 +1064,25 @@ async function runCapture(): Promise<void> {
   const probeRoundTripMs: number[] = [];
   const startedAt = nowIso();
   const combatParam = enableCombat ? '1' : '0';
-  const url = `http://localhost:${port}/?sandbox=true&npcs=${effectiveNpcs}&autostart=true&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}`;
+  const autostart = requestedMode === 'ai_sandbox' ? 'true' : 'false';
+  const url = `http://localhost:${port}/?sandbox=true&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}`;
+  const preflightUrl = `http://localhost:${port}/?sandbox=true&npcs=${effectiveNpcs}&autostart=false&duration=0&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}`;
   let failureReason: string | undefined;
   let validation: ValidationReport = { overall: 'warn', checks: [] };
-  let startupState: { started: boolean; lastFrameCount: number; reason?: string } = { started: false, lastFrameCount: 0 };
+  let startupState: {
+    started: boolean;
+    lastFrameCount: number;
+    reason?: string;
+    firstEngineSeenSec?: number;
+    firstMetricsSeenSec?: number;
+    thresholdReachedSec?: number;
+    lastStartupMark?: string;
+    lastStartupMarkMs?: number;
+  } = { started: false, lastFrameCount: 0 };
+  let prewarmResult = { totalMs: 0, allOk: true };
+  let runtimePreflightResult: { totalMs: number; ok: boolean; reason?: string } = { totalMs: 0, ok: true };
   let startupDiagnostics: StartupDiagnostics | null = null;
+  let startupTimeline: any = null;
   let activeScenarioStarted = false;
   let cdpStarted = false;
   let playwrightTracingStarted = false;
@@ -837,6 +1106,11 @@ async function runCapture(): Promise<void> {
       server = await startDevServer(port);
       startedDevServer = true;
       await sleep(2000);
+    }
+    if (prewarm) {
+      stage = 'prewarm-dev-server';
+      prewarmResult = await prewarmDevServer(port);
+      logStep(`🔥 Dev-server prewarm completed in ${prewarmResult.totalMs}ms (allOk=${prewarmResult.allOk})`);
     }
 
     stage = 'launch-browser';
@@ -895,10 +1169,50 @@ async function runCapture(): Promise<void> {
       cdpStarted = true;
     }
 
+    if (runtimePreflight) {
+      stage = 'runtime-preflight';
+      runtimePreflightResult = await preflightRuntimePage(page, preflightUrl, startupTimeoutSeconds);
+      logStep(`🧪 Runtime preflight completed in ${runtimePreflightResult.totalMs}ms (ok=${runtimePreflightResult.ok})`);
+      if (!runtimePreflightResult.ok) {
+        logStep(`⚠ Runtime preflight failed: ${runtimePreflightResult.reason ?? 'unknown'}`);
+      }
+    }
+
     stage = 'navigate-and-startup';
     logStep(`📍 Navigating to ${url}`);
     await withTimeout('page.goto', page.goto(url, { waitUntil: 'commit' }), STEP_TIMEOUT_MS);
+    if (requestedMode !== 'ai_sandbox') {
+      await withTimeout(
+        'wait __engine',
+        page.waitForFunction(() => Boolean((window as any).__engine), undefined, { timeout: startupTimeoutSeconds * 1000 }),
+        startupTimeoutSeconds * 1000 + 1000
+      );
+      const modeStartResult = await safeAwait(
+        `start mode ${requestedMode}`,
+        page.evaluate(async (mode: string) => {
+          const engine = (window as any).__engine;
+          if (!engine || typeof engine.startGameWithMode !== 'function') {
+            return { ok: false, reason: 'engine unavailable' };
+          }
+          try {
+            await engine.startGameWithMode(mode);
+            return { ok: true };
+          } catch (error) {
+            return { ok: false, reason: error instanceof Error ? error.message : String(error) };
+          }
+        }, requestedMode),
+        STEP_TIMEOUT_MS
+      );
+      if (!modeStartResult || !modeStartResult.ok) {
+        throw new Error(`Failed to start requested mode ${requestedMode}: ${modeStartResult?.reason ?? 'unknown'}`);
+      }
+    }
     startupState = await waitForRendering(page, startupTimeoutSeconds, startupFrameThreshold);
+    startupTimeline = await safeAwait(
+      'startup timeline snapshot',
+      page.evaluate(() => (window as any).__startupTelemetry?.getSnapshot?.() ?? null),
+      3000
+    );
     if (!startupState.started) {
       logStep(`⚠ Startup did not stabilize: ${startupState.reason ?? 'unknown'}`);
       startupDiagnostics = await safeAwait(
@@ -918,7 +1232,10 @@ async function runCapture(): Promise<void> {
       if (enableCombat) {
         await setupActiveScenarioDriver(page, {
           enabled: activePlayerScenario,
+          mode: requestedMode,
           compressFrontline,
+          allowWarpRecovery,
+          movementDecisionIntervalMs,
           frontlineTriggerDistance,
           maxCompressedPerFaction
         });
@@ -940,18 +1257,21 @@ async function runCapture(): Promise<void> {
     logStep(`🎯 Capturing profiling data for ${durationSeconds}s`);
     const startMs = Date.now();
     let missedSamples = 0;
+    let sampleTick = 0;
     while (Date.now() - startMs < durationSeconds * 1000) {
-      await sleep(SAMPLE_INTERVAL_MS);
+      await sleep(sampleIntervalMs);
       let sample: RuntimeSample | null = null;
       try {
         const probeStart = Date.now();
-        const raw = await withTimeout('runtime sample', page.evaluate(() => {
+        const includeDetails = sampleTick % detailEverySamples === 0;
+        const raw = await withTimeout('runtime sample', page.evaluate((shouldIncludeDetails: boolean) => {
           const metrics = (window as any).__metrics;
           const perf = (window as any).perf;
-          const combatProfile = (window as any).combatProfile?.();
+          const basicValidation = perf?.validate?.();
+          const report = shouldIncludeDetails ? perf?.report?.() : null;
+          const combatProfile = shouldIncludeDetails ? (window as any).combatProfile?.() : null;
           const memory = (performance as any).memory;
           const snapshot = metrics?.getSnapshot?.();
-          const report = perf?.report?.();
           return {
             frameCount: Number(snapshot?.frameCount ?? 0),
             avgFrameMs: Number(snapshot?.avgFrameMs ?? 0),
@@ -962,10 +1282,10 @@ async function runCapture(): Promise<void> {
             hitch50Count: Number(snapshot?.hitch50Count ?? 0),
             hitch100Count: Number(snapshot?.hitch100Count ?? 0),
             combatantCount: Number(snapshot?.combatantCount ?? 0),
-            overBudgetPercent: Number(report?.overBudgetPercent ?? 0),
-            shotsThisSession: Number(report?.hitDetection?.shotsThisSession ?? 0),
-            hitsThisSession: Number(report?.hitDetection?.hitsThisSession ?? 0),
-            hitRate: Number(report?.hitDetection?.hitRate ?? 0),
+            overBudgetPercent: Number(basicValidation?.frameBudget?.overBudgetPercent ?? report?.overBudgetPercent ?? 0),
+            shotsThisSession: Number(basicValidation?.hitDetection?.shotsThisSession ?? report?.hitDetection?.shotsThisSession ?? 0),
+            hitsThisSession: Number(basicValidation?.hitDetection?.hitsThisSession ?? report?.hitDetection?.hitsThisSession ?? 0),
+            hitRate: Number(basicValidation?.hitDetection?.hitRate ?? report?.hitDetection?.hitRate ?? 0),
             heapUsedMb: memory?.usedJSHeapSize ? Number(memory.usedJSHeapSize) / (1024 * 1024) : undefined,
             heapTotalMb: memory?.totalJSHeapSize ? Number(memory.totalJSHeapSize) / (1024 * 1024) : undefined,
             uiErrorPanelVisible: Boolean(document.querySelector('.error-panel')),
@@ -977,7 +1297,35 @@ async function runCapture(): Promise<void> {
                   billboardUpdateMs: Number(combatProfile.timing.billboardUpdateMs ?? 0),
                   effectPoolsMs: Number(combatProfile.timing.effectPoolsMs ?? 0),
                   influenceMapMs: Number(combatProfile.timing.influenceMapMs ?? 0),
-                  aiStateMs: typeof combatProfile.timing.aiStateMs === 'object' ? combatProfile.timing.aiStateMs : undefined
+                  aiStateMs: typeof combatProfile.timing.aiStateMs === 'object' ? combatProfile.timing.aiStateMs : undefined,
+                  losCache: combatProfile.timing.losCache ? {
+                    hits: Number(combatProfile.timing.losCache.hits ?? 0),
+                    misses: Number(combatProfile.timing.losCache.misses ?? 0),
+                    hitRate: Number(combatProfile.timing.losCache.hitRate ?? 0),
+                    budgetDenials: Number(combatProfile.timing.losCache.budgetDenials ?? 0)
+                  } : undefined,
+                  raycastBudget: combatProfile.timing.raycastBudget ? {
+                    maxPerFrame: Number(combatProfile.timing.raycastBudget.maxPerFrame ?? 0),
+                    usedThisFrame: Number(combatProfile.timing.raycastBudget.usedThisFrame ?? 0),
+                    deniedThisFrame: Number(combatProfile.timing.raycastBudget.deniedThisFrame ?? 0),
+                    totalExhaustedFrames: Number(combatProfile.timing.raycastBudget.totalExhaustedFrames ?? 0),
+                    totalRequested: Number(combatProfile.timing.raycastBudget.totalRequested ?? 0),
+                    totalDenied: Number(combatProfile.timing.raycastBudget.totalDenied ?? 0),
+                    saturationRate: Number(combatProfile.timing.raycastBudget.saturationRate ?? 0),
+                    denialRate: Number(combatProfile.timing.raycastBudget.denialRate ?? 0)
+                  } : undefined,
+                  aiScheduling: combatProfile.timing.aiScheduling ? {
+                    frameCounter: Number(combatProfile.timing.aiScheduling.frameCounter ?? 0),
+                    intervalScale: Number(combatProfile.timing.aiScheduling.intervalScale ?? 1),
+                    aiBudgetMs: Number(combatProfile.timing.aiScheduling.aiBudgetMs ?? 0),
+                    staggeredSkips: Number(combatProfile.timing.aiScheduling.staggeredSkips ?? 0),
+                    highFullUpdates: Number(combatProfile.timing.aiScheduling.highFullUpdates ?? 0),
+                    mediumFullUpdates: Number(combatProfile.timing.aiScheduling.mediumFullUpdates ?? 0),
+                    maxHighFullUpdatesPerFrame: Number(combatProfile.timing.aiScheduling.maxHighFullUpdatesPerFrame ?? 0),
+                    maxMediumFullUpdatesPerFrame: Number(combatProfile.timing.aiScheduling.maxMediumFullUpdatesPerFrame ?? 0),
+                    aiBudgetExceededEvents: Number(combatProfile.timing.aiScheduling.aiBudgetExceededEvents ?? 0),
+                    aiSevereOverBudgetEvents: Number(combatProfile.timing.aiScheduling.aiSevereOverBudgetEvents ?? 0)
+                  } : undefined
                 }
               : undefined,
             systemTop: Array.isArray(report?.systemBreakdown)
@@ -988,17 +1336,21 @@ async function runCapture(): Promise<void> {
                 }))
               : []
           };
-        }), 8000);
+        }, includeDetails), 8000);
         probeRoundTripMs.push(Date.now() - probeStart);
         sample = { ts: nowIso(), ...raw };
+        sampleTick++;
       } catch {
         missedSamples++;
+        sampleTick++;
       }
 
       if (sample) {
         runtimeSamples.push(sample);
         finalFrameCount = sample.frameCount;
-        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h50=${Number(sample.hitch50Count ?? 0)} shots=${Number(sample.shotsThisSession ?? 0)} hits=${Number(sample.hitsThisSession ?? 0)} hitRate=${(Number(sample.hitRate ?? 0) * 100).toFixed(1)}%`);
+        const denialRatePct = Number(sample.combatBreakdown?.raycastBudget?.denialRate ?? 0) * 100;
+        const aiStarve = Number(sample.combatBreakdown?.aiScheduling?.aiBudgetExceededEvents ?? 0);
+        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h50=${Number(sample.hitch50Count ?? 0)} shots=${Number(sample.shotsThisSession ?? 0)} hits=${Number(sample.hitsThisSession ?? 0)} hitRate=${(Number(sample.hitRate ?? 0) * 100).toFixed(1)}% rayDeny=${denialRatePct.toFixed(1)}% aiStarve=${aiStarve}`);
       }
     }
     if (missedSamples > 0) {
@@ -1029,7 +1381,8 @@ async function runCapture(): Promise<void> {
       logStep('⚠ Skipping heavy CDP shutdown capture due unstable startup or blocked runtime samples');
     }
     validation = validateRun(runtimeSamples, consoleEntries, durationSeconds, {
-      requireHitValidation: enableCombat && activePlayerScenario
+      requireHitValidation: enableCombat && activePlayerScenario,
+      sampleIntervalMs
     });
     if (!startupState.started) {
       validation.checks.push({
@@ -1039,6 +1392,26 @@ async function runCapture(): Promise<void> {
         message: startupState.reason ?? 'Startup rendering did not stabilize'
       });
       validation.overall = 'fail';
+    } else {
+      if (typeof startupState.thresholdReachedSec === 'number') {
+        const sec = startupState.thresholdReachedSec;
+        validation.checks.push({
+          id: 'startup_threshold_seconds',
+          status: sec < 10 ? 'pass' : sec < 25 ? 'warn' : 'warn',
+          value: sec,
+          message: `Startup frame threshold reached in ${sec.toFixed(1)}s`
+        });
+      }
+      if (runtimePreflight && runtimePreflightResult.totalMs > 0) {
+        const sec = runtimePreflightResult.totalMs / 1000;
+        validation.checks.push({
+          id: 'toolchain_prewarm_seconds',
+          status: sec < 10 ? 'pass' : sec < 30 ? 'warn' : 'warn',
+          value: sec,
+          message: `Runtime preflight cold cost ${sec.toFixed(1)}s (toolchain/runtime warmup)`
+        });
+      }
+      validation.overall = getOverallStatus(validation.checks);
     }
 
     stage = 'write-artifacts';
@@ -1054,6 +1427,9 @@ async function runCapture(): Promise<void> {
     writeFileSync(join(artifactDir, 'validation.json'), JSON.stringify(validation, null, 2), 'utf-8');
     if (startupDiagnostics) {
       writeFileSync(join(artifactDir, 'startup-diagnostics.json'), JSON.stringify(startupDiagnostics, null, 2), 'utf-8');
+    }
+    if (startupTimeline) {
+      writeFileSync(join(artifactDir, 'startup-timeline.json'), JSON.stringify(startupTimeline, null, 2), 'utf-8');
     }
 
     if (startupState.started) {
@@ -1110,7 +1486,8 @@ async function runCapture(): Promise<void> {
         validation,
         lastStage: stage,
         scenario: {
-          mode: 'AI_SANDBOX',
+          mode: startupState.started ? requestedMode : 'unknown',
+          requestedMode,
           playerExperience: enableCombat
             ? activePlayerScenario
               ? 'Automated large-scale jungle firefight with scripted player movement/firing, forced ground-level engagement, and instant respawn to keep sampling in active combat.'
@@ -1118,14 +1495,35 @@ async function runCapture(): Promise<void> {
             : 'Automated sandbox flywheel with combat AI disabled for control baseline (render/terrain/harness overhead isolation).',
           systemsEmphasized: enableCombat
             ? activePlayerScenario
-              ? ['Combat AI', 'Player input/fire loop', 'Respawn pipeline', 'Terrain chunking', 'Core frame scheduling']
-              : ['Combat AI', 'Combat updates', 'Terrain chunking', 'Billboard rendering', 'Core frame scheduling']
+              ? requestedMode === 'open_frontier'
+                ? ['Combat AI', 'Open-frontier zone flow', 'Player input/fire loop', 'Respawn pipeline', 'Terrain chunking', 'Core frame scheduling']
+                : ['Combat AI', 'Player input/fire loop', 'Respawn pipeline', 'Terrain chunking', 'Core frame scheduling']
+              : requestedMode === 'open_frontier'
+                ? ['Combat AI', 'Open-frontier zone flow', 'Terrain chunking', 'Billboard rendering', 'Core frame scheduling']
+                : ['Combat AI', 'Combat updates', 'Terrain chunking', 'Billboard rendering', 'Core frame scheduling']
             : ['Terrain chunking', 'Billboard rendering', 'Core frame scheduling', 'Harness overhead baseline']
         },
         harnessOverhead: {
           probeRoundTripAvgMs: average(probeRoundTripMs),
           probeRoundTripP95Ms: percentile(probeRoundTripMs, 0.95),
-          sampleCount: probeRoundTripMs.length
+          sampleCount: probeRoundTripMs.length,
+          sampleIntervalMs,
+          detailEverySamples
+        },
+        startupTiming: {
+          firstEngineSeenSec: startupState.firstEngineSeenSec,
+          firstMetricsSeenSec: startupState.firstMetricsSeenSec,
+          thresholdReachedSec: startupState.thresholdReachedSec,
+          lastStartupMark: startupState.lastStartupMark,
+          lastStartupMarkMs: startupState.lastStartupMarkMs
+        },
+        toolchain: {
+          prewarmEnabled: prewarm,
+          prewarmTotalMs: prewarmResult.totalMs,
+          prewarmAllOk: prewarmResult.allOk,
+          runtimePreflightEnabled: runtimePreflight,
+          runtimePreflightMs: runtimePreflightResult.totalMs,
+          runtimePreflightOk: runtimePreflightResult.ok
         }
       };
       writeFileSync(join(artifactDir, 'summary.json'), JSON.stringify(summary, null, 2), 'utf-8');

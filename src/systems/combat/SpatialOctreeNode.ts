@@ -1,5 +1,8 @@
 import * as THREE from 'three'
 
+// Module-level scratch vectors to avoid per-call allocations
+const _center = new THREE.Vector3()
+
 /**
  * Octree node for spatial partitioning of combatants in 3D space.
  * Provides efficient O(log n) queries for radius, frustum, ray, and k-nearest searches.
@@ -28,7 +31,7 @@ export class OctreeNode {
   subdivide(): void {
     if (!this.isLeaf()) return
 
-    const center = this.bounds.getCenter(new THREE.Vector3())
+    const center = this.bounds.getCenter(_center).clone()
     const min = this.bounds.min
     const max = this.bounds.max
 
@@ -80,7 +83,7 @@ export class OctreeNode {
    * Find which child octant contains a point
    */
   getOctantIndex(position: THREE.Vector3): number {
-    const center = this.bounds.getCenter(new THREE.Vector3())
+    const center = this.bounds.getCenter(_center)
     let index = 0
     if (position.x >= center.x) index |= 1
     if (position.z >= center.z) index |= 2

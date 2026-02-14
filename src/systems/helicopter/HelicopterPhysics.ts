@@ -38,6 +38,7 @@ export class HelicopterPhysics {
   private readonly MAX_CYCLIC_FORCE = 8000; // N (responsive horizontal movement)
   private readonly MAX_YAW_RATE = 2.0; // rad/s
   private readonly ENGINE_SPOOL_RATE = 2.0; // How fast engine responds
+  private readonly MAX_HORIZONTAL_SPEED = 60; // m/s cap to keep chunk churn sustainable
 
   // Arcade-style damping for stability
   private readonly VELOCITY_DAMPING = 0.95; // Less drift
@@ -108,7 +109,7 @@ export class HelicopterPhysics {
   }
 
   private smoothControlInputs(deltaTime: number): void {
-    const smoothRate = this.INPUT_SMOOTH_RATE * deltaTime;
+    const smoothRate = Math.min(this.INPUT_SMOOTH_RATE * deltaTime, 1.0);
 
     this.smoothedControls.collective = THREE.MathUtils.lerp(
       this.smoothedControls.collective,
@@ -142,7 +143,7 @@ export class HelicopterPhysics {
   private updateEngine(deltaTime: number): void {
     // Engine RPM follows collective input with realistic spool-up/down
     const targetRPM = Math.max(0.2, this.smoothedControls.collective); // Idle at 20% (rotor always spinning)
-    const spoolRate = this.ENGINE_SPOOL_RATE * deltaTime;
+    const spoolRate = Math.min(this.ENGINE_SPOOL_RATE * deltaTime, 1.0);
 
     if (targetRPM > this.state.engineRPM) {
       // Spool up (gradual for takeoff realism)
@@ -195,6 +196,17 @@ export class HelicopterPhysics {
     // Cap maximum vertical velocity for better control
     const maxVerticalSpeed = 15.0; // m/s maximum climb/descent rate
     this.state.velocity.y = THREE.MathUtils.clamp(this.state.velocity.y, -maxVerticalSpeed, maxVerticalSpeed);
+
+    // Cap horizontal speed to prevent excessive chunk churn
+    const hx = this.state.velocity.x;
+    const hz = this.state.velocity.z;
+    const horizontalSpeedSq = hx * hx + hz * hz;
+    const maxHSq = this.MAX_HORIZONTAL_SPEED * this.MAX_HORIZONTAL_SPEED;
+    if (horizontalSpeedSq > maxHSq) {
+      const scale = this.MAX_HORIZONTAL_SPEED / Math.sqrt(horizontalSpeedSq);
+      this.state.velocity.x *= scale;
+      this.state.velocity.z *= scale;
+    }
 
     // Yaw angular velocity from tail rotor
     this.state.angularVelocity.y = this.smoothedControls.yaw * this.MAX_YAW_RATE;

@@ -225,18 +225,17 @@ describe('ImprovedChunkManager', () => {
   });
 
   describe('init', () => {
-    it('should load initial chunks', async () => {
+    it('should load initial startup cross around center synchronously', async () => {
       manager = new ImprovedChunkManager(scene, camera, assetLoader, billboardSystem, config);
-
-      mockPriorityManager.getChunksInRadius.mockReturnValue([
-        { x: 0, z: 0 },
-        { x: 1, z: 0 },
-      ]);
 
       await manager.init();
 
-      expect(mockPriorityManager.getChunksInRadius).toHaveBeenCalled();
-      expect(mockLifecycleManager.loadChunkImmediate).toHaveBeenCalledTimes(2);
+      expect(mockLifecycleManager.loadChunkImmediate).toHaveBeenCalledTimes(5);
+      expect(mockLifecycleManager.loadChunkImmediate).toHaveBeenCalledWith(0, 0);
+      expect(mockLifecycleManager.loadChunkImmediate).toHaveBeenCalledWith(1, 0);
+      expect(mockLifecycleManager.loadChunkImmediate).toHaveBeenCalledWith(-1, 0);
+      expect(mockLifecycleManager.loadChunkImmediate).toHaveBeenCalledWith(0, 1);
+      expect(mockLifecycleManager.loadChunkImmediate).toHaveBeenCalledWith(0, -1);
     });
 
     it('should update load queue after init', async () => {

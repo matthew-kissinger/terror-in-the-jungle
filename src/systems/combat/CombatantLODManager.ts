@@ -21,6 +21,7 @@ const STAGGER_MEDIUM = 5;
  * Manages LOD (Level of Detail) calculations and update scheduling for combatants
  */
 export class CombatantLODManager {
+  private static readonly MIN_AI_BUDGET_MS = 0.5;
   private combatants: Map<string, Combatant>;
   private readonly highBucket: Combatant[] = [];
   private readonly mediumBucket: Combatant[] = [];
@@ -63,6 +64,9 @@ export class CombatantLODManager {
   private maxMediumFullUpdatesPerFrame = 24;
   private highFullUpdatesThisFrame = 0;
   private mediumFullUpdatesThisFrame = 0;
+  private aiBudgetExceededEventsThisFrame = 0;
+  private aiSevereOverBudgetEventsThisFrame = 0;
+  private aiBudgetMs = this.AI_FRAME_BUDGET_MS;
 
   // Module dependencies
   private combatantAI: CombatantAI;
@@ -205,6 +209,9 @@ export class CombatantLODManager {
     this.staggeredSkipCount = 0;
     this.highFullUpdatesThisFrame = 0;
     this.mediumFullUpdatesThisFrame = 0;
+    this.aiBudgetExceededEventsThisFrame = 0;
+    this.aiSevereOverBudgetEventsThisFrame = 0;
+    this.aiBudgetMs = Math.max(CombatantLODManager.MIN_AI_BUDGET_MS, this.AI_FRAME_BUDGET_MS * this.intervalScale);
 
     const now = Date.now();
     const worldSize = this.gameModeManager?.getWorldSize() || 4000;
@@ -369,20 +376,25 @@ export class CombatantLODManager {
 
   private isAIBudgetExceeded(aiFrameStart: number): boolean {
     const elapsed = performance.now() - aiFrameStart;
-    if (elapsed <= this.AI_FRAME_BUDGET_MS) {
+    if (elapsed <= this.aiBudgetMs) {
       return false;
     }
+    this.aiBudgetExceededEventsThisFrame++;
 
     const now = performance.now();
     if (now - this.lastAiBudgetLogMs > this.AI_LOG_THROTTLE_MS) {
       this.lastAiBudgetLogMs = now;
-      Logger.warn('combat-ai', `[AI budget] frame AI budget exceeded (${elapsed.toFixed(1)}ms > ${this.AI_FRAME_BUDGET_MS.toFixed(1)}ms), degrading remaining updates`);
+      Logger.warn('combat-ai', `[AI budget] frame AI budget exceeded (${elapsed.toFixed(1)}ms > ${this.aiBudgetMs.toFixed(1)}ms), degrading remaining updates`);
     }
     return true;
   }
 
   private isAISeverelyOverBudget(aiFrameStart: number): boolean {
-    return (performance.now() - aiFrameStart) > (this.AI_FRAME_BUDGET_MS * this.AI_SEVERE_OVER_BUDGET_MULTIPLIER);
+    const severe = (performance.now() - aiFrameStart) > (this.aiBudgetMs * this.AI_SEVERE_OVER_BUDGET_MULTIPLIER);
+    if (severe) {
+      this.aiSevereOverBudgetEventsThisFrame++;
+    }
+    return severe;
   }
 
   private updateCombatantFull(combatant: Combatant, deltaTime: number): void {
@@ -497,6 +509,32 @@ export class CombatantLODManager {
       this.combatants.delete(id);
       this.spatialGrid.remove(id);
     });
+  }
+
+  getFrameSchedulingStats(): {
+    frameCounter: number;
+    intervalScale: number;
+    aiBudgetMs: number;
+    staggeredSkips: number;
+    highFullUpdates: number;
+    mediumFullUpdates: number;
+    maxHighFullUpdatesPerFrame: number;
+    maxMediumFullUpdatesPerFrame: number;
+    aiBudgetExceededEvents: number;
+    aiSevereOverBudgetEvents: number;
+  } {
+    return {
+      frameCounter: this.frameCounter,
+      intervalScale: this.intervalScale,
+      aiBudgetMs: this.aiBudgetMs,
+      staggeredSkips: this.staggeredSkipCount,
+      highFullUpdates: this.highFullUpdatesThisFrame,
+      mediumFullUpdates: this.mediumFullUpdatesThisFrame,
+      maxHighFullUpdatesPerFrame: this.maxHighFullUpdatesPerFrame,
+      maxMediumFullUpdatesPerFrame: this.maxMediumFullUpdatesPerFrame,
+      aiBudgetExceededEvents: this.aiBudgetExceededEventsThisFrame,
+      aiSevereOverBudgetEvents: this.aiSevereOverBudgetEventsThisFrame
+    };
   }
 
   private simulateDistantAI(combatant: Combatant): void {

@@ -9,6 +9,8 @@ let maxRaycasts = DEFAULT_MAX_RAYCASTS;
 let raycastsThisFrame = 0;
 let budgetExhaustedCount = 0;
 let totalBudgetExhaustedFrames = 0;
+let totalRequestedRaycasts = 0;
+let totalDeniedRaycasts = 0;
 
 /**
  * Reset the budget at the start of each frame.
@@ -27,8 +29,10 @@ export function resetRaycastBudget(): void {
  * Returns true if the raycast is allowed, false if budget exhausted.
  */
 export function tryConsumeRaycast(): boolean {
+  totalRequestedRaycasts++;
   if (raycastsThisFrame >= maxRaycasts) {
     budgetExhaustedCount++;
+    totalDeniedRaycasts++;
     return false;
   }
   raycastsThisFrame++;
@@ -79,11 +83,21 @@ export function getRaycastBudgetStats(): {
   usedThisFrame: number;
   deniedThisFrame: number;
   totalExhaustedFrames: number;
+  totalRequested: number;
+  totalDenied: number;
+  saturationRate: number;
+  denialRate: number;
 } {
+  const saturationRate = maxRaycasts > 0 ? raycastsThisFrame / maxRaycasts : 0;
+  const denialRate = totalRequestedRaycasts > 0 ? totalDeniedRaycasts / totalRequestedRaycasts : 0;
   return {
     maxPerFrame: maxRaycasts,
     usedThisFrame: raycastsThisFrame,
     deniedThisFrame: budgetExhaustedCount,
     totalExhaustedFrames: totalBudgetExhaustedFrames,
+    totalRequested: totalRequestedRaycasts,
+    totalDenied: totalDeniedRaycasts,
+    saturationRate,
+    denialRate,
   };
 }

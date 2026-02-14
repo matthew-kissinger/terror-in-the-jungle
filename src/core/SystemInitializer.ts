@@ -39,6 +39,7 @@ import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { VoiceCalloutSystem } from '../systems/audio/VoiceCalloutSystem';
 import { LoadoutSelector } from '../ui/loadout/LoadoutSelector';
 import { objectPool } from '../utils/ObjectPoolManager';
+import { markStartup } from './StartupTelemetry';
 
 export interface SystemReferences {
   assetLoader: AssetLoader;
@@ -97,6 +98,7 @@ export class SystemInitializer {
     _renderer?: any
   ): Promise<InitializationResult> {
     Logger.info('core', ' Initializing game systems...');
+    markStartup('systems.initialize.begin');
 
     // Warmup object pools to prevent allocations during gameplay
     objectPool.warmup(50, 20, 10, 30);
@@ -126,13 +128,17 @@ export class SystemInitializer {
 
     // Phase 2: Load textures
     onProgress('textures', 0);
+    markStartup('systems.assets.begin');
     await refs.assetLoader.init();
+    markStartup('systems.assets.end');
     onProgress('textures', 1);
 
     // Phase 3: Load audio
     onProgress('audio', 0);
     refs.audioManager = new AudioManager(scene, camera);
+    markStartup('systems.audio.begin');
     await refs.audioManager.init();
+    markStartup('systems.audio.end');
     onProgress('audio', 1);
 
     // Phase 4: Initialize world systems
@@ -230,10 +236,21 @@ export class SystemInitializer {
 
     const systems: GameSystem[] = allSystems.filter(system => !deferredSystems.has(system));
     const deferredSystemList: GameSystem[] = allSystems.filter(system => deferredSystems.has(system));
+    const preInitializedSystems = new Set<GameSystem>([
+      refs.assetLoader,
+      refs.audioManager
+    ]);
 
     // Initialize critical systems first
     for (const system of systems) {
+      const name = (system as any)?.constructor?.name ?? 'UnknownSystem';
+      if (preInitializedSystems.has(system)) {
+        markStartup(`systems.init.${name}.skipped-preinitialized`);
+        continue;
+      }
+      markStartup(`systems.init.${name}.begin`);
       await system.init();
+      markStartup(`systems.init.${name}.end`);
     }
 
     onProgress('world', 1);

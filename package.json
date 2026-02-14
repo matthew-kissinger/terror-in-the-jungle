@@ -14,6 +14,8 @@
     "perf:capture:headless": "npx tsx scripts/perf-capture.ts",
     "perf:capture:headed": "npx tsx scripts/perf-capture.ts --headed",
     "perf:capture:devtools": "npx tsx scripts/perf-capture.ts --headed --devtools",
+    "perf:capture:combat120": "npx tsx scripts/perf-capture.ts --headed --mode ai_sandbox --npcs 120 --duration 90 --warmup 15",
+    "perf:capture:frontier30m": "npx tsx scripts/perf-capture.ts --headed --mode open_frontier --npcs 120 --duration 1800 --warmup 30 --sample-interval-ms 2000 --detail-every-samples 5 --runtime-preflight false",
     "perf:analyze:latest": "npx tsx scripts/perf-analyze-latest.ts",
     "test": "vitest",
     "test:run": "vitest run"

@@ -1,6 +1,7 @@
 import { GameEngine } from './GameEngine';
 import { injectSharedStyles } from '../ui/design/styles';
 import { TouchControlLayout } from '../ui/controls/TouchControlLayout';
+import { markStartup, resetStartupTelemetry } from './StartupTelemetry';
 
 function showFatalError(message: string) {
   const overlay = document.createElement('div');
@@ -43,6 +44,8 @@ function showFatalError(message: string) {
 }
 
 export async function bootstrapGame(): Promise<void> {
+  resetStartupTelemetry();
+  markStartup('bootstrap.begin');
   // Inject shared design system CSS before any UI is created
   injectSharedStyles();
 
@@ -51,10 +54,14 @@ export async function bootstrapGame(): Promise<void> {
   touchLayout.init();
 
   const engine = new GameEngine();
+  markStartup('bootstrap.engine-constructed');
 
   try {
+    markStartup('bootstrap.engine-initialize.begin');
     await engine.initialize();
+    markStartup('bootstrap.engine-initialize.end');
     engine.start();
+    markStartup('bootstrap.engine-started');
 
     // Expose engine root for perf harness scenario control.
     (window as any).__engine = engine;

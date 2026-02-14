@@ -20,6 +20,7 @@ export class CombatantMovement {
   private ticketSystem?: TicketSystem;
   private gameModeManager?: GameModeManager;
   private spatialGridManager?: SpatialGridManager;
+  private readonly _spacingForce = new THREE.Vector3();
 
   constructor(chunkManager?: ImprovedChunkManager, zoneManager?: ZoneManager) {
     this.chunkManager = chunkManager;
@@ -63,8 +64,8 @@ export class CombatantMovement {
     // Apply friendly spacing force to prevent bunching
     // This gently pushes NPCs apart when they get too close to friendlies
     if (this.spatialGridManager) {
-      const spacingForce = clusterManager.calculateSpacingForce(combatant, combatants, this.spatialGridManager);
-      combatant.velocity.add(spacingForce);
+      clusterManager.calculateSpacingForce(combatant, combatants, this.spatialGridManager, this._spacingForce);
+      combatant.velocity.add(this._spacingForce);
     }
 
     // Apply velocity normally - LOD scaling handled in CombatantSystem

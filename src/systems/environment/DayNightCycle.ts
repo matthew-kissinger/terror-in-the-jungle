@@ -34,7 +34,12 @@ export class DayNightCycle implements GameSystem {
     night: new THREE.Color(0x0a1012), // Dark blue-green
     dawnDusk: new THREE.Color(0x8b6f47), // Brownish for dawn/dusk
   };
-  
+
+  // Pre-allocated scratch colors to avoid allocations in update methods
+  private readonly _scratchColorA = new THREE.Color();
+  private readonly _scratchColorB = new THREE.Color();
+  private readonly _scratchSkyColor = new THREE.Color();
+
   constructor(scene: THREE.Scene) {
     this.scene = scene;
   }
@@ -113,26 +118,26 @@ export class DayNightCycle implements GameSystem {
         // Dawn (5am - 7am)
         const t = (time - 5) / 2;
         sunLight.color.lerpColors(
-          new THREE.Color(0x4a6b8a), // Blue moonlight
-          new THREE.Color(0xffb380), // Warm orange
+          this._scratchColorA.set(0x4a6b8a), // Blue moonlight
+          this._scratchColorB.set(0xffb380), // Warm orange
           t
         );
       } else if (time >= 7 && time < 17) {
         // Day (7am - 5pm)
         const t = (time - 7) / 10;
-        const noonColor = new THREE.Color(0xfffacd); // Warm yellow
-        const morningColor = new THREE.Color(0xffb380); // Orange
+        this._scratchColorA.set(0xffb380); // Orange (morning)
+        this._scratchColorB.set(0xfffacd); // Warm yellow (noon)
         if (t < 0.5) {
-          sunLight.color.lerpColors(morningColor, noonColor, t * 2);
+          sunLight.color.lerpColors(this._scratchColorA, this._scratchColorB, t * 2);
         } else {
-          sunLight.color.lerpColors(noonColor, morningColor, (t - 0.5) * 2);
+          sunLight.color.lerpColors(this._scratchColorB, this._scratchColorA, (t - 0.5) * 2);
         }
       } else if (time >= 17 && time < 19) {
         // Dusk (5pm - 7pm)
         const t = (time - 17) / 2;
         sunLight.color.lerpColors(
-          new THREE.Color(0xff8c42), // Orange sunset
-          new THREE.Color(0x4a6b8a), // Blue moonlight
+          this._scratchColorA.set(0xff8c42), // Orange sunset
+          this._scratchColorB.set(0x4a6b8a), // Blue moonlight
           t
         );
       } else {
@@ -146,13 +151,15 @@ export class DayNightCycle implements GameSystem {
       // Intensity: 0.5 day, 0.15 night
       const dayIntensity = 0.5;
       const nightIntensity = 0.15;
-      this.renderer.ambientLight.intensity = 
+      this.renderer.ambientLight.intensity =
         nightIntensity + (1 - nightFactor) * (dayIntensity - nightIntensity);
-      
+
       // Color shift: warm day, cool night
-      const dayColor = new THREE.Color(0xffffff);
-      const nightColor = new THREE.Color(0x1a2f3a); // Dark blue
-      this.renderer.ambientLight.color.lerpColors(nightColor, dayColor, 1 - nightFactor);
+      this.renderer.ambientLight.color.lerpColors(
+        this._scratchColorA.set(0x1a2f3a), // Dark blue (night)
+        this._scratchColorB.set(0xffffff), // White (day)
+        1 - nightFactor
+      );
     }
     
     // === HEMISPHERE LIGHT ===
@@ -202,47 +209,34 @@ export class DayNightCycle implements GameSystem {
     if (!this.scene) return;
 
     const time = this.currentTime;
-    // nightFactor reserved for future ambient light adjustments
-    const _nightFactor = this.getNightFactor();
+    const skyColor = this._scratchSkyColor;
 
-    let skyColor: THREE.Color;
-    
     if (time >= 5 && time < 7) {
       // Dawn (5am - 7am): Pink-orange gradient
       const t = (time - 5) / 2;
-      skyColor = new THREE.Color().lerpColors(
-        this.skyColors.midnight,
-        this.skyColors.dawn,
-        t
-      );
+      skyColor.lerpColors(this.skyColors.midnight, this.skyColors.dawn, t);
     } else if (time >= 7 && time < 17) {
       // Day (7am - 5pm): Bright blue
       const t = (time - 7) / 10;
-      const morningColor = this.skyColors.dawn;
-      const noonColor = this.skyColors.noon;
       if (t < 0.5) {
-        skyColor = new THREE.Color().lerpColors(morningColor, noonColor, t * 2);
+        skyColor.lerpColors(this.skyColors.dawn, this.skyColors.noon, t * 2);
       } else {
-        skyColor = new THREE.Color().lerpColors(noonColor, morningColor, (t - 0.5) * 2);
+        skyColor.lerpColors(this.skyColors.noon, this.skyColors.dawn, (t - 0.5) * 2);
       }
     } else if (time >= 17 && time < 19) {
       // Dusk (5pm - 7pm): Orange gradient
       const t = (time - 17) / 2;
-      skyColor = new THREE.Color().lerpColors(
-        this.skyColors.dusk,
-        this.skyColors.midnight,
-        t
-      );
+      skyColor.lerpColors(this.skyColors.dusk, this.skyColors.midnight, t);
     } else {
       // Night: Dark blue-purple
-      skyColor = this.skyColors.midnight.clone();
+      skyColor.copy(this.skyColors.midnight);
     }
-    
+
     // Update scene background
     if (this.scene.background instanceof THREE.Color) {
       this.scene.background.copy(skyColor);
     } else {
-      this.scene.background = skyColor;
+      this.scene.background = skyColor.clone();
     }
   }
 

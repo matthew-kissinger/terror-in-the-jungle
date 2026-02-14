@@ -50,7 +50,7 @@ export class ChunkTerrainQueries {
    * Get height at world position from terrain chunks
    */
   getHeightAt(x: number, z: number): number {
-    const chunk = this.getChunkAt(new THREE.Vector3(x, 0, z));
+    const chunk = this.getChunkAt(_heightTestPoint.set(x, 0, z));
     if (chunk) {
       return chunk.getHeightAt(x, z);
     }

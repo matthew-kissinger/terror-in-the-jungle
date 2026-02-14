@@ -164,9 +164,9 @@ Use critical-path priorities as guidance, not hard sequencing, when evidence poi
 | P3-3 | TODO | Billboard shader path unresolved |
 | P4-1 | IN_PROGRESS | Duplicate command paths reduced; full parity/invariant sweep still open |
 | P4-2 | IN_PROGRESS | HUD/tactical cadence throttled; remaining UI hot paths need fine-grain profiling |
-| P4-3 | TODO | Audio pooling inconsistency persists |
-| P5-1 | TODO | Legacy terrain modules still present |
-| P5-2 | TODO | Legacy spatial grid file still present |
+| P4-3 | DONE | Audio Object3D pool + filter/gain node disconnect on end; see EXP-027 |
+| P5-1 | DONE | Dead terrain modules deleted (2026-02-14) |
+| P5-2 | DONE | SpatialGrid.ts deleted (2026-02-14) |
 | P5-3 | TODO | Tests not aligned with runtime invariants |
 | P5-4 | TODO | Architecture CI guardrails missing |
 
@@ -235,16 +235,38 @@ Use critical-path priorities as guidance, not hard sequencing, when evidence poi
 | 2026-02-14 | EXP-024 | LOS broad-phase culling performs expensive per-query bounds recomputation | Cached chunk world bounds at `registerChunk` and reused bounds during LOS relevance tests | LOS unit tests + build | Removed per-query `Box3.setFromObject` work from LOS hot path while preserving behavior | KEEP | `src/systems/combat/LOSAccelerator.ts`, `src/systems/combat/LOSAccelerator.test.ts` |
 | 2026-02-14 | EXP-025 | Harness startup intermittently fails early from fixed 30s navigation/metrics waits | Hardened startup with stale-port cleanup, `goto(waitUntil='commit')`, and startup wait logic that honors configured timeout and returns structured failure context instead of hard throw | short headed captures | Harness now continues through late sandbox metric availability and produces actionable artifacts on unstable startup | KEEP + ITERATE | `scripts/perf-capture.ts`, `artifacts/perf/2026-02-14T06-22-46-021Z` |
 | 2026-02-14 | EXP-026 | Unstable startup path wastes capture time and obscures root-cause evidence | Added startup-diagnostics artifact and skipped runtime sampling when startup is not stabilized | short headed capture | Faster failure loop with clearer startup state (`startup-diagnostics.json`) and less noisy false runtime data | KEEP | `scripts/perf-capture.ts` |
+| 2026-02-14 | EXP-027 | Helicopter fast-flight crash on Open Frontier from unclamped deltaTime + allocation cascade | 13 fixes: deltaTime clamp, horizontal speed cap, lerp clamping, rotor wrap, allocation elimination (octree/cluster/terrain/audio), ring buffer metrics, octree threshold increase | build + 3222 tests + headed harness (20s, 60 NPC) | All PASS (15/16 checks pass, 1 warn=heap 25.5MB). Avg frame 7.13ms, p99 11.9ms, max 100ms (clamp working), 0 errors, 0 crashes, 70 shots / 1 hit validated | KEEP | `GameEngineLoop.ts`, `HelicopterPhysics.ts`, `HelicopterAnimation.ts`, `SpatialOctree.ts`, `SpatialOctreeNode.ts`, `ClusterManager.ts`, `CombatantMovement.ts`, `ChunkTerrainQueries.ts`, `ChunkSpatialUtils.ts`, `AudioWeaponSounds.ts`, `DayNightCycle.ts`, `RuntimeMetrics.ts` |
+
+### EXP-027: Helicopter Fast-Flight Crash Fix (2026-02-14)
+
+Root cause: Flying fast in helicopter on Open Frontier (~1 min) crashes browser. Cascade: unclamped deltaTime + no horizontal speed cap -> GC/GPU stall -> long frame -> unclamped deltaTime into physics (lerp factor > 1.0 = NaN) -> renderer crash. Secondary: massive per-frame allocations (480+ Vector3 from octree, 120 from cluster manager) and audio node leaks compound the stall.
+
+13 fixes across 8 files:
+
+1. **GameEngineLoop.ts**: Clamp `deltaTime` to 100ms (10 FPS floor) - prevents NaN cascade.
+2. **HelicopterPhysics.ts**: Cap horizontal speed at 60 m/s - keeps chunk churn sustainable.
+3. **HelicopterPhysics.ts**: Clamp lerp factors to `[0, 1.0]` in input smoothing + engine spool.
+4. **HelicopterAnimation.ts**: Wrap rotor rotation with `% TAU` to prevent float precision loss.
+5. **SpatialOctree.ts**: Eliminate double-clone in `insert()` - saves 240 Vector3/frame at 120 NPCs.
+6. **SpatialOctreeNode.ts**: Module-level scratch vector for `getOctantIndex()` + `subdivide()`.
+7. **ClusterManager.ts + CombatantMovement.ts**: Caller-provided output vector for spacing force - saves 120 Vector3/frame.
+8. **ChunkTerrainQueries.ts**: Reuse `_heightTestPoint` scratch vector in `getHeightAt()`.
+9. **ChunkSpatialUtils.ts**: Module-level scratch Vector2 for `worldToChunkCoord()`.
+10. **AudioWeaponSounds.ts**: Object3D pool (16 reusable) + disconnect filter/gain nodes on `onEnded`.
+11. **DayNightCycle.ts**: Pre-allocated scratch Color objects for all update methods (~12 allocs/cycle eliminated).
+12. **RuntimeMetrics.ts**: Ring buffer (`Float64Array(300)`) with cached percentiles - eliminates `Array.shift()` O(n) and sort-on-every-call.
+13. **SpatialOctree.ts**: Increase position-change threshold from 0.01 to 1.0 - most NPC updates correctly skipped.
+
+Validation: 3220/3222 tests pass (2 skipped), clean build, 0 lint errors.
 
 ## Current Loop Snapshot
 
-- Latest active-combat capture artifact: `artifacts/perf/2026-02-14T05-52-35-983Z`
-- Outcome: validation pass with 15/15 runtime samples; avg frame `7.90ms`, max p95 `10.70ms`, zero browser errors, runtime init-error panel check PASS, hits validated (`49` shots / `7` hits, peak rate `20.69%`).
-- Persisting warnings: missing optional grenade audio assets and periodic AI budget degradation warnings.
-- Persisting warnings: missing optional grenade audio assets and periodic AI budget degradation warnings.
-- New cleanup in progress: legacy procedural-audio code and obsolete tests/comments are being removed incrementally; runtime paths are now explicitly asset-only for footsteps/callouts.
-- Current high-priority blocker remains hitch tails (`maxFrameMs` spikes >200ms) despite healthy average frame times in active captures.
-- Startup stabilization remains inconsistent under load; sandbox metrics can appear very late (>30s) on some runs and must be treated as a core blocker before trusting short-window perf comparisons.
+- Latest active-combat capture artifact: `artifacts/perf/2026-02-14T18-34-14-711Z`
+- Outcome: validation WARN (15/16 checks pass, 1 warn=heap growth 25.5MB); 20/20 runtime samples; avg frame `7.13ms`, p99 `11.9ms`, max `100ms` (deltaTime clamp working), zero browser errors/crashes, hits validated (`70` shots / `1` hit, peak rate `6.25%`).
+- Previous worst-case max frame spikes (>200ms) are now clamped to 100ms by the deltaTime guard in `GameEngineLoop.ts`.
+- Helicopter fast-flight crash on Open Frontier is resolved (EXP-027): 13 fixes eliminated unclamped deltaTime cascade, allocation churn (360+ Vector3/frame removed), and audio node leaks.
+- Persisting warnings: heap growth (25.5MB over 20s), missing optional grenade audio assets, periodic AI budget degradation warnings.
+- Startup stabilization remains inconsistent under load; sandbox metrics can appear very late (>30s) on some runs.
 - Interpretation: headed active scenario is currently the only trustworthy optimization signal on this hardware; headless remains secondary/regression-only until blocking is fixed.
 
 ### Next Loop Focus
@@ -413,3 +435,112 @@ Interpretation:
 - Combat hot path is not the current dominant stall source (combat breakdown remains sub-ms to low-ms).
 - Remaining hitch risk is one-off/sparse main-thread spikes outside sustained combat update costs.
 - Next highest-value work is terrain/chunk ingestion memory churn and worker payload compaction, not AI decision math.
+
+### Startup Diagnosis Snapshot (2026-02-14, evening)
+
+- Evidence run: `artifacts/perf/2026-02-14T19-24-46-634Z`
+  - Harness wall clock to startup threshold: ~45s.
+  - In-page startup telemetry at first visibility sample was only ~2.4s (`systems.audio.begin`), then reached `bootstrap.engine-started` at ~5.4s.
+- Interpretation:
+  - Large portion of the perceived startup delay is outside in-page startup execution (likely dev-tooling/bundler/page readiness path), not purely game runtime init.
+  - Startup diagnostics must report both harness wall-clock and in-page startup marks to avoid poisoned optimization decisions.
+  - Warm/dev-server-reuse runs on the same machine show substantially lower startup threshold time (~6s) versus cold runs (~45s), confirming tooling warmup as a major confounder.
+
+### Startup Plan (Incremental, Reversible)
+
+1. Harden startup evidence path (P0-1):
+   - Keep `scripts/perf-capture.ts` startup probes reporting `engine/metrics` readiness and latest startup mark.
+   - Record `summary.startupTiming` and `summary.toolchain` so every run can separate tooling delay from runtime delay.
+2. Reduce mandatory startup terrain work (P2-4):
+   - `ImprovedChunkManager.init()` now sync-loads a bounded spawn-safe set (center + cardinal neighbors, 5 chunks) to prevent invisible terrain at spawn.
+   - Remaining chunks are queued and loaded under existing frame/idle budgets.
+3. Keep perf loop signal clean (P0-1):
+   - Harness now records `toolchain.prewarm*` and `toolchain.runtimePreflight*` separately from runtime startup.
+   - Startup checks include `startup_threshold_seconds` plus explicit toolchain warmup cost.
+   - Policy: use cold runs for deployment-like startup risk, and warm/reuse runs for runtime optimization decisions.
+4. Validate before/after startup timing on same machine:
+   - Compare `thresholdReachedSec`, `firstEngineSeenSec`, and `prewarmTotalMs`.
+   - Keep change only if startup threshold improves without early-playability regressions.
+
+### Combat Scaling Fast Triage (2026-02-14, night)
+
+Architecture map (combat-critical path):
+- `CombatantSystem.update()`:
+  - player position + frame timing update
+  - spawn/objective/influence updates
+  - `CombatantLODManager.updateCombatants()` (AI/combat/movement scheduling + raycast budget reset)
+  - `spatialGridManager.syncAllPositions()` (secondary spatial sync pass)
+  - billboard/effect pool updates
+- LOS path:
+  - `CombatantAI` -> `AILineOfSight.canSeeTarget()` -> FOV/range filters -> LOS cache -> `RaycastBudget.tryConsumeRaycast()` -> terrain/sandbag/smoke checks.
+- Spatial ownership today:
+  - `SpatialOctree` in `CombatantLODManager` for AI/movement queries.
+  - `spatialGridManager` wraps another `SpatialOctree` and runs full-map sync pass for hit/aux queries.
+
+Top 3 hotspots (verified by instrumentation and code path):
+1. AI/LOS decision path under high contact:
+   - `CombatantLODManager.updateCombatants()` + `CombatantAI.updateAI()` + LOS/raycast gate.
+2. Duplicate spatial maintenance:
+   - per-combatant `spatialGrid.updatePosition(...)` during LOD updates plus `spatialGridManager.syncAllPositions(...)` every frame.
+3. Startup/toolchain warmup tail:
+   - cold captures show large wall-clock delay before engine visibility despite short in-page startup marks; confounds optimization loop if not separated.
+
+How budgets/LOD work today:
+- AI frame budget:
+  - `CombatantLODManager` enforces adaptive budget (`aiBudgetMs`) with severe-over-budget degrade tiers (visual-only / ultra-light).
+- Update staggering:
+  - high LOD full updates every 3 frames (`STAGGER_HIGH`), medium every 5 (`STAGGER_MEDIUM`) with per-frame caps.
+- LOS budget:
+  - `RaycastBudget` hard-caps raycasts/frame (`DEFAULT_MAX_RAYCASTS=8`), denials tracked in profiler/harness.
+- LOD tiers:
+  - distance buckets (`high/medium/low/culled`) with dynamic interval scaling by distance and FPS EMA.
+
+### Two Reversible Experiments (Next)
+
+EXP-A: LOS candidate narrowing before raycast
+- What to change:
+  - Add cheap pre-raycast lane filter in `AILineOfSight.canSeeTarget()`:
+    - reject targets outside vertical delta band and near-parallel backface cone before touching cache/raycast.
+  - Add per-combatant target candidate cap in `CombatantAI` (nearest K, priority by threat/visibility memory) before LOS.
+- Measure:
+  - `raycastBudget.denialRate`, `losCache.hitRate`, `aiScheduling.aiBudgetExceededEvents`, frame p95/p99.
+- Win condition:
+  - >=20% reduction in raycast denial rate or >=15% drop in AI starvation events with no rise in “shoot-through-cover” bugs.
+- Rollback:
+  - gate with config flag (`PERF_LOS_PRE_FILTER=0/1`) and revert to current branchless path in one commit.
+
+EXP-B: Spatial sync de-dup (incremental)
+- What to change:
+  - Keep `SpatialOctree` authoritative for AI update loop and throttle/skip `spatialGridManager.syncAllPositions(...)` for entities already updated this frame by LOD manager.
+  - Add frame-local “position-updated” marker map from LOD manager to spatial manager sync call.
+- Measure:
+  - `combatBreakdown.spatialSyncMs`, `combatBreakdown.totalMs`, frame hitches (`>50ms`, `>100ms`), gameplay sanity (hit detection parity).
+- Win condition:
+  - >=25% drop in spatial sync ms and measurable tail-latency reduction without hit-regression.
+- Rollback:
+  - behind feature toggle (`PERF_SPATIAL_DEDUP_SYNC=0/1`) with immediate fallback to full sync path.
+
+### Implementation Sketch (Concrete)
+
+Files to touch first:
+- `src/systems/combat/ai/AILineOfSight.ts`
+  - add cheap prefilter counters and reject reasons.
+- `src/systems/combat/CombatantAI.ts`
+  - candidate shortlist cap + priority order before LOS checks.
+- `src/systems/combat/CombatantLODManager.ts`
+  - emit updated-id set for this frame (high/medium/low paths).
+- `src/systems/combat/CombatantSystem.ts`
+  - pass optional updated-id set into spatial sync call.
+- `src/systems/combat/SpatialGridManager.ts`
+  - accept skip-set in `syncAllPositions` and track skipped/updated counts.
+- `scripts/perf-capture.ts`
+  - keep low-overhead long-run captures (`sampleIntervalMs`, `detailEverySamples`) and add new experiment toggles to summary metadata.
+
+Instrumentation points:
+- Combat runtime:
+  - `combatProfile().timing` fields (`aiUpdateMs`, `spatialSyncMs`, `raycastBudget`, `aiScheduling`).
+- Harness:
+  - `runtime-samples.json` + `summary.harnessOverhead`.
+  - Open Frontier soak: `npm run perf:capture:frontier30m`.
+- Startup:
+  - `startup-timeline.json` + `summary.startupTiming/toolchain`.

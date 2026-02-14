@@ -52,7 +52,7 @@ export class SpatialOctree {
     const oldPosition = this.entityPositions.get(id)
 
     // If position hasn't changed significantly, skip update
-    if (oldPosition && oldPosition.distanceToSquared(position) < 0.01) {
+    if (oldPosition && oldPosition.distanceToSquared(position) < 1.0) {
       return
     }
 
@@ -69,9 +69,9 @@ export class SpatialOctree {
    * Insert entity into octree
    */
   private insert(id: string, position: THREE.Vector3): void {
-    // Clamp position to world bounds
+    // Clamp position to world bounds (single clone, reused for both storage and insertion)
     const clampedPos = position.clone().clamp(this.worldBounds.min, this.worldBounds.max)
-    this.entityPositions.set(id, clampedPos.clone())
+    this.entityPositions.set(id, clampedPos)
     this.insertIntoNode(this.root, id, clampedPos)
   }
 

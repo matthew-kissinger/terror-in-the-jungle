@@ -20,7 +20,7 @@ export function animate(engine: GameEngine): void {
   // Skip rendering while WebGL context is lost
   if (engine.contextLost) return;
 
-  const deltaTime = engine.clock.getDelta();
+  const deltaTime = Math.min(engine.clock.getDelta(), 0.1);
   engine.lastFrameDelta = deltaTime;
 
   try {

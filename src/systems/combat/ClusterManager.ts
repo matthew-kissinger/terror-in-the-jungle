@@ -78,11 +78,6 @@ export class ClusterManager {
       force.divideScalar(nearbyCount)
     }
 
-    // If no output vector provided, return a new vector (don't return scratch)
-    if (!outputVector) {
-      return new THREE.Vector3().copy(force)
-    }
-
     return force
   }
 

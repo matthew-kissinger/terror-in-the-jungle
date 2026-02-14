@@ -41,6 +41,7 @@ import { SystemInitializer, SystemReferences } from './SystemInitializer';
 import { SystemConnector } from './SystemConnector';
 import { SystemUpdater } from './SystemUpdater';
 import { SystemDisposer } from './SystemDisposer';
+import { markStartup } from './StartupTelemetry';
 
 export class SystemManager {
   private systems: GameSystem[] = [];
@@ -179,6 +180,7 @@ export class SystemManager {
 
   async preGenerateSpawnArea(spawnPos: THREE.Vector3): Promise<void> {
     Logger.info('core', `Pre-generating spawn area around (${spawnPos.x.toFixed(0)}, ${spawnPos.z.toFixed(0)})...`);
+    markStartup('systems.pre-generate.begin');
 
     if (this.chunkManager) {
       // Generate chunks around the spawn position and wait for minimum playable ring.
@@ -215,6 +217,7 @@ export class SystemManager {
       Logger.info('core', 'Initializing zones after chunk generation...');
       this.zoneManager.initializeZones();
     }
+    markStartup('systems.pre-generate.end');
   }
 
   updateSystems(deltaTime: number, gameStarted: boolean = true): void {

@@ -71,12 +71,13 @@ export class HelicopterAnimation {
     this.mainRotorSpeed.set(helicopterId, newMainSpeed);
     this.tailRotorSpeed.set(helicopterId, newTailSpeed);
 
-    // Apply rotations to rotor groups
+    // Apply rotations to rotor groups (wrap to prevent float precision loss)
+    const TAU = Math.PI * 2;
     helicopter.traverse((child) => {
       if (child.userData.type === 'mainBlades') {
-        child.rotation.y += newMainSpeed * deltaTime;
+        child.rotation.y = (child.rotation.y + newMainSpeed * deltaTime) % TAU;
       } else if (child.userData.type === 'tailBlades') {
-        child.rotation.z += newTailSpeed * deltaTime;
+        child.rotation.z = (child.rotation.z + newTailSpeed * deltaTime) % TAU;
       }
     });
   }
