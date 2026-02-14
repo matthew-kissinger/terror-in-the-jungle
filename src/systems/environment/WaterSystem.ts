@@ -23,8 +23,9 @@ export class WaterSystem implements GameSystem {
   
   // Water configuration
   private readonly WATER_LEVEL = 0; // Sea level height
-  private readonly WATER_SIZE = 2000; // Size of water plane
+  private readonly BASE_WATER_SIZE = 2000; // Base geometry size before scaling
   private readonly WATER_SEGMENTS = 100; // Geometry segments for waves
+  private worldWaterSize = 2000;
   
   // State
   private sun: THREE.Vector3;
@@ -47,8 +48,8 @@ export class WaterSystem implements GameSystem {
     
     // Create water geometry - large plane
     const waterGeometry = new THREE.PlaneGeometry(
-      this.WATER_SIZE, 
-      this.WATER_SIZE,
+      this.BASE_WATER_SIZE,
+      this.BASE_WATER_SIZE,
       this.WATER_SEGMENTS,
       this.WATER_SEGMENTS
     );
@@ -82,6 +83,7 @@ export class WaterSystem implements GameSystem {
     
     // Position at water level
     this.water.position.y = this.WATER_LEVEL;
+    this.updateWaterScale();
     
     // Add to scene
     this.scene.add(this.water);
@@ -123,6 +125,10 @@ export class WaterSystem implements GameSystem {
     if (waterUniforms && waterUniforms.time) {
       waterUniforms.time.value += deltaTime * 0.5; // Slower wave speed
     }
+
+    // Keep ocean centered under camera so map-edge seams are not visible in large worlds.
+    this.water.position.x = this.camera.position.x;
+    this.water.position.z = this.camera.position.z;
 
     // Check underwater state
     this.checkUnderwaterState();
@@ -224,5 +230,24 @@ export class WaterSystem implements GameSystem {
         waterUniforms.distortionScale.value = scale;
       }
     }
+  }
+
+  /**
+   * Match water coverage to current game mode world size.
+   * Adds margin to absorb fast traversal and distant chunk transitions.
+   */
+  setWorldSize(worldSize: number): void {
+    const safeWorld = Number.isFinite(worldSize) && worldSize > 0 ? worldSize : this.BASE_WATER_SIZE;
+    const target = Math.max(this.BASE_WATER_SIZE, safeWorld * 1.8);
+    if (Math.abs(target - this.worldWaterSize) < 1) return;
+    this.worldWaterSize = target;
+    this.updateWaterScale();
+    Logger.info('environment', `Water coverage resized for world: ${this.worldWaterSize.toFixed(0)}m`);
+  }
+
+  private updateWaterScale(): void {
+    if (!this.water) return;
+    const scale = this.worldWaterSize / this.BASE_WATER_SIZE;
+    this.water.scale.set(scale, 1, scale);
   }
 }

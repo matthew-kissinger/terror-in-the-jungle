@@ -254,6 +254,9 @@ export class SystemManager {
 
     // Set weather config for mode
     const config = getGameModeConfig(mode);
+    if (this.waterSystem && typeof this.waterSystem.setWorldSize === 'function') {
+      this.waterSystem.setWorldSize(config.worldSize);
+    }
     if (this.weatherSystem) {
       this.weatherSystem.setWeatherConfig(config.weather);
     }
