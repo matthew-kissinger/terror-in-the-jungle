@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Combatant, CombatantState, Faction, Squad } from './types';
 import { TracerPool } from '../effects/TracerPool';
-import { MuzzleFlashPool } from '../effects/MuzzleFlashPool';
+import { MuzzleFlashSystem } from '../effects/MuzzleFlashSystem';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { PlayerHealthSystem } from '../player/PlayerHealthSystem';
 import { TicketSystem } from '../world/TicketSystem';
@@ -66,7 +66,7 @@ export class CombatantCombat {
   constructor(
     scene: THREE.Scene,
     tracerPool: TracerPool,
-    muzzleFlashPool: MuzzleFlashPool,
+    muzzleFlashSystem: MuzzleFlashSystem,
     impactEffectsPool: ImpactEffectsPool,
     combatantRenderer?: CombatantRenderer
   ) {
@@ -81,7 +81,7 @@ export class CombatantCombat {
     this.suppression = new CombatantSuppression();
     this.effects = new CombatantCombatEffects(
       tracerPool,
-      muzzleFlashPool,
+      muzzleFlashSystem,
       impactEffectsPool,
       this.damage,
       this.suppression

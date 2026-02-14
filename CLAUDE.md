@@ -158,7 +158,7 @@ src/
 │   │       └── BillboardBufferManager.ts
 │   ├── effects/       # Visual effects
 │   │   ├── TracerPool.ts
-│   │   ├── MuzzleFlashPool.ts
+│   │   ├── MuzzleFlashSystem.ts
 │   │   ├── ImpactEffectsPool.ts
 │   │   ├── ExplosionEffectsPool.ts
 │   │   ├── CameraShakeSystem.ts

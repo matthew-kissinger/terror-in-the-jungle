@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { CombatantCombat, CombatHitResult } from './CombatantCombat';
 import { Combatant, CombatantState, Faction } from './types';
 import { TracerPool } from '../effects/TracerPool';
-import { MuzzleFlashPool } from '../effects/MuzzleFlashPool';
+import { MuzzleFlashSystem } from '../effects/MuzzleFlashSystem';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { CombatantHitDetection } from './CombatantHitDetection';
 import { PlayerHealthSystem } from '../player/PlayerHealthSystem';
@@ -18,8 +18,8 @@ const mockTracerPool: TracerPool = {
   spawn: vi.fn(),
 } as any;
 
-const mockMuzzleFlashPool: MuzzleFlashPool = {
-  spawn: vi.fn(),
+const mockMuzzleFlashSystem: MuzzleFlashSystem = {
+  spawnNPC: vi.fn(),
 } as any;
 
 const mockImpactEffectsPool: ImpactEffectsPool = {
@@ -126,7 +126,7 @@ describe('CombatantCombat', () => {
     combatantCombat = new CombatantCombat(
       mockScene,
       mockTracerPool,
-      mockMuzzleFlashPool,
+      mockMuzzleFlashSystem,
       mockImpactEffectsPool,
       mockCombatantRenderer
     );
@@ -147,7 +147,7 @@ describe('CombatantCombat', () => {
       const combat = new CombatantCombat(
         mockScene,
         mockTracerPool,
-        mockMuzzleFlashPool,
+        mockMuzzleFlashSystem,
         mockImpactEffectsPool
       );
       expect(combat.hitDetection).toBeDefined();
@@ -157,7 +157,7 @@ describe('CombatantCombat', () => {
       const combat = new CombatantCombat(
         mockScene,
         mockTracerPool,
-        mockMuzzleFlashPool,
+        mockMuzzleFlashSystem,
         mockImpactEffectsPool
       );
       // Modules should be initialized

@@ -21,7 +21,7 @@ let mockInput: any;
 let mockAmmo: any;
 let mockSwitching: any;
 let mockTracerPool: any;
-let mockMuzzleFlashPool: any;
+let mockMuzzleFlashSystem: any;
 let mockImpactEffectsPool: any;
 
 const mockGunCore = {
@@ -109,9 +109,9 @@ vi.mock('../effects/TracerPool', () => ({
   }),
 }));
 
-vi.mock('../effects/MuzzleFlashPool', () => ({
-  MuzzleFlashPool: vi.fn(function(this: any) {
-    return mockMuzzleFlashPool;
+vi.mock('../effects/MuzzleFlashSystem', () => ({
+  MuzzleFlashSystem: vi.fn(function(this: any) {
+    return mockMuzzleFlashSystem;
   }),
 }));
 
@@ -221,7 +221,7 @@ describe('FirstPersonWeapon', () => {
       dispose: vi.fn(),
     };
 
-    mockMuzzleFlashPool = {
+    mockMuzzleFlashSystem = {
       update: vi.fn(),
       dispose: vi.fn(),
     };
@@ -286,7 +286,7 @@ describe('FirstPersonWeapon', () => {
 
     it('should initialize all effect pools during construction', () => {
       expect(mockTracerPool).toBeDefined();
-      expect(mockMuzzleFlashPool).toBeDefined();
+      expect(mockMuzzleFlashSystem).toBeDefined();
       expect(mockImpactEffectsPool).toBeDefined();
     });
 
@@ -369,7 +369,7 @@ describe('FirstPersonWeapon', () => {
       weapon.update(0.016);
 
       expect(mockTracerPool.update).toHaveBeenCalled();
-      expect(mockMuzzleFlashPool.update).toHaveBeenCalled();
+      expect(mockMuzzleFlashSystem.update).toHaveBeenCalled();
       expect(mockImpactEffectsPool.update).toHaveBeenCalledWith(0.016);
     });
 
@@ -794,7 +794,7 @@ describe('FirstPersonWeapon', () => {
       expect(mockInput.dispose).toHaveBeenCalled();
       expect(mockModel.dispose).toHaveBeenCalled();
       expect(mockTracerPool.dispose).toHaveBeenCalled();
-      expect(mockMuzzleFlashPool.dispose).toHaveBeenCalled();
+      expect(mockMuzzleFlashSystem.dispose).toHaveBeenCalled();
       expect(mockImpactEffectsPool.dispose).toHaveBeenCalled();
     });
   });

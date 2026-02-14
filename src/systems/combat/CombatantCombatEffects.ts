@@ -2,7 +2,7 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { Combatant, Squad } from './types';
 import { TracerPool } from '../effects/TracerPool';
-import { MuzzleFlashPool } from '../effects/MuzzleFlashPool';
+import { MuzzleFlashSystem } from '../effects/MuzzleFlashSystem';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { AudioManager } from '../audio/AudioManager';
 import { CombatantDamage } from './CombatantDamage';
@@ -22,7 +22,7 @@ import { objectPool } from '../../utils/ObjectPoolManager';
  */
 export class CombatantCombatEffects {
   private tracerPool: TracerPool;
-  private muzzleFlashPool: MuzzleFlashPool;
+  private muzzleFlashSystem: MuzzleFlashSystem;
   private impactEffectsPool: ImpactEffectsPool;
   private audioManager?: AudioManager;
   private voiceCalloutSystem?: VoiceCalloutSystem;
@@ -37,13 +37,13 @@ export class CombatantCombatEffects {
 
   constructor(
     tracerPool: TracerPool,
-    muzzleFlashPool: MuzzleFlashPool,
+    muzzleFlashSystem: MuzzleFlashSystem,
     impactEffectsPool: ImpactEffectsPool,
     damage: CombatantDamage,
     suppression: CombatantSuppression
   ) {
     this.tracerPool = tracerPool;
-    this.muzzleFlashPool = muzzleFlashPool;
+    this.muzzleFlashSystem = muzzleFlashSystem;
     this.impactEffectsPool = impactEffectsPool;
     this.damage = damage;
     this.suppression = suppression;
@@ -91,7 +91,7 @@ export class CombatantCombatEffects {
       const muzzleOffset = objectPool.getVector3();
       muzzleOffset.copy(shotRay.direction).multiplyScalar(2);
       muzzlePos.add(muzzleOffset);
-      this.muzzleFlashPool.spawn(muzzlePos, shotRay.direction, 1.2);
+      this.muzzleFlashSystem.spawnNPC(muzzlePos, shotRay.direction);
       objectPool.releaseVector3(muzzleOffset);
       objectPool.releaseVector3(muzzlePos);
 
@@ -152,7 +152,7 @@ export class CombatantCombatEffects {
 
       this.scratchMuzzleFlashPos.copy(this.scratchMuzzlePos);
       this.scratchMuzzleFlashPos.addScaledVector(shotRay.direction, 2);
-      this.muzzleFlashPool.spawn(this.scratchMuzzleFlashPos, shotRay.direction, 1.2);
+      this.muzzleFlashSystem.spawnNPC(this.scratchMuzzleFlashPos, shotRay.direction);
 
       if (this.audioManager) {
         this.audioManager.playGunshotAt(combatant.position);

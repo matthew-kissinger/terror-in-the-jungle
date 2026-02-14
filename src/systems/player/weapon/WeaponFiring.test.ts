@@ -4,7 +4,7 @@ import { WeaponFiring } from './WeaponFiring'
 import { GunplayCore } from '../../weapons/GunplayCore'
 import { CombatantSystem } from '../../combat/CombatantSystem'
 import { TracerPool } from '../../effects/TracerPool'
-import { MuzzleFlashPool } from '../../effects/MuzzleFlashPool'
+import { MuzzleFlashSystem } from '../../effects/MuzzleFlashSystem'
 import { ImpactEffectsPool } from '../../effects/ImpactEffectsPool'
 import { AudioManager } from '../../audio/AudioManager'
 import { PlayerStatsTracker } from '../PlayerStatsTracker'
@@ -17,7 +17,7 @@ import type { HUDSystem } from '../../../ui/hud/HUDSystem'
 vi.mock('../../weapons/GunplayCore')
 vi.mock('../../combat/CombatantSystem')
 vi.mock('../../effects/TracerPool')
-vi.mock('../../effects/MuzzleFlashPool')
+vi.mock('../../effects/MuzzleFlashSystem')
 vi.mock('../../effects/ImpactEffectsPool')
 vi.mock('../../audio/AudioManager')
 vi.mock('../PlayerStatsTracker')
@@ -34,12 +34,13 @@ describe('WeaponFiring', () => {
   let camera: THREE.Camera
   let gunCore: GunplayCore
   let tracerPool: TracerPool
-  let muzzleFlashPool: MuzzleFlashPool
+  let muzzleFlashSystem: MuzzleFlashSystem
   let impactEffectsPool: ImpactEffectsPool
   let combatantSystem: CombatantSystem
   let audioManager: AudioManager
   let statsTracker: PlayerStatsTracker
   let hudSystem: HUDSystem
+  let overlayScene: THREE.Scene
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -50,7 +51,7 @@ describe('WeaponFiring', () => {
 
     gunCore = new GunplayCore({} as any)
     tracerPool = new TracerPool({} as any)
-    muzzleFlashPool = new MuzzleFlashPool({} as any)
+    muzzleFlashSystem = new MuzzleFlashSystem({} as any)
     impactEffectsPool = new ImpactEffectsPool({} as any)
     combatantSystem = new CombatantSystem({} as any, {} as any)
     audioManager = new AudioManager({} as any)
@@ -59,13 +60,15 @@ describe('WeaponFiring', () => {
       showHitMarker: vi.fn(),
       spawnDamageNumber: vi.fn()
     } as any
+    overlayScene = new THREE.Scene()
 
     weaponFiring = new WeaponFiring(
       camera,
       gunCore,
       tracerPool,
-      muzzleFlashPool,
-      impactEffectsPool
+      muzzleFlashSystem,
+      impactEffectsPool,
+      overlayScene
     )
   })
 
@@ -143,7 +146,7 @@ describe('WeaponFiring', () => {
     })
 
     it('should return default result if combatant system is missing', () => {
-      const emptyWeaponFiring = new WeaponFiring(camera, gunCore, tracerPool, muzzleFlashPool, impactEffectsPool)
+      const emptyWeaponFiring = new WeaponFiring(camera, gunCore, tracerPool, muzzleFlashSystem, impactEffectsPool, overlayScene)
       const result = emptyWeaponFiring.executeShot(command)
       expect(result).toEqual({ hit: false, killed: false, headshot: false, damageDealt: 0 })
     })
@@ -158,7 +161,7 @@ describe('WeaponFiring', () => {
 
       // Verify effects
       expect(impactEffectsPool.spawn).toHaveBeenCalled()
-      expect(muzzleFlashPool.spawn).toHaveBeenCalled()
+      expect(muzzleFlashSystem.spawnPlayer).toHaveBeenCalled()
 
       // Verify stats
       expect(statsTracker.registerShot).toHaveBeenCalledWith(true) // Called by WeaponFiring
@@ -217,7 +220,7 @@ describe('WeaponFiring', () => {
     })
 
     it('should track stats correctly when optional components are missing', () => {
-      const basicWeaponFiring = new WeaponFiring(camera, gunCore, tracerPool, muzzleFlashPool, impactEffectsPool)
+      const basicWeaponFiring = new WeaponFiring(camera, gunCore, tracerPool, muzzleFlashSystem, impactEffectsPool, overlayScene)
       basicWeaponFiring.setCombatantSystem(combatantSystem)
       
       const result = basicWeaponFiring.executeShot(command)
@@ -227,13 +230,13 @@ describe('WeaponFiring', () => {
   })
 
   describe('spawnMuzzleFlash', () => {
-    it('should use muzzleRef if provided (using 1.5 offset)', () => {
+    it('should use muzzleRef world position when provided', () => {
       const muzzleRef = new THREE.Object3D()
+      muzzleRef.position.set(0.5, -0.3, -0.7)
       weaponFiring.setMuzzleRef(muzzleRef)
-      
-      camera.position.set(0, 0, 0)
-      vi.spyOn(camera, 'getWorldPosition').mockImplementation((target) => {
-        target.set(0, 0, 0)
+
+      vi.spyOn(muzzleRef, 'getWorldPosition').mockImplementation((target) => {
+        target.set(0.5, -0.3, -0.7)
         return target
       })
       vi.spyOn(camera, 'getWorldDirection').mockImplementation((target) => {
@@ -243,16 +246,17 @@ describe('WeaponFiring', () => {
 
       // @ts-ignore - call private method
       weaponFiring.spawnMuzzleFlash()
-      
-      // Current implementation: _muzzlePos.copy(_cameraPos).addScaledVector(_forward, 1.5)
-      expect(muzzleFlashPool.spawn).toHaveBeenCalledWith(
-        expect.objectContaining({ x: 0, y: 0, z: -1.5 }),
+
+      // Should use actual muzzle position, not camera offset
+      expect(muzzleFlashSystem.spawnPlayer).toHaveBeenCalledWith(
+        overlayScene,
+        expect.objectContaining({ x: 0.5, y: -0.3, z: -0.7 }),
         expect.objectContaining({ x: 0, y: 0, z: -1 }),
         expect.any(Number)
       )
     })
 
-    it('should use camera position and direction if muzzleRef is not provided', () => {
+    it('should use camera position fallback if muzzleRef is not provided', () => {
       camera.position.set(0, 1, 0)
       vi.spyOn(camera, 'getWorldPosition').mockImplementation((target) => {
         target.set(0, 1, 0)
@@ -266,23 +270,28 @@ describe('WeaponFiring', () => {
       // @ts-ignore
       weaponFiring.spawnMuzzleFlash()
 
-      // _muzzlePos.copy(_cameraPos).addScaledVector(_forward, 1)
       // (0, 1, 0) + (0, 0, -1) * 1 = (0, 1, -1)
-      expect(muzzleFlashPool.spawn).toHaveBeenCalledWith(
+      expect(muzzleFlashSystem.spawnPlayer).toHaveBeenCalledWith(
+        overlayScene,
         expect.objectContaining({ x: 0, y: 1, z: -1 }),
         expect.objectContaining({ x: 0, y: 0, z: -1 }),
         expect.any(Number)
       )
     })
 
-    it('should use larger flash for shotgun', () => {
+    it('should use shotgun variant for shotgun weapon', () => {
       vi.mocked(gunCore.isShotgun).mockReturnValue(true)
+      vi.spyOn(camera, 'getWorldDirection').mockImplementation((target) => {
+        target.set(0, 0, -1)
+        return target
+      })
       // @ts-ignore
       weaponFiring.spawnMuzzleFlash()
-      expect(muzzleFlashPool.spawn).toHaveBeenCalledWith(
+      expect(muzzleFlashSystem.spawnPlayer).toHaveBeenCalledWith(
+        overlayScene,
         expect.any(THREE.Vector3),
         expect.any(THREE.Vector3),
-        1.6
+        1 // MuzzleFlashVariant.SHOTGUN = 1
       )
     })
   })
@@ -328,7 +337,7 @@ describe('WeaponFiring', () => {
 
     it('should spawn muzzle flash', () => {
       weaponFiring.fire(false)
-      expect(muzzleFlashPool.spawn).toHaveBeenCalled()
+      expect(muzzleFlashSystem.spawnPlayer).toHaveBeenCalled()
     })
   })
 })

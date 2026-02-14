@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { GameSystem } from '../../types'
 import { TracerPool } from '../effects/TracerPool'
-import { MuzzleFlashPool } from '../effects/MuzzleFlashPool'
+import { MuzzleFlashSystem } from '../effects/MuzzleFlashSystem'
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool'
 import { CombatantSystem } from '../combat/CombatantSystem'
 import { AssetLoader } from '../assets/AssetLoader'
@@ -51,7 +51,7 @@ export class FirstPersonWeapon implements GameSystem {
 
   // Effects pools
   private tracerPool: TracerPool
-  private muzzleFlashPool: MuzzleFlashPool
+  private muzzleFlashSystem: MuzzleFlashSystem
   private impactEffectsPool: ImpactEffectsPool
 
   // Dependencies
@@ -80,7 +80,7 @@ export class FirstPersonWeapon implements GameSystem {
 
     // Initialize effects pools
     this.tracerPool = new TracerPool(this.scene, 96)
-    this.muzzleFlashPool = new MuzzleFlashPool(this.scene, 32)
+    this.muzzleFlashSystem = new MuzzleFlashSystem(this.scene)
     this.impactEffectsPool = new ImpactEffectsPool(this.scene, 32)
     
     // Initialize firing module
@@ -88,8 +88,9 @@ export class FirstPersonWeapon implements GameSystem {
       camera,
       this.rigManager.getCurrentCore(),
       this.tracerPool,
-      this.muzzleFlashPool,
-      this.impactEffectsPool
+      this.muzzleFlashSystem,
+      this.impactEffectsPool,
+      this.model.getWeaponScene()
     )
 
     // Initialize ammo management
@@ -166,7 +167,7 @@ export class FirstPersonWeapon implements GameSystem {
 
     // Update all effects
     this.tracerPool.update()
-    this.muzzleFlashPool.update()
+    this.muzzleFlashSystem.update(deltaTime)
     this.impactEffectsPool.update(deltaTime)
   }
 
@@ -174,7 +175,7 @@ export class FirstPersonWeapon implements GameSystem {
     this.input.dispose()
     this.model.dispose()
     this.tracerPool.dispose()
-    this.muzzleFlashPool.dispose()
+    this.muzzleFlashSystem.dispose()
     this.impactEffectsPool.dispose()
 
     Logger.info('weapon', 'First Person Weapon disposed')

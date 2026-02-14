@@ -3,7 +3,7 @@ import { GunplayCore } from '../../weapons/GunplayCore'
 import { CombatantSystem } from '../../combat/CombatantSystem'
 import { CombatHitResult } from '../../combat/CombatantCombat'
 import { TracerPool } from '../../effects/TracerPool'
-import { MuzzleFlashPool } from '../../effects/MuzzleFlashPool'
+import { MuzzleFlashSystem, MuzzleFlashVariant } from '../../effects/MuzzleFlashSystem'
 import { ImpactEffectsPool } from '../../effects/ImpactEffectsPool'
 import { AudioManager } from '../../audio/AudioManager'
 import { PlayerStatsTracker } from '../PlayerStatsTracker'
@@ -29,26 +29,29 @@ export class WeaponFiring {
   private combatantSystem?: CombatantSystem
   private gunCore: GunplayCore
   private tracerPool: TracerPool
-  private muzzleFlashPool: MuzzleFlashPool
+  private muzzleFlashSystem: MuzzleFlashSystem
   private impactEffectsPool: ImpactEffectsPool
   private audioManager?: AudioManager
   private statsTracker?: PlayerStatsTracker
   private hudSystem?: HUDSystem
   private muzzleRef?: THREE.Object3D
   private shotExecutor?: WeaponShotExecutor
+  private overlayScene: THREE.Scene
 
   constructor(
     camera: THREE.Camera,
     gunCore: GunplayCore,
     tracerPool: TracerPool,
-    muzzleFlashPool: MuzzleFlashPool,
-    impactEffectsPool: ImpactEffectsPool
+    muzzleFlashSystem: MuzzleFlashSystem,
+    impactEffectsPool: ImpactEffectsPool,
+    overlayScene: THREE.Scene
   ) {
     this.camera = camera
     this.gunCore = gunCore
     this.tracerPool = tracerPool
-    this.muzzleFlashPool = muzzleFlashPool
+    this.muzzleFlashSystem = muzzleFlashSystem
     this.impactEffectsPool = impactEffectsPool
+    this.overlayScene = overlayScene
   }
 
   setCombatantSystem(combatantSystem: CombatantSystem): void {
@@ -292,21 +295,25 @@ export class WeaponFiring {
   }
 
   private spawnMuzzleFlash(): void {
-    this.camera.getWorldPosition(_cameraPos)
     this.camera.getWorldDirection(_forward)
 
+    // Map weapon type to variant
+    let variant: MuzzleFlashVariant = MuzzleFlashVariant.RIFLE
+    if (this.gunCore.isShotgun()) {
+      variant = MuzzleFlashVariant.SHOTGUN
+    }
+    // SMG/Pistol detection would need core identity - default to RIFLE for now
+
     if (this.muzzleRef) {
-      // Get muzzle world position for 3D scene flash
+      // Use actual muzzle world position from weapon model
       this.muzzleRef.getWorldPosition(_muzzlePos)
-      // Offset forward from camera position
-      _muzzlePos.copy(_cameraPos).addScaledVector(_forward, 1.5)
     } else {
+      // Fallback: offset from camera
+      this.camera.getWorldPosition(_cameraPos)
       _muzzlePos.copy(_cameraPos).addScaledVector(_forward, 1)
     }
 
-    // Shotgun has a bigger muzzle flash
-    const flashSize = this.gunCore.isShotgun() ? 1.6 : 1.2
-    this.muzzleFlashPool.spawn(_muzzlePos, _forward, flashSize)
+    this.muzzleFlashSystem.spawnPlayer(this.overlayScene, _muzzlePos, _forward, variant)
   }
 
   getGunCore(): GunplayCore {

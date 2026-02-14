@@ -5,7 +5,7 @@ import { AssetLoader } from '../assets/AssetLoader';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { Combatant, CombatantState, Faction } from './types';
 import { TracerPool } from '../effects/TracerPool';
-import { MuzzleFlashPool } from '../effects/MuzzleFlashPool';
+import { MuzzleFlashSystem } from '../effects/MuzzleFlashSystem';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { TicketSystem } from '../world/TicketSystem';
@@ -72,7 +72,7 @@ export class CombatantSystem implements GameSystem {
 
   // Effects pools
   private tracerPool: TracerPool;
-  private muzzleFlashPool: MuzzleFlashPool;
+  private muzzleFlashSystem: MuzzleFlashSystem;
   public readonly impactEffectsPool: ImpactEffectsPool;
   public readonly explosionEffectsPool: ExplosionEffectsPool;
 
@@ -103,7 +103,7 @@ export class CombatantSystem implements GameSystem {
 
     // Initialize effect pools
     this.tracerPool = new TracerPool(this.scene, 256);
-    this.muzzleFlashPool = new MuzzleFlashPool(this.scene, 128);
+    this.muzzleFlashSystem = new MuzzleFlashSystem(this.scene, 64);
     this.impactEffectsPool = new ImpactEffectsPool(this.scene, 128);
     this.explosionEffectsPool = new ExplosionEffectsPool(this.scene, 16);
 
@@ -114,7 +114,7 @@ export class CombatantSystem implements GameSystem {
     this.combatantCombat = new CombatantCombat(
       scene,
       this.tracerPool,
-      this.muzzleFlashPool,
+      this.muzzleFlashSystem,
       this.impactEffectsPool,
       this.combatantRenderer
     );
@@ -281,7 +281,7 @@ export class CombatantSystem implements GameSystem {
     // Update effect pools
     t0 = performance.now();
     this.tracerPool.update();
-    this.muzzleFlashPool.update();
+    this.muzzleFlashSystem.update(deltaTime);
     this.impactEffectsPool.update(deltaTime);
     this.profiler.profiling.effectPoolsMs = performance.now() - t0;
 
@@ -433,7 +433,7 @@ export class CombatantSystem implements GameSystem {
 
     // Clean up pools
     this.tracerPool.dispose();
-    this.muzzleFlashPool.dispose();
+    this.muzzleFlashSystem.dispose();
     this.impactEffectsPool.dispose();
 
     // Clear combatants
