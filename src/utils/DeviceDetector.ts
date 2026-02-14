@@ -57,7 +57,7 @@ export function isMobileGPU(): boolean {
         isMobileRenderer = /adreno|mali|powervr|apple gpu|vivante|tegra/i.test(renderer);
       }
     }
-  } catch (e) {
+  } catch (_e) {
     // Ignore context creation errors
   }
 
@@ -99,7 +99,7 @@ export function estimateGPUTier(): GPUTier {
         }
       }
     }
-  } catch (e) {
+  } catch (_e) {
     // Default to medium if WebGL fails
   }
 

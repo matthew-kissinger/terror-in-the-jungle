@@ -16,7 +16,7 @@ export default [
     languageOptions: {
       parser: tsParser,
       parserOptions: {
-        project: ["./tsconfig.json"],
+        project: ["./tsconfig.eslint.json"],
         tsconfigRootDir: __dirname,
         sourceType: "module",
       },
@@ -45,6 +45,15 @@ export default [
       "src/workers/**/*.{ts,tsx}",
     ],
     rules: {
+      "no-console": "off",
+    },
+  },
+  {
+    files: ["**/*.test.ts", "**/*.spec.ts"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/no-unsafe-function-type": "off",
+      "@typescript-eslint/no-unused-vars": "warn",
       "no-console": "off",
     },
   },

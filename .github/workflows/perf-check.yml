@@ -2,7 +2,7 @@ name: Performance Regression Check
 
 on:
   push:
-    branches: [master, main]
+    branches: [master]
     paths:
       - 'src/**'
       - 'scripts/**'
@@ -11,7 +11,7 @@ on:
       - 'vite.config.js'
       - '.github/workflows/perf-check.yml'
   pull_request:
-    branches: [master, main]
+    branches: [master]
     paths:
       - 'src/**'
       - 'scripts/**'
@@ -36,7 +36,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: '.nvmrc'
           cache: 'npm'
       
       - name: Install dependencies

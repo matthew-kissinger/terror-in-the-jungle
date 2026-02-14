@@ -9,7 +9,6 @@
     "preview": "vite preview",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
-    "compress-textures": "node scripts/compress-textures.js",
     "perf:baseline": "npx tsx scripts/perf-baseline.ts",
     "perf:capture": "npx tsx scripts/perf-capture.ts --headed",
     "perf:capture:headless": "npx tsx scripts/perf-capture.ts",

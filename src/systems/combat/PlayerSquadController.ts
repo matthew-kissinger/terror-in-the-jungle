@@ -102,7 +102,7 @@ export class PlayerSquadController implements GameSystem {
     }
   }
 
-  private onKeyUp(event: KeyboardEvent): void {
+  private onKeyUp(_event: KeyboardEvent): void {
     // Z key release is now handled via toggleRadialMenu()
     // This method can be kept for future key-up events if needed
   }

@@ -10,8 +10,6 @@ const C6 = 1046.5;
 const E6 = 1318.5;
 
 const KILL_STREAK_GAIN = 0.2;
-const KILL_STREAK_STING_PATH = 'assets/optimized/killStreakSting.wav';
-
 /**
  * Procedural audio stings for kill streak milestones.
  * Uses Web Audio API with lazy AudioContext (user gesture required in browsers).
@@ -21,7 +19,7 @@ function playKillStreakSting(streak: number): void {
   void streak;
 }
 
-function playSting(ctx: AudioContext, streak: number): void {
+function _playSting(ctx: AudioContext, streak: number): void {
   const now = ctx.currentTime;
 
   if (streak === 3) {

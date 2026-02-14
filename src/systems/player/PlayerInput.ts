@@ -74,7 +74,7 @@ export class PlayerInput {
       this.touchControls.look.setSensitivity(touchSensitivity);
 
       // Listen for changes to mouseSensitivity to update touch sensitivity
-      SettingsManager.getInstance().onChange((key, value) => {
+      SettingsManager.getInstance().onChange((key, _value) => {
         if (key === 'mouseSensitivity' && this.touchControls) {
           const newRaw = SettingsManager.getInstance().getMouseSensitivityRaw();
           const newTouch = newRaw * 2;

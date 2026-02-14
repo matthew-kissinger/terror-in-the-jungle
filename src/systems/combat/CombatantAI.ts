@@ -228,7 +228,7 @@ export class CombatantAI {
    * - PATROL_HERE: ensure non-combat states stay in PATROLLING (does NOT override active combat)
    * - FREE_ROAM / NONE: clear command-driven overrides, return to normal AI
    */
-  private applySquadCommandOverride(combatant: Combatant, playerPosition: THREE.Vector3): void {
+  private applySquadCommandOverride(combatant: Combatant, _playerPosition: THREE.Vector3): void {
     // Only affect US faction (player's team)
     if (combatant.faction !== Faction.US) return
     if (!combatant.squadId) return

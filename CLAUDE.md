@@ -10,7 +10,7 @@ Browser-based 3D combined-arms FPS with GPU-accelerated billboard rendering of 2
 npm install
 npm run dev          # Dev server on localhost:5173
 npm run build        # Production build (tsc + vite)
-npm run test:run     # 3363 tests (98 files)
+npm run test:run     # 3222 tests (95 files)
 npm run lint         # ESLint check
 npm run lint:fix     # ESLint autofix
 ```
@@ -47,7 +47,7 @@ See `docs/PROFILING_HARNESS.md` for full reference.
 
 ## Codebase
 
-~61k lines source, ~50k lines tests. 308 source files, 98 test files. Systems-based architecture with orchestrator pattern.
+~60k lines source, ~48k lines tests. 302 source files, 95 test files. Systems-based architecture with orchestrator pattern.
 
 ```
 src/
