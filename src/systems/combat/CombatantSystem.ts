@@ -38,6 +38,7 @@ import { CombatantSystemSetters } from './CombatantSystemSetters';
 import { CombatantSystemUpdate } from './CombatantSystemUpdate';
 import { AILineOfSight } from './ai/AILineOfSight';
 import { getRaycastBudgetStats } from './ai/RaycastBudget';
+import { getCombatFireRaycastBudgetStats } from './ai/CombatFireRaycastBudget';
 
 export class CombatantSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -85,6 +86,7 @@ export class CombatantSystem implements GameSystem {
   // Player proxy
   private playerProxyId: string = 'player_proxy';
   private combatEnabled = false;
+  private readonly secondarySpatialSyncEnabled: boolean;
 
   // Player squad
   public shouldCreatePlayerSquad = false;
@@ -182,6 +184,11 @@ export class CombatantSystem implements GameSystem {
       this.squadManager,
       this.spatialGrid
     );
+
+    // Combat query consumers use primary combat spatial ownership by default.
+    this.combatantCombat.setSpatialQueryProvider((center, radius) => this.spatialGrid.queryRadius(center, radius));
+
+    this.secondarySpatialSyncEnabled = this.resolveSecondarySpatialSyncEnabled();
   }
 
   async init(): Promise<void> {
@@ -260,6 +267,7 @@ export class CombatantSystem implements GameSystem {
     this.profiler.profiling.aiScheduling = this.lodManager.getFrameSchedulingStats();
     this.profiler.profiling.losCache = AILineOfSight.getCacheStats();
     this.profiler.profiling.raycastBudget = getRaycastBudgetStats();
+    this.profiler.profiling.combatFireRaycastBudget = getCombatFireRaycastBudgetStats();
 
     // Update LOD counts in profiler
     this.profiler.setLODCounts(
@@ -272,10 +280,14 @@ export class CombatantSystem implements GameSystem {
     // Count engaging combatants
     this.profiler.updateEngagementCounts();
 
-    // Sync spatial grid manager with all combatant positions
-    t0 = performance.now();
-    spatialGridManager.syncAllPositions(this.combatants, this.playerPosition);
-    this.profiler.profiling.spatialSyncMs = performance.now() - t0;
+    // Secondary sync path is experimental; primary spatial ownership is the octree updated in LOD manager.
+    if (this.secondarySpatialSyncEnabled) {
+      t0 = performance.now();
+      spatialGridManager.syncAllPositions(this.combatants, this.playerPosition);
+      this.profiler.profiling.spatialSyncMs = performance.now() - t0;
+    } else {
+      this.profiler.profiling.spatialSyncMs = 0;
+    }
 
     // Update billboard rotations
     t0 = performance.now();
@@ -350,6 +362,20 @@ export class CombatantSystem implements GameSystem {
 
   getAllCombatants(): Combatant[] {
     return Array.from(this.combatants.values());
+  }
+
+  private resolveSecondarySpatialSyncEnabled(): boolean {
+    const fromGlobal = (globalThis as any).__SPATIAL_SECONDARY_SYNC__;
+    if (typeof fromGlobal === 'boolean') return fromGlobal;
+    if (typeof window === 'undefined') return true;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const raw = params.get('spatialSecondarySync');
+      if (raw === '0' || raw === 'false') return false;
+      return true;
+    } catch {
+      return true;
+    }
   }
 
   // Setters for external systems

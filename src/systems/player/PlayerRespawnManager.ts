@@ -185,7 +185,7 @@ export class PlayerRespawnManager implements GameSystem {
     // Move player to spawn position
     if (this.playerController) {
       if (typeof this.playerController.setPosition === 'function') {
-        this.playerController.setPosition(position);
+        this.playerController.setPosition(position, 'respawn.manager');
       }
       if (typeof this.playerController.enableControls === 'function') {
         this.playerController.enableControls();

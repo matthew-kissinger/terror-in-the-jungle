@@ -6,6 +6,7 @@ import { SpatialOctreeQueries } from './SpatialOctreeQueries'
 export class SpatialOctree {
   private root: OctreeNode
   private entityPositions: Map<string, THREE.Vector3> = new Map()
+  private entityNodes: Map<string, OctreeNode> = new Map()
   private readonly maxEntitiesPerNode: number
   private readonly maxDepth: number
   private worldBounds: THREE.Box3
@@ -87,12 +88,14 @@ export class SpatialOctree {
       } else {
         // Position doesn't fit perfectly, store at this level
         node.entities.push(id)
+        this.entityNodes.set(id, node)
       }
       return
     }
 
     // Add to leaf node
     node.entities.push(id)
+    this.entityNodes.set(id, node)
 
     // Subdivide if over capacity and not at max depth
     if (node.entities.length > this.maxEntitiesPerNode && node.depth < this.maxDepth) {
@@ -122,9 +125,25 @@ export class SpatialOctree {
   remove(id: string): void {
     const position = this.entityPositions.get(id)
     if (!position) return
-
-    this.removeFromNode(this.root, id, position)
+    const directNode = this.entityNodes.get(id)
+    let removed = false
+    if (directNode) {
+      removed = this.removeFromExactNode(directNode, id)
+    }
+    if (!removed) {
+      removed = this.removeFromNode(this.root, id, position)
+    }
     this.entityPositions.delete(id)
+    this.entityNodes.delete(id)
+  }
+
+  private removeFromExactNode(node: OctreeNode, id: string): boolean {
+    const index = node.entities.indexOf(id)
+    if (index === -1) return false
+    const last = node.entities[node.entities.length - 1]
+    node.entities[index] = last
+    node.entities.pop()
+    return true
   }
 
   /**
@@ -138,6 +157,7 @@ export class SpatialOctree {
         const last = node.entities[node.entities.length - 1]
         node.entities[index] = last
         node.entities.pop()
+        this.entityNodes.delete(id)
         return true
       }
       return false
@@ -150,6 +170,7 @@ export class SpatialOctree {
       const last = node.entities[node.entities.length - 1]
       node.entities[index] = last
       node.entities.pop()
+      this.entityNodes.delete(id)
       return true
     }
 
@@ -218,6 +239,7 @@ export class SpatialOctree {
    */
   clear(): void {
     this.entityPositions.clear()
+    this.entityNodes.clear()
     this.root = new OctreeNode(this.worldBounds.clone(), 0)
     // Recreate queries instance to update entityPositions reference
     this.queries = new SpatialOctreeQueries(this.entityPositions)

@@ -3,8 +3,9 @@ import { CaptureZone, ZoneState } from './ZoneManager';
 import { Faction } from '../combat/types';
 
 export class ZoneCaptureLogic {
-  private readonly CAPTURE_SPEED = 1; // Progress per second with 1 attacker
-  private readonly CONTEST_THRESHOLD = 0.3; // Ratio needed to contest
+  private readonly neutralCaptureFaction = new Map<string, Faction>();
+  private readonly dwellTimers = new Map<string, { us: number; opfor: number }>();
+  private readonly CAPTURE_DWELL_SECONDS = 2.5;
 
   updateZoneCaptureState(
     zone: CaptureZone,
@@ -14,70 +15,103 @@ export class ZoneCaptureLogic {
     if (zone.isHomeBase) return; // Skip home bases
 
     const { us, opfor } = occupants;
-    const total = us + opfor;
-
-    if (total === 0) {
+    const dwell = this.updateDwellTimers(zone.id, us, opfor, deltaTime);
+    if (us === 0 && opfor === 0) {
       // No one in zone, no change
       zone.state = this.getStateForOwner(zone.owner);
       return;
     }
 
-    // Calculate capture dynamics
-    const usRatio = us / total;
-    const opforRatio = opfor / total;
+    const advantage = us - opfor;
+    const pressure = Math.abs(advantage);
+    const bothPresent = us > 0 && opfor > 0;
 
-    // Determine if zone is contested
-    if (usRatio > this.CONTEST_THRESHOLD && opforRatio > this.CONTEST_THRESHOLD) {
+    // Owned zone behavior: attackers reduce control based on net advantage.
+    if (zone.owner === Faction.US) {
+      if (advantage >= 0) {
+        zone.captureProgress = Math.min(100, zone.captureProgress + zone.captureSpeed * deltaTime * Math.max(0, advantage));
+        zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.US_CONTROLLED;
+      } else {
+        if (dwell.opfor < this.CAPTURE_DWELL_SECONDS) {
+          zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.US_CONTROLLED;
+          return;
+        }
+        zone.captureProgress -= zone.captureSpeed * deltaTime * pressure;
+        zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.US_CONTROLLED;
+        if (zone.captureProgress <= 0) {
+          zone.captureProgress = 0;
+          zone.owner = null;
+          zone.state = ZoneState.NEUTRAL;
+          this.neutralCaptureFaction.delete(zone.id);
+        }
+      }
+      return;
+    }
+
+    if (zone.owner === Faction.OPFOR) {
+      if (advantage <= 0) {
+        zone.captureProgress = Math.min(100, zone.captureProgress + zone.captureSpeed * deltaTime * Math.max(0, -advantage));
+        zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.OPFOR_CONTROLLED;
+      } else {
+        if (dwell.us < this.CAPTURE_DWELL_SECONDS) {
+          zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.OPFOR_CONTROLLED;
+          return;
+        }
+        zone.captureProgress -= zone.captureSpeed * deltaTime * pressure;
+        zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.OPFOR_CONTROLLED;
+        if (zone.captureProgress <= 0) {
+          zone.captureProgress = 0;
+          zone.owner = null;
+          zone.state = ZoneState.NEUTRAL;
+          this.neutralCaptureFaction.delete(zone.id);
+        }
+      }
+      return;
+    }
+
+    // Neutral zone behavior: one faction builds progress; opposite pressure first erodes then flips direction.
+    if (pressure === 0) {
       zone.state = ZoneState.CONTESTED;
-      // No progress change when contested
-    } else if (usRatio > opforRatio) {
-      // US capturing
-      if (zone.owner !== Faction.US) {
-        zone.captureProgress += zone.captureSpeed * deltaTime * us;
-        zone.state = ZoneState.CONTESTED;
-
-        if (zone.captureProgress >= 100) {
-          zone.captureProgress = 100;
-          zone.owner = Faction.US;
-          zone.state = ZoneState.US_CONTROLLED;
-          Logger.info('world', ` Zone ${zone.name} captured by US!`);
-        }
-      } else {
-        zone.state = ZoneState.US_CONTROLLED;
-      }
-    } else if (opforRatio > usRatio) {
-      // OPFOR capturing
-      if (zone.owner !== Faction.OPFOR) {
-        zone.captureProgress += zone.captureSpeed * deltaTime * opfor;
-        zone.state = ZoneState.CONTESTED;
-
-        if (zone.captureProgress >= 100) {
-          zone.captureProgress = 100;
-          zone.owner = Faction.OPFOR;
-          zone.state = ZoneState.OPFOR_CONTROLLED;
-          Logger.info('world', ` Zone ${zone.name} captured by OPFOR!`);
-        }
-      } else {
-        zone.state = ZoneState.OPFOR_CONTROLLED;
-      }
+      return;
     }
 
-    // Neutralize progress if switching sides
-    if (zone.owner === Faction.US && opforRatio > usRatio) {
-      zone.captureProgress -= zone.captureSpeed * deltaTime * opfor;
-      if (zone.captureProgress <= 0) {
-        zone.captureProgress = 0;
-        zone.owner = null;
-        zone.state = ZoneState.NEUTRAL;
-      }
-    } else if (zone.owner === Faction.OPFOR && usRatio > opforRatio) {
-      zone.captureProgress -= zone.captureSpeed * deltaTime * us;
-      if (zone.captureProgress <= 0) {
-        zone.captureProgress = 0;
-        zone.owner = null;
-        zone.state = ZoneState.NEUTRAL;
-      }
+    const capturingFaction = advantage > 0 ? Faction.US : Faction.OPFOR;
+    const capturingDwell = capturingFaction === Faction.US ? dwell.us : dwell.opfor;
+    if (capturingDwell < this.CAPTURE_DWELL_SECONDS) {
+      zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.NEUTRAL;
+      return;
     }
+    const activeFaction = this.neutralCaptureFaction.get(zone.id);
+
+    if (activeFaction && activeFaction !== capturingFaction) {
+      zone.captureProgress -= zone.captureSpeed * deltaTime * pressure;
+      zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.NEUTRAL;
+      if (zone.captureProgress <= 0) {
+        zone.captureProgress = 0;
+        this.neutralCaptureFaction.set(zone.id, capturingFaction);
+      }
+      return;
+    }
+
+    this.neutralCaptureFaction.set(zone.id, capturingFaction);
+    zone.captureProgress += zone.captureSpeed * deltaTime * pressure;
+    zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.NEUTRAL;
+
+    if (zone.captureProgress >= 100) {
+      zone.captureProgress = 100;
+      zone.owner = capturingFaction;
+      zone.state = capturingFaction === Faction.US ? ZoneState.US_CONTROLLED : ZoneState.OPFOR_CONTROLLED;
+      this.neutralCaptureFaction.delete(zone.id);
+      Logger.info('world', ` Zone ${zone.name} captured by ${zone.owner}!`);
+    }
+  }
+
+  private updateDwellTimers(zoneId: string, us: number, opfor: number, deltaTime: number): { us: number; opfor: number } {
+    const timers = this.dwellTimers.get(zoneId) ?? { us: 0, opfor: 0 };
+    timers.us = us > 0 ? Math.min(this.CAPTURE_DWELL_SECONDS + 2, timers.us + deltaTime) : 0;
+    timers.opfor = opfor > 0 ? Math.min(this.CAPTURE_DWELL_SECONDS + 2, timers.opfor + deltaTime) : 0;
+    this.dwellTimers.set(zoneId, timers);
+    return timers;
   }
 
   getStateForOwner(owner: Faction | null): ZoneState {

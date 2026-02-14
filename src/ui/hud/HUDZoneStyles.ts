@@ -54,6 +54,14 @@ export const HUDZoneStyles = `
     gap: 4px;
   }
 
+  .zone-status-text {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: rgba(220, 225, 230, 0.7);
+    text-transform: uppercase;
+  }
+
   .zone-icon {
     width: 14px;
     height: 14px;
@@ -89,6 +97,14 @@ export const HUDZoneStyles = `
     color: rgba(220, 225, 230, 0.35);
     margin-left: 4px;
     font-weight: 600;
+  }
+
+  .zone-empty {
+    font-size: 10px;
+    color: rgba(220, 225, 230, 0.45);
+    padding: 4px 2px 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
   }
 
   /* Mobile responsive adjustments */

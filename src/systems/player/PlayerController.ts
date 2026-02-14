@@ -22,6 +22,8 @@ import type { IGameRenderer } from '../../types/SystemInterfaces';
 import type { PlayerSquadController } from '../combat/PlayerSquadController';
 
 export class PlayerController implements GameSystem {
+  private static readonly SPAWN_STABILIZATION_MS = 2500;
+  private static readonly SPAWN_STABILIZATION_MAX_DIST = 60;
   private camera: THREE.PerspectiveCamera;
   private chunkManager?: ImprovedChunkManager;
   private gameModeManager?: GameModeManager;
@@ -41,6 +43,7 @@ export class PlayerController implements GameSystem {
   private playerSquadId?: string;
   private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
   private playerState: PlayerState;
+  private spawnStabilizationUntilMs = 0;
 
   // New modules
   private input: PlayerInput;
@@ -426,12 +429,47 @@ export class PlayerController implements GameSystem {
 
   // Public API methods
 
-  setPosition(position: THREE.Vector3): void {
+  private isStabilizationBypassReason(reason: string): boolean {
+    return reason.startsWith('startup')
+      || reason.startsWith('respawn')
+      || reason.startsWith('helicopter')
+      || reason.startsWith('harness')
+      || reason === 'teleport';
+  }
+
+  setPosition(position: THREE.Vector3, reason = 'unknown'): void {
+    const now = performance.now();
+    const dist = this.playerState.position.distanceTo(position);
+    const inStabilizationWindow = now < this.spawnStabilizationUntilMs;
+    if (
+      inStabilizationWindow
+      && !this.isStabilizationBypassReason(reason)
+      && dist > PlayerController.SPAWN_STABILIZATION_MAX_DIST
+    ) {
+      Logger.warn(
+        'player',
+        `[spawn-stabilization] blocked position jump reason=${reason} dist=${dist.toFixed(1)} from=(${this.playerState.position.x.toFixed(1)}, ${this.playerState.position.y.toFixed(1)}, ${this.playerState.position.z.toFixed(1)}) to=(${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)})`
+      );
+      return;
+    }
+
     this.playerState.position.copy(position);
     this.camera.position.copy(position);
     this.playerState.velocity.set(0, 0, 0);
     this.playerState.isGrounded = false;
-    Logger.info('player', `Player teleported to ${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)}`);
+    if (reason.startsWith('startup')) {
+      this.spawnStabilizationUntilMs = now + PlayerController.SPAWN_STABILIZATION_MS;
+    }
+
+    // Large jumps can outpace chunk streaming; force immediate position sync.
+    if (this.chunkManager && dist > 32) {
+      this.chunkManager.updatePlayerPosition(this.playerState.position);
+    }
+
+    Logger.info(
+      'player',
+      `Player moved (${reason}) to ${position.x.toFixed(1)}, ${position.y.toFixed(1)}, ${position.z.toFixed(1)} dist=${dist.toFixed(1)}`
+    );
   }
 
   updatePlayerPosition(position: THREE.Vector3): void { this.playerState.position.copy(position); }
@@ -453,7 +491,7 @@ export class PlayerController implements GameSystem {
   }
   getCamera(): THREE.PerspectiveCamera { return this.camera; }
   isMoving(): boolean { return this.playerState.velocity.length() > 0.1; }
-  teleport(position: THREE.Vector3): void { this.playerState.position.copy(position); this.playerState.velocity.set(0, 0, 0); }
+  teleport(position: THREE.Vector3): void { this.setPosition(position, 'teleport'); }
 
   equipWeapon(): void {
     if (this.firstPersonWeapon) {
@@ -477,7 +515,7 @@ export class PlayerController implements GameSystem {
     this.playerState.isInHelicopter = true;
     this.playerState.helicopterId = helicopterId;
 
-    this.setPosition(helicopterPosition);
+    this.setPosition(helicopterPosition, 'helicopter.enter');
     this.playerState.velocity.set(0, 0, 0);
     this.playerState.isRunning = false;
 
@@ -508,7 +546,7 @@ export class PlayerController implements GameSystem {
     this.playerState.isInHelicopter = false;
     this.playerState.helicopterId = null;
 
-    this.setPosition(exitPosition);
+    this.setPosition(exitPosition, 'helicopter.exit');
     this.input.setInHelicopter(false);
     this.equipWeapon();
 

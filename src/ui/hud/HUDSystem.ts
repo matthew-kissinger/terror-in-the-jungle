@@ -116,7 +116,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     if (this.staticHudAccumulator >= this.STATIC_HUD_INTERVAL) {
       // Update objectives display
       if (this.zoneManager) {
-        this.updater.updateObjectivesDisplay(this.zoneManager, isTDM);
+        this.updater.updateObjectivesDisplay(this.zoneManager, isTDM, this.camera?.position);
       }
 
       // Update combat statistics

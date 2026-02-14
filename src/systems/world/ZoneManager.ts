@@ -114,30 +114,57 @@ export class ZoneManager implements GameSystem {
 
     const combatants = this.combatantSystem.combatants;
 
-    // Use spatial grid to query combatants near each zone - O(zones * nearby_entities)
-    for (const zone of this.zones.values()) {
-      const occupants = { us: 0, opfor: 0 };
+      // Use spatial grid to query combatants near each zone - O(zones * nearby_entities)
+      for (const zone of this.zones.values()) {
+        const occupants = { us: 0, opfor: 0 };
+        let playerProxyCounted = false;
 
-      // Optimized spatial query: find combatant IDs within zone radius
-      // Note: This includes the 'player_proxy' which correctly counts the player as Faction.US
-      const nearbyIds = this.spatialGridManager.queryRadius(zone.position, zone.radius);
-      
-      for (const id of nearbyIds) {
-        const combatant = combatants.get(id);
-        if (!combatant) continue;
+        // Optimized spatial query: find combatant IDs within zone radius
+        // Note: This includes the 'player_proxy' which correctly counts the player as Faction.US
+        const nearbyIds = this.spatialGridManager.queryRadius(zone.position, zone.radius);
+
+        for (const id of nearbyIds) {
+          const combatant = combatants.get(id);
+          if (!combatant) continue;
 
         // Skip dead combatants (state can be enum or string depending on version)
         if (combatant.state === CombatantState.DEAD || (combatant as any).state === 'dead') continue;
 
-        if (combatant.faction === Faction.US) {
-          occupants.us++;
-        } else if (combatant.faction === Faction.OPFOR) {
-          occupants.opfor++;
+          if (combatant.faction === Faction.US) {
+            occupants.us++;
+            if ((combatant as any).isPlayerProxy || combatant.id === 'player_proxy') {
+              playerProxyCounted = true;
+            }
+          } else if (combatant.faction === Faction.OPFOR) {
+            occupants.opfor++;
+          }
         }
-      }
 
-      this.occupants.set(zone.id, occupants);
-    }
+        // Resilience fallback: if spatial query misses everything, do a cheap linear pass.
+        // 120 combatants * ~10 zones * 10Hz is still small and prevents capture deadlocks.
+        if (nearbyIds.length === 0 && combatants.size > 0) {
+          combatants.forEach(combatant => {
+            if (!combatant) return;
+            if (combatant.state === CombatantState.DEAD || (combatant as any).state === 'dead') return;
+            if (combatant.position.distanceTo(zone.position) > zone.radius) return;
+            if (combatant.faction === Faction.US) {
+              occupants.us++;
+              if ((combatant as any).isPlayerProxy || combatant.id === 'player_proxy') {
+                playerProxyCounted = true;
+              }
+            } else if (combatant.faction === Faction.OPFOR) {
+              occupants.opfor++;
+            }
+          });
+        }
+
+        // Ensure player can always capture even if player_proxy is briefly missing/desynced.
+        if (combatants.size > 0 && nearbyIds.length === 0 && !playerProxyCounted && this.playerPosition.distanceTo(zone.position) <= zone.radius) {
+          occupants.us++;
+        }
+
+        this.occupants.set(zone.id, occupants);
+      }
   }
 
   update(deltaTime: number): void {

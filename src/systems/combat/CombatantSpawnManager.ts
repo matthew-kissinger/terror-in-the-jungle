@@ -34,6 +34,7 @@ export class CombatantSpawnManager {
   private MAX_COMBATANTS = 30;
   private SPAWN_CHECK_INTERVAL = 3000;
   private readonly PROGRESSIVE_SPAWN_DELAY = 1000;
+  private readonly MAX_ENQUEUED_SPAWNS = 24;
   private progressiveSpawnTimer = 0;
   private progressiveSpawnQueue: Array<{faction: Faction, position: THREE.Vector3, size: number}> = [];
   private reinforcementWaveTimer = 0;
@@ -147,12 +148,15 @@ export class CombatantSpawnManager {
       }
     }
 
-    // Seed a small progressive queue to get early contact
+    // Seed progressive queue. Open Frontier gets an explicit pressure corridor so
+    // first contact happens earlier in large maps instead of both sides idling at HQ.
     if (this.combatants.size < this.MAX_COMBATANTS) {
-      this.progressiveSpawnQueue = [
-        { faction: Faction.US, position: new THREE.Vector3(usBasePos.x + 10, usBasePos.y, usBasePos.z + 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) },
-        { faction: Faction.OPFOR, position: new THREE.Vector3(opforBasePos.x - 10, opforBasePos.y, opforBasePos.z - 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) }
-      ];
+      this.progressiveSpawnQueue = this.buildInitialProgressiveQueue(
+        config,
+        usBasePos,
+        opforBasePos,
+        avgSquadSize
+      );
     }
 
     Logger.info('Combat', `Initial forces deployed: ${this.combatants.size} combatants`);
@@ -193,7 +197,7 @@ export class CombatantSpawnManager {
         this.progressiveSpawnTimer = 0;
         const spawn = this.progressiveSpawnQueue.shift()!;
         this.spawnSquad(spawn.faction, spawn.position, spawn.size);
-        Logger.debug('combat', `Reinforcements deployed: ${spawn.faction} squad size ${spawn.size}`);
+        Logger.debug('combat', `Reinforcements deployed: ${spawn.faction} squad size ${spawn.size} (queued=${this.progressiveSpawnQueue.length})`);
       }
     }
 
@@ -254,7 +258,7 @@ export class CombatantSpawnManager {
       if (missing <= 0) return;
 
       // Spawn up to two squads immediately to refill strength, respecting global cap
-      const anchors = SpawnPositionCalculator.getFactionAnchors(faction, this.zoneManager);
+      const anchors = this.getReinforcementAnchors(faction);
       let squadsToSpawn = Math.min(2, Math.ceil(missing / Math.max(1, avgSquadSize)));
 
       // Emergency refill: spawn more aggressively
@@ -272,7 +276,12 @@ export class CombatantSpawnManager {
         } else {
           pos = SpawnPositionCalculator.getSpawnPosition(faction, this.zoneManager, this.gameModeManager?.getCurrentConfig());
         }
-        this.spawnSquad(faction, pos, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
+        const squadSize = SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax);
+        if (this.shouldQueueSpawnsForCurrentMode()) {
+          this.enqueueSpawn(faction, pos, squadSize);
+        } else {
+          this.spawnSquad(faction, pos, squadSize);
+        }
         Logger.debug('Combat', `Refill spawn: ${faction} squad of ${this.randomSquadSize()} deployed (${living + (i+1)*avgSquadSize}/${targetPerFaction})`);
       }
     };
@@ -304,15 +313,109 @@ export class CombatantSpawnManager {
    * Spawn reinforcement wave for a faction
    */
   private spawnReinforcementWave(faction: Faction): void {
+    const spawnHandler = this.shouldQueueSpawnsForCurrentMode()
+      ? (f: Faction, p: THREE.Vector3, s: number) => this.enqueueSpawn(f, p, s)
+      : (f: Faction, p: THREE.Vector3, s: number) => this.spawnSquad(f, p, s);
     this.respawnManager.spawnReinforcementWave(
       faction,
       this.MAX_COMBATANTS,
       this.squadSizeMin,
       this.squadSizeMax,
-      (f, p, s) => this.spawnSquad(f, p, s),
+      spawnHandler,
       this.zoneManager,
       this.gameModeManager
     );
+  }
+
+  private shouldQueueSpawnsForCurrentMode(): boolean {
+    const worldSize = this.gameModeManager?.getWorldSize?.() ?? 0;
+    return worldSize >= 1000;
+  }
+
+  private buildInitialProgressiveQueue(
+    config: ReturnType<GameModeManager['getCurrentConfig']> | undefined,
+    usBasePos: THREE.Vector3,
+    opforBasePos: THREE.Vector3,
+    avgSquadSize: number
+  ): Array<{faction: Faction, position: THREE.Vector3, size: number}> {
+    const defaultQueue = [
+      { faction: Faction.US, position: new THREE.Vector3(usBasePos.x + 10, usBasePos.y, usBasePos.z + 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) },
+      { faction: Faction.OPFOR, position: new THREE.Vector3(opforBasePos.x - 10, opforBasePos.y, opforBasePos.z - 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) }
+    ];
+
+    if (config?.id !== 'open_frontier') {
+      return defaultQueue;
+    }
+
+    const lane = _scratchVec.copy(opforBasePos).sub(usBasePos);
+    const laneDistance = lane.length();
+    if (laneDistance < 1) return defaultQueue;
+    lane.divideScalar(laneDistance);
+    const lateral = _offsetVec.set(-lane.z, 0, lane.x);
+
+    const createForwardPoint = (origin: THREE.Vector3, forwardMeters: number, lateralMeters: number): THREE.Vector3 => {
+      return new THREE.Vector3(
+        origin.x + lane.x * forwardMeters + lateral.x * lateralMeters,
+        origin.y,
+        origin.z + lane.z * forwardMeters + lateral.z * lateralMeters
+      );
+    };
+    const createBackwardPoint = (origin: THREE.Vector3, forwardMeters: number, lateralMeters: number): THREE.Vector3 => {
+      return new THREE.Vector3(
+        origin.x - lane.x * forwardMeters + lateral.x * lateralMeters,
+        origin.y,
+        origin.z - lane.z * forwardMeters + lateral.z * lateralMeters
+      );
+    };
+
+    const pushSize = Math.max(3, Math.floor(avgSquadSize * 0.7));
+    const pressureQueue: Array<{faction: Faction, position: THREE.Vector3, size: number}> = [
+      { faction: Faction.US, position: createForwardPoint(usBasePos, laneDistance * 0.24, -55), size: pushSize },
+      { faction: Faction.OPFOR, position: createBackwardPoint(opforBasePos, laneDistance * 0.24, 55), size: pushSize },
+      { faction: Faction.US, position: createForwardPoint(usBasePos, laneDistance * 0.34, 45), size: pushSize },
+      { faction: Faction.OPFOR, position: createBackwardPoint(opforBasePos, laneDistance * 0.34, -45), size: pushSize },
+      { faction: Faction.US, position: createForwardPoint(usBasePos, laneDistance * 0.42, -20), size: Math.max(2, Math.floor(avgSquadSize * 0.5)) },
+      { faction: Faction.OPFOR, position: createBackwardPoint(opforBasePos, laneDistance * 0.42, 20), size: Math.max(2, Math.floor(avgSquadSize * 0.5)) }
+    ];
+
+    return pressureQueue;
+  }
+
+  private getReinforcementAnchors(faction: Faction): THREE.Vector3[] {
+    const anchors = SpawnPositionCalculator.getFactionAnchors(faction, this.zoneManager);
+    const config = this.gameModeManager?.getCurrentConfig();
+    if (!config || config.id !== 'open_frontier') {
+      return anchors;
+    }
+
+    const { usBasePos, opforBasePos } = SpawnPositionCalculator.getBasePositions(config);
+    const ownBase = faction === Faction.US ? usBasePos : opforBasePos;
+    const enemyBase = faction === Faction.US ? opforBasePos : usBasePos;
+
+    const lane = _scratchVec.copy(enemyBase).sub(ownBase);
+    const laneDistance = lane.length();
+    if (laneDistance < 1) return anchors;
+    lane.divideScalar(laneDistance);
+
+    // Add one forward staging anchor so waves don't remain HQ-only.
+    const forwardAnchor = new THREE.Vector3(
+      ownBase.x + lane.x * (laneDistance * 0.25),
+      ownBase.y,
+      ownBase.z + lane.z * (laneDistance * 0.25)
+    );
+
+    return [...anchors, forwardAnchor];
+  }
+
+  private enqueueSpawn(faction: Faction, position: THREE.Vector3, size: number): void {
+    if (this.progressiveSpawnQueue.length >= this.MAX_ENQUEUED_SPAWNS) {
+      return;
+    }
+    this.progressiveSpawnQueue.push({
+      faction,
+      position: position.clone(),
+      size: Math.max(1, size)
+    });
   }
 
   /**

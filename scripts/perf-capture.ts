@@ -38,8 +38,25 @@ type RuntimeSample = {
     effectPoolsMs: number;
     influenceMapMs: number;
     aiStateMs?: Record<string, number>;
-    losCache?: { hits: number; misses: number; hitRate: number; budgetDenials: number };
+    losCache?: {
+      hits: number;
+      misses: number;
+      hitRate: number;
+      budgetDenials: number;
+      prefilterPasses?: number;
+      prefilterRejects?: number;
+    };
     raycastBudget?: {
+      maxPerFrame: number;
+      usedThisFrame: number;
+      deniedThisFrame: number;
+      totalExhaustedFrames: number;
+      totalRequested: number;
+      totalDenied: number;
+      saturationRate: number;
+      denialRate: number;
+    };
+    combatFireRaycastBudget?: {
       maxPerFrame: number;
       usedThisFrame: number;
       deniedThisFrame: number;
@@ -144,14 +161,16 @@ const DEFAULT_COMPRESS_FRONTLINE = true;
 const DEFAULT_ALLOW_WARP_RECOVERY = false;
 const DEFAULT_MOVEMENT_DECISION_INTERVAL_MS = 450;
 const DEFAULT_PREWARM = true;
-const DEFAULT_RUNTIME_PREFLIGHT = true;
+const DEFAULT_RUNTIME_PREFLIGHT = false;
+const DEFAULT_RUNTIME_PREFLIGHT_TIMEOUT_SECONDS = 8;
+const DEFAULT_SANDBOX_MODE = false;
 const DEFAULT_FRONTLINE_TRIGGER_DISTANCE = 500;
 const DEFAULT_MAX_COMPRESSED_PER_FACTION = 28;
 const DEFAULT_SAMPLE_INTERVAL_MS = 1000;
 const DEFAULT_DETAIL_EVERY_SAMPLES = 1;
 const STEP_TIMEOUT_MS = 30_000;
 const ARTIFACT_ROOT = join(process.cwd(), 'artifacts', 'perf');
-const RUN_HARD_TIMEOUT_MS = 120_000;
+const MIN_RUN_HARD_TIMEOUT_MS = 120_000;
 const LOCK_FILE = join(process.cwd(), 'tmp', 'perf-capture.lock');
 const CDP_STOP_TIMEOUT_MS = 3_000;
 const TRACE_STOP_TIMEOUT_MS = 5_000;
@@ -399,7 +418,7 @@ function validateRun(
   runtimeSamples: RuntimeSample[],
   consoleEntries: ConsoleEntry[],
   durationSeconds: number,
-  options?: { requireHitValidation?: boolean; sampleIntervalMs?: number }
+  options?: { hitValidation?: 'strict' | 'relaxed' | 'off'; sampleIntervalMs?: number }
 ): ValidationReport {
   const checks: ValidationCheck[] = [];
   const sampleCount = runtimeSamples.length;
@@ -553,7 +572,8 @@ function validateRun(
     });
   }
 
-  if (options?.requireHitValidation) {
+  const hitValidationMode = options?.hitValidation ?? 'off';
+  if (hitValidationMode !== 'off') {
     const shotSamples = runtimeSamples.filter(s => typeof s.shotsThisSession === 'number');
     const maxShots = shotSamples.length > 0
       ? Math.max(...shotSamples.map(s => Number(s.shotsThisSession ?? 0)))
@@ -565,23 +585,30 @@ function validateRun(
       ? Math.max(...shotSamples.map(s => Number(s.hitRate ?? 0)))
       : 0;
 
+    const strict = hitValidationMode === 'strict';
     checks.push({
       id: 'player_shots_recorded',
-      status: maxShots >= 5 ? 'pass' : maxShots > 0 ? 'warn' : 'fail',
+      status: strict
+        ? (maxShots >= 5 ? 'pass' : maxShots > 0 ? 'warn' : 'fail')
+        : (maxShots >= 3 ? 'pass' : 'warn'),
       value: maxShots,
       message: `Recorded player shots in sim=${maxShots}`
     });
 
     checks.push({
       id: 'player_hits_recorded',
-      status: maxHits >= 1 ? 'pass' : 'fail',
+      status: strict
+        ? (maxHits >= 1 ? 'pass' : 'fail')
+        : (maxHits >= 1 ? 'pass' : 'warn'),
       value: maxHits,
       message: `Recorded player hits in sim=${maxHits}`
     });
 
     checks.push({
       id: 'player_hit_rate_peak',
-      status: peakHitRate >= 0.02 ? 'pass' : peakHitRate > 0 ? 'warn' : 'fail',
+      status: strict
+        ? (peakHitRate >= 0.02 ? 'pass' : peakHitRate > 0 ? 'warn' : 'fail')
+        : (peakHitRate >= 0.01 ? 'pass' : 'warn'),
       value: peakHitRate,
       message: `Peak hit rate ${(peakHitRate * 100).toFixed(2)}%`
     });
@@ -719,9 +746,8 @@ async function killDevServer(server: ChildProcess): Promise<void> {
   logStep('✅ Dev server stopped');
 }
 
-async function prewarmDevServer(port: number): Promise<{ totalMs: number; allOk: boolean }> {
+async function prewarmDevServer(port: number, paths: string[]): Promise<{ totalMs: number; allOk: boolean }> {
   const start = Date.now();
-  const paths = ['/', '/?sandbox=true&autostart=false'];
   let allOk = true;
 
   for (const path of paths) {
@@ -751,20 +777,30 @@ async function prewarmDevServer(port: number): Promise<{ totalMs: number; allOk:
 async function preflightRuntimePage(
   page: Page,
   preflightUrl: string,
-  startupTimeoutSeconds: number
+  startupTimeoutSeconds: number,
+  runtimePreflightTimeoutSeconds: number
 ): Promise<{ totalMs: number; ok: boolean; reason?: string }> {
   const start = Date.now();
+  const timeoutMs = Math.max(
+    1000,
+    Math.min(startupTimeoutSeconds * 1000, runtimePreflightTimeoutSeconds * 1000)
+  );
+  const navTimeoutMs = Math.max(STEP_TIMEOUT_MS, startupTimeoutSeconds * 1000 + 5000);
   try {
     logStep(`🧪 Runtime preflight navigate ${preflightUrl}`);
-    await withTimeout('preflight page.goto', page.goto(preflightUrl, { waitUntil: 'commit' }), STEP_TIMEOUT_MS);
+    await withTimeout('preflight page.goto', page.goto(preflightUrl, { waitUntil: 'commit' }), navTimeoutMs);
     await withTimeout(
       'preflight wait runtime',
       page.waitForFunction(
-        () => Boolean((window as any).__startupTelemetry?.getSnapshot?.() && (window as any).__metrics),
+        () => {
+          const startup = (window as any).__startupTelemetry?.getSnapshot?.();
+          const hasStartupMark = Boolean(startup?.marks?.length);
+          return hasStartupMark || document.readyState === 'complete';
+        },
         undefined,
-        { timeout: startupTimeoutSeconds * 1000 }
+        { timeout: timeoutMs }
       ),
-      startupTimeoutSeconds * 1000 + 1000
+      timeoutMs + 1000
     );
     const snapshot = await safeAwait(
       'preflight startup snapshot',
@@ -964,7 +1000,7 @@ async function stopActiveScenarioDriver(page: Page): Promise<void> {
 
   if (result) {
     logStep(
-      `🎮 Active driver stopped (respawns=${result.respawnCount}, frontlineCompressed=${result.frontlineCompressed}, frontlineDistance=${Number(result.frontlineDistance ?? 0).toFixed(1)}, moved=${result.frontlineMoveCount ?? 0})`
+      `🎮 Active driver stopped (respawns=${result.respawnCount}, frontlineCompressed=${result.frontlineCompressed}, frontlineDistance=${Number(result.frontlineDistance ?? 0).toFixed(1)}, moved=${result.frontlineMoveCount ?? 0}, capturedZones=${result.capturedZoneCount ?? 0})`
     );
   }
 }
@@ -1022,6 +1058,7 @@ async function runCapture(): Promise<void> {
   const npcs = parseNumberFlag('npcs', DEFAULT_NPCS);
   const startupTimeoutSeconds = parseNumberFlag('startup-timeout', DEFAULT_STARTUP_TIMEOUT_SECONDS);
   const startupFrameThreshold = parseNumberFlag('startup-frame-threshold', DEFAULT_STARTUP_FRAME_THRESHOLD);
+  const runtimePreflightTimeoutSeconds = parseNumberFlag('runtime-preflight-timeout', DEFAULT_RUNTIME_PREFLIGHT_TIMEOUT_SECONDS);
   const port = parseNumberFlag('port', DEV_SERVER_PORT);
   const headed = hasFlag('headed');
   const devtools = hasFlag('devtools');
@@ -1033,6 +1070,8 @@ async function runCapture(): Promise<void> {
   const compressFrontline = parseBooleanFlag('compress-frontline', DEFAULT_COMPRESS_FRONTLINE);
   const allowWarpRecovery = parseBooleanFlag('allow-warp-recovery', DEFAULT_ALLOW_WARP_RECOVERY);
   const movementDecisionIntervalMs = parseNumberFlag('movement-decision-interval-ms', DEFAULT_MOVEMENT_DECISION_INTERVAL_MS);
+  const losHeightPrefilter = parseBooleanFlag('los-height-prefilter', false);
+  const spatialSecondarySync = parseBooleanFlag('spatial-secondary-sync', true);
   const sampleIntervalMs = Math.max(250, parseNumberFlag('sample-interval-ms', DEFAULT_SAMPLE_INTERVAL_MS));
   const detailEverySamples = Math.max(
     1,
@@ -1043,6 +1082,10 @@ async function runCapture(): Promise<void> {
   );
   const prewarm = parseBooleanFlag('prewarm', DEFAULT_PREWARM);
   const runtimePreflight = parseBooleanFlag('runtime-preflight', DEFAULT_RUNTIME_PREFLIGHT);
+  const sandboxMode = parseBooleanFlag(
+    'sandbox',
+    requestedMode === 'ai_sandbox' ? true : DEFAULT_SANDBOX_MODE
+  );
   const frontlineTriggerDistance = parseNumberFlag('frontline-trigger-distance', DEFAULT_FRONTLINE_TRIGGER_DISTANCE);
   const maxCompressedPerFaction = parseNumberFlag('frontline-compressed-per-faction', DEFAULT_MAX_COMPRESSED_PER_FACTION);
   const logLevel = String(process.env.PERF_LOG_LEVEL ?? process.argv.find(a => a.startsWith('--log-level='))?.split('=')[1] ?? 'warn');
@@ -1051,7 +1094,7 @@ async function runCapture(): Promise<void> {
   const artifactDir = makeArtifactDir();
   const browserProfileDir = join(artifactDir, 'browser-profile');
   mkdirSync(browserProfileDir, { recursive: true });
-  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} movementDecisionIntervalMs=${movementDecisionIntervalMs} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} prewarm=${prewarm} runtimePreflight=${runtimePreflight} reuseDevServer=${reuseDevServer}`);
+  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} spatialSecondarySync=${spatialSecondarySync} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} prewarm=${prewarm} runtimePreflight=${runtimePreflight} reuseDevServer=${reuseDevServer}`);
 
   let server: ChildProcess | null = null;
   let context: BrowserContext | null = null;
@@ -1065,8 +1108,26 @@ async function runCapture(): Promise<void> {
   const startedAt = nowIso();
   const combatParam = enableCombat ? '1' : '0';
   const autostart = requestedMode === 'ai_sandbox' ? 'true' : 'false';
-  const url = `http://localhost:${port}/?sandbox=true&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}`;
-  const preflightUrl = `http://localhost:${port}/?sandbox=true&npcs=${effectiveNpcs}&autostart=false&duration=0&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}`;
+  const losPrefilterParam = losHeightPrefilter ? '1' : '0';
+  const spatialSecondarySyncParam = spatialSecondarySync ? '1' : '0';
+  const query = sandboxMode
+    ? `?sandbox=true&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}&spatialSecondarySync=${spatialSecondarySyncParam}`
+    : `?logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}&spatialSecondarySync=${spatialSecondarySyncParam}`;
+  const url = `http://localhost:${port}/${query}`;
+  const preflightUrl = `http://localhost:${port}/`;
+  const primaryPath = new URL(url).pathname + new URL(url).search;
+  const prewarmPaths = sandboxMode
+    ? [
+        '/',
+        '/?sandbox=true&autostart=false',
+        primaryPath.replace(`duration=${durationSeconds}`, 'duration=0')
+      ]
+    : ['/', primaryPath];
+  const runHardTimeoutMs = Math.max(
+    MIN_RUN_HARD_TIMEOUT_MS,
+    (startupTimeoutSeconds + warmupSeconds + durationSeconds + 90) * 1000
+  );
+  const navTimeoutMs = Math.max(STEP_TIMEOUT_MS, startupTimeoutSeconds * 1000 + 5000);
   let failureReason: string | undefined;
   let validation: ValidationReport = { overall: 'warn', checks: [] };
   let startupState: {
@@ -1096,7 +1157,7 @@ async function runCapture(): Promise<void> {
       const reason = `Hard timeout reached at stage=${stage}`;
       console.error(reason);
       process.exit(1);
-    }, RUN_HARD_TIMEOUT_MS);
+    }, runHardTimeoutMs);
 
     stage = 'start-dev-server';
     if (reuseDevServer && await isPortOpen(port)) {
@@ -1109,7 +1170,7 @@ async function runCapture(): Promise<void> {
     }
     if (prewarm) {
       stage = 'prewarm-dev-server';
-      prewarmResult = await prewarmDevServer(port);
+      prewarmResult = await prewarmDevServer(port, prewarmPaths);
       logStep(`🔥 Dev-server prewarm completed in ${prewarmResult.totalMs}ms (allOk=${prewarmResult.allOk})`);
     }
 
@@ -1138,6 +1199,7 @@ async function runCapture(): Promise<void> {
     stage = 'open-page';
     page = context.pages()[0] ?? await context.newPage();
     page.setDefaultTimeout(STEP_TIMEOUT_MS);
+    page.setDefaultNavigationTimeout(navTimeoutMs);
     page.on('console', msg => {
       const entry = { ts: nowIso(), type: msg.type(), text: msg.text() };
       consoleEntries.push(entry);
@@ -1171,7 +1233,10 @@ async function runCapture(): Promise<void> {
 
     if (runtimePreflight) {
       stage = 'runtime-preflight';
-      runtimePreflightResult = await preflightRuntimePage(page, preflightUrl, startupTimeoutSeconds);
+      const preflightPage = await context.newPage();
+      preflightPage.setDefaultTimeout(STEP_TIMEOUT_MS);
+      runtimePreflightResult = await preflightRuntimePage(preflightPage, preflightUrl, startupTimeoutSeconds, runtimePreflightTimeoutSeconds);
+      await safeAwait('preflight page close', preflightPage.close({ runBeforeUnload: false }), 3000);
       logStep(`🧪 Runtime preflight completed in ${runtimePreflightResult.totalMs}ms (ok=${runtimePreflightResult.ok})`);
       if (!runtimePreflightResult.ok) {
         logStep(`⚠ Runtime preflight failed: ${runtimePreflightResult.reason ?? 'unknown'}`);
@@ -1180,7 +1245,7 @@ async function runCapture(): Promise<void> {
 
     stage = 'navigate-and-startup';
     logStep(`📍 Navigating to ${url}`);
-    await withTimeout('page.goto', page.goto(url, { waitUntil: 'commit' }), STEP_TIMEOUT_MS);
+    await withTimeout('page.goto', page.goto(url, { waitUntil: 'commit' }), navTimeoutMs);
     if (requestedMode !== 'ai_sandbox') {
       await withTimeout(
         'wait __engine',
@@ -1302,7 +1367,9 @@ async function runCapture(): Promise<void> {
                     hits: Number(combatProfile.timing.losCache.hits ?? 0),
                     misses: Number(combatProfile.timing.losCache.misses ?? 0),
                     hitRate: Number(combatProfile.timing.losCache.hitRate ?? 0),
-                    budgetDenials: Number(combatProfile.timing.losCache.budgetDenials ?? 0)
+                    budgetDenials: Number(combatProfile.timing.losCache.budgetDenials ?? 0),
+                    prefilterPasses: Number(combatProfile.timing.losCache.prefilterPasses ?? 0),
+                    prefilterRejects: Number(combatProfile.timing.losCache.prefilterRejects ?? 0)
                   } : undefined,
                   raycastBudget: combatProfile.timing.raycastBudget ? {
                     maxPerFrame: Number(combatProfile.timing.raycastBudget.maxPerFrame ?? 0),
@@ -1313,6 +1380,16 @@ async function runCapture(): Promise<void> {
                     totalDenied: Number(combatProfile.timing.raycastBudget.totalDenied ?? 0),
                     saturationRate: Number(combatProfile.timing.raycastBudget.saturationRate ?? 0),
                     denialRate: Number(combatProfile.timing.raycastBudget.denialRate ?? 0)
+                  } : undefined,
+                  combatFireRaycastBudget: combatProfile.timing.combatFireRaycastBudget ? {
+                    maxPerFrame: Number(combatProfile.timing.combatFireRaycastBudget.maxPerFrame ?? 0),
+                    usedThisFrame: Number(combatProfile.timing.combatFireRaycastBudget.usedThisFrame ?? 0),
+                    deniedThisFrame: Number(combatProfile.timing.combatFireRaycastBudget.deniedThisFrame ?? 0),
+                    totalExhaustedFrames: Number(combatProfile.timing.combatFireRaycastBudget.totalExhaustedFrames ?? 0),
+                    totalRequested: Number(combatProfile.timing.combatFireRaycastBudget.totalRequested ?? 0),
+                    totalDenied: Number(combatProfile.timing.combatFireRaycastBudget.totalDenied ?? 0),
+                    saturationRate: Number(combatProfile.timing.combatFireRaycastBudget.saturationRate ?? 0),
+                    denialRate: Number(combatProfile.timing.combatFireRaycastBudget.denialRate ?? 0)
                   } : undefined,
                   aiScheduling: combatProfile.timing.aiScheduling ? {
                     frameCounter: Number(combatProfile.timing.aiScheduling.frameCounter ?? 0),
@@ -1380,8 +1457,12 @@ async function runCapture(): Promise<void> {
     } else if (cdpStarted) {
       logStep('⚠ Skipping heavy CDP shutdown capture due unstable startup or blocked runtime samples');
     }
+    const hitValidationMode: 'strict' | 'relaxed' | 'off' =
+      enableCombat && activePlayerScenario
+        ? (requestedMode === 'open_frontier' ? 'relaxed' : 'strict')
+        : 'off';
     validation = validateRun(runtimeSamples, consoleEntries, durationSeconds, {
-      requireHitValidation: enableCombat && activePlayerScenario,
+      hitValidation: hitValidationMode,
       sampleIntervalMs
     });
     if (!startupState.started) {

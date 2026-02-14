@@ -26,11 +26,12 @@ const PLAYER_HIT_ZONES: HitZone[] = [
 ]
 
 export class CombatantHitDetection {
-  private readonly MAX_ENGAGEMENT_RANGE = 150
+  private readonly MAX_ENGAGEMENT_RANGE = 280
   private readonly FRIENDLY_FIRE_ENABLED = false
 
   // Spatial grid manager reference (uses singleton by default)
   private gridManager: SpatialGridManager
+  private queryProvider: ((center: THREE.Vector3, radius: number) => string[]) | null = null
 
   // Pre-allocated scratch vectors to avoid allocations in hot path
   private scratchVec1 = new THREE.Vector3()
@@ -77,6 +78,14 @@ export class CombatantHitDetection {
     this.gridManager = manager
   }
 
+  /**
+   * Optional spatial query provider.
+   * When set, this is preferred over SpatialGridManager and enables single-owner spatial paths.
+   */
+  setQueryProvider(provider: (center: THREE.Vector3, radius: number) => string[]): void {
+    this.queryProvider = provider
+  }
+
   checkPlayerHit(
     ray: THREE.Ray,
     playerPosition: THREE.Vector3
@@ -117,19 +126,21 @@ export class CombatantHitDetection {
   ): { combatant: Combatant; distance: number; point: THREE.Vector3; headshot: boolean } | null {
     let closest: { combatant: Combatant; distance: number; point: THREE.Vector3; headshot: boolean } | null = null
 
-    // REQUIRED: Use spatial grid for O(log n) query
-    // NO FALLBACK - grid must be initialized
-    if (!this.gridManager.getIsInitialized()) {
-      if (!CombatantHitDetection.loggedUninitializedGrid) {
-        CombatantHitDetection.loggedUninitializedGrid = true
-        Logger.error('combat', '[HitDetection] Grid not initialized! Call spatialGridManager.initialize() first.')
+    // Query radius around ray origin - prefer injected primary spatial owner query.
+    let candidateIds: string[] = []
+    if (this.queryProvider) {
+      candidateIds = this.queryProvider(ray.origin, this.MAX_ENGAGEMENT_RANGE)
+    } else {
+      if (!this.gridManager.getIsInitialized()) {
+        if (!CombatantHitDetection.loggedUninitializedGrid) {
+          CombatantHitDetection.loggedUninitializedGrid = true
+          Logger.error('combat', '[HitDetection] Grid not initialized! Call spatialGridManager.initialize() first.')
+        }
+        performanceTelemetry.recordFallback()
+        return null
       }
-      performanceTelemetry.recordFallback()
-      return null
+      candidateIds = this.gridManager.queryRadius(ray.origin, this.MAX_ENGAGEMENT_RANGE)
     }
-
-    // Query radius around ray origin - only check nearby combatants
-    const candidateIds = this.gridManager.queryRadius(ray.origin, this.MAX_ENGAGEMENT_RANGE)
 
     // Use scratch vectors to avoid allocations
     const tmp = this.scratchVec1

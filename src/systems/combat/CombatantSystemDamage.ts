@@ -81,11 +81,11 @@ export class CombatantSystemDamage {
             KillAssistTracker.processKillAssists(combatant, attackerId);
           }
 
-          // Initialize death animation for explosion (always spinfall)
+          // Explosions use the arcade shatter profile for stronger readability.
           combatant.isDying = true;
           combatant.deathProgress = 0;
           combatant.deathStartTime = performance.now();
-          combatant.deathAnimationType = 'spinfall'; // Explosions cause spin fall
+          combatant.deathAnimationType = 'shatter';
 
           // Calculate death direction (away from explosion center)
           _deathDir.subVectors(combatant.position, center).normalize();

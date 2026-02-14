@@ -16,25 +16,50 @@
       allowWarpRecovery: options.allowWarpRecovery === true,
       movementDecisionIntervalMs: Number(options.movementDecisionIntervalMs || 450)
     };
-    const modeProfile = opts.mode === 'open_frontier'
-      ? {
-          sprintDistance: 260,
-          approachDistance: 120,
-          retreatDistance: 26,
-          holdChanceWhenVisible: 0.35,
-          transitionHoldMs: 1000,
-          decisionIntervalMs: Math.max(620, opts.movementDecisionIntervalMs),
-          preferredJuke: 'strafe'
-        }
-      : {
-          sprintDistance: 200,
-          approachDistance: 120,
-          retreatDistance: 30,
-          holdChanceWhenVisible: 0.6,
-          transitionHoldMs: 720,
-          decisionIntervalMs: Math.max(420, opts.movementDecisionIntervalMs),
-          preferredJuke: 'push'
-        };
+    const modeProfiles = {
+      ai_sandbox: {
+        sprintDistance: 200,
+        approachDistance: 120,
+        retreatDistance: 18,
+        holdChanceWhenVisible: 0.06,
+        transitionHoldMs: 900,
+        decisionIntervalMs: Math.max(420, opts.movementDecisionIntervalMs),
+        preferredJuke: 'push',
+        objectiveBias: 'frontline'
+      },
+      open_frontier: {
+        sprintDistance: 360,
+        approachDistance: 185,
+        retreatDistance: 16,
+        holdChanceWhenVisible: 0.02,
+        transitionHoldMs: 900,
+        decisionIntervalMs: Math.max(380, opts.movementDecisionIntervalMs),
+        preferredJuke: 'strafe',
+        objectiveBias: 'zone'
+      },
+      zone_control: {
+        sprintDistance: 220,
+        approachDistance: 110,
+        retreatDistance: 16,
+        holdChanceWhenVisible: 0.05,
+        transitionHoldMs: 950,
+        decisionIntervalMs: Math.max(480, opts.movementDecisionIntervalMs),
+        preferredJuke: 'push',
+        objectiveBias: 'zone'
+      },
+      team_deathmatch: {
+        sprintDistance: 175,
+        approachDistance: 90,
+        retreatDistance: 12,
+        holdChanceWhenVisible: 0.08,
+        transitionHoldMs: 700,
+        decisionIntervalMs: Math.max(360, opts.movementDecisionIntervalMs),
+        preferredJuke: 'push',
+        objectiveBias: 'enemy_mass'
+      }
+    };
+    const modeProfile = modeProfiles[opts.mode] || modeProfiles.ai_sandbox;
+    const perceptionRange = opts.mode === 'open_frontier' ? 900 : opts.mode === 'team_deathmatch' ? 260 : 220;
 
     const state = {
       fireTimer: null,
@@ -50,11 +75,18 @@
       lastMovementDecisionAt: 0,
       movementLockUntil: 0,
       movementState: 'advance',
+      firingUntil: 0,
       lastStablePos: null,
-      stuckMs: 0
+      stuckMs: 0,
+      objectiveZoneId: null,
+      objectiveSwitchAt: 0,
+      captureZoneId: null,
+      captureHoldUntil: 0,
+      capturedZoneCount: 0,
+      lastShotAt: Date.now()
     };
-    const MAX_YAW_STEP = 0.08;
-    const MAX_PITCH_STEP = 0.05;
+    const MAX_YAW_STEP = 0.09;
+    const MAX_PITCH_STEP = 0.06;
 
     function dispatchKey(type, code) {
       document.dispatchEvent(new KeyboardEvent(type, {
@@ -93,7 +125,7 @@
         return;
       }
       state.movementState = nextState;
-      state.movementLockUntil = now + modeProfile.transitionHoldMs + Math.floor(Math.random() * 240);
+      state.movementLockUntil = now + modeProfile.transitionHoldMs + Math.floor(Math.random() * 360);
 
       if (nextState === 'sprint') {
         setMovementPattern(['KeyW', 'ShiftLeft']);
@@ -226,7 +258,7 @@
       const lateralZ = dirX;
 
       // Keep respawn/insert near the middle lane with a slight own-side bias.
-      const ownSideBias = -18;
+      const ownSideBias = 8;
       const along = ownSideBias + (Math.random() - 0.5) * 40;
       const lateral = (Math.random() - 0.5) * 44;
       return {
@@ -264,6 +296,23 @@
       return nearest;
     }
 
+    function predictTargetPoint(targetCombatant, playerPos) {
+      if (!targetCombatant || !targetCombatant.position) return null;
+      const targetPos = targetCombatant.position;
+      const vel = targetCombatant.velocity;
+      const vx = vel && Number.isFinite(Number(vel.x)) ? Number(vel.x) : 0;
+      const vz = vel && Number.isFinite(Number(vel.z)) ? Number(vel.z) : 0;
+      const dx = Number(targetPos.x) - Number(playerPos.x);
+      const dz = Number(targetPos.z) - Number(playerPos.z);
+      const dist = Math.hypot(dx, dz);
+      const leadTime = Math.min(0.35, Math.max(0.08, dist / 280));
+      return {
+        x: Number(targetPos.x) + vx * leadTime,
+        y: Number(targetPos.y || 0),
+        z: Number(targetPos.z) + vz * leadTime
+      };
+    }
+
     function hasTerrainOcclusion(systems, fromPos, toPos) {
       const chunkManager = systems && systems.chunkManager;
       if (!chunkManager || !chunkManager.raycastTerrain || !fromPos || !toPos) return false;
@@ -277,6 +326,37 @@
       const dir = { x: dx / distance, y: dy / distance, z: dz / distance };
       const hit = chunkManager.raycastTerrain(fromPos, dir, distance);
       return !!(hit && hit.hit && Number.isFinite(hit.distance) && hit.distance < distance - 0.75);
+    }
+
+    function hasHeightProfileOcclusion(systems, fromPos, toPos) {
+      const chunkManager = systems && systems.chunkManager;
+      if (!chunkManager || !fromPos || !toPos) return false;
+      const getHeight =
+        chunkManager.getTerrainHeightAt ||
+        chunkManager.getHeightAtWorldPosition ||
+        chunkManager.getHeightAt;
+      if (!getHeight) return false;
+
+      const dx = toPos.x - fromPos.x;
+      const dz = toPos.z - fromPos.z;
+      const horizontalDist = Math.hypot(dx, dz);
+      if (!Number.isFinite(horizontalDist) || horizontalDist < 8) return false;
+
+      const samples = Math.min(7, Math.max(3, Math.floor(horizontalDist / 18)));
+      let blockingSamples = 0;
+      for (let i = 1; i < samples; i++) {
+        const t = i / samples;
+        const sx = fromPos.x + dx * t;
+        const sz = fromPos.z + dz * t;
+        const lineY = fromPos.y + ((toPos.y || 0) - (fromPos.y || 0)) * t;
+        const terrainY = Number(getHeight.call(chunkManager, sx, sz));
+        if (!Number.isFinite(terrainY)) continue;
+        if (terrainY > lineY + 1.3) {
+          blockingSamples++;
+          if (blockingSamples >= 2) return true;
+        }
+      }
+      return false;
     }
 
     function getCameraForward(camera) {
@@ -335,28 +415,87 @@
       return getEnemySpawn(systems);
     }
 
-    function getModeObjective(systems, playerPos) {
-      if (opts.mode !== 'open_frontier') {
+    function getLeadChargePoint(systems) {
+      const combatants = systems && systems.combatantSystem && systems.combatantSystem.getAllCombatants
+        ? systems.combatantSystem.getAllCombatants()
+        : null;
+      if (!Array.isArray(combatants) || combatants.length === 0) {
         return getEngagementCenter(systems) || getEnemySpawn(systems);
       }
 
+      let usCount = 0;
+      let usX = 0;
+      let usY = 0;
+      let usZ = 0;
+      let opforCount = 0;
+      let opforX = 0;
+      let opforY = 0;
+      let opforZ = 0;
+
+      for (let i = 0; i < combatants.length; i++) {
+        const combatant = combatants[i];
+        if (!combatant || combatant.id === 'player_proxy') continue;
+        if (combatant.health <= 0 || combatant.state === 'dead') continue;
+        if (combatant.faction === 'US') {
+          usX += Number(combatant.position.x);
+          usY += Number(combatant.position.y);
+          usZ += Number(combatant.position.z);
+          usCount++;
+        } else if (combatant.faction === 'OPFOR') {
+          opforX += Number(combatant.position.x);
+          opforY += Number(combatant.position.y);
+          opforZ += Number(combatant.position.z);
+          opforCount++;
+        }
+      }
+
+      if (usCount < 1 || opforCount < 1) {
+        return getEngagementCenter(systems) || getEnemySpawn(systems);
+      }
+
+      const usCenter = { x: usX / usCount, y: usY / usCount, z: usZ / usCount };
+      const opforCenter = { x: opforX / opforCount, y: opforY / opforCount, z: opforZ / opforCount };
+      const laneX = opforCenter.x - usCenter.x;
+      const laneZ = opforCenter.z - usCenter.z;
+      const laneLen = Math.hypot(laneX, laneZ) || 1;
+      const dirX = laneX / laneLen;
+      const dirZ = laneZ / laneLen;
+
+      // Push player ahead of friendly centroid toward contact, not behind the line.
+      const pushDist = Math.min(110, Math.max(55, laneLen * 0.32));
+      const lateralX = -dirZ;
+      const lateralZ = dirX;
+      const lateral = (Math.random() - 0.5) * 20;
+
+      return {
+        x: usCenter.x + dirX * pushDist + lateralX * lateral,
+        y: (usCenter.y + opforCenter.y) * 0.5,
+        z: usCenter.z + dirZ * pushDist + lateralZ * lateral
+      };
+    }
+
+    function getObjectiveZoneTarget(systems, playerPos) {
       const zoneManager = systems && systems.zoneManager;
       const zones = zoneManager && zoneManager.getAllZones ? zoneManager.getAllZones() : null;
       if (!Array.isArray(zones) || zones.length === 0) {
-        return getEngagementCenter(systems) || getEnemySpawn(systems);
+        return null;
       }
 
       let bestZone = null;
       let bestScore = Number.POSITIVE_INFINITY;
+      const now = Date.now();
+      const stickyZoneId = now < state.objectiveSwitchAt ? state.objectiveZoneId : null;
       for (let i = 0; i < zones.length; i++) {
         const zone = zones[i];
         if (!zone || zone.isHomeBase) continue;
-        // Prioritize contested and non-US-owned zones.
-        const priority = zone.state === 'contested' ? 0 : zone.owner === 'US' ? 2 : 1;
+        const isContested = zone.state === 'contested';
+        const isOwnedByUs = zone.owner === 'US';
+        const isSticky = stickyZoneId && zone.id === stickyZoneId;
+        const priority = isContested ? 0 : isOwnedByUs ? 3 : 1;
         const dx = Number(zone.position.x) - Number(playerPos.x);
         const dz = Number(zone.position.z) - Number(playerPos.z);
         const distSq = dx * dx + dz * dz;
-        const score = priority * 500000 + distSq;
+        const score = priority * 500000 + distSq + (isSticky ? -160000 : 0);
         if (score < bestScore) {
           bestScore = score;
           bestZone = zone;
@@ -364,13 +503,147 @@
       }
 
       if (bestZone && bestZone.position) {
+        state.objectiveZoneId = String(bestZone.id || '');
+        state.objectiveSwitchAt = now + 5500 + Math.floor(Math.random() * 2200);
         return {
           x: Number(bestZone.position.x),
           y: Number(bestZone.position.y || 0),
           z: Number(bestZone.position.z)
         };
       }
-      return getEngagementCenter(systems) || getEnemySpawn(systems);
+      return null;
+    }
+
+    function findZoneById(zones, id) {
+      if (!Array.isArray(zones) || !id) return null;
+      for (let i = 0; i < zones.length; i++) {
+        if (zones[i] && String(zones[i].id) === String(id)) return zones[i];
+      }
+      return null;
+    }
+
+    function getCaptureFocus(systems, playerPos) {
+      const zoneManager = systems && systems.zoneManager;
+      const zones = zoneManager && zoneManager.getAllZones ? zoneManager.getAllZones() : null;
+      if (!Array.isArray(zones) || zones.length === 0) {
+        state.captureZoneId = null;
+        state.captureHoldUntil = 0;
+        return null;
+      }
+
+      const now = Date.now();
+      const activeZone = findZoneById(zones, state.captureZoneId);
+      if (activeZone) {
+        const dx = Number(activeZone.position.x) - Number(playerPos.x);
+        const dz = Number(activeZone.position.z) - Number(playerPos.z);
+        const dist = Math.hypot(dx, dz);
+        const inside = dist <= Math.max(7, Number(activeZone.radius) * 0.72);
+
+        if (activeZone.owner === 'US' && !activeZone.isHomeBase) {
+          state.capturedZoneCount += 1;
+          state.captureZoneId = null;
+          state.captureHoldUntil = 0;
+          return null;
+        }
+
+        if (inside && now > state.captureHoldUntil) {
+          // Capture in Open Frontier can take a long time with a single actor.
+          state.captureHoldUntil = now + 90000 + Math.floor(Math.random() * 20000);
+        }
+
+        if (dist > Math.max(16, Number(activeZone.radius) * 1.5) && now > state.captureHoldUntil) {
+          state.captureZoneId = null;
+          state.captureHoldUntil = 0;
+          return null;
+        }
+
+        return {
+          zone: activeZone,
+          target: {
+            x: Number(activeZone.position.x),
+            y: Number(activeZone.position.y || 0),
+            z: Number(activeZone.position.z)
+          },
+          inside: inside,
+          hold: now < state.captureHoldUntil
+        };
+      }
+
+      let bestZone = null;
+      let bestDist = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < zones.length; i++) {
+        const zone = zones[i];
+        if (!zone || zone.isHomeBase) continue;
+        if (zone.owner === 'US' && zone.state !== 'contested') continue;
+        const dx = Number(zone.position.x) - Number(playerPos.x);
+        const dz = Number(zone.position.z) - Number(playerPos.z);
+        const dist = Math.hypot(dx, dz);
+        const prefer = zone.state === 'contested' ? -20 : 0;
+        const score = dist + prefer;
+        if (score < bestDist) {
+          bestDist = score;
+          bestZone = zone;
+        }
+      }
+
+      if (!bestZone) return null;
+      const distToBest = Math.hypot(Number(bestZone.position.x) - Number(playerPos.x), Number(bestZone.position.z) - Number(playerPos.z));
+      state.captureZoneId = String(bestZone.id || '');
+      state.captureHoldUntil = now + 110000 + Math.floor(Math.random() * 25000);
+      return {
+        zone: bestZone,
+        target: {
+          x: Number(bestZone.position.x),
+          y: Number(bestZone.position.y || 0),
+          z: Number(bestZone.position.z)
+        },
+        inside: distToBest <= Math.max(7, Number(bestZone.radius) * 0.72),
+        hold: distToBest <= Math.max(7, Number(bestZone.radius) * 0.72)
+      };
+    }
+
+    function getEnemyMassPoint(systems) {
+      const combatants = systems && systems.combatantSystem && systems.combatantSystem.getAllCombatants
+        ? systems.combatantSystem.getAllCombatants()
+        : null;
+      if (!Array.isArray(combatants) || combatants.length === 0) return null;
+
+      let count = 0;
+      let sumX = 0;
+      let sumY = 0;
+      let sumZ = 0;
+      for (let i = 0; i < combatants.length; i++) {
+        const combatant = combatants[i];
+        if (!combatant || combatant.id === 'player_proxy') continue;
+        if (combatant.faction !== 'OPFOR') continue;
+        if (combatant.health <= 0 || combatant.state === 'dead') continue;
+        sumX += Number(combatant.position.x);
+        sumY += Number(combatant.position.y || 0);
+        sumZ += Number(combatant.position.z);
+        count++;
+      }
+      if (count < 1) return null;
+      return { x: sumX / count, y: sumY / count, z: sumZ / count };
+    }
+
+    function getModeObjective(systems, playerPos) {
+      if (modeProfile.objectiveBias === 'zone') {
+        return (
+          getObjectiveZoneTarget(systems, playerPos) ||
+          getLeadChargePoint(systems) ||
+          getEngagementCenter(systems) ||
+          getEnemySpawn(systems)
+        );
+      }
+      if (modeProfile.objectiveBias === 'enemy_mass') {
+        return (
+          getEnemyMassPoint(systems) ||
+          getLeadChargePoint(systems) ||
+          getEngagementCenter(systems) ||
+          getEnemySpawn(systems)
+        );
+      }
+      return getLeadChargePoint(systems) || getEngagementCenter(systems) || getEnemySpawn(systems);
     }
 
     function compressFrontline(systems) {
@@ -476,18 +749,20 @@
         if (systems.playerRespawnManager && systems.playerRespawnManager.respawnAtBase) {
           systems.playerRespawnManager.respawnAtBase();
         }
-        const pressureSpawn = getPressureSpawnPoint(systems);
-        if (pressureSpawn && systems.playerController && systems.playerController.setPosition) {
-          const currentPos = systems.playerController.getPosition ? systems.playerController.getPosition() : null;
-          const nextPos = currentPos && currentPos.clone ? currentPos.clone() : { x: 0, y: pressureSpawn.y, z: 0 };
-          nextPos.x = pressureSpawn.x;
-          nextPos.z = pressureSpawn.z;
-          nextPos.y = pressureSpawn.y;
-          const height = systems.chunkManager && systems.chunkManager.getHeightAtWorldPosition
-            ? systems.chunkManager.getHeightAtWorldPosition(nextPos.x, nextPos.z)
-            : undefined;
-          if (Number.isFinite(height)) nextPos.y = Number(height) + 2;
-          systems.playerController.setPosition(nextPos);
+        if (opts.allowWarpRecovery) {
+          const pressureSpawn = getPressureSpawnPoint(systems);
+          if (pressureSpawn && systems.playerController && systems.playerController.setPosition) {
+            const currentPos = systems.playerController.getPosition ? systems.playerController.getPosition() : null;
+            const nextPos = currentPos && currentPos.clone ? currentPos.clone() : { x: 0, y: pressureSpawn.y, z: 0 };
+            nextPos.x = pressureSpawn.x;
+            nextPos.z = pressureSpawn.z;
+            nextPos.y = pressureSpawn.y;
+            const height = systems.chunkManager && systems.chunkManager.getHeightAtWorldPosition
+              ? systems.chunkManager.getHeightAtWorldPosition(nextPos.x, nextPos.z)
+              : undefined;
+            if (Number.isFinite(height)) nextPos.y = Number(height) + 2;
+            systems.playerController.setPosition(nextPos, 'harness.recovery.respawn');
+          }
         }
         state.respawnCount++;
       }
@@ -529,15 +804,14 @@
             : undefined;
           if (Number.isFinite(h)) insertPos.y = Number(h) + 2;
           if (systems.playerController && systems.playerController.setPosition) {
-            systems.playerController.setPosition(insertPos);
+            systems.playerController.setPosition(insertPos, 'harness.recovery.pressure');
           }
         }
       }
       const engagementCenter = getEngagementCenter(systems) || enemySpawn;
-      const nearestOpfor = findNearestOpfor(systems, 200 * 200);
-      const target = nearestOpfor
-        ? nearestOpfor.position
-        : getModeObjective(systems, playerPos) || engagementCenter;
+      const nearestOpfor = findNearestOpfor(systems, perceptionRange * perceptionRange);
+      const predictedTarget = nearestOpfor ? predictTargetPoint(nearestOpfor, playerPos) : null;
+      const target = predictedTarget || nearestOpfor?.position || getModeObjective(systems, playerPos) || engagementCenter;
       state.targetVisible = false;
 
       if (target) {
@@ -553,8 +827,14 @@
         while (yawDelta < -Math.PI) yawDelta += Math.PI * 2;
         const pitchDelta = desiredPitch - prevPitch;
 
-        const nextYaw = prevYaw + Math.max(-MAX_YAW_STEP, Math.min(MAX_YAW_STEP, yawDelta));
-        const nextPitch = prevPitch + Math.max(-MAX_PITCH_STEP, Math.min(MAX_PITCH_STEP, pitchDelta));
+        const distToTarget = Math.hypot(
+          Number((target.x || 0) - playerPos.x),
+          Number((target.z || 0) - playerPos.z)
+        );
+        const dynamicYawStep = Math.min(0.14, MAX_YAW_STEP + (distToTarget < 85 ? 0.03 : 0));
+        const dynamicPitchStep = Math.min(0.1, MAX_PITCH_STEP + (distToTarget < 85 ? 0.02 : 0));
+        const nextYaw = prevYaw + Math.max(-dynamicYawStep, Math.min(dynamicYawStep, yawDelta));
+        const nextPitch = prevPitch + Math.max(-dynamicPitchStep, Math.min(dynamicPitchStep, pitchDelta));
 
         camera.rotation.y = nextYaw;
         camera.rotation.x = nextPitch;
@@ -574,12 +854,25 @@
             y: Number(nearestOpfor.position.y || 0) + 1.2,
             z: nearestOpfor.position.z
           };
-          const blocked = hasTerrainOcclusion(systems, eye, targetEye);
-          state.targetVisible = !blocked;
+          const blockedRay = hasTerrainOcclusion(systems, eye, targetEye);
+          const blockedHeight = hasHeightProfileOcclusion(systems, eye, targetEye);
+          state.targetVisible = !(blockedRay || blockedHeight);
         }
       }
 
-      const movementTarget = nearestOpfor ? nearestOpfor.position : (getModeObjective(systems, playerPos) || engagementCenter);
+      const captureFocus = getCaptureFocus(systems, playerPos);
+      const shouldBiasCombat = opts.mode === 'open_frontier'
+        && (state.capturedZoneCount > 0 || (Date.now() - state.lastShotAt) > 25000);
+      const combatTarget = getEnemyMassPoint(systems) || getLeadChargePoint(systems) || engagementCenter;
+      const objectiveTarget = shouldBiasCombat
+        ? (combatTarget || captureFocus?.target || getModeObjective(systems, playerPos) || engagementCenter)
+        : (captureFocus?.target || getModeObjective(systems, playerPos) || engagementCenter);
+      const nearestDist = nearestOpfor
+        ? Math.hypot(nearestOpfor.position.x - playerPos.x, nearestOpfor.position.z - playerPos.z)
+        : Number.POSITIVE_INFINITY;
+      const nearestPredicted = nearestOpfor ? predictTargetPoint(nearestOpfor, playerPos) : null;
+      const predictedLockDistance = opts.mode === 'open_frontier' ? 170 : opts.mode === 'team_deathmatch' ? 125 : 95;
+      const movementTarget = (nearestPredicted && nearestDist < predictedLockDistance) ? nearestPredicted : objectiveTarget;
       if (movementTarget) {
         const dx = movementTarget.x - playerPos.x;
         const dz = movementTarget.z - playerPos.z;
@@ -615,15 +908,37 @@
               nextPos.y = Number(height) + 2;
             }
             if (systems.playerController && systems.playerController.setPosition) {
-              systems.playerController.setPosition(nextPos);
+              systems.playerController.setPosition(nextPos, 'harness.recovery.stuck');
             }
             state.stuckMs = 0;
           }
         }
 
         const now = Date.now();
+        if (captureFocus && captureFocus.hold && captureFocus.inside) {
+          setMovementState('hold');
+          return;
+        }
+
+        if (now < state.firingUntil && state.targetVisible) {
+          setMovementState('hold');
+          return;
+        }
         if (now - state.lastMovementDecisionAt >= modeProfile.decisionIntervalMs) {
           state.lastMovementDecisionAt = now;
+          const noNearbyEnemy = !nearestOpfor || nearestDist > (opts.mode === 'open_frontier' ? 140 : 95);
+          if (captureFocus && !captureFocus.inside && noNearbyEnemy) {
+            setMovementState('sprint');
+            return;
+          }
+          if (captureFocus && !captureFocus.inside) {
+            setMovementState(dist > modeProfile.sprintDistance ? 'sprint' : 'advance');
+            return;
+          }
+          if (!state.targetVisible && dist > 60) {
+            setMovementState(dist > modeProfile.sprintDistance ? 'sprint' : 'advance');
+            return;
+          }
           // Coherent movement policy: fewer abrupt transitions, mode-aware ranges.
           if (dist > modeProfile.sprintDistance) {
             setMovementState('sprint');
@@ -631,7 +946,7 @@
             setMovementState('advance');
           } else if (dist < modeProfile.retreatDistance && state.targetVisible) {
             setMovementState('retreat');
-          } else if (state.targetVisible && Math.random() < modeProfile.holdChanceWhenVisible) {
+          } else if (state.targetVisible && dist < 70 && Math.random() < modeProfile.holdChanceWhenVisible) {
             setMovementState('hold');
           } else if (modeProfile.preferredJuke === 'push' && Math.random() < 0.3) {
             setMovementState('advance');
@@ -651,7 +966,8 @@
         respawnCount: state.respawnCount,
         frontlineCompressed: state.frontlineCompressed,
         frontlineDistance: state.frontlineDistance,
-        frontlineMoveCount: state.frontlineMoveCount
+        frontlineMoveCount: state.frontlineMoveCount,
+        capturedZoneCount: state.capturedZoneCount
       };
     }
 
@@ -667,7 +983,7 @@
       const camera = systems && systems.playerController && systems.playerController.getCamera
         ? systems.playerController.getCamera()
         : null;
-      const nearestOpfor = findNearestOpfor(systems, 180 * 180);
+      const nearestOpfor = findNearestOpfor(systems, perceptionRange * perceptionRange);
       if (!playerPos || !camera || !nearestOpfor) return;
 
       const dx = nearestOpfor.position.x - playerPos.x;
@@ -675,22 +991,64 @@
       const dz = nearestOpfor.position.z - playerPos.z;
       const dist = Math.hypot(dx, dy, dz);
       if (!Number.isFinite(dist) || dist < 0.001) return;
-      const closeRange = dist < 45;
-      if (!state.targetVisible && !closeRange) return;
+      const closeRange = dist < (opts.mode === 'open_frontier' ? 95 : 65);
+      const eye = {
+        x: playerPos.x,
+        y: Number(playerPos.y || 0) + 1.6,
+        z: playerPos.z
+      };
+      const targetEye = {
+        x: nearestOpfor.position.x,
+        y: Number(nearestOpfor.position.y || 0) + 1.2,
+        z: nearestOpfor.position.z
+      };
+      const blockedRay = hasTerrainOcclusion(systems, eye, targetEye);
+      const blockedHeight = hasHeightProfileOcclusion(systems, eye, targetEye);
+      const visibleNow = !(blockedRay || blockedHeight);
+      state.targetVisible = visibleNow;
+      if (!visibleNow && !closeRange) return;
       const tx = dx / dist;
       const ty = dy / dist;
       const tz = dz / dist;
 
+      // Pre-shot assist: tighten aim toward center mass just before burst.
+      const cameraController = systems.playerController ? systems.playerController.cameraController : null;
+      const prevYaw = cameraController ? Number(cameraController.yaw || 0) : Number(camera.rotation.y || 0);
+      const prevPitch = cameraController ? Number(cameraController.pitch || 0) : Number(camera.rotation.x || 0);
+      camera.lookAt(nearestOpfor.position.x, (nearestOpfor.position.y || 0) + 1.25, nearestOpfor.position.z);
+      const desiredYaw = Number(camera.rotation.y || 0);
+      const desiredPitch = Number(camera.rotation.x || 0);
+      let yawDelta = desiredYaw - prevYaw;
+      while (yawDelta > Math.PI) yawDelta -= Math.PI * 2;
+      while (yawDelta < -Math.PI) yawDelta += Math.PI * 2;
+      const pitchDelta = desiredPitch - prevPitch;
+      const assistYaw = Math.max(-0.24, Math.min(0.24, yawDelta));
+      const assistPitch = Math.max(-0.16, Math.min(0.16, pitchDelta));
+      const nextYaw = prevYaw + assistYaw;
+      const nextPitch = prevPitch + assistPitch;
+      camera.rotation.y = nextYaw;
+      camera.rotation.x = nextPitch;
+      if (cameraController) {
+        cameraController.yaw = nextYaw;
+        cameraController.pitch = nextPitch;
+      }
+
       const forward = getCameraForward(camera);
       const aimDot = forward.x * tx + forward.y * ty + forward.z * tz;
-      if (aimDot < 0.82) return;
+      if (aimDot < 0.58) return;
+
+      if (dist < 110) {
+        setMovementState('hold');
+      }
 
       mouseDown();
-      const holdMs = 220 + Math.floor(Math.random() * 220);
+      state.lastShotAt = Date.now();
+      const holdMs = 260 + Math.floor(Math.random() * 220);
+      state.firingUntil = Date.now() + holdMs + 120;
       setTimeout(function () {
         mouseUp();
       }, holdMs);
-    }, 900);
+    }, 700);
 
     state.heartbeatTimer = setInterval(function () {
       keepPlayerInAction();
@@ -716,7 +1074,9 @@
       globalWindow.__perfHarnessDriverState = driver;
       return {
         movementPatternCount: driver.movementPatternCount || 0,
-        compressFrontline: !!driver.compressFrontline
+        compressFrontline: !!driver.compressFrontline,
+        mode: String(driver.mode || ''),
+        allowWarpRecovery: !!driver.allowWarpRecovery
       };
     },
     stop: function () {

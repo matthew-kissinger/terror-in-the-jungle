@@ -43,8 +43,8 @@ export class HUDUpdater {
     this.initializeGameStatus();
   }
 
-  updateObjectivesDisplay(zoneManager: ZoneManager, isTDM: boolean = false): void {
-    this.zoneDisplay.updateObjectivesDisplay(zoneManager, isTDM);
+  updateObjectivesDisplay(zoneManager: ZoneManager, isTDM: boolean = false, playerPosition?: { x: number; y: number; z: number }): void {
+    this.zoneDisplay.updateObjectivesDisplay(zoneManager, isTDM, playerPosition);
   }
 
   updateTicketDisplay(usTickets: number, opforTickets: number, isTDM: boolean = false, target: number = 0): void {

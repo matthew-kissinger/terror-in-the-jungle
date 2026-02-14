@@ -149,7 +149,7 @@ export interface IPlayerController {
   dispose(): void;
 
   // Movement / state
-  setPosition(position: THREE.Vector3): void;
+  setPosition(position: THREE.Vector3, reason?: string): void;
   updatePlayerPosition(position: THREE.Vector3): void;
   disableControls(): void;
   enableControls(): void;

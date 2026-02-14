@@ -4,6 +4,12 @@ Last updated: 2026-02-14
 Scope: Full codebase remediation with combat-first critical path, using iterative discovery.
 Primary performance target: 60 FPS (16.67 ms frame), with 120 combatants and high vegetation density.
 
+## Active Mode
+
+- Frontier exploration mode is now active.
+- Primary mission document: `docs/PERFORMANCE_FRONTIER_MISSION.md`.
+- This file remains the execution ledger and architecture map, but paradigm-replacement decisions must follow the frontier mission rules.
+
 ## Operating Rules
 
 - No new abstractions on hot paths unless they remove measurable frame time.
@@ -236,6 +242,12 @@ Use critical-path priorities as guidance, not hard sequencing, when evidence poi
 | 2026-02-14 | EXP-025 | Harness startup intermittently fails early from fixed 30s navigation/metrics waits | Hardened startup with stale-port cleanup, `goto(waitUntil='commit')`, and startup wait logic that honors configured timeout and returns structured failure context instead of hard throw | short headed captures | Harness now continues through late sandbox metric availability and produces actionable artifacts on unstable startup | KEEP + ITERATE | `scripts/perf-capture.ts`, `artifacts/perf/2026-02-14T06-22-46-021Z` |
 | 2026-02-14 | EXP-026 | Unstable startup path wastes capture time and obscures root-cause evidence | Added startup-diagnostics artifact and skipped runtime sampling when startup is not stabilized | short headed capture | Faster failure loop with clearer startup state (`startup-diagnostics.json`) and less noisy false runtime data | KEEP | `scripts/perf-capture.ts` |
 | 2026-02-14 | EXP-027 | Helicopter fast-flight crash on Open Frontier from unclamped deltaTime + allocation cascade | 13 fixes: deltaTime clamp, horizontal speed cap, lerp clamping, rotor wrap, allocation elimination (octree/cluster/terrain/audio), ring buffer metrics, octree threshold increase | build + 3222 tests + headed harness (20s, 60 NPC) | All PASS (15/16 checks pass, 1 warn=heap 25.5MB). Avg frame 7.13ms, p99 11.9ms, max 100ms (clamp working), 0 errors, 0 crashes, 70 shots / 1 hit validated | KEEP | `GameEngineLoop.ts`, `HelicopterPhysics.ts`, `HelicopterAnimation.ts`, `SpatialOctree.ts`, `SpatialOctreeNode.ts`, `ClusterManager.ts`, `CombatantMovement.ts`, `ChunkTerrainQueries.ts`, `ChunkSpatialUtils.ts`, `AudioWeaponSounds.ts`, `DayNightCycle.ts`, `RuntimeMetrics.ts` |
+| 2026-02-14 | EXP-028 | Harness startup/gating overhead is contaminating perf signal and producing false aborts | Made runtime preflight opt-in by default, capped preflight timeout, scaled run hard-timeout with configured run budget, and aligned `page.goto` timeout with startup timeout | short/medium headed captures across modes | Harness now avoids preflight-driven 50s stalls and no longer false-aborts long startup/mode boots at static 30s/120s limits | KEEP | `scripts/perf-capture.ts`, `docs/PROFILING_HARNESS.md` |
+| 2026-02-14 | EXP-029 | Single generic sim-player behavior under-covers mode-specific combat dynamics | Added mode-aware active driver profiles/objective selection for `ai_sandbox`, `zone_control`, `team_deathmatch`, `open_frontier`; added mode-specific harness commands and relaxed frontier hit-gate for short sweeps | headed mode sweep (`zone_control`, `team_deathmatch`, `open_frontier`) | Zone Control + TDM pass with active hits; Open Frontier short sweep now fails on real tail-latency (p99 spikes), not hit-gate strictness | KEEP + ITERATE | `scripts/perf-active-driver.js`, `scripts/perf-capture.ts`, `package.json`, `docs/PROFILING_HARNESS.md`, `artifacts/perf/2026-02-14T20-38-29-583Z`, `artifacts/perf/2026-02-14T20-39-27-239Z`, `artifacts/perf/2026-02-14T20-43-38-411Z` |
+| 2026-02-14 | EXP-030 | Open Frontier objective-approach stalls are primarily from far/culled AI update bursts, not harness observer overhead | Added culled-loop strict budgeting, desynced distant simulation phases, sparse/no spatial sync for large-world culled path, and octree direct node ownership for O(1)-ish remove | native Open Frontier (`--sandbox false`) repeated headed captures | Peak catastrophic stalls dropped from ~29s/14s class to bounded spikes; intermittent large spikes traced to single-combatant culled path | KEEP + ITERATE | `src/systems/combat/CombatantLODManager.ts`, `src/systems/combat/SpatialOctree.ts`, `src/systems/combat/SpatialOctreeNode.ts`, `artifacts/perf/2026-02-14T21-16-32-140Z`, `artifacts/perf/2026-02-14T21-25-36-931Z`, `artifacts/perf/2026-02-14T21-32-28-241Z`, `artifacts/perf/2026-02-14T21-41-05-313Z` |
+| 2026-02-14 | EXP-031 | Single-NPC rotation state corruption can hard-stall the frame loop during culled-near updates | Replaced unbounded `while` angle normalization in `CombatantMovement.updateRotation` with finite guards + modulo normalization and clamped delta | Open Frontier near-objective active captures with warp recovery | Reproducible single-combatant 12.7s culled spike path eliminated in follow-up runs; objective-proximity runs now sustain active shots/hits with no multi-second freeze signature | KEEP | `src/systems/combat/CombatantMovement.ts`, `src/systems/combat/CombatantLODManager.ts`, `artifacts/perf/2026-02-14T21-45-38-644Z` |
+| 2026-02-14 | EXP-032 | Zone capture/HUD semantics were inconsistent in Open Frontier (false `CONTESTED`, capture deadlock feel) | Replaced capture-state logic with net-advantage tug-of-war + dwell-time gate; constrained `CONTESTED` to true two-faction presence; surfaced per-zone status text in HUD objectives panel | world unit tests + live Open Frontier runs | Capture now requires time-in-zone, no instant step-in flips, and HUD no longer labels single-faction capture as contested | KEEP + TUNE | `src/systems/world/ZoneCaptureLogic.ts`, `src/systems/world/ZoneCaptureLogic.test.ts`, `src/ui/hud/HUDZoneDisplay.ts`, `src/ui/hud/HUDZoneStyles.ts` |
+| 2026-02-14 | EXP-033 | Open Frontier player hits dropped at close/mid range due over-restrictive combat range + coarse heightfield occlusion rejection | Increased engagement hit range (150 -> 280), bypassed coarse height-profile occlusion for close-range shots, and kept terrain ray block as authoritative | combat tests + OF headed captures | Player shot/hit path restored in frontier captures (`shots/hits` non-zero), with close-range hill fights no longer silently rejected by prefilter | KEEP + MONITOR | `src/systems/combat/CombatantHitDetection.ts`, `src/systems/combat/CombatantCombat.ts`, `src/systems/combat/CombatantHitDetection.test.ts`, `src/systems/combat/CombatantCombat.test.ts`, `artifacts/perf/2026-02-14T22-38-33-605Z` |
 
 ### EXP-027: Helicopter Fast-Flight Crash Fix (2026-02-14)
 
@@ -544,3 +556,109 @@ Instrumentation points:
   - Open Frontier soak: `npm run perf:capture:frontier30m`.
 - Startup:
   - `startup-timeline.json` + `summary.startupTiming/toolchain`.
+
+### Frontier Cycle 1 (Active): Perception Primitive Swap
+
+- Subsystem: Perception (LOS).
+- Current method: CPU terrain raycast confirmations after cache/FOV checks.
+- Replacement candidate: terrain heightfield prefilter (sampled line test) before raycast budget consumption.
+- New paradigm: probabilistic/approximate field sampling before precise narrowphase.
+- Flagged experiment:
+  - Runtime query flag: `losHeightPrefilter=1`.
+  - Harness flag: `PERF_LOS_HEIGHT_PREFILTER=1` or `--los-height-prefilter true`.
+  - Profile command: `npm run perf:capture:combat120:losprefilter`.
+- New telemetry:
+  - `combatProfile.timing.losCache.prefilterPasses`
+  - `combatProfile.timing.losCache.prefilterRejects`
+- Keep/revert gate:
+  - Keep only if raycast denial and AI starvation tail metrics improve without obvious LOS fairness regressions.
+
+Frontier Cycle 1 A/B result (2026-02-14, short headed smoke):
+- Baseline artifact: `artifacts/perf/2026-02-14T20-03-50-039Z`
+- Prefilter artifact: `artifacts/perf/2026-02-14T20-05-17-421Z`
+- Baseline:
+  - `hits=3`, `raycast.totalRequested=1674`, `raycast.totalDenied=24`, `denialRate=1.43%`
+- Prefilter enabled:
+  - `hits=2`, `raycast.totalRequested=1378`, `raycast.totalDenied=17`, `denialRate=1.23%`
+  - `los.prefilterPasses=1378`, `los.prefilterRejects=523`
+- Decision:
+  - KEEP AS EXPERIMENTAL (flag-off default) and proceed to longer 120-NPC A/B run.
+  - Rationale: measurable raycast pressure reduction with similar frame stability and no hard hit-validation failure after prefilter guardrail adjustments.
+
+Frontier Cycle 1 120-NPC gate (45s, headed, matched runtime settings):
+- Baseline artifact: `artifacts/perf/2026-02-14T20-06-31-598Z`
+- Prefilter artifact: `artifacts/perf/2026-02-14T20-07-39-231Z`
+- Baseline:
+  - `summary.avg_frame_ms=8.50`
+  - `summary.peak_p99_frame_ms=15.0`
+  - `hits=14/160`
+  - `raycast.totalRequested=9260`, `raycast.totalDenied=33` (`denialRate=0.36%`)
+- Prefilter enabled:
+  - `summary.avg_frame_ms=9.90` (worse)
+  - `summary.peak_p99_frame_ms=18.7` (worse)
+  - `hits=4/147` (worse combat pressure quality)
+  - `raycast.totalRequested=6424`, `raycast.totalDenied=11` (`denialRate=0.17%`)
+  - `prefilterPasses=6424`, `prefilterRejects=3323`
+- Decision:
+  - DO NOT PROMOTE as default path.
+  - Keep behind `losHeightPrefilter` experiment flag for future GPU/WASM field-backed variants.
+  - Current pure CPU heightfield prefilter cuts raycast pressure but regresses overall frame quality and engagement outcomes in the 120-NPC gate.
+
+Harness player-policy follow-up (2026-02-14):
+- Adjusted active driver to lead the charge:
+  - objective shifted ahead of friendly centroid toward enemy center
+  - reduced idle/hold behavior and softened retreat conditions
+  - respawn bias moved closer to frontline
+- Verification artifact: `artifacts/perf/2026-02-14T20-11-10-660Z`
+  - 120 NPC, 12s smoke, hit validation passes (`7` hits / `30` shots), stable startup (`6s` threshold).
+
+### Frontier Cycle 2 (Active): Remove Duplicate Spatial Sync Ownership
+
+- Subsystem: Spatial queries / synchronization.
+- Current method: primary octree updates in LOD path plus secondary full-map `spatialGridManager.syncAllPositions(...)`.
+- Replacement candidate: disable secondary sync pass and test single-owner viability.
+- Flagged experiment:
+  - Query flag: `spatialSecondarySync=0`
+  - Harness flag: `PERF_SPATIAL_SECONDARY_SYNC=0` or `--spatial-secondary-sync false`
+  - Profile command: `npm run perf:capture:combat120:nosecondaryspatial`
+- Keep/revert gate:
+  - Keep if p95/p99 and `combatBreakdown.totalMs` improve without hit-validation regressions.
+
+Cycle 2 initial result (direct disable smoke):
+- Artifact: `artifacts/perf/2026-02-14T20-12-35-626Z`
+- Setup: `spatialSecondarySync=0`, 120 NPC, 12s smoke.
+- Outcome:
+  - Validation FAIL: `player_hits_recorded=0` and `player_hit_rate_peak=0`.
+  - Spatial sync cost was removed (`combat.spatialSyncMs=0`) but combat correctness regressed.
+- Decision:
+  - REJECT direct removal of secondary sync path in current architecture.
+  - Secondary sync remains required by at least one hit-detection/targeting consumer.
+  - Next frontier action for Cycle 2:
+    - identify and migrate all consumers from `spatialGridManager` to single-owner spatial source,
+    - then re-run `spatialSecondarySync=0` gate.
+
+### EXP-032: Post-Spawn Teleport Guard (Open Frontier)
+
+Problem signal:
+- Player can spawn at HQ, then jump to mid-map about 1s later.
+- Symptom overlaps with harness recovery warps and any stray post-start position writes.
+
+Change:
+- `PlayerController.setPosition(position, reason?)` now accepts an optional source tag.
+- Added spawn stabilization window:
+  - for 2.5s after `startup.spawn.*`, block large unknown jumps (`>60m`) unless reason is trusted (`startup|respawn|helicopter|harness|teleport`).
+- Startup and respawn callsites now pass explicit reasons:
+  - `startup.spawn.sandbox`
+  - `startup.spawn.mode-hq`
+  - `respawn.manager`
+- Harness recovery warps now pass explicit `harness.recovery.*` reasons.
+- Large teleports now force immediate chunk-player sync to reduce visual-hole windows after jumps.
+
+Why this is reversible:
+- Logic is isolated in `PlayerController` gate; can be removed by deleting stabilization branch and optional reason tags.
+
+Validation target:
+- In manual Open Frontier starts, no unexpected second relocation in first 2.5s.
+- If relocation is attempted, log shows:
+  - blocked (`[spawn-stabilization] blocked ... reason=unknown`)
+  - or allowed with explicit source reason.

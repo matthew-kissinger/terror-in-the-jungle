@@ -203,6 +203,7 @@ export class ImprovedChunkManager implements GameSystem {
       
       // Check if player moved to different chunk
       if (this.priorityManager.hasPlayerMovedChunk()) {
+        this.ensurePlayerChunkResident();
         this.loadQueueManager.updateLoadQueue();
       }
       
@@ -256,6 +257,25 @@ export class ImprovedChunkManager implements GameSystem {
       (distance) => this.priorityManager.calculateLOD(distance),
       (distance) => this.priorityManager.shouldChunkBeVisible(distance)
     );
+  }
+
+  private ensurePlayerChunkResident(): void {
+    const centerX = Math.floor(this.playerPosition.x / this.config.size);
+    const centerZ = Math.floor(this.playerPosition.z / this.config.size);
+    const required: Array<[number, number]> = [
+      [centerX, centerZ],
+      [centerX + 1, centerZ],
+      [centerX - 1, centerZ],
+      [centerX, centerZ + 1],
+      [centerX, centerZ - 1]
+    ];
+
+    for (const [chunkX, chunkZ] of required) {
+      if (this.lifecycleManager.isChunkLoaded(chunkX, chunkZ)) continue;
+      void this.lifecycleManager.loadChunkImmediate(chunkX, chunkZ).catch((error) => {
+        Logger.warn('chunks', `Failed immediate ensure-load for chunk (${chunkX}, ${chunkZ}): ${String(error)}`);
+      });
+    }
   }
 
   // Public accessors

@@ -38,6 +38,8 @@ export class AILineOfSight {
   static cacheHits = 0;
   static cacheMisses = 0;
   static budgetDenials = 0;
+  static prefilterPasses = 0;
+  static prefilterRejects = 0;
 
   setChunkManager(chunkManager: ImprovedChunkManager): void {
     this.chunkManager = chunkManager;
@@ -70,13 +72,22 @@ export class AILineOfSight {
   /**
    * Get profiling stats for the LOS cache.
    */
-  static getCacheStats(): { hits: number; misses: number; hitRate: number; budgetDenials: number } {
+  static getCacheStats(): {
+    hits: number;
+    misses: number;
+    hitRate: number;
+    budgetDenials: number;
+    prefilterPasses: number;
+    prefilterRejects: number;
+  } {
     const total = AILineOfSight.cacheHits + AILineOfSight.cacheMisses;
     return {
       hits: AILineOfSight.cacheHits,
       misses: AILineOfSight.cacheMisses,
       hitRate: total > 0 ? AILineOfSight.cacheHits / total : 0,
       budgetDenials: AILineOfSight.budgetDenials,
+      prefilterPasses: AILineOfSight.prefilterPasses,
+      prefilterRejects: AILineOfSight.prefilterRejects,
     };
   }
 
@@ -87,6 +98,8 @@ export class AILineOfSight {
     AILineOfSight.cacheHits = 0;
     AILineOfSight.cacheMisses = 0;
     AILineOfSight.budgetDenials = 0;
+    AILineOfSight.prefilterPasses = 0;
+    AILineOfSight.prefilterRejects = 0;
   }
 
   /**
@@ -133,6 +146,18 @@ export class AILineOfSight {
     }
 
     AILineOfSight.cacheMisses++;
+
+    // Cheap substitution for many expensive LOS raycasts:
+    // sample terrain heightfield along the sight segment and reject clearly occluded pairs.
+    if (this.isHeightfieldPrefilterEnabled() && this.chunkManager) {
+      const blocked = this.isBlockedByHeightfield(combatant, targetPos, distance);
+      if (blocked) {
+        AILineOfSight.prefilterRejects++;
+        this.losCache.set(cacheKey, { result: false, timestamp: now });
+        return false;
+      }
+      AILineOfSight.prefilterPasses++;
+    }
 
     // --- Raycast budget gate ---
     // Terrain and sandbag checks are the expensive part.
@@ -226,5 +251,50 @@ export class AILineOfSight {
     }
 
     return true;
+  }
+
+  private isHeightfieldPrefilterEnabled(): boolean {
+    const fromGlobal = (globalThis as any).__LOS_HEIGHTFIELD_PREFILTER__;
+    if (typeof fromGlobal === 'boolean') return fromGlobal;
+    if (typeof window === 'undefined') return false;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const raw = params.get('losHeightPrefilter');
+      return raw === '1' || raw === 'true';
+    } catch {
+      return false;
+    }
+  }
+
+  private isBlockedByHeightfield(combatant: Combatant, targetPos: THREE.Vector3, distance: number): boolean {
+    if (!this.chunkManager || distance < 35 || distance > 220) return false;
+    const getTerrainHeightAt =
+      (this.chunkManager as any).getTerrainHeightAt ||
+      (this.chunkManager as any).getHeightAt ||
+      (this.chunkManager as any).getEffectiveHeightAt;
+    if (typeof getTerrainHeightAt !== 'function') return false;
+
+    _eyePos.copy(combatant.position);
+    _eyePos.y += 1.7;
+    _targetEyePos.copy(targetPos);
+    _targetEyePos.y += 1.7;
+
+    const samples = Math.min(6, Math.max(2, Math.floor(distance / 20)));
+    let blockingSamples = 0;
+    for (let i = 1; i < samples; i++) {
+      const t = i / samples;
+      const sampleX = _eyePos.x + (_targetEyePos.x - _eyePos.x) * t;
+      const sampleZ = _eyePos.z + (_targetEyePos.z - _eyePos.z) * t;
+      const lineY = _eyePos.y + (_targetEyePos.y - _eyePos.y) * t;
+      const terrainY = Number(getTerrainHeightAt.call(this.chunkManager, sampleX, sampleZ));
+      if (!Number.isFinite(terrainY)) continue;
+      if (terrainY > lineY + 1.2) {
+        blockingSamples++;
+        if (blockingSamples >= 2) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 }

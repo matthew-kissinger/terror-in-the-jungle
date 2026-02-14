@@ -9,6 +9,8 @@ import { Logger } from '../../utils/Logger';
 export class HelicopterAudio {
   private audioListener?: THREE.AudioListener;
   private rotorAudio: Map<string, THREE.PositionalAudio> = new Map();
+  private audioReady: Map<string, boolean> = new Map();
+  private audioFailed: Set<string> = new Set();
   private audioLoader = new THREE.AudioLoader();
 
   /**
@@ -42,11 +44,15 @@ export class HelicopterAudio {
         rotorAudio.setMaxDistance(100); // Ensure it can be heard at reasonable distance
 
         // Don't start playing immediately - wait for control
+        this.audioReady.set(helicopterId, true);
         Logger.debug('helicopter', ' Helicopter rotor audio loaded and ready - volume:', rotorAudio.getVolume());
       },
       undefined,
       (error) => {
-        Logger.error('helicopter', ' Failed to load helicopter rotor audio:', error);
+        this.audioReady.set(helicopterId, false);
+        this.audioFailed.add(helicopterId);
+        Logger.warn('helicopter', ' Failed to load helicopter rotor audio; disabling rotor audio for this helicopter');
+        Logger.debug('helicopter', String(error));
       }
     );
 
@@ -66,15 +72,25 @@ export class HelicopterAudio {
   ): void {
     const rotorAudio = this.rotorAudio.get(helicopterId);
     if (!rotorAudio) return;
+    if (this.audioFailed.has(helicopterId)) return;
+    const isReady = this.audioReady.get(helicopterId) === true;
 
     let targetVolume: number;
     let targetPlaybackRate: number;
 
     if (isPlayerControlling && physics) {
+      if (!isReady) return;
       // Player is controlling - ensure audio is playing
       if (!rotorAudio.isPlaying) {
-        rotorAudio.play();
-        Logger.debug('helicopter', ' Starting helicopter rotor audio');
+        try {
+          rotorAudio.play();
+          Logger.debug('helicopter', ' Starting helicopter rotor audio');
+        } catch (error) {
+          this.audioFailed.add(helicopterId);
+          Logger.warn('helicopter', ` Failed to start rotor audio playback for ${helicopterId}; disabling audio`);
+          Logger.debug('helicopter', String(error));
+          return;
+        }
       }
 
       // Use physics data
@@ -142,6 +158,8 @@ export class HelicopterAudio {
       audio.disconnect();
       this.rotorAudio.delete(helicopterId);
     }
+    this.audioReady.delete(helicopterId);
+    this.audioFailed.delete(helicopterId);
   }
 
   /**
@@ -155,5 +173,7 @@ export class HelicopterAudio {
       audio.disconnect();
     });
     this.rotorAudio.clear();
+    this.audioReady.clear();
+    this.audioFailed.clear();
   }
 }

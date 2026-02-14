@@ -72,11 +72,8 @@ export class OctreeNode {
       ), this.depth + 1)
     ]
 
-    // Redistribute entities to children
-    for (const _id of this.entities) {
-      // Children will handle insertion
-    }
-    this.entities = []
+    // Keep entities on this node until caller redistributes them.
+    // Clearing here breaks insert/remove bookkeeping during subdivision.
   }
 
   /**

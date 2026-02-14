@@ -271,6 +271,10 @@ export const getNPCFragmentShader = (): string => {
           finalColor = mix(finalColor, finalColor + combatTint, combatState);
         }
 
+        // Keep combatants readable at mid/far ranges in jungle lighting.
+        finalColor = finalColor * 1.18 + vec3(0.045);
+        finalColor = clamp(finalColor, 0.0, 1.0);
+
         gl_FragColor = vec4(finalColor, texColor.a);
       }
     `;

@@ -11,6 +11,7 @@ import { AudioManager } from '../audio/AudioManager';
 export class CombatantSuppression {
   private playerSuppressionSystem?: PlayerSuppressionSystem;
   private audioManager?: AudioManager;
+  private queryProvider: ((center: THREE.Vector3, radius: number) => string[]) | null = null;
 
   // Module-level scratch vectors (do not share with other modules)
   private readonly SUPPRESSION_RADIUS = 5.0;
@@ -22,6 +23,10 @@ export class CombatantSuppression {
 
   setAudioManager(manager: AudioManager): void {
     this.audioManager = manager;
+  }
+
+  setQueryProvider(provider: (center: THREE.Vector3, radius: number) => string[]): void {
+    this.queryProvider = provider;
   }
 
   /**
@@ -51,7 +56,7 @@ export class CombatantSuppression {
     }
 
     // Use spatial query to find only nearby combatants instead of O(n) scan
-    if (!spatialGridManager.getIsInitialized()) {
+    if (!this.queryProvider && !spatialGridManager.getIsInitialized()) {
       // Fallback to old behavior if spatial grid not initialized (shouldn't happen)
       allCombatants.forEach(combatant => {
         if (combatant.faction === shooterFaction) return;
@@ -68,7 +73,9 @@ export class CombatantSuppression {
     }
 
     // Spatial query: only check combatants within SUPPRESSION_RADIUS
-    const nearbyCombatantIds = spatialGridManager.queryRadius(hitPoint, this.SUPPRESSION_RADIUS);
+    const nearbyCombatantIds = this.queryProvider
+      ? this.queryProvider(hitPoint, this.SUPPRESSION_RADIUS)
+      : spatialGridManager.queryRadius(hitPoint, this.SUPPRESSION_RADIUS);
 
     for (const id of nearbyCombatantIds) {
       const combatant = allCombatants.get(id);

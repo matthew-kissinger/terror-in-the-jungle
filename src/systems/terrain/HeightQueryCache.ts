@@ -30,9 +30,6 @@ export class HeightQueryCache {
     // Check cache
     const cached = this.cache.get(key);
     if (cached !== undefined) {
-      // Move to end (LRU)
-      this.cache.delete(key);
-      this.cache.set(key, cached);
       return cached;
     }
 

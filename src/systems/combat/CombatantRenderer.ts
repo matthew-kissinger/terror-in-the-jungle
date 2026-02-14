@@ -34,6 +34,7 @@ export class CombatantRenderer {
   private readonly scratchPosition = new THREE.Vector3();
   private readonly scratchUp = new THREE.Vector3(0, 1, 0);
   private readonly scratchTiltAxis = new THREE.Vector3();
+  private readonly scratchPerpDir = new THREE.Vector3();
   private readonly scratchTiltMatrix = new THREE.Matrix4();
   private readonly scratchScaleMatrix = new THREE.Matrix4();
   private readonly scratchOutlineMatrix = new THREE.Matrix4();
@@ -45,6 +46,15 @@ export class CombatantRenderer {
     this.camera = camera;
     this.assetLoader = assetLoader;
     this.meshFactory = new CombatantMeshFactory(scene, assetLoader);
+  }
+
+  private stableHash01(id: string): number {
+    let hash = 2166136261;
+    for (let i = 0; i < id.length; i++) {
+      hash ^= id.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return ((hash >>> 0) % 1000) / 1000;
   }
 
   async createFactionBillboards(): Promise<void> {
@@ -145,7 +155,61 @@ export class CombatantRenderer {
           const progress = combatant.deathProgress;
           const animType = combatant.deathAnimationType || 'fallback';
 
-          if (animType === 'spinfall') {
+          if (animType === 'shatter') {
+            const seed = this.stableHash01(combatant.id);
+            const spinBias = 0.8 + seed * 1.2;
+            const spreadBias = 1.0 + seed * 0.9;
+            const deathDir = combatant.deathDirection ?? this.scratchTiltAxis.set(0, 0, -1);
+            this.scratchPerpDir.set(-deathDir.z, 0, deathDir.x).normalize();
+
+            if (progress < FALL_PHASE) {
+              const t = progress / FALL_PHASE;
+              const pop = Math.sin(t * Math.PI);
+              finalPosition.x += deathDir.x * pop * (0.9 * spreadBias);
+              finalPosition.z += deathDir.z * pop * (0.9 * spreadBias);
+              finalPosition.x += this.scratchPerpDir.x * pop * ((seed - 0.5) * 1.4);
+              finalPosition.z += this.scratchPerpDir.z * pop * ((seed - 0.5) * 1.4);
+              finalPosition.y += 0.25 + pop * 0.45;
+              const spinY = (0.8 + t * 2.4) * Math.PI * spinBias;
+              const spinZ = (0.2 + t * 1.4) * Math.PI * (0.6 + seed);
+              this.scratchSpinMatrix.makeRotationY(spinY);
+              matrix.multiply(this.scratchSpinMatrix);
+              this.scratchSpinMatrix.makeRotationZ(spinZ);
+              matrix.multiply(this.scratchSpinMatrix);
+              finalScaleX *= 1.05 + pop * (0.45 + seed * 0.2);
+              finalScaleY *= Math.max(0.3, 1.0 - pop * 0.65);
+              finalScaleZ *= 1.02 + pop * 0.25;
+            } else if (progress < FALL_PHASE + GROUND_PHASE) {
+              const t = (progress - FALL_PHASE) / GROUND_PHASE;
+              finalPosition.x += deathDir.x * (1.9 * spreadBias);
+              finalPosition.z += deathDir.z * (1.9 * spreadBias);
+              finalPosition.x += this.scratchPerpDir.x * (seed - 0.5) * 1.8;
+              finalPosition.z += this.scratchPerpDir.z * (seed - 0.5) * 1.8;
+              finalPosition.y -= 0.8 + t * 1.0;
+              this.scratchSpinMatrix.makeRotationZ(Math.PI * (0.55 + seed * 0.35));
+              matrix.multiply(this.scratchSpinMatrix);
+              finalScaleX *= 1.25 + seed * 0.2;
+              finalScaleY *= 0.18;
+              finalScaleZ *= 1.18 + (1 - seed) * 0.15;
+            } else {
+              const fadeProgress = (progress - FALL_PHASE - GROUND_PHASE) / FADEOUT_PHASE;
+              finalPosition.x += deathDir.x * (1.9 * spreadBias);
+              finalPosition.z += deathDir.z * (1.9 * spreadBias);
+              finalPosition.x += this.scratchPerpDir.x * (seed - 0.5) * 1.8;
+              finalPosition.z += this.scratchPerpDir.z * (seed - 0.5) * 1.8;
+              finalPosition.y -= 1.8;
+              this.scratchSpinMatrix.makeRotationZ(Math.PI * (0.55 + seed * 0.35));
+              matrix.multiply(this.scratchSpinMatrix);
+              finalScaleX *= 1.25 + seed * 0.2;
+              finalScaleY *= 0.18;
+              finalScaleZ *= 1.18 + (1 - seed) * 0.15;
+              const flicker = 0.7 + 0.3 * Math.sin((fadeProgress + seed) * Math.PI * 10);
+              const fadeScale = Math.max(0, (1 - fadeProgress) * flicker);
+              finalScaleX *= fadeScale;
+              finalScaleY *= fadeScale;
+              finalScaleZ *= fadeScale;
+            }
+          } else if (animType === 'spinfall') {
             if (progress < FALL_PHASE) {
               const fallProgress = progress / FALL_PHASE;
               const easeOut = 1 - Math.pow(1 - fallProgress, 2);

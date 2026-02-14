@@ -15,6 +15,7 @@ import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem';
 import { Logger } from '../../utils/Logger';
 import { IHUDSystem } from '../../types/SystemInterfaces';
+import { tryConsumeCombatFireRaycast } from './ai/CombatFireRaycastBudget';
 // Extracted modules
 import { CombatantBallistics } from './CombatantBallistics';
 import { CombatantDamage } from './CombatantDamage';
@@ -30,9 +31,10 @@ export interface CombatHitResult {
 }
 
 export class CombatantCombat {
-  private readonly MAX_ENGAGEMENT_RANGE = 150;
+  private readonly MAX_ENGAGEMENT_RANGE = 280;
   private readonly TERRAIN_SAMPLE_STEP = 1.25;
-  private readonly TERRAIN_OCCLUSION_EPSILON = 0.1;
+  private readonly TERRAIN_OCCLUSION_EPSILON = 0.45;
+  private readonly CLOSE_RANGE_OCCLUSION_BYPASS = 35;
 
   private impactEffectsPool: ImpactEffectsPool;
   public hitDetection: CombatantHitDetection;
@@ -181,6 +183,11 @@ export class CombatantCombat {
       // Check terrain obstruction before firing - only for high/medium LOD combatants
       if (this.chunkManager && combatant.lodLevel &&
           (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium')) {
+        // Budget expensive terrain confirmation checks to avoid burst-frame spikes.
+        if (!tryConsumeCombatFireRaycast()) {
+          combatant.currentBurst--; // Undo burst increment
+          return;
+        }
 
         // Use module-level scratch vectors instead of pool allocation
         this._muzzlePos.copy(combatant.position);
@@ -366,6 +373,11 @@ export class CombatantCombat {
       return false;
     }
 
+    // Heightfield prefilter is too coarse for close combat on steep terrain.
+    if (maxDistance <= this.CLOSE_RANGE_OCCLUSION_BYPASS) {
+      return false;
+    }
+
     const end = Math.min(maxDistance, this.MAX_ENGAGEMENT_RANGE);
     if (!Number.isFinite(end) || end <= this.TERRAIN_SAMPLE_STEP) return false;
 
@@ -382,6 +394,10 @@ export class CombatantCombat {
 
   private findHeightProfileBlockDistance(ray: THREE.Ray, maxDistance: number): number {
     if (!this.chunkManager || typeof this.chunkManager.getEffectiveHeightAt !== 'function') {
+      return Math.min(maxDistance, this.MAX_ENGAGEMENT_RANGE);
+    }
+
+    if (maxDistance <= this.CLOSE_RANGE_OCCLUSION_BYPASS) {
       return Math.min(maxDistance, this.MAX_ENGAGEMENT_RANGE);
     }
 
@@ -468,5 +484,11 @@ export class CombatantCombat {
   setCombatantRenderer(renderer: CombatantRenderer): void {
     this.combatantRenderer = renderer;
     this.damage.setCombatantRenderer(renderer);
+  }
+
+  setSpatialQueryProvider(provider: (center: THREE.Vector3, radius: number) => string[]): void {
+    this.hitDetection.setQueryProvider(provider);
+    this.damage.setQueryProvider(provider);
+    this.suppression.setQueryProvider(provider);
   }
 }

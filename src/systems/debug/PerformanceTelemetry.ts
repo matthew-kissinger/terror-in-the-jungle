@@ -332,7 +332,15 @@ export class PerformanceTelemetry {
   private readBuildEnvTelemetryFlag(): boolean | null {
     try {
       const env = (import.meta as { env?: { DEV?: boolean } }).env
-      if (env?.DEV === true) return true
+      if (env?.DEV === true) {
+        if (typeof window === 'undefined' || !window.location) return false
+        const host = (window.location.hostname || '').toLowerCase()
+        if (host === '' || host === 'localhost' || host === '127.0.0.1' || host === '::1') {
+          return true
+        }
+        // On non-local origins, don't enable telemetry by default even in DEV bundles.
+        return false
+      }
     } catch {
       // ignore and fall through
     }

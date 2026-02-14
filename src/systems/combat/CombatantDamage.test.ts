@@ -270,7 +270,7 @@ describe('CombatantDamage', () => {
     it('should set death animation type based on headshot', () => {
       const target = createMockCombatant('target-1', Faction.US, 10);
       combatantDamage.applyDamage(target, 10, undefined, undefined, true); // isHeadshot = true
-      expect(target.deathAnimationType).toBe('fallback');
+      expect(target.deathAnimationType).toBe('shatter');
     });
 
     it('should set death animation type based on high damage', () => {

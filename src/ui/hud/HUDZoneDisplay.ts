@@ -1,16 +1,18 @@
 import { ZoneManager, ZoneState, CaptureZone } from '../../systems/world/ZoneManager';
+import { Faction } from '../../systems/combat/types';
 import { HUDElements } from './HUDElements';
 
 export class HUDZoneDisplay {
   private elements: HUDElements;
   private readonly zoneElements = new Map<string, ZoneElementRefs>();
   private zoneOrder: string[] = [];
+  private emptyStateEl?: HTMLDivElement;
 
   constructor(elements: HUDElements) {
     this.elements = elements;
   }
 
-  updateObjectivesDisplay(zoneManager: ZoneManager, isTDM: boolean = false): void {
+  updateObjectivesDisplay(zoneManager: ZoneManager, isTDM: boolean = false, playerPosition?: { x: number; y: number; z: number }): void {
     if (isTDM) {
       this.elements.objectivesList.style.display = 'none';
       return;
@@ -20,6 +22,28 @@ export class HUDZoneDisplay {
     const zones = zoneManager.getAllZones();
     const capturableZones = zones.filter(z => !z.isHomeBase);
     const zoneIds = capturableZones.map(zone => zone.id);
+    const titleElement = this.elements.objectivesList.querySelector('.objectives-title');
+
+    if (capturableZones.length === 0) {
+      this.zoneElements.forEach((element) => {
+        if (element.root.parentElement === this.elements.objectivesList) {
+          this.elements.objectivesList.removeChild(element.root);
+        }
+      });
+      this.zoneElements.clear();
+      this.zoneOrder = [];
+      if (!this.emptyStateEl) {
+        this.emptyStateEl = document.createElement('div');
+        this.emptyStateEl.className = 'zone-empty';
+        this.emptyStateEl.textContent = 'No objectives loaded';
+      }
+      if (titleElement && this.emptyStateEl.parentElement !== this.elements.objectivesList) {
+        this.elements.objectivesList.appendChild(this.emptyStateEl);
+      }
+      return;
+    } else if (this.emptyStateEl && this.emptyStateEl.parentElement === this.elements.objectivesList) {
+      this.elements.objectivesList.removeChild(this.emptyStateEl);
+    }
 
     for (const [zoneId, element] of this.zoneElements.entries()) {
       if (!zoneIds.includes(zoneId)) {
@@ -36,14 +60,13 @@ export class HUDZoneDisplay {
         zoneElement = this.createZoneElement(zone);
         this.zoneElements.set(zone.id, zoneElement);
       }
-      this.updateZoneElement(zoneElement, zone);
+      this.updateZoneElement(zoneElement, zone, playerPosition);
     });
 
     const orderChanged = zoneIds.length !== this.zoneOrder.length
       || zoneIds.some((zoneId, index) => zoneId !== this.zoneOrder[index]);
 
     if (orderChanged) {
-      const titleElement = this.elements.objectivesList.querySelector('.objectives-title');
       Array.from(this.elements.objectivesList.children).forEach(child => {
         if (child !== titleElement) {
           this.elements.objectivesList.removeChild(child);
@@ -78,7 +101,10 @@ export class HUDZoneDisplay {
     statusContainer.className = 'zone-status';
     const iconEl = document.createElement('div');
     iconEl.className = 'zone-icon zone-neutral';
+    const statusTextEl = document.createElement('span');
+    statusTextEl.className = 'zone-status-text';
     statusContainer.appendChild(iconEl);
+    statusContainer.appendChild(statusTextEl);
 
     const progressContainer = document.createElement('div');
     progressContainer.className = 'capture-progress';
@@ -96,6 +122,7 @@ export class HUDZoneDisplay {
       nameEl,
       distanceEl,
       iconEl,
+      statusTextEl,
       progressContainer,
       progressBar
     };
@@ -104,7 +131,7 @@ export class HUDZoneDisplay {
     return elementRefs;
   }
 
-  private updateZoneElement(element: ZoneElementRefs, zone: CaptureZone): void {
+  private updateZoneElement(element: ZoneElementRefs, zone: CaptureZone, playerPosition?: { x: number; y: number; z: number }): void {
     let zoneClass = 'zone-neutral';
 
     switch (zone.state) {
@@ -119,17 +146,40 @@ export class HUDZoneDisplay {
         break;
     }
 
-    const distance = Math.round(zone.position.length());
+    let distance = Math.round(zone.position.length());
+    if (playerPosition) {
+      const dx = Number(zone.position.x) - Number(playerPosition.x);
+      const dz = Number(zone.position.z) - Number(playerPosition.z);
+      distance = Math.round(Math.hypot(dx, dz));
+    }
     element.nameEl.textContent = zone.name;
     element.distanceEl.textContent = `${distance}m`;
     element.iconEl.className = `zone-icon ${zoneClass}`;
+    element.statusTextEl.textContent = this.getStatusText(zone);
 
-    if (zone.state === ZoneState.CONTESTED) {
+    const showProgress = zone.state === ZoneState.CONTESTED || (zone.owner === null && zone.captureProgress > 0);
+    if (showProgress) {
       element.progressContainer.style.display = 'block';
       element.progressBar.style.width = `${zone.captureProgress}%`;
     } else {
       element.progressContainer.style.display = 'none';
     }
+  }
+
+  private getStatusText(zone: CaptureZone): string {
+    if (zone.state === ZoneState.US_CONTROLLED) return 'US';
+    if (zone.state === ZoneState.OPFOR_CONTROLLED) return 'OPFOR';
+    if (zone.state === ZoneState.NEUTRAL && zone.captureProgress <= 0) return 'Neutral';
+    if (zone.state === ZoneState.NEUTRAL && zone.captureProgress > 0) {
+      const pct = Math.max(0, Math.min(100, Math.round(zone.captureProgress)));
+      if (zone.owner === Faction.US) return `US ${pct}%`;
+      if (zone.owner === Faction.OPFOR) return `OPFOR ${pct}%`;
+      return `Capturing ${pct}%`;
+    }
+    const pct = Math.max(0, Math.min(100, Math.round(zone.captureProgress)));
+    if (zone.owner === Faction.US) return `US ${pct}%`;
+    if (zone.owner === Faction.OPFOR) return `OPFOR ${pct}%`;
+    return `Contested ${pct}%`;
   }
 }
 
@@ -138,6 +188,7 @@ interface ZoneElementRefs {
   nameEl: HTMLSpanElement;
   distanceEl: HTMLSpanElement;
   iconEl: HTMLDivElement;
+  statusTextEl: HTMLSpanElement;
   progressContainer: HTMLDivElement;
   progressBar: HTMLDivElement;
 }

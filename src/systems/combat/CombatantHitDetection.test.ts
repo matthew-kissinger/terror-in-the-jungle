@@ -179,7 +179,7 @@ describe('CombatantHitDetection', () => {
     });
 
     it('should skip when ray is beyond MAX_ENGAGEMENT_RANGE', () => {
-      const playerPosition = new THREE.Vector3(200, 0, 0);
+      const playerPosition = new THREE.Vector3(320, 0, 0);
       const ray = makeRay(
         new THREE.Vector3(0, 0, 0),
         new THREE.Vector3(1, 0, 0)

@@ -26,6 +26,7 @@ export class CombatantDamage {
   private impactEffectsPool?: ImpactEffectsPool;
   private voiceCalloutSystem?: VoiceCalloutSystem;
   private playerPosition: THREE.Vector3 = new THREE.Vector3();
+  private queryProvider: ((center: THREE.Vector3, radius: number) => string[]) | null = null;
 
   // Module-level scratch vectors (do not share with other modules)
   private readonly scratchDeathDir = new THREE.Vector3();
@@ -62,6 +63,10 @@ export class CombatantDamage {
 
   setVoiceCalloutSystem(system: VoiceCalloutSystem): void {
     this.voiceCalloutSystem = system;
+  }
+
+  setQueryProvider(provider: (center: THREE.Vector3, radius: number) => string[]): void {
+    this.queryProvider = provider;
   }
 
   updatePlayerPosition(position: THREE.Vector3): void {
@@ -175,10 +180,13 @@ export class CombatantDamage {
 
     // Choose death animation type based on damage source
     if (isHeadshot) {
-      // Headshots cause dramatic fall back
-      target.deathAnimationType = 'fallback';
+      // Arcade readability: headshots shatter aggressively.
+      target.deathAnimationType = 'shatter';
+    } else if (damage > 100) {
+      // Very high damage gets the same arcade breakup profile.
+      target.deathAnimationType = 'shatter';
     } else if (damage > 80) {
-      // High damage (likely explosive or shotgun) causes spin fall
+      // High damage causes a heavier spin-fall.
       target.deathAnimationType = 'spinfall';
     } else {
       // Normal damage causes crumple
@@ -261,9 +269,11 @@ export class CombatantDamage {
     const ALLY_SEARCH_RADIUS_SQ = ALLY_SEARCH_RADIUS * ALLY_SEARCH_RADIUS;
     const nearbyAllies: Combatant[] = [];
 
-    if (spatialGridManager.getIsInitialized()) {
+    if (this.queryProvider || spatialGridManager.getIsInitialized()) {
       // Spatial query: only check combatants within 30 units
-      const nearbyIds = spatialGridManager.queryRadius(target.position, ALLY_SEARCH_RADIUS);
+      const nearbyIds = this.queryProvider
+        ? this.queryProvider(target.position, ALLY_SEARCH_RADIUS)
+        : spatialGridManager.queryRadius(target.position, ALLY_SEARCH_RADIUS);
 
       for (const id of nearbyIds) {
         const c = allCombatants.get(id);

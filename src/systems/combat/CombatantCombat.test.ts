@@ -579,18 +579,18 @@ describe('CombatantCombat', () => {
 
       vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue({
         combatant: target,
-        point: new THREE.Vector3(20, 1.2, 0),
-        distance: 20,
+        point: new THREE.Vector3(40, 1.2, 0),
+        distance: 40,
         headshot: false,
       });
       (mockChunkManager.raycastTerrain as any).mockReturnValue({ hit: false, distance: undefined });
-      (mockChunkManager.getEffectiveHeightAt as any).mockImplementation((x: number) => (x >= 6 ? 1.5 : 0));
+      (mockChunkManager.getEffectiveHeightAt as any).mockImplementation((x: number) => (x >= 12 ? 1.5 : 0));
 
       const result = combatantCombat.handlePlayerShot(ray, () => 50, allCombatants);
 
       expect(result.hit).toBe(false);
-      expect(result.point.x).toBeGreaterThan(5);
-      expect(result.point.x).toBeLessThan(8);
+      expect(result.point.x).toBeGreaterThan(11);
+      expect(result.point.x).toBeLessThan(14);
       expect(target.health).toBe(100);
     });
   });

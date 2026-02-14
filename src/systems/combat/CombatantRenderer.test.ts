@@ -385,6 +385,26 @@ describe('CombatantRenderer', () => {
       expect(dyingCombatant.billboardIndex).toBeDefined();
     });
 
+    it('should handle shatter death animation', () => {
+      const combatants = new Map<string, Combatant>();
+      const dyingCombatant = createMockCombatant(
+        'dying-shatter-1',
+        Faction.US,
+        new THREE.Vector3(10, 0, 0),
+        CombatantState.DEAD
+      );
+      dyingCombatant.isDying = true;
+      dyingCombatant.deathProgress = 0.2;
+      dyingCombatant.deathAnimationType = 'shatter';
+      dyingCombatant.deathDirection = new THREE.Vector3(1, 0, 0);
+      combatants.set('dying-shatter-1', dyingCombatant);
+
+      const playerPosition = new THREE.Vector3(0, 0, 0);
+      renderer.updateBillboards(combatants, playerPosition);
+
+      expect(dyingCombatant.billboardIndex).toBeDefined();
+    });
+
     it('should handle crumple death animation', () => {
       const combatants = new Map<string, Combatant>();
       const dyingCombatant = createMockCombatant(

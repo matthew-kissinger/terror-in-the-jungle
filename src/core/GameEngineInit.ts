@@ -166,13 +166,13 @@ async function runStartupFlow(engine: GameEngine): Promise<void> {
     if (cfg.id === GameMode.AI_SANDBOX) {
       const pos = new THREE.Vector3(0, 0, 0);
       pos.y = getHeightQueryCache().getHeightAt(pos.x, pos.z) + 2;
-      engine.systemManager.playerController.setPosition(pos);
+      engine.systemManager.playerController.setPosition(pos, 'startup.spawn.sandbox');
     } else {
       const spawn = cfg.zones.find((z: ZoneConfig) => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
       if (spawn) {
         const pos = spawn.position.clone();
         pos.y = getHeightQueryCache().getHeightAt(pos.x, pos.z) + 2;
-        engine.systemManager.playerController.setPosition(pos);
+        engine.systemManager.playerController.setPosition(pos, 'startup.spawn.mode-hq');
       }
     }
   } catch {

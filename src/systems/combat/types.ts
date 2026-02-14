@@ -86,7 +86,7 @@ export interface Combatant {
   deathProgress?: number;
   deathStartTime?: number;
   deathDirection?: THREE.Vector3;
-  deathAnimationType?: 'fallback' | 'crumple' | 'spinfall';
+  deathAnimationType?: 'fallback' | 'crumple' | 'spinfall' | 'shatter';
   defendingZoneId?: string;
   defensePosition?: THREE.Vector3;
   lastDefenseReassignTime?: number;
@@ -95,6 +95,10 @@ export interface Combatant {
   kills: number;
   deaths: number;
   flashDisorientedUntil?: number; // Timestamp when flashbang disorientation ends
+  terrainSampleX?: number;
+  terrainSampleZ?: number;
+  terrainSampleHeight?: number;
+  terrainSampleTimeMs?: number;
 }
 
 export enum SquadCommand {

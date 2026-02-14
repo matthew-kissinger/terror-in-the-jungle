@@ -449,7 +449,7 @@ describe('PlayerRespawnManager', () => {
     it('should respawn at US base position', () => {
       respawnManager.respawnAtBase();
 
-      expect(mockPlayerController.setPosition).toHaveBeenCalledWith(expect.any(THREE.Vector3));
+      expect(mockPlayerController.setPosition).toHaveBeenCalledWith(expect.any(THREE.Vector3), 'respawn.manager');
       const callPosition = vi.mocked(mockPlayerController.setPosition).mock.calls[0][0];
       expect(callPosition.x).toBe(0);
       expect(callPosition.z).toBe(-50);
@@ -460,7 +460,7 @@ describe('PlayerRespawnManager', () => {
 
       respawnManager.respawnAtBase();
 
-      expect(mockPlayerController.setPosition).toHaveBeenCalledWith(expect.any(THREE.Vector3));
+      expect(mockPlayerController.setPosition).toHaveBeenCalledWith(expect.any(THREE.Vector3), 'respawn.manager');
       const callPosition = vi.mocked(mockPlayerController.setPosition).mock.calls[0][0];
       expect(callPosition.x).toBe(0);
       expect(callPosition.y).toBe(2); // terrain height (0) + player offset (2)
@@ -521,7 +521,7 @@ describe('PlayerRespawnManager', () => {
     it('should respawn at specified zone position', () => {
       respawnManager.respawnAtSpecificZone('zone_a');
 
-      expect(mockPlayerController.setPosition).toHaveBeenCalledWith(expect.any(THREE.Vector3));
+      expect(mockPlayerController.setPosition).toHaveBeenCalledWith(expect.any(THREE.Vector3), 'respawn.manager');
       const callPosition = vi.mocked(mockPlayerController.setPosition).mock.calls[0][0];
       // Zone Alpha at (100, 0, 100) + offset (5, 2, 5)
       expect(callPosition.x).toBe(105);
@@ -661,7 +661,7 @@ describe('PlayerRespawnManager', () => {
 
       respawnManager['confirmRespawn']();
 
-      expect(mockPlayerController.setPosition).toHaveBeenCalledWith(expect.any(THREE.Vector3));
+      expect(mockPlayerController.setPosition).toHaveBeenCalledWith(expect.any(THREE.Vector3), 'respawn.manager');
       const callPosition = vi.mocked(mockPlayerController.setPosition).mock.calls[0][0];
 
       // Position should be near zone_a (100, 0, 100) with ±5 randomization
