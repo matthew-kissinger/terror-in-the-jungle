@@ -18,7 +18,7 @@ import { Logger } from '../../utils/Logger';
 import type { HelicopterModel } from '../helicopter/HelicopterModel';
 import type { FirstPersonWeapon } from './FirstPersonWeapon';
 import type { HUDSystem } from '../../ui/hud/HUDSystem';
-import type { ISandboxRenderer } from '../../types/SystemInterfaces';
+import type { IGameRenderer } from '../../types/SystemInterfaces';
 import type { PlayerSquadController } from '../combat/PlayerSquadController';
 
 export class PlayerController implements GameSystem {
@@ -29,7 +29,7 @@ export class PlayerController implements GameSystem {
   private firstPersonWeapon?: FirstPersonWeapon;
   private hudSystem?: HUDSystem;
   private ticketSystem?: TicketSystem;
-  private sandboxRenderer?: ISandboxRenderer;
+  private gameRenderer?: IGameRenderer;
   private inventoryManager?: InventoryManager;
   private grenadeSystem?: GrenadeSystem;
   private mortarSystem?: MortarSystem;
@@ -460,8 +460,8 @@ export class PlayerController implements GameSystem {
       this.firstPersonWeapon.showWeapon();
       this.firstPersonWeapon.setFireingEnabled(true);
     }
-    if (this.sandboxRenderer) {
-      this.sandboxRenderer.showCrosshair();
+    if (this.gameRenderer) {
+      this.gameRenderer.showCrosshair();
     }
   }
 
@@ -542,7 +542,7 @@ export class PlayerController implements GameSystem {
     this.wireTouchToWeapon();
   }
   setHUDSystem(hudSystem: HUDSystem): void { this.hudSystem = hudSystem; }
-  setSandboxRenderer(sandboxRenderer: ISandboxRenderer): void { this.sandboxRenderer = sandboxRenderer; }
+  setRenderer(renderer: IGameRenderer): void { this.gameRenderer = renderer; }
   setInventoryManager(inventoryManager: InventoryManager): void {
     this.inventoryManager = inventoryManager;
     inventoryManager.onSlotChange((slot: WeaponSlot) => this.handleWeaponSlotChange(slot));

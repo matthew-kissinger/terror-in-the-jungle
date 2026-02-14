@@ -1,10 +1,10 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { ISandboxRenderer } from '../../types/SystemInterfaces';
+import { IGameRenderer } from '../../types/SystemInterfaces';
 
 export class DayNightCycle implements GameSystem {
-  private sandboxRenderer?: ISandboxRenderer;
+  private renderer?: IGameRenderer;
   private scene?: THREE.Scene;
   
   // Time tracking (in hours, 0-24)
@@ -43,8 +43,8 @@ export class DayNightCycle implements GameSystem {
     Logger.info('environment', 'Day-Night Cycle System initialized');
   }
 
-  setSandboxRenderer(renderer: ISandboxRenderer): void {
-    this.sandboxRenderer = renderer;
+  setRenderer(renderer: IGameRenderer): void {
+    this.renderer = renderer;
     // Cache base values
     if (renderer.fog) {
       this.baseFogColor = renderer.fog.color.getHex();
@@ -53,7 +53,7 @@ export class DayNightCycle implements GameSystem {
   }
 
   update(deltaTime: number): void {
-    if (!this.sandboxRenderer) return;
+    if (!this.renderer) return;
 
     // Update timer
     this.updateTimer += deltaTime;
@@ -77,14 +77,14 @@ export class DayNightCycle implements GameSystem {
   }
 
   private updateLighting(): void {
-    if (!this.sandboxRenderer) return;
+    if (!this.renderer) return;
 
     const time = this.currentTime;
     const nightFactor = this.getNightFactor();
     
     // === SUN/MOON LIGHT (DirectionalLight) ===
-    if (this.sandboxRenderer.moonLight) {
-      const sunLight = this.sandboxRenderer.moonLight;
+    if (this.renderer.moonLight) {
+      const sunLight = this.renderer.moonLight;
       
       // Position: Rotate around scene based on time
       // At noon (12h): high in sky (y=80)
@@ -142,31 +142,31 @@ export class DayNightCycle implements GameSystem {
     }
     
     // === AMBIENT LIGHT ===
-    if (this.sandboxRenderer.ambientLight) {
+    if (this.renderer.ambientLight) {
       // Intensity: 0.5 day, 0.15 night
       const dayIntensity = 0.5;
       const nightIntensity = 0.15;
-      this.sandboxRenderer.ambientLight.intensity = 
+      this.renderer.ambientLight.intensity = 
         nightIntensity + (1 - nightFactor) * (dayIntensity - nightIntensity);
       
       // Color shift: warm day, cool night
       const dayColor = new THREE.Color(0xffffff);
       const nightColor = new THREE.Color(0x1a2f3a); // Dark blue
-      this.sandboxRenderer.ambientLight.color.lerpColors(nightColor, dayColor, 1 - nightFactor);
+      this.renderer.ambientLight.color.lerpColors(nightColor, dayColor, 1 - nightFactor);
     }
     
-    // === HEMISPHERE LIGHT (Jungle light) ===
-    if (this.sandboxRenderer.jungleLight) {
+    // === HEMISPHERE LIGHT ===
+    if (this.renderer.hemisphereLight) {
       // Intensity: 0.5 day, 0.2 night
       const dayIntensity = 0.5;
       const nightIntensity = 0.2;
-      this.sandboxRenderer.jungleLight.intensity = 
+      this.renderer.hemisphereLight.intensity = 
         nightIntensity + (1 - nightFactor) * (dayIntensity - nightIntensity);
     }
   }
 
   private updateFog(): void {
-    if (!this.sandboxRenderer || !this.sandboxRenderer.fog) return;
+    if (!this.renderer || !this.renderer.fog) return;
 
     const time = this.currentTime;
     const nightFactor = this.getNightFactor();
@@ -182,7 +182,7 @@ export class DayNightCycle implements GameSystem {
       densityMultiplier = 0.8;
     }
     
-    this.sandboxRenderer.fog.density = this.baseFogDensity * densityMultiplier;
+    this.renderer.fog.density = this.baseFogDensity * densityMultiplier;
     
     // Fog color: Blue-tinted at night, lighter during day
     const dayFogColor = this.fogColors.day;
@@ -191,10 +191,10 @@ export class DayNightCycle implements GameSystem {
     
     if ((time >= 5 && time < 7) || (time >= 17 && time < 19)) {
       // Dawn/Dusk: Use special brown/orange tint
-      this.sandboxRenderer.fog.color.copy(dawnDuskColor);
+      this.renderer.fog.color.copy(dawnDuskColor);
     } else {
       // Interpolate between day and night
-      this.sandboxRenderer.fog.color.lerpColors(dayFogColor, nightFogColor, nightFactor);
+      this.renderer.fog.color.lerpColors(dayFogColor, nightFogColor, nightFactor);
     }
   }
 

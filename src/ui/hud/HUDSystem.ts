@@ -58,7 +58,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       window.location.reload();
     });
 
-    // Play Again uses callback when set (e.g. by PixelArtSandboxInit); otherwise MatchEndScreen falls back to reload
+    // Play Again uses callback when set (e.g. by GameEngineInit); otherwise MatchEndScreen falls back to reload
     this.matchEndScreen.onPlayAgain(() => {
       if (this.onPlayAgainCallback) this.onPlayAgainCallback();
     });

@@ -1,4 +1,4 @@
-export interface SandboxMetricsSnapshot {
+export interface RuntimeMetricsSnapshot {
   frameCount: number;
   avgFrameMs: number;
   p95FrameMs: number;
@@ -12,7 +12,7 @@ export interface SandboxMetricsSnapshot {
   engagingCount: number;
 }
 
-export class SandboxMetrics {
+export class RuntimeMetrics {
   private readonly maxSamples = 300;
   private frameTimes: number[] = [];
   private frameCount = 0;
@@ -41,7 +41,7 @@ export class SandboxMetrics {
       const getSnapshot = () => this.getSnapshot();
       const reset = () => this.reset();
 
-      (window as any).sandboxMetrics = {
+      (window as any).__metrics = {
         get frameCount() { return getFrameCount(); },
         get avgFrameMs() { return getAvgFrameMs(); },
         get p95FrameMs() { return getP95FrameMs(); },
@@ -81,7 +81,7 @@ export class SandboxMetrics {
     this.engagingCount = stats.engagingCount;
   }
 
-  getSnapshot(): SandboxMetricsSnapshot {
+  getSnapshot(): RuntimeMetricsSnapshot {
     return {
       frameCount: this.frameCount,
       avgFrameMs: this.getAvgFrameMs(),

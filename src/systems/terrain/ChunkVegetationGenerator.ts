@@ -136,7 +136,7 @@ export class ChunkVegetationGenerator {
       });
     }
     
-    // LAYER 4: Giant Canopy Trees - Common throughout jungle
+    // LAYER 4: Giant Canopy Trees - Common throughout
     const giantTreePoints = MathUtils.poissonDiskSampling(size, size, 16);
     const maxGiantTrees = Math.floor(size * size * DENSITY_PER_UNIT * 0.15); // Reduced
     for (let i = 0; i < Math.min(giantTreePoints.length, maxGiantTrees); i++) {

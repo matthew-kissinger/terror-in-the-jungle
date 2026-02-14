@@ -6,18 +6,18 @@
 
 import { shouldUseTouchControls } from '../utils/DeviceDetector';
 import { SettingsManager } from '../config/SettingsManager';
-import type { PixelArtSandbox } from '../core/PixelArtSandbox';
+import type { GameEngine } from '../core/GameEngine';
 import { colors, zIndex } from './design/tokens';
 
 export class MobilePauseOverlay {
   private overlay: HTMLDivElement | null = null;
-  private sandbox: PixelArtSandbox;
+  private engine: GameEngine;
   private boundVisibilityChange: () => void;
   private boundResumeTap: (e: Event) => void;
   private needsResume = false;
 
-  constructor(sandbox: PixelArtSandbox) {
-    this.sandbox = sandbox;
+  constructor(engine: GameEngine) {
+    this.engine = engine;
     this.boundVisibilityChange = this.onVisibilityChange.bind(this);
     this.boundResumeTap = this.onResumeTap.bind(this);
   }
@@ -73,7 +73,7 @@ export class MobilePauseOverlay {
   }
 
   private onVisibilityChange(): void {
-    if (!this.sandbox.gameStarted || !this.overlay) return;
+    if (!this.engine.gameStarted || !this.overlay) return;
 
     if (document.visibilityState === 'hidden') {
       this.pause();
@@ -86,7 +86,7 @@ export class MobilePauseOverlay {
 
   private pause(): void {
     this.needsResume = true;
-    const audio = this.sandbox.systemManager?.audioManager;
+    const audio = this.engine.systemManager?.audioManager;
     if (audio) {
       audio.setMasterVolume(0);
     }
@@ -109,7 +109,7 @@ export class MobilePauseOverlay {
 
     const settings = SettingsManager.getInstance();
     const volume = settings.getMasterVolumeNormalized();
-    const audio = this.sandbox.systemManager?.audioManager;
+    const audio = this.engine.systemManager?.audioManager;
     if (audio) {
       audio.setMasterVolume(volume);
     }

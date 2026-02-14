@@ -42,7 +42,7 @@ import { SystemConnector } from './SystemConnector';
 import { SystemUpdater } from './SystemUpdater';
 import { SystemDisposer } from './SystemDisposer';
 
-export class SandboxSystemManager {
+export class SystemManager {
   private systems: GameSystem[] = [];
   private deferredSystems: GameSystem[] = [];
   private deferredInitStarted = false;
@@ -97,7 +97,7 @@ export class SandboxSystemManager {
     scene: THREE.Scene,
     camera: THREE.PerspectiveCamera,
     onProgress: (phase: string, progress: number) => void,
-    sandboxRenderer?: any
+    renderer?: any
   ): Promise<void> {
     // Initialize all systems
     const result = await this.initializer.initializeSystems(
@@ -105,7 +105,7 @@ export class SandboxSystemManager {
       scene,
       camera,
       onProgress,
-      sandboxRenderer
+      renderer
     );
 
     // Store systems and scene
@@ -151,7 +151,7 @@ export class SandboxSystemManager {
     this.loadoutSelector = this.refs.loadoutSelector;
 
     // Connect systems together
-    this.connector.connectSystems(this.refs, scene, camera, sandboxRenderer);
+    this.connector.connectSystems(this.refs, scene, camera, renderer);
   }
 
   startDeferredInitialization(): void {

@@ -90,7 +90,7 @@ Current `peak_max_frame_ms` classification:
 - `fail >= 300ms`
 
 Reason:
-- `sandboxMetrics.maxFrameMs` is a rolling max since reset. A single early one-off stall can remain visible for the full capture window even when hitch-rate and p99 are healthy.
+- `__metrics.maxFrameMs` is a rolling max since reset. A single early one-off stall can remain visible for the full capture window even when hitch-rate and p99 are healthy.
 - Severe spikes still fail, but isolated spikes now warn.
 
 ## Runaway Process Guardrails

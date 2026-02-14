@@ -1,6 +1,6 @@
 # Terror in the Jungle
 
-3D pixel art battlefield with GPU-accelerated billboard rendering. Procedurally generated jungle with 200k+ vegetation instances.
+Browser-based 3D combined-arms FPS. GPU-accelerated billboard rendering of 200k+ procedural vegetation. Faction-based AI combat with squad tactics, influence maps, and spatial acceleration.
 
 **[Play Now](https://matthew-kissinger.github.io/terror-in-the-jungle/)**
 
@@ -9,68 +9,73 @@
 ```bash
 npm install
 npm run dev        # localhost:5173
-npm run build      # Production
-npm run test:run   # 3388 tests
-```
-
-## Controls
-
-**Desktop**
-
-| Action | Key |
-|--------|-----|
-| Move | WASD |
-| Sprint | Shift |
-| Jump | Space |
-| Fire | Left Click |
-| ADS | Right Click |
-| Reload | R |
-| Weapons | 1-6 |
-| Grenade | G |
-| Squad Menu | Z |
-| Scoreboard | TAB |
-| Deploy Mortar | B |
-| Fire Mortar | F |
-| Aim Mortar | Arrow Keys / Mouse Wheel |
-| Mortar Camera | M |
-| **Perf Overlay** | **F2** |
-| Console Stats | F1 |
-
-**Mobile/Touch** - Virtual joystick (move), touch-drag (look), fire/ADS/reload/grenade/scoreboard buttons, weapon bar, helicopter controls, mortar controls, sandbag placement, squad menu
-
-## Performance Tools
-
-Press **F2** for real-time performance overlay showing:
-- FPS, frame time, draw calls
-- Combat system timing
-- LOD breakdown
-- Octree stats
-- Frame budget visualization
-
-Console API:
-```javascript
-perf.report()    // Full telemetry
-perf.validate()  // System checks
+npm run build      # Production build
+npm run test:run   # 3363 tests
 ```
 
 ## Game Modes
 
-- **Zone Control** - 400x400, 15v15, 3 min
-- **Open Frontier** - 3200x3200, 60v60, 15 min
-- **Team Deathmatch** - 400x400, 15v15, 5 min
+| Mode | Map Size | Teams | Duration |
+|------|----------|-------|----------|
+| Zone Control | 400x400 | 15v15 | 3 min |
+| Open Frontier | 3200x3200 | 60v60 | 15 min |
+| Team Deathmatch | 400x400 | 15v15 | 5 min |
 
-## Tech
+## Controls
 
-- Three.js r182 + postprocessing v6.37
-- three-mesh-bvh v0.9 for spatial queries
-- Web workers (BVH pool, chunk generation)
-- TypeScript 5.9, Vite 7.1, Vitest 4.0
-- ~60k lines, 308 source files, 98 test files (3388 tests)
-- Design token system for consistent UI theming
+**Desktop** - WASD move, Shift sprint, Space jump, Click fire, Right-click ADS, R reload, 1-6 weapons, G grenade, B mortar deploy, F mortar fire, Z squad menu, TAB scoreboard, F2 perf overlay
+
+**Mobile** - Virtual joystick, touch-drag look, on-screen fire/ADS/reload/grenade/scoreboard, weapon bar, helicopter/mortar/sandbag touch controls, squad menu
+
+## Tech Stack
+
+| Layer | Tech |
+|-------|------|
+| Runtime | Three.js r182 + postprocessing v6.38 |
+| Spatial | three-mesh-bvh v0.9, custom octree + grid |
+| Build | Vite 7.3, TypeScript 5.9 |
+| Workers | BVH pool, chunk generation workers |
+| Tests | Vitest 4.0 - 98 files, 3363 tests |
+
+~61k lines source, ~50k lines tests across 406 files.
+
+## Performance Profiling
+
+**In-game**: F2 overlay (FPS, draw calls, triangles, combat timing, memory)
+
+**Console API**:
+```javascript
+perf.report()        // Full telemetry
+perf.validate()      // System checks
+perf.benchmark(1000) // Raycast benchmark
+```
+
+**Automated harness** (Playwright CDP):
+```bash
+npm run perf:capture              # Headed capture (default, trusted)
+npm run perf:capture:headless     # Headless (secondary signal)
+npm run perf:capture:devtools     # With Chrome DevTools
+npm run perf:analyze:latest       # Analyze latest artifacts
+```
+
+**AI Sandbox** for stress testing: `?sandbox=true&npcs=80&autostart=true`
+
+See `docs/PROFILING_HARNESS.md` for full harness documentation.
 
 ## Documentation
 
-- `CLAUDE.md` - Development guide, architecture, controls, tech debt
+| Doc | Purpose |
+|-----|---------|
+| `CLAUDE.md` | Development guide, architecture, key files, tech debt |
+| `docs/PROFILING_HARNESS.md` | Perf harness commands, artifacts, validation checks |
+| `docs/ARCHITECTURE_RECOVERY_PLAN.md` | Optimization workstreams, experiment log, discovery loop |
+| `docs/AUDIO_ASSETS_NEEDED.md` | Audio asset specifications |
+
+## CI/CD
+
+- **ci.yml** - Lint, build, test on push/PR
+- **deploy.yml** - GitHub Pages deploy on push to master
+- **perf-check.yml** - Automated perf regression capture (control + combat profiles)
 
 ## License
 

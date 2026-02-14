@@ -34,7 +34,7 @@ export class ImprovedChunk {
   private terrainMesh?: THREE.Mesh;
   private terrainGeometry?: THREE.BufferGeometry;
   
-  // Billboard instances - Full jungle layers
+  // Billboard instances - Vegetation layers
   private globalBillboardSystem: GlobalBillboardSystem;
   // Ground cover
   private fernInstances: BillboardInstance[] = [];          // Dense everywhere

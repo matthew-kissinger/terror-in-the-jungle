@@ -1,9 +1,9 @@
 /**
- * Loading indicator UI module for SandboxRenderer.
+ * Loading indicator UI module for GameRenderer.
  * Manages the spawn loading overlay with CSS styling.
  */
 
-export class SandboxLoadingUI {
+export class LoadingUI {
   private spawnLoadingDiv?: HTMLDivElement;
 
   showSpawnLoadingIndicator(): void {

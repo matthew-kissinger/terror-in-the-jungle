@@ -51,13 +51,13 @@ export class BillboardVegetationTypes {
   async initializeAll(): Promise<VegetationMeshes> {
     Logger.info('world', ' Initializing Terror in the Jungle Billboard System...');
 
-    await this.initializeJungleFoliage();
+    await this.initializeFoliage();
 
-    Logger.info('world', ` Jungle Billboard System ready with all tropical foliage types`);
+    Logger.info('world', ` Billboard system ready with all foliage types`);
     return this.meshes;
   }
 
-  private async initializeJungleFoliage(): Promise<void> {
+  private async initializeFoliage(): Promise<void> {
     // Ground cover
     this.meshes.fernInstances = await this.createUndergrowthMesh(
       'Fern', 'fern', this.config.maxFernInstances, 4.5, 6.0

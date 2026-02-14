@@ -3,7 +3,7 @@ import { SystemReferences } from './SystemInitializer';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import { spatialGridManager } from '../systems/combat/SpatialGridManager';
 import { setSmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
-import { ISandboxRenderer } from '../types/SystemInterfaces';
+import { IGameRenderer } from '../types/SystemInterfaces';
 
 /**
  * Handles wiring up dependencies between game systems
@@ -13,7 +13,7 @@ export class SystemConnector {
     refs: SystemReferences,
     scene: THREE.Scene,
     camera: THREE.PerspectiveCamera,
-    sandboxRenderer?: ISandboxRenderer
+    renderer?: IGameRenderer
   ): void {
     // Connect systems with chunk manager
     refs.playerController.setChunkManager(refs.chunkManager);
@@ -22,8 +22,8 @@ export class SystemConnector {
     refs.playerController.setHelicopterModel(refs.helicopterModel);
     refs.playerController.setFirstPersonWeapon(refs.firstPersonWeapon);
     refs.playerController.setHUDSystem(refs.hudSystem);
-    if (sandboxRenderer) {
-      refs.playerController.setSandboxRenderer(sandboxRenderer);
+    if (renderer) {
+      refs.playerController.setRenderer(renderer);
     }
     refs.combatantSystem.setChunkManager(refs.chunkManager);
     refs.combatantSystem.setCamera(camera);
@@ -179,8 +179,8 @@ export class SystemConnector {
     // Connect weather system
     if (refs.weatherSystem) {
       refs.weatherSystem.setAudioManager(refs.audioManager);
-      if (sandboxRenderer) {
-        refs.weatherSystem.setSandboxRenderer(sandboxRenderer);
+      if (renderer) {
+        refs.weatherSystem.setRenderer(renderer);
       }
     }
     
@@ -190,8 +190,8 @@ export class SystemConnector {
     }
 
     // Connect day-night cycle
-    if (refs.dayNightCycle && sandboxRenderer) {
-      refs.dayNightCycle.setSandboxRenderer(sandboxRenderer);
+    if (refs.dayNightCycle && renderer) {
+      refs.dayNightCycle.setRenderer(renderer);
     }
 
     // Connect footstep audio system
@@ -207,8 +207,8 @@ export class SystemConnector {
     });
 
     // Initialize GPU timing if renderer is available
-    if (sandboxRenderer && sandboxRenderer.renderer) {
-      performanceTelemetry.initGPUTiming(sandboxRenderer.renderer);
+    if (renderer && renderer.renderer) {
+      performanceTelemetry.initGPUTiming(renderer.renderer);
     }
 
     // Connect voice callout system

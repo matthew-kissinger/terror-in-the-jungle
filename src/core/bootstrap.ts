@@ -1,4 +1,4 @@
-import { PixelArtSandbox } from './PixelArtSandbox';
+import { GameEngine } from './GameEngine';
 import { injectSharedStyles } from '../ui/design/styles';
 import { TouchControlLayout } from '../ui/controls/TouchControlLayout';
 
@@ -50,26 +50,26 @@ export async function bootstrapGame(): Promise<void> {
   const touchLayout = new TouchControlLayout();
   touchLayout.init();
 
-  const sandbox = new PixelArtSandbox();
+  const engine = new GameEngine();
 
   try {
-    await sandbox.initialize();
-    sandbox.start();
+    await engine.initialize();
+    engine.start();
 
-    // Expose sandbox root for perf harness scenario control.
-    (window as any).__sandbox = sandbox;
-    // Expose sandbox renderer for performance measurement scripts
-    (window as any).__sandboxRenderer = sandbox.sandboxRenderer;
+    // Expose engine root for perf harness scenario control.
+    (window as any).__engine = engine;
+    // Expose renderer for performance measurement scripts
+    (window as any).__renderer = engine.renderer;
 
     window.addEventListener('beforeunload', () => {
       touchLayout.dispose();
-      sandbox.dispose();
+      engine.dispose();
     });
 
     if (import.meta.hot) {
       import.meta.hot.dispose(() => {
         touchLayout.dispose();
-        sandbox.dispose();
+        engine.dispose();
       });
     }
   } catch (error) {

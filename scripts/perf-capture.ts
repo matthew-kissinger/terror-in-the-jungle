@@ -70,8 +70,8 @@ type CaptureSummary = {
 type StartupDiagnostics = {
   ts: string;
   readyState: string;
-  hasSandboxMetrics: boolean;
-  hasSandboxRoot: boolean;
+  hasMetrics: boolean;
+  hasEngine: boolean;
   hasPerfApi: boolean;
   bodyClassName: string;
   errorPanelVisible: boolean;
@@ -614,14 +614,14 @@ async function killDevServer(server: ChildProcess): Promise<void> {
 
 async function getFrameCount(page: Page): Promise<number> {
   return withTimeout('frame count', page.evaluate(() => {
-    const metrics = (window as any).sandboxMetrics;
+    const metrics = (window as any).__metrics;
     return metrics ? Number(metrics.frameCount ?? 0) : 0;
   }), 8000);
 }
 
 async function getStartupProbe(page: Page): Promise<{ frameCount: number; combatTotalMs?: number; combatAiMs?: number; combatSpatialMs?: number; combatBillboardMs?: number; combatAiStateTop?: string; combatAiStateTopMs?: number }> {
   return withTimeout('startup probe', page.evaluate(() => {
-    const metrics = (window as any).sandboxMetrics;
+    const metrics = (window as any).__metrics;
     const combatProfile = (window as any).combatProfile?.();
     let combatAiStateTop: string | undefined;
     let combatAiStateTopMs: number | undefined;
@@ -906,8 +906,8 @@ async function runCapture(): Promise<void> {
         page.evaluate(() => ({
           ts: new Date().toISOString(),
           readyState: document.readyState,
-          hasSandboxMetrics: Boolean((window as any).sandboxMetrics),
-          hasSandboxRoot: Boolean((window as any).__sandbox),
+          hasMetrics: Boolean((window as any).__metrics),
+          hasEngine: Boolean((window as any).__engine),
           hasPerfApi: Boolean((window as any).perf?.report),
           bodyClassName: document.body?.className ?? '',
           errorPanelVisible: Boolean(document.querySelector('.error-panel'))
@@ -929,7 +929,7 @@ async function runCapture(): Promise<void> {
       await safeAwait(
         'reset in-page metrics',
         page.evaluate(() => {
-          (window as any).sandboxMetrics?.reset?.();
+          (window as any).__metrics?.reset?.();
           (window as any).perf?.reset?.();
         }),
         3000
@@ -946,7 +946,7 @@ async function runCapture(): Promise<void> {
       try {
         const probeStart = Date.now();
         const raw = await withTimeout('runtime sample', page.evaluate(() => {
-          const metrics = (window as any).sandboxMetrics;
+          const metrics = (window as any).__metrics;
           const perf = (window as any).perf;
           const combatProfile = (window as any).combatProfile?.();
           const memory = (performance as any).memory;

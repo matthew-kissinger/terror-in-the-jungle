@@ -1,6 +1,6 @@
 import { Logger } from '../utils/Logger';
 import { PostProcessingManager } from '../systems/effects/PostProcessingManager';
-import type { SandboxRenderer } from './SandboxRenderer';
+import type { GameRenderer } from './GameRenderer';
 
 /**
  * Handles WebGL context loss and restoration.
@@ -10,7 +10,7 @@ import type { SandboxRenderer } from './SandboxRenderer';
  */
 export class WebGLContextRecovery {
   private canvas: HTMLCanvasElement;
-  private sandboxRenderer: SandboxRenderer;
+  private renderer: GameRenderer;
   private overlay: HTMLDivElement | null = null;
   private boundContextLost: (e: Event) => void;
   private boundContextRestored: () => void;
@@ -18,9 +18,9 @@ export class WebGLContextRecovery {
   /** True while the WebGL context is lost */
   public contextLost = false;
 
-  constructor(sandboxRenderer: SandboxRenderer) {
-    this.sandboxRenderer = sandboxRenderer;
-    this.canvas = sandboxRenderer.renderer.domElement;
+  constructor(renderer: GameRenderer) {
+    this.renderer = renderer;
+    this.canvas = renderer.renderer.domElement;
 
     this.boundContextLost = this.onContextLost.bind(this);
     this.boundContextRestored = this.onContextRestored.bind(this);
@@ -103,7 +103,7 @@ export class WebGLContextRecovery {
   private onContextRestored(): void {
     Logger.info('WebGL', 'WebGL context restored — rebuilding GPU resources');
 
-    const sr = this.sandboxRenderer;
+    const sr = this.renderer;
 
     // Renderer auto-restores its own state, but we must resize to
     // re-allocate the drawing buffer at the correct dimensions.

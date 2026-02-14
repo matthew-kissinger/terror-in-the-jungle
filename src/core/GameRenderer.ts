@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import { PixelPerfectUtils } from '../utils/PixelPerfect';
 import { PostProcessingManager } from '../systems/effects/PostProcessingManager';
-import { SandboxCrosshairUI } from './SandboxCrosshairUI';
-import { SandboxLoadingUI } from './SandboxLoadingUI';
+import { CrosshairUI } from './CrosshairUI';
+import { LoadingUI } from './LoadingUI';
 import { Logger } from '../utils/Logger';
 import { estimateGPUTier, isMobileGPU, shouldEnableShadows, getShadowMapSize, getMaxPixelRatio } from '../utils/DeviceDetector';
 
-export class SandboxRenderer {
+export class GameRenderer {
   public renderer: THREE.WebGLRenderer;
   public scene: THREE.Scene;
   public camera: THREE.PerspectiveCamera;
@@ -16,10 +16,10 @@ export class SandboxRenderer {
   public fog?: THREE.FogExp2;
   public ambientLight?: THREE.AmbientLight;
   public moonLight?: THREE.DirectionalLight;
-  public jungleLight?: THREE.HemisphereLight;
+  public hemisphereLight?: THREE.HemisphereLight;
 
-  private crosshairUI = new SandboxCrosshairUI();
-  private loadingUI = new SandboxLoadingUI();
+  private crosshairUI = new CrosshairUI();
+  private loadingUI = new LoadingUI();
 
   constructor() {
     this.scene = new THREE.Scene();
@@ -68,12 +68,12 @@ export class SandboxRenderer {
   private setupLighting(): void {
     const gpuTier = estimateGPUTier();
 
-    // === JUNGLE ATMOSPHERE ===
+    // === ATMOSPHERE ===
     // Fog re-enabled with matching support in GPU billboard shader
     // Both terrain and vegetation now fade consistently to fog color
 
     // Background color - matches fog for seamless distance fade
-    const fogColor = 0x5a7a6a; // Muted jungle green
+    const fogColor = 0x5a7a6a; // Muted green
     this.scene.background = new THREE.Color(fogColor);
 
     // Exponential fog - density tuned to hide terrain edge (~400-500m)
@@ -82,12 +82,12 @@ export class SandboxRenderer {
     this.scene.fog = this.fog;
 
     // Ambient light - general scene illumination
-    // Reduced intensity for moody jungle atmosphere
+    // Reduced intensity for moody atmosphere
     this.ambientLight = new THREE.AmbientLight(0x4a5a4a, 0.4); // Muted green, lower intensity
     this.scene.add(this.ambientLight);
 
-    // Directional light - filtered sunlight through canopy
-    // Reduced intensity, slightly green-tinted for jungle feel
+    // Directional light - filtered sunlight
+    // Reduced intensity, slightly green-tinted
     this.moonLight = new THREE.DirectionalLight(0xeef8ee, 0.5); // Soft filtered light
     this.moonLight.position.set(-30, 80, -50);
     this.moonLight.castShadow = shouldEnableShadows();
@@ -113,17 +113,17 @@ export class SandboxRenderer {
 
     this.scene.add(this.moonLight);
 
-    // Hemisphere light for jungle atmosphere
-    // Sky: filtered canopy light from above
-    // Ground: dark forest floor bounce light
-    this.jungleLight = new THREE.HemisphereLight(
-      0x667766, // Muted green-gray canopy light
+    // Hemisphere light for atmosphere
+    // Sky: filtered light from above
+    // Ground: dark ground bounce light
+    this.hemisphereLight = new THREE.HemisphereLight(
+      0x667766, // Muted green-gray sky light
       0x332211, // Dark brown ground bounce
       0.3 // Subtle fill
     );
-    this.scene.add(this.jungleLight);
+    this.scene.add(this.hemisphereLight);
 
-    Logger.info('Renderer', 'Jungle atmosphere initialized');
+    Logger.info('Renderer', 'Atmosphere initialized');
   }
 
   private setupPostProcessing(): void {

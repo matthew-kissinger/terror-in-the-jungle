@@ -79,7 +79,7 @@ export class AssetLoader implements GameSystem {
     if (name.includes('floor') || name.includes('ground')) {
       return AssetCategory.GROUND;
     }
-    // Expanded foliage detection for jungle assets
+    // Expanded foliage detection for vegetation assets
     if (name.includes('tree') || name.includes('grass') ||
         name.includes('dipterocarp') || name.includes('banyan') || name.includes('palm') ||
         name.includes('fern') || name.includes('elephant')) {

@@ -37,7 +37,7 @@ describe('PlayerController', () => {
   let mockHelicopterModel: HelicopterModel;
   let mockFirstPersonWeapon: FirstPersonWeapon;
   let mockHUDSystem: HUDSystem;
-  let mockSandboxRenderer: any;
+  let mockRenderer: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -139,7 +139,7 @@ describe('PlayerController', () => {
       showMessage: vi.fn(),
     } as any;
 
-    mockSandboxRenderer = {
+    mockRenderer = {
       showCrosshair: vi.fn(),
     };
   });
@@ -436,7 +436,7 @@ describe('PlayerController', () => {
   describe('Weapon System', () => {
     beforeEach(async () => {
       playerController.setFirstPersonWeapon(mockFirstPersonWeapon);
-      playerController.setSandboxRenderer(mockSandboxRenderer);
+      playerController.setRenderer(mockRenderer);
       playerController.setInventoryManager(mockInventoryManager);
       await playerController.init();
     });
@@ -446,7 +446,7 @@ describe('PlayerController', () => {
 
       expect(mockFirstPersonWeapon.showWeapon).toHaveBeenCalled();
       expect(mockFirstPersonWeapon.setFireingEnabled).toHaveBeenCalledWith(true);
-      expect(mockSandboxRenderer.showCrosshair).toHaveBeenCalled();
+      expect(mockRenderer.showCrosshair).toHaveBeenCalled();
     });
 
     it('should unequip weapon', () => {
@@ -650,9 +650,9 @@ describe('PlayerController', () => {
     });
 
     it('should set sandbox renderer', () => {
-      playerController.setSandboxRenderer(mockSandboxRenderer);
+      playerController.setRenderer(mockRenderer);
 
-      expect(playerController['sandboxRenderer']).toBe(mockSandboxRenderer);
+      expect(playerController['gameRenderer']).toBe(mockRenderer);
     });
 
     it('should set inventory manager', () => {

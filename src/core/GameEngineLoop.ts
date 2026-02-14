@@ -1,6 +1,6 @@
 import { Logger } from '../utils/Logger';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
-import type { PixelArtSandbox } from './PixelArtSandbox';
+import type { GameEngine } from './GameEngine';
 
 // Crash tracking for frame loop resilience
 let crashCount = 0;
@@ -12,26 +12,26 @@ let errorOverlayShown = false;
 /**
  * Main game loop animation frame
  */
-export function animate(sandbox: PixelArtSandbox): void {
-  requestAnimationFrame(() => animate(sandbox));
+export function animate(engine: GameEngine): void {
+  requestAnimationFrame(() => animate(engine));
 
-  if (!sandbox.isInitialized || !sandbox.gameStarted) return;
+  if (!engine.isInitialized || !engine.gameStarted) return;
 
   // Skip rendering while WebGL context is lost
-  if (sandbox.contextLost) return;
+  if (engine.contextLost) return;
 
-  const deltaTime = sandbox.clock.getDelta();
-  sandbox.lastFrameDelta = deltaTime;
+  const deltaTime = engine.clock.getDelta();
+  engine.lastFrameDelta = deltaTime;
 
   try {
     // Update all systems
-    sandbox.systemManager.updateSystems(deltaTime, sandbox.gameStarted);
+    engine.systemManager.updateSystems(deltaTime, engine.gameStarted);
 
     // Update skybox position
-    sandbox.systemManager.skybox.updatePosition(sandbox.sandboxRenderer.camera.position);
+    engine.systemManager.skybox.updatePosition(engine.renderer.camera.position);
 
     // Check if mortar is deployed and using mortar camera view
-    const mortarSystem = sandbox.systemManager.mortarSystem;
+    const mortarSystem = engine.systemManager.mortarSystem;
     const usingMortarCamera = mortarSystem?.isUsingMortarCamera() ?? false;
     const mortarCamera = mortarSystem?.getMortarCamera();
 
@@ -46,17 +46,17 @@ export function animate(sandbox: PixelArtSandbox): void {
     if (usingMortarCamera && mortarCamera) {
       // Render with mortar camera (top-down view)
       // Note: Mortar camera renders directly without post-processing for tactical view clarity
-      sandbox.sandboxRenderer.renderer.render(
-        sandbox.sandboxRenderer.scene,
+      engine.renderer.renderer.render(
+        engine.renderer.scene,
         mortarCamera
       );
     } else {
-      if (sandbox.sandboxRenderer.postProcessing) {
-        sandbox.sandboxRenderer.postProcessing.render(deltaTime);
+      if (engine.renderer.postProcessing) {
+        engine.renderer.postProcessing.render(deltaTime);
       } else {
-        sandbox.sandboxRenderer.renderer.render(
-          sandbox.sandboxRenderer.scene,
-          sandbox.sandboxRenderer.camera
+        engine.renderer.renderer.render(
+          engine.renderer.scene,
+          engine.renderer.camera
         );
       }
     }
@@ -67,18 +67,18 @@ export function animate(sandbox: PixelArtSandbox): void {
 
     // Render weapon overlay
     performanceTelemetry.beginSystem('RenderOverlay');
-    if (sandbox.systemManager.firstPersonWeapon && !usingMortarCamera) {
-      sandbox.systemManager.firstPersonWeapon.renderWeapon(sandbox.sandboxRenderer.renderer);
+    if (engine.systemManager.firstPersonWeapon && !usingMortarCamera) {
+      engine.systemManager.firstPersonWeapon.renderWeapon(engine.renderer.renderer);
     }
 
     // Render grenade overlays
-    const renderer = sandbox.sandboxRenderer.renderer;
+    const renderer = engine.renderer.renderer;
     const currentAutoClear = renderer.autoClear;
     renderer.autoClear = false;
 
-    if (sandbox.systemManager.grenadeSystem && sandbox.systemManager.inventoryManager && !usingMortarCamera) {
-      const grenadeScene = sandbox.systemManager.grenadeSystem.getGrenadeOverlayScene();
-      const grenadeCamera = sandbox.systemManager.grenadeSystem.getGrenadeOverlayCamera();
+    if (engine.systemManager.grenadeSystem && engine.systemManager.inventoryManager && !usingMortarCamera) {
+      const grenadeScene = engine.systemManager.grenadeSystem.getGrenadeOverlayScene();
+      const grenadeCamera = engine.systemManager.grenadeSystem.getGrenadeOverlayCamera();
       if (grenadeScene && grenadeCamera) {
         renderer.clearDepth();
         renderer.render(grenadeScene, grenadeCamera);
@@ -88,10 +88,10 @@ export function animate(sandbox: PixelArtSandbox): void {
     renderer.autoClear = currentAutoClear;
     performanceTelemetry.endSystem('RenderOverlay');
 
-    updateSandboxMetrics(sandbox, deltaTime);
-    updatePerformanceOverlay(sandbox, deltaTime);
-    updateLogOverlay(sandbox);
-    updateTimeIndicator(sandbox);
+    updateRuntimeMetrics(engine, deltaTime);
+    updatePerformanceOverlay(engine, deltaTime);
+    updateLogOverlay(engine);
+    updateTimeIndicator(engine);
 
     // Any successful frame clears crash streak so only consecutive failures escalate.
     if (crashCount > 0) {
@@ -115,7 +115,7 @@ export function animate(sandbox: PixelArtSandbox): void {
     // If too many crashes in short time, show error overlay
     if (crashCount >= MAX_CRASHES && !errorOverlayShown) {
       errorOverlayShown = true;
-      showFrameLoopError(sandbox, error);
+      showFrameLoopError(engine, error);
     }
 
     // Continue the loop - don't let a single crash stop the game
@@ -125,9 +125,9 @@ export function animate(sandbox: PixelArtSandbox): void {
 /**
  * Show an error overlay for repeated frame loop crashes
  */
-function showFrameLoopError(sandbox: PixelArtSandbox, error: unknown): void {
+function showFrameLoopError(engine: GameEngine, error: unknown): void {
   // In harness/sandbox mode keep running and log, do not block testing with fatal overlay.
-  if (sandbox.sandboxEnabled) {
+  if (engine.sandboxEnabled) {
     Logger.error('frame-loop', 'Suppressed fatal frame-loop overlay in sandbox mode:', error);
     return;
   }
@@ -136,24 +136,24 @@ function showFrameLoopError(sandbox: PixelArtSandbox, error: unknown): void {
     ? `${error.message}\n\nThe game encountered ${crashCount} errors within ${CRASH_WINDOW_MS / 1000} seconds.`
     : `The game encountered ${crashCount} errors within ${CRASH_WINDOW_MS / 1000} seconds.`;
 
-  sandbox.loadingScreen.showError(
+  engine.loadingScreen.showError(
     'Game Error - Multiple Crashes',
     errorMessage
   );
 }
 
 /**
- * Updates sandbox-level metrics
+ * Updates runtime metrics
  */
-export function updateSandboxMetrics(sandbox: PixelArtSandbox, deltaTime: number): void {
-  sandbox.sandboxMetrics.updateFrame(deltaTime);
+export function updateRuntimeMetrics(engine: GameEngine, deltaTime: number): void {
+  engine.runtimeMetrics.updateFrame(deltaTime);
 
-  const combatSystem = sandbox.systemManager.combatantSystem;
+  const combatSystem = engine.systemManager.combatantSystem;
   if (!combatSystem) return;
 
   const combatStats = combatSystem.getCombatStats();
   const combatProfile = combatSystem.getCombatProfile();
-  sandbox.sandboxMetrics.updateCombatStats({
+  engine.runtimeMetrics.updateCombatStats({
     combatantCount: combatStats.total,
     firingCount: combatProfile.timing.firingCount,
     engagingCount: combatProfile.timing.engagingCount
@@ -163,18 +163,18 @@ export function updateSandboxMetrics(sandbox: PixelArtSandbox, deltaTime: number
 /**
  * Updates the real-time performance overlay data
  */
-export function updatePerformanceOverlay(sandbox: PixelArtSandbox, deltaTime: number): void {
-  if (!sandbox.performanceOverlay.isVisible()) return;
+export function updatePerformanceOverlay(engine: GameEngine, deltaTime: number): void {
+  if (!engine.performanceOverlay.isVisible()) return;
 
-  const perfStats = sandbox.sandboxRenderer.getPerformanceStats();
-  const debugInfo = sandbox.systemManager.globalBillboardSystem.getDebugInfo();
-  const combatStats = sandbox.systemManager.combatantSystem.getCombatStats();
-  const chunkQueue = sandbox.systemManager.chunkManager.getQueueSize();
-  const loadedChunks = sandbox.systemManager.chunkManager.getLoadedChunkCount();
+  const perfStats = engine.renderer.getPerformanceStats();
+  const debugInfo = engine.systemManager.globalBillboardSystem.getDebugInfo();
+  const combatStats = engine.systemManager.combatantSystem.getCombatStats();
+  const chunkQueue = engine.systemManager.chunkManager.getQueueSize();
+  const loadedChunks = engine.systemManager.chunkManager.getLoadedChunkCount();
   const fps = 1 / Math.max(0.0001, deltaTime);
   const logStats = Logger.getStats();
-  const combatTelemetry = sandbox.systemManager.combatantSystem
-    ? sandbox.systemManager.combatantSystem.getTelemetry()
+  const combatTelemetry = engine.systemManager.combatantSystem
+    ? engine.systemManager.combatantSystem.getTelemetry()
     : {
         lastMs: 0,
         emaMs: 0,
@@ -193,15 +193,15 @@ export function updatePerformanceOverlay(sandbox: PixelArtSandbox, deltaTime: nu
     .reduce((sum, [, value]) => sum + (value as number), 0);
 
   // Get terrain merger stats
-  const mergerStats = sandbox.systemManager.chunkManager.getMergerStats();
+  const mergerStats = engine.systemManager.chunkManager.getMergerStats();
 
   // Get system timings from system manager
-  const systemTimings = sandbox.systemManager.getSystemTimings();
+  const systemTimings = engine.systemManager.getSystemTimings();
 
   // Get GPU telemetry
   const gpuTelemetry = performanceTelemetry.getGPUTelemetry();
 
-  sandbox.performanceOverlay.update({
+  engine.performanceOverlay.update({
     fps,
     frameTimeMs: deltaTime * 1000,
     drawCalls: perfStats.drawCalls,
@@ -236,23 +236,23 @@ export function updatePerformanceOverlay(sandbox: PixelArtSandbox, deltaTime: nu
 /**
  * Updates the log overlay with recent log entries
  */
-export function updateLogOverlay(sandbox: PixelArtSandbox): void {
-  if (!sandbox.logOverlay.isVisible()) return;
+export function updateLogOverlay(engine: GameEngine): void {
+  if (!engine.logOverlay.isVisible()) return;
 
   const recent = Logger.getRecent(12);
-  sandbox.logOverlay.update(recent);
+  engine.logOverlay.update(recent);
 }
 
 /**
  * Updates the time indicator overlay
  */
-export function updateTimeIndicator(sandbox: PixelArtSandbox): void {
-  if (!sandbox.timeIndicator.isVisible()) return;
+export function updateTimeIndicator(engine: GameEngine): void {
+  if (!engine.timeIndicator.isVisible()) return;
 
-  const dayNightCycle = sandbox.systemManager.dayNightCycle;
+  const dayNightCycle = engine.systemManager.dayNightCycle;
   if (dayNightCycle) {
     const timeString = dayNightCycle.getFormattedTime();
     const nightFactor = dayNightCycle.getNightFactor();
-    sandbox.timeIndicator.update(timeString, nightFactor);
+    engine.timeIndicator.update(timeString, nightFactor);
   }
 }

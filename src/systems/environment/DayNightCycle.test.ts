@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as THREE from 'three';
 import { DayNightCycle } from './DayNightCycle';
-import { ISandboxRenderer } from '../../types/SystemInterfaces';
+import { IGameRenderer } from '../../types/SystemInterfaces';
 
 vi.mock('../../utils/Logger');
 
 // Helper to create mock sandbox renderer
-function createMockRenderer(): ISandboxRenderer {
+function createMockRenderer(): IGameRenderer {
   return {
     fog: {
       color: new THREE.Color(0x0a1012),
@@ -21,16 +21,16 @@ function createMockRenderer(): ISandboxRenderer {
       color: new THREE.Color(0xffffff),
       position: new THREE.Vector3(0, 80, -50)
     } as THREE.DirectionalLight,
-    jungleLight: {
+    hemisphereLight: {
       intensity: 0.5
     } as THREE.HemisphereLight
-  } as ISandboxRenderer;
+  } as IGameRenderer;
 }
 
 describe('DayNightCycle', () => {
   let system: DayNightCycle;
   let scene: THREE.Scene;
-  let mockRenderer: ISandboxRenderer;
+  let mockRenderer: IGameRenderer;
 
   beforeEach(() => {
     scene = new THREE.Scene();
@@ -64,9 +64,9 @@ describe('DayNightCycle', () => {
     });
   });
 
-  describe('setSandboxRenderer', () => {
+  describe('setRenderer', () => {
     it('should accept and store renderer', () => {
-      system.setSandboxRenderer(mockRenderer);
+      system.setRenderer(mockRenderer);
       // No error should be thrown
     });
 
@@ -75,19 +75,19 @@ describe('DayNightCycle', () => {
       customRenderer.fog!.color = new THREE.Color(0xff0000);
       customRenderer.fog!.density = 0.02;
       
-      system.setSandboxRenderer(customRenderer);
+      system.setRenderer(customRenderer);
       // Values are cached internally
     });
 
     it('should handle renderer without fog', () => {
       const rendererNoFog = { ...mockRenderer, fog: undefined };
-      expect(() => system.setSandboxRenderer(rendererNoFog)).not.toThrow();
+      expect(() => system.setRenderer(rendererNoFog)).not.toThrow();
     });
   });
 
   describe('update', () => {
     beforeEach(() => {
-      system.setSandboxRenderer(mockRenderer);
+      system.setRenderer(mockRenderer);
     });
 
     it('should not update without renderer', () => {
@@ -229,7 +229,7 @@ describe('DayNightCycle', () => {
 
   describe('setTimeScale', () => {
     beforeEach(() => {
-      system.setSandboxRenderer(mockRenderer);
+      system.setRenderer(mockRenderer);
     });
 
     it('should set time scale', () => {
@@ -276,7 +276,7 @@ describe('DayNightCycle', () => {
 
   describe('setNightMode', () => {
     beforeEach(() => {
-      system.setSandboxRenderer(mockRenderer);
+      system.setRenderer(mockRenderer);
     });
 
     it('should lock time to midnight when enabled', () => {
@@ -395,7 +395,7 @@ describe('DayNightCycle', () => {
 
   describe('lighting transitions', () => {
     beforeEach(() => {
-      system.setSandboxRenderer(mockRenderer);
+      system.setRenderer(mockRenderer);
     });
 
     describe('sun/moon light', () => {
@@ -510,7 +510,7 @@ describe('DayNightCycle', () => {
         system.setTimeOfDay(12);
         system.update(0.5);
         
-        const dayIntensity = mockRenderer.jungleLight!.intensity;
+        const dayIntensity = mockRenderer.hemisphereLight!.intensity;
         expect(dayIntensity).toBeGreaterThan(0.4);
       });
 
@@ -518,7 +518,7 @@ describe('DayNightCycle', () => {
         system.setTimeOfDay(0);
         system.update(0.5);
         
-        const nightIntensity = mockRenderer.jungleLight!.intensity;
+        const nightIntensity = mockRenderer.hemisphereLight!.intensity;
         expect(nightIntensity).toBeLessThan(0.3);
       });
     });
@@ -526,7 +526,7 @@ describe('DayNightCycle', () => {
 
   describe('fog transitions', () => {
     beforeEach(() => {
-      system.setSandboxRenderer(mockRenderer);
+      system.setRenderer(mockRenderer);
     });
 
     it('should have normal density during day', () => {
@@ -590,7 +590,7 @@ describe('DayNightCycle', () => {
 
   describe('sky color transitions', () => {
     beforeEach(() => {
-      system.setSandboxRenderer(mockRenderer);
+      system.setRenderer(mockRenderer);
     });
 
     it('should have bright blue sky at noon', () => {
@@ -646,7 +646,7 @@ describe('DayNightCycle', () => {
 
   describe('edge cases', () => {
     beforeEach(() => {
-      system.setSandboxRenderer(mockRenderer);
+      system.setRenderer(mockRenderer);
     });
 
     it('should handle very large delta time', () => {
@@ -690,17 +690,17 @@ describe('DayNightCycle', () => {
       const partialRenderer = {
         fog: mockRenderer.fog,
         ambientLight: mockRenderer.ambientLight
-        // Missing moonLight and jungleLight
-      } as ISandboxRenderer;
+        // Missing moonLight and hemisphereLight
+      } as IGameRenderer;
       
-      system.setSandboxRenderer(partialRenderer);
+      system.setRenderer(partialRenderer);
       expect(() => system.update(0.5)).not.toThrow();
     });
 
     it('should handle scene without background', () => {
       const sceneNoBackground = new THREE.Scene();
       const systemNoBackground = new DayNightCycle(sceneNoBackground);
-      systemNoBackground.setSandboxRenderer(mockRenderer);
+      systemNoBackground.setRenderer(mockRenderer);
       
       expect(() => systemNoBackground.update(0.5)).not.toThrow();
     });

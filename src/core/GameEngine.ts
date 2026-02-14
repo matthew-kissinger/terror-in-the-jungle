@@ -3,13 +3,13 @@ import * as THREE from 'three';
 import '../style.css';
 
 import { LoadingScreen } from '../ui/loading/LoadingScreen';
-import { SandboxSystemManager } from './SandboxSystemManager';
-import { SandboxRenderer } from './SandboxRenderer';
+import { SystemManager } from './SystemManager';
+import { GameRenderer } from './GameRenderer';
 import { GameMode } from '../config/gameModes';
 import { PerformanceOverlay } from '../ui/debug/PerformanceOverlay';
 import { TimeIndicator } from '../ui/debug/TimeIndicator';
 import { LogOverlay } from '../ui/debug/LogOverlay';
-import { SandboxMetrics } from './SandboxMetrics';
+import { RuntimeMetrics } from './RuntimeMetrics';
 import { SandboxConfig, getSandboxConfig, isSandboxMode } from './SandboxModeDetector';
 import { SettingsManager } from '../config/SettingsManager';
 import { MobilePauseOverlay } from '../ui/MobilePauseOverlay';
@@ -17,19 +17,19 @@ import { WebGLContextRecovery } from './WebGLContextRecovery';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 
 // Import split modules
-import * as Init from './PixelArtSandboxInit';
-import * as Input from './PixelArtSandboxInput';
-import * as Loop from './PixelArtSandboxLoop';
+import * as Init from './GameEngineInit';
+import * as Input from './GameEngineInput';
+import * as Loop from './GameEngineLoop';
 
-export class PixelArtSandbox {
+export class GameEngine {
   // Core components (Public for split module access)
   public loadingScreen: LoadingScreen;
-  public sandboxRenderer: SandboxRenderer;
-  public systemManager: SandboxSystemManager;
+  public renderer: GameRenderer;
+  public systemManager: SystemManager;
   public performanceOverlay: PerformanceOverlay;
   public timeIndicator: TimeIndicator;
   public logOverlay: LogOverlay;
-  public sandboxMetrics: SandboxMetrics;
+  public runtimeMetrics: RuntimeMetrics;
   public sandboxConfig: SandboxConfig | null;
   public readonly sandboxEnabled: boolean;
 
@@ -44,7 +44,7 @@ export class PixelArtSandbox {
   private contextRecovery: WebGLContextRecovery;
 
   constructor() {
-    Logger.info('core', ' Initializing Pixel Art Sandbox Engine...');
+    Logger.info('core', ' Initializing engine...');
     Logger.info('core', 'Three.js version:', THREE.REVISION);
 
     this.sandboxEnabled = isSandboxMode();
@@ -54,14 +54,14 @@ export class PixelArtSandbox {
     this.loadingScreen = new LoadingScreen();
 
     // Create renderer and system manager
-    this.sandboxRenderer = new SandboxRenderer();
-    this.systemManager = new SandboxSystemManager();
+    this.renderer = new GameRenderer();
+    this.systemManager = new SystemManager();
     this.performanceOverlay = new PerformanceOverlay();
     this.timeIndicator = new TimeIndicator();
     this.logOverlay = new LogOverlay();
-    this.sandboxMetrics = new SandboxMetrics();
+    this.runtimeMetrics = new RuntimeMetrics();
 
-    this.contextRecovery = new WebGLContextRecovery(this.sandboxRenderer);
+    this.contextRecovery = new WebGLContextRecovery(this.renderer);
     this.setupEventListeners();
     this.setupMenuCallbacks();
     this.mobilePauseOverlay = new MobilePauseOverlay(this);
@@ -111,7 +111,7 @@ export class PixelArtSandbox {
 
     // Apply shadow setting to renderer immediately
     const shadowsEnabled = settings.get('enableShadows');
-    this.sandboxRenderer.renderer.shadowMap.enabled = shadowsEnabled;
+    this.renderer.renderer.shadowMap.enabled = shadowsEnabled;
 
     // Apply FPS overlay visibility
     if (settings.get('showFPS')) {
@@ -130,11 +130,11 @@ export class PixelArtSandbox {
       }
       case 'enableShadows': {
         const enabled = value as boolean;
-        this.sandboxRenderer.renderer.shadowMap.enabled = enabled;
+        this.renderer.renderer.shadowMap.enabled = enabled;
         // Mark all materials as needing update for shadow change
-        this.sandboxRenderer.renderer.shadowMap.needsUpdate = true;
-        if (this.sandboxRenderer.moonLight) {
-          this.sandboxRenderer.moonLight.castShadow = enabled;
+        this.renderer.renderer.shadowMap.needsUpdate = true;
+        if (this.renderer.moonLight) {
+          this.renderer.moonLight.castShadow = enabled;
         }
         Logger.info('settings', `Shadows ${enabled ? 'enabled' : 'disabled'}`);
         break;
@@ -158,8 +158,8 @@ export class PixelArtSandbox {
   }
 
   private applyGraphicsQuality(quality: string): void {
-    const renderer = this.sandboxRenderer.renderer;
-    const moonLight = this.sandboxRenderer.moonLight;
+    const renderer = this.renderer.renderer;
+    const moonLight = this.renderer.moonLight;
 
     switch (quality) {
       case 'low':
@@ -267,11 +267,11 @@ export class PixelArtSandbox {
     this.mobilePauseOverlay?.dispose();
     Input.disposeEventListeners();
     this.loadingScreen.dispose();
-    this.sandboxRenderer.dispose();
+    this.renderer.dispose();
     this.systemManager.dispose();
     this.performanceOverlay.dispose();
     this.timeIndicator.dispose();
     this.logOverlay.dispose();
-    Logger.info('core', 'Sandbox disposed');
+    Logger.info('core', 'Engine disposed');
   }
 }

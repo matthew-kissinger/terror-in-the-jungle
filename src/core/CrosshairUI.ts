@@ -1,9 +1,9 @@
 /**
- * Crosshair UI module for SandboxRenderer.
+ * Crosshair UI module for GameRenderer.
  * Manages the tactical crosshair overlay with CSS styling.
  */
 
-export class SandboxCrosshairUI {
+export class CrosshairUI {
   private crosshair?: HTMLDivElement;
 
   showCrosshair(): void {

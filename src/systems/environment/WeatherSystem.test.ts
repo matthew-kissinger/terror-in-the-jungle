@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { WeatherSystem } from './WeatherSystem';
 import { WeatherState, WeatherConfig } from '../../config/gameModes';
-import type { IChunkManager, ISandboxRenderer } from '../../types/SystemInterfaces';
+import type { IChunkManager, IGameRenderer } from '../../types/SystemInterfaces';
 import { updateLightning } from './WeatherLightning';
 import { updateAtmosphere, getBlendedRainIntensity } from './WeatherAtmosphere';
 import { Logger } from '../../utils/Logger';
@@ -29,7 +29,7 @@ type WeatherSystemAny = WeatherSystem & {
   baseFogDensity: number;
   baseAmbientIntensity: number;
   baseMoonIntensity: number;
-  baseJungleIntensity: number;
+  baseHemisphereIntensity: number;
   baseFogColor: number;
   baseAmbientColor: number;
   isUnderwater: boolean;
@@ -40,7 +40,7 @@ type WeatherSystemAny = WeatherSystem & {
   updateRain: (deltaTime: number) => void;
 };
 
-function createMockRenderer(): ISandboxRenderer {
+function createMockRenderer(): IGameRenderer {
   return {
     fog: {
       color: new THREE.Color(0x123456),
@@ -53,10 +53,10 @@ function createMockRenderer(): ISandboxRenderer {
     moonLight: {
       intensity: 1.1
     } as THREE.DirectionalLight,
-    jungleLight: {
+    hemisphereLight: {
       intensity: 0.5
     } as THREE.HemisphereLight
-  } as ISandboxRenderer;
+  } as IGameRenderer;
 }
 
 function createSystem(): {
@@ -133,11 +133,11 @@ describe('WeatherSystem', () => {
     });
   });
 
-  describe('setSandboxRenderer', () => {
+  describe('setRenderer', () => {
     it('caches fog values from renderer', () => {
       const { system } = createSystem();
       const renderer = createMockRenderer();
-      system.setSandboxRenderer(renderer);
+      system.setRenderer(renderer);
       const systemAny = system as WeatherSystemAny;
       expect(systemAny.baseFogDensity).toBe(renderer.fog!.density);
       expect(systemAny.baseFogColor).toBe(renderer.fog!.color.getHex());
@@ -146,25 +146,25 @@ describe('WeatherSystem', () => {
     it('caches ambient light values from renderer', () => {
       const { system } = createSystem();
       const renderer = createMockRenderer();
-      system.setSandboxRenderer(renderer);
+      system.setRenderer(renderer);
       const systemAny = system as WeatherSystemAny;
       expect(systemAny.baseAmbientIntensity).toBe(renderer.ambientLight!.intensity);
       expect(systemAny.baseAmbientColor).toBe(renderer.ambientLight!.color.getHex());
     });
 
-    it('caches moon and jungle intensities from renderer', () => {
+    it('caches moon and hemisphere intensities from renderer', () => {
       const { system } = createSystem();
       const renderer = createMockRenderer();
-      system.setSandboxRenderer(renderer);
+      system.setRenderer(renderer);
       const systemAny = system as WeatherSystemAny;
       expect(systemAny.baseMoonIntensity).toBe(renderer.moonLight!.intensity);
-      expect(systemAny.baseJungleIntensity).toBe(renderer.jungleLight!.intensity);
+      expect(systemAny.baseHemisphereIntensity).toBe(renderer.hemisphereLight!.intensity);
     });
 
     it('handles missing renderer fields without throwing', () => {
       const { system } = createSystem();
-      const renderer = { fog: undefined, ambientLight: undefined } as ISandboxRenderer;
-      expect(() => system.setSandboxRenderer(renderer)).not.toThrow();
+      const renderer = { fog: undefined, ambientLight: undefined } as IGameRenderer;
+      expect(() => system.setRenderer(renderer)).not.toThrow();
     });
   });
 

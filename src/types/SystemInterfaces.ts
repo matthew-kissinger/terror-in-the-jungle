@@ -184,7 +184,7 @@ export interface IPlayerController {
   setHelicopterModel(helicopterModel: HelicopterModel): void;
   setFirstPersonWeapon(firstPersonWeapon: FirstPersonWeapon): void;
   setHUDSystem(hudSystem: HUDSystem): void;
-  setSandboxRenderer(sandboxRenderer: ISandboxRenderer): void;
+  setRenderer(renderer: IGameRenderer): void;
   setInventoryManager(inventoryManager: InventoryManager): void;
   setGrenadeSystem(grenadeSystem: GrenadeSystem): void;
   setMortarSystem(mortarSystem: MortarSystem): void;
@@ -319,9 +319,9 @@ export interface IInventoryManager {
 }
 
 /**
- * Sandbox Renderer interface - main rendering system
+ * Game Renderer interface - main rendering system
  */
-export interface ISandboxRenderer {
+export interface IGameRenderer {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
@@ -329,7 +329,7 @@ export interface ISandboxRenderer {
   fog?: THREE.FogExp2;
   ambientLight?: THREE.AmbientLight;
   moonLight?: THREE.DirectionalLight;
-  jungleLight?: THREE.HemisphereLight;
+  hemisphereLight?: THREE.HemisphereLight;
   getPerformanceStats(): any;
   showSpawnLoadingIndicator(): void;
   hideSpawnLoadingIndicator(): void;

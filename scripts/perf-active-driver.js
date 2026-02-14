@@ -94,7 +94,7 @@
     }
 
     function getSystems() {
-      return globalWindow.__sandbox && globalWindow.__sandbox.systemManager;
+      return globalWindow.__engine && globalWindow.__engine.systemManager;
     }
 
     function getEnemySpawn(systems) {

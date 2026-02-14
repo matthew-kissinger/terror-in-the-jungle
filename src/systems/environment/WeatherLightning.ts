@@ -1,5 +1,5 @@
 import { WeatherState } from '../../config/gameModes';
-import { IAudioManager, ISandboxRenderer } from '../../types/SystemInterfaces';
+import { IAudioManager, IGameRenderer } from '../../types/SystemInterfaces';
 
 export interface LightningState {
   isFlashing: boolean;
@@ -15,7 +15,7 @@ export function updateLightning(
   currentState: WeatherState,
   targetState: WeatherState,
   transitionProgress: number,
-  sandboxRenderer?: ISandboxRenderer,
+  renderer?: IGameRenderer,
   audioManager?: IAudioManager,
   onFlashEnd?: () => void
 ): void {
@@ -38,7 +38,7 @@ export function updateLightning(
     if (currentState === WeatherState.STORM || targetState === WeatherState.STORM) {
       const stormIntensity = transitionProgress;
       if (Math.random() < 0.005 * stormIntensity) {
-        triggerLightning(state, sandboxRenderer);
+        triggerLightning(state, renderer);
       }
     }
   }
@@ -46,16 +46,16 @@ export function updateLightning(
 
 function triggerLightning(
   state: LightningState,
-  sandboxRenderer?: ISandboxRenderer
+  renderer?: IGameRenderer
 ): void {
   state.isFlashing = true;
   state.flashTimer = FLASH_DURATION;
 
-  if (sandboxRenderer?.moonLight && sandboxRenderer?.ambientLight) {
-    sandboxRenderer.moonLight.intensity = 2.0;
-    sandboxRenderer.ambientLight.intensity = 1.0;
-    if (sandboxRenderer.fog) {
-      sandboxRenderer.fog.color.setHex(0x4a6b8a);
+  if (renderer?.moonLight && renderer?.ambientLight) {
+    renderer.moonLight.intensity = 2.0;
+    renderer.ambientLight.intensity = 1.0;
+    if (renderer.fog) {
+      renderer.fog.color.setHex(0x4a6b8a);
     }
   }
 

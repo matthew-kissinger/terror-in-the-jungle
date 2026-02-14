@@ -46,7 +46,7 @@ Use critical-path priorities as guidance, not hard sequencing, when evidence poi
 | ID | Workstream | Why | Primary Files | Dependency Bias | Done Criteria | Effort |
 |---|---|---|---|---|---|---|
 | P0-1 | Make perf harness reliable under stalls | Cannot optimize blind; harness must fail with evidence, not hang | `scripts/perf-baseline.ts`, `scripts/perf-capture.ts`, `scripts/perf-analyze-latest.ts`, `src/systems/debug/PerformanceTelemetry.ts` | None | Harness completes in bounded time with artifacts + validation | M |
-| P0-2 | Add fixed benchmark scenarios (combat-heavy, terrain-heavy, mixed) | Prevents regressions hidden by random play sessions | `scripts/perf-baseline.ts`, `scripts/perf-capture.ts`, `src/core/PixelArtSandbox.ts` | P0-1 | Repeatable scenario scripts checked into repo | M |
+| P0-2 | Add fixed benchmark scenarios (combat-heavy, terrain-heavy, mixed) | Prevents regressions hidden by random play sessions | `scripts/perf-baseline.ts`, `scripts/perf-capture.ts`, `src/core/GameEngine.ts` | P0-1 | Repeatable scenario scripts checked into repo | M |
 | P1-1 | Remove dual spatial ownership in combat | Current octree/grid duplication causes drift and redundant updates | `src/systems/combat/CombatantSystem.ts`, `src/systems/combat/CombatantLODManager.ts`, `src/systems/combat/SpatialGridManager.ts`, `src/systems/combat/SpatialOctree.ts` | P0-1 strong | One authoritative spatial index for combat queries and LOD | L |
 | P1-2 | Flatten combat tick pipeline to one deterministic pass | Multiple manager passes waste frame budget and create state races | `src/systems/combat/CombatantSystemUpdate.ts`, `src/systems/combat/CombatantAI.ts`, `src/systems/combat/CombatantCombat.ts`, `src/systems/combat/CombatantMovement.ts` | P1-1 | Single update order doc + implementation + no duplicate per-entity loops | L |
 | P1-3 | Budget/centralize line-of-sight and raycasts | LOS work explodes with agent counts | `src/systems/combat/ai/RaycastBudget.ts`, `src/systems/combat/ai/AILineOfSight.ts`, `src/systems/combat/ai/AITargetAcquisition.ts`, `src/systems/combat/LOSAccelerator.ts` | P1-2 | Raycast count capped/frame with graceful degradation | M |
@@ -62,8 +62,8 @@ Use critical-path priorities as guidance, not hard sequencing, when evidence poi
 | P4-1 | Fix duplicated input command dispatch and parity drift | Double-fired commands create gameplay inconsistency | `src/systems/player/PlayerInput.ts`, `src/ui/controls/*` | P1-2 | One command dispatch per action across keyboard/touch | M |
 | P4-2 | Stabilize HUD update cadence and reduce full redraws | UI churn steals main-thread time from simulation | `src/ui/hud/HUDSystem.ts`, `src/ui/hud/HUDUpdater.ts`, `src/ui/minimap/MinimapSystem.ts` | P0-2 | HUD updates are event-driven or throttled by budget | M |
 | P4-3 | Fix audio positional/object pooling correctness | Temp object allocation and incorrect attachment cause leaks/bugs | `src/systems/audio/AudioWeaponSounds.ts`, `src/systems/audio/FootstepAudioSystem.ts`, `src/systems/audio/AudioPoolManager.ts` | P0-1 | Pooled nodes used consistently; no temp object churn | M |
-| P5-1 | Delete confirmed dead terrain legacy modules | Reduces confusion and test noise | `src/systems/terrain/Chunk.ts`, `src/systems/terrain/ChunkTerrain.ts`, `src/systems/terrain/ChunkVegetation.ts`, `src/systems/terrain/DebugChunk.ts` | P2-1 | Files removed and imports cleaned | S |
-| P5-2 | Delete unused combat spatial legacy module | Duplicate spatial implementations confuse ownership | `src/systems/combat/SpatialGrid.ts` | P1-1 | File removed; tests realigned | S |
+| P5-1 | ~~Delete confirmed dead terrain legacy modules~~ **DONE** | Reduces confusion and test noise | Deleted: `Chunk.ts`, `ChunkTerrain.ts`, `ChunkVegetation.ts`, `ChunkJungleVegetation.ts` (duplicate of `ChunkVegetationGenerator.ts`) | P2-1 | Files removed and imports cleaned | S |
+| P5-2 | ~~Delete unused combat spatial legacy module~~ **DONE** | Duplicate spatial implementations confuse ownership | Deleted: `SpatialGrid.ts` + `SpatialGrid.test.ts` | P1-1 | Files removed; `SpatialGridManager.ts` is the active impl | S |
 | P5-3 | Align tests with runtime architecture and add perf guards | Current test quantity hides architecture drift | `vitest.config.ts`, runtime-adjacent `*.test.ts` across combat/terrain/workers | P1-2, P2-2 | Coverage thresholds + integration perf smoke tests | M |
 | P5-4 | Add architecture invariants doc and CI checks | Prevents regression back into fragmented architecture | `docs/`, CI workflow files | P5-3 preferred | CI gate validates invariants and perf budget deltas | M |
 
@@ -71,10 +71,10 @@ Use critical-path priorities as guidance, not hard sequencing, when evidence poi
 
 ### Runtime/Core Wiring
 
-- Entry and lifecycle: `src/core/bootstrap.ts`, `src/core/PixelArtSandbox.ts`
-- Initialization split: `src/core/PixelArtSandboxInit.ts`, `src/core/SystemInitializer.ts`, `src/core/SystemConnector.ts`
-- Frame loop: `src/core/PixelArtSandboxLoop.ts`, `src/core/SystemUpdater.ts`
-- Input bridge: `src/core/PixelArtSandboxInput.ts`
+- Entry and lifecycle: `src/core/bootstrap.ts`, `src/core/GameEngine.ts`
+- Initialization split: `src/core/GameEngineInit.ts`, `src/core/SystemInitializer.ts`, `src/core/SystemConnector.ts`
+- Frame loop: `src/core/GameEngineLoop.ts`, `src/core/SystemUpdater.ts`
+- Input bridge: `src/core/GameEngineInput.ts`
 - Disposal/recovery: `src/core/SystemDisposer.ts`, `src/core/WebGLContextRecovery.ts`
 
 ### Combat (Primary Bottleneck)
@@ -119,14 +119,14 @@ Use critical-path priorities as guidance, not hard sequencing, when evidence poi
 - Harness entry: `scripts/perf-capture.ts` launches Vite on `:9100`, opens Chromium, hits `/?sandbox=true&npcs=<N>&autostart=true&duration=<S>`.
 - Sandbox mode parse: `src/core/SandboxModeDetector.ts` maps URL params to `SandboxConfig`.
 - Game mode override: `src/config/gameModes.ts` injects `sandboxConfig.npcCount` into `AI_SANDBOX_CONFIG.maxCombatants`.
-- Autostart path: `src/core/PixelArtSandboxInit.ts` calls `startGameWithMode(..., AI_SANDBOX)` when sandbox+autostart.
-- Combat activation: `src/core/PixelArtSandboxInit.ts` eventually calls `combatantSystem.enableCombat()`.
+- Autostart path: `src/core/GameEngineInit.ts` calls `startGameWithMode(..., AI_SANDBOX)` when sandbox+autostart.
+- Combat activation: `src/core/GameEngineInit.ts` eventually calls `combatantSystem.enableCombat()`.
 - Per-frame system update order: `src/core/SystemUpdater.ts` (`Combat -> Terrain -> Billboards -> Player -> Weapons -> UI -> World -> Other`).
 - Frame timing capture: `src/core/SystemUpdater.ts` wraps each tracked system with `performanceTelemetry.beginSystem/endSystem`, frame with `beginFrame/endFrame`.
 - Harness-read metrics:
-  - `window.sandboxMetrics.getSnapshot()` from `src/core/SandboxMetrics.ts` updated in `src/core/PixelArtSandboxLoop.ts`.
+  - `window.__metrics.getSnapshot()` from `src/core/RuntimeMetrics.ts` updated in `src/core/GameEngineLoop.ts`.
   - `window.perf.report()` from `src/systems/debug/PerformanceTelemetry.ts` backed by `FrameTimingTracker`.
-  - `__sandboxRenderer.getPerformanceStats()` from `src/core/SandboxRenderer.ts`.
+  - `__renderer.getPerformanceStats()` from `src/core/GameRenderer.ts`.
 - Failure signature now observed repeatedly: startup frame progression stalls before stable render cadence, and `FrameTimingTracker` slow-frame logs attribute dominant cost to `Combat`.
 
 ## Gamer-Level Interpretation Of Current Harness
@@ -215,7 +215,7 @@ Use critical-path priorities as guidance, not hard sequencing, when evidence poi
 | 2026-02-14 | EXP-004 | Runaway headless/browser processes are contaminating harness runs | Added run lock + per-run browser profile + forced targeted browser cleanup + hard timeout | all `perf:capture` runs | Guardrails added; pending clean-state verification | IN PROGRESS | `scripts/perf-capture.ts`, `docs/PROFILING_HARNESS.md` |
 | 2026-02-14 | EXP-005 | Harness observer effect is creating false GPU stalls (`ReadPixels`) | Disabled Playwright tracing/screenshots by default; made screenshot optional/timeout-guarded | 20-NPC sandbox capture | Harness exits faster and no longer hangs; `ReadPixels` warning persists (not fully harness-caused) | PARTIAL KEEP | `scripts/perf-capture.ts`, `artifacts/perf/2026-02-14T03-25-13-119Z/console.json` |
 | 2026-02-14 | EXP-006 | Audio loader errors are polluting signal quality during perf runs | Deduped asset load failure logging to warn-once in audio loader | 20-NPC sandbox capture | Pending rerun to verify warning count reduction | IN PROGRESS | `src/systems/audio/AudioManager.ts` |
-| 2026-02-14 | EXP-007 | Startup instability is driven by timer-based startup sequencing and fake readiness waits | Replaced startup timeout chain with explicit async startup flow and chunk readiness polling | 20-NPC control runs | Startup reaches render-visible more deterministically; headless still experiences periodic long stalls | KEEP + ITERATE | `src/core/PixelArtSandboxInit.ts`, `src/core/SandboxSystemManager.ts` |
+| 2026-02-14 | EXP-007 | Startup instability is driven by timer-based startup sequencing and fake readiness waits | Replaced startup timeout chain with explicit async startup flow and chunk readiness polling | 20-NPC control runs | Startup reaches render-visible more deterministically; headless still experiences periodic long stalls | KEEP + ITERATE | `src/core/GameEngineInit.ts`, `src/core/SystemManager.ts` |
 | 2026-02-14 | EXP-008 | Input action duplication contributes to control inconsistency and hidden workload | Removed `KeyZ` keyup duplicate and synthetic key dispatch touch paths; added direct slot API | unit test suites | All targeted player/combat tests pass; input path simplified | KEEP | `src/systems/player/PlayerInput.ts`, `src/systems/player/PlayerController.ts`, `src/systems/player/InventoryManager.ts` |
 | 2026-02-14 | EXP-009 | Large merge spikes come from full-ring terrain merge passes | Incremental ring merging (`MAX_RINGS_PER_PASS=3`) + merged BVH opt-out by default | unit tests + build | Terrain merger remains functional with lower per-pass work; compile/tests green | KEEP | `src/systems/terrain/TerrainMeshMerger.ts` |
 | 2026-02-14 | EXP-010 | Main-thread spikes in combat come from unbounded AI work within a frame | Added per-frame AI budget cap/degradation in LOD manager | unit tests + build | AI workload now hard-capped with controlled degradation logs | KEEP | `src/systems/combat/CombatantLODManager.ts` |
@@ -293,10 +293,10 @@ Reason: large boot chain is fully blocking; no phased readiness split (playable 
 2. `src/systems/terrain/ImprovedChunkManager.ts` init loads initial chunks synchronously with `await` per chunk (`loadChunkImmediate` loop).
 Reason: startup cost scales with chunk cost and blocks interactivity.
 
-3. `src/core/PixelArtSandboxInit.ts` startup orchestration is timer-driven (`setTimeout` chain) instead of state-driven.
+3. `src/core/GameEngineInit.ts` startup orchestration is timer-driven (`setTimeout` chain) instead of state-driven.
 Reason: non-deterministic readiness; race-prone when terrain/combat load times vary.
 
-4. `src/core/SandboxSystemManager.ts` `preGenerateSpawnArea` relies on `chunkManager.update(0.01)` + fixed `setTimeout(200)`.
+4. `src/core/SystemManager.ts` `preGenerateSpawnArea` relies on `chunkManager.update(0.01)` + fixed `setTimeout(200)`.
 Reason: fake synchronization, not completion-based; causes inconsistent startup outcomes.
 
 5. `src/systems/terrain/ImprovedChunkManager.ts` processes chunks at `UPDATE_INTERVAL = 0.25` with `MAX_CHUNKS_PER_FRAME = 1`.
@@ -331,12 +331,12 @@ minimum playable ring first, then background expansion with explicit completion 
 
 - Combat-disabled path now skips AI decisions (`src/systems/combat/CombatantSystem.ts`, `src/systems/combat/CombatantLODManager.ts`).
 - Combat force reseed now respects player squad creation intent (`src/systems/combat/CombatantSystem.ts`, `src/systems/combat/CombatantSpawnManager.ts`).
-- Autostart avoids duplicate pre-generation, and shader precompile moved off immediate startup critical path (`src/core/PixelArtSandboxInit.ts`).
+- Autostart avoids duplicate pre-generation, and shader precompile moved off immediate startup critical path (`src/core/GameEngineInit.ts`).
 
 ### Progress Applied In Code (Entry/Terrain/Input Integrity)
 
-- Replaced timer-chain startup bootstrap with explicit async startup phases in `src/core/PixelArtSandboxInit.ts` (`hide-loading -> position-player -> flush-chunk-update -> renderer-visible -> enable-player-systems -> interactive-ready`).
-- Replaced fixed `setTimeout(200)` spawn pregen wait with chunk readiness polling in `src/core/SandboxSystemManager.ts` (checks minimum playable ring chunk load around spawn).
+- Replaced timer-chain startup bootstrap with explicit async startup phases in `src/core/GameEngineInit.ts` (`hide-loading -> position-player -> flush-chunk-update -> renderer-visible -> enable-player-systems -> interactive-ready`).
+- Replaced fixed `setTimeout(200)` spawn pregen wait with chunk readiness polling in `src/core/SystemManager.ts` (checks minimum playable ring chunk load around spawn).
 - Added explicit chunk size accessor in `src/systems/terrain/ImprovedChunkManager.ts` to support deterministic spawn-area readiness checks.
 - Removed duplicated `KeyZ` command firing on keyup in `src/systems/player/PlayerInput.ts` (single action per key press).
 - Removed synthetic keyboard dispatch for touch sandbag/rally commands in `src/systems/player/PlayerInput.ts` (direct callback path).
@@ -344,10 +344,10 @@ minimum playable ring first, then background expansion with explicit completion 
 - Added direct inventory slot API in `src/systems/player/InventoryManager.ts` for non-keyboard callers.
 - Added deferred initialization pathway (critical systems first, deferred systems after interactive-ready):
   - `src/core/SystemInitializer.ts`
-  - `src/core/SandboxSystemManager.ts`
-  - `src/core/PixelArtSandboxInit.ts`
+  - `src/core/SystemManager.ts`
+  - `src/core/GameEngineInit.ts`
 - Reduced startup shader compile stall risk by preferring async `compileAsync` with fallback:
-  - `src/core/SandboxRenderer.ts`
+  - `src/core/GameRenderer.ts`
   - Reference: https://threejs.org/docs/api/en/renderers/WebGLRenderer.html (`compileAsync`)
 - Updated perf harness startup model to support realistic warmup and startup windows:
   - `scripts/perf-capture.ts`
@@ -390,7 +390,7 @@ Validation:
   - Added runtime enable gate (`setEnabled`, `isEnabled`) and disabled-by-default behavior outside sandbox/dev/explicit flags.
   - Why: avoid frame-timing bookkeeping overhead in normal hosted play sessions.
 
-- `src/core/PixelArtSandboxInput.ts`, `src/core/PixelArtSandbox.ts`, `src/core/PixelArtSandboxInit.ts`:
+- `src/core/GameEngineInput.ts`, `src/core/GameEngine.ts`, `src/core/GameEngineInit.ts`:
   - Telemetry now toggles with FPS overlay visibility (or sandbox mode).
   - Why: keep perf instrumentation available when needed without always-on cost.
 

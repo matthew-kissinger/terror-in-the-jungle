@@ -1,7 +1,7 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { IChunkManager, IAudioManager, ISandboxRenderer } from '../../types/SystemInterfaces';
+import { IChunkManager, IAudioManager, IGameRenderer } from '../../types/SystemInterfaces';
 import { WeatherState, WeatherConfig } from '../../config/gameModes';
 import { updateLightning, LightningState } from './WeatherLightning';
 import { updateAtmosphere, getBlendedRainIntensity, AtmosphereBaseValues } from './WeatherAtmosphere';
@@ -12,7 +12,7 @@ export class WeatherSystem implements GameSystem {
   private camera: THREE.Camera;
   private chunkManager: IChunkManager;
   private audioManager?: IAudioManager;
-  private sandboxRenderer?: ISandboxRenderer;
+  private renderer?: IGameRenderer;
 
   // Configuration
   private config?: WeatherConfig;
@@ -43,13 +43,13 @@ export class WeatherSystem implements GameSystem {
   private isUnderwater: boolean = false;
   
   // Base atmosphere values (cached from renderer on init)
-  // SALVAGE FIX: Updated defaults to match brighter SandboxRenderer values
-  // Note: These are overwritten by actual renderer values in setSandboxRenderer()
+  // SALVAGE FIX: Updated defaults to match brighter GameRenderer values
+  // Note: These are overwritten by actual renderer values in setRenderer()
   private baseFogDensity: number = 0.005;
   private baseAmbientIntensity: number = 0.6;
   private baseMoonIntensity: number = 0.8;
-  private baseJungleIntensity: number = 0.4;
-  private baseFogColor: number = 0x3a5a4a; // Green-gray jungle fog
+  private baseHemisphereIntensity: number = 0.4;
+  private baseFogColor: number = 0x3a5a4a; // Green-gray fog
   private baseAmbientColor: number = 0x6a8a7a; // Warm green ambient
 
   constructor(scene: THREE.Scene, camera: THREE.Camera, chunkManager: IChunkManager) {
@@ -84,8 +84,8 @@ export class WeatherSystem implements GameSystem {
     this.audioManager = audioManager;
   }
 
-  setSandboxRenderer(renderer: ISandboxRenderer): void {
-    this.sandboxRenderer = renderer;
+  setRenderer(renderer: IGameRenderer): void {
+    this.renderer = renderer;
     // Cache initial values from renderer
     if (renderer.fog) {
       this.baseFogDensity = renderer.fog.density;
@@ -96,7 +96,7 @@ export class WeatherSystem implements GameSystem {
       this.baseAmbientColor = renderer.ambientLight.color.getHex();
     }
     if (renderer.moonLight) this.baseMoonIntensity = renderer.moonLight.intensity;
-    if (renderer.jungleLight) this.baseJungleIntensity = renderer.jungleLight.intensity;
+    if (renderer.hemisphereLight) this.baseHemisphereIntensity = renderer.hemisphereLight.intensity;
   }
 
   setWeatherConfig(config?: WeatherConfig): void {
@@ -299,7 +299,7 @@ export class WeatherSystem implements GameSystem {
       this.currentState,
       this.targetState,
       this.transitionProgress,
-      this.sandboxRenderer,
+      this.renderer,
       this.audioManager,
       () => this.updateAtmosphere()
     );
@@ -310,13 +310,13 @@ export class WeatherSystem implements GameSystem {
       fogDensity: this.baseFogDensity,
       ambientIntensity: this.baseAmbientIntensity,
       moonIntensity: this.baseMoonIntensity,
-      jungleIntensity: this.baseJungleIntensity,
+      hemisphereIntensity: this.baseHemisphereIntensity,
       fogColor: this.baseFogColor,
       ambientColor: this.baseAmbientColor
     };
 
     updateAtmosphere(
-      this.sandboxRenderer,
+      this.renderer,
       this.isUnderwater,
       this.currentState,
       this.targetState,

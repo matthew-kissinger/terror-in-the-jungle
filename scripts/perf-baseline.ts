@@ -29,7 +29,7 @@ const THRESHOLDS = {
   overBudgetPercent: { warn: 0.20, fail: 0.50 }, // 20% warn, 50% fail (absolute increase)
 };
 
-interface SandboxMetrics {
+interface RuntimeMetrics {
   frameCount: number;
   avgFrameMs: number;
   p95FrameMs: number;
@@ -104,7 +104,7 @@ interface ComparisonResult {
 interface RuntimeStateSnapshot {
   url: string;
   readyState: string;
-  hasSandboxMetrics: boolean;
+  hasMetrics: boolean;
   hasPerf: boolean;
   hasRenderer: boolean;
   frameCount: number;
@@ -229,14 +229,14 @@ async function getRuntimeState(page: Page): Promise<RuntimeStateSnapshot> {
   return withTimeout(
     'runtime state snapshot',
     page.evaluate(() => {
-      const sandboxMetrics = (window as any).sandboxMetrics;
+      const runtimeMetrics = (window as any).__metrics;
       return {
         url: window.location.href,
         readyState: document.readyState,
-        hasSandboxMetrics: Boolean(sandboxMetrics),
+        hasMetrics: Boolean(runtimeMetrics),
         hasPerf: Boolean((window as any).perf),
-        hasRenderer: Boolean((window as any).__sandboxRenderer),
-        frameCount: sandboxMetrics ? Number(sandboxMetrics.frameCount ?? 0) : 0
+        hasRenderer: Boolean((window as any).__engineRenderer),
+        frameCount: runtimeMetrics ? Number(runtimeMetrics.frameCount ?? 0) : 0
       };
     }),
     METRIC_COLLECTION_TIMEOUT_MS
@@ -341,8 +341,8 @@ async function runBenchmark(): Promise<void> {
 
     // Wait for game to initialize
     logStep('⏳ Waiting for game initialization');
-    await withTimeout('wait sandboxMetrics', page.waitForFunction(() => {
-      return (window as any).sandboxMetrics !== undefined;
+    await withTimeout('wait __metrics', page.waitForFunction(() => {
+      return (window as any).__metrics !== undefined;
     }, { timeout: STEP_TIMEOUT_MS }), STEP_TIMEOUT_MS + 1000);
     lastRuntimeState = await getRuntimeState(page);
     logStep(`Sandbox ready: frameCount=${lastRuntimeState.frameCount}`);
@@ -380,16 +380,16 @@ async function runBenchmark(): Promise<void> {
     // Collect metrics
     logStep('📊 Collecting metrics');
 
-    const sandboxMetrics = await withTimeout('collect sandbox metrics', page.evaluate(() => {
-      return (window as any).sandboxMetrics.getSnapshot();
-    }), METRIC_COLLECTION_TIMEOUT_MS) as SandboxMetrics;
+    const runtimeMetrics = await withTimeout('collect runtime metrics', page.evaluate(() => {
+      return (window as any).__metrics.getSnapshot();
+    }), METRIC_COLLECTION_TIMEOUT_MS) as RuntimeMetrics;
 
     const perfReport = await withTimeout('collect perf report', page.evaluate(() => {
       return (window as any).perf.report();
     }), METRIC_COLLECTION_TIMEOUT_MS) as PerformanceReport;
 
     const rendererStats = await withTimeout('collect renderer stats', page.evaluate(() => {
-      const renderer = (window as any).__sandboxRenderer;
+      const renderer = (window as any).__engineRenderer;
       if (!renderer) return null;
       return renderer.getPerformanceStats();
     }), METRIC_COLLECTION_TIMEOUT_MS) as RendererStats | null;
@@ -398,10 +398,10 @@ async function runBenchmark(): Promise<void> {
     const previousBaseline = loadBaseline();
 
     // Print report
-    printReport(sandboxMetrics, perfReport, rendererStats);
+    printReport(runtimeMetrics, perfReport, rendererStats);
 
     // Compare with baseline and save new baseline
-    const hasRegression = compareAndSaveBaseline(sandboxMetrics, perfReport, rendererStats, previousBaseline);
+    const hasRegression = compareAndSaveBaseline(runtimeMetrics, perfReport, rendererStats, previousBaseline);
 
     // Exit with error code if regression detected
     if (hasRegression) {
@@ -438,7 +438,7 @@ async function runBenchmark(): Promise<void> {
 }
 
 function printReport(
-  sandbox: SandboxMetrics,
+  metrics: RuntimeMetrics,
   perf: PerformanceReport,
   renderer: RendererStats | null
 ): void {
@@ -447,16 +447,16 @@ function printReport(
   console.log('='.repeat(70));
 
   console.log('\n📈 FRAME TIMING');
-  console.log(`   Frames rendered:     ${sandbox.frameCount}`);
-  console.log(`   Average frame time:  ${sandbox.avgFrameMs.toFixed(2)} ms`);
-  console.log(`   P95 frame time:      ${sandbox.p95FrameMs.toFixed(2)} ms`);
-  console.log(`   Average FPS:         ${(1000 / sandbox.avgFrameMs).toFixed(1)}`);
+  console.log(`   Frames rendered:     ${metrics.frameCount}`);
+  console.log(`   Average frame time:  ${metrics.avgFrameMs.toFixed(2)} ms`);
+  console.log(`   P95 frame time:      ${metrics.p95FrameMs.toFixed(2)} ms`);
+  console.log(`   Average FPS:         ${(1000 / metrics.avgFrameMs).toFixed(1)}`);
   console.log(`   Frames over budget:  ${perf.overBudgetPercent.toFixed(1)}%`);
 
   console.log('\n🎯 COMBAT STATS');
-  console.log(`   Active combatants:   ${sandbox.combatantCount}`);
-  console.log(`   Currently firing:    ${sandbox.firingCount}`);
-  console.log(`   Currently engaging:  ${sandbox.engagingCount}`);
+  console.log(`   Active combatants:   ${metrics.combatantCount}`);
+  console.log(`   Currently firing:    ${metrics.firingCount}`);
+  console.log(`   Currently engaging:  ${metrics.engagingCount}`);
   console.log(`   Hit detection rate:  ${(perf.hitDetection.hitRate * 100).toFixed(1)}%`);
   console.log(`   Total shots:         ${perf.hitDetection.shotsThisSession}`);
   console.log(`   Total hits:          ${perf.hitDetection.hitsThisSession}`);
@@ -513,7 +513,7 @@ function loadBaseline(): BaselineMetrics | null {
 }
 
 function compareAndSaveBaseline(
-  sandbox: SandboxMetrics,
+  metrics: RuntimeMetrics,
   perf: PerformanceReport,
   renderer: RendererStats | null,
   previousBaseline: BaselineMetrics | null
@@ -521,13 +521,13 @@ function compareAndSaveBaseline(
   const currentMetrics: BaselineMetrics = {
     lastRun: new Date().toISOString(),
     metrics: {
-      avgFrameMs: sandbox.avgFrameMs,
-      p95FrameMs: sandbox.p95FrameMs,
+      avgFrameMs: metrics.avgFrameMs,
+      p95FrameMs: metrics.p95FrameMs,
       overBudgetPercent: perf.overBudgetPercent,
       drawCalls: renderer?.drawCalls ?? 0,
       triangles: renderer?.triangles ?? 0,
-      frameCount: sandbox.frameCount,
-      combatantCount: sandbox.combatantCount,
+      frameCount: metrics.frameCount,
+      combatantCount: metrics.combatantCount,
     }
   };
 
