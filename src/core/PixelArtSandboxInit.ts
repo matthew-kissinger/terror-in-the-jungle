@@ -150,7 +150,7 @@ export function startGame(sandbox: PixelArtSandbox): void {
       }
     } catch { /* ignore */ }
 
-    // Show renderer AFTER player is positioned to avoid seeing stacked terrain
+    // Kick one more chunk update before revealing the renderer
     sandbox.systemManager.chunkManager.update(0.01);
     sandbox.sandboxRenderer.showRenderer();
 

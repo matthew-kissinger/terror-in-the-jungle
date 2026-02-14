@@ -17,6 +17,8 @@ export class TerrainMeshMerger {
   private readonly MERGE_DEBOUNCE_MS = 500; // Debounce re-merges
   private mergeTimer: number | null = null;
   private pendingMerge = false;
+  // Track which chunks have been merged (originals hidden)
+  private mergedChunkKeys: Set<string> = new Set();
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -62,11 +64,19 @@ export class TerrainMeshMerger {
     // Track which rings are still active
     const activeRings = new Set<number>();
 
+    // Reset merged chunk tracking (rebuilt from ringAssignments after merge)
+    this.mergedChunkKeys.clear();
+
     // Merge each ring
     chunksByRing.forEach((ringChunks, ring) => {
       activeRings.add(ring);
       this.mergeRing(ring, ringChunks);
     });
+
+    // Track all merged chunk keys so the visibility system can skip them
+    for (const key of this.ringAssignments.keys()) {
+      this.mergedChunkKeys.add(key);
+    }
 
     // Dispose rings that are no longer needed
     this.mergedMeshes.forEach((mesh, ring) => {
@@ -133,6 +143,12 @@ export class TerrainMeshMerger {
       const terrainMesh = chunk.getTerrainMesh();
       if (!terrainMesh) continue;
 
+      // Ensure matrixWorld is up-to-date before baking transforms.
+      // During initialization the renderer hasn't run yet, so matrixWorld
+      // would still be the identity matrix, causing all chunks to merge
+      // at the origin and produce a visible stack of terrain planes.
+      terrainMesh.updateWorldMatrix(true, false);
+
       // Clone geometry to avoid modifying original
       const geomClone = terrainMesh.geometry.clone();
 
@@ -193,6 +209,14 @@ export class TerrainMeshMerger {
   }
 
   /**
+   * Check if a chunk has been merged (original mesh hidden).
+   * Used by the visibility system to avoid overriding the merger's hidden state.
+   */
+  isChunkMerged(chunkKey: string): boolean {
+    return this.mergedChunkKeys.has(chunkKey);
+  }
+
+  /**
    * Get stats for debugging
    */
   getStats(): {
@@ -234,6 +258,7 @@ export class TerrainMeshMerger {
 
     this.mergedMeshes.clear();
     this.ringAssignments.clear();
+    this.mergedChunkKeys.clear();
     this.pendingMerge = false;
   }
 }

@@ -175,13 +175,18 @@ export class ChunkLifecycleManager {
     calculateLOD: (distance: number) => number,
     shouldBeVisible: (distance: number) => boolean
   ): void {
-    this.chunks.forEach((chunk) => {
+    this.chunks.forEach((chunk, key) => {
       const distance = getChunkDistance(chunk.getPosition(), this.playerPosition);
-      const isVisible = shouldBeVisible(distance);
       const lodLevel = calculateLOD(distance);
-      
-      chunk.setVisible(isVisible);
       chunk.setLODLevel(lodLevel);
+
+      // If this chunk's mesh has been merged, keep the original hidden
+      // to avoid double-rendering with the merged mesh
+      if (this.meshMerger && this.meshMerger.isChunkMerged(key)) {
+        chunk.setVisible(false);
+      } else {
+        chunk.setVisible(shouldBeVisible(distance));
+      }
     });
   }
 
