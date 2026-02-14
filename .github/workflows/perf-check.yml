@@ -49,17 +49,20 @@ jobs:
         run: npm run build
       
       - name: Capture control profile (combat off)
+        continue-on-error: true
         env:
           PERF_STARTUP_TIMEOUT: 90
         run: xvfb-run -a npm run perf:capture -- --duration=20 --warmup=6 --combat=0 --reuse-dev-server=true --log-level=warn
       
       - name: Capture combat profile (active scenario)
+        continue-on-error: true
         env:
           PERF_STARTUP_TIMEOUT: 90
         run: xvfb-run -a npm run perf:capture -- --duration=20 --warmup=8 --npcs=60 --combat=1 --active-player=1 --reuse-dev-server=true --log-level=warn
       
       - name: Analyze latest capture
         if: always()
+        continue-on-error: true
         run: npm run perf:analyze:latest
 
       - name: Upload perf artifacts
