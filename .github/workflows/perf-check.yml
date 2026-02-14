@@ -3,13 +3,31 @@ name: Performance Regression Check
 on:
   push:
     branches: [master, main]
+    paths:
+      - 'src/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.js'
+      - '.github/workflows/perf-check.yml'
   pull_request:
     branches: [master, main]
+    paths:
+      - 'src/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.js'
+      - '.github/workflows/perf-check.yml'
+
+concurrency:
+  group: perf-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  perf-baseline:
+  perf-capture:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     
     steps:
       - name: Checkout
@@ -18,7 +36,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
       
       - name: Install dependencies
@@ -30,25 +48,24 @@ jobs:
       - name: Build
         run: npm run build
       
-      - name: Establish baseline (first run)
-        run: npm run perf:baseline
-        continue-on-error: true
+      - name: Capture control profile (combat off)
+        env:
+          PERF_STARTUP_TIMEOUT: 90
+        run: xvfb-run -a npm run perf:capture -- --duration=20 --warmup=6 --combat=0 --reuse-dev-server=true --log-level=warn
       
-      - name: Check for regression (second run)
-        run: npm run perf:baseline
+      - name: Capture combat profile (active scenario)
+        env:
+          PERF_STARTUP_TIMEOUT: 90
+        run: xvfb-run -a npm run perf:capture -- --duration=20 --warmup=8 --npcs=60 --combat=1 --active-player=1 --reuse-dev-server=true --log-level=warn
       
-      - name: Upload results on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: perf-baseline-results
-          path: perf-baselines.json
-          retention-days: 7
-      
-      - name: Upload full results
+      - name: Analyze latest capture
+        if: always()
+        run: npm run perf:analyze:latest
+
+      - name: Upload perf artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: perf-baseline-json
-          path: perf-baselines.json
+          name: perf-capture-artifacts
+          path: artifacts/perf/**
           retention-days: 7
