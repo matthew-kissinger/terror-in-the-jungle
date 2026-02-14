@@ -3,8 +3,8 @@ import { Logger } from '../../utils/Logger';
 
 const _losDirection = new THREE.Vector3();
 const _rayBox = new THREE.Box3();
-const _meshBox = new THREE.Box3();
 const _losRaycaster = new THREE.Raycaster();
+const _registeredChunkBox = new THREE.Box3();
 
 /**
  * Accelerates line-of-sight checks using BVH-accelerated raycasting
@@ -16,7 +16,7 @@ const _losRaycaster = new THREE.Raycaster();
  * - Tracks performance metrics for monitoring
  */
 export class LOSAccelerator {
-  private chunkCache: Map<string, THREE.Mesh> = new Map();
+  private chunkCache: Map<string, { mesh: THREE.Mesh; bounds: THREE.Box3 }> = new Map();
 
   // Performance tracking
   private queryCount = 0;
@@ -28,7 +28,18 @@ export class LOSAccelerator {
    * Register a chunk's terrain mesh for LOS checks
    */
   registerChunk(chunkKey: string, mesh: THREE.Mesh): void {
-    this.chunkCache.set(chunkKey, mesh);
+    mesh.updateMatrixWorld(true);
+
+    let bounds: THREE.Box3;
+    const geometry = mesh.geometry;
+    if (geometry && geometry.boundingBox) {
+      bounds = _registeredChunkBox.copy(geometry.boundingBox).applyMatrix4(mesh.matrixWorld).clone();
+    } else {
+      // Fallback once at registration for non-standard or uncached geometry.
+      bounds = _registeredChunkBox.setFromObject(mesh).clone();
+    }
+
+    this.chunkCache.set(chunkKey, { mesh, bounds });
     Logger.debug('los', `Registered chunk ${chunkKey} for LOS (total: ${this.chunkCache.size})`);
   }
 
@@ -120,13 +131,10 @@ export class LOSAccelerator {
     _rayBox.expandByScalar(2); // Small buffer for edge cases
 
     // Check each cached chunk
-    for (const [, mesh] of this.chunkCache.entries()) {
-      // Get mesh bounding box
-      _meshBox.setFromObject(mesh);
-
+    for (const [, entry] of this.chunkCache.entries()) {
       // Only include if ray box intersects chunk box
-      if (_rayBox.intersectsBox(_meshBox)) {
-        meshes.push(mesh);
+      if (_rayBox.intersectsBox(entry.bounds)) {
+        meshes.push(entry.mesh);
       }
     }
 

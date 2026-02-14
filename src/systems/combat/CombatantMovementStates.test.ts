@@ -3,7 +3,6 @@ import * as THREE from 'three';
 import { updatePatrolMovement, updateCombatMovement, updateCoverSeekingMovement, updateDefendingMovement } from './CombatantMovementStates';
 import { Combatant, Faction, Squad, SquadCommand } from './types';
 import { ZoneState } from '../world/ZoneManager';
-import { objectPool } from '../../utils/ObjectPoolManager';
 import { handlePlayerCommand, handleRejoiningMovement } from './CombatantMovementCommands';
 
 // Mock Three.js Vector3
@@ -21,18 +20,6 @@ vi.mock('three', () => ({
     multiplyScalar(s: number) { this.x *= s; this.y *= s; this.z *= s; return this; }
   }
 }));
-
-// Mock objectPool
-vi.mock('../../utils/ObjectPoolManager', async () => {
-  const three = await import('three');
-  const makeVector3 = (x = 0, y = 0, z = 0) => new three.Vector3(x, y, z);
-  return {
-    objectPool: {
-      getVector3: vi.fn(() => makeVector3()),
-      releaseVector3: vi.fn()
-    }
-  };
-});
 
 // Mock CombatantMovementCommands
 vi.mock('./CombatantMovementCommands', () => ({
@@ -335,7 +322,6 @@ describe('CombatantMovementStates', () => {
       const combatant = createCombatant({ velocity: new THREE.Vector3(1, 0, 0), target: null });
       updateCombatMovement(combatant);
       expect(combatant.velocity.x).toBe(1);
-      expect(objectPool.getVector3).not.toHaveBeenCalled();
     });
 
     it('moves toward target when too far', () => {

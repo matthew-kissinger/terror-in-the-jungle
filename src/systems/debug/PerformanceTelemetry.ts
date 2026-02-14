@@ -49,6 +49,7 @@ export class PerformanceTelemetry {
   private gpuTiming = new GPUTimingTelemetry()
   private benchmark = new PerformanceBenchmark()
   private frameTiming = new FrameTimingTracker()
+  private enabled = this.resolveInitialEnabledState()
 
   private constructor() {
     // Expose to window for console debugging
@@ -67,6 +68,14 @@ export class PerformanceTelemetry {
       PerformanceTelemetry.instance = new PerformanceTelemetry()
     }
     return PerformanceTelemetry.instance
+  }
+
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled
+  }
+
+  isEnabled(): boolean {
+    return this.enabled
   }
 
   /**
@@ -116,6 +125,7 @@ export class PerformanceTelemetry {
    * Call at the start of each frame
    */
   beginFrame(): void {
+    if (!this.enabled) return
     this.frameTiming.beginFrame()
     // Reset per-frame counters
     this.spatialGridTelemetry.queriesThisFrame = 0
@@ -125,6 +135,7 @@ export class PerformanceTelemetry {
    * Call before updating a system
    */
   beginSystem(name: string): void {
+    if (!this.enabled) return
     this.frameTiming.beginSystem(name)
   }
 
@@ -132,6 +143,7 @@ export class PerformanceTelemetry {
    * Call after updating a system
    */
   endSystem(name: string): void {
+    if (!this.enabled) return
     this.frameTiming.endSystem(name)
   }
 
@@ -139,6 +151,7 @@ export class PerformanceTelemetry {
    * Call at the end of each frame
    */
   endFrame(): void {
+    if (!this.enabled) return
     this.frameTiming.endFrame()
   }
 
@@ -146,6 +159,7 @@ export class PerformanceTelemetry {
    * Set the budget for a specific system
    */
   setSystemBudget(name: string, budgetMs: number): void {
+    if (!this.enabled) return
     this.frameTiming.setSystemBudget(name, budgetMs)
   }
 
@@ -184,6 +198,7 @@ export class PerformanceTelemetry {
    * Get average frame time over history
    */
   getAvgFrameTime(): number {
+    if (!this.enabled) return 16.67
     return this.frameTiming.getAvgFrameTime()
   }
 
@@ -191,6 +206,7 @@ export class PerformanceTelemetry {
    * Get percentage of frames over budget
    */
   getOverBudgetPercent(): number {
+    if (!this.enabled) return 0
     return this.frameTiming.getOverBudgetPercent()
   }
 
@@ -198,6 +214,7 @@ export class PerformanceTelemetry {
    * Get system breakdown for display
    */
   getSystemBreakdown(): SystemTiming[] {
+    if (!this.enabled) return []
     return this.frameTiming.getSystemBreakdown()
   }
 
@@ -282,6 +299,44 @@ export class PerformanceTelemetry {
       lastSyncMs: 0
     }
     Logger.info('performance', '[Perf] Telemetry reset')
+  }
+
+  private resolveInitialEnabledState(): boolean {
+    const fromGlobal = (globalThis as { __ENABLE_PERF_TELEMETRY__?: boolean }).__ENABLE_PERF_TELEMETRY__
+    if (typeof fromGlobal === 'boolean') {
+      return fromGlobal
+    }
+
+    const fromBuild = this.readBuildEnvTelemetryFlag()
+    if (fromBuild !== null) {
+      return fromBuild
+    }
+
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search)
+        const sandboxFlag = params.get('sandbox')
+        const perfFlag = params.get('perf')
+        const telemetryFlag = params.get('telemetry')
+        if (sandboxFlag === '1' || sandboxFlag === 'true') return true
+        if (perfFlag === '1' || perfFlag === 'true') return true
+        if (telemetryFlag === '1' || telemetryFlag === 'true') return true
+      } catch {
+        // ignore
+      }
+    }
+
+    return false
+  }
+
+  private readBuildEnvTelemetryFlag(): boolean | null {
+    try {
+      const env = (import.meta as { env?: { DEV?: boolean } }).env
+      if (env?.DEV === true) return true
+    } catch {
+      // ignore and fall through
+    }
+    return null
   }
 
   /**

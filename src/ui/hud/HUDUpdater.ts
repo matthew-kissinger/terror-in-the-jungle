@@ -23,6 +23,16 @@ export class HUDUpdater {
   private kdRatioEl?: HTMLDivElement;
   private gameStatusTextEl?: HTMLDivElement;
   private bleedIndicatorEl?: HTMLDivElement;
+  private lastUsTicketsText = '';
+  private lastOpforTicketsText = '';
+  private lastTicketHeaderText = '';
+  private lastCombatStats: { us: number; opfor: number; total: number } | null = null;
+  private lastStatusText = '';
+  private lastBleedText = '';
+  private lastBleedVisible = false;
+  private lastTimerText = '';
+  private lastTimerColor = '';
+  private lastTimerClass = '';
 
   constructor(elements: HUDElements) {
     this.elements = elements;
@@ -53,11 +63,23 @@ export class HUDUpdater {
     }
 
     if (isTDM) {
-      this.ticketHeader.textContent = `FIRST TO ${target} KILLS`;
+      const headerText = `FIRST TO ${target} KILLS`;
+      if (this.lastTicketHeaderText !== headerText) {
+        this.ticketHeader.textContent = headerText;
+        this.lastTicketHeaderText = headerText;
+      }
     }
 
-    this.usTicketCount.textContent = `${Math.round(usTickets)}`;
-    this.opforTicketCount.textContent = `${Math.round(opforTickets)}`;
+    const usText = `${Math.round(usTickets)}`;
+    const opforText = `${Math.round(opforTickets)}`;
+    if (this.lastUsTicketsText !== usText) {
+      this.usTicketCount.textContent = usText;
+      this.lastUsTicketsText = usText;
+    }
+    if (this.lastOpforTicketsText !== opforText) {
+      this.opforTicketCount.textContent = opforText;
+      this.lastOpforTicketsText = opforText;
+    }
   }
 
   updateCombatStats(combatantSystem: CombatantSystem): void {
@@ -67,9 +89,19 @@ export class HUDUpdater {
       return;
     }
 
+    if (
+      this.lastCombatStats &&
+      this.lastCombatStats.us === stats.us &&
+      this.lastCombatStats.opfor === stats.opfor &&
+      this.lastCombatStats.total === stats.total
+    ) {
+      return;
+    }
+
     this.combatStatsLines[0].textContent = `Allies: ${stats.us}`;
     this.combatStatsLines[1].textContent = `Enemies: ${stats.opfor}`;
     this.combatStatsLines[2].textContent = `Total: ${stats.total}`;
+    this.lastCombatStats = { us: stats.us, opfor: stats.opfor, total: stats.total };
   }
 
   updateKillCounter(): void {
@@ -119,17 +151,24 @@ export class HUDUpdater {
       }
     }
 
-    if (this.gameStatusTextEl) {
+    if (this.gameStatusTextEl && this.lastStatusText !== statusText) {
       this.gameStatusTextEl.textContent = statusText;
+      this.lastStatusText = statusText;
     }
 
     if (this.bleedIndicatorEl) {
-      if (bleedText) {
+      const bleedVisible = Boolean(bleedText);
+      if (bleedVisible && this.lastBleedText !== bleedText) {
         this.bleedIndicatorEl.textContent = bleedText;
-        this.bleedIndicatorEl.style.display = 'block';
-      } else {
+        this.lastBleedText = bleedText;
+      }
+      if (this.lastBleedVisible !== bleedVisible) {
+        this.bleedIndicatorEl.style.display = bleedVisible ? 'block' : 'none';
+        this.lastBleedVisible = bleedVisible;
+      }
+      if (!bleedVisible && this.lastBleedText !== '') {
         this.bleedIndicatorEl.textContent = '';
-        this.bleedIndicatorEl.style.display = 'none';
+        this.lastBleedText = '';
       }
     }
   }
@@ -153,23 +192,36 @@ export class HUDUpdater {
     const seconds = Math.floor(Math.max(0, timeRemaining) % 60);
     const timeText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-    timerDisplay.textContent = timeText;
+    if (this.lastTimerText !== timeText) {
+      timerDisplay.textContent = timeText;
+      this.lastTimerText = timeText;
+    }
 
     // Update color based on time remaining
-    if (timeRemaining <= 0) {
-      timerDisplay.style.color = 'rgba(201, 86, 74, 0.95)';
-      this.elements.timerElement.classList.add('timer-critical');
-    } else if (timeRemaining <= 30) {
-      timerDisplay.style.color = 'rgba(201, 86, 74, 0.95)';
-      this.elements.timerElement.classList.add('timer-critical');
-      this.elements.timerElement.classList.remove('timer-warning');
+    let color: string;
+    let timerClass: 'timer-critical' | 'timer-warning' | '';
+    if (timeRemaining <= 30) {
+      color = 'rgba(201, 86, 74, 0.95)';
+      timerClass = 'timer-critical';
     } else if (timeRemaining <= 60) {
-      timerDisplay.style.color = 'rgba(212, 163, 68, 0.95)';
-      this.elements.timerElement.classList.add('timer-warning');
-      this.elements.timerElement.classList.remove('timer-critical');
+      color = 'rgba(212, 163, 68, 0.95)';
+      timerClass = 'timer-warning';
     } else {
-      timerDisplay.style.color = 'rgba(220, 225, 230, 0.9)';
+      color = 'rgba(220, 225, 230, 0.9)';
+      timerClass = '';
+    }
+
+    if (this.lastTimerColor !== color) {
+      timerDisplay.style.color = color;
+      this.lastTimerColor = color;
+    }
+
+    if (this.lastTimerClass !== timerClass) {
       this.elements.timerElement.classList.remove('timer-warning', 'timer-critical');
+      if (timerClass) {
+        this.elements.timerElement.classList.add(timerClass);
+      }
+      this.lastTimerClass = timerClass;
     }
   }
 

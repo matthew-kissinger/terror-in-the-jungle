@@ -38,6 +38,7 @@ export class CombatantHitDetection {
   private scratchVec3 = new THREE.Vector3()
   private readonly playerHitPoint = new THREE.Vector3()
   private readonly playerMissPoint = new THREE.Vector3()
+  private static loggedUninitializedGrid = false
 
   // Cached hit zones to avoid per-call allocations
   private readonly hitZonesEngaging: HitZone[] = [
@@ -119,7 +120,10 @@ export class CombatantHitDetection {
     // REQUIRED: Use spatial grid for O(log n) query
     // NO FALLBACK - grid must be initialized
     if (!this.gridManager.getIsInitialized()) {
-      Logger.error('combat', '[HitDetection] Grid not initialized! Call spatialGridManager.initialize() first.')
+      if (!CombatantHitDetection.loggedUninitializedGrid) {
+        CombatantHitDetection.loggedUninitializedGrid = true
+        Logger.error('combat', '[HitDetection] Grid not initialized! Call spatialGridManager.initialize() first.')
+      }
       performanceTelemetry.recordFallback()
       return null
     }

@@ -97,8 +97,12 @@ export class CombatantSpawnManager {
     const config = this.gameModeManager?.getCurrentConfig();
     const avgSquadSize = SpawnPositionCalculator.getAverageSquadSize(this.squadSizeMin, this.squadSizeMax);
     const targetPerFaction = Math.floor(this.MAX_COMBATANTS / 2);
-    const initialPerFaction = Math.max(avgSquadSize, Math.floor(targetPerFaction * 0.3));
-    let initialSquadsPerFaction = Math.max(1, Math.round(initialPerFaction / avgSquadSize));
+    const initialPerFaction = targetPerFaction > 0
+      ? Math.max(Math.min(this.squadSizeMin, targetPerFaction), Math.floor(targetPerFaction * 0.3))
+      : 0;
+    let initialSquadsPerFaction = initialPerFaction > 0
+      ? Math.max(1, Math.ceil(initialPerFaction / Math.max(1, avgSquadSize)))
+      : 0;
 
     const usHQs = SpawnPositionCalculator.getHQZonesForFaction(Faction.US, config);
     const opforHQs = SpawnPositionCalculator.getHQZonesForFaction(Faction.OPFOR, config);
@@ -144,10 +148,12 @@ export class CombatantSpawnManager {
     }
 
     // Seed a small progressive queue to get early contact
-    this.progressiveSpawnQueue = [
-      { faction: Faction.US, position: new THREE.Vector3(usBasePos.x + 10, usBasePos.y, usBasePos.z + 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) },
-      { faction: Faction.OPFOR, position: new THREE.Vector3(opforBasePos.x - 10, opforBasePos.y, opforBasePos.z - 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) }
-    ];
+    if (this.combatants.size < this.MAX_COMBATANTS) {
+      this.progressiveSpawnQueue = [
+        { faction: Faction.US, position: new THREE.Vector3(usBasePos.x + 10, usBasePos.y, usBasePos.z + 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) },
+        { faction: Faction.OPFOR, position: new THREE.Vector3(opforBasePos.x - 10, opforBasePos.y, opforBasePos.z - 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) }
+      ];
+    }
 
     Logger.info('Combat', `Initial forces deployed: ${this.combatants.size} combatants`);
 
@@ -161,14 +167,14 @@ export class CombatantSpawnManager {
   /**
    * Reseed forces when switching game modes
    */
-  reseedForcesForMode(): void {
+  reseedForcesForMode(shouldCreatePlayerSquad = false, playerSquadId?: string): string | undefined {
     Logger.info('Combat', 'Reseed forces for new game mode configuration...');
     this.combatants.clear();
     this.spatialGrid.clear();
     this.progressiveSpawnQueue = [];
     this.progressiveSpawnTimer = 0;
     this.reinforcementWaveTimer = 0;
-    this.spawnInitialForces(false);
+    return this.spawnInitialForces(shouldCreatePlayerSquad, playerSquadId);
   }
 
   /**
@@ -279,7 +285,13 @@ export class CombatantSpawnManager {
    * Spawn a squad at the given position
    */
   spawnSquad(faction: Faction, centerPos: THREE.Vector3, size: number): void {
-    const { members } = this.squadManager.createSquad(faction, centerPos, size);
+    const remaining = this.MAX_COMBATANTS - this.combatants.size;
+    if (remaining <= 0) {
+      return;
+    }
+
+    const clampedSize = Math.max(1, Math.min(size, remaining));
+    const { members } = this.squadManager.createSquad(faction, centerPos, clampedSize);
 
     // Add all squad members to our combatants map and spatial grid
     members.forEach(combatant => {

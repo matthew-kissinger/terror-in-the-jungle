@@ -37,6 +37,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private onPlayAgainCallback?: () => void;
   private respawnButtonPointerDownHandler?: (e: PointerEvent) => void;
   private viewportUnsubscribe?: () => void;
+  private staticHudAccumulator = 0;
+  private readonly STATIC_HUD_INTERVAL = 0.2; // 5Hz for mostly-static HUD text/state
 
   constructor(camera?: THREE.Camera, ticketSystem?: TicketSystem, playerHealthSystem?: PlayerHealthSystem, _playerRespawnManager?: unknown) {
     this.camera = camera;
@@ -110,29 +112,33 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
   update(deltaTime: number): void {
     const isTDM = this.ticketSystem ? this.ticketSystem.isTDMMode() : false;
+    this.staticHudAccumulator += deltaTime;
+    if (this.staticHudAccumulator >= this.STATIC_HUD_INTERVAL) {
+      // Update objectives display
+      if (this.zoneManager) {
+        this.updater.updateObjectivesDisplay(this.zoneManager, isTDM);
+      }
 
-    // Update objectives display
-    if (this.zoneManager) {
-      this.updater.updateObjectivesDisplay(this.zoneManager, isTDM);
-    }
+      // Update combat statistics
+      if (this.combatantSystem) {
+        this.updater.updateCombatStats(this.combatantSystem);
+      }
 
-    // Update combat statistics
-    if (this.combatantSystem) {
-      this.updater.updateCombatStats(this.combatantSystem);
-    }
+      // Update game status and tickets
+      if (this.ticketSystem) {
+        this.updater.updateGameStatus(this.ticketSystem);
+        this.updater.updateTicketDisplay(
+          this.ticketSystem.getTickets(Faction.US),
+          this.ticketSystem.getTickets(Faction.OPFOR),
+          isTDM,
+          this.ticketSystem.getKillTarget()
+        );
+        // Update match timer
+        const timeRemaining = this.ticketSystem.getMatchTimeRemaining();
+        this.updater.updateTimer(timeRemaining);
+      }
 
-    // Update game status and tickets
-    if (this.ticketSystem) {
-      this.updater.updateGameStatus(this.ticketSystem);
-      this.updater.updateTicketDisplay(
-        this.ticketSystem.getTickets(Faction.US),
-        this.ticketSystem.getTickets(Faction.OPFOR),
-        isTDM,
-        this.ticketSystem.getKillTarget()
-      );
-      // Update match timer
-      const timeRemaining = this.ticketSystem.getMatchTimeRemaining();
-      this.updater.updateTimer(timeRemaining);
+      this.staticHudAccumulator = 0;
     }
 
     // Update grenade power meter
@@ -323,12 +329,10 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   }
 
   showInteractionPrompt(text: string): void {
-    Logger.info('hud', ' HUDSystem: showInteractionPrompt called with:', text);
     this.elements.showInteractionPrompt(text);
   }
 
   hideInteractionPrompt(): void {
-    Logger.info('hud', ' HUDSystem: hideInteractionPrompt called');
     this.elements.hideInteractionPrompt();
   }
 

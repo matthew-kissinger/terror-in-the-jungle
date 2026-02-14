@@ -31,6 +31,8 @@ export interface CombatHitResult {
 
 export class CombatantCombat {
   private readonly MAX_ENGAGEMENT_RANGE = 150;
+  private readonly TERRAIN_SAMPLE_STEP = 1.25;
+  private readonly TERRAIN_OCCLUSION_EPSILON = 0.1;
 
   private impactEffectsPool: ImpactEffectsPool;
   public hitDetection: CombatantHitDetection;
@@ -55,6 +57,7 @@ export class CombatantCombat {
 
   // Pre-allocated scratch vectors to avoid per-frame allocations in hot paths
   private readonly scratchEndPoint = new THREE.Vector3();
+  private readonly scratchSamplePoint = new THREE.Vector3();
   // Module-level scratch vectors for fire loop (replaces pool allocations)
   private readonly _muzzlePos = new THREE.Vector3();
   private readonly _targetFirePos = new THREE.Vector3();
@@ -296,6 +299,26 @@ export class CombatantCombat {
     }
 
     const hit = this.hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
+    const terrainHit = this.chunkManager
+      ? this.chunkManager.raycastTerrain(ray.origin, ray.direction, this.MAX_ENGAGEMENT_RANGE)
+      : { hit: false as const };
+
+    if (hit && terrainHit.hit && terrainHit.distance !== undefined && terrainHit.distance < hit.distance - 0.5) {
+      if (terrainHit.point) {
+        this.impactEffectsPool.spawn(terrainHit.point, ray.direction);
+        return { hit: false, point: terrainHit.point };
+      }
+      this.scratchEndPoint.copy(ray.origin).addScaledVector(ray.direction, terrainHit.distance);
+      this.impactEffectsPool.spawn(this.scratchEndPoint, ray.direction);
+      return { hit: false, point: this.scratchEndPoint };
+    }
+
+    if (hit && this.isBlockedByHeightProfile(ray, hit.distance)) {
+      const blockDistance = this.findHeightProfileBlockDistance(ray, hit.distance);
+      this.scratchEndPoint.copy(ray.origin).addScaledVector(ray.direction, blockDistance);
+      this.impactEffectsPool.spawn(this.scratchEndPoint, ray.direction);
+      return { hit: false, point: this.scratchEndPoint };
+    }
 
     if (hit) {
       const damage = damageCalculator(hit.distance, hit.headshot);
@@ -322,9 +345,58 @@ export class CombatantCombat {
       return { hit: true, point: hit.point, killed, headshot: hit.headshot, damage };
     }
 
-    this.scratchEndPoint.copy(ray.origin)
-      .addScaledVector(ray.direction, this.MAX_ENGAGEMENT_RANGE);
+    if (terrainHit.hit) {
+      if (terrainHit.point) {
+        this.impactEffectsPool.spawn(terrainHit.point, ray.direction);
+        return { hit: false, point: terrainHit.point };
+      }
+      if (terrainHit.distance !== undefined) {
+        this.scratchEndPoint.copy(ray.origin).addScaledVector(ray.direction, terrainHit.distance);
+        this.impactEffectsPool.spawn(this.scratchEndPoint, ray.direction);
+        return { hit: false, point: this.scratchEndPoint };
+      }
+    }
+
+    this.scratchEndPoint.copy(ray.origin).addScaledVector(ray.direction, this.MAX_ENGAGEMENT_RANGE);
     return { hit: false, point: this.scratchEndPoint };
+  }
+
+  private isBlockedByHeightProfile(ray: THREE.Ray, maxDistance: number): boolean {
+    if (!this.chunkManager || typeof this.chunkManager.getEffectiveHeightAt !== 'function') {
+      return false;
+    }
+
+    const end = Math.min(maxDistance, this.MAX_ENGAGEMENT_RANGE);
+    if (!Number.isFinite(end) || end <= this.TERRAIN_SAMPLE_STEP) return false;
+
+    for (let d = this.TERRAIN_SAMPLE_STEP; d < end; d += this.TERRAIN_SAMPLE_STEP) {
+      this.scratchSamplePoint.copy(ray.origin).addScaledVector(ray.direction, d);
+      const terrainY = this.chunkManager.getEffectiveHeightAt(this.scratchSamplePoint.x, this.scratchSamplePoint.z);
+      if (terrainY + this.TERRAIN_OCCLUSION_EPSILON >= this.scratchSamplePoint.y) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private findHeightProfileBlockDistance(ray: THREE.Ray, maxDistance: number): number {
+    if (!this.chunkManager || typeof this.chunkManager.getEffectiveHeightAt !== 'function') {
+      return Math.min(maxDistance, this.MAX_ENGAGEMENT_RANGE);
+    }
+
+    const end = Math.min(maxDistance, this.MAX_ENGAGEMENT_RANGE);
+    if (!Number.isFinite(end) || end <= this.TERRAIN_SAMPLE_STEP) return end;
+
+    for (let d = this.TERRAIN_SAMPLE_STEP; d < end; d += this.TERRAIN_SAMPLE_STEP) {
+      this.scratchSamplePoint.copy(ray.origin).addScaledVector(ray.direction, d);
+      const terrainY = this.chunkManager.getEffectiveHeightAt(this.scratchSamplePoint.x, this.scratchSamplePoint.z);
+      if (terrainY + this.TERRAIN_OCCLUSION_EPSILON >= this.scratchSamplePoint.y) {
+        return d;
+      }
+    }
+
+    return end;
   }
 
   // Public API maintained for backward compatibility

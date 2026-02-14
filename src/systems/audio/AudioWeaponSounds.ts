@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SOUND_CONFIGS, SoundConfig } from '../../config/audio';
 import { AudioPoolManager } from './AudioPoolManager';
 import { AudioDuckingSystem } from './AudioDuckingSystem';
+import { Logger } from '../../utils/Logger';
 
 /**
  * Manages weapon-specific sound playback.
@@ -13,6 +14,7 @@ export class AudioWeaponSounds {
     private poolManager: AudioPoolManager;
     private duckingSystem: AudioDuckingSystem;
     private soundConfigs: Record<string, SoundConfig> = SOUND_CONFIGS;
+    private bulletWhizMissingLogged = false;
 
     constructor(
         scene: THREE.Scene,
@@ -268,7 +270,12 @@ export class AudioWeaponSounds {
             // Slight pitch variation for variety
             sound.setPlaybackRate(0.9 + Math.random() * 0.2);
             sound.play();
+            return;
         }
-        // If no bulletWhiz sound loaded, silently skip
+        if (!this.bulletWhizMissingLogged) {
+            this.bulletWhizMissingLogged = true;
+            // One-time warning keeps missing-asset visibility without runtime log spam.
+            Logger.warn('audio', 'Missing optional bulletWhiz asset; near-miss SFX disabled');
+        }
     }
 }

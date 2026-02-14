@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 import { Combatant, Faction, Squad, SquadCommand } from './types';
 import { ZoneManager, ZoneState } from '../world/ZoneManager';
-import { objectPool } from '../../utils/ObjectPoolManager';
 import { handlePlayerCommand, handleRejoiningMovement } from './CombatantMovementCommands';
+
+const _moveVec = new THREE.Vector3();
+const _moveVec2 = new THREE.Vector3();
 export interface PatrolMovementDependencies {
   zoneManager?: ZoneManager;
   getEnemyBasePosition: (faction: Faction) => THREE.Vector3;
@@ -32,20 +34,17 @@ export function updatePatrolMovement(
     if (squad && squad.leaderId) {
         const leader = combatants.get(squad.leaderId);
         if (leader && leader.id !== combatant.id) {
-          const toLeader = objectPool.getVector3();
-          toLeader.subVectors(leader.position, combatant.position);
-          if (toLeader.length() > 6) {
-            toLeader.normalize();
+          _moveVec.subVectors(leader.position, combatant.position);
+          if (_moveVec.length() > 6) {
+            _moveVec.normalize();
             combatant.velocity.set(
-            toLeader.x * 3, // Normal squad following speed
+            _moveVec.x * 3, // Normal squad following speed
             0,
-            toLeader.z * 3
+            _moveVec.z * 3
           );
-          combatant.rotation = Math.atan2(toLeader.z, toLeader.x);
-          objectPool.releaseVector3(toLeader);
+          combatant.rotation = Math.atan2(_moveVec.z, _moveVec.x);
           return;
         }
-        objectPool.releaseVector3(toLeader);
       }
     }
   }
@@ -109,32 +108,28 @@ export function updatePatrolMovement(
     }
     if (combatant.destinationPoint) {
       // Move toward the selected zone
-      const toZone = objectPool.getVector3();
-      toZone.subVectors(combatant.destinationPoint, combatant.position);
-      const distance = toZone.length();
-      toZone.normalize();
+      _moveVec.subVectors(combatant.destinationPoint, combatant.position);
+      const distance = _moveVec.length();
+      _moveVec.normalize();
       // Variable speed based on distance
       let speed = 4; // Normal speed
       if (distance < 20) speed = 2; // Slow down when near zone
       if (distance > 100) speed = 6; // Speed up for long distances
-      combatant.velocity.set(toZone.x * speed, 0, toZone.z * speed);
-      if (speed > 0.1) combatant.rotation = Math.atan2(toZone.z, toZone.x);
-      objectPool.releaseVector3(toZone);
+      combatant.velocity.set(_moveVec.x * speed, 0, _moveVec.z * speed);
+      if (speed > 0.1) combatant.rotation = Math.atan2(_moveVec.z, _moveVec.x);
       return;
     }
   }
   // Fallback: advance toward enemy territory
   if (combatant.squadRole === 'leader') {
     const enemyBasePos = deps.getEnemyBasePosition(combatant.faction);
-    const toEnemyBase = objectPool.getVector3();
-    toEnemyBase.subVectors(enemyBasePos, combatant.position).normalize();
+    _moveVec.subVectors(enemyBasePos, combatant.position).normalize();
     combatant.velocity.set(
-      toEnemyBase.x * 3,
+      _moveVec.x * 3,
       0,
-      toEnemyBase.z * 3
+      _moveVec.z * 3
     );
-    combatant.rotation = Math.atan2(toEnemyBase.z, toEnemyBase.x);
-    objectPool.releaseVector3(toEnemyBase);
+    combatant.rotation = Math.atan2(_moveVec.z, _moveVec.x);
   } else {
     // Followers: limited wander near leader
     combatant.timeToDirectionChange -= deltaTime;
@@ -155,49 +150,42 @@ export function updatePatrolMovement(
 }
 export function updateCombatMovement(combatant: Combatant): void {
   if (!combatant.target) return;
-  const toTarget = objectPool.getVector3();
-  toTarget.subVectors(combatant.target.position, combatant.position);
-  const distance = toTarget.length();
-  toTarget.normalize();
+  _moveVec.subVectors(combatant.target.position, combatant.position);
+  const distance = _moveVec.length();
+  _moveVec.normalize();
   const idealEngagementDistance = 30;
   if (distance > idealEngagementDistance + 10) {
     // Move closer
-    combatant.velocity.copy(toTarget).multiplyScalar(3);
+    combatant.velocity.copy(_moveVec).multiplyScalar(3);
   } else if (distance < idealEngagementDistance - 10) {
     // Back up
-    combatant.velocity.copy(toTarget).multiplyScalar(-2);
+    combatant.velocity.copy(_moveVec).multiplyScalar(-2);
   } else {
     // Strafe
     const strafeAngle = Math.sin(Date.now() * 0.001) * 0.5;
-    const strafeDirection = objectPool.getVector3();
-    strafeDirection.set(-toTarget.z, 0, toTarget.x);
-    combatant.velocity.copy(strafeDirection).multiplyScalar(strafeAngle * 2);
-    objectPool.releaseVector3(strafeDirection);
+    _moveVec2.set(-_moveVec.z, 0, _moveVec.x);
+    combatant.velocity.copy(_moveVec2).multiplyScalar(strafeAngle * 2);
   }
-  objectPool.releaseVector3(toTarget);
 }
 export function updateCoverSeekingMovement(combatant: Combatant): void {
   if (!combatant.destinationPoint) {
     combatant.velocity.set(0, 0, 0);
     return;
   }
-  const toDestination = objectPool.getVector3();
-  toDestination.subVectors(combatant.destinationPoint, combatant.position);
-  const distance = toDestination.length();
+  _moveVec.subVectors(combatant.destinationPoint, combatant.position);
+  const distance = _moveVec.length();
   if (distance < 2) {
     combatant.velocity.set(0, 0, 0);
-    objectPool.releaseVector3(toDestination);
     return;
   }
-  toDestination.normalize();
+  _moveVec.normalize();
   // Move quickly to cover with urgency
   const speed = 6;
   combatant.velocity.set(
-    toDestination.x * speed,
+    _moveVec.x * speed,
     0,
-    toDestination.z * speed
+    _moveVec.z * speed
   );
-  objectPool.releaseVector3(toDestination);
 }
 export function updateDefendingMovement(combatant: Combatant): void {
   if (!combatant.destinationPoint) {
@@ -205,21 +193,18 @@ export function updateDefendingMovement(combatant: Combatant): void {
     combatant.velocity.set(0, 0, 0);
     return;
   }
-  const toDestination = objectPool.getVector3();
-  toDestination.subVectors(combatant.destinationPoint, combatant.position);
-  const distance = toDestination.length();
+  _moveVec.subVectors(combatant.destinationPoint, combatant.position);
+  const distance = _moveVec.length();
   if (distance < 2) {
     combatant.velocity.set(0, 0, 0);
-    objectPool.releaseVector3(toDestination);
     return;
   }
-  toDestination.normalize();
+  _moveVec.normalize();
   // Move to defensive position at normal speed
   const speed = 3;
   combatant.velocity.set(
-    toDestination.x * speed,
+    _moveVec.x * speed,
     0,
-    toDestination.z * speed
+    _moveVec.z * speed
   );
-  objectPool.releaseVector3(toDestination);
 }

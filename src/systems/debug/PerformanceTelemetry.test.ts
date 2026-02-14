@@ -87,10 +87,15 @@ vi.mock('./FrameTimingTracker', () => ({
   }
 }))
 
-async function loadTelemetry(withWindow: boolean = true) {
+async function loadTelemetry(withWindow: boolean = true, opts?: { telemetryEnabled?: boolean; search?: string }) {
   vi.resetModules()
+  if (typeof opts?.telemetryEnabled === 'boolean') {
+    ;(globalThis as any).__ENABLE_PERF_TELEMETRY__ = opts.telemetryEnabled
+  } else {
+    delete (globalThis as any).__ENABLE_PERF_TELEMETRY__
+  }
   if (withWindow) {
-    ;(globalThis as any).window = {}
+    ;(globalThis as any).window = { location: { search: opts?.search ?? '' } }
   } else {
     delete (globalThis as any).window
   }
@@ -322,5 +327,15 @@ describe('PerformanceTelemetry', () => {
     expect(benchmarkSpies.injectDependencies).toHaveBeenCalledWith(deps)
     expect(benchmarkSpies.run).toHaveBeenCalledWith(123)
     expect(result).toEqual(benchmarkResultMock)
+  })
+
+  it('defaults telemetry off when no explicit enable flags are present', async () => {
+    const { instance } = await loadTelemetry(true, { telemetryEnabled: false, search: '' })
+    expect(instance.isEnabled()).toBe(false)
+  })
+
+  it('enables telemetry automatically in sandbox query mode', async () => {
+    const { instance } = await loadTelemetry(true, { search: '?sandbox=true' })
+    expect(instance.isEnabled()).toBe(true)
   })
 })

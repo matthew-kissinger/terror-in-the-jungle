@@ -56,6 +56,8 @@ export async function bootstrapGame(): Promise<void> {
     await sandbox.initialize();
     sandbox.start();
 
+    // Expose sandbox root for perf harness scenario control.
+    (window as any).__sandbox = sandbox;
     // Expose sandbox renderer for performance measurement scripts
     (window as any).__sandboxRenderer = sandbox.sandboxRenderer;
 

@@ -120,6 +120,7 @@ export class PlayerController implements GameSystem {
       onMouseUp: (button: number) => this.handleMouseUp(button),
       onReload: () => this.handleTouchReload(),
       onGrenadeSwitch: () => this.handleTouchGrenadeSwitch(),
+      onWeaponSlotChange: (slot: WeaponSlot) => this.handleWeaponSlotChange(slot),
       onSquadCommand: () => this.playerSquadController?.toggleRadialMenu(),
       onMenuPause: () => this.handleMenuPause(),
       onMenuResume: () => this.handleMenuResume(),
@@ -151,15 +152,9 @@ export class PlayerController implements GameSystem {
       weaponInput.triggerADS(active);
     });
 
-    // Wire weapon bar to dispatch synthetic key events (same as InventoryManager expects)
+    // Wire weapon bar directly through inventory manager to avoid synthetic key events.
     touchControls.weaponBar.setOnWeaponSelect((slotIndex: number) => {
-      const digitCode = `Digit${slotIndex + 1}`;
-      const event = new KeyboardEvent('keydown', {
-        code: digitCode,
-        key: `${slotIndex + 1}`,
-        bubbles: true,
-      });
-      window.dispatchEvent(event);
+      this.inventoryManager?.setCurrentSlot(slotIndex as WeaponSlot);
       // Reset ADS when switching weapons
       touchControls.adsButton.resetADS();
     });
@@ -196,13 +191,7 @@ export class PlayerController implements GameSystem {
   }
 
   private handleTouchGrenadeSwitch(): void {
-    // Dispatch synthetic keyboard event to switch to grenade slot via InventoryManager
-    const event = new KeyboardEvent('keydown', {
-      code: 'Digit2',
-      key: '2',
-      bubbles: true,
-    });
-    window.dispatchEvent(event);
+    this.inventoryManager?.setCurrentSlot(WeaponSlot.GRENADE);
   }
 
   private handleMenuPause(): void {

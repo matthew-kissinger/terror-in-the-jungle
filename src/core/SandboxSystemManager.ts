@@ -44,6 +44,8 @@ import { SystemDisposer } from './SystemDisposer';
 
 export class SandboxSystemManager {
   private systems: GameSystem[] = [];
+  private deferredSystems: GameSystem[] = [];
+  private deferredInitStarted = false;
   private scene?: THREE.Scene;
   
   private initializer = new SystemInitializer();
@@ -108,6 +110,7 @@ export class SandboxSystemManager {
 
     // Store systems and scene
     this.systems = result.systems;
+    this.deferredSystems = result.deferredSystems;
     this.scene = result.scene;
 
     // Copy initialized references to public properties
@@ -151,14 +154,62 @@ export class SandboxSystemManager {
     this.connector.connectSystems(this.refs, scene, camera, sandboxRenderer);
   }
 
+  startDeferredInitialization(): void {
+    if (this.deferredInitStarted || this.deferredSystems.length === 0) {
+      return;
+    }
+
+    this.deferredInitStarted = true;
+    void this.initializeDeferredSystems();
+  }
+
+  private async initializeDeferredSystems(): Promise<void> {
+    Logger.info('core', `Starting deferred initialization for ${this.deferredSystems.length} systems...`);
+    for (const system of this.deferredSystems) {
+      try {
+        await system.init();
+        this.systems.push(system);
+      } catch (error) {
+        Logger.error('core', 'Deferred system init failed:', error);
+      }
+    }
+    this.deferredSystems = [];
+    Logger.info('core', 'Deferred initialization complete');
+  }
+
   async preGenerateSpawnArea(spawnPos: THREE.Vector3): Promise<void> {
     Logger.info('core', `Pre-generating spawn area around (${spawnPos.x.toFixed(0)}, ${spawnPos.z.toFixed(0)})...`);
 
     if (this.chunkManager) {
-      // Generate chunks around the spawn position
+      // Generate chunks around the spawn position and wait for minimum playable ring.
       this.chunkManager.updatePlayerPosition(spawnPos);
-      this.chunkManager.update(0.01);
-      await new Promise(resolve => setTimeout(resolve, 200));
+      const chunkSize = this.chunkManager.getChunkSize();
+      const centerX = Math.floor(spawnPos.x / chunkSize);
+      const centerZ = Math.floor(spawnPos.z / chunkSize);
+      const minPlayableRadius = 1;
+      const timeoutMs = 5000;
+      const start = performance.now();
+
+      while (performance.now() - start < timeoutMs) {
+        this.chunkManager.update(0.016);
+
+        let ready = true;
+        for (let x = centerX - minPlayableRadius; x <= centerX + minPlayableRadius; x++) {
+          for (let z = centerZ - minPlayableRadius; z <= centerZ + minPlayableRadius; z++) {
+            if (!this.chunkManager.isChunkLoaded(x, z)) {
+              ready = false;
+              break;
+            }
+          }
+          if (!ready) break;
+        }
+
+        if (ready) {
+          break;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 16));
+      }
 
       // Initialize zones after chunk generation
       Logger.info('core', 'Initializing zones after chunk generation...');

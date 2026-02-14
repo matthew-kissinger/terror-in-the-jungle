@@ -23,6 +23,12 @@ export class GPUTimingTelemetry {
    */
   init(renderer: THREE.WebGLRenderer): void {
     this.renderer = renderer
+    if (!this.shouldEnableGpuTiming()) {
+      this.gpuTimingAvailable = false
+      Logger.info('performance', '[Perf] GPU timing disabled (opt-in via ?gpuTiming=1)')
+      return
+    }
+
     const gl = renderer.getContext() as WebGL2RenderingContext
 
     if (!gl) {
@@ -120,5 +126,15 @@ export class GPUTimingTelemetry {
 
   get timeMs(): number {
     return this.gpuTimeMs
+  }
+
+  private shouldEnableGpuTiming(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('gpuTiming') === '1';
+    } catch {
+      return false;
+    }
   }
 }

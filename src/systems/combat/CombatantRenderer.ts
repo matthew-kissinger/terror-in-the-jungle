@@ -38,6 +38,8 @@ export class CombatantRenderer {
   private readonly scratchScaleMatrix = new THREE.Matrix4();
   private readonly scratchOutlineMatrix = new THREE.Matrix4();
   private readonly scratchMarkerMatrix = new THREE.Matrix4();
+  private readonly renderWriteCounts = new Map<string, number>();
+  private readonly renderCombatStates = new Map<string, number>();
   constructor(scene: THREE.Scene, camera: THREE.Camera, assetLoader: AssetLoader) {
     this.scene = scene;
     this.camera = camera;
@@ -63,21 +65,23 @@ export class CombatantRenderer {
     this.factionMeshes.forEach(mesh => mesh.count = 0);
     this.factionAuraMeshes.forEach(mesh => mesh.count = 0);
     this.factionGroundMarkers.forEach(mesh => mesh.count = 0);
-    const combatantGroups = new Map<string, Combatant[]>();
-    const RENDER_DISTANCE = 400;
-    if (!this.playerSquadDetected && this.playerSquadId) {
-      let debugCount = 0;
-      combatants.forEach(c => {
-        if (c.faction === Faction.US && debugCount < 3 && c.position.distanceTo(playerPosition) < 50) {
-          Logger.info('combat-renderer', ` Debug US combatant: id=${c.id}, squadId=${c.squadId}, playerSquadId=${this.playerSquadId}, match=${c.squadId === this.playerSquadId}`);
-          debugCount++;
-        }
-      });
-    }
+    const RENDER_DISTANCE_SQ = 400 * 400;
+    this.renderWriteCounts.clear();
+    this.renderCombatStates.clear();
+    this.factionMeshes.forEach((_mesh, key) => {
+      this.renderWriteCounts.set(key, 0);
+      this.renderCombatStates.set(key, 0);
+    });
+
+    const matrix = this.scratchMatrix;
+    this.camera.getWorldDirection(this.scratchCameraDir);
+    const cameraAngle = Math.atan2(this.scratchCameraDir.x, this.scratchCameraDir.z);
+    this.scratchCameraRight.crossVectors(this.scratchCameraDir, this.scratchUp).normalize();
+    this.scratchCameraForward.set(this.scratchCameraDir.x, 0, this.scratchCameraDir.z).normalize();
     combatants.forEach(combatant => {
       if (combatant.state === CombatantState.DEAD && !combatant.isDying) return;
       if (combatant.isPlayerProxy) return;
-      if (combatant.position.distanceTo(playerPosition) > RENDER_DISTANCE) return;
+      if (combatant.position.distanceToSquared(playerPosition) > RENDER_DISTANCE_SQ) return;
 
       let isShowingBack = false;
       if (combatant.faction === Faction.OPFOR) {
@@ -94,62 +98,46 @@ export class CombatantRenderer {
       } else if (combatant.state === CombatantState.ALERT) {
         stateKey = 'alert';
       }
-
       const isPlayerSquad = combatant.squadId === this.playerSquadId && combatant.faction === Faction.US;
+      if (isPlayerSquad && !this.playerSquadDetected) this.playerSquadDetected = true;
       const factionPrefix = isPlayerSquad ? 'SQUAD' : combatant.faction;
       const key = `${factionPrefix}_${stateKey}`;
-      if (!combatantGroups.has(key)) {
-        combatantGroups.set(key, []);
-      }
-      combatantGroups.get(key)!.push(combatant);
 
-      if (isPlayerSquad && !this.playerSquadDetected) {
-        Logger.info('combat-renderer', ` Player squad member detected: ${combatant.id}, squadId: ${combatant.squadId}, rendering as: ${key}`);
-        this.playerSquadDetected = true;
-      }
-    });
-    const matrix = this.scratchMatrix;
-    this.camera.getWorldDirection(this.scratchCameraDir);
-    const cameraAngle = Math.atan2(this.scratchCameraDir.x, this.scratchCameraDir.z);
-    this.scratchCameraRight.crossVectors(this.scratchCameraDir, this.scratchUp).normalize();
-    this.scratchCameraForward.set(this.scratchCameraDir.x, 0, this.scratchCameraDir.z).normalize();
-    combatantGroups.forEach((combatants, key) => {
       const mesh = this.factionMeshes.get(key);
       if (!mesh) return;
       const capacity = (mesh.instanceMatrix as any).count ?? mesh.count;
-      let written = 0;
-      for (let index = 0; index < combatants.length && index < capacity; index++) {
-        const combatant = combatants[index];
-        const isBackTexture = key.includes('_back');
+      const index = this.renderWriteCounts.get(key) ?? 0;
+      if (index >= capacity) return;
+      const isBackTexture = key.includes('_back');
 
-        this.scratchCombatantForward.set(Math.cos(combatant.visualRotation), 0, Math.sin(combatant.visualRotation));
-        this.scratchToCombatant.subVectors(combatant.position, playerPosition).normalize();
-        const viewAngle = this.scratchToCombatant.dot(this.scratchCameraRight);
+      this.scratchCombatantForward.set(Math.cos(combatant.visualRotation), 0, Math.sin(combatant.visualRotation));
+      this.scratchToCombatant.subVectors(combatant.position, playerPosition).normalize();
+      const viewAngle = this.scratchToCombatant.dot(this.scratchCameraRight);
 
-        let finalRotation: number;
-        let scaleX = combatant.scale.x;
-        if (isBackTexture) {
-          finalRotation = cameraAngle * 0.8 + combatant.visualRotation * 0.2;
-          scaleX = Math.abs(scaleX);
-        } else if (combatant.faction === Faction.OPFOR) {
-          finalRotation = cameraAngle;
-          scaleX = Math.abs(scaleX);
-        } else {
-          const facingDot = Math.abs(this.scratchCombatantForward.dot(this.scratchCameraForward));
-          const billboardBlend = 0.3 + facingDot * 0.4;
-          finalRotation = cameraAngle * billboardBlend + combatant.visualRotation * (1 - billboardBlend);
+      let finalRotation: number;
+      let scaleX = combatant.scale.x;
+      if (isBackTexture) {
+        finalRotation = cameraAngle * 0.8 + combatant.visualRotation * 0.2;
+        scaleX = Math.abs(scaleX);
+      } else if (combatant.faction === Faction.OPFOR) {
+        finalRotation = cameraAngle;
+        scaleX = Math.abs(scaleX);
+      } else {
+        const facingDot = Math.abs(this.scratchCombatantForward.dot(this.scratchCameraForward));
+        const billboardBlend = 0.3 + facingDot * 0.4;
+        finalRotation = cameraAngle * billboardBlend + combatant.visualRotation * (1 - billboardBlend);
 
-          const combatantDotRight = this.scratchCombatantForward.dot(this.scratchCameraRight);
-          const shouldFlip = (viewAngle > 0 && combatantDotRight < 0) || (viewAngle < 0 && combatantDotRight > 0);
-          scaleX = shouldFlip ? -Math.abs(scaleX) : Math.abs(scaleX);
-        }
-        matrix.makeRotationY(finalRotation);
-        this.scratchPosition.copy(combatant.position);
-        let finalPosition = this.scratchPosition;
-        let finalScaleX = scaleX;
-        let finalScaleY = combatant.scale.y;
-        let finalScaleZ = combatant.scale.z;
-        if (combatant.isDying && combatant.deathProgress !== undefined) {
+        const combatantDotRight = this.scratchCombatantForward.dot(this.scratchCameraRight);
+        const shouldFlip = (viewAngle > 0 && combatantDotRight < 0) || (viewAngle < 0 && combatantDotRight > 0);
+        scaleX = shouldFlip ? -Math.abs(scaleX) : Math.abs(scaleX);
+      }
+      matrix.makeRotationY(finalRotation);
+      this.scratchPosition.copy(combatant.position);
+      let finalPosition = this.scratchPosition;
+      let finalScaleX = scaleX;
+      let finalScaleY = combatant.scale.y;
+      let finalScaleZ = combatant.scale.z;
+      if (combatant.isDying && combatant.deathProgress !== undefined) {
           const FALL_PHASE = 0.7 / 5.7;
           const GROUND_PHASE = 4.0 / 5.7;
           const FADEOUT_PHASE = 1.0 / 5.7;
@@ -291,51 +279,65 @@ export class CombatantRenderer {
               finalScaleZ *= fadeScale;
             }
           }
-        }
-
-        matrix.setPosition(finalPosition);
-        this.scratchScaleMatrix.makeScale(finalScaleX, finalScaleY, finalScaleZ);
-        matrix.multiply(this.scratchScaleMatrix);
-        mesh.setMatrixAt(index, matrix);
-        combatant.billboardIndex = index;
-        const outlineMesh = this.factionAuraMeshes.get(key);
-        if (outlineMesh) {
-          this.scratchOutlineMatrix.copy(matrix);
-          this.scratchScaleMatrix.makeScale(1.2, 1.2, 1.2);
-          this.scratchOutlineMatrix.multiply(this.scratchScaleMatrix);
-          outlineMesh.setMatrixAt(index, this.scratchOutlineMatrix);
-        }
-        const markerMesh = this.factionGroundMarkers.get(key);
-        if (markerMesh) {
-          this.scratchMarkerMatrix.makeRotationX(-Math.PI / 2);
-          this.scratchMarkerMatrix.setPosition(combatant.position.x, 0.1, combatant.position.z);
-          markerMesh.setMatrixAt(index, this.scratchMarkerMatrix);
-        }
-        written++;
       }
-      mesh.count = written;
-      mesh.instanceMatrix.needsUpdate = true;
+
+      matrix.setPosition(finalPosition);
+      this.scratchScaleMatrix.makeScale(finalScaleX, finalScaleY, finalScaleZ);
+      matrix.multiply(this.scratchScaleMatrix);
+      mesh.setMatrixAt(index, matrix);
+      combatant.billboardIndex = index;
+
       const outlineMesh = this.factionAuraMeshes.get(key);
       if (outlineMesh) {
-        outlineMesh.count = written;
-        outlineMesh.instanceMatrix.needsUpdate = true;
+        this.scratchOutlineMatrix.copy(matrix);
+        this.scratchScaleMatrix.makeScale(1.2, 1.2, 1.2);
+        this.scratchOutlineMatrix.multiply(this.scratchScaleMatrix);
+        outlineMesh.setMatrixAt(index, this.scratchOutlineMatrix);
       }
       const markerMesh = this.factionGroundMarkers.get(key);
       if (markerMesh) {
+        this.scratchMarkerMatrix.makeRotationX(-Math.PI / 2);
+        this.scratchMarkerMatrix.setPosition(combatant.position.x, 0.1, combatant.position.z);
+        markerMesh.setMatrixAt(index, this.scratchMarkerMatrix);
+      }
+
+      this.renderWriteCounts.set(key, index + 1);
+      const currentCombatState = this.renderCombatStates.get(key) ?? 0;
+      let combatStateWeight = currentCombatState;
+      if (combatant.state === CombatantState.ENGAGING || combatant.state === CombatantState.SUPPRESSING) {
+        combatStateWeight = Math.max(combatStateWeight, 1.0);
+      } else if (combatant.state === CombatantState.ALERT) {
+        combatStateWeight = Math.max(combatStateWeight, 0.5);
+      }
+      this.renderCombatStates.set(key, combatStateWeight);
+    });
+
+    this.factionMeshes.forEach((mesh, key) => {
+      const written = this.renderWriteCounts.get(key) ?? 0;
+      const previousCount = mesh.count;
+      mesh.count = written;
+      if (written > 0 || previousCount !== written) {
+        mesh.instanceMatrix.needsUpdate = true;
+      }
+      const outlineMesh = this.factionAuraMeshes.get(key);
+      if (outlineMesh) {
+        const previousOutlineCount = outlineMesh.count;
+        outlineMesh.count = written;
+        if (written > 0 || previousOutlineCount !== written) {
+          outlineMesh.instanceMatrix.needsUpdate = true;
+        }
+      }
+      const markerMesh = this.factionGroundMarkers.get(key);
+      if (markerMesh) {
+        const previousMarkerCount = markerMesh.count;
         markerMesh.count = written;
-        markerMesh.instanceMatrix.needsUpdate = true;
+        if (written > 0 || previousMarkerCount !== written) {
+          markerMesh.instanceMatrix.needsUpdate = true;
+        }
       }
       const outlineMaterial = this.factionMaterials.get(key);
       if (outlineMaterial && outlineMaterial instanceof THREE.ShaderMaterial) {
-        let avgCombatState = 0;
-        for (const combatant of combatants) {
-          if (combatant.state === CombatantState.ENGAGING || combatant.state === CombatantState.SUPPRESSING) {
-            avgCombatState = Math.max(avgCombatState, 1.0);
-          } else if (combatant.state === CombatantState.ALERT) {
-            avgCombatState = Math.max(avgCombatState, 0.5);
-          }
-        }
-        outlineMaterial.uniforms.combatState.value = avgCombatState;
+        outlineMaterial.uniforms.combatState.value = this.renderCombatStates.get(key) ?? 0;
       }
     });
   }

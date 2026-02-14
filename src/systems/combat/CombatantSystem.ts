@@ -188,12 +188,6 @@ export class CombatantSystem implements GameSystem {
     // Create billboard meshes for each faction and state
     await this.combatantRenderer.createFactionBillboards();
 
-    // Spawn initial forces
-    const createdPlayerSquadId = this.spawnManager.spawnInitialForces(this.shouldCreatePlayerSquad, this.playerSquadId);
-    if (createdPlayerSquadId) {
-      this.playerSquadId = createdPlayerSquadId;
-    }
-
     // Update AI with all squads
     this.combatantAI.setSquads(this.squadManager.getAllSquads());
 
@@ -222,12 +216,14 @@ export class CombatantSystem implements GameSystem {
     const isGameActive = this.ticketSystem ? this.ticketSystem.isGameActive() : true;
 
     if (!this.combatEnabled || !isGameActive) {
-      // Still update positions and billboards for visual consistency
-      this.lodManager.updateCombatants(deltaTime);
+      // Combat-disabled path: movement/visual updates only, no AI/combat decisions.
+      this.lodManager.updateCombatants(deltaTime, { enableAI: false });
       this.combatantRenderer.updateBillboards(this.combatants, this.playerPosition);
       this.combatantRenderer.updateShaderUniforms(deltaTime);
       const duration = performance.now() - updateStart;
       this.profiler.updateTiming(duration);
+      this.profiler.profiling.aiStateMs = {};
+      this.profiler.profiling.aiUpdateMs = 0;
       return;
     }
 
@@ -258,6 +254,7 @@ export class CombatantSystem implements GameSystem {
     t0 = performance.now();
     this.lodManager.updateCombatants(deltaTime);
     this.profiler.profiling.aiUpdateMs = performance.now() - t0;
+    this.profiler.profiling.aiStateMs = this.combatantAI.getFrameStateProfile();
 
     // Update LOD counts in profiler
     this.profiler.setLODCounts(
@@ -295,7 +292,10 @@ export class CombatantSystem implements GameSystem {
 
   // Reseed forces when switching game modes to honor new HQ layouts and caps
   public reseedForcesForMode(): void {
-    this.spawnManager.reseedForcesForMode();
+    const createdPlayerSquadId = this.spawnManager.reseedForcesForMode(this.shouldCreatePlayerSquad, this.playerSquadId);
+    if (createdPlayerSquadId) {
+      this.playerSquadId = createdPlayerSquadId;
+    }
     this.combatantAI.setSquads(this.squadManager.getAllSquads());
   }
 

@@ -18,6 +18,7 @@ export class CombatantProfiler {
   // Detailed profiling for combat bottleneck analysis
   profiling = {
     aiUpdateMs: 0,
+    aiStateMs: {} as Record<string, number>,
     spatialSyncMs: 0,
     billboardUpdateMs: 0,
     effectPoolsMs: 0,
@@ -70,7 +71,7 @@ export class CombatantProfiler {
    * Get detailed combat profiling info for debugging performance
    */
   getCombatProfile(): {
-    timing: { aiUpdateMs: number; spatialSyncMs: number; billboardUpdateMs: number; effectPoolsMs: number; influenceMapMs: number; totalMs: number; engagingCount: number; firingCount: number };
+    timing: { aiUpdateMs: number; aiStateMs: Record<string, number>; spatialSyncMs: number; billboardUpdateMs: number; effectPoolsMs: number; influenceMapMs: number; totalMs: number; engagingCount: number; firingCount: number };
     counts: { total: number; high: number; medium: number; low: number; culled: number };
     lod: { engaging: number; firing: number };
   } {

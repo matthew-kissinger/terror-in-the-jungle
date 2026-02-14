@@ -14,6 +14,7 @@ import { SandboxConfig, getSandboxConfig, isSandboxMode } from './SandboxModeDet
 import { SettingsManager } from '../config/SettingsManager';
 import { MobilePauseOverlay } from '../ui/MobilePauseOverlay';
 import { WebGLContextRecovery } from './WebGLContextRecovery';
+import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 
 // Import split modules
 import * as Init from './PixelArtSandboxInit';
@@ -145,6 +146,7 @@ export class PixelArtSandbox {
         } else if (!show && this.performanceOverlay.isVisible()) {
           this.performanceOverlay.toggle();
         }
+        performanceTelemetry.setEnabled(this.performanceOverlay.isVisible() || this.sandboxEnabled);
         break;
       }
       case 'graphicsQuality': {

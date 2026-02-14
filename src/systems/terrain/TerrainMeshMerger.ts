@@ -15,8 +15,12 @@ export class TerrainMeshMerger {
 
   private readonly NUM_RINGS = 10; // Number of distance rings
   private readonly MERGE_DEBOUNCE_MS = 500; // Debounce re-merges
+  private readonly MAX_RINGS_PER_PASS = 3; // Incremental ring updates to avoid merge spikes
+  // Merged meshes are visual-only in current architecture; keep BVH build opt-in.
+  private readonly ENABLE_MERGED_BVH = false;
   private mergeTimer: number | null = null;
   private pendingMerge = false;
+  private ringCursor = 0;
   // Track which chunks have been merged (originals hidden)
   private mergedChunkKeys: Set<string> = new Set();
 
@@ -39,9 +43,8 @@ export class TerrainMeshMerger {
 
     this.pendingMerge = true;
     this.mergeTimer = window.setTimeout(() => {
-      this.performMerge(chunks, playerPosition, chunkSize);
-      this.pendingMerge = false;
       this.mergeTimer = null;
+      this.performMerge(chunks, playerPosition, chunkSize);
     }, this.MERGE_DEBOUNCE_MS);
   }
 
@@ -60,25 +63,32 @@ export class TerrainMeshMerger {
 
     // Group chunks by ring
     const chunksByRing = this.groupChunksByRing(chunks, playerPosition, chunkSize);
-
-    // Track which rings are still active
-    const activeRings = new Set<number>();
+    const ringKeys = Array.from(chunksByRing.keys()).sort((a, b) => a - b);
 
     // Reset merged chunk tracking (rebuilt from ringAssignments after merge)
     this.mergedChunkKeys.clear();
 
-    // Merge each ring
-    chunksByRing.forEach((ringChunks, ring) => {
-      activeRings.add(ring);
-      this.mergeRing(ring, ringChunks);
-    });
+    // Merge a bounded number of rings per pass.
+    const ringsToProcess = Math.min(this.MAX_RINGS_PER_PASS, ringKeys.length);
+    if (ringKeys.length > 0) {
+      for (let i = 0; i < ringsToProcess; i++) {
+        const idx = (this.ringCursor + i) % ringKeys.length;
+        const ring = ringKeys[idx];
+        const ringChunks = chunksByRing.get(ring);
+        if (ringChunks) {
+          this.mergeRing(ring, ringChunks);
+        }
+      }
+      this.ringCursor = (this.ringCursor + ringsToProcess) % ringKeys.length;
+    }
 
     // Track all merged chunk keys so the visibility system can skip them
     for (const key of this.ringAssignments.keys()) {
       this.mergedChunkKeys.add(key);
     }
 
-    // Dispose rings that are no longer needed
+    // Dispose rings that are no longer needed in current assignment.
+    const activeRings = new Set<number>(ringKeys);
     this.mergedMeshes.forEach((mesh, ring) => {
       if (!activeRings.has(ring)) {
         this.scene.remove(mesh);
@@ -91,11 +101,24 @@ export class TerrainMeshMerger {
       }
     });
 
+    // If we couldn't process all rings this pass, schedule another quick pass.
+    if (ringKeys.length > ringsToProcess) {
+      this.pendingMerge = true;
+      if (this.mergeTimer === null) {
+        this.mergeTimer = window.setTimeout(() => {
+          this.mergeTimer = null;
+          this.performMerge(chunks, playerPosition, chunkSize);
+        }, 50);
+      }
+    } else {
+      this.pendingMerge = false;
+    }
+
     // End timing for telemetry
     performanceTelemetry.endSystem('terrain_merger');
 
     const elapsed = performance.now() - startTime;
-    Logger.info('terrain-merger', `Merged ${chunks.size} chunks into ${activeRings.size} rings in ${elapsed.toFixed(2)}ms`);
+    Logger.info('terrain-merger', `Merged ${chunks.size} chunks (${ringsToProcess}/${ringKeys.length} rings this pass) in ${elapsed.toFixed(2)}ms`);
   }
 
   /**
@@ -182,8 +205,9 @@ export class TerrainMeshMerger {
       return;
     }
 
-    // Compute BVH for merged geometry (important for raycasting!)
-    mergedGeometry.computeBoundsTree();
+    if (this.ENABLE_MERGED_BVH && typeof (mergedGeometry as any).computeBoundsTree === 'function') {
+      (mergedGeometry as any).computeBoundsTree();
+    }
 
     // Create merged mesh
     const mergedMesh = new THREE.Mesh(

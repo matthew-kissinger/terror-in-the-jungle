@@ -16,6 +16,9 @@ const DEV_SERVER_PORT = 9100;
 const TEST_DURATION_SECONDS = 30;
 const NPC_COUNT = 40;
 const BASELINE_FILE = join(process.cwd(), 'perf-baselines.json');
+const STEP_TIMEOUT_MS = 30_000;
+const METRIC_COLLECTION_TIMEOUT_MS = 8_000;
+const FRAME_PROGRESS_STALL_MS = 12_000;
 
 // Regression thresholds
 const THRESHOLDS = {
@@ -98,8 +101,45 @@ interface ComparisonResult {
   threshold?: { warn: number; fail: number };
 }
 
+interface RuntimeStateSnapshot {
+  url: string;
+  readyState: string;
+  hasSandboxMetrics: boolean;
+  hasPerf: boolean;
+  hasRenderer: boolean;
+  frameCount: number;
+}
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+function logStep(step: string): void {
+  console.log(`[${nowIso()}] ${step}`);
+}
+
+async function withTimeout<T>(label: string, promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeoutId: NodeJS.Timeout | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, ms));
+}
+
 async function startDevServer(): Promise<ChildProcess> {
-  console.log(`\n🚀 Starting dev server on port ${DEV_SERVER_PORT}...`);
+  logStep(`🚀 Starting dev server on port ${DEV_SERVER_PORT}`);
 
   const server = spawn('npm', ['run', 'dev', '--', '--port', String(DEV_SERVER_PORT), '--host'], {
     cwd: process.cwd(),
@@ -110,17 +150,19 @@ async function startDevServer(): Promise<ChildProcess> {
   // Wait for server to be ready
   return new Promise((resolve, reject) => {
     let output = '';
+    let resolved = false;
 
     const timeout = setTimeout(() => {
       server.kill();
       reject(new Error('Dev server startup timeout'));
-    }, 30000);
+    }, STEP_TIMEOUT_MS);
 
     server.stdout?.on('data', (data) => {
       output += data.toString();
-      if (output.includes('Local:') || output.includes('localhost')) {
+      if (!resolved && (output.includes('Local:') || output.includes('localhost'))) {
+        resolved = true;
         clearTimeout(timeout);
-        console.log('✅ Dev server ready');
+        logStep('✅ Dev server ready');
         resolve(server);
       }
     });
@@ -137,7 +179,7 @@ async function startDevServer(): Promise<ChildProcess> {
 }
 
 async function killDevServer(server: ChildProcess): Promise<void> {
-  console.log('\n🛑 Stopping dev server...');
+  logStep('🛑 Stopping dev server');
 
   return new Promise((resolve) => {
     if (!server.pid) {
@@ -146,23 +188,34 @@ async function killDevServer(server: ChildProcess): Promise<void> {
     }
 
     server.on('exit', () => {
-      console.log('✅ Dev server stopped');
+      logStep('✅ Dev server stopped');
       resolve();
     });
 
     // Kill process tree (handles child processes)
-    try {
-      process.kill(-server.pid, 'SIGTERM');
-    } catch (err) {
-      // If that fails, try regular kill
-      server.kill('SIGTERM');
+    if (process.platform === 'win32') {
+      const killer = spawn('taskkill', ['/PID', String(server.pid), '/T', '/F'], { shell: true, stdio: 'ignore' });
+      killer.on('exit', () => {
+        // best-effort, resolve path handled by listeners/timeouts
+      });
+    } else {
+      try {
+        process.kill(-server.pid, 'SIGTERM');
+      } catch (err) {
+        // If that fails, try regular kill
+        server.kill('SIGTERM');
+      }
     }
 
     // Force kill after 5 seconds
     setTimeout(() => {
       try {
         if (server.pid) {
-          process.kill(-server.pid, 'SIGKILL');
+          if (process.platform === 'win32') {
+            spawn('taskkill', ['/PID', String(server.pid), '/T', '/F'], { shell: true, stdio: 'ignore' });
+          } else {
+            process.kill(-server.pid, 'SIGKILL');
+          }
         }
       } catch (err) {
         // Ignore
@@ -172,20 +225,83 @@ async function killDevServer(server: ChildProcess): Promise<void> {
   });
 }
 
+async function getRuntimeState(page: Page): Promise<RuntimeStateSnapshot> {
+  return withTimeout(
+    'runtime state snapshot',
+    page.evaluate(() => {
+      const sandboxMetrics = (window as any).sandboxMetrics;
+      return {
+        url: window.location.href,
+        readyState: document.readyState,
+        hasSandboxMetrics: Boolean(sandboxMetrics),
+        hasPerf: Boolean((window as any).perf),
+        hasRenderer: Boolean((window as any).__sandboxRenderer),
+        frameCount: sandboxMetrics ? Number(sandboxMetrics.frameCount ?? 0) : 0
+      };
+    }),
+    METRIC_COLLECTION_TIMEOUT_MS
+  );
+}
+
+async function getRuntimeStateOrThrow(page: Page, context: string, lastKnownFrameCount: number): Promise<RuntimeStateSnapshot> {
+  try {
+    return await getRuntimeState(page);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Main-thread stall during ${context}: could not evaluate runtime state. Last known frameCount=${lastKnownFrameCount}. Root error: ${reason}`
+    );
+  }
+}
+
+async function waitForFrameProgress(
+  page: Page,
+  durationSeconds: number,
+  onSample?: (state: RuntimeStateSnapshot) => void
+): Promise<void> {
+  const start = Date.now();
+  const deadline = start + durationSeconds * 1000;
+  let lastFrameCount = -1;
+  let lastProgressAt = Date.now();
+
+  while (Date.now() < deadline) {
+    await sleep(1000);
+    const state = await getRuntimeStateOrThrow(page, 'benchmark sampling', lastFrameCount);
+    onSample?.(state);
+    const elapsed = Math.round((Date.now() - start) / 1000);
+    logStep(`⏱️  Sample t=${elapsed}s frameCount=${state.frameCount}`);
+
+    if (state.frameCount > lastFrameCount) {
+      lastFrameCount = state.frameCount;
+      lastProgressAt = Date.now();
+      continue;
+    }
+
+    if (Date.now() - lastProgressAt > FRAME_PROGRESS_STALL_MS) {
+      throw new Error(
+        `Frame progress stalled for ${FRAME_PROGRESS_STALL_MS}ms (frameCount=${state.frameCount}, url=${state.url}, readyState=${state.readyState})`
+      );
+    }
+  }
+}
+
 async function runBenchmark(): Promise<void> {
   let server: ChildProcess | null = null;
   let browser: Browser | null = null;
   let page: Page | null = null;
+  let lastRuntimeState: RuntimeStateSnapshot | null = null;
 
   try {
+    logStep('Starting benchmark run');
+
     // Start dev server
     server = await startDevServer();
 
     // Wait a bit for server to fully initialize
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await sleep(2000);
 
     // Launch browser
-    console.log('\n🌐 Launching browser...');
+    logStep('🌐 Launching browser');
     browser = await chromium.launch({
       headless: true,
       args: [
@@ -197,13 +313,21 @@ async function runBenchmark(): Promise<void> {
     });
 
     page = await browser.newPage();
+    page.setDefaultTimeout(STEP_TIMEOUT_MS);
+    page.setDefaultNavigationTimeout(STEP_TIMEOUT_MS);
 
     // Listen to console logs
     page.on('console', msg => {
       const type = msg.type();
-      if (type === 'error' || type === 'warning') {
+      if (type === 'error' || type === 'warning' || type === 'assert') {
         console.log(`[Browser ${type}]`, msg.text());
       }
+    });
+    page.on('pageerror', error => {
+      console.log('[Browser pageerror]', error.message);
+    });
+    page.on('crash', () => {
+      console.log('[Browser crash] page crashed');
     });
 
     // Set viewport
@@ -211,62 +335,64 @@ async function runBenchmark(): Promise<void> {
 
     // Navigate to sandbox mode
     const url = `http://localhost:${DEV_SERVER_PORT}/?sandbox=true&npcs=${NPC_COUNT}&autostart=true&duration=${TEST_DURATION_SECONDS}`;
-    console.log(`📍 Navigating to: ${url}`);
+    logStep(`📍 Navigating to: ${url}`);
 
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await withTimeout('page.goto', page.goto(url, { waitUntil: 'domcontentloaded' }), STEP_TIMEOUT_MS);
 
     // Wait for game to initialize
-    console.log('⏳ Waiting for game initialization...');
-    await page.waitForFunction(() => {
+    logStep('⏳ Waiting for game initialization');
+    await withTimeout('wait sandboxMetrics', page.waitForFunction(() => {
       return (window as any).sandboxMetrics !== undefined;
-    }, { timeout: 15000 });
+    }, { timeout: STEP_TIMEOUT_MS }), STEP_TIMEOUT_MS + 1000);
+    lastRuntimeState = await getRuntimeState(page);
+    logStep(`Sandbox ready: frameCount=${lastRuntimeState.frameCount}`);
 
     // Wait for meaningful frame count (game fully loaded and running)
-    console.log('⏳ Waiting for game to fully load and start rendering...');
+    logStep('⏳ Waiting for game to start rendering');
 
     // Poll frameCount to monitor progress
-    let lastFrameCount = 0;
+    let renderStarted = false;
+    let startupFrameCount = 0;
     for (let i = 0; i < 6; i++) {
-      await new Promise(resolve => setTimeout(resolve, 5000));
-      const frameCount = await page.evaluate(() => {
-        const metrics = (window as any).sandboxMetrics;
-        return metrics ? metrics.frameCount : 0;
-      });
-      console.log(`   Frame count after ${(i+1)*5}s: ${frameCount}`);
-
-      if (frameCount > 30) {
-        console.log('   ✓ Game is rendering, proceeding with test');
+      await sleep(5000);
+      const state = await getRuntimeStateOrThrow(page, `startup sampling (${(i + 1) * 5}s)`, startupFrameCount);
+      lastRuntimeState = state;
+      startupFrameCount = state.frameCount;
+      logStep(`Startup sample ${(i + 1) * 5}s frameCount=${state.frameCount}`);
+      if (state.frameCount > 30) {
+        renderStarted = true;
+        logStep('✓ Rendering detected, proceeding with test');
         break;
       }
-
-      if (frameCount === lastFrameCount && i > 0) {
-        console.log('   ⚠ Frame count not increasing, game may be stuck');
-      }
-      lastFrameCount = frameCount;
     }
 
-    console.log(`\n🎮 Running sandbox for ${TEST_DURATION_SECONDS} seconds with ${NPC_COUNT} NPCs...`);
-    console.log('   (metrics are collected continuously)');
+    if (!renderStarted) {
+      throw new Error(`Game did not reach active rendering threshold (frameCount=${startupFrameCount})`);
+    }
 
-    // Wait for test duration + buffer
-    await new Promise(resolve => setTimeout(resolve, (TEST_DURATION_SECONDS + 5) * 1000));
+    logStep(`🎮 Running sandbox for ${TEST_DURATION_SECONDS} seconds with ${NPC_COUNT} NPCs`);
+
+    // Collect progress during benchmark window; fail if frame progression stalls
+    await waitForFrameProgress(page, TEST_DURATION_SECONDS + 5, (state) => {
+      lastRuntimeState = state;
+    });
 
     // Collect metrics
-    console.log('\n📊 Collecting metrics...');
+    logStep('📊 Collecting metrics');
 
-    const sandboxMetrics = await page.evaluate(() => {
+    const sandboxMetrics = await withTimeout('collect sandbox metrics', page.evaluate(() => {
       return (window as any).sandboxMetrics.getSnapshot();
-    }) as SandboxMetrics;
+    }), METRIC_COLLECTION_TIMEOUT_MS) as SandboxMetrics;
 
-    const perfReport = await page.evaluate(() => {
+    const perfReport = await withTimeout('collect perf report', page.evaluate(() => {
       return (window as any).perf.report();
-    }) as PerformanceReport;
+    }), METRIC_COLLECTION_TIMEOUT_MS) as PerformanceReport;
 
-    const rendererStats = await page.evaluate(() => {
+    const rendererStats = await withTimeout('collect renderer stats', page.evaluate(() => {
       const renderer = (window as any).__sandboxRenderer;
       if (!renderer) return null;
       return renderer.getPerformanceStats();
-    }) as RendererStats | null;
+    }), METRIC_COLLECTION_TIMEOUT_MS) as RendererStats | null;
 
     // Load previous baseline
     const previousBaseline = loadBaseline();
@@ -284,7 +410,18 @@ async function runBenchmark(): Promise<void> {
     }
 
   } catch (error) {
+    if (page) {
+      try {
+        const latest = await getRuntimeState(page);
+        lastRuntimeState = latest;
+      } catch {
+        // Keep previously captured state when page is too blocked to evaluate.
+      }
+    }
     console.error('\n❌ Benchmark failed:', error);
+    if (lastRuntimeState) {
+      console.error('Last runtime state:', lastRuntimeState);
+    }
     throw error;
   } finally {
     // Cleanup

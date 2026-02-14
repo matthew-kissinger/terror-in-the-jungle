@@ -2,12 +2,14 @@ export interface SandboxConfig {
   npcCount: number;
   duration: number;
   autoStart: boolean;
+  enableCombat: boolean;
 }
 
 const DEFAULT_SANDBOX_CONFIG: SandboxConfig = {
   npcCount: 40,
   duration: 0,
-  autoStart: true
+  autoStart: true,
+  enableCombat: true
 };
 
 const getSearchParams = (): URLSearchParams | null => {
@@ -41,13 +43,16 @@ export const getSandboxConfig = (): SandboxConfig => {
     return { ...DEFAULT_SANDBOX_CONFIG, autoStart: false };
   }
 
-  const npcCount = parseNumber(params.get('npcs'), DEFAULT_SANDBOX_CONFIG.npcCount, 2, 400);
+  const enableCombat = parseBoolean(params.get('combat'), true);
+  const npcMin = enableCombat ? 2 : 0;
+  const npcCount = parseNumber(params.get('npcs'), DEFAULT_SANDBOX_CONFIG.npcCount, npcMin, 400);
   const duration = parseNumber(params.get('duration'), DEFAULT_SANDBOX_CONFIG.duration, 0, 86400);
   const autoStart = parseBoolean(params.get('autostart'), isSandboxMode() ? true : false);
 
   return {
     npcCount,
     duration,
-    autoStart
+    autoStart,
+    enableCombat
   };
 };

@@ -11,6 +11,7 @@ import { GameModeManager } from '../world/GameModeManager';
 import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 import { estimateGPUTier, isMobileGPU } from '../../utils/DeviceDetector';
 import { resetRaycastBudget } from './ai/RaycastBudget';
+import { Logger } from '../../utils/Logger';
 
 // Stagger periods: how many frames between full AI updates per LOD tier
 const STAGGER_HIGH = 3;
@@ -53,6 +54,15 @@ export class CombatantLODManager {
 
   // Profiling: how many AI updates were staggered (skipped) this frame
   staggeredSkipCount = 0;
+  private lastAiSpikeLogMs = 0;
+  private lastAiBudgetLogMs = 0;
+  private readonly AI_LOG_THROTTLE_MS = 5000;
+  private readonly AI_FRAME_BUDGET_MS = 6.0;
+  private readonly AI_SEVERE_OVER_BUDGET_MULTIPLIER = 2.5;
+  private maxHighFullUpdatesPerFrame = 20;
+  private maxMediumFullUpdatesPerFrame = 24;
+  private highFullUpdatesThisFrame = 0;
+  private mediumFullUpdatesThisFrame = 0;
 
   // Module dependencies
   private combatantAI: CombatantAI;
@@ -98,10 +108,17 @@ export class CombatantLODManager {
       this.highLODRange = 60;
       this.mediumLODRange = 120;
       this.lowLODRange = 250;
+      this.maxHighFullUpdatesPerFrame = 8;
+      this.maxMediumFullUpdatesPerFrame = 10;
     } else if (gpuTier === 'medium') {
       this.highLODRange = 120;
       this.mediumLODRange = 250;
       this.lowLODRange = 450;
+      this.maxHighFullUpdatesPerFrame = 12;
+      this.maxMediumFullUpdatesPerFrame = 16;
+    } else {
+      this.maxHighFullUpdatesPerFrame = 20;
+      this.maxMediumFullUpdatesPerFrame = 24;
     }
   }
 
@@ -169,18 +186,25 @@ export class CombatantLODManager {
   /**
    * Update all combatants with LOD-based scheduling
    */
-  updateCombatants(deltaTime: number): void {
+  updateCombatants(deltaTime: number, options?: { enableAI?: boolean }): void {
+    const enableAI = options?.enableAI ?? true;
+    const aiFrameStart = performance.now();
     this.updateDeathAnimations(deltaTime);
 
-    // Reset per-frame raycast budget
-    resetRaycastBudget();
+    if (enableAI) {
+      // Reset per-frame raycast budget
+      resetRaycastBudget();
 
-    // Clear stale LOS cache entries
-    this.combatantAI.clearLOSCache();
+      // Clear stale LOS cache entries
+      this.combatantAI.clearLOSCache();
+      this.combatantAI.beginFrame?.();
+    }
 
     // Increment frame counter for AI staggering
     this.frameCounter++;
     this.staggeredSkipCount = 0;
+    this.highFullUpdatesThisFrame = 0;
+    this.mediumFullUpdatesThisFrame = 0;
 
     const now = Date.now();
     const worldSize = this.gameModeManager?.getWorldSize() || 4000;
@@ -227,9 +251,25 @@ export class CombatantLODManager {
       combatant.lodLevel = 'high';
       this.lodHighCount++;
 
+      if (!enableAI || this.isAIBudgetExceeded(aiFrameStart)) {
+        if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
+          this.updateCombatantUltraLight(combatant, deltaTime);
+        } else {
+          this.updateCombatantVisualOnly(combatant, deltaTime);
+        }
+        this.staggeredSkipCount++;
+        return;
+      }
+
       // Stagger AI decisions: only run full AI+combat on this combatant's turn
       if (this.frameCounter % STAGGER_HIGH === index % STAGGER_HIGH) {
+        if (this.highFullUpdatesThisFrame >= this.maxHighFullUpdatesPerFrame) {
+          this.updateCombatantVisualOnly(combatant, deltaTime);
+          this.staggeredSkipCount++;
+          return;
+        }
         this.updateCombatantFull(combatant, deltaTime);
+        this.highFullUpdatesThisFrame++;
       } else {
         // Off-frame: still update movement, rotation, spatial position for smooth visuals
         this.updateCombatantVisualOnly(combatant, deltaTime);
@@ -245,10 +285,26 @@ export class CombatantLODManager {
       const elapsedMs = now - (combatant.lastUpdateTime || 0);
 
       if (elapsedMs > dynamicIntervalMs) {
+        if (!enableAI || this.isAIBudgetExceeded(aiFrameStart)) {
+          if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
+            this.updateCombatantUltraLight(combatant, deltaTime);
+          } else {
+            this.updateCombatantBasic(combatant, deltaTime);
+          }
+          combatant.lastUpdateTime = now;
+          this.staggeredSkipCount++;
+          return;
+        }
+
         // Apply stagger within the medium LOD tier as well
         if (this.frameCounter % STAGGER_MEDIUM === index % STAGGER_MEDIUM) {
+          if (this.mediumFullUpdatesThisFrame >= this.maxMediumFullUpdatesPerFrame) {
+            this.staggeredSkipCount++;
+            return;
+          }
           const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, 1.0) : deltaTime;
           this.updateCombatantMedium(combatant, effectiveDelta);
+          this.mediumFullUpdatesThisFrame++;
           combatant.lastUpdateTime = now;
         } else {
           this.staggeredSkipCount++;
@@ -264,6 +320,12 @@ export class CombatantLODManager {
       const elapsedMs = now - (combatant.lastUpdateTime || 0);
       
       if (elapsedMs > dynamicIntervalMs) {
+        if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
+          this.updateCombatantUltraLight(combatant, deltaTime);
+          combatant.lastUpdateTime = now;
+          this.staggeredSkipCount++;
+          return;
+        }
         const maxEff = Math.min(2.0, dynamicIntervalMs / 1000 * 2);
         const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, maxEff) : deltaTime;
         this.updateCombatantBasic(combatant, effectiveDelta);
@@ -280,12 +342,22 @@ export class CombatantLODManager {
       const elapsedMs = now - (combatant.lastUpdateTime || 0);
       if (distance > SIMULATION_THRESHOLD) {
         if (elapsedMs > 30000) {
-          this.simulateDistantAI(combatant);
+          if (enableAI && !this.isAIBudgetExceeded(aiFrameStart)) {
+            this.simulateDistantAI(combatant);
+          } else if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
+            this.updateCombatantUltraLight(combatant, deltaTime);
+          }
           combatant.lastUpdateTime = now;
         }
       } else {
         const dynamicIntervalMs = this.computeDynamicIntervalMs(distance) * this.intervalScale;
         if (elapsedMs > dynamicIntervalMs) {
+          if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
+            this.updateCombatantUltraLight(combatant, deltaTime);
+            combatant.lastUpdateTime = now;
+            this.staggeredSkipCount++;
+            return;
+          }
           const maxEff = Math.min(3.0, dynamicIntervalMs / 1000 * 3);
           const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, maxEff) : deltaTime;
           this.updateCombatantBasic(combatant, effectiveDelta);
@@ -295,8 +367,36 @@ export class CombatantLODManager {
     });
   }
 
+  private isAIBudgetExceeded(aiFrameStart: number): boolean {
+    const elapsed = performance.now() - aiFrameStart;
+    if (elapsed <= this.AI_FRAME_BUDGET_MS) {
+      return false;
+    }
+
+    const now = performance.now();
+    if (now - this.lastAiBudgetLogMs > this.AI_LOG_THROTTLE_MS) {
+      this.lastAiBudgetLogMs = now;
+      Logger.warn('combat-ai', `[AI budget] frame AI budget exceeded (${elapsed.toFixed(1)}ms > ${this.AI_FRAME_BUDGET_MS.toFixed(1)}ms), degrading remaining updates`);
+    }
+    return true;
+  }
+
+  private isAISeverelyOverBudget(aiFrameStart: number): boolean {
+    return (performance.now() - aiFrameStart) > (this.AI_FRAME_BUDGET_MS * this.AI_SEVERE_OVER_BUDGET_MULTIPLIER);
+  }
+
   private updateCombatantFull(combatant: Combatant, deltaTime: number): void {
+    const aiStart = performance.now();
     this.combatantAI.updateAI(combatant, deltaTime, this.playerPosition, this.combatants, this.spatialGrid);
+    const aiMs = performance.now() - aiStart;
+    const now = performance.now();
+    if (aiMs > 50 && now - this.lastAiSpikeLogMs > this.AI_LOG_THROTTLE_MS) {
+      this.lastAiSpikeLogMs = now;
+      Logger.warn(
+        'combat-ai',
+        `[AI spike] ${aiMs.toFixed(1)}ms combatant=${combatant.id} state=${combatant.state} squad=${combatant.squadId ?? 'none'} target=${combatant.target?.id ?? 'none'}`
+      );
+    }
     this.combatantMovement.updateMovement(
       combatant,
       deltaTime,
@@ -359,6 +459,15 @@ export class CombatantLODManager {
     this.combatantRenderer.updateCombatantTexture(combatant);
     this.combatantMovement.updateRotation(combatant, deltaTime);
     this.spatialGrid.updatePosition(combatant.id, combatant.position);
+  }
+
+  /**
+   * Emergency degrade mode for severe overload frames.
+   * Keeps billboard-facing continuity while skipping movement/combat/spatial updates.
+   */
+  private updateCombatantUltraLight(combatant: Combatant, deltaTime: number): void {
+    this.combatantRenderer.updateCombatantTexture(combatant);
+    this.combatantMovement.updateRotation(combatant, deltaTime);
   }
 
   private updateDeathAnimations(deltaTime: number): void {

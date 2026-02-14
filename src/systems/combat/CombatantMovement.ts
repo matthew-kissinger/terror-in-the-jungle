@@ -4,7 +4,6 @@ import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { ZoneManager } from '../world/ZoneManager';
 import { TicketSystem } from '../world/TicketSystem';
 import { GameModeManager } from '../world/GameModeManager';
-import { objectPool } from '../../utils/ObjectPoolManager';
 import { clusterManager } from './ClusterManager';
 import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 import { SpatialGridManager } from './SpatialGridManager';
@@ -69,10 +68,7 @@ export class CombatantMovement {
     }
 
     // Apply velocity normally - LOD scaling handled in CombatantSystem
-    const velocityDelta = objectPool.getVector3();
-    velocityDelta.copy(combatant.velocity).multiplyScalar(deltaTime);
-    combatant.position.add(velocityDelta);
-    objectPool.releaseVector3(velocityDelta);
+    combatant.position.addScaledVector(combatant.velocity, deltaTime);
 
     // Keep on terrain
     const terrainHeight = this.getTerrainHeight(combatant.position.x, combatant.position.z);

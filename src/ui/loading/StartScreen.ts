@@ -212,6 +212,8 @@ export class StartScreen {
   }
 
   hide(): void {
+    // Autostart/sandbox flows can skip showMainMenu; ensure init timeout cannot fire mid-match.
+    this.markInitialized();
     this.container.classList.add('hidden');
     setTimeout(() => { this.isVisible = false; }, 500);
   }

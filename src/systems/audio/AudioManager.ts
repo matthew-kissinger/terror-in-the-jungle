@@ -24,6 +24,9 @@ export class AudioManager implements GameSystem {
 
     // Sound configurations
     private readonly soundConfigs: Record<string, SoundConfig> = SOUND_CONFIGS;
+    private static loggedLoadFailures: Set<string> = new Set();
+    private static loggedOptionalMissing: Set<string> = new Set();
+    private hitFeedbackMissingLogged = false;
 
     constructor(scene: THREE.Scene, camera: THREE.Camera) {
         this.scene = scene;
@@ -89,7 +92,11 @@ export class AudioManager implements GameSystem {
                 this.loadAudio(key, config.path)
                     .then(buffer => ({ key, buffer }))
                     .catch(() => {
-                        Logger.warn('Audio', `Optional audio ${key} not found: ${config.path}`);
+                        const dedupeKey = `${key}:${config.path}`;
+                        if (!AudioManager.loggedOptionalMissing.has(dedupeKey)) {
+                            AudioManager.loggedOptionalMissing.add(dedupeKey);
+                            Logger.warn('Audio', `Optional audio ${key} not found: ${config.path}`);
+                        }
                         return { key, buffer: undefined };
                     })
             );
@@ -115,7 +122,12 @@ export class AudioManager implements GameSystem {
                     // Progress callback
                 },
                 (error) => {
-                    Logger.error('Audio', `Failed to load ${key}: ${path}`, error);
+                    const dedupeKey = `${key}:${path}`;
+                    if (!AudioManager.loggedLoadFailures.has(dedupeKey)) {
+                        AudioManager.loggedLoadFailures.add(dedupeKey);
+                        const message = error instanceof Error ? error.message : String(error);
+                        Logger.warn('Audio', `Failed to load ${key}: ${path} (${message})`);
+                    }
                     reject(error);
                 }
             );
@@ -171,8 +183,13 @@ export class AudioManager implements GameSystem {
             sound.setPlaybackRate(pitch);
             sound.setVolume(volume);
             sound.play();
+            return;
         }
-        // If no hitMarker sound loaded, silently skip (no procedural fallback)
+
+        if (!this.hitFeedbackMissingLogged) {
+            this.hitFeedbackMissingLogged = true;
+            Logger.warn('Audio', 'Missing optional hitMarker asset; hit feedback audio disabled');
+        }
     }
 
     // Set master volume

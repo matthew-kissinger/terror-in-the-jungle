@@ -81,6 +81,7 @@ export interface SystemReferences {
 
 export interface InitializationResult {
   systems: GameSystem[];
+  deferredSystems: GameSystem[];
   scene: THREE.Scene;
 }
 
@@ -178,7 +179,7 @@ export class SystemInitializer {
 
     // Add systems to update list
     // NOTE: dayNightCycle removed - conflicts with weatherSystem for lighting control
-    const systems: GameSystem[] = [
+    const allSystems: GameSystem[] = [
       refs.assetLoader,
       refs.audioManager,
       refs.globalBillboardSystem,
@@ -219,7 +220,18 @@ export class SystemInitializer {
 
     onProgress('world', 0.5);
 
-    // Initialize all systems
+    // Defer non-critical systems so first interactive frame is not blocked.
+    const deferredSystems = new Set<GameSystem>([
+      refs.helipadSystem,
+      refs.helicopterModel,
+      refs.voiceCalloutSystem,
+      refs.loadoutSelector
+    ]);
+
+    const systems: GameSystem[] = allSystems.filter(system => !deferredSystems.has(system));
+    const deferredSystemList: GameSystem[] = allSystems.filter(system => deferredSystems.has(system));
+
+    // Initialize critical systems first
     for (const system of systems) {
       await system.init();
     }
@@ -228,6 +240,7 @@ export class SystemInitializer {
 
     return {
       systems,
+      deferredSystems: deferredSystemList,
       scene
     };
   }

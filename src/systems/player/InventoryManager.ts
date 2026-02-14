@@ -113,6 +113,14 @@ export class InventoryManager implements GameSystem {
     this.updateUI();
   }
 
+  /**
+   * Explicit API for non-keyboard callers (touch/controller) to switch slots
+   * without synthesizing keyboard events.
+   */
+  setCurrentSlot(slot: WeaponSlot): void {
+    this.switchToSlot(slot);
+  }
+
   private cycleWeapon(): void {
     const nextSlot = (this.currentSlot + 1) % 6;
     this.switchToSlot(nextSlot);

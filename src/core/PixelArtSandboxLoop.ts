@@ -38,6 +38,7 @@ export function animate(sandbox: PixelArtSandbox): void {
     // Collect GPU timing from previous frame
     performanceTelemetry.collectGPUTime();
 
+    performanceTelemetry.beginSystem('RenderMain');
     // Begin GPU timing for this frame
     performanceTelemetry.beginGPUTimer();
 
@@ -62,8 +63,10 @@ export function animate(sandbox: PixelArtSandbox): void {
 
     // End GPU timing measurement
     performanceTelemetry.endGPUTimer();
+    performanceTelemetry.endSystem('RenderMain');
 
     // Render weapon overlay
+    performanceTelemetry.beginSystem('RenderOverlay');
     if (sandbox.systemManager.firstPersonWeapon && !usingMortarCamera) {
       sandbox.systemManager.firstPersonWeapon.renderWeapon(sandbox.sandboxRenderer.renderer);
     }
@@ -83,11 +86,18 @@ export function animate(sandbox: PixelArtSandbox): void {
     }
 
     renderer.autoClear = currentAutoClear;
+    performanceTelemetry.endSystem('RenderOverlay');
 
     updateSandboxMetrics(sandbox, deltaTime);
     updatePerformanceOverlay(sandbox, deltaTime);
     updateLogOverlay(sandbox);
     updateTimeIndicator(sandbox);
+
+    // Any successful frame clears crash streak so only consecutive failures escalate.
+    if (crashCount > 0) {
+      crashCount = 0;
+      lastCrashTime = 0;
+    }
   } catch (error) {
     // Handle frame loop crash
     Logger.error('frame-loop', 'Frame loop error:', error);
@@ -116,6 +126,12 @@ export function animate(sandbox: PixelArtSandbox): void {
  * Show an error overlay for repeated frame loop crashes
  */
 function showFrameLoopError(sandbox: PixelArtSandbox, error: unknown): void {
+  // In harness/sandbox mode keep running and log, do not block testing with fatal overlay.
+  if (sandbox.sandboxEnabled) {
+    Logger.error('frame-loop', 'Suppressed fatal frame-loop overlay in sandbox mode:', error);
+    return;
+  }
+
   const errorMessage = error instanceof Error
     ? `${error.message}\n\nThe game encountered ${crashCount} errors within ${CRASH_WINDOW_MS / 1000} seconds.`
     : `The game encountered ${crashCount} errors within ${CRASH_WINDOW_MS / 1000} seconds.`;

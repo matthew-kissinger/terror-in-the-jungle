@@ -63,3 +63,13 @@ public/assets/originals/
 # Performance baselines (machine-specific, should not be committed)
 perf-baselines.json
 .playwright-mcp/
+artifacts/
+
+# Local capture/debug screenshots
+gameplay-profile.png
+hud-current-state.png
+hud-layout-check.png
+hud-layout-fixed.png
+hud-layout.png
+settings-modal.png
+start-screen.png

@@ -7,6 +7,7 @@ import { isSandboxMode } from './SandboxModeDetector';
 import { SettingsManager } from '../config/SettingsManager';
 import { shouldUseTouchControls } from '../utils/DeviceDetector';
 import { tryLockLandscapeOrientation } from '../utils/Orientation';
+import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import type { PixelArtSandbox } from './PixelArtSandbox';
 
 /**
@@ -30,9 +31,14 @@ export async function initializeSystems(sandbox: PixelArtSandbox): Promise<void>
       Logger.info('sandbox-init', 'Skybox created');
     }
 
-    Logger.info('sandbox-init', 'Pre-generating spawn area...');
-    const spawnPosition = sandbox.sandboxEnabled ? new THREE.Vector3(0, 5, 0) : new THREE.Vector3(0, 5, -50);
-    await sandbox.systemManager.preGenerateSpawnArea(spawnPosition);
+    const shouldPreGenerateNow = !(sandbox.sandboxEnabled && sandbox.sandboxConfig?.autoStart);
+    if (shouldPreGenerateNow) {
+      Logger.info('sandbox-init', 'Pre-generating spawn area...');
+      const spawnPosition = sandbox.sandboxEnabled ? new THREE.Vector3(0, 5, 0) : new THREE.Vector3(0, 5, -50);
+      await sandbox.systemManager.preGenerateSpawnArea(spawnPosition);
+    } else {
+      Logger.info('sandbox-init', 'Skipping initial spawn pre-generation (autostart will pre-generate mode-specific spawn).');
+    }
 
     Logger.info('sandbox-init', 'World system ready!');
     sandbox.loadingScreen.updateProgress('entities', 1);
@@ -125,55 +131,7 @@ export function startGame(sandbox: PixelArtSandbox): void {
     sandbox.systemManager.playerController.setPointerLockEnabled(false);
   }
 
-  sandbox.loadingScreen.hide();
-  sandbox.sandboxRenderer.showSpawnLoadingIndicator();
-  sandbox.sandboxRenderer.precompileShaders();
-
-  const startTime = performance.now();
-  setTimeout(() => {
-    Logger.info('sandbox-init', `Game ready in ${performance.now() - startTime}ms`);
-    sandbox.sandboxRenderer.hideSpawnLoadingIndicator();
-
-    try {
-      const cfg = sandbox.systemManager.gameModeManager.getCurrentConfig();
-      if (cfg.id === GameMode.AI_SANDBOX) {
-        const pos = new THREE.Vector3(0, 0, 0);
-        pos.y = getHeightQueryCache().getHeightAt(pos.x, pos.z) + 2;
-        sandbox.systemManager.playerController.setPosition(pos);
-      } else {
-        const spawn = cfg.zones.find((z: ZoneConfig) => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
-        if (spawn) {
-          const pos = spawn.position.clone();
-          pos.y = getHeightQueryCache().getHeightAt(pos.x, pos.z) + 2;
-          sandbox.systemManager.playerController.setPosition(pos);
-        }
-      }
-    } catch { /* ignore */ }
-
-    // Kick one more chunk update before revealing the renderer
-    sandbox.systemManager.chunkManager.update(0.01);
-    sandbox.sandboxRenderer.showRenderer();
-
-    setTimeout(() => {
-      sandbox.systemManager.firstPersonWeapon.setGameStarted(true);
-      sandbox.systemManager.playerController.setGameStarted(true);
-
-      if (!sandbox.sandboxEnabled && !shouldUseTouchControls()) {
-        Logger.info('sandbox-init', 'Click anywhere to enable mouse look!');
-      }
-      if (sandbox.systemManager.audioManager) sandbox.systemManager.audioManager.startAmbient();
-      // Apply saved volume setting
-      if (sandbox.systemManager.audioManager) {
-        const settings = SettingsManager.getInstance();
-        sandbox.systemManager.audioManager.setMasterVolume(settings.getMasterVolumeNormalized());
-      }
-      if (sandbox.systemManager.combatantSystem && typeof sandbox.systemManager.combatantSystem.enableCombat === 'function') {
-        sandbox.systemManager.combatantSystem.enableCombat();
-        Logger.info('sandbox-init', 'Combat AI activated!');
-      }
-      sandbox.systemManager.hudSystem.startMatch();
-    }, 200);
-  }, 300);
+  void runStartupFlow(sandbox);
 
   sandbox.sandboxRenderer.showCrosshair();
   if (!sandbox.sandboxEnabled) showWelcomeMessage(sandbox);
@@ -182,6 +140,84 @@ export function startGame(sandbox: PixelArtSandbox): void {
   const showFPS = SettingsManager.getInstance().get('showFPS');
   if (showFPS && !sandbox.performanceOverlay.isVisible()) {
     sandbox.performanceOverlay.toggle();
+  }
+  performanceTelemetry.setEnabled(sandbox.performanceOverlay.isVisible() || sandbox.sandboxEnabled);
+}
+
+async function runStartupFlow(sandbox: PixelArtSandbox): Promise<void> {
+  const startTime = performance.now();
+  const markPhase = (phase: string) => Logger.info('sandbox-init', `[startup] ${phase}`);
+
+  markPhase('hide-loading');
+  sandbox.loadingScreen.hide();
+  sandbox.sandboxRenderer.showSpawnLoadingIndicator();
+
+  markPhase('position-player');
+  try {
+    const cfg = sandbox.systemManager.gameModeManager.getCurrentConfig();
+    if (cfg.id === GameMode.AI_SANDBOX) {
+      const pos = new THREE.Vector3(0, 0, 0);
+      pos.y = getHeightQueryCache().getHeightAt(pos.x, pos.z) + 2;
+      sandbox.systemManager.playerController.setPosition(pos);
+    } else {
+      const spawn = cfg.zones.find((z: ZoneConfig) => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
+      if (spawn) {
+        const pos = spawn.position.clone();
+        pos.y = getHeightQueryCache().getHeightAt(pos.x, pos.z) + 2;
+        sandbox.systemManager.playerController.setPosition(pos);
+      }
+    }
+  } catch {
+    // Keep startup resilient; spawn fallback already exists elsewhere.
+  }
+
+  markPhase('flush-chunk-update');
+  sandbox.systemManager.chunkManager.update(0.016);
+  await nextFrame();
+
+  markPhase('renderer-visible');
+  sandbox.sandboxRenderer.showRenderer();
+  sandbox.sandboxRenderer.hideSpawnLoadingIndicator();
+
+  markPhase('enable-player-systems');
+  sandbox.systemManager.firstPersonWeapon.setGameStarted(true);
+  sandbox.systemManager.playerController.setGameStarted(true);
+  sandbox.systemManager.hudSystem.startMatch();
+
+  if (!sandbox.sandboxEnabled && !shouldUseTouchControls()) {
+    Logger.info('sandbox-init', 'Click anywhere to enable mouse look!');
+  }
+
+  if (sandbox.systemManager.audioManager) {
+    sandbox.systemManager.audioManager.startAmbient();
+    const settings = SettingsManager.getInstance();
+    sandbox.systemManager.audioManager.setMasterVolume(settings.getMasterVolumeNormalized());
+  }
+
+  const allowCombat = sandbox.sandboxConfig?.enableCombat ?? true;
+  if (allowCombat && sandbox.systemManager.combatantSystem && typeof sandbox.systemManager.combatantSystem.enableCombat === 'function') {
+    sandbox.systemManager.combatantSystem.enableCombat();
+    Logger.info('sandbox-init', 'Combat AI activated!');
+  } else if (!allowCombat) {
+    Logger.info('sandbox-init', 'Combat AI disabled by sandbox config (combat=0)');
+  }
+
+  // Delay shader warmup until after first interactive frame.
+  requestBackgroundTask(() => sandbox.sandboxRenderer.precompileShaders(), 1000);
+  requestBackgroundTask(() => sandbox.systemManager.startDeferredInitialization(), 500);
+  markPhase(`interactive-ready (${(performance.now() - startTime).toFixed(1)}ms)`);
+}
+
+function nextFrame(): Promise<void> {
+  return new Promise(resolve => requestAnimationFrame(() => resolve()));
+}
+
+function requestBackgroundTask(task: () => void, timeoutMs: number): void {
+  const w = window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
+  if (typeof w.requestIdleCallback === 'function') {
+    w.requestIdleCallback(() => task(), { timeout: timeoutMs });
+  } else {
+    setTimeout(task, timeoutMs);
   }
 }
 

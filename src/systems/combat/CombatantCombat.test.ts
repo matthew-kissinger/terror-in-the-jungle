@@ -52,6 +52,7 @@ const mockHUDSystem: IHUDSystem = {
 
 const mockChunkManager: ImprovedChunkManager = {
   raycastTerrain: vi.fn(() => ({ hit: false, distance: undefined })),
+  getEffectiveHeightAt: vi.fn(() => -1000),
 } as any;
 
 // Mock scene
@@ -524,6 +525,73 @@ describe('CombatantCombat', () => {
 
       expect(result.headshot).toBe(true);
       expect(result.damage).toBe(150);
+    });
+
+    it('should block player hit when terrain is closer than target', () => {
+      const target = createMockCombatant('target-1', Faction.OPFOR, 100);
+      const allCombatants = new Map<string, Combatant>();
+      allCombatants.set('target-1', target);
+
+      const ray = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0));
+      const damageCalculator = () => 50;
+
+      vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue({
+        combatant: target,
+        point: new THREE.Vector3(20, 0, 0),
+        distance: 20,
+        headshot: false,
+      });
+      (mockChunkManager.raycastTerrain as any).mockReturnValue({
+        hit: true,
+        point: new THREE.Vector3(8, 0, 0),
+        distance: 8
+      });
+
+      const result = combatantCombat.handlePlayerShot(ray, damageCalculator, allCombatants);
+
+      expect(result.hit).toBe(false);
+      expect(result.point.x).toBeCloseTo(8, 5);
+      expect(target.health).toBe(100);
+    });
+
+    it('should return terrain impact point on miss when terrain is hit', () => {
+      const allCombatants = new Map<string, Combatant>();
+      const ray = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0));
+
+      vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue(null);
+      (mockChunkManager.raycastTerrain as any).mockReturnValue({
+        hit: true,
+        point: new THREE.Vector3(12, 0, 0),
+        distance: 12
+      });
+
+      const result = combatantCombat.handlePlayerShot(ray, () => 50, allCombatants);
+
+      expect(result.hit).toBe(false);
+      expect(result.point.x).toBeCloseTo(12, 5);
+    });
+
+    it('should block hit when height profile indicates occlusion', () => {
+      const target = createMockCombatant('target-1', Faction.OPFOR, 100);
+      const allCombatants = new Map<string, Combatant>();
+      allCombatants.set('target-1', target);
+      const ray = new THREE.Ray(new THREE.Vector3(0, 1.2, 0), new THREE.Vector3(1, 0, 0));
+
+      vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue({
+        combatant: target,
+        point: new THREE.Vector3(20, 1.2, 0),
+        distance: 20,
+        headshot: false,
+      });
+      (mockChunkManager.raycastTerrain as any).mockReturnValue({ hit: false, distance: undefined });
+      (mockChunkManager.getEffectiveHeightAt as any).mockImplementation((x: number) => (x >= 6 ? 1.5 : 0));
+
+      const result = combatantCombat.handlePlayerShot(ray, () => 50, allCombatants);
+
+      expect(result.hit).toBe(false);
+      expect(result.point.x).toBeGreaterThan(5);
+      expect(result.point.x).toBeLessThan(8);
+      expect(target.health).toBe(100);
     });
   });
 

@@ -3,7 +3,14 @@ import * as THREE from 'three';
 import { GameSystem, TerrainType } from '../../types';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { getHeightQueryCache } from '../terrain/HeightQueryCache';
-import { FootstepSynthesis, SynthesisStarter } from './FootstepSynthesis';
+
+const FOOTSTEP_SOUND_PATHS: Record<TerrainType, string> = {
+  [TerrainType.GRASS]: 'assets/optimized/footstepGrass.wav',
+  [TerrainType.MUD]: 'assets/optimized/footstepMud.wav',
+  [TerrainType.WATER]: 'assets/optimized/footstepWater.wav',
+  [TerrainType.ROCK]: 'assets/optimized/footstepRock.wav'
+};
+const FOOTSTEP_AUDIO_ENABLED = false;
 
 /**
  * Configuration for footstep sounds per terrain type
@@ -22,6 +29,8 @@ interface FootstepConfig {
  */
 export class FootstepAudioSystem implements GameSystem {
   private listener: THREE.AudioListener;
+  private audioLoader = new THREE.AudioLoader();
+  private footstepBuffers: Partial<Record<TerrainType, AudioBuffer>> = {};
   private chunkManager?: ImprovedChunkManager;
   
   // Audio pools for player (non-positional)
@@ -73,10 +82,16 @@ export class FootstepAudioSystem implements GameSystem {
 
   constructor(listener: THREE.AudioListener) {
     this.listener = listener;
-    this.initializeAudioPools();
+    if (FOOTSTEP_AUDIO_ENABLED) {
+      this.initializeAudioPools();
+    } else {
+      Logger.info('audio', '[FootstepAudioSystem] Disabled (awaiting authored assets)');
+    }
   }
 
   async init(): Promise<void> {
+    if (!FOOTSTEP_AUDIO_ENABLED) return;
+    await this.loadFootstepBuffers();
     Logger.info('audio', '[FootstepAudioSystem] Initialized');
   }
 
@@ -131,6 +146,9 @@ export class FootstepAudioSystem implements GameSystem {
     deltaTime: number,
     isMoving: boolean
   ): void {
+    // TODO(audio): Re-enable when distinct terrain footstep assets are authored.
+    if (!FOOTSTEP_AUDIO_ENABLED) return;
+
     if (!isMoving) {
       this.playerStepTimer = 0;
       return;
@@ -154,6 +172,8 @@ export class FootstepAudioSystem implements GameSystem {
    * Play footstep for landing after jump
    */
   playLandingSound(position: THREE.Vector3, impactVelocity: number = 1): void {
+    if (!FOOTSTEP_AUDIO_ENABLED) return;
+
     const terrainType = this.detectTerrainType(position);
     const config = this.terrainConfigs[terrainType];
     
@@ -172,6 +192,9 @@ export class FootstepAudioSystem implements GameSystem {
     playerPosition: THREE.Vector3,
     _isRunning: boolean = false
   ): boolean {
+    // TODO(audio): Re-enable when distinct terrain footstep assets are authored.
+    if (!FOOTSTEP_AUDIO_ENABLED) return false;
+
     // Check distance - don't play if too far
     const distance = position.distanceTo(playerPosition);
     if (distance > this.AI_FOOTSTEP_RANGE) {
@@ -240,61 +263,31 @@ export class FootstepAudioSystem implements GameSystem {
     pitchMultiplier: number = 1.0,
     position?: THREE.Vector3
   ): void {
-    const audioContext = this.listener.context;
-    
+    const buffer = this.footstepBuffers[terrainType];
+    if (!buffer) return;
+
     const pitchVariation = config.pitchRange[0] + 
       Math.random() * (config.pitchRange[1] - config.pitchRange[0]);
     const finalPitch = pitchVariation * pitchMultiplier;
     const volume = volumeOverride !== undefined ? volumeOverride : config.volume;
-    
-    let starter: SynthesisStarter;
-    
-    switch (terrainType) {
-      case TerrainType.GRASS:
-        starter = FootstepSynthesis.createGrassFootstep(audioContext, volume, finalPitch);
-        break;
-      case TerrainType.MUD:
-        starter = FootstepSynthesis.createMudFootstep(audioContext, volume, finalPitch);
-        break;
-      case TerrainType.WATER:
-        starter = FootstepSynthesis.createWaterFootstep(audioContext, volume, finalPitch);
-        break;
-      case TerrainType.ROCK:
-        starter = FootstepSynthesis.createRockFootstep(audioContext, volume, finalPitch);
-        break;
-      default:
-        starter = FootstepSynthesis.createGrassFootstep(audioContext, volume, finalPitch);
-    }
 
-    if (isPositional && position) {
+    if (isPositional) {
       const sound = this.getAvailablePositionalSound();
-      if (sound) {
-        this.setupPositionalChain(sound, position, starter);
-      }
-    } else {
-      starter(audioContext.destination);
+      if (!sound) return;
+      if (position) sound.position.copy(position);
+      sound.setBuffer(buffer);
+      sound.setPlaybackRate(finalPitch);
+      sound.setVolume(volume);
+      sound.play();
+      return;
     }
-  }
 
-  /**
-   * Setup positional audio chain
-   */
-  private setupPositionalChain(
-    sound: THREE.PositionalAudio,
-    position: THREE.Vector3,
-    starter: SynthesisStarter
-  ): void {
-    const tempObj = new THREE.Object3D();
-    tempObj.position.copy(position);
-    tempObj.add(sound);
-    
-    const duration = starter(sound.getOutput());
-    
-    setTimeout(() => {
-      if (tempObj.children.includes(sound)) {
-        tempObj.remove(sound);
-      }
-    }, duration * 1000 + 100);
+    const sound = this.getAvailablePlayerSound();
+    if (!sound) return;
+    sound.setBuffer(buffer);
+    sound.setPlaybackRate(finalPitch);
+    sound.setVolume(volume);
+    sound.play();
   }
 
   /**
@@ -324,5 +317,20 @@ export class FootstepAudioSystem implements GameSystem {
    */
   setChunkManager(chunkManager: ImprovedChunkManager): void {
     this.chunkManager = chunkManager;
+  }
+
+  private async loadFootstepBuffers(): Promise<void> {
+    if (!FOOTSTEP_AUDIO_ENABLED) return;
+    const entries = Object.entries(FOOTSTEP_SOUND_PATHS) as Array<[TerrainType, string]>;
+    await Promise.all(entries.map(async ([terrainType, path]) => {
+      try {
+        const buffer = await new Promise<AudioBuffer>((resolve, reject) => {
+          this.audioLoader.load(path, resolve, undefined, reject);
+        });
+        this.footstepBuffers[terrainType] = buffer;
+      } catch {
+        // Missing optional placeholder should not break runtime.
+      }
+    }));
   }
 }

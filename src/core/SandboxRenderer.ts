@@ -201,14 +201,29 @@ export class SandboxRenderer {
     Logger.info('Renderer', 'Pre-compiling shaders...');
     const startTime = performance.now();
 
-    // Force shader compilation for all materials in the scene
-    this.renderer.compile(this.scene, this.camera);
+    const rendererAny = this.renderer as THREE.WebGLRenderer & {
+      compileAsync?: (scene: THREE.Object3D, camera: THREE.Camera) => Promise<unknown>;
+    };
 
-    // Also trigger a render to warm up any lazy-initialized shaders
-    this.renderer.render(this.scene, this.camera);
+    // Prefer async compile path to reduce main-thread stalls on startup.
+    if (typeof rendererAny.compileAsync === 'function') {
+      void rendererAny.compileAsync(this.scene, this.camera)
+        .then(() => {
+          this.renderer.render(this.scene, this.camera);
+          const elapsed = performance.now() - startTime;
+          Logger.info('Renderer', `Shader pre-compilation complete async (${elapsed.toFixed(1)}ms)`);
+        })
+        .catch((error) => {
+          // Avoid sync fallback in runtime; it can cause multi-second stalls on some drivers/headless runs.
+          Logger.warn('Renderer', `Async shader pre-compilation failed; skipping fallback compile: ${error}`);
+          const elapsed = performance.now() - startTime;
+          Logger.info('Renderer', `Shader pre-compilation skipped fallback (${elapsed.toFixed(1)}ms)`);
+        });
+      return;
+    }
 
-    const elapsed = performance.now() - startTime;
-    Logger.info('Renderer', `Shader pre-compilation complete (${elapsed.toFixed(1)}ms)`);
+    // No sync fallback: better to pay small first-use shader costs than stall startup hard.
+    Logger.warn('Renderer', 'compileAsync unavailable; skipping synchronous shader pre-compilation');
   }
 
   dispose(): void {

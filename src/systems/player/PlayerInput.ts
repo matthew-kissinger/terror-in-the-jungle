@@ -109,18 +109,9 @@ export class PlayerInput {
         },
         onScoreboardTap: () => callbacks.onScoreboardTap?.(),
         onEnterExitHelicopter: () => callbacks.onEnterExitHelicopter?.(),
-        onSandbagRotateLeft: () => {
-          const event = new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true });
-          window.dispatchEvent(event);
-        },
-        onSandbagRotateRight: () => {
-          const event = new KeyboardEvent('keydown', { code: 'KeyT', key: 't', bubbles: true });
-          window.dispatchEvent(event);
-        },
-        onRallyPointPlace: () => {
-          const event = new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true });
-          window.dispatchEvent(event);
-        },
+        onSandbagRotateLeft: () => callbacks.onSandbagRotateLeft?.(),
+        onSandbagRotateRight: () => callbacks.onSandbagRotateRight?.(),
+        onRallyPointPlace: () => callbacks.onRallyPointPlace?.(),
         onSquadCommand: () => callbacks.onSquadCommand?.(),
         onMenuPause: () => callbacks.onMenuPause?.(),
         onMenuResume: () => callbacks.onMenuResume?.(),
@@ -394,10 +385,7 @@ export class PlayerInput {
       this.callbacks.onRunStop?.();
     }
 
-    // Squad command menu - toggle on release to execute command
-    if (event.code === 'KeyZ' && !this.isInHelicopter) {
-      this.callbacks.onSquadCommand?.();
-    }
+    // KeyZ handled on keydown only to enforce one action per press.
   }
 
   private requestPointerLock(): void {

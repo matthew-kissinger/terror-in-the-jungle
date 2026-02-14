@@ -114,11 +114,18 @@ export class GPUBillboardSystem {
     let bounds = this.chunkBounds.get(chunkKey);
     if (!bounds) {
       bounds = new THREE.Box2();
+      bounds.makeEmpty();
       this.chunkBounds.set(chunkKey, bounds);
     }
-    
+
     for (const instance of instances) {
-      bounds.expandByPoint(new THREE.Vector2(instance.position.x, instance.position.z));
+      const x = instance.position.x;
+      const z = instance.position.z;
+
+      if (x < bounds.min.x) bounds.min.x = x;
+      if (z < bounds.min.y) bounds.min.y = z;
+      if (x > bounds.max.x) bounds.max.x = x;
+      if (z > bounds.max.y) bounds.max.y = z;
     }
   }
 

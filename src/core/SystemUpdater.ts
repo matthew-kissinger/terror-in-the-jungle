@@ -19,6 +19,8 @@ interface SystemTimingEntry {
 export class SystemUpdater {
   private systemTimings: Map<string, SystemTimingEntry> = new Map();
   private readonly EMA_ALPHA = 0.1;
+  private tacticalUiAccumulator = 0;
+  private readonly TACTICAL_UI_INTERVAL = 1 / 20; // 20 Hz is enough for map/compass updates
 
   updateSystems(
     refs: SystemReferences,
@@ -86,21 +88,33 @@ export class SystemUpdater {
     // Gate UI systems - skip if game hasn't started or full map is visible
     const fullMapVisible = refs.fullMapSystem?.getIsVisible() || false;
     const shouldUpdateUI = gameStarted && !fullMapVisible;
+    this.tacticalUiAccumulator += deltaTime;
 
-    this.trackSystemUpdate('UI', 1.0, () => {
-      performanceTelemetry.beginSystem('UI');
-      // HUD always updates (handles its own visibility)
+    this.trackSystemUpdate('HUD', 1.0, () => {
+      performanceTelemetry.beginSystem('HUD');
       if (refs.hudSystem) refs.hudSystem.update(deltaTime);
+      performanceTelemetry.endSystem('HUD');
+    });
 
-      // Gate minimap, compass when full map is open or game not started
-      if (shouldUpdateUI) {
-        if (refs.minimapSystem) refs.minimapSystem.update(deltaTime);
-        if (refs.compassSystem) refs.compassSystem.update(deltaTime);
+    this.trackSystemUpdate('TacticalUI', 0.5, () => {
+      performanceTelemetry.beginSystem('TacticalUI');
+
+      // Minimap/compass/full-map updates are throttled to reduce DOM/canvas churn.
+      if (shouldUpdateUI && this.tacticalUiAccumulator >= this.TACTICAL_UI_INTERVAL) {
+        const tacticalDelta = this.tacticalUiAccumulator;
+        this.tacticalUiAccumulator = 0;
+        if (refs.minimapSystem) refs.minimapSystem.update(tacticalDelta);
+        if (refs.compassSystem) refs.compassSystem.update(tacticalDelta);
       }
 
-      // Full map updates when visible
-      if (refs.fullMapSystem) refs.fullMapSystem.update(deltaTime);
-      performanceTelemetry.endSystem('UI');
+      // Full map updates when visible, on same tactical cadence.
+      if (refs.fullMapSystem && fullMapVisible && this.tacticalUiAccumulator >= this.TACTICAL_UI_INTERVAL) {
+        const tacticalDelta = this.tacticalUiAccumulator;
+        this.tacticalUiAccumulator = 0;
+        refs.fullMapSystem.update(tacticalDelta);
+      }
+
+      performanceTelemetry.endSystem('TacticalUI');
     });
 
     // Gate World systems - skip weather and tickets during menu/loading
@@ -119,29 +133,9 @@ export class SystemUpdater {
     });
 
     // Update remaining systems without tracking (lightweight systems)
-    const trackedSystems = new Set<GameSystem>([
-      refs.combatantSystem,
-      refs.chunkManager,
-      refs.globalBillboardSystem,
-      refs.playerController,
-      refs.firstPersonWeapon,
-      refs.grenadeSystem,
-      refs.mortarSystem,
-      refs.sandbagSystem,
-      refs.ammoSupplySystem,
-      refs.hudSystem,
-      refs.minimapSystem,
-      refs.fullMapSystem,
-      refs.compassSystem,
-      refs.zoneManager,
-      refs.ticketSystem,
-      refs.waterSystem,
-      refs.weatherSystem // FIX: Was missing - caused double-update bug
-    ]);
-
     performanceTelemetry.beginSystem('Other');
     for (const system of systems) {
-      if (!trackedSystems.has(system)) {
+      if (!this.isTrackedSystem(system, refs)) {
         try {
           system.update(deltaTime);
         } catch (error) {
@@ -153,6 +147,26 @@ export class SystemUpdater {
 
     // End frame telemetry
     performanceTelemetry.endFrame();
+  }
+
+  private isTrackedSystem(system: GameSystem, refs: SystemReferences): boolean {
+    return system === refs.combatantSystem
+      || system === refs.chunkManager
+      || system === refs.globalBillboardSystem
+      || system === refs.playerController
+      || system === refs.firstPersonWeapon
+      || system === refs.grenadeSystem
+      || system === refs.mortarSystem
+      || system === refs.sandbagSystem
+      || system === refs.ammoSupplySystem
+      || system === refs.hudSystem
+      || system === refs.minimapSystem
+      || system === refs.fullMapSystem
+      || system === refs.compassSystem
+      || system === refs.zoneManager
+      || system === refs.ticketSystem
+      || system === refs.waterSystem
+      || system === refs.weatherSystem;
   }
 
   private trackSystemUpdate(name: string, budgetMs: number, updateFn: () => void): void {

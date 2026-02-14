@@ -45,6 +45,8 @@ export class AICoverSystem {
   private readonly CACHE_TTL_MS = 5000  // Re-evaluate every 5 seconds
   private readonly MAX_COVER_SPOTS_PER_CHUNK = 8
   private readonly CHUNK_SIZE = 32
+  private readonly MAX_COVER_SEARCHES_PER_FRAME = 8
+  private coverSearchesThisFrame = 0
 
   // Cover occupation tracking
   private coverOccupation: Map<string, string> = new Map()  // coverKey -> combatantId
@@ -66,6 +68,11 @@ export class AICoverSystem {
     allCombatants: Map<string, Combatant>,
     maxSearchRadius: number = 30
   ): CoverSpot | null {
+    if (this.coverSearchesThisFrame >= this.MAX_COVER_SEARCHES_PER_FRAME) {
+      return null
+    }
+    this.coverSearchesThisFrame++
+
     const candidates: CoverSpot[] = []
 
     // Get chunks to search
@@ -140,6 +147,13 @@ export class AICoverSystem {
     }
 
     return bestSpot
+  }
+
+  /**
+   * Reset per-frame budgets. Call once per frame before AI updates.
+   */
+  beginFrame(): void {
+    this.coverSearchesThisFrame = 0
   }
 
   /**

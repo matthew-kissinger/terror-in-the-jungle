@@ -1,5 +1,6 @@
 import { Logger } from '../utils/Logger';
 import type { PixelArtSandbox } from './PixelArtSandbox';
+import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 
 let sandboxRef: PixelArtSandbox | null = null;
 let listenersAttached = false;
@@ -111,6 +112,8 @@ export function togglePerformanceStats(sandbox: PixelArtSandbox): void {
 export function toggleRealtimeStatsOverlay(sandbox: PixelArtSandbox): void {
   if (!sandbox.gameStarted) return;
   sandbox.performanceOverlay.toggle();
+  const overlayVisible = sandbox.performanceOverlay.isVisible();
+  performanceTelemetry.setEnabled(overlayVisible || sandbox.sandboxEnabled);
 }
 
 /**

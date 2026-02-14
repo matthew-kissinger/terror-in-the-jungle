@@ -68,17 +68,6 @@ export const SOUND_CONFIGS: Record<string, SoundConfig> = {
     maxDistance: 150,
     rolloffFactor: 1.5
   },
-  grenadeThrow: {
-    path: 'assets/optimized/grenadeThrow.wav',
-    volume: 0.5,
-    refDistance: 5,
-    maxDistance: 50,
-    rolloffFactor: 1.5
-  },
-  grenadePinPull: {
-    path: 'assets/optimized/grenadePinPull.wav',
-    volume: 0.4
-  },
   // Hit feedback sounds - add hitMarker.wav to enable
   hitMarker: {
     path: 'assets/optimized/hitMarker.wav',

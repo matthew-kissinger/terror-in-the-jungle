@@ -50,7 +50,9 @@ export class SpatialGridManager {
 
   // Query timing for EMA
   private queryTimesMs: number[] = []
+  private queryTimesSumMs = 0
   private readonly MAX_QUERY_SAMPLES = 100
+  private loggedUninitializedMethods: Set<string> = new Set()
 
   /**
    * Initialize the spatial grid with known world size.
@@ -71,6 +73,7 @@ export class SpatialGridManager {
     const duration = performance.now() - start
     this.telemetry.initialized = true
     this.telemetry.lastRebuildMs = duration
+    this.loggedUninitializedMethods.clear()
 
     Logger.info('spatial-grid', `Initialized with world size ${worldSize} in ${duration.toFixed(1)}ms`)
 
@@ -90,6 +93,7 @@ export class SpatialGridManager {
     this.isInitialized = false
     this.grid = null
     this.telemetry.entityCount = 0
+    this.loggedUninitializedMethods.clear()
     this.initialize(worldSize)
   }
 
@@ -109,9 +113,7 @@ export class SpatialGridManager {
     playerPosition: THREE.Vector3
   ): void {
     if (!this.isInitialized || !this.grid) {
-      Logger.error('spatial-grid', 'syncAllPositions called before initialization!')
-      this.telemetry.fallbackCount++
-      performanceTelemetry.recordFallback()
+      this.recordUninitializedFallback('syncAllPositions')
       return
     }
 
@@ -164,9 +166,7 @@ export class SpatialGridManager {
    */
   syncEntity(id: string, position: THREE.Vector3): void {
     if (!this.isInitialized || !this.grid) {
-      Logger.error('spatial-grid', 'syncEntity called before initialization!')
-      this.telemetry.fallbackCount++
-      performanceTelemetry.recordFallback()
+      this.recordUninitializedFallback('syncEntity')
       return
     }
 
@@ -186,9 +186,7 @@ export class SpatialGridManager {
    */
   queryRadius(center: THREE.Vector3, radius: number): string[] {
     if (!this.isInitialized || !this.grid) {
-      Logger.error('spatial-grid', 'queryRadius called before initialization!')
-      this.telemetry.fallbackCount++
-      performanceTelemetry.recordFallback()
+      this.recordUninitializedFallback('queryRadius')
       return []
     }
 
@@ -198,12 +196,14 @@ export class SpatialGridManager {
 
     // Update query timing
     this.queryTimesMs.push(duration)
+    this.queryTimesSumMs += duration
     if (this.queryTimesMs.length > this.MAX_QUERY_SAMPLES) {
-      this.queryTimesMs.shift()
+      const removed = this.queryTimesMs.shift() ?? 0
+      this.queryTimesSumMs -= removed
     }
 
     // Calculate EMA
-    const avgQueryTime = this.queryTimesMs.reduce((a, b) => a + b, 0) / this.queryTimesMs.length
+    const avgQueryTime = this.queryTimesSumMs / this.queryTimesMs.length
     this.telemetry.avgQueryTimeMs = avgQueryTime
     this.telemetry.queriesThisFrame++
 
@@ -221,9 +221,7 @@ export class SpatialGridManager {
    */
   queryNearestK(center: THREE.Vector3, k: number, maxDistance: number = Infinity): string[] {
     if (!this.isInitialized || !this.grid) {
-      Logger.error('spatial-grid', 'queryNearestK called before initialization!')
-      this.telemetry.fallbackCount++
-      performanceTelemetry.recordFallback()
+      this.recordUninitializedFallback('queryNearestK')
       return []
     }
 
@@ -232,8 +230,10 @@ export class SpatialGridManager {
     const duration = performance.now() - start
 
     this.queryTimesMs.push(duration)
+    this.queryTimesSumMs += duration
     if (this.queryTimesMs.length > this.MAX_QUERY_SAMPLES) {
-      this.queryTimesMs.shift()
+      const removed = this.queryTimesMs.shift() ?? 0
+      this.queryTimesSumMs -= removed
     }
 
     this.telemetry.queriesThisFrame++
@@ -245,9 +245,7 @@ export class SpatialGridManager {
    */
   queryRay(origin: THREE.Vector3, direction: THREE.Vector3, maxDistance: number): string[] {
     if (!this.isInitialized || !this.grid) {
-      Logger.error('spatial-grid', 'queryRay called before initialization!')
-      this.telemetry.fallbackCount++
-      performanceTelemetry.recordFallback()
+      this.recordUninitializedFallback('queryRay')
       return []
     }
 
@@ -256,8 +254,10 @@ export class SpatialGridManager {
     const duration = performance.now() - start
 
     this.queryTimesMs.push(duration)
+    this.queryTimesSumMs += duration
     if (this.queryTimesMs.length > this.MAX_QUERY_SAMPLES) {
-      this.queryTimesMs.shift()
+      const removed = this.queryTimesMs.shift() ?? 0
+      this.queryTimesSumMs -= removed
     }
 
     this.telemetry.queriesThisFrame++
@@ -272,6 +272,8 @@ export class SpatialGridManager {
       this.grid.clear()
     }
     this.telemetry.entityCount = 0
+    this.queryTimesMs = []
+    this.queryTimesSumMs = 0
   }
 
   /**
@@ -306,6 +308,14 @@ export class SpatialGridManager {
    */
   getGrid(): SpatialOctree | null {
     return this.grid
+  }
+
+  private recordUninitializedFallback(method: string): void {
+    this.telemetry.fallbackCount++
+    performanceTelemetry.recordFallback()
+    if (this.loggedUninitializedMethods.has(method)) return
+    this.loggedUninitializedMethods.add(method)
+    Logger.error('spatial-grid', `${method} called before initialization!`)
   }
 }
 

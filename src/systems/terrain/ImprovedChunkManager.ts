@@ -127,7 +127,7 @@ export class ImprovedChunkManager implements GameSystem {
         loadDistance: config.loadDistance,
         renderDistance: config.renderDistance,
         skipTerrainMesh: config.skipTerrainMesh,
-        enableMeshMerging: true // Enable chunk mesh merging to reduce draw calls
+        enableMeshMerging: false // Disabled by default: async merge spikes stall the main thread.
       },
       this.noiseGenerator,
       this.losAccelerator,
@@ -319,6 +319,10 @@ export class ImprovedChunkManager implements GameSystem {
 
   getLoadingCount(): number {
     return this.lifecycleManager.getLoadingCount();
+  }
+
+  getChunkSize(): number {
+    return this.config.size;
   }
 
   /**

@@ -161,7 +161,7 @@ describe('WeaponFiring', () => {
       expect(muzzleFlashPool.spawn).toHaveBeenCalled()
 
       // Verify stats
-      expect(statsTracker.registerShot).toHaveBeenCalledWith(false) // Called by WeaponFiring
+      expect(statsTracker.registerShot).toHaveBeenCalledWith(true) // Called by WeaponFiring
       expect(statsTracker.addDamage).toHaveBeenCalledWith(25)
       expect(statsTracker.addHeadshot).toHaveBeenCalled()
       expect(statsTracker.updateLongestKill).toHaveBeenCalled()
@@ -305,7 +305,7 @@ describe('WeaponFiring', () => {
 
     it('should register shot with stats tracker', () => {
       weaponFiring.fire(false)
-      expect(statsTracker.registerShot).toHaveBeenCalledWith(false)
+      expect(statsTracker.registerShot).toHaveBeenCalledWith(true)
     })
 
     it('should play weapon sound', () => {

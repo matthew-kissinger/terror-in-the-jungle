@@ -10,28 +10,15 @@ const C6 = 1046.5;
 const E6 = 1318.5;
 
 const KILL_STREAK_GAIN = 0.2;
+const KILL_STREAK_STING_PATH = 'assets/optimized/killStreakSting.wav';
 
 /**
  * Procedural audio stings for kill streak milestones.
  * Uses Web Audio API with lazy AudioContext (user gesture required in browsers).
  */
 function playKillStreakSting(streak: number): void {
-  let ctx: AudioContext | undefined;
-  try {
-    ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-  } catch {
-    return;
-  }
-
-  const resumeAndPlay = (): void => {
-    if (ctx!.state === 'suspended') {
-      ctx!.resume().then(() => playSting(ctx!, streak)).catch(() => {});
-    } else {
-      playSting(ctx!, streak);
-    }
-  };
-
-  resumeAndPlay();
+  // TODO(audio): Re-enable kill-streak sting when dedicated milestone assets are authored.
+  void streak;
 }
 
 function playSting(ctx: AudioContext, streak: number): void {

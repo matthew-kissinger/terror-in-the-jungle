@@ -35,8 +35,18 @@ export class CombatantAI {
   private voiceCalloutSystem?: VoiceCalloutSystem
   private ticketSystem?: TicketSystem
   private lastStateById: Map<string, CombatantState> = new Map()
+  private flankingUpdatedSquadsThisFrame: Set<string> = new Set()
 
   private squads: Map<string, Squad> = new Map()
+  private aiStateMs: Record<string, number> = {
+    patrolling: 0,
+    alert: 0,
+    engaging: 0,
+    suppressing: 0,
+    advancing: 0,
+    seeking_cover: 0,
+    defending: 0
+  }
 
   constructor() {
     this.patrolHandler = new AIStatePatrol()
@@ -90,14 +100,17 @@ export class CombatantAI {
     // Update flanking operations for squad members
     if (combatant.squadId) {
       const operation = this.flankingSystem.getActiveOperation(combatant.squadId)
-      if (operation) {
+      if (operation && !this.flankingUpdatedSquadsThisFrame.has(combatant.squadId)) {
         const squad = this.squads.get(combatant.squadId)
         if (squad) {
           this.flankingSystem.updateFlankingOperation(operation, squad, allCombatants)
+          this.flankingUpdatedSquadsThisFrame.add(combatant.squadId)
         }
       }
     }
 
+    const stateAtStart = combatant.state
+    const stateStart = performance.now()
     // Delegate to appropriate state handler
     switch (combatant.state) {
       case CombatantState.PATROLLING:
@@ -175,9 +188,35 @@ export class CombatantAI {
         )
         break
     }
+    const stateDuration = performance.now() - stateStart
+    const key = this.getStateTimingKey(stateAtStart)
+    this.aiStateMs[key] = (this.aiStateMs[key] || 0) + stateDuration
 
     this.maybeTriggerMovementCallout(combatant, lastState)
     this.lastStateById.set(combatant.id, combatant.state)
+  }
+
+  beginFrame(): void {
+    for (const key of Object.keys(this.aiStateMs)) {
+      this.aiStateMs[key] = 0
+    }
+  }
+
+  getFrameStateProfile(): Record<string, number> {
+    return { ...this.aiStateMs }
+  }
+
+  private getStateTimingKey(state: CombatantState): string {
+    switch (state) {
+      case CombatantState.PATROLLING: return 'patrolling'
+      case CombatantState.ALERT: return 'alert'
+      case CombatantState.ENGAGING: return 'engaging'
+      case CombatantState.SUPPRESSING: return 'suppressing'
+      case CombatantState.ADVANCING: return 'advancing'
+      case CombatantState.SEEKING_COVER: return 'seeking_cover'
+      case CombatantState.DEFENDING: return 'defending'
+      default: return 'patrolling'
+    }
   }
 
   /**
@@ -385,5 +424,7 @@ export class CombatantAI {
    */
   clearLOSCache(): void {
     this.targeting.clearLOSCache()
+    this.flankingUpdatedSquadsThisFrame.clear()
+    this.coverSystem.beginFrame()
   }
 }

@@ -101,11 +101,6 @@ export class WeaponFiring {
       return { hit: false, killed: false, headshot: false, damageDealt: 0 }
     }
 
-    // Register shot with stats tracker
-    if (this.statsTracker) {
-      this.statsTracker.registerShot(false)
-    }
-
     // Play weapon-specific sound
     if (this.audioManager) {
       this.audioManager.playPlayerWeaponSound(command.weaponType)
@@ -117,6 +112,10 @@ export class WeaponFiring {
       result = this.shotExecutor.executeShotgunShot(command)
     } else {
       result = this.shotExecutor.executeSingleShot(command)
+    }
+
+    if (this.statsTracker) {
+      this.statsTracker.registerShot(result.hit)
     }
 
     // Spawn muzzle flash
@@ -134,11 +133,6 @@ export class WeaponFiring {
    */
   fire(isShotgun: boolean, weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' = 'rifle'): void {
     if (!this.combatantSystem) return
-
-    // Register shot with stats tracker (will be marked as hit/miss after damage calculations)
-    if (this.statsTracker) {
-      this.statsTracker.registerShot(false) // Will be updated to true if hits
-    }
 
     // Play weapon-specific sound
     if (this.audioManager) {
@@ -165,6 +159,9 @@ export class WeaponFiring {
 
     // Hitscan damage application with enhanced result
     const result = this.combatantSystem.handlePlayerShot(ray, (d, head) => this.gunCore.computeDamage(d, head))
+    if (this.statsTracker) {
+      this.statsTracker.registerShot(!!result.hit)
+    }
 
     // Spawn impact effect at hit point
     if (result.hit) {
@@ -287,6 +284,10 @@ export class WeaponFiring {
       if (totalDamage > 0) {
         this.hudSystem.spawnDamageNumber(bestHit.point, totalDamage, bestHit.headshot || false, bestHit.killed || false)
       }
+    }
+
+    if (this.statsTracker) {
+      this.statsTracker.registerShot(anyHit)
     }
   }
 
