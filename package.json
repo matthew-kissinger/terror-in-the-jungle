@@ -24,20 +24,20 @@
     "@types/three": "^0.182.0",
     "@typescript-eslint/eslint-plugin": "^8.55.0",
     "@typescript-eslint/parser": "^8.55.0",
-    "eslint": "^10.0.0",
+    "eslint": "^9.39.2",
     "eslint-plugin-import": "latest",
     "jsdom": "^28.0.0",
     "lighthouse": "^12.8.2",
     "playwright": "^1.58.2",
     "speedscope": "^1.25.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.2",
-    "vite": "^7.1.5",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
     "vite-plugin-compression": "^0.5.1",
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "postprocessing": "^6.37.8",
+    "postprocessing": "^6.38.2",
     "three": "^0.182.0",
     "three-mesh-bvh": "^0.9.8"
   }
