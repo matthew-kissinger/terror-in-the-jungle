@@ -1,24 +1,26 @@
+import { zIndex } from '../design/tokens';
+
 export const COMPASS_STYLES = `
     .compass-container {
       position: fixed;
-      top: 120px;
+      top: 80px;
       left: 50%;
       transform: translateX(-50%);
-      width: 180px;
-      height: 80px;
-      z-index: 115;
+      width: 160px;
+      height: 70px;
+      z-index: ${zIndex.hudCompass};
       pointer-events: none;
     }
 
     .compass-rose-container {
       position: relative;
-      width: 180px;
-      height: 50px;
-      background: linear-gradient(to bottom, rgba(10, 10, 14, 0.5), rgba(10, 10, 14, 0.2));
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 6px;
-      backdrop-filter: blur(4px);
-      -webkit-backdrop-filter: blur(4px);
+      width: 160px;
+      height: 42px;
+      background: rgba(8, 12, 18, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 4px;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
       overflow: hidden;
     }
 
@@ -26,8 +28,8 @@ export const COMPASS_STYLES = `
       position: absolute;
       top: 50%;
       left: 50%;
-      width: 1440px; /* Quadruple width for better seamless rotation */
-      height: 40px;
+      width: 1440px;
+      height: 36px;
       transform: translate(-50%, -50%);
       transition: none;
     }
@@ -43,23 +45,24 @@ export const COMPASS_STYLES = `
 
     .compass-cardinal {
       position: absolute;
-      color: rgba(255, 255, 255, 0.9);
-      font-family: 'Courier New', monospace;
-      font-weight: bold;
-      font-size: 18px;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+      color: rgba(220, 225, 230, 0.7);
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 0.5px;
     }
 
-    .compass-cardinal.north { color: #ff4444; }
-    .compass-cardinal.east { color: rgba(255, 255, 255, 0.7); }
-    .compass-cardinal.south { color: rgba(255, 255, 255, 0.7); }
-    .compass-cardinal.west { color: rgba(255, 255, 255, 0.7); }
+    .compass-cardinal.north { color: rgba(201, 86, 74, 0.85); }
+    .compass-cardinal.east { color: rgba(220, 225, 230, 0.5); }
+    .compass-cardinal.south { color: rgba(220, 225, 230, 0.5); }
+    .compass-cardinal.west { color: rgba(220, 225, 230, 0.5); }
 
     .compass-degree {
       position: absolute;
-      color: rgba(255, 255, 255, 0.4);
-      font-family: 'Courier New', monospace;
-      font-size: 10px;
+      color: rgba(220, 225, 230, 0.25);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 9px;
+      font-weight: 600;
       top: 50%;
       transform: translateY(-50%);
     }
@@ -68,15 +71,15 @@ export const COMPASS_STYLES = `
       position: absolute;
       top: 0;
       left: 50%;
-      width: 2px;
+      width: 1px;
       height: 100%;
       background: linear-gradient(to bottom,
-        rgba(255, 255, 255, 0.8) 0%,
-        rgba(255, 255, 255, 0.6) 20%,
+        rgba(220, 225, 230, 0.5) 0%,
+        rgba(220, 225, 230, 0.3) 20%,
         transparent 40%,
         transparent 60%,
-        rgba(255, 255, 255, 0.6) 80%,
-        rgba(255, 255, 255, 0.8) 100%
+        rgba(220, 225, 230, 0.3) 80%,
+        rgba(220, 225, 230, 0.5) 100%
       );
       transform: translateX(-50%);
       z-index: 10;
@@ -88,21 +91,21 @@ export const COMPASS_STYLES = `
       bottom: 0;
       left: 50%;
       transform: translateX(-50%);
-      color: rgba(255, 255, 255, 0.9);
-      font-family: 'Courier New', monospace;
-      font-size: 14px;
-      font-weight: bold;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-      padding: 2px 8px;
-      background: rgba(0, 0, 0, 0.4);
-      border-radius: 4px;
+      color: rgba(220, 225, 230, 0.65);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 1px 6px;
+      background: rgba(8, 12, 18, 0.4);
+      border-radius: 3px;
+      letter-spacing: 1px;
     }
 
     .compass-tick {
       position: absolute;
       width: 1px;
-      height: 10px;
-      background: rgba(255, 255, 255, 0.3);
+      height: 8px;
+      background: rgba(220, 225, 230, 0.15);
       top: 50%;
       transform: translateY(-50%);
     }
@@ -120,42 +123,41 @@ export const COMPASS_STYLES = `
       position: absolute;
       top: 50%;
       transform: translate(-50%, -50%);
-      width: 20px;
-      height: 20px;
+      width: 16px;
+      height: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: 'Courier New', monospace;
-      font-weight: bold;
-      font-size: 11px;
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 700;
+      font-size: 9px;
       border-radius: 50%;
-      border: 2px solid;
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+      border: 1.5px solid;
     }
 
     .compass-marker.friendly {
-      background: rgba(0, 100, 255, 0.3);
-      border-color: rgba(0, 150, 255, 0.8);
-      color: rgba(0, 200, 255, 1);
+      background: rgba(91, 140, 201, 0.25);
+      border-color: rgba(91, 140, 201, 0.6);
+      color: rgba(91, 140, 201, 0.9);
     }
 
     .compass-marker.enemy {
-      background: rgba(255, 50, 50, 0.3);
-      border-color: rgba(255, 100, 100, 0.8);
-      color: rgba(255, 150, 150, 1);
+      background: rgba(201, 86, 74, 0.25);
+      border-color: rgba(201, 86, 74, 0.6);
+      color: rgba(201, 86, 74, 0.9);
     }
 
     .compass-marker.neutral {
-      background: rgba(255, 255, 255, 0.2);
-      border-color: rgba(255, 255, 255, 0.6);
-      color: rgba(255, 255, 255, 0.9);
+      background: rgba(220, 225, 230, 0.1);
+      border-color: rgba(220, 225, 230, 0.35);
+      color: rgba(220, 225, 230, 0.7);
     }
 
     .compass-marker.contested {
-      animation: compassBlink 0.6s infinite;
-      background: rgba(255, 200, 0, 0.3);
-      border-color: rgba(255, 200, 0, 0.8);
-      color: rgba(255, 220, 100, 1);
+      animation: compassBlink 0.8s infinite;
+      background: rgba(212, 163, 68, 0.2);
+      border-color: rgba(212, 163, 68, 0.6);
+      color: rgba(212, 163, 68, 0.9);
     }
 
     @keyframes compassBlink {
@@ -165,26 +167,26 @@ export const COMPASS_STYLES = `
 
     @media (max-width: 768px) {
       .compass-container {
-        top: 60px;
-        width: 140px;
-        height: 60px;
+        top: 50px;
+        width: 130px;
+        height: 55px;
       }
 
       .compass-rose-container {
-        width: 140px;
-        height: 40px;
+        width: 130px;
+        height: 34px;
       }
 
       .compass-cardinal {
-        font-size: 14px;
+        font-size: 12px;
       }
 
       .compass-degree {
-        font-size: 8px;
+        font-size: 7px;
       }
 
       .compass-heading {
-        font-size: 11px;
+        font-size: 10px;
       }
     }
   `;

@@ -184,7 +184,7 @@ export class RespawnMapView {
 
   private drawGrid(ctx: CanvasRenderingContext2D): void {
     const gridSize = 50 / this.mapScale; // Adjust grid size for scale
-    ctx.strokeStyle = 'rgba(0, 255, 0, 0.05)';
+    ctx.strokeStyle = 'rgba(220, 225, 230, 0.04)';
     ctx.lineWidth = 1 / this.mapScale; // Keep lines thin at any scale
 
     for (let i = 0; i <= this.MAP_SIZE; i += gridSize) {
@@ -231,7 +231,7 @@ export class RespawnMapView {
 
       // HQ text
       ctx.fillStyle = '#000';
-      ctx.font = 'bold 10px monospace';
+      ctx.font = 'bold 10px Rajdhani, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('HQ', x, y);
@@ -244,17 +244,17 @@ export class RespawnMapView {
     }
 
     // Zone name
-    ctx.fillStyle = isSpawnable ? '#00ff00' : 'rgba(255, 255, 255, 0.6)';
+    ctx.fillStyle = isSpawnable ? 'rgba(92, 184, 92, 0.9)' : 'rgba(220, 225, 230, 0.6)';
     const fontSize = this.worldSize > this.BASE_WORLD_SIZE ? 12 : (isSpawnable ? 11 : 10);
-    ctx.font = isSpawnable ? `bold ${fontSize}px monospace` : `${fontSize}px monospace`;
+    ctx.font = isSpawnable ? `bold ${fontSize}px Rajdhani, sans-serif` : `${fontSize}px Rajdhani, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillText(zone.name, x, y - radius - 5);
 
     // Spawn indicator for spawnable zones
     if (isSpawnable) {
-      ctx.fillStyle = '#00ff00';
-      ctx.font = 'bold 14px monospace';
+      ctx.fillStyle = 'rgba(92, 184, 92, 0.9)';
+      ctx.font = 'bold 14px Rajdhani, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       ctx.fillText('◈', x, y + radius + 2);
@@ -263,27 +263,26 @@ export class RespawnMapView {
 
   private getZoneColor(zone: CaptureZone, alpha: number, isSpawnable: boolean): string {
     if (!isSpawnable && zone.owner !== Faction.OPFOR) {
-      // Dim non-spawnable friendly zones
-      return `rgba(100, 100, 100, ${alpha * 0.5})`;
+      return `rgba(107, 119, 128, ${alpha * 0.5})`;
     }
 
     if (zone.isHomeBase) {
       if (zone.owner === Faction.US) {
-        return `rgba(0, 128, 255, ${alpha})`;
+        return `rgba(91, 140, 201, ${alpha})`;
       } else {
-        return `rgba(255, 0, 0, ${alpha})`;
+        return `rgba(201, 86, 74, ${alpha})`;
       }
     }
 
     switch (zone.state) {
       case ZoneState.US_CONTROLLED:
-        return `rgba(0, 255, 0, ${alpha})`;
+        return `rgba(92, 184, 92, ${alpha})`;
       case ZoneState.OPFOR_CONTROLLED:
-        return `rgba(255, 0, 0, ${alpha})`;
+        return `rgba(201, 86, 74, ${alpha})`;
       case ZoneState.CONTESTED:
-        return `rgba(255, 255, 0, ${alpha})`;
+        return `rgba(212, 163, 68, ${alpha})`;
       default:
-        return `rgba(128, 128, 128, ${alpha})`;
+        return `rgba(107, 119, 128, ${alpha})`;
     }
   }
 
@@ -297,7 +296,7 @@ export class RespawnMapView {
     const time = Date.now() / 1000;
     const pulse = Math.sin(time * 3) * 0.2 + 0.8;
 
-    ctx.strokeStyle = `rgba(0, 255, 0, ${pulse})`;
+    ctx.strokeStyle = `rgba(92, 184, 92, ${pulse})`;
     ctx.lineWidth = 4 / this.mapScale;
     const dashSize = 5 / this.mapScale;
     ctx.setLineDash([dashSize, dashSize]);

@@ -38,8 +38,8 @@ export class TouchSandbagButtons {
     const btn = document.createElement('div');
     btn.id = `sandbag-${id}`;
     Object.assign(btn.style, {
-      width: '60px',
-      height: '60px',
+      width: 'var(--tc-action-size, 60px)',
+      height: 'var(--tc-action-size, 60px)',
       borderRadius: '50%',
       background: 'rgba(255, 200, 100, 0.3)',
       border: '2px solid rgba(255, 220, 150, 0.5)',

@@ -24,8 +24,8 @@ describe('TouchFireButton', () => {
   it('creates the fire button element', () => {
     expect(button).toBeTruthy();
     expect(button.textContent).toBe('FIRE');
-    expect(button.style.width).toBe('80px');
-    expect(button.style.height).toBe('80px');
+    expect(button.style.width).toBe('var(--tc-fire-size, 80px)');
+    expect(button.style.height).toBe('var(--tc-fire-size, 80px)');
   });
 
   it('touch start triggers onFireStart and visual pressed state', () => {

@@ -21,7 +21,7 @@ export class DeathCamOverlay {
 
     this.overlayElement = document.createElement('div');
     this.overlayElement.id = 'death-cam-overlay';
-    this.overlayElement.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9000; display: none; font-family: "Courier New", monospace;';
+    this.overlayElement.style.cssText = 'position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 9000; display: none; font-family: "Rajdhani", "Segoe UI", sans-serif;';
 
     const vignette = document.createElement('div');
     vignette.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 30%, rgba(0,0,0,0.7) 100%); pointer-events: none;';
@@ -29,21 +29,21 @@ export class DeathCamOverlay {
 
     const infoPanel = document.createElement('div');
     infoPanel.id = 'death-info-panel';
-    infoPanel.style.cssText = 'position: absolute; top: 20%; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.85); border: 2px solid #ff0000; border-radius: 4px; padding: 20px 40px; text-align: center; animation: fadeSlideIn 0.5s ease-out;';
+    infoPanel.style.cssText = 'position: absolute; top: 20%; left: 50%; transform: translateX(-50%); background: rgba(8, 12, 18, 0.9); border: 1px solid rgba(201, 86, 74, 0.5); border-radius: 4px; padding: 20px 40px; text-align: center; animation: fadeSlideIn 0.5s ease-out; backdrop-filter: blur(8px);';
 
     this.killerNameEl = document.createElement('div');
     this.killerNameEl.id = 'killer-name';
-    this.killerNameEl.style.cssText = 'color: #ff0000; font-size: 32px; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; text-shadow: 0 0 10px rgba(255,0,0,0.5);';
+    this.killerNameEl.style.cssText = 'color: rgba(201, 86, 74, 0.95); font-size: 32px; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; text-shadow: 0 0 8px rgba(201, 86, 74, 0.3);';
     infoPanel.appendChild(this.killerNameEl);
 
     this.killDetailsEl = document.createElement('div');
     this.killDetailsEl.id = 'kill-details';
-    this.killDetailsEl.style.cssText = 'color: #ffffff; font-size: 16px; margin-top: 10px;';
+    this.killDetailsEl.style.cssText = 'color: rgba(220, 225, 230, 0.8); font-size: 16px; margin-top: 10px;';
     infoPanel.appendChild(this.killDetailsEl);
 
     this.headshotEl = document.createElement('div');
     this.headshotEl.id = 'headshot-indicator';
-    this.headshotEl.style.cssText = 'color: #ffaa00; font-size: 18px; font-weight: bold; margin-top: 10px; text-transform: uppercase; display: none;';
+    this.headshotEl.style.cssText = 'color: rgba(212, 163, 68, 0.9); font-size: 18px; font-weight: bold; margin-top: 10px; text-transform: uppercase; display: none;';
     this.headshotEl.textContent = ' HEADSHOT ';
     infoPanel.appendChild(this.headshotEl);
 
@@ -51,7 +51,7 @@ export class DeathCamOverlay {
 
     this.timerEl = document.createElement('div');
     this.timerEl.id = 'death-respawn-timer';
-    this.timerEl.style.cssText = 'position: absolute; bottom: 30%; left: 50%; transform: translateX(-50%); color: #888888; font-size: 16px; text-transform: uppercase; letter-spacing: 2px;';
+    this.timerEl.style.cssText = 'position: absolute; bottom: 30%; left: 50%; transform: translateX(-50%); color: rgba(220, 225, 230, 0.45); font-size: 16px; text-transform: uppercase; letter-spacing: 2px;';
     this.overlayElement.appendChild(this.timerEl);
 
     const style = document.createElement('style');

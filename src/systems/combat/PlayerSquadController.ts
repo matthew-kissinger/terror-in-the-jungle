@@ -138,12 +138,12 @@ export class PlayerSquadController implements GameSystem {
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: rgba(0, 255, 0, 0.2);
-      border: 2px solid rgba(0, 255, 0, 0.8);
+      background: rgba(92, 184, 92, 0.15);
+      border: 1px solid rgba(92, 184, 92, 0.5);
       padding: 20px 40px;
-      border-radius: 10px;
-      color: #00ff00;
-      font-family: 'Courier New', monospace;
+      border-radius: 6px;
+      color: rgba(92, 184, 92, 0.9);
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 24px;
       font-weight: bold;
       z-index: 10000;
@@ -180,11 +180,11 @@ export class PlayerSquadController implements GameSystem {
       bottom: 140px;
       left: 16px;
       background: rgba(10, 10, 14, 0.28);
-      border: 1px solid rgba(0, 255, 0, 0.3);
-      border-radius: 6px;
+      border: 1px solid rgba(92, 184, 92, 0.2);
+      border-radius: 4px;
       padding: 8px 10px;
-      color: #00ff00;
-      font-family: 'Courier New', monospace;
+      color: rgba(92, 184, 92, 0.8);
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 10px;
       z-index: 1000;
       backdrop-filter: blur(6px);
@@ -193,7 +193,7 @@ export class PlayerSquadController implements GameSystem {
     `;
 
     this.commandUIElement.innerHTML = `
-      <div style="font-weight: bold; margin-bottom: 4px; color: #00ff88; font-size: 9px;">SQUAD</div>
+      <div style="font-weight: bold; margin-bottom: 4px; color: rgba(92, 184, 92, 0.7); font-size: 9px;">SQUAD</div>
       <div style="line-height: 1.4;">
         <div>Shift+1 Follow Me</div>
         <div>Shift+2 Hold Pos</div>
@@ -238,14 +238,14 @@ export class PlayerSquadController implements GameSystem {
     this.commandIndicatorElement = document.createElement('div');
     this.commandIndicatorElement.style.cssText = `
       position: fixed;
-      top: 120px;
-      left: 20px;
-      background: rgba(100, 100, 100, 0.2);
-      border: 1px solid rgba(100, 100, 100, 0.6);
-      border-radius: 6px;
-      padding: 5px 8px;
-      color: #aaaaaa;
-      font-family: 'Courier New', monospace;
+      top: 90px;
+      left: 16px;
+      background: rgba(8, 12, 18, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 4px;
+      padding: 4px 8px;
+      color: rgba(220, 225, 230, 0.6);
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 9px;
       font-weight: bold;
       z-index: 1000;
@@ -287,9 +287,9 @@ export class PlayerSquadController implements GameSystem {
       this.commandIndicatorElement.style.background = 'rgba(100, 100, 100, 0.2)';
       this.commandIndicatorElement.style.color = '#aaaaaa';
     } else {
-      this.commandIndicatorElement.style.borderColor = 'rgba(0, 255, 100, 0.6)';
-      this.commandIndicatorElement.style.background = 'rgba(0, 255, 100, 0.2)';
-      this.commandIndicatorElement.style.color = '#00ff66';
+      this.commandIndicatorElement.style.borderColor = 'rgba(92, 184, 92, 0.4)';
+      this.commandIndicatorElement.style.background = 'rgba(92, 184, 92, 0.12)';
+      this.commandIndicatorElement.style.color = 'rgba(92, 184, 92, 0.9)';
     }
   }
 

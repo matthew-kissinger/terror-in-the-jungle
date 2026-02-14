@@ -73,7 +73,8 @@ describe('PlayerMovement', () => {
 
     // Setup mock sandbag system
     mockSandbagSystem = {
-      checkCollision: vi.fn().mockReturnValue(false)
+      checkCollision: vi.fn().mockReturnValue(false),
+      getStandingHeight: vi.fn().mockReturnValue(null)
     } as any;
 
     // Setup mock footstep audio

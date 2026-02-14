@@ -33,7 +33,7 @@ export class ElevationSlider {
     const elevationDisplay = document.createElement('div');
     elevationDisplay.className = 'elevation-display';
     elevationDisplay.style.cssText = `
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 12px;
       color: rgba(255, 255, 255, 0.9);
       font-weight: bold;
@@ -48,7 +48,7 @@ export class ElevationSlider {
     // Simple elevation label
     const label = document.createElement('div');
     label.style.cssText = `
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 9px;
       color: rgba(255, 255, 255, 0.6);
       text-align: center;

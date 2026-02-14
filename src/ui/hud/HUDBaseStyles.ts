@@ -1,6 +1,7 @@
 /**
  * Base HUD styles - container and common animations
  */
+import { zIndex, fontStack } from '../design/tokens';
 
 export const HUDBaseStyles = `
   .hud-container {
@@ -10,9 +11,10 @@ export const HUDBaseStyles = `
     right: 0;
     bottom: 0;
     pointer-events: none;
-    font-family: 'Courier New', monospace;
-    color: white;
-    z-index: 100;
+    font-family: ${fontStack.hud};
+    color: rgba(220, 225, 230, 0.95);
+    z-index: ${zIndex.hudBase};
+    letter-spacing: 0.2px;
   }
 
   @keyframes pulse {

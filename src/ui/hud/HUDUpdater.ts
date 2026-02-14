@@ -157,18 +157,18 @@ export class HUDUpdater {
 
     // Update color based on time remaining
     if (timeRemaining <= 0) {
-      timerDisplay.style.color = '#ff0000';
+      timerDisplay.style.color = 'rgba(201, 86, 74, 0.95)';
       this.elements.timerElement.classList.add('timer-critical');
     } else if (timeRemaining <= 30) {
-      timerDisplay.style.color = '#ff0000';
+      timerDisplay.style.color = 'rgba(201, 86, 74, 0.95)';
       this.elements.timerElement.classList.add('timer-critical');
       this.elements.timerElement.classList.remove('timer-warning');
     } else if (timeRemaining <= 60) {
-      timerDisplay.style.color = '#ffff00';
+      timerDisplay.style.color = 'rgba(212, 163, 68, 0.95)';
       this.elements.timerElement.classList.add('timer-warning');
       this.elements.timerElement.classList.remove('timer-critical');
     } else {
-      timerDisplay.style.color = '#ffffff';
+      timerDisplay.style.color = 'rgba(220, 225, 230, 0.9)';
       this.elements.timerElement.classList.remove('timer-warning', 'timer-critical');
     }
   }
@@ -194,7 +194,7 @@ export class HUDUpdater {
       'transform: translateX(-50%)',
       'width: 200px',
       'text-align: center',
-      'color: #aaa',
+      'color: rgba(220, 225, 230, 0.5)',
       'font-size: 10px',
       'letter-spacing: 1px',
       'font-weight: bold'

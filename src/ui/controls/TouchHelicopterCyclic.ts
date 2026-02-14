@@ -31,7 +31,7 @@ export class TouchHelicopterCyclic {
     this.container.id = 'touch-helicopter-cyclic';
     Object.assign(this.container.style, {
       position: 'fixed',
-      left: `calc(20px + env(safe-area-inset-left, 0px))`,
+      left: `calc(var(--tc-edge-inset, 20px) + env(safe-area-inset-left, 0px))`,
       bottom: `calc(200px + env(safe-area-inset-bottom, 0px))`,
       width: `${this.PAD_SIZE}px`,
       height: `${this.PAD_SIZE}px`,

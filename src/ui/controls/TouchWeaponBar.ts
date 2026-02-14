@@ -62,15 +62,15 @@ export class TouchWeaponBar {
   private addSlot(index: number, label: string): void {
     const btn = document.createElement('div');
     Object.assign(btn.style, {
-      width: '40px',
-      height: '36px',
+      width: 'var(--tc-weapon-w, 40px)',
+      height: 'var(--tc-weapon-h, 36px)',
       borderRadius: '6px',
       background: 'rgba(255,255,255,0.12)',
       border: '1.5px solid rgba(255,255,255,0.25)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontSize: '10px',
+      fontSize: 'var(--tc-font-size, 10px)',
       fontWeight: 'bold',
       color: 'rgba(255,255,255,0.7)',
       userSelect: 'none',

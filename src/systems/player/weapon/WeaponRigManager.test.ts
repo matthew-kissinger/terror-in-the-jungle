@@ -455,7 +455,7 @@ describe('WeaponRigManager', () => {
 
       expect(hudSystem.showWeaponSwitch).toHaveBeenCalledWith(
         'RIFLE',
-        '🔫',
+        'AR',
         expect.any(String)
       )
     })
@@ -470,7 +470,7 @@ describe('WeaponRigManager', () => {
 
       expect(hudSystem.showWeaponSwitch).toHaveBeenCalledWith(
         'SHOTGUN',
-        '💥',
+        'SG',
         expect.any(String)
       )
     })
@@ -485,7 +485,7 @@ describe('WeaponRigManager', () => {
 
       expect(hudSystem.showWeaponSwitch).toHaveBeenCalledWith(
         'SMG',
-        '',
+        'SM',
         expect.any(String)
       )
     })
@@ -500,7 +500,7 @@ describe('WeaponRigManager', () => {
 
       expect(hudSystem.showWeaponSwitch).toHaveBeenCalledWith(
         'PISTOL',
-        '🔫',
+        'PT',
         expect.any(String)
       )
     })

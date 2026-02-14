@@ -1,8 +1,7 @@
 import * as THREE from 'three';
-import { GameMode, ZoneConfig } from '../config/gameModes';
+import { GameMode, ZoneConfig, getGameModeConfig } from '../config/gameModes';
 import { getHeightQueryCache } from '../systems/terrain/HeightQueryCache';
 import { Logger } from '../utils/Logger';
-import { LoadoutWeapon } from '../ui/loadout/LoadoutSelector';
 import { GrenadeType, Faction } from '../systems/combat/types';
 import { isSandboxMode } from './SandboxModeDetector';
 import { SettingsManager } from '../config/SettingsManager';
@@ -85,7 +84,7 @@ export function restartMatch(sandbox: PixelArtSandbox): void {
 /**
  * Sets game mode and prepares for game start
  */
-export function startGameWithMode(sandbox: PixelArtSandbox, mode: GameMode): void {
+export async function startGameWithMode(sandbox: PixelArtSandbox, mode: GameMode): Promise<void> {
   if (!sandbox.isInitialized || sandbox.gameStarted) return;
   Logger.info('sandbox-init', `PixelArtSandbox: Starting game with mode: ${mode}`);
 
@@ -95,58 +94,17 @@ export function startGameWithMode(sandbox: PixelArtSandbox, mode: GameMode): voi
 
   sandbox.gameStarted = true;
   sandbox.systemManager.setGameMode(mode, { createPlayerSquad: mode !== GameMode.AI_SANDBOX });
-  
-  // Show loadout selector before starting game (skip in sandbox mode)
-  if (!isSandboxMode() && mode !== GameMode.AI_SANDBOX) {
-    showLoadoutSelector(sandbox, mode);
-  } else {
-    // Sandbox mode or AI sandbox - use defaults and start immediately
-    applyDefaultLoadout(sandbox);
-    startGame(sandbox);
-  }
-}
 
-/**
- * Shows loadout selector and waits for player confirmation
- */
-function showLoadoutSelector(sandbox: PixelArtSandbox, _mode: GameMode): void {
-  const loadoutSelector = sandbox.systemManager.loadoutSelector;
-  
-  // Hide loading screen
-  sandbox.loadingScreen.hide();
-  
-  // Set up callback to apply selections and start game
-  loadoutSelector.onConfirm((weapon: LoadoutWeapon, grenadeType: GrenadeType) => {
-    applyLoadout(sandbox, weapon, grenadeType);
-    startGame(sandbox);
-  });
-  
-  // Show loadout selector
-  loadoutSelector.show();
-  Logger.info('sandbox-init', 'Loadout selector shown');
-}
+  // Pre-generate chunks at actual spawn position for this mode
+  const config = getGameModeConfig(mode);
+  const usHQ = config.zones.find(z => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
+  const spawnPos = usHQ ? usHQ.position.clone() : new THREE.Vector3(0, 0, -50);
+  spawnPos.y = 5;
+  await sandbox.systemManager.preGenerateSpawnArea(spawnPos);
 
-/**
- * Apply selected loadout to game systems
- */
-function applyLoadout(sandbox: PixelArtSandbox, weapon: LoadoutWeapon, grenadeType: GrenadeType): void {
-  // Map LoadoutWeapon enum to weapon type string
-  const weaponTypeMap: Record<LoadoutWeapon, 'rifle' | 'shotgun' | 'smg' | 'pistol'> = {
-    [LoadoutWeapon.RIFLE]: 'rifle',
-    [LoadoutWeapon.SHOTGUN]: 'shotgun',
-    [LoadoutWeapon.SMG]: 'smg',
-    [LoadoutWeapon.PISTOL]: 'pistol'
-  };
-  
-  const weaponType = weaponTypeMap[weapon];
-  
-  // Set primary weapon
-  sandbox.systemManager.firstPersonWeapon.setPrimaryWeapon(weaponType);
-  Logger.info('sandbox-init', `Primary weapon set to: ${weaponType}`);
-  
-  // Set grenade type
-  sandbox.systemManager.grenadeSystem.setGrenadeType(grenadeType);
-  Logger.info('sandbox-init', `Grenade type set to: ${grenadeType}`);
+  // Skip loadout selector - all weapons available via hotbar, default frag grenades
+  applyDefaultLoadout(sandbox);
+  startGame(sandbox);
 }
 
 /**
@@ -169,7 +127,6 @@ export function startGame(sandbox: PixelArtSandbox): void {
 
   sandbox.loadingScreen.hide();
   sandbox.sandboxRenderer.showSpawnLoadingIndicator();
-  sandbox.sandboxRenderer.showRenderer();
   sandbox.sandboxRenderer.precompileShaders();
 
   const startTime = performance.now();
@@ -192,6 +149,10 @@ export function startGame(sandbox: PixelArtSandbox): void {
         }
       }
     } catch { /* ignore */ }
+
+    // Show renderer AFTER player is positioned to avoid seeing stacked terrain
+    sandbox.systemManager.chunkManager.update(0.01);
+    sandbox.sandboxRenderer.showRenderer();
 
     setTimeout(() => {
       sandbox.systemManager.firstPersonWeapon.setGameStarted(true);

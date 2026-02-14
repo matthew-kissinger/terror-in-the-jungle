@@ -7,36 +7,37 @@ export class PlayerHealthUI {
   private readonly UI_STYLES = `
     .health-display {
       position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(10, 10, 14, 0.35);
-      backdrop-filter: blur(6px) saturate(1.1);
-      -webkit-backdrop-filter: blur(6px) saturate(1.1);
-      padding: 10px 14px;
-      border: 1px solid rgba(255, 255, 255, 0.18);
-      border-radius: 10px;
-      color: rgba(255, 255, 255, 0.95);
-      font-family: 'Courier New', monospace;
-      font-size: 16px;
+      bottom: 16px;
+      left: 16px;
+      background: rgba(8, 12, 18, 0.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      padding: 8px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      color: rgba(220, 225, 230, 0.9);
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+      font-size: 14px;
+      font-weight: 600;
       z-index: 200;
+      letter-spacing: 0.3px;
     }
 
     .health-bar {
-      width: 260px;
-      height: 14px;
-      background: rgba(255, 255, 255, 0.12);
-      border-radius: 999px;
+      width: 220px;
+      height: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 3px;
       overflow: hidden;
-      margin-top: 6px;
-      border: 1px solid rgba(255, 255, 255, 0.25);
+      margin-top: 5px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     .health-fill {
       height: 100%;
-      background: linear-gradient(90deg, rgba(255,68,68,0.9) 0%, rgba(255,170,68,0.9) 50%, rgba(68,255,68,0.9) 100%);
-      transition: width 0.3s ease;
-      border-radius: 999px;
+      background: rgba(92, 184, 92, 0.85);
+      transition: width 0.3s ease, background-color 0.3s ease;
+      border-radius: 2px;
     }
 
     .low-health {
@@ -44,8 +45,8 @@ export class PlayerHealthUI {
     }
 
     @keyframes redPulse {
-      0%, 100% { box-shadow: 0 0 0 rgba(255, 68, 68, 0); }
-      50% { box-shadow: 0 0 20px rgba(255, 68, 68, 0.6); }
+      0%, 100% { box-shadow: 0 0 0 rgba(201, 86, 74, 0); }
+      50% { box-shadow: 0 0 12px rgba(201, 86, 74, 0.4); }
     }
 
     .spawn-protection {
@@ -55,6 +56,32 @@ export class PlayerHealthUI {
     @keyframes protectionPulse {
       0%, 100% { opacity: 0.7; }
       50% { opacity: 1.0; }
+    }
+
+    @media (max-width: 768px) {
+      .health-display {
+        bottom: 160px;
+        left: 10px;
+        padding: 6px 12px;
+        font-size: 12px;
+      }
+      .health-bar {
+        width: 160px;
+        height: 8px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .health-display {
+        bottom: 170px;
+        left: 8px;
+        padding: 4px 10px;
+        font-size: 11px;
+      }
+      .health-bar {
+        width: 130px;
+        height: 7px;
+      }
     }
   `;
 
@@ -90,6 +117,15 @@ export class PlayerHealthUI {
       healthValue.textContent = Math.round(health).toString();
       const healthPercent = (health / maxHealth) * 100;
       healthFill.style.width = `${healthPercent}%`;
+
+      // Dynamic color based on health percentage
+      if (healthPercent > 60) {
+        healthFill.style.background = 'rgba(92, 184, 92, 0.85)';
+      } else if (healthPercent > 30) {
+        healthFill.style.background = 'rgba(212, 163, 68, 0.85)';
+      } else {
+        healthFill.style.background = 'rgba(201, 86, 74, 0.85)';
+      }
     }
   }
 

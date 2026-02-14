@@ -34,21 +34,21 @@ export function getZoneColor(zone: CaptureZone, alpha: number, isSpawnable: bool
 
   if (zone.isHomeBase) {
     if (zone.owner === Faction.US) {
-      return `rgba(0, 128, 255, ${alpha})`;
+      return `rgba(91, 140, 201, ${alpha})`;
     } else {
-      return `rgba(255, 0, 0, ${alpha})`;
+      return `rgba(201, 86, 74, ${alpha})`;
     }
   }
 
   switch (zone.state) {
     case ZoneState.US_CONTROLLED:
-      return `rgba(0, 255, 0, ${alpha})`;
+      return `rgba(92, 184, 92, ${alpha})`;
     case ZoneState.OPFOR_CONTROLLED:
-      return `rgba(255, 0, 0, ${alpha})`;
+      return `rgba(201, 86, 74, ${alpha})`;
     case ZoneState.CONTESTED:
-      return `rgba(255, 255, 0, ${alpha})`;
+      return `rgba(212, 163, 68, ${alpha})`;
     default:
-      return `rgba(128, 128, 128, ${alpha})`;
+      return `rgba(107, 119, 128, ${alpha})`;
   }
 }
 

@@ -1,129 +1,147 @@
 /**
  * Zone and objectives panel styles
  */
+import { colors, fontStack } from '../design/tokens';
 
 export const HUDZoneStyles = `
   .objectives-panel {
     position: absolute;
-    top: 236px;
-    right: 20px;
-    background: rgba(10, 10, 14, 0.28);
-    backdrop-filter: blur(6px) saturate(1.1);
-    -webkit-backdrop-filter: blur(6px) saturate(1.1);
-    padding: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 8px;
-    min-width: 240px;
+    top: 220px;
+    right: 16px;
+    background: ${colors.hudGlass};
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 8px 10px;
+    border: 1px solid ${colors.hudBorder};
+    border-radius: 4px;
+    min-width: 180px;
+    max-width: 220px;
+    font-family: ${fontStack.hud};
   }
 
   .objectives-title {
-    font-size: 18px;
-    font-weight: bold;
-    margin-bottom: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    margin-bottom: 6px;
     text-transform: uppercase;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-    padding-bottom: 5px;
+    letter-spacing: 1.5px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 4px;
+    color: rgba(220, 225, 230, 0.5);
   }
 
   .zone-item {
-    margin: 8px 0;
-    padding: 5px;
+    margin: 4px 0;
+    padding: 3px 6px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.15);
     border-radius: 3px;
   }
 
   .zone-name {
-    font-weight: bold;
+    font-weight: 700;
     text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    color: rgba(220, 225, 230, 0.85);
   }
 
   .zone-status {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
   }
 
   .zone-icon {
-    width: 20px;
-    height: 20px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
-    border: 2px solid white;
+    border: 1.5px solid rgba(255, 255, 255, 0.3);
   }
 
-  .zone-neutral { background: #888; }
-  .zone-us { background: #0066cc; }
-  .zone-opfor { background: #cc0000; }
+  .zone-neutral { background: rgba(107, 119, 128, 0.6); }
+  .zone-us { background: rgba(91, 140, 201, 0.6); }
+  .zone-opfor { background: rgba(201, 86, 74, 0.6); }
   .zone-contested {
-    background: linear-gradient(90deg, #0066cc 50%, #cc0000 50%);
+    background: linear-gradient(90deg, rgba(91, 140, 201, 0.6) 50%, rgba(201, 86, 74, 0.6) 50%);
     animation: pulse 1s infinite;
   }
 
   .capture-progress {
-    width: 100px;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.2);
+    width: 80px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.08);
     border-radius: 2px;
     overflow: hidden;
-    margin-top: 3px;
+    margin-top: 2px;
   }
 
   .capture-bar {
     height: 100%;
-    background: white;
+    background: rgba(220, 225, 230, 0.5);
     transition: width 0.3s ease;
   }
 
   .zone-distance {
-    font-size: 10px;
-    color: #aaa;
-    margin-left: 5px;
+    font-size: 9px;
+    color: rgba(220, 225, 230, 0.35);
+    margin-left: 4px;
+    font-weight: 600;
   }
 
   /* Mobile responsive adjustments */
   @media (max-width: 1024px) {
     .objectives-panel {
-      min-width: 180px;
-      right: 12px;
-      top: 176px;
-      padding: 8px;
+      min-width: 150px;
+      max-width: 180px;
+      right: 10px;
+      top: 170px;
+      padding: 6px 8px;
     }
 
     .objectives-title {
-      font-size: 14px;
-      margin-bottom: 6px;
+      font-size: 9px;
+      margin-bottom: 4px;
+    }
+
+    .zone-name {
+      font-size: 11px;
     }
 
     .capture-progress {
-      width: 70px;
+      width: 60px;
     }
   }
 
   @media (max-width: 480px) {
     .objectives-panel {
-      min-width: 140px;
-      max-width: 45vw;
+      min-width: 120px;
+      max-width: 40vw;
       right: 8px;
-      top: 142px;
-      padding: 6px;
-      font-size: 11px;
+      top: 140px;
+      padding: 4px 6px;
+      font-size: 10px;
     }
 
     .objectives-title {
-      font-size: 12px;
-      margin-bottom: 4px;
-      padding-bottom: 3px;
+      font-size: 8px;
+      margin-bottom: 3px;
+      padding-bottom: 2px;
     }
 
     .zone-item {
-      margin: 4px 0;
-      padding: 3px;
+      margin: 2px 0;
+      padding: 2px 4px;
+    }
+
+    .zone-name {
+      font-size: 10px;
     }
 
     .capture-progress {
-      width: 50px;
+      width: 40px;
     }
   }
 `;

@@ -60,6 +60,7 @@ function createMockCombatant(
 function createMockCombatantAI(): CombatantAI {
   return {
     updateAI: vi.fn(),
+    clearLOSCache: vi.fn(),
   } as unknown as CombatantAI;
 }
 
@@ -366,31 +367,33 @@ describe('CombatantLODManager', () => {
       manager.setGameModeManager(gameModeManager);
     });
 
-    it('should update high LOD combatants every frame', () => {
+    it('should update high LOD combatants with staggering over 3 frames', () => {
       const combatant = createMockCombatant('high', new THREE.Vector3(10, 0, 0));
       combatants.set('high', combatant);
 
-      // First update
+      // With stagger period of 3, AI should be called once within 3 frames
+      manager.updateCombatants(0.016);
+      manager.updateCombatants(0.016);
       manager.updateCombatants(0.016);
       expect(combatantAI.updateAI).toHaveBeenCalledTimes(1);
 
-      // Second update immediately after
-      manager.updateCombatants(0.016);
-      expect(combatantAI.updateAI).toHaveBeenCalledTimes(2);
+      // Movement should still update every frame (visual smoothness)
+      expect(combatantMovement.updateMovement).toHaveBeenCalledTimes(3);
     });
 
-    it('should schedule medium LOD updates based on dynamic interval', () => {
+    it('should schedule medium LOD updates based on dynamic interval and stagger', () => {
       const combatant = createMockCombatant('medium', new THREE.Vector3(200, 0, 0));
       combatants.set('medium', combatant);
 
-      // First update
-      manager.updateCombatants(0.016);
-      expect(combatantAI.updateAI).toHaveBeenCalledTimes(1);
-
-      // Immediate second update should be skipped
-      manager.updateCombatants(0.016);
-      // Should still be 1 because not enough time passed
-      // Note: Due to Date.now() based timing, this might vary
+      // Medium LOD uses both time-based intervals and stagger (period 5).
+      // Over several frames, AI may or may not fire depending on timing + stagger alignment.
+      // Run enough frames to ensure at least one AI update triggers.
+      for (let i = 0; i < 10; i++) {
+        manager.updateCombatants(0.016);
+      }
+      // Should have been called at least once within 10 frames
+      const callCount = (combatantAI.updateAI as any).mock.calls.length;
+      expect(callCount).toBeGreaterThanOrEqual(1);
     });
 
     it('should update dead combatants for death animation', () => {

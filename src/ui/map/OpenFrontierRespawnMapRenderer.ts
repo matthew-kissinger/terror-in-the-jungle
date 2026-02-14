@@ -74,7 +74,7 @@ export class OpenFrontierRespawnMapRenderer {
 
   private static drawGrid(ctx: CanvasRenderingContext2D): void {
     const gridSize = 100;
-    ctx.strokeStyle = 'rgba(0, 255, 0, 0.03)';
+    ctx.strokeStyle = 'rgba(220, 225, 230, 0.025)';
     ctx.lineWidth = 1;
 
     for (let i = 0; i <= MAP_SIZE; i += gridSize) {
@@ -90,7 +90,7 @@ export class OpenFrontierRespawnMapRenderer {
     }
 
     // Draw major grid lines
-    ctx.strokeStyle = 'rgba(0, 255, 0, 0.08)';
+    ctx.strokeStyle = 'rgba(220, 225, 230, 0.06)';
     ctx.lineWidth = 2;
 
     // Center crosshair
@@ -144,7 +144,7 @@ export class OpenFrontierRespawnMapRenderer {
       ctx.fillRect(x - iconSize/2, y - iconSize/2, iconSize, iconSize);
 
       ctx.fillStyle = '#000';
-      ctx.font = 'bold 12px monospace';
+      ctx.font = 'bold 12px Rajdhani, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('HQ', x, y);
@@ -157,8 +157,8 @@ export class OpenFrontierRespawnMapRenderer {
 
     // Spawn indicator for spawnable zones
     if (isSpawnable) {
-      ctx.fillStyle = '#00ff00';
-      ctx.font = 'bold 16px monospace';
+      ctx.fillStyle = 'rgba(92, 184, 92, 0.9)';
+      ctx.font = 'bold 16px Rajdhani, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       ctx.fillText('⬇', x, y + radius + 3);
@@ -176,7 +176,7 @@ export class OpenFrontierRespawnMapRenderer {
 
     // Zone name with background for better readability
     const name = zone.name.toUpperCase();
-    ctx.font = isSpawnable ? 'bold 11px monospace' : '10px monospace';
+    ctx.font = isSpawnable ? 'bold 11px Rajdhani, sans-serif' : '10px Rajdhani, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
 
@@ -192,7 +192,7 @@ export class OpenFrontierRespawnMapRenderer {
     );
 
     // Text
-    ctx.fillStyle = isSpawnable ? '#00ff00' : 'rgba(255, 255, 255, 0.7)';
+    ctx.fillStyle = isSpawnable ? 'rgba(92, 184, 92, 0.9)' : 'rgba(255, 255, 255, 0.7)';
     ctx.fillText(name, x, y - radius - 8);
   }
 
@@ -204,7 +204,7 @@ export class OpenFrontierRespawnMapRenderer {
     const time = Date.now() / 1000;
     const pulse = Math.sin(time * 3) * 0.2 + 0.8;
 
-    ctx.strokeStyle = `rgba(0, 255, 0, ${pulse})`;
+    ctx.strokeStyle = `rgba(92, 184, 92, ${pulse})`;
     ctx.lineWidth = 4;
     ctx.setLineDash([5, 5]);
     ctx.lineDashOffset = time * 10;
@@ -229,7 +229,7 @@ export class OpenFrontierRespawnMapRenderer {
     // Background
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(x, y, minimapSize, minimapSize);
-    ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+    ctx.strokeStyle = 'rgba(220, 225, 230, 0.3)';
     ctx.strokeRect(x, y, minimapSize, minimapSize);
 
     // Draw zones on minimap
@@ -263,8 +263,8 @@ export class OpenFrontierRespawnMapRenderer {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.fillRect(10, MAP_SIZE - 60, 200, 50);
 
-    ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';
-    ctx.font = '11px monospace';
+    ctx.fillStyle = 'rgba(220, 225, 230, 0.6)';
+    ctx.font = '11px Rajdhani, sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText('Scroll: Zoom', 15, MAP_SIZE - 45);
     ctx.fillText('Shift+Drag: Pan', 15, MAP_SIZE - 30);

@@ -62,7 +62,7 @@ export class DamageNumberSystem {
     element.className = 'damage-number';
     element.style.cssText = `
       position: absolute;
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 18px;
       font-weight: bold;
       text-shadow:
@@ -102,23 +102,23 @@ export class DamageNumberSystem {
       }
 
       .damage-number.normal {
-        color: #ffffff;
+        color: rgba(220, 225, 230, 0.95);
       }
 
       .damage-number.headshot {
-        color: #ffd700;
+        color: rgba(212, 163, 68, 0.95);
         font-size: 20px;
         text-shadow:
           1px 1px 2px rgba(0, 0, 0, 0.9),
-          0 0 6px rgba(255, 215, 0, 0.6);
+          0 0 4px rgba(212, 163, 68, 0.3);
       }
 
       .damage-number.kill {
-        color: #ff4444;
+        color: rgba(201, 86, 74, 0.95);
         font-size: 22px;
         text-shadow:
           1px 1px 2px rgba(0, 0, 0, 0.9),
-          0 0 8px rgba(255, 68, 68, 0.7);
+          0 0 5px rgba(201, 86, 74, 0.4);
       }
     `;
     document.head.appendChild(style);

@@ -208,7 +208,7 @@ export class PixelArtSandbox {
     return Init.loadGameAssets(this);
   }
 
-  public startGameWithMode(mode: GameMode): void {
+  public startGameWithMode(mode: GameMode): Promise<void> {
     return Init.startGameWithMode(this, mode);
   }
 

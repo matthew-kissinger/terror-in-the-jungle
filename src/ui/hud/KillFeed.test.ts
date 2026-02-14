@@ -89,56 +89,56 @@ describe("KillFeed", () => {
       killFeed.addKill("Killer", Faction.US, "Victim", Faction.OPFOR, true);
       const container = mockParent.querySelector(".kill-feed");
       const entry = container?.children[0];
-      expect(entry?.textContent).toContain("☠");
+      expect(entry?.textContent).toContain("HS");
     });
 
     it("should not show headshot indicator when isHeadshot is false", () => {
       killFeed.addKill("Killer", Faction.US, "Victim", Faction.OPFOR, false);
       const container = mockParent.querySelector(".kill-feed");
       const entry = container?.children[0];
-      expect(entry?.textContent).not.toContain("☠");
+      expect(entry?.textContent).not.toContain("HS");
     });
 
     it("should display rifle weapon icon", () => {
       killFeed.addKill("K", Faction.US, "V", Faction.OPFOR, false, "rifle");
       const container = mockParent.querySelector(".kill-feed");
-      expect(container?.textContent).toContain("▸");
+      expect(container?.textContent).toContain("[AR]");
     });
 
     it("should display shotgun weapon icon", () => {
       killFeed.addKill("K", Faction.US, "V", Faction.OPFOR, false, "shotgun");
       const container = mockParent.querySelector(".kill-feed");
-      expect(container?.textContent).toContain("◈");
+      expect(container?.textContent).toContain("[SG]");
     });
 
     it("should display smg weapon icon", () => {
       killFeed.addKill("K", Faction.US, "V", Faction.OPFOR, false, "smg");
       const container = mockParent.querySelector(".kill-feed");
-      expect(container?.textContent).toContain("≫");
+      expect(container?.textContent).toContain("[SM]");
     });
 
     it("should display grenade weapon icon", () => {
       killFeed.addKill("K", Faction.US, "V", Faction.OPFOR, false, "grenade");
       const container = mockParent.querySelector(".kill-feed");
-      expect(container?.textContent).toContain("💥");
+      expect(container?.textContent).toContain("[GR]");
     });
 
     it("should display mortar weapon icon", () => {
       killFeed.addKill("K", Faction.US, "V", Faction.OPFOR, false, "mortar");
       const container = mockParent.querySelector(".kill-feed");
-      expect(container?.textContent).toContain("💣");
+      expect(container?.textContent).toContain("[MT]");
     });
 
     it("should display melee weapon icon", () => {
       killFeed.addKill("K", Faction.US, "V", Faction.OPFOR, false, "melee");
       const container = mockParent.querySelector(".kill-feed");
-      expect(container?.textContent).toContain("⚔");
+      expect(container?.textContent).toContain("[ML]");
     });
 
     it("should display unknown weapon icon", () => {
       killFeed.addKill("K", Faction.US, "V", Faction.OPFOR, false, "unknown");
       const container = mockParent.querySelector(".kill-feed");
-      expect(container?.textContent).toContain("•");
+      expect(container?.textContent).toContain("--");
     });
   });
 
@@ -385,7 +385,7 @@ describe("KillFeed", () => {
       const container = mockParent.querySelector(".kill-feed");
       const entry = container?.children[0] as HTMLElement;
       const killerSpan = entry?.querySelector("span:first-child") as HTMLElement;
-      expect(killerSpan?.style.color).toContain("rgb(74, 158, 255)");
+      expect(killerSpan?.style.color).toContain("rgb(91, 140, 201)");
     });
 
     it("should color OPFOR faction names red", () => {
@@ -393,7 +393,7 @@ describe("KillFeed", () => {
       const container = mockParent.querySelector(".kill-feed");
       const entry = container?.children[0] as HTMLElement;
       const victimSpan = entry?.querySelector("span:last-child") as HTMLElement;
-      expect(victimSpan?.style.color).toContain("rgb(255, 74, 74)");
+      expect(victimSpan?.style.color).toContain("rgb(201, 86, 74)");
     });
   });
 
@@ -514,8 +514,8 @@ describe("KillFeed", () => {
     it("should handle headshot with explosive weapon", () => {
       killFeed.addKill("K", Faction.US, "V", Faction.OPFOR, true, "grenade");
       const container = mockParent.querySelector(".kill-feed");
-      expect(container?.textContent).toContain("☠");
-      expect(container?.textContent).toContain("💥");
+      expect(container?.textContent).toContain("HS");
+      expect(container?.textContent).toContain("[GR]");
     });
   });
 });

@@ -160,9 +160,9 @@ export class AmmoSupplySystem implements GameSystem {
     // Ammo markings (yellow stripes)
     const stripeGeometry = new THREE.BoxGeometry(this.CRATE_SIZE + 0.02, 0.1, this.CRATE_SIZE + 0.02);
     const stripeMaterial = new THREE.MeshStandardMaterial({
-      color: 0xffff00,
+      color: 0xd4a344,
       roughness: 0.6,
-      emissive: 0xffff00,
+      emissive: 0xd4a344,
       emissiveIntensity: 0.3
     });
 
@@ -182,7 +182,7 @@ export class AmmoSupplySystem implements GameSystem {
       this.CRATE_SIZE * 1.2
     );
     const glowMaterial = new THREE.MeshBasicMaterial({
-      color: 0x00ff00,
+      color: 0x5cb85c,
       transparent: true,
       opacity: 0.3,
       side: THREE.BackSide
@@ -228,16 +228,16 @@ export class AmmoSupplySystem implements GameSystem {
           // Bright pulsing glow when in range and ready
           const pulseIntensity = 0.5 + Math.sin(this.glowTime * this.GLOW_PULSE_SPEED * 2) * 0.3;
           (crate.glowMesh.material as THREE.MeshBasicMaterial).opacity = pulseIntensity;
-          (crate.glowMesh.material as THREE.MeshBasicMaterial).color.setHex(0x00ff00);
+          (crate.glowMesh.material as THREE.MeshBasicMaterial).color.setHex(0x5cb85c);
         } else if (isInRange && isOnCooldown) {
           // Dim red glow when on cooldown
           (crate.glowMesh.material as THREE.MeshBasicMaterial).opacity = 0.2;
-          (crate.glowMesh.material as THREE.MeshBasicMaterial).color.setHex(0xff0000);
+          (crate.glowMesh.material as THREE.MeshBasicMaterial).color.setHex(0xc9564a);
         } else {
           // Normal glow when out of range
           const pulseIntensity = 0.3 + Math.sin(this.glowTime * this.GLOW_PULSE_SPEED) * 0.2;
           (crate.glowMesh.material as THREE.MeshBasicMaterial).opacity = pulseIntensity;
-          (crate.glowMesh.material as THREE.MeshBasicMaterial).color.setHex(0x00ff00);
+          (crate.glowMesh.material as THREE.MeshBasicMaterial).color.setHex(0x5cb85c);
         }
       }
 
@@ -306,13 +306,11 @@ export class AmmoSupplySystem implements GameSystem {
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 32px;
       font-weight: bold;
-      color: #00ff00;
-      text-shadow:
-        1px 1px 2px rgba(0, 0, 0, 0.9),
-        0 0 12px rgba(0, 255, 0, 0.8);
+      color: rgba(92, 184, 92, 0.95);
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9);
       pointer-events: none;
       z-index: 500;
       display: none;

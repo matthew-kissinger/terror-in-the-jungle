@@ -2,6 +2,7 @@ import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
 import { Faction } from '../../systems/combat/types';
 import { isTouchDevice } from '../../utils/DeviceDetector';
+import { colors } from '../design/tokens';
 
 interface PlayerScore {
   name: string;
@@ -33,23 +34,24 @@ export class Scoreboard {
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0, 0, 0.85);
+      background: rgba(8, 12, 18, 0.85);
       display: none;
       justify-content: center;
       align-items: center;
       z-index: 200;
       pointer-events: none;
-      font-family: 'Courier New', monospace;
-      color: white;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+      color: rgba(220, 225, 230, 0.95);
+      backdrop-filter: blur(6px);
     `;
 
     const content = document.createElement('div');
     content.className = 'scoreboard-content';
     content.style.cssText = `
-      background: rgba(20, 20, 25, 0.95);
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 12px;
-      padding: 30px;
+      background: rgba(8, 12, 18, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+      padding: 24px;
       max-width: 800px;
       width: 90%;
       max-height: 80vh;
@@ -118,13 +120,13 @@ export class Scoreboard {
       </div>
       <div class="scoreboard-grid">
         <div>
-          <div class="scoreboard-team-label" style="font-weight: bold; color: #4488ff; text-align: center; text-transform: uppercase;">
+          <div class="scoreboard-team-label" style="font-weight: bold; color: ${colors.us}; text-align: center; text-transform: uppercase;">
             US Forces
           </div>
           ${this.renderTeamTable(usScores, usTotals)}
         </div>
         <div>
-          <div class="scoreboard-team-label" style="font-weight: bold; color: #ff4444; text-align: center; text-transform: uppercase;">
+          <div class="scoreboard-team-label" style="font-weight: bold; color: ${colors.opfor}; text-align: center; text-transform: uppercase;">
             OPFOR
           </div>
           ${this.renderTeamTable(opforScores, opforTotals)}
@@ -139,17 +141,17 @@ export class Scoreboard {
   private renderTeamTable(scores: PlayerScore[], totals: { kills: number; deaths: number }): string {
     const rows = scores.map((player, index) => {
       const kdRatio = player.deaths === 0 ? player.kills.toFixed(2) : (player.kills / player.deaths).toFixed(2);
-      const highlightStyle = player.isPlayer ? 'background: rgba(255, 215, 0, 0.15); border-left: 3px solid #ffd700;' : '';
+      const highlightStyle = player.isPlayer ? 'background: rgba(220, 225, 230, 0.08); border-left: 2px solid rgba(220, 225, 230, 0.5);' : '';
 
       return `
         <tr style="${highlightStyle}">
-          <td style="padding: 8px; text-align: center;">${index + 1}</td>
-          <td style="padding: 8px; ${player.isPlayer ? 'font-weight: bold; color: #ffd700;' : ''}">${player.name}</td>
-          <td style="padding: 8px; text-align: center; color: #4ade80;">${player.kills}</td>
-          <td style="padding: 8px; text-align: center; color: #60a5fa;">${player.assists}</td>
-          <td style="padding: 8px; text-align: center; color: #f87171;">${player.deaths}</td>
-          <td style="padding: 8px; text-align: center; color: #fbbf24;">${kdRatio}</td>
-          <td style="padding: 8px; text-align: center; font-weight: bold;">${player.score}</td>
+          <td style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.4);">${index + 1}</td>
+          <td style="padding: 6px 8px; ${player.isPlayer ? 'font-weight: 700; color: rgba(220, 225, 230, 0.95);' : 'color: rgba(220, 225, 230, 0.7);'}">${player.name}</td>
+          <td style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.8);">${player.kills}</td>
+          <td style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.5);">${player.assists}</td>
+          <td style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.5);">${player.deaths}</td>
+          <td style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.6);">${kdRatio}</td>
+          <td style="padding: 6px 8px; text-align: center; font-weight: 700;">${player.score}</td>
         </tr>
       `;
     }).join('');
@@ -157,28 +159,28 @@ export class Scoreboard {
     const totalKd = totals.deaths === 0 ? totals.kills.toFixed(2) : (totals.kills / totals.deaths).toFixed(2);
 
     return `
-      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
         <thead>
-          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.2);">
-            <th style="padding: 8px; text-align: center; opacity: 0.7; font-size: 11px;">#</th>
-            <th style="padding: 8px; text-align: left; opacity: 0.7; font-size: 11px;">Name</th>
-            <th style="padding: 8px; text-align: center; opacity: 0.7; font-size: 11px;">K</th>
-            <th style="padding: 8px; text-align: center; opacity: 0.7; font-size: 11px;">A</th>
-            <th style="padding: 8px; text-align: center; opacity: 0.7; font-size: 11px;">D</th>
-            <th style="padding: 8px; text-align: center; opacity: 0.7; font-size: 11px;">K/D</th>
-            <th style="padding: 8px; text-align: center; opacity: 0.7; font-size: 11px;">Score</th>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <th style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.35); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">#</th>
+            <th style="padding: 6px 8px; text-align: left; color: rgba(220, 225, 230, 0.35); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Name</th>
+            <th style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.35); font-size: 10px; font-weight: 600;">K</th>
+            <th style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.35); font-size: 10px; font-weight: 600;">A</th>
+            <th style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.35); font-size: 10px; font-weight: 600;">D</th>
+            <th style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.35); font-size: 10px; font-weight: 600;">K/D</th>
+            <th style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.35); font-size: 10px; font-weight: 600;">Score</th>
           </tr>
         </thead>
         <tbody>
           ${rows}
-          <tr style="border-top: 2px solid rgba(255, 255, 255, 0.2); font-weight: bold;">
-            <td style="padding: 8px; text-align: center;">-</td>
-            <td style="padding: 8px;">Team Total</td>
-            <td style="padding: 8px; text-align: center; color: #4ade80;">${totals.kills}</td>
-            <td style="padding: 8px; text-align: center; color: #60a5fa;">-</td>
-            <td style="padding: 8px; text-align: center; color: #f87171;">${totals.deaths}</td>
-            <td style="padding: 8px; text-align: center; color: #fbbf24;">${totalKd}</td>
-            <td style="padding: 8px; text-align: center;">-</td>
+          <tr style="border-top: 1px solid rgba(255, 255, 255, 0.1); font-weight: 700;">
+            <td style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.3);">-</td>
+            <td style="padding: 6px 8px; color: rgba(220, 225, 230, 0.6);">Team Total</td>
+            <td style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.8);">${totals.kills}</td>
+            <td style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.4);">-</td>
+            <td style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.5);">${totals.deaths}</td>
+            <td style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.6);">${totalKd}</td>
+            <td style="padding: 6px 8px; text-align: center; color: rgba(220, 225, 230, 0.3);">-</td>
           </tr>
         </tbody>
       </table>

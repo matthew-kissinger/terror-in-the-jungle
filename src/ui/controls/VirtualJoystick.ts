@@ -47,8 +47,8 @@ export class VirtualJoystick {
     this.base = document.createElement('div');
     Object.assign(this.base.style, {
       position: 'absolute',
-      left: 'max(30px, env(safe-area-inset-left, 0px))',
-      bottom: 'max(30px, env(safe-area-inset-bottom, 0px))',
+      left: `max(var(--tc-edge-inset, 30px), env(safe-area-inset-left, 0px))`,
+      bottom: `max(var(--tc-edge-inset, 30px), env(safe-area-inset-bottom, 0px))`,
       width: `${this.BASE_SIZE}px`,
       height: `${this.BASE_SIZE}px`,
       borderRadius: '50%',

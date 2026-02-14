@@ -53,7 +53,7 @@ export class ScorePopupSystem {
     element.className = 'score-popup';
     element.style.cssText = `
       position: fixed;
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 24px;
       font-weight: bold;
       text-shadow:
@@ -100,50 +100,50 @@ export class ScorePopupSystem {
       }
 
       .score-popup.capture {
-        color: #4499ff;
+        color: rgba(91, 140, 201, 0.95);
         font-size: 28px;
         text-shadow:
           1px 1px 2px rgba(0, 0, 0, 0.9),
-          0 0 12px rgba(68, 153, 255, 0.8);
+          0 0 6px rgba(91, 140, 201, 0.4);
       }
 
       .score-popup.defend {
-        color: #ffff44;
+        color: rgba(212, 163, 68, 0.95);
         text-shadow:
           1px 1px 2px rgba(0, 0, 0, 0.9),
-          0 0 8px rgba(255, 255, 68, 0.6);
+          0 0 4px rgba(212, 163, 68, 0.3);
       }
 
       .score-popup.secured {
-        color: #44ff44;
+        color: rgba(92, 184, 92, 0.95);
         font-size: 32px;
         text-shadow:
           1px 1px 2px rgba(0, 0, 0, 0.9),
-          0 0 14px rgba(68, 255, 68, 0.8);
+          0 0 6px rgba(92, 184, 92, 0.4);
       }
 
       .score-popup.kill {
-        color: #ffd700;
+        color: rgba(220, 225, 230, 0.95);
         font-size: 26px;
         text-shadow:
           1px 1px 2px rgba(0, 0, 0, 0.9),
-          0 0 10px rgba(255, 215, 0, 0.7);
+          0 0 5px rgba(220, 225, 230, 0.3);
       }
 
       .score-popup.headshot {
-        color: #ff3333;
+        color: rgba(212, 163, 68, 0.95);
         font-size: 24px;
         text-shadow:
           1px 1px 2px rgba(0, 0, 0, 0.9),
-          0 0 12px rgba(255, 51, 51, 0.8);
+          0 0 5px rgba(212, 163, 68, 0.4);
       }
 
       .score-popup.assist {
-        color: #88ccff;
+        color: rgba(154, 168, 178, 0.95);
         font-size: 20px;
         text-shadow:
           1px 1px 2px rgba(0, 0, 0, 0.9),
-          0 0 6px rgba(136, 204, 255, 0.5);
+          0 0 3px rgba(154, 168, 178, 0.3);
       }
     `;
     document.head.appendChild(style);

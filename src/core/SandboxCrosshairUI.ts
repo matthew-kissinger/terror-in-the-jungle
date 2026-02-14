@@ -35,8 +35,8 @@ export class SandboxCrosshairUI {
           transform: translate(-50%, -50%);
           width: 2px;
           height: 2px;
-          background: #00ff44;
-          box-shadow: 0 0 3px #00ff44, 0 0 6px rgba(0,255,68,0.5);
+          background: rgba(220, 225, 230, 0.85);
+          box-shadow: 0 0 3px rgba(220, 225, 230, 0.85), 0 0 6px rgba(220, 225, 230, 0.3);
           border-radius: 50%;
           z-index: 2;
         }
@@ -44,7 +44,7 @@ export class SandboxCrosshairUI {
         /* Crosshair lines */
         .crosshair-line {
           position: absolute;
-          background: #00ff44;
+          background: rgba(220, 225, 230, 0.85);
           opacity: 0.9;
         }
 
@@ -54,7 +54,7 @@ export class SandboxCrosshairUI {
           left: 50%;
           top: 8px;
           transform: translateX(-50%);
-          box-shadow: 0 0 2px #00ff44;
+          box-shadow: 0 0 2px rgba(220, 225, 230, 0.85);
         }
 
         .crosshair-line.bottom {
@@ -63,7 +63,7 @@ export class SandboxCrosshairUI {
           left: 50%;
           bottom: 8px;
           transform: translateX(-50%);
-          box-shadow: 0 0 2px #00ff44;
+          box-shadow: 0 0 2px rgba(220, 225, 230, 0.85);
         }
 
         .crosshair-line.left {
@@ -72,7 +72,7 @@ export class SandboxCrosshairUI {
           left: 8px;
           top: 50%;
           transform: translateY(-50%);
-          box-shadow: 0 0 2px #00ff44;
+          box-shadow: 0 0 2px rgba(220, 225, 230, 0.85);
         }
 
         .crosshair-line.right {
@@ -81,13 +81,13 @@ export class SandboxCrosshairUI {
           right: 8px;
           top: 50%;
           transform: translateY(-50%);
-          box-shadow: 0 0 2px #00ff44;
+          box-shadow: 0 0 2px rgba(220, 225, 230, 0.85);
         }
 
         /* Corner brackets for tactical feel */
         .crosshair-bracket {
           position: absolute;
-          border: 1px solid #00ff44;
+          border: 1px solid rgba(220, 225, 230, 0.85);
           opacity: 0.5;
         }
 
@@ -135,7 +135,7 @@ export class SandboxCrosshairUI {
           transform: translate(-50%, -50%);
           width: 30px;
           height: 30px;
-          border: 1px solid rgba(0,255,68,0.3);
+          border: 1px solid rgba(220, 225, 230, 0.2);
           border-radius: 50%;
           transition: all 0.1s ease;
           pointer-events: none;

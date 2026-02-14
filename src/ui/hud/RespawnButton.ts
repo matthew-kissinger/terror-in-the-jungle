@@ -11,37 +11,36 @@ export class RespawnButton {
     const button = document.createElement('button');
     button.className = 'respawn-button';
     const hintText = isTouchDevice() ? 'Tap to respawn' : 'Press K';
-    button.innerHTML = ` RESPAWN<br><span style="font-size: 10px;">${hintText}</span>`;
+    button.innerHTML = `RESPAWN<br><span style="font-size: 10px; color: rgba(220, 225, 230, 0.5);">${hintText}</span>`;
     button.style.cssText = `
       position: fixed;
       bottom: 120px;
-      right: 20px;
-      padding: 12px 20px;
-      background: rgba(255, 0, 0, 0.1);
-      border: 2px solid rgba(255, 0, 0, 0.5);
-      color: #ff6b6b;
-      font-family: 'Courier New', monospace;
+      right: 16px;
+      padding: 10px 20px;
+      background: rgba(201, 86, 74, 0.15);
+      border: 1px solid rgba(201, 86, 74, 0.4);
+      color: rgba(201, 86, 74, 0.9);
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 14px;
-      font-weight: bold;
+      font-weight: 700;
       text-transform: uppercase;
       cursor: pointer;
       border-radius: 4px;
-      transition: all 0.3s;
+      transition: all 0.2s;
       z-index: 100;
       text-align: center;
-      backdrop-filter: blur(5px);
+      backdrop-filter: blur(6px);
+      letter-spacing: 1px;
     `;
 
     button.onmouseover = () => {
-      button.style.background = 'rgba(255, 0, 0, 0.2)';
-      button.style.borderColor = 'rgba(255, 0, 0, 0.8)';
-      button.style.transform = 'scale(1.05)';
+      button.style.background = 'rgba(201, 86, 74, 0.25)';
+      button.style.borderColor = 'rgba(201, 86, 74, 0.6)';
     };
 
     button.onmouseout = () => {
-      button.style.background = 'rgba(255, 0, 0, 0.1)';
-      button.style.borderColor = 'rgba(255, 0, 0, 0.5)';
-      button.style.transform = 'scale(1)';
+      button.style.background = 'rgba(201, 86, 74, 0.15)';
+      button.style.borderColor = 'rgba(201, 86, 74, 0.4)';
     };
 
     return button;

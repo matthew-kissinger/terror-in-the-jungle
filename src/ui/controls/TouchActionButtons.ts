@@ -20,7 +20,7 @@ export class TouchActionButtons {
     this.container.id = 'touch-action-buttons';
     Object.assign(this.container.style, {
       position: 'fixed',
-      right: 'max(30px, env(safe-area-inset-right, 0px))',
+      right: `max(var(--tc-edge-inset, 30px), env(safe-area-inset-right, 0px))`,
       bottom: 'calc(130px + env(safe-area-inset-bottom, 0px))', // above fire button (80px + 30px bottom + 20px gap)
       display: 'flex',
       flexDirection: 'column',
@@ -47,15 +47,15 @@ export class TouchActionButtons {
   private addButton(key: string, label: string): void {
     const btn = document.createElement('div');
     Object.assign(btn.style, {
-      width: '52px',
-      height: '52px',
+      width: 'var(--tc-action-size, 52px)',
+      height: 'var(--tc-action-size, 52px)',
       borderRadius: '50%',
       background: 'rgba(255,255,255,0.15)',
       border: '2px solid rgba(255,255,255,0.3)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontSize: '11px',
+      fontSize: 'var(--tc-font-size, 11px)',
       fontWeight: 'bold',
       color: 'rgba(255,255,255,0.8)',
       userSelect: 'none',

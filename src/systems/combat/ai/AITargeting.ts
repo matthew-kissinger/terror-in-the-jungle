@@ -43,6 +43,13 @@ export class AITargeting {
     this.lineOfSight.setSmokeCloudSystem(smokeCloudSystem);
   }
 
+  /**
+   * Clear the LOS cache. Call once per frame.
+   */
+  clearLOSCache(): void {
+    this.lineOfSight.clearCache();
+  }
+
   findNearestEnemy(
     combatant: Combatant,
     playerPosition: THREE.Vector3,

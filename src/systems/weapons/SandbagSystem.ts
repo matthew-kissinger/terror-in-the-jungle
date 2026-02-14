@@ -105,7 +105,7 @@ export class SandbagSystem implements GameSystem {
     this.previewPosition.copy(camera.position).add(direction.multiplyScalar(distance));
 
     const groundHeight = this.getGroundHeight(this.previewPosition.x, this.previewPosition.z);
-    this.previewPosition.y = groundHeight + 1.5; // Increased height offset
+    this.previewPosition.y = groundHeight + ProgrammaticExplosivesFactory.SANDBAG_HEIGHT / 2;
 
     // Calculate rotation to align with player facing direction (not perpendicular)
     const playerYaw = Math.atan2(direction.x, direction.z);
@@ -287,29 +287,41 @@ export class SandbagSystem implements GameSystem {
 
   checkCollision(position: THREE.Vector3, radius: number = 0.5): boolean {
     // Check if a position collides with any sandbag
-    const testPoint = new THREE.Vector3(position.x, position.y, position.z);
+    const testPoint = position;
 
     for (const sandbag of this.sandbags) {
-      // Update bounds for accurate collision
       sandbag.bounds.setFromObject(sandbag.mesh);
 
-      // Expand bounds slightly for player radius
-      const expandedBounds = sandbag.bounds.clone();
-      expandedBounds.min.x -= radius;
-      expandedBounds.min.z -= radius;
-      expandedBounds.max.x += radius;
-      expandedBounds.max.z += radius;
+      const b = sandbag.bounds;
 
-      // Check if position is within bounds horizontally
-      if (testPoint.x >= expandedBounds.min.x && testPoint.x <= expandedBounds.max.x &&
-          testPoint.z >= expandedBounds.min.z && testPoint.z <= expandedBounds.max.z) {
-        // Check if player is at a height where they would collide
-        if (testPoint.y < expandedBounds.max.y + 1) { // Can step over if high enough
+      // Check horizontal overlap (expanded by player radius)
+      if (testPoint.x >= b.min.x - radius && testPoint.x <= b.max.x + radius &&
+          testPoint.z >= b.min.z - radius && testPoint.z <= b.max.z + radius) {
+        // Block if player feet are below sandbag top (wall collision)
+        // Allow passage if player is standing on top (feet above top surface)
+        if (testPoint.y < b.max.y) {
           return true;
         }
       }
     }
     return false;
+  }
+
+  /** Returns the top surface height if the player is directly above a sandbag, else null. */
+  getStandingHeight(x: number, z: number): number | null {
+    let maxTop: number | null = null;
+    for (const sandbag of this.sandbags) {
+      sandbag.bounds.setFromObject(sandbag.mesh);
+      const b = sandbag.bounds;
+      if (x >= b.min.x && x <= b.max.x &&
+          z >= b.min.z && z <= b.max.z) {
+        const top = b.max.y;
+        if (maxTop === null || top > maxTop) {
+          maxTop = top;
+        }
+      }
+    }
+    return maxTop;
   }
 
   private getGroundHeight(x: number, z: number): number {

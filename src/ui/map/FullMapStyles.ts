@@ -2,6 +2,8 @@
  * CSS styles and drawing constants for the Full Map System
  */
 
+import { zIndex } from '../design/tokens';
+
 export const MAP_STYLES = `
   .full-map-container {
     display: none;
@@ -12,7 +14,7 @@ export const MAP_STYLES = `
     height: 100%;
     background: rgba(0, 0, 0, 0.85);
     backdrop-filter: blur(10px);
-    z-index: 200;
+    z-index: ${zIndex.fullMap};
   }
 
   .full-map-container.visible {
@@ -46,7 +48,7 @@ export const MAP_STYLES = `
     color: rgba(255, 255, 255, 0.9);
     font-size: 24px;
     font-weight: bold;
-    font-family: 'Courier New', monospace;
+    font-family: 'Rajdhani', 'Segoe UI', sans-serif;
     text-transform: uppercase;
     letter-spacing: 4px;
   }
@@ -60,7 +62,7 @@ export const MAP_STYLES = `
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.8);
-    font-family: 'Courier New', monospace;
+    font-family: 'Rajdhani', 'Segoe UI', sans-serif;
     font-size: 12px;
   }
 
@@ -94,7 +96,7 @@ export const MAP_STYLES = `
     border-radius: 8px;
     color: rgba(255, 255, 255, 0.8);
     font-size: 20px;
-    font-family: 'Courier New', monospace;
+    font-family: 'Rajdhani', 'Segoe UI', sans-serif;
     cursor: pointer;
     transition: all 0.2s;
   }
@@ -109,7 +111,7 @@ export const MAP_STYLES = `
     bottom: 20px;
     left: 20px;
     color: rgba(255, 255, 255, 0.5);
-    font-family: 'Courier New', monospace;
+    font-family: 'Rajdhani', 'Segoe UI', sans-serif;
     font-size: 12px;
   }
 
@@ -124,7 +126,7 @@ export const MAP_STYLES = `
   .compass-direction {
     position: absolute;
     color: rgba(255, 255, 255, 0.8);
-    font-family: 'Courier New', monospace;
+    font-family: 'Rajdhani', 'Segoe UI', sans-serif;
     font-weight: bold;
     font-size: 16px;
   }
@@ -140,7 +142,7 @@ export const MAP_STYLES = `
     top: 14px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 1002;
+    z-index: ${zIndex.touchMenu};
     width: 48px;
     height: 48px;
     border-radius: 50%;
@@ -148,7 +150,7 @@ export const MAP_STYLES = `
     border: 2px solid rgba(255, 255, 255, 0.3);
     color: rgba(255, 255, 255, 0.9);
     font-size: 20px;
-    font-family: 'Courier New', monospace;
+    font-family: 'Rajdhani', 'Segoe UI', sans-serif;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -169,7 +171,7 @@ export const MAP_STYLES = `
     position: absolute;
     top: 10px;
     right: 60px;
-    z-index: 210;
+    z-index: ${zIndex.fullMapOverlay};
     width: 40px;
     height: 40px;
     border-radius: 8px;
@@ -177,7 +179,7 @@ export const MAP_STYLES = `
     border: 1px solid rgba(255, 80, 80, 0.5);
     color: rgba(255, 255, 255, 0.9);
     font-size: 20px;
-    font-family: 'Courier New', monospace;
+    font-family: 'Rajdhani', 'Segoe UI', sans-serif;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -245,17 +247,17 @@ export const MAX_ZOOM = 8; // Increased max zoom for Open Frontier
 
 // Zone color constants (RGBA values)
 export const ZONE_COLORS = {
-  US_CONTROLLED: { r: 68, g: 136, b: 255 },
-  OPFOR_CONTROLLED: { r: 255, g: 68, b: 68 },
-  CONTESTED: { r: 255, g: 255, b: 68 },
-  NEUTRAL: { r: 136, g: 136, b: 136 },
+  US_CONTROLLED: { r: 91, g: 140, b: 201 },
+  OPFOR_CONTROLLED: { r: 201, g: 86, b: 74 },
+  CONTESTED: { r: 212, g: 163, b: 68 },
+  NEUTRAL: { r: 107, g: 119, b: 128 },
 } as const;
 
 // Combatant colors
 export const COMBATANT_COLORS = {
-  US: 'rgba(68, 136, 255, 0.6)',
-  OPFOR: 'rgba(255, 68, 68, 0.6)',
-  PLAYER: '#00ff00',
+  US: 'rgba(91, 140, 201, 0.6)',
+  OPFOR: 'rgba(201, 86, 74, 0.6)',
+  PLAYER: 'rgba(220, 225, 230, 0.95)',
 } as const;
 
 // Grid drawing constants

@@ -14,10 +14,10 @@ export class TouchFireButton {
     this.button.id = 'touch-fire-btn';
     Object.assign(this.button.style, {
       position: 'fixed',
-      right: 'max(30px, env(safe-area-inset-right, 0px))',
-      bottom: 'max(30px, env(safe-area-inset-bottom, 0px))',
-      width: '80px',
-      height: '80px',
+      right: `max(var(--tc-edge-inset, 30px), env(safe-area-inset-right, 0px))`,
+      bottom: `max(var(--tc-edge-inset, 30px), env(safe-area-inset-bottom, 0px))`,
+      width: 'var(--tc-fire-size, 80px)',
+      height: 'var(--tc-fire-size, 80px)',
       borderRadius: '50%',
       background: 'rgba(255, 60, 60, 0.4)',
       border: '3px solid rgba(255, 100, 100, 0.6)',
@@ -29,7 +29,7 @@ export class TouchFireButton {
       pointerEvents: 'auto',
       userSelect: 'none',
       webkitUserSelect: 'none',
-      fontSize: '12px',
+      fontSize: 'var(--tc-font-size, 12px)',
       fontWeight: 'bold',
       color: 'rgba(255,255,255,0.8)',
       textTransform: 'uppercase',

@@ -16,7 +16,7 @@ describe('SettingsManager', () => {
     const sm = SettingsManager.getInstance();
     expect(sm.get('masterVolume')).toBe(70);
     expect(sm.get('mouseSensitivity')).toBe(5);
-    expect(sm.get('showFPS')).toBe(true);
+    expect(sm.get('showFPS')).toBe(false);
     expect(sm.get('enableShadows')).toBe(true);
     expect(sm.get('graphicsQuality')).toBe('medium');
   });
@@ -92,7 +92,7 @@ describe('SettingsManager', () => {
     expect(all).toEqual({
       masterVolume: 70,
       mouseSensitivity: 5,
-      showFPS: true,
+      showFPS: false,
       enableShadows: true,
       graphicsQuality: 'medium',
     });

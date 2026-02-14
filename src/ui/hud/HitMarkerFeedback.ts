@@ -131,10 +131,10 @@ export class HitMarkerFeedback {
 
       .hit-marker-headshot::before,
       .hit-marker-headshot::after {
-        background: #ffd700;
+        background: rgba(212, 163, 68, 0.95);
         box-shadow:
-          0 0 6px rgba(255, 215, 0, 0.8),
-          0 0 3px rgba(0, 0, 0, 0.9);
+          0 0 4px rgba(212, 163, 68, 0.5),
+          0 0 2px rgba(0, 0, 0, 0.9);
       }
 
       /* Kill marker - X shape */
@@ -159,10 +159,10 @@ export class HitMarkerFeedback {
 
       .hit-marker-kill::before,
       .hit-marker-kill::after {
-        background: #ff4444;
+        background: rgba(201, 86, 74, 0.95);
         box-shadow:
-          0 0 8px rgba(255, 68, 68, 0.9),
-          0 0 4px rgba(0, 0, 0, 0.9);
+          0 0 5px rgba(201, 86, 74, 0.6),
+          0 0 3px rgba(0, 0, 0, 0.9);
       }
 
       .hit-marker-kill::before {
@@ -199,12 +199,12 @@ export class HitMarkerFeedback {
       }
 
       .vignette-kill {
-        background: radial-gradient(circle at center, transparent 0%, rgba(255, 0, 0, 0.4) 100%);
+        background: radial-gradient(circle at center, transparent 0%, rgba(201, 86, 74, 0.25) 100%);
         animation: killVignettePulse 400ms ease-out forwards;
       }
 
       .vignette-headshot {
-        background: radial-gradient(circle at center, transparent 0%, rgba(255, 215, 0, 0.25) 100%);
+        background: radial-gradient(circle at center, transparent 0%, rgba(212, 163, 68, 0.15) 100%);
         animation: headshotVignettePulse 350ms ease-out forwards;
       }
     `;

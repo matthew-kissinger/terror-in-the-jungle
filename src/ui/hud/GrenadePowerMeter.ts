@@ -28,14 +28,15 @@ export class GrenadePowerMeter {
     // Label
     const label = document.createElement('div');
     label.style.cssText = `
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 11px;
-      color: rgba(255, 255, 255, 0.9);
-      font-weight: bold;
+      color: rgba(220, 225, 230, 0.8);
+      font-weight: 700;
       text-align: center;
       margin-bottom: 4px;
       text-transform: uppercase;
-      text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+      letter-spacing: 0.5px;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
     `;
     label.textContent = 'THROW POWER';
 
@@ -43,13 +44,12 @@ export class GrenadePowerMeter {
     const barContainer = document.createElement('div');
     barContainer.style.cssText = `
       width: 100%;
-      height: 12px;
-      background: rgba(0, 0, 0, 0.6);
-      border: 2px solid rgba(255, 255, 255, 0.5);
-      border-radius: 6px;
+      height: 10px;
+      background: rgba(8, 12, 18, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
       position: relative;
       overflow: hidden;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
     `;
 
     // Power fill bar
@@ -61,9 +61,9 @@ export class GrenadePowerMeter {
       top: 0;
       height: 100%;
       width: 30%;
-      background: linear-gradient(to right, #00ff44, #88ff44);
+      background: linear-gradient(to right, rgba(92, 184, 92, 0.85), rgba(106, 184, 122, 0.85));
       transition: width 0.05s linear, background 0.1s ease;
-      border-radius: 3px;
+      border-radius: 2px;
     `;
 
     // Power percentage text
@@ -74,11 +74,11 @@ export class GrenadePowerMeter {
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 10px;
-      font-weight: bold;
-      color: white;
-      text-shadow: 0 0 3px rgba(0, 0, 0, 1);
+      font-weight: 700;
+      color: rgba(220, 225, 230, 0.95);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
       z-index: 1;
     `;
     powerText.textContent = '30%';
@@ -87,14 +87,14 @@ export class GrenadePowerMeter {
     const cookingTimer = document.createElement('div');
     cookingTimer.className = 'grenade-cooking-timer';
     cookingTimer.style.cssText = `
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 12px;
-      color: rgba(255, 100, 100, 0.9);
-      font-weight: bold;
+      color: rgba(201, 86, 74, 0.9);
+      font-weight: 700;
       text-align: center;
       margin-top: 6px;
       text-transform: uppercase;
-      text-shadow: 0 0 4px rgba(255, 0, 0, 0.8);
+      letter-spacing: 0.5px;
       display: none;
     `;
     cookingTimer.textContent = 'COOKING: 0.0s';
@@ -136,16 +136,16 @@ export class GrenadePowerMeter {
         powerText.textContent = `${displayPercent}%`;
       }
 
-      // Color gradient: green (low) -> yellow (mid) -> red (max)
+      // Color gradient: muted green (low) -> amber (mid) -> red (max)
       if (normalizedPower < 40) {
-        powerFill.style.background = 'linear-gradient(to right, #00ff44, #88ff44)'; // Green
-        if (label) label.style.color = 'rgba(100, 255, 100, 0.9)';
+        powerFill.style.background = 'linear-gradient(to right, rgba(92, 184, 92, 0.85), rgba(106, 184, 122, 0.85))';
+        if (label) label.style.color = 'rgba(92, 184, 92, 0.9)';
       } else if (normalizedPower < 75) {
-        powerFill.style.background = 'linear-gradient(to right, #ffff44, #ffaa44)'; // Yellow
-        if (label) label.style.color = 'rgba(255, 255, 100, 0.9)';
+        powerFill.style.background = 'linear-gradient(to right, rgba(212, 163, 68, 0.85), rgba(212, 140, 68, 0.85))';
+        if (label) label.style.color = 'rgba(212, 163, 68, 0.9)';
       } else {
-        powerFill.style.background = 'linear-gradient(to right, #ff8844, #ff4444)'; // Red
-        if (label) label.style.color = 'rgba(255, 100, 100, 0.9)';
+        powerFill.style.background = 'linear-gradient(to right, rgba(201, 120, 74, 0.85), rgba(201, 86, 74, 0.85))';
+        if (label) label.style.color = 'rgba(201, 86, 74, 0.9)';
         // Pulse animation at max power
         if (normalizedPower >= 95) {
           powerFill.style.animation = 'pulse-glow 0.5s infinite';
@@ -165,13 +165,13 @@ export class GrenadePowerMeter {
 
         // Change color based on time left
         if (timeLeft <= 1.0) {
-          cookingTimer.style.color = 'rgba(255, 50, 50, 1)';
+          cookingTimer.style.color = 'rgba(184, 58, 94, 0.95)';
           cookingTimer.style.animation = 'pulse-glow 0.3s infinite';
         } else if (timeLeft <= 2.0) {
-          cookingTimer.style.color = 'rgba(255, 150, 50, 0.95)';
+          cookingTimer.style.color = 'rgba(201, 86, 74, 0.95)';
           cookingTimer.style.animation = 'pulse-glow 0.6s infinite';
         } else {
-          cookingTimer.style.color = 'rgba(255, 200, 100, 0.9)';
+          cookingTimer.style.color = 'rgba(212, 163, 68, 0.9)';
           cookingTimer.style.animation = 'none';
         }
       } else {

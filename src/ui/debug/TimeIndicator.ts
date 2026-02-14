@@ -1,3 +1,5 @@
+import { zIndex } from '../design/tokens';
+
 export class TimeIndicator {
   private container: HTMLDivElement;
   private visible = false;
@@ -17,7 +19,7 @@ export class TimeIndicator {
     this.container.style.fontFamily = '"Courier New", monospace';
     this.container.style.fontSize = '14px';
     this.container.style.color = '#a9f1d8';
-    this.container.style.zIndex = '10004';
+    this.container.style.zIndex = String(zIndex.debug);
     this.container.style.pointerEvents = 'none';
     this.container.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.35)';
     this.container.style.backdropFilter = 'blur(6px)';

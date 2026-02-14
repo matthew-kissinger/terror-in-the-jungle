@@ -33,19 +33,19 @@ export class WeaponAmmoDisplay {
     if (magazine === 0 && reserve > 0) {
       const reloadText = isTouchDevice() ? 'Tap reload' : 'Press R to reload';
       statusElement.textContent = reloadText;
-      statusElement.style.color = '#ff6b6b';
-      magElement.style.color = '#ff6b6b';
+      statusElement.style.color = 'rgba(201, 86, 74, 0.9)';
+      magElement.style.color = 'rgba(201, 86, 74, 0.9)';
     } else if (magazine <= 10 && magazine > 0) {
       statusElement.textContent = 'Low ammo';
-      statusElement.style.color = '#ffd93d';
-      magElement.style.color = '#ffd93d';
+      statusElement.style.color = 'rgba(212, 163, 68, 0.9)';
+      magElement.style.color = 'rgba(212, 163, 68, 0.9)';
     } else if (magazine === 0 && reserve === 0) {
       statusElement.textContent = 'No ammo!';
-      statusElement.style.color = '#ff0000';
-      magElement.style.color = '#ff0000';
+      statusElement.style.color = 'rgba(184, 58, 94, 0.9)';
+      magElement.style.color = 'rgba(184, 58, 94, 0.9)';
     } else {
       statusElement.textContent = '';
-      magElement.style.color = 'white';
+      magElement.style.color = 'rgba(220, 225, 230, 0.9)';
     }
   }
 }

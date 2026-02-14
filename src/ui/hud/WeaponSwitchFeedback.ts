@@ -69,31 +69,31 @@ export class WeaponSwitchFeedback {
       }
 
       .weapon-switch-icon {
-        font-size: 48px;
-        margin-bottom: 8px;
-        text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+        font-size: 20px;
+        font-weight: 700;
+        margin-bottom: 4px;
+        color: rgba(220, 225, 230, 0.7);
       }
 
       .weapon-switch-name {
-        font-family: 'Courier New', monospace;
-        font-size: 20px;
-        font-weight: bold;
-        color: rgba(255, 255, 255, 0.95);
+        font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+        color: rgba(220, 225, 230, 0.9);
         text-transform: uppercase;
-        text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
-        letter-spacing: 2px;
-        background: rgba(0, 0, 0, 0.6);
-        padding: 8px 20px;
-        border-radius: 6px;
-        border: 2px solid rgba(255, 255, 255, 0.3);
+        letter-spacing: 1.5px;
+        background: rgba(8, 12, 18, 0.6);
+        padding: 6px 18px;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(6px);
       }
 
       .weapon-switch-ammo {
-        font-family: 'Courier New', monospace;
-        font-size: 14px;
-        font-weight: bold;
-        color: rgba(255, 255, 255, 0.75);
-        text-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+        font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+        font-size: 13px;
+        font-weight: 600;
+        color: rgba(220, 225, 230, 0.55);
         margin-top: 4px;
       }
     `;

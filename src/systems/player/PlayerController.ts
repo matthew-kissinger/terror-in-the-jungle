@@ -78,7 +78,6 @@ export class PlayerController implements GameSystem {
     if (this.gameModeManager) this.playerState.position.copy(this.getSpawnPosition());
     this.camera.position.copy(this.playerState.position);
     Logger.info('player', `Player controller initialized at ${this.playerState.position.x.toFixed(1)}, ${this.playerState.position.y.toFixed(1)}, ${this.playerState.position.z.toFixed(1)}`);
-    if (this.inventoryManager) this.inventoryManager.onSlotChange((slot: WeaponSlot) => this.handleWeaponSlotChange(slot));
   }
 
   update(deltaTime: number): void {
@@ -377,6 +376,7 @@ export class PlayerController implements GameSystem {
       case WeaponSlot.PRIMARY:
       case WeaponSlot.SHOTGUN:
       case WeaponSlot.SMG:
+      case WeaponSlot.PISTOL:
         if (this.firstPersonWeapon) {
           this.firstPersonWeapon.setWeaponVisibility(true);
         }
@@ -554,7 +554,10 @@ export class PlayerController implements GameSystem {
   }
   setHUDSystem(hudSystem: HUDSystem): void { this.hudSystem = hudSystem; }
   setSandboxRenderer(sandboxRenderer: ISandboxRenderer): void { this.sandboxRenderer = sandboxRenderer; }
-  setInventoryManager(inventoryManager: InventoryManager): void { this.inventoryManager = inventoryManager; }
+  setInventoryManager(inventoryManager: InventoryManager): void {
+    this.inventoryManager = inventoryManager;
+    inventoryManager.onSlotChange((slot: WeaponSlot) => this.handleWeaponSlotChange(slot));
+  }
   setGrenadeSystem(grenadeSystem: GrenadeSystem): void { this.grenadeSystem = grenadeSystem; }
   setMortarSystem(mortarSystem: MortarSystem): void { this.mortarSystem = mortarSystem; }
   setSandbagSystem(sandbagSystem: SandbagSystem): void { this.sandbagSystem = sandbagSystem; this.movement.setSandbagSystem(sandbagSystem); }

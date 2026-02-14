@@ -1,4 +1,6 @@
 import { PixelArtSandbox } from './PixelArtSandbox';
+import { injectSharedStyles } from '../ui/design/styles';
+import { TouchControlLayout } from '../ui/controls/TouchControlLayout';
 
 function showFatalError(message: string) {
   const overlay = document.createElement('div');
@@ -32,7 +34,7 @@ function showFatalError(message: string) {
   button.style.fontSize = '16px';
   button.style.padding = '8px 16px';
   button.style.cursor = 'pointer';
-  button.onclick = () => window.location.reload();
+  button.addEventListener('pointerdown', (e) => { e.preventDefault(); window.location.reload(); });
 
   overlay.appendChild(title);
   overlay.appendChild(err);
@@ -41,6 +43,13 @@ function showFatalError(message: string) {
 }
 
 export async function bootstrapGame(): Promise<void> {
+  // Inject shared design system CSS before any UI is created
+  injectSharedStyles();
+
+  // Init responsive touch control sizing (sets CSS custom properties)
+  const touchLayout = new TouchControlLayout();
+  touchLayout.init();
+
   const sandbox = new PixelArtSandbox();
 
   try {
@@ -51,11 +60,13 @@ export async function bootstrapGame(): Promise<void> {
     (window as any).__sandboxRenderer = sandbox.sandboxRenderer;
 
     window.addEventListener('beforeunload', () => {
+      touchLayout.dispose();
       sandbox.dispose();
     });
 
     if (import.meta.hot) {
       import.meta.hot.dispose(() => {
+        touchLayout.dispose();
         sandbox.dispose();
       });
     }

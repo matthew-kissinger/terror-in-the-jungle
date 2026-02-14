@@ -29,20 +29,20 @@ export class TeamScorePanel {
       display: flex;
       gap: 20px;
       align-items: center;
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       pointer-events: none;
       z-index: 105;
     `;
 
     panel.innerHTML = `
       <div style="display: flex; flex-direction: column; align-items: center;">
-        <div style="font-size: 10px; text-transform: uppercase; color: #4488ff; margin-bottom: 4px; font-weight: bold;">US</div>
-        <div class="us-ticket-count" style="font-size: 22px; font-weight: bold; color: #4488ff;">300</div>
+        <div style="font-size: 10px; text-transform: uppercase; color: rgba(91, 140, 201, 0.8); margin-bottom: 4px; font-weight: bold;">US</div>
+        <div class="us-ticket-count" style="font-size: 22px; font-weight: bold; color: rgba(91, 140, 201, 0.9);">300</div>
       </div>
-      <div style="font-size: 20px; color: #666;">VS</div>
+      <div style="font-size: 20px; color: rgba(220, 225, 230, 0.25);">VS</div>
       <div style="display: flex; flex-direction: column; align-items: center;">
-        <div style="font-size: 10px; text-transform: uppercase; color: #ff4444; margin-bottom: 4px; font-weight: bold;">OPFOR</div>
-        <div class="opfor-ticket-count" style="font-size: 22px; font-weight: bold; color: #ff4444;">300</div>
+        <div style="font-size: 10px; text-transform: uppercase; color: rgba(201, 86, 74, 0.8); margin-bottom: 4px; font-weight: bold;">OPFOR</div>
+        <div class="opfor-ticket-count" style="font-size: 22px; font-weight: bold; color: rgba(201, 86, 74, 0.9);">300</div>
       </div>
     `;
 

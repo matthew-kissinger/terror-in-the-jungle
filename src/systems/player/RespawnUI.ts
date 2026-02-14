@@ -63,7 +63,7 @@ export class RespawnUI {
       background: rgba(0, 0, 0, 0.95);
       display: none;
       z-index: 10000;
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
     `;
 
     const mainLayout = document.createElement('div');
@@ -77,21 +77,21 @@ export class RespawnUI {
     const header = document.createElement('div');
     header.className = 'header';
     header.style.cssText = `
-      background: linear-gradient(180deg, rgba(20,0,0,0.95) 0%, rgba(10,0,0,0.8) 100%);
-      border-bottom: 2px solid #ff0000;
+      background: linear-gradient(180deg, rgba(18, 8, 8, 0.95) 0%, rgba(8, 4, 4, 0.8) 100%);
+      border-bottom: 1px solid rgba(201, 86, 74, 0.4);
       padding: 20px;
       text-align: center;
     `;
 
     const kiaText = document.createElement('h1');
     kiaText.style.cssText = `
-      color: #ff0000;
+      color: rgba(201, 86, 74, 0.95);
       font-size: clamp(24px, 6vw, 48px);
       font-weight: bold;
       text-transform: uppercase;
       margin: 0;
       letter-spacing: clamp(2px, 1vw, 8px);
-      text-shadow: 0 0 20px rgba(255,0,0,0.5);
+      text-shadow: 0 0 12px rgba(201, 86, 74, 0.3);
     `;
     kiaText.textContent = 'K.I.A.';
     header.appendChild(kiaText);
@@ -129,7 +129,7 @@ export class RespawnUI {
     const mapTitle = document.createElement('h2');
     mapTitle.className = 'map-title';
     mapTitle.style.cssText = `
-      color: #00ff00;
+      color: rgba(92, 184, 92, 0.85);
       font-size: 20px;
       text-transform: uppercase;
       margin: 0 0 15px 0;
@@ -143,8 +143,8 @@ export class RespawnUI {
     mapContainer.className = 'map-container';
     mapContainer.style.cssText = `
       flex: 1;
-      background: #0a0a0a;
-      border: 2px solid #00ff00;
+      background: rgba(8, 12, 18, 0.9);
+      border: 1px solid rgba(92, 184, 92, 0.3);
       border-radius: 4px;
       position: relative;
       min-height: 500px;
@@ -167,8 +167,8 @@ export class RespawnUI {
 
     const selectedInfo = document.createElement('div');
     selectedInfo.style.cssText = `
-      background: rgba(0, 50, 0, 0.3);
-      border: 1px solid #00ff00;
+      background: rgba(8, 18, 12, 0.3);
+      border: 1px solid rgba(92, 184, 92, 0.3);
       border-radius: 4px;
       padding: 20px;
     `;
@@ -176,7 +176,7 @@ export class RespawnUI {
     const selectedTitle = document.createElement('h3');
     selectedTitle.className = 'selected-title';
     selectedTitle.style.cssText = `
-      color: #00ff00;
+      color: rgba(92, 184, 92, 0.8);
       font-size: 16px;
       text-transform: uppercase;
       margin: 0 0 15px 0;
@@ -219,7 +219,7 @@ export class RespawnUI {
     const timerDisplay = document.createElement('div');
     timerDisplay.id = 'respawn-timer';
     timerDisplay.style.cssText = `
-      color: #ff6600;
+      color: rgba(212, 163, 68, 0.9);
       font-size: 16px;
       margin-bottom: 20px;
       text-transform: uppercase;
@@ -230,9 +230,9 @@ export class RespawnUI {
     const respawnButton = document.createElement('button');
     respawnButton.id = 'respawn-button';
     respawnButton.style.cssText = `
-      background: linear-gradient(180deg, #00ff00 0%, #00cc00 100%);
-      border: 2px solid #00ff00;
-      color: #000;
+      background: rgba(92, 184, 92, 0.2);
+      border: 1px solid rgba(92, 184, 92, 0.5);
+      color: rgba(92, 184, 92, 0.95);
       font-size: 18px;
       font-weight: bold;
       padding: 15px 40px;
@@ -243,7 +243,7 @@ export class RespawnUI {
       transition: all 0.2s;
       width: 100%;
       min-height: 44px;
-      box-shadow: 0 4px 10px rgba(0,255,0,0.3);
+      box-shadow: 0 2px 8px rgba(92, 184, 92, 0.15);
       touch-action: manipulation;
     `;
     respawnButton.textContent = 'DEPLOY';
@@ -253,12 +253,12 @@ export class RespawnUI {
     respawnButton.onmouseover = () => {
       if (!respawnButton.disabled) {
         respawnButton.style.transform = 'scale(1.05)';
-        respawnButton.style.boxShadow = '0 6px 20px rgba(0,255,0,0.5)';
+        respawnButton.style.boxShadow = '0 4px 12px rgba(92, 184, 92, 0.25)';
       }
     };
     respawnButton.onmouseout = () => {
       respawnButton.style.transform = 'scale(1)';
-      respawnButton.style.boxShadow = '0 4px 10px rgba(0,255,0,0.3)';
+      respawnButton.style.boxShadow = '0 2px 8px rgba(92, 184, 92, 0.15)';
     };
     respawnButton.ontouchstart = () => {
       if (!respawnButton.disabled) {
@@ -298,10 +298,10 @@ export class RespawnUI {
     legend.appendChild(legendTitle);
 
     const legendItems = [
-      { color: '#0080ff', label: 'HQ / Main Base' },
-      { color: '#00ff00', label: 'Controlled Zone' },
-      { color: '#ffff00', label: 'Contested Zone' },
-      { color: '#ff0000', label: 'Enemy Zone' }
+      { color: 'rgba(91, 140, 201, 0.9)', label: 'HQ / Main Base' },
+      { color: 'rgba(92, 184, 92, 0.85)', label: 'Controlled Zone' },
+      { color: 'rgba(212, 163, 68, 0.85)', label: 'Contested Zone' },
+      { color: 'rgba(201, 86, 74, 0.85)', label: 'Enemy Zone' }
     ];
 
     legendItems.forEach(item => {
@@ -374,10 +374,10 @@ export class RespawnUI {
     if (timerElement) {
       if (respawnTimer > 0) {
         timerElement.textContent = `Deployment available in ${Math.ceil(respawnTimer)}s`;
-        timerElement.style.color = '#ff6600';
+        timerElement.style.color = 'rgba(212, 163, 68, 0.9)';
       } else {
         timerElement.textContent = 'Ready for deployment';
-        timerElement.style.color = '#00ff00';
+        timerElement.style.color = 'rgba(92, 184, 92, 0.9)';
       }
     }
 

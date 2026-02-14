@@ -2,6 +2,8 @@
  * CSS styles for the Match End Screen
  */
 
+import { zIndex } from '../design/tokens';
+
 export const MATCH_END_SCREEN_STYLES = `
   .match-end-screen {
     position: fixed;
@@ -16,9 +18,9 @@ export const MATCH_END_SCREEN_STYLES = `
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    z-index: 10000;
+    z-index: ${zIndex.modal};
     color: #fff;
-    font-family: 'Courier New', monospace;
+    font-family: 'Rajdhani', 'Segoe UI', sans-serif;
     animation: fadeIn 0.5s ease-out;
   }
 
@@ -28,11 +30,11 @@ export const MATCH_END_SCREEN_STYLES = `
   }
 
   .match-end-screen.victory {
-    background: rgba(20, 50, 20, 0.9);
+    background: rgba(8, 18, 12, 0.9);
   }
 
   .match-end-screen.defeat {
-    background: rgba(50, 20, 20, 0.9);
+    background: rgba(18, 8, 8, 0.9);
   }
 
   .end-screen-header {
@@ -62,11 +64,11 @@ export const MATCH_END_SCREEN_STYLES = `
   }
 
   .victory .end-screen-title {
-    color: #4CAF50;
+    color: rgba(92, 184, 92, 0.95);
   }
 
   .defeat .end-screen-title {
-    color: #F44336;
+    color: rgba(201, 86, 74, 0.95);
   }
 
   .end-screen-subtitle {
@@ -209,7 +211,7 @@ export const MATCH_END_SCREEN_STYLES = `
     text-transform: uppercase;
     letter-spacing: 0.15em;
     margin-bottom: 0.75rem;
-    color: #7FB4D9;
+    color: rgba(127, 180, 217, 0.8);
     border-bottom: 1px solid rgba(127, 180, 217, 0.3);
     padding-bottom: 0.5rem;
   }
@@ -227,11 +229,11 @@ export const MATCH_END_SCREEN_STYLES = `
 
   .stat-value {
     font-weight: bold;
-    color: #7FB4D9;
+    color: rgba(127, 180, 217, 0.8);
   }
 
   .stat-value.highlight {
-    color: #4CAF50;
+    color: rgba(92, 184, 92, 0.9);
   }
 
   .ticket-comparison {
@@ -261,11 +263,11 @@ export const MATCH_END_SCREEN_STYLES = `
   }
 
   .faction-score.us .faction-tickets {
-    color: #2196F3;
+    color: rgba(91, 140, 201, 0.9);
   }
 
   .faction-score.opfor .faction-tickets {
-    color: #F44336;
+    color: rgba(201, 86, 74, 0.9);
   }
 
   .vs-divider {
@@ -288,7 +290,7 @@ export const MATCH_END_SCREEN_STYLES = `
     color: #fff;
     padding: 1rem 2rem;
     font-size: 1.1rem;
-    font-family: 'Courier New', monospace;
+    font-family: 'Rajdhani', 'Segoe UI', sans-serif;
     text-transform: uppercase;
     letter-spacing: 0.1em;
     cursor: pointer;
@@ -298,14 +300,14 @@ export const MATCH_END_SCREEN_STYLES = `
 
   .end-screen-button:hover {
     background: rgba(127, 180, 217, 0.3);
-    border-color: #7FB4D9;
+    border-color: rgba(127, 180, 217, 0.8);
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(127, 180, 217, 0.3);
   }
 
   .end-screen-button.primary {
     background: rgba(127, 180, 217, 0.4);
-    border-color: #7FB4D9;
+    border-color: rgba(127, 180, 217, 0.8);
   }
 
   .end-screen-button.primary:hover {
@@ -323,7 +325,7 @@ export const MATCH_END_SCREEN_STYLES = `
     text-transform: uppercase;
     letter-spacing: 0.15em;
     margin-bottom: 1rem;
-    color: #7FB4D9;
+    color: rgba(127, 180, 217, 0.8);
   }
 
   .awards-container {
@@ -375,16 +377,16 @@ export const MATCH_END_SCREEN_STYLES = `
 
   .award-value {
     font-size: 1.2rem;
-    color: #7FB4D9;
+    color: rgba(127, 180, 217, 0.8);
     font-weight: bold;
   }
 
   .victory .award-value {
-    color: #4CAF50;
+    color: rgba(92, 184, 92, 0.9);
   }
 
   .defeat .award-value {
-    color: #F44336;
+    color: rgba(201, 86, 74, 0.9);
   }
 `;
 

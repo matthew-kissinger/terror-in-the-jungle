@@ -547,31 +547,31 @@ describe('FullMapSystem', () => {
   describe('getZoneColor', () => {
     it('should return correct color for US controlled zone', () => {
       const color = (system as any).getZoneColor(ZoneState.US_CONTROLLED, 0.5);
-      expect(color).toContain('68'); // Red component
-      expect(color).toContain('136'); // Green component
-      expect(color).toContain('255'); // Blue component
+      expect(color).toContain('91'); // Red component
+      expect(color).toContain('140'); // Green component
+      expect(color).toContain('201'); // Blue component
       expect(color).toContain('0.5'); // Alpha
     });
 
     it('should return correct color for OPFOR controlled zone', () => {
       const color = (system as any).getZoneColor(ZoneState.OPFOR_CONTROLLED, 0.8);
-      expect(color).toContain('255'); // Red component
-      expect(color).toContain('68'); // Green component
-      expect(color).toContain('68'); // Blue component
+      expect(color).toContain('201'); // Red component
+      expect(color).toContain('86'); // Green component
+      expect(color).toContain('74'); // Blue component
       expect(color).toContain('0.8'); // Alpha
     });
 
     it('should return correct color for contested zone', () => {
       const color = (system as any).getZoneColor(ZoneState.CONTESTED, 0.3);
-      expect(color).toContain('255'); // Red component
-      expect(color).toContain('255'); // Green component
+      expect(color).toContain('212'); // Red component
+      expect(color).toContain('163'); // Green component
       expect(color).toContain('68'); // Blue component
       expect(color).toContain('0.3'); // Alpha
     });
 
     it('should return neutral color for unknown state', () => {
       const color = (system as any).getZoneColor('unknown' as ZoneState, 0.7);
-      expect(color).toContain('136'); // Gray components
+      expect(color).toContain('107'); // Gray components
       expect(color).toContain('0.7'); // Alpha
     });
   });
@@ -588,7 +588,7 @@ describe('FullMapSystem', () => {
       
       (system as any).drawCombatants(mockCanvasContext);
       
-      expect(mockCanvasContext.fillStyle).toContain('68'); // US color
+      expect(mockCanvasContext.fillStyle).toContain('91'); // US color (muted blue)
       expect(mockCanvasContext.beginPath).toHaveBeenCalled();
       expect(mockCanvasContext.arc).toHaveBeenCalled();
       expect(mockCanvasContext.fill).toHaveBeenCalled();
@@ -601,7 +601,7 @@ describe('FullMapSystem', () => {
       
       (system as any).drawCombatants(mockCanvasContext);
       
-      expect(mockCanvasContext.fillStyle).toContain('255'); // OPFOR color
+      expect(mockCanvasContext.fillStyle).toContain('201'); // OPFOR color (muted red)
       expect(mockCanvasContext.beginPath).toHaveBeenCalled();
       expect(mockCanvasContext.arc).toHaveBeenCalled();
       expect(mockCanvasContext.fill).toHaveBeenCalled();
@@ -624,7 +624,7 @@ describe('FullMapSystem', () => {
       mockCamera.position.set(100, 5, 200);
       (system as any).drawPlayer(mockCanvasContext);
       
-      expect(mockCanvasContext.fillStyle).toBe('#00ff00'); // Player color
+      expect(mockCanvasContext.fillStyle).toBe('rgba(220, 225, 230, 0.95)'); // Player color
       expect(mockCanvasContext.beginPath).toHaveBeenCalled();
       expect(mockCanvasContext.arc).toHaveBeenCalled();
       expect(mockCanvasContext.fill).toHaveBeenCalled();
@@ -639,7 +639,7 @@ describe('FullMapSystem', () => {
       
       (system as any).drawPlayer(mockCanvasContext);
       
-      expect(mockCanvasContext.strokeStyle).toBe('#00ff00'); // Player color
+      expect(mockCanvasContext.strokeStyle).toBe('rgba(220, 225, 230, 0.95)'); // Player color
       expect(mockCanvasContext.moveTo).toHaveBeenCalled();
       expect(mockCanvasContext.lineTo).toHaveBeenCalled();
       expect(mockCanvasContext.stroke).toHaveBeenCalled();

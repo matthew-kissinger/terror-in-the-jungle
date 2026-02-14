@@ -266,7 +266,7 @@ export class WeaponRigManager {
     // Notify HUD about weapon switch
     if (hudSystem && hudSystem.showWeaponSwitch) {
       const weaponNames = { rifle: 'RIFLE', shotgun: 'SHOTGUN', smg: 'SMG', pistol: 'PISTOL' }
-      const weaponIcons = { rifle: '🔫', shotgun: '💥', smg: '', pistol: '🔫' }
+      const weaponIcons = { rifle: 'AR', shotgun: 'SG', smg: 'SM', pistol: 'PT' }
       const ammoState = ammoManager?.getState() || { currentMagazine: 0, reserveAmmo: 0 }
       hudSystem.showWeaponSwitch(
         weaponNames[weaponType],

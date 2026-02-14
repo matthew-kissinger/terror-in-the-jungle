@@ -7,6 +7,7 @@
 import { shouldUseTouchControls } from '../utils/DeviceDetector';
 import { SettingsManager } from '../config/SettingsManager';
 import type { PixelArtSandbox } from '../core/PixelArtSandbox';
+import { colors, zIndex } from './design/tokens';
 
 export class MobilePauseOverlay {
   private overlay: HTMLDivElement | null = null;
@@ -38,7 +39,7 @@ export class MobilePauseOverlay {
       width: 100%;
       height: 100%;
       background: rgba(0, 0, 0, 0.75);
-      z-index: 10000;
+      z-index: ${zIndex.modal};
       align-items: center;
       justify-content: center;
       cursor: pointer;
@@ -50,7 +51,7 @@ export class MobilePauseOverlay {
       msg.style.cssText = `
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         font-size: 1.5rem;
-        color: #7fb4d9;
+        color: ${colors.primary};
         text-transform: uppercase;
         letter-spacing: 0.1em;
         padding: 1rem 2rem;

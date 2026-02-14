@@ -10,6 +10,11 @@ import { ZoneManager } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 import { estimateGPUTier, isMobileGPU } from '../../utils/DeviceDetector';
+import { resetRaycastBudget } from './ai/RaycastBudget';
+
+// Stagger periods: how many frames between full AI updates per LOD tier
+const STAGGER_HIGH = 3;
+const STAGGER_MEDIUM = 5;
 
 /**
  * Manages LOD (Level of Detail) calculations and update scheduling for combatants
@@ -42,6 +47,12 @@ export class CombatantLODManager {
   private frameDeltaEma = 1 / 60; // seconds
   private readonly FRAME_EMA_ALPHA = 0.1;
   intervalScale = 1.0; // Scales min update intervals when FPS is low
+
+  // Frame counter for AI staggering
+  private frameCounter = 0;
+
+  // Profiling: how many AI updates were staggered (skipped) this frame
+  staggeredSkipCount = 0;
 
   // Module dependencies
   private combatantAI: CombatantAI;
@@ -161,6 +172,16 @@ export class CombatantLODManager {
   updateCombatants(deltaTime: number): void {
     this.updateDeathAnimations(deltaTime);
 
+    // Reset per-frame raycast budget
+    resetRaycastBudget();
+
+    // Clear stale LOS cache entries
+    this.combatantAI.clearLOSCache();
+
+    // Increment frame counter for AI staggering
+    this.frameCounter++;
+    this.staggeredSkipCount = 0;
+
     const now = Date.now();
     const worldSize = this.gameModeManager?.getWorldSize() || 4000;
 
@@ -202,23 +223,36 @@ export class CombatantLODManager {
       }
     });
 
-    this.highBucket.forEach(combatant => {
+    this.highBucket.forEach((combatant, index) => {
       combatant.lodLevel = 'high';
       this.lodHighCount++;
-      this.updateCombatantFull(combatant, deltaTime);
+
+      // Stagger AI decisions: only run full AI+combat on this combatant's turn
+      if (this.frameCounter % STAGGER_HIGH === index % STAGGER_HIGH) {
+        this.updateCombatantFull(combatant, deltaTime);
+      } else {
+        // Off-frame: still update movement, rotation, spatial position for smooth visuals
+        this.updateCombatantVisualOnly(combatant, deltaTime);
+        this.staggeredSkipCount++;
+      }
     });
 
-    this.mediumBucket.forEach(combatant => {
+    this.mediumBucket.forEach((combatant, index) => {
       combatant.lodLevel = 'medium';
       this.lodMediumCount++;
       const distance = Math.sqrt(combatant.distanceSq!);
       const dynamicIntervalMs = this.computeDynamicIntervalMs(distance) * this.intervalScale;
       const elapsedMs = now - (combatant.lastUpdateTime || 0);
-      
+
       if (elapsedMs > dynamicIntervalMs) {
-        const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, 1.0) : deltaTime;
-        this.updateCombatantMedium(combatant, effectiveDelta);
-        combatant.lastUpdateTime = now;
+        // Apply stagger within the medium LOD tier as well
+        if (this.frameCounter % STAGGER_MEDIUM === index % STAGGER_MEDIUM) {
+          const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, 1.0) : deltaTime;
+          this.updateCombatantMedium(combatant, effectiveDelta);
+          combatant.lastUpdateTime = now;
+        } else {
+          this.staggeredSkipCount++;
+        }
       }
     });
 
@@ -307,6 +341,22 @@ export class CombatantLODManager {
       this.squadManager.getAllSquads(),
       this.combatants
     );
+    this.combatantMovement.updateRotation(combatant, deltaTime);
+    this.spatialGrid.updatePosition(combatant.id, combatant.position);
+  }
+
+  /**
+   * Visual-only update for staggered frames: movement, rotation, texture, spatial.
+   * AI decisions and combat are skipped to save budget.
+   */
+  private updateCombatantVisualOnly(combatant: Combatant, deltaTime: number): void {
+    this.combatantMovement.updateMovement(
+      combatant,
+      deltaTime,
+      this.squadManager.getAllSquads(),
+      this.combatants
+    );
+    this.combatantRenderer.updateCombatantTexture(combatant);
     this.combatantMovement.updateRotation(combatant, deltaTime);
     this.spatialGrid.updatePosition(combatant.id, combatant.position);
   }

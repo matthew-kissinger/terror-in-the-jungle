@@ -18,7 +18,7 @@ const STORAGE_KEY = 'pixelart-sandbox-settings';
 const DEFAULT_SETTINGS: GameSettings = {
   masterVolume: 70,
   mouseSensitivity: 5,
-  showFPS: true,
+  showFPS: false,
   enableShadows: true,
   graphicsQuality: 'medium',
 };

@@ -17,6 +17,7 @@ vi.mock('../../utils/Logger', () => ({
 // Mock ProgrammaticExplosivesFactory
 vi.mock('./ProgrammaticExplosivesFactory', () => ({
   ProgrammaticExplosivesFactory: {
+    SANDBAG_HEIGHT: 2.4,
     createSandbag: vi.fn(() => {
       const geometry = new THREE.BoxGeometry(2, 1.2, 0.8);
       const material = new THREE.MeshStandardMaterial({ color: 0x8b7355 });

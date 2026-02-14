@@ -3,19 +3,15 @@ import { GameSystem } from '../../types';
 import { GrenadeType } from '../../systems/combat/types';
 import { shouldUseTouchControls } from '../../utils/DeviceDetector';
 import { renderGrenadePanel } from './LoadoutGrenadePanel';
-import { renderWeaponPanel } from './LoadoutWeaponPanel';
 import { LoadoutWeapon } from './LoadoutTypes';
 
 export { LoadoutWeapon };
 
 export class LoadoutSelector implements GameSystem {
   private overlayElement?: HTMLElement;
-  private selectedWeapon: LoadoutWeapon = LoadoutWeapon.RIFLE;
   private selectedGrenade: GrenadeType = GrenadeType.FRAG;
   private isVisible = false;
   private boundOnKeyDown = this.onKeyDown.bind(this);
-  private weaponOptionElements: HTMLElement[] = [];
-  private weaponOptionHandlers: Array<(event: PointerEvent) => void> = [];
   private grenadeOptionElements: HTMLElement[] = [];
   private grenadeOptionHandlers: Array<(event: PointerEvent) => void> = [];
 
@@ -46,20 +42,18 @@ export class LoadoutSelector implements GameSystem {
       justify-content: center;
       align-items: center;
       z-index: 9999;
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       color: #fff;
     `;
 
     this.overlayElement.innerHTML = `
-      <div style="text-align: center; max-width: 900px; padding: 40px; overflow-y: auto; max-height: 100vh;">
+      <div style="text-align: center; max-width: 800px; padding: 40px; overflow-y: auto; max-height: 100vh;">
         <h1 style="font-size: 36px; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 3px;">
-          Select Loadout
+          Choose Grenade
         </h1>
         <p style="font-size: 14px; color: rgba(255, 255, 255, 0.6); margin-bottom: 40px;">
-          Choose your primary weapon and grenade type
+          Pick your grenade type for this match
         </p>
-
-        ${renderWeaponPanel()}
 
         ${renderGrenadePanel()}
 
@@ -67,7 +61,7 @@ export class LoadoutSelector implements GameSystem {
           <span style="background: rgba(255, 255, 255, 0.1); padding: 6px 12px; border-radius: 4px; margin: 0 8px;">
             ${shouldUseTouchControls() ? 'TAP' : 'CLICK'}
           </span>
-          to select weapon
+          to select
           ${!shouldUseTouchControls() ? `
           <span style="background: rgba(255, 255, 255, 0.1); padding: 6px 12px; border-radius: 4px; margin: 0 8px;">
             SPACE
@@ -100,23 +94,6 @@ export class LoadoutSelector implements GameSystem {
     // Add hover styles
     const style = document.createElement('style');
     style.textContent = `
-      .loadout-option {
-        touch-action: manipulation;
-        -webkit-tap-highlight-color: transparent;
-      }
-
-      .loadout-option:hover {
-        border-color: rgba(0, 255, 100, 0.6) !important;
-        background: rgba(30, 30, 40, 0.8) !important;
-        transform: scale(1.05);
-      }
-
-      .loadout-option.selected {
-        border-color: rgba(0, 255, 100, 0.8) !important;
-        background: rgba(0, 255, 100, 0.15) !important;
-        box-shadow: 0 0 20px rgba(0, 255, 100, 0.4);
-      }
-
       .grenade-option {
         touch-action: manipulation;
         -webkit-tap-highlight-color: transparent;
@@ -138,33 +115,14 @@ export class LoadoutSelector implements GameSystem {
 
     document.body.appendChild(this.overlayElement);
 
-    // Mark rifle as initially selected
+    // Mark frag as initially selected
     this.updateSelection();
   }
 
   private setupEventListeners(): void {
     if (!this.overlayElement) return;
 
-    // Click on weapon options - use pointerdown for immediate response
-    const options = this.overlayElement.querySelectorAll('.loadout-option');
-    options.forEach(option => {
-      const optionElement = option as HTMLElement;
-      const pointerHandler = (e: PointerEvent) => {
-        // Only trigger on primary button (left click) or touch
-        if (e.button !== 0 && e.pointerType === 'mouse') return;
-        
-        const weapon = optionElement.dataset.weapon as LoadoutWeapon;
-        this.selectedWeapon = weapon;
-        this.updateSelection();
-      };
-      this.weaponOptionElements.push(optionElement);
-      this.weaponOptionHandlers.push(pointerHandler);
-      optionElement.addEventListener('pointerdown', pointerHandler);
-      // Prevent click from doing anything else if we handle pointerdown
-      optionElement.addEventListener('click', (e) => e.preventDefault());
-    });
-
-    // Click on grenade options - use pointerdown
+    // Click on grenade options - use pointerdown for immediate response
     const grenadeOptions = this.overlayElement.querySelectorAll('.grenade-option');
     grenadeOptions.forEach(option => {
       const optionElement = option as HTMLElement;
@@ -203,36 +161,10 @@ export class LoadoutSelector implements GameSystem {
       event.preventDefault();
       this.confirmSelection();
     }
-
-    // Number keys 1-4 for quick select
-    if (event.code === 'Digit1') {
-      this.selectedWeapon = LoadoutWeapon.RIFLE;
-      this.updateSelection();
-    } else if (event.code === 'Digit2') {
-      this.selectedWeapon = LoadoutWeapon.SHOTGUN;
-      this.updateSelection();
-    } else if (event.code === 'Digit3') {
-      this.selectedWeapon = LoadoutWeapon.SMG;
-      this.updateSelection();
-    } else if (event.code === 'Digit4') {
-      this.selectedWeapon = LoadoutWeapon.PISTOL;
-      this.updateSelection();
-    }
   }
 
   private updateSelection(): void {
     if (!this.overlayElement) return;
-
-    // Update weapon selection
-    const options = this.overlayElement.querySelectorAll('.loadout-option');
-    options.forEach(option => {
-      const weapon = (option as HTMLElement).dataset.weapon;
-      if (weapon === this.selectedWeapon) {
-        option.classList.add('selected');
-      } else {
-        option.classList.remove('selected');
-      }
-    });
 
     // Update grenade selection
     const grenadeOptions = this.overlayElement.querySelectorAll('.grenade-option');
@@ -247,10 +179,11 @@ export class LoadoutSelector implements GameSystem {
   }
 
   private confirmSelection(): void {
-    Logger.info('ui', `Loadout selected: ${this.selectedWeapon.toUpperCase()}, Grenade: ${this.selectedGrenade.toUpperCase()}`);
+    Logger.info('ui', `Loadout selected: Grenade: ${this.selectedGrenade.toUpperCase()}`);
 
     if (this.onLoadoutSelected) {
-      this.onLoadoutSelected(this.selectedWeapon, this.selectedGrenade);
+      // Always use rifle as primary weapon - all weapons are available in-game via hotbar
+      this.onLoadoutSelected(LoadoutWeapon.RIFLE, this.selectedGrenade);
     }
 
     this.hide();
@@ -291,13 +224,6 @@ export class LoadoutSelector implements GameSystem {
   }
 
   /**
-   * Get currently selected weapon
-   */
-  getSelectedWeapon(): LoadoutWeapon {
-    return this.selectedWeapon;
-  }
-
-  /**
    * Get currently selected grenade type
    */
   getSelectedGrenade(): GrenadeType {
@@ -312,15 +238,6 @@ export class LoadoutSelector implements GameSystem {
   }
 
   dispose(): void {
-    this.weaponOptionElements.forEach((option, index) => {
-      const handler = this.weaponOptionHandlers[index];
-      if (handler) {
-        option.removeEventListener('pointerdown', handler);
-      }
-    });
-    this.weaponOptionElements = [];
-    this.weaponOptionHandlers = [];
-
     this.grenadeOptionElements.forEach((option, index) => {
       const handler = this.grenadeOptionHandlers[index];
       if (handler) {

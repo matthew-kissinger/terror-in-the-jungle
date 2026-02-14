@@ -188,6 +188,17 @@ export class PlayerMovement {
       groundHeight = effectiveHeight + 2;
     }
 
+    // Allow standing on top of sandbags
+    if (this.sandbagSystem) {
+      const sandbagTop = this.sandbagSystem.getStandingHeight(newPosition.x, newPosition.z);
+      if (sandbagTop !== null) {
+        const sandbagGround = sandbagTop + 2; // player eye height above surface
+        if (sandbagGround > groundHeight) {
+          groundHeight = sandbagGround;
+        }
+      }
+    }
+
     // Check for landing and play landing sound
     const wasGrounded = this.playerState.isGrounded;
 

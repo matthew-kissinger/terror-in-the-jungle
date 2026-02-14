@@ -3,6 +3,7 @@ import { Combatant } from '../types';
 import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
 import { SmokeCloudSystem } from '../../effects/SmokeCloudSystem';
+import { tryConsumeRaycast } from './RaycastBudget';
 
 // Module-level scratch vectors for LOS checks
 const _toTarget = new THREE.Vector3();
@@ -13,6 +14,15 @@ const _direction = new THREE.Vector3();
 const _intersection = new THREE.Vector3();
 const _ray = new THREE.Ray();
 
+/** Cache entry for LOS results */
+interface LOSCacheEntry {
+  result: boolean;
+  timestamp: number;
+}
+
+/** Cache TTL in milliseconds - combatants don't teleport */
+const LOS_CACHE_TTL_MS = 150;
+
 /**
  * Handles line-of-sight and visibility checks
  */
@@ -20,6 +30,14 @@ export class AILineOfSight {
   private chunkManager?: ImprovedChunkManager;
   private sandbagSystem?: SandbagSystem;
   private smokeCloudSystem?: SmokeCloudSystem;
+
+  // LOS result cache: avoids redundant raycasts for the same combatant pair
+  private losCache: Map<string, LOSCacheEntry> = new Map();
+
+  // Profiling counters
+  static cacheHits = 0;
+  static cacheMisses = 0;
+  static budgetDenials = 0;
 
   setChunkManager(chunkManager: ImprovedChunkManager): void {
     this.chunkManager = chunkManager;
@@ -31,6 +49,44 @@ export class AILineOfSight {
 
   setSmokeCloudSystem(smokeCloudSystem: SmokeCloudSystem): void {
     this.smokeCloudSystem = smokeCloudSystem;
+  }
+
+  /**
+   * Clear stale entries from the LOS cache.
+   * Call once per frame to keep memory bounded.
+   */
+  clearCache(): void {
+    const now = performance.now();
+    // Only do full sweep if cache is getting large
+    if (this.losCache.size > 200) {
+      this.losCache.forEach((entry, key) => {
+        if (now - entry.timestamp > LOS_CACHE_TTL_MS) {
+          this.losCache.delete(key);
+        }
+      });
+    }
+  }
+
+  /**
+   * Get profiling stats for the LOS cache.
+   */
+  static getCacheStats(): { hits: number; misses: number; hitRate: number; budgetDenials: number } {
+    const total = AILineOfSight.cacheHits + AILineOfSight.cacheMisses;
+    return {
+      hits: AILineOfSight.cacheHits,
+      misses: AILineOfSight.cacheMisses,
+      hitRate: total > 0 ? AILineOfSight.cacheHits / total : 0,
+      budgetDenials: AILineOfSight.budgetDenials,
+    };
+  }
+
+  /**
+   * Reset profiling counters.
+   */
+  static resetStats(): void {
+    AILineOfSight.cacheHits = 0;
+    AILineOfSight.cacheMisses = 0;
+    AILineOfSight.budgetDenials = 0;
   }
 
   /**
@@ -49,7 +105,7 @@ export class AILineOfSight {
 
     const distance = Math.sqrt(distanceSq);
 
-    // FOV check
+    // FOV check (cheap - always do this before cache lookup)
     _toTarget.subVectors(targetPos, combatant.position).divideScalar(distance || 1);
 
     _forward.set(
@@ -66,6 +122,52 @@ export class AILineOfSight {
       return false;
     }
 
+    // --- LOS Cache check (for the expensive raycast portion) ---
+    const cacheKey = `${combatant.id}_${target.id}`;
+    const now = performance.now();
+    const cached = this.losCache.get(cacheKey);
+
+    if (cached && (now - cached.timestamp) < LOS_CACHE_TTL_MS) {
+      AILineOfSight.cacheHits++;
+      return cached.result;
+    }
+
+    AILineOfSight.cacheMisses++;
+
+    // --- Raycast budget gate ---
+    // Terrain and sandbag checks are the expensive part.
+    // If budget is exhausted, return conservative default (can't see).
+    const needsTerrainRaycast = this.chunkManager && combatant.lodLevel &&
+      (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium');
+
+    if (needsTerrainRaycast) {
+      if (!tryConsumeRaycast()) {
+        AILineOfSight.budgetDenials++;
+        // Budget exhausted: return last cached result if available, otherwise conservative false
+        if (cached) {
+          return cached.result;
+        }
+        return false;
+      }
+    }
+
+    // --- Full LOS evaluation ---
+    const result = this.evaluateFullLOS(combatant, targetPos, distance);
+
+    // Store in cache
+    this.losCache.set(cacheKey, { result, timestamp: now });
+
+    return result;
+  }
+
+  /**
+   * Perform the full (expensive) LOS evaluation: terrain, sandbag, smoke checks.
+   */
+  private evaluateFullLOS(
+    combatant: Combatant,
+    targetPos: THREE.Vector3,
+    distance: number
+  ): boolean {
     // Terrain LOS check (high/medium LOD only)
     if (this.chunkManager && combatant.lodLevel &&
         (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium')) {

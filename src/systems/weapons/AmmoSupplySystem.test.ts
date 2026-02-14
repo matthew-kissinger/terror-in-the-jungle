@@ -171,7 +171,7 @@ describe('AmmoSupplySystem', () => {
       const crateGroup = scene.children[0] as THREE.Group;
       const stripes = crateGroup.children.filter((child) => {
         if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
-          return child.material.color.getHex() === 0xffff00;
+          return child.material.color.getHex() === 0xd4a344;
         }
         return false;
       });
@@ -534,7 +534,7 @@ describe('AmmoSupplySystem', () => {
 
       system.update(0.016);
 
-      expect(glowMaterial.color.getHex()).toBe(0x00ff00);
+      expect(glowMaterial.color.getHex()).toBe(0x5cb85c);
       expect(glowMaterial.opacity).toBeGreaterThan(0.3);
     });
 
@@ -557,7 +557,7 @@ describe('AmmoSupplySystem', () => {
       camera.position.set(0, 0, 3);
       system.update(0.016);
 
-      expect(glowMaterial.color.getHex()).toBe(0xff0000);
+      expect(glowMaterial.color.getHex()).toBe(0xc9564a);
     });
   });
 

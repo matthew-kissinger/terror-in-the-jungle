@@ -1,41 +1,42 @@
+import { colors, zIndex } from '../design/tokens';
+
 export const MINIMAP_SIZE = 200;
 export const DEFAULT_WORLD_SIZE = 300;
 
 export const MINIMAP_STYLES = `
   .minimap-container {
     position: fixed;
-    top: 24px;
-    right: 24px;
-    width: 200px;
-    height: 200px;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 14px;
+    top: 16px;
+    right: 16px;
+    width: clamp(110px, 13vw, 180px);
+    height: clamp(110px, 13vw, 180px);
+    border: 1px solid ${colors.hudBorder};
+    border-radius: 6px;
     overflow: hidden;
-    background: rgba(10, 10, 14, 0.28);
-    backdrop-filter: blur(6px) saturate(1.1);
-    -webkit-backdrop-filter: blur(6px) saturate(1.1);
-    z-index: 120;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+    background: ${colors.hudGlass};
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: ${zIndex.hudWeapon};
     transition: all 0.3s ease-in-out;
   }
 
   @media (max-width: 1024px) {
     .minimap-container {
-      width: 150px;
-      height: 150px;
-      top: 16px;
-      right: 16px;
-      border-radius: 10px;
+      width: 130px;
+      height: 130px;
+      top: 12px;
+      right: 10px;
+      border-radius: 5px;
     }
   }
 
   @media (max-width: 480px) {
     .minimap-container {
-      width: 120px;
-      height: 120px;
-      top: 12px;
-      right: 12px;
-      border-radius: 8px;
+      width: 100px;
+      height: 100px;
+      top: 10px;
+      right: 8px;
+      border-radius: 4px;
     }
   }
 
@@ -49,14 +50,15 @@ export const MINIMAP_STYLES = `
 
   .minimap-legend {
     position: absolute;
-    bottom: 6px;
-    left: 6px;
-    color: rgba(255, 255, 255, 0.72);
-    font-size: 9px;
-    font-family: 'Courier New', monospace;
+    bottom: 4px;
+    left: 4px;
+    color: rgba(220, 225, 230, 0.45);
+    font-size: 8px;
+    font-family: 'Rajdhani', sans-serif;
+    font-weight: 600;
     pointer-events: none;
   }
-  
+
   @media (max-width: 480px) {
     .minimap-legend {
       display: none;

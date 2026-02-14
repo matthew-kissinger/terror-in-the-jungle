@@ -326,7 +326,7 @@ export class FullMapSystem implements GameSystem {
     // Zone name - adjust font size for readability
     const fontSize = Math.max(10, 12 / Math.sqrt(zoomLevel));
     ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.font = `bold ${fontSize}px Courier New`;
+    ctx.font = `bold ${fontSize}px Rajdhani`;
     ctx.textAlign = 'center';
     ctx.fillText(zone.name, x, y - radius - 8);
   }

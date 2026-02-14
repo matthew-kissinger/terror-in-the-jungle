@@ -1,21 +1,22 @@
 /**
  * Status display styles - tickets, combat stats, game status, timer, victory screen
  */
+import { colors, zIndex, fontStack } from '../design/tokens';
 
 export const HUDStatusStyles = `
   .ticket-display {
     position: absolute;
-    top: 16px;
+    top: 12px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(10, 10, 14, 0.28);
-    backdrop-filter: blur(6px) saturate(1.1);
-    -webkit-backdrop-filter: blur(6px) saturate(1.1);
-    padding: 8px 16px;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 10px;
+    background: ${colors.hudGlass};
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 6px 20px;
+    border: 1px solid ${colors.hudBorder};
+    border-radius: 6px;
     display: flex;
-    gap: 24px;
+    gap: 16px;
     align-items: center;
   }
 
@@ -26,120 +27,126 @@ export const HUDStatusStyles = `
   }
 
   .faction-name {
-    font-size: 12px;
+    font-size: 10px;
+    font-weight: 600;
     text-transform: uppercase;
-    margin-bottom: 5px;
+    margin-bottom: 2px;
+    letter-spacing: 1px;
+    color: rgba(220, 225, 230, 0.5);
   }
 
   .ticket-count {
-    font-size: 28px;
-    font-weight: bold;
+    font-size: 24px;
+    font-weight: 700;
+    font-family: ${fontStack.hud};
   }
 
-  .us-tickets { color: #4488ff; }
-  .opfor-tickets { color: #ff4444; }
+  .us-tickets { color: ${colors.us}; }
+  .opfor-tickets { color: ${colors.opfor}; }
 
   .ticket-separator {
-    font-size: 24px;
-    color: #666;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.2);
+    font-weight: 300;
   }
 
+  /* Combat stats - hidden to reduce clutter, info available in scoreboard */
   .combat-stats {
-    position: absolute;
-    bottom: 16px;
-    right: 16px;
-    background: rgba(10, 10, 14, 0.28);
-    backdrop-filter: blur(6px) saturate(1.1);
-    -webkit-backdrop-filter: blur(6px) saturate(1.1);
-    padding: 8px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    font-size: 12px;
+    display: none;
   }
 
   .stat-line {
-    margin: 3px 0;
+    margin: 2px 0;
   }
 
   .game-status {
     position: absolute;
-    top: 70px;
-    left: 20px;
-    background: rgba(10, 10, 14, 0.28);
-    backdrop-filter: blur(6px) saturate(1.1);
-    -webkit-backdrop-filter: blur(6px) saturate(1.1);
-    padding: 6px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    border-radius: 6px;
-    font-size: 12px;
+    top: 58px;
+    left: 16px;
+    background: ${colors.hudGlass};
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 4px 10px;
+    border: 1px solid ${colors.hudBorder};
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
   }
 
-  .phase-setup { border-color: #ffaa00; color: #ffaa00; }
-  .phase-combat { border-color: #ff4444; color: #ff4444; }
-  .phase-overtime { border-color: #ff0088; color: #ff0088; animation: pulse 0.5s infinite; }
-  .phase-ended { border-color: #00ff00; color: #00ff00; }
+  .phase-setup { border-color: rgba(212, 163, 68, 0.3); color: ${colors.warning}; }
+  .phase-combat { border-color: rgba(201, 86, 74, 0.3); color: ${colors.opfor}; }
+  .phase-overtime { border-color: rgba(184, 58, 94, 0.3); color: ${colors.critical}; animation: pulse 0.5s infinite; }
+  .phase-ended { border-color: rgba(92, 184, 92, 0.3); color: ${colors.success}; }
 
   .time-remaining {
-    font-size: 12px;
-    margin-top: 5px;
-    opacity: 0.8;
+    font-size: 11px;
+    margin-top: 4px;
+    opacity: 0.6;
   }
 
   .bleed-indicator {
     font-size: 10px;
-    margin-top: 3px;
-    opacity: 0.7;
+    margin-top: 2px;
+    opacity: 0.5;
   }
 
   .match-timer {
     position: absolute;
-    top: 20px;
-    left: 20px;
-    background: rgba(10, 10, 14, 0.5);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    padding: 8px 14px;
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    border-radius: 6px;
+    top: 14px;
+    left: 16px;
+    background: ${colors.hudGlass};
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 4px 12px;
+    border: 1px solid ${colors.hudBorder};
+    border-radius: 4px;
     pointer-events: none;
-    z-index: 105;
+    z-index: ${zIndex.hudStatus};
   }
 
   .timer-display {
-    font-family: 'Courier New', monospace;
-    font-size: 22px;
-    font-weight: bold;
-    color: white;
+    font-family: ${fontStack.hud};
+    font-size: 20px;
+    font-weight: 700;
+    color: rgba(220, 225, 230, 0.9);
     text-align: center;
-    letter-spacing: 1px;
-    transition: color 0.3s ease, text-shadow 0.3s ease;
+    letter-spacing: 1.5px;
+    transition: color 0.3s ease;
+  }
+
+  .match-timer.timer-warning .timer-display {
+    color: ${colors.warning};
+  }
+
+  .match-timer.timer-critical .timer-display {
+    color: ${colors.danger};
   }
 
   .match-timer.timer-warning {
-    border-color: rgba(255, 255, 0, 0.6);
-    animation: timerWarningPulse 1s ease-in-out infinite;
+    border-color: rgba(212, 163, 68, 0.3);
   }
 
   .match-timer.timer-critical {
-    border-color: rgba(255, 0, 0, 0.8);
-    animation: timerCriticalPulse 0.5s ease-in-out infinite;
+    border-color: rgba(201, 86, 74, 0.4);
+    animation: timerCriticalPulse 1s ease-in-out infinite;
   }
 
   @keyframes timerWarningPulse {
     0%, 100% {
-      box-shadow: 0 0 10px rgba(255, 255, 0, 0.3);
+      box-shadow: 0 0 6px rgba(212, 163, 68, 0.2);
     }
     50% {
-      box-shadow: 0 0 20px rgba(255, 255, 0, 0.6);
+      box-shadow: 0 0 12px rgba(212, 163, 68, 0.4);
     }
   }
 
   @keyframes timerCriticalPulse {
     0%, 100% {
-      box-shadow: 0 0 15px rgba(255, 0, 0, 0.4);
+      box-shadow: 0 0 8px rgba(201, 86, 74, 0.2);
     }
     50% {
-      box-shadow: 0 0 30px rgba(255, 0, 0, 0.8);
+      box-shadow: 0 0 16px rgba(201, 86, 74, 0.5);
     }
   }
 
@@ -155,36 +162,36 @@ export const HUDStatusStyles = `
     border-radius: 10px;
     text-align: center;
     border: 3px solid;
-    z-index: 1000;
+    z-index: ${zIndex.victoryScreen};
   }
 
-  .victory-us { border-color: #4488ff; color: #4488ff; }
-  .victory-opfor { border-color: #ff4444; color: #ff4444; }
+  .victory-us { border-color: ${colors.us}; color: ${colors.us}; }
+  .victory-opfor { border-color: ${colors.opfor}; color: ${colors.opfor}; }
 
   /* Mobile responsive adjustments */
   @media (max-width: 768px) {
     .combat-stats {
       bottom: 160px;
       right: 12px;
-      font-size: 11px;
-      padding: 6px;
-    }
-
-    .game-status {
-      top: 60px;
-      left: 12px;
-      font-size: 11px;
+      font-size: 10px;
       padding: 4px 8px;
     }
 
+    .game-status {
+      top: 46px;
+      left: 10px;
+      font-size: 10px;
+      padding: 3px 8px;
+    }
+
     .match-timer {
-      top: 12px;
-      left: 12px;
-      padding: 6px 10px;
+      top: 10px;
+      left: 10px;
+      padding: 3px 10px;
     }
 
     .timer-display {
-      font-size: 18px;
+      font-size: 16px;
     }
 
     .victory-screen {
@@ -195,12 +202,12 @@ export const HUDStatusStyles = `
     }
 
     .ticket-display {
-      padding: 6px 12px;
-      gap: 16px;
+      padding: 4px 12px;
+      gap: 12px;
     }
 
     .ticket-count {
-      font-size: 22px;
+      font-size: 20px;
     }
   }
 
@@ -210,39 +217,39 @@ export const HUDStatusStyles = `
     }
 
     .game-status {
-      top: 50px;
+      top: 40px;
       left: 8px;
-      font-size: 10px;
+      font-size: 9px;
     }
 
     .match-timer {
       top: 8px;
       left: 8px;
-      padding: 4px 8px;
+      padding: 2px 8px;
     }
 
     .timer-display {
-      font-size: 16px;
+      font-size: 14px;
     }
 
     .victory-screen {
       padding: 16px;
       font-size: 20px;
       width: 90vw;
-      border-radius: 8px;
+      border-radius: 6px;
     }
 
     .ticket-display {
-      padding: 4px 8px;
-      gap: 12px;
+      padding: 3px 8px;
+      gap: 10px;
     }
 
     .ticket-count {
-      font-size: 18px;
+      font-size: 16px;
     }
 
     .faction-name {
-      font-size: 10px;
+      font-size: 9px;
     }
   }
 `;

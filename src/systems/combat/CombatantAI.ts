@@ -379,4 +379,11 @@ export class CombatantAI {
     this.coverSystem.cleanupOccupation(allCombatants)
     this.flankingSystem.cleanupOperations(this.squads, allCombatants)
   }
+
+  /**
+   * Clear the LOS result cache. Call once per frame from the LOD manager.
+   */
+  clearLOSCache(): void {
+    this.targeting.clearLOSCache()
+  }
 }

@@ -1,6 +1,9 @@
 # Audio Assets Needed for Enhanced Combat Audio
 
-This document describes the audio files that would significantly improve the combat audio experience. The system is implemented with placeholder audio files (reusing existing sounds), but adding these specific files would provide the full intended experience.
+> **Audio system location**: `src/systems/audio/` - AudioPoolManager, FootstepAudioSystem, RadioTransmissionSystem, plus weapon/ambient audio
+> **Current assets**: `public/assets/optimized/` - OGG format, compressed
+
+This document describes audio files that would improve the combat audio experience. The system uses placeholder audio (reusing existing sounds) where dedicated files are missing.
 
 ## Weapon Sound Variants
 

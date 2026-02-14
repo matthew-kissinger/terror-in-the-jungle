@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export class ProgrammaticExplosivesFactory {
   static createGrenade(): THREE.Group {
@@ -158,47 +159,79 @@ export class ProgrammaticExplosivesFactory {
     return round;
   }
 
+  /** Total height of the sandbag wall (3 rows) - used by SandbagSystem for placement */
+  static readonly SANDBAG_HEIGHT = 0.8 * 3; // bagH * rows
+
   static createSandbag(): THREE.Mesh {
-    const width = 4;
-    const height = 3; // Increased height for better cover
-    const depth = 2.5;
+    const bagW = 1.5;   // Width per bag
+    const bagH = 0.8;   // Height per bag
+    const bagD = 1.5;   // Depth per bag (thick wall)
+    const halfH = (bagH * 3) / 2; // Center geometry at y=0
 
-    const geometry = new THREE.BoxGeometry(width, height, depth, 4, 3, 3);
+    // Row layout: bottom 3, middle 2 (brick offset), top 3
+    const rows: { count: number; offsets: number[]; y: number }[] = [
+      { count: 3, offsets: [-bagW, 0, bagW], y: bagH * 0.5 - halfH },
+      { count: 2, offsets: [-bagW * 0.5, bagW * 0.5], y: bagH * 1.5 - halfH },
+      { count: 3, offsets: [-bagW, 0, bagW], y: bagH * 2.5 - halfH },
+    ];
 
-    const positionAttribute = geometry.getAttribute('position');
+    const geometries: THREE.BufferGeometry[] = [];
     const vertex = new THREE.Vector3();
 
-    for (let i = 0; i < positionAttribute.count; i++) {
-      vertex.fromBufferAttribute(positionAttribute, i);
+    for (const row of rows) {
+      for (let b = 0; b < row.count; b++) {
+        const geo = new THREE.BoxGeometry(
+          bagW * 0.93, bagH * 0.90, bagD * 0.93,
+          2, 2, 2
+        );
+        const pos = geo.getAttribute('position');
+        const ox = row.offsets[b];
+        const oy = row.y;
+        const halfBW = bagW * 0.465;
+        const halfBH = bagH * 0.45;
+        const halfBD = bagD * 0.465;
 
-      const normalizedY = (vertex.y + height / 2) / height;
-      const sagAmount = Math.pow(normalizedY, 2) * 0.3;
-      vertex.y -= sagAmount;
+        for (let i = 0; i < pos.count; i++) {
+          vertex.fromBufferAttribute(pos, i);
 
-      if (vertex.y > height * 0.3) {
-        const topFactor = (vertex.y - height * 0.3) / (height * 0.7);
-        vertex.x *= 1 - topFactor * 0.2;
-        vertex.z *= 1 - topFactor * 0.15;
+          // Pillowy bulge outward
+          const nx = vertex.x / halfBW;
+          const ny = vertex.y / halfBH;
+          const nz = vertex.z / halfBD;
+          const bulge = Math.max(0, (1 - nx * nx) * (1 - ny * ny) * (1 - nz * nz));
+          vertex.x += nx * bulge * 0.12;
+          vertex.y += ny * bulge * 0.08;
+          vertex.z += nz * bulge * 0.10;
+
+          // Cloth-like surface noise
+          vertex.x += (Math.random() - 0.5) * 0.04;
+          vertex.y += (Math.random() - 0.5) * 0.03;
+          vertex.z += (Math.random() - 0.5) * 0.04;
+
+          // Apply row/column offset
+          vertex.x += ox;
+          vertex.y += oy;
+
+          pos.setXYZ(i, vertex.x, vertex.y, vertex.z);
+        }
+
+        geo.computeVertexNormals();
+        geometries.push(geo);
       }
-
-      const randomOffset = (Math.random() - 0.5) * 0.1;
-      vertex.x += randomOffset;
-      vertex.z += randomOffset;
-
-      positionAttribute.setXYZ(i, vertex.x, vertex.y, vertex.z);
     }
 
-    geometry.computeVertexNormals();
+    const merged = BufferGeometryUtils.mergeGeometries(geometries, false);
+    for (const geo of geometries) geo.dispose();
 
     const material = new THREE.MeshStandardMaterial({
-      color: 0x8B7355, // Sandy tan color
-      roughness: 0.95, // Very rough texture
-      metalness: 0.0, // No metallic sheen
-      emissive: 0x4A3C28, // Slight self-illumination to ensure visibility
+      color: 0x8B7355,
+      roughness: 0.95,
+      metalness: 0.0,
+      emissive: 0x4A3C28,
       emissiveIntensity: 0.1
     });
 
-    const sandbag = new THREE.Mesh(geometry, material);
+    const sandbag = new THREE.Mesh(merged, material);
     sandbag.castShadow = true;
     sandbag.receiveShadow = true;
     sandbag.name = 'sandbag';

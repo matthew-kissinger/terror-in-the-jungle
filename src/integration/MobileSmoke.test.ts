@@ -33,7 +33,6 @@ vi.mock('../ui/controls/TouchSandbagButtons', () => ({ TouchSandbagButtons: clas
 vi.mock('../ui/controls/TouchRallyPointButton', () => ({ TouchRallyPointButton: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); setCallback = vi.fn(); showButton = vi.fn(); } }));
 
 // Mock Loadout sub-renderers
-vi.mock('../ui/loadout/LoadoutWeaponPanel', () => ({ renderWeaponPanel: () => '<div id="weapon-panel"></div>' }));
 vi.mock('../ui/loadout/LoadoutGrenadePanel', () => ({ renderGrenadePanel: () => '<div id="grenade-panel"></div>' }));
 
 import { isTouchDevice, isMobileViewport, shouldUseTouchControls } from '../utils/DeviceDetector';

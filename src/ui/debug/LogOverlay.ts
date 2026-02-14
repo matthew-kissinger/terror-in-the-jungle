@@ -1,4 +1,5 @@
 import type { LogEntry } from '../../utils/Logger';
+import { zIndex } from '../design/tokens';
 
 export class LogOverlay {
   private container: HTMLDivElement;
@@ -22,7 +23,7 @@ export class LogOverlay {
     this.container.style.color = '#b9f5e2';
     this.container.style.whiteSpace = 'pre-wrap';
     this.container.style.pointerEvents = 'none';
-    this.container.style.zIndex = '10005';
+    this.container.style.zIndex = String(zIndex.debugLog);
     this.container.style.display = 'none';
     this.container.style.boxShadow = '0 8px 20px rgba(0, 0, 0, 0.35)';
 

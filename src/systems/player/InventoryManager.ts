@@ -223,44 +223,45 @@ export class InventoryManager implements GameSystem {
     this.uiElement = document.createElement('div');
     this.uiElement.style.cssText = `
       position: fixed;
-      bottom: 24px;
-      left: 200px;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
-      gap: 6px;
+      gap: 4px;
       z-index: 1000;
     `;
 
     this.uiElement.innerHTML = `
       <div id="slot-shotgun" class="hotbar-slot" data-slot="0">
-        <div class="slot-key">[1]</div>
-        <div class="slot-icon">💥</div>
+        <div class="slot-key">1</div>
+        <div class="slot-icon">SG</div>
         <div class="slot-label">SHOTGUN</div>
       </div>
       <div id="slot-grenade" class="hotbar-slot" data-slot="1">
-        <div class="slot-key">[2]</div>
-        <div class="slot-icon">💣</div>
+        <div class="slot-key">2</div>
+        <div class="slot-icon">GR</div>
         <div class="slot-label">GRENADE</div>
         <div class="slot-count" id="grenade-count">${this.grenades}</div>
       </div>
       <div id="slot-primary" class="hotbar-slot active" data-slot="2">
-        <div class="slot-key">[3]</div>
-        <div class="slot-icon">🔫</div>
+        <div class="slot-key">3</div>
+        <div class="slot-icon">AR</div>
         <div class="slot-label">RIFLE</div>
       </div>
       <div id="slot-sandbag" class="hotbar-slot" data-slot="3">
-        <div class="slot-key">[4]</div>
-        <div class="slot-icon">🟫</div>
+        <div class="slot-key">4</div>
+        <div class="slot-icon">SB</div>
         <div class="slot-label">SANDBAG</div>
         <div class="slot-count" id="sandbag-count">${this.sandbags}</div>
       </div>
       <div id="slot-smg" class="hotbar-slot" data-slot="4">
-        <div class="slot-key">[5]</div>
-        <div class="slot-icon"></div>
+        <div class="slot-key">5</div>
+        <div class="slot-icon">SM</div>
         <div class="slot-label">SMG</div>
       </div>
       <div id="slot-pistol" class="hotbar-slot" data-slot="5">
-        <div class="slot-key">[6]</div>
-        <div class="slot-icon">🔫</div>
+        <div class="slot-key">6</div>
+        <div class="slot-icon">PT</div>
         <div class="slot-label">PISTOL</div>
       </div>
     `;
@@ -269,53 +270,63 @@ export class InventoryManager implements GameSystem {
     styles.textContent = `
       .hotbar-slot {
         position: relative;
-        width: 55px;
-        height: 65px;
-        background: rgba(10, 10, 14, 0.5);
-        border: 2px solid rgba(255, 255, 255, 0.2);
-        border-radius: 6px;
+        width: 48px;
+        height: 52px;
+        background: rgba(10, 10, 14, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        font-family: 'Courier New', monospace;
-        transition: all 0.2s;
+        font-family: 'Rajdhani', sans-serif;
+        transition: border-color 0.15s, background 0.15s;
         backdrop-filter: blur(4px);
+        gap: 1px;
       }
 
       .hotbar-slot.active {
-        border-color: rgba(0, 255, 100, 0.8);
-        background: rgba(0, 255, 100, 0.15);
-        box-shadow: 0 0 15px rgba(0, 255, 100, 0.3);
+        border-color: rgba(200, 230, 255, 0.6);
+        background: rgba(200, 230, 255, 0.12);
       }
 
       .slot-key {
         position: absolute;
-        top: 3px;
-        left: 3px;
-        font-size: 8px;
-        color: rgba(255, 255, 255, 0.5);
-        font-weight: bold;
+        top: 2px;
+        left: 4px;
+        font-size: 9px;
+        color: rgba(255, 255, 255, 0.35);
+        font-weight: 600;
+        font-family: 'Rajdhani', sans-serif;
       }
 
       .slot-icon {
-        font-size: 24px;
-        margin-bottom: 2px;
+        font-size: 15px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.85);
+        letter-spacing: -0.5px;
+        margin-top: 4px;
+      }
+
+      .hotbar-slot.active .slot-icon {
+        color: rgba(220, 240, 255, 1);
       }
 
       .slot-label {
-        font-size: 8px;
-        color: rgba(255, 255, 255, 0.7);
-        font-weight: bold;
+        font-size: 7px;
+        color: rgba(255, 255, 255, 0.45);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
       }
 
       .slot-count {
         position: absolute;
-        bottom: 3px;
-        right: 5px;
-        font-size: 11px;
-        color: #fff;
-        font-weight: bold;
+        bottom: 2px;
+        right: 4px;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.7);
+        font-weight: 700;
       }
     `;
 

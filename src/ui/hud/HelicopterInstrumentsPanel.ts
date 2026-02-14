@@ -5,9 +5,9 @@ export class HelicopterInstrumentsPanel {
   private hoverIndicator: HTMLDivElement | null = null;
   private boostIndicator: HTMLDivElement | null = null;
 
-  static readonly GRADIENT_HIGH = 'linear-gradient(to top, #ff4444, #ff8844)';
-  static readonly GRADIENT_MED = 'linear-gradient(to top, #ffaa44, #ffdd44)';
-  static readonly GRADIENT_NORMAL = 'linear-gradient(to top, #00ff44, #88ff44)';
+  static readonly GRADIENT_HIGH = 'linear-gradient(to top, rgba(201, 86, 74, 0.85), rgba(201, 120, 74, 0.85))';
+  static readonly GRADIENT_MED = 'linear-gradient(to top, rgba(212, 163, 68, 0.85), rgba(212, 180, 68, 0.85))';
+  static readonly GRADIENT_NORMAL = 'linear-gradient(to top, rgba(92, 184, 92, 0.85), rgba(106, 184, 122, 0.85))';
 
   constructor() {
     this.helicopterInstruments = this.createHelicopterInstruments();
@@ -48,7 +48,7 @@ export class HelicopterInstrumentsPanel {
 
     const collectiveLabel = document.createElement('div');
     collectiveLabel.style.cssText = `
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 8px;
       color: rgba(255, 255, 255, 0.6);
       text-align: center;
@@ -76,7 +76,7 @@ export class HelicopterInstrumentsPanel {
       left: 0;
       width: 100%;
       height: 0%;
-      background: linear-gradient(to top, #00ff44, #88ff44);
+      background: linear-gradient(to top, rgba(92, 184, 92, 0.85), rgba(106, 184, 122, 0.85));
       border-radius: 1px;
       transition: height 0.1s ease;
     `;
@@ -97,7 +97,7 @@ export class HelicopterInstrumentsPanel {
 
     const rpmLabel = document.createElement('div');
     rpmLabel.style.cssText = `
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 8px;
       color: rgba(255, 255, 255, 0.6);
       text-align: center;
@@ -109,7 +109,7 @@ export class HelicopterInstrumentsPanel {
     const rpmValue = document.createElement('div');
     rpmValue.className = 'rpm-value';
     rpmValue.style.cssText = `
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 10px;
       color: rgba(255, 255, 255, 0.9);
       font-weight: bold;
@@ -141,7 +141,7 @@ export class HelicopterInstrumentsPanel {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 8px;
       color: rgba(255, 255, 255, 0.7);
       font-weight: bold;
@@ -159,7 +159,7 @@ export class HelicopterInstrumentsPanel {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 8px;
       color: rgba(255, 255, 255, 0.7);
       font-weight: bold;
@@ -209,37 +209,37 @@ export class HelicopterInstrumentsPanel {
 
       // Color coding for RPM
       if (rpmPercentage < 30) {
-        this.rpmValue.style.color = 'rgba(255, 100, 100, 0.9)'; // Red for low RPM
+        this.rpmValue.style.color = 'rgba(201, 86, 74, 0.9)';
       } else if (rpmPercentage > 90) {
-        this.rpmValue.style.color = 'rgba(255, 255, 100, 0.9)'; // Yellow for high RPM
+        this.rpmValue.style.color = 'rgba(212, 163, 68, 0.9)';
       } else {
-        this.rpmValue.style.color = 'rgba(255, 255, 255, 0.9)'; // White for normal
+        this.rpmValue.style.color = 'rgba(220, 225, 230, 0.9)';
       }
     }
 
     // Update hover assist indicator
     if (this.hoverIndicator) {
       if (autoHover) {
-        this.hoverIndicator.style.background = 'rgba(0, 200, 0, 0.6)';
-        this.hoverIndicator.style.borderColor = 'rgba(0, 255, 0, 0.8)';
-        this.hoverIndicator.style.color = 'rgba(255, 255, 255, 1)';
+        this.hoverIndicator.style.background = 'rgba(92, 184, 92, 0.4)';
+        this.hoverIndicator.style.borderColor = 'rgba(92, 184, 92, 0.7)';
+        this.hoverIndicator.style.color = 'rgba(220, 225, 230, 0.95)';
       } else {
-        this.hoverIndicator.style.background = 'rgba(100, 100, 100, 0.3)';
-        this.hoverIndicator.style.borderColor = 'rgba(255, 255, 255, 0.4)';
-        this.hoverIndicator.style.color = 'rgba(255, 255, 255, 0.5)';
+        this.hoverIndicator.style.background = 'rgba(100, 100, 100, 0.2)';
+        this.hoverIndicator.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+        this.hoverIndicator.style.color = 'rgba(220, 225, 230, 0.4)';
       }
     }
 
     // Update boost indicator
     if (this.boostIndicator) {
       if (engineBoost) {
-        this.boostIndicator.style.background = 'rgba(255, 150, 0, 0.6)';
-        this.boostIndicator.style.borderColor = 'rgba(255, 200, 0, 0.8)';
-        this.boostIndicator.style.color = 'rgba(255, 255, 255, 1)';
+        this.boostIndicator.style.background = 'rgba(212, 163, 68, 0.4)';
+        this.boostIndicator.style.borderColor = 'rgba(212, 163, 68, 0.7)';
+        this.boostIndicator.style.color = 'rgba(220, 225, 230, 0.95)';
       } else {
-        this.boostIndicator.style.background = 'rgba(100, 100, 100, 0.3)';
-        this.boostIndicator.style.borderColor = 'rgba(255, 255, 255, 0.4)';
-        this.boostIndicator.style.color = 'rgba(255, 255, 255, 0.5)';
+        this.boostIndicator.style.background = 'rgba(100, 100, 100, 0.2)';
+        this.boostIndicator.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+        this.boostIndicator.style.color = 'rgba(220, 225, 230, 0.4)';
       }
     }
   }

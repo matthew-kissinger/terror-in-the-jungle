@@ -16,6 +16,11 @@ export class WeaponInput {
   private rigManager: WeaponRigManager
   private inventoryManager?: InventoryManager
 
+  private isGunSlot(): boolean {
+    const slot = this.inventoryManager?.getCurrentSlot()
+    return !this.inventoryManager || slot === WeaponSlot.PRIMARY || slot === WeaponSlot.SHOTGUN || slot === WeaponSlot.SMG || slot === WeaponSlot.PISTOL
+  }
+
   // Callbacks
   private onFireStart?: () => void
   private onFireStop?: () => void
@@ -85,11 +90,7 @@ export class WeaponInput {
     // Don't process input until game has started and weapon is visible
     if (!this.gameStarted || !this.isEnabled || !this.rigManager.getCurrentRig()) return
 
-    // Only handle gun input when PRIMARY, SHOTGUN, or SMG weapon is equipped
-    const currentSlot = this.inventoryManager?.getCurrentSlot()
-    if (this.inventoryManager && currentSlot !== WeaponSlot.PRIMARY && currentSlot !== WeaponSlot.SHOTGUN && currentSlot !== WeaponSlot.SMG) {
-      return
-    }
+    if (!this.isGunSlot()) return
 
     if (event.button === 2) {
       // Right mouse - ADS toggle hold (can't ADS while reloading)
@@ -136,10 +137,7 @@ export class WeaponInput {
   triggerFireStart(): void {
     if (!this.gameStarted || !this.isEnabled || !this.rigManager.getCurrentRig()) return
 
-    const currentSlot = this.inventoryManager?.getCurrentSlot()
-    if (this.inventoryManager && currentSlot !== WeaponSlot.PRIMARY && currentSlot !== WeaponSlot.SHOTGUN && currentSlot !== WeaponSlot.SMG) {
-      return
-    }
+    if (!this.isGunSlot()) return
 
     if (!this.reload.isAnimating()) {
       this.isFiring = true
@@ -163,10 +161,7 @@ export class WeaponInput {
   triggerADS(active: boolean): void {
     if (!this.gameStarted || !this.isEnabled || !this.rigManager.getCurrentRig()) return
 
-    const currentSlot = this.inventoryManager?.getCurrentSlot()
-    if (this.inventoryManager && currentSlot !== WeaponSlot.PRIMARY && currentSlot !== WeaponSlot.SHOTGUN && currentSlot !== WeaponSlot.SMG) {
-      return
-    }
+    if (!this.isGunSlot()) return
 
     if (active) {
       if (!this.reload.isAnimating()) {

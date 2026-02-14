@@ -60,11 +60,11 @@ export class TouchMortarButton {
 
     // -- Deploy button (shown when not deployed) --
     this.deployButton = this.createButton('DEPLOY', 'mortar-deploy', {
-      width: '70px',
-      height: '70px',
+      width: 'var(--tc-fire-size, 70px)',
+      height: 'var(--tc-fire-size, 70px)',
       background: 'rgba(255, 180, 60, 0.3)',
       border: '2px solid rgba(255, 200, 100, 0.5)',
-      fontSize: '11px',
+      fontSize: 'var(--tc-font-size, 11px)',
     });
     this.deployButton.addEventListener('touchstart', (e: TouchEvent) => {
       e.preventDefault();
@@ -167,11 +167,11 @@ export class TouchMortarButton {
 
     // Fire button (prominent)
     this.fireButton = this.createButton('FIRE', 'mortar-fire', {
-      width: '70px',
-      height: '70px',
+      width: 'var(--tc-fire-size, 70px)',
+      height: 'var(--tc-fire-size, 70px)',
       background: 'rgba(255, 60, 60, 0.4)',
       border: '3px solid rgba(255, 100, 100, 0.6)',
-      fontSize: '12px',
+      fontSize: 'var(--tc-font-size, 12px)',
     });
     this.fireButton.addEventListener('touchstart', (e: TouchEvent) => {
       e.preventDefault();
@@ -194,11 +194,11 @@ export class TouchMortarButton {
 
     // Undeploy button
     this.undeployButton = this.createButton('PACK', 'mortar-undeploy', {
-      width: '52px',
-      height: '52px',
+      width: 'var(--tc-action-size, 52px)',
+      height: 'var(--tc-action-size, 52px)',
       background: 'rgba(255, 180, 60, 0.3)',
       border: '2px solid rgba(255, 200, 100, 0.5)',
-      fontSize: '10px',
+      fontSize: 'var(--tc-font-size, 10px)',
     });
     this.undeployButton.addEventListener('touchstart', (e: TouchEvent) => {
       e.preventDefault();
@@ -221,11 +221,11 @@ export class TouchMortarButton {
 
     // Camera toggle button
     this.cameraButton = this.createButton('CAM', 'mortar-camera', {
-      width: '50px',
-      height: '50px',
+      width: 'var(--tc-action-size, 50px)',
+      height: 'var(--tc-action-size, 50px)',
       background: 'rgba(60, 150, 255, 0.3)',
       border: '2px solid rgba(100, 170, 255, 0.5)',
-      fontSize: '10px',
+      fontSize: 'var(--tc-font-size, 10px)',
     });
     this.cameraButton.addEventListener('touchstart', (e: TouchEvent) => {
       e.preventDefault();

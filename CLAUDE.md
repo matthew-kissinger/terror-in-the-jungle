@@ -10,49 +10,56 @@
 npm install
 npm run dev        # Dev server on localhost:5173
 npm run build      # Production build
-npm run test:run   # 3370 tests (all passing)
+npm run test:run   # 3388 tests (all passing)
 ```
 
 ## Stack
 
 | Layer | Tech |
 |-------|------|
-| Graphics | Three.js r182 + postprocessing |
-| Spatial | three-mesh-bvh, custom octree/grid |
-| Build | Vite 7, TypeScript 5.9 |
+| Graphics | Three.js r182 + postprocessing v6.37 |
+| Spatial | three-mesh-bvh v0.9, custom octree/grid |
+| Build | Vite 7.1, TypeScript 5.9 |
 | Workers | BVH pool (4), chunk generation workers |
-| Tests | Vitest - 96 files, 3370 tests |
+| Tests | Vitest 4.0 - 98 files, 3388 tests |
 
 ## Architecture
 
-~58k lines across 297 source files. Systems-based architecture with orchestrator pattern.
+~60k lines across 308 source files. Systems-based architecture with orchestrator pattern.
 
 ```
 src/
 ├── core/           # Game loop, renderer, bootstrap, WebGL recovery
 ├── systems/
+│   ├── assets/     # Asset loading
 │   ├── audio/      # Ambient, radio, footsteps, weapon sounds, voice callouts
 │   ├── combat/     # AI targeting, flanking, cover, spatial octree, influence maps
-│   ├── player/     # Controller, weapons, health, flashbang
-│   ├── helicopter/ # Model, physics, animation, audio
-│   ├── terrain/    # Chunks, workers, vegetation, GPU terrain
+│   │   └── ai/    # AI state machine (patrol, engage, defend), LOS, targeting
+│   ├── player/     # Controller, movement, weapons, health, flashbang, respawn
+│   │   └── weapon/ # Weapon rig, ammo, shot commands, input handling
+│   ├── helicopter/ # Model, physics, animation, audio, helipad
+│   ├── terrain/    # Chunks, workers, vegetation, height queries, mesh merging
 │   ├── weapons/    # Gunplay, grenades, mortars, ammo, sandbags, pickups
 │   ├── world/      # Zones, billboards, tickets
-│   ├── debug/      # PerformanceTelemetry
-│   ├── effects/    # Pools (tracers, muzzle, impact, explosion), smoke
+│   │   └── billboard/ # Billboard buffer management
+│   ├── debug/      # PerformanceTelemetry, GPU timing, benchmarks
+│   ├── effects/    # Pools (tracers, muzzle, impact, explosion), smoke, pixelation
 │   └── environment/# Day/night, weather, water, skybox
 ├── ui/
 │   ├── compass/    # Compass bearing + zone markers
 │   ├── controls/   # Touch controls (joystick, fire, look, ADS, weapon bar, actions)
+│   ├── design/     # Design tokens, responsive utilities, shared styles
 │   ├── end/        # Match end screen (responsive)
 │   ├── hud/        # HUD elements, scoreboard, kill feed, squad radial menu
-│   ├── loading/    # Loading screen, mode selection (touch-to-start)
-│   ├── loadout/    # Weapon + grenade loadout selector (touch deploy button)
+│   ├── loading/    # Start screen, mode cards, settings modal, how-to-play
+│   ├── loadout/    # Grenade type selector (touch deploy button)
 │   ├── map/        # Fullscreen map (pinch-zoom, drag-pan), respawn map
-│   └── minimap/    # Minimap styles + rendering
+│   ├── minimap/    # Minimap styles + rendering
+│   └── debug/      # Log overlay, performance overlay, time indicator
 ├── workers/        # BVHWorker, ChunkWorker
 ├── shaders/        # GLSL shaders
 ├── config/         # Game modes, loading phases, settings
+├── types/          # TypeScript interfaces and declarations
 └── utils/          # Logger, ObjectPoolManager, math, DeviceDetector
 ```
 
@@ -60,8 +67,10 @@ src/
 
 - `src/core/PixelArtSandbox.ts` - Main game class (split into 3 modules)
 - `src/core/PixelArtSandboxInit.ts` - Async initialization + `startGameWithMode()`
+- `src/core/SandboxSystemManager.ts` - System orchestration, pre-generation, game mode setup
 - `src/core/bootstrap.ts` - Entry point (async, awaits initialization)
-- `src/ui/loading/LoadingScreen.ts` - Loading screen with mode selection
+- `src/ui/loading/StartScreen.ts` - Start screen with mode selection
+- `src/ui/design/tokens.ts` - Design tokens (colors, spacing, typography, z-index)
 
 ## Game Modes
 
@@ -82,18 +91,16 @@ src/
 
 - **WASD** Move, **Shift** Sprint, **Space** Jump
 - **Click** Fire, **RClick** ADS, **R** Reload
-- **1-6** Weapons, **G** Grenade, **Z** Squad UI, **TAB** Scoreboard
+- **1-6** Weapons (1=Shotgun, 2=Grenade, 3=Primary, 4=Sandbag, 5=SMG, 6=Pistol), **G** Grenade, **Z** Squad UI, **TAB** Scoreboard
 - **B** Deploy/undeploy mortar, **F** Fire mortar, **Arrows** Aim mortar (pitch/yaw), **Mouse wheel** Adjust pitch
 - **F1** Console stats, **F2** Performance overlay, **M** Mortar camera
 - **Mobile**: Virtual joystick, touch-drag look, fire/ADS/reload/grenade/scoreboard buttons, weapon bar, helicopter entry/cyclic, mortar deploy/fire/aim pad/camera, sandbag rotate, rally point, squad menu, landscape lock
 
 ## Known Tech Debt
 
-- 9 `: any` annotations in source (excluding tests, SystemInterfaces, and .d.ts files)
-- `FullMapDOMHelpers.ts` zoom buttons use `onclick` (lines 42, 47, 52) instead of `pointerdown` - 300ms delay on mobile map controls.
-- `bootstrap.ts` error recovery button uses `onclick` (line 35) instead of `pointerdown`.
+- 14 `: any` annotations in source (excluding tests, SystemInterfaces, and .d.ts files)
 - `OpenFrontierRespawnMap` uses separate mouse/touch handlers (correct - do not change)
 - No weapon switch feedback - `FirstPersonWeapon.ts` silently ignores fire input during switch (line 223).
 - Full map (M key hold-to-view) has no touch button - mobile players cannot open the tactical map. `FullMapInput.ts` only listens for keyboard events.
 - Helicopter auto-hover toggle (Space key in helicopter) has no touch button - mobile pilots cannot toggle hover mode.
-- Unmerged branches: `mycel/task-bcab2aff` has reload-while-ADS fix (commit 3b92565), `mycel/task-7976102b` has zone capture celebration (commit 86ebf39). Both tested and passing but need cherry-pick to master.
+- Desktop hotbar slots are display-only (no click handlers) - pointer lock prevents DOM click events during gameplay. Weapon switching is keyboard-only (keys 1-6) on desktop, touch weapon bar on mobile.

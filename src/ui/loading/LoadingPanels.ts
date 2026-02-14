@@ -86,7 +86,7 @@ export class LoadingPanels {
 
         <div style="margin: 1rem 0;">
           <label style="color: #b8d4e3; cursor: pointer; display: flex; align-items: center;">
-            <input type="checkbox" checked data-setting="showFPS" style="margin-right: 0.5rem;"> Show FPS Counter
+            <input type="checkbox" data-setting="showFPS" style="margin-right: 0.5rem;"> Show FPS Counter
           </label>
         </div>
 

@@ -74,20 +74,20 @@ function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: Minim
 
   switch (zone.state) {
     case ZoneState.US_CONTROLLED:
-      ctx.fillStyle = 'rgba(68, 136, 255, 0.3)';
-      ctx.strokeStyle = '#4488ff';
+      ctx.fillStyle = 'rgba(91, 140, 201, 0.3)';
+      ctx.strokeStyle = 'rgba(91, 140, 201, 0.8)';
       break;
     case ZoneState.OPFOR_CONTROLLED:
-      ctx.fillStyle = 'rgba(255, 68, 68, 0.3)';
-      ctx.strokeStyle = '#ff4444';
+      ctx.fillStyle = 'rgba(201, 86, 74, 0.3)';
+      ctx.strokeStyle = 'rgba(201, 86, 74, 0.8)';
       break;
     case ZoneState.CONTESTED:
-      ctx.fillStyle = 'rgba(255, 255, 68, 0.3)';
-      ctx.strokeStyle = '#ffff44';
+      ctx.fillStyle = 'rgba(212, 163, 68, 0.3)';
+      ctx.strokeStyle = 'rgba(212, 163, 68, 0.8)';
       break;
     default:
-      ctx.fillStyle = 'rgba(128, 128, 128, 0.3)';
-      ctx.strokeStyle = '#888888';
+      ctx.fillStyle = 'rgba(107, 119, 128, 0.3)';
+      ctx.strokeStyle = 'rgba(107, 119, 128, 0.8)';
   }
 
   ctx.beginPath();
@@ -97,7 +97,7 @@ function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: Minim
   ctx.stroke();
 
   if (zone.isHomeBase) {
-    ctx.fillStyle = zone.state === ZoneState.US_CONTROLLED ? '#4488ff' : '#ff4444';
+    ctx.fillStyle = zone.state === ZoneState.US_CONTROLLED ? 'rgba(91, 140, 201, 0.9)' : 'rgba(201, 86, 74, 0.9)';
     const baseSize = 12 * renderScale;
     ctx.fillRect(x - baseSize / 2, y - baseSize / 2, baseSize, baseSize);
   } else {
@@ -111,14 +111,14 @@ function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: Minim
   }
 
   ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-  ctx.font = `${Math.round(10 * renderScale)}px Courier New`;
+  ctx.font = `${Math.round(10 * renderScale)}px Rajdhani`;
   ctx.textAlign = 'center';
   ctx.fillText(zone.name, x, y + zoneRadius + 12 * renderScale);
 
   if (zone.state === ZoneState.CONTESTED) {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
     ctx.fillRect(x - 15 * renderScale, y + zoneRadius + 15 * renderScale, 30 * renderScale, 3 * renderScale);
-    ctx.fillStyle = '#ffff44';
+    ctx.fillStyle = 'rgba(212, 163, 68, 0.9)';
     ctx.fillRect(x - 15 * renderScale, y + zoneRadius + 15 * renderScale, 30 * renderScale * (zone.captureProgress / 100), 3 * renderScale);
   }
 }
@@ -138,9 +138,9 @@ function drawCombatantIndicators(ctx: CanvasRenderingContext2D, state: MinimapRe
 
     const isPlayerSquad = combatant.squadId === state.playerSquadId && combatant.faction === Faction.US;
     if (isPlayerSquad) {
-      ctx.fillStyle = 'rgba(0, 255, 102, 0.8)';
+      ctx.fillStyle = 'rgba(92, 184, 92, 0.8)';
     } else {
-      ctx.fillStyle = combatant.faction === Faction.US ? 'rgba(68, 136, 255, 0.6)' : 'rgba(255, 68, 68, 0.6)';
+      ctx.fillStyle = combatant.faction === Faction.US ? 'rgba(91, 140, 201, 0.6)' : 'rgba(201, 86, 74, 0.6)';
     }
     ctx.beginPath();
     ctx.arc(x, y, 2 * renderScale, 0, Math.PI * 2);
@@ -152,12 +152,12 @@ function drawPlayer(ctx: CanvasRenderingContext2D, size: number, renderScale: nu
   const centerX = size / 2;
   const centerY = size / 2;
 
-  ctx.fillStyle = '#00ff00';
+  ctx.fillStyle = 'rgba(220, 225, 230, 0.95)';
   ctx.beginPath();
   ctx.arc(centerX, centerY, 4 * renderScale, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = '#00ff00';
+  ctx.strokeStyle = 'rgba(220, 225, 230, 0.95)';
   ctx.lineWidth = 2 * renderScale;
   ctx.stroke();
 }
@@ -170,7 +170,7 @@ function drawViewCone(ctx: CanvasRenderingContext2D, camera: THREE.Camera, size:
 
   const angle = 0;
 
-  ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
+  ctx.strokeStyle = 'rgba(220, 225, 230, 0.6)';
   ctx.lineWidth = 3 * renderScale;
   ctx.beginPath();
   ctx.moveTo(centerX, centerY);
@@ -191,7 +191,7 @@ function drawViewCone(ctx: CanvasRenderingContext2D, camera: THREE.Camera, size:
   const rightX = centerX + Math.sin(rightAngle) * coneLength;
   const rightY = centerY - Math.cos(rightAngle) * coneLength;
 
-  ctx.fillStyle = 'rgba(0, 255, 0, 0.1)';
+  ctx.fillStyle = 'rgba(220, 225, 230, 0.08)';
   ctx.beginPath();
   ctx.moveTo(centerX, centerY);
   ctx.lineTo(leftX, leftY);
@@ -208,7 +208,7 @@ function drawCommandMarker(ctx: CanvasRenderingContext2D, state: MinimapRenderSt
 
   if (x < 0 || x > state.size || y < 0 || y > state.size) return;
 
-  ctx.strokeStyle = '#00ff66';
+  ctx.strokeStyle = 'rgba(92, 184, 92, 0.8)';
   ctx.lineWidth = 2 * renderScale;
 
   ctx.beginPath();

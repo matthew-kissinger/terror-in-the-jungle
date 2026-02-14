@@ -106,7 +106,7 @@ export class WeaponPickupSystem implements GameSystem {
       color: #fff;
       padding: 12px 24px;
       border-radius: 8px;
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 16px;
       font-weight: bold;
       border: 2px solid rgba(255, 255, 255, 0.3);

@@ -6,7 +6,6 @@ import { PlayerController } from '../systems/player/PlayerController';
 import { CombatantSystem } from '../systems/combat/CombatantSystem';
 import { Skybox } from '../systems/environment/Skybox';
 import { ImprovedChunkManager } from '../systems/terrain/ImprovedChunkManager';
-import { GPUTerrain } from '../systems/terrain/GPUTerrain';
 import { GlobalBillboardSystem } from '../systems/world/billboard/GlobalBillboardSystem';
 import { WaterSystem } from '../systems/environment/WaterSystem';
 import { FirstPersonWeapon } from '../systems/player/FirstPersonWeapon';
@@ -58,7 +57,6 @@ export class SandboxSystemManager {
   // Game systems
   public assetLoader!: AssetLoader;
   public chunkManager!: ImprovedChunkManager;
-  public gpuTerrain!: GPUTerrain;
   public globalBillboardSystem!: GlobalBillboardSystem;
   public playerController!: PlayerController;
   public combatantSystem!: CombatantSystem;
@@ -154,34 +152,13 @@ export class SandboxSystemManager {
   }
 
   async preGenerateSpawnArea(spawnPos: THREE.Vector3): Promise<void> {
-    Logger.info('core', `Pre-generating spawn areas for both factions...`);
+    Logger.info('core', `Pre-generating spawn area around (${spawnPos.x.toFixed(0)}, ${spawnPos.z.toFixed(0)})...`);
 
     if (this.chunkManager) {
-      // Generate US base chunks
-      const usBasePos = new THREE.Vector3(0, 0, -50);
-      Logger.info('core', 'Generating US base chunks...');
-      this.chunkManager.updatePlayerPosition(usBasePos);
-      this.chunkManager.update(0.01);
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Generate OPFOR base chunks
-      const opforBasePos = new THREE.Vector3(0, 0, 145);
-      Logger.info('core', 'Generating OPFOR base chunks...');
-      this.chunkManager.updatePlayerPosition(opforBasePos);
-      this.chunkManager.update(0.01);
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Generate middle battlefield chunks
-      const centerPos = new THREE.Vector3(0, 0, 50);
-      Logger.info('core', 'Generating battlefield chunks...');
-      this.chunkManager.updatePlayerPosition(centerPos);
-      this.chunkManager.update(0.01);
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Return to player spawn position
+      // Generate chunks around the spawn position
       this.chunkManager.updatePlayerPosition(spawnPos);
       this.chunkManager.update(0.01);
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       // Initialize zones after chunk generation
       Logger.info('core', 'Initializing zones after chunk generation...');

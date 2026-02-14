@@ -1,4 +1,5 @@
 import { Faction } from '../../systems/combat/types';
+import { colors } from '../design/tokens';
 
 export type WeaponType = 'rifle' | 'shotgun' | 'smg' | 'grenade' | 'mortar' | 'melee' | 'unknown';
 
@@ -174,15 +175,15 @@ export class KillFeed {
       display: flex;
       align-items: center;
       justify-content: flex-end;
-      gap: 6px;
-      padding: 4px 8px;
-      background: rgba(0, 0, 0, ${0.6 * entry.opacity});
-      border: 1px solid ${isExplosive ? `rgba(255, 100, 50, ${0.3 * entry.opacity})` : `rgba(255, 255, 255, ${0.2 * entry.opacity})`};
-      border-radius: 3px;
+      gap: 5px;
+      padding: 3px 6px;
+      background: rgba(8, 12, 18, ${0.45 * entry.opacity});
+      border-left: 2px solid ${isExplosive ? `rgba(212, 163, 68, ${0.4 * entry.opacity})` : `rgba(220, 225, 230, ${0.1 * entry.opacity})`};
+      border-radius: 0 2px 2px 0;
       opacity: ${entry.opacity};
       transition: opacity 0.3s ease;
-      backdrop-filter: blur(3px);
-      animation: slideIn 0.2s ease-out;
+      backdrop-filter: blur(4px);
+      animation: slideIn 0.15s ease-out;
     `;
 
     // Killer name
@@ -209,11 +210,13 @@ export class KillFeed {
     let headshotSpan: HTMLSpanElement | null = null;
     if (entry.isHeadshot) {
       headshotSpan = document.createElement('span');
-      headshotSpan.textContent = '☠';
+      headshotSpan.textContent = 'HS';
       headshotSpan.style.cssText = `
-        color: #ff6b6b;
-        font-size: 14px;
-        filter: drop-shadow(0 0 3px #ff0000);
+        color: rgba(255, 200, 120, 0.9);
+        font-size: 9px;
+        font-weight: 700;
+        font-family: 'Rajdhani', sans-serif;
+        letter-spacing: 0.5px;
       `;
     }
 
@@ -248,28 +251,28 @@ export class KillFeed {
   private getWeaponIcon(weaponType: WeaponType): { text: string; color: string; size: string } {
     switch (weaponType) {
       case 'rifle':
-        return { text: '▸', color: 'rgba(255, 255, 255, 0.8)', size: '12px' };
+        return { text: '[AR]', color: 'rgba(255, 255, 255, 0.6)', size: '10px' };
       case 'shotgun':
-        return { text: '◈', color: '#ff9933', size: '14px' };
+        return { text: '[SG]', color: 'rgba(255, 255, 255, 0.6)', size: '10px' };
       case 'smg':
-        return { text: '≫', color: '#ffcc33', size: '12px' };
+        return { text: '[SM]', color: 'rgba(255, 255, 255, 0.6)', size: '10px' };
       case 'grenade':
-        return { text: '💥', color: '#ff6b35', size: '14px' };
+        return { text: '[GR]', color: 'rgba(255, 180, 100, 0.7)', size: '10px' };
       case 'mortar':
-        return { text: '💣', color: '#ff3333', size: '14px' };
+        return { text: '[MT]', color: 'rgba(255, 140, 100, 0.7)', size: '10px' };
       case 'melee':
-        return { text: '⚔', color: '#cccccc', size: '14px' };
+        return { text: '[ML]', color: 'rgba(255, 255, 255, 0.6)', size: '10px' };
       default:
-        return { text: '•', color: 'rgba(255, 255, 255, 0.6)', size: '12px' };
+        return { text: '--', color: 'rgba(255, 255, 255, 0.4)', size: '10px' };
     }
   }
 
   private getFactionColor(faction: Faction): string {
     switch (faction) {
       case Faction.US:
-        return '#4a9eff'; // Blue for US
+        return colors.us;
       case Faction.OPFOR:
-        return '#ff4a4a'; // Red for OPFOR
+        return colors.opfor;
       default:
         return '#ffffff';
     }
@@ -289,38 +292,40 @@ export class KillFeed {
     style.textContent = `
       .kill-feed {
         position: fixed;
-        top: 400px;
-        right: 20px;
-        width: 260px;
+        bottom: 120px;
+        right: 16px;
+        width: 220px;
         display: flex;
         flex-direction: column;
-        gap: 3px;
+        gap: 2px;
         z-index: 100;
         pointer-events: none;
-        font-family: 'Courier New', monospace;
+        font-family: 'Rajdhani', sans-serif;
         font-size: 11px;
+        font-weight: 600;
       }
 
       @media (max-width: 1024px) {
         .kill-feed {
-          top: 320px;
-          right: 12px;
-          width: 200px;
-        }
-      }
-
-      @media (max-width: 480px) {
-        .kill-feed {
-          top: 250px;
+          bottom: 100px;
           right: 10px;
           width: 180px;
           font-size: 10px;
         }
       }
 
+      @media (max-width: 480px) {
+        .kill-feed {
+          bottom: 200px;
+          right: 8px;
+          width: 160px;
+          font-size: 9px;
+        }
+      }
+
       @keyframes slideIn {
         from {
-          transform: translateX(100px);
+          transform: translateX(60px);
           opacity: 0;
         }
         to {

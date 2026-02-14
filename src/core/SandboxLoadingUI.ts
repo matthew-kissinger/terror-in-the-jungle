@@ -43,14 +43,14 @@ export class SandboxLoadingUI {
         }
         .loading-text {
           color: #8fbc8f;
-          font-family: 'Courier New', monospace;
+          font-family: 'Rajdhani', 'Segoe UI', sans-serif;
           font-size: 18px;
           margin-top: 20px;
           animation: pulse 2s ease-in-out infinite;
         }
         .loading-tip {
           color: #708070;
-          font-family: 'Courier New', monospace;
+          font-family: 'Rajdhani', 'Segoe UI', sans-serif;
           font-size: 14px;
           margin-top: 10px;
           max-width: 400px;

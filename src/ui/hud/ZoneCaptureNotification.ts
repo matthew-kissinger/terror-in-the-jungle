@@ -1,3 +1,5 @@
+import { zIndex } from '../design/tokens';
+
 export class ZoneCaptureNotification {
   private container: HTMLDivElement;
   private currentNotification?: HTMLDivElement;
@@ -14,7 +16,7 @@ export class ZoneCaptureNotification {
       top: 15%;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 9999;
+      z-index: ${zIndex.zoneCaptureNotification};
       pointer-events: none;
     `;
     return container;
@@ -38,33 +40,33 @@ export class ZoneCaptureNotification {
     }
 
     const notification = document.createElement('div');
-    const color = isCaptured ? '#00ff00' : '#ff0000';
+    const color = isCaptured ? 'rgba(92, 184, 92, 0.9)' : 'rgba(201, 86, 74, 0.9)';
+    const borderColor = isCaptured ? 'rgba(92, 184, 92, 0.4)' : 'rgba(201, 86, 74, 0.4)';
     const text = isCaptured ? 'CAPTURED' : 'LOST';
 
     notification.style.cssText = `
-      padding: 20px 40px;
-      background: rgba(0, 0, 0, 0.85);
-      border: 2px solid ${color};
+      padding: 16px 36px;
+      background: rgba(8, 12, 18, 0.8);
+      border: 1px solid ${borderColor};
       border-radius: 4px;
       text-align: center;
       animation: zoneNotifyFadeIn 0.3s ease-out;
-      box-shadow: 0 0 20px ${color}40;
+      backdrop-filter: blur(8px);
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
     `;
 
     notification.innerHTML = `
       <div style="
-        font-size: 28px;
-        font-weight: bold;
+        font-size: 24px;
+        font-weight: 700;
         color: ${color};
-        text-shadow: 0 0 10px ${color};
-        margin-bottom: 8px;
+        margin-bottom: 6px;
         letter-spacing: 2px;
       ">ZONE ${zoneName}</div>
       <div style="
-        font-size: 20px;
-        font-weight: bold;
+        font-size: 16px;
+        font-weight: 700;
         color: ${color};
-        text-shadow: 0 0 8px ${color};
         letter-spacing: 1px;
       ">${text}</div>
     `;

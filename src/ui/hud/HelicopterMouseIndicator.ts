@@ -68,7 +68,7 @@ export class HelicopterMouseIndicator {
     const statusText = document.createElement('div');
     statusText.className = 'mouse-status-text';
     statusText.style.cssText = `
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 9px;
       color: rgba(255, 255, 255, 0.9);
       font-weight: bold;
@@ -81,7 +81,7 @@ export class HelicopterMouseIndicator {
     // Mode label
     const modeLabel = document.createElement('div');
     modeLabel.style.cssText = `
-      font-family: 'Courier New', monospace;
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 8px;
       color: rgba(255, 255, 255, 0.6);
       text-align: center;

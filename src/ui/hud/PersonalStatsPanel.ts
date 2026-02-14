@@ -127,24 +127,24 @@ export class PersonalStatsPanel {
 
     panel.innerHTML = `
       <div class="stats-desktop">
-        <div style="font-weight: bold; margin-bottom: 8px; text-transform: uppercase; font-size: 11px; opacity: 0.7; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">Your Stats</div>
-        <div style="margin: 5px 0; display: flex; justify-content: space-between;">
-          <span>Kills:</span>
-          <span class="stat-kills" style="color: #4ade80; font-weight: bold;">0</span>
+        <div style="font-weight: 700; margin-bottom: 6px; text-transform: uppercase; font-size: 9px; letter-spacing: 1.5px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 3px; color: rgba(220, 225, 230, 0.4);">Stats</div>
+        <div style="margin: 3px 0; display: flex; justify-content: space-between; gap: 16px;">
+          <span style="color: rgba(220, 225, 230, 0.5); font-size: 11px;">K</span>
+          <span class="stat-kills" style="color: rgba(220, 225, 230, 0.9); font-weight: 700;">0</span>
         </div>
-        <div style="margin: 5px 0; display: flex; justify-content: space-between;">
-          <span>Deaths:</span>
-          <span class="stat-deaths" style="color: #f87171; font-weight: bold;">0</span>
+        <div style="margin: 3px 0; display: flex; justify-content: space-between; gap: 16px;">
+          <span style="color: rgba(220, 225, 230, 0.5); font-size: 11px;">D</span>
+          <span class="stat-deaths" style="color: rgba(220, 225, 230, 0.55); font-weight: 700;">0</span>
         </div>
-        <div style="margin: 5px 0; display: flex; justify-content: space-between;">
-          <span>K/D:</span>
-          <span class="stat-kd" style="color: #fbbf24; font-weight: bold;">0.00</span>
+        <div style="margin: 3px 0; display: flex; justify-content: space-between; gap: 16px;">
+          <span style="color: rgba(220, 225, 230, 0.5); font-size: 11px;">K/D</span>
+          <span class="stat-kd" style="color: rgba(220, 225, 230, 0.65); font-weight: 700;">0.00</span>
         </div>
       </div>
       <div class="stats-mobile">
-        <span style="color: #4ade80; font-weight: bold;">K:<span class="stat-kills">0</span></span>
-        <span style="color: #f87171; font-weight: bold; margin-left: 8px;">D:<span class="stat-deaths">0</span></span>
-        <span style="color: #fbbf24; font-weight: bold; margin-left: 8px;">K/D:<span class="stat-kd">0.00</span></span>
+        <span style="color: rgba(220, 225, 230, 0.9); font-weight: 700;">K:<span class="stat-kills">0</span></span>
+        <span style="color: rgba(220, 225, 230, 0.55); font-weight: 700; margin-left: 8px;">D:<span class="stat-deaths">0</span></span>
+        <span style="color: rgba(220, 225, 230, 0.65); font-weight: 700; margin-left: 8px;">KD:<span class="stat-kd">0.00</span></span>
       </div>
     `;
 
@@ -159,20 +159,21 @@ export class PersonalStatsPanel {
       top: 50%;
       left: 50%;
       transform: translate(-50%, -100px);
-      background: rgba(255, 0, 0, 0.1);
-      border: 2px solid rgba(255, 100, 100, 0.8);
-      padding: 20px 40px;
-      border-radius: 12px;
-      font-family: 'Courier New', monospace;
-      font-size: 28px;
-      font-weight: bold;
-      color: #ff4444;
+      background: rgba(8, 12, 18, 0.7);
+      border: 1px solid rgba(201, 86, 74, 0.5);
+      padding: 14px 32px;
+      border-radius: 4px;
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: rgba(220, 225, 230, 0.95);
       text-align: center;
       pointer-events: none;
       z-index: 150;
       display: none;
-      text-shadow: 0 0 10px rgba(255, 0, 0, 0.8);
-      box-shadow: 0 0 20px rgba(255, 0, 0, 0.3);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      backdrop-filter: blur(8px);
     `;
 
     return streakEl;
@@ -215,28 +216,28 @@ export class PersonalStatsPanel {
 
   private checkKillStreakMilestone(): void {
     let message = '';
-    let color = '#ff4444';
+    let color = 'rgba(201, 86, 74, 0.9)';
 
     switch (this.currentStreak) {
       case 3:
         message = 'KILLING SPREE';
-        color = '#ff8844';
+        color = 'rgba(212, 163, 68, 0.9)';
         break;
       case 5:
         message = 'RAMPAGE';
-        color = '#ff4444';
+        color = 'rgba(201, 120, 74, 0.9)';
         break;
       case 7:
         message = 'DOMINATING';
-        color = '#ff0000';
+        color = 'rgba(201, 86, 74, 0.9)';
         break;
       case 10:
         message = 'UNSTOPPABLE';
-        color = '#ff0088';
+        color = 'rgba(184, 58, 94, 0.9)';
         break;
       case 15:
         message = 'GODLIKE';
-        color = '#ff00ff';
+        color = 'rgba(220, 225, 230, 1)';
         break;
       default:
         return; // No milestone
@@ -278,18 +279,18 @@ export class PersonalStatsPanel {
     style.textContent = `
       .personal-stats-panel {
         position: fixed;
-        top: 120px;
-        right: 20px;
-        background: rgba(10, 10, 14, 0.4);
-        backdrop-filter: blur(6px) saturate(1.1);
-        -webkit-backdrop-filter: blur(6px) saturate(1.1);
-        padding: 12px 16px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 8px;
-        font-family: 'Courier New', monospace;
-        font-size: 13px;
-        color: white;
-        min-width: 140px;
+        bottom: 76px;
+        left: 16px;
+        background: rgba(8, 12, 18, 0.55);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        padding: 6px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 4px;
+        font-family: 'Rajdhani', sans-serif;
+        font-size: 12px;
+        color: rgba(220, 225, 230, 0.8);
+        min-width: 110px;
         pointer-events: none;
         z-index: 105;
       }
@@ -300,23 +301,22 @@ export class PersonalStatsPanel {
 
       @media (max-width: 768px) {
         .personal-stats-panel {
-          right: 10px;
+          left: 10px;
+          bottom: 170px;
           font-size: 11px;
-          padding: 8px 12px;
-          min-width: 120px;
+          padding: 6px 10px;
+          min-width: 100px;
         }
       }
 
       @media (max-width: 480px) {
         .personal-stats-panel {
-          top: 100px; /* Below compass */
-          left: 10px;
-          right: auto;
-          background: rgba(10, 10, 14, 0.6);
-          padding: 4px 10px;
+          bottom: 200px;
+          left: 8px;
+          background: rgba(8, 12, 18, 0.6);
+          padding: 3px 8px;
           min-width: 0;
-          border-radius: 4px;
-          border-color: rgba(255, 255, 255, 0.15);
+          border-radius: 3px;
         }
 
         .stats-desktop {
@@ -326,7 +326,7 @@ export class PersonalStatsPanel {
         .stats-mobile {
           display: flex;
           align-items: center;
-          font-size: 11px;
+          font-size: 10px;
           white-space: nowrap;
         }
 

@@ -9,23 +9,23 @@ export function createLegend(): HTMLDivElement {
   legend.className = 'map-legend';
   legend.innerHTML = `
     <div class="legend-item">
-      <div class="legend-icon" style="background: #00ff00;"></div>
+      <div class="legend-icon" style="background: rgba(220, 225, 230, 0.95);"></div>
       <span>You</span>
     </div>
     <div class="legend-item">
-      <div class="legend-icon" style="background: #4488ff;"></div>
+      <div class="legend-icon" style="background: rgba(91, 140, 201, 0.9);"></div>
       <span>US Forces</span>
     </div>
     <div class="legend-item">
-      <div class="legend-icon" style="background: #ff4444;"></div>
+      <div class="legend-icon" style="background: rgba(201, 86, 74, 0.9);"></div>
       <span>OPFOR</span>
     </div>
     <div class="legend-item">
-      <div class="legend-icon" style="background: #ffff44;"></div>
+      <div class="legend-icon" style="background: rgba(212, 163, 68, 0.9);"></div>
       <span>Contested</span>
     </div>
     <div class="legend-item">
-      <div class="legend-icon" style="background: #888888;"></div>
+      <div class="legend-icon" style="background: rgba(107, 119, 128, 0.8);"></div>
       <span>Neutral</span>
     </div>
   `;
@@ -39,17 +39,17 @@ export function createControls(inputHandler: FullMapInput): HTMLDivElement {
   const zoomIn = document.createElement('button');
   zoomIn.className = 'map-control-button';
   zoomIn.textContent = '+';
-  zoomIn.onclick = () => inputHandler.zoom(0.2);
+  zoomIn.addEventListener('pointerdown', (e) => { e.preventDefault(); inputHandler.zoom(0.2); });
 
   const zoomOut = document.createElement('button');
   zoomOut.className = 'map-control-button';
   zoomOut.textContent = '-';
-  zoomOut.onclick = () => inputHandler.zoom(-0.2);
+  zoomOut.addEventListener('pointerdown', (e) => { e.preventDefault(); inputHandler.zoom(-0.2); });
 
   const reset = document.createElement('button');
   reset.className = 'map-control-button';
   reset.textContent = '⟲';
-  reset.onclick = () => inputHandler.resetZoom();
+  reset.addEventListener('pointerdown', (e) => { e.preventDefault(); inputHandler.resetZoom(); });
 
   controls.appendChild(zoomIn);
   controls.appendChild(zoomOut);

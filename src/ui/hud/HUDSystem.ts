@@ -15,6 +15,7 @@ import { PersonalStatsPanel } from './PersonalStatsPanel';
 import type { GrenadeSystem } from '../../systems/weapons/GrenadeSystem';
 import type { PlayerHealthSystem } from '../../systems/player/PlayerHealthSystem';
 import { IHUDSystem } from '../../types/SystemInterfaces';
+import { ViewportManager } from '../design/responsive';
 
 export class HUDSystem implements GameSystem, IHUDSystem {
   private combatantSystem?: CombatantSystem;
@@ -35,6 +36,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private isScoreboardVisible = false;
   private onPlayAgainCallback?: () => void;
   private respawnButtonPointerDownHandler?: (e: PointerEvent) => void;
+  private viewportUnsubscribe?: () => void;
 
   constructor(camera?: THREE.Camera, ticketSystem?: TicketSystem, playerHealthSystem?: PlayerHealthSystem, _playerRespawnManager?: unknown) {
     this.camera = camera;
@@ -72,6 +74,16 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
     // Inject styles
     this.styles.inject();
+
+    // Subscribe to viewport changes for responsive HUD
+    this.viewportUnsubscribe = ViewportManager.getInstance().subscribe((info) => {
+      const container = this.elements.hudContainer;
+      if (container) {
+        container.style.setProperty('--hud-scale', String(info.scale));
+        container.style.setProperty('--hud-bottom-offset', info.viewportClass === 'phone' ? '8px' : '16px');
+        container.style.setProperty('--hud-edge-inset', info.viewportClass === 'phone' ? '8px' : '16px');
+      }
+    });
 
     // Add HUD to DOM
     this.elements.attachToDOM();
@@ -151,6 +163,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   }
 
   dispose(): void {
+    this.viewportUnsubscribe?.();
     if (this.elements.respawnButton && this.respawnButtonPointerDownHandler) {
       this.elements.respawnButton.removeEventListener('pointerdown', this.respawnButtonPointerDownHandler);
     }

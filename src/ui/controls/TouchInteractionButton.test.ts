@@ -24,8 +24,8 @@ describe('TouchInteractionButton', () => {
   it('creates the interaction button element', () => {
     expect(button).toBeTruthy();
     expect(button.textContent).toBe('E');
-    expect(button.style.width).toBe('70px');
-    expect(button.style.height).toBe('70px');
+    expect(button.style.width).toBe('var(--tc-fire-size, 70px)');
+    expect(button.style.height).toBe('var(--tc-fire-size, 70px)');
   });
 
   it('starts hidden by default', () => {
