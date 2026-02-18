@@ -12,7 +12,7 @@ const DIRECTIONS = ['front', 'back', 'side'] as const;
 // Helper to create mock InstancedMesh
 function createMockInstancedMesh(): THREE.InstancedMesh {
   const geometry = new THREE.PlaneGeometry(1, 1);
-  const material = new THREE.MeshLambertMaterial();
+  const material = new THREE.MeshBasicMaterial();
   const mesh = new THREE.InstancedMesh(geometry, material, 100);
   mesh.count = 0;
   return mesh;

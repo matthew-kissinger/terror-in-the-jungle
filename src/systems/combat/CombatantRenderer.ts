@@ -118,7 +118,7 @@ export class CombatantRenderer {
         // Key is "{FACTION}_{direction}", mesh key is "{FACTION}_walking_{direction}"
         const meshKey = `${key.split('_')[0]}_walking_${key.split('_')[1]}`;
         const mesh = this.factionMeshes.get(meshKey);
-        if (mesh && mesh.material instanceof THREE.MeshLambertMaterial) {
+        if (mesh && mesh.material instanceof THREE.MeshBasicMaterial) {
           mesh.material.map = tex;
           mesh.material.needsUpdate = true;
         }
