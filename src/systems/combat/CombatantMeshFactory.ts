@@ -96,7 +96,7 @@ export class CombatantMeshFactory {
       const isUS = key.startsWith('US') || isPlayerSquad;
 
       // Main sprite material
-      const spriteMaterial = new THREE.MeshLambertMaterial({
+      const spriteMaterial = new THREE.MeshBasicMaterial({
         map: texture,
         transparent: true,
         alphaTest: 0.5,

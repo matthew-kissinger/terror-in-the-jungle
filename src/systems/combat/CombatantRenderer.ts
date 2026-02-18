@@ -193,9 +193,9 @@ export class CombatantRenderer {
       if (viewDir === 'side') {
         // Side sprites show the soldier facing right.
         // Determine NPC travel direction relative to camera right axis.
-        // If NPC faces left relative to camera, flip the sprite.
+        // If NPC faces right relative to camera, flip the sprite so it faces forward.
         const combatantDotRight = this.scratchCombatantForward.dot(this.scratchCameraRight);
-        if (combatantDotRight < 0) {
+        if (combatantDotRight > 0) {
           scaleX = -scaleX; // Flip horizontally
         }
       }
