@@ -1,12 +1,13 @@
 # Docs Index
 
-Last updated: 2026-02-14
+Last updated: 2026-02-18
 
 ## Read Order
 
 1. `PERFORMANCE_FRONTIER_MISSION.md`
 2. `PROFILING_HARNESS.md`
 3. `ARCHITECTURE_RECOVERY_PLAN.md`
+4. `A_SHAU_VALLEY_MODE.md`
 
 ## What Each Doc Is For
 
@@ -21,6 +22,10 @@ Last updated: 2026-02-14
 - `ARCHITECTURE_RECOVERY_PLAN.md`
   - Long-running experiment ledger and decision history.
   - Tracks what changed, why, and which paths were kept or reverted.
+
+- `A_SHAU_VALLEY_MODE.md`
+  - Status, full specs, and engine extensions for the A Shau Valley game mode.
+  - Covers the war simulation engine, DEM terrain, materialization pipeline, persistence, and all new files.
 
 - `AUDIO_ASSETS_NEEDED.md`
   - Audio content backlog and production specifications.
