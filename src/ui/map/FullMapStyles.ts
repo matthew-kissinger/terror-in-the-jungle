@@ -242,8 +242,8 @@ export const MAP_SIZE = 800;
 export const BASE_WORLD_SIZE = 400; // Zone Control world size as baseline for scaling
 
 // Zoom constants
-export const MIN_ZOOM = 0.5;
-export const MAX_ZOOM = 8; // Increased max zoom for Open Frontier
+export const MIN_ZOOM = 0.3;
+export const MAX_ZOOM = 30; // High enough for 21km worlds (~1px/unit at zoom 26)
 
 // Zone color constants (RGBA values)
 export const ZONE_COLORS = {

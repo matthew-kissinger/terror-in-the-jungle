@@ -160,8 +160,10 @@ function drawStrategicAgents(ctx: CanvasRenderingContext2D, state: MinimapRender
 
   const data = state.warSimulator.getAgentPositionsForMap();
   const scale = state.size / state.worldSize;
-  const halfSize = state.size / 2;
   const dotSize = 1.5 * renderScale;
+  const cos = Math.cos(state.playerRotation);
+  const sin = Math.sin(state.playerRotation);
+  const halfSize = state.size / 2;
 
   for (let i = 0; i < data.length; i += 4) {
     const faction = data[i];     // 0 = US, 1 = OPFOR
@@ -172,11 +174,13 @@ function drawStrategicAgents(ctx: CanvasRenderingContext2D, state: MinimapRender
     // Skip materialized agents - already drawn by drawCombatantIndicators
     if (tier === 0) continue;
 
-    // World to minimap (player-centered)
+    // World to minimap (player-centered + rotated, same as worldToMinimap)
     const dx = ax - state.playerPosition.x;
     const dz = az - state.playerPosition.z;
-    const mx = halfSize + dx * scale;
-    const my = halfSize + dz * scale;
+    const rotatedX = dx * cos + dz * sin;
+    const rotatedZ = -dx * sin + dz * cos;
+    const mx = halfSize + rotatedX * scale;
+    const my = halfSize + rotatedZ * scale;
 
     if (mx < 0 || mx > state.size || my < 0 || my > state.size) continue;
 

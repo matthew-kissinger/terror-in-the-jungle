@@ -36,10 +36,18 @@ export class FullMapInput {
   private initialPinchZoom = 1;
   private activeTouchCount = 0;
 
+  // Mouse drag state
+  private isDragging = false;
+  private lastMouseX = 0;
+  private lastMouseY = 0;
+
   // Bound event handlers (stored to allow cleanup)
   private boundKeyDownHandler: (e: KeyboardEvent) => void;
   private boundKeyUpHandler: (e: KeyboardEvent) => void;
   private boundWheelHandler: (e: WheelEvent) => void;
+  private boundMouseDownHandler: (e: MouseEvent) => void;
+  private boundMouseMoveHandler: (e: MouseEvent) => void;
+  private boundMouseUpHandler: (e: MouseEvent) => void;
   private boundTouchStartHandler: (e: TouchEvent) => void;
   private boundTouchMoveHandler: (e: TouchEvent) => void;
   private boundTouchEndHandler: (e: TouchEvent) => void;
@@ -51,6 +59,9 @@ export class FullMapInput {
     this.boundKeyDownHandler = this.handleKeyDown.bind(this);
     this.boundKeyUpHandler = this.handleKeyUp.bind(this);
     this.boundWheelHandler = this.handleWheel.bind(this);
+    this.boundMouseDownHandler = this.handleMouseDown.bind(this);
+    this.boundMouseMoveHandler = this.handleMouseMove.bind(this);
+    this.boundMouseUpHandler = this.handleMouseUp.bind(this);
     this.boundTouchStartHandler = this.handleTouchStart.bind(this);
     this.boundTouchMoveHandler = this.handleTouchMove.bind(this);
     this.boundTouchEndHandler = this.handleTouchEnd.bind(this);
@@ -62,8 +73,11 @@ export class FullMapInput {
     window.addEventListener('keydown', this.boundKeyDownHandler);
     window.addEventListener('keyup', this.boundKeyUpHandler);
 
-    // Mouse wheel zoom
+    // Mouse wheel zoom + drag-to-pan
     mapCanvas.addEventListener('wheel', this.boundWheelHandler);
+    mapCanvas.addEventListener('mousedown', this.boundMouseDownHandler);
+    window.addEventListener('mousemove', this.boundMouseMoveHandler);
+    window.addEventListener('mouseup', this.boundMouseUpHandler);
 
     // Touch gestures (pinch-zoom + drag-pan)
     mapCanvas.addEventListener('touchstart', this.boundTouchStartHandler, { passive: false });
@@ -93,8 +107,34 @@ export class FullMapInput {
 
   private handleWheel(e: WheelEvent): void {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    this.zoom(delta);
+    // Multiplicative zoom: each scroll tick changes by ~15%
+    const factor = e.deltaY > 0 ? 1 / 1.15 : 1.15;
+    this.zoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.zoomLevel * factor));
+    this.callbacks.onRender();
+  }
+
+  // --- Mouse drag-to-pan handlers ---
+
+  private handleMouseDown(e: MouseEvent): void {
+    if (e.button !== 0) return; // Left button only
+    this.isDragging = true;
+    this.lastMouseX = e.clientX;
+    this.lastMouseY = e.clientY;
+  }
+
+  private handleMouseMove(e: MouseEvent): void {
+    if (!this.isDragging) return;
+    const dx = e.clientX - this.lastMouseX;
+    const dy = e.clientY - this.lastMouseY;
+    this.panX += dx;
+    this.panY += dy;
+    this.lastMouseX = e.clientX;
+    this.lastMouseY = e.clientY;
+    this.callbacks.onRender();
+  }
+
+  private handleMouseUp(_e: MouseEvent): void {
+    this.isDragging = false;
   }
 
   // --- Touch gesture handlers ---
@@ -182,9 +222,9 @@ export class FullMapInput {
   // --- Public API ---
 
   zoom(delta: number): void {
-    // Scale zoom speed based on current zoom level for smoother control
-    const scaledDelta = delta * Math.sqrt(this.zoomLevel);
-    this.zoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.zoomLevel + scaledDelta));
+    // Multiplicative zoom for consistent feel at any zoom level
+    const factor = delta > 0 ? 1.2 : 1 / 1.2;
+    this.zoomLevel = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.zoomLevel * factor));
     this.callbacks.onRender();
   }
 
@@ -248,8 +288,11 @@ export class FullMapInput {
   dispose(): void {
     window.removeEventListener('keydown', this.boundKeyDownHandler);
     window.removeEventListener('keyup', this.boundKeyUpHandler);
+    window.removeEventListener('mousemove', this.boundMouseMoveHandler);
+    window.removeEventListener('mouseup', this.boundMouseUpHandler);
     if (this.mapCanvas) {
       this.mapCanvas.removeEventListener('wheel', this.boundWheelHandler);
+      this.mapCanvas.removeEventListener('mousedown', this.boundMouseDownHandler);
       this.mapCanvas.removeEventListener('touchstart', this.boundTouchStartHandler);
       this.mapCanvas.removeEventListener('touchmove', this.boundTouchMoveHandler);
       this.mapCanvas.removeEventListener('touchend', this.boundTouchEndHandler);
