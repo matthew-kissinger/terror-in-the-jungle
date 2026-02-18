@@ -34,7 +34,7 @@ import { SmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
 import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
-import { RiverWaterSystem } from '../systems/environment/RiverWaterSystem';
+
 import { DayNightCycle } from '../systems/environment/DayNightCycle';
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { VoiceCalloutSystem } from '../systems/audio/VoiceCalloutSystem';
@@ -52,7 +52,7 @@ export interface SystemReferences {
   combatantSystem: CombatantSystem;
   skybox: Skybox;
   waterSystem: WaterSystem;
-  riverWaterSystem: RiverWaterSystem;
+
   weatherSystem: WeatherSystem;
   dayNightCycle: DayNightCycle;
   firstPersonWeapon: FirstPersonWeapon;
@@ -154,7 +154,7 @@ export class SystemInitializer {
     refs.combatantSystem = new CombatantSystem(scene, camera, refs.globalBillboardSystem, refs.assetLoader, refs.chunkManager);
     refs.skybox = new Skybox(scene);
     refs.waterSystem = new WaterSystem(scene, camera, refs.assetLoader);
-    refs.riverWaterSystem = new RiverWaterSystem(scene);
+
     refs.weatherSystem = new WeatherSystem(scene, camera, refs.chunkManager);
     refs.dayNightCycle = new DayNightCycle(scene);
     refs.firstPersonWeapon = new FirstPersonWeapon(scene, camera, refs.assetLoader);
@@ -201,7 +201,6 @@ export class SystemInitializer {
       refs.chunkManager,
       // gpuTerrain disabled
       refs.waterSystem,
-      refs.riverWaterSystem,
       refs.weatherSystem,
       // dayNightCycle DISABLED: Conflicts with WeatherSystem lighting
       refs.playerController,

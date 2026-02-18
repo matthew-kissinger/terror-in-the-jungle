@@ -8,7 +8,7 @@ import { Skybox } from '../systems/environment/Skybox';
 import { ImprovedChunkManager } from '../systems/terrain/ImprovedChunkManager';
 import { GlobalBillboardSystem } from '../systems/world/billboard/GlobalBillboardSystem';
 import { WaterSystem } from '../systems/environment/WaterSystem';
-import { RiverWaterSystem } from '../systems/environment/RiverWaterSystem';
+
 import { FirstPersonWeapon } from '../systems/player/FirstPersonWeapon';
 import { ZoneManager } from '../systems/world/ZoneManager';
 import { HUDSystem } from '../ui/hud/HUDSystem';
@@ -68,7 +68,7 @@ export class SystemManager {
   public combatantSystem!: CombatantSystem;
   public skybox!: Skybox;
   public waterSystem!: WaterSystem;
-  public riverWaterSystem!: RiverWaterSystem;
+
   public weatherSystem!: WeatherSystem;
   public dayNightCycle!: DayNightCycle;
   public firstPersonWeapon!: FirstPersonWeapon;
@@ -128,7 +128,7 @@ export class SystemManager {
     this.combatantSystem = this.refs.combatantSystem;
     this.skybox = this.refs.skybox;
     this.waterSystem = this.refs.waterSystem;
-    this.riverWaterSystem = this.refs.riverWaterSystem;
+
     this.weatherSystem = this.refs.weatherSystem;
     this.dayNightCycle = this.refs.dayNightCycle;
     this.firstPersonWeapon = this.refs.firstPersonWeapon;

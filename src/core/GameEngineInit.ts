@@ -140,12 +140,6 @@ export async function startGameWithMode(engine: GameEngine, mode: GameMode): Pro
     }
     markStartup(`engine-init.start-game.${mode}.dem-load.end`);
 
-    // Load river water meshes for DEM modes
-    try {
-      await engine.systemManager.riverWaterSystem.loadRivers('data/vietnam/a-shau-rivers.json');
-    } catch (error) {
-      Logger.warn('engine-init', 'Failed to load river data:', error);
-    }
   }
 
   // Configure renderer for mode-specific settings

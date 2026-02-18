@@ -222,7 +222,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       position: geoToWorld(16.233, 107.177),
       radius: 60,
       isHomeBase: false,
-      owner: Faction.OPFOR,          // NVA starts entrenched
+      owner: null,                   // Contested - the central prize
       ticketBleedRate: 6
     },
 
@@ -246,7 +246,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       position: geoToWorld(16.20, 107.19),
       radius: 45,
       isHomeBase: false,
-      owner: Faction.OPFOR,          // NVA controls valley floor
+      owner: null,                   // Contested - valley floor fight
       ticketBleedRate: 4
     },
 
@@ -258,7 +258,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       position: geoToWorld(16.17, 107.23),
       radius: 40,
       isHomeBase: false,
-      owner: null,                   // Contested from the start
+      owner: Faction.US,             // US established firebase
       ticketBleedRate: 4
     },
 
@@ -269,7 +269,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       position: geoToWorld(16.22, 107.25),
       radius: 35,
       isHomeBase: false,
-      owner: null,
+      owner: Faction.US,             // US established firebase
       ticketBleedRate: 3
     },
 
@@ -292,7 +292,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       position: geoToWorld(16.21, 107.22),
       radius: 35,
       isHomeBase: false,
-      owner: null,
+      owner: Faction.US,             // US controls eastern approach
       ticketBleedRate: 2
     },
 
@@ -314,7 +314,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       position: geoToWorld(16.26, 107.25),
       radius: 35,
       isHomeBase: false,
-      owner: null,
+      owner: Faction.US,             // US controls eastern ridgeline
       ticketBleedRate: 2
     },
 
@@ -349,7 +349,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       position: geoToWorld(16.28, 107.22),
       radius: 35,
       isHomeBase: false,
-      owner: null,
+      owner: null,                   // Contested from the start
       ticketBleedRate: 2
     }
   ]

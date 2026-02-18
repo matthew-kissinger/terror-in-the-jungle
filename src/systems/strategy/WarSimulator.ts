@@ -199,7 +199,8 @@ export class WarSimulator implements GameSystem {
       return;
     }
 
-    // Also spawn some OPFOR squads at their controlled non-HQ zones
+    // Also spawn some squads at controlled non-HQ zones for both factions
+    const usZones = zones.filter(z => !z.isHomeBase && z.owner === Faction.US);
     const opforZones = zones.filter(z => !z.isHomeBase && z.owner === Faction.OPFOR);
 
     const squadMin = this.config.squadSize.min;
@@ -207,8 +208,13 @@ export class WarSimulator implements GameSystem {
     const avgSquadSize = Math.floor((squadMin + squadMax) / 2);
     const squadsPerFaction = Math.ceil(this.config.agentsPerFaction / avgSquadSize);
 
-    // Spawn US forces at their HQs
-    this.spawnFactionForces(Faction.US, usHQs, [], squadsPerFaction, squadMin, squadMax);
+    // Spawn US forces: 60% at HQs, 40% at forward positions (firebases)
+    const usHQSquads = Math.ceil(squadsPerFaction * 0.6);
+    const usZoneSquads = squadsPerFaction - usHQSquads;
+    this.spawnFactionForces(Faction.US, usHQs, [], usHQSquads, squadMin, squadMax);
+    if (usZoneSquads > 0 && usZones.length > 0) {
+      this.spawnFactionForces(Faction.US, usZones, [], usZoneSquads, squadMin, squadMax);
+    }
 
     // Spawn OPFOR forces: 60% at HQs, 40% distributed at controlled zones
     const opforHQSquads = Math.ceil(squadsPerFaction * 0.6);

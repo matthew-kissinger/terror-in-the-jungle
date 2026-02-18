@@ -136,10 +136,9 @@ export class GameModeManager implements GameSystem {
       this.chunkManager.setRenderDistance(config.chunkRenderDistance);
     }
 
-    // Configure minimap scale - use minimapScale for small modes, worldSize for large
+    // Configure minimap scale (local player-centered view area)
     if (this.minimapSystem) {
-      const minimapWorldSize = config.worldSize > 3200 ? config.worldSize : config.minimapScale;
-      this.minimapSystem.setWorldScale(minimapWorldSize);
+      this.minimapSystem.setWorldScale(config.minimapScale);
     }
 
     // Apply scale overrides for large maps
