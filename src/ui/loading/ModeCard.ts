@@ -36,7 +36,7 @@ export const MODE_CARD_CONFIGS: Record<string, ModeCardConfig> = {
     title: 'A Shau Valley',
     subtitle: 'Historical',
     description: 'Real terrain - Hamburger Hill 1969',
-    features: ['21km', '200 Units', '30 Min', 'DEM Terrain'],
+    features: ['21km', '1500v1500', '60 Min', 'DEM Terrain'],
     cssClass: 'a-shau-valley-card',
   },
 };

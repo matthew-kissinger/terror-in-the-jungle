@@ -112,7 +112,10 @@ export class GameModeManager implements GameSystem {
       this.combatantSystem.setMaxCombatants(config.maxCombatants);
       this.combatantSystem.setSquadSizes(config.squadSize.min, config.squadSize.max);
       this.combatantSystem.setReinforcementInterval(config.reinforcementInterval);
-      this.combatantSystem.reseedForcesForMode();
+      // Skip standard spawning when WarSimulator handles force generation
+      if (!config.warSimulator?.enabled) {
+        this.combatantSystem.reseedForcesForMode();
+      }
     }
 
     // Configure ticket system
@@ -133,9 +136,10 @@ export class GameModeManager implements GameSystem {
       this.chunkManager.setRenderDistance(config.chunkRenderDistance);
     }
 
-    // Configure minimap scale
+    // Configure minimap scale - use minimapScale for small modes, worldSize for large
     if (this.minimapSystem) {
-      this.minimapSystem.setWorldScale(config.minimapScale);
+      const minimapWorldSize = config.worldSize > 3200 ? config.worldSize : config.minimapScale;
+      this.minimapSystem.setWorldScale(minimapWorldSize);
     }
 
     // Apply scale overrides for large maps

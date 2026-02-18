@@ -200,28 +200,35 @@ export class FullMapSystem implements GameSystem {
   }
 
   private autoFitView(): void {
-    // Calculate the optimal zoom to show all zones
-    // For Open Frontier (3200 world size), we want to see everything
-    // For Zone Control (400 world size), default zoom is fine
+    // Calculate the optimal zoom to show all zones at readable size.
+    // Base rendering scale is MAP_SIZE / worldSize pixels per unit.
+    // We want ~1 px/unit minimum so zone radii (50-100 units) are visible.
 
-    if (this.worldSize > BASE_WORLD_SIZE) {
-      // For larger worlds, calculate zoom to fit all content with some padding
-      // We want the entire world to fit in about 80% of the map canvas
+    const baseScale = MAP_SIZE / this.worldSize; // e.g. 0.038 for 21km
+
+    if (this.worldSize > 5000) {
+      // Very large worlds: zoom so 1 world-unit ~ 0.5 px (shows ~1600m across canvas)
+      const targetPxPerUnit = 0.5;
+      const zoomLevel = Math.max(1.0, targetPxPerUnit / baseScale);
+      this.inputHandler.setZoomLevel(zoomLevel);
+
+      // Center pan on player position
+      const scale = MAP_SIZE / this.worldSize;
+      const px = (this.worldSize / 2 - this.playerPosition.x) * scale;
+      const py = (this.worldSize / 2 - this.playerPosition.z) * scale;
+      const panX = (MAP_SIZE / 2 - px) * zoomLevel;
+      const panY = (MAP_SIZE / 2 - py) * zoomLevel;
+      this.inputHandler.setPanOffset(panX, panY);
+    } else if (this.worldSize > BASE_WORLD_SIZE) {
+      // Medium worlds (Open Frontier): fit entire world
       const targetViewSize = MAP_SIZE * 0.8;
       const requiredScale = targetViewSize / this.worldSize;
-
-      // The base scale is MAP_SIZE / worldSize, so we need to compensate
-      const baseScale = MAP_SIZE / this.worldSize;
       const zoomLevel = requiredScale / baseScale;
-
-      // Clamp to reasonable bounds and set
       this.inputHandler.setZoomLevel(zoomLevel);
     } else {
-      // For Zone Control, use a comfortable default that shows all zones
       this.inputHandler.setZoomLevel(1.0);
     }
 
-    // Update the default zoom level for reset button
     this.inputHandler.setDefaultZoomLevel(this.inputHandler.getZoomLevel());
   }
 

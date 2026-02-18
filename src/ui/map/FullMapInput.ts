@@ -220,6 +220,11 @@ export class FullMapInput {
     this.panY = 0;
   }
 
+  setPanOffset(x: number, y: number): void {
+    this.panX = x;
+    this.panY = y;
+  }
+
   setIsVisible(visible: boolean): void {
     this.isVisible = visible;
     if (!visible) {
