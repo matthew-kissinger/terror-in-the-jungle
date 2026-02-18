@@ -233,6 +233,22 @@ export class WaterSystem implements GameSystem {
   }
 
   /**
+   * Show or hide the water plane. Modes with no lakes/ocean (e.g. A Shau Valley)
+   * disable the global water to avoid a flat plane slicing through terrain.
+   */
+  setEnabled(enabled: boolean): void {
+    if (this.water) {
+      this.water.visible = enabled;
+    }
+    if (this.overlay) {
+      if (!enabled) {
+        this.overlay.style.display = 'none';
+        this.overlay.style.opacity = '0';
+      }
+    }
+  }
+
+  /**
    * Match water coverage to current game mode world size.
    * Adds margin to absorb fast traversal and distant chunk transitions.
    */

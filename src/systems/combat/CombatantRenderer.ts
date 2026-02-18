@@ -1,14 +1,23 @@
 import * as THREE from 'three';
 import { Combatant, CombatantState, Faction } from './types';
 import { AssetLoader } from '../assets/AssetLoader';
-import { CombatantMeshFactory, disposeCombatantMeshes, updateCombatantTexture } from './CombatantMeshFactory';
+import { CombatantMeshFactory, disposeCombatantMeshes, updateCombatantTexture, type ViewDirection, type WalkFrameMap } from './CombatantMeshFactory';
 import { CombatantShaderSettingsManager, setDamageFlash, updateShaderUniforms, type NPCShaderSettings, type ShaderPreset, type ShaderUniformSettings } from './CombatantShaders';
 import { Logger } from '../../utils/Logger';
 
-const _enemyForward = new THREE.Vector3();
-const _toPlayer = new THREE.Vector3();
-
 export type { NPCShaderSettings, ShaderPreset } from './CombatantShaders';
+
+/** Walk animation interval in seconds. */
+const WALK_FRAME_INTERVAL = 0.4;
+
+/** Dot product threshold for side view. Below this absolute value = side. */
+const SIDE_DOT_THRESHOLD = 0.45;
+
+/** Y bob amplitude in world units. */
+const BOB_AMPLITUDE = 0.12;
+
+/** Y bob speed multiplier. */
+const BOB_SPEED = 3.0;
 
 export class CombatantRenderer {
   private scene: THREE.Scene;
@@ -20,10 +29,18 @@ export class CombatantRenderer {
   private factionGroundMarkers: Map<string, THREE.InstancedMesh> = new Map();
   private soldierTextures: Map<string, THREE.Texture> = new Map();
   private factionMaterials: Map<string, THREE.ShaderMaterial> = new Map();
+  private walkFrameTextures: WalkFrameMap = new Map();
   private playerSquadId?: string;
   private playerSquadDetected = false;
   private shaderSettings = new CombatantShaderSettingsManager();
   private combatantStates: Map<string, { state: number; damaged: number }> = new Map();
+
+  // Walk animation state
+  private walkFrameTimer = 0;
+  private currentWalkFrame: 'a' | 'b' = 'a';
+  private elapsedTime = 0;
+
+  // Scratch objects to avoid per-frame allocation
   private readonly scratchMatrix = new THREE.Matrix4();
   private readonly scratchSpinMatrix = new THREE.Matrix4();
   private readonly scratchCameraDir = new THREE.Vector3();
@@ -41,6 +58,7 @@ export class CombatantRenderer {
   private readonly scratchMarkerMatrix = new THREE.Matrix4();
   private readonly renderWriteCounts = new Map<string, number>();
   private readonly renderCombatStates = new Map<string, number>();
+
   constructor(scene: THREE.Scene, camera: THREE.Camera, assetLoader: AssetLoader) {
     this.scene = scene;
     this.camera = camera;
@@ -64,11 +82,53 @@ export class CombatantRenderer {
     this.factionGroundMarkers = assets.factionGroundMarkers;
     this.soldierTextures = assets.soldierTextures;
     this.factionMaterials = assets.factionMaterials;
+    this.walkFrameTextures = assets.walkFrameTextures;
   }
+
   setPlayerSquadId(squadId: string | undefined): void {
     this.playerSquadId = squadId;
     this.playerSquadDetected = false;
     Logger.info('combat-renderer', ` Renderer: Player squad ID set to: ${squadId}`);
+  }
+
+  /**
+   * Compute viewing direction for a combatant based on camera angle.
+   * Returns 'front' if camera is in front of the NPC, 'back' if behind, 'side' if perpendicular.
+   */
+  private getViewDirection(combatantForward: THREE.Vector3, cameraToCombatant: THREE.Vector3): ViewDirection {
+    const facingDot = combatantForward.dot(cameraToCombatant);
+    if (Math.abs(facingDot) < SIDE_DOT_THRESHOLD) return 'side';
+    // facingDot > 0 means camera-to-npc aligns with npc facing = camera sees back
+    return facingDot > 0 ? 'back' : 'front';
+  }
+
+  /**
+   * Update walk frame animation timer. Call once per frame.
+   */
+  updateWalkFrame(deltaTime: number): void {
+    this.elapsedTime += deltaTime;
+    this.walkFrameTimer += deltaTime;
+    if (this.walkFrameTimer >= WALK_FRAME_INTERVAL) {
+      this.walkFrameTimer -= WALK_FRAME_INTERVAL;
+      this.currentWalkFrame = this.currentWalkFrame === 'a' ? 'b' : 'a';
+
+      // Swap textures on all walking meshes
+      this.walkFrameTextures.forEach((frames, key) => {
+        const tex = frames[this.currentWalkFrame];
+        // Key is "{FACTION}_{direction}", mesh key is "{FACTION}_walking_{direction}"
+        const meshKey = `${key.split('_')[0]}_walking_${key.split('_')[1]}`;
+        const mesh = this.factionMeshes.get(meshKey);
+        if (mesh && mesh.material instanceof THREE.MeshLambertMaterial) {
+          mesh.material.map = tex;
+          mesh.material.needsUpdate = true;
+        }
+        // Also update outline mesh texture
+        const outlineMat = this.factionMaterials.get(meshKey);
+        if (outlineMat && outlineMat.uniforms.map) {
+          outlineMat.uniforms.map.value = tex;
+        }
+      });
+    }
   }
 
   updateBillboards(combatants: Map<string, Combatant>, playerPosition: THREE.Vector3): void {
@@ -88,65 +148,73 @@ export class CombatantRenderer {
     const cameraAngle = Math.atan2(this.scratchCameraDir.x, this.scratchCameraDir.z);
     this.scratchCameraRight.crossVectors(this.scratchCameraDir, this.scratchUp).normalize();
     this.scratchCameraForward.set(this.scratchCameraDir.x, 0, this.scratchCameraDir.z).normalize();
+
     combatants.forEach(combatant => {
       if (combatant.state === CombatantState.DEAD && !combatant.isDying) return;
       if (combatant.isPlayerProxy) return;
       if (combatant.position.distanceToSquared(playerPosition) > RENDER_DISTANCE_SQ) return;
 
-      let isShowingBack = false;
-      if (combatant.faction === Faction.OPFOR) {
-        _enemyForward.set(Math.cos(combatant.visualRotation), 0, Math.sin(combatant.visualRotation));
-        _toPlayer.subVectors(playerPosition, combatant.position).normalize();
-        const behindDot = _enemyForward.dot(_toPlayer);
-        isShowingBack = behindDot < -0.2 && (!combatant.target || combatant.target.id !== 'PLAYER');
-      }
-      let stateKey = 'walking';
-      if (isShowingBack) {
-        stateKey = 'back';
-      } else if (combatant.state === CombatantState.ENGAGING || combatant.state === CombatantState.SUPPRESSING) {
+      // Compute NPC forward direction
+      this.scratchCombatantForward.set(
+        Math.cos(combatant.visualRotation), 0, Math.sin(combatant.visualRotation)
+      );
+
+      // Camera-to-NPC vector (normalized)
+      this.scratchToCombatant.subVectors(combatant.position, this.camera.position).normalize();
+
+      // Determine viewing direction
+      const viewDir = this.getViewDirection(this.scratchCombatantForward, this.scratchToCombatant);
+
+      // Determine render state
+      let stateKey: string;
+      if (combatant.state === CombatantState.ENGAGING || combatant.state === CombatantState.SUPPRESSING) {
         stateKey = 'firing';
-      } else if (combatant.state === CombatantState.ALERT) {
-        stateKey = 'alert';
+      } else {
+        stateKey = 'walking';
       }
+
+      // Build mesh key: {faction}_{ state}_{direction}
       const isPlayerSquad = combatant.squadId === this.playerSquadId && combatant.faction === Faction.US;
       if (isPlayerSquad && !this.playerSquadDetected) this.playerSquadDetected = true;
       const factionPrefix = isPlayerSquad ? 'SQUAD' : combatant.faction;
-      const key = `${factionPrefix}_${stateKey}`;
+      const key = `${factionPrefix}_${stateKey}_${viewDir}`;
 
       const mesh = this.factionMeshes.get(key);
       if (!mesh) return;
       const capacity = (mesh.instanceMatrix as any).count ?? mesh.count;
       const index = this.renderWriteCounts.get(key) ?? 0;
       if (index >= capacity) return;
-      const isBackTexture = key.includes('_back');
 
-      this.scratchCombatantForward.set(Math.cos(combatant.visualRotation), 0, Math.sin(combatant.visualRotation));
-      this.scratchToCombatant.subVectors(combatant.position, playerPosition).normalize();
-      const viewAngle = this.scratchToCombatant.dot(this.scratchCameraRight);
+      // Billboard rotation: face camera
+      matrix.makeRotationY(cameraAngle);
 
-      let finalRotation: number;
-      let scaleX = combatant.scale.x;
-      if (isBackTexture) {
-        finalRotation = cameraAngle * 0.8 + combatant.visualRotation * 0.2;
-        scaleX = Math.abs(scaleX);
-      } else if (combatant.faction === Faction.OPFOR) {
-        finalRotation = cameraAngle;
-        scaleX = Math.abs(scaleX);
-      } else {
-        const facingDot = Math.abs(this.scratchCombatantForward.dot(this.scratchCameraForward));
-        const billboardBlend = 0.3 + facingDot * 0.4;
-        finalRotation = cameraAngle * billboardBlend + combatant.visualRotation * (1 - billboardBlend);
-
+      // Determine scaleX (side sprite flipping)
+      let scaleX = Math.abs(combatant.scale.x);
+      if (viewDir === 'side') {
+        // Side sprites show the soldier facing right.
+        // Determine NPC travel direction relative to camera right axis.
+        // If NPC faces left relative to camera, flip the sprite.
         const combatantDotRight = this.scratchCombatantForward.dot(this.scratchCameraRight);
-        const shouldFlip = (viewAngle > 0 && combatantDotRight < 0) || (viewAngle < 0 && combatantDotRight > 0);
-        scaleX = shouldFlip ? -Math.abs(scaleX) : Math.abs(scaleX);
+        if (combatantDotRight < 0) {
+          scaleX = -scaleX; // Flip horizontally
+        }
       }
-      matrix.makeRotationY(finalRotation);
+
+      // Position with Y bob for walking NPCs
       this.scratchPosition.copy(combatant.position);
       let finalPosition = this.scratchPosition;
       let finalScaleX = scaleX;
       let finalScaleY = combatant.scale.y;
       let finalScaleZ = combatant.scale.z;
+
+      // Walking Y bob (not for firing or dying)
+      if (stateKey === 'walking' && !combatant.isDying) {
+        const bobPhase = this.stableHash01(combatant.id) * Math.PI * 2;
+        const bobY = Math.sin(this.elapsedTime * BOB_SPEED + bobPhase) * BOB_AMPLITUDE;
+        finalPosition.y += bobY;
+      }
+
+      // Death animation
       if (combatant.isDying && combatant.deathProgress !== undefined) {
           const FALL_PHASE = 0.7 / 5.7;
           const GROUND_PHASE = 4.0 / 5.7;
@@ -225,7 +293,6 @@ export class CombatantRenderer {
               matrix.multiply(this.scratchSpinMatrix);
               finalScaleY *= 1 - (easeOut * 0.3);
             } else if (progress < FALL_PHASE + GROUND_PHASE) {
-              const groundProgress = (progress - FALL_PHASE) / GROUND_PHASE;
               if (combatant.deathDirection) {
                 finalPosition.x += combatant.deathDirection.x * 2.5;
                 finalPosition.z += combatant.deathDirection.z * 2.5;
@@ -233,6 +300,7 @@ export class CombatantRenderer {
               finalPosition.y -= 4.0;
               this.scratchSpinMatrix.makeRotationZ(Math.PI * 2);
               matrix.multiply(this.scratchSpinMatrix);
+              const groundProgress = (progress - FALL_PHASE) / GROUND_PHASE;
               const settle = Math.max(0, (1 - groundProgress * 4) * 0.1);
               finalPosition.y += settle;
               finalScaleY *= 0.7;
@@ -455,7 +523,8 @@ export class CombatantRenderer {
       factionAuraMeshes: this.factionAuraMeshes,
       factionGroundMarkers: this.factionGroundMarkers,
       soldierTextures: this.soldierTextures,
-      factionMaterials: this.factionMaterials
+      factionMaterials: this.factionMaterials,
+      walkFrameTextures: this.walkFrameTextures
     });
     this.combatantStates.clear();
   }

@@ -1,0 +1,124 @@
+{
+  "name": "A Shau Valley / Hamburger Hill - Big Map",
+  "description": "Large-scale terrain data for Vietnam War open world mode",
+  "center": {
+    "lat": 16.233,
+    "lon": 107.177,
+    "feature": "Hill 937 (Hamburger Hill)"
+  },
+  "downloaded": "2026-02-18T02:46:34.013Z",
+  "grids": {
+    "z13": {
+      "name": "A Shau Valley / Hamburger Hill",
+      "center": {
+        "lat": 16.233,
+        "lon": 107.177
+      },
+      "centerFeature": "Hill 937 (Dong Ap Bia / Hamburger Hill)",
+      "zoom": 13,
+      "gridSize": 7,
+      "tileCount": 49,
+      "width": 1792,
+      "height": 1792,
+      "format": "float32",
+      "byteOrder": "little-endian",
+      "unit": "meters",
+      "pixelResolutionMeters": 18,
+      "coverageKm": 32.9,
+      "coverageMeters": 32879,
+      "geoBounds": {
+        "north": 16.383391123608394,
+        "south": 16.08804222014881,
+        "west": 107.0068359375,
+        "east": 107.314453125
+      },
+      "elevation": {
+        "min": 90,
+        "max": 2053,
+        "mean": 860.5,
+        "stddev": 314.6,
+        "relief": 1963
+      },
+      "waterPercent": 0,
+      "keyFeatures": [
+        "Hill 937 (Hamburger Hill / Dong Ap Bia) - 937m, center of map",
+        "A Shau Valley floor - ~580m, NW-SE corridor",
+        "Eastern ridgeline - 900-1200m",
+        "Western ridgeline (Laos border) - 1000-1800m",
+        "Multiple LZs and firebase sites along valley",
+        "Triple-canopy jungle throughout",
+        "Ho Chi Minh Trail corridor"
+      ],
+      "historicalBattles": [
+        "Battle of Hamburger Hill (Hill 937) - May 10-20, 1969",
+        "Operation Apache Snow - May 1969",
+        "Operation Delaware - April 1968",
+        "Firebase Ripcord - March-July 1970",
+        "Battle of A Shau - March 1966"
+      ],
+      "gameCompatibility": {
+        "currentHeightRange": "[-8, 100] (108 units)",
+        "reliefNeeded": 1963,
+        "scaleFactor1to1": 0.055,
+        "recommendation": "Expand height range to at least 0-2000 for 1:1 scale",
+        "worldSizeAtPixelRes": "32879m x 32879m"
+      }
+    },
+    "z14": {
+      "name": "A Shau Valley / Hamburger Hill",
+      "center": {
+        "lat": 16.233,
+        "lon": 107.177
+      },
+      "centerFeature": "Hill 937 (Dong Ap Bia / Hamburger Hill)",
+      "zoom": 14,
+      "gridSize": 9,
+      "tileCount": 81,
+      "width": 2304,
+      "height": 2304,
+      "format": "float32",
+      "byteOrder": "little-endian",
+      "unit": "meters",
+      "pixelResolutionMeters": 9,
+      "coverageKm": 21.1,
+      "coverageMeters": 21136,
+      "geoBounds": {
+        "north": 16.320139453117566,
+        "south": 16.130262012034756,
+        "west": 107.07275390625,
+        "east": 107.2705078125
+      },
+      "elevation": {
+        "min": 372.6,
+        "max": 1902.2,
+        "mean": 835.2,
+        "stddev": 260.3,
+        "relief": 1530
+      },
+      "waterPercent": 0,
+      "keyFeatures": [
+        "Hill 937 (Hamburger Hill / Dong Ap Bia) - 937m, center of map",
+        "A Shau Valley floor - ~580m, NW-SE corridor",
+        "Eastern ridgeline - 900-1200m",
+        "Western ridgeline (Laos border) - 1000-1800m",
+        "Multiple LZs and firebase sites along valley",
+        "Triple-canopy jungle throughout",
+        "Ho Chi Minh Trail corridor"
+      ],
+      "historicalBattles": [
+        "Battle of Hamburger Hill (Hill 937) - May 10-20, 1969",
+        "Operation Apache Snow - May 1969",
+        "Operation Delaware - April 1968",
+        "Firebase Ripcord - March-July 1970",
+        "Battle of A Shau - March 1966"
+      ],
+      "gameCompatibility": {
+        "currentHeightRange": "[-8, 100] (108 units)",
+        "reliefNeeded": 1530,
+        "scaleFactor1to1": 0.0706,
+        "recommendation": "Expand height range to at least 0-2000 for 1:1 scale",
+        "worldSizeAtPixelRes": "21136m x 21136m"
+      }
+    }
+  }
+}

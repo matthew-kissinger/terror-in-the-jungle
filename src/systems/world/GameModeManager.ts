@@ -6,6 +6,9 @@ import { CombatantSystem } from '../combat/CombatantSystem';
 import { TicketSystem } from './TicketSystem';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { MinimapSystem } from '../../ui/minimap/MinimapSystem';
+import { InfluenceMapSystem } from '../combat/InfluenceMapSystem';
+import type { WarSimulator } from '../strategy/WarSimulator';
+import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 
 export class GameModeManager implements GameSystem {
   public currentMode: GameMode = GameMode.ZONE_CONTROL;
@@ -17,6 +20,8 @@ export class GameModeManager implements GameSystem {
   private ticketSystem?: TicketSystem;
   private chunkManager?: ImprovedChunkManager;
   private minimapSystem?: MinimapSystem;
+  private influenceMapSystem?: InfluenceMapSystem;
+  private warSimulator?: WarSimulator;
 
   // Callbacks
   private onModeChange?: (mode: GameMode, config: GameModeConfig) => void;
@@ -51,6 +56,14 @@ export class GameModeManager implements GameSystem {
     this.ticketSystem = ticketSystem;
     this.chunkManager = chunkManager;
     this.minimapSystem = minimapSystem;
+  }
+
+  public setInfluenceMapSystem(influenceMapSystem: InfluenceMapSystem): void {
+    this.influenceMapSystem = influenceMapSystem;
+  }
+
+  public setWarSimulator(warSimulator: WarSimulator): void {
+    this.warSimulator = warSimulator;
   }
 
   // Get current mode
@@ -123,6 +136,51 @@ export class GameModeManager implements GameSystem {
     // Configure minimap scale
     if (this.minimapSystem) {
       this.minimapSystem.setWorldScale(config.minimapScale);
+    }
+
+    // Apply scale overrides for large maps
+    if (config.scaleConfig && this.combatantSystem) {
+      const sc = config.scaleConfig;
+      if (sc.aiEngagementRange !== undefined) {
+        this.combatantSystem.combatantAI.setEngagementRange(sc.aiEngagementRange);
+      }
+      if (sc.lodHighRange !== undefined && sc.lodMediumRange !== undefined && sc.lodLowRange !== undefined) {
+        (this.combatantSystem as any).lodManager?.setLODRanges(sc.lodHighRange, sc.lodMediumRange, sc.lodLowRange);
+      }
+      if (sc.spatialBounds !== undefined) {
+        this.combatantSystem.setSpatialBounds(sc.spatialBounds);
+      }
+    }
+
+    // Reinitialize influence map for world size
+    if (this.influenceMapSystem) {
+      const gridSize = config.scaleConfig?.influenceMapGridSize;
+      this.influenceMapSystem.reinitialize(config.worldSize, gridSize);
+    }
+
+    // Configure or disable WarSimulator
+    if (this.warSimulator) {
+      if (config.warSimulator?.enabled) {
+        const heightCache = getHeightQueryCache();
+        this.warSimulator.configure(
+          config.warSimulator,
+          (x: number, z: number) => heightCache.getHeightAt(x, z)
+        );
+
+        // Spawn strategic forces from zone config
+        if (this.zoneManager) {
+          const zones = this.zoneManager.getAllZones().map(z => ({
+            id: z.id,
+            name: z.name,
+            position: { x: z.position.x, z: z.position.z },
+            isHomeBase: z.isHomeBase,
+            owner: z.owner
+          }));
+          this.warSimulator.spawnStrategicForces(zones);
+        }
+      } else {
+        this.warSimulator.disable();
+      }
     }
 
     Logger.info('world', `Applied ${config.name} configuration`);

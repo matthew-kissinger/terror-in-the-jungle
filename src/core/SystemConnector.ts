@@ -102,6 +102,7 @@ export class SystemConnector {
       refs.chunkManager,
       refs.minimapSystem
     );
+    refs.gameModeManager.setInfluenceMapSystem(refs.influenceMapSystem);
 
     // Connect camera shake system
     refs.playerController.setCameraShakeSystem(refs.cameraShakeSystem);
@@ -216,5 +217,21 @@ export class SystemConnector {
       refs.combatantSystem.setVoiceCalloutSystem(refs.voiceCalloutSystem);
       refs.grenadeSystem.setVoiceCalloutSystem(refs.voiceCalloutSystem);
     }
+
+    // Connect war simulator dependencies
+    refs.warSimulator.setCombatantSystem(refs.combatantSystem);
+    refs.warSimulator.setZoneManager(refs.zoneManager);
+    refs.warSimulator.setTicketSystem(refs.ticketSystem);
+    refs.warSimulator.setInfluenceMap(refs.influenceMapSystem);
+
+    // Connect strategic feedback
+    refs.strategicFeedback.setWarSimulator(refs.warSimulator);
+    refs.strategicFeedback.setHUDSystem(refs.hudSystem);
+    refs.strategicFeedback.setAudioManager(refs.audioManager);
+
+    // Connect war simulator to game mode manager and UI
+    refs.gameModeManager.setWarSimulator(refs.warSimulator);
+    refs.minimapSystem.setWarSimulator(refs.warSimulator);
+    refs.fullMapSystem.setWarSimulator(refs.warSimulator);
   }
 }

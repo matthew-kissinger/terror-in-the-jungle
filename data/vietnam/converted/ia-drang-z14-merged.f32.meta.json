@@ -1,0 +1,7 @@
+{
+  "width": 768,
+  "height": 768,
+  "format": "float32",
+  "byteOrder": "little-endian",
+  "unit": "meters"
+}

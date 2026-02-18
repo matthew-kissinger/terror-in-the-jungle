@@ -134,6 +134,28 @@ export class GameRenderer {
     );
   }
 
+  /**
+   * Adjust camera, fog, and shadow parameters for a given world size and elevation range.
+   * Called during game mode initialization for modes that need non-default values.
+   */
+  configureForWorldSize(options: {
+    cameraFar?: number;
+    fogDensity?: number;
+    shadowFar?: number;
+  }): void {
+    if (options.cameraFar !== undefined) {
+      this.camera.far = options.cameraFar;
+      this.camera.updateProjectionMatrix();
+    }
+    if (options.fogDensity !== undefined && this.fog) {
+      this.fog.density = options.fogDensity;
+    }
+    if (options.shadowFar !== undefined && this.moonLight) {
+      this.moonLight.shadow.camera.far = options.shadowFar;
+      this.moonLight.shadow.camera.updateProjectionMatrix();
+    }
+  }
+
   showRenderer(): void {
     this.renderer.domElement.style.display = 'block';
   }

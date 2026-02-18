@@ -227,6 +227,7 @@ export class CombatantSystem implements GameSystem {
     if (!this.combatEnabled || !isGameActive) {
       // Combat-disabled path: movement/visual updates only, no AI/combat decisions.
       this.lodManager.updateCombatants(deltaTime, { enableAI: false });
+      this.combatantRenderer.updateWalkFrame(deltaTime);
       this.combatantRenderer.updateBillboards(this.combatants, this.playerPosition);
       this.combatantRenderer.updateShaderUniforms(deltaTime);
       const duration = performance.now() - updateStart;
@@ -289,8 +290,9 @@ export class CombatantSystem implements GameSystem {
       this.profiler.profiling.spatialSyncMs = 0;
     }
 
-    // Update billboard rotations
+    // Update billboard rotations and walk animation
     t0 = performance.now();
+    this.combatantRenderer.updateWalkFrame(deltaTime);
     this.combatantRenderer.updateBillboards(this.combatants, this.playerPosition);
     this.combatantRenderer.updateShaderUniforms(deltaTime);
     this.profiler.profiling.billboardUpdateMs = performance.now() - t0;
@@ -314,6 +316,57 @@ export class CombatantSystem implements GameSystem {
       this.playerSquadId = createdPlayerSquadId;
     }
     this.combatantAI.setSquads(this.squadManager.getAllSquads());
+  }
+
+  // -- Materialization bridge (used by WarSimulator) --
+
+  /**
+   * Create a full CombatantSystem entity from external agent data.
+   * Returns the combatant ID for tracking.
+   */
+  materializeAgent(data: {
+    faction: Faction;
+    x: number;
+    y: number;
+    z: number;
+    health: number;
+    squadId?: string;
+  }): string {
+    const position = new THREE.Vector3(data.x, data.y, data.z);
+    const combatant = this.combatantFactory.createCombatant(
+      data.faction,
+      position,
+      data.squadId ? { squadId: data.squadId, squadRole: 'follower' } : undefined
+    );
+    combatant.health = Math.min(data.health, combatant.maxHealth);
+    this.combatants.set(combatant.id, combatant);
+    this.spatialGrid.updatePosition(combatant.id, combatant.position);
+    spatialGridManager.syncEntity(combatant.id, combatant.position);
+    return combatant.id;
+  }
+
+  /**
+   * Remove a combatant and return its current state for the WarSimulator to absorb.
+   * Returns null if combatant not found.
+   */
+  dematerializeAgent(combatantId: string): { x: number; y: number; z: number; health: number; alive: boolean } | null {
+    const c = this.combatants.get(combatantId);
+    if (!c) return null;
+
+    const snapshot = {
+      x: c.position.x,
+      y: c.position.y,
+      z: c.position.z,
+      health: c.health,
+      alive: c.state !== CombatantState.DEAD
+    };
+
+    // Remove from all spatial structures
+    this.spatialGrid.remove(combatantId);
+    spatialGridManager.removeEntity(combatantId);
+    this.combatants.delete(combatantId);
+
+    return snapshot;
   }
 
   // Public API
@@ -441,6 +494,16 @@ export class CombatantSystem implements GameSystem {
 
   setReinforcementInterval(interval: number): void {
     this.setters.setReinforcementInterval(interval);
+  }
+
+  setSpatialBounds(size: number): void {
+    this.spatialGrid = new SpatialOctree(size, 12, 6);
+    spatialGridManager.initialize(size);
+    // Re-insert all existing combatants
+    this.combatants.forEach((c, id) => {
+      this.spatialGrid.updatePosition(id, c.position);
+    });
+    Logger.info('combat', `Spatial bounds resized to ${size}m`);
   }
 
   enableCombat(): void {

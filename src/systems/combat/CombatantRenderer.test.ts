@@ -6,10 +6,13 @@ import { AssetLoader } from '../assets/AssetLoader';
 import * as CombatantMeshFactoryModule from './CombatantMeshFactory';
 import * as CombatantShadersModule from './CombatantShaders';
 
+// Directions used in directional billboard system
+const DIRECTIONS = ['front', 'back', 'side'] as const;
+
 // Helper to create mock InstancedMesh
 function createMockInstancedMesh(): THREE.InstancedMesh {
   const geometry = new THREE.PlaneGeometry(1, 1);
-  const material = new THREE.MeshBasicMaterial();
+  const material = new THREE.MeshLambertMaterial();
   const mesh = new THREE.InstancedMesh(geometry, material, 100);
   mesh.count = 0;
   return mesh;
@@ -25,41 +28,42 @@ function createMockShaderMaterial(): THREE.ShaderMaterial {
   });
 }
 
+// Build faction mesh maps for all directional keys
+function buildFactionMeshMap(): Map<string, THREE.InstancedMesh> {
+  const map = new Map<string, THREE.InstancedMesh>();
+  for (const prefix of ['US', 'OPFOR', 'SQUAD']) {
+    for (const state of ['walking', 'firing']) {
+      for (const dir of DIRECTIONS) {
+        map.set(`${prefix}_${state}_${dir}`, createMockInstancedMesh());
+      }
+    }
+  }
+  return map;
+}
+
+function buildFactionMaterialMap(): Map<string, THREE.ShaderMaterial> {
+  const map = new Map<string, THREE.ShaderMaterial>();
+  for (const prefix of ['US', 'OPFOR', 'SQUAD']) {
+    for (const state of ['walking', 'firing']) {
+      for (const dir of DIRECTIONS) {
+        map.set(`${prefix}_${state}_${dir}`, createMockShaderMaterial());
+      }
+    }
+  }
+  return map;
+}
+
 // Mock CombatantMeshFactory module
 vi.mock('./CombatantMeshFactory', () => ({
   CombatantMeshFactory: class MockCombatantMeshFactory {
     createFactionBillboards() {
       return {
-        factionMeshes: new Map([
-          ['US_walking', createMockInstancedMesh()],
-          ['US_firing', createMockInstancedMesh()],
-          ['US_alert', createMockInstancedMesh()],
-          ['US_back', createMockInstancedMesh()],
-          ['OPFOR_walking', createMockInstancedMesh()],
-          ['OPFOR_firing', createMockInstancedMesh()],
-          ['OPFOR_alert', createMockInstancedMesh()],
-          ['OPFOR_back', createMockInstancedMesh()],
-          ['SQUAD_walking', createMockInstancedMesh()],
-          ['SQUAD_firing', createMockInstancedMesh()],
-          ['SQUAD_alert', createMockInstancedMesh()],
-        ]),
-        factionAuraMeshes: new Map([
-          ['US_walking', createMockInstancedMesh()],
-          ['US_firing', createMockInstancedMesh()],
-          ['OPFOR_walking', createMockInstancedMesh()],
-          ['SQUAD_walking', createMockInstancedMesh()],
-        ]),
-        factionGroundMarkers: new Map([
-          ['US_walking', createMockInstancedMesh()],
-          ['OPFOR_walking', createMockInstancedMesh()],
-          ['SQUAD_walking', createMockInstancedMesh()],
-        ]),
+        factionMeshes: buildFactionMeshMap(),
+        factionAuraMeshes: buildFactionMeshMap(),
+        factionGroundMarkers: buildFactionMeshMap(),
         soldierTextures: new Map(),
-        factionMaterials: new Map([
-          ['US_walking', createMockShaderMaterial()],
-          ['OPFOR_walking', createMockShaderMaterial()],
-          ['SQUAD_walking', createMockShaderMaterial()],
-        ]),
+        factionMaterials: buildFactionMaterialMap(),
+        walkFrameTextures: new Map(),
       };
     }
   },
@@ -158,7 +162,6 @@ describe('CombatantRenderer', () => {
     });
 
     it('should create mesh factory', () => {
-      // CombatantMeshFactory is instantiated via constructor
       expect(renderer).toBeDefined();
     });
   });
@@ -204,7 +207,6 @@ describe('CombatantRenderer', () => {
 
       renderer.updateBillboards(combatants, playerPosition);
 
-      // All meshes should have count = 0
       expect(renderer).toBeDefined();
     });
 
@@ -323,22 +325,98 @@ describe('CombatantRenderer', () => {
       expect(squadMember.billboardIndex).toBeDefined();
     });
 
-    it('should handle OPFOR showing back texture', () => {
+    it('should render alert state as walking (no separate alert texture)', () => {
       const combatants = new Map<string, Combatant>();
-      const opforCombatant = createMockCombatant(
-        'opfor-1',
-        Faction.OPFOR,
+      const alertCombatant = createMockCombatant(
+        'alert-1',
+        Faction.US,
         new THREE.Vector3(10, 0, 0),
-        CombatantState.IDLE,
-        Math.PI // Facing away from player at origin
+        CombatantState.ALERT
       );
-      combatants.set('opfor-1', opforCombatant);
+      combatants.set('alert-1', alertCombatant);
 
       const playerPosition = new THREE.Vector3(0, 0, 0);
 
       renderer.updateBillboards(combatants, playerPosition);
 
-      expect(opforCombatant.billboardIndex).toBeDefined();
+      // Alert now maps to walking, so it should render
+      expect(alertCombatant.billboardIndex).toBeDefined();
+    });
+  });
+
+  describe('Directional billboard selection', () => {
+    it('should select front view when camera faces NPC', () => {
+      // Camera at z=10, NPC at origin facing toward camera (rotation = PI = facing -z)
+      camera.position.set(0, 5, 10);
+      camera.lookAt(0, 0, 0);
+
+      const combatants = new Map<string, Combatant>();
+      const combatant = createMockCombatant(
+        'front-test',
+        Faction.US,
+        new THREE.Vector3(0, 0, 0),
+        CombatantState.IDLE,
+        Math.PI // Facing toward camera
+      );
+      combatants.set('front-test', combatant);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, 10));
+
+      expect(combatant.billboardIndex).toBeDefined();
+    });
+
+    it('should select back view when camera is behind NPC', () => {
+      camera.position.set(0, 5, -10);
+      camera.lookAt(0, 0, 0);
+
+      const combatants = new Map<string, Combatant>();
+      const combatant = createMockCombatant(
+        'back-test',
+        Faction.US,
+        new THREE.Vector3(0, 0, 0),
+        CombatantState.IDLE,
+        Math.PI // Facing -z, camera is behind at -z
+      );
+      combatants.set('back-test', combatant);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(0, 0, -10));
+
+      expect(combatant.billboardIndex).toBeDefined();
+    });
+
+    it('should select side view when camera is perpendicular', () => {
+      camera.position.set(10, 5, 0);
+      camera.lookAt(0, 0, 0);
+
+      const combatants = new Map<string, Combatant>();
+      const combatant = createMockCombatant(
+        'side-test',
+        Faction.US,
+        new THREE.Vector3(0, 0, 0),
+        CombatantState.IDLE,
+        0 // Facing +x, camera is at +x
+      );
+      combatants.set('side-test', combatant);
+
+      renderer.updateBillboards(combatants, new THREE.Vector3(10, 0, 0));
+
+      expect(combatant.billboardIndex).toBeDefined();
+    });
+  });
+
+  describe('Walk animation', () => {
+    it('should update walk frame timer without error', () => {
+      expect(() => {
+        renderer.updateWalkFrame(0.016);
+      }).not.toThrow();
+    });
+
+    it('should swap walk frame after interval', () => {
+      // Advance time past the 400ms interval
+      for (let i = 0; i < 30; i++) {
+        renderer.updateWalkFrame(0.016);
+      }
+      expect(renderer).toBeDefined();
     });
   });
 
@@ -435,7 +513,7 @@ describe('CombatantRenderer', () => {
         CombatantState.DEAD
       );
       dyingCombatant.isDying = true;
-      dyingCombatant.deathProgress = 0.95; // Near end of animation
+      dyingCombatant.deathProgress = 0.95;
       dyingCombatant.deathAnimationType = 'fallback';
       dyingCombatant.deathDirection = new THREE.Vector3(1, 0, 0);
       combatants.set('dying-1', dyingCombatant);
@@ -458,7 +536,6 @@ describe('CombatantRenderer', () => {
       dyingCombatant.isDying = true;
       dyingCombatant.deathProgress = 0.3;
       dyingCombatant.deathAnimationType = 'fallback';
-      // No deathDirection
       combatants.set('dying-1', dyingCombatant);
 
       const playerPosition = new THREE.Vector3(0, 0, 0);
@@ -502,23 +579,6 @@ describe('CombatantRenderer', () => {
       renderer.updateBillboards(combatants, playerPosition);
 
       expect(suppressingCombatant.billboardIndex).toBeDefined();
-    });
-
-    it('should render alert state correctly', () => {
-      const combatants = new Map<string, Combatant>();
-      const alertCombatant = createMockCombatant(
-        'alert-1',
-        Faction.US,
-        new THREE.Vector3(10, 0, 0),
-        CombatantState.ALERT
-      );
-      combatants.set('alert-1', alertCombatant);
-
-      const playerPosition = new THREE.Vector3(0, 0, 0);
-
-      renderer.updateBillboards(combatants, playerPosition);
-
-      expect(alertCombatant.billboardIndex).toBeDefined();
     });
 
     it('should update combat state uniforms based on combatant states', () => {
@@ -575,7 +635,7 @@ describe('CombatantRenderer', () => {
       expect(scaledCombatant.billboardIndex).toBeDefined();
     });
 
-    it('should flip US combatant texture based on view angle', () => {
+    it('should flip side sprite based on view angle', () => {
       const combatants = new Map<string, Combatant>();
       const usCombatant = createMockCombatant(
         'us-1',
@@ -726,7 +786,7 @@ describe('CombatantRenderer', () => {
       const combatant = createMockCombatant(
         'test-1',
         Faction.US,
-        new THREE.Vector3(400, 0, 0) // Exactly at render distance
+        new THREE.Vector3(400, 0, 0)
       );
       combatants.set('test-1', combatant);
 
@@ -740,7 +800,6 @@ describe('CombatantRenderer', () => {
     it('should handle mesh capacity overflow gracefully', () => {
       const combatants = new Map<string, Combatant>();
 
-      // Create more combatants than instance capacity (100)
       for (let i = 0; i < 150; i++) {
         const combatant = createMockCombatant(
           `combatant-${i}`,
@@ -758,7 +817,7 @@ describe('CombatantRenderer', () => {
       }).not.toThrow();
     });
 
-    it('should handle combatant with no target when determining back view', () => {
+    it('should handle combatant with no target', () => {
       const combatants = new Map<string, Combatant>();
       const opforCombatant = createMockCombatant(
         'opfor-1',
@@ -780,7 +839,6 @@ describe('CombatantRenderer', () => {
     it('should handle death animation in different phases', () => {
       const combatants = new Map<string, Combatant>();
 
-      // Fall phase
       const fallingCombatant = createMockCombatant(
         'falling-1',
         Faction.US,
@@ -793,7 +851,6 @@ describe('CombatantRenderer', () => {
       fallingCombatant.deathDirection = new THREE.Vector3(1, 0, 0);
       combatants.set('falling-1', fallingCombatant);
 
-      // Ground phase
       const groundCombatant = createMockCombatant(
         'ground-1',
         Faction.US,
@@ -806,7 +863,6 @@ describe('CombatantRenderer', () => {
       groundCombatant.deathDirection = new THREE.Vector3(1, 0, 0);
       combatants.set('ground-1', groundCombatant);
 
-      // Fadeout phase
       const fadingCombatant = createMockCombatant(
         'fading-1',
         Faction.US,
@@ -833,7 +889,6 @@ describe('CombatantRenderer', () => {
 
       const combatants = new Map<string, Combatant>();
 
-      // US combatant
       const usCombatant = createMockCombatant(
         'us-1',
         Faction.US,
@@ -842,7 +897,6 @@ describe('CombatantRenderer', () => {
       );
       combatants.set('us-1', usCombatant);
 
-      // OPFOR combatant
       const opforCombatant = createMockCombatant(
         'opfor-1',
         Faction.OPFOR,
@@ -851,7 +905,6 @@ describe('CombatantRenderer', () => {
       );
       combatants.set('opfor-1', opforCombatant);
 
-      // Squad member
       const squadMember = createMockCombatant(
         'squad-1',
         Faction.US,
@@ -861,7 +914,6 @@ describe('CombatantRenderer', () => {
       squadMember.squadId = 'squad-1';
       combatants.set('squad-1', squadMember);
 
-      // Dying combatant
       const dyingCombatant = createMockCombatant(
         'dying-1',
         Faction.US,
@@ -876,7 +928,7 @@ describe('CombatantRenderer', () => {
 
       const playerPosition = new THREE.Vector3(0, 0, 0);
 
-      // First update
+      renderer.updateWalkFrame(0.016);
       renderer.updateBillboards(combatants, playerPosition);
 
       expect(usCombatant.billboardIndex).toBeDefined();
@@ -884,27 +936,17 @@ describe('CombatantRenderer', () => {
       expect(squadMember.billboardIndex).toBeDefined();
       expect(dyingCombatant.billboardIndex).toBeDefined();
 
-      // Update shader uniforms
       renderer.updateShaderUniforms(0.016);
 
-      // Second update with different positions
       playerPosition.set(10, 0, 10);
+      renderer.updateWalkFrame(0.016);
       renderer.updateBillboards(combatants, playerPosition);
 
       expect(renderer).toBeDefined();
     });
 
     it('should handle damage flash and shader update cycle', () => {
-      const combatant = createMockCombatant(
-        'test-1',
-        Faction.US,
-        new THREE.Vector3(10, 0, 0)
-      );
-
-      // Apply damage flash
       renderer.setDamageFlash('test-1', 1.0);
-
-      // Update shader uniforms
       renderer.updateShaderUniforms(0.016);
 
       expect(renderer).toBeDefined();

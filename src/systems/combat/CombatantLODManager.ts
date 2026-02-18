@@ -136,6 +136,12 @@ export class CombatantLODManager {
     }
   }
 
+  setLODRanges(high: number, medium: number, low: number): void {
+    this.highLODRange = high;
+    this.mediumLODRange = medium;
+    this.lowLODRange = low;
+  }
+
   setPlayerPosition(position: THREE.Vector3): void {
     this.playerPosition = position;
   }

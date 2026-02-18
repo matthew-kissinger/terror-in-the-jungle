@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import { GameMode, ZoneConfig, getGameModeConfig } from '../config/gameModes';
 import { getHeightQueryCache } from '../systems/terrain/HeightQueryCache';
+import { DEMHeightProvider } from '../systems/terrain/DEMHeightProvider';
 import { Logger } from '../utils/Logger';
 import { GrenadeType, Faction } from '../systems/combat/types';
 import { SettingsManager } from '../config/SettingsManager';
 import { shouldUseTouchControls } from '../utils/DeviceDetector';
 import { tryLockLandscapeOrientation } from '../utils/Orientation';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
+import { PersistenceSystem } from '../systems/strategy/PersistenceSystem';
 import type { GameEngine } from './GameEngine';
 import { markStartup } from './StartupTelemetry';
 
@@ -104,10 +106,80 @@ export async function startGameWithMode(engine: GameEngine, mode: GameMode): Pro
   }
 
   engine.gameStarted = true;
+
+  // Load DEM data if this mode uses real terrain
+  const config = getGameModeConfig(mode);
+  if (config.heightSource?.type === 'dem') {
+    markStartup(`engine-init.start-game.${mode}.dem-load.begin`);
+    Logger.info('engine-init', `Loading DEM terrain from ${config.heightSource.path}...`);
+    try {
+      const response = await fetch(config.heightSource.path);
+      if (!response.ok) throw new Error(`DEM fetch failed: ${response.status}`);
+      const buffer = await response.arrayBuffer();
+      const demProvider = new DEMHeightProvider(
+        new Float32Array(buffer),
+        config.heightSource.width,
+        config.heightSource.height,
+        config.heightSource.metersPerPixel
+      );
+
+      // Update global height query cache to use DEM
+      const heightCache = getHeightQueryCache();
+      heightCache.setProvider(demProvider);
+
+      // Send DEM data to chunk worker pool
+      const workerPool = engine.systemManager.chunkManager.getWorkerPool?.();
+      if (workerPool) {
+        workerPool.sendHeightProvider(demProvider.getWorkerConfig());
+      }
+
+      Logger.info('engine-init', `DEM loaded: ${config.heightSource.width}x${config.heightSource.height}, ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB`);
+    } catch (error) {
+      Logger.error('engine-init', 'Failed to load DEM terrain:', error);
+      // Fall back to procedural noise - don't block the game
+    }
+    markStartup(`engine-init.start-game.${mode}.dem-load.end`);
+
+    // Load river water meshes for DEM modes
+    try {
+      await engine.systemManager.riverWaterSystem.loadRivers('data/vietnam/a-shau-rivers.json');
+    } catch (error) {
+      Logger.warn('engine-init', 'Failed to load river data:', error);
+    }
+  }
+
+  // Configure renderer for mode-specific settings
+  if (config.cameraFar || config.fogDensity || config.shadowFar) {
+    engine.renderer.configureForWorldSize({
+      cameraFar: config.cameraFar,
+      fogDensity: config.fogDensity,
+      shadowFar: config.shadowFar
+    });
+  }
+
+  // Reconfigure chunk size if mode specifies a different value
+  if (config.chunkSize && config.chunkSize !== engine.systemManager.chunkManager.getChunkSize()) {
+    engine.systemManager.chunkManager.setChunkSize(config.chunkSize);
+  }
+
+  // Update render distance if mode specifies it
+  if (config.chunkRenderDistance) {
+    engine.systemManager.chunkManager.setRenderDistance(config.chunkRenderDistance);
+  }
+
   engine.systemManager.setGameMode(mode, { createPlayerSquad: mode !== GameMode.AI_SANDBOX });
 
+  // Load persisted war state if available (A Shau Valley mode)
+  if (config.warSimulator?.enabled && engine.systemManager.warSimulator.isEnabled()) {
+    const persistence = new PersistenceSystem();
+    const existingSave = persistence.getAutoSave(mode);
+    if (existingSave) {
+      Logger.info('engine-init', `Restoring war state: ${existingSave.agents.length} agents, ${existingSave.elapsedTime.toFixed(0)}s elapsed`);
+      engine.systemManager.warSimulator.loadWarState(existingSave);
+    }
+  }
+
   // Pre-generate chunks at actual spawn position for this mode
-  const config = getGameModeConfig(mode);
   const usHQ = config.zones.find(z => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
   const spawnPos = usHQ ? usHQ.position.clone() : new THREE.Vector3(0, 0, -50);
   spawnPos.y = 5;

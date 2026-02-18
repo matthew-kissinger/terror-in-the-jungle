@@ -32,6 +32,13 @@ export const MODE_CARD_CONFIGS: Record<string, ModeCardConfig> = {
     features: ['400x400', '15v15', '5 Min'],
     cssClass: 'team-deathmatch-card',
   },
+  a_shau_valley: {
+    title: 'A Shau Valley',
+    subtitle: 'Historical',
+    description: 'Real terrain - Hamburger Hill 1969',
+    features: ['21km', '200 Units', '30 Min', 'DEM Terrain'],
+    cssClass: 'a-shau-valley-card',
+  },
 };
 
 export function createModeCardHTML(mode: string, selected: boolean): string {

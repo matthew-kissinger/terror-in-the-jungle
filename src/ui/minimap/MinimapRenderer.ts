@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ZoneManager, CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { Faction } from '../../systems/combat/types';
+import type { WarSimulator } from '../../systems/strategy/WarSimulator';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -15,6 +16,7 @@ type MinimapRenderState = {
   camera: THREE.Camera;
   zoneManager?: ZoneManager;
   combatantSystem?: CombatantSystem;
+  warSimulator?: WarSimulator;
   playerSquadId?: string;
   commandPosition?: THREE.Vector3;
 };
@@ -39,6 +41,7 @@ export function renderMinimap(state: MinimapRenderState): void {
   }
 
   drawCombatantIndicators(ctx, state, renderScale);
+  drawStrategicAgents(ctx, state, renderScale);
 
   if (state.commandPosition) {
     drawCommandMarker(ctx, state, renderScale);
@@ -146,6 +149,47 @@ function drawCombatantIndicators(ctx: CanvasRenderingContext2D, state: MinimapRe
     ctx.arc(x, y, 2 * renderScale, 0, Math.PI * 2);
     ctx.fill();
   });
+}
+
+/**
+ * Render non-materialized strategic agents as smaller, dimmer dots.
+ * Only active when WarSimulator is running. Shows the broader war beyond immediate area.
+ */
+function drawStrategicAgents(ctx: CanvasRenderingContext2D, state: MinimapRenderState, renderScale: number): void {
+  if (!state.warSimulator || !state.warSimulator.isEnabled()) return;
+
+  const data = state.warSimulator.getAgentPositionsForMap();
+  const scale = state.size / state.worldSize;
+  const halfSize = state.size / 2;
+  const dotSize = 1.5 * renderScale;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const faction = data[i];     // 0 = US, 1 = OPFOR
+    const ax = data[i + 1];
+    const az = data[i + 2];
+    const tier = data[i + 3];    // 0 = materialized, 1 = simulated, 2 = strategic
+
+    // Skip materialized agents - already drawn by drawCombatantIndicators
+    if (tier === 0) continue;
+
+    // World to minimap (player-centered)
+    const dx = ax - state.playerPosition.x;
+    const dz = az - state.playerPosition.z;
+    const mx = halfSize + dx * scale;
+    const my = halfSize + dz * scale;
+
+    if (mx < 0 || mx > state.size || my < 0 || my > state.size) continue;
+
+    // Dimmer for strategic tier, slightly brighter for simulated
+    const alpha = tier === 1 ? 0.35 : 0.2;
+    ctx.fillStyle = faction === 0
+      ? `rgba(91, 140, 201, ${alpha})`
+      : `rgba(201, 86, 74, ${alpha})`;
+
+    ctx.beginPath();
+    ctx.arc(mx, my, dotSize, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 function drawPlayer(ctx: CanvasRenderingContext2D, size: number, renderScale: number): void {

@@ -10,7 +10,7 @@ Browser-based 3D combined-arms FPS with GPU-accelerated billboard rendering of 2
 npm install
 npm run dev          # Dev server on localhost:5173
 npm run build        # Production build (tsc + vite)
-npm run test:run     # 3222 tests (95 files)
+npm run test:run     # 3248 tests (99 files)
 npm run lint         # ESLint check
 npm run lint:fix     # ESLint autofix
 ```
@@ -47,7 +47,7 @@ See `docs/PROFILING_HARNESS.md` for full reference.
 
 ## Codebase
 
-~60k lines source, ~48k lines tests. 302 source files, 95 test files. Systems-based architecture with orchestrator pattern.
+~62k lines source, ~48k lines tests. 315 source files, 99 test files. Systems-based architecture with orchestrator pattern.
 
 ```
 src/
@@ -72,6 +72,7 @@ src/
 │   ├── OpenFrontierConfig.ts
 │   ├── TeamDeathmatchConfig.ts
 │   ├── AiSandboxConfig.ts     # Stress test mode
+│   ├── AShauValleyConfig.ts   # 21km DEM terrain + war simulator
 │   ├── SettingsManager.ts     # User settings (localStorage)
 │   ├── audio.ts               # Audio config
 │   ├── loading.ts             # Loading phases
@@ -93,7 +94,8 @@ src/
 │   │   ├── CombatantAI.ts           # AI controller
 │   │   ├── CombatantCombat.ts       # Damage resolution
 │   │   ├── CombatantMovement.ts     # NPC movement
-│   │   ├── CombatantRenderer.ts     # Instanced billboard rendering
+│   │   ├── CombatantRenderer.ts     # Directional billboard rendering (front/back/side)
+│   │   ├── CombatantMeshFactory.ts  # Faction mesh creation + walk frame textures
 │   │   ├── CombatantLODManager.ts   # LOD + AI budget capping
 │   │   ├── CombatantHitDetection.ts # Hit registration
 │   │   ├── CombatantDamage.ts       # Damage model
@@ -141,6 +143,9 @@ src/
 │   │   ├── ChunkLifecycleManager.ts # Chunk create/dispose
 │   │   ├── TerrainMeshMerger.ts     # Incremental ring merging
 │   │   ├── HeightQueryCache.ts      # Terrain height cache
+│   │   ├── IHeightProvider.ts       # Height provider interface
+│   │   ├── NoiseHeightProvider.ts   # Procedural noise height (default)
+│   │   ├── DEMHeightProvider.ts     # Real-world DEM elevation data
 │   │   └── ChunkVegetationGenerator.ts # Vegetation placement
 │   ├── weapons/       # Weapon systems
 │   │   ├── GrenadeSystem.ts         # Grenade physics + explosion
@@ -164,10 +169,20 @@ src/
 │   │   ├── CameraShakeSystem.ts
 │   │   ├── SmokeCloudSystem.ts
 │   │   └── PixelationPass.ts
+│   ├── strategy/      # War simulation engine (opt-in per mode)
+│   │   ├── WarSimulator.ts          # Core orchestrator (3000 agents)
+│   │   ├── MaterializationPipeline.ts# Tier transitions (strategic/simulated/materialized)
+│   │   ├── StrategicDirector.ts     # Squad-to-objective AI
+│   │   ├── AbstractCombatResolver.ts# Off-screen combat resolution
+│   │   ├── StrategicFeedback.ts     # HUD alerts, distant audio, map dots
+│   │   ├── PersistenceSystem.ts     # localStorage save/load
+│   │   ├── WarEventEmitter.ts       # Pub/sub event bus
+│   │   └── types.ts                 # Agent, squad, event types
 │   ├── environment/   # Environmental systems
 │   │   ├── DayNightCycle.ts
 │   │   ├── WeatherSystem.ts
 │   │   ├── WaterSystem.ts
+│   │   ├── RiverWaterSystem.ts      # River rendering for DEM terrain
 │   │   └── SkyboxSystem.ts
 │   └── debug/         # Profiling and telemetry
 │       ├── PerformanceTelemetry.ts  # Frame timing + system breakdown
@@ -206,6 +221,10 @@ src/
 | `scripts/perf-capture.ts` | Playwright CDP perf harness |
 | `scripts/perf-active-driver.js` | Active player scenario driver for harness |
 | `scripts/perf-analyze-latest.ts` | Capture artifact analysis |
+| `src/systems/strategy/WarSimulator.ts` | War simulation orchestrator (3000 agents) |
+| `src/config/AShauValleyConfig.ts` | A Shau Valley mode config with historical zones |
+| `src/systems/terrain/DEMHeightProvider.ts` | Real-world DEM elevation provider |
+| `data/vietnam/` | DEM heightmap + river GeoJSON data |
 
 ## Game Modes
 
@@ -215,6 +234,21 @@ src/
 | Open Frontier | 3200x3200 | 60v60 | 15 min | `OPEN_FRONTIER` |
 | Team Deathmatch | 400x400 | 15v15 | 5 min | `TEAM_DEATHMATCH` |
 | AI Sandbox | configurable | configurable | unlimited | `AI_SANDBOX` |
+| A Shau Valley | 21000x21000 (DEM) | 1500v1500 | 60 min | `A_SHAU_VALLEY` |
+
+### A Shau Valley
+
+Large-scale historically-grounded mode using real DEM elevation data and a tiered war simulation engine. 3000 strategic agents managed by `WarSimulator` with three tiers:
+
+- **Materialized** (30-60): Full CombatantSystem entities with AI, rendering, combat
+- **Simulated** (~200): Lightweight position lerp within 3000m of player
+- **Strategic** (~2700): Squad-level counters, abstract probability-based combat
+
+Key subsystems: `MaterializationPipeline` (tier transitions with hysteresis), `StrategicDirector` (assigns squads to zones every 5s), `AbstractCombatResolver` (off-screen combat every 2s), `StrategicFeedback` (HUD alerts, minimap/fullmap dots), `PersistenceSystem` (auto-save to localStorage every 60s).
+
+Zone layout based on real 1966-1970 operations: 3 US LZs on eastern ridgeline, 3 NVA base areas on western mountains, 12 capture zones at historical locations (Hill 937/Hamburger Hill, Firebase Ripcord, Ta Bat/A Luoi airfields, etc). NVA starts entrenched at most zones. Scale-aware config overrides AI engagement range, LOD distances, spatial bounds, and influence map grid size.
+
+War simulator is opt-in via `GameModeConfig.warSimulator`. When absent or disabled, zero runtime cost (single boolean check in update loop).
 
 ## Profiling
 
@@ -248,6 +282,34 @@ Validation gates: frame budget, hitches, stalls, combat dominance, shot/hit vali
 - **B** Deploy/undeploy mortar, **F** Fire mortar, **Arrows** Aim mortar, **Mouse wheel** Adjust pitch
 - **F1** Console stats, **F2** Performance overlay, **M** Mortar camera
 - **Mobile**: Virtual joystick, touch-drag look, fire/ADS/reload/grenade/scoreboard buttons, weapon bar, helicopter entry/cyclic, mortar deploy/fire/aim pad/camera, sandbag rotate, rally point, squad menu, landscape lock
+
+## NPC Sprite System
+
+Directional billboard system with 2-frame walk animation per faction.
+
+### Assets (`public/assets/`)
+
+18 sprites at 512x512 RGBA WebP, naming pattern: `{faction}-{action}-{direction}[-{frame}].webp`
+
+| Faction | Walking (6 each) | Firing (3 each) |
+|---------|-------------------|------------------|
+| US | `us-walk-{front,back,side}-{1,2}.webp` | `us-fire-{front,back,side}.webp` |
+| VC | `vc-walk-{front,back,side}-{1,2}.webp` | `vc-fire-{front,back,side}.webp` |
+
+Old sprites archived in `public/assets/archived/`.
+
+### Rendering Pipeline
+
+- **View direction**: Dot product of NPC forward vs camera-to-NPC vector. `|dot| < 0.45` = side, `dot > 0` = back, else front.
+- **Mesh keys**: `{FACTION}_{state}_{direction}` (e.g., `US_walking_front`, `OPFOR_firing_side`). 18 InstancedMesh total.
+- **Walk animation**: Global 400ms timer swaps frame 1/2 textures on all walking meshes (synchronized marching).
+- **Y bob**: `sin(time * 3.0 + stableHash(id) * TAU) * 0.12` for walking NPCs.
+- **Side flipping**: Negative scaleX when NPC faces left relative to camera.
+- **State mapping**: IDLE/PATROLLING/ALERT/ADVANCING/RETREATING/SEEKING_COVER/DEFENDING = walking. ENGAGING/SUPPRESSING = firing.
+
+### Draw Calls
+
+18 sprite meshes + 18 outlines + 18 ground markers = 54 draw calls for NPC rendering.
 
 ## Known Tech Debt
 

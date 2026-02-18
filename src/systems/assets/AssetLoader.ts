@@ -29,28 +29,38 @@ export class AssetLoader implements GameSystem {
     const knownAssets = [
       'forestfloor.png',
       // Large canopy trees (scale 8-12)
-      'DipterocarpGiant.png',
-      'TwisterBanyan.png',
+      'DipterocarpGiant.webp',
+      'TwisterBanyan.webp',
       // Medium palms (scale 4-6)
-      'CoconutPalm.png',
-      'ArecaPalmCluster.png',
+      'CoconutPalm.webp',
+      'ArecaPalmCluster.webp',
       // Small ground foliage (scale 1-3)
-      'Fern.png',
-      'FanPalmCluster.png',
-      'ElephantEarPlants.png',
+      'Fern.webp',
+      'FanPalmCluster.webp',
+      'ElephantEarPlants.webp',
       // Legacy trees (kept for compatibility)
-      'tree.png',
-      'grass.png',
-      // US Faction soldiers (prefixed with 'A')
-      'ASoldierWalking.png',
-      'ASoldierAlert.png',
-      'ASoldierFiring.png',
-      'ASoldierFlameThrower.png',
-      // OPFOR/Enemy soldiers
-      'EnemySoldierWalking.png',  // Renamed from SoliderWalking.png
-      'EnemySoldierAlert.png',     // Renamed from SoldierAlert.png
-      'EnemySoldierFiring.png',    // Renamed from SoliderFiring.png
-      'EnemySoldierBack.png',      // Back view of enemy soldier
+      'tree.webp',
+      'grass.webp',
+      // US soldiers - walk (front/back/side x 2 frames) + fire (front/back/side)
+      'us-walk-front-1.webp',
+      'us-walk-front-2.webp',
+      'us-walk-back-1.webp',
+      'us-walk-back-2.webp',
+      'us-walk-side-1.webp',
+      'us-walk-side-2.webp',
+      'us-fire-front.webp',
+      'us-fire-back.webp',
+      'us-fire-side.webp',
+      // VC soldiers - walk (front/back/side x 2 frames) + fire (front/back/side)
+      'vc-walk-front-1.webp',
+      'vc-walk-front-2.webp',
+      'vc-walk-back-1.webp',
+      'vc-walk-back-2.webp',
+      'vc-walk-side-1.webp',
+      'vc-walk-side-2.webp',
+      'vc-fire-front.webp',
+      'vc-fire-back.webp',
+      'vc-fire-side.webp',
       // UI/Player
       'first-person.png',
       // Environment
@@ -61,7 +71,7 @@ export class AssetLoader implements GameSystem {
     for (const filename of knownAssets) {
       const category = this.categorizeAsset(filename);
       const assetInfo: AssetInfo = {
-        name: filename.replace('.png', '').replace('.jpg', ''),
+        name: filename.replace(/\.(png|jpg|webp)$/, ''),
         path: getAssetPath(filename),
         category
       };
@@ -85,9 +95,8 @@ export class AssetLoader implements GameSystem {
         name.includes('fern') || name.includes('elephant')) {
       return AssetCategory.FOLIAGE;
     }
-    // Soldier detection - all soldiers are categorized as ENEMY for now (will be distinguished by prefix)
-    // ASoldier* = US faction, Solider*/Soldier* = OPFOR faction
-    if (name.includes('soldier') || name.includes('solider')) {
+    // Soldier detection - directional sprites: us-walk-*, us-fire-*, vc-walk-*, vc-fire-*
+    if (name.startsWith('us-') || name.startsWith('vc-')) {
       return AssetCategory.ENEMY;  // Using ENEMY category for all combatants
     }
     if (name.includes('skybox') || name.includes('sky')) {

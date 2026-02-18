@@ -1,0 +1,150 @@
+{
+  "description": "Firebase and LZ locations in/near A Shau Valley, compiled from DOD records",
+  "datum": "WGS84",
+  "sources": [
+    "https://vietnamtripledeuce.org/Location%20of%20Bases%20in%20Vietnam.pdf",
+    "http://www.thebattleofkontum.com/extras/RVNlistoflocations.pdf"
+  ],
+  "mapBounds": {
+    "north": 16.32,
+    "south": 16.13,
+    "west": 107.07,
+    "east": 107.27
+  },
+  "features": [
+    {
+      "name": "Hill 937 (Hamburger Hill / Dong Ap Bia)",
+      "type": "battle_site",
+      "lat": 16.233,
+      "lon": 107.177,
+      "elevation_m": 937,
+      "date": "1969-05-10 to 1969-05-20",
+      "operation": "Operation Apache Snow",
+      "notes": "10-day assault by 101st Airborne, 3/187th Infantry. 72 KIA, 372 WIA."
+    },
+    {
+      "name": "Firebase Ripcord",
+      "type": "firebase",
+      "lat": 16.17,
+      "lon": 107.23,
+      "elevation_m": 600,
+      "date": "1970-03 to 1970-07-23",
+      "operation": "Operation Chicago Peak / Texas Star",
+      "notes": "Last major US firebase battle. 101st Airborne. Evacuated under fire."
+    },
+    {
+      "name": "Firebase Bastogne",
+      "type": "firebase",
+      "lat": 16.353,
+      "lon": 107.443,
+      "elevation_m": 430,
+      "date": "1968-1971",
+      "notes": "101st Airborne base, east of A Shau Valley. Multiple attacks."
+    },
+    {
+      "name": "Firebase Veghel",
+      "type": "firebase",
+      "lat": 16.32,
+      "lon": 107.41,
+      "elevation_m": 380,
+      "date": "1968-1970",
+      "notes": "Near Firebase Bastogne, 101st Airborne sector."
+    },
+    {
+      "name": "Firebase Blaze",
+      "type": "firebase",
+      "lat": 16.22,
+      "lon": 107.25,
+      "elevation_m": 700,
+      "date": "1969",
+      "notes": "Eastern ridge of A Shau Valley."
+    },
+    {
+      "name": "A Luoi Airfield",
+      "type": "airfield",
+      "lat": 16.20,
+      "lon": 107.29,
+      "elevation_m": 580,
+      "date": "1966-captured, 1968-recaptured",
+      "notes": "Valley floor airstrip. Captured by NVA March 1966. US recaptured during Operation Delaware April 1968."
+    },
+    {
+      "name": "A Shau Special Forces Camp",
+      "type": "camp",
+      "lat": 16.25,
+      "lon": 107.18,
+      "elevation_m": 590,
+      "date": "1963-1966",
+      "notes": "CIDG/Special Forces camp. Overrun by NVA March 9-10, 1966. Battle of A Shau."
+    },
+    {
+      "name": "Ta Bat Airfield",
+      "type": "airfield",
+      "lat": 16.27,
+      "lon": 107.16,
+      "elevation_m": 575,
+      "date": "pre-1966",
+      "notes": "Northern valley floor airstrip near Laos border."
+    },
+    {
+      "name": "LZ Stallion",
+      "type": "lz",
+      "lat": 16.24,
+      "lon": 107.20,
+      "elevation_m": 600,
+      "date": "1968",
+      "operation": "Operation Delaware",
+      "notes": "Helicopter landing zone on valley floor."
+    },
+    {
+      "name": "LZ Pepper",
+      "type": "lz",
+      "lat": 16.21,
+      "lon": 107.22,
+      "elevation_m": 620,
+      "date": "1968",
+      "operation": "Operation Delaware",
+      "notes": "Landing zone east of valley center."
+    },
+    {
+      "name": "LZ Goodman",
+      "type": "lz",
+      "lat": 16.23,
+      "lon": 107.15,
+      "elevation_m": 590,
+      "date": "1969",
+      "operation": "Operation Apache Snow",
+      "notes": "Staging area for Hamburger Hill assault."
+    },
+    {
+      "name": "Tiger Mountain (Dong Ngai)",
+      "type": "terrain_feature",
+      "lat": 16.19,
+      "lon": 107.13,
+      "elevation_m": 1200,
+      "notes": "Western ridge, Laos border. NVA observation and anti-aircraft positions."
+    },
+    {
+      "name": "Dong So Ridge",
+      "type": "terrain_feature",
+      "lat": 16.26,
+      "lon": 107.25,
+      "elevation_m": 1000,
+      "notes": "Eastern ridgeline overlooking valley. Multiple firebase sites."
+    },
+    {
+      "name": "Route 548 (Valley Road)",
+      "type": "road",
+      "lat": 16.22,
+      "lon": 107.22,
+      "notes": "Main road through A Shau Valley floor, NW-SE. Part of Ho Chi Minh Trail network. All-weather road by 1968."
+    },
+    {
+      "name": "NVA Base Area 611",
+      "type": "enemy_base",
+      "lat": 16.25,
+      "lon": 107.12,
+      "notes": "Major NVA logistics base on Laos border side of western ridge. Supply depot for A Shau corridor."
+    }
+  ]
+}

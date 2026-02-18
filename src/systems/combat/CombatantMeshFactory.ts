@@ -4,13 +4,23 @@ import { Combatant, CombatantState } from './types';
 import { createOutlineMaterial } from './CombatantShaders';
 import { Logger } from '../../utils/Logger';
 
+/** Viewing directions for directional billboards. */
+export type ViewDirection = 'front' | 'back' | 'side';
+
+/** Walk frame A/B textures per direction, keyed by "{faction}_{direction}". */
+export type WalkFrameMap = Map<string, { a: THREE.Texture; b: THREE.Texture }>;
+
 export interface CombatantMeshAssets {
   factionMeshes: Map<string, THREE.InstancedMesh>;
   factionAuraMeshes: Map<string, THREE.InstancedMesh>;
   factionGroundMarkers: Map<string, THREE.InstancedMesh>;
   soldierTextures: Map<string, THREE.Texture>;
   factionMaterials: Map<string, THREE.ShaderMaterial>;
+  walkFrameTextures: WalkFrameMap;
 }
+
+// Directions used to create mesh keys
+const DIRECTIONS: ViewDirection[] = ['front', 'back', 'side'];
 
 export class CombatantMeshFactory {
   private scene: THREE.Scene;
@@ -27,40 +37,65 @@ export class CombatantMeshFactory {
     const factionGroundMarkers = new Map<string, THREE.InstancedMesh>();
     const soldierTextures = new Map<string, THREE.Texture>();
     const factionMaterials = new Map<string, THREE.ShaderMaterial>();
+    const walkFrameTextures: WalkFrameMap = new Map();
 
-    // Load US soldier textures
-    const usWalking = this.assetLoader.getTexture('ASoldierWalking');
-    const usAlert = this.assetLoader.getTexture('ASoldierAlert');
-    const usFiring = this.assetLoader.getTexture('ASoldierFiring');
+    // Load US directional textures
+    const usWalk = {
+      front: { a: this.assetLoader.getTexture('us-walk-front-1'), b: this.assetLoader.getTexture('us-walk-front-2') },
+      back:  { a: this.assetLoader.getTexture('us-walk-back-1'),  b: this.assetLoader.getTexture('us-walk-back-2') },
+      side:  { a: this.assetLoader.getTexture('us-walk-side-1'),  b: this.assetLoader.getTexture('us-walk-side-2') },
+    };
+    const usFire = {
+      front: this.assetLoader.getTexture('us-fire-front'),
+      back:  this.assetLoader.getTexture('us-fire-back'),
+      side:  this.assetLoader.getTexture('us-fire-side'),
+    };
 
-    // Load OPFOR soldier textures
-    const opforWalking = this.assetLoader.getTexture('EnemySoldierWalking');
-    const opforAlert = this.assetLoader.getTexture('EnemySoldierAlert');
-    const opforFiring = this.assetLoader.getTexture('EnemySoldierFiring');
-    const opforBack = this.assetLoader.getTexture('EnemySoldierBack');
+    // Load VC/OPFOR directional textures
+    const vcWalk = {
+      front: { a: this.assetLoader.getTexture('vc-walk-front-1'), b: this.assetLoader.getTexture('vc-walk-front-2') },
+      back:  { a: this.assetLoader.getTexture('vc-walk-back-1'),  b: this.assetLoader.getTexture('vc-walk-back-2') },
+      side:  { a: this.assetLoader.getTexture('vc-walk-side-1'),  b: this.assetLoader.getTexture('vc-walk-side-2') },
+    };
+    const vcFire = {
+      front: this.assetLoader.getTexture('vc-fire-front'),
+      back:  this.assetLoader.getTexture('vc-fire-back'),
+      side:  this.assetLoader.getTexture('vc-fire-side'),
+    };
 
-    // Store textures
-    if (usWalking) soldierTextures.set('US_walking', usWalking);
-    if (usAlert) soldierTextures.set('US_alert', usAlert);
-    if (usFiring) soldierTextures.set('US_firing', usFiring);
-    if (opforWalking) soldierTextures.set('OPFOR_walking', opforWalking);
-    if (opforAlert) soldierTextures.set('OPFOR_alert', opforAlert);
-    if (opforFiring) soldierTextures.set('OPFOR_firing', opforFiring);
-    if (opforBack) soldierTextures.set('OPFOR_back', opforBack);
+    // Store walk frame pairs for texture swapping by the renderer
+    for (const dir of DIRECTIONS) {
+      const us = usWalk[dir];
+      if (us.a && us.b) {
+        walkFrameTextures.set(`US_${dir}`, { a: us.a, b: us.b });
+        walkFrameTextures.set(`SQUAD_${dir}`, { a: us.a, b: us.b });
+      }
+      const vc = vcWalk[dir];
+      if (vc.a && vc.b) {
+        walkFrameTextures.set(`OPFOR_${dir}`, { a: vc.a, b: vc.b });
+      }
+    }
 
-    // Create instanced meshes for each faction-state combination
+    // Store flat texture references (frame A is the default walking texture)
+    for (const dir of DIRECTIONS) {
+      if (usWalk[dir].a) soldierTextures.set(`US_walking_${dir}`, usWalk[dir].a!);
+      if (usFire[dir]) soldierTextures.set(`US_firing_${dir}`, usFire[dir]!);
+      if (vcWalk[dir].a) soldierTextures.set(`OPFOR_walking_${dir}`, vcWalk[dir].a!);
+      if (vcFire[dir]) soldierTextures.set(`OPFOR_firing_${dir}`, vcFire[dir]!);
+    }
+
     const soldierGeometry = new THREE.PlaneGeometry(5, 7);
 
-    // Helper to create mesh for faction-state with outline effect
+    // Helper to create instanced mesh + outline + ground marker
     const createFactionMesh = (
       texture: THREE.Texture,
       key: string,
       maxInstances: number = 120
     ) => {
       const isPlayerSquad = key.startsWith('SQUAD');
-      const isUS = key.includes('US');
+      const isUS = key.startsWith('US') || isPlayerSquad;
 
-      // Main sprite material - use lit material to respond to scene lighting
+      // Main sprite material
       const spriteMaterial = new THREE.MeshLambertMaterial({
         map: texture,
         transparent: true,
@@ -69,7 +104,6 @@ export class CombatantMeshFactory {
         depthWrite: true
       });
 
-      // Create main sprite mesh
       const mesh = new THREE.InstancedMesh(soldierGeometry, spriteMaterial, maxInstances);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.frustumCulled = false;
@@ -78,19 +112,14 @@ export class CombatantMeshFactory {
       this.scene.add(mesh);
       factionMeshes.set(key, mesh);
 
-      // Create outline material with appropriate color
-      let outlineColor: THREE.Color;
-      if (isPlayerSquad) {
-        outlineColor = new THREE.Color(0.0, 1.0, 0.3);
-      } else if (isUS) {
-        outlineColor = new THREE.Color(0.0, 0.6, 1.0);
-      } else {
-        outlineColor = new THREE.Color(1.0, 0.0, 0.0);
-      }
+      // Outline color: green for squad, blue for US, red for OPFOR
+      const outlineColor = isPlayerSquad
+        ? new THREE.Color(0.0, 1.0, 0.3)
+        : isUS
+          ? new THREE.Color(0.0, 0.6, 1.0)
+          : new THREE.Color(1.0, 0.0, 0.0);
 
       const outlineMaterial = createOutlineMaterial(texture, outlineColor);
-
-      // Create outline mesh
       const outlineMesh = new THREE.InstancedMesh(soldierGeometry, outlineMaterial, maxInstances);
       outlineMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       outlineMesh.frustumCulled = false;
@@ -100,15 +129,12 @@ export class CombatantMeshFactory {
       factionAuraMeshes.set(key, outlineMesh);
       factionMaterials.set(key, outlineMaterial);
 
-      // Create ground marker
-      let markerColor: THREE.Color;
-      if (isPlayerSquad) {
-        markerColor = new THREE.Color(0.0, 1.0, 0.3);
-      } else if (isUS) {
-        markerColor = new THREE.Color(0.0, 0.5, 1.0);
-      } else {
-        markerColor = new THREE.Color(1.0, 0.0, 0.0);
-      }
+      // Ground marker
+      const markerColor = isPlayerSquad
+        ? new THREE.Color(0.0, 1.0, 0.3)
+        : isUS
+          ? new THREE.Color(0.0, 0.5, 1.0)
+          : new THREE.Color(1.0, 0.0, 0.0);
 
       const markerMaterial = new THREE.MeshBasicMaterial({
         color: markerColor,
@@ -128,30 +154,34 @@ export class CombatantMeshFactory {
       factionGroundMarkers.set(key, markerMesh);
     };
 
-    // Create meshes for regular US forces
-    if (usWalking) createFactionMesh(usWalking, 'US_walking');
-    if (usAlert) createFactionMesh(usAlert, 'US_alert');
-    if (usFiring) createFactionMesh(usFiring, 'US_firing');
+    // Create 6 meshes per faction variant: walking_{front,back,side} + firing_{front,back,side}
+    // US forces
+    for (const dir of DIRECTIONS) {
+      if (usWalk[dir].a) createFactionMesh(usWalk[dir].a!, `US_walking_${dir}`);
+      if (usFire[dir]) createFactionMesh(usFire[dir]!, `US_firing_${dir}`);
+    }
 
-    // Create meshes for player squad (green outlines)
-    if (usWalking) createFactionMesh(usWalking, 'SQUAD_walking');
-    if (usAlert) createFactionMesh(usAlert, 'SQUAD_alert');
-    if (usFiring) createFactionMesh(usFiring, 'SQUAD_firing');
+    // Player squad (reuses US textures, different outline color)
+    for (const dir of DIRECTIONS) {
+      if (usWalk[dir].a) createFactionMesh(usWalk[dir].a!, `SQUAD_walking_${dir}`);
+      if (usFire[dir]) createFactionMesh(usFire[dir]!, `SQUAD_firing_${dir}`);
+    }
 
-    // Create meshes for OPFOR
-    if (opforWalking) createFactionMesh(opforWalking, 'OPFOR_walking');
-    if (opforAlert) createFactionMesh(opforAlert, 'OPFOR_alert');
-    if (opforFiring) createFactionMesh(opforFiring, 'OPFOR_firing');
-    if (opforBack) createFactionMesh(opforBack, 'OPFOR_back');
+    // OPFOR (VC textures)
+    for (const dir of DIRECTIONS) {
+      if (vcWalk[dir].a) createFactionMesh(vcWalk[dir].a!, `OPFOR_walking_${dir}`);
+      if (vcFire[dir]) createFactionMesh(vcFire[dir]!, `OPFOR_firing_${dir}`);
+    }
 
-    Logger.info('combat', ' Created faction-specific soldier meshes (with player squad support)');
+    Logger.info('combat', `Created directional soldier meshes: ${factionMeshes.size} meshes (${factionMeshes.size * 3} draw calls)`);
 
     return {
       factionMeshes,
       factionAuraMeshes,
       factionGroundMarkers,
       soldierTextures,
-      factionMaterials
+      factionMaterials,
+      walkFrameTextures
     };
   }
 }
@@ -160,22 +190,21 @@ export const updateCombatantTexture = (
   soldierTextures: Map<string, THREE.Texture>,
   combatant: Combatant
 ): void => {
-  let textureKey = `${combatant.faction}_`;
+  // Texture lookup is now direction-aware, but this function provides a
+  // default front-facing fallback for systems that call it without direction.
+  let stateKey: string;
 
   switch (combatant.state) {
     case CombatantState.ENGAGING:
     case CombatantState.SUPPRESSING:
-      textureKey += 'firing';
-      break;
-    case CombatantState.ALERT:
-      textureKey += 'alert';
+      stateKey = 'firing';
       break;
     default:
-      textureKey += 'walking';
+      stateKey = 'walking';
       break;
   }
 
-  combatant.currentTexture = soldierTextures.get(textureKey);
+  combatant.currentTexture = soldierTextures.get(`${combatant.faction}_${stateKey}_front`);
 };
 
 export const disposeCombatantMeshes = (

@@ -117,6 +117,18 @@ export class SystemUpdater {
       performanceTelemetry.endSystem('TacticalUI');
     });
 
+    // War Simulator (only active for A Shau Valley mode)
+    this.trackSystemUpdate('WarSim', 2.0, () => {
+      performanceTelemetry.beginSystem('WarSim');
+      if (refs.warSimulator && refs.playerController) {
+        const pos = refs.playerController.getPosition();
+        refs.warSimulator.setPlayerPosition(pos.x, pos.y, pos.z);
+        refs.warSimulator.update(deltaTime);
+        refs.strategicFeedback.setPlayerPosition(pos.x, pos.z);
+      }
+      performanceTelemetry.endSystem('WarSim');
+    });
+
     // Gate World systems - skip weather and tickets during menu/loading
     this.trackSystemUpdate('World', 1.0, () => {
       performanceTelemetry.beginSystem('World');
@@ -166,7 +178,9 @@ export class SystemUpdater {
       || system === refs.zoneManager
       || system === refs.ticketSystem
       || system === refs.waterSystem
-      || system === refs.weatherSystem;
+      || system === refs.weatherSystem
+      || system === refs.warSimulator
+      || system === refs.strategicFeedback;
   }
 
   private trackSystemUpdate(name: string, budgetMs: number, updateFn: () => void): void {

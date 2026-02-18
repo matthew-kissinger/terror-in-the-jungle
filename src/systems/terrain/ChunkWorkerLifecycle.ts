@@ -25,7 +25,7 @@ export interface WorkerState {
 }
 
 export interface WorkerMessageData {
-  type: 'ready' | 'result';
+  type: 'ready' | 'result' | 'providerReady';
   requestId?: number;
   chunkX?: number;
   chunkZ?: number;
@@ -150,6 +150,35 @@ export class ChunkWorkerLifecycle {
       segments: request.segments,
       seed: request.seed
     });
+  }
+
+  /**
+   * Send height provider configuration to all workers.
+   * For DEM mode, the buffer is transferred (zero-copy) to each worker via slicing.
+   */
+  sendHeightProvider(config: import('./IHeightProvider').HeightProviderConfig): void {
+    for (const state of this.workers) {
+      if (config.type === 'dem') {
+        // Each worker gets its own copy of the buffer (transferable)
+        const bufferCopy = config.buffer.slice(0);
+        state.worker.postMessage({
+          type: 'setHeightProvider',
+          providerType: 'dem',
+          buffer: bufferCopy,
+          width: config.width,
+          height: config.height,
+          metersPerPixel: config.metersPerPixel,
+          originX: config.originX,
+          originZ: config.originZ
+        }, [bufferCopy]);
+      } else {
+        state.worker.postMessage({
+          type: 'setHeightProvider',
+          providerType: 'noise',
+          seed: config.seed
+        });
+      }
+    }
   }
 
   /**

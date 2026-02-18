@@ -73,12 +73,13 @@ export const BILLBOARD_VERTEX_SHADER = `
     // X -> right, Y -> up, and implicitly the plane faces toward the camera
     vec3 rotatedPosition = right * scaledPos.x + up * scaledPos.y;
 
-    // Add wind sway animation (reduced for distant objects)
+    // Add wind sway animation anchored at the base (uv.y = 0 at ground, 1 at top)
     float lodWindScale = 1.0 - vLodFactor * 0.7; // Reduce wind for distant objects
     float windStrength = 0.3 * lodWindScale;
     float windFreq = 1.5;
     float sway = sin(time * windFreq + worldPos.x * 0.1 + worldPos.z * 0.1) * windStrength;
-    rotatedPosition.x += sway * position.y * 0.1; // More sway at top
+    float swayWeight = uv.y * uv.y; // Quadratic: rooted at base, increasing toward canopy
+    rotatedPosition.x += sway * swayWeight * 0.08;
 
     // Transform to world position
     vec3 finalPosition = worldPos + rotatedPosition;

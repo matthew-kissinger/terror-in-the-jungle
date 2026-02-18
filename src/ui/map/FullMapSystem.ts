@@ -18,6 +18,7 @@ import {
 } from './FullMapStyles';
 import { createLegend, createControls, createCompass } from './FullMapDOMHelpers';
 import { shouldUseTouchControls } from '../../utils/DeviceDetector';
+import type { WarSimulator } from '../../systems/strategy/WarSimulator';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -27,6 +28,7 @@ export class FullMapSystem implements GameSystem {
   private zoneManager?: ZoneManager;
   private combatantSystem?: CombatantSystem;
   private gameModeManager?: GameModeManager;
+  private warSimulator?: WarSimulator;
 
   // Canvas elements
   private mapCanvas: HTMLCanvasElement;
@@ -258,7 +260,10 @@ export class FullMapSystem implements GameSystem {
       zones.forEach(zone => this.drawZone(ctx, zone));
     }
 
-    // Draw combatants
+    // Draw strategic agents (non-materialized, dimmer)
+    this.drawStrategicAgents(ctx);
+
+    // Draw combatants (materialized, full brightness)
     if (this.combatantSystem) {
       this.drawCombatants(ctx);
     }
@@ -372,6 +377,35 @@ export class FullMapSystem implements GameSystem {
     });
   }
 
+  private drawStrategicAgents(ctx: CanvasRenderingContext2D): void {
+    if (!this.warSimulator || !this.warSimulator.isEnabled()) return;
+
+    const scale = MAP_SIZE / this.worldSize;
+    const data = this.warSimulator.getAgentPositionsForMap();
+
+    for (let i = 0; i < data.length; i += 4) {
+      const faction = data[i];     // 0 = US, 1 = OPFOR
+      const ax = data[i + 1];
+      const az = data[i + 2];
+      const tier = data[i + 3];    // 0 = materialized, 1 = simulated, 2 = strategic
+
+      // Skip materialized - drawn by drawCombatants
+      if (tier === 0) continue;
+
+      // Flipped axes matching drawCombatants
+      const x = (this.worldSize / 2 - ax) * scale;
+      const y = (this.worldSize / 2 - az) * scale;
+
+      const alpha = tier === 1 ? 0.4 : 0.2;
+      ctx.fillStyle = faction === 0
+        ? `rgba(91, 140, 201, ${alpha})`
+        : `rgba(201, 86, 74, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(x, y, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   private drawPlayer(ctx: CanvasRenderingContext2D): void {
     const scale = MAP_SIZE / this.worldSize;
     // Fixed north-up map with flipped axes:
@@ -410,6 +444,10 @@ export class FullMapSystem implements GameSystem {
 
   setCombatantSystem(system: CombatantSystem): void {
     this.combatantSystem = system;
+  }
+
+  setWarSimulator(simulator: WarSimulator): void {
+    this.warSimulator = simulator;
   }
 
   setGameModeManager(manager: GameModeManager): void {

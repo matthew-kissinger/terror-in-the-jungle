@@ -359,6 +359,7 @@ export interface IPlayerSuppressionSystem {
  */
 export interface ICombatantRenderer {
   setPlayerSquadId(squadId: string | undefined): void;
+  updateWalkFrame(deltaTime: number): void;
   updateBillboards(combatants: Map<string, Combatant>, playerPosition: THREE.Vector3): void;
 }
 

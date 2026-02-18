@@ -259,6 +259,14 @@ export class ChunkWorkerPool {
   }
 
   /**
+   * Send height provider configuration to all workers.
+   * Call this before generating chunks to switch between noise and DEM modes.
+   */
+  sendHeightProvider(config: import('./IHeightProvider').HeightProviderConfig): void {
+    this.lifecycle.sendHeightProvider(config);
+  }
+
+  /**
    * Dispose all workers
    */
   dispose(): void {

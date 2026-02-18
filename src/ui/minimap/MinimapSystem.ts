@@ -7,6 +7,7 @@ import { createMinimapDOM } from './MinimapDOMBuilder';
 import { DEFAULT_WORLD_SIZE, MINIMAP_SIZE } from './MinimapStyles';
 import { renderMinimap } from './MinimapRenderer';
 import { isMobileViewport } from '../../utils/DeviceDetector';
+import type { WarSimulator } from '../../systems/strategy/WarSimulator';
 
 // Reusable scratch vectors to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -15,6 +16,7 @@ export class MinimapSystem implements GameSystem {
   private camera: THREE.Camera;
   private zoneManager?: ZoneManager;
   private combatantSystem?: CombatantSystem;
+  private warSimulator?: WarSimulator;
   private playerSquadId?: string;
   private commandPosition?: THREE.Vector3;
 
@@ -83,6 +85,10 @@ export class MinimapSystem implements GameSystem {
     this.combatantSystem = system;
   }
 
+  setWarSimulator(simulator: WarSimulator): void {
+    this.warSimulator = simulator;
+  }
+
   // Game mode configuration
   setWorldScale(scale: number): void {
     this.WORLD_SIZE = scale;
@@ -108,6 +114,7 @@ export class MinimapSystem implements GameSystem {
       camera: this.camera,
       zoneManager: this.zoneManager,
       combatantSystem: this.combatantSystem,
+      warSimulator: this.warSimulator,
       playerSquadId: this.playerSquadId,
       commandPosition: this.commandPosition
     });

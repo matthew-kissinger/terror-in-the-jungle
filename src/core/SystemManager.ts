@@ -8,6 +8,7 @@ import { Skybox } from '../systems/environment/Skybox';
 import { ImprovedChunkManager } from '../systems/terrain/ImprovedChunkManager';
 import { GlobalBillboardSystem } from '../systems/world/billboard/GlobalBillboardSystem';
 import { WaterSystem } from '../systems/environment/WaterSystem';
+import { RiverWaterSystem } from '../systems/environment/RiverWaterSystem';
 import { FirstPersonWeapon } from '../systems/player/FirstPersonWeapon';
 import { ZoneManager } from '../systems/world/ZoneManager';
 import { HUDSystem } from '../ui/hud/HUDSystem';
@@ -37,6 +38,8 @@ import { DayNightCycle } from '../systems/environment/DayNightCycle';
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { VoiceCalloutSystem } from '../systems/audio/VoiceCalloutSystem';
 import { LoadoutSelector } from '../ui/loadout/LoadoutSelector';
+import { WarSimulator } from '../systems/strategy/WarSimulator';
+import { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
 import { SystemInitializer, SystemReferences } from './SystemInitializer';
 import { SystemConnector } from './SystemConnector';
 import { SystemUpdater } from './SystemUpdater';
@@ -65,6 +68,7 @@ export class SystemManager {
   public combatantSystem!: CombatantSystem;
   public skybox!: Skybox;
   public waterSystem!: WaterSystem;
+  public riverWaterSystem!: RiverWaterSystem;
   public weatherSystem!: WeatherSystem;
   public dayNightCycle!: DayNightCycle;
   public firstPersonWeapon!: FirstPersonWeapon;
@@ -93,6 +97,8 @@ export class SystemManager {
   public footstepAudioSystem!: FootstepAudioSystem;
   public voiceCalloutSystem!: VoiceCalloutSystem;
   public loadoutSelector!: LoadoutSelector;
+  public warSimulator!: WarSimulator;
+  public strategicFeedback!: StrategicFeedback;
 
   async initializeSystems(
     scene: THREE.Scene,
@@ -122,6 +128,7 @@ export class SystemManager {
     this.combatantSystem = this.refs.combatantSystem;
     this.skybox = this.refs.skybox;
     this.waterSystem = this.refs.waterSystem;
+    this.riverWaterSystem = this.refs.riverWaterSystem;
     this.weatherSystem = this.refs.weatherSystem;
     this.dayNightCycle = this.refs.dayNightCycle;
     this.firstPersonWeapon = this.refs.firstPersonWeapon;
@@ -150,6 +157,8 @@ export class SystemManager {
     this.footstepAudioSystem = this.refs.footstepAudioSystem;
     this.voiceCalloutSystem = this.refs.voiceCalloutSystem;
     this.loadoutSelector = this.refs.loadoutSelector;
+    this.warSimulator = this.refs.warSimulator;
+    this.strategicFeedback = this.refs.strategicFeedback;
 
     // Connect systems together
     this.connector.connectSystems(this.refs, scene, camera, renderer);
@@ -254,8 +263,12 @@ export class SystemManager {
 
     // Set weather config for mode
     const config = getGameModeConfig(mode);
-    if (this.waterSystem && typeof this.waterSystem.setWorldSize === 'function') {
-      this.waterSystem.setWorldSize(config.worldSize);
+    if (this.waterSystem) {
+      const waterEnabled = config.waterEnabled !== false;
+      this.waterSystem.setEnabled(waterEnabled);
+      if (waterEnabled && typeof this.waterSystem.setWorldSize === 'function') {
+        this.waterSystem.setWorldSize(config.worldSize);
+      }
     }
     if (this.weatherSystem) {
       this.weatherSystem.setWeatherConfig(config.weather);

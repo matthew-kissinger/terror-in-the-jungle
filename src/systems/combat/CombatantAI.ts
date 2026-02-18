@@ -20,7 +20,7 @@ import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem'
  */
 export class CombatantAI {
   private readonly FRIENDLY_FIRE_ENABLED = false
-  private readonly MAX_ENGAGEMENT_RANGE = 150
+  private MAX_ENGAGEMENT_RANGE = 150
 
   // State handler modules
   private patrolHandler: AIStatePatrol
@@ -388,6 +388,14 @@ export class CombatantAI {
     this.targeting.setChunkManager(chunkManager)
     this.coverSystem.setChunkManager(chunkManager)
     this.flankingSystem.setChunkManager(chunkManager)
+  }
+
+  setEngagementRange(range: number): void {
+    this.MAX_ENGAGEMENT_RANGE = range
+  }
+
+  getEngagementRange(): number {
+    return this.MAX_ENGAGEMENT_RANGE
   }
 
   setSandbagSystem(sandbagSystem: SandbagSystem): void {

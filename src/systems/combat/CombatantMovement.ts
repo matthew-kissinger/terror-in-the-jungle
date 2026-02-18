@@ -49,6 +49,12 @@ export class CombatantMovement {
       return;
     }
 
+    // Dead/dying NPCs: freeze in place, no movement or spacing forces
+    if (combatant.isDying || combatant.state === CombatantState.DEAD) {
+      combatant.velocity.set(0, 0, 0);
+      return;
+    }
+
     // Movement based on state
     if (combatant.state === CombatantState.PATROLLING) {
       updatePatrolMovement(combatant, deltaTime, squads, combatants, {

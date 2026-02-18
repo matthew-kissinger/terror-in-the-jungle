@@ -166,6 +166,7 @@ export class StartScreen {
       case 'zone_control': return GameMode.ZONE_CONTROL;
       case 'open_frontier': return GameMode.OPEN_FRONTIER;
       case 'tdm': return GameMode.TEAM_DEATHMATCH;
+      case 'a_shau_valley': return GameMode.A_SHAU_VALLEY;
       default: return GameMode.ZONE_CONTROL;
     }
   }
@@ -180,6 +181,7 @@ export class StartScreen {
     const modeName =
       mode === GameMode.ZONE_CONTROL ? 'ZONE CONTROL'
       : mode === GameMode.OPEN_FRONTIER ? 'OPEN FRONTIER'
+      : mode === GameMode.A_SHAU_VALLEY ? 'A SHAU VALLEY'
       : 'TEAM DEATHMATCH';
 
     this.selectedModeDisplay.innerHTML = `Selected: <strong>${modeName}</strong>`;

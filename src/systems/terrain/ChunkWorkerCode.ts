@@ -78,10 +78,50 @@ class WorkerNoise {
 
 let noiseGenerator = null;
 
-// NOTE: This calculateHeight function duplicates the logic from ChunkHeightGenerator.generateHeightAt()
+// DEM data (set via 'setHeightProvider' message)
+let demData = null;       // Float32Array
+let demWidth = 0;
+let demHeight = 0;
+let demMetersPerPixel = 0;
+let demOriginX = 0;
+let demOriginZ = 0;
+let demHalfWidthMeters = 0;
+let demHalfHeightMeters = 0;
+let useDEM = false;
+
+// DEM bilinear sampling - matches DEMHeightProvider.sampleBilinear()
+function sampleDEM(worldX, worldZ) {
+  const relX = worldX - demOriginX + demHalfWidthMeters;
+  const relZ = worldZ - demOriginZ + demHalfHeightMeters;
+
+  const gxf = relX / demMetersPerPixel;
+  const gzf = relZ / demMetersPerPixel;
+
+  const gx = Math.max(0, Math.min(demWidth - 1.001, gxf));
+  const gz = Math.max(0, Math.min(demHeight - 1.001, gzf));
+
+  const x0 = Math.floor(gx);
+  const z0 = Math.floor(gz);
+  const x1 = Math.min(x0 + 1, demWidth - 1);
+  const z1 = Math.min(z0 + 1, demHeight - 1);
+
+  const fx = gx - x0;
+  const fz = gz - z0;
+
+  const h00 = demData[z0 * demWidth + x0];
+  const h10 = demData[z0 * demWidth + x1];
+  const h01 = demData[z1 * demWidth + x0];
+  const h11 = demData[z1 * demWidth + x1];
+
+  const h0 = h00 * (1 - fx) + h10 * fx;
+  const h1 = h01 * (1 - fx) + h11 * fx;
+
+  return h0 * (1 - fz) + h1 * fz;
+}
+
+// NOTE: This calculateHeight function duplicates the logic from NoiseHeightProvider.calculateHeight()
 // They must match exactly to ensure seamless terrain generation between main thread and workers.
-// See src/systems/terrain/ChunkHeightGenerator.ts for the canonical implementation.
-function calculateHeight(worldX, worldZ, noise) {
+function calculateHeightNoise(worldX, worldZ, noise) {
   let continentalHeight = noise.noise(worldX * 0.001, worldZ * 0.001);
   let ridgeNoise = 1 - Math.abs(noise.noise(worldX * 0.003, worldZ * 0.003));
   ridgeNoise = Math.pow(ridgeNoise, 1.5);
@@ -112,6 +152,14 @@ function calculateHeight(worldX, worldZ, noise) {
     height = height * 0.7;
   }
   return Math.max(-8, height);
+}
+
+// Dispatch: use DEM if loaded, otherwise noise
+function calculateHeight(worldX, worldZ, noise) {
+  if (useDEM) {
+    return sampleDEM(worldX, worldZ);
+  }
+  return calculateHeightNoise(worldX, worldZ, noise);
 }
 
 function generateChunk(request) {
@@ -304,9 +352,46 @@ function randomInRange(min, max) {
   return min + Math.random() * (max - min);
 }
 
+// Compute slope at a local position using adjacent height samples
+function getSlopeAtLocal(heightData, segments, size, localX, localZ) {
+  const sampleDist = size / segments;
+  const h = getHeightAtLocal(heightData, segments, size, localX, localZ);
+  const hN = getHeightAtLocal(heightData, segments, size, localX, Math.min(size, localZ + sampleDist));
+  const hE = getHeightAtLocal(heightData, segments, size, Math.min(size, localX + sampleDist), localZ);
+  const dz = hN - h;
+  const dx = hE - h;
+  const slopeAngle = Math.atan(Math.sqrt(dx * dx + dz * dz) / sampleDist);
+  return slopeAngle * (180 / Math.PI); // degrees
+}
+
+// Biome density multiplier based on elevation (DEM mode only)
+// Returns 0-1 multiplier for each vegetation type
+function getBiomeDensity(elevation, slopeDeg) {
+  // Steep slopes: minimal vegetation
+  if (slopeDeg > 45) return { fern: 0.1, elephantEar: 0, fanPalm: 0, coconut: 0, areca: 0, dipterocarp: 0, banyan: 0 };
+  if (slopeDeg > 35) return { fern: 0.3, elephantEar: 0.1, fanPalm: 0, coconut: 0, areca: 0, dipterocarp: 0.1, banyan: 0 };
+
+  // Valley floor (370-600m): Dense lowland vegetation
+  if (elevation < 600) {
+    return { fern: 1.0, elephantEar: 1.2, fanPalm: 1.0, coconut: 0.8, areca: 0.6, dipterocarp: 0.5, banyan: 0.5 };
+  }
+  // Mid-slope (600-900m): Triple canopy
+  if (elevation < 900) {
+    return { fern: 0.8, elephantEar: 0.5, fanPalm: 0.6, coconut: 0.3, areca: 0.8, dipterocarp: 1.2, banyan: 1.0 };
+  }
+  // Ridgeline (900-1200m): Moderate
+  if (elevation < 1200) {
+    return { fern: 0.6, elephantEar: 0.2, fanPalm: 0.4, coconut: 0.1, areca: 0.5, dipterocarp: 0.6, banyan: 0.3 };
+  }
+  // High ridge (1200m+): Sparse
+  return { fern: 0.4, elephantEar: 0.05, fanPalm: 0.1, coconut: 0, areca: 0.1, dipterocarp: 0.1, banyan: 0 };
+}
+
 function generateVegetationPositions(chunkX, chunkZ, size, heightData, segments) {
   const baseX = chunkX * size;
   const baseZ = chunkZ * size;
+  // Scale density for larger chunks: keep vegetation count proportional to 64-unit chunks
+  const chunkScale = (size * size) / (64 * 64);
   const DENSITY_PER_UNIT = 1.0 / 128.0;
 
   const vegetation = {
@@ -319,12 +404,22 @@ function generateVegetationPositions(chunkX, chunkZ, size, heightData, segments)
     banyan: []
   };
 
+  // Cap vegetation instances per chunk for performance with large chunks
+  const MAX_FERN = 500;
+  const MAX_SMALL_PLANT = 200;
+  const MAX_TREE = 100;
+
   // Ferns - dense ground cover
-  const fernCount = Math.floor(size * size * DENSITY_PER_UNIT * 6.0);
+  const fernCount = Math.min(MAX_FERN, Math.floor(size * size * DENSITY_PER_UNIT * 6.0));
   for (let i = 0; i < fernCount; i++) {
     const localX = Math.random() * size;
     const localZ = Math.random() * size;
     const height = getHeightAtLocal(heightData, segments, size, localX, localZ);
+    if (useDEM) {
+      const slope = getSlopeAtLocal(heightData, segments, size, localX, localZ);
+      const biome = getBiomeDensity(height, slope);
+      if (Math.random() > biome.fern) continue;
+    }
     vegetation.fern.push({
       x: baseX + localX, y: height + 0.2, z: baseZ + localZ,
       sx: randomInRange(2.4, 3.6), sy: randomInRange(2.4, 3.6)
@@ -332,11 +427,16 @@ function generateVegetationPositions(chunkX, chunkZ, size, heightData, segments)
   }
 
   // Elephant ear
-  const elephantEarCount = Math.floor(size * size * DENSITY_PER_UNIT * 0.8);
+  const elephantEarCount = Math.min(MAX_SMALL_PLANT, Math.floor(size * size * DENSITY_PER_UNIT * 0.8));
   for (let i = 0; i < elephantEarCount; i++) {
     const localX = Math.random() * size;
     const localZ = Math.random() * size;
     const height = getHeightAtLocal(heightData, segments, size, localX, localZ);
+    if (useDEM) {
+      const slope = getSlopeAtLocal(heightData, segments, size, localX, localZ);
+      const biome = getBiomeDensity(height, slope);
+      if (Math.random() > biome.elephantEar) continue;
+    }
     vegetation.elephantEar.push({
       x: baseX + localX, y: height + 0.8, z: baseZ + localZ,
       sx: randomInRange(1.0, 1.5), sy: randomInRange(1.0, 1.5)
@@ -344,11 +444,16 @@ function generateVegetationPositions(chunkX, chunkZ, size, heightData, segments)
   }
 
   // Fan Palm
-  const fanPalmCount = Math.floor(size * size * DENSITY_PER_UNIT * 0.5);
+  const fanPalmCount = Math.min(MAX_SMALL_PLANT, Math.floor(size * size * DENSITY_PER_UNIT * 0.5));
   for (let i = 0; i < fanPalmCount; i++) {
     const localX = Math.random() * size;
     const localZ = Math.random() * size;
     const height = getHeightAtLocal(heightData, segments, size, localX, localZ);
+    if (useDEM) {
+      const slope = getSlopeAtLocal(heightData, segments, size, localX, localZ);
+      const biome = getBiomeDensity(height, slope);
+      if (Math.random() > biome.fanPalm) continue;
+    }
     vegetation.fanPalm.push({
       x: baseX + localX, y: height + 0.6, z: baseZ + localZ,
       sx: randomInRange(0.8, 1.2), sy: randomInRange(0.8, 1.2)
@@ -357,10 +462,15 @@ function generateVegetationPositions(chunkX, chunkZ, size, heightData, segments)
 
   // Coconut palms - Poisson distributed
   const coconutPoints = poissonDiskSampling(size, size, 12);
-  const maxCoconuts = Math.floor(size * size * DENSITY_PER_UNIT * 0.3);
+  const maxCoconuts = Math.min(MAX_TREE, Math.floor(size * size * DENSITY_PER_UNIT * 0.3));
   for (let i = 0; i < Math.min(coconutPoints.length * 0.5, maxCoconuts); i++) {
     const point = coconutPoints[i];
     const height = getHeightAtLocal(heightData, segments, size, point.x, point.y);
+    if (useDEM) {
+      const slope = getSlopeAtLocal(heightData, segments, size, point.x, point.y);
+      const biome = getBiomeDensity(height, slope);
+      if (Math.random() > biome.coconut) continue;
+    }
     if (Math.random() < 0.8) {
       vegetation.coconut.push({
         x: baseX + point.x, y: height + 2.0, z: baseZ + point.y,
@@ -371,10 +481,15 @@ function generateVegetationPositions(chunkX, chunkZ, size, heightData, segments)
 
   // Areca palms - Poisson distributed
   const arecaPoints = poissonDiskSampling(size, size, 8);
-  const maxAreca = Math.floor(size * size * DENSITY_PER_UNIT * 0.4);
+  const maxAreca = Math.min(MAX_TREE, Math.floor(size * size * DENSITY_PER_UNIT * 0.4));
   for (let i = 0; i < Math.min(arecaPoints.length * 0.8, maxAreca); i++) {
     const point = arecaPoints[i];
     const height = getHeightAtLocal(heightData, segments, size, point.x, point.y);
+    if (useDEM) {
+      const slope = getSlopeAtLocal(heightData, segments, size, point.x, point.y);
+      const biome = getBiomeDensity(height, slope);
+      if (Math.random() > biome.areca) continue;
+    }
     vegetation.areca.push({
       x: baseX + point.x, y: height + 1.6, z: baseZ + point.y,
       sx: randomInRange(0.8, 1.0), sy: randomInRange(0.8, 1.0)
@@ -383,10 +498,16 @@ function generateVegetationPositions(chunkX, chunkZ, size, heightData, segments)
 
   // Giant trees - Poisson distributed
   const giantTreePoints = poissonDiskSampling(size, size, 16);
-  const maxGiantTrees = Math.floor(size * size * DENSITY_PER_UNIT * 0.15);
+  const maxGiantTrees = Math.min(MAX_TREE, Math.floor(size * size * DENSITY_PER_UNIT * 0.15));
   for (let i = 0; i < Math.min(giantTreePoints.length, maxGiantTrees); i++) {
     const point = giantTreePoints[i];
     const height = getHeightAtLocal(heightData, segments, size, point.x, point.y);
+    if (useDEM) {
+      const slope = getSlopeAtLocal(heightData, segments, size, point.x, point.y);
+      const biome = getBiomeDensity(height, slope);
+      if (i % 2 === 0 && Math.random() > biome.dipterocarp) continue;
+      if (i % 2 !== 0 && Math.random() > biome.banyan) continue;
+    }
     if (i % 2 === 0) {
       vegetation.dipterocarp.push({
         x: baseX + point.x, y: height + 8.0, z: baseZ + point.y,
@@ -405,6 +526,27 @@ function generateVegetationPositions(chunkX, chunkZ, size, heightData, segments)
 
 self.onmessage = function(event) {
   const request = event.data;
+
+  if (request.type === 'setHeightProvider') {
+    if (request.providerType === 'dem') {
+      demData = new Float32Array(request.buffer);
+      demWidth = request.width;
+      demHeight = request.height;
+      demMetersPerPixel = request.metersPerPixel;
+      demOriginX = request.originX;
+      demOriginZ = request.originZ;
+      demHalfWidthMeters = (demWidth * demMetersPerPixel) / 2;
+      demHalfHeightMeters = (demHeight * demMetersPerPixel) / 2;
+      useDEM = true;
+      self.postMessage({ type: 'providerReady' });
+    } else if (request.providerType === 'noise') {
+      useDEM = false;
+      noiseGenerator = new WorkerNoise(request.seed);
+      self.postMessage({ type: 'providerReady' });
+    }
+    return;
+  }
+
   if (request.type === 'generate') {
     const result = generateChunk(request);
     self.postMessage(result, [

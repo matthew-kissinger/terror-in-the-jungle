@@ -34,10 +34,13 @@ import { SmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
 import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
+import { RiverWaterSystem } from '../systems/environment/RiverWaterSystem';
 import { DayNightCycle } from '../systems/environment/DayNightCycle';
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { VoiceCalloutSystem } from '../systems/audio/VoiceCalloutSystem';
 import { LoadoutSelector } from '../ui/loadout/LoadoutSelector';
+import { WarSimulator } from '../systems/strategy/WarSimulator';
+import { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
 import { objectPool } from '../utils/ObjectPoolManager';
 import { markStartup } from './StartupTelemetry';
 
@@ -49,6 +52,7 @@ export interface SystemReferences {
   combatantSystem: CombatantSystem;
   skybox: Skybox;
   waterSystem: WaterSystem;
+  riverWaterSystem: RiverWaterSystem;
   weatherSystem: WeatherSystem;
   dayNightCycle: DayNightCycle;
   firstPersonWeapon: FirstPersonWeapon;
@@ -78,6 +82,8 @@ export interface SystemReferences {
   footstepAudioSystem: FootstepAudioSystem;
   voiceCalloutSystem: VoiceCalloutSystem;
   loadoutSelector: LoadoutSelector;
+  warSimulator: WarSimulator;
+  strategicFeedback: StrategicFeedback;
 }
 
 export interface InitializationResult {
@@ -148,6 +154,7 @@ export class SystemInitializer {
     refs.combatantSystem = new CombatantSystem(scene, camera, refs.globalBillboardSystem, refs.assetLoader, refs.chunkManager);
     refs.skybox = new Skybox(scene);
     refs.waterSystem = new WaterSystem(scene, camera, refs.assetLoader);
+    refs.riverWaterSystem = new RiverWaterSystem(scene);
     refs.weatherSystem = new WeatherSystem(scene, camera, refs.chunkManager);
     refs.dayNightCycle = new DayNightCycle(scene);
     refs.firstPersonWeapon = new FirstPersonWeapon(scene, camera, refs.assetLoader);
@@ -178,6 +185,8 @@ export class SystemInitializer {
     refs.footstepAudioSystem = new FootstepAudioSystem(refs.audioManager.getListener());
     refs.voiceCalloutSystem = new VoiceCalloutSystem(scene, refs.audioManager.getListener());
     refs.loadoutSelector = new LoadoutSelector();
+    refs.warSimulator = new WarSimulator();
+    refs.strategicFeedback = new StrategicFeedback();
 
     // Initialize influence map system based on game mode world size
     const worldSize = 4000; // Default, will be updated when game mode is set
@@ -192,6 +201,7 @@ export class SystemInitializer {
       refs.chunkManager,
       // gpuTerrain disabled
       refs.waterSystem,
+      refs.riverWaterSystem,
       refs.weatherSystem,
       // dayNightCycle DISABLED: Conflicts with WeatherSystem lighting
       refs.playerController,
@@ -221,7 +231,9 @@ export class SystemInitializer {
       refs.influenceMapSystem,
       refs.ammoSupplySystem,
       refs.voiceCalloutSystem,
-      refs.loadoutSelector
+      refs.loadoutSelector,
+      refs.warSimulator,
+      refs.strategicFeedback
     ];
 
     onProgress('world', 0.5);

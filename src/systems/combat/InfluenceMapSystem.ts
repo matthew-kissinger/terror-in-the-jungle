@@ -56,6 +56,15 @@ export class InfluenceMapSystem implements GameSystem {
     Logger.info('influence-map', `   Grid: ${this.gridSize}x${this.gridSize}, Cell size: ${this.cellSize.toFixed(1)}m, World: ${this.worldSize}m`);
   }
 
+  reinitialize(worldSize: number, gridSize?: number): void {
+    this.worldSize = worldSize;
+    if (gridSize !== undefined) this.gridSize = gridSize;
+    this.cellSize = this.worldSize / this.gridSize;
+    this.worldOffset = new THREE.Vector2(-this.worldSize / 2, -this.worldSize / 2);
+    this.initializeGrid();
+    Logger.info('influence-map', `Reinitialized: ${this.gridSize}x${this.gridSize}, cell ${this.cellSize.toFixed(1)}m, world ${this.worldSize}m`);
+  }
+
   private initializeGrid(): void {
     this.grid = InfluenceMapGrid.initializeGrid(
       this.gridSize,

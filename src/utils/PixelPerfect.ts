@@ -15,17 +15,20 @@ export class PixelPerfectUtils {
   /**
    * Configure texture for billboards with mipmapping.
    * - NearestFilter for magFilter: crisp pixels when close
-   * - LinearMipmapLinearFilter for minFilter: smooth blending at distance
-   * - Mipmaps enabled: reduces aliasing/shimmering at distance
+   * - NearestMipmapLinearFilter for minFilter: nearest-neighbor within each mip
+   *   level (preserves pixel art character) with linear blending between mip
+   *   levels (prevents visible popping as distance changes)
+   * - Mipmaps enabled: reduces shimmer/aliasing at distance
+   * - Anisotropy disabled: billboards always face the camera so oblique-angle
+   *   correction provides no benefit
    */
   static configureBillboardTexture(texture: THREE.Texture): THREE.Texture {
-    texture.magFilter = THREE.NearestFilter;  // Crisp when close
-    texture.minFilter = THREE.LinearMipmapLinearFilter;  // Smooth when far
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.NearestMipmapLinearFilter;
     texture.wrapS = THREE.ClampToEdgeWrapping;
     texture.wrapT = THREE.ClampToEdgeWrapping;
     texture.flipY = true;
-    texture.generateMipmaps = true;  // Enable mipmaps for distance
-    texture.anisotropy = 4;  // Improve quality at oblique angles
+    texture.generateMipmaps = true;
     texture.needsUpdate = true;
     return texture;
   }

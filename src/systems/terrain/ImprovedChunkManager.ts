@@ -353,6 +353,13 @@ export class ImprovedChunkManager implements GameSystem {
   }
 
   /**
+   * Get the worker pool for DEM data transfer
+   */
+  getWorkerPool(): ChunkWorkerPool | null {
+    return this.workerPool;
+  }
+
+  /**
    * Get worker pool statistics for debugging
    */
   getWorkerStats(): { enabled: boolean; queueLength: number; busyWorkers: number; totalWorkers: number } | null {
@@ -386,6 +393,48 @@ export class ImprovedChunkManager implements GameSystem {
     const telemetry = this.workerPool.getTelemetry();
     Logger.info('terrain', '[ChunkManager] Worker Telemetry:', telemetry);
     return { enabled: true, ...telemetry };
+  }
+
+  /**
+   * Reconfigure chunk size for a different game mode.
+   * Disposes all loaded chunks and resets the worker pool with new parameters.
+   * Must be called before loading chunks for the new mode.
+   */
+  setChunkSize(size: number): void {
+    if (size === this.config.size) return;
+
+    Logger.info('chunks', `Reconfiguring chunk size: ${this.config.size} -> ${size}`);
+    this.config.size = size;
+
+    // Update sub-managers with new chunk size
+    this.priorityManager.updateConfig({ chunkSize: size });
+
+    // Dispose existing chunks since they have the wrong size
+    this.lifecycleManager.dispose();
+
+    // Reinitialize lifecycle manager with new config
+    this.lifecycleManager = new ChunkLifecycleManager(
+      this.scene,
+      this.assetLoader,
+      this.globalBillboardSystem,
+      {
+        size,
+        loadDistance: this.config.loadDistance,
+        renderDistance: this.config.renderDistance,
+        skipTerrainMesh: this.config.skipTerrainMesh,
+        enableMeshMerging: false
+      },
+      this.noiseGenerator,
+      this.losAccelerator,
+      this.workerPool,
+      this.bvhWorker
+    );
+
+    // Update terrain queries with new lifecycle manager
+    this.terrainQueries = new ChunkTerrainQueries(
+      this.losAccelerator,
+      (worldPos: THREE.Vector3) => this.lifecycleManager.getChunkAt(worldPos)
+    );
   }
 
   // Game mode configuration

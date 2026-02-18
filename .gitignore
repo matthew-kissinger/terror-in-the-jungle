@@ -65,6 +65,18 @@ perf-baselines.json
 .playwright-mcp/
 artifacts/
 
+# Vietnam terrain data (large binary files, downloaded via scripts)
+data/vietnam/terrain-tiles/
+data/vietnam/big-map/z13/
+data/vietnam/big-map/z14/
+data/vietnam/big-map/*.f32
+data/vietnam/big-map/*.png
+data/vietnam/converted/*.f32
+data/vietnam/reference/hydroviet-rivers/
+
+# Public DEM data (copied from data/ for runtime serving, too large for git)
+public/data/vietnam/
+
 # Local capture/debug screenshots
 gameplay-profile.png
 hud-current-state.png
