@@ -46,7 +46,7 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
-    "postprocessing": "^6.38.2",
+    "postprocessing": "^6.38.3",
     "three": "^0.182.0",
     "three-mesh-bvh": "^0.9.8"
   }
