@@ -5,6 +5,8 @@ import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import { spatialGridManager } from '../systems/combat/SpatialGridManager';
 import { ShotCommandFactory } from '../systems/player/weapon/ShotCommand';
 import { Logger } from '../utils/Logger';
+import { GameMode } from '../config/gameModes';
+import { Faction } from '../systems/combat/types';
 
 interface SystemTimingEntry {
   name: string;
@@ -21,6 +23,11 @@ export class SystemUpdater {
   private readonly EMA_ALPHA = 0.1;
   private tacticalUiAccumulator = 0;
   private readonly TACTICAL_UI_INTERVAL = 1 / 20; // 20 Hz is enough for map/compass updates
+  private ashauNoContactMs = 0;
+  private ashauLastAssistAtMs = 0;
+  private readonly ASHAU_CONTACT_RADIUS = 250;
+  private readonly ASHAU_CONTACT_ASSIST_DELAY_MS = 90_000;
+  private readonly ASHAU_CONTACT_ASSIST_COOLDOWN_MS = 120_000;
 
   updateSystems(
     refs: SystemReferences,
@@ -129,6 +136,13 @@ export class SystemUpdater {
       performanceTelemetry.endSystem('WarSim');
     });
 
+    // Keep A Shau sessions from drifting into long no-contact dead time.
+    this.trackSystemUpdate('AShauAssist', 0.2, () => {
+      performanceTelemetry.beginSystem('AShauAssist');
+      this.updateAShauContactAssist(refs, deltaTime, gameStarted);
+      performanceTelemetry.endSystem('AShauAssist');
+    });
+
     // Gate World systems - skip weather and tickets during menu/loading
     this.trackSystemUpdate('World', 1.0, () => {
       performanceTelemetry.beginSystem('World');
@@ -181,6 +195,47 @@ export class SystemUpdater {
       || system === refs.weatherSystem
       || system === refs.warSimulator
       || system === refs.strategicFeedback;
+  }
+
+  private updateAShauContactAssist(
+    refs: SystemReferences,
+    deltaTime: number,
+    gameStarted: boolean
+  ): void {
+    if (!gameStarted) return;
+    const mode = refs.gameModeManager?.getCurrentMode?.() ?? refs.gameModeManager?.currentMode;
+    if (mode !== GameMode.A_SHAU_VALLEY) {
+      this.ashauNoContactMs = 0;
+      return;
+    }
+    if (!refs.playerController || !refs.combatantSystem) return;
+
+    const playerPos = refs.playerController.getPosition();
+    const contactRadiusSq = this.ASHAU_CONTACT_RADIUS * this.ASHAU_CONTACT_RADIUS;
+    const hasNearbyOpfor = refs.combatantSystem.getAllCombatants().some(c => {
+      if (c.faction !== Faction.OPFOR || c.state === 'dead' || c.health <= 0) return false;
+      const dx = c.position.x - playerPos.x;
+      const dz = c.position.z - playerPos.z;
+      return (dx * dx + dz * dz) <= contactRadiusSq;
+    });
+
+    if (hasNearbyOpfor) {
+      this.ashauNoContactMs = 0;
+      return;
+    }
+
+    this.ashauNoContactMs += deltaTime * 1000;
+    const now = Date.now();
+    if (this.ashauNoContactMs < this.ASHAU_CONTACT_ASSIST_DELAY_MS) return;
+    if (now - this.ashauLastAssistAtMs < this.ASHAU_CONTACT_ASSIST_COOLDOWN_MS) return;
+
+    const suggested = refs.playerRespawnManager?.getAShauPressureInsertionSuggestion?.();
+    if (!suggested) return;
+    suggested.y = playerPos.y;
+    refs.playerController.setPosition(suggested, 'ashau.contact_assist');
+    refs.playerHealthSystem?.applySpawnProtection?.(2);
+    this.ashauNoContactMs = 0;
+    this.ashauLastAssistAtMs = now;
   }
 
   private trackSystemUpdate(name: string, budgetMs: number, updateFn: () => void): void {

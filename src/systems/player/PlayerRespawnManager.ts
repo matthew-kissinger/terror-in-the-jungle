@@ -382,6 +382,12 @@ export class PlayerRespawnManager implements GameSystem {
     this.respawnUI.updateTimerDisplay(this.respawnTimer, hasSelection);
   }
 
+  getAShauPressureInsertionSuggestion(): THREE.Vector3 | null {
+    if (this.getCurrentGameMode() !== GameMode.A_SHAU_VALLEY) return null;
+    const pressureSpawn = this.getAShauPressureSpawnPosition();
+    return pressureSpawn ? pressureSpawn.clone() : null;
+  }
+
   private getAShauPressureSpawnPosition(): THREE.Vector3 | null {
     if (!this.zoneManager) return null;
     const zones = this.zoneManager.getAllZones();

@@ -549,3 +549,40 @@ Next:
 - Add lightweight sustained-contact assist policy:
   - if no tactical OPFOR within `250m` for >90s, bias next respawn/objective anchor inward by one tier.
 - Re-run diagnostics aiming for `sustained_5m r250 > 0`.
+
+### Iteration 017 - Sustained-contact assist pass + rerun (2026-02-21)
+
+Changes:
+- Added A Shau sustained-contact assist in `src/core/SystemUpdater.ts`:
+  - Tracks nearby OPFOR contact window (`250m`).
+  - If no close contact for >90s (with 120s cooldown), triggers pressure reinsertion via:
+    - `playerRespawnManager.getAShauPressureInsertionSuggestion()`
+    - `playerController.setPosition(..., 'ashau.contact_assist')`
+    - short spawn protection (`2s`).
+- Exposed pressure insertion suggestion method in `src/systems/player/PlayerRespawnManager.ts`.
+- Enhanced respawn candidate quality:
+  - Added multi-candidate scoring and terrain-ready filtering in `PlayerRespawnManager`.
+  - Added chunk manager dependency wiring in `src/core/SystemConnector.ts`.
+
+Validation:
+- Tests/build:
+  - `npx vitest run src/systems/player/PlayerRespawnManager.test.ts src/systems/strategy/WarSimulator.test.ts src/ui/minimap/MinimapRenderer.test.ts`
+  - Result: `3` files passed, `90` tests passed.
+  - `npm run build` passed.
+- Diagnostics reruns:
+  - `artifacts/ashau-diagnostics/2026-02-21T20-37-32-584Z/summary.md`
+    - `post_respawn r250=3` (improved)
+    - `sustained_5m r250=0`
+  - `artifacts/ashau-diagnostics/2026-02-21T20-48-08-292Z/summary.md`
+    - `post_respawn r250=1` (still improved vs baseline)
+    - `sustained_5m r250=0`
+
+Interpretation:
+- Immediate post-respawn close-contact objective is now repeatedly achievable in unattended runs.
+- Sustained 5-minute close-contact objective still not stable; player remains within broader contact envelope (`r800=9`) but not consistently in `r250`.
+
+Next:
+- Phase 4 sustained skirmish tuning:
+  - reduce no-contact assist delay from `90s` to `60s` in A Shau
+  - require reinsertion toward objective-side candidates with minimum OPFOR density threshold
+  - optionally add low-amplitude periodic objective micro-shift toward active contested zone center
