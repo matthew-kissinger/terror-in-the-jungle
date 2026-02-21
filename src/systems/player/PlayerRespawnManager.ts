@@ -382,9 +382,17 @@ export class PlayerRespawnManager implements GameSystem {
     this.respawnUI.updateTimerDisplay(this.respawnTimer, hasSelection);
   }
 
-  getAShauPressureInsertionSuggestion(): THREE.Vector3 | null {
+  getAShauPressureInsertionSuggestion(options?: { minOpfor250?: number }): THREE.Vector3 | null {
     if (this.getCurrentGameMode() !== GameMode.A_SHAU_VALLEY) return null;
     const pressureSpawn = this.getAShauPressureSpawnPosition();
+    if (!pressureSpawn) return null;
+    const minOpfor250 = Math.max(0, Number(options?.minOpfor250 ?? 0));
+    if (minOpfor250 > 0) {
+      const opfor250 = this.countNearbyAgents(pressureSpawn, 250, Faction.OPFOR);
+      if (opfor250 < minOpfor250) {
+        return null;
+      }
+    }
     return pressureSpawn ? pressureSpawn.clone() : null;
   }
 

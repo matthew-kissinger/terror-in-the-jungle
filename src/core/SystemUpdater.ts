@@ -26,8 +26,8 @@ export class SystemUpdater {
   private ashauNoContactMs = 0;
   private ashauLastAssistAtMs = 0;
   private readonly ASHAU_CONTACT_RADIUS = 250;
-  private readonly ASHAU_CONTACT_ASSIST_DELAY_MS = 90_000;
-  private readonly ASHAU_CONTACT_ASSIST_COOLDOWN_MS = 120_000;
+  private readonly ASHAU_CONTACT_ASSIST_DELAY_MS = 60_000;
+  private readonly ASHAU_CONTACT_ASSIST_COOLDOWN_MS = 90_000;
 
   updateSystems(
     refs: SystemReferences,
@@ -229,7 +229,7 @@ export class SystemUpdater {
     if (this.ashauNoContactMs < this.ASHAU_CONTACT_ASSIST_DELAY_MS) return;
     if (now - this.ashauLastAssistAtMs < this.ASHAU_CONTACT_ASSIST_COOLDOWN_MS) return;
 
-    const suggested = refs.playerRespawnManager?.getAShauPressureInsertionSuggestion?.();
+    const suggested = refs.playerRespawnManager?.getAShauPressureInsertionSuggestion?.({ minOpfor250: 1 });
     if (!suggested) return;
     suggested.y = playerPos.y;
     refs.playerController.setPosition(suggested, 'ashau.contact_assist');

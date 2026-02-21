@@ -586,3 +586,35 @@ Next:
   - reduce no-contact assist delay from `90s` to `60s` in A Shau
   - require reinsertion toward objective-side candidates with minimum OPFOR density threshold
   - optionally add low-amplitude periodic objective micro-shift toward active contested zone center
+
+### Iteration 018 - 60s assist + density threshold verification (2026-02-21)
+
+Changes:
+- Tightened sustained-contact assist policy:
+  - `ASHAU_CONTACT_ASSIST_DELAY_MS`: `90s -> 60s`
+  - `ASHAU_CONTACT_ASSIST_COOLDOWN_MS`: `120s -> 90s`
+  - assist insertions now require minimum close-threat density:
+    - `getAShauPressureInsertionSuggestion({ minOpfor250: 1 })`
+- Added option support in `PlayerRespawnManager.getAShauPressureInsertionSuggestion(...)`.
+
+Validation:
+- Tests/build:
+  - `npx vitest run src/systems/player/PlayerRespawnManager.test.ts src/systems/strategy/WarSimulator.test.ts src/ui/minimap/MinimapRenderer.test.ts`
+  - Result: `3` files passed, `90` tests passed.
+  - `npm run build` passed.
+- Diagnostics rerun:
+  - `artifacts/ashau-diagnostics/2026-02-21T20-56-56-865Z/capture.json`
+  - `artifacts/ashau-diagnostics/2026-02-21T20-56-56-865Z/summary.md`
+
+Results:
+- `first_contact`: `r250=1`, `firstTacticalContactMs=40265`
+- `post_respawn`: `r250=1`
+- `sustained_5m`: `r250=0`, `r800=4`
+
+Interpretation:
+- Early and post-respawn close-contact behavior improved and is now consistently achievable in unattended runs.
+- Sustained close-contact remains unstable; system still drifts into mid-range envelope by 5-minute checkpoint.
+
+Next:
+- Add periodic objective micro-shift toward contested-zone centroid when no close contact persists, not just one-off reinsertion.
+- Re-run diagnostics targeting `sustained_5m r250 > 0`.
