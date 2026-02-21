@@ -79,6 +79,26 @@ export class MaterializationPipeline {
       }
 
       if (agent.tier === AgentTier.MATERIALIZED) {
+        // Keep strategic state coherent when materialized combatants die/despawn.
+        if (agent.combatantId) {
+          const liveness = this.combatantSystem.getCombatantLiveness(agent.combatantId);
+          if (!liveness.exists) {
+            agent.alive = false;
+            agent.health = 0;
+            agent.combatState = 'dead';
+            agent.tier = AgentTier.STRATEGIC;
+            agent.combatantId = undefined;
+            continue;
+          }
+          if (!liveness.alive) {
+            this.dematerialize(agent);
+            continue;
+          }
+        } else {
+          agent.tier = AgentTier.SIMULATED;
+          continue;
+        }
+
         materializedCount++;
       }
 

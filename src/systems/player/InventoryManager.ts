@@ -195,7 +195,7 @@ export class InventoryManager implements GameSystem {
     this.grenades = this.maxGrenades;
     this.mortarRounds = this.maxMortarRounds;
     this.sandbags = this.maxSandbags;
-    this.currentSlot = WeaponSlot.PRIMARY;
+    this.switchToSlot(WeaponSlot.PRIMARY);
     Logger.info('inventory', 'Inventory reset');
     this.notifyInventoryChange();
   }

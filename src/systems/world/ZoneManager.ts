@@ -55,6 +55,7 @@ export class ZoneManager implements GameSystem {
   private combatantSystem?: CombatantSystem;
   private chunkManager?: ImprovedChunkManager;
   private spatialGridManager: SpatialGridManager = spatialGridManager;
+  private spatialQueryProvider: ((center: THREE.Vector3, radius: number) => string[]) | null = null;
   private playerPosition = new THREE.Vector3();
   private camera?: THREE.Camera;
 
@@ -121,7 +122,9 @@ export class ZoneManager implements GameSystem {
 
         // Optimized spatial query: find combatant IDs within zone radius
         // Note: This includes the 'player_proxy' which correctly counts the player as Faction.US
-        const nearbyIds = this.spatialGridManager.queryRadius(zone.position, zone.radius);
+        const nearbyIds = this.spatialQueryProvider
+          ? this.spatialQueryProvider(zone.position, zone.radius)
+          : this.spatialGridManager.queryRadius(zone.position, zone.radius);
 
         for (const id of nearbyIds) {
           const combatant = combatants.get(id);
@@ -311,6 +314,10 @@ export class ZoneManager implements GameSystem {
 
   setSpatialGridManager(manager: SpatialGridManager): void {
     this.spatialGridManager = manager;
+  }
+
+  setSpatialQueryProvider(provider: ((center: THREE.Vector3, radius: number) => string[]) | null): void {
+    this.spatialQueryProvider = provider;
   }
 
   setHUDSystem(hudSystem: IHUDSystem): void {

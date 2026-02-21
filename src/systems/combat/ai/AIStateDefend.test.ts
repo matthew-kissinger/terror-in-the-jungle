@@ -2,15 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { AIStateDefend } from './AIStateDefend';
 import { Combatant, CombatantState, Faction } from '../types';
-import { spatialGridManager } from '../SpatialGridManager';
 import { clusterManager } from '../ClusterManager';
-
-// Mock dependencies
-vi.mock('../SpatialGridManager', () => ({
-  spatialGridManager: {
-    getIsInitialized: vi.fn(() => false),
-  }
-}));
 
 vi.mock('../ClusterManager', () => ({
   clusterManager: {
@@ -154,6 +146,29 @@ describe('AIStateDefend', () => {
       );
 
       expect(combatant.state).toBe(CombatantState.ALERT);
+    });
+
+    it('should apply staggered reaction delay when local cluster density is high', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(100, 0, 100));
+      const enemy = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(110, 0, 100));
+      allCombatants.set(combatant.id, combatant);
+      for (let i = 0; i < 4; i++) {
+        allCombatants.set(`ally-${i}`, createMockCombatant(`ally-${i}`, Faction.US, new THREE.Vector3(101 + i, 0, 100)));
+      }
+      const mockSpatialGrid = {
+        queryRadius: vi.fn(() => [combatant.id, 'ally-0', 'ally-1', 'ally-2', 'ally-3']),
+      } as any;
+
+      findNearestEnemy.mockReturnValue(enemy);
+      canSeeTarget.mockReturnValue(true);
+      (clusterManager.getStaggeredReactionDelay as any).mockReturnValue(400);
+
+      aiStateDefend.handleDefending(
+        combatant, 0.016, playerPosition, allCombatants, mockSpatialGrid,
+        findNearestEnemy, canSeeTarget
+      );
+
+      expect(combatant.reactionTimer).toBe(0.4);
     });
   });
 });

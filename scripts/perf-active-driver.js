@@ -14,8 +14,15 @@
       maxCompressedPerFaction: Number(options.maxCompressedPerFaction || 28),
       mode: String(options.mode || 'ai_sandbox').toLowerCase(),
       allowWarpRecovery: options.allowWarpRecovery === true,
+      topUpHealth: options.topUpHealth !== false,
+      autoRespawn: options.autoRespawn !== false,
       movementDecisionIntervalMs: Number(options.movementDecisionIntervalMs || 450)
     };
+    const enableFrontlineCompression = opts.compressFrontline && (
+      opts.mode === 'ai_sandbox' ||
+      opts.mode === 'zone_control' ||
+      opts.mode === 'team_deathmatch'
+    );
     const modeProfiles = {
       ai_sandbox: {
         sprintDistance: 200,
@@ -36,6 +43,16 @@
         decisionIntervalMs: Math.max(380, opts.movementDecisionIntervalMs),
         preferredJuke: 'strafe',
         objectiveBias: 'zone'
+      },
+      a_shau_valley: {
+        sprintDistance: 320,
+        approachDistance: 150,
+        retreatDistance: 18,
+        holdChanceWhenVisible: 0.01,
+        transitionHoldMs: 850,
+        decisionIntervalMs: Math.max(360, opts.movementDecisionIntervalMs),
+        preferredJuke: 'push',
+        objectiveBias: 'enemy_mass'
       },
       zone_control: {
         sprintDistance: 220,
@@ -59,7 +76,13 @@
       }
     };
     const modeProfile = modeProfiles[opts.mode] || modeProfiles.ai_sandbox;
-    const perceptionRange = opts.mode === 'open_frontier' ? 900 : opts.mode === 'team_deathmatch' ? 260 : 220;
+    const perceptionRange = opts.mode === 'a_shau_valley'
+      ? 1100
+      : opts.mode === 'open_frontier'
+        ? 900
+        : opts.mode === 'team_deathmatch'
+          ? 260
+          : 220;
 
     const state = {
       fireTimer: null,
@@ -87,6 +110,10 @@
     };
     const MAX_YAW_STEP = 0.09;
     const MAX_PITCH_STEP = 0.06;
+    const MAX_AIM_VERTICAL_DELTA = 4.5;
+    const FORCE_CONTACT_REINSERT_MS = opts.mode === 'a_shau_valley' ? 15000 : 22000;
+    const FORCE_CONTACT_REINSERT_COOLDOWN_MS = opts.mode === 'a_shau_valley' ? 20000 : 32000;
+    let lastForcedContactInsertAt = 0;
 
     function dispatchKey(type, code) {
       document.dispatchEvent(new KeyboardEvent(type, {
@@ -371,6 +398,48 @@
       return { x: fx / len, y: fy / len, z: fz / len };
     }
 
+    function clampAimY(playerY, desiredY) {
+      const py = Number(playerY || 0);
+      const dy = Number(desiredY || py);
+      return Math.max(py - MAX_AIM_VERTICAL_DELTA, Math.min(py + MAX_AIM_VERTICAL_DELTA, dy));
+    }
+
+    function isTerrainReadyAt(systems, x, z) {
+      if (!systems || !systems.chunkManager) return false;
+      const cm = systems.chunkManager;
+      if (!cm.isChunkLoaded || !cm.getChunkSize) return false;
+      const chunkSize = Number(cm.getChunkSize());
+      if (!Number.isFinite(chunkSize) || chunkSize <= 0) return false;
+
+      const cx = Math.floor(Number(x) / chunkSize);
+      const cz = Math.floor(Number(z) / chunkSize);
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!cm.isChunkLoaded(cx + dx, cz + dz)) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+
+    function groundPlayerIfNeeded(systems, playerPos) {
+      if (!systems || !systems.playerController || !systems.playerController.setPosition || !playerPos) return;
+      if (systems.playerController.isInHelicopter && systems.playerController.isInHelicopter()) return;
+      const chunkManager = systems.chunkManager;
+      if (!chunkManager || !chunkManager.getHeightAtWorldPosition) return;
+      if (!isTerrainReadyAt(systems, playerPos.x, playerPos.z)) return;
+      const ground = Number(chunkManager.getHeightAtWorldPosition(Number(playerPos.x), Number(playerPos.z)));
+      if (!Number.isFinite(ground)) return;
+      const targetY = ground + 2;
+      const currentY = Number(playerPos.y || 0);
+      // Snap only when clearly off-ground to prevent jitter.
+      if (Math.abs(currentY - targetY) < 3.5) return;
+      const corrected = playerPos.clone ? playerPos.clone() : { x: Number(playerPos.x), y: currentY, z: Number(playerPos.z) };
+      corrected.y = targetY;
+      systems.playerController.setPosition(corrected, 'harness.ground_lock');
+    }
+
     function getEngagementCenter(systems) {
       const combatants = systems && systems.combatantSystem && systems.combatantSystem.getAllCombatants
         ? systems.combatantSystem.getAllCombatants()
@@ -647,7 +716,7 @@
     }
 
     function compressFrontline(systems) {
-      if (!opts.compressFrontline || state.frontlineCompressed) return;
+      if (!enableFrontlineCompression || state.frontlineCompressed) return;
       const combatants = systems && systems.combatantSystem && systems.combatantSystem.getAllCombatants
         ? systems.combatantSystem.getAllCombatants()
         : null;
@@ -727,7 +796,7 @@
       if (!systems) return;
 
       const health = systems.playerHealthSystem;
-      if (health && health.getHealth && health.getMaxHealth && health.isDead && !health.isDead()) {
+      if (opts.topUpHealth && health && health.getHealth && health.getMaxHealth && health.isDead && !health.isDead()) {
         const hp = Number(health.getHealth());
         const maxHp = Number(health.getMaxHealth());
         if (Number.isFinite(hp) && Number.isFinite(maxHp) && hp < Math.max(45, maxHp * 0.35)) {
@@ -740,7 +809,7 @@
         }
       }
 
-      if (health && health.isDead && health.isDead()) {
+      if (opts.autoRespawn && health && health.isDead && health.isDead()) {
         releaseAllKeys();
         mouseUp();
         if (systems.playerRespawnManager && systems.playerRespawnManager.cancelPendingRespawn) {
@@ -752,6 +821,10 @@
         if (opts.allowWarpRecovery) {
           const pressureSpawn = getPressureSpawnPoint(systems);
           if (pressureSpawn && systems.playerController && systems.playerController.setPosition) {
+            if (!isTerrainReadyAt(systems, pressureSpawn.x, pressureSpawn.z)) {
+              state.respawnCount++;
+              return;
+            }
             const currentPos = systems.playerController.getPosition ? systems.playerController.getPosition() : null;
             const nextPos = currentPos && currentPos.clone ? currentPos.clone() : { x: 0, y: pressureSpawn.y, z: 0 };
             nextPos.x = pressureSpawn.x;
@@ -790,12 +863,18 @@
         ? systems.playerController.getCamera()
         : null;
       if (!playerPos || !camera) return;
+      groundPlayerIfNeeded(systems, playerPos);
 
       const enemySpawn = getEnemySpawn(systems);
       const pressureSpawn = getPressureSpawnPoint(systems);
       if (pressureSpawn) {
         const distToPressure = Math.hypot(pressureSpawn.x - playerPos.x, pressureSpawn.z - playerPos.z);
         if (distToPressure > 260 && opts.allowWarpRecovery) {
+          if (!isTerrainReadyAt(systems, pressureSpawn.x, pressureSpawn.z)) {
+            // Skip pressure warp until terrain around target is resident.
+            // Keeps harness movement from dropping player through not-yet-loaded ground.
+            return;
+          }
           const insertPos = playerPos.clone();
           insertPos.x = pressureSpawn.x;
           insertPos.z = pressureSpawn.z;
@@ -819,7 +898,8 @@
         const prevYaw = cameraController ? Number(cameraController.yaw || 0) : Number(camera.rotation.y || 0);
         const prevPitch = cameraController ? Number(cameraController.pitch || 0) : Number(camera.rotation.x || 0);
 
-        camera.lookAt(target.x, (target.y || 0) + 1.2, target.z);
+        const aimY = clampAimY(playerPos.y, (target.y || 0) + 1.2);
+        camera.lookAt(target.x, aimY, target.z);
         const desiredYaw = Number(camera.rotation.y || 0);
         const desiredPitch = Number(camera.rotation.x || 0);
         let yawDelta = desiredYaw - prevYaw;
@@ -873,6 +953,31 @@
       const nearestPredicted = nearestOpfor ? predictTargetPoint(nearestOpfor, playerPos) : null;
       const predictedLockDistance = opts.mode === 'open_frontier' ? 170 : opts.mode === 'team_deathmatch' ? 125 : 95;
       const movementTarget = (nearestPredicted && nearestDist < predictedLockDistance) ? nearestPredicted : objectiveTarget;
+
+      const nowMs = Date.now();
+      const noContactTooLong = (nowMs - state.lastShotAt) > FORCE_CONTACT_REINSERT_MS;
+      const farFromFight = !nearestOpfor || nearestDist > (opts.mode === 'a_shau_valley' ? 320 : 260);
+      if (farFromFight && noContactTooLong && (nowMs - lastForcedContactInsertAt) > FORCE_CONTACT_REINSERT_COOLDOWN_MS) {
+        const insertAnchor = getEnemyMassPoint(systems) || getLeadChargePoint(systems) || engagementCenter || movementTarget;
+        if (insertAnchor && systems.playerController && systems.playerController.setPosition) {
+          const nextPos = playerPos.clone ? playerPos.clone() : { x: Number(playerPos.x), y: Number(playerPos.y || 0), z: Number(playerPos.z) };
+          const lateral = (Math.random() - 0.5) * 70;
+          const forward = 35 + Math.random() * 35;
+          nextPos.x = Number(insertAnchor.x) + forward;
+          nextPos.z = Number(insertAnchor.z) + lateral;
+          if (!isTerrainReadyAt(systems, nextPos.x, nextPos.z)) {
+            return;
+          }
+          const h = systems.chunkManager && systems.chunkManager.getHeightAtWorldPosition
+            ? systems.chunkManager.getHeightAtWorldPosition(nextPos.x, nextPos.z)
+            : undefined;
+          if (Number.isFinite(h)) nextPos.y = Number(h) + 2;
+          systems.playerController.setPosition(nextPos, 'harness.recovery.contact_insert');
+          lastForcedContactInsertAt = nowMs;
+          state.stuckMs = 0;
+        }
+      }
+
       if (movementTarget) {
         const dx = movementTarget.x - playerPos.x;
         const dz = movementTarget.z - playerPos.z;
@@ -898,6 +1003,9 @@
             const offsetRadius = 80 + Math.random() * 45;
             const nextX = anchor.x + Math.cos(offsetAngle) * offsetRadius;
             const nextZ = anchor.z + Math.sin(offsetAngle) * offsetRadius;
+            if (!isTerrainReadyAt(systems, nextX, nextZ)) {
+              return;
+            }
             const nextPos = playerPos.clone();
             nextPos.x = nextX;
             nextPos.z = nextZ;
@@ -1006,7 +1114,7 @@
       const blockedHeight = hasHeightProfileOcclusion(systems, eye, targetEye);
       const visibleNow = !(blockedRay || blockedHeight);
       state.targetVisible = visibleNow;
-      if (!visibleNow && !closeRange) return;
+      if (!visibleNow) return;
       const tx = dx / dist;
       const ty = dy / dist;
       const tz = dz / dist;
@@ -1015,7 +1123,8 @@
       const cameraController = systems.playerController ? systems.playerController.cameraController : null;
       const prevYaw = cameraController ? Number(cameraController.yaw || 0) : Number(camera.rotation.y || 0);
       const prevPitch = cameraController ? Number(cameraController.pitch || 0) : Number(camera.rotation.x || 0);
-      camera.lookAt(nearestOpfor.position.x, (nearestOpfor.position.y || 0) + 1.25, nearestOpfor.position.z);
+      const clampedAimY = clampAimY(playerPos.y, (nearestOpfor.position.y || 0) + 1.25);
+      camera.lookAt(nearestOpfor.position.x, clampedAimY, nearestOpfor.position.z);
       const desiredYaw = Number(camera.rotation.y || 0);
       const desiredPitch = Number(camera.rotation.x || 0);
       let yawDelta = desiredYaw - prevYaw;
@@ -1035,7 +1144,9 @@
 
       const forward = getCameraForward(camera);
       const aimDot = forward.x * tx + forward.y * ty + forward.z * tz;
-      if (aimDot < 0.58) return;
+      const verticalComponent = Math.abs(ty);
+      if (aimDot < 0.8) return;
+      if (verticalComponent > 0.45 && !closeRange) return;
 
       if (dist < 110) {
         setMovementState('hold');
@@ -1059,9 +1170,11 @@
     return {
       stop: stop,
       movementPatternCount: 3,
-      compressFrontline: opts.compressFrontline,
+      compressFrontline: enableFrontlineCompression,
       mode: opts.mode,
-      allowWarpRecovery: opts.allowWarpRecovery
+      allowWarpRecovery: opts.allowWarpRecovery,
+      topUpHealth: opts.topUpHealth,
+      autoRespawn: opts.autoRespawn
     };
   }
 
@@ -1076,7 +1189,9 @@
         movementPatternCount: driver.movementPatternCount || 0,
         compressFrontline: !!driver.compressFrontline,
         mode: String(driver.mode || ''),
-        allowWarpRecovery: !!driver.allowWarpRecovery
+        allowWarpRecovery: !!driver.allowWarpRecovery,
+        topUpHealth: driver.topUpHealth !== false,
+        autoRespawn: driver.autoRespawn !== false
       };
     },
     stop: function () {

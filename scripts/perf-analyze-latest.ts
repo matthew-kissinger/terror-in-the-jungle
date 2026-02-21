@@ -80,8 +80,20 @@ const avgFrameMs = avg(samples.map(s => s.avgFrameMs));
 const avgOverBudget = avg(samples.map(s => s.overBudgetPercent));
 const maxP95 = samples.reduce((max, s) => Math.max(max, s.p95FrameMs), 0);
 const heapSamples = samples.filter(s => typeof s.heapUsedMb === 'number');
+const heapBaselineCount = Math.min(3, heapSamples.length);
+const heapBaseline = heapBaselineCount > 0
+  ? avg(heapSamples.slice(0, heapBaselineCount).map(s => Number(s.heapUsedMb ?? 0)))
+  : 0;
+const heapEnd = heapSamples.length > 0 ? Number(heapSamples[heapSamples.length - 1].heapUsedMb ?? 0) : 0;
+const heapPeak = heapSamples.length > 0 ? Math.max(...heapSamples.map(s => Number(s.heapUsedMb ?? 0))) : 0;
 const heapGrowth = heapSamples.length >= 2
-  ? (heapSamples[heapSamples.length - 1].heapUsedMb ?? 0) - (heapSamples[0].heapUsedMb ?? 0)
+  ? heapEnd - heapBaseline
+  : 0;
+const heapPeakGrowth = heapSamples.length >= 2
+  ? heapPeak - heapBaseline
+  : 0;
+const heapRecoveryFromPeak = heapSamples.length >= 2
+  ? heapPeak - heapEnd
   : 0;
 
 const topSystemCounts = new Map<string, number>();
@@ -103,6 +115,8 @@ console.log(`Max p95 frame ms: ${maxP95.toFixed(2)}`);
 console.log(`Avg over-budget %: ${avgOverBudget.toFixed(2)}`);
 if (heapSamples.length > 0) {
   console.log(`Heap growth (MB): ${heapGrowth.toFixed(2)}`);
+  console.log(`Heap peak growth (MB): ${heapPeakGrowth.toFixed(2)}`);
+  console.log(`Heap recovered from peak (MB): ${heapRecoveryFromPeak.toFixed(2)}`);
 }
 console.log('Dominant top systems:');
 for (const [name, count] of dominantSystems) {

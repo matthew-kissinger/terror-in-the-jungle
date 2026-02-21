@@ -32,6 +32,7 @@ export class CombatantLODManager {
   private readonly mediumBucket: Combatant[] = [];
   private readonly lowBucket: Combatant[] = [];
   private readonly culledBucket: Combatant[] = [];
+  private readonly spatiallyUpdatedIds: Set<string> = new Set();
   private readonly scratchVector = new THREE.Vector3();
   private readonly _scratchDirection = new THREE.Vector3();
   private readonly _scratchOffset = new THREE.Vector3();
@@ -204,6 +205,40 @@ export class CombatantLODManager {
   }
 
   /**
+   * Squared-distance variant to avoid repeated sqrt in hot LOD loops.
+   */
+  computeDynamicIntervalMsFromDistanceSq(distanceSq: number): number {
+    const worldSize = this.gameModeManager?.getWorldSize() || 4000;
+    const isLargeWorld = worldSize > 1000;
+    const gpuTier = estimateGPUTier();
+    const isMobile = isMobileGPU();
+
+    const startScaleAt = isMobile ? 40 : (isLargeWorld ? 120 : 80);
+    const maxScaleAt = isMobile ? 300 : (isLargeWorld ? 600 : 1000);
+    const startScaleSq = startScaleAt * startScaleAt;
+    const maxScaleSq = maxScaleAt * maxScaleAt;
+
+    let minMs = isLargeWorld ? 33 : 16;
+    let maxMs = isLargeWorld ? 1000 : 500;
+
+    if (isMobile || gpuTier === 'low') {
+      minMs *= 2;
+      maxMs *= 1.5;
+    }
+
+    if (distanceSq <= startScaleSq) {
+      return minMs;
+    }
+    if (distanceSq >= maxScaleSq) {
+      return maxMs;
+    }
+
+    const normalized = Math.min(1, Math.max(0, (distanceSq - startScaleSq) / Math.max(1, maxScaleSq - startScaleSq)));
+    const curve = normalized * normalized;
+    return minMs + curve * (maxMs - minMs);
+  }
+
+  /**
    * Update all combatants with LOD-based scheduling
    */
   updateCombatants(deltaTime: number, options?: { enableAI?: boolean }): void {
@@ -236,6 +271,7 @@ export class CombatantLODManager {
     // Increment frame counter for AI staggering
     this.frameCounter++;
     this.staggeredSkipCount = 0;
+    this.spatiallyUpdatedIds.clear();
     this.highFullUpdatesThisFrame = 0;
     this.mediumFullUpdatesThisFrame = 0;
     this.aiBudgetExceededEventsThisFrame = 0;
@@ -262,6 +298,13 @@ export class CombatantLODManager {
 
     const classifyStart = performance.now();
     this.combatants.forEach(combatant => {
+      if (combatant.state === CombatantState.DEAD) {
+        // Death animation/rendering is handled separately; dead actors should not
+        // consume AI/movement/spatial update budget or stay queryable in octree.
+        this.spatialGrid.remove(combatant.id);
+        return;
+      }
+
       if (Math.abs(combatant.position.x) > worldSize ||
           Math.abs(combatant.position.z) > worldSize) {
         this.scratchVector.set(-Math.sign(combatant.position.x), 0, -Math.sign(combatant.position.z));
@@ -322,8 +365,7 @@ export class CombatantLODManager {
     this.mediumBucket.forEach((combatant, index) => {
       combatant.lodLevel = 'medium';
       this.lodMediumCount++;
-      const distance = Math.sqrt(combatant.distanceSq!);
-      const dynamicIntervalMs = this.computeDynamicIntervalMs(distance) * this.intervalScale;
+      const dynamicIntervalMs = this.computeDynamicIntervalMsFromDistanceSq(combatant.distanceSq!) * this.intervalScale;
       const elapsedMs = now - (combatant.lastUpdateTime || 0);
 
       if (elapsedMs > dynamicIntervalMs) {
@@ -363,8 +405,7 @@ export class CombatantLODManager {
         this.staggeredSkipCount++;
         return;
       }
-      const distance = Math.sqrt(combatant.distanceSq!);
-      const dynamicIntervalMs = this.computeDynamicIntervalMs(distance) * this.intervalScale;
+      const dynamicIntervalMs = this.computeDynamicIntervalMsFromDistanceSq(combatant.distanceSq!) * this.intervalScale;
       const elapsedMs = now - (combatant.lastUpdateTime || 0);
       
       if (elapsedMs > dynamicIntervalMs) {
@@ -396,7 +437,8 @@ export class CombatantLODManager {
           break;
         }
       }
-      const distance = Math.sqrt(combatant.distanceSq!);
+      const distanceSq = combatant.distanceSq!;
+      const distance = Math.sqrt(distanceSq);
       const SIMULATION_THRESHOLD = this.lowLODRange + 200;
       if (!combatant.lastUpdateTime) {
         combatant.lastUpdateTime = now - this.getStablePhaseOffsetMs(combatant.id, this.CULLED_DISTANT_SIM_INTERVAL_MS);
@@ -426,7 +468,7 @@ export class CombatantLODManager {
           this.staggeredSkipCount++;
           return;
         }
-        const dynamicIntervalMs = this.computeDynamicIntervalMs(distance) * this.intervalScale;
+        const dynamicIntervalMs = this.computeDynamicIntervalMsFromDistanceSq(distanceSq) * this.intervalScale;
         if (elapsedMs > dynamicIntervalMs) {
           if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
             this.updateCombatantUltraLight(combatant, deltaTime);
@@ -532,7 +574,7 @@ export class CombatantLODManager {
     const renderMs = performance.now() - renderStart;
     this.combatantMovement.updateRotation(combatant, deltaTime);
     const spatialStart = performance.now();
-    this.spatialGrid.updatePosition(combatant.id, combatant.position);
+    this.recordSpatialUpdate(combatant);
     const spatialMs = performance.now() - spatialStart;
 
     const totalMs = performance.now() - fullStart;
@@ -561,7 +603,7 @@ export class CombatantLODManager {
       this.squadManager.getAllSquads()
     );
     this.combatantMovement.updateRotation(combatant, deltaTime);
-    this.spatialGrid.updatePosition(combatant.id, combatant.position);
+    this.recordSpatialUpdate(combatant);
   }
 
   private updateCombatantBasic(combatant: Combatant, deltaTime: number, options?: { lowCost?: boolean; updateSpatial?: boolean }): void {
@@ -570,7 +612,7 @@ export class CombatantLODManager {
       combatant.position.addScaledVector(combatant.velocity, deltaTime);
       this.combatantMovement.updateRotation(combatant, deltaTime);
       if (options.updateSpatial !== false) {
-        this.spatialGrid.updatePosition(combatant.id, combatant.position);
+        this.recordSpatialUpdate(combatant);
       }
       return;
     }
@@ -582,7 +624,7 @@ export class CombatantLODManager {
       this.combatants
     );
     this.combatantMovement.updateRotation(combatant, deltaTime);
-    this.spatialGrid.updatePosition(combatant.id, combatant.position);
+    this.recordSpatialUpdate(combatant);
   }
 
   /**
@@ -598,7 +640,7 @@ export class CombatantLODManager {
     );
     this.combatantRenderer.updateCombatantTexture(combatant);
     this.combatantMovement.updateRotation(combatant, deltaTime);
-    this.spatialGrid.updatePosition(combatant.id, combatant.position);
+    this.recordSpatialUpdate(combatant);
   }
 
   /**
@@ -663,6 +705,15 @@ export class CombatantLODManager {
       aiBudgetExceededEvents: this.aiBudgetExceededEventsThisFrame,
       aiSevereOverBudgetEvents: this.aiSevereOverBudgetEventsThisFrame
     };
+  }
+
+  getSpatiallyUpdatedIds(): ReadonlySet<string> {
+    return this.spatiallyUpdatedIds;
+  }
+
+  private recordSpatialUpdate(combatant: Combatant): void {
+    this.spatialGrid.updatePosition(combatant.id, combatant.position);
+    this.spatiallyUpdatedIds.add(combatant.id);
   }
 
   private simulateDistantAI(combatant: Combatant): void {

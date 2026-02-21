@@ -16,6 +16,8 @@ const _playerProxy: Combatant = {
   deaths: 0
 } as Combatant;
 
+const _potentialTargetsScratch: Combatant[] = [];
+
 /**
  * Handles target acquisition and engagement decisions
  */
@@ -31,7 +33,8 @@ export class AITargetAcquisition {
   ): Combatant | null {
     const visualRange = combatant.skillProfile.visualRange;
     const visualRangeSq = visualRange * visualRange;
-    const potentialTargets: Combatant[] = [];
+    const potentialTargets = _potentialTargetsScratch;
+    potentialTargets.length = 0;
     let inCluster = false;
 
     // Check player as potential target for OPFOR
@@ -97,12 +100,21 @@ export class AITargetAcquisition {
     // Use cluster-aware target distribution when in a cluster
     // This prevents all NPCs from focusing the same enemy
     if (inCluster) {
-      return clusterManager.assignDistributedTarget(combatant, potentialTargets, allCombatants);
+      const target = clusterManager.assignDistributedTarget(combatant, potentialTargets, allCombatants);
+      potentialTargets.length = 0;
+      return target;
     }
 
     // Not in cluster - just pick nearest target
-    if (potentialTargets.length === 0) return null;
-    if (potentialTargets.length === 1) return potentialTargets[0];
+    if (potentialTargets.length === 0) {
+      potentialTargets.length = 0;
+      return null;
+    }
+    if (potentialTargets.length === 1) {
+      const target = potentialTargets[0];
+      potentialTargets.length = 0;
+      return target;
+    }
 
     let nearestEnemy: Combatant | null = null;
     let minDistanceSq = Infinity;
@@ -116,6 +128,7 @@ export class AITargetAcquisition {
       }
     }
 
+    potentialTargets.length = 0;
     return nearestEnemy;
   }
 

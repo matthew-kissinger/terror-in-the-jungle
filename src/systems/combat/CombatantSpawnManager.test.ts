@@ -361,6 +361,124 @@ describe('CombatantSpawnManager', () => {
 
       expect(squadManager.createSquad).toHaveBeenCalled();
     });
+
+    it('should still spawn OPFOR squads when player squad is created', () => {
+      spawnManager.setMaxCombatants(30);
+      spawnManager.setSquadSizes(8, 12);
+      const mockConfig = {
+        id: 'zone_control',
+        worldSize: 400,
+        terrainScale: 1.0,
+        baseSpacing: 600,
+        usBasePosition: new THREE.Vector3(-150, 0, -150),
+        opforBasePosition: new THREE.Vector3(150, 0, 150),
+        zones: [
+          {
+            id: 'us_base',
+            name: 'US Base',
+            position: new THREE.Vector3(-100, 0, -100),
+            radius: 30,
+            owner: Faction.US,
+            isHomeBase: true,
+          },
+          {
+            id: 'opfor_base',
+            name: 'OPFOR Base',
+            position: new THREE.Vector3(100, 0, 100),
+            radius: 30,
+            owner: Faction.OPFOR,
+            isHomeBase: true,
+          },
+        ],
+      };
+      vi.mocked(gameModeManager.getCurrentConfig).mockReturnValue(mockConfig as any);
+
+      spawnManager.spawnInitialForces(true);
+
+      const calls = vi.mocked(squadManager.createSquad).mock.calls;
+      const opforCalls = calls.filter(call => call[0] === Faction.OPFOR);
+      expect(opforCalls.length).toBeGreaterThan(0);
+    });
+
+    it('should spread initial large-mode squads across multiple HQ anchors', () => {
+      spawnManager.setMaxCombatants(60);
+      spawnManager.setSquadSizes(8, 12);
+      const createSquadMock = vi.mocked(squadManager.createSquad);
+      const capturedUSPositions: THREE.Vector3[] = [];
+      const originalImpl = createSquadMock.getMockImplementation();
+      createSquadMock.mockImplementation((faction, position, size) => {
+        if (faction === Faction.US) {
+          capturedUSPositions.push(position.clone());
+        }
+        if (originalImpl) {
+          return originalImpl(faction, position, size);
+        }
+        const members: Combatant[] = [];
+        for (let i = 0; i < size; i++) {
+          members.push(createMockCombatant(`member-${i}`, faction, position.clone()));
+        }
+        return {
+          squad: {
+            id: `squad-${Math.random()}`,
+            faction,
+            members: members.map(m => m.id),
+            isPlayerControlled: false,
+            currentCommand: 0,
+          },
+          members,
+        };
+      });
+
+      const usHQs = [
+        new THREE.Vector3(-2000, 0, -2000),
+        new THREE.Vector3(-1400, 0, -1300),
+        new THREE.Vector3(-800, 0, -1900),
+      ];
+      const opforHQs = [
+        new THREE.Vector3(1800, 0, 1800),
+        new THREE.Vector3(1200, 0, 1500),
+        new THREE.Vector3(700, 0, 2100),
+      ];
+      const mockConfig = {
+        id: 'a_shau_valley',
+        worldSize: 21136,
+        terrainScale: 1.0,
+        baseSpacing: 1800,
+        usBasePosition: usHQs[0],
+        opforBasePosition: opforHQs[0],
+        zones: [
+          { id: 'us_base', name: 'US Main', position: usHQs[0], radius: 30, owner: Faction.US, isHomeBase: true },
+          { id: 'us_hq_east', name: 'US East', position: usHQs[1], radius: 30, owner: Faction.US, isHomeBase: true },
+          { id: 'us_hq_south', name: 'US South', position: usHQs[2], radius: 30, owner: Faction.US, isHomeBase: true },
+          { id: 'opfor_hq_main', name: 'OPFOR Main', position: opforHQs[0], radius: 30, owner: Faction.OPFOR, isHomeBase: true },
+          { id: 'opfor_hq_north', name: 'OPFOR North', position: opforHQs[1], radius: 30, owner: Faction.OPFOR, isHomeBase: true },
+          { id: 'opfor_hq_south', name: 'OPFOR South', position: opforHQs[2], radius: 30, owner: Faction.OPFOR, isHomeBase: true },
+        ],
+      };
+      vi.mocked(gameModeManager.getCurrentConfig).mockReturnValue(mockConfig as any);
+
+      spawnManager.spawnInitialForces(false);
+      const usedAnchors = new Set<number>();
+      for (const pos of capturedUSPositions) {
+        let bestIndex = -1;
+        let bestDist = Number.POSITIVE_INFINITY;
+        for (let i = 0; i < usHQs.length; i++) {
+          const dx = pos.x - usHQs[i].x;
+          const dz = pos.z - usHQs[i].z;
+          const distSq = dx * dx + dz * dz;
+          if (distSq < bestDist) {
+            bestDist = distSq;
+            bestIndex = i;
+          }
+        }
+        if (bestIndex >= 0) {
+          usedAnchors.add(bestIndex);
+        }
+      }
+
+      expect(capturedUSPositions.length).toBeGreaterThan(1);
+      expect(usedAnchors.size).toBeGreaterThan(1);
+    });
   });
 
   describe('spawnSquad', () => {

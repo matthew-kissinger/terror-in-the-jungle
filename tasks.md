@@ -1,65 +1,31 @@
-# Tasks & Ideas - Terror in the Jungle
+# Tasks
 
-## 🎮 Gameplay Features
-<!-- Ideas for new gameplay mechanics, weapons, game modes, etc. -->
-- [ ] Add mounted machine guns at strategic positions (usable by both NPCs and players)
-- [ ] Implement airstrike calling system (radio/command feature)
-- [ ] Improve mortar controls and mechanics
-  - [ ] Document/clarify mortar controls for gameplay
-  - [ ] Make mortar available and functional in actual game mode (currently only shows in mobile?)
+Last updated: 2026-02-21
 
-## 🤖 AI & Combat
-<!-- Improvements to faction AI, enemy behavior, pathfinding, etc. -->
-- [ ] Enable NPCs to use mounted machine guns
+## P0 - Stability
 
-## 🎨 Graphics & Rendering
-<!-- Billboard rendering improvements, visual effects, shader work, etc. -->
-- [ ] Reskin game assets (visual update pass)
+- [ ] A Shau spawn/respawn grounding reliability pass (20/20 manual checks)
+- [ ] Tactical marker fidelity: map/HUD contact must match visible enemy presence
+- [ ] Remove random/erratic AI firing behavior in low-confidence targeting states
 
-## 🗺️ Terrain & Environment
-<!-- Procedural generation enhancements, biomes, environment details, etc. -->
-- [ ] Integrate real Vietnam elevation maps into terrain generation
-- [ ] Integrate real Vietnam river maps into terrain generation
-- [ ] Research and acquire authentic Vietnam geographical data
+## P1 - Performance Frontier
 
-## 🔧 Performance & Optimization
-<!-- GPU acceleration, frame rate improvements, memory optimization, etc. -->
-- [ ] 
+- [ ] Complete F3 spatial ownership migration and retire duplicate sync paths
+- [ ] Isolate retained heap growth sources in combat-heavy runs
+- [ ] Lock matched A/B evidence before flipping `spatialSecondarySync=0` default
 
-## 🐛 Bugs & Fixes
-<!-- Known issues that need addressing -->
-- [ ] Fix mortar projectile arc - doesn't match visual projection
-- [ ] Fix grenade projectile arc - doesn't follow projected trajectory
-- [ ] Improve arc projection accuracy for both mortars and grenades
+## P2 - Gameplay Flow
 
-## 📱 UI/UX
-<!-- User interface improvements, menus, HUD elements, etc. -->
-- [ ] Complete mobile UI overhaul
-  - [ ] Remove unnecessary HUD clutter
-  - [ ] Fix formatting issues
-  - [ ] Improve mobile control responsiveness
-  - [ ] Redesign mobile control layout
+- [ ] A Shau sustained skirmish pressure at 5-minute checkpoint
+- [ ] Reduce long no-contact wandering loops in large-world modes
+- [ ] Add clearer insertion-to-objective flow for large-scale testability
 
-## 🎵 Audio
-<!-- Sound effects, music, audio implementation -->
-- [ ] 
+## P3 - Content
 
-## 🏗️ Architecture & Code Quality
-<!-- Refactoring, code organization, technical debt -->
-- [ ] 
+- [ ] Fill Priority 1 combat audio backlog (`docs/AUDIO_ASSETS_NEEDED.md`)
+- [ ] Add helicopter gameplay integration specific to A Shau flow
 
-## 📚 Documentation
-<!-- README updates, code comments, guides, etc. -->
-- [ ] Document mortar controls
+## P4 - UX
 
-## 🚀 Deployment & CI/CD
-<!-- GitHub Pages, build process, automated testing -->
-- [ ] 
-
-## 💡 Brainstorming
-<!-- Raw ideas and thoughts to organize later -->
-- 
-
----
-
-**Last Updated:** 2026-02-17 20:08:57
+- [ ] Improve full-map and minimap tactical clarity (tactical vs strategic layers)
+- [ ] Finalize mobile parity for major gameplay actions

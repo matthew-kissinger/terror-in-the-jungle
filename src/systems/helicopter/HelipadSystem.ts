@@ -36,19 +36,32 @@ export class HelipadSystem implements GameSystem {
 
   createHelipadWhenReady(): void {
     if (!this.helipads.has('us_helipad')) {
-      this.createOpenFrontierHelipad();
+      this.createModeHelipad();
     }
   }
 
 
-  private createOpenFrontierHelipad(): void {
+  private getHelipadAnchorPosition(): THREE.Vector3 {
+    const currentConfig = this.gameModeManager?.getCurrentConfig();
+    if (currentConfig && Array.isArray(currentConfig.zones)) {
+      const usHomeBases = currentConfig.zones.filter(z => z.isHomeBase && z.owner === 'US');
+      if (usHomeBases.length > 0) {
+        const preferred = usHomeBases.find(z => z.id.includes('main') || z.id === 'us_base') ?? usHomeBases[0];
+        return new THREE.Vector3(preferred.position.x + 40, preferred.position.y, preferred.position.z);
+      }
+    }
+    // Fallback remains Open Frontier legacy position.
+    return new THREE.Vector3(40, 0, -1400);
+  }
+
+  private createModeHelipad(): void {
     if (!this.terrainManager) {
       Logger.warn('helicopter', 'Cannot create helipad - terrain manager not available');
       return;
     }
 
-    // Position near US Main HQ spawn in Open Frontier mode - offset to the right (east)
-    const helipadPosition = new THREE.Vector3(40, 0, -1400); // 40 units east of US Main HQ
+    // Position near the primary US home base, offset east for clear approach/exit.
+    const helipadPosition = this.getHelipadAnchorPosition();
 
     // Find the highest terrain point within the platform area for proper collision
     const platformRadius = 12;
@@ -69,7 +82,7 @@ export class HelipadSystem implements GameSystem {
     // Clear vegetation in helipad area
     this.clearVegetationArea(helipadPosition.x, helipadPosition.z, platformRadius + 2);
 
-    Logger.info('helicopter', `Created Open Frontier helipad at position (${helipadPosition.x}, ${helipadPosition.y}, ${helipadPosition.z}) - max terrain height: ${maxHeight.toFixed(2)}`);
+    Logger.info('helicopter', `Created mode helipad at position (${helipadPosition.x}, ${helipadPosition.y}, ${helipadPosition.z}) - max terrain height: ${maxHeight.toFixed(2)}`);
   }
 
   private findMaxTerrainHeight(centerX: number, centerZ: number, radius: number): number {
@@ -257,29 +270,27 @@ export class HelipadSystem implements GameSystem {
   }
 
   update(_deltaTime: number): void {
-    // Create helipad ONLY in Open Frontier mode
+    // Create helipad in large-scale modes with US home-base support.
     if (!this.helipads.has('us_helipad') && this.terrainManager && this.gameModeManager) {
       const currentConfig = this.gameModeManager.getCurrentConfig();
-      const isOpenFrontier = currentConfig.id === 'open_frontier';
+      const supportsHelipad = currentConfig.id === 'open_frontier' || currentConfig.id === 'a_shau_valley';
 
-      if (isOpenFrontier) {
-        // Open Frontier mode only: at (40, 0, -1400)
-        const openFrontierX = 40;
-        const openFrontierZ = -1400;
-        const testHeight = this.terrainManager.getHeightAt(openFrontierX, openFrontierZ);
+      if (supportsHelipad) {
+        const candidatePos = this.getHelipadAnchorPosition();
+        const testHeight = this.terrainManager.getHeightAt(candidatePos.x, candidatePos.z);
 
         // More robust terrain loading check - ensure terrain chunk is actually loaded
-        const helipadWorldPos = new THREE.Vector3(openFrontierX, 0, openFrontierZ);
+        const helipadWorldPos = new THREE.Vector3(candidatePos.x, 0, candidatePos.z);
         const chunk = this.terrainManager.getChunkAt(helipadWorldPos);
         const isChunkLoaded = chunk !== undefined;
 
         // Create helipad when terrain is properly loaded (height > -100 indicates valid terrain data)
         if ((testHeight > -100 && isChunkLoaded) || testHeight > 0) {
-          Logger.info('helicopter', `Open Frontier mode detected - creating helipad at (${openFrontierX}, ${openFrontierZ}) - terrain height: ${testHeight.toFixed(2)}, chunk loaded: ${isChunkLoaded}`);
-          this.createOpenFrontierHelipad();
+          Logger.info('helicopter', `${currentConfig.name} mode detected - creating helipad at (${candidatePos.x}, ${candidatePos.z}) - terrain height: ${testHeight.toFixed(2)}, chunk loaded: ${isChunkLoaded}`);
+          this.createModeHelipad();
         }
       }
-      // No helicopter in Zone Control mode
+      // No helicopter in smaller modes.
     }
 
     // Future: Could add blinking lights animation here

@@ -110,7 +110,8 @@ export class SpatialGridManager {
    */
   syncAllPositions(
     combatants: Map<string, Combatant>,
-    playerPosition: THREE.Vector3
+    playerPosition: THREE.Vector3,
+    skipIds?: ReadonlySet<string>
   ): void {
     if (!this.isInitialized || !this.grid) {
       this.recordUninitializedFallback('syncAllPositions')
@@ -120,25 +121,31 @@ export class SpatialGridManager {
     const start = performance.now()
     this.frameCounter++
 
+    const nearSq = 150 * 150
+    const mediumSq = 300 * 300
+    const lowSq = 500 * 500
     combatants.forEach((combatant, id) => {
       if (combatant.state === CombatantState.DEAD) {
         // Remove dead entities from grid
         this.grid!.remove(id)
         return
       }
+      if (skipIds && skipIds.has(id)) {
+        return
+      }
 
       // Determine sync frequency based on distance
-      const distance = this.scratchVec
+      const distanceSq = this.scratchVec
         .copy(combatant.position)
         .sub(playerPosition)
-        .length()
+        .lengthSq()
 
       let syncFreq: number
-      if (distance < 150) {
+      if (distanceSq < nearSq) {
         syncFreq = SyncFrequency.EVERY_FRAME
-      } else if (distance < 300) {
+      } else if (distanceSq < mediumSq) {
         syncFreq = SyncFrequency.EVERY_2_FRAMES
-      } else if (distance < 500) {
+      } else if (distanceSq < lowSq) {
         syncFreq = SyncFrequency.EVERY_5_FRAMES
       } else {
         syncFreq = SyncFrequency.EVERY_30_FRAMES

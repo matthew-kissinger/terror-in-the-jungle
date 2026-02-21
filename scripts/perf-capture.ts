@@ -159,6 +159,8 @@ const DEFAULT_ACTIVE_PLAYER = true;
 const DEFAULT_GAME_MODE = 'ai_sandbox';
 const DEFAULT_COMPRESS_FRONTLINE = true;
 const DEFAULT_ALLOW_WARP_RECOVERY = false;
+const DEFAULT_ACTIVE_TOP_UP_HEALTH = true;
+const DEFAULT_ACTIVE_AUTO_RESPAWN = true;
 const DEFAULT_MOVEMENT_DECISION_INTERVAL_MS = 450;
 const DEFAULT_PREWARM = true;
 const DEFAULT_RUNTIME_PREFLIGHT = false;
@@ -356,13 +358,14 @@ function parseStringFlag(name: string, fallback: string): string {
   return fallback;
 }
 
-function normalizeGameMode(mode: string): 'ai_sandbox' | 'open_frontier' | 'zone_control' | 'team_deathmatch' {
+function normalizeGameMode(mode: string): 'ai_sandbox' | 'open_frontier' | 'zone_control' | 'team_deathmatch' | 'a_shau_valley' {
   const normalized = String(mode ?? '').trim().toLowerCase();
   if (
     normalized === 'open_frontier' ||
     normalized === 'zone_control' ||
     normalized === 'team_deathmatch' ||
-    normalized === 'ai_sandbox'
+    normalized === 'ai_sandbox' ||
+    normalized === 'a_shau_valley'
   ) {
     return normalized;
   }
@@ -616,14 +619,35 @@ function validateRun(
 
   const heapSamples = runtimeSamples.filter(s => typeof s.heapUsedMb === 'number');
   if (heapSamples.length >= 2) {
-    const firstHeap = heapSamples[0].heapUsedMb ?? 0;
-    const lastHeap = heapSamples[heapSamples.length - 1].heapUsedMb ?? 0;
-    const heapDelta = lastHeap - firstHeap;
+    const baselineCount = Math.min(3, heapSamples.length);
+    const baselineValues = heapSamples.slice(0, baselineCount).map(s => Number(s.heapUsedMb ?? 0));
+    const baselineHeap = average(baselineValues);
+    const lastHeap = Number(heapSamples[heapSamples.length - 1].heapUsedMb ?? 0);
+    const peakHeap = Math.max(...heapSamples.map(s => Number(s.heapUsedMb ?? 0)));
+    const endDelta = lastHeap - baselineHeap;
+    const peakDelta = peakHeap - baselineHeap;
+    const recoveredMb = Math.max(0, peakHeap - lastHeap);
+    const recoveredRatio = peakDelta > 0 ? recoveredMb / peakDelta : 1;
+
     checks.push({
       id: 'heap_growth_mb',
-      status: heapDelta < 20 ? 'pass' : heapDelta < 80 ? 'warn' : 'fail',
-      value: heapDelta,
-      message: `Heap growth ${heapDelta.toFixed(2)} MB over capture window`
+      status: endDelta < 20 ? 'pass' : endDelta < 80 ? 'warn' : 'fail',
+      value: endDelta,
+      message: `Heap end-growth ${endDelta.toFixed(2)} MB (baseline=${baselineHeap.toFixed(2)} MB, end=${lastHeap.toFixed(2)} MB)`
+    });
+
+    checks.push({
+      id: 'heap_peak_growth_mb',
+      status: peakDelta < 35 ? 'pass' : peakDelta < 120 ? 'warn' : 'fail',
+      value: peakDelta,
+      message: `Heap peak-growth ${peakDelta.toFixed(2)} MB (peak=${peakHeap.toFixed(2)} MB)`
+    });
+
+    checks.push({
+      id: 'heap_recovery_ratio',
+      status: recoveredRatio >= 0.5 ? 'pass' : recoveredRatio >= 0.25 ? 'warn' : 'fail',
+      value: recoveredRatio,
+      message: `Heap recovery ${(recoveredRatio * 100).toFixed(1)}% from peak (${recoveredMb.toFixed(2)} MB reclaimed before end)`
     });
   }
 
@@ -966,6 +990,8 @@ type ActiveScenarioOptions = {
   mode: string;
   compressFrontline: boolean;
   allowWarpRecovery: boolean;
+  topUpHealth: boolean;
+  autoRespawn: boolean;
   movementDecisionIntervalMs: number;
   frontlineTriggerDistance: number;
   maxCompressedPerFaction: number;
@@ -987,7 +1013,7 @@ async function setupActiveScenarioDriver(page: Page, options: ActiveScenarioOpti
   );
 
   logStep(
-    `🎮 Active scenario driver enabled (patterns=${Number(setupResult?.movementPatternCount ?? 0)}, mode=${String(setupResult?.mode ?? options.mode)}, compressFrontline=${Boolean(setupResult?.compressFrontline)}, allowWarpRecovery=${Boolean(setupResult?.allowWarpRecovery)})`
+    `🎮 Active scenario driver enabled (patterns=${Number(setupResult?.movementPatternCount ?? 0)}, mode=${String(setupResult?.mode ?? options.mode)}, compressFrontline=${Boolean(setupResult?.compressFrontline)}, allowWarpRecovery=${Boolean(setupResult?.allowWarpRecovery)}, topUpHealth=${Boolean(setupResult?.topUpHealth)}, autoRespawn=${Boolean(setupResult?.autoRespawn)})`
   );
 }
 
@@ -1069,9 +1095,12 @@ async function runCapture(): Promise<void> {
   const activePlayerScenario = parseBooleanFlag('active-player', DEFAULT_ACTIVE_PLAYER);
   const compressFrontline = parseBooleanFlag('compress-frontline', DEFAULT_COMPRESS_FRONTLINE);
   const allowWarpRecovery = parseBooleanFlag('allow-warp-recovery', DEFAULT_ALLOW_WARP_RECOVERY);
+  const activeTopUpHealth = parseBooleanFlag('active-top-up-health', DEFAULT_ACTIVE_TOP_UP_HEALTH);
+  const activeAutoRespawn = parseBooleanFlag('active-auto-respawn', DEFAULT_ACTIVE_AUTO_RESPAWN);
   const movementDecisionIntervalMs = parseNumberFlag('movement-decision-interval-ms', DEFAULT_MOVEMENT_DECISION_INTERVAL_MS);
   const losHeightPrefilter = parseBooleanFlag('los-height-prefilter', false);
   const spatialSecondarySync = parseBooleanFlag('spatial-secondary-sync', true);
+  const spatialDedupSync = parseBooleanFlag('spatial-dedup-sync', true);
   const sampleIntervalMs = Math.max(250, parseNumberFlag('sample-interval-ms', DEFAULT_SAMPLE_INTERVAL_MS));
   const detailEverySamples = Math.max(
     1,
@@ -1094,7 +1123,7 @@ async function runCapture(): Promise<void> {
   const artifactDir = makeArtifactDir();
   const browserProfileDir = join(artifactDir, 'browser-profile');
   mkdirSync(browserProfileDir, { recursive: true });
-  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} spatialSecondarySync=${spatialSecondarySync} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} prewarm=${prewarm} runtimePreflight=${runtimePreflight} reuseDevServer=${reuseDevServer}`);
+  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} spatialSecondarySync=${spatialSecondarySync} spatialDedupSync=${spatialDedupSync} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} prewarm=${prewarm} runtimePreflight=${runtimePreflight} reuseDevServer=${reuseDevServer}`);
 
   let server: ChildProcess | null = null;
   let context: BrowserContext | null = null;
@@ -1110,9 +1139,10 @@ async function runCapture(): Promise<void> {
   const autostart = requestedMode === 'ai_sandbox' ? 'true' : 'false';
   const losPrefilterParam = losHeightPrefilter ? '1' : '0';
   const spatialSecondarySyncParam = spatialSecondarySync ? '1' : '0';
+  const spatialDedupSyncParam = spatialDedupSync ? '1' : '0';
   const query = sandboxMode
-    ? `?sandbox=true&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}&spatialSecondarySync=${spatialSecondarySyncParam}`
-    : `?logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}&spatialSecondarySync=${spatialSecondarySyncParam}`;
+    ? `?sandbox=true&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}&spatialSecondarySync=${spatialSecondarySyncParam}&spatialDedupSync=${spatialDedupSyncParam}`
+    : `?logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}&spatialSecondarySync=${spatialSecondarySyncParam}&spatialDedupSync=${spatialDedupSyncParam}`;
   const url = `http://localhost:${port}/${query}`;
   const preflightUrl = `http://localhost:${port}/`;
   const primaryPath = new URL(url).pathname + new URL(url).search;
@@ -1300,6 +1330,8 @@ async function runCapture(): Promise<void> {
           mode: requestedMode,
           compressFrontline,
           allowWarpRecovery,
+          topUpHealth: activeTopUpHealth,
+          autoRespawn: activeAutoRespawn,
           movementDecisionIntervalMs,
           frontlineTriggerDistance,
           maxCompressedPerFaction
@@ -1459,7 +1491,7 @@ async function runCapture(): Promise<void> {
     }
     const hitValidationMode: 'strict' | 'relaxed' | 'off' =
       enableCombat && activePlayerScenario
-        ? (requestedMode === 'open_frontier' ? 'relaxed' : 'strict')
+        ? (requestedMode === 'open_frontier' || requestedMode === 'a_shau_valley' ? 'relaxed' : 'strict')
         : 'off';
     validation = validateRun(runtimeSamples, consoleEntries, durationSeconds, {
       hitValidation: hitValidationMode,
@@ -1571,16 +1603,18 @@ async function runCapture(): Promise<void> {
           requestedMode,
           playerExperience: enableCombat
             ? activePlayerScenario
-              ? 'Automated large-scale jungle firefight with scripted player movement/firing, forced ground-level engagement, and instant respawn to keep sampling in active combat.'
+              ? requestedMode === 'a_shau_valley'
+                ? 'Automated valley-scale mil-sim firefight with scripted movement/fire behavior over long travel corridors; active harness can be configured for realistic damage/death handling.'
+                : 'Automated large-scale jungle firefight with scripted player movement/firing, forced ground-level engagement, and instant respawn to keep sampling in active combat.'
               : 'Automated large-scale jungle firefight with active AI squads, combat simulation, terrain streaming, and rendering load; no objective play loop focus.'
             : 'Automated sandbox flywheel with combat AI disabled for control baseline (render/terrain/harness overhead isolation).',
           systemsEmphasized: enableCombat
             ? activePlayerScenario
-              ? requestedMode === 'open_frontier'
-                ? ['Combat AI', 'Open-frontier zone flow', 'Player input/fire loop', 'Respawn pipeline', 'Terrain chunking', 'Core frame scheduling']
+              ? requestedMode === 'open_frontier' || requestedMode === 'a_shau_valley'
+                ? ['Combat AI', 'Large-world objective flow', 'Player input/fire loop', 'Respawn pipeline', 'Terrain chunking', 'Core frame scheduling']
                 : ['Combat AI', 'Player input/fire loop', 'Respawn pipeline', 'Terrain chunking', 'Core frame scheduling']
-              : requestedMode === 'open_frontier'
-                ? ['Combat AI', 'Open-frontier zone flow', 'Terrain chunking', 'Billboard rendering', 'Core frame scheduling']
+              : requestedMode === 'open_frontier' || requestedMode === 'a_shau_valley'
+                ? ['Combat AI', 'Large-world objective flow', 'Terrain chunking', 'Billboard rendering', 'Core frame scheduling']
                 : ['Combat AI', 'Combat updates', 'Terrain chunking', 'Billboard rendering', 'Core frame scheduling']
             : ['Terrain chunking', 'Billboard rendering', 'Core frame scheduling', 'Harness overhead baseline']
         },

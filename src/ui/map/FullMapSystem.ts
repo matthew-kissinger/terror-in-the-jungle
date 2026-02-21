@@ -385,6 +385,7 @@ export class FullMapSystem implements GameSystem {
   }
 
   private drawStrategicAgents(ctx: CanvasRenderingContext2D): void {
+    if ((globalThis as any).__FULLMAP_SHOW_STRATEGIC_AGENTS__ !== true) return;
     if (!this.warSimulator || !this.warSimulator.isEnabled()) return;
 
     const scale = MAP_SIZE / this.worldSize;

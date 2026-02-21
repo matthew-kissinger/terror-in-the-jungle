@@ -272,6 +272,20 @@ describe('SpatialGridManager', () => {
       const telemetry = manager.getTelemetry();
       expect(telemetry.entityCount).toBe(3);
     });
+
+    it('should skip entities already updated by primary spatial owner', () => {
+      manager.initialize(4000);
+
+      const combatants = new Map<string, Combatant>([
+        ['c1', createMockCombatant('c1', new THREE.Vector3(100, 0, 100))],
+      ]);
+      const playerPosition = new THREE.Vector3(0, 0, 0);
+
+      const updateSpy = vi.spyOn(manager.getGrid()!, 'updatePosition');
+      manager.syncAllPositions(combatants, playerPosition, new Set<string>(['c1']));
+
+      expect(updateSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('syncEntity', () => {

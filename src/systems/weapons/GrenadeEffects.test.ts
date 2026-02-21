@@ -8,7 +8,6 @@ import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { CombatantSystem } from '../combat/CombatantSystem';
 import { AudioManager } from '../audio/AudioManager';
 import { spawnSmokeCloud } from '../effects/SmokeCloudSystem';
-import { spatialGridManager } from '../combat/SpatialGridManager';
 import { Logger } from '../../utils/Logger';
 import type { IFlashbangScreenEffect, IPlayerController } from '../../types/SystemInterfaces';
 
@@ -91,6 +90,7 @@ vi.mock('../combat/CombatantSystem', () => ({
   CombatantSystem: vi.fn(function (this: CombatantSystem) {
     this.applyExplosionDamage = vi.fn();
     this.combatants = new Map();
+    this.querySpatialRadius = vi.fn(() => []);
   }),
 }));
 
@@ -102,13 +102,6 @@ vi.mock('../audio/AudioManager', () => ({
 
 vi.mock('../effects/SmokeCloudSystem', () => ({
   spawnSmokeCloud: vi.fn(),
-}));
-
-vi.mock('../combat/SpatialGridManager', () => ({
-  spatialGridManager: {
-    getIsInitialized: vi.fn(() => false), // Default to not initialized for fallback test
-    queryRadius: vi.fn(() => []),
-  },
 }));
 
 vi.mock('../../utils/Logger', () => ({
@@ -207,9 +200,7 @@ describe('GrenadeEffects', () => {
     // Set flashbangEffect for flashbang tests
     grenadeEffects.setFlashbangEffect(mockFlashbangEffect);
 
-    // Reset spatialGridManager state
-    spatialGridManager.getIsInitialized = vi.fn(() => false);
-    spatialGridManager.queryRadius = vi.fn(() => []);
+    (mockCombatantSystem as any).querySpatialRadius = vi.fn(() => []);
   });
 
   afterEach(() => {
@@ -658,43 +649,40 @@ describe('GrenadeEffects', () => {
       );
     });
 
-    it('should apply full disorientation to NPCs within 15m (spatial grid initialized)', () => {
+    it('should apply full disorientation to NPCs within 15m (query provider path)', () => {
       const npc1 = createMockCombatant('npc1', new THREE.Vector3(10, 0, 0)); // 10m - full disorient
       const npc2 = createMockCombatant('npc2', new THREE.Vector3(20, 0, 0)); // 20m - partial disorient
       mockCombatantSystem.combatants.set(npc1.id, npc1);
       mockCombatantSystem.combatants.set(npc2.id, npc2);
 
-      spatialGridManager.getIsInitialized.mockReturnValue(true);
-      spatialGridManager.queryRadius.mockReturnValue([npc1.id, npc2.id]);
+      (mockCombatantSystem as any).querySpatialRadius.mockReturnValue([npc1.id, npc2.id]);
 
       (grenadeEffects as any).applyNPCDisorientation(flashPosition, mockCombatantSystem);
 
       expect(npc1.flashDisorientedUntil).toBe(MOCK_DATE_NOW + 3000);
       expect(npc2.flashDisorientedUntil).toBe(MOCK_DATE_NOW + 1500);
-      expect(spatialGridManager.queryRadius).toHaveBeenCalledWith(flashPosition, 25);
+      expect((mockCombatantSystem as any).querySpatialRadius).toHaveBeenCalledWith(flashPosition, 25);
       expect(Logger.info).toHaveBeenCalledWith('weapons', 'Flashbang disoriented 2 NPCs');
     });
 
-    it('should apply partial disorientation to NPCs between 15-25m (spatial grid initialized)', () => {
+    it('should apply partial disorientation to NPCs between 15-25m (query provider path)', () => {
       const npc1 = createMockCombatant('npc1', new THREE.Vector3(16, 0, 0)); // 16m - partial disorient
       mockCombatantSystem.combatants.set(npc1.id, npc1);
 
-      spatialGridManager.getIsInitialized.mockReturnValue(true);
-      spatialGridManager.queryRadius.mockReturnValue([npc1.id]);
+      (mockCombatantSystem as any).querySpatialRadius.mockReturnValue([npc1.id]);
 
       (grenadeEffects as any).applyNPCDisorientation(flashPosition, mockCombatantSystem);
 
       expect(npc1.flashDisorientedUntil).toBe(MOCK_DATE_NOW + 1500);
     });
 
-    it('should skip dead combatants (spatial grid initialized)', () => {
+    it('should skip dead combatants (query provider path)', () => {
       const npc1 = createMockCombatant('npc1', new THREE.Vector3(10, 0, 0), CombatantState.DEAD);
       const npc2 = createMockCombatant('npc2', new THREE.Vector3(5, 0, 0));
       mockCombatantSystem.combatants.set(npc1.id, npc1);
       mockCombatantSystem.combatants.set(npc2.id, npc2);
 
-      spatialGridManager.getIsInitialized.mockReturnValue(true);
-      spatialGridManager.queryRadius.mockReturnValue([npc1.id, npc2.id]);
+      (mockCombatantSystem as any).querySpatialRadius.mockReturnValue([npc1.id, npc2.id]);
 
       (grenadeEffects as any).applyNPCDisorientation(flashPosition, mockCombatantSystem);
 
@@ -703,14 +691,13 @@ describe('GrenadeEffects', () => {
       expect(Logger.info).toHaveBeenCalledWith('weapons', 'Flashbang disoriented 1 NPCs');
     });
 
-    it('should skip combatants beyond 25m (spatial grid initialized)', () => {
+    it('should skip combatants beyond 25m (query provider path)', () => {
       const npc1 = createMockCombatant('npc1', new THREE.Vector3(26, 0, 0)); // 26m - beyond range
       const npc2 = createMockCombatant('npc2', new THREE.Vector3(24, 0, 0)); // 24m - partial disorient
       mockCombatantSystem.combatants.set(npc1.id, npc1);
       mockCombatantSystem.combatants.set(npc2.id, npc2);
 
-      spatialGridManager.getIsInitialized.mockReturnValue(true);
-      spatialGridManager.queryRadius.mockReturnValue([npc1.id, npc2.id]);
+      (mockCombatantSystem as any).querySpatialRadius.mockReturnValue([npc1.id, npc2.id]);
 
       (grenadeEffects as any).applyNPCDisorientation(flashPosition, mockCombatantSystem);
 
@@ -719,7 +706,7 @@ describe('GrenadeEffects', () => {
       expect(Logger.info).toHaveBeenCalledWith('weapons', 'Flashbang disoriented 1 NPCs');
     });
 
-    it('should fall back to iterate all combatants when spatialGrid not initialized', () => {
+    it('should fall back to iterate all combatants when query provider is missing', () => {
       const npc1 = createMockCombatant('npc1', new THREE.Vector3(10, 0, 0));
       const npc2 = createMockCombatant('npc2', new THREE.Vector3(20, 0, 0));
       const npc3 = createMockCombatant('npc3', new THREE.Vector3(30, 0, 0)); // Beyond range for fallback
@@ -727,11 +714,11 @@ describe('GrenadeEffects', () => {
       mockCombatantSystem.combatants.set(npc2.id, npc2);
       mockCombatantSystem.combatants.set(npc3.id, npc3);
 
-      spatialGridManager.getIsInitialized.mockReturnValue(false); // Not initialized
+      (mockCombatantSystem as any).querySpatialRadius = undefined;
 
       (grenadeEffects as any).applyNPCDisorientation(flashPosition, mockCombatantSystem);
 
-      expect(spatialGridManager.queryRadius).not.toHaveBeenCalled(); // Should not use queryRadius
+      expect((mockCombatantSystem as any).querySpatialRadius).toBeUndefined();
       expect(npc1.flashDisorientedUntil).toBe(MOCK_DATE_NOW + 3000);
       expect(npc2.flashDisorientedUntil).toBe(MOCK_DATE_NOW + 1500);
       expect(npc3.flashDisorientedUntil).toBeUndefined();
@@ -742,7 +729,7 @@ describe('GrenadeEffects', () => {
       const npc1 = createMockCombatant('npc1', new THREE.Vector3(30, 0, 0)); // Beyond range
       mockCombatantSystem.combatants.set(npc1.id, npc1);
 
-      spatialGridManager.getIsInitialized.mockReturnValue(false);
+      (mockCombatantSystem as any).querySpatialRadius = undefined;
 
       (grenadeEffects as any).applyNPCDisorientation(flashPosition, mockCombatantSystem);
 
@@ -766,8 +753,7 @@ describe('GrenadeEffects', () => {
       mockCombatantSystem.combatants.set(npcNearDead.id, npcNearDead);
       mockCombatantSystem.combatants.set(npcMidDead.id, npcMidDead);
 
-      spatialGridManager.getIsInitialized.mockReturnValue(true);
-      spatialGridManager.queryRadius.mockReturnValue([
+      (mockCombatantSystem as any).querySpatialRadius.mockReturnValue([
         npcNearAlive.id,
         npcMidAlive.id,
         npcFarAlive.id,

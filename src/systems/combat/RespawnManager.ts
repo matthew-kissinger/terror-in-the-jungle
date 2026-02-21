@@ -8,6 +8,7 @@ import { SpawnPositionCalculator } from './SpawnPositionCalculator';
 import { ZoneManager } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { Logger } from '../../utils/Logger';
+import { spatialGridManager } from './SpatialGridManager';
 
 // Module-level scratch vectors
 const _squadCentroid = new THREE.Vector3();
@@ -49,6 +50,10 @@ export class RespawnManager {
     this.pendingRespawns = resppawns;
   }
 
+  clearPendingRespawns(): void {
+    this.pendingRespawns = [];
+  }
+
   /**
    * Remove a combatant and queue respawn if they are in the player squad
    */
@@ -79,6 +84,8 @@ export class RespawnManager {
       this.squadManager.removeSquadMember(combatant.squadId, id);
     }
     this.spatialGrid.remove(id);
+    // Keep secondary grid ownership consistent while F3 migration is in progress.
+    spatialGridManager.removeEntity(id);
     this.combatants.delete(id);
   }
 
@@ -174,6 +181,8 @@ export class RespawnManager {
     squad.members.push(newMember.id);
     this.combatants.set(newMember.id, newMember);
     this.spatialGrid.updatePosition(newMember.id, newMember.position);
+    // Ensure newly respawned members are immediately queryable by legacy consumers.
+    spatialGridManager.syncEntity(newMember.id, newMember.position);
 
     Logger.info('combat', ` Squad member ${newMember.id} spawned and moving to rejoin squad`);
   }

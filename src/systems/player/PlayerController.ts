@@ -473,7 +473,26 @@ export class PlayerController implements GameSystem {
   }
 
   updatePlayerPosition(position: THREE.Vector3): void { this.playerState.position.copy(position); }
-  disableControls(): void { this.input.setControlsEnabled(false); this.playerState.velocity.set(0, 0, 0); this.playerState.isRunning = false; this.input.unlockPointer(); }
+  disableControls(): void {
+    this.input.setControlsEnabled(false);
+    this.playerState.velocity.set(0, 0, 0);
+    this.playerState.isRunning = false;
+    this.input.unlockPointer();
+
+    // Ensure no high-frequency auxiliary-weapon loops remain active while dead/respawning.
+    if (this.grenadeSystem?.isCurrentlyAiming()) {
+      this.grenadeSystem.cancelThrow();
+    }
+    if (this.mortarSystem?.isCurrentlyAiming()) {
+      this.mortarSystem.cancelAiming();
+    }
+    if (this.sandbagSystem) {
+      this.sandbagSystem.showPlacementPreview(false);
+    }
+    if (this.hudSystem) {
+      this.hudSystem.hideGrenadePowerMeter();
+    }
+  }
   enableControls(): void { this.input.setControlsEnabled(true); this.input.relockPointer(); }
   setPointerLockEnabled(enabled: boolean): void { this.input.setPointerLockEnabled(enabled); }
   setGameStarted(started: boolean): void { this.input.setGameStarted(started); }

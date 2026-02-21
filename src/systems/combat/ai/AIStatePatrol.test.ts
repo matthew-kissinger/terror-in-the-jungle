@@ -3,15 +3,7 @@ import * as THREE from 'three';
 import { AIStatePatrol } from './AIStatePatrol';
 import { Combatant, CombatantState, Faction, Squad, SquadCommand } from '../types';
 import { ZoneManager } from '../../world/ZoneManager';
-import { spatialGridManager } from '../SpatialGridManager';
 import { clusterManager } from '../ClusterManager';
-
-// Mock dependencies
-vi.mock('../SpatialGridManager', () => ({
-  spatialGridManager: {
-    getIsInitialized: vi.fn(() => false),
-  }
-}));
 
 vi.mock('../ClusterManager', () => ({
   clusterManager: {
@@ -136,17 +128,22 @@ describe('AIStatePatrol', () => {
     it('should apply staggered reaction delay when in dense clusters', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(100, 0, 100));
       const enemy = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(120, 0, 120));
+      allCombatants.set(combatant.id, combatant);
+      for (let i = 0; i < 4; i++) {
+        allCombatants.set(`ally-${i}`, createMockCombatant(`ally-${i}`, Faction.US, new THREE.Vector3(101 + i, 0, 101)));
+      }
+      const mockSpatialGrid = {
+        queryRadius: vi.fn(() => [combatant.id, 'ally-0', 'ally-1', 'ally-2', 'ally-3']),
+      } as any;
       
       findNearestEnemy.mockReturnValue(enemy);
       canSeeTarget.mockReturnValue(true);
       shouldEngage.mockReturnValue(true);
 
-      (spatialGridManager.getIsInitialized as any).mockReturnValue(true);
-      (clusterManager.getClusterDensity as any).mockReturnValue(0.5);
       (clusterManager.getStaggeredReactionDelay as any).mockReturnValue(500);
 
       aiStatePatrol.handlePatrolling(
-        combatant, 0.016, playerPosition, allCombatants, undefined,
+        combatant, 0.016, playerPosition, allCombatants, mockSpatialGrid,
         findNearestEnemy, canSeeTarget, shouldEngage
       );
 

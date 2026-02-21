@@ -10,6 +10,7 @@ import { TicketSystem } from '../world/TicketSystem';
 import { Logger } from '../../utils/Logger';
 import { SpawnPositionCalculator } from './SpawnPositionCalculator';
 import { RespawnManager } from './RespawnManager';
+import { spatialGridManager } from './SpatialGridManager';
 
 // Module-level scratch vectors to avoid per-call allocations
 const _spawnPos = new THREE.Vector3();
@@ -40,6 +41,7 @@ export class CombatantSpawnManager {
   private reinforcementWaveTimer = 0;
   private reinforcementWaveIntervalSeconds = 15;
   private lastSpawnCheck = 0;
+  private autonomousSpawningEnabled = true;
 
   // Squad size configuration
   private squadSizeMin = 3;
@@ -98,16 +100,30 @@ export class CombatantSpawnManager {
     const config = this.gameModeManager?.getCurrentConfig();
     const avgSquadSize = SpawnPositionCalculator.getAverageSquadSize(this.squadSizeMin, this.squadSizeMax);
     const targetPerFaction = Math.floor(this.MAX_COMBATANTS / 2);
+    const modeId = config?.id;
+    const isLargeScaleMode = modeId === 'open_frontier'
+      || modeId === 'a_shau_valley'
+      || (config?.worldSize ?? 0) >= 2000;
+    const initialDeploymentRatio = (modeId === 'a_shau_valley' || (config?.worldSize ?? 0) >= 8000)
+      ? 0.5
+      : (modeId === 'open_frontier' || isLargeScaleMode)
+        ? 0.4
+        : 0.3;
     const initialPerFaction = targetPerFaction > 0
-      ? Math.max(Math.min(this.squadSizeMin, targetPerFaction), Math.floor(targetPerFaction * 0.3))
+      ? Math.max(Math.min(this.squadSizeMin, targetPerFaction), Math.floor(targetPerFaction * initialDeploymentRatio))
       : 0;
     let initialSquadsPerFaction = initialPerFaction > 0
       ? Math.max(1, Math.ceil(initialPerFaction / Math.max(1, avgSquadSize)))
       : 0;
+    if (isLargeScaleMode && targetPerFaction >= avgSquadSize * 2) {
+      initialSquadsPerFaction = Math.max(2, initialSquadsPerFaction);
+    }
 
     const usHQs = SpawnPositionCalculator.getHQZonesForFaction(Faction.US, config);
     const opforHQs = SpawnPositionCalculator.getHQZonesForFaction(Faction.OPFOR, config);
     const { usBasePos, opforBasePos } = SpawnPositionCalculator.getBasePositions(config);
+    let initialUSSquads = initialSquadsPerFaction;
+    const initialOPFORSquads = initialSquadsPerFaction;
 
     let createdPlayerSquadId: string | undefined;
 
@@ -128,23 +144,30 @@ export class CombatantSpawnManager {
 
       Logger.info('Combat', `Player squad created: ${createdPlayerSquadId} with ${playerSquad.members.length} members at player spawn`);
 
-      // Reduce US squads by 1 since we already spawned the player squad
-      initialSquadsPerFaction = Math.max(0, initialSquadsPerFaction - 1);
+      // Reduce only US AI squads by 1 since we already spawned the player squad.
+      initialUSSquads = Math.max(0, initialUSSquads - 1);
     }
 
     // Fallback to legacy base positions if no HQs configured
     if (usHQs.length === 0 || opforHQs.length === 0) {
-      if (initialSquadsPerFaction > 0) {
+      for (let i = 0; i < initialUSSquads; i++) {
         this.spawnSquad(Faction.US, usBasePos, avgSquadSize);
       }
-      this.spawnSquad(Faction.OPFOR, opforBasePos, avgSquadSize);
+      for (let i = 0; i < initialOPFORSquads; i++) {
+        this.spawnSquad(Faction.OPFOR, opforBasePos, avgSquadSize);
+      }
     } else {
-      // Distribute squads evenly across HQs
-      for (let i = 0; i < initialSquadsPerFaction; i++) {
-        const posUS = _spawnPos.copy(usHQs[i % usHQs.length].position).add(SpawnPositionCalculator.randomSpawnOffset(20, 40));
-        const posOP = _scratchVec.copy(opforHQs[i % opforHQs.length].position).add(SpawnPositionCalculator.randomSpawnOffset(20, 40));
-        this.spawnSquad(Faction.US, posUS, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
-        this.spawnSquad(Faction.OPFOR, posOP, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
+      // Distribute squads across all configured HQs.
+      const totalSpawnRounds = Math.max(initialUSSquads, initialOPFORSquads);
+      for (let i = 0; i < totalSpawnRounds; i++) {
+        if (i < initialUSSquads) {
+          const posUS = _spawnPos.copy(usHQs[i % usHQs.length].position).add(SpawnPositionCalculator.randomSpawnOffset(20, 40));
+          this.spawnSquad(Faction.US, posUS, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
+        }
+        if (i < initialOPFORSquads) {
+          const posOP = _scratchVec.copy(opforHQs[i % opforHQs.length].position).add(SpawnPositionCalculator.randomSpawnOffset(20, 40));
+          this.spawnSquad(Faction.OPFOR, posOP, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
+        }
       }
     }
 
@@ -185,6 +208,9 @@ export class CombatantSpawnManager {
    * Update spawning logic - progressive spawns, reinforcement waves, respawns
    */
   update(deltaTime: number, combatEnabled: boolean, ticketSystem?: TicketSystem): void {
+    if (!this.autonomousSpawningEnabled) {
+      return;
+    }
     // Stop all spawning logic if game is not active
     if (ticketSystem && !ticketSystem.isGameActive()) {
       return;
@@ -306,6 +332,7 @@ export class CombatantSpawnManager {
     members.forEach(combatant => {
       this.combatants.set(combatant.id, combatant);
       this.spatialGrid.updatePosition(combatant.id, combatant.position);
+      spatialGridManager.syncEntity(combatant.id, combatant.position);
     });
   }
 
@@ -458,5 +485,17 @@ export class CombatantSpawnManager {
       else if (c.faction === Faction.OPFOR) opfor++;
     }
     return { us, opfor };
+  }
+
+  setAutonomousSpawningEnabled(enabled: boolean): void {
+    this.autonomousSpawningEnabled = enabled;
+  }
+
+  resetRuntimeStateForExternalPopulation(): void {
+    this.progressiveSpawnQueue = [];
+    this.progressiveSpawnTimer = 0;
+    this.reinforcementWaveTimer = 0;
+    this.lastSpawnCheck = 0;
+    this.respawnManager.clearPendingRespawns();
   }
 }

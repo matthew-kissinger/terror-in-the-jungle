@@ -7,7 +7,6 @@ import { CombatantSystem } from '../combat/CombatantSystem';
 import { AudioManager } from '../audio/AudioManager';
 import { Grenade } from './GrenadePhysics';
 import { spawnSmokeCloud } from '../effects/SmokeCloudSystem';
-import { spatialGridManager } from '../combat/SpatialGridManager';
 import type { IFlashbangScreenEffect, IPlayerController } from '../../types/SystemInterfaces';
 
 // Module-level scratch vectors for direction calculations
@@ -187,9 +186,13 @@ export class GrenadeEffects {
 
     let affectedCount = 0;
 
-    if (spatialGridManager.getIsInitialized()) {
-      // Efficient spatial query - only check NPCs within max range
-      const nearbyCombatantIds = spatialGridManager.queryRadius(flashPosition, PARTIAL_DISORIENT_DISTANCE);
+    const querySpatialRadius = (combatantSystem as any).querySpatialRadius as
+      | ((center: THREE.Vector3, radius: number) => string[])
+      | undefined;
+
+    if (querySpatialRadius) {
+      // Prefer primary combat spatial owner when available.
+      const nearbyCombatantIds = querySpatialRadius(flashPosition, PARTIAL_DISORIENT_DISTANCE);
 
       for (const id of nearbyCombatantIds) {
         const combatant = allCombatants.get(id);

@@ -407,6 +407,21 @@ describe('CombatantLODManager', () => {
       expect(dyingCombatant.deathProgress).toBeGreaterThan(0);
     });
 
+    it('should skip dead actors from LOD update loops and remove them from spatial grid', () => {
+      const deadCombatant = createMockCombatant('dead', new THREE.Vector3(100, 0, 0), Faction.US, CombatantState.DEAD, true);
+      deadCombatant.deathProgress = 0.1;
+      combatants.set('dead', deadCombatant);
+
+      manager.updateCombatants(0.016);
+
+      expect(spatialGrid.remove).toHaveBeenCalledWith('dead');
+      expect(combatantAI.updateAI).not.toHaveBeenCalled();
+      expect(combatantMovement.updateMovement).not.toHaveBeenCalled();
+      expect(spatialGrid.updatePosition).not.toHaveBeenCalled();
+      // Death animation clock still advances even though LOD updates are skipped.
+      expect(deadCombatant.deathProgress).toBeGreaterThan(0.1);
+    });
+
     it('should remove combatants after death animation completes', () => {
       const dyingCombatant = createMockCombatant('dying', new THREE.Vector3(100, 0, 0), Faction.US, CombatantState.ENGAGING, true);
       dyingCombatant.deathProgress = 0.99;

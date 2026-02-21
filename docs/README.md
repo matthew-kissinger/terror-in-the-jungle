@@ -1,39 +1,39 @@
 # Docs Index
 
-Last updated: 2026-02-14
+Last updated: 2026-02-21
 
 ## Read Order
 
 1. `PERFORMANCE_FRONTIER_MISSION.md`
 2. `PROFILING_HARNESS.md`
 3. `ARCHITECTURE_RECOVERY_PLAN.md`
+4. `ASHAU_VALLEY_IMPLEMENTATION_PLAN.md`
 
-## What Each Doc Is For
+## Active Docs
 
 - `PERFORMANCE_FRONTIER_MISSION.md`
-  - Defines current operating mode for large-scale performance exploration.
-  - Sets experiment discipline, required decomposition, and keep/revert gates.
-
+  - Optimization operating model, keep/revert gates, and current frontier track.
 - `PROFILING_HARNESS.md`
-  - Source of truth for capture commands, flags, output artifacts, and validation.
-  - Includes observer-overhead rules and scenario semantics.
-
+  - Source of truth for perf capture commands, flags, artifacts, and validation semantics.
 - `ARCHITECTURE_RECOVERY_PLAN.md`
-  - Long-running experiment ledger and decision history.
-  - Tracks what changed, why, and which paths were kept or reverted.
-
+  - Current architecture risk register and prioritized implementation board.
+- `ASHAU_VALLEY_IMPLEMENTATION_PLAN.md`
+  - A Shau mode stabilization plan and validation checklist.
 - `AUDIO_ASSETS_NEEDED.md`
-  - Audio content backlog and production specifications.
+  - Audio backlog/spec used by `src/systems/audio`.
+- `../data/vietnam/DATA_PIPELINE.md`
+  - Real-terrain data status and integration pipeline for Vietnam maps.
 
-## Operating Contract
+## Archive Policy
 
-- Do not tune blindly. Every substantial change must be measured.
-- Keep experiments reversible and flaggable.
-- Prefer objective metrics (`p95/p99`, hitch ratios, shot/hit validity, stall windows).
-- Record outcomes in `ARCHITECTURE_RECOVERY_PLAN.md` and update harness docs when flags/scenarios change.
+- `docs/archive/` contains retired analyses and old task snapshots.
+- Archived docs are informational only and not part of active execution.
+- When an active doc is replaced, summarize the replacement and move old content to git history (not long-lived duplicate files).
 
-## Canonical Runtime Goal
+## Documentation Rules
 
-- Maintain believable combat and objective flow with ~120+ combatants.
-- Minimize tail spikes (rare long frames) before chasing average FPS gains.
-- Keep deployed pages clean from harness-only instrumentation overhead.
+- Keep active docs concise and current.
+- Prefer status boards and acceptance criteria over long chronological logs.
+- Any perf-sensitive change must update:
+  - `PROFILING_HARNESS.md` if capture behavior/flags changed
+  - `ARCHITECTURE_RECOVERY_PLAN.md` with decision and evidence path

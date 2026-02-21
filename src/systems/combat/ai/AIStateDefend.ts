@@ -3,7 +3,6 @@ import { Combatant, CombatantState } from '../types';
 import { SpatialOctree } from '../SpatialOctree';
 import { ZoneManager } from '../../world/ZoneManager';
 import { clusterManager } from '../ClusterManager';
-import { spatialGridManager } from '../SpatialGridManager';
 
 const _toTarget = new THREE.Vector3();
 const _toDefensePos = new THREE.Vector3();
@@ -64,8 +63,8 @@ export class AIStateDefend {
           let baseDelay = (combatant.skillProfile.reactionDelayMs * (veryCloseRange ? 0.3 : 1) + rangeDelay);
 
           // In clusters, stagger reactions to prevent synchronized behavior
-          if (spatialGridManager.getIsInitialized()) {
-            const clusterDensity = clusterManager.getClusterDensity(combatant, allCombatants, spatialGridManager);
+          if (spatialGrid) {
+            const clusterDensity = this.getClusterDensity(combatant, allCombatants, spatialGrid);
             if (clusterDensity > 0.3) {
               baseDelay = clusterManager.getStaggeredReactionDelay(baseDelay, clusterDensity);
             }
@@ -104,5 +103,29 @@ export class AIStateDefend {
         }
       }
     }
+  }
+
+  private getClusterDensity(
+    combatant: Combatant,
+    allCombatants: Map<string, Combatant>,
+    spatialGrid: SpatialOctree
+  ): number {
+    const CLUSTER_RADIUS = 15;
+    const CLUSTER_RADIUS_SQ = CLUSTER_RADIUS * CLUSTER_RADIUS;
+    const nearbyIds = spatialGrid.queryRadius(combatant.position, CLUSTER_RADIUS);
+    let nearbyCount = 0;
+    const maxExpected = 10;
+
+    for (const id of nearbyIds) {
+      if (id === combatant.id) continue;
+      const other = allCombatants.get(id);
+      if (!other) continue;
+      if (other.state === CombatantState.DEAD) continue;
+      if (combatant.position.distanceToSquared(other.position) < CLUSTER_RADIUS_SQ) {
+        nearbyCount++;
+      }
+    }
+
+    return Math.min(1, nearbyCount / maxExpected);
   }
 }

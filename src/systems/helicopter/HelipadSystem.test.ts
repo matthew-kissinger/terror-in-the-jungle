@@ -98,9 +98,9 @@ function createMockTerrainManager(heightValue = 10) {
   };
 }
 
-function createMockGameModeManager(modeId = 'open_frontier') {
+function createMockGameModeManager(modeId = 'open_frontier', zones: any[] = []) {
   return {
-    getCurrentConfig: vi.fn().mockReturnValue({ id: modeId }),
+    getCurrentConfig: vi.fn().mockReturnValue({ id: modeId, name: modeId, zones }),
   };
 }
 
@@ -325,6 +325,25 @@ describe('HelipadSystem', () => {
       system.setGameModeManager(gmm as any);
       system.update(0.016);
       expect(scene.children.length).toBe(0);
+    });
+
+    it('creates helipad in A Shau Valley near US base anchor', () => {
+      const tm = createMockTerrainManager(10);
+      const gmm = createMockGameModeManager('a_shau_valley', [
+        {
+          id: 'us_base',
+          isHomeBase: true,
+          owner: 'US',
+          position: new (THREE as any).Vector3(900, 0, -600)
+        }
+      ]);
+      system.setTerrainManager(tm as any);
+      system.setGameModeManager(gmm as any);
+      system.update(0.016);
+      expect(scene.children.length).toBe(1);
+      const helipad = scene.children[0];
+      expect(helipad.position.x).toBe(940);
+      expect(helipad.position.z).toBe(-600);
     });
 
     it('waits for valid terrain data before creating helipad', () => {

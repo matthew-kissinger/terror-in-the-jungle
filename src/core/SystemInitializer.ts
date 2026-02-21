@@ -106,8 +106,8 @@ export class SystemInitializer {
     Logger.info('core', ' Initializing game systems...');
     markStartup('systems.initialize.begin');
 
-    // Warmup object pools to prevent allocations during gameplay
-    objectPool.warmup(50, 20, 10, 30);
+    // Warm pools to frontier-scale combat levels to avoid hot-path fallback allocations.
+    objectPool.warmup(240, 80, 32, 96);
 
     // Phase 1: Core systems
     onProgress('core', 0);

@@ -223,6 +223,28 @@ describe('ZoneManager', () => {
       expect(occupants?.opfor).toBe(1);
     });
 
+    it('should prefer injected spatial query provider over legacy spatial grid manager', () => {
+      const queryProvider = vi.fn(() => ['combatant1']);
+      zoneManager.setSpatialQueryProvider(queryProvider);
+      mockSpatialGrid.queryRadius.mockReturnValue(['combatant2']);
+      mockCombatantSystem.combatants.set('combatant1', {
+        faction: Faction.US,
+        state: CombatantState.ALIVE,
+      });
+      mockCombatantSystem.combatants.set('combatant2', {
+        faction: Faction.OPFOR,
+        state: CombatantState.ALIVE,
+      });
+
+      zoneManager.update(0.15);
+
+      expect(queryProvider).toHaveBeenCalled();
+      expect(mockSpatialGrid.queryRadius).not.toHaveBeenCalled();
+      const occupants = zoneManager['occupants'].get('test_zone');
+      expect(occupants?.us).toBe(1);
+      expect(occupants?.opfor).toBe(0);
+    });
+
     it('should skip dead combatants', () => {
       mockSpatialGrid.queryRadius.mockReturnValue(['combatant1', 'combatant2']);
       mockCombatantSystem.combatants.set('combatant1', {

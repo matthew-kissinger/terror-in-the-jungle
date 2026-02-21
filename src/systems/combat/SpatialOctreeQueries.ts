@@ -21,21 +21,21 @@ export class SpatialOctreeQueries {
   queryRadius(root: OctreeNode, center: THREE.Vector3, radius: number): string[] {
     const results: string[] = []
     this.scratchSphere.set(center, radius)
-    this.queryRadiusRecursive(root, this.scratchSphere, results)
+    const radiusSq = radius * radius
+    this.queryRadiusRecursive(root, this.scratchSphere, radiusSq, results)
     return results
   }
 
   /**
    * Recursively query radius in octree
    */
-  private queryRadiusRecursive(node: OctreeNode, sphere: THREE.Sphere, results: string[]): void {
+  private queryRadiusRecursive(node: OctreeNode, sphere: THREE.Sphere, radiusSq: number, results: string[]): void {
     // Early exit if sphere doesn't intersect node bounds
     if (!sphere.intersectsBox(node.bounds)) {
       return
     }
 
     // Add all entities in this node that are within radius
-    const radiusSq = sphere.radius * sphere.radius
     for (const id of node.entities) {
       const pos = this.entityPositions.get(id)
       if (pos && pos.distanceToSquared(sphere.center) <= radiusSq) {
@@ -46,7 +46,7 @@ export class SpatialOctreeQueries {
     // Recurse into children
     if (!node.isLeaf() && node.children) {
       for (const child of node.children) {
-        this.queryRadiusRecursive(child, sphere, results)
+        this.queryRadiusRecursive(child, sphere, radiusSq, results)
       }
     }
   }
@@ -91,17 +91,23 @@ export class SpatialOctreeQueries {
   queryRay(root: OctreeNode, origin: THREE.Vector3, direction: THREE.Vector3, maxDistance: number): string[] {
     const results: string[] = []
     this.scratchRay.set(origin, direction)
-    this.queryRayRecursive(root, this.scratchRay, maxDistance, results)
+    const maxDistanceSq = maxDistance * maxDistance
+    this.queryRayRecursive(root, this.scratchRay, maxDistanceSq, results)
     return results
   }
 
   /**
    * Recursively query ray in octree
    */
-  private queryRayRecursive(node: OctreeNode, ray: THREE.Ray, maxDistance: number, results: string[]): void {
+  private queryRayRecursive(
+    node: OctreeNode,
+    ray: THREE.Ray,
+    maxDistanceSq: number,
+    results: string[]
+  ): void {
     // Early exit if ray doesn't intersect node bounds
     const intersection = ray.intersectBox(node.bounds, this.scratchVector)
-    if (!intersection || intersection.distanceTo(ray.origin) > maxDistance) {
+    if (!intersection || intersection.distanceToSquared(ray.origin) > maxDistanceSq) {
       return
     }
 
@@ -110,7 +116,7 @@ export class SpatialOctreeQueries {
       const pos = this.entityPositions.get(id)
       if (pos) {
         const distance = ray.distanceToPoint(pos)
-        if (distance < 2.0 && ray.origin.distanceTo(pos) <= maxDistance) {
+        if (distance < 2.0 && ray.origin.distanceToSquared(pos) <= maxDistanceSq) {
           results.push(id)
         }
       }
@@ -119,7 +125,7 @@ export class SpatialOctreeQueries {
     // Recurse into children
     if (!node.isLeaf() && node.children) {
       for (const child of node.children) {
-        this.queryRayRecursive(child, ray, maxDistance, results)
+        this.queryRayRecursive(child, ray, maxDistanceSq, results)
       }
     }
   }
@@ -164,18 +170,10 @@ export class SpatialOctreeQueries {
       }
     }
 
-    // Recurse into children, prioritizing closer ones
+    // Recurse into children directly. Sorting child bounds each call adds extra
+    // allocations and compare work without changing correctness here.
     if (!node.isLeaf() && node.children) {
-      // Calculate distance to each child and sort
-      const childDistances = node.children.map((child, index) => ({
-        child,
-        index,
-        distance: child.bounds.distanceToPoint(center)
-      }))
-
-      childDistances.sort((a, b) => a.distance - b.distance)
-
-      for (const { child } of childDistances) {
+      for (const child of node.children) {
         this.queryNearestKRecursive(child, center, candidates, maxDistanceSq)
       }
     }

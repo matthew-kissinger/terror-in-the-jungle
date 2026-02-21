@@ -12,6 +12,39 @@ import { PersistenceSystem } from '../systems/strategy/PersistenceSystem';
 import type { GameEngine } from './GameEngine';
 import { markStartup } from './StartupTelemetry';
 
+function getPrimaryUSBase(config: ReturnType<typeof getGameModeConfig>): ZoneConfig | undefined {
+  return config.zones.find(z => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
+}
+
+function resolveAShauInsertion(config: ReturnType<typeof getGameModeConfig>): THREE.Vector3 | null {
+  const hill937 = config.zones.find(z => z.id === 'zone_hill937');
+  const usForwardBase = config.zones.find(z => z.id === 'us_hq_east') ?? getPrimaryUSBase(config);
+  if (!hill937 || !usForwardBase) {
+    return null;
+  }
+
+  const dir = new THREE.Vector3().subVectors(usForwardBase.position, hill937.position);
+  dir.y = 0;
+  const len = dir.length();
+  if (len < 1) {
+    return null;
+  }
+  dir.divideScalar(len);
+
+  // Spawn on the US-approach side of Hill 937 to shorten time-to-contact.
+  return hill937.position.clone().addScaledVector(dir, 240);
+}
+
+function resolveModeSpawnPosition(config: ReturnType<typeof getGameModeConfig>): THREE.Vector3 {
+  if (config.id === GameMode.A_SHAU_VALLEY) {
+    const insertion = resolveAShauInsertion(config);
+    if (insertion) {
+      return insertion;
+    }
+  }
+  return getPrimaryUSBase(config)?.position.clone() ?? new THREE.Vector3(0, 0, -50);
+}
+
 /**
  * Handles initialization of game systems and assets
  */
@@ -174,8 +207,7 @@ export async function startGameWithMode(engine: GameEngine, mode: GameMode): Pro
   }
 
   // Pre-generate chunks at actual spawn position for this mode
-  const usHQ = config.zones.find(z => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
-  const spawnPos = usHQ ? usHQ.position.clone() : new THREE.Vector3(0, 0, -50);
+  const spawnPos = resolveModeSpawnPosition(config);
   spawnPos.y = 5;
   await engine.systemManager.preGenerateSpawnArea(spawnPos);
   markStartup(`engine-init.start-game.${mode}.post-pre-generate`);
@@ -234,12 +266,9 @@ async function runStartupFlow(engine: GameEngine): Promise<void> {
       pos.y = getHeightQueryCache().getHeightAt(pos.x, pos.z) + 2;
       engine.systemManager.playerController.setPosition(pos, 'startup.spawn.sandbox');
     } else {
-      const spawn = cfg.zones.find((z: ZoneConfig) => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
-      if (spawn) {
-        const pos = spawn.position.clone();
-        pos.y = getHeightQueryCache().getHeightAt(pos.x, pos.z) + 2;
-        engine.systemManager.playerController.setPosition(pos, 'startup.spawn.mode-hq');
-      }
+      const pos = resolveModeSpawnPosition(cfg);
+      pos.y = getHeightQueryCache().getHeightAt(pos.x, pos.z) + 2;
+      engine.systemManager.playerController.setPosition(pos, 'startup.spawn.mode-hq');
     }
   } catch {
     // Keep startup resilient; spawn fallback already exists elsewhere.

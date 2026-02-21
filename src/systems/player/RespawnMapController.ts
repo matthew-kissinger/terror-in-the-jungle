@@ -15,10 +15,12 @@ export class RespawnMapController {
   private gameModeManager?: GameModeManager;
   private onZoneSelected?: (zoneId: string, zoneName: string) => void;
   private updateInterval?: number;
+  private activeMap: RespawnMapView | OpenFrontierRespawnMap;
 
   constructor() {
     this.respawnMapView = new RespawnMapView();
     this.openFrontierRespawnMap = new OpenFrontierRespawnMap();
+    this.activeMap = this.respawnMapView;
   }
 
   setZoneManager(manager: ZoneManager): void {
@@ -62,6 +64,7 @@ export class RespawnMapController {
     Logger.info('respawn-map', ` Using map: ${isOpenFrontier ? 'OpenFrontierRespawnMap' : 'RespawnMapView'}`);
 
     const activeMap = isOpenFrontier ? this.openFrontierRespawnMap : this.respawnMapView;
+    this.activeMap = activeMap;
     const mapCanvas = activeMap.getCanvas();
 
     mapCanvas.style.cssText = isOpenFrontier ? `
@@ -93,8 +96,8 @@ export class RespawnMapController {
     this.stopMapUpdateInterval();
 
     this.updateInterval = window.setInterval(() => {
-      this.respawnMapView.updateSpawnableZones();
-      this.respawnMapView.render();
+      this.activeMap.updateSpawnableZones();
+      this.activeMap.render();
     }, 1000);
   }
 
