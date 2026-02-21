@@ -12,6 +12,7 @@ import { RespawnUI } from './RespawnUI';
 import { RespawnMapController } from './RespawnMapController';
 import type { IFirstPersonWeapon, IPlayerController } from '../../types/SystemInterfaces';
 import type { WarSimulator } from '../strategy/WarSimulator';
+import type { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 
 export class PlayerRespawnManager implements GameSystem {
   private scene: THREE.Scene;
@@ -23,6 +24,7 @@ export class PlayerRespawnManager implements GameSystem {
   private firstPersonWeapon?: IFirstPersonWeapon;
   private inventoryManager?: InventoryManager;
   private warSimulator?: WarSimulator;
+  private chunkManager?: ImprovedChunkManager;
 
   // Respawn state
   private isRespawnUIVisible = false;
@@ -121,6 +123,10 @@ export class PlayerRespawnManager implements GameSystem {
 
   setWarSimulator(warSimulator: WarSimulator): void {
     this.warSimulator = warSimulator;
+  }
+
+  setChunkManager(chunkManager: ImprovedChunkManager): void {
+    this.chunkManager = chunkManager;
   }
 
   setRespawnCallback(callback: (position: THREE.Vector3) => void): void {
@@ -425,7 +431,9 @@ export class PlayerRespawnManager implements GameSystem {
     const insertionOffsetMeters = enemyHotspot
       ? Math.min(110, Math.max(55, nearestUSDist * 0.2))
       : Math.min(160, Math.max(80, nearestUSDist * 0.3));
-    return anchor.clone().addScaledVector(dir, insertionOffsetMeters);
+    const anchorSpawn = anchor.clone().addScaledVector(dir, insertionOffsetMeters);
+    const sampled = this.selectBestRespawnCandidate(anchorSpawn, dir, nearestUS.position, bestObjective.position);
+    return sampled ?? anchorSpawn;
   }
 
   private getEnemyHotspotNear(objective: THREE.Vector3, maxRadius: number): THREE.Vector3 | null {
@@ -456,6 +464,103 @@ export class PlayerRespawnManager implements GameSystem {
       sumZ += candidates[i].z;
     }
     return new THREE.Vector3(sumX / take, 0, sumZ / take);
+  }
+
+  private selectBestRespawnCandidate(
+    anchorSpawn: THREE.Vector3,
+    usFacingDir: THREE.Vector3,
+    nearestUSPos: THREE.Vector3,
+    objectivePos: THREE.Vector3
+  ): THREE.Vector3 | null {
+    const candidates = this.buildRespawnCandidates(anchorSpawn, usFacingDir);
+    if (candidates.length === 0) return null;
+
+    let best: { pos: THREE.Vector3; score: number } | null = null;
+    for (const candidate of candidates) {
+      if (!this.isTerrainReadyAt(candidate.x, candidate.z)) continue;
+      const score = this.scoreRespawnCandidate(candidate, nearestUSPos, objectivePos);
+      if (!best || score > best.score) {
+        best = { pos: candidate, score };
+      }
+    }
+
+    return best?.pos ?? null;
+  }
+
+  private buildRespawnCandidates(anchorSpawn: THREE.Vector3, usFacingDir: THREE.Vector3): THREE.Vector3[] {
+    const dir = usFacingDir.clone().normalize();
+    if (!Number.isFinite(dir.x) || !Number.isFinite(dir.z) || dir.lengthSq() < 0.0001) {
+      dir.set(0, 0, 1);
+    }
+    const lateral = new THREE.Vector3(-dir.z, 0, dir.x);
+    const offsets = [
+      { forward: 0, side: 0 },
+      { forward: -18, side: 0 },
+      { forward: 18, side: 0 },
+      { forward: -12, side: -14 },
+      { forward: -12, side: 14 },
+      { forward: 12, side: -14 },
+      { forward: 12, side: 14 },
+      { forward: -26, side: -10 },
+      { forward: -26, side: 10 },
+      { forward: -8, side: -22 },
+      { forward: -8, side: 22 }
+    ];
+
+    return offsets.map(o =>
+      anchorSpawn.clone()
+        .addScaledVector(dir, o.forward)
+        .addScaledVector(lateral, o.side)
+    );
+  }
+
+  private scoreRespawnCandidate(candidate: THREE.Vector3, nearestUSPos: THREE.Vector3, objectivePos: THREE.Vector3): number {
+    const opfor250 = this.countNearbyAgents(candidate, 250, Faction.OPFOR);
+    const opfor400 = this.countNearbyAgents(candidate, 400, Faction.OPFOR);
+    const us220 = this.countNearbyAgents(candidate, 220, Faction.US);
+    const dToObjective = candidate.distanceTo(objectivePos);
+    const dToUS = candidate.distanceTo(nearestUSPos);
+
+    // Heavily reward immediate/near tactical pressure, lightly penalize
+    // excessive objective stand-off and deep friendline bias.
+    return opfor250 * 8
+      + opfor400 * 2.5
+      - us220 * 1.25
+      - dToObjective * 0.01
+      - dToUS * 0.002;
+  }
+
+  private countNearbyAgents(center: THREE.Vector3, radius: number, faction: Faction): number {
+    if (!this.warSimulator || !this.warSimulator.isEnabled()) return 0;
+    const r2 = radius * radius;
+    let count = 0;
+    for (const agent of this.warSimulator.getAllAgents().values()) {
+      if (!agent.alive || agent.faction !== faction) continue;
+      const dx = agent.x - center.x;
+      const dz = agent.z - center.z;
+      if ((dx * dx + dz * dz) <= r2) count++;
+    }
+    return count;
+  }
+
+  private isTerrainReadyAt(x: number, z: number): boolean {
+    const cm = this.chunkManager as any;
+    if (!cm || typeof cm.isChunkLoaded !== 'function' || typeof cm.getChunkSize !== 'function') {
+      return true;
+    }
+    const chunkSize = Number(cm.getChunkSize());
+    if (!Number.isFinite(chunkSize) || chunkSize <= 0) return true;
+
+    const cx = Math.floor(x / chunkSize);
+    const cz = Math.floor(z / chunkSize);
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!cm.isChunkLoaded(cx + dx, cz + dz)) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   private getCurrentGameMode(): GameMode | undefined {

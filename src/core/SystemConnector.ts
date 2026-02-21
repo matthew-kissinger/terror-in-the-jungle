@@ -83,6 +83,7 @@ export class SystemConnector {
     refs.playerRespawnManager.setFirstPersonWeapon(refs.firstPersonWeapon);
     refs.playerRespawnManager.setInventoryManager(refs.inventoryManager);
     refs.playerRespawnManager.setWarSimulator(refs.warSimulator);
+    refs.playerRespawnManager.setChunkManager(refs.chunkManager);
 
     // Connect helipad system
     refs.helipadSystem.setTerrainManager(refs.chunkManager);

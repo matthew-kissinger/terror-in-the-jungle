@@ -516,3 +516,36 @@ Next:
 - Re-run diagnostics and target:
   - `post_respawn r250 > 0`
   - `sustained_5m r250 > 0`
+
+### Iteration 016 - Contact-guarantee respawn sampling (2026-02-21)
+
+Changes:
+- Implemented contact-guarantee candidate sampling in `src/systems/player/PlayerRespawnManager.ts`:
+  - Builds 11 candidate insertion points around hotspot anchor.
+  - Scores candidates by nearby OPFOR density (`r250`, `r400`) with penalties for over-friendly clustering and excessive objective standoff.
+  - Adds terrain-ready gating per candidate using chunk residency ring when chunk manager data is available.
+  - Added chunk manager dependency setter and wiring in `src/core/SystemConnector.ts`.
+- Kept hotspot centroid approach and integrated it into sampling anchor selection.
+
+Validation:
+- Tests/build:
+  - `npx vitest run src/systems/player/PlayerRespawnManager.test.ts src/systems/strategy/WarSimulator.test.ts src/ui/minimap/MinimapRenderer.test.ts`
+  - Result: `3` files passed, `90` tests passed.
+  - `npm run build` passed.
+- Diagnostics rerun:
+  - `artifacts/ashau-diagnostics/2026-02-21T20-37-32-584Z/capture.json`
+  - `artifacts/ashau-diagnostics/2026-02-21T20-37-32-584Z/summary.md`
+
+Results:
+- `post_respawn`: `r250=3`, `r500=3`, `r800=5` (target achieved for immediate close-contact after respawn).
+- `sustained_5m`: `r250=0`, `r500=0`, `r800=4` (close-contact not sustained yet).
+- `firstTacticalContactMs=45263` (~45.3s), comfortably inside target window.
+
+Interpretation:
+- Respawn insertion quality materially improved and now can deliver immediate skirmish conditions.
+- Sustained close-contact still drifts outward; next tuning should focus on periodic player pressure nudges/objective retargeting during long unattended windows.
+
+Next:
+- Add lightweight sustained-contact assist policy:
+  - if no tactical OPFOR within `250m` for >90s, bias next respawn/objective anchor inward by one tier.
+- Re-run diagnostics aiming for `sustained_5m r250 > 0`.
