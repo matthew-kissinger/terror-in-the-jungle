@@ -476,3 +476,43 @@ Expected impact:
 
 Next:
 - Re-run `scripts/ashau-diagnostics-capture.ts` to verify whether `post_respawn/sustained_5m` now cross `r250 > 0`.
+
+### Iteration 015 - Post-push diagnostics verification (2026-02-21)
+
+Artifacts:
+- `artifacts/ashau-diagnostics/2026-02-21T20-16-51-768Z/capture.json`
+- `artifacts/ashau-diagnostics/2026-02-21T20-16-51-768Z/summary.md`
+
+Captured checkpoints:
+- `mode_start`:
+  - `elapsedMs=47745`
+  - `nearby tactical OPFOR r250=0 r500=0 r800=0`
+  - `materializedAgents=48`
+- `first_contact_broad`:
+  - `elapsedMs=48447`
+  - `nearby tactical OPFOR r250=0 r500=0 r800=1`
+  - `materializedAgents=52`
+- `post_respawn`:
+  - `elapsedMs=52646`
+  - `nearby tactical OPFOR r250=0 r500=0 r800=9`
+  - `respawn stats deaths=1 respawns=1`
+  - `materializedAgents=60`
+- `sustained_5m`:
+  - `elapsedMs=348997`
+  - `firstTacticalContactMs=71878`
+  - `nearby tactical OPFOR r250=0 r500=0 r800=9`
+  - `materializedAgents=60`
+
+Outcome:
+- Close-contact (`r250`) target still not reached in unattended runs.
+- Mid-range pressure remains improved relative to pre-fix baseline (`r800` non-zero after respawn and at sustained checkpoint).
+- First-contact timing remains within target envelope in this run (`~71.9s`).
+
+Next:
+- Introduce an optional “contact guarantee” respawn micro-offset policy for A Shau:
+  - sample 8-12 candidate insertion points around hotspot
+  - choose nearest point with highest nearby OPFOR tactical density estimate
+  - reject points lacking loaded terrain ring
+- Re-run diagnostics and target:
+  - `post_respawn r250 > 0`
+  - `sustained_5m r250 > 0`
