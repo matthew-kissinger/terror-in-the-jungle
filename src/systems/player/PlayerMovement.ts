@@ -184,8 +184,17 @@ export class PlayerMovement {
     // Check ground collision using ImprovedChunkManager if available, otherwise use flat baseline
     let groundHeight = 2; // Default player height above ground (flat world fallback)
     if (this.chunkManager) {
-      const effectiveHeight = this.chunkManager.getEffectiveHeightAt(newPosition.x, newPosition.z);
-      groundHeight = effectiveHeight + 2;
+      const resolver =
+        (this.chunkManager as any).getTerrainHeightAt
+        ?? (this.chunkManager as any).getHeightAt
+        ?? (this.chunkManager as any).getHeightAtWorldPosition
+        ?? (this.chunkManager as any).getEffectiveHeightAt;
+      if (typeof resolver === 'function') {
+        const terrainHeight = Number(resolver.call(this.chunkManager, newPosition.x, newPosition.z));
+        if (Number.isFinite(terrainHeight)) {
+          groundHeight = terrainHeight + 2;
+        }
+      }
     }
 
     // Allow standing on top of sandbags

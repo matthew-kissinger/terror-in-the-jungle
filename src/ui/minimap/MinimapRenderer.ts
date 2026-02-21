@@ -131,9 +131,19 @@ function drawCombatantIndicators(ctx: CanvasRenderingContext2D, state: MinimapRe
 
   const combatants = state.combatantSystem.getAllCombatants();
   const scale = state.size / state.worldSize;
+  const configuredRange = Number((globalThis as any).__MINIMAP_TACTICAL_RANGE__);
+  const tacticalRange = Number.isFinite(configuredRange)
+    ? configuredRange
+    : (state.worldSize >= 10000 ? 900 : Infinity);
+  const tacticalRangeSq = tacticalRange * tacticalRange;
 
   combatants.forEach(combatant => {
     if (combatant.state === 'dead') return;
+    if (Number.isFinite(tacticalRangeSq)) {
+      const dx = combatant.position.x - state.playerPosition.x;
+      const dz = combatant.position.z - state.playerPosition.z;
+      if ((dx * dx + dz * dz) > tacticalRangeSq) return;
+    }
 
     const { x, y } = worldToMinimap(combatant.position, state, scale);
 
@@ -156,6 +166,9 @@ function drawCombatantIndicators(ctx: CanvasRenderingContext2D, state: MinimapRe
  * Only active when WarSimulator is running. Shows the broader war beyond immediate area.
  */
 function drawStrategicAgents(ctx: CanvasRenderingContext2D, state: MinimapRenderState, renderScale: number): void {
+  // Default off: these are abstract (non-materialized) war agents and can look
+  // like "ghost enemies" on the minimap if shown as normal contacts.
+  if ((globalThis as any).__MINIMAP_SHOW_STRATEGIC_AGENTS__ !== true) return;
   if (!state.warSimulator || !state.warSimulator.isEnabled()) return;
 
   const data = state.warSimulator.getAgentPositionsForMap();

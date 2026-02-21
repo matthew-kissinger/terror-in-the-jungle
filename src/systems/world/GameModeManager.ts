@@ -114,7 +114,11 @@ export class GameModeManager implements GameSystem {
       this.combatantSystem.setReinforcementInterval(config.reinforcementInterval);
       // Skip standard spawning when WarSimulator handles force generation
       if (!config.warSimulator?.enabled) {
+        this.combatantSystem.setAutonomousSpawningEnabled(true);
         this.combatantSystem.reseedForcesForMode();
+      } else {
+        this.combatantSystem.setAutonomousSpawningEnabled(false);
+        this.combatantSystem.clearCombatantsForExternalPopulation();
       }
     }
 
@@ -177,7 +181,9 @@ export class GameModeManager implements GameSystem {
             name: z.name,
             position: { x: z.position.x, z: z.position.z },
             isHomeBase: z.isHomeBase,
-            owner: z.owner
+            owner: z.owner,
+            state: z.state,
+            ticketBleedRate: z.ticketBleedRate
           }));
           this.warSimulator.spawnStrategicForces(zones);
         }

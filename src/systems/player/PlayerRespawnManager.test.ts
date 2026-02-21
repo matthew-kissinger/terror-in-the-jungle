@@ -8,6 +8,7 @@ import { InventoryManager } from './InventoryManager';
 import { Faction } from '../combat/types';
 import { RespawnUI } from './RespawnUI';
 import { RespawnMapController } from './RespawnMapController';
+import { GameMode } from '../../config/gameModes';
 
 // Mock browser globals for Node.js environment
 if (typeof document === 'undefined') {
@@ -489,6 +490,24 @@ describe('PlayerRespawnManager', () => {
       respawnManager.respawnAtBase();
 
       expect(mockPlayerHealthSystem.applySpawnProtection).toHaveBeenCalledWith(3);
+    });
+
+    it('should use A Shau pressure spawn policy near contested objective', () => {
+      (mockGameModeManager as any).currentMode = GameMode.A_SHAU_VALLEY;
+      vi.mocked(mockZoneManager.getAllZones).mockReturnValue([
+        createMockZone('us_base', 'US Base', new THREE.Vector3(0, 0, -50), ZoneState.US_CONTROLLED, true, Faction.US),
+        { ...createMockZone('zone_us_forward', 'US Forward', new THREE.Vector3(100, 0, 100), ZoneState.US_CONTROLLED, false, Faction.US), ticketBleedRate: 2 },
+        { ...createMockZone('zone_obj', 'Objective', new THREE.Vector3(220, 0, 220), ZoneState.CONTESTED, false, Faction.NONE), ticketBleedRate: 6 },
+      ] as any);
+
+      respawnManager.respawnAtBase();
+
+      const callPosition = vi.mocked(mockPlayerController.setPosition).mock.calls[0][0];
+      // Should no longer be base fallback.
+      expect(callPosition.z).not.toBe(-50);
+      // Should bias toward objective (higher than forward-base X/Z)
+      expect(callPosition.x).toBeGreaterThan(100);
+      expect(callPosition.z).toBeGreaterThan(100);
     });
 
     it('should use spawn protection from game mode manager', () => {

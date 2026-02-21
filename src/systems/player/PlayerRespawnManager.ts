@@ -7,9 +7,11 @@ import { PlayerHealthSystem } from './PlayerHealthSystem';
 import { GameModeManager } from '../world/GameModeManager';
 import { InventoryManager } from './InventoryManager';
 import { getHeightQueryCache } from '../terrain/HeightQueryCache';
+import { GameMode } from '../../config/gameModes';
 import { RespawnUI } from './RespawnUI';
 import { RespawnMapController } from './RespawnMapController';
 import type { IFirstPersonWeapon, IPlayerController } from '../../types/SystemInterfaces';
+import type { WarSimulator } from '../strategy/WarSimulator';
 
 export class PlayerRespawnManager implements GameSystem {
   private scene: THREE.Scene;
@@ -20,12 +22,17 @@ export class PlayerRespawnManager implements GameSystem {
   private playerController?: IPlayerController;
   private firstPersonWeapon?: IFirstPersonWeapon;
   private inventoryManager?: InventoryManager;
+  private warSimulator?: WarSimulator;
 
   // Respawn state
   private isRespawnUIVisible = false;
   private respawnTimer = 0;
   private selectedSpawnPoint?: string;
   private availableSpawnPoints: Array<{ id: string; name: string; position: THREE.Vector3; safe: boolean }> = [];
+  private lastTimerDisplaySecond: number = -1;
+  private lastTimerDisplayHasSelection = false;
+  private deathCount = 0;
+  private respawnCount = 0;
 
   // UI and map modules
   private respawnUI: RespawnUI;
@@ -61,7 +68,14 @@ export class PlayerRespawnManager implements GameSystem {
   update(deltaTime: number): void {
     if (this.isRespawnUIVisible && this.respawnTimer > 0) {
       this.respawnTimer -= deltaTime;
-      this.updateTimerDisplay();
+      const currentSecond = Math.max(0, Math.ceil(this.respawnTimer));
+      const hasSelection = !!this.selectedSpawnPoint;
+      if (
+        currentSecond !== this.lastTimerDisplaySecond
+        || hasSelection !== this.lastTimerDisplayHasSelection
+      ) {
+        this.updateTimerDisplay();
+      }
     }
   }
 
@@ -103,6 +117,10 @@ export class PlayerRespawnManager implements GameSystem {
 
   setInventoryManager(inventoryManager: InventoryManager): void {
     this.inventoryManager = inventoryManager;
+  }
+
+  setWarSimulator(warSimulator: WarSimulator): void {
+    this.warSimulator = warSimulator;
   }
 
   setRespawnCallback(callback: (position: THREE.Vector3) => void): void {
@@ -158,6 +176,16 @@ export class PlayerRespawnManager implements GameSystem {
       return;
     }
 
+    const currentMode = this.getCurrentGameMode();
+    if (currentMode === GameMode.A_SHAU_VALLEY) {
+      const pressureSpawn = this.getAShauPressureSpawnPosition();
+      if (pressureSpawn) {
+        pressureSpawn.y = 5;
+        this.respawn(pressureSpawn);
+        return;
+      }
+    }
+
     const usBase = this.zoneManager.getAllZones().find(
       z => z.id === 'us_base' || (z.isHomeBase && z.owner === Faction.US)
     );
@@ -209,6 +237,7 @@ export class PlayerRespawnManager implements GameSystem {
     }
 
     Logger.info('player', ` Player respawned at ${position.x}, ${position.y}, ${position.z}`);
+    this.respawnCount++;
 
     // Trigger callback
     if (this.onRespawnCallback) {
@@ -218,6 +247,7 @@ export class PlayerRespawnManager implements GameSystem {
 
   onPlayerDeath(): void {
     Logger.info('player', ' Player eliminated!');
+    this.deathCount++;
 
     // Re-check game mode when player dies in case it changed
     if (this.gameModeManager) {
@@ -266,6 +296,8 @@ export class PlayerRespawnManager implements GameSystem {
 
     this.selectedSpawnPoint = undefined;
     this.respawnUI.resetSelectedSpawn();
+    this.lastTimerDisplaySecond = -1;
+    this.lastTimerDisplayHasSelection = false;
 
     // Update buttons and timer
     this.updateTimerDisplay();
@@ -337,6 +369,113 @@ export class PlayerRespawnManager implements GameSystem {
   }
 
   private updateTimerDisplay(): void {
-    this.respawnUI.updateTimerDisplay(this.respawnTimer, !!this.selectedSpawnPoint);
+    const currentSecond = Math.max(0, Math.ceil(this.respawnTimer));
+    const hasSelection = !!this.selectedSpawnPoint;
+    this.lastTimerDisplaySecond = currentSecond;
+    this.lastTimerDisplayHasSelection = hasSelection;
+    this.respawnUI.updateTimerDisplay(this.respawnTimer, hasSelection);
+  }
+
+  private getAShauPressureSpawnPosition(): THREE.Vector3 | null {
+    if (!this.zoneManager) return null;
+    const zones = this.zoneManager.getAllZones();
+    const usForward = zones.filter(z => !z.isHomeBase && z.state === ZoneState.US_CONTROLLED);
+    if (usForward.length === 0) return null;
+
+    const enemyLike = zones.filter(z => z.owner === Faction.OPFOR || z.state === ZoneState.CONTESTED || z.owner === null);
+    if (enemyLike.length === 0) {
+      return usForward[0].position.clone();
+    }
+
+    const contestedOrNeutral = enemyLike.filter(z => z.state === ZoneState.CONTESTED || z.owner === null);
+    const objectiveCandidates = contestedOrNeutral.length > 0 ? contestedOrNeutral : enemyLike;
+
+    let bestObjective = objectiveCandidates[0];
+    let bestObjectiveScore = -Infinity;
+    for (const zone of objectiveCandidates) {
+      const objectiveScore = zone.ticketBleedRate ?? 0;
+      if (objectiveScore > bestObjectiveScore) {
+        bestObjectiveScore = objectiveScore;
+        bestObjective = zone;
+      }
+    }
+
+    let nearestUS = usForward[0];
+    let nearestUSDist = Infinity;
+    for (const usZone of usForward) {
+      const d = usZone.position.distanceTo(bestObjective.position);
+      if (d < nearestUSDist) {
+        nearestUSDist = d;
+        nearestUS = usZone;
+      }
+    }
+
+    const enemyHotspot = this.getEnemyHotspotNear(bestObjective.position, 900);
+    const anchor = enemyHotspot ?? bestObjective.position;
+    const dir = new THREE.Vector3().subVectors(nearestUS.position, anchor);
+    dir.y = 0;
+    const len = dir.length();
+    if (len < 1) {
+      return nearestUS.position.clone();
+    }
+    dir.divideScalar(len);
+
+    // Insert on the US-facing side of the objective to cut dead travel while
+    // avoiding direct center-of-objective spawn.
+    const insertionOffsetMeters = enemyHotspot
+      ? Math.min(110, Math.max(55, nearestUSDist * 0.2))
+      : Math.min(160, Math.max(80, nearestUSDist * 0.3));
+    return anchor.clone().addScaledVector(dir, insertionOffsetMeters);
+  }
+
+  private getEnemyHotspotNear(objective: THREE.Vector3, maxRadius: number): THREE.Vector3 | null {
+    if (!this.warSimulator || !this.warSimulator.isEnabled()) return null;
+
+    const agents = this.warSimulator.getAllAgents();
+    const maxRadiusSq = maxRadius * maxRadius;
+    type Candidate = { x: number; z: number; d2: number };
+    const candidates: Candidate[] = [];
+
+    for (const agent of agents.values()) {
+      if (!agent.alive || agent.faction !== Faction.OPFOR) continue;
+      const dx = agent.x - objective.x;
+      const dz = agent.z - objective.z;
+      const d2 = dx * dx + dz * dz;
+      if (d2 > maxRadiusSq) continue;
+
+      candidates.push({ x: agent.x, z: agent.z, d2 });
+    }
+
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => a.d2 - b.d2);
+    const take = Math.min(10, candidates.length);
+    let sumX = 0;
+    let sumZ = 0;
+    for (let i = 0; i < take; i++) {
+      sumX += candidates[i].x;
+      sumZ += candidates[i].z;
+    }
+    return new THREE.Vector3(sumX / take, 0, sumZ / take);
+  }
+
+  private getCurrentGameMode(): GameMode | undefined {
+    if (!this.gameModeManager) return undefined;
+
+    // Preserve compatibility with older test doubles and runtime call-sites
+    // that expose `currentMode` as a property instead of a getter.
+    const modeFromGetter = typeof this.gameModeManager.getCurrentMode === 'function'
+      ? this.gameModeManager.getCurrentMode()
+      : undefined;
+
+    if (modeFromGetter !== undefined) return modeFromGetter;
+
+    return (this.gameModeManager as unknown as { currentMode?: GameMode }).currentMode;
+  }
+
+  getSessionRespawnStats(): { deaths: number; respawns: number } {
+    return {
+      deaths: this.deathCount,
+      respawns: this.respawnCount
+    };
   }
 }

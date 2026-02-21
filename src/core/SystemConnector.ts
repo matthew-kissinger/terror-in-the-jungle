@@ -68,6 +68,7 @@ export class SystemConnector {
     refs.zoneManager.setCamera(camera);
     refs.zoneManager.setChunkManager(refs.chunkManager);
     refs.zoneManager.setSpatialGridManager(spatialGridManager);
+    refs.zoneManager.setSpatialQueryProvider((center, radius) => refs.combatantSystem.querySpatialRadius(center, radius));
     refs.zoneManager.setHUDSystem(refs.hudSystem);
 
     // Connect audio manager
@@ -81,6 +82,7 @@ export class SystemConnector {
     refs.playerRespawnManager.setPlayerController(refs.playerController);
     refs.playerRespawnManager.setFirstPersonWeapon(refs.firstPersonWeapon);
     refs.playerRespawnManager.setInventoryManager(refs.inventoryManager);
+    refs.playerRespawnManager.setWarSimulator(refs.warSimulator);
 
     // Connect helipad system
     refs.helipadSystem.setTerrainManager(refs.chunkManager);

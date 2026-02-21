@@ -15,6 +15,7 @@ import { AudioManager } from '../audio/AudioManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { Logger } from '../../utils/Logger';
 import { VoiceCalloutSystem } from '../audio/VoiceCalloutSystem';
+import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 
 // Refactored modules
 import { CombatantFactory } from './CombatantFactory';
@@ -82,11 +83,13 @@ export class CombatantSystem implements GameSystem {
   // Combatant management
   public readonly combatants: Map<string, Combatant> = new Map();
   private playerPosition = new THREE.Vector3();
+  private autonomousSpawningEnabled = true;
 
   // Player proxy
   private playerProxyId: string = 'player_proxy';
   private combatEnabled = false;
   private readonly secondarySpatialSyncEnabled: boolean;
+  private readonly secondarySpatialDedupEnabled: boolean;
 
   // Player squad
   public shouldCreatePlayerSquad = false;
@@ -189,6 +192,7 @@ export class CombatantSystem implements GameSystem {
     this.combatantCombat.setSpatialQueryProvider((center, radius) => this.spatialGrid.queryRadius(center, radius));
 
     this.secondarySpatialSyncEnabled = this.resolveSecondarySpatialSyncEnabled();
+    this.secondarySpatialDedupEnabled = this.resolveSecondarySpatialDedupEnabled();
   }
 
   async init(): Promise<void> {
@@ -241,7 +245,9 @@ export class CombatantSystem implements GameSystem {
     this.updateHelpers.ensurePlayerProxy();
 
     // Update spawn manager (progressive spawns, reinforcement waves, respawns)
-    this.spawnManager.update(deltaTime, this.combatEnabled, this.ticketSystem);
+    if (this.autonomousSpawningEnabled) {
+      this.spawnManager.update(deltaTime, this.combatEnabled, this.ticketSystem);
+    }
 
     // Periodic squad objective reassignment using influence map
     this.updateHelpers.updateSquadObjectives(deltaTime);
@@ -284,7 +290,11 @@ export class CombatantSystem implements GameSystem {
     // Secondary sync path is experimental; primary spatial ownership is the octree updated in LOD manager.
     if (this.secondarySpatialSyncEnabled) {
       t0 = performance.now();
-      spatialGridManager.syncAllPositions(this.combatants, this.playerPosition);
+      spatialGridManager.syncAllPositions(
+        this.combatants,
+        this.playerPosition,
+        this.secondarySpatialDedupEnabled ? this.lodManager.getSpatiallyUpdatedIds() : undefined
+      );
       this.profiler.profiling.spatialSyncMs = performance.now() - t0;
     } else {
       this.profiler.profiling.spatialSyncMs = 0;
@@ -333,6 +343,25 @@ export class CombatantSystem implements GameSystem {
     squadId?: string;
   }): string {
     const position = new THREE.Vector3(data.x, data.y, data.z);
+
+    // Ensure external materialized agents are grounded at current terrain height.
+    // Strategic agents can travel long distances between height updates.
+    const terrainResolver =
+      (this.chunkManager as any)?.getTerrainHeightAt
+      ?? (this.chunkManager as any)?.getHeightAt
+      ?? (this.chunkManager as any)?.getEffectiveHeightAt;
+
+    let terrainHeight = Number.NaN;
+    if (typeof terrainResolver === 'function') {
+      terrainHeight = Number(terrainResolver.call(this.chunkManager, data.x, data.z));
+    }
+    if (!Number.isFinite(terrainHeight)) {
+      terrainHeight = getHeightQueryCache().getHeightAt(data.x, data.z);
+    }
+    if (Number.isFinite(terrainHeight)) {
+      position.y = terrainHeight + 3;
+    }
+
     const combatant = this.combatantFactory.createCombatant(
       data.faction,
       position,
@@ -417,6 +446,21 @@ export class CombatantSystem implements GameSystem {
     return Array.from(this.combatants.values());
   }
 
+  querySpatialRadius(center: THREE.Vector3, radius: number): string[] {
+    return this.spatialGrid.queryRadius(center, radius);
+  }
+
+  getCombatantLiveness(id: string): { exists: boolean; alive: boolean } {
+    const combatant = this.combatants.get(id);
+    if (!combatant) {
+      return { exists: false, alive: false };
+    }
+    return {
+      exists: true,
+      alive: combatant.state !== CombatantState.DEAD && !combatant.isDying && combatant.health > 0
+    };
+  }
+
   private resolveSecondarySpatialSyncEnabled(): boolean {
     const fromGlobal = (globalThis as any).__SPATIAL_SECONDARY_SYNC__;
     if (typeof fromGlobal === 'boolean') return fromGlobal;
@@ -424,6 +468,20 @@ export class CombatantSystem implements GameSystem {
     try {
       const params = new URLSearchParams(window.location.search);
       const raw = params.get('spatialSecondarySync');
+      if (raw === '0' || raw === 'false') return false;
+      return true;
+    } catch {
+      return true;
+    }
+  }
+
+  private resolveSecondarySpatialDedupEnabled(): boolean {
+    const fromGlobal = (globalThis as any).__SPATIAL_DEDUP_SYNC__;
+    if (typeof fromGlobal === 'boolean') return fromGlobal;
+    if (typeof window === 'undefined') return true;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const raw = params.get('spatialDedupSync');
       if (raw === '0' || raw === 'false') return false;
       return true;
     } catch {
@@ -494,6 +552,27 @@ export class CombatantSystem implements GameSystem {
 
   setReinforcementInterval(interval: number): void {
     this.setters.setReinforcementInterval(interval);
+  }
+
+  setAutonomousSpawningEnabled(enabled: boolean): void {
+    this.autonomousSpawningEnabled = enabled;
+    this.spawnManager.setAutonomousSpawningEnabled(enabled);
+    if (!enabled) {
+      this.spawnManager.resetRuntimeStateForExternalPopulation();
+    }
+  }
+
+  clearCombatantsForExternalPopulation(): void {
+    const ids = Array.from(this.combatants.keys());
+    for (const id of ids) {
+      this.spatialGrid.remove(id);
+      spatialGridManager.removeEntity(id);
+    }
+    this.combatants.clear();
+    this.squadManager.dispose();
+    this.playerSquadId = undefined;
+    this.spawnManager.resetRuntimeStateForExternalPopulation();
+    this.combatantAI.setSquads(this.squadManager.getAllSquads());
   }
 
   setSpatialBounds(size: number): void {

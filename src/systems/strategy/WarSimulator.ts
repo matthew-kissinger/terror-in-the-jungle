@@ -187,9 +187,18 @@ export class WarSimulator implements GameSystem {
    * Distributes agents across faction HQ zones in squads.
    */
   spawnStrategicForces(
-    zones: Array<{ id: string; name: string; position: { x: number; z: number }; isHomeBase: boolean; owner: Faction | null }>
+    zones: Array<{
+      id: string;
+      name: string;
+      position: { x: number; z: number };
+      isHomeBase: boolean;
+      owner: Faction | null;
+      state?: string;
+      ticketBleedRate?: number;
+    }>
   ): void {
     if (!this.config) return;
+    this.resetStrategicForces();
 
     const usHQs = zones.filter(z => z.isHomeBase && z.owner === Faction.US);
     const opforHQs = zones.filter(z => z.isHomeBase && z.owner === Faction.OPFOR);
@@ -202,29 +211,57 @@ export class WarSimulator implements GameSystem {
     // Also spawn some squads at controlled non-HQ zones for both factions
     const usZones = zones.filter(z => !z.isHomeBase && z.owner === Faction.US);
     const opforZones = zones.filter(z => !z.isHomeBase && z.owner === Faction.OPFOR);
+    const frontlineZones = zones
+      .filter(z => !z.isHomeBase && (z.owner === null || z.state === 'contested'))
+      .sort((a, b) => (b.ticketBleedRate ?? 0) - (a.ticketBleedRate ?? 0));
 
     const squadMin = this.config.squadSize.min;
     const squadMax = this.config.squadSize.max;
     const avgSquadSize = Math.floor((squadMin + squadMax) / 2);
     const squadsPerFaction = Math.ceil(this.config.agentsPerFaction / avgSquadSize);
 
-    // Spawn US forces: 60% at HQs, 40% at forward positions (firebases)
-    const usHQSquads = Math.ceil(squadsPerFaction * 0.6);
-    const usZoneSquads = squadsPerFaction - usHQSquads;
+    // Spawn distribution: keep HQ reserves, but guarantee frontline presence
+    // so early contact emerges near strategic objectives.
+    const frontlineSquads = frontlineZones.length > 0
+      ? Math.max(1, Math.floor(squadsPerFaction * 0.2))
+      : 0;
+    const hqSquads = Math.max(1, Math.ceil(squadsPerFaction * 0.45));
+    const zoneSquads = Math.max(0, squadsPerFaction - hqSquads - frontlineSquads);
+
+    // Spawn US forces
+    const usHQSquads = hqSquads;
+    const usZoneSquads = zoneSquads;
     this.spawnFactionForces(Faction.US, usHQs, [], usHQSquads, squadMin, squadMax);
     if (usZoneSquads > 0 && usZones.length > 0) {
       this.spawnFactionForces(Faction.US, usZones, [], usZoneSquads, squadMin, squadMax);
+    } else if (usZoneSquads > 0) {
+      this.spawnFactionForces(Faction.US, usHQs, [], usZoneSquads, squadMin, squadMax);
+    }
+    if (frontlineSquads > 0) {
+      this.spawnFactionForces(Faction.US, frontlineZones, [], frontlineSquads, squadMin, squadMax);
     }
 
-    // Spawn OPFOR forces: 60% at HQs, 40% distributed at controlled zones
-    const opforHQSquads = Math.ceil(squadsPerFaction * 0.6);
-    const opforZoneSquads = squadsPerFaction - opforHQSquads;
+    // Spawn OPFOR forces
+    const opforHQSquads = hqSquads;
+    const opforZoneSquads = zoneSquads;
     this.spawnFactionForces(Faction.OPFOR, opforHQs, opforZones, opforHQSquads, squadMin, squadMax);
     if (opforZoneSquads > 0 && opforZones.length > 0) {
       this.spawnFactionForces(Faction.OPFOR, opforZones, [], opforZoneSquads, squadMin, squadMax);
+    } else if (opforZoneSquads > 0) {
+      this.spawnFactionForces(Faction.OPFOR, opforHQs, [], opforZoneSquads, squadMin, squadMax);
+    }
+    if (frontlineSquads > 0) {
+      this.spawnFactionForces(Faction.OPFOR, frontlineZones, [], frontlineSquads, squadMin, squadMax);
     }
 
     Logger.info('war-sim', `Spawned ${this.agents.size} agents in ${this.squads.size} squads`);
+  }
+
+  private resetStrategicForces(): void {
+    this.agents.clear();
+    this.squads.clear();
+    this.nextAgentId = 0;
+    this.nextSquadId = 0;
   }
 
   private spawnFactionForces(
@@ -321,8 +358,9 @@ export class WarSimulator implements GameSystem {
       agent.x += dx * ratio;
       agent.z += dz * ratio;
 
-      // Update Y from terrain (throttled - only every ~10 agents need exact height)
-      if (this.getTerrainHeight && agent.tier === AgentTier.SIMULATED) {
+      // Keep non-materialized agents terrain-aligned so later materialization
+      // never inherits stale altitude from long-range strategic movement.
+      if (this.getTerrainHeight) {
         agent.y = this.getTerrainHeight(agent.x, agent.z);
       }
     }
