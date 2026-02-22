@@ -416,68 +416,6 @@ export function getStartScreenStyles(): string {
       font-variant-numeric: tabular-nums;
     }
 
-    /* ---- Landscape prompt ---- */
-    .landscape-orientation-prompt {
-      position: absolute;
-      inset: 0;
-      z-index: 9;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-    }
-
-    .landscape-orientation-card {
-      pointer-events: auto;
-      width: min(92vw, 340px);
-      background: rgba(8, 16, 24, 0.94);
-      border: 1px solid rgba(127, 180, 217, 0.3);
-      border-radius: ${borderRadius.lg};
-      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
-      padding: 1rem;
-      text-align: center;
-      color: ${colors.textPrimary};
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-    }
-
-    .landscape-orientation-icon {
-      font-size: 1.2rem;
-      line-height: 1;
-      color: ${colors.primary};
-      margin-bottom: 0.3rem;
-    }
-
-    .landscape-orientation-text {
-      font-size: 0.8rem;
-      letter-spacing: 0.04em;
-      margin-bottom: 0.5rem;
-      opacity: 0.8;
-    }
-
-    .landscape-orientation-dismiss {
-      appearance: none;
-      border: 1px solid rgba(127, 180, 217, 0.3);
-      background: rgba(127, 180, 217, 0.1);
-      color: ${colors.primary};
-      border-radius: ${borderRadius.pill};
-      min-height: 44px;
-      padding: 0.3rem 0.8rem;
-      cursor: pointer;
-      touch-action: manipulation;
-      font: inherit;
-      font-size: 0.7rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      font-weight: 600;
-    }
-
-    @media (orientation: portrait) and (max-width: ${breakpoints.tablet}px) {
-      .landscape-orientation-prompt.visible {
-        display: flex;
-      }
-    }
-
     /* ---- Error panel ---- */
     .error-panel {
       position: fixed;

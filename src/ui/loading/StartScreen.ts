@@ -4,7 +4,7 @@
  */
 
 import { GameMode } from '../../config/gameModes';
-import { isTouchDevice, isMobileViewport } from '../../utils/DeviceDetector';
+import { isTouchDevice } from '../../utils/DeviceDetector';
 import { isPortraitViewport, tryLockLandscapeOrientation } from '../../utils/Orientation';
 import { getStartScreenStyles } from './StartScreenStyles';
 import { createModeCardHTML, MODE_CARD_CONFIGS } from './ModeCard';
@@ -12,8 +12,6 @@ import { SettingsModal } from './SettingsModal';
 import { HowToPlayModal } from './HowToPlayModal';
 import { LoadingProgress } from './LoadingProgress';
 import { LOADING_PHASES } from '../../config/loading';
-
-let landscapePromptDismissedForSession = false;
 
 export class StartScreen {
   private container: HTMLDivElement;
@@ -31,7 +29,6 @@ export class StartScreen {
 
   private errorPanel: HTMLDivElement | null = null;
   private fullscreenPrompt: HTMLDivElement | null = null;
-  private landscapePrompt: HTMLDivElement | null = null;
 
   private settingsModal: SettingsModal;
   private howToPlayModal: HowToPlayModal;
@@ -43,14 +40,17 @@ export class StartScreen {
   private initTimeoutId: number | null = null;
   private isInitialized = false;
 
-  private readonly handleOrientationOrResize = () => {
-    if (!this.landscapePrompt) return;
-    if (!isPortraitViewport()) {
-      this.dismissLandscapePrompt();
-    }
-  };
-
   private handlePlayClick = () => {
+    // On touch devices, auto-enter fullscreen + landscape on play (no separate prompt needed)
+    if (isTouchDevice() && !document.fullscreenElement) {
+      const el = document.documentElement;
+      if (el.requestFullscreen) {
+        el.requestFullscreen()
+          .then(() => tryLockLandscapeOrientation())
+          .catch(() => {});
+      }
+    }
+    this.dismissFullscreenPrompt();
     if (this.onPlayCallback) this.onPlayCallback(this.selectedGameMode);
   };
   private handleSettingsClick = () => this.settingsModal.show();
@@ -208,9 +208,6 @@ export class StartScreen {
     this.progress.showComplete();
 
     if (isTouchDevice()) this.showFullscreenPrompt();
-    if (isTouchDevice() && isMobileViewport() && isPortraitViewport()) {
-      this.showLandscapePrompt();
-    }
   }
 
   hide(): void {
@@ -300,30 +297,29 @@ export class StartScreen {
     const prompt = document.createElement('div');
     prompt.setAttribute('role', 'button');
     prompt.tabIndex = 0;
-    prompt.innerHTML = `
-      <span style="font-size: 0.8rem; font-weight: 600; letter-spacing: 0.06em;">TAP FOR FULLSCREEN</span>
-      <span style="font-size: 0.65rem; opacity: 0.6; margin-top: 0.15rem;">optional - fullscreen + landscape recommended</span>
-    `;
+    const isPortrait = isPortraitViewport();
+    prompt.innerHTML = isPortrait
+      ? `<span style="font-size: 0.7rem; font-weight: 600; letter-spacing: 0.05em;">TAP FOR FULLSCREEN + LANDSCAPE</span>`
+      : `<span style="font-size: 0.7rem; font-weight: 600; letter-spacing: 0.05em;">TAP FOR FULLSCREEN</span>`;
     Object.assign(prompt.style, {
       position: 'absolute',
-      bottom: '1rem',
+      bottom: '0.6rem',
       left: '50%',
       transform: 'translateX(-50%)',
-      padding: '0.5rem 1rem',
-      minHeight: '44px',
+      padding: '0.35rem 0.8rem',
       display: 'flex',
-      flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'rgba(8, 16, 24, 0.8)',
-      border: '1px solid rgba(127, 180, 217, 0.25)',
-      borderRadius: '10px',
-      color: 'rgba(127, 180, 217, 0.9)',
+      background: 'rgba(8, 16, 24, 0.7)',
+      border: '1px solid rgba(127, 180, 217, 0.2)',
+      borderRadius: '8px',
+      color: 'rgba(127, 180, 217, 0.8)',
       cursor: 'pointer',
       touchAction: 'manipulation',
       WebkitTapHighlightColor: 'transparent',
       zIndex: '10',
-      transition: 'opacity 0.2s',
+      transition: 'opacity 0.3s',
+      opacity: '1',
     } as Partial<CSSStyleDeclaration>);
 
     const handleTap = () => {
@@ -341,42 +337,14 @@ export class StartScreen {
     prompt.addEventListener('click', (e) => e.preventDefault());
     this.container.appendChild(prompt);
     this.fullscreenPrompt = prompt;
-  }
 
-  private showLandscapePrompt(): void {
-    if (landscapePromptDismissedForSession || this.landscapePrompt || !isPortraitViewport()) return;
-
-    const prompt = document.createElement('div');
-    prompt.className = 'landscape-orientation-prompt visible';
-    prompt.innerHTML = `
-      <div class="landscape-orientation-card" role="status" aria-live="polite">
-        <div class="landscape-orientation-icon" aria-hidden="true">[ ]</div>
-        <div class="landscape-orientation-text">Rotate your device for the best experience</div>
-        <button class="landscape-orientation-dismiss" type="button">Continue anyway</button>
-      </div>
-    `;
-
-    const dismissBtn = prompt.querySelector('.landscape-orientation-dismiss');
-    dismissBtn?.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      landscapePromptDismissedForSession = true;
-      this.dismissLandscapePrompt();
-    });
-    dismissBtn?.addEventListener('click', (e) => e.preventDefault());
-
-    window.addEventListener('orientationchange', this.handleOrientationOrResize);
-    window.addEventListener('resize', this.handleOrientationOrResize);
-    this.container.appendChild(prompt);
-    this.landscapePrompt = prompt;
-  }
-
-  private dismissLandscapePrompt(): void {
-    window.removeEventListener('orientationchange', this.handleOrientationOrResize);
-    window.removeEventListener('resize', this.handleOrientationOrResize);
-    if (this.landscapePrompt?.parentElement) {
-      this.landscapePrompt.remove();
-      this.landscapePrompt = null;
-    }
+    // Auto-fade after 6 seconds so it doesn't nag
+    setTimeout(() => {
+      if (this.fullscreenPrompt) {
+        this.fullscreenPrompt.style.opacity = '0';
+        setTimeout(() => this.dismissFullscreenPrompt(), 300);
+      }
+    }, 6000);
   }
 
   private dismissFullscreenPrompt(): void {
