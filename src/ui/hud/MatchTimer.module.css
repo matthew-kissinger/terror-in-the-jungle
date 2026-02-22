@@ -1,0 +1,69 @@
+/**
+ * MatchTimer - Match countdown timer
+ *
+ * Design: Bare text with text-shadow. Timer is the primary visual anchor
+ * for match pacing - large tabular-nums for instant readability.
+ * Warning/critical states add color and pulse animation.
+ */
+
+.container {
+  padding: var(--space-1) var(--space-3);
+  pointer-events: none;
+  user-select: none;
+}
+
+.display {
+  font-size: var(--font-size-xl);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  text-align: center;
+  letter-spacing: 1.5px;
+  text-shadow: var(--shadow-text);
+  transition: color var(--duration-normal) var(--ease-out);
+  line-height: 1;
+}
+
+/* Warning state: <=60s remaining */
+.warning .display {
+  color: var(--accent);
+}
+
+/* Critical state: <=30s remaining */
+.critical .display {
+  color: var(--danger);
+}
+
+.critical {
+  animation: timerCriticalPulse 1s ease-in-out infinite;
+}
+
+@keyframes timerCriticalPulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 4px rgba(201, 86, 74, 0.2));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(201, 86, 74, 0.5));
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: var(--space-0-5) var(--space-2);
+  }
+
+  .display {
+    font-size: var(--font-size-lg);
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: var(--space-0-5) var(--space-1-5);
+  }
+
+  .display {
+    font-size: var(--font-size-base);
+  }
+}

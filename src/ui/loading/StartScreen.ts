@@ -1,38 +1,31 @@
 /**
- * StartScreen - main orchestrator for the start/menu screen.
- * Title + mode cards + play button. Delegates to SettingsModal and HowToPlayModal.
+ * StartScreen - Main menu / loading screen.
+ *
+ * Title + mode cards + progress bar + deploy button.
+ * Delegates to SettingsModal and HowToPlayModal as child UIComponents.
+ * LoadingProgress handles phase tracking and tip rotation.
+ *
+ * Replaces: old StartScreen (inline styles via StartScreenStyles.ts)
  */
 
+import { UIComponent } from '../engine/UIComponent';
 import { GameMode } from '../../config/gameModes';
 import { isTouchDevice } from '../../utils/DeviceDetector';
 import { isPortraitViewport, tryLockLandscapeOrientation } from '../../utils/Orientation';
-import { getStartScreenStyles } from './StartScreenStyles';
-import { createModeCardHTML, MODE_CARD_CONFIGS } from './ModeCard';
 import { SettingsModal } from './SettingsModal';
 import { HowToPlayModal } from './HowToPlayModal';
 import { LoadingProgress } from './LoadingProgress';
 import { LOADING_PHASES } from '../../config/loading';
+import { MODE_CARD_CONFIGS } from './ModeCard';
+import styles from './StartScreen.module.css';
 
-export class StartScreen {
-  private container: HTMLDivElement;
-  private progressBar: HTMLDivElement;
-  private progressFill: HTMLDivElement;
-  private percentText: HTMLSpanElement;
-  private phaseText: HTMLDivElement;
-  private tipText: HTMLDivElement;
-  private playButton: HTMLButtonElement;
-  private settingsButton: HTMLButtonElement;
-  private howToPlayButton: HTMLButtonElement;
-  private modeSelectionContainer: HTMLDivElement;
-  private modeCards: HTMLDivElement[];
-  private selectedModeDisplay: HTMLDivElement;
-
-  private errorPanel: HTMLDivElement | null = null;
-  private fullscreenPrompt: HTMLDivElement | null = null;
-
+export class StartScreen extends UIComponent {
   private settingsModal: SettingsModal;
   private howToPlayModal: HowToPlayModal;
-  private progress: LoadingProgress;
+
+  // Built lazily in build()
+  private progress!: LoadingProgress;
+  private modeCards: HTMLDivElement[] = [];
 
   private isVisible = true;
   private selectedGameMode: GameMode = GameMode.ZONE_CONTROL;
@@ -40,155 +33,129 @@ export class StartScreen {
   private initTimeoutId: number | null = null;
   private isInitialized = false;
 
-  private handlePlayClick = () => {
-    // On touch devices, auto-enter fullscreen + landscape on play (no separate prompt needed)
-    if (isTouchDevice() && !document.fullscreenElement) {
-      const el = document.documentElement;
-      if (el.requestFullscreen) {
-        el.requestFullscreen()
-          .then(() => tryLockLandscapeOrientation())
-          .catch(() => {});
-      }
-    }
-    this.dismissFullscreenPrompt();
-    if (this.onPlayCallback) this.onPlayCallback(this.selectedGameMode);
-  };
-  private handleSettingsClick = () => this.settingsModal.show();
-  private handleHowToPlayClick = () => this.howToPlayModal.show();
+  // Fullscreen prompt state
+  private fullscreenPrompt: HTMLDivElement | null = null;
+  private fullscreenFadeTimerId: ReturnType<typeof setTimeout> | null = null;
+  private fullscreenAutoTimerId: ReturnType<typeof setTimeout> | null = null;
+
+  // Error panel (appended outside root)
+  private errorPanel: HTMLDivElement | null = null;
 
   constructor() {
-    this.container = this.buildDOM();
-    this.progressBar = this.container.querySelector('.loading-bar') as HTMLDivElement;
-    this.progressFill = this.container.querySelector('.progress-fill') as HTMLDivElement;
-    this.percentText = this.container.querySelector('.percent-text') as HTMLSpanElement;
-    this.phaseText = this.container.querySelector('.phase-text') as HTMLDivElement;
-    this.tipText = this.container.querySelector('.tip-text') as HTMLDivElement;
-    this.playButton = this.container.querySelector('.play-button') as HTMLButtonElement;
-    this.settingsButton = this.container.querySelector('.settings-button') as HTMLButtonElement;
-    this.howToPlayButton = this.container.querySelector('.how-to-play-button') as HTMLButtonElement;
-    this.modeSelectionContainer = this.container.querySelector('.mode-selection-container') as HTMLDivElement;
-    this.selectedModeDisplay = this.container.querySelector('.selected-mode-display') as HTMLDivElement;
-    this.modeCards = Array.from(this.container.querySelectorAll('.mode-card')) as HTMLDivElement[];
-
+    super();
     this.settingsModal = new SettingsModal();
     this.howToPlayModal = new HowToPlayModal();
-    this.progress = new LoadingProgress(
-      this.progressFill, this.percentText, this.phaseText, this.tipText
-    );
-
-    this.initializePhases();
-    this.setupEventListeners();
-    this.progress.initializeTips();
-    this.startInitTimeout();
   }
 
-  private buildDOM(): HTMLDivElement {
-    const container = document.createElement('div');
-    container.id = 'loading-screen';
+  protected build(): void {
+    this.root.className = styles.screen;
 
     const modeCardsHTML = Object.keys(MODE_CARD_CONFIGS)
-      .map((mode, i) => createModeCardHTML(mode, i === 0))
+      .map((mode, i) => this.buildModeCardHTML(mode, i === 0))
       .join('');
 
-    container.innerHTML = `
-      <style>${getStartScreenStyles()}</style>
-
-      <div class="loading-content">
-        <div class="header-section">
-          <h1 class="game-title">TERROR IN THE JUNGLE</h1>
-          <div class="subtitle">US FORCES vs OPFOR</div>
+    this.root.innerHTML = `
+      <div class="${styles.content}">
+        <div>
+          <h1 class="${styles.gameTitle}">TERROR IN THE JUNGLE</h1>
+          <div class="${styles.subtitle}">US FORCES vs OPFOR</div>
         </div>
 
-        <div class="loading-section">
-          <div class="loading-bar">
-            <div class="progress-fill" style="width: 0%"></div>
-            <span class="percent-text">0%</span>
+        <div class="${styles.loadingSection}">
+          <div class="${styles.loadingBar}" data-ref="bar">
+            <div class="${styles.progressFill}" data-ref="fill" style="width: 0%"></div>
+            <span class="${styles.percentText}" data-ref="percent">0%</span>
           </div>
-          <div class="phase-text">Initializing...</div>
+          <div class="${styles.phaseText}" data-ref="phase">Initializing...</div>
         </div>
 
-        <div class="tip-container">
-          <div class="tip-label">INTEL</div>
-          <div class="tip-text"></div>
+        <div class="${styles.tipContainer}">
+          <div class="${styles.tipLabel}">INTEL</div>
+          <div class="${styles.tipText}" data-ref="tip"></div>
         </div>
 
-        <div class="mode-selection-container">
-          <div class="mode-cards">${modeCardsHTML}</div>
-          <div class="selected-mode-display">
+        <div class="${styles.modeSelection}" data-ref="modeSection">
+          <div class="${styles.modeCards}">${modeCardsHTML}</div>
+          <div class="${styles.selectedModeDisplay}" data-ref="modeDisplay">
             Selected: <strong>ZONE CONTROL</strong>
           </div>
         </div>
 
-        <div class="menu-buttons">
-          <button class="menu-button play-button">DEPLOY -- ZONE CONTROL</button>
-          <div class="button-row">
-            <button class="menu-button secondary-button settings-button">SETTINGS</button>
-            <button class="menu-button secondary-button how-to-play-button">CONTROLS</button>
+        <div class="${styles.menuButtons}" data-ref="menuButtons">
+          <button class="${styles.menuButton} ${styles.playButton}" data-ref="play">DEPLOY -- ZONE CONTROL</button>
+          <div class="${styles.buttonRow}">
+            <button class="${styles.menuButton} ${styles.secondaryButton}" data-ref="settings">SETTINGS</button>
+            <button class="${styles.menuButton} ${styles.secondaryButton}" data-ref="howToPlay">CONTROLS</button>
           </div>
         </div>
       </div>
 
-      <div class="loading-stats">
-        <span class="load-time"></span>
+      <div class="${styles.loadingStats}">
+        <span data-ref="loadTime"></span>
       </div>
     `;
 
-    document.body.appendChild(container);
-    return container;
+    // Initialize LoadingProgress with DOM refs
+    this.progress = new LoadingProgress(
+      this.$('[data-ref="fill"]') as HTMLDivElement,
+      this.$('[data-ref="percent"]') as HTMLSpanElement,
+      this.$('[data-ref="phase"]') as HTMLDivElement,
+      this.$('[data-ref="tip"]') as HTMLDivElement
+    );
+
+    // Cache mode cards
+    this.modeCards = Array.from(this.root.querySelectorAll('[data-mode]')) as HTMLDivElement[];
   }
 
-  private initializePhases(): void {
+  protected onMount(): void {
+    // Mount child modals to body
+    this.settingsModal.mount(document.body);
+    this.howToPlayModal.mount(document.body);
+
+    // Initialize loading phases
     for (const phase of LOADING_PHASES) {
       this.progress.addPhase(phase.id, phase.weight, phase.label);
     }
-  }
+    this.progress.initializeTips();
 
-  private setupEventListeners(): void {
     // Mode card selection
     for (const card of this.modeCards) {
       const mode = card.dataset.mode;
       if (!mode) continue;
       const gameMode = this.resolveGameMode(mode);
-      card.addEventListener('pointerdown', () => this.selectGameMode(gameMode));
-      card.addEventListener('click', (e) => e.preventDefault());
+      this.listen(card, 'pointerdown', () => this.selectGameMode(gameMode));
+      this.listen(card, 'click', (e) => e.preventDefault());
     }
 
-    this.playButton.addEventListener('pointerdown', this.handlePlayClick);
-    this.playButton.addEventListener('click', (e) => e.preventDefault());
-    this.settingsButton.addEventListener('pointerdown', this.handleSettingsClick);
-    this.settingsButton.addEventListener('click', (e) => e.preventDefault());
-    this.howToPlayButton.addEventListener('pointerdown', this.handleHowToPlayClick);
-    this.howToPlayButton.addEventListener('click', (e) => e.preventDefault());
-  }
-
-  private resolveGameMode(mode: string): GameMode {
-    switch (mode) {
-      case 'zone_control': return GameMode.ZONE_CONTROL;
-      case 'open_frontier': return GameMode.OPEN_FRONTIER;
-      case 'tdm': return GameMode.TEAM_DEATHMATCH;
-      case 'a_shau_valley': return GameMode.A_SHAU_VALLEY;
-      default: return GameMode.ZONE_CONTROL;
-    }
-  }
-
-  private selectGameMode(mode: GameMode): void {
-    this.selectedGameMode = mode;
-
-    for (const card of this.modeCards) {
-      card.classList.toggle('selected', this.resolveGameMode(card.dataset.mode || '') === mode);
+    // Button listeners
+    const playBtn = this.$('[data-ref="play"]');
+    if (playBtn) {
+      this.listen(playBtn, 'pointerdown', this.handlePlayClick);
+      this.listen(playBtn, 'click', (e) => e.preventDefault());
     }
 
-    const modeName =
-      mode === GameMode.ZONE_CONTROL ? 'ZONE CONTROL'
-      : mode === GameMode.OPEN_FRONTIER ? 'OPEN FRONTIER'
-      : mode === GameMode.A_SHAU_VALLEY ? 'A SHAU VALLEY'
-      : 'TEAM DEATHMATCH';
+    const settingsBtn = this.$('[data-ref="settings"]');
+    if (settingsBtn) {
+      this.listen(settingsBtn, 'pointerdown', () => this.settingsModal.show());
+      this.listen(settingsBtn, 'click', (e) => e.preventDefault());
+    }
 
-    this.selectedModeDisplay.innerHTML = `Selected: <strong>${modeName}</strong>`;
-    this.playButton.textContent = `DEPLOY -- ${modeName}`;
+    const howToPlayBtn = this.$('[data-ref="howToPlay"]');
+    if (howToPlayBtn) {
+      this.listen(howToPlayBtn, 'pointerdown', () => this.howToPlayModal.show());
+      this.listen(howToPlayBtn, 'click', (e) => e.preventDefault());
+    }
+
+    // Start init timeout
+    this.startInitTimeout();
   }
 
-  // --- Public API (same as old LoadingScreen) ---
+  protected onUnmount(): void {
+    this.dismissFullscreenPrompt();
+    this.clearInitTimeout();
+  }
+
+  // --- Public API ---
 
   updateProgress(phaseId: string, progress: number): void {
     this.progress.updateProgress(phaseId, progress);
@@ -201,24 +168,25 @@ export class StartScreen {
   showMainMenu(): void {
     this.markInitialized();
 
-    const buttons = this.container.querySelector('.menu-buttons');
-    if (buttons) buttons.classList.add('visible');
+    const buttons = this.$('[data-ref="menuButtons"]');
+    if (buttons) buttons.classList.add(styles.menuButtonsVisible);
 
-    this.modeSelectionContainer.classList.add('visible');
+    const modeSection = this.$('[data-ref="modeSection"]');
+    if (modeSection) modeSection.classList.add(styles.modeSelectionVisible);
+
     this.progress.showComplete();
 
     if (isTouchDevice()) this.showFullscreenPrompt();
   }
 
   hide(): void {
-    // Autostart/sandbox flows can skip showMainMenu; ensure init timeout cannot fire mid-match.
     this.markInitialized();
-    this.container.classList.add('hidden');
+    this.root.classList.add(styles.hidden);
     setTimeout(() => { this.isVisible = false; }, 500);
   }
 
   show(): void {
-    this.container.classList.remove('hidden');
+    this.root.classList.remove(styles.hidden);
     this.isVisible = true;
   }
 
@@ -236,27 +204,24 @@ export class StartScreen {
 
   showError(title: string, message: string): void {
     if (this.errorPanel) this.errorPanel.remove();
-    if (this.initTimeoutId !== null) {
-      clearTimeout(this.initTimeoutId);
-      this.initTimeoutId = null;
-    }
+    this.clearInitTimeout();
 
     this.errorPanel = document.createElement('div');
-    this.errorPanel.className = 'error-panel';
+    this.errorPanel.className = styles.errorPanel;
     this.errorPanel.innerHTML = `
-      <div class="error-panel-title">${this.escapeHtml(title)}</div>
-      <div class="error-panel-message">${this.escapeHtml(message)}</div>
-      <div class="error-panel-actions">
-        <button class="error-panel-button primary retry-button">Retry</button>
-        <button class="error-panel-button report-button">Report Issue</button>
+      <div class="${styles.errorTitle}">${this.escapeHtml(title)}</div>
+      <div class="${styles.errorMessage}">${this.escapeHtml(message)}</div>
+      <div class="${styles.errorActions}">
+        <button class="${styles.errorButton} ${styles.errorButtonPrimary}" data-action="retry">Retry</button>
+        <button class="${styles.errorButton}" data-action="report">Report Issue</button>
       </div>
     `;
 
-    const retryBtn = this.errorPanel.querySelector('.retry-button');
+    const retryBtn = this.errorPanel.querySelector('[data-action="retry"]');
     retryBtn?.addEventListener('pointerdown', () => window.location.reload());
     retryBtn?.addEventListener('click', (e) => e.preventDefault());
 
-    const reportBtn = this.errorPanel.querySelector('.report-button');
+    const reportBtn = this.errorPanel.querySelector('[data-action="report"]');
     reportBtn?.addEventListener('pointerdown', () => {
       window.open('https://github.com/matthew-kissinger/terror-in-the-jungle/issues', '_blank');
     });
@@ -290,37 +255,106 @@ export class StartScreen {
     this.clearInitTimeout();
   }
 
-  // --- Fullscreen / Landscape prompts ---
+  override dispose(): void {
+    this.dismissFullscreenPrompt();
+    this.clearInitTimeout();
+
+    if (this.errorPanel) {
+      this.errorPanel.remove();
+      this.errorPanel = null;
+    }
+
+    this.settingsModal.dispose();
+    this.howToPlayModal.dispose();
+
+    super.dispose();
+  }
+
+  // --- Private ---
+
+  private handlePlayClick = () => {
+    if (isTouchDevice() && !document.fullscreenElement) {
+      const el = document.documentElement;
+      if (el.requestFullscreen) {
+        el.requestFullscreen()
+          .then(() => tryLockLandscapeOrientation())
+          .catch(() => {});
+      }
+    }
+    this.dismissFullscreenPrompt();
+    if (this.onPlayCallback) this.onPlayCallback(this.selectedGameMode);
+  };
+
+  private resolveGameMode(mode: string): GameMode {
+    switch (mode) {
+      case 'zone_control': return GameMode.ZONE_CONTROL;
+      case 'open_frontier': return GameMode.OPEN_FRONTIER;
+      case 'tdm': return GameMode.TEAM_DEATHMATCH;
+      case 'a_shau_valley': return GameMode.A_SHAU_VALLEY;
+      default: return GameMode.ZONE_CONTROL;
+    }
+  }
+
+  private selectGameMode(mode: GameMode): void {
+    this.selectedGameMode = mode;
+
+    for (const card of this.modeCards) {
+      const isSelected = this.resolveGameMode(card.dataset.mode || '') === mode;
+      card.classList.toggle(styles.modeCardSelected, isSelected);
+    }
+
+    const modeName =
+      mode === GameMode.ZONE_CONTROL ? 'ZONE CONTROL'
+      : mode === GameMode.OPEN_FRONTIER ? 'OPEN FRONTIER'
+      : mode === GameMode.A_SHAU_VALLEY ? 'A SHAU VALLEY'
+      : 'TEAM DEATHMATCH';
+
+    const display = this.$('[data-ref="modeDisplay"]');
+    if (display) display.innerHTML = `Selected: <strong>${modeName}</strong>`;
+
+    const playBtn = this.$('[data-ref="play"]');
+    if (playBtn) playBtn.textContent = `DEPLOY -- ${modeName}`;
+  }
+
+  // --- Mode card HTML builder ---
+
+  private buildModeCardHTML(mode: string, selected: boolean): string {
+    const config = MODE_CARD_CONFIGS[mode];
+    if (!config) return '';
+
+    const selectedClass = selected ? ` ${styles.modeCardSelected}` : '';
+    const tdmClass = config.cssClass === 'team-deathmatch-card' ? ` ${styles.tdmCard}` : '';
+    const features = config.features
+      .map(f => `<span class="${styles.modeFeature}">${f}</span>`)
+      .join('');
+
+    return `
+      <div class="${styles.modeCard}${selectedClass}${tdmClass}" data-mode="${mode}">
+        <div class="${styles.modeCardIndicator}"></div>
+        <div class="${styles.modeCardHeader}">
+          <span class="${styles.modeCardTitle}">${config.title}</span>
+          <span class="${styles.modeCardSubtitle}">${config.subtitle}</span>
+        </div>
+        <div class="${styles.modeCardDescription}">${config.description}</div>
+        <div class="${styles.modeCardFeatures}">${features}</div>
+      </div>
+    `;
+  }
+
+  // --- Fullscreen prompt ---
 
   private showFullscreenPrompt(): void {
     if (this.fullscreenPrompt) return;
+
     const prompt = document.createElement('div');
+    prompt.className = styles.fullscreenPrompt;
     prompt.setAttribute('role', 'button');
     prompt.tabIndex = 0;
+
     const isPortrait = isPortraitViewport();
-    prompt.innerHTML = isPortrait
-      ? `<span style="font-size: 0.7rem; font-weight: 600; letter-spacing: 0.05em;">TAP FOR FULLSCREEN + LANDSCAPE</span>`
-      : `<span style="font-size: 0.7rem; font-weight: 600; letter-spacing: 0.05em;">TAP FOR FULLSCREEN</span>`;
-    Object.assign(prompt.style, {
-      position: 'absolute',
-      bottom: '0.6rem',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      padding: '0.35rem 0.8rem',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'rgba(8, 16, 24, 0.7)',
-      border: '1px solid rgba(127, 180, 217, 0.2)',
-      borderRadius: '8px',
-      color: 'rgba(127, 180, 217, 0.8)',
-      cursor: 'pointer',
-      touchAction: 'manipulation',
-      WebkitTapHighlightColor: 'transparent',
-      zIndex: '10',
-      transition: 'opacity 0.3s',
-      opacity: '1',
-    } as Partial<CSSStyleDeclaration>);
+    prompt.textContent = isPortrait
+      ? 'TAP FOR FULLSCREEN + LANDSCAPE'
+      : 'TAP FOR FULLSCREEN';
 
     const handleTap = () => {
       const el = document.documentElement;
@@ -333,21 +367,30 @@ export class StartScreen {
         this.dismissFullscreenPrompt();
       }
     };
+
     prompt.addEventListener('pointerdown', (e) => { e.preventDefault(); handleTap(); });
     prompt.addEventListener('click', (e) => e.preventDefault());
-    this.container.appendChild(prompt);
+    this.root.appendChild(prompt);
     this.fullscreenPrompt = prompt;
 
-    // Auto-fade after 6 seconds so it doesn't nag
-    setTimeout(() => {
+    // Auto-fade after 6 seconds
+    this.fullscreenAutoTimerId = setTimeout(() => {
       if (this.fullscreenPrompt) {
-        this.fullscreenPrompt.style.opacity = '0';
-        setTimeout(() => this.dismissFullscreenPrompt(), 300);
+        this.fullscreenPrompt.classList.add(styles.fullscreenPromptFading);
+        this.fullscreenFadeTimerId = setTimeout(() => this.dismissFullscreenPrompt(), 300);
       }
     }, 6000);
   }
 
   private dismissFullscreenPrompt(): void {
+    if (this.fullscreenAutoTimerId !== null) {
+      clearTimeout(this.fullscreenAutoTimerId);
+      this.fullscreenAutoTimerId = null;
+    }
+    if (this.fullscreenFadeTimerId !== null) {
+      clearTimeout(this.fullscreenFadeTimerId);
+      this.fullscreenFadeTimerId = null;
+    }
     if (this.fullscreenPrompt?.parentElement) {
       this.fullscreenPrompt.remove();
       this.fullscreenPrompt = null;
@@ -358,27 +401,5 @@ export class StartScreen {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
-  }
-
-  dispose(): void {
-    this.dismissFullscreenPrompt();
-    this.dismissLandscapePrompt();
-    this.clearInitTimeout();
-
-    this.playButton.removeEventListener('pointerdown', this.handlePlayClick);
-    this.settingsButton.removeEventListener('pointerdown', this.handleSettingsClick);
-    this.howToPlayButton.removeEventListener('pointerdown', this.handleHowToPlayClick);
-
-    if (this.errorPanel) {
-      this.errorPanel.remove();
-      this.errorPanel = null;
-    }
-
-    this.settingsModal.dispose();
-    this.howToPlayModal.dispose();
-
-    if (this.container?.parentElement) {
-      this.container.parentElement.removeChild(this.container);
-    }
   }
 }

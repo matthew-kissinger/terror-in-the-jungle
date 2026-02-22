@@ -41,24 +41,3 @@ export const MODE_CARD_CONFIGS: Record<string, ModeCardConfig> = {
   },
 };
 
-export function createModeCardHTML(mode: string, selected: boolean): string {
-  const config = MODE_CARD_CONFIGS[mode];
-  if (!config) return '';
-
-  const selectedClass = selected ? ' selected' : '';
-  const features = config.features
-    .map(f => `<span class="mode-feature">${f}</span>`)
-    .join('');
-
-  return `
-    <div class="mode-card ${config.cssClass}${selectedClass}" data-mode="${mode}">
-      <div class="mode-card-indicator"></div>
-      <div class="mode-card-header">
-        <span class="mode-card-title">${config.title}</span>
-        <span class="mode-card-subtitle">${config.subtitle}</span>
-      </div>
-      <div class="mode-card-description">${config.description}</div>
-      <div class="mode-card-features">${features}</div>
-    </div>
-  `;
-}

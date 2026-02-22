@@ -1,0 +1,173 @@
+/**
+ * StatsPanel - Personal K/D stats + kill streak notifications
+ *
+ * Design: Glass panel with desktop (vertical) and mobile (horizontal) layouts.
+ * Kill streak notification is a centered overlay with faction-colored border.
+ */
+
+.container {
+  background: var(--surface-panel);
+  backdrop-filter: blur(6px);
+  padding: var(--space-1-5) var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  min-width: 110px;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* --- Desktop layout (vertical) --- */
+.desktop {
+  display: block;
+}
+
+.header {
+  font-weight: var(--weight-bold);
+  margin-bottom: var(--space-1-5);
+  text-transform: uppercase;
+  font-size: var(--font-size-3xs);
+  letter-spacing: 1.5px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 3px;
+  color: var(--text-muted);
+}
+
+.statRow {
+  margin: 3px 0;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.statLabel {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.statValueKills {
+  color: var(--text-primary);
+  font-weight: var(--weight-bold);
+}
+
+.statValueDeaths {
+  color: var(--text-muted);
+  font-weight: var(--weight-bold);
+}
+
+.statValueKD {
+  color: var(--text-secondary);
+  font-weight: var(--weight-bold);
+}
+
+/* --- Mobile layout (horizontal) --- */
+.mobile {
+  display: none;
+}
+
+/* --- Kill streak notification overlay --- */
+.streakOverlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -100px);
+  background: var(--surface-panel);
+  border: 1px solid var(--danger);
+  padding: 14px 32px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xl);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  text-align: center;
+  pointer-events: none;
+  z-index: 150;
+  display: none;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+}
+
+.streakVisible {
+  display: block;
+  animation: streakPulse 0.5s ease-out;
+}
+
+.streakFading {
+  animation: streakFadeOut 0.3s ease forwards;
+}
+
+@keyframes streakPulse {
+  0% {
+    transform: translate(-50%, -100px) scale(0.5);
+    opacity: 0;
+  }
+  50% {
+    transform: translate(-50%, -100px) scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -100px) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes streakFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    font-size: var(--font-size-xs);
+    padding: var(--space-1-5) var(--space-2-5);
+    min-width: 100px;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    background: rgba(8, 12, 18, 0.6);
+    padding: 3px var(--space-2);
+    min-width: 0;
+    border-radius: 3px;
+  }
+
+  .desktop {
+    display: none;
+  }
+
+  .mobile {
+    display: flex;
+    align-items: center;
+    font-size: var(--font-size-2xs);
+    white-space: nowrap;
+    gap: var(--space-2);
+  }
+
+  .streakOverlay {
+    font-size: var(--font-size-lg);
+    padding: var(--space-2-5) var(--space-5);
+    transform: translate(-50%, -80px);
+  }
+
+  @keyframes streakPulse {
+    0% {
+      transform: translate(-50%, -80px) scale(0.5);
+      opacity: 0;
+    }
+    50% {
+      transform: translate(-50%, -80px) scale(1.1);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(-50%, -80px) scale(1);
+      opacity: 1;
+    }
+  }
+}

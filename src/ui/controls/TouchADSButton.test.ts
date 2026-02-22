@@ -20,6 +20,7 @@ describe('TouchADSButton', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     adsButton = new TouchADSButton();
+    adsButton.mount(document.body);
     button = document.getElementById('touch-ads-btn') as HTMLDivElement;
   });
 
@@ -27,11 +28,7 @@ describe('TouchADSButton', () => {
     expect(button).toBeTruthy();
     expect(button.id).toBe('touch-ads-btn');
     expect(button.textContent).toBe('ADS');
-    expect(button.style.position).toBe('fixed');
-    // Uses responsive CSS calc based on fire button size + edge inset
-    expect(button.style.right).toContain('calc');
-    expect(button.style.right).toContain('--tc-fire-size');
-    expect(button.style.bottom).toContain('--tc-edge-inset');
+    expect(button.className).toContain('adsBtn');
   });
 
   it('hold-to-ADS: pointerdown activates, pointerup deactivates', () => {
@@ -60,17 +57,15 @@ describe('TouchADSButton', () => {
 
   it('button shows active styling when held', () => {
     // Initial state (OFF)
-    expect(button.style.background).toBe('rgba(255, 255, 255, 0.15)');
+    expect(button.classList.contains('adsActive')).toBe(false);
 
     // Hold ON
     button.dispatchEvent(pointerEvent('pointerdown'));
-    expect(button.style.background).toBe('rgba(100, 180, 255, 0.45)');
-    expect(button.style.borderColor).toBe('rgba(100, 180, 255, 0.8)');
-    expect(button.style.color).toBe('rgb(255, 255, 255)');
+    expect(button.classList.contains('adsActive')).toBe(true);
 
     // Release OFF
     button.dispatchEvent(pointerEvent('pointerup'));
-    expect(button.style.background).toBe('rgba(255, 255, 255, 0.15)');
+    expect(button.classList.contains('adsActive')).toBe(false);
   });
 
   it('resetADS clears active state and triggers callback', () => {
@@ -84,7 +79,7 @@ describe('TouchADSButton', () => {
     // Reset
     adsButton.resetADS();
     expect(onADSToggle).toHaveBeenCalledWith(false);
-    expect(button.style.background).toBe('rgba(255, 255, 255, 0.15)');
+    expect(button.classList.contains('adsActive')).toBe(false);
   });
 
   it('show and hide toggle visibility', () => {

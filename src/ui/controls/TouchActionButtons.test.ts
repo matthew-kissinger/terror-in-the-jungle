@@ -22,6 +22,7 @@ describe('TouchActionButtons', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     actions = new TouchActionButtons();
+    actions.mount(document.body);
     container = document.getElementById('touch-action-buttons') as HTMLDivElement;
     buttons = Array.from(container.children) as HTMLDivElement[];
   });
@@ -33,9 +34,7 @@ describe('TouchActionButtons', () => {
   });
 
   it('arranges buttons in a column layout', () => {
-    expect(container.style.display).toBe('flex');
-    expect(container.style.flexDirection).toBe('column');
-    expect(container.style.gap).toBe('12px');
+    expect(container.className).toContain('actionContainer');
   });
 
   it('triggers callbacks for jump, reload, and grenade actions', () => {

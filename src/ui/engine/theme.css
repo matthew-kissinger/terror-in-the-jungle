@@ -1,0 +1,206 @@
+/**
+ * Layer 2: Semantic Design Tokens
+ * Contextual meaning referencing primitives.
+ * Components reference THESE tokens, never Layer 1 directly.
+ */
+
+@import './primitives.css';
+
+:root {
+  /* === Fonts === */
+  --font-primary: 'Rajdhani', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+
+  /* === Surfaces === */
+  --surface-void: var(--color-jungle-950);
+  --surface-base: var(--color-neutral-950);
+  --surface-panel: rgba(10, 15, 8, 0.75);
+  --surface-panel-hover: rgba(10, 15, 8, 0.85);
+  --surface-glass: rgba(10, 15, 8, 0.6);
+  --surface-hud: transparent;
+  --surface-overlay: rgba(0, 0, 0, 0.85);
+
+  /* === Text === */
+  --text-primary: var(--color-steel-200);
+  --text-secondary: var(--color-steel-400);
+  --text-muted: rgba(255, 255, 255, 0.4);
+  --text-inverse: var(--color-neutral-950);
+
+  /* === Faction colors === */
+  --faction-us: var(--color-cerulean-500);
+  --faction-us-dim: var(--color-cerulean-600);
+  --faction-us-bg: rgba(59, 130, 246, 0.15);
+  --faction-opfor: var(--color-crimson-500);
+  --faction-opfor-dim: var(--color-crimson-600);
+  --faction-opfor-bg: rgba(239, 68, 68, 0.15);
+  --faction-squad: var(--color-green-400);
+  --faction-neutral: var(--color-neutral-300);
+
+  /* === Game state === */
+  --health-full: var(--color-green-400);
+  --health-mid: var(--color-amber-300);
+  --health-low: var(--color-crimson-500);
+  --health-critical: var(--color-crimson-600);
+
+  --ammo-normal: var(--text-primary);
+  --ammo-low: var(--color-amber-300);
+  --ammo-empty: var(--color-crimson-500);
+
+  /* === Feedback === */
+  --feedback-success: var(--color-green-400);
+  --feedback-warning: var(--color-amber-300);
+  --feedback-danger: var(--color-crimson-500);
+  --feedback-critical: var(--color-crimson-600);
+  --feedback-headshot: var(--color-amber-300);
+
+  /* === Accent (amber - objectives, active states, UI highlights) === */
+  --accent: var(--color-amber-500);
+  --accent-bright: var(--color-amber-400);
+  --accent-dim: var(--color-amber-600);
+  --accent-bg: rgba(217, 119, 6, 0.15);
+
+  /* === Borders === */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-default: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.2);
+  --border-accent: var(--accent);
+
+  /* === Shadows === */
+  --shadow-text: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 8px rgba(0, 0, 0, 0.5);
+  --shadow-panel: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-glow-accent: 0 0 12px rgba(217, 119, 6, 0.3);
+  --shadow-glow-danger: 0 0 12px rgba(239, 68, 68, 0.3);
+
+  /* === Glass effects === */
+  --glass-blur: blur(8px);
+  --glass-saturate: saturate(120%);
+
+  /* === Buttons === */
+  --button-bg: rgba(217, 119, 6, 0.2);
+  --button-bg-hover: rgba(217, 119, 6, 0.35);
+  --button-bg-active: rgba(217, 119, 6, 0.5);
+  --button-secondary-bg: rgba(255, 255, 255, 0.05);
+  --button-secondary-bg-hover: rgba(255, 255, 255, 0.1);
+
+  /* === Screen / Menu chrome (blue) === */
+  --screen-accent: #7fb4d9;
+  --screen-accent-dim: #5a8fb5;
+  --screen-accent-bright: #9fcfeb;
+  --screen-glass: rgba(8, 16, 24, 0.55);
+  --screen-glass-dense: rgba(8, 16, 24, 0.95);
+  --screen-glass-border: rgba(127, 180, 217, 0.12);
+  --screen-glass-border-bright: rgba(127, 180, 217, 0.3);
+  --screen-danger: #d97a70;
+  --screen-tdm-accent: #c9564a;
+
+  /* === Victory / Defeat === */
+  --victory-bg: rgba(8, 18, 12, 0.9);
+  --defeat-bg: rgba(18, 8, 8, 0.9);
+
+  /* === Touch controls === */
+  --tc-fire-size: 80px;
+  --tc-ads-size: 56px;
+  --tc-action-size: 52px;
+  --tc-edge-inset: 30px;
+  --tc-joystick-base: 120px;
+  --tc-font-size: 12px;
+  --tc-font-size-sm: 11px;
+  --tc-z-controls: 1001;
+  --tc-z-menu: 1002;
+  --tc-z-overlay: 1000;
+  --tc-z-look: 999;
+  --tc-z-pause: 9990;
+}
+
+/* === Shared keyframe animations === */
+
+@keyframes ui-fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ui-fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes ui-fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ui-fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ui-slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes ui-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+@keyframes ui-pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(239, 68, 68, 0.4);
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.8);
+    opacity: 0.9;
+  }
+}
+
+@keyframes ui-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes ui-scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* === Global resets for game UI === */
+
+#game-hud-root *,
+#game-hud-root *::before,
+#game-hud-root *::after {
+  box-sizing: border-box;
+}
+
+#game-hud-root {
+  font-family: var(--font-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-variant-numeric: tabular-nums;
+}

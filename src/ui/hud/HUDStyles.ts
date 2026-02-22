@@ -1,23 +1,15 @@
-import { HUDBaseStyles } from './HUDBaseStyles';
 import { HUDZoneStyles } from './HUDZoneStyles';
-import { HUDStatusStyles } from './HUDStatusStyles';
-import { HUDWeaponStyles } from './HUDWeaponStyles';
-import { ScoreboardStyles } from './ScoreboardStyles';
 
 /**
- * Main HUD styles singleton - combines all style modules
+ * HUD styles singleton - injects remaining non-CSS-Module styles.
+ * Currently only HUDZoneStyles (ObjectiveDisplay / HUDZoneDisplay) remains.
+ * Delete this file once those components are migrated to CSS Modules.
  */
 export class HUDStyles {
   private static instance: HUDStyles;
   private styleSheet?: HTMLStyleElement;
 
-  private readonly styles = [
-    HUDBaseStyles,
-    HUDZoneStyles,
-    HUDStatusStyles,
-    HUDWeaponStyles,
-    ScoreboardStyles,
-  ].join('\n');
+  private readonly styles = HUDZoneStyles;
 
   static getInstance(): HUDStyles {
     if (!HUDStyles.instance) {

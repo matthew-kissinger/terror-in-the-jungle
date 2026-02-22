@@ -1,0 +1,109 @@
+/**
+ * HowToPlayModal - Full-screen overlay with scrollable controls reference.
+ * Device-aware content (touch vs KBM vs gamepad).
+ */
+
+.overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 10001;
+  justify-content: center;
+  align-items: center;
+  overflow-y: auto;
+  touch-action: manipulation;
+}
+
+.visible {
+  display: flex;
+}
+
+.card {
+  background: var(--screen-glass-dense);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--screen-glass-border-bright);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-6) var(--space-8);
+  max-width: min(520px, 90vw);
+  max-height: min(85vh, 720px);
+  overflow-y: auto;
+  width: 100%;
+  box-sizing: border-box;
+  color: var(--text-primary);
+  font-family: var(--font-primary);
+  margin: 20px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+.title {
+  color: var(--text-primary);
+  margin: 0 0 var(--space-4);
+  font-weight: var(--weight-semibold);
+  font-size: var(--font-size-lg);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.heading {
+  color: var(--screen-accent);
+  margin: var(--space-4) 0 var(--space-1-5);
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.8;
+}
+
+.list li::before {
+  content: '>';
+  color: var(--screen-accent);
+  margin-right: var(--space-2);
+  opacity: 0.5;
+  font-weight: var(--weight-semibold);
+}
+
+.text {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.closeBtn {
+  margin-top: var(--space-5);
+  width: 100%;
+  padding: var(--space-2);
+  min-height: 44px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  background: linear-gradient(135deg, var(--screen-accent-dim), var(--screen-accent));
+  color: white;
+  border: 1px solid var(--screen-glass-border-bright);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  transition: all 0.2s;
+}
+
+.closeBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(90, 143, 181, 0.3);
+}

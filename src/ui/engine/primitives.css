@@ -1,0 +1,132 @@
+/**
+ * Layer 1: Primitive Design Tokens
+ * Raw palette values named by what they ARE, not what they mean.
+ * Never reference these directly in components - use theme.css semantic tokens.
+ */
+
+:root {
+  /* --- Jungle darks --- */
+  --color-jungle-950: #0a0f08;
+  --color-jungle-900: #151d10;
+  --color-jungle-800: #1e2a16;
+  --color-jungle-700: #2d3d22;
+  --color-jungle-600: #3f5530;
+
+  /* --- Olive --- */
+  --color-olive-700: #4a6332;
+  --color-olive-600: #5a7a3e;
+  --color-olive-500: #6b904a;
+  --color-olive-400: #8aad5e;
+  --color-olive-300: #a8c87a;
+
+  /* --- Steel (blue-grey) --- */
+  --color-steel-900: #1a1f2e;
+  --color-steel-800: #252d3e;
+  --color-steel-700: #333d50;
+  --color-steel-600: #4a5568;
+  --color-steel-500: #64748b;
+  --color-steel-400: #94a3b8;
+  --color-steel-300: #cbd5e1;
+  --color-steel-200: #e2e8f0;
+
+  /* --- Amber --- */
+  --color-amber-700: #92400e;
+  --color-amber-600: #b45309;
+  --color-amber-500: #d97706;
+  --color-amber-400: #f59e0b;
+  --color-amber-300: #fbbf24;
+  --color-amber-200: #fde68a;
+
+  /* --- Crimson --- */
+  --color-crimson-800: #7f1d1d;
+  --color-crimson-700: #991b1b;
+  --color-crimson-600: #dc2626;
+  --color-crimson-500: #ef4444;
+  --color-crimson-400: #f87171;
+  --color-crimson-300: #fca5a5;
+
+  /* --- Cerulean (blue) --- */
+  --color-cerulean-800: #1e3a5f;
+  --color-cerulean-700: #1d4ed8;
+  --color-cerulean-600: #3b82f6;
+  --color-cerulean-500: #60a5fa;
+  --color-cerulean-400: #93c5fd;
+  --color-cerulean-300: #bfdbfe;
+
+  /* --- Green (success/squad) --- */
+  --color-green-600: #16a34a;
+  --color-green-500: #22c55e;
+  --color-green-400: #4ade80;
+  --color-green-300: #86efac;
+
+  /* --- Neutral --- */
+  --color-neutral-950: #0a0a0a;
+  --color-neutral-900: #171717;
+  --color-neutral-800: #262626;
+  --color-neutral-700: #404040;
+  --color-neutral-600: #525252;
+  --color-neutral-500: #737373;
+  --color-neutral-400: #a3a3a3;
+  --color-neutral-300: #d4d4d4;
+  --color-neutral-200: #e5e5e5;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-50: #fafafa;
+
+  /* --- White / Black --- */
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  /* --- Typography scale (fluid) --- */
+  --font-size-2xs: clamp(0.5625rem, 1vw, 0.625rem);
+  --font-size-xs: clamp(0.625rem, 1.2vw, 0.75rem);
+  --font-size-sm: clamp(0.75rem, 1.4vw, 0.875rem);
+  --font-size-base: clamp(0.875rem, 1.6vw, 1rem);
+  --font-size-lg: clamp(1rem, 2vw, 1.25rem);
+  --font-size-xl: clamp(1.25rem, 2.5vw, 1.5rem);
+  --font-size-2xl: clamp(1.5rem, 3.5vw, 2.25rem);
+  --font-size-3xl: clamp(2rem, 5vw, 3.5rem);
+
+  /* --- Spacing scale --- */
+  --space-0: 0;
+  --space-px: 1px;
+  --space-0-5: 0.125rem;
+  --space-1: 0.25rem;
+  --space-1-5: 0.375rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* --- Border radius --- */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 20px;
+  --radius-pill: 50px;
+  --radius-full: 50%;
+
+  /* --- Font weights --- */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* --- Timing --- */
+  --duration-instant: 80ms;
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+  --duration-reveal: 600ms;
+
+  /* --- Easing --- */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.45, 0, 0.55, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}

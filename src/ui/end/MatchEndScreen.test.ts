@@ -53,28 +53,28 @@ describe('MatchEndScreen', () => {
 
   it('show() adds end screen to the DOM', () => {
     screen.show(Faction.US, makeGameState(), makeStats());
-    const container = document.querySelector('.match-end-screen');
+    const container = document.querySelector('.screen');
     expect(container).toBeTruthy();
   });
 
   it('shows VICTORY when US wins', () => {
     screen.show(Faction.US, makeGameState(), makeStats());
-    const title = document.querySelector('.end-screen-title');
+    const title = document.querySelector('.title');
     expect(title?.textContent).toBe('VICTORY');
-    expect(document.querySelector('.match-end-screen.victory')).toBeTruthy();
+    expect(document.querySelector('.screen.victory')).toBeTruthy();
   });
 
   it('shows DEFEAT when OPFOR wins', () => {
     screen.show(Faction.OPFOR, makeGameState({ winner: Faction.OPFOR }), makeStats());
-    const title = document.querySelector('.end-screen-title');
+    const title = document.querySelector('.title');
     expect(title?.textContent).toBe('DEFEAT');
-    expect(document.querySelector('.match-end-screen.defeat')).toBeTruthy();
+    expect(document.querySelector('.screen.defeat')).toBeTruthy();
   });
 
   it('creates Play Again and Return to Menu buttons', () => {
     screen.show(Faction.US, makeGameState(), makeStats());
-    const playAgainBtn = document.querySelector('.play-again-btn') as HTMLButtonElement;
-    const returnBtn = document.querySelector('.return-menu-btn') as HTMLButtonElement;
+    const playAgainBtn = document.querySelector('[data-ref="playAgain"]') as HTMLButtonElement;
+    const returnBtn = document.querySelector('[data-ref="return"]') as HTMLButtonElement;
     expect(playAgainBtn).toBeTruthy();
     expect(returnBtn).toBeTruthy();
     expect(playAgainBtn.textContent).toBe('Play Again');
@@ -86,7 +86,7 @@ describe('MatchEndScreen', () => {
     screen.onPlayAgain(callback);
     screen.show(Faction.US, makeGameState(), makeStats());
 
-    const btn = document.querySelector('.play-again-btn') as HTMLButtonElement;
+    const btn = document.querySelector('[data-ref="playAgain"]') as HTMLButtonElement;
     btn.click();
     expect(callback).toHaveBeenCalledTimes(1);
   });
@@ -96,7 +96,7 @@ describe('MatchEndScreen', () => {
     screen.onReturnToMenu(callback);
     screen.show(Faction.US, makeGameState(), makeStats());
 
-    const btn = document.querySelector('.return-menu-btn') as HTMLButtonElement;
+    const btn = document.querySelector('[data-ref="return"]') as HTMLButtonElement;
     btn.click();
     expect(callback).toHaveBeenCalledTimes(1);
   });
@@ -110,30 +110,30 @@ describe('MatchEndScreen', () => {
     });
 
     screen.show(Faction.US, makeGameState(), makeStats());
-    const btn = document.querySelector('.play-again-btn') as HTMLButtonElement;
+    const btn = document.querySelector('[data-ref="playAgain"]') as HTMLButtonElement;
     btn.click();
     expect(reloadMock).toHaveBeenCalledTimes(1);
   });
 
   it('hide() removes the end screen from the DOM', () => {
     screen.show(Faction.US, makeGameState(), makeStats());
-    expect(document.querySelector('.match-end-screen')).toBeTruthy();
+    expect(document.querySelector('.screen')).toBeTruthy();
 
     screen.hide();
-    expect(document.querySelector('.match-end-screen')).toBeNull();
+    expect(document.querySelector('.screen')).toBeNull();
   });
 
   it('show() replaces any existing end screen', () => {
     screen.show(Faction.US, makeGameState(), makeStats());
     screen.show(Faction.OPFOR, makeGameState({ winner: Faction.OPFOR }), makeStats());
-    const containers = document.querySelectorAll('.match-end-screen');
+    const containers = document.querySelectorAll('.screen');
     expect(containers).toHaveLength(1);
-    expect(document.querySelector('.end-screen-title')?.textContent).toBe('DEFEAT');
+    expect(document.querySelector('.title')?.textContent).toBe('DEFEAT');
   });
 
   it('displays player stats correctly', () => {
     screen.show(Faction.US, makeGameState(), makeStats({ kills: 15, deaths: 5, assists: 7 }));
-    const statValues = document.querySelectorAll('.stat-value');
+    const statValues = document.querySelectorAll('.statValue');
     const texts = Array.from(statValues).map((el) => el.textContent?.trim());
     // Should include kills: 15, assists: 7, deaths: 5
     expect(texts).toContain('15');
@@ -143,35 +143,35 @@ describe('MatchEndScreen', () => {
 
   it('shows ticket labels for non-TDM modes', () => {
     screen.show(Faction.US, makeGameState({ isTDM: false }), makeStats());
-    const factionNames = document.querySelectorAll('.faction-name');
+    const factionNames = document.querySelectorAll('.factionName');
     const texts = Array.from(factionNames).map((el) => el.textContent);
     expect(texts.some((t) => t?.includes('Tickets'))).toBe(true);
   });
 
   it('shows kills labels for TDM mode', () => {
     screen.show(Faction.US, makeGameState({ isTDM: true }), makeStats());
-    const factionNames = document.querySelectorAll('.faction-name');
+    const factionNames = document.querySelectorAll('.factionName');
     const texts = Array.from(factionNames).map((el) => el.textContent);
     expect(texts.some((t) => t?.includes('Kills'))).toBe(true);
   });
 
   it('hides zones captured in TDM mode', () => {
     screen.show(Faction.US, makeGameState({ isTDM: true }), makeStats());
-    const labels = document.querySelectorAll('.stat-label');
+    const labels = document.querySelectorAll('.statLabel');
     const texts = Array.from(labels).map((el) => el.textContent);
     expect(texts).not.toContain('Zones Captured');
   });
 
   it('shows zones captured in non-TDM mode', () => {
     screen.show(Faction.US, makeGameState({ isTDM: false }), makeStats());
-    const labels = document.querySelectorAll('.stat-label');
+    const labels = document.querySelectorAll('.statLabel');
     const texts = Array.from(labels).map((el) => el.textContent);
     expect(texts).toContain('Zones Captured');
   });
 
   it('shows awards when earned', () => {
     screen.show(Faction.US, makeGameState(), makeStats({ bestKillStreak: 5, accuracy: 0.5 }));
-    const awardNames = document.querySelectorAll('.award-name');
+    const awardNames = document.querySelectorAll('.awardName');
     const texts = Array.from(awardNames).map((el) => el.textContent);
     expect(texts).toContain('Kill Streak');
     expect(texts).toContain('Sharpshooter');
@@ -189,26 +189,27 @@ describe('MatchEndScreen', () => {
         deaths: 5,
       }),
     );
-    expect(document.querySelector('.awards-section')).toBeNull();
+    expect(document.querySelector('.awardsSection')).toBeNull();
   });
 
-  it('container has overflow-y auto for scrollability', () => {
+  it('screen root has the correct CSS module class', () => {
     screen.show(Faction.US, makeGameState(), makeStats());
-    const container = document.querySelector('.match-end-screen') as HTMLElement;
-    // Style is injected via <style> tag inside the container
-    const style = container.querySelector('style');
-    expect(style?.textContent).toContain('overflow-y: auto');
+    const container = document.querySelector('.screen') as HTMLElement;
+    expect(container).toBeTruthy();
+    expect(container.classList.contains('screen')).toBe(true);
   });
 
-  it('buttons have touch-action: manipulation in styles', () => {
+  it('buttons are present and interactive', () => {
     screen.show(Faction.US, makeGameState(), makeStats());
-    const style = document.querySelector('.match-end-screen style');
-    expect(style?.textContent).toContain('touch-action: manipulation');
+    const playBtn = document.querySelector('[data-ref="playAgain"]') as HTMLButtonElement;
+    const returnBtn = document.querySelector('[data-ref="return"]') as HTMLButtonElement;
+    expect(playBtn.tagName).toBe('BUTTON');
+    expect(returnBtn.tagName).toBe('BUTTON');
   });
 
   it('dispose cleans up the DOM', () => {
     screen.show(Faction.US, makeGameState(), makeStats());
     screen.dispose();
-    expect(document.querySelector('.match-end-screen')).toBeNull();
+    expect(document.querySelector('.screen')).toBeNull();
   });
 });

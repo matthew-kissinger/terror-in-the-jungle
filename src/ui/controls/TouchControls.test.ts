@@ -14,6 +14,7 @@ vi.mock('./VirtualJoystick', () => ({
     show = vi.fn();
     hide = vi.fn();
     dispose = vi.fn();
+    mount = vi.fn();
     setSprintCallbacks = vi.fn();
 
     constructor() {
@@ -27,6 +28,7 @@ vi.mock('./TouchLook', () => ({
     show = vi.fn();
     hide = vi.fn();
     dispose = vi.fn();
+    mount = vi.fn();
     consumeDelta = vi.fn().mockReturnValue({ x: 1.2, y: -0.4 });
 
     constructor() {
@@ -40,6 +42,7 @@ vi.mock('./TouchFireButton', () => ({
     show = vi.fn();
     hide = vi.fn();
     dispose = vi.fn();
+    mount = vi.fn();
     setCallbacks = vi.fn();
 
     constructor() {
@@ -53,6 +56,7 @@ vi.mock('./TouchActionButtons', () => ({
     show = vi.fn();
     hide = vi.fn();
     dispose = vi.fn();
+    mount = vi.fn();
     setOnAction = vi.fn();
 
     constructor() {
@@ -61,10 +65,82 @@ vi.mock('./TouchActionButtons', () => ({
   },
 }));
 
+vi.mock('./TouchADSButton', () => ({
+  TouchADSButton: class {
+    show = vi.fn();
+    hide = vi.fn();
+    dispose = vi.fn();
+    mount = vi.fn();
+    setOnADSToggle = vi.fn();
+    resetADS = vi.fn();
+  },
+}));
+
+vi.mock('./TouchInteractionButton', () => ({
+  TouchInteractionButton: class {
+    show = vi.fn();
+    hide = vi.fn();
+    dispose = vi.fn();
+    mount = vi.fn();
+    setCallback = vi.fn();
+  },
+}));
+
+vi.mock('./TouchSandbagButtons', () => ({
+  TouchSandbagButtons: class {
+    show = vi.fn();
+    hide = vi.fn();
+    dispose = vi.fn();
+    mount = vi.fn();
+    setCallbacks = vi.fn();
+  },
+}));
+
+vi.mock('./TouchRallyPointButton', () => ({
+  TouchRallyPointButton: class {
+    show = vi.fn();
+    hide = vi.fn();
+    dispose = vi.fn();
+    mount = vi.fn();
+    setCallback = vi.fn();
+  },
+}));
+
+vi.mock('./TouchMenuButton', () => ({
+  TouchMenuButton: class {
+    show = vi.fn();
+    hide = vi.fn();
+    dispose = vi.fn();
+    mount = vi.fn();
+    setCallbacks = vi.fn();
+    setSquadCallback = vi.fn();
+    setScoreboardCallback = vi.fn();
+  },
+}));
+
+vi.mock('./TouchMortarButton', () => ({
+  TouchMortarButton: class {
+    show = vi.fn();
+    hide = vi.fn();
+    dispose = vi.fn();
+    mount = vi.fn();
+  },
+}));
+
+vi.mock('./TouchHelicopterCyclic', () => ({
+  TouchHelicopterCyclic: class {
+    show = vi.fn();
+    hide = vi.fn();
+    dispose = vi.fn();
+    mount = vi.fn();
+  },
+}));
+
 import { TouchControls } from './TouchControls';
 
 describe('TouchControls', () => {
   beforeEach(() => {
+    document.body.innerHTML = '';
     joystickInstances.length = 0;
     lookInstances.length = 0;
     fireInstances.length = 0;

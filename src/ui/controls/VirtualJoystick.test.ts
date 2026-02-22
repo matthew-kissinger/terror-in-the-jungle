@@ -23,6 +23,7 @@ describe('VirtualJoystick', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     joystick = new VirtualJoystick();
+    joystick.mount(document.body);
     zone = document.getElementById('touch-joystick-zone') as HTMLDivElement;
     base = zone.firstElementChild as HTMLDivElement;
 

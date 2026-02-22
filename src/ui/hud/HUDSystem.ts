@@ -10,8 +10,8 @@ import { HUDElements } from './HUDElements';
 import { HUDUpdater } from './HUDUpdater';
 import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
 import { MatchEndScreen, MatchStats } from '../end/MatchEndScreen';
-import { Scoreboard } from './Scoreboard';
-import { PersonalStatsPanel } from './PersonalStatsPanel';
+import { ScoreboardPanel } from './ScoreboardPanel';
+import { StatsPanel } from './StatsPanel';
 import type { GrenadeSystem } from '../../systems/weapons/GrenadeSystem';
 import type { MortarSystem } from '../../systems/weapons/MortarSystem';
 import type { PlayerHealthSystem } from '../../systems/player/PlayerHealthSystem';
@@ -33,8 +33,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private updater: HUDUpdater;
   private statsTracker: PlayerStatsTracker;
   private matchEndScreen: MatchEndScreen;
-  private scoreboard: Scoreboard;
-  private personalStatsPanel: PersonalStatsPanel;
+  private scoreboard: ScoreboardPanel;
+  private personalStatsPanel: StatsPanel;
   private scoreboardCombatantProxy: CombatantSystem;
   private isScoreboardVisible = false;
   private onPlayAgainCallback?: () => void;
@@ -54,8 +54,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.hudLayout = new HUDLayout();
     this.matchEndScreen = new MatchEndScreen();
     this.scoreboardCombatantProxy = this.createScoreboardCombatantProxy();
-    this.scoreboard = new Scoreboard(this.statsTracker, this.scoreboardCombatantProxy);
-    this.personalStatsPanel = new PersonalStatsPanel(this.statsTracker);
+    this.scoreboard = new ScoreboardPanel(this.statsTracker, this.scoreboardCombatantProxy);
+    this.personalStatsPanel = new StatsPanel(this.statsTracker);
 
     // Setup return to menu callback
     this.matchEndScreen.onReturnToMenu(() => {
@@ -103,11 +103,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
     // Add HUD to DOM (pass layout for grid-based mounting)
     this.elements.attachToDOM(this.hudLayout);
-    this.scoreboard.attachToDOM();
-    this.personalStatsPanel.attachToDOM(
-      this.hudLayout.getSlot('stats'),
-      this.hudLayout.getSlot('center')
-    );
+    this.scoreboard.mount(document.body);
+    this.personalStatsPanel.mount(this.hudLayout.getSlot('stats'));
 
     // Initialize ticket display
     this.updater.updateTicketDisplay(300, 300);

@@ -1,0 +1,429 @@
+/**
+ * MatchEndScreen - Full-screen match results overlay.
+ * Victory/defeat theming, two-column stats, awards badges.
+ */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  z-index: 10000;
+  color: var(--text-primary);
+  font-family: var(--font-primary);
+  animation: fadeIn var(--duration-slow) ease-out;
+  box-sizing: border-box;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+
+.victory {
+  background: var(--victory-bg);
+}
+
+.defeat {
+  background: var(--defeat-bg);
+}
+
+/* --- Header --- */
+
+.header {
+  text-align: center;
+  margin-top: auto;
+  margin-bottom: var(--space-8);
+  animation: slideDown var(--duration-reveal) ease-out;
+}
+
+.title {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  margin-bottom: var(--space-2);
+  text-shadow: 0 0 20px currentColor;
+}
+
+.victory .title {
+  color: var(--feedback-success);
+}
+
+.defeat .title {
+  color: var(--feedback-danger);
+}
+
+.subtitle {
+  font-size: var(--font-size-xl);
+  opacity: 0.8;
+  letter-spacing: 0.1em;
+}
+
+/* --- Stats panel --- */
+
+.statsPanel {
+  background: rgba(20, 35, 50, 0.9);
+  border: 1px solid var(--screen-glass-border-bright);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+  width: 90%;
+  max-width: 800px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-8);
+  animation: fadeInUp 0.8s ease-out 0.2s backwards;
+  flex-shrink: 0;
+}
+
+.victory .statsPanel {
+  border-color: var(--feedback-success);
+}
+
+.defeat .statsPanel {
+  border-color: var(--feedback-danger);
+}
+
+.statsColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.statsSection {
+  margin-bottom: var(--space-2);
+}
+
+.statsSectionTitle {
+  font-size: var(--font-size-base);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-bottom: var(--space-3);
+  color: var(--screen-accent);
+  border-bottom: 1px solid var(--screen-glass-border-bright);
+  padding-bottom: var(--space-2);
+}
+
+.statRow {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-1) 0;
+  font-size: var(--font-size-base);
+}
+
+.statLabel {
+  opacity: 0.8;
+}
+
+.statValue {
+  font-weight: var(--weight-bold);
+  color: var(--screen-accent);
+}
+
+.statHighlight {
+  color: var(--feedback-success);
+}
+
+/* --- Ticket comparison --- */
+
+.ticketComparison {
+  display: flex;
+  justify-content: space-around;
+  margin: var(--space-4) 0;
+  padding: var(--space-4);
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-lg);
+}
+
+.factionScore {
+  text-align: center;
+}
+
+.factionName {
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.7;
+  margin-bottom: var(--space-2);
+}
+
+.factionTickets {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--weight-bold);
+}
+
+.factionUS .factionTickets {
+  color: var(--faction-us);
+}
+
+.factionOPFOR .factionTickets {
+  color: var(--faction-opfor);
+}
+
+.vsDivider {
+  display: flex;
+  align-items: center;
+  font-size: var(--font-size-xl);
+  opacity: 0.5;
+}
+
+/* --- Awards --- */
+
+.awardsSection {
+  margin-top: var(--space-8);
+  animation: fadeInUp 1s ease-out 0.6s backwards;
+}
+
+.awardsTitle {
+  text-align: center;
+  font-size: var(--font-size-xl);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-bottom: var(--space-4);
+  color: var(--screen-accent);
+}
+
+.awardsContainer {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.awardBadge {
+  background: rgba(20, 35, 50, 0.4);
+  border: 1px solid var(--screen-glass-border-bright);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-6);
+  min-width: 150px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.victory .awardBadge {
+  border-color: var(--feedback-success);
+}
+
+.defeat .awardBadge {
+  border-color: var(--feedback-danger);
+}
+
+.awardBadge:hover {
+  transform: translateY(-3px);
+}
+
+.victory .awardBadge:hover {
+  box-shadow: 0 5px 15px rgba(92, 184, 92, 0.3);
+}
+
+.defeat .awardBadge:hover {
+  box-shadow: 0 5px 15px rgba(239, 68, 68, 0.3);
+}
+
+.awardName {
+  font-size: var(--font-size-base);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: var(--space-2);
+  color: var(--text-primary);
+  font-weight: var(--weight-bold);
+}
+
+.awardValue {
+  font-size: var(--font-size-lg);
+  color: var(--screen-accent);
+  font-weight: var(--weight-bold);
+}
+
+.victory .awardValue {
+  color: var(--feedback-success);
+}
+
+.defeat .awardValue {
+  color: var(--feedback-danger);
+}
+
+/* --- Action buttons --- */
+
+.actions {
+  margin-top: var(--space-8);
+  margin-bottom: auto;
+  display: flex;
+  gap: var(--space-4);
+  animation: fadeInUp 1s ease-out 0.4s backwards;
+  flex-shrink: 0;
+  padding-bottom: var(--space-4);
+}
+
+.button {
+  background: rgba(90, 143, 181, 0.3);
+  border: 1px solid var(--screen-glass-border-bright);
+  color: var(--text-primary);
+  padding: var(--space-4) var(--space-8);
+  font-size: var(--font-size-base);
+  font-family: var(--font-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  border-radius: var(--radius-lg);
+  transition: all 0.3s ease;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  min-height: 48px;
+}
+
+.button:hover {
+  background: rgba(90, 143, 181, 0.5);
+  border-color: var(--screen-accent);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(127, 180, 217, 0.2);
+}
+
+.button:active {
+  transform: scale(0.96);
+  transition: transform 0.1s ease;
+}
+
+.buttonPrimary {
+  background: rgba(90, 143, 181, 0.5);
+  border-color: var(--screen-accent);
+}
+
+.buttonPrimary:hover {
+  background: var(--screen-accent-dim);
+}
+
+/* --- Animations --- */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 768px) {
+  .screen {
+    padding: var(--space-4) env(safe-area-inset-right, 0px) var(--space-4) env(safe-area-inset-left, 0px);
+  }
+
+  .header {
+    margin-bottom: var(--space-4);
+  }
+
+  .title {
+    letter-spacing: 0.1em;
+  }
+
+  .subtitle {
+    font-size: var(--font-size-lg);
+  }
+
+  .statsPanel {
+    grid-template-columns: 1fr;
+    padding: var(--space-6);
+    gap: var(--space-6);
+  }
+
+  .statsColumn {
+    gap: var(--space-4);
+  }
+
+  .factionTickets {
+    font-size: var(--font-size-xl);
+  }
+
+  .ticketComparison {
+    padding: var(--space-2);
+    gap: var(--space-2);
+  }
+
+  .vsDivider {
+    font-size: var(--font-size-base);
+  }
+
+  .actions {
+    flex-direction: column;
+    width: 90%;
+    max-width: 300px;
+    margin-top: var(--space-4);
+  }
+
+  .button {
+    width: 100%;
+    padding: var(--space-3) var(--space-6);
+  }
+}
+
+@media (max-width: 480px) {
+  .screen {
+    padding: var(--space-2) env(safe-area-inset-right, 0px) var(--space-2) env(safe-area-inset-left, 0px);
+  }
+
+  .header {
+    margin-bottom: var(--space-3);
+  }
+
+  .statsPanel {
+    padding: var(--space-3);
+    width: 95%;
+    gap: var(--space-4);
+  }
+
+  .statsSectionTitle {
+    font-size: var(--font-size-sm);
+    margin-bottom: var(--space-2);
+  }
+
+  .statRow {
+    font-size: var(--font-size-sm);
+  }
+
+  .awardBadge {
+    padding: var(--space-3);
+    min-width: 120px;
+  }
+
+  .awardName {
+    font-size: var(--font-size-sm);
+  }
+
+  .awardValue {
+    font-size: var(--font-size-base);
+  }
+
+  .awardsSection {
+    margin-top: var(--space-4);
+  }
+
+  .awardsTitle {
+    font-size: var(--font-size-base);
+    margin-bottom: var(--space-2);
+  }
+}

@@ -8,8 +8,11 @@
  * - Dead zone: ignores sub-pixel jitter (configurable, default 1.5px)
  * - Acceleration curve: sub-linear for fine aim, amplified for fast swipes
  */
-export class TouchLook {
-  private container: HTMLDivElement;
+
+import { UIComponent } from '../engine/UIComponent';
+import styles from './TouchControls.module.css';
+
+export class TouchLook extends UIComponent {
   private activePointerId: number | null = null;
   private lastX = 0;
   private lastY = 0;
@@ -28,27 +31,16 @@ export class TouchLook {
    */
   private accelExponent = 0.75;
 
-  constructor() {
-    // Touch zone covers right 60% of screen, upper 70% to avoid fire button area
-    this.container = document.createElement('div');
-    this.container.id = 'touch-look-zone';
-    Object.assign(this.container.style, {
-      position: 'fixed',
-      right: '0',
-      top: '0',
-      width: '60%',
-      height: '70%',
-      zIndex: '999',
-      touchAction: 'none',
-      pointerEvents: 'auto',
-    } as Partial<CSSStyleDeclaration>);
+  protected build(): void {
+    this.root.className = styles.lookZone;
+    this.root.id = 'touch-look-zone';
+  }
 
-    document.body.appendChild(this.container);
-
-    this.container.addEventListener('pointerdown', this.onPointerDown, { passive: false });
-    this.container.addEventListener('pointermove', this.onPointerMove, { passive: false });
-    this.container.addEventListener('pointerup', this.onPointerUp, { passive: false });
-    this.container.addEventListener('pointercancel', this.onPointerCancel, { passive: false });
+  protected onMount(): void {
+    this.listen(this.root, 'pointerdown', this.handlePointerDown, { passive: false });
+    this.listen(this.root, 'pointermove', this.handlePointerMove, { passive: false });
+    this.listen(this.root, 'pointerup', this.handlePointerUp, { passive: false });
+    this.listen(this.root, 'pointercancel', this.handlePointerCancel, { passive: false });
   }
 
   setSensitivity(s: number): void {
@@ -63,19 +55,19 @@ export class TouchLook {
     this.accelExponent = Math.max(0.1, Math.min(2.0, exponent));
   }
 
-  private onPointerDown = (e: PointerEvent): void => {
+  private handlePointerDown = (e: PointerEvent): void => {
     e.preventDefault();
     if (this.activePointerId !== null) return;
 
     this.activePointerId = e.pointerId;
-    if (typeof this.container.setPointerCapture === 'function') {
-      this.container.setPointerCapture(e.pointerId);
+    if (typeof this.root.setPointerCapture === 'function') {
+      this.root.setPointerCapture(e.pointerId);
     }
     this.lastX = e.clientX;
     this.lastY = e.clientY;
   };
 
-  private onPointerMove = (e: PointerEvent): void => {
+  private handlePointerMove = (e: PointerEvent): void => {
     e.preventDefault();
     if (e.pointerId !== this.activePointerId) return;
 
@@ -85,7 +77,7 @@ export class TouchLook {
     // Dead zone: ignore sub-pixel jitter
     const magnitude = Math.sqrt(dx * dx + dy * dy);
     if (magnitude < this.deadZone) {
-      return; // Don't update lastX/Y so the movement accumulates until it exceeds dead zone
+      return;
     }
 
     // Apply non-linear acceleration curve (preserves direction)
@@ -96,7 +88,7 @@ export class TouchLook {
       dy *= factor;
     }
 
-    // Accumulate deltas (will be consumed by PlayerInput)
+    // Accumulate deltas (consumed by PlayerInput)
     this.delta.x += dx * this.sensitivity;
     this.delta.y += dy * this.sensitivity;
 
@@ -104,21 +96,21 @@ export class TouchLook {
     this.lastY = e.clientY;
   };
 
-  private onPointerUp = (e: PointerEvent): void => {
+  private handlePointerUp = (e: PointerEvent): void => {
     e.preventDefault();
     if (e.pointerId !== this.activePointerId) return;
     this.activePointerId = null;
-    if (typeof this.container.releasePointerCapture === 'function' && this.container.hasPointerCapture(e.pointerId)) {
-      this.container.releasePointerCapture(e.pointerId);
+    if (typeof this.root.releasePointerCapture === 'function' && this.root.hasPointerCapture(e.pointerId)) {
+      this.root.releasePointerCapture(e.pointerId);
     }
   };
 
-  private onPointerCancel = (e: PointerEvent): void => {
+  private handlePointerCancel = (e: PointerEvent): void => {
     e.preventDefault();
     if (e.pointerId !== this.activePointerId) return;
     this.activePointerId = null;
-    if (typeof this.container.releasePointerCapture === 'function' && this.container.hasPointerCapture(e.pointerId)) {
-      this.container.releasePointerCapture(e.pointerId);
+    if (typeof this.root.releasePointerCapture === 'function' && this.root.hasPointerCapture(e.pointerId)) {
+      this.root.releasePointerCapture(e.pointerId);
     }
   };
 
@@ -132,21 +124,13 @@ export class TouchLook {
   }
 
   show(): void {
-    this.container.style.display = 'block';
+    this.root.style.display = 'block';
   }
 
   hide(): void {
-    this.container.style.display = 'none';
+    this.root.style.display = 'none';
     this.activePointerId = null;
     this.delta.x = 0;
     this.delta.y = 0;
-  }
-
-  dispose(): void {
-    this.container.removeEventListener('pointerdown', this.onPointerDown);
-    this.container.removeEventListener('pointermove', this.onPointerMove);
-    this.container.removeEventListener('pointerup', this.onPointerUp);
-    this.container.removeEventListener('pointercancel', this.onPointerCancel);
-    this.container.remove();
   }
 }

@@ -11,6 +11,7 @@ export class LoadingScreen {
 
   constructor() {
     this.screen = new StartScreen();
+    this.screen.mount(document.body);
   }
 
   public updateProgress(phaseId: string, progress: number): void {

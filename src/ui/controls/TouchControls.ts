@@ -3,6 +3,9 @@
  * Creates and wires up VirtualJoystick, TouchLook, TouchFireButton, and TouchActionButtons.
  * Only instantiated on touch-capable devices.
  *
+ * All sub-components are UIComponents. The orchestrator mounts them to document.body
+ * on construction, then mountToLayout() reparents eligible ones into HUD grid slots.
+ *
  * Weapon bar is now handled by UnifiedWeaponBar (owned by HUDSystem, not TouchControls).
  */
 
@@ -66,6 +69,20 @@ export class TouchControls {
     this.menuButton = new TouchMenuButton();
     this.mortarButton = new TouchMortarButton();
     this.helicopterCyclic = new TouchHelicopterCyclic();
+
+    // Mount all to document.body
+    const body = document.body;
+    this.joystick.mount(body);
+    this.look.mount(body);
+    this.fireButton.mount(body);
+    this.actionButtons.mount(body);
+    this.adsButton.mount(body);
+    this.interactionButton.mount(body);
+    this.sandbagButtons.mount(body);
+    this.rallyPointButton.mount(body);
+    this.menuButton.mount(body);
+    this.mortarButton.mount(body);
+    this.helicopterCyclic.mount(body);
 
     // Start hidden until game starts
     this.hide();

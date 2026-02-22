@@ -1,0 +1,78 @@
+/**
+ * GameStatusPanel - Match phase indicator + ticket bleed rate
+ *
+ * Design: Bare text with text-shadow. Phase color-coded via CSS custom property.
+ * The bleed indicator is a secondary readout below the phase text.
+ */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+  user-select: none;
+  gap: var(--space-0-5);
+}
+
+.phaseText {
+  font-size: var(--font-size-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  text-shadow: var(--shadow-text);
+  color: var(--text-secondary);
+  transition: color var(--duration-fast) var(--ease-out);
+  line-height: 1.2;
+}
+
+.bleed {
+  font-size: var(--font-size-2xs);
+  font-weight: var(--weight-semibold);
+  text-shadow: var(--shadow-text);
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+.bleedHidden {
+  display: none;
+}
+
+/* Phase-specific colors */
+.phaseSetup .phaseText {
+  color: var(--accent);
+}
+
+.phaseCombat .phaseText {
+  color: var(--faction-opfor);
+}
+
+.phaseOvertime .phaseText {
+  color: var(--critical);
+  animation: overtimePulse 0.5s infinite;
+}
+
+.phaseEnded .phaseText {
+  color: var(--success);
+}
+
+@keyframes overtimePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .phaseText {
+    font-size: var(--font-size-2xs);
+  }
+
+  .bleed {
+    font-size: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .phaseText {
+    font-size: 9px;
+  }
+}

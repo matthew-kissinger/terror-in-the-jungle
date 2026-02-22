@@ -9,5 +9,10 @@ export default defineConfig({
     typecheck: {
       enabled: true,
     },
+    css: {
+      modules: {
+        classNameStrategy: 'non-scoped',
+      },
+    },
   },
 });

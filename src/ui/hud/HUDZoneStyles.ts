@@ -72,7 +72,7 @@ export const HUDZoneStyles = `
   .zone-opfor { background: ${colors.opfor}; }
   .zone-contested {
     background: linear-gradient(90deg, ${colors.us} 50%, ${colors.opfor} 50%);
-    animation: pulse 1s infinite;
+    animation: ui-pulse 1s infinite;
   }
 
   .capture-progress {

@@ -5,41 +5,47 @@ import { DamageNumberSystem } from './DamageNumberSystem';
 import { ScorePopupSystem } from './ScorePopupSystem';
 import { HitMarkerFeedback } from './HitMarkerFeedback';
 import { WeaponSwitchFeedback } from './WeaponSwitchFeedback';
-import { WeaponAmmoDisplay } from './WeaponAmmoDisplay';
 import { UnifiedWeaponBar } from './UnifiedWeaponBar';
 import { ObjectiveDisplay } from './ObjectiveDisplay';
-import { CombatStatsDisplay } from './CombatStatsDisplay';
-import { GameStatusDisplay } from './GameStatusDisplay';
-import { HelicopterInstruments } from './HelicopterInstruments';
-import { GrenadePowerMeter } from './GrenadePowerMeter';
-import { InteractionPrompt } from './InteractionPrompt';
+import { TicketDisplay } from './TicketDisplay';
+import { MatchTimer } from './MatchTimer';
+import { GameStatusPanel } from './GameStatusPanel';
+import { KillCounter } from './KillCounter';
+import { AmmoDisplay } from './AmmoDisplay';
+import { HelicopterHUD } from './HelicopterHUD';
+import { InteractionPromptPanel } from './InteractionPromptPanel';
+import { GrenadeMeter } from './GrenadeMeter';
+import { MortarPanel } from './MortarPanel';
 import { RespawnButton } from './RespawnButton';
 import { ZoneCaptureNotification } from './ZoneCaptureNotification';
-import { MortarIndicator } from './MortarIndicator';
+import { zIndex, fontStack } from '../design/tokens';
 import type { HUDLayout } from '../layout/HUDLayout';
 import * as THREE from 'three';
 
 export class HUDElements {
   // Main containers
   public hudContainer: HTMLDivElement;
-  
-  // Extracted modules - expose their public properties for backward compatibility
+
+  // UIComponent-based elements
   public objectivesList: HTMLDivElement;
-  public ticketDisplay: HTMLDivElement;
+  public ticketDisplay: TicketDisplay;
+  public matchTimer: MatchTimer;
+  public gameStatusPanel: GameStatusPanel;
+  public killCounter: KillCounter;
+  public ammoDisplay: AmmoDisplay;
+
+  // Legacy HTMLDivElement properties (not yet migrated)
   public combatStats: HTMLDivElement;
-  public gameStatus: HTMLDivElement;
-  public timerElement: HTMLDivElement;
   public hitMarkerContainer: HTMLDivElement;
-  public killCounter: HTMLDivElement;
-  public ammoDisplay: HTMLDivElement;
   public respawnButton: HTMLButtonElement;
-  public interactionPrompt: HTMLDivElement;
-  public elevationSlider: HTMLDivElement;
-  public helicopterMouseIndicator: HTMLDivElement;
-  public helicopterInstruments: HTMLDivElement;
-  public grenadePowerMeter: HTMLDivElement;
-  public grenadeCookingTimer?: HTMLDivElement;
-  public mortarIndicatorElement: HTMLDivElement;
+
+  // UIComponent-based elements (Phase 3)
+  public interactionPromptPanel: InteractionPromptPanel;
+  public grenadeMeter: GrenadeMeter;
+  public mortarPanel: MortarPanel;
+
+  // UIComponent-based elements (Phase 4)
+  public helicopterHUD: HelicopterHUD;
 
   // Feedback systems
   public killFeed: KillFeed;
@@ -50,51 +56,41 @@ export class HUDElements {
   public zoneCaptureNotification?: ZoneCaptureNotification;
   public unifiedWeaponBar: UnifiedWeaponBar;
 
-  // Module instances
-  private weaponAmmoDisplay: WeaponAmmoDisplay;
+  // Legacy module instances (not yet migrated to UIComponent)
   private objectiveDisplay: ObjectiveDisplay;
-  private combatStatsDisplay: CombatStatsDisplay;
-  private gameStatusDisplay: GameStatusDisplay;
-  private helicopterInstrumentsModule: HelicopterInstruments;
-  private grenadePowerMeterModule: GrenadePowerMeter;
-  private interactionPromptModule: InteractionPrompt;
   private respawnButtonModule: RespawnButton;
-  private mortarIndicatorModule: MortarIndicator;
 
   constructor(camera?: THREE.Camera) {
     this.hudContainer = this.createHUDContainer();
-    
-    // Initialize extracted modules
-    this.weaponAmmoDisplay = new WeaponAmmoDisplay();
+
+    // Initialize UIComponent-based modules
+    this.ticketDisplay = new TicketDisplay();
+    this.matchTimer = new MatchTimer();
+    this.gameStatusPanel = new GameStatusPanel();
+    this.killCounter = new KillCounter();
+    this.ammoDisplay = new AmmoDisplay();
+
+    // Initialize Phase 3 UIComponent modules
+    this.interactionPromptPanel = new InteractionPromptPanel();
+    this.grenadeMeter = new GrenadeMeter();
+    this.mortarPanel = new MortarPanel();
+
+    // Initialize Phase 4 UIComponent modules
+    this.helicopterHUD = new HelicopterHUD();
+
+    // Initialize legacy modules (not yet migrated)
     this.objectiveDisplay = new ObjectiveDisplay();
-    this.combatStatsDisplay = new CombatStatsDisplay();
-    this.gameStatusDisplay = new GameStatusDisplay();
-    this.helicopterInstrumentsModule = new HelicopterInstruments();
-    this.grenadePowerMeterModule = new GrenadePowerMeter();
-    this.interactionPromptModule = new InteractionPrompt();
     this.respawnButtonModule = new RespawnButton();
-    this.mortarIndicatorModule = new MortarIndicator();
-    
-    // Expose module properties for backward compatibility
+
+    // Expose legacy module properties for backward compatibility
     this.objectivesList = this.objectiveDisplay.objectivesList;
-    this.ticketDisplay = this.objectiveDisplay.ticketDisplay;
-    this.combatStats = this.combatStatsDisplay.combatStats;
-    this.gameStatus = this.gameStatusDisplay.gameStatus;
-    this.timerElement = this.gameStatusDisplay.timerElement;
-    this.killCounter = this.combatStatsDisplay.killCounter;
-    this.ammoDisplay = this.weaponAmmoDisplay.ammoDisplay;
+    this.combatStats = document.createElement('div'); // hidden, placeholder
+    this.combatStats.style.display = 'none';
     this.respawnButton = this.respawnButtonModule.respawnButton;
-    this.interactionPrompt = this.interactionPromptModule.interactionPrompt;
-    this.elevationSlider = this.helicopterInstrumentsModule.elevationSlider;
-    this.helicopterMouseIndicator = this.helicopterInstrumentsModule.helicopterMouseIndicator;
-    this.helicopterInstruments = this.helicopterInstrumentsModule.helicopterInstruments;
-    this.grenadePowerMeter = this.grenadePowerMeterModule.grenadePowerMeter;
-    this.grenadeCookingTimer = this.grenadePowerMeterModule.grenadeCookingTimer;
-    this.mortarIndicatorElement = this.mortarIndicatorModule.mortarIndicator;
-    
+
     // Create hit marker container (simple, no module needed)
     this.hitMarkerContainer = this.createHitMarkerContainer();
-    
+
     // Initialize feedback systems
     this.killFeed = new KillFeed();
 
@@ -118,38 +114,44 @@ export class HUDElements {
     // Initialize unified weapon bar
     this.unifiedWeaponBar = new UnifiedWeaponBar();
 
-    // Assemble HUD structure
+    // Assemble HUD structure (fallback for non-grid mode)
     this.hudContainer.appendChild(this.objectivesList);
-    this.hudContainer.appendChild(this.ticketDisplay);
+    this.ticketDisplay.mount(this.hudContainer);
     this.hudContainer.appendChild(this.combatStats);
-    this.hudContainer.appendChild(this.gameStatus);
-    this.hudContainer.appendChild(this.timerElement);
+    this.gameStatusPanel.mount(this.hudContainer);
+    this.matchTimer.mount(this.hudContainer);
     this.hudContainer.appendChild(this.hitMarkerContainer);
-    this.hudContainer.appendChild(this.killCounter);
-    this.hudContainer.appendChild(this.ammoDisplay);
-    this.hudContainer.appendChild(this.interactionPrompt);
-    this.hudContainer.appendChild(this.elevationSlider);
-    this.hudContainer.appendChild(this.helicopterMouseIndicator);
-    this.hudContainer.appendChild(this.helicopterInstruments);
-    this.hudContainer.appendChild(this.grenadePowerMeter);
-    this.hudContainer.appendChild(this.mortarIndicatorElement);
+    this.killCounter.mount(this.hudContainer);
+    this.ammoDisplay.mount(this.hudContainer);
+    this.interactionPromptPanel.mount(this.hudContainer);
+    this.helicopterHUD.mount(this.hudContainer);
+    this.grenadeMeter.mount(this.hudContainer);
+    this.mortarPanel.mount(this.hudContainer);
     // Removed respawn button from HUD
   }
 
   private createHUDContainer(): HTMLDivElement {
     const container = document.createElement('div');
-    container.className = 'hud-container';
+    container.style.cssText = `
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      pointer-events: none;
+      font-family: ${fontStack.hud};
+      color: rgba(220, 225, 230, 0.95);
+      z-index: ${zIndex.hudBase};
+      letter-spacing: 0.2px;
+    `;
     return container;
   }
 
   private createHitMarkerContainer(): HTMLDivElement {
     const container = document.createElement('div');
-    container.className = 'hit-marker-container';
+    container.style.cssText = 'position: relative; width: 0; height: 0; pointer-events: none;';
     return container;
   }
 
   updateAmmoDisplay(magazine: number, reserve: number): void {
-    this.weaponAmmoDisplay.updateAmmoDisplay(magazine, reserve);
+    this.ammoDisplay.setAmmo(magazine, reserve);
     this.unifiedWeaponBar.updateAmmo(magazine, reserve);
   }
 
@@ -180,14 +182,14 @@ export class HUDElements {
       font-size: 24px;
       border-radius: 5px;
       text-align: center;
-      animation: fadeIn 0.3s ease;
+      animation: ui-fadeIn 0.3s ease;
     `;
     messageElement.textContent = message;
 
     this.hudContainer.appendChild(messageElement);
 
     setTimeout(() => {
-      messageElement.style.animation = 'fadeOut 0.3s ease';
+      messageElement.style.animation = 'ui-fadeOut 0.3s ease';
       setTimeout(() => {
         if (messageElement.parentNode) {
           this.hudContainer.removeChild(messageElement);
@@ -197,86 +199,107 @@ export class HUDElements {
   }
 
   showInteractionPrompt(text: string): void {
-    this.interactionPromptModule.showInteractionPrompt(text);
+    this.interactionPromptPanel.show(text);
   }
 
   hideInteractionPrompt(): void {
-    this.interactionPromptModule.hideInteractionPrompt();
+    this.interactionPromptPanel.hide();
   }
 
   updateElevation(elevation: number): void {
-    this.helicopterInstrumentsModule.updateElevation(elevation);
+    this.helicopterHUD.setElevation(elevation);
   }
 
   // Helicopter mouse control indicator methods
   showHelicopterMouseIndicator(): void {
-    this.helicopterInstrumentsModule.showHelicopterMouseIndicator();
+    this.helicopterHUD.showMouseIndicator();
   }
 
   hideHelicopterMouseIndicator(): void {
-    this.helicopterInstrumentsModule.hideHelicopterMouseIndicator();
+    this.helicopterHUD.hideMouseIndicator();
   }
 
   updateHelicopterMouseMode(controlMode: boolean): void {
-    this.helicopterInstrumentsModule.updateHelicopterMouseMode(controlMode);
+    this.helicopterHUD.setMouseMode(controlMode);
   }
 
   // Helicopter instruments methods (only visible in helicopter)
   showHelicopterInstruments(): void {
-    this.helicopterInstrumentsModule.showHelicopterInstruments();
+    this.helicopterHUD.show();
+    this.helicopterHUD.showInstruments();
   }
 
   hideHelicopterInstruments(): void {
-    this.helicopterInstrumentsModule.hideHelicopterInstruments();
+    this.helicopterHUD.hide();
+    this.helicopterHUD.hideInstruments();
   }
 
   updateHelicopterInstruments(collective: number, rpm: number, autoHover: boolean, engineBoost: boolean): void {
-    this.helicopterInstrumentsModule.updateHelicopterInstruments(collective, rpm, autoHover, engineBoost);
+    this.helicopterHUD.setInstruments(collective, rpm, autoHover, engineBoost);
   }
 
   // Mortar indicator methods
   showMortarIndicator(): void {
-    this.mortarIndicatorModule.show();
+    this.mortarPanel.show();
   }
 
   hideMortarIndicator(): void {
-    this.mortarIndicatorModule.hide();
+    this.mortarPanel.hide();
   }
 
   updateMortarState(pitch: number, yaw: number, power: number, isAiming: boolean): void {
-    this.mortarIndicatorModule.updateState(pitch, yaw, power, isAiming);
+    this.mortarPanel.setState(pitch, yaw, power, isAiming);
   }
 
   // Grenade power meter methods
   showGrenadePowerMeter(): void {
-    this.grenadePowerMeterModule.showGrenadePowerMeter();
+    this.grenadeMeter.show();
   }
 
   hideGrenadePowerMeter(): void {
-    this.grenadePowerMeterModule.hideGrenadePowerMeter();
+    this.grenadeMeter.hide();
   }
 
   updateGrenadePower(power: number, estimatedDistance?: number, cookingTime?: number): void {
-    this.grenadePowerMeterModule.updateGrenadePower(power, estimatedDistance, cookingTime);
+    this.grenadeMeter.setPower(power, estimatedDistance, cookingTime);
   }
 
   attachToDOM(layout?: HUDLayout): void {
     if (layout) {
-      // Mount components into grid slots (Phase 2+)
-      layout.getSlot('tickets').appendChild(this.ticketDisplay);
-      layout.getSlot('timer').appendChild(this.timerElement);
-      layout.getSlot('game-status').appendChild(this.gameStatus);
+      // Mount UIComponent-based elements into grid slots
+      this.ticketDisplay.unmount();
+      this.ticketDisplay.mount(layout.getSlot('tickets'));
+
+      this.matchTimer.unmount();
+      this.matchTimer.mount(layout.getSlot('timer'));
+
+      this.gameStatusPanel.unmount();
+      this.gameStatusPanel.mount(layout.getSlot('game-status'));
+
+      this.killCounter.unmount();
+      this.killCounter.mount(layout.getSlot('center'));
+
+      this.ammoDisplay.unmount();
+      this.ammoDisplay.mount(layout.getSlot('ammo'));
+
+      // Phase 3 UIComponent elements
+      this.interactionPromptPanel.unmount();
+      this.interactionPromptPanel.mount(layout.getSlot('center'));
+
+      this.grenadeMeter.unmount();
+      this.grenadeMeter.mount(layout.getSlot('center'));
+
+      this.mortarPanel.unmount();
+      this.mortarPanel.mount(layout.getSlot('center'));
+
+      // Phase 4 UIComponent elements
+      this.helicopterHUD.unmount();
+      this.helicopterHUD.mount(layout.getSlot('center'));
+
+      // Legacy HTMLDivElement elements
       layout.getSlot('objectives').appendChild(this.objectivesList);
       layout.getSlot('stats').appendChild(this.combatStats);
-      layout.getSlot('ammo').appendChild(this.ammoDisplay);
       layout.getSlot('center').appendChild(this.hitMarkerContainer);
-      layout.getSlot('center').appendChild(this.interactionPrompt);
-      layout.getSlot('center').appendChild(this.grenadePowerMeter);
-      layout.getSlot('center').appendChild(this.mortarIndicatorElement);
-      layout.getSlot('center').appendChild(this.helicopterInstruments);
-      layout.getSlot('center').appendChild(this.helicopterMouseIndicator);
-      layout.getSlot('center').appendChild(this.elevationSlider);
-      layout.getSlot('center').appendChild(this.killCounter);
 
       // Feedback systems mount to the center slot too
       this.killFeed.attachToDOM(layout.getSlot('kill-feed'));
@@ -355,6 +378,14 @@ export class HUDElements {
     if (this.hudContainer.parentNode) {
       this.hudContainer.parentNode.removeChild(this.hudContainer);
     }
+    // Dispose UIComponent-based elements
+    this.ticketDisplay.dispose();
+    this.matchTimer.dispose();
+    this.gameStatusPanel.dispose();
+    this.killCounter.dispose();
+    this.ammoDisplay.dispose();
+
+    // Dispose legacy feedback systems
     this.killFeed.dispose();
     if (this.damageNumbers) {
       this.damageNumbers.dispose();
@@ -369,6 +400,9 @@ export class HUDElements {
       this.weaponSwitchFeedback.dispose();
     }
     this.unifiedWeaponBar.dispose();
-    this.mortarIndicatorModule.dispose();
+    this.interactionPromptPanel.dispose();
+    this.grenadeMeter.dispose();
+    this.mortarPanel.dispose();
+    this.helicopterHUD.dispose();
   }
 }

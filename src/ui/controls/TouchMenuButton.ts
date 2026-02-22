@@ -4,8 +4,10 @@
  * On tap: shows a pause overlay with Resume and Quit to Menu options.
  */
 
-export class TouchMenuButton {
-  private button: HTMLDivElement;
+import { UIComponent } from '../engine/UIComponent';
+import styles from './TouchControls.module.css';
+
+export class TouchMenuButton extends UIComponent {
   private overlay: HTMLDivElement | null = null;
   private isOverlayVisible = false;
 
@@ -14,56 +16,22 @@ export class TouchMenuButton {
   private onSquadCommandCallback?: () => void;
   private onScoreboardCallback?: () => void;
 
-  constructor() {
-    this.button = document.createElement('div');
-    this.button.id = 'touch-menu-btn';
-    Object.assign(this.button.style, {
-      position: 'fixed',
-      top: '12px',
-      right: '12px',
-      width: 'var(--tc-action-size, 36px)',
-      height: 'var(--tc-action-size, 36px)',
-      borderRadius: '8px',
-      background: 'rgba(0, 0, 0, 0.35)',
-      backdropFilter: 'blur(4px)',
-      webkitBackdropFilter: 'blur(4px)',
-      border: '1px solid rgba(255, 255, 255, 0.2)',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: '3px',
-      zIndex: '1002',
-      touchAction: 'manipulation',
-      pointerEvents: 'auto',
-      userSelect: 'none',
-      webkitUserSelect: 'none',
-      cursor: 'pointer',
-    } as Partial<CSSStyleDeclaration>);
+  protected build(): void {
+    this.root.className = styles.menuBtn;
+    this.root.id = 'touch-menu-btn';
 
     // Create hamburger icon (3 horizontal lines)
     for (let i = 0; i < 3; i++) {
       const line = document.createElement('div');
-      Object.assign(line.style, {
-        width: '18px',
-        height: '2px',
-        background: 'rgba(255, 255, 255, 0.8)',
-        borderRadius: '1px',
-        pointerEvents: 'none',
-      } as Partial<CSSStyleDeclaration>);
-      this.button.appendChild(line);
+      line.className = styles.menuLine;
+      this.root.appendChild(line);
     }
-
-    this.button.addEventListener('pointerdown', this.onButtonTap, { passive: false });
-
-    document.body.appendChild(this.button);
   }
 
-  /**
-   * Set callbacks for pause/resume state changes.
-   * onPause: called when overlay opens (game should pause input)
-   * onResume: called when overlay closes (game should resume input)
-   */
+  protected onMount(): void {
+    this.listen(this.root, 'pointerdown', this.onButtonTap, { passive: false });
+  }
+
   setCallbacks(onPause: () => void, onResume: () => void): void {
     this.onPauseCallback = onPause;
     this.onResumeCallback = onResume;
@@ -93,52 +61,25 @@ export class TouchMenuButton {
 
     this.overlay = document.createElement('div');
     this.overlay.id = 'touch-menu-overlay';
-    Object.assign(this.overlay.style, {
-      position: 'fixed',
-      top: '0',
-      left: '0',
-      width: '100%',
-      height: '100%',
-      background: 'rgba(0, 0, 0, 0.7)',
-      backdropFilter: 'blur(6px)',
-      webkitBackdropFilter: 'blur(6px)',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: '16px',
-      zIndex: '9990',
-      touchAction: 'manipulation',
-      pointerEvents: 'auto',
-    } as Partial<CSSStyleDeclaration>);
+    this.overlay.className = styles.pauseOverlay;
 
-    // Prevent any pointer events from passing through to game
+    // Prevent pointer events from passing through
     this.overlay.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
     }, { passive: false });
 
     // Title
     const title = document.createElement('div');
-    Object.assign(title.style, {
-      fontSize: '24px',
-      fontWeight: 'bold',
-      color: 'rgba(255, 255, 255, 0.9)',
-      marginBottom: '20px',
-      fontFamily: 'monospace, sans-serif',
-      letterSpacing: '2px',
-      textTransform: 'uppercase',
-    } as Partial<CSSStyleDeclaration>);
+    title.className = styles.pauseTitle;
     title.textContent = 'PAUSED';
     this.overlay.appendChild(title);
 
-    // Resume button
+    // Resume
     this.overlay.appendChild(
-      this.createOverlayButton('Resume', () => {
-        this.hideOverlay();
-      })
+      this.createOverlayButton('Resume', () => this.hideOverlay())
     );
 
-    // Squad Commands button
+    // Squad Commands
     this.overlay.appendChild(
       this.createOverlayButton('Squad Commands', () => {
         this.hideOverlay();
@@ -146,7 +87,7 @@ export class TouchMenuButton {
       })
     );
 
-    // Scoreboard button
+    // Scoreboard
     this.overlay.appendChild(
       this.createOverlayButton('Scoreboard', () => {
         this.hideOverlay();
@@ -154,7 +95,7 @@ export class TouchMenuButton {
       })
     );
 
-    // Quit to Menu button
+    // Quit to Menu
     this.overlay.appendChild(
       this.createOverlayButton('Quit to Menu', () => {
         window.location.reload();
@@ -179,46 +120,25 @@ export class TouchMenuButton {
 
   private createOverlayButton(label: string, onClick: () => void): HTMLDivElement {
     const btn = document.createElement('div');
-    Object.assign(btn.style, {
-      width: '220px',
-      minHeight: '48px',
-      borderRadius: '8px',
-      background: 'rgba(255, 255, 255, 0.12)',
-      border: '1px solid rgba(255, 255, 255, 0.25)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontSize: '16px',
-      fontWeight: 'bold',
-      color: 'rgba(255, 255, 255, 0.9)',
-      fontFamily: 'monospace, sans-serif',
-      userSelect: 'none',
-      webkitUserSelect: 'none',
-      touchAction: 'manipulation',
-      pointerEvents: 'auto',
-      cursor: 'pointer',
-    } as Partial<CSSStyleDeclaration>);
+    btn.className = styles.pauseBtn;
     btn.textContent = label;
 
     btn.addEventListener('pointerdown', (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      btn.style.background = 'rgba(255, 255, 255, 0.25)';
-      btn.style.transform = 'scale(0.96)';
+      btn.classList.add(styles.pressed);
     }, { passive: false });
 
     btn.addEventListener('pointerup', (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      btn.style.background = 'rgba(255, 255, 255, 0.12)';
-      btn.style.transform = 'scale(1)';
+      btn.classList.remove(styles.pressed);
       onClick();
     }, { passive: false });
 
     btn.addEventListener('pointercancel', (e: PointerEvent) => {
       e.preventDefault();
-      btn.style.background = 'rgba(255, 255, 255, 0.12)';
-      btn.style.transform = 'scale(1)';
+      btn.classList.remove(styles.pressed);
     }, { passive: false });
 
     return btn;
@@ -231,32 +151,26 @@ export class TouchMenuButton {
 
   /** Re-parent into a grid slot. */
   mountTo(parent: HTMLElement): void {
-    this.button.style.position = '';
-    this.button.style.top = '';
-    this.button.style.right = '';
-    this.button.style.zIndex = '';
-    if (this.button.parentNode) this.button.parentNode.removeChild(this.button);
-    parent.appendChild(this.button);
+    this.root.classList.add(styles.slotted);
+    this.reparentTo(parent);
   }
 
   show(): void {
-    this.button.style.display = 'flex';
+    this.root.style.display = 'flex';
   }
 
   hide(): void {
-    this.button.style.display = 'none';
-    // Also close overlay if open
+    this.root.style.display = 'none';
     if (this.isOverlayVisible) {
       this.hideOverlay();
     }
   }
 
-  dispose(): void {
-    this.button.removeEventListener('pointerdown', this.onButtonTap);
-    this.button.remove();
+  override dispose(): void {
     if (this.overlay) {
       this.overlay.remove();
       this.overlay = null;
     }
+    super.dispose();
   }
 }

@@ -1,0 +1,35 @@
+/**
+ * InteractionPromptPanel - contextual "Press E to..." prompt
+ *
+ * Design: Glass panel with text shadow, centered in viewport.
+ * Only visible when near interactable objects.
+ */
+
+.container {
+  padding: var(--space-2-5) var(--space-5);
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  text-align: center;
+  text-shadow: var(--shadow-text);
+  letter-spacing: 0.5px;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  display: none;
+  margin: 0 auto;
+}
+
+.visible {
+  display: block;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    font-size: var(--font-size-xs);
+    padding: var(--space-2) var(--space-4);
+  }
+}

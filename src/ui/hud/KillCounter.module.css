@@ -1,0 +1,83 @@
+/**
+ * KillCounter - Player K/D/A display
+ *
+ * Design: Bare text with text-shadow. Compact single-line format.
+ * Kill count is brightest, death count secondary, K/D ratio tertiary.
+ */
+
+.container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  pointer-events: none;
+  user-select: none;
+}
+
+.stat {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-0-5);
+}
+
+.value {
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  text-shadow: var(--shadow-text);
+  line-height: 1;
+}
+
+.label {
+  font-size: var(--font-size-2xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  text-shadow: var(--shadow-text);
+  line-height: 1;
+}
+
+.kills .value {
+  color: var(--text-primary);
+}
+
+.deaths .value {
+  color: var(--text-secondary);
+}
+
+.ratio {
+  font-size: var(--font-size-2xs);
+  font-weight: var(--weight-semibold);
+  color: var(--text-muted);
+  text-shadow: var(--shadow-text);
+  line-height: 1;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .value {
+    font-size: var(--font-size-xs);
+  }
+
+  .label {
+    font-size: 8px;
+  }
+
+  .container {
+    gap: var(--space-1-5);
+  }
+}
+
+@media (max-width: 480px) {
+  .value {
+    font-size: var(--font-size-2xs);
+  }
+
+  .container {
+    gap: var(--space-1);
+  }
+
+  .ratio {
+    display: none;
+  }
+}

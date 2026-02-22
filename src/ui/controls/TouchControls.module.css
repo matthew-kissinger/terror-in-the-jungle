@@ -1,0 +1,521 @@
+/**
+ * TouchControls.module.css - Shared styles for all touch control components.
+ *
+ * Token references: src/ui/engine/theme.css (--tc-* tokens)
+ * Components: TouchFireButton, TouchADSButton, TouchActionButtons,
+ *   TouchMenuButton, TouchInteractionButton, VirtualJoystick, TouchLook,
+ *   TouchSandbagButtons, TouchRallyPointButton, TouchMortarButton,
+ *   TouchHelicopterCyclic
+ */
+
+/* ==========================================================================
+   Shared base
+   ========================================================================== */
+
+.btn {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.8);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  pointer-events: auto;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-sizing: border-box;
+  transition: none;
+}
+
+.pressed {
+  transform: scale(0.92);
+}
+
+/* Override fixed positioning when slotted into HUD grid */
+.slotted {
+  position: static !important;
+  z-index: auto !important;
+  inset: auto !important;
+}
+
+/* ==========================================================================
+   Fire button
+   ========================================================================== */
+
+.fireBtn {
+  composes: btn;
+  position: fixed;
+  right: max(var(--tc-edge-inset), env(safe-area-inset-right, 0px));
+  bottom: max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px));
+  width: var(--tc-fire-size);
+  height: var(--tc-fire-size);
+  background: rgba(255, 60, 60, 0.4);
+  border: 3px solid rgba(255, 100, 100, 0.6);
+  z-index: var(--tc-z-controls);
+  font-size: var(--tc-font-size);
+  letter-spacing: 1px;
+}
+
+.fireBtn.pressed {
+  background: rgba(255, 60, 60, 0.7);
+}
+
+/* ==========================================================================
+   ADS button
+   ========================================================================== */
+
+.adsBtn {
+  composes: btn;
+  position: fixed;
+  right: calc(var(--tc-fire-size) + max(var(--tc-edge-inset), env(safe-area-inset-right, 0px)) + 12px);
+  bottom: max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px));
+  width: var(--tc-ads-size);
+  height: var(--tc-ads-size);
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  z-index: var(--tc-z-controls);
+  font-size: var(--tc-font-size-sm);
+}
+
+.adsActive {
+  background: rgba(100, 180, 255, 0.45);
+  border-color: rgba(100, 180, 255, 0.8);
+  color: rgba(255, 255, 255, 1);
+}
+
+/* ==========================================================================
+   Action buttons (jump, reload, grenade column)
+   ========================================================================== */
+
+.actionContainer {
+  position: fixed;
+  right: max(var(--tc-edge-inset), env(safe-area-inset-right, 0px));
+  bottom: calc(var(--tc-fire-size) + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: var(--tc-z-controls);
+  touch-action: none;
+  pointer-events: auto;
+}
+
+.actionBtn {
+  composes: btn;
+  width: var(--tc-action-size);
+  height: var(--tc-action-size);
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  font-size: var(--tc-font-size-sm);
+}
+
+.actionBtn.pressed {
+  background: rgba(255, 255, 255, 0.35);
+  transform: scale(0.9);
+}
+
+/* ==========================================================================
+   Menu button (hamburger)
+   ========================================================================== */
+
+.menuBtn {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  z-index: var(--tc-z-menu);
+  touch-action: manipulation;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+
+.menuLine {
+  width: 18px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 1px;
+  pointer-events: none;
+}
+
+/* Pause overlay */
+.pauseOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: var(--tc-z-pause);
+  touch-action: manipulation;
+  pointer-events: auto;
+}
+
+.pauseTitle {
+  font-size: 24px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 20px;
+  font-family: monospace, sans-serif;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.pauseBtn {
+  width: 220px;
+  min-height: 48px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: monospace, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.pauseBtn.pressed {
+  background: rgba(255, 255, 255, 0.25);
+  transform: scale(0.96);
+}
+
+/* ==========================================================================
+   Interaction button (contextual - helicopter, etc.)
+   ========================================================================== */
+
+.interactBtn {
+  composes: btn;
+  position: fixed;
+  right: calc(var(--tc-fire-size) + max(var(--tc-edge-inset), env(safe-area-inset-right, 0px)) + 16px);
+  bottom: max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px));
+  width: 70px;
+  height: 70px;
+  background: rgba(100, 200, 255, 0.4);
+  border: 3px solid rgba(150, 220, 255, 0.6);
+  z-index: var(--tc-z-controls);
+  font-size: 28px;
+  letter-spacing: 1px;
+}
+
+.interactBtn.pressed {
+  background: rgba(100, 200, 255, 0.7);
+}
+
+/* ==========================================================================
+   Virtual joystick
+   ========================================================================== */
+
+.joystickZone {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 40%;
+  height: 60%;
+  z-index: var(--tc-z-overlay);
+  touch-action: none;
+  pointer-events: auto;
+}
+
+.joystickBase {
+  position: absolute;
+  left: max(var(--tc-edge-inset), env(safe-area-inset-left, 0px));
+  bottom: max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px));
+  width: var(--tc-joystick-base);
+  height: var(--tc-joystick-base);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.joystickThumb {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  position: absolute;
+  transition: none;
+}
+
+/* ==========================================================================
+   Touch look zone
+   ========================================================================== */
+
+.lookZone {
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 60%;
+  height: 70%;
+  z-index: var(--tc-z-look);
+  touch-action: none;
+  pointer-events: auto;
+}
+
+/* ==========================================================================
+   Sandbag rotation buttons
+   ========================================================================== */
+
+.sandbagContainer {
+  position: fixed;
+  right: 140px;
+  bottom: 30px;
+  display: none;
+  flex-direction: row;
+  gap: 12px;
+  z-index: var(--tc-z-controls);
+  touch-action: none;
+  pointer-events: auto;
+}
+
+.sandbagBtn {
+  composes: btn;
+  width: 60px;
+  height: 60px;
+  background: rgba(255, 200, 100, 0.3);
+  border: 2px solid rgba(255, 220, 150, 0.5);
+  font-size: 24px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.sandbagBtn.pressed {
+  background: rgba(255, 200, 100, 0.6);
+  transform: scale(0.9);
+}
+
+/* ==========================================================================
+   Rally point button
+   ========================================================================== */
+
+.rallyBtn {
+  composes: btn;
+  position: fixed;
+  right: 30px;
+  bottom: 250px;
+  width: 56px;
+  height: 56px;
+  background: rgba(100, 255, 100, 0.3);
+  border: 2px solid rgba(150, 255, 150, 0.5);
+  z-index: var(--tc-z-controls);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.rallyBtn.pressed {
+  background: rgba(100, 255, 100, 0.6);
+  transform: scale(0.9);
+}
+
+/* ==========================================================================
+   Mortar controls
+   ========================================================================== */
+
+.mortarContainer {
+  position: fixed;
+  left: 20px;
+  bottom: 140px;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  z-index: var(--tc-z-controls);
+  touch-action: none;
+  pointer-events: auto;
+}
+
+.mortarDeployBtn {
+  composes: btn;
+  width: 70px;
+  height: 70px;
+  background: rgba(255, 180, 60, 0.3);
+  border: 2px solid rgba(255, 200, 100, 0.5);
+  font-size: var(--tc-font-size-sm);
+}
+
+.mortarDeployBtn.pressed {
+  background: rgba(255, 180, 60, 0.6);
+  transform: scale(0.9);
+}
+
+.mortarDeployed {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.mortarDeployed.visible {
+  display: flex;
+}
+
+.mortarAimPad {
+  width: 120px;
+  height: 120px;
+  border-radius: 12px;
+  background: rgba(100, 150, 255, 0.2);
+  border: 2px solid rgba(130, 170, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.6);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  pointer-events: auto;
+}
+
+.mortarAimPad.pressed {
+  background: rgba(100, 150, 255, 0.4);
+}
+
+.mortarBtnRow {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
+
+.mortarFireBtn {
+  composes: btn;
+  width: 70px;
+  height: 70px;
+  background: rgba(255, 60, 60, 0.4);
+  border: 3px solid rgba(255, 100, 100, 0.6);
+  font-size: var(--tc-font-size);
+}
+
+.mortarFireBtn.pressed {
+  background: rgba(255, 60, 60, 0.7);
+  transform: scale(0.9);
+}
+
+.mortarPackBtn {
+  composes: btn;
+  width: var(--tc-action-size);
+  height: var(--tc-action-size);
+  background: rgba(255, 180, 60, 0.3);
+  border: 2px solid rgba(255, 200, 100, 0.5);
+  font-size: 10px;
+}
+
+.mortarPackBtn.pressed {
+  background: rgba(255, 180, 60, 0.6);
+  transform: scale(0.9);
+}
+
+.mortarCamBtn {
+  composes: btn;
+  width: 50px;
+  height: 50px;
+  background: rgba(60, 150, 255, 0.3);
+  border: 2px solid rgba(100, 170, 255, 0.5);
+  font-size: 10px;
+}
+
+.mortarCamBtn.pressed {
+  background: rgba(60, 150, 255, 0.6);
+  transform: scale(0.9);
+}
+
+/* ==========================================================================
+   Helicopter cyclic pad
+   ========================================================================== */
+
+.cyclicPad {
+  position: fixed;
+  left: calc(var(--tc-edge-inset, 20px) + env(safe-area-inset-left, 0px));
+  bottom: calc(200px + env(safe-area-inset-bottom, 0px));
+  width: var(--tc-joystick-base);
+  height: var(--tc-joystick-base);
+  border-radius: 12px;
+  background: rgba(30, 60, 30, 0.35);
+  border: 2px solid rgba(80, 200, 80, 0.4);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--tc-z-controls);
+  touch-action: none;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.cyclicPad.active {
+  background: rgba(30, 60, 30, 0.5);
+}
+
+.cyclicCrosshair {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.cyclicLineH {
+  position: absolute;
+  top: 50%;
+  left: 10%;
+  width: 80%;
+  height: 1px;
+  background: rgba(80, 200, 80, 0.25);
+}
+
+.cyclicLineV {
+  position: absolute;
+  left: 50%;
+  top: 10%;
+  height: 80%;
+  width: 1px;
+  background: rgba(80, 200, 80, 0.25);
+}
+
+.cyclicLabel {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  font-size: 9px;
+  font-weight: bold;
+  color: rgba(80, 200, 80, 0.5);
+  letter-spacing: 1px;
+  pointer-events: none;
+}
+
+.cyclicIndicator {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(80, 200, 80, 0.6);
+  border: 2px solid rgba(120, 255, 120, 0.7);
+  pointer-events: none;
+  transition: none;
+}

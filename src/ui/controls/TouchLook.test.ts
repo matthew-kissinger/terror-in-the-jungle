@@ -22,6 +22,7 @@ describe('TouchLook', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     look = new TouchLook();
+    look.mount(document.body);
     // Disable QoL features for deterministic linear tests
     look.setDeadZone(0);
     look.setAcceleration(1.0);
@@ -30,10 +31,7 @@ describe('TouchLook', () => {
 
   it('creates look zone with expected dimensions', () => {
     expect(zone).toBeTruthy();
-    expect(zone.style.width).toBe('60%');
-    expect(zone.style.height).toBe('70%');
-    expect(zone.style.right).toBe('0px');
-    expect(zone.style.top).toBe('0px');
+    expect(zone.className).toContain('lookZone');
   });
 
   it('accumulates movement delta on pointer move with default sensitivity', () => {

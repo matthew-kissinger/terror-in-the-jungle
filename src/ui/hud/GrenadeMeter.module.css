@@ -1,0 +1,124 @@
+/**
+ * GrenadeMeter - Throw power bar + cooking timer
+ *
+ * Design: Compact power bar with percentage/distance text.
+ * Color gradient from green (low) -> amber (mid) -> red (max).
+ * Cooking timer shows countdown below the bar.
+ */
+
+.container {
+  width: 200px;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  margin: 120px auto 0;
+}
+
+.visible {
+  display: flex;
+}
+
+.label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-shadow: var(--shadow-text);
+  margin-bottom: 4px;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.barContainer {
+  width: 100%;
+  height: 10px;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  position: relative;
+  overflow: hidden;
+}
+
+.fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 30%;
+  background: linear-gradient(to right, var(--success), var(--heal));
+  transition: width 0.05s linear, background 0.1s ease;
+  border-radius: 2px;
+}
+
+.fillMax {
+  animation: pulseGlow 0.5s infinite;
+}
+
+.text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  z-index: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.cooking {
+  font-size: var(--font-size-xs);
+  font-weight: var(--weight-bold);
+  color: var(--danger);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 6px;
+  display: none;
+  text-shadow: var(--shadow-text);
+}
+
+.cookingVisible {
+  display: block;
+}
+
+.cookingCritical {
+  color: var(--critical);
+  animation: pulseGlow 0.3s infinite;
+}
+
+.cookingDanger {
+  color: var(--danger);
+  animation: pulseGlow 0.6s infinite;
+}
+
+.cookingWarning {
+  color: var(--accent);
+  animation: none;
+}
+
+/* Power level colors applied via classes on label */
+.powerLow { color: var(--success); }
+.powerMid { color: var(--accent); }
+.powerHigh { color: var(--danger); }
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    width: 160px;
+    margin-top: 80px;
+  }
+
+  .label {
+    font-size: var(--font-size-2xs);
+  }
+}

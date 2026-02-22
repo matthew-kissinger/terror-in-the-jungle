@@ -1,0 +1,113 @@
+/**
+ * AmmoDisplay - Magazine/reserve ammo readout
+ *
+ * Design: Bare text with text-shadow. Magazine count is primary,
+ * reserve is secondary. Status text appears for low/empty/reload states.
+ * Color-coded: normal (white), low (amber), empty/reload (red), no ammo (critical).
+ */
+
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: none;
+  user-select: none;
+  gap: var(--space-0-5);
+}
+
+.counter {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.magazine {
+  font-size: var(--font-size-xl);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  text-shadow: var(--shadow-text);
+  transition: color var(--duration-fast) var(--ease-out);
+  line-height: 1;
+}
+
+.separator {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  font-weight: var(--weight-regular);
+  text-shadow: var(--shadow-text);
+  opacity: 0.5;
+}
+
+.reserve {
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  text-shadow: var(--shadow-text);
+  line-height: 1;
+}
+
+.status {
+  font-size: var(--font-size-2xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-shadow: var(--shadow-text);
+  min-height: 1em;
+  line-height: 1;
+}
+
+.statusHidden {
+  visibility: hidden;
+}
+
+/* Ammo states */
+.low .magazine {
+  color: var(--accent);
+}
+
+.low .status {
+  color: var(--accent);
+}
+
+.empty .magazine {
+  color: var(--danger);
+}
+
+.empty .status {
+  color: var(--danger);
+}
+
+.noAmmo .magazine {
+  color: var(--critical);
+}
+
+.noAmmo .status {
+  color: var(--critical);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .magazine {
+    font-size: var(--font-size-lg);
+  }
+
+  .reserve {
+    font-size: var(--font-size-xs);
+  }
+}
+
+@media (max-width: 480px) {
+  .magazine {
+    font-size: var(--font-size-base);
+  }
+
+  .reserve {
+    font-size: var(--font-size-2xs);
+  }
+
+  .status {
+    font-size: 8px;
+  }
+}

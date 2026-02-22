@@ -4,10 +4,13 @@
  * Outputs a normalised {x, z} vector in [-1, 1] range.
  * Uses pointer events with setPointerCapture for reliable multi-touch.
  */
-export class VirtualJoystick {
-  private container: HTMLDivElement;
-  private base: HTMLDivElement;
-  private thumb: HTMLDivElement;
+
+import { UIComponent } from '../engine/UIComponent';
+import styles from './TouchControls.module.css';
+
+export class VirtualJoystick extends UIComponent {
+  private base!: HTMLDivElement;
+  private thumb!: HTMLDivElement;
 
   private activePointerId: number | null = null;
   private baseX = 0;
@@ -31,61 +34,33 @@ export class VirtualJoystick {
   private readonly SPRINT_THRESHOLD = 0.9;
 
   constructor() {
+    super();
     this.maxDistance = this.FALLBACK_BASE / 2;
+  }
 
-    // Container - covers left 40% of the screen as touch zone
-    this.container = document.createElement('div');
-    this.container.id = 'touch-joystick-zone';
-    Object.assign(this.container.style, {
-      position: 'fixed',
-      left: '0',
-      bottom: '0',
-      width: '40%',
-      height: '60%',
-      zIndex: '1000',
-      touchAction: 'none',
-      pointerEvents: 'auto',
-    } as Partial<CSSStyleDeclaration>);
+  protected build(): void {
+    this.root.className = styles.joystickZone;
+    this.root.id = 'touch-joystick-zone';
 
     // Base circle
     this.base = document.createElement('div');
-    Object.assign(this.base.style, {
-      position: 'absolute',
-      left: `max(var(--tc-edge-inset, 30px), env(safe-area-inset-left, 0px))`,
-      bottom: `max(var(--tc-edge-inset, 30px), env(safe-area-inset-bottom, 0px))`,
-      width: `var(--tc-joystick-base, ${this.FALLBACK_BASE}px)`,
-      height: `var(--tc-joystick-base, ${this.FALLBACK_BASE}px)`,
-      borderRadius: '50%',
-      background: 'rgba(255,255,255,0.15)',
-      border: '2px solid rgba(255,255,255,0.3)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      boxSizing: 'border-box',
-    } as Partial<CSSStyleDeclaration>);
+    this.base.className = styles.joystickBase;
 
     // Thumb
     this.thumb = document.createElement('div');
-    Object.assign(this.thumb.style, {
-      width: `${this.THUMB_SIZE}px`,
-      height: `${this.THUMB_SIZE}px`,
-      borderRadius: '50%',
-      background: 'rgba(255,255,255,0.5)',
-      position: 'absolute',
-      left: `calc(50% - ${this.THUMB_SIZE / 2}px)`,
-      top: `calc(50% - ${this.THUMB_SIZE / 2}px)`,
-      transition: 'none',
-    } as Partial<CSSStyleDeclaration>);
+    this.thumb.className = styles.joystickThumb;
+    this.thumb.style.left = `calc(50% - ${this.THUMB_SIZE / 2}px)`;
+    this.thumb.style.top = `calc(50% - ${this.THUMB_SIZE / 2}px)`;
 
     this.base.appendChild(this.thumb);
-    this.container.appendChild(this.base);
-    document.body.appendChild(this.container);
+    this.root.appendChild(this.base);
+  }
 
-    // Pointer events
-    this.container.addEventListener('pointerdown', this.onPointerDown, { passive: false });
-    this.container.addEventListener('pointermove', this.onPointerMove, { passive: false });
-    this.container.addEventListener('pointerup', this.onPointerUp, { passive: false });
-    this.container.addEventListener('pointercancel', this.onPointerCancel, { passive: false });
+  protected onMount(): void {
+    this.listen(this.root, 'pointerdown', this.handlePointerDown, { passive: false });
+    this.listen(this.root, 'pointermove', this.handlePointerMove, { passive: false });
+    this.listen(this.root, 'pointerup', this.handlePointerUp, { passive: false });
+    this.listen(this.root, 'pointercancel', this.handlePointerCancel, { passive: false });
   }
 
   setSprintCallbacks(onStart: () => void, onStop: () => void): void {
@@ -93,16 +68,15 @@ export class VirtualJoystick {
     this.onSprintStop = onStop;
   }
 
-  private onPointerDown = (e: PointerEvent): void => {
+  private handlePointerDown = (e: PointerEvent): void => {
     e.preventDefault();
-    if (this.activePointerId !== null) return; // already tracking
+    if (this.activePointerId !== null) return;
     this.activePointerId = e.pointerId;
 
-    if (typeof this.container.setPointerCapture === 'function') {
-      this.container.setPointerCapture(e.pointerId);
+    if (typeof this.root.setPointerCapture === 'function') {
+      this.root.setPointerCapture(e.pointerId);
     }
 
-    // Record base centre and actual rendered size
     const rect = this.base.getBoundingClientRect();
     this.baseX = rect.left + rect.width / 2;
     this.baseY = rect.top + rect.height / 2;
@@ -111,28 +85,28 @@ export class VirtualJoystick {
     this.updateThumb(e.clientX, e.clientY);
   };
 
-  private onPointerMove = (e: PointerEvent): void => {
+  private handlePointerMove = (e: PointerEvent): void => {
     e.preventDefault();
     if (e.pointerId !== this.activePointerId) return;
     this.updateThumb(e.clientX, e.clientY);
   };
 
-  private onPointerUp = (e: PointerEvent): void => {
+  private handlePointerUp = (e: PointerEvent): void => {
     e.preventDefault();
     if (e.pointerId !== this.activePointerId) return;
     this.activePointerId = null;
-    if (typeof this.container.releasePointerCapture === 'function' && this.container.hasPointerCapture(e.pointerId)) {
-      this.container.releasePointerCapture(e.pointerId);
+    if (typeof this.root.releasePointerCapture === 'function' && this.root.hasPointerCapture(e.pointerId)) {
+      this.root.releasePointerCapture(e.pointerId);
     }
     this.resetThumb();
   };
 
-  private onPointerCancel = (e: PointerEvent): void => {
+  private handlePointerCancel = (e: PointerEvent): void => {
     e.preventDefault();
     if (e.pointerId !== this.activePointerId) return;
     this.activePointerId = null;
-    if (typeof this.container.releasePointerCapture === 'function' && this.container.hasPointerCapture(e.pointerId)) {
-      this.container.releasePointerCapture(e.pointerId);
+    if (typeof this.root.releasePointerCapture === 'function' && this.root.hasPointerCapture(e.pointerId)) {
+      this.root.releasePointerCapture(e.pointerId);
     }
     this.resetThumb();
   };
@@ -169,8 +143,8 @@ export class VirtualJoystick {
       normY *= scale;
     }
 
-    this.output.x = normX;   // right = positive
-    this.output.z = normY;   // down on screen = positive (backward in game)
+    this.output.x = normX;
+    this.output.z = normY;
 
     // Sprint detection
     const magnitude = Math.sqrt(normX * normX + normY * normY);
@@ -196,20 +170,12 @@ export class VirtualJoystick {
   }
 
   show(): void {
-    this.container.style.display = 'block';
+    this.root.style.display = 'block';
   }
 
   hide(): void {
-    this.container.style.display = 'none';
+    this.root.style.display = 'none';
     this.resetThumb();
     this.activePointerId = null;
-  }
-
-  dispose(): void {
-    this.container.removeEventListener('pointerdown', this.onPointerDown);
-    this.container.removeEventListener('pointermove', this.onPointerMove);
-    this.container.removeEventListener('pointerup', this.onPointerUp);
-    this.container.removeEventListener('pointercancel', this.onPointerCancel);
-    this.container.remove();
   }
 }

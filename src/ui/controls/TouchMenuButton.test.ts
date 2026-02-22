@@ -8,7 +8,9 @@ describe('TouchMenuButton', () => {
   let button: TouchMenuButton;
 
   beforeEach(() => {
+    document.body.innerHTML = '';
     button = new TouchMenuButton();
+    button.mount(document.body);
   });
 
   afterEach(() => {
@@ -18,9 +20,7 @@ describe('TouchMenuButton', () => {
   it('creates button element in the DOM', () => {
     const el = document.getElementById('touch-menu-btn');
     expect(el).toBeTruthy();
-    expect(el!.style.position).toBe('fixed');
-    expect(el!.style.top).toBe('12px');
-    expect(el!.style.right).toBe('12px');
+    expect(el!.className).toContain('menuBtn');
   });
 
   it('renders three hamburger lines', () => {

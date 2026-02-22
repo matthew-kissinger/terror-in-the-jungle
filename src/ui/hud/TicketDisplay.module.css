@@ -1,0 +1,135 @@
+/**
+ * TicketDisplay - Ticket/score comparison widget
+ *
+ * Design: Bare text with text-shadow, no glass panel.
+ * The ticket counts are the primary visual - faction labels are de-emphasized.
+ * Per plan P1: "In-combat HUD should feel etched into the viewport"
+ *
+ * Layout: [US Label] [US Count] | [OPFOR Count] [OPFOR Label]
+ * TDM mode adds a target header above.
+ */
+
+.container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  user-select: none;
+  pointer-events: none;
+}
+
+.faction {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-0-5);
+}
+
+.label {
+  font-size: var(--font-size-2xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  text-shadow: var(--shadow-text);
+}
+
+.count {
+  font-size: var(--font-size-xl);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  text-shadow: var(--shadow-text);
+  transition: color var(--duration-fast) var(--ease-out);
+  line-height: 1;
+}
+
+.us .count {
+  color: var(--faction-us);
+}
+
+.opfor .count {
+  color: var(--faction-opfor);
+}
+
+.separator {
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+  font-weight: var(--weight-regular);
+  text-shadow: var(--shadow-text);
+  opacity: 0.4;
+}
+
+/* TDM mode header - shows target kill count */
+.header {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: var(--font-size-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-shadow: var(--shadow-text);
+}
+
+.headerHidden {
+  display: none;
+}
+
+/* Low ticket warning - subtle pulse on the count */
+.low .count {
+  animation: ticketLow 1.5s ease-in-out infinite;
+}
+
+@keyframes ticketLow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Critical ticket warning - faster pulse */
+.critical .count {
+  animation: ticketCritical 0.75s ease-in-out infinite;
+}
+
+@keyframes ticketCritical {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Responsive: smaller on mobile */
+@media (max-width: 768px) {
+  .count {
+    font-size: var(--font-size-lg);
+  }
+
+  .label {
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
+
+  .container {
+    gap: var(--space-2);
+    padding: var(--space-0-5) var(--space-2);
+  }
+}
+
+@media (max-width: 480px) {
+  .count {
+    font-size: var(--font-size-base);
+  }
+
+  .container {
+    gap: var(--space-1-5);
+  }
+
+  .separator {
+    font-size: var(--font-size-2xs);
+  }
+
+  .header {
+    font-size: 7px;
+    top: -16px;
+  }
+}

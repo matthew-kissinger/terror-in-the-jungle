@@ -20,14 +20,14 @@ describe('TouchInteractionButton', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     interactionButton = new TouchInteractionButton();
+    interactionButton.mount(document.body);
     button = document.getElementById('touch-interaction-btn') as HTMLDivElement;
   });
 
   it('creates the interaction button element', () => {
     expect(button).toBeTruthy();
     expect(button.textContent).toBe('E');
-    expect(button.style.width).toBe('var(--tc-fire-size, 70px)');
-    expect(button.style.height).toBe('var(--tc-fire-size, 70px)');
+    expect(button.className).toContain('interactBtn');
   });
 
   it('starts hidden by default', () => {
@@ -42,8 +42,7 @@ describe('TouchInteractionButton', () => {
     button.dispatchEvent(pointerEvent('pointerdown'));
 
     expect(onInteract).toHaveBeenCalledTimes(1);
-    expect(button.style.background).toBe('rgba(100, 200, 255, 0.7)');
-    expect(button.style.transform).toBe('scale(0.92)');
+    expect(button.classList.contains('pressed')).toBe(true);
   });
 
   it('touch end resets visuals', () => {
@@ -54,8 +53,7 @@ describe('TouchInteractionButton', () => {
     button.dispatchEvent(pointerEvent('pointerdown'));
     button.dispatchEvent(pointerEvent('pointerup'));
 
-    expect(button.style.background).toBe('rgba(100, 200, 255, 0.4)');
-    expect(button.style.transform).toBe('scale(1)');
+    expect(button.classList.contains('pressed')).toBe(false);
   });
 
   it('showButton makes button visible', () => {

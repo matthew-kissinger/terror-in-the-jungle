@@ -1,7 +1,10 @@
 /**
- * Small action buttons for mobile: Scoreboard, Jump, Reload, Grenade.
+ * Small action buttons for mobile: Jump, Reload, Grenade.
  * Positioned in a column above the fire button on the right side.
  */
+
+import { UIComponent } from '../engine/UIComponent';
+import styles from './TouchControls.module.css';
 
 interface ActionButton {
   element: HTMLDivElement;
@@ -9,33 +12,44 @@ interface ActionButton {
   label: string;
 }
 
-export class TouchActionButtons {
+export class TouchActionButtons extends UIComponent {
   private buttons: ActionButton[] = [];
-  private container: HTMLDivElement;
 
   private onAction?: (action: string) => void;
 
-  constructor() {
-    this.container = document.createElement('div');
-    this.container.id = 'touch-action-buttons';
-    Object.assign(this.container.style, {
-      position: 'fixed',
-      right: `max(var(--tc-edge-inset, 30px), env(safe-area-inset-right, 0px))`,
-      bottom: `calc(var(--tc-fire-size, 80px) + max(var(--tc-edge-inset, 30px), env(safe-area-inset-bottom, 0px)) + 16px)`,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '12px',
-      zIndex: '1001',
-      touchAction: 'none',
-      pointerEvents: 'auto',
-    } as Partial<CSSStyleDeclaration>);
+  protected build(): void {
+    this.root.className = styles.actionContainer;
+    this.root.id = 'touch-action-buttons';
 
     // Create buttons from bottom to top (most-used closest to thumb)
     this.addButton('jump', 'JUMP');
     this.addButton('reload', 'R');
     this.addButton('grenade', 'G');
+  }
 
-    document.body.appendChild(this.container);
+  protected onMount(): void {
+    for (const { element, key } of this.buttons) {
+      this.listen(element, 'pointerdown', (e: PointerEvent) => {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
+        element.classList.add(styles.pressed);
+        if (typeof element.setPointerCapture === 'function') element.setPointerCapture(e.pointerId);
+        this.onAction?.(key);
+      }, { passive: false });
+
+      this.listen(element, 'pointerup', (e: PointerEvent) => {
+        e.preventDefault();
+        element.classList.remove(styles.pressed);
+        if (typeof element.releasePointerCapture === 'function' && element.hasPointerCapture(e.pointerId)) element.releasePointerCapture(e.pointerId);
+      }, { passive: false });
+
+      this.listen(element, 'pointercancel', (e: PointerEvent) => {
+        e.preventDefault();
+        element.classList.remove(styles.pressed);
+        if (typeof element.releasePointerCapture === 'function' && element.hasPointerCapture(e.pointerId)) element.releasePointerCapture(e.pointerId);
+      }, { passive: false });
+    }
   }
 
   setOnAction(callback: (action: string) => void): void {
@@ -44,76 +58,23 @@ export class TouchActionButtons {
 
   private addButton(key: string, label: string): void {
     const btn = document.createElement('div');
-    Object.assign(btn.style, {
-      width: 'var(--tc-action-size, 52px)',
-      height: 'var(--tc-action-size, 52px)',
-      borderRadius: '50%',
-      background: 'rgba(255,255,255,0.15)',
-      border: '2px solid rgba(255,255,255,0.3)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontSize: 'var(--tc-font-size, 11px)',
-      fontWeight: 'bold',
-      color: 'rgba(255,255,255,0.8)',
-      userSelect: 'none',
-      webkitUserSelect: 'none',
-      touchAction: 'none',
-      pointerEvents: 'auto',
-    } as Partial<CSSStyleDeclaration>);
+    btn.className = styles.actionBtn;
     btn.textContent = label;
-
-    const onPointerDown = (e: PointerEvent): void => {
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
-      e.preventDefault();
-      e.stopPropagation();
-      btn.style.background = 'rgba(255,255,255,0.35)';
-      btn.style.transform = 'scale(0.9)';
-      if (typeof btn.setPointerCapture === 'function') btn.setPointerCapture(e.pointerId);
-      this.onAction?.(key);
-    };
-
-    const onPointerUp = (e: PointerEvent): void => {
-      e.preventDefault();
-      btn.style.background = 'rgba(255,255,255,0.15)';
-      btn.style.transform = 'scale(1)';
-      if (typeof btn.releasePointerCapture === 'function' && btn.hasPointerCapture(e.pointerId)) btn.releasePointerCapture(e.pointerId);
-    };
-
-    const onPointerCancel = (e: PointerEvent): void => {
-      e.preventDefault();
-      btn.style.background = 'rgba(255,255,255,0.15)';
-      btn.style.transform = 'scale(1)';
-      if (typeof btn.releasePointerCapture === 'function' && btn.hasPointerCapture(e.pointerId)) btn.releasePointerCapture(e.pointerId);
-    };
-
-    btn.addEventListener('pointerdown', onPointerDown, { passive: false });
-    btn.addEventListener('pointerup', onPointerUp, { passive: false });
-    btn.addEventListener('pointercancel', onPointerCancel, { passive: false });
-
     this.buttons.push({ element: btn, key, label });
-    this.container.appendChild(btn);
+    this.root.appendChild(btn);
   }
 
   /** Re-parent into a grid slot. */
   mountTo(parent: HTMLElement): void {
-    this.container.style.position = '';
-    this.container.style.right = '';
-    this.container.style.bottom = '';
-    this.container.style.zIndex = '';
-    if (this.container.parentNode) this.container.parentNode.removeChild(this.container);
-    parent.appendChild(this.container);
+    this.root.classList.add(styles.slotted);
+    this.reparentTo(parent);
   }
 
   show(): void {
-    this.container.style.display = 'flex';
+    this.root.style.display = 'flex';
   }
 
   hide(): void {
-    this.container.style.display = 'none';
-  }
-
-  dispose(): void {
-    this.container.remove();
+    this.root.style.display = 'none';
   }
 }

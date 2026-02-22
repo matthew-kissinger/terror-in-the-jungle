@@ -20,14 +20,14 @@ describe('TouchFireButton', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     fireButton = new TouchFireButton();
+    fireButton.mount(document.body);
     button = document.getElementById('touch-fire-btn') as HTMLDivElement;
   });
 
   it('creates the fire button element', () => {
     expect(button).toBeTruthy();
     expect(button.textContent).toBe('FIRE');
-    expect(button.style.width).toBe('var(--tc-fire-size, 80px)');
-    expect(button.style.height).toBe('var(--tc-fire-size, 80px)');
+    expect(button.className).toContain('fireBtn');
   });
 
   it('touch start triggers onFireStart and visual pressed state', () => {
@@ -38,8 +38,7 @@ describe('TouchFireButton', () => {
     button.dispatchEvent(pointerEvent('pointerdown'));
 
     expect(onFireStart).toHaveBeenCalledTimes(1);
-    expect(button.style.background).toBe('rgba(255, 60, 60, 0.7)');
-    expect(button.style.transform).toBe('scale(0.92)');
+    expect(button.classList.contains('pressed')).toBe(true);
   });
 
   it('touch end triggers onFireStop and resets visuals', () => {
@@ -51,8 +50,7 @@ describe('TouchFireButton', () => {
     button.dispatchEvent(pointerEvent('pointerup'));
 
     expect(onFireStop).toHaveBeenCalledTimes(1);
-    expect(button.style.background).toBe('rgba(255, 60, 60, 0.4)');
-    expect(button.style.transform).toBe('scale(1)');
+    expect(button.classList.contains('pressed')).toBe(false);
   });
 
   it('show and hide toggle visibility', () => {
