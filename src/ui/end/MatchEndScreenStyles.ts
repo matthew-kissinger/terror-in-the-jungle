@@ -18,11 +18,17 @@ export const MATCH_END_SCREEN_STYLES = `
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    /* Use flex-start + auto margins instead of justify-content: center
+       so the container scrolls when content exceeds viewport height */
+    justify-content: flex-start;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     z-index: ${zIndex.modal};
     color: ${colors.textPrimary};
     font-family: ${fontStack.hud};
     animation: fadeIn 0.5s ease-out;
+    box-sizing: border-box;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
   }
 
   @keyframes fadeIn {
@@ -40,6 +46,7 @@ export const MATCH_END_SCREEN_STYLES = `
 
   .end-screen-header {
     text-align: center;
+    margin-top: auto;
     margin-bottom: 2rem;
     animation: slideDown 0.6s ease-out;
   }
@@ -89,10 +96,19 @@ export const MATCH_END_SCREEN_STYLES = `
     grid-template-columns: 1fr 1fr;
     gap: 2rem;
     animation: fadeInUp 0.8s ease-out 0.2s backwards;
+    flex-shrink: 0;
   }
 
   /* Responsive Adjustments */
   @media (max-width: 768px) {
+    .match-end-screen {
+      padding: 1rem env(safe-area-inset-right, 0px) 1rem env(safe-area-inset-left, 0px);
+    }
+
+    .end-screen-header {
+      margin-bottom: 1rem;
+    }
+
     .end-screen-title {
       font-size: 2.5rem;
       letter-spacing: 0.1em;
@@ -106,8 +122,6 @@ export const MATCH_END_SCREEN_STYLES = `
       grid-template-columns: 1fr;
       padding: 1.5rem;
       gap: 1.5rem;
-      max-height: 60vh;
-      overflow-y: auto;
     }
 
     .stats-column {
@@ -131,6 +145,7 @@ export const MATCH_END_SCREEN_STYLES = `
       flex-direction: column;
       width: 90%;
       max-width: 300px;
+      margin-top: 1rem;
     }
 
     .end-screen-button {
@@ -140,6 +155,14 @@ export const MATCH_END_SCREEN_STYLES = `
   }
 
   @media (max-width: 480px) {
+    .match-end-screen {
+      padding: 0.5rem env(safe-area-inset-right, 0px) 0.5rem env(safe-area-inset-left, 0px);
+    }
+
+    .end-screen-header {
+      margin-bottom: 0.75rem;
+    }
+
     .end-screen-title {
       font-size: 1.5rem;
       letter-spacing: 0.05em;
@@ -175,6 +198,15 @@ export const MATCH_END_SCREEN_STYLES = `
 
     .award-value {
       font-size: 1rem;
+    }
+
+    .awards-section {
+      margin-top: 1rem;
+    }
+
+    .awards-title {
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
     }
   }
 
@@ -280,9 +312,12 @@ export const MATCH_END_SCREEN_STYLES = `
 
   .end-screen-actions {
     margin-top: 2rem;
+    margin-bottom: auto;
     display: flex;
     gap: 1rem;
     animation: fadeInUp 1s ease-out 0.4s backwards;
+    flex-shrink: 0;
+    padding-bottom: 1rem;
   }
 
   .end-screen-button {
@@ -297,6 +332,10 @@ export const MATCH_END_SCREEN_STYLES = `
     cursor: pointer;
     border-radius: 8px;
     transition: all 0.3s ease;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+    min-height: 48px;
   }
 
   .end-screen-button:hover {
@@ -313,6 +352,11 @@ export const MATCH_END_SCREEN_STYLES = `
 
   .end-screen-button.primary:hover {
     background: ${colors.secondary};
+  }
+
+  .end-screen-button:active {
+    transform: scale(0.96);
+    transition: transform 0.1s ease;
   }
 
   .awards-section {

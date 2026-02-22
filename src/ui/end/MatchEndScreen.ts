@@ -52,11 +52,11 @@ export class MatchEndScreen {
 
   hide(): void {
     if (this.playAgainBtn) {
-      this.playAgainBtn.removeEventListener('pointerdown', this.handlePlayAgain);
+      this.playAgainBtn.removeEventListener('click', this.handlePlayAgain);
       this.playAgainBtn = undefined;
     }
     if (this.returnBtn) {
-      this.returnBtn.removeEventListener('pointerdown', this.handleReturnToMenu);
+      this.returnBtn.removeEventListener('click', this.handleReturnToMenu);
       this.returnBtn = undefined;
     }
 
@@ -109,17 +109,15 @@ export class MatchEndScreen {
     // Add victory/defeat class
     container.classList.add(isVictory ? 'victory' : 'defeat');
 
-    // Setup button handlers
+    // Setup button handlers - use click for universal device support (mouse, touch, keyboard, gamepad)
     this.playAgainBtn = container.querySelector('.play-again-btn') as HTMLButtonElement;
     if (this.playAgainBtn) {
-      this.playAgainBtn.addEventListener('pointerdown', this.handlePlayAgain);
-      this.playAgainBtn.addEventListener('click', (e) => e.preventDefault());
+      this.playAgainBtn.addEventListener('click', this.handlePlayAgain);
     }
 
     this.returnBtn = container.querySelector('.return-menu-btn') as HTMLButtonElement;
     if (this.returnBtn) {
-      this.returnBtn.addEventListener('pointerdown', this.handleReturnToMenu);
-      this.returnBtn.addEventListener('click', (e) => e.preventDefault());
+      this.returnBtn.addEventListener('click', this.handleReturnToMenu);
     }
 
     return container;
