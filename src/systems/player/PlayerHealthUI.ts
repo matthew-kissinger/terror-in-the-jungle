@@ -6,9 +6,6 @@ export class PlayerHealthUI {
 
   private readonly UI_STYLES = `
     .health-display {
-      position: fixed;
-      bottom: 16px;
-      left: 16px;
       background: rgba(8, 12, 18, 0.55);
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
@@ -19,12 +16,11 @@ export class PlayerHealthUI {
       font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 14px;
       font-weight: 600;
-      z-index: 200;
       letter-spacing: 0.3px;
     }
 
     .health-bar {
-      width: 220px;
+      width: clamp(120px, 20vw, 220px);
       height: 10px;
       background: rgba(255, 255, 255, 0.08);
       border-radius: 3px;
@@ -57,32 +53,6 @@ export class PlayerHealthUI {
       0%, 100% { opacity: 0.7; }
       50% { opacity: 1.0; }
     }
-
-    @media (max-width: 768px) {
-      .health-display {
-        bottom: 160px;
-        left: 10px;
-        padding: 6px 12px;
-        font-size: 12px;
-      }
-      .health-bar {
-        width: 160px;
-        height: 8px;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .health-display {
-        bottom: 170px;
-        left: 8px;
-        padding: 4px 10px;
-        font-size: 11px;
-      }
-      .health-bar {
-        width: 130px;
-        height: 7px;
-      }
-    }
   `;
 
   constructor() {
@@ -106,7 +76,10 @@ export class PlayerHealthUI {
 
   init(): void {
     document.head.appendChild(this.styleSheet);
-    document.body.appendChild(this.healthDisplay);
+  }
+
+  mountTo(parent: HTMLElement): void {
+    parent.appendChild(this.healthDisplay);
   }
 
   updateHealthDisplay(health: number, maxHealth: number): void {

@@ -65,10 +65,11 @@ export class SystemConnector {
     refs.fullMapSystem.setGameModeManager(refs.gameModeManager);
     refs.compassSystem.setZoneManager(refs.zoneManager);
 
-    // Mount compass and minimap into grid slots
+    // Mount compass, minimap, and health into grid slots
     const layout = refs.hudSystem.getLayout();
     refs.compassSystem.mountTo(layout.getSlot('compass'));
     refs.minimapSystem.mountTo(layout.getSlot('minimap'));
+    refs.playerHealthSystem.mountUI(layout.getSlot('health'));
     refs.zoneManager.setCombatantSystem(refs.combatantSystem);
     refs.zoneManager.setCamera(camera);
     refs.zoneManager.setChunkManager(refs.chunkManager);

@@ -179,29 +179,32 @@ export const HUD_LAYOUT_STYLES = `
   /* =========================================================
    * MOBILE LANDSCAPE (touch + width > height)
    *
-   *  minimap    | weapon-bar | fire
+   *  minimap    | weapon-bar |
+   *             |  compass   | fire
    *             |  tickets   | ads
-   *             |  compass   | action-btns
-   *             |            | ammo
-   *  joystick   |  center    |
+   *             |            | action-btns
+   *  health     |  center    | ammo
+   *  joystick   |            |
    *  joystick   |            | menu
    * ========================================================= */
   @media (pointer: coarse) and (orientation: landscape) {
     #game-hud-root {
       grid-template-columns: minmax(100px, 1fr) minmax(140px, 2fr) minmax(80px, 1fr);
       grid-template-rows:
-        auto     /* minimap / weapon-bar / fire */
+        auto     /* minimap / weapon-bar */
+        auto     /* . / compass / fire */
         auto     /* . / tickets / ads */
-        auto     /* . / compass / action-btns */
-        auto     /* . / . / ammo */
-        1fr      /* joystick / center */
+        auto     /* . / . / action-btns */
+        1fr      /* health / center / ammo */
+        auto     /* joystick */
         auto;    /* joystick / . / menu */
       grid-template-areas:
-        "minimap     weapon-bar  fire"
+        "minimap     weapon-bar  ."
+        ".           compass     fire"
         ".           tickets     ads"
-        ".           compass     action-btns"
-        ".           .           ammo"
-        "joystick    center      ."
+        ".           .           action-btns"
+        "health      center      ammo"
+        "joystick    .           ."
         "joystick    .           menu";
       gap: 2px;
     }
@@ -212,11 +215,11 @@ export const HUD_LAYOUT_STYLES = `
    *
    *  minimap    |            | menu
    *             | weapon-bar |
-   *             |  tickets   |
-   *             |            | fire
+   *             |  tickets   | fire
    *             |  center    | ads
    *             |            | action-btns
-   *  joystick   |            | ammo
+   *  health     |            | ammo
+   *  joystick   |            |
    *  joystick   |            |
    * ========================================================= */
   @media (pointer: coarse) and (orientation: portrait) {
@@ -225,20 +228,20 @@ export const HUD_LAYOUT_STYLES = `
       grid-template-rows:
         auto     /* minimap / . / menu */
         auto     /* . / weapon-bar */
-        auto     /* . / tickets */
-        auto     /* . / . / fire */
+        auto     /* . / tickets / fire */
         1fr      /* . / center / ads */
         auto     /* . / . / action-btns */
-        auto     /* joystick / . / ammo */
-        1fr;     /* joystick / . / . */
+        auto     /* health / . / ammo */
+        auto     /* joystick */
+        1fr;     /* joystick */
       grid-template-areas:
         "minimap     .           menu"
         ".           weapon-bar  ."
-        ".           tickets     ."
-        ".           .           fire"
+        ".           tickets     fire"
         ".           center      ads"
         ".           .           action-btns"
-        "joystick    .           ammo"
+        "health      .           ammo"
+        "joystick    .           ."
         "joystick    .           .";
       gap: 2px;
     }

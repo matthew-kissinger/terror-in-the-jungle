@@ -85,6 +85,10 @@ export class PlayerHealthSystem implements GameSystem {
     Logger.info('Combat', 'Player Health System initialized');
   }
 
+  mountUI(parent: HTMLElement): void {
+    this.ui.mountTo(parent);
+  }
+
   update(deltaTime: number): void {
     if (this.playerState.isDead) {
       this.updateDeathState(deltaTime);
