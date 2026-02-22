@@ -328,10 +328,11 @@ describe('GrenadeArcRenderer', () => {
     expect(startZ).toBeCloseTo(0);
 
     const baseThrowAngle = 0.4;
-    const expectedVelY = 10 * Math.sin(baseThrowAngle) - 1;
+    const timeStep = 0.033; // Matches arc renderer's finer timestep
+    const expectedVelY = 10 * Math.sin(baseThrowAngle) + (-10) * timeStep;
     const expectedVelZ = 10 * Math.cos(baseThrowAngle);
-    const expectedY = 5 + expectedVelY * 0.1;
-    const expectedZ = expectedVelZ * 0.1;
+    const expectedY = 5 + expectedVelY * timeStep;
+    const expectedZ = expectedVelZ * timeStep;
 
     const secondX = positions[3];
     const secondY = positions[4];
@@ -343,7 +344,7 @@ describe('GrenadeArcRenderer', () => {
   });
 
   it('positions landing indicator at collision point with offset', () => {
-    const renderer = new GrenadeArcRenderer(scene, 20, 6);
+    const renderer = new GrenadeArcRenderer(scene, 50, 6); // Enough points for finer timestep trajectory
     const landingIndicator = renderer.getLandingIndicator() as THREE.Mesh;
 
     const distance = renderer.updateArc(
@@ -391,7 +392,7 @@ describe('GrenadeArcRenderer', () => {
     const geometry = arcVisualization.geometry as any;
 
     expect(groundHeight).toHaveBeenCalled();
-    expect(geometry.drawRange.count).toBeLessThan(30);
+    expect(geometry.drawRange.count).toBeLessThan(40); // Finer timestep produces more points before collision
   });
 
   it('handles zero velocity throws at ground height', () => {
@@ -410,7 +411,7 @@ describe('GrenadeArcRenderer', () => {
     const arcVisualization = (renderer as any).arcVisualization as any;
     const geometry = arcVisualization.geometry as any;
 
-    expect(distance).toBeCloseTo(0);
+    expect(distance).toBeCloseTo(0.3); // Grenade radius offset (0.3) from start at ground level
     expect(geometry.drawRange.count).toBe(2);
   });
 

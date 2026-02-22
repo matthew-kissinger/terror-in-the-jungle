@@ -169,43 +169,23 @@ export const HUDWeaponStyles = `
     100% { border-color: rgba(220, 225, 230, 0.3); }
   }
 
-  /* Mobile responsive adjustments - ammo moves above touch controls */
-  @media (max-width: 768px) {
+  /* Touch device: position ammo above right-side action buttons, no overlap */
+  @media (pointer: coarse) {
     .ammo-display {
-      right: 50%;
-      transform: translateX(50%);
-      bottom: calc(160px + env(safe-area-inset-bottom, 0px));
-      min-width: 80px;
-      padding: 6px 10px;
+      right: max(16px, env(safe-area-inset-right, 0px));
+      bottom: calc(
+        var(--tc-fire-size, 80px) +
+        max(var(--tc-edge-inset, 30px), env(safe-area-inset-bottom, 0px)) +
+        (var(--tc-action-size, 52px) * 3) + 36px + 16px
+      );
+      transform: none;
+      min-width: auto;
+      padding: 4px 10px;
     }
 
-    .kill-counter {
-      bottom: calc(160px + env(safe-area-inset-bottom, 0px));
-      min-width: 80px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .ammo-display {
-      bottom: calc(170px + env(safe-area-inset-bottom, 0px));
-      padding: 5px 10px;
-      min-width: 70px;
-    }
-
-    .ammo-magazine {
-      font-size: 18px;
-    }
-
-    .ammo-separator {
-      font-size: 12px;
-    }
-
-    .ammo-reserve {
-      font-size: 13px;
-    }
-
-    .kill-counter {
-      display: none;
-    }
+    .ammo-magazine { font-size: 18px; }
+    .ammo-separator { font-size: 12px; }
+    .ammo-reserve { font-size: 13px; }
+    .kill-counter { display: none; }
   }
 `;

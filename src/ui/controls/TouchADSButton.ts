@@ -58,14 +58,19 @@ export class TouchADSButton {
   private onTouchStart = (e: TouchEvent): void => {
     e.preventDefault();
     e.stopPropagation();
-    this.isActive = !this.isActive;
+    if (this.isActive) return;
+    this.isActive = true;
     this.updateVisual();
-    this.onADSToggle?.(this.isActive);
+    this.onADSToggle?.(true);
   };
 
   private onTouchEnd = (e: TouchEvent): void => {
     e.preventDefault();
     e.stopPropagation();
+    if (!this.isActive) return;
+    this.isActive = false;
+    this.updateVisual();
+    this.onADSToggle?.(false);
   };
 
   private updateVisual(): void {

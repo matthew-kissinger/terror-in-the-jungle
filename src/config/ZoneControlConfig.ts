@@ -44,7 +44,7 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
   reinforcementInterval: 20,
 
   captureRadius: 18,  // Slightly larger zones
-  captureSpeed: 1,
+  captureSpeed: 7,
 
   minimapScale: 400,
   viewDistance: 180,

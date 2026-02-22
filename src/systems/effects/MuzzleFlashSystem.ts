@@ -153,6 +153,9 @@ export class MuzzleFlashSystem {
   private ringIndex = 0;
   private maxInstances: number;
 
+  // Dirty flag: batches GPU buffer uploads to update() instead of per-spawn
+  private npcDirty = false;
+
   // Scratch objects
   private readonly _mat4 = new THREE.Matrix4();
   private readonly _pos = new THREE.Vector3();
@@ -250,10 +253,9 @@ export class MuzzleFlashSystem {
     this.variantAttr[i] = variant as number;
     this.intensityAttr[i] = 1.0 + Math.random() * 0.3;
 
-    this.npcMesh.instanceMatrix.needsUpdate = true;
-    (this.npcMesh.geometry.attributes.instanceLife as THREE.BufferAttribute).needsUpdate = true;
-    (this.npcMesh.geometry.attributes.instanceVariant as THREE.BufferAttribute).needsUpdate = true;
-    (this.npcMesh.geometry.attributes.instanceIntensity as THREE.BufferAttribute).needsUpdate = true;
+    // Defer GPU buffer uploads to update() - avoids redundant uploads when
+    // multiple NPCs fire in the same frame.
+    this.npcDirty = true;
   }
 
   /**
@@ -312,9 +314,15 @@ export class MuzzleFlashSystem {
       }
     }
 
-    if (anyAlive) {
+    if (anyAlive || this.npcDirty) {
       this.npcMesh.instanceMatrix.needsUpdate = true;
       (this.npcMesh.geometry.attributes.instanceLife as THREE.BufferAttribute).needsUpdate = true;
+      // Variant and intensity only change on spawn, not during decay
+      if (this.npcDirty) {
+        (this.npcMesh.geometry.attributes.instanceVariant as THREE.BufferAttribute).needsUpdate = true;
+        (this.npcMesh.geometry.attributes.instanceIntensity as THREE.BufferAttribute).needsUpdate = true;
+        this.npcDirty = false;
+      }
     }
 
     // -- Player mesh --

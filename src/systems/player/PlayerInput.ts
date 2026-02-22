@@ -416,6 +416,11 @@ export class PlayerInput {
       }
     }
 
+    // Reload with R key (when not rotating sandbag)
+    if (!this.isInHelicopter && this.currentWeaponMode !== WeaponSlot.SANDBAG && event.code === 'KeyR') {
+      this.callbacks.onReload?.();
+    }
+
     // Rally point placement with V key (when not in helicopter)
     if (!this.isInHelicopter && event.code === 'KeyV') {
       this.callbacks.onRallyPointPlace?.();

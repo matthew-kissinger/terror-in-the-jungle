@@ -122,9 +122,15 @@ export class PlayerController implements GameSystem {
       onMortarFire: () => this.handleMortarFire(),
       onMortarAdjustPitch: (delta: number) => this.handleMortarAdjustPitch(delta),
       onMortarAdjustYaw: (delta: number) => this.handleMortarAdjustYaw(delta),
-      onMouseDown: (button: number) => this.handleMouseDown(button),
-      onMouseUp: (button: number) => this.handleMouseUp(button),
-      onReload: () => this.handleTouchReload(),
+      onMouseDown: (button: number) => {
+        if (button === 0) this.actionFireStart();
+        else if (button === 2) this.actionADSStart();
+      },
+      onMouseUp: (button: number) => {
+        if (button === 0) this.actionFireStop();
+        else if (button === 2) this.actionADSStop();
+      },
+      onReload: () => this.actionReload(),
       onGrenadeSwitch: () => this.handleTouchGrenadeSwitch(),
       onWeaponSlotChange: (slot: WeaponSlot) => this.handleWeaponSlotChange(slot),
       onSquadCommand: () => this.playerSquadController?.toggleRadialMenu(),
@@ -133,36 +139,18 @@ export class PlayerController implements GameSystem {
     });
   }
 
-  /** Wire touch fire/reload/ADS/weapons to WeaponInput when both are available */
-  private wireTouchToWeapon(): void {
-    if (!this.input.getIsTouchMode() || !this.firstPersonWeapon) return;
-
+  /**
+   * Wire touch-specific controls that need direct references (mortar, weapon bar).
+   * Called once when firstPersonWeapon becomes available.
+   * Fire/ADS/reload all flow through unified action methods via PlayerInput callbacks.
+   */
+  private wireTouchExtras(): void {
     const touchControls = this.input.getTouchControls();
     if (!touchControls) return;
-
-    const weaponInput = this.firstPersonWeapon.getWeaponInput();
-    touchControls.fireButton.setCallbacks(
-      () => {
-        // Trigger both PlayerController mouse-down (grenades/sandbags) and WeaponInput fire
-        this.handleMouseDown(0);
-        weaponInput.triggerFireStart();
-      },
-      () => {
-        this.handleMouseUp(0);
-        weaponInput.triggerFireStop();
-      }
-    );
-
-    // Wire ADS button to WeaponInput
-    touchControls.adsButton.setOnADSToggle((active: boolean) => {
-      weaponInput.triggerADS(active);
-    });
 
     // Wire weapon bar directly through inventory manager to avoid synthetic key events.
     touchControls.weaponBar.setOnWeaponSelect((slotIndex: number) => {
       this.inventoryManager?.setCurrentSlot(slotIndex as WeaponSlot);
-      // Reset ADS when switching weapons
-      touchControls.adsButton.resetADS();
     });
 
     // Wire mortar button callbacks
@@ -190,10 +178,58 @@ export class PlayerController implements GameSystem {
     });
   }
 
-  private handleTouchReload(): void {
-    if (this.firstPersonWeapon) {
-      this.firstPersonWeapon.getWeaponInput().triggerReload();
+  // ---- Unified action methods (all input types route here) ----
+
+  /** Start firing - routes to weapon system based on current weapon mode */
+  private actionFireStart(): void {
+    const isGameActive = this.ticketSystem ? this.ticketSystem.isGameActive() : true;
+    if (!isGameActive) return;
+
+    switch (this.currentWeaponMode) {
+      case WeaponSlot.GRENADE:
+        if (this.grenadeSystem) {
+          this.grenadeSystem.startAiming();
+          this.hudSystem?.showGrenadePowerMeter();
+        }
+        break;
+      case WeaponSlot.SANDBAG:
+        this.sandbagSystem?.placeSandbag();
+        break;
+      default:
+        // Gun slots - delegate to WeaponInput
+        this.firstPersonWeapon?.getWeaponInput()?.triggerFireStart();
+        break;
     }
+  }
+
+  /** Stop firing - routes to weapon system based on current weapon mode */
+  private actionFireStop(): void {
+    switch (this.currentWeaponMode) {
+      case WeaponSlot.GRENADE:
+        if (this.grenadeSystem) {
+          this.grenadeSystem.throwGrenade();
+          this.hudSystem?.hideGrenadePowerMeter();
+        }
+        break;
+      default:
+        this.firstPersonWeapon?.getWeaponInput()?.triggerFireStop();
+        break;
+    }
+  }
+
+  /** Start ADS - delegates to WeaponInput */
+  private actionADSStart(): void {
+    this.firstPersonWeapon?.getWeaponInput()?.triggerADS(true);
+  }
+
+  /** Stop ADS - delegates to WeaponInput */
+  private actionADSStop(): void {
+    this.firstPersonWeapon?.getWeaponInput()?.triggerADS(false);
+  }
+
+  /** Reload - delegates to WeaponInput */
+  private actionReload(): void {
+    this.firstPersonWeapon?.getWeaponInput()?.triggerReload();
   }
 
   private handleTouchGrenadeSwitch(): void {
@@ -289,41 +325,6 @@ export class PlayerController implements GameSystem {
   private handleMortarAdjustYaw(delta: number): void {
     if (this.mortarSystem && this.mortarSystem.isCurrentlyDeployed()) {
       this.mortarSystem.adjustYaw(delta * 2);
-    }
-  }
-
-  private handleMouseDown(button: number): void {
-    const isGameActive = this.ticketSystem ? this.ticketSystem.isGameActive() : true;
-    if (!isGameActive) return;
-
-    switch (this.currentWeaponMode) {
-      case WeaponSlot.GRENADE:
-        if (button === 0 && this.grenadeSystem) {
-          this.grenadeSystem.startAiming();
-          if (this.hudSystem) {
-            this.hudSystem.showGrenadePowerMeter();
-          }
-        }
-        break;
-
-      case WeaponSlot.SANDBAG:
-        if (button === 0 && this.sandbagSystem) {
-          this.sandbagSystem.placeSandbag();
-        }
-        break;
-    }
-  }
-
-  private handleMouseUp(button: number): void {
-    switch (this.currentWeaponMode) {
-      case WeaponSlot.GRENADE:
-        if (button === 0 && this.grenadeSystem) {
-          this.grenadeSystem.throwGrenade();
-          if (this.hudSystem) {
-            this.hudSystem.hideGrenadePowerMeter();
-          }
-        }
-        break;
     }
   }
 
@@ -598,8 +599,10 @@ export class PlayerController implements GameSystem {
   setHelicopterModel(helicopterModel: HelicopterModel): void { this.helicopterModel = helicopterModel; this.movement.setHelicopterModel(helicopterModel); this.cameraController.setHelicopterModel(helicopterModel); helicopterModel.setPlayerInput(this.input); }
   setFirstPersonWeapon(firstPersonWeapon: FirstPersonWeapon): void {
     this.firstPersonWeapon = firstPersonWeapon;
-    // Wire touch controls to weapon input for fire/reload
-    this.wireTouchToWeapon();
+    // Disable WeaponInput's direct mouse/key listeners - all input flows through PlayerController
+    firstPersonWeapon.getWeaponInput().disableDirectListeners();
+    // Wire touch-specific extras (weapon bar, mortar)
+    this.wireTouchExtras();
   }
   setHUDSystem(hudSystem: HUDSystem): void { this.hudSystem = hudSystem; }
   setRenderer(renderer: IGameRenderer): void { this.gameRenderer = renderer; }

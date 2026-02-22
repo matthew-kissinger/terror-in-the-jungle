@@ -26,11 +26,15 @@ describe('ZoneCaptureLogic', () => {
     const logic = new ZoneCaptureLogic();
     const zone = createZone();
 
-    logic.updateZoneCaptureState(zone, { us: 1, opfor: 0 }, 1.0);
-    logic.updateZoneCaptureState(zone, { us: 1, opfor: 0 }, 1.0);
+    // Dwell is 1.0s - progress should be zero while dwell timer hasn't been met
+    logic.updateZoneCaptureState(zone, { us: 1, opfor: 0 }, 0.4);
     expect(zone.captureProgress).toBe(0);
 
-    logic.updateZoneCaptureState(zone, { us: 1, opfor: 0 }, 1.0);
+    logic.updateZoneCaptureState(zone, { us: 1, opfor: 0 }, 0.4);
+    expect(zone.captureProgress).toBe(0);
+
+    // After dwell threshold crossed (0.4+0.4+0.4 = 1.2s > 1.0s), progress begins
+    logic.updateZoneCaptureState(zone, { us: 1, opfor: 0 }, 0.4);
     expect(zone.captureProgress).toBeGreaterThan(0);
   });
 

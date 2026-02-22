@@ -172,10 +172,15 @@ export class WeaponInput {
     }
   }
 
-  dispose(): void {
+  /** Remove direct window listeners so all input flows through PlayerController */
+  disableDirectListeners(): void {
     window.removeEventListener('mousedown', this.boundOnMouseDown)
     window.removeEventListener('mouseup', this.boundOnMouseUp)
     window.removeEventListener('contextmenu', this.boundOnContextMenu)
     window.removeEventListener('keydown', this.boundOnKeyDown)
+  }
+
+  dispose(): void {
+    this.disableDirectListeners()
   }
 }

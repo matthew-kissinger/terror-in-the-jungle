@@ -33,7 +33,10 @@ export class GrenadeArcRenderer {
     gravity: number,
     minThrowForce: number,
     maxThrowForce: number,
-    getGroundHeight: GroundHeightFn
+    getGroundHeight: GroundHeightFn,
+    airResistance: number = 1.0,
+    bounceDamping: number = 0.0,
+    groundFriction: number = 0.7
   ): number {
     if (!this.arcVisualization) return 0;
 
@@ -65,8 +68,13 @@ export class GrenadeArcRenderer {
     const lookUpBoost = Math.max(0, direction.y * 3); // Only boost if looking up
     throwVelocity.y += lookUpBoost * throwPower;
 
-    const steps = 30;
-    const timeStep = 0.1;
+    // Match actual physics: use finer timestep and include air resistance + bouncing.
+    // GrenadePhysics applies airResistance (0.995) per frame (~60fps).
+    // For larger preview timesteps, exponentiate to match: drag^(step * 60).
+    const timeStep = 0.033; // ~30fps-equivalent steps for accuracy
+    const maxSteps = 90; // ~3 seconds of flight + bounce
+    const dragPerStep = Math.pow(airResistance, timeStep * 60);
+    const grenadeRadius = 0.3; // Match physics ground offset
 
     const pos = objectPool.getVector3().copy(startPos);
     const vel = objectPool.getVector3().copy(throwVelocity);
@@ -74,7 +82,10 @@ export class GrenadeArcRenderer {
     const velDelta = objectPool.getVector3();
 
     let pointCount = 0;
-    for (let i = 0; i < steps; i++) {
+    let bounceCount = 0;
+    const maxBounces = 2;
+
+    for (let i = 0; i < maxSteps; i++) {
       // Write to Float32Array
       if (pointCount < this.maxArcPoints) {
         this.arcPositions[pointCount * 3] = pos.x;
@@ -83,17 +94,38 @@ export class GrenadeArcRenderer {
         pointCount++;
       }
 
+      // Apply gravity
       vel.y += gravity * timeStep;
+
+      // Apply air resistance (matches GrenadePhysics.updateGrenade)
+      vel.multiplyScalar(dragPerStep);
 
       velDelta.copy(vel).multiplyScalar(timeStep);
       pos.add(velDelta);
 
-      const groundHeight = getGroundHeight(pos.x, pos.z);
+      // Match physics: grenade collides at groundHeight + radius
+      const groundHeight = getGroundHeight(pos.x, pos.z) + grenadeRadius;
       if (pos.y <= groundHeight) {
         pos.y = groundHeight;
         landingPos.copy(pos);
 
-        // Add final point
+        // Simulate bounce (matches GrenadePhysics bounce logic)
+        if (bounceDamping > 0 && bounceCount < maxBounces && Math.abs(vel.y) > 2.0) {
+          vel.y = -vel.y * bounceDamping;
+          vel.x *= (1.0 - groundFriction * 0.3);
+          vel.z *= (1.0 - groundFriction * 0.3);
+          bounceCount++;
+          // Add the bounce point
+          if (pointCount < this.maxArcPoints) {
+            this.arcPositions[pointCount * 3] = pos.x;
+            this.arcPositions[pointCount * 3 + 1] = pos.y;
+            this.arcPositions[pointCount * 3 + 2] = pos.z;
+            pointCount++;
+          }
+          continue; // Keep simulating after bounce
+        }
+
+        // No more bounces - grenade comes to rest here
         if (pointCount < this.maxArcPoints) {
           this.arcPositions[pointCount * 3] = pos.x;
           this.arcPositions[pointCount * 3 + 1] = pos.y;
@@ -108,7 +140,7 @@ export class GrenadeArcRenderer {
     this.arcVisualization.geometry.setDrawRange(0, pointCount);
     this.arcVisualization.computeLineDistances();
 
-    // Update landing indicator position
+    // Update landing indicator at final rest position
     if (this.landingIndicator) {
       this.landingIndicator.position.copy(landingPos);
       this.landingIndicator.position.y += 0.1; // Slightly above ground to prevent z-fighting

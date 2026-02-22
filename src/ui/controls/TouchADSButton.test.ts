@@ -32,33 +32,42 @@ describe('TouchADSButton', () => {
     expect(button.style.bottom).toContain('--tc-edge-inset');
   });
 
-  it('setOnADSToggle stores and triggers callback on touchstart', () => {
+  it('hold-to-ADS: touchstart activates, touchend deactivates', () => {
     const onADSToggle = vi.fn();
     adsButton.setOnADSToggle(onADSToggle);
 
-    // First tap: toggle ON
+    // Hold: touchstart = ADS ON
     button.dispatchEvent(touchEvent('touchstart'));
     expect(onADSToggle).toHaveBeenCalledWith(true);
     expect(onADSToggle).toHaveBeenCalledTimes(1);
 
-    // Second tap: toggle OFF
-    button.dispatchEvent(touchEvent('touchstart'));
+    // Release: touchend = ADS OFF
+    button.dispatchEvent(touchEvent('touchend'));
     expect(onADSToggle).toHaveBeenCalledWith(false);
     expect(onADSToggle).toHaveBeenCalledTimes(2);
   });
 
-  it('button shows active styling when toggled on', () => {
+  it('ignores duplicate touchstart when already held', () => {
+    const onADSToggle = vi.fn();
+    adsButton.setOnADSToggle(onADSToggle);
+
+    button.dispatchEvent(touchEvent('touchstart'));
+    button.dispatchEvent(touchEvent('touchstart')); // duplicate
+    expect(onADSToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('button shows active styling when held', () => {
     // Initial state (OFF)
     expect(button.style.background).toBe('rgba(255, 255, 255, 0.15)');
 
-    // Toggle ON
+    // Hold ON
     button.dispatchEvent(touchEvent('touchstart'));
     expect(button.style.background).toBe('rgba(100, 180, 255, 0.45)');
     expect(button.style.borderColor).toBe('rgba(100, 180, 255, 0.8)');
     expect(button.style.color).toBe('rgb(255, 255, 255)');
 
-    // Toggle OFF
-    button.dispatchEvent(touchEvent('touchstart'));
+    // Release OFF
+    button.dispatchEvent(touchEvent('touchend'));
     expect(button.style.background).toBe('rgba(255, 255, 255, 0.15)');
   });
 

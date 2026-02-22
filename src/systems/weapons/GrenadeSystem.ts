@@ -52,8 +52,8 @@ export class GrenadeSystem implements GameSystem {
   private readonly BOUNCE_DAMPING = 0.4; // Tighter bounce control
   private readonly AIR_RESISTANCE = 0.995; // Reduced air resistance for snappier throws
   private readonly MIN_THROW_FORCE = 18;
-  private readonly MAX_THROW_FORCE = 50;
-  private readonly MAX_ARC_POINTS = 50;
+  private readonly MAX_THROW_FORCE = 70; // Increased for longer throws (~40m at full power)
+  private readonly MAX_ARC_POINTS = 100;
 
   private physics: GrenadePhysics;
   private arcRenderer: GrenadeArcRenderer;
@@ -208,7 +208,10 @@ export class GrenadeSystem implements GameSystem {
       this.GRAVITY,
       this.MIN_THROW_FORCE,
       this.MAX_THROW_FORCE,
-      (x, z) => this.getGroundHeight(x, z)
+      (x, z) => this.getGroundHeight(x, z),
+      this.AIR_RESISTANCE,
+      this.BOUNCE_DAMPING,
+      this.FRICTION_MUD
     );
   }
 

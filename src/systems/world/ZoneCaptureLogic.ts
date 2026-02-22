@@ -5,7 +5,7 @@ import { Faction } from '../combat/types';
 export class ZoneCaptureLogic {
   private readonly neutralCaptureFaction = new Map<string, Faction>();
   private readonly dwellTimers = new Map<string, { us: number; opfor: number }>();
-  private readonly CAPTURE_DWELL_SECONDS = 2.5;
+  private readonly CAPTURE_DWELL_SECONDS = 1.0;
 
   updateZoneCaptureState(
     zone: CaptureZone,

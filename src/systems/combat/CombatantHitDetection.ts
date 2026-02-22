@@ -41,29 +41,33 @@ export class CombatantHitDetection {
   private readonly playerMissPoint = new THREE.Vector3()
   private static loggedUninitializedGrid = false
 
-  // Cached hit zones to avoid per-call allocations
+  // Cached hit zones to avoid per-call allocations.
+  // Billboard sprites are PlaneGeometry(5, 7) centered at combatant.position
+  // (ground level). The visible character figure occupies roughly y=0 to y=+3.5.
+  // Spheres are widened to better match the billboard visual width (~2.5m body).
+  // Legs raised from below-ground to y=0+ so shots at visible feet register.
   private readonly hitZonesEngaging: HitZone[] = [
-    { offset: new THREE.Vector3(0, 2.5, 0), radius: 0.3, isHead: true },
-    { offset: new THREE.Vector3(0.2, 1.4, 0), radius: 0.65, isHead: false },
-    { offset: new THREE.Vector3(0, 0.4, 0), radius: 0.5, isHead: false },
-    { offset: new THREE.Vector3(-0.2, -0.6, 0), radius: 0.35, isHead: false },
-    { offset: new THREE.Vector3(0.2, -0.6, 0), radius: 0.35, isHead: false }
+    { offset: new THREE.Vector3(0, 2.5, 0), radius: 0.4, isHead: true },
+    { offset: new THREE.Vector3(0.15, 1.4, 0), radius: 0.8, isHead: false },
+    { offset: new THREE.Vector3(0, 0.5, 0), radius: 0.7, isHead: false },
+    { offset: new THREE.Vector3(-0.2, 0.0, 0), radius: 0.45, isHead: false },
+    { offset: new THREE.Vector3(0.2, 0.0, 0), radius: 0.45, isHead: false }
   ]
 
   private readonly hitZonesAlert: HitZone[] = [
-    { offset: new THREE.Vector3(0, 2.7, 0), radius: 0.35, isHead: true },
-    { offset: new THREE.Vector3(0, 1.5, 0), radius: 0.65, isHead: false },
-    { offset: new THREE.Vector3(0, 0.5, 0), radius: 0.55, isHead: false },
-    { offset: new THREE.Vector3(-0.35, -0.8, 0), radius: 0.4, isHead: false },
-    { offset: new THREE.Vector3(0.35, -0.8, 0), radius: 0.4, isHead: false }
+    { offset: new THREE.Vector3(0, 2.7, 0), radius: 0.4, isHead: true },
+    { offset: new THREE.Vector3(0, 1.5, 0), radius: 0.8, isHead: false },
+    { offset: new THREE.Vector3(0, 0.5, 0), radius: 0.7, isHead: false },
+    { offset: new THREE.Vector3(-0.3, 0.0, 0), radius: 0.45, isHead: false },
+    { offset: new THREE.Vector3(0.3, 0.0, 0), radius: 0.45, isHead: false }
   ]
 
   private readonly hitZonesDefault: HitZone[] = [
-    { offset: new THREE.Vector3(0, 2.8, 0), radius: 0.35, isHead: true },
-    { offset: new THREE.Vector3(0, 1.5, 0), radius: 0.6, isHead: false },
-    { offset: new THREE.Vector3(0, 0.5, 0), radius: 0.55, isHead: false },
-    { offset: new THREE.Vector3(-0.3, -0.8, 0), radius: 0.4, isHead: false },
-    { offset: new THREE.Vector3(0.3, -0.8, 0), radius: 0.4, isHead: false }
+    { offset: new THREE.Vector3(0, 2.8, 0), radius: 0.4, isHead: true },
+    { offset: new THREE.Vector3(0, 1.5, 0), radius: 0.8, isHead: false },
+    { offset: new THREE.Vector3(0, 0.5, 0), radius: 0.7, isHead: false },
+    { offset: new THREE.Vector3(-0.3, 0.0, 0), radius: 0.45, isHead: false },
+    { offset: new THREE.Vector3(0.3, 0.0, 0), radius: 0.45, isHead: false }
   ]
 
   constructor(gridManager?: SpatialGridManager) {

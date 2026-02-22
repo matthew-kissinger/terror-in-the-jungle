@@ -123,6 +123,13 @@ describe('PlayerController', () => {
       hideWeapon: vi.fn(),
       setWeaponVisibility: vi.fn(),
       setFireingEnabled: vi.fn(),
+      getWeaponInput: vi.fn().mockReturnValue({
+        disableDirectListeners: vi.fn(),
+        triggerFireStart: vi.fn(),
+        triggerFireStop: vi.fn(),
+        triggerADS: vi.fn(),
+        triggerReload: vi.fn(),
+      }),
     } as any;
 
     mockHUDSystem = {
@@ -761,16 +768,16 @@ describe('PlayerController', () => {
       slotChangeCallback(WeaponSlot.GRENADE);
     });
 
-    it('should start aiming on mouse down', () => {
-      // Call private handler directly
-      playerController['handleMouseDown'](0); // Left click
+    it('should start aiming on fire start', () => {
+      // Call unified action method
+      playerController['actionFireStart']();
 
       expect(mockGrenadeSystem.startAiming).toHaveBeenCalled();
       expect(mockHUDSystem.showGrenadePowerMeter).toHaveBeenCalled();
     });
 
-    it('should throw grenade on mouse up', () => {
-      playerController['handleMouseUp'](0); // Left click
+    it('should throw grenade on fire stop', () => {
+      playerController['actionFireStop']();
 
       expect(mockGrenadeSystem.throwGrenade).toHaveBeenCalled();
       expect(mockHUDSystem.hideGrenadePowerMeter).toHaveBeenCalled();
@@ -783,7 +790,7 @@ describe('PlayerController', () => {
 
       vi.clearAllMocks();
 
-      playerController['handleMouseDown'](0);
+      playerController['actionFireStart']();
 
       expect(mockGrenadeSystem.startAiming).not.toHaveBeenCalled();
     });
@@ -800,8 +807,8 @@ describe('PlayerController', () => {
       slotChangeCallback(WeaponSlot.SANDBAG);
     });
 
-    it('should place sandbag on mouse down', () => {
-      playerController['handleMouseDown'](0); // Left click
+    it('should place sandbag on fire start', () => {
+      playerController['actionFireStart']();
 
       expect(mockSandbagSystem.placeSandbag).toHaveBeenCalled();
     });

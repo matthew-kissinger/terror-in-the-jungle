@@ -22,6 +22,9 @@ export class RuntimeMetrics {
   private percentileCacheDirty = true;
   private cachedP95 = 0;
   private cachedP99 = 0;
+  private sortScratch: Float64Array | null = null;
+  private lastPercentileComputeTime = 0;
+  private readonly PERCENTILE_RECOMPUTE_INTERVAL_MS = 500;
   private frameCount = 0;
   private maxFrameMs = 0;
   private hitch33Count = 0;
@@ -132,6 +135,12 @@ export class RuntimeMetrics {
 
   private computePercentiles(): void {
     if (!this.percentileCacheDirty) return;
+
+    // Throttle: sorting 300 floats is cheap but not free. Display metrics
+    // don't need sub-frame freshness - 500ms is more than enough.
+    const now = performance.now();
+    if (now - this.lastPercentileComputeTime < this.PERCENTILE_RECOMPUTE_INTERVAL_MS) return;
+    this.lastPercentileComputeTime = now;
     this.percentileCacheDirty = false;
 
     if (this.ringCount === 0) {
@@ -140,15 +149,20 @@ export class RuntimeMetrics {
       return;
     }
 
-    // Copy active portion and sort
-    const sorted = new Float64Array(this.ringCount);
-    for (let i = 0; i < this.ringCount; i++) {
-      sorted[i] = this.ringBuffer[i];
+    // Reuse a single scratch buffer to avoid per-frame allocation + GC pressure.
+    // Only reallocate if the ring grew (happens once during warmup, then never).
+    if (!this.sortScratch || this.sortScratch.length < this.ringCount) {
+      this.sortScratch = new Float64Array(this.maxSamples);
     }
-    sorted.sort();
+    for (let i = 0; i < this.ringCount; i++) {
+      this.sortScratch[i] = this.ringBuffer[i];
+    }
+    // Sort only the active portion via a subarray view (no allocation)
+    const active = this.sortScratch.subarray(0, this.ringCount);
+    active.sort();
 
-    this.cachedP95 = sorted[Math.floor((this.ringCount - 1) * 0.95)];
-    this.cachedP99 = sorted[Math.floor((this.ringCount - 1) * 0.99)];
+    this.cachedP95 = active[Math.floor((this.ringCount - 1) * 0.95)];
+    this.cachedP99 = active[Math.floor((this.ringCount - 1) * 0.99)];
   }
 
   private getP95FrameMs(): number {

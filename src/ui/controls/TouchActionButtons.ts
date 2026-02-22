@@ -30,9 +30,7 @@ export class TouchActionButtons {
       pointerEvents: 'auto',
     } as Partial<CSSStyleDeclaration>);
 
-    // Create buttons from bottom to top (scoreboard at top for easy reach)
-    this.addButton('squad', 'SQUAD');
-    this.addButton('scoreboard', 'SCORE');
+    // Create buttons from bottom to top (most-used closest to thumb)
     this.addButton('jump', 'JUMP');
     this.addButton('reload', 'R');
     this.addButton('grenade', 'G');

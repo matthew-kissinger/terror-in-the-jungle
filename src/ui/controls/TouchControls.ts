@@ -108,6 +108,8 @@ export class TouchControls {
       () => callbacks.onMenuPause?.(),
       () => callbacks.onMenuResume?.(),
     );
+    this.menuButton.setSquadCallback(() => callbacks.onSquadCommand?.());
+    this.menuButton.setScoreboardCallback(() => callbacks.onScoreboardTap?.());
   }
 
   /**

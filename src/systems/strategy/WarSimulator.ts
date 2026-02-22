@@ -78,10 +78,16 @@ export class WarSimulator implements GameSystem {
   update(deltaTime: number): void {
     if (!this.enabled || !this.config) return;
 
+    // Gate on game phase: during SETUP the player is still loading terrain
+    // and spawning in. Don't run the war machine yet.
+    const phase = this.ticketSystem?.getGameState().phase;
+    if (phase === 'SETUP') return;
+    const gameActive = phase !== 'ENDED';
+
     const budgetStart = performance.now();
     this.elapsedTime += deltaTime;
 
-    // 1. Update materialization pipeline
+    // 1. Update materialization pipeline (always - handles despawn on game end too)
     if (this.pipeline) {
       this.pipeline.update(
         this.playerX, this.playerY, this.playerZ,
@@ -90,15 +96,17 @@ export class WarSimulator implements GameSystem {
     }
 
     // 2. Update simulated agent movement (position lerp toward destination)
-    this.updateSimulatedMovement(deltaTime, budgetStart);
+    if (gameActive) {
+      this.updateSimulatedMovement(deltaTime, budgetStart);
+    }
 
-    // 3. Run abstract combat resolver on schedule
-    if (this.resolver) {
+    // 3. Run abstract combat resolver on schedule (only during active combat)
+    if (this.resolver && gameActive) {
       this.resolver.update(this.elapsedTime);
     }
 
-    // 4. Run strategic director on schedule
-    if (this.director) {
+    // 4. Run strategic director on schedule (only during active combat)
+    if (this.director && gameActive) {
       this.director.update(this.elapsedTime);
     }
 

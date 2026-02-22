@@ -127,6 +127,7 @@ export class SystemConnector {
     refs.grenadeSystem.setPlayerController(refs.playerController);
     refs.grenadeSystem.setFlashbangEffect(refs.flashbangScreenEffect);
     refs.hudSystem.setGrenadeSystem(refs.grenadeSystem);
+    refs.hudSystem.setMortarSystem(refs.mortarSystem);
     refs.mortarSystem.setCombatantSystem(refs.combatantSystem);
     refs.mortarSystem.setInventoryManager(refs.inventoryManager);
     refs.mortarSystem.setAudioManager(refs.audioManager);

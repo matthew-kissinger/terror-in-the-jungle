@@ -158,4 +158,11 @@ export const HUDZoneStyles = `
       width: 40px;
     }
   }
+
+  /* Hide objectives panel on touch devices to avoid overlap with action buttons */
+  @media (pointer: coarse) {
+    .objectives-panel {
+      display: none;
+    }
+  }
 `;

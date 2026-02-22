@@ -276,6 +276,12 @@ export class ZoneManager implements GameSystem {
     if (this.zones.size === 0 && this.chunkManager) {
       Logger.info('world', ' Creating zones with terrain mapping...');
       this.zoneInitializer.createDefaultZones(this.zones, this.occupants);
+
+      // Seed previousZoneState to prevent false capture notifications on first frame
+      for (const zone of this.zones.values()) {
+        this.previousZoneState.set(zone.id, zone.owner);
+      }
+
       Logger.info('world', ` Zones created with terrain mapping: ${this.zones.size} zones`);
     }
   }
@@ -287,6 +293,12 @@ export class ZoneManager implements GameSystem {
     this.zoneInitializer.setGameModeConfig(config);
     this.clearAllZones();
     this.zoneInitializer.createZonesFromConfig(this.zones, this.occupants);
+
+    // Seed previousZoneState so the first update() frame doesn't treat
+    // pre-owned zones as newly-captured and spam notifications.
+    for (const zone of this.zones.values()) {
+      this.previousZoneState.set(zone.id, zone.owner);
+    }
   }
 
   private clearAllZones(): void {
@@ -295,6 +307,7 @@ export class ZoneManager implements GameSystem {
     });
     this.zones.clear();
     this.occupants.clear();
+    this.previousZoneState.clear();
   }
 
 

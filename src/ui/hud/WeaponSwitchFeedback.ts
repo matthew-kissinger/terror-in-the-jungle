@@ -96,6 +96,13 @@ export class WeaponSwitchFeedback {
         color: rgba(220, 225, 230, 0.55);
         margin-top: 4px;
       }
+
+      /* Hide on touch devices - weapon bar already highlights active weapon */
+      @media (pointer: coarse) {
+        .weapon-switch-feedback {
+          display: none !important;
+        }
+      }
     `;
     document.head.appendChild(style);
   }

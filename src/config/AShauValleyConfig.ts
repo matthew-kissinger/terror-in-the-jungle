@@ -109,7 +109,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
   reinforcementInterval: 60,
 
   captureRadius: 50,
-  captureSpeed: 0.4,
+  captureSpeed: 3.5,
 
   minimapScale: 3000,
   viewDistance: 600,

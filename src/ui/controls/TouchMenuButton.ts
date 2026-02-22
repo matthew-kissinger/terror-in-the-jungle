@@ -11,6 +11,8 @@ export class TouchMenuButton {
 
   private onPauseCallback?: () => void;
   private onResumeCallback?: () => void;
+  private onSquadCommandCallback?: () => void;
+  private onScoreboardCallback?: () => void;
 
   constructor() {
     this.button = document.createElement('div');
@@ -65,6 +67,14 @@ export class TouchMenuButton {
   setCallbacks(onPause: () => void, onResume: () => void): void {
     this.onPauseCallback = onPause;
     this.onResumeCallback = onResume;
+  }
+
+  setSquadCallback(callback: () => void): void {
+    this.onSquadCommandCallback = callback;
+  }
+
+  setScoreboardCallback(callback: () => void): void {
+    this.onScoreboardCallback = callback;
   }
 
   private onButtonTap = (e: Event): void => {
@@ -128,6 +138,22 @@ export class TouchMenuButton {
     this.overlay.appendChild(
       this.createOverlayButton('Resume', () => {
         this.hideOverlay();
+      })
+    );
+
+    // Squad Commands button
+    this.overlay.appendChild(
+      this.createOverlayButton('Squad Commands', () => {
+        this.hideOverlay();
+        this.onSquadCommandCallback?.();
+      })
+    );
+
+    // Scoreboard button
+    this.overlay.appendChild(
+      this.createOverlayButton('Scoreboard', () => {
+        this.hideOverlay();
+        this.onScoreboardCallback?.();
       })
     );
 

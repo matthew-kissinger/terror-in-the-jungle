@@ -30,7 +30,7 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
   reinforcementInterval: 30,
 
   captureRadius: 25,
-  captureSpeed: 0.75,
+  captureSpeed: 5,
 
   minimapScale: 800,
   viewDistance: 300,
