@@ -6,8 +6,8 @@ import { colors, fontStack } from '../design/tokens';
 export const HUDZoneStyles = `
   .objectives-panel {
     position: absolute;
-    top: 220px;
-    right: 16px;
+    top: calc(220px + env(safe-area-inset-top, 0px));
+    right: max(var(--hud-edge-inset, 16px), env(safe-area-inset-right, 0px));
     background: ${colors.hudGlass};
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
@@ -25,9 +25,9 @@ export const HUDZoneStyles = `
     margin-bottom: 6px;
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid ${colors.hudBorder};
     padding-bottom: 4px;
-    color: rgba(220, 225, 230, 0.5);
+    color: ${colors.textMuted};
   }
 
   .zone-item {
@@ -69,11 +69,11 @@ export const HUDZoneStyles = `
     border: 1.5px solid rgba(255, 255, 255, 0.3);
   }
 
-  .zone-neutral { background: rgba(107, 119, 128, 0.6); }
-  .zone-us { background: rgba(91, 140, 201, 0.6); }
-  .zone-opfor { background: rgba(201, 86, 74, 0.6); }
+  .zone-neutral { background: ${colors.textMuted}; }
+  .zone-us { background: ${colors.us}; }
+  .zone-opfor { background: ${colors.opfor}; }
   .zone-contested {
-    background: linear-gradient(90deg, rgba(91, 140, 201, 0.6) 50%, rgba(201, 86, 74, 0.6) 50%);
+    background: linear-gradient(90deg, ${colors.us} 50%, ${colors.opfor} 50%);
     animation: pulse 1s infinite;
   }
 
@@ -112,8 +112,7 @@ export const HUDZoneStyles = `
     .objectives-panel {
       min-width: 150px;
       max-width: 180px;
-      right: 10px;
-      top: 170px;
+      top: calc(170px + env(safe-area-inset-top, 0px));
       padding: 6px 8px;
     }
 
@@ -135,8 +134,7 @@ export const HUDZoneStyles = `
     .objectives-panel {
       min-width: 120px;
       max-width: 40vw;
-      right: 8px;
-      top: 140px;
+      top: calc(140px + env(safe-area-inset-top, 0px));
       padding: 4px 6px;
       font-size: 10px;
     }

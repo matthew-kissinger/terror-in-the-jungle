@@ -105,8 +105,8 @@ export const HUDWeaponStyles = `
   /* Ammo display */
   .ammo-display {
     position: absolute;
-    bottom: 16px;
-    right: 16px;
+    bottom: max(var(--hud-bottom-offset, 16px), env(safe-area-inset-bottom, 0px));
+    right: max(var(--hud-edge-inset, 16px), env(safe-area-inset-right, 0px));
     background: ${colors.hudGlass};
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
@@ -169,26 +169,25 @@ export const HUDWeaponStyles = `
     100% { border-color: rgba(220, 225, 230, 0.3); }
   }
 
-  /* Mobile responsive adjustments */
+  /* Mobile responsive adjustments - ammo moves above touch controls */
   @media (max-width: 768px) {
     .ammo-display {
       right: 50%;
       transform: translateX(50%);
-      bottom: 160px;
+      bottom: calc(160px + env(safe-area-inset-bottom, 0px));
       min-width: 80px;
       padding: 6px 10px;
     }
 
     .kill-counter {
-      bottom: 160px;
-      left: 10px;
+      bottom: calc(160px + env(safe-area-inset-bottom, 0px));
       min-width: 80px;
     }
   }
 
   @media (max-width: 480px) {
     .ammo-display {
-      bottom: 170px;
+      bottom: calc(170px + env(safe-area-inset-bottom, 0px));
       padding: 5px 10px;
       min-width: 70px;
     }

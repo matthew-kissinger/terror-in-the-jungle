@@ -28,8 +28,8 @@ const SCALE_MAP: Record<ViewportClass, number> = {
 function classify(width: number): ViewportClass {
   if (width <= breakpoints.phone) return 'phone';
   if (width <= breakpoints.tablet) return 'tablet';
-  if (width <= breakpoints.wide) return 'wide';
-  return 'desktop';
+  if (width <= breakpoints.wide) return 'desktop';
+  return 'wide';
 }
 
 export class ViewportManager {

@@ -1,3 +1,5 @@
+import { colors, zIndex, fontStack } from '../design/tokens';
+
 export class GrenadePowerMeter {
   public grenadePowerMeter: HTMLDivElement;
   public grenadeCookingTimer?: HTMLDivElement;
@@ -21,16 +23,16 @@ export class GrenadePowerMeter {
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      z-index: 1000;
+      z-index: ${zIndex.hudWeapon};
       pointer-events: none;
     `;
 
     // Label
     const label = document.createElement('div');
     label.style.cssText = `
-      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+      font-family: ${fontStack.hud};
       font-size: 11px;
-      color: rgba(220, 225, 230, 0.8);
+      color: ${colors.textPrimary};
       font-weight: 700;
       text-align: center;
       margin-bottom: 4px;
@@ -45,8 +47,8 @@ export class GrenadePowerMeter {
     barContainer.style.cssText = `
       width: 100%;
       height: 10px;
-      background: rgba(8, 12, 18, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: ${colors.hudGlass};
+      border: 1px solid ${colors.hudBorder};
       border-radius: 3px;
       position: relative;
       overflow: hidden;
@@ -61,7 +63,7 @@ export class GrenadePowerMeter {
       top: 0;
       height: 100%;
       width: 30%;
-      background: linear-gradient(to right, rgba(92, 184, 92, 0.85), rgba(106, 184, 122, 0.85));
+      background: linear-gradient(to right, ${colors.success}, ${colors.heal});
       transition: width 0.05s linear, background 0.1s ease;
       border-radius: 2px;
     `;
@@ -74,10 +76,10 @@ export class GrenadePowerMeter {
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+      font-family: ${fontStack.hud};
       font-size: 10px;
       font-weight: 700;
-      color: rgba(220, 225, 230, 0.95);
+      color: ${colors.textPrimary};
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
       z-index: 1;
     `;
@@ -87,9 +89,9 @@ export class GrenadePowerMeter {
     const cookingTimer = document.createElement('div');
     cookingTimer.className = 'grenade-cooking-timer';
     cookingTimer.style.cssText = `
-      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+      font-family: ${fontStack.hud};
       font-size: 12px;
-      color: rgba(201, 86, 74, 0.9);
+      color: ${colors.danger};
       font-weight: 700;
       text-align: center;
       margin-top: 6px;
@@ -138,14 +140,14 @@ export class GrenadePowerMeter {
 
       // Color gradient: muted green (low) -> amber (mid) -> red (max)
       if (normalizedPower < 40) {
-        powerFill.style.background = 'linear-gradient(to right, rgba(92, 184, 92, 0.85), rgba(106, 184, 122, 0.85))';
-        if (label) label.style.color = 'rgba(92, 184, 92, 0.9)';
+        powerFill.style.background = `linear-gradient(to right, ${colors.success}, ${colors.heal})`;
+        if (label) label.style.color = colors.success;
       } else if (normalizedPower < 75) {
-        powerFill.style.background = 'linear-gradient(to right, rgba(212, 163, 68, 0.85), rgba(212, 140, 68, 0.85))';
-        if (label) label.style.color = 'rgba(212, 163, 68, 0.9)';
+        powerFill.style.background = `linear-gradient(to right, ${colors.warning}, ${colors.headshot})`;
+        if (label) label.style.color = colors.warning;
       } else {
-        powerFill.style.background = 'linear-gradient(to right, rgba(201, 120, 74, 0.85), rgba(201, 86, 74, 0.85))';
-        if (label) label.style.color = 'rgba(201, 86, 74, 0.9)';
+        powerFill.style.background = `linear-gradient(to right, ${colors.danger}, ${colors.opfor})`;
+        if (label) label.style.color = colors.danger;
         // Pulse animation at max power
         if (normalizedPower >= 95) {
           powerFill.style.animation = 'pulse-glow 0.5s infinite';
@@ -165,13 +167,13 @@ export class GrenadePowerMeter {
 
         // Change color based on time left
         if (timeLeft <= 1.0) {
-          cookingTimer.style.color = 'rgba(184, 58, 94, 0.95)';
+          cookingTimer.style.color = colors.critical;
           cookingTimer.style.animation = 'pulse-glow 0.3s infinite';
         } else if (timeLeft <= 2.0) {
-          cookingTimer.style.color = 'rgba(201, 86, 74, 0.95)';
+          cookingTimer.style.color = colors.danger;
           cookingTimer.style.animation = 'pulse-glow 0.6s infinite';
         } else {
-          cookingTimer.style.color = 'rgba(212, 163, 68, 0.9)';
+          cookingTimer.style.color = colors.warning;
           cookingTimer.style.animation = 'none';
         }
       } else {

@@ -3,6 +3,7 @@ import { SettingsManager } from '../../config/SettingsManager';
 import { WeaponSlot } from './InventoryManager';
 import { shouldUseTouchControls, isTouchDevice } from '../../utils/DeviceDetector';
 import { TouchControls } from '../../ui/controls/TouchControls';
+import { GamepadManager } from '../../ui/controls/GamepadManager';
 
 export interface InputCallbacks {
   onJump?: () => void;
@@ -52,9 +53,12 @@ export class PlayerInput {
   private isInHelicopter = false;
   private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
 
-  /** Touch controls – only created on touch-capable devices */
+  /** Touch controls - only created on touch-capable devices */
   private touchControls: TouchControls | null = null;
   private readonly isTouchMode: boolean;
+
+  /** Gamepad manager - created on all non-touch devices */
+  private gamepadManager: GamepadManager | null = null;
 
   /** Cached touch movement vector to avoid per-frame allocation */
   private touchMoveResult = { x: 0, z: 0 };
@@ -68,20 +72,29 @@ export class PlayerInput {
       this.pointerLockEnabled = false;
       Logger.info('player', 'Touch device detected – touch controls enabled');
 
-      // Initialize touch look sensitivity based on mouse sensitivity setting
-      const rawMouseSensitivity = SettingsManager.getInstance().getMouseSensitivityRaw();
-      const touchSensitivity = rawMouseSensitivity * 2; // Convert to touch range (approx 0.002-0.01)
+      // Initialize touch look sensitivity from dedicated touch sensitivity setting
+      const touchSensitivity = SettingsManager.getInstance().getTouchSensitivityRaw();
       this.touchControls.look.setSensitivity(touchSensitivity);
 
-      // Listen for changes to mouseSensitivity to update touch sensitivity
-      SettingsManager.getInstance().onChange((key, _value) => {
-        if (key === 'mouseSensitivity' && this.touchControls) {
-          const newRaw = SettingsManager.getInstance().getMouseSensitivityRaw();
-          const newTouch = newRaw * 2;
-          this.touchControls.look.setSensitivity(newTouch);
+      // Listen for changes to touchSensitivity
+      SettingsManager.getInstance().onChange((key) => {
+        if (key === 'touchSensitivity' && this.touchControls) {
+          const newRaw = SettingsManager.getInstance().getTouchSensitivityRaw();
+          this.touchControls.look.setSensitivity(newRaw);
         }
       });
     }
+
+    // Gamepad support on all platforms (touch or desktop)
+    this.gamepadManager = new GamepadManager();
+    this.gamepadManager.updateSensitivity();
+
+    // Sync gamepad sensitivity when mouse sensitivity changes
+    SettingsManager.getInstance().onChange((key) => {
+      if (key === 'mouseSensitivity' && this.gamepadManager) {
+        this.gamepadManager.updateSensitivity();
+      }
+    });
 
     this.setupEventListeners();
   }
@@ -115,6 +128,31 @@ export class PlayerInput {
         onSquadCommand: () => callbacks.onSquadCommand?.(),
         onMenuPause: () => callbacks.onMenuPause?.(),
         onMenuResume: () => callbacks.onMenuResume?.(),
+      });
+    }
+
+    // Wire gamepad to the same callbacks
+    if (this.gamepadManager) {
+      this.gamepadManager.setCallbacks({
+        onJump: () => callbacks.onJump?.(),
+        onReload: () => callbacks.onReload?.(),
+        onInteract: () => callbacks.onEnterExitHelicopter?.(),
+        onWeaponSwitch: () => {
+          // Cycle through weapons: primary -> secondary -> throwable
+          const next = ((this.currentWeaponMode + 1) % 3) as WeaponSlot;
+          callbacks.onWeaponSlotChange?.(next);
+        },
+        onGrenade: () => callbacks.onGrenadeSwitch?.(),
+        onSprintStart: () => callbacks.onRunStart?.(),
+        onSprintStop: () => callbacks.onRunStop?.(),
+        onFireStart: () => callbacks.onMouseDown?.(0),
+        onFireStop: () => callbacks.onMouseUp?.(0),
+        onADSStart: () => callbacks.onMouseDown?.(2),
+        onADSStop: () => callbacks.onMouseUp?.(2),
+        onEscape: () => callbacks.onEscape?.(),
+        onScoreboardToggle: (visible: boolean) => callbacks.onScoreboardToggle?.(visible),
+        onSquadCommand: () => callbacks.onSquadCommand?.(),
+        onWeaponSlot: (slot: number) => callbacks.onWeaponSlotChange?.(slot as WeaponSlot),
       });
     }
   }
@@ -175,6 +213,23 @@ export class PlayerInput {
     return this.keys.has(key.toLowerCase());
   }
 
+  /** Poll the gamepad once per frame. Must be called before reading movement/look. */
+  pollGamepad(): void {
+    if (this.gamepadManager) {
+      this.gamepadManager.poll();
+    }
+  }
+
+  /** Whether a gamepad is connected and actively providing input */
+  isGamepadActive(): boolean {
+    return this.gamepadManager?.isActive() ?? false;
+  }
+
+  /** The GamepadManager instance (null if not created) */
+  getGamepadManager(): GamepadManager | null {
+    return this.gamepadManager;
+  }
+
   getMouseMovement(): { x: number; y: number } {
     this.mouseResult.x = this.mouseMovement.x;
     this.mouseResult.y = this.mouseMovement.y;
@@ -184,6 +239,13 @@ export class PlayerInput {
       const touchDelta = this.touchControls.consumeLookDelta();
       this.mouseResult.x += touchDelta.x;
       this.mouseResult.y += touchDelta.y;
+    }
+
+    // Add gamepad right-stick look delta
+    if (this.gamepadManager?.isActive()) {
+      const gpDelta = this.gamepadManager.consumeLookDelta();
+      this.mouseResult.x += gpDelta.x;
+      this.mouseResult.y += gpDelta.y;
     }
 
     return this.mouseResult;
@@ -197,6 +259,8 @@ export class PlayerInput {
   getIsPointerLocked(): boolean {
     // On touch devices, always report as "locked" so camera updates apply
     if (this.isTouchMode && this.gameStarted) return true;
+    // On gamepad, always report as "locked" so right-stick look works
+    if (this.gamepadManager?.isActive() && this.gameStarted) return true;
     return this.isPointerLocked;
   }
 
@@ -211,18 +275,31 @@ export class PlayerInput {
   }
 
   /**
-   * Get touch joystick movement vector.
-   * Returns {x, z} in [-1, 1] range, or {0, 0} on desktop / no input.
+   * Get analog movement vector from touch joystick or gamepad left stick.
+   * Returns {x, z} in [-1, 1] range, or {0, 0} when no analog input.
    */
   getTouchMovementVector(): { x: number; z: number } {
-    if (!this.touchControls) {
-      this.touchMoveResult.x = 0;
-      this.touchMoveResult.z = 0;
-    } else {
+    // Touch joystick takes priority
+    if (this.touchControls) {
       const v = this.touchControls.getMovementVector();
       this.touchMoveResult.x = v.x;
       this.touchMoveResult.z = v.z;
+      // If touch is providing input, use it
+      if (Math.abs(v.x) > 0.01 || Math.abs(v.z) > 0.01) {
+        return this.touchMoveResult;
+      }
     }
+
+    // Fall through to gamepad left stick
+    if (this.gamepadManager?.isActive()) {
+      const gv = this.gamepadManager.getMovementVector();
+      this.touchMoveResult.x = gv.x;
+      this.touchMoveResult.z = gv.z;
+      return this.touchMoveResult;
+    }
+
+    this.touchMoveResult.x = 0;
+    this.touchMoveResult.z = 0;
     return this.touchMoveResult;
   }
 
@@ -279,6 +356,11 @@ export class PlayerInput {
     if (this.touchControls) {
       this.touchControls.dispose();
       this.touchControls = null;
+    }
+
+    if (this.gamepadManager) {
+      this.gamepadManager.dispose();
+      this.gamepadManager = null;
     }
   }
 

@@ -92,6 +92,7 @@ describe('SettingsManager', () => {
     expect(all).toEqual({
       masterVolume: 70,
       mouseSensitivity: 5,
+      touchSensitivity: 5,
       showFPS: false,
       enableShadows: true,
       graphicsQuality: 'medium',

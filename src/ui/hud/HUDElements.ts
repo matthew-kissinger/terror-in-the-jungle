@@ -14,6 +14,7 @@ import { GrenadePowerMeter } from './GrenadePowerMeter';
 import { InteractionPrompt } from './InteractionPrompt';
 import { RespawnButton } from './RespawnButton';
 import { ZoneCaptureNotification } from './ZoneCaptureNotification';
+import { MortarIndicator } from './MortarIndicator';
 import * as THREE from 'three';
 
 export class HUDElements {
@@ -36,7 +37,8 @@ export class HUDElements {
   public helicopterInstruments: HTMLDivElement;
   public grenadePowerMeter: HTMLDivElement;
   public grenadeCookingTimer?: HTMLDivElement;
-  
+  public mortarIndicatorElement: HTMLDivElement;
+
   // Feedback systems
   public killFeed: KillFeed;
   public damageNumbers?: DamageNumberSystem;
@@ -54,6 +56,7 @@ export class HUDElements {
   private grenadePowerMeterModule: GrenadePowerMeter;
   private interactionPromptModule: InteractionPrompt;
   private respawnButtonModule: RespawnButton;
+  private mortarIndicatorModule: MortarIndicator;
 
   constructor(camera?: THREE.Camera) {
     this.hudContainer = this.createHUDContainer();
@@ -67,6 +70,7 @@ export class HUDElements {
     this.grenadePowerMeterModule = new GrenadePowerMeter();
     this.interactionPromptModule = new InteractionPrompt();
     this.respawnButtonModule = new RespawnButton();
+    this.mortarIndicatorModule = new MortarIndicator();
     
     // Expose module properties for backward compatibility
     this.objectivesList = this.objectiveDisplay.objectivesList;
@@ -83,6 +87,7 @@ export class HUDElements {
     this.helicopterInstruments = this.helicopterInstrumentsModule.helicopterInstruments;
     this.grenadePowerMeter = this.grenadePowerMeterModule.grenadePowerMeter;
     this.grenadeCookingTimer = this.grenadePowerMeterModule.grenadeCookingTimer;
+    this.mortarIndicatorElement = this.mortarIndicatorModule.mortarIndicator;
     
     // Create hit marker container (simple, no module needed)
     this.hitMarkerContainer = this.createHitMarkerContainer();
@@ -121,6 +126,7 @@ export class HUDElements {
     this.hudContainer.appendChild(this.helicopterMouseIndicator);
     this.hudContainer.appendChild(this.helicopterInstruments);
     this.hudContainer.appendChild(this.grenadePowerMeter);
+    this.hudContainer.appendChild(this.mortarIndicatorElement);
     // Removed respawn button from HUD
   }
 
@@ -221,6 +227,19 @@ export class HUDElements {
     this.helicopterInstrumentsModule.updateHelicopterInstruments(collective, rpm, autoHover, engineBoost);
   }
 
+  // Mortar indicator methods
+  showMortarIndicator(): void {
+    this.mortarIndicatorModule.show();
+  }
+
+  hideMortarIndicator(): void {
+    this.mortarIndicatorModule.hide();
+  }
+
+  updateMortarState(pitch: number, yaw: number, power: number, isAiming: boolean): void {
+    this.mortarIndicatorModule.updateState(pitch, yaw, power, isAiming);
+  }
+
   // Grenade power meter methods
   showGrenadePowerMeter(): void {
     this.grenadePowerMeterModule.showGrenadePowerMeter();
@@ -316,5 +335,6 @@ export class HUDElements {
     if (this.weaponSwitchFeedback) {
       this.weaponSwitchFeedback.dispose();
     }
+    this.mortarIndicatorModule.dispose();
   }
 }

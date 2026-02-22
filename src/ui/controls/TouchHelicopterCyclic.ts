@@ -17,9 +17,13 @@ export class TouchHelicopterCyclic {
   private cyclicPitch = 0;
   private cyclicRoll = 0;
 
-  private readonly PAD_SIZE = 120;
-  private readonly HALF_PAD = 60;
+  private readonly FALLBACK_PAD_SIZE = 120;
   private readonly INDICATOR_SIZE = 20;
+  /** Dead zone as fraction of half-pad (0-1). Small deflections inside this map to zero. */
+  private readonly DEAD_ZONE = 0.08;
+
+  // Actual rendered half-pad size (updated on pointerdown)
+  private halfPad = 60;
 
   // Bound handlers for cleanup
   private readonly onPointerDown: (e: PointerEvent) => void;
@@ -33,8 +37,8 @@ export class TouchHelicopterCyclic {
       position: 'fixed',
       left: `calc(var(--tc-edge-inset, 20px) + env(safe-area-inset-left, 0px))`,
       bottom: `calc(200px + env(safe-area-inset-bottom, 0px))`,
-      width: `${this.PAD_SIZE}px`,
-      height: `${this.PAD_SIZE}px`,
+      width: `var(--tc-joystick-base, ${this.FALLBACK_PAD_SIZE}px)`,
+      height: `var(--tc-joystick-base, ${this.FALLBACK_PAD_SIZE}px)`,
       borderRadius: '12px',
       background: 'rgba(30, 60, 30, 0.35)',
       border: '2px solid rgba(80, 200, 80, 0.4)',
@@ -110,8 +114,8 @@ export class TouchHelicopterCyclic {
       background: 'rgba(80, 200, 80, 0.6)',
       border: '2px solid rgba(120, 255, 120, 0.7)',
       pointerEvents: 'none',
-      left: `${this.HALF_PAD - this.INDICATOR_SIZE / 2}px`,
-      top: `${this.HALF_PAD - this.INDICATOR_SIZE / 2}px`,
+      left: `calc(50% - ${this.INDICATOR_SIZE / 2}px)`,
+      top: `calc(50% - ${this.INDICATOR_SIZE / 2}px)`,
       transition: 'none',
     } as Partial<CSSStyleDeclaration>);
     this.container.appendChild(this.indicator);
@@ -125,8 +129,9 @@ export class TouchHelicopterCyclic {
       this.container.setPointerCapture(e.pointerId);
 
       const rect = this.container.getBoundingClientRect();
-      this.padCenterX = rect.left + this.HALF_PAD;
-      this.padCenterY = rect.top + this.HALF_PAD;
+      this.halfPad = rect.width / 2;
+      this.padCenterX = rect.left + this.halfPad;
+      this.padCenterY = rect.top + this.halfPad;
 
       this.updateFromPointer(e.clientX, e.clientY);
       this.container.style.background = 'rgba(30, 60, 30, 0.5)';
@@ -161,21 +166,43 @@ export class TouchHelicopterCyclic {
   private updateFromPointer(clientX: number, clientY: number): void {
     const dx = clientX - this.padCenterX;
     const dy = clientY - this.padCenterY;
+    const hp = this.halfPad || this.FALLBACK_PAD_SIZE / 2;
 
     // Normalize to [-1, 1] and clamp
-    this.cyclicRoll = Math.max(-1, Math.min(1, dx / this.HALF_PAD));
+    let roll = Math.max(-1, Math.min(1, dx / hp));
     // Invert Y: dragging up (negative dy) = positive pitch (forward)
-    this.cyclicPitch = Math.max(-1, Math.min(1, -dy / this.HALF_PAD));
+    let pitch = Math.max(-1, Math.min(1, -dy / hp));
 
-    this.updateIndicatorPosition(this.cyclicRoll, this.cyclicPitch);
+    // Apply dead zone: small deflections near center map to zero
+    const mag = Math.sqrt(roll * roll + pitch * pitch);
+    if (mag < this.DEAD_ZONE) {
+      roll = 0;
+      pitch = 0;
+    } else if (mag > 0) {
+      // Remap from [DEAD_ZONE, 1] -> [0, 1]
+      const remapped = (mag - this.DEAD_ZONE) / (1 - this.DEAD_ZONE);
+      const scale = remapped / mag;
+      roll *= scale;
+      pitch *= scale;
+    }
+
+    this.cyclicRoll = roll;
+    this.cyclicPitch = pitch;
+
+    // Visual indicator still uses raw position for responsive feedback
+    this.updateIndicatorPosition(
+      Math.max(-1, Math.min(1, dx / hp)),
+      Math.max(-1, Math.min(1, -dy / hp))
+    );
   }
 
   private updateIndicatorPosition(rollNorm: number, pitchNorm: number): void {
     const halfIndicator = this.INDICATOR_SIZE / 2;
-    const maxOffset = this.HALF_PAD - halfIndicator;
-    const px = this.HALF_PAD + rollNorm * maxOffset - halfIndicator;
+    const hp = this.halfPad || this.FALLBACK_PAD_SIZE / 2;
+    const maxOffset = hp - halfIndicator;
+    const px = hp + rollNorm * maxOffset - halfIndicator;
     // Invert pitch for screen coords: positive pitch = upward on screen
-    const py = this.HALF_PAD - pitchNorm * maxOffset - halfIndicator;
+    const py = hp - pitchNorm * maxOffset - halfIndicator;
     this.indicator.style.left = `${px}px`;
     this.indicator.style.top = `${py}px`;
   }

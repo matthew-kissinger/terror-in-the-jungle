@@ -13,8 +13,8 @@ export class TouchADSButton {
     this.button.id = 'touch-ads-btn';
     Object.assign(this.button.style, {
       position: 'fixed',
-      right: '120px',
-      bottom: '40px',
+      right: `calc(var(--tc-fire-size, 80px) + max(var(--tc-edge-inset, 30px), env(safe-area-inset-right, 0px)) + 12px)`,
+      bottom: `max(var(--tc-edge-inset, 30px), env(safe-area-inset-bottom, 0px))`,
       width: 'var(--tc-ads-size, 56px)',
       height: 'var(--tc-ads-size, 56px)',
       borderRadius: '50%',

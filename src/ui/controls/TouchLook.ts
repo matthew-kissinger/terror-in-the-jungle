@@ -2,6 +2,10 @@
  * Touch-based camera look control.
  * Uses the right half of the screen (excluding button areas) for drag-to-look.
  * Produces camera delta {x, y} each frame similar to mouse movement.
+ *
+ * QoL features:
+ * - Dead zone: ignores sub-pixel jitter (configurable, default 1.5px)
+ * - Acceleration curve: sub-linear for fine aim, amplified for fast swipes
  */
 export class TouchLook {
   private container: HTMLDivElement;
@@ -9,10 +13,19 @@ export class TouchLook {
   private lastX = 0;
   private lastY = 0;
 
-  /** Accumulated delta since last read – consumed by PlayerInput */
+  /** Accumulated delta since last read - consumed by PlayerInput */
   readonly delta = { x: 0, y: 0 };
 
   private sensitivity = 0.004;
+
+  /** Dead zone in CSS pixels - movements below this are ignored to prevent jitter */
+  private deadZone = 1.5;
+
+  /**
+   * Acceleration exponent. 1.0 = linear (raw), <1.0 = sub-linear (fine aim boost).
+   * Default 0.75 gives sqrt-like curve: small swipes are finer, fast swipes feel natural.
+   */
+  private accelExponent = 0.75;
 
   constructor() {
     // Touch zone covers right 60% of screen, upper 70% to avoid fire button area
@@ -41,6 +54,14 @@ export class TouchLook {
     this.sensitivity = s;
   }
 
+  setDeadZone(px: number): void {
+    this.deadZone = Math.max(0, px);
+  }
+
+  setAcceleration(exponent: number): void {
+    this.accelExponent = Math.max(0.1, Math.min(2.0, exponent));
+  }
+
   private onTouchStart = (e: TouchEvent): void => {
     e.preventDefault();
     if (this.activeTouchId !== null) return;
@@ -56,8 +77,22 @@ export class TouchLook {
     const touch = this.findActiveTouch(e.changedTouches);
     if (!touch) return;
 
-    const dx = touch.clientX - this.lastX;
-    const dy = touch.clientY - this.lastY;
+    let dx = touch.clientX - this.lastX;
+    let dy = touch.clientY - this.lastY;
+
+    // Dead zone: ignore sub-pixel jitter
+    const magnitude = Math.sqrt(dx * dx + dy * dy);
+    if (magnitude < this.deadZone) {
+      return; // Don't update lastX/Y so the movement accumulates until it exceeds dead zone
+    }
+
+    // Apply non-linear acceleration curve (preserves direction)
+    if (this.accelExponent !== 1.0 && magnitude > 0) {
+      const scaled = Math.pow(magnitude, this.accelExponent);
+      const factor = scaled / magnitude;
+      dx *= factor;
+      dy *= factor;
+    }
 
     // Accumulate deltas (will be consumed by PlayerInput)
     this.delta.x += dx * this.sensitivity;

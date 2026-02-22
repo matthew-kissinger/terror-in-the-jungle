@@ -110,6 +110,9 @@ export interface IHUDSystem {
   hideInteractionPrompt(): void;
   spawnDamageNumber(worldPos: THREE.Vector3, damage: number, isHeadshot?: boolean, isKill?: boolean): void;
   showWeaponSwitch(weaponName: string, weaponIcon: string, ammo: string): void;
+  showMortarIndicator(): void;
+  hideMortarIndicator(): void;
+  updateMortarState(pitch: number, yaw: number, power: number, isAiming: boolean): void;
 }
 
 /**

@@ -9,6 +9,7 @@ vi.mock('../config/SettingsManager', () => ({
   SettingsManager: {
     getInstance: () => ({
       getMouseSensitivityRaw: () => 0.005,
+      getTouchSensitivityRaw: () => 0.005,
       onChange: vi.fn(),
     }),
   },

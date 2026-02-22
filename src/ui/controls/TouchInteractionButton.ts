@@ -15,8 +15,8 @@ export class TouchInteractionButton {
     this.button.id = 'touch-interaction-btn';
     Object.assign(this.button.style, {
       position: 'fixed',
-      right: '140px', // Left of the fire button (80px width + 30px margin + 30px gap)
-      bottom: '30px',
+      right: `calc(var(--tc-fire-size, 80px) + max(var(--tc-edge-inset, 30px), env(safe-area-inset-right, 0px)) + 16px)`,
+      bottom: `max(var(--tc-edge-inset, 30px), env(safe-area-inset-bottom, 0px))`,
       width: 'var(--tc-fire-size, 70px)',
       height: 'var(--tc-fire-size, 70px)',
       borderRadius: '50%',

@@ -1,8 +1,9 @@
 /**
  * CSS styles for the Match End Screen
+ * Uses design tokens for consistent theming.
  */
 
-import { zIndex } from '../design/tokens';
+import { colors, zIndex, fontStack } from '../design/tokens';
 
 export const MATCH_END_SCREEN_STYLES = `
   .match-end-screen {
@@ -19,8 +20,8 @@ export const MATCH_END_SCREEN_STYLES = `
     align-items: center;
     justify-content: center;
     z-index: ${zIndex.modal};
-    color: #fff;
-    font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+    color: ${colors.textPrimary};
+    font-family: ${fontStack.hud};
     animation: fadeIn 0.5s ease-out;
   }
 
@@ -64,11 +65,11 @@ export const MATCH_END_SCREEN_STYLES = `
   }
 
   .victory .end-screen-title {
-    color: rgba(92, 184, 92, 0.95);
+    color: ${colors.success};
   }
 
   .defeat .end-screen-title {
-    color: rgba(201, 86, 74, 0.95);
+    color: ${colors.danger};
   }
 
   .end-screen-subtitle {
@@ -78,8 +79,8 @@ export const MATCH_END_SCREEN_STYLES = `
   }
 
   .stats-panel {
-    background: rgba(20, 35, 50, 0.7);
-    border: 2px solid rgba(127, 180, 217, 0.3);
+    background: ${colors.glassBgDense};
+    border: 1px solid ${colors.glassBorderBright};
     border-radius: 12px;
     padding: 2rem;
     width: 90%;
@@ -189,11 +190,11 @@ export const MATCH_END_SCREEN_STYLES = `
   }
 
   .victory .stats-panel {
-    border-color: rgba(76, 175, 80, 0.5);
+    border-color: ${colors.success};
   }
 
   .defeat .stats-panel {
-    border-color: rgba(244, 67, 54, 0.5);
+    border-color: ${colors.danger};
   }
 
   .stats-column {
@@ -211,8 +212,8 @@ export const MATCH_END_SCREEN_STYLES = `
     text-transform: uppercase;
     letter-spacing: 0.15em;
     margin-bottom: 0.75rem;
-    color: rgba(127, 180, 217, 0.8);
-    border-bottom: 1px solid rgba(127, 180, 217, 0.3);
+    color: ${colors.primary};
+    border-bottom: 1px solid ${colors.glassBorderBright};
     padding-bottom: 0.5rem;
   }
 
@@ -229,11 +230,11 @@ export const MATCH_END_SCREEN_STYLES = `
 
   .stat-value {
     font-weight: bold;
-    color: rgba(127, 180, 217, 0.8);
+    color: ${colors.primary};
   }
 
   .stat-value.highlight {
-    color: rgba(92, 184, 92, 0.9);
+    color: ${colors.success};
   }
 
   .ticket-comparison {
@@ -263,11 +264,11 @@ export const MATCH_END_SCREEN_STYLES = `
   }
 
   .faction-score.us .faction-tickets {
-    color: rgba(91, 140, 201, 0.9);
+    color: ${colors.us};
   }
 
   .faction-score.opfor .faction-tickets {
-    color: rgba(201, 86, 74, 0.9);
+    color: ${colors.opfor};
   }
 
   .vs-divider {
@@ -285,12 +286,12 @@ export const MATCH_END_SCREEN_STYLES = `
   }
 
   .end-screen-button {
-    background: rgba(127, 180, 217, 0.2);
-    border: 2px solid rgba(127, 180, 217, 0.5);
-    color: #fff;
+    background: ${colors.buttonBg};
+    border: 1px solid ${colors.glassBorderBright};
+    color: ${colors.textPrimary};
     padding: 1rem 2rem;
     font-size: 1.1rem;
-    font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+    font-family: ${fontStack.hud};
     text-transform: uppercase;
     letter-spacing: 0.1em;
     cursor: pointer;
@@ -299,19 +300,19 @@ export const MATCH_END_SCREEN_STYLES = `
   }
 
   .end-screen-button:hover {
-    background: rgba(127, 180, 217, 0.3);
-    border-color: rgba(127, 180, 217, 0.8);
+    background: ${colors.buttonHover};
+    border-color: ${colors.primary};
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(127, 180, 217, 0.3);
+    box-shadow: 0 5px 15px ${colors.glassBorder};
   }
 
   .end-screen-button.primary {
-    background: rgba(127, 180, 217, 0.4);
-    border-color: rgba(127, 180, 217, 0.8);
+    background: ${colors.buttonHover};
+    border-color: ${colors.primary};
   }
 
   .end-screen-button.primary:hover {
-    background: rgba(127, 180, 217, 0.6);
+    background: ${colors.secondary};
   }
 
   .awards-section {
@@ -325,7 +326,7 @@ export const MATCH_END_SCREEN_STYLES = `
     text-transform: uppercase;
     letter-spacing: 0.15em;
     margin-bottom: 1rem;
-    color: rgba(127, 180, 217, 0.8);
+    color: ${colors.primary};
   }
 
   .awards-container {
@@ -336,8 +337,8 @@ export const MATCH_END_SCREEN_STYLES = `
   }
 
   .award-badge {
-    background: rgba(127, 180, 217, 0.2);
-    border: 2px solid rgba(127, 180, 217, 0.5);
+    background: ${colors.glassBg};
+    border: 1px solid ${colors.glassBorderBright};
     border-radius: 8px;
     padding: 1rem 1.5rem;
     min-width: 150px;
@@ -346,24 +347,24 @@ export const MATCH_END_SCREEN_STYLES = `
   }
 
   .victory .award-badge {
-    border-color: rgba(76, 175, 80, 0.5);
+    border-color: ${colors.success};
   }
 
   .defeat .award-badge {
-    border-color: rgba(244, 67, 54, 0.5);
+    border-color: ${colors.danger};
   }
 
   .award-badge:hover {
     transform: translateY(-3px);
-    box-shadow: 0 5px 15px rgba(127, 180, 217, 0.3);
+    box-shadow: 0 5px 15px ${colors.glassBorder};
   }
 
   .victory .award-badge:hover {
-    box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+    box-shadow: 0 5px 15px ${colors.success};
   }
 
   .defeat .award-badge:hover {
-    box-shadow: 0 5px 15px rgba(244, 67, 54, 0.4);
+    box-shadow: 0 5px 15px ${colors.danger};
   }
 
   .award-name {
@@ -371,22 +372,21 @@ export const MATCH_END_SCREEN_STYLES = `
     text-transform: uppercase;
     letter-spacing: 0.1em;
     margin-bottom: 0.5rem;
-    color: #fff;
+    color: ${colors.textPrimary};
     font-weight: bold;
   }
 
   .award-value {
     font-size: 1.2rem;
-    color: rgba(127, 180, 217, 0.8);
+    color: ${colors.primary};
     font-weight: bold;
   }
 
   .victory .award-value {
-    color: rgba(92, 184, 92, 0.9);
+    color: ${colors.success};
   }
 
   .defeat .award-value {
-    color: rgba(201, 86, 74, 0.9);
+    color: ${colors.danger};
   }
 `;
-

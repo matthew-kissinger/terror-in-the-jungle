@@ -79,6 +79,21 @@ vi.mock('../../ui/controls/TouchControls', () => ({
   TouchControls: vi.fn()
 }));
 
+// Mock GamepadManager to avoid window.addEventListener in non-jsdom environment
+vi.mock('../../ui/controls/GamepadManager', () => {
+  const MockGamepadManager = vi.fn(function (this: any) {
+    this.setCallbacks = vi.fn();
+    this.poll = vi.fn();
+    this.isActive = vi.fn().mockReturnValue(false);
+    this.isConnected = vi.fn().mockReturnValue(false);
+    this.consumeLookDelta = vi.fn().mockReturnValue({ x: 0, y: 0 });
+    this.getMovementVector = vi.fn().mockReturnValue({ x: 0, z: 0 });
+    this.updateSensitivity = vi.fn();
+    this.dispose = vi.fn();
+  });
+  return { GamepadManager: MockGamepadManager };
+});
+
 describe('PlayerInput', () => {
   let playerInput: PlayerInput;
   let addEventListenerSpy: any;

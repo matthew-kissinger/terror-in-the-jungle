@@ -292,8 +292,8 @@ export class KillFeed {
     style.textContent = `
       .kill-feed {
         position: fixed;
-        bottom: 120px;
-        right: 16px;
+        bottom: max(120px, calc(120px + env(safe-area-inset-bottom, 0px)));
+        right: max(var(--hud-edge-inset, 16px), env(safe-area-inset-right, 0px));
         width: 220px;
         display: flex;
         flex-direction: column;
@@ -307,8 +307,7 @@ export class KillFeed {
 
       @media (max-width: 1024px) {
         .kill-feed {
-          bottom: 100px;
-          right: 10px;
+          bottom: max(100px, calc(100px + env(safe-area-inset-bottom, 0px)));
           width: 180px;
           font-size: 10px;
         }
@@ -316,8 +315,7 @@ export class KillFeed {
 
       @media (max-width: 480px) {
         .kill-feed {
-          bottom: 200px;
-          right: 8px;
+          bottom: calc(200px + env(safe-area-inset-bottom, 0px));
           width: 160px;
           font-size: 9px;
         }

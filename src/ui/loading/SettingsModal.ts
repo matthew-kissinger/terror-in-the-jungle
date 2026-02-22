@@ -35,7 +35,17 @@ export class SettingsModal {
       touchAction: 'manipulation',
     } as Partial<CSSStyleDeclaration>);
 
-    const sensLabel = isTouchDevice() ? 'Look' : 'Mouse';
+    const isTouch = isTouchDevice();
+
+    // Touch sensitivity row only shown on touch devices
+    const touchSensitivityRow = isTouch
+      ? `
+        <div class="settings-field">
+          <label class="settings-label">Touch Sensitivity <span data-touch-sensitivity-label>5</span></label>
+          <input type="range" min="1" max="10" value="5" data-setting="touchSensitivity" class="settings-range">
+        </div>
+      `
+      : '';
 
     this.panel.innerHTML = `
       <div class="settings-modal-inner" style="
@@ -78,9 +88,11 @@ export class SettingsModal {
         </div>
 
         <div class="settings-field">
-          <label class="settings-label">${sensLabel} Sensitivity <span data-sensitivity-label>5</span></label>
+          <label class="settings-label">Mouse Sensitivity <span data-sensitivity-label>5</span></label>
           <input type="range" min="1" max="10" value="5" data-setting="mouseSensitivity" class="settings-range">
         </div>
+
+        ${touchSensitivityRow}
 
         <div class="settings-field">
           <label class="settings-check">
@@ -190,11 +202,13 @@ export class SettingsModal {
 
     const volumeSlider = panel.querySelector('[data-setting="masterVolume"]') as HTMLInputElement | null;
     const sensitivitySlider = panel.querySelector('[data-setting="mouseSensitivity"]') as HTMLInputElement | null;
+    const touchSensitivitySlider = panel.querySelector('[data-setting="touchSensitivity"]') as HTMLInputElement | null;
     const fpsCheckbox = panel.querySelector('[data-setting="showFPS"]') as HTMLInputElement | null;
     const shadowsCheckbox = panel.querySelector('[data-setting="enableShadows"]') as HTMLInputElement | null;
     const qualitySelect = panel.querySelector('[data-setting="graphicsQuality"]') as HTMLSelectElement | null;
     const volumeLabel = panel.querySelector('[data-volume-label]') as HTMLSpanElement | null;
     const sensitivityLabel = panel.querySelector('[data-sensitivity-label]') as HTMLSpanElement | null;
+    const touchSensitivityLabel = panel.querySelector('[data-touch-sensitivity-label]') as HTMLSpanElement | null;
 
     const current = settings.getAll();
 
@@ -205,6 +219,10 @@ export class SettingsModal {
     if (sensitivitySlider) {
       sensitivitySlider.value = String(current.mouseSensitivity);
       if (sensitivityLabel) sensitivityLabel.textContent = String(current.mouseSensitivity);
+    }
+    if (touchSensitivitySlider) {
+      touchSensitivitySlider.value = String(current.touchSensitivity);
+      if (touchSensitivityLabel) touchSensitivityLabel.textContent = String(current.touchSensitivity);
     }
     if (fpsCheckbox) fpsCheckbox.checked = current.showFPS;
     if (shadowsCheckbox) shadowsCheckbox.checked = current.enableShadows;
@@ -222,6 +240,12 @@ export class SettingsModal {
       if (sensitivityLabel) sensitivityLabel.textContent = String(val);
       settings.set('mouseSensitivity', val);
     };
+    const onTouchSensitivityChange = () => {
+      if (!touchSensitivitySlider) return;
+      const val = Number(touchSensitivitySlider.value);
+      if (touchSensitivityLabel) touchSensitivityLabel.textContent = String(val);
+      settings.set('touchSensitivity', val);
+    };
     const onFPSChange = () => {
       if (!fpsCheckbox) return;
       settings.set('showFPS', fpsCheckbox.checked);
@@ -237,6 +261,7 @@ export class SettingsModal {
 
     volumeSlider?.addEventListener('input', onVolumeChange);
     sensitivitySlider?.addEventListener('input', onSensitivityChange);
+    touchSensitivitySlider?.addEventListener('input', onTouchSensitivityChange);
     fpsCheckbox?.addEventListener('change', onFPSChange);
     shadowsCheckbox?.addEventListener('change', onShadowsChange);
     qualitySelect?.addEventListener('change', onQualityChange);
@@ -244,6 +269,7 @@ export class SettingsModal {
     this.settingsCleanup = () => {
       volumeSlider?.removeEventListener('input', onVolumeChange);
       sensitivitySlider?.removeEventListener('input', onSensitivityChange);
+      touchSensitivitySlider?.removeEventListener('input', onTouchSensitivityChange);
       fpsCheckbox?.removeEventListener('change', onFPSChange);
       shadowsCheckbox?.removeEventListener('change', onShadowsChange);
       qualitySelect?.removeEventListener('change', onQualityChange);

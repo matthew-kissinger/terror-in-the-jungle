@@ -21,7 +21,7 @@ export class TouchActionButtons {
     Object.assign(this.container.style, {
       position: 'fixed',
       right: `max(var(--tc-edge-inset, 30px), env(safe-area-inset-right, 0px))`,
-      bottom: 'calc(130px + env(safe-area-inset-bottom, 0px))', // above fire button (80px + 30px bottom + 20px gap)
+      bottom: `calc(var(--tc-fire-size, 80px) + max(var(--tc-edge-inset, 30px), env(safe-area-inset-bottom, 0px)) + 16px)`,
       display: 'flex',
       flexDirection: 'column',
       gap: '12px',

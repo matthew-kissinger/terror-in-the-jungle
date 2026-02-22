@@ -84,6 +84,9 @@ export class PlayerController implements GameSystem {
   }
 
   update(deltaTime: number): void {
+    // Poll gamepad before reading any input state
+    this.input.pollGamepad();
+
     if (this.cameraShakeSystem) this.cameraShakeSystem.update(deltaTime);
     if (this.playerState.isInHelicopter) {
       this.updateHelicopterMode(deltaTime);

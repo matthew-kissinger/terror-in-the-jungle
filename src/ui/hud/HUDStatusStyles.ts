@@ -6,7 +6,7 @@ import { colors, zIndex, fontStack } from '../design/tokens';
 export const HUDStatusStyles = `
   .ticket-display {
     position: absolute;
-    top: 12px;
+    top: calc(12px + env(safe-area-inset-top, 0px));
     left: 50%;
     transform: translateX(-50%);
     background: ${colors.hudGlass};
@@ -61,8 +61,8 @@ export const HUDStatusStyles = `
 
   .game-status {
     position: absolute;
-    top: 58px;
-    left: 16px;
+    top: calc(58px + env(safe-area-inset-top, 0px));
+    left: max(var(--hud-edge-inset, 16px), env(safe-area-inset-left, 0px));
     background: ${colors.hudGlass};
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
@@ -93,8 +93,8 @@ export const HUDStatusStyles = `
 
   .match-timer {
     position: absolute;
-    top: 14px;
-    left: 16px;
+    top: calc(14px + env(safe-area-inset-top, 0px));
+    left: max(var(--hud-edge-inset, 16px), env(safe-area-inset-left, 0px));
     background: ${colors.hudGlass};
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -172,21 +172,18 @@ export const HUDStatusStyles = `
   @media (max-width: 768px) {
     .combat-stats {
       bottom: 160px;
-      right: 12px;
       font-size: 10px;
       padding: 4px 8px;
     }
 
     .game-status {
-      top: 46px;
-      left: 10px;
+      top: calc(46px + env(safe-area-inset-top, 0px));
       font-size: 10px;
       padding: 3px 8px;
     }
 
     .match-timer {
-      top: 10px;
-      left: 10px;
+      top: calc(10px + env(safe-area-inset-top, 0px));
       padding: 3px 10px;
     }
 
@@ -217,14 +214,12 @@ export const HUDStatusStyles = `
     }
 
     .game-status {
-      top: 40px;
-      left: 8px;
+      top: calc(40px + env(safe-area-inset-top, 0px));
       font-size: 9px;
     }
 
     .match-timer {
-      top: 8px;
-      left: 8px;
+      top: calc(8px + env(safe-area-inset-top, 0px));
       padding: 2px 8px;
     }
 

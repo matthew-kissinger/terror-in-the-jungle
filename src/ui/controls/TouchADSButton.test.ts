@@ -26,8 +26,10 @@ describe('TouchADSButton', () => {
     expect(button.id).toBe('touch-ads-btn');
     expect(button.textContent).toBe('ADS');
     expect(button.style.position).toBe('fixed');
-    expect(button.style.right).toBe('120px');
-    expect(button.style.bottom).toBe('40px');
+    // Uses responsive CSS calc based on fire button size + edge inset
+    expect(button.style.right).toContain('calc');
+    expect(button.style.right).toContain('--tc-fire-size');
+    expect(button.style.bottom).toContain('--tc-edge-inset');
   });
 
   it('setOnADSToggle stores and triggers callback on touchstart', () => {

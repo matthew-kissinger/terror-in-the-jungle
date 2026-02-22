@@ -13,6 +13,7 @@ import { MatchEndScreen, MatchStats } from '../end/MatchEndScreen';
 import { Scoreboard } from './Scoreboard';
 import { PersonalStatsPanel } from './PersonalStatsPanel';
 import type { GrenadeSystem } from '../../systems/weapons/GrenadeSystem';
+import type { MortarSystem } from '../../systems/weapons/MortarSystem';
 import type { PlayerHealthSystem } from '../../systems/player/PlayerHealthSystem';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 import { ViewportManager } from '../design/responsive';
@@ -23,6 +24,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private ticketSystem?: TicketSystem;
   private playerHealthSystem?: PlayerHealthSystem;
   private grenadeSystem?: GrenadeSystem;
+  private mortarSystem?: MortarSystem;
   private camera?: THREE.Camera;
 
   private styles: HUDStyles;
@@ -79,12 +81,13 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
     // Subscribe to viewport changes for responsive HUD
     this.viewportUnsubscribe = ViewportManager.getInstance().subscribe((info) => {
-      const container = this.elements.hudContainer;
-      if (container) {
-        container.style.setProperty('--hud-scale', String(info.scale));
-        container.style.setProperty('--hud-bottom-offset', info.viewportClass === 'phone' ? '8px' : '16px');
-        container.style.setProperty('--hud-edge-inset', info.viewportClass === 'phone' ? '8px' : '16px');
-      }
+      const isSmall = info.viewportClass === 'phone' || info.viewportClass === 'tablet';
+      const root = document.documentElement;
+      // Set on :root so body-level elements (scoreboard, stats panel, kill feed) also inherit
+      root.style.setProperty('--hud-scale', String(info.scale));
+      root.style.setProperty('--hud-bottom-offset', isSmall ? '8px' : '16px');
+      root.style.setProperty('--hud-edge-inset', isSmall ? '10px' : '16px');
+      root.style.setProperty('--hud-is-touch', info.isTouch ? '1' : '0');
     });
 
     // Add HUD to DOM
@@ -149,6 +152,17 @@ export class HUDSystem implements GameSystem, IHUDSystem {
         this.elements.updateGrenadePower(aimingState.power, aimingState.estimatedDistance, aimingState.cookingTime);
       } else {
         this.elements.hideGrenadePowerMeter();
+      }
+    }
+
+    // Update mortar indicator
+    if (this.mortarSystem) {
+      if (this.mortarSystem.isCurrentlyDeployed()) {
+        const aim = this.mortarSystem.getAimingState();
+        this.elements.showMortarIndicator();
+        this.elements.updateMortarState(aim.pitch, aim.yaw, aim.power, this.mortarSystem.isCurrentlyAiming());
+      } else {
+        this.elements.hideMortarIndicator();
       }
     }
 
@@ -316,6 +330,10 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.grenadeSystem = system;
   }
 
+  setMortarSystem(system: MortarSystem): void {
+    this.mortarSystem = system;
+  }
+
   updateTickets(usTickets: number, opforTickets: number): void {
     this.updater.updateTicketDisplay(usTickets, opforTickets);
   }
@@ -365,6 +383,19 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
   updateHelicopterInstruments(collective: number, rpm: number, autoHover: boolean, engineBoost: boolean): void {
     this.elements.updateHelicopterInstruments(collective, rpm, autoHover, engineBoost);
+  }
+
+  // Mortar indicator methods (IHUDSystem)
+  showMortarIndicator(): void {
+    this.elements.showMortarIndicator();
+  }
+
+  hideMortarIndicator(): void {
+    this.elements.hideMortarIndicator();
+  }
+
+  updateMortarState(pitch: number, yaw: number, power: number, isAiming: boolean): void {
+    this.elements.updateMortarState(pitch, yaw, power, isAiming);
   }
 
   // Grenade power meter methods

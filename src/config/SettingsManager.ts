@@ -5,6 +5,7 @@ export type GraphicsQuality = 'low' | 'medium' | 'high' | 'ultra';
 export interface GameSettings {
   masterVolume: number;       // 0-100
   mouseSensitivity: number;   // 1-10 (UI scale), mapped to 0.001-0.005 internally
+  touchSensitivity: number;   // 1-10 (UI scale), mapped to 0.002-0.008 internally (touch needs higher base)
   showFPS: boolean;
   enableShadows: boolean;
   graphicsQuality: GraphicsQuality;
@@ -18,6 +19,7 @@ const STORAGE_KEY = 'pixelart-sandbox-settings';
 const DEFAULT_SETTINGS: GameSettings = {
   masterVolume: 70,
   mouseSensitivity: 5,
+  touchSensitivity: 5,
   showFPS: false,
   enableShadows: true,
   graphicsQuality: 'medium',
@@ -56,6 +58,12 @@ export class SettingsManager {
   getMouseSensitivityRaw(): number {
     const uiValue = this.settings.mouseSensitivity; // 1-10
     return 0.001 + (uiValue - 1) * (0.004 / 9);
+  }
+
+  /** Returns touch look sensitivity (0.002 - 0.008). Higher base than mouse for responsive feel. */
+  getTouchSensitivityRaw(): number {
+    const uiValue = this.settings.touchSensitivity; // 1-10
+    return 0.002 + (uiValue - 1) * (0.006 / 9);
   }
 
   /** Returns master volume as 0-1 float */

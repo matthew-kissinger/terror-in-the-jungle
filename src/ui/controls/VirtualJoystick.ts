@@ -15,10 +15,13 @@ export class VirtualJoystick {
   /** Normalised output – read every frame */
   readonly output = { x: 0, z: 0 };
 
-  // Geometry
-  private readonly BASE_SIZE = 120;
+  // Geometry - CSS sizes (used for initial thumb centering)
+  private readonly FALLBACK_BASE = 120;
   private readonly THUMB_SIZE = 50;
-  private readonly MAX_DISTANCE: number;
+  private maxDistance: number;
+
+  /** Dead zone as fraction of maxDistance (0-1). Movements inside this radius output zero. */
+  private readonly DEAD_ZONE = 0.1;
 
   // Callbacks for sprint
   private onSprintStart?: () => void;
@@ -27,7 +30,7 @@ export class VirtualJoystick {
   private readonly SPRINT_THRESHOLD = 0.9;
 
   constructor() {
-    this.MAX_DISTANCE = this.BASE_SIZE / 2;
+    this.maxDistance = this.FALLBACK_BASE / 2;
 
     // Container – covers left 40% of the screen as touch zone
     this.container = document.createElement('div');
@@ -49,8 +52,8 @@ export class VirtualJoystick {
       position: 'absolute',
       left: `max(var(--tc-edge-inset, 30px), env(safe-area-inset-left, 0px))`,
       bottom: `max(var(--tc-edge-inset, 30px), env(safe-area-inset-bottom, 0px))`,
-      width: `${this.BASE_SIZE}px`,
-      height: `${this.BASE_SIZE}px`,
+      width: `var(--tc-joystick-base, ${this.FALLBACK_BASE}px)`,
+      height: `var(--tc-joystick-base, ${this.FALLBACK_BASE}px)`,
       borderRadius: '50%',
       background: 'rgba(255,255,255,0.15)',
       border: '2px solid rgba(255,255,255,0.3)',
@@ -60,7 +63,7 @@ export class VirtualJoystick {
       boxSizing: 'border-box',
     } as Partial<CSSStyleDeclaration>);
 
-    // Thumb
+    // Thumb - centered using calc + percentage
     this.thumb = document.createElement('div');
     Object.assign(this.thumb.style, {
       width: `${this.THUMB_SIZE}px`,
@@ -68,8 +71,8 @@ export class VirtualJoystick {
       borderRadius: '50%',
       background: 'rgba(255,255,255,0.5)',
       position: 'absolute',
-      left: `${(this.BASE_SIZE - this.THUMB_SIZE) / 2}px`,
-      top: `${(this.BASE_SIZE - this.THUMB_SIZE) / 2}px`,
+      left: `calc(50% - ${this.THUMB_SIZE / 2}px)`,
+      top: `calc(50% - ${this.THUMB_SIZE / 2}px)`,
       transition: 'none',
     } as Partial<CSSStyleDeclaration>);
 
@@ -96,10 +99,11 @@ export class VirtualJoystick {
     const touch = e.changedTouches[0];
     this.activeTouchId = touch.identifier;
 
-    // Record base centre
+    // Record base centre and actual rendered size
     const rect = this.base.getBoundingClientRect();
     this.baseX = rect.left + rect.width / 2;
     this.baseY = rect.top + rect.height / 2;
+    this.maxDistance = rect.width / 2;
 
     this.updateThumb(touch.clientX, touch.clientY);
   };
@@ -130,24 +134,39 @@ export class VirtualJoystick {
     let dx = clientX - this.baseX;
     let dy = clientY - this.baseY;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    const clamped = Math.min(distance, this.MAX_DISTANCE);
+    const clamped = Math.min(distance, this.maxDistance);
 
     if (distance > 0) {
       dx = (dx / distance) * clamped;
       dy = (dy / distance) * clamped;
     }
 
-    // Position thumb relative to base centre
-    this.thumb.style.left = `${(this.BASE_SIZE - this.THUMB_SIZE) / 2 + dx}px`;
-    this.thumb.style.top = `${(this.BASE_SIZE - this.THUMB_SIZE) / 2 + dy}px`;
+    // Position thumb relative to base centre using calc for responsive base
+    const baseSize = this.base.offsetWidth || this.FALLBACK_BASE;
+    this.thumb.style.left = `${(baseSize - this.THUMB_SIZE) / 2 + dx}px`;
+    this.thumb.style.top = `${(baseSize - this.THUMB_SIZE) / 2 + dy}px`;
 
     // Normalise output: x = left/right, z = forward/back (up = forward = -z in game)
-    const normX = dx / this.MAX_DISTANCE;
-    const normY = dy / this.MAX_DISTANCE;
+    let normX = this.maxDistance > 0 ? dx / this.maxDistance : 0;
+    let normY = this.maxDistance > 0 ? dy / this.maxDistance : 0;
+
+    // Apply dead zone: movements inside DEAD_ZONE radius map to zero,
+    // movements outside are remapped from [DEAD_ZONE, 1] -> [0, 1]
+    const rawMagnitude = Math.sqrt(normX * normX + normY * normY);
+    if (rawMagnitude < this.DEAD_ZONE) {
+      normX = 0;
+      normY = 0;
+    } else if (rawMagnitude > 0) {
+      const remapped = (rawMagnitude - this.DEAD_ZONE) / (1 - this.DEAD_ZONE);
+      const scale = remapped / rawMagnitude;
+      normX *= scale;
+      normY *= scale;
+    }
+
     this.output.x = normX;   // right = positive
     this.output.z = normY;   // down on screen = positive (backward in game)
 
-    // Sprint detection
+    // Sprint detection (uses remapped magnitude)
     const magnitude = Math.sqrt(normX * normX + normY * normY);
     if (magnitude >= this.SPRINT_THRESHOLD && !this.isSprinting) {
       this.isSprinting = true;
@@ -159,8 +178,8 @@ export class VirtualJoystick {
   }
 
   private resetThumb(): void {
-    this.thumb.style.left = `${(this.BASE_SIZE - this.THUMB_SIZE) / 2}px`;
-    this.thumb.style.top = `${(this.BASE_SIZE - this.THUMB_SIZE) / 2}px`;
+    this.thumb.style.left = `calc(50% - ${this.THUMB_SIZE / 2}px)`;
+    this.thumb.style.top = `calc(50% - ${this.THUMB_SIZE / 2}px)`;
     this.output.x = 0;
     this.output.z = 0;
 

@@ -264,8 +264,8 @@ export class PersonalStatsPanel {
     style.textContent = `
       .personal-stats-panel {
         position: fixed;
-        bottom: 76px;
-        left: 16px;
+        bottom: max(76px, calc(76px + env(safe-area-inset-bottom, 0px)));
+        left: max(var(--hud-edge-inset, 16px), env(safe-area-inset-left, 0px));
         background: rgba(8, 12, 18, 0.55);
         backdrop-filter: blur(6px);
         -webkit-backdrop-filter: blur(6px);
@@ -286,8 +286,7 @@ export class PersonalStatsPanel {
 
       @media (max-width: 768px) {
         .personal-stats-panel {
-          left: 10px;
-          bottom: 170px;
+          bottom: calc(170px + env(safe-area-inset-bottom, 0px));
           font-size: 11px;
           padding: 6px 10px;
           min-width: 100px;
@@ -296,8 +295,7 @@ export class PersonalStatsPanel {
 
       @media (max-width: 480px) {
         .personal-stats-panel {
-          bottom: 200px;
-          left: 8px;
+          bottom: calc(200px + env(safe-area-inset-bottom, 0px));
           background: rgba(8, 12, 18, 0.6);
           padding: 3px 8px;
           min-width: 0;

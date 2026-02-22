@@ -22,6 +22,9 @@ describe('TouchLook', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     look = new TouchLook();
+    // Disable QoL features for deterministic linear tests
+    look.setDeadZone(0);
+    look.setAcceleration(1.0);
     zone = document.getElementById('touch-look-zone') as HTMLDivElement;
   });
 
@@ -75,5 +78,34 @@ describe('TouchLook', () => {
     zone.dispatchEvent(touchEvent('touchstart', [touch(1, 100, 100)]));
     zone.dispatchEvent(touchEvent('touchmove', [touch(1, 140, 120)]));
     expect(look.consumeDelta()).toEqual({ x: 0, y: 0 });
+  });
+
+  it('dead zone ignores small movements', () => {
+    look.setDeadZone(3);
+    look.setAcceleration(1.0);
+
+    zone.dispatchEvent(touchEvent('touchstart', [touch(1, 100, 100)]));
+    // Move 1px (under dead zone of 3px) - should be ignored
+    zone.dispatchEvent(touchEvent('touchmove', [touch(1, 101, 100)]));
+    expect(look.delta.x).toBe(0);
+    expect(look.delta.y).toBe(0);
+
+    // Move 5px (above dead zone) - should register
+    zone.dispatchEvent(touchEvent('touchmove', [touch(1, 106, 100)]));
+    expect(look.delta.x).not.toBe(0);
+  });
+
+  it('acceleration curve reduces output for small movements', () => {
+    look.setDeadZone(0);
+    look.setAcceleration(0.5); // Strong curve
+
+    zone.dispatchEvent(touchEvent('touchstart', [touch(1, 100, 100)]));
+    zone.dispatchEvent(touchEvent('touchmove', [touch(1, 110, 100)]));
+    const curvedDelta = look.consumeDelta();
+
+    // With exponent 0.5, 10px movement: scaled = 10^0.5 = ~3.16
+    // So output is 3.16 * 0.004 = ~0.01265 instead of linear 10 * 0.004 = 0.04
+    expect(Math.abs(curvedDelta.x)).toBeLessThan(0.04);
+    expect(Math.abs(curvedDelta.x)).toBeGreaterThan(0);
   });
 });
