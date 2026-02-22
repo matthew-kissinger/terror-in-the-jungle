@@ -112,11 +112,8 @@ export class TouchMenuButton {
       pointerEvents: 'auto',
     } as Partial<CSSStyleDeclaration>);
 
-    // Prevent any touch events from passing through to game
+    // Prevent any pointer events from passing through to game
     this.overlay.addEventListener('pointerdown', (e) => {
-      e.stopPropagation();
-    }, { passive: false });
-    this.overlay.addEventListener('touchstart', (e) => {
       e.stopPropagation();
     }, { passive: false });
 
@@ -224,17 +221,22 @@ export class TouchMenuButton {
       btn.style.transform = 'scale(1)';
     }, { passive: false });
 
-    // Prevent touch events from reaching game
-    btn.addEventListener('touchstart', (e) => {
-      e.stopPropagation();
-    }, { passive: false });
-
     return btn;
   }
 
   /** Whether the pause overlay is currently showing */
   isPaused(): boolean {
     return this.isOverlayVisible;
+  }
+
+  /** Re-parent into a grid slot. */
+  mountTo(parent: HTMLElement): void {
+    this.button.style.position = '';
+    this.button.style.top = '';
+    this.button.style.right = '';
+    this.button.style.zIndex = '';
+    if (this.button.parentNode) this.button.parentNode.removeChild(this.button);
+    parent.appendChild(this.button);
   }
 
   show(): void {

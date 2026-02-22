@@ -6,6 +6,7 @@ import { ScorePopupSystem } from './ScorePopupSystem';
 import { HitMarkerFeedback } from './HitMarkerFeedback';
 import { WeaponSwitchFeedback } from './WeaponSwitchFeedback';
 import { WeaponAmmoDisplay } from './WeaponAmmoDisplay';
+import { UnifiedWeaponBar } from './UnifiedWeaponBar';
 import { ObjectiveDisplay } from './ObjectiveDisplay';
 import { CombatStatsDisplay } from './CombatStatsDisplay';
 import { GameStatusDisplay } from './GameStatusDisplay';
@@ -15,6 +16,7 @@ import { InteractionPrompt } from './InteractionPrompt';
 import { RespawnButton } from './RespawnButton';
 import { ZoneCaptureNotification } from './ZoneCaptureNotification';
 import { MortarIndicator } from './MortarIndicator';
+import type { HUDLayout } from '../layout/HUDLayout';
 import * as THREE from 'three';
 
 export class HUDElements {
@@ -46,6 +48,7 @@ export class HUDElements {
   public hitMarkerFeedback?: HitMarkerFeedback;
   public weaponSwitchFeedback?: WeaponSwitchFeedback;
   public zoneCaptureNotification?: ZoneCaptureNotification;
+  public unifiedWeaponBar: UnifiedWeaponBar;
 
   // Module instances
   private weaponAmmoDisplay: WeaponAmmoDisplay;
@@ -112,6 +115,9 @@ export class HUDElements {
     // Initialize zone capture notification system
     this.zoneCaptureNotification = new ZoneCaptureNotification();
 
+    // Initialize unified weapon bar
+    this.unifiedWeaponBar = new UnifiedWeaponBar();
+
     // Assemble HUD structure
     this.hudContainer.appendChild(this.objectivesList);
     this.hudContainer.appendChild(this.ticketDisplay);
@@ -144,6 +150,7 @@ export class HUDElements {
 
   updateAmmoDisplay(magazine: number, reserve: number): void {
     this.weaponAmmoDisplay.updateAmmoDisplay(magazine, reserve);
+    this.unifiedWeaponBar.updateAmmo(magazine, reserve);
   }
 
   showHitMarker(type: 'hit' | 'kill' | 'headshot' = 'hit'): void {
@@ -253,23 +260,49 @@ export class HUDElements {
     this.grenadePowerMeterModule.updateGrenadePower(power, estimatedDistance, cookingTime);
   }
 
-  attachToDOM(): void {
-    document.body.appendChild(this.hudContainer);
-    this.killFeed.attachToDOM(document.body);
-    if (this.damageNumbers) {
-      this.damageNumbers.attachToDOM();
-    }
-    if (this.scorePopups) {
-      this.scorePopups.attachToDOM();
-    }
-    if (this.hitMarkerFeedback) {
-      this.hitMarkerFeedback.attachToDOM();
-    }
-    if (this.weaponSwitchFeedback) {
-      this.weaponSwitchFeedback.attachToDOM();
-    }
-    if (this.zoneCaptureNotification) {
-      this.zoneCaptureNotification.mount(document.body);
+  attachToDOM(layout?: HUDLayout): void {
+    if (layout) {
+      // Mount components into grid slots (Phase 2+)
+      layout.getSlot('tickets').appendChild(this.ticketDisplay);
+      layout.getSlot('timer').appendChild(this.timerElement);
+      layout.getSlot('game-status').appendChild(this.gameStatus);
+      layout.getSlot('objectives').appendChild(this.objectivesList);
+      layout.getSlot('stats').appendChild(this.combatStats);
+      layout.getSlot('ammo').appendChild(this.ammoDisplay);
+      layout.getSlot('center').appendChild(this.hitMarkerContainer);
+      layout.getSlot('center').appendChild(this.interactionPrompt);
+      layout.getSlot('center').appendChild(this.grenadePowerMeter);
+      layout.getSlot('center').appendChild(this.mortarIndicatorElement);
+      layout.getSlot('center').appendChild(this.helicopterInstruments);
+      layout.getSlot('center').appendChild(this.helicopterMouseIndicator);
+      layout.getSlot('center').appendChild(this.elevationSlider);
+      layout.getSlot('center').appendChild(this.killCounter);
+
+      // Feedback systems mount to the center slot too
+      this.killFeed.attachToDOM(layout.getSlot('kill-feed'));
+      if (this.damageNumbers) this.damageNumbers.attachToDOM(layout.getSlot('center'));
+      if (this.scorePopups) this.scorePopups.attachToDOM(layout.getSlot('center'));
+      if (this.hitMarkerFeedback) this.hitMarkerFeedback.attachToDOM(layout.getSlot('center'));
+      if (this.weaponSwitchFeedback) this.weaponSwitchFeedback.attachToDOM(layout.getSlot('center'));
+      if (this.zoneCaptureNotification) this.zoneCaptureNotification.mount(layout.getSlot('center'));
+
+      // Unified weapon bar into weapon-bar slot (infantry only)
+      const weaponSlot = layout.getSlot('weapon-bar');
+      weaponSlot.dataset.show = 'infantry';
+      this.unifiedWeaponBar.mount(weaponSlot);
+
+      // hud-container is no longer needed in grid mode, but keep it for disposal tracking
+      this.hudContainer.style.display = 'none';
+      document.body.appendChild(this.hudContainer);
+    } else {
+      // Legacy path: mount everything to body (backward compat)
+      document.body.appendChild(this.hudContainer);
+      this.killFeed.attachToDOM(document.body);
+      if (this.damageNumbers) this.damageNumbers.attachToDOM();
+      if (this.scorePopups) this.scorePopups.attachToDOM();
+      if (this.hitMarkerFeedback) this.hitMarkerFeedback.attachToDOM();
+      if (this.weaponSwitchFeedback) this.weaponSwitchFeedback.attachToDOM();
+      if (this.zoneCaptureNotification) this.zoneCaptureNotification.mount(document.body);
     }
   }
 
@@ -335,6 +368,7 @@ export class HUDElements {
     if (this.weaponSwitchFeedback) {
       this.weaponSwitchFeedback.dispose();
     }
+    this.unifiedWeaponBar.dispose();
     this.mortarIndicatorModule.dispose();
   }
 }

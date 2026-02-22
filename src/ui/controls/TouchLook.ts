@@ -2,6 +2,7 @@
  * Touch-based camera look control.
  * Uses the right half of the screen (excluding button areas) for drag-to-look.
  * Produces camera delta {x, y} each frame similar to mouse movement.
+ * Uses pointer events with setPointerCapture for reliable multi-touch.
  *
  * QoL features:
  * - Dead zone: ignores sub-pixel jitter (configurable, default 1.5px)
@@ -9,7 +10,7 @@
  */
 export class TouchLook {
   private container: HTMLDivElement;
-  private activeTouchId: number | null = null;
+  private activePointerId: number | null = null;
   private lastX = 0;
   private lastY = 0;
 
@@ -44,10 +45,10 @@ export class TouchLook {
 
     document.body.appendChild(this.container);
 
-    this.container.addEventListener('touchstart', this.onTouchStart, { passive: false });
-    this.container.addEventListener('touchmove', this.onTouchMove, { passive: false });
-    this.container.addEventListener('touchend', this.onTouchEnd, { passive: false });
-    this.container.addEventListener('touchcancel', this.onTouchEnd, { passive: false });
+    this.container.addEventListener('pointerdown', this.onPointerDown, { passive: false });
+    this.container.addEventListener('pointermove', this.onPointerMove, { passive: false });
+    this.container.addEventListener('pointerup', this.onPointerUp, { passive: false });
+    this.container.addEventListener('pointercancel', this.onPointerCancel, { passive: false });
   }
 
   setSensitivity(s: number): void {
@@ -62,23 +63,24 @@ export class TouchLook {
     this.accelExponent = Math.max(0.1, Math.min(2.0, exponent));
   }
 
-  private onTouchStart = (e: TouchEvent): void => {
+  private onPointerDown = (e: PointerEvent): void => {
     e.preventDefault();
-    if (this.activeTouchId !== null) return;
+    if (this.activePointerId !== null) return;
 
-    const touch = e.changedTouches[0];
-    this.activeTouchId = touch.identifier;
-    this.lastX = touch.clientX;
-    this.lastY = touch.clientY;
+    this.activePointerId = e.pointerId;
+    if (typeof this.container.setPointerCapture === 'function') {
+      this.container.setPointerCapture(e.pointerId);
+    }
+    this.lastX = e.clientX;
+    this.lastY = e.clientY;
   };
 
-  private onTouchMove = (e: TouchEvent): void => {
+  private onPointerMove = (e: PointerEvent): void => {
     e.preventDefault();
-    const touch = this.findActiveTouch(e.changedTouches);
-    if (!touch) return;
+    if (e.pointerId !== this.activePointerId) return;
 
-    let dx = touch.clientX - this.lastX;
-    let dy = touch.clientY - this.lastY;
+    let dx = e.clientX - this.lastX;
+    let dy = e.clientY - this.lastY;
 
     // Dead zone: ignore sub-pixel jitter
     const magnitude = Math.sqrt(dx * dx + dy * dy);
@@ -98,23 +100,27 @@ export class TouchLook {
     this.delta.x += dx * this.sensitivity;
     this.delta.y += dy * this.sensitivity;
 
-    this.lastX = touch.clientX;
-    this.lastY = touch.clientY;
+    this.lastX = e.clientX;
+    this.lastY = e.clientY;
   };
 
-  private onTouchEnd = (e: TouchEvent): void => {
+  private onPointerUp = (e: PointerEvent): void => {
     e.preventDefault();
-    const touch = this.findActiveTouch(e.changedTouches);
-    if (!touch) return;
-    this.activeTouchId = null;
+    if (e.pointerId !== this.activePointerId) return;
+    this.activePointerId = null;
+    if (typeof this.container.releasePointerCapture === 'function' && this.container.hasPointerCapture(e.pointerId)) {
+      this.container.releasePointerCapture(e.pointerId);
+    }
   };
 
-  private findActiveTouch(touches: TouchList): Touch | null {
-    for (let i = 0; i < touches.length; i++) {
-      if (touches[i].identifier === this.activeTouchId) return touches[i];
+  private onPointerCancel = (e: PointerEvent): void => {
+    e.preventDefault();
+    if (e.pointerId !== this.activePointerId) return;
+    this.activePointerId = null;
+    if (typeof this.container.releasePointerCapture === 'function' && this.container.hasPointerCapture(e.pointerId)) {
+      this.container.releasePointerCapture(e.pointerId);
     }
-    return null;
-  }
+  };
 
   /** Read and clear accumulated delta */
   consumeDelta(): { x: number; y: number } {
@@ -131,16 +137,16 @@ export class TouchLook {
 
   hide(): void {
     this.container.style.display = 'none';
-    this.activeTouchId = null;
+    this.activePointerId = null;
     this.delta.x = 0;
     this.delta.y = 0;
   }
 
   dispose(): void {
-    this.container.removeEventListener('touchstart', this.onTouchStart);
-    this.container.removeEventListener('touchmove', this.onTouchMove);
-    this.container.removeEventListener('touchend', this.onTouchEnd);
-    this.container.removeEventListener('touchcancel', this.onTouchEnd);
+    this.container.removeEventListener('pointerdown', this.onPointerDown);
+    this.container.removeEventListener('pointermove', this.onPointerMove);
+    this.container.removeEventListener('pointerup', this.onPointerUp);
+    this.container.removeEventListener('pointercancel', this.onPointerCancel);
     this.container.remove();
   }
 }

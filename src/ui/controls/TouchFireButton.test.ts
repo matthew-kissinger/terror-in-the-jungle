@@ -4,11 +4,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TouchFireButton } from './TouchFireButton';
 
-function touchEvent(type: string): TouchEvent {
-  const event = new Event(type, { bubbles: true, cancelable: true }) as TouchEvent;
-  Object.defineProperty(event, 'changedTouches', { value: [] });
-  Object.defineProperty(event, 'touches', { value: [] });
-  return event;
+function pointerEvent(type: string, pointerId = 1): PointerEvent {
+  return new PointerEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    pointerId,
+    pointerType: 'touch',
+  });
 }
 
 describe('TouchFireButton', () => {
@@ -33,7 +35,7 @@ describe('TouchFireButton', () => {
     const onFireStop = vi.fn();
     fireButton.setCallbacks(onFireStart, onFireStop);
 
-    button.dispatchEvent(touchEvent('touchstart'));
+    button.dispatchEvent(pointerEvent('pointerdown'));
 
     expect(onFireStart).toHaveBeenCalledTimes(1);
     expect(button.style.background).toBe('rgba(255, 60, 60, 0.7)');
@@ -45,8 +47,8 @@ describe('TouchFireButton', () => {
     const onFireStop = vi.fn();
     fireButton.setCallbacks(onFireStart, onFireStop);
 
-    button.dispatchEvent(touchEvent('touchstart'));
-    button.dispatchEvent(touchEvent('touchend'));
+    button.dispatchEvent(pointerEvent('pointerdown'));
+    button.dispatchEvent(pointerEvent('pointerup'));
 
     expect(onFireStop).toHaveBeenCalledTimes(1);
     expect(button.style.background).toBe('rgba(255, 60, 60, 0.4)');
@@ -66,7 +68,7 @@ describe('TouchFireButton', () => {
     const onFireStop = vi.fn();
     fireButton.setCallbacks(onFireStart, onFireStop);
 
-    button.dispatchEvent(touchEvent('touchstart'));
+    button.dispatchEvent(pointerEvent('pointerdown'));
     fireButton.hide();
 
     expect(onFireStop).toHaveBeenCalledTimes(1);
@@ -80,8 +82,8 @@ describe('TouchFireButton', () => {
     fireButton.dispose();
     expect(document.getElementById('touch-fire-btn')).toBeNull();
 
-    button.dispatchEvent(touchEvent('touchstart'));
-    button.dispatchEvent(touchEvent('touchend'));
+    button.dispatchEvent(pointerEvent('pointerdown'));
+    button.dispatchEvent(pointerEvent('pointerup'));
     expect(onFireStart).not.toHaveBeenCalled();
     expect(onFireStop).not.toHaveBeenCalled();
   });

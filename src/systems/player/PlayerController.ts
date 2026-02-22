@@ -148,10 +148,16 @@ export class PlayerController implements GameSystem {
     const touchControls = this.input.getTouchControls();
     if (!touchControls) return;
 
-    // Wire weapon bar directly through inventory manager to avoid synthetic key events.
-    touchControls.weaponBar.setOnWeaponSelect((slotIndex: number) => {
+    // Wire weapon bar through HUDSystem (UnifiedWeaponBar replaces TouchWeaponBar)
+    this.hudSystem?.setWeaponSelectCallback((slotIndex: number) => {
       this.inventoryManager?.setCurrentSlot(slotIndex as WeaponSlot);
     });
+
+    // Mount touch controls into grid layout slots
+    const layout = this.hudSystem?.getLayout();
+    if (layout) {
+      touchControls.mountToLayout(layout);
+    }
 
     // Wire mortar button callbacks
     touchControls.mortarButton.setCallbacks({
@@ -392,10 +398,12 @@ export class PlayerController implements GameSystem {
     this.currentWeaponMode = slot;
     this.input.setCurrentWeaponMode(slot);
 
-    // Update touch weapon bar highlight
+    // Update unified weapon bar highlight (works for both desktop and touch)
+    this.hudSystem?.setActiveWeaponSlot(slot as number);
+
+    // Update touch-specific controls
     const touchControls = this.input.getTouchControls();
     if (touchControls) {
-      touchControls.weaponBar.setActiveSlot(slot as number);
       touchControls.adsButton.resetADS();
 
       // Show/hide sandbag rotation buttons

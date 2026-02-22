@@ -286,6 +286,8 @@ export class FirstPersonWeapon implements GameSystem {
     this.hudSystem = hudSystem
     this.firing.setHUDSystem(hudSystem)
     this.switching.setHUDSystem(hudSystem)
+    // Wire ADS state to HUD visibility
+    this.animations.onADSChange = (ads: boolean) => hudSystem.setADS(ads)
   }
 
   setAudioManager(audioManager: AudioManager): void {

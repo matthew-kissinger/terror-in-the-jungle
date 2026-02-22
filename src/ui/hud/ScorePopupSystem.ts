@@ -234,8 +234,8 @@ export class ScorePopupSystem {
     this.activePopups = this.activePopups.filter(p => p.active);
   }
 
-  attachToDOM(): void {
-    document.body.appendChild(this.container);
+  attachToDOM(parent?: HTMLElement): void {
+    (parent ?? document.body).appendChild(this.container);
   }
 
   dispose(): void {

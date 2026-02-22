@@ -5,9 +5,7 @@ import { colors, fontStack } from '../design/tokens';
 
 export const HUDZoneStyles = `
   .objectives-panel {
-    position: absolute;
-    top: calc(220px + env(safe-area-inset-top, 0px));
-    right: max(var(--hud-edge-inset, 16px), env(safe-area-inset-right, 0px));
+    /* Positioned by grid slot [data-region="objectives"] */
     background: ${colors.hudGlass};
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
@@ -112,7 +110,6 @@ export const HUDZoneStyles = `
     .objectives-panel {
       min-width: 150px;
       max-width: 180px;
-      top: calc(170px + env(safe-area-inset-top, 0px));
       padding: 6px 8px;
     }
 
@@ -134,7 +131,6 @@ export const HUDZoneStyles = `
     .objectives-panel {
       min-width: 120px;
       max-width: 40vw;
-      top: calc(140px + env(safe-area-inset-top, 0px));
       padding: 4px 6px;
       font-size: 10px;
     }
@@ -159,10 +155,5 @@ export const HUDZoneStyles = `
     }
   }
 
-  /* Hide objectives panel on touch devices to avoid overlap with action buttons */
-  @media (pointer: coarse) {
-    .objectives-panel {
-      display: none;
-    }
-  }
+  /* Touch device visibility handled by grid layout data-device CSS rules */
 `;

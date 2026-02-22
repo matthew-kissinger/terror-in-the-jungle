@@ -1,19 +1,16 @@
 /**
  * Weapon-related HUD styles - hit markers, kill counter, ammo display, interaction prompt
+ * Positioning is handled by CSS Grid slots in HUDLayoutStyles.ts
  */
-import { colors, zIndex, fontStack } from '../design/tokens';
+import { colors, fontStack } from '../design/tokens';
 
 export const HUDWeaponStyles = `
-  /* Hit markers */
+  /* Hit markers - in center grid slot */
   .hit-marker-container {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    position: relative;
     width: 0;
     height: 0;
     pointer-events: none;
-    z-index: ${zIndex.hudWeapon};
   }
 
   .hit-marker {
@@ -102,11 +99,8 @@ export const HUDWeaponStyles = `
     display: none;
   }
 
-  /* Ammo display */
+  /* Ammo display - positioned by grid slot [data-region="ammo"] */
   .ammo-display {
-    position: absolute;
-    bottom: max(var(--hud-bottom-offset, 16px), env(safe-area-inset-bottom, 0px));
-    right: max(var(--hud-edge-inset, 16px), env(safe-area-inset-right, 0px));
     background: ${colors.hudGlass};
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
@@ -169,16 +163,9 @@ export const HUDWeaponStyles = `
     100% { border-color: rgba(220, 225, 230, 0.3); }
   }
 
-  /* Touch device: position ammo above right-side action buttons, no overlap */
+  /* Touch device: adjust ammo sizing (no repositioning - grid handles it) */
   @media (pointer: coarse) {
     .ammo-display {
-      right: max(16px, env(safe-area-inset-right, 0px));
-      bottom: calc(
-        var(--tc-fire-size, 80px) +
-        max(var(--tc-edge-inset, 30px), env(safe-area-inset-bottom, 0px)) +
-        (var(--tc-action-size, 52px) * 3) + 36px + 16px
-      );
-      transform: none;
       min-width: auto;
       padding: 4px 10px;
     }

@@ -1,10 +1,10 @@
 /**
  * Large fire button for mobile touch controls.
- * Positioned in the bottom-right corner.
+ * Uses pointer events for unified mouse/touch/pen handling.
  */
 export class TouchFireButton {
   private button: HTMLDivElement;
-  private isTouched = false;
+  private activePointerId: number | null = null;
 
   private onFireStart?: () => void;
   private onFireStop?: () => void;
@@ -39,9 +39,9 @@ export class TouchFireButton {
 
     document.body.appendChild(this.button);
 
-    this.button.addEventListener('touchstart', this.onTouchStart, { passive: false });
-    this.button.addEventListener('touchend', this.onTouchEnd, { passive: false });
-    this.button.addEventListener('touchcancel', this.onTouchEnd, { passive: false });
+    this.button.addEventListener('pointerdown', this.onPointerDown, { passive: false });
+    this.button.addEventListener('pointerup', this.onPointerUp, { passive: false });
+    this.button.addEventListener('pointercancel', this.onPointerCancel, { passive: false });
   }
 
   setCallbacks(onStart: () => void, onStop: () => void): void {
@@ -49,25 +49,54 @@ export class TouchFireButton {
     this.onFireStop = onStop;
   }
 
-  private onTouchStart = (e: TouchEvent): void => {
+  private onPointerDown = (e: PointerEvent): void => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    if (this.isTouched) return;
-    this.isTouched = true;
+    if (this.activePointerId !== null) return;
+    this.activePointerId = e.pointerId;
+    if (typeof this.button.setPointerCapture === 'function') {
+      this.button.setPointerCapture(e.pointerId);
+    }
     this.button.style.background = 'rgba(255, 60, 60, 0.7)';
     this.button.style.transform = 'scale(0.92)';
     this.onFireStart?.();
   };
 
-  private onTouchEnd = (e: TouchEvent): void => {
+  private onPointerUp = (e: PointerEvent): void => {
+    if (e.pointerId !== this.activePointerId) return;
     e.preventDefault();
     e.stopPropagation();
-    if (!this.isTouched) return;
-    this.isTouched = false;
+    this.activePointerId = null;
     this.button.style.background = 'rgba(255, 60, 60, 0.4)';
     this.button.style.transform = 'scale(1)';
+    if (typeof this.button.releasePointerCapture === 'function' && this.button.hasPointerCapture(e.pointerId)) {
+      this.button.releasePointerCapture(e.pointerId);
+    }
     this.onFireStop?.();
   };
+
+  private onPointerCancel = (e: PointerEvent): void => {
+    if (e.pointerId !== this.activePointerId) return;
+    e.preventDefault();
+    this.activePointerId = null;
+    this.button.style.background = 'rgba(255, 60, 60, 0.4)';
+    this.button.style.transform = 'scale(1)';
+    if (typeof this.button.releasePointerCapture === 'function' && this.button.hasPointerCapture(e.pointerId)) {
+      this.button.releasePointerCapture(e.pointerId);
+    }
+    this.onFireStop?.();
+  };
+
+  /** Re-parent into a grid slot. */
+  mountTo(parent: HTMLElement): void {
+    this.button.style.position = '';
+    this.button.style.right = '';
+    this.button.style.bottom = '';
+    this.button.style.zIndex = '';
+    if (this.button.parentNode) this.button.parentNode.removeChild(this.button);
+    parent.appendChild(this.button);
+  }
 
   show(): void {
     this.button.style.display = 'flex';
@@ -75,16 +104,18 @@ export class TouchFireButton {
 
   hide(): void {
     this.button.style.display = 'none';
-    if (this.isTouched) {
-      this.isTouched = false;
+    if (this.activePointerId !== null) {
+      this.activePointerId = null;
+      this.button.style.background = 'rgba(255, 60, 60, 0.4)';
+      this.button.style.transform = 'scale(1)';
       this.onFireStop?.();
     }
   }
 
   dispose(): void {
-    this.button.removeEventListener('touchstart', this.onTouchStart);
-    this.button.removeEventListener('touchend', this.onTouchEnd);
-    this.button.removeEventListener('touchcancel', this.onTouchEnd);
+    this.button.removeEventListener('pointerdown', this.onPointerDown);
+    this.button.removeEventListener('pointerup', this.onPointerUp);
+    this.button.removeEventListener('pointercancel', this.onPointerCancel);
     this.button.remove();
   }
 }

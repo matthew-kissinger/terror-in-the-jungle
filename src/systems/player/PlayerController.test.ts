@@ -144,6 +144,9 @@ describe('PlayerController', () => {
       hideGrenadePowerMeter: vi.fn(),
       updateGrenadePower: vi.fn(),
       showMessage: vi.fn(),
+      setWeaponSelectCallback: vi.fn(),
+      setActiveWeaponSlot: vi.fn(),
+      getLayout: vi.fn().mockReturnValue({ getSlot: vi.fn().mockReturnValue({}) }),
     } as any;
 
     mockRenderer = {

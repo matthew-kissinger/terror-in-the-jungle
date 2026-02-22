@@ -17,6 +17,7 @@ import type { MortarSystem } from '../../systems/weapons/MortarSystem';
 import type { PlayerHealthSystem } from '../../systems/player/PlayerHealthSystem';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 import { ViewportManager } from '../design/responsive';
+import { HUDLayout } from '../layout/HUDLayout';
 
 export class HUDSystem implements GameSystem, IHUDSystem {
   private combatantSystem?: CombatantSystem;
@@ -38,6 +39,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private isScoreboardVisible = false;
   private onPlayAgainCallback?: () => void;
   private respawnButtonPointerDownHandler?: (e: PointerEvent) => void;
+  private hudLayout: HUDLayout;
   private viewportUnsubscribe?: () => void;
   private staticHudAccumulator = 0;
   private readonly STATIC_HUD_INTERVAL = 0.2; // 5Hz for mostly-static HUD text/state
@@ -49,6 +51,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.updater = new HUDUpdater(this.elements);
     this.playerHealthSystem = playerHealthSystem;
     this.statsTracker = new PlayerStatsTracker();
+    this.hudLayout = new HUDLayout();
     this.matchEndScreen = new MatchEndScreen();
     this.scoreboardCombatantProxy = this.createScoreboardCombatantProxy();
     this.scoreboard = new Scoreboard(this.statsTracker, this.scoreboardCombatantProxy);
@@ -73,8 +76,16 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.onPlayAgainCallback = callback;
   }
 
+  /** Get the grid layout system (for component migration). */
+  getLayout(): HUDLayout {
+    return this.hudLayout;
+  }
+
   async init(): Promise<void> {
     Logger.info('hud', ' Initializing HUD System...');
+
+    // Initialize grid layout system (Phase 1: coexists with existing UI)
+    this.hudLayout.init();
 
     // Inject styles
     this.styles.inject();
@@ -90,10 +101,13 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       root.style.setProperty('--hud-is-touch', info.isTouch ? '1' : '0');
     });
 
-    // Add HUD to DOM
-    this.elements.attachToDOM();
+    // Add HUD to DOM (pass layout for grid-based mounting)
+    this.elements.attachToDOM(this.hudLayout);
     this.scoreboard.attachToDOM();
-    this.personalStatsPanel.attachToDOM();
+    this.personalStatsPanel.attachToDOM(
+      this.hudLayout.getSlot('stats'),
+      this.hudLayout.getSlot('center')
+    );
 
     // Initialize ticket display
     this.updater.updateTicketDisplay(300, 300);
@@ -187,6 +201,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     if (this.elements.respawnButton && this.respawnButtonPointerDownHandler) {
       this.elements.respawnButton.removeEventListener('pointerdown', this.respawnButtonPointerDownHandler);
     }
+    this.hudLayout.dispose();
     this.scoreboard.dispose();
     this.personalStatsPanel.dispose();
     this.elements.dispose();
@@ -255,6 +270,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
   startMatch(): void {
     this.statsTracker.startMatch();
+    this.hudLayout.setPhase('playing');
     Logger.info('hud', ' Match statistics tracking started');
   }
 
@@ -293,6 +309,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     };
 
     Logger.info('hud', ' Showing match end screen with stats:', matchStats);
+    this.hudLayout.setPhase('ended');
     this.matchEndScreen.show(winner, gameState, matchStats);
   }
 
@@ -375,10 +392,12 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   // Helicopter instruments methods (only visible in helicopter)
   showHelicopterInstruments(): void {
     this.elements.showHelicopterInstruments();
+    this.hudLayout.setState({ vehicle: 'helicopter' });
   }
 
   hideHelicopterInstruments(): void {
     this.elements.hideHelicopterInstruments();
+    this.hudLayout.setState({ vehicle: 'infantry' });
   }
 
   updateHelicopterInstruments(collective: number, rpm: number, autoHover: boolean, engineBoost: boolean): void {
@@ -433,6 +452,15 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.showWeaponSwitch(weaponName, weaponIcon, ammo);
   }
 
+  // Unified weapon bar API
+  setWeaponSelectCallback(callback: (slotIndex: number) => void): void {
+    this.elements.unifiedWeaponBar.setOnWeaponSelect(callback);
+  }
+
+  setActiveWeaponSlot(slot: number): void {
+    this.elements.unifiedWeaponBar.setActiveSlot(slot);
+  }
+
   // Scoreboard toggle
   toggleScoreboard(visible: boolean): void {
     this.isScoreboardVisible = visible;
@@ -442,5 +470,20 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   /** Toggle scoreboard visibility (for touch: tap to show, tap again to hide). */
   toggleScoreboardVisibility(): void {
     this.toggleScoreboard(!this.isScoreboardVisible);
+  }
+
+  /** Set the HUD game phase (controls slot visibility via CSS). */
+  setPhase(phase: 'menu' | 'loading' | 'playing' | 'paused' | 'ended'): void {
+    this.hudLayout.setPhase(phase);
+  }
+
+  /** Set the vehicle context (hides infantry-only slots in helicopter). */
+  setVehicle(vehicle: 'infantry' | 'helicopter'): void {
+    this.hudLayout.setState({ vehicle });
+  }
+
+  /** Set ADS state (dims non-essential HUD when aiming). */
+  setADS(ads: boolean): void {
+    this.hudLayout.setState({ ads });
   }
 }

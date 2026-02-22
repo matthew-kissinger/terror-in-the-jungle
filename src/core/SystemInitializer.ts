@@ -174,6 +174,7 @@ export class SystemInitializer {
     const squadManager = (refs.combatantSystem as any).squadManager;
     refs.playerSquadController = new PlayerSquadController(squadManager);
     refs.inventoryManager = new InventoryManager();
+    refs.inventoryManager.setSuppressUI(true); // UnifiedWeaponBar replaces built-in hotbar
     refs.grenadeSystem = new GrenadeSystem(scene, camera, refs.chunkManager);
     refs.mortarSystem = new MortarSystem(scene, camera, refs.chunkManager);
     refs.sandbagSystem = new SandbagSystem(scene, camera, refs.chunkManager);

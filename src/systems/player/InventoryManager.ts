@@ -34,11 +34,20 @@ export class InventoryManager implements GameSystem {
 
   private uiElement?: HTMLElement;
   private boundOnKeyDown!: (event: KeyboardEvent) => void;
+  /** When true, skip built-in hotbar UI (UnifiedWeaponBar handles display). */
+  private suppressBuiltInUI = false;
+
+  /** Suppress the built-in hotbar UI (call before init). */
+  setSuppressUI(suppress: boolean): void {
+    this.suppressBuiltInUI = suppress;
+  }
 
   async init(): Promise<void> {
     Logger.info('inventory', 'Initializing Inventory Manager...');
     this.setupEventListeners();
-    this.createUI();
+    if (!this.suppressBuiltInUI) {
+      this.createUI();
+    }
     this.notifyInventoryChange();
   }
 

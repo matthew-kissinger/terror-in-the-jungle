@@ -2,13 +2,14 @@
  * Orchestrator for all mobile touch controls.
  * Creates and wires up VirtualJoystick, TouchLook, TouchFireButton, and TouchActionButtons.
  * Only instantiated on touch-capable devices.
+ *
+ * Weapon bar is now handled by UnifiedWeaponBar (owned by HUDSystem, not TouchControls).
  */
 
 import { VirtualJoystick } from './VirtualJoystick';
 import { TouchLook } from './TouchLook';
 import { TouchFireButton } from './TouchFireButton';
 import { TouchActionButtons } from './TouchActionButtons';
-import { TouchWeaponBar } from './TouchWeaponBar';
 import { TouchADSButton } from './TouchADSButton';
 import { TouchInteractionButton } from './TouchInteractionButton';
 import { TouchSandbagButtons } from './TouchSandbagButtons';
@@ -16,6 +17,7 @@ import { TouchRallyPointButton } from './TouchRallyPointButton';
 import { TouchMenuButton } from './TouchMenuButton';
 import { TouchMortarButton } from './TouchMortarButton';
 import { TouchHelicopterCyclic } from './TouchHelicopterCyclic';
+import type { HUDLayout } from '../layout/HUDLayout';
 
 export interface TouchControlCallbacks {
   onFireStart: () => void;
@@ -42,7 +44,6 @@ export class TouchControls {
   readonly look: TouchLook;
   readonly fireButton: TouchFireButton;
   readonly actionButtons: TouchActionButtons;
-  readonly weaponBar: TouchWeaponBar;
   readonly adsButton: TouchADSButton;
   readonly interactionButton: TouchInteractionButton;
   readonly sandbagButtons: TouchSandbagButtons;
@@ -58,7 +59,6 @@ export class TouchControls {
     this.look = new TouchLook();
     this.fireButton = new TouchFireButton();
     this.actionButtons = new TouchActionButtons();
-    this.weaponBar = new TouchWeaponBar();
     this.adsButton = new TouchADSButton();
     this.interactionButton = new TouchInteractionButton();
     this.sandbagButtons = new TouchSandbagButtons();
@@ -73,6 +73,7 @@ export class TouchControls {
 
   /**
    * Wire up callbacks from the game input system.
+   * Note: weapon bar callbacks are now wired through HUDSystem, not here.
    */
   setCallbacks(callbacks: TouchControlCallbacks): void {
     this.fireButton.setCallbacks(callbacks.onFireStart, callbacks.onFireStop);
@@ -99,7 +100,6 @@ export class TouchControls {
       }
     });
 
-    this.weaponBar.setOnWeaponSelect(callbacks.onWeaponSelect);
     this.adsButton.setOnADSToggle(callbacks.onADSToggle);
     this.interactionButton.setCallback(callbacks.onEnterExitHelicopter);
     this.sandbagButtons.setCallbacks(callbacks.onSandbagRotateLeft, callbacks.onSandbagRotateRight);
@@ -110,6 +110,24 @@ export class TouchControls {
     );
     this.menuButton.setSquadCallback(() => callbacks.onSquadCommand?.());
     this.menuButton.setScoreboardCallback(() => callbacks.onScoreboardTap?.());
+  }
+
+  /**
+   * Re-parent eligible touch controls into grid layout slots.
+   * Joystick and look stay as viewport overlays (need large touch zones).
+   */
+  mountToLayout(layout: HUDLayout): void {
+    this.fireButton.mountTo(layout.getSlot('fire'));
+    this.adsButton.mountTo(layout.getSlot('ads'));
+
+    // Action buttons are infantry-only (mortar, rally point, sandbag)
+    const actionSlot = layout.getSlot('action-btns');
+    actionSlot.dataset.show = 'infantry';
+    this.actionButtons.mountTo(actionSlot);
+
+    this.menuButton.mountTo(layout.getSlot('menu'));
+    // joystick + look stay as overlays
+    // contextual buttons (interaction, sandbag, rally, mortar) keep their positioning for now
   }
 
   /**
@@ -134,7 +152,6 @@ export class TouchControls {
     this.look.show();
     this.fireButton.show();
     this.actionButtons.show();
-    this.weaponBar.show();
     this.adsButton.show();
     this.interactionButton.show();
     this.sandbagButtons.show();
@@ -151,7 +168,6 @@ export class TouchControls {
     this.look.hide();
     this.fireButton.hide();
     this.actionButtons.hide();
-    this.weaponBar.hide();
     this.adsButton.hide();
     this.interactionButton.hide();
     this.sandbagButtons.hide();
@@ -170,7 +186,6 @@ export class TouchControls {
     this.look.dispose();
     this.fireButton.dispose();
     this.actionButtons.dispose();
-    this.weaponBar.dispose();
     this.adsButton.dispose();
     this.interactionButton.dispose();
     this.sandbagButtons.dispose();

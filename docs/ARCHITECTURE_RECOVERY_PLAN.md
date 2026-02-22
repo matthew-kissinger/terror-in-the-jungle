@@ -16,11 +16,16 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 | P1 | Spatial ownership unification (F3) | IN_PROGRESS | Several consumers migrated; legacy secondary sync remains as fallback. |
 | P2 | Heap growth triage in combat-heavy runs | IN_PROGRESS | New diagnostics added; source still mixed between transient waves and retained growth. |
 | P3 | A Shau gameplay flow and contact reliability | IN_PROGRESS | Immediate contact improved; sustained close-contact remains inconsistent. |
-| P4 | UI/HUD update budget discipline | TODO | Continue reducing avoidable per-frame UI churn. |
+| P4 | UI/HUD update budget discipline | IN_PROGRESS | Grid layout Phases 1-4 complete. VisibilityManager wired: phase (menu/playing/ended), vehicle (infantry/helicopter), ADS dimming. All touch controls on pointer events. UnifiedWeaponBar replaces 3 duplicates. Phase 5 (remove remaining position:fixed from slot-mounted elements) deferred - viewport-overlay elements (DamageNumbers, ScorePopups, HitMarkerFeedback) correctly use position:fixed for screen-space rendering. |
 | P5 | Terrain/chunk lifecycle bounded work | TODO | Keep chunk generation/merge costs under frame budget at large map scale. |
 
 ## Keep Decisions (Recent)
 
+- Keep: CSS Grid HUD layout (`#game-hud-root`) with 17 named slots replacing 33+ position:fixed elements.
+- Keep: UnifiedWeaponBar (single weapon UI for desktop + touch, replaces TouchWeaponBar + InventoryManager hotbar + WeaponAmmoDisplay).
+- Keep: pointer events (pointerdown/up/cancel + setPointerCapture) on all touch controls, replacing touch events (zero touchstart/end/move listeners remain in controls).
+- Keep: VisibilityManager drives HUD visibility via data attributes on #game-hud-root; CSS rules respond to data-phase, data-vehicle, data-ads, data-device, data-layout.
+- Keep: data-show="infantry" on weapon-bar and action-btns slots (hidden in helicopter via CSS rule).
 - Keep: squared-distance and allocation reductions in spatial queries.
 - Keep: AI target acquisition scratch-buffer reuse.
 - Keep: heap validation expansion (`growth`, `peak`, `recovery`) in harness output.

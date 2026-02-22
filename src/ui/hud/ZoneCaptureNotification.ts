@@ -1,5 +1,3 @@
-import { zIndex } from '../design/tokens';
-
 export class ZoneCaptureNotification {
   private container: HTMLDivElement;
   private currentNotification?: HTMLDivElement;
@@ -12,12 +10,8 @@ export class ZoneCaptureNotification {
   private createContainer(): HTMLDivElement {
     const container = document.createElement('div');
     container.style.cssText = `
-      position: fixed;
-      top: 15%;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: ${zIndex.zoneCaptureNotification};
       pointer-events: none;
+      text-align: center;
     `;
     return container;
   }

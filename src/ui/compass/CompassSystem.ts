@@ -38,9 +38,9 @@ export class CompassSystem implements GameSystem {
     this.styleSheet = dom.styleSheet;
   }
 
-  async init(): Promise<void> {
+  async init(parent?: HTMLElement): Promise<void> {
     Logger.info('compass', 'Initializing Compass System...');
-    document.body.appendChild(this.compassContainer);
+    (parent ?? document.body).appendChild(this.compassContainer);
     Logger.info('compass', 'Compass System initialized');
   }
 
@@ -73,6 +73,14 @@ export class CompassSystem implements GameSystem {
         this.zoneUpdateTimer = 0;
       }
     }
+  }
+
+  /** Re-parent compass into a grid slot (called after init). */
+  mountTo(parent: HTMLElement): void {
+    if (this.compassContainer.parentNode) {
+      this.compassContainer.parentNode.removeChild(this.compassContainer);
+    }
+    parent.appendChild(this.compassContainer);
   }
 
   setZoneManager(manager: ZoneManager): void {

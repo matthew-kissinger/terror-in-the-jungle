@@ -4,11 +4,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TouchInteractionButton } from './TouchInteractionButton';
 
-function touchEvent(type: string): TouchEvent {
-  const event = new Event(type, { bubbles: true, cancelable: true }) as TouchEvent;
-  Object.defineProperty(event, 'changedTouches', { value: [] });
-  Object.defineProperty(event, 'touches', { value: [] });
-  return event;
+function pointerEvent(type: string, pointerId = 1): PointerEvent {
+  return new PointerEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    pointerId,
+    pointerType: 'touch',
+  });
 }
 
 describe('TouchInteractionButton', () => {
@@ -37,7 +39,7 @@ describe('TouchInteractionButton', () => {
     interactionButton.setCallback(onInteract);
     interactionButton.showButton();
 
-    button.dispatchEvent(touchEvent('touchstart'));
+    button.dispatchEvent(pointerEvent('pointerdown'));
 
     expect(onInteract).toHaveBeenCalledTimes(1);
     expect(button.style.background).toBe('rgba(100, 200, 255, 0.7)');
@@ -49,8 +51,8 @@ describe('TouchInteractionButton', () => {
     interactionButton.setCallback(onInteract);
     interactionButton.showButton();
 
-    button.dispatchEvent(touchEvent('touchstart'));
-    button.dispatchEvent(touchEvent('touchend'));
+    button.dispatchEvent(pointerEvent('pointerdown'));
+    button.dispatchEvent(pointerEvent('pointerup'));
 
     expect(button.style.background).toBe('rgba(100, 200, 255, 0.4)');
     expect(button.style.transform).toBe('scale(1)');
@@ -83,19 +85,19 @@ describe('TouchInteractionButton', () => {
     interactionButton.setCallback(onInteract);
 
     // Button is hidden by default
-    button.dispatchEvent(touchEvent('touchstart'));
+    button.dispatchEvent(pointerEvent('pointerdown'));
 
     expect(onInteract).toHaveBeenCalledTimes(1); // Still triggers (button exists in DOM)
   });
 
-  it('does not trigger callback multiple times from repeat touchstart', () => {
+  it('does not trigger callback multiple times from repeat pointerdown', () => {
     const onInteract = vi.fn();
     interactionButton.setCallback(onInteract);
     interactionButton.showButton();
 
-    button.dispatchEvent(touchEvent('touchstart'));
-    button.dispatchEvent(touchEvent('touchstart'));
-    button.dispatchEvent(touchEvent('touchstart'));
+    button.dispatchEvent(pointerEvent('pointerdown'));
+    button.dispatchEvent(pointerEvent('pointerdown'));
+    button.dispatchEvent(pointerEvent('pointerdown'));
 
     expect(onInteract).toHaveBeenCalledTimes(1);
   });
@@ -107,7 +109,7 @@ describe('TouchInteractionButton', () => {
     interactionButton.dispose();
     expect(document.getElementById('touch-interaction-btn')).toBeNull();
 
-    button.dispatchEvent(touchEvent('touchstart'));
+    button.dispatchEvent(pointerEvent('pointerdown'));
     expect(onInteract).not.toHaveBeenCalled();
   });
 });

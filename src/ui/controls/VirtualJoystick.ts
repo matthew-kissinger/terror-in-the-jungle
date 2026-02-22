@@ -2,28 +2,29 @@
  * Virtual joystick overlay for mobile movement control.
  * Renders on the left side of the screen.
  * Outputs a normalised {x, z} vector in [-1, 1] range.
+ * Uses pointer events with setPointerCapture for reliable multi-touch.
  */
 export class VirtualJoystick {
   private container: HTMLDivElement;
   private base: HTMLDivElement;
   private thumb: HTMLDivElement;
 
-  private activeTouchId: number | null = null;
+  private activePointerId: number | null = null;
   private baseX = 0;
   private baseY = 0;
 
-  /** Normalised output – read every frame */
+  /** Normalised output - read every frame */
   readonly output = { x: 0, z: 0 };
 
-  // Geometry - CSS sizes (used for initial thumb centering)
+  // Geometry
   private readonly FALLBACK_BASE = 120;
   private readonly THUMB_SIZE = 50;
   private maxDistance: number;
 
-  /** Dead zone as fraction of maxDistance (0-1). Movements inside this radius output zero. */
+  /** Dead zone as fraction of maxDistance (0-1). */
   private readonly DEAD_ZONE = 0.1;
 
-  // Callbacks for sprint
+  // Sprint callbacks
   private onSprintStart?: () => void;
   private onSprintStop?: () => void;
   private isSprinting = false;
@@ -32,7 +33,7 @@ export class VirtualJoystick {
   constructor() {
     this.maxDistance = this.FALLBACK_BASE / 2;
 
-    // Container – covers left 40% of the screen as touch zone
+    // Container - covers left 40% of the screen as touch zone
     this.container = document.createElement('div');
     this.container.id = 'touch-joystick-zone';
     Object.assign(this.container.style, {
@@ -63,7 +64,7 @@ export class VirtualJoystick {
       boxSizing: 'border-box',
     } as Partial<CSSStyleDeclaration>);
 
-    // Thumb - centered using calc + percentage
+    // Thumb
     this.thumb = document.createElement('div');
     Object.assign(this.thumb.style, {
       width: `${this.THUMB_SIZE}px`,
@@ -80,11 +81,11 @@ export class VirtualJoystick {
     this.container.appendChild(this.base);
     document.body.appendChild(this.container);
 
-    // Bind touch events
-    this.container.addEventListener('touchstart', this.onTouchStart, { passive: false });
-    this.container.addEventListener('touchmove', this.onTouchMove, { passive: false });
-    this.container.addEventListener('touchend', this.onTouchEnd, { passive: false });
-    this.container.addEventListener('touchcancel', this.onTouchEnd, { passive: false });
+    // Pointer events
+    this.container.addEventListener('pointerdown', this.onPointerDown, { passive: false });
+    this.container.addEventListener('pointermove', this.onPointerMove, { passive: false });
+    this.container.addEventListener('pointerup', this.onPointerUp, { passive: false });
+    this.container.addEventListener('pointercancel', this.onPointerCancel, { passive: false });
   }
 
   setSprintCallbacks(onStart: () => void, onStop: () => void): void {
@@ -92,12 +93,14 @@ export class VirtualJoystick {
     this.onSprintStop = onStop;
   }
 
-  private onTouchStart = (e: TouchEvent): void => {
+  private onPointerDown = (e: PointerEvent): void => {
     e.preventDefault();
-    if (this.activeTouchId !== null) return; // already tracking a touch
+    if (this.activePointerId !== null) return; // already tracking
+    this.activePointerId = e.pointerId;
 
-    const touch = e.changedTouches[0];
-    this.activeTouchId = touch.identifier;
+    if (typeof this.container.setPointerCapture === 'function') {
+      this.container.setPointerCapture(e.pointerId);
+    }
 
     // Record base centre and actual rendered size
     const rect = this.base.getBoundingClientRect();
@@ -105,30 +108,34 @@ export class VirtualJoystick {
     this.baseY = rect.top + rect.height / 2;
     this.maxDistance = rect.width / 2;
 
-    this.updateThumb(touch.clientX, touch.clientY);
+    this.updateThumb(e.clientX, e.clientY);
   };
 
-  private onTouchMove = (e: TouchEvent): void => {
+  private onPointerMove = (e: PointerEvent): void => {
     e.preventDefault();
-    const touch = this.findActiveTouch(e.changedTouches);
-    if (!touch) return;
-    this.updateThumb(touch.clientX, touch.clientY);
+    if (e.pointerId !== this.activePointerId) return;
+    this.updateThumb(e.clientX, e.clientY);
   };
 
-  private onTouchEnd = (e: TouchEvent): void => {
+  private onPointerUp = (e: PointerEvent): void => {
     e.preventDefault();
-    const touch = this.findActiveTouch(e.changedTouches);
-    if (!touch) return;
-    this.activeTouchId = null;
+    if (e.pointerId !== this.activePointerId) return;
+    this.activePointerId = null;
+    if (typeof this.container.releasePointerCapture === 'function' && this.container.hasPointerCapture(e.pointerId)) {
+      this.container.releasePointerCapture(e.pointerId);
+    }
     this.resetThumb();
   };
 
-  private findActiveTouch(touches: TouchList): Touch | null {
-    for (let i = 0; i < touches.length; i++) {
-      if (touches[i].identifier === this.activeTouchId) return touches[i];
+  private onPointerCancel = (e: PointerEvent): void => {
+    e.preventDefault();
+    if (e.pointerId !== this.activePointerId) return;
+    this.activePointerId = null;
+    if (typeof this.container.releasePointerCapture === 'function' && this.container.hasPointerCapture(e.pointerId)) {
+      this.container.releasePointerCapture(e.pointerId);
     }
-    return null;
-  }
+    this.resetThumb();
+  };
 
   private updateThumb(clientX: number, clientY: number): void {
     let dx = clientX - this.baseX;
@@ -141,17 +148,16 @@ export class VirtualJoystick {
       dy = (dy / distance) * clamped;
     }
 
-    // Position thumb relative to base centre using calc for responsive base
+    // Position thumb relative to base centre
     const baseSize = this.base.offsetWidth || this.FALLBACK_BASE;
     this.thumb.style.left = `${(baseSize - this.THUMB_SIZE) / 2 + dx}px`;
     this.thumb.style.top = `${(baseSize - this.THUMB_SIZE) / 2 + dy}px`;
 
-    // Normalise output: x = left/right, z = forward/back (up = forward = -z in game)
+    // Normalise output
     let normX = this.maxDistance > 0 ? dx / this.maxDistance : 0;
     let normY = this.maxDistance > 0 ? dy / this.maxDistance : 0;
 
-    // Apply dead zone: movements inside DEAD_ZONE radius map to zero,
-    // movements outside are remapped from [DEAD_ZONE, 1] -> [0, 1]
+    // Apply dead zone
     const rawMagnitude = Math.sqrt(normX * normX + normY * normY);
     if (rawMagnitude < this.DEAD_ZONE) {
       normX = 0;
@@ -166,7 +172,7 @@ export class VirtualJoystick {
     this.output.x = normX;   // right = positive
     this.output.z = normY;   // down on screen = positive (backward in game)
 
-    // Sprint detection (uses remapped magnitude)
+    // Sprint detection
     const magnitude = Math.sqrt(normX * normX + normY * normY);
     if (magnitude >= this.SPRINT_THRESHOLD && !this.isSprinting) {
       this.isSprinting = true;
@@ -196,14 +202,14 @@ export class VirtualJoystick {
   hide(): void {
     this.container.style.display = 'none';
     this.resetThumb();
-    this.activeTouchId = null;
+    this.activePointerId = null;
   }
 
   dispose(): void {
-    this.container.removeEventListener('touchstart', this.onTouchStart);
-    this.container.removeEventListener('touchmove', this.onTouchMove);
-    this.container.removeEventListener('touchend', this.onTouchEnd);
-    this.container.removeEventListener('touchcancel', this.onTouchEnd);
+    this.container.removeEventListener('pointerdown', this.onPointerDown);
+    this.container.removeEventListener('pointermove', this.onPointerMove);
+    this.container.removeEventListener('pointerup', this.onPointerUp);
+    this.container.removeEventListener('pointercancel', this.onPointerCancel);
     this.container.remove();
   }
 }

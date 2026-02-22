@@ -1,4 +1,4 @@
-import { colors, zIndex, fontStack } from '../design/tokens';
+import { colors, fontStack } from '../design/tokens';
 
 export class GrenadePowerMeter {
   public grenadePowerMeter: HTMLDivElement;
@@ -13,18 +13,14 @@ export class GrenadePowerMeter {
     const container = document.createElement('div');
     container.className = 'grenade-power-meter';
     container.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, 120px);
       width: 200px;
       height: 30px;
       display: none;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      z-index: ${zIndex.hudWeapon};
       pointer-events: none;
+      margin: 120px auto 0;
     `;
 
     // Label

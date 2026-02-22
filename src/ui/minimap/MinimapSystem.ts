@@ -49,11 +49,11 @@ export class MinimapSystem implements GameSystem {
     this.minimapContainer = dom.container;
   }
 
-  async init(): Promise<void> {
+  async init(parent?: HTMLElement): Promise<void> {
     Logger.info('minimap', ' Initializing Minimap System...');
 
-    // Add to DOM
-    document.body.appendChild(this.minimapContainer);
+    // Add to DOM (grid slot or body)
+    (parent ?? document.body).appendChild(this.minimapContainer);
 
     Logger.info('minimap', ' Minimap System initialized');
   }
@@ -73,6 +73,14 @@ export class MinimapSystem implements GameSystem {
     this.lastUpdateTime = now;
 
     this.renderMinimap();
+  }
+
+  /** Re-parent minimap into a grid slot (called after init). */
+  mountTo(parent: HTMLElement): void {
+    if (this.minimapContainer.parentNode) {
+      this.minimapContainer.parentNode.removeChild(this.minimapContainer);
+    }
+    parent.appendChild(this.minimapContainer);
   }
 
   // System connections

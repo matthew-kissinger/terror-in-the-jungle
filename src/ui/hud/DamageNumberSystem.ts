@@ -209,8 +209,8 @@ export class DamageNumberSystem {
     return _screenResult;
   }
 
-  attachToDOM(): void {
-    document.body.appendChild(this.container);
+  attachToDOM(parent?: HTMLElement): void {
+    (parent ?? document.body).appendChild(this.container);
   }
 
   dispose(): void {

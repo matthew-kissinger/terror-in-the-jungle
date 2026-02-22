@@ -1,10 +1,12 @@
 /**
  * Contextual touch button for rally point placement (V key).
  * Visible when player is alive and on foot.
+ * Uses pointer events with setPointerCapture for unified input handling.
  */
 export class TouchRallyPointButton {
   private button: HTMLDivElement;
   private isVisible = false;
+  private activePointerId: number | null = null;
 
   private onPlaceRallyPoint?: () => void;
 
@@ -36,31 +38,51 @@ export class TouchRallyPointButton {
 
     document.body.appendChild(this.button);
 
-    this.button.addEventListener('touchstart', (e: TouchEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.button.style.background = 'rgba(100, 255, 100, 0.6)';
-      this.button.style.transform = 'scale(0.9)';
-      this.onPlaceRallyPoint?.();
-    }, { passive: false });
-
-    this.button.addEventListener('touchend', (e: TouchEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      this.button.style.background = 'rgba(100, 255, 100, 0.3)';
-      this.button.style.transform = 'scale(1)';
-    }, { passive: false });
-
-    this.button.addEventListener('touchcancel', (e: TouchEvent) => {
-      e.preventDefault();
-      this.button.style.background = 'rgba(100, 255, 100, 0.3)';
-      this.button.style.transform = 'scale(1)';
-    }, { passive: false });
+    this.button.addEventListener('pointerdown', this.onPointerDown, { passive: false });
+    this.button.addEventListener('pointerup', this.onPointerUp, { passive: false });
+    this.button.addEventListener('pointercancel', this.onPointerCancel, { passive: false });
   }
 
   setCallback(onPlaceRallyPoint: () => void): void {
     this.onPlaceRallyPoint = onPlaceRallyPoint;
   }
+
+  private onPointerDown = (e: PointerEvent): void => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (this.activePointerId !== null) return;
+    this.activePointerId = e.pointerId;
+    if (typeof this.button.setPointerCapture === 'function') {
+      this.button.setPointerCapture(e.pointerId);
+    }
+    this.button.style.background = 'rgba(100, 255, 100, 0.6)';
+    this.button.style.transform = 'scale(0.9)';
+    this.onPlaceRallyPoint?.();
+  };
+
+  private onPointerUp = (e: PointerEvent): void => {
+    if (e.pointerId !== this.activePointerId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    this.activePointerId = null;
+    this.button.style.background = 'rgba(100, 255, 100, 0.3)';
+    this.button.style.transform = 'scale(1)';
+    if (typeof this.button.releasePointerCapture === 'function' && this.button.hasPointerCapture(e.pointerId)) {
+      this.button.releasePointerCapture(e.pointerId);
+    }
+  };
+
+  private onPointerCancel = (e: PointerEvent): void => {
+    if (e.pointerId !== this.activePointerId) return;
+    e.preventDefault();
+    this.activePointerId = null;
+    this.button.style.background = 'rgba(100, 255, 100, 0.3)';
+    this.button.style.transform = 'scale(1)';
+    if (typeof this.button.releasePointerCapture === 'function' && this.button.hasPointerCapture(e.pointerId)) {
+      this.button.releasePointerCapture(e.pointerId);
+    }
+  };
 
   showButton(): void {
     if (this.isVisible) return;
@@ -83,6 +105,9 @@ export class TouchRallyPointButton {
   }
 
   dispose(): void {
+    this.button.removeEventListener('pointerdown', this.onPointerDown);
+    this.button.removeEventListener('pointerup', this.onPointerUp);
+    this.button.removeEventListener('pointercancel', this.onPointerCancel);
     this.button.remove();
   }
 }

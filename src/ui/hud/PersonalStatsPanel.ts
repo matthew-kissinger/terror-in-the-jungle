@@ -249,9 +249,9 @@ export class PersonalStatsPanel {
     }, 3000);
   }
 
-  attachToDOM(): void {
-    document.body.appendChild(this.container);
-    document.body.appendChild(this.killStreakElement);
+  attachToDOM(parent?: HTMLElement, centerParent?: HTMLElement): void {
+    (parent ?? document.body).appendChild(this.container);
+    (centerParent ?? document.body).appendChild(this.killStreakElement);
     this.injectStyles();
   }
 
@@ -263,9 +263,6 @@ export class PersonalStatsPanel {
     style.id = styleId;
     style.textContent = `
       .personal-stats-panel {
-        position: fixed;
-        bottom: max(76px, calc(76px + env(safe-area-inset-bottom, 0px)));
-        left: max(var(--hud-edge-inset, 16px), env(safe-area-inset-left, 0px));
         background: rgba(8, 12, 18, 0.55);
         backdrop-filter: blur(6px);
         -webkit-backdrop-filter: blur(6px);
@@ -277,7 +274,6 @@ export class PersonalStatsPanel {
         color: rgba(220, 225, 230, 0.8);
         min-width: 110px;
         pointer-events: none;
-        z-index: 105;
       }
 
       .stats-mobile {
@@ -286,7 +282,6 @@ export class PersonalStatsPanel {
 
       @media (max-width: 768px) {
         .personal-stats-panel {
-          bottom: calc(170px + env(safe-area-inset-bottom, 0px));
           font-size: 11px;
           padding: 6px 10px;
           min-width: 100px;
@@ -295,7 +290,6 @@ export class PersonalStatsPanel {
 
       @media (max-width: 480px) {
         .personal-stats-panel {
-          bottom: calc(200px + env(safe-area-inset-bottom, 0px));
           background: rgba(8, 12, 18, 0.6);
           padding: 3px 8px;
           min-width: 0;

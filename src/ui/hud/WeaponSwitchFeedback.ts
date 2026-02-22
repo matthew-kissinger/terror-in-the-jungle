@@ -17,16 +17,12 @@ export class WeaponSwitchFeedback {
     const container = document.createElement('div');
     container.className = 'weapon-switch-feedback';
     container.style.cssText = `
-      position: fixed;
-      bottom: 120px;
-      left: 50%;
-      transform: translateX(-50%);
       display: none;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      z-index: 1000;
       pointer-events: none;
+      margin: 0 auto;
     `;
     return container;
   }
@@ -51,11 +47,11 @@ export class WeaponSwitchFeedback {
       @keyframes weaponSwitchSlideUp {
         from {
           opacity: 0;
-          transform: translateX(-50%) translateY(20px);
+          transform: translateY(20px);
         }
         to {
           opacity: 1;
-          transform: translateX(-50%) translateY(0);
+          transform: translateY(0);
         }
       }
 
@@ -145,8 +141,8 @@ export class WeaponSwitchFeedback {
     this.container.classList.remove('fade-out');
   }
 
-  attachToDOM(): void {
-    document.body.appendChild(this.container);
+  attachToDOM(parent?: HTMLElement): void {
+    (parent ?? document.body).appendChild(this.container);
   }
 
   dispose(): void {

@@ -27,7 +27,6 @@ vi.mock('../ui/controls/VirtualJoystick', () => ({ VirtualJoystick: class { show
 vi.mock('../ui/controls/TouchLook', () => ({ TouchLook: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); setSensitivity = vi.fn(); consumeDelta = vi.fn().mockReturnValue({ x: 0, y: 0 }); } }));
 vi.mock('../ui/controls/TouchFireButton', () => ({ TouchFireButton: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); setCallbacks = vi.fn(); } }));
 vi.mock('../ui/controls/TouchActionButtons', () => ({ TouchActionButtons: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); setOnAction = vi.fn(); } }));
-vi.mock('../ui/controls/TouchWeaponBar', () => ({ TouchWeaponBar: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); setOnWeaponSelect = vi.fn(); } }));
 vi.mock('../ui/controls/TouchADSButton', () => ({ TouchADSButton: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); setOnADSToggle = vi.fn(); } }));
 vi.mock('../ui/controls/TouchInteractionButton', () => ({ TouchInteractionButton: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); setCallback = vi.fn(); } }));
 vi.mock('../ui/controls/TouchSandbagButtons', () => ({ TouchSandbagButtons: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); setCallbacks = vi.fn(); } }));
@@ -85,7 +84,6 @@ describe('Mobile Smoke Tests', () => {
     expect(controls.look).toBeDefined();
     expect(controls.fireButton).toBeDefined();
     expect(controls.actionButtons).toBeDefined();
-    expect(controls.weaponBar).toBeDefined();
     expect(controls.adsButton).toBeDefined();
     expect(controls.interactionButton).toBeDefined();
     expect(controls.sandbagButtons).toBeDefined();

@@ -1,6 +1,7 @@
 /**
  * Contextual touch buttons for sandbag rotation (R/T keys).
  * Only visible when sandbag weapon is selected.
+ * Uses pointer events with setPointerCapture for unified input handling.
  */
 export class TouchSandbagButtons {
   private container: HTMLDivElement;
@@ -10,6 +11,10 @@ export class TouchSandbagButtons {
 
   private onRotateLeft?: () => void;
   private onRotateRight?: () => void;
+
+  // Track active pointers per button for proper release
+  private leftPointerId: number | null = null;
+  private rightPointerId: number | null = null;
 
   constructor() {
     this.container = document.createElement('div');
@@ -56,29 +61,56 @@ export class TouchSandbagButtons {
     } as Partial<CSSStyleDeclaration>);
     btn.textContent = label;
 
-    btn.addEventListener('touchstart', (e: TouchEvent) => {
+    const isLeft = id === 'rotate-left';
+
+    btn.addEventListener('pointerdown', (e: PointerEvent) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
+      if (isLeft) {
+        if (this.leftPointerId !== null) return;
+        this.leftPointerId = e.pointerId;
+      } else {
+        if (this.rightPointerId !== null) return;
+        this.rightPointerId = e.pointerId;
+      }
+      if (typeof btn.setPointerCapture === 'function') {
+        btn.setPointerCapture(e.pointerId);
+      }
       btn.style.background = 'rgba(255, 200, 100, 0.6)';
       btn.style.transform = 'scale(0.9)';
-      if (id === 'rotate-left') {
+      if (isLeft) {
         this.onRotateLeft?.();
       } else {
         this.onRotateRight?.();
       }
     }, { passive: false });
 
-    btn.addEventListener('touchend', (e: TouchEvent) => {
+    btn.addEventListener('pointerup', (e: PointerEvent) => {
+      const activeId = isLeft ? this.leftPointerId : this.rightPointerId;
+      if (e.pointerId !== activeId) return;
       e.preventDefault();
       e.stopPropagation();
+      if (isLeft) this.leftPointerId = null;
+      else this.rightPointerId = null;
       btn.style.background = 'rgba(255, 200, 100, 0.3)';
       btn.style.transform = 'scale(1)';
+      if (typeof btn.releasePointerCapture === 'function' && btn.hasPointerCapture(e.pointerId)) {
+        btn.releasePointerCapture(e.pointerId);
+      }
     }, { passive: false });
 
-    btn.addEventListener('touchcancel', (e: TouchEvent) => {
+    btn.addEventListener('pointercancel', (e: PointerEvent) => {
+      const activeId = isLeft ? this.leftPointerId : this.rightPointerId;
+      if (e.pointerId !== activeId) return;
       e.preventDefault();
+      if (isLeft) this.leftPointerId = null;
+      else this.rightPointerId = null;
       btn.style.background = 'rgba(255, 200, 100, 0.3)';
       btn.style.transform = 'scale(1)';
+      if (typeof btn.releasePointerCapture === 'function' && btn.hasPointerCapture(e.pointerId)) {
+        btn.releasePointerCapture(e.pointerId);
+      }
     }, { passive: false });
 
     return btn;

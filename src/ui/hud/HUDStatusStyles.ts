@@ -1,14 +1,12 @@
 /**
  * Status display styles - tickets, combat stats, game status, timer, victory screen
+ * Positioning is handled by CSS Grid slots in HUDLayoutStyles.ts
  */
 import { colors, zIndex, fontStack } from '../design/tokens';
 
 export const HUDStatusStyles = `
   .ticket-display {
-    position: absolute;
-    top: calc(12px + env(safe-area-inset-top, 0px));
-    left: 50%;
-    transform: translateX(-50%);
+    /* Positioned by grid slot [data-region="tickets"] */
     background: ${colors.hudGlass};
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -60,9 +58,7 @@ export const HUDStatusStyles = `
   }
 
   .game-status {
-    position: absolute;
-    top: calc(58px + env(safe-area-inset-top, 0px));
-    left: max(var(--hud-edge-inset, 16px), env(safe-area-inset-left, 0px));
+    /* Positioned by grid slot [data-region="game-status"] */
     background: ${colors.hudGlass};
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
@@ -92,9 +88,7 @@ export const HUDStatusStyles = `
   }
 
   .match-timer {
-    position: absolute;
-    top: calc(14px + env(safe-area-inset-top, 0px));
-    left: max(var(--hud-edge-inset, 16px), env(safe-area-inset-left, 0px));
+    /* Positioned by grid slot [data-region="timer"] */
     background: ${colors.hudGlass};
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -102,7 +96,6 @@ export const HUDStatusStyles = `
     border: 1px solid ${colors.hudBorder};
     border-radius: 4px;
     pointer-events: none;
-    z-index: ${zIndex.hudStatus};
   }
 
   .timer-display {
@@ -168,22 +161,19 @@ export const HUDStatusStyles = `
   .victory-us { border-color: ${colors.us}; color: ${colors.us}; }
   .victory-opfor { border-color: ${colors.opfor}; color: ${colors.opfor}; }
 
-  /* Mobile responsive adjustments */
+  /* Mobile responsive adjustments - size only, no positioning */
   @media (max-width: 768px) {
     .combat-stats {
-      bottom: 160px;
       font-size: 10px;
       padding: 4px 8px;
     }
 
     .game-status {
-      top: calc(46px + env(safe-area-inset-top, 0px));
       font-size: 10px;
       padding: 3px 8px;
     }
 
     .match-timer {
-      top: calc(10px + env(safe-area-inset-top, 0px));
       padding: 3px 10px;
     }
 
@@ -214,12 +204,10 @@ export const HUDStatusStyles = `
     }
 
     .game-status {
-      top: calc(40px + env(safe-area-inset-top, 0px));
       font-size: 9px;
     }
 
     .match-timer {
-      top: calc(8px + env(safe-area-inset-top, 0px));
       padding: 2px 8px;
     }
 

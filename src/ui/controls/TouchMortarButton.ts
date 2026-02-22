@@ -3,6 +3,7 @@
  * Shows DEPLOY when mortar is available but not deployed.
  * Shows FIRE, aim pad, and UNDEPLOY when mortar is deployed.
  * Positioned on the LEFT side of screen.
+ * Uses pointer events with setPointerCapture for unified input handling.
  */
 
 export interface TouchMortarCallbacks {
@@ -42,6 +43,26 @@ export class TouchMortarButton {
   private readonly onAimPointerMove: (e: PointerEvent) => void;
   private readonly onAimPointerUp: (e: PointerEvent) => void;
 
+  // Button pointer handlers for cleanup
+  private readonly onDeployPointerDown: (e: PointerEvent) => void;
+  private readonly onDeployPointerUp: (e: PointerEvent) => void;
+  private readonly onDeployPointerCancel: (e: PointerEvent) => void;
+  private readonly onFirePointerDown: (e: PointerEvent) => void;
+  private readonly onFirePointerUp: (e: PointerEvent) => void;
+  private readonly onFirePointerCancel: (e: PointerEvent) => void;
+  private readonly onUndeployPointerDown: (e: PointerEvent) => void;
+  private readonly onUndeployPointerUp: (e: PointerEvent) => void;
+  private readonly onUndeployPointerCancel: (e: PointerEvent) => void;
+  private readonly onCameraPointerDown: (e: PointerEvent) => void;
+  private readonly onCameraPointerUp: (e: PointerEvent) => void;
+  private readonly onCameraPointerCancel: (e: PointerEvent) => void;
+
+  // Active pointer tracking per button
+  private deployPointerId: number | null = null;
+  private firePointerId: number | null = null;
+  private undeployPointerId: number | null = null;
+  private cameraPointerId: number | null = null;
+
   constructor() {
     // Main container
     this.container = document.createElement('div');
@@ -66,24 +87,45 @@ export class TouchMortarButton {
       border: '2px solid rgba(255, 200, 100, 0.5)',
       fontSize: 'var(--tc-font-size, 11px)',
     });
-    this.deployButton.addEventListener('touchstart', (e: TouchEvent) => {
+
+    this.onDeployPointerDown = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
+      if (this.deployPointerId !== null) return;
+      this.deployPointerId = e.pointerId;
+      if (typeof this.deployButton.setPointerCapture === 'function') {
+        this.deployButton.setPointerCapture(e.pointerId);
+      }
       this.deployButton.style.background = 'rgba(255, 180, 60, 0.6)';
       this.deployButton.style.transform = 'scale(0.9)';
       this.callbacks?.onDeploy();
-    }, { passive: false });
-    this.deployButton.addEventListener('touchend', (e: TouchEvent) => {
+    };
+    this.onDeployPointerUp = (e: PointerEvent) => {
+      if (e.pointerId !== this.deployPointerId) return;
       e.preventDefault();
       e.stopPropagation();
+      this.deployPointerId = null;
       this.deployButton.style.background = 'rgba(255, 180, 60, 0.3)';
       this.deployButton.style.transform = 'scale(1)';
-    }, { passive: false });
-    this.deployButton.addEventListener('touchcancel', (e: TouchEvent) => {
+      if (typeof this.deployButton.releasePointerCapture === 'function' && this.deployButton.hasPointerCapture(e.pointerId)) {
+        this.deployButton.releasePointerCapture(e.pointerId);
+      }
+    };
+    this.onDeployPointerCancel = (e: PointerEvent) => {
+      if (e.pointerId !== this.deployPointerId) return;
       e.preventDefault();
+      this.deployPointerId = null;
       this.deployButton.style.background = 'rgba(255, 180, 60, 0.3)';
       this.deployButton.style.transform = 'scale(1)';
-    }, { passive: false });
+      if (typeof this.deployButton.releasePointerCapture === 'function' && this.deployButton.hasPointerCapture(e.pointerId)) {
+        this.deployButton.releasePointerCapture(e.pointerId);
+      }
+    };
+
+    this.deployButton.addEventListener('pointerdown', this.onDeployPointerDown, { passive: false });
+    this.deployButton.addEventListener('pointerup', this.onDeployPointerUp, { passive: false });
+    this.deployButton.addEventListener('pointercancel', this.onDeployPointerCancel, { passive: false });
     this.container.appendChild(this.deployButton);
 
     // -- Deployed controls container --
@@ -95,7 +137,7 @@ export class TouchMortarButton {
       alignItems: 'center',
     } as Partial<CSSStyleDeclaration>);
 
-    // Aim pad (drag zone for pitch/yaw)
+    // Aim pad (drag zone for pitch/yaw) - already uses pointer events
     this.aimPad = document.createElement('div');
     this.aimPad.id = 'mortar-aim-pad';
     Object.assign(this.aimPad.style, {
@@ -125,7 +167,9 @@ export class TouchMortarButton {
       this.aimPointerId = e.pointerId;
       this.aimLastX = e.clientX;
       this.aimLastY = e.clientY;
-      this.aimPad.setPointerCapture(e.pointerId);
+      if (typeof this.aimPad.setPointerCapture === 'function') {
+        this.aimPad.setPointerCapture(e.pointerId);
+      }
       this.aimPad.style.background = 'rgba(100, 150, 255, 0.4)';
     };
 
@@ -149,12 +193,15 @@ export class TouchMortarButton {
       if (e.pointerId !== this.aimPointerId) return;
       this.aimPointerId = null;
       this.aimPad.style.background = 'rgba(100, 150, 255, 0.2)';
+      if (typeof this.aimPad.releasePointerCapture === 'function' && this.aimPad.hasPointerCapture(e.pointerId)) {
+        this.aimPad.releasePointerCapture(e.pointerId);
+      }
     };
 
-    this.aimPad.addEventListener('pointerdown', this.onAimPointerDown);
-    this.aimPad.addEventListener('pointermove', this.onAimPointerMove);
-    this.aimPad.addEventListener('pointerup', this.onAimPointerUp);
-    this.aimPad.addEventListener('pointercancel', this.onAimPointerUp);
+    this.aimPad.addEventListener('pointerdown', this.onAimPointerDown, { passive: false });
+    this.aimPad.addEventListener('pointermove', this.onAimPointerMove, { passive: false });
+    this.aimPad.addEventListener('pointerup', this.onAimPointerUp, { passive: false });
+    this.aimPad.addEventListener('pointercancel', this.onAimPointerUp, { passive: false });
     this.deployedContainer.appendChild(this.aimPad);
 
     // Fire and undeploy row
@@ -173,24 +220,45 @@ export class TouchMortarButton {
       border: '3px solid rgba(255, 100, 100, 0.6)',
       fontSize: 'var(--tc-font-size, 12px)',
     });
-    this.fireButton.addEventListener('touchstart', (e: TouchEvent) => {
+
+    this.onFirePointerDown = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
+      if (this.firePointerId !== null) return;
+      this.firePointerId = e.pointerId;
+      if (typeof this.fireButton.setPointerCapture === 'function') {
+        this.fireButton.setPointerCapture(e.pointerId);
+      }
       this.fireButton.style.background = 'rgba(255, 60, 60, 0.7)';
       this.fireButton.style.transform = 'scale(0.9)';
       this.callbacks?.onFire();
-    }, { passive: false });
-    this.fireButton.addEventListener('touchend', (e: TouchEvent) => {
+    };
+    this.onFirePointerUp = (e: PointerEvent) => {
+      if (e.pointerId !== this.firePointerId) return;
       e.preventDefault();
       e.stopPropagation();
+      this.firePointerId = null;
       this.fireButton.style.background = 'rgba(255, 60, 60, 0.4)';
       this.fireButton.style.transform = 'scale(1)';
-    }, { passive: false });
-    this.fireButton.addEventListener('touchcancel', (e: TouchEvent) => {
+      if (typeof this.fireButton.releasePointerCapture === 'function' && this.fireButton.hasPointerCapture(e.pointerId)) {
+        this.fireButton.releasePointerCapture(e.pointerId);
+      }
+    };
+    this.onFirePointerCancel = (e: PointerEvent) => {
+      if (e.pointerId !== this.firePointerId) return;
       e.preventDefault();
+      this.firePointerId = null;
       this.fireButton.style.background = 'rgba(255, 60, 60, 0.4)';
       this.fireButton.style.transform = 'scale(1)';
-    }, { passive: false });
+      if (typeof this.fireButton.releasePointerCapture === 'function' && this.fireButton.hasPointerCapture(e.pointerId)) {
+        this.fireButton.releasePointerCapture(e.pointerId);
+      }
+    };
+
+    this.fireButton.addEventListener('pointerdown', this.onFirePointerDown, { passive: false });
+    this.fireButton.addEventListener('pointerup', this.onFirePointerUp, { passive: false });
+    this.fireButton.addEventListener('pointercancel', this.onFirePointerCancel, { passive: false });
 
     // Undeploy button
     this.undeployButton = this.createButton('PACK', 'mortar-undeploy', {
@@ -200,24 +268,45 @@ export class TouchMortarButton {
       border: '2px solid rgba(255, 200, 100, 0.5)',
       fontSize: 'var(--tc-font-size, 10px)',
     });
-    this.undeployButton.addEventListener('touchstart', (e: TouchEvent) => {
+
+    this.onUndeployPointerDown = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
+      if (this.undeployPointerId !== null) return;
+      this.undeployPointerId = e.pointerId;
+      if (typeof this.undeployButton.setPointerCapture === 'function') {
+        this.undeployButton.setPointerCapture(e.pointerId);
+      }
       this.undeployButton.style.background = 'rgba(255, 180, 60, 0.6)';
       this.undeployButton.style.transform = 'scale(0.9)';
       this.callbacks?.onUndeploy();
-    }, { passive: false });
-    this.undeployButton.addEventListener('touchend', (e: TouchEvent) => {
+    };
+    this.onUndeployPointerUp = (e: PointerEvent) => {
+      if (e.pointerId !== this.undeployPointerId) return;
       e.preventDefault();
       e.stopPropagation();
+      this.undeployPointerId = null;
       this.undeployButton.style.background = 'rgba(255, 180, 60, 0.3)';
       this.undeployButton.style.transform = 'scale(1)';
-    }, { passive: false });
-    this.undeployButton.addEventListener('touchcancel', (e: TouchEvent) => {
+      if (typeof this.undeployButton.releasePointerCapture === 'function' && this.undeployButton.hasPointerCapture(e.pointerId)) {
+        this.undeployButton.releasePointerCapture(e.pointerId);
+      }
+    };
+    this.onUndeployPointerCancel = (e: PointerEvent) => {
+      if (e.pointerId !== this.undeployPointerId) return;
       e.preventDefault();
+      this.undeployPointerId = null;
       this.undeployButton.style.background = 'rgba(255, 180, 60, 0.3)';
       this.undeployButton.style.transform = 'scale(1)';
-    }, { passive: false });
+      if (typeof this.undeployButton.releasePointerCapture === 'function' && this.undeployButton.hasPointerCapture(e.pointerId)) {
+        this.undeployButton.releasePointerCapture(e.pointerId);
+      }
+    };
+
+    this.undeployButton.addEventListener('pointerdown', this.onUndeployPointerDown, { passive: false });
+    this.undeployButton.addEventListener('pointerup', this.onUndeployPointerUp, { passive: false });
+    this.undeployButton.addEventListener('pointercancel', this.onUndeployPointerCancel, { passive: false });
 
     // Camera toggle button
     this.cameraButton = this.createButton('CAM', 'mortar-camera', {
@@ -227,24 +316,45 @@ export class TouchMortarButton {
       border: '2px solid rgba(100, 170, 255, 0.5)',
       fontSize: 'var(--tc-font-size, 10px)',
     });
-    this.cameraButton.addEventListener('touchstart', (e: TouchEvent) => {
+
+    this.onCameraPointerDown = (e: PointerEvent) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
+      if (this.cameraPointerId !== null) return;
+      this.cameraPointerId = e.pointerId;
+      if (typeof this.cameraButton.setPointerCapture === 'function') {
+        this.cameraButton.setPointerCapture(e.pointerId);
+      }
       this.cameraButton.style.background = 'rgba(60, 150, 255, 0.6)';
       this.cameraButton.style.transform = 'scale(0.9)';
       this.callbacks?.onToggleMortarCamera();
-    }, { passive: false });
-    this.cameraButton.addEventListener('touchend', (e: TouchEvent) => {
+    };
+    this.onCameraPointerUp = (e: PointerEvent) => {
+      if (e.pointerId !== this.cameraPointerId) return;
       e.preventDefault();
       e.stopPropagation();
+      this.cameraPointerId = null;
       this.cameraButton.style.background = 'rgba(60, 150, 255, 0.3)';
       this.cameraButton.style.transform = 'scale(1)';
-    }, { passive: false });
-    this.cameraButton.addEventListener('touchcancel', (e: TouchEvent) => {
+      if (typeof this.cameraButton.releasePointerCapture === 'function' && this.cameraButton.hasPointerCapture(e.pointerId)) {
+        this.cameraButton.releasePointerCapture(e.pointerId);
+      }
+    };
+    this.onCameraPointerCancel = (e: PointerEvent) => {
+      if (e.pointerId !== this.cameraPointerId) return;
       e.preventDefault();
+      this.cameraPointerId = null;
       this.cameraButton.style.background = 'rgba(60, 150, 255, 0.3)';
       this.cameraButton.style.transform = 'scale(1)';
-    }, { passive: false });
+      if (typeof this.cameraButton.releasePointerCapture === 'function' && this.cameraButton.hasPointerCapture(e.pointerId)) {
+        this.cameraButton.releasePointerCapture(e.pointerId);
+      }
+    };
+
+    this.cameraButton.addEventListener('pointerdown', this.onCameraPointerDown, { passive: false });
+    this.cameraButton.addEventListener('pointerup', this.onCameraPointerUp, { passive: false });
+    this.cameraButton.addEventListener('pointercancel', this.onCameraPointerCancel, { passive: false });
 
     buttonRow.appendChild(this.fireButton);
     buttonRow.appendChild(this.undeployButton);
@@ -317,6 +427,18 @@ export class TouchMortarButton {
   }
 
   dispose(): void {
+    this.deployButton.removeEventListener('pointerdown', this.onDeployPointerDown);
+    this.deployButton.removeEventListener('pointerup', this.onDeployPointerUp);
+    this.deployButton.removeEventListener('pointercancel', this.onDeployPointerCancel);
+    this.fireButton.removeEventListener('pointerdown', this.onFirePointerDown);
+    this.fireButton.removeEventListener('pointerup', this.onFirePointerUp);
+    this.fireButton.removeEventListener('pointercancel', this.onFirePointerCancel);
+    this.undeployButton.removeEventListener('pointerdown', this.onUndeployPointerDown);
+    this.undeployButton.removeEventListener('pointerup', this.onUndeployPointerUp);
+    this.undeployButton.removeEventListener('pointercancel', this.onUndeployPointerCancel);
+    this.cameraButton.removeEventListener('pointerdown', this.onCameraPointerDown);
+    this.cameraButton.removeEventListener('pointerup', this.onCameraPointerUp);
+    this.cameraButton.removeEventListener('pointercancel', this.onCameraPointerCancel);
     this.aimPad.removeEventListener('pointerdown', this.onAimPointerDown);
     this.aimPad.removeEventListener('pointermove', this.onAimPointerMove);
     this.aimPad.removeEventListener('pointerup', this.onAimPointerUp);

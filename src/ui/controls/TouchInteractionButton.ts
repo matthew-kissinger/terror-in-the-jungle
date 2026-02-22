@@ -2,10 +2,11 @@
  * Touch button for contextual interactions (e.g., helicopter entry/exit).
  * Appears in the center-right area when an interaction is available.
  * Only visible on touch devices when interaction prompt is active.
+ * Uses pointer events with setPointerCapture for unified input handling.
  */
 export class TouchInteractionButton {
   private button: HTMLDivElement;
-  private isTouched = false;
+  private activePointerId: number | null = null;
   private isVisible = false;
 
   private onInteract?: () => void;
@@ -40,32 +41,50 @@ export class TouchInteractionButton {
 
     document.body.appendChild(this.button);
 
-    this.button.addEventListener('touchstart', this.onTouchStart, { passive: false });
-    this.button.addEventListener('touchend', this.onTouchEnd, { passive: false });
-    this.button.addEventListener('touchcancel', this.onTouchEnd, { passive: false });
+    this.button.addEventListener('pointerdown', this.onPointerDown, { passive: false });
+    this.button.addEventListener('pointerup', this.onPointerUp, { passive: false });
+    this.button.addEventListener('pointercancel', this.onPointerCancel, { passive: false });
   }
 
   setCallback(onInteract: () => void): void {
     this.onInteract = onInteract;
   }
 
-  private onTouchStart = (e: TouchEvent): void => {
+  private onPointerDown = (e: PointerEvent): void => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    if (this.isTouched) return;
-    this.isTouched = true;
+    if (this.activePointerId !== null) return;
+    this.activePointerId = e.pointerId;
+    if (typeof this.button.setPointerCapture === 'function') {
+      this.button.setPointerCapture(e.pointerId);
+    }
     this.button.style.background = 'rgba(100, 200, 255, 0.7)';
     this.button.style.transform = 'scale(0.92)';
     this.onInteract?.();
   };
 
-  private onTouchEnd = (e: TouchEvent): void => {
+  private onPointerUp = (e: PointerEvent): void => {
+    if (e.pointerId !== this.activePointerId) return;
     e.preventDefault();
     e.stopPropagation();
-    if (!this.isTouched) return;
-    this.isTouched = false;
+    this.activePointerId = null;
     this.button.style.background = 'rgba(100, 200, 255, 0.4)';
     this.button.style.transform = 'scale(1)';
+    if (typeof this.button.releasePointerCapture === 'function' && this.button.hasPointerCapture(e.pointerId)) {
+      this.button.releasePointerCapture(e.pointerId);
+    }
+  };
+
+  private onPointerCancel = (e: PointerEvent): void => {
+    if (e.pointerId !== this.activePointerId) return;
+    e.preventDefault();
+    this.activePointerId = null;
+    this.button.style.background = 'rgba(100, 200, 255, 0.4)';
+    this.button.style.transform = 'scale(1)';
+    if (typeof this.button.releasePointerCapture === 'function' && this.button.hasPointerCapture(e.pointerId)) {
+      this.button.releasePointerCapture(e.pointerId);
+    }
   };
 
   /**
@@ -84,8 +103,8 @@ export class TouchInteractionButton {
     if (!this.isVisible) return;
     this.isVisible = false;
     this.button.style.display = 'none';
-    if (this.isTouched) {
-      this.isTouched = false;
+    if (this.activePointerId !== null) {
+      this.activePointerId = null;
     }
   }
 
@@ -103,9 +122,9 @@ export class TouchInteractionButton {
   }
 
   dispose(): void {
-    this.button.removeEventListener('touchstart', this.onTouchStart);
-    this.button.removeEventListener('touchend', this.onTouchEnd);
-    this.button.removeEventListener('touchcancel', this.onTouchEnd);
+    this.button.removeEventListener('pointerdown', this.onPointerDown);
+    this.button.removeEventListener('pointerup', this.onPointerUp);
+    this.button.removeEventListener('pointercancel', this.onPointerCancel);
     this.button.remove();
   }
 }

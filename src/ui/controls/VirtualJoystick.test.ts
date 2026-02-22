@@ -4,15 +4,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VirtualJoystick } from './VirtualJoystick';
 
-function touch(identifier: number, clientX: number, clientY: number): Touch {
-  return { identifier, clientX, clientY } as Touch;
-}
-
-function touchEvent(type: string, touches: Touch[]): TouchEvent {
-  const event = new Event(type, { bubbles: true, cancelable: true }) as TouchEvent;
-  Object.defineProperty(event, 'changedTouches', { value: touches });
-  Object.defineProperty(event, 'touches', { value: touches });
-  return event;
+function pointerEvent(type: string, clientX: number, clientY: number, pointerId = 1): PointerEvent {
+  return new PointerEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    pointerId,
+    pointerType: 'touch',
+    clientX,
+    clientY,
+  });
 }
 
 describe('VirtualJoystick', () => {
@@ -45,17 +45,17 @@ describe('VirtualJoystick', () => {
     expect(base.firstElementChild).toBeTruthy();
   });
 
-  it('activates on touch start and updates movement on touch move', () => {
-    zone.dispatchEvent(touchEvent('touchstart', [touch(1, 60, 60)]));
-    zone.dispatchEvent(touchEvent('touchmove', [touch(1, 120, 60)]));
+  it('activates on pointer down and updates movement on pointer move', () => {
+    zone.dispatchEvent(pointerEvent('pointerdown', 60, 60));
+    zone.dispatchEvent(pointerEvent('pointermove', 120, 60));
 
     expect(joystick.output.x).toBeCloseTo(1, 5);
     expect(joystick.output.z).toBeCloseTo(0, 5);
   });
 
   it('keeps movement vector within [-1, 1] bounds', () => {
-    zone.dispatchEvent(touchEvent('touchstart', [touch(1, 60, 60)]));
-    zone.dispatchEvent(touchEvent('touchmove', [touch(1, 2000, -2000)]));
+    zone.dispatchEvent(pointerEvent('pointerdown', 60, 60));
+    zone.dispatchEvent(pointerEvent('pointermove', 2000, -2000));
 
     expect(joystick.output.x).toBeLessThanOrEqual(1);
     expect(joystick.output.x).toBeGreaterThanOrEqual(-1);
@@ -68,22 +68,22 @@ describe('VirtualJoystick', () => {
     const onSprintStop = vi.fn();
     joystick.setSprintCallbacks(onSprintStart, onSprintStop);
 
-    zone.dispatchEvent(touchEvent('touchstart', [touch(1, 60, 60)]));
-    zone.dispatchEvent(touchEvent('touchmove', [touch(1, 120, 60)]));
+    zone.dispatchEvent(pointerEvent('pointerdown', 60, 60));
+    zone.dispatchEvent(pointerEvent('pointermove', 120, 60));
     expect(onSprintStart).toHaveBeenCalledTimes(1);
 
-    zone.dispatchEvent(touchEvent('touchmove', [touch(1, 90, 60)]));
+    zone.dispatchEvent(pointerEvent('pointermove', 90, 60));
     expect(onSprintStop).toHaveBeenCalledTimes(1);
   });
 
-  it('resets movement and deactivates on touch end', () => {
-    zone.dispatchEvent(touchEvent('touchstart', [touch(1, 60, 60)]));
-    zone.dispatchEvent(touchEvent('touchmove', [touch(1, 120, 60)]));
-    zone.dispatchEvent(touchEvent('touchend', [touch(1, 120, 60)]));
+  it('resets movement and deactivates on pointer up', () => {
+    zone.dispatchEvent(pointerEvent('pointerdown', 60, 60));
+    zone.dispatchEvent(pointerEvent('pointermove', 120, 60));
+    zone.dispatchEvent(pointerEvent('pointerup', 120, 60));
 
     expect(joystick.output).toEqual({ x: 0, z: 0 });
 
-    zone.dispatchEvent(touchEvent('touchmove', [touch(1, 120, 120)]));
+    zone.dispatchEvent(pointerEvent('pointermove', 120, 120));
     expect(joystick.output).toEqual({ x: 0, z: 0 });
   });
 
@@ -99,8 +99,8 @@ describe('VirtualJoystick', () => {
     joystick.dispose();
     expect(document.getElementById('touch-joystick-zone')).toBeNull();
 
-    zone.dispatchEvent(touchEvent('touchstart', [touch(1, 60, 60)]));
-    zone.dispatchEvent(touchEvent('touchmove', [touch(1, 120, 60)]));
+    zone.dispatchEvent(pointerEvent('pointerdown', 60, 60));
+    zone.dispatchEvent(pointerEvent('pointermove', 120, 60));
     expect(joystick.output).toEqual({ x: 0, z: 0 });
   });
 });

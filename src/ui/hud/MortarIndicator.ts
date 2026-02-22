@@ -2,7 +2,7 @@
  * Mortar HUD indicator - shows deployed state, elevation, bearing, and power.
  * Uses design tokens for consistent theming.
  */
-import { colors, zIndex, fontStack } from '../design/tokens';
+import { colors, fontStack } from '../design/tokens';
 
 export class MortarIndicator {
   public mortarIndicator: HTMLDivElement;
@@ -15,14 +15,10 @@ export class MortarIndicator {
     const container = document.createElement('div');
     container.className = 'mortar-indicator';
     container.style.cssText = `
-      position: fixed;
-      bottom: 140px;
-      left: 20px;
       width: 160px;
       display: none;
       flex-direction: column;
       gap: 4px;
-      z-index: ${zIndex.hudWeapon};
       pointer-events: none;
       font-family: ${fontStack.hud};
       background: ${colors.hudGlass};

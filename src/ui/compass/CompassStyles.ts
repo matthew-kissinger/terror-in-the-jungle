@@ -1,14 +1,8 @@
-import { zIndex } from '../design/tokens';
-
 export const COMPASS_STYLES = `
     .compass-container {
-      position: fixed;
-      top: 80px;
-      left: 50%;
-      transform: translateX(-50%);
+      /* Positioned by grid slot [data-region="compass"] */
       width: 160px;
       height: 70px;
-      z-index: ${zIndex.hudCompass};
       pointer-events: none;
     }
 
@@ -167,7 +161,6 @@ export const COMPASS_STYLES = `
 
     @media (max-width: 768px) {
       .compass-container {
-        top: 50px;
         width: 130px;
         height: 55px;
       }

@@ -95,6 +95,16 @@ export class TouchActionButtons {
     this.container.appendChild(btn);
   }
 
+  /** Re-parent into a grid slot. */
+  mountTo(parent: HTMLElement): void {
+    this.container.style.position = '';
+    this.container.style.right = '';
+    this.container.style.bottom = '';
+    this.container.style.zIndex = '';
+    if (this.container.parentNode) this.container.parentNode.removeChild(this.container);
+    parent.appendChild(this.container);
+  }
+
   show(): void {
     this.container.style.display = 'flex';
   }

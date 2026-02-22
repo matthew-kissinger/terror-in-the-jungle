@@ -256,9 +256,10 @@ export class HitMarkerFeedback {
     }, duration);
   }
 
-  attachToDOM(): void {
-    document.body.appendChild(this.vignetteOverlay);
-    document.body.appendChild(this.container);
+  attachToDOM(parent?: HTMLElement): void {
+    const target = parent ?? document.body;
+    target.appendChild(this.vignetteOverlay);
+    target.appendChild(this.container);
   }
 
   dispose(): void {

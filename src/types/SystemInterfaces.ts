@@ -101,6 +101,9 @@ export interface IHUDSystem {
   hideHelicopterInstruments(): void;
   spawnScorePopup(type: 'capture' | 'defend' | 'secured' | 'kill' | 'headshot' | 'assist', points: number, multiplier?: number): void;
   startMatch(): void;
+  setPhase(phase: 'menu' | 'loading' | 'playing' | 'paused' | 'ended'): void;
+  setVehicle(vehicle: 'infantry' | 'helicopter'): void;
+  setADS(ads: boolean): void;
   toggleScoreboard(visible: boolean): void;
   toggleScoreboardVisibility(): void;
   updateTickets(usTickets: number, opforTickets: number): void;
@@ -110,6 +113,8 @@ export interface IHUDSystem {
   hideInteractionPrompt(): void;
   spawnDamageNumber(worldPos: THREE.Vector3, damage: number, isHeadshot?: boolean, isKill?: boolean): void;
   showWeaponSwitch(weaponName: string, weaponIcon: string, ammo: string): void;
+  setWeaponSelectCallback(callback: (slotIndex: number) => void): void;
+  setActiveWeaponSlot(slot: number): void;
   showMortarIndicator(): void;
   hideMortarIndicator(): void;
   updateMortarState(pitch: number, yaw: number, power: number, isAiming: boolean): void;

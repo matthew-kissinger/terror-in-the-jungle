@@ -93,8 +93,14 @@ export class WeaponAnimations {
     }
   }
 
+  /** Callback fired when ADS state changes. */
+  onADSChange?: (ads: boolean) => void
+
   setADS(enabled: boolean): void {
-    this.isADS = enabled
+    if (this.isADS !== enabled) {
+      this.isADS = enabled
+      this.onADSChange?.(enabled)
+    }
   }
 
   getADS(): boolean {

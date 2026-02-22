@@ -64,6 +64,11 @@ export class SystemConnector {
     refs.fullMapSystem.setCombatantSystem(refs.combatantSystem);
     refs.fullMapSystem.setGameModeManager(refs.gameModeManager);
     refs.compassSystem.setZoneManager(refs.zoneManager);
+
+    // Mount compass and minimap into grid slots
+    const layout = refs.hudSystem.getLayout();
+    refs.compassSystem.mountTo(layout.getSlot('compass'));
+    refs.minimapSystem.mountTo(layout.getSlot('minimap'));
     refs.zoneManager.setCombatantSystem(refs.combatantSystem);
     refs.zoneManager.setCamera(camera);
     refs.zoneManager.setChunkManager(refs.chunkManager);

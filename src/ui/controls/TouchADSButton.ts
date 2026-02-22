@@ -1,10 +1,11 @@
 /**
- * ADS (Aim Down Sights) toggle button for mobile touch controls.
- * Positioned above/left of the fire button. Tap to toggle ADS on/off.
+ * ADS (Aim Down Sights) button for mobile touch controls.
+ * Hold to aim, release to stop aiming. Uses pointer events.
  */
 export class TouchADSButton {
   private button: HTMLDivElement;
   private isActive = false;
+  private activePointerId: number | null = null;
 
   private onADSToggle?: (active: boolean) => void;
 
@@ -37,9 +38,9 @@ export class TouchADSButton {
 
     document.body.appendChild(this.button);
 
-    this.button.addEventListener('touchstart', this.onTouchStart, { passive: false });
-    this.button.addEventListener('touchend', this.onTouchEnd, { passive: false });
-    this.button.addEventListener('touchcancel', this.onTouchEnd, { passive: false });
+    this.button.addEventListener('pointerdown', this.onPointerDown, { passive: false });
+    this.button.addEventListener('pointerup', this.onPointerUp, { passive: false });
+    this.button.addEventListener('pointercancel', this.onPointerCancel, { passive: false });
   }
 
   setOnADSToggle(callback: (active: boolean) => void): void {
@@ -50,27 +51,51 @@ export class TouchADSButton {
   resetADS(): void {
     if (this.isActive) {
       this.isActive = false;
+      this.activePointerId = null;
       this.updateVisual();
       this.onADSToggle?.(false);
     }
   }
 
-  private onTouchStart = (e: TouchEvent): void => {
+  private onPointerDown = (e: PointerEvent): void => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
     if (this.isActive) return;
+    this.activePointerId = e.pointerId;
+    if (typeof this.button.setPointerCapture === 'function') {
+      this.button.setPointerCapture(e.pointerId);
+    }
     this.isActive = true;
     this.updateVisual();
     this.onADSToggle?.(true);
   };
 
-  private onTouchEnd = (e: TouchEvent): void => {
+  private onPointerUp = (e: PointerEvent): void => {
+    if (e.pointerId !== this.activePointerId) return;
     e.preventDefault();
     e.stopPropagation();
     if (!this.isActive) return;
+    this.activePointerId = null;
     this.isActive = false;
     this.updateVisual();
     this.onADSToggle?.(false);
+    if (typeof this.button.releasePointerCapture === 'function' && this.button.hasPointerCapture(e.pointerId)) {
+      this.button.releasePointerCapture(e.pointerId);
+    }
+  };
+
+  private onPointerCancel = (e: PointerEvent): void => {
+    if (e.pointerId !== this.activePointerId) return;
+    e.preventDefault();
+    if (!this.isActive) return;
+    this.activePointerId = null;
+    this.isActive = false;
+    this.updateVisual();
+    this.onADSToggle?.(false);
+    if (typeof this.button.releasePointerCapture === 'function' && this.button.hasPointerCapture(e.pointerId)) {
+      this.button.releasePointerCapture(e.pointerId);
+    }
   };
 
   private updateVisual(): void {
@@ -85,6 +110,16 @@ export class TouchADSButton {
     }
   }
 
+  /** Re-parent into a grid slot. */
+  mountTo(parent: HTMLElement): void {
+    this.button.style.position = '';
+    this.button.style.right = '';
+    this.button.style.bottom = '';
+    this.button.style.zIndex = '';
+    if (this.button.parentNode) this.button.parentNode.removeChild(this.button);
+    parent.appendChild(this.button);
+  }
+
   show(): void {
     this.button.style.display = 'flex';
   }
@@ -95,9 +130,9 @@ export class TouchADSButton {
   }
 
   dispose(): void {
-    this.button.removeEventListener('touchstart', this.onTouchStart);
-    this.button.removeEventListener('touchend', this.onTouchEnd);
-    this.button.removeEventListener('touchcancel', this.onTouchEnd);
+    this.button.removeEventListener('pointerdown', this.onPointerDown);
+    this.button.removeEventListener('pointerup', this.onPointerUp);
+    this.button.removeEventListener('pointercancel', this.onPointerCancel);
     this.button.remove();
   }
 }

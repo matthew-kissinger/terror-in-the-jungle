@@ -4,11 +4,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TouchADSButton } from './TouchADSButton';
 
-function touchEvent(type: string): TouchEvent {
-  const event = new Event(type, { bubbles: true, cancelable: true }) as TouchEvent;
-  Object.defineProperty(event, 'changedTouches', { value: [] });
-  Object.defineProperty(event, 'touches', { value: [] });
-  return event;
+function pointerEvent(type: string, pointerId = 1): PointerEvent {
+  return new PointerEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    pointerId,
+    pointerType: 'touch',
+  });
 }
 
 describe('TouchADSButton', () => {
@@ -32,27 +34,27 @@ describe('TouchADSButton', () => {
     expect(button.style.bottom).toContain('--tc-edge-inset');
   });
 
-  it('hold-to-ADS: touchstart activates, touchend deactivates', () => {
+  it('hold-to-ADS: pointerdown activates, pointerup deactivates', () => {
     const onADSToggle = vi.fn();
     adsButton.setOnADSToggle(onADSToggle);
 
-    // Hold: touchstart = ADS ON
-    button.dispatchEvent(touchEvent('touchstart'));
+    // Hold: pointerdown = ADS ON
+    button.dispatchEvent(pointerEvent('pointerdown'));
     expect(onADSToggle).toHaveBeenCalledWith(true);
     expect(onADSToggle).toHaveBeenCalledTimes(1);
 
-    // Release: touchend = ADS OFF
-    button.dispatchEvent(touchEvent('touchend'));
+    // Release: pointerup = ADS OFF
+    button.dispatchEvent(pointerEvent('pointerup'));
     expect(onADSToggle).toHaveBeenCalledWith(false);
     expect(onADSToggle).toHaveBeenCalledTimes(2);
   });
 
-  it('ignores duplicate touchstart when already held', () => {
+  it('ignores duplicate pointerdown when already held', () => {
     const onADSToggle = vi.fn();
     adsButton.setOnADSToggle(onADSToggle);
 
-    button.dispatchEvent(touchEvent('touchstart'));
-    button.dispatchEvent(touchEvent('touchstart')); // duplicate
+    button.dispatchEvent(pointerEvent('pointerdown'));
+    button.dispatchEvent(pointerEvent('pointerdown')); // duplicate
     expect(onADSToggle).toHaveBeenCalledTimes(1);
   });
 
@@ -61,13 +63,13 @@ describe('TouchADSButton', () => {
     expect(button.style.background).toBe('rgba(255, 255, 255, 0.15)');
 
     // Hold ON
-    button.dispatchEvent(touchEvent('touchstart'));
+    button.dispatchEvent(pointerEvent('pointerdown'));
     expect(button.style.background).toBe('rgba(100, 180, 255, 0.45)');
     expect(button.style.borderColor).toBe('rgba(100, 180, 255, 0.8)');
     expect(button.style.color).toBe('rgb(255, 255, 255)');
 
     // Release OFF
-    button.dispatchEvent(touchEvent('touchend'));
+    button.dispatchEvent(pointerEvent('pointerup'));
     expect(button.style.background).toBe('rgba(255, 255, 255, 0.15)');
   });
 
@@ -76,7 +78,7 @@ describe('TouchADSButton', () => {
     adsButton.setOnADSToggle(onADSToggle);
 
     // Toggle ON
-    button.dispatchEvent(touchEvent('touchstart'));
+    button.dispatchEvent(pointerEvent('pointerdown'));
     expect(onADSToggle).toHaveBeenCalledWith(true);
 
     // Reset
@@ -97,7 +99,7 @@ describe('TouchADSButton', () => {
     const onADSToggle = vi.fn();
     adsButton.setOnADSToggle(onADSToggle);
 
-    button.dispatchEvent(touchEvent('touchstart'));
+    button.dispatchEvent(pointerEvent('pointerdown'));
     adsButton.hide();
 
     expect(onADSToggle).toHaveBeenCalledWith(false);
@@ -111,7 +113,7 @@ describe('TouchADSButton', () => {
     expect(document.getElementById('touch-ads-btn')).toBeNull();
 
     // Trigger event on the detached button to verify listener removal
-    button.dispatchEvent(touchEvent('touchstart'));
+    button.dispatchEvent(pointerEvent('pointerdown'));
     expect(onADSToggle).not.toHaveBeenCalled();
   });
 });
