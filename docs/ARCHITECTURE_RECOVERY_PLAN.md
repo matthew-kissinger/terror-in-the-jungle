@@ -1,6 +1,6 @@
 # Architecture Recovery Plan
 
-Last updated: 2026-02-21
+Last updated: 2026-02-22
 Scope: runtime architecture stabilization with performance and gameplay fidelity gates.
 
 ## Current Goal
@@ -26,6 +26,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: pointer events (pointerdown/up/cancel + setPointerCapture) on all touch controls, replacing touch events (zero touchstart/end/move listeners remain in controls).
 - Keep: VisibilityManager drives HUD visibility via data attributes on #game-hud-root; CSS rules respond to data-phase, data-vehicle, data-ads, data-device, data-layout.
 - Keep: data-show="infantry" on weapon-bar and action-btns slots (hidden in helicopter via CSS rule).
+- Keep: single compact fullscreen prompt on mobile entry (auto-fades 6s); landscape prompt removed as redundant (Deploy tap auto-enters fullscreen + locks landscape).
 - Keep: squared-distance and allocation reductions in spatial queries.
 - Keep: AI target acquisition scratch-buffer reuse.
 - Keep: heap validation expansion (`growth`, `peak`, `recovery`) in harness output.
