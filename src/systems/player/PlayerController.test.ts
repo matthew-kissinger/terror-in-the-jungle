@@ -18,6 +18,30 @@ import { Faction } from '../combat/types';
 
 // Mock dependencies
 vi.mock('./PlayerInput');
+vi.mock('../input/InputManager', () => ({
+  InputManager: class {
+    setCallbacks = vi.fn();
+    init = vi.fn();
+    dispose = vi.fn();
+    getIsTouchMode = vi.fn().mockReturnValue(false);
+    pollGamepad = vi.fn();
+    setPointerLockEnabled = vi.fn();
+    setControlsEnabled = vi.fn();
+    setInputContext = vi.fn();
+    setCurrentWeaponMode = vi.fn();
+    setGameStarted = vi.fn();
+    setInHelicopter = vi.fn();
+    getTouchControls = vi.fn().mockReturnValue(null);
+    getIsPointerLocked = vi.fn().mockReturnValue(false);
+    getMouseMovement = vi.fn().mockReturnValue({ x: 0, y: 0 });
+    clearMouseMovement = vi.fn();
+    unlockPointer = vi.fn();
+    relockPointer = vi.fn();
+    getActiveInputMode = vi.fn().mockReturnValue('keyboardMouse');
+    onModeChange = vi.fn();
+    isContextBlocked = vi.fn().mockReturnValue(false);
+  },
+}));
 vi.mock('./PlayerMovement');
 vi.mock('./PlayerCamera');
 vi.mock('../../utils/Logger');

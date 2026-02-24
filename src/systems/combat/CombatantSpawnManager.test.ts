@@ -332,7 +332,7 @@ describe('CombatantSpawnManager', () => {
             name: 'OPFOR HQ',
             position: new THREE.Vector3(100, 0, 100),
             radius: 30,
-            owner: Faction.OPFOR,
+            owner: Faction.NVA,
             isHomeBase: true,
           },
         ],
@@ -386,7 +386,7 @@ describe('CombatantSpawnManager', () => {
             name: 'OPFOR Base',
             position: new THREE.Vector3(100, 0, 100),
             radius: 30,
-            owner: Faction.OPFOR,
+            owner: Faction.NVA,
             isHomeBase: true,
           },
         ],
@@ -396,7 +396,7 @@ describe('CombatantSpawnManager', () => {
       spawnManager.spawnInitialForces(true);
 
       const calls = vi.mocked(squadManager.createSquad).mock.calls;
-      const opforCalls = calls.filter(call => call[0] === Faction.OPFOR);
+      const opforCalls = calls.filter(call => call[0] === Faction.NVA);
       expect(opforCalls.length).toBeGreaterThan(0);
     });
 
@@ -450,9 +450,9 @@ describe('CombatantSpawnManager', () => {
           { id: 'us_base', name: 'US Main', position: usHQs[0], radius: 30, owner: Faction.US, isHomeBase: true },
           { id: 'us_hq_east', name: 'US East', position: usHQs[1], radius: 30, owner: Faction.US, isHomeBase: true },
           { id: 'us_hq_south', name: 'US South', position: usHQs[2], radius: 30, owner: Faction.US, isHomeBase: true },
-          { id: 'opfor_hq_main', name: 'OPFOR Main', position: opforHQs[0], radius: 30, owner: Faction.OPFOR, isHomeBase: true },
-          { id: 'opfor_hq_north', name: 'OPFOR North', position: opforHQs[1], radius: 30, owner: Faction.OPFOR, isHomeBase: true },
-          { id: 'opfor_hq_south', name: 'OPFOR South', position: opforHQs[2], radius: 30, owner: Faction.OPFOR, isHomeBase: true },
+          { id: 'opfor_hq_main', name: 'OPFOR Main', position: opforHQs[0], radius: 30, owner: Faction.NVA, isHomeBase: true },
+          { id: 'opfor_hq_north', name: 'OPFOR North', position: opforHQs[1], radius: 30, owner: Faction.NVA, isHomeBase: true },
+          { id: 'opfor_hq_south', name: 'OPFOR South', position: opforHQs[2], radius: 30, owner: Faction.NVA, isHomeBase: true },
         ],
       };
       vi.mocked(gameModeManager.getCurrentConfig).mockReturnValue(mockConfig as any);
@@ -513,9 +513,9 @@ describe('CombatantSpawnManager', () => {
       const position = new THREE.Vector3(-10, 0, -10);
       const size = 3;
 
-      spawnManager.spawnSquad(Faction.OPFOR, position, size);
+      spawnManager.spawnSquad(Faction.NVA, position, size);
 
-      expect(squadManager.createSquad).toHaveBeenCalledWith(Faction.OPFOR, position, size);
+      expect(squadManager.createSquad).toHaveBeenCalledWith(Faction.NVA, position, size);
       expect(combatants.size).toBe(size);
     });
   });

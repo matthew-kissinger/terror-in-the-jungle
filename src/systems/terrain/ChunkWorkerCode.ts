@@ -275,7 +275,8 @@ function poissonDiskSampling(width, height, minDist) {
   // Start with random point
   addPoint(Math.random() * width, Math.random() * height);
 
-  while (active.length > 0 && points.length < 500) {
+  const maxPoints = Math.min(1500, Math.max(500, Math.floor(width * height / (minDist * minDist))));
+  while (active.length > 0 && points.length < maxPoints) {
     const idx = Math.floor(Math.random() * active.length);
     const point = points[active[idx]];
     let found = false;
@@ -364,161 +365,217 @@ function getSlopeAtLocal(heightData, segments, size, localX, localZ) {
   return slopeAngle * (180 / Math.PI); // degrees
 }
 
-// Biome density multiplier based on elevation (DEM mode only)
-// Returns 0-1 multiplier for each vegetation type
-function getBiomeDensity(elevation, slopeDeg) {
-  // Steep slopes: minimal vegetation
-  if (slopeDeg > 45) return { fern: 0.1, elephantEar: 0, fanPalm: 0, coconut: 0, areca: 0, dipterocarp: 0, banyan: 0 };
-  if (slopeDeg > 35) return { fern: 0.3, elephantEar: 0.1, fanPalm: 0, coconut: 0, areca: 0, dipterocarp: 0.1, banyan: 0 };
+// ---------------------------------------------------------------------------
+// Biome classification (mirrors BiomeClassifier.ts)
+// ---------------------------------------------------------------------------
+let biomeRules = [];        // Array of { biomeId, elevationMin?, elevationMax?, slopeMax?, priority }
+let defaultBiomeId = 'denseJungle';
+let allBiomePalettes = {};  // Record<biomeId, vegetationPalette[]>
 
-  // Valley floor (370-600m): Dense lowland vegetation
-  if (elevation < 600) {
-    return { fern: 1.0, elephantEar: 1.2, fanPalm: 1.0, coconut: 0.8, areca: 0.6, dipterocarp: 0.5, banyan: 0.5 };
-  }
-  // Mid-slope (600-900m): Triple canopy
-  if (elevation < 900) {
-    return { fern: 0.8, elephantEar: 0.5, fanPalm: 0.6, coconut: 0.3, areca: 0.8, dipterocarp: 1.2, banyan: 1.0 };
-  }
-  // Ridgeline (900-1200m): Moderate
-  if (elevation < 1200) {
-    return { fern: 0.6, elephantEar: 0.2, fanPalm: 0.4, coconut: 0.1, areca: 0.5, dipterocarp: 0.6, banyan: 0.3 };
-  }
-  // High ridge (1200m+): Sparse
-  return { fern: 0.4, elephantEar: 0.05, fanPalm: 0.1, coconut: 0, areca: 0.1, dipterocarp: 0.1, banyan: 0 };
+function computeSlopeFromHeightData(heightData, segments, size) {
+  const mid = Math.floor(segments / 2);
+  const s = segments + 1;
+  const hC = heightData[mid * s + mid] || 0;
+  const hE = heightData[mid * s + Math.min(mid + 1, segments)] || 0;
+  const hN = heightData[Math.min(mid + 1, segments) * s + mid] || 0;
+  const step = size / segments;
+  const dx = hE - hC;
+  const dz = hN - hC;
+  return Math.atan(Math.sqrt(dx * dx + dz * dz) / step) * (180 / Math.PI);
 }
 
-function generateVegetationPositions(chunkX, chunkZ, size, heightData, segments) {
+function classifyBiomeWorker(elevation, slopeDeg) {
+  if (!biomeRules || biomeRules.length === 0) return defaultBiomeId;
+  let bestId = defaultBiomeId;
+  let bestPri = -Infinity;
+  for (let i = 0; i < biomeRules.length; i++) {
+    const r = biomeRules[i];
+    if (r.priority <= bestPri) continue;
+    if (r.elevationMin !== undefined && elevation < r.elevationMin) continue;
+    if (r.elevationMax !== undefined && elevation > r.elevationMax) continue;
+    if (r.slopeMax !== undefined && slopeDeg > r.slopeMax) continue;
+    bestId = r.biomeId;
+    bestPri = r.priority;
+  }
+  return bestId;
+}
+
+// ---------------------------------------------------------------------------
+// Data-driven vegetation generation
+// vegetationTypes and biomePalette are sent via 'setVegetationConfig' message
+// ---------------------------------------------------------------------------
+let vegTypes = [];      // Array of { id, yOffset, baseDensity, placement, poissonMinDistance }
+let biomePalette = [];  // Array of { typeId, densityMultiplier }
+
+const TRUNK_R_SQ = 9;
+const TRUNK_CELL = 3;
+
+function densityNoise(wx, wz) {
+  let h = ((wx * 374761 | 0) ^ (wz * 668265 | 0)) | 0;
+  h = (h ^ (h >> 13)) * 1274126177;
+  h = h ^ (h >> 16);
+  return (h & 0x7fff) / 0x7fff;
+}
+
+function createTrunkGrid() {
+  const cells = {};
+  function key(cx, cz) { return (cx + 1000) * 10000 + (cz + 1000); }
+  return {
+    add(x, z) {
+      const k = key(Math.floor(x / TRUNK_CELL), Math.floor(z / TRUNK_CELL));
+      if (!cells[k]) cells[k] = [];
+      cells[k].push({ x, z });
+    },
+    isNear(lx, lz) {
+      const cx = Math.floor(lx / TRUNK_CELL);
+      const cz = Math.floor(lz / TRUNK_CELL);
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          const cell = cells[key(cx + dx, cz + dz)];
+          if (!cell) continue;
+          for (let i = 0; i < cell.length; i++) {
+            const ddx = lx - cell[i].x;
+            const ddz = lz - cell[i].z;
+            if (ddx * ddx + ddz * ddz < TRUNK_R_SQ) return true;
+          }
+        }
+      }
+      return false;
+    }
+  };
+}
+
+function generateVegetationPositions(chunkX, chunkZ, size, heightData, segments, palette) {
   const baseX = chunkX * size;
   const baseZ = chunkZ * size;
-  // Scale density for larger chunks: keep vegetation count proportional to 64-unit chunks
-  const chunkScale = (size * size) / (64 * 64);
   const DENSITY_PER_UNIT = 1.0 / 128.0;
+  const MAX_PER_TYPE = Math.min(1500, Math.max(500, Math.floor(size * size / 128)));
 
-  const vegetation = {
-    fern: [],
-    elephantEar: [],
-    fanPalm: [],
-    coconut: [],
-    areca: [],
-    dipterocarp: [],
-    banyan: []
-  };
+  const vegetation = {};
+  const densityMap = {};
+  const activePalette = palette || biomePalette;
+  for (const entry of activePalette) densityMap[entry.typeId] = entry.densityMultiplier;
 
-  // Cap vegetation instances per chunk for performance with large chunks
-  const MAX_FERN = 500;
-  const MAX_SMALL_PLANT = 200;
-  const MAX_TREE = 100;
-
-  // Ferns - dense ground cover
-  const fernCount = Math.min(MAX_FERN, Math.floor(size * size * DENSITY_PER_UNIT * 6.0));
-  for (let i = 0; i < fernCount; i++) {
-    const localX = Math.random() * size;
-    const localZ = Math.random() * size;
-    const height = getHeightAtLocal(heightData, segments, size, localX, localZ);
-    if (useDEM) {
-      const slope = getSlopeAtLocal(heightData, segments, size, localX, localZ);
-      const biome = getBiomeDensity(height, slope);
-      if (Math.random() > biome.fern) continue;
-    }
-    vegetation.fern.push({
-      x: baseX + localX, y: height + 0.2, z: baseZ + localZ,
-      sx: randomInRange(2.4, 3.6), sy: randomInRange(2.4, 3.6)
-    });
+  const canopyTypes = [];
+  const midPoissonTypes = [];
+  const groundTypes = [];
+  for (const vt of vegTypes) {
+    const d = densityMap[vt.id];
+    if (d === undefined || d <= 0) continue;
+    if (vt.tier === 'canopy') canopyTypes.push(vt);
+    else if (vt.tier === 'midLevel' && vt.placement === 'poisson') midPoissonTypes.push(vt);
+    else groundTypes.push(vt);
   }
 
-  // Elephant ear
-  const elephantEarCount = Math.min(MAX_SMALL_PLANT, Math.floor(size * size * DENSITY_PER_UNIT * 0.8));
-  for (let i = 0; i < elephantEarCount; i++) {
-    const localX = Math.random() * size;
-    const localZ = Math.random() * size;
-    const height = getHeightAtLocal(heightData, segments, size, localX, localZ);
-    if (useDEM) {
-      const slope = getSlopeAtLocal(heightData, segments, size, localX, localZ);
-      const biome = getBiomeDensity(height, slope);
-      if (Math.random() > biome.elephantEar) continue;
-    }
-    vegetation.elephantEar.push({
-      x: baseX + localX, y: height + 0.8, z: baseZ + localZ,
-      sx: randomInRange(1.0, 1.5), sy: randomInRange(1.0, 1.5)
-    });
-  }
+  const trunkGrid = createTrunkGrid();
+  const MAX_CANOPY_SLOPE = 30;
+  const MAX_MID_SLOPE = 40;
 
-  // Fan Palm
-  const fanPalmCount = Math.min(MAX_SMALL_PLANT, Math.floor(size * size * DENSITY_PER_UNIT * 0.5));
-  for (let i = 0; i < fanPalmCount; i++) {
-    const localX = Math.random() * size;
-    const localZ = Math.random() * size;
-    const height = getHeightAtLocal(heightData, segments, size, localX, localZ);
-    if (useDEM) {
-      const slope = getSlopeAtLocal(heightData, segments, size, localX, localZ);
-      const biome = getBiomeDensity(height, slope);
-      if (Math.random() > biome.fanPalm) continue;
+  // ---- CANOPY: shared grid, slope + water + density noise ----
+  if (canopyTypes.length > 0) {
+    let maxMinDist = 16;
+    for (const ct of canopyTypes) {
+      if ((ct.poissonMinDistance || 16) > maxMinDist) maxMinDist = ct.poissonMinDistance;
     }
-    vegetation.fanPalm.push({
-      x: baseX + localX, y: height + 0.6, z: baseZ + localZ,
-      sx: randomInRange(0.8, 1.2), sy: randomInRange(0.8, 1.2)
-    });
-  }
-
-  // Coconut palms - Poisson distributed
-  const coconutPoints = poissonDiskSampling(size, size, 12);
-  const maxCoconuts = Math.min(MAX_TREE, Math.floor(size * size * DENSITY_PER_UNIT * 0.3));
-  for (let i = 0; i < Math.min(coconutPoints.length * 0.5, maxCoconuts); i++) {
-    const point = coconutPoints[i];
-    const height = getHeightAtLocal(heightData, segments, size, point.x, point.y);
-    if (useDEM) {
-      const slope = getSlopeAtLocal(heightData, segments, size, point.x, point.y);
-      const biome = getBiomeDensity(height, slope);
-      if (Math.random() > biome.coconut) continue;
+    const sharedPoints = poissonDiskSampling(size, size, maxMinDist);
+    let totalW = 0;
+    const weights = [];
+    for (const ct of canopyTypes) {
+      const w = ct.baseDensity * (densityMap[ct.id] || 0);
+      weights.push({ t: ct, w });
+      totalW += w;
     }
-    if (Math.random() < 0.8) {
-      vegetation.coconut.push({
-        x: baseX + point.x, y: height + 2.0, z: baseZ + point.y,
-        sx: randomInRange(0.8, 1.0), sy: randomInRange(0.9, 1.1)
-      });
+    let idx = 0;
+    for (const wt of weights) {
+      const share = totalW > 0 ? wt.w / totalW : 0;
+      const count = Math.floor(sharedPoints.length * share);
+      const insts = [];
+      for (let i = 0; i < count && idx < sharedPoints.length; i++, idx++) {
+        const p = sharedPoints[idx];
+        const h = getHeightAtLocal(heightData, segments, size, p.x, p.y);
+        if (h < 0) continue;
+        const slope = getSlopeAtLocal(heightData, segments, size, p.x, p.y);
+        if (slope > MAX_CANOPY_SLOPE) continue;
+        const dn = densityNoise(baseX + p.x, baseZ + p.y);
+        if (dn < 0.15) continue;
+        const s = randomInRange(0.9, 1.1);
+        insts.push({ x: baseX + p.x, y: h + wt.t.yOffset, z: baseZ + p.y, sx: s, sy: s });
+        trunkGrid.add(p.x, p.y);
+      }
+      if (insts.length > 0) vegetation[wt.t.id] = insts;
     }
   }
 
-  // Areca palms - Poisson distributed
-  const arecaPoints = poissonDiskSampling(size, size, 8);
-  const maxAreca = Math.min(MAX_TREE, Math.floor(size * size * DENSITY_PER_UNIT * 0.4));
-  for (let i = 0; i < Math.min(arecaPoints.length * 0.8, maxAreca); i++) {
-    const point = arecaPoints[i];
-    const height = getHeightAtLocal(heightData, segments, size, point.x, point.y);
-    if (useDEM) {
-      const slope = getSlopeAtLocal(heightData, segments, size, point.x, point.y);
-      const biome = getBiomeDensity(height, slope);
-      if (Math.random() > biome.areca) continue;
+  // ---- MID-LEVEL POISSON: shared grid, moderate slope ----
+  if (midPoissonTypes.length > 0) {
+    let maxMinDist = 8;
+    for (const mt of midPoissonTypes) {
+      if ((mt.poissonMinDistance || 8) > maxMinDist) maxMinDist = mt.poissonMinDistance;
     }
-    vegetation.areca.push({
-      x: baseX + point.x, y: height + 1.6, z: baseZ + point.y,
-      sx: randomInRange(0.8, 1.0), sy: randomInRange(0.8, 1.0)
-    });
+    const sharedPoints = poissonDiskSampling(size, size, maxMinDist);
+    let totalW = 0;
+    const weights = [];
+    for (const mt of midPoissonTypes) {
+      const w = mt.baseDensity * (densityMap[mt.id] || 0);
+      weights.push({ t: mt, w });
+      totalW += w;
+    }
+    let idx = 0;
+    for (const wt of weights) {
+      const share = totalW > 0 ? wt.w / totalW : 0;
+      const count = Math.floor(sharedPoints.length * share);
+      const insts = [];
+      for (let i = 0; i < count && idx < sharedPoints.length; i++, idx++) {
+        const p = sharedPoints[idx];
+        const h = getHeightAtLocal(heightData, segments, size, p.x, p.y);
+        if (h < 0) continue;
+        const slope = getSlopeAtLocal(heightData, segments, size, p.x, p.y);
+        if (slope > MAX_MID_SLOPE) continue;
+        const dn = densityNoise(baseX + p.x, baseZ + p.y);
+        if (dn < 0.1) continue;
+        const s = randomInRange(0.9, 1.1);
+        insts.push({ x: baseX + p.x, y: h + wt.t.yOffset, z: baseZ + p.y, sx: s, sy: s });
+        trunkGrid.add(p.x, p.y);
+      }
+      if (insts.length > 0) vegetation[wt.t.id] = insts;
+    }
   }
 
-  // Giant trees - Poisson distributed
-  const giantTreePoints = poissonDiskSampling(size, size, 16);
-  const maxGiantTrees = Math.min(MAX_TREE, Math.floor(size * size * DENSITY_PER_UNIT * 0.15));
-  for (let i = 0; i < Math.min(giantTreePoints.length, maxGiantTrees); i++) {
-    const point = giantTreePoints[i];
-    const height = getHeightAtLocal(heightData, segments, size, point.x, point.y);
-    if (useDEM) {
-      const slope = getSlopeAtLocal(heightData, segments, size, point.x, point.y);
-      const biome = getBiomeDensity(height, slope);
-      if (i % 2 === 0 && Math.random() > biome.dipterocarp) continue;
-      if (i % 2 !== 0 && Math.random() > biome.banyan) continue;
-    }
-    if (i % 2 === 0) {
-      vegetation.dipterocarp.push({
-        x: baseX + point.x, y: height + 8.0, z: baseZ + point.y,
-        sx: randomInRange(0.9, 1.1), sy: randomInRange(0.9, 1.1)
-      });
+  // ---- GROUND COVER + RANDOM MID: trunk suppression, water, density noise ----
+  for (const vt of groundTypes) {
+    const biomeDensity = densityMap[vt.id];
+    const effectiveDensity = vt.baseDensity * biomeDensity;
+    const insts = [];
+
+    if (vt.placement === 'poisson') {
+      const minDist = vt.poissonMinDistance || 10;
+      const pts = poissonDiskSampling(size, size, minDist);
+      const maxCount = Math.min(MAX_PER_TYPE, Math.floor(size * size * DENSITY_PER_UNIT * effectiveDensity));
+      const limit = Math.min(pts.length, maxCount);
+      for (let i = 0; i < limit; i++) {
+        const p = pts[i];
+        const h = getHeightAtLocal(heightData, segments, size, p.x, p.y);
+        if (h < 0) continue;
+        if (trunkGrid.isNear(p.x, p.y)) continue;
+        const s = randomInRange(0.9, 1.1);
+        insts.push({ x: baseX + p.x, y: h + vt.yOffset, z: baseZ + p.y, sx: s, sy: s });
+      }
     } else {
-      vegetation.banyan.push({
-        x: baseX + point.x, y: height + 7.0, z: baseZ + point.y,
-        sx: randomInRange(0.9, 1.1), sy: randomInRange(0.9, 1.1)
-      });
+      const count = Math.min(MAX_PER_TYPE, Math.floor(size * size * DENSITY_PER_UNIT * effectiveDensity));
+      for (let i = 0; i < count; i++) {
+        const lx = Math.random() * size;
+        const lz = Math.random() * size;
+        const h = getHeightAtLocal(heightData, segments, size, lx, lz);
+        if (h < 0) continue;
+        if (trunkGrid.isNear(lx, lz)) continue;
+        const dn = densityNoise(baseX + lx, baseZ + lz);
+        if (Math.random() > dn) continue;
+        const s = randomInRange(0.9, 1.1);
+        insts.push({ x: baseX + lx, y: h + vt.yOffset, z: baseZ + lz, sx: s, sy: s });
+      }
     }
+
+    if (insts.length > 0) vegetation[vt.id] = insts;
   }
 
   return vegetation;
@@ -547,8 +604,42 @@ self.onmessage = function(event) {
     return;
   }
 
+  if (request.type === 'setVegetationConfig') {
+    vegTypes = request.vegetationTypes || [];
+    biomePalette = request.biomePalette || [];
+    return;
+  }
+
+  if (request.type === 'setBiomeConfig') {
+    biomeRules = request.biomeRules || [];
+    defaultBiomeId = request.defaultBiomeId || 'denseJungle';
+    allBiomePalettes = request.allBiomePalettes || {};
+    return;
+  }
+
   if (request.type === 'generate') {
     const result = generateChunk(request);
+
+    // Classify biome from chunk center height + slope
+    const cx = request.chunkX * request.size + request.size / 2;
+    const cz = request.chunkZ * request.size + request.size / 2;
+    const centerIdx = Math.floor(request.segments / 2) * (request.segments + 1) + Math.floor(request.segments / 2);
+    const centerElev = result.heightData[centerIdx] || 0;
+    const centerSlope = computeSlopeFromHeightData(result.heightData, request.segments, request.size);
+    const chunkBiomeId = classifyBiomeWorker(centerElev, centerSlope);
+
+    // Re-generate vegetation with per-chunk biome palette if available
+    const chunkPalette = allBiomePalettes[chunkBiomeId];
+    if (chunkPalette && chunkPalette.length > 0) {
+      const perBiomeVeg = generateVegetationPositions(
+        request.chunkX, request.chunkZ, request.size,
+        result.heightData, request.segments, chunkPalette
+      );
+      result.vegetation = perBiomeVeg;
+    }
+
+    result.biomeId = chunkBiomeId;
+
     self.postMessage(result, [
       result.positions.buffer,
       result.normals.buffer,

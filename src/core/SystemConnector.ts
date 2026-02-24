@@ -65,11 +65,12 @@ export class SystemConnector {
     refs.fullMapSystem.setGameModeManager(refs.gameModeManager);
     refs.compassSystem.setZoneManager(refs.zoneManager);
 
-    // Mount compass, minimap, and health into grid slots
+    // Mount compass, minimap, health, and squad indicator into grid slots
     const layout = refs.hudSystem.getLayout();
     refs.compassSystem.mountTo(layout.getSlot('compass'));
     refs.minimapSystem.mountTo(layout.getSlot('minimap'));
     refs.playerHealthSystem.mountUI(layout.getSlot('health'));
+    refs.playerSquadController.mountIndicatorTo(layout.getSlot('stats'));
     refs.zoneManager.setCombatantSystem(refs.combatantSystem);
     refs.zoneManager.setCamera(camera);
     refs.zoneManager.setChunkManager(refs.chunkManager);
@@ -95,6 +96,11 @@ export class SystemConnector {
     refs.helipadSystem.setTerrainManager(refs.chunkManager);
     refs.helipadSystem.setVegetationSystem(refs.globalBillboardSystem);
     refs.helipadSystem.setGameModeManager(refs.gameModeManager);
+    refs.helipadSystem.onHelipadsCreated((helipads) => {
+      const markers = helipads.map(hp => ({ id: hp.id, position: hp.position }));
+      refs.minimapSystem.setHelipadMarkers(markers);
+      refs.fullMapSystem.setHelipadMarkers(markers);
+    });
 
     // Connect helicopter model
     refs.helicopterModel.setTerrainManager(refs.chunkManager);

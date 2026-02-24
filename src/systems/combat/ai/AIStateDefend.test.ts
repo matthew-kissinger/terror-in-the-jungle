@@ -101,7 +101,7 @@ describe('AIStateDefend', () => {
     it('should transition to ALERT when enemy is found within 50m and LOS is clear', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(10, 0, 10));
       combatant.defensePosition = new THREE.Vector3(10, 0, 10);
-      const enemy = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(20, 0, 20));
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(20, 0, 20));
       
       findNearestEnemy.mockReturnValue(enemy);
       canSeeTarget.mockReturnValue(true);
@@ -119,7 +119,7 @@ describe('AIStateDefend', () => {
     it('should face enemy before checking LOS', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(10, 0, 10));
       combatant.rotation = 0;
-      const enemy = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(0, 0, 0));
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(0, 0, 0));
       
       findNearestEnemy.mockReturnValue(enemy);
       canSeeTarget.mockReturnValue(false); // Should still rotate even if LOS fails
@@ -135,7 +135,7 @@ describe('AIStateDefend', () => {
 
     it('should react immediately and bypass LOS check at very close range (<15m)', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(10, 0, 10));
-      const enemy = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(12, 0, 12));
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(12, 0, 12));
       
       findNearestEnemy.mockReturnValue(enemy);
       canSeeTarget.mockReturnValue(false); // LOS blocked
@@ -150,7 +150,7 @@ describe('AIStateDefend', () => {
 
     it('should apply staggered reaction delay when local cluster density is high', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(100, 0, 100));
-      const enemy = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(110, 0, 100));
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(110, 0, 100));
       allCombatants.set(combatant.id, combatant);
       for (let i = 0; i < 4; i++) {
         allCombatants.set(`ally-${i}`, createMockCombatant(`ally-${i}`, Faction.US, new THREE.Vector3(101 + i, 0, 100)));

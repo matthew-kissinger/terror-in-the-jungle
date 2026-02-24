@@ -193,7 +193,7 @@ describe('AmmoSupplySystem', () => {
     });
 
     it('should not create crate for enemy zone', async () => {
-      friendlyZone.owner = Faction.OPFOR;
+      friendlyZone.owner = Faction.NVA;
       await system.init();
       system.update(0.016);
 
@@ -228,7 +228,7 @@ describe('AmmoSupplySystem', () => {
     });
 
     it('should show crate when zone is captured by friendly', async () => {
-      zone.owner = Faction.OPFOR;
+      zone.owner = Faction.NVA;
       await system.init();
       system.update(0.016);
 
@@ -251,7 +251,7 @@ describe('AmmoSupplySystem', () => {
       expect(crateGroup.visible).toBe(true);
 
       // Lose zone
-      zone.owner = Faction.OPFOR;
+      zone.owner = Faction.NVA;
       system.update(0.016);
 
       expect(crateGroup.visible).toBe(false);
@@ -801,7 +801,7 @@ describe('AmmoSupplySystem', () => {
           id: 'zone3',
           name: 'Charlie',
           position: new THREE.Vector3(100, 0, 0),
-          owner: Faction.OPFOR,
+          owner: Faction.NVA,
         },
       ];
 

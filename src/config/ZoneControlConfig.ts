@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Faction } from '../systems/combat/types';
+import { Faction, Alliance } from '../systems/combat/types';
 import { GameMode, GameModeConfig, WeatherState } from './gameModeTypes';
 
 // Zone Control - Current smaller scale mode
@@ -22,8 +22,16 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
   name: 'Zone Control',
   description: 'Fast-paced combat over 3 strategic zones. Control the majority to drain enemy tickets.',
 
-  worldSize: 500,  // Slightly larger to accommodate spread
-  chunkRenderDistance: 8,  // Increased to push terrain edge further with height fog
+  worldSize: 500,
+  chunkRenderDistance: 5,
+  terrain: {
+    defaultBiome: 'denseJungle',
+    biomeRules: [
+      { biomeId: 'highland',   elevationMin: 15, slopeMax: 45, priority: 3 },
+      { biomeId: 'tallGrass',  elevationMax: 5,  slopeMax: 10, priority: 2 },
+      { biomeId: 'denseJungle', elevationMax: 15, priority: 1 },
+    ],
+  },
   weather: {
     enabled: true,
     initialState: WeatherState.LIGHT_RAIN,
@@ -67,7 +75,7 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
       position: new THREE.Vector3(0, 0, 220),
       radius: 25,
       isHomeBase: true,
-      owner: Faction.OPFOR,
+      owner: Faction.VC,
       ticketBleedRate: 0
     },
     // Capture Zones - staggered layout, wider apart
@@ -98,5 +106,9 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
       owner: null,
       ticketBleedRate: 1
     }
-  ]
+  ],
+  factionMix: {
+    [Alliance.BLUFOR]: [Faction.US],
+    [Alliance.OPFOR]: [Faction.VC],
+  }
 };

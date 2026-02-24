@@ -1,8 +1,9 @@
 import { Logger } from '../../../utils/Logger';
 import * as THREE from 'three'
-import { ProgrammaticGunFactory } from '../ProgrammaticGunFactory'
 import { GunplayCore, WeaponSpec } from '../../weapons/GunplayCore'
 import type { IAmmoManager, IAudioManager, IHUDSystem } from '../../../types/SystemInterfaces'
+import { modelLoader } from '../../assets/ModelLoader'
+import { WeaponModels } from '../../assets/modelPaths'
 
 /**
  * Manages weapon model creation and switching between rifle/shotgun/SMG
@@ -81,34 +82,149 @@ export class WeaponRigManager {
   }
 
   async init(): Promise<void> {
-    // Build programmatic rifle
-    this.rifleRig = ProgrammaticGunFactory.createRifle()
+    // Load GLB weapon models in parallel
+    const [rifleScene, shotgunScene, smgScene, pistolScene] = await Promise.all([
+      modelLoader.loadModel(WeaponModels.M16A1),
+      modelLoader.loadModel(WeaponModels.ITHACA37),
+      modelLoader.loadModel(WeaponModels.M3_GREASE_GUN),
+      modelLoader.loadModel(WeaponModels.M1911),
+    ])
+
+    // Configure each weapon rig: barrel along +X, use MeshBasicMaterial for
+    // first-person overlay (unlit, matches weapon scene rendering)
+    this.rifleRig = this.prepareWeaponRig(rifleScene, 1.5, false)
     this.rifleRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.weaponScene.add(this.rifleRig)
 
-    // Build programmatic shotgun
-    this.shotgunRig = ProgrammaticGunFactory.createShotgun()
+    this.shotgunRig = this.prepareWeaponRig(shotgunScene, 1.5, true)
     this.shotgunRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
-    this.shotgunRig.visible = false // Hidden initially
+    this.shotgunRig.visible = false
     this.weaponScene.add(this.shotgunRig)
 
-    // Build programmatic SMG
-    this.smgRig = ProgrammaticGunFactory.createSMG()
+    this.smgRig = this.prepareWeaponRig(smgScene, 1.5, false)
     this.smgRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
-    this.smgRig.visible = false // Hidden initially
+    this.smgRig.visible = false
     this.weaponScene.add(this.smgRig)
 
-    // Build programmatic Pistol
-    this.pistolRig = ProgrammaticGunFactory.createPistol()
+    this.pistolRig = this.prepareWeaponRig(pistolScene, 1.7, false)
     this.pistolRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
-    this.pistolRig.visible = false // Hidden initially
+    this.pistolRig.visible = false
     this.weaponScene.add(this.pistolRig)
 
     // Start with rifle active
     this.weaponRig = this.rifleRig
     this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined
     this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined
-    this.pumpGripRef = undefined // Only shotgun has pump grip
+    this.pumpGripRef = undefined
+  }
+
+  /**
+   * Prepare a loaded GLB scene for first-person weapon display.
+   * GLB models face +Z (convention), weapon scene expects barrel along +X.
+   * Converts MeshStandardMaterial to MeshBasicMaterial for unlit FPS overlay.
+   * Adds fallback named markers (muzzle, magazine, pumpGrip) for animations.
+   */
+  private prepareWeaponRig(scene: THREE.Group, scale: number, isShotgun: boolean): THREE.Group {
+    const rig = new THREE.Group()
+
+    // Rotate so +Z-facing GLB barrel points along +X (rig-local barrel axis)
+    // +π/2 around Y: +Z → +X, then updateTransform's +π/2 sends +X → -Z (away from player)
+    scene.rotation.y = Math.PI / 2
+
+    // Convert to unlit materials for weapon overlay scene
+    scene.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+        const std = child.material
+        child.material = new THREE.MeshBasicMaterial({
+          color: std.color,
+          map: std.map,
+          transparent: std.transparent,
+          opacity: std.opacity,
+        })
+        std.dispose()
+      }
+    })
+
+    rig.add(scene)
+    rig.scale.set(scale, scale, scale)
+
+    // Wire GLB magazine meshes under a 'magazine' group for reload animation.
+    // Shotgun (Ithaca 37) has a fixed tubular magazine - no detachable mag animation.
+    // GLB nodes: Mesh_Magazine, Mesh_MagFloorPlate, Mesh_MagFeedLips, Mesh_MagBase, Mesh_MagazineBase
+    if (!isShotgun && !rig.getObjectByName('magazine')) {
+      const magParts: THREE.Object3D[] = []
+      scene.traverse((child) => {
+        const n = child.name.toLowerCase()
+        if (n.includes('magazine') || n === 'mesh_magfloorplate' || n === 'mesh_magfeedlips' || n === 'mesh_magbase') {
+          magParts.push(child)
+        }
+      })
+      if (magParts.length > 0) {
+        // Group magazine parts under a single parent so reload moves them all
+        const magGroup = new THREE.Group()
+        magGroup.name = 'magazine'
+        // Use first part's position as pivot
+        const pivot = magParts[0].position.clone()
+        magGroup.position.copy(pivot)
+        for (const part of magParts) {
+          part.removeFromParent()
+          part.position.sub(pivot)
+          magGroup.add(part)
+        }
+        scene.add(magGroup)
+      } else {
+        // Fallback invisible marker
+        const magazine = new THREE.Object3D()
+        magazine.name = 'magazine'
+        magazine.position.set(0.2, -0.25, 0)
+        magazine.rotation.set(0, 0, 0.1)
+        rig.add(magazine)
+      }
+    }
+
+    // Attach a muzzle marker at the actual barrel tip.
+    // Priority list matches the four weapon GLBs:
+    //   Mesh_FlashHider  → M16A1  (flash hider at barrel end)
+    //   Mesh_Muzzle      → M3 Grease Gun (dedicated muzzle node)
+    //   Mesh_FrontBead   → Ithaca37 (front bead at muzzle end)
+    //   Mesh_BarrelBushing → M1911 (bushing at barrel muzzle end)
+    //   Mesh_Barrel      → universal fallback
+    if (!rig.getObjectByName('muzzle')) {
+      const MUZZLE_TIP_NAMES = [
+        'Mesh_FlashHider',
+        'Mesh_Muzzle',
+        'Mesh_FrontBead',
+        'Mesh_BarrelBushing',
+        'Mesh_Barrel',
+      ]
+      const muzzle = new THREE.Object3D()
+      muzzle.name = 'muzzle'
+
+      let attached = false
+      for (const name of MUZZLE_TIP_NAMES) {
+        const tipNode = rig.getObjectByName(name)
+        if (tipNode instanceof THREE.Mesh && tipNode.geometry) {
+          tipNode.geometry.computeBoundingBox()
+          const bbox = tipNode.geometry.boundingBox
+          if (bbox) {
+            // In GLB convention the barrel faces +Z; bbox.max.z is the forward tip.
+            // The GLB scene is rotated π/2 around Y so +Z → +X in rig space,
+            // meaning this offset moves the marker to the physical muzzle tip.
+            muzzle.position.set(0, 0, bbox.max.z)
+          }
+          tipNode.add(muzzle)
+          attached = true
+          break
+        }
+      }
+
+      if (!attached) {
+        muzzle.position.set(1.7, 0, 0)
+        rig.add(muzzle)
+      }
+    }
+
+    return rig
   }
 
   getCurrentRig(): THREE.Group | undefined {
@@ -236,8 +352,8 @@ export class WeaponRigManager {
         this.weaponRig = this.shotgunRig
         this.gunCore = this.shotgunCore
         this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined
-        this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined
-        this.pumpGripRef = this.weaponRig.getObjectByName('pumpGrip') || undefined
+        this.magazineRef = undefined // Ithaca 37 has fixed tubular mag - no reload animation
+        this.pumpGripRef = undefined // No pump grip animation
         break
       case 'smg':
         this.rifleRig.visible = false

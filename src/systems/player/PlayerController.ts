@@ -11,7 +11,7 @@ import { SandbagSystem } from '../weapons/SandbagSystem';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { RallyPointSystem } from '../combat/RallyPointSystem';
 import { FootstepAudioSystem } from '../audio/FootstepAudioSystem';
-import { PlayerInput } from './PlayerInput';
+import { InputManager } from '../input/InputManager';
 import { PlayerMovement } from './PlayerMovement';
 import { PlayerCamera } from './PlayerCamera';
 import { Logger } from '../../utils/Logger';
@@ -46,7 +46,7 @@ export class PlayerController implements GameSystem {
   private spawnStabilizationUntilMs = 0;
 
   // New modules
-  private input: PlayerInput;
+  private input: InputManager;
   private movement: PlayerMovement;
   private cameraController: PlayerCamera;
 
@@ -69,7 +69,7 @@ export class PlayerController implements GameSystem {
     };
 
     // Initialize modules
-    this.input = new PlayerInput();
+    this.input = new InputManager();
     this.movement = new PlayerMovement(this.playerState);
     this.cameraController = new PlayerCamera(camera, this.playerState);
 
@@ -134,6 +134,7 @@ export class PlayerController implements GameSystem {
       onGrenadeSwitch: () => this.handleTouchGrenadeSwitch(),
       onWeaponSlotChange: (slot: WeaponSlot) => this.handleWeaponSlotChange(slot),
       onSquadCommand: () => this.playerSquadController?.toggleRadialMenu(),
+      onSquadQuickCommand: (slot: number) => this.playerSquadController?.issueQuickCommand(slot),
       onMenuPause: () => this.handleMenuPause(),
       onMenuResume: () => this.handleMenuResume(),
     });
@@ -244,12 +245,14 @@ export class PlayerController implements GameSystem {
 
   private handleMenuPause(): void {
     this.input.setControlsEnabled(false);
+    this.input.setInputContext('menu');
     this.playerState.velocity.set(0, 0, 0);
     this.playerState.isRunning = false;
   }
 
   private handleMenuResume(): void {
     this.input.setControlsEnabled(true);
+    this.input.setInputContext('gameplay');
   }
 
   private handleEscape(): void {
@@ -507,7 +510,10 @@ export class PlayerController implements GameSystem {
   }
   enableControls(): void { this.input.setControlsEnabled(true); this.input.relockPointer(); }
   setPointerLockEnabled(enabled: boolean): void { this.input.setPointerLockEnabled(enabled); }
-  setGameStarted(started: boolean): void { this.input.setGameStarted(started); }
+  setGameStarted(started: boolean): void {
+    this.input.setGameStarted(started);
+    this.input.setInputContext(started ? 'gameplay' : 'menu');
+  }
 
   applyRecoil(pitchDeltaRad: number, yawDeltaRad: number): void { this.cameraController.applyRecoil(pitchDeltaRad, yawDeltaRad); }
   applyScreenShake(intensity: number, duration: number = 0.2): void { if (this.cameraShakeSystem) this.cameraShakeSystem.shake(intensity, duration); }

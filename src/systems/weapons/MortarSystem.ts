@@ -7,7 +7,8 @@ import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { InventoryManager } from '../player/InventoryManager';
 import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
-import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
+import { modelLoader } from '../assets/ModelLoader';
+import { StructureModels } from '../assets/modelPaths';
 import { MortarBallistics } from './MortarBallistics';
 import { MortarVisuals } from './MortarVisuals';
 import { MortarRoundManager } from './MortarRoundManager';
@@ -112,36 +113,74 @@ export class MortarSystem implements GameSystem {
     this.visuals.dispose();
   }
 
+  private isDeploying = false;
+
   deployMortar(playerPosition: THREE.Vector3, playerDirection: THREE.Vector3): boolean {
     if (this.ticketSystem && !this.ticketSystem.isGameActive()) return false;
-    if (this.isDeployed) {
+    if (this.isDeployed || this.isDeploying) {
       Logger.warn('mortar', ' Mortar already deployed');
       return false;
     }
 
+    this.isDeploying = true;
+
     // Calculate deployment position (in front of player)
-    _deployPos.copy(playerPosition);
-    _direction.copy(playerDirection).multiplyScalar(3);
-    _deployPos.add(_direction);
-    _deployPos.y = this.getGroundHeight(_deployPos.x, _deployPos.z);
+    const deployTarget = playerPosition.clone();
+    const dir = playerDirection.clone().multiplyScalar(3);
+    deployTarget.add(dir);
+    deployTarget.y = this.getGroundHeight(deployTarget.x, deployTarget.z);
 
-    // Create mortar tube mesh
-    this.mortarTube = ProgrammaticExplosivesFactory.createMortarTube();
-    this.mortarTube.position.copy(_deployPos);
-    this.scene.add(this.mortarTube);
+    const yawAtDeploy = Math.atan2(playerDirection.x, playerDirection.z) * 180 / Math.PI;
 
-    if (this.tubePosition) {
-      this.tubePosition.copy(_deployPos);
-    } else {
-      this.tubePosition = _deployPos.clone();
-    }
-    this.isDeployed = true;
-
-    // Initialize yaw to face player's direction
-    this.yaw = Math.atan2(playerDirection.x, playerDirection.z) * 180 / Math.PI;
-
-    Logger.info('mortar', `Mortar deployed at (${_deployPos.x.toFixed(1)}, ${_deployPos.y.toFixed(1)}, ${_deployPos.z.toFixed(1)})`);
+    // Load mortar GLB model async, then finalize deployment
+    void this.finishDeploy(deployTarget, yawAtDeploy);
     return true;
+  }
+
+  private async finishDeploy(pos: THREE.Vector3, yawDeg: number): Promise<void> {
+    try {
+      const scene = await modelLoader.loadModel(StructureModels.MORTAR_PIT);
+
+      // Tag the tube mesh for pitch rotation if found
+      let tubeFound = false;
+      scene.traverse((child) => {
+        const n = child.name.toLowerCase();
+        if (n === 'tube' || n.includes('tube') || n.includes('barrel')) {
+          child.name = 'tube';
+          tubeFound = true;
+        }
+      });
+
+      // If no named tube part, wrap the whole model in a group named 'tube'
+      if (!tubeFound) {
+        const tubeWrapper = new THREE.Group();
+        tubeWrapper.name = 'tube';
+        // Move all children into the wrapper
+        while (scene.children.length > 0) {
+          tubeWrapper.add(scene.children[0]);
+        }
+        scene.add(tubeWrapper);
+      }
+
+      this.mortarTube = scene;
+      this.mortarTube.position.copy(pos);
+      this.scene.add(this.mortarTube);
+
+      if (this.tubePosition) {
+        this.tubePosition.copy(pos);
+      } else {
+        this.tubePosition = pos.clone();
+      }
+
+      this.yaw = yawDeg;
+      this.isDeployed = true;
+      this.isDeploying = false;
+
+      Logger.info('mortar', `Mortar deployed at (${pos.x.toFixed(1)}, ${pos.y.toFixed(1)}, ${pos.z.toFixed(1)})`);
+    } catch (err) {
+      this.isDeploying = false;
+      Logger.warn('mortar', 'Failed to load mortar model', err);
+    }
   }
 
   undeployMortar(): void {
@@ -255,8 +294,42 @@ export class MortarSystem implements GameSystem {
   }
 
   private spawnMortarRound(position: THREE.Vector3, velocity: THREE.Vector3): void {
-    const mesh = ProgrammaticExplosivesFactory.createMortarRound();
+    const mesh = this.createMortarRound();
     this.roundManager.spawnRound(mesh, position, velocity, this.FUSE_TIME);
+  }
+
+  /** Procedural mortar round projectile (small, no GLB needed). */
+  private createMortarRound(): THREE.Group {
+    const round = new THREE.Group();
+    round.name = 'mortar_round';
+
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.35, 0.35, 1.5, 12),
+      new THREE.MeshStandardMaterial({ color: 0x4A5D23, metalness: 0.5, roughness: 0.6 })
+    );
+    body.castShadow = true;
+    round.add(body);
+
+    const nose = new THREE.Mesh(
+      new THREE.ConeGeometry(0.35, 0.6, 12),
+      new THREE.MeshStandardMaterial({ color: 0x606060, metalness: 0.8, roughness: 0.3 })
+    );
+    nose.position.y = 1.05;
+    nose.castShadow = true;
+    round.add(nose);
+
+    const finGeo = new THREE.BoxGeometry(0.15, 0.8, 0.05);
+    const finMat = new THREE.MeshStandardMaterial({ color: 0x505050, metalness: 0.7, roughness: 0.4 });
+    for (let i = 0; i < 4; i++) {
+      const fin = new THREE.Mesh(finGeo, finMat);
+      const angle = (i / 4) * Math.PI * 2;
+      fin.position.set(Math.cos(angle) * 0.35, -0.9, Math.sin(angle) * 0.35);
+      fin.rotation.y = angle;
+      fin.castShadow = true;
+      round.add(fin);
+    }
+
+    return round;
   }
 
   private updateTrajectoryPreview(): void {

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { Combatant, Faction } from './types';
+import { Combatant, Faction, isBlufor, isOpfor } from './types';
 import { CaptureZone } from '../world/ZoneManager';
 import { InfluenceCell, InfluenceMapGrid } from './InfluenceMapGrid';
 import { Logger } from '../../utils/Logger';
@@ -163,7 +163,7 @@ export class InfluenceMapSystem implements GameSystem {
         // For OPFOR, invert threat level preference
         let score = cell.combinedScore;
 
-        if (faction === Faction.OPFOR) {
+        if (isOpfor(faction)) {
           // OPFOR wants to attack high-threat areas (where player is)
           score = cell.opportunityLevel * 2.0 +
                   cell.threatLevel * 1.5 +  // Seek threat instead of avoiding
@@ -312,8 +312,8 @@ export class InfluenceMapSystem implements GameSystem {
       const x = Math.floor((zone.position.x - this.worldOffset.x) / this.cellSize);
       const z = Math.floor((zone.position.z - this.worldOffset.y) / this.cellSize);
 
-      ctx.strokeStyle = zone.owner === Faction.US ? 'blue' :
-                        zone.owner === Faction.OPFOR ? 'red' : 'white';
+      ctx.strokeStyle = zone.owner !== null && isBlufor(zone.owner as Faction) ? 'blue' :
+                        zone.owner !== null && isOpfor(zone.owner as Faction) ? 'red' : 'white';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(

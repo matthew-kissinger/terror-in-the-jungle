@@ -6,7 +6,7 @@ import { spatialGridManager } from '../systems/combat/SpatialGridManager';
 import { ShotCommandFactory } from '../systems/player/weapon/ShotCommand';
 import { Logger } from '../utils/Logger';
 import { GameMode } from '../config/gameModes';
-import { Faction } from '../systems/combat/types';
+import { isOpfor } from '../systems/combat/types';
 
 interface SystemTimingEntry {
   name: string;
@@ -63,7 +63,7 @@ export class SystemUpdater {
 
     this.trackSystemUpdate('Terrain', 2.0, () => {
       performanceTelemetry.beginSystem('Terrain');
-      if (refs.chunkManager) refs.chunkManager.update(deltaTime);
+      if (refs.chunkManager && gameStarted) refs.chunkManager.update(deltaTime);
       performanceTelemetry.endSystem('Terrain');
     });
 
@@ -213,7 +213,7 @@ export class SystemUpdater {
     const playerPos = refs.playerController.getPosition();
     const contactRadiusSq = this.ASHAU_CONTACT_RADIUS * this.ASHAU_CONTACT_RADIUS;
     const hasNearbyOpfor = refs.combatantSystem.getAllCombatants().some(c => {
-      if (c.faction !== Faction.OPFOR || c.state === 'dead' || c.health <= 0) return false;
+      if (!isOpfor(c.faction) || c.state === 'dead' || c.health <= 0) return false;
       const dx = c.position.x - playerPos.x;
       const dz = c.position.z - playerPos.z;
       return (dx * dx + dz * dz) <= contactRadiusSq;

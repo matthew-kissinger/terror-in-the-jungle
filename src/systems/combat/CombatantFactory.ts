@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, AISkillProfile, Faction } from './types';
+import { Combatant, CombatantState, AISkillProfile, Faction, isOpfor } from './types';
 import { WeaponSpec, GunplayCore } from '../weapons/GunplayCore';
 
 export class CombatantFactory {
@@ -53,8 +53,7 @@ export class CombatantFactory {
       updatePriority: 0,
       lodLevel: 'high',
 
-      // 40% of OPFOR are objective-focused (less aggressive)
-      isObjectiveFocused: faction === Faction.OPFOR && Math.random() < 0.4,
+      isObjectiveFocused: isOpfor(faction) && Math.random() < 0.4,
 
       kills: 0,
       deaths: 0,
@@ -104,76 +103,94 @@ export class CombatantFactory {
   }
 
   private createWeaponSpec(faction: Faction): WeaponSpec {
-    if (faction === Faction.US) {
-      return {
-        name: 'M16A4',
-        rpm: 750,
-        adsTime: 0.18,
-        baseSpreadDeg: 0.6,
-        bloomPerShotDeg: 0.2,
-        recoilPerShotDeg: 0.55,
-        recoilHorizontalDeg: 0.3,
-        damageNear: 26,
-        damageFar: 18,
-        falloffStart: 25,
-        falloffEnd: 65,
-        headshotMultiplier: 1.7,
-        penetrationPower: 1
-      };
-    } else {
-      return {
-        name: 'AK-74',
-        rpm: 600,
-        adsTime: 0.20,
-        baseSpreadDeg: 0.8,
-        bloomPerShotDeg: 0.3,
-        recoilPerShotDeg: 0.75,
-        recoilHorizontalDeg: 0.4,
-        damageNear: 30,
-        damageFar: 16,
-        falloffStart: 20,
-        falloffEnd: 55,
-        headshotMultiplier: 1.6,
-        penetrationPower: 1.2
-      };
+    switch (faction) {
+      case Faction.US:
+        return {
+          name: 'M16A1', rpm: 750, adsTime: 0.18,
+          baseSpreadDeg: 0.6, bloomPerShotDeg: 0.2,
+          recoilPerShotDeg: 0.55, recoilHorizontalDeg: 0.3,
+          damageNear: 26, damageFar: 18,
+          falloffStart: 25, falloffEnd: 65,
+          headshotMultiplier: 1.7, penetrationPower: 1
+        };
+      case Faction.ARVN:
+        return {
+          name: 'M16A1', rpm: 750, adsTime: 0.20,
+          baseSpreadDeg: 0.7, bloomPerShotDeg: 0.25,
+          recoilPerShotDeg: 0.60, recoilHorizontalDeg: 0.35,
+          damageNear: 26, damageFar: 18,
+          falloffStart: 25, falloffEnd: 65,
+          headshotMultiplier: 1.7, penetrationPower: 1
+        };
+      case Faction.NVA:
+        return {
+          name: 'AK-47', rpm: 600, adsTime: 0.20,
+          baseSpreadDeg: 0.8, bloomPerShotDeg: 0.3,
+          recoilPerShotDeg: 0.75, recoilHorizontalDeg: 0.4,
+          damageNear: 30, damageFar: 16,
+          falloffStart: 20, falloffEnd: 55,
+          headshotMultiplier: 1.6, penetrationPower: 1.2
+        };
+      case Faction.VC:
+        return {
+          name: 'AK-47', rpm: 600, adsTime: 0.22,
+          baseSpreadDeg: 0.9, bloomPerShotDeg: 0.35,
+          recoilPerShotDeg: 0.80, recoilHorizontalDeg: 0.45,
+          damageNear: 30, damageFar: 16,
+          falloffStart: 20, falloffEnd: 55,
+          headshotMultiplier: 1.6, penetrationPower: 1.2
+        };
     }
   }
 
   private createSkillProfile(faction: Faction, role: 'leader' | 'follower'): AISkillProfile {
-    let baseProfile: AISkillProfile;
+    const isLead = role === 'leader';
+    const profiles: Record<Faction, AISkillProfile> = {
+      [Faction.NVA]: {
+        reactionDelayMs: isLead ? 400 : 600,
+        aimJitterAmplitude: isLead ? 1.2 : 1.8,
+        burstLength: isLead ? 4 : 3,
+        burstPauseMs: isLead ? 800 : 1000,
+        leadingErrorFactor: isLead ? 0.7 : 0.5,
+        suppressionResistance: isLead ? 0.8 : 0.6,
+        visualRange: 130, fieldOfView: 130,
+        firstShotAccuracy: 0.4, burstDegradation: 3.5
+      },
+      [Faction.VC]: {
+        reactionDelayMs: isLead ? 350 : 550,
+        aimJitterAmplitude: isLead ? 1.4 : 2.0,
+        burstLength: isLead ? 3 : 2,
+        burstPauseMs: isLead ? 700 : 900,
+        leadingErrorFactor: isLead ? 0.6 : 0.4,
+        suppressionResistance: isLead ? 0.6 : 0.4,
+        visualRange: 120, fieldOfView: 140,
+        firstShotAccuracy: 0.5, burstDegradation: 4.0
+      },
+      [Faction.US]: {
+        reactionDelayMs: isLead ? 450 : 650,
+        aimJitterAmplitude: isLead ? 1.5 : 2.0,
+        burstLength: isLead ? 3 : 3,
+        burstPauseMs: isLead ? 900 : 1100,
+        leadingErrorFactor: isLead ? 0.6 : 0.4,
+        suppressionResistance: isLead ? 0.7 : 0.5,
+        visualRange: 120, fieldOfView: 120,
+        firstShotAccuracy: 0.5, burstDegradation: 4.0
+      },
+      [Faction.ARVN]: {
+        reactionDelayMs: isLead ? 500 : 700,
+        aimJitterAmplitude: isLead ? 1.6 : 2.2,
+        burstLength: isLead ? 3 : 2,
+        burstPauseMs: isLead ? 1000 : 1200,
+        leadingErrorFactor: isLead ? 0.5 : 0.35,
+        suppressionResistance: isLead ? 0.6 : 0.4,
+        visualRange: 110, fieldOfView: 120,
+        firstShotAccuracy: 0.55, burstDegradation: 4.5
+      },
+    };
 
-    if (faction === Faction.OPFOR) {
-      baseProfile = {
-        reactionDelayMs: role === 'leader' ? 400 : 600,
-        aimJitterAmplitude: role === 'leader' ? 1.2 : 1.8, // Increased from 0.3/0.5
-        burstLength: role === 'leader' ? 4 : 3,
-        burstPauseMs: role === 'leader' ? 800 : 1000,
-        leadingErrorFactor: role === 'leader' ? 0.7 : 0.5, // Reduced accuracy
-        suppressionResistance: role === 'leader' ? 0.8 : 0.6,
-        visualRange: 130,
-        fieldOfView: 130,
-        firstShotAccuracy: 0.4, // Increased from 0.15 (less accurate)
-        burstDegradation: 3.5 // Increased from 2.0
-      };
-    } else {
-      baseProfile = {
-        reactionDelayMs: role === 'leader' ? 450 : 650,
-        aimJitterAmplitude: role === 'leader' ? 1.5 : 2.0, // Increased from 0.4/0.6
-        burstLength: role === 'leader' ? 3 : 3,
-        burstPauseMs: role === 'leader' ? 900 : 1100,
-        leadingErrorFactor: role === 'leader' ? 0.6 : 0.4, // Reduced accuracy
-        suppressionResistance: role === 'leader' ? 0.7 : 0.5,
-        visualRange: 120,
-        fieldOfView: 120,
-        firstShotAccuracy: 0.5, // Increased from 0.2 (less accurate)
-        burstDegradation: 4.0 // Increased from 2.5
-      };
-    }
-
-    // Add some randomization for variety
+    const baseProfile = { ...profiles[faction] };
     baseProfile.reactionDelayMs += (Math.random() - 0.5) * 100;
-    baseProfile.aimJitterAmplitude += (Math.random() - 0.5) * 0.3; // Increased variation
-
+    baseProfile.aimJitterAmplitude += (Math.random() - 0.5) * 0.3;
     return baseProfile;
   }
 }

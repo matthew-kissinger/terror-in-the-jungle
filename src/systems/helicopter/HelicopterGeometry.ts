@@ -1,170 +1,195 @@
 import * as THREE from 'three';
-import { createCockpitGeometry, createRotorSystems, createDoorGuns } from './HelicopterGeometryParts';
+import { modelLoader } from '../assets/ModelLoader';
+import { AircraftModels } from '../assets/modelPaths';
+import { Logger } from '../../utils/Logger';
 
 /**
- * Creates the 3D geometry for a UH-1 Huey helicopter.
- * This module handles all mesh creation, materials, and geometry assembly.
+ * Aircraft metadata for display and identification.
  */
-export function createUH1HueyGeometry(): THREE.Group {
-  const helicopterGroup = new THREE.Group();
+interface AircraftInfo {
+  modelPath: string;
+  displayName: string;
+  faction: string;
+}
 
-  // Olive drab military colors
-  const oliveDrab = 0x4B5320;
-  const metalGray = 0x555555;
-  const blackMetal = 0x222222;
+const AIRCRAFT_INFO: Record<string, AircraftInfo> = {
+  UH1_HUEY:      { modelPath: AircraftModels.UH1_HUEY,      displayName: 'UH-1 Huey',      faction: 'US' },
+  UH1C_GUNSHIP:  { modelPath: AircraftModels.UH1C_GUNSHIP,  displayName: 'UH-1C Gunship',  faction: 'US' },
+  AH1_COBRA:     { modelPath: AircraftModels.AH1_COBRA,      displayName: 'AH-1 Cobra',     faction: 'US' },
+  AC47_SPOOKY:   { modelPath: AircraftModels.AC47_SPOOKY,    displayName: 'AC-47 Spooky',   faction: 'US' },
+  F4_PHANTOM:    { modelPath: AircraftModels.F4_PHANTOM,      displayName: 'F-4 Phantom',    faction: 'US' },
+  A1_SKYRAIDER:  { modelPath: AircraftModels.A1_SKYRAIDER,    displayName: 'A-1 Skyraider',  faction: 'US' },
+};
 
-  // Create properly proportioned cabin and cockpit
-  const wallThickness = 0.1;
-
-  // MAIN CABIN - larger troop/cargo area
-  const cabinWidth = 3.2;
-  const cabinHeight = 2.8;
-  const cabinLength = 6;
-
-  // Cabin bottom panel
-  const cabinBottom = new THREE.Mesh(
-    new THREE.BoxGeometry(cabinLength, wallThickness, cabinWidth),
-    new THREE.MeshLambertMaterial({ color: oliveDrab })
-  );
-  cabinBottom.position.set(0.5, 0.8, 0);
-  helicopterGroup.add(cabinBottom);
-
-  // Cabin top panel
-  const cabinTop = new THREE.Mesh(
-    new THREE.BoxGeometry(cabinLength, wallThickness, cabinWidth),
-    new THREE.MeshLambertMaterial({ color: oliveDrab })
-  );
-  cabinTop.position.set(0.5, 3.6, 0);
-  helicopterGroup.add(cabinTop);
-
-  // Cabin back wall
-  const cabinBack = new THREE.Mesh(
-    new THREE.BoxGeometry(wallThickness, cabinHeight, cabinWidth),
-    new THREE.MeshLambertMaterial({ color: oliveDrab })
-  );
-  cabinBack.position.set(3.5, 2.2, 0);
-  helicopterGroup.add(cabinBack);
-
-  // COCKPIT SECTION - proper Huey nose design
-  const cockpitGroup = createCockpitGeometry();
-  helicopterGroup.add(cockpitGroup);
-
-  // Cabin side walls with large door openings for troop access
-
-  // Left cabin wall with door opening
-  const leftWallFront = new THREE.Mesh(
-    new THREE.BoxGeometry(1.8, cabinHeight, wallThickness),
-    new THREE.MeshLambertMaterial({ color: oliveDrab })
-  );
-  leftWallFront.position.set(-1.1, 2.2, -1.6);
-  helicopterGroup.add(leftWallFront);
-
-  const leftWallRear = new THREE.Mesh(
-    new THREE.BoxGeometry(1.7, cabinHeight, wallThickness),
-    new THREE.MeshLambertMaterial({ color: oliveDrab })
-  );
-  leftWallRear.position.set(2.15, 2.2, -1.6);
-  helicopterGroup.add(leftWallRear);
-
-  // Right cabin wall with door opening
-  const rightWallFront = new THREE.Mesh(
-    new THREE.BoxGeometry(1.8, cabinHeight, wallThickness),
-    new THREE.MeshLambertMaterial({ color: oliveDrab })
-  );
-  rightWallFront.position.set(-1.1, 2.2, 1.6);
-  helicopterGroup.add(rightWallFront);
-
-  const rightWallRear = new THREE.Mesh(
-    new THREE.BoxGeometry(1.7, cabinHeight, wallThickness),
-    new THREE.MeshLambertMaterial({ color: oliveDrab })
-  );
-  rightWallRear.position.set(2.15, 2.2, 1.6);
-  helicopterGroup.add(rightWallRear);
-
-  // Tail boom - extending from rear
-  const tailBoomGeometry = new THREE.CylinderGeometry(0.4, 0.6, 6, 8);
-  const tailBoomMaterial = new THREE.MeshLambertMaterial({ color: oliveDrab });
-  const tailBoom = new THREE.Mesh(tailBoomGeometry, tailBoomMaterial);
-  tailBoom.rotation.z = Math.PI / 2;
-  tailBoom.position.set(5.5, 1.5, 0);
-  helicopterGroup.add(tailBoom);
-
-  // ROTOR SYSTEMS - main and tail rotors
-  const { mainRotor, tailRotor } = createRotorSystems();
-  helicopterGroup.add(mainRotor);
-  helicopterGroup.add(tailRotor);
-
-  // Landing skids - lowered and better proportioned
-  const skidGeometry = new THREE.BoxGeometry(5, 0.15, 0.25);
-  const skidMaterial = new THREE.MeshLambertMaterial({ color: metalGray });
-
-  const leftSkid = new THREE.Mesh(skidGeometry, skidMaterial);
-  leftSkid.position.set(-0.5, 0.2, -1.5);
-  helicopterGroup.add(leftSkid);
-
-  const rightSkid = new THREE.Mesh(skidGeometry, skidMaterial);
-  rightSkid.position.set(-0.5, 0.2, 1.5);
-  helicopterGroup.add(rightSkid);
-
-  // Skid supports - adjusted for lower height
-  const supportGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.8, 6);
-  const supportMaterial = new THREE.MeshLambertMaterial({ color: metalGray });
-
-  for (let i = 0; i < 4; i++) {
-    const support = new THREE.Mesh(supportGeometry, supportMaterial);
-    const x = i < 2 ? -2 : 1;
-    const z = i % 2 === 0 ? -1.5 : 1.5;
-    support.position.set(x, 0.6, z);
-    helicopterGroup.add(support);
+/**
+ * Load any aircraft GLB and wire rotor groups for animation.
+ *
+ * All GLBs face +Z (Y-up). Rotated -90° Y so nose faces forward.
+ * HelicopterAnimation.updateRotors() looks for children with
+ * userData.type === 'mainBlades' / 'tailBlades' and spins them.
+ *
+ * Blade meshes named MainRotor/MainBlade and TailRotor/TailBlade
+ * are auto-grouped under spin parents. Synthetic blades are added as fallback.
+ */
+export async function createHelicopterGeometry(
+  aircraftKey: string,
+  helicopterId: string,
+): Promise<THREE.Group> {
+  const info = AIRCRAFT_INFO[aircraftKey];
+  if (!info) {
+    Logger.warn('helicopter', `Unknown aircraft key "${aircraftKey}", falling back to UH1_HUEY`);
   }
+  const { modelPath, displayName, faction } = info ?? AIRCRAFT_INFO.UH1_HUEY;
 
-  // Engine exhaust
-  const exhaustGeometry = new THREE.CylinderGeometry(0.3, 0.2, 1, 6);
-  const exhaustMaterial = new THREE.MeshLambertMaterial({ color: blackMetal });
-  const exhaust = new THREE.Mesh(exhaustGeometry, exhaustMaterial);
-  exhaust.position.set(1.5, 3.2, 0);
-  exhaust.rotation.z = Math.PI / 4;
-  helicopterGroup.add(exhaust);
+  const scene = await modelLoader.loadModel(modelPath);
 
-  // Add some interior detail for hollow effect
-  const interiorFloor = new THREE.Mesh(
-    new THREE.PlaneGeometry(4, 2),
-    new THREE.MeshLambertMaterial({
-      color: 0x333333,
-      side: THREE.DoubleSide
-    })
-  );
-  interiorFloor.rotation.x = -Math.PI / 2;
-  interiorFloor.position.set(0, 0.85, 0);
-  helicopterGroup.add(interiorFloor);
+  // Rotate GLB -90 degrees so nose faces forward in game space
+  scene.rotation.y = -Math.PI / 2;
 
-  // Door-mounted M60 machine guns - improved Vietnam Huey design
-  const [leftMinigun, rightMinigun] = createDoorGuns();
-  helicopterGroup.add(leftMinigun);
-  helicopterGroup.add(rightMinigun);
+  const helicopterGroup = new THREE.Group();
+  helicopterGroup.add(scene);
 
-  // US Army star markings (simplified) - positioned on the rear walls
-  const starGeometry = new THREE.CylinderGeometry(0.35, 0.35, 0.02, 5);
-  const starMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
-
-  const leftStar = new THREE.Mesh(starGeometry, starMaterial);
-  leftStar.position.set(1.65, 1.8, -1.26);
-  leftStar.rotation.x = Math.PI / 2;
-  leftStar.rotation.z = Math.PI / 2;
-  helicopterGroup.add(leftStar);
-
-  const rightStar = new THREE.Mesh(starGeometry, starMaterial);
-  rightStar.position.set(1.65, 1.8, 1.26);
-  rightStar.rotation.x = -Math.PI / 2;
-  rightStar.rotation.z = Math.PI / 2;
-  helicopterGroup.add(rightStar);
+  wireRotorGroups(scene, helicopterGroup);
 
   helicopterGroup.userData = {
     type: 'helicopter',
-    model: 'UH-1 Huey',
-    faction: 'US',
-    id: 'us_huey'
+    model: displayName,
+    faction,
+    id: helicopterId,
   };
 
   return helicopterGroup;
+}
+
+/** Legacy wrapper kept for backward compatibility. */
+export async function createUH1HueyGeometry(): Promise<THREE.Group> {
+  return createHelicopterGeometry('UH1_HUEY', 'us_huey');
+}
+
+// ─── Rotor wiring ─────────────────────────────────────────────────────────
+
+function wireRotorGroups(scene: THREE.Group, helicopterGroup: THREE.Group): void {
+  const mainBladeNodes: THREE.Object3D[] = [];
+  const tailBladeNodes: THREE.Object3D[] = [];
+  let rotorHub: THREE.Object3D | undefined;
+
+  scene.traverse((child) => {
+    const name = child.name.toLowerCase();
+
+    // Match grouped rotor parts (if model already has a spin group)
+    if (name.includes('mainrotor') || name.includes('main_rotor') || name.includes('mainblades') || name.includes('main_blades')) {
+      child.userData.type = 'mainBlades';
+    } else if (name.includes('tailrotor') || name.includes('tail_rotor') || name.includes('tailblades') || name.includes('tail_blades')) {
+      child.userData.type = 'tailBlades';
+    }
+
+    // Match individual blade/rotor meshes
+    if (name.includes('mainblade') || name.includes('mainrotor')) {
+      mainBladeNodes.push(child);
+    } else if (name.includes('tailblade') || name.includes('tailrotor')) {
+      tailBladeNodes.push(child);
+    } else if (name.includes('rotorhub')) {
+      rotorHub = child;
+    }
+  });
+
+  // Group individual main blades under a single spin parent
+  const hasGroupedMain = !!helicopterGroup.getObjectByName('mainBlades') ||
+    Array.from(helicopterGroup.children).some(c => c.userData.type === 'mainBlades');
+  if (mainBladeNodes.length > 0 && !hasGroupedMain) {
+    groupBladesUnderParent(scene, mainBladeNodes, 'mainBlades', rotorHub);
+  }
+
+  // Group individual tail blades
+  const hasGroupedTail = Array.from(helicopterGroup.children).some(c => c.userData.type === 'tailBlades');
+  if (tailBladeNodes.length > 0 && !hasGroupedTail) {
+    groupBladesUnderParent(scene, tailBladeNodes, 'tailBlades');
+  }
+
+  // Synthetic fallbacks if no blades found at all
+  if (mainBladeNodes.length === 0 && !hasGroupedMain) {
+    const mainBlades = createSyntheticMainRotor();
+    mainBlades.position.set(0, 4.5, 0);
+    helicopterGroup.add(mainBlades);
+    Logger.debug('helicopter', 'Added synthetic main rotor blades');
+  }
+  if (tailBladeNodes.length === 0 && !hasGroupedTail) {
+    const tailBlades = createSyntheticTailRotor();
+    tailBlades.position.set(-6, 2.5, 0);
+    helicopterGroup.add(tailBlades);
+    Logger.debug('helicopter', 'Added synthetic tail rotor blades');
+  }
+}
+
+function groupBladesUnderParent(
+  scene: THREE.Group,
+  bladeNodes: THREE.Object3D[],
+  groupName: string,
+  hub?: THREE.Object3D,
+): void {
+  const group = new THREE.Group();
+  group.name = groupName;
+  group.userData.type = groupName;
+
+  const pivot = hub
+    ? hub.getWorldPosition(new THREE.Vector3())
+    : bladeNodes[0].getWorldPosition(new THREE.Vector3());
+  scene.worldToLocal(pivot);
+  group.position.copy(pivot);
+
+  for (const blade of bladeNodes) {
+    const worldPos = blade.getWorldPosition(new THREE.Vector3());
+    scene.worldToLocal(worldPos);
+    blade.removeFromParent();
+    blade.position.sub(pivot);
+    group.add(blade);
+  }
+  if (hub) {
+    const worldPos = hub.getWorldPosition(new THREE.Vector3());
+    scene.worldToLocal(worldPos);
+    hub.removeFromParent();
+    hub.position.sub(pivot);
+    group.add(hub);
+  }
+  scene.add(group);
+  Logger.debug('helicopter', `Grouped ${bladeNodes.length} ${groupName} meshes under spin parent`);
+}
+
+// ─── Synthetic fallback rotors ────────────────────────────────────────────
+
+function createSyntheticMainRotor(): THREE.Group {
+  const bladesGroup = new THREE.Group();
+  bladesGroup.userData = { type: 'mainBlades' };
+
+  const blackMetal = 0x222222;
+  const bladeGeometry = new THREE.BoxGeometry(8.5, 0.06, 0.28);
+  const bladeMaterial = new THREE.MeshLambertMaterial({ color: blackMetal });
+
+  const blade1 = new THREE.Mesh(bladeGeometry, bladeMaterial);
+  bladesGroup.add(blade1);
+
+  const blade2 = new THREE.Mesh(bladeGeometry, bladeMaterial);
+  blade2.rotation.y = Math.PI / 2;
+  bladesGroup.add(blade2);
+
+  return bladesGroup;
+}
+
+function createSyntheticTailRotor(): THREE.Group {
+  const bladesGroup = new THREE.Group();
+  bladesGroup.userData = { type: 'tailBlades' };
+
+  const blackMetal = 0x222222;
+  const bladeGeometry = new THREE.BoxGeometry(0.04, 1.4, 0.06);
+  const bladeMaterial = new THREE.MeshLambertMaterial({ color: blackMetal });
+
+  const blade1 = new THREE.Mesh(bladeGeometry, bladeMaterial);
+  blade1.position.set(0, 0.7, 0);
+  bladesGroup.add(blade1);
+
+  const blade2 = new THREE.Mesh(bladeGeometry, bladeMaterial);
+  blade2.position.set(0, -0.7, 0);
+  bladesGroup.add(blade2);
+
+  return bladesGroup;
 }

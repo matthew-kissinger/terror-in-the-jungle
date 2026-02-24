@@ -1,8 +1,5 @@
 /**
- * KillCounter - Player K/D/A display
- *
- * Design: Bare text with text-shadow. Compact single-line format.
- * Kill count is brightest, death count secondary, K/D ratio tertiary.
+ * KillCounter - Compact K/D display
  */
 
 .container {
@@ -11,6 +8,7 @@
   gap: var(--space-2);
   pointer-events: none;
   user-select: none;
+  padding: 2px 4px;
 }
 
 .stat {
@@ -45,14 +43,6 @@
   color: var(--text-secondary);
 }
 
-.ratio {
-  font-size: var(--font-size-2xs);
-  font-weight: var(--weight-semibold);
-  color: var(--text-muted);
-  text-shadow: var(--shadow-text);
-  line-height: 1;
-}
-
 /* Responsive */
 @media (max-width: 768px) {
   .value {
@@ -75,9 +65,5 @@
 
   .container {
     gap: var(--space-1);
-  }
-
-  .ratio {
-    display: none;
   }
 }

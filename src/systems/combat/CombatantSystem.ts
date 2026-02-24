@@ -3,7 +3,7 @@ import { GameSystem } from '../../types';
 import { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
 import { AssetLoader } from '../assets/AssetLoader';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
-import { Combatant, CombatantState, Faction } from './types';
+import { Combatant, CombatantState, Faction, isBlufor, isOpfor } from './types';
 import { TracerPool } from '../effects/TracerPool';
 import { MuzzleFlashSystem } from '../effects/MuzzleFlashSystem';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
@@ -196,7 +196,7 @@ export class CombatantSystem implements GameSystem {
   }
 
   async init(): Promise<void> {
-    Logger.info('Combat', 'Initializing Combatant System (US vs OPFOR)...');
+    Logger.info('Combat', 'Initializing Combatant System (BLUFOR vs OPFOR)...');
 
     // Create billboard meshes for each faction and state
     await this.combatantRenderer.createFactionBillboards();
@@ -419,7 +419,7 @@ export class CombatantSystem implements GameSystem {
     let opfor = 0;
     this.combatants.forEach(combatant => {
       if (combatant.state === CombatantState.DEAD) return;
-      if (combatant.faction === Faction.US) {
+      if (isBlufor(combatant.faction)) {
         us++;
       } else {
         opfor++;
@@ -431,7 +431,7 @@ export class CombatantSystem implements GameSystem {
   getTeamKillStats(): { usKills: number; usDeaths: number; opforKills: number; opforDeaths: number } {
     let usKills = 0; let usDeaths = 0; let opforKills = 0; let opforDeaths = 0;
     this.combatants.forEach(combatant => {
-      if (combatant.faction === Faction.US) {
+      if (isBlufor(combatant.faction)) {
         usKills += combatant.kills || 0;
         usDeaths += combatant.deaths || 0;
       } else {

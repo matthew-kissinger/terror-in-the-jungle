@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction, Squad } from './types';
+import { Combatant, CombatantState, Faction, Squad, isBlufor } from './types';
 import { PlayerHealthSystem } from '../player/PlayerHealthSystem';
 import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
@@ -226,8 +226,8 @@ export class CombatantDamage {
 
     // Audio
     if (this.audioManager) {
-      const isAlly = target.faction === Faction.US;
-      this.audioManager.playDeathSound(target.position, isAlly);
+      const isAllyDeath = isBlufor(target.faction);
+      this.audioManager.playDeathSound(target.position, isAllyDeath);
     }
 
     // Ticket system

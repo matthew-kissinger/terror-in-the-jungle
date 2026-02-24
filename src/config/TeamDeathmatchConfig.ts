@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Faction } from '../systems/combat/types';
+import { Faction, Alliance } from '../systems/combat/types';
 import { GameMode, GameModeConfig, WeatherState } from './gameModeTypes';
 
 // Team Deathmatch - Pure combat mode
@@ -10,6 +10,14 @@ export const TEAM_DEATHMATCH_CONFIG: GameModeConfig = {
 
   worldSize: 400,
   chunkRenderDistance: 6,
+  terrain: {
+    defaultBiome: 'denseJungle',
+    biomeRules: [
+      { biomeId: 'highland',   elevationMin: 15, slopeMax: 45, priority: 3 },
+      { biomeId: 'tallGrass',  elevationMax: 5,  slopeMax: 10, priority: 2 },
+      { biomeId: 'denseJungle', elevationMax: 15, priority: 1 },
+    ],
+  },
   weather: {
     enabled: true,
     initialState: WeatherState.CLEAR,
@@ -48,12 +56,16 @@ export const TEAM_DEATHMATCH_CONFIG: GameModeConfig = {
     },
     {
       id: 'opfor_base',
-      name: 'OPFOR Deployment',
+      name: 'NVA Deployment',
       position: new THREE.Vector3(0, 0, 150),
       radius: 30,
       isHomeBase: true,
-      owner: Faction.OPFOR,
+      owner: Faction.NVA,
       ticketBleedRate: 0
     }
-  ]
+  ],
+  factionMix: {
+    [Alliance.BLUFOR]: [Faction.US],
+    [Alliance.OPFOR]: [Faction.NVA],
+  }
 };

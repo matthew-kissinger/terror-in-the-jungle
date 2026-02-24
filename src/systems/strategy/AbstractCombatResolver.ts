@@ -1,4 +1,4 @@
-import { Faction } from '../combat/types';
+import { Faction, isBlufor } from '../combat/types';
 import { WarSimulatorConfig } from '../../config/gameModeTypes';
 import { AgentTier, StrategicAgent, StrategicSquad } from './types';
 import { WarEventEmitter } from './WarEventEmitter';
@@ -65,7 +65,7 @@ export class AbstractCombatResolver {
 
     for (const squad of this.squads.values()) {
       if (squad.strength <= 0) continue;
-      if (squad.faction === Faction.US) usSquads.push(squad);
+      if (isBlufor(squad.faction)) usSquads.push(squad);
       else opforSquads.push(squad);
     }
 

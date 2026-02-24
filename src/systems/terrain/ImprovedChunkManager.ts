@@ -12,13 +12,18 @@ import { ChunkPriorityManager } from './ChunkPriorityManager';
 import { ChunkLifecycleManager } from './ChunkLifecycleManager';
 import { ChunkTerrainQueries } from './ChunkTerrainQueries';
 import { ChunkLoadQueueManager } from './ChunkLoadQueueManager';
+import { BiomeTexturePool } from './BiomeTexturePool';
+import { BiomeClassificationRule } from '../../config/biomes';
+import { HeightQueryCache, getHeightQueryCache } from './HeightQueryCache';
 
 export interface ChunkConfig {
   size: number;
   renderDistance: number;
   loadDistance: number;
   lodLevels: number;
-  skipTerrainMesh?: boolean; // When true, chunks only spawn vegetation (GPU terrain handles visuals)
+  skipTerrainMesh?: boolean;
+  defaultBiomeId?: string;
+  biomeRules?: BiomeClassificationRule[];
 }
 
 /**
@@ -42,10 +47,11 @@ export class ImprovedChunkManager implements GameSystem {
   // LOS acceleration
   private losAccelerator: LOSAccelerator = new LOSAccelerator();
 
-  // Web worker pool for parallel chunk generation
   private workerPool: ChunkWorkerPool | null = null;
   private bvhWorker: ViteBVHWorker | null = null;
   private readonly USE_WORKERS = true;
+  private biomeTexturePool: BiomeTexturePool;
+  private heightQueryCache: HeightQueryCache;
 
   // Player tracking
   private playerPosition = new THREE.Vector3();
@@ -90,6 +96,9 @@ export class ImprovedChunkManager implements GameSystem {
     this.maxRenderDistance = config.renderDistance;
     this.minRenderDistance = Math.max(3, Math.floor(config.renderDistance / 2));
 
+    this.biomeTexturePool = new BiomeTexturePool(assetLoader);
+    this.heightQueryCache = getHeightQueryCache();
+
     // Initialize worker pool for parallel chunk generation
     if (this.USE_WORKERS) {
       try {
@@ -120,19 +129,22 @@ export class ImprovedChunkManager implements GameSystem {
 
     this.lifecycleManager = new ChunkLifecycleManager(
       scene,
-      assetLoader,
       globalBillboardSystem,
       {
         size: config.size,
         loadDistance: config.loadDistance,
         renderDistance: config.renderDistance,
         skipTerrainMesh: config.skipTerrainMesh,
-        enableMeshMerging: false // Disabled by default: async merge spikes stall the main thread.
+        enableMeshMerging: false,
+        defaultBiomeId: config.defaultBiomeId,
+        biomeRules: config.biomeRules,
       },
       this.noiseGenerator,
       this.losAccelerator,
       this.workerPool,
-      this.bvhWorker
+      this.bvhWorker,
+      this.biomeTexturePool,
+      this.heightQueryCache,
     );
 
     // Initialize terrain queries manager
@@ -236,6 +248,7 @@ export class ImprovedChunkManager implements GameSystem {
       this.bvhWorker = null;
     }
 
+    this.biomeTexturePool.dispose();
     Logger.info('chunks', 'Chunk manager disposed');
   }
 
@@ -412,22 +425,24 @@ export class ImprovedChunkManager implements GameSystem {
     // Dispose existing chunks since they have the wrong size
     this.lifecycleManager.dispose();
 
-    // Reinitialize lifecycle manager with new config
     this.lifecycleManager = new ChunkLifecycleManager(
       this.scene,
-      this.assetLoader,
       this.globalBillboardSystem,
       {
         size,
         loadDistance: this.config.loadDistance,
         renderDistance: this.config.renderDistance,
         skipTerrainMesh: this.config.skipTerrainMesh,
-        enableMeshMerging: false
+        enableMeshMerging: false,
+        defaultBiomeId: this.config.defaultBiomeId,
+        biomeRules: this.config.biomeRules,
       },
       this.noiseGenerator,
       this.losAccelerator,
       this.workerPool,
-      this.bvhWorker
+      this.bvhWorker,
+      this.biomeTexturePool,
+      this.heightQueryCache,
     );
 
     // Update terrain queries with new lifecycle manager
@@ -437,7 +452,16 @@ export class ImprovedChunkManager implements GameSystem {
     );
   }
 
-  // Game mode configuration
+  setBiomeConfig(defaultBiomeId: string, biomeRules?: BiomeClassificationRule[]): void {
+    this.config.defaultBiomeId = defaultBiomeId;
+    this.config.biomeRules = biomeRules;
+    this.lifecycleManager.updateConfig({
+      defaultBiomeId,
+      biomeRules,
+    });
+    Logger.info('chunks', `Biome config set: default=${defaultBiomeId}, rules=${biomeRules?.length ?? 0}`);
+  }
+
   setRenderDistance(distance: number): void {
     this.config.renderDistance = distance;
     this.config.loadDistance = distance + 1;

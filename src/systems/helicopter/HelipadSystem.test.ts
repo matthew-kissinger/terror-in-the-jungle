@@ -78,6 +78,26 @@ vi.mock('../terrain/ImprovedChunkManager', () => ({
   ImprovedChunkManager: vi.fn()
 }));
 
+vi.mock('../assets/ModelLoader', () => ({
+  modelLoader: {
+    loadModel: vi.fn(async () => {
+      const THREE = await import('three');
+      const group = new THREE.Group();
+      const mesh = new THREE.Mesh(
+        new THREE.BoxGeometry(1, 1, 1),
+        new THREE.MeshLambertMaterial()
+      );
+      mesh.receiveShadow = true;
+      group.add(mesh);
+      return group;
+    }),
+  }
+}));
+
+vi.mock('../assets/modelPaths', () => ({
+  StructureModels: { HELIPAD: 'structures/helipad.glb' }
+}));
+
 vi.mock('../world/GameModeManager', () => ({
   GameModeManager: vi.fn()
 }));
@@ -85,6 +105,8 @@ vi.mock('../world/GameModeManager', () => ({
 import * as THREE from 'three';
 import { HelipadSystem } from './HelipadSystem';
 import { Logger } from '../../utils/Logger';
+
+const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0));
 
 function createMockScene(): THREE.Scene {
   return new THREE.Scene();
@@ -95,6 +117,7 @@ function createMockTerrainManager(heightValue = 10) {
     getHeightAt: vi.fn().mockReturnValue(heightValue),
     getChunkAt: vi.fn().mockReturnValue({ id: 'chunk-1' }),
     registerCollisionObject: vi.fn(),
+    unregisterCollisionObject: vi.fn(),
   };
 }
 
@@ -150,33 +173,33 @@ describe('HelipadSystem', () => {
   // ─── Setter Methods ───────────────────────────────────────────────
 
   describe('setTerrainManager', () => {
-    it('stores terrain manager reference', () => {
+    it('stores terrain manager reference', async () => {
       const tm = createMockTerrainManager();
       system.setTerrainManager(tm as any);
-      // Verify by triggering createHelipadWhenReady which uses terrainManager
       system.createHelipadWhenReady();
+      await flushPromises();
       expect(tm.getHeightAt).toHaveBeenCalled();
     });
   });
 
   describe('setVegetationSystem', () => {
-    it('stores vegetation system reference', () => {
+    it('stores vegetation system reference', async () => {
       const vs = createMockVegetationSystem();
       system.setVegetationSystem(vs);
-      // Vegetation is used during helipad creation
       system.setTerrainManager(createMockTerrainManager() as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       expect(vs.clearArea).toHaveBeenCalled();
     });
   });
 
   describe('setGameModeManager', () => {
-    it('stores game mode manager reference', () => {
+    it('stores game mode manager reference', async () => {
       const gmm = createMockGameModeManager();
       system.setGameModeManager(gmm as any);
-      // Used in update() to check game mode
       system.setTerrainManager(createMockTerrainManager() as any);
       system.update(0.016);
+      await flushPromises();
       expect(gmm.getCurrentConfig).toHaveBeenCalled();
     });
   });
@@ -184,16 +207,19 @@ describe('HelipadSystem', () => {
   // ─── createHelipadWhenReady ───────────────────────────────────────
 
   describe('createHelipadWhenReady', () => {
-    it('creates helipad when terrain manager is set', () => {
+    it('creates helipad when terrain manager is set', async () => {
       system.setTerrainManager(createMockTerrainManager() as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       expect(scene.children.length).toBe(1);
     });
 
-    it('does not create duplicate helipads', () => {
+    it('does not create duplicate helipads', async () => {
       system.setTerrainManager(createMockTerrainManager() as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       system.createHelipadWhenReady();
+      await flushPromises();
       expect(scene.children.length).toBe(1);
     });
 
@@ -211,9 +237,10 @@ describe('HelipadSystem', () => {
   // ─── Helipad Geometry ─────────────────────────────────────────────
 
   describe('helipad geometry', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       system.setTerrainManager(createMockTerrainManager() as any);
       system.createHelipadWhenReady();
+      await flushPromises();
     });
 
     it('creates a Group added to scene', () => {
@@ -227,56 +254,64 @@ describe('HelipadSystem', () => {
       expect(helipad.userData).toEqual({
         type: 'helipad',
         faction: 'US',
-        id: 'us_helipad',
       });
     });
 
-    it('creates expected number of children (platform + border + 3 H bars + 4 pillars + 8 lights = 17)', () => {
+    it('creates helipad with GLB model child', () => {
       const helipad = scene.children[0] as THREE.Group;
-      // platform(1) + border(1) + leftBar(1) + rightBar(1) + crossBar(1) + 4 pillars + 8 lights = 17
-      expect(helipad.children.length).toBe(17);
+      // helipadGroup wraps the loaded GLB scene
+      expect(helipad.children.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('platform receives shadow', () => {
+    it('loaded mesh receives shadow', () => {
       const helipad = scene.children[0] as THREE.Group;
-      const platform = helipad.children[0];
-      expect(platform.receiveShadow).toBe(true);
+      // Find the mesh inside the GLB model
+      let meshFound = false;
+      helipad.traverse((child: any) => {
+        if (child.isMesh) {
+          expect(child.receiveShadow).toBe(true);
+          meshFound = true;
+        }
+      });
+      expect(meshFound).toBe(true);
     });
   });
 
   // ─── Terrain Height Sampling ──────────────────────────────────────
 
   describe('terrain height sampling', () => {
-    it('samples multiple terrain points to find max height', () => {
+    it('samples multiple terrain points to find max height', async () => {
       const tm = createMockTerrainManager(5);
       system.setTerrainManager(tm as any);
       system.createHelipadWhenReady();
-      // findMaxTerrainHeight samples: center (1) + ring1 (16) + ring2 (32) + ring3 (48) + diameter (18) = 115 calls
-      // Plus the update() testHeight call if invoked separately
+      await flushPromises();
       expect(tm.getHeightAt.mock.calls.length).toBeGreaterThan(10);
     });
 
-    it('positions helipad at max terrain height + offset', () => {
+    it('positions helipad at max terrain height + offset', async () => {
       const tm = createMockTerrainManager(20);
       system.setTerrainManager(tm as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       const helipad = scene.children[0];
-      // maxHeight (20) + 0.8 offset
-      expect(helipad.position.y).toBeCloseTo(20.8, 1);
+      // maxHeight (20) + 0.1 offset (flush with terrain)
+      expect(helipad.position.y).toBeCloseTo(20.1, 1);
     });
 
-    it('handles zero terrain height', () => {
+    it('handles zero terrain height', async () => {
       const tm = createMockTerrainManager(0);
       system.setTerrainManager(tm as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       const helipad = scene.children[0];
-      expect(helipad.position.y).toBeCloseTo(0.8, 1);
+      expect(helipad.position.y).toBeCloseTo(0.1, 1);
     });
 
-    it('uses correct helipad position (40, z, -1400)', () => {
+    it('uses correct helipad position (40, z, -1400)', async () => {
       const tm = createMockTerrainManager(10);
       system.setTerrainManager(tm as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       const helipad = scene.children[0];
       expect(helipad.position.x).toBe(40);
       expect(helipad.position.z).toBe(-1400);
@@ -286,10 +321,11 @@ describe('HelipadSystem', () => {
   // ─── Collision Registration ───────────────────────────────────────
 
   describe('collision registration', () => {
-    it('registers collision object with terrain manager', () => {
+    it('registers collision object with terrain manager', async () => {
       const tm = createMockTerrainManager();
       system.setTerrainManager(tm as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       expect(tm.registerCollisionObject).toHaveBeenCalledWith('us_helipad', expect.any(Object));
     });
   });
@@ -309,12 +345,13 @@ describe('HelipadSystem', () => {
       expect(scene.children.length).toBe(0);
     });
 
-    it('creates helipad in Open Frontier mode when terrain loaded', () => {
+    it('creates helipad in Open Frontier mode when terrain loaded', async () => {
       const tm = createMockTerrainManager(10);
       const gmm = createMockGameModeManager('open_frontier');
       system.setTerrainManager(tm as any);
       system.setGameModeManager(gmm as any);
       system.update(0.016);
+      await flushPromises();
       expect(scene.children.length).toBe(1);
     });
 
@@ -327,7 +364,7 @@ describe('HelipadSystem', () => {
       expect(scene.children.length).toBe(0);
     });
 
-    it('creates helipad in A Shau Valley near US base anchor', () => {
+    it('creates helipad in A Shau Valley near US base anchor', async () => {
       const tm = createMockTerrainManager(10);
       const gmm = createMockGameModeManager('a_shau_valley', [
         {
@@ -340,6 +377,7 @@ describe('HelipadSystem', () => {
       system.setTerrainManager(tm as any);
       system.setGameModeManager(gmm as any);
       system.update(0.016);
+      await flushPromises();
       expect(scene.children.length).toBe(1);
       const helipad = scene.children[0];
       expect(helipad.position.x).toBe(940);
@@ -357,35 +395,40 @@ describe('HelipadSystem', () => {
       expect(scene.children.length).toBe(0);
     });
 
-    it('creates helipad when terrain height > 0 even without chunk', () => {
+    it('creates helipad when terrain height > 0 even without chunk', async () => {
       const tm = createMockTerrainManager(5);
       tm.getChunkAt.mockReturnValue(undefined);
       const gmm = createMockGameModeManager('open_frontier');
       system.setTerrainManager(tm as any);
       system.setGameModeManager(gmm as any);
       system.update(0.016);
+      await flushPromises();
       // Height > 0 satisfies the fallback condition
       expect(scene.children.length).toBe(1);
     });
 
-    it('creates helipad when height > -100 and chunk loaded', () => {
+    it('creates helipad when height > -100 and chunk loaded', async () => {
       const tm = createMockTerrainManager(-50);
       tm.getChunkAt.mockReturnValue({ id: 'chunk-1' });
       const gmm = createMockGameModeManager('open_frontier');
       system.setTerrainManager(tm as any);
       system.setGameModeManager(gmm as any);
       system.update(0.016);
+      await flushPromises();
       expect(scene.children.length).toBe(1);
     });
 
-    it('does not create helipad twice on subsequent updates', () => {
+    it('does not create helipad twice on subsequent updates', async () => {
       const tm = createMockTerrainManager(10);
       const gmm = createMockGameModeManager('open_frontier');
       system.setTerrainManager(tm as any);
       system.setGameModeManager(gmm as any);
       system.update(0.016);
+      await flushPromises();
       system.update(0.016);
+      await flushPromises();
       system.update(0.016);
+      await flushPromises();
       expect(scene.children.length).toBe(1);
     });
   });
@@ -393,18 +436,20 @@ describe('HelipadSystem', () => {
   // ─── getHelipadPosition ───────────────────────────────────────────
 
   describe('getHelipadPosition', () => {
-    it('returns position clone for existing helipad', () => {
+    it('returns position clone for existing helipad', async () => {
       system.setTerrainManager(createMockTerrainManager(10) as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       const pos = system.getHelipadPosition('us_helipad');
       expect(pos).not.toBeNull();
       expect(pos!.x).toBe(40);
       expect(pos!.z).toBe(-1400);
     });
 
-    it('returns a clone, not the original reference', () => {
+    it('returns a clone, not the original reference', async () => {
       system.setTerrainManager(createMockTerrainManager(10) as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       const pos1 = system.getHelipadPosition('us_helipad');
       const pos2 = system.getHelipadPosition('us_helipad');
       expect(pos1).not.toBe(pos2);
@@ -427,9 +472,10 @@ describe('HelipadSystem', () => {
       expect(system.getAllHelipads()).toEqual([]);
     });
 
-    it('returns array of helipad info objects after creation', () => {
+    it('returns array of helipad info objects after creation', async () => {
       system.setTerrainManager(createMockTerrainManager(10) as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       const helipads = system.getAllHelipads();
       expect(helipads).toHaveLength(1);
       expect(helipads[0].id).toBe('us_helipad');
@@ -438,67 +484,73 @@ describe('HelipadSystem', () => {
       expect(helipads[0].position.z).toBe(-1400);
     });
 
-    it('returns cloned positions', () => {
+    it('returns helipad info with correct metadata', async () => {
       system.setTerrainManager(createMockTerrainManager(10) as any);
       system.createHelipadWhenReady();
-      const helipads1 = system.getAllHelipads();
-      const helipads2 = system.getAllHelipads();
-      expect(helipads1[0].position).not.toBe(helipads2[0].position);
+      await flushPromises();
+      const helipads = system.getAllHelipads();
+      expect(helipads[0].aircraft).toBe('UH1_HUEY');
     });
   });
 
   // ─── Vegetation Clearing ──────────────────────────────────────────
 
   describe('vegetation clearing', () => {
-    it('calls clearArea when vegetation system supports it', () => {
+    it('calls clearArea when vegetation system supports it', async () => {
       const vs = createMockVegetationSystem({ clearArea: true, addExclusionZone: true });
       system.setTerrainManager(createMockTerrainManager() as any);
       system.setVegetationSystem(vs);
       system.createHelipadWhenReady();
-      expect(vs.clearArea).toHaveBeenCalledWith(40, -1400, 14); // platformRadius(12) + 2
+      await flushPromises();
+      expect(vs.clearArea).toHaveBeenCalledWith(40, -1400, 13); // platformRadius(12) + 1
     });
 
-    it('calls addExclusionZone as fallback when clearArea not available', () => {
+    it('calls addExclusionZone as fallback when clearArea not available', async () => {
       const vs = createMockVegetationSystem({ clearArea: false, addExclusionZone: true });
       // Remove clearArea to test fallback
       delete (vs as any).clearArea;
       system.setTerrainManager(createMockTerrainManager() as any);
       system.setVegetationSystem(vs);
       system.createHelipadWhenReady();
-      expect(vs.addExclusionZone).toHaveBeenCalledWith(40, -1400, 14);
+      await flushPromises();
+      expect(vs.addExclusionZone).toHaveBeenCalledWith(40, -1400, 13);
     });
 
-    it('handles vegetation system with neither method', () => {
+    it('handles vegetation system with neither method', async () => {
       const vs = {};
       system.setTerrainManager(createMockTerrainManager() as any);
       system.setVegetationSystem(vs);
       system.createHelipadWhenReady();
-      // Should not throw, just log
-      expect(Logger.info).toHaveBeenCalledWith('helicopter', expect.stringContaining('does not support area clearing'));
+      await flushPromises();
+      // Should not throw
+      expect(scene.children.length).toBe(1);
     });
 
-    it('handles missing vegetation system gracefully', () => {
+    it('handles missing vegetation system gracefully', async () => {
       system.setTerrainManager(createMockTerrainManager() as any);
       system.createHelipadWhenReady();
-      // No vegetation system set - should log and not throw
-      expect(Logger.info).toHaveBeenCalledWith('helicopter', expect.stringContaining('No vegetation system'));
+      await flushPromises();
+      // No vegetation system set - should not throw
+      expect(scene.children.length).toBe(1);
     });
   });
 
   // ─── dispose ──────────────────────────────────────────────────────
 
   describe('dispose', () => {
-    it('removes all helipads from scene', () => {
+    it('removes all helipads from scene', async () => {
       system.setTerrainManager(createMockTerrainManager() as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       expect(scene.children.length).toBe(1);
       system.dispose();
       expect(scene.children.length).toBe(0);
     });
 
-    it('traverses and disposes geometry/materials', () => {
+    it('traverses and disposes geometry/materials', async () => {
       system.setTerrainManager(createMockTerrainManager() as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       const helipad = scene.children[0] as THREE.Group;
 
       // Collect dispose mocks before dispose clears references
@@ -518,9 +570,10 @@ describe('HelipadSystem', () => {
       });
     });
 
-    it('clears helipads map after dispose', () => {
+    it('clears helipads map after dispose', async () => {
       system.setTerrainManager(createMockTerrainManager() as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       system.dispose();
       expect(system.getAllHelipads()).toEqual([]);
       expect(system.getHelipadPosition('us_helipad')).toBeNull();
@@ -530,9 +583,10 @@ describe('HelipadSystem', () => {
       expect(() => system.dispose()).not.toThrow();
     });
 
-    it('safe to call multiple times', () => {
+    it('safe to call multiple times', async () => {
       system.setTerrainManager(createMockTerrainManager() as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       system.dispose();
       expect(() => system.dispose()).not.toThrow();
     });
@@ -564,16 +618,17 @@ describe('HelipadSystem', () => {
   // ─── Edge Cases ───────────────────────────────────────────────────
 
   describe('edge cases', () => {
-    it('can create helipad after failed attempt (terrain manager set later)', () => {
+    it('can create helipad after failed attempt (terrain manager set later)', async () => {
       system.createHelipadWhenReady(); // Fails - no terrain manager
       expect(scene.children.length).toBe(0);
 
       system.setTerrainManager(createMockTerrainManager() as any);
       system.createHelipadWhenReady(); // Succeeds now
+      await flushPromises();
       expect(scene.children.length).toBe(1);
     });
 
-    it('handles varying terrain heights', () => {
+    it('handles varying terrain heights', async () => {
       const tm = createMockTerrainManager(0);
       let callCount = 0;
       tm.getHeightAt.mockImplementation(() => {
@@ -583,25 +638,28 @@ describe('HelipadSystem', () => {
       });
       system.setTerrainManager(tm as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       const helipad = scene.children[0];
-      // Max height should be 50, position = 50 + 0.8
-      expect(helipad.position.y).toBeCloseTo(50.8, 1);
+      // Max height should be 50, position = 50 + 0.1
+      expect(helipad.position.y).toBeCloseTo(50.1, 1);
     });
 
-    it('helipad position x and z are fixed regardless of terrain', () => {
+    it('helipad position x and z are fixed regardless of terrain', async () => {
       system.setTerrainManager(createMockTerrainManager(100) as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       const helipad = scene.children[0];
       expect(helipad.position.x).toBe(40);
       expect(helipad.position.z).toBe(-1400);
     });
 
-    it('negative terrain height handled correctly', () => {
+    it('negative terrain height handled correctly', async () => {
       const tm = createMockTerrainManager(-5);
       system.setTerrainManager(tm as any);
       system.createHelipadWhenReady();
+      await flushPromises();
       const helipad = scene.children[0];
-      expect(helipad.position.y).toBeCloseTo(-4.2, 1); // -5 + 0.8
+      expect(helipad.position.y).toBeCloseTo(-4.9, 1); // -5 + 0.1
     });
   });
 });

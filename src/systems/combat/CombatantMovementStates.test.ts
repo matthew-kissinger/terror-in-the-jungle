@@ -144,7 +144,7 @@ describe('CombatantMovementStates', () => {
           {
             id: 'zone-1',
             position: new THREE.Vector3(50, 0, 0),
-            owner: Faction.OPFOR,
+            owner: Faction.NVA,
             state: ZoneState.CONTESTED,
             isHomeBase: false,
             ticketBleedRate: 3
@@ -152,7 +152,7 @@ describe('CombatantMovementStates', () => {
           {
             id: 'zone-2',
             position: new THREE.Vector3(60, 0, 0),
-            owner: Faction.OPFOR,
+            owner: Faction.NVA,
             state: ZoneState.OPFOR_CONTROLLED,
             isHomeBase: false,
             ticketBleedRate: 1
@@ -264,7 +264,7 @@ describe('CombatantMovementStates', () => {
           {
             id: 'zone-1',
             position: new THREE.Vector3(100, 0, 0),
-            owner: Faction.OPFOR,
+            owner: Faction.NVA,
             state: ZoneState.CONTESTED,
             isHomeBase: false,
             ticketBleedRate: 3
@@ -272,7 +272,7 @@ describe('CombatantMovementStates', () => {
           {
             id: 'zone-2',
             position: new THREE.Vector3(100, 0, 0),
-            owner: Faction.OPFOR,
+            owner: Faction.NVA,
             state: ZoneState.OPFOR_CONTROLLED,
             isHomeBase: false,
             ticketBleedRate: 1

@@ -313,6 +313,10 @@ export class WeaponFiring {
       _muzzlePos.copy(_cameraPos).addScaledVector(_forward, 1)
     }
 
+    // Nudge upward in overlay-scene space so the burst stays with the gun
+    // during the recoil kick (gun snaps up ~0.10 units in overlay world on fire).
+    _muzzlePos.y += 0.03
+
     this.muzzleFlashSystem.spawnPlayer(this.overlayScene, _muzzlePos, _forward, variant)
   }
 

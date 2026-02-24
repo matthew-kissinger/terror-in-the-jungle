@@ -24,7 +24,7 @@ vi.mock('../debug/PerformanceTelemetry', () => ({
 function makeCombatant(overrides: Partial<Combatant> = {}): Combatant {
   return {
     id: 'test-combatant',
-    faction: Faction.OPFOR,
+    faction: Faction.NVA,
     position: new THREE.Vector3(0, 0, 0),
     velocity: new THREE.Vector3(0, 0, 0),
     rotation: 0,
@@ -235,14 +235,14 @@ describe('CombatantHitDetection', () => {
     it('should hit closest enemy combatant', () => {
       const combatant1 = makeCombatant({
         id: 'enemy1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(10, 2.8, 0),
         state: CombatantState.IDLE
       });
 
       const combatant2 = makeCombatant({
         id: 'enemy2',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(20, 2.8, 0),
         state: CombatantState.IDLE
       });
@@ -285,7 +285,7 @@ describe('CombatantHitDetection', () => {
     it('should skip DEAD combatants', () => {
       const deadCombatant = makeCombatant({
         id: 'dead1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(10, 2.8, 0),
         state: CombatantState.DEAD
       });
@@ -305,7 +305,7 @@ describe('CombatantHitDetection', () => {
     it('should return null on complete miss', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(10, 0, 0),
         state: CombatantState.IDLE
       });
@@ -326,14 +326,14 @@ describe('CombatantHitDetection', () => {
     it('should return closest hit when multiple candidates exist', () => {
       const combatant1 = makeCombatant({
         id: 'enemy1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(10, 2.8, 0),
         state: CombatantState.IDLE
       });
 
       const combatant2 = makeCombatant({
         id: 'enemy2',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(5, 2.8, 0),
         state: CombatantState.IDLE
       });
@@ -355,7 +355,7 @@ describe('CombatantHitDetection', () => {
     it('should use ENGAGING hit zones for ENGAGING state', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(10, 0, 0),
         state: CombatantState.ENGAGING
       });
@@ -377,7 +377,7 @@ describe('CombatantHitDetection', () => {
     it('should use ALERT hit zones for ALERT state', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(10, 0, 0),
         state: CombatantState.ALERT
       });
@@ -399,7 +399,7 @@ describe('CombatantHitDetection', () => {
     it('should use default hit zones for IDLE state', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(10, 0, 0),
         state: CombatantState.IDLE
       });
@@ -421,7 +421,7 @@ describe('CombatantHitDetection', () => {
     it('should return point on zone surface, not center', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(10, 0, 0),
         state: CombatantState.IDLE
       });
@@ -449,7 +449,7 @@ describe('CombatantHitDetection', () => {
     it('should use ENGAGING zones for SUPPRESSING state', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(10, 0, 0),
         state: CombatantState.SUPPRESSING
       });
@@ -473,7 +473,7 @@ describe('CombatantHitDetection', () => {
     it('should return engaging zones for ENGAGING state', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(10, 0, 0),
         state: CombatantState.ENGAGING
       });
@@ -491,7 +491,7 @@ describe('CombatantHitDetection', () => {
     it('should return engaging zones for SUPPRESSING state', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(10, 0, 0),
         state: CombatantState.SUPPRESSING
       });
@@ -508,7 +508,7 @@ describe('CombatantHitDetection', () => {
     it('should return alert zones for ALERT state', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(10, 0, 0),
         state: CombatantState.ALERT
       });
@@ -526,7 +526,7 @@ describe('CombatantHitDetection', () => {
     it('should return default zones for IDLE state', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(10, 0, 0),
         state: CombatantState.IDLE
       });
@@ -544,7 +544,7 @@ describe('CombatantHitDetection', () => {
     it('should return default zones for PATROLLING state', () => {
       const combatant = makeCombatant({
         id: 'enemy1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(10, 0, 0),
         state: CombatantState.PATROLLING
       });

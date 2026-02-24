@@ -271,8 +271,12 @@ export class KillFeed {
     switch (faction) {
       case Faction.US:
         return colors.us;
-      case Faction.OPFOR:
+      case Faction.ARVN:
+        return '#5ab8b8';
+      case Faction.NVA:
         return colors.opfor;
+      case Faction.VC:
+        return '#d4943c';
       default:
         return '#ffffff';
     }
@@ -291,29 +295,18 @@ export class KillFeed {
     style.id = 'kill-feed-styles';
     style.textContent = `
       .kill-feed {
-        /* Positioned by grid slot [data-region="kill-feed"] */
+        /* Positioned by grid slot [data-region="kill-feed"], top-right corner */
         width: 220px;
         display: flex;
         flex-direction: column;
+        align-items: flex-end;
         gap: 2px;
+        padding-top: 4px;
+        padding-right: 8px;
         pointer-events: none;
         font-family: 'Rajdhani', sans-serif;
         font-size: 11px;
         font-weight: 600;
-      }
-
-      @media (max-width: 1024px) {
-        .kill-feed {
-          width: 180px;
-          font-size: 10px;
-        }
-      }
-
-      @media (max-width: 480px) {
-        .kill-feed {
-          width: 160px;
-          font-size: 9px;
-        }
       }
 
       @keyframes slideIn {

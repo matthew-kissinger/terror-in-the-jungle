@@ -148,7 +148,7 @@ describe('AIStateEngage', () => {
 
     it('should transition to PATROLLING when target is DEAD', () => {
       const combatant = createMockCombatant('c1', Faction.US);
-      const deadTarget = createMockTarget('dead', Faction.OPFOR);
+      const deadTarget = createMockTarget('dead', Faction.NVA);
       deadTarget.state = CombatantState.DEAD;
       combatant.target = deadTarget;
 
@@ -176,7 +176,7 @@ describe('AIStateEngage', () => {
 
     it('should face target and update rotation', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(10, 0, 10));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(10, 0, 10));
       combatant.target = target;
 
       aiStateEngage.handleEngaging(
@@ -191,7 +191,7 @@ describe('AIStateEngage', () => {
 
     it('should enable full auto at close range (<15m)', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(10, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(10, 0, 0));
       combatant.target = target;
 
       aiStateEngage.handleEngaging(
@@ -206,7 +206,7 @@ describe('AIStateEngage', () => {
 
     it('should not enable full auto at medium range (>15m)', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(30, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(30, 0, 0));
       combatant.target = target;
       combatant.faction = Faction.US;
       combatant.squadRole = 'follower';
@@ -222,7 +222,7 @@ describe('AIStateEngage', () => {
 
     it('should increase panic when recently hit', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(20, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
       combatant.target = target;
       combatant.lastHitTime = Date.now() - 1000; // 1 second ago
       combatant.panicLevel = 0;
@@ -237,7 +237,7 @@ describe('AIStateEngage', () => {
 
     it('should enable full auto when panic level is high', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(20, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
       combatant.target = target;
       combatant.lastHitTime = Date.now() - 500;
       combatant.panicLevel = 0.6;
@@ -254,7 +254,7 @@ describe('AIStateEngage', () => {
 
     it('should decrease panic over time', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(20, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
       combatant.target = target;
       combatant.lastHitTime = Date.now() - 5000; // 5 seconds ago
       combatant.panicLevel = 0.5;
@@ -269,7 +269,7 @@ describe('AIStateEngage', () => {
 
     it('should transition to SEEKING_COVER when should seek cover', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(20, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
       combatant.target = target;
       shouldSeekCover.mockReturnValue(true);
       findNearestCover.mockReturnValue(new THREE.Vector3(5, 0, 5));
@@ -286,7 +286,7 @@ describe('AIStateEngage', () => {
 
     it('should use advanced cover system when available', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(20, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
       combatant.target = target;
       shouldSeekCover.mockReturnValue(true);
 
@@ -306,7 +306,7 @@ describe('AIStateEngage', () => {
 
     it('should enable full auto when many nearby enemies', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(20, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
       combatant.target = target;
       countNearbyEnemies.mockReturnValue(4);
 
@@ -321,7 +321,7 @@ describe('AIStateEngage', () => {
 
     it('should transition to SUPPRESSING when cannot see target', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(20, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
       combatant.target = target;
       canSeeTarget.mockReturnValue(false);
 
@@ -338,7 +338,7 @@ describe('AIStateEngage', () => {
 
     it('should update last known target position when target is visible', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(20, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
       combatant.target = target;
 
       aiStateEngage.handleEngaging(
@@ -353,7 +353,7 @@ describe('AIStateEngage', () => {
     describe('In Cover Behavior', () => {
       it('should use peek-and-fire burst params when in cover', () => {
         const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-        const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(20, 0, 0));
+        const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
         combatant.target = target;
         combatant.inCover = true;
         combatant.coverPosition = new THREE.Vector3(0, 0, 0);
@@ -370,7 +370,7 @@ describe('AIStateEngage', () => {
 
       it('should reposition when cover is compromised', () => {
         const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-        const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(20, 0, 0));
+        const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
         combatant.target = target;
         combatant.inCover = true;
         combatant.coverPosition = new THREE.Vector3(0, 0, 0);
@@ -391,7 +391,7 @@ describe('AIStateEngage', () => {
 
       it('should use fallback flanked check when no cover system', () => {
         const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-        const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(20, 0, 0));
+        const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
         combatant.target = target;
         combatant.inCover = true;
         combatant.coverPosition = new THREE.Vector3(0, 0, 0);
@@ -409,7 +409,7 @@ describe('AIStateEngage', () => {
 
     describe('Burst Parameter Adjustment', () => {
       it('should use OPFOR leader burst params', () => {
-        const combatant = createMockCombatant('c1', Faction.OPFOR, new THREE.Vector3(0, 0, 0));
+        const combatant = createMockCombatant('c1', Faction.NVA, new THREE.Vector3(0, 0, 0));
         const target = createMockTarget('t1', Faction.US, new THREE.Vector3(50, 0, 0));
         combatant.target = target;
         combatant.squadRole = 'leader';
@@ -424,7 +424,7 @@ describe('AIStateEngage', () => {
       });
 
       it('should use OPFOR follower burst params', () => {
-        const combatant = createMockCombatant('c1', Faction.OPFOR, new THREE.Vector3(0, 0, 0));
+        const combatant = createMockCombatant('c1', Faction.NVA, new THREE.Vector3(0, 0, 0));
         const target = createMockTarget('t1', Faction.US, new THREE.Vector3(50, 0, 0));
         combatant.target = target;
         combatant.squadRole = 'follower';
@@ -440,7 +440,7 @@ describe('AIStateEngage', () => {
 
       it('should use US leader burst params', () => {
         const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-        const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(50, 0, 0));
+        const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
         combatant.target = target;
         combatant.squadRole = 'leader';
 
@@ -455,7 +455,7 @@ describe('AIStateEngage', () => {
 
       it('should use US follower burst params', () => {
         const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-        const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(50, 0, 0));
+        const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
         combatant.target = target;
         combatant.squadRole = 'follower';
 
@@ -476,7 +476,7 @@ describe('AIStateEngage', () => {
 
       it('should initiate flanking when conditions are met', () => {
         const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-        const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(50, 0, 0));
+        const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
         combatant.target = target;
         combatant.squadId = 'squad-1';
 
@@ -502,7 +502,7 @@ describe('AIStateEngage', () => {
 
       it('should not initiate flanking if already active', () => {
         const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-        const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(50, 0, 0));
+        const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
         combatant.target = target;
         combatant.squadId = 'squad-1';
 
@@ -555,7 +555,7 @@ describe('AIStateEngage', () => {
       const combatant = createMockCombatant('c1', Faction.US);
       combatant.state = CombatantState.SUPPRESSING;
       combatant.alertTimer = 0.01;
-      const target = createMockTarget('t1', Faction.OPFOR);
+      const target = createMockTarget('t1', Faction.NVA);
       combatant.target = target;
 
       aiStateEngage.handleSuppressing(combatant, 0.02);
@@ -590,7 +590,7 @@ describe('AIStateEngage', () => {
       combatant.state = CombatantState.ALERT;
       combatant.alertTimer = 2.0;
       combatant.reactionTimer = 1.0;
-      const target = createMockTarget('t1', Faction.OPFOR);
+      const target = createMockTarget('t1', Faction.NVA);
       combatant.target = target;
 
       aiStateEngage.handleAlert(combatant, 0.5, playerPosition, canSeeTarget);
@@ -604,7 +604,7 @@ describe('AIStateEngage', () => {
       combatant.state = CombatantState.ALERT;
       combatant.reactionTimer = 0.01;
       combatant.alertTimer = 2.0;
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(10, 0, 10));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(10, 0, 10));
       combatant.target = target;
 
       aiStateEngage.handleAlert(combatant, 0.02, playerPosition, canSeeTarget);
@@ -618,7 +618,7 @@ describe('AIStateEngage', () => {
       combatant.state = CombatantState.ALERT;
       combatant.reactionTimer = 0.01;
       combatant.rotation = 0;
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(10, 0, 10));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(10, 0, 10));
       combatant.target = target;
 
       aiStateEngage.handleAlert(combatant, 0.02, playerPosition, canSeeTarget);
@@ -631,7 +631,7 @@ describe('AIStateEngage', () => {
       const combatant = createMockCombatant('c1', Faction.US);
       combatant.state = CombatantState.ALERT;
       combatant.reactionTimer = 0.01;
-      const target = createMockTarget('t1', Faction.OPFOR);
+      const target = createMockTarget('t1', Faction.NVA);
       combatant.target = target;
       canSeeTarget.mockReturnValue(false);
 
@@ -646,7 +646,7 @@ describe('AIStateEngage', () => {
       combatant.state = CombatantState.ALERT;
       combatant.previousState = CombatantState.DEFENDING;
       combatant.reactionTimer = 0.01;
-      const target = createMockTarget('t1', Faction.OPFOR);
+      const target = createMockTarget('t1', Faction.NVA);
       combatant.target = target;
       canSeeTarget.mockReturnValue(false);
 
@@ -688,7 +688,7 @@ describe('AIStateEngage', () => {
 
     it('should initiate squad suppression when conditions are met', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(50, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
       combatant.target = target;
       combatant.squadId = 'squad-1';
       combatant.squadRole = 'leader';
@@ -720,7 +720,7 @@ describe('AIStateEngage', () => {
 
     it('should not initiate suppression if squad too small', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(50, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
       combatant.target = target;
       combatant.squadId = 'squad-1';
 
@@ -744,7 +744,7 @@ describe('AIStateEngage', () => {
 
     it('should respect suppression cooldown', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(50, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
       combatant.target = target;
       combatant.squadId = 'squad-1';
 
@@ -779,7 +779,7 @@ describe('AIStateEngage', () => {
 
     it('should not initiate if distance too close', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(20, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
       combatant.target = target;
       combatant.squadId = 'squad-1';
 
@@ -803,7 +803,7 @@ describe('AIStateEngage', () => {
 
     it('should not initiate if distance too far', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(100, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(100, 0, 0));
       combatant.target = target;
       combatant.squadId = 'squad-1';
 
@@ -827,7 +827,7 @@ describe('AIStateEngage', () => {
 
     it('should initiate when squadmate has low health', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.OPFOR, new THREE.Vector3(50, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
       combatant.target = target;
       combatant.squadId = 'squad-1';
       combatant.squadRole = 'leader';

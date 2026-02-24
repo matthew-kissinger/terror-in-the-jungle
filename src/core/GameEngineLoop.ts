@@ -39,53 +39,49 @@ export function animate(engine: GameEngine): void {
     performanceTelemetry.collectGPUTime();
 
     performanceTelemetry.beginSystem('RenderMain');
-    // Begin GPU timing for this frame
     performanceTelemetry.beginGPUTimer();
+
+    const pp = engine.renderer.postProcessing;
+    const renderer = engine.renderer.renderer;
+
+    // Begin post-processing frame (redirects all rendering to low-res target)
+    if (pp && !usingMortarCamera) pp.beginFrame();
 
     // Render the main scene
     if (usingMortarCamera && mortarCamera) {
-      // Render with mortar camera (top-down view)
-      // Note: Mortar camera renders directly without post-processing for tactical view clarity
-      engine.renderer.renderer.render(
-        engine.renderer.scene,
-        mortarCamera
-      );
+      renderer.render(engine.renderer.scene, mortarCamera);
     } else {
-      if (engine.renderer.postProcessing) {
-        engine.renderer.postProcessing.render(deltaTime);
-      } else {
-        engine.renderer.renderer.render(
-          engine.renderer.scene,
-          engine.renderer.camera
-        );
-      }
+      renderer.render(engine.renderer.scene, engine.renderer.camera);
     }
 
-    // End GPU timing measurement
     performanceTelemetry.endGPUTimer();
     performanceTelemetry.endSystem('RenderMain');
 
-    // Render weapon overlay
+    // Render weapon + grenade overlays (into the same post-processing target)
     performanceTelemetry.beginSystem('RenderOverlay');
-    if (engine.systemManager.firstPersonWeapon && !usingMortarCamera) {
-      engine.systemManager.firstPersonWeapon.renderWeapon(engine.renderer.renderer);
-    }
-
-    // Render grenade overlays
-    const renderer = engine.renderer.renderer;
-    const currentAutoClear = renderer.autoClear;
-    renderer.autoClear = false;
-
-    if (engine.systemManager.grenadeSystem && engine.systemManager.inventoryManager && !usingMortarCamera) {
-      const grenadeScene = engine.systemManager.grenadeSystem.getGrenadeOverlayScene();
-      const grenadeCamera = engine.systemManager.grenadeSystem.getGrenadeOverlayCamera();
-      if (grenadeScene && grenadeCamera) {
-        renderer.clearDepth();
-        renderer.render(grenadeScene, grenadeCamera);
+    if (!usingMortarCamera) {
+      if (engine.systemManager.firstPersonWeapon) {
+        engine.systemManager.firstPersonWeapon.renderWeapon(renderer);
       }
+
+      const currentAutoClear = renderer.autoClear;
+      renderer.autoClear = false;
+
+      if (engine.systemManager.grenadeSystem && engine.systemManager.inventoryManager) {
+        const grenadeScene = engine.systemManager.grenadeSystem.getGrenadeOverlayScene();
+        const grenadeCamera = engine.systemManager.grenadeSystem.getGrenadeOverlayCamera();
+        if (grenadeScene && grenadeCamera) {
+          renderer.clearDepth();
+          renderer.render(grenadeScene, grenadeCamera);
+        }
+      }
+
+      renderer.autoClear = currentAutoClear;
     }
 
-    renderer.autoClear = currentAutoClear;
+    // End post-processing frame (blits low-res target to screen with retro effect)
+    if (pp && !usingMortarCamera) pp.endFrame();
+
     performanceTelemetry.endSystem('RenderOverlay');
 
     updateRuntimeMetrics(engine, deltaTime);

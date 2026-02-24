@@ -152,7 +152,6 @@ export class HUDElements {
 
   updateAmmoDisplay(magazine: number, reserve: number): void {
     this.ammoDisplay.setAmmo(magazine, reserve);
-    this.unifiedWeaponBar.updateAmmo(magazine, reserve);
   }
 
   showHitMarker(type: 'hit' | 'kill' | 'headshot' = 'hit'): void {
@@ -277,7 +276,7 @@ export class HUDElements {
       this.gameStatusPanel.mount(layout.getSlot('game-status'));
 
       this.killCounter.unmount();
-      this.killCounter.mount(layout.getSlot('center'));
+      this.killCounter.mount(layout.getSlot('stats'));
 
       this.ammoDisplay.unmount();
       this.ammoDisplay.mount(layout.getSlot('ammo'));
@@ -314,9 +313,9 @@ export class HUDElements {
       weaponSlot.dataset.show = 'infantry';
       this.unifiedWeaponBar.mount(weaponSlot);
 
-      // hud-container is no longer needed in grid mode, but keep it for disposal tracking
+      // hud-container is no longer needed in grid mode, but keep it mounted under HUD root for disposal tracking.
       this.hudContainer.style.display = 'none';
-      document.body.appendChild(this.hudContainer);
+      layout.getRoot().appendChild(this.hudContainer);
     } else {
       // Legacy path: mount everything to body (backward compat)
       document.body.appendChild(this.hudContainer);

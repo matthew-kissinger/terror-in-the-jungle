@@ -1,6 +1,6 @@
 import { Logger } from '../../utils/Logger';
 import { CaptureZone, ZoneState } from './ZoneManager';
-import { Faction } from '../combat/types';
+import { Faction, isBlufor, isOpfor } from '../combat/types';
 
 export class ZoneCaptureLogic {
   private readonly neutralCaptureFaction = new Map<string, Faction>();
@@ -48,7 +48,7 @@ export class ZoneCaptureLogic {
       return;
     }
 
-    if (zone.owner === Faction.OPFOR) {
+    if (zone.owner !== null && isOpfor(zone.owner)) {
       if (advantage <= 0) {
         zone.captureProgress = Math.min(100, zone.captureProgress + zone.captureSpeed * deltaTime * Math.max(0, -advantage));
         zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.OPFOR_CONTROLLED;
@@ -75,7 +75,7 @@ export class ZoneCaptureLogic {
       return;
     }
 
-    const capturingFaction = advantage > 0 ? Faction.US : Faction.OPFOR;
+    const capturingFaction = advantage > 0 ? Faction.US : Faction.NVA;
     const capturingDwell = capturingFaction === Faction.US ? dwell.us : dwell.opfor;
     if (capturingDwell < this.CAPTURE_DWELL_SECONDS) {
       zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.NEUTRAL;
@@ -100,7 +100,7 @@ export class ZoneCaptureLogic {
     if (zone.captureProgress >= 100) {
       zone.captureProgress = 100;
       zone.owner = capturingFaction;
-      zone.state = capturingFaction === Faction.US ? ZoneState.US_CONTROLLED : ZoneState.OPFOR_CONTROLLED;
+      zone.state = isBlufor(capturingFaction) ? ZoneState.US_CONTROLLED : ZoneState.OPFOR_CONTROLLED;
       this.neutralCaptureFaction.delete(zone.id);
       Logger.info('world', ` Zone ${zone.name} captured by ${zone.owner}!`);
     }
@@ -116,7 +116,7 @@ export class ZoneCaptureLogic {
 
   getStateForOwner(owner: Faction | null): ZoneState {
     if (!owner) return ZoneState.NEUTRAL;
-    return owner === Faction.US ? ZoneState.US_CONTROLLED : ZoneState.OPFOR_CONTROLLED;
+    return isBlufor(owner) ? ZoneState.US_CONTROLLED : ZoneState.OPFOR_CONTROLLED;
   }
 
   calculateTicketBleedRate(zones: Map<string, CaptureZone>): { us: number; opfor: number } {
@@ -125,7 +125,7 @@ export class ZoneCaptureLogic {
 
     const capturedZones = Array.from(zones.values()).filter(z => !z.isHomeBase && z.owner !== null);
     const usZones = capturedZones.filter(z => z.owner === Faction.US).length;
-    const opforZones = capturedZones.filter(z => z.owner === Faction.OPFOR).length;
+    const opforZones = capturedZones.filter(z => z.owner !== null && isOpfor(z.owner)).length;
 
     // Majority holder causes ticket bleed for opponent
     if (usZones > opforZones) {

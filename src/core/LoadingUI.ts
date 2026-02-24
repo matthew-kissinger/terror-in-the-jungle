@@ -1,87 +1,60 @@
 /**
  * Loading indicator UI module for GameRenderer.
- * Manages the spawn loading overlay with CSS styling.
+ * Uses optimized loading artwork and supports dynamic status updates.
  */
+
+import './LoadingUI.css';
 
 export class LoadingUI {
   private spawnLoadingDiv?: HTMLDivElement;
+  private statusText?: HTMLDivElement;
+  private detailText?: HTMLDivElement;
 
   showSpawnLoadingIndicator(): void {
+    if (this.spawnLoadingDiv) return;
     this.spawnLoadingDiv = document.createElement('div');
-    this.spawnLoadingDiv.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 10003;
-      transition: opacity 0.5s ease-out;
-    `;
+    this.spawnLoadingDiv.className = 'spawn-loading-overlay';
 
     this.spawnLoadingDiv.innerHTML = `
-      <style>
-        @keyframes pulse {
-          0%, 100% { opacity: 0.4; }
-          50% { opacity: 1; }
-        }
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        .loading-ring {
-          width: 60px;
-          height: 60px;
-          border: 3px solid rgba(74, 124, 78, 0.2);
-          border-top: 3px solid #4a7c4e;
-          border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-        .loading-text {
-          color: #8fbc8f;
-          font-family: 'Rajdhani', 'Segoe UI', sans-serif;
-          font-size: 18px;
-          margin-top: 20px;
-          animation: pulse 2s ease-in-out infinite;
-        }
-        .loading-tip {
-          color: #708070;
-          font-family: 'Rajdhani', 'Segoe UI', sans-serif;
-          font-size: 14px;
-          margin-top: 10px;
-          max-width: 400px;
-          text-align: center;
-        }
-      </style>
-      <div class="loading-ring"></div>
-      <div class="loading-text">DEPLOYING TO BATTLEFIELD</div>
-      <div class="loading-tip">Generating terrain and preparing combat zone...</div>
+      <div class="spawn-loading-backdrop"></div>
+      <div class="spawn-loading-panel">
+        <div class="spawn-loading-ring" aria-hidden="true"></div>
+        <div class="spawn-loading-status" data-ref="status">DEPLOYING TO BATTLEFIELD</div>
+        <div class="spawn-loading-detail" data-ref="detail">Preparing insertion route and combat zone...</div>
+      </div>
     `;
 
+    this.statusText = this.spawnLoadingDiv.querySelector('[data-ref="status"]') as HTMLDivElement | null ?? undefined;
+    this.detailText = this.spawnLoadingDiv.querySelector('[data-ref="detail"]') as HTMLDivElement | null ?? undefined;
     document.body.appendChild(this.spawnLoadingDiv);
+  }
+
+  setSpawnLoadingStatus(status: string, detail?: string): void {
+    if (this.statusText) this.statusText.textContent = status;
+    if (detail !== undefined && this.detailText) this.detailText.textContent = detail;
   }
 
   hideSpawnLoadingIndicator(): void {
     if (this.spawnLoadingDiv) {
-      this.spawnLoadingDiv.style.opacity = '0';
+      this.spawnLoadingDiv.classList.add('spawn-loading-overlay-hidden');
       setTimeout(() => {
-        if (this.spawnLoadingDiv && this.spawnLoadingDiv.parentElement) {
+        if (this.spawnLoadingDiv?.parentElement) {
           this.spawnLoadingDiv.parentElement.removeChild(this.spawnLoadingDiv);
-          this.spawnLoadingDiv = undefined;
         }
-      }, 500);
+        this.spawnLoadingDiv = undefined;
+        this.statusText = undefined;
+        this.detailText = undefined;
+      }, 450);
     }
   }
 
   dispose(): void {
-    if (this.spawnLoadingDiv && this.spawnLoadingDiv.parentElement) {
+    if (this.spawnLoadingDiv?.parentElement) {
       this.spawnLoadingDiv.parentElement.removeChild(this.spawnLoadingDiv);
-      this.spawnLoadingDiv = undefined;
     }
+    this.spawnLoadingDiv = undefined;
+    this.statusText = undefined;
+    this.detailText = undefined;
   }
 
   getElement(): HTMLDivElement | undefined {

@@ -59,7 +59,7 @@ describe('TicketSystem', () => {
     it('should initialize with default ticket values', async () => {
       await ticketSystem.init();
       expect(ticketSystem.getTickets(Faction.US)).toBe(300);
-      expect(ticketSystem.getTickets(Faction.OPFOR)).toBe(300);
+      expect(ticketSystem.getTickets(Faction.NVA)).toBe(300);
       expect(ticketSystem.isGameActive()).toBe(true);
       expect(ticketSystem.getGameState().phase).toBe('SETUP');
     });
@@ -68,13 +68,13 @@ describe('TicketSystem', () => {
       ticketSystem.setMaxTickets(500);
       await ticketSystem.init();
       expect(ticketSystem.getTickets(Faction.US)).toBe(500);
-      expect(ticketSystem.getTickets(Faction.OPFOR)).toBe(500);
+      expect(ticketSystem.getTickets(Faction.NVA)).toBe(500);
     });
 
     it('should initialize kill counts to zero', async () => {
       await ticketSystem.init();
       expect(ticketSystem.getKills(Faction.US)).toBe(0);
-      expect(ticketSystem.getKills(Faction.OPFOR)).toBe(0);
+      expect(ticketSystem.getKills(Faction.NVA)).toBe(0);
     });
   });
 
@@ -82,12 +82,12 @@ describe('TicketSystem', () => {
     it('should deduct tickets for the opposing faction when a US combatant dies', () => {
       ticketSystem.onCombatantDeath(Faction.US);
       expect(ticketSystem.getTickets(Faction.US)).toBe(298); // Default death penalty is 2
-      expect(ticketSystem.getKills(Faction.OPFOR)).toBe(1);
+      expect(ticketSystem.getKills(Faction.NVA)).toBe(1);
     });
 
     it('should deduct tickets for the opposing faction when an OPFOR combatant dies', () => {
-      ticketSystem.onCombatantDeath(Faction.OPFOR);
-      expect(ticketSystem.getTickets(Faction.OPFOR)).toBe(298); // Default death penalty is 2
+      ticketSystem.onCombatantDeath(Faction.NVA);
+      expect(ticketSystem.getTickets(Faction.NVA)).toBe(298); // Default death penalty is 2
       expect(ticketSystem.getKills(Faction.US)).toBe(1);
     });
 
@@ -107,7 +107,7 @@ describe('TicketSystem', () => {
       ticketSystem.forceEndGame(Faction.US);
       ticketSystem.onCombatantDeath(Faction.US);
       expect(ticketSystem.getTickets(Faction.US)).toBe(300); // Should remain default
-      expect(ticketSystem.getKills(Faction.OPFOR)).toBe(0);
+      expect(ticketSystem.getKills(Faction.NVA)).toBe(0);
     });
   });
 
@@ -123,14 +123,14 @@ describe('TicketSystem', () => {
 
     it('should track kills instead of deducting tickets on death', () => {
       expect(ticketSystem.getTickets(Faction.US)).toBe(0); // Kills start at 0 in TDM
-      expect(ticketSystem.getTickets(Faction.OPFOR)).toBe(0);
+      expect(ticketSystem.getTickets(Faction.NVA)).toBe(0);
 
       ticketSystem.onCombatantDeath(Faction.US); // OPFOR gets a kill
-      expect(ticketSystem.getTickets(Faction.OPFOR)).toBe(1);
-      expect(ticketSystem.getKills(Faction.OPFOR)).toBe(1);
+      expect(ticketSystem.getTickets(Faction.NVA)).toBe(1);
+      expect(ticketSystem.getKills(Faction.NVA)).toBe(1);
       expect(ticketSystem.getTickets(Faction.US)).toBe(0); // US tickets (kills) still 0
 
-      ticketSystem.onCombatantDeath(Faction.OPFOR); // US gets a kill
+      ticketSystem.onCombatantDeath(Faction.NVA); // US gets a kill
       expect(ticketSystem.getTickets(Faction.US)).toBe(1);
       expect(ticketSystem.getKills(Faction.US)).toBe(1);
     });
@@ -143,11 +143,11 @@ describe('TicketSystem', () => {
       ticketSystem.update(ticketSystem.getSetupDuration() + 0.1);
 
       for (let i = 0; i < 49; i++) {
-        ticketSystem.onCombatantDeath(Faction.OPFOR); // US gets 49 kills
+        ticketSystem.onCombatantDeath(Faction.NVA); // US gets 49 kills
       }
       expect(ticketSystem.isGameActive()).toBe(true); // Game not ended yet
 
-      ticketSystem.onCombatantDeath(Faction.OPFOR); // US gets 50th kill (triggers checkVictoryConditions -> endGame)
+      ticketSystem.onCombatantDeath(Faction.NVA); // US gets 50th kill (triggers checkVictoryConditions -> endGame)
 
       expect(ticketSystem.isGameActive()).toBe(false);
       expect(ticketSystem.getGameState().winner).toBe(Faction.US);
@@ -170,22 +170,22 @@ describe('TicketSystem', () => {
       ticketSystem.onCombatantDeath(Faction.US); // OPFOR gets 50th kill (triggers checkVictoryConditions -> endGame)
 
       expect(ticketSystem.isGameActive()).toBe(false);
-      expect(ticketSystem.getGameState().winner).toBe(Faction.OPFOR);
-      expect(gameEndCallback).toHaveBeenCalledWith(Faction.OPFOR, expect.any(Object));
+      expect(ticketSystem.getGameState().winner).toBe(Faction.NVA);
+      expect(gameEndCallback).toHaveBeenCalledWith(Faction.NVA, expect.any(Object));
       expect(gameEndCallback.mock.calls[0][1].phase).toBe('ENDED');
     });
 
     it('should reset kills when restarting match in TDM mode', () => {
       ticketSystem.onCombatantDeath(Faction.US); // OPFOR gets 1 kill
-      ticketSystem.onCombatantDeath(Faction.OPFOR); // US gets 1 kill
+      ticketSystem.onCombatantDeath(Faction.NVA); // US gets 1 kill
 
       expect(ticketSystem.getKills(Faction.US)).toBe(1);
-      expect(ticketSystem.getKills(Faction.OPFOR)).toBe(1);
+      expect(ticketSystem.getKills(Faction.NVA)).toBe(1);
 
       ticketSystem.restartMatch();
 
       expect(ticketSystem.getKills(Faction.US)).toBe(0);
-      expect(ticketSystem.getKills(Faction.OPFOR)).toBe(0);
+      expect(ticketSystem.getKills(Faction.NVA)).toBe(0);
       expect(ticketSystem.isGameActive()).toBe(true);
       expect(ticketSystem.getGameState().phase).toBe('SETUP');
     });
@@ -200,8 +200,8 @@ describe('TicketSystem', () => {
       // Ensure current tickets match requested values
       ticketSystem.removeTickets(Faction.US, initialUsTickets);
       ticketSystem.addTickets(Faction.US, initialUsTickets);
-      ticketSystem.removeTickets(Faction.OPFOR, initialOpforTickets);
-      ticketSystem.addTickets(Faction.OPFOR, initialOpforTickets);
+      ticketSystem.removeTickets(Faction.NVA, initialOpforTickets);
+      ticketSystem.addTickets(Faction.NVA, initialOpforTickets);
 
       // Advance matchDuration to COMBAT phase
       ticketSystem.update(ticketSystem.getSetupDuration() + 0.1);
@@ -212,11 +212,11 @@ describe('TicketSystem', () => {
       ticketSystem.update(ticketSystem.getSetupDuration() + 1);
 
       const initialUSTickets = ticketSystem.getTickets(Faction.US);
-      const initialOpforTickets = ticketSystem.getTickets(Faction.OPFOR);
+      const initialOpforTickets = ticketSystem.getTickets(Faction.NVA);
       ticketSystem.update(1); // 1 second passes
 
       expect(ticketSystem.getTickets(Faction.US)).toBe(initialUSTickets);
-      expect(ticketSystem.getTickets(Faction.OPFOR)).toBe(initialOpforTickets);
+      expect(ticketSystem.getTickets(Faction.NVA)).toBe(initialOpforTickets);
       expect(ticketSystem.getTicketBleedRate()).toEqual({ usTickets: 0, opforTickets: 0, bleedPerSecond: 0 });
     });
 
@@ -225,13 +225,13 @@ describe('TicketSystem', () => {
       setupZones(zones);
 
       const initialUSTickets = ticketSystem.getTickets(Faction.US);
-      const initialOpforTickets = ticketSystem.getTickets(Faction.OPFOR);
+      const initialOpforTickets = ticketSystem.getTickets(Faction.NVA);
       ticketSystem.update(1); // 1 second passes
 
       const baseBleedRate = ticketSystem.getBaseBleedRate();
       // 0/2 controlled = both bleed at base rate
       expect(ticketSystem.getTickets(Faction.US)).toBeCloseTo(initialUSTickets - 1.0 * baseBleedRate);
-      expect(ticketSystem.getTickets(Faction.OPFOR)).toBeCloseTo(initialOpforTickets - 1.0 * baseBleedRate);
+      expect(ticketSystem.getTickets(Faction.NVA)).toBeCloseTo(initialOpforTickets - 1.0 * baseBleedRate);
     });
 
     it('should have no ticket bleed if zones are equally controlled', () => {
@@ -242,11 +242,11 @@ describe('TicketSystem', () => {
       setupZones(zones);
 
       const initialUSTickets = ticketSystem.getTickets(Faction.US);
-      const initialOpforTickets = ticketSystem.getTickets(Faction.OPFOR);
+      const initialOpforTickets = ticketSystem.getTickets(Faction.NVA);
       ticketSystem.update(1); // 1 second passes
 
       expect(ticketSystem.getTickets(Faction.US)).toBe(initialUSTickets);
-      expect(ticketSystem.getTickets(Faction.OPFOR)).toBe(initialOpforTickets);
+      expect(ticketSystem.getTickets(Faction.NVA)).toBe(initialOpforTickets);
     });
 
     it('should apply ticket bleed to US if OPFOR controls more zones', () => {
@@ -273,11 +273,11 @@ describe('TicketSystem', () => {
       ];
       setupZones(zones);
 
-      const initialOpforTickets = ticketSystem.getTickets(Faction.OPFOR);
+      const initialOpforTickets = ticketSystem.getTickets(Faction.NVA);
       ticketSystem.update(1); // 1 second passes
 
       const baseBleedRate = ticketSystem.getBaseBleedRate();
-      expect(ticketSystem.getTickets(Faction.OPFOR)).toBeCloseTo(initialOpforTickets - 1.0 * baseBleedRate);
+      expect(ticketSystem.getTickets(Faction.NVA)).toBeCloseTo(initialOpforTickets - 1.0 * baseBleedRate);
     });
 
     it('should apply accelerated ticket bleed if US controls all zones', () => {
@@ -294,11 +294,11 @@ describe('TicketSystem', () => {
       ticketSystem['gameState'].matchDuration = ticketSystem.getSetupDuration() + 0.01;
       ticketSystem['gameState'].phase = 'COMBAT';
 
-      const initialOpforTickets = ticketSystem.getTickets(Faction.OPFOR);
+      const initialOpforTickets = ticketSystem.getTickets(Faction.NVA);
       ticketSystem.update(1); // 1 second passes
 
       const baseBleedRate = ticketSystem.getBaseBleedRate();
-      expect(ticketSystem.getTickets(Faction.OPFOR)).toBeCloseTo(initialOpforTickets - 2 * baseBleedRate);
+      expect(ticketSystem.getTickets(Faction.NVA)).toBeCloseTo(initialOpforTickets - 2 * baseBleedRate);
     });
 
     it('should apply accelerated ticket bleed if OPFOR controls all zones', () => {
@@ -390,14 +390,14 @@ describe('TicketSystem', () => {
       ticketSystem.onCombatantDeath(Faction.US); 
 
       expect(ticketSystem.isGameActive()).toBe(false);
-      expect(ticketSystem.getGameState().winner).toBe(Faction.OPFOR);
-      expect(gameEndCallback).toHaveBeenCalledWith(Faction.OPFOR, expect.any(Object));
+      expect(ticketSystem.getGameState().winner).toBe(Faction.NVA);
+      expect(gameEndCallback).toHaveBeenCalledWith(Faction.NVA, expect.any(Object));
     });
 
     it('should declare US winner if OPFOR tickets deplete', () => {
       ticketSystem.update(ticketSystem.getSetupDuration() + 0.1);
-      ticketSystem.removeTickets(Faction.OPFOR, 299); 
-      ticketSystem.onCombatantDeath(Faction.OPFOR); 
+      ticketSystem.removeTickets(Faction.NVA, 299); 
+      ticketSystem.onCombatantDeath(Faction.NVA); 
 
       expect(ticketSystem.isGameActive()).toBe(false);
       expect(ticketSystem.getGameState().winner).toBe(Faction.US);
@@ -424,13 +424,13 @@ describe('TicketSystem', () => {
       ticketSystem.update(ticketSystem.getSetupDuration() + 0.1);
 
       expect(ticketSystem.isGameActive()).toBe(false);
-      expect(ticketSystem.getGameState().winner).toBe(Faction.OPFOR);
+      expect(ticketSystem.getGameState().winner).toBe(Faction.NVA);
     });
 
     it('should enter OVERTIME if tickets are close at match end time', () => {
       ticketSystem.setMaxTickets(300);
       ticketSystem.removeTickets(Faction.US, 200); // 100
-      ticketSystem.removeTickets(Faction.OPFOR, 180); // 120
+      ticketSystem.removeTickets(Faction.NVA, 180); // 120
 
       const timeToMatchEnd = ticketSystem.getSetupDuration() + ticketSystem.getCombatDuration();
       ticketSystem.update(timeToMatchEnd + 0.01);
@@ -442,7 +442,7 @@ describe('TicketSystem', () => {
     it('should end game by time limit if tickets are not close at match end time', () => {
       ticketSystem.setMaxTickets(300);
       ticketSystem.removeTickets(Faction.US, 100); // 200
-      ticketSystem.removeTickets(Faction.OPFOR, 250); // 50
+      ticketSystem.removeTickets(Faction.NVA, 250); // 50
 
       const timeToMatchEnd = ticketSystem.getSetupDuration() + ticketSystem.getCombatDuration();
       ticketSystem.update(timeToMatchEnd + 0.01);
@@ -505,16 +505,16 @@ describe('TicketSystem', () => {
 
       // Damage some state first
       ticketSystem.onCombatantDeath(Faction.US);
-      ticketSystem.onCombatantDeath(Faction.OPFOR);
+      ticketSystem.onCombatantDeath(Faction.NVA);
 
       ticketSystem.restartMatch();
 
       expect(restartCallback).toHaveBeenCalledTimes(1);
       // Verify ticket state is also reset
       expect(ticketSystem.getTickets(Faction.US)).toBe(300);
-      expect(ticketSystem.getTickets(Faction.OPFOR)).toBe(300);
+      expect(ticketSystem.getTickets(Faction.NVA)).toBe(300);
       expect(ticketSystem.getKills(Faction.US)).toBe(0);
-      expect(ticketSystem.getKills(Faction.OPFOR)).toBe(0);
+      expect(ticketSystem.getKills(Faction.NVA)).toBe(0);
       expect(ticketSystem.isGameActive()).toBe(true);
     });
   });

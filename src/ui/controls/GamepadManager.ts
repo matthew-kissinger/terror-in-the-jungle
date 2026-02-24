@@ -68,6 +68,7 @@ export interface GamepadCallbacks {
   onScoreboardToggle?: (visible: boolean) => void;
   onSquadCommand?: () => void;
   onWeaponSlot?: (slot: number) => void;
+  onSquadQuickCommand?: (slot: number) => void;
 }
 
 export class GamepadManager {
@@ -84,14 +85,24 @@ export class GamepadManager {
   /** Whether any gamepad input has been received this session */
   private hasReceivedInput = false;
 
-  /** Stick dead zone (fraction of axis range, 0-1). Movements below this are zeroed. */
-  private readonly STICK_DEAD_ZONE = 0.15;
+  /** Stick dead zones (fraction of axis range, 0-1). Movements below these are zeroed. */
+  private moveDeadZone = 0.15;
+  private lookDeadZone = 0.15;
 
   /** Right-stick sensitivity - radians per unit per poll. */
   private lookSensitivity = 0.04;
 
   /** Non-linear exponent for right stick. <1 = sub-linear (precision aim). */
   private lookExponent = 0.85;
+
+  /** Southpaw swaps movement and look sticks. */
+  private useSouthpaw = false;
+
+  /** Invert vertical look axis for controller right stick. */
+  private invertLookY = false;
+
+  /** D-pad behavior mode from settings. */
+  private dpadMode: 'weapons' | 'quickCommands' = 'weapons';
 
   /** Sprint is held via RB, not toggled */
   private isSprinting = false;
@@ -119,6 +130,7 @@ export class GamepadManager {
         }
       }
     }
+    this.loadControllerSettings();
   }
 
   setCallbacks(callbacks: GamepadCallbacks): void {
@@ -142,6 +154,7 @@ export class GamepadManager {
   poll(): void {
     if (this.gamepadIndex === null) return;
     if (typeof navigator.getGamepads !== 'function') return;
+    this.loadControllerSettings();
 
     const gamepads = navigator.getGamepads();
     const gp = gamepads[this.gamepadIndex];
@@ -174,7 +187,18 @@ export class GamepadManager {
   /** Update look sensitivity from settings */
   updateSensitivity(): void {
     this.lookSensitivity = SettingsManager.getInstance().getMouseSensitivityRaw() * 14;
+    this.loadControllerSettings();
   }
+  private loadControllerSettings(): void {
+    const settings = SettingsManager.getInstance();
+    this.moveDeadZone = settings.getControllerMoveDeadZoneRaw();
+    this.lookDeadZone = settings.getControllerLookDeadZoneRaw();
+    this.lookExponent = settings.get('controllerLookCurve') === 'linear' ? 1.0 : 0.85;
+    this.useSouthpaw = settings.get('controllerPreset') === 'southpaw';
+    this.invertLookY = settings.get('controllerInvertY');
+    this.dpadMode = settings.get('controllerDpadMode');
+  }
+
 
   dispose(): void {
     window.removeEventListener('gamepadconnected', this.onConnected);
@@ -218,24 +242,30 @@ export class GamepadManager {
     this.prevLT = gp.buttons[GamepadButton.LT]?.value > this.TRIGGER_THRESHOLD;
   }
 
-  private applyDeadZone(value: number): number {
+  private applyDeadZone(value: number, deadZone: number): number {
     const abs = Math.abs(value);
-    if (abs < this.STICK_DEAD_ZONE) return 0;
+    if (abs < deadZone) return 0;
     // Remap from [deadZone, 1] -> [0, 1] preserving sign
-    const remapped = (abs - this.STICK_DEAD_ZONE) / (1 - this.STICK_DEAD_ZONE);
+    const remapped = (abs - deadZone) / (1 - deadZone);
     return Math.sign(value) * remapped;
   }
 
   private processSticks(gp: Gamepad): void {
-    // Left stick -> movement
-    const lx = this.applyDeadZone(gp.axes[GamepadAxis.LEFT_X] ?? 0);
-    const ly = this.applyDeadZone(gp.axes[GamepadAxis.LEFT_Y] ?? 0);
+    const movementAxisX = this.useSouthpaw ? GamepadAxis.RIGHT_X : GamepadAxis.LEFT_X;
+    const movementAxisY = this.useSouthpaw ? GamepadAxis.RIGHT_Y : GamepadAxis.LEFT_Y;
+    const lookAxisX = this.useSouthpaw ? GamepadAxis.LEFT_X : GamepadAxis.RIGHT_X;
+    const lookAxisY = this.useSouthpaw ? GamepadAxis.LEFT_Y : GamepadAxis.RIGHT_Y;
+
+    // Movement stick -> movement
+    const lx = this.applyDeadZone(gp.axes[movementAxisX] ?? 0, this.moveDeadZone);
+    const ly = this.applyDeadZone(gp.axes[movementAxisY] ?? 0, this.moveDeadZone);
     this.moveVector.x = lx;
     this.moveVector.z = ly; // Forward on stick (negative Y) maps to -z in game
 
-    // Right stick -> look delta
-    const rx = this.applyDeadZone(gp.axes[GamepadAxis.RIGHT_X] ?? 0);
-    const ry = this.applyDeadZone(gp.axes[GamepadAxis.RIGHT_Y] ?? 0);
+    // Look stick -> look delta
+    const rx = this.applyDeadZone(gp.axes[lookAxisX] ?? 0, this.lookDeadZone);
+    const ryInput = this.applyDeadZone(gp.axes[lookAxisY] ?? 0, this.lookDeadZone);
+    const ry = this.invertLookY ? -ryInput : ryInput;
 
     if (rx !== 0 || ry !== 0) {
       this.hasReceivedInput = true;
@@ -340,11 +370,23 @@ export class GamepadManager {
     if (justPressed(GamepadButton.BACK)) this.callbacks.onScoreboardToggle?.(true);
     if (justReleased(GamepadButton.BACK)) this.callbacks.onScoreboardToggle?.(false);
 
-    // --- D-pad -> Weapon slots ---
-    if (justPressed(GamepadButton.DPAD_UP)) this.callbacks.onWeaponSlot?.(0);    // Primary
-    if (justPressed(GamepadButton.DPAD_RIGHT)) this.callbacks.onWeaponSlot?.(1); // Secondary
-    if (justPressed(GamepadButton.DPAD_DOWN)) this.callbacks.onWeaponSlot?.(2);  // Throwable
-    if (justPressed(GamepadButton.DPAD_LEFT)) this.callbacks.onWeaponSlot?.(3);  // Special
+    // --- D-pad -> configurable (weapon slots or squad quick commands) ---
+    if (justPressed(GamepadButton.DPAD_UP)) {
+      if (this.dpadMode === 'quickCommands') this.callbacks.onSquadQuickCommand?.(1);
+      else this.callbacks.onWeaponSlot?.(0);
+    }
+    if (justPressed(GamepadButton.DPAD_RIGHT)) {
+      if (this.dpadMode === 'quickCommands') this.callbacks.onSquadQuickCommand?.(2);
+      else this.callbacks.onWeaponSlot?.(1);
+    }
+    if (justPressed(GamepadButton.DPAD_DOWN)) {
+      if (this.dpadMode === 'quickCommands') this.callbacks.onSquadQuickCommand?.(3);
+      else this.callbacks.onWeaponSlot?.(2);
+    }
+    if (justPressed(GamepadButton.DPAD_LEFT)) {
+      if (this.dpadMode === 'quickCommands') this.callbacks.onSquadQuickCommand?.(4);
+      else this.callbacks.onWeaponSlot?.(3);
+    }
 
     // Update previous button state
     for (let i = 0; i < btns.length; i++) {

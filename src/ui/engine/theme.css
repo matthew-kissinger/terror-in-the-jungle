@@ -112,6 +112,30 @@
   --tc-z-pause: 9990;
 }
 
+@media (max-width: 900px) {
+  :root {
+    --tc-fire-size: 72px;
+    --tc-ads-size: 52px;
+    --tc-action-size: 48px;
+    --tc-edge-inset: 20px;
+    --tc-joystick-base: 108px;
+    --tc-font-size: 11px;
+    --tc-font-size-sm: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --tc-fire-size: 64px;
+    --tc-ads-size: 46px;
+    --tc-action-size: 42px;
+    --tc-edge-inset: 12px;
+    --tc-joystick-base: 92px;
+    --tc-font-size: 10px;
+    --tc-font-size-sm: 9px;
+  }
+}
+
 /* === Shared keyframe animations === */
 
 @keyframes ui-fadeIn {

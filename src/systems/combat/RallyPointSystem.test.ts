@@ -82,7 +82,7 @@ describe('RallyPointSystem', () => {
     });
 
     it('should fail to place rally point in enemy zone', () => {
-      const enemyZone = createMockZone('zone-1', new THREE.Vector3(0, 0, 0), 30, Faction.OPFOR);
+      const enemyZone = createMockZone('zone-1', new THREE.Vector3(0, 0, 0), 30, Faction.NVA);
       const zoneManager = createMockZoneManager([enemyZone]);
       system.setZoneManager(zoneManager);
 

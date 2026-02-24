@@ -11,6 +11,8 @@ import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import { PersistenceSystem } from '../systems/strategy/PersistenceSystem';
 import type { GameEngine } from './GameEngine';
 import { markStartup } from './StartupTelemetry';
+import { toWorkerVegetationConfigs } from '../config/vegetationTypes';
+import { toWorkerBiomeConfig, BIOMES } from '../config/biomes';
 
 function getPrimaryUSBase(config: ReturnType<typeof getGameModeConfig>): ZoneConfig | undefined {
   return config.zones.find(z => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
@@ -67,15 +69,20 @@ export async function initializeSystems(engine: GameEngine): Promise<void> {
       Logger.info('engine-init', 'Skybox created');
     }
 
-    const shouldPreGenerateNow = !(engine.sandboxEnabled && engine.sandboxConfig?.autoStart);
-    if (shouldPreGenerateNow) {
-      markStartup('engine-init.pre-generate.begin');
-      Logger.info('engine-init', 'Pre-generating spawn area...');
-      const spawnPosition = engine.sandboxEnabled ? new THREE.Vector3(0, 5, 0) : new THREE.Vector3(0, 5, -50);
-      await engine.systemManager.preGenerateSpawnArea(spawnPosition);
-      markStartup('engine-init.pre-generate.end');
-    } else {
-      Logger.info('engine-init', 'Skipping initial spawn pre-generation (autostart will pre-generate mode-specific spawn).');
+    // Send default vegetation config to workers as a safety net. This is just
+    // a postMessage (microseconds). Chunk generation is deferred to
+    // startGameWithMode() where it runs at the actual mode spawn position.
+    engine.systemManager.globalBillboardSystem.configure('denseJungle');
+    {
+      const activeTypes = engine.systemManager.globalBillboardSystem.getActiveVegetationTypes();
+      const activeBiome = engine.systemManager.globalBillboardSystem.getActiveBiome();
+      const workerPool = engine.systemManager.chunkManager.getWorkerPool?.();
+      if (workerPool) {
+        workerPool.sendVegetationConfig({
+          types: toWorkerVegetationConfigs(activeTypes),
+          biomePalette: toWorkerBiomeConfig(activeBiome).vegetationPalette,
+        });
+      }
     }
 
     Logger.info('engine-init', 'World system ready!');
@@ -194,6 +201,36 @@ export async function startGameWithMode(engine: GameEngine, mode: GameMode): Pro
     engine.systemManager.chunkManager.setRenderDistance(config.chunkRenderDistance);
   }
 
+  // Push biome rules to chunk manager so per-chunk classification works
+  const defaultBiome = config.terrain?.defaultBiome ?? 'denseJungle';
+  engine.systemManager.chunkManager.setBiomeConfig(defaultBiome, config.terrain?.biomeRules);
+
+  // Configure biome / vegetation for this mode
+  engine.systemManager.globalBillboardSystem.configure(defaultBiome);
+
+  // Send vegetation + biome config to chunk workers
+  {
+    const activeTypes = engine.systemManager.globalBillboardSystem.getActiveVegetationTypes();
+    const activeBiome = engine.systemManager.globalBillboardSystem.getActiveBiome();
+    const workerPool = engine.systemManager.chunkManager.getWorkerPool?.();
+    if (workerPool) {
+      workerPool.sendVegetationConfig({
+        types: toWorkerVegetationConfigs(activeTypes),
+        biomePalette: toWorkerBiomeConfig(activeBiome).vegetationPalette,
+      });
+
+      const allPalettes: Record<string, any[]> = {};
+      for (const [id, biome] of Object.entries(BIOMES)) {
+        allPalettes[id] = biome.vegetationPalette;
+      }
+      workerPool.sendBiomeConfig({
+        biomeRules: config.terrain?.biomeRules ?? [],
+        defaultBiomeId: defaultBiome,
+        allBiomePalettes: allPalettes,
+      });
+    }
+  }
+
   engine.systemManager.setGameMode(mode, { createPlayerSquad: mode !== GameMode.AI_SANDBOX });
 
   // Load persisted war state if available (A Shau Valley mode)
@@ -252,13 +289,19 @@ export function startGame(engine: GameEngine): void {
 async function runStartupFlow(engine: GameEngine): Promise<void> {
   markStartup('engine-init.startup-flow.begin');
   const startTime = performance.now();
-  const markPhase = (phase: string) => Logger.info('engine-init', `[startup] ${phase}`);
+  const markPhase = (phase: string, status?: string, detail?: string) => {
+    Logger.info('engine-init', `[startup] ${phase}`);
+    if (status) {
+      engine.renderer.setSpawnLoadingStatus(status, detail);
+    }
+  };
 
   markPhase('hide-loading');
   engine.loadingScreen.hide();
   engine.renderer.showSpawnLoadingIndicator();
+  engine.renderer.setSpawnLoadingStatus('DEPLOYING TO BATTLEFIELD', 'Preparing insertion route and combat zone...');
 
-  markPhase('position-player');
+  markPhase('position-player', 'SYNCING INSERTION POINT', 'Validating terrain height and spawn safety...');
   try {
     const cfg = engine.systemManager.gameModeManager.getCurrentConfig();
     if (cfg.id === GameMode.AI_SANDBOX) {
@@ -274,15 +317,15 @@ async function runStartupFlow(engine: GameEngine): Promise<void> {
     // Keep startup resilient; spawn fallback already exists elsewhere.
   }
 
-  markPhase('flush-chunk-update');
+  markPhase('flush-chunk-update', 'BUILDING LOCAL TERRAIN', 'Finalizing chunk data around insertion zone...');
   engine.systemManager.chunkManager.update(0.016);
   await nextFrame();
 
-  markPhase('renderer-visible');
+  markPhase('renderer-visible', 'RENDERER ONLINE', 'Bringing visual systems to ready state...');
   engine.renderer.showRenderer();
   engine.renderer.hideSpawnLoadingIndicator();
 
-  markPhase('enable-player-systems');
+  markPhase('enable-player-systems', 'LIVE', 'Combat systems active. Good hunting.');
   engine.systemManager.firstPersonWeapon.setGameStarted(true);
   engine.systemManager.playerController.setGameStarted(true);
   engine.systemManager.hudSystem.startMatch();

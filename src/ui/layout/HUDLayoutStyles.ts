@@ -27,8 +27,8 @@ export const HUD_LAYOUT_STYLES = `
     position: fixed;
     inset: 0;
     width: 100%;
-    height: 100dvh;
-    height: 100vh; /* fallback for browsers without dvh */
+    height: 100vh; /* fallback for browsers without dvh support */
+    height: 100dvh; /* overrides vh on browsers that support dynamic viewport height */
     z-index: ${zIndex.hudBase};
     pointer-events: none;
     font-family: ${fontStack.hud};
@@ -43,12 +43,6 @@ export const HUD_LAYOUT_STYLES = `
     -webkit-tap-highlight-color: transparent;
   }
 
-  @supports (height: 100dvh) {
-    #game-hud-root {
-      height: 100dvh;
-    }
-  }
-
   /* Slots are grid children. Each one is a named region. */
   .hud-slot {
     pointer-events: auto;
@@ -59,14 +53,19 @@ export const HUD_LAYOUT_STYLES = `
     box-sizing: border-box;
   }
 
-  /* Center-aligned slots (tickets, compass, weapon-bar, center, kill-feed) */
+  /* Center-aligned slots (tickets, compass, weapon-bar, center) */
   .hud-slot[data-region="tickets"],
   .hud-slot[data-region="compass"],
   .hud-slot[data-region="weapon-bar"],
-  .hud-slot[data-region="center"],
-  .hud-slot[data-region="kill-feed"] {
+  .hud-slot[data-region="center"] {
     justify-content: center;
     align-items: center;
+  }
+
+  /* Kill-feed: top-right corner on desktop */
+  .hud-slot[data-region="kill-feed"] {
+    justify-content: flex-end;
+    align-items: flex-start;
   }
 
   /* Top-left slots */
@@ -77,13 +76,39 @@ export const HUD_LAYOUT_STYLES = `
     align-items: flex-start;
   }
 
+  /* Desktop left rail: timer, phase/status, and player stats read as one aligned column */
+  [data-device="desktop"] .hud-slot[data-region="timer"],
+  [data-device="desktop"] .hud-slot[data-region="game-status"],
+  [data-device="desktop"] .hud-slot[data-region="stats"] {
+    padding-left: 10px;
+  }
+
+  [data-device="desktop"] .hud-slot[data-region="stats"] {
+    flex-direction: column;
+    gap: 6px;
+  }
+
   /* Top-right / right-side slots */
   .hud-slot[data-region="minimap"],
   .hud-slot[data-region="objectives"],
-  .hud-slot[data-region="ammo"],
   .hud-slot[data-region="menu"] {
     justify-content: flex-end;
     align-items: flex-start;
+  }
+
+  /* Ammo: bottom-right — align-items: flex-end so it sticks to the bottom
+   * of its cell on both desktop (auto row) and mobile landscape (1fr row). */
+  .hud-slot[data-region="ammo"] {
+    justify-content: flex-end;
+    align-items: flex-end;
+    padding-bottom: 4px;
+    padding-right: 4px;
+  }
+
+  /* Desktop gets a little more breathing room from the screen edge */
+  [data-device="desktop"] .hud-slot[data-region="ammo"] {
+    padding-bottom: 8px;
+    padding-right: 10px;
   }
 
   /* Bottom-left */
@@ -107,8 +132,7 @@ export const HUD_LAYOUT_STYLES = `
    *  timer      |  tickets   | minimap
    *  game-status|  compass   | minimap
    *  stats      |            | objectives
-   *             |  center    |
-   *             |  kill-feed |
+   *             |  center    | kill-feed  ← top-right
    *  health     | weapon-bar | ammo
    * ========================================================= */
   #game-hud-root {
@@ -118,15 +142,13 @@ export const HUD_LAYOUT_STYLES = `
       auto     /* timer / tickets / minimap top */
       auto     /* game-status / compass / minimap bottom */
       auto     /* stats / . / objectives */
-      1fr      /* center (flexible) */
-      auto     /* kill-feed */
+      1fr      /* center (flexible) / kill-feed top-right */
       auto;    /* health / weapon-bar / ammo */
     grid-template-areas:
       "timer        tickets     minimap"
       "game-status  compass     minimap"
       "stats        .           objectives"
-      ".            center      ."
-      ".            kill-feed   ."
+      ".            center      kill-feed"
       "health       weapon-bar  ammo";
     gap: 4px;
   }
@@ -173,6 +195,11 @@ export const HUD_LAYOUT_STYLES = `
   /* stats hidden on phones (too small) */
   [data-layout="mobile-portrait"] .hud-slot[data-region="stats"],
   [data-layout="mobile-landscape"] .hud-slot[data-region="stats"] {
+    display: none !important;
+  }
+
+  /* kill-feed hidden on all touch/mobile layouts */
+  [data-device="touch"] .hud-slot[data-region="kill-feed"] {
     display: none !important;
   }
 
@@ -266,8 +293,16 @@ export const HUD_LAYOUT_STYLES = `
   /* =========================================================
    * VEHICLE-BASED VISIBILITY
    * Hide infantry-only controls when in helicopter.
+   * Also hide readouts that are irrelevant while flying:
+   *   stats (kill counter), game-status (phase label), ammo.
    * ========================================================= */
   [data-vehicle="helicopter"] .hud-slot[data-show="infantry"] {
+    display: none !important;
+  }
+
+  [data-vehicle="helicopter"] .hud-slot[data-region="stats"],
+  [data-vehicle="helicopter"] .hud-slot[data-region="game-status"],
+  [data-vehicle="helicopter"] .hud-slot[data-region="ammo"] {
     display: none !important;
   }
 

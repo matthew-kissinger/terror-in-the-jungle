@@ -1,5 +1,5 @@
 import { GameSystem } from '../../types';
-import { Faction } from '../combat/types';
+import { Faction, isBlufor } from '../combat/types';
 import { Logger } from '../../utils/Logger';
 import { WarEvent } from './types';
 import type { WarSimulator } from './WarSimulator';
@@ -84,9 +84,9 @@ export class StrategicFeedback implements GameSystem {
         case 'zone_captured':
           this.showThrottledMessage(
             `zone_${event.zoneId}`,
-            event.faction === Faction.US
-              ? `${event.zoneName} secured by US forces!`
-              : `${event.zoneName} captured by NVA!`,
+            isBlufor(event.faction)
+              ? `${event.zoneName} secured by ${event.faction} forces!`
+              : `${event.zoneName} captured by ${event.faction}!`,
             now, 5000
           );
           break;
@@ -102,9 +102,9 @@ export class StrategicFeedback implements GameSystem {
         case 'zone_lost':
           this.showThrottledMessage(
             `lost_${event.zoneId}`,
-            event.faction === Faction.US
-              ? `US forces lost ${event.zoneName}!`
-              : `NVA lost control of ${event.zoneName}`,
+            isBlufor(event.faction)
+              ? `${event.faction} forces lost ${event.zoneName}!`
+              : `${event.faction} lost control of ${event.zoneName}`,
             now, 5000
           );
           break;
@@ -112,9 +112,9 @@ export class StrategicFeedback implements GameSystem {
         case 'reinforcements_arriving':
           this.showThrottledMessage(
             `reinforce_${event.faction}`,
-            event.faction === Faction.US
-              ? `${event.count} US reinforcements deploying to ${event.zoneName}`
-              : `NVA reinforcements spotted near ${event.zoneName}`,
+            isBlufor(event.faction)
+              ? `${event.count} ${event.faction} reinforcements deploying to ${event.zoneName}`
+              : `${event.faction} reinforcements spotted near ${event.zoneName}`,
             now, 5000
           );
           break;
@@ -156,9 +156,9 @@ export class StrategicFeedback implements GameSystem {
           if (event.ratio > 1.5) {
             this.showThrottledMessage(
               'faction_advantage',
-              event.faction === Faction.US
-                ? 'US forces gaining the upper hand!'
-                : 'NVA forces pressing the advantage!',
+              isBlufor(event.faction)
+                ? `${event.faction} forces gaining the upper hand!`
+                : `${event.faction} forces pressing the advantage!`,
               now, 4000
             );
           }

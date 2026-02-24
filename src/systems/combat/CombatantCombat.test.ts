@@ -217,7 +217,7 @@ describe('CombatantCombat', () => {
 
     it('should attempt to fire when state is ENGAGING with target', () => {
       const combatant = createMockCombatant('test-1', Faction.US, 100, CombatantState.ENGAGING);
-      const target = createMockCombatant('target-1', Faction.OPFOR, 100);
+      const target = createMockCombatant('target-1', Faction.NVA, 100);
       combatant.target = target;
       combatant.lodLevel = 'high';
 
@@ -296,7 +296,7 @@ describe('CombatantCombat', () => {
   describe('Target Management', () => {
     it('should acquire and maintain a target', () => {
       const combatant = createMockCombatant('test-1', Faction.US);
-      const target = createMockCombatant('target-1', Faction.OPFOR);
+      const target = createMockCombatant('target-1', Faction.NVA);
 
       combatant.state = CombatantState.ENGAGING;
       combatant.target = target;
@@ -315,7 +315,7 @@ describe('CombatantCombat', () => {
 
     it('should handle target at range', () => {
       const combatant = createMockCombatant('test-1', Faction.US, 100, CombatantState.ENGAGING);
-      const target = createMockCombatant('target-1', Faction.OPFOR, 100, CombatantState.IDLE, new THREE.Vector3(150, 0, 0));
+      const target = createMockCombatant('target-1', Faction.NVA, 100, CombatantState.IDLE, new THREE.Vector3(150, 0, 0));
 
       combatant.target = target;
       combatant.lodLevel = 'high';
@@ -341,7 +341,7 @@ describe('CombatantCombat', () => {
     it('should respect fire rate limits', () => {
       const combatant = createMockCombatant('test-1', Faction.US, 100, CombatantState.ENGAGING);
       combatant.burstCooldown = 0.5; // Cooldown still active
-      const target = createMockCombatant('target-1', Faction.OPFOR);
+      const target = createMockCombatant('target-1', Faction.NVA);
       combatant.target = target;
       combatant.lodLevel = 'high';
 
@@ -450,7 +450,7 @@ describe('CombatantCombat', () => {
 
   describe('handlePlayerShot', () => {
     it('should return hit result on successful hit', () => {
-      const target = createMockCombatant('target-1', Faction.OPFOR, 100);
+      const target = createMockCombatant('target-1', Faction.NVA, 100);
       const allCombatants = new Map<string, Combatant>();
       allCombatants.set('target-1', target);
 
@@ -486,7 +486,7 @@ describe('CombatantCombat', () => {
     });
 
     it('should add kill to HUD when target is eliminated', () => {
-      const target = createMockCombatant('target-1', Faction.OPFOR, 10);
+      const target = createMockCombatant('target-1', Faction.NVA, 10);
       const allCombatants = new Map<string, Combatant>();
       allCombatants.set('target-1', target);
 
@@ -507,7 +507,7 @@ describe('CombatantCombat', () => {
     });
 
     it('should track headshot in result', () => {
-      const target = createMockCombatant('target-1', Faction.OPFOR, 100);
+      const target = createMockCombatant('target-1', Faction.NVA, 100);
       const allCombatants = new Map<string, Combatant>();
       allCombatants.set('target-1', target);
 
@@ -528,7 +528,7 @@ describe('CombatantCombat', () => {
     });
 
     it('should block player hit when terrain is closer than target', () => {
-      const target = createMockCombatant('target-1', Faction.OPFOR, 100);
+      const target = createMockCombatant('target-1', Faction.NVA, 100);
       const allCombatants = new Map<string, Combatant>();
       allCombatants.set('target-1', target);
 
@@ -572,7 +572,7 @@ describe('CombatantCombat', () => {
     });
 
     it('should block hit when height profile indicates occlusion', () => {
-      const target = createMockCombatant('target-1', Faction.OPFOR, 100);
+      const target = createMockCombatant('target-1', Faction.NVA, 100);
       const allCombatants = new Map<string, Combatant>();
       allCombatants.set('target-1', target);
       const ray = new THREE.Ray(new THREE.Vector3(0, 1.2, 0), new THREE.Vector3(1, 0, 0));
@@ -615,7 +615,7 @@ describe('CombatantCombat', () => {
   describe('applyDamage', () => {
     it('should apply damage via damage module', () => {
       const target = createMockCombatant('target-1', Faction.US, 100);
-      const attacker = createMockCombatant('attacker-1', Faction.OPFOR, 100);
+      const attacker = createMockCombatant('attacker-1', Faction.NVA, 100);
 
       vi.spyOn(combatantCombat['damage'], 'applyDamage');
 
@@ -725,7 +725,7 @@ describe('CombatantCombat', () => {
 
     it('should not fire when canFire returns false', () => {
       const combatant = createMockCombatant('test-1', Faction.US, 100, CombatantState.ENGAGING);
-      const target = createMockCombatant('target-1', Faction.OPFOR);
+      const target = createMockCombatant('target-1', Faction.NVA);
       combatant.target = target;
       combatant.lodLevel = 'high';
 
@@ -748,7 +748,7 @@ describe('CombatantCombat', () => {
 
     it('should handle terrain obstruction blocking shots', () => {
       const combatant = createMockCombatant('test-1', Faction.US, 100, CombatantState.ENGAGING);
-      const target = createMockCombatant('target-1', Faction.OPFOR, 100, CombatantState.IDLE, new THREE.Vector3(20, 0, 0));
+      const target = createMockCombatant('target-1', Faction.NVA, 100, CombatantState.IDLE, new THREE.Vector3(20, 0, 0));
       combatant.target = target;
       combatant.lodLevel = 'high';
 
@@ -822,7 +822,7 @@ describe('CombatantCombat', () => {
   describe('Integration', () => {
     it('should handle full combat loop: acquire target -> fire -> adjust aim', () => {
       const attacker = createMockCombatant('attacker-1', Faction.US, 100, CombatantState.IDLE);
-      const target = createMockCombatant('target-1', Faction.OPFOR, 100, CombatantState.IDLE, new THREE.Vector3(30, 0, 0));
+      const target = createMockCombatant('target-1', Faction.NVA, 100, CombatantState.IDLE, new THREE.Vector3(30, 0, 0));
 
       // Step 1: Acquire target
       attacker.state = CombatantState.ENGAGING;

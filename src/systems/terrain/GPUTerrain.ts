@@ -43,8 +43,9 @@ export class GPUTerrain implements GameSystem {
   private readonly LOD_RINGS = 8; // Number of LOD rings
   private readonly RING_SEGMENTS = 64; // Segments per ring
 
-  // Ground texture
+  // Ground textures
   private groundTexture?: THREE.Texture;
+  private highTexture?: THREE.Texture;
 
   // Initialization flag
   private isInitialized = false;
@@ -62,24 +63,31 @@ export class GPUTerrain implements GameSystem {
   async init(): Promise<void> {
     Logger.info('terrain', '[GPUTerrain] Initializing GPU terrain system...');
 
-    // Load ground texture with fallback
-    this.groundTexture = this.assetLoader.getTexture('forestfloor');
+    // Load ground texture with fallback chain
+    this.groundTexture = this.assetLoader.getTexture('jungle-floor');
     if (!this.groundTexture) {
-      // Create a simple green placeholder texture
       const size = 4;
       const data = new Uint8Array(size * size * 4);
       for (let i = 0; i < size * size; i++) {
-        data[i * 4] = 60;      // R
-        data[i * 4 + 1] = 90;  // G
-        data[i * 4 + 2] = 50;  // B
-        data[i * 4 + 3] = 255; // A
+        data[i * 4] = 60;
+        data[i * 4 + 1] = 90;
+        data[i * 4 + 2] = 50;
+        data[i * 4 + 3] = 255;
       }
       this.groundTexture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
-      Logger.warn('terrain', '[GPUTerrain] forestfloor texture not found, using placeholder');
+      Logger.warn('terrain', '[GPUTerrain] jungle-floor texture not found, using placeholder');
     }
     this.groundTexture.wrapS = THREE.RepeatWrapping;
     this.groundTexture.wrapT = THREE.RepeatWrapping;
     this.groundTexture.needsUpdate = true;
+
+    // High-elevation texture (rocky highland) for multi-texture blending
+    this.highTexture = this.assetLoader.getTexture('rocky-highland') ?? this.groundTexture;
+    if (this.highTexture !== this.groundTexture) {
+      this.highTexture.wrapS = THREE.RepeatWrapping;
+      this.highTexture.wrapT = THREE.RepeatWrapping;
+      this.highTexture.needsUpdate = true;
+    }
 
     // Create heightmap texture
     this.createHeightmapTexture();
@@ -129,7 +137,10 @@ export class GPUTerrain implements GameSystem {
         terrainScale: { value: this.TERRAIN_SCALE },
         heightmapCenter: { value: new THREE.Vector2(0, 0) },
         groundTexture: { value: this.groundTexture },
-        textureRepeat: { value: 0.05 }, // Texture tiling
+        highTexture: { value: this.highTexture },
+        textureRepeat: { value: 0.05 },
+        blendLow: { value: 20.0 },
+        blendHigh: { value: 60.0 },
         fogColor: { value: new THREE.Color(0x5a7a6a) },
         fogNear: { value: 50 },
         fogFar: { value: 500 },

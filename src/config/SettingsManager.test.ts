@@ -16,6 +16,8 @@ describe('SettingsManager', () => {
     const sm = SettingsManager.getInstance();
     expect(sm.get('masterVolume')).toBe(70);
     expect(sm.get('mouseSensitivity')).toBe(5);
+    expect(sm.get('controllerPreset')).toBe('default');
+    expect(sm.get('controllerDpadMode')).toBe('weapons');
     expect(sm.get('showFPS')).toBe(false);
     expect(sm.get('enableShadows')).toBe(true);
     expect(sm.get('graphicsQuality')).toBe('medium');
@@ -93,9 +95,23 @@ describe('SettingsManager', () => {
       masterVolume: 70,
       mouseSensitivity: 5,
       touchSensitivity: 5,
+      controllerPreset: 'default',
+      controllerMoveDeadZone: 15,
+      controllerLookDeadZone: 15,
+      controllerLookCurve: 'precision',
+      controllerInvertY: false,
+      controllerDpadMode: 'weapons',
       showFPS: false,
       enableShadows: true,
       graphicsQuality: 'medium',
     });
+  });
+
+  it('should convert controller dead zones to 0-1 values', () => {
+    const sm = SettingsManager.getInstance();
+    sm.set('controllerMoveDeadZone', 20);
+    sm.set('controllerLookDeadZone', 12);
+    expect(sm.getControllerMoveDeadZoneRaw()).toBeCloseTo(0.2);
+    expect(sm.getControllerLookDeadZoneRaw()).toBeCloseTo(0.12);
   });
 });

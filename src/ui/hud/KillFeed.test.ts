@@ -43,29 +43,29 @@ describe("KillFeed", () => {
     });
 
     it("should add a kill entry", () => {
-      killFeed.addKill("Player1", Faction.US, "Player2", Faction.OPFOR);
+      killFeed.addKill("Player1", Faction.US, "Player2", Faction.NVA);
       const container = mockParent.querySelector(".kill-feed");
       expect(container?.children.length).toBe(1);
     });
 
     it("should create entry with correct killer name", () => {
-      killFeed.addKill("Killer", Faction.US, "Victim", Faction.OPFOR);
+      killFeed.addKill("Killer", Faction.US, "Victim", Faction.NVA);
       const container = mockParent.querySelector(".kill-feed");
       const entry = container?.children[0];
       expect(entry?.textContent).toContain("Killer");
     });
 
     it("should create entry with correct victim name", () => {
-      killFeed.addKill("Killer", Faction.US, "Victim", Faction.OPFOR);
+      killFeed.addKill("Killer", Faction.US, "Victim", Faction.NVA);
       const container = mockParent.querySelector(".kill-feed");
       const entry = container?.children[0];
       expect(entry?.textContent).toContain("Victim");
     });
 
     it("should create entry with unique ID", () => {
-      killFeed.addKill("P1", Faction.US, "P2", Faction.OPFOR);
+      killFeed.addKill("P1", Faction.US, "P2", Faction.NVA);
       vi.advanceTimersByTime(10);
-      killFeed.addKill("P3", Faction.US, "P4", Faction.OPFOR);
+      killFeed.addKill("P3", Faction.US, "P4", Faction.NVA);
       
       const container = mockParent.querySelector(".kill-feed");
       const id1 = container?.children[0].getAttribute("data-entry-id");
@@ -75,68 +75,68 @@ describe("KillFeed", () => {
     });
 
     it("should add multiple kills in order", () => {
-      killFeed.addKill("P1", Faction.US, "P2", Faction.OPFOR);
+      killFeed.addKill("P1", Faction.US, "P2", Faction.NVA);
       vi.advanceTimersByTime(100);
-      killFeed.addKill("P3", Faction.US, "P4", Faction.OPFOR);
+      killFeed.addKill("P3", Faction.US, "P4", Faction.NVA);
       vi.advanceTimersByTime(100);
-      killFeed.addKill("P5", Faction.US, "P6", Faction.OPFOR);
+      killFeed.addKill("P5", Faction.US, "P6", Faction.NVA);
       
       const container = mockParent.querySelector(".kill-feed");
       expect(container?.children.length).toBe(3);
     });
 
     it("should show headshot indicator when isHeadshot is true", () => {
-      killFeed.addKill("Killer", Faction.US, "Victim", Faction.OPFOR, true);
+      killFeed.addKill("Killer", Faction.US, "Victim", Faction.NVA, true);
       const container = mockParent.querySelector(".kill-feed");
       const entry = container?.children[0];
       expect(entry?.textContent).toContain("HS");
     });
 
     it("should not show headshot indicator when isHeadshot is false", () => {
-      killFeed.addKill("Killer", Faction.US, "Victim", Faction.OPFOR, false);
+      killFeed.addKill("Killer", Faction.US, "Victim", Faction.NVA, false);
       const container = mockParent.querySelector(".kill-feed");
       const entry = container?.children[0];
       expect(entry?.textContent).not.toContain("HS");
     });
 
     it("should display rifle weapon icon", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR, false, "rifle");
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA, false, "rifle");
       const container = mockParent.querySelector(".kill-feed");
       expect(container?.textContent).toContain("[AR]");
     });
 
     it("should display shotgun weapon icon", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR, false, "shotgun");
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA, false, "shotgun");
       const container = mockParent.querySelector(".kill-feed");
       expect(container?.textContent).toContain("[SG]");
     });
 
     it("should display smg weapon icon", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR, false, "smg");
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA, false, "smg");
       const container = mockParent.querySelector(".kill-feed");
       expect(container?.textContent).toContain("[SM]");
     });
 
     it("should display grenade weapon icon", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR, false, "grenade");
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA, false, "grenade");
       const container = mockParent.querySelector(".kill-feed");
       expect(container?.textContent).toContain("[GR]");
     });
 
     it("should display mortar weapon icon", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR, false, "mortar");
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA, false, "mortar");
       const container = mockParent.querySelector(".kill-feed");
       expect(container?.textContent).toContain("[MT]");
     });
 
     it("should display melee weapon icon", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR, false, "melee");
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA, false, "melee");
       const container = mockParent.querySelector(".kill-feed");
       expect(container?.textContent).toContain("[ML]");
     });
 
     it("should display unknown weapon icon", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR, false, "unknown");
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA, false, "unknown");
       const container = mockParent.querySelector(".kill-feed");
       expect(container?.textContent).toContain("--");
     });
@@ -149,7 +149,7 @@ describe("KillFeed", () => {
 
     it("should cap entries at 6", () => {
       for (let i = 0; i < 10; i++) {
-        killFeed.addKill(`P${i}`, Faction.US, `V${i}`, Faction.OPFOR);
+        killFeed.addKill(`P${i}`, Faction.US, `V${i}`, Faction.NVA);
         vi.advanceTimersByTime(10);
       }
       
@@ -159,7 +159,7 @@ describe("KillFeed", () => {
 
     it("should remove oldest entry when exceeding MAX_ENTRIES", () => {
       for (let i = 0; i < 7; i++) {
-        killFeed.addKill(`Killer${i}`, Faction.US, `Victim${i}`, Faction.OPFOR);
+        killFeed.addKill(`Killer${i}`, Faction.US, `Victim${i}`, Faction.NVA);
         vi.advanceTimersByTime(10);
       }
       
@@ -170,7 +170,7 @@ describe("KillFeed", () => {
 
     it("should clean up DOM element for removed oldest entry", () => {
       for (let i = 0; i < 7; i++) {
-        killFeed.addKill(`P${i}`, Faction.US, `V${i}`, Faction.OPFOR);
+        killFeed.addKill(`P${i}`, Faction.US, `V${i}`, Faction.NVA);
         vi.advanceTimersByTime(10);
       }
       
@@ -182,7 +182,7 @@ describe("KillFeed", () => {
 
     it("should maintain correct order after overflow", () => {
       for (let i = 0; i < 8; i++) {
-        killFeed.addKill(`K${i}`, Faction.US, `V${i}`, Faction.OPFOR);
+        killFeed.addKill(`K${i}`, Faction.US, `V${i}`, Faction.NVA);
         vi.advanceTimersByTime(10);
       }
       
@@ -199,7 +199,7 @@ describe("KillFeed", () => {
     });
 
     it("should maintain full opacity before FADE_START (3000ms)", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR);
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA);
       
       const container = mockParent.querySelector(".kill-feed");
       const entry = container?.children[0] as HTMLElement;
@@ -213,7 +213,7 @@ describe("KillFeed", () => {
     });
 
     it("should start fading after FADE_START (3000ms)", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR);
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA);
       
       vi.advanceTimersByTime(3500);
       killFeed.update(0);
@@ -226,7 +226,7 @@ describe("KillFeed", () => {
     });
 
     it("should calculate correct opacity at 4000ms (halfway through fade)", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR);
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA);
       
       vi.advanceTimersByTime(4000);
       killFeed.update(0);
@@ -240,7 +240,7 @@ describe("KillFeed", () => {
     });
 
     it("should reach near-zero opacity at 4999ms", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR);
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA);
       
       vi.advanceTimersByTime(4999);
       killFeed.update(0);
@@ -252,9 +252,9 @@ describe("KillFeed", () => {
     });
 
     it("should fade multiple entries independently", () => {
-      killFeed.addKill("K1", Faction.US, "V1", Faction.OPFOR);
+      killFeed.addKill("K1", Faction.US, "V1", Faction.NVA);
       vi.advanceTimersByTime(1000);
-      killFeed.addKill("K2", Faction.US, "V2", Faction.OPFOR);
+      killFeed.addKill("K2", Faction.US, "V2", Faction.NVA);
       
       vi.advanceTimersByTime(2500); // K1 at 3500ms, K2 at 2500ms
       killFeed.update(0);
@@ -277,7 +277,7 @@ describe("KillFeed", () => {
     });
 
     it("should remove entry after ENTRY_LIFETIME (5000ms)", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR);
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA);
       
       vi.advanceTimersByTime(5000);
       killFeed.update(0);
@@ -287,7 +287,7 @@ describe("KillFeed", () => {
     });
 
     it("should keep entry just before ENTRY_LIFETIME", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR);
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA);
       
       vi.advanceTimersByTime(4999);
       killFeed.update(0);
@@ -297,7 +297,7 @@ describe("KillFeed", () => {
     });
 
     it("should clean up DOM element for expired entry", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR);
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA);
       const container = mockParent.querySelector(".kill-feed");
       const initialId = container?.children[0].getAttribute("data-entry-id");
       
@@ -309,11 +309,11 @@ describe("KillFeed", () => {
     });
 
     it("should remove multiple expired entries", () => {
-      killFeed.addKill("K1", Faction.US, "V1", Faction.OPFOR);
+      killFeed.addKill("K1", Faction.US, "V1", Faction.NVA);
       vi.advanceTimersByTime(100);
-      killFeed.addKill("K2", Faction.US, "V2", Faction.OPFOR);
+      killFeed.addKill("K2", Faction.US, "V2", Faction.NVA);
       vi.advanceTimersByTime(100);
-      killFeed.addKill("K3", Faction.US, "V3", Faction.OPFOR);
+      killFeed.addKill("K3", Faction.US, "V3", Faction.NVA);
       
       vi.advanceTimersByTime(5000);
       killFeed.update(0);
@@ -323,9 +323,9 @@ describe("KillFeed", () => {
     });
 
     it("should keep newer entries when older ones expire", () => {
-      killFeed.addKill("Old", Faction.US, "V1", Faction.OPFOR);
+      killFeed.addKill("Old", Faction.US, "V1", Faction.NVA);
       vi.advanceTimersByTime(3000);
-      killFeed.addKill("New", Faction.US, "V2", Faction.OPFOR);
+      killFeed.addKill("New", Faction.US, "V2", Faction.NVA);
       
       vi.advanceTimersByTime(2500); // Old at 5500ms, New at 2500ms
       killFeed.update(0);
@@ -343,17 +343,17 @@ describe("KillFeed", () => {
     });
 
     it("should create DOM elements for new entries", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR);
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA);
       const container = mockParent.querySelector(".kill-feed");
       expect(container?.children.length).toBe(1);
     });
 
     it("should maintain entry order (oldest first, newest last)", () => {
-      killFeed.addKill("First", Faction.US, "V1", Faction.OPFOR);
+      killFeed.addKill("First", Faction.US, "V1", Faction.NVA);
       vi.advanceTimersByTime(100);
-      killFeed.addKill("Second", Faction.US, "V2", Faction.OPFOR);
+      killFeed.addKill("Second", Faction.US, "V2", Faction.NVA);
       vi.advanceTimersByTime(100);
-      killFeed.addKill("Third", Faction.US, "V3", Faction.OPFOR);
+      killFeed.addKill("Third", Faction.US, "V3", Faction.NVA);
       
       const container = mockParent.querySelector(".kill-feed");
       const entries = Array.from(container?.children || []);
@@ -363,7 +363,7 @@ describe("KillFeed", () => {
     });
 
     it("should update existing elements instead of recreating", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR);
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA);
       const container = mockParent.querySelector(".kill-feed");
       const originalElement = container?.children[0];
       
@@ -381,7 +381,7 @@ describe("KillFeed", () => {
     });
 
     it("should color US faction names blue", () => {
-      killFeed.addKill("USPlayer", Faction.US, "Enemy", Faction.OPFOR);
+      killFeed.addKill("USPlayer", Faction.US, "Enemy", Faction.NVA);
       const container = mockParent.querySelector(".kill-feed");
       const entry = container?.children[0] as HTMLElement;
       const killerSpan = entry?.querySelector("span:first-child") as HTMLElement;
@@ -389,7 +389,7 @@ describe("KillFeed", () => {
     });
 
     it("should color OPFOR faction names red", () => {
-      killFeed.addKill("Player", Faction.US, "OPFOREnemy", Faction.OPFOR);
+      killFeed.addKill("Player", Faction.US, "OPFOREnemy", Faction.NVA);
       const container = mockParent.querySelector(".kill-feed");
       const entry = container?.children[0] as HTMLElement;
       const victimSpan = entry?.querySelector("span:last-child") as HTMLElement;
@@ -435,7 +435,7 @@ describe("KillFeed", () => {
 
     it("should clear entries", () => {
       killFeed.attachToDOM(mockParent);
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR);
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA);
       killFeed.dispose();
       
       // Create new instance and attach to verify cleanup
@@ -454,7 +454,7 @@ describe("KillFeed", () => {
 
     it("should handle multiple rapid kills", () => {
       for (let i = 0; i < 5; i++) {
-        killFeed.addKill(`K${i}`, Faction.US, `V${i}`, Faction.OPFOR);
+        killFeed.addKill(`K${i}`, Faction.US, `V${i}`, Faction.NVA);
       }
       
       const container = mockParent.querySelector(".kill-feed");
@@ -462,9 +462,9 @@ describe("KillFeed", () => {
     });
 
     it("should maintain correct order for rapid kills", () => {
-      killFeed.addKill("First", Faction.US, "V1", Faction.OPFOR);
-      killFeed.addKill("Second", Faction.US, "V2", Faction.OPFOR);
-      killFeed.addKill("Third", Faction.US, "V3", Faction.OPFOR);
+      killFeed.addKill("First", Faction.US, "V1", Faction.NVA);
+      killFeed.addKill("Second", Faction.US, "V2", Faction.NVA);
+      killFeed.addKill("Third", Faction.US, "V3", Faction.NVA);
       
       const container = mockParent.querySelector(".kill-feed");
       const entries = Array.from(container?.children || []);
@@ -474,9 +474,9 @@ describe("KillFeed", () => {
     });
 
     it("should generate unique IDs for simultaneous kills", () => {
-      killFeed.addKill("K1", Faction.US, "V1", Faction.OPFOR);
-      killFeed.addKill("K2", Faction.US, "V2", Faction.OPFOR);
-      killFeed.addKill("K3", Faction.US, "V3", Faction.OPFOR);
+      killFeed.addKill("K1", Faction.US, "V1", Faction.NVA);
+      killFeed.addKill("K2", Faction.US, "V2", Faction.NVA);
+      killFeed.addKill("K3", Faction.US, "V3", Faction.NVA);
       
       const container = mockParent.querySelector(".kill-feed");
       const ids = Array.from(container?.children || []).map(
@@ -494,13 +494,13 @@ describe("KillFeed", () => {
     });
 
     it("should handle empty killer name", () => {
-      killFeed.addKill("", Faction.US, "Victim", Faction.OPFOR);
+      killFeed.addKill("", Faction.US, "Victim", Faction.NVA);
       const container = mockParent.querySelector(".kill-feed");
       expect(container?.children.length).toBe(1);
     });
 
     it("should handle empty victim name", () => {
-      killFeed.addKill("Killer", Faction.US, "", Faction.OPFOR);
+      killFeed.addKill("Killer", Faction.US, "", Faction.NVA);
       const container = mockParent.querySelector(".kill-feed");
       expect(container?.children.length).toBe(1);
     });
@@ -512,7 +512,7 @@ describe("KillFeed", () => {
     });
 
     it("should handle headshot with explosive weapon", () => {
-      killFeed.addKill("K", Faction.US, "V", Faction.OPFOR, true, "grenade");
+      killFeed.addKill("K", Faction.US, "V", Faction.NVA, true, "grenade");
       const container = mockParent.querySelector(".kill-feed");
       expect(container?.textContent).toContain("HS");
       expect(container?.textContent).toContain("[GR]");

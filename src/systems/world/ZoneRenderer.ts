@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CaptureZone, ZoneState } from './ZoneManager';
-import { Faction } from '../combat/types';
+import { Faction, isBlufor, isOpfor } from '../combat/types';
 
 export class ZoneRenderer {
   private scene: THREE.Scene;
@@ -88,7 +88,7 @@ export class ZoneRenderer {
     zone.opforFlagMesh.position.copy(zone.position);
     zone.opforFlagMesh.position.x += 2.5;
     zone.opforFlagMesh.position.y = terrainHeight;
-    zone.opforFlagMesh.visible = zone.owner === Faction.OPFOR;
+    zone.opforFlagMesh.visible = zone.owner !== null && isOpfor(zone.owner);
     this.scene.add(zone.opforFlagMesh);
 
     // Initialize flag height based on ownership
@@ -96,7 +96,7 @@ export class ZoneRenderer {
     if (zone.owner === Faction.US) {
       zone.currentFlagHeight = terrainY + zone.height - 2;
       zone.usFlagMesh.position.y = zone.currentFlagHeight;
-    } else if (zone.owner === Faction.OPFOR) {
+    } else if (zone.owner !== null && isOpfor(zone.owner)) {
       zone.currentFlagHeight = terrainY + zone.height - 2;
       zone.opforFlagMesh.position.y = zone.currentFlagHeight;
     } else {
@@ -168,7 +168,7 @@ export class ZoneRenderer {
     if (zone.owner === Faction.US) {
       targetHeight = terrainHeight + zone.height - 2;
       showUSFlag = true;
-    } else if (zone.owner === Faction.OPFOR) {
+    } else if (zone.owner !== null && isOpfor(zone.owner)) {
       targetHeight = terrainHeight + zone.height - 2;
       showOPFORFlag = true;
     } else if (zone.state === ZoneState.CONTESTED) {
@@ -245,7 +245,7 @@ export class ZoneRenderer {
     const flagBaseY = terrainHeight + 2;
     const flagTopY = terrainHeight + zone.height - 2;
 
-    if (zone.owner === Faction.US || zone.owner === Faction.OPFOR) {
+    if (zone.owner !== null) {
       zone.currentFlagHeight = flagTopY;
     } else if (zone.state === ZoneState.CONTESTED) {
       const progress = zone.captureProgress / 100;

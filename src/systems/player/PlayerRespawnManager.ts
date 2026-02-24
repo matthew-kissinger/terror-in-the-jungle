@@ -1,7 +1,7 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { Faction } from '../combat/types';
+import { Faction, Alliance, getAlliance, isBlufor, isOpfor } from '../combat/types';
 import { ZoneManager, ZoneState } from '../world/ZoneManager';
 import { PlayerHealthSystem } from './PlayerHealthSystem';
 import { GameModeManager } from '../world/GameModeManager';
@@ -145,11 +145,11 @@ export class PlayerRespawnManager implements GameSystem {
     // Check if game mode allows spawning at zones
     const canSpawnAtZones = this.gameModeManager?.canPlayerSpawnAtZones() ?? false;
 
-    // Filter zones - only US controlled zones (not OPFOR or contested)
+    // Filter zones - only BLUFOR controlled zones (not OPFOR or contested)
     const zones = this.zoneManager.getAllZones().filter(z => {
-      // Only allow US bases (not OPFOR bases)
-      if (z.isHomeBase && z.owner === Faction.US) return true;
-      // Only allow fully US-captured zones (not contested or OPFOR controlled)
+      // Only allow BLUFOR bases (not OPFOR bases)
+      if (z.isHomeBase && z.owner !== null && isBlufor(z.owner)) return true;
+      // Only allow fully BLUFOR-captured zones (not contested or OPFOR controlled)
       if (canSpawnAtZones && !z.isHomeBase && z.state === ZoneState.US_CONTROLLED) return true;
       return false;
     });
@@ -193,7 +193,7 @@ export class PlayerRespawnManager implements GameSystem {
     }
 
     const usBase = this.zoneManager.getAllZones().find(
-      z => z.id === 'us_base' || (z.isHomeBase && z.owner === Faction.US)
+      z => z.id === 'us_base' || (z.isHomeBase && z.owner !== null && isBlufor(z.owner))
     );
 
     const basePos = usBase ? usBase.position.clone() : new THREE.Vector3(0, 5, -50);
@@ -325,9 +325,9 @@ export class PlayerRespawnManager implements GameSystem {
 
     this.availableSpawnPoints = zones
       .filter(z => {
-        // Can only spawn at US-owned bases (not OPFOR bases)
-        if (z.isHomeBase && z.owner === Faction.US) return true;
-        // Can spawn at fully captured zones if game mode allows (must be US controlled, not contested or OPFOR)
+        // Can only spawn at BLUFOR-owned bases (not OPFOR bases)
+        if (z.isHomeBase && z.owner !== null && isBlufor(z.owner)) return true;
+        // Can spawn at fully captured zones if game mode allows (must be BLUFOR controlled, not contested or OPFOR)
         if (canSpawnAtZones && !z.isHomeBase && z.state === ZoneState.US_CONTROLLED) return true;
         return false;
       })
@@ -388,7 +388,7 @@ export class PlayerRespawnManager implements GameSystem {
     if (!pressureSpawn) return null;
     const minOpfor250 = Math.max(0, Number(options?.minOpfor250 ?? 0));
     if (minOpfor250 > 0) {
-      const opfor250 = this.countNearbyAgents(pressureSpawn, 250, Faction.OPFOR);
+      const opfor250 = this.countNearbyAgents(pressureSpawn, 250, Alliance.OPFOR);
       if (opfor250 < minOpfor250) {
         return null;
       }
@@ -402,7 +402,7 @@ export class PlayerRespawnManager implements GameSystem {
     const usForward = zones.filter(z => !z.isHomeBase && z.state === ZoneState.US_CONTROLLED);
     if (usForward.length === 0) return null;
 
-    const enemyLike = zones.filter(z => z.owner === Faction.OPFOR || z.state === ZoneState.CONTESTED || z.owner === null);
+    const enemyLike = zones.filter(z => (z.owner !== null && isOpfor(z.owner)) || z.state === ZoneState.CONTESTED || z.owner === null);
     if (enemyLike.length === 0) {
       return usForward[0].position.clone();
     }
@@ -459,7 +459,7 @@ export class PlayerRespawnManager implements GameSystem {
     const candidates: Candidate[] = [];
 
     for (const agent of agents.values()) {
-      if (!agent.alive || agent.faction !== Faction.OPFOR) continue;
+      if (!agent.alive || !isOpfor(agent.faction)) continue;
       const dx = agent.x - objective.x;
       const dz = agent.z - objective.z;
       const d2 = dx * dx + dz * dz;
@@ -529,9 +529,9 @@ export class PlayerRespawnManager implements GameSystem {
   }
 
   private scoreRespawnCandidate(candidate: THREE.Vector3, nearestUSPos: THREE.Vector3, objectivePos: THREE.Vector3): number {
-    const opfor250 = this.countNearbyAgents(candidate, 250, Faction.OPFOR);
-    const opfor400 = this.countNearbyAgents(candidate, 400, Faction.OPFOR);
-    const us220 = this.countNearbyAgents(candidate, 220, Faction.US);
+    const opfor250 = this.countNearbyAgents(candidate, 250, Alliance.OPFOR);
+    const opfor400 = this.countNearbyAgents(candidate, 400, Alliance.OPFOR);
+    const us220 = this.countNearbyAgents(candidate, 220, Alliance.BLUFOR);
     const dToObjective = candidate.distanceTo(objectivePos);
     const dToUS = candidate.distanceTo(nearestUSPos);
 
@@ -544,12 +544,12 @@ export class PlayerRespawnManager implements GameSystem {
       - dToUS * 0.002;
   }
 
-  private countNearbyAgents(center: THREE.Vector3, radius: number, faction: Faction): number {
+  private countNearbyAgents(center: THREE.Vector3, radius: number, alliance: Alliance): number {
     if (!this.warSimulator || !this.warSimulator.isEnabled()) return 0;
     const r2 = radius * radius;
     let count = 0;
     for (const agent of this.warSimulator.getAllAgents().values()) {
-      if (!agent.alive || agent.faction !== faction) continue;
+      if (!agent.alive || getAlliance(agent.faction) !== alliance) continue;
       const dx = agent.x - center.x;
       const dz = agent.z - center.z;
       if ((dx * dx + dz * dz) <= r2) count++;

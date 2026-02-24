@@ -82,7 +82,7 @@ describe('InfluenceMapComputations', () => {
     it('should accumulate threat from OPFOR combatants', () => {
       const params = createTestParams();
       const enemyPos = new THREE.Vector3(0, 0, 0);
-      const enemy = createMockCombatant('enemy1', Faction.OPFOR, enemyPos);
+      const enemy = createMockCombatant('enemy1', Faction.NVA, enemyPos);
       params.combatants.set('enemy1', enemy);
 
       computeThreatLevel(params);
@@ -97,7 +97,7 @@ describe('InfluenceMapComputations', () => {
       const params = createTestParams();
 
       // Add both OPFOR and US combatants
-      const enemy = createMockCombatant('enemy1', Faction.OPFOR, new THREE.Vector3(0, 0, 0));
+      const enemy = createMockCombatant('enemy1', Faction.NVA, new THREE.Vector3(0, 0, 0));
       const friendly = createMockCombatant('friendly1', Faction.US, new THREE.Vector3(50, 0, 50));
       params.combatants.set('enemy1', enemy);
       params.combatants.set('friendly1', friendly);
@@ -115,8 +115,8 @@ describe('InfluenceMapComputations', () => {
       const params = createTestParams();
 
       // Add both alive and dead OPFOR combatants
-      const aliveEnemy = createMockCombatant('alive', Faction.OPFOR, new THREE.Vector3(0, 0, 0), 'engaging');
-      const deadEnemy = createMockCombatant('dead', Faction.OPFOR, new THREE.Vector3(50, 0, 50), 'dead');
+      const aliveEnemy = createMockCombatant('alive', Faction.NVA, new THREE.Vector3(0, 0, 0), 'engaging');
+      const deadEnemy = createMockCombatant('dead', Faction.NVA, new THREE.Vector3(50, 0, 50), 'dead');
       params.combatants.set('alive', aliveEnemy);
       params.combatants.set('dead', deadEnemy);
 
@@ -133,7 +133,7 @@ describe('InfluenceMapComputations', () => {
       const params = createTestParams();
       // Place enemy far from center to avoid cap at 1.0
       const enemyPos = new THREE.Vector3(80, 0, 80);
-      const enemy = createMockCombatant('enemy1', Faction.OPFOR, enemyPos);
+      const enemy = createMockCombatant('enemy1', Faction.NVA, enemyPos);
       params.combatants.set('enemy1', enemy);
       params.playerPosition = new THREE.Vector3(0, 0, 0);
 
@@ -154,7 +154,7 @@ describe('InfluenceMapComputations', () => {
     it('should decay threat with distance', () => {
       const params = createTestParams();
       const enemyPos = new THREE.Vector3(0, 0, 0);
-      const enemy = createMockCombatant('enemy1', Faction.OPFOR, enemyPos);
+      const enemy = createMockCombatant('enemy1', Faction.NVA, enemyPos);
       params.combatants.set('enemy1', enemy);
 
       computeThreatLevel(params);
@@ -173,7 +173,7 @@ describe('InfluenceMapComputations', () => {
       // Add multiple enemies at same location
       const pos = new THREE.Vector3(0, 0, 0);
       for (let i = 0; i < 5; i++) {
-        const enemy = createMockCombatant(`enemy${i}`, Faction.OPFOR, pos);
+        const enemy = createMockCombatant(`enemy${i}`, Faction.NVA, pos);
         params.combatants.set(`enemy${i}`, enemy);
       }
 
@@ -200,7 +200,7 @@ describe('InfluenceMapComputations', () => {
     it('should ignore home base zones', () => {
       const params = createTestParams();
       const zonePos = new THREE.Vector3(0, 0, 0);
-      const zone = createMockZone('zone1', zonePos, Faction.OPFOR, ZoneState.OPFOR_CONTROLLED, true);
+      const zone = createMockZone('zone1', zonePos, Faction.NVA, ZoneState.OPFOR_CONTROLLED, true);
       params.zones.push(zone);
 
       computeOpportunityLevel(params);
@@ -225,7 +225,7 @@ describe('InfluenceMapComputations', () => {
       contestedParams.zones = [contestedZone];
 
       const enemyParams = createTestParams();
-      const enemyZone = createMockZone('enemy', new THREE.Vector3(-50, 0, -50), Faction.OPFOR, ZoneState.OPFOR_CONTROLLED);
+      const enemyZone = createMockZone('enemy', new THREE.Vector3(-50, 0, -50), Faction.NVA, ZoneState.OPFOR_CONTROLLED);
       enemyParams.zones = [enemyZone];
 
       const neutralParams = createTestParams();
@@ -360,7 +360,7 @@ describe('InfluenceMapComputations', () => {
     it('should ignore OPFOR combatants', () => {
       const params = createTestParams();
       const enemyPos = new THREE.Vector3(0, 0, 0);
-      const enemy = createMockCombatant('enemy1', Faction.OPFOR, enemyPos);
+      const enemy = createMockCombatant('enemy1', Faction.NVA, enemyPos);
       params.combatants.set('enemy1', enemy);
 
       computeSquadSupport(params);
@@ -550,8 +550,8 @@ describe('InfluenceMapComputations', () => {
       const params = createTestParams();
 
       // Set up a complex scene
-      const enemy1 = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(-50, 0, -50));
-      const enemy2 = createMockCombatant('e2', Faction.OPFOR, new THREE.Vector3(50, 0, 50));
+      const enemy1 = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(-50, 0, -50));
+      const enemy2 = createMockCombatant('e2', Faction.NVA, new THREE.Vector3(50, 0, 50));
       params.combatants.set('e1', enemy1);
       params.combatants.set('e2', enemy2);
 
@@ -559,7 +559,7 @@ describe('InfluenceMapComputations', () => {
       params.combatants.set('f1', friendly1);
 
       const zone1 = createMockZone('z1', new THREE.Vector3(-30, 0, -30), null, ZoneState.CONTESTED);
-      const zone2 = createMockZone('z2', new THREE.Vector3(30, 0, 30), Faction.OPFOR);
+      const zone2 = createMockZone('z2', new THREE.Vector3(30, 0, 30), Faction.NVA);
       params.zones.push(zone1, zone2);
 
       const sandbag = new THREE.Box3(
@@ -607,7 +607,7 @@ describe('InfluenceMapComputations', () => {
       const params1 = createTestParams();
       const params2 = createTestParams();
 
-      const enemy = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(0, 0, 0));
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(0, 0, 0));
 
       params1.combatants.set('e1', enemy);
       params2.combatants.set('e1', enemy);

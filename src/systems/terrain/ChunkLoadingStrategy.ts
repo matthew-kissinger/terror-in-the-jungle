@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { ImprovedChunk } from './ImprovedChunk';
 import { NoiseGenerator } from '../../utils/NoiseGenerator';
-import { AssetLoader } from '../assets/AssetLoader';
 import { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
 import { LOSAccelerator } from '../combat/LOSAccelerator';
 import { ChunkWorkerPool } from './ChunkWorkerPool';
@@ -9,10 +8,11 @@ import { ViteBVHWorker } from '../../workers/BVHWorker';
 import { Logger } from '../../utils/Logger';
 import { ChunkLifecycleConfig } from './ChunkLifecycleTypes';
 import { getChunkDistanceFromPlayer, getChunkKey } from './ChunkSpatialUtils';
+import { BiomeTexturePool } from './BiomeTexturePool';
+import { HeightQueryCache } from './HeightQueryCache';
 
 interface ChunkLoadingStrategyDeps {
   scene: THREE.Scene;
-  assetLoader: AssetLoader;
   globalBillboardSystem: GlobalBillboardSystem;
   noiseGenerator: NoiseGenerator;
   losAccelerator: LOSAccelerator;
@@ -23,11 +23,12 @@ interface ChunkLoadingStrategyDeps {
   playerPosition: THREE.Vector3;
   getConfig: () => ChunkLifecycleConfig;
   updateMergedMeshes: () => void;
+  biomeTexturePool: BiomeTexturePool;
+  heightQueryCache: HeightQueryCache;
 }
 
 export class ChunkLoadingStrategy {
   private scene: THREE.Scene;
-  private assetLoader: AssetLoader;
   private globalBillboardSystem: GlobalBillboardSystem;
   private noiseGenerator: NoiseGenerator;
   private losAccelerator: LOSAccelerator;
@@ -38,10 +39,11 @@ export class ChunkLoadingStrategy {
   private playerPosition: THREE.Vector3;
   private getConfig: () => ChunkLifecycleConfig;
   private updateMergedMeshes: () => void;
+  private biomeTexturePool: BiomeTexturePool;
+  private heightQueryCache: HeightQueryCache;
 
   constructor(deps: ChunkLoadingStrategyDeps) {
     this.scene = deps.scene;
-    this.assetLoader = deps.assetLoader;
     this.globalBillboardSystem = deps.globalBillboardSystem;
     this.noiseGenerator = deps.noiseGenerator;
     this.losAccelerator = deps.losAccelerator;
@@ -52,6 +54,8 @@ export class ChunkLoadingStrategy {
     this.playerPosition = deps.playerPosition;
     this.getConfig = deps.getConfig;
     this.updateMergedMeshes = deps.updateMergedMeshes;
+    this.biomeTexturePool = deps.biomeTexturePool;
+    this.heightQueryCache = deps.heightQueryCache;
   }
 
   /**
@@ -123,21 +127,24 @@ export class ChunkLoadingStrategy {
         }
       }
 
-      // Create chunk and populate with worker data
+      const cfg = this.getConfig();
       const chunk = new ImprovedChunk(
         this.scene,
-        this.assetLoader,
         chunkX,
         chunkZ,
-        this.getConfig().size,
+        cfg.size,
         this.noiseGenerator,
         this.globalBillboardSystem,
-        this.getConfig().skipTerrainMesh ?? false
+        this.biomeTexturePool,
+        this.heightQueryCache,
+        cfg.defaultBiomeId,
+        cfg.biomeRules,
+        cfg.skipTerrainMesh ?? false,
       );
 
       // Use worker-generated geometry, height data, and vegetation
       // Pass bvhComputed flag to skip redundant BVH computation
-      await chunk.generateFromWorker(result.geometry, result.heightData, result.vegetation, bvhComputed);
+      await chunk.generateFromWorker(result.geometry, result.heightData, result.vegetation, bvhComputed, result.biomeId);
 
       this.chunks.set(chunkKey, chunk);
 
@@ -172,13 +179,16 @@ export class ChunkLoadingStrategy {
         const config = this.getConfig();
         const chunk = new ImprovedChunk(
           this.scene,
-          this.assetLoader,
           chunkX,
           chunkZ,
           config.size,
           this.noiseGenerator,
           this.globalBillboardSystem,
-          config.skipTerrainMesh ?? false
+          this.biomeTexturePool,
+          this.heightQueryCache,
+          config.defaultBiomeId,
+          config.biomeRules,
+          config.skipTerrainMesh ?? false,
         );
 
         await chunk.generate();

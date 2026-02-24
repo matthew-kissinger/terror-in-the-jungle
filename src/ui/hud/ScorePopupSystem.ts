@@ -1,4 +1,5 @@
 import { Logger } from '../../utils/Logger';
+import { zIndex } from '../design/tokens';
 
 interface ScorePopup {
   element: HTMLDivElement;
@@ -27,7 +28,7 @@ export class ScorePopupSystem {
       width: 100vw;
       height: 100vh;
       pointer-events: none;
-      z-index: 200;
+      z-index: ${zIndex.hudFeedback};
     `;
 
     // Initialize pool

@@ -13,15 +13,12 @@ export class PlayerSquadController implements GameSystem {
   private commandUIElement?: HTMLElement;
   private commandIndicatorElement?: HTMLElement;
   private isUIVisible = false;
-  private boundOnKeyDown!: (event: KeyboardEvent) => void;
-  private boundOnKeyUp!: (event: KeyboardEvent) => void;
   private radialMenu: SquadRadialMenu;
 
   constructor(squadManager: SquadManager) {
     this.squadManager = squadManager;
     this.radialMenu = new SquadRadialMenu();
     this.radialMenu.setCommandSelectedCallback((command) => this.issueCommand(command));
-    this.setupEventListeners();
     this.createCommandUI();
   }
 
@@ -34,7 +31,6 @@ export class PlayerSquadController implements GameSystem {
   }
 
   dispose(): void {
-    this.removeEventListeners();
     this.radialMenu.dispose();
     if (this.commandUIElement && this.commandUIElement.parentNode) {
       this.commandUIElement.parentNode.removeChild(this.commandUIElement);
@@ -60,51 +56,19 @@ export class PlayerSquadController implements GameSystem {
     this.playerPosition.copy(position);
   }
 
-  private setupEventListeners(): void {
-    this.boundOnKeyDown = this.onKeyDown.bind(this);
-    this.boundOnKeyUp = this.onKeyUp.bind(this);
-    window.addEventListener('keydown', this.boundOnKeyDown);
-    window.addEventListener('keyup', this.boundOnKeyUp);
-  }
-
-  private removeEventListeners(): void {
-    window.removeEventListener('keydown', this.boundOnKeyDown);
-    window.removeEventListener('keyup', this.boundOnKeyUp);
-  }
-
-  private onKeyDown(event: KeyboardEvent): void {
-    if (!this.playerSquadId) return;
-
-    const squad = this.squadManager.getSquad(this.playerSquadId);
-    if (!squad) return;
-
-    // Note: Z key is now handled via PlayerInput callback -> toggleRadialMenu()
-    // This handler only processes Shift+Digit shortcuts for direct command issuing
-
-    if (event.shiftKey) {
-      switch (event.code) {
-        case 'Digit1':
-          this.issueCommand(SquadCommand.FOLLOW_ME);
-          break;
-        case 'Digit2':
-          this.issueCommand(SquadCommand.HOLD_POSITION);
-          break;
-        case 'Digit3':
-          this.issueCommand(SquadCommand.PATROL_HERE);
-          break;
-        case 'Digit4':
-          this.issueCommand(SquadCommand.RETREAT);
-          break;
-        case 'Digit5':
-          this.issueCommand(SquadCommand.FREE_ROAM);
-          break;
-      }
+  /** Entry point for centralized input routing (Shift+Digit from PlayerInput/InputManager). */
+  issueQuickCommand(slot: number): void {
+    if (slot === 1) {
+      this.issueCommand(SquadCommand.FOLLOW_ME);
+    } else if (slot === 2) {
+      this.issueCommand(SquadCommand.HOLD_POSITION);
+    } else if (slot === 3) {
+      this.issueCommand(SquadCommand.PATROL_HERE);
+    } else if (slot === 4) {
+      this.issueCommand(SquadCommand.RETREAT);
+    } else if (slot === 5) {
+      this.issueCommand(SquadCommand.FREE_ROAM);
     }
-  }
-
-  private onKeyUp(_event: KeyboardEvent): void {
-    // Z key release is now handled via toggleRadialMenu()
-    // This method can be kept for future key-up events if needed
   }
 
   private issueCommand(command: SquadCommand): void {
@@ -237,60 +201,60 @@ export class PlayerSquadController implements GameSystem {
   private createCommandIndicator(): void {
     this.commandIndicatorElement = document.createElement('div');
     this.commandIndicatorElement.style.cssText = `
-      position: fixed;
-      top: 90px;
-      left: 16px;
-      background: rgba(8, 12, 18, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 4px;
-      padding: 4px 8px;
-      color: rgba(220, 225, 230, 0.6);
+      display: flex;
+      align-items: baseline;
+      gap: 5px;
+      pointer-events: none;
+      user-select: none;
+      color: rgba(220, 225, 230, 0.55);
       font-family: 'Rajdhani', 'Segoe UI', sans-serif;
       font-size: 9px;
       font-weight: bold;
-      z-index: 1000;
-      backdrop-filter: blur(6px);
-      text-align: center;
-      min-width: 90px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+      padding: 2px 4px;
     `;
 
     this.commandIndicatorElement.innerHTML = `
-      <div style="font-size: 8px; opacity: 0.6; margin-bottom: 2px;">SQUAD</div>
-      <div id="current-command-text">AUTO (NPC)</div>
+      <span style="opacity: 0.45; font-size: 8px;">SQD</span>
+      <span id="current-command-text">AUTO</span>
     `;
 
-    document.body.appendChild(this.commandIndicatorElement);
     this.updateCommandIndicator();
+  }
+
+  /**
+   * Move the indicator into a grid slot (e.g. stats).
+   * Called from SystemConnector after layout is available.
+   */
+  mountIndicatorTo(parent: HTMLElement): void {
+    if (!this.commandIndicatorElement) return;
+    if (this.commandIndicatorElement.parentNode) {
+      this.commandIndicatorElement.parentNode.removeChild(this.commandIndicatorElement);
+    }
+    parent.appendChild(this.commandIndicatorElement);
   }
 
   private updateCommandIndicator(): void {
     if (!this.commandIndicatorElement) return;
 
-    const commandText = this.commandIndicatorElement.querySelector('#current-command-text');
+    const commandText = this.commandIndicatorElement.querySelector<HTMLElement>('#current-command-text');
     if (!commandText) return;
 
     const commandNames: Record<SquadCommand, string> = {
-      [SquadCommand.FOLLOW_ME]: 'FOLLOW ME',
-      [SquadCommand.HOLD_POSITION]: 'HOLD POSITION',
-      [SquadCommand.PATROL_HERE]: 'PATROL HERE',
+      [SquadCommand.FOLLOW_ME]: 'FOLLOW',
+      [SquadCommand.HOLD_POSITION]: 'HOLD',
+      [SquadCommand.PATROL_HERE]: 'PATROL',
       [SquadCommand.RETREAT]: 'RETREAT',
-      [SquadCommand.FREE_ROAM]: 'FREE ROAM',
-      [SquadCommand.NONE]: 'AUTO (NPC)'
+      [SquadCommand.FREE_ROAM]: 'FREE',
+      [SquadCommand.NONE]: 'AUTO'
     };
 
-    const commandName = commandNames[this.currentCommand] || 'AUTO (NPC)';
-    commandText.textContent = commandName;
+    commandText.textContent = commandNames[this.currentCommand] ?? 'AUTO';
 
-    // Change color based on command
-    if (this.currentCommand === SquadCommand.NONE || this.currentCommand === SquadCommand.FREE_ROAM) {
-      this.commandIndicatorElement.style.borderColor = 'rgba(100, 100, 100, 0.6)';
-      this.commandIndicatorElement.style.background = 'rgba(100, 100, 100, 0.2)';
-      this.commandIndicatorElement.style.color = '#aaaaaa';
-    } else {
-      this.commandIndicatorElement.style.borderColor = 'rgba(92, 184, 92, 0.4)';
-      this.commandIndicatorElement.style.background = 'rgba(92, 184, 92, 0.12)';
-      this.commandIndicatorElement.style.color = 'rgba(92, 184, 92, 0.9)';
-    }
+    const isActiveCommand = this.currentCommand !== SquadCommand.NONE && this.currentCommand !== SquadCommand.FREE_ROAM;
+    commandText.style.color = isActiveCommand ? 'rgba(92, 184, 92, 0.9)' : 'rgba(220, 225, 230, 0.55)';
   }
 
   getCommandPosition(): THREE.Vector3 | undefined {

@@ -182,13 +182,12 @@ export class PlayerMovement {
     }
 
     // Check ground collision using ImprovedChunkManager if available, otherwise use flat baseline
+    // getEffectiveHeightAt includes collision objects (helipad, helicopter, etc.)
     let groundHeight = 2; // Default player height above ground (flat world fallback)
     if (this.chunkManager) {
       const resolver =
-        (this.chunkManager as any).getTerrainHeightAt
-        ?? (this.chunkManager as any).getHeightAt
-        ?? (this.chunkManager as any).getHeightAtWorldPosition
-        ?? (this.chunkManager as any).getEffectiveHeightAt;
+        (this.chunkManager as any).getEffectiveHeightAt
+        ?? (this.chunkManager as any).getHeightAt;
       if (typeof resolver === 'function') {
         const terrainHeight = Number(resolver.call(this.chunkManager, newPosition.x, newPosition.z));
         if (Number.isFinite(terrainHeight)) {

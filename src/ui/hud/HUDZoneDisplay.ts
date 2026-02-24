@@ -1,5 +1,5 @@
 import { ZoneManager, ZoneState, CaptureZone } from '../../systems/world/ZoneManager';
-import { Faction } from '../../systems/combat/types';
+import { Faction, isBlufor, isOpfor } from '../../systems/combat/types';
 import { HUDElements } from './HUDElements';
 
 export class HUDZoneDisplay {
@@ -172,13 +172,13 @@ export class HUDZoneDisplay {
     if (zone.state === ZoneState.NEUTRAL && zone.captureProgress <= 0) return 'Neutral';
     if (zone.state === ZoneState.NEUTRAL && zone.captureProgress > 0) {
       const pct = Math.max(0, Math.min(100, Math.round(zone.captureProgress)));
-      if (zone.owner === Faction.US) return `US ${pct}%`;
-      if (zone.owner === Faction.OPFOR) return `OPFOR ${pct}%`;
+      if (zone.owner !== null && isBlufor(zone.owner)) return `${zone.owner} ${pct}%`;
+      if (zone.owner !== null && isOpfor(zone.owner)) return `${zone.owner} ${pct}%`;
       return `Capturing ${pct}%`;
     }
     const pct = Math.max(0, Math.min(100, Math.round(zone.captureProgress)));
-    if (zone.owner === Faction.US) return `US ${pct}%`;
-    if (zone.owner === Faction.OPFOR) return `OPFOR ${pct}%`;
+    if (zone.owner !== null && isBlufor(zone.owner)) return `${zone.owner} ${pct}%`;
+    if (zone.owner !== null && isOpfor(zone.owner)) return `${zone.owner} ${pct}%`;
     return `Contested ${pct}%`;
   }
 }

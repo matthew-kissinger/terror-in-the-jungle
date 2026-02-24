@@ -142,7 +142,7 @@ describe('ZoneManager', () => {
       expect(usZones).toHaveLength(1);
       expect(usZones[0].owner).toBe(Faction.US);
 
-      const opforZones = zoneManager.getZonesByOwner(Faction.OPFOR);
+      const opforZones = zoneManager.getZonesByOwner(Faction.NVA);
       expect(opforZones).toHaveLength(0);
     });
 
@@ -211,7 +211,7 @@ describe('ZoneManager', () => {
         state: CombatantState.ALIVE,
       });
       mockCombatantSystem.combatants.set('combatant2', {
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         state: CombatantState.ALIVE,
       });
 
@@ -232,7 +232,7 @@ describe('ZoneManager', () => {
         state: CombatantState.ALIVE,
       });
       mockCombatantSystem.combatants.set('combatant2', {
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         state: CombatantState.ALIVE,
       });
 
@@ -252,7 +252,7 @@ describe('ZoneManager', () => {
         state: CombatantState.DEAD,
       });
       mockCombatantSystem.combatants.set('combatant2', {
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         state: CombatantState.ALIVE,
       });
 
@@ -423,7 +423,7 @@ describe('ZoneManager', () => {
       zoneManager['previousZoneState'].set('test_zone', Faction.US);
       
       // Simulate OPFOR capturing zone from US
-      zone.owner = Faction.OPFOR;
+      zone.owner = Faction.NVA;
       zone.state = ZoneState.OPFOR_CONTROLLED;
       
       zoneManager.update(0.1);
@@ -458,7 +458,7 @@ describe('ZoneManager', () => {
       const zone = zoneManager['zones'].get('test_zone')!;
       zoneManager['previousZoneState'].set('test_zone', null);
       
-      zone.owner = Faction.OPFOR;
+      zone.owner = Faction.NVA;
       zone.state = ZoneState.OPFOR_CONTROLLED;
       
       zoneManager.update(0.1);

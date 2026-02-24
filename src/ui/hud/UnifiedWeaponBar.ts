@@ -6,7 +6,7 @@
  *   - InventoryManager.createUI() hotbar (desktop, bottom-center)
  *   - WeaponAmmoDisplay (desktop ammo readout)
  *
- * Desktop: shows key hints (1-6), highlights active slot, shows ammo.
+ * Desktop: shows key hints (1-6) and active slot highlight.
  * Touch: same bar with pointer-event tap to switch weapons.
  * Mounts into the 'weapon-bar' grid slot.
  */
@@ -16,15 +16,12 @@ interface WeaponSlotEl {
   index: number;
   label: string;
   keyHint: HTMLSpanElement;
-  ammoEl: HTMLSpanElement;
 }
 
 export class UnifiedWeaponBar {
   private container: HTMLDivElement;
   private slots: WeaponSlotEl[] = [];
   private activeIndex = 2; // Default: slot 3 (PRIMARY / AR)
-  private currentMagazine = 0;
-  private currentReserve = 0;
 
   private onWeaponSelect?: (slotIndex: number) => void;
   private styleEl?: HTMLStyleElement;
@@ -69,11 +66,8 @@ export class UnifiedWeaponBar {
     }
   }
 
-  updateAmmo(magazine: number, reserve: number): void {
-    this.currentMagazine = magazine;
-    this.currentReserve = reserve;
-    this.updateAmmoDisplay();
-  }
+  /** Ammo is intentionally not rendered in hotkey bar; dedicated AmmoDisplay owns it. */
+  updateAmmo(_magazine: number, _reserve: number): void {}
 
   mount(parent: HTMLElement): void {
     parent.appendChild(this.container);
@@ -110,13 +104,8 @@ export class UnifiedWeaponBar {
     icon.className = 'uwb-icon';
     icon.textContent = label;
 
-    // Ammo (shown only on active slot)
-    const ammoEl = document.createElement('span');
-    ammoEl.className = 'uwb-ammo';
-
     slot.appendChild(keyHint);
     slot.appendChild(icon);
-    slot.appendChild(ammoEl);
 
     // Pointer events for weapon selection
     const onPointerDown = (e: PointerEvent): void => {
@@ -152,7 +141,7 @@ export class UnifiedWeaponBar {
     slot.addEventListener('pointerup', onPointerUp, { passive: false });
     slot.addEventListener('pointercancel', onPointerCancel, { passive: false });
 
-    this.slots.push({ element: slot, index, label, keyHint, ammoEl });
+    this.slots.push({ element: slot, index, label, keyHint });
     this.container.appendChild(slot);
   }
 
@@ -162,35 +151,6 @@ export class UnifiedWeaponBar {
         slot.element.classList.add('uwb-slot--active');
       } else {
         slot.element.classList.remove('uwb-slot--active');
-      }
-    }
-    this.updateAmmoDisplay();
-  }
-
-  private updateAmmoDisplay(): void {
-    for (const slot of this.slots) {
-      if (slot.index === this.activeIndex) {
-        // Show ammo only on active slot (skip grenade/sandbag - they use counts, not magazine)
-        if (slot.index === 1 || slot.index === 3) {
-          slot.ammoEl.textContent = '';
-        } else {
-          slot.ammoEl.textContent = `${this.currentMagazine}/${this.currentReserve}`;
-        }
-        slot.ammoEl.style.display = '';
-
-        // Color-code ammo
-        if (this.currentMagazine === 0 && this.currentReserve === 0) {
-          slot.ammoEl.classList.add('uwb-ammo--empty');
-          slot.ammoEl.classList.remove('uwb-ammo--low');
-        } else if (this.currentMagazine === 0 || this.currentMagazine <= 10) {
-          slot.ammoEl.classList.add('uwb-ammo--low');
-          slot.ammoEl.classList.remove('uwb-ammo--empty');
-        } else {
-          slot.ammoEl.classList.remove('uwb-ammo--low', 'uwb-ammo--empty');
-        }
-      } else {
-        slot.ammoEl.textContent = '';
-        slot.ammoEl.style.display = 'none';
       }
     }
   }
@@ -249,21 +209,6 @@ export class UnifiedWeaponBar {
         color: rgba(255, 255, 255, 0.95);
       }
 
-      .uwb-ammo {
-        font-size: 9px;
-        font-weight: 600;
-        color: rgba(220, 225, 230, 0.7);
-        line-height: 1;
-      }
-
-      .uwb-ammo--low {
-        color: rgba(212, 163, 68, 0.9);
-      }
-
-      .uwb-ammo--empty {
-        color: rgba(201, 86, 74, 0.9);
-      }
-
       /* Hide key hints on touch devices */
       [data-device="touch"] .uwb-key {
         display: none;
@@ -277,9 +222,6 @@ export class UnifiedWeaponBar {
         }
         .uwb-icon {
           font-size: 10px;
-        }
-        .uwb-ammo {
-          font-size: 8px;
         }
       }
     `;

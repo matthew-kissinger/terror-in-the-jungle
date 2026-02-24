@@ -1,5 +1,5 @@
 import { GameSystem } from '../../types';
-import { Faction } from '../combat/types';
+import { Faction, isBlufor } from '../combat/types';
 import { ZoneManager } from './ZoneManager';
 import { Logger } from '../../utils/Logger';
 import { TicketSystemPhases, GamePhase } from './TicketSystemPhases';
@@ -154,10 +154,10 @@ export class TicketSystem implements GameSystem {
   onCombatantDeath(faction: Faction): void {
     if (!this.gameState.gameActive) return;
 
-    if (faction === Faction.US) {
+    if (isBlufor(faction)) {
       this.opforKills++;
       this.usTickets = Math.max(0, this.usTickets - this.deathPenalty);
-      Logger.info('tickets', `US soldier KIA, tickets: ${Math.round(this.usTickets)}, OPFOR kills: ${this.opforKills}`);
+      Logger.info('tickets', `BLUFOR soldier KIA, tickets: ${Math.round(this.usTickets)}, OPFOR kills: ${this.opforKills}`);
     } else {
       this.usKills++;
       this.opforTickets = Math.max(0, this.opforTickets - this.deathPenalty);
@@ -170,13 +170,13 @@ export class TicketSystem implements GameSystem {
 
   getTickets(faction: Faction): number {
     if (this.isTDM) {
-      return faction === Faction.US ? this.usKills : this.opforKills;
+      return isBlufor(faction) ? this.usKills : this.opforKills;
     }
-    return faction === Faction.US ? this.usTickets : this.opforTickets;
+    return isBlufor(faction) ? this.usTickets : this.opforTickets;
   }
 
   getKills(faction: Faction): number {
-    return faction === Faction.US ? this.usKills : this.opforKills;
+    return isBlufor(faction) ? this.usKills : this.opforKills;
   }
 
   getKillTarget(): number {
@@ -271,7 +271,7 @@ export class TicketSystem implements GameSystem {
   // Admin/debug methods
 
   addTickets(faction: Faction, amount: number): void {
-    if (faction === Faction.US) {
+    if (isBlufor(faction)) {
       this.usTickets = Math.min(this.maxTickets, this.usTickets + amount);
     } else {
       this.opforTickets = Math.min(this.maxTickets, this.opforTickets + amount);
@@ -280,7 +280,7 @@ export class TicketSystem implements GameSystem {
   }
 
   removeTickets(faction: Faction, amount: number): void {
-    if (faction === Faction.US) {
+    if (isBlufor(faction)) {
       this.usTickets = Math.max(0, this.usTickets - amount);
     } else {
       this.opforTickets = Math.max(0, this.opforTickets - amount);

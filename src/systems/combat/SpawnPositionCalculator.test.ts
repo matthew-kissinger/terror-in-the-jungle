@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SpawnPositionCalculator } from './SpawnPositionCalculator';
-import { Faction } from './types';
+import { Faction, Alliance } from './types';
 import { ZoneManager, ZoneState, CaptureZone } from '../world/ZoneManager';
 import { GameModeConfig } from '../../config/gameModes';
 import * as THREE from 'three';
@@ -65,7 +65,7 @@ describe('SpawnPositionCalculator', () => {
       const config: GameModeConfig = {
         zones: [
           { id: 'us_main', position: new THREE.Vector3(10, 0, 20), isHomeBase: true, owner: Faction.US, radius: 30 } as any,
-          { id: 'opfor_main', position: new THREE.Vector3(30, 0, 40), isHomeBase: true, owner: Faction.OPFOR, radius: 30 } as any,
+          { id: 'opfor_main', position: new THREE.Vector3(30, 0, 40), isHomeBase: true, owner: Faction.NVA, radius: 30 } as any,
         ],
       } as GameModeConfig;
 
@@ -81,7 +81,7 @@ describe('SpawnPositionCalculator', () => {
       const config: GameModeConfig = {
         zones: [
           { id: 'us_base', position: new THREE.Vector3(5, 0, 10), isHomeBase: true, owner: Faction.US, radius: 30 } as any,
-          { id: 'opfor_base', position: new THREE.Vector3(15, 0, 20), isHomeBase: true, owner: Faction.OPFOR, radius: 30 } as any,
+          { id: 'opfor_base', position: new THREE.Vector3(15, 0, 20), isHomeBase: true, owner: Faction.NVA, radius: 30 } as any,
         ],
       } as GameModeConfig;
 
@@ -144,7 +144,7 @@ describe('SpawnPositionCalculator', () => {
     });
 
     it('should fall back when no owned bases found for faction', () => {
-      const zones = [createMockZone('opfor_base', Faction.OPFOR, new THREE.Vector3(100, 0, 100), true)];
+      const zones = [createMockZone('opfor_base', Faction.NVA, new THREE.Vector3(100, 0, 100), true)];
       const zoneManager = createMockZoneManager(zones);
 
       const result = SpawnPositionCalculator.getBaseSpawnPosition(Faction.US, zoneManager);
@@ -173,7 +173,7 @@ describe('SpawnPositionCalculator', () => {
       const opforBase = new THREE.Vector3(100, 0, 100);
       const zones = [
         createMockZone('us_base', Faction.US, usBase, true),
-        createMockZone('opfor_base', Faction.OPFOR, opforBase, true),
+        createMockZone('opfor_base', Faction.NVA, opforBase, true),
       ];
       const zoneManager = createMockZoneManager(zones);
 
@@ -182,7 +182,7 @@ describe('SpawnPositionCalculator', () => {
       expect(usDistance).toBeGreaterThanOrEqual(20);
       expect(usDistance).toBeLessThanOrEqual(50);
 
-      const opforResult = SpawnPositionCalculator.getBaseSpawnPosition(Faction.OPFOR, zoneManager);
+      const opforResult = SpawnPositionCalculator.getBaseSpawnPosition(Faction.NVA, zoneManager);
       const opforDistance = opforResult.distanceTo(opforBase);
       expect(opforDistance).toBeGreaterThanOrEqual(20);
       expect(opforDistance).toBeLessThanOrEqual(50);
@@ -192,7 +192,7 @@ describe('SpawnPositionCalculator', () => {
       const config: GameModeConfig = {
         zones: [
           { id: 'us_main', position: new THREE.Vector3(200, 0, 200), isHomeBase: true, owner: Faction.US, radius: 30 } as any,
-          { id: 'opfor_main', position: new THREE.Vector3(300, 0, 300), isHomeBase: true, owner: Faction.OPFOR, radius: 30 } as any,
+          { id: 'opfor_main', position: new THREE.Vector3(300, 0, 300), isHomeBase: true, owner: Faction.NVA, radius: 30 } as any,
         ],
       } as GameModeConfig;
 
@@ -265,7 +265,7 @@ describe('SpawnPositionCalculator', () => {
 
     it('should fall back to base position when no zones owned', () => {
       const zones = [
-        createMockZone('zone1', Faction.OPFOR, new THREE.Vector3(100, 0, 100), false),
+        createMockZone('zone1', Faction.NVA, new THREE.Vector3(100, 0, 100), false),
       ];
       const zoneManager = createMockZoneManager(zones);
 
@@ -313,10 +313,10 @@ describe('SpawnPositionCalculator', () => {
 
     it('should work for OPFOR faction', () => {
       const zonePos = new THREE.Vector3(150, 0, 150);
-      const zones = [createMockZone('zone1', Faction.OPFOR, zonePos, false, ZoneState.OPFOR_CONTROLLED)];
+      const zones = [createMockZone('zone1', Faction.NVA, zonePos, false, ZoneState.OPFOR_CONTROLLED)];
       const zoneManager = createMockZoneManager(zones);
 
-      const result = SpawnPositionCalculator.getSpawnPosition(Faction.OPFOR, zoneManager);
+      const result = SpawnPositionCalculator.getSpawnPosition(Faction.NVA, zoneManager);
       
       const distance = result.distanceTo(zonePos);
       expect(distance).toBeGreaterThanOrEqual(20);
@@ -327,11 +327,11 @@ describe('SpawnPositionCalculator', () => {
       const config: GameModeConfig = {
         zones: [
           { id: 'us_main', position: new THREE.Vector3(250, 0, 250), isHomeBase: true, owner: Faction.US, radius: 30 } as any,
-          { id: 'opfor_main', position: new THREE.Vector3(350, 0, 350), isHomeBase: true, owner: Faction.OPFOR, radius: 30 } as any,
+          { id: 'opfor_main', position: new THREE.Vector3(350, 0, 350), isHomeBase: true, owner: Faction.NVA, radius: 30 } as any,
         ],
       } as GameModeConfig;
 
-      const result = SpawnPositionCalculator.getSpawnPosition(Faction.OPFOR, undefined, config);
+      const result = SpawnPositionCalculator.getSpawnPosition(Faction.NVA, undefined, config);
       
       const configBase = new THREE.Vector3(350, 0, 350);
       const distance = result.distanceTo(configBase);
@@ -371,7 +371,7 @@ describe('SpawnPositionCalculator', () => {
       const opforPos = new THREE.Vector3(100, 0, 100);
       const zones = [
         createMockZone('us_zone', Faction.US, usPos, false, ZoneState.US_CONTROLLED),
-        createMockZone('opfor_zone', Faction.OPFOR, opforPos, false, ZoneState.OPFOR_CONTROLLED),
+        createMockZone('opfor_zone', Faction.NVA, opforPos, false, ZoneState.OPFOR_CONTROLLED),
       ];
       const zoneManager = createMockZoneManager(zones);
 
@@ -383,7 +383,7 @@ describe('SpawnPositionCalculator', () => {
 
     it('should return empty array when faction owns no zones', () => {
       const zones = [
-        createMockZone('opfor_zone', Faction.OPFOR, new THREE.Vector3(100, 0, 100), false),
+        createMockZone('opfor_zone', Faction.NVA, new THREE.Vector3(100, 0, 100), false),
       ];
       const zoneManager = createMockZoneManager(zones);
 
@@ -409,24 +409,24 @@ describe('SpawnPositionCalculator', () => {
     });
   });
 
-  describe('getHQZonesForFaction', () => {
-    it('should return home bases for specified faction', () => {
+  describe('getHQZonesForAlliance', () => {
+    it('should return home bases for specified alliance', () => {
       const usHq = new THREE.Vector3(100, 0, 100);
       const config: GameModeConfig = {
         zones: [
           { id: 'us_hq', position: usHq, isHomeBase: true, owner: Faction.US, radius: 30 } as any,
-          { id: 'opfor_hq', position: new THREE.Vector3(200, 0, 200), isHomeBase: true, owner: Faction.OPFOR, radius: 30 } as any,
+          { id: 'opfor_hq', position: new THREE.Vector3(200, 0, 200), isHomeBase: true, owner: Faction.NVA, radius: 30 } as any,
         ],
       } as GameModeConfig;
 
-      const result = SpawnPositionCalculator.getHQZonesForFaction(Faction.US, config);
+      const result = SpawnPositionCalculator.getHQZonesForAlliance(Alliance.BLUFOR, config);
       
       expect(result.length).toBe(1);
       expect(result[0].position).toBe(usHq);
     });
 
     it('should return empty array when no config', () => {
-      const result = SpawnPositionCalculator.getHQZonesForFaction(Faction.US);
+      const result = SpawnPositionCalculator.getHQZonesForAlliance(Alliance.BLUFOR);
       
       expect(result).toEqual([]);
     });
@@ -438,21 +438,21 @@ describe('SpawnPositionCalculator', () => {
         ],
       } as GameModeConfig;
 
-      const result = SpawnPositionCalculator.getHQZonesForFaction(Faction.US, config);
+      const result = SpawnPositionCalculator.getHQZonesForAlliance(Alliance.BLUFOR, config);
       
       expect(result).toEqual([]);
     });
 
-    it('should filter by faction', () => {
+    it('should filter by alliance', () => {
       const config: GameModeConfig = {
         zones: [
           { id: 'us_hq', position: new THREE.Vector3(100, 0, 100), isHomeBase: true, owner: Faction.US, radius: 30 } as any,
-          { id: 'opfor_hq', position: new THREE.Vector3(200, 0, 200), isHomeBase: true, owner: Faction.OPFOR, radius: 30 } as any,
+          { id: 'opfor_hq', position: new THREE.Vector3(200, 0, 200), isHomeBase: true, owner: Faction.NVA, radius: 30 } as any,
         ],
       } as GameModeConfig;
 
-      const usResult = SpawnPositionCalculator.getHQZonesForFaction(Faction.US, config);
-      const opforResult = SpawnPositionCalculator.getHQZonesForFaction(Faction.OPFOR, config);
+      const usResult = SpawnPositionCalculator.getHQZonesForAlliance(Alliance.BLUFOR, config);
+      const opforResult = SpawnPositionCalculator.getHQZonesForAlliance(Alliance.OPFOR, config);
       
       expect(usResult.length).toBe(1);
       expect(opforResult.length).toBe(1);
@@ -460,7 +460,7 @@ describe('SpawnPositionCalculator', () => {
       expect(opforResult[0].position.x).toBe(200);
     });
 
-    it('should return multiple HQs for same faction', () => {
+    it('should return multiple HQs for same alliance', () => {
       const config: GameModeConfig = {
         zones: [
           { id: 'us_hq1', position: new THREE.Vector3(100, 0, 100), isHomeBase: true, owner: Faction.US, radius: 30 } as any,
@@ -468,7 +468,7 @@ describe('SpawnPositionCalculator', () => {
         ],
       } as GameModeConfig;
 
-      const result = SpawnPositionCalculator.getHQZonesForFaction(Faction.US, config);
+      const result = SpawnPositionCalculator.getHQZonesForAlliance(Alliance.BLUFOR, config);
       
       expect(result.length).toBe(2);
     });

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { ZoneManager, CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
-import { Faction } from '../../systems/combat/types';
+import { isBlufor } from '../../systems/combat/types';
 import { GameModeManager } from '../../systems/world/GameModeManager';
 import { FullMapInput } from './FullMapInput';
 import {
@@ -19,6 +19,7 @@ import {
 import { createLegend, createControls, createCompass } from './FullMapDOMHelpers';
 import { shouldUseTouchControls } from '../../utils/DeviceDetector';
 import type { WarSimulator } from '../../systems/strategy/WarSimulator';
+import type { HelipadMarker } from '../minimap/MinimapRenderer';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -29,6 +30,7 @@ export class FullMapSystem implements GameSystem {
   private combatantSystem?: CombatantSystem;
   private gameModeManager?: GameModeManager;
   private warSimulator?: WarSimulator;
+  private helipadMarkers: HelipadMarker[] = [];
 
   // Canvas elements
   private mapCanvas: HTMLCanvasElement;
@@ -270,6 +272,9 @@ export class FullMapSystem implements GameSystem {
     // Draw strategic agents (non-materialized, dimmer)
     this.drawStrategicAgents(ctx);
 
+    // Draw helipad markers
+    this.drawHelipadMarkers(ctx);
+
     // Draw combatants (materialized, full brightness)
     if (this.combatantSystem) {
       this.drawCombatants(ctx);
@@ -376,7 +381,7 @@ export class FullMapSystem implements GameSystem {
       const x = (this.worldSize / 2 - combatant.position.x) * scale;
       const y = (this.worldSize / 2 - combatant.position.z) * scale;
 
-      ctx.fillStyle = combatant.faction === Faction.US ?
+      ctx.fillStyle = isBlufor(combatant.faction) ?
         COMBATANT_COLORS.US : COMBATANT_COLORS.OPFOR;
       ctx.beginPath();
       ctx.arc(x, y, 3, 0, Math.PI * 2);
@@ -460,6 +465,42 @@ export class FullMapSystem implements GameSystem {
 
   setGameModeManager(manager: GameModeManager): void {
     this.gameModeManager = manager;
+  }
+
+  setHelipadMarkers(markers: HelipadMarker[]): void {
+    this.helipadMarkers = markers;
+  }
+
+  private drawHelipadMarkers(ctx: CanvasRenderingContext2D): void {
+    if (this.helipadMarkers.length === 0) return;
+
+    const scale = MAP_SIZE / this.worldSize;
+    const zoomLevel = this.inputHandler.getZoomLevel();
+    const iconSize = Math.max(10, 12 / zoomLevel);
+
+    for (const marker of this.helipadMarkers) {
+      // Same flipped-axis coordinate system as zones/combatants
+      const x = (this.worldSize / 2 - marker.position.x) * scale;
+      const y = (this.worldSize / 2 - marker.position.z) * scale;
+
+      // Circle background
+      ctx.fillStyle = 'rgba(91, 140, 201, 0.4)';
+      ctx.beginPath();
+      ctx.arc(x, y, iconSize, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(91, 140, 201, 0.9)';
+      ctx.lineWidth = Math.max(1.5, 1 / zoomLevel);
+      ctx.stroke();
+
+      // H letter
+      const fontSize = Math.max(10, 12 / Math.sqrt(zoomLevel));
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.font = `bold ${fontSize}px Rajdhani`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('H', x, y);
+    }
   }
 
   dispose(): void {

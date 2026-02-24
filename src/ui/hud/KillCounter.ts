@@ -1,8 +1,7 @@
 /**
- * KillCounter - Displays player kills, deaths, and K/D ratio.
+ * KillCounter - Displays compact player kills/deaths.
  *
- * Signal-driven: addKill()/addDeath() increment counters,
- * K/D ratio is a computed signal that auto-updates.
+ * Signal-driven: addKill()/addDeath() increment counters.
  *
  * Replaces: CombatStatsDisplay.killCounter + HUDUpdater.initializeKillCounter() + updateKillCounter()
  */
@@ -14,11 +13,6 @@ export class KillCounter extends UIComponent {
   // --- Reactive state ---
   private kills = this.signal(0);
   private deaths = this.signal(0);
-  private kdRatio = this.computed(() => {
-    const k = this.kills.value;
-    const d = this.deaths.value;
-    return d > 0 ? (k / d).toFixed(2) : k.toFixed(2);
-  });
 
   protected build(): void {
     this.root.className = styles.container;
@@ -31,7 +25,6 @@ export class KillCounter extends UIComponent {
         <span class="${styles.value}" data-ref="deaths">0</span>
         <span class="${styles.label}">Deaths</span>
       </div>
-      <span class="${styles.ratio}" data-ref="ratio">K/D: 0.00</span>
     `;
   }
 
@@ -44,9 +37,6 @@ export class KillCounter extends UIComponent {
       this.text('[data-ref="deaths"]', String(this.deaths.value));
     });
 
-    this.effect(() => {
-      this.text('[data-ref="ratio"]', `K/D: ${this.kdRatio.value}`);
-    });
   }
 
   // --- Public API ---

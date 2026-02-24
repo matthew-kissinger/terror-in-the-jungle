@@ -35,7 +35,7 @@ export class HelicopterHUD extends UIComponent {
   private readonly isTouch = isTouchDevice();
 
   protected build(): void {
-    this.root.className = styles.container;
+    this.root.className = `${styles.container} ${this.isTouch ? styles.touchMode : ''}`;
     this.root.innerHTML = `
       <div data-ref="elevation" class="${styles.panel}">
         <div data-ref="elevValue" class="${styles.elevationValue}">0m</div>
@@ -49,13 +49,13 @@ export class HelicopterHUD extends UIComponent {
         <div class="${styles.mouseLabel}">RCTRL</div>
       </div>
       <div data-ref="instruments" class="${styles.panel} ${styles.instrumentsSection}">
-        <div style="display:flex;flex-direction:column;align-items:center;width:100%">
+        <div class="${styles.instrumentColumn}">
           <div class="${styles.instrumentLabel}">THRU</div>
           <div class="${styles.thrustBar}">
             <div data-ref="thrustFill" class="${styles.thrustFill} ${styles.thrustNormal}"></div>
           </div>
         </div>
-        <div style="display:flex;flex-direction:column;align-items:center;width:100%">
+        <div class="${styles.instrumentColumn}">
           <div class="${styles.instrumentLabel}">RPM</div>
           <div data-ref="rpmValue" class="${styles.rpmValue}">0%</div>
         </div>

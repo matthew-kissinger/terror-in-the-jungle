@@ -1,14 +1,18 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { ProgrammaticExplosivesFactory } from './ProgrammaticExplosivesFactory';
+import { modelLoader } from '../assets/ModelLoader';
+import { StructureModels } from '../assets/modelPaths';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { InventoryManager } from '../player/InventoryManager';
 import { TicketSystem } from '../world/TicketSystem';
 
+/** Height of a sandbag wall in world units (used for placement Y offset). */
+export const SANDBAG_HEIGHT = 2.4;
+
 interface PlacedSandbag {
   id: string;
-  mesh: THREE.Mesh;
+  mesh: THREE.Object3D;
   bounds: THREE.Box3;
   position: THREE.Vector3;
 }
@@ -27,13 +31,14 @@ export class SandbagSystem implements GameSystem {
   private readonly MAX_SLOPE_DEGREES = 30;
   private readonly MAX_WATER_HEIGHT = 1.0;
 
-  private placementPreview?: THREE.Mesh;
+  private placementPreview?: THREE.Object3D;
   private previewVisible = false;
   private previewPosition = new THREE.Vector3();
   private previewRotation = 0;
   private additionalRotation = 0; // For manual rotation adjustments
   private placementValid = false;
   private pulseTime = 0;
+  private previewReady = false;
 
   private raycaster = new THREE.Raycaster();
 
@@ -45,12 +50,11 @@ export class SandbagSystem implements GameSystem {
     this.scene = scene;
     this.camera = camera;
     this.chunkManager = chunkManager;
-
-    this.createPlacementPreview();
   }
 
   async init(): Promise<void> {
     Logger.info('weapons', 'Initializing Sandbag System...');
+    await this.createPlacementPreview();
   }
 
   update(deltaTime: number): void {
@@ -63,40 +67,59 @@ export class SandbagSystem implements GameSystem {
   dispose(): void {
     this.sandbags.forEach(sandbag => {
       this.scene.remove(sandbag.mesh);
-      sandbag.mesh.geometry.dispose();
-      if (sandbag.mesh.material instanceof THREE.Material) {
-        sandbag.mesh.material.dispose();
-      }
+      this.disposeObject3D(sandbag.mesh);
     });
     this.sandbags = [];
 
     if (this.placementPreview) {
       this.scene.remove(this.placementPreview);
-      this.placementPreview.geometry.dispose();
-      if (this.placementPreview.material instanceof THREE.Material) {
-        this.placementPreview.material.dispose();
-      }
+      this.disposeObject3D(this.placementPreview);
     }
   }
 
-  private createPlacementPreview(): void {
-    const sandbagMesh = ProgrammaticExplosivesFactory.createSandbag();
-
-    const previewMaterial = new THREE.MeshStandardMaterial({
-      color: 0x00ff00,
-      transparent: true,
-      opacity: 0.5,
-      emissive: 0x00ff00,
-      emissiveIntensity: 0.2
+  private disposeObject3D(obj: THREE.Object3D): void {
+    obj.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry.dispose();
+        if (Array.isArray(child.material)) {
+          child.material.forEach(m => m.dispose());
+        } else if (child.material instanceof THREE.Material) {
+          child.material.dispose();
+        }
+      }
     });
+  }
 
-    this.placementPreview = new THREE.Mesh(sandbagMesh.geometry, previewMaterial);
-    this.placementPreview.visible = false;
-    this.scene.add(this.placementPreview);
+  private async createPlacementPreview(): Promise<void> {
+    try {
+      const scene = await modelLoader.loadModel(StructureModels.SANDBAG_WALL);
+
+      // Replace all materials with translucent green for preview
+      const previewMaterial = new THREE.MeshStandardMaterial({
+        color: 0x00ff00,
+        transparent: true,
+        opacity: 0.5,
+        emissive: 0x00ff00,
+        emissiveIntensity: 0.2
+      });
+
+      scene.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.material = previewMaterial;
+        }
+      });
+
+      this.placementPreview = scene;
+      this.placementPreview.visible = false;
+      this.scene.add(this.placementPreview);
+      this.previewReady = true;
+    } catch (err) {
+      Logger.warn('weapons', 'Failed to load sandbag preview model', err);
+    }
   }
 
   updatePreviewPosition(camera: THREE.Camera): void {
-    if (!this.placementPreview) return;
+    if (!this.placementPreview || !this.previewReady) return;
 
     const direction = new THREE.Vector3();
     camera.getWorldDirection(direction);
@@ -105,42 +128,40 @@ export class SandbagSystem implements GameSystem {
     this.previewPosition.copy(camera.position).add(direction.multiplyScalar(distance));
 
     const groundHeight = this.getGroundHeight(this.previewPosition.x, this.previewPosition.z);
-    this.previewPosition.y = groundHeight + ProgrammaticExplosivesFactory.SANDBAG_HEIGHT / 2;
+    this.previewPosition.y = groundHeight + SANDBAG_HEIGHT / 2;
 
     // Calculate rotation to align with player facing direction (not perpendicular)
     const playerYaw = Math.atan2(direction.x, direction.z);
-    // Don't add 90 degrees - align with view direction for proper blocking
     this.previewRotation = playerYaw + this.additionalRotation;
 
     this.placementValid = this.isPlacementValid(this.previewPosition);
 
-    if (this.placementPreview.material instanceof THREE.MeshStandardMaterial) {
-      if (this.placementValid) {
-        this.placementPreview.material.color.setHex(0x00ff00);
-        this.placementPreview.material.emissive.setHex(0x00ff00);
-      } else {
-        this.placementPreview.material.color.setHex(0xff0000);
-        this.placementPreview.material.emissive.setHex(0xff0000);
+    // Update preview material color (valid = green, invalid = red)
+    const colorHex = this.placementValid ? 0x00ff00 : 0xff0000;
+    this.placementPreview.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+        child.material.color.setHex(colorHex);
+        child.material.emissive.setHex(colorHex);
       }
-    }
+    });
 
     this.placementPreview.position.copy(this.previewPosition);
     this.placementPreview.rotation.y = this.previewRotation;
   }
 
   private updatePreviewPulse(deltaTime: number): void {
-    if (!this.placementPreview || this.placementPreview.material instanceof THREE.MeshStandardMaterial === false) {
-      return;
-    }
+    if (!this.placementPreview || !this.previewReady) return;
 
     this.pulseTime += deltaTime;
-    const material = this.placementPreview.material as THREE.MeshStandardMaterial;
 
     // Breathing effect: opacity oscillates between 0.3 and 0.7
     const breathe = Math.sin(this.pulseTime * 3) * 0.2 + 0.5;
-    material.opacity = breathe;
+    this.placementPreview.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshStandardMaterial) {
+        child.material.opacity = breathe;
+      }
+    });
 
-    // Reset pulse time every 2 seconds to avoid floating point issues
     if (this.pulseTime > 6.28) {
       this.pulseTime = 0;
     }
@@ -216,27 +237,46 @@ export class SandbagSystem implements GameSystem {
       return false;
     }
 
-    const sandbagMesh = ProgrammaticExplosivesFactory.createSandbag();
-    sandbagMesh.position.copy(this.previewPosition);
-    sandbagMesh.rotation.y = this.placementPreview!.rotation.y;
-    this.scene.add(sandbagMesh);
-
-    const bounds = new THREE.Box3().setFromObject(sandbagMesh);
-
-    const sandbag: PlacedSandbag = {
-      id: `sandbag_${this.nextSandbagId++}`,
-      mesh: sandbagMesh,
-      bounds: bounds,
-      position: this.previewPosition.clone()
-    };
-
-    this.sandbags.push(sandbag);
+    // Async load a fresh GLB clone for placement
+    const pos = this.previewPosition.clone();
+    const rotY = this.placementPreview?.rotation.y ?? 0;
+    void this.placeSandbagAsync(pos, rotY);
 
     this.inventoryManager.useSandbag();
-
-    Logger.info('weapons', `Sandbag placed at (${this.previewPosition.x.toFixed(1)}, ${this.previewPosition.z.toFixed(1)}). Total: ${this.sandbags.length}/${this.MAX_SANDBAGS}`);
-
     return true;
+  }
+
+  private async placeSandbagAsync(pos: THREE.Vector3, rotY: number): Promise<void> {
+    try {
+      const sandbagModel = await modelLoader.loadModel(StructureModels.SANDBAG_WALL);
+      sandbagModel.position.copy(pos);
+      sandbagModel.rotation.y = rotY;
+
+      // Enable shadows
+      sandbagModel.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+
+      this.scene.add(sandbagModel);
+
+      const bounds = new THREE.Box3().setFromObject(sandbagModel);
+
+      const sandbag: PlacedSandbag = {
+        id: `sandbag_${this.nextSandbagId++}`,
+        mesh: sandbagModel,
+        bounds: bounds,
+        position: pos.clone()
+      };
+
+      this.sandbags.push(sandbag);
+
+      Logger.info('weapons', `Sandbag placed at (${pos.x.toFixed(1)}, ${pos.z.toFixed(1)}). Total: ${this.sandbags.length}/${this.MAX_SANDBAGS}`);
+    } catch (err) {
+      Logger.warn('weapons', 'Failed to load sandbag model for placement', err);
+    }
   }
 
   showPlacementPreview(show: boolean): void {
@@ -258,8 +298,8 @@ export class SandbagSystem implements GameSystem {
   checkRayIntersection(ray: THREE.Ray): boolean {
     this.raycaster.ray.copy(ray);
 
-    const meshes = this.sandbags.map(s => s.mesh);
-    const intersections = this.raycaster.intersectObjects(meshes, false);
+    const objects = this.sandbags.map(s => s.mesh);
+    const intersections = this.raycaster.intersectObjects(objects, true);
 
     return intersections.length > 0;
   }
@@ -267,8 +307,8 @@ export class SandbagSystem implements GameSystem {
   getRayIntersectionPoint(ray: THREE.Ray): THREE.Vector3 | null {
     this.raycaster.ray.copy(ray);
 
-    const meshes = this.sandbags.map(s => s.mesh);
-    const intersections = this.raycaster.intersectObjects(meshes, false);
+    const objects = this.sandbags.map(s => s.mesh);
+    const intersections = this.raycaster.intersectObjects(objects, true);
 
     if (intersections.length > 0) {
       return intersections[0].point;

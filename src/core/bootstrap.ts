@@ -3,7 +3,7 @@ import { injectSharedStyles } from '../ui/design/styles';
 import { TouchControlLayout } from '../ui/controls/TouchControlLayout';
 import { markStartup, resetStartupTelemetry } from './StartupTelemetry';
 import { AgentTier } from '../systems/strategy/types';
-import { Faction } from '../systems/combat/types';
+import { Faction, isBlufor, isOpfor } from '../systems/combat/types';
 
 const ashauSessionTelemetry = {
   sessionStartEpochMs: Date.now(),
@@ -114,8 +114,8 @@ function buildAShauDiagnostics(engine: GameEngine) {
 
   const aliveCombatants = combatants.filter(c => c.state !== 'dead' && c.health > 0);
   const aliveCombatByFaction = {
-    us: aliveCombatants.filter(c => c.faction === Faction.US).length,
-    opfor: aliveCombatants.filter(c => c.faction === Faction.OPFOR).length
+    us: aliveCombatants.filter(c => isBlufor(c.faction)).length,
+    opfor: aliveCombatants.filter(c => isOpfor(c.faction)).length
   };
 
   const nearbyTactical = {
@@ -125,7 +125,7 @@ function buildAShauDiagnostics(engine: GameEngine) {
   };
   if (playerPos) {
     for (const c of aliveCombatants) {
-      if (c.faction !== Faction.OPFOR) continue;
+      if (!isOpfor(c.faction)) continue;
       const d = c.position.distanceTo(playerPos);
       if (d <= 250) nearbyTactical.r250++;
       if (d <= 500) nearbyTactical.r500++;
@@ -180,7 +180,7 @@ function buildAShauDiagnostics(engine: GameEngine) {
       }
       if (!nearestZoneId || nearestDist > 240) continue;
       const row = zoneDistribution.get(nearestZoneId) ?? { us: 0, opfor: 0 };
-      if (a.faction === Faction.US) row.us++;
+      if (isBlufor(a.faction)) row.us++;
       else row.opfor++;
       zoneDistribution.set(nearestZoneId, row);
     }

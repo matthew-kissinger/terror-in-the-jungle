@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Logger } from '../../utils/Logger';
+import { zIndex } from '../design/tokens';
 
 const _scratchProjection = new THREE.Vector3();
 const _screenResult = { x: 0, y: 0, z: 0 };
@@ -35,7 +36,7 @@ export class DamageNumberSystem {
       width: 100vw;
       height: 100vh;
       pointer-events: none;
-      z-index: 100;
+      z-index: ${zIndex.hudFeedback};
     `;
 
     // Initialize pool

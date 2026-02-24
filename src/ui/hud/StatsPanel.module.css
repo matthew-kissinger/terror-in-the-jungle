@@ -6,6 +6,8 @@
  */
 
 .container {
+  /* Keep panel mounted for streak overlay lifecycle, but hide duplicate K/D block in gameplay HUD. */
+  display: none;
   background: var(--surface-panel);
   backdrop-filter: blur(6px);
   padding: var(--space-1-5) var(--space-3);

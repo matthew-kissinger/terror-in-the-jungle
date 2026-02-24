@@ -418,19 +418,19 @@ describe('DayNightCycle', () => {
       it('should position sun high at noon', () => {
         system.setTimeOfDay(12);
         system.update(0.5);
-        
+
         const position = mockRenderer.moonLight!.position;
-        // At noon, angle = (12-6)/24 * 2π = π/2, cos(π/2) ≈ 0
-        expect(Math.abs(position.y)).toBeLessThan(10);
+        // At noon, sun should be high (large positive y)
+        expect(position.y).toBeGreaterThan(50);
       });
 
       it('should position sun low at dawn', () => {
         system.setTimeOfDay(6);
         system.update(0.5);
-        
+
         const position = mockRenderer.moonLight!.position;
-        // At dawn (6am), angle = 0, cos(0) = 1, so y = 80
-        expect(position.y).toBeGreaterThan(70);
+        // At dawn (6am), sun is at/near horizon (low y)
+        expect(position.y).toBeLessThan(10);
       });
 
       it('should have warm color at noon', () => {

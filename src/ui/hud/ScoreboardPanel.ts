@@ -10,7 +10,7 @@
 import { UIComponent } from '../engine/UIComponent';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
-import { Faction } from '../../systems/combat/types';
+import { Faction, isBlufor, isOpfor } from '../../systems/combat/types';
 import { isTouchDevice } from '../../utils/DeviceDetector';
 import styles from './ScoreboardPanel.module.css';
 
@@ -69,8 +69,8 @@ export class ScoreboardPanel extends UIComponent {
     const npcScores = this.getNPCScores();
     const all = [playerScore, ...npcScores];
 
-    const usScores = all.filter(s => s.faction === Faction.US).sort((a, b) => b.score - a.score);
-    const opforScores = all.filter(s => s.faction === Faction.OPFOR).sort((a, b) => b.score - a.score);
+    const usScores = all.filter(s => isBlufor(s.faction)).sort((a, b) => b.score - a.score);
+    const opforScores = all.filter(s => isOpfor(s.faction)).sort((a, b) => b.score - a.score);
 
     const teamStats = this.combatantSystem.getTeamKillStats();
     const usTotals = {

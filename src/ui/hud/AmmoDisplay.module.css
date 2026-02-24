@@ -15,6 +15,13 @@
   gap: var(--space-0-5);
 }
 
+:global([data-device="touch"]) .container {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
 .counter {
   display: flex;
   align-items: baseline;
@@ -109,5 +116,31 @@
 
   .status {
     font-size: 8px;
+  }
+}
+
+/* Touch landscape: bump up magazine number so it's thumb-readable */
+@media (pointer: coarse) and (orientation: landscape) {
+  .magazine {
+    font-size: var(--font-size-lg);
+  }
+
+  .reserve {
+    font-size: var(--font-size-xs);
+  }
+}
+
+/* Touch portrait: center-aligned, slightly larger */
+@media (pointer: coarse) and (orientation: portrait) {
+  .container {
+    align-items: center;
+  }
+
+  .magazine {
+    font-size: var(--font-size-lg);
+  }
+
+  .reserve {
+    font-size: var(--font-size-xs);
   }
 }

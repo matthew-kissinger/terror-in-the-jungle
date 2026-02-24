@@ -5,7 +5,7 @@ import { ZoneManager } from '../../systems/world/ZoneManager';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { createMinimapDOM } from './MinimapDOMBuilder';
 import { DEFAULT_WORLD_SIZE, MINIMAP_SIZE } from './MinimapStyles';
-import { renderMinimap } from './MinimapRenderer';
+import { renderMinimap, HelipadMarker } from './MinimapRenderer';
 import { isMobileViewport } from '../../utils/DeviceDetector';
 import type { WarSimulator } from '../../systems/strategy/WarSimulator';
 
@@ -19,6 +19,7 @@ export class MinimapSystem implements GameSystem {
   private warSimulator?: WarSimulator;
   private playerSquadId?: string;
   private commandPosition?: THREE.Vector3;
+  private helipadMarkers: HelipadMarker[] = [];
 
   // Canvas elements
   private minimapCanvas: HTMLCanvasElement;
@@ -59,19 +60,12 @@ export class MinimapSystem implements GameSystem {
   }
 
   update(_deltaTime: number): void {
-    // Update player position and rotation
     this.playerPosition.copy(this.camera.position);
 
-    // Get camera direction for rotation
     this.camera.getWorldDirection(_v1);
-    // Yaw measured from true north (-Z) turning clockwise toward +X (east)
     this.playerRotation = Math.atan2(_v1.x, -_v1.z);
 
-    // Throttle updates
-    const now = Date.now();
-    if (now - this.lastUpdateTime < this.UPDATE_INTERVAL) return;
-    this.lastUpdateTime = now;
-
+    // Throttling is handled by SystemUpdater's tacticalUiAccumulator (20Hz).
     this.renderMinimap();
   }
 
@@ -112,6 +106,10 @@ export class MinimapSystem implements GameSystem {
     this.commandPosition = position;
   }
 
+  setHelipadMarkers(markers: HelipadMarker[]): void {
+    this.helipadMarkers = markers;
+  }
+
   private renderMinimap(): void {
     renderMinimap({
       ctx: this.minimapContext,
@@ -124,7 +122,8 @@ export class MinimapSystem implements GameSystem {
       combatantSystem: this.combatantSystem,
       warSimulator: this.warSimulator,
       playerSquadId: this.playerSquadId,
-      commandPosition: this.commandPosition
+      commandPosition: this.commandPosition,
+      helipadMarkers: this.helipadMarkers
     });
   }
 

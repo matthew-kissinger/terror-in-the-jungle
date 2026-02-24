@@ -1,4 +1,4 @@
-import { Faction } from '../combat/types';
+import { Faction, isBlufor } from '../combat/types';
 import { ZoneManager, ZoneState } from './ZoneManager';
 import { GamePhase, PhaseTimings } from './TicketSystemPhases';
 
@@ -41,14 +41,14 @@ export class VictoryConditions {
         return { winner: Faction.US, reason: 'KILL_TARGET_REACHED', shouldEnterOvertime: false };
       }
       if (params.opforKills >= params.killTarget) {
-        return { winner: Faction.OPFOR, reason: 'KILL_TARGET_REACHED', shouldEnterOvertime: false };
+        return { winner: Faction.NVA, reason: 'KILL_TARGET_REACHED', shouldEnterOvertime: false };
       }
     }
 
     // Check ticket depletion (only if not in TDM)
     if (!params.isTDM) {
       if (params.usTickets <= 0) {
-        return { winner: Faction.OPFOR, reason: 'TICKETS_DEPLETED', shouldEnterOvertime: false };
+        return { winner: Faction.NVA, reason: 'TICKETS_DEPLETED', shouldEnterOvertime: false };
       }
 
       if (params.opforTickets <= 0) {
@@ -89,7 +89,7 @@ export class VictoryConditions {
       if (usControlled === capturableZones.length) {
         return { winner: Faction.US, reason: 'TOTAL_CONTROL', shouldEnterOvertime: false };
       } else if (opforControlled === capturableZones.length) {
-        return { winner: Faction.OPFOR, reason: 'TOTAL_CONTROL', shouldEnterOvertime: false };
+        return { winner: Faction.NVA, reason: 'TOTAL_CONTROL', shouldEnterOvertime: false };
       }
     }
 
@@ -116,14 +116,14 @@ export class VictoryConditions {
         return { winner: null, reason: null, shouldEnterOvertime: true };
       } else {
         // If not close, end game by time limit
-        const winner = usTickets > opforTickets ? Faction.US : Faction.OPFOR;
+        const winner = usTickets > opforTickets ? Faction.US : Faction.NVA;
         return { winner, reason: 'TIME_LIMIT', shouldEnterOvertime: false };
       }
     }
 
     // If in OVERTIME phase and overtime duration is reached
     if (currentPhase === 'OVERTIME' && matchDuration >= totalOvertimeDuration) {
-      const winner = usTickets > opforTickets ? Faction.US : Faction.OPFOR;
+      const winner = usTickets > opforTickets ? Faction.US : Faction.NVA;
       return { winner, reason: 'TIME_LIMIT', shouldEnterOvertime: false };
     }
 

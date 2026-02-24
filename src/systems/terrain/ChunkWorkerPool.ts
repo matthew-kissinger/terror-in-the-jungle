@@ -23,19 +23,13 @@ export interface VegetationPosition {
   sy: number;
 }
 
-export interface VegetationData {
-  fern: VegetationPosition[];
-  elephantEar: VegetationPosition[];
-  fanPalm: VegetationPosition[];
-  coconut: VegetationPosition[];
-  areca: VegetationPosition[];
-  dipterocarp: VegetationPosition[];
-  banyan: VegetationPosition[];
-}
+/** Keyed by vegetation type id (e.g. 'fern', 'bambooGrove'). */
+export type VegetationData = Record<string, VegetationPosition[]>;
 
 export interface ChunkGeometryResult {
   chunkX: number;
   chunkZ: number;
+  biomeId?: string;
   geometry: THREE.BufferGeometry;
   heightData: Float32Array;
   vegetation?: VegetationData;
@@ -114,6 +108,7 @@ export class ChunkWorkerPool {
       const result: ChunkGeometryResult = {
         chunkX: data.chunkX!,
         chunkZ: data.chunkZ!,
+        biomeId: data.biomeId,
         geometry,
         heightData: data.heightData,
         vegetation: data.vegetation
@@ -264,6 +259,17 @@ export class ChunkWorkerPool {
    */
   sendHeightProvider(config: import('./IHeightProvider').HeightProviderConfig): void {
     this.lifecycle.sendHeightProvider(config);
+  }
+
+  /**
+   * Send vegetation + biome config to all workers so they generate data-driven vegetation.
+   */
+  sendVegetationConfig(config: { types: any[]; biomePalette: any[] }): void {
+    this.lifecycle.sendVegetationConfig(config);
+  }
+
+  sendBiomeConfig(config: { biomeRules: any[]; defaultBiomeId: string; allBiomePalettes: Record<string, any[]> }): void {
+    this.lifecycle.sendBiomeConfig(config);
   }
 
   /**

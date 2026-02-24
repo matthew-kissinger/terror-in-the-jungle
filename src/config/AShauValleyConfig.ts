@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Faction } from '../systems/combat/types';
+import { Faction, Alliance } from '../systems/combat/types';
 import { GameMode, GameModeConfig, WeatherState } from './gameModeTypes';
 
 /**
@@ -87,6 +87,15 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
     metersPerPixel: DEM_METERS_PER_PIXEL
   },
 
+  terrain: {
+    defaultBiome: 'denseJungle',
+    biomeRules: [
+      { biomeId: 'highland', elevationMin: 900, slopeMax: 45, priority: 2 },
+      { biomeId: 'cleared', slopeMax: 10, elevationMin: 1200, priority: 3 },
+      { biomeId: 'denseJungle', elevationMax: 900, priority: 1 },
+    ]
+  },
+
   // Renderer overrides for tall terrain
   cameraFar: 4000,
   fogDensity: 0.001,
@@ -144,6 +153,12 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
     reinforcementCooldown: 90
   },
 
+  helipads: [
+    { id: 'helipad_goodman', position: geoToWorld(16.23, 107.155), aircraft: 'UH1_HUEY' },
+    { id: 'helipad_stallion', position: geoToWorld(16.245, 107.205), aircraft: 'UH1C_GUNSHIP' },
+    { id: 'helipad_eagle', position: geoToWorld(16.175, 107.195), aircraft: 'AH1_COBRA' },
+  ],
+
   zones: [
     // ===== US Landing Zones (eastern ridgeline) =====
     // US forces insert via helicopter to LZs on the eastern side,
@@ -187,7 +202,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       position: geoToWorld(16.25, 107.10),
       radius: 50,
       isHomeBase: true,
-      owner: Faction.OPFOR,
+      owner: Faction.NVA,
       ticketBleedRate: 0
     },
     {
@@ -196,7 +211,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       position: geoToWorld(16.30, 107.12),
       radius: 45,
       isHomeBase: true,
-      owner: Faction.OPFOR,
+      owner: Faction.NVA,
       ticketBleedRate: 0
     },
     {
@@ -205,7 +220,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       position: geoToWorld(16.15, 107.10),
       radius: 40,
       isHomeBase: true,
-      owner: Faction.OPFOR,
+      owner: Faction.NVA,
       ticketBleedRate: 0
     },
 
@@ -234,7 +249,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       position: geoToWorld(16.27, 107.16),
       radius: 50,
       isHomeBase: false,
-      owner: Faction.OPFOR,          // NVA controls valley floor
+      owner: Faction.NVA,          // NVA controls valley floor
       ticketBleedRate: 4
     },
 
@@ -281,7 +296,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       position: geoToWorld(16.16, 107.14),
       radius: 40,
       isHomeBase: false,
-      owner: Faction.OPFOR,          // NVA overran it in 1966
+      owner: Faction.NVA,          // NVA overran it in 1966
       ticketBleedRate: 3
     },
 
@@ -303,7 +318,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       position: geoToWorld(16.19, 107.13),
       radius: 40,
       isHomeBase: false,
-      owner: Faction.OPFOR,
+      owner: Faction.NVA,
       ticketBleedRate: 3
     },
 
@@ -326,7 +341,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       position: geoToWorld(16.22, 107.11),
       radius: 45,
       isHomeBase: false,
-      owner: Faction.OPFOR,
+      owner: Faction.NVA,
       ticketBleedRate: 5
     },
 
@@ -338,7 +353,7 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       position: geoToWorld(16.25, 107.18),
       radius: 35,
       isHomeBase: false,
-      owner: Faction.OPFOR,
+      owner: Faction.NVA,
       ticketBleedRate: 3
     },
 
@@ -352,5 +367,9 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       owner: null,                   // Contested from the start
       ticketBleedRate: 2
     }
-  ]
+  ],
+  factionMix: {
+    [Alliance.BLUFOR]: [Faction.US, Faction.ARVN],
+    [Alliance.OPFOR]: [Faction.NVA, Faction.VC],
+  }
 };

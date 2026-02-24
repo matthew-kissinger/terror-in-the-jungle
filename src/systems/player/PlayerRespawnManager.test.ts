@@ -197,7 +197,7 @@ describe('PlayerRespawnManager', () => {
     mockZoneManager = {
       getAllZones: vi.fn(() => [
         createMockZone('us_base', 'US Base', new THREE.Vector3(0, 0, -50), ZoneState.US_CONTROLLED, true, Faction.US),
-        createMockZone('opfor_base', 'OPFOR Base', new THREE.Vector3(0, 0, 50), ZoneState.OPFOR_CONTROLLED, true, Faction.OPFOR),
+        createMockZone('opfor_base', 'OPFOR Base', new THREE.Vector3(0, 0, 50), ZoneState.OPFOR_CONTROLLED, true, Faction.NVA),
         createMockZone('zone_a', 'Zone Alpha', new THREE.Vector3(100, 0, 100), ZoneState.US_CONTROLLED, false),
         createMockZone('zone_b', 'Zone Bravo', new THREE.Vector3(-100, 0, 100), ZoneState.CONTESTED, false),
       ]),

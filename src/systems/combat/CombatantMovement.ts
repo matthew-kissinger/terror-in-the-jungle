@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction, Squad } from './types';
+import { Combatant, CombatantState, Faction, Squad, isBlufor } from './types';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { ZoneManager } from '../world/ZoneManager';
 import { TicketSystem } from '../world/TicketSystem';
@@ -169,12 +169,12 @@ export class CombatantMovement {
   private getEnemyBasePosition(faction: Faction): THREE.Vector3 {
     if (this.gameModeManager) {
       const config = this.gameModeManager.getCurrentConfig();
-      const enemyFaction = faction === Faction.US ? Faction.OPFOR : Faction.US;
+      const lookForBlufor = !isBlufor(faction);
 
-      // Find enemy main base
       const enemyBase = config.zones.find(z =>
-        z.isHomeBase && z.owner === enemyFaction &&
-        (z.id.includes('main') || z.id === `${enemyFaction.toLowerCase()}_base`)
+        z.isHomeBase && z.owner !== null &&
+        isBlufor(z.owner as Faction) === lookForBlufor &&
+        (z.id.includes('main') || z.id.includes('_base'))
       );
 
       if (enemyBase) {
@@ -183,7 +183,7 @@ export class CombatantMovement {
     }
 
     // Fallback to default positions
-    return faction === Faction.US ?
+    return isBlufor(faction) ?
       new THREE.Vector3(0, 0, 145) : // OPFOR base
       new THREE.Vector3(0, 0, -50); // US base
   }

@@ -113,7 +113,7 @@ describe('ClusterManager', () => {
 
     it('should ignore opposite faction', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
-      const enemy = createMockCombatant('c2', Faction.OPFOR, new THREE.Vector3(2, 0, 0))
+      const enemy = createMockCombatant('c2', Faction.NVA, new THREE.Vector3(2, 0, 0))
       allCombatants.set('c1', combatant)
       allCombatants.set('c2', enemy)
       const spatialGrid = createMockSpatialGrid(['c1', 'c2'])
@@ -264,10 +264,10 @@ describe('ClusterManager', () => {
 
     it('should ignore opposite faction', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
-      const enemy1 = createMockCombatant('c2', Faction.OPFOR, new THREE.Vector3(5, 0, 0))
-      const enemy2 = createMockCombatant('c3', Faction.OPFOR, new THREE.Vector3(0, 0, 5))
-      const enemy3 = createMockCombatant('c4', Faction.OPFOR, new THREE.Vector3(-5, 0, 0))
-      const enemy4 = createMockCombatant('c5', Faction.OPFOR, new THREE.Vector3(0, 0, -5))
+      const enemy1 = createMockCombatant('c2', Faction.NVA, new THREE.Vector3(5, 0, 0))
+      const enemy2 = createMockCombatant('c3', Faction.NVA, new THREE.Vector3(0, 0, 5))
+      const enemy3 = createMockCombatant('c4', Faction.NVA, new THREE.Vector3(-5, 0, 0))
+      const enemy4 = createMockCombatant('c5', Faction.NVA, new THREE.Vector3(0, 0, -5))
       allCombatants.set('c1', combatant)
       allCombatants.set('c2', enemy1)
       allCombatants.set('c3', enemy2)
@@ -361,8 +361,8 @@ describe('ClusterManager', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
       const friendly1 = createMockCombatant('c2', Faction.US, new THREE.Vector3(5, 0, 0))
       const friendly2 = createMockCombatant('c3', Faction.US, new THREE.Vector3(0, 0, 5))
-      const enemy1 = createMockCombatant('c4', Faction.OPFOR, new THREE.Vector3(-5, 0, 0))
-      const enemy2 = createMockCombatant('c5', Faction.OPFOR, new THREE.Vector3(0, 0, -5))
+      const enemy1 = createMockCombatant('c4', Faction.NVA, new THREE.Vector3(-5, 0, 0))
+      const enemy2 = createMockCombatant('c5', Faction.NVA, new THREE.Vector3(0, 0, -5))
       allCombatants.set('c1', combatant)
       allCombatants.set('c2', friendly1)
       allCombatants.set('c3', friendly2)
@@ -491,7 +491,7 @@ describe('ClusterManager', () => {
 
     it('should return single target when only one available', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
-      const enemy = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(10, 0, 0))
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(10, 0, 0))
       allCombatants.set('c1', combatant)
       allCombatants.set('e1', enemy)
 
@@ -502,8 +502,8 @@ describe('ClusterManager', () => {
 
     it('should prefer closer targets', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
-      const closeEnemy = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(10, 0, 0))
-      const farEnemy = createMockCombatant('e2', Faction.OPFOR, new THREE.Vector3(100, 0, 0))
+      const closeEnemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(10, 0, 0))
+      const farEnemy = createMockCombatant('e2', Faction.NVA, new THREE.Vector3(100, 0, 0))
       allCombatants.set('c1', combatant)
       allCombatants.set('e1', closeEnemy)
       allCombatants.set('e2', farEnemy)
@@ -520,8 +520,8 @@ describe('ClusterManager', () => {
 
     it('should prefer less-targeted enemies', () => {
       const combatant1 = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
-      const enemy1 = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(20, 0, 0))
-      const enemy2 = createMockCombatant('e2', Faction.OPFOR, new THREE.Vector3(20, 0, 5)) // Same distance
+      const enemy1 = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(20, 0, 0))
+      const enemy2 = createMockCombatant('e2', Faction.NVA, new THREE.Vector3(20, 0, 5)) // Same distance
 
       allCombatants.set('c1', combatant1)
       allCombatants.set('e1', enemy1)
@@ -552,7 +552,7 @@ describe('ClusterManager', () => {
 
     it('should rebuild target counts periodically', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
-      const enemy = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(10, 0, 0))
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(10, 0, 0))
       combatant.target = enemy
       allCombatants.set('c1', combatant)
       allCombatants.set('e1', enemy)
@@ -585,7 +585,7 @@ describe('ClusterManager', () => {
     it('should update target counts when assigning', () => {
       const combatant1 = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
       const combatant2 = createMockCombatant('c2', Faction.US, new THREE.Vector3(5, 0, 0))
-      const enemy = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(10, 0, 0))
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(10, 0, 0))
       allCombatants.set('c1', combatant1)
       allCombatants.set('c2', combatant2)
       allCombatants.set('e1', enemy)
@@ -739,7 +739,7 @@ describe('ClusterManager', () => {
   describe('reset', () => {
     it('should clear target counts', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
-      const enemy = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(10, 0, 0))
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(10, 0, 0))
       combatant.target = enemy
       allCombatants.set('c1', combatant)
       allCombatants.set('e1', enemy)
@@ -757,7 +757,7 @@ describe('ClusterManager', () => {
 
     it('should reset last distribution time', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0))
-      const enemy = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(10, 0, 0))
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(10, 0, 0))
       allCombatants.set('c1', combatant)
       allCombatants.set('e1', enemy)
 

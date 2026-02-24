@@ -220,9 +220,9 @@ describe('SquadManager', () => {
 
     it('should create OPFOR squads', () => {
       const position = new THREE.Vector3(-10, 0, -10)
-      const { squad } = squadManager.createSquad(Faction.OPFOR, position, 3)
+      const { squad } = squadManager.createSquad(Faction.NVA, position, 3)
 
-      expect(squad.faction).toBe(Faction.OPFOR)
+      expect(squad.faction).toBe(Faction.NVA)
       expect(squad.members.length).toBe(3)
     })
 
@@ -384,7 +384,7 @@ describe('SquadManager', () => {
     it('should return all created squads', () => {
       const position = new THREE.Vector3(0, 0, 0)
       squadManager.createSquad(Faction.US, position, 4)
-      squadManager.createSquad(Faction.OPFOR, position, 3)
+      squadManager.createSquad(Faction.NVA, position, 3)
 
       const squads = squadManager.getAllSquads()
 
@@ -429,7 +429,7 @@ describe('SquadManager', () => {
         name: 'Alpha',
         position: new THREE.Vector3(50, 0, 50),
         radius: 30,
-        owner: Faction.OPFOR,
+        owner: Faction.NVA,
         isHomeBase: false,
       }
 
@@ -451,7 +451,7 @@ describe('SquadManager', () => {
         name: 'Alpha',
         position: new THREE.Vector3(50, 0, 50),
         radius: 30,
-        owner: Faction.OPFOR,
+        owner: Faction.NVA,
         isHomeBase: false,
       }
 
@@ -641,7 +641,7 @@ describe('SquadManager', () => {
     it('should clear all squads', () => {
       const position = new THREE.Vector3(0, 0, 0)
       squadManager.createSquad(Faction.US, position, 4)
-      squadManager.createSquad(Faction.OPFOR, position, 3)
+      squadManager.createSquad(Faction.NVA, position, 3)
 
       squadManager.dispose()
 

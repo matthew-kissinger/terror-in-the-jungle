@@ -45,6 +45,15 @@
   opacity: 0.9;
 }
 
+.sectionTitle {
+  margin: var(--space-5) 0 var(--space-2);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+}
+
 .field {
   margin: var(--space-3) 0;
 }

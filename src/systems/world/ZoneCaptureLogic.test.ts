@@ -53,7 +53,7 @@ describe('ZoneCaptureLogic', () => {
     for (let i = 0; i < 30; i++) {
       logic.updateZoneCaptureState(zone, { us: 1, opfor: 5 }, 1.0);
     }
-    expect(zone.owner).toBe(Faction.OPFOR);
+    expect(zone.owner).toBe(Faction.NVA);
     expect([ZoneState.OPFOR_CONTROLLED, ZoneState.CONTESTED]).toContain(zone.state);
   });
 
@@ -69,7 +69,7 @@ describe('ZoneCaptureLogic', () => {
       logic.updateZoneCaptureState(zone, { us: 0, opfor: 3 }, 1.0);
     }
 
-    expect(zone.owner).toBe(Faction.OPFOR);
+    expect(zone.owner).toBe(Faction.NVA);
     expect(zone.state).toBe(ZoneState.OPFOR_CONTROLLED);
     expect(zone.captureProgress).toBe(100);
   });

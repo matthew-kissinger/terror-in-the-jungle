@@ -2,208 +2,117 @@ import * as THREE from 'three';
 import { GameSystem, BillboardInstance } from '../../../types';
 import { AssetLoader } from '../../assets/AssetLoader';
 import { GPUBillboardSystem } from './GPUBillboardSystem';
-import { BillboardVegetationTypes } from './BillboardVegetationTypes';
-import { BillboardInstanceManager } from './BillboardInstanceManager';
-import { BillboardRenderer } from './BillboardRenderer';
 import { Logger } from '../../../utils/Logger';
+import { VegetationTypeConfig, VEGETATION_TYPES } from '../../../config/vegetationTypes';
+import { BiomeConfig, getBiome } from '../../../config/biomes';
 
 export class GlobalBillboardSystem implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
   private assetLoader: AssetLoader;
 
-  // GPU system for vegetation (performance critical)
-  private gpuVegetationSystem: GPUBillboardSystem;
+  private gpuSystem: GPUBillboardSystem;
 
-  // CPU system kept for NPCs (AI integration)
-  private vegetationTypes: BillboardVegetationTypes;
-  private instanceManager!: BillboardInstanceManager;
-  private renderer!: BillboardRenderer;
-
-  // Toggle to use GPU for vegetation
-  private useGPUForVegetation = true;
-
-  // Exclusion zones where vegetation should not spawn
   private exclusionZones: Array<{ x: number; z: number; radius: number }> = [];
+
+  /** The active vegetation types for the current biome/mode. */
+  private activeTypes: VegetationTypeConfig[] = VEGETATION_TYPES;
+
+  /** The active biome (used by generators to pick vegetation palette). */
+  private activeBiome: BiomeConfig = getBiome('denseJungle');
 
   constructor(scene: THREE.Scene, camera: THREE.Camera, assetLoader: AssetLoader) {
     this.scene = scene;
     this.camera = camera;
     this.assetLoader = assetLoader;
+    this.gpuSystem = new GPUBillboardSystem(scene, assetLoader);
+  }
 
-    // Initialize GPU system for vegetation
-    this.gpuVegetationSystem = new GPUBillboardSystem(scene, assetLoader);
+  /**
+   * Configure which biome / vegetation types are active before init().
+   * Call this from the game mode setup before init().
+   */
+  configure(biomeId?: string): void {
+    if (biomeId) {
+      this.activeBiome = getBiome(biomeId);
+    }
 
-    // Keep CPU system for potential NPC use
-    this.vegetationTypes = new BillboardVegetationTypes(scene, assetLoader);
+    // Filter vegetation types to only those present in the biome palette
+    const paletteIds = new Set(this.activeBiome.vegetationPalette.map(e => e.typeId));
+    this.activeTypes = VEGETATION_TYPES.filter(t => paletteIds.has(t.id));
+  }
+
+  getActiveBiome(): BiomeConfig {
+    return this.activeBiome;
+  }
+
+  getActiveVegetationTypes(): VegetationTypeConfig[] {
+    return this.activeTypes;
   }
 
   async init(): Promise<void> {
-    if (this.useGPUForVegetation) {
-      // Use GPU for vegetation (high performance)
-      await this.gpuVegetationSystem.initialize();
-      Logger.info('World', 'Using GPU billboard system for vegetation');
-    } else {
-      // Fallback to CPU system if needed
-      const meshes = await this.vegetationTypes.initializeAll();
-      this.instanceManager = new BillboardInstanceManager(meshes);
-      this.renderer = new BillboardRenderer(this.camera, meshes, this.instanceManager);
-      Logger.info('World', 'Using CPU billboard system');
-    }
+    await this.gpuSystem.initializeFromConfig(this.activeTypes);
+    Logger.info('World', `Billboard system initialized (${this.activeTypes.length} types, biome=${this.activeBiome.id})`);
   }
 
   update(deltaTime: number, fog?: THREE.FogExp2 | null): void {
-    if (this.useGPUForVegetation) {
-      this.gpuVegetationSystem.update(this.camera, deltaTime, fog);
-    } else if (this.renderer) {
-      this.renderer.update(deltaTime);
-    }
+    this.gpuSystem.update(this.camera, deltaTime, fog);
   }
 
   dispose(): void {
-    if (this.useGPUForVegetation) {
-      this.gpuVegetationSystem.dispose();
-    } else if (this.vegetationTypes) {
-      this.vegetationTypes.dispose();
-    }
+    this.gpuSystem.dispose();
     Logger.info('World', 'Global Billboard System disposed');
   }
 
   /**
-   * Add billboard instances for a specific chunk
+   * Add billboard instances for a chunk. Uses a generic map keyed by vegetation type id.
    */
-  addChunkInstances(
-    chunkKey: string,
-    fernInstances?: BillboardInstance[],
-    elephantEarInstances?: BillboardInstance[],
-    fanPalmInstances?: BillboardInstance[],
-    coconutInstances?: BillboardInstance[],
-    arecaInstances?: BillboardInstance[],
-    dipterocarpInstances?: BillboardInstance[],
-    banyanInstances?: BillboardInstance[]
-  ): void {
-    if (this.useGPUForVegetation) {
-      // Filter all vegetation types through exclusion zones
-      const filteredFern = fernInstances ? this.filterVegetationInstances(fernInstances) : undefined;
-      const filteredElephantEar = elephantEarInstances ? this.filterVegetationInstances(elephantEarInstances) : undefined;
-      const filteredFanPalm = fanPalmInstances ? this.filterVegetationInstances(fanPalmInstances) : undefined;
-      const filteredCoconut = coconutInstances ? this.filterVegetationInstances(coconutInstances) : undefined;
-      const filteredAreca = arecaInstances ? this.filterVegetationInstances(arecaInstances) : undefined;
-      const filteredDipterocarp = dipterocarpInstances ? this.filterVegetationInstances(dipterocarpInstances) : undefined;
-      const filteredBanyan = banyanInstances ? this.filterVegetationInstances(banyanInstances) : undefined;
+  addChunkInstances(chunkKey: string, instancesByType: Map<string, BillboardInstance[]>): void {
+    let totalAdded = 0;
 
-      // Convert to GPU format and add
-      const types: Array<[string, BillboardInstance[] | undefined]> = [
-        ['fern', filteredFern],
-        ['elephantEar', filteredElephantEar],
-        ['fanPalm', filteredFanPalm],
-        ['coconut', filteredCoconut],
-        ['areca', filteredAreca],
-        ['dipterocarp', filteredDipterocarp],
-        ['banyan', filteredBanyan]
-      ];
+    // Filter all types through exclusion zones, then forward to GPU system
+    for (const [typeId, instances] of instancesByType) {
+      if (instances.length === 0) continue;
+      const filtered = this.filterVegetationInstances(instances);
+      if (filtered.length === 0) continue;
+      this.gpuSystem.addChunkInstances(chunkKey, typeId, filtered);
+      totalAdded += filtered.length;
+    }
 
-      let totalAdded = 0;
-      for (const [type, instances] of types) {
-        if (instances && instances.length > 0) {
-          this.gpuVegetationSystem.addChunkInstances(chunkKey, type, instances);
-          totalAdded += instances.length;
-        }
-      }
-
-      if (totalAdded > 0) {
-        Logger.debug('World', `GPU: Added ${totalAdded} vegetation instances for chunk ${chunkKey}`);
-      }
-    } else if (this.instanceManager) {
-      // Filter vegetation for CPU system too
-      this.instanceManager.addChunkInstances(
-        chunkKey,
-        fernInstances ? this.filterVegetationInstances(fernInstances) : fernInstances,
-        elephantEarInstances ? this.filterVegetationInstances(elephantEarInstances) : elephantEarInstances,
-        fanPalmInstances ? this.filterVegetationInstances(fanPalmInstances) : fanPalmInstances,
-        coconutInstances ? this.filterVegetationInstances(coconutInstances) : coconutInstances,
-        arecaInstances ? this.filterVegetationInstances(arecaInstances) : arecaInstances,
-        dipterocarpInstances ? this.filterVegetationInstances(dipterocarpInstances) : dipterocarpInstances,
-        banyanInstances ? this.filterVegetationInstances(banyanInstances) : banyanInstances
-      );
+    if (totalAdded > 0) {
+      Logger.debug('World', `GPU: Added ${totalAdded} vegetation instances for chunk ${chunkKey}`);
     }
   }
 
-  /**
-   * Remove billboard instances for a specific chunk
-   */
   removeChunkInstances(chunkKey: string): void {
-    if (this.useGPUForVegetation) {
-      this.gpuVegetationSystem.removeChunkInstances(chunkKey);
-    } else if (this.instanceManager) {
-      this.instanceManager.removeChunkInstances(chunkKey);
-    }
+    this.gpuSystem.removeChunkInstances(chunkKey);
   }
 
-  /**
-   * Add an exclusion zone where vegetation should not spawn and clear existing vegetation
-   */
   addExclusionZone(x: number, z: number, radius: number): void {
     this.exclusionZones.push({ x, z, radius });
     Logger.info('World', `Added vegetation exclusion zone at (${x}, ${z}) with radius ${radius}`);
-
-    // Clear existing vegetation in this area by regenerating affected chunks
     this.clearVegetationInArea(x, z, radius);
   }
 
-  /**
-   * Clear existing vegetation in a specific area by removing instances
-   */
   private clearVegetationInArea(x: number, z: number, radius: number): void {
-    if (this.useGPUForVegetation) {
-      Logger.info('World', `Clearing existing vegetation in ${radius}m radius around (${x}, ${z})`);
-      this.gpuVegetationSystem.clearInstancesInArea(x, z, radius);
-    }
+    Logger.info('World', `Clearing existing vegetation in ${radius}m radius around (${x}, ${z})`);
+    this.gpuSystem.clearInstancesInArea(x, z, radius);
   }
 
-  /**
-   * Check if a position is within any exclusion zone
-   */
   private isInExclusionZone(x: number, z: number): boolean {
     for (const zone of this.exclusionZones) {
       const distance = Math.sqrt((x - zone.x) ** 2 + (z - zone.z) ** 2);
-      if (distance <= zone.radius) {
-        return true;
-      }
+      if (distance <= zone.radius) return true;
     }
     return false;
   }
 
-  /**
-   * Filter vegetation instances to exclude those in exclusion zones
-   */
   private filterVegetationInstances(instances: BillboardInstance[]): BillboardInstance[] {
-    if (this.exclusionZones.length === 0) {
-      return instances;
-    }
-
-    return instances.filter(instance => !this.isInExclusionZone(instance.position.x, instance.position.z));
+    if (this.exclusionZones.length === 0) return instances;
+    return instances.filter(inst => !this.isInExclusionZone(inst.position.x, inst.position.z));
   }
 
-  /**
-   * Get total number of active instances by type
-   */
-  getInstanceCount(type: 'fern' | 'elephantEar' | 'fanPalm' | 'coconut' | 'areca' | 'dipterocarp' | 'banyan'): number {
-    if (this.instanceManager) {
-      return this.instanceManager.getInstanceCount(type);
-    }
-    return 0;
-  }
-
-  /**
-   * Get debug information about the system
-   */
   getDebugInfo(): { [key: string]: number } {
-    if (this.useGPUForVegetation) {
-      return this.gpuVegetationSystem.getDebugInfo();
-    } else if (this.instanceManager) {
-      return this.instanceManager.getDebugInfo();
-    }
-    return { chunksTracked: 0 };
+    return this.gpuSystem.getDebugInfo();
   }
 }

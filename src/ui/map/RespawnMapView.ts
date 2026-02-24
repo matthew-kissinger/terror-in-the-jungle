@@ -1,6 +1,6 @@
 import { Logger } from '../../utils/Logger';
 import { ZoneManager, CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
-import { Faction } from '../../systems/combat/types';
+import { Faction, isBlufor, isOpfor } from '../../systems/combat/types';
 import { GameModeManager } from '../../systems/world/GameModeManager';
 
 export class RespawnMapView {
@@ -117,12 +117,12 @@ export class RespawnMapView {
   }
 
   private isZoneSpawnable(zone: CaptureZone): boolean {
-    // Can spawn at US home base
-    if (zone.isHomeBase && zone.owner === Faction.US) {
+    // Can spawn at BLUFOR home base
+    if (zone.isHomeBase && zone.owner !== null && isBlufor(zone.owner)) {
       return true;
     }
 
-    // Can spawn at US controlled zones if game mode allows
+    // Can spawn at BLUFOR controlled zones if game mode allows
     const canSpawnAtZones = this.gameModeManager?.canPlayerSpawnAtZones() ?? false;
     if (canSpawnAtZones && !zone.isHomeBase && zone.state === ZoneState.US_CONTROLLED) {
       return true;
@@ -140,7 +140,7 @@ export class RespawnMapView {
     const canSpawnAtZones = this.gameModeManager?.canPlayerSpawnAtZones() ?? false;
 
     this.spawnableZones = this.zoneManager.getAllZones().filter(zone => {
-      if (zone.isHomeBase && zone.owner === Faction.US) return true;
+      if (zone.isHomeBase && zone.owner !== null && isBlufor(zone.owner)) return true;
       if (canSpawnAtZones && !zone.isHomeBase && zone.state === ZoneState.US_CONTROLLED) return true;
       return false;
     });
@@ -262,12 +262,12 @@ export class RespawnMapView {
   }
 
   private getZoneColor(zone: CaptureZone, alpha: number, isSpawnable: boolean): string {
-    if (!isSpawnable && zone.owner !== Faction.OPFOR) {
+    if (!isSpawnable && !(zone.owner !== null && isOpfor(zone.owner))) {
       return `rgba(107, 119, 128, ${alpha * 0.5})`;
     }
 
     if (zone.isHomeBase) {
-      if (zone.owner === Faction.US) {
+      if (zone.owner !== null && isBlufor(zone.owner)) {
         return `rgba(91, 140, 201, ${alpha})`;
       } else {
         return `rgba(201, 86, 74, ${alpha})`;

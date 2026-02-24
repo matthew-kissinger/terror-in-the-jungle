@@ -1,7 +1,7 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { CaptureZone, ZoneState } from './ZoneManager';
-import { Faction } from '../combat/types';
+import { Faction, isBlufor } from '../combat/types';
 import { GameModeConfig } from '../../config/gameModes';
 import { ZoneRenderer } from './ZoneRenderer';
 import { ZoneTerrainAdapter } from './ZoneTerrainAdapter';
@@ -58,7 +58,7 @@ export class ZoneInitializer {
         id: 'opfor_base',
         name: 'OPFOR Base',
         position: opforBasePos,
-        owner: Faction.OPFOR,
+        owner: Faction.VC,
         isHomeBase: true,
         ticketBleedRate: 0
       },
@@ -131,7 +131,7 @@ export class ZoneInitializer {
       height: 20,
       owner: config.owner,
       state: config.owner ?
-        (config.owner === Faction.US ? ZoneState.US_CONTROLLED : ZoneState.OPFOR_CONTROLLED) :
+        (isBlufor(config.owner) ? ZoneState.US_CONTROLLED : ZoneState.OPFOR_CONTROLLED) :
         ZoneState.NEUTRAL,
       captureProgress: config.owner ? 100 : 0,
       captureSpeed: this.gameModeConfig?.captureSpeed || 1,

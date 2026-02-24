@@ -7,12 +7,26 @@
  */
 
 .container {
+  position: fixed;
+  /*
+   * Bottom-anchored on the left side — completely avoids the top-left column
+   * (timer, game-status, stats) regardless of their rendered height.
+   * The lower-left is clear during helicopter mode because weapon-bar/ammo/stats
+   * are all hidden by the vehicle="helicopter" CSS rules.
+   */
+  left: max(14px, env(safe-area-inset-left, 0px));
+  bottom: max(60px, env(safe-area-inset-bottom, 0px));
   display: none;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 6px;
   pointer-events: none;
   user-select: none;
+  z-index: 160;
+}
+
+.touchMode {
+  gap: 4px;
 }
 
 .visible {
@@ -31,6 +45,18 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-2) var(--space-1-5);
+}
+
+.touchMode .panel {
+  width: 48px;
+  padding: 6px 6px;
+}
+
+.instrumentColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
 }
 
 /* --- Elevation section --- */
@@ -54,6 +80,10 @@
   margin-top: var(--space-1);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.touchMode .elevationLabel {
+  display: none;
 }
 
 /* --- Mouse mode section --- */
@@ -121,6 +151,10 @@
   gap: 6px;
 }
 
+.touchMode .instrumentsSection {
+  gap: 4px;
+}
+
 .instrumentsSectionVisible {
   display: flex;
 }
@@ -141,6 +175,10 @@
   position: relative;
   border-radius: 2px;
   background: rgba(0, 0, 0, 0.3);
+}
+
+.touchMode .thrustBar {
+  height: 24px;
 }
 
 .thrustFill {
@@ -175,6 +213,10 @@
   transition: color var(--duration-fast) var(--ease-out);
 }
 
+.touchMode .rpmValue {
+  font-size: 10px;
+}
+
 .rpmLow {
   color: var(--danger);
 }
@@ -189,6 +231,10 @@
   gap: 4px;
   width: 100%;
   justify-content: center;
+}
+
+.touchMode .statusRow {
+  gap: 2px;
 }
 
 .statusBox {
@@ -208,6 +254,12 @@
               color var(--duration-fast) var(--ease-out);
 }
 
+.touchMode .statusBox {
+  width: 10px;
+  height: 10px;
+  font-size: 7px;
+}
+
 .statusBoxActive {
   color: var(--text-primary);
 }
@@ -223,7 +275,26 @@
 }
 
 /* Responsive */
+@media (pointer: coarse) and (orientation: landscape) {
+  .container {
+    top: max(58px, env(safe-area-inset-top, 0px));
+    right: max(8px, env(safe-area-inset-right, 0px));
+  }
+}
+
+@media (pointer: coarse) and (orientation: portrait) {
+  .container {
+    top: max(88px, env(safe-area-inset-top, 0px));
+    right: max(8px, env(safe-area-inset-right, 0px));
+  }
+}
+
 @media (max-width: 768px) {
+  .container {
+    bottom: max(60px, env(safe-area-inset-bottom, 0px));
+    left: max(10px, env(safe-area-inset-left, 0px));
+  }
+
   .panel {
     width: 50px;
     padding: var(--space-1-5) var(--space-1);
@@ -233,5 +304,23 @@
     font-size: var(--font-size-xs);
     padding: 2px 4px;
     min-width: 32px;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    top: auto;
+    bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+    right: max(8px, env(safe-area-inset-right, 0px));
+  }
+
+  .touchMode .panel {
+    width: 44px;
+    padding: 5px;
+  }
+
+  .touchMode .elevationValue {
+    min-width: 28px;
+    font-size: 10px;
   }
 }

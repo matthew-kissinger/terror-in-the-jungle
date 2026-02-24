@@ -5,10 +5,12 @@ import { HelicopterPhysics } from './HelicopterPhysics';
 import { HelicopterAnimation } from './HelicopterAnimation';
 import { HelicopterAudio } from './HelicopterAudio';
 import { HelicopterInteraction } from './HelicopterInteraction';
-import { createUH1HueyGeometry } from './HelicopterGeometry';
+import { createHelicopterGeometry } from './HelicopterGeometry';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
-import { HelipadSystem } from './HelipadSystem';
+import { HelipadSystem, HelipadInfo } from './HelipadSystem';
 import { IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
+
+const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0));
 
 // Hoisted mocks to store instances
 const { mocks } = vi.hoisted(() => ({
@@ -79,6 +81,7 @@ vi.mock('./HelicopterInteraction', () => ({
     setTerrainManager = vi.fn();
     setPlayerController = vi.fn();
     setHUDSystem = vi.fn();
+    setPlayerInput = vi.fn();
     checkPlayerProximity = vi.fn();
     tryEnterHelicopter = vi.fn();
     exitHelicopter = vi.fn();
@@ -89,7 +92,12 @@ vi.mock('./HelicopterInteraction', () => ({
 }));
 
 vi.mock('./HelicopterGeometry', () => ({
-  createUH1HueyGeometry: vi.fn(() => {
+  createHelicopterGeometry: vi.fn(async (_aircraftKey: string, helicopterId: string) => {
+    const group = new THREE.Group();
+    group.userData = { model: 'UH-1 Huey', id: helicopterId };
+    return group;
+  }),
+  createUH1HueyGeometry: vi.fn(async () => {
     const group = new THREE.Group();
     group.userData = { model: 'UH-1 Huey' };
     return group;
@@ -97,6 +105,14 @@ vi.mock('./HelicopterGeometry', () => ({
 }));
 
 vi.mock('../../utils/Logger');
+
+const HELIPAD_POS = new THREE.Vector3(100, 10, 100);
+const HELIPAD_ID = 'us_helipad';
+const HELI_ID = `heli_${HELIPAD_ID}`;
+
+function makeHelipadInfo(id = HELIPAD_ID, pos = HELIPAD_POS): HelipadInfo {
+  return { id, position: pos.clone(), aircraft: 'UH1_HUEY', faction: 'US' };
+}
 
 describe('HelicopterModel', () => {
   let model: HelicopterModel;
@@ -109,13 +125,13 @@ describe('HelicopterModel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     scene = new THREE.Scene();
-    
+
     // Clear the hoisted instances before creating a new model
     mocks.physics = null;
     mocks.animation = null;
     mocks.audio = null;
     mocks.interaction = null;
-    
+
     model = new HelicopterModel(scene);
 
     mockTerrainManager = {
@@ -126,7 +142,8 @@ describe('HelicopterModel', () => {
     } as unknown as ImprovedChunkManager;
 
     mockHelipadSystem = {
-      getHelipadPosition: vi.fn().mockReturnValue(new THREE.Vector3(100, 10, 100)),
+      getHelipadPosition: vi.fn().mockReturnValue(HELIPAD_POS.clone()),
+      getAllHelipads: vi.fn().mockReturnValue([makeHelipadInfo()]),
     } as unknown as HelipadSystem;
 
     mockPlayerController = {
@@ -175,41 +192,44 @@ describe('HelicopterModel', () => {
   });
 
   describe('Helicopter Creation', () => {
-    it('should create helicopter when helipad is ready', () => {
+    it('should create helicopter when helipad is ready', async () => {
       model.setHelipadSystem(mockHelipadSystem);
       model.setTerrainManager(mockTerrainManager);
-      
-      model.createHelicopterWhenReady();
 
-      expect(createUH1HueyGeometry).toHaveBeenCalled();
+      model.createHelicopterWhenReady();
+      await flushPromises();
+
+      expect(createHelicopterGeometry).toHaveBeenCalledWith('UH1_HUEY', HELI_ID);
       expect(scene.children.length).toBe(1);
       expect(model.getAllHelicopters().length).toBe(1);
     });
 
     it('should not create helicopter if systems are missing', () => {
       model.createHelicopterWhenReady();
-      expect(createUH1HueyGeometry).not.toHaveBeenCalled();
+      expect(createHelicopterGeometry).not.toHaveBeenCalled();
     });
 
-    it('should register helicopter for collision detection', () => {
+    it('should register helicopter for collision detection', async () => {
       model.setHelipadSystem(mockHelipadSystem);
       model.setTerrainManager(mockTerrainManager);
-      
-      model.createHelicopterWhenReady();
 
-      expect(mockTerrainManager.registerCollisionObject).toHaveBeenCalledWith('us_huey', expect.any(THREE.Group));
+      model.createHelicopterWhenReady();
+      await flushPromises();
+
+      expect(mockTerrainManager.registerCollisionObject).toHaveBeenCalledWith(HELI_ID, expect.any(THREE.Group));
     });
   });
 
   describe('Getters', () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       model.setHelipadSystem(mockHelipadSystem);
       model.setTerrainManager(mockTerrainManager);
       model.createHelicopterWhenReady();
+      await flushPromises();
     });
 
     it('should return helicopter position', () => {
-      const pos = model.getHelicopterPosition('us_huey');
+      const pos = model.getHelicopterPosition(HELI_ID);
       expect(pos).toBeDefined();
       expect(pos?.x).toBe(100);
       expect(pos?.y).toBe(10);
@@ -223,7 +243,7 @@ describe('HelicopterModel', () => {
 
     it('should copy helicopter position to target vector', () => {
       const target = new THREE.Vector3();
-      const success = model.getHelicopterPositionTo('us_huey', target);
+      const success = model.getHelicopterPositionTo(HELI_ID, target);
       expect(success).toBe(true);
       expect(target.x).toBe(100);
     });
@@ -235,21 +255,21 @@ describe('HelicopterModel', () => {
     });
 
     it('should return helicopter quaternion', () => {
-      const quat = model.getHelicopterQuaternion('us_huey');
+      const quat = model.getHelicopterQuaternion(HELI_ID);
       expect(quat).toBeDefined();
       expect(quat).toBeInstanceOf(THREE.Quaternion);
     });
 
     it('should copy helicopter quaternion to target', () => {
       const target = new THREE.Quaternion();
-      const success = model.getHelicopterQuaternionTo('us_huey', target);
+      const success = model.getHelicopterQuaternionTo(HELI_ID, target);
       expect(success).toBe(true);
     });
 
     it('should return all helicopters', () => {
       const helicopters = model.getAllHelicopters();
       expect(helicopters.length).toBe(1);
-      expect(helicopters[0].id).toBe('us_huey');
+      expect(helicopters[0].id).toBe(HELI_ID);
       expect(helicopters[0].model).toBe('UH-1 Huey');
     });
   });
@@ -260,15 +280,17 @@ describe('HelicopterModel', () => {
       model.setTerrainManager(mockTerrainManager);
     });
 
-    it('should create helicopter in update if it does not exist and terrain is ready', () => {
+    it('should create helicopter in update if it does not exist and terrain is ready', async () => {
       model.update(0.16);
-      expect(createUH1HueyGeometry).toHaveBeenCalled();
+      await flushPromises();
+      expect(createHelicopterGeometry).toHaveBeenCalled();
     });
 
-    it('should update animations, audio, and interactions', () => {
+    it('should update animations, audio, and interactions', async () => {
       model.createHelicopterWhenReady();
+      await flushPromises();
       model.setPlayerController(mockPlayerController);
-      
+
       model.update(0.16);
 
       expect(mocks.animation.updateRotors).toHaveBeenCalled();
@@ -276,11 +298,12 @@ describe('HelicopterModel', () => {
       expect(mocks.interaction.checkPlayerProximity).toHaveBeenCalled();
     });
 
-    it('should update physics when player is in helicopter', () => {
+    it('should update physics when player is in helicopter', async () => {
       model.createHelicopterWhenReady();
+      await flushPromises();
       model.setPlayerController(mockPlayerController);
       vi.mocked(mockPlayerController.isInHelicopter).mockReturnValue(true);
-      vi.mocked(mockPlayerController.getHelicopterId).mockReturnValue('us_huey');
+      vi.mocked(mockPlayerController.getHelicopterId).mockReturnValue(HELI_ID);
 
       model.update(0.16);
 
@@ -288,27 +311,25 @@ describe('HelicopterModel', () => {
       expect(mockPlayerController.updatePlayerPosition).toHaveBeenCalled();
     });
 
-    it('should detect helipad height during physics update when near helipad', () => {
+    it('should detect helipad height during physics update when near helipad', async () => {
       model.setHelipadSystem(mockHelipadSystem);
       model.setTerrainManager(mockTerrainManager);
       model.createHelicopterWhenReady();
+      await flushPromises();
       model.setPlayerController(mockPlayerController);
-      
+
       vi.mocked(mockPlayerController.isInHelicopter).mockReturnValue(true);
-      vi.mocked(mockPlayerController.getHelicopterId).mockReturnValue('us_huey');
-      
-      // Helicopter is at (10, 20, 30) - from physics mock
-      // Helipad is at (100, 10, 100) - from helipad mock
-      // Distance is sqrt((100-10)^2 + (100-30)^2) = sqrt(90^2 + 70^2) = sqrt(8100 + 4900) = sqrt(13000) approx 114
-      // Radius is 15. So it shouldn't detect helipad.
-      
+      vi.mocked(mockPlayerController.getHelicopterId).mockReturnValue(HELI_ID);
+
+      // Physics state position (10, 20, 30) is far from helipad (100, 10, 100) - no helipad height
       model.update(0.16);
       expect(mocks.physics.update).toHaveBeenCalledWith(0.16, 10, undefined);
-      
-      // Now move helipad closer
-      vi.mocked(mockHelipadSystem.getHelipadPosition).mockReturnValue(new THREE.Vector3(15, 10, 35));
-      // Distance = sqrt(5^2 + 5^2) = sqrt(50) approx 7.07 < 15
-      
+
+      // Move helipad closer to physics position
+      vi.mocked(mockHelipadSystem.getAllHelipads).mockReturnValue([
+        makeHelipadInfo(HELIPAD_ID, new THREE.Vector3(15, 10, 35))
+      ]);
+
       model.update(0.16);
       expect(mocks.physics.update).toHaveBeenCalledWith(0.16, 10, 10);
     });
@@ -327,40 +348,43 @@ describe('HelicopterModel', () => {
   });
 
   describe('Physics Controls', () => {
-    it('should set helicopter controls', () => {
+    it('should set helicopter controls', async () => {
       model.setHelipadSystem(mockHelipadSystem);
       model.setTerrainManager(mockTerrainManager);
       model.createHelicopterWhenReady();
+      await flushPromises();
 
       const controls = { collective: 0.8 };
-      model.setHelicopterControls('us_huey', controls);
+      model.setHelicopterControls(HELI_ID, controls);
 
       expect(mocks.physics.setControls).toHaveBeenCalledWith(controls);
     });
 
-    it('should return helicopter state', () => {
+    it('should return helicopter state', async () => {
       model.setHelipadSystem(mockHelipadSystem);
       model.setTerrainManager(mockTerrainManager);
       model.createHelicopterWhenReady();
+      await flushPromises();
 
-      const state = model.getHelicopterState('us_huey');
+      const state = model.getHelicopterState(HELI_ID);
       expect(state).toBeDefined();
       expect(state?.position.y).toBe(20);
     });
   });
 
   describe('Dispose', () => {
-    it('should dispose of all resources', () => {
+    it('should dispose of all resources', async () => {
       model.setHelipadSystem(mockHelipadSystem);
       model.setTerrainManager(mockTerrainManager);
       model.createHelicopterWhenReady();
+      await flushPromises();
 
       model.dispose();
 
       expect(mocks.animation.dispose).toHaveBeenCalled();
       expect(mocks.audio.dispose).toHaveBeenCalled();
       expect(scene.children.length).toBe(0);
-      expect(mockTerrainManager.unregisterCollisionObject).toHaveBeenCalledWith('us_huey');
+      expect(mockTerrainManager.unregisterCollisionObject).toHaveBeenCalledWith(HELI_ID);
     });
   });
 });

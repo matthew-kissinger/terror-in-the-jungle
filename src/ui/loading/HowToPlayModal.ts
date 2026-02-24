@@ -53,7 +53,9 @@ export class HowToPlayModal extends UIComponent {
       <li>Y / Triangle -- Switch weapon</li>
       <li>LB / L1 -- Grenade</li>
       <li>RB / R1 -- Sprint (hold)</li>
-      <li>D-Pad -- Weapon slots</li>
+      <li>D-Pad -- Weapon slots (or squad quick commands from Settings)</li>
+      <li>L3 -- Sprint toggle</li>
+      <li>R3 -- Squad command wheel</li>
       <li>Start -- Menu</li>
       <li>Back -- Scoreboard</li>
     `;

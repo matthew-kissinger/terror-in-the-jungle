@@ -12,6 +12,7 @@ export enum AssetCategory {
   FOLIAGE = 'foliage',
   ENEMY = 'enemy',
   SKYBOX = 'skybox',
+  MODEL = 'model',
   UNKNOWN = 'unknown'
 }
 

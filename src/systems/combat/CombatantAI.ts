@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Combatant, CombatantState, Faction, Squad, SquadCommand } from './types'
+import { Combatant, CombatantState, Faction, Squad, SquadCommand, isBlufor } from './types'
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager'
 import { SandbagSystem } from '../weapons/SandbagSystem'
 import { SmokeCloudSystem } from '../effects/SmokeCloudSystem'
@@ -229,8 +229,7 @@ export class CombatantAI {
    * - FREE_ROAM / NONE: clear command-driven overrides, return to normal AI
    */
   private applySquadCommandOverride(combatant: Combatant, _playerPosition: THREE.Vector3): void {
-    // Only affect US faction (player's team)
-    if (combatant.faction !== Faction.US) return
+    if (!isBlufor(combatant.faction)) return
     if (!combatant.squadId) return
 
     const squad = this.squads.get(combatant.squadId)

@@ -19,6 +19,9 @@ import { LOADING_PHASES } from '../../config/loading';
 import { MODE_CARD_CONFIGS } from './ModeCard';
 import styles from './StartScreen.module.css';
 
+const START_SCREEN_IMAGE_URL = '/assets/ui/screens/start-screen.webp';
+const LOADING_SCREEN_IMAGE_URL = '/assets/ui/screens/loading-screen.webp';
+
 export class StartScreen extends UIComponent {
   private settingsModal: SettingsModal;
   private howToPlayModal: HowToPlayModal;
@@ -40,11 +43,21 @@ export class StartScreen extends UIComponent {
 
   // Error panel (appended outside root)
   private errorPanel: HTMLDivElement | null = null;
+  private menuGamepadRafId: number | null = null;
+  private prevGamepadButtons = { a: false, dpadLeft: false, dpadRight: false };
+  private quickStartHintText = '';
+  private readonly modeOrder: GameMode[] = [
+    GameMode.ZONE_CONTROL,
+    GameMode.OPEN_FRONTIER,
+    GameMode.TEAM_DEATHMATCH,
+    GameMode.A_SHAU_VALLEY,
+  ];
 
   constructor() {
     super();
     this.settingsModal = new SettingsModal();
     this.howToPlayModal = new HowToPlayModal();
+    this.preloadScreenImages();
   }
 
   protected build(): void {
@@ -87,6 +100,7 @@ export class StartScreen extends UIComponent {
             <button class="${styles.menuButton} ${styles.secondaryButton}" data-ref="settings">SETTINGS</button>
             <button class="${styles.menuButton} ${styles.secondaryButton}" data-ref="howToPlay">CONTROLS</button>
           </div>
+          <div class="${styles.quickStartHint}" data-ref="quickStartHint"></div>
         </div>
       </div>
 
@@ -100,7 +114,8 @@ export class StartScreen extends UIComponent {
       this.$('[data-ref="fill"]') as HTMLDivElement,
       this.$('[data-ref="percent"]') as HTMLSpanElement,
       this.$('[data-ref="phase"]') as HTMLDivElement,
-      this.$('[data-ref="tip"]') as HTMLDivElement
+      this.$('[data-ref="tip"]') as HTMLDivElement,
+      this.$('[data-ref="loadTime"]') as HTMLSpanElement | null
     );
 
     // Cache mode cards
@@ -146,12 +161,16 @@ export class StartScreen extends UIComponent {
       this.listen(howToPlayBtn, 'click', (e) => e.preventDefault());
     }
 
+    this.listen(window, 'keydown', this.handleMenuKeyDown);
+    this.startMenuGamepadLoop();
+
     // Start init timeout
     this.startInitTimeout();
   }
 
   protected onUnmount(): void {
     this.dismissFullscreenPrompt();
+    this.stopMenuGamepadLoop();
     this.clearInitTimeout();
   }
 
@@ -175,6 +194,7 @@ export class StartScreen extends UIComponent {
     if (modeSection) modeSection.classList.add(styles.modeSelectionVisible);
 
     this.progress.showComplete();
+    this.updateQuickStartHint();
 
     if (isTouchDevice()) this.showFullscreenPrompt();
   }
@@ -257,6 +277,7 @@ export class StartScreen extends UIComponent {
 
   override dispose(): void {
     this.dismissFullscreenPrompt();
+    this.stopMenuGamepadLoop();
     this.clearInitTimeout();
 
     if (this.errorPanel) {
@@ -283,6 +304,24 @@ export class StartScreen extends UIComponent {
     }
     this.dismissFullscreenPrompt();
     if (this.onPlayCallback) this.onPlayCallback(this.selectedGameMode);
+  };
+
+  private handleMenuKeyDown = (event: KeyboardEvent): void => {
+    if (!this.isMenuInteractive()) return;
+    if (event.code === 'Enter' || event.code === 'Space') {
+      event.preventDefault();
+      this.handlePlayClick();
+      return;
+    }
+    if (event.code === 'ArrowRight') {
+      event.preventDefault();
+      this.cycleGameMode(1);
+      return;
+    }
+    if (event.code === 'ArrowLeft') {
+      event.preventDefault();
+      this.cycleGameMode(-1);
+    }
   };
 
   private resolveGameMode(mode: string): GameMode {
@@ -314,6 +353,13 @@ export class StartScreen extends UIComponent {
 
     const playBtn = this.$('[data-ref="play"]');
     if (playBtn) playBtn.textContent = `DEPLOY -- ${modeName}`;
+  }
+
+  private cycleGameMode(direction: 1 | -1): void {
+    const currentIndex = this.modeOrder.indexOf(this.selectedGameMode);
+    const safeCurrent = currentIndex >= 0 ? currentIndex : 0;
+    const nextIndex = (safeCurrent + direction + this.modeOrder.length) % this.modeOrder.length;
+    this.selectGameMode(this.modeOrder[nextIndex]);
   }
 
   // --- Mode card HTML builder ---
@@ -394,6 +440,75 @@ export class StartScreen extends UIComponent {
     if (this.fullscreenPrompt?.parentElement) {
       this.fullscreenPrompt.remove();
       this.fullscreenPrompt = null;
+    }
+  }
+
+  private isMenuInteractive(): boolean {
+    const buttons = this.$('[data-ref="menuButtons"]');
+    return !!buttons && buttons.classList.contains(styles.menuButtonsVisible);
+  }
+
+  private startMenuGamepadLoop(): void {
+    if (this.menuGamepadRafId !== null) return;
+    const tick = () => {
+      this.menuGamepadRafId = requestAnimationFrame(tick);
+      if (!this.isVisible || !this.isMenuInteractive()) return;
+      this.updateQuickStartHint();
+      if (typeof navigator.getGamepads !== 'function') return;
+      const pads = navigator.getGamepads();
+      const gp = pads.find((pad) => !!pad);
+      if (!gp) return;
+
+      const aPressed = gp.buttons[0]?.pressed ?? false;
+      const leftPressed = gp.buttons[14]?.pressed ?? false;
+      const rightPressed = gp.buttons[15]?.pressed ?? false;
+
+      if (aPressed && !this.prevGamepadButtons.a) this.handlePlayClick();
+      if (leftPressed && !this.prevGamepadButtons.dpadLeft) this.cycleGameMode(-1);
+      if (rightPressed && !this.prevGamepadButtons.dpadRight) this.cycleGameMode(1);
+
+      this.prevGamepadButtons.a = aPressed;
+      this.prevGamepadButtons.dpadLeft = leftPressed;
+      this.prevGamepadButtons.dpadRight = rightPressed;
+    };
+    this.menuGamepadRafId = requestAnimationFrame(tick);
+  }
+
+  private stopMenuGamepadLoop(): void {
+    if (this.menuGamepadRafId !== null) {
+      cancelAnimationFrame(this.menuGamepadRafId);
+      this.menuGamepadRafId = null;
+    }
+    this.prevGamepadButtons = { a: false, dpadLeft: false, dpadRight: false };
+  }
+
+  private preloadScreenImages(): void {
+    const links: string[] = [START_SCREEN_IMAGE_URL, LOADING_SCREEN_IMAGE_URL];
+    for (const href of links) {
+      if (document.querySelector(`link[data-screen-preload="${href}"]`)) continue;
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.as = 'image';
+      link.href = href;
+      link.setAttribute('data-screen-preload', href);
+      document.head.appendChild(link);
+    }
+  }
+
+  private updateQuickStartHint(): void {
+    const hintEl = this.$('[data-ref="quickStartHint"]');
+    if (!hintEl) return;
+    let text: string;
+    if (isTouchDevice()) {
+      text = 'Tap DEPLOY to enter battle.';
+    } else if (typeof navigator.getGamepads === 'function' && navigator.getGamepads().some(p => !!p)) {
+      text = 'Gamepad: A/Cross deploys, D-pad left/right changes mode.';
+    } else {
+      text = 'Keyboard: Enter deploys, Left/Right arrows change mode.';
+    }
+    if (text !== this.quickStartHintText) {
+      this.quickStartHintText = text;
+      hintEl.textContent = text;
     }
   }
 

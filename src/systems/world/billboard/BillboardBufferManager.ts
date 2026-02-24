@@ -80,8 +80,8 @@ export class GPUBillboardVegetation {
         maxDistance: { value: config.maxDistance },
         lodDistances: { value: new THREE.Vector2(150, 300) },
         viewMatrix: { value: new THREE.Matrix4() },
-        colorTint: { value: new THREE.Color(0.65, 0.7, 0.62) },
-        gammaAdjust: { value: 1.2 },
+        colorTint: { value: new THREE.Color(0.92, 0.94, 0.88) },
+        gammaAdjust: { value: 1.0 },
         // Height fog uniforms - creates ground-level mist effect
         fogColor: { value: new THREE.Color(0x5a7a6a) },
         fogDensity: { value: 0.006 },        // How much fog accumulates with distance

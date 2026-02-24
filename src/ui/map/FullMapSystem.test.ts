@@ -595,7 +595,7 @@ describe('FullMapSystem', () => {
     });
 
     it('should draw OPFOR combatants with correct color', () => {
-      const opforCombatant = createTestCombatant({ faction: Faction.OPFOR });
+      const opforCombatant = createTestCombatant({ faction: Faction.NVA });
       mockCombatantSystem.getAllCombatants = vi.fn(() => [opforCombatant]);
       system.setCombatantSystem(mockCombatantSystem);
       

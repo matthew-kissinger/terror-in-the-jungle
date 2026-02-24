@@ -92,9 +92,10 @@ export class DayNightCycle implements GameSystem {
       const sunLight = this.renderer.moonLight;
       
       // Position: Rotate around scene based on time
-      // At noon (12h): high in sky (y=80)
-      // At midnight (0h/24h): opposite side or low
-      const angle = ((time - 6) / 24) * Math.PI * 2; // 6am = horizon
+      // At noon (12h): directly overhead (y=80)
+      // At 6am/6pm: on the horizon (y≈0)
+      // angle=0 → directly overhead; angle=±π/2 → horizon
+      const angle = ((time - 12) / 24) * Math.PI * 2;
       const distance = 80;
       sunLight.position.set(
         Math.sin(angle) * distance * 0.5,
@@ -107,7 +108,7 @@ export class DayNightCycle implements GameSystem {
         // Daytime (6am - 6pm)
         const dayProgress = (time - 6) / 12;
         const dayIntensity = Math.sin(dayProgress * Math.PI); // 0 at dawn/dusk, 1 at noon
-        sunLight.intensity = 0.3 + dayIntensity * 0.7; // 0.3 to 1.0
+        sunLight.intensity = 0.4 + dayIntensity * 1.6; // 0.4 at dawn/dusk, 2.0 at noon
       } else {
         // Nighttime
         sunLight.intensity = 0.05 + (Math.random() * 0.02); // Minimal moonlight with flicker
@@ -148,8 +149,8 @@ export class DayNightCycle implements GameSystem {
     
     // === AMBIENT LIGHT ===
     if (this.renderer.ambientLight) {
-      // Intensity: 0.5 day, 0.15 night
-      const dayIntensity = 0.5;
+      // Intensity: 1.0 day, 0.15 night
+      const dayIntensity = 1.0;
       const nightIntensity = 0.15;
       this.renderer.ambientLight.intensity =
         nightIntensity + (1 - nightFactor) * (dayIntensity - nightIntensity);
@@ -164,8 +165,8 @@ export class DayNightCycle implements GameSystem {
     
     // === HEMISPHERE LIGHT ===
     if (this.renderer.hemisphereLight) {
-      // Intensity: 0.5 day, 0.2 night
-      const dayIntensity = 0.5;
+      // Intensity: 0.8 day, 0.2 night
+      const dayIntensity = 0.8;
       const nightIntensity = 0.2;
       this.renderer.hemisphereLight.intensity = 
         nightIntensity + (1 - nightFactor) * (dayIntensity - nightIntensity);

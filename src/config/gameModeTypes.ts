@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { Faction } from '../systems/combat/types';
+import { Faction, Alliance } from '../systems/combat/types';
+import { TerrainConfig } from './biomes';
 
 export enum GameMode {
   ZONE_CONTROL = 'zone_control',
@@ -119,6 +120,23 @@ export interface GameModeConfig {
   // Optional scale overrides for large maps
   scaleConfig?: ScaleConfig;
 
+  // Terrain biome / vegetation configuration
+  terrain?: TerrainConfig;
+
+  // Helipad placements - where helicopters spawn on the map
+  helipads?: Array<{
+    id: string;
+    position: THREE.Vector3;
+    aircraft: string; // key from AircraftModels (e.g. 'UH1_HUEY')
+  }>;
+
   // Optional war simulator for persistent large-scale battles
   warSimulator?: WarSimulatorConfig;
+
+  // Faction composition per alliance. Defines which factions spawn on each side.
+  // If omitted, defaults to { blufor: [US], opfor: [VC] }.
+  factionMix?: {
+    [Alliance.BLUFOR]: Faction[];
+    [Alliance.OPFOR]: Faction[];
+  };
 }

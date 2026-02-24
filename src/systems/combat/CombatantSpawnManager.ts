@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction, SquadCommand } from './types';
+import { Combatant, CombatantState, Faction, Alliance, isBlufor, isOpfor, SquadCommand } from './types';
 import { CombatantFactory } from './CombatantFactory';
 import { SquadManager } from './SquadManager';
 import { SpatialOctree } from './SpatialOctree';
@@ -92,6 +92,17 @@ export class CombatantSpawnManager {
   }
 
   /**
+   * Pick an OPFOR faction from the current game mode's factionMix config.
+   * Falls back to NVA if not configured.
+   */
+  private pickOpforFaction(): Faction {
+    const config = this.gameModeManager?.getCurrentConfig();
+    const opforFactions = config?.factionMix?.[Alliance.OPFOR];
+    if (!opforFactions || opforFactions.length === 0) return Faction.NVA;
+    return opforFactions[Math.floor(Math.random() * opforFactions.length)];
+  }
+
+  /**
    * Spawn initial forces for both factions
    */
   spawnInitialForces(shouldCreatePlayerSquad: boolean, _playerSquadId?: string): string | undefined {
@@ -119,8 +130,8 @@ export class CombatantSpawnManager {
       initialSquadsPerFaction = Math.max(2, initialSquadsPerFaction);
     }
 
-    const usHQs = SpawnPositionCalculator.getHQZonesForFaction(Faction.US, config);
-    const opforHQs = SpawnPositionCalculator.getHQZonesForFaction(Faction.OPFOR, config);
+    const usHQs = SpawnPositionCalculator.getHQZonesForAlliance(Alliance.BLUFOR, config);
+    const opforHQs = SpawnPositionCalculator.getHQZonesForAlliance(Alliance.OPFOR, config);
     const { usBasePos, opforBasePos } = SpawnPositionCalculator.getBasePositions(config);
     let initialUSSquads = initialSquadsPerFaction;
     const initialOPFORSquads = initialSquadsPerFaction;
@@ -154,7 +165,7 @@ export class CombatantSpawnManager {
         this.spawnSquad(Faction.US, usBasePos, avgSquadSize);
       }
       for (let i = 0; i < initialOPFORSquads; i++) {
-        this.spawnSquad(Faction.OPFOR, opforBasePos, avgSquadSize);
+        this.spawnSquad(this.pickOpforFaction(), opforBasePos, avgSquadSize);
       }
     } else {
       // Distribute squads across all configured HQs.
@@ -166,7 +177,7 @@ export class CombatantSpawnManager {
         }
         if (i < initialOPFORSquads) {
           const posOP = _scratchVec.copy(opforHQs[i % opforHQs.length].position).add(SpawnPositionCalculator.randomSpawnOffset(20, 40));
-          this.spawnSquad(Faction.OPFOR, posOP, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
+          this.spawnSquad(this.pickOpforFaction(), posOP, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
         }
       }
     }
@@ -232,7 +243,7 @@ export class CombatantSpawnManager {
     if (this.reinforcementWaveTimer >= this.reinforcementWaveIntervalSeconds) {
       this.reinforcementWaveTimer = 0;
       this.spawnReinforcementWave(Faction.US);
-      this.spawnReinforcementWave(Faction.OPFOR);
+      this.spawnReinforcementWave(this.pickOpforFaction());
     }
 
     // Periodic cleanup and refill
@@ -312,8 +323,8 @@ export class CombatantSpawnManager {
       }
     };
 
-    ensureFactionStrength(Faction.US, counts.us);
-    ensureFactionStrength(Faction.OPFOR, counts.opfor);
+    ensureFactionStrength(Faction.US, counts.blufor);
+    ensureFactionStrength(this.pickOpforFaction(), counts.opfor);
   }
 
   /**
@@ -365,9 +376,10 @@ export class CombatantSpawnManager {
     opforBasePos: THREE.Vector3,
     avgSquadSize: number
   ): Array<{faction: Faction, position: THREE.Vector3, size: number}> {
+    const opfor = this.pickOpforFaction();
     const defaultQueue = [
       { faction: Faction.US, position: new THREE.Vector3(usBasePos.x + 10, usBasePos.y, usBasePos.z + 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) },
-      { faction: Faction.OPFOR, position: new THREE.Vector3(opforBasePos.x - 10, opforBasePos.y, opforBasePos.z - 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) }
+      { faction: opfor, position: new THREE.Vector3(opforBasePos.x - 10, opforBasePos.y, opforBasePos.z - 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) }
     ];
 
     if (config?.id !== 'open_frontier') {
@@ -398,11 +410,11 @@ export class CombatantSpawnManager {
     const pushSize = Math.max(3, Math.floor(avgSquadSize * 0.7));
     const pressureQueue: Array<{faction: Faction, position: THREE.Vector3, size: number}> = [
       { faction: Faction.US, position: createForwardPoint(usBasePos, laneDistance * 0.24, -55), size: pushSize },
-      { faction: Faction.OPFOR, position: createBackwardPoint(opforBasePos, laneDistance * 0.24, 55), size: pushSize },
+      { faction: opfor, position: createBackwardPoint(opforBasePos, laneDistance * 0.24, 55), size: pushSize },
       { faction: Faction.US, position: createForwardPoint(usBasePos, laneDistance * 0.34, 45), size: pushSize },
-      { faction: Faction.OPFOR, position: createBackwardPoint(opforBasePos, laneDistance * 0.34, -45), size: pushSize },
+      { faction: opfor, position: createBackwardPoint(opforBasePos, laneDistance * 0.34, -45), size: pushSize },
       { faction: Faction.US, position: createForwardPoint(usBasePos, laneDistance * 0.42, -20), size: Math.max(2, Math.floor(avgSquadSize * 0.5)) },
-      { faction: Faction.OPFOR, position: createBackwardPoint(opforBasePos, laneDistance * 0.42, 20), size: Math.max(2, Math.floor(avgSquadSize * 0.5)) }
+      { faction: opfor, position: createBackwardPoint(opforBasePos, laneDistance * 0.42, 20), size: Math.max(2, Math.floor(avgSquadSize * 0.5)) }
     ];
 
     return pressureQueue;
@@ -416,8 +428,8 @@ export class CombatantSpawnManager {
     }
 
     const { usBasePos, opforBasePos } = SpawnPositionCalculator.getBasePositions(config);
-    const ownBase = faction === Faction.US ? usBasePos : opforBasePos;
-    const enemyBase = faction === Faction.US ? opforBasePos : usBasePos;
+    const ownBase = isBlufor(faction) ? usBasePos : opforBasePos;
+    const enemyBase = isBlufor(faction) ? opforBasePos : usBasePos;
 
     const lane = _scratchVec.copy(enemyBase).sub(ownBase);
     const laneDistance = lane.length();
@@ -477,14 +489,14 @@ export class CombatantSpawnManager {
     return SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax);
   }
 
-  private countLivingByFaction(): { us: number; opfor: number } {
-    let us = 0, opfor = 0;
+  private countLivingByFaction(): { blufor: number; opfor: number } {
+    let blufor = 0, opfor = 0;
     for (const c of this.combatants.values()) {
       if (c.state === CombatantState.DEAD) continue;
-      if (c.faction === Faction.US) us++;
-      else if (c.faction === Faction.OPFOR) opfor++;
+      if (isBlufor(c.faction)) blufor++;
+      else if (isOpfor(c.faction)) opfor++;
     }
-    return { us, opfor };
+    return { blufor, opfor };
   }
 
   setAutonomousSpawningEnabled(enabled: boolean): void {

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Faction } from './types';
+import { Faction, Alliance, getAlliance, isBlufor } from './types';
 import { ZoneManager, ZoneState, CaptureZone } from '../world/ZoneManager';
 import { GameModeConfig } from '../../config/gameModes';
 import { Logger } from '../../utils/Logger';
@@ -21,11 +21,11 @@ export class SpawnPositionCalculator {
     if (gameModeConfig) {
       // Find main bases for each faction
       const usBase = gameModeConfig.zones.find(z =>
-        z.isHomeBase && z.owner === Faction.US &&
+        z.isHomeBase && z.owner !== null && isBlufor(z.owner as Faction) &&
         (z.id.includes('main') || z.id === 'us_base')
       );
       const opforBase = gameModeConfig.zones.find(z =>
-        z.isHomeBase && z.owner === Faction.OPFOR &&
+        z.isHomeBase && z.owner !== null && !isBlufor(z.owner as Faction) &&
         (z.id.includes('main') || z.id === 'opfor_base')
       );
 
@@ -52,9 +52,10 @@ export class SpawnPositionCalculator {
   ): THREE.Vector3 {
     if (zoneManager) {
       const allZones = zoneManager.getAllZones();
+      const factionAlliance = getAlliance(faction);
       const ownedBases: CaptureZone[] = [];
       for (const z of allZones) {
-        if (z.owner === faction && z.isHomeBase) {
+        if (z.owner !== null && getAlliance(z.owner as Faction) === factionAlliance && z.isHomeBase) {
           ownedBases.push(z);
         }
       }
@@ -79,7 +80,7 @@ export class SpawnPositionCalculator {
     }
 
     const { usBasePos, opforBasePos } = this.getBasePositions(gameModeConfig);
-    const basePos = faction === Faction.US ? usBasePos : opforBasePos;
+    const basePos = isBlufor(faction) ? usBasePos : opforBasePos;
 
     const angle = Math.random() * Math.PI * 2;
     const radius = 20 + Math.random() * 30;
@@ -103,13 +104,14 @@ export class SpawnPositionCalculator {
   ): THREE.Vector3 {
     if (zoneManager) {
       const allZones = zoneManager.getAllZones();
+      const factionAlliance = getAlliance(faction);
       
       let contestedAnchor: CaptureZone | null = null;
       let capturedAnchor: CaptureZone | null = null;
       let hqAnchor: CaptureZone | null = null;
 
       for (const z of allZones) {
-        if (z.owner !== faction) continue;
+        if (z.owner === null || getAlliance(z.owner as Faction) !== factionAlliance) continue;
 
         if (z.isHomeBase) {
           if (!hqAnchor) hqAnchor = z;
@@ -141,7 +143,7 @@ export class SpawnPositionCalculator {
 
     // Fallback: spawn at fixed base positions
     const { usBasePos, opforBasePos } = this.getBasePositions(gameModeConfig);
-    const basePos = faction === Faction.US ? usBasePos : opforBasePos;
+    const basePos = isBlufor(faction) ? usBasePos : opforBasePos;
 
     // Add random offset around the base
     const angle = Math.random() * Math.PI * 2;
@@ -162,12 +164,13 @@ export class SpawnPositionCalculator {
   static getFactionAnchors(faction: Faction, zoneManager?: ZoneManager): THREE.Vector3[] {
     if (!zoneManager) return [];
     
+    const factionAlliance = getAlliance(faction);
     const contested: THREE.Vector3[] = [];
     const captured: THREE.Vector3[] = [];
     const hqs: THREE.Vector3[] = [];
 
     for (const z of zoneManager.getAllZones()) {
-      if (z.owner !== faction) continue;
+      if (z.owner === null || getAlliance(z.owner as Faction) !== factionAlliance) continue;
       
       if (z.isHomeBase) {
         hqs.push(z.position);
@@ -182,15 +185,15 @@ export class SpawnPositionCalculator {
   }
 
   /**
-   * Get HQ zones defined in game mode config
+   * Get HQ zones defined in game mode config for an alliance
    */
-  static getHQZonesForFaction(faction: Faction, config?: GameModeConfig): Array<{ position: THREE.Vector3 }> {
+  static getHQZonesForAlliance(alliance: Alliance, config?: GameModeConfig): Array<{ position: THREE.Vector3 }> {
     const zones = config?.zones;
     if (!zones) return [];
     
     const hqs: Array<{ position: THREE.Vector3 }> = [];
     for (const z of zones) {
-      if (z.isHomeBase && z.owner === faction) {
+      if (z.isHomeBase && z.owner !== null && getAlliance(z.owner as Faction) === alliance) {
         hqs.push({ position: z.position });
       }
     }

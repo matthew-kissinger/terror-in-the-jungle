@@ -1,6 +1,7 @@
 import { Logger } from '../utils/Logger';
 import type { GameEngine } from './GameEngine';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
+import { InputContextManager } from '../systems/input/InputContextManager';
 
 let engineRef: GameEngine | null = null;
 let listenersAttached = false;
@@ -12,6 +13,17 @@ function handleResize(): void {
 
 function handleKeyDown(event: KeyboardEvent): void {
   if (!engineRef) return;
+  const context = InputContextManager.getInstance().getContext();
+  const isDebugKey =
+    event.key === 'F1' ||
+    event.key === 'F2' ||
+    event.key === 'F3' ||
+    event.key === 'F4' ||
+    event.key === 'p' ||
+    event.key === 'P' ||
+    event.key === '[' ||
+    event.key === ']';
+  if (context !== 'gameplay' && !isDebugKey) return;
 
   if (event.key === 'F1') {
     togglePerformanceStats(engineRef);

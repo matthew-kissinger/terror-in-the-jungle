@@ -65,7 +65,7 @@ describe('MatchEndScreen', () => {
   });
 
   it('shows DEFEAT when OPFOR wins', () => {
-    screen.show(Faction.OPFOR, makeGameState({ winner: Faction.OPFOR }), makeStats());
+    screen.show(Faction.NVA, makeGameState({ winner: Faction.NVA }), makeStats());
     const title = document.querySelector('.title');
     expect(title?.textContent).toBe('DEFEAT');
     expect(document.querySelector('.screen.defeat')).toBeTruthy();
@@ -125,7 +125,7 @@ describe('MatchEndScreen', () => {
 
   it('show() replaces any existing end screen', () => {
     screen.show(Faction.US, makeGameState(), makeStats());
-    screen.show(Faction.OPFOR, makeGameState({ winner: Faction.OPFOR }), makeStats());
+    screen.show(Faction.NVA, makeGameState({ winner: Faction.NVA }), makeStats());
     const containers = document.querySelectorAll('.screen');
     expect(containers).toHaveLength(1);
     expect(document.querySelector('.title')?.textContent).toBe('DEFEAT');

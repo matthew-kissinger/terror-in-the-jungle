@@ -2,7 +2,8 @@
  * @vitest-environment jsdom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { GamepadManager, GamepadButton, GamepadAxis } from './GamepadManager';
+import { GamepadManager, GamepadButton } from './GamepadManager';
+import { SettingsManager } from '../../config/SettingsManager';
 
 // ---------- Mock helpers ----------
 
@@ -61,6 +62,8 @@ describe('GamepadManager', () => {
   let mgr: GamepadManager;
 
   beforeEach(() => {
+    localStorage.removeItem('pixelart-sandbox-settings');
+    (SettingsManager as any).instance = null;
     gamepads = [null, null, null, null];
     // Define navigator.getGamepads if it doesn't exist (jsdom)
     if (typeof navigator.getGamepads !== 'function') {
@@ -224,6 +227,31 @@ describe('GamepadManager', () => {
       mgr.poll();
       expect(cb.onWeaponSlot).toHaveBeenCalledWith(1);
     });
+
+    it('fires squad quick command when D-pad mode is quickCommands', () => {
+      SettingsManager.getInstance().set('controllerDpadMode', 'quickCommands');
+      const cb = { onWeaponSlot: vi.fn(), onSquadQuickCommand: vi.fn() };
+      mgr.setCallbacks(cb);
+
+      setGamepad(buildGamepad([0, 0, 0, 0], { [GamepadButton.DPAD_LEFT]: mockButton(true) }));
+      mgr.poll();
+      expect(cb.onSquadQuickCommand).toHaveBeenCalledWith(4);
+      expect(cb.onWeaponSlot).not.toHaveBeenCalled();
+    });
+  });
+
+  it('supports southpaw stick preset for look/move', () => {
+    SettingsManager.getInstance().set('controllerPreset', 'southpaw');
+    const gp = buildGamepad();
+    setGamepad(gp);
+    window.dispatchEvent(new GamepadEvent('gamepadconnected', { gamepad: gp }));
+
+    setGamepad(buildGamepad([0.5, 0, 0.9, 0]));
+    mgr.poll();
+    const movement = mgr.getMovementVector();
+    const look = mgr.consumeLookDelta();
+    expect(movement.x).toBeGreaterThan(0.7);
+    expect(look.x).not.toBe(0);
   });
 
   describe('analog triggers', () => {

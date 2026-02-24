@@ -2,6 +2,8 @@
  * Enhanced hit marker feedback system with animations and screen effects
  */
 
+import { zIndex } from '../design/tokens';
+
 export type HitMarkerType = 'hit' | 'headshot' | 'kill';
 
 export class HitMarkerFeedback {
@@ -19,7 +21,7 @@ export class HitMarkerFeedback {
       width: 100vw;
       height: 100vh;
       pointer-events: none;
-      z-index: 200;
+      z-index: ${zIndex.hudFeedback};
     `;
 
     // Create vignette overlay for kill flashes
@@ -33,7 +35,7 @@ export class HitMarkerFeedback {
       height: 100vh;
       pointer-events: none;
       opacity: 0;
-      z-index: 199;
+      z-index: ${zIndex.hudOverlay};
       background: radial-gradient(circle at center, transparent 0%, rgba(255, 0, 0, 0.3) 100%);
     `;
 

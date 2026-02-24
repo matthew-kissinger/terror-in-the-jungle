@@ -23,6 +23,10 @@
     "perf:capture:combat120:nosecondaryspatial": "npx tsx scripts/perf-capture.ts --headed --mode ai_sandbox --npcs 120 --duration 90 --warmup 15 --spatial-secondary-sync false",
     "perf:capture:frontier30m": "npx tsx scripts/perf-capture.ts --headed --mode open_frontier --npcs 120 --duration 1800 --warmup 30 --sample-interval-ms 2000 --detail-every-samples 5 --runtime-preflight false",
     "perf:analyze:latest": "npx tsx scripts/perf-analyze-latest.ts",
+    "assets:optimize": "npx tsx scripts/optimize-assets.ts",
+    "assets:optimize:vegetation": "npx tsx scripts/optimize-assets.ts --category vegetation --force",
+    "assets:optimize:dry": "npx tsx scripts/optimize-assets.ts --dry-run",
+    "ui:matrix": "npx tsx scripts/ui-device-matrix.ts",
     "test": "vitest",
     "test:run": "vitest run"
   },
@@ -38,6 +42,7 @@
     "playwright": "^1.58.2",
     "pngjs": "^7.0.0",
     "shapefile": "^0.6.6",
+    "sharp": "^0.34.5",
     "shpjs": "^6.2.0",
     "speedscope": "^1.25.0",
     "tsx": "^4.21.0",
@@ -48,7 +53,6 @@
   },
   "dependencies": {
     "@preact/signals-core": "^1.13.0",
-    "postprocessing": "^6.38.2",
     "three": "^0.182.0",
     "three-mesh-bvh": "^0.9.8"
   }

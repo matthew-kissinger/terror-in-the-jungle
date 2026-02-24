@@ -16,10 +16,18 @@ export class WeaponReload {
   private magazineRef?: THREE.Object3D
   private audioManager?: AudioManager
 
+  // Stored base position/rotation from the magazine ref (supports GLBs with non-default positions)
+  private magBasePos = { x: 0.2, y: -0.25, z: 0 }
+  private magBaseRot = { x: 0, y: 0, z: 0.1 }
+
   constructor() {}
 
   setMagazineRef(ref: THREE.Object3D | undefined): void {
     this.magazineRef = ref
+    if (ref) {
+      this.magBasePos = { x: ref.position.x, y: ref.position.y, z: ref.position.z }
+      this.magBaseRot = { x: ref.rotation.x, y: ref.rotation.y, z: ref.rotation.z }
+    }
   }
 
   setAudioManager(audioManager: AudioManager): void {
@@ -57,10 +65,10 @@ export class WeaponReload {
       this.magazineOffset = { x: 0, y: 0, z: 0 }
       this.magazineRotation = { x: 0, y: 0, z: 0 }
 
-      // Reset magazine to default position
+      // Reset magazine to its original position
       if (this.magazineRef) {
-        this.magazineRef.position.set(0.2, -0.25, 0)
-        this.magazineRef.rotation.set(0, 0, 0.1)
+        this.magazineRef.position.set(this.magBasePos.x, this.magBasePos.y, this.magBasePos.z)
+        this.magazineRef.rotation.set(this.magBaseRot.x, this.magBaseRot.y, this.magBaseRot.z)
       }
       return
     }
@@ -165,15 +173,15 @@ export class WeaponReload {
       this.magazineRotation.z = 0
     }
 
-    // Update magazine position if it exists
+    // Update magazine position if it exists (offset from stored base)
     if (this.magazineRef) {
-      this.magazineRef.position.x = 0.2 + this.magazineOffset.x
-      this.magazineRef.position.y = -0.25 + this.magazineOffset.y
-      this.magazineRef.position.z = 0 + this.magazineOffset.z
+      this.magazineRef.position.x = this.magBasePos.x + this.magazineOffset.x
+      this.magazineRef.position.y = this.magBasePos.y + this.magazineOffset.y
+      this.magazineRef.position.z = this.magBasePos.z + this.magazineOffset.z
 
-      this.magazineRef.rotation.x = this.magazineRotation.x
-      this.magazineRef.rotation.y = this.magazineRotation.y
-      this.magazineRef.rotation.z = 0.1 + this.magazineRotation.z
+      this.magazineRef.rotation.x = this.magBaseRot.x + this.magazineRotation.x
+      this.magazineRef.rotation.y = this.magBaseRot.y + this.magazineRotation.y
+      this.magazineRef.rotation.z = this.magBaseRot.z + this.magazineRotation.z
     }
   }
 

@@ -3,6 +3,7 @@
  */
 
 import { MIN_ZOOM, MAX_ZOOM } from './FullMapStyles';
+import { InputContextManager } from '../../systems/input/InputContextManager';
 
 export interface FullMapInputCallbacks {
   onShow: () => void;
@@ -23,6 +24,7 @@ export class FullMapInput {
   private callbacks: FullMapInputCallbacks;
   private isVisible = false;
   private mapCanvas?: HTMLCanvasElement;
+  private readonly contextManager = InputContextManager.getInstance();
 
   // Pan offset (in canvas pixels, applied before zoom)
   private panX = 0;
@@ -90,10 +92,12 @@ export class FullMapInput {
     if (e.key === 'm' || e.key === 'M') {
       if (!e.repeat) {
         this.isVisible = true;
+        this.contextManager.setContext('map');
         this.callbacks.onShow();
       }
     } else if (e.key === 'Escape' && this.isVisible) {
       this.isVisible = false;
+      this.contextManager.setContext('gameplay');
       this.callbacks.onHide();
     }
   }
@@ -101,6 +105,7 @@ export class FullMapInput {
   private handleKeyUp(e: KeyboardEvent): void {
     if (e.key === 'm' || e.key === 'M') {
       this.isVisible = false;
+      this.contextManager.setContext('gameplay');
       this.callbacks.onHide();
     }
   }
@@ -267,6 +272,7 @@ export class FullMapInput {
 
   setIsVisible(visible: boolean): void {
     this.isVisible = visible;
+    this.contextManager.setContext(visible ? 'map' : 'gameplay');
     if (!visible) {
       // Reset gesture state when map is hidden
       this.gestureState = GestureState.IDLE;
@@ -278,9 +284,11 @@ export class FullMapInput {
   toggle(): void {
     if (this.isVisible) {
       this.isVisible = false;
+      this.contextManager.setContext('gameplay');
       this.callbacks.onHide();
     } else {
       this.isVisible = true;
+      this.contextManager.setContext('map');
       this.callbacks.onShow();
     }
   }

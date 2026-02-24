@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, Faction } from './types';
+import { Combatant, Faction, isBlufor, isOpfor } from './types';
 import { CaptureZone } from '../world/ZoneManager';
 import { InfluenceCell } from './InfluenceMapGrid';
 import { InfluenceMapGrid } from './InfluenceMapGrid';
@@ -34,7 +34,7 @@ export function computeThreatLevel(params: ComputationParams): void {
 
   combatants.forEach(combatant => {
     // Only enemies contribute to threat
-    if (combatant.faction === Faction.US) return;
+    if (isBlufor(combatant.faction)) return;
     if (combatant.state === 'dead') return;
 
     _v2a.set(combatant.position.x, combatant.position.z);
@@ -111,7 +111,7 @@ export function computeOpportunityLevel(params: ComputationParams): void {
       zoneValue = 1.5;
     }
     // Enemy-owned zones are high priority
-    else if (zone.owner === Faction.OPFOR) {
+    else if (zone.owner !== null && isOpfor(zone.owner as Faction)) {
       zoneValue = 1.2;
     }
     // Neutral zones are medium priority
@@ -119,7 +119,7 @@ export function computeOpportunityLevel(params: ComputationParams): void {
       zoneValue = 0.8;
     }
     // Friendly zones are low priority (already captured)
-    else if (zone.owner === Faction.US) {
+    else if (zone.owner !== null && isBlufor(zone.owner as Faction)) {
       zoneValue = 0.3;
     }
 
@@ -198,8 +198,8 @@ export function computeSquadSupport(params: ComputationParams): void {
   const SUPPORT_FALLOFF = 0.025; // per meter
 
   combatants.forEach(combatant => {
-    // Only friendlies contribute to support
-    if (combatant.faction === Faction.OPFOR) return;
+    // Only friendlies (BLUFOR) contribute to support
+    if (!isBlufor(combatant.faction)) return;
     if (combatant.state === 'dead') return;
 
     _v2a.set(combatant.position.x, combatant.position.z);

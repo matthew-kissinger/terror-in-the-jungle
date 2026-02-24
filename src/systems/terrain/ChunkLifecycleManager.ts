@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { ImprovedChunk } from './ImprovedChunk';
 import { NoiseGenerator } from '../../utils/NoiseGenerator';
-import { AssetLoader } from '../assets/AssetLoader';
 import { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
 import { LOSAccelerator } from '../combat/LOSAccelerator';
 import { ChunkWorkerPool } from './ChunkWorkerPool';
@@ -13,6 +12,8 @@ import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 import { ChunkLoadingStrategy } from './ChunkLoadingStrategy';
 import { ChunkLifecycleConfig } from './ChunkLifecycleTypes';
 import { getChunkKey, worldToChunkCoord } from './ChunkSpatialUtils';
+import { BiomeTexturePool } from './BiomeTexturePool';
+import { HeightQueryCache } from './HeightQueryCache';
 
 /**
  * Manages chunk lifecycle: creation, loading, disposal, visibility
@@ -20,7 +21,6 @@ import { getChunkKey, worldToChunkCoord } from './ChunkSpatialUtils';
  */
 export class ChunkLifecycleManager {
   private scene: THREE.Scene;
-  private assetLoader: AssetLoader;
   private globalBillboardSystem: GlobalBillboardSystem;
   private config: ChunkLifecycleConfig;
   private noiseGenerator: NoiseGenerator;
@@ -28,37 +28,35 @@ export class ChunkLifecycleManager {
   private workerPool: ChunkWorkerPool | null;
   private bvhWorker: ViteBVHWorker | null;
   private loadingStrategy: ChunkLoadingStrategy;
+  private biomeTexturePool: BiomeTexturePool;
+  private heightQueryCache: HeightQueryCache;
 
-  // Chunk storage
   private chunks: Map<string, ImprovedChunk> = new Map();
   private loadingChunks: Set<string> = new Set();
-
-  // Player tracking for distance checks
   private playerPosition = new THREE.Vector3();
-
-  // Mesh merging system
   private meshMerger: TerrainMeshMerger | null = null;
 
   constructor(
     scene: THREE.Scene,
-    assetLoader: AssetLoader,
     globalBillboardSystem: GlobalBillboardSystem,
     config: ChunkLifecycleConfig,
     noiseGenerator: NoiseGenerator,
     losAccelerator: LOSAccelerator,
     workerPool: ChunkWorkerPool | null,
-    bvhWorker: ViteBVHWorker | null
+    bvhWorker: ViteBVHWorker | null,
+    biomeTexturePool: BiomeTexturePool,
+    heightQueryCache: HeightQueryCache,
   ) {
     this.scene = scene;
-    this.assetLoader = assetLoader;
     this.globalBillboardSystem = globalBillboardSystem;
     this.config = config;
     this.noiseGenerator = noiseGenerator;
     this.losAccelerator = losAccelerator;
     this.workerPool = workerPool;
     this.bvhWorker = bvhWorker;
+    this.biomeTexturePool = biomeTexturePool;
+    this.heightQueryCache = heightQueryCache;
 
-    // Initialize mesh merger if enabled
     if (config.enableMeshMerging && !config.skipTerrainMesh) {
       this.meshMerger = new TerrainMeshMerger(scene);
       Logger.info('chunks', 'Terrain mesh merging enabled');
@@ -66,7 +64,6 @@ export class ChunkLifecycleManager {
 
     this.loadingStrategy = new ChunkLoadingStrategy({
       scene: this.scene,
-      assetLoader: this.assetLoader,
       globalBillboardSystem: this.globalBillboardSystem,
       noiseGenerator: this.noiseGenerator,
       losAccelerator: this.losAccelerator,
@@ -76,7 +73,9 @@ export class ChunkLifecycleManager {
       loadingChunks: this.loadingChunks,
       playerPosition: this.playerPosition,
       getConfig: () => this.config,
-      updateMergedMeshes: () => this.updateMergedMeshes()
+      updateMergedMeshes: () => this.updateMergedMeshes(),
+      biomeTexturePool: this.biomeTexturePool,
+      heightQueryCache: this.heightQueryCache,
     });
   }
 
@@ -98,13 +97,16 @@ export class ChunkLifecycleManager {
     try {
       const chunk = new ImprovedChunk(
         this.scene,
-        this.assetLoader,
         chunkX,
         chunkZ,
         this.config.size,
         this.noiseGenerator,
         this.globalBillboardSystem,
-        this.config.skipTerrainMesh ?? false
+        this.biomeTexturePool,
+        this.heightQueryCache,
+        this.config.defaultBiomeId,
+        this.config.biomeRules,
+        this.config.skipTerrainMesh ?? false,
       );
 
       await chunk.generate();

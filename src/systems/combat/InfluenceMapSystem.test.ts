@@ -242,7 +242,7 @@ describe('InfluenceMapSystem', () => {
 
     it('should not update before 500ms has passed', () => {
       const combatants = new Map<string, Combatant>();
-      combatants.set('c1', createMockCombatant('c1', Faction.OPFOR, new THREE.Vector3(0, 0, 0)));
+      combatants.set('c1', createMockCombatant('c1', Faction.NVA, new THREE.Vector3(0, 0, 0)));
       system.setCombatants(combatants);
 
       // First update
@@ -270,7 +270,7 @@ describe('InfluenceMapSystem', () => {
 
     it('should update after 500ms has passed', () => {
       const combatants = new Map<string, Combatant>();
-      combatants.set('c1', createMockCombatant('c1', Faction.OPFOR, new THREE.Vector3(0, 0, 0)));
+      combatants.set('c1', createMockCombatant('c1', Faction.NVA, new THREE.Vector3(0, 0, 0)));
       system.setCombatants(combatants);
 
       // Set player far away to avoid player threat contribution
@@ -298,7 +298,7 @@ describe('InfluenceMapSystem', () => {
       vi.advanceTimersByTime(500);
 
       const combatants = new Map<string, Combatant>();
-      combatants.set('c1', createMockCombatant('c1', Faction.OPFOR, new THREE.Vector3(0, 0, 0)));
+      combatants.set('c1', createMockCombatant('c1', Faction.NVA, new THREE.Vector3(0, 0, 0)));
       system.setCombatants(combatants);
 
       system.update(16);
@@ -399,7 +399,7 @@ describe('InfluenceMapSystem', () => {
       system.update(16);
 
       const targetPos = new THREE.Vector3(0, 0, 0);
-      const result = system.findBestPositionNear(targetPos, 50, Faction.OPFOR);
+      const result = system.findBestPositionNear(targetPos, 50, Faction.NVA);
 
       expect(result).not.toBeNull();
       if (result) {
@@ -427,7 +427,7 @@ describe('InfluenceMapSystem', () => {
 
       const searchCenter = new THREE.Vector3(0, 0, 0);
       const usResult = system.findBestPositionNear(searchCenter, 100, Faction.US);
-      const opforResult = system.findBestPositionNear(searchCenter, 100, Faction.OPFOR);
+      const opforResult = system.findBestPositionNear(searchCenter, 100, Faction.NVA);
 
       // Both should find positions
       expect(usResult).not.toBeNull();
@@ -553,7 +553,7 @@ describe('InfluenceMapSystem', () => {
 
     it('should target enemy-owned zones', () => {
       const zones = [
-        createMockZone('enemy', new THREE.Vector3(0, 0, 0), Faction.OPFOR, ZoneState.OPFOR_CONTROLLED, false)
+        createMockZone('enemy', new THREE.Vector3(0, 0, 0), Faction.NVA, ZoneState.OPFOR_CONTROLLED, false)
       ];
       system.setZones(zones);
       system.update(16);
@@ -624,7 +624,7 @@ describe('InfluenceMapSystem', () => {
 
     it('should handle multiple zones and pick best', () => {
       const zones = [
-        createMockZone('z1', new THREE.Vector3(-50, 0, -50), Faction.OPFOR, ZoneState.OPFOR_CONTROLLED, false),
+        createMockZone('z1', new THREE.Vector3(-50, 0, -50), Faction.NVA, ZoneState.OPFOR_CONTROLLED, false),
         createMockZone('z2', new THREE.Vector3(0, 0, 0), null, ZoneState.CONTESTED, false),
         createMockZone('z3', new THREE.Vector3(50, 0, 50), null, ZoneState.NEUTRAL, false)
       ];
@@ -757,13 +757,13 @@ describe('InfluenceMapSystem', () => {
     it('should compute full influence map with all data sources', () => {
       // Set up complex scenario
       const combatants = new Map<string, Combatant>();
-      combatants.set('enemy1', createMockCombatant('enemy1', Faction.OPFOR, new THREE.Vector3(-30, 0, -30)));
-      combatants.set('enemy2', createMockCombatant('enemy2', Faction.OPFOR, new THREE.Vector3(30, 0, 30)));
+      combatants.set('enemy1', createMockCombatant('enemy1', Faction.NVA, new THREE.Vector3(-30, 0, -30)));
+      combatants.set('enemy2', createMockCombatant('enemy2', Faction.NVA, new THREE.Vector3(30, 0, 30)));
       combatants.set('friendly1', createMockCombatant('friendly1', Faction.US, new THREE.Vector3(0, 0, 0)));
 
       const zones = [
         createMockZone('z1', new THREE.Vector3(-50, 0, -50), null, ZoneState.CONTESTED),
-        createMockZone('z2', new THREE.Vector3(50, 0, 50), Faction.OPFOR, ZoneState.OPFOR_CONTROLLED)
+        createMockZone('z2', new THREE.Vector3(50, 0, 50), Faction.NVA, ZoneState.OPFOR_CONTROLLED)
       ];
 
       const sandbags = [
@@ -797,7 +797,7 @@ describe('InfluenceMapSystem', () => {
       system.setPlayerPosition(new THREE.Vector3(1000, 0, 1000));
 
       const combatants = new Map<string, Combatant>();
-      combatants.set('enemy1', createMockCombatant('enemy1', Faction.OPFOR, new THREE.Vector3(0, 0, 0)));
+      combatants.set('enemy1', createMockCombatant('enemy1', Faction.NVA, new THREE.Vector3(0, 0, 0)));
       system.setCombatants(combatants);
       system.update(16);
 

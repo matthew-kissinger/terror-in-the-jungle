@@ -1,5 +1,5 @@
 import { GameSystem } from '../../types';
-import { Faction } from '../combat/types';
+import { Faction, Alliance, isBlufor, isOpfor } from '../combat/types';
 import { WarSimulatorConfig } from '../../config/gameModeTypes';
 import { Logger } from '../../utils/Logger';
 import {
@@ -37,8 +37,8 @@ export class WarSimulator implements GameSystem {
   private squads: Map<string, StrategicSquad> = new Map();
   private elapsedTime = 0;
   private factionStats = {
-    [Faction.US]: { tickets: 0, kills: 0, deaths: 0 },
-    [Faction.OPFOR]: { tickets: 0, kills: 0, deaths: 0 }
+    [Alliance.BLUFOR]: { tickets: 0, kills: 0, deaths: 0 },
+    [Alliance.OPFOR]: { tickets: 0, kills: 0, deaths: 0 }
   };
 
   // Player tracking
@@ -208,8 +208,8 @@ export class WarSimulator implements GameSystem {
     if (!this.config) return;
     this.resetStrategicForces();
 
-    const usHQs = zones.filter(z => z.isHomeBase && z.owner === Faction.US);
-    const opforHQs = zones.filter(z => z.isHomeBase && z.owner === Faction.OPFOR);
+    const usHQs = zones.filter(z => z.isHomeBase && z.owner !== null && isBlufor(z.owner));
+    const opforHQs = zones.filter(z => z.isHomeBase && z.owner !== null && isOpfor(z.owner));
 
     if (usHQs.length === 0 || opforHQs.length === 0) {
       Logger.warn('war-sim', 'No HQ zones found for one or both factions');
@@ -217,8 +217,8 @@ export class WarSimulator implements GameSystem {
     }
 
     // Also spawn some squads at controlled non-HQ zones for both factions
-    const usZones = zones.filter(z => !z.isHomeBase && z.owner === Faction.US);
-    const opforZones = zones.filter(z => !z.isHomeBase && z.owner === Faction.OPFOR);
+    const usZones = zones.filter(z => !z.isHomeBase && z.owner !== null && isBlufor(z.owner));
+    const opforZones = zones.filter(z => !z.isHomeBase && z.owner !== null && isOpfor(z.owner));
     const frontlineZones = zones
       .filter(z => !z.isHomeBase && (z.owner === null || z.state === 'contested'))
       .sort((a, b) => (b.ticketBleedRate ?? 0) - (a.ticketBleedRate ?? 0));
@@ -252,14 +252,14 @@ export class WarSimulator implements GameSystem {
     // Spawn OPFOR forces
     const opforHQSquads = hqSquads;
     const opforZoneSquads = zoneSquads;
-    this.spawnFactionForces(Faction.OPFOR, opforHQs, opforZones, opforHQSquads, squadMin, squadMax);
+    this.spawnFactionForces(Faction.NVA, opforHQs, opforZones, opforHQSquads, squadMin, squadMax);
     if (opforZoneSquads > 0 && opforZones.length > 0) {
-      this.spawnFactionForces(Faction.OPFOR, opforZones, [], opforZoneSquads, squadMin, squadMax);
+      this.spawnFactionForces(Faction.NVA, opforZones, [], opforZoneSquads, squadMin, squadMax);
     } else if (opforZoneSquads > 0) {
-      this.spawnFactionForces(Faction.OPFOR, opforHQs, [], opforZoneSquads, squadMin, squadMax);
+      this.spawnFactionForces(Faction.NVA, opforHQs, [], opforZoneSquads, squadMin, squadMax);
     }
     if (frontlineSquads > 0) {
-      this.spawnFactionForces(Faction.OPFOR, frontlineZones, [], frontlineSquads, squadMin, squadMax);
+      this.spawnFactionForces(Faction.NVA, frontlineZones, [], frontlineSquads, squadMin, squadMax);
     }
 
     Logger.info('war-sim', `Spawned ${this.agents.size} agents in ${this.squads.size} squads`);
@@ -327,7 +327,7 @@ export class WarSimulator implements GameSystem {
         z: zone.position.z,
         objectiveX: zone.position.x,
         objectiveZ: zone.position.z,
-        stance: faction === Faction.OPFOR ? 'defend' : 'patrol',
+        stance: isOpfor(faction) ? 'defend' : 'patrol',
         strength: 1.0,
         combatActive: false,
         lastCombatTime: 0
@@ -463,7 +463,7 @@ export class WarSimulator implements GameSystem {
     let i = 0;
     for (const a of this.agents.values()) {
       if (!a.alive) continue;
-      buf[i++] = a.faction === Faction.US ? 0 : 1;
+      buf[i++] = isBlufor(a.faction) ? 0 : 1;
       buf[i++] = a.x;
       buf[i++] = a.z;
       buf[i++] = a.tier === AgentTier.MATERIALIZED ? 0 : a.tier === AgentTier.SIMULATED ? 1 : 2;

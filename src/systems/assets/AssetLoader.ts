@@ -27,20 +27,35 @@ export class AssetLoader implements GameSystem {
   private async discoverAssets(): Promise<void> {
     // Known assets in the project root
     const knownAssets = [
-      'forestfloor.png',
-      // Large canopy trees (scale 8-12)
+      // Terrain textures
+      'jungle-floor.webp',
+      'rocky-highland.webp',
+      'mud-ground.webp',
+      'rice-paddy.webp',
+      'river-bank.webp',
+      'red-laterite.webp',
+      'tall-grass.webp',
+      'bamboo-floor.webp',
+      'swamp.webp',
+      'sandy-beach.webp',
+      'defoliated-ground.webp',
+      'firebase-ground.webp',
+      // Vegetation — canopy
       'DipterocarpGiant.webp',
       'TwisterBanyan.webp',
-      // Medium palms (scale 4-6)
+      'RubberTree.webp',
+      // Vegetation — mid-level
       'CoconutPalm.webp',
       'ArecaPalmCluster.webp',
-      // Small ground foliage (scale 1-3)
-      'Fern.webp',
       'FanPalmCluster.webp',
+      'BambooGrove.webp',
+      'BananaPlant.webp',
+      // Vegetation — ground cover
+      'Fern.webp',
       'ElephantEarPlants.webp',
-      // Legacy trees (kept for compatibility)
-      'tree.webp',
-      'grass.webp',
+      'ElephantGrass.webp',
+      'RicePaddyPlants.webp',
+      'Mangrove.webp',
       // US soldiers - walk (front/back/side x 2 frames) + fire (front/back/side)
       'us-walk-front-1.webp',
       'us-walk-front-2.webp',
@@ -61,6 +76,26 @@ export class AssetLoader implements GameSystem {
       'vc-fire-front.webp',
       'vc-fire-back.webp',
       'vc-fire-side.webp',
+      // NVA soldiers - walk (front/back/side x 2 frames) + fire (front/back/side)
+      'nva-walk-front-1.webp',
+      'nva-walk-front-2.webp',
+      'nva-walk-back-1.webp',
+      'nva-walk-back-2.webp',
+      'nva-walk-side-1.webp',
+      'nva-walk-side-2.webp',
+      'nva-fire-front.webp',
+      'nva-fire-back.webp',
+      'nva-fire-side.webp',
+      // ARVN soldiers - walk (front/back/side x 2 frames) + fire (front/back/side)
+      'arvn-walk-front-1.webp',
+      'arvn-walk-front-2.webp',
+      'arvn-walk-back-1.webp',
+      'arvn-walk-back-2.webp',
+      'arvn-walk-side-1.webp',
+      'arvn-walk-side-2.webp',
+      'arvn-fire-front.webp',
+      'arvn-fire-back.webp',
+      'arvn-fire-side.webp',
       // UI/Player
       'first-person.png',
       // Environment
@@ -86,18 +121,24 @@ export class AssetLoader implements GameSystem {
   private categorizeAsset(filename: string): AssetCategory {
     const name = filename.toLowerCase();
 
-    if (name.includes('floor') || name.includes('ground')) {
+    if (name.includes('floor') || name.includes('ground') ||
+        name.includes('laterite') || name.includes('highland') ||
+        name.includes('beach') || name.includes('swamp') ||
+        name.includes('river-bank') || name.includes('rice-paddy.') ||
+        name.includes('tall-grass.') || name.includes('defoliated') ||
+        name.includes('mud-')) {
       return AssetCategory.GROUND;
     }
-    // Expanded foliage detection for vegetation assets
     if (name.includes('tree') || name.includes('grass') ||
         name.includes('dipterocarp') || name.includes('banyan') || name.includes('palm') ||
-        name.includes('fern') || name.includes('elephant')) {
+        name.includes('fern') || name.includes('elephant') ||
+        name.includes('bamboo') || name.includes('banana') ||
+        name.includes('mangrove') || name.includes('ricepaddyplants') ||
+        name.includes('rubber')) {
       return AssetCategory.FOLIAGE;
     }
-    // Soldier detection - directional sprites: us-walk-*, us-fire-*, vc-walk-*, vc-fire-*
-    if (name.startsWith('us-') || name.startsWith('vc-')) {
-      return AssetCategory.ENEMY;  // Using ENEMY category for all combatants
+    if (name.startsWith('us-') || name.startsWith('vc-') || name.startsWith('nva-') || name.startsWith('arvn-')) {
+      return AssetCategory.ENEMY;
     }
     if (name.includes('skybox') || name.includes('sky')) {
       return AssetCategory.SKYBOX;

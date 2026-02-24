@@ -21,10 +21,10 @@ const PHASE_CLASSES: Record<GamePhase, string> = {
   ENDED: styles.phaseEnded,
 };
 
-/** Human-readable phase labels */
+/** Human-readable phase labels — COMBAT is intentionally blank (players know they're in combat) */
 const PHASE_LABELS: Record<GamePhase, string> = {
   SETUP: 'PREPARE FOR BATTLE',
-  COMBAT: 'IN COMBAT',
+  COMBAT: '',
   OVERTIME: 'OVERTIME!',
   ENDED: 'GAME ENDED',
 };

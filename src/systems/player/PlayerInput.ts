@@ -29,6 +29,7 @@ export interface InputCallbacks {
   onReload?: () => void;
   onGrenadeSwitch?: () => void;
   onSquadCommand?: () => void;
+  onSquadQuickCommand?: (slot: number) => void;
   onMenuPause?: () => void;
   onMenuResume?: () => void;
 }
@@ -153,6 +154,7 @@ export class PlayerInput {
         onScoreboardToggle: (visible: boolean) => callbacks.onScoreboardToggle?.(visible),
         onSquadCommand: () => callbacks.onSquadCommand?.(),
         onWeaponSlot: (slot: number) => callbacks.onWeaponSlotChange?.(slot as WeaponSlot),
+        onSquadQuickCommand: (slot: number) => callbacks.onSquadQuickCommand?.(slot),
       });
     }
   }
@@ -457,6 +459,21 @@ export class PlayerInput {
     // Squad command menu with Z key (when not in helicopter)
     if (!this.isInHelicopter && event.code === 'KeyZ') {
       this.callbacks.onSquadCommand?.();
+    }
+
+    // Squad quick commands (centralized path; replaces PlayerSquadController direct key listener).
+    if (!this.isInHelicopter && event.shiftKey) {
+      if (event.code === 'Digit1') {
+        this.callbacks.onSquadQuickCommand?.(1);
+      } else if (event.code === 'Digit2') {
+        this.callbacks.onSquadQuickCommand?.(2);
+      } else if (event.code === 'Digit3') {
+        this.callbacks.onSquadQuickCommand?.(3);
+      } else if (event.code === 'Digit4') {
+        this.callbacks.onSquadQuickCommand?.(4);
+      } else if (event.code === 'Digit5') {
+        this.callbacks.onSquadQuickCommand?.(5);
+      }
     }
   }
 

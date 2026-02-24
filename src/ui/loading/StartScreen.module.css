@@ -6,7 +6,7 @@
 .screen {
   position: fixed;
   inset: 0;
-  background-image: url('/assets/background.png');
+  background-image: url('/assets/ui/screens/start-screen.webp');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -404,6 +404,15 @@
   display: flex;
   gap: var(--space-2);
   justify-content: center;
+}
+
+.quickStartHint {
+  margin-top: var(--space-2);
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.06em;
+  opacity: 0.75;
+  text-transform: uppercase;
 }
 
 /* --- Loading stats --- */

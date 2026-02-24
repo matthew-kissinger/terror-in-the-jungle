@@ -41,6 +41,8 @@ describe('ChunkLoadingStrategy', () => {
   let playerPosition: THREE.Vector3;
   let mockGetConfig: ReturnType<typeof vi.fn>;
   let mockUpdateMergedMeshes: ReturnType<typeof vi.fn>;
+  let mockBiomePool: any;
+  let mockHeightCache: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -69,9 +71,11 @@ describe('ChunkLoadingStrategy', () => {
     // Reset getChunkDistanceFromPlayer mock
     vi.mocked(getChunkDistanceFromPlayer).mockReturnValue(5);
 
+    mockBiomePool = { getMaterial: vi.fn(() => new THREE.MeshBasicMaterial()), dispose: vi.fn() } as any;
+    mockHeightCache = { getHeightAt: vi.fn(() => 5), clearCache: vi.fn() } as any;
+
     strategy = new ChunkLoadingStrategy({
       scene: mockScene,
-      assetLoader: mockAssetLoader,
       globalBillboardSystem: mockBillboardSystem,
       noiseGenerator: mockNoiseGenerator,
       losAccelerator: mockLOSAccelerator,
@@ -82,6 +86,8 @@ describe('ChunkLoadingStrategy', () => {
       playerPosition,
       getConfig: mockGetConfig,
       updateMergedMeshes: mockUpdateMergedMeshes,
+      biomeTexturePool: mockBiomePool,
+      heightQueryCache: mockHeightCache,
     });
   });
 
@@ -89,7 +95,6 @@ describe('ChunkLoadingStrategy', () => {
     it('should store all dependencies', () => {
       expect(strategy).toBeDefined();
       expect(strategy['scene']).toBe(mockScene);
-      expect(strategy['assetLoader']).toBe(mockAssetLoader);
       expect(strategy['globalBillboardSystem']).toBe(mockBillboardSystem);
       expect(strategy['noiseGenerator']).toBe(mockNoiseGenerator);
       expect(strategy['losAccelerator']).toBe(mockLOSAccelerator);
@@ -141,7 +146,6 @@ describe('ChunkLoadingStrategy', () => {
 
       strategy = new ChunkLoadingStrategy({
         scene: mockScene,
-        assetLoader: mockAssetLoader,
         globalBillboardSystem: mockBillboardSystem,
         noiseGenerator: mockNoiseGenerator,
         losAccelerator: mockLOSAccelerator,
@@ -152,6 +156,8 @@ describe('ChunkLoadingStrategy', () => {
         playerPosition,
         getConfig: mockGetConfig,
         updateMergedMeshes: mockUpdateMergedMeshes,
+        biomeTexturePool: mockBiomePool,
+        heightQueryCache: mockHeightCache,
       });
 
       const mockChunk = {
@@ -215,7 +221,6 @@ describe('ChunkLoadingStrategy', () => {
 
       strategy = new ChunkLoadingStrategy({
         scene: mockScene,
-        assetLoader: mockAssetLoader,
         globalBillboardSystem: mockBillboardSystem,
         noiseGenerator: mockNoiseGenerator,
         losAccelerator: mockLOSAccelerator,
@@ -226,6 +231,8 @@ describe('ChunkLoadingStrategy', () => {
         playerPosition,
         getConfig: mockGetConfig,
         updateMergedMeshes: mockUpdateMergedMeshes,
+        biomeTexturePool: mockBiomePool,
+        heightQueryCache: mockHeightCache,
       });
     });
 
@@ -240,13 +247,14 @@ describe('ChunkLoadingStrategy', () => {
 
       expect(ImprovedChunk).toHaveBeenCalledWith(
         mockScene,
-        mockAssetLoader,
-        5,
-        10,
-        100,
+        5, 10, 100,
         mockNoiseGenerator,
         mockBillboardSystem,
-        false
+        mockBiomePool,
+        mockHeightCache,
+        undefined,
+        undefined,
+        false,
       );
     });
 
@@ -307,7 +315,6 @@ describe('ChunkLoadingStrategy', () => {
 
       strategy = new ChunkLoadingStrategy({
         scene: mockScene,
-        assetLoader: mockAssetLoader,
         globalBillboardSystem: mockBillboardSystem,
         noiseGenerator: mockNoiseGenerator,
         losAccelerator: mockLOSAccelerator,
@@ -318,6 +325,8 @@ describe('ChunkLoadingStrategy', () => {
         playerPosition,
         getConfig: mockGetConfig,
         updateMergedMeshes: mockUpdateMergedMeshes,
+        biomeTexturePool: mockBiomePool,
+        heightQueryCache: mockHeightCache,
       });
 
       await strategy.loadChunkAsync(5, 10);
@@ -335,7 +344,6 @@ describe('ChunkLoadingStrategy', () => {
 
       strategy = new ChunkLoadingStrategy({
         scene: mockScene,
-        assetLoader: mockAssetLoader,
         globalBillboardSystem: mockBillboardSystem,
         noiseGenerator: mockNoiseGenerator,
         losAccelerator: mockLOSAccelerator,
@@ -346,6 +354,8 @@ describe('ChunkLoadingStrategy', () => {
         playerPosition,
         getConfig: mockGetConfig,
         updateMergedMeshes: mockUpdateMergedMeshes,
+        biomeTexturePool: mockBiomePool,
+        heightQueryCache: mockHeightCache,
       });
 
       await strategy.loadChunkAsync(5, 10);
@@ -399,13 +409,14 @@ describe('ChunkLoadingStrategy', () => {
       await vi.waitFor(() => {
         expect(ImprovedChunk).toHaveBeenCalledWith(
           mockScene,
-          mockAssetLoader,
-          5,
-          10,
-          100,
+          5, 10, 100,
           mockNoiseGenerator,
           mockBillboardSystem,
-          false
+          mockBiomePool,
+          mockHeightCache,
+          undefined,
+          undefined,
+          false,
         );
       }, { timeout: 100 });
     });

@@ -1,4 +1,4 @@
-import { Faction } from '../combat/types';
+import { Faction, Alliance, getAlliance, isBlufor, isOpfor, getEnemyAlliance } from '../combat/types';
 import { WarSimulatorConfig } from '../../config/gameModeTypes';
 import { StrategicAgent, StrategicSquad, AgentTier } from './types';
 import { WarEventEmitter } from './WarEventEmitter';
@@ -57,7 +57,7 @@ export class StrategicDirector {
 
     // Assign squads per faction
     this.assignFactionSquads(Faction.US, zones, zoneScores);
-    this.assignFactionSquads(Faction.OPFOR, zones, zoneScores);
+    this.assignFactionSquads(Faction.NVA, zones, zoneScores);
 
     // Propagate orders to agents
     this.propagateOrders();
@@ -93,7 +93,7 @@ export class StrategicDirector {
         const distSq = dx * dx + dz * dz;
         if (distSq < 2000 * 2000) { // 2km
           // Count for both factions - each faction evaluates separately
-          if (squad.faction === Faction.US) friendlyNearby++;
+          if (isBlufor(squad.faction)) friendlyNearby++;
           else enemyNearby++;
         }
       }
@@ -121,8 +121,8 @@ export class StrategicDirector {
     const weak = factionSquads.filter(s => s.strength > 0.1 && s.strength <= 0.5);
 
     // Get zone lists by faction perspective
-    const enemyFaction = faction === Faction.US ? Faction.OPFOR : Faction.US;
-    const enemyZones = zones.filter(z => z.owner === enemyFaction && !z.isHomeBase);
+    const enemyAlliance = getEnemyAlliance(getAlliance(faction));
+    const enemyZones = zones.filter(z => z.owner !== null && getAlliance(z.owner) === enemyAlliance && !z.isHomeBase);
     const ownedZones = zones.filter(z => z.owner === faction && !z.isHomeBase);
     const contestedZones = zones.filter(z => z.state === 'contested' && !z.isHomeBase);
     const neutralZones = zones.filter(z => z.owner === null && !z.isHomeBase);
@@ -130,7 +130,7 @@ export class StrategicDirector {
     // Historical doctrine:
     // NVA: primarily defend, counterattack when strong, patrol supply routes
     // US: primarily attack, reinforce contested, hold captured
-    const isDefensiveFaction = faction === Faction.OPFOR;
+    const isDefensiveFaction = isOpfor(faction);
 
     // Strong squads: split between attack and defend
     let attackRatio: number;
@@ -234,7 +234,7 @@ export class StrategicDirector {
   private handleReinforcements(elapsedTime: number, zones: CaptureZone[]): void {
     const cooldown = this.config.reinforcementCooldown;
 
-    for (const [faction, label] of [[Faction.US, 'US'], [Faction.OPFOR, 'OPFOR']] as const) {
+    for (const [faction, label] of [[Faction.US, 'US'], [Faction.NVA, 'NVA']] as const) {
       const key = `reinforce_${faction}`;
       const lastTime = this.lastReinforcementTime[key] || 0;
       if (elapsedTime - lastTime < cooldown) continue;

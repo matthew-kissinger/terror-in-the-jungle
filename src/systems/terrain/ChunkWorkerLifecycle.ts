@@ -35,6 +35,7 @@ export interface WorkerMessageData {
   indices?: Uint32Array;
   heightData?: Float32Array;
   vegetation?: import('./ChunkWorkerPool').VegetationData;
+  biomeId?: string;
 }
 
 /**
@@ -178,6 +179,31 @@ export class ChunkWorkerLifecycle {
           seed: config.seed
         });
       }
+    }
+  }
+
+  /**
+   * Send vegetation + biome config to all workers.
+   * Workers use this to generate vegetation data-driven instead of hardcoded.
+   */
+  sendVegetationConfig(config: { types: any[]; biomePalette: any[] }): void {
+    for (const state of this.workers) {
+      state.worker.postMessage({
+        type: 'setVegetationConfig',
+        vegetationTypes: config.types,
+        biomePalette: config.biomePalette,
+      });
+    }
+  }
+
+  sendBiomeConfig(config: { biomeRules: any[]; defaultBiomeId: string; allBiomePalettes: Record<string, any[]> }): void {
+    for (const state of this.workers) {
+      state.worker.postMessage({
+        type: 'setBiomeConfig',
+        biomeRules: config.biomeRules,
+        defaultBiomeId: config.defaultBiomeId,
+        allBiomePalettes: config.allBiomePalettes,
+      });
     }
   }
 

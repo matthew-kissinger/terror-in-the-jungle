@@ -1,5 +1,5 @@
 import { ZoneManager, CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
-import { Faction } from '../../systems/combat/types';
+import { Faction, isOpfor } from '../../systems/combat/types';
 import { GameModeManager } from '../../systems/world/GameModeManager';
 
 export const MAP_SIZE = 800;
@@ -27,7 +27,7 @@ export function isZoneSpawnable(zone: CaptureZone, gameModeManager?: GameModeMan
  * Returns the color for a zone based on its state and owner
  */
 export function getZoneColor(zone: CaptureZone, alpha: number, isSpawnable: boolean): string {
-  if (!isSpawnable && zone.owner !== Faction.OPFOR) {
+  if (!isSpawnable && !(zone.owner !== null && isOpfor(zone.owner))) {
     // Dim non-spawnable friendly zones
     return `rgba(100, 100, 100, ${alpha * 0.5})`;
   }

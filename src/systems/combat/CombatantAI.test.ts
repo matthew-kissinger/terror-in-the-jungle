@@ -591,7 +591,7 @@ describe('CombatantAI', () => {
   describe('findNearestEnemy', () => {
     it('should delegate to targeting module', () => {
       const targeting = (ai as any).targeting
-      const mockEnemy = createMockCombatant({ id: 'enemy1', faction: Faction.OPFOR })
+      const mockEnemy = createMockCombatant({ id: 'enemy1', faction: Faction.NVA })
       targeting.findNearestEnemy.mockReturnValue(mockEnemy)
 
       const result = ai.findNearestEnemy(mockCombatant, mockPlayerPosition, mockAllCombatants, mockSpatialGrid)
@@ -758,7 +758,7 @@ describe('CombatantAI', () => {
 
       it('should interrupt ENGAGING state and transition to PATROLLING', () => {
         mockCombatant.state = CombatantState.ENGAGING
-        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.OPFOR })
+        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.NVA })
         mockCombatant.inCover = true
         mockCombatant.isFullAuto = true
 
@@ -772,7 +772,7 @@ describe('CombatantAI', () => {
 
       it('should interrupt SUPPRESSING state and transition to PATROLLING', () => {
         mockCombatant.state = CombatantState.SUPPRESSING
-        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.OPFOR })
+        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.NVA })
 
         ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
 
@@ -782,7 +782,7 @@ describe('CombatantAI', () => {
 
       it('should interrupt ALERT state and transition to PATROLLING', () => {
         mockCombatant.state = CombatantState.ALERT
-        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.OPFOR })
+        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.NVA })
 
         ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
 
@@ -792,7 +792,7 @@ describe('CombatantAI', () => {
 
       it('should interrupt SEEKING_COVER state and transition to PATROLLING', () => {
         mockCombatant.state = CombatantState.SEEKING_COVER
-        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.OPFOR })
+        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.NVA })
 
         ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
 
@@ -823,7 +823,7 @@ describe('CombatantAI', () => {
 
       it('should interrupt ENGAGING state and transition to PATROLLING', () => {
         mockCombatant.state = CombatantState.ENGAGING
-        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.OPFOR })
+        mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.NVA })
 
         ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
 
@@ -998,7 +998,7 @@ describe('CombatantAI', () => {
 
     describe('faction and squad filtering', () => {
       it('should NOT affect OPFOR faction combatants', () => {
-        mockCombatant.faction = Faction.OPFOR
+        mockCombatant.faction = Faction.NVA
         mockCombatant.state = CombatantState.ENGAGING
         squad.currentCommand = SquadCommand.FOLLOW_ME
 

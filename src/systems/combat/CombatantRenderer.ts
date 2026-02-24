@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction } from './types';
+import { Combatant, CombatantState, Faction, isBlufor } from './types';
 import { AssetLoader } from '../assets/AssetLoader';
 import { CombatantMeshFactory, disposeCombatantMeshes, updateCombatantTexture, type ViewDirection, type WalkFrameMap } from './CombatantMeshFactory';
 import { CombatantShaderSettingsManager, setDamageFlash, updateShaderUniforms, type NPCShaderSettings, type ShaderPreset, type ShaderUniformSettings } from './CombatantShaders';
@@ -174,7 +174,7 @@ export class CombatantRenderer {
       }
 
       // Build mesh key: {faction}_{ state}_{direction}
-      const isPlayerSquad = combatant.squadId === this.playerSquadId && combatant.faction === Faction.US;
+      const isPlayerSquad = combatant.squadId === this.playerSquadId && isBlufor(combatant.faction);
       if (isPlayerSquad && !this.playerSquadDetected) this.playerSquadDetected = true;
       const factionPrefix = isPlayerSquad ? 'SQUAD' : combatant.faction;
       const key = `${factionPrefix}_${stateKey}_${viewDir}`;

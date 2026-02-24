@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Combatant, CombatantState, Faction } from './types'
+import { Combatant, CombatantState, Faction, isAlly } from './types'
 import { SpatialGridManager, spatialGridManager } from './SpatialGridManager'
 import { performanceTelemetry } from '../debug/PerformanceTelemetry'
 import { Logger } from '../../utils/Logger'
@@ -154,7 +154,7 @@ export class CombatantHitDetection {
     for (const id of candidateIds) {
       const combatant = allCombatants.get(id)
       if (!combatant) continue
-      if (!this.FRIENDLY_FIRE_ENABLED && combatant.faction === shooterFaction) continue
+      if (!this.FRIENDLY_FIRE_ENABLED && isAlly(combatant.faction, shooterFaction)) continue
       if (combatant.state === CombatantState.DEAD) continue
 
       // Use cached hit zones (no allocation)

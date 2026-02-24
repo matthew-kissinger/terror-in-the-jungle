@@ -5,6 +5,7 @@ import { CrosshairUI } from './CrosshairUI';
 import { LoadingUI } from './LoadingUI';
 import { Logger } from '../utils/Logger';
 import { estimateGPUTier, isMobileGPU, shouldEnableShadows, getShadowMapSize, getMaxPixelRatio } from '../utils/DeviceDetector';
+import { ViewportInfo, ViewportManager } from '../ui/design/responsive';
 
 export class GameRenderer {
   public renderer: THREE.WebGLRenderer;
@@ -20,6 +21,7 @@ export class GameRenderer {
 
   private crosshairUI = new CrosshairUI();
   private loadingUI = new LoadingUI();
+  private viewportUnsubscribe?: () => void;
 
   constructor() {
     this.scene = new THREE.Scene();
@@ -52,17 +54,24 @@ export class GameRenderer {
     // Device-adaptive pixel ratio
     this.renderer.setPixelRatio(getMaxPixelRatio());
 
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    const initialViewport = ViewportManager.getInstance().info;
+    this.renderer.setSize(initialViewport.width, initialViewport.height);
     
     // Device-adaptive shadow settings
     this.renderer.shadowMap.enabled = shouldEnableShadows();
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
 
     document.body.appendChild(this.renderer.domElement);
 
     // Hide renderer initially
     this.renderer.domElement.style.display = 'none';
+
+    this.viewportUnsubscribe = ViewportManager.getInstance().subscribe((info) => {
+      this.applyViewport(info);
+    });
   }
 
   private setupLighting(): void {
@@ -81,15 +90,11 @@ export class GameRenderer {
     this.fog = new THREE.FogExp2(fogColor, 0.004);
     this.scene.fog = this.fog;
 
-    // Ambient light - general scene illumination
-    // Reduced intensity for moody atmosphere
-    this.ambientLight = new THREE.AmbientLight(0x4a5a4a, 0.4); // Muted green, lower intensity
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
     this.scene.add(this.ambientLight);
 
-    // Directional light - filtered sunlight
-    // Reduced intensity, slightly green-tinted
-    this.moonLight = new THREE.DirectionalLight(0xeef8ee, 0.5); // Soft filtered light
-    this.moonLight.position.set(-30, 80, -50);
+    this.moonLight = new THREE.DirectionalLight(0xfffacd, 2.0);
+    this.moonLight.position.set(0, 80, -50);
     this.moonLight.castShadow = shouldEnableShadows();
 
     // Device-adaptive shadow map size
@@ -117,9 +122,9 @@ export class GameRenderer {
     // Sky: filtered light from above
     // Ground: dark ground bounce light
     this.hemisphereLight = new THREE.HemisphereLight(
-      0x667766, // Muted green-gray sky light
-      0x332211, // Dark brown ground bounce
-      0.3 // Subtle fill
+      0x87ceeb, // Sky blue
+      0x4a6b3a, // Green ground bounce
+      0.8
     );
     this.scene.add(this.hemisphereLight);
 
@@ -165,13 +170,7 @@ export class GameRenderer {
   }
 
   onWindowResize(): void {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-
-    if (this.postProcessing) {
-      this.postProcessing.setSize(window.innerWidth, window.innerHeight);
-    }
+    this.applyViewport(ViewportManager.getInstance().info);
   }
 
 
@@ -189,6 +188,10 @@ export class GameRenderer {
 
   showSpawnLoadingIndicator(): void {
     this.loadingUI.showSpawnLoadingIndicator();
+  }
+
+  setSpawnLoadingStatus(status: string, detail?: string): void {
+    this.loadingUI.setSpawnLoadingStatus(status, detail);
   }
 
   hideSpawnLoadingIndicator(): void {
@@ -249,6 +252,8 @@ export class GameRenderer {
   }
 
   dispose(): void {
+    this.viewportUnsubscribe?.();
+
     // Clean up UI modules
     this.loadingUI.dispose();
     this.crosshairUI.dispose();
@@ -257,6 +262,17 @@ export class GameRenderer {
     this.renderer.dispose();
     if (this.renderer.domElement.parentElement) {
       document.body.removeChild(this.renderer.domElement);
+    }
+  }
+
+  private applyViewport(info: ViewportInfo): void {
+    const width = Math.max(1, info.width);
+    const height = Math.max(1, info.height);
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(width, height);
+    if (this.postProcessing) {
+      this.postProcessing.setSize(width, height);
     }
   }
 }

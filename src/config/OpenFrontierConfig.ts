@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Faction } from '../systems/combat/types';
+import { Faction, Alliance } from '../systems/combat/types';
 import { GameMode, GameModeConfig, WeatherState } from './gameModeTypes';
 
 // Open Frontier - Large scale mode
@@ -10,6 +10,16 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
 
   worldSize: 3200, // ~2x2 miles
   chunkRenderDistance: 10,
+  terrain: {
+    defaultBiome: 'denseJungle',
+    biomeRules: [
+      { biomeId: 'highland',   elevationMin: 15, slopeMax: 45, priority: 3 },
+      { biomeId: 'cleared',    elevationMin: 18, slopeMax: 8,  priority: 4 },
+      { biomeId: 'tallGrass',  elevationMax: 5,  slopeMax: 10, priority: 2 },
+      { biomeId: 'riverbank',  elevationMax: 1,  slopeMax: 15, priority: 5 },
+      { biomeId: 'denseJungle', elevationMax: 15, priority: 1 },
+    ],
+  },
   weather: {
     enabled: true,
     initialState: WeatherState.CLEAR,
@@ -34,6 +44,12 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
 
   minimapScale: 800,
   viewDistance: 300,
+
+  helipads: [
+    { id: 'helipad_main', position: new THREE.Vector3(40, 0, -1400), aircraft: 'UH1_HUEY' },
+    { id: 'helipad_west', position: new THREE.Vector3(-960, 0, -800), aircraft: 'UH1C_GUNSHIP' },
+    { id: 'helipad_east', position: new THREE.Vector3(1040, 0, -800), aircraft: 'AH1_COBRA' },
+  ],
 
   zones: [
     // US HQs
@@ -68,29 +84,29 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
     // OPFOR HQs
     {
       id: 'opfor_hq_main',
-      name: 'OPFOR Main HQ',
+      name: 'NVA Main HQ',
       position: new THREE.Vector3(0, 0, 1400),
       radius: 30,
       isHomeBase: true,
-      owner: Faction.OPFOR,
+      owner: Faction.NVA,
       ticketBleedRate: 0
     },
     {
       id: 'opfor_hq_west',
-      name: 'OPFOR West FOB',
+      name: 'NVA West FOB',
       position: new THREE.Vector3(-1000, 0, 800),
       radius: 25,
       isHomeBase: true,
-      owner: Faction.OPFOR,
+      owner: Faction.NVA,
       ticketBleedRate: 0
     },
     {
       id: 'opfor_hq_east',
-      name: 'OPFOR East FOB',
+      name: 'NVA East FOB',
       position: new THREE.Vector3(1000, 0, 800),
       radius: 25,
       isHomeBase: true,
-      owner: Faction.OPFOR,
+      owner: Faction.NVA,
       ticketBleedRate: 0
     },
 
@@ -185,5 +201,9 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
       owner: null,
       ticketBleedRate: 2
     }
-  ]
+  ],
+  factionMix: {
+    [Alliance.BLUFOR]: [Faction.US, Faction.ARVN],
+    [Alliance.OPFOR]: [Faction.NVA, Faction.VC],
+  }
 };

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Faction } from '../systems/combat/types';
+import { Faction, Alliance } from '../systems/combat/types';
 import { GameMode, GameModeConfig, WeatherState } from './gameModeTypes';
 
 // AI Sandbox - Automated combat stress test mode
@@ -10,6 +10,14 @@ export const AI_SANDBOX_CONFIG: GameModeConfig = {
 
   worldSize: 200,
   chunkRenderDistance: 4,
+  terrain: {
+    defaultBiome: 'denseJungle',
+    biomeRules: [
+      { biomeId: 'highland',   elevationMin: 15, slopeMax: 45, priority: 3 },
+      { biomeId: 'tallGrass',  elevationMax: 5,  slopeMax: 10, priority: 2 },
+      { biomeId: 'denseJungle', elevationMax: 15, priority: 1 },
+    ],
+  },
   weather: {
     enabled: false,
     initialState: WeatherState.CLEAR,
@@ -51,8 +59,12 @@ export const AI_SANDBOX_CONFIG: GameModeConfig = {
       position: new THREE.Vector3(0, 0, 40),
       radius: 20,
       isHomeBase: true,
-      owner: Faction.OPFOR,
+      owner: Faction.NVA,
       ticketBleedRate: 0
     }
-  ]
+  ],
+  factionMix: {
+    [Alliance.BLUFOR]: [Faction.US],
+    [Alliance.OPFOR]: [Faction.NVA],
+  }
 };

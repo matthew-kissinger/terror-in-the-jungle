@@ -28,6 +28,10 @@ export function createLegend(): HTMLDivElement {
       <div class="legend-icon" style="background: rgba(107, 119, 128, 0.8);"></div>
       <span>Neutral</span>
     </div>
+    <div class="legend-item">
+      <div class="legend-icon" style="background: rgba(91, 140, 201, 0.5); border-radius: 50%; font-size: 8px; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">H</div>
+      <span>Helipad</span>
+    </div>
   `;
   return legend;
 }

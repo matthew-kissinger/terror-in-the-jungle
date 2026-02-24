@@ -71,7 +71,11 @@
       "Bash(git status:*)",
       "mcp__Claude_Preview__preview_start",
       "Bash(where:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npm install:*)",
+      "Bash(npm view:*)",
+      "Bash(wc:*)",
+      "Bash(du:*)"
     ],
     "deny": [],
     "ask": []

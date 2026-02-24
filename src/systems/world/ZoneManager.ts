@@ -2,7 +2,7 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { CombatantSystem } from '../combat/CombatantSystem';
-import { Faction, CombatantState } from '../combat/types';
+import { Faction, CombatantState, isBlufor, isOpfor } from '../combat/types';
 import { spatialGridManager, SpatialGridManager } from '../combat/SpatialGridManager';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { ZoneRenderer } from './ZoneRenderer';
@@ -133,12 +133,12 @@ export class ZoneManager implements GameSystem {
         // Skip dead combatants (state can be enum or string depending on version)
         if (combatant.state === CombatantState.DEAD || (combatant as any).state === 'dead') continue;
 
-          if (combatant.faction === Faction.US) {
+          if (isBlufor(combatant.faction)) {
             occupants.us++;
             if ((combatant as any).isPlayerProxy || combatant.id === 'player_proxy') {
               playerProxyCounted = true;
             }
-          } else if (combatant.faction === Faction.OPFOR) {
+          } else if (isOpfor(combatant.faction)) {
             occupants.opfor++;
           }
         }
@@ -150,12 +150,12 @@ export class ZoneManager implements GameSystem {
             if (!combatant) return;
             if (combatant.state === CombatantState.DEAD || (combatant as any).state === 'dead') return;
             if (combatant.position.distanceTo(zone.position) > zone.radius) return;
-            if (combatant.faction === Faction.US) {
+            if (isBlufor(combatant.faction)) {
               occupants.us++;
               if ((combatant as any).isPlayerProxy || combatant.id === 'player_proxy') {
                 playerProxyCounted = true;
               }
-            } else if (combatant.faction === Faction.OPFOR) {
+            } else if (isOpfor(combatant.faction)) {
               occupants.opfor++;
             }
           });
@@ -197,15 +197,15 @@ export class ZoneManager implements GameSystem {
       // Update capture state
       this.captureLogic.updateZoneCaptureState(zone, occupants, deltaTime);
 
-      // Detect capture by US (player faction)
-      if (previousOwner !== Faction.US && zone.owner === Faction.US && !zone.isHomeBase) {
+      // Detect capture by BLUFOR (player faction)
+      if (!(previousOwner != null && isBlufor(previousOwner)) && zone.owner !== null && isBlufor(zone.owner) && !zone.isHomeBase) {
         if (this.hudSystem && typeof this.hudSystem.addZoneCapture === 'function') {
           this.hudSystem.addZoneCapture(zone.name, false);
         }
       }
 
-      // Detect zone lost by US (captured by OPFOR)
-      if (previousOwner === Faction.US && zone.owner === Faction.OPFOR && !zone.isHomeBase) {
+      // Detect zone lost by BLUFOR (captured by OPFOR)
+      if (previousOwner != null && isBlufor(previousOwner) && zone.owner !== null && isOpfor(zone.owner) && !zone.isHomeBase) {
         if (this.hudSystem && typeof this.hudSystem.addZoneCapture === 'function') {
           this.hudSystem.addZoneCapture(zone.name, true);
         }

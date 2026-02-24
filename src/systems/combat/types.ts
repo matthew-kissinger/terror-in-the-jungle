@@ -3,7 +3,45 @@ import { WeaponSpec, GunplayCore } from '../weapons/GunplayCore';
 
 export enum Faction {
   US = 'US',
+  ARVN = 'ARVN',
+  NVA = 'NVA',
+  VC = 'VC'
+}
+
+export enum Alliance {
+  BLUFOR = 'BLUFOR',
   OPFOR = 'OPFOR'
+}
+
+const FACTION_ALLIANCE: Record<Faction, Alliance> = {
+  [Faction.US]: Alliance.BLUFOR,
+  [Faction.ARVN]: Alliance.BLUFOR,
+  [Faction.NVA]: Alliance.OPFOR,
+  [Faction.VC]: Alliance.OPFOR,
+};
+
+export function getAlliance(faction: Faction): Alliance {
+  return FACTION_ALLIANCE[faction];
+}
+
+export function isAlly(a: Faction, b: Faction): boolean {
+  return FACTION_ALLIANCE[a] === FACTION_ALLIANCE[b];
+}
+
+export function isEnemy(a: Faction, b: Faction): boolean {
+  return FACTION_ALLIANCE[a] !== FACTION_ALLIANCE[b];
+}
+
+export function isBlufor(faction: Faction): boolean {
+  return FACTION_ALLIANCE[faction] === Alliance.BLUFOR;
+}
+
+export function isOpfor(faction: Faction): boolean {
+  return FACTION_ALLIANCE[faction] === Alliance.OPFOR;
+}
+
+export function getEnemyAlliance(alliance: Alliance): Alliance {
+  return alliance === Alliance.BLUFOR ? Alliance.OPFOR : Alliance.BLUFOR;
 }
 
 export interface AISkillProfile {

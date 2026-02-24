@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction } from './types';
+import { Combatant, CombatantState, Faction, isOpfor, isAlly } from './types';
 import { spatialGridManager } from './SpatialGridManager';
 import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 import { AudioManager } from '../audio/AudioManager';
@@ -41,7 +41,7 @@ export class CombatantSuppression {
     playerPosition?: THREE.Vector3
   ): void {
     // Check player for suppression (if OPFOR is shooting)
-    if (playerPosition && shooterFaction === Faction.OPFOR && this.playerSuppressionSystem) {
+    if (playerPosition && isOpfor(shooterFaction) && this.playerSuppressionSystem) {
       const distanceToPlayerSq = hitPoint.distanceToSquared(playerPosition);
 
       if (distanceToPlayerSq < this.SUPPRESSION_RADIUS_SQ) {

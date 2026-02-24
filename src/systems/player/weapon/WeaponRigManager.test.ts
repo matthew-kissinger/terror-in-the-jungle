@@ -73,43 +73,47 @@ vi.mock('three', async () => {
   }
 })
 
-// Mock ProgrammaticGunFactory
-vi.mock('../ProgrammaticGunFactory', () => {
-  // Import THREE from the mock
+// Mock ModelLoader - returns groups for each weapon GLB
+vi.mock('../../assets/ModelLoader', () => {
   const THREE = require('three')
 
-  // Create a helper to make groups with mock named objects
-  function createMockGroup(name: string, hasPumpGrip = false): any {
-    const group = new THREE.Group()
-    group.name = name
-
-    // Create named objects that getObjectByName will find
-    const muzzle = new THREE.Object3D()
-    muzzle.name = 'muzzle'
-    group.add(muzzle)
-
-    const magazine = new THREE.Object3D()
-    magazine.name = 'magazine'
-    group.add(magazine)
-
-    if (hasPumpGrip) {
-      const pumpGrip = new THREE.Object3D()
-      pumpGrip.name = 'pumpGrip'
-      group.add(pumpGrip)
-    }
-
-    return group
-  }
+  // Track which model path was requested to return correct group
+  const shotgunPath = 'weapons/ithaca37.glb'
 
   return {
-    ProgrammaticGunFactory: {
-      createRifle: vi.fn(() => createMockGroup('rifle')),
-      createShotgun: vi.fn(() => createMockGroup('shotgun', true)),
-      createSMG: vi.fn(() => createMockGroup('smg')),
-      createPistol: vi.fn(() => createMockGroup('pistol')),
+    modelLoader: {
+      loadModel: vi.fn(async (path: string) => {
+        const group = new THREE.Group()
+
+        const muzzle = new THREE.Object3D()
+        muzzle.name = 'muzzle'
+        group.add(muzzle)
+
+        const magazine = new THREE.Object3D()
+        magazine.name = 'magazine'
+        group.add(magazine)
+
+        // Only shotgun has pumpGrip
+        if (path === shotgunPath) {
+          const pumpGrip = new THREE.Object3D()
+          pumpGrip.name = 'pumpGrip'
+          group.add(pumpGrip)
+        }
+
+        return group
+      }),
     },
   }
 })
+
+vi.mock('../../assets/modelPaths', () => ({
+  WeaponModels: {
+    M16A1: 'weapons/m16a1.glb',
+    ITHACA37: 'weapons/ithaca37.glb',
+    M3_GREASE_GUN: 'weapons/m3-grease-gun.glb',
+    M1911: 'weapons/m1911.glb',
+  },
+}))
 
 // Mock GunplayCore
 vi.mock('../../weapons/GunplayCore', () => ({
@@ -400,14 +404,14 @@ describe('WeaponRigManager', () => {
       expect(manager.getPumpGripRef()).toBeUndefined() // No pump grip on rifle
     })
 
-    it('switches to shotgun: visibility toggled, core updated, pump grip found', () => {
+    it('switches to shotgun: visibility toggled, core updated, no mag/pump refs', () => {
       manager.startWeaponSwitch('shotgun')
       manager.updateSwitchAnimation(0.21) // Cross midpoint to perform switch
 
       expect(manager.getCurrentCore()).toBe(manager.getShotgunCore())
       expect(manager.getMuzzleRef()).toBeDefined()
-      expect(manager.getMagazineRef()).toBeDefined()
-      expect(manager.getPumpGripRef()).toBeDefined() // Shotgun has pump grip
+      expect(manager.getMagazineRef()).toBeUndefined() // Ithaca 37 has fixed tubular mag
+      expect(manager.getPumpGripRef()).toBeUndefined() // No pump grip animation
     })
 
     it('switches to SMG: visibility toggled, core updated, refs updated', () => {

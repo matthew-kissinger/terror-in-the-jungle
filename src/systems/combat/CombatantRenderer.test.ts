@@ -31,7 +31,7 @@ function createMockShaderMaterial(): THREE.ShaderMaterial {
 // Build faction mesh maps for all directional keys
 function buildFactionMeshMap(): Map<string, THREE.InstancedMesh> {
   const map = new Map<string, THREE.InstancedMesh>();
-  for (const prefix of ['US', 'OPFOR', 'SQUAD']) {
+  for (const prefix of ['US', 'ARVN', 'NVA', 'VC', 'SQUAD']) {
     for (const state of ['walking', 'firing']) {
       for (const dir of DIRECTIONS) {
         map.set(`${prefix}_${state}_${dir}`, createMockInstancedMesh());
@@ -43,7 +43,7 @@ function buildFactionMeshMap(): Map<string, THREE.InstancedMesh> {
 
 function buildFactionMaterialMap(): Map<string, THREE.ShaderMaterial> {
   const map = new Map<string, THREE.ShaderMaterial>();
-  for (const prefix of ['US', 'OPFOR', 'SQUAD']) {
+  for (const prefix of ['US', 'ARVN', 'NVA', 'VC', 'SQUAD']) {
     for (const state of ['walking', 'firing']) {
       for (const dir of DIRECTIONS) {
         map.set(`${prefix}_${state}_${dir}`, createMockShaderMaterial());
@@ -289,7 +289,7 @@ describe('CombatantRenderer', () => {
       );
       const opforCombatant = createMockCombatant(
         'opfor-1',
-        Faction.OPFOR,
+        Faction.NVA,
         new THREE.Vector3(20, 0, 0),
         CombatantState.ENGAGING
       );
@@ -821,7 +821,7 @@ describe('CombatantRenderer', () => {
       const combatants = new Map<string, Combatant>();
       const opforCombatant = createMockCombatant(
         'opfor-1',
-        Faction.OPFOR,
+        Faction.NVA,
         new THREE.Vector3(10, 0, 0),
         CombatantState.IDLE,
         Math.PI
@@ -899,7 +899,7 @@ describe('CombatantRenderer', () => {
 
       const opforCombatant = createMockCombatant(
         'opfor-1',
-        Faction.OPFOR,
+        Faction.NVA,
         new THREE.Vector3(20, 0, 0),
         CombatantState.ENGAGING
       );

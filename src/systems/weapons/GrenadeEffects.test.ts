@@ -130,7 +130,7 @@ const createMockCombatant = (
   id: string,
   position: THREE.Vector3,
   state: CombatantState = CombatantState.IDLE,
-  faction: Faction = Faction.OPFOR
+  faction: Faction = Faction.NVA
 ): Combatant => ({
   id,
   faction,

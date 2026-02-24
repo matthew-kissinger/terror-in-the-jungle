@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { Faction } from './types';
+import { Faction, isBlufor, getAlliance } from './types';
 import { ZoneManager } from '../world/ZoneManager';
 import { Logger } from '../../utils/Logger';
 
@@ -226,9 +226,9 @@ export class RallyPointSystem implements GameSystem {
 
     const zones = this.zoneManager.getAllZones();
 
+    const factionAlliance = getAlliance(faction);
     for (const zone of zones) {
-      // Check if zone is owned by the same faction
-      if (zone.owner === faction) {
+      if (zone.owner !== null && getAlliance(zone.owner as Faction) === factionAlliance) {
         const distance = position.distanceTo(zone.position);
         if (distance <= zone.radius + this.RALLY_POINT_PLACEMENT_RANGE) {
           return true;
@@ -269,7 +269,7 @@ export class RallyPointSystem implements GameSystem {
     const flagGeometry = new THREE.PlaneGeometry(this.FLAG_WIDTH, this.FLAG_HEIGHT, 8, 8);
 
     // Set flag color based on faction
-    const flagColor = faction === Faction.US ? 0x0080ff : 0xff0000;
+    const flagColor = isBlufor(faction) ? 0x0080ff : 0xff0000;
     const flagMaterial = new THREE.MeshStandardMaterial({
       color: flagColor,
       side: THREE.DoubleSide,

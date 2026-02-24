@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Faction } from '../../systems/combat/types';
+import { Faction, isBlufor, isOpfor } from '../../systems/combat/types';
 import { CaptureZone, ZoneManager, ZoneState } from '../../systems/world/ZoneManager';
 
 const _cameraPos = new THREE.Vector3();
@@ -61,7 +61,7 @@ export function updateZoneMarkers({
       markerClass += 'contested';
     } else if (zone.owner === Faction.US) {
       markerClass += 'friendly';
-    } else if (zone.owner === Faction.OPFOR) {
+    } else if (zone.owner !== null && isOpfor(zone.owner)) {
       markerClass += 'enemy';
     } else {
       markerClass += 'neutral';

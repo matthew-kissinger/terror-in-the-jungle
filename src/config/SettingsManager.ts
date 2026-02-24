@@ -1,11 +1,20 @@
 import { Logger } from '../utils/Logger';
 
 export type GraphicsQuality = 'low' | 'medium' | 'high' | 'ultra';
+export type ControllerPreset = 'default' | 'southpaw';
+export type ControllerLookCurve = 'precision' | 'linear';
+export type ControllerDpadMode = 'weapons' | 'quickCommands';
 
 export interface GameSettings {
   masterVolume: number;       // 0-100
   mouseSensitivity: number;   // 1-10 (UI scale), mapped to 0.001-0.005 internally
   touchSensitivity: number;   // 1-10 (UI scale), mapped to 0.002-0.008 internally (touch needs higher base)
+  controllerPreset: ControllerPreset;
+  controllerMoveDeadZone: number; // 5-30 percent
+  controllerLookDeadZone: number; // 5-30 percent
+  controllerLookCurve: ControllerLookCurve;
+  controllerInvertY: boolean;
+  controllerDpadMode: ControllerDpadMode;
   showFPS: boolean;
   enableShadows: boolean;
   graphicsQuality: GraphicsQuality;
@@ -20,6 +29,12 @@ const DEFAULT_SETTINGS: GameSettings = {
   masterVolume: 70,
   mouseSensitivity: 5,
   touchSensitivity: 5,
+  controllerPreset: 'default',
+  controllerMoveDeadZone: 15,
+  controllerLookDeadZone: 15,
+  controllerLookCurve: 'precision',
+  controllerInvertY: false,
+  controllerDpadMode: 'weapons',
   showFPS: false,
   enableShadows: true,
   graphicsQuality: 'medium',
@@ -64,6 +79,16 @@ export class SettingsManager {
   getTouchSensitivityRaw(): number {
     const uiValue = this.settings.touchSensitivity; // 1-10
     return 0.002 + (uiValue - 1) * (0.006 / 9);
+  }
+
+  /** Returns controller move stick dead zone as 0-1 fraction. */
+  getControllerMoveDeadZoneRaw(): number {
+    return this.settings.controllerMoveDeadZone / 100;
+  }
+
+  /** Returns controller look stick dead zone as 0-1 fraction. */
+  getControllerLookDeadZoneRaw(): number {
+    return this.settings.controllerLookDeadZone / 100;
   }
 
   /** Returns master volume as 0-1 float */

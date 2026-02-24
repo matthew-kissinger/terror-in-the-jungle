@@ -58,9 +58,9 @@ describe('WarSimulator.spawnStrategicForces frontline seeding', () => {
 
     const zones: SpawnZone[] = [
       { id: 'us_hq', name: 'US HQ', position: { x: -1000, z: 0 }, isHomeBase: true, owner: Faction.US },
-      { id: 'opfor_hq', name: 'OP HQ', position: { x: 1000, z: 0 }, isHomeBase: true, owner: Faction.OPFOR },
+      { id: 'opfor_hq', name: 'OP HQ', position: { x: 1000, z: 0 }, isHomeBase: true, owner: Faction.NVA },
       { id: 'us_firebase', name: 'US Firebase', position: { x: -400, z: 180 }, isHomeBase: false, owner: Faction.US, ticketBleedRate: 2 },
-      { id: 'opfor_depot', name: 'OP Depot', position: { x: 420, z: -150 }, isHomeBase: false, owner: Faction.OPFOR, ticketBleedRate: 2 },
+      { id: 'opfor_depot', name: 'OP Depot', position: { x: 420, z: -150 }, isHomeBase: false, owner: Faction.NVA, ticketBleedRate: 2 },
       { id: 'hill_937', name: 'Hill 937', position: { x: 0, z: 0 }, isHomeBase: false, owner: null, state: 'contested', ticketBleedRate: 6 },
       { id: 'valley_crossing', name: 'Valley Crossing', position: { x: 120, z: 80 }, isHomeBase: false, owner: null, state: 'neutral', ticketBleedRate: 4 }
     ];
@@ -71,7 +71,7 @@ describe('WarSimulator.spawnStrategicForces frontline seeding', () => {
 
     const frontlineZones = zones.filter(z => !z.isHomeBase && (z.owner === null || z.state === 'contested'));
     const usFrontline = countFactionAgentsNearZones(simulator, frontlineZones, Faction.US, 220);
-    const opforFrontline = countFactionAgentsNearZones(simulator, frontlineZones, Faction.OPFOR, 220);
+    const opforFrontline = countFactionAgentsNearZones(simulator, frontlineZones, Faction.NVA, 220);
 
     // 20% frontline share with fixed size 10 gives >=20 agents/faction near frontline.
     expect(usFrontline).toBeGreaterThanOrEqual(20);
@@ -102,9 +102,9 @@ describe('WarSimulator.spawnStrategicForces frontline seeding', () => {
 
     const zones: SpawnZone[] = [
       { id: 'us_hq', name: 'US HQ', position: { x: -1000, z: 0 }, isHomeBase: true, owner: Faction.US },
-      { id: 'opfor_hq', name: 'OP HQ', position: { x: 1000, z: 0 }, isHomeBase: true, owner: Faction.OPFOR },
+      { id: 'opfor_hq', name: 'OP HQ', position: { x: 1000, z: 0 }, isHomeBase: true, owner: Faction.NVA },
       { id: 'us_zone', name: 'US Zone', position: { x: -350, z: 120 }, isHomeBase: false, owner: Faction.US },
-      { id: 'op_zone', name: 'OP Zone', position: { x: 360, z: -120 }, isHomeBase: false, owner: Faction.OPFOR },
+      { id: 'op_zone', name: 'OP Zone', position: { x: 360, z: -120 }, isHomeBase: false, owner: Faction.NVA },
       highValue,
       lowValue
     ];
@@ -112,9 +112,9 @@ describe('WarSimulator.spawnStrategicForces frontline seeding', () => {
     simulator.spawnStrategicForces(zones);
 
     const usAtHigh = countFactionAgentsNearZones(simulator, [highValue], Faction.US, 220);
-    const opforAtHigh = countFactionAgentsNearZones(simulator, [highValue], Faction.OPFOR, 220);
+    const opforAtHigh = countFactionAgentsNearZones(simulator, [highValue], Faction.NVA, 220);
     const usAtLow = countFactionAgentsNearZones(simulator, [lowValue], Faction.US, 220);
-    const opforAtLow = countFactionAgentsNearZones(simulator, [lowValue], Faction.OPFOR, 220);
+    const opforAtLow = countFactionAgentsNearZones(simulator, [lowValue], Faction.NVA, 220);
 
     // With one frontline squad/faction, both should seed at the highest-value frontline objective.
     expect(usAtHigh).toBeGreaterThanOrEqual(10);
@@ -127,7 +127,7 @@ describe('WarSimulator.spawnStrategicForces frontline seeding', () => {
     const simulator = createConfiguredSimulator(60, 10);
     const zones: SpawnZone[] = [
       { id: 'us_hq', name: 'US HQ', position: { x: -1000, z: 0 }, isHomeBase: true, owner: Faction.US },
-      { id: 'opfor_hq', name: 'OP HQ', position: { x: 1000, z: 0 }, isHomeBase: true, owner: Faction.OPFOR },
+      { id: 'opfor_hq', name: 'OP HQ', position: { x: 1000, z: 0 }, isHomeBase: true, owner: Faction.NVA },
       { id: 'hill_937', name: 'Hill 937', position: { x: 0, z: 0 }, isHomeBase: false, owner: null, state: 'contested', ticketBleedRate: 6 }
     ];
 

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Combatant, CombatantState, Faction, Squad } from '../types'
+import { Combatant, CombatantState, Faction, Squad, isOpfor } from '../types'
 import { SpatialOctree } from '../SpatialOctree'
 import { AICoverSystem } from './AICoverSystem'
 import { AIFlankingSystem } from './AIFlankingSystem'
@@ -181,7 +181,7 @@ export class AIStateEngage {
       // Reset burst params if not full auto
       if (!combatant.isFullAuto) {
         const isLeader = combatant.squadRole === 'leader'
-        if (combatant.faction === Faction.OPFOR) {
+        if (isOpfor(combatant.faction)) {
           combatant.skillProfile.burstLength = isLeader ? 4 : 3
           combatant.skillProfile.burstPauseMs = isLeader ? 800 : 1000
         } else {

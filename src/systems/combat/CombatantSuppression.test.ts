@@ -87,7 +87,7 @@ describe('CombatantSuppression', () => {
     it('increases combatant suppression level on near miss', () => {
       const combatant = createMockCombatant({
         id: 'enemy-1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(2, 0, 0),
         suppressionLevel: 0,
       });
@@ -107,7 +107,7 @@ describe('CombatantSuppression', () => {
     it('does not suppress dead combatants', () => {
       const combatant = createMockCombatant({
         id: 'enemy-1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(2, 0, 0),
         state: CombatantState.DEAD,
         suppressionLevel: 0,
@@ -155,7 +155,7 @@ describe('CombatantSuppression', () => {
 
       vi.mocked(spatialGridManager.queryRadius).mockReturnValue([]);
 
-      suppression.trackNearMisses(shotRay, hitPoint, Faction.OPFOR, allCombatants, playerPosition);
+      suppression.trackNearMisses(shotRay, hitPoint, Faction.NVA, allCombatants, playerPosition);
 
       expect(mockPlayerSuppressionSystem.registerNearMiss).toHaveBeenCalledWith(hitPoint, playerPosition);
     });
@@ -186,7 +186,7 @@ describe('CombatantSuppression', () => {
 
       vi.mocked(spatialGridManager.queryRadius).mockReturnValue([]);
 
-      suppression.trackNearMisses(shotRay, hitPoint, Faction.OPFOR, allCombatants, playerPosition);
+      suppression.trackNearMisses(shotRay, hitPoint, Faction.NVA, allCombatants, playerPosition);
 
       expect(mockAudioManager.playBulletWhizSound).toHaveBeenCalledWith(hitPoint, playerPosition);
     });
@@ -202,7 +202,7 @@ describe('CombatantSuppression', () => {
 
       vi.mocked(spatialGridManager.queryRadius).mockReturnValue([]);
 
-      suppression.trackNearMisses(shotRay, hitPoint, Faction.OPFOR, allCombatants, playerPosition);
+      suppression.trackNearMisses(shotRay, hitPoint, Faction.NVA, allCombatants, playerPosition);
 
       expect(mockAudioManager.playBulletWhizSound).not.toHaveBeenCalled();
     });
@@ -210,7 +210,7 @@ describe('CombatantSuppression', () => {
     it('uses spatial grid query for efficient lookups', () => {
       const combatant = createMockCombatant({
         id: 'enemy-1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(2, 0, 0),
       });
 
@@ -230,7 +230,7 @@ describe('CombatantSuppression', () => {
 
       const combatant = createMockCombatant({
         id: 'enemy-1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(2, 0, 0),
         suppressionLevel: 0,
       });
@@ -248,7 +248,7 @@ describe('CombatantSuppression', () => {
     it('increases panic level based on proximity', () => {
       const combatant = createMockCombatant({
         id: 'enemy-1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(1, 0, 0), // Very close
         panicLevel: 0,
       });
@@ -267,7 +267,7 @@ describe('CombatantSuppression', () => {
     it('triggers cover seeking after multiple near misses', () => {
       const combatant = createMockCombatant({
         id: 'enemy-1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(1, 0, 0),
         state: CombatantState.ENGAGING,
         panicLevel: 0.7,
@@ -289,7 +289,7 @@ describe('CombatantSuppression', () => {
     it('does not trigger cover seeking from idle state', () => {
       const combatant = createMockCombatant({
         id: 'enemy-1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(1, 0, 0),
         state: CombatantState.IDLE,
         panicLevel: 0.7,
@@ -310,7 +310,7 @@ describe('CombatantSuppression', () => {
     it('sets lastSuppressedTime timestamp', () => {
       const combatant = createMockCombatant({
         id: 'enemy-1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(2, 0, 0),
       });
 
@@ -331,7 +331,7 @@ describe('CombatantSuppression', () => {
     it('clamps suppression level at 1.0', () => {
       const combatant = createMockCombatant({
         id: 'enemy-1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(1, 0, 0),
         suppressionLevel: 0.9,
       });
@@ -350,7 +350,7 @@ describe('CombatantSuppression', () => {
     it('clamps panic level at 1.0', () => {
       const combatant = createMockCombatant({
         id: 'enemy-1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(1, 0, 0),
         panicLevel: 0.95,
       });
@@ -369,7 +369,7 @@ describe('CombatantSuppression', () => {
     it('ignores combatants outside suppression radius', () => {
       const combatant = createMockCombatant({
         id: 'enemy-1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(100, 0, 0), // Far away
         suppressionLevel: 0,
       });
@@ -389,14 +389,14 @@ describe('CombatantSuppression', () => {
     it('handles multiple combatants in suppression radius', () => {
       const combatant1 = createMockCombatant({
         id: 'enemy-1',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(2, 0, 0),
         suppressionLevel: 0,
       });
 
       const combatant2 = createMockCombatant({
         id: 'enemy-2',
-        faction: Faction.OPFOR,
+        faction: Faction.NVA,
         position: new THREE.Vector3(0, 2, 0),
         suppressionLevel: 0,
       });
@@ -425,7 +425,7 @@ describe('CombatantSuppression', () => {
 
       vi.mocked(spatialGridManager.queryRadius).mockReturnValue([]);
 
-      suppression.trackNearMisses(shotRay, hitPoint, Faction.OPFOR, allCombatants);
+      suppression.trackNearMisses(shotRay, hitPoint, Faction.NVA, allCombatants);
 
       expect(mockPlayerSuppressionSystem.registerNearMiss).not.toHaveBeenCalled();
     });

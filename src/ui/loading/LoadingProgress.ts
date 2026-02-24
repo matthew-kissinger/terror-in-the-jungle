@@ -28,17 +28,20 @@ export class LoadingProgress {
   private percentText: HTMLSpanElement;
   private phaseText: HTMLDivElement;
   private tipText: HTMLDivElement;
+  private loadTimeText: HTMLSpanElement | null;
 
   constructor(
     progressFill: HTMLDivElement,
     percentText: HTMLSpanElement,
     phaseText: HTMLDivElement,
-    tipText: HTMLDivElement
+    tipText: HTMLDivElement,
+    loadTimeText: HTMLSpanElement | null = null
   ) {
     this.progressFill = progressFill;
     this.percentText = percentText;
     this.phaseText = phaseText;
     this.tipText = tipText;
+    this.loadTimeText = loadTimeText;
   }
 
   addPhase(id: string, weight: number, name: string): void {
@@ -100,9 +103,8 @@ export class LoadingProgress {
 
   private updateLoadTime(): void {
     const loadTime = ((Date.now() - this.startTime) / 1000).toFixed(1);
-    const statsEl = document.querySelector('.load-time');
-    if (statsEl) {
-      statsEl.textContent = `Load time: ${loadTime}s`;
+    if (this.loadTimeText) {
+      this.loadTimeText.textContent = `Load time: ${loadTime}s`;
     }
   }
 

@@ -160,7 +160,7 @@ export class VoiceCalloutSystem implements GameSystem {
 
     const byFaction: Array<[Faction, string]> = [
       [Faction.US, 'assets/optimized/voiceCalloutUS.wav'],
-      [Faction.OPFOR, 'assets/optimized/voiceCalloutOPFOR.wav']
+      [Faction.NVA, 'assets/optimized/voiceCalloutOPFOR.wav']
     ];
     await Promise.all(byFaction.map(async ([faction, path]) => {
       try {

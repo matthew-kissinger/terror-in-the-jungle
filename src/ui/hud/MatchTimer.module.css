@@ -7,7 +7,7 @@
  */
 
 .container {
-  padding: var(--space-1) var(--space-3);
+  padding: var(--space-0-5) var(--space-2);
   pointer-events: none;
   user-select: none;
 }
@@ -17,8 +17,8 @@
   font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
   color: var(--text-primary);
-  text-align: center;
-  letter-spacing: 1.5px;
+  text-align: left;
+  letter-spacing: 1px;
   text-shadow: var(--shadow-text);
   transition: color var(--duration-normal) var(--ease-out);
   line-height: 1;
@@ -50,7 +50,7 @@
 /* Responsive */
 @media (max-width: 768px) {
   .container {
-    padding: var(--space-0-5) var(--space-2);
+    padding: var(--space-0-5) var(--space-1-5);
   }
 
   .display {
@@ -60,7 +60,7 @@
 
 @media (max-width: 480px) {
   .container {
-    padding: var(--space-0-5) var(--space-1-5);
+    padding: 2px var(--space-1);
   }
 
   .display {

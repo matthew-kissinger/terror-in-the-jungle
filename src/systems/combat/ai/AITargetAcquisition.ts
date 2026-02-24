@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction } from '../types';
+import { Combatant, CombatantState, Faction, isOpfor } from '../types';
 import { SpatialOctree } from '../SpatialOctree';
 import { clusterManager } from '../ClusterManager';
 
@@ -38,7 +38,7 @@ export class AITargetAcquisition {
     let inCluster = false;
 
     // Check player as potential target for OPFOR
-    if (combatant.faction === Faction.OPFOR) {
+    if (isOpfor(combatant.faction)) {
       const playerDistanceSq = combatant.position.distanceToSquared(playerPosition);
       if (playerDistanceSq < visualRangeSq) {
         // Reuse player proxy instead of creating new object
@@ -172,7 +172,7 @@ export class AITargetAcquisition {
     let count = 0;
     const radiusSq = radius * radius;
 
-    if (combatant.faction === Faction.OPFOR) {
+    if (isOpfor(combatant.faction)) {
       if (combatant.position.distanceToSquared(playerPosition) < radiusSq) {
         count++;
       }

@@ -2,7 +2,7 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
-import { Faction } from '../../systems/combat/types';
+import { Faction, Alliance, getAlliance } from '../../systems/combat/types';
 import { ZoneManager } from '../../systems/world/ZoneManager';
 import { TicketSystem, GameState } from '../../systems/world/TicketSystem';
 import { HUDStyles } from './HUDStyles';
@@ -103,7 +103,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
     // Add HUD to DOM (pass layout for grid-based mounting)
     this.elements.attachToDOM(this.hudLayout);
-    this.scoreboard.mount(document.body);
+    this.scoreboard.mount(this.hudLayout.getRoot());
     this.personalStatsPanel.mount(this.hudLayout.getSlot('stats'));
 
     // Initialize ticket display
@@ -143,7 +143,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
         this.updater.updateGameStatus(this.ticketSystem);
         this.updater.updateTicketDisplay(
           this.ticketSystem.getTickets(Faction.US),
-          this.ticketSystem.getTickets(Faction.OPFOR),
+          this.ticketSystem.getTickets(Faction.NVA),
           isTDM,
           this.ticketSystem.getKillTarget()
         );
@@ -288,7 +288,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       zonesCaptured: playerStats.zonesCaptured,
       matchDuration: gameState.matchDuration,
       usTickets: this.ticketSystem.getTickets(Faction.US),
-      opforTickets: this.ticketSystem.getTickets(Faction.OPFOR),
+      opforTickets: this.ticketSystem.getTickets(Faction.NVA),
       usTeamKills: teamKillStats.usKills + playerStats.kills,
       usTeamDeaths: teamKillStats.usDeaths + playerStats.deaths,
       opforTeamKills: teamKillStats.opforKills,

@@ -162,7 +162,7 @@ describe('CombatantDamage', () => {
 
     it('should track damage for KillAssistTracker', () => {
       const target = createMockCombatant('target-1', Faction.US, 100);
-      const attacker = createMockCombatant('attacker-1', Faction.OPFOR, 100);
+      const attacker = createMockCombatant('attacker-1', Faction.NVA, 100);
       combatantDamage.applyDamage(target, 10, attacker);
       expect(KillAssistTracker.trackDamage).toHaveBeenCalledWith(target, 'attacker-1', 10);
     });
@@ -176,15 +176,15 @@ describe('CombatantDamage', () => {
 
     it('should trigger player death HUD and kill feed if player proxy dies', () => {
       const playerProxy = createMockCombatant('player-proxy', Faction.US, 100, CombatantState.IDLE, true);
-      const attacker = createMockCombatant('attacker-0001', Faction.OPFOR, 100);
+      const attacker = createMockCombatant('attacker-0001', Faction.NVA, 100);
       (mockPlayerHealthSystem.takeDamage as vi.Mock).mockReturnValue(true); // Player dies
 
       combatantDamage.applyDamage(playerProxy, 100, attacker);
 
       expect(mockHUDSystem.addDeath).toHaveBeenCalled();
       expect(mockHUDSystem.addKillToFeed).toHaveBeenCalledWith(
-        'OPFOR-0001',
-        Faction.OPFOR,
+        'NVA-0001',
+        Faction.NVA,
         'PLAYER',
         Faction.US,
         false,
@@ -230,7 +230,7 @@ describe('CombatantDamage', () => {
 
     it('should increment attacker kills if attacker exists and is not player proxy', () => {
       const target = createMockCombatant('target-1', Faction.US, 10);
-      const attacker = createMockCombatant('attacker-1', Faction.OPFOR, 100);
+      const attacker = createMockCombatant('attacker-1', Faction.NVA, 100);
       combatantDamage.applyDamage(target, 20, attacker);
       expect(attacker.kills).toBe(1);
     });
@@ -245,7 +245,7 @@ describe('CombatantDamage', () => {
     it('should process kill assists via KillAssistTracker', () => {
       const target = createMockCombatant('target-0002', Faction.US, 10);
       target.damageHistory = [{ attackerId: 'some-attacker', damage: 1, timestamp: Date.now() }];
-      const attacker = createMockCombatant('attacker-0001', Faction.OPFOR, 100);
+      const attacker = createMockCombatant('attacker-0001', Faction.NVA, 100);
       combatantDamage.applyDamage(target, 20, attacker);
       expect(KillAssistTracker.processKillAssists).toHaveBeenCalledWith(target, 'attacker-0001');
     });
@@ -253,7 +253,7 @@ describe('CombatantDamage', () => {
     it('should call hudSystem.addAssist if player gets an assist', () => {
       const target = createMockCombatant('target-0003', Faction.US, 10);
       target.damageHistory = [{ attackerId: 'some-attacker', damage: 1, timestamp: Date.now() }];
-      const attacker = createMockCombatant('attacker-0004', Faction.OPFOR, 100);
+      const attacker = createMockCombatant('attacker-0004', Faction.NVA, 100);
       (KillAssistTracker.processKillAssists as vi.Mock).mockReturnValue(new Set<string>(['PLAYER']));
       combatantDamage.applyDamage(target, 20, attacker);
       expect(mockHUDSystem.addAssist).toHaveBeenCalled();
@@ -288,7 +288,7 @@ describe('CombatantDamage', () => {
     it('should calculate death direction from attacker position', () => {
       const target = createMockCombatant('target-1', Faction.US, 10);
       target.position.set(5, 0, 0);
-      const attacker = createMockCombatant('attacker-1', Faction.OPFOR, 100);
+      const attacker = createMockCombatant('attacker-1', Faction.NVA, 100);
       attacker.position.set(0, 0, 0);
       combatantDamage.applyDamage(target, 20, attacker);
       expect(target.deathDirection).toBeInstanceOf(THREE.Vector3);
@@ -313,7 +313,7 @@ describe('CombatantDamage', () => {
     it('should trigger "Man down!" callout for nearby allies (with probability)', () => {
       const target = createMockCombatant('target-1', Faction.US, 10, CombatantState.IDLE, false, 'squad-1');
       target.position.set(0, 0, 0); // Set target position to ensure ally is nearby
-      const attacker = createMockCombatant('attacker-1', Faction.OPFOR, 100);
+      const attacker = createMockCombatant('attacker-1', Faction.NVA, 100);
       const ally1 = createMockCombatant('ally-1', Faction.US, 100, CombatantState.IDLE, false, 'squad-1');
       ally1.position.set(10, 0, 0);
       const allCombatants = new Map<string, Combatant>();
@@ -377,11 +377,11 @@ describe('CombatantDamage', () => {
 
     it('should add AI-on-AI kill to HUD kill feed', () => {
       const target = createMockCombatant('target-0002', Faction.US, 10);
-      const attacker = createMockCombatant('attacker-0001', Faction.OPFOR, 100); // ID for slice(-4)
+      const attacker = createMockCombatant('attacker-0001', Faction.NVA, 100); // ID for slice(-4)
       combatantDamage.applyDamage(target, 20, attacker);
       expect(mockHUDSystem.addKillToFeed).toHaveBeenCalledWith(
-        'OPFOR-0001', // attacker.id.slice(-4)
-        Faction.OPFOR,
+        'NVA-0001', // attacker.id.slice(-4)
+        Faction.NVA,
         'US-0002', // target.id.slice(-4)
         Faction.US,
         false,
@@ -412,10 +412,10 @@ describe('CombatantDamage', () => {
   describe('getKillerName/getVictimName logic within kill feed updates', () => {
     it('should correctly format killer name for AI attacker', () => {
       const target = createMockCombatant('target-1', Faction.US, 10);
-      const attacker = createMockCombatant('killer-5678', Faction.OPFOR, 100);
+      const attacker = createMockCombatant('killer-5678', Faction.NVA, 100);
       combatantDamage.applyDamage(target, 20, attacker);
       expect(mockHUDSystem.addKillToFeed).toHaveBeenCalledWith(
-        'OPFOR-5678',
+        'NVA-5678',
         expect.any(String),
         expect.any(String),
         expect.any(String),
@@ -426,7 +426,7 @@ describe('CombatantDamage', () => {
 
     it('should correctly format victim name for AI target', () => {
       const target = createMockCombatant('victim-1234', Faction.US, 10);
-      const attacker = createMockCombatant('killer-5678', Faction.OPFOR, 100);
+      const attacker = createMockCombatant('killer-5678', Faction.NVA, 100);
       combatantDamage.applyDamage(target, 20, attacker);
       expect(mockHUDSystem.addKillToFeed).toHaveBeenCalledWith(
         expect.any(String),
@@ -440,7 +440,7 @@ describe('CombatantDamage', () => {
 
     it('should use "PLAYER" for player proxy as victim', () => {
       const playerProxy = createMockCombatant('player-proxy', Faction.US, 100, CombatantState.IDLE, true);
-      const attacker = createMockCombatant('attacker-1', Faction.OPFOR, 100);
+      const attacker = createMockCombatant('attacker-1', Faction.NVA, 100);
       (mockPlayerHealthSystem.takeDamage as vi.Mock).mockReturnValue(true); // Player dies
 
       combatantDamage.applyDamage(playerProxy, 100, attacker);
@@ -461,7 +461,7 @@ describe('CombatantDamage', () => {
 
       const target = createMockCombatant('target-1', Faction.US, 10, CombatantState.IDLE, false, 'squad-1');
       target.position.set(0, 0, 0); // Set target position to ensure ally is nearby
-      const attacker = createMockCombatant('attacker-1', Faction.OPFOR, 100);
+      const attacker = createMockCombatant('attacker-1', Faction.NVA, 100);
       const ally1 = createMockCombatant('ally-1', Faction.US, 100, CombatantState.IDLE, false, 'squad-1');
       ally1.position.set(10, 0, 0);
       const allCombatants = new Map<string, Combatant>();
@@ -482,7 +482,7 @@ describe('CombatantDamage', () => {
 
     it('should not trigger Man Down callout if no nearby allies', () => {
       const target = createMockCombatant('target-1', Faction.US, 10, CombatantState.IDLE, false, 'squad-1');
-      const attacker = createMockCombatant('attacker-1', Faction.OPFOR, 100);
+      const attacker = createMockCombatant('attacker-1', Faction.NVA, 100);
       const allCombatants = new Map<string, Combatant>();
       allCombatants.set(target.id, target);
       
@@ -498,7 +498,7 @@ describe('CombatantDamage', () => {
 
     it('should not trigger Man Down callout if nearby ally is dead', () => {
       const target = createMockCombatant('target-1', Faction.US, 10, CombatantState.IDLE, false, 'squad-1');
-      const attacker = createMockCombatant('attacker-1', Faction.OPFOR, 100);
+      const attacker = createMockCombatant('attacker-1', Faction.NVA, 100);
       const deadAlly = createMockCombatant('dead-ally', Faction.US, 0, CombatantState.DEAD, false, 'squad-1');
       deadAlly.position.set(10, 0, 0);
       const allCombatants = new Map<string, Combatant>();
@@ -516,8 +516,8 @@ describe('CombatantDamage', () => {
 
     it('should not trigger Man Down callout if nearby ally is of different faction', () => {
       const target = createMockCombatant('target-1', Faction.US, 10, CombatantState.IDLE, false, 'squad-1');
-      const attacker = createMockCombatant('attacker-1', Faction.OPFOR, 100);
-      const enemyAlly = createMockCombatant('enemy-ally', Faction.OPFOR, 100, CombatantState.IDLE, false, 'squad-2');
+      const attacker = createMockCombatant('attacker-1', Faction.NVA, 100);
+      const enemyAlly = createMockCombatant('enemy-ally', Faction.NVA, 100, CombatantState.IDLE, false, 'squad-2');
       enemyAlly.position.set(10, 0, 0);
       const allCombatants = new Map<string, Combatant>();
       allCombatants.set(target.id, target);

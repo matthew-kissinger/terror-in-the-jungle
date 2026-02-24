@@ -42,7 +42,7 @@ export class GPUTimingTelemetry {
       this.gpuTimingAvailable = true
       Logger.info('performance', '[Perf] GPU timing enabled (EXT_disjoint_timer_query_webgl2)')
     } else {
-      Logger.info('performance', '[Perf] GPU timing unavailable (extension not supported)')
+      Logger.debug('performance', '[Perf] GPU timing unavailable (extension not supported)')
     }
   }
 

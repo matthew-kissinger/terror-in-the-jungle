@@ -91,7 +91,7 @@ describe('AIStatePatrol', () => {
 
     it('should transition to ALERT when enemy is found and LOS is clear', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(100, 0, 100));
-      const enemy = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(120, 0, 120));
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(120, 0, 120));
       
       findNearestEnemy.mockReturnValue(enemy);
       canSeeTarget.mockReturnValue(true);
@@ -110,7 +110,7 @@ describe('AIStatePatrol', () => {
 
     it('should react immediately and bypass LOS check at very close range (<15m)', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(10, 0, 10));
-      const enemy = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(12, 0, 12));
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(12, 0, 12));
       
       findNearestEnemy.mockReturnValue(enemy);
       canSeeTarget.mockReturnValue(false); // LOS blocked
@@ -127,7 +127,7 @@ describe('AIStatePatrol', () => {
 
     it('should apply staggered reaction delay when in dense clusters', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(100, 0, 100));
-      const enemy = createMockCombatant('e1', Faction.OPFOR, new THREE.Vector3(120, 0, 120));
+      const enemy = createMockCombatant('e1', Faction.NVA, new THREE.Vector3(120, 0, 120));
       allCombatants.set(combatant.id, combatant);
       for (let i = 0; i < 4; i++) {
         allCombatants.set(`ally-${i}`, createMockCombatant(`ally-${i}`, Faction.US, new THREE.Vector3(101 + i, 0, 101)));

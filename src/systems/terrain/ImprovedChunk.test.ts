@@ -4,6 +4,8 @@ import { ImprovedChunk } from './ImprovedChunk';
 import { AssetLoader } from '../assets/AssetLoader';
 import { NoiseGenerator } from '../../utils/NoiseGenerator';
 import { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
+import { BiomeTexturePool } from './BiomeTexturePool';
+import { HeightQueryCache } from './HeightQueryCache';
 
 // Mock Logger
 vi.mock('../../utils/Logger', () => ({
@@ -43,15 +45,7 @@ vi.mock('./ChunkHeightGenerator', () => ({
 // Mock ChunkVegetationGenerator
 vi.mock('./ChunkVegetationGenerator', () => ({
   ChunkVegetationGenerator: {
-    generateVegetation: vi.fn(() => ({
-      fernInstances: [],
-      elephantEarInstances: [],
-      fanPalmInstances: [],
-      coconutInstances: [],
-      arecaInstances: [],
-      dipterocarpInstances: [],
-      banyanInstances: []
-    }))
+    generateVegetation: vi.fn(() => new Map())
   }
 }));
 
@@ -78,13 +72,7 @@ vi.mock('./ChunkWorkerAdapter', () => ({
     applyWorkerData: vi.fn().mockResolvedValue({
       terrainMesh: undefined,
       terrainGeometry: undefined,
-      fernInstances: [],
-      elephantEarInstances: [],
-      fanPalmInstances: [],
-      coconutInstances: [],
-      arecaInstances: [],
-      dipterocarpInstances: [],
-      banyanInstances: []
+      vegetationMap: new Map()
     })
   }
 }));
@@ -121,7 +109,23 @@ function createMockBillboardSystem(): GlobalBillboardSystem {
     reserveBillboardsForChunk: vi.fn(),
     activateBillboardsForChunk: vi.fn(),
     releaseBillboardsForChunk: vi.fn(),
+    getActiveVegetationTypes: vi.fn(() => []),
+    getActiveBiome: vi.fn(() => ({ id: 'denseJungle', vegetationPalette: [] })),
   } as unknown as GlobalBillboardSystem;
+}
+
+function createMockBiomePool(): BiomeTexturePool {
+  return {
+    getMaterial: vi.fn(() => new THREE.MeshBasicMaterial()),
+    dispose: vi.fn(),
+  } as unknown as BiomeTexturePool;
+}
+
+function createMockHeightCache(): HeightQueryCache {
+  return {
+    getHeightAt: vi.fn(() => 5),
+    clearCache: vi.fn(),
+  } as unknown as HeightQueryCache;
 }
 
 describe('ImprovedChunk', () => {
@@ -129,6 +133,8 @@ describe('ImprovedChunk', () => {
   let assetLoader: AssetLoader;
   let noiseGenerator: NoiseGenerator;
   let billboardSystem: GlobalBillboardSystem;
+  let biomePool: BiomeTexturePool;
+  let heightCache: HeightQueryCache;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -136,11 +142,13 @@ describe('ImprovedChunk', () => {
     assetLoader = createMockAssetLoader();
     noiseGenerator = createMockNoiseGenerator();
     billboardSystem = createMockBillboardSystem();
+    biomePool = createMockBiomePool();
+    heightCache = createMockHeightCache();
   });
 
   describe('Constructor', () => {
     it('should create chunk with correct position', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 2, 3, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 2, 3, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       const position = chunk.getPosition();
       expect(position.x).toBe(2 * 64 + 32); // chunkX * size + size/2
@@ -149,14 +157,14 @@ describe('ImprovedChunk', () => {
     });
 
     it('should initialize with given chunk coordinates', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 5, 10, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 5, 10, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       expect(chunk.isInBounds(5 * 64, 10 * 64)).toBe(true);
       expect(chunk.isInBounds(5 * 64 + 32, 10 * 64 + 32)).toBe(true);
     });
 
     it('should initialize with given size', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 128, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 128, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       expect(chunk.isInBounds(0, 0)).toBe(true);
       expect(chunk.isInBounds(127, 127)).toBe(true);
@@ -164,7 +172,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should handle negative chunk coordinates', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, -2, -3, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, -2, -3, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       const position = chunk.getPosition();
       expect(position.x).toBe(-2 * 64 + 32);
@@ -172,7 +180,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should support skipTerrainMesh flag', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem, true);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache, undefined, undefined, true);
       
       expect(chunk).toBeDefined();
     });
@@ -180,7 +188,7 @@ describe('ImprovedChunk', () => {
 
   describe('getPosition', () => {
     it('should return cached position vector', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 1, 2, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 1, 2, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       const pos1 = chunk.getPosition();
       const pos2 = chunk.getPosition();
@@ -189,7 +197,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should calculate center position correctly', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 3, 4, 100, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 3, 4, 100, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       const position = chunk.getPosition();
       expect(position.x).toBe(3 * 100 + 50);
@@ -200,7 +208,7 @@ describe('ImprovedChunk', () => {
 
   describe('isInBounds', () => {
     it('should return true for positions within chunk', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       expect(chunk.isInBounds(0, 0)).toBe(true);
       expect(chunk.isInBounds(32, 32)).toBe(true);
@@ -208,7 +216,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should return false for positions outside chunk', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       expect(chunk.isInBounds(-1, 0)).toBe(false);
       expect(chunk.isInBounds(0, -1)).toBe(false);
@@ -218,7 +226,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should handle chunk at non-zero coordinates', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 2, 3, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 2, 3, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       const baseX = 2 * 64;
       const baseZ = 3 * 64;
@@ -231,7 +239,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should handle boundary conditions correctly', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 1, 1, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 1, 1, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       // Lower boundary (inclusive)
       expect(chunk.isInBounds(64, 64)).toBe(true);
@@ -244,7 +252,7 @@ describe('ImprovedChunk', () => {
 
   describe('getHeightAt', () => {
     it('should return height for position within chunk', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       const height = chunk.getHeightAt(32, 32);
@@ -252,7 +260,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should return 0 for position outside chunk bounds', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       expect(chunk.getHeightAt(-10, 32)).toBe(0);
@@ -262,7 +270,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should convert world coordinates to local coordinates', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 2, 3, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 2, 3, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       const worldX = 2 * 64 + 10;
@@ -273,7 +281,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should handle chunk at origin', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       expect(chunk.getHeightAt(0, 0)).toBeGreaterThanOrEqual(0);
@@ -282,7 +290,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should handle negative chunk coordinates', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, -1, -1, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, -1, -1, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       const worldX = -64 + 32;
@@ -295,7 +303,7 @@ describe('ImprovedChunk', () => {
 
   describe('getHeightAtLocal - Bilinear Interpolation', () => {
     it('should interpolate height at chunk corners', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       // Corner (0, 0) should be close to heightData[0]
@@ -312,7 +320,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should interpolate height at chunk center', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       // Center should be average of surrounding heights
@@ -322,7 +330,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should clamp coordinates to chunk bounds', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       // Coordinates beyond bounds should return 0 (out of bounds check)
@@ -333,7 +341,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should handle fractional coordinates with bilinear interpolation', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       // Test interpolation at fractional position
@@ -347,7 +355,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should produce smooth height transitions', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       // Sample heights along a line
@@ -364,7 +372,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should handle edge interpolation correctly', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
 
       // Test edge positions - getHeightAt uses > (not >=) for bounds, so 64 is inclusive
@@ -381,7 +389,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should interpolate correctly with custom height data', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       // With our mock height data (x + z), center should be around 32
@@ -393,7 +401,7 @@ describe('ImprovedChunk', () => {
 
   describe('generate', () => {
     it('should generate terrain mesh', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       await chunk.generate();
       
@@ -401,7 +409,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should skip terrain mesh when skipTerrainMesh is true', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem, true);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache, undefined, undefined, true);
       
       await chunk.generate();
       
@@ -409,7 +417,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should generate vegetation', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       await chunk.generate();
       
@@ -417,7 +425,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should not regenerate if already generated', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       await chunk.generate();
       const firstCallCount = (scene.add as any).mock.calls.length;
@@ -429,19 +437,13 @@ describe('ImprovedChunk', () => {
     });
 
     it('should register billboard instances with correct chunk key', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 2, 3, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 2, 3, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       await chunk.generate();
       
       expect(billboardSystem.addChunkInstances).toHaveBeenCalledWith(
         '2,3',
-        expect.any(Array),
-        expect.any(Array),
-        expect.any(Array),
-        expect.any(Array),
-        expect.any(Array),
-        expect.any(Array),
-        expect.any(Array)
+        expect.any(Map)
       );
     });
   });
@@ -454,16 +456,10 @@ describe('ImprovedChunk', () => {
       vi.mocked(ChunkWorkerAdapter.applyWorkerData).mockResolvedValueOnce({
         terrainMesh: mockMesh,
         terrainGeometry: new THREE.BufferGeometry(),
-        fernInstances: [],
-        elephantEarInstances: [],
-        fanPalmInstances: [],
-        coconutInstances: [],
-        arecaInstances: [],
-        dipterocarpInstances: [],
-        banyanInstances: []
+        vegetationMap: new Map()
       });
 
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
 
       const workerGeometry = new THREE.BufferGeometry();
       const workerHeightData = new Float32Array(33 * 33);
@@ -474,7 +470,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should use worker-provided height data', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       const workerGeometry = new THREE.BufferGeometry();
       const workerHeightData = new Float32Array(33 * 33);
@@ -489,7 +485,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should not regenerate if already generated', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       await chunk.generate();
       
@@ -507,7 +503,7 @@ describe('ImprovedChunk', () => {
       const { ChunkWorkerAdapter } = await import('./ChunkWorkerAdapter');
       vi.mocked(ChunkWorkerAdapter.applyWorkerData).mockClear();
 
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
 
       const workerGeometry = new THREE.BufferGeometry();
       const workerHeightData = new Float32Array(33 * 33);
@@ -515,24 +511,24 @@ describe('ImprovedChunk', () => {
       await chunk.generateFromWorker(workerGeometry, workerHeightData, undefined, true);
 
       expect(ChunkWorkerAdapter.applyWorkerData).toHaveBeenCalledTimes(1);
-      // Verify bvhAlreadyComputed (12th arg, index 11) is true
       const callArgs = vi.mocked(ChunkWorkerAdapter.applyWorkerData).mock.calls[0];
-      expect(callArgs[11]).toBe(true);
-      // Last arg should be a height query function
-      expect(typeof callArgs[12]).toBe('function');
+      // bvhAlreadyComputed is arg index 10 in new signature
+      expect(callArgs[10]).toBe(true);
+      // height query function is arg index 11
+      expect(typeof callArgs[11]).toBe('function');
     });
   });
 
   describe('getHeightAtRaycast', () => {
     it('should return 0 when terrain mesh is not available', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       const height = chunk.getHeightAtRaycast(32, 32);
       expect(height).toBe(0);
     });
 
     it('should use raycasting when terrain mesh is available', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       const height = chunk.getHeightAtRaycast(32, 32);
@@ -542,7 +538,7 @@ describe('ImprovedChunk', () => {
 
   describe('setVisible', () => {
     it('should set terrain mesh visibility', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       const mesh = chunk.getTerrainMesh();
@@ -556,7 +552,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should not throw when terrain mesh is not available', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       expect(() => {
         chunk.setVisible(false);
@@ -566,7 +562,7 @@ describe('ImprovedChunk', () => {
 
   describe('dispose', () => {
     it('should remove terrain mesh from scene', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       chunk.dispose();
@@ -575,7 +571,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should remove billboard instances', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 2, 3, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 2, 3, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       chunk.dispose();
@@ -583,27 +579,27 @@ describe('ImprovedChunk', () => {
       expect(billboardSystem.removeChunkInstances).toHaveBeenCalledWith('2,3');
     });
 
-    it('should dispose geometry and material', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+    it('should dispose geometry but NOT shared material', async () => {
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
-      
+
       const mesh = chunk.getTerrainMesh();
       if (mesh) {
         const geometry = mesh.geometry;
         const material = mesh.material as THREE.Material;
-        
+
         const geometryDispose = vi.spyOn(geometry, 'dispose');
         const materialDispose = vi.spyOn(material, 'dispose');
-        
+
         chunk.dispose();
-        
+
         expect(geometryDispose).toHaveBeenCalled();
-        expect(materialDispose).toHaveBeenCalled();
+        expect(materialDispose).not.toHaveBeenCalled();
       }
     });
 
     it('should not throw when terrain mesh is not available', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       expect(() => {
         chunk.dispose();
@@ -611,7 +607,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should be safe to call dispose multiple times', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       expect(() => {
@@ -624,13 +620,13 @@ describe('ImprovedChunk', () => {
 
   describe('getTerrainMesh', () => {
     it('should return undefined before generation', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       expect(chunk.getTerrainMesh()).toBeUndefined();
     });
 
     it('should return mesh after generation', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       const mesh = chunk.getTerrainMesh();
@@ -638,7 +634,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should return undefined when skipTerrainMesh is true', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem, true);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache, undefined, undefined, true);
       await chunk.generate();
       
       expect(chunk.getTerrainMesh()).toBeUndefined();
@@ -647,7 +643,7 @@ describe('ImprovedChunk', () => {
 
   describe('Edge cases', () => {
     it('should handle zero-sized chunk', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 0, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 0, noiseGenerator, billboardSystem, biomePool, heightCache);
 
       // With size=0, isInBounds uses strict < so 0 < 0+0 is false
       expect(chunk.isInBounds(0, 0)).toBe(false);
@@ -655,7 +651,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should handle very large chunk coordinates', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 1000, 2000, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 1000, 2000, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       const position = chunk.getPosition();
       expect(position.x).toBe(1000 * 64 + 32);
@@ -663,7 +659,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should handle very large chunk size', () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 1024, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 1024, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       expect(chunk.isInBounds(0, 0)).toBe(true);
       expect(chunk.isInBounds(1023, 1023)).toBe(true);
@@ -671,7 +667,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should handle height queries at exact boundaries', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
 
       // Lower boundary (inclusive)
@@ -686,7 +682,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should handle floating point precision in bounds checks', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       // Very close to boundary
@@ -697,7 +693,7 @@ describe('ImprovedChunk', () => {
 
   describe('Integration tests', () => {
     it('should generate chunk and query heights correctly', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 1, 2, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 1, 2, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       // Test multiple positions
@@ -715,7 +711,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should maintain consistent heights across multiple queries', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       await chunk.generate();
       
       const x = 32;
@@ -730,7 +726,7 @@ describe('ImprovedChunk', () => {
     });
 
     it('should handle full lifecycle: create, generate, query, dispose', async () => {
-      const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
+      const chunk = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       // Generate
       await chunk.generate();
@@ -753,7 +749,7 @@ describe('ImprovedChunk', () => {
       const sizes = [32, 64, 128, 256];
       
       for (const size of sizes) {
-        const chunk = new ImprovedChunk(scene, assetLoader, 0, 0, size, noiseGenerator, billboardSystem);
+        const chunk = new ImprovedChunk(scene, 0, 0, size, noiseGenerator, billboardSystem, biomePool, heightCache);
         await chunk.generate();
         
         const height = chunk.getHeightAt(size / 2, size / 2);
@@ -764,8 +760,8 @@ describe('ImprovedChunk', () => {
     });
 
     it('should handle adjacent chunks correctly', async () => {
-      const chunk1 = new ImprovedChunk(scene, assetLoader, 0, 0, 64, noiseGenerator, billboardSystem);
-      const chunk2 = new ImprovedChunk(scene, assetLoader, 1, 0, 64, noiseGenerator, billboardSystem);
+      const chunk1 = new ImprovedChunk(scene, 0, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
+      const chunk2 = new ImprovedChunk(scene, 1, 0, 64, noiseGenerator, billboardSystem, biomePool, heightCache);
       
       await chunk1.generate();
       await chunk2.generate();

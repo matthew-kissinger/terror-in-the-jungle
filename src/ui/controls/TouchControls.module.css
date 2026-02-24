@@ -121,8 +121,8 @@
 
 .menuBtn {
   position: fixed;
-  top: 12px;
-  right: 12px;
+  top: max(12px, env(safe-area-inset-top, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
   width: 36px;
   height: 36px;
   border-radius: 8px;
@@ -285,8 +285,8 @@
 
 .sandbagContainer {
   position: fixed;
-  right: 140px;
-  bottom: 30px;
+  right: calc(var(--tc-fire-size) + max(var(--tc-edge-inset), env(safe-area-inset-right, 0px)) + 20px);
+  bottom: max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px));
   display: none;
   flex-direction: row;
   gap: 12px;
@@ -317,8 +317,13 @@
 .rallyBtn {
   composes: btn;
   position: fixed;
-  right: 30px;
-  bottom: 250px;
+  right: max(var(--tc-edge-inset), env(safe-area-inset-right, 0px));
+  bottom: calc(
+    var(--tc-fire-size)
+    + var(--tc-action-size)
+    + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px))
+    + 36px
+  );
   width: 56px;
   height: 56px;
   background: rgba(100, 255, 100, 0.3);
@@ -339,8 +344,8 @@
 
 .mortarContainer {
   position: fixed;
-  left: 20px;
-  bottom: 140px;
+  left: max(var(--tc-edge-inset), env(safe-area-inset-left, 0px));
+  bottom: calc(var(--tc-fire-size) + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + 10px);
   display: none;
   flex-direction: column;
   gap: 10px;
@@ -465,6 +470,47 @@
   pointer-events: auto;
   user-select: none;
   -webkit-user-select: none;
+}
+
+@media (max-width: 900px) {
+  .actionContainer {
+    gap: 10px;
+  }
+
+  .mortarAimPad {
+    width: 108px;
+    height: 108px;
+  }
+}
+
+@media (max-width: 480px) {
+  .menuBtn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .menuLine {
+    width: 16px;
+  }
+
+  .actionContainer {
+    gap: 8px;
+  }
+
+  .mortarContainer {
+    bottom: calc(var(--tc-fire-size) + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + 6px);
+  }
+
+  .mortarAimPad {
+    width: 96px;
+    height: 96px;
+  }
+
+  .mortarFireBtn,
+  .mortarDeployBtn {
+    width: 60px;
+    height: 60px;
+  }
 }
 
 .cyclicPad.active {

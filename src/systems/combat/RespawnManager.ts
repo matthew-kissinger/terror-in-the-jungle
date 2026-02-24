@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction } from './types';
+import { Combatant, CombatantState, Faction, isBlufor, isOpfor } from './types';
 import { SquadManager } from './SquadManager';
 import { SpatialOctree } from './SpatialOctree';
 import { CombatantFactory } from './CombatantFactory';
@@ -201,7 +201,7 @@ export class RespawnManager {
   ): void {
     const targetPerFaction = Math.floor(maxCombatants / 2);
     const counts = this.countLivingByFaction();
-    const currentFactionCount = faction === Faction.US ? counts.us : counts.opfor;
+    const currentFactionCount = isBlufor(faction) ? counts.blufor : counts.opfor;
     const missing = Math.max(0, targetPerFaction - currentFactionCount);
     if (missing === 0) return;
 
@@ -227,13 +227,13 @@ export class RespawnManager {
     }
   }
 
-  private countLivingByFaction(): { us: number; opfor: number } {
-    let us = 0, opfor = 0;
+  private countLivingByFaction(): { blufor: number; opfor: number } {
+    let blufor = 0, opfor = 0;
     for (const c of this.combatants.values()) {
       if (c.state === CombatantState.DEAD) continue;
-      if (c.faction === Faction.US) us++;
-      else if (c.faction === Faction.OPFOR) opfor++;
+      if (isBlufor(c.faction)) blufor++;
+      else if (isOpfor(c.faction)) opfor++;
     }
-    return { us, opfor };
+    return { blufor, opfor };
   }
 }

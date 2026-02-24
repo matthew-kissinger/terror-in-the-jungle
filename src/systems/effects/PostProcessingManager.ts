@@ -1,88 +1,111 @@
 import * as THREE from 'three';
-import {
-  EffectComposer,
-  RenderPass,
-  EffectPass,
-  SMAAEffect,
-  SMAAPreset,
-  PixelationEffect
-} from 'postprocessing';
 import { Logger } from '../../utils/Logger';
-import { estimateGPUTier, isMobileGPU } from '../../utils/DeviceDetector';
 
+/**
+ * Retro post-processing: pixelation + color quantization.
+ *
+ * Usage (in game loop):
+ *   postProcessing.beginFrame();
+ *   renderer.render(worldScene, worldCamera);
+ *   renderer.clearDepth();
+ *   renderer.render(overlayScene, overlayCamera);  // weapons, grenades, etc.
+ *   postProcessing.endFrame();
+ *
+ * Everything rendered between begin/end goes through the low-res target
+ * and gets the retro pixelation + color quantization treatment.
+ */
 export class PostProcessingManager {
-  private composer: EffectComposer;
-  private renderPass: RenderPass;
-  private pixelationEffect: PixelationEffect;
-  private pixelationPass: EffectPass;
-  private enabled: boolean = true;
   private renderer: THREE.WebGLRenderer;
-  private scene: THREE.Scene;
-  private camera: THREE.Camera;
+  private enabled = true;
+
+  private renderTarget: THREE.WebGLRenderTarget;
+  private pixelScale: number;
+
+  private blitScene: THREE.Scene;
+  private blitCamera: THREE.OrthographicCamera;
+  private blitMaterial: THREE.ShaderMaterial;
 
   constructor(
     renderer: THREE.WebGLRenderer,
     scene: THREE.Scene,
-    camera: THREE.Camera
+    _camera: THREE.Camera,
   ) {
-    // Store references for fallback rendering
     this.renderer = renderer;
-    this.scene = scene;
-    this.camera = camera;
+    this.pixelScale = 3;
 
-    const gpuTier = estimateGPUTier();
-    const isMobile = isMobileGPU();
+    const size = renderer.getSize(new THREE.Vector2());
+    const w = Math.max(1, Math.floor(size.x / this.pixelScale));
+    const h = Math.max(1, Math.floor(size.y / this.pixelScale));
 
-    // Initialize composer
-    this.composer = new EffectComposer(renderer, {
-      frameBufferType: gpuTier === 'high' ? THREE.HalfFloatType : THREE.UnsignedByteType
+    this.renderTarget = new THREE.WebGLRenderTarget(w, h, {
+      minFilter: THREE.NearestFilter,
+      magFilter: THREE.NearestFilter,
+      format: THREE.RGBAFormat,
     });
 
-    // Add render pass
-    this.renderPass = new RenderPass(scene, camera);
-    this.composer.addPass(this.renderPass);
+    this.blitCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    this.blitScene = new THREE.Scene();
 
-    // Add pixelation effect using postprocessing's built-in effect
-    // Granularity is the pixel size (higher = more pixelated)
-    this.pixelationEffect = new PixelationEffect(2);
-    this.pixelationPass = new EffectPass(camera, this.pixelationEffect);
-    this.composer.addPass(this.pixelationPass);
+    this.blitMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        tDiffuse: { value: this.renderTarget.texture },
+        colorLevels: { value: 24.0 },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position.xy, 0.0, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float colorLevels;
+        varying vec2 vUv;
+        void main() {
+          vec4 color = texture2D(tDiffuse, vUv);
+          color.rgb = floor(color.rgb * colorLevels + 0.5) / colorLevels;
+          gl_FragColor = color;
+        }
+      `,
+      depthTest: false,
+      depthWrite: false,
+    });
 
-    // Only add SMAA on medium/high desktop GPUs
-    if (!isMobile && gpuTier !== 'low') {
-      const smaaEffect = new SMAAEffect({
-        preset: gpuTier === 'high' ? SMAAPreset.MEDIUM : SMAAPreset.LOW,
-        edgeDetectionMode: 1
-      });
-      const smaaPass = new EffectPass(camera, smaaEffect);
-      smaaPass.renderToScreen = true;
-      this.composer.addPass(smaaPass);
-      Logger.info('render', `Post-processing: pixelation (granularity 2) + SMAA (${gpuTier === 'high' ? 'MEDIUM' : 'LOW'})`);
-    } else {
-      this.pixelationPass.renderToScreen = true;
-      Logger.info('render', 'Post-processing: pixelation only (mobile/low-tier optimized)');
-    }
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.blitMaterial);
+    quad.frustumCulled = false;
+    this.blitScene.add(quad);
+
+    Logger.info('render', `Retro post-processing: pixelScale=${this.pixelScale}, colorLevels=24`);
   }
 
-  render(deltaTime: number): void {
-    if (this.enabled) {
-      this.composer.render(deltaTime);
-    } else {
-      // Fallback: render scene directly without post-processing
-      this.renderer.render(this.scene, this.camera);
-    }
+  /** Redirect all subsequent renderer.render() calls into the low-res target. */
+  beginFrame(): void {
+    if (!this.enabled) return;
+    this.renderer.setRenderTarget(this.renderTarget);
+  }
+
+  /** Blit low-res target to screen with color quantization. */
+  endFrame(): void {
+    if (!this.enabled) return;
+    this.renderer.setRenderTarget(null);
+    this.renderer.render(this.blitScene, this.blitCamera);
   }
 
   setSize(width: number, height: number): void {
-    this.composer.setSize(width, height);
+    const w = Math.max(1, Math.floor(width / this.pixelScale));
+    const h = Math.max(1, Math.floor(height / this.pixelScale));
+    this.renderTarget.setSize(w, h);
   }
 
   setPixelSize(size: number): void {
-    this.pixelationEffect.granularity = size;
+    this.pixelScale = Math.max(1, size);
+    const s = this.renderer.getSize(new THREE.Vector2());
+    this.setSize(s.x, s.y);
   }
 
   getPixelSize(): number {
-    return this.pixelationEffect.granularity;
+    return this.pixelScale;
   }
 
   setEnabled(enabled: boolean): void {
@@ -94,6 +117,7 @@ export class PostProcessingManager {
   }
 
   dispose(): void {
-    this.composer.dispose();
+    this.renderTarget.dispose();
+    this.blitMaterial.dispose();
   }
 }

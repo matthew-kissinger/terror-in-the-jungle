@@ -1,11 +1,16 @@
 import * as THREE from 'three';
 import { ZoneManager, CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
-import { Faction } from '../../systems/combat/types';
+import { isBlufor } from '../../systems/combat/types';
 import type { WarSimulator } from '../../systems/strategy/WarSimulator';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
+
+export type HelipadMarker = {
+  id: string;
+  position: THREE.Vector3;
+};
 
 type MinimapRenderState = {
   ctx: CanvasRenderingContext2D;
@@ -19,6 +24,7 @@ type MinimapRenderState = {
   warSimulator?: WarSimulator;
   playerSquadId?: string;
   commandPosition?: THREE.Vector3;
+  helipadMarkers?: HelipadMarker[];
 };
 
 type MinimapPosition = {
@@ -42,6 +48,7 @@ export function renderMinimap(state: MinimapRenderState): void {
 
   drawCombatantIndicators(ctx, state, renderScale);
   drawStrategicAgents(ctx, state, renderScale);
+  drawHelipadMarkers(ctx, state, renderScale);
 
   if (state.commandPosition) {
     drawCommandMarker(ctx, state, renderScale);
@@ -149,11 +156,11 @@ function drawCombatantIndicators(ctx: CanvasRenderingContext2D, state: MinimapRe
 
     if (x < 0 || x > state.size || y < 0 || y > state.size) return;
 
-    const isPlayerSquad = combatant.squadId === state.playerSquadId && combatant.faction === Faction.US;
+    const isPlayerSquad = combatant.squadId === state.playerSquadId && isBlufor(combatant.faction);
     if (isPlayerSquad) {
       ctx.fillStyle = 'rgba(92, 184, 92, 0.8)';
     } else {
-      ctx.fillStyle = combatant.faction === Faction.US ? 'rgba(91, 140, 201, 0.6)' : 'rgba(201, 86, 74, 0.6)';
+      ctx.fillStyle = isBlufor(combatant.faction) ? 'rgba(91, 140, 201, 0.6)' : 'rgba(201, 86, 74, 0.6)';
     }
     ctx.beginPath();
     ctx.arc(x, y, 2 * renderScale, 0, Math.PI * 2);
@@ -285,6 +292,35 @@ function drawCommandMarker(ctx: CanvasRenderingContext2D, state: MinimapRenderSt
   ctx.beginPath();
   ctx.arc(x, y, 6 * renderScale, 0, Math.PI * 2);
   ctx.stroke();
+}
+
+function drawHelipadMarkers(ctx: CanvasRenderingContext2D, state: MinimapRenderState, renderScale: number): void {
+  if (!state.helipadMarkers || state.helipadMarkers.length === 0) return;
+
+  const scale = state.size / state.worldSize;
+  const iconSize = 8 * renderScale;
+
+  for (const marker of state.helipadMarkers) {
+    const { x, y } = worldToMinimap(marker.position, state, scale);
+    if (x < -iconSize || x > state.size + iconSize || y < -iconSize || y > state.size + iconSize) continue;
+
+    // Circle background
+    ctx.fillStyle = 'rgba(91, 140, 201, 0.4)';
+    ctx.beginPath();
+    ctx.arc(x, y, iconSize, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(91, 140, 201, 0.9)';
+    ctx.lineWidth = 1.5 * renderScale;
+    ctx.stroke();
+
+    // H letter
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.font = `bold ${Math.round(10 * renderScale)}px Rajdhani`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('H', x, y);
+  }
 }
 
 function worldToMinimap(

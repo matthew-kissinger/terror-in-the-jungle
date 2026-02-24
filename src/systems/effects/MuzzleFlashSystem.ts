@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-/** Weapon variant index for flash appearance */
+/** Weapon variant index for particle appearance */
 export const enum MuzzleFlashVariant {
   RIFLE = 0,
   SHOTGUN = 1,
@@ -8,333 +8,349 @@ export const enum MuzzleFlashVariant {
   PISTOL = 3,
 }
 
-const FLASH_LIFETIME = 0.033; // 33ms ~2 frames at 60fps
-const MAX_NPC_INSTANCES = 64;
+// Per-variant burst parameters
+const PRESETS = [
+  // RIFLE: tight hot burst
+  { count: 8,  spread: 0.14, speed: 0.55, lifetime: 0.055, baseSize: 11, r: 1.0, g: 0.70, b: 0.30 },
+  // SHOTGUN: wide orange spray
+  { count: 13, spread: 0.32, speed: 0.48, lifetime: 0.080, baseSize: 14, r: 1.0, g: 0.72, b: 0.18 },
+  // SMG: small fast orange burst
+  { count: 6,  spread: 0.18, speed: 0.65, lifetime: 0.042, baseSize: 10, r: 1.0, g: 0.62, b: 0.22 },
+  // PISTOL: softer yellow pop
+  { count: 5,  spread: 0.24, speed: 0.50, lifetime: 0.065, baseSize: 11, r: 1.0, g: 0.82, b: 0.38 },
+] as const;
 
-// ---- Shaders ----
+const MAX_PLAYER = 32;  // ring buffer for player weapon overlay
+const MAX_NPC    = 64;  // ring buffer shared across all NPC weapons
 
-const vertexShader = /* glsl */ `
-  attribute float instanceLife;
-  attribute float instanceVariant;
-  attribute float instanceIntensity;
-
+// ---- Player overlay shader (orthographic camera, fixed pixel size) ----
+const PLAYER_VERT = /* glsl */`
+  attribute float aLife;
+  attribute float aBaseSize;
+  attribute vec3  aColor;
+  varying vec3  vColor;
   varying float vLife;
-  varying float vVariant;
-  varying float vIntensity;
-  varying vec2 vUv;
 
   void main() {
-    vLife = instanceLife;
-    vVariant = instanceVariant;
-    vIntensity = instanceIntensity;
-    vUv = uv;
-
-    // Spherical billboard: extract camera-right and camera-up from view matrix
-    vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-
-    // Scale by life (shrinks as it fades) and instance scale from matrix
-    float scale = length(instanceMatrix[0].xyz) * mix(0.6, 1.0, instanceLife);
-
-    // Offset quad corners in view space
-    mvPosition.xy += position.xy * scale;
-
-    gl_Position = projectionMatrix * mvPosition;
+    vColor = aColor;
+    vLife  = aLife;
+    if (aLife <= 0.0) {
+      gl_Position = vec4(99999.0, 99999.0, 0.0, 1.0);
+      gl_PointSize = 0.0;
+      return;
+    }
+    gl_Position  = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = aBaseSize * aLife;
   }
 `;
 
-const fragmentShader = /* glsl */ `
+// ---- NPC scene shader (perspective camera, distance-attenuated size) ----
+const NPC_VERT = /* glsl */`
+  attribute float aLife;
+  attribute float aBaseSize;
+  attribute vec3  aColor;
+  varying vec3  vColor;
   varying float vLife;
-  varying float vVariant;
-  varying float vIntensity;
-  varying vec2 vUv;
+
+  void main() {
+    vColor = aColor;
+    vLife  = aLife;
+    if (aLife <= 0.0) {
+      gl_Position = vec4(99999.0, 99999.0, 0.0, 1.0);
+      gl_PointSize = 0.0;
+      return;
+    }
+    vec4 mvPos   = modelViewMatrix * vec4(position, 1.0);
+    gl_Position  = projectionMatrix * mvPos;
+    // world-unit base size, divided by view-space depth for perspective
+    gl_PointSize = (aBaseSize * aLife * 40.0) / -mvPos.z;
+  }
+`;
+
+// Shared fragment shader: soft radial circle, bright core
+const SHARED_FRAG = /* glsl */`
+  varying vec3  vColor;
+  varying float vLife;
 
   void main() {
     if (vLife <= 0.0) discard;
-
-    // Center UV to [-1, 1]
-    vec2 uv = vUv * 2.0 - 1.0;
-    float r = length(uv);
-    float angle = atan(uv.y, uv.x);
-
-    // Variant-dependent spoke count and width
-    // 0=rifle(8), 1=shotgun(12), 2=smg(6), 3=pistol(6)
-    float spokeCount = 8.0;
-    float spokeWidth = 0.45;
-    if (vVariant > 0.5 && vVariant < 1.5) {
-      spokeCount = 12.0;
-      spokeWidth = 0.55;
-    } else if (vVariant > 1.5) {
-      spokeCount = 6.0;
-      spokeWidth = 0.4;
-    }
-
-    // Star pattern via angular modulation
-    float spoke = abs(cos(angle * spokeCount * 0.5));
-    spoke = pow(spoke, 3.0);
-
-    // Radial falloff - hot center to edge fade
-    float radialFade = 1.0 - smoothstep(0.0, 0.5 + spoke * spokeWidth, r);
-
-    // Core glow (always bright white in center)
-    float core = 1.0 - smoothstep(0.0, 0.15, r);
-
-    // Color temperature per variant
-    // Rifle: orange-white, Shotgun: yellow-white, SMG: orange, Pistol: yellow
-    vec3 hotColor = vec3(1.0, 0.95, 0.85); // near-white center
-    vec3 edgeColor = vec3(1.0, 0.6, 0.15);  // orange edge default (rifle)
-
-    if (vVariant > 0.5 && vVariant < 1.5) {
-      // Shotgun: yellow-white
-      edgeColor = vec3(1.0, 0.75, 0.2);
-    } else if (vVariant > 1.5 && vVariant < 2.5) {
-      // SMG: warmer orange
-      edgeColor = vec3(1.0, 0.5, 0.1);
-    } else if (vVariant > 2.5) {
-      // Pistol: yellow
-      edgeColor = vec3(1.0, 0.7, 0.15);
-    }
-
-    vec3 color = mix(edgeColor, hotColor, core + radialFade * 0.3);
-
-    // Combine: radial shape * life fade * intensity
-    float alpha = radialFade * vLife * vIntensity;
-
-    // Discard fully transparent fragments
-    if (alpha < 0.01) discard;
-
-    // Overbright output - additive blending allows HDR values for strong glow
-    gl_FragColor = vec4(color * alpha * 3.0, alpha);
+    vec2  coord = gl_PointCoord * 2.0 - 1.0;
+    float d     = length(coord);
+    if (d > 1.0) discard;
+    float alpha = (1.0 - d * d) * vLife * 0.85;
+    // hot white core, variant color at edge
+    vec3  col   = mix(vColor, vec3(1.0, 0.96, 0.90), max(0.0, 1.0 - d * 1.8));
+    gl_FragColor = vec4(col * 1.6, alpha);
   }
 `;
 
-// Single-mesh vertex shader (no instancing)
-const playerVertexShader = /* glsl */ `
-  uniform float uLife;
-  uniform float uScale;
+// CPU-side particle state (plain arrays for tight memory layout)
+interface CpuParticle {
+  x: number; y: number; z: number;
+  vx: number; vy: number; vz: number;
+  life: number;    // 0..1 normalized
+  decay: number;   // per second
+  r: number; g: number; b: number;
+  size: number;    // pixels (player) or world fraction (NPC)
+}
 
-  varying float vLife;
-  varying float vVariant;
-  varying float vIntensity;
-  varying vec2 vUv;
+function makeCpuSlots(n: number): CpuParticle[] {
+  return Array.from({ length: n }, () => ({
+    x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0,
+    life: 0, decay: 0, r: 1, g: 1, b: 1, size: 10,
+  }));
+}
 
-  // passed via uniforms instead of instance attributes
-  uniform float uVariant;
-  uniform float uIntensity;
+function buildPoints(max: number, vertexShader: string): {
+  points: THREE.Points;
+  positions: Float32Array;
+  colors: Float32Array;
+  lives: Float32Array;
+  sizes: Float32Array;
+} {
+  const positions = new Float32Array(max * 3);
+  const colors    = new Float32Array(max * 3);
+  const lives     = new Float32Array(max);
+  const sizes     = new Float32Array(max);
 
-  void main() {
-    vLife = uLife;
-    vVariant = uVariant;
-    vIntensity = uIntensity;
-    vUv = uv;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position',  new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('aColor',    new THREE.BufferAttribute(colors,    3));
+  geo.setAttribute('aLife',     new THREE.BufferAttribute(lives,     1));
+  geo.setAttribute('aBaseSize', new THREE.BufferAttribute(sizes,     1));
 
-    // Billboard in view space
-    vec4 mvPosition = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
-    float scale = uScale * mix(0.6, 1.0, uLife);
-    mvPosition.xy += position.xy * scale;
+  const mat = new THREE.ShaderMaterial({
+    vertexShader,
+    fragmentShader: SHARED_FRAG,
+    blending:      THREE.AdditiveBlending,
+    depthWrite:    false,
+    depthTest:     true,
+    transparent:   true,
+  });
 
-    gl_Position = projectionMatrix * mvPosition;
+  const points = new THREE.Points(geo, mat);
+  points.frustumCulled = false;
+
+  return { points, positions, colors, lives, sizes };
+}
+
+// Emit one particle into a slot
+function emitParticle(
+  slot: CpuParticle,
+  pos: THREE.Vector3,
+  forwardDir: { x: number; y: number; z: number },
+  preset: typeof PRESETS[number],
+  sizeScale = 1,
+): void {
+  slot.x = pos.x; slot.y = pos.y; slot.z = pos.z;
+
+  // Random direction in a cone around forwardDir
+  const theta  = Math.random() * Math.PI * 2;
+  const phi    = Math.random() * preset.spread;
+  const sinPhi = Math.sin(phi);
+  const cosPhi = Math.cos(phi);
+
+  // Build a perpendicular frame (simple - not fully accurate but fine for small spread)
+  const perpX = sinPhi * Math.cos(theta);
+  const perpY = sinPhi * Math.sin(theta);
+
+  const spd = preset.speed * (0.7 + Math.random() * 0.6);
+  slot.vx = (forwardDir.x * cosPhi + perpX) * spd;
+  slot.vy = (forwardDir.y * cosPhi + perpY) * spd;
+  slot.vz = forwardDir.z * cosPhi * spd;
+
+  slot.life  = 1.0;
+  slot.decay = 1.0 / (preset.lifetime * (0.8 + Math.random() * 0.4));
+  slot.r     = preset.r;
+  slot.g     = preset.g;
+  slot.b     = preset.b;
+  slot.size  = preset.baseSize * sizeScale * (0.8 + Math.random() * 0.4);
+}
+
+// Upload particle state to GPU buffers
+function uploadSlots(
+  slots: CpuParticle[],
+  positions: Float32Array,
+  colors: Float32Array,
+  lives: Float32Array,
+  sizes: Float32Array,
+  geo: THREE.BufferGeometry,
+): void {
+  for (let i = 0; i < slots.length; i++) {
+    const s = slots[i];
+    const i3 = i * 3;
+    positions[i3]     = s.x;
+    positions[i3 + 1] = s.y;
+    positions[i3 + 2] = s.z;
+    colors[i3]        = s.r;
+    colors[i3 + 1]    = s.g;
+    colors[i3 + 2]    = s.b;
+    lives[i]          = s.life;
+    sizes[i]          = s.size;
   }
-`;
+  (geo.getAttribute('position')  as THREE.BufferAttribute).needsUpdate = true;
+  (geo.getAttribute('aColor')    as THREE.BufferAttribute).needsUpdate = true;
+  (geo.getAttribute('aLife')     as THREE.BufferAttribute).needsUpdate = true;
+  (geo.getAttribute('aBaseSize') as THREE.BufferAttribute).needsUpdate = true;
+}
+
+// Scratch vectors to avoid allocation
+const _scratchVec = new THREE.Vector3();
 
 /**
- * Procedural shader-based muzzle flash system.
+ * 3D particle burst system for weapon firing.
  *
- * NPC path: Single InstancedMesh (64 instances) in the main scene.
- * Player path: Single Mesh added to the weapon overlay scene.
+ * Player path: Points burst in the weapon overlay scene (orthographic camera).
+ *   Particles spread from the muzzle tip in a cone toward screen center.
  *
- * Replaces MuzzleFlashPool - zero textures, zero PointLights, 1 draw call.
+ * NPC path: Points burst in the main 3D scene (perspective camera).
+ *   Ring-buffered pool shared across all NPC weapons firing simultaneously.
+ *
+ * Zero textures. 1 draw call per path. Ring-buffer pool, no alloc per shot.
  */
 export class MuzzleFlashSystem {
-  // ---- NPC path (InstancedMesh) ----
-  private npcMesh: THREE.InstancedMesh;
-  private lifeAttr: Float32Array;
-  private variantAttr: Float32Array;
-  private intensityAttr: Float32Array;
-  private ringIndex = 0;
-  private maxInstances: number;
+  // ---- Player path ----
+  private playerSlots: CpuParticle[]  = makeCpuSlots(MAX_PLAYER);
+  private playerRing  = 0;
+  private playerGeo!: THREE.BufferGeometry;
+  private playerPos!: Float32Array;
+  private playerCol!: Float32Array;
+  private playerLif!: Float32Array;
+  private playerSiz!: Float32Array;
+  private playerMesh?: THREE.Points;
+  private playerScene: THREE.Scene | null = null;
 
-  // Dirty flag: batches GPU buffer uploads to update() instead of per-spawn
-  private npcDirty = false;
+  // ---- NPC path ----
+  private npcSlots: CpuParticle[];
+  private npcRing  = 0;
+  private npcGeo:   THREE.BufferGeometry;
+  private npcPos:   Float32Array;
+  private npcCol:   Float32Array;
+  private npcLif:   Float32Array;
+  private npcSiz:   Float32Array;
+  private npcMesh:  THREE.Points;
 
-  // Scratch objects
-  private readonly _mat4 = new THREE.Matrix4();
-  private readonly _pos = new THREE.Vector3();
-  private readonly _quat = new THREE.Quaternion();
-  private readonly _scale = new THREE.Vector3();
-  private readonly _zeroScale = new THREE.Vector3(0, 0, 0);
-
-  // ---- Player path (single Mesh) ----
-  private playerMesh: THREE.Mesh;
-  private playerMaterial: THREE.ShaderMaterial;
-  private playerLife = 0;
-  private playerAddedToScene: THREE.Scene | null = null;
-
-  constructor(scene: THREE.Scene, maxInstances = MAX_NPC_INSTANCES) {
-    this.maxInstances = maxInstances;
-
-    // -- NPC InstancedMesh --
-    const geometry = new THREE.PlaneGeometry(1, 1);
-    const material = new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      depthTest: true,
-      transparent: true,
-      side: THREE.DoubleSide,
-    });
-
-    this.npcMesh = new THREE.InstancedMesh(geometry, material, maxInstances);
-    this.npcMesh.frustumCulled = false; // instances manage their own visibility via zero-scale
-
-    // Per-instance attributes
-    this.lifeAttr = new Float32Array(maxInstances);
-    this.variantAttr = new Float32Array(maxInstances);
-    this.intensityAttr = new Float32Array(maxInstances);
-
-    const instLife = new THREE.InstancedBufferAttribute(this.lifeAttr, 1);
-    const instVariant = new THREE.InstancedBufferAttribute(this.variantAttr, 1);
-    const instIntensity = new THREE.InstancedBufferAttribute(this.intensityAttr, 1);
-
-    geometry.setAttribute('instanceLife', instLife);
-    geometry.setAttribute('instanceVariant', instVariant);
-    geometry.setAttribute('instanceIntensity', instIntensity);
-
-    // Initialize all instances to zero-scale (hidden)
-    for (let i = 0; i < maxInstances; i++) {
-      this._mat4.compose(this._pos, this._quat, this._zeroScale);
-      this.npcMesh.setMatrixAt(i, this._mat4);
-    }
-    this.npcMesh.instanceMatrix.needsUpdate = true;
-
+  constructor(scene: THREE.Scene, _maxInstances = 64) {
+    // NPC pool lives in the main scene from construction
+    const npc = buildPoints(MAX_NPC, NPC_VERT);
+    this.npcSlots = makeCpuSlots(MAX_NPC);
+    this.npcGeo   = npc.points.geometry as THREE.BufferGeometry;
+    this.npcPos   = npc.positions;
+    this.npcCol   = npc.colors;
+    this.npcLif   = npc.lives;
+    this.npcSiz   = npc.sizes;
+    this.npcMesh  = npc.points;
     scene.add(this.npcMesh);
-
-    // -- Player Mesh --
-    const playerGeometry = new THREE.PlaneGeometry(1, 1);
-    this.playerMaterial = new THREE.ShaderMaterial({
-      uniforms: {
-        uLife: { value: 0.0 },
-        uScale: { value: 1.0 },
-        uVariant: { value: 0.0 },
-        uIntensity: { value: 1.0 },
-      },
-      vertexShader: playerVertexShader,
-      fragmentShader,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      depthTest: true,
-      transparent: true,
-      side: THREE.DoubleSide,
-    });
-    this.playerMesh = new THREE.Mesh(playerGeometry, this.playerMaterial);
-    this.playerMesh.visible = false;
-    this.playerMesh.frustumCulled = false;
   }
 
   /**
-   * Spawn a muzzle flash for an NPC in the main scene.
+   * Spawn a particle burst for an NPC weapon firing.
    */
   spawnNPC(
     position: THREE.Vector3,
     direction: THREE.Vector3,
-    scale = 1.5,
-    variant: MuzzleFlashVariant = MuzzleFlashVariant.RIFLE
+    scale = 1.0,
+    variant: MuzzleFlashVariant = MuzzleFlashVariant.RIFLE,
   ): void {
-    const i = this.ringIndex;
-    this.ringIndex = (this.ringIndex + 1) % this.maxInstances;
+    const preset = PRESETS[variant as number] ?? PRESETS[0];
+    const fwd = { x: direction.x, y: direction.y, z: direction.z };
 
-    // Position slightly forward in fire direction
-    this._pos.copy(position).addScaledVector(direction, 0.1);
-    this._scale.set(scale, scale, scale);
-    this._mat4.compose(this._pos, this._quat, this._scale);
-
-    this.npcMesh.setMatrixAt(i, this._mat4);
-    this.lifeAttr[i] = 1.0;
-    this.variantAttr[i] = variant as number;
-    this.intensityAttr[i] = 1.0 + Math.random() * 0.3;
-
-    // Defer GPU buffer uploads to update() - avoids redundant uploads when
-    // multiple NPCs fire in the same frame.
-    this.npcDirty = true;
+    for (let i = 0; i < preset.count; i++) {
+      const slot = this.npcSlots[this.npcRing];
+      this.npcRing = (this.npcRing + 1) % MAX_NPC;
+      _scratchVec.copy(position).addScaledVector(direction, 0.05);
+      emitParticle(slot, _scratchVec, fwd, preset, scale * 0.3);
+    }
   }
 
   /**
-   * Spawn a muzzle flash for the player weapon in the overlay scene.
+   * Spawn a particle burst for the player weapon.
+   * Particles are added to the overlay scene and spread from the muzzle tip.
    */
   spawnPlayer(
     overlayScene: THREE.Scene,
     muzzleWorldPos: THREE.Vector3,
-    direction: THREE.Vector3,
-    variant: MuzzleFlashVariant = MuzzleFlashVariant.RIFLE
+    _direction: THREE.Vector3,
+    variant: MuzzleFlashVariant = MuzzleFlashVariant.RIFLE,
   ): void {
-    // Add to overlay scene if not already there (or if scene changed)
-    if (this.playerAddedToScene !== overlayScene) {
-      if (this.playerAddedToScene) {
-        this.playerAddedToScene.remove(this.playerMesh);
+    // Lazily build the player Points geometry and add to the overlay scene
+    if (this.playerScene !== overlayScene) {
+      if (this.playerMesh && this.playerScene) {
+        this.playerScene.remove(this.playerMesh);
       }
+      const player = buildPoints(MAX_PLAYER, PLAYER_VERT);
+      this.playerSlots = makeCpuSlots(MAX_PLAYER);
+      this.playerGeo   = player.points.geometry as THREE.BufferGeometry;
+      this.playerPos   = player.positions;
+      this.playerCol   = player.colors;
+      this.playerLif   = player.lives;
+      this.playerSiz   = player.sizes;
+      this.playerMesh  = player.points;
+      this.playerRing  = 0;
       overlayScene.add(this.playerMesh);
-      this.playerAddedToScene = overlayScene;
+      this.playerScene = overlayScene;
     }
 
-    this.playerMesh.position.copy(muzzleWorldPos);
-    this.playerMesh.visible = true;
-    this.playerLife = 1.0;
+    const preset = PRESETS[variant as number] ?? PRESETS[0];
 
-    // Variant-dependent scale
-    let scale = 0.5;
-    if (variant === MuzzleFlashVariant.SHOTGUN) scale = 0.7;
-    else if (variant === MuzzleFlashVariant.PISTOL) scale = 0.35;
-    else if (variant === MuzzleFlashVariant.SMG) scale = 0.4;
+    // Forward direction in overlay scene: from muzzle toward screen center in XY,
+    // with a small -Z component (barrel points roughly into screen in ortho view).
+    const fx = -muzzleWorldPos.x;
+    const fy = -muzzleWorldPos.y;
+    const fLen = Math.sqrt(fx * fx + fy * fy) || 1;
+    const fwd = {
+      x: (fx / fLen) * 0.85,
+      y: (fy / fLen) * 0.85,
+      z: -0.3,
+    };
 
-    this.playerMaterial.uniforms.uLife.value = 1.0;
-    this.playerMaterial.uniforms.uScale.value = scale;
-    this.playerMaterial.uniforms.uVariant.value = variant as number;
-    this.playerMaterial.uniforms.uIntensity.value = 1.0 + Math.random() * 0.3;
+    for (let i = 0; i < preset.count; i++) {
+      const slot = this.playerSlots[this.playerRing];
+      this.playerRing = (this.playerRing + 1) % MAX_PLAYER;
+      emitParticle(slot, muzzleWorldPos, fwd, preset, 1.0);
+    }
   }
 
   /**
-   * Per-frame update. Decays all active flashes.
+   * Per-frame update — decays all active particles and uploads to GPU.
    */
   update(deltaTime?: number): void {
     const dt = deltaTime ?? 0.016;
-    const decay = dt / FLASH_LIFETIME;
+    let playerDirty = false;
+    let npcDirty    = false;
 
-    // -- NPC instances --
-    let anyAlive = false;
-    for (let i = 0; i < this.maxInstances; i++) {
-      if (this.lifeAttr[i] > 0) {
-        this.lifeAttr[i] -= decay;
-        if (this.lifeAttr[i] <= 0) {
-          this.lifeAttr[i] = 0;
-          // Zero-scale to hide
-          this._mat4.compose(this._pos.set(0, 0, 0), this._quat, this._zeroScale);
-          this.npcMesh.setMatrixAt(i, this._mat4);
+    // Player slots
+    if (this.playerMesh) {
+      for (let i = 0; i < MAX_PLAYER; i++) {
+        const s = this.playerSlots[i];
+        if (s.life > 0) {
+          s.life -= s.decay * dt;
+          if (s.life < 0) s.life = 0;
+          s.x += s.vx * dt;
+          s.y += s.vy * dt;
+          s.z += s.vz * dt;
+          playerDirty = true;
         }
-        anyAlive = true;
+      }
+      if (playerDirty) {
+        uploadSlots(this.playerSlots, this.playerPos, this.playerCol, this.playerLif, this.playerSiz, this.playerGeo);
       }
     }
 
-    if (anyAlive || this.npcDirty) {
-      this.npcMesh.instanceMatrix.needsUpdate = true;
-      (this.npcMesh.geometry.attributes.instanceLife as THREE.BufferAttribute).needsUpdate = true;
-      // Variant and intensity only change on spawn, not during decay
-      if (this.npcDirty) {
-        (this.npcMesh.geometry.attributes.instanceVariant as THREE.BufferAttribute).needsUpdate = true;
-        (this.npcMesh.geometry.attributes.instanceIntensity as THREE.BufferAttribute).needsUpdate = true;
-        this.npcDirty = false;
+    // NPC slots
+    for (let i = 0; i < MAX_NPC; i++) {
+      const s = this.npcSlots[i];
+      if (s.life > 0) {
+        s.life -= s.decay * dt;
+        if (s.life < 0) s.life = 0;
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
+        s.z += s.vz * dt;
+        npcDirty = true;
       }
     }
-
-    // -- Player mesh --
-    if (this.playerLife > 0) {
-      this.playerLife -= decay;
-      if (this.playerLife <= 0) {
-        this.playerLife = 0;
-        this.playerMesh.visible = false;
-        this.playerMaterial.uniforms.uLife.value = 0;
-      } else {
-        this.playerMaterial.uniforms.uLife.value = this.playerLife;
-      }
+    if (npcDirty) {
+      uploadSlots(this.npcSlots, this.npcPos, this.npcCol, this.npcLif, this.npcSiz, this.npcGeo);
     }
   }
 
@@ -343,10 +359,10 @@ export class MuzzleFlashSystem {
     (this.npcMesh.material as THREE.ShaderMaterial).dispose();
     this.npcMesh.parent?.remove(this.npcMesh);
 
-    this.playerMesh.geometry.dispose();
-    this.playerMaterial.dispose();
-    if (this.playerAddedToScene) {
-      this.playerAddedToScene.remove(this.playerMesh);
+    if (this.playerMesh) {
+      this.playerMesh.geometry.dispose();
+      (this.playerMesh.material as THREE.ShaderMaterial).dispose();
+      this.playerScene?.remove(this.playerMesh);
     }
   }
 }

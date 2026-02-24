@@ -247,10 +247,10 @@ describe('WeaponFiring', () => {
       // @ts-ignore - call private method
       weaponFiring.spawnMuzzleFlash()
 
-      // Should use actual muzzle position, not camera offset
+      // Should use actual muzzle position + 0.03 Y nudge for recoil compensation
       expect(muzzleFlashSystem.spawnPlayer).toHaveBeenCalledWith(
         overlayScene,
-        expect.objectContaining({ x: 0.5, y: -0.3, z: -0.7 }),
+        expect.objectContaining({ x: 0.5, y: expect.closeTo(-0.27, 2), z: -0.7 }),
         expect.objectContaining({ x: 0, y: 0, z: -1 }),
         expect.any(Number)
       )
@@ -270,10 +270,10 @@ describe('WeaponFiring', () => {
       // @ts-ignore
       weaponFiring.spawnMuzzleFlash()
 
-      // (0, 1, 0) + (0, 0, -1) * 1 = (0, 1, -1)
+      // (0, 1, 0) + (0, 0, -1) * 1 = (0, 1, -1), then +0.03 Y nudge = (0, 1.03, -1)
       expect(muzzleFlashSystem.spawnPlayer).toHaveBeenCalledWith(
         overlayScene,
-        expect.objectContaining({ x: 0, y: 1, z: -1 }),
+        expect.objectContaining({ x: 0, y: expect.closeTo(1.03, 2), z: -1 }),
         expect.objectContaining({ x: 0, y: 0, z: -1 }),
         expect.any(Number)
       )
