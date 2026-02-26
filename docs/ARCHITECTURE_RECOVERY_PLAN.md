@@ -1,6 +1,6 @@
 # Architecture Recovery Plan
 
-Last updated: 2026-02-25
+Last updated: 2026-02-26
 Scope: runtime architecture stabilization with performance and gameplay fidelity gates.
 
 ## Current Goal
@@ -48,6 +48,11 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: ObjectiveDisplay.ticketDisplay dead property removed (real TicketDisplay is UIComponent).
 - Keep: RespawnButton module + HUDElements.respawnButton removed (never mounted to layout; RespawnUI has its own button).
 - Keep: 20 dead interfaces removed from SystemInterfaces.ts (never imported). 9 used interfaces retained.
+- Keep: HUDUpdater forwarding layer eliminated; HUDSystem calls UIComponents directly. HUDZoneDisplay owned by HUDSystem. Bleed text logic inlined.
+- Keep: 29 mock-wiring/setter-propagation tests deleted from CombatantAI.test.ts; 40 behavioral tests retained (suppression decay, movement callouts, squad command overrides).
+- Keep: VoiceCalloutSystem.test.ts deleted (1 trivial test for disabled system).
+- Keep: UI_ENGINE_PLAN.md archived to docs/archive/ (completed project, 1302 lines).
+- Keep: PROFILING_HARNESS.md updated with perf:quick, perf:compare, perf:update-baseline commands; stale spatial feature flag env vars removed.
 
 ## Deferred Decisions
 

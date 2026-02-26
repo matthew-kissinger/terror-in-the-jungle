@@ -1,6 +1,6 @@
 # Profiling Harness
 
-Last updated: 2026-02-21
+Last updated: 2026-02-26
 
 Mission linkage:
 - `docs/PERFORMANCE_FRONTIER_MISSION.md`
@@ -11,11 +11,16 @@ Mission linkage:
 - Default capture (headed): `npm run perf:capture`
 - Headless capture: `npm run perf:capture:headless`
 - Deep debug capture: `npm run perf:capture -- --deep-cdp`
+- Quick smoke test: `npm run perf:quick`
 - Combat throughput: `npm run perf:capture:combat120`
+- Zone control: `npm run perf:capture:zonecontrol`
+- Team deathmatch: `npm run perf:capture:teamdeathmatch`
 - Open Frontier short: `npm run perf:capture:openfrontier:short`
 - A Shau short: `npm run perf:capture:ashau:short`
 - 30-minute soak: `npm run perf:capture:frontier30m`
 - Analyze latest: `npm run perf:analyze:latest`
+- Compare against baseline: `npm run perf:compare`
+- Update baseline snapshot: `npm run perf:update-baseline`
 
 ## Scenario Controls
 
@@ -32,11 +37,6 @@ Set via env vars (or equivalent CLI flags):
 - `PERF_FRONTLINE_TRIGGER_DISTANCE`
 - `PERF_FRONTLINE_COMPRESSED_PER_FACTION`
 - `PERF_MOVEMENT_DECISION_INTERVAL_MS`
-
-Frontier toggles:
-- `PERF_LOS_HEIGHT_PREFILTER=1|0`
-- `PERF_SPATIAL_SECONDARY_SYNC=1|0`
-- `PERF_SPATIAL_DEDUP_SYNC=1|0`
 
 Sampling/observer controls:
 - `PERF_SAMPLE_INTERVAL_MS`

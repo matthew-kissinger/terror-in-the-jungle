@@ -2,12 +2,12 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
-import { Faction, Alliance, getAlliance } from '../../systems/combat/types';
+import { Faction } from '../../systems/combat/types';
 import { ZoneManager } from '../../systems/world/ZoneManager';
 import { TicketSystem, GameState } from '../../systems/world/TicketSystem';
 import { HUDStyles } from './HUDStyles';
 import { HUDElements } from './HUDElements';
-import { HUDUpdater } from './HUDUpdater';
+import { HUDZoneDisplay } from './HUDZoneDisplay';
 import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
 import { MatchEndScreen, MatchStats } from '../end/MatchEndScreen';
 import { ScoreboardPanel } from './ScoreboardPanel';
@@ -18,6 +18,7 @@ import type { PlayerHealthSystem } from '../../systems/player/PlayerHealthSystem
 import { IHUDSystem } from '../../types/SystemInterfaces';
 import { ViewportManager } from '../design/responsive';
 import { HUDLayout } from '../layout/HUDLayout';
+import type { GamePhase } from './GameStatusPanel';
 
 export class HUDSystem implements GameSystem, IHUDSystem {
   private combatantSystem?: CombatantSystem;
@@ -30,7 +31,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
   private styles: HUDStyles;
   private elements: HUDElements;
-  private updater: HUDUpdater;
+  private zoneDisplay: HUDZoneDisplay;
   private statsTracker: PlayerStatsTracker;
   private matchEndScreen: MatchEndScreen;
   private scoreboard: ScoreboardPanel;
@@ -47,7 +48,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.camera = camera;
     this.styles = HUDStyles.getInstance();
     this.elements = new HUDElements(camera);
-    this.updater = new HUDUpdater(this.elements);
+    this.zoneDisplay = new HUDZoneDisplay(this.elements);
     this.playerHealthSystem = playerHealthSystem;
     this.statsTracker = new PlayerStatsTracker();
     this.hudLayout = new HUDLayout();
@@ -105,7 +106,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.personalStatsPanel.mount(this.hudLayout.getSlot('stats'));
 
     // Initialize ticket display
-    this.updater.updateTicketDisplay(300, 300);
+    this.elements.ticketDisplay.setTickets(300, 300);
 
     Logger.info('hud', ' HUD System initialized');
   }
@@ -116,26 +117,19 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     if (this.staticHudAccumulator >= this.STATIC_HUD_INTERVAL) {
       // Update objectives display
       if (this.zoneManager) {
-        this.updater.updateObjectivesDisplay(this.zoneManager, isTDM, this.camera?.position);
-      }
-
-      // Update combat statistics
-      if (this.combatantSystem) {
-        this.updater.updateCombatStats(this.combatantSystem);
+        this.zoneDisplay.updateObjectivesDisplay(this.zoneManager, isTDM, this.camera?.position);
       }
 
       // Update game status and tickets
       if (this.ticketSystem) {
-        this.updater.updateGameStatus(this.ticketSystem);
-        this.updater.updateTicketDisplay(
+        this.updateGameStatus(this.ticketSystem);
+        this.elements.ticketDisplay.setMode(isTDM, this.ticketSystem.getKillTarget());
+        this.elements.ticketDisplay.setTickets(
           this.ticketSystem.getTickets(Faction.US),
-          this.ticketSystem.getTickets(Faction.NVA),
-          isTDM,
-          this.ticketSystem.getKillTarget()
+          this.ticketSystem.getTickets(Faction.NVA)
         );
         // Update match timer
-        const timeRemaining = this.ticketSystem.getMatchTimeRemaining();
-        this.updater.updateTimer(timeRemaining);
+        this.elements.matchTimer.setTime(this.ticketSystem.getMatchTimeRemaining());
       }
 
       this.staticHudAccumulator = 0;
@@ -197,7 +191,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   }
 
   addKill(isHeadshot: boolean = false): void {
-    this.updater.addKill();
+    this.elements.killCounter.addKill();
+    this.elements.showHitMarker('kill');
     this.statsTracker.addKill();
     this.personalStatsPanel.onKill();
 
@@ -214,7 +209,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   }
 
   addDeath(): void {
-    this.updater.addDeath();
+    this.elements.killCounter.addDeath();
     this.statsTracker.addDeath();
     this.personalStatsPanel.onDeath();
   }
@@ -252,6 +247,26 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.statsTracker.startMatch();
     this.hudLayout.setPhase('playing');
     Logger.info('hud', ' Match statistics tracking started');
+  }
+
+  private updateGameStatus(ticketSystem: TicketSystem): void {
+    const gameState = ticketSystem.getGameState();
+    const bleedRate = ticketSystem.getTicketBleedRate();
+
+    let bleedText = '';
+    if (bleedRate.bleedPerSecond > 0) {
+      if (bleedRate.usTickets > bleedRate.opforTickets) {
+        bleedText = `US -${bleedRate.usTickets.toFixed(1)}/s`;
+      } else if (bleedRate.opforTickets > bleedRate.usTickets) {
+        bleedText = `OPFOR -${bleedRate.opforTickets.toFixed(1)}/s`;
+      }
+    }
+
+    this.elements.gameStatusPanel.setGameState(
+      gameState.phase as GamePhase,
+      gameState.winner ?? null,
+      bleedText
+    );
   }
 
   private handleGameEnd(winner: Faction, gameState: GameState): void {
@@ -332,7 +347,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   }
 
   updateTickets(usTickets: number, opforTickets: number): void {
-    this.updater.updateTicketDisplay(usTickets, opforTickets);
+    this.elements.ticketDisplay.setTickets(usTickets, opforTickets);
   }
 
   showMessage(message: string, duration: number = 3000): void {
