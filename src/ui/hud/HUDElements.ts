@@ -16,7 +16,6 @@ import { HelicopterHUD } from './HelicopterHUD';
 import { InteractionPromptPanel } from './InteractionPromptPanel';
 import { GrenadeMeter } from './GrenadeMeter';
 import { MortarPanel } from './MortarPanel';
-import { RespawnButton } from './RespawnButton';
 import { ZoneCaptureNotification } from './ZoneCaptureNotification';
 import { zIndex, fontStack } from '../design/tokens';
 import type { HUDLayout } from '../layout/HUDLayout';
@@ -35,9 +34,7 @@ export class HUDElements {
   public ammoDisplay: AmmoDisplay;
 
   // Legacy HTMLDivElement properties (not yet migrated)
-  public combatStats: HTMLDivElement;
   public hitMarkerContainer: HTMLDivElement;
-  public respawnButton: HTMLButtonElement;
 
   // UIComponent-based elements (Phase 3)
   public interactionPromptPanel: InteractionPromptPanel;
@@ -58,7 +55,6 @@ export class HUDElements {
 
   // Legacy module instances (not yet migrated to UIComponent)
   private objectiveDisplay: ObjectiveDisplay;
-  private respawnButtonModule: RespawnButton;
 
   constructor(camera?: THREE.Camera) {
     this.hudContainer = this.createHUDContainer();
@@ -80,12 +76,8 @@ export class HUDElements {
 
     // Initialize legacy modules (not yet migrated)
     this.objectiveDisplay = new ObjectiveDisplay();
-    this.respawnButtonModule = new RespawnButton();
 
     this.objectivesList = this.objectiveDisplay.objectivesList;
-    this.combatStats = document.createElement('div'); // hidden, placeholder
-    this.combatStats.style.display = 'none';
-    this.respawnButton = this.respawnButtonModule.respawnButton;
 
     // Create hit marker container (simple, no module needed)
     this.hitMarkerContainer = this.createHitMarkerContainer();
@@ -116,7 +108,6 @@ export class HUDElements {
     // Initial mount to hudContainer; attachToDOM() remounts into grid slots
     this.hudContainer.appendChild(this.objectivesList);
     this.ticketDisplay.mount(this.hudContainer);
-    this.hudContainer.appendChild(this.combatStats);
     this.gameStatusPanel.mount(this.hudContainer);
     this.matchTimer.mount(this.hudContainer);
     this.hudContainer.appendChild(this.hitMarkerContainer);
@@ -295,7 +286,6 @@ export class HUDElements {
 
     // Legacy HTMLDivElement elements
     layout.getSlot('objectives').appendChild(this.objectivesList);
-    layout.getSlot('stats').appendChild(this.combatStats);
     layout.getSlot('center').appendChild(this.hitMarkerContainer);
 
     // Feedback systems mount to the center slot too

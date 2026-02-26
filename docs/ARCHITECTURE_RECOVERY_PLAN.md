@@ -44,6 +44,10 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: ZoneTerrainAdapter.setChunkManager() no-op removed (uses HeightQueryCache).
 - Keep: createUH1HueyGeometry() legacy wrapper removed (createHelicopterGeometry is the API).
 - Keep: FirstPersonWeapon.setEnemySystem() deprecated stub removed.
+- Keep: HUDElements.combatStats placeholder div removed (was hidden, never updated).
+- Keep: ObjectiveDisplay.ticketDisplay dead property removed (real TicketDisplay is UIComponent).
+- Keep: RespawnButton module + HUDElements.respawnButton removed (never mounted to layout; RespawnUI has its own button).
+- Keep: 20 dead interfaces removed from SystemInterfaces.ts (never imported). 9 used interfaces retained.
 
 ## Deferred Decisions
 

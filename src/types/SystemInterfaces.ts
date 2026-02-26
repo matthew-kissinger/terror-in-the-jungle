@@ -1,10 +1,10 @@
 /**
  * System Interface Definitions
- * Replaces `any` types with proper typed interfaces for system dependencies
+ * Only interfaces actively imported by other modules belong here.
  */
 
 import * as THREE from 'three';
-import { Combatant, Faction, Squad } from '../systems/combat/types';
+import { Faction } from '../systems/combat/types';
 import type { CameraShakeSystem } from '../systems/effects/CameraShakeSystem';
 import type { ImprovedChunkManager } from '../systems/terrain/ImprovedChunkManager';
 import type { GameModeManager } from '../systems/world/GameModeManager';
@@ -18,65 +18,6 @@ import type { HUDSystem } from '../ui/hud/HUDSystem';
 import type { InventoryManager } from '../systems/player/InventoryManager';
 import type { FirstPersonWeapon } from '../systems/player/FirstPersonWeapon';
 import type { PlayerController } from '../systems/player/PlayerController';
-
-/**
- * Impact Effects Pool interface - blood/debris effects on hit
- */
-export interface IImpactEffectsPool {
-  spawn(position: THREE.Vector3): void;
-  update(deltaTime: number): void;
-  dispose(): void;
-}
-
-/**
- * Explosion Effects Pool interface - explosion visual effects
- */
-export interface IExplosionEffectsPool {
-  spawn(position: THREE.Vector3): void;
-  update(deltaTime: number): void;
-  dispose(): void;
-}
-
-/**
- * Combatant Combat interface - handles NPC combat behavior
- */
-export interface ICombatantCombat {
-  hitDetection: IHitDetection;
-  setSandbagSystem(system: ISandbagSystem): void;
-}
-
-/**
- * Combatant AI interface - handles NPC AI behavior
- */
-export interface ICombatantAI {
-  setSandbagSystem(system: ISandbagSystem): void;
-  setZoneManager(manager: IZoneManager): void;
-  setSmokeCloudSystem(system: ISmokeCloudSystem): void;
-}
-
-/**
- * Squad Manager interface - manages NPC squads
- */
-export interface ISquadManager {
-  setInfluenceMap(map: IInfluenceMapSystem): void;
-  getSquad(squadId: string): Squad | undefined;
-  getAllSquads(): Map<string, Squad>;
-}
-
-/**
- * Influence Map System interface - strategic AI targeting
- */
-export interface IInfluenceMapSystem {
-  update(deltaTime: number): void;
-}
-
-/**
- * Smoke Cloud System interface - smoke grenade effects
- */
-export interface ISmokeCloudSystem {
-  isLineBlocked(start: THREE.Vector3, end: THREE.Vector3): boolean;
-  update(deltaTime: number): void;
-}
 
 /**
  * HUD System interface - handles all UI display and feedback
@@ -118,33 +59,6 @@ export interface IHUDSystem {
   showMortarIndicator(): void;
   hideMortarIndicator(): void;
   updateMortarState(pitch: number, yaw: number, power: number, isAiming: boolean): void;
-}
-
-/**
- * Player Health System interface
- */
-export interface IPlayerHealthSystem {
-  takeDamage(amount: number, source?: string): boolean;
-  heal(amount: number): void;
-  isAlive(): boolean;
-  voluntaryRespawn(): void;
-  applySpawnProtection(durationSeconds: number): void;
-}
-
-/**
- * Grenade System interface
- */
-export interface IGrenadeSystem {
-  isCurrentlyAiming(): boolean;
-  updateArc(): void;
-  getAimingState(): {
-    isAiming: boolean;
-    power: number;
-    estimatedDistance: number;
-  };
-  startAiming(): void;
-  throwGrenade(): void;
-  showGrenadeInHand(show: boolean): void;
 }
 
 /**
@@ -244,50 +158,6 @@ export interface IChunkManager {
 }
 
 /**
- * Combatant System interface - NPC management
- */
-export interface ICombatantSystem {
-  getCombatants(): Map<string, any>;
-  getCombatantAt(id: string): any;
-  getClosestEnemy(position: THREE.Vector3, faction: string): any;
-  reseedForcesForMode(): void;
-
-  // Internal subsystems exposed for system wiring
-  readonly impactEffectsPool: IImpactEffectsPool;
-  readonly explosionEffectsPool: IExplosionEffectsPool;
-  readonly combatantCombat: ICombatantCombat;
-  readonly combatantAI: ICombatantAI;
-  readonly squadManager: ISquadManager;
-  readonly combatantRenderer: ICombatantRenderer;
-  readonly combatants: Map<string, any>;
-
-  // Player squad controls
-  shouldCreatePlayerSquad: boolean;
-  playerSquadId?: string;
-
-  // Internal properties for influence map and sandbag system wiring
-  influenceMap?: IInfluenceMapSystem;
-  sandbagSystem?: ISandbagSystem;
-}
-
-/**
- * Zone Manager interface
- */
-export interface IZoneManager {
-  getAllZones(): any[];
-  getZoneAtPosition(position: THREE.Vector3): any;
-}
-
-/**
- * Ticket System interface - game state and scoring
- */
-export interface ITicketSystem {
-  getTickets(faction: string): number;
-  getMatchTimeRemaining(): number;
-  getGameState(): string;
-}
-
-/**
  * Audio Manager interface
  */
 export interface IAudioManager {
@@ -318,15 +188,6 @@ export interface IFlashbangScreenEffect {
 }
 
 /**
- * Inventory Manager interface
- */
-export interface IInventoryManager {
-  getCurrentWeapon(): any;
-  getAmmo(slot: number): number;
-  switchWeapon(slot: number): void;
-}
-
-/**
  * Game Renderer interface - main rendering system
  */
 export interface IGameRenderer {
@@ -344,64 +205,4 @@ export interface IGameRenderer {
   showRenderer(): void;
   showCrosshair(): void;
   onWindowResize(): void;
-}
-
-/**
- * Sandbag System interface
- */
-export interface ISandbagSystem {
-  placeSandbag(position: THREE.Vector3, rotation: number): void;
-  getSandbags(): any[];
-}
-
-/**
- * Suppression System interface
- */
-export interface IPlayerSuppressionSystem {
-  applySuppression(intensity: number): void;
-  clearSuppression(): void;
-}
-
-/**
- * Combatant Renderer interface
- */
-export interface ICombatantRenderer {
-  setPlayerSquadId(squadId: string | undefined): void;
-  updateWalkFrame(deltaTime: number): void;
-  updateBillboards(combatants: Map<string, Combatant>, playerPosition: THREE.Vector3): void;
-}
-
-/**
- * Hit Detection interface
- */
-export interface IHitDetection {
-  raycast(origin: THREE.Vector3, direction: THREE.Vector3, maxDistance: number): any;
-}
-
-/**
- * Camera Shake System interface
- */
-export interface ICameraShakeSystem {
-  addShake(magnitude: number, duration: number): void;
-  update(deltaTime: number): void;
-  apply(camera: THREE.Camera): void;
-}
-
-/**
- * Helicopter Dropship interface
- */
-export interface IHelicopterDropship {
-  position: THREE.Vector3;
-  isDocked: boolean;
-  board(player: any): void;
-  release(player: any): void;
-}
-
-/**
- * Game Mode Manager interface
- */
-export interface IGameModeManager {
-  getCurrentGameMode(): string;
-  startMatch(): void;
-  endMatch(): void;
 }
