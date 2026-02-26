@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { WeatherSystem } from './WeatherSystem';
-import { WeatherState, WeatherConfig } from '../../config/gameModes';
+import { WeatherState, WeatherConfig } from '../../config/gameModeTypes';
 import type { IChunkManager, IGameRenderer } from '../../types/SystemInterfaces';
 import { updateLightning } from './WeatherLightning';
 import { updateAtmosphere, getBlendedRainIntensity } from './WeatherAtmosphere';

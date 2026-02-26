@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Combatant, CombatantState } from './types';
 import { CombatantFactory } from './CombatantFactory';
 import { SquadManager } from './SquadManager';
-import { SpatialOctree } from './SpatialOctree';
+import { spatialGridManager } from './SpatialGridManager';
 import { ZoneManager } from '../world/ZoneManager';
 
 /**
@@ -19,7 +19,6 @@ export class CombatantSystemUpdate {
     private playerPosition: THREE.Vector3,
     private combatantFactory: CombatantFactory,
     private squadManager: SquadManager,
-    private spatialGrid: SpatialOctree,
     private zoneManager?: ZoneManager
   ) {}
 
@@ -75,11 +74,11 @@ export class CombatantSystemUpdate {
     if (!proxy) {
       proxy = this.combatantFactory.createPlayerProxy(this.playerPosition);
       this.combatants.set(this.playerProxyId, proxy);
-      this.spatialGrid.updatePosition(this.playerProxyId, this.playerPosition);
+      spatialGridManager.syncEntity(this.playerProxyId, this.playerPosition);
     } else {
       proxy.position.copy(this.playerPosition);
       proxy.state = CombatantState.ENGAGING;
-      this.spatialGrid.updatePosition(this.playerProxyId, this.playerPosition);
+      spatialGridManager.syncEntity(this.playerProxyId, this.playerPosition);
     }
   }
 

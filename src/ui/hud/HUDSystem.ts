@@ -68,7 +68,6 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       if (this.onPlayAgainCallback) this.onPlayAgainCallback();
     });
 
-    // Parameters are optional for backward compatibility
   }
 
   /** Set callback for Play Again button (programmatic match restart). Called from bootstrap. */

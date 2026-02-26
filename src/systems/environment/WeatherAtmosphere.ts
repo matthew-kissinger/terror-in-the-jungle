@@ -1,4 +1,4 @@
-import { WeatherState } from '../../config/gameModes';
+import { WeatherState } from '../../config/gameModeTypes';
 import { IGameRenderer } from '../../types/SystemInterfaces';
 
 export interface WeatherParams {

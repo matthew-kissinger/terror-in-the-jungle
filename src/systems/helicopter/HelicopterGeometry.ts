@@ -61,11 +61,6 @@ export async function createHelicopterGeometry(
   return helicopterGroup;
 }
 
-/** Legacy wrapper kept for backward compatibility. */
-export async function createUH1HueyGeometry(): Promise<THREE.Group> {
-  return createHelicopterGeometry('UH1_HUEY', 'us_huey');
-}
-
 // ─── Rotor wiring ─────────────────────────────────────────────────────────
 
 function wireRotorGroups(scene: THREE.Group, helicopterGroup: THREE.Group): void {

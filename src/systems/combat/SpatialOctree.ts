@@ -3,7 +3,12 @@ import { Combatant, CombatantState } from './types'
 import { OctreeNode } from './SpatialOctreeNode'
 import { SpatialOctreeQueries } from './SpatialOctreeQueries'
 
-export class SpatialOctree {
+/** Minimal interface for spatial radius queries. Satisfied by both SpatialOctree and SpatialGridManager. */
+export interface ISpatialQuery {
+  queryRadius(center: THREE.Vector3, radius: number): string[];
+}
+
+export class SpatialOctree implements ISpatialQuery {
   private root: OctreeNode
   private entityPositions: Map<string, THREE.Vector3> = new Map()
   private entityNodes: Map<string, OctreeNode> = new Map()

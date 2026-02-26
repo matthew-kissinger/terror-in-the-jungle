@@ -7,7 +7,7 @@ import { PlayerHealthSystem } from './PlayerHealthSystem';
 import { GameModeManager } from '../world/GameModeManager';
 import { InventoryManager } from './InventoryManager';
 import { getHeightQueryCache } from '../terrain/HeightQueryCache';
-import { GameMode } from '../../config/gameModes';
+import { GameMode } from '../../config/gameModeTypes';
 import { RespawnUI } from './RespawnUI';
 import { RespawnMapController } from './RespawnMapController';
 import type { IFirstPersonWeapon, IPlayerController } from '../../types/SystemInterfaces';

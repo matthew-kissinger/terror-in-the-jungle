@@ -2,10 +2,10 @@ import { Logger } from '../utils/Logger';
 import * as THREE from 'three';
 import '../style.css';
 
-import { LoadingScreen } from '../ui/loading/LoadingScreen';
+import { StartScreen } from '../ui/loading/StartScreen';
 import { SystemManager } from './SystemManager';
 import { GameRenderer } from './GameRenderer';
-import { GameMode } from '../config/gameModes';
+import { GameMode } from '../config/gameModeTypes';
 import { PerformanceOverlay } from '../ui/debug/PerformanceOverlay';
 import { TimeIndicator } from '../ui/debug/TimeIndicator';
 import { LogOverlay } from '../ui/debug/LogOverlay';
@@ -24,7 +24,7 @@ import { markStartup } from './StartupTelemetry';
 
 export class GameEngine {
   // Core components (Public for split module access)
-  public loadingScreen: LoadingScreen;
+  public loadingScreen: StartScreen;
   public renderer: GameRenderer;
   public systemManager: SystemManager;
   public performanceOverlay: PerformanceOverlay;
@@ -51,8 +51,9 @@ export class GameEngine {
     this.sandboxEnabled = isSandboxMode();
     this.sandboxConfig = this.sandboxEnabled ? getSandboxConfig() : null;
 
-    // Create loading screen immediately
-    this.loadingScreen = new LoadingScreen();
+    // Create start screen immediately
+    this.loadingScreen = new StartScreen();
+    this.loadingScreen.mount(document.body);
 
     // Create renderer and system manager
     this.renderer = new GameRenderer();
@@ -89,14 +90,14 @@ export class GameEngine {
       this.startGameWithMode(mode);
     });
 
-    // Settings button opens settings panel (handled in LoadingScreen)
+    // Settings button opens settings panel (handled in StartScreen)
     this.loadingScreen.onSettings(() => {
-      // Panel show/hide handled by LoadingScreen.handleSettingsClick
+      // Panel show/hide handled by StartScreen.handleSettingsClick
     });
 
-    // How to play button opens how-to-play panel (handled in LoadingScreen)
+    // How to play button opens how-to-play panel (handled in StartScreen)
     this.loadingScreen.onHowToPlay(() => {
-      // Panel show/hide handled by LoadingScreen.handleHowToPlayClick
+      // Panel show/hide handled by StartScreen.handleHowToPlayClick
     });
 
     // Subscribe to settings changes and apply to game systems in real time

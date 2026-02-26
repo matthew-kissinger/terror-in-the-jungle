@@ -96,11 +96,6 @@ vi.mock('./HelicopterGeometry', () => ({
     const group = new THREE.Group();
     group.userData = { model: 'UH-1 Huey', id: helicopterId };
     return group;
-  }),
-  createUH1HueyGeometry: vi.fn(async () => {
-    const group = new THREE.Group();
-    group.userData = { model: 'UH-1 Huey' };
-    return group;
   })
 }));
 

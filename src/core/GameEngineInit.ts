@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { GameMode, ZoneConfig, getGameModeConfig } from '../config/gameModes';
+import { GameMode, ZoneConfig } from '../config/gameModeTypes';
+import { getGameModeConfig } from '../config/gameModes';
 import { getHeightQueryCache } from '../systems/terrain/HeightQueryCache';
 import { DEMHeightProvider } from '../systems/terrain/DEMHeightProvider';
 import { Logger } from '../utils/Logger';

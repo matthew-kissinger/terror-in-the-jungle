@@ -9,7 +9,7 @@ import { ZoneRenderer } from './ZoneRenderer';
 import { ZoneCaptureLogic } from './ZoneCaptureLogic';
 import { ZoneTerrainAdapter } from './ZoneTerrainAdapter';
 import { ZoneInitializer } from './ZoneInitializer';
-import { GameModeConfig } from '../../config/gameModes';
+import { GameModeConfig } from '../../config/gameModeTypes';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 
 export enum ZoneState {
@@ -141,24 +141,6 @@ export class ZoneManager implements GameSystem {
           } else if (isOpfor(combatant.faction)) {
             occupants.opfor++;
           }
-        }
-
-        // Resilience fallback: if spatial query misses everything, do a cheap linear pass.
-        // 120 combatants * ~10 zones * 10Hz is still small and prevents capture deadlocks.
-        if (nearbyIds.length === 0 && combatants.size > 0) {
-          combatants.forEach(combatant => {
-            if (!combatant) return;
-            if (combatant.state === CombatantState.DEAD || (combatant as any).state === 'dead') return;
-            if (combatant.position.distanceTo(zone.position) > zone.radius) return;
-            if (isBlufor(combatant.faction)) {
-              occupants.us++;
-              if ((combatant as any).isPlayerProxy || combatant.id === 'player_proxy') {
-                playerProxyCounted = true;
-              }
-            } else if (isOpfor(combatant.faction)) {
-              occupants.opfor++;
-            }
-          });
         }
 
         // Ensure player can always capture even if player_proxy is briefly missing/desynced.
@@ -321,7 +303,6 @@ export class ZoneManager implements GameSystem {
 
   setChunkManager(chunkManager: ImprovedChunkManager): void {
     this.chunkManager = chunkManager;
-    this.terrainAdapter.setChunkManager();
     Logger.info('world', 'ChunkManager connected to ZoneManager');
   }
 

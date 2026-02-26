@@ -24,10 +24,8 @@ import { CombatantCombat, CombatHitResult } from './CombatantCombat';
 import { CombatantMovement } from './CombatantMovement';
 import { CombatantRenderer } from './CombatantRenderer';
 import { SquadManager } from './SquadManager';
-import { SpatialOctree } from './SpatialOctree';
 import { spatialGridManager } from './SpatialGridManager';
 import { InfluenceMapSystem } from './InfluenceMapSystem';
-import { RallyPointSystem } from './RallyPointSystem';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 
 // New focused modules
@@ -61,10 +59,8 @@ export class CombatantSystem implements GameSystem {
   private combatantMovement: CombatantMovement;
   public readonly combatantRenderer: CombatantRenderer;
   public readonly squadManager: SquadManager;
-  private spatialGrid: SpatialOctree;
   public influenceMap?: InfluenceMapSystem;
   public sandbagSystem?: import('../weapons/SandbagSystem').SandbagSystem;
-  private rallyPointSystem?: RallyPointSystem;
 
   // New focused modules
   private spawnManager: CombatantSpawnManager;
@@ -88,8 +84,6 @@ export class CombatantSystem implements GameSystem {
   // Player proxy
   private playerProxyId: string = 'player_proxy';
   private combatEnabled = false;
-  private readonly secondarySpatialSyncEnabled: boolean;
-  private readonly secondarySpatialDedupEnabled: boolean;
 
   // Player squad
   public shouldCreatePlayerSquad = false;
@@ -128,11 +122,7 @@ export class CombatantSystem implements GameSystem {
     this.combatantMovement = new CombatantMovement(chunkManager, undefined);
     this.squadManager = new SquadManager(this.combatantFactory, chunkManager);
 
-    // Use legacy spatial grid for internal queries (AI, etc.)
-    // SpatialGridManager (singleton) is used for hit detection
-    this.spatialGrid = new SpatialOctree(4000, 12, 6); // 4000m world, 12 entities/node, 6 max depth
-
-    // Initialize the singleton spatial grid manager (will be reinitialized when game mode is set)
+    // Initialize spatial grid (will be reinitialized when game mode is set)
     spatialGridManager.initialize(4000);
 
     // Set spatial grid manager on CombatantMovement for cluster manager optimizations
@@ -141,7 +131,6 @@ export class CombatantSystem implements GameSystem {
     // Initialize new focused modules
     this.spawnManager = new CombatantSpawnManager(
       this.combatants,
-      this.spatialGrid,
       this.combatantFactory,
       this.squadManager
     );
@@ -153,13 +142,11 @@ export class CombatantSystem implements GameSystem {
       this.combatantCombat,
       this.combatantMovement,
       this.combatantRenderer,
-      this.squadManager,
-      this.spatialGrid
+      this.squadManager
     );
 
     this.profiler = new CombatantProfiler(
-      this.combatants,
-      this.spatialGrid
+      this.combatants
     );
 
     // Initialize extracted modules
@@ -175,8 +162,7 @@ export class CombatantSystem implements GameSystem {
       this.combatantAI,
       this.squadManager,
       this.spawnManager,
-      this.lodManager,
-      this.spatialGrid
+      this.lodManager
     );
 
     this.updateHelpers = new CombatantSystemUpdate(
@@ -184,15 +170,11 @@ export class CombatantSystem implements GameSystem {
       this.playerProxyId,
       this.playerPosition,
       this.combatantFactory,
-      this.squadManager,
-      this.spatialGrid
+      this.squadManager
     );
 
-    // Combat query consumers use primary combat spatial ownership by default.
-    this.combatantCombat.setSpatialQueryProvider((center, radius) => this.spatialGrid.queryRadius(center, radius));
-
-    this.secondarySpatialSyncEnabled = this.resolveSecondarySpatialSyncEnabled();
-    this.secondarySpatialDedupEnabled = this.resolveSecondarySpatialDedupEnabled();
+    // Combat queries use the unified spatial grid manager.
+    this.combatantCombat.setSpatialQueryProvider((center, radius) => spatialGridManager.queryRadius(center, radius));
   }
 
   async init(): Promise<void> {
@@ -287,19 +269,6 @@ export class CombatantSystem implements GameSystem {
     // Count engaging combatants
     this.profiler.updateEngagementCounts();
 
-    // Secondary sync path is experimental; primary spatial ownership is the octree updated in LOD manager.
-    if (this.secondarySpatialSyncEnabled) {
-      t0 = performance.now();
-      spatialGridManager.syncAllPositions(
-        this.combatants,
-        this.playerPosition,
-        this.secondarySpatialDedupEnabled ? this.lodManager.getSpatiallyUpdatedIds() : undefined
-      );
-      this.profiler.profiling.spatialSyncMs = performance.now() - t0;
-    } else {
-      this.profiler.profiling.spatialSyncMs = 0;
-    }
-
     // Update billboard rotations and walk animation
     t0 = performance.now();
     this.combatantRenderer.updateWalkFrame(deltaTime);
@@ -369,7 +338,6 @@ export class CombatantSystem implements GameSystem {
     );
     combatant.health = Math.min(data.health, combatant.maxHealth);
     this.combatants.set(combatant.id, combatant);
-    this.spatialGrid.updatePosition(combatant.id, combatant.position);
     spatialGridManager.syncEntity(combatant.id, combatant.position);
     return combatant.id;
   }
@@ -390,8 +358,6 @@ export class CombatantSystem implements GameSystem {
       alive: c.state !== CombatantState.DEAD
     };
 
-    // Remove from all spatial structures
-    this.spatialGrid.remove(combatantId);
     spatialGridManager.removeEntity(combatantId);
     this.combatants.delete(combatantId);
 
@@ -447,7 +413,7 @@ export class CombatantSystem implements GameSystem {
   }
 
   querySpatialRadius(center: THREE.Vector3, radius: number): string[] {
-    return this.spatialGrid.queryRadius(center, radius);
+    return spatialGridManager.queryRadius(center, radius);
   }
 
   getCombatantLiveness(id: string): { exists: boolean; alive: boolean } {
@@ -459,34 +425,6 @@ export class CombatantSystem implements GameSystem {
       exists: true,
       alive: combatant.state !== CombatantState.DEAD && !combatant.isDying && combatant.health > 0
     };
-  }
-
-  private resolveSecondarySpatialSyncEnabled(): boolean {
-    const fromGlobal = (globalThis as any).__SPATIAL_SECONDARY_SYNC__;
-    if (typeof fromGlobal === 'boolean') return fromGlobal;
-    if (typeof window === 'undefined') return true;
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const raw = params.get('spatialSecondarySync');
-      if (raw === '0' || raw === 'false') return false;
-      return true;
-    } catch {
-      return true;
-    }
-  }
-
-  private resolveSecondarySpatialDedupEnabled(): boolean {
-    const fromGlobal = (globalThis as any).__SPATIAL_DEDUP_SYNC__;
-    if (typeof fromGlobal === 'boolean') return fromGlobal;
-    if (typeof window === 'undefined') return true;
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const raw = params.get('spatialDedupSync');
-      if (raw === '0' || raw === 'false') return false;
-      return true;
-    } catch {
-      return true;
-    }
   }
 
   // Setters for external systems
@@ -565,7 +503,6 @@ export class CombatantSystem implements GameSystem {
   clearCombatantsForExternalPopulation(): void {
     const ids = Array.from(this.combatants.keys());
     for (const id of ids) {
-      this.spatialGrid.remove(id);
       spatialGridManager.removeEntity(id);
     }
     this.combatants.clear();
@@ -576,11 +513,10 @@ export class CombatantSystem implements GameSystem {
   }
 
   setSpatialBounds(size: number): void {
-    this.spatialGrid = new SpatialOctree(size, 12, 6);
-    spatialGridManager.initialize(size);
+    spatialGridManager.reinitialize(size);
     // Re-insert all existing combatants
     this.combatants.forEach((c, id) => {
-      this.spatialGrid.updatePosition(id, c.position);
+      spatialGridManager.syncEntity(id, c.position);
     });
     Logger.info('combat', `Spatial bounds resized to ${size}m`);
   }

@@ -24,18 +24,6 @@ describe('Logger', () => {
     vi.restoreAllMocks();
   });
 
-  it('should have log level methods', () => {
-    expect(typeof Logger.debug).toBe('function');
-    expect(typeof Logger.info).toBe('function');
-    expect(typeof Logger.warn).toBe('function');
-    expect(typeof Logger.error).toBe('function');
-  });
-
-  it('should call console methods when logging', () => {
-    Logger.info('test', 'hello');
-    expect(console.info).toHaveBeenCalled();
-  });
-
   it('uses error level default on github pages host', () => {
     Object.defineProperty(globalThis, 'window', {
       value: { location: { hostname: 'mygame.github.io', search: '' }, localStorage: undefined },

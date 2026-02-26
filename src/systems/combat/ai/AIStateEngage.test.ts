@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { AIStateEngage } from './AIStateEngage';
 import { Combatant, CombatantState, Faction, Squad } from '../types';
-import { SpatialOctree } from '../SpatialOctree';
+import { ISpatialQuery } from '../SpatialOctree';
 import { AICoverSystem } from './AICoverSystem';
 import { AIFlankingSystem } from './AIFlankingSystem';
 
@@ -22,7 +22,7 @@ describe('AIStateEngage', () => {
   let allCombatants: Map<string, Combatant>;
   let mockCoverSystem: any;
   let mockFlankingSystem: any;
-  let spatialGrid: SpatialOctree | undefined;
+  let spatialGrid: ISpatialQuery | undefined;
 
   const playerPosition = new THREE.Vector3(0, 0, 0);
 

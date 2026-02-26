@@ -296,48 +296,4 @@ describe('WeaponFiring', () => {
     })
   })
 
-  describe('Legacy fire method', () => {
-    beforeEach(() => {
-      weaponFiring.setCombatantSystem(combatantSystem)
-      weaponFiring.setStatsTracker(statsTracker)
-      weaponFiring.setAudioManager(audioManager)
-      vi.mocked(combatantSystem.handlePlayerShot).mockReturnValue({
-        hit: true,
-        point: new THREE.Vector3(0, 0, -10),
-        damage: 10,
-        killed: false,
-        headshot: false
-      })
-      vi.mocked(gunCore.getSpreadDeg).mockReturnValue(0)
-      vi.mocked(gunCore.computeShotRay).mockReturnValue(new THREE.Ray(new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-1)))
-    })
-
-    it('should register shot with stats tracker', () => {
-      weaponFiring.fire(false)
-      expect(statsTracker.registerShot).toHaveBeenCalledWith(true)
-    })
-
-    it('should play weapon sound', () => {
-      weaponFiring.fire(false, 'smg')
-      expect(audioManager.playPlayerWeaponSound).toHaveBeenCalledWith('smg')
-    })
-
-    it('should execute single shot when isShotgun is false', () => {
-      weaponFiring.fire(false)
-      expect(combatantSystem.handlePlayerShot).toHaveBeenCalled()
-      expect(impactEffectsPool.spawn).toHaveBeenCalled()
-    })
-
-    it('should execute shotgun shot when isShotgun is true', () => {
-      vi.mocked(gunCore.computePelletRays).mockReturnValue([new THREE.Ray()])
-      weaponFiring.fire(true)
-      expect(gunCore.computePelletRays).toHaveBeenCalled()
-      expect(combatantSystem.handlePlayerShot).toHaveBeenCalled()
-    })
-
-    it('should spawn muzzle flash', () => {
-      weaponFiring.fire(false)
-      expect(muzzleFlashSystem.spawnPlayer).toHaveBeenCalled()
-    })
-  })
 })

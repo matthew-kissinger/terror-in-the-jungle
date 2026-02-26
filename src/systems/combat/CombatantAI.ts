@@ -3,7 +3,7 @@ import { Combatant, CombatantState, Faction, Squad, SquadCommand, isBlufor } fro
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager'
 import { SandbagSystem } from '../weapons/SandbagSystem'
 import { SmokeCloudSystem } from '../effects/SmokeCloudSystem'
-import { SpatialOctree } from './SpatialOctree'
+import { ISpatialQuery } from './SpatialOctree'
 import { ZoneManager } from '../world/ZoneManager'
 import { TicketSystem } from '../world/TicketSystem'
 import { AIStatePatrol } from './ai/AIStatePatrol'
@@ -82,7 +82,7 @@ export class CombatantAI {
     deltaTime: number,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid?: SpatialOctree
+    spatialGrid?: ISpatialQuery
   ): void {
     // Stop AI updates if game is not active
     if (this.ticketSystem && !this.ticketSystem.isGameActive()) {
@@ -319,7 +319,7 @@ export class CombatantAI {
     combatant: Combatant,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid?: SpatialOctree
+    spatialGrid?: ISpatialQuery
   ): Combatant | null {
     return this.targeting.findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid)
   }
@@ -341,7 +341,7 @@ export class CombatantAI {
     radius: number,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid?: SpatialOctree
+    spatialGrid?: ISpatialQuery
   ): number {
     return this.targeting.countNearbyEnemies(combatant, radius, playerPosition, allCombatants, spatialGrid)
   }

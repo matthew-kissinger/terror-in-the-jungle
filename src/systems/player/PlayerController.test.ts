@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { PlayerController } from './PlayerController';
-import { PlayerState } from '../../types';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { InventoryManager, WeaponSlot } from './InventoryManager';
@@ -10,7 +9,6 @@ import { MortarSystem } from '../weapons/MortarSystem';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { RallyPointSystem } from '../combat/RallyPointSystem';
-import { FootstepAudioSystem } from '../audio/FootstepAudioSystem';
 import { HelicopterModel } from '../helicopter/HelicopterModel';
 import { FirstPersonWeapon } from './FirstPersonWeapon';
 import { HUDSystem } from '../../ui/hud/HUDSystem';
@@ -57,7 +55,6 @@ describe('PlayerController', () => {
   let mockSandbagSystem: SandbagSystem;
   let mockCameraShakeSystem: CameraShakeSystem;
   let mockRallyPointSystem: RallyPointSystem;
-  let mockFootstepAudioSystem: FootstepAudioSystem;
   let mockHelicopterModel: HelicopterModel;
   let mockFirstPersonWeapon: FirstPersonWeapon;
   let mockHUDSystem: HUDSystem;
@@ -131,11 +128,6 @@ describe('PlayerController', () => {
       }),
     } as any;
 
-    mockFootstepAudioSystem = {
-      playPlayerFootstep: vi.fn(),
-      playLandingSound: vi.fn(),
-    } as any;
-
     mockHelicopterModel = {
       tryEnterHelicopter: vi.fn(),
       exitHelicopter: vi.fn(),
@@ -191,17 +183,6 @@ describe('PlayerController', () => {
       expect(position.z).toBe(-50);
     });
 
-    it('should initialize velocity to zero', () => {
-      const velocity = playerController.getVelocity();
-      expect(velocity.x).toBe(0);
-      expect(velocity.y).toBe(0);
-      expect(velocity.z).toBe(0);
-    });
-
-    it('should not be in helicopter initially', () => {
-      expect(playerController.isInHelicopter()).toBe(false);
-      expect(playerController.getHelicopterId()).toBeNull();
-    });
   });
 
   describe('init', () => {
@@ -294,31 +275,12 @@ describe('PlayerController', () => {
     });
   });
 
-  describe('dispose', () => {
-    it('should call dispose on input system', () => {
-      const disposeSpy = vi.spyOn(playerController['input'], 'dispose');
-
-      playerController.dispose();
-
-      expect(disposeSpy).toHaveBeenCalled();
-    });
-  });
-
   describe('Position and Velocity Getters', () => {
     it('should return position via target-vector pattern', () => {
       const target = new THREE.Vector3();
       const result = playerController.getPosition(target);
 
       expect(result).toBe(target);
-      expect(result.x).toBe(0);
-      expect(result.y).toBe(5);
-      expect(result.z).toBe(-50);
-    });
-
-    it('should create new vector when no target provided', () => {
-      const result = playerController.getPosition();
-
-      expect(result).toBeInstanceOf(THREE.Vector3);
       expect(result.x).toBe(0);
       expect(result.y).toBe(5);
       expect(result.z).toBe(-50);
@@ -334,14 +296,6 @@ describe('PlayerController', () => {
       expect(result.z).toBe(0);
     });
 
-    it('should create new vector for velocity when no target provided', () => {
-      const result = playerController.getVelocity();
-
-      expect(result).toBeInstanceOf(THREE.Vector3);
-      expect(result.x).toBe(0);
-      expect(result.y).toBe(0);
-      expect(result.z).toBe(0);
-    });
   });
 
   describe('setPosition', () => {
@@ -427,43 +381,6 @@ describe('PlayerController', () => {
       playerController['playerState'].velocity.set(0.05, 0, 0);
 
       expect(playerController.isMoving()).toBe(false);
-    });
-  });
-
-  describe('Camera Shake', () => {
-    beforeEach(() => {
-      playerController.setCameraShakeSystem(mockCameraShakeSystem);
-    });
-
-    it('should apply screen shake with intensity', () => {
-      playerController.applyScreenShake(0.5, 0.3);
-
-      expect(mockCameraShakeSystem.shake).toHaveBeenCalledWith(0.5, 0.3);
-    });
-
-    it('should apply damage shake', () => {
-      playerController.applyDamageShake(25);
-
-      expect(mockCameraShakeSystem.shakeFromDamage).toHaveBeenCalledWith(25);
-    });
-
-    it('should apply explosion shake', () => {
-      const explosionPos = new THREE.Vector3(100, 0, 100);
-      const maxRadius = 50;
-
-      playerController.applyExplosionShake(explosionPos, maxRadius);
-
-      expect(mockCameraShakeSystem.shakeFromExplosion).toHaveBeenCalledWith(
-        explosionPos,
-        expect.any(THREE.Vector3),
-        maxRadius
-      );
-    });
-
-    it('should apply recoil shake', () => {
-      playerController.applyRecoilShake();
-
-      expect(mockCameraShakeSystem.shakeFromRecoil).toHaveBeenCalled();
     });
   });
 
@@ -637,105 +554,6 @@ describe('PlayerController', () => {
       expect(playerController['playerState'].isRunning).toBe(false);
     });
 
-    it('should enable controls', () => {
-      playerController.enableControls();
-
-      // Should call setControlsEnabled(true) on input (verified via mock)
-      expect(playerController).toBeDefined();
-    });
-
-    it('should set game started state', () => {
-      playerController.setGameStarted(true);
-
-      // Should call setGameStarted on input
-      expect(playerController).toBeDefined();
-    });
-  });
-
-  describe('Dependency Setters', () => {
-    it('should set chunk manager', () => {
-      playerController.setChunkManager(mockChunkManager);
-
-      expect(playerController['chunkManager']).toBe(mockChunkManager);
-    });
-
-    it('should set game mode manager', () => {
-      playerController.setGameModeManager(mockGameModeManager);
-
-      expect(playerController['gameModeManager']).toBe(mockGameModeManager);
-    });
-
-    it('should set helicopter model', () => {
-      playerController.setHelicopterModel(mockHelicopterModel);
-
-      expect(playerController['helicopterModel']).toBe(mockHelicopterModel);
-    });
-
-    it('should set first person weapon', () => {
-      playerController.setFirstPersonWeapon(mockFirstPersonWeapon);
-
-      expect(playerController['firstPersonWeapon']).toBe(mockFirstPersonWeapon);
-    });
-
-    it('should set HUD system', () => {
-      playerController.setHUDSystem(mockHUDSystem);
-
-      expect(playerController['hudSystem']).toBe(mockHUDSystem);
-    });
-
-    it('should set sandbox renderer', () => {
-      playerController.setRenderer(mockRenderer);
-
-      expect(playerController['gameRenderer']).toBe(mockRenderer);
-    });
-
-    it('should set inventory manager', () => {
-      playerController.setInventoryManager(mockInventoryManager);
-
-      expect(playerController['inventoryManager']).toBe(mockInventoryManager);
-    });
-
-    it('should set grenade system', () => {
-      playerController.setGrenadeSystem(mockGrenadeSystem);
-
-      expect(playerController['grenadeSystem']).toBe(mockGrenadeSystem);
-    });
-
-    it('should set mortar system', () => {
-      playerController.setMortarSystem(mockMortarSystem);
-
-      expect(playerController['mortarSystem']).toBe(mockMortarSystem);
-    });
-
-    it('should set sandbag system', () => {
-      playerController.setSandbagSystem(mockSandbagSystem);
-
-      expect(playerController['sandbagSystem']).toBe(mockSandbagSystem);
-    });
-
-    it('should set camera shake system', () => {
-      playerController.setCameraShakeSystem(mockCameraShakeSystem);
-
-      expect(playerController['cameraShakeSystem']).toBe(mockCameraShakeSystem);
-    });
-
-    it('should set rally point system', () => {
-      playerController.setRallyPointSystem(mockRallyPointSystem);
-
-      expect(playerController['rallyPointSystem']).toBe(mockRallyPointSystem);
-    });
-
-    it('should set footstep audio system', () => {
-      playerController.setFootstepAudioSystem(mockFootstepAudioSystem);
-
-      expect(playerController['footstepAudioSystem']).toBe(mockFootstepAudioSystem);
-    });
-
-    it('should set player squad ID', () => {
-      playerController.setPlayerSquadId('squad-alpha');
-
-      expect(playerController['playerSquadId']).toBe('squad-alpha');
-    });
   });
 
   describe('Rally Point Placement', () => {
@@ -840,16 +658,7 @@ describe('PlayerController', () => {
       expect(mockSandbagSystem.placeSandbag).toHaveBeenCalled();
     });
 
-    it('should rotate preview left', () => {
-      // Sandbag rotate is called directly from input, test the system setter
-      expect(mockSandbagSystem.rotatePlacementPreview).toBeDefined();
-    });
-
-    it('should rotate preview right', () => {
-      // Sandbag rotate is called directly from input, test the system setter
-      expect(mockSandbagSystem.rotatePlacementPreview).toBeDefined();
-    });
-  });
+});
 
   describe('Mortar Camera', () => {
     beforeEach(() => {

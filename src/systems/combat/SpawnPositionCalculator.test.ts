@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SpawnPositionCalculator } from './SpawnPositionCalculator';
 import { Faction, Alliance } from './types';
 import { ZoneManager, ZoneState, CaptureZone } from '../world/ZoneManager';
-import { GameModeConfig } from '../../config/gameModes';
+import { GameModeConfig } from '../../config/gameModeTypes';
 import * as THREE from 'three';
 
 vi.mock('three', () => ({

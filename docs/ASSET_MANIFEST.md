@@ -1,7 +1,25 @@
 # Asset Manifest - Terror in the Jungle
 
-Last updated: 2026-02-22
+Last updated: 2026-02-25
 Status: DRAFT - Generation queue for Pixel Forge agent
+
+## Generated Assets (75 GLBs)
+
+75 GLB models have been generated via Pixel Forge and are staged in `deploy-3d-assets/`.
+See `deploy-3d-assets/README.md` for the complete inventory with tri counts and file sizes.
+
+| Category | Count | Examples |
+|----------|-------|---------|
+| Weapons | 9 | M16A1, AK-47, M60, RPG-7, M79, Ithaca 37, M1911, M2 Browning, M3 Grease Gun |
+| Aircraft | 6 | UH-1 Huey, UH-1C Gunship, AH-1 Cobra, F-4 Phantom, AC-47 Spooky, A-1 Skyraider |
+| Ground vehicles | 5 | M151 Jeep, M113 APC, M35 Truck, M48 Patton, PT-76 |
+| Watercraft | 2 | Sampan, PBR |
+| Structures | 32 | Sandbag wall/bunker, guard tower, helipad, TOC bunker, tunnel entrance, etc. |
+| Buildings | 12 | Shophouse, French villa, pagoda, church, farmhouse, etc. |
+| Animals | 6 | Water buffalo, tiger, macaque, king cobra, egret, wild boar |
+| Props | 1 | Wooden barrel |
+
+**Integration status:** Assets are generated but not yet wired into the engine. The generation queue below documents remaining specs and any assets still needed beyond what has been generated.
 
 ## Context for Asset Generation Agent
 
@@ -29,7 +47,7 @@ The game source code is at `C:\Users\Mattm\X\games-3d\terror-in-the-jungle`. Ref
 - **Terrain textures:** Applied via `THREE.MeshStandardMaterial` to chunk geometry
 - **GLB loading:** Will use `THREE.GLTFLoader` - named mesh parts accessed via `model.getObjectByName('partName')`
 
-**Current state:** The game has ZERO GLB files. All 3D objects are currently procedural geometry (boxes, cylinders, planes). All vegetation and NPCs are 2D billboard sprites. This manifest covers the full replacement of procedural geometry with proper models PLUS all new assets needed for the roadmap.
+**Current state:** 75 GLB models have been generated (see `deploy-3d-assets/README.md`) but are not yet integrated into the engine. All in-engine 3D objects still use procedural geometry (boxes, cylinders, planes). All vegetation and NPCs are 2D billboard sprites. This manifest covers the full replacement of procedural geometry with the generated models PLUS any additional assets needed for the roadmap.
 
 ### Art Direction
 

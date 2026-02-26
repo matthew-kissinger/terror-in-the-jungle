@@ -1,6 +1,7 @@
 import { Logger } from '../../utils/Logger';
 import { GameSystem } from '../../types';
-import { GameMode, GameModeConfig, getGameModeConfig } from '../../config/gameModes';
+import { GameMode, GameModeConfig } from '../../config/gameModeTypes';
+import { getGameModeConfig } from '../../config/gameModes';
 import { ZoneManager } from './ZoneManager';
 import { CombatantSystem } from '../combat/CombatantSystem';
 import { TicketSystem } from './TicketSystem';

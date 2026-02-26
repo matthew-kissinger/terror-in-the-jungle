@@ -1,4 +1,4 @@
-import { WeatherState } from '../../config/gameModes';
+import { WeatherState } from '../../config/gameModeTypes';
 import { IAudioManager, IGameRenderer } from '../../types/SystemInterfaces';
 
 export interface LightningState {

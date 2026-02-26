@@ -1,6 +1,6 @@
 # A Shau Valley Implementation Plan
 
-Last updated: 2026-02-21
+Last updated: 2026-02-25
 Status: Active
 Owner: Matt + Codex
 
@@ -28,9 +28,9 @@ Still failing intermittently:
 
 ### Phase 1: Spawn and Grounding Reliability
 
-- [ ] Run 10 start-spawn checks and 10 respawn checks in A Shau.
-- [ ] Verify no air spawn, fall-through, or multi-meter snap artifacts.
-- [ ] Validate terrain-ready gating around insertion points.
+- [x] Run 10 start-spawn checks and 10 respawn checks in A Shau.
+- [~] Verify no air spawn, fall-through, or multi-meter snap artifacts. (Improved; occasional edge-terrain anomalies remain)
+- [x] Validate terrain-ready gating around insertion points.
 
 Acceptance:
 - 20/20 grounding checks pass.
@@ -46,9 +46,9 @@ Acceptance:
 
 ### Phase 3: Time-To-Contact and Flow
 
-- [ ] Keep first engagement within 60-120 seconds.
-- [ ] Reduce long wandering loops around non-contact zones.
-- [ ] Maintain sustained skirmish pressure at 5-minute checkpoint.
+- [x] Keep first engagement within 60-120 seconds. (Frontline seeding improved first-contact timing)
+- [~] Reduce long wandering loops around non-contact zones. (AShauContactAssist auto-warps after 60s no-contact)
+- [ ] Maintain sustained skirmish pressure at 5-minute checkpoint. (Still unstable)
 
 Acceptance:
 - `first_contact <= 120s` and non-zero close-contact density at sustained checkpoint.

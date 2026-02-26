@@ -50,16 +50,11 @@ function createCombatant(id: string, faction: Faction, squadId?: string): Combat
 
 describe('RespawnManager spatial consistency', () => {
   let combatants: Map<string, Combatant>;
-  let spatialOctree: { remove: ReturnType<typeof vi.fn>; updatePosition: ReturnType<typeof vi.fn> };
   let squadManager: { getSquad: ReturnType<typeof vi.fn>; removeSquadMember: ReturnType<typeof vi.fn> };
   let factory: { createCombatant: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     combatants = new Map();
-    spatialOctree = {
-      remove: vi.fn(),
-      updatePosition: vi.fn(),
-    };
     squadManager = {
       getSquad: vi.fn(() => null),
       removeSquadMember: vi.fn(),
@@ -76,7 +71,6 @@ describe('RespawnManager spatial consistency', () => {
   it('removes entity from SpatialGridManager on combatant removal', () => {
     const manager = new RespawnManager(
       combatants,
-      spatialOctree as any,
       squadManager as any,
       factory as any
     );
@@ -84,7 +78,6 @@ describe('RespawnManager spatial consistency', () => {
 
     manager.removeCombatant('dead-1');
 
-    expect(spatialOctree.remove).toHaveBeenCalledWith('dead-1');
     expect(spatialGridManager.removeEntity).toHaveBeenCalledWith('dead-1');
     expect(combatants.has('dead-1')).toBe(false);
   });
@@ -92,7 +85,6 @@ describe('RespawnManager spatial consistency', () => {
   it('syncs respawned member into SpatialGridManager immediately', () => {
     const manager = new RespawnManager(
       combatants,
-      spatialOctree as any,
       squadManager as any,
       factory as any
     );
@@ -107,7 +99,6 @@ describe('RespawnManager spatial consistency', () => {
     manager.respawnSquadMember('squad-1');
 
     expect(factory.createCombatant).toHaveBeenCalled();
-    expect(spatialOctree.updatePosition).toHaveBeenCalledWith('new-member-1', expect.any(THREE.Vector3));
     expect(spatialGridManager.syncEntity).toHaveBeenCalledWith('new-member-1', expect.any(THREE.Vector3));
     expect(combatants.has('new-member-1')).toBe(true);
   });

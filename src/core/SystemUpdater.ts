@@ -2,10 +2,9 @@ import * as THREE from 'three';
 import { GameSystem } from '../types';
 import { SystemReferences } from './SystemInitializer';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
-import { spatialGridManager } from '../systems/combat/SpatialGridManager';
 import { ShotCommandFactory } from '../systems/player/weapon/ShotCommand';
 import { Logger } from '../utils/Logger';
-import { GameMode } from '../config/gameModes';
+import { GameMode } from '../config/gameModeTypes';
 import { isOpfor } from '../systems/combat/types';
 
 interface SystemTimingEntry {
@@ -21,6 +20,9 @@ interface SystemTimingEntry {
 export class SystemUpdater {
   private systemTimings: Map<string, SystemTimingEntry> = new Map();
   private readonly EMA_ALPHA = 0.1;
+  private readonly BUDGET_WARN_THRESHOLD = 1.5; // Warn when EMA exceeds 150% of budget
+  private readonly BUDGET_WARN_COOLDOWN_MS = 10_000;
+  private budgetWarningLastMs: Map<string, number> = new Map();
   private tacticalUiAccumulator = 0;
   private readonly TACTICAL_UI_INTERVAL = 1 / 20; // 20 Hz is enough for map/compass updates
   private ashauNoContactMs = 0;
@@ -38,7 +40,7 @@ export class SystemUpdater {
   ): void {
     // Begin frame telemetry
     performanceTelemetry.beginFrame();
-    spatialGridManager.resetFrameTelemetry();
+    refs.spatialGridManager.resetFrameTelemetry();
     ShotCommandFactory.resetPool();
 
     // Update player position in squad controller
@@ -254,6 +256,16 @@ export class SystemUpdater {
     } else {
       entry.lastMs = duration;
       entry.emaMs = entry.emaMs * (1 - this.EMA_ALPHA) + duration * this.EMA_ALPHA;
+    }
+
+    // Warn when a system consistently exceeds its budget
+    if (entry.emaMs > entry.budgetMs * this.BUDGET_WARN_THRESHOLD) {
+      const now = performance.now();
+      const lastWarn = this.budgetWarningLastMs.get(name) ?? 0;
+      if (now - lastWarn > this.BUDGET_WARN_COOLDOWN_MS) {
+        this.budgetWarningLastMs.set(name, now);
+        Logger.warn('SystemUpdater', `"${name}" over budget: ${entry.emaMs.toFixed(2)}ms EMA vs ${entry.budgetMs}ms budget`);
+      }
     }
   }
 

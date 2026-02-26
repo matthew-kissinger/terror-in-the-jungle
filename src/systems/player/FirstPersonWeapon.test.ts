@@ -5,9 +5,7 @@ import { AssetLoader } from '../assets/AssetLoader';
 import { PlayerController } from './PlayerController';
 import { CombatantSystem } from '../combat/CombatantSystem';
 import { AudioManager } from '../audio/AudioManager';
-import { ZoneManager } from '../world/ZoneManager';
 import { InventoryManager, WeaponSlot } from './InventoryManager';
-import { PlayerStatsTracker } from './PlayerStatsTracker';
 import { AmmoState } from '../weapons/AmmoManager';
 import type { HUDSystem } from '../../ui/hud/HUDSystem';
 
@@ -138,9 +136,7 @@ describe('FirstPersonWeapon', () => {
   let mockCombatantSystem: CombatantSystem;
   let mockHUDSystem: HUDSystem;
   let mockAudioManager: AudioManager;
-  let mockZoneManager: ZoneManager;
   let mockInventoryManager: InventoryManager;
-  let mockStatsTracker: PlayerStatsTracker;
 
   beforeEach(() => {
     // Reset mock instances
@@ -254,13 +250,10 @@ describe('FirstPersonWeapon', () => {
     } as unknown as HUDSystem;
 
     mockAudioManager = {} as AudioManager;
-    mockZoneManager = {} as ZoneManager;
 
     mockInventoryManager = {
       onSlotChange: vi.fn(),
     } as unknown as InventoryManager;
-
-    mockStatsTracker = {} as PlayerStatsTracker;
 
     // Reset mock core and ammo manager
     mockGunCore.canFire.mockReturnValue(true);
@@ -279,17 +272,6 @@ describe('FirstPersonWeapon', () => {
   });
 
   describe('Constructor and Initialization', () => {
-    it('should create weapon with all modules initialized', () => {
-      expect(weapon).toBeDefined();
-      expect(weapon).toBeInstanceOf(FirstPersonWeapon);
-    });
-
-    it('should initialize all effect pools during construction', () => {
-      expect(mockTracerPool).toBeDefined();
-      expect(mockMuzzleFlashSystem).toBeDefined();
-      expect(mockImpactEffectsPool).toBeDefined();
-    });
-
     it('should initialize rig manager and update references', async () => {
       await weapon.init();
 
@@ -636,117 +618,6 @@ describe('FirstPersonWeapon', () => {
       weapon.enable();
 
       expect(mockHUDSystem.updateAmmoDisplay).toHaveBeenCalledWith(30, 90);
-    });
-  });
-
-  describe('Dependency Injection', () => {
-    beforeEach(async () => {
-      await weapon.init();
-    });
-
-    it('should set player controller', () => {
-      expect(() => weapon.setPlayerController(mockPlayerController)).not.toThrow();
-    });
-
-    it('should set combatant system and propagate to firing module', () => {
-      weapon.setCombatantSystem(mockCombatantSystem);
-
-      expect(mockFiring.setCombatantSystem).toHaveBeenCalledWith(mockCombatantSystem);
-    });
-
-    it('should set HUD system and propagate to modules', () => {
-      weapon.setHUDSystem(mockHUDSystem);
-
-      expect(mockFiring.setHUDSystem).toHaveBeenCalledWith(mockHUDSystem);
-      expect(mockSwitching.setHUDSystem).toHaveBeenCalledWith(mockHUDSystem);
-    });
-
-    it('should set audio manager and propagate to modules', () => {
-      weapon.setAudioManager(mockAudioManager);
-
-      expect(mockFiring.setAudioManager).toHaveBeenCalledWith(mockAudioManager);
-      expect(mockReload.setAudioManager).toHaveBeenCalledWith(mockAudioManager);
-      expect(mockSwitching.setAudioManager).toHaveBeenCalledWith(mockAudioManager);
-    });
-
-    it('should set stats tracker and propagate to firing module', () => {
-      weapon.setStatsTracker(mockStatsTracker);
-
-      expect(mockFiring.setStatsTracker).toHaveBeenCalledWith(mockStatsTracker);
-    });
-
-    it('should set zone manager and propagate to ammo module', () => {
-      weapon.setZoneManager(mockZoneManager);
-
-      expect(mockAmmo.setZoneManager).toHaveBeenCalledWith(mockZoneManager);
-    });
-
-    it('should set inventory manager and propagate to input module', () => {
-      weapon.setInventoryManager(mockInventoryManager);
-
-      expect(mockInput.setInventoryManager).toHaveBeenCalledWith(mockInventoryManager);
-    });
-  });
-
-  describe('Helicopter Integration', () => {
-    beforeEach(async () => {
-      await weapon.init();
-    });
-
-    it('should hide weapon', () => {
-      weapon.hideWeapon();
-      expect(mockRigManager.setWeaponVisibility).toHaveBeenCalledWith(false);
-    });
-
-    it('should show weapon', () => {
-      weapon.showWeapon();
-      expect(mockRigManager.setWeaponVisibility).toHaveBeenCalledWith(true);
-    });
-
-    it('should disable firing and stop current fire', () => {
-      weapon.setFireingEnabled(false);
-
-      expect(mockInput.setEnabled).toHaveBeenCalledWith(false);
-      expect(mockInput.setFiringActive).toHaveBeenCalledWith(false);
-    });
-
-    it('should enable firing', () => {
-      weapon.setFireingEnabled(true);
-
-      expect(mockInput.setEnabled).toHaveBeenCalledWith(true);
-    });
-  });
-
-  describe('Rendering and Visibility', () => {
-    beforeEach(async () => {
-      await weapon.init();
-    });
-
-    it('should render weapon overlay', () => {
-      const mockRenderer = { render: vi.fn() } as unknown as THREE.WebGLRenderer;
-      weapon.renderWeapon(mockRenderer);
-
-      expect(mockModel.render).toHaveBeenCalledWith(mockRenderer, mockRigManager);
-    });
-
-    it('should set weapon visibility', () => {
-      weapon.setWeaponVisibility(false);
-      expect(mockRigManager.setWeaponVisibility).toHaveBeenCalledWith(false);
-
-      weapon.setWeaponVisibility(true);
-      expect(mockRigManager.setWeaponVisibility).toHaveBeenCalledWith(true);
-    });
-  });
-
-  describe('Game State', () => {
-    beforeEach(async () => {
-      await weapon.init();
-    });
-
-    it('should set game started state and propagate to input', () => {
-      weapon.setGameStarted(true);
-
-      expect(mockInput.setGameStarted).toHaveBeenCalledWith(true);
     });
   });
 

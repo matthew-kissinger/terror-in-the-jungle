@@ -5,7 +5,7 @@ import { CombatantCombat } from './CombatantCombat';
 import { CombatantMovement } from './CombatantMovement';
 import { CombatantRenderer } from './CombatantRenderer';
 import { SquadManager } from './SquadManager';
-import { SpatialOctree } from './SpatialOctree';
+import { SpatialGridManager, spatialGridManager } from './SpatialGridManager';
 import { ZoneManager } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { estimateGPUTier, isMobileGPU } from '../../utils/DeviceDetector';
@@ -85,8 +85,6 @@ export class CombatantLODManager {
   private combatantMovement: CombatantMovement;
   private combatantRenderer: CombatantRenderer;
   private squadManager: SquadManager;
-  private spatialGrid: SpatialOctree;
-
   constructor(
     combatants: Map<string, Combatant>,
     playerPosition: THREE.Vector3,
@@ -94,8 +92,7 @@ export class CombatantLODManager {
     combatantCombat: CombatantCombat,
     combatantMovement: CombatantMovement,
     combatantRenderer: CombatantRenderer,
-    squadManager: SquadManager,
-    spatialGrid: SpatialOctree
+    squadManager: SquadManager
   ) {
     this.combatants = combatants;
     this.playerPosition = playerPosition;
@@ -104,7 +101,6 @@ export class CombatantLODManager {
     this.combatantMovement = combatantMovement;
     this.combatantRenderer = combatantRenderer;
     this.squadManager = squadManager;
-    this.spatialGrid = spatialGrid;
 
     this.applyPerformanceScaling();
   }
@@ -301,7 +297,7 @@ export class CombatantLODManager {
       if (combatant.state === CombatantState.DEAD) {
         // Death animation/rendering is handled separately; dead actors should not
         // consume AI/movement/spatial update budget or stay queryable in octree.
-        this.spatialGrid.remove(combatant.id);
+        spatialGridManager.removeEntity(combatant.id);
         return;
       }
 
@@ -542,7 +538,7 @@ export class CombatantLODManager {
   private updateCombatantFull(combatant: Combatant, deltaTime: number): void {
     const fullStart = performance.now();
     const aiStart = performance.now();
-    this.combatantAI.updateAI(combatant, deltaTime, this.playerPosition, this.combatants, this.spatialGrid);
+    this.combatantAI.updateAI(combatant, deltaTime, this.playerPosition, this.combatants, spatialGridManager);
     const aiMs = performance.now() - aiStart;
     const now = performance.now();
     if (aiMs > 50 && now - this.lastAiSpikeLogMs > this.AI_LOG_THROTTLE_MS) {
@@ -588,7 +584,7 @@ export class CombatantLODManager {
   }
 
   private updateCombatantMedium(combatant: Combatant, deltaTime: number): void {
-    this.combatantAI.updateAI(combatant, deltaTime, this.playerPosition, this.combatants, this.spatialGrid);
+    this.combatantAI.updateAI(combatant, deltaTime, this.playerPosition, this.combatants, spatialGridManager);
     this.combatantMovement.updateMovement(
       combatant,
       deltaTime,
@@ -677,7 +673,7 @@ export class CombatantLODManager {
 
     toRemove.forEach(id => {
       this.combatants.delete(id);
-      this.spatialGrid.remove(id);
+      spatialGridManager.removeEntity(id);
     });
   }
 
@@ -712,7 +708,7 @@ export class CombatantLODManager {
   }
 
   private recordSpatialUpdate(combatant: Combatant): void {
-    this.spatialGrid.updatePosition(combatant.id, combatant.position);
+    spatialGridManager.syncEntity(combatant.id, combatant.position);
     this.spatiallyUpdatedIds.add(combatant.id);
   }
 

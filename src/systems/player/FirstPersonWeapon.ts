@@ -185,11 +185,6 @@ export class FirstPersonWeapon implements GameSystem {
     this.playerController = controller
   }
 
-  // Deprecated: Use setCombatantSystem instead
-  setEnemySystem(_enemy: any): void {
-    Logger.warn('weapon', 'setEnemySystem is deprecated, use setCombatantSystem')
-  }
-
   setCombatantSystem(combatantSystem: CombatantSystem): void {
     this.combatantSystem = combatantSystem
     this.firing.setCombatantSystem(combatantSystem)

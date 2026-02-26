@@ -87,8 +87,6 @@ export function animate(engine: GameEngine): void {
     updateRuntimeMetrics(engine, deltaTime);
     updatePerformanceOverlay(engine, deltaTime);
     updateLogOverlay(engine);
-    updateTimeIndicator(engine);
-
     // Any successful frame clears crash streak so only consecutive failures escalate.
     if (crashCount > 0) {
       crashCount = 0;
@@ -239,16 +237,3 @@ export function updateLogOverlay(engine: GameEngine): void {
   engine.logOverlay.update(recent);
 }
 
-/**
- * Updates the time indicator overlay
- */
-export function updateTimeIndicator(engine: GameEngine): void {
-  if (!engine.timeIndicator.isVisible()) return;
-
-  const dayNightCycle = engine.systemManager.dayNightCycle;
-  if (dayNightCycle) {
-    const timeString = dayNightCycle.getFormattedTime();
-    const nightFactor = dayNightCycle.getNightFactor();
-    engine.timeIndicator.update(timeString, nightFactor);
-  }
-}

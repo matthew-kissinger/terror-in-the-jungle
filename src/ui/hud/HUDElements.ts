@@ -82,7 +82,6 @@ export class HUDElements {
     this.objectiveDisplay = new ObjectiveDisplay();
     this.respawnButtonModule = new RespawnButton();
 
-    // Expose legacy module properties for backward compatibility
     this.objectivesList = this.objectiveDisplay.objectivesList;
     this.combatStats = document.createElement('div'); // hidden, placeholder
     this.combatStats.style.display = 'none';
@@ -114,7 +113,7 @@ export class HUDElements {
     // Initialize unified weapon bar
     this.unifiedWeaponBar = new UnifiedWeaponBar();
 
-    // Assemble HUD structure (fallback for non-grid mode)
+    // Initial mount to hudContainer; attachToDOM() remounts into grid slots
     this.hudContainer.appendChild(this.objectivesList);
     this.ticketDisplay.mount(this.hudContainer);
     this.hudContainer.appendChild(this.combatStats);
@@ -263,69 +262,58 @@ export class HUDElements {
     this.grenadeMeter.setPower(power, estimatedDistance, cookingTime);
   }
 
-  attachToDOM(layout?: HUDLayout): void {
-    if (layout) {
-      // Mount UIComponent-based elements into grid slots
-      this.ticketDisplay.unmount();
-      this.ticketDisplay.mount(layout.getSlot('tickets'));
+  attachToDOM(layout: HUDLayout): void {
+    // Mount UIComponent-based elements into grid slots
+    this.ticketDisplay.unmount();
+    this.ticketDisplay.mount(layout.getSlot('tickets'));
 
-      this.matchTimer.unmount();
-      this.matchTimer.mount(layout.getSlot('timer'));
+    this.matchTimer.unmount();
+    this.matchTimer.mount(layout.getSlot('timer'));
 
-      this.gameStatusPanel.unmount();
-      this.gameStatusPanel.mount(layout.getSlot('game-status'));
+    this.gameStatusPanel.unmount();
+    this.gameStatusPanel.mount(layout.getSlot('game-status'));
 
-      this.killCounter.unmount();
-      this.killCounter.mount(layout.getSlot('stats'));
+    this.killCounter.unmount();
+    this.killCounter.mount(layout.getSlot('stats'));
 
-      this.ammoDisplay.unmount();
-      this.ammoDisplay.mount(layout.getSlot('ammo'));
+    this.ammoDisplay.unmount();
+    this.ammoDisplay.mount(layout.getSlot('ammo'));
 
-      // Phase 3 UIComponent elements
-      this.interactionPromptPanel.unmount();
-      this.interactionPromptPanel.mount(layout.getSlot('center'));
+    // Phase 3 UIComponent elements
+    this.interactionPromptPanel.unmount();
+    this.interactionPromptPanel.mount(layout.getSlot('center'));
 
-      this.grenadeMeter.unmount();
-      this.grenadeMeter.mount(layout.getSlot('center'));
+    this.grenadeMeter.unmount();
+    this.grenadeMeter.mount(layout.getSlot('center'));
 
-      this.mortarPanel.unmount();
-      this.mortarPanel.mount(layout.getSlot('center'));
+    this.mortarPanel.unmount();
+    this.mortarPanel.mount(layout.getSlot('center'));
 
-      // Phase 4 UIComponent elements
-      this.helicopterHUD.unmount();
-      this.helicopterHUD.mount(layout.getSlot('center'));
+    // Phase 4 UIComponent elements
+    this.helicopterHUD.unmount();
+    this.helicopterHUD.mount(layout.getSlot('center'));
 
-      // Legacy HTMLDivElement elements
-      layout.getSlot('objectives').appendChild(this.objectivesList);
-      layout.getSlot('stats').appendChild(this.combatStats);
-      layout.getSlot('center').appendChild(this.hitMarkerContainer);
+    // Legacy HTMLDivElement elements
+    layout.getSlot('objectives').appendChild(this.objectivesList);
+    layout.getSlot('stats').appendChild(this.combatStats);
+    layout.getSlot('center').appendChild(this.hitMarkerContainer);
 
-      // Feedback systems mount to the center slot too
-      this.killFeed.attachToDOM(layout.getSlot('kill-feed'));
-      if (this.damageNumbers) this.damageNumbers.attachToDOM(layout.getSlot('center'));
-      if (this.scorePopups) this.scorePopups.attachToDOM(layout.getSlot('center'));
-      if (this.hitMarkerFeedback) this.hitMarkerFeedback.attachToDOM(layout.getSlot('center'));
-      if (this.weaponSwitchFeedback) this.weaponSwitchFeedback.attachToDOM(layout.getSlot('center'));
-      if (this.zoneCaptureNotification) this.zoneCaptureNotification.mount(layout.getSlot('center'));
+    // Feedback systems mount to the center slot too
+    this.killFeed.attachToDOM(layout.getSlot('kill-feed'));
+    if (this.damageNumbers) this.damageNumbers.attachToDOM(layout.getSlot('center'));
+    if (this.scorePopups) this.scorePopups.attachToDOM(layout.getSlot('center'));
+    if (this.hitMarkerFeedback) this.hitMarkerFeedback.attachToDOM(layout.getSlot('center'));
+    if (this.weaponSwitchFeedback) this.weaponSwitchFeedback.attachToDOM(layout.getSlot('center'));
+    if (this.zoneCaptureNotification) this.zoneCaptureNotification.mount(layout.getSlot('center'));
 
-      // Unified weapon bar into weapon-bar slot (infantry only)
-      const weaponSlot = layout.getSlot('weapon-bar');
-      weaponSlot.dataset.show = 'infantry';
-      this.unifiedWeaponBar.mount(weaponSlot);
+    // Unified weapon bar into weapon-bar slot (infantry only)
+    const weaponSlot = layout.getSlot('weapon-bar');
+    weaponSlot.dataset.show = 'infantry';
+    this.unifiedWeaponBar.mount(weaponSlot);
 
-      // hud-container is no longer needed in grid mode, but keep it mounted under HUD root for disposal tracking.
-      this.hudContainer.style.display = 'none';
-      layout.getRoot().appendChild(this.hudContainer);
-    } else {
-      // Legacy path: mount everything to body (backward compat)
-      document.body.appendChild(this.hudContainer);
-      this.killFeed.attachToDOM(document.body);
-      if (this.damageNumbers) this.damageNumbers.attachToDOM();
-      if (this.scorePopups) this.scorePopups.attachToDOM();
-      if (this.hitMarkerFeedback) this.hitMarkerFeedback.attachToDOM();
-      if (this.weaponSwitchFeedback) this.weaponSwitchFeedback.attachToDOM();
-      if (this.zoneCaptureNotification) this.zoneCaptureNotification.mount(document.body);
-    }
+    // hud-container is no longer needed in grid mode, but keep it mounted under HUD root for disposal tracking.
+    this.hudContainer.style.display = 'none';
+    layout.getRoot().appendChild(this.hudContainer);
   }
 
   updateKillFeed(deltaTime: number): void {

@@ -1,6 +1,6 @@
 # Project Notes
 
-Last updated: 2026-02-22
+Last updated: 2026-02-25
 
 ## Project
 
@@ -15,6 +15,10 @@ Terror in the Jungle is a browser-based 3D combat game focused on:
 npm run dev
 npm run build
 npm run test:run
+npm run test:quick           # unit tests only (excludes integration)
+npm run test:integration     # integration scenario tests only
+npm run validate             # quick: type-check + unit tests + build
+npm run validate:full        # full: type-check + all tests + build
 npm run perf:capture
 npm run perf:analyze:latest
 ```
@@ -26,17 +30,21 @@ npm run perf:capture:combat120
 npm run perf:capture:openfrontier:short
 npm run perf:capture:ashau:short
 npm run perf:capture:frontier30m
+npm run perf:quick            # capture combat120 + compare baseline
+npm run perf:compare          # compare latest capture against baselines
+npm run perf:update-baseline  # update baseline from latest capture
 ```
 
 ## Runtime Landmarks
 
 - Entry: `src/main.ts`, `src/core/bootstrap.ts`
 - Engine: `src/core/GameEngine.ts`, `src/core/GameEngineInit.ts`, `src/core/SystemUpdater.ts`
-- Modes: `src/config/gameModes.ts`, `src/config/*Config.ts`
+- Modes: `src/config/gameModeTypes.ts`, `src/config/*Config.ts`
 - Combat: `src/systems/combat/*`
 - Strategy (A Shau): `src/systems/strategy/*`
 - Terrain: `src/systems/terrain/*`
-- Harness: `scripts/perf-capture.ts`, `scripts/perf-analyze-latest.ts`
+- Harness: `scripts/perf-capture.ts`, `scripts/perf-analyze-latest.ts`, `scripts/perf-compare.ts`
+- Integration tests: `src/integration/harness/`, `src/integration/scenarios/`
 
 ## Current Focus
 
@@ -48,4 +56,5 @@ npm run perf:capture:frontier30m
 
 - Update `docs/ARCHITECTURE_RECOVERY_PLAN.md` after architecture/perf decisions.
 - Update `docs/PROFILING_HARNESS.md` when capture flags/semantics change.
+- See `docs/AGENT_TESTING.md` for agent validation workflows and perf baselines.
 - Keep docs concise; remove stale status logs.

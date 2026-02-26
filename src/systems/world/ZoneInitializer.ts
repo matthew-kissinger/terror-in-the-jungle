@@ -2,7 +2,7 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { CaptureZone, ZoneState } from './ZoneManager';
 import { Faction, isBlufor } from '../combat/types';
-import { GameModeConfig } from '../../config/gameModes';
+import { GameModeConfig } from '../../config/gameModeTypes';
 import { ZoneRenderer } from './ZoneRenderer';
 import { ZoneTerrainAdapter } from './ZoneTerrainAdapter';
 

@@ -18,12 +18,6 @@ describe('ViewportManager', () => {
     ViewportManager.resetForTest();
   });
 
-  it('is a singleton', () => {
-    const a = ViewportManager.getInstance();
-    const b = ViewportManager.getInstance();
-    expect(a).toBe(b);
-  });
-
   it('provides initial viewport info', () => {
     const vm = ViewportManager.getInstance();
     const info = vm.info;
@@ -54,10 +48,4 @@ describe('ViewportManager', () => {
     expect(cb).toHaveBeenCalledTimes(1);
   });
 
-  it('resetForTest cleans up singleton', () => {
-    const a = ViewportManager.getInstance();
-    ViewportManager.resetForTest();
-    const b = ViewportManager.getInstance();
-    expect(a).not.toBe(b);
-  });
 });

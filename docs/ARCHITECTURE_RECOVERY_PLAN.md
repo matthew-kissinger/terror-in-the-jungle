@@ -1,6 +1,6 @@
 # Architecture Recovery Plan
 
-Last updated: 2026-02-22
+Last updated: 2026-02-25
 Scope: runtime architecture stabilization with performance and gameplay fidelity gates.
 
 ## Current Goal
@@ -13,10 +13,10 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 | Priority | Workstream | Status | Notes |
 |---|---|---|---|
 | P0 | Harness integrity and measurement quality | IN_PROGRESS | Startup contamination and observer overhead still require careful run discipline. |
-| P1 | Spatial ownership unification (F3) | IN_PROGRESS | Several consumers migrated; legacy secondary sync remains as fallback. |
+| P1 | Spatial ownership unification (F3) | DONE | Legacy SpatialOctree removed from CombatantSystem. All consumers (AI, LOD, spawn, hit detection) use SpatialGridManager singleton. Secondary sync and dedup feature flags removed. |
 | P2 | Heap growth triage in combat-heavy runs | IN_PROGRESS | New diagnostics added; source still mixed between transient waves and retained growth. |
 | P3 | A Shau gameplay flow and contact reliability | IN_PROGRESS | Immediate contact improved; sustained close-contact remains inconsistent. |
-| P4 | UI/HUD update budget discipline | IN_PROGRESS | Grid layout Phases 1-4 complete. VisibilityManager wired: phase (menu/playing/ended), vehicle (infantry/helicopter), ADS dimming. All touch controls on pointer events. UnifiedWeaponBar replaces 3 duplicates. Renderer now subscribes to ViewportManager and key feedback layers use tokenized z-index values. |
+| P4 | UI/HUD update budget discipline | DONE | UI Engine Phases 0-7 complete. 11 UIComponents migrated to CSS Modules + signals. Grid layout with 17 named slots. VisibilityManager wired. All touch controls on pointer events as UIComponent subclasses. UnifiedWeaponBar replaces 3 duplicates. Renderer subscribes to ViewportManager. 12 dead component files + 7 dead style files deleted. |
 | P5 | Terrain/chunk lifecycle bounded work | TODO | Keep chunk generation/merge costs under frame budget at large map scale. |
 
 ## Keep Decisions (Recent)
@@ -32,17 +32,28 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: squared-distance and allocation reductions in spatial queries.
 - Keep: AI target acquisition scratch-buffer reuse.
 - Keep: heap validation expansion (`growth`, `peak`, `recovery`) in harness output.
-- Keep: migration of selected systems to primary spatial provider path.
+- Keep: Single SpatialGridManager as sole spatial owner. Legacy SpatialOctree direct usage removed from CombatantSystem and all sub-modules.
+- Keep: ISpatialQuery interface for AI state handlers (decouples AI from concrete spatial implementation).
+- Keep: spatialGridManager injected through SystemReferences in core orchestration (SystemInitializer, SystemConnector, SystemUpdater).
+- Keep: DayNightCycle removed entirely (conflicted with WeatherSystem; rebuild if needed for night modes).
+- Keep: LoadingScreen facade deleted; GameEngine uses StartScreen directly.
+- Keep: gameModes.ts barrel re-exports removed; consumers import from gameModeTypes.ts or specific config files.
+- Keep: HUDElements.attachToDOM() requires HUDLayout (no body-mount fallback).
+- Keep: WeaponFiring.fire() deprecated method + fireSingleShot/fireShotgunPellets removed; executeShot() is the sole API.
+- Keep: ZoneManager spatial query resilience fallback removed; SpatialGridManager is trusted as sole spatial authority.
+- Keep: ZoneTerrainAdapter.setChunkManager() no-op removed (uses HeightQueryCache).
+- Keep: createUH1HueyGeometry() legacy wrapper removed (createHelicopterGeometry is the API).
+- Keep: FirstPersonWeapon.setEnemySystem() deprecated stub removed.
 
 ## Deferred Decisions
 
-- Default flip of `spatialSecondarySync=0` is deferred pending cleaner matched A/B and longer soak confirmation.
+(None active.)
 
 ## Open Risks
 
 - High-intensity runs can still show heap growth warnings.
 - A/B startup variance can hide small wins/losses.
-- Remaining dual-path spatial consumers increase complexity and drift risk.
+- ZoneManager no longer falls back to linear scan if spatial query returns empty; if SpatialGridManager has sync bugs, zone capture may stall.
 
 ## Required Evidence For Major Changes
 
@@ -52,10 +63,9 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 
 ## Next Execution Slice
 
-1. Finish spatial consumer migration and remove unnecessary secondary sync paths.
-2. Isolate retained heap growth sources with focused captures and subsystem counters.
-3. Complete A Shau contact-flow loop so player reaches and sustains skirmish pressure without harness warps.
-4. Re-baseline and lock regression checks after each accepted change.
+1. Isolate retained heap growth sources with focused captures and subsystem counters.
+2. Complete A Shau contact-flow loop so player reaches and sustains skirmish pressure without harness warps.
+3. Re-baseline and lock regression checks after each accepted change.
 
 ## Update Rule
 

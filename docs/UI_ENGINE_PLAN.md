@@ -1040,7 +1040,7 @@ src/ui/
 
 ## 13. Migration Phases
 
-### Phase 0: Foundation (no visible changes)
+### Phase 0: Foundation (no visible changes) [DONE]
 
 **Goal:** Set up infrastructure that all subsequent work depends on.
 
@@ -1058,7 +1058,7 @@ auto-dispose). Verify CSS custom properties render correctly.
 
 **Risk:** None -- additive only, no existing code modified.
 
-### Phase 1: First Component Migration (proof of concept)
+### Phase 1: First Component Migration (proof of concept) [DONE]
 
 **Goal:** Migrate one simple HUD component end-to-end to validate the pattern.
 
@@ -1075,7 +1075,7 @@ Pick: **TicketDisplay** -- simple, visible, few states, easy to verify.
 **Deliverable:** One fully migrated component proving the UIComponent +
 CSS Module + signals pattern works end-to-end.
 
-### Phase 2: HUD Core Components
+### Phase 2: HUD Core Components [DONE]
 
 **Goal:** Migrate all always-visible HUD elements.
 
@@ -1092,7 +1092,7 @@ After each: verify desktop + mobile, run tests, confirm no regressions.
 
 **Milestone:** The main gameplay HUD is fully on the new system.
 
-### Phase 3: Feedback & Overlay Components
+### Phase 3: Feedback & Overlay Components [DONE]
 
 **Goal:** Migrate transient/overlay components.
 
@@ -1105,7 +1105,7 @@ After each: verify desktop + mobile, run tests, confirm no regressions.
 7. MortarIndicator
 8. RespawnOverlay
 
-### Phase 4: System Components
+### Phase 4: System Components [DONE]
 
 **Goal:** Migrate canvas-based and system-level components.
 
@@ -1115,7 +1115,7 @@ After each: verify desktop + mobile, run tests, confirm no regressions.
 4. Scoreboard
 5. PersonalStatsPanel
 
-### Phase 5: Screen Rewrites
+### Phase 5: Screen Rewrites [DONE]
 
 **Goal:** Rebuild full-screen experiences.
 
@@ -1124,7 +1124,7 @@ After each: verify desktop + mobile, run tests, confirm no regressions.
 3. SettingsModal
 4. HowToPlayModal
 
-### Phase 6: Cleanup & Polish
+### Phase 6: Cleanup & Polish [DONE]
 
 **Goal:** Remove all legacy style infrastructure.
 
@@ -1149,7 +1149,7 @@ After each: verify desktop + mobile, run tests, confirm no regressions.
 - Remaining: HUDZoneStyles.ts (ObjectiveDisplay + HUDZoneDisplay not yet migrated),
   styles.ts (design mixins), tokens.ts shrink
 
-### Phase 7: Touch Controls Integration
+### Phase 7: Touch Controls Integration [DONE]
 
 **Goal:** Bring touch controls into the UIComponent system.
 

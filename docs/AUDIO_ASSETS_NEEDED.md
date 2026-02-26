@@ -1,7 +1,8 @@
 # Audio Assets Needed
 
-Last updated: 2026-02-21
+Last updated: 2026-02-25
 Target path: `public/assets/optimized/`
+Status: No audio assets from this list have been generated or integrated yet. All items remain TODO.
 
 ## Goal
 

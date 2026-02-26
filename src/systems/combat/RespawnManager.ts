@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { Combatant, CombatantState, Faction, isBlufor, isOpfor } from './types';
 import { SquadManager } from './SquadManager';
-import { SpatialOctree } from './SpatialOctree';
 import { CombatantFactory } from './CombatantFactory';
 import { RallyPointSystem } from './RallyPointSystem';
 import { SpawnPositionCalculator } from './SpawnPositionCalculator';
@@ -25,19 +24,16 @@ export interface PendingRespawn {
  */
 export class RespawnManager {
   private combatants: Map<string, Combatant>;
-  private spatialGrid: SpatialOctree;
   private squadManager: SquadManager;
   private combatantFactory: CombatantFactory;
   private pendingRespawns: PendingRespawn[] = [];
 
   constructor(
     combatants: Map<string, Combatant>,
-    spatialGrid: SpatialOctree,
     squadManager: SquadManager,
     combatantFactory: CombatantFactory
   ) {
     this.combatants = combatants;
-    this.spatialGrid = spatialGrid;
     this.squadManager = squadManager;
     this.combatantFactory = combatantFactory;
   }
@@ -83,8 +79,6 @@ export class RespawnManager {
 
       this.squadManager.removeSquadMember(combatant.squadId, id);
     }
-    this.spatialGrid.remove(id);
-    // Keep secondary grid ownership consistent while F3 migration is in progress.
     spatialGridManager.removeEntity(id);
     this.combatants.delete(id);
   }
@@ -180,8 +174,6 @@ export class RespawnManager {
 
     squad.members.push(newMember.id);
     this.combatants.set(newMember.id, newMember);
-    this.spatialGrid.updatePosition(newMember.id, newMember.position);
-    // Ensure newly respawned members are immediately queryable by legacy consumers.
     spatialGridManager.syncEntity(newMember.id, newMember.position);
 
     Logger.info('combat', ` Squad member ${newMember.id} spawned and moving to rejoin squad`);

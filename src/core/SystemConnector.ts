@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { SystemReferences } from './SystemInitializer';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
-import { spatialGridManager } from '../systems/combat/SpatialGridManager';
 import { setSmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
 import { IGameRenderer } from '../types/SystemInterfaces';
 
@@ -74,7 +73,7 @@ export class SystemConnector {
     refs.zoneManager.setCombatantSystem(refs.combatantSystem);
     refs.zoneManager.setCamera(camera);
     refs.zoneManager.setChunkManager(refs.chunkManager);
-    refs.zoneManager.setSpatialGridManager(spatialGridManager);
+    refs.zoneManager.setSpatialGridManager(refs.spatialGridManager);
     refs.zoneManager.setSpatialQueryProvider((center, radius) => refs.combatantSystem.querySpatialRadius(center, radius));
     refs.zoneManager.setHUDSystem(refs.hudSystem);
 
@@ -206,11 +205,6 @@ export class SystemConnector {
       refs.waterSystem.setWeatherSystem(refs.weatherSystem);
     }
 
-    // Connect day-night cycle
-    if (refs.dayNightCycle && renderer) {
-      refs.dayNightCycle.setRenderer(renderer);
-    }
-
     // Connect footstep audio system
     refs.footstepAudioSystem.setChunkManager(refs.chunkManager);
     refs.playerController.setFootstepAudioSystem(refs.footstepAudioSystem);
@@ -220,7 +214,7 @@ export class SystemConnector {
       hitDetection: refs.combatantSystem.combatantCombat?.hitDetection,
       chunkManager: refs.chunkManager,
       combatants: refs.combatantSystem.combatants,
-      spatialGridManager: spatialGridManager
+      spatialGridManager: refs.spatialGridManager
     });
 
     // Initialize GPU timing if renderer is available

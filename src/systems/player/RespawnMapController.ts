@@ -1,4 +1,4 @@
-import { GameMode } from '../../config/gameModes';
+import { GameMode } from '../../config/gameModeTypes';
 import { RespawnMapView } from '../../ui/map/RespawnMapView';
 import { OpenFrontierRespawnMap } from '../../ui/map/OpenFrontierRespawnMap';
 import { ZoneManager } from '../world/ZoneManager';

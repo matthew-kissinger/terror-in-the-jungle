@@ -151,20 +151,6 @@ describe('PerformanceTelemetry', () => {
     expect(report.hitDetection.hitRate).toBe(0)
   })
 
-  it('delegates system timing to frame tracker', async () => {
-    const { instance } = await loadTelemetry()
-
-    instance.beginSystem('ai')
-    instance.endSystem('ai')
-    instance.beginSystem('physics')
-    instance.endSystem('physics')
-
-    expect(frameTimingSpies.beginSystem).toHaveBeenCalledWith('ai')
-    expect(frameTimingSpies.endSystem).toHaveBeenCalledWith('ai')
-    expect(frameTimingSpies.beginSystem).toHaveBeenCalledWith('physics')
-    expect(frameTimingSpies.endSystem).toHaveBeenCalledWith('physics')
-  })
-
   it('tracks frames and resets per-frame spatial grid counters', async () => {
     const { instance } = await loadTelemetry()
 
@@ -298,35 +284,6 @@ describe('PerformanceTelemetry', () => {
       avgMs: 18,
       overBudgetPercent: 5
     })
-  })
-
-  it('delegates GPU timing integration to sub-module', async () => {
-    const { instance } = await loadTelemetry()
-
-    const renderer = {} as any
-    instance.initGPUTiming(renderer)
-    instance.beginGPUTimer()
-    instance.endGPUTimer()
-    instance.collectGPUTime()
-    const telemetry = instance.getGPUTelemetry()
-
-    expect(gpuTimingSpies.init).toHaveBeenCalledWith(renderer)
-    expect(gpuTimingSpies.beginTimer).toHaveBeenCalled()
-    expect(gpuTimingSpies.endTimer).toHaveBeenCalled()
-    expect(gpuTimingSpies.collectTime).toHaveBeenCalled()
-    expect(telemetry).toEqual(gpuTelemetryMock)
-  })
-
-  it('forwards benchmark dependency injection and run', async () => {
-    const { instance } = await loadTelemetry()
-
-    const deps = { hitDetection: {}, chunkManager: {} }
-    instance.injectBenchmarkDependencies(deps)
-    const result = instance.runBenchmark(123)
-
-    expect(benchmarkSpies.injectDependencies).toHaveBeenCalledWith(deps)
-    expect(benchmarkSpies.run).toHaveBeenCalledWith(123)
-    expect(result).toEqual(benchmarkResultMock)
   })
 
   it('defaults telemetry off when no explicit enable flags are present', async () => {

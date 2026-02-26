@@ -35,12 +35,12 @@ import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
 
-import { DayNightCycle } from '../systems/environment/DayNightCycle';
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { VoiceCalloutSystem } from '../systems/audio/VoiceCalloutSystem';
 import { LoadoutSelector } from '../ui/loadout/LoadoutSelector';
 import { WarSimulator } from '../systems/strategy/WarSimulator';
 import { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
+import { SpatialGridManager, spatialGridManager } from '../systems/combat/SpatialGridManager';
 import { objectPool } from '../utils/ObjectPoolManager';
 import { markStartup } from './StartupTelemetry';
 
@@ -54,7 +54,6 @@ export interface SystemReferences {
   waterSystem: WaterSystem;
 
   weatherSystem: WeatherSystem;
-  dayNightCycle: DayNightCycle;
   firstPersonWeapon: FirstPersonWeapon;
   zoneManager: ZoneManager;
   hudSystem: HUDSystem;
@@ -84,6 +83,7 @@ export interface SystemReferences {
   loadoutSelector: LoadoutSelector;
   warSimulator: WarSimulator;
   strategicFeedback: StrategicFeedback;
+  spatialGridManager: SpatialGridManager;
 }
 
 export interface InitializationResult {
@@ -156,7 +156,6 @@ export class SystemInitializer {
     refs.waterSystem = new WaterSystem(scene, camera, refs.assetLoader);
 
     refs.weatherSystem = new WeatherSystem(scene, camera, refs.chunkManager);
-    refs.dayNightCycle = new DayNightCycle(scene);
     refs.firstPersonWeapon = new FirstPersonWeapon(scene, camera, refs.assetLoader);
     refs.zoneManager = new ZoneManager(scene);
     refs.ticketSystem = new TicketSystem();
@@ -188,13 +187,13 @@ export class SystemInitializer {
     refs.loadoutSelector = new LoadoutSelector();
     refs.warSimulator = new WarSimulator();
     refs.strategicFeedback = new StrategicFeedback();
+    refs.spatialGridManager = spatialGridManager;
 
     // Initialize influence map system based on game mode world size
     const worldSize = 4000; // Default, will be updated when game mode is set
     refs.influenceMapSystem = new InfluenceMapSystem(worldSize);
 
     // Add systems to update list
-    // NOTE: dayNightCycle removed - conflicts with weatherSystem for lighting control
     const allSystems: GameSystem[] = [
       refs.assetLoader,
       refs.audioManager,
@@ -203,7 +202,6 @@ export class SystemInitializer {
       // gpuTerrain disabled
       refs.waterSystem,
       refs.weatherSystem,
-      // dayNightCycle DISABLED: Conflicts with WeatherSystem lighting
       refs.playerController,
       refs.firstPersonWeapon,
       refs.combatantSystem,

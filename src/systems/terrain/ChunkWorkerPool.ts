@@ -43,6 +43,7 @@ export class ChunkWorkerPool {
   private readonly seed: number;
   private readonly segments: number;
   private isDisposed = false;
+  private static readonly WORKER_TIMEOUT_MS = 30_000;
 
   constructor(
     workerCount: number = navigator.hardwareConcurrency || 4,
@@ -205,10 +206,22 @@ export class ChunkWorkerPool {
       this.processQueue();
     });
 
-    // Track in-flight after promise is created
-    this.taskQueue.trackInFlight(chunkX, chunkZ, promise);
+    // Wrap with timeout watchdog
+    const timedPromise = Promise.race([
+      promise,
+      new Promise<ChunkGeometryResult>((_, reject) => {
+        setTimeout(() => {
+          Logger.warn('Terrain', `Worker timeout generating chunk (${chunkX}, ${chunkZ}) after ${ChunkWorkerPool.WORKER_TIMEOUT_MS}ms`);
+          this.taskQueue.removeInFlight(chunkX, chunkZ);
+          reject(new Error(`Worker timeout for chunk (${chunkX}, ${chunkZ})`));
+        }, ChunkWorkerPool.WORKER_TIMEOUT_MS);
+      })
+    ]);
 
-    return promise;
+    // Track in-flight after promise is created
+    this.taskQueue.trackInFlight(chunkX, chunkZ, timedPromise);
+
+    return timedPromise;
   }
 
   /**

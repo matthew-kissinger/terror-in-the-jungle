@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Combatant, CombatantState, Faction, isOpfor } from '../types';
-import { SpatialOctree } from '../SpatialOctree';
+import { ISpatialQuery } from '../SpatialOctree';
 import { clusterManager } from '../ClusterManager';
 
 // Module-level scratch vectors
@@ -29,7 +29,7 @@ export class AITargetAcquisition {
     combatant: Combatant,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid?: SpatialOctree
+    spatialGrid?: ISpatialQuery
   ): Combatant | null {
     const visualRange = combatant.skillProfile.visualRange;
     const visualRangeSq = visualRange * visualRange;
@@ -167,7 +167,7 @@ export class AITargetAcquisition {
     radius: number,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid?: SpatialOctree
+    spatialGrid?: ISpatialQuery
   ): number {
     let count = 0;
     const radiusSq = radius * radius;

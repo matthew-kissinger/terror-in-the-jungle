@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { Combatant, CombatantState, Faction, Squad, isOpfor } from '../types'
-import { SpatialOctree } from '../SpatialOctree'
+import { ISpatialQuery } from '../SpatialOctree'
 import { AICoverSystem } from './AICoverSystem'
 import { AIFlankingSystem } from './AIFlankingSystem'
 import { Logger } from '../../../utils/Logger'
@@ -35,7 +35,7 @@ export class AIStateEngage {
     deltaTime: number,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid: SpatialOctree | undefined,
+    spatialGrid: ISpatialQuery | undefined,
     canSeeTarget: (
       combatant: Combatant,
       target: Combatant,
@@ -48,7 +48,7 @@ export class AIStateEngage {
       radius: number,
       playerPosition: THREE.Vector3,
       allCombatants: Map<string, Combatant>,
-      spatialGrid?: SpatialOctree
+      spatialGrid?: ISpatialQuery
     ) => number,
     isCoverFlanked: (combatant: Combatant, threatPos: THREE.Vector3) => boolean
   ): void {
@@ -263,10 +263,10 @@ export class AIStateEngage {
       radius: number,
       playerPosition: THREE.Vector3,
       allCombatants: Map<string, Combatant>,
-      spatialGrid?: SpatialOctree
+      spatialGrid?: ISpatialQuery
     ) => number,
     playerPosition: THREE.Vector3,
-    spatialGrid?: SpatialOctree
+    spatialGrid?: ISpatialQuery
   ): boolean {
     if (!combatant.squadId) return false
 

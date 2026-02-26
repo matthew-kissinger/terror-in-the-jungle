@@ -1,6 +1,6 @@
 # Frontend Rearchitecture Backlog
 
-Last updated: 2026-02-23
+Last updated: 2026-02-25
 Owner: frontend/runtime
 
 ## Scope
@@ -16,9 +16,9 @@ This backlog operationalizes the frontend rearchitecture across:
 | Phase | Outcome | Status | Acceptance criteria |
 |---|---|---|---|
 | Phase 1 | Inventory + guardrails | DONE | Ownership map published, conflict register published, context manager introduced |
-| Phase 2 | Input consolidation | IN_PROGRESS | `InputManager` wrapper active in player flow, squad quick commands centralized, context gating applied in map/debug paths |
-| Phase 3 | HUD composition unification | IN_PROGRESS | Scoreboard/HUD gameplay mounting under layout root, key feedback z-layers tokenized |
-| Phase 4 | Responsive/viewport unification | IN_PROGRESS | Renderer subscribes to `ViewportManager`, shared viewport source between HUD and renderer |
+| Phase 2 | Input consolidation | DONE | `InputManager` wrapper active in player flow, squad quick commands centralized, context gating applied in map/debug paths |
+| Phase 3 | HUD composition unification | DONE | Scoreboard/HUD gameplay mounting under layout root, key feedback z-layers tokenized, all 11 UIComponents migrated to CSS Modules |
+| Phase 4 | Responsive/viewport unification | DONE | Renderer subscribes to `ViewportManager`, shared viewport source between HUD and renderer |
 | Phase 5 | Validation hardening | TODO | Device matrix, input conflict checks, HUD overlap checks, perf-tail check integrated into release gate |
 
 ## Immediate Implementation Tasks

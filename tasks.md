@@ -1,6 +1,9 @@
 # Tasks
 
-Last updated: 2026-02-21
+Last updated: 2026-02-25
+Last synced with ARCHITECTURE_RECOVERY_PLAN.md: 2026-02-25
+
+> Lightweight task subset. See `docs/ARCHITECTURE_RECOVERY_PLAN.md` for full priority board and decision log.
 
 ## P0 - Stability
 

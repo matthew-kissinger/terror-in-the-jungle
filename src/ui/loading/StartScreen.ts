@@ -9,7 +9,7 @@
  */
 
 import { UIComponent } from '../engine/UIComponent';
-import { GameMode } from '../../config/gameModes';
+import { GameMode } from '../../config/gameModeTypes';
 import { isTouchDevice } from '../../utils/DeviceDetector';
 import { isPortraitViewport, tryLockLandscapeOrientation } from '../../utils/Orientation';
 import { SettingsModal } from './SettingsModal';

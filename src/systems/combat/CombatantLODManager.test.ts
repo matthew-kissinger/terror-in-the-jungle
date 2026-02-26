@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as THREE from 'three';
 import { CombatantLODManager } from './CombatantLODManager';
 import { Combatant, CombatantState, Faction } from './types';
-import { SpatialOctree } from './SpatialOctree';
 import type { CombatantAI } from './CombatantAI';
 import type { CombatantCombat } from './CombatantCombat';
 import type { CombatantMovement } from './CombatantMovement';
@@ -10,6 +9,14 @@ import type { CombatantRenderer } from './CombatantRenderer';
 import type { SquadManager } from './SquadManager';
 import type { GameModeManager } from '../world/GameModeManager';
 import type { ZoneManager } from '../world/ZoneManager';
+import { spatialGridManager } from './SpatialGridManager';
+
+vi.mock('./SpatialGridManager', () => ({
+  spatialGridManager: {
+    syncEntity: vi.fn(),
+    removeEntity: vi.fn(),
+  },
+}));
 
 // Helper to create a mock combatant
 function createMockCombatant(
@@ -89,13 +96,6 @@ function createMockSquadManager(): SquadManager {
   } as unknown as SquadManager;
 }
 
-function createMockSpatialOctree(): SpatialOctree {
-  return {
-    updatePosition: vi.fn(),
-    remove: vi.fn(),
-  } as unknown as SpatialOctree;
-}
-
 function createMockGameModeManager(worldSize = 400): GameModeManager {
   return {
     getWorldSize: vi.fn().mockReturnValue(worldSize),
@@ -117,7 +117,6 @@ describe('CombatantLODManager', () => {
   let combatantMovement: CombatantMovement;
   let combatantRenderer: CombatantRenderer;
   let squadManager: SquadManager;
-  let spatialGrid: SpatialOctree;
 
   beforeEach(() => {
     combatants = new Map();
@@ -127,7 +126,8 @@ describe('CombatantLODManager', () => {
     combatantMovement = createMockCombatantMovement();
     combatantRenderer = createMockCombatantRenderer();
     squadManager = createMockSquadManager();
-    spatialGrid = createMockSpatialOctree();
+    vi.mocked(spatialGridManager.syncEntity).mockClear();
+    vi.mocked(spatialGridManager.removeEntity).mockClear();
 
     manager = new CombatantLODManager(
       combatants,
@@ -136,8 +136,7 @@ describe('CombatantLODManager', () => {
       combatantCombat,
       combatantMovement,
       combatantRenderer,
-      squadManager,
-      spatialGrid
+      squadManager
     );
   });
 
@@ -414,10 +413,10 @@ describe('CombatantLODManager', () => {
 
       manager.updateCombatants(0.016);
 
-      expect(spatialGrid.remove).toHaveBeenCalledWith('dead');
+      expect(spatialGridManager.removeEntity).toHaveBeenCalledWith('dead');
       expect(combatantAI.updateAI).not.toHaveBeenCalled();
       expect(combatantMovement.updateMovement).not.toHaveBeenCalled();
-      expect(spatialGrid.updatePosition).not.toHaveBeenCalled();
+      expect(spatialGridManager.syncEntity).not.toHaveBeenCalled();
       // Death animation clock still advances even though LOD updates are skipped.
       expect(deadCombatant.deathProgress).toBeGreaterThan(0.1);
     });

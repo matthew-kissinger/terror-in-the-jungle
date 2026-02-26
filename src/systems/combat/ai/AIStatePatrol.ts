@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { Combatant, CombatantState, Squad, SquadCommand } from '../types'
 import { ZoneManager } from '../../world/ZoneManager'
 import { Logger } from '../../../utils/Logger'
-import { SpatialOctree } from '../SpatialOctree'
+import { ISpatialQuery } from '../SpatialOctree'
 import { clusterManager } from '../ClusterManager'
 
 const _toTarget = new THREE.Vector3()
@@ -34,12 +34,12 @@ export class AIStatePatrol {
     deltaTime: number,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid: SpatialOctree | undefined,
+    spatialGrid: ISpatialQuery | undefined,
     findNearestEnemy: (
       combatant: Combatant,
       playerPosition: THREE.Vector3,
       allCombatants: Map<string, Combatant>,
-      spatialGrid?: SpatialOctree
+      spatialGrid?: ISpatialQuery
     ) => Combatant | null,
     canSeeTarget: (
       combatant: Combatant,
@@ -274,7 +274,7 @@ export class AIStatePatrol {
   private getClusterDensity(
     combatant: Combatant,
     allCombatants: Map<string, Combatant>,
-    spatialGrid: SpatialOctree
+    spatialGrid: ISpatialQuery
   ): number {
     const CLUSTER_RADIUS = 15;
     const CLUSTER_RADIUS_SQ = CLUSTER_RADIUS * CLUSTER_RADIUS;

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Faction, Alliance, getAlliance, isBlufor } from './types';
 import { ZoneManager, ZoneState, CaptureZone } from '../world/ZoneManager';
-import { GameModeConfig } from '../../config/gameModes';
+import { GameModeConfig } from '../../config/gameModeTypes';
 import { Logger } from '../../utils/Logger';
 
 // Module-level scratch vectors to avoid per-call allocations

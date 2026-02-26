@@ -1,12 +1,11 @@
 import { Combatant, CombatantState } from './types';
-import { SpatialOctree } from './SpatialOctree';
+import { spatialGridManager } from './SpatialGridManager';
 
 /**
  * Manages profiling and telemetry for the combat system
  */
 export class CombatantProfiler {
   private combatants: Map<string, Combatant>;
-  private spatialGrid: SpatialOctree;
   private lodHighCount = 0;
   private lodMediumCount = 0;
   private lodLowCount = 0;
@@ -69,11 +68,9 @@ export class CombatantProfiler {
   };
 
   constructor(
-    combatants: Map<string, Combatant>,
-    spatialGrid: SpatialOctree
+    combatants: Map<string, Combatant>
   ) {
     this.combatants = combatants;
-    this.spatialGrid = spatialGrid;
   }
 
   /**
@@ -198,7 +195,7 @@ export class CombatantProfiler {
       avgEntitiesPerLeaf: number;
     };
   } {
-    const octreeStats = this.spatialGrid.getStats();
+    const octreeStats = spatialGridManager.getOctreeStats() ?? { totalNodes: 0, maxDepth: 0, avgEntitiesPerLeaf: 0 };
     return {
       lastMs: this.updateLastMs,
       emaMs: this.updateEmaMs,

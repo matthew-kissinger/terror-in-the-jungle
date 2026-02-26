@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { Combatant, CombatantState, Faction, Alliance, isBlufor, isOpfor, SquadCommand } from './types';
 import { CombatantFactory } from './CombatantFactory';
 import { SquadManager } from './SquadManager';
-import { SpatialOctree } from './SpatialOctree';
 import { ZoneManager } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { RallyPointSystem } from './RallyPointSystem';
@@ -23,7 +22,6 @@ const _scratchVec = new THREE.Vector3();
  */
 export class CombatantSpawnManager {
   private combatants: Map<string, Combatant>;
-  private spatialGrid: SpatialOctree;
   private combatantFactory: CombatantFactory;
   private squadManager: SquadManager;
   private zoneManager?: ZoneManager;
@@ -49,17 +47,14 @@ export class CombatantSpawnManager {
 
   constructor(
     combatants: Map<string, Combatant>,
-    spatialGrid: SpatialOctree,
     combatantFactory: CombatantFactory,
     squadManager: SquadManager
   ) {
     this.combatants = combatants;
-    this.spatialGrid = spatialGrid;
     this.combatantFactory = combatantFactory;
     this.squadManager = squadManager;
     this.respawnManager = new RespawnManager(
       combatants,
-      spatialGrid,
       squadManager,
       combatantFactory
     );
@@ -196,8 +191,10 @@ export class CombatantSpawnManager {
     Logger.info('Combat', `Initial forces deployed: ${this.combatants.size} combatants`);
 
     // Log initial octree stats
-    const octreeStats = this.spatialGrid.getStats();
-    Logger.info('Combat', `Octree initialized: ${octreeStats.totalNodes} nodes, ${octreeStats.totalEntities} entities, max depth ${octreeStats.maxDepth}`);
+    const octreeStats = spatialGridManager.getOctreeStats();
+    if (octreeStats) {
+      Logger.info('Combat', `Spatial grid initialized: ${octreeStats.totalNodes} nodes, ${octreeStats.totalEntities} entities, max depth ${octreeStats.maxDepth}`);
+    }
 
     return createdPlayerSquadId;
   }
@@ -208,7 +205,7 @@ export class CombatantSpawnManager {
   reseedForcesForMode(shouldCreatePlayerSquad = false, playerSquadId?: string): string | undefined {
     Logger.info('Combat', 'Reseed forces for new game mode configuration...');
     this.combatants.clear();
-    this.spatialGrid.clear();
+    spatialGridManager.clear();
     this.progressiveSpawnQueue = [];
     this.progressiveSpawnTimer = 0;
     this.reinforcementWaveTimer = 0;
@@ -342,7 +339,6 @@ export class CombatantSpawnManager {
     // Add all squad members to our combatants map and spatial grid
     members.forEach(combatant => {
       this.combatants.set(combatant.id, combatant);
-      this.spatialGrid.updatePosition(combatant.id, combatant.position);
       spatialGridManager.syncEntity(combatant.id, combatant.position);
     });
   }

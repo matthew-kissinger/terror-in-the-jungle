@@ -35,7 +35,6 @@ export default defineConfig({
             // All three/src/* in one chunk to avoid circular-dep TDZ errors
             if (id.includes('three/src')) return 'three'
             if (id.includes('three-mesh-bvh')) return 'bvh'
-            if (id.includes('postprocessing')) return 'postprocessing'
             if (id.includes('three')) return 'three'
           }
 

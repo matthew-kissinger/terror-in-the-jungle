@@ -3,7 +3,7 @@ import { Combatant } from '../types';
 import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
 import { SmokeCloudSystem } from '../../effects/SmokeCloudSystem';
-import { SpatialOctree } from '../SpatialOctree';
+import { ISpatialQuery } from '../SpatialOctree';
 import { AITargetAcquisition } from './AITargetAcquisition';
 import { AILineOfSight } from './AILineOfSight';
 import { AICoverFinding } from './AICoverFinding';
@@ -54,7 +54,7 @@ export class AITargeting {
     combatant: Combatant,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid?: SpatialOctree
+    spatialGrid?: ISpatialQuery
   ): Combatant | null {
     return this.targetAcquisition.findNearestEnemy(
       combatant,
@@ -81,7 +81,7 @@ export class AITargeting {
     radius: number,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid?: SpatialOctree
+    spatialGrid?: ISpatialQuery
   ): number {
     return this.targetAcquisition.countNearbyEnemies(
       combatant,

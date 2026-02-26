@@ -1,7 +1,9 @@
 # Terror in the Jungle - Roadmap
 
-Last updated: 2026-02-22
+Last updated: 2026-02-25
 Status: DRAFT - Awaiting alignment
+
+> **Note:** This is an aspirational planning document. Phase dates and scope are not commitments. See `ARCHITECTURE_RECOVERY_PLAN.md` for active work status and `UI_ENGINE_PLAN.md` for UI migration status.
 
 ## Vision
 
@@ -24,8 +26,8 @@ Vietnam War is the first theater. The architecture should generalize to any war 
 | Terrain | Noise + DEM chunking | Single ground texture, no biome variation, no terrain engine module |
 | Vegetation | 7 billboard types | Old assets, uniform distribution, no biome awareness |
 | Water | Global plane + shader rivers | No swimming, no boats, disabled in A Shau, shader is basic |
-| Assets | 0 GLB models, all procedural | Primitive geometry meshes (boxes/cylinders), no real 3D models |
-| HUD/UI | Mid-migration (CSS Modules) | Squad UI scattered, no RTS command surface, no vehicle weapon HUD |
+| Assets | 75 GLBs generated (not yet integrated), all in-engine still procedural | Models staged in `deploy-3d-assets/`, engine still uses boxes/cylinders |
+| HUD/UI | UI Engine Phases 0-7 complete (CSS Modules + signals) | Squad UI scattered, no RTS command surface, no vehicle weapon HUD |
 | Scale | 3000 agents / 21km map | Heap growth warnings at current scale, architecture recovery P0-P3 active |
 | Factions | US vs OPFOR (labeled VC) | No NVA/ARVN/VC visual distinction, no faction switching |
 
@@ -433,7 +435,10 @@ Not one monolith sandbox mode. Instead, composable blocks that can be combined:
 
 ### Testing (All Phases)
 - Unit tests for all new systems
+- Integration scenario tests in `src/integration/scenarios/` (real system wiring, minimal mocks)
 - Perf captures via `npm run perf:capture` after each phase
+- Perf baseline comparison via `npm run perf:compare` (auto pass/warn/fail)
+- Agent validation workflow: see `docs/AGENT_TESTING.md`
 - Mobile smoke tests for touch controls
 - A/B comparison for architectural changes
 

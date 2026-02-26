@@ -2,7 +2,7 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { IChunkManager, IAudioManager, IGameRenderer } from '../../types/SystemInterfaces';
-import { WeatherState, WeatherConfig } from '../../config/gameModes';
+import { WeatherState, WeatherConfig } from '../../config/gameModeTypes';
 import { updateLightning, LightningState } from './WeatherLightning';
 import { updateAtmosphere, getBlendedRainIntensity, AtmosphereBaseValues } from './WeatherAtmosphere';
 import { estimateGPUTier, isMobileGPU } from '../../utils/DeviceDetector';

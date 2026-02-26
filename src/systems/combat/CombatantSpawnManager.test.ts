@@ -4,11 +4,24 @@ import { CombatantSpawnManager } from './CombatantSpawnManager';
 import { Combatant, CombatantState, Faction } from './types';
 import { CombatantFactory } from './CombatantFactory';
 import { SquadManager } from './SquadManager';
-import { SpatialOctree } from './SpatialOctree';
 import { ZoneManager } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { RallyPointSystem } from './RallyPointSystem';
 import { TicketSystem } from '../world/TicketSystem';
+import { spatialGridManager } from './SpatialGridManager';
+
+vi.mock('./SpatialGridManager', () => ({
+  spatialGridManager: {
+    syncEntity: vi.fn(),
+    removeEntity: vi.fn(),
+    getOctreeStats: vi.fn(() => ({
+      totalNodes: 10,
+      totalEntities: 20,
+      maxDepth: 3,
+    })),
+    clear: vi.fn(),
+  },
+}));
 
 // Helper to create a mock combatant
 function createMockCombatant(
@@ -84,19 +97,6 @@ function createMockSquadManager(): SquadManager {
   } as unknown as SquadManager;
 }
 
-function createMockSpatialOctree(): SpatialOctree {
-  return {
-    updatePosition: vi.fn(),
-    remove: vi.fn(),
-    clear: vi.fn(),
-    getStats: vi.fn(() => ({
-      totalNodes: 10,
-      totalEntities: 20,
-      maxDepth: 3,
-    })),
-  } as unknown as SpatialOctree;
-}
-
 function createMockZoneManager(): ZoneManager {
   return {
     getAllZones: vi.fn(() => []),
@@ -137,7 +137,6 @@ function createMockTicketSystem(): TicketSystem {
 describe('CombatantSpawnManager', () => {
   let spawnManager: CombatantSpawnManager;
   let combatants: Map<string, Combatant>;
-  let spatialGrid: SpatialOctree;
   let combatantFactory: CombatantFactory;
   let squadManager: SquadManager;
   let zoneManager: ZoneManager;
@@ -147,17 +146,19 @@ describe('CombatantSpawnManager', () => {
 
   beforeEach(() => {
     combatants = new Map();
-    spatialGrid = createMockSpatialOctree();
     combatantFactory = createMockCombatantFactory();
     squadManager = createMockSquadManager();
     zoneManager = createMockZoneManager();
     gameModeManager = createMockGameModeManager();
     rallyPointSystem = createMockRallyPointSystem();
     ticketSystem = createMockTicketSystem();
+    vi.mocked(spatialGridManager.syncEntity).mockClear();
+    vi.mocked(spatialGridManager.removeEntity).mockClear();
+    vi.mocked(spatialGridManager.getOctreeStats).mockClear();
+    vi.mocked(spatialGridManager.clear).mockClear();
 
     spawnManager = new CombatantSpawnManager(
       combatants,
-      spatialGrid,
       combatantFactory,
       squadManager
     );
@@ -175,7 +176,6 @@ describe('CombatantSpawnManager', () => {
     it('should create RespawnManager instance', () => {
       const manager = new CombatantSpawnManager(
         combatants,
-        spatialGrid,
         combatantFactory,
         squadManager
       );
@@ -187,7 +187,6 @@ describe('CombatantSpawnManager', () => {
     it('should set ZoneManager', () => {
       const manager = new CombatantSpawnManager(
         combatants,
-        spatialGrid,
         combatantFactory,
         squadManager
       );
@@ -198,7 +197,6 @@ describe('CombatantSpawnManager', () => {
     it('should set GameModeManager', () => {
       const manager = new CombatantSpawnManager(
         combatants,
-        spatialGrid,
         combatantFactory,
         squadManager
       );
@@ -209,7 +207,6 @@ describe('CombatantSpawnManager', () => {
     it('should set RallyPointSystem', () => {
       const manager = new CombatantSpawnManager(
         combatants,
-        spatialGrid,
         combatantFactory,
         squadManager
       );
@@ -294,7 +291,7 @@ describe('CombatantSpawnManager', () => {
     it('should update spatial grid with spawned combatants', () => {
       spawnManager.spawnInitialForces(false);
 
-      expect(spatialGrid.updatePosition).toHaveBeenCalled();
+      expect(spatialGridManager.syncEntity).toHaveBeenCalled();
     });
 
     it('should seed progressive spawn queue', () => {
@@ -308,7 +305,7 @@ describe('CombatantSpawnManager', () => {
     it('should log octree stats after initialization', () => {
       spawnManager.spawnInitialForces(false);
 
-      expect(spatialGrid.getStats).toHaveBeenCalled();
+      expect(spatialGridManager.getOctreeStats).toHaveBeenCalled();
     });
 
     it('should spawn at HQ zones when configured', () => {
@@ -506,7 +503,7 @@ describe('CombatantSpawnManager', () => {
 
       spawnManager.spawnSquad(Faction.US, position, size);
 
-      expect(spatialGrid.updatePosition).toHaveBeenCalledTimes(size);
+      expect(spatialGridManager.syncEntity).toHaveBeenCalledTimes(size);
     });
 
     it('should spawn OPFOR squads', () => {
@@ -814,7 +811,7 @@ describe('CombatantSpawnManager', () => {
       spawnManager.reseedForcesForMode();
 
       // Should clear and re-seed
-      expect(spatialGrid.clear).toHaveBeenCalled();
+      expect(spatialGridManager.clear).toHaveBeenCalled();
     });
 
     it('should reset progressive spawn queue', () => {
@@ -884,7 +881,6 @@ describe('CombatantSpawnManager', () => {
     it('should handle update without ZoneManager set', () => {
       const manager = new CombatantSpawnManager(
         combatants,
-        spatialGrid,
         combatantFactory,
         squadManager
       );
@@ -897,7 +893,6 @@ describe('CombatantSpawnManager', () => {
     it('should handle update without GameModeManager set', () => {
       const manager = new CombatantSpawnManager(
         combatants,
-        spatialGrid,
         combatantFactory,
         squadManager
       );
@@ -910,7 +905,6 @@ describe('CombatantSpawnManager', () => {
     it('should handle update without RallyPointSystem set', () => {
       const manager = new CombatantSpawnManager(
         combatants,
-        spatialGrid,
         combatantFactory,
         squadManager
       );

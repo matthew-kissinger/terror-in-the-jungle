@@ -90,8 +90,4 @@ export class ZoneTerrainAdapter {
     return getHeightQueryCache().getHeightAt(x, z);
   }
 
-  // Keep for backwards compatibility but no longer needed
-  setChunkManager(): void {
-    // No-op - using HeightQueryCache now
-  }
 }

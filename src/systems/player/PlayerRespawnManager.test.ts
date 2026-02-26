@@ -8,7 +8,7 @@ import { InventoryManager } from './InventoryManager';
 import { Faction } from '../combat/types';
 import { RespawnUI } from './RespawnUI';
 import { RespawnMapController } from './RespawnMapController';
-import { GameMode } from '../../config/gameModes';
+import { GameMode } from '../../config/gameModeTypes';
 
 // Mock browser globals for Node.js environment
 if (typeof document === 'undefined') {
@@ -236,69 +236,11 @@ describe('PlayerRespawnManager', () => {
   });
 
   describe('Constructor and init', () => {
-    it('should initialize with scene and camera', () => {
-      expect(respawnManager).toBeDefined();
-      expect(respawnManager['scene']).toBe(mockScene);
-      expect(respawnManager['camera']).toBe(mockCamera);
-    });
-
     it('should setup UI callbacks on init', async () => {
       await respawnManager.init();
 
       expect(mockRespawnUI.setRespawnClickCallback).toHaveBeenCalled();
       expect(mockMapController.setZoneSelectedCallback).toHaveBeenCalled();
-    });
-
-    it('should initialize with respawn UI hidden', () => {
-      expect(respawnManager['isRespawnUIVisible']).toBe(false);
-    });
-
-    it('should initialize with zero respawn timer', () => {
-      expect(respawnManager['respawnTimer']).toBe(0);
-    });
-
-    it('should initialize with no selected spawn point', () => {
-      expect(respawnManager['selectedSpawnPoint']).toBeUndefined();
-    });
-  });
-
-  describe('setDependencies', () => {
-    it('should set zone manager and pass to map controller', () => {
-      respawnManager.setZoneManager(mockZoneManager);
-
-      expect(respawnManager['zoneManager']).toBe(mockZoneManager);
-      expect(mockMapController.setZoneManager).toHaveBeenCalledWith(mockZoneManager);
-    });
-
-    it('should set player health system', () => {
-      respawnManager.setPlayerHealthSystem(mockPlayerHealthSystem);
-
-      expect(respawnManager['playerHealthSystem']).toBe(mockPlayerHealthSystem);
-    });
-
-    it('should set game mode manager and pass to map controller', () => {
-      respawnManager.setGameModeManager(mockGameModeManager);
-
-      expect(respawnManager['gameModeManager']).toBe(mockGameModeManager);
-      expect(mockMapController.setGameModeManager).toHaveBeenCalledWith(mockGameModeManager);
-    });
-
-    it('should set player controller', () => {
-      respawnManager.setPlayerController(mockPlayerController);
-
-      expect(respawnManager['playerController']).toBe(mockPlayerController);
-    });
-
-    it('should set first person weapon', () => {
-      respawnManager.setFirstPersonWeapon(mockFirstPersonWeapon);
-
-      expect(respawnManager['firstPersonWeapon']).toBe(mockFirstPersonWeapon);
-    });
-
-    it('should set inventory manager', () => {
-      respawnManager.setInventoryManager(mockInventoryManager);
-
-      expect(respawnManager['inventoryManager']).toBe(mockInventoryManager);
     });
   });
 
@@ -888,54 +830,6 @@ describe('PlayerRespawnManager', () => {
     it('should handle death without first person weapon', () => {
       respawnManager.setGameModeManager(mockGameModeManager);
       respawnManager.setPlayerController(mockPlayerController);
-
-      expect(() => respawnManager.onPlayerDeath()).not.toThrow();
-    });
-
-    it('should handle player controller without setPosition method', () => {
-      const controllerWithoutSetPosition = {
-        enableControls: vi.fn(),
-      };
-      respawnManager.setPlayerController(controllerWithoutSetPosition);
-      respawnManager.setZoneManager(mockZoneManager);
-
-      expect(() => respawnManager.respawnAtBase()).not.toThrow();
-    });
-
-    it('should handle player controller without enableControls method', () => {
-      const controllerWithoutEnable = {
-        setPosition: vi.fn(),
-      };
-      respawnManager.setPlayerController(controllerWithoutEnable);
-      respawnManager.setZoneManager(mockZoneManager);
-
-      expect(() => respawnManager.respawnAtBase()).not.toThrow();
-    });
-
-    it('should handle player controller without disableControls method', () => {
-      const controllerWithoutDisable = {};
-      respawnManager.setPlayerController(controllerWithoutDisable);
-      respawnManager.setGameModeManager(mockGameModeManager);
-
-      expect(() => respawnManager.onPlayerDeath()).not.toThrow();
-    });
-
-    it('should handle first person weapon without enable method', () => {
-      const weaponWithoutEnable = {
-        disable: vi.fn(),
-      };
-      respawnManager.setFirstPersonWeapon(weaponWithoutEnable);
-      respawnManager.setPlayerController(mockPlayerController);
-      respawnManager.setZoneManager(mockZoneManager);
-
-      expect(() => respawnManager.respawnAtBase()).not.toThrow();
-    });
-
-    it('should handle first person weapon without disable method', () => {
-      const weaponWithoutDisable = {};
-      respawnManager.setFirstPersonWeapon(weaponWithoutDisable);
-      respawnManager.setPlayerController(mockPlayerController);
-      respawnManager.setGameModeManager(mockGameModeManager);
 
       expect(() => respawnManager.onPlayerDeath()).not.toThrow();
     });

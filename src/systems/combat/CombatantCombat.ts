@@ -415,7 +415,6 @@ export class CombatantCombat {
     return end;
   }
 
-  // Public API maintained for backward compatibility
   applyDamage(
     target: Combatant,
     damage: number,

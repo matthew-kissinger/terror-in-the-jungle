@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { Combatant, CombatantState } from '../types'
-import { SpatialOctree } from '../SpatialOctree'
+import { ISpatialQuery } from '../SpatialOctree'
 import { Logger } from '../../../utils/Logger'
 import { VoiceCalloutSystem, CalloutType } from '../../audio/VoiceCalloutSystem'
 
@@ -18,12 +18,12 @@ export class AIStateMovement {
     deltaTime: number,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid: SpatialOctree | undefined,
+    spatialGrid: ISpatialQuery | undefined,
     findNearestEnemy: (
       combatant: Combatant,
       playerPosition: THREE.Vector3,
       allCombatants: Map<string, Combatant>,
-      spatialGrid?: SpatialOctree
+      spatialGrid?: ISpatialQuery
     ) => Combatant | null,
     canSeeTarget: (
       combatant: Combatant,

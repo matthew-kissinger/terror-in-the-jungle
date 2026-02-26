@@ -14,7 +14,6 @@ import { VoiceCalloutSystem } from '../audio/VoiceCalloutSystem';
 import { SquadManager } from './SquadManager';
 import { CombatantSpawnManager } from './CombatantSpawnManager';
 import { CombatantLODManager } from './CombatantLODManager';
-import { SpatialOctree } from './SpatialOctree';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 
 /**
@@ -28,8 +27,7 @@ export class CombatantSystemSetters {
     private combatantAI: CombatantAI,
     private squadManager: SquadManager,
     private spawnManager: CombatantSpawnManager,
-    private lodManager: CombatantLODManager,
-    private spatialGrid: SpatialOctree
+    private lodManager: CombatantLODManager
   ) {}
 
   setChunkManager(chunkManager: ImprovedChunkManager): void {
@@ -67,10 +65,8 @@ export class CombatantSystemSetters {
     this.combatantMovement.setGameModeManager(gameModeManager);
     this.spawnManager.setGameModeManager(gameModeManager);
     this.lodManager.setGameModeManager(gameModeManager);
-    // Update spatial grid world size
+    // Reinitialize spatial grid with correct world size
     const worldSize = gameModeManager.getWorldSize();
-    this.spatialGrid.setWorldSize(worldSize);
-    // Reinitialize spatial grid manager with correct world size
     spatialGridManager.reinitialize(worldSize);
     Logger.info('combat', `Spatial grid reinitialized with world size ${worldSize}`);
   }

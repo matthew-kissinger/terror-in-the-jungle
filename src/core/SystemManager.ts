@@ -17,7 +17,8 @@ import { PlayerHealthSystem } from '../systems/player/PlayerHealthSystem';
 import { MinimapSystem } from '../ui/minimap/MinimapSystem';
 import { AudioManager } from '../systems/audio/AudioManager';
 import { GameModeManager } from '../systems/world/GameModeManager';
-import { GameMode, getGameModeConfig } from '../config/gameModes';
+import { GameMode } from '../config/gameModeTypes';
+import { getGameModeConfig } from '../config/gameModes';
 import { PlayerRespawnManager } from '../systems/player/PlayerRespawnManager';
 import { FullMapSystem } from '../ui/map/FullMapSystem';
 import { CompassSystem } from '../ui/compass/CompassSystem';
@@ -34,7 +35,6 @@ import { SmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
 import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
-import { DayNightCycle } from '../systems/environment/DayNightCycle';
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { VoiceCalloutSystem } from '../systems/audio/VoiceCalloutSystem';
 import { LoadoutSelector } from '../ui/loadout/LoadoutSelector';
@@ -70,7 +70,6 @@ export class SystemManager {
   public waterSystem!: WaterSystem;
 
   public weatherSystem!: WeatherSystem;
-  public dayNightCycle!: DayNightCycle;
   public firstPersonWeapon!: FirstPersonWeapon;
   public zoneManager!: ZoneManager;
   public hudSystem!: HUDSystem;
@@ -130,7 +129,6 @@ export class SystemManager {
     this.waterSystem = this.refs.waterSystem;
 
     this.weatherSystem = this.refs.weatherSystem;
-    this.dayNightCycle = this.refs.dayNightCycle;
     this.firstPersonWeapon = this.refs.firstPersonWeapon;
     this.zoneManager = this.refs.zoneManager;
     this.hudSystem = this.refs.hudSystem;
@@ -254,9 +252,6 @@ export class SystemManager {
     }
 
     // Reset environment systems for new match
-    if (this.dayNightCycle) {
-      this.dayNightCycle.reset();
-    }
     if (this.weatherSystem) {
       this.weatherSystem.resetState();
     }
