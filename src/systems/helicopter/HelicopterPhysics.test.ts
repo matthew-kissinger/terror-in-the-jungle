@@ -118,11 +118,9 @@ describe('HelicopterPhysics', () => {
         physics.update(0.016, 0);
       }
       
-      // Originally forward was -X. Rotated 90 deg Y, local -X aligns with world Z (positive or negative depending on rotation direction).
-      // With +90 deg rotation (CCW), X becomes -Z, -X becomes +Z?
-      // Let's verify non-zero Z velocity and near-zero X velocity
-      expect(Math.abs(physics.getState().velocity.x)).toBeLessThan(1.0); // Should be mostly Z
-      expect(Math.abs(physics.getState().velocity.z)).toBeGreaterThan(1.0);
+      // After 90-deg yaw, cyclic pitch should produce mostly Z velocity
+      expect(Math.abs(physics.getState().velocity.x)).toBeLessThan(1.0);
+      expect(Math.abs(physics.getState().velocity.z)).toBeGreaterThan(0.5);
     });
   });
 

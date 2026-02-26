@@ -1,6 +1,6 @@
 # Architecture Recovery Plan
 
-Last updated: 2026-02-26
+Last updated: 2026-02-27
 Scope: runtime architecture stabilization with performance and gameplay fidelity gates.
 
 ## Current Goal
@@ -49,6 +49,12 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: RespawnButton module + HUDElements.respawnButton removed (never mounted to layout; RespawnUI has its own button).
 - Keep: 20 dead interfaces removed from SystemInterfaces.ts (never imported). 9 used interfaces retained.
 - Keep: HUDUpdater forwarding layer eliminated; HUDSystem calls UIComponents directly. HUDZoneDisplay owned by HUDSystem. Bleed text logic inlined.
+- Keep: Per-aircraft physics config (AircraftConfigs.ts). Each aircraft type (UH1_HUEY, UH1C_GUNSHIP, AH1_COBRA) has distinct mass, lift, agility, speed, damping. HelicopterPhysics constructor accepts AircraftPhysicsConfig.
+- Keep: Helicopter interaction uses findNearestHelicopter() instead of hardcoded 'us_huey' key (fixed post-multi-helipad migration).
+- Keep: Unoccupied airborne helicopters continue physics simulation (gravity pulls them down). Grounded unoccupied helicopters skip physics.
+- Keep: HUD RPM reads from HelicopterPhysics.engineRPM (real spool-up/down) instead of fake formula.
+- Keep: HelicopterGeometryParts.ts deleted (307 lines of unused procedural cockpit/door-gun geometry; GLBs are the source).
+- Keep: HelicopterModel.getControlInputs() dead method removed (returned empty object; controls flow through PlayerMovement.setHelicopterControls).
 - Keep: 29 mock-wiring/setter-propagation tests deleted from CombatantAI.test.ts; 40 behavioral tests retained (suppression decay, movement callouts, squad command overrides).
 - Keep: VoiceCalloutSystem.test.ts deleted (1 trivial test for disabled system).
 - Keep: UI_ENGINE_PLAN.md archived to docs/archive/ (completed project, 1302 lines).

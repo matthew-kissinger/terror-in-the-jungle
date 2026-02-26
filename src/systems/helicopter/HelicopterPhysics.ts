@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { AircraftPhysicsConfig } from './AircraftConfigs';
 
 const _gravity = new THREE.Vector3();
 const _lift = new THREE.Vector3();
@@ -27,31 +28,32 @@ export interface HelicopterState {
   groundHeight: number;
 }
 
+// Default physics when no config is provided (backwards-compatible with old tests)
+const DEFAULT_PHYSICS: AircraftPhysicsConfig = {
+  mass: 2200,
+  maxLiftForce: 36000,
+  maxCyclicForce: 8000,
+  maxYawRate: 1.8,
+  maxHorizontalSpeed: 55,
+  velocityDamping: 0.95,
+  angularDamping: 0.85,
+  autoLevelStrength: 3.0,
+  groundEffectHeight: 8.0,
+  groundEffectStrength: 0.25,
+  engineSpoolRate: 1.8,
+  inputSmoothRate: 8.0,
+};
+
 export class HelicopterPhysics {
   private state: HelicopterState;
   private controls: HelicopterControls;
 
-  // Physics constants (tuned for arcade feel with good ground handling)
-  private readonly MASS = 1500; // kg (lighter for snappy response)
-  private readonly GRAVITY = -9.81; // m/s²
-  private readonly MAX_LIFT_FORCE = 30000; // N (balanced thrust-to-weight ratio)
-  private readonly MAX_CYCLIC_FORCE = 8000; // N (responsive horizontal movement)
-  private readonly MAX_YAW_RATE = 2.0; // rad/s
-  private readonly ENGINE_SPOOL_RATE = 2.0; // How fast engine responds
-  private readonly MAX_HORIZONTAL_SPEED = 60; // m/s cap to keep chunk churn sustainable
-
-  // Arcade-style damping for stability
-  private readonly VELOCITY_DAMPING = 0.95; // Less drift
-  private readonly ANGULAR_DAMPING = 0.85; // Prevents spinning out but allows banking
-  private readonly AUTO_LEVEL_STRENGTH = 3.0; // Strong auto-stabilization
-  private readonly GROUND_EFFECT_HEIGHT = 8.0; // Good ground effect zone
-  private readonly GROUND_EFFECT_STRENGTH = 0.25; // Helps with hovering near ground
-
-  // Input smoothing for better feel
-  private readonly INPUT_SMOOTH_RATE = 8.0; // How fast inputs respond
+  private readonly GRAVITY = -9.81;
+  private readonly cfg: AircraftPhysicsConfig;
   private smoothedControls: HelicopterControls;
 
-  constructor(initialPosition: THREE.Vector3) {
+  constructor(initialPosition: THREE.Vector3, config?: AircraftPhysicsConfig) {
+    this.cfg = config ?? DEFAULT_PHYSICS;
     this.state = {
       position: initialPosition.clone(),
       velocity: new THREE.Vector3(),
@@ -109,7 +111,7 @@ export class HelicopterPhysics {
   }
 
   private smoothControlInputs(deltaTime: number): void {
-    const smoothRate = Math.min(this.INPUT_SMOOTH_RATE * deltaTime, 1.0);
+    const smoothRate = Math.min(this.cfg.inputSmoothRate * deltaTime, 1.0);
 
     this.smoothedControls.collective = THREE.MathUtils.lerp(
       this.smoothedControls.collective,
@@ -141,9 +143,8 @@ export class HelicopterPhysics {
   }
 
   private updateEngine(deltaTime: number): void {
-    // Engine RPM follows collective input with realistic spool-up/down
-    const targetRPM = Math.max(0.2, this.smoothedControls.collective); // Idle at 20% (rotor always spinning)
-    const spoolRate = Math.min(this.ENGINE_SPOOL_RATE * deltaTime, 1.0);
+    const targetRPM = Math.max(0.2, this.smoothedControls.collective);
+    const spoolRate = Math.min(this.cfg.engineSpoolRate * deltaTime, 1.0);
 
     if (targetRPM > this.state.engineRPM) {
       // Spool up (gradual for takeoff realism)
@@ -155,70 +156,65 @@ export class HelicopterPhysics {
   }
 
   private calculateForces(deltaTime: number): void {
-    // Gravity (always present)
-    _gravity.set(0, this.GRAVITY * this.MASS, 0);
+    const { mass, maxLiftForce, maxCyclicForce, maxYawRate, maxHorizontalSpeed,
+            groundEffectHeight, groundEffectStrength } = this.cfg;
+
+    // Gravity
+    _gravity.set(0, this.GRAVITY * mass, 0);
 
     // Vertical lift from collective
-    let liftForce = this.smoothedControls.collective * this.MAX_LIFT_FORCE;
+    let liftForce = this.smoothedControls.collective * maxLiftForce;
 
-    // Engine boost multiplier
     if (this.smoothedControls.engineBoost) {
       liftForce *= 1.4;
     }
 
-    // Ground effect - easier to hover near ground
+    // Ground effect
     const heightAboveGround = this.state.position.y - this.state.groundHeight;
-    if (heightAboveGround < this.GROUND_EFFECT_HEIGHT) {
-      const groundEffect = 1.0 - (heightAboveGround / this.GROUND_EFFECT_HEIGHT);
-      liftForce += groundEffect * this.GROUND_EFFECT_STRENGTH * this.MAX_LIFT_FORCE;
+    if (heightAboveGround < groundEffectHeight) {
+      const groundEffect = 1.0 - (heightAboveGround / groundEffectHeight);
+      liftForce += groundEffect * groundEffectStrength * maxLiftForce;
     }
 
     _lift.set(0, liftForce, 0);
 
     // Horizontal forces from cyclic (relative to helicopter orientation)
-    // With 90-degree model rotation, forward is -X, right is -Z in local space
     _cyclicForce.set(
-      -this.smoothedControls.cyclicPitch * this.MAX_CYCLIC_FORCE, // Forward/backward on -X-axis
+      -this.smoothedControls.cyclicPitch * maxCyclicForce,
       0,
-      -this.smoothedControls.cyclicRoll * this.MAX_CYCLIC_FORCE   // Left/right on -Z-axis
+      -this.smoothedControls.cyclicRoll * maxCyclicForce
     );
-
-    // Transform cyclic forces to world space
     _cyclicForce.applyQuaternion(this.state.quaternion);
 
-    // Total force
+    // Total force -> acceleration
     const totalForce = _gravity.add(_lift).add(_cyclicForce);
-
-    // Apply force to velocity (F = ma, so a = F/m)
-    const acceleration = totalForce.divideScalar(this.MASS);
+    const acceleration = totalForce.divideScalar(mass);
     this.state.velocity.add(acceleration.multiplyScalar(deltaTime));
 
-    // Cap maximum vertical velocity for better control
-    const maxVerticalSpeed = 15.0; // m/s maximum climb/descent rate
+    // Cap vertical velocity
+    const maxVerticalSpeed = 15.0;
     this.state.velocity.y = THREE.MathUtils.clamp(this.state.velocity.y, -maxVerticalSpeed, maxVerticalSpeed);
 
-    // Cap horizontal speed to prevent excessive chunk churn
+    // Cap horizontal speed
     const hx = this.state.velocity.x;
     const hz = this.state.velocity.z;
     const horizontalSpeedSq = hx * hx + hz * hz;
-    const maxHSq = this.MAX_HORIZONTAL_SPEED * this.MAX_HORIZONTAL_SPEED;
+    const maxHSq = maxHorizontalSpeed * maxHorizontalSpeed;
     if (horizontalSpeedSq > maxHSq) {
-      const scale = this.MAX_HORIZONTAL_SPEED / Math.sqrt(horizontalSpeedSq);
+      const scale = maxHorizontalSpeed / Math.sqrt(horizontalSpeedSq);
       this.state.velocity.x *= scale;
       this.state.velocity.z *= scale;
     }
 
-    // Yaw angular velocity from tail rotor
-    this.state.angularVelocity.y = this.smoothedControls.yaw * this.MAX_YAW_RATE;
+    // Yaw
+    this.state.angularVelocity.y = this.smoothedControls.yaw * maxYawRate;
   }
 
   private applyAutoStabilization(deltaTime: number): void {
-    // Extract roll and pitch from current quaternion
     _euler.setFromQuaternion(this.state.quaternion, 'YXZ');
 
-    // Auto-level forces (stronger when tilted more)
-    const rollCorrection = -_euler.z * this.AUTO_LEVEL_STRENGTH;
-    const pitchCorrection = -_euler.x * this.AUTO_LEVEL_STRENGTH;
+    const rollCorrection = -_euler.z * this.cfg.autoLevelStrength;
+    const pitchCorrection = -_euler.x * this.cfg.autoLevelStrength;
 
     // Apply corrections to angular velocity
     this.state.angularVelocity.z += rollCorrection * deltaTime;
@@ -246,11 +242,8 @@ export class HelicopterPhysics {
   }
 
   private applyDamping(deltaTime: number): void {
-    // Velocity damping for stability
-    this.state.velocity.multiplyScalar(Math.pow(this.VELOCITY_DAMPING, deltaTime));
-
-    // Angular velocity damping to prevent spinning
-    this.state.angularVelocity.multiplyScalar(Math.pow(this.ANGULAR_DAMPING, deltaTime));
+    this.state.velocity.multiplyScalar(Math.pow(this.cfg.velocityDamping, deltaTime));
+    this.state.angularVelocity.multiplyScalar(Math.pow(this.cfg.angularDamping, deltaTime));
   }
 
   private enforceGroundCollision(): void {

@@ -131,6 +131,7 @@ export interface IHelicopterModel {
   getHelicopterPositionTo(id: string, target: THREE.Vector3): boolean;
   getHelicopterQuaternionTo(id: string, target: THREE.Quaternion): boolean;
   setHelicopterControls(helicopterId: string, controls: any): void;
+  getHelicopterState(helicopterId: string): { engineRPM: number } | null;
 }
 
 /**

@@ -302,11 +302,16 @@ export class PlayerMovement {
       this.helicopterModel.setHelicopterControls(this.playerState.helicopterId, this.helicopterControls);
     }
 
-    // Update helicopter instruments HUD
+    // Update helicopter instruments HUD with real engine RPM from physics
     if (hudSystem) {
+      let rpm = this.helicopterControls.collective * 0.8 + 0.2; // fallback
+      if (this.helicopterModel && this.playerState.helicopterId) {
+        const state = this.helicopterModel.getHelicopterState(this.playerState.helicopterId);
+        if (state) rpm = state.engineRPM;
+      }
       hudSystem.updateHelicopterInstruments(
         this.helicopterControls.collective,
-        this.helicopterControls.collective * 0.8 + 0.2, // Simple RPM simulation based on collective
+        rpm,
         this.helicopterControls.autoHover,
         this.helicopterControls.engineBoost
       );

@@ -3,6 +3,7 @@ import { GameSystem } from '../../types';
 import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { HelipadSystem } from './HelipadSystem';
 import { HelicopterPhysics, HelicopterControls } from './HelicopterPhysics';
+import { getAircraftConfig } from './AircraftConfigs';
 import { Logger } from '../../utils/Logger';
 import { createHelicopterGeometry } from './HelicopterGeometry';
 import { HelicopterAnimation } from './HelicopterAnimation';
@@ -120,7 +121,8 @@ export class HelicopterModel implements GameSystem {
     this.scene.add(helicopter);
     this.helicopters.set(helicopterId, helicopter);
 
-    const physics = new HelicopterPhysics(helicopterPosition);
+    const aircraftConfig = getAircraftConfig(aircraftKey);
+    const physics = new HelicopterPhysics(helicopterPosition, aircraftConfig.physics);
     this.helicopterPhysics.set(helicopterId, physics);
 
     this.animation.initialize(helicopterId);
@@ -204,47 +206,55 @@ export class HelicopterModel implements GameSystem {
   }
 
   private updateHelicopterPhysics(deltaTime: number): void {
-    if (!this.playerController || !this.playerController.isInHelicopter()) return;
+    if (!this.terrainManager) return;
 
-    const helicopterId = this.playerController.getHelicopterId();
-    if (!helicopterId) return;
+    const pilotedId = this.playerController?.isInHelicopter()
+      ? this.playerController.getHelicopterId()
+      : null;
 
-    const helicopter = this.helicopters.get(helicopterId);
-    const physics = this.helicopterPhysics.get(helicopterId);
-    if (!helicopter || !physics || !this.terrainManager) return;
+    for (const [id, helicopter] of this.helicopters) {
+      const physics = this.helicopterPhysics.get(id);
+      if (!physics) continue;
 
-    const controls = this.getControlInputs();
-    physics.setControls(controls);
+      const isPiloted = id === pilotedId;
 
-    const currentPos = physics.getState().position;
-    const terrainHeight = this.terrainManager.getHeightAt(currentPos.x, currentPos.z);
+      if (isPiloted) {
+        // Controls are set each frame by PlayerMovement.setHelicopterControls()
+      } else if (!physics.getState().isGrounded) {
+        // Unoccupied + airborne: zero controls so gravity pulls it down
+        physics.setControls({ collective: 0, cyclicPitch: 0, cyclicRoll: 0, yaw: 0, engineBoost: false });
+      } else {
+        // Unoccupied + grounded: no update needed
+        continue;
+      }
 
-    // Check if over any helipad
-    let helipadHeight: number | undefined;
-    if (this.helipadSystem) {
-      for (const hp of this.helipadSystem.getAllHelipads()) {
-        const dx = currentPos.x - hp.position.x;
-        const dz = currentPos.z - hp.position.z;
-        if (dx * dx + dz * dz < 15 * 15) {
-          helipadHeight = hp.position.y;
-          break;
+      const currentPos = physics.getState().position;
+      const terrainHeight = this.terrainManager.getHeightAt(currentPos.x, currentPos.z);
+
+      let helipadHeight: number | undefined;
+      if (this.helipadSystem) {
+        for (const hp of this.helipadSystem.getAllHelipads()) {
+          const dx = currentPos.x - hp.position.x;
+          const dz = currentPos.z - hp.position.z;
+          if (dx * dx + dz * dz < 15 * 15) {
+            helipadHeight = hp.position.y;
+            break;
+          }
         }
       }
+
+      physics.update(deltaTime, terrainHeight, helipadHeight);
+
+      const state = physics.getState();
+      helicopter.position.copy(state.position);
+
+      const finalQuaternion = this.animation.updateVisualTilt(helicopter, id, physics, deltaTime);
+      helicopter.quaternion.copy(finalQuaternion);
+
+      if (isPiloted && this.playerController) {
+        this.playerController.updatePlayerPosition(state.position);
+      }
     }
-
-    physics.update(deltaTime, terrainHeight, helipadHeight);
-
-    const state = physics.getState();
-    helicopter.position.copy(state.position);
-
-    const finalQuaternion = this.animation.updateVisualTilt(helicopter, helicopterId, physics, deltaTime);
-    helicopter.quaternion.copy(finalQuaternion);
-
-    this.playerController.updatePlayerPosition(state.position);
-  }
-
-  private getControlInputs(): Partial<HelicopterControls> {
-    return {};
   }
 
   setHelicopterControls(helicopterId: string, controls: Partial<HelicopterControls>): void {
