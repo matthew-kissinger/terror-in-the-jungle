@@ -12,6 +12,9 @@ import styles from './TouchControls.module.css';
 const SLOT_LABELS = ['SG', 'GRN', 'AR', 'SB', 'SMG', 'PST'];
 const SLOT_COUNT = 6;
 
+/** Gun-only slot indices for weapon cycling (skip GRENADE=1, SANDBAG=3) */
+const GUN_SLOTS = [0, 2, 4, 5]; // SHOTGUN, PRIMARY, SMG, PISTOL
+
 interface ActionButton {
   element: HTMLDivElement;
   key: string;
@@ -135,7 +138,10 @@ export class TouchActionButtons extends UIComponent {
   }
 
   private cycleNext(): void {
-    const next = (this.activeIndex + 1) % SLOT_COUNT;
+    // Cycle forward through gun slots only (skip equipment slots)
+    const currentGunIdx = GUN_SLOTS.indexOf(this.activeIndex);
+    const nextGunIdx = (currentGunIdx + 1) % GUN_SLOTS.length;
+    const next = GUN_SLOTS[nextGunIdx >= 0 ? nextGunIdx : 0];
     this.activeIndex = next;
     this.updateWeaponLabel();
     this.onWeaponSelect?.(next);
@@ -143,7 +149,10 @@ export class TouchActionButtons extends UIComponent {
   }
 
   private cyclePrev(): void {
-    const prev = (this.activeIndex - 1 + SLOT_COUNT) % SLOT_COUNT;
+    // Cycle backward through gun slots only (skip equipment slots)
+    const currentGunIdx = GUN_SLOTS.indexOf(this.activeIndex);
+    const prevGunIdx = (currentGunIdx - 1 + GUN_SLOTS.length) % GUN_SLOTS.length;
+    const prev = GUN_SLOTS[prevGunIdx >= 0 ? prevGunIdx : 0];
     this.activeIndex = prev;
     this.updateWeaponLabel();
     this.onWeaponSelect?.(prev);

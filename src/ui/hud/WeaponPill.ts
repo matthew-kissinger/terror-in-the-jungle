@@ -22,6 +22,8 @@ export class WeaponPill extends UIComponent {
 
   private static readonly SLOT_LABELS = ['SG', 'GRN', 'AR', 'SB', 'SMG', 'PST'];
   private static readonly SLOT_COUNT = 6;
+  /** Gun-only slot indices for weapon cycling (skip GRENADE=1, SANDBAG=3) */
+  private static readonly GUN_SLOTS = [0, 2, 4, 5];
 
   private onWeaponSelect?: (slotIndex: number) => void;
 
@@ -137,14 +139,22 @@ export class WeaponPill extends UIComponent {
   // --- Internal ---
 
   private cycleNext(): void {
-    const next = (this.activeIndex.value + 1) % WeaponPill.SLOT_COUNT;
+    // Cycle forward through gun slots only (skip equipment slots)
+    const guns = WeaponPill.GUN_SLOTS;
+    const currentGunIdx = guns.indexOf(this.activeIndex.value);
+    const nextGunIdx = (currentGunIdx + 1) % guns.length;
+    const next = guns[nextGunIdx >= 0 ? nextGunIdx : 0];
     this.activeIndex.value = next;
     this.onWeaponSelect?.(next);
     this.flashSwitch();
   }
 
   private cyclePrev(): void {
-    const prev = (this.activeIndex.value - 1 + WeaponPill.SLOT_COUNT) % WeaponPill.SLOT_COUNT;
+    // Cycle backward through gun slots only (skip equipment slots)
+    const guns = WeaponPill.GUN_SLOTS;
+    const currentGunIdx = guns.indexOf(this.activeIndex.value);
+    const prevGunIdx = (currentGunIdx - 1 + guns.length) % guns.length;
+    const prev = guns[prevGunIdx >= 0 ? prevGunIdx : 0];
     this.activeIndex.value = prev;
     this.onWeaponSelect?.(prev);
     this.flashSwitch();
