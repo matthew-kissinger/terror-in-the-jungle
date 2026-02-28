@@ -108,13 +108,15 @@ export class TouchControls {
         case 'reload':
           callbacks.onReload();
           break;
-        case 'grenade':
-          callbacks.onGrenade();
-          break;
         case 'scoreboard':
           callbacks.onScoreboardTap?.();
           break;
       }
+    });
+
+    // Wire weapon cycling from the action buttons weapon cycler
+    this.actionButtons.setOnWeaponSelect((slotIndex: number) => {
+      callbacks.onWeaponSelect(slotIndex);
     });
 
     this.adsButton.setOnADSToggle(callbacks.onADSToggle);
@@ -193,6 +195,11 @@ export class TouchControls {
     this.menuButton.hide();
     this.mortarButton.hide();
     this.helicopterCyclic.hide();
+  }
+
+  /** Update the weapon cycler's active slot (synced from PlayerController). */
+  setActiveWeaponSlot(slot: number): void {
+    this.actionButtons.setActiveSlot(slot);
   }
 
   isVisible(): boolean {

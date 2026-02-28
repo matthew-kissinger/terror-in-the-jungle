@@ -58,6 +58,8 @@ vi.mock('./TouchActionButtons', () => ({
     dispose = vi.fn();
     mount = vi.fn();
     setOnAction = vi.fn();
+    setOnWeaponSelect = vi.fn();
+    setActiveSlot = vi.fn();
 
     constructor() {
       actionInstances.push(this);
@@ -209,7 +211,7 @@ describe('TouchControls', () => {
     expect(lookInstances[0].consumeDelta).toHaveBeenCalledTimes(1);
   });
 
-  it('setCallbacks() wires fire, sprint, and action callbacks', () => {
+  it('setCallbacks() wires fire, sprint, action, and weapon select callbacks', () => {
     const controls = new TouchControls();
     const callbacks = {
       onFireStart: vi.fn(),
@@ -219,6 +221,7 @@ describe('TouchControls', () => {
       onGrenade: vi.fn(),
       onSprintStart: vi.fn(),
       onSprintStop: vi.fn(),
+      onWeaponSelect: vi.fn(),
     };
 
     controls.setCallbacks(callbacks);
@@ -226,14 +229,18 @@ describe('TouchControls', () => {
     expect(fireInstances[0].setCallbacks).toHaveBeenCalledWith(callbacks.onFireStart, callbacks.onFireStop);
     expect(joystickInstances[0].setSprintCallbacks).toHaveBeenCalledWith(callbacks.onSprintStart, callbacks.onSprintStop);
     expect(actionInstances[0].setOnAction).toHaveBeenCalledTimes(1);
+    expect(actionInstances[0].setOnWeaponSelect).toHaveBeenCalledTimes(1);
 
     const actionRouter = actionInstances[0].setOnAction.mock.calls[0][0] as (action: string) => void;
     actionRouter('jump');
     actionRouter('reload');
-    actionRouter('grenade');
 
     expect(callbacks.onJump).toHaveBeenCalledTimes(1);
     expect(callbacks.onReload).toHaveBeenCalledTimes(1);
-    expect(callbacks.onGrenade).toHaveBeenCalledTimes(1);
+
+    // Weapon select is wired through setOnWeaponSelect, not through action router
+    const weaponRouter = actionInstances[0].setOnWeaponSelect.mock.calls[0][0] as (slot: number) => void;
+    weaponRouter(3);
+    expect(callbacks.onWeaponSelect).toHaveBeenCalledWith(3);
   });
 });

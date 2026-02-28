@@ -76,10 +76,10 @@
   transform: scale(0.93);
 }
 
-/* Portrait: thumb rests a bit lower */
+/* Portrait: thumb rests lower to avoid overlapping with action buttons */
 @media (orientation: portrait) {
   .fireBtn {
-    bottom: 30%;
+    bottom: 24%;
   }
 }
 
@@ -112,7 +112,7 @@
 /* Portrait: match fire button offset */
 @media (orientation: portrait) {
   .adsBtn {
-    bottom: calc(30% - var(--tc-ads-size) / 2 + 4px);
+    bottom: calc(24% - var(--tc-ads-size) / 2 + 4px);
   }
 }
 
@@ -127,16 +127,17 @@
   bottom: calc(36% + var(--tc-fire-size) / 2 + 12px);
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: 10px;
   z-index: var(--tc-z-controls);
   touch-action: none;
   pointer-events: auto;
 }
 
-/* Portrait: fire drops to bottom:30%, so actions follow */
+/* Portrait: fire drops to bottom:24%, so actions follow */
 @media (orientation: portrait) {
   .actionContainer {
-    bottom: calc(30% + var(--tc-fire-size) / 2 + 12px);
+    bottom: calc(24% + var(--tc-fire-size) / 2 + 12px);
   }
 }
 
@@ -155,6 +156,66 @@
 .actionBtn.pressed {
   background: rgba(255, 255, 255, 0.3);
   transform: scale(0.9);
+}
+
+/* ==========================================================================
+   Weapon cycler (replaces grenade button in action column)
+   Compact pill showing [◂ AR ▸] with tap-to-cycle chevrons.
+   ========================================================================== */
+
+.weaponCycler {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: var(--tc-action-size);
+  min-width: calc(var(--tc-action-size) * 2.2);
+  border-radius: calc(var(--tc-action-size) / 2);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  touch-action: none;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.weaponCyclerChevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--tc-action-size) * 0.55);
+  height: 100%;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 18px;
+  font-weight: bold;
+  touch-action: none;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: 50%;
+}
+
+.weaponCyclerChevron:active {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.weaponCyclerLabel {
+  font-size: var(--tc-font-size);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: center;
+  min-width: 28px;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+  font-family: 'Rajdhani', sans-serif;
+  line-height: 1;
+}
+
+.weaponCyclerActive {
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.15), 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* ==========================================================================
@@ -363,19 +424,19 @@
 .rallyBtn {
   composes: btn;
   position: fixed;
-  right: max(var(--tc-edge-inset), env(safe-area-inset-right, 0px));
-  bottom: calc(
-    var(--tc-fire-size)
-    + var(--tc-action-size)
-    + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px))
-    + 36px
-  );
-  width: 56px;
-  height: 56px;
+  left: max(var(--tc-edge-inset), env(safe-area-inset-left, 0px));
+  /* Position above joystick, bottom-left area */
+  bottom: calc(var(--tc-joystick-base) + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + 16px);
+  min-width: 56px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 20px;
   background: rgba(100, 255, 100, 0.3);
   border: 2px solid rgba(150, 255, 150, 0.5);
   z-index: var(--tc-z-controls);
-  font-size: 13px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
   color: rgba(255, 255, 255, 0.9);
 }
 

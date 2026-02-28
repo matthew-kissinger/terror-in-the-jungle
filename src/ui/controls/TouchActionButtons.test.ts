@@ -27,27 +27,43 @@ describe('TouchActionButtons', () => {
     buttons = Array.from(container.children) as HTMLDivElement[];
   });
 
-  it('creates Jump, Reload, and Grenade buttons', () => {
+  it('creates Jump, Reload buttons and weapon cycler', () => {
     expect(container).toBeTruthy();
+    // 2 action buttons + 1 weapon cycler row
     expect(buttons).toHaveLength(3);
-    expect(buttons.map((b) => b.textContent)).toEqual(['JUMP', 'R', 'G']);
+    expect(buttons[0].textContent).toBe('JUMP');
+    expect(buttons[1].textContent).toBe('R');
+    // Third child is the weapon cycler row (contains chevrons + label)
+    expect(buttons[2].textContent).toContain('AR');
   });
 
   it('arranges buttons in a column layout', () => {
     expect(container.className).toContain('actionContainer');
   });
 
-  it('triggers callbacks for jump, reload, and grenade actions', () => {
+  it('triggers callbacks for jump and reload actions', () => {
     const onAction = vi.fn();
     actions.setOnAction(onAction);
 
     buttons[0].dispatchEvent(pointerDownEvent());
     buttons[1].dispatchEvent(pointerDownEvent());
-    buttons[2].dispatchEvent(pointerDownEvent());
 
     expect(onAction).toHaveBeenNthCalledWith(1, 'jump');
     expect(onAction).toHaveBeenNthCalledWith(2, 'reload');
-    expect(onAction).toHaveBeenNthCalledWith(3, 'grenade');
+  });
+
+  it('weapon cycler triggers onWeaponSelect callback', () => {
+    const onWeaponSelect = vi.fn();
+    actions.setOnWeaponSelect(onWeaponSelect);
+
+    // The weapon cycler row is the 3rd child; its next chevron is the last child
+    const cyclerRow = buttons[2];
+    const nextChevron = cyclerRow.lastElementChild as HTMLDivElement;
+    nextChevron.dispatchEvent(pointerDownEvent());
+
+    expect(onWeaponSelect).toHaveBeenCalledTimes(1);
+    // Default activeIndex is 2 (AR), cycling next should give 3
+    expect(onWeaponSelect).toHaveBeenCalledWith(3);
   });
 
   it('show and hide toggle visibility', () => {

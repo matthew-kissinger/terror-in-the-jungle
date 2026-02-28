@@ -408,6 +408,7 @@ export class PlayerController implements GameSystem {
     const touchControls = this.input.getTouchControls();
     if (touchControls) {
       touchControls.adsButton.resetADS();
+      touchControls.setActiveWeaponSlot(slot as number);
 
       // Show/hide sandbag rotation buttons
       if (slot === WeaponSlot.SANDBAG) {
