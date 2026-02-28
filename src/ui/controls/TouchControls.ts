@@ -175,7 +175,7 @@ export class TouchControls {
     this.sandbagButtons.show();
     this.rallyPointButton.show();
     this.menuButton.show();
-    this.mortarButton.show();
+    // mortarButton removed from mobile HUD — mortar is desktop-only for now
     // helicopterCyclic is NOT shown here; it's shown/hidden by PlayerController on helicopter enter/exit
   }
 

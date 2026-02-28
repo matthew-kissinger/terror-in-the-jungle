@@ -57,14 +57,25 @@ export const HUD_LAYOUT_STYLES = `
     box-sizing: border-box;
   }
 
-  /* Center-aligned slots (tickets, compass, weapon-bar, center, status-bar) */
+  /* Center-aligned slots (tickets, compass, center, status-bar) */
   .hud-slot[data-region="tickets"],
   .hud-slot[data-region="compass"],
-  .hud-slot[data-region="weapon-bar"],
   .hud-slot[data-region="center"],
   .hud-slot[data-region="status-bar"] {
     justify-content: center;
     align-items: center;
+  }
+
+  /* Weapon-bar: centered on desktop, left-aligned on touch */
+  .hud-slot[data-region="weapon-bar"] {
+    justify-content: center;
+    align-items: center;
+  }
+  [data-device="touch"] .hud-slot[data-region="weapon-bar"] {
+    justify-content: flex-start;
+    align-items: flex-end;
+    padding-left: 4px;
+    padding-bottom: 2px;
   }
 
   /* Kill-feed: top-right corner on desktop */
@@ -230,11 +241,12 @@ export const HUD_LAYOUT_STYLES = `
    * Simplified grid - fire/ADS/actions are fixed-position.
    * Status-bar at top-center provides timer+tickets.
    * Right column kept empty — touch controls are fixed-pos.
+   * Weapon-bar + health bottom-left, nothing in screen center.
    *
    *  minimap    | status-bar  | menu
-   *             | weapon-bar  |
-   *             |  center     |
    *             |             |
+   *             |             |
+   *  weapon-bar |             |
    *  health     |             |
    *  joystick   |             |
    *  joystick   |             |
@@ -244,17 +256,15 @@ export const HUD_LAYOUT_STYLES = `
       grid-template-columns: minmax(100px, 1fr) minmax(140px, 2fr) minmax(80px, 1fr);
       grid-template-rows:
         auto     /* minimap / status-bar / menu */
-        auto     /* . / weapon-bar */
-        auto     /* . / center */
-        1fr      /* flex space */
+        1fr      /* flex space (center overlay lives here) */
+        auto     /* weapon-bar */
         auto     /* health */
         auto     /* joystick */
         auto;    /* joystick */
       grid-template-areas:
         "minimap     status-bar  menu"
-        ".           weapon-bar  ."
         ".           center      ."
-        ".           .           ."
+        "weapon-bar  .           ."
         "health      .           ."
         "joystick    .           ."
         "joystick    .           .";
@@ -265,16 +275,18 @@ export const HUD_LAYOUT_STYLES = `
   /* =========================================================
    * MOBILE PORTRAIT (touch + height > width)
    *
-   * Status-bar at top, weapon pill center-bottom area.
+   * Status-bar at top, weapon pill + health bottom-left.
    * Fire/ADS are fixed-position, not in grid.
    * Right column kept empty — fire/ADS/actions are fixed-pos.
+   * Nothing in screen center.
    *
    *  minimap    | status-bar  | menu
    *             |             |
-   *             |  center     |
    *             |             |
    *             |             |
-   *  health     | weapon-bar  |
+   *             |             |
+   *  weapon-bar |             |
+   *  health     |             |
    *  joystick   |             |
    *  joystick   |             |
    * ========================================================= */
@@ -284,10 +296,10 @@ export const HUD_LAYOUT_STYLES = `
       grid-template-rows:
         auto     /* minimap / status-bar / menu */
         1fr      /* flex space */
-        auto     /* . / center */
+        1fr      /* flex space (center overlay lives here) */
         1fr      /* flex space */
-        1fr      /* flex space */
-        auto     /* health / weapon-bar */
+        auto     /* weapon-bar */
+        auto     /* health */
         auto     /* joystick */
         1fr;     /* joystick */
       grid-template-areas:
@@ -295,8 +307,8 @@ export const HUD_LAYOUT_STYLES = `
         ".           .           ."
         ".           center      ."
         ".           .           ."
-        ".           .           ."
-        "health      weapon-bar  ."
+        "weapon-bar  .           ."
+        "health      .           ."
         "joystick    .           ."
         "joystick    .           .";
       gap: 2px;
