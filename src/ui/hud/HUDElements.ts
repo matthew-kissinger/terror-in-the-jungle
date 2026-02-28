@@ -6,6 +6,8 @@ import { ScorePopupSystem } from './ScorePopupSystem';
 import { HitMarkerFeedback } from './HitMarkerFeedback';
 import { WeaponSwitchFeedback } from './WeaponSwitchFeedback';
 import { UnifiedWeaponBar } from './UnifiedWeaponBar';
+import { WeaponPill } from './WeaponPill';
+import { MobileStatusBar } from './MobileStatusBar';
 import { ObjectiveDisplay } from './ObjectiveDisplay';
 import { TicketDisplay } from './TicketDisplay';
 import { MatchTimer } from './MatchTimer';
@@ -18,6 +20,7 @@ import { GrenadeMeter } from './GrenadeMeter';
 import { MortarPanel } from './MortarPanel';
 import { ZoneCaptureNotification } from './ZoneCaptureNotification';
 import { zIndex, fontStack } from '../design/tokens';
+import { ViewportManager } from '../design/responsive';
 import type { HUDLayout } from '../layout/HUDLayout';
 import * as THREE from 'three';
 
@@ -52,6 +55,8 @@ export class HUDElements {
   public weaponSwitchFeedback?: WeaponSwitchFeedback;
   public zoneCaptureNotification?: ZoneCaptureNotification;
   public unifiedWeaponBar: UnifiedWeaponBar;
+  public weaponPill: WeaponPill;
+  public mobileStatusBar: MobileStatusBar;
 
   // Legacy module instances (not yet migrated to UIComponent)
   private objectiveDisplay: ObjectiveDisplay;
@@ -104,6 +109,10 @@ export class HUDElements {
 
     // Initialize unified weapon bar
     this.unifiedWeaponBar = new UnifiedWeaponBar();
+
+    // Initialize mobile-only components
+    this.weaponPill = new WeaponPill();
+    this.mobileStatusBar = new MobileStatusBar();
 
     // Initial mount to hudContainer; attachToDOM() remounts into grid slots
     this.hudContainer.appendChild(this.objectivesList);
@@ -301,6 +310,17 @@ export class HUDElements {
     weaponSlot.dataset.show = 'infantry';
     this.unifiedWeaponBar.mount(weaponSlot);
 
+    // Mobile-only: WeaponPill replaces UnifiedWeaponBar on touch devices
+    const isTouch = ViewportManager.getInstance().info.isTouch;
+    if (isTouch) {
+      // Hide the 6-slot weapon bar on touch - use WeaponPill instead
+      this.unifiedWeaponBar.hide();
+      this.weaponPill.mount(weaponSlot);
+    }
+
+    // Mobile-only: MobileStatusBar merges timer + tickets
+    this.mobileStatusBar.mount(layout.getSlot('status-bar'));
+
     // hud-container is no longer needed in grid mode, but keep it mounted under HUD root for disposal tracking.
     this.hudContainer.style.display = 'none';
     layout.getRoot().appendChild(this.hudContainer);
@@ -377,6 +397,8 @@ export class HUDElements {
       this.weaponSwitchFeedback.dispose();
     }
     this.unifiedWeaponBar.dispose();
+    this.weaponPill.dispose();
+    this.mobileStatusBar.dispose();
     this.interactionPromptPanel.dispose();
     this.grenadeMeter.dispose();
     this.mortarPanel.dispose();

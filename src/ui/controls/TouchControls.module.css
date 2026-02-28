@@ -41,48 +41,79 @@
 }
 
 /* ==========================================================================
-   Fire button
+   Fire button - Thumb arc positioning (mid-right)
+   Modern 2026 aesthetic: solid fill, no border, radial gradient + glow
    ========================================================================== */
 
 .fireBtn {
   composes: btn;
   position: fixed;
   right: max(var(--tc-edge-inset), env(safe-area-inset-right, 0px));
-  bottom: max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px));
+  bottom: 36%;
   width: var(--tc-fire-size);
   height: var(--tc-fire-size);
-  background: rgba(255, 60, 60, 0.4);
-  border: 3px solid rgba(255, 100, 100, 0.6);
+  background: radial-gradient(circle at 38% 38%,
+    rgba(255, 100, 80, 0.85),
+    rgba(210, 45, 30, 0.75));
+  border: none;
+  box-shadow:
+    0 0 24px rgba(255, 60, 40, 0.3),
+    inset 0 1px 3px rgba(255, 200, 180, 0.2);
   z-index: var(--tc-z-controls);
   font-size: var(--tc-font-size);
   letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .fireBtn.pressed {
-  background: rgba(255, 60, 60, 0.7);
+  background: radial-gradient(circle at 38% 38%,
+    rgba(255, 120, 100, 0.95),
+    rgba(230, 60, 40, 0.9));
+  box-shadow:
+    0 0 32px rgba(255, 60, 40, 0.5),
+    inset 0 1px 3px rgba(255, 200, 180, 0.3);
+  transform: scale(0.93);
+}
+
+/* Portrait: thumb rests a bit lower */
+@media (orientation: portrait) {
+  .fireBtn {
+    bottom: 30%;
+  }
 }
 
 /* ==========================================================================
-   ADS button
+   ADS button - Below fire, offset left. Solid blue fill.
    ========================================================================== */
 
 .adsBtn {
   composes: btn;
   position: fixed;
-  right: calc(var(--tc-fire-size) + max(var(--tc-edge-inset), env(safe-area-inset-right, 0px)) + 12px);
-  bottom: max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px));
+  right: calc(var(--tc-fire-size) + max(var(--tc-edge-inset), env(safe-area-inset-right, 0px)) + 10px);
+  bottom: calc(36% - var(--tc-ads-size) / 2 + 4px);
   width: var(--tc-ads-size);
   height: var(--tc-ads-size);
-  background: rgba(255, 255, 255, 0.15);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(60, 130, 200, 0.55);
+  border: none;
+  box-shadow: 0 0 14px rgba(60, 130, 200, 0.2);
   z-index: var(--tc-z-controls);
   font-size: var(--tc-font-size-sm);
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .adsActive {
-  background: rgba(100, 180, 255, 0.45);
-  border-color: rgba(100, 180, 255, 0.8);
+  background: rgba(80, 160, 255, 0.75);
+  box-shadow: 0 0 20px rgba(80, 160, 255, 0.4);
   color: rgba(255, 255, 255, 1);
+}
+
+/* Portrait: match fire button offset */
+@media (orientation: portrait) {
+  .adsBtn {
+    bottom: calc(30% - var(--tc-ads-size) / 2 + 4px);
+  }
 }
 
 /* ==========================================================================
@@ -95,7 +126,7 @@
   bottom: calc(var(--tc-fire-size) + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + 16px);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   z-index: var(--tc-z-controls);
   touch-action: none;
   pointer-events: auto;
@@ -105,13 +136,16 @@
   composes: btn;
   width: var(--tc-action-size);
   height: var(--tc-action-size);
-  background: rgba(255, 255, 255, 0.15);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   font-size: var(--tc-font-size-sm);
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .actionBtn.pressed {
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.3);
   transform: scale(0.9);
 }
 
@@ -125,11 +159,12 @@
   right: max(12px, env(safe-area-inset-right, 0px));
   width: 36px;
   height: 36px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -247,8 +282,9 @@
   width: var(--tc-joystick-base);
   height: var(--tc-joystick-base);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.2), 0 2px 12px rgba(0, 0, 0, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -259,7 +295,9 @@
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.35);
+  border: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   position: absolute;
   transition: none;
 }

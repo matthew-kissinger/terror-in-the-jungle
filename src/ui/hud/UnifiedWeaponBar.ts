@@ -165,17 +165,17 @@ export class UnifiedWeaponBar {
         position: relative;
         width: 48px;
         height: 52px;
-        background: rgba(10, 10, 14, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        border-radius: 4px;
+        background: rgba(10, 15, 8, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 6px;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        font-family: 'Rajdhani', 'Segoe UI', sans-serif;
-        transition: border-color 0.15s, background 0.15s;
-        backdrop-filter: blur(4px);
-        gap: 1px;
+        font-family: var(--font-primary, 'Rajdhani', sans-serif);
+        transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+        backdrop-filter: blur(6px);
+        gap: 2px;
         cursor: pointer;
         touch-action: none;
         pointer-events: auto;
@@ -183,8 +183,9 @@ export class UnifiedWeaponBar {
       }
 
       .uwb-slot--active {
-        border-color: rgba(200, 230, 255, 0.6);
-        background: rgba(200, 230, 255, 0.12);
+        border-color: rgba(217, 119, 6, 0.5);
+        background: rgba(217, 119, 6, 0.12);
+        box-shadow: 0 0 8px rgba(217, 119, 6, 0.15);
       }
 
       .uwb-slot--pressed {
@@ -194,14 +195,18 @@ export class UnifiedWeaponBar {
       .uwb-key {
         font-size: 9px;
         font-weight: 600;
-        color: rgba(255, 255, 255, 0.35);
+        color: rgba(255, 255, 255, 0.3);
         line-height: 1;
+      }
+
+      .uwb-slot--active .uwb-key {
+        color: rgba(217, 160, 80, 0.7);
       }
 
       .uwb-icon {
         font-size: 12px;
         font-weight: 700;
-        color: rgba(255, 255, 255, 0.7);
+        color: rgba(255, 255, 255, 0.55);
         line-height: 1;
       }
 
@@ -209,7 +214,12 @@ export class UnifiedWeaponBar {
         color: rgba(255, 255, 255, 0.95);
       }
 
-      /* Hide key hints on touch devices */
+      /* Hide entire weapon bar on touch - WeaponPill replaces it */
+      [data-device="touch"] .uwb {
+        display: none !important;
+      }
+
+      /* Hide key hints on touch devices (fallback) */
       [data-device="touch"] .uwb-key {
         display: none;
       }

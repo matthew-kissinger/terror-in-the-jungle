@@ -13,12 +13,17 @@
   pointer-events: none;
   user-select: none;
   gap: var(--space-0-5);
+  background: rgba(10, 15, 8, 0.45);
+  backdrop-filter: blur(4px);
+  border-radius: 8px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 :global([data-device="touch"]) .container {
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  border: none;
+  border-radius: 10px;
   padding: 5px 8px;
 }
 

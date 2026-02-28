@@ -131,11 +131,12 @@ export class TouchControls {
 
   /**
    * Re-parent eligible touch controls into grid layout slots.
+   * Fire/ADS stay as fixed-position viewport overlays (thumb-arc ergonomics).
    * Joystick and look stay as viewport overlays (need large touch zones).
    */
   mountToLayout(layout: HUDLayout): void {
-    this.fireButton.mountTo(layout.getSlot('fire'));
-    this.adsButton.mountTo(layout.getSlot('ads'));
+    // Fire + ADS are NOT slotted into the grid; they stay fixed-position
+    // with thumb-arc CSS positioning for ergonomic reach.
 
     // Action buttons are infantry-only (mortar, rally point, sandbag)
     const actionSlot = layout.getSlot('action-btns');

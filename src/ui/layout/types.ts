@@ -22,6 +22,7 @@ export type HUDRegion =
   | 'weapon-bar'
   | 'center'        // hit markers, damage numbers, grenade meter, mortar indicator
   | 'health'        // future: health bar / player status
+  | 'status-bar'    // mobile: merged timer + tickets in one compact line
 
   // Touch controls (touch devices only)
   | 'joystick'

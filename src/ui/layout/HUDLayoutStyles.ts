@@ -8,6 +8,10 @@
  *
  * Visibility is controlled via data attributes on #game-hud-root,
  * not inline styles on components.
+ *
+ * Mobile redesign (2026): Fire/ADS buttons stay fixed-position (thumb-arc
+ * ergonomics). Status-bar replaces timer/tickets/compass on mobile.
+ * WeaponPill replaces 6-slot weapon bar on mobile.
  */
 
 import { zIndex, fontStack, colors } from '../design/tokens';
@@ -53,11 +57,12 @@ export const HUD_LAYOUT_STYLES = `
     box-sizing: border-box;
   }
 
-  /* Center-aligned slots (tickets, compass, weapon-bar, center) */
+  /* Center-aligned slots (tickets, compass, weapon-bar, center, status-bar) */
   .hud-slot[data-region="tickets"],
   .hud-slot[data-region="compass"],
   .hud-slot[data-region="weapon-bar"],
-  .hud-slot[data-region="center"] {
+  .hud-slot[data-region="center"],
+  .hud-slot[data-region="status-bar"] {
     justify-content: center;
     align-items: center;
   }
@@ -118,7 +123,8 @@ export const HUD_LAYOUT_STYLES = `
     align-items: flex-end;
   }
 
-  /* Touch control slots - right side */
+  /* Touch control slots - right side (grid placeholders on mobile,
+   * fire/ADS stay fixed-position and don't use these slots) */
   .hud-slot[data-region="fire"],
   .hud-slot[data-region="ads"],
   .hud-slot[data-region="action-btns"] {
@@ -132,7 +138,7 @@ export const HUD_LAYOUT_STYLES = `
    *  timer      |  tickets   | minimap
    *  game-status|  compass   | minimap
    *  stats      |            | objectives
-   *             |  center    | kill-feed  ← top-right
+   *             |  center    | kill-feed  <- top-right
    *  health     | weapon-bar | ammo
    * ========================================================= */
   #game-hud-root {
@@ -172,6 +178,9 @@ export const HUD_LAYOUT_STYLES = `
   .hud-slot[data-region="action-btns"] { grid-area: action-btns; }
   .hud-slot[data-region="menu"]        { grid-area: menu; }
 
+  /* status-bar: not part of the desktop grid, positioned absolutely on desktop (hidden) */
+  .hud-slot[data-region="status-bar"]  { grid-area: status-bar; }
+
   /* Touch-only slots hidden on desktop */
   [data-device="desktop"] .hud-slot[data-region="joystick"],
   [data-device="desktop"] .hud-slot[data-region="fire"],
@@ -181,58 +190,67 @@ export const HUD_LAYOUT_STYLES = `
     display: none !important;
   }
 
+  /* status-bar hidden on desktop (desktop uses separate timer/tickets/compass) */
+  [data-device="desktop"] .hud-slot[data-region="status-bar"] {
+    display: none !important;
+  }
+
   /* Objectives hidden on touch */
   [data-device="touch"] .hud-slot[data-region="objectives"] {
     display: none !important;
   }
 
-  /* game-status hidden on phones (too small) */
-  [data-layout="mobile-portrait"] .hud-slot[data-region="game-status"],
-  [data-layout="mobile-landscape"] .hud-slot[data-region="game-status"] {
-    display: none !important;
-  }
-
-  /* stats hidden on phones (too small) */
-  [data-layout="mobile-portrait"] .hud-slot[data-region="stats"],
-  [data-layout="mobile-landscape"] .hud-slot[data-region="stats"] {
-    display: none !important;
-  }
-
-  /* kill-feed hidden on all touch/mobile layouts */
+  /* On mobile, hide the individual timer/tickets/compass/game-status/stats/kill-feed
+   * since MobileStatusBar handles the essential info in one compact line */
+  [data-device="touch"] .hud-slot[data-region="timer"],
+  [data-device="touch"] .hud-slot[data-region="tickets"],
+  [data-device="touch"] .hud-slot[data-region="compass"],
+  [data-device="touch"] .hud-slot[data-region="game-status"],
+  [data-device="touch"] .hud-slot[data-region="stats"],
   [data-device="touch"] .hud-slot[data-region="kill-feed"] {
+    display: none !important;
+  }
+
+  /* On mobile, fire/ADS stay as fixed-position overlays (thumb-arc ergonomics),
+   * so their grid slots are empty placeholders. Hide them. */
+  [data-device="touch"] .hud-slot[data-region="fire"],
+  [data-device="touch"] .hud-slot[data-region="ads"] {
     display: none !important;
   }
 
   /* =========================================================
    * MOBILE LANDSCAPE (touch + width > height)
    *
-   *  minimap    | weapon-bar |
-   *             |  compass   | fire
-   *             |  tickets   | ads
-   *             |            | action-btns
-   *  health     |  center    | ammo
-   *  joystick   |            |
-   *  joystick   |            | menu
+   * Simplified grid - fire/ADS are fixed-position, not in grid.
+   * Status-bar at top-center provides timer+tickets.
+   *
+   *  minimap    | status-bar  | menu
+   *             | weapon-bar  |
+   *             |  center     | action-btns
+   *             |             |
+   *  health     |             | ammo
+   *  joystick   |             |
+   *  joystick   |             |
    * ========================================================= */
   @media (pointer: coarse) and (orientation: landscape) {
     #game-hud-root {
       grid-template-columns: minmax(100px, 1fr) minmax(140px, 2fr) minmax(80px, 1fr);
       grid-template-rows:
-        auto     /* minimap / weapon-bar */
-        auto     /* . / compass / fire */
-        auto     /* . / tickets / ads */
-        auto     /* . / . / action-btns */
-        1fr      /* health / center / ammo */
+        auto     /* minimap / status-bar / menu */
+        auto     /* . / weapon-bar */
+        auto     /* . / center / action-btns */
+        1fr      /* flex space */
+        auto     /* health / . / ammo */
         auto     /* joystick */
-        auto;    /* joystick / . / menu */
+        auto;    /* joystick */
       grid-template-areas:
-        "minimap     weapon-bar  ."
-        ".           compass     fire"
-        ".           tickets     ads"
-        ".           .           action-btns"
-        "health      center      ammo"
+        "minimap     status-bar  menu"
+        ".           weapon-bar  ."
+        ".           center      action-btns"
+        ".           .           ."
+        "health      .           ammo"
         "joystick    .           ."
-        "joystick    .           menu";
+        "joystick    .           .";
       gap: 2px;
     }
   }
@@ -240,43 +258,40 @@ export const HUD_LAYOUT_STYLES = `
   /* =========================================================
    * MOBILE PORTRAIT (touch + height > width)
    *
-   *  minimap    |            | menu
-   *             | weapon-bar |
-   *             |  tickets   | fire
-   *             |  center    | ads
-   *             |            | action-btns
-   *  health     |            | ammo
-   *  joystick   |            |
-   *  joystick   |            |
+   * Status-bar at top, weapon pill center-bottom area.
+   * Fire/ADS are fixed-position, not in grid.
+   *
+   *  minimap    | status-bar  | menu
+   *             |             |
+   *             |  center     |
+   *             |             | action-btns
+   *             |             |
+   *  health     | weapon-bar  | ammo
+   *  joystick   |             |
+   *  joystick   |             |
    * ========================================================= */
   @media (pointer: coarse) and (orientation: portrait) {
     #game-hud-root {
       grid-template-columns: minmax(80px, 1fr) minmax(120px, 2fr) minmax(80px, 1fr);
       grid-template-rows:
-        auto     /* minimap / . / menu */
-        auto     /* . / weapon-bar */
-        auto     /* . / tickets / fire */
-        1fr      /* . / center / ads */
+        auto     /* minimap / status-bar / menu */
+        1fr      /* flex space */
+        auto     /* . / center */
         auto     /* . / . / action-btns */
-        auto     /* health / . / ammo */
+        1fr      /* flex space */
+        auto     /* health / weapon-bar / ammo */
         auto     /* joystick */
         1fr;     /* joystick */
       grid-template-areas:
-        "minimap     .           menu"
-        ".           weapon-bar  ."
-        ".           tickets     fire"
-        ".           center      ads"
+        "minimap     status-bar  menu"
+        ".           .           ."
+        ".           center      ."
         ".           .           action-btns"
-        "health      .           ammo"
+        ".           .           ."
+        "health      weapon-bar  ammo"
         "joystick    .           ."
         "joystick    .           .";
       gap: 2px;
-    }
-
-    /* In portrait, timer and compass are hidden - not enough room */
-    .hud-slot[data-region="timer"],
-    .hud-slot[data-region="compass"] {
-      display: none !important;
     }
   }
 
@@ -313,6 +328,7 @@ export const HUD_LAYOUT_STYLES = `
   [data-ads="true"] .hud-slot[data-region="weapon-bar"],
   [data-ads="true"] .hud-slot[data-region="minimap"],
   [data-ads="true"] .hud-slot[data-region="tickets"],
+  [data-ads="true"] .hud-slot[data-region="status-bar"],
   [data-ads="true"] .hud-slot[data-region="kill-feed"],
   [data-ads="true"] .hud-slot[data-region="action-btns"] {
     opacity: 0.3;
