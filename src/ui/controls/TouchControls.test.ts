@@ -105,6 +105,7 @@ vi.mock('./TouchRallyPointButton', () => ({
     dispose = vi.fn();
     mount = vi.fn();
     setCallback = vi.fn();
+    setSquadCommandCallback = vi.fn();
   },
 }));
 

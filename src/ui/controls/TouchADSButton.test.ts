@@ -31,39 +31,51 @@ describe('TouchADSButton', () => {
     expect(button.className).toContain('adsBtn');
   });
 
-  it('hold-to-ADS: pointerdown activates, pointerup deactivates', () => {
+  it('toggle-ADS: first tap activates, second tap deactivates', () => {
     const onADSToggle = vi.fn();
     adsButton.setOnADSToggle(onADSToggle);
 
-    // Hold: pointerdown = ADS ON
+    // First tap: pointerdown then pointerup = ADS ON
     button.dispatchEvent(pointerEvent('pointerdown'));
+    button.dispatchEvent(pointerEvent('pointerup'));
     expect(onADSToggle).toHaveBeenCalledWith(true);
     expect(onADSToggle).toHaveBeenCalledTimes(1);
 
-    // Release: pointerup = ADS OFF
+    // Second tap: pointerdown then pointerup = ADS OFF
+    button.dispatchEvent(pointerEvent('pointerdown'));
     button.dispatchEvent(pointerEvent('pointerup'));
     expect(onADSToggle).toHaveBeenCalledWith(false);
     expect(onADSToggle).toHaveBeenCalledTimes(2);
   });
 
-  it('ignores duplicate pointerdown when already held', () => {
+  it('pointerdown alone does not toggle', () => {
     const onADSToggle = vi.fn();
     adsButton.setOnADSToggle(onADSToggle);
 
     button.dispatchEvent(pointerEvent('pointerdown'));
-    button.dispatchEvent(pointerEvent('pointerdown')); // duplicate
-    expect(onADSToggle).toHaveBeenCalledTimes(1);
+    expect(onADSToggle).not.toHaveBeenCalled();
   });
 
-  it('button shows active styling when held', () => {
+  it('pointercancel does not toggle state', () => {
+    const onADSToggle = vi.fn();
+    adsButton.setOnADSToggle(onADSToggle);
+
+    button.dispatchEvent(pointerEvent('pointerdown'));
+    button.dispatchEvent(pointerEvent('pointercancel'));
+    expect(onADSToggle).not.toHaveBeenCalled();
+  });
+
+  it('button shows active styling when toggled on', () => {
     // Initial state (OFF)
     expect(button.classList.contains('adsActive')).toBe(false);
 
-    // Hold ON
+    // Toggle ON
     button.dispatchEvent(pointerEvent('pointerdown'));
+    button.dispatchEvent(pointerEvent('pointerup'));
     expect(button.classList.contains('adsActive')).toBe(true);
 
-    // Release OFF
+    // Toggle OFF
+    button.dispatchEvent(pointerEvent('pointerdown'));
     button.dispatchEvent(pointerEvent('pointerup'));
     expect(button.classList.contains('adsActive')).toBe(false);
   });
@@ -74,6 +86,7 @@ describe('TouchADSButton', () => {
 
     // Toggle ON
     button.dispatchEvent(pointerEvent('pointerdown'));
+    button.dispatchEvent(pointerEvent('pointerup'));
     expect(onADSToggle).toHaveBeenCalledWith(true);
 
     // Reset
@@ -95,6 +108,7 @@ describe('TouchADSButton', () => {
     adsButton.setOnADSToggle(onADSToggle);
 
     button.dispatchEvent(pointerEvent('pointerdown'));
+    button.dispatchEvent(pointerEvent('pointerup'));
     adsButton.hide();
 
     expect(onADSToggle).toHaveBeenCalledWith(false);
@@ -109,6 +123,7 @@ describe('TouchADSButton', () => {
 
     // Trigger event on the detached button to verify listener removal
     button.dispatchEvent(pointerEvent('pointerdown'));
+    button.dispatchEvent(pointerEvent('pointerup'));
     expect(onADSToggle).not.toHaveBeenCalled();
   });
 });

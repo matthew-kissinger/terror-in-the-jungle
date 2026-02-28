@@ -1,6 +1,8 @@
 /**
  * ADS (Aim Down Sights) button for mobile touch controls.
- * Hold to aim, release to stop aiming. Uses pointer events.
+ * Toggle mode: tap to aim, tap again to stop. Uses pointer events.
+ *
+ * PC/controller ADS remains hold-to-aim (handled by right-click in PlayerInput).
  */
 
 import { UIComponent } from '../engine/UIComponent';
@@ -42,41 +44,37 @@ export class TouchADSButton extends UIComponent {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
-    if (this.isActive) return;
+    // Ignore if another pointer is already tracked (multi-touch guard)
+    if (this.activePointerId !== null) return;
     this.activePointerId = e.pointerId;
     if (typeof this.root.setPointerCapture === 'function') {
       this.root.setPointerCapture(e.pointerId);
     }
-    this.isActive = true;
-    this.updateVisual();
-    this.onADSToggle?.(true);
   };
 
   private handlePointerUp = (e: PointerEvent): void => {
     if (e.pointerId !== this.activePointerId) return;
     e.preventDefault();
     e.stopPropagation();
-    if (!this.isActive) return;
     this.activePointerId = null;
-    this.isActive = false;
-    this.updateVisual();
-    this.onADSToggle?.(false);
     if (typeof this.root.releasePointerCapture === 'function' && this.root.hasPointerCapture(e.pointerId)) {
       this.root.releasePointerCapture(e.pointerId);
     }
+
+    // Toggle ADS on tap release
+    this.isActive = !this.isActive;
+    this.updateVisual();
+    this.onADSToggle?.(this.isActive);
   };
 
   private handlePointerCancel = (e: PointerEvent): void => {
     if (e.pointerId !== this.activePointerId) return;
     e.preventDefault();
-    if (!this.isActive) return;
     this.activePointerId = null;
-    this.isActive = false;
-    this.updateVisual();
-    this.onADSToggle?.(false);
     if (typeof this.root.releasePointerCapture === 'function' && this.root.hasPointerCapture(e.pointerId)) {
       this.root.releasePointerCapture(e.pointerId);
     }
+    // Cancel does not toggle — leave state as-is
   };
 
   private updateVisual(): void {
