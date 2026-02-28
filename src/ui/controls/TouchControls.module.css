@@ -94,18 +94,18 @@
   bottom: calc(36% - var(--tc-ads-size) / 2 + 4px);
   width: var(--tc-ads-size);
   height: var(--tc-ads-size);
-  background: rgba(60, 130, 200, 0.55);
+  background: rgba(60, 130, 200, 0.35);
   border: none;
-  box-shadow: 0 0 14px rgba(60, 130, 200, 0.2);
+  box-shadow: none;
   z-index: var(--tc-z-controls);
   font-size: var(--tc-font-size-sm);
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.7);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 .adsActive {
-  background: rgba(80, 160, 255, 0.75);
-  box-shadow: 0 0 20px rgba(80, 160, 255, 0.4);
+  background: rgba(80, 160, 255, 0.65);
+  box-shadow: 0 0 16px rgba(80, 160, 255, 0.3);
   color: rgba(255, 255, 255, 1);
 }
 
@@ -123,12 +123,12 @@
 .actionContainer {
   position: fixed;
   right: max(var(--tc-edge-inset), env(safe-area-inset-right, 0px));
-  /* Position above fire button: fire is at bottom:36%, stack actions above it */
-  bottom: calc(36% + var(--tc-fire-size) / 2 + 12px);
+  /* Position above fire button with generous clearance to prevent overlap */
+  bottom: calc(36% + var(--tc-fire-size) / 2 + 20px);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 10px;
+  gap: 8px;
   z-index: var(--tc-z-controls);
   touch-action: none;
   pointer-events: auto;
@@ -137,7 +137,7 @@
 /* Portrait: fire drops to bottom:24%, so actions follow */
 @media (orientation: portrait) {
   .actionContainer {
-    bottom: calc(24% + var(--tc-fire-size) / 2 + 12px);
+    bottom: calc(24% + var(--tc-fire-size) / 2 + 20px);
   }
 }
 
@@ -145,16 +145,16 @@
   composes: btn;
   width: var(--tc-action-size);
   height: var(--tc-action-size);
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
   border: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: none;
   font-size: var(--tc-font-size-sm);
-  color: rgba(255, 255, 255, 0.75);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.55);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .actionBtn.pressed {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.25);
   transform: scale(0.9);
 }
 
@@ -427,28 +427,29 @@
   left: max(var(--tc-edge-inset), env(safe-area-inset-left, 0px));
   /* Position above joystick + weapon pill + health bar to avoid overlap */
   bottom: calc(var(--tc-joystick-base) + var(--tc-weapon-h) + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + 56px);
-  min-width: 52px;
-  height: 36px;
-  padding: 0 10px;
-  border-radius: 18px;
-  background: rgba(100, 255, 100, 0.3);
-  border: 1px solid rgba(150, 255, 150, 0.4);
+  min-width: 44px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 16px;
+  background: rgba(100, 255, 100, 0.2);
+  border: 1px solid rgba(150, 255, 150, 0.3);
   z-index: var(--tc-z-controls);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.5px;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.8);
 }
 
 .rallyBtn.pressed {
-  background: rgba(100, 255, 100, 0.6);
+  background: rgba(100, 255, 100, 0.5);
   transform: scale(0.9);
 }
 
-/* Landscape: lower the rally button to avoid minimap overlap */
+/* Landscape: position rally button to the right of the joystick to avoid minimap overlap */
 @media (orientation: landscape) {
   .rallyBtn {
-    bottom: calc(var(--tc-joystick-base) + var(--tc-weapon-h) + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + 8px);
+    left: calc(var(--tc-joystick-base) + max(var(--tc-edge-inset), env(safe-area-inset-left, 0px)) + 12px);
+    bottom: max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -564,26 +565,60 @@
 }
 
 /* ==========================================================================
-   Helicopter cyclic pad
+   Helicopter cyclic joystick (right side) - mirrors left joystick layout
    ========================================================================== */
 
-.cyclicPad {
+.heliCyclicZone {
   position: fixed;
-  left: calc(var(--tc-edge-inset, 20px) + env(safe-area-inset-left, 0px));
-  bottom: calc(200px + env(safe-area-inset-bottom, 0px));
-  width: var(--tc-joystick-base);
-  height: var(--tc-joystick-base);
-  border-radius: 12px;
-  background: rgba(30, 60, 30, 0.35);
-  border: 2px solid rgba(80, 200, 80, 0.4);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--tc-z-controls);
+  right: 0;
+  bottom: 0;
+  width: 40%;
+  height: 60%;
+  z-index: var(--tc-z-overlay);
   touch-action: none;
   pointer-events: auto;
-  user-select: none;
-  -webkit-user-select: none;
+  display: none;
+}
+
+.heliCyclicBase {
+  position: absolute;
+  right: max(var(--tc-edge-inset), env(safe-area-inset-right, 0px));
+  bottom: max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px));
+  width: var(--tc-joystick-base);
+  height: var(--tc-joystick-base);
+  border-radius: 50%;
+  background: rgba(30, 80, 30, 0.15);
+  border: 2px solid rgba(80, 200, 80, 0.3);
+  box-shadow: inset 0 0 20px rgba(0, 40, 0, 0.2), 0 2px 12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.heliCyclicThumb {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(80, 200, 80, 0.4);
+  border: 2px solid rgba(120, 255, 120, 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  position: absolute;
+  transition: none;
+}
+
+.heliCyclicLabel {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  font-size: 9px;
+  font-weight: bold;
+  color: rgba(80, 200, 80, 0.5);
+  letter-spacing: 1px;
+  pointer-events: none;
+  text-transform: uppercase;
 }
 
 @media (max-width: 900px) {
@@ -627,38 +662,10 @@
   }
 }
 
-.cyclicPad.active {
-  background: rgba(30, 60, 30, 0.5);
-}
-
-.cyclicCrosshair {
+/* Helicopter left joystick label overlay - shown when in helicopter mode */
+.heliThrottleLabel {
   position: absolute;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-.cyclicLineH {
-  position: absolute;
-  top: 50%;
-  left: 10%;
-  width: 80%;
-  height: 1px;
-  background: rgba(80, 200, 80, 0.25);
-}
-
-.cyclicLineV {
-  position: absolute;
-  left: 50%;
-  top: 10%;
-  height: 80%;
-  width: 1px;
-  background: rgba(80, 200, 80, 0.25);
-}
-
-.cyclicLabel {
-  position: absolute;
-  top: 4px;
+  top: 6px;
   left: 0;
   width: 100%;
   text-align: center;
@@ -667,15 +674,6 @@
   color: rgba(80, 200, 80, 0.5);
   letter-spacing: 1px;
   pointer-events: none;
-}
-
-.cyclicIndicator {
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: rgba(80, 200, 80, 0.6);
-  border: 2px solid rgba(120, 255, 120, 0.7);
-  pointer-events: none;
-  transition: none;
+  text-transform: uppercase;
+  display: none;
 }

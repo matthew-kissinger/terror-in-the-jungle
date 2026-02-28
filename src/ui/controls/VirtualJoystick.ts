@@ -11,6 +11,7 @@ import styles from './TouchControls.module.css';
 export class VirtualJoystick extends UIComponent {
   private base!: HTMLDivElement;
   private thumb!: HTMLDivElement;
+  private heliLabel!: HTMLDivElement;
 
   private activePointerId: number | null = null;
   private baseX = 0;
@@ -33,6 +34,9 @@ export class VirtualJoystick extends UIComponent {
   private isSprinting = false;
   private readonly SPRINT_THRESHOLD = 0.9;
 
+  /** Whether helicopter mode label is shown */
+  private helicopterMode = false;
+
   constructor() {
     super();
     this.maxDistance = this.FALLBACK_BASE / 2;
@@ -46,14 +50,29 @@ export class VirtualJoystick extends UIComponent {
     this.base = document.createElement('div');
     this.base.className = styles.joystickBase;
 
+    // Helicopter mode label (hidden by default)
+    this.heliLabel = document.createElement('div');
+    this.heliLabel.className = styles.heliThrottleLabel;
+    this.heliLabel.textContent = 'THROTTLE';
+
     // Thumb
     this.thumb = document.createElement('div');
     this.thumb.className = styles.joystickThumb;
     this.thumb.style.left = `calc(50% - ${this.THUMB_SIZE / 2}px)`;
     this.thumb.style.top = `calc(50% - ${this.THUMB_SIZE / 2}px)`;
 
+    this.base.appendChild(this.heliLabel);
     this.base.appendChild(this.thumb);
     this.root.appendChild(this.base);
+  }
+
+  /** Show/hide the helicopter throttle label on the joystick base. */
+  setHelicopterMode(enabled: boolean): void {
+    this.helicopterMode = enabled;
+    this.heliLabel.style.display = enabled ? 'block' : 'none';
+    // Green tint for helicopter mode
+    this.base.style.borderColor = enabled ? 'rgba(80, 200, 80, 0.3)' : '';
+    this.base.style.background = enabled ? 'rgba(30, 80, 30, 0.15)' : '';
   }
 
   protected onMount(): void {

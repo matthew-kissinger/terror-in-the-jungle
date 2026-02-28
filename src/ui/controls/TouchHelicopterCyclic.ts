@@ -1,61 +1,55 @@
 /**
- * Touch cyclic control pad for helicopter pitch/roll on mobile.
- * A drag pad that maps finger position to cyclicPitch (vertical) and cyclicRoll (horizontal).
- * Auto-centers when not dragging. Positioned on the LEFT side of screen above the joystick.
+ * Touch cyclic joystick for helicopter pitch/roll on mobile.
+ * A full right-side virtual joystick that maps to cyclicPitch (Y) and cyclicRoll (X).
+ * Mirrors the left VirtualJoystick layout but positioned on the right side.
+ * Auto-centers when not dragging. Only visible in helicopter mode.
  */
 
 import { UIComponent } from '../engine/UIComponent';
 import styles from './TouchControls.module.css';
 
 export class TouchHelicopterCyclic extends UIComponent {
-  private indicator!: HTMLDivElement;
+  private base!: HTMLDivElement;
+  private thumb!: HTMLDivElement;
+  private label!: HTMLDivElement;
 
   private isVisible = false;
   private pointerId: number | null = null;
-  private padCenterX = 0;
-  private padCenterY = 0;
+  private baseX = 0;
+  private baseY = 0;
 
   /** Current normalized cyclic values: pitch [-1,1] (up=forward), roll [-1,1] (right=bank right) */
   private cyclicPitch = 0;
   private cyclicRoll = 0;
 
-  private readonly FALLBACK_PAD_SIZE = 120;
-  private readonly INDICATOR_SIZE = 20;
-  /** Dead zone as fraction of half-pad (0-1). */
+  private readonly FALLBACK_BASE = 120;
+  private readonly THUMB_SIZE = 50;
+  private maxDistance = 60;
+  /** Dead zone as fraction of maxDistance (0-1). */
   private readonly DEAD_ZONE = 0.08;
 
-  private halfPad = 60;
-
   protected build(): void {
-    this.root.className = styles.cyclicPad;
+    this.root.className = styles.heliCyclicZone;
     this.root.id = 'touch-helicopter-cyclic';
 
-    // Crosshair lines
-    const crosshair = document.createElement('div');
-    crosshair.className = styles.cyclicCrosshair;
-
-    const hLine = document.createElement('div');
-    hLine.className = styles.cyclicLineH;
-
-    const vLine = document.createElement('div');
-    vLine.className = styles.cyclicLineV;
-
-    crosshair.appendChild(hLine);
-    crosshair.appendChild(vLine);
-    this.root.appendChild(crosshair);
+    // Base circle
+    this.base = document.createElement('div');
+    this.base.className = styles.heliCyclicBase;
 
     // Label
-    const label = document.createElement('div');
-    label.className = styles.cyclicLabel;
-    label.textContent = 'CYCLIC';
-    this.root.appendChild(label);
+    this.label = document.createElement('div');
+    this.label.className = styles.heliCyclicLabel;
+    this.label.textContent = 'CYCLIC';
 
-    // Movable indicator dot
-    this.indicator = document.createElement('div');
-    this.indicator.className = styles.cyclicIndicator;
-    this.indicator.style.left = `calc(50% - ${this.INDICATOR_SIZE / 2}px)`;
-    this.indicator.style.top = `calc(50% - ${this.INDICATOR_SIZE / 2}px)`;
-    this.root.appendChild(this.indicator);
+    // Thumb
+    this.thumb = document.createElement('div');
+    this.thumb.className = styles.heliCyclicThumb;
+    this.thumb.style.left = `calc(50% - ${this.THUMB_SIZE / 2}px)`;
+    this.thumb.style.top = `calc(50% - ${this.THUMB_SIZE / 2}px)`;
+
+    this.base.appendChild(this.label);
+    this.base.appendChild(this.thumb);
+    this.root.appendChild(this.base);
   }
 
   protected onMount(): void {
@@ -72,13 +66,12 @@ export class TouchHelicopterCyclic extends UIComponent {
     this.pointerId = e.pointerId;
     this.root.setPointerCapture(e.pointerId);
 
-    const rect = this.root.getBoundingClientRect();
-    this.halfPad = rect.width / 2;
-    this.padCenterX = rect.left + this.halfPad;
-    this.padCenterY = rect.top + this.halfPad;
+    const rect = this.base.getBoundingClientRect();
+    this.maxDistance = rect.width / 2;
+    this.baseX = rect.left + this.maxDistance;
+    this.baseY = rect.top + this.maxDistance;
 
     this.updateFromPointer(e.clientX, e.clientY);
-    this.root.classList.add(styles.active);
   };
 
   private handlePointerMove = (e: PointerEvent): void => {
@@ -95,15 +88,27 @@ export class TouchHelicopterCyclic extends UIComponent {
     this.pointerId = null;
     this.cyclicPitch = 0;
     this.cyclicRoll = 0;
-    this.updateIndicatorPosition(0, 0);
-    this.root.classList.remove(styles.active);
+    this.resetThumb();
   };
 
   private updateFromPointer(clientX: number, clientY: number): void {
-    const dx = clientX - this.padCenterX;
-    const dy = clientY - this.padCenterY;
-    const hp = this.halfPad || this.FALLBACK_PAD_SIZE / 2;
+    let dx = clientX - this.baseX;
+    let dy = clientY - this.baseY;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    const clamped = Math.min(distance, this.maxDistance);
 
+    if (distance > 0) {
+      dx = (dx / distance) * clamped;
+      dy = (dy / distance) * clamped;
+    }
+
+    // Position thumb relative to base center
+    const baseSize = this.base.offsetWidth || this.FALLBACK_BASE;
+    this.thumb.style.left = `${(baseSize - this.THUMB_SIZE) / 2 + dx}px`;
+    this.thumb.style.top = `${(baseSize - this.THUMB_SIZE) / 2 + dy}px`;
+
+    // Normalize output
+    const hp = this.maxDistance || this.FALLBACK_BASE / 2;
     let roll = Math.max(-1, Math.min(1, dx / hp));
     let pitch = Math.max(-1, Math.min(1, -dy / hp));
 
@@ -120,21 +125,11 @@ export class TouchHelicopterCyclic extends UIComponent {
 
     this.cyclicRoll = roll;
     this.cyclicPitch = pitch;
-
-    this.updateIndicatorPosition(
-      Math.max(-1, Math.min(1, dx / hp)),
-      Math.max(-1, Math.min(1, -dy / hp))
-    );
   }
 
-  private updateIndicatorPosition(rollNorm: number, pitchNorm: number): void {
-    const halfIndicator = this.INDICATOR_SIZE / 2;
-    const hp = this.halfPad || this.FALLBACK_PAD_SIZE / 2;
-    const maxOffset = hp - halfIndicator;
-    const px = hp + rollNorm * maxOffset - halfIndicator;
-    const py = hp - pitchNorm * maxOffset - halfIndicator;
-    this.indicator.style.left = `${px}px`;
-    this.indicator.style.top = `${py}px`;
+  private resetThumb(): void {
+    this.thumb.style.left = `calc(50% - ${this.THUMB_SIZE / 2}px)`;
+    this.thumb.style.top = `calc(50% - ${this.THUMB_SIZE / 2}px)`;
   }
 
   /** Get current cyclic input. pitch: [-1,1] (positive=forward), roll: [-1,1] (positive=right bank) */
@@ -145,7 +140,7 @@ export class TouchHelicopterCyclic extends UIComponent {
   show(): void {
     if (this.isVisible) return;
     this.isVisible = true;
-    this.root.style.display = 'flex';
+    this.root.style.display = 'block';
   }
 
   hide(): void {
@@ -155,6 +150,6 @@ export class TouchHelicopterCyclic extends UIComponent {
     this.pointerId = null;
     this.cyclicPitch = 0;
     this.cyclicRoll = 0;
-    this.updateIndicatorPosition(0, 0);
+    this.resetThumb();
   }
 }

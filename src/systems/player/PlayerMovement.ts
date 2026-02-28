@@ -242,10 +242,24 @@ export class PlayerMovement {
   }
 
   updateHelicopterControls(deltaTime: number, input: PlayerInput, hudSystem?: IHUDSystem): void {
-    // Update helicopter controls based on keyboard input
+    // Check if touch controls are in helicopter dual-joystick mode
+    const touchControls = input.getTouchControls();
+    const hasTouchHeliMode = touchControls?.isInHelicopterMode() ?? false;
 
-    // Collective (W/S) - vertical thrust
-    if (input.isKeyPressed('keyw')) {
+    // --- Collective (vertical thrust) ---
+    if (hasTouchHeliMode) {
+      // Left joystick Y axis: up (negative z) = increase collective, down = decrease
+      const touchMove = input.getTouchMovementVector();
+      const collectiveInput = -touchMove.z; // Invert: joystick up = more thrust
+      if (Math.abs(collectiveInput) > 0.1) {
+        const target = (collectiveInput + 1) / 2; // Map [-1,1] to [0,1]
+        this.helicopterControls.collective = THREE.MathUtils.lerp(
+          this.helicopterControls.collective, target, deltaTime * 3.0
+        );
+      } else if (this.helicopterControls.autoHover) {
+        this.helicopterControls.collective = THREE.MathUtils.lerp(this.helicopterControls.collective, 0.4, deltaTime * 2.0);
+      }
+    } else if (input.isKeyPressed('keyw')) {
       this.helicopterControls.collective = Math.min(1.0, this.helicopterControls.collective + 2.0 * deltaTime);
     } else if (input.isKeyPressed('keys')) {
       this.helicopterControls.collective = Math.max(0.0, this.helicopterControls.collective - 2.0 * deltaTime);
@@ -256,8 +270,16 @@ export class PlayerMovement {
       }
     }
 
-    // Yaw (A/D) - tail rotor, turning
-    if (input.isKeyPressed('keya')) {
+    // --- Yaw (tail rotor, turning) ---
+    if (hasTouchHeliMode) {
+      // Left joystick X axis: right = yaw right (negative), left = yaw left (positive)
+      const touchMove = input.getTouchMovementVector();
+      if (Math.abs(touchMove.x) > 0.1) {
+        this.helicopterControls.yaw = -touchMove.x; // Right stick = negative yaw (turn right)
+      } else {
+        this.helicopterControls.yaw = THREE.MathUtils.lerp(this.helicopterControls.yaw, 0, deltaTime * 8.0);
+      }
+    } else if (input.isKeyPressed('keya')) {
       this.helicopterControls.yaw = Math.min(1.0, this.helicopterControls.yaw + 3.0 * deltaTime); // Turn left
     } else if (input.isKeyPressed('keyd')) {
       this.helicopterControls.yaw = Math.max(-1.0, this.helicopterControls.yaw - 3.0 * deltaTime); // Turn right
@@ -266,13 +288,13 @@ export class PlayerMovement {
       this.helicopterControls.yaw = THREE.MathUtils.lerp(this.helicopterControls.yaw, 0, deltaTime * 8.0);
     }
 
-    // Cyclic Pitch (Arrow Up/Down) - forward/backward movement
-    // Touch cyclic overrides keyboard when active
+    // --- Cyclic Pitch/Roll ---
+    // Touch cyclic (right joystick) overrides keyboard when active
     const touchCyclic = input.getTouchCyclicInput();
     const hasTouchCyclic = Math.abs(touchCyclic.pitch) > 0.05 || Math.abs(touchCyclic.roll) > 0.05;
 
     if (hasTouchCyclic) {
-      // Direct mapping from touch pad position
+      // Direct mapping from touch joystick position
       this.helicopterControls.cyclicPitch = touchCyclic.pitch;
       this.helicopterControls.cyclicRoll = touchCyclic.roll;
     } else if (input.isKeyPressed('arrowup')) {
