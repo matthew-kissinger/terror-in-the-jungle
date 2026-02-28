@@ -310,12 +310,12 @@ export class HUDElements {
     weaponSlot.dataset.show = 'infantry';
     this.unifiedWeaponBar.mount(weaponSlot);
 
-    // Mobile-only: WeaponPill replaces UnifiedWeaponBar on touch devices
+    // Mobile-only: hide the 6-slot weapon bar on touch.
+    // WeaponPill is NOT mounted — it sits under the joystick zone (z:100 vs z:1000)
+    // and is unreachable. Ammo is shown in the weapon cycler (TouchActionButtons) instead.
     const isTouch = ViewportManager.getInstance().info.isTouch;
     if (isTouch) {
-      // Hide the 6-slot weapon bar on touch - use WeaponPill instead
       this.unifiedWeaponBar.hide();
-      this.weaponPill.mount(weaponSlot);
     }
 
     // Mobile-only: MobileStatusBar merges timer + tickets

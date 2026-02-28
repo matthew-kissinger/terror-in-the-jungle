@@ -202,6 +202,16 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+.weaponCyclerInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  pointer-events: none;
+  min-width: 36px;
+}
+
 .weaponCyclerLabel {
   font-size: var(--tc-font-size);
   font-weight: 700;
@@ -212,6 +222,17 @@
   pointer-events: none;
   font-family: 'Rajdhani', sans-serif;
   line-height: 1;
+}
+
+.weaponCyclerAmmo {
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  text-align: center;
+  pointer-events: none;
+  font-family: 'Rajdhani', monospace;
+  line-height: 1;
+  letter-spacing: 0.3px;
 }
 
 .weaponCyclerActive {

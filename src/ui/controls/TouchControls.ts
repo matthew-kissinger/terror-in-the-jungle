@@ -202,6 +202,11 @@ export class TouchControls {
     this.actionButtons.setActiveSlot(slot);
   }
 
+  /** Update the weapon cycler's ammo display. */
+  setAmmo(magazine: number, reserve: number): void {
+    this.actionButtons.setAmmo(magazine, reserve);
+  }
+
   isVisible(): boolean {
     return this.visible;
   }

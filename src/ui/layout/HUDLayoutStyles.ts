@@ -237,8 +237,14 @@ export const HUD_LAYOUT_STYLES = `
     display: none !important;
   }
 
-  /* On mobile, hide the separate ammo display — WeaponPill already shows ammo */
+  /* On mobile, hide the separate ammo display — weapon cycler shows ammo */
   [data-device="touch"] .hud-slot[data-region="ammo"] {
+    display: none !important;
+  }
+
+  /* On mobile, hide weapon-bar slot — WeaponPill is not mounted (under joystick zone),
+   * ammo is shown in the weapon cycler (TouchActionButtons) instead. */
+  [data-device="touch"] .hud-slot[data-region="weapon-bar"] {
     display: none !important;
   }
 
@@ -264,18 +270,18 @@ export const HUD_LAYOUT_STYLES = `
       grid-template-rows:
         auto     /* minimap / status-bar / menu */
         1fr      /* flex space (center overlay lives here) */
-        auto     /* weapon-bar */
         auto     /* health */
         auto     /* joystick */
         auto;    /* joystick */
       grid-template-areas:
         "minimap     status-bar  menu"
         ".           center      ."
-        "weapon-bar  .           ."
         "health      .           ."
         "joystick    .           ."
         "joystick    .           .";
       gap: 2px;
+      /* Push health row above fixed rally button (joystick-base + inset + 16px + btn height) */
+      padding-bottom: calc(var(--tc-joystick-base) + var(--tc-edge-inset) + 60px);
     }
   }
 
@@ -305,7 +311,6 @@ export const HUD_LAYOUT_STYLES = `
         1fr      /* flex space */
         1fr      /* flex space (center overlay lives here) */
         1fr      /* flex space */
-        auto     /* weapon-bar */
         auto     /* health */
         auto     /* joystick */
         1fr;     /* joystick */
@@ -314,11 +319,12 @@ export const HUD_LAYOUT_STYLES = `
         ".           .           ."
         ".           center      ."
         ".           .           ."
-        "weapon-bar  .           ."
         "health      .           ."
         "joystick    .           ."
         "joystick    .           .";
       gap: 2px;
+      /* Push health row above fixed rally button (joystick-base + inset + 16px + btn height) */
+      padding-bottom: calc(var(--tc-joystick-base) + var(--tc-edge-inset) + 60px);
     }
   }
 

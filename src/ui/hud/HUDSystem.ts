@@ -43,6 +43,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private viewportUnsubscribe?: () => void;
   private staticHudAccumulator = 0;
   private readonly STATIC_HUD_INTERVAL = 0.2; // 5Hz for mostly-static HUD text/state
+  private mobileAmmoCallback?: (magazine: number, reserve: number) => void;
 
   constructor(camera?: THREE.Camera, ticketSystem?: TicketSystem, playerHealthSystem?: PlayerHealthSystem, _playerRespawnManager?: unknown) {
     this.camera = camera;
@@ -362,6 +363,13 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.updateAmmoDisplay(magazine, reserve);
     // Also update the mobile WeaponPill ammo display
     this.elements.weaponPill.setAmmo(magazine, reserve);
+    // Feed ammo to mobile touch controls (weapon cycler)
+    this.mobileAmmoCallback?.(magazine, reserve);
+  }
+
+  /** Register a callback to push ammo updates to mobile touch controls. */
+  setMobileAmmoCallback(callback: (magazine: number, reserve: number) => void): void {
+    this.mobileAmmoCallback = callback;
   }
 
   showInteractionPrompt(text: string): void {

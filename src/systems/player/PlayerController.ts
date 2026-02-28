@@ -630,6 +630,13 @@ export class PlayerController implements GameSystem {
     hudSystem.setWeaponSelectCallback((slotIndex: number) => {
       this.inventoryManager?.setCurrentSlot(slotIndex as WeaponSlot);
     });
+    // Wire ammo updates to mobile weapon cycler
+    const touchControls = this.input.getTouchControls();
+    if (touchControls) {
+      hudSystem.setMobileAmmoCallback((magazine, reserve) => {
+        touchControls.setAmmo(magazine, reserve);
+      });
+    }
   }
   setRenderer(renderer: IGameRenderer): void { this.gameRenderer = renderer; }
   setInventoryManager(inventoryManager: InventoryManager): void {

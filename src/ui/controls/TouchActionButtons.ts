@@ -22,6 +22,7 @@ export class TouchActionButtons extends UIComponent {
   private buttons: ActionButton[] = [];
   private activeIndex = 2; // Default: AR (slot 2)
   private weaponLabelEl?: HTMLElement;
+  private weaponAmmoEl?: HTMLElement;
   private weaponCyclerEl?: HTMLElement;
   private weaponPrevEl?: HTMLElement;
   private weaponNextEl?: HTMLElement;
@@ -107,6 +108,13 @@ export class TouchActionButtons extends UIComponent {
     this.root.appendChild(btn);
   }
 
+  /** Update the ammo display on the weapon cycler. */
+  setAmmo(magazine: number, reserve: number): void {
+    if (this.weaponAmmoEl) {
+      this.weaponAmmoEl.textContent = `${magazine}/${reserve}`;
+    }
+  }
+
   private addWeaponCycler(): void {
     const row = document.createElement('div');
     row.className = styles.weaponCycler;
@@ -115,21 +123,32 @@ export class TouchActionButtons extends UIComponent {
     prevBtn.className = styles.weaponCyclerChevron;
     prevBtn.textContent = '\u2039';
 
+    const infoCol = document.createElement('div');
+    infoCol.className = styles.weaponCyclerInfo;
+
     const label = document.createElement('div');
     label.className = styles.weaponCyclerLabel;
     label.textContent = SLOT_LABELS[this.activeIndex];
+
+    const ammo = document.createElement('div');
+    ammo.className = styles.weaponCyclerAmmo;
+    ammo.textContent = '';
+
+    infoCol.appendChild(label);
+    infoCol.appendChild(ammo);
 
     const nextBtn = document.createElement('div');
     nextBtn.className = styles.weaponCyclerChevron;
     nextBtn.textContent = '\u203A';
 
     row.appendChild(prevBtn);
-    row.appendChild(label);
+    row.appendChild(infoCol);
     row.appendChild(nextBtn);
     this.root.appendChild(row);
 
     this.weaponCyclerEl = row;
     this.weaponLabelEl = label;
+    this.weaponAmmoEl = ammo;
     this.weaponPrevEl = prevBtn;
     this.weaponNextEl = nextBtn;
   }
