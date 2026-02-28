@@ -166,6 +166,8 @@ export class TouchControls {
     return this.look.consumeDelta();
   }
 
+  private inHelicopterMode = false;
+
   show(): void {
     if (this.visible) return;
     this.visible = true;
@@ -179,7 +181,7 @@ export class TouchControls {
     this.rallyPointButton.show();
     this.menuButton.show();
     // mortarButton removed from mobile HUD — mortar is desktop-only for now
-    // helicopterCyclic is NOT shown here; it's shown/hidden by PlayerController on helicopter enter/exit
+    // helicopterCyclic is NOT shown here; it's shown/hidden by enterHelicopterMode/exitHelicopterMode
   }
 
   hide(): void {
@@ -196,6 +198,57 @@ export class TouchControls {
     this.menuButton.hide();
     this.mortarButton.hide();
     this.helicopterCyclic.hide();
+  }
+
+  /**
+   * Enter helicopter mode: dual joystick layout.
+   * Left joystick = collective (Y) + yaw (X).
+   * Right joystick = cyclic pitch (Y) + cyclic roll (X).
+   * Hides infantry controls (fire, ADS, action buttons, rally).
+   */
+  enterHelicopterMode(): void {
+    if (this.inHelicopterMode) return;
+    this.inHelicopterMode = true;
+
+    // Hide infantry-specific controls
+    this.fireButton.hide();
+    this.adsButton.hide();
+    this.actionButtons.hide();
+    this.rallyPointButton.hideButton();
+    this.sandbagButtons.hide();
+    this.look.hide();
+
+    // Show helicopter cyclic joystick (right side)
+    this.helicopterCyclic.show();
+
+    // Set left joystick to helicopter throttle mode
+    this.joystick.setHelicopterMode(true);
+  }
+
+  /**
+   * Exit helicopter mode: restore infantry controls.
+   */
+  exitHelicopterMode(): void {
+    if (!this.inHelicopterMode) return;
+    this.inHelicopterMode = false;
+
+    // Hide helicopter controls
+    this.helicopterCyclic.hide();
+
+    // Restore infantry controls
+    this.fireButton.show();
+    this.adsButton.show();
+    this.actionButtons.show();
+    this.rallyPointButton.showButton();
+    this.look.show();
+
+    // Reset left joystick to infantry mode
+    this.joystick.setHelicopterMode(false);
+  }
+
+  /** Whether currently in helicopter dual-joystick mode. */
+  isInHelicopterMode(): boolean {
+    return this.inHelicopterMode;
   }
 
   /** Update the weapon cycler's active slot (synced from PlayerController). */

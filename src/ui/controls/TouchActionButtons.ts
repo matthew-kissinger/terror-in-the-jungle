@@ -36,10 +36,9 @@ export class TouchActionButtons extends UIComponent {
     this.root.className = styles.actionContainer;
     this.root.id = 'touch-action-buttons';
 
-    // Create buttons from top to bottom (weapon cycler closest to thumb at bottom)
-    this.addButton('jump', 'JUMP');
+    // Only essential actions — weapon cycling handled by WeaponPill (bottom-left)
     this.addButton('reload', 'R');
-    this.addWeaponCycler();
+    this.addButton('jump', 'JUMP');
   }
 
   protected onMount(): void {
