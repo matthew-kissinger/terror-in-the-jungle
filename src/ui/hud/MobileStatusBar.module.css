@@ -78,39 +78,6 @@
   line-height: 1;
 }
 
-/* K/D score section */
-.score {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-}
-
-.killVal {
-  font-size: 12px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.88);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
-  line-height: 1;
-}
-
-.deathVal {
-  font-size: 12px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.5);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
-  line-height: 1;
-}
-
-.scoreLbl {
-  font-size: 9px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.3);
-  line-height: 1;
-  margin-right: 2px;
-}
-
 /* Hidden on desktop - separate components handle this */
 :global([data-device="desktop"]) .bar {
   display: none;
@@ -129,11 +96,7 @@
     height: 22px;
   }
 
-  .timer, .us, .opfor, .killVal, .deathVal {
+  .timer, .us, .opfor {
     font-size: 10px;
-  }
-
-  .scoreLbl {
-    font-size: 8px;
   }
 }

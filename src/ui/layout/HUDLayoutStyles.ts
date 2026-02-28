@@ -119,6 +119,13 @@ export const HUD_LAYOUT_STYLES = `
     padding: 2px;
   }
 
+  /* On mobile, stats (K/D) sits directly under the minimap — left-aligned */
+  [data-device="touch"] .hud-slot[data-region="stats"] {
+    justify-content: flex-start;
+    align-items: flex-start;
+    padding-left: 2px;
+  }
+
   /* Ammo: bottom-right — align-items: flex-end so it sticks to the bottom
    * of its cell on both desktop (auto row) and mobile landscape (1fr row). */
   .hud-slot[data-region="ammo"] {
@@ -218,13 +225,13 @@ export const HUD_LAYOUT_STYLES = `
     display: none !important;
   }
 
-  /* On mobile, hide the individual timer/tickets/compass/game-status/stats/kill-feed
-   * since MobileStatusBar handles the essential info in one compact line */
+  /* On mobile, hide the individual timer/tickets/compass/game-status/kill-feed
+   * since MobileStatusBar handles the essential info in one compact line.
+   * Stats (K/D) stays visible — positioned under the minimap. */
   [data-device="touch"] .hud-slot[data-region="timer"],
   [data-device="touch"] .hud-slot[data-region="tickets"],
   [data-device="touch"] .hud-slot[data-region="compass"],
   [data-device="touch"] .hud-slot[data-region="game-status"],
-  [data-device="touch"] .hud-slot[data-region="stats"],
   [data-device="touch"] .hud-slot[data-region="kill-feed"] {
     display: none !important;
   }
@@ -247,11 +254,12 @@ export const HUD_LAYOUT_STYLES = `
    *
    * Simplified grid - fire/ADS/actions are fixed-position.
    * Status-bar at top-center provides timer+tickets.
+   * Stats (K/D) sits directly under the minimap.
    * Right column kept empty — touch controls are fixed-pos.
    * Weapon-bar + health bottom-left, nothing in screen center.
    *
    *  minimap    | status-bar  | menu
-   *             |             |
+   *  stats      |             |
    *             |             |
    *  weapon-bar |             |
    *  health     |             |
@@ -263,6 +271,7 @@ export const HUD_LAYOUT_STYLES = `
       grid-template-columns: minmax(100px, 1fr) minmax(140px, 2fr) minmax(80px, 1fr);
       grid-template-rows:
         auto     /* minimap / status-bar / menu */
+        auto     /* stats (K/D under minimap) */
         1fr      /* flex space (center overlay lives here) */
         auto     /* weapon-bar */
         auto     /* health */
@@ -270,6 +279,7 @@ export const HUD_LAYOUT_STYLES = `
         auto;    /* joystick */
       grid-template-areas:
         "minimap     status-bar  menu"
+        "stats       .           ."
         ".           center      ."
         "weapon-bar  .           ."
         "health      .           ."
@@ -282,13 +292,14 @@ export const HUD_LAYOUT_STYLES = `
   /* =========================================================
    * MOBILE PORTRAIT (touch + height > width)
    *
-   * Status-bar at top, weapon pill + health bottom-left.
+   * Status-bar at top, stats (K/D) under minimap.
+   * Weapon pill + health bottom-left.
    * Fire/ADS are fixed-position, not in grid.
    * Right column kept empty — fire/ADS/actions are fixed-pos.
    * Nothing in screen center.
    *
    *  minimap    | status-bar  | menu
-   *             |             |
+   *  stats      |             |
    *             |             |
    *             |             |
    *             |             |
@@ -302,6 +313,7 @@ export const HUD_LAYOUT_STYLES = `
       grid-template-columns: minmax(80px, 1fr) minmax(120px, 2fr) minmax(80px, 1fr);
       grid-template-rows:
         auto     /* minimap / status-bar / menu */
+        auto     /* stats (K/D under minimap) */
         1fr      /* flex space */
         1fr      /* flex space (center overlay lives here) */
         1fr      /* flex space */
@@ -311,6 +323,7 @@ export const HUD_LAYOUT_STYLES = `
         1fr;     /* joystick */
       grid-template-areas:
         "minimap     status-bar  menu"
+        "stats       .           ."
         ".           .           ."
         ".           center      ."
         ".           .           ."

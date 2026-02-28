@@ -1,9 +1,10 @@
 /**
  * MobileStatusBar - Compact merged status line for touch devices.
  *
- * Combines timer, tickets, and K/D into a single horizontal pill:
- *   12:45 • US 300 | 300 OP • K:5 D:2
+ * Combines timer and tickets into a single horizontal pill:
+ *   12:45 • US 300 | 300 OP
  *
+ * K/D is displayed separately under the minimap via the 'stats' grid slot.
  * Hidden on desktop via CSS (where separate TicketDisplay/MatchTimer render).
  * Mounts into the 'status-bar' grid slot.
  */
@@ -15,8 +16,6 @@ export class MobileStatusBar extends UIComponent {
   private timeRemaining = this.signal(Infinity);
   private usTickets = this.signal(0);
   private opforTickets = this.signal(0);
-  private kills = this.signal(0);
-  private deaths = this.signal(0);
 
   protected build(): void {
     this.root.className = styles.bar;
@@ -27,11 +26,6 @@ export class MobileStatusBar extends UIComponent {
         <span class="${styles.us}" data-ref="us">0</span>
         <span class="${styles.sep}">|</span>
         <span class="${styles.opfor}" data-ref="opfor">0</span>
-      </span>
-      <span class="${styles.dot}">\u2022</span>
-      <span class="${styles.score}" data-ref="score">
-        <span class="${styles.killVal}" data-ref="kills">0</span><span class="${styles.scoreLbl}">K</span>
-        <span class="${styles.deathVal}" data-ref="deaths">0</span><span class="${styles.scoreLbl}">D</span>
       </span>
     `;
   }
@@ -57,14 +51,6 @@ export class MobileStatusBar extends UIComponent {
     this.effect(() => {
       this.text('[data-ref="opfor"]', String(Math.round(this.opforTickets.value)));
     });
-
-    this.effect(() => {
-      this.text('[data-ref="kills"]', String(this.kills.value));
-    });
-
-    this.effect(() => {
-      this.text('[data-ref="deaths"]', String(this.deaths.value));
-    });
   }
 
   // --- Public API ---
@@ -76,10 +62,5 @@ export class MobileStatusBar extends UIComponent {
   setTickets(us: number, opfor: number): void {
     this.usTickets.value = us;
     this.opforTickets.value = opfor;
-  }
-
-  setScore(kills: number, deaths: number): void {
-    this.kills.value = kills;
-    this.deaths.value = deaths;
   }
 }
