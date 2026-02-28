@@ -27,12 +27,14 @@ describe('TouchActionButtons', () => {
     buttons = Array.from(container.children) as HTMLDivElement[];
   });
 
-  it('creates Reload and Jump buttons (weapon cycling handled by WeaponPill)', () => {
+  it('creates weapon cycler, Reload, and Jump buttons', () => {
     expect(container).toBeTruthy();
-    // 2 action buttons only — weapon cycler removed (WeaponPill handles cycling)
-    expect(buttons).toHaveLength(2);
-    expect(buttons[0].textContent).toBe('R');
-    expect(buttons[1].textContent).toBe('JUMP');
+    // 3 children: weapon cycler pill + 2 action buttons (reload, jump)
+    expect(buttons).toHaveLength(3);
+    // First child is the weapon cycler pill (contains chevrons + label)
+    expect(buttons[0].className).toContain('weaponCycler');
+    expect(buttons[1].textContent).toBe('R');
+    expect(buttons[2].textContent).toBe('JUMP');
   });
 
   it('arranges buttons in a column layout', () => {
@@ -43,8 +45,9 @@ describe('TouchActionButtons', () => {
     const onAction = vi.fn();
     actions.setOnAction(onAction);
 
-    buttons[0].dispatchEvent(pointerDownEvent());
+    // buttons[0] is weapon cycler (not an action button), buttons[1]=reload, buttons[2]=jump
     buttons[1].dispatchEvent(pointerDownEvent());
+    buttons[2].dispatchEvent(pointerDownEvent());
 
     expect(onAction).toHaveBeenNthCalledWith(1, 'reload');
     expect(onAction).toHaveBeenNthCalledWith(2, 'jump');

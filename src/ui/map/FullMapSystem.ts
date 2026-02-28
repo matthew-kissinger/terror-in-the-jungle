@@ -143,18 +143,7 @@ export class FullMapSystem implements GameSystem {
     Logger.info('ui', 'Initializing Full Map System...');
     document.body.appendChild(this.mapContainer);
 
-    // Create mobile map toggle button (tap-to-toggle)
-    if (shouldUseTouchControls()) {
-      this.mapToggleButton = document.createElement('div');
-      this.mapToggleButton.className = 'map-toggle-button';
-      this.mapToggleButton.textContent = 'M';
-      this.mapToggleButton.addEventListener('touchstart', (e: TouchEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.inputHandler.toggle();
-      }, { passive: false });
-      document.body.appendChild(this.mapToggleButton);
-    }
+    // Map toggle button removed from mobile HUD — map is accessible via menu.
 
     Logger.info('ui', 'Full Map System initialized');
   }
