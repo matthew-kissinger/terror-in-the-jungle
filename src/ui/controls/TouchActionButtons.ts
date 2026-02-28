@@ -36,7 +36,7 @@ export class TouchActionButtons extends UIComponent {
     this.root.className = styles.actionContainer;
     this.root.id = 'touch-action-buttons';
 
-    // Only essential actions — weapon cycling handled by WeaponPill (bottom-left)
+    this.addWeaponCycler();
     this.addButton('reload', 'R');
     this.addButton('jump', 'JUMP');
   }

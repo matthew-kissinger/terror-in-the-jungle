@@ -124,11 +124,11 @@
   position: fixed;
   right: max(var(--tc-edge-inset), env(safe-area-inset-right, 0px));
   /* Position above fire button with generous clearance to prevent overlap */
-  bottom: calc(36% + var(--tc-fire-size) / 2 + 20px);
+  bottom: calc(36% + var(--tc-fire-size) / 2 + 32px);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
+  gap: 10px;
   z-index: var(--tc-z-controls);
   touch-action: none;
   pointer-events: auto;
@@ -137,7 +137,7 @@
 /* Portrait: fire drops to bottom:24%, so actions follow */
 @media (orientation: portrait) {
   .actionContainer {
-    bottom: calc(24% + var(--tc-fire-size) / 2 + 20px);
+    bottom: calc(24% + var(--tc-fire-size) / 2 + 32px);
   }
 }
 
