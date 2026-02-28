@@ -211,24 +211,31 @@ export const HUD_LAYOUT_STYLES = `
     display: none !important;
   }
 
-  /* On mobile, fire/ADS stay as fixed-position overlays (thumb-arc ergonomics),
-   * so their grid slots are empty placeholders. Hide them. */
+  /* On mobile, fire/ADS/action-btns stay as fixed-position overlays
+   * (thumb-arc ergonomics), so their grid slots are empty. Hide them. */
   [data-device="touch"] .hud-slot[data-region="fire"],
-  [data-device="touch"] .hud-slot[data-region="ads"] {
+  [data-device="touch"] .hud-slot[data-region="ads"],
+  [data-device="touch"] .hud-slot[data-region="action-btns"] {
+    display: none !important;
+  }
+
+  /* On mobile, hide the separate ammo display — WeaponPill already shows ammo */
+  [data-device="touch"] .hud-slot[data-region="ammo"] {
     display: none !important;
   }
 
   /* =========================================================
    * MOBILE LANDSCAPE (touch + width > height)
    *
-   * Simplified grid - fire/ADS are fixed-position, not in grid.
+   * Simplified grid - fire/ADS/actions are fixed-position.
    * Status-bar at top-center provides timer+tickets.
+   * Right column kept empty — touch controls are fixed-pos.
    *
    *  minimap    | status-bar  | menu
    *             | weapon-bar  |
-   *             |  center     | action-btns
+   *             |  center     |
    *             |             |
-   *  health     |             | ammo
+   *  health     |             |
    *  joystick   |             |
    *  joystick   |             |
    * ========================================================= */
@@ -238,17 +245,17 @@ export const HUD_LAYOUT_STYLES = `
       grid-template-rows:
         auto     /* minimap / status-bar / menu */
         auto     /* . / weapon-bar */
-        auto     /* . / center / action-btns */
+        auto     /* . / center */
         1fr      /* flex space */
-        auto     /* health / . / ammo */
+        auto     /* health */
         auto     /* joystick */
         auto;    /* joystick */
       grid-template-areas:
         "minimap     status-bar  menu"
         ".           weapon-bar  ."
-        ".           center      action-btns"
+        ".           center      ."
         ".           .           ."
-        "health      .           ammo"
+        "health      .           ."
         "joystick    .           ."
         "joystick    .           .";
       gap: 2px;
@@ -260,13 +267,14 @@ export const HUD_LAYOUT_STYLES = `
    *
    * Status-bar at top, weapon pill center-bottom area.
    * Fire/ADS are fixed-position, not in grid.
+   * Right column kept empty — fire/ADS/actions are fixed-pos.
    *
    *  minimap    | status-bar  | menu
    *             |             |
    *             |  center     |
-   *             |             | action-btns
    *             |             |
-   *  health     | weapon-bar  | ammo
+   *             |             |
+   *  health     | weapon-bar  |
    *  joystick   |             |
    *  joystick   |             |
    * ========================================================= */
@@ -277,18 +285,18 @@ export const HUD_LAYOUT_STYLES = `
         auto     /* minimap / status-bar / menu */
         1fr      /* flex space */
         auto     /* . / center */
-        auto     /* . / . / action-btns */
         1fr      /* flex space */
-        auto     /* health / weapon-bar / ammo */
+        1fr      /* flex space */
+        auto     /* health / weapon-bar */
         auto     /* joystick */
         1fr;     /* joystick */
       grid-template-areas:
         "minimap     status-bar  menu"
         ".           .           ."
         ".           center      ."
-        ".           .           action-btns"
         ".           .           ."
-        "health      weapon-bar  ammo"
+        ".           .           ."
+        "health      weapon-bar  ."
         "joystick    .           ."
         "joystick    .           .";
       gap: 2px;

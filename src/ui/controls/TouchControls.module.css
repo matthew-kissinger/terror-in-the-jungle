@@ -123,13 +123,21 @@
 .actionContainer {
   position: fixed;
   right: max(var(--tc-edge-inset), env(safe-area-inset-right, 0px));
-  bottom: calc(var(--tc-fire-size) + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + 16px);
+  /* Position above fire button: fire is at bottom:36%, stack actions above it */
+  bottom: calc(36% + var(--tc-fire-size) / 2 + 12px);
   display: flex;
   flex-direction: column;
   gap: 10px;
   z-index: var(--tc-z-controls);
   touch-action: none;
   pointer-events: auto;
+}
+
+/* Portrait: fire drops to bottom:30%, so actions follow */
+@media (orientation: portrait) {
+  .actionContainer {
+    bottom: calc(30% + var(--tc-fire-size) / 2 + 12px);
+  }
 }
 
 .actionBtn {
