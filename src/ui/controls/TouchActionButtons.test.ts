@@ -62,8 +62,8 @@ describe('TouchActionButtons', () => {
     nextChevron.dispatchEvent(pointerDownEvent());
 
     expect(onWeaponSelect).toHaveBeenCalledTimes(1);
-    // Default activeIndex is 2 (AR), cycling next should give 3
-    expect(onWeaponSelect).toHaveBeenCalledWith(3);
+    // Default activeIndex is 2 (AR), cycling next skips equipment → gives 4 (SMG)
+    expect(onWeaponSelect).toHaveBeenCalledWith(4);
   });
 
   it('show and hide toggle visibility', () => {

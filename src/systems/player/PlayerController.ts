@@ -385,11 +385,23 @@ export class PlayerController implements GameSystem {
       case WeaponSlot.PRIMARY:
       case WeaponSlot.SHOTGUN:
       case WeaponSlot.SMG:
-      case WeaponSlot.PISTOL:
+      case WeaponSlot.PISTOL: {
         if (this.firstPersonWeapon) {
           this.firstPersonWeapon.setWeaponVisibility(true);
+          // Explicitly switch weapon model — acts as defensive fallback in case
+          // the InventoryManager onSlotChange → FirstPersonWeapon callback path
+          // didn't trigger (e.g. touch input race). setPrimaryWeapon is a no-op
+          // if the switch is already in progress.
+          const weaponMap: Record<number, 'rifle' | 'shotgun' | 'smg' | 'pistol'> = {
+            [WeaponSlot.PRIMARY]: 'rifle',
+            [WeaponSlot.SHOTGUN]: 'shotgun',
+            [WeaponSlot.SMG]: 'smg',
+            [WeaponSlot.PISTOL]: 'pistol',
+          };
+          this.firstPersonWeapon.setPrimaryWeapon(weaponMap[slot]);
         }
         break;
+      }
       case WeaponSlot.GRENADE:
         if (this.grenadeSystem) {
           this.grenadeSystem.showGrenadeInHand(true);

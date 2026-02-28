@@ -425,8 +425,8 @@
   composes: btn;
   position: fixed;
   left: max(var(--tc-edge-inset), env(safe-area-inset-left, 0px));
-  /* Position above joystick, bottom-left area */
-  bottom: calc(var(--tc-joystick-base) + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + 16px);
+  /* Position above joystick + weapon pill + health bar to avoid overlap */
+  bottom: calc(var(--tc-joystick-base) + var(--tc-weapon-h) + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + 56px);
   min-width: 56px;
   height: 40px;
   padding: 0 12px;

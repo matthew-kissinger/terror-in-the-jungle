@@ -139,6 +139,7 @@ describe('PlayerController', () => {
       hideWeapon: vi.fn(),
       setWeaponVisibility: vi.fn(),
       setFireingEnabled: vi.fn(),
+      setPrimaryWeapon: vi.fn(),
       getWeaponInput: vi.fn().mockReturnValue({
         disableDirectListeners: vi.fn(),
         triggerFireStart: vi.fn(),
@@ -414,6 +415,7 @@ describe('PlayerController', () => {
       slotChangeCallback(WeaponSlot.PRIMARY);
 
       expect(mockFirstPersonWeapon.setWeaponVisibility).toHaveBeenCalledWith(true);
+      expect(mockFirstPersonWeapon.setPrimaryWeapon).toHaveBeenCalledWith('rifle');
     });
 
     it('should handle weapon slot change to grenade', async () => {
