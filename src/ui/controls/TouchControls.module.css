@@ -167,9 +167,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 0;
   height: var(--tc-action-size);
-  min-width: calc(var(--tc-action-size) * 2.2);
+  min-width: calc(var(--tc-action-size) * 1.7);
   border-radius: calc(var(--tc-action-size) / 2);
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(4px);
@@ -186,10 +186,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: calc(var(--tc-action-size) * 0.55);
+  width: calc(var(--tc-action-size) * 0.45);
   height: 100%;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 18px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 14px;
   font-weight: bold;
   touch-action: none;
   pointer-events: auto;
@@ -203,12 +203,12 @@
 }
 
 .weaponCyclerLabel {
-  font-size: var(--tc-font-size);
+  font-size: var(--tc-font-size-sm);
   font-weight: 700;
   color: rgba(255, 255, 255, 0.85);
   text-align: center;
-  min-width: 28px;
-  letter-spacing: 0.5px;
+  min-width: 20px;
+  letter-spacing: 0.3px;
   pointer-events: none;
   font-family: 'Rajdhani', sans-serif;
   line-height: 1;
@@ -427,14 +427,14 @@
   left: max(var(--tc-edge-inset), env(safe-area-inset-left, 0px));
   /* Position above joystick + weapon pill + health bar to avoid overlap */
   bottom: calc(var(--tc-joystick-base) + var(--tc-weapon-h) + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + 56px);
-  min-width: 56px;
-  height: 40px;
-  padding: 0 12px;
-  border-radius: 20px;
+  min-width: 52px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 18px;
   background: rgba(100, 255, 100, 0.3);
-  border: 2px solid rgba(150, 255, 150, 0.5);
+  border: 1px solid rgba(150, 255, 150, 0.4);
   z-index: var(--tc-z-controls);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.5px;
   color: rgba(255, 255, 255, 0.9);
@@ -443,6 +443,13 @@
 .rallyBtn.pressed {
   background: rgba(100, 255, 100, 0.6);
   transform: scale(0.9);
+}
+
+/* Landscape: lower the rally button to avoid minimap overlap */
+@media (orientation: landscape) {
+  .rallyBtn {
+    bottom: calc(var(--tc-joystick-base) + var(--tc-weapon-h) + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + 8px);
+  }
 }
 
 /* ==========================================================================

@@ -123,6 +123,7 @@ export class TouchControls {
     this.interactionButton.setCallback(callbacks.onEnterExitHelicopter);
     this.sandbagButtons.setCallbacks(callbacks.onSandbagRotateLeft, callbacks.onSandbagRotateRight);
     this.rallyPointButton.setCallback(callbacks.onRallyPointPlace);
+    this.rallyPointButton.setSquadCommandCallback(() => callbacks.onSquadCommand?.());
     this.menuButton.setCallbacks(
       () => callbacks.onMenuPause?.(),
       () => callbacks.onMenuResume?.(),

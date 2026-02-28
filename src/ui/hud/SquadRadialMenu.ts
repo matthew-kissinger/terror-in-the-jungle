@@ -213,13 +213,30 @@ export class SquadRadialMenu {
     this.container.appendChild(svg)
     document.body.appendChild(this.container)
 
-    // Inject CSS for animations
+    // Inject CSS for animations and responsive layout
     if (!document.getElementById('squad-radial-menu-styles')) {
       const style = document.createElement('style')
       style.id = 'squad-radial-menu-styles'
       style.textContent = `
         #squad-radial-menu svg {
           filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.5));
+        }
+        /* Shrink on small touch screens */
+        @media (pointer: coarse) and (max-height: 600px) {
+          #squad-radial-menu {
+            width: 240px !important;
+            height: 240px !important;
+          }
+          #squad-radial-menu svg {
+            width: 240px;
+            height: 240px;
+          }
+        }
+        /* Landscape mobile: shift right to avoid minimap overlap */
+        @media (pointer: coarse) and (orientation: landscape) {
+          #squad-radial-menu {
+            left: 55% !important;
+          }
         }
       `
       document.head.appendChild(style)
