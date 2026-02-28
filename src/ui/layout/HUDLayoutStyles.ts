@@ -112,6 +112,13 @@ export const HUD_LAYOUT_STYLES = `
     align-items: flex-start;
   }
 
+  /* On mobile, minimap is in the left column — align flush top-left */
+  [data-device="touch"] .hud-slot[data-region="minimap"] {
+    justify-content: flex-start;
+    align-items: flex-start;
+    padding: 2px;
+  }
+
   /* Ammo: bottom-right — align-items: flex-end so it sticks to the bottom
    * of its cell on both desktop (auto row) and mobile landscape (1fr row). */
   .hud-slot[data-region="ammo"] {

@@ -33,6 +33,13 @@ export const MINIMAP_STYLES = `
     }
   }
 
+  /* Ensure no extra spacing on mobile — sits snug in its grid slot */
+  @media (pointer: coarse) {
+    .minimap-container {
+      margin: 0;
+    }
+  }
+
   .minimap-canvas {
     width: 100%;
     height: 100%;

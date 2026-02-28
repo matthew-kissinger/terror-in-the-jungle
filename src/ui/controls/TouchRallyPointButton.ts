@@ -1,5 +1,6 @@
 /**
- * Contextual touch button for rally point placement (V key).
+ * Contextual touch button for swarm/rally controls.
+ * Shows the active swarm command label (default: "RALLY").
  * Visible when player is alive and on foot.
  * Uses pointer events with setPointerCapture for unified input handling.
  */
@@ -17,7 +18,12 @@ export class TouchRallyPointButton extends UIComponent {
     this.root.className = styles.rallyBtn;
     this.root.id = 'touch-rally-point-btn';
     this.root.style.display = 'none'; // Start hidden
-    this.root.textContent = 'V';
+    this.root.textContent = 'RALLY';
+  }
+
+  /** Update the button label to reflect the active swarm control. */
+  setLabel(label: string): void {
+    this.root.textContent = label;
   }
 
   protected onMount(): void {
