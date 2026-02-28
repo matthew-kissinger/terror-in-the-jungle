@@ -132,7 +132,13 @@ export class PlayerController implements GameSystem {
       },
       onReload: () => this.actionReload(),
       onGrenadeSwitch: () => this.handleTouchGrenadeSwitch(),
-      onWeaponSlotChange: (slot: WeaponSlot) => this.handleWeaponSlotChange(slot),
+      onWeaponSlotChange: (slot: WeaponSlot) => {
+        // Route through InventoryManager so FirstPersonWeapon's onSlotChange callback
+        // fires and actually switches the weapon model/ammo (not just visibility).
+        if (this.inventoryManager) {
+          this.inventoryManager.setCurrentSlot(slot);
+        }
+      },
       onSquadCommand: () => this.playerSquadController?.toggleRadialMenu(),
       onSquadQuickCommand: (slot: number) => this.playerSquadController?.issueQuickCommand(slot),
       onMenuPause: () => this.handleMenuPause(),
@@ -149,10 +155,8 @@ export class PlayerController implements GameSystem {
     const touchControls = this.input.getTouchControls();
     if (!touchControls) return;
 
-    // Wire weapon bar through HUDSystem (UnifiedWeaponBar replaces TouchWeaponBar)
-    this.hudSystem?.setWeaponSelectCallback((slotIndex: number) => {
-      this.inventoryManager?.setCurrentSlot(slotIndex as WeaponSlot);
-    });
+    // Note: weapon bar/pill callbacks are wired in setHUDSystem() since
+    // wireTouchExtras() runs before hudSystem is available.
 
     // Mount touch controls into grid layout slots
     const layout = this.hudSystem?.getLayout();
@@ -619,7 +623,14 @@ export class PlayerController implements GameSystem {
     // Wire touch-specific extras (weapon bar, mortar)
     this.wireTouchExtras();
   }
-  setHUDSystem(hudSystem: HUDSystem): void { this.hudSystem = hudSystem; }
+  setHUDSystem(hudSystem: HUDSystem): void {
+    this.hudSystem = hudSystem;
+    // Wire UnifiedWeaponBar and WeaponPill weapon-select callbacks through InventoryManager
+    // so actual weapon switching occurs (model + ammo swap, not just UI highlight).
+    hudSystem.setWeaponSelectCallback((slotIndex: number) => {
+      this.inventoryManager?.setCurrentSlot(slotIndex as WeaponSlot);
+    });
+  }
   setRenderer(renderer: IGameRenderer): void { this.gameRenderer = renderer; }
   setInventoryManager(inventoryManager: InventoryManager): void {
     this.inventoryManager = inventoryManager;

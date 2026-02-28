@@ -108,6 +108,21 @@
   display: none;
 }
 
+/* Touch: passive ammo display only (under joystick zone at z-1000, not tappable).
+ * Cycling is handled by the weapon cycler in TouchActionButtons. */
+:global([data-device="touch"]) .pill {
+  pointer-events: none;
+}
+
+:global([data-device="touch"]) .chevron {
+  display: none;
+}
+
+:global([data-device="touch"]) .info {
+  cursor: default;
+  padding: 0 8px;
+}
+
 /* Responsive */
 @media (max-width: 480px) {
   .pill {
