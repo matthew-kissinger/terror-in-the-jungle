@@ -41,15 +41,15 @@
 }
 
 /* ==========================================================================
-   Fire button - Thumb arc positioning (mid-right)
+   Fire button - Left of ADS button (swapped positions)
    Modern 2026 aesthetic: solid fill, no border, radial gradient + glow
    ========================================================================== */
 
 .fireBtn {
   composes: btn;
   position: fixed;
-  right: max(var(--tc-edge-inset), env(safe-area-inset-right, 0px));
-  bottom: 36%;
+  right: calc(var(--tc-ads-size) + max(var(--tc-edge-inset), env(safe-area-inset-right, 0px)) + 10px);
+  bottom: calc(36% - var(--tc-fire-size) / 2 + 4px);
   width: var(--tc-fire-size);
   height: var(--tc-fire-size);
   background: radial-gradient(circle at 38% 38%,
@@ -79,19 +79,19 @@
 /* Portrait: thumb rests lower to avoid overlapping with action buttons */
 @media (orientation: portrait) {
   .fireBtn {
-    bottom: 24%;
+    bottom: calc(24% - var(--tc-fire-size) / 2 + 4px);
   }
 }
 
 /* ==========================================================================
-   ADS button - Below fire, offset left. Solid blue fill.
+   ADS button - Rightmost position (swapped with fire). Solid blue fill.
    ========================================================================== */
 
 .adsBtn {
   composes: btn;
   position: fixed;
-  right: calc(var(--tc-fire-size) + max(var(--tc-edge-inset), env(safe-area-inset-right, 0px)) + 10px);
-  bottom: calc(36% - var(--tc-ads-size) / 2 + 4px);
+  right: max(var(--tc-edge-inset), env(safe-area-inset-right, 0px));
+  bottom: 36%;
   width: var(--tc-ads-size);
   height: var(--tc-ads-size);
   background: rgba(60, 130, 200, 0.35);
@@ -112,7 +112,7 @@
 /* Portrait: match fire button offset */
 @media (orientation: portrait) {
   .adsBtn {
-    bottom: calc(24% - var(--tc-ads-size) / 2 + 4px);
+    bottom: 24%;
   }
 }
 
@@ -123,8 +123,8 @@
 .actionContainer {
   position: fixed;
   right: max(var(--tc-edge-inset), env(safe-area-inset-right, 0px));
-  /* Position above fire button with generous clearance to prevent overlap */
-  bottom: calc(36% + var(--tc-fire-size) / 2 + 32px);
+  /* Position above ADS button (rightmost) with generous clearance */
+  bottom: calc(36% + var(--tc-ads-size) + 16px);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -134,10 +134,10 @@
   pointer-events: auto;
 }
 
-/* Portrait: fire drops to bottom:24%, so actions follow */
+/* Portrait: ADS drops to bottom:24%, so actions follow */
 @media (orientation: portrait) {
   .actionContainer {
-    bottom: calc(24% + var(--tc-fire-size) / 2 + 32px);
+    bottom: calc(24% + var(--tc-ads-size) + 16px);
   }
 }
 
@@ -314,7 +314,7 @@
 .interactBtn {
   composes: btn;
   position: fixed;
-  right: calc(var(--tc-fire-size) + max(var(--tc-edge-inset), env(safe-area-inset-right, 0px)) + 16px);
+  right: calc(var(--tc-ads-size) + max(var(--tc-edge-inset), env(safe-area-inset-right, 0px)) + 16px);
   bottom: max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px));
   width: 70px;
   height: 70px;

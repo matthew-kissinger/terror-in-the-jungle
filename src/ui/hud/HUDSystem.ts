@@ -200,12 +200,6 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.statsTracker.addKill();
     this.personalStatsPanel.onKill();
 
-    // Sync K/D to mobile status bar
-    this.elements.mobileStatusBar.setScore(
-      this.elements.killCounter.getKills(),
-      this.elements.killCounter.getDeaths(),
-    );
-
     // Get kill streak multiplier
     const multiplier = this.statsTracker.getKillStreakMultiplier();
 
@@ -222,12 +216,6 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.killCounter.addDeath();
     this.statsTracker.addDeath();
     this.personalStatsPanel.onDeath();
-
-    // Sync K/D to mobile status bar
-    this.elements.mobileStatusBar.setScore(
-      this.elements.killCounter.getKills(),
-      this.elements.killCounter.getDeaths(),
-    );
   }
 
   addZoneCapture(zoneName?: string, isLost?: boolean): void {
