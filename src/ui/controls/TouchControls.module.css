@@ -364,11 +364,15 @@
   composes: btn;
   position: fixed;
   right: max(var(--tc-edge-inset), env(safe-area-inset-right, 0px));
+  /* Position above the action button stack (3 buttons + 2 gaps + margin).
+     Action container bottom: 36% + fire/2 + 12px.
+     Action container height: 3 * action-size + 2 * 10px gap.
+     Rally sits above with 10px spacing to match the action button gap. */
   bottom: calc(
-    var(--tc-fire-size)
-    + var(--tc-action-size)
-    + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px))
-    + 36px
+    36%
+    + var(--tc-fire-size) / 2 + 12px
+    + var(--tc-action-size) * 3 + 20px
+    + 10px
   );
   width: 56px;
   height: 56px;
@@ -382,6 +386,18 @@
 .rallyBtn.pressed {
   background: rgba(100, 255, 100, 0.6);
   transform: scale(0.9);
+}
+
+/* Portrait: match action container's 30% base offset */
+@media (orientation: portrait) {
+  .rallyBtn {
+    bottom: calc(
+      30%
+      + var(--tc-fire-size) / 2 + 12px
+      + var(--tc-action-size) * 3 + 20px
+      + 10px
+    );
+  }
 }
 
 /* ==========================================================================

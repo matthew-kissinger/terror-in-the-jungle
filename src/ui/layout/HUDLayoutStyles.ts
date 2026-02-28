@@ -243,7 +243,7 @@ export const HUD_LAYOUT_STYLES = `
    * Right column kept empty — touch controls are fixed-pos.
    * Weapon-bar + health bottom-left, nothing in screen center.
    *
-   *  minimap    | status-bar  | menu
+   *  menu       | status-bar  | minimap
    *             |             |
    *             |             |
    *  weapon-bar |             |
@@ -253,22 +253,27 @@ export const HUD_LAYOUT_STYLES = `
    * ========================================================= */
   @media (pointer: coarse) and (orientation: landscape) {
     #game-hud-root {
-      grid-template-columns: minmax(100px, 1fr) minmax(140px, 2fr) minmax(80px, 1fr);
+      grid-template-columns: minmax(100px, 1fr) minmax(140px, 2fr) minmax(100px, 1fr);
       grid-template-rows:
-        auto     /* minimap / status-bar / menu */
+        auto     /* menu / status-bar / minimap */
         1fr      /* flex space (center overlay lives here) */
         auto     /* weapon-bar */
         auto     /* health */
         auto     /* joystick */
         auto;    /* joystick */
       grid-template-areas:
-        "minimap     status-bar  menu"
+        "menu        status-bar  minimap"
         ".           center      ."
         "weapon-bar  .           ."
         "health      .           ."
         "joystick    .           ."
         "joystick    .           .";
       gap: 2px;
+    }
+
+    /* Landscape: menu moves to left column — align it left */
+    .hud-slot[data-region="menu"] {
+      justify-content: flex-start;
     }
   }
 
