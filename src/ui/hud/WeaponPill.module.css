@@ -1,0 +1,127 @@
+/**
+ * WeaponPill - Compact mobile weapon indicator
+ *
+ * Replaces the 6-slot weapon bar with a minimal pill:
+ *   [◂] AR 30/90 [▸]
+ *
+ * Modern 2026 aesthetic: solid dark fill, no borders, subtle glow.
+ */
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: var(--radius-pill, 50px);
+  padding: 3px 2px;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  min-width: 120px;
+  height: 38px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+.chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 20px;
+  font-weight: bold;
+  padding: 0;
+  touch-action: none;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chevron:active {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.info {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1;
+  justify-content: center;
+  touch-action: none;
+  cursor: grab;
+  padding: 0 2px;
+}
+
+.weaponName {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  line-height: 1;
+}
+
+.ammo {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  font-family: var(--font-primary, 'Rajdhani', sans-serif);
+  line-height: 1;
+  transition: color var(--duration-fast, 150ms) ease;
+}
+
+.ammoSep {
+  color: rgba(255, 255, 255, 0.25);
+  margin: 0 1px;
+  font-weight: 400;
+}
+
+/* Ammo states */
+.low .ammo { color: var(--accent, #d97706); }
+.low .weaponName { color: rgba(255, 255, 255, 0.85); }
+
+.empty .ammo { color: var(--danger, #ef4444); }
+.empty .weaponName { color: rgba(255, 255, 255, 0.7); }
+
+.noAmmo .ammo { color: var(--critical, #dc2626); }
+.noAmmo .weaponName { color: rgba(255, 255, 255, 0.45); }
+
+/* On weapon cycle, brief highlight */
+.pill.switching {
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.15), 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Desktop: hidden (UnifiedWeaponBar handles desktop) */
+:global([data-device="desktop"]) .pill {
+  display: none;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .pill {
+    min-width: 100px;
+    height: 32px;
+    padding: 2px 1px;
+  }
+
+  .chevron {
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
+  }
+
+  .weaponName { font-size: 12px; }
+  .ammo { font-size: 10px; }
+}

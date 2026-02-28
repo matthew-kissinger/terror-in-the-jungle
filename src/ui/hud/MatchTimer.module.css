@@ -7,9 +7,15 @@
  */
 
 .container {
-  padding: var(--space-0-5) var(--space-2);
+  padding: var(--space-0-5) var(--space-3);
   pointer-events: none;
   user-select: none;
+  background: rgba(10, 15, 8, 0.45);
+  backdrop-filter: blur(4px);
+  border-radius: 50px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  display: inline-flex;
+  align-items: center;
 }
 
 .display {

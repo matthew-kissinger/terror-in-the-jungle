@@ -30,6 +30,7 @@ const ALL_REGIONS: HUDRegion[] = [
   'weapon-bar',
   'center',
   'health',
+  'status-bar',
   'joystick',
   'fire',
   'ads',

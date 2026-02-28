@@ -107,6 +107,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
     // Initialize ticket display
     this.elements.ticketDisplay.setTickets(300, 300);
+    this.elements.mobileStatusBar.setTickets(300, 300);
 
     Logger.info('hud', ' HUD System initialized');
   }
@@ -124,12 +125,15 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       if (this.ticketSystem) {
         this.updateGameStatus(this.ticketSystem);
         this.elements.ticketDisplay.setMode(isTDM, this.ticketSystem.getKillTarget());
-        this.elements.ticketDisplay.setTickets(
-          this.ticketSystem.getTickets(Faction.US),
-          this.ticketSystem.getTickets(Faction.NVA)
-        );
+        const usTickets = this.ticketSystem.getTickets(Faction.US);
+        const opforTickets = this.ticketSystem.getTickets(Faction.NVA);
+        const timeRemaining = this.ticketSystem.getMatchTimeRemaining();
+        this.elements.ticketDisplay.setTickets(usTickets, opforTickets);
         // Update match timer
-        this.elements.matchTimer.setTime(this.ticketSystem.getMatchTimeRemaining());
+        this.elements.matchTimer.setTime(timeRemaining);
+        // Feed mobile status bar (merged timer + tickets)
+        this.elements.mobileStatusBar.setTickets(usTickets, opforTickets);
+        this.elements.mobileStatusBar.setTime(timeRemaining);
       }
 
       this.staticHudAccumulator = 0;
@@ -356,6 +360,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
   updateAmmoDisplay(magazine: number, reserve: number): void {
     this.elements.updateAmmoDisplay(magazine, reserve);
+    // Also update the mobile WeaponPill ammo display
+    this.elements.weaponPill.setAmmo(magazine, reserve);
   }
 
   showInteractionPrompt(text: string): void {
@@ -447,13 +453,15 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.showWeaponSwitch(weaponName, weaponIcon, ammo);
   }
 
-  // Unified weapon bar API
+  // Unified weapon bar API (shared across desktop bar + mobile pill)
   setWeaponSelectCallback(callback: (slotIndex: number) => void): void {
     this.elements.unifiedWeaponBar.setOnWeaponSelect(callback);
+    this.elements.weaponPill.setOnWeaponSelect(callback);
   }
 
   setActiveWeaponSlot(slot: number): void {
     this.elements.unifiedWeaponBar.setActiveSlot(slot);
+    this.elements.weaponPill.setActiveSlot(slot);
   }
 
   // Scoreboard toggle
