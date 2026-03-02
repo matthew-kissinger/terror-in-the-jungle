@@ -119,7 +119,10 @@ export class TouchControls {
       callbacks.onWeaponSelect(slotIndex);
     });
 
-    this.adsButton.setOnADSToggle(callbacks.onADSToggle);
+    this.adsButton.setOnADSToggle((active: boolean) => {
+      this.look.setADS(active);
+      callbacks.onADSToggle(active);
+    });
     this.interactionButton.setCallback(callbacks.onEnterExitHelicopter);
     this.sandbagButtons.setCallbacks(callbacks.onSandbagRotateLeft, callbacks.onSandbagRotateRight);
     this.rallyPointButton.setCallback(callbacks.onRallyPointPlace);

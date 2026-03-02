@@ -20,16 +20,20 @@ export class TouchLook extends UIComponent {
   /** Accumulated delta since last read - consumed by PlayerInput */
   readonly delta = { x: 0, y: 0 };
 
-  private sensitivity = 0.004;
+  private sensitivity = 0.006;
 
   /** Dead zone in CSS pixels - movements below this are ignored to prevent jitter */
-  private deadZone = 1.5;
+  private deadZone = 0.5;
 
   /**
-   * Acceleration exponent. 1.0 = linear (raw), <1.0 = sub-linear (fine aim boost).
-   * Default 0.75 gives sqrt-like curve: small swipes are finer, fast swipes feel natural.
+   * Acceleration exponent. 1.0 = linear (raw), >1.0 = super-linear (fast swipe boost).
+   * 1.35 tuned for Fortnite-style feel: precise aim at low speed, fast 180s on flicks.
    */
-  private accelExponent = 0.75;
+  private accelExponent = 1.35;
+
+  /** ADS (aim-down-sight) sensitivity multiplier. Applied on top of base sensitivity. */
+  private adsSensitivityMultiplier = 0.45;
+  private isADS = false;
 
   protected build(): void {
     this.root.className = styles.lookZone;
@@ -53,6 +57,11 @@ export class TouchLook extends UIComponent {
 
   setAcceleration(exponent: number): void {
     this.accelExponent = Math.max(0.1, Math.min(2.0, exponent));
+  }
+
+  /** Enable/disable ADS sensitivity reduction. */
+  setADS(active: boolean): void {
+    this.isADS = active;
   }
 
   private handlePointerDown = (e: PointerEvent): void => {
@@ -89,8 +98,11 @@ export class TouchLook extends UIComponent {
     }
 
     // Accumulate deltas (consumed by PlayerInput)
-    this.delta.x += dx * this.sensitivity;
-    this.delta.y += dy * this.sensitivity;
+    const effectiveSensitivity = this.isADS
+      ? this.sensitivity * this.adsSensitivityMultiplier
+      : this.sensitivity;
+    this.delta.x += dx * effectiveSensitivity;
+    this.delta.y += dy * effectiveSensitivity;
 
     this.lastX = e.clientX;
     this.lastY = e.clientY;
