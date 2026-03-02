@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Logger } from '../../utils/Logger';
+import { isMobileGPU } from '../../utils/DeviceDetector';
 
 /**
  * Retro post-processing: pixelation + color quantization.
@@ -31,7 +32,8 @@ export class PostProcessingManager {
     _camera: THREE.Camera,
   ) {
     this.renderer = renderer;
-    this.pixelScale = 3;
+    // Mobile already has limited resolution — use lighter pixelation to stay readable
+    this.pixelScale = isMobileGPU() ? 2 : 3;
 
     const size = renderer.getSize(new THREE.Vector2());
     const w = Math.max(1, Math.floor(size.x / this.pixelScale));

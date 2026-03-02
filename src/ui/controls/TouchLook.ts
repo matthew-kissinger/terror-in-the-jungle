@@ -20,16 +20,16 @@ export class TouchLook extends UIComponent {
   /** Accumulated delta since last read - consumed by PlayerInput */
   readonly delta = { x: 0, y: 0 };
 
-  private sensitivity = 0.004;
+  private sensitivity = 0.006;
 
   /** Dead zone in CSS pixels - movements below this are ignored to prevent jitter */
-  private deadZone = 1.5;
+  private deadZone = 1.0;
 
   /**
-   * Acceleration exponent. 1.0 = linear (raw), <1.0 = sub-linear (fine aim boost).
-   * Default 0.75 gives sqrt-like curve: small swipes are finer, fast swipes feel natural.
+   * Acceleration exponent. 1.0 = linear (raw), >1.0 = super-linear (fast swipe boost).
+   * Default 1.2 gives Fortnite-style feel: precise aim at low speed, fast 180s on flicks.
    */
-  private accelExponent = 0.75;
+  private accelExponent = 1.2;
 
   protected build(): void {
     this.root.className = styles.lookZone;
