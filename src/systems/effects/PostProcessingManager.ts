@@ -33,7 +33,7 @@ export class PostProcessingManager {
   ) {
     this.renderer = renderer;
     // Mobile already has limited resolution — use lighter pixelation to stay readable
-    this.pixelScale = isMobileGPU() ? 2 : 3;
+    this.pixelScale = isMobileGPU() ? 1.5 : 3;
 
     const size = renderer.getSize(new THREE.Vector2());
     const w = Math.max(1, Math.floor(size.x / this.pixelScale));

@@ -94,7 +94,7 @@ describe('SettingsManager', () => {
     expect(all).toEqual({
       masterVolume: 70,
       mouseSensitivity: 5,
-      touchSensitivity: 6,
+      touchSensitivity: 7,
       controllerPreset: 'default',
       controllerMoveDeadZone: 15,
       controllerLookDeadZone: 15,
