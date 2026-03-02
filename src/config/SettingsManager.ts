@@ -8,7 +8,7 @@ export type ControllerDpadMode = 'weapons' | 'quickCommands';
 export interface GameSettings {
   masterVolume: number;       // 0-100
   mouseSensitivity: number;   // 1-10 (UI scale), mapped to 0.001-0.005 internally
-  touchSensitivity: number;   // 1-10 (UI scale), mapped to 0.006-0.024 internally (Fortnite-level responsiveness)
+  touchSensitivity: number;   // 1-10 (UI scale), mapped to 0.006-0.024 internally
   controllerPreset: ControllerPreset;
   controllerMoveDeadZone: number; // 5-30 percent
   controllerLookDeadZone: number; // 5-30 percent
@@ -28,7 +28,7 @@ const STORAGE_KEY = 'pixelart-sandbox-settings';
 const DEFAULT_SETTINGS: GameSettings = {
   masterVolume: 70,
   mouseSensitivity: 5,
-  touchSensitivity: 7,
+  touchSensitivity: 5,
   controllerPreset: 'default',
   controllerMoveDeadZone: 15,
   controllerLookDeadZone: 15,
