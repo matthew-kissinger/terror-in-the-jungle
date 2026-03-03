@@ -1,0 +1,299 @@
+# UI Domain
+
+> Self-contained reference. 4 blocks, 60+ modules across 10 subdirectories under `src/ui/`.
+> HUD has NO polling loop for most data - other systems push via direct method calls.
+> HUDSystem.update() does only 5Hz zone/ticket polling.
+> UIComponent is the abstract base class for all widget modules; it uses @preact/signals-core for reactive state.
+> All DOM mounting goes through HUDLayout.getSlot() to preserve the CSS Grid structure.
+> VisibilityManager controls slot visibility via data-phase and data-vehicle CSS attributes (not JS style manipulation).
+
+[GH]: https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src
+
+---
+
+## Blocks
+
+| Block | Modules | Budget | Update Rate | Fan-in | Notes |
+|---|---|---|---|---|---|
+| HUDSystem | 27 (see below) | 1ms | push + 5Hz poll | 7 | push-driven; owns HUDZoneDisplay |
+| MinimapSystem | MinimapSystem + 3 helpers | 0.5ms | 20Hz | 3 | canvas 2D, downsampled position reads |
+| FullMapSystem | FullMapSystem + 6 helpers | 0.5ms | 20Hz (when open) | 4 | paused when closed |
+| CompassSystem | CompassSystem + 3 helpers | 0.5ms | 20Hz | 1 | reads player yaw only |
+
+---
+
+## Directory Layout
+
+All UI files live under `src/ui/` (not `src/systems/`):
+
+```
+src/ui/
+  compass/     CompassSystem, CompassDOMBuilder, CompassStyles, CompassZoneMarkers
+  controls/    TouchControls, TouchLook, TouchFireButton, TouchADSButton, TouchActionButtons,
+               TouchInteractionButton, TouchMenuButton, TouchMortarButton, TouchRallyPointButton,
+               TouchSandbagButtons, TouchHelicopterCyclic, VirtualJoystick, GamepadManager,
+               TouchControlLayout
+  debug/       PerformanceOverlay, LogOverlay, TimeIndicator
+  design/      styles, tokens, responsive, index
+  end/         MatchEndScreen
+  engine/      UIComponent, css-modules.d, index
+  hud/         27 widget modules (see registry below)
+  layout/      HUDLayout, HUDLayoutStyles, VisibilityManager, types, index
+  loading/     StartScreen, ModeCard, SettingsModal, HowToPlayModal, LoadingPanels, LoadingProgress
+  loadout/     LoadoutSelector, LoadoutGrenadePanel, LoadoutTypes
+  map/         FullMapSystem, FullMapInput, FullMapStyles, FullMapDOMHelpers,
+               RespawnMapView, OpenFrontierRespawnMap, OpenFrontierRespawnMapRenderer,
+               OpenFrontierRespawnMapUtils
+  minimap/     MinimapSystem, MinimapDOMBuilder, MinimapRenderer, MinimapStyles
+  MobilePauseOverlay.ts
+```
+
+---
+
+## HUD Module Registry (27 modules in `ui/hud/`)
+
+| Module | File | Role |
+|---|---|---|
+| [HUDSystem]([GH]/ui/hud/HUDSystem.ts) | ui/hud/HUDSystem.ts | Top-level block class; owns HUDElements and HUDZoneDisplay; 5Hz zone/ticket poll |
+| [HUDElements]([GH]/ui/hud/HUDElements.ts) | ui/hud/HUDElements.ts | Instantiates and wires all widget UIComponent instances |
+| [HUDZoneDisplay]([GH]/ui/hud/HUDZoneDisplay.ts) | ui/hud/HUDZoneDisplay.ts | Zone objectives panel, owned by HUDSystem |
+| [HUDStyles]([GH]/ui/hud/HUDStyles.ts) | ui/hud/HUDStyles.ts | Injects global HUD CSS at runtime |
+| [HUDZoneStyles]([GH]/ui/hud/HUDZoneStyles.ts) | ui/hud/HUDZoneStyles.ts | Zone display CSS styles |
+| [ScoreboardPanel]([GH]/ui/hud/ScoreboardPanel.ts) | ui/hud/ScoreboardPanel.ts | Tab-key scoreboard overlay |
+| [StatsPanel]([GH]/ui/hud/StatsPanel.ts) | ui/hud/StatsPanel.ts | Per-player stats display within scoreboard |
+| [UnifiedWeaponBar]([GH]/ui/hud/UnifiedWeaponBar.ts) | ui/hud/UnifiedWeaponBar.ts | Unified weapon slot bar (replaces 3 legacy duplicates) |
+| [WeaponPill]([GH]/ui/hud/WeaponPill.ts) | ui/hud/WeaponPill.ts | Single weapon slot pill inside UnifiedWeaponBar |
+| [WeaponSwitchFeedback]([GH]/ui/hud/WeaponSwitchFeedback.ts) | ui/hud/WeaponSwitchFeedback.ts | Brief animation on weapon swap |
+| [AmmoDisplay]([GH]/ui/hud/AmmoDisplay.ts) | ui/hud/AmmoDisplay.ts | Current mag / reserve ammo counts |
+| [GrenadeMeter]([GH]/ui/hud/GrenadeMeter.ts) | ui/hud/GrenadeMeter.ts | Grenade count + cook progress arc |
+| [KillCounter]([GH]/ui/hud/KillCounter.ts) | ui/hud/KillCounter.ts | Running kill tally for player |
+| [KillFeed]([GH]/ui/hud/KillFeed.ts) | ui/hud/KillFeed.ts | Scrolling kill feed, auto-expires entries |
+| [MatchTimer]([GH]/ui/hud/MatchTimer.ts) | ui/hud/MatchTimer.ts | Countdown timer from TicketSystem |
+| [TicketDisplay]([GH]/ui/hud/TicketDisplay.ts) | ui/hud/TicketDisplay.ts | BLUFOR/OPFOR ticket counts |
+| [HelicopterHUD]([GH]/ui/hud/HelicopterHUD.ts) | ui/hud/HelicopterHUD.ts | RPM gauge, altitude, airspeed instruments |
+| [GameStatusPanel]([GH]/ui/hud/GameStatusPanel.ts) | ui/hud/GameStatusPanel.ts | Mode-specific status text (e.g., "Capturing...") |
+| [InteractionPromptPanel]([GH]/ui/hud/InteractionPromptPanel.ts) | ui/hud/InteractionPromptPanel.ts | Context prompt (E to enter helicopter, etc.) |
+| [ObjectiveDisplay]([GH]/ui/hud/ObjectiveDisplay.ts) | ui/hud/ObjectiveDisplay.ts | Primary objective text slot |
+| [MobileStatusBar]([GH]/ui/hud/MobileStatusBar.ts) | ui/hud/MobileStatusBar.ts | Compact status for portrait-fallback |
+| [MortarPanel]([GH]/ui/hud/MortarPanel.ts) | ui/hud/MortarPanel.ts | Mortar targeting UI overlay |
+| [SquadRadialMenu]([GH]/ui/hud/SquadRadialMenu.ts) | ui/hud/SquadRadialMenu.ts | Radial command menu for squad orders |
+| [DamageNumberSystem]([GH]/ui/hud/DamageNumberSystem.ts) | ui/hud/DamageNumberSystem.ts | Floating damage numbers in world space |
+| [HitMarkerFeedback]([GH]/ui/hud/HitMarkerFeedback.ts) | ui/hud/HitMarkerFeedback.ts | Crosshair hit flash |
+| [ScorePopupSystem]([GH]/ui/hud/ScorePopupSystem.ts) | ui/hud/ScorePopupSystem.ts | "+100 pts" popups |
+| [ZoneCaptureNotification]([GH]/ui/hud/ZoneCaptureNotification.ts) | ui/hud/ZoneCaptureNotification.ts | "Zone captured!" banner on ownership flip |
+
+---
+
+## Layout System (in `ui/layout/`)
+
+| Module | File | Role |
+|---|---|---|
+| [HUDLayout]([GH]/ui/layout/HUDLayout.ts) | ui/layout/HUDLayout.ts | Creates `#game-hud-root`, 18 named CSS Grid slots, `getSlot(region)` API |
+| [HUDLayoutStyles]([GH]/ui/layout/HUDLayoutStyles.ts) | ui/layout/HUDLayoutStyles.ts | CSS Grid template definitions (desktop, mobile-landscape, mobile-portrait) |
+| [VisibilityManager]([GH]/ui/layout/VisibilityManager.ts) | ui/layout/VisibilityManager.ts | Sets data-device/data-phase/data-vehicle/data-ads attributes on `#game-hud-root`; CSS rules handle visibility |
+| [types]([GH]/ui/layout/types.ts) | ui/layout/types.ts | `HUDRegion` type (18 values), `LayoutMode`, `UIState`, `LayoutComponent`, `LayoutRegistration` |
+
+---
+
+## 18 Named HUD Regions
+
+Source: [types.ts]([GH]/ui/layout/types.ts) `HUDRegion` type
+
+| Region | Category | Default Content |
+|---|---|---|
+| `timer` | Info | MatchTimer |
+| `tickets` | Info | TicketDisplay |
+| `game-status` | Info | GameStatusPanel |
+| `compass` | Info | CompassSystem |
+| `minimap` | Info | MinimapSystem canvas |
+| `objectives` | Info | ObjectiveDisplay / HUDZoneDisplay |
+| `stats` | Info | StatsPanel (within ScoreboardPanel) |
+| `kill-feed` | Info | KillFeed |
+| `ammo` | Info | AmmoDisplay |
+| `weapon-bar` | Info | UnifiedWeaponBar |
+| `center` | Info | hit markers, damage numbers, grenade meter, mortar indicator |
+| `health` | Info | health bar / player status |
+| `status-bar` | Mobile | merged timer + tickets in one compact line |
+| `joystick` | Touch | VirtualJoystick (left side) |
+| `fire` | Touch | TouchFireButton |
+| `ads` | Touch | TouchADSButton |
+| `action-btns` | Touch | reload, crouch, sprint buttons |
+| `menu` | Touch | TouchMenuButton |
+
+Visibility: `data-show="infantry"` on `weapon-bar` and `action-btns` - CSS hides these when `data-vehicle="helicopter"` is set on `#game-hud-root`. VisibilityManager sets/removes data attributes. Do not use JS `style.display` to hide/show slots.
+
+---
+
+## Touch Control Module Registry (14 modules in `ui/controls/`)
+
+| Module | File | Role |
+|---|---|---|
+| [TouchControls]([GH]/ui/controls/TouchControls.ts) | ui/controls/TouchControls.ts | Root touch controller, delegates to sub-modules |
+| [TouchLook]([GH]/ui/controls/TouchLook.ts) | ui/controls/TouchLook.ts | Right-side swipe -> camera yaw/pitch |
+| [TouchFireButton]([GH]/ui/controls/TouchFireButton.ts) | ui/controls/TouchFireButton.ts | Fire button, pointer events |
+| [TouchADSButton]([GH]/ui/controls/TouchADSButton.ts) | ui/controls/TouchADSButton.ts | Aim-down-sights toggle |
+| [TouchActionButtons]([GH]/ui/controls/TouchActionButtons.ts) | ui/controls/TouchActionButtons.ts | Reload, crouch, sprint buttons |
+| [TouchInteractionButton]([GH]/ui/controls/TouchInteractionButton.ts) | ui/controls/TouchInteractionButton.ts | Context interaction (enter helicopter, pick up weapon) |
+| [TouchMenuButton]([GH]/ui/controls/TouchMenuButton.ts) | ui/controls/TouchMenuButton.ts | Pause/menu button |
+| [TouchMortarButton]([GH]/ui/controls/TouchMortarButton.ts) | ui/controls/TouchMortarButton.ts | Opens mortar targeting mode |
+| [TouchRallyPointButton]([GH]/ui/controls/TouchRallyPointButton.ts) | ui/controls/TouchRallyPointButton.ts | Places squad rally point |
+| [TouchSandbagButtons]([GH]/ui/controls/TouchSandbagButtons.ts) | ui/controls/TouchSandbagButtons.ts | Place/remove sandbag buttons |
+| [TouchHelicopterCyclic]([GH]/ui/controls/TouchHelicopterCyclic.ts) | ui/controls/TouchHelicopterCyclic.ts | Cyclic joystick for helicopter (no collective/yaw on touch) |
+| [VirtualJoystick]([GH]/ui/controls/VirtualJoystick.ts) | ui/controls/VirtualJoystick.ts | Reusable floating joystick widget |
+| [GamepadManager]([GH]/ui/controls/GamepadManager.ts) | ui/controls/GamepadManager.ts | Gamepad API polling, axis/button mapping |
+| [TouchControlLayout]([GH]/ui/controls/TouchControlLayout.ts) | ui/controls/TouchControlLayout.ts | Positions touch controls on screen, CSS custom properties |
+
+---
+
+## Loading / Menu Module Registry (in `ui/loading/`)
+
+| Module | File | Role |
+|---|---|---|
+| [StartScreen]([GH]/ui/loading/StartScreen.ts) | ui/loading/StartScreen.ts | Main menu, mode carousel, deploy button |
+| [ModeCard]([GH]/ui/loading/ModeCard.ts) | ui/loading/ModeCard.ts | Individual mode card within the carousel |
+| [SettingsModal]([GH]/ui/loading/SettingsModal.ts) | ui/loading/SettingsModal.ts | Graphics/audio settings |
+| [HowToPlayModal]([GH]/ui/loading/HowToPlayModal.ts) | ui/loading/HowToPlayModal.ts | Controls reference modal |
+| [LoadingPanels]([GH]/ui/loading/LoadingPanels.ts) | ui/loading/LoadingPanels.ts | Loading state panel layout |
+| [LoadingProgress]([GH]/ui/loading/LoadingProgress.ts) | ui/loading/LoadingProgress.ts | Progress bar driven by bootstrap events |
+
+---
+
+## Match End (in `ui/end/`)
+
+| Module | File | Role |
+|---|---|---|
+| [MatchEndScreen]([GH]/ui/end/MatchEndScreen.ts) | ui/end/MatchEndScreen.ts | Victory/defeat overlay, triggered by gameEndCallback |
+
+---
+
+## Loadout (in `ui/loadout/`)
+
+| Module | File | Role |
+|---|---|---|
+| [LoadoutSelector]([GH]/ui/loadout/LoadoutSelector.ts) | ui/loadout/LoadoutSelector.ts | Weapon loadout picker. DEFERRED (500ms after first frame). |
+| [LoadoutGrenadePanel]([GH]/ui/loadout/LoadoutGrenadePanel.ts) | ui/loadout/LoadoutGrenadePanel.ts | Grenade selection sub-panel |
+| [LoadoutTypes]([GH]/ui/loadout/LoadoutTypes.ts) | ui/loadout/LoadoutTypes.ts | Type definitions for loadout items |
+
+---
+
+## Map / Compass Module Registry
+
+| Module | File | Role |
+|---|---|---|
+| [MinimapSystem]([GH]/ui/minimap/MinimapSystem.ts) | ui/minimap/MinimapSystem.ts | Canvas 2D minimap, 20Hz, blip rendering |
+| [MinimapDOMBuilder]([GH]/ui/minimap/MinimapDOMBuilder.ts) | ui/minimap/MinimapDOMBuilder.ts | Minimap container DOM construction |
+| [MinimapRenderer]([GH]/ui/minimap/MinimapRenderer.ts) | ui/minimap/MinimapRenderer.ts | Canvas rendering logic for blips and overlays |
+| [MinimapStyles]([GH]/ui/minimap/MinimapStyles.ts) | ui/minimap/MinimapStyles.ts | Minimap CSS |
+| [FullMapSystem]([GH]/ui/map/FullMapSystem.ts) | ui/map/FullMapSystem.ts | Full-screen map overlay |
+| [FullMapInput]([GH]/ui/map/FullMapInput.ts) | ui/map/FullMapInput.ts | Pan/zoom input for full map |
+| [FullMapStyles]([GH]/ui/map/FullMapStyles.ts) | ui/map/FullMapStyles.ts | Full map CSS |
+| [FullMapDOMHelpers]([GH]/ui/map/FullMapDOMHelpers.ts) | ui/map/FullMapDOMHelpers.ts | DOM helper utilities for full map |
+| [RespawnMapView]([GH]/ui/map/RespawnMapView.ts) | ui/map/RespawnMapView.ts | Respawn point selection overlay on full map |
+| [OpenFrontierRespawnMap]([GH]/ui/map/OpenFrontierRespawnMap.ts) | ui/map/OpenFrontierRespawnMap.ts | Open Frontier mode respawn map variant |
+| [OpenFrontierRespawnMapRenderer]([GH]/ui/map/OpenFrontierRespawnMapRenderer.ts) | ui/map/OpenFrontierRespawnMapRenderer.ts | Renderer for Open Frontier respawn map |
+| [OpenFrontierRespawnMapUtils]([GH]/ui/map/OpenFrontierRespawnMapUtils.ts) | ui/map/OpenFrontierRespawnMapUtils.ts | Utility functions for Open Frontier respawn map |
+| [CompassSystem]([GH]/ui/compass/CompassSystem.ts) | ui/compass/CompassSystem.ts | Heading compass strip, reads player yaw |
+| [CompassDOMBuilder]([GH]/ui/compass/CompassDOMBuilder.ts) | ui/compass/CompassDOMBuilder.ts | Compass container DOM construction |
+| [CompassStyles]([GH]/ui/compass/CompassStyles.ts) | ui/compass/CompassStyles.ts | Compass CSS |
+| [CompassZoneMarkers]([GH]/ui/compass/CompassZoneMarkers.ts) | ui/compass/CompassZoneMarkers.ts | Zone direction markers on compass |
+
+---
+
+## UI Engine (in `ui/engine/`)
+
+| Module | File | Role |
+|---|---|---|
+| [UIComponent]([GH]/ui/engine/UIComponent.ts) | ui/engine/UIComponent.ts | Abstract base class; @preact/signals-core reactive state |
+
+---
+
+## Design System (in `ui/design/`)
+
+| Module | File | Role |
+|---|---|---|
+| [styles]([GH]/ui/design/styles.ts) | ui/design/styles.ts | Shared CSS helper functions |
+| [tokens]([GH]/ui/design/tokens.ts) | ui/design/tokens.ts | Design tokens (colors, spacing, typography) |
+| [responsive]([GH]/ui/design/responsive.ts) | ui/design/responsive.ts | ViewportManager singleton, breakpoint signals |
+
+---
+
+## Debug Overlays (in `ui/debug/`)
+
+| Module | File | Role |
+|---|---|---|
+| [PerformanceOverlay]([GH]/ui/debug/PerformanceOverlay.ts) | ui/debug/PerformanceOverlay.ts | F2 real-time perf stats overlay |
+| [LogOverlay]([GH]/ui/debug/LogOverlay.ts) | ui/debug/LogOverlay.ts | F3 log message overlay |
+| [TimeIndicator]([GH]/ui/debug/TimeIndicator.ts) | ui/debug/TimeIndicator.ts | F4 time indicator |
+
+---
+
+## Other
+
+| Module | File | Role |
+|---|---|---|
+| [MobilePauseOverlay]([GH]/ui/MobilePauseOverlay.ts) | ui/MobilePauseOverlay.ts | Shown on mobile visibility change (tab backgrounded) |
+
+---
+
+## Wiring
+
+### Deps In (what UI blocks need)
+
+| Dep | Source | Injected Via |
+|---|---|---|
+| ZoneManager (zone state) | ZoneManager | setter (HUDSystem 5Hz poll) |
+| TicketSystem (counts) | TicketSystem | setter (HUDSystem 5Hz poll) |
+| CombatantSystem (positions) | CombatantSystem | setter (MinimapSystem, FullMapSystem) |
+| PlayerState (position, yaw) | PlayerSystem | setter (CompassSystem, MinimapSystem) |
+| HeightQueryCache | TerrainSystem | setter (FullMapSystem terrain overlay) |
+
+### Deps Out (what UI blocks provide - all via direct calls)
+
+| Caller | Method Called | Trigger |
+|---|---|---|
+| FirstPersonWeapon | hud.updateAmmoDisplay(mag, reserve) | on fire / reload |
+| CombatantSystem | hud.addKillToFeed(killer, victim) | on kill event |
+| HelicopterModel | hud.showHelicopterInstruments(rpm, alt, spd) | on enter helicopter |
+| HelicopterModel | hud.hideHelicopterInstruments() | on exit helicopter |
+| GrenadeSystem | hud.updateGrenadeMeter(count, cookProgress) | on cook / throw |
+| TicketSystem | hud.handleGameEnd(winner) | on match end |
+| PlayerRespawnManager | hud.showRespawnMap() | on player death |
+| CombatantSystem | hud.spawnDamageNumber(pos, amount) | on hit |
+
+---
+
+## Data Flow Summary
+
+```
+PUSH (most data):
+  FirstPersonWeapon   ---ammo--->  HUDSystem.updateAmmoDisplay()
+  CombatantSystem     ---kill--->  HUDSystem.addKillToFeed()
+  HelicopterModel     ---rpm---->  HUDSystem.showHelicopterInstruments()
+  GrenadeSystem       ---count-->  HUDSystem.updateGrenadeMeter()
+
+POLL (5Hz, in HUDSystem.update()):
+  ZoneManager.getZones()    -> HUDZoneDisplay.refresh()
+  TicketSystem.getTickets() -> TicketDisplay.refresh()
+
+POLL (20Hz, own update()):
+  MinimapSystem: CombatantSystem.getPositions(), PlayerState.position
+  FullMapSystem: same (only when map is open)
+  CompassSystem: PlayerState.yaw
+```
+
+---
+
+## Mobile Entry
+
+Deploy button on StartScreen: calls `document.documentElement.requestFullscreen()` then `screen.orientation.lock('landscape')`. Compact fullscreen prompt auto-fades after 6 seconds. Touch controls activate only in fullscreen landscape.
+
+---
+
+## Related
+
+- [Hub](../CODEBASE_BLOCKS.md) | [Player](player.md) | [Combat](combat.md) | [World](world.md) | [Vehicle](vehicle.md) | [Weapons](weapons.md)
+- [src/ui/ directory]([GH]/ui) - full UI tree
+- [src/ui/hud/]([GH]/ui/hud) - HUD widget modules
+- [src/ui/controls/]([GH]/ui/controls) - touch controls
+- [src/ui/layout/]([GH]/ui/layout) - grid layout system
+- [src/ui/engine/]([GH]/ui/engine) - UIComponent base class
