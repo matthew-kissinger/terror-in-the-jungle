@@ -45,6 +45,7 @@ commit_*.sh
 run_*.sh
 test_build.sh
 test_telemetry.html
+prompts/
 
 # Python
 __pycache__/
