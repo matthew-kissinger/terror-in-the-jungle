@@ -122,7 +122,8 @@ export class CombatantAI {
           spatialGrid,
           this.findNearestEnemy.bind(this),
           this.canSeeTarget.bind(this),
-          this.shouldEngage.bind(this)
+          this.shouldEngage.bind(this),
+          this.getClusterDensity.bind(this)
         )
         break
 
@@ -184,7 +185,8 @@ export class CombatantAI {
           allCombatants,
           spatialGrid,
           this.findNearestEnemy.bind(this),
-          this.canSeeTarget.bind(this)
+          this.canSeeTarget.bind(this),
+          this.getClusterDensity.bind(this)
         )
         break
     }
@@ -197,6 +199,7 @@ export class CombatantAI {
   }
 
   beginFrame(): void {
+    this.targeting.beginFrame()
     for (const key of Object.keys(this.aiStateMs)) {
       this.aiStateMs[key] = 0
     }
@@ -348,6 +351,14 @@ export class CombatantAI {
 
   private shouldSeekCover(combatant: Combatant): boolean {
     return this.targeting.shouldSeekCover(combatant)
+  }
+
+  private getClusterDensity(
+    combatant: Combatant,
+    allCombatants: Map<string, Combatant>,
+    spatialGrid?: ISpatialQuery
+  ): number {
+    return this.targeting.getClusterDensity(combatant, allCombatants, spatialGrid)
   }
 
   private findNearestCover(combatant: Combatant, threatPosition: THREE.Vector3): THREE.Vector3 | null {

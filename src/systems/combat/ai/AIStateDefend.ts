@@ -34,7 +34,12 @@ export class AIStateDefend {
       combatant: Combatant,
       target: Combatant,
       playerPosition: THREE.Vector3
-    ) => boolean
+    ) => boolean,
+    getClusterDensity?: (
+      combatant: Combatant,
+      allCombatants: Map<string, Combatant>,
+      spatialGrid?: ISpatialQuery
+    ) => number
   ): void {
     // Check for nearby enemies - defenders engage if threatened
     const enemy = findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid);
@@ -64,7 +69,9 @@ export class AIStateDefend {
 
           // In clusters, stagger reactions to prevent synchronized behavior
           if (spatialGrid) {
-            const clusterDensity = this.getClusterDensity(combatant, allCombatants, spatialGrid);
+            const clusterDensity = getClusterDensity
+              ? getClusterDensity(combatant, allCombatants, spatialGrid)
+              : this.getClusterDensity(combatant, allCombatants, spatialGrid);
             if (clusterDensity > 0.3) {
               baseDelay = clusterManager.getStaggeredReactionDelay(baseDelay, clusterDensity);
             }

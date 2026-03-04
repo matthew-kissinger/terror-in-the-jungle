@@ -140,17 +140,43 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
   - The second warm `combat120` rerun lost combat pressure (`80 / 41` shots / hits) and was not trustworthy as an acceptance run.
 - Decision: revert the production change and keep the hotspot ranking. Revisit `HeightQueryCache` only with a lower-overhead design or after AI query reduction narrows the combat variance.
 
+### Accepted experiment: frame-local AI neighborhood cache
+
+- Accepted change: `AITargetAcquisition` now caches the widest `queryRadius()` result per combatant for the current frame, and patrol/defend cluster-density checks reuse that cached neighborhood through `CombatantAI` / `AITargeting`.
+- Primary acceptance pair:
+  - warm baseline: `2026-03-04T07-50-37-054Z`
+  - warm post-change: `2026-03-04T14-12-07-483Z`
+- Secondary / discarded captures:
+  - fresh pre-change control `2026-03-04T14-04-40-073Z` under-shot the driver (`81 / 44` shots / hits) and is not the primary A/B control.
+  - first post-change run `2026-03-04T14-09-38-289Z` restarted the dev server and is flagged as cold-start data.
+- Matched warm result under slightly higher combat pressure (`220 / 140` shots / hits post vs `212 / 130` baseline):
+  - `avgFrameMs`: `15.10 -> 14.59`
+  - `p95FrameMs`: `23.2 -> 22.6`
+  - hitch `>50ms`: `1.30% -> 1.04%`
+  - average over-budget time: `1.43% -> 1.08%`
+  - combat-budget dominance: `8.0% -> 5.7%`
+  - AI starvation: `16.82 -> 12.91` events/sample
+  - long tasks: `76 -> 63`; LoAF blocking: `6104.3ms -> 4910.4ms`
+  - heap end-growth: `15.73MB -> 3.64MB`
+  - heap peak-growth: `26.98MB -> 10.06MB`
+  - heap recovery: `41.7% -> 63.8%`
+- Remaining losses / limits:
+  - `peak_p99_frame_ms` still fails at `100ms`.
+  - `SystemUpdater.Combat.maxDurationMs` rose slightly: `224.4ms -> 233.6ms`.
+  - `SystemUpdater.Terrain.maxDurationMs` also rose slightly: `89.3ms -> 97.4ms`.
+- Decision: keep. The change measurably reduces average combat pressure, starvation, and heap churn under comparable or higher load, but it does not solve the worst combat-tail spikes. The next AI slice should target high-LOD `suppressing` / `advancing` work and off-frame movement/spatial upkeep.
+
 ## Validation Snapshot (2026-03-04)
 
-- `npm run test:run`: pass (`2956` tests passed, `2` skipped).
+- `npm run test:run`: pass (`2959` tests passed, `2` skipped).
 - `npm run validate`: pass (`test:run` + production build).
 - Production bundle scan: no matches for perf globals, observer hooks, or `SystemUpdater.*` timing labels in `dist/assets`.
 - Source console scan: raw console usage in shipping code is limited to fatal bootstrap errors in `src/main.ts` / `src/core/bootstrap.ts` plus the centralized `Logger` implementation.
 
 ## Ranked Phase 2 Targets
 
-1. `combat120` high-LOD AI spikes inside `CombatantAI.updateAI()`, especially target acquisition / nearby-enemy query churn.
-2. `HeightQueryCache.getHeightAt()` keying and LRU hit cost. This is now a cross-cutting hotspot for combat and terrain paths.
+1. `combat120` high-LOD AI spikes that remain after query-cache reuse, especially `suppressing` / `advancing` state work and off-frame upkeep in `CombatantLODManager.updateCombatantVisualOnly()`.
+2. `HeightQueryCache.getHeightAt()` keying and hit cost. This remains a cross-cutting hotspot for combat and terrain paths even after AI query consolidation.
 3. `TerrainRaycastRuntime` near-field rebuild bursts and the terrain height-sampling path in `open_frontier`, `frontier30m`, and `a_shau_valley`.
 4. A Shau `WarSim` steady-state cost and large heap waves once terrain tails are reduced enough to isolate strategy work more cleanly.
 5. GPU/asset pipeline work (`KTX2`, atlasing, WebGPU/BatchedMesh) after the current CPU bottlenecks are re-measured.
@@ -158,8 +184,8 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
 ## Frontier Technology Fit (Measured, Not Adopted)
 
 - High-fit, low-friction now:
+  - off-frame work reduction around `CombatantLODManager.updateCombatantVisualOnly()` and spacing-force paths
   - data-oriented keying / lower-churn cache strategy for `HeightQueryCache`
-  - combat AI query consolidation and scratch-buffer reuse around `AITargetAcquisition` / spacing queries
   - scheduling or throttling around near-field terrain rebuild work
 - Medium-fit after JS-level cleanup:
   - worker offload for terrain rebuild or WarSim batch work if either still exceeds `4ms/frame` after local optimizations

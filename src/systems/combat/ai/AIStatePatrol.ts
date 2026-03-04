@@ -46,7 +46,12 @@ export class AIStatePatrol {
       target: Combatant,
       playerPosition: THREE.Vector3
     ) => boolean,
-    shouldEngage: (combatant: Combatant, distance: number) => boolean
+    shouldEngage: (combatant: Combatant, distance: number) => boolean,
+    getClusterDensity?: (
+      combatant: Combatant,
+      allCombatants: Map<string, Combatant>,
+      spatialGrid?: ISpatialQuery
+    ) => number
   ): void {
     const squad = combatant.squadId ? this.squads.get(combatant.squadId) : undefined;
 
@@ -91,7 +96,9 @@ export class AIStatePatrol {
 
           // In clusters, stagger reactions to prevent synchronized behavior
           if (spatialGrid) {
-            const clusterDensity = this.getClusterDensity(combatant, allCombatants, spatialGrid);
+            const clusterDensity = getClusterDensity
+              ? getClusterDensity(combatant, allCombatants, spatialGrid)
+              : this.getClusterDensity(combatant, allCombatants, spatialGrid);
             if (clusterDensity > 0.3) {
               baseDelay = clusterManager.getStaggeredReactionDelay(baseDelay, clusterDensity);
             }

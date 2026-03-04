@@ -27,6 +27,10 @@ export class AITargeting {
     this.coverFinding = new AICoverFinding();
   }
 
+  beginFrame(): void {
+    this.targetAcquisition.beginFrame();
+  }
+
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {
     this.terrainSystem = terrainSystem;
     this.lineOfSight.setTerrainSystem(terrainSystem);
@@ -90,6 +94,14 @@ export class AITargeting {
       allCombatants,
       spatialGrid
     );
+  }
+
+  getClusterDensity(
+    combatant: Combatant,
+    allCombatants: Map<string, Combatant>,
+    spatialGrid?: ISpatialQuery
+  ): number {
+    return this.targetAcquisition.getClusterDensity(combatant, allCombatants, spatialGrid);
   }
 
   shouldSeekCover(combatant: Combatant): boolean {

@@ -17,11 +17,54 @@ const _playerProxy: Combatant = {
 } as Combatant;
 
 const _potentialTargetsScratch: Combatant[] = [];
+const CLUSTER_RADIUS = 15;
+const CLUSTER_RADIUS_SQ = CLUSTER_RADIUS * CLUSTER_RADIUS;
+const CLUSTER_THRESHOLD = 4;
+const MAX_EXPECTED_CLUSTER_NEIGHBORS = 10;
+
+type SpatialQueryCacheEntry = {
+  radius: number;
+  ids: readonly string[];
+};
 
 /**
  * Handles target acquisition and engagement decisions
  */
 export class AITargetAcquisition {
+  private readonly spatialQueryCache = new Map<string, SpatialQueryCacheEntry>();
+
+  beginFrame(): void {
+    this.spatialQueryCache.clear();
+  }
+
+  getClusterDensity(
+    combatant: Combatant,
+    allCombatants: Map<string, Combatant>,
+    spatialGrid?: ISpatialQuery
+  ): number {
+    if (!spatialGrid) {
+      return 0;
+    }
+
+    const nearbyIds = this.getNearbyIds(combatant, CLUSTER_RADIUS, spatialGrid);
+    let nearbyFriendlies = 0;
+
+    for (const id of nearbyIds) {
+      if (id === combatant.id) continue;
+
+      const other = allCombatants.get(id);
+      if (!other || other.state === CombatantState.DEAD || other.faction !== combatant.faction) {
+        continue;
+      }
+
+      if (combatant.position.distanceToSquared(other.position) < CLUSTER_RADIUS_SQ) {
+        nearbyFriendlies++;
+      }
+    }
+
+    return Math.min(1, nearbyFriendlies / MAX_EXPECTED_CLUSTER_NEIGHBORS);
+  }
+
   /**
    * Find the nearest enemy within visual range, with cluster-aware target distribution
    */
@@ -49,11 +92,8 @@ export class AITargetAcquisition {
 
     // Collect all enemy combatants within visual range and determine cluster status
     if (spatialGrid) {
-      // Use spatial grid to check both targets and cluster status in one pass if possible,
-      // but query radius must be the larger of the two.
-      const queryRadius = Math.max(visualRange, 15); // 15 is CLUSTER_RADIUS
-      const nearbyIds = spatialGrid.queryRadius(combatant.position, queryRadius);
-      const CLUSTER_RADIUS_SQ = 15 * 15;
+      const queryRadius = Math.max(visualRange, CLUSTER_RADIUS);
+      const nearbyIds = this.getNearbyIds(combatant, queryRadius, spatialGrid);
       let nearbyFriendlies = 0;
 
       for (const id of nearbyIds) {
@@ -73,10 +113,9 @@ export class AITargetAcquisition {
           potentialTargets.push(other);
         }
       }
-      inCluster = nearbyFriendlies >= 4; // 4 is CLUSTER_THRESHOLD
+      inCluster = nearbyFriendlies >= CLUSTER_THRESHOLD;
     } else {
       let nearbyFriendlies = 0;
-      const CLUSTER_RADIUS_SQ = 15 * 15;
 
       allCombatants.forEach(other => {
         if (other.state === CombatantState.DEAD) return;
@@ -94,7 +133,7 @@ export class AITargetAcquisition {
           potentialTargets.push(other);
         }
       });
-      inCluster = nearbyFriendlies >= 4;
+      inCluster = nearbyFriendlies >= CLUSTER_THRESHOLD;
     }
 
     // Use cluster-aware target distribution when in a cluster
@@ -179,7 +218,7 @@ export class AITargetAcquisition {
     }
 
     if (spatialGrid) {
-      const nearbyIds = spatialGrid.queryRadius(combatant.position, radius);
+      const nearbyIds = this.getNearbyIds(combatant, radius, spatialGrid);
 
       for (const id of nearbyIds) {
         const other = allCombatants.get(id);
@@ -201,5 +240,20 @@ export class AITargetAcquisition {
     }
 
     return count;
+  }
+
+  private getNearbyIds(
+    combatant: Combatant,
+    radius: number,
+    spatialGrid: ISpatialQuery
+  ): readonly string[] {
+    const cached = this.spatialQueryCache.get(combatant.id);
+    if (cached && cached.radius >= radius) {
+      return cached.ids;
+    }
+
+    const ids = spatialGrid.queryRadius(combatant.position, radius);
+    this.spatialQueryCache.set(combatant.id, { radius, ids });
+    return ids;
   }
 }

@@ -85,10 +85,12 @@ vi.mock('./ai/AIStateDefend', () => ({
 // Mock tactical systems
 vi.mock('./ai/AITargeting', () => ({
   AITargeting: class {
+    beginFrame = vi.fn()
     findNearestEnemy = vi.fn(() => null)
     canSeeTarget = vi.fn(() => false)
     shouldEngage = vi.fn(() => false)
     countNearbyEnemies = vi.fn(() => 0)
+    getClusterDensity = vi.fn(() => 0)
     shouldSeekCover = vi.fn(() => false)
     findNearestCover = vi.fn(() => null)
     isCoverFlanked = vi.fn(() => false)
