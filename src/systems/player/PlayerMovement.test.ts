@@ -67,9 +67,10 @@ describe('PlayerMovement', () => {
       dispose: vi.fn()
     } as any;
 
-    // Setup mock chunk manager
+    // Setup mock terrain system
     mockTerrainSystem = {
-      getEffectiveHeightAt: vi.fn().mockReturnValue(0)
+      getEffectiveHeightAt: vi.fn().mockReturnValue(0),
+      getWorldSize: vi.fn().mockReturnValue(0)
     } as any;
 
     // Setup mock sandbag system
@@ -458,7 +459,7 @@ describe('PlayerMovement', () => {
       expect(controls.collective).toBeLessThan(1.0);
     });
 
-    it('should not auto-stabilize when auto-hover disabled', () => {
+    it('should decay collective toward zero when auto-hover disabled', () => {
       playerMovement.toggleAutoHover(); // Disable
 
       vi.mocked(mockInput.isKeyPressed).mockImplementation((key: string) => key === 'keyw');
@@ -469,8 +470,8 @@ describe('PlayerMovement', () => {
       playerMovement.updateHelicopterControls(0.016, mockInput);
       const collective2 = playerMovement.getHelicopterControls().collective;
 
-      // Should stay same (no auto-stabilization)
-      expect(collective2).toBe(collective1);
+      // Should decay toward 0 (not freeze)
+      expect(collective2).toBeLessThan(collective1);
     });
 
     it('should control yaw with A/D keys', () => {

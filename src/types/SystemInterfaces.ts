@@ -155,6 +155,7 @@ export interface IFirstPersonWeapon {
 export interface ITerrainRuntime {
   getHeightAt(x: number, z: number): number;
   getEffectiveHeightAt(x: number, z: number): number;
+  getWorldSize(): number;
   isTerrainReady(): boolean;
   hasTerrainAt(x: number, z: number): boolean;
   getActiveTerrainTileCount(): number;

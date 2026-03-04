@@ -64,6 +64,9 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: `TerrainRaycastRuntime` no longer computes unused vertex normals for the near-field LOS mesh.
 - Keep: loading/start-screen asset URLs are base-aware; root-relative screen asset paths that produced preview/Page `404`s were removed.
 - Keep: CDLODQuadtree `range * 1.5` early-return removed. The skip created coverage holes when a parent subdivided but children fell outside `childRange * 1.5`, leaving terrain patches invisible (collision and vegetation still worked via HeightQueryCache). Every node now must either emit or subdivide.
+- Keep: World boundary enforcement reads `getWorldSize()` from `ITerrainRuntime` directly in `PlayerMovement.updateMovement()` instead of relying on a `setWorldSize()` call chain through GameEngineInit/PlayerController. Eliminates init-ordering fragility.
+- Keep: Terrain visual margin (200m) via inflated CDLOD quadtree in `TerrainRenderRuntime`. Margin tiles sample clamped heightmap UVs (ClampToEdge), extending edge terrain seamlessly. Player is clamped at the actual world boundary.
+- Keep: Vegetation cell bounds check in `VegetationScatterer.generateCell()` limits scatter to `worldHalfExtent + 200m`, matching the terrain visual margin. Player can't walk there; it's visual filler only.
 
 ## Deferred Decisions
 

@@ -21,7 +21,7 @@ export class PlayerMovement {
   private sandbagSystem?: SandbagSystem;
   private footstepAudioSystem?: FootstepAudioSystem;
   private helicopterModel?: IHelicopterModel;
-  private worldHalfExtent = Infinity;
+  private worldHalfExtent = 0;
   private helicopterControls: HelicopterControls = {
     collective: 0,
     cyclicPitch: 0,
@@ -227,11 +227,14 @@ export class PlayerMovement {
       this.playerState.isGrounded = false;
     }
 
-    // Clamp to world bounds
-    const limit = this.worldHalfExtent;
-    if (limit > 0 && limit < Infinity) {
-      newPosition.x = THREE.MathUtils.clamp(newPosition.x, -limit, limit);
-      newPosition.z = THREE.MathUtils.clamp(newPosition.z, -limit, limit);
+    // Clamp to world bounds (read directly from terrain system)
+    if (this.terrainSystem) {
+      const ws = this.terrainSystem.getWorldSize();
+      if (ws > 0) this.worldHalfExtent = ws * 0.5;
+    }
+    if (this.worldHalfExtent > 0) {
+      newPosition.x = THREE.MathUtils.clamp(newPosition.x, -this.worldHalfExtent, this.worldHalfExtent);
+      newPosition.z = THREE.MathUtils.clamp(newPosition.z, -this.worldHalfExtent, this.worldHalfExtent);
     }
 
     this.playerState.position.copy(newPosition);
