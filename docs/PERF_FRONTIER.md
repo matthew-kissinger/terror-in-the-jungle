@@ -185,6 +185,24 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
   - lower combat pressure plus worse tails made it unsuitable as an acceptance run and strengthened the rejection.
 - Decision: revert. Friendly-spacing work on visual-only high-LOD frames is not the primary source of the remaining `combat120` tails. The next combat slice should target full-update `suppressing` / `advancing` spikes or other off-frame upkeep with tighter evidence.
 
+### Reverted experiment: throttle advancing threat reacquisition
+
+- Attempted change: in `AIStateMovement.handleAdvancing()`, reuse a live target and throttle `findNearestEnemy()` calls during active flank movement.
+- Attempt artifacts:
+  - cold-start post-change run: `2026-03-04T18-17-53-745Z`
+  - warm post-change rerun: `2026-03-04T18-20-23-437Z`
+- Why it was reverted:
+  - the first post-change capture restarted the dev server and did not hit the startup frame threshold until `24s`, so it is cold-start data only.
+  - the warm rerun improved the headline mean (`avgFrameMs 14.59 -> 13.54`) but materially reduced combat pressure (`220 / 140 -> 90 / 53` shots / hits), which makes it unacceptable as a gameplay-preserving change.
+  - the warm rerun also worsened the tail and stall signals that matter:
+    - hitch `>50ms`: `1.04% -> 1.39%`
+    - average over-budget time: `1.08% -> 1.54%`
+    - combat-budget dominance: `5.7% -> 15.9%`
+    - AI starvation: `12.91 -> 14.44` events/sample
+    - long tasks: `63 -> 88`; LoAF blocking: `4910.4ms -> 9624.4ms`
+    - `SystemUpdater.Combat.maxDurationMs`: `233.6ms -> 255.6ms`
+- Decision: revert. Throttling advancing threat reacquisition traded away combat activity before it reduced the actual `combat120` tails.
+
 ## Validation Snapshot (2026-03-04)
 
 - `npm run test:run`: pass (`2959` tests passed, `2` skipped).
@@ -194,7 +212,7 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
 
 ## Ranked Phase 2 Targets
 
-1. `combat120` high-LOD AI spikes that remain after query-cache reuse, especially `suppressing` / `advancing` state work. A March 4, 2026 attempt to skip friendly-spacing work on visual-only high-LOD frames was reverted, so the remaining tail source is deeper than spacing-force alone.
+1. `combat120` high-LOD AI spikes that remain after query-cache reuse, especially `suppressing` / `advancing` state work. March 4, 2026 attempts to skip visual-only spacing work and to throttle advancing threat reacquisition were both reverted, so the remaining tail source is deeper than those low-friction gates.
 2. `HeightQueryCache.getHeightAt()` keying and hit cost. This remains a cross-cutting hotspot for combat and terrain paths even after AI query consolidation.
 3. `TerrainRaycastRuntime` near-field rebuild bursts and the terrain height-sampling path in `open_frontier`, `frontier30m`, and `a_shau_valley`.
 4. A Shau `WarSim` steady-state cost and large heap waves once terrain tails are reduced enough to isolate strategy work more cleanly.
@@ -204,6 +222,7 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
 
 - High-fit, low-friction now:
   - more selective off-frame work reduction around `CombatantLODManager.updateCombatantVisualOnly()`; the first friendly-spacing skip attempt was reverted
+  - deeper attribution inside full-update `suppressing` / `advancing` work before any further behavior throttling
   - data-oriented keying / lower-churn cache strategy for `HeightQueryCache`
   - scheduling or throttling around near-field terrain rebuild work
 - Medium-fit after JS-level cleanup:
