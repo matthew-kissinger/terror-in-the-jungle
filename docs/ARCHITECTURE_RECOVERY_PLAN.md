@@ -83,6 +83,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: player death accounting is single-source in `PlayerHealthSystem`; `CombatantDamage` no longer applies a second HUD death increment for player-proxy lethal events.
 - Keep: active perf driver sustain policy is bounded and behavior-preserving (respawn debounce, cooldown-based low-health top-up without spawn-protection refresh, and ammo refill guardrails).
 - Keep: suppression-init cover-search budget is explicitly bounded in `AIStateEngage` (max 2 flank cover lookups per initiation) to constrain single-frame burst cost; promote to full perf-accepted status only after a clean warm A/B pair on the updated harness.
+- Keep: suppression flank-cover discovery remains in the suppression-init path only; a March 4 deferred recheck attempt in `AIStateMovement.ADVANCING` was reverted after warm captures increased hitch/AI-starvation risk without a clean pressure-matched win.
 - Keep: `MaterializationPipeline` materializes nearest squads first so large-map scenarios establish combat around the player before distant squads consume the budget.
 - Keep: `SpatialOctree` vertical world bounds scale with world size. Fixed Y bounds were invalid on mountainous maps and caused empty high-altitude hit-detection queries.
 
@@ -103,6 +104,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - A March 4, 2026 attempt to reuse targets and throttle advancing threat reacquisition during flank movement was also reverted. The warm rerun improved mean frame time but reduced combat pressure sharply (`220 / 140 -> 90 / 53` shots / hits) while worsening hitch rate, combat dominance, long-task totals, and `SystemUpdater.Combat.maxDurationMs`.
 - March 4, 2026 short diagnostic captures (`2026-03-04T18-35-30-494Z`, `2026-03-04T18-39-02-145Z`) localize the rare `CombatantAI` spikes to `AIStateEngage.initiateSquadSuppression()`. The inner spike logs are dominated by `suppression.initiate` `65-214ms`; source inspection shows this path synchronously runs `findNearestCover()` for each flanker, which is the leading candidate for the remaining combat tails.
 - March 4, 2026 warm reruns after the suppression-init flank-probe cleanup (`2026-03-04T19-00-58-280Z`, `2026-03-04T19-03-09-563Z`) show lower combat tail/stall pressure than warm pre-control `2026-03-04T18-56-58-892Z`, but run-to-run combat pressure still varies (`shots/hits` drift), so acceptance remains evidence-backed but not yet final-tail closure.
+- March 4, 2026 deferred flank-cover recheck attempt (`2026-03-04T23-35-55-753Z`, `2026-03-04T23-37-57-165Z`) improved p99 but worsened warm hitch/starvation/over-budget means versus warm pre-controls (`2026-03-04T23-26-57-305Z`, `2026-03-04T23-29-06-527Z`) and ran at higher combat pressure; it was reverted and should not be treated as an accepted path.
 - Active-driver stop logs still report `moved` as frontline compression movement count, not literal player-distance moved; pressure comparability should rely primarily on shots/hits and frame progression.
 - `HeightQueryCache.getHeightAt()` is unexpectedly hot in combat-heavy runs because string-key generation and LRU churn sit directly on terrain and movement paths.
 - The March 4, 2026 numeric-key linked-list `HeightQueryCache` experiment was reverted. Open Frontier improved, but warm `combat120` evidence was inconsistent and one matched pair worsened heap recovery from `41.7%` to `8.7%`.
@@ -119,7 +121,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 
 ## Next Execution Slice
 
-1. Continue `combat120` tail reduction in `AIStateEngage.initiateSquadSuppression()`: the flank-probe cleanup is accepted, but remaining outliers still point to synchronous per-flanker cover search bursts.
+1. Continue `combat120` tail reduction in `AIStateEngage.initiateSquadSuppression()`: the flank-probe cleanup is accepted, and remaining outliers still point to synchronous per-flanker cover search bursts. Keep work in this init path; do not reintroduce deferred `ADVANCING` flank-cover retries unless a pressure-matched warm A/B proves a win.
 2. Normalize `combat120` acceptance loops for pressure comparability (treat shots/hits drift as a first-class acceptance signal when active-driver movement stays compressed).
 3. Revisit `HeightQueryCache` only with a lower-overhead design and matched warm captures; the numeric-key linked-list LRU attempt was reverted and the AI neighborhood cache is now the accepted combat baseline.
 4. Break down `TerrainRaycastRuntime` near-field rebuild and vegetation update cost inside `TerrainSystem.update()` for `open_frontier`, `frontier30m`, and `a_shau_valley`.

@@ -240,6 +240,25 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
     - `SystemUpdater.Combat.maxDurationMs`: `233.6ms -> 255.6ms`
 - Decision: revert. Throttling advancing threat reacquisition traded away combat activity before it reduced the actual `combat120` tails.
 
+### Reverted experiment: defer suppression flank-cover searches into `ADVANCING`
+
+- Attempted change:
+  - lower immediate suppression-init flank-cover budget from `2` to `1`
+  - schedule staggered deferred flank-cover rechecks in `AIStateMovement.handleAdvancing()` (bounded retries per flanker)
+- Attempt artifacts:
+  - warm pre-change controls: `2026-03-04T23-26-57-305Z`, `2026-03-04T23-29-06-527Z`
+  - cold post-change run (discarded): `2026-03-04T23-33-20-148Z` (`startup_threshold_seconds=30`)
+  - warm post-change runs: `2026-03-04T23-35-55-753Z`, `2026-03-04T23-37-57-165Z`
+- Warm-pair read:
+  - `peak_p99_frame_ms` improved (`100.0 -> 73.0/84.8`)
+  - but key tail/stability signals regressed under warm post runs:
+    - average frame time mean: `14.43ms -> 14.84ms`
+    - hitch `>50ms` mean: `0.58% -> 1.39%`
+    - over-budget mean: `0.81% -> 2.18%`
+    - AI starvation mean: `11.36 -> 15.58` events/sample
+  - post runs also carried higher combat pressure (`shots/hits` mean `170.5/85.5 -> 213.0/113.5`), so this is not a clean promotion-quality A/B.
+- Decision: revert. The deferred `ADVANCING` recheck approach did not produce a clear, pressure-comparable win and increased starvation/hitch risk in warm runs. Keep the previously accepted suppression-init cleanup and current immediate cover-search cap behavior.
+
 ### March 4 diagnostic attribution: `suppressing` / `advancing` spikes are really suppression-init work
 
 - Diagnostic instrumentation added:
