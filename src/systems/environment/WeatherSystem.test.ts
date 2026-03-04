@@ -68,6 +68,7 @@ function createSystem(): {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera();
   const terrainRuntime = {
+    getPlayableWorldSize: vi.fn(() => 2000),
     setSurfaceWetness: vi.fn(),
   } as unknown as ITerrainRuntime;
   const system = new WeatherSystem(scene, camera, terrainRuntime);

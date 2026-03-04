@@ -8,9 +8,12 @@ import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
 const mockTerrainSystem: ITerrainRuntime = {
   getHeightAt: vi.fn((x: number, z: number) => mockHeightQueryCache.getHeightAt(x, z)),
   getEffectiveHeightAt: vi.fn((x: number, z: number) => mockHeightQueryCache.getHeightAt(x, z)),
+  getPlayableWorldSize: vi.fn(() => 2000),
+  getWorldSize: vi.fn(() => 2000),
   isTerrainReady: vi.fn(() => true),
   hasTerrainAt: vi.fn(() => true),
   getActiveTerrainTileCount: vi.fn(() => 0),
+  setSurfaceWetness: vi.fn(),
   updatePlayerPosition: vi.fn(),
   registerCollisionObject: vi.fn(),
   unregisterCollisionObject: vi.fn(),

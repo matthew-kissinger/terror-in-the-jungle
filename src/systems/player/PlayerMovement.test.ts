@@ -70,6 +70,7 @@ describe('PlayerMovement', () => {
     // Setup mock terrain system
     mockTerrainSystem = {
       getEffectiveHeightAt: vi.fn().mockReturnValue(0),
+      getPlayableWorldSize: vi.fn().mockReturnValue(0),
       getWorldSize: vi.fn().mockReturnValue(0)
     } as any;
 
@@ -332,7 +333,7 @@ describe('PlayerMovement', () => {
     beforeEach(() => {
       playerMovement.setTerrainSystem(mockTerrainSystem);
       playerMovement.setSandbagSystem(mockSandbagSystem);
-      vi.mocked(mockTerrainSystem.getWorldSize).mockReturnValue(500);
+      vi.mocked(mockTerrainSystem.getPlayableWorldSize).mockReturnValue(500);
       vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockReturnValue(0);
     });
 

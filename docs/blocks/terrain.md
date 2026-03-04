@@ -266,7 +266,7 @@ Real runtime behavior:
 - loading/start-screen terrain-adjacent UI assets now use base-aware paths instead of hard-coded root-relative URLs
 - automated preview smoke now confirms shader-clean, terrain-warning-clean, request-error-clean startup in both `zone_control` and `a_shau_valley`
 - A Shau biome coverage has been retuned toward dense jungle and bamboo uplands, with highland rock constrained to upper ridges and cliff accents
-- playable boundary: player and helicopters bounce off the playable world edge (velocity reversed at 50%). `PlayerMovement.enforceWorldBoundary()` and `HelicopterModel` read `getPlayableWorldSize()` from `ITerrainRuntime` with `getWorldSize()` fallback for older callers
+- playable boundary: player and helicopters bounce off the playable world edge (velocity reversed at 50%). `PlayerMovement.enforceWorldBoundary()` and `HelicopterModel` read `getPlayableWorldSize()` from `ITerrainRuntime`
 - configurable visual terrain margin: `TerrainRenderRuntime` inflates the CDLOD quadtree by `visualMargin * 2` total. Vertex shader explicitly clamps UVs to `[0,1]`, so overflow tiles sample edge heights from the heightmap
 - vegetation overflow uses the same `visualMargin` contract as terrain render overflow, so mode tuning changes both systems together
 - terrain material uniform updates preserve compiled shader references by updating `.value` in place instead of creating new uniform objects

@@ -105,7 +105,7 @@ export async function bootstrapGame(): Promise<void> {
 
 function buildAShauDiagnostics(engine: GameEngine) {
   const systems = engine.systemManager;
-  const mode = systems.gameModeManager.getCurrentMode?.() ?? systems.gameModeManager.currentMode;
+  const mode = systems.gameModeManager.getCurrentMode();
   const config = systems.gameModeManager.getCurrentConfig?.();
   const playerPos = systems.playerController.getPosition?.();
   const war = systems.warSimulator;

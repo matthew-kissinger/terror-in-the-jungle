@@ -213,7 +213,7 @@ describe('PlayerRespawnManager', () => {
       canPlayerSpawnAtZones: vi.fn(() => true),
       getRespawnTime: vi.fn(() => 5),
       getSpawnProtectionDuration: vi.fn(() => 3),
-      currentMode: 'zone_control',
+      getCurrentMode: vi.fn(() => GameMode.ZONE_CONTROL),
       getWorldSize: vi.fn(() => 400),
     } as unknown as GameModeManager;
 
@@ -235,9 +235,12 @@ describe('PlayerRespawnManager', () => {
     mockTerrainSystem = {
       getHeightAt: vi.fn(() => 0),
       getEffectiveHeightAt: vi.fn(() => 0),
+      getPlayableWorldSize: vi.fn(() => 400),
+      getWorldSize: vi.fn(() => 400),
       isTerrainReady: vi.fn(() => true),
       hasTerrainAt: vi.fn(() => true),
       getActiveTerrainTileCount: vi.fn(() => 0),
+      setSurfaceWetness: vi.fn(),
       updatePlayerPosition: vi.fn(),
       registerCollisionObject: vi.fn(),
       unregisterCollisionObject: vi.fn(),
@@ -451,7 +454,7 @@ describe('PlayerRespawnManager', () => {
     });
 
     it('should use A Shau pressure spawn policy near contested objective', () => {
-      (mockGameModeManager as any).currentMode = GameMode.A_SHAU_VALLEY;
+      vi.mocked(mockGameModeManager.getCurrentMode).mockReturnValue(GameMode.A_SHAU_VALLEY);
       vi.mocked(mockZoneManager.getAllZones).mockReturnValue([
         createMockZone('us_base', 'US Base', new THREE.Vector3(0, 0, -50), ZoneState.US_CONTROLLED, true, Faction.US),
         { ...createMockZone('zone_us_forward', 'US Forward', new THREE.Vector3(100, 0, 100), ZoneState.US_CONTROLLED, false, Faction.US), ticketBleedRate: 2 },
@@ -863,9 +866,12 @@ describe('PlayerRespawnManager', () => {
       const terrainRuntime = {
         getHeightAt: vi.fn(() => 10),
         getEffectiveHeightAt: vi.fn(() => 10),
+        getPlayableWorldSize: vi.fn(() => 400),
+        getWorldSize: vi.fn(() => 400),
         isTerrainReady: vi.fn(() => true),
         hasTerrainAt: vi.fn(() => true),
         getActiveTerrainTileCount: vi.fn(() => 0),
+        setSurfaceWetness: vi.fn(),
         updatePlayerPosition: vi.fn(),
         registerCollisionObject: vi.fn(),
         unregisterCollisionObject: vi.fn(),

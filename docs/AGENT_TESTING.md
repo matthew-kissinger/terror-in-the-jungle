@@ -5,10 +5,12 @@ Commands available for validating changes, from fastest to most thorough.
 ## Quick Validation (< 30 seconds)
 
 ```bash
+npm run test:frontier    # High-signal terrain/player/helicopter/integration suite
 npm run test:quick       # All unit tests, dot reporter (compact output)
 npm run lint             # ESLint on src/
 ```
 
+- `test:frontier` is the preferred loop for terrain, boundary, helipad, and combat-flow iteration.
 - `test:quick` runs all 3300+ vitest tests with minimal output.
 - Exit code 0 = pass, 1 = test failures.
 - Run after any code change. If tests fail, fix before proceeding.
@@ -17,10 +19,12 @@ npm run lint             # ESLint on src/
 
 ```bash
 npm run validate         # test:run + build (sequential)
+npm run deadcode         # knip scan for unused files/exports
 ```
 
 - Runs full test suite with verbose reporter, then TypeScript check + Vite production build.
 - Catches type errors that tests alone miss (tests use jsdom, build uses full tsc).
+- `deadcode` is advisory, not a green gate. Use it to build cleanup backlog and catch stale imports/exports.
 - Exit code 0 = pass, non-zero = failure in either step.
 
 ## Integration Tests (< 30 seconds)

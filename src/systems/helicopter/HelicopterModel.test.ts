@@ -132,6 +132,7 @@ describe('HelicopterModel', () => {
 
     mockTerrainManager = {
       getHeightAt: vi.fn().mockReturnValue(10),
+      getPlayableWorldSize: vi.fn().mockReturnValue(2000),
       getWorldSize: vi.fn().mockReturnValue(2000),
       isTerrainReady: vi.fn().mockReturnValue(true),
       hasTerrainAt: vi.fn().mockReturnValue(true),

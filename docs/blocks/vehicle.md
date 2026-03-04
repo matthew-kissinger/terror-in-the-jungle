@@ -67,13 +67,13 @@ Config fields in `AircraftPhysicsConfig`: mass, maxLiftForce, maxCyclicForce, ma
 ## Key Design Notes
 
 ### Deferred Initialization
-HelipadSystem.initialize() is a no-op if `GameModeConfig.helipads` is empty or absent. HelicopterModel instances are created lazily when HelipadSystem.initialize() runs with a populated config. Modes without helipads pay zero allocation cost.
+Helipad creation is config-driven only. `HelipadSystem` is a no-op if `GameModeConfig.helipads` is empty or absent, and it no longer synthesizes a fallback helipad. HelicopterModel instances are created lazily only when `HelipadSystem` sees a populated config. Modes without helipads pay zero allocation cost and config mistakes are no longer masked at runtime.
 
 ### Unoccupied Helicopter Gravity
 When a pilot exits mid-air, HelicopterPhysics zeroes all control inputs but continues integrating physics (gravity applies). The helicopter descends until it collides with terrain. There is no auto-land or despawn.
 
 ### World Boundary Enforcement
-HelicopterPhysics enforces world boundary independently from PlayerMovement. `HelicopterModel.updateHelicopterPhysics()` sets `worldHalfExtent` on the physics instance each frame from `terrainManager.getPlayableWorldSize()` with `getWorldSize()` fallback for older callers. `HelicopterPhysics.enforceWorldBoundary()` runs after ground collision and bounces velocity inward at 50% strength when position exceeds limits. This mirrors the player boundary bounce-back but runs in the helicopter physics pipeline, not the player movement pipeline.
+HelicopterPhysics enforces world boundary independently from PlayerMovement. `HelicopterModel.updateHelicopterPhysics()` sets `worldHalfExtent` on the physics instance each frame from `terrainManager.getPlayableWorldSize()`. `HelicopterPhysics.enforceWorldBoundary()` runs after ground collision and bounces velocity inward at 50% strength when position exceeds limits. This mirrors the player boundary bounce-back but runs in the helicopter physics pipeline, not the player movement pipeline.
 
 ### Frame Ordering Constraint
 ```

@@ -193,7 +193,7 @@ export async function startGameWithMode(engine: GameEngine, mode: GameMode): Pro
   }
 
   const terrainSystem = engine.systemManager.terrainSystem;
-  const previousWorldSize = terrainSystem.getPlayableWorldSize?.() ?? terrainSystem.getWorldSize();
+  const previousWorldSize = terrainSystem.getPlayableWorldSize();
   const targetWorldSize = config.worldSize ?? previousWorldSize;
   const worldSizeChanged = targetWorldSize !== previousWorldSize;
 

@@ -59,26 +59,29 @@ export class HelipadSystem implements GameSystem {
       Logger.warn('helicopter', 'Cannot create helipads - terrain manager not available');
       return;
     }
+    if (!this.gameModeManager) {
+      Logger.warn('helicopter', 'Cannot create helipads - game mode manager not available');
+      return;
+    }
     if (this.isCreatingHelipads) return;
     this.isCreatingHelipads = true;
 
-    const currentConfig = this.gameModeManager?.getCurrentConfig();
-    const configHelipads = currentConfig?.helipads;
+    try {
+      const currentConfig = this.gameModeManager.getCurrentConfig();
+      const configHelipads = currentConfig.helipads ?? [];
 
-    if (configHelipads && configHelipads.length > 0) {
-      // Create helipads from game mode config
+      if (configHelipads.length === 0) {
+        Logger.info('helicopter', `No helipads configured for mode "${currentConfig.id}"`);
+        return;
+      }
+
       await Promise.all(configHelipads.map(cfg => this.createHelipad(cfg.id, cfg.position, cfg.aircraft)));
-    } else {
-      // Legacy fallback: single helipad at anchor position
-      const pos = this.getHelipadAnchorPosition();
-      await this.createHelipad('us_helipad', pos, 'UH1_HUEY');
-    }
 
-    this.isCreatingHelipads = false;
-
-    // Notify map systems about helipad positions
-    if (this.onHelipadsCreatedCallback && this.helipadMeta.size > 0) {
-      this.onHelipadsCreatedCallback(this.getAllHelipads());
+      if (this.onHelipadsCreatedCallback && this.helipadMeta.size > 0) {
+        this.onHelipadsCreatedCallback(this.getAllHelipads());
+      }
+    } finally {
+      this.isCreatingHelipads = false;
     }
   }
 
@@ -107,18 +110,6 @@ export class HelipadSystem implements GameSystem {
     this.clearVegetationArea(helipadPosition.x, helipadPosition.z, platformRadius + 1);
 
     Logger.info('helicopter', `Created helipad "${id}" at (${helipadPosition.x.toFixed(0)}, ${helipadPosition.y.toFixed(1)}, ${helipadPosition.z.toFixed(0)}) aircraft=${aircraft}`);
-  }
-
-  private getHelipadAnchorPosition(): THREE.Vector3 {
-    const currentConfig = this.gameModeManager?.getCurrentConfig();
-    if (currentConfig && Array.isArray(currentConfig.zones)) {
-      const usHomeBases = currentConfig.zones.filter(z => z.isHomeBase && z.owner === 'US');
-      if (usHomeBases.length > 0) {
-        const preferred = usHomeBases.find(z => z.id.includes('main') || z.id === 'us_base') ?? usHomeBases[0];
-        return new THREE.Vector3(preferred.position.x + 40, preferred.position.y, preferred.position.z);
-      }
-    }
-    return new THREE.Vector3(40, 0, -1400);
   }
 
   private findMaxTerrainHeight(centerX: number, centerZ: number, radius: number): number {
@@ -198,15 +189,16 @@ export class HelipadSystem implements GameSystem {
     const currentConfig = this.gameModeManager.getCurrentConfig();
     const supportsHelipad = currentConfig.id === 'open_frontier' || currentConfig.id === 'a_shau_valley';
     if (!supportsHelipad) return;
+    if (!currentConfig.helipads || currentConfig.helipads.length === 0) return;
 
     // Check if terrain is loaded at the first helipad position
     const configHelipads = currentConfig.helipads;
-    const checkPos = configHelipads?.[0]?.position ?? this.getHelipadAnchorPosition();
+    const checkPos = configHelipads[0].position;
     const testHeight = this.terrainManager.getHeightAt(checkPos.x, checkPos.z);
     const hasTerrain = this.terrainManager.isTerrainReady() && this.terrainManager.hasTerrainAt(checkPos.x, checkPos.z);
 
     if ((testHeight > -100 && hasTerrain) || testHeight > 0) {
-      Logger.info('helicopter', `${currentConfig.name} mode - creating ${configHelipads?.length ?? 1} helipads`);
+      Logger.info('helicopter', `${currentConfig.name} mode - creating ${configHelipads.length} helipads`);
       void this.createAllHelipads();
     }
   }

@@ -258,7 +258,7 @@ export class PlayerRespawnManager implements GameSystem {
 
     // Re-check game mode when player dies in case it changed
     if (this.gameModeManager) {
-      const currentGameMode = this.gameModeManager.currentMode;
+      const currentGameMode = this.gameModeManager.getCurrentMode();
       const worldSize = this.gameModeManager.getWorldSize();
       Logger.info('player', ` Death screen: Current game mode is ${currentGameMode}, world size: ${worldSize}`);
     }
@@ -566,17 +566,7 @@ export class PlayerRespawnManager implements GameSystem {
   }
 
   private getCurrentGameMode(): GameMode | undefined {
-    if (!this.gameModeManager) return undefined;
-
-    // Preserve compatibility with older test doubles and runtime call-sites
-    // that expose `currentMode` as a property instead of a getter.
-    const modeFromGetter = typeof this.gameModeManager.getCurrentMode === 'function'
-      ? this.gameModeManager.getCurrentMode()
-      : undefined;
-
-    if (modeFromGetter !== undefined) return modeFromGetter;
-
-    return (this.gameModeManager as unknown as { currentMode?: GameMode }).currentMode;
+    return this.gameModeManager?.getCurrentMode();
   }
 
   getSessionRespawnStats(): { deaths: number; respawns: number } {

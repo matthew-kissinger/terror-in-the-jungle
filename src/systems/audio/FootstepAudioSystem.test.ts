@@ -140,9 +140,12 @@ describe('FootstepAudioSystem', () => {
     mockTerrainSystem = {
       getHeightAt: vi.fn().mockReturnValue(10),
       getEffectiveHeightAt: vi.fn().mockReturnValue(10),
+      getPlayableWorldSize: vi.fn(() => 2000),
+      getWorldSize: vi.fn(() => 2000),
       isTerrainReady: vi.fn(() => true),
       hasTerrainAt: vi.fn(() => true),
       getActiveTerrainTileCount: vi.fn(() => 0),
+      setSurfaceWetness: vi.fn(),
       updatePlayerPosition: vi.fn(),
       registerCollisionObject: vi.fn(),
       unregisterCollisionObject: vi.fn(),

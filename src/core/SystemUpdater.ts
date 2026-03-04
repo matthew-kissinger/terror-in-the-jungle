@@ -205,7 +205,7 @@ export class SystemUpdater {
     gameStarted: boolean
   ): void {
     if (!gameStarted) return;
-    const mode = refs.gameModeManager?.getCurrentMode?.() ?? refs.gameModeManager?.currentMode;
+    const mode = refs.gameModeManager?.getCurrentMode();
     if (mode !== GameMode.A_SHAU_VALLEY) {
       this.ashauNoContactMs = 0;
       return;

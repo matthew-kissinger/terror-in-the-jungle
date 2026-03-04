@@ -31,7 +31,7 @@ export class RespawnMapController {
   setGameModeManager(manager: GameModeManager): void {
     this.gameModeManager = manager;
     if (manager) {
-      this.currentGameMode = manager.currentMode;
+      this.currentGameMode = manager.getCurrentMode();
       const worldSize = manager.getWorldSize();
       Logger.info('respawn-map', ` RespawnMapController: Game mode detected as ${this.currentGameMode} (world size: ${worldSize})`);
     }
@@ -53,7 +53,7 @@ export class RespawnMapController {
     if (!mapContainer) return;
 
     if (this.gameModeManager) {
-      this.currentGameMode = this.gameModeManager.currentMode;
+      this.currentGameMode = this.gameModeManager.getCurrentMode();
       const worldSize = this.gameModeManager.getWorldSize();
       Logger.info('respawn-map', ` Showing respawn map for mode: ${this.currentGameMode}, world size: ${worldSize}`);
     }

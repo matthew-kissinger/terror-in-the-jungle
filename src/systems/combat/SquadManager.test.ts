@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { SquadManager } from './SquadManager'
 import { Combatant, CombatantState, Faction, Squad } from './types'
 import { CombatantFactory } from './CombatantFactory'
-import { InfluenceMapSystem } from './ai/InfluenceMapSystem'
+import { InfluenceMapSystem } from './InfluenceMapSystem'
 import type { ITerrainRuntime } from '../../types/SystemInterfaces'
 
 // Mock Three.js Vector3
@@ -133,9 +133,12 @@ describe('SquadManager', () => {
     mockTerrainSystem = {
       getHeightAt: vi.fn(() => 0),
       getEffectiveHeightAt: vi.fn(() => 0),
+      getPlayableWorldSize: vi.fn(() => 2000),
+      getWorldSize: vi.fn(() => 2000),
       isTerrainReady: vi.fn(() => true),
       hasTerrainAt: vi.fn(() => true),
       getActiveTerrainTileCount: vi.fn(() => 0),
+      setSurfaceWetness: vi.fn(() => {}),
       updatePlayerPosition: vi.fn(),
       registerCollisionObject: vi.fn(),
       unregisterCollisionObject: vi.fn(),

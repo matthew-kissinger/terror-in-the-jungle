@@ -43,7 +43,7 @@ Last updated: 2026-03-04
 - `AUDIO_ASSETS_NEEDED.md`
   - Audio backlog/spec used by `src/systems/audio`.
 - `AGENT_TESTING.md`
-  - Agent validation workflows, test commands, perf baselines.
+  - Agent validation workflows, including `test:frontier` for fast gameplay-critical validation and `deadcode` (`knip`) for cleanup passes.
 - `../data/vietnam/DATA_PIPELINE.md`
   - Real-terrain data status and integration pipeline for Vietnam maps.
 

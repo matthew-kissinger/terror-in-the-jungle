@@ -229,7 +229,7 @@ export class PlayerMovement {
 
     // Bounce off world boundary (read directly from terrain system)
     if (this.terrainSystem) {
-      const ws = this.terrainSystem.getPlayableWorldSize?.() ?? this.terrainSystem.getWorldSize();
+      const ws = this.terrainSystem.getPlayableWorldSize();
       if (ws > 0) this.worldHalfExtent = ws * 0.5;
     }
     if (this.worldHalfExtent > 0) {
