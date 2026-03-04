@@ -65,6 +65,7 @@ Each run writes to `artifacts/perf/<timestamp>/`:
 - `renderer.info` counters (`drawCalls`, `triangles`, `geometries`, `textures`, `programs`)
 - browser-stall totals (`longtask`, `long-animation-frame`)
 - harness-only `SystemUpdater.*` user-timing totals
+- `browserStalls.totals` are cumulative from page start, not reset per sample. For tail attribution, prefer `userTimingByName.*.maxDurationMs` or diff adjacent totals instead of treating each sample total as an instantaneous cost.
 
 ## Validation Gates
 

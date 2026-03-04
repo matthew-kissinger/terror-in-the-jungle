@@ -14,10 +14,10 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 |---|---|---|---|
 | P0 | Harness integrity and measurement quality | IN_PROGRESS | Required Phase 1 scenarios are now behavior-valid. Remaining gap: `systemTop` snapshot quality is secondary to `userTimingByName`, so phase analysis should use user-timing totals as the authoritative tick-group source. |
 | P1 | Spatial ownership unification (F3) | DONE | Legacy SpatialOctree removed from CombatantSystem. All consumers (AI, LOD, spawn, hit detection) use SpatialGridManager singleton. Secondary sync and dedup feature flags removed. |
-| P2 | Heap growth triage in combat-heavy runs | IN_PROGRESS | New diagnostics added; source still mixed between transient waves and retained growth. |
+| P2 | Heap growth triage in combat-heavy runs | IN_PROGRESS | New diagnostics added. Latest Phase 2 evidence points to churn-heavy waves rather than a proven unbounded leak, with `HeightQueryCache` and terrain rebuild work now the main cross-cutting suspects. |
 | P3 | A Shau gameplay flow and contact reliability | IN_PROGRESS | Short harness capture is now behavior-valid (`270` shots / `150` hits on 2026-03-04). Remaining work is performance analysis, not basic contact acquisition. |
 | P4 | UI/HUD update budget discipline | DONE | UI Engine Phases 0-7 complete. 11 UIComponents migrated to CSS Modules + signals. Grid layout with 17 named slots. VisibilityManager wired. All touch controls on pointer events as UIComponent subclasses. UnifiedWeaponBar replaces 3 duplicates. Renderer subscribes to ViewportManager. 12 dead component files + 7 dead style files deleted. |
-| P5 | Terrain runtime stabilization | IN_PROGRESS | Terrain rewrite is active under `TERRAIN_REWRITE_MASTER_PLAN.md`: world-size authority, truthful terrain API, biome/vegetation runtime wiring, terrain block-boundary cleanup, and large-world startup cost reduction validated in preview smoke. |
+| P5 | Terrain runtime stabilization | IN_PROGRESS | Terrain rewrite is active under `TERRAIN_REWRITE_MASTER_PLAN.md`: world-size authority, truthful terrain API, biome/vegetation runtime wiring, terrain block-boundary cleanup, and large-world startup cost reduction validated in preview smoke. Phase 2 warm captures still show terrain max-duration spikes of `849.6ms` (`open_frontier`), `869.7ms` (`frontier30m`), and `2225.2ms` (`a_shau_valley`). |
 
 ## Keep Decisions (Recent)
 
@@ -85,7 +85,12 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - ZoneManager no longer falls back to linear scan if spatial query returns empty; if SpatialGridManager has sync bugs, zone capture may stall.
 - The immediate A Shau terrain-startup spike has improved in preview smoke, but this is not yet a substitute for broader perf-harness evidence under sustained combat and camera motion.
 - `combat120` now has a valid harness run, but it fails on `peak_p99_frame_ms` and AI starvation. This is the clearest measured hotspot.
+- Deep `combat120` capture localizes the worst tails to `CombatantAI.updateAI()` inside high-LOD full updates. The captured spike logs are dominated by `suppressing` / `advancing` states, with near-zero move/combat/render/spatial time in the same event.
+- `HeightQueryCache.getHeightAt()` is unexpectedly hot in combat-heavy runs because string-key generation and LRU churn sit directly on terrain and movement paths.
+- The March 4, 2026 numeric-key linked-list `HeightQueryCache` experiment was reverted. Open Frontier improved, but warm `combat120` evidence was inconsistent and one matched pair worsened heap recovery from `41.7%` to `8.7%`.
 - `open_frontier` and `frontier30m` are throughput-pass / tail-fail patterns: averages stay low while long-task and LoAF totals remain high.
+- Terrain tails are currently more suspicious than CDLOD selection itself. `TerrainSystem.update()` still couples render update, vegetation update, and near-field BVH rebuild in the same tick group.
+- Asset loading is still on `TextureLoader` + `.webp/.png/.jpg`; no KTX2/Basis pipeline is in place yet. This remains a secondary frontier opportunity, not the first measured bottleneck.
 - `systemTop` remains a secondary signal in some captures; authoritative frame-budget analysis should use `browserStalls.totals.userTimingByName`.
 
 ## Required Evidence For Major Changes
@@ -96,11 +101,12 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 
 ## Next Execution Slice
 
-1. Triage `combat120` AI starvation and `Combat` tick cost before considering higher-friction frontier work.
-2. Break down `open_frontier` / `frontier30m` tail spikes with the new user-timing, long-task, and LoAF evidence; prioritize terrain/render-path causes over average-frame improvements.
-3. Isolate A Shau `WarSim` heap waves and retained growth now that combat contact is behavior-valid.
+1. Triage `combat120` AI starvation through `AITargetAcquisition` query churn and high-LOD off-frame work before considering higher-friction frontier work.
+2. Revisit `HeightQueryCache` only with a lower-overhead design and matched warm captures; the numeric-key linked-list LRU attempt was reverted.
+3. Break down `TerrainRaycastRuntime` near-field rebuild and vegetation update cost inside `TerrainSystem.update()` for `open_frontier`, `frontier30m`, and `a_shau_valley`.
 4. Re-baseline and lock regression checks after each accepted change. Deploy now gated on CI (lint+test+build). `perf:compare` wired into perf-check.yml workflow.
 5. Keep terrain rewrite progress aligned with `TERRAIN_REWRITE_MASTER_PLAN.md`; do not reintroduce chunk-era semantics into active runtime code. T-006 (CDLOD LOD transitions) done: XZ morphing in vertex shader, wireframe debug toggle.
+6. Hold WebGPU, WASM, worker offload, and navmesh adoption until the low-friction CPU fixes above are re-measured against warm baselines.
 
 ## Update Rule
 

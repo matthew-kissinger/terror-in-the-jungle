@@ -49,9 +49,10 @@ npm run perf:update-baseline  # update baseline from latest capture
 ## Current Focus
 
 1. Phase 1 perf frontier baselines captured for `combat120`, `openfrontier:short`, `ashau:short`, and `frontier30m`; see `docs/PERF_FRONTIER.md`.
-2. Combat AI starvation and `p99` tails in `combat120` are the clearest measured hotspot.
-3. Open-world tail stability remains the main issue in `open_frontier` / `frontier30m` despite good average frame times.
-4. A Shau harness is now behavior-valid after nearest-first materialization and high-elevation spatial-bounds fixes; next step is WarSim/heap analysis, not harness repair.
+2. Deep `combat120` evidence localizes the worst tails to `CombatantAI.updateAI()` inside high-LOD full updates, with `AITargetAcquisition` query churn and off-frame movement work as the first suspects.
+3. `HeightQueryCache.getHeightAt()` is a cross-cutting hotspot; a March 4, 2026 numeric-key linked-list LRU attempt was reverted because combat heap recovery regressed and warm `combat120` evidence was inconsistent.
+4. Open-world tail stability remains terrain-led in `open_frontier` / `frontier30m`; current suspects are near-field BVH rebuild bursts plus height-query cost, not CDLOD tile selection alone.
+5. A Shau harness is now behavior-valid after nearest-first materialization and high-elevation spatial-bounds fixes; next step is terrain-tail reduction, then WarSim/heap isolation.
 
 ## Documentation Contract
 

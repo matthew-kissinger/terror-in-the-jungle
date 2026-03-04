@@ -1,7 +1,7 @@
 # Perf Frontier
 
 Last updated: 2026-03-04
-Scope: Phase 1 measurement, harness validation, and baseline capture state.
+Scope: Phase 1 measurement, harness validation, baseline capture state, and Phase 2 bottleneck analysis.
 
 ## Phase 1 Status
 
@@ -55,9 +55,117 @@ Scope: Phase 1 measurement, harness validation, and baseline capture state.
 - Use the artifact IDs above as the pre-change baselines until newer warm captures are explicitly promoted.
 - Do not evaluate WebGPU, WASM, workers, or new spatial structures until the measured bottleneck for a scenario is named first.
 
+## Phase 2 Analysis Snapshot (2026-03-04)
+
+### Deep `combat120` capture
+
+- Artifact: `2026-03-04T13-27-30-341Z` (`npx tsx scripts/perf-capture.ts --headed --mode ai_sandbox --npcs 120 --duration 90 --warmup 15 --deep-cdp`)
+- Result: behavior-valid but still fails `peak_p99_frame_ms` (`100ms`) and AI starvation (`34.31` average events/sample).
+- Startup remained valid (`startup_threshold_seconds=9`), so the artifact is useful for hot-path diagnosis rather than harness repair.
+- `console.json` localizes the worst spikes to `CombatantLODManager.updateCombatantFull()` calling `CombatantAI.updateAI()`:
+  - `[AI spike] 217.2ms ... state=suppressing`
+  - `[AI spike] 258.3ms ... state=advancing`
+  - `[AI full-update spike] total=258.6ms ai=258.3 move=0.0 combat=0.0 render=0.0 spatial=0.0`
+  - `[LOD spike] total=261.0ms ... high=261.0 ... counts(h/m/l/c)=94/0/0/0`
+- Deep user-timing maxima match the logs: `SystemUpdater.Combat.maxDurationMs=261.1`, versus the warm baseline peak of `224.4ms`.
+
+### CPU hot paths validated against source
+
+- Deep CPU profile confirms the main production hotspots (excluding harness-only `withUserTiming`):
+  - `HeightQueryCache.getHeightAt`: `2634.9ms`
+  - `SpatialOctreeQueries.queryRadiusRecursive`: `554.1ms`
+  - `CombatantLODManager.updateCombatantFull`: `401.1ms`
+  - `SpatialGridManager.queryRadius`: `351.8ms`
+  - `CombatantRenderer.updateBillboards`: `326.2ms`
+  - `CombatantMovement.getTerrainHeightForCombatant`: `293.1ms`
+  - `CombatantMovement.updateMovement`: `290.0ms`
+  - `CombatantAI.updateAI`: `169.9ms`
+  - `AITargetAcquisition.findNearestEnemy`: `128.9ms`
+- Source validation matches the profile:
+  - `CombatantLODManager.updateCombatantVisualOnly()` still performs movement, texture updates, rotation, and spatial sync on off-frames.
+  - `CombatantMovement.updateMovement()` applies spacing force and terrain sampling unless explicitly disabled.
+  - `AITargetAcquisition.findNearestEnemy()` and `countNearbyEnemies()` each issue `queryRadius()` scans.
+  - `HeightQueryCache.getHeightAt()` still builds string keys and does `delete()` + `set()` on cache hits to maintain LRU order.
+
+### Cross-mode tail attribution
+
+| Scenario | Primary evidence | Dominant max-duration signal | Current interpretation |
+|---|---|---:|---|
+| `combat120` | Warm baseline + deep capture | `SystemUpdater.Combat=224.4ms` warm, `261.1ms` deep | High-LOD combat AI spikes are the clearest frame-tail source. Terrain still leaks into tails secondarily (`89.3ms` warm, `143.5ms` / `133.4ms` slow-frame logs). |
+| `openfrontier:short` | Warm baseline | `SystemUpdater.Terrain=849.6ms` | Terrain tail spikes dominate despite low average frame time. Rendering pressure is high (`254.72` draw calls, `639,428` triangles), but the tail signature is CPU terrain work first. |
+| `ashau:short` | Warm baseline | `SystemUpdater.Terrain=2225.2ms`, `SystemUpdater.WarSim=25.0ms` | A Shau is no longer blocked on contact validity. Terrain spikes are extreme, while WarSim is the steady heavy system by total time. |
+| `frontier30m` | Warm soak baseline | `SystemUpdater.Terrain=869.7ms`, `SystemUpdater.Combat=280.8ms` | Soak failure is a terrain-led tail problem with combat as the secondary contributor. |
+
+### Heap checkpoints
+
+`runtime-samples.json` only reaches the full `t=1800s` point in the soak run, but the nearest checkpoints still show useful shape:
+
+| Scenario | `t=0s` | `t=60s` | nearest `t=300s` | nearest `t=1800s` | Reading |
+|---|---:|---:|---:|---:|---|
+| `combat120` | `53.88 MB` | `50.31 MB` | `75.73 MB` at `89.3s` | `75.73 MB` at `89.3s` | Short run ends on a high wave; not enough evidence yet for a leak, but churn remains visible. |
+| `openfrontier:short` | `77.18 MB` | `63.91 MB` | `86.85 MB` at `179.1s` | `86.85 MB` at `179.1s` | Similar wave pattern with elevated end-state. |
+| `ashau:short` | `143.51 MB` | `115.27 MB` | `176.90 MB` at `179.5s` | `176.90 MB` at `179.5s` | Largest retained wave of the short scenarios; likely mixed terrain + strategy pressure. |
+| `frontier30m` | `63.55 MB` | `91.06 MB` | `91.36 MB` at `299.5s` | `85.45 MB` at `1798.2s` | Soak does recover from peak, so the current signature looks more like churn/tail pressure than an unbounded leak. |
+
+### Terrain-specific findings
+
+- `TerrainSystem.update()` currently bundles `renderRuntime.update()`, `vegetationScatterer.update()`, and `raycastRuntime.updateNearFieldMesh()` into the same tick group.
+- `TerrainRaycastRuntime.rebuildNearFieldMesh()` rebuilds a fresh CPU mesh when the player moves more than `50m`. At the default `radius=200` and `step=4`, that is roughly `10,201` vertices plus rebuilt indices each time.
+- `CDLODQuadtree.selectTiles()` does not look heavy enough in source to explain `849-2225ms` tails by itself.
+- Current evidence points to height-query cost plus near-field rebuild bursts as the first terrain suspects, not CDLOD selection alone.
+
+### Rendering / asset pipeline findings
+
+- `openfrontier:short` remains the highest short-run render-pressure mode (`254.72` draw calls, `639,428` triangles, `80` textures).
+- `frontier30m` reaches the highest triangle load in the warm baselines (`682,198` average triangles).
+- `AssetLoader` still uses `THREE.TextureLoader()` with `.webp`, `.png`, and `.jpg` assets only. There is no `KTX2Loader`, Basis/KTX2 transcode path, WebGPU renderer path, Draco, or meshopt pipeline in active use.
+- This means texture compression and GPU-memory work remain viable frontier candidates, but they are not the first measured bottleneck in the current captures.
+
+### Shader / browser diagnostics
+
+- Deep `combat120` capture logged two startup-only `THREE.WebGLProgram` warnings for `f_sampleBiomeTextureRaw`.
+- No current evidence points to steady-state shader-variant churn as the cause of the worst frame tails. Treat shader work as a secondary investigation unless a later trace shows runtime compile stalls outside startup.
+
+### Reverted experiment: `HeightQueryCache` numeric-key LRU
+
+- Attempted change: replace string keys + `Map.delete()/set()` hit churn with numeric quantization keys and a linked-list LRU.
+- Attempt artifacts:
+  - `openfrontier:short`: `2026-03-04T13-43-12-583Z`
+  - warm `combat120`: `2026-03-04T13-47-56-906Z`
+  - second warm `combat120` sanity check: `2026-03-04T13-50-37-624Z`
+- Why it was reverted:
+  - `openfrontier:short` looked materially better (`6.57ms -> 5.40ms` avg, `25.2ms -> 21.3ms` p99, `849.6ms -> 170.9ms` terrain max), but this was a single post-change run.
+  - The first post-change `combat120` run at `2026-03-04T13:40:46.312Z` was cold-start polluted and should not be used for A/B.
+  - The warm `combat120` pair was mixed: frame metrics improved (`15.10ms -> 14.25ms` avg, AI starvation `16.82 -> 13.09`), but heap growth/regression worsened materially (`15.73MB -> 29.53MB`, recovery `41.7% -> 8.7%`) and `SystemUpdater.Combat.maxDurationMs` increased (`224.4 -> 241.1`).
+  - The second warm `combat120` rerun lost combat pressure (`80 / 41` shots / hits) and was not trustworthy as an acceptance run.
+- Decision: revert the production change and keep the hotspot ranking. Revisit `HeightQueryCache` only with a lower-overhead design or after AI query reduction narrows the combat variance.
+
 ## Validation Snapshot (2026-03-04)
 
 - `npm run test:run`: pass (`2956` tests passed, `2` skipped).
 - `npm run validate`: pass (`test:run` + production build).
 - Production bundle scan: no matches for perf globals, observer hooks, or `SystemUpdater.*` timing labels in `dist/assets`.
 - Source console scan: raw console usage in shipping code is limited to fatal bootstrap errors in `src/main.ts` / `src/core/bootstrap.ts` plus the centralized `Logger` implementation.
+
+## Ranked Phase 2 Targets
+
+1. `combat120` high-LOD AI spikes inside `CombatantAI.updateAI()`, especially target acquisition / nearby-enemy query churn.
+2. `HeightQueryCache.getHeightAt()` keying and LRU hit cost. This is now a cross-cutting hotspot for combat and terrain paths.
+3. `TerrainRaycastRuntime` near-field rebuild bursts and the terrain height-sampling path in `open_frontier`, `frontier30m`, and `a_shau_valley`.
+4. A Shau `WarSim` steady-state cost and large heap waves once terrain tails are reduced enough to isolate strategy work more cleanly.
+5. GPU/asset pipeline work (`KTX2`, atlasing, WebGPU/BatchedMesh) after the current CPU bottlenecks are re-measured.
+
+## Frontier Technology Fit (Measured, Not Adopted)
+
+- High-fit, low-friction now:
+  - data-oriented keying / lower-churn cache strategy for `HeightQueryCache`
+  - combat AI query consolidation and scratch-buffer reuse around `AITargetAcquisition` / spacing queries
+  - scheduling or throttling around near-field terrain rebuild work
+- Medium-fit after JS-level cleanup:
+  - worker offload for terrain rebuild or WarSim batch work if either still exceeds `4ms/frame` after local optimizations
+  - KTX2/Basis texture compression for memory pressure and startup decode cost
+- Deferred until evidence says rendering is the limit:
+  - WebGPU renderer migration
+  - BatchedMesh expansion purely for throughput
+  - WASM hot-path replacement for combat or strategy loops
+  - navmesh / recast adoption

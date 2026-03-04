@@ -160,6 +160,14 @@ describe('HeightQueryCache', () => {
       
       expect(cache.getCacheStats().size).toBe(2);
     });
+
+    it('should keep signed coordinates distinct', () => {
+      const cache = new HeightQueryCache();
+      cache.getHeightAt(-10, 20);
+      cache.getHeightAt(10, -20);
+
+      expect(cache.getCacheStats().size).toBe(2);
+    });
   });
 
   describe('getNormalAt', () => {
