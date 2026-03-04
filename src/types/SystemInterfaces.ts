@@ -158,6 +158,7 @@ export interface ITerrainRuntime {
   isTerrainReady(): boolean;
   hasTerrainAt(x: number, z: number): boolean;
   getActiveTerrainTileCount(): number;
+  setSurfaceWetness(wetness: number): void;
   updatePlayerPosition(position: THREE.Vector3): void;
   registerCollisionObject(id: string, object: THREE.Object3D): void;
   unregisterCollisionObject(id: string): void;

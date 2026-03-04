@@ -22,7 +22,7 @@ describe('BiomeClassifier', () => {
     expect(terrainConfig).toBeDefined();
 
     const biomeId = classifyBiome(
-      1450,
+      1550,
       22,
       terrainConfig?.biomeRules,
       terrainConfig?.defaultBiome ?? 'denseJungle',
@@ -36,7 +36,7 @@ describe('BiomeClassifier', () => {
     expect(terrainConfig).toBeDefined();
 
     const biomeId = classifyBiome(
-      1100,
+      1200,
       12,
       terrainConfig?.biomeRules,
       terrainConfig?.defaultBiome ?? 'denseJungle',

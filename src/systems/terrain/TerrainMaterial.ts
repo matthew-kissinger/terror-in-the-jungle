@@ -58,6 +58,7 @@ uniform float biomeRulePriority[8];
 uniform float biomeRuleEnabled[8];
 uniform float antiTilingStrength;
 uniform float triplanarSlopeThreshold;
+uniform float environmentWetness;
 
 varying vec3 vWorldPosition;
 varying vec2 vWorldUV;
@@ -71,39 +72,106 @@ float hashUV(vec2 p) {
   return fract(q.x * q.y);
 }
 
-float classifyBiomeSlot(vec3 normal) {
+vec2 rotateUv(vec2 uv, float angle) {
+  float s = sin(angle);
+  float c = cos(angle);
+  return mat2(c, -s, s, c) * uv;
+}
+
+float biomeElevationWeight(float elevation, float minElevation, float maxElevation, float blendWidth) {
+  float weight = 1.0;
+  if (minElevation > -99999999.0) {
+    weight *= smoothstep(minElevation - blendWidth, minElevation + blendWidth, elevation);
+  }
+  if (maxElevation < 99999999.0) {
+    weight *= 1.0 - smoothstep(maxElevation - blendWidth, maxElevation + blendWidth, elevation);
+  }
+  return weight;
+}
+
+float biomeSlopeWeight(float slopeUp, float minUpDot, float blendWidth) {
+  if (minUpDot <= -0.5) {
+    return 1.0;
+  }
+  return smoothstep(minUpDot - blendWidth, minUpDot + blendWidth, slopeUp);
+}
+
+float computeBiomeRuleWeight(int ruleIndex, float elevation, float slopeUp) {
+  float elevationWeight = biomeElevationWeight(
+    elevation,
+    biomeRuleMinElevation[ruleIndex],
+    biomeRuleMaxElevation[ruleIndex],
+    120.0
+  );
+  float slopeWeight = biomeSlopeWeight(slopeUp, biomeRuleMinUpDot[ruleIndex], 0.08);
+  float priorityBias = 1.0 + max(0.0, biomeRulePriority[ruleIndex]) * 0.02;
+  return elevationWeight * slopeWeight * priorityBias;
+}
+
+void classifyBiomeBlend(vec3 normal, out float primarySlot, out float secondarySlot, out float secondaryBlend) {
   float elevation = vWorldPosition.y;
   float slopeUp = clamp(dot(normal, vec3(0.0, 1.0, 0.0)), 0.0, 1.0);
-  float selectedSlot = 0.0;
-  float selectedPriority = -100000.0;
+  float bestSlot = 0.0;
+  float bestWeight = 0.35;
+  float secondSlot = 0.0;
+  float secondWeight = 0.0;
 
   for (int i = 0; i < 8; i++) {
     if (biomeRuleEnabled[i] < 0.5) {
       continue;
     }
 
-    bool matches = elevation >= biomeRuleMinElevation[i]
-      && elevation <= biomeRuleMaxElevation[i]
-      && slopeUp >= biomeRuleMinUpDot[i];
+    float ruleWeight = computeBiomeRuleWeight(i, elevation, slopeUp);
+    if (ruleWeight <= 0.001) {
+      continue;
+    }
 
-    if (matches && biomeRulePriority[i] > selectedPriority) {
-      selectedPriority = biomeRulePriority[i];
-      selectedSlot = biomeRuleBiomeSlot[i];
+    if (ruleWeight > bestWeight) {
+      secondSlot = bestSlot;
+      secondWeight = bestWeight;
+      bestSlot = biomeRuleBiomeSlot[i];
+      bestWeight = ruleWeight;
+    } else if (ruleWeight > secondWeight) {
+      secondSlot = biomeRuleBiomeSlot[i];
+      secondWeight = ruleWeight;
     }
   }
 
-  return selectedSlot;
+  primarySlot = bestSlot;
+  secondarySlot = secondSlot;
+  secondaryBlend = secondWeight <= 0.001 ? 0.0 : clamp(secondWeight / (bestWeight + secondWeight), 0.0, 0.5);
+}
+
+vec4 sampleBiomeTextureRaw(float biomeSlot, vec2 uv) {
+  if (biomeSlot < 0.5) return texture2D(biomeTexture0, uv);
+  if (biomeSlot < 1.5) return texture2D(biomeTexture1, uv);
+  if (biomeSlot < 2.5) return texture2D(biomeTexture2, uv);
+  if (biomeSlot < 3.5) return texture2D(biomeTexture3, uv);
+  if (biomeSlot < 4.5) return texture2D(biomeTexture4, uv);
+  if (biomeSlot < 5.5) return texture2D(biomeTexture5, uv);
+  if (biomeSlot < 6.5) return texture2D(biomeTexture6, uv);
+  return texture2D(biomeTexture7, uv);
+}
+
+float sampleBiomeTileScale(float biomeSlot) {
+  if (biomeSlot < 0.5) return biomeTileScale[0];
+  if (biomeSlot < 1.5) return biomeTileScale[1];
+  if (biomeSlot < 2.5) return biomeTileScale[2];
+  if (biomeSlot < 3.5) return biomeTileScale[3];
+  if (biomeSlot < 4.5) return biomeTileScale[4];
+  if (biomeSlot < 5.5) return biomeTileScale[5];
+  if (biomeSlot < 6.5) return biomeTileScale[6];
+  return biomeTileScale[7];
 }
 
 vec4 sampleBiomeTexture(float biomeSlot, vec2 worldUv, vec2 uvOffset) {
-  if (biomeSlot < 0.5) return texture2D(biomeTexture0, worldUv * biomeTileScale[0] + uvOffset);
-  if (biomeSlot < 1.5) return texture2D(biomeTexture1, worldUv * biomeTileScale[1] + uvOffset);
-  if (biomeSlot < 2.5) return texture2D(biomeTexture2, worldUv * biomeTileScale[2] + uvOffset);
-  if (biomeSlot < 3.5) return texture2D(biomeTexture3, worldUv * biomeTileScale[3] + uvOffset);
-  if (biomeSlot < 4.5) return texture2D(biomeTexture4, worldUv * biomeTileScale[4] + uvOffset);
-  if (biomeSlot < 5.5) return texture2D(biomeTexture5, worldUv * biomeTileScale[5] + uvOffset);
-  if (biomeSlot < 6.5) return texture2D(biomeTexture6, worldUv * biomeTileScale[6] + uvOffset);
-  return texture2D(biomeTexture7, worldUv * biomeTileScale[7] + uvOffset);
+  float tileScale = sampleBiomeTileScale(biomeSlot);
+  vec2 primaryUv = worldUv * tileScale + uvOffset;
+  vec2 rotatedUv = rotateUv(worldUv, 0.67) * (tileScale * 0.63) + uvOffset * 1.7 + vec2(17.13, 9.71);
+  vec4 primarySample = sampleBiomeTextureRaw(biomeSlot, primaryUv);
+  vec4 rotatedSample = sampleBiomeTextureRaw(biomeSlot, rotatedUv);
+  float breakup = hashUV(worldUv * 0.25 + uvOffset * 10.0);
+  return mix(primarySample, rotatedSample, 0.32 + breakup * 0.18);
 }
 
 vec4 sampleBiomeTriplanar(float biomeSlot, vec3 worldPos, vec3 worldNormal, vec2 uvOffset) {
@@ -127,10 +195,55 @@ float sampleBiomeRoughness(float biomeSlot) {
   if (biomeSlot < 6.5) return biomeRoughness[6];
   return biomeRoughness[7];
 }
+
+float macroVariation(vec2 worldPos) {
+  float base = sin(worldPos.x * 0.012 + sin(worldPos.y * 0.007) * 1.7);
+  float detail = cos(worldPos.y * 0.016 + sin(worldPos.x * 0.011) * 1.3);
+  return clamp(1.0 + (base * 0.06 + detail * 0.04), 0.9, 1.12);
+}
+
+vec3 jungleHumidityTint(vec3 color, float slopeUp, float elevation) {
+  float lowlandFactor = 1.0 - smoothstep(900.0, 1500.0, elevation);
+  float flatFactor = smoothstep(0.45, 0.95, slopeUp);
+  vec3 humidTint = vec3(0.93, 1.01, 0.94);
+  return mix(color, color * humidTint, lowlandFactor * flatFactor * 0.22);
+}
+
+float lowlandWetnessMask(float slopeUp, float elevation) {
+  float lowlandFactor = 1.0 - smoothstep(700.0, 1200.0, elevation);
+  float flatFactor = smoothstep(0.58, 0.98, slopeUp);
+  return lowlandFactor * flatFactor * mix(0.35, 1.0, clamp(environmentWetness, 0.0, 1.0));
+}
+
+vec3 applyLowlandWetness(vec3 color, float slopeUp, float elevation) {
+  float wetness = lowlandWetnessMask(slopeUp, elevation);
+  if (wetness <= 0.001) {
+    return color;
+  }
+
+  vec3 wetTint = vec3(0.82, 0.9, 0.84);
+  vec3 darkened = color * wetTint;
+  return mix(color, darkened, wetness * 0.35);
+}
+
+vec3 applyCliffRockAccent(vec3 color, float slopeUp, float elevation, vec2 worldUv, vec2 uvOffset) {
+  float cliffMask = 1.0 - smoothstep(0.55, 0.78, slopeUp);
+  float elevationMask = smoothstep(700.0, 1400.0, elevation);
+  float rockBlend = cliffMask * elevationMask * 0.38;
+  if (rockBlend <= 0.001) {
+    return color;
+  }
+
+  vec4 rockPlanar = sampleBiomeTexture(1.0, worldUv, uvOffset);
+  return mix(color, rockPlanar.rgb, rockBlend);
+}
 `;
 
 const TERRAIN_FRAGMENT_MAP = /* glsl */ `
-float biomeSlot = classifyBiomeSlot(vTerrainNormal);
+float primaryBiomeSlot;
+float secondaryBiomeSlot;
+float secondaryBiomeBlend;
+classifyBiomeBlend(normalize(vTerrainNormal), primaryBiomeSlot, secondaryBiomeSlot, secondaryBiomeBlend);
 vec2 uvOffset = vec2(0.0);
 if (antiTilingStrength > 0.0) {
   float noise = hashUV(vWorldUV * 7.0);
@@ -142,15 +255,39 @@ float triplanarBlend = 1.0 - smoothstep(
   triplanarSlopeThreshold,
   slopeUp
 );
-vec4 planarSample = sampleBiomeTexture(biomeSlot, vWorldPosition.xz, uvOffset);
-vec4 triplanarSample = sampleBiomeTriplanar(biomeSlot, vWorldPosition, normalize(vTerrainNormal), uvOffset);
-vec4 biomeSample = mix(planarSample, triplanarSample, triplanarBlend);
-diffuseColor.rgb = biomeSample.rgb;
+vec4 primaryPlanarSample = sampleBiomeTexture(primaryBiomeSlot, vWorldPosition.xz, uvOffset);
+vec4 primaryTriplanarSample = sampleBiomeTriplanar(primaryBiomeSlot, vWorldPosition, normalize(vTerrainNormal), uvOffset);
+vec4 primaryBiomeSample = mix(primaryPlanarSample, primaryTriplanarSample, triplanarBlend);
+vec4 biomeSample = primaryBiomeSample;
+if (secondaryBiomeBlend > 0.001) {
+  vec4 secondaryPlanarSample = sampleBiomeTexture(secondaryBiomeSlot, vWorldPosition.xz, uvOffset);
+  vec4 secondaryTriplanarSample = sampleBiomeTriplanar(secondaryBiomeSlot, vWorldPosition, normalize(vTerrainNormal), uvOffset);
+  vec4 secondaryBiomeSample = mix(secondaryPlanarSample, secondaryTriplanarSample, triplanarBlend);
+  biomeSample = mix(primaryBiomeSample, secondaryBiomeSample, secondaryBiomeBlend);
+}
+vec3 finalColor = biomeSample.rgb * macroVariation(vWorldPosition.xz);
+finalColor = jungleHumidityTint(finalColor, slopeUp, vWorldPosition.y);
+finalColor = applyLowlandWetness(finalColor, slopeUp, vWorldPosition.y);
+finalColor = applyCliffRockAccent(finalColor, slopeUp, vWorldPosition.y, vWorldPosition.xz, uvOffset);
+diffuseColor.rgb = finalColor;
 `;
 
 const TERRAIN_FRAGMENT_ROUGHNESS = /* glsl */ `
-float roughnessBiomeSlot = classifyBiomeSlot(vTerrainNormal);
-roughnessFactor *= sampleBiomeRoughness(roughnessBiomeSlot);
+float primaryRoughnessBiomeSlot;
+float secondaryRoughnessBiomeSlot;
+float roughnessSecondaryBlend;
+classifyBiomeBlend(normalize(vTerrainNormal), primaryRoughnessBiomeSlot, secondaryRoughnessBiomeSlot, roughnessSecondaryBlend);
+float roughnessSample = sampleBiomeRoughness(primaryRoughnessBiomeSlot);
+if (roughnessSecondaryBlend > 0.001) {
+  float secondaryRoughness = sampleBiomeRoughness(secondaryRoughnessBiomeSlot);
+  roughnessSample = mix(roughnessSample, secondaryRoughness, roughnessSecondaryBlend);
+}
+float wetness = lowlandWetnessMask(
+  clamp(dot(normalize(vTerrainNormal), vec3(0.0, 1.0, 0.0)), 0.0, 1.0),
+  vWorldPosition.y
+);
+roughnessSample = mix(roughnessSample, roughnessSample * 0.72, wetness);
+roughnessFactor *= roughnessSample;
 `;
 
 const TERRAIN_FRAGMENT_NORMAL_OVERRIDE = /* glsl */ `
@@ -184,6 +321,7 @@ export interface TerrainMaterialOptions {
   worldSize: number;
   splatmap: SplatmapConfig;
   biomeConfig: TerrainBiomeMaterialConfig;
+  surfaceWetness?: number;
 }
 
 export function createTerrainMaterial(options: TerrainMaterialOptions): THREE.MeshStandardMaterial {
@@ -217,8 +355,21 @@ export function updateTerrainMaterialTextures(
       triplanarSlopeThreshold: 0.707,
       antiTilingStrength: 0.3,
     },
+    surfaceWetness: readCurrentSurfaceWetness(material),
   });
   material.needsUpdate = true;
+}
+
+export function updateTerrainMaterialWetness(
+  material: THREE.MeshStandardMaterial,
+  surfaceWetness: number,
+): void {
+  const clampedWetness = THREE.MathUtils.clamp(surfaceWetness, 0, 1);
+  material.userData.terrainSurfaceWetness = clampedWetness;
+  const terrainUniforms = material.userData.terrainUniforms as Record<string, { value: unknown }> | undefined;
+  if (terrainUniforms?.environmentWetness) {
+    terrainUniforms.environmentWetness.value = clampedWetness;
+  }
 }
 
 function applyTerrainMaterialOptions(
@@ -226,6 +377,9 @@ function applyTerrainMaterialOptions(
   options: TerrainMaterialOptions,
 ): void {
   const shaderBindings = createShaderBindings(options);
+  material.userData ??= {};
+  material.userData.terrainUniforms = shaderBindings.uniforms;
+  material.userData.terrainSurfaceWetness = shaderBindings.uniforms.environmentWetness.value;
 
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, shaderBindings.uniforms);
@@ -269,6 +423,7 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
   const { heightTexture, normalTexture, worldSize, biomeConfig, splatmap } = options;
   const layers = biomeConfig.layers;
   const rules = biomeConfig.rules;
+  const surfaceWetness = THREE.MathUtils.clamp(options.surfaceWetness ?? 0, 0, 1);
 
   if (layers.length === 0) {
     throw new Error('Terrain material requires at least one biome layer');
@@ -321,6 +476,7 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
     terrainWorldSize: { value: worldSize },
     antiTilingStrength: { value: splatmap.antiTilingStrength },
     triplanarSlopeThreshold: { value: splatmap.triplanarSlopeThreshold },
+    environmentWetness: { value: surfaceWetness },
     biomeTileScale: { value: biomeTileScale },
     biomeRoughness: { value: biomeRoughness },
     biomeRuleBiomeSlot: { value: ruleBiomeSlot },
@@ -336,4 +492,9 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
   }
 
   return { uniforms };
+}
+
+function readCurrentSurfaceWetness(material: THREE.MeshStandardMaterial): number {
+  const currentWetness = material.userData.terrainSurfaceWetness;
+  return typeof currentWetness === 'number' ? currentWetness : 0;
 }

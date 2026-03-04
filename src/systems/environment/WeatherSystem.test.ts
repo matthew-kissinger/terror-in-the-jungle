@@ -63,25 +63,29 @@ function createSystem(): {
   system: WeatherSystem;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
+  terrainRuntime: ITerrainRuntime;
 } {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera();
-  const terrainRuntime = {} as ITerrainRuntime;
+  const terrainRuntime = {
+    setSurfaceWetness: vi.fn(),
+  } as unknown as ITerrainRuntime;
   const system = new WeatherSystem(scene, camera, terrainRuntime);
-  return { system, scene, camera };
+  return { system, scene, camera, terrainRuntime };
 }
 
 function createSystemWithRainCount(rainCount: number): {
   system: WeatherSystem;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
+  terrainRuntime: ITerrainRuntime;
 } {
-  const { system, scene, camera } = createSystem();
+  const { system, scene, camera, terrainRuntime } = createSystem();
   const systemAny = system as WeatherSystemAny;
   systemAny.rainCount = rainCount;
   systemAny.rainVelocities = new Float32Array(rainCount);
   systemAny.rainPositions = new Float32Array(rainCount * 3);
-  return { system, scene, camera };
+  return { system, scene, camera, terrainRuntime };
 }
 
 function createWeatherConfig(overrides: Partial<WeatherConfig> = {}): WeatherConfig {
@@ -401,22 +405,24 @@ describe('WeatherSystem', () => {
 
   describe('updateRain', () => {
     it('hides rain when intensity is near zero', async () => {
-      const { system } = createSystemWithRainCount(3);
+      const { system, terrainRuntime } = createSystemWithRainCount(3);
       await system.init();
       vi.mocked(getBlendedRainIntensity).mockReturnValue(0);
       const systemAny = system as WeatherSystemAny;
       systemAny.updateRain(1);
       expect(systemAny.rainMesh?.visible).toBe(false);
+      expect(terrainRuntime.setSurfaceWetness).toHaveBeenCalledWith(0);
     });
 
     it('shows rain and sets opacity based on intensity', async () => {
-      const { system } = createSystemWithRainCount(3);
+      const { system, terrainRuntime } = createSystemWithRainCount(3);
       await system.init();
       vi.mocked(getBlendedRainIntensity).mockReturnValue(0.5);
       const systemAny = system as WeatherSystemAny;
       systemAny.updateRain(1);
       expect(systemAny.rainMesh?.visible).toBe(true);
       expect((systemAny.rainMesh?.material as THREE.MeshBasicMaterial).opacity).toBeCloseTo(0.3, 5);
+      expect(terrainRuntime.setSurfaceWetness).toHaveBeenCalledWith(0.5);
     });
 
     it('applies storm wind strength', async () => {
@@ -478,12 +484,13 @@ describe('WeatherSystem', () => {
 
   describe('update', () => {
     it('early-returns when weather is disabled', () => {
-      const { system } = createSystem();
+      const { system, terrainRuntime } = createSystem();
       system.setWeatherConfig(createWeatherConfig({ enabled: false }));
       vi.clearAllMocks();
       system.update(1);
       expect(updateLightning).not.toHaveBeenCalled();
       expect(updateAtmosphere).not.toHaveBeenCalled();
+      expect(terrainRuntime.setSurfaceWetness).toHaveBeenCalledWith(0);
     });
 
     it('updates lightning and atmosphere when enabled', async () => {
@@ -514,6 +521,14 @@ describe('WeatherSystem', () => {
       expect(removeSpy).toHaveBeenCalledWith(systemAny.rainMesh);
       expect(geometryDisposeSpy).toHaveBeenCalled();
       expect(materialDisposeSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('resetState', () => {
+    it('clears terrain wetness when weather resets', () => {
+      const { system, terrainRuntime } = createSystem();
+      system.resetState();
+      expect(terrainRuntime.setSurfaceWetness).toHaveBeenCalledWith(0);
     });
   });
 });

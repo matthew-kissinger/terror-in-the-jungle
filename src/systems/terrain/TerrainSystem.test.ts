@@ -73,6 +73,7 @@ vi.mock('./TerrainMaterial', () => ({
     dispose: vi.fn(),
   }),
   updateTerrainMaterialTextures: vi.fn(),
+  updateTerrainMaterialWetness: vi.fn(),
 }));
 
 vi.mock('./TerrainWorkerPool', () => ({

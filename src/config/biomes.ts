@@ -41,7 +41,7 @@ export const BIOME_DENSE_JUNGLE: BiomeConfig = {
   id: 'denseJungle',
   name: 'Dense Jungle',
   groundTexture: 'jungle-floor',
-  groundTileScale: 0.1,
+  groundTileScale: 0.14,
   groundRoughness: 0.85,
   vegetationPalette: [
     { typeId: 'fern',          densityMultiplier: 1.0 },
@@ -62,7 +62,7 @@ export const BIOME_HIGHLAND: BiomeConfig = {
   id: 'highland',
   name: 'Highland',
   groundTexture: 'rocky-highland',
-  groundTileScale: 0.08,
+  groundTileScale: 0.1,
   groundRoughness: 0.78,
   vegetationPalette: [
     { typeId: 'fern',          densityMultiplier: 0.6 },
@@ -142,7 +142,7 @@ export const BIOME_BAMBOO_GROVE: BiomeConfig = {
   id: 'bambooGrove',
   name: 'Bamboo Grove',
   groundTexture: 'bamboo-floor',
-  groundTileScale: 0.11,
+  groundTileScale: 0.135,
   groundRoughness: 0.84,
   vegetationPalette: [
     { typeId: 'bambooGrove',   densityMultiplier: 2.0 },

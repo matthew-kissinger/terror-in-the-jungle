@@ -164,7 +164,10 @@ export class WeatherSystem implements GameSystem {
   }
 
   update(deltaTime: number): void {
-    if (!this.config?.enabled) return;
+    if (!this.config?.enabled) {
+      this.terrainRuntime.setSurfaceWetness(0);
+      return;
+    }
 
     this.updateCycle(deltaTime);
     this.updateTransition(deltaTime);
@@ -219,6 +222,7 @@ export class WeatherSystem implements GameSystem {
     if (instant) {
       this.currentState = state;
       this.transitionProgress = 1.0;
+      this.terrainRuntime.setSurfaceWetness(getBlendedRainIntensity(state, state, 1.0));
       this.updateAtmosphere();
     } else {
       this.transitionProgress = 0.0;
@@ -240,6 +244,7 @@ export class WeatherSystem implements GameSystem {
 
     // Determine rain intensity based on blended state
     const intensity = getBlendedRainIntensity(this.currentState, this.targetState, this.transitionProgress);
+    this.terrainRuntime.setSurfaceWetness(intensity);
     
     if (intensity <= 0.01) {
       this.rainMesh.visible = false;
@@ -335,6 +340,7 @@ export class WeatherSystem implements GameSystem {
     this.transitionProgress = 1.0;
     this.transitionTimer = 0;
     this.cycleTimer = this.getRandomCycleDuration();
+    this.terrainRuntime.setSurfaceWetness(0);
     Logger.info('weather', 'Weather system reset to clear state');
   }
 

@@ -49,6 +49,7 @@ export class TerrainSystem implements GameSystem {
   private explicitWorldSize: number | null = null;
   private defaultBiomeId = 'denseJungle';
   private biomeRules: BiomeClassificationRule[] = [];
+  private surfaceWetness = 0;
 
   constructor(
     scene: THREE.Scene,
@@ -164,6 +165,15 @@ export class TerrainSystem implements GameSystem {
 
   updatePlayerPosition(position: THREE.Vector3): void {
     this.playerPosition.copy(position);
+  }
+
+  setSurfaceWetness(wetness: number): void {
+    const clampedWetness = THREE.MathUtils.clamp(wetness, 0, 1);
+    if (Math.abs(clampedWetness - this.surfaceWetness) < 0.001) {
+      return;
+    }
+    this.surfaceWetness = clampedWetness;
+    this.surfaceRuntime.setSurfaceWetness(clampedWetness);
   }
 
   // ──── Height queries ────

@@ -17,9 +17,12 @@ vi.mock('three', () => ({
   Color: class {
     constructor(public hex: number) {}
   },
+  MathUtils: {
+    clamp: (value: number, min: number, max: number) => Math.min(Math.max(value, min), max),
+  },
 }));
 
-import { createTerrainMaterial, updateTerrainMaterialTextures } from './TerrainMaterial';
+import { createTerrainMaterial, updateTerrainMaterialTextures, updateTerrainMaterialWetness } from './TerrainMaterial';
 import type { SplatmapConfig } from './TerrainConfig';
 
 function makeMockTexture(): any {
@@ -86,7 +89,15 @@ describe('TerrainMaterial', () => {
     expect(shader.uniforms.biomeRuleBiomeSlot).toBeDefined();
     expect(shader.uniforms.antiTilingStrength.value).toBe(0.3);
     expect(shader.uniforms.triplanarSlopeThreshold.value).toBe(0.707);
+    expect(shader.uniforms.environmentWetness.value).toBe(0);
     expect(shader.fragmentShader).toContain('sampleBiomeTriplanar');
+    expect(shader.fragmentShader).toContain('classifyBiomeBlend');
+    expect(shader.fragmentShader).toContain('macroVariation');
+    expect(shader.fragmentShader).toContain('rotateUv');
+    expect(shader.fragmentShader).toContain('jungleHumidityTint');
+    expect(shader.fragmentShader).toContain('lowlandWetnessMask');
+    expect(shader.fragmentShader).toContain('applyLowlandWetness');
+    expect(shader.fragmentShader).toContain('applyCliffRockAccent');
   });
 
   it('updateTerrainMaterialTextures replaces textures', () => {
@@ -104,5 +115,26 @@ describe('TerrainMaterial', () => {
 
     // The material should be marked for recompile
     expect(mat.needsUpdate).toBe(true);
+  });
+
+  it('updateTerrainMaterialWetness updates the live shader uniform', () => {
+    const mat = createTerrainMaterial({
+      heightTexture: makeMockTexture(),
+      normalTexture: makeMockTexture(),
+      worldSize: 1024,
+      splatmap: testSplatmap,
+      biomeConfig: testBiomeConfig,
+    });
+
+    const shader = {
+      uniforms: {} as Record<string, any>,
+      vertexShader: '#include <common>\n#include <begin_vertex>\n#include <project_vertex>',
+      fragmentShader: '#include <common>\n#include <map_fragment>\n#include <normal_fragment_begin>',
+    };
+
+    mat.onBeforeCompile(shader as any, null as any);
+    updateTerrainMaterialWetness(mat, 0.8);
+
+    expect(shader.uniforms.environmentWetness.value).toBe(0.8);
   });
 });

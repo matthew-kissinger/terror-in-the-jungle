@@ -7,6 +7,7 @@ import { HeightmapGPU } from './HeightmapGPU';
 import {
   createTerrainMaterial,
   updateTerrainMaterialTextures,
+  updateTerrainMaterialWetness,
 } from './TerrainMaterial';
 import { buildTerrainBiomeMaterialConfig } from './TerrainBiomeRuntimeConfig';
 
@@ -42,6 +43,7 @@ export class TerrainSurfaceRuntime {
   private readonly splatmap: SplatmapConfig;
   private readonly heightmapGPU: HeightmapGPU;
   private terrainMaterial: THREE.MeshStandardMaterial | null = null;
+  private surfaceWetness = 0;
 
   constructor(assetLoader: AssetLoader, splatmap: SplatmapConfig) {
     this.assetLoader = assetLoader;
@@ -69,6 +71,7 @@ export class TerrainSurfaceRuntime {
       worldSize,
       splatmap: this.splatmap,
       biomeConfig: buildTerrainBiomeMaterialConfig(this.assetLoader, defaultBiomeId, biomeRules),
+      surfaceWetness: this.surfaceWetness,
     });
 
     return this.terrainMaterial;
@@ -88,6 +91,13 @@ export class TerrainSurfaceRuntime {
       throw new Error('Terrain material requested before initialization');
     }
     return this.terrainMaterial;
+  }
+
+  setSurfaceWetness(surfaceWetness: number): void {
+    this.surfaceWetness = THREE.MathUtils.clamp(surfaceWetness, 0, 1);
+    if (this.terrainMaterial) {
+      updateTerrainMaterialWetness(this.terrainMaterial, this.surfaceWetness);
+    }
   }
 
   dispose(): void {
@@ -112,5 +122,6 @@ export class TerrainSurfaceRuntime {
       buildTerrainBiomeMaterialConfig(this.assetLoader, defaultBiomeId, biomeRules),
       this.splatmap,
     );
+    updateTerrainMaterialWetness(this.terrainMaterial, this.surfaceWetness);
   }
 }

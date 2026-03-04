@@ -46,6 +46,7 @@ export class GameScenario {
       isTerrainReady: () => true,
       hasTerrainAt: () => true,
       getActiveTerrainTileCount: () => 0,
+      setSurfaceWetness: () => {},
       updatePlayerPosition: () => {},
       registerCollisionObject: () => {},
       unregisterCollisionObject: () => {},
