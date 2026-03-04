@@ -98,6 +98,7 @@ Current `peak_max_frame_ms` classification:
 - `scripts/perf-browser-observers.js` installs `PerformanceObserver` listeners for `longtask` and `long-animation-frame` during harness runs only.
 - `SystemUpdater` emits `performance.mark()` / `performance.measure()` spans during perf captures so tick-group totals can be recovered from the artifact without shipping overlay/debug code.
 - `GameRenderer` snapshots `renderer.info` once per frame for harness sampling; this data is recorded in artifacts, not rendered to gameplay UI.
+- March 4, 2026 tail attribution used temporary local AI probes (`aiPhaseMs` snapshots plus spike-phase log suffixes) to localize rare `combat120` spikes. Those probes were removed after capture so no extra AI diagnostics ship in the current branch.
 
 ## Driver Expectations
 
@@ -109,6 +110,7 @@ Current `peak_max_frame_ms` classification:
 
 - Treat the first capture after a fresh boot as cold-start data and discard or label it accordingly.
 - `systemTop` inside `runtime-samples.json` is a quick snapshot, not the authoritative budget breakdown in every mode. Use `browserStalls.totals.userTimingByName` for phase analysis.
+- The March 4, 2026 AI attribution artifacts are still valid evidence, but the temporary probe fields and spike-phase log suffixes are not present in the current branch. Re-add them only behind harness-only gating if deeper tail attribution is needed again.
 - Chromium-only browser diagnostics (`longtask`, `long-animation-frame`) are valid for harness evidence but must remain out of production builds.
 
 ## Guardrails

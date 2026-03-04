@@ -203,6 +203,30 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
     - `SystemUpdater.Combat.maxDurationMs`: `233.6ms -> 255.6ms`
 - Decision: revert. Throttling advancing threat reacquisition traded away combat activity before it reduced the actual `combat120` tails.
 
+### March 4 diagnostic attribution: `suppressing` / `advancing` spikes are really suppression-init work
+
+- Diagnostic instrumentation added:
+  - dev-only `aiPhaseMs` snapshots on `combatProfile.timing`
+  - dev-only phase suffixes on `[AI spike]` / `[AI full-update spike]`
+  - dev-only `[AI engage spike]` logs inside `AIStateEngage.handleEngaging()`
+- Diagnostic artifacts:
+  - full combat capture with sampled AI phases: `2026-03-04T18-30-45-251Z`
+  - short spike-attribution run: `2026-03-04T18-35-30-494Z`
+  - short engage-subphase run: `2026-03-04T18-39-02-145Z`
+- What the evidence says:
+  - sampled `aiPhaseMs` from `2026-03-04T18-30-45-251Z` showed steady-state `handler.suppressing` is effectively zero while `handler.engaging` dominates. That means the rare spike labels were being misread from transition end-state, not true hot-path ownership.
+  - `2026-03-04T18-35-30-494Z` confirmed that direct `[AI spike]` events logged as `state=suppressing` / `state=advancing` actually carried `phases=handler.engaging:...`.
+  - `2026-03-04T18-39-02-145Z` then localized the engaging spikes further: repeated `[AI engage spike]` logs were dominated by `suppression.initiate` at `65-214ms`, with only trace time in `suppression.shouldInitiate`, `nearbyEnemies`, `flank.shouldInitiate`, or outer cover checks.
+  - Representative examples from `2026-03-04T18-39-02-145Z`:
+    - `combatant_73`: `202.2ms`, `state=suppressing`, `phases=suppression.initiate:201.8`
+    - `combatant_20`: `164.0ms`, `state=advancing`, `phases=suppression.initiate:163.7`
+    - `combatant_88`: `120.5ms`, `state=suppressing`, `phases=suppression.initiate:120.0, cover.findBest:0.4, nearbyEnemies:0.1`
+- Source-backed inference:
+  - Inside `AIStateEngage.initiateSquadSuppression()`, the only repeated expensive substep is the per-flanker `findNearestCover({ ...member, position: flankingPos }, targetPos)` call.
+  - `AICoverFinding.findNearestCover()` does a broad search over sandbags, a vegetation grid, and terrain raycasts. Running that synchronously for multiple flankers in one squad-initiation burst is the most credible explanation for the `65-214ms` spikes.
+- Probe cleanup: the temporary AI attribution fields/log suffixes were removed after these captures and the production bundle was re-scanned clean. The artifacts above remain the source of truth for this diagnosis.
+- Decision: do not touch gameplay cadence again until this suppression-init cover-search path is addressed. The next combat optimization slice should target that synchronous cover search directly, not state throttling.
+
 ## Validation Snapshot (2026-03-04)
 
 - `npm run test:run`: pass (`2959` tests passed, `2` skipped).
@@ -212,7 +236,7 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
 
 ## Ranked Phase 2 Targets
 
-1. `combat120` high-LOD AI spikes that remain after query-cache reuse, especially `suppressing` / `advancing` state work. March 4, 2026 attempts to skip visual-only spacing work and to throttle advancing threat reacquisition were both reverted, so the remaining tail source is deeper than those low-friction gates.
+1. `combat120` high-LOD AI spikes that remain after query-cache reuse, now specifically localized to `AIStateEngage.initiateSquadSuppression()` and the per-flanker fallback cover search inside that path. March 4, 2026 behavior-throttling attempts were both reverted; the next win needs to come from this synchronous setup work instead.
 2. `HeightQueryCache.getHeightAt()` keying and hit cost. This remains a cross-cutting hotspot for combat and terrain paths even after AI query consolidation.
 3. `TerrainRaycastRuntime` near-field rebuild bursts and the terrain height-sampling path in `open_frontier`, `frontier30m`, and `a_shau_valley`.
 4. A Shau `WarSim` steady-state cost and large heap waves once terrain tails are reduced enough to isolate strategy work more cleanly.
@@ -221,8 +245,8 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
 ## Frontier Technology Fit (Measured, Not Adopted)
 
 - High-fit, low-friction now:
-  - more selective off-frame work reduction around `CombatantLODManager.updateCombatantVisualOnly()`; the first friendly-spacing skip attempt was reverted
-  - deeper attribution inside full-update `suppressing` / `advancing` work before any further behavior throttling
+  - reduce or defer the synchronous per-flanker cover search inside `AIStateEngage.initiateSquadSuppression()`
+  - if deeper attribution is needed, re-add the March 4 AI probes behind harness-only gating and remove them again after capture
   - data-oriented keying / lower-churn cache strategy for `HeightQueryCache`
   - scheduling or throttling around near-field terrain rebuild work
 - Medium-fit after JS-level cleanup:

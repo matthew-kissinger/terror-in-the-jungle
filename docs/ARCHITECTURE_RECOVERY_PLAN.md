@@ -86,10 +86,11 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - ZoneManager no longer falls back to linear scan if spatial query returns empty; if SpatialGridManager has sync bugs, zone capture may stall.
 - The immediate A Shau terrain-startup spike has improved in preview smoke, but this is not yet a substitute for broader perf-harness evidence under sustained combat and camera motion.
 - `combat120` now has a valid harness run, but it fails on `peak_p99_frame_ms` and AI starvation. This is the clearest measured hotspot.
-- Deep `combat120` capture localizes the worst tails to `CombatantAI.updateAI()` inside high-LOD full updates. The captured spike logs are dominated by `suppressing` / `advancing` states, with near-zero move/combat/render/spatial time in the same event.
+- Deep `combat120` capture localizes the worst tails to `CombatantAI.updateAI()` inside high-LOD full updates. March 4 diagnostic probes now show those nominal `suppressing` / `advancing` spikes are actually `AIStateEngage.handleEngaging()` work that transitions into those states.
 - The accepted March 4, 2026 frame-local `AITargetAcquisition` cache reduced matched warm `combat120` starvation (`16.82 -> 12.91`), average frame time (`15.10ms -> 14.59ms`), and heap growth (`15.73MB -> 3.64MB`) under slightly higher combat pressure, but `peak_p99_frame_ms` still fails and `SystemUpdater.Combat.maxDurationMs` rose slightly (`224.4ms -> 233.6ms`).
 - A March 4, 2026 attempt to disable friendly-spacing work on visual-only high-LOD frames was reverted. Two warm post-change runs lowered mean frame time slightly, but tails, stall totals, and AI-starvation signals worsened; one rerun also under-shot badly (`54 / 32` shots / hits).
 - A March 4, 2026 attempt to reuse targets and throttle advancing threat reacquisition during flank movement was also reverted. The warm rerun improved mean frame time but reduced combat pressure sharply (`220 / 140 -> 90 / 53` shots / hits) while worsening hitch rate, combat dominance, long-task totals, and `SystemUpdater.Combat.maxDurationMs`.
+- March 4, 2026 short diagnostic captures (`2026-03-04T18-35-30-494Z`, `2026-03-04T18-39-02-145Z`) localize the rare `CombatantAI` spikes to `AIStateEngage.initiateSquadSuppression()`. The inner spike logs are dominated by `suppression.initiate` `65-214ms`; source inspection shows this path synchronously runs `findNearestCover()` for each flanker, which is the leading candidate for the remaining combat tails.
 - `HeightQueryCache.getHeightAt()` is unexpectedly hot in combat-heavy runs because string-key generation and LRU churn sit directly on terrain and movement paths.
 - The March 4, 2026 numeric-key linked-list `HeightQueryCache` experiment was reverted. Open Frontier improved, but warm `combat120` evidence was inconsistent and one matched pair worsened heap recovery from `41.7%` to `8.7%`.
 - `open_frontier` and `frontier30m` are throughput-pass / tail-fail patterns: averages stay low while long-task and LoAF totals remain high.
@@ -105,7 +106,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 
 ## Next Execution Slice
 
-1. Triage the remaining `combat120` tail spikes in high-LOD `suppressing` / `advancing` updates now that AI query churn is reduced. Friendly-spacing removal and advancing threat-scan throttling were both rejected, so the next slice needs deeper attribution, not broader behavior throttles.
+1. Triage the remaining `combat120` tail spikes in `AIStateEngage.initiateSquadSuppression()`. Friendly-spacing removal and advancing threat-scan throttling were both rejected; the measured hotspot is now the synchronous per-flanker cover-search work inside suppression-init.
 2. Revisit `HeightQueryCache` only with a lower-overhead design and matched warm captures; the numeric-key linked-list LRU attempt was reverted and the AI neighborhood cache is now the accepted combat baseline.
 3. Break down `TerrainRaycastRuntime` near-field rebuild and vegetation update cost inside `TerrainSystem.update()` for `open_frontier`, `frontier30m`, and `a_shau_valley`.
 4. Re-baseline and lock regression checks after each accepted change. Deploy now gated on CI (lint+test+build). `perf:compare` wired into perf-check.yml workflow.
