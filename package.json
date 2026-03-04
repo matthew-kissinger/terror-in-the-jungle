@@ -57,7 +57,7 @@
   },
   "dependencies": {
     "@preact/signals-core": "^1.13.0",
-    "three": "^0.182.0",
+    "three": "^0.183.2",
     "three-mesh-bvh": "^0.9.8"
   }
 }
