@@ -63,6 +63,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: large-world terrain surface bake budget is scale-aware instead of fixed. `TerrainSurfaceRuntime` now reduces the render-only bake grid at A Shau scale from `1024` to `512`, while gameplay height authority remains on `HeightQueryCache`.
 - Keep: `TerrainRaycastRuntime` no longer computes unused vertex normals for the near-field LOS mesh.
 - Keep: loading/start-screen asset URLs are base-aware; root-relative screen asset paths that produced preview/Page `404`s were removed.
+- Keep: CDLODQuadtree `range * 1.5` early-return removed. The skip created coverage holes when a parent subdivided but children fell outside `childRange * 1.5`, leaving terrain patches invisible (collision and vegetation still worked via HeightQueryCache). Every node now must either emit or subdivide.
 
 ## Deferred Decisions
 
@@ -84,9 +85,9 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 ## Next Execution Slice
 
 1. Isolate retained heap growth sources with focused captures and subsystem counters.
-2. Complete A Shau contact-flow loop so player reaches and sustains skirmish pressure without harness warps.
-3. Re-baseline and lock regression checks after each accepted change.
-4. Keep terrain rewrite progress aligned with `TERRAIN_REWRITE_MASTER_PLAN.md`; do not reintroduce chunk-era semantics into active runtime code.
+2. A Shau sustained contact pressure improved (2026-03-03): StrategicDirector biases zone scoring toward player (1.5km radius, +3.0 score), AbstractCombatResolver reduces kill rate within 1km of player (30% multiplier), reinforcements spawn at forward-owned zones near player. Needs live validation.
+3. Re-baseline and lock regression checks after each accepted change. Deploy now gated on CI (lint+test+build). `perf:compare` wired into perf-check.yml workflow.
+4. Keep terrain rewrite progress aligned with `TERRAIN_REWRITE_MASTER_PLAN.md`; do not reintroduce chunk-era semantics into active runtime code. T-006 (CDLOD LOD transitions) done: XZ morphing in vertex shader, wireframe debug toggle.
 5. Re-run matched perf captures after the terrain startup-path changes so the recovery plan has sustained evidence, not just preview smoke evidence.
 
 ## Update Rule

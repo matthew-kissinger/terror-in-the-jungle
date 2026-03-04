@@ -112,12 +112,9 @@ export class CDLODQuadtree {
 
     const range = this.lodRanges[lodLevel] ?? this.lodRanges[this.lodRanges.length - 1];
 
-    // If outside this LOD's range, skip entirely (parent will handle)
-    if (dist > range * 1.5) {
-      return;
-    }
-
-    // Check if we should subdivide (higher detail)
+    // Check if we should subdivide (higher detail).
+    // A node called by its parent MUST either emit itself or subdivide -
+    // never return empty, as the parent already delegated this area to us.
     const shouldSubdivide = lodLevel > 0 && dist < range;
 
     if (shouldSubdivide) {
