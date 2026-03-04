@@ -254,11 +254,14 @@ Real runtime behavior:
 - near-field collision proxy mesh is rebuilt as the player moves
 - height queries can resolve through the runtime
 - weapons and helicopter systems use terrain-effective height methods
-- terrain material now uses live biome textures, biome roughness, and slope-aware triplanar sampling on steep surfaces
+- terrain material now uses live biome textures, biome roughness, soft biome blending, rotated dual-sample anti-tiling, macro breakup, and slope-aware triplanar sampling on steep surfaces
+- terrain shading now includes lowland humidity/wetness response and cliff-only rock accenting instead of broad rock overpaint
+- live weather now drives terrain surface wetness through the runtime, so rain changes terrain darkness/roughness rather than only particles and fog
 - terrain ground textures now use linear mipmapped filtering instead of nearest/no-mipmap sprite filtering
 - render-only surface bake density now scales with world size; A Shau uses a 512-grid render surface instead of a fixed 1024-grid bake
 - loading/start-screen terrain-adjacent UI assets now use base-aware paths instead of hard-coded root-relative URLs
 - automated preview smoke now confirms shader-clean, terrain-warning-clean, request-error-clean startup in both `zone_control` and `a_shau_valley`
+- A Shau biome coverage has been retuned toward dense jungle and bamboo uplands, with highland rock constrained to upper ridges and cliff accents
 
 ### Transitional residue
 
@@ -315,6 +318,17 @@ The immediate A Shau startup cost issue that appeared in the earlier smoke artif
 
 That is strong evidence that the current terrain runtime is in a materially better state.
 It is not yet proof that large-world terrain cost is solved under broader camera motion, combat pressure, or long-run play.
+
+### 5. Visual tuning is ahead of visual proof
+
+The material stack is now materially better than the earlier prototype state:
+- more jungle-biased biome coverage,
+- anti-tiling breakup,
+- wet lowland response,
+- weather-driven surface wetness.
+
+What is still missing is a canonical screenshot-based review loop on live A Shau and one small mode.
+Until that exists, the shader stack is improved but not yet visually signed off.
 
 ### 5. Stale docs
 

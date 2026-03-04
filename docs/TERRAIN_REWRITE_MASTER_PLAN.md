@@ -258,11 +258,11 @@ Validation:
 | T-001A | Pass mode world size into terrain runtime | P0 | `done` | `GameEngineInit` now calls `setWorldSize(config.worldSize)` |
 | T-001B | Decouple render distance from map extent | P0 | `done` | Chunk size/render distance no longer override explicit map extent |
 | T-002 | Unify gameplay height path | P1 | `done` | `TerrainSystem.getHeightAt()` now delegates to gameplay queries |
-| T-003 | Wire vegetation and biome config | P1 | `in_progress` | terrain material and vegetation both consume biome rules; automated preview smoke is now fully clean in `zone_control` and `a_shau_valley`, manual visual review/tuning is still pending |
+| T-003 | Wire vegetation and biome config | P1 | `in_progress` | terrain material and vegetation both consume biome rules; A Shau biome coverage has been retuned toward jungle/bamboo instead of broad highland rock, automated preview smoke is fully clean, manual visual review/tuning is still pending |
 | T-004 | Remove dishonest compat semantics | P2 | `done` | Dishonest chunk stubs and alias interfaces are gone from the runtime boundary; core callers use truthful terrain semantics |
 | T-005 | Clarify terrain block boundaries | P2 | `done` | runtime/query/data roles are explicit, gameplay/world consumers use injected terrain runtime, and remaining direct height-cache usage is confined to terrain internals plus bootstrap/provider setup |
 | T-006 | Prove CDLOD transitions | P3 | `pending` | morphing + validation |
-| T-007 | Finish terrain material stack | P3 | `in_progress` | biome textures, roughness, slope-aware triplanar sampling, terrain-appropriate ground texture filtering, and base-aware loading/start-screen asset paths are live; large-world surface bake now scales down to a 512 grid at A Shau size, and automated preview smoke is shader-clean, terrain-warning-clean, and request-error-clean, but authored per-layer normal/PBR inputs are still pending because they are not yet in the asset inventory |
+| T-007 | Finish terrain material stack | P3 | `in_progress` | biome textures, roughness, slope-aware triplanar sampling, rotated dual-sample anti-tiling, macro breakup, cliff-only rock accents, lowland wetness shading, and live weather-driven terrain wetness are live; large-world surface bake now scales down to a 512 grid at A Shau size, automated preview smoke is shader-clean/terrain-warning-clean/request-error-clean, but authored per-layer normal/PBR inputs are still pending because they are not yet in the asset inventory |
 | T-008 | Add hydrology layer plan and interfaces | P3 | `pending` | river gameplay |
 | T-009 | Per-match random terrain seeds | P1 | `done` | `terrainSeed` on GameModeConfig, `rebakeHeightmap()` on TerrainSystem, wired in GameEngineInit |
 | T-010 | Vietnam-scale tiled DEM support | P2 | `pending` | heightmap streaming for maps beyond 21km; needed for Hue, Mekong Delta, DMZ theaters |
@@ -479,6 +479,44 @@ Next:
 - manual visual review of `artifacts/terrain-smoke/2026-03-04T00-54-47-243Z`
 - continue `T-007` with authored terrain normal/PBR inputs when those assets are added
 - move to `T-006` and prove LOD transition quality with wireframe/transition capture
+
+### 2026-03-04 (session 4)
+
+Completed:
+- retuned A Shau biome classification so the map reads more like jungle and bamboo uplands instead of broad rock coverage:
+  - `highland` now only applies on upper ridges,
+  - `bambooGrove` is limited to flatter upland shelves,
+  - default fallback remains `denseJungle`
+- increased biome ground tile density in `src/config/biomes.ts` so jungle, bamboo, and highland surfaces read sharper at gameplay distance
+- upgraded `TerrainMaterial` with:
+  - soft biome blending across rule boundaries,
+  - rotated dual-sample terrain texturing to reduce obvious tiling,
+  - macro world-space color breakup,
+  - lowland humidity tint,
+  - cliff-only rock accenting instead of broad rock overpaint,
+  - lowland wetness darkening and roughness response
+- connected live weather state into terrain shading:
+  - `ITerrainRuntime` now exposes `setSurfaceWetness(...)`,
+  - `WeatherSystem` pushes blended rain intensity into terrain wetness,
+  - terrain wetness clears correctly when weather is disabled or reset,
+  - `TerrainSurfaceRuntime` and `TerrainMaterial` now carry a live `environmentWetness` path
+- updated terrain/runtime tests and integration harnesses to the new wetness contract
+
+Validated:
+- targeted validation:
+  - `npx vitest run src/systems/terrain/TerrainMaterial.test.ts src/systems/terrain/TerrainSystem.test.ts src/systems/environment/WeatherSystem.test.ts src/systems/terrain/BiomeClassifier.test.ts src/systems/player/PlayerMovement.test.ts src/systems/terrain/HeightQueryCache.test.ts`
+  - `npx tsc --noEmit`
+  - `npm run build`
+- result:
+  - 139 targeted tests passed,
+  - no type errors,
+  - build succeeded,
+  - only remaining warning is the pre-existing Vite chunk-size warning
+
+Next:
+- perform an in-engine A Shau screenshot/smoke pass so `T-003` and `T-007` can be tuned from frames instead of thresholds
+- continue `T-007` with authored normal/PBR terrain inputs when those assets exist
+- move to `T-006` and prove LOD transition quality under camera motion
 
 ---
 
