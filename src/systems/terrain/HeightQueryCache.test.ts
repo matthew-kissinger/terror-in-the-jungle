@@ -61,23 +61,33 @@ describe('HeightQueryCache', () => {
       expect(cache.getCacheStats().size).toBe(1);
     });
 
-    it('should snap coordinates to grid', () => {
+    it('should snap coordinates to a fine cache grid', () => {
       const cache = new HeightQueryCache();
       
-      const height1 = cache.getHeightAt(10.1, 20.1); // Snaps to 10.0, 20.0
+      const height1 = cache.getHeightAt(10.11, 20.11); // Snaps to 10.1, 20.1
       
       mockNoise.mockClear();
-      const height2 = cache.getHeightAt(10.2, 20.2); // Snaps to 10.0, 20.0
+      const height2 = cache.getHeightAt(10.14, 20.14); // Snaps to 10.1, 20.1
       
       expect(height2).toBe(height1);
       expect(mockNoise).not.toHaveBeenCalled();
       
       mockNoise.mockClear();
       mockNoise.mockReturnValue(0.6); // Change return value to ensure it's different if called
-      cache.getHeightAt(10.4, 20.4); // Snaps to 10.5, 20.5
+      cache.getHeightAt(10.26, 20.26); // Snaps to 10.3, 20.3
       
       expect(mockNoise).toHaveBeenCalled();
       expect(cache.getCacheStats().size).toBe(2);
+    });
+
+    it('does not collapse nearby movement-scale queries onto the same coarse sample', () => {
+      const cache = new HeightQueryCache();
+
+      cache.getHeightAt(10.11, 20.11);
+      mockNoise.mockClear();
+      cache.getHeightAt(10.31, 20.31);
+
+      expect(mockNoise).toHaveBeenCalled();
     });
   });
 

@@ -11,7 +11,9 @@ export class HeightQueryCache {
   private provider: IHeightProvider;
   private cache: Map<string, number> = new Map();
   private readonly maxCacheSize: number;
-  private readonly CACHE_RESOLUTION = 0.5; // Snap queries to 0.5m grid for cache hits
+  // Keep cache snapping fine enough that grounded player motion on slopes does
+  // not visibly step between coarse height samples.
+  private readonly CACHE_RESOLUTION = 0.1;
 
   constructor(provider?: IHeightProvider, maxCacheSize?: number);
   constructor(seed?: number, maxCacheSize?: number);
