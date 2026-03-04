@@ -101,6 +101,8 @@
       pressedKeys: new Set(),
       firingHeld: false,
       respawnCount: 0,
+      ammoRefillCount: 0,
+      healthTopUpCount: 0,
       enemySpawn: null,
       frontlineCompressed: false,
       frontlineDistance: 0,
@@ -120,12 +122,25 @@
       captureHoldUntil: 0,
       capturedZoneCount: 0,
       lastShotAt: Date.now(),
+      lastAmmoRefillAt: 0,
+      lastHealthTopUpAt: 0,
+      deathHandled: false,
+      respawnRetryAt: 0,
       frontlineInserted: false,
       setupFastForwarded: false
     };
     const MAX_YAW_STEP = 0.09;
     const MAX_PITCH_STEP = 0.06;
     const MAX_AIM_VERTICAL_DELTA = 4.5;
+    const HEALTH_TOP_UP_COOLDOWN_MS = 12000;
+    const HEALTH_TOP_UP_CRITICAL_RATIO = 0.14;
+    const HEALTH_TOP_UP_CRITICAL_HP_ABS = 20;
+    const HEALTH_TOP_UP_TARGET_RATIO = 0.55;
+    const HEALTH_TOP_UP_BURST_HP = 55;
+    const RESPAWN_RETRY_COOLDOWN_MS = 450;
+    const AMMO_REFILL_COOLDOWN_MS = 5000;
+    const AMMO_RESERVE_FLOOR = 24;
+    const AMMO_CRITICAL_RESERVE = 4;
     const FORCE_CONTACT_REINSERT_MS = opts.mode === 'open_frontier'
       ? 10000
       : opts.mode === 'a_shau_valley'
@@ -976,6 +991,46 @@
       state.frontlineCompressed = true;
     }
 
+    function topUpPlayerHealth(health) {
+      if (!opts.topUpHealth || !health || !health.getHealth || !health.getMaxHealth || !health.isDead || health.isDead()) {
+        return;
+      }
+      const now = Date.now();
+      if (now - state.lastHealthTopUpAt < HEALTH_TOP_UP_COOLDOWN_MS) return;
+      const hp = Number(health.getHealth());
+      const maxHp = Number(health.getMaxHealth());
+      if (!Number.isFinite(hp) || !Number.isFinite(maxHp) || maxHp <= 0) return;
+      const criticalHp = Math.max(HEALTH_TOP_UP_CRITICAL_HP_ABS, maxHp * HEALTH_TOP_UP_CRITICAL_RATIO);
+      if (hp > criticalHp) return;
+      if (!health.playerState) return;
+      const targetHp = Math.min(maxHp, Math.max(maxHp * HEALTH_TOP_UP_TARGET_RATIO, hp + HEALTH_TOP_UP_BURST_HP));
+      health.playerState.health = targetHp;
+      state.lastHealthTopUpAt = now;
+      state.healthTopUpCount++;
+    }
+
+    function sustainAmmo(systems, forceRefill) {
+      const weapon = systems && systems.firstPersonWeapon;
+      if (!weapon || typeof weapon.getAmmoState !== 'function') return false;
+      const now = Date.now();
+      if (!forceRefill && now - state.lastAmmoRefillAt < AMMO_REFILL_COOLDOWN_MS) return false;
+      const ammoState = weapon.getAmmoState();
+      const magazine = Number(ammoState && ammoState.currentMagazine);
+      const reserve = Number(ammoState && ammoState.reserveAmmo);
+      if (!Number.isFinite(magazine) || !Number.isFinite(reserve)) return false;
+      const needsRefill = forceRefill || reserve <= AMMO_RESERVE_FLOOR || (magazine <= 0 && reserve <= AMMO_CRITICAL_RESERVE);
+      if (!needsRefill) return false;
+      if (systems.inventoryManager && typeof systems.inventoryManager.reset === 'function') {
+        systems.inventoryManager.reset();
+      }
+      if (typeof weapon.enable === 'function') {
+        weapon.enable();
+      }
+      state.lastAmmoRefillAt = now;
+      state.ammoRefillCount++;
+      return true;
+    }
+
     function keepPlayerInAction() {
       const systems = getSystems();
       if (!systems) return;
@@ -983,48 +1038,56 @@
       fastForwardSetupPhaseIfNeeded(systems);
 
       const health = systems.playerHealthSystem;
-      if (opts.topUpHealth && health && health.getHealth && health.getMaxHealth && health.isDead && !health.isDead()) {
-        const hp = Number(health.getHealth());
-        const maxHp = Number(health.getMaxHealth());
-        if (Number.isFinite(hp) && Number.isFinite(maxHp) && hp < Math.max(45, maxHp * 0.35)) {
-          if (health.playerState) {
-            health.playerState.health = maxHp;
-          }
-          if (health.applySpawnProtection) {
-            health.applySpawnProtection(1.0);
-          }
-        }
+      const isDead = Boolean(health && health.isDead && health.isDead());
+      if (!isDead) {
+        state.deathHandled = false;
       }
+      topUpPlayerHealth(health);
 
-      if (opts.autoRespawn && health && health.isDead && health.isDead()) {
+      if (opts.autoRespawn && isDead) {
+        const now = Date.now();
+        if (state.deathHandled && now < state.respawnRetryAt) {
+          return;
+        }
+        state.deathHandled = true;
+        state.respawnRetryAt = now + RESPAWN_RETRY_COOLDOWN_MS;
         releaseAllKeys();
         mouseUp();
+        let respawned = false;
         if (systems.playerRespawnManager && systems.playerRespawnManager.cancelPendingRespawn) {
           systems.playerRespawnManager.cancelPendingRespawn();
         }
         if (systems.playerRespawnManager && systems.playerRespawnManager.respawnAtBase) {
           systems.playerRespawnManager.respawnAtBase();
+          respawned = true;
         }
         if (opts.allowWarpRecovery) {
           const pressureSpawn = getPressureSpawnPoint(systems);
           if (pressureSpawn && systems.playerController && systems.playerController.setPosition) {
-            if (!isTerrainReadyAt(systems, pressureSpawn.x, pressureSpawn.z)) {
-              state.respawnCount++;
-              return;
+            if (isTerrainReadyAt(systems, pressureSpawn.x, pressureSpawn.z)) {
+              const currentPos = systems.playerController.getPosition ? systems.playerController.getPosition() : null;
+              const nextPos = currentPos && currentPos.clone ? currentPos.clone() : { x: 0, y: pressureSpawn.y, z: 0 };
+              nextPos.x = pressureSpawn.x;
+              nextPos.z = pressureSpawn.z;
+              nextPos.y = pressureSpawn.y;
+              const height = systems.terrainSystem && systems.terrainSystem.getHeightAt
+                ? systems.terrainSystem.getHeightAt(nextPos.x, nextPos.z)
+                : undefined;
+              if (Number.isFinite(height)) nextPos.y = Number(height) + 2;
+              setHarnessPlayerPosition(systems, nextPos, 'harness.recovery.respawn');
             }
-            const currentPos = systems.playerController.getPosition ? systems.playerController.getPosition() : null;
-            const nextPos = currentPos && currentPos.clone ? currentPos.clone() : { x: 0, y: pressureSpawn.y, z: 0 };
-            nextPos.x = pressureSpawn.x;
-            nextPos.z = pressureSpawn.z;
-            nextPos.y = pressureSpawn.y;
-            const height = systems.terrainSystem && systems.terrainSystem.getHeightAt
-              ? systems.terrainSystem.getHeightAt(nextPos.x, nextPos.z)
-              : undefined;
-            if (Number.isFinite(height)) nextPos.y = Number(height) + 2;
-            setHarnessPlayerPosition(systems, nextPos, 'harness.recovery.respawn');
           }
         }
-        state.respawnCount++;
+        if (respawned) {
+          state.respawnCount++;
+          state.lastHealthTopUpAt = now;
+          sustainAmmo(systems, true);
+        }
+        return;
+      }
+
+      if (isDead) {
+        return;
       }
 
       if (systems.playerController && systems.playerController.isInHelicopter && systems.playerController.isInHelicopter()) {
@@ -1050,6 +1113,7 @@
         ? systems.playerController.getCamera()
         : null;
       if (!playerPos || !camera) return;
+      sustainAmmo(systems, false);
       syncCameraPosition(camera, systems.playerController.cameraController, playerPos);
       groundPlayerIfNeeded(systems, playerPos);
 
@@ -1265,6 +1329,8 @@
       if (state.heartbeatTimer) clearInterval(state.heartbeatTimer);
       return {
         respawnCount: state.respawnCount,
+        ammoRefillCount: state.ammoRefillCount,
+        healthTopUpCount: state.healthTopUpCount,
         frontlineCompressed: state.frontlineCompressed,
         frontlineDistance: state.frontlineDistance,
         frontlineMoveCount: state.frontlineMoveCount,
@@ -1288,6 +1354,8 @@
         lastRepositionAt: state.lastRepositionAt,
         lastShotAt: state.lastShotAt,
         respawnCount: state.respawnCount,
+        ammoRefillCount: state.ammoRefillCount,
+        healthTopUpCount: state.healthTopUpCount,
         lastFireProbe: state.lastFireProbe
       };
     }

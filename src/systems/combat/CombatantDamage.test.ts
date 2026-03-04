@@ -174,14 +174,14 @@ describe('CombatantDamage', () => {
       expect(playerProxy.health).toBe(100); // Player proxy health handled by PlayerHealthSystem
     });
 
-    it('should trigger player death HUD and kill feed if player proxy dies', () => {
+    it('should trigger player kill feed if player proxy dies', () => {
       const playerProxy = createMockCombatant('player-proxy', Faction.US, 100, CombatantState.IDLE, true);
       const attacker = createMockCombatant('attacker-0001', Faction.NVA, 100);
       (mockPlayerHealthSystem.takeDamage as vi.Mock).mockReturnValue(true); // Player dies
 
       combatantDamage.applyDamage(playerProxy, 100, attacker);
 
-      expect(mockHUDSystem.addDeath).toHaveBeenCalled();
+      expect(mockHUDSystem.addDeath).not.toHaveBeenCalled();
       expect(mockHUDSystem.addKillToFeed).toHaveBeenCalledWith(
         'NVA-0001',
         Faction.NVA,

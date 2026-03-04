@@ -72,6 +72,8 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: Helipad creation no longer has a synthetic fallback pad. Vehicle systems only activate when the active `GameModeConfig` explicitly declares `helipads`. Modes that omit helipads pay zero hidden vehicle cost and no longer mask config errors.
 - Keep: perf diagnostics are gated behind `import.meta.env.DEV` and `?perf=1`. Harness-only globals, renderer counters, and user-timing spans must stay out of production bundles.
 - Keep: `GameRenderer` captures per-frame `renderer.info` stats for perf harness sampling; this is harness evidence, not shipping HUD/debug behavior.
+- Keep: player death accounting is single-source in `PlayerHealthSystem`; `CombatantDamage` no longer applies a second HUD death increment for player-proxy lethal events.
+- Keep: active perf driver sustain policy is bounded and behavior-preserving (respawn debounce, cooldown-based low-health top-up without spawn-protection refresh, and ammo refill guardrails).
 - Keep: `MaterializationPipeline` materializes nearest squads first so large-map scenarios establish combat around the player before distant squads consume the budget.
 - Keep: `SpatialOctree` vertical world bounds scale with world size. Fixed Y bounds were invalid on mountainous maps and caused empty high-altitude hit-detection queries.
 
@@ -92,6 +94,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - A March 4, 2026 attempt to reuse targets and throttle advancing threat reacquisition during flank movement was also reverted. The warm rerun improved mean frame time but reduced combat pressure sharply (`220 / 140 -> 90 / 53` shots / hits) while worsening hitch rate, combat dominance, long-task totals, and `SystemUpdater.Combat.maxDurationMs`.
 - March 4, 2026 short diagnostic captures (`2026-03-04T18-35-30-494Z`, `2026-03-04T18-39-02-145Z`) localize the rare `CombatantAI` spikes to `AIStateEngage.initiateSquadSuppression()`. The inner spike logs are dominated by `suppression.initiate` `65-214ms`; source inspection shows this path synchronously runs `findNearestCover()` for each flanker, which is the leading candidate for the remaining combat tails.
 - March 4, 2026 warm reruns after the suppression-init flank-probe cleanup (`2026-03-04T19-00-58-280Z`, `2026-03-04T19-03-09-563Z`) show lower combat tail/stall pressure than warm pre-control `2026-03-04T18-56-58-892Z`, but run-to-run combat pressure still varies (`shots/hits` drift), so acceptance remains evidence-backed but not yet final-tail closure.
+- Active-driver stop logs still report `moved` as frontline compression movement count, not literal player-distance moved; pressure comparability should rely primarily on shots/hits and frame progression.
 - `HeightQueryCache.getHeightAt()` is unexpectedly hot in combat-heavy runs because string-key generation and LRU churn sit directly on terrain and movement paths.
 - The March 4, 2026 numeric-key linked-list `HeightQueryCache` experiment was reverted. Open Frontier improved, but warm `combat120` evidence was inconsistent and one matched pair worsened heap recovery from `41.7%` to `8.7%`.
 - `open_frontier` and `frontier30m` are throughput-pass / tail-fail patterns: averages stay low while long-task and LoAF totals remain high.

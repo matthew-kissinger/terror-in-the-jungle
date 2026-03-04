@@ -112,6 +112,8 @@ Current `peak_max_frame_ms` classification:
 - `systemTop` inside `runtime-samples.json` is a quick snapshot, not the authoritative budget breakdown in every mode. Use `browserStalls.totals.userTimingByName` for phase analysis.
 - The March 4, 2026 AI attribution artifacts are still valid evidence, but the temporary probe fields and spike-phase log suffixes are not present in the current branch. Re-add them only behind harness-only gating if deeper tail attribution is needed again.
 - In recent `combat120` runs with frontline compression enabled, active-driver movement can stay near zero while combat remains valid. For acceptance comparisons, match warm startup quality and compare shots/hits alongside frame/tail metrics to avoid false wins from reduced pressure.
+- Active-driver shutdown telemetry now includes `ammoRefills` and `healthTopUps` counters to help validate sustained pressure behavior on long runs; these are harness-only diagnostics.
+- Active-driver shutdown `moved` is the frontline-compression combatant move count, not literal player distance traveled.
 - Chromium-only browser diagnostics (`longtask`, `long-animation-frame`) are valid for harness evidence but must remain out of production builds.
 
 ## Guardrails

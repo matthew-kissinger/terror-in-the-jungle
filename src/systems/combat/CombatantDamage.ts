@@ -98,21 +98,18 @@ export class CombatantDamage {
           attacker?.position,
           target.position
         );
-        if (killed && this.hudSystem) {
-          this.hudSystem.addDeath();
-
-          // Add player death to kill feed
-          if (attacker) {
-            const killerName = `${attacker.faction}-${attacker.id.slice(-4)}`;
-            this.hudSystem.addKillToFeed(
-              killerName,
-              attacker.faction,
-              'PLAYER',
-              Faction.US,
-              isHeadshot,
-              'rifle' // AI combatants use rifles
-            );
-          }
+        if (killed && this.hudSystem && attacker) {
+          // PlayerHealthSystem already records the player death in HUD/stats.
+          // This path only contributes kill-feed context for the attacker.
+          const killerName = `${attacker.faction}-${attacker.id.slice(-4)}`;
+          this.hudSystem.addKillToFeed(
+            killerName,
+            attacker.faction,
+            'PLAYER',
+            Faction.US,
+            isHeadshot,
+            'rifle' // AI combatants use rifles
+          );
         }
       }
       return;

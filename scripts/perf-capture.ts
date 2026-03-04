@@ -1081,7 +1081,7 @@ async function stopActiveScenarioDriver(page: Page): Promise<void> {
 
   if (result) {
     logStep(
-      `🎮 Active driver stopped (respawns=${result.respawnCount}, frontlineCompressed=${result.frontlineCompressed}, frontlineDistance=${Number(result.frontlineDistance ?? 0).toFixed(1)}, moved=${result.frontlineMoveCount ?? 0}, capturedZones=${result.capturedZoneCount ?? 0})`
+      `🎮 Active driver stopped (respawns=${result.respawnCount}, ammoRefills=${result.ammoRefillCount ?? 0}, healthTopUps=${result.healthTopUpCount ?? 0}, frontlineCompressed=${result.frontlineCompressed}, frontlineDistance=${Number(result.frontlineDistance ?? 0).toFixed(1)}, moved=${result.frontlineMoveCount ?? 0}, capturedZones=${result.capturedZoneCount ?? 0})`
     );
   }
 }

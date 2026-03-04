@@ -249,6 +249,26 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
   - combat pressure still varies (`shots/hits` drift and `moved=0` in active-driver logs), so treat this as an accepted incremental win, not final closure of combat tails
 - Decision: keep. This is a low-risk, behavior-preserving hot-path cleanup with consistent positive tail movement.
 
+### Harness integrity fix: duplicate player deaths, post-death survivability, and long-run ammo exhaustion
+
+- Reported runtime issue (March 4): one player death in harness play could render as two HUD deaths, and long runs could become non-killable or eventually ammo-starved.
+- Root causes confirmed in source:
+  - `PlayerHealthSystem.onPlayerDeath()` already calls `hudSystem.addDeath()`.
+  - `CombatantDamage.applyDamage()` also called `hudSystem.addDeath()` for `isPlayerProxy` lethal hits, creating a duplicate increment path.
+  - `scripts/perf-active-driver.js` top-up logic repeatedly set player health high and re-applied spawn protection in-loop, which could suppress normal lethality.
+  - driver had no explicit long-run ammo sustain path; reserve depletion could stop firing pressure.
+- Implemented fixes:
+  - removed duplicate HUD death increment from `CombatantDamage`; that path now only emits player kill-feed context.
+  - updated `CombatantDamage` tests to enforce no extra `addDeath()` in player-proxy lethal handling.
+  - active driver now debounces respawn handling per death window, uses cooldown-based low-health top-ups without spawn-protection refresh, and performs bounded ammo refills (with `ammoRefillCount` / `healthTopUpCount` surfaced in stop stats).
+  - perf capture stop log now includes `ammoRefills` and `healthTopUps`.
+- Verification:
+  - `npx vitest run src/systems/combat/CombatantDamage.test.ts` passed.
+  - full `npm run test:run` and `npm run validate` passed after fixes.
+  - warm harness captures after patch retained high combat pressure (`shots/hits` up to `246/133` in `2026-03-04T21-40-18-916Z`) without ammo starvation.
+- Remaining harness caveat:
+  - stop log `moved` remains a frontline-compression counter, not literal player displacement.
+
 ## Validation Snapshot (2026-03-04)
 
 - `npm run test:run`: pass (`2960` tests passed, `2` skipped).
