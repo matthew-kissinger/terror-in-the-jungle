@@ -261,7 +261,7 @@ Validation:
 | T-003 | Wire vegetation and biome config | P1 | `in_progress` | terrain material and vegetation both consume biome rules; A Shau biome coverage has been retuned toward jungle/bamboo instead of broad highland rock, automated preview smoke is fully clean, manual visual review/tuning is still pending |
 | T-004 | Remove dishonest compat semantics | P2 | `done` | Dishonest chunk stubs and alias interfaces are gone from the runtime boundary; core callers use truthful terrain semantics |
 | T-005 | Clarify terrain block boundaries | P2 | `done` | runtime/query/data roles are explicit, gameplay/world consumers use injected terrain runtime, and remaining direct height-cache usage is confined to terrain internals plus bootstrap/provider setup |
-| T-006 | Prove CDLOD transitions | P3 | `pending` | morphing + validation |
+| T-006 | Prove CDLOD transitions | P3 | `done` | XZ morph in vertex shader, wireframe debug toggle via `setDebugWireframe()`, LOD-level color coding |
 | T-007 | Finish terrain material stack | P3 | `in_progress` | biome textures, roughness, slope-aware triplanar sampling, rotated dual-sample anti-tiling, macro breakup, cliff-only rock accents, lowland wetness shading, and live weather-driven terrain wetness are live; large-world surface bake now scales down to a 512 grid at A Shau size, automated preview smoke is shader-clean/terrain-warning-clean/request-error-clean, but authored per-layer normal/PBR inputs are still pending because they are not yet in the asset inventory |
 | T-008 | Add hydrology layer plan and interfaces | P3 | `pending` | river gameplay |
 | T-009 | Per-match random terrain seeds | P1 | `done` | `terrainSeed` on GameModeConfig, `rebakeHeightmap()` on TerrainSystem, wired in GameEngineInit |

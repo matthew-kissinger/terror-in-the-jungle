@@ -227,14 +227,13 @@ export class PlayerMovement {
       this.playerState.isGrounded = false;
     }
 
-    // Clamp to world bounds (read directly from terrain system)
+    // Bounce off world boundary (read directly from terrain system)
     if (this.terrainSystem) {
       const ws = this.terrainSystem.getWorldSize();
       if (ws > 0) this.worldHalfExtent = ws * 0.5;
     }
     if (this.worldHalfExtent > 0) {
-      newPosition.x = THREE.MathUtils.clamp(newPosition.x, -this.worldHalfExtent, this.worldHalfExtent);
-      newPosition.z = THREE.MathUtils.clamp(newPosition.z, -this.worldHalfExtent, this.worldHalfExtent);
+      this.enforceWorldBoundary(newPosition, this.worldHalfExtent);
     }
 
     this.playerState.position.copy(newPosition);
@@ -363,5 +362,23 @@ export class PlayerMovement {
       this.helicopterControls.cyclicPitch - mouseMovement.y * mouseSensitivity,
       -1.0, 1.0
     );
+  }
+
+  /** Clamp position to world boundary and bounce velocity inward. */
+  private enforceWorldBoundary(position: THREE.Vector3, halfExtent: number): void {
+    if (position.x > halfExtent) {
+      position.x = halfExtent;
+      this.playerState.velocity.x = -Math.abs(this.playerState.velocity.x) * 0.5;
+    } else if (position.x < -halfExtent) {
+      position.x = -halfExtent;
+      this.playerState.velocity.x = Math.abs(this.playerState.velocity.x) * 0.5;
+    }
+    if (position.z > halfExtent) {
+      position.z = halfExtent;
+      this.playerState.velocity.z = -Math.abs(this.playerState.velocity.z) * 0.5;
+    } else if (position.z < -halfExtent) {
+      position.z = -halfExtent;
+      this.playerState.velocity.z = Math.abs(this.playerState.velocity.z) * 0.5;
+    }
   }
 }

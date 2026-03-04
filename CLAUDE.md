@@ -1,6 +1,6 @@
 # Project Notes
 
-Last updated: 2026-02-25
+Last updated: 2026-03-04
 
 ## Project
 
@@ -48,9 +48,10 @@ npm run perf:update-baseline  # update baseline from latest capture
 
 ## Current Focus
 
-1. Spatial ownership unification and heap-growth triage.
-2. A Shau spawn/grounding and contact-fidelity stabilization.
-3. Sustained skirmish gameplay flow (not just first-contact success).
+1. Perf harness stabilization: fix `startup_stabilized` detection, recapture baselines post-terrain-rewrite.
+2. Heap-growth triage and combat AI spike optimization.
+3. Live validation of A Shau sustained contact pressure (three-pronged fix deployed 2026-03-04).
+4. Phase 1 asset integration groundwork.
 
 ## Documentation Contract
 

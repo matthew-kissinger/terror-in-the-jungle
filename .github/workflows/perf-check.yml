@@ -65,6 +65,15 @@ jobs:
         continue-on-error: true
         run: npm run perf:analyze:latest
 
+      - name: Compare against baselines
+        if: always()
+        run: |
+          if ls artifacts/perf/*/capture-summary.json 1>/dev/null 2>&1; then
+            npm run perf:compare
+          else
+            echo "No capture artifacts found, skipping comparison"
+          fi
+
       - name: Upload perf artifacts
         if: always()
         uses: actions/upload-artifact@v4

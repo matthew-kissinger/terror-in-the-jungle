@@ -7,6 +7,12 @@
     return code.toLowerCase();
   }
 
+  // Alliance helpers: factions are US/ARVN (BLUFOR) and NVA/VC (OPFOR)
+  const OPFOR_FACTIONS = new Set(['NVA', 'VC']);
+  const BLUFOR_FACTIONS = new Set(['US', 'ARVN']);
+  function isOpforFaction(faction) { return OPFOR_FACTIONS.has(faction); }
+  function isBluforFaction(faction) { return BLUFOR_FACTIONS.has(faction); }
+
   function createDriver(options) {
     const opts = {
       compressFrontline: !!options.compressFrontline,
@@ -214,7 +220,7 @@
       if (zones) {
         for (let i = 0; i < zones.length; i++) {
           const zone = zones[i];
-          if (zone && zone.isHomeBase && zone.owner === 'OPFOR' && zone.position) {
+          if (zone && zone.isHomeBase && isOpforFaction(zone.owner) && zone.position) {
             state.enemySpawn = {
               x: Number(zone.position.x),
               y: Number(zone.position.y),
@@ -237,7 +243,7 @@
       for (let i = 0; i < combatants.length; i++) {
         const combatant = combatants[i];
         if (!combatant || combatant.id === 'player_proxy') continue;
-        if (combatant.faction !== 'OPFOR') continue;
+        if (!isOpforFaction(combatant.faction)) continue;
         if (combatant.health <= 0 || combatant.state === 'dead') continue;
         sumX += Number(combatant.position.x);
         sumY += Number(combatant.position.y);
@@ -258,7 +264,7 @@
       if (!zones) return null;
       for (let i = 0; i < zones.length; i++) {
         const zone = zones[i];
-        if (zone && zone.isHomeBase && zone.owner === 'US' && zone.position) {
+        if (zone && zone.isHomeBase && isBluforFaction(zone.owner) && zone.position) {
           return {
             x: Number(zone.position.x),
             y: Number(zone.position.y),
@@ -310,7 +316,7 @@
       for (let i = 0; i < combatants.length; i++) {
         const combatant = combatants[i];
         if (!combatant || combatant.id === 'player_proxy') continue;
-        if (combatant.faction !== 'OPFOR') continue;
+        if (!isOpforFaction(combatant.faction)) continue;
         if (combatant.health <= 0 || combatant.state === 'dead') continue;
         const dx = combatant.position.x - playerPos.x;
         const dz = combatant.position.z - playerPos.z;
@@ -341,8 +347,8 @@
     }
 
     function hasTerrainOcclusion(systems, fromPos, toPos) {
-      const chunkManager = systems && systems.chunkManager;
-      if (!chunkManager || !chunkManager.raycastTerrain || !fromPos || !toPos) return false;
+      const terrain = systems && systems.terrainSystem;
+      if (!terrain || !terrain.raycastTerrain || !fromPos || !toPos) return false;
 
       const dx = toPos.x - fromPos.x;
       const dy = (toPos.y || 0) - (fromPos.y || 0);
@@ -351,18 +357,13 @@
       if (!Number.isFinite(distance) || distance < 0.001) return false;
 
       const dir = { x: dx / distance, y: dy / distance, z: dz / distance };
-      const hit = chunkManager.raycastTerrain(fromPos, dir, distance);
+      const hit = terrain.raycastTerrain(fromPos, dir, distance);
       return !!(hit && hit.hit && Number.isFinite(hit.distance) && hit.distance < distance - 0.75);
     }
 
     function hasHeightProfileOcclusion(systems, fromPos, toPos) {
-      const chunkManager = systems && systems.chunkManager;
-      if (!chunkManager || !fromPos || !toPos) return false;
-      const getHeight =
-        chunkManager.getTerrainHeightAt ||
-        chunkManager.getHeightAtWorldPosition ||
-        chunkManager.getHeightAt;
-      if (!getHeight) return false;
+      const terrain = systems && systems.terrainSystem;
+      if (!terrain || !terrain.getHeightAt || !fromPos || !toPos) return false;
 
       const dx = toPos.x - fromPos.x;
       const dz = toPos.z - fromPos.z;
@@ -376,7 +377,7 @@
         const sx = fromPos.x + dx * t;
         const sz = fromPos.z + dz * t;
         const lineY = fromPos.y + ((toPos.y || 0) - (fromPos.y || 0)) * t;
-        const terrainY = Number(getHeight.call(chunkManager, sx, sz));
+        const terrainY = Number(terrain.getHeightAt(sx, sz));
         if (!Number.isFinite(terrainY)) continue;
         if (terrainY > lineY + 1.3) {
           blockingSamples++;
@@ -405,31 +406,20 @@
     }
 
     function isTerrainReadyAt(systems, x, z) {
-      if (!systems || !systems.chunkManager) return false;
-      const cm = systems.chunkManager;
-      if (!cm.isChunkLoaded || !cm.getChunkSize) return false;
-      const chunkSize = Number(cm.getChunkSize());
-      if (!Number.isFinite(chunkSize) || chunkSize <= 0) return false;
-
-      const cx = Math.floor(Number(x) / chunkSize);
-      const cz = Math.floor(Number(z) / chunkSize);
-      for (let dz = -1; dz <= 1; dz++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          if (!cm.isChunkLoaded(cx + dx, cz + dz)) {
-            return false;
-          }
-        }
-      }
+      const terrain = systems && systems.terrainSystem;
+      if (!terrain) return false;
+      if (terrain.isTerrainReady && !terrain.isTerrainReady()) return false;
+      if (terrain.hasTerrainAt) return terrain.hasTerrainAt(Number(x), Number(z));
       return true;
     }
 
     function groundPlayerIfNeeded(systems, playerPos) {
       if (!systems || !systems.playerController || !systems.playerController.setPosition || !playerPos) return;
       if (systems.playerController.isInHelicopter && systems.playerController.isInHelicopter()) return;
-      const chunkManager = systems.chunkManager;
-      if (!chunkManager || !chunkManager.getHeightAtWorldPosition) return;
+      const terrain = systems.terrainSystem;
+      if (!terrain || !terrain.getHeightAt) return;
       if (!isTerrainReadyAt(systems, playerPos.x, playerPos.z)) return;
-      const ground = Number(chunkManager.getHeightAtWorldPosition(Number(playerPos.x), Number(playerPos.z)));
+      const ground = Number(terrain.getHeightAt(Number(playerPos.x), Number(playerPos.z)));
       if (!Number.isFinite(ground)) return;
       const targetY = ground + 2;
       const currentY = Number(playerPos.y || 0);
@@ -461,12 +451,12 @@
         const combatant = combatants[i];
         if (!combatant || combatant.id === 'player_proxy') continue;
         if (combatant.health <= 0 || combatant.state === 'dead') continue;
-        if (combatant.faction === 'US') {
+        if (isBluforFaction(combatant.faction)) {
           usX += Number(combatant.position.x);
           usY += Number(combatant.position.y);
           usZ += Number(combatant.position.z);
           usCount++;
-        } else if (combatant.faction === 'OPFOR') {
+        } else if (isOpforFaction(combatant.faction)) {
           opforX += Number(combatant.position.x);
           opforY += Number(combatant.position.y);
           opforZ += Number(combatant.position.z);
@@ -505,12 +495,12 @@
         const combatant = combatants[i];
         if (!combatant || combatant.id === 'player_proxy') continue;
         if (combatant.health <= 0 || combatant.state === 'dead') continue;
-        if (combatant.faction === 'US') {
+        if (isBluforFaction(combatant.faction)) {
           usX += Number(combatant.position.x);
           usY += Number(combatant.position.y);
           usZ += Number(combatant.position.z);
           usCount++;
-        } else if (combatant.faction === 'OPFOR') {
+        } else if (isOpforFaction(combatant.faction)) {
           opforX += Number(combatant.position.x);
           opforY += Number(combatant.position.y);
           opforZ += Number(combatant.position.z);
@@ -558,7 +548,7 @@
         const zone = zones[i];
         if (!zone || zone.isHomeBase) continue;
         const isContested = zone.state === 'contested';
-        const isOwnedByUs = zone.owner === 'US';
+        const isOwnedByUs = isBluforFaction(zone.owner);
         const isSticky = stickyZoneId && zone.id === stickyZoneId;
         const priority = isContested ? 0 : isOwnedByUs ? 3 : 1;
         const dx = Number(zone.position.x) - Number(playerPos.x);
@@ -608,7 +598,7 @@
         const dist = Math.hypot(dx, dz);
         const inside = dist <= Math.max(7, Number(activeZone.radius) * 0.72);
 
-        if (activeZone.owner === 'US' && !activeZone.isHomeBase) {
+        if (isBluforFaction(activeZone.owner) && !activeZone.isHomeBase) {
           state.capturedZoneCount += 1;
           state.captureZoneId = null;
           state.captureHoldUntil = 0;
@@ -643,7 +633,7 @@
       for (let i = 0; i < zones.length; i++) {
         const zone = zones[i];
         if (!zone || zone.isHomeBase) continue;
-        if (zone.owner === 'US' && zone.state !== 'contested') continue;
+        if (isBluforFaction(zone.owner) && zone.state !== 'contested') continue;
         const dx = Number(zone.position.x) - Number(playerPos.x);
         const dz = Number(zone.position.z) - Number(playerPos.z);
         const dist = Math.hypot(dx, dz);
@@ -684,7 +674,7 @@
       for (let i = 0; i < combatants.length; i++) {
         const combatant = combatants[i];
         if (!combatant || combatant.id === 'player_proxy') continue;
-        if (combatant.faction !== 'OPFOR') continue;
+        if (!isOpforFaction(combatant.faction)) continue;
         if (combatant.health <= 0 || combatant.state === 'dead') continue;
         sumX += Number(combatant.position.x);
         sumY += Number(combatant.position.y || 0);
@@ -728,8 +718,8 @@
         combatant.health > 0 &&
         combatant.state !== 'dead'
       );
-      const us = alive.filter((combatant) => combatant.faction === 'US');
-      const opfor = alive.filter((combatant) => combatant.faction === 'OPFOR');
+      const us = alive.filter((combatant) => isBluforFaction(combatant.faction));
+      const opfor = alive.filter((combatant) => isOpforFaction(combatant.faction));
       if (us.length === 0 || opfor.length === 0) return;
 
       function centroid(items) {
@@ -769,8 +759,8 @@
           const forwardOffset = side * (35 + Math.random() * 25);
           const nextX = midpointX + safeDx * forwardOffset + lateralX * laneOffset;
           const nextZ = midpointZ + safeDz * forwardOffset + lateralZ * laneOffset;
-          const height = systems.chunkManager && systems.chunkManager.getHeightAtWorldPosition
-            ? systems.chunkManager.getHeightAtWorldPosition(nextX, nextZ)
+          const height = systems.terrainSystem && systems.terrainSystem.getHeightAt
+            ? systems.terrainSystem.getHeightAt(nextX, nextZ)
             : undefined;
           combatant.position.x = nextX;
           combatant.position.z = nextZ;
@@ -830,8 +820,8 @@
             nextPos.x = pressureSpawn.x;
             nextPos.z = pressureSpawn.z;
             nextPos.y = pressureSpawn.y;
-            const height = systems.chunkManager && systems.chunkManager.getHeightAtWorldPosition
-              ? systems.chunkManager.getHeightAtWorldPosition(nextPos.x, nextPos.z)
+            const height = systems.terrainSystem && systems.terrainSystem.getHeightAt
+              ? systems.terrainSystem.getHeightAt(nextPos.x, nextPos.z)
               : undefined;
             if (Number.isFinite(height)) nextPos.y = Number(height) + 2;
             systems.playerController.setPosition(nextPos, 'harness.recovery.respawn');
@@ -844,8 +834,8 @@
         const position = systems.playerController.getPosition ? systems.playerController.getPosition() : null;
         if (position && position.clone) {
           const exitPos = position.clone();
-          const height = systems.chunkManager && systems.chunkManager.getHeightAtWorldPosition
-            ? systems.chunkManager.getHeightAtWorldPosition(exitPos.x, exitPos.z)
+          const height = systems.terrainSystem && systems.terrainSystem.getHeightAt
+            ? systems.terrainSystem.getHeightAt(exitPos.x, exitPos.z)
             : undefined;
           exitPos.y = Number.isFinite(height) ? Number(height) + 2 : exitPos.y;
           if (systems.playerController.exitHelicopter) {
@@ -878,8 +868,8 @@
           const insertPos = playerPos.clone();
           insertPos.x = pressureSpawn.x;
           insertPos.z = pressureSpawn.z;
-          const h = systems.chunkManager && systems.chunkManager.getHeightAtWorldPosition
-            ? systems.chunkManager.getHeightAtWorldPosition(insertPos.x, insertPos.z)
+          const h = systems.terrainSystem && systems.terrainSystem.getHeightAt
+            ? systems.terrainSystem.getHeightAt(insertPos.x, insertPos.z)
             : undefined;
           if (Number.isFinite(h)) insertPos.y = Number(h) + 2;
           if (systems.playerController && systems.playerController.setPosition) {
@@ -968,8 +958,8 @@
           if (!isTerrainReadyAt(systems, nextPos.x, nextPos.z)) {
             return;
           }
-          const h = systems.chunkManager && systems.chunkManager.getHeightAtWorldPosition
-            ? systems.chunkManager.getHeightAtWorldPosition(nextPos.x, nextPos.z)
+          const h = systems.terrainSystem && systems.terrainSystem.getHeightAt
+            ? systems.terrainSystem.getHeightAt(nextPos.x, nextPos.z)
             : undefined;
           if (Number.isFinite(h)) nextPos.y = Number(h) + 2;
           systems.playerController.setPosition(nextPos, 'harness.recovery.contact_insert');
@@ -1009,8 +999,8 @@
             const nextPos = playerPos.clone();
             nextPos.x = nextX;
             nextPos.z = nextZ;
-            const height = systems.chunkManager && systems.chunkManager.getHeightAtWorldPosition
-              ? systems.chunkManager.getHeightAtWorldPosition(nextX, nextZ)
+            const height = systems.terrainSystem && systems.terrainSystem.getHeightAt
+              ? systems.terrainSystem.getHeightAt(nextX, nextZ)
               : undefined;
             if (Number.isFinite(height)) {
               nextPos.y = Number(height) + 2;

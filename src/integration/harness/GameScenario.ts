@@ -42,6 +42,7 @@ export class GameScenario {
     this.terrainRuntime = {
       getHeightAt: (_x: number, _z: number) => 0,
       getEffectiveHeightAt: (_x: number, _z: number) => 0,
+      getWorldSize: () => worldSize,
       raycastTerrain: () => ({ hit: false }),
       isTerrainReady: () => true,
       hasTerrainAt: () => true,

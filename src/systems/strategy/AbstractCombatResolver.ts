@@ -38,6 +38,13 @@ export class AbstractCombatResolver {
   private readonly DEFENSE_MULTIPLIER = 1.5;          // Defending at owned zone bonus
   private readonly MAJOR_BATTLE_THRESHOLD = 4;         // Squads involved for "major battle" event
 
+  // Player proximity protection: reduce abstract kill rate near player
+  // to prevent incoming reinforcements from being killed off-screen
+  private playerX = 0;
+  private playerZ = 0;
+  private readonly PLAYER_PROTECTION_RADIUS_SQ = 1000 * 1000; // 1km
+  private readonly NEAR_PLAYER_KILL_MULTIPLIER = 0.3;          // 30% kill rate near player
+
   constructor(
     agents: Map<string, StrategicAgent>,
     squads: Map<string, StrategicSquad>,
@@ -52,6 +59,11 @@ export class AbstractCombatResolver {
     this.events = events;
     this.ticketSystem = ticketSystem;
     this.zoneManager = zoneManager;
+  }
+
+  setPlayerPosition(x: number, z: number): void {
+    this.playerX = x;
+    this.playerZ = z;
   }
 
   update(elapsedTime: number): void {
@@ -168,7 +180,14 @@ export class AbstractCombatResolver {
   ): void {
     // Kill probability scales with attacker strength relative to target
     const ratio = targetSquad.strength > 0 ? attackerStrength / targetSquad.strength : 2.0;
-    const killProb = this.BASE_KILL_PROBABILITY * Math.min(ratio, 3.0);
+    let killProb = this.BASE_KILL_PROBABILITY * Math.min(ratio, 3.0);
+
+    // Reduce kill rate for squads near the player to protect incoming reinforcements
+    const sdx = targetSquad.x - this.playerX;
+    const sdz = targetSquad.z - this.playerZ;
+    if (sdx * sdx + sdz * sdz < this.PLAYER_PROTECTION_RADIUS_SQ) {
+      killProb *= this.NEAR_PLAYER_KILL_MULTIPLIER;
+    }
 
     // Roll for each alive non-materialized member
     for (const memberId of targetSquad.members) {

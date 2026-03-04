@@ -403,6 +403,10 @@ export class WarSimulator implements GameSystem {
     this.playerX = x;
     this.playerY = y;
     this.playerZ = z;
+
+    // Propagate to subsystems for pressure biasing
+    this.director?.setPlayerPosition(x, z);
+    this.resolver?.setPlayerPosition(x, z);
   }
 
   // -- Dependency setters --

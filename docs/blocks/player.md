@@ -30,7 +30,7 @@
 |--------|------|------|
 | [PlayerCamera]([GH]/systems/player/PlayerCamera.ts) | systems/player/PlayerCamera.ts | First-person camera math, pitch/yaw |
 | [PlayerInput]([GH]/systems/player/PlayerInput.ts) | systems/player/PlayerInput.ts | Keyboard/mouse/touch input, sensitivity |
-| [PlayerMovement]([GH]/systems/player/PlayerMovement.ts) | systems/player/PlayerMovement.ts | Velocity, grounding, gravity, helicopter controls |
+| [PlayerMovement]([GH]/systems/player/PlayerMovement.ts) | systems/player/PlayerMovement.ts | Velocity, grounding, gravity, helicopter controls, world boundary bounce-back |
 | [PlayerStatsTracker]([GH]/systems/player/PlayerStatsTracker.ts) | systems/player/PlayerStatsTracker.ts | K/D/assist stats |
 | [PlayerHealthEffects]([GH]/systems/player/PlayerHealthEffects.ts) | systems/player/PlayerHealthEffects.ts | Visual health feedback (vignette, red flash) |
 | [PlayerHealthUI]([GH]/systems/player/PlayerHealthUI.ts) | systems/player/PlayerHealthUI.ts | Health bar DOM rendering |

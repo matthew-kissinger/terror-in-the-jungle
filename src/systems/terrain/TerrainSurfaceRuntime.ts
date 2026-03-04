@@ -42,12 +42,14 @@ export class TerrainSurfaceRuntime {
   private readonly assetLoader: AssetLoader;
   private readonly splatmap: SplatmapConfig;
   private readonly heightmapGPU: HeightmapGPU;
+  private readonly tileGridResolution: number;
   private terrainMaterial: THREE.MeshStandardMaterial | null = null;
   private surfaceWetness = 0;
 
-  constructor(assetLoader: AssetLoader, splatmap: SplatmapConfig) {
+  constructor(assetLoader: AssetLoader, splatmap: SplatmapConfig, tileGridResolution = 32) {
     this.assetLoader = assetLoader;
     this.splatmap = splatmap;
+    this.tileGridResolution = tileGridResolution;
     this.heightmapGPU = new HeightmapGPU();
   }
 
@@ -72,6 +74,7 @@ export class TerrainSurfaceRuntime {
       splatmap: this.splatmap,
       biomeConfig: buildTerrainBiomeMaterialConfig(this.assetLoader, defaultBiomeId, biomeRules),
       surfaceWetness: this.surfaceWetness,
+      tileGridResolution: this.tileGridResolution,
     });
 
     return this.terrainMaterial;

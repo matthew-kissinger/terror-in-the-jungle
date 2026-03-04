@@ -156,15 +156,12 @@ describe('FootstepAudioSystem', () => {
   });
 
   describe('constructor', () => {
-    it('should not initialize pools while audio is disabled', () => {
-      // Access private pools via any
+    it('should initialize audio pools on construction', () => {
       const playerPool = (system as any).playerFootstepPool;
       const aiPool = (system as any).aiFootstepPool;
 
-      expect(playerPool.length).toBe(0);
-      expect(aiPool.length).toBe(0);
-      expect(THREE.Audio).not.toHaveBeenCalled();
-      expect(THREE.PositionalAudio).not.toHaveBeenCalled();
+      expect(playerPool.length).toBe(4);
+      expect(aiPool.length).toBe(8);
     });
   });
 
@@ -302,35 +299,15 @@ describe('FootstepAudioSystem', () => {
       expect(FootstepSynthesis.createGrassFootstep).not.toHaveBeenCalled();
     });
 
-    it('should return false while audio is disabled', () => {
+    it('should play AI footstep within range', () => {
       const nearPos = new THREE.Vector3(10, 0, 0);
       const result = system.playAIFootstep(nearPos, playerPos);
-      expect(result).toBe(false);
-      expect(FootstepSynthesis.createGrassFootstep).not.toHaveBeenCalled();
+      expect(result).toBe(true);
     });
 
-    it('should no-op for concurrency check path while disabled', () => {
-      const result = system.playAIFootstep(new THREE.Vector3(10, 0, 0), playerPos);
-      expect(result).toBe(false);
-    });
-
-    it('should keep AI pool empty while disabled', () => {
-      system.playAIFootstep(new THREE.Vector3(10, 0, 0), playerPos);
+    it('should populate AI pool on construction', () => {
       const aiPool = (system as any).aiFootstepPool;
-      expect(aiPool.length).toBe(0);
-    });
-
-    it('should not position AI sound while disabled', () => {
-      const result = system.playAIFootstep(new THREE.Vector3(10, 5, 10), playerPos);
-      expect(result).toBe(false);
-    });
-
-    it('should not schedule cleanup while disabled', () => {
-      vi.useFakeTimers();
-      system.playAIFootstep(new THREE.Vector3(10, 0, 0), playerPos);
-      vi.advanceTimersByTime(700);
-      expect((system as any).aiFootstepPool.length).toBe(0);
-      vi.useRealTimers();
+      expect(aiPool.length).toBe(8);
     });
   });
 

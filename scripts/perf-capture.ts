@@ -153,7 +153,7 @@ const DEV_SERVER_PORT = 9100;
 const DEFAULT_DURATION_SECONDS = 90;
 const DEFAULT_WARMUP_SECONDS = 15;
 const DEFAULT_NPCS = 60;
-const DEFAULT_STARTUP_TIMEOUT_SECONDS = 60;
+const DEFAULT_STARTUP_TIMEOUT_SECONDS = 120;
 const DEFAULT_STARTUP_FRAME_THRESHOLD = 30;
 const DEFAULT_ACTIVE_PLAYER = true;
 const DEFAULT_GAME_MODE = 'ai_sandbox';
@@ -1099,8 +1099,6 @@ async function runCapture(): Promise<void> {
   const activeAutoRespawn = parseBooleanFlag('active-auto-respawn', DEFAULT_ACTIVE_AUTO_RESPAWN);
   const movementDecisionIntervalMs = parseNumberFlag('movement-decision-interval-ms', DEFAULT_MOVEMENT_DECISION_INTERVAL_MS);
   const losHeightPrefilter = parseBooleanFlag('los-height-prefilter', false);
-  const spatialSecondarySync = parseBooleanFlag('spatial-secondary-sync', true);
-  const spatialDedupSync = parseBooleanFlag('spatial-dedup-sync', true);
   const sampleIntervalMs = Math.max(250, parseNumberFlag('sample-interval-ms', DEFAULT_SAMPLE_INTERVAL_MS));
   const detailEverySamples = Math.max(
     1,
@@ -1123,7 +1121,7 @@ async function runCapture(): Promise<void> {
   const artifactDir = makeArtifactDir();
   const browserProfileDir = join(artifactDir, 'browser-profile');
   mkdirSync(browserProfileDir, { recursive: true });
-  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} spatialSecondarySync=${spatialSecondarySync} spatialDedupSync=${spatialDedupSync} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} prewarm=${prewarm} runtimePreflight=${runtimePreflight} reuseDevServer=${reuseDevServer}`);
+  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} prewarm=${prewarm} runtimePreflight=${runtimePreflight} reuseDevServer=${reuseDevServer}`);
 
   let server: ChildProcess | null = null;
   let context: BrowserContext | null = null;
@@ -1138,11 +1136,9 @@ async function runCapture(): Promise<void> {
   const combatParam = enableCombat ? '1' : '0';
   const autostart = requestedMode === 'ai_sandbox' ? 'true' : 'false';
   const losPrefilterParam = losHeightPrefilter ? '1' : '0';
-  const spatialSecondarySyncParam = spatialSecondarySync ? '1' : '0';
-  const spatialDedupSyncParam = spatialDedupSync ? '1' : '0';
   const query = sandboxMode
-    ? `?sandbox=true&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}&spatialSecondarySync=${spatialSecondarySyncParam}&spatialDedupSync=${spatialDedupSyncParam}`
-    : `?logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}&spatialSecondarySync=${spatialSecondarySyncParam}&spatialDedupSync=${spatialDedupSyncParam}`;
+    ? `?sandbox=true&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}`
+    : `?logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}`;
   const url = `http://localhost:${port}/${query}`;
   const preflightUrl = `http://localhost:${port}/`;
   const primaryPath = new URL(url).pathname + new URL(url).search;

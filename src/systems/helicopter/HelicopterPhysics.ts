@@ -51,6 +51,7 @@ export class HelicopterPhysics {
   private readonly GRAVITY = -9.81;
   private readonly cfg: AircraftPhysicsConfig;
   private smoothedControls: HelicopterControls;
+  private worldHalfExtent = 0;
 
   constructor(initialPosition: THREE.Vector3, config?: AircraftPhysicsConfig) {
     this.cfg = config ?? DEFAULT_PHYSICS;
@@ -108,6 +109,15 @@ export class HelicopterPhysics {
 
     // Enforce ground collision
     this.enforceGroundCollision();
+
+    // Enforce world boundary
+    if (this.worldHalfExtent > 0) {
+      this.enforceWorldBoundary();
+    }
+  }
+
+  setWorldHalfExtent(halfExtent: number): void {
+    this.worldHalfExtent = halfExtent;
   }
 
   private smoothControlInputs(deltaTime: number): void {
@@ -275,6 +285,16 @@ export class HelicopterPhysics {
     } else {
       this.state.isGrounded = false;
     }
+  }
+
+  private enforceWorldBoundary(): void {
+    const limit = this.worldHalfExtent;
+    const pos = this.state.position;
+    const vel = this.state.velocity;
+    if (pos.x > limit) { pos.x = limit; vel.x = -Math.abs(vel.x) * 0.5; }
+    else if (pos.x < -limit) { pos.x = -limit; vel.x = Math.abs(vel.x) * 0.5; }
+    if (pos.z > limit) { pos.z = limit; vel.z = -Math.abs(vel.z) * 0.5; }
+    else if (pos.z < -limit) { pos.z = -limit; vel.z = Math.abs(vel.z) * 0.5; }
   }
 
   // Public methods for control input

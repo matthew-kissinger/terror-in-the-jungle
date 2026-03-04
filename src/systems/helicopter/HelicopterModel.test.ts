@@ -27,6 +27,7 @@ vi.mock('./HelicopterPhysics', () => ({
   HelicopterPhysics: class {
     update = vi.fn();
     setControls = vi.fn();
+    setWorldHalfExtent = vi.fn();
     getState = vi.fn().mockImplementation(() => ({
       position: new THREE.Vector3(10, 20, 30),
       velocity: new THREE.Vector3(0, 0, 0),
@@ -131,6 +132,7 @@ describe('HelicopterModel', () => {
 
     mockTerrainManager = {
       getHeightAt: vi.fn().mockReturnValue(10),
+      getWorldSize: vi.fn().mockReturnValue(2000),
       isTerrainReady: vi.fn().mockReturnValue(true),
       hasTerrainAt: vi.fn().mockReturnValue(true),
       getChunkAt: vi.fn().mockReturnValue({}),

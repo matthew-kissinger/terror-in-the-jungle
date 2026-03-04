@@ -8,6 +8,8 @@ const TERRAIN_VERTEX_PARS = /* glsl */ `
 uniform sampler2D terrainHeightmap;
 uniform sampler2D terrainNormalMap;
 uniform float terrainWorldSize;
+uniform float tileGridResolution;
+uniform bool debugWireframe;
 
 attribute float lodLevel;
 attribute float morphFactor;
@@ -20,12 +22,22 @@ varying float vMorphFactor;
 `;
 
 const TERRAIN_VERTEX_MAIN = /* glsl */ `
-vec4 worldPos4 = instanceMatrix * vec4(position, 1.0);
+// CDLOD morph: snap fine-grid vertices toward parent LOD grid for smooth transitions
+float parentStep = 2.0 / tileGridResolution;
+vec2 gridPos = position.xz + 0.5;
+vec2 snapped = floor(gridPos / parentStep + 0.5) * parentStep;
+vec3 morphedPos = vec3(
+  mix(gridPos.x, snapped.x, morphFactor) - 0.5,
+  position.y,
+  mix(gridPos.y, snapped.y, morphFactor) - 0.5
+);
+
+vec4 worldPos4 = instanceMatrix * vec4(morphedPos, 1.0);
 float halfWorld = terrainWorldSize * 0.5;
-vWorldUV = vec2(
+vWorldUV = clamp(vec2(
   (worldPos4.x + halfWorld) / terrainWorldSize,
   (worldPos4.z + halfWorld) / terrainWorldSize
-);
+), 0.0, 1.0);
 
 float terrainH = texture2D(terrainHeightmap, vWorldUV).r;
 worldPos4.y = terrainH;
@@ -59,6 +71,7 @@ uniform float biomeRuleEnabled[8];
 uniform float antiTilingStrength;
 uniform float triplanarSlopeThreshold;
 uniform float environmentWetness;
+uniform bool debugWireframe;
 
 varying vec3 vWorldPosition;
 varying vec2 vWorldUV;
@@ -270,6 +283,19 @@ finalColor = jungleHumidityTint(finalColor, slopeUp, vWorldPosition.y);
 finalColor = applyLowlandWetness(finalColor, slopeUp, vWorldPosition.y);
 finalColor = applyCliffRockAccent(finalColor, slopeUp, vWorldPosition.y, vWorldPosition.xz, uvOffset);
 diffuseColor.rgb = finalColor;
+if (debugWireframe) {
+  // Color-code LOD levels for visual debugging
+  vec3 lodColors[5];
+  lodColors[0] = vec3(0.0, 1.0, 0.0); // LOD 0: green (finest)
+  lodColors[1] = vec3(0.0, 0.5, 1.0); // LOD 1: blue
+  lodColors[2] = vec3(1.0, 1.0, 0.0); // LOD 2: yellow
+  lodColors[3] = vec3(1.0, 0.5, 0.0); // LOD 3: orange
+  lodColors[4] = vec3(1.0, 0.0, 0.0); // LOD 4: red (coarsest)
+  int lodIdx = clamp(int(vLodLevel), 0, 4);
+  vec3 lodColor = lodColors[lodIdx];
+  // Blend morph factor as brightness
+  diffuseColor.rgb = lodColor * (0.5 + 0.5 * (1.0 - vMorphFactor));
+}
 `;
 
 const TERRAIN_FRAGMENT_ROUGHNESS = /* glsl */ `
@@ -322,6 +348,7 @@ export interface TerrainMaterialOptions {
   splatmap: SplatmapConfig;
   biomeConfig: TerrainBiomeMaterialConfig;
   surfaceWetness?: number;
+  tileGridResolution?: number;
 }
 
 export function createTerrainMaterial(options: TerrainMaterialOptions): THREE.MeshStandardMaterial {
@@ -378,6 +405,24 @@ function applyTerrainMaterialOptions(
 ): void {
   const shaderBindings = createShaderBindings(options);
   material.userData ??= {};
+
+  const existingUniforms = material.userData.terrainUniforms as Record<string, { value: unknown }> | undefined;
+
+  if (existingUniforms) {
+    // Update existing uniform values IN PLACE to preserve shader references.
+    // Creating new uniform objects would orphan the compiled shader's references.
+    for (const [key, uniform] of Object.entries(shaderBindings.uniforms)) {
+      if (existingUniforms[key]) {
+        existingUniforms[key].value = (uniform as { value: unknown }).value;
+      } else {
+        existingUniforms[key] = uniform as { value: unknown };
+      }
+    }
+    material.userData.terrainSurfaceWetness = shaderBindings.uniforms.environmentWetness.value;
+    return;
+  }
+
+  // First-time setup: store uniforms and install onBeforeCompile
   material.userData.terrainUniforms = shaderBindings.uniforms;
   material.userData.terrainSurfaceWetness = shaderBindings.uniforms.environmentWetness.value;
 
@@ -470,10 +515,14 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
     ruleEnabled[i] = 1;
   }
 
+  const tileGridRes = options.tileGridResolution ?? 32;
+
   const uniforms: Record<string, { value: unknown }> = {
     terrainHeightmap: { value: heightTexture },
     terrainNormalMap: { value: normalTexture },
     terrainWorldSize: { value: worldSize },
+    tileGridResolution: { value: tileGridRes },
+    debugWireframe: { value: false },
     antiTilingStrength: { value: splatmap.antiTilingStrength },
     triplanarSlopeThreshold: { value: splatmap.triplanarSlopeThreshold },
     environmentWetness: { value: surfaceWetness },

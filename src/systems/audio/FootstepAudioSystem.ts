@@ -9,7 +9,7 @@ const FOOTSTEP_SOUND_PATHS: Record<TerrainType, string> = {
   [TerrainType.WATER]: 'assets/optimized/footstepWater.wav',
   [TerrainType.ROCK]: 'assets/optimized/footstepRock.wav'
 };
-const FOOTSTEP_AUDIO_ENABLED = false;
+const FOOTSTEP_AUDIO_ENABLED = true;
 
 /**
  * Configuration for footstep sounds per terrain type
@@ -84,7 +84,7 @@ export class FootstepAudioSystem implements GameSystem {
     if (FOOTSTEP_AUDIO_ENABLED) {
       this.initializeAudioPools();
     } else {
-      Logger.info('audio', '[FootstepAudioSystem] Disabled (awaiting authored assets)');
+      Logger.info('audio', '[FootstepAudioSystem] Disabled');
     }
   }
 
@@ -145,7 +145,6 @@ export class FootstepAudioSystem implements GameSystem {
     deltaTime: number,
     isMoving: boolean
   ): void {
-    // TODO(audio): Re-enable when distinct terrain footstep assets are authored.
     if (!FOOTSTEP_AUDIO_ENABLED) return;
 
     if (!isMoving) {
@@ -191,7 +190,6 @@ export class FootstepAudioSystem implements GameSystem {
     playerPosition: THREE.Vector3,
     _isRunning: boolean = false
   ): boolean {
-    // TODO(audio): Re-enable when distinct terrain footstep assets are authored.
     if (!FOOTSTEP_AUDIO_ENABLED) return false;
 
     // Check distance - don't play if too far

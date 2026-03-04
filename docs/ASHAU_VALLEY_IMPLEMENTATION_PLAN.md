@@ -48,7 +48,7 @@ Acceptance:
 
 - [x] Keep first engagement within 60-120 seconds. (Frontline seeding improved first-contact timing)
 - [~] Reduce long wandering loops around non-contact zones. (AShauContactAssist auto-warps after 60s no-contact)
-- [ ] Maintain sustained skirmish pressure at 5-minute checkpoint. (Still unstable)
+- [~] Maintain sustained skirmish pressure at 5-minute checkpoint. (StrategicDirector player-zone bias, AbstractCombatResolver near-player protection, forward-zone reinforcements; needs live validation)
 
 Acceptance:
 - `first_contact <= 120s` and non-zero close-contact density at sustained checkpoint.
@@ -76,6 +76,7 @@ Acceptance:
 
 - A Shau diagnostics runs show first-contact improvement but inconsistent sustained close-contact.
 - Recent work improved post-respawn contact quality; sustained 5-minute close-contact remains unstable.
+- 2026-03-03: Three-pronged pressure fix deployed - StrategicDirector biases zone scores +3.0 within 1.5km of player, AbstractCombatResolver applies 0.3x kill rate within 1km of player to protect incoming reinforcements, reinforcements now also spawn at forward-owned zones near player (2km radius). Awaiting live validation.
 
 ## Update Protocol
 

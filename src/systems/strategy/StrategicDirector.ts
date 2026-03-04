@@ -29,6 +29,17 @@ export class StrategicDirector {
   private lastUpdateTime = 0;
   private lastReinforcementTime: Record<string, number> = {};
 
+  // Player position for pressure biasing
+  private playerX = 0;
+  private playerZ = 0;
+
+  // Zones within this radius of the player get a score boost
+  private readonly PLAYER_PRESSURE_RADIUS = 1500; // meters
+  private readonly PLAYER_PRESSURE_BOOST = 3.0;   // additive score boost
+
+  // Forward reinforcement: allow spawning at zones near the player
+  private readonly FORWARD_REINFORCE_RADIUS = 2000; // meters
+
   constructor(
     squads: Map<string, StrategicSquad>,
     agents: Map<string, StrategicAgent>,
@@ -41,6 +52,11 @@ export class StrategicDirector {
     this.config = config;
     this.events = events;
     this.zoneManager = zoneManager;
+  }
+
+  setPlayerPosition(x: number, z: number): void {
+    this.playerX = x;
+    this.playerZ = z;
   }
 
   update(elapsedTime: number): void {
@@ -100,6 +116,16 @@ export class StrategicDirector {
 
       // Zones with more enemy presence are higher priority
       score *= 1 + (friendlyNearby + enemyNearby) * 0.2;
+
+      // Boost zones near the player to sustain contact pressure
+      const pdx = zone.position.x - this.playerX;
+      const pdz = zone.position.z - this.playerZ;
+      const playerDistSq = pdx * pdx + pdz * pdz;
+      if (playerDistSq < this.PLAYER_PRESSURE_RADIUS * this.PLAYER_PRESSURE_RADIUS) {
+        const proximity = 1 - Math.sqrt(playerDistSq) / this.PLAYER_PRESSURE_RADIUS;
+        score += this.PLAYER_PRESSURE_BOOST * proximity;
+      }
+
       scores.set(zone.id, score);
     }
 
@@ -252,43 +278,57 @@ export class StrategicDirector {
       // Reinforce if below 70% strength
       if (total > 0 && alive / total < 0.7) {
         const hqs = zones.filter(z => z.isHomeBase && z.owner === faction);
-        if (hqs.length > 0) {
-          // Respawn dead agents at HQ positions
-          let respawned = 0;
-          const maxRespawn = Math.min(30, total - alive);
+        if (hqs.length === 0) continue;
 
-          for (const agent of this.agents.values()) {
-            if (respawned >= maxRespawn) break;
-            if (agent.faction !== faction || agent.alive) continue;
+        // Find forward zones near the player owned by this faction
+        // This gets reinforcements into the fight faster than HQ-only spawning
+        const forwardZones = zones.filter(z => {
+          if (z.isHomeBase || z.owner !== faction) return false;
+          const fdx = z.position.x - this.playerX;
+          const fdz = z.position.z - this.playerZ;
+          return (fdx * fdx + fdz * fdz) < this.FORWARD_REINFORCE_RADIUS * this.FORWARD_REINFORCE_RADIUS;
+        });
 
-            const hq = hqs[respawned % hqs.length];
-            const angle = Math.random() * Math.PI * 2;
-            const dist = 50 + Math.random() * 100;
+        // Mix spawn points: 50% forward zones (if available), 50% HQ
+        const spawnPoints = forwardZones.length > 0
+          ? [...forwardZones, ...hqs]
+          : hqs;
 
-            agent.alive = true;
-            agent.health = 100;
-            agent.x = hq.position.x + Math.cos(angle) * dist;
-            agent.z = hq.position.z + Math.sin(angle) * dist;
-            agent.y = 0; // Will be updated by movement tick
-            agent.combatState = 'idle';
-            agent.tier = AgentTier.STRATEGIC;
-            agent.combatantId = undefined;
-            respawned++;
-          }
+        // Respawn dead agents
+        let respawned = 0;
+        const maxRespawn = Math.min(30, total - alive);
 
-          if (respawned > 0) {
-            this.lastReinforcementTime[key] = elapsedTime;
-            const hq = hqs[0];
-            const zoneName = hq.name || hq.id;
-            this.events.emit({
-              type: 'reinforcements_arriving',
-              faction,
-              zoneId: hq.id,
-              zoneName,
-              count: respawned,
-              timestamp: elapsedTime
-            });
-          }
+        for (const agent of this.agents.values()) {
+          if (respawned >= maxRespawn) break;
+          if (agent.faction !== faction || agent.alive) continue;
+
+          const spawnZone = spawnPoints[respawned % spawnPoints.length];
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 50 + Math.random() * 100;
+
+          agent.alive = true;
+          agent.health = 100;
+          agent.x = spawnZone.position.x + Math.cos(angle) * dist;
+          agent.z = spawnZone.position.z + Math.sin(angle) * dist;
+          agent.y = 0; // Will be updated by movement tick
+          agent.combatState = 'idle';
+          agent.tier = AgentTier.STRATEGIC;
+          agent.combatantId = undefined;
+          respawned++;
+        }
+
+        if (respawned > 0) {
+          this.lastReinforcementTime[key] = elapsedTime;
+          const primaryZone = forwardZones.length > 0 ? forwardZones[0] : hqs[0];
+          const zoneName = primaryZone.name || primaryZone.id;
+          this.events.emit({
+            type: 'reinforcements_arriving',
+            faction,
+            zoneId: primaryZone.id,
+            zoneName,
+            count: respawned,
+            timestamp: elapsedTime
+          });
         }
       }
     }

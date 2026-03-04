@@ -122,6 +122,10 @@ export class HelicopterModel implements GameSystem {
 
     const aircraftConfig = getAircraftConfig(aircraftKey);
     const physics = new HelicopterPhysics(helicopterPosition, aircraftConfig.physics);
+    if (this.terrainManager) {
+      const ws = this.terrainManager.getWorldSize();
+      if (ws > 0) physics.setWorldHalfExtent(ws * 0.5);
+    }
     this.helicopterPhysics.set(helicopterId, physics);
 
     this.animation.initialize(helicopterId);
@@ -207,6 +211,7 @@ export class HelicopterModel implements GameSystem {
   private updateHelicopterPhysics(deltaTime: number): void {
     if (!this.terrainManager) return;
 
+    const worldHalfExtent = this.terrainManager.getWorldSize() * 0.5;
     const pilotedId = this.playerController?.isInHelicopter()
       ? this.playerController.getHelicopterId()
       : null;
@@ -214,6 +219,8 @@ export class HelicopterModel implements GameSystem {
     for (const [id, helicopter] of this.helicopters) {
       const physics = this.helicopterPhysics.get(id);
       if (!physics) continue;
+
+      if (worldHalfExtent > 0) physics.setWorldHalfExtent(worldHalfExtent);
 
       const isPiloted = id === pilotedId;
 
