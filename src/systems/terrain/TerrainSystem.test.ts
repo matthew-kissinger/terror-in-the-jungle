@@ -88,6 +88,7 @@ vi.mock('./TerrainWorkerPool', () => ({
 vi.mock('./VegetationScatterer', () => ({
   VegetationScatterer: class {
     configure = mockVegetationConfigure;
+    setWorldSize = vi.fn();
     update = vi.fn();
     clear = vi.fn();
     regenerateAll = mockVegetationRegenerateAll;

@@ -20,6 +20,7 @@ export class VegetationScatterer {
   private maxCellDistance: number; // In cells
   private lastPlayerCellX = NaN;
   private lastPlayerCellZ = NaN;
+  private worldHalfExtent = Infinity; // Half the world size; cells outside are skipped
 
   // Vegetation config
   private vegetationTypes: VegetationTypeConfig[] = [];
@@ -35,6 +36,10 @@ export class VegetationScatterer {
     this.billboardSystem = billboardSystem;
     this.cellSize = cellSize;
     this.maxCellDistance = maxCellDistance;
+  }
+
+  setWorldSize(worldSize: number): void {
+    this.worldHalfExtent = worldSize * 0.5;
   }
 
   /**
@@ -105,6 +110,10 @@ export class VegetationScatterer {
     const baseZ = cellZ * this.cellSize;
     const centerX = baseX + this.cellSize * 0.5;
     const centerZ = baseZ + this.cellSize * 0.5;
+
+    // Skip cells beyond the visual terrain margin (200m past world edge)
+    const limit = this.worldHalfExtent + 200;
+    if (Math.abs(centerX) > limit || Math.abs(centerZ) > limit) return;
     const centerHeight = cache.getHeightAt(centerX, centerZ);
     const centerSlopeDeg = computeSlopeDeg(centerX, centerZ, 4, (x, z) => cache.getHeightAt(x, z));
     const biomeId = classifyBiome(centerHeight, centerSlopeDeg, this.biomeRules, this.defaultBiomeId);

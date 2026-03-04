@@ -75,11 +75,12 @@ export class TerrainSystem implements GameSystem {
       maxLODLevels: runtimeConfig.lodLevels,
     });
 
-    this.surfaceRuntime = new TerrainSurfaceRuntime(assetLoader, this.config.splatmap);
+    this.surfaceRuntime = new TerrainSurfaceRuntime(assetLoader, this.config.splatmap, this.config.tileResolution - 1);
     const losAccelerator = new LOSAccelerator();
     this.raycastRuntime = new TerrainRaycastRuntime(losAccelerator);
     this.terrainQueries = new TerrainQueries(losAccelerator);
     this.vegetationScatterer = new VegetationScatterer(globalBillboardSystem, this.config.vegetationCellSize);
+    this.vegetationScatterer.setWorldSize(worldSize);
     this.workerPool = new TerrainWorkerPool();
   }
 
@@ -244,6 +245,26 @@ export class TerrainSystem implements GameSystem {
     return this.workerPool.getTelemetry();
   }
 
+  // ──── Debug ────
+
+  /**
+   * Toggle LOD wireframe debug view. Color-codes tiles by LOD level
+   * and dims morphing regions to visualize CDLOD transitions.
+   */
+  setDebugWireframe(enabled: boolean): void {
+    try {
+      const mat = this.surfaceRuntime.getMaterial();
+      const terrainUniforms = mat.userData.terrainUniforms as Record<string, { value: unknown }> | undefined;
+      if (terrainUniforms?.debugWireframe) {
+        terrainUniforms.debugWireframe.value = enabled;
+      }
+      mat.wireframe = enabled;
+      mat.needsUpdate = true;
+    } catch {
+      // Material not yet initialized
+    }
+  }
+
   // ──── Runtime metrics ────
 
   getActiveTerrainTileCount(): number {
@@ -324,6 +345,7 @@ export class TerrainSystem implements GameSystem {
 
     this.config.worldSize = newWorldSize;
     this.config.lodRanges = computeDefaultLODRanges(newWorldSize, this.config.maxLODLevels);
+    this.vegetationScatterer.setWorldSize(newWorldSize);
 
     if (this.isInitialized) {
       this.renderRuntime?.reconfigure({

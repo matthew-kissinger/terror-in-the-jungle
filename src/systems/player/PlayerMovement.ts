@@ -21,6 +21,7 @@ export class PlayerMovement {
   private sandbagSystem?: SandbagSystem;
   private footstepAudioSystem?: FootstepAudioSystem;
   private helicopterModel?: IHelicopterModel;
+  private worldHalfExtent = Infinity;
   private helicopterControls: HelicopterControls = {
     collective: 0,
     cyclicPitch: 0,
@@ -37,6 +38,10 @@ export class PlayerMovement {
 
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {
     this.terrainSystem = terrainSystem;
+  }
+
+  setWorldSize(worldSize: number): void {
+    this.worldHalfExtent = worldSize * 0.5;
   }
 
   setSandbagSystem(sandbagSystem: SandbagSystem): void {
@@ -222,6 +227,13 @@ export class PlayerMovement {
       this.playerState.isGrounded = false;
     }
 
+    // Clamp to world bounds
+    const limit = this.worldHalfExtent;
+    if (limit > 0 && limit < Infinity) {
+      newPosition.x = THREE.MathUtils.clamp(newPosition.x, -limit, limit);
+      newPosition.z = THREE.MathUtils.clamp(newPosition.z, -limit, limit);
+    }
+
     this.playerState.position.copy(newPosition);
 
     // Play footstep sounds when moving on ground
@@ -253,16 +265,17 @@ export class PlayerMovement {
         );
       } else if (this.helicopterControls.autoHover) {
         this.helicopterControls.collective = THREE.MathUtils.lerp(this.helicopterControls.collective, 0.4, deltaTime * 2.0);
+      } else {
+        this.helicopterControls.collective = THREE.MathUtils.lerp(this.helicopterControls.collective, 0.0, deltaTime * 3.0);
       }
     } else if (input.isKeyPressed('keyw')) {
       this.helicopterControls.collective = Math.min(1.0, this.helicopterControls.collective + 2.0 * deltaTime);
     } else if (input.isKeyPressed('keys')) {
       this.helicopterControls.collective = Math.max(0.0, this.helicopterControls.collective - 2.0 * deltaTime);
+    } else if (this.helicopterControls.autoHover) {
+      this.helicopterControls.collective = THREE.MathUtils.lerp(this.helicopterControls.collective, 0.4, deltaTime * 2.0);
     } else {
-      // Auto-stabilize collective for hover only when enabled
-      if (this.helicopterControls.autoHover) {
-        this.helicopterControls.collective = THREE.MathUtils.lerp(this.helicopterControls.collective, 0.4, deltaTime * 2.0);
-      }
+      this.helicopterControls.collective = THREE.MathUtils.lerp(this.helicopterControls.collective, 0.0, deltaTime * 3.0);
     }
 
     // --- Yaw (tail rotor, turning) ---

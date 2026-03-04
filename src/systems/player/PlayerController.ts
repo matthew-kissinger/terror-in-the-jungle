@@ -622,6 +622,7 @@ export class PlayerController implements GameSystem {
 
   // Dependency setters
   setTerrainSystem(terrainSystem: ITerrainRuntime): void { this.terrainSystem = terrainSystem; this.movement.setTerrainSystem(terrainSystem); }
+  setWorldSize(worldSize: number): void { this.movement.setWorldSize(worldSize); }
   setGameModeManager(gameModeManager: GameModeManager): void { this.gameModeManager = gameModeManager; }
   setTicketSystem(ticketSystem: TicketSystem): void { this.ticketSystem = ticketSystem; }
   setHelicopterModel(helicopterModel: HelicopterModel): void { this.helicopterModel = helicopterModel; this.movement.setHelicopterModel(helicopterModel); this.cameraController.setHelicopterModel(helicopterModel); helicopterModel.setPlayerInput(this.input); }

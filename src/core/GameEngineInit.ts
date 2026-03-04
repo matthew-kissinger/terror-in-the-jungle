@@ -79,6 +79,8 @@ export async function initializeSystems(engine: GameEngine): Promise<void> {
     // Wire Play Again to programmatic restart so it does not reload the page
     engine.systemManager.hudSystem.setPlayAgainCallback(() => restartMatch(engine));
 
+    markStartup('engine-init.initialize-systems.end');
+
     if (engine.sandboxEnabled && engine.sandboxConfig?.autoStart) {
       markStartup('engine-init.autostart.begin');
       startGameWithMode(engine, GameMode.AI_SANDBOX);
@@ -197,6 +199,7 @@ export async function startGameWithMode(engine: GameEngine, mode: GameMode): Pro
 
   if (config.worldSize) {
     terrainSystem.setWorldSize(config.worldSize);
+    engine.systemManager.playerController.setWorldSize(config.worldSize);
   }
 
   // Reconfigure chunk size if mode specifies a different value
@@ -385,4 +388,3 @@ export function showWelcomeMessage(engine: GameEngine): void {
 Have fun!
     `);
 }
-    markStartup('engine-init.initialize-systems.end');
