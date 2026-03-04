@@ -53,9 +53,10 @@ npm run perf:update-baseline  # update baseline from latest capture
 3. `HeightQueryCache.getHeightAt()` remains a cross-cutting hotspot; a separate March 4, 2026 numeric-key linked-list LRU attempt was reverted because combat heap recovery regressed and warm evidence was inconsistent.
 4. A March 4, 2026 attempt to disable friendly-spacing work on visual-only high-LOD frames in `CombatantLODManager` was reverted. Warm means improved slightly, but hitch rate, long-task totals, and AI starvation regressed, including one rerun that under-shot badly (`54 / 32` shots / hits).
 5. March 4, 2026 diagnostic captures now show the worst nominal `suppressing` / `advancing` AI spikes are actually `AIStateEngage.handleEngaging()` transitions dominated by `initiateSquadSuppression()`, specifically the per-flanker fallback cover search path.
-6. A March 4, 2026 attempt to reuse targets and throttle advancing threat reacquisition during flank movement was also reverted. The warm rerun improved mean frame time but collapsed combat pressure (`90 / 53` shots / hits) and worsened tail signals.
-7. Open-world tail stability remains terrain-led in `open_frontier` / `frontier30m`; current suspects are near-field BVH rebuild bursts plus height-query cost, not CDLOD tile selection alone.
-8. A Shau harness is now behavior-valid after nearest-first materialization and high-elevation spatial-bounds fixes; next step is terrain-tail reduction, then WarSim/heap isolation.
+6. March 4, 2026 accepted optimization: `AIStateEngage.initiateSquadSuppression()` now probes flank cover at member elevation (no hardcoded `y=0`) and reuses a tiny probe object instead of per-call member spread. Warm control `2026-03-04T18-56-58-892Z` vs post runs (`2026-03-04T19-00-58-280Z`, `2026-03-04T19-03-09-563Z`) shows lower combat tails/stalls (`Combat.maxDurationMs 259.7ms -> 218.6ms/182.3ms`, long tasks `74 -> 47/31`), but p99 spikes still need follow-up.
+7. A March 4, 2026 attempt to reuse targets and throttle advancing threat reacquisition during flank movement was also reverted. The warm rerun improved mean frame time but collapsed combat pressure (`90 / 53` shots / hits) and worsened tail signals.
+8. Open-world tail stability remains terrain-led in `open_frontier` / `frontier30m`; current suspects are near-field BVH rebuild bursts plus height-query cost, not CDLOD tile selection alone.
+9. A Shau harness is now behavior-valid after nearest-first materialization and high-elevation spatial-bounds fixes; next step is terrain-tail reduction, then WarSim/heap isolation.
 
 ## Documentation Contract
 

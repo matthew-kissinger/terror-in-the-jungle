@@ -111,6 +111,7 @@ Current `peak_max_frame_ms` classification:
 - Treat the first capture after a fresh boot as cold-start data and discard or label it accordingly.
 - `systemTop` inside `runtime-samples.json` is a quick snapshot, not the authoritative budget breakdown in every mode. Use `browserStalls.totals.userTimingByName` for phase analysis.
 - The March 4, 2026 AI attribution artifacts are still valid evidence, but the temporary probe fields and spike-phase log suffixes are not present in the current branch. Re-add them only behind harness-only gating if deeper tail attribution is needed again.
+- In recent `combat120` runs with frontline compression enabled, active-driver movement can stay near zero while combat remains valid. For acceptance comparisons, match warm startup quality and compare shots/hits alongside frame/tail metrics to avoid false wins from reduced pressure.
 - Chromium-only browser diagnostics (`longtask`, `long-animation-frame`) are valid for harness evidence but must remain out of production builds.
 
 ## Guardrails

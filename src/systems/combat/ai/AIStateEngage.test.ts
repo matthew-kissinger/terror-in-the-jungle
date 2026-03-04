@@ -856,5 +856,39 @@ describe('AIStateEngage', () => {
 
       expect(combatant.state).toBe(CombatantState.SUPPRESSING);
     });
+
+    it('uses member elevation for flank cover probe and does not mutate member positions', () => {
+      const leader = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 5, 0));
+      const suppressor = createMockCombatant('c2', Faction.US, new THREE.Vector3(5, 9, 0));
+      const flanker = createMockCombatant('c3', Faction.US, new THREE.Vector3(-5, 14, 0));
+      const targetPos = new THREE.Vector3(50, 0, 0);
+      leader.squadId = 'squad-1';
+      leader.squadRole = 'leader';
+
+      allCombatants.set('c1', leader);
+      allCombatants.set('c2', suppressor);
+      allCombatants.set('c3', flanker);
+
+      const squad: Squad = {
+        id: 'squad-1',
+        faction: Faction.US,
+        members: ['c1', 'c2', 'c3'],
+      } as Squad;
+      squads.set('squad-1', squad);
+      aiStateEngage.setSquads(squads);
+
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.0);
+      findNearestCover.mockReturnValue(null);
+
+      aiStateEngage.initiateSquadSuppression(leader, targetPos, allCombatants, findNearestCover);
+
+      randomSpy.mockRestore();
+
+      expect(findNearestCover).toHaveBeenCalledTimes(1);
+      const [probeCombatant] = findNearestCover.mock.calls[0];
+      expect((probeCombatant as Combatant).position.y).toBe(14);
+      expect(flanker.position.y).toBe(14);
+      expect(flanker.state).toBe(CombatantState.ADVANCING);
+    });
   });
 });

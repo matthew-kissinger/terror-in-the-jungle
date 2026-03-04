@@ -227,25 +227,49 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
 - Probe cleanup: the temporary AI attribution fields/log suffixes were removed after these captures and the production bundle was re-scanned clean. The artifacts above remain the source of truth for this diagnosis.
 - Decision: do not touch gameplay cadence again until this suppression-init cover-search path is addressed. The next combat optimization slice should target that synchronous cover search directly, not state throttling.
 
+### Accepted experiment: suppression-init flank probe elevation fix + spread removal
+
+- Accepted code change in `AIStateEngage.initiateSquadSuppression()`:
+  - flank probe Y now uses `member.position.y` instead of hardcoded `0`
+  - per-flanker `findNearestCover()` probe now reuses a tiny `{ position }` object instead of `{ ...member, position: flankingPos }` spread allocation
+- Why this target:
+  - diagnostics localized rare tails to synchronous per-flanker suppression-init cover search
+  - hardcoded `y=0` widened vegetation/elevation candidate checks in `AICoverFinding.findNearestCover()` on non-flat terrain, and object spreading added avoidable churn in the hot loop
+- Artifacts:
+  - warm pre-change control: `2026-03-04T18-56-58-892Z`
+  - warm post-change run 1: `2026-03-04T19-00-58-280Z`
+  - warm post-change run 2 (sanity rerun): `2026-03-04T19-03-09-563Z`
+- Result summary:
+  - pre `2026-03-04T18-56-58-892Z`: `avgFrameMs=14.37`, `hitch>50=1.21%`, `overBudget=1.41%`, `aiStarve=22.01`, `SystemUpdater.Combat.max=259.7ms`, `longTasks=74`, shots/hits `90/66`
+  - post1 `2026-03-04T19-00-58-280Z`: `avgFrameMs=13.95`, `hitch>50=0.72%`, `overBudget=0.87%`, `aiStarve=7.53`, `SystemUpdater.Combat.max=218.6ms`, `longTasks=47`, shots/hits `120/68`
+  - post2 `2026-03-04T19-03-09-563Z`: `avgFrameMs=14.13`, `hitch>50=0.48%`, `overBudget=0.70%`, `aiStarve=11.40`, `SystemUpdater.Combat.max=182.3ms`, `longTasks=31`, shots/hits `90/49`
+- Read:
+  - both warm post-change captures improved combat-tail/stall signals versus the matched warm pre-control, including lower `SystemUpdater.Combat.maxDurationMs`
+  - one rerun (`post2`) also dropped `peak_p99_frame_ms` from fail (`100ms`) to warn (`59.8ms`)
+  - combat pressure still varies (`shots/hits` drift and `moved=0` in active-driver logs), so treat this as an accepted incremental win, not final closure of combat tails
+- Decision: keep. This is a low-risk, behavior-preserving hot-path cleanup with consistent positive tail movement.
+
 ## Validation Snapshot (2026-03-04)
 
-- `npm run test:run`: pass (`2959` tests passed, `2` skipped).
+- `npm run test:run`: pass (`2960` tests passed, `2` skipped).
 - `npm run validate`: pass (`test:run` + production build).
 - Production bundle scan: no matches for perf globals, observer hooks, or `SystemUpdater.*` timing labels in `dist/assets`.
 - Source console scan: raw console usage in shipping code is limited to fatal bootstrap errors in `src/main.ts` / `src/core/bootstrap.ts` plus the centralized `Logger` implementation.
 
 ## Ranked Phase 2 Targets
 
-1. `combat120` high-LOD AI spikes that remain after query-cache reuse, now specifically localized to `AIStateEngage.initiateSquadSuppression()` and the per-flanker fallback cover search inside that path. March 4, 2026 behavior-throttling attempts were both reverted; the next win needs to come from this synchronous setup work instead.
+1. `combat120` high-LOD AI spikes still rooted in `AIStateEngage.initiateSquadSuppression()`. The elevation/probe cleanup lowered tails, but rare `100ms` p99 events still appear in some warm runs.
 2. `HeightQueryCache.getHeightAt()` keying and hit cost. This remains a cross-cutting hotspot for combat and terrain paths even after AI query consolidation.
-3. `TerrainRaycastRuntime` near-field rebuild bursts and the terrain height-sampling path in `open_frontier`, `frontier30m`, and `a_shau_valley`.
-4. A Shau `WarSim` steady-state cost and large heap waves once terrain tails are reduced enough to isolate strategy work more cleanly.
-5. GPU/asset pipeline work (`KTX2`, atlasing, WebGPU/BatchedMesh) after the current CPU bottlenecks are re-measured.
+3. Harness pressure normalization for `combat120` acceptance loops (`shots/hits` comparability when active-driver movement remains compressed).
+4. `TerrainRaycastRuntime` near-field rebuild bursts and the terrain height-sampling path in `open_frontier`, `frontier30m`, and `a_shau_valley`.
+5. A Shau `WarSim` steady-state cost and large heap waves once terrain tails are reduced enough to isolate strategy work more cleanly.
+6. GPU/asset pipeline work (`KTX2`, atlasing, WebGPU/BatchedMesh) after the current CPU bottlenecks are re-measured.
 
 ## Frontier Technology Fit (Measured, Not Adopted)
 
 - High-fit, low-friction now:
-  - reduce or defer the synchronous per-flanker cover search inside `AIStateEngage.initiateSquadSuppression()`
+  - reduce or defer the remaining synchronous per-flanker cover search cost inside `AIStateEngage.initiateSquadSuppression()`
+  - budget or amortize suppression-init cover lookups across frames without changing tactical outcomes
   - if deeper attribution is needed, re-add the March 4 AI probes behind harness-only gating and remove them again after capture
   - data-oriented keying / lower-churn cache strategy for `HeightQueryCache`
   - scheduling or throttling around near-field terrain rebuild work

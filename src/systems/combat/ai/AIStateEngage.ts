@@ -306,6 +306,8 @@ export class AIStateEngage {
 
     this.squadSuppressionCooldown.set(combatant.squadId, Date.now())
 
+    const flankCoverProbe = { position: new THREE.Vector3() } as Combatant
+
     squad.members.forEach((memberId, index) => {
       const member = allCombatants.get(memberId)
       if (!member || member.state === CombatantState.DEAD) return
@@ -328,14 +330,12 @@ export class AIStateEngage {
 
         const flankingPos = _flankingPos.set(
           targetPos.x + Math.cos(flankingAngle) * flankingDistance,
-          0,
+          member.position.y,
           targetPos.z + Math.sin(flankingAngle) * flankingDistance
         )
 
-        const coverNearFlank = findNearestCover(
-          { ...member, position: flankingPos } as Combatant,
-          targetPos
-        )
+        flankCoverProbe.position.copy(flankingPos)
+        const coverNearFlank = findNearestCover(flankCoverProbe, targetPos)
 
         if (coverNearFlank) {
           member.destinationPoint = coverNearFlank
