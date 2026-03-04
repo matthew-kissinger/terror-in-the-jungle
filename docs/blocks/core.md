@@ -57,6 +57,7 @@ startGameWithMode(mode)   (GameEngineInit)
   |    fetch DEM binary -> DEMHeightProvider -> HeightQueryCache + ChunkWorkerPool
   |- renderer.configureForWorldSize()      // camera far, fog density, shadow far
   |- terrainSystem.setWorldSize(config.worldSize)
+  |- terrainSystem.setVisualMargin(config.visualMargin ?? 200)
   |- terrainSystem set chunk size + render distance
   |- terrainSystem.setBiomeConfig(defaultBiome, biomeRules)
   |- systemManager.setGameMode(mode)       // GameModeManager.setGameMode ->

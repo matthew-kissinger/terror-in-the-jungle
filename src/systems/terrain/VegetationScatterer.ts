@@ -14,6 +14,7 @@ import { getHeightQueryCache } from './HeightQueryCache';
  * (canopy / mid / ground via ChunkVegetationGenerator).
  */
 export class VegetationScatterer {
+  private static readonly DEFAULT_VISUAL_MARGIN = 200;
   private billboardSystem: GlobalBillboardSystem;
   private cellSize: number;
   private activeCells: Set<string> = new Set();
@@ -21,6 +22,7 @@ export class VegetationScatterer {
   private lastPlayerCellX = NaN;
   private lastPlayerCellZ = NaN;
   private worldHalfExtent = Infinity; // Half the world size; cells outside are skipped
+  private visualMargin = VegetationScatterer.DEFAULT_VISUAL_MARGIN;
 
   // Vegetation config
   private vegetationTypes: VegetationTypeConfig[] = [];
@@ -40,6 +42,11 @@ export class VegetationScatterer {
 
   setWorldSize(worldSize: number): void {
     this.worldHalfExtent = worldSize * 0.5;
+  }
+
+  setWorldBounds(worldSize: number, visualMargin: number = VegetationScatterer.DEFAULT_VISUAL_MARGIN): void {
+    this.worldHalfExtent = worldSize * 0.5;
+    this.visualMargin = Math.max(0, visualMargin);
   }
 
   /**
@@ -112,7 +119,7 @@ export class VegetationScatterer {
     const centerZ = baseZ + this.cellSize * 0.5;
 
     // Skip cells beyond the visual terrain margin (200m past world edge)
-    const limit = this.worldHalfExtent + 200;
+    const limit = this.worldHalfExtent + this.visualMargin;
     if (Math.abs(centerX) > limit || Math.abs(centerZ) > limit) return;
     const centerHeight = cache.getHeightAt(centerX, centerZ);
     const centerSlopeDeg = computeSlopeDeg(centerX, centerZ, 4, (x, z) => cache.getHeightAt(x, z));

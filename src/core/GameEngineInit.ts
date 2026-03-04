@@ -193,7 +193,7 @@ export async function startGameWithMode(engine: GameEngine, mode: GameMode): Pro
   }
 
   const terrainSystem = engine.systemManager.terrainSystem;
-  const previousWorldSize = terrainSystem.getWorldSize();
+  const previousWorldSize = terrainSystem.getPlayableWorldSize?.() ?? terrainSystem.getWorldSize();
   const targetWorldSize = config.worldSize ?? previousWorldSize;
   const worldSizeChanged = targetWorldSize !== previousWorldSize;
 
@@ -201,6 +201,7 @@ export async function startGameWithMode(engine: GameEngine, mode: GameMode): Pro
     terrainSystem.setWorldSize(config.worldSize);
     engine.systemManager.playerController.setWorldSize(config.worldSize);
   }
+  terrainSystem.setVisualMargin(config.visualMargin ?? 200);
 
   // Reconfigure chunk size if mode specifies a different value
   if (config.chunkSize && config.chunkSize !== terrainSystem.getChunkSize()) {

@@ -72,6 +72,7 @@ export class TerrainSystem implements GameSystem {
 
     this.config = createTerrainConfig({
       worldSize,
+      visualMargin: 200,
       maxLODLevels: runtimeConfig.lodLevels,
     });
 
@@ -80,7 +81,7 @@ export class TerrainSystem implements GameSystem {
     this.raycastRuntime = new TerrainRaycastRuntime(losAccelerator);
     this.terrainQueries = new TerrainQueries(losAccelerator);
     this.vegetationScatterer = new VegetationScatterer(globalBillboardSystem, this.config.vegetationCellSize);
-    this.vegetationScatterer.setWorldSize(worldSize);
+    this.vegetationScatterer.setWorldBounds(worldSize, this.config.visualMargin);
     this.workerPool = new TerrainWorkerPool();
   }
 
@@ -109,6 +110,7 @@ export class TerrainSystem implements GameSystem {
       terrainMaterial,
       {
         worldSize: this.config.worldSize,
+        visualMargin: this.config.visualMargin,
         maxLODLevels: this.config.maxLODLevels,
         lodRanges: this.config.lodRanges,
         tileResolution: this.config.tileResolution,
@@ -293,8 +295,39 @@ export class TerrainSystem implements GameSystem {
     this.reconfigureWorld();
   }
 
+  setVisualMargin(visualMargin: number): void {
+    if (!Number.isFinite(visualMargin)) return;
+    const nextMargin = Math.max(0, visualMargin);
+    if (nextMargin === this.config.visualMargin) return;
+
+    this.config.visualMargin = nextMargin;
+    this.vegetationScatterer.setWorldBounds(this.config.worldSize, this.config.visualMargin);
+
+    if (this.isInitialized) {
+      this.renderRuntime?.reconfigure({
+        worldSize: this.config.worldSize,
+        visualMargin: this.config.visualMargin,
+        maxLODLevels: this.config.maxLODLevels,
+        lodRanges: this.config.lodRanges,
+        tileResolution: this.config.tileResolution,
+      });
+    }
+  }
+
   getWorldSize(): number {
     return this.config.worldSize;
+  }
+
+  getPlayableWorldSize(): number {
+    return this.config.worldSize;
+  }
+
+  getVisualMargin(): number {
+    return this.config.visualMargin;
+  }
+
+  getVisualWorldSize(): number {
+    return this.config.worldSize + this.config.visualMargin * 2;
   }
 
   setBiomeConfig(defaultBiomeId: string, biomeRules?: BiomeClassificationRule[]): void {
@@ -345,11 +378,12 @@ export class TerrainSystem implements GameSystem {
 
     this.config.worldSize = newWorldSize;
     this.config.lodRanges = computeDefaultLODRanges(newWorldSize, this.config.maxLODLevels);
-    this.vegetationScatterer.setWorldSize(newWorldSize);
+    this.vegetationScatterer.setWorldBounds(newWorldSize, this.config.visualMargin);
 
     if (this.isInitialized) {
       this.renderRuntime?.reconfigure({
         worldSize: this.config.worldSize,
+        visualMargin: this.config.visualMargin,
         maxLODLevels: this.config.maxLODLevels,
         lodRanges: this.config.lodRanges,
         tileResolution: this.config.tileResolution,

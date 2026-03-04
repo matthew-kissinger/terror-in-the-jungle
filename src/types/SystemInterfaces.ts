@@ -155,6 +155,12 @@ export interface IFirstPersonWeapon {
 export interface ITerrainRuntime {
   getHeightAt(x: number, z: number): number;
   getEffectiveHeightAt(x: number, z: number): number;
+  /** Playable world extent used for gameplay, collision, and movement boundaries. */
+  getPlayableWorldSize?(): number;
+  /** Total visual terrain coverage, including render-only overflow beyond the playable map. */
+  getVisualWorldSize?(): number;
+  /** Render-only overflow beyond the playable map edge. */
+  getVisualMargin?(): number;
   getWorldSize(): number;
   isTerrainReady(): boolean;
   hasTerrainAt(x: number, z: number): boolean;

@@ -8,6 +8,7 @@ const {
   mockSampleHeight,
   mockBakeFromProvider,
   mockVegetationConfigure,
+  mockVegetationSetWorldBounds,
   mockVegetationRegenerateAll,
 } = vi.hoisted(() => ({
   mockProviderGetHeightAt: vi.fn().mockReturnValue(10),
@@ -15,6 +16,7 @@ const {
   mockSampleHeight: vi.fn().mockReturnValue(999),
   mockBakeFromProvider: vi.fn(),
   mockVegetationConfigure: vi.fn(),
+  mockVegetationSetWorldBounds: vi.fn(),
   mockVegetationRegenerateAll: vi.fn(),
 }));
 
@@ -89,6 +91,7 @@ vi.mock('./VegetationScatterer', () => ({
   VegetationScatterer: class {
     configure = mockVegetationConfigure;
     setWorldSize = vi.fn();
+    setWorldBounds = mockVegetationSetWorldBounds;
     update = vi.fn();
     clear = vi.fn();
     regenerateAll = mockVegetationRegenerateAll;
@@ -166,6 +169,7 @@ describe('TerrainSystem', () => {
     mockSampleHeight.mockClear();
     mockBakeFromProvider.mockClear();
     mockVegetationConfigure.mockClear();
+    mockVegetationSetWorldBounds.mockClear();
     mockVegetationRegenerateAll.mockClear();
     scene = makeMockScene();
     terrain = new TerrainSystem(
@@ -265,6 +269,19 @@ describe('TerrainSystem', () => {
       terrain.setRenderDistance(3);
 
       expect(terrain.getWorldSize()).toBe(21136);
+    });
+
+    it('setVisualMargin updates shared visual overflow bounds without changing playable size', async () => {
+      await terrain.init();
+
+      terrain.setWorldSize(500);
+      terrain.setVisualMargin(320);
+
+      expect(terrain.getWorldSize()).toBe(500);
+      expect(terrain.getPlayableWorldSize()).toBe(500);
+      expect(terrain.getVisualMargin()).toBe(320);
+      expect(terrain.getVisualWorldSize()).toBe(1140);
+      expect(mockVegetationSetWorldBounds).toHaveBeenLastCalledWith(500, 320);
     });
 
     it('uses a reduced render-surface bake grid for very large worlds', async () => {

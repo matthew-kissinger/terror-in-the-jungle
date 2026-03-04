@@ -73,7 +73,7 @@ HelipadSystem.initialize() is a no-op if `GameModeConfig.helipads` is empty or a
 When a pilot exits mid-air, HelicopterPhysics zeroes all control inputs but continues integrating physics (gravity applies). The helicopter descends until it collides with terrain. There is no auto-land or despawn.
 
 ### World Boundary Enforcement
-HelicopterPhysics enforces world boundary independently from PlayerMovement. `HelicopterModel.updateHelicopterPhysics()` sets `worldHalfExtent` on the physics instance each frame from `terrainManager.getWorldSize() * 0.5`. `HelicopterPhysics.enforceWorldBoundary()` runs after ground collision and bounces velocity inward at 50% strength when position exceeds limits. This mirrors the player boundary bounce-back but runs in the helicopter physics pipeline, not the player movement pipeline.
+HelicopterPhysics enforces world boundary independently from PlayerMovement. `HelicopterModel.updateHelicopterPhysics()` sets `worldHalfExtent` on the physics instance each frame from `terrainManager.getPlayableWorldSize()` with `getWorldSize()` fallback for older callers. `HelicopterPhysics.enforceWorldBoundary()` runs after ground collision and bounces velocity inward at 50% strength when position exceeds limits. This mirrors the player boundary bounce-back but runs in the helicopter physics pipeline, not the player movement pipeline.
 
 ### Frame Ordering Constraint
 ```

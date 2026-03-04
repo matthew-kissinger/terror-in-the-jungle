@@ -328,6 +328,27 @@ describe('PlayerMovement', () => {
     });
   });
 
+  describe('updateMovement - world boundary', () => {
+    beforeEach(() => {
+      playerMovement.setTerrainSystem(mockTerrainSystem);
+      playerMovement.setSandbagSystem(mockSandbagSystem);
+      vi.mocked(mockTerrainSystem.getWorldSize).mockReturnValue(500);
+      vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockReturnValue(0);
+    });
+
+    it('clamps the player to the playable world boundary and bounces inward', () => {
+      playerState.position.set(249, 2, 0);
+      vi.mocked(mockInput.isKeyPressed).mockImplementation((key: string) => key === 'keyd');
+
+      for (let i = 0; i < 20; i++) {
+        playerMovement.updateMovement(0.016, mockInput, mockCamera);
+      }
+
+      expect(playerState.position.x).toBeLessThanOrEqual(250);
+      expect(playerState.velocity.x).toBeLessThanOrEqual(0);
+    });
+  });
+
   describe('updateMovement - landing sound', () => {
     beforeEach(() => {
       playerMovement.setTerrainSystem(mockTerrainSystem);

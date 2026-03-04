@@ -82,6 +82,7 @@ Worker/config:
 - `setChunkSize(size)`
 - `setRenderDistance(distance)`
 - `setWorldSize(worldSize)`
+- `setVisualMargin(visualMargin)`
 - `setBiomeConfig(defaultBiomeId, biomeRules)`
 - `isTerrainReady()`
 - `hasTerrainAt(x, z)`
@@ -89,6 +90,9 @@ Worker/config:
 Runtime config/metrics:
 - `getChunkSize()`
 - `getActiveTerrainTileCount()`
+- `getPlayableWorldSize()`
+- `getVisualMargin()`
+- `getVisualWorldSize()`
 
 ### Fan-In
 
@@ -233,8 +237,8 @@ Construction and storage:
 Terrain-affecting config currently comes from multiple places:
 - `GameEngineInit` loads DEM and swaps the `HeightQueryCache` provider
 - `GameEngineInit` configures active terrain biome state on `TerrainSystem`
+- `GameEngineInit` pushes both playable world size and render-only visual margin into `TerrainSystem`
 - `GameModeManager` changes terrain render distance
-- `GameEngineInit` pushes world extent into `TerrainSystem`
 
 This means mode changes intentionally span both:
 - the data-authority layer (`HeightQueryCache`)
@@ -262,8 +266,9 @@ Real runtime behavior:
 - loading/start-screen terrain-adjacent UI assets now use base-aware paths instead of hard-coded root-relative URLs
 - automated preview smoke now confirms shader-clean, terrain-warning-clean, request-error-clean startup in both `zone_control` and `a_shau_valley`
 - A Shau biome coverage has been retuned toward dense jungle and bamboo uplands, with highland rock constrained to upper ridges and cliff accents
-- world boundary: player and helicopters bounce off world edge (velocity reversed at 50%). `PlayerMovement.enforceWorldBoundary()` reads `getWorldSize()` from `ITerrainRuntime`; `HelicopterPhysics.enforceWorldBoundary()` uses `worldHalfExtent` set per-frame by `HelicopterModel`
-- 200m visual terrain margin: `TerrainRenderRuntime` inflates CDLOD quadtree by 400m total. Vertex shader explicitly clamps UVs to `[0,1]`, so margin tiles sample edge heights from the heightmap
+- playable boundary: player and helicopters bounce off the playable world edge (velocity reversed at 50%). `PlayerMovement.enforceWorldBoundary()` and `HelicopterModel` read `getPlayableWorldSize()` from `ITerrainRuntime` with `getWorldSize()` fallback for older callers
+- configurable visual terrain margin: `TerrainRenderRuntime` inflates the CDLOD quadtree by `visualMargin * 2` total. Vertex shader explicitly clamps UVs to `[0,1]`, so overflow tiles sample edge heights from the heightmap
+- vegetation overflow uses the same `visualMargin` contract as terrain render overflow, so mode tuning changes both systems together
 - terrain material uniform updates preserve compiled shader references by updating `.value` in place instead of creating new uniform objects
 
 ### Transitional residue

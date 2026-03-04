@@ -2,13 +2,9 @@ import * as THREE from 'three';
 import { CDLODQuadtree, type FrustumPlane } from './CDLODQuadtree';
 import { CDLODRenderer } from './CDLODRenderer';
 
-/** Visual margin added to the quadtree beyond the heightmap world size.
- *  Tiles in this margin sample clamped heightmap UVs, extending the edge
- *  terrain so the player never sees a hard world boundary. */
-const VISUAL_MARGIN = 200;
-
 export interface TerrainRenderRuntimeConfig {
   worldSize: number;
+  visualMargin: number;
   maxLODLevels: number;
   lodRanges: number[];
   tileResolution: number;
@@ -65,7 +61,7 @@ export class TerrainRenderRuntime {
     // Inflate quadtree coverage so terrain tiles extend past the heightmap
     // boundary. Edge tiles sample clamped UVs, creating a seamless visual margin.
     return new CDLODQuadtree(
-      this.config.worldSize + VISUAL_MARGIN * 2,
+      this.config.worldSize + this.config.visualMargin * 2,
       this.config.maxLODLevels,
       this.config.lodRanges,
     );

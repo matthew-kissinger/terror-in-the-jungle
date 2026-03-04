@@ -74,6 +74,7 @@ export interface GameModeConfig {
 
   // World settings
   worldSize: number;
+  visualMargin?: number; // Extra render-only terrain/vegetation overflow beyond playable bounds
   chunkRenderDistance: number;
   chunkSize?: number; // Chunk size in world units (default 64)
   weather?: WeatherConfig;

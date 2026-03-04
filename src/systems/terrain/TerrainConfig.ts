@@ -25,6 +25,7 @@ export interface SplatmapConfig {
  */
 export interface TerrainSystemConfig {
   worldSize: number;
+  visualMargin: number;
   maxLODLevels: number;
   lodRanges: number[]; // Per-level max distance from camera
   tileResolution: number; // Vertices per tile edge (e.g. 33 for 32 quads)
@@ -69,6 +70,7 @@ export function createTerrainConfig(overrides: Partial<TerrainSystemConfig> = {}
   const maxLODLevels = overrides.maxLODLevels ?? 6;
   return {
     worldSize,
+    visualMargin: overrides.visualMargin ?? 200,
     maxLODLevels,
     lodRanges: overrides.lodRanges ?? computeDefaultLODRanges(worldSize, maxLODLevels),
     tileResolution: overrides.tileResolution ?? 33,

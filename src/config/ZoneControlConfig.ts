@@ -23,6 +23,7 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
   description: 'Fast-paced combat over 3 strategic zones. Control the majority to drain enemy tickets.',
 
   worldSize: 500,
+  visualMargin: 320,
   chunkRenderDistance: 5,
   terrainSeed: 'random',
   terrain: {
