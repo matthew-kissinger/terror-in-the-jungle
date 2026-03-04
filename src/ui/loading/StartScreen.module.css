@@ -6,7 +6,6 @@
 .screen {
   position: fixed;
   inset: 0;
-  background-image: url('/assets/ui/screens/start-screen.webp');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

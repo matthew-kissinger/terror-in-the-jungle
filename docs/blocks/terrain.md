@@ -257,7 +257,8 @@ Real runtime behavior:
 - terrain material now uses live biome textures, biome roughness, and slope-aware triplanar sampling on steep surfaces
 - terrain ground textures now use linear mipmapped filtering instead of nearest/no-mipmap sprite filtering
 - render-only surface bake density now scales with world size; A Shau uses a 512-grid render surface instead of a fixed 1024-grid bake
-- automated preview smoke now confirms shader-clean, terrain-warning-clean startup in both `zone_control` and `a_shau_valley`
+- loading/start-screen terrain-adjacent UI assets now use base-aware paths instead of hard-coded root-relative URLs
+- automated preview smoke now confirms shader-clean, terrain-warning-clean, request-error-clean startup in both `zone_control` and `a_shau_valley`
 
 ### Transitional residue
 

@@ -258,11 +258,11 @@ Validation:
 | T-001A | Pass mode world size into terrain runtime | P0 | `done` | `GameEngineInit` now calls `setWorldSize(config.worldSize)` |
 | T-001B | Decouple render distance from map extent | P0 | `done` | Chunk size/render distance no longer override explicit map extent |
 | T-002 | Unify gameplay height path | P1 | `done` | `TerrainSystem.getHeightAt()` now delegates to gameplay queries |
-| T-003 | Wire vegetation and biome config | P1 | `in_progress` | terrain material and vegetation both consume biome rules; automated smoke is clean in `zone_control` and `a_shau_valley`, manual visual review/tuning is still pending |
+| T-003 | Wire vegetation and biome config | P1 | `in_progress` | terrain material and vegetation both consume biome rules; automated preview smoke is now fully clean in `zone_control` and `a_shau_valley`, manual visual review/tuning is still pending |
 | T-004 | Remove dishonest compat semantics | P2 | `done` | Dishonest chunk stubs and alias interfaces are gone from the runtime boundary; core callers use truthful terrain semantics |
 | T-005 | Clarify terrain block boundaries | P2 | `done` | runtime/query/data roles are explicit, gameplay/world consumers use injected terrain runtime, and remaining direct height-cache usage is confined to terrain internals plus bootstrap/provider setup |
 | T-006 | Prove CDLOD transitions | P3 | `pending` | morphing + validation |
-| T-007 | Finish terrain material stack | P3 | `in_progress` | biome textures, roughness, slope-aware triplanar sampling, and terrain-appropriate ground texture filtering are live; large-world surface bake now scales down to a 512 grid at A Shau size, automated preview smoke is shader-clean and terrain-warning-clean, but authored per-layer normal/PBR inputs are still pending because they are not yet in the asset inventory |
+| T-007 | Finish terrain material stack | P3 | `in_progress` | biome textures, roughness, slope-aware triplanar sampling, terrain-appropriate ground texture filtering, and base-aware loading/start-screen asset paths are live; large-world surface bake now scales down to a 512 grid at A Shau size, and automated preview smoke is shader-clean, terrain-warning-clean, and request-error-clean, but authored per-layer normal/PBR inputs are still pending because they are not yet in the asset inventory |
 | T-008 | Add hydrology layer plan and interfaces | P3 | `pending` | river gameplay |
 | T-009 | Per-match random terrain seeds | P1 | `done` | `terrainSeed` on GameModeConfig, `rebakeHeightmap()` on TerrainSystem, wired in GameEngineInit |
 | T-010 | Vietnam-scale tiled DEM support | P2 | `pending` | heightmap streaming for maps beyond 21km; needed for Hue, Mekong Delta, DMZ theaters |
@@ -438,6 +438,47 @@ Next:
 - manual visual review of `artifacts/terrain-smoke/2026-03-04T00-41-49-250Z`
 - continue `T-007` with authored terrain normal/PBR inputs when those assets are added
 - move to `T-006` and prove LOD transition quality with wireframe/transition capture, now that the terrain runtime is materially stable again
+
+### 2026-03-04 (session 3)
+
+Completed:
+- fixed the last known runtime request errors caused by hard-coded root-relative UI screen asset paths:
+  - `StartScreen.ts`
+  - `StartScreen.module.css`
+  - `LoadingUI.ts`
+  - `LoadingUI.css`
+  - `index.html` favicon paths
+- removed the preview/build mismatch where `/assets/ui/screens/start-screen.webp` and `/assets/ui/screens/loading-screen.webp` returned `404` under the configured Vite base path
+- captured a fully clean preview-smoke artifact under:
+  - `artifacts/terrain-smoke/2026-03-04T00-54-47-243Z`
+
+Validated findings:
+- `zone_control`:
+  - `terrainReady=true`
+  - `activeTiles=58`
+  - `worldSize=500`
+  - no request errors
+  - no terrain perf warnings
+- `a_shau_valley`:
+  - `terrainReady=true`
+  - `activeTiles=27`
+  - `worldSize=21136`
+  - no request errors
+  - no terrain perf warnings
+- the only remaining preview-smoke shader note is the environment warning about `KHR_parallel_shader_compile` availability in `zone_control`; this is not a terrain shader failure
+
+Validation:
+- `npx tsc --noEmit`
+- `npx vitest run src/systems/terrain/TerrainSystem.test.ts src/integration/scenarios/squad-lifecycle.test.ts src/integration/scenarios/combat-flow.test.ts`
+- `npm run build`
+- preview-mode Playwright terrain smoke against:
+  - `zone_control`
+  - `a_shau_valley`
+
+Next:
+- manual visual review of `artifacts/terrain-smoke/2026-03-04T00-54-47-243Z`
+- continue `T-007` with authored terrain normal/PBR inputs when those assets are added
+- move to `T-006` and prove LOD transition quality with wireframe/transition capture
 
 ---
 

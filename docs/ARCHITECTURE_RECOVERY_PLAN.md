@@ -62,6 +62,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: terrain startup no longer double-rebakes the render surface at mode start after a world-size change; `GameEngineInit` now lets `setWorldSize()` own that rebake path.
 - Keep: large-world terrain surface bake budget is scale-aware instead of fixed. `TerrainSurfaceRuntime` now reduces the render-only bake grid at A Shau scale from `1024` to `512`, while gameplay height authority remains on `HeightQueryCache`.
 - Keep: `TerrainRaycastRuntime` no longer computes unused vertex normals for the near-field LOS mesh.
+- Keep: loading/start-screen asset URLs are base-aware; root-relative screen asset paths that produced preview/Page `404`s were removed.
 
 ## Deferred Decisions
 

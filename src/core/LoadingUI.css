@@ -16,9 +16,6 @@
 .spawn-loading-backdrop {
   position: absolute;
   inset: 0;
-  background-image:
-    linear-gradient(to bottom, rgba(4, 8, 14, 0.15), rgba(4, 8, 14, 0.8)),
-    url('/assets/ui/screens/loading-screen.webp');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

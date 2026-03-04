@@ -37,7 +37,7 @@ Last updated: 2026-03-04
 - `ARCHITECTURE_RECOVERY_PLAN.md`
   - Current architecture risk register and prioritized implementation board.
 - `TERRAIN_REWRITE_MASTER_PLAN.md`
-  - Canonical terrain rewrite control document. This is the only terrain execution plan. Latest validated state includes A Shau preview-smoke evidence under `artifacts/terrain-smoke/2026-03-04T00-41-49-250Z`.
+  - Canonical terrain rewrite control document. This is the only terrain execution plan. Latest validated state includes fully clean preview-smoke evidence under `artifacts/terrain-smoke/2026-03-04T00-54-47-243Z`.
 - `ASHAU_VALLEY_IMPLEMENTATION_PLAN.md`
   - A Shau mode stabilization plan and validation checklist.
 - `AUDIO_ASSETS_NEEDED.md`

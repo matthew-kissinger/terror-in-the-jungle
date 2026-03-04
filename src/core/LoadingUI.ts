@@ -5,6 +5,8 @@
 
 import './LoadingUI.css';
 
+const LOADING_SCREEN_IMAGE_URL = `${import.meta.env.BASE_URL}assets/ui/screens/loading-screen.webp`;
+
 export class LoadingUI {
   private spawnLoadingDiv?: HTMLDivElement;
   private statusText?: HTMLDivElement;
@@ -26,6 +28,11 @@ export class LoadingUI {
 
     this.statusText = this.spawnLoadingDiv.querySelector('[data-ref="status"]') as HTMLDivElement | null ?? undefined;
     this.detailText = this.spawnLoadingDiv.querySelector('[data-ref="detail"]') as HTMLDivElement | null ?? undefined;
+    const backdrop = this.spawnLoadingDiv.querySelector('.spawn-loading-backdrop') as HTMLDivElement | null;
+    if (backdrop) {
+      backdrop.style.backgroundImage =
+        `linear-gradient(to bottom, rgba(4, 8, 14, 0.15), rgba(4, 8, 14, 0.8)), url("${LOADING_SCREEN_IMAGE_URL}")`;
+    }
     document.body.appendChild(this.spawnLoadingDiv);
   }
 

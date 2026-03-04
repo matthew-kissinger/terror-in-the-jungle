@@ -19,8 +19,9 @@ import { LOADING_PHASES } from '../../config/loading';
 import { MODE_CARD_CONFIGS } from './ModeCard';
 import styles from './StartScreen.module.css';
 
-const START_SCREEN_IMAGE_URL = '/assets/ui/screens/start-screen.webp';
-const LOADING_SCREEN_IMAGE_URL = '/assets/ui/screens/loading-screen.webp';
+const SCREEN_ASSET_BASE_URL = import.meta.env.BASE_URL;
+const START_SCREEN_IMAGE_URL = `${SCREEN_ASSET_BASE_URL}assets/ui/screens/start-screen.webp`;
+const LOADING_SCREEN_IMAGE_URL = `${SCREEN_ASSET_BASE_URL}assets/ui/screens/loading-screen.webp`;
 
 export class StartScreen extends UIComponent {
   private settingsModal: SettingsModal;
@@ -62,6 +63,7 @@ export class StartScreen extends UIComponent {
 
   protected build(): void {
     this.root.className = styles.screen;
+    this.root.style.backgroundImage = `url("${START_SCREEN_IMAGE_URL}")`;
 
     const modeCardsHTML = Object.keys(MODE_CARD_CONFIGS)
       .map((mode, i) => this.buildModeCardHTML(mode, i === 0))
