@@ -306,6 +306,13 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
 - Remaining harness caveat:
   - stop log `moved` remains a frontline-compression counter, not literal player displacement.
 
+### Landed (pending final A/B promotion): suppression-init flank cover-search cap
+
+- Change: `AIStateEngage.initiateSquadSuppression()` now caps synchronous `findNearestCover()` calls to `2` per suppression initiation (`MAX_FLANK_COVER_SEARCHES_PER_SUPPRESSION`), then falls back to existing flanking destination behavior for remaining flankers.
+- Purpose: bound worst-case per-squad suppression-init burst cost without changing squad role assignment or movement-state transitions.
+- Test coverage: `AIStateEngage.test.ts` now includes a larger-squad case asserting cover lookups are capped while all flanking members still receive advancing destinations.
+- Status: code is landed and validated (`test:run`, `validate`), but this cap still needs a clean, post-harness-fix warm A/B pair to promote as a confirmed perf win.
+
 ## Validation Snapshot (2026-03-04)
 
 - `npm run test:run`: pass (`2960` tests passed, `2` skipped).

@@ -13,6 +13,7 @@ const _toAttacker = new THREE.Vector3()
  * Handles engaging and suppressing combat states
  */
 export class AIStateEngage {
+  private readonly MAX_FLANK_COVER_SEARCHES_PER_SUPPRESSION = 2
   private squads: Map<string, Squad> = new Map()
   private squadSuppressionCooldown: Map<string, number> = new Map()
   private coverSystem?: AICoverSystem
@@ -307,6 +308,7 @@ export class AIStateEngage {
     this.squadSuppressionCooldown.set(combatant.squadId, Date.now())
 
     const flankCoverProbe = { position: new THREE.Vector3() } as Combatant
+    let flankCoverSearches = 0
 
     squad.members.forEach((memberId, index) => {
       const member = allCombatants.get(memberId)
@@ -334,8 +336,12 @@ export class AIStateEngage {
           targetPos.z + Math.sin(flankingAngle) * flankingDistance
         )
 
-        flankCoverProbe.position.copy(flankingPos)
-        const coverNearFlank = findNearestCover(flankCoverProbe, targetPos)
+        let coverNearFlank: THREE.Vector3 | null = null
+        if (flankCoverSearches < this.MAX_FLANK_COVER_SEARCHES_PER_SUPPRESSION) {
+          flankCoverProbe.position.copy(flankingPos)
+          coverNearFlank = findNearestCover(flankCoverProbe, targetPos)
+          flankCoverSearches++
+        }
 
         if (coverNearFlank) {
           member.destinationPoint = coverNearFlank

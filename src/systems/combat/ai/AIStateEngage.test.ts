@@ -890,5 +890,44 @@ describe('AIStateEngage', () => {
       expect(flanker.position.y).toBe(14);
       expect(flanker.state).toBe(CombatantState.ADVANCING);
     });
+
+    it('caps flank cover searches per suppression initiation for larger squads', () => {
+      const targetPos = new THREE.Vector3(60, 0, 0);
+      const leader = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 2, 0));
+      leader.squadId = 'squad-1';
+      leader.squadRole = 'leader';
+
+      const members = [leader];
+      for (let i = 2; i <= 6; i++) {
+        const member = createMockCombatant(`c${i}`, Faction.US, new THREE.Vector3(i * 2, i, 0));
+        member.squadId = 'squad-1';
+        member.squadRole = 'follower';
+        members.push(member);
+      }
+
+      members.forEach(member => allCombatants.set(member.id, member));
+      const squad: Squad = {
+        id: 'squad-1',
+        faction: Faction.US,
+        members: members.map(member => member.id),
+      } as Squad;
+      squads.set('squad-1', squad);
+      aiStateEngage.setSquads(squads);
+
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.0);
+      findNearestCover.mockReturnValue(null);
+
+      aiStateEngage.initiateSquadSuppression(leader, targetPos, allCombatants, findNearestCover);
+
+      randomSpy.mockRestore();
+
+      // 6-member squad => 2 suppressors + 4 flankers, but cover search is capped at 2.
+      expect(findNearestCover).toHaveBeenCalledTimes(2);
+      const flankingMembers = members.slice(2);
+      for (const member of flankingMembers) {
+        expect(member.state).toBe(CombatantState.ADVANCING);
+        expect(member.destinationPoint).toBeDefined();
+      }
+    });
   });
 });

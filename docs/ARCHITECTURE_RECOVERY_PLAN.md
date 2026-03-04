@@ -82,6 +82,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: `GameRenderer` captures per-frame `renderer.info` stats for perf harness sampling; this is harness evidence, not shipping HUD/debug behavior.
 - Keep: player death accounting is single-source in `PlayerHealthSystem`; `CombatantDamage` no longer applies a second HUD death increment for player-proxy lethal events.
 - Keep: active perf driver sustain policy is bounded and behavior-preserving (respawn debounce, cooldown-based low-health top-up without spawn-protection refresh, and ammo refill guardrails).
+- Keep: suppression-init cover-search budget is explicitly bounded in `AIStateEngage` (max 2 flank cover lookups per initiation) to constrain single-frame burst cost; promote to full perf-accepted status only after a clean warm A/B pair on the updated harness.
 - Keep: `MaterializationPipeline` materializes nearest squads first so large-map scenarios establish combat around the player before distant squads consume the budget.
 - Keep: `SpatialOctree` vertical world bounds scale with world size. Fixed Y bounds were invalid on mountainous maps and caused empty high-altitude hit-detection queries.
 
