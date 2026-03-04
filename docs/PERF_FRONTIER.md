@@ -3,6 +3,43 @@
 Last updated: 2026-03-04
 Scope: Phase 1 measurement, harness validation, baseline capture state, and Phase 2 bottleneck analysis.
 
+## Zoomed-Out Progress Snapshot (2026-03-04, Evening)
+
+### Mission phase status
+
+| Phase | Status | Evidence-backed read |
+|---|---|---|
+| Phase 1 (orientation + harness + baselines) | COMPLETE | Required docs/code orientation done. All required scenarios have behavior-valid captures with non-zero combat activity. |
+| Phase 2 (bottleneck analysis) | IN_PROGRESS | Combat and terrain bottlenecks are ranked with artifact-backed attribution; suppression-init cover search remains the top combat-tail suspect. |
+| Phase 3 (frontier tech evaluation) | QUEUED | No speculative adoption yet. WebGPU/WASM/workers remain gated behind measured bottleneck closure. |
+| Phase 4 (execution loop) | IN_PROGRESS | Multiple low-friction experiments completed; accepted wins are retained, regressions reverted. |
+| Phase 5 (validation loop) | IN_PROGRESS | `test:run` and `validate` are run after accepted changes; baseline refresh is pending the next stable warm capture set. |
+
+### Scenario health matrix (latest warm evidence in this branch)
+
+| Scenario | Latest artifact | Outcome | Key numbers | Current gate |
+|---|---|---|---|---|
+| `combat120` | `2026-03-04T21-40-18-916Z` | FAIL / behavior-valid | `avg=14.17ms`, `p99=86.90ms`, `shots/hits=246/133`, `ai_starvation=12.34` | Tail + starvation still fail despite improved pressure and throughput. |
+| `openfrontier:short` | `2026-03-04T13-43-12-583Z` | PASS | `avg=5.40ms`, `p99=21.30ms`, `shots/hits=29/13` | Throughput healthy on current branch; keep as control for terrain-heavy changes. |
+| `ashau:short` | `2026-03-04T07-46-50-552Z` | WARN / behavior-valid | `avg=8.93ms`, `p99=25.80ms`, `shots/hits=270/150` | Contact reliability fixed; remaining work is strategy/terrain tail analysis. |
+| `frontier30m` | `2026-03-04T07-57-32-230Z` | FAIL / behavior-valid | `avg=7.13ms`, `p99=85.90ms`, `shots/hits=156/85` | Soak still fails on tails/stalls, not mean frame time. |
+
+### Net progress since the original warm `combat120` baseline
+
+- Baseline anchor: `2026-03-04T07-50-37-054Z`.
+- Latest warm capture: `2026-03-04T21-40-18-916Z`.
+- Direction of travel is positive but incomplete:
+  - `avgFrameMs`: `15.10 -> 14.17`
+  - `ai_budget_starvation_events`: `16.82 -> 12.34`
+  - `shots/hits`: `212/130 -> 246/133`
+  - `peak_p99_frame_ms` remains fail-class (`100.00 -> 86.90`)
+
+### What this means operationally
+
+- We are no longer blocked by harness validity; we are blocked by combat-tail closure and soak-tail closure.
+- The optimization program is making measurable forward movement, but it is not yet in “stabilized frontier” state.
+- Next acceptance gate should require two consecutive warm `combat120` runs with comparable pressure and no new tail regressions before promoting new baselines.
+
 ## Phase 1 Status
 
 - Orientation complete: required docs, block maps, runtime landmarks, and harness scripts reviewed against source.

@@ -8,11 +8,19 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Deliver stable large-scale combat with consistent frame tails.
 - Stabilize A Shau mode flow so it is testable and tactically coherent.
 
+## Progress Checkpoint (2026-03-04, Evening)
+
+- Harness fidelity has materially improved: duplicate player-death accounting is fixed, long-run ammo sustain is explicit, and required scenarios are behavior-valid.
+- Architecture risk has shifted from "measurement reliability" to "tail closure":
+  - `combat120` still fails on p99/starvation despite better average frame time and stronger combat pressure.
+  - `frontier30m` still fails on long-tail stability while mean frame time remains healthy.
+- Strategic posture is unchanged: continue low-friction, evidence-backed CPU/harness work first; hold frontier block replacements (WebGPU/WASM/worker architecture shifts) until tail gates are met.
+
 ## Priority Board
 
 | Priority | Workstream | Status | Notes |
 |---|---|---|---|
-| P0 | Harness integrity and measurement quality | IN_PROGRESS | Required Phase 1 scenarios are now behavior-valid. Remaining gap: `systemTop` snapshot quality is secondary to `userTimingByName`, so phase analysis should use user-timing totals as the authoritative tick-group source. |
+| P0 | Harness integrity and measurement quality | IN_PROGRESS | Required Phase 1 scenarios are behavior-valid. Duplicate HUD death accounting and long-run ammo depletion in active-driver runs were fixed on 2026-03-04. Remaining gap: `systemTop` is still secondary to `userTimingByName` for authoritative tick-group analysis. |
 | P1 | Spatial ownership unification (F3) | DONE | Legacy SpatialOctree removed from CombatantSystem. All consumers (AI, LOD, spawn, hit detection) use SpatialGridManager singleton. Secondary sync and dedup feature flags removed. |
 | P2 | Heap growth triage in combat-heavy runs | IN_PROGRESS | New diagnostics added. Latest Phase 2 evidence still points to churn-heavy waves rather than a proven unbounded leak. A frame-local `AITargetAcquisition` neighborhood cache improved warm `combat120` starvation (`16.82 -> 12.91`) and heap growth (`15.73MB -> 3.64MB`). A second accepted March 4 optimization in `AIStateEngage.initiateSquadSuppression()` (flank-probe elevation + probe allocation cleanup) reduced warm combat tails/stalls again (`Combat.maxDurationMs 259.7ms -> 218.6ms/182.3ms`, long tasks `74 -> 47/31`), but rare p99 spikes still appear in some runs. |
 | P3 | A Shau gameplay flow and contact reliability | IN_PROGRESS | Short harness capture is now behavior-valid (`270` shots / `150` hits on 2026-03-04). Remaining work is performance analysis, not basic contact acquisition. |
