@@ -166,6 +166,25 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
   - `SystemUpdater.Terrain.maxDurationMs` also rose slightly: `89.3ms -> 97.4ms`.
 - Decision: keep. The change measurably reduces average combat pressure, starvation, and heap churn under comparable or higher load, but it does not solve the worst combat-tail spikes. The next AI slice should target high-LOD `suppressing` / `advancing` work and off-frame movement/spatial upkeep.
 
+### Reverted experiment: disable spacing on visual-only high-LOD frames
+
+- Attempted change: pass `disableSpacing: true` to `CombatantMovement.updateMovement()` from `CombatantLODManager.updateCombatantVisualOnly()` so staggered high-LOD off-frames keep movement/rotation/spatial sync but skip friendly-spacing queries.
+- Attempt artifacts:
+  - first warm post-change run: `2026-03-04T18-07-17-018Z`
+  - second warm sanity rerun: `2026-03-04T18-10-35-774Z`
+- Compared against accepted warm combat baseline `2026-03-04T14-12-07-483Z`, the first post-change run was not convincing:
+  - headline averages moved slightly in the right direction (`avgFrameMs 14.59 -> 14.37`), but tail/stall signals regressed.
+  - hitch `>50ms`: `1.04% -> 1.42%`
+  - average over-budget time: `1.08% -> 1.69%`
+  - combat-budget dominance: `5.7% -> 10.2%`
+  - AI starvation: `12.91 -> 16.19` events/sample
+  - long tasks: `63 -> 87`; LoAF blocking: `4910.4ms -> 7287.9ms`
+  - end-of-run `SystemUpdater.Combat.maxDurationMs` improved slightly (`233.6ms -> 229.9ms`), but `SystemUpdater.Terrain.maxDurationMs` worsened (`97.4ms -> 119.3ms`).
+- The second warm rerun under-shot badly (`54 / 32` shots / hits) while still failing the same tail checks:
+  - summary `avgFrameMs=14.18`, hitch `>50ms=1.40%`, over-budget `1.53%`, combat-budget dominance `12.5%`, AI starvation `18.91`, long tasks `86`, LoAF blocking `7368.3ms`.
+  - lower combat pressure plus worse tails made it unsuitable as an acceptance run and strengthened the rejection.
+- Decision: revert. Friendly-spacing work on visual-only high-LOD frames is not the primary source of the remaining `combat120` tails. The next combat slice should target full-update `suppressing` / `advancing` spikes or other off-frame upkeep with tighter evidence.
+
 ## Validation Snapshot (2026-03-04)
 
 - `npm run test:run`: pass (`2959` tests passed, `2` skipped).
@@ -175,7 +194,7 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
 
 ## Ranked Phase 2 Targets
 
-1. `combat120` high-LOD AI spikes that remain after query-cache reuse, especially `suppressing` / `advancing` state work and off-frame upkeep in `CombatantLODManager.updateCombatantVisualOnly()`.
+1. `combat120` high-LOD AI spikes that remain after query-cache reuse, especially `suppressing` / `advancing` state work. A March 4, 2026 attempt to skip friendly-spacing work on visual-only high-LOD frames was reverted, so the remaining tail source is deeper than spacing-force alone.
 2. `HeightQueryCache.getHeightAt()` keying and hit cost. This remains a cross-cutting hotspot for combat and terrain paths even after AI query consolidation.
 3. `TerrainRaycastRuntime` near-field rebuild bursts and the terrain height-sampling path in `open_frontier`, `frontier30m`, and `a_shau_valley`.
 4. A Shau `WarSim` steady-state cost and large heap waves once terrain tails are reduced enough to isolate strategy work more cleanly.
@@ -184,7 +203,7 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
 ## Frontier Technology Fit (Measured, Not Adopted)
 
 - High-fit, low-friction now:
-  - off-frame work reduction around `CombatantLODManager.updateCombatantVisualOnly()` and spacing-force paths
+  - more selective off-frame work reduction around `CombatantLODManager.updateCombatantVisualOnly()`; the first friendly-spacing skip attempt was reverted
   - data-oriented keying / lower-churn cache strategy for `HeightQueryCache`
   - scheduling or throttling around near-field terrain rebuild work
 - Medium-fit after JS-level cleanup:
