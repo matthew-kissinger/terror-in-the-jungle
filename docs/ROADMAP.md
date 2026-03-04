@@ -23,8 +23,8 @@ Vietnam War is the first theater. The architecture should generalize to any war 
 | Weapons | 4 player + 2 NPC types | No loadout selection, all weapons always available |
 | AI | 8-state FSM, 2 factions (US/OPFOR) | No vehicle usage, no turret manning, limited tactical intelligence |
 | Squad | 5 commands via Z-menu | Conflicting mobile/PC controls, dead code paths, radial menu race condition on touch |
-| Terrain | Noise + DEM chunking | Single ground texture, no biome variation, no terrain engine module |
-| Vegetation | 7 billboard types | Old assets, uniform distribution, no biome awareness |
+| Terrain | Noise + DEM terrain runtime | CDLOD transition validation and hydrology/gameplay integration are still incomplete |
+| Vegetation | 7+ billboard types with biome-aware runtime wiring | Needs in-engine smoke validation and visual tuning across modes |
 | Water | Global plane + shader rivers | No swimming, no boats, disabled in A Shau, shader is basic |
 | Assets | 75 GLBs generated (not yet integrated), all in-engine still procedural | Models staged in `deploy-3d-assets/`, engine still uses boxes/cylinders |
 | HUD/UI | UI Engine Phases 0-7 complete (CSS Modules + signals) | Squad UI scattered, no RTS command surface, no vehicle weapon HUD |

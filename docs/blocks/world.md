@@ -55,7 +55,7 @@ Config resolution: `getGameModeConfig(mode)` in [config/gameModes.ts](https://gi
 |---|---|---|
 | spatialQueryProvider | SpatialGridManager (ISpatialQuery) | setter (ZoneCaptureLogic) |
 | GameModeConfig | GameModeManager / getGameModeConfig() | constructor (ZoneInitializer) |
-| HeightQueryCache | TerrainSystem | setter (ZoneTerrainAdapter) |
+| HeightQueryCache | Terrain domain | direct query service (ZoneTerrainAdapter) |
 | scene (THREE.Scene) | GameRenderer | constructor (ZoneRenderer, GPUBillboardSystem) |
 | TicketSystem ref | ZoneManager | setter (TicketBleedCalculator reads zone state) |
 | gameEndCallback | GameEngine bootstrap | setter (VictoryConditions) |

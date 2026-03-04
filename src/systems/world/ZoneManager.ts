@@ -4,13 +4,12 @@ import { GameSystem } from '../../types';
 import { CombatantSystem } from '../combat/CombatantSystem';
 import { Faction, CombatantState, isBlufor, isOpfor } from '../combat/types';
 import { spatialGridManager, SpatialGridManager } from '../combat/SpatialGridManager';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { ZoneRenderer } from './ZoneRenderer';
 import { ZoneCaptureLogic } from './ZoneCaptureLogic';
 import { ZoneTerrainAdapter } from './ZoneTerrainAdapter';
 import { ZoneInitializer } from './ZoneInitializer';
 import { GameModeConfig } from '../../config/gameModeTypes';
-import { IHUDSystem } from '../../types/SystemInterfaces';
+import type { IHUDSystem, ITerrainRuntime } from '../../types/SystemInterfaces';
 
 export enum ZoneState {
   NEUTRAL = 'neutral',
@@ -53,7 +52,7 @@ export class ZoneManager implements GameSystem {
   private scene: THREE.Scene;
   private zones: Map<string, CaptureZone> = new Map();
   private combatantSystem?: CombatantSystem;
-  private chunkManager?: ImprovedChunkManager;
+  private terrainSystem?: ITerrainRuntime;
   private spatialGridManager: SpatialGridManager = spatialGridManager;
   private spatialQueryProvider: ((center: THREE.Vector3, radius: number) => string[]) | null = null;
   private playerPosition = new THREE.Vector3();
@@ -87,12 +86,12 @@ export class ZoneManager implements GameSystem {
 
   async init(): Promise<void> {
     Logger.info('world', ' Initializing Zone Manager...');
-    Logger.info('world', ' Zone Manager initialized, waiting for ChunkManager connection...');
+    Logger.info('world', ' Zone Manager initialized, waiting for terrain runtime connection...');
   }
 
 
   private updateZonePositions(): void {
-    if (!this.chunkManager) return;
+    if (!this.terrainSystem) return;
 
     this.zones.forEach(zone => {
       const terrainHeight = this.terrainAdapter.getTerrainHeight(zone.position.x, zone.position.z);
@@ -255,7 +254,7 @@ export class ZoneManager implements GameSystem {
   }
 
   initializeZones(): void {
-    if (this.zones.size === 0 && this.chunkManager) {
+    if (this.zones.size === 0 && this.terrainSystem) {
       Logger.info('world', ' Creating zones with terrain mapping...');
       this.zoneInitializer.createDefaultZones(this.zones, this.occupants);
 
@@ -301,9 +300,10 @@ export class ZoneManager implements GameSystem {
     this.camera = camera;
   }
 
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.chunkManager = chunkManager;
-    Logger.info('world', 'ChunkManager connected to ZoneManager');
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
+    this.terrainAdapter.setTerrainSystem(terrainSystem);
+    Logger.info('world', 'TerrainSystem connected to ZoneManager');
   }
 
   setSpatialGridManager(manager: SpatialGridManager): void {

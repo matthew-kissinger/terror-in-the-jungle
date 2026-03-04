@@ -15,6 +15,8 @@ export interface BiomeConfig {
   id: string;
   name: string;
   groundTexture: string;     // AssetLoader texture key for terrain
+  groundTileScale: number;   // UV repeat per world unit
+  groundRoughness: number;
   vegetationPalette: BiomeVegetationEntry[];
 }
 
@@ -39,6 +41,8 @@ export const BIOME_DENSE_JUNGLE: BiomeConfig = {
   id: 'denseJungle',
   name: 'Dense Jungle',
   groundTexture: 'jungle-floor',
+  groundTileScale: 0.1,
+  groundRoughness: 0.85,
   vegetationPalette: [
     { typeId: 'fern',          densityMultiplier: 1.0 },
     { typeId: 'elephantEar',   densityMultiplier: 1.0 },
@@ -58,6 +62,8 @@ export const BIOME_HIGHLAND: BiomeConfig = {
   id: 'highland',
   name: 'Highland',
   groundTexture: 'rocky-highland',
+  groundTileScale: 0.08,
+  groundRoughness: 0.78,
   vegetationPalette: [
     { typeId: 'fern',          densityMultiplier: 0.6 },
     { typeId: 'elephantGrass', densityMultiplier: 0.5 },
@@ -72,6 +78,8 @@ export const BIOME_RICE_PADDY: BiomeConfig = {
   id: 'ricePaddy',
   name: 'Rice Paddy',
   groundTexture: 'rice-paddy',
+  groundTileScale: 0.12,
+  groundRoughness: 0.95,
   vegetationPalette: [
     { typeId: 'ricePaddyPlants', densityMultiplier: 1.5 },
     { typeId: 'elephantGrass',   densityMultiplier: 0.4 },
@@ -83,6 +91,8 @@ export const BIOME_RIVERBANK: BiomeConfig = {
   id: 'riverbank',
   name: 'Riverbank',
   groundTexture: 'river-bank',
+  groundTileScale: 0.1,
+  groundRoughness: 0.9,
   vegetationPalette: [
     { typeId: 'elephantEar',   densityMultiplier: 1.2 },
     { typeId: 'fanPalm',      densityMultiplier: 0.8 },
@@ -96,6 +106,8 @@ export const BIOME_CLEARED: BiomeConfig = {
   id: 'cleared',
   name: 'Cleared Area',
   groundTexture: 'firebase-ground',
+  groundTileScale: 0.1,
+  groundRoughness: 0.88,
   vegetationPalette: [
     { typeId: 'elephantGrass', densityMultiplier: 0.3 },
   ],
@@ -105,6 +117,8 @@ export const BIOME_TALL_GRASS: BiomeConfig = {
   id: 'tallGrass',
   name: 'Tall Grass',
   groundTexture: 'tall-grass',
+  groundTileScale: 0.1,
+  groundRoughness: 0.87,
   vegetationPalette: [
     { typeId: 'elephantGrass', densityMultiplier: 1.5 },
     { typeId: 'fern',          densityMultiplier: 0.4 },
@@ -116,6 +130,8 @@ export const BIOME_MUD_TRAIL: BiomeConfig = {
   id: 'mudTrail',
   name: 'Mud Trail',
   groundTexture: 'mud-ground',
+  groundTileScale: 0.12,
+  groundRoughness: 0.92,
   vegetationPalette: [
     { typeId: 'fern',          densityMultiplier: 0.2 },
     { typeId: 'elephantGrass', densityMultiplier: 0.1 },
@@ -126,6 +142,8 @@ export const BIOME_BAMBOO_GROVE: BiomeConfig = {
   id: 'bambooGrove',
   name: 'Bamboo Grove',
   groundTexture: 'bamboo-floor',
+  groundTileScale: 0.11,
+  groundRoughness: 0.84,
   vegetationPalette: [
     { typeId: 'bambooGrove',   densityMultiplier: 2.0 },
     { typeId: 'fern',          densityMultiplier: 0.8 },
@@ -137,6 +155,8 @@ export const BIOME_SWAMP: BiomeConfig = {
   id: 'swamp',
   name: 'Swamp',
   groundTexture: 'swamp',
+  groundTileScale: 0.14,
+  groundRoughness: 0.96,
   vegetationPalette: [
     { typeId: 'mangrove',      densityMultiplier: 1.2 },
     { typeId: 'elephantEar',   densityMultiplier: 0.8 },
@@ -148,6 +168,8 @@ export const BIOME_DEFOLIATED: BiomeConfig = {
   id: 'defoliated',
   name: 'Defoliated Zone',
   groundTexture: 'defoliated-ground',
+  groundTileScale: 0.1,
+  groundRoughness: 0.9,
   vegetationPalette: [
     { typeId: 'elephantGrass', densityMultiplier: 0.1 },
   ],
@@ -167,9 +189,13 @@ export const BIOMES: Record<string, BiomeConfig> = {
   [BIOME_DEFOLIATED.id]:   BIOME_DEFOLIATED,
 };
 
-/** Resolve a BiomeConfig by id, falling back to denseJungle. */
+/** Resolve a BiomeConfig by id and fail fast when configuration is invalid. */
 export function getBiome(id: string): BiomeConfig {
-  return BIOMES[id] ?? BIOME_DENSE_JUNGLE;
+  const biome = BIOMES[id];
+  if (!biome) {
+    throw new Error(`Unknown biome id: ${id}`);
+  }
+  return biome;
 }
 
 /**

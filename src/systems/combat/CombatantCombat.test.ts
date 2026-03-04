@@ -11,7 +11,7 @@ import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
 import { CombatantRenderer } from './CombatantRenderer';
 import { IHUDSystem } from '../../types/SystemInterfaces';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import { TerrainSystem } from '../terrain/TerrainSystem';
 
 // Mock dependencies
 const mockTracerPool: TracerPool = {
@@ -50,7 +50,7 @@ const mockHUDSystem: IHUDSystem = {
   addKillToFeed: vi.fn(),
 } as any;
 
-const mockChunkManager: ImprovedChunkManager = {
+const mockTerrainSystem: TerrainSystem = {
   raycastTerrain: vi.fn(() => ({ hit: false, distance: undefined })),
   getEffectiveHeightAt: vi.fn(() => -1000),
 } as any;
@@ -136,7 +136,7 @@ describe('CombatantCombat', () => {
     combatantCombat.setTicketSystem(mockTicketSystem);
     combatantCombat.setAudioManager(mockAudioManager);
     combatantCombat.setHUDSystem(mockHUDSystem);
-    combatantCombat.setChunkManager(mockChunkManager);
+    combatantCombat.setTerrainSystem(mockTerrainSystem);
 
     // Reset all mocks
     vi.clearAllMocks();
@@ -541,7 +541,7 @@ describe('CombatantCombat', () => {
         distance: 20,
         headshot: false,
       });
-      (mockChunkManager.raycastTerrain as any).mockReturnValue({
+      (mockTerrainSystem.raycastTerrain as any).mockReturnValue({
         hit: true,
         point: new THREE.Vector3(8, 0, 0),
         distance: 8
@@ -559,7 +559,7 @@ describe('CombatantCombat', () => {
       const ray = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0));
 
       vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue(null);
-      (mockChunkManager.raycastTerrain as any).mockReturnValue({
+      (mockTerrainSystem.raycastTerrain as any).mockReturnValue({
         hit: true,
         point: new THREE.Vector3(12, 0, 0),
         distance: 12
@@ -583,8 +583,8 @@ describe('CombatantCombat', () => {
         distance: 40,
         headshot: false,
       });
-      (mockChunkManager.raycastTerrain as any).mockReturnValue({ hit: false, distance: undefined });
-      (mockChunkManager.getEffectiveHeightAt as any).mockImplementation((x: number) => (x >= 12 ? 1.5 : 0));
+      (mockTerrainSystem.raycastTerrain as any).mockReturnValue({ hit: false, distance: undefined });
+      (mockTerrainSystem.getEffectiveHeightAt as any).mockImplementation((x: number) => (x >= 12 ? 1.5 : 0));
 
       const result = combatantCombat.handlePlayerShot(ray, () => 50, allCombatants);
 
@@ -671,7 +671,7 @@ describe('CombatantCombat', () => {
     });
 
     it('should set ChunkManager', () => {
-      combatantCombat.setChunkManager(mockChunkManager);
+      combatantCombat.setTerrainSystem(mockTerrainSystem);
       expect(combatantCombat).toBeDefined();
     });
 
@@ -757,7 +757,7 @@ describe('CombatantCombat', () => {
       const squads = new Map();
 
       // Mock terrain as blocking the shot
-      (mockChunkManager.raycastTerrain as any).mockReturnValue({
+      (mockTerrainSystem.raycastTerrain as any).mockReturnValue({
         hit: true,
         distance: 10,
       });

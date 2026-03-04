@@ -1,21 +1,34 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
-import { getHeightQueryCache } from '../terrain/HeightQueryCache';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
 export class ZoneTerrainAdapter {
+  private terrainSystem?: ITerrainRuntime;
+
   constructor() {
-    // No longer needs chunkManager dependency
+    // Zone placement requires the live terrain runtime height authority.
+  }
+
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
+  }
+
+  private requireTerrainSystem(): ITerrainRuntime {
+    if (!this.terrainSystem) {
+      throw new Error('ZoneTerrainAdapter requires terrainSystem before terrain queries');
+    }
+    return this.terrainSystem;
   }
 
   findSuitableZonePosition(desiredPosition: THREE.Vector3, searchRadius: number): THREE.Vector3 {
-    const heightCache = getHeightQueryCache();
+    const terrainSystem = this.requireTerrainSystem();
 
     let bestPosition = desiredPosition.clone();
     let bestSlope = Infinity;
     const sampleCount = 12;
 
     // Test the desired position first
-    const centerHeight = heightCache.getHeightAt(desiredPosition.x, desiredPosition.z);
+    const centerHeight = terrainSystem.getHeightAt(desiredPosition.x, desiredPosition.z);
     const centerSlope = this.calculateTerrainSlope(desiredPosition.x, desiredPosition.z);
     bestPosition.y = centerHeight;
     bestSlope = centerSlope;
@@ -27,7 +40,7 @@ export class ZoneTerrainAdapter {
       const testX = desiredPosition.x + Math.cos(angle) * distance;
       const testZ = desiredPosition.z + Math.sin(angle) * distance;
 
-      const height = heightCache.getHeightAt(testX, testZ);
+      const height = terrainSystem.getHeightAt(testX, testZ);
       const slope = this.calculateTerrainSlope(testX, testZ);
 
       // Prefer flatter terrain (lower slope) and avoid water
@@ -50,7 +63,7 @@ export class ZoneTerrainAdapter {
         for (let attempt = 0; attempt < 5; attempt++) {
           const testX = -80 + attempt * 10;
           const testZ = 30 + attempt * 10;
-          const testHeight = heightCache.getHeightAt(testX, testZ);
+          const testHeight = terrainSystem.getHeightAt(testX, testZ);
 
           if (testHeight > -2 && testHeight < 30) {
             bestPosition = new THREE.Vector3(testX, testHeight, testZ);
@@ -65,15 +78,15 @@ export class ZoneTerrainAdapter {
   }
 
   private calculateTerrainSlope(x: number, z: number): number {
-    const heightCache = getHeightQueryCache();
+    const terrainSystem = this.requireTerrainSystem();
     const sampleDistance = 5;
-    const centerHeight = heightCache.getHeightAt(x, z);
+    const centerHeight = terrainSystem.getHeightAt(x, z);
 
     // Sample heights in 4 directions
-    const northHeight = heightCache.getHeightAt(x, z + sampleDistance);
-    const southHeight = heightCache.getHeightAt(x, z - sampleDistance);
-    const eastHeight = heightCache.getHeightAt(x + sampleDistance, z);
-    const westHeight = heightCache.getHeightAt(x - sampleDistance, z);
+    const northHeight = terrainSystem.getHeightAt(x, z + sampleDistance);
+    const southHeight = terrainSystem.getHeightAt(x, z - sampleDistance);
+    const eastHeight = terrainSystem.getHeightAt(x + sampleDistance, z);
+    const westHeight = terrainSystem.getHeightAt(x - sampleDistance, z);
 
     // Calculate maximum height difference (slope)
     const maxDifference = Math.max(
@@ -87,7 +100,7 @@ export class ZoneTerrainAdapter {
   }
 
   getTerrainHeight(x: number, z: number): number {
-    return getHeightQueryCache().getHeightAt(x, z);
+    return this.requireTerrainSystem().getHeightAt(x, z);
   }
 
 }

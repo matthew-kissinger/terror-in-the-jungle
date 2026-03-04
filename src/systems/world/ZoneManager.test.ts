@@ -37,7 +37,7 @@ vi.mock('./ZoneCaptureLogic', () => ({
 vi.mock('./ZoneTerrainAdapter', () => ({
   ZoneTerrainAdapter: class {
     getTerrainHeight = vi.fn(() => 0);
-    setChunkManager = vi.fn();
+    setTerrainSystem = vi.fn();
   },
 }));
 
@@ -86,9 +86,9 @@ describe('ZoneManager', () => {
       await expect(zoneManager.init()).resolves.toBeUndefined();
     });
 
-    it('should create zones when initializeZones is called with chunk manager', () => {
-      const mockChunkManager = { getHeightAt: vi.fn(() => 0) } as any;
-      zoneManager.setChunkManager(mockChunkManager);
+    it('should create zones when initializeZones is called with terrain system', () => {
+      const mockTerrainSystem = { getHeightAt: vi.fn(() => 0) } as any;
+      zoneManager.setTerrainSystem(mockTerrainSystem);
       zoneManager.initializeZones();
       
       // Should have called createDefaultZones
@@ -635,8 +635,8 @@ describe('ZoneManager', () => {
       zoneManager['zones'].set(zone.id, zone);
       zoneManager['occupants'].set(zone.id, { us: 0, opfor: 0 });
 
-      const mockChunkManager = { getHeightAt: vi.fn(() => 5) } as any;
-      zoneManager.setChunkManager(mockChunkManager);
+      const mockTerrainSystem = { getHeightAt: vi.fn(() => 5) } as any;
+      zoneManager.setTerrainSystem(mockTerrainSystem);
 
       zoneManager['terrainAdapter'].getTerrainHeight = vi.fn(() => 5);
 

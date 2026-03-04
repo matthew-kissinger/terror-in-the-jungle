@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { Combatant, CombatantState, Faction, Squad, SquadCommand, isBlufor } from './types'
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager'
+import type { ITerrainRuntime } from '../../types/SystemInterfaces'
 import { SandbagSystem } from '../weapons/SandbagSystem'
 import { SmokeCloudSystem } from '../effects/SmokeCloudSystem'
 import { ISpatialQuery } from './SpatialOctree'
@@ -383,10 +383,10 @@ export class CombatantAI {
   }
 
   // Dependency injection
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.targeting.setChunkManager(chunkManager)
-    this.coverSystem.setChunkManager(chunkManager)
-    this.flankingSystem.setChunkManager(chunkManager)
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.targeting.setTerrainSystem(terrainSystem)
+    this.coverSystem.setTerrainSystem(terrainSystem)
+    this.flankingSystem.setTerrainSystem(terrainSystem)
   }
 
   setEngagementRange(range: number): void {

@@ -42,7 +42,7 @@ export class PerformanceTelemetry {
     hitsThisSession: 0
   }
 
-  // Terrain merger telemetry (updated externally by chunk manager)
+  // Terrain runtime telemetry (updated externally by terrain runtime integration)
   private terrainMergerTelemetry: TerrainMergerTelemetry | null = null
 
   // Sub-modules
@@ -188,7 +188,7 @@ export class PerformanceTelemetry {
   }
 
   /**
-   * Update terrain merger telemetry (called by chunk manager)
+   * Update terrain merger telemetry (called by terrain runtime integration)
    */
   updateTerrainMergerTelemetry(telemetry: TerrainMergerTelemetry | null): void {
     this.terrainMergerTelemetry = telemetry

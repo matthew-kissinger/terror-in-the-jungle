@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { TicketSystem } from '../world/TicketSystem';
 import { PlayerHealthSystem } from '../player/PlayerHealthSystem';
 import { ZoneManager } from '../world/ZoneManager';
@@ -30,11 +30,11 @@ export class CombatantSystemSetters {
     private lodManager: CombatantLODManager
   ) {}
 
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.combatantMovement.setChunkManager(chunkManager);
-    this.squadManager.setChunkManager(chunkManager);
-    this.combatantAI.setChunkManager(chunkManager);
-    this.combatantCombat.setChunkManager(chunkManager);
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.combatantMovement.setTerrainSystem(terrainSystem);
+    this.squadManager.setTerrainSystem(terrainSystem);
+    this.combatantAI.setTerrainSystem(terrainSystem);
+    this.combatantCombat.setTerrainSystem(terrainSystem);
   }
 
   setCamera(camera: THREE.Camera): void {

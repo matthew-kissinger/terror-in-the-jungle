@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { Logger } from '../../utils/Logger';
 import { IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
 import { shouldUseTouchControls } from '../../utils/DeviceDetector';
@@ -9,7 +9,7 @@ export class HelicopterInteraction {
   private helicopters: Map<string, THREE.Group>;
   private playerController?: IPlayerController;
   private hudSystem?: IHUDSystem;
-  private terrainManager?: ImprovedChunkManager;
+  private terrainManager?: ITerrainRuntime;
   private playerInput?: PlayerInput;
   private interactionRadius: number;
   private isPlayerNearHelicopter = false;
@@ -35,7 +35,7 @@ export class HelicopterInteraction {
     this.hudSystem = hudSystem;
   }
 
-  setTerrainManager(terrainManager: ImprovedChunkManager): void {
+  setTerrainManager(terrainManager: ITerrainRuntime): void {
     this.terrainManager = terrainManager;
   }
 

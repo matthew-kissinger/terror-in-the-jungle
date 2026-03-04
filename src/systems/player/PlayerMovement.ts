@@ -2,7 +2,7 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { PlayerState } from '../../types';
 import { HelicopterControls } from '../helicopter/HelicopterPhysics';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { FootstepAudioSystem } from '../audio/FootstepAudioSystem';
 import { PlayerInput } from './PlayerInput';
@@ -17,7 +17,7 @@ const _upVector = new THREE.Vector3(0, 1, 0);
 
 export class PlayerMovement {
   private playerState: PlayerState;
-  private chunkManager?: ImprovedChunkManager;
+  private terrainSystem?: ITerrainRuntime;
   private sandbagSystem?: SandbagSystem;
   private footstepAudioSystem?: FootstepAudioSystem;
   private helicopterModel?: IHelicopterModel;
@@ -35,8 +35,8 @@ export class PlayerMovement {
     this.playerState = playerState;
   }
 
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.chunkManager = chunkManager;
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
   }
 
   setSandbagSystem(sandbagSystem: SandbagSystem): void {
@@ -181,18 +181,13 @@ export class PlayerMovement {
       }
     }
 
-    // Check ground collision using ImprovedChunkManager if available, otherwise use flat baseline
+    // Check ground collision using TerrainSystem if available, otherwise use flat baseline
     // getEffectiveHeightAt includes collision objects (helipad, helicopter, etc.)
     let groundHeight = 2; // Default player height above ground (flat world fallback)
-    if (this.chunkManager) {
-      const resolver =
-        (this.chunkManager as any).getEffectiveHeightAt
-        ?? (this.chunkManager as any).getHeightAt;
-      if (typeof resolver === 'function') {
-        const terrainHeight = Number(resolver.call(this.chunkManager, newPosition.x, newPosition.z));
-        if (Number.isFinite(terrainHeight)) {
-          groundHeight = terrainHeight + 2;
-        }
+    if (this.terrainSystem) {
+      const terrainHeight = Number(this.terrainSystem.getEffectiveHeightAt(newPosition.x, newPosition.z));
+      if (Number.isFinite(terrainHeight)) {
+        groundHeight = terrainHeight + 2;
       }
     }
 

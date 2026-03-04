@@ -1,11 +1,10 @@
 import * as THREE from 'three';
 import { Combatant, CombatantState, Faction, Squad, isBlufor } from './types';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { ZoneManager } from '../world/ZoneManager';
 import { TicketSystem } from '../world/TicketSystem';
 import { GameModeManager } from '../world/GameModeManager';
 import { clusterManager } from './ClusterManager';
-import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 import { SpatialGridManager } from './SpatialGridManager';
 import {
   updateCombatMovement,
@@ -16,15 +15,15 @@ import {
 
 export class CombatantMovement {
   private static readonly TAU = Math.PI * 2;
-  private chunkManager?: ImprovedChunkManager;
+  private terrainSystem?: ITerrainRuntime;
   private zoneManager?: ZoneManager;
   private ticketSystem?: TicketSystem;
   private gameModeManager?: GameModeManager;
   private spatialGridManager?: SpatialGridManager;
   private readonly _spacingForce = new THREE.Vector3();
 
-  constructor(chunkManager?: ImprovedChunkManager, zoneManager?: ZoneManager) {
-    this.chunkManager = chunkManager;
+  constructor(terrainSystem?: ITerrainRuntime, zoneManager?: ZoneManager) {
+    this.terrainSystem = terrainSystem;
     this.zoneManager = zoneManager;
   }
 
@@ -116,8 +115,10 @@ export class CombatantMovement {
 
 
   private getTerrainHeight(x: number, z: number): number {
-    // Use HeightQueryCache - always returns valid height from noise
-    return getHeightQueryCache().getHeightAt(x, z);
+    if (!this.terrainSystem) {
+      throw new Error('CombatantMovement requires terrainSystem before terrain height queries');
+    }
+    return this.terrainSystem.getHeightAt(x, z);
   }
 
   private getTerrainHeightForCombatant(combatant: Combatant): number {
@@ -154,8 +155,8 @@ export class CombatantMovement {
     return nextHeight;
   }
 
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.chunkManager = chunkManager;
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
   }
 
   setZoneManager(zoneManager: ZoneManager): void {

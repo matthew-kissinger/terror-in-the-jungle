@@ -1,7 +1,7 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { IChunkManager, IAudioManager, IGameRenderer } from '../../types/SystemInterfaces';
+import { ITerrainRuntime, IAudioManager, IGameRenderer } from '../../types/SystemInterfaces';
 import { WeatherState, WeatherConfig } from '../../config/gameModeTypes';
 import { updateLightning, LightningState } from './WeatherLightning';
 import { updateAtmosphere, getBlendedRainIntensity, AtmosphereBaseValues } from './WeatherAtmosphere';
@@ -10,7 +10,7 @@ import { estimateGPUTier, isMobileGPU } from '../../utils/DeviceDetector';
 export class WeatherSystem implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
-  private chunkManager: IChunkManager;
+  private terrainRuntime: ITerrainRuntime;
   private audioManager?: IAudioManager;
   private renderer?: IGameRenderer;
 
@@ -52,10 +52,10 @@ export class WeatherSystem implements GameSystem {
   private baseFogColor: number = 0x3a5a4a; // Green-gray fog
   private baseAmbientColor: number = 0x6a8a7a; // Warm green ambient
 
-  constructor(scene: THREE.Scene, camera: THREE.Camera, chunkManager: IChunkManager) {
+  constructor(scene: THREE.Scene, camera: THREE.Camera, terrainRuntime: ITerrainRuntime) {
     this.scene = scene;
     this.camera = camera;
-    this.chunkManager = chunkManager;
+    this.terrainRuntime = terrainRuntime;
     this.rainCount = this.calculateRainCount();
     this.rainVelocities = new Float32Array(this.rainCount);
     this.rainPositions = new Float32Array(this.rainCount * 3);

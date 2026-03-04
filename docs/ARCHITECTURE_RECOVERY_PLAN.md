@@ -1,6 +1,6 @@
 # Architecture Recovery Plan
 
-Last updated: 2026-02-27
+Last updated: 2026-03-04
 Scope: runtime architecture stabilization with performance and gameplay fidelity gates.
 
 ## Current Goal
@@ -17,7 +17,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 | P2 | Heap growth triage in combat-heavy runs | IN_PROGRESS | New diagnostics added; source still mixed between transient waves and retained growth. |
 | P3 | A Shau gameplay flow and contact reliability | IN_PROGRESS | Immediate contact improved; sustained close-contact remains inconsistent. |
 | P4 | UI/HUD update budget discipline | DONE | UI Engine Phases 0-7 complete. 11 UIComponents migrated to CSS Modules + signals. Grid layout with 17 named slots. VisibilityManager wired. All touch controls on pointer events as UIComponent subclasses. UnifiedWeaponBar replaces 3 duplicates. Renderer subscribes to ViewportManager. 12 dead component files + 7 dead style files deleted. |
-| P5 | Terrain/chunk lifecycle bounded work | TODO | Keep chunk generation/merge costs under frame budget at large map scale. |
+| P5 | Terrain runtime stabilization | IN_PROGRESS | Terrain rewrite is active under `TERRAIN_REWRITE_MASTER_PLAN.md`: world-size authority, truthful terrain API, biome/vegetation runtime wiring, terrain block-boundary cleanup, and large-world startup cost reduction validated in preview smoke. |
 
 ## Keep Decisions (Recent)
 
@@ -41,7 +41,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: HUDElements.attachToDOM() requires HUDLayout (no body-mount fallback).
 - Keep: WeaponFiring.fire() deprecated method + fireSingleShot/fireShotgunPellets removed; executeShot() is the sole API.
 - Keep: ZoneManager spatial query resilience fallback removed; SpatialGridManager is trusted as sole spatial authority.
-- Keep: ZoneTerrainAdapter.setChunkManager() no-op removed (uses HeightQueryCache).
+- Keep: ZoneTerrainAdapter no longer carries terrain-manager setter baggage; it uses canonical terrain height queries directly.
 - Keep: createUH1HueyGeometry() legacy wrapper removed (createHelicopterGeometry is the API).
 - Keep: FirstPersonWeapon.setEnemySystem() deprecated stub removed.
 - Keep: HUDElements.combatStats placeholder div removed (was hidden, never updated).
@@ -59,6 +59,9 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: VoiceCalloutSystem.test.ts deleted (1 trivial test for disabled system).
 - Keep: UI_ENGINE_PLAN.md archived to docs/archive/ (completed project, 1302 lines).
 - Keep: PROFILING_HARNESS.md updated with perf:quick, perf:compare, perf:update-baseline commands; stale spatial feature flag env vars removed.
+- Keep: terrain startup no longer double-rebakes the render surface at mode start after a world-size change; `GameEngineInit` now lets `setWorldSize()` own that rebake path.
+- Keep: large-world terrain surface bake budget is scale-aware instead of fixed. `TerrainSurfaceRuntime` now reduces the render-only bake grid at A Shau scale from `1024` to `512`, while gameplay height authority remains on `HeightQueryCache`.
+- Keep: `TerrainRaycastRuntime` no longer computes unused vertex normals for the near-field LOS mesh.
 
 ## Deferred Decisions
 
@@ -69,6 +72,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - High-intensity runs can still show heap growth warnings.
 - A/B startup variance can hide small wins/losses.
 - ZoneManager no longer falls back to linear scan if spatial query returns empty; if SpatialGridManager has sync bugs, zone capture may stall.
+- The immediate A Shau terrain-startup spike has improved in preview smoke, but this is not yet a substitute for broader perf-harness evidence under sustained combat and camera motion.
 
 ## Required Evidence For Major Changes
 
@@ -81,6 +85,8 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 1. Isolate retained heap growth sources with focused captures and subsystem counters.
 2. Complete A Shau contact-flow loop so player reaches and sustains skirmish pressure without harness warps.
 3. Re-baseline and lock regression checks after each accepted change.
+4. Keep terrain rewrite progress aligned with `TERRAIN_REWRITE_MASTER_PLAN.md`; do not reintroduce chunk-era semantics into active runtime code.
+5. Re-run matched perf captures after the terrain startup-path changes so the recovery plan has sustained evidence, not just preview smoke evidence.
 
 ## Update Rule
 

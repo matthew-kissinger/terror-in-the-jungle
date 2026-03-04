@@ -1,8 +1,7 @@
 import * as THREE from 'three';
 import { Combatant } from '../types';
-import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager';
+import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
-import { getHeightQueryCache } from '../../terrain/HeightQueryCache';
 
 // Module-level scratch vectors for cover finding
 const _sandbagCenter = new THREE.Vector3();
@@ -26,11 +25,11 @@ const _ray = new THREE.Ray();
  * Handles cover finding and cover viability checks
  */
 export class AICoverFinding {
-  private chunkManager?: ImprovedChunkManager;
+  private terrainSystem?: ITerrainRuntime;
   private sandbagSystem?: SandbagSystem;
 
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.chunkManager = chunkManager;
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
   }
 
   setSandbagSystem(sandbagSystem: SandbagSystem): void {
@@ -115,7 +114,7 @@ export class AICoverFinding {
     }
 
     // Check vegetation cover
-    if (this.chunkManager) {
+    if (this.terrainSystem) {
       const vegetationCover = this.findVegetationCover(combatant.position, threatPosition, MAX_SEARCH_RADIUS);
 
       for (const vegPos of vegetationCover) {
@@ -143,7 +142,7 @@ export class AICoverFinding {
     }
 
     // Check terrain cover
-    if (this.chunkManager) {
+    if (this.terrainSystem) {
       for (let i = 0; i < SEARCH_SAMPLES; i++) {
         const angle = (i / SEARCH_SAMPLES) * Math.PI * 2;
 
@@ -154,7 +153,7 @@ export class AICoverFinding {
             combatant.position.z + Math.sin(angle) * radius
           );
 
-          const terrainHeight = getHeightQueryCache().getHeightAt(_testPos.x, _testPos.z);
+          const terrainHeight = this.terrainSystem.getHeightAt(_testPos.x, _testPos.z);
           _testPos.y = terrainHeight;
 
           if (this.isPositionCover(_testPos, combatant.position, threatPosition)) {
@@ -197,7 +196,7 @@ export class AICoverFinding {
     threatPosition: THREE.Vector3,
     searchRadius: number
   ): THREE.Vector3[] {
-    if (!this.chunkManager) return [];
+    if (!this.terrainSystem) return [];
 
     const coverPositions: THREE.Vector3[] = [];
     const VEGETATION_COVER_DISTANCE = 3;
@@ -219,12 +218,12 @@ export class AICoverFinding {
         const distanceSq = position.distanceToSquared(samplePos);
         if (distanceSq > searchRadiusSq || distanceSq < 9) continue;
 
-        const localHeight = getHeightQueryCache().getHeightAt(samplePos.x, samplePos.z);
+        const localHeight = this.terrainSystem.getHeightAt(samplePos.x, samplePos.z);
         const surroundingHeights = [
-          getHeightQueryCache().getHeightAt(samplePos.x + 2, samplePos.z),
-          getHeightQueryCache().getHeightAt(samplePos.x - 2, samplePos.z),
-          getHeightQueryCache().getHeightAt(samplePos.x, samplePos.z + 2),
-          getHeightQueryCache().getHeightAt(samplePos.x, samplePos.z - 2)
+          this.terrainSystem.getHeightAt(samplePos.x + 2, samplePos.z),
+          this.terrainSystem.getHeightAt(samplePos.x - 2, samplePos.z),
+          this.terrainSystem.getHeightAt(samplePos.x, samplePos.z + 2),
+          this.terrainSystem.getHeightAt(samplePos.x, samplePos.z - 2)
         ];
 
         const avgHeight = surroundingHeights.reduce((a, b) => a + b, 0) / surroundingHeights.length;
@@ -239,7 +238,7 @@ export class AICoverFinding {
 
           const coverPos = _coverPos;
           coverPos.copy(samplePos).addScaledVector(threatToVeg, VEGETATION_COVER_DISTANCE);
-          coverPos.y = getHeightQueryCache().getHeightAt(coverPos.x, coverPos.z);
+          coverPos.y = this.terrainSystem.getHeightAt(coverPos.x, coverPos.z);
 
           _coverToSample.subVectors(samplePos, coverPos).normalize();
           _coverToThreat.subVectors(threatPosition, coverPos).normalize();
@@ -260,7 +259,7 @@ export class AICoverFinding {
     combatantPos: THREE.Vector3,
     threatPos: THREE.Vector3
   ): boolean {
-    if (!this.chunkManager) {
+    if (!this.terrainSystem) {
       return false;
     }
 
@@ -279,7 +278,7 @@ export class AICoverFinding {
 
     _direction.subVectors(_coverEyePos, _threatEyePos).normalize();
 
-    const terrainHit = this.chunkManager.raycastTerrain(_threatEyePos, _direction, distance);
+    const terrainHit = this.terrainSystem.raycastTerrain(_threatEyePos, _direction, distance);
 
     return terrainHit.hit && terrainHit.distance! < distance - 1;
   }

@@ -5,7 +5,7 @@ import { AssetLoader } from '../systems/assets/AssetLoader';
 import { PlayerController } from '../systems/player/PlayerController';
 import { CombatantSystem } from '../systems/combat/CombatantSystem';
 import { Skybox } from '../systems/environment/Skybox';
-import { ImprovedChunkManager } from '../systems/terrain/ImprovedChunkManager';
+import { TerrainSystem } from '../systems/terrain/TerrainSystem';
 import { GlobalBillboardSystem } from '../systems/world/billboard/GlobalBillboardSystem';
 import { WaterSystem } from '../systems/environment/WaterSystem';
 import { FirstPersonWeapon } from '../systems/player/FirstPersonWeapon';
@@ -46,7 +46,7 @@ import { markStartup } from './StartupTelemetry';
 
 export interface SystemReferences {
   assetLoader: AssetLoader;
-  chunkManager: ImprovedChunkManager;
+  terrainSystem: TerrainSystem;
   globalBillboardSystem: GlobalBillboardSystem;
   playerController: PlayerController;
   combatantSystem: CombatantSystem;
@@ -122,7 +122,7 @@ export class SystemInitializer {
     const renderDistanceMultiplier = getRenderDistanceMultiplier();
     const adaptiveRenderDistance = Math.max(3, Math.round(baseRenderDistance * renderDistanceMultiplier));
     
-    refs.chunkManager = new ImprovedChunkManager(scene, camera, refs.assetLoader, refs.globalBillboardSystem, {
+    refs.terrainSystem = new TerrainSystem(scene, camera, refs.assetLoader, refs.globalBillboardSystem, {
       size: 64,
       renderDistance: adaptiveRenderDistance,
       loadDistance: adaptiveRenderDistance + 1,
@@ -151,11 +151,11 @@ export class SystemInitializer {
     onProgress('world', 0);
 
     refs.playerController = new PlayerController(camera);
-    refs.combatantSystem = new CombatantSystem(scene, camera, refs.globalBillboardSystem, refs.assetLoader, refs.chunkManager);
+    refs.combatantSystem = new CombatantSystem(scene, camera, refs.globalBillboardSystem, refs.assetLoader, refs.terrainSystem);
     refs.skybox = new Skybox(scene);
     refs.waterSystem = new WaterSystem(scene, camera, refs.assetLoader);
 
-    refs.weatherSystem = new WeatherSystem(scene, camera, refs.chunkManager);
+    refs.weatherSystem = new WeatherSystem(scene, camera, refs.terrainSystem);
     refs.firstPersonWeapon = new FirstPersonWeapon(scene, camera, refs.assetLoader);
     refs.zoneManager = new ZoneManager(scene);
     refs.ticketSystem = new TicketSystem();
@@ -174,9 +174,9 @@ export class SystemInitializer {
     refs.playerSquadController = new PlayerSquadController(squadManager);
     refs.inventoryManager = new InventoryManager();
     refs.inventoryManager.setSuppressUI(true); // UnifiedWeaponBar replaces built-in hotbar
-    refs.grenadeSystem = new GrenadeSystem(scene, camera, refs.chunkManager);
-    refs.mortarSystem = new MortarSystem(scene, camera, refs.chunkManager);
-    refs.sandbagSystem = new SandbagSystem(scene, camera, refs.chunkManager);
+    refs.grenadeSystem = new GrenadeSystem(scene, camera, refs.terrainSystem);
+    refs.mortarSystem = new MortarSystem(scene, camera, refs.terrainSystem);
+    refs.sandbagSystem = new SandbagSystem(scene, camera, refs.terrainSystem);
     refs.cameraShakeSystem = new CameraShakeSystem();
     refs.playerSuppressionSystem = new PlayerSuppressionSystem();
     refs.flashbangScreenEffect = new FlashbangScreenEffect();
@@ -198,7 +198,7 @@ export class SystemInitializer {
       refs.assetLoader,
       refs.audioManager,
       refs.globalBillboardSystem,
-      refs.chunkManager,
+      refs.terrainSystem,
       // gpuTerrain disabled
       refs.waterSystem,
       refs.weatherSystem,

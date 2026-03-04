@@ -11,8 +11,11 @@ export interface PerformanceStats {
   frameTimeMs: number;
   drawCalls: number;
   triangles: number;
-  chunkQueueSize: number;
-  loadedChunks: number;
+  terrainReady: boolean;
+  activeTerrainTiles: number;
+  terrainWorkerQueue: number;
+  terrainBusyWorkers: number;
+  terrainTotalWorkers: number;
   usCombatants: number;
   opforCombatants: number;
   vegetationActive: number;
@@ -34,11 +37,6 @@ export interface PerformanceStats {
   systemTimings?: SystemTiming[];
   gpuTimeMs?: number;
   gpuTimingAvailable?: boolean;
-  // Terrain mesh merger stats
-  terrainMergerRings?: number;
-  terrainMergerChunks?: number;
-  terrainMergerSavings?: number;
-  terrainMergerPending?: boolean;
 }
 
 interface BudgetBarRefs {
@@ -147,10 +145,8 @@ export class PerformanceOverlay {
         : `GPU: N/A (extension not supported)`,
       `Draw Calls: ${stats.drawCalls}`,
       `Triangles: ${stats.triangles.toLocaleString()}`,
-      `Chunks: ${stats.loadedChunks} (queue ${stats.chunkQueueSize})`,
-      stats.terrainMergerRings !== undefined
-        ? `Terrain Merger: ${stats.terrainMergerChunks} chunks -> ${stats.terrainMergerRings} rings (saves ${stats.terrainMergerSavings} draw calls)${stats.terrainMergerPending ? ' [PENDING]' : ''}`
-        : null,
+      `Terrain: ${stats.terrainReady ? 'ready' : 'not-ready'} / ${stats.activeTerrainTiles} active tiles`,
+      `Terrain workers: ${stats.terrainBusyWorkers}/${stats.terrainTotalWorkers} busy (queue ${stats.terrainWorkerQueue})`,
       `Combatants: US ${stats.usCombatants} / OPFOR ${stats.opforCombatants}`,
       `Vegetation: ${stats.vegetationActive} active / ${stats.vegetationReserved} reserved`,
       `Combat: last ${stats.combatLastMs.toFixed(2)} ms (avg ${stats.combatEmaMs.toFixed(2)} ms)`,

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Combatant } from '../types';
-import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager';
+import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
 import { SmokeCloudSystem } from '../../effects/SmokeCloudSystem';
 import { ISpatialQuery } from '../SpatialOctree';
@@ -13,7 +13,7 @@ import { AICoverFinding } from './AICoverFinding';
  * Delegates to specialized modules for each concern
  */
 export class AITargeting {
-  private chunkManager?: ImprovedChunkManager;
+  private terrainSystem?: ITerrainRuntime;
   private sandbagSystem?: SandbagSystem;
 
   // Extracted modules
@@ -27,10 +27,10 @@ export class AITargeting {
     this.coverFinding = new AICoverFinding();
   }
 
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.chunkManager = chunkManager;
-    this.lineOfSight.setChunkManager(chunkManager);
-    this.coverFinding.setChunkManager(chunkManager);
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
+    this.lineOfSight.setTerrainSystem(terrainSystem);
+    this.coverFinding.setTerrainSystem(terrainSystem);
   }
 
   setSandbagSystem(sandbagSystem: SandbagSystem): void {

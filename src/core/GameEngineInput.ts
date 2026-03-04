@@ -109,11 +109,18 @@ export function togglePerformanceStats(engine: GameEngine): void {
   const vegetationReserved = Object.entries(debugInfo)
     .filter(([key]) => key.endsWith('HighWater'))
     .reduce((sum, [, value]) => sum + (value as number), 0);
+  const terrainReady = engine.systemManager.terrainSystem.isTerrainReady();
+  const terrainTiles = engine.systemManager.terrainSystem.getActiveTerrainTileCount();
+  const workerStats = engine.systemManager.terrainSystem.getWorkerStats?.();
   Logger.info('engine-input', `Vegetation: ${vegetationActive} active / ${vegetationReserved} reserved`);
   Logger.info('engine-input', `Combatants - US: ${combatStats.us}, OPFOR: ${combatStats.opfor}`);
-  Logger.info('engine-input', `Chunks loaded: ${engine.systemManager.chunkManager.getLoadedChunkCount()}, ` +
-              `Queue: ${engine.systemManager.chunkManager.getQueueSize()}, ` +
-              `Loading: ${engine.systemManager.chunkManager.getLoadingCount()}`);
+  Logger.info(
+    'engine-input',
+    `Terrain: ${terrainReady ? 'ready' : 'not-ready'}, ` +
+      `${terrainTiles} active tiles, ` +
+      `worker queue ${workerStats?.queueLength ?? 0}, ` +
+      `${workerStats?.busyWorkers ?? 0}/${workerStats?.totalWorkers ?? 0} workers busy`,
+  );
   Logger.info('engine-input', `Chunks tracked: ${debugInfo.chunksTracked}`);
   Logger.info('engine-input', `Logs suppressed (total): ${logStats.suppressedTotal}`);
 }

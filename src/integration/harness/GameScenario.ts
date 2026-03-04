@@ -7,6 +7,7 @@ import { RespawnManager } from '../../systems/combat/RespawnManager';
 import { TicketSystem } from '../../systems/world/TicketSystem';
 import { ZoneCaptureLogic } from '../../systems/world/ZoneCaptureLogic';
 import { CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
 /**
  * Integration test harness that wires real game systems together.
@@ -25,6 +26,7 @@ export class GameScenario {
   readonly captureLogic: ZoneCaptureLogic;
   readonly combatants: Map<string, Combatant>;
   readonly zones: Map<string, CaptureZone>;
+  readonly terrainRuntime: ITerrainRuntime;
 
   private worldSize: number;
 
@@ -37,9 +39,21 @@ export class GameScenario {
     this.spatialGrid = new SpatialGridManager();
     this.spatialGrid.initialize(worldSize);
 
+    this.terrainRuntime = {
+      getHeightAt: (_x: number, _z: number) => 0,
+      getEffectiveHeightAt: (_x: number, _z: number) => 0,
+      raycastTerrain: () => ({ hit: false }),
+      isTerrainReady: () => true,
+      hasTerrainAt: () => true,
+      getActiveTerrainTileCount: () => 0,
+      updatePlayerPosition: () => {},
+      registerCollisionObject: () => {},
+      unregisterCollisionObject: () => {},
+    };
+
     // Real factory and squad manager
     this.combatantFactory = new CombatantFactory();
-    this.squadManager = new SquadManager(this.combatantFactory);
+    this.squadManager = new SquadManager(this.combatantFactory, this.terrainRuntime);
 
     // Real respawn manager wired to the shared combatants map
     this.respawnManager = new RespawnManager(

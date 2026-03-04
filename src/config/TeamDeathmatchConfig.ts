@@ -10,6 +10,7 @@ export const TEAM_DEATHMATCH_CONFIG: GameModeConfig = {
 
   worldSize: 400,
   chunkRenderDistance: 6,
+  terrainSeed: 'random',
   terrain: {
     defaultBiome: 'denseJungle',
     biomeRules: [

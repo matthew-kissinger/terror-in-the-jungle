@@ -10,6 +10,7 @@ export const AI_SANDBOX_CONFIG: GameModeConfig = {
 
   worldSize: 200,
   chunkRenderDistance: 4,
+  terrainSeed: 'random',
   terrain: {
     defaultBiome: 'denseJungle',
     biomeRules: [

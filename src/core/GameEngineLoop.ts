@@ -163,8 +163,9 @@ export function updatePerformanceOverlay(engine: GameEngine, deltaTime: number):
   const perfStats = engine.renderer.getPerformanceStats();
   const debugInfo = engine.systemManager.globalBillboardSystem.getDebugInfo();
   const combatStats = engine.systemManager.combatantSystem.getCombatStats();
-  const chunkQueue = engine.systemManager.chunkManager.getQueueSize();
-  const loadedChunks = engine.systemManager.chunkManager.getLoadedChunkCount();
+  const terrainManager = engine.systemManager.terrainSystem;
+  const workerStats = terrainManager.getWorkerStats?.();
+  const activeTerrainTiles = terrainManager.getActiveTerrainTileCount();
   const fps = 1 / Math.max(0.0001, deltaTime);
   const logStats = Logger.getStats();
   const combatTelemetry = engine.systemManager.combatantSystem
@@ -186,9 +187,6 @@ export function updatePerformanceOverlay(engine: GameEngine, deltaTime: number):
     .filter(([key]) => key.endsWith('HighWater'))
     .reduce((sum, [, value]) => sum + (value as number), 0);
 
-  // Get terrain merger stats
-  const mergerStats = engine.systemManager.chunkManager.getMergerStats();
-
   // Get system timings from system manager
   const systemTimings = engine.systemManager.getSystemTimings();
 
@@ -200,8 +198,11 @@ export function updatePerformanceOverlay(engine: GameEngine, deltaTime: number):
     frameTimeMs: deltaTime * 1000,
     drawCalls: perfStats.drawCalls,
     triangles: perfStats.triangles,
-    chunkQueueSize: chunkQueue,
-    loadedChunks,
+    terrainReady: terrainManager.isTerrainReady(),
+    activeTerrainTiles,
+    terrainWorkerQueue: workerStats?.queueLength ?? 0,
+    terrainBusyWorkers: workerStats?.busyWorkers ?? 0,
+    terrainTotalWorkers: workerStats?.totalWorkers ?? 0,
     usCombatants: combatStats.us,
     opforCombatants: combatStats.opfor,
     vegetationActive,
@@ -219,11 +220,7 @@ export function updatePerformanceOverlay(engine: GameEngine, deltaTime: number):
     combatantCount: combatTelemetry.combatantCount,
     systemTimings,
     gpuTimeMs: gpuTelemetry.gpuTimeMs,
-    gpuTimingAvailable: gpuTelemetry.available,
-    terrainMergerRings: mergerStats?.activeRings,
-    terrainMergerChunks: mergerStats?.totalChunks,
-    terrainMergerSavings: mergerStats?.estimatedDrawCallSavings,
-    terrainMergerPending: mergerStats?.pendingMerge
+    gpuTimingAvailable: gpuTelemetry.available
   });
 }
 
@@ -236,4 +233,3 @@ export function updateLogOverlay(engine: GameEngine): void {
   const recent = Logger.getRecent(12);
   engine.logOverlay.update(recent);
 }
-

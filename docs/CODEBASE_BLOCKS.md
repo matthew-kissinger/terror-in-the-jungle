@@ -15,7 +15,7 @@
 |--------|-----|--------|---------------|--------|
 | [Core](blocks/core.md) | Engine shell | 0 (11 modules) | [GameEngine]([GH]/core/GameEngine.ts) | - |
 | [Combat](blocks/combat.md) | NPC AI, spatial, squads | 4 (48+ modules) | [CombatantSystem]([GH]/systems/combat/CombatantSystem.ts) | 5ms |
-| [Terrain](blocks/terrain.md) | Chunks, workers, height | 2 (22 modules) | [ImprovedChunkManager]([GH]/systems/terrain/ImprovedChunkManager.ts) | 2ms |
+| [Terrain](blocks/terrain.md) | Terrain runtime, height authority, queries | 2 (active split block) | [TerrainSystem]([GH]/systems/terrain/TerrainSystem.ts) | 2ms |
 | [Strategy](blocks/strategy.md) | War sim, materialization | 2 (5 modules) | [WarSimulator]([GH]/systems/strategy/WarSimulator.ts) | 2ms |
 | [Player](blocks/player.md) | Movement, weapon, health | 8 (21 modules) | [PlayerController]([GH]/systems/player/PlayerController.ts) | 1ms |
 | [Weapons](blocks/weapons.md) | Grenades, mortar, sandbag | 5 (16 modules) | [GrenadeSystem]([GH]/systems/weapons/GrenadeSystem.ts) | 1ms |
@@ -37,7 +37,7 @@ Most-depended-on blocks. Touch these and you touch everything.
 | **[CombatantSystem]([GH]/systems/combat/CombatantSystem.ts)** | **8** | 9 | FPWeapon, FullMap, Grenade, HUD, Minimap, Mortar, WarSim, ZoneMgr |
 | **[AudioManager]([GH]/systems/audio/AudioManager.ts)** | **7** | 0 | Combat, FPWeapon, Grenade, Helicopter, Mortar, StratFeedback, Weather |
 | [HUDSystem]([GH]/ui/hud/HUDSystem.ts) | 7 | 5 | Combat, FPWeapon, Helicopter, PlayerCtrl, PlayerHealth, StratFeedback, ZoneMgr |
-| [ChunkManager]([GH]/systems/terrain/ImprovedChunkManager.ts) | 7 | 0 | Combat, Footstep, Helicopter, Helipad, PlayerCtrl, PlayerRespawn, ZoneMgr |
+| [TerrainSystem]([GH]/systems/terrain/TerrainSystem.ts) | 7 | 0 | Combat, Footstep, Helicopter, Helipad, PlayerCtrl, PlayerRespawn, ZoneMgr |
 | [InventoryManager]([GH]/systems/player/InventoryManager.ts) | 7 | 0 | AmmoSupply, FPWeapon, Grenade, Mortar, PlayerCtrl, PlayerRespawn, Sandbag |
 | [PlayerController]([GH]/systems/player/PlayerController.ts) | 7 | **13** | FPWeapon, Flashbang, Grenade, Helicopter, PlayerHealth, PlayerRespawn, Suppression |
 
@@ -56,7 +56,7 @@ playerSquadController.updatePlayerPosition()
 
 TRACKED (budgeted, EMA-monitored):
   Combat    5.0ms  combatantSystem.update(dt)
-  Terrain   2.0ms  chunkManager.update(dt)
+  Terrain   2.0ms  terrainSystem.update(dt)
   Billboards 2.0ms  globalBillboardSystem.update(dt)
   Player    1.0ms  playerController + firstPersonWeapon
   Weapons   1.0ms  grenade + mortar + sandbag + ammoSupply
@@ -142,8 +142,8 @@ RESTART    clearCombatants, resetTickets, respawnPlayer
 | the LOD manager | CombatantLODManager | [combat/CombatantLODManager.ts]([GH]/systems/combat/CombatantLODManager.ts) |
 | squads | SquadManager | [combat/SquadManager.ts]([GH]/systems/combat/SquadManager.ts) |
 | influence map | InfluenceMapSystem | [combat/InfluenceMapSystem.ts]([GH]/systems/combat/InfluenceMapSystem.ts) |
-| terrain / chunks | ImprovedChunkManager | [terrain/ImprovedChunkManager.ts]([GH]/systems/terrain/ImprovedChunkManager.ts) |
-| terrain workers | ChunkWorkerPool | [terrain/ChunkWorkerPool.ts]([GH]/systems/terrain/ChunkWorkerPool.ts) |
+| terrain runtime | TerrainSystem | [terrain/TerrainSystem.ts]([GH]/systems/terrain/TerrainSystem.ts) |
+| terrain workers | TerrainWorkerPool | [terrain/TerrainWorkerPool.ts]([GH]/systems/terrain/TerrainWorkerPool.ts) |
 | height cache | HeightQueryCache | [terrain/HeightQueryCache.ts]([GH]/systems/terrain/HeightQueryCache.ts) |
 | DEM / real terrain | DEMHeightProvider | [terrain/DEMHeightProvider.ts]([GH]/systems/terrain/DEMHeightProvider.ts) |
 | war layer / war sim | WarSimulator | [strategy/WarSimulator.ts]([GH]/systems/strategy/WarSimulator.ts) |

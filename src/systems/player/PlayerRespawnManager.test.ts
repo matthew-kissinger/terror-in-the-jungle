@@ -9,6 +9,7 @@ import { Faction } from '../combat/types';
 import { RespawnUI } from './RespawnUI';
 import { RespawnMapController } from './RespawnMapController';
 import { GameMode } from '../../config/gameModeTypes';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
 // Mock browser globals for Node.js environment
 if (typeof document === 'undefined') {
@@ -159,6 +160,7 @@ describe('PlayerRespawnManager', () => {
   let mockPlayerController: any;
   let mockFirstPersonWeapon: any;
   let mockInventoryManager: InventoryManager;
+  let mockTerrainSystem: ITerrainRuntime;
 
   beforeEach(() => {
     mockScene = new THREE.Scene();
@@ -229,6 +231,20 @@ describe('PlayerRespawnManager', () => {
     mockInventoryManager = {
       reset: vi.fn(),
     } as unknown as InventoryManager;
+
+    mockTerrainSystem = {
+      getHeightAt: vi.fn(() => 0),
+      getEffectiveHeightAt: vi.fn(() => 0),
+      isTerrainReady: vi.fn(() => true),
+      hasTerrainAt: vi.fn(() => true),
+      getActiveTerrainTileCount: vi.fn(() => 0),
+      updatePlayerPosition: vi.fn(),
+      registerCollisionObject: vi.fn(),
+      unregisterCollisionObject: vi.fn(),
+      raycastTerrain: vi.fn(() => ({ hit: false })),
+    };
+
+    respawnManager.setTerrainSystem(mockTerrainSystem);
   });
 
   afterEach(() => {
@@ -842,18 +858,19 @@ describe('PlayerRespawnManager', () => {
       expect(() => respawnManager.respawnAtBase()).not.toThrow();
     });
 
-    it('should apply terrain height offset correctly', async () => {
-      // Re-mock HeightQueryCache to return custom height for this test
-      vi.resetModules();
-      vi.doMock('../terrain/HeightQueryCache', () => ({
-        getHeightQueryCache: vi.fn(() => ({
-          getHeightAt: vi.fn(() => 10),
-        })),
-      }));
-
-      // Re-import to get new mock
-      const { PlayerRespawnManager: TestManager } = await import('./PlayerRespawnManager');
-      const testRespawnManager = new TestManager(mockScene, mockCamera);
+    it('should apply terrain height offset correctly', () => {
+      const testRespawnManager = new PlayerRespawnManager(mockScene, mockCamera);
+      const terrainRuntime = {
+        getHeightAt: vi.fn(() => 10),
+        getEffectiveHeightAt: vi.fn(() => 10),
+        isTerrainReady: vi.fn(() => true),
+        hasTerrainAt: vi.fn(() => true),
+        getActiveTerrainTileCount: vi.fn(() => 0),
+        updatePlayerPosition: vi.fn(),
+        registerCollisionObject: vi.fn(),
+        unregisterCollisionObject: vi.fn(),
+        raycastTerrain: vi.fn(() => ({ hit: false })),
+      } as ITerrainRuntime;
 
       // Inject mocks
       (testRespawnManager as any).respawnUI = mockRespawnUI;
@@ -861,6 +878,7 @@ describe('PlayerRespawnManager', () => {
 
       testRespawnManager.setZoneManager(mockZoneManager);
       testRespawnManager.setPlayerController(mockPlayerController);
+      testRespawnManager.setTerrainSystem(terrainRuntime);
 
       testRespawnManager.respawnAtBase();
 

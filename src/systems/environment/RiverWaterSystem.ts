@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { Logger } from '../../utils/Logger';
-import { getHeightQueryCache } from '../terrain/HeightQueryCache';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
 // ---------------------------------------------------------------------------
 // River data JSON shape (loaded at runtime from public/data/vietnam/)
@@ -186,6 +186,7 @@ export class RiverWaterSystem implements GameSystem {
   private meshes: THREE.Mesh[] = [];
   private material: THREE.ShaderMaterial | null = null;
   private active = false;
+  private terrainSystem?: ITerrainRuntime;
 
   // Height offset above terrain so rivers sit on the surface
   private readonly SURFACE_OFFSET = 0.15;
@@ -196,6 +197,10 @@ export class RiverWaterSystem implements GameSystem {
 
   async init(): Promise<void> {
     // No-op; rivers are loaded on demand via loadRivers()
+  }
+
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
   }
 
   /**
@@ -220,6 +225,10 @@ export class RiverWaterSystem implements GameSystem {
   }
 
   private buildMeshes(rivers: RiverSegment[]): void {
+    if (!this.terrainSystem) {
+      throw new Error('RiverWaterSystem requires terrainSystem before river mesh generation');
+    }
+
     // Shared material for all river segments
     this.material = new THREE.ShaderMaterial({
       vertexShader: RIVER_VERTEX,
@@ -237,8 +246,6 @@ export class RiverWaterSystem implements GameSystem {
       side: THREE.DoubleSide,
     });
 
-    const heightCache = getHeightQueryCache();
-
     // Batch small rivers into merged geometries to reduce draw calls.
     // Bucket: major (width >= 8) get individual meshes, small rivers are merged.
     const majorRivers: RiverSegment[] = [];
@@ -255,7 +262,7 @@ export class RiverWaterSystem implements GameSystem {
 
     // Build major rivers individually (few of them, long meshes)
     for (const river of majorRivers) {
-      const geom = this.buildSegmentGeometry(river, heightCache);
+      const geom = this.buildSegmentGeometry(river, this.terrainSystem);
       if (!geom) continue;
       const mesh = new THREE.Mesh(geom, this.material);
       mesh.frustumCulled = true;
@@ -271,7 +278,7 @@ export class RiverWaterSystem implements GameSystem {
       const geometries: THREE.BufferGeometry[] = [];
 
       for (const river of batch) {
-        const geom = this.buildSegmentGeometry(river, heightCache);
+        const geom = this.buildSegmentGeometry(river, this.terrainSystem);
         if (geom) geometries.push(geom);
       }
 
@@ -291,11 +298,11 @@ export class RiverWaterSystem implements GameSystem {
 
   private buildSegmentGeometry(
     river: RiverSegment,
-    heightCache: ReturnType<typeof getHeightQueryCache>
+    terrainSystem: ITerrainRuntime
   ): THREE.BufferGeometry | null {
     const pts: THREE.Vector3[] = [];
     for (const [wx, wz] of river.points) {
-      const y = heightCache.getHeightAt(wx, wz) + this.SURFACE_OFFSET;
+      const y = terrainSystem.getHeightAt(wx, wz) + this.SURFACE_OFFSET;
       pts.push(new THREE.Vector3(wx, y, wz));
     }
     if (pts.length < 2) return null;

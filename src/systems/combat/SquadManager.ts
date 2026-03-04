@@ -1,22 +1,21 @@
 import * as THREE from 'three';
 import { Combatant, Faction, Squad } from './types';
 import { CombatantFactory } from './CombatantFactory';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { InfluenceMapSystem } from './InfluenceMapSystem';
 import { CaptureZone } from '../world/ZoneManager';
-import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 import { Logger } from '../../utils/Logger';
 
 export class SquadManager {
   private squads: Map<string, Squad> = new Map();
   private nextSquadId = 0;
   private combatantFactory: CombatantFactory;
-  private chunkManager?: ImprovedChunkManager;
+  private terrainSystem?: ITerrainRuntime;
   private influenceMap?: InfluenceMapSystem;
 
-  constructor(combatantFactory: CombatantFactory, chunkManager?: ImprovedChunkManager) {
+  constructor(combatantFactory: CombatantFactory, terrainSystem?: ITerrainRuntime) {
     this.combatantFactory = combatantFactory;
-    this.chunkManager = chunkManager;
+    this.terrainSystem = terrainSystem;
   }
 
   createSquad(
@@ -111,12 +110,14 @@ export class SquadManager {
   }
 
   private getTerrainHeight(x: number, z: number): number {
-    // Use HeightQueryCache - always returns valid height from noise
-    return getHeightQueryCache().getHeightAt(x, z);
+    if (!this.terrainSystem) {
+      throw new Error('SquadManager requires terrainSystem before terrain height queries');
+    }
+    return this.terrainSystem.getHeightAt(x, z);
   }
 
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.chunkManager = chunkManager;
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
   }
 
   setInfluenceMap(influenceMap: InfluenceMapSystem): void {

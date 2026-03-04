@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Combatant } from '../types';
-import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager';
+import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
 import { SmokeCloudSystem } from '../../effects/SmokeCloudSystem';
 import { tryConsumeRaycast } from './RaycastBudget';
@@ -27,7 +27,7 @@ const LOS_CACHE_TTL_MS = 150;
  * Handles line-of-sight and visibility checks
  */
 export class AILineOfSight {
-  private chunkManager?: ImprovedChunkManager;
+  private terrainSystem?: ITerrainRuntime;
   private sandbagSystem?: SandbagSystem;
   private smokeCloudSystem?: SmokeCloudSystem;
 
@@ -41,8 +41,8 @@ export class AILineOfSight {
   static prefilterPasses = 0;
   static prefilterRejects = 0;
 
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.chunkManager = chunkManager;
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
   }
 
   setSandbagSystem(sandbagSystem: SandbagSystem): void {
@@ -149,7 +149,7 @@ export class AILineOfSight {
 
     // Cheap substitution for many expensive LOS raycasts:
     // sample terrain heightfield along the sight segment and reject clearly occluded pairs.
-    if (this.isHeightfieldPrefilterEnabled() && this.chunkManager) {
+    if (this.isHeightfieldPrefilterEnabled() && this.terrainSystem) {
       const blocked = this.isBlockedByHeightfield(combatant, targetPos, distance);
       if (blocked) {
         AILineOfSight.prefilterRejects++;
@@ -162,7 +162,7 @@ export class AILineOfSight {
     // --- Raycast budget gate ---
     // Terrain and sandbag checks are the expensive part.
     // If budget is exhausted, return conservative default (can't see).
-    const needsTerrainRaycast = this.chunkManager && combatant.lodLevel &&
+    const needsTerrainRaycast = this.terrainSystem && combatant.lodLevel &&
       (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium');
 
     if (needsTerrainRaycast) {
@@ -194,7 +194,7 @@ export class AILineOfSight {
     distance: number
   ): boolean {
     // Terrain LOS check (high/medium LOD only)
-    if (this.chunkManager && combatant.lodLevel &&
+    if (this.terrainSystem && combatant.lodLevel &&
         (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium')) {
 
       _eyePos.copy(combatant.position);
@@ -205,7 +205,7 @@ export class AILineOfSight {
 
       _direction.subVectors(_targetEyePos, _eyePos).normalize();
 
-      const terrainHit = this.chunkManager.raycastTerrain(_eyePos, _direction, distance);
+      const terrainHit = this.terrainSystem.raycastTerrain(_eyePos, _direction, distance);
 
       if (terrainHit.hit && terrainHit.distance! < distance - 1) {
         return false;
@@ -267,12 +267,7 @@ export class AILineOfSight {
   }
 
   private isBlockedByHeightfield(combatant: Combatant, targetPos: THREE.Vector3, distance: number): boolean {
-    if (!this.chunkManager || distance < 35 || distance > 220) return false;
-    const getTerrainHeightAt =
-      (this.chunkManager as any).getTerrainHeightAt ||
-      (this.chunkManager as any).getHeightAt ||
-      (this.chunkManager as any).getEffectiveHeightAt;
-    if (typeof getTerrainHeightAt !== 'function') return false;
+    if (!this.terrainSystem || distance < 35 || distance > 220) return false;
 
     _eyePos.copy(combatant.position);
     _eyePos.y += 1.7;
@@ -286,7 +281,7 @@ export class AILineOfSight {
       const sampleX = _eyePos.x + (_targetEyePos.x - _eyePos.x) * t;
       const sampleZ = _eyePos.z + (_targetEyePos.z - _eyePos.z) * t;
       const lineY = _eyePos.y + (_targetEyePos.y - _eyePos.y) * t;
-      const terrainY = Number(getTerrainHeightAt.call(this.chunkManager, sampleX, sampleZ));
+      const terrainY = Number(this.terrainSystem.getEffectiveHeightAt(sampleX, sampleZ));
       if (!Number.isFinite(terrainY)) continue;
       if (terrainY > lineY + 1.2) {
         blockingSamples++;

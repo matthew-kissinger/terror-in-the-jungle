@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { PlayerController } from './PlayerController';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import { TerrainSystem } from '../terrain/TerrainSystem';
 import { GameModeManager } from '../world/GameModeManager';
 import { InventoryManager, WeaponSlot } from './InventoryManager';
 import { GrenadeSystem } from '../weapons/GrenadeSystem';
@@ -47,7 +47,7 @@ vi.mock('../../utils/Logger');
 describe('PlayerController', () => {
   let playerController: PlayerController;
   let mockCamera: THREE.PerspectiveCamera;
-  let mockChunkManager: ImprovedChunkManager;
+  let mockTerrainSystem: TerrainSystem;
   let mockGameModeManager: GameModeManager;
   let mockInventoryManager: InventoryManager;
   let mockGrenadeSystem: GrenadeSystem;
@@ -71,7 +71,7 @@ describe('PlayerController', () => {
     playerController = new PlayerController(mockCamera);
 
     // Setup mock dependencies
-    mockChunkManager = {
+    mockTerrainSystem = {
       getEffectiveHeightAt: vi.fn().mockReturnValue(0),
       updatePlayerPosition: vi.fn(),
     } as any;
@@ -220,7 +220,7 @@ describe('PlayerController', () => {
 
   describe('update', () => {
     beforeEach(() => {
-      playerController.setChunkManager(mockChunkManager);
+      playerController.setTerrainSystem(mockTerrainSystem);
       playerController.setHUDSystem(mockHUDSystem);
     });
 
@@ -235,7 +235,7 @@ describe('PlayerController', () => {
     it('should update chunk manager with player position', () => {
       playerController.update(0.016);
 
-      expect(mockChunkManager.updatePlayerPosition).toHaveBeenCalled();
+      expect(mockTerrainSystem.updatePlayerPosition).toHaveBeenCalled();
     });
 
     it('should update HUD with elevation', () => {

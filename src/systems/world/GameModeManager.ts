@@ -5,11 +5,10 @@ import { getGameModeConfig } from '../../config/gameModes';
 import { ZoneManager } from './ZoneManager';
 import { CombatantSystem } from '../combat/CombatantSystem';
 import { TicketSystem } from './TicketSystem';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { MinimapSystem } from '../../ui/minimap/MinimapSystem';
 import { InfluenceMapSystem } from '../combat/InfluenceMapSystem';
 import type { WarSimulator } from '../strategy/WarSimulator';
-import { getHeightQueryCache } from '../terrain/HeightQueryCache';
+import type { ITerrainRuntimeController } from '../../types/SystemInterfaces';
 
 export class GameModeManager implements GameSystem {
   public currentMode: GameMode = GameMode.ZONE_CONTROL;
@@ -19,7 +18,7 @@ export class GameModeManager implements GameSystem {
   private zoneManager?: ZoneManager;
   private combatantSystem?: CombatantSystem;
   private ticketSystem?: TicketSystem;
-  private chunkManager?: ImprovedChunkManager;
+  private terrainSystem?: ITerrainRuntimeController;
   private minimapSystem?: MinimapSystem;
   private influenceMapSystem?: InfluenceMapSystem;
   private warSimulator?: WarSimulator;
@@ -49,13 +48,13 @@ export class GameModeManager implements GameSystem {
     zoneManager: ZoneManager,
     combatantSystem: CombatantSystem,
     ticketSystem: TicketSystem,
-    chunkManager: ImprovedChunkManager,
+    terrainSystem: ITerrainRuntimeController,
     minimapSystem: MinimapSystem
   ): void {
     this.zoneManager = zoneManager;
     this.combatantSystem = combatantSystem;
     this.ticketSystem = ticketSystem;
-    this.chunkManager = chunkManager;
+    this.terrainSystem = terrainSystem;
     this.minimapSystem = minimapSystem;
   }
 
@@ -136,9 +135,9 @@ export class GameModeManager implements GameSystem {
       }
     }
 
-    // Configure chunk manager render distance
-    if (this.chunkManager) {
-      this.chunkManager.setRenderDistance(config.chunkRenderDistance);
+    // Configure terrain runtime render distance
+    if (this.terrainSystem) {
+      this.terrainSystem.setRenderDistance(config.chunkRenderDistance);
     }
 
     // Configure minimap scale (local player-centered view area)
@@ -169,10 +168,12 @@ export class GameModeManager implements GameSystem {
     // Configure or disable WarSimulator
     if (this.warSimulator) {
       if (config.warSimulator?.enabled) {
-        const heightCache = getHeightQueryCache();
+        if (!this.terrainSystem) {
+          throw new Error('GameModeManager requires terrainSystem before WarSimulator configuration');
+        }
         this.warSimulator.configure(
           config.warSimulator,
-          (x: number, z: number) => heightCache.getHeightAt(x, z)
+          (x: number, z: number) => this.terrainSystem!.getHeightAt(x, z)
         );
 
         // Spawn strategic forces from zone config

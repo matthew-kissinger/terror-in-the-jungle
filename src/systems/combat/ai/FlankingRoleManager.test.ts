@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import { FlankingRoleManager } from './FlankingRoleManager'
 import { Combatant, CombatantState, Faction, Squad } from '../types'
 import { FlankingOperation, FlankingStatus } from './AIFlankingSystem'
-import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager'
+import { TerrainSystem } from '../../terrain/TerrainSystem'
 
 // Mock HeightQueryCache
 vi.mock('../../terrain/HeightQueryCache', () => ({
@@ -129,13 +129,13 @@ function createMockFlankingOperation(
 describe('FlankingRoleManager', () => {
   let roleManager: FlankingRoleManager
   let allCombatants: Map<string, Combatant>
-  let mockChunkManager: ImprovedChunkManager
+  let mockChunkManager: TerrainSystem
 
   beforeEach(() => {
     roleManager = new FlankingRoleManager()
     allCombatants = new Map()
     mockChunkManager = {
-      getTerrainHeightAt: vi.fn(() => 0),
+      getHeightAt: vi.fn(() => 0),
     } as any
     vi.clearAllMocks()
   })
@@ -148,7 +148,7 @@ describe('FlankingRoleManager', () => {
 
     it('should accept chunk manager', () => {
       const manager = new FlankingRoleManager()
-      manager.setChunkManager(mockChunkManager)
+      manager.setTerrainSystem(mockChunkManager)
       expect(manager).toBeDefined()
     })
   })
@@ -474,7 +474,7 @@ describe('FlankingRoleManager', () => {
       const flanker = createMockCombatant('c2', Faction.US, new THREE.Vector3(0, 0, 0), CombatantState.ENGAGING, 'follower')
       allCombatants.set('c2', flanker)
 
-      roleManager.setChunkManager(mockChunkManager)
+      roleManager.setTerrainSystem(mockChunkManager)
       const operation = createMockFlankingOperation('squad-1', ['c1'], ['c2'])
 
       roleManager.assignFlankingBehavior(operation, allCombatants)

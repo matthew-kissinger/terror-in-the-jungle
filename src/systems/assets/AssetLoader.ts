@@ -152,20 +152,7 @@ export class AssetLoader implements GameSystem {
       try {
         const texture = await this.loadTexture(asset.path);
 
-        // Configure texture based on category
-        // Billboards (foliage, enemies) use mipmapping for better distance rendering
-        // Other textures use pixel-perfect nearest filtering
-        if (asset.category === AssetCategory.FOLIAGE || asset.category === AssetCategory.ENEMY) {
-          // Billboard textures: mipmaps + anisotropic filtering for distance
-          PixelPerfectUtils.configureBillboardTexture(texture);
-        } else {
-          // Standard pixel-perfect: nearest filtering, no mipmaps
-          texture.magFilter = THREE.NearestFilter;
-          texture.minFilter = THREE.NearestFilter;
-          texture.wrapS = THREE.RepeatWrapping;
-          texture.wrapT = THREE.RepeatWrapping;
-          texture.generateMipmaps = false;
-        }
+        this.configureTextureForCategory(texture, asset.category);
 
         // Downscale extremely large textures to avoid GPU memory exhaustion
         const resized = this.downscaleIfNeeded(asset.name, texture);
@@ -186,6 +173,33 @@ export class AssetLoader implements GameSystem {
     });
 
     await Promise.all(loadPromises);
+  }
+
+  private configureTextureForCategory(texture: THREE.Texture, category: AssetCategory): void {
+    if (category === AssetCategory.FOLIAGE || category === AssetCategory.ENEMY) {
+      // Billboard textures: mipmaps + anisotropic filtering for distance
+      PixelPerfectUtils.configureBillboardTexture(texture);
+      return;
+    }
+
+    if (category === AssetCategory.GROUND) {
+      // Terrain surfaces need linear filtering and mipmaps. Nearest filtering
+      // causes visible shimmer and aliasing at gameplay camera distances.
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.generateMipmaps = true;
+      texture.needsUpdate = true;
+      return;
+    }
+
+    // Default UI/general textures keep the pixel-perfect path.
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.NearestFilter;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.generateMipmaps = false;
   }
 
   // Heuristically clamp texture size by asset type to keep WebGL stable

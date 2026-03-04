@@ -5,7 +5,7 @@ import { GrenadeType } from '../combat/types';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { CombatantSystem } from '../combat/CombatantSystem';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { InventoryManager } from '../player/InventoryManager';
 import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
@@ -20,7 +20,7 @@ import type { IFlashbangScreenEffect, IHUDSystem, IPlayerController } from '../.
 export class GrenadeSystem implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
-  private chunkManager?: ImprovedChunkManager;
+  private terrainSystem?: ITerrainRuntime;
   private combatantSystem?: CombatantSystem;
   private impactEffectsPool?: ImpactEffectsPool;
   private explosionEffectsPool?: ExplosionEffectsPool;
@@ -67,11 +67,11 @@ export class GrenadeSystem implements GameSystem {
   constructor(
     scene: THREE.Scene,
     camera: THREE.Camera,
-    chunkManager?: ImprovedChunkManager
+    terrainSystem?: ITerrainRuntime
   ) {
     this.scene = scene;
     this.camera = camera;
-    this.chunkManager = chunkManager;
+    this.terrainSystem = terrainSystem;
 
     this.physics = new GrenadePhysics(
       this.GRAVITY,
@@ -311,8 +311,8 @@ export class GrenadeSystem implements GameSystem {
   }
 
   private getGroundHeight(x: number, z: number): number {
-    if (this.chunkManager) {
-      return this.chunkManager.getEffectiveHeightAt(x, z);
+    if (this.terrainSystem) {
+      return this.terrainSystem.getEffectiveHeightAt(x, z);
     }
     return 0;
   }

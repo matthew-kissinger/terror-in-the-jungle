@@ -22,9 +22,9 @@ graph TD
     end
 
     subgraph Terrain["TERRAIN (2ms budget)"]
-        CM[ImprovedChunkManager]
+        CM[TerrainSystem]
         subgraph TerrainInternal[" "]
-            CWP[ChunkWorkerPool]
+            CWP[TerrainWorkerPool]
             HQC[HeightQueryCache ★]
             DEM[DEMHeightProvider]
         end
@@ -147,7 +147,7 @@ graph TD
     SF -->|hud| HUD
     ZM -->|hud| HUD
 
-    %% ChunkManager (fan-in 7)
+    %% TerrainSystem
     CS -->|terrain| CM
     PC -->|terrain| CM
     PRM -->|terrain| CM

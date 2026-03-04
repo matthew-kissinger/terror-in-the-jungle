@@ -201,7 +201,7 @@ spatialGridManager.syncEntity(combatant.id, combatant.position)
 
 | Dep | Setter | Purpose |
 |-----|--------|---------|
-| [ImprovedChunkManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ImprovedChunkManager.ts) | setChunkManager | Terrain height for NPC grounding; LOS raycasting |
+| [TerrainSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/TerrainSystem.ts) | setTerrainSystem | Terrain-effective height, LOS raycasting, grounded spawn/materialization queries |
 | [TicketSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world/TicketSystem.ts) | setTicketSystem | isGameActive() gate; death ticket deduction |
 | [PlayerHealthSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/player/PlayerHealthSystem.ts) | setPlayerHealthSystem | Player damage from NPC fire |
 | [ZoneManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world/ZoneManager.ts) | setZoneManager | Zone-aware spawning; squad objectives; distant AI sim |

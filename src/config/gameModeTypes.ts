@@ -78,6 +78,11 @@ export interface GameModeConfig {
   chunkSize?: number; // Chunk size in world units (default 64)
   weather?: WeatherConfig;
 
+  // Terrain seed for procedural noise modes. Ignored when heightSource is DEM.
+  // 'random' = new seed each match (default for procedural modes).
+  // A number = deterministic, same terrain every time.
+  terrainSeed?: number | 'random';
+
   // Optional DEM terrain source (if absent, use procedural noise)
   heightSource?: {
     type: 'dem';

@@ -47,7 +47,7 @@ Config fields in `AircraftPhysicsConfig`: mass, maxLiftForce, maxCyclicForce, ma
 | Dep | Source | Injected Via |
 |---|---|---|
 | GameModeConfig.helipads | GameModeManager | constructor (HelipadSystem) |
-| HeightQueryCache | TerrainSystem | setter (HelipadSystem - for ground spawn) |
+| TerrainSystem | Terrain domain | setter (`setTerrainManager`) for helipad placement and helicopter grounding |
 | scene (THREE.Scene) | GameRenderer | constructor |
 | PlayerState / controls | PlayerSystem | setter (HelicopterInteraction) |
 | camera | GameRenderer | setter (HelicopterModel - cockpit view) |

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { MortarSystem } from './MortarSystem';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import { TerrainSystem } from '../terrain/TerrainSystem';
 import { CombatantSystem } from '../combat/CombatantSystem';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
@@ -45,7 +45,7 @@ const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0));
 // Mock dependencies
 const mockChunkManager = {
   getEffectiveHeightAt: vi.fn((_x: number, _z: number) => 0),
-} as unknown as ImprovedChunkManager;
+} as unknown as TerrainSystem;
 
 const mockCombatantSystem = {
   applyExplosionDamage: vi.fn(),

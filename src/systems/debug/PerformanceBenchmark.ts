@@ -16,7 +16,7 @@ export interface BenchmarkResult {
 
 export interface BenchmarkDependencies {
   hitDetection?: any
-  chunkManager?: any
+  terrainRuntime?: any
   combatants?: Map<string, any>
   spatialGridManager?: any
 }
@@ -123,12 +123,12 @@ export class PerformanceBenchmark {
   }
 
   private benchmarkTerrainRaycast(rays: THREE.Ray[]): number {
-    const { chunkManager } = this.deps
-    if (!chunkManager) return 0
+    const { terrainRuntime } = this.deps
+    if (!terrainRuntime) return 0
 
     const start = performance.now()
     for (const ray of rays) {
-      chunkManager.raycastTerrain(ray.origin, ray.direction, 150)
+      terrainRuntime.raycastTerrain(ray.origin, ray.direction, 150)
     }
     return performance.now() - start
   }

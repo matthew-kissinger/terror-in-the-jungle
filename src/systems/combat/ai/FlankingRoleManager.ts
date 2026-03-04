@@ -2,9 +2,8 @@ import * as THREE from 'three'
 import { Combatant, CombatantState, Squad } from '../types'
 import { FlankingOperation, FlankingStatus } from './AIFlankingSystem'
 import { Logger } from '../../../utils/Logger'
-import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager'
+import type { ITerrainRuntime } from '../../../types/SystemInterfaces'
 import { objectPool } from '../../../utils/ObjectPoolManager'
-import { getHeightQueryCache } from '../../terrain/HeightQueryCache'
 
 // Reusable scratch vectors to avoid per-frame allocations
 const _toTarget = new THREE.Vector3()
@@ -14,11 +13,11 @@ const _spreadOffset = new THREE.Vector3()
  * Manages combatant role assignments and behaviors during flanking
  */
 export class FlankingRoleManager {
-  private chunkManager?: ImprovedChunkManager
+  private terrainSystem?: ITerrainRuntime
   private readonly SUPPRESSION_DURATION_MS = 4000  // How long suppressors fire before flankers move
 
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.chunkManager = chunkManager
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem
   }
 
   /**
@@ -112,8 +111,8 @@ export class FlankingRoleManager {
 
       const flankerDestination = combatant.destinationPoint || objectPool.getVector3()
       flankerDestination.copy(operation.flankWaypoint).add(_spreadOffset)
-      if (this.chunkManager) {
-        flankerDestination.y = getHeightQueryCache().getHeightAt(flankerDestination.x, flankerDestination.z)
+      if (this.terrainSystem) {
+        flankerDestination.y = this.terrainSystem.getHeightAt(flankerDestination.x, flankerDestination.z)
       }
 
       combatant.state = CombatantState.ADVANCING

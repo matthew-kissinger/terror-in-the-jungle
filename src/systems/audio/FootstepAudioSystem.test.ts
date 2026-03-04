@@ -2,14 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as THREE from 'three';
 import { FootstepAudioSystem } from './FootstepAudioSystem';
 import { TerrainType } from '../../types';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
-import { HeightQueryCache, getHeightQueryCache } from '../terrain/HeightQueryCache';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { FootstepSynthesis } from './FootstepSynthesis';
 
 // Mocks
 vi.mock('../../utils/Logger');
 vi.mock('./FootstepSynthesis');
-vi.mock('../terrain/HeightQueryCache');
 
 // Mock THREE.js audio classes to avoid window/DOM dependencies
 vi.mock('three', async () => {
@@ -25,8 +23,7 @@ vi.mock('three', async () => {
 describe('FootstepAudioSystem', () => {
   let system: FootstepAudioSystem;
   let listener: THREE.AudioListener;
-  let mockChunkManager: ImprovedChunkManager;
-  let mockHeightQueryCache: any;
+  let mockTerrainSystem: ITerrainRuntime;
 
   // Mock AudioContext and AudioNodes
   const mockAudioContext = {
@@ -130,12 +127,6 @@ describe('FootstepAudioSystem', () => {
     // Now safe to instantiate listener (uses mock)
     listener = new THREE.AudioListener();
     
-    // Mock HeightQueryCache
-    mockHeightQueryCache = {
-      getHeightAt: vi.fn().mockReturnValue(10), // Default height (GRASS)
-    };
-    (getHeightQueryCache as any).mockReturnValue(mockHeightQueryCache);
-
     // Mock FootstepSynthesis methods to return a starter function that returns duration
     const mockStarter = vi.fn().mockReturnValue(0.5); // 0.5s duration
     (FootstepSynthesis.createGrassFootstep as any).mockReturnValue(mockStarter);
@@ -146,9 +137,18 @@ describe('FootstepAudioSystem', () => {
     // Create system
     system = new FootstepAudioSystem(listener);
     
-    // Mock ChunkManager
-    mockChunkManager = {} as ImprovedChunkManager;
-    system.setChunkManager(mockChunkManager);
+    mockTerrainSystem = {
+      getHeightAt: vi.fn().mockReturnValue(10),
+      getEffectiveHeightAt: vi.fn().mockReturnValue(10),
+      isTerrainReady: vi.fn(() => true),
+      hasTerrainAt: vi.fn(() => true),
+      getActiveTerrainTileCount: vi.fn(() => 0),
+      updatePlayerPosition: vi.fn(),
+      registerCollisionObject: vi.fn(),
+      unregisterCollisionObject: vi.fn(),
+      raycastTerrain: vi.fn(() => ({ hit: false })),
+    };
+    system.setTerrainSystem(mockTerrainSystem);
   });
 
   afterEach(() => {
@@ -169,26 +169,26 @@ describe('FootstepAudioSystem', () => {
   });
 
   describe('detectTerrainType', () => {
-    it('should return GRASS if chunkManager is not set', () => {
+    it('should return GRASS if terrain system is not set', () => {
       const systemNoChunks = new FootstepAudioSystem(listener);
       const type = (systemNoChunks as any).detectTerrainType(new THREE.Vector3(0, 0, 0));
       expect(type).toBe(TerrainType.GRASS);
     });
 
     it('should return WATER if height < 1.0', () => {
-      mockHeightQueryCache.getHeightAt.mockReturnValue(0.5);
+      vi.mocked(mockTerrainSystem.getHeightAt).mockReturnValue(0.5);
       const type = (system as any).detectTerrainType(new THREE.Vector3(0, 0, 0));
       expect(type).toBe(TerrainType.WATER);
     });
 
     it('should return MUD if height < 3.0', () => {
-      mockHeightQueryCache.getHeightAt.mockReturnValue(2.5);
+      vi.mocked(mockTerrainSystem.getHeightAt).mockReturnValue(2.5);
       const type = (system as any).detectTerrainType(new THREE.Vector3(0, 0, 0));
       expect(type).toBe(TerrainType.MUD);
     });
 
     it('should return ROCK if slope > 0.5', () => {
-      mockHeightQueryCache.getHeightAt.mockImplementation((x: number, z: number) => {
+      vi.mocked(mockTerrainSystem.getHeightAt).mockImplementation((x: number, z: number) => {
         // Base height 10.
         // detectTerrainType checks center, center+1, center-1 for X and Z.
         // Logic: 
@@ -205,7 +205,7 @@ describe('FootstepAudioSystem', () => {
     });
 
     it('should return GRASS otherwise', () => {
-      mockHeightQueryCache.getHeightAt.mockReturnValue(10); // High enough, flat
+      vi.mocked(mockTerrainSystem.getHeightAt).mockReturnValue(10); // High enough, flat
       const type = (system as any).detectTerrainType(new THREE.Vector3(0, 0, 0));
       expect(type).toBe(TerrainType.GRASS);
     });
@@ -239,7 +239,7 @@ describe('FootstepAudioSystem', () => {
     });
 
     it('should not select terrain sound while disabled', () => {
-      mockHeightQueryCache.getHeightAt.mockReturnValue(0.5); // Water
+      vi.mocked(mockTerrainSystem.getHeightAt).mockReturnValue(0.5); // Water
       system.playPlayerFootstep(new THREE.Vector3(), false, 1.0, true);
       expect(FootstepSynthesis.createWaterFootstep).not.toHaveBeenCalled();
     });
@@ -261,9 +261,9 @@ describe('FootstepAudioSystem', () => {
     });
 
     it('should use correct volume for ROCK', () => {
-      mockHeightQueryCache.getHeightAt.mockReturnValue(10); // Base
+      vi.mocked(mockTerrainSystem.getHeightAt).mockReturnValue(10); // Base
       // Mock slope > 0.5
-      mockHeightQueryCache.getHeightAt.mockImplementation((x: number) => x > 0 ? 12 : 10);
+      vi.mocked(mockTerrainSystem.getHeightAt).mockImplementation((x: number) => x > 0 ? 12 : 10);
       
       system.playPlayerFootstep(new THREE.Vector3(0, 10, 0), false, 1.0, true);
       expect(FootstepSynthesis.createRockFootstep).not.toHaveBeenCalled();
@@ -272,13 +272,13 @@ describe('FootstepAudioSystem', () => {
 
   describe('terrain configurations', () => {
     it('should use correct volume for MUD', () => {
-      mockHeightQueryCache.getHeightAt.mockReturnValue(2.5); // Mud
+      vi.mocked(mockTerrainSystem.getHeightAt).mockReturnValue(2.5); // Mud
       system.playPlayerFootstep(new THREE.Vector3(), false, 1.0, true);
       expect(FootstepSynthesis.createMudFootstep).not.toHaveBeenCalled();
     });
 
     it('should use correct volume for WATER', () => {
-      mockHeightQueryCache.getHeightAt.mockReturnValue(0.5); // Water
+      vi.mocked(mockTerrainSystem.getHeightAt).mockReturnValue(0.5); // Water
       system.playPlayerFootstep(new THREE.Vector3(), false, 1.0, true);
       expect(FootstepSynthesis.createWaterFootstep).not.toHaveBeenCalled();
     });

@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { HelipadSystem } from './HelipadSystem';
 import { HelicopterPhysics, HelicopterControls } from './HelicopterPhysics';
 import { getAircraftConfig } from './AircraftConfigs';
@@ -9,12 +8,12 @@ import { createHelicopterGeometry } from './HelicopterGeometry';
 import { HelicopterAnimation } from './HelicopterAnimation';
 import { HelicopterAudio } from './HelicopterAudio';
 import { HelicopterInteraction } from './HelicopterInteraction';
-import { IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
+import type { IHUDSystem, IPlayerController, ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { PlayerInput } from '../player/PlayerInput';
 
 export class HelicopterModel implements GameSystem {
   private scene: THREE.Scene;
-  private terrainManager?: ImprovedChunkManager;
+  private terrainManager?: ITerrainRuntime;
   private helipadSystem?: HelipadSystem;
   private playerController?: IPlayerController;
   private hudSystem?: IHUDSystem;
@@ -42,7 +41,7 @@ export class HelicopterModel implements GameSystem {
     Logger.debug('helicopter', ' Initializing Helicopter Model System...');
   }
 
-  setTerrainManager(terrainManager: ImprovedChunkManager): void {
+  setTerrainManager(terrainManager: ITerrainRuntime): void {
     this.terrainManager = terrainManager;
     this.interaction.setTerrainManager(terrainManager);
   }
@@ -88,10 +87,10 @@ export class HelicopterModel implements GameSystem {
       const helipadPosition = this.helipadSystem.getHelipadPosition(helipadInfo.id);
       if (!helipadPosition) continue;
 
-      // Terrain must be loaded
+      // Terrain must be ready at the helipad position
       const terrainHeight = this.terrainManager.getHeightAt(helipadPosition.x, helipadPosition.z);
-      const chunk = this.terrainManager.getChunkAt(helipadPosition);
-      if (terrainHeight <= -100 && !chunk) continue;
+      const hasTerrain = this.terrainManager.isTerrainReady() && this.terrainManager.hasTerrainAt(helipadPosition.x, helipadPosition.z);
+      if (terrainHeight <= -100 && !hasTerrain) continue;
 
       const helicopterId = `heli_${helipadInfo.id}`;
       await this.createHelicopterAtHelipad(helicopterId, helipadInfo.aircraft, helipadPosition);

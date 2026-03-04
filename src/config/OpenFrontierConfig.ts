@@ -10,6 +10,7 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
 
   worldSize: 3200, // ~2x2 miles
   chunkRenderDistance: 10,
+  terrainSeed: 'random',
   terrain: {
     defaultBiome: 'denseJungle',
     biomeRules: [

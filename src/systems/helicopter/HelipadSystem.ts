@@ -1,7 +1,7 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { GameModeManager } from '../world/GameModeManager';
 import { modelLoader } from '../assets/ModelLoader';
 import { StructureModels } from '../assets/modelPaths';
@@ -15,7 +15,7 @@ export interface HelipadInfo {
 
 export class HelipadSystem implements GameSystem {
   private scene: THREE.Scene;
-  private terrainManager?: ImprovedChunkManager;
+  private terrainManager?: ITerrainRuntime;
   private vegetationSystem?: { clearArea?: (x: number, z: number, radius: number) => void; addExclusionZone?: (x: number, z: number, radius: number) => void };
   private gameModeManager?: GameModeManager;
   private helipads: Map<string, THREE.Group> = new Map();
@@ -30,7 +30,7 @@ export class HelipadSystem implements GameSystem {
     Logger.info('helicopter', 'Initializing Helipad System...');
   }
 
-  setTerrainManager(terrainManager: ImprovedChunkManager): void {
+  setTerrainManager(terrainManager: ITerrainRuntime): void {
     this.terrainManager = terrainManager;
   }
 
@@ -203,10 +203,9 @@ export class HelipadSystem implements GameSystem {
     const configHelipads = currentConfig.helipads;
     const checkPos = configHelipads?.[0]?.position ?? this.getHelipadAnchorPosition();
     const testHeight = this.terrainManager.getHeightAt(checkPos.x, checkPos.z);
-    const chunk = this.terrainManager.getChunkAt(new THREE.Vector3(checkPos.x, 0, checkPos.z));
-    const isChunkLoaded = chunk !== undefined;
+    const hasTerrain = this.terrainManager.isTerrainReady() && this.terrainManager.hasTerrainAt(checkPos.x, checkPos.z);
 
-    if ((testHeight > -100 && isChunkLoaded) || testHeight > 0) {
+    if ((testHeight > -100 && hasTerrain) || testHeight > 0) {
       Logger.info('helicopter', `${currentConfig.name} mode - creating ${configHelipads?.length ?? 1} helipads`);
       void this.createAllHelipads();
     }

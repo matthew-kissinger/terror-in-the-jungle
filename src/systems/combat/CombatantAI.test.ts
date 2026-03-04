@@ -92,7 +92,7 @@ vi.mock('./ai/AITargeting', () => ({
     shouldSeekCover = vi.fn(() => false)
     findNearestCover = vi.fn(() => null)
     isCoverFlanked = vi.fn(() => false)
-    setChunkManager = vi.fn()
+    setTerrainSystem = vi.fn()
     setSandbagSystem = vi.fn()
     setSmokeCloudSystem = vi.fn()
   },
@@ -101,7 +101,7 @@ vi.mock('./ai/AITargeting', () => ({
 vi.mock('./ai/AICoverSystem', () => ({
   AICoverSystem: class {
     cleanupOccupation = vi.fn()
-    setChunkManager = vi.fn()
+    setTerrainSystem = vi.fn()
     setSandbagSystem = vi.fn()
   },
 }))
@@ -111,7 +111,7 @@ vi.mock('./ai/AIFlankingSystem', () => ({
     getActiveOperation = vi.fn(() => null)
     updateFlankingOperation = vi.fn()
     cleanupOperations = vi.fn()
-    setChunkManager = vi.fn()
+    setTerrainSystem = vi.fn()
   },
 }))
 

@@ -6,7 +6,6 @@
 import * as THREE from 'three';
 import { Faction } from '../systems/combat/types';
 import type { CameraShakeSystem } from '../systems/effects/CameraShakeSystem';
-import type { ImprovedChunkManager } from '../systems/terrain/ImprovedChunkManager';
 import type { GameModeManager } from '../systems/world/GameModeManager';
 import type { HelicopterModel } from '../systems/helicopter/HelicopterModel';
 import type { GrenadeSystem } from '../systems/weapons/GrenadeSystem';
@@ -101,7 +100,7 @@ export interface IPlayerController {
   getHelicopterId(): string | null;
 
   // Dependency setters
-  setChunkManager(chunkManager: ImprovedChunkManager): void;
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void;
   setGameModeManager(gameModeManager: GameModeManager): void;
   setHelicopterModel(helicopterModel: HelicopterModel): void;
   setFirstPersonWeapon(firstPersonWeapon: FirstPersonWeapon): void;
@@ -150,12 +149,27 @@ export interface IFirstPersonWeapon {
 }
 
 /**
- * Chunk Manager interface - terrain queries and management
+ * Terrain runtime interface - minimal truthful surface for systems that depend
+ * on terrain presence and height.
  */
-export interface IChunkManager {
-  getTerrainHeightAt(x: number, z: number): number;
-  getChunkAt(worldPos: THREE.Vector3): any;
-  isChunkLoaded(x: number, z: number): boolean;
+export interface ITerrainRuntime {
+  getHeightAt(x: number, z: number): number;
+  getEffectiveHeightAt(x: number, z: number): number;
+  isTerrainReady(): boolean;
+  hasTerrainAt(x: number, z: number): boolean;
+  getActiveTerrainTileCount(): number;
+  updatePlayerPosition(position: THREE.Vector3): void;
+  registerCollisionObject(id: string, object: THREE.Object3D): void;
+  unregisterCollisionObject(id: string): void;
+  raycastTerrain(origin: THREE.Vector3, direction: THREE.Vector3, maxDistance: number): { hit: boolean; point?: THREE.Vector3; distance?: number };
+}
+
+/**
+ * Terrain runtime controller surface for systems that tune runtime policy in
+ * addition to querying terrain state.
+ */
+export interface ITerrainRuntimeController extends ITerrainRuntime {
+  setRenderDistance(distance: number): void;
 }
 
 /**

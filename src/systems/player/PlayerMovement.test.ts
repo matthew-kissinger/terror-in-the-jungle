@@ -3,13 +3,13 @@ import { PlayerMovement } from './PlayerMovement';
 import { PlayerState } from '../../types';
 import * as THREE from 'three';
 import { PlayerInput } from './PlayerInput';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import { TerrainSystem } from '../terrain/TerrainSystem';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { FootstepAudioSystem } from '../audio/FootstepAudioSystem';
 
 // Mock dependencies
 vi.mock('./PlayerInput');
-vi.mock('../terrain/ImprovedChunkManager');
+vi.mock('../terrain/TerrainSystem');
 vi.mock('../weapons/SandbagSystem');
 vi.mock('../audio/FootstepAudioSystem');
 vi.mock('../../utils/Logger');
@@ -19,7 +19,7 @@ describe('PlayerMovement', () => {
   let playerState: PlayerState;
   let mockInput: PlayerInput;
   let mockCamera: THREE.Camera;
-  let mockChunkManager: ImprovedChunkManager;
+  let mockTerrainSystem: TerrainSystem;
   let mockSandbagSystem: SandbagSystem;
   let mockFootstepAudio: FootstepAudioSystem;
 
@@ -68,7 +68,7 @@ describe('PlayerMovement', () => {
     } as any;
 
     // Setup mock chunk manager
-    mockChunkManager = {
+    mockTerrainSystem = {
       getEffectiveHeightAt: vi.fn().mockReturnValue(0)
     } as any;
 
@@ -150,7 +150,7 @@ describe('PlayerMovement', () => {
 
   describe('updateMovement - basic movement', () => {
     beforeEach(() => {
-      playerMovement.setChunkManager(mockChunkManager);
+      playerMovement.setTerrainSystem(mockTerrainSystem);
       playerMovement.setSandbagSystem(mockSandbagSystem);
     });
 
@@ -222,7 +222,7 @@ describe('PlayerMovement', () => {
 
   describe('updateMovement - gravity and ground detection', () => {
     beforeEach(() => {
-      playerMovement.setChunkManager(mockChunkManager);
+      playerMovement.setTerrainSystem(mockTerrainSystem);
       playerMovement.setSandbagSystem(mockSandbagSystem);
     });
 
@@ -240,7 +240,7 @@ describe('PlayerMovement', () => {
       playerState.position.y = 5;
       playerState.velocity.y = -10;
       playerState.isGrounded = false;
-      vi.mocked(mockChunkManager.getEffectiveHeightAt).mockReturnValue(0);
+      vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockReturnValue(0);
 
       playerMovement.updateMovement(0.5, mockInput, mockCamera); // Large deltaTime to ensure landing
 
@@ -253,7 +253,7 @@ describe('PlayerMovement', () => {
     it('should set isGrounded to false when in air', () => {
       playerState.position.y = 10;
       playerState.isGrounded = true;
-      vi.mocked(mockChunkManager.getEffectiveHeightAt).mockReturnValue(0);
+      vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockReturnValue(0);
 
       playerMovement.updateMovement(0.016, mockInput, mockCamera);
 
@@ -263,7 +263,7 @@ describe('PlayerMovement', () => {
     it('should query terrain height from chunk manager', () => {
       playerMovement.updateMovement(0.016, mockInput, mockCamera);
 
-      expect(mockChunkManager.getEffectiveHeightAt).toHaveBeenCalled();
+      expect(mockTerrainSystem.getEffectiveHeightAt).toHaveBeenCalled();
     });
 
     it('should use default height when no chunk manager', () => {
@@ -280,7 +280,7 @@ describe('PlayerMovement', () => {
 
   describe('updateMovement - collision detection', () => {
     beforeEach(() => {
-      playerMovement.setChunkManager(mockChunkManager);
+      playerMovement.setTerrainSystem(mockTerrainSystem);
       playerMovement.setSandbagSystem(mockSandbagSystem);
     });
 
@@ -329,7 +329,7 @@ describe('PlayerMovement', () => {
 
   describe('updateMovement - landing sound', () => {
     beforeEach(() => {
-      playerMovement.setChunkManager(mockChunkManager);
+      playerMovement.setTerrainSystem(mockTerrainSystem);
       playerMovement.setSandbagSystem(mockSandbagSystem);
       playerMovement.setFootstepAudioSystem(mockFootstepAudio);
     });
@@ -338,7 +338,7 @@ describe('PlayerMovement', () => {
       playerState.position.y = 10;
       playerState.velocity.y = -6; // Above threshold
       playerState.isGrounded = false;
-      vi.mocked(mockChunkManager.getEffectiveHeightAt).mockReturnValue(0);
+      vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockReturnValue(0);
 
       playerMovement.updateMovement(0.5, mockInput, mockCamera);
 
@@ -357,7 +357,7 @@ describe('PlayerMovement', () => {
       playerState.position.y = 2.5;
       playerState.velocity.y = -4; // Below -5 threshold
       playerState.isGrounded = false;
-      vi.mocked(mockChunkManager.getEffectiveHeightAt).mockReturnValue(0);
+      vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockReturnValue(0);
 
       playerMovement.updateMovement(0.016, mockInput, mockCamera); // Small deltaTime
 
@@ -367,7 +367,7 @@ describe('PlayerMovement', () => {
 
   describe('updateMovement - footstep audio', () => {
     beforeEach(() => {
-      playerMovement.setChunkManager(mockChunkManager);
+      playerMovement.setTerrainSystem(mockTerrainSystem);
       playerMovement.setSandbagSystem(mockSandbagSystem);
       playerMovement.setFootstepAudioSystem(mockFootstepAudio);
     });
@@ -613,7 +613,7 @@ describe('PlayerMovement', () => {
 
   describe('Edge cases', () => {
     beforeEach(() => {
-      playerMovement.setChunkManager(mockChunkManager);
+      playerMovement.setTerrainSystem(mockTerrainSystem);
       playerMovement.setSandbagSystem(mockSandbagSystem);
     });
 

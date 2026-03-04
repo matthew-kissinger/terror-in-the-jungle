@@ -1,8 +1,7 @@
 import * as THREE from 'three'
 import { Combatant } from '../types'
-import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager'
+import type { ITerrainRuntime } from '../../../types/SystemInterfaces'
 import { objectPool } from '../../../utils/ObjectPoolManager'
-import { getHeightQueryCache } from '../../terrain/HeightQueryCache'
 
 // Module-level scratch vectors for tactical calculations
 const _leftDir = new THREE.Vector3()
@@ -15,12 +14,12 @@ const _centroidCopy = new THREE.Vector3()
  * Tactical resolver for flanking direction and waypoint calculations
  */
 export class FlankingTacticsResolver {
-  private chunkManager?: ImprovedChunkManager
+  private terrainSystem?: ITerrainRuntime
   private readonly FLANK_ANGLE_DEG = 60  // Angle offset for flanking position
   private readonly FLANK_DISTANCE = 25  // Distance from target for flanking position
 
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.chunkManager = chunkManager
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem
   }
 
   /**
@@ -50,14 +49,14 @@ export class FlankingTacticsResolver {
     let leftScore = 0
     let rightScore = 0
 
-    if (this.chunkManager) {
+    if (this.terrainSystem) {
       // Sample terrain along flank routes
       for (let dist = 10; dist <= this.FLANK_DISTANCE; dist += 10) {
         _leftPos.copy(centroid).add(_centroidCopy.copy(_leftDir).multiplyScalar(dist))
         _rightPos.copy(centroid).add(_centroidCopy.copy(_rightDir).multiplyScalar(dist))
 
-        const leftHeight = getHeightQueryCache().getHeightAt(_leftPos.x, _leftPos.z)
-        const rightHeight = getHeightQueryCache().getHeightAt(_rightPos.x, _rightPos.z)
+        const leftHeight = this.terrainSystem.getHeightAt(_leftPos.x, _leftPos.z)
+        const rightHeight = this.terrainSystem.getHeightAt(_rightPos.x, _rightPos.z)
 
         // Prefer elevated positions
         leftScore += leftHeight
@@ -102,8 +101,8 @@ export class FlankingTacticsResolver {
     )
 
     // Set terrain height
-    if (this.chunkManager) {
-      waypoint.y = getHeightQueryCache().getHeightAt(waypoint.x, waypoint.z)
+    if (this.terrainSystem) {
+      waypoint.y = this.terrainSystem.getHeightAt(waypoint.x, waypoint.z)
     }
 
     return waypoint

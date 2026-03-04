@@ -1,242 +1,368 @@
 # Terrain Domain
 
-Self-contained reference for the Terrain domain. 2 blocks, 26 modules, 2ms tick budget.
+Current reference for the live terrain domain.
 
-Base URL: `https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src`
+Status: active runtime/query boundaries are now explicit. `TerrainSystem` owns runtime orchestration, `TerrainQueries` exposes gameplay-facing terrain queries, and `HeightQueryCache` remains the canonical height data authority underneath those query paths.
 
 ---
 
-## Blocks
+## Summary
+
+The terrain domain currently consists of three explicit blocks:
+
+1. `TerrainSystem`
+   Active terrain runtime facade. Owns render-time terrain selection, terrain material setup, near-field collision proxy generation, biome/vegetation orchestration, and runtime lifecycle.
+
+2. `TerrainQueries`
+   Gameplay-facing terrain query surface. Owns terrain height/effective-height queries, collision object registration, and terrain LOS/raycast access.
+
+3. `HeightQueryCache`
+   Canonical terrain data service. Owns the active `IHeightProvider`, cached `getHeightAt()` access, and provider switching between procedural and DEM terrain.
+
+This is now a valid layered block shape instead of an implicit split.
+
+---
+
+## Active Blocks
 
 | Block | File | Tick | Budget | Status |
 |-------|------|------|--------|--------|
-| [ImprovedChunkManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ImprovedChunkManager.ts) | `systems/terrain/ImprovedChunkManager.ts` | Terrain | 2ms | Active |
-| [GPUTerrain](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/GPUTerrain.ts) | `systems/terrain/GPUTerrain.ts` | - | - | DISABLED (comment in SystemInitializer: "going with web workers approach instead") |
+| `TerrainSystem` | `src/systems/terrain/TerrainSystem.ts` | Terrain | 2ms | Active |
+| `TerrainQueries` | `src/systems/terrain/TerrainQueries.ts` | shared service | unbudgeted | Active |
+| `HeightQueryCache` | `src/systems/terrain/HeightQueryCache.ts` | shared service | unbudgeted | Active |
 
 ---
 
-## Module Registry
+## TerrainSystem
 
-### Chunk Management (7 modules)
+### Role
+
+`TerrainSystem` is the active terrain runtime injected into core game systems.
+
+It currently owns:
+- terrain runtime orchestration across render, surface, raycast/query, vegetation, and workers
+- terrain biome/material orchestration via `TerrainBiomeRuntimeConfig`
+- collision object registry and terrain ray queries via `TerrainQueries`
+- vegetation scatter triggering via `VegetationScatterer`
+- worker access via `TerrainWorkerPool`
+- a shrinking transitional metrics surface retained for runtime reporting
+
+### Constructor Dependencies
+
+Injected at construction:
+- `scene`
+- `camera`
+- `assetLoader`
+- `globalBillboardSystem`
+- terrain runtime bootstrap config
+
+### Public Contract
+
+The runtime currently exposes four categories of API:
+
+Rendering/runtime:
+- `init()`
+- `update(deltaTime)`
+- `dispose()`
+- `updatePlayerPosition(position)`
+
+Queries/collision:
+- `getHeightAt(x, z)`
+- `getEffectiveHeightAt(x, z)`
+- `raycastTerrain(origin, direction, maxDistance)`
+- `registerCollisionObject(id, object)`
+- `unregisterCollisionObject(id)`
+- `checkObjectCollision(position, radius)`
+- `getLOSAccelerator()`
+
+Worker/config:
+- `getWorkerPool()`
+- `getWorkerStats()`
+- `getWorkerTelemetry()`
+- `setChunkSize(size)`
+- `setRenderDistance(distance)`
+- `setWorldSize(worldSize)`
+- `setBiomeConfig(defaultBiomeId, biomeRules)`
+- `isTerrainReady()`
+- `hasTerrainAt(x, z)`
+
+Runtime config/metrics:
+- `getChunkSize()`
+- `getActiveTerrainTileCount()`
+
+### Fan-In
+
+`TerrainSystem` is wired into:
+- `PlayerController`
+- `CombatantSystem`
+- `ZoneManager`
+- `PlayerRespawnManager`
+- `HelipadSystem`
+- `HelicopterModel`
+- `GameModeManager`
+- `FootstepAudioSystem`
+- `GrenadeSystem`
+- `MortarSystem`
+- `SandbagSystem`
+
+This is a high-coupling block.
+
+### Main Critique
+
+As a block, `TerrainSystem` is overburdened.
+
+It tries to be:
+- the terrain runtime,
+- the gameplay query service,
+- the collision/raycast provider.
+
+That load is materially lower than before because render, surface, and raycast internals have been split into dedicated runtime modules, and live consumers now depend on `ITerrainRuntime` / `ITerrainRuntimeController` instead of deleted chunk-era shims.
+
+The remaining architectural pressure is internal cohesion, not fake public compatibility.
+
+---
+
+## TerrainQueries
+
+### Role
+
+`TerrainQueries` is the gameplay terrain query boundary.
+
+It owns:
+- canonical `getHeightAt()` access through `HeightQueryCache`
+- effective-height queries against near-field collision objects
+- terrain raycast and LOS integration
+- collision object registration for non-height terrain blockers
+
+### Why it matters
+
+Gameplay systems should not care whether terrain render data comes from CDLOD selection, heightmap baking, or future tiled DEM streaming.
+
+They need:
+- terrain height,
+- effective standing height,
+- terrain presence/readiness,
+- terrain ray queries.
+
+Those semantics are now exposed through `TerrainSystem` as a runtime facade over `TerrainQueries`, rather than through ad hoc direct `HeightQueryCache` reads across combat/player/world code.
+
+---
+
+## HeightQueryCache
+
+### Role
+
+`HeightQueryCache` remains the practical terrain data authority for much of the game.
+
+It owns:
+- the current `IHeightProvider`
+- cached `getHeightAt()` access
+- provider switching between procedural and DEM terrain
+
+### Why it matters
+
+`HeightQueryCache` still matters because it is the one canonical height source beneath gameplay and render/runtime consumers.
+
+Direct `getHeightQueryCache()` usage is now confined to:
+- terrain internals such as `TerrainQueries`, `TerrainSystem`, and `VegetationScatterer`
+- startup/provider wiring in `GameEngineInit`
+
+### Main Critique
+
+This split is now explicit and acceptable:
+- `HeightQueryCache` is the data authority,
+- `TerrainQueries` is the gameplay query layer,
+- `TerrainSystem` is the runtime facade and orchestration block.
+
+The remaining concern is not authority confusion. It is whether `TerrainSystem` should continue to host both runtime orchestration and query-surface forwarding long term.
+
+---
+
+## Internal Modules
+
+### Runtime/render modules
 
 | Module | File | Role |
 |--------|------|------|
-| [ImprovedChunkManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ImprovedChunkManager.ts) | `systems/terrain/ImprovedChunkManager.ts` | Orchestrator. Ring-based load/unload, adaptive render distance (FPS EMA), 0.25s update cadence. Implements `GameSystem`. |
-| [ImprovedChunk](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ImprovedChunk.ts) | `systems/terrain/ImprovedChunk.ts` | Single chunk lifecycle: generate, add to scene, hold heightData + vegetation map, dispose. |
-| [ChunkLifecycleManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkLifecycleManager.ts) | `systems/terrain/ChunkLifecycleManager.ts` | Chunk create/destroy, loadChunkImmediate for startup, exposes `getChunks()` / `getLoadingChunks()`. |
-| [ChunkLoadQueueManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkLoadQueueManager.ts) | `systems/terrain/ChunkLoadQueueManager.ts` | Drains priority queue via `requestIdleCallback` (fallback: 100ms timeout). Per-frame budget enforced. |
-| [ChunkLoadingStrategy](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkLoadingStrategy.ts) | `systems/terrain/ChunkLoadingStrategy.ts` | Decides which chunks to load next; delegates to ChunkLifecycleManager. |
-| [ChunkPriorityManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkPriorityManager.ts) | `systems/terrain/ChunkPriorityManager.ts` | Distance-based priority queue. Detects player chunk change, exposes `updateLoadQueue()`. |
-| [ChunkTaskQueue](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkTaskQueue.ts) | `systems/terrain/ChunkTaskQueue.ts` | Worker task queue (max 48). Priority sort on dequeue, deduplication via in-flight map. |
+| `TerrainSystem` | `src/systems/terrain/TerrainSystem.ts` | Top-level terrain runtime facade |
+| `TerrainRenderRuntime` | `src/systems/terrain/TerrainRenderRuntime.ts` | Frustum extraction, quadtree selection, instanced draw submission |
+| `TerrainSurfaceRuntime` | `src/systems/terrain/TerrainSurfaceRuntime.ts` | Heightmap bake, terrain material creation, material refresh on world/provider/biome changes |
+| `TerrainRaycastRuntime` | `src/systems/terrain/TerrainRaycastRuntime.ts` | Near-field BVH terrain mesh rebuild and LOS accelerator registration |
+| `CDLODQuadtree` | `src/systems/terrain/CDLODQuadtree.ts` | Terrain tile selection |
+| `CDLODRenderer` | `src/systems/terrain/CDLODRenderer.ts` | Instanced terrain tile renderer |
+| `TerrainMaterial` | `src/systems/terrain/TerrainMaterial.ts` | Shader/material injection for terrain |
+| `HeightmapGPU` | `src/systems/terrain/HeightmapGPU.ts` | CPU->GPU height/normal bake and sampling |
 
-### Worker System (4 modules)
-
-| Module | File | Role |
-|--------|------|------|
-| [ChunkWorkerPool](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkWorkerPool.ts) | `systems/terrain/ChunkWorkerPool.ts` | 2-8 web workers (defaults to `navigator.hardwareConcurrency`). 30s watchdog via `Promise.race`. Exposes `generateChunk()` returning `ChunkGeometryResult`. |
-| [ChunkWorkerAdapter](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkWorkerAdapter.ts) | `systems/terrain/ChunkWorkerAdapter.ts` | Main-thread adapter: reconstructs Three.js mesh + vegetation map from transferred ArrayBuffers. |
-| [ChunkWorkerLifecycle](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkWorkerLifecycle.ts) | `systems/terrain/ChunkWorkerLifecycle.ts` | Worker create/assign/terminate. Owns `WorkerState[]`. Fires `onWorkerReady`, `onWorkerResult`, `onWorkerError` callbacks. |
-| [ChunkWorkerTelemetry](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkWorkerTelemetry.ts) | `systems/terrain/ChunkWorkerTelemetry.ts` | Worker timing stats: chunksGenerated, avgGenerationTimeMs, workersReady, duplicatesAvoided. |
-
-### Height System (5 modules)
+### Query/data modules
 
 | Module | File | Role |
 |--------|------|------|
-| [HeightQueryCache](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/HeightQueryCache.ts) | `systems/terrain/HeightQueryCache.ts` | **SINGLETON** via `getHeightQueryCache()`. LRU cache (10k entries, 0.5m snap grid). Delegates to IHeightProvider. Exposes `getHeightAt`, `getNormalAt`, `getSlopeAt`, `isUnderwater`, `preloadRegion`, `setProvider`. |
-| [IHeightProvider](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/IHeightProvider.ts) | `systems/terrain/IHeightProvider.ts` | Interface: `getHeightAt(x,z)` + `getWorkerConfig(): HeightProviderConfig`. Config is a discriminated union `{type:'noise',seed}` or `{type:'dem',...}`. |
-| [NoiseHeightProvider](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/NoiseHeightProvider.ts) | `systems/terrain/NoiseHeightProvider.ts` | Default provider. Multi-layer noise: continental (0.001), ridges (0.003), valleys (0.008), hills (0.015/0.03/0.06), detail (0.1). Water/river carving logic. Heights: -8 to ~130m. |
-| [DEMHeightProvider](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/DEMHeightProvider.ts) | `systems/terrain/DEMHeightProvider.ts` | Real DEM Float32Array. Bilinear interpolation, grid centered at `(originX, originZ)`. A Shau Valley: 21km real terrain. Static `sampleBilinear()` used by inline worker code. |
-| [BiomeClassifier](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/BiomeClassifier.ts) | `systems/terrain/BiomeClassifier.ts` | `classifyBiome(elevation, slopeDeg, rules, default)` - priority-sorted rule matching. `computeSlopeDeg(cx, cz, dist, getHeight)` - 4-neighbour finite difference. |
+| `HeightQueryCache` | `src/systems/terrain/HeightQueryCache.ts` | Cached terrain height authority |
+| `IHeightProvider` | `src/systems/terrain/IHeightProvider.ts` | Height-provider interface |
+| `NoiseHeightProvider` | `src/systems/terrain/NoiseHeightProvider.ts` | Procedural terrain source |
+| `DEMHeightProvider` | `src/systems/terrain/DEMHeightProvider.ts` | DEM terrain source |
+| `TerrainQueries` | `src/systems/terrain/TerrainQueries.ts` | Collision object + LOS query facade |
 
-### Geometry (6 modules)
-
-| Module | File | Role |
-|--------|------|------|
-| [ChunkGeometryBuilder](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkGeometryBuilder.ts) | `systems/terrain/ChunkGeometryBuilder.ts` | Static methods: `createGeometryFromHeightData` (PlaneGeometry + Y-displacement + BVH), `createMeshFromGeometry`. |
-| [ChunkMaterials](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkMaterials.ts) | `systems/terrain/ChunkMaterials.ts` | Material management per chunk. |
-| [ChunkHeightGenerator](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkHeightGenerator.ts) | `systems/terrain/ChunkHeightGenerator.ts` | Static: `generateHeightAt`, `generateHeightData`. Thin wrapper over `NoiseHeightProvider.calculateHeight`. |
-| [ChunkHeightQueries](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkHeightQueries.ts) | `systems/terrain/ChunkHeightQueries.ts` | Static: `getHeightAtLocal` (bilinear from Float32Array), `getHeightAt` (world coords), `getHeightAtRaycast` (BVH raycast fallback). |
-| [ChunkTerrainQueries](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkTerrainQueries.ts) | `systems/terrain/ChunkTerrainQueries.ts` | Collision object registry (LOSAccelerator), effective height from chunks, raycasting utilities. Uses module-level scratch vectors. |
-| [ChunkVegetationGenerator](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkVegetationGenerator.ts) | `systems/terrain/ChunkVegetationGenerator.ts` | Per-chunk billboard placement. Slope limits (canopy 30 deg, midlevel 40 deg). Integer-hash density noise. TrunkGrid O(1) suppress radius check. |
-
-### Mesh (3 modules)
+### Vegetation/worker modules
 
 | Module | File | Role |
 |--------|------|------|
-| [TerrainMeshFactory](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/TerrainMeshFactory.ts) | `systems/terrain/TerrainMeshFactory.ts` | `createTerrainMesh` (from heightData) and `createTerrainMeshFromGeometry` (from worker result). Sets `receiveShadow`, positions mesh at `chunkX*size+size/2`. |
-| [TerrainMeshMerger](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/TerrainMeshMerger.ts) | `systems/terrain/TerrainMeshMerger.ts` | Merges per-chunk meshes into 10 distance rings (reduces ~100-150 draw calls to ~10). 500ms debounce, 3 rings/pass max. `ENABLE_MERGED_BVH=false` (visual only). Currently `enableMeshMerging: false` in config. |
-| [BiomeTexturePool](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/BiomeTexturePool.ts) | `systems/terrain/BiomeTexturePool.ts` | One `MeshLambertMaterial` per biome, shared across all chunks. Texture repeat=16, trilinear filtering. Fallback color `#4a7c59`. |
+| `VegetationScatterer` | `src/systems/terrain/VegetationScatterer.ts` | Cell-based vegetation scatter runtime |
+| `TerrainWorkerPool` | `src/systems/terrain/TerrainWorkerPool.ts` | Terrain worker access |
+| `terrain.worker.ts` | `src/workers/terrain.worker.ts` | Height bake / terrain work worker |
 
-### Utility (2 modules)
-
-| Module | File | Role |
-|--------|------|------|
-| [ChunkSpatialUtils](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkSpatialUtils.ts) | `systems/terrain/ChunkSpatialUtils.ts` | `worldToChunkCoord`, `getChunkKey` (`"x,z"`), `getChunkDistanceFromPlayer` (Chebyshev). Module-level scratch `Vector2`. |
-| [ChunkLifecycleTypes](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkLifecycleTypes.ts) | `systems/terrain/ChunkLifecycleTypes.ts` | `ChunkLifecycleConfig` interface (size, loadDistance, renderDistance, skipTerrainMesh, enableMeshMerging, defaultBiomeId, biomeRules). |
-
-### GPU Terrain (disabled - 2 modules)
+### Config
 
 | Module | File | Role |
 |--------|------|------|
-| [GPUTerrainGeometry](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/GPUTerrainGeometry.ts) | `systems/terrain/GPUTerrainGeometry.ts` | `createLODRingGeometry`: concentric LOD rings, exponential spacing. Not in use. |
-| [GPUTerrainShaders](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/GPUTerrainShaders.ts) | `systems/terrain/GPUTerrainShaders.ts` | Vertex/fragment shader strings for heightmap texture displacement. Not in use. |
-
-### Workers (src/workers/)
-
-| Module | File | Role |
-|--------|------|------|
-| [ChunkWorker](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/workers/ChunkWorker.ts) | `workers/ChunkWorker.ts` | Web worker entry. Self-contained noise impl (must match `NoiseGenerator.ts` exactly). Handles `generate`, `setHeightProvider`, `setVegetationConfig`, `setBiomeConfig`. Returns transferable ArrayBuffers. |
-| [BVHWorker](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/workers/BVHWorker.ts) | `workers/BVHWorker.ts` | `ViteBVHWorker` class: pool of BVH workers for off-thread collision tree. Uses `bvh.worker.js?worker` (Vite native syntax). |
-| [bvh.worker.js](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/workers/bvh.worker.js) | `workers/bvh.worker.js` | Raw BVH worker script. Imported by BVHWorker.ts via Vite `?worker`. |
+| `TerrainConfig` | `src/systems/terrain/TerrainConfig.ts` | Runtime config and terrain bootstrap config shape |
 
 ---
 
-## Config
+## Wiring Shape
 
-| File | Role |
-|------|------|
-| [config/biomes.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/config/biomes.ts) | `BiomeConfig`, `BiomeClassificationRule`, `TerrainConfig`. All 10 built-in biomes. `BIOMES` record + `getBiome()`. `WorkerBiomeConfig` / `toWorkerBiomeConfig()` for worker transfer. |
-| [config/vegetationTypes.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/config/vegetationTypes.ts) | `VegetationTypeConfig`. All vegetation type definitions. |
+### Core ownership
 
----
+Construction and storage:
+- `SystemInitializer` constructs `TerrainSystem`
+- `SystemManager` stores it as `terrainSystem`
+- `SystemConnector` injects it into dependent systems
 
-## Biomes
+### Runtime mode/config flow
 
-| ID | Name | Ground Texture |
-|----|------|----------------|
-| denseJungle | Dense Jungle | jungle-floor |
-| highland | Highland | rocky-highland |
-| ricePaddy | Rice Paddy | rice-paddy |
-| riverbank | Riverbank | river-bank |
-| cleared | Cleared Area | firebase-ground |
-| tallGrass | Tall Grass | tall-grass |
-| mudTrail | Mud Trail | mud-ground |
-| bambooGrove | Bamboo Grove | bamboo-floor |
-| swamp | Swamp | swamp |
-| defoliated | Defoliated Zone | defoliated-ground |
+Terrain-affecting config currently comes from multiple places:
+- `GameEngineInit` loads DEM and swaps the `HeightQueryCache` provider
+- `GameEngineInit` configures active terrain biome state on `TerrainSystem`
+- `GameModeManager` changes terrain render distance
+- `GameEngineInit` pushes world extent into `TerrainSystem`
 
-Biome selection (DEM mode): `classifyBiome(elevation, slopeDeg, rules, default)` - highest-priority rule that satisfies all constraints wins. Noise mode uses single `defaultBiomeId`.
+This means mode changes intentionally span both:
+- the data-authority layer (`HeightQueryCache`)
+- and the terrain runtime/controller layer (`TerrainSystem`)
+
+That is now a documented bootstrap/config boundary, not an accidental gameplay leak.
 
 ---
 
-## Worker Communication Protocol
+## Behavioral Notes
 
-All messages are typed via `WorkerMessageData` in [ChunkWorkerLifecycle.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkWorkerLifecycle.ts).
+### What is real
 
-### Main thread -> Worker
+Real runtime behavior:
+- terrain mesh exists and updates from quadtree selection
+- heightmap textures are baked from the active provider
+- near-field collision proxy mesh is rebuilt as the player moves
+- height queries can resolve through the runtime
+- weapons and helicopter systems use terrain-effective height methods
+- terrain material now uses live biome textures, biome roughness, and slope-aware triplanar sampling on steep surfaces
+- terrain ground textures now use linear mipmapped filtering instead of nearest/no-mipmap sprite filtering
+- render-only surface bake density now scales with world size; A Shau uses a 512-grid render surface instead of a fixed 1024-grid bake
+- automated preview smoke now confirms shader-clean, terrain-warning-clean startup in both `zone_control` and `a_shau_valley`
 
-| Message | Payload | Notes |
-|---------|---------|-------|
-| `generate` | `{chunkX, chunkZ, size, segments, seed, requestId}` | Triggers geometry generation |
-| `setHeightProvider` | `HeightProviderConfig` (`{type:'noise',seed}` or `{type:'dem',buffer,...}`) | ArrayBuffer transfer for DEM |
-| `setVegetationConfig` | `VegetationTypeConfig[]` | Vegetation type definitions |
-| `setBiomeConfig` | `WorkerBiomeConfig[]` | Biome vegetation palettes |
+### Transitional residue
 
-### Worker -> Main thread
+The dishonest chunk-era compatibility stubs have been removed from the live runtime.
+The remaining issue is internal responsibility load inside `TerrainSystem`, not public chunk-era API residue.
+That load has started to reduce:
+- frustum extraction, quadtree selection, and instanced terrain draw submission now live in `TerrainRenderRuntime`,
+- heightmap bake and terrain material refresh now live in `TerrainSurfaceRuntime`.
+- near-field BVH terrain mesh rebuild and LOS registration now live in `TerrainRaycastRuntime`.
 
-| Message | Payload | Notes |
-|---------|---------|-------|
-| `ready` | - | Worker initialized |
-| `result` | `{requestId, chunkX, chunkZ, positions, normals, uvs, indices, heightData, vegetation, biomeId}` | All geometry as transferable ArrayBuffers (zero-copy) |
-| `providerReady` | - | DEM provider loaded in worker |
-
----
-
-## Height Query Chain
-
-```
-getHeightQueryCache()           // singleton, module-level instance
-  provider: NoiseHeightProvider // default (procedural)
-
-  // A Shau Valley mode:
-  heightCache.setProvider(new DEMHeightProvider(float32data, w, h, metersPerPixel))
-  workerPool.sendHeightProvider(provider.getWorkerConfig())  // workers get same DEM
-
-  getHeightAt(x, z)             // LRU cache, 0.5m snap grid, up to 10k entries
-    -> provider.getHeightAt(x, z)
-       NoiseHeightProvider: multi-layer noise
-       DEMHeightProvider: bilinear interpolation of Float32Array
-```
-
-**Consumers** (all call `getHeightQueryCache().getHeightAt(x, z)`):
-
-- `ChunkLifecycleManager` / `ChunkLoadingStrategy` - chunk grounding
-- `ChunkTerrainQueries` - collision / effective height
-- `ZoneTerrainAdapter` - zone initialization
-- `PlayerRespawnManager` - spawn point grounding
-- `WarSimulator` - strategic agent elevation
-- NPC grounding on every movement update (via CombatantMovement)
-- Helicopter terrain collision (HelicopterPhysics)
-- Helipad placement
+Critical gameplay flow has already moved to:
+- `isTerrainReady()`
+- `hasTerrainAt(x, z)`
 
 ---
 
-## ImprovedChunkManager Key Constants
+## Risks
 
-| Constant | Value | Role |
-|----------|-------|------|
-| `UPDATE_INTERVAL` | 0.25s | Chunk system cadence (not every frame) |
-| `MAX_CHUNKS_PER_FRAME` | 1 | Ingestion limit to reduce spikes |
-| `IN_FRAME_BUDGET_MS` | 2.0ms | Per-frame work budget |
-| `IDLE_BUDGET_MS` | 6.0ms | requestIdleCallback budget |
-| `MAX_QUEUE_SIZE` | 48 | Worker task queue cap |
-| `LOAD_DELAY_FALLBACK` | 100ms | Fallback when rIC unavailable |
-| `FPS_EMA_ALPHA` | 0.1 | Smoothing for adaptive render distance |
-| `ADAPT_COOLDOWN_MS` | 1500ms | Min time between render distance changes |
-| Default `size` | 64 world units | Chunk side length |
-| Default `renderDistance` | 6 chunks | Visible ring radius |
-| Default `loadDistance` | 7 chunks | Load ring (1 beyond visible) |
-| Default `segments` | 32 | Vertices per side in worker |
-| Startup sync chunks | 5 | Center + 4 cardinal neighbors |
+### 1. Runtime facade still carries too much orchestration
 
-Adaptive render distance: shrinks if FPS EMA < 55, grows if > 65. Bounded `[max(3, renderDistance/2), renderDistance]`.
+The terrain domain no longer has misleading public authority split, but `TerrainSystem` still owns:
+- biome/runtime coordination
+- worker coordination
+- render/runtime module orchestration
+- query-surface forwarding
 
----
+That is workable now, but still a hotspot for future hydrology and tiled-DEM work.
 
-## Chunk Lifecycle States
+### 2. Overloaded block
 
-```
-queued (ChunkPriorityManager)
-  -> loading (ChunkLifecycleManager.loadingChunks set)
-    -> worker generates geometry (ChunkWorkerPool)
-      -> result returned (ChunkWorkerAdapter.applyWorkerData)
-        -> chunk added to scene (ChunkLifecycleManager.chunks map)
-          -> chunk unloaded when outside loadDistance (unloadDistantChunks)
-```
+`TerrainSystem` is carrying too many concerns for a block with this much fan-in.
 
-Startup: `loadChunkImmediate` bypasses queue for center + 4 cardinal neighbors (prevents spawn hole).
+### 3. Terrain material is improved but not final
 
----
+The terrain material stack is no longer a placeholder:
+- live biome textures are active,
+- biome roughness is active,
+- steep slopes can switch toward triplanar sampling.
 
-## Wiring
+What is still missing for a fully frontier-grade terrain surface:
+- authored per-layer normal inputs,
+- richer per-layer PBR control beyond roughness,
+- visual validation against A Shau and a small procedural mode.
 
-`ImprovedChunkManager` has **no setter dependencies** - all constructor-injected: `scene`, `camera`, `assetLoader`, `globalBillboardSystem`.
+Current hard evidence:
+- `AssetLoader` currently inventories biome ground albedo textures such as `jungle-floor.webp`, `rocky-highland.webp`, `rice-paddy.webp`, `river-bank.webp`, `firebase-ground.webp`, `tall-grass.webp`, `bamboo-floor.webp`, `swamp.webp`, `defoliated-ground.webp`
+- no parallel terrain-specific normal/roughness/metalness map set is currently present in that active asset inventory
 
-**Fan-in** (7 systems reference it as `ChunkManager`): Combat, Footstep, Helicopter, Helipad, PlayerCtrl, PlayerRespawn, ZoneMgr.
+### 4. Large-world terrain budget still needs wider proof
 
-`HeightQueryCache` is a module-level singleton - no injection needed anywhere, just `import { getHeightQueryCache }`.
+The immediate A Shau startup cost issue that appeared in the earlier smoke artifact has been materially improved:
+- the previous preview smoke artifact (`artifacts/terrain-smoke/2026-03-04T00-38-53-189Z`) reported terrain slow-frame and terrain budget warnings
+- the current preview smoke artifact (`artifacts/terrain-smoke/2026-03-04T00-41-49-250Z`) does not
 
----
+That is strong evidence that the current terrain runtime is in a materially better state.
+It is not yet proof that large-world terrain cost is solved under broader camera motion, combat pressure, or long-run play.
 
-## Tests
+### 5. Stale docs
 
-| Test File | What It Covers |
-|-----------|----------------|
-| [HeightQueryCache.test.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/HeightQueryCache.test.ts) | LRU eviction, cache hits, setProvider, preloadRegion |
-| [ChunkWorkerPool.test.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkWorkerPool.test.ts) | Worker pool lifecycle, deduplication, timeout watchdog |
-| [DEMHeightProvider.test.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/DEMHeightProvider.test.ts) | Bilinear interpolation, out-of-bounds clamping, getWorkerConfig |
-| [ChunkLoadingStrategy.test.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkLoadingStrategy.test.ts) | Load order strategy |
-| [ChunkPriorityManager.test.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ChunkPriorityManager.test.ts) | Distance-based priority, player chunk change detection |
-| [ImprovedChunk.test.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ImprovedChunk.test.ts) | Chunk generation, dispose |
-| [ImprovedChunkManager.test.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/ImprovedChunkManager.test.ts) | Manager init, update, adaptive render distance |
-| [TerrainMeshMerger.test.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/TerrainMeshMerger.test.ts) | Ring merge, draw call reduction |
+Architecture docs elsewhere still describe the deleted chunk architecture.
 
 ---
 
-## Related Docs
+## Recommended Refactor Shape
 
-- `docs/blocks/combat.md` - NPC grounding uses HeightQueryCache
-- `docs/blocks/strategy.md` - WarSimulator elevation queries
-- `docs/blocks/vehicle.md` - Helicopter terrain collision
-- `docs/blocks/world.md` - Zone initialization needs terrain height
-- `docs/ARCHITECTURE_RECOVERY_PLAN.md` - Terrain perf optimization history
+The terrain domain should probably resolve into three explicit blocks:
+
+### `TerrainDataAuthority`
+
+Would own:
+- `HeightQueryCache`
+- provider switching
+- canonical world extents
+- DEM/procedural source semantics
+
+### `TerrainRuntime`
+
+Would own:
+- CDLOD/clipmap/far-field rendering
+- terrain material/shader runtime
+- optional derived collision proxies
+- vegetation runtime orchestration
+
+### `TerrainGameplayQueries`
+
+Would own:
+- effective height
+- terrain-aware collision objects
+- LOS/raycast queries
+- the exact API required by player, AI, weapons, helicopters, and respawn
+
+If old chunk semantics still need to exist temporarily, they should live in a separate adapter, not in the main terrain runtime class.
+
+---
+
+## Verdict
+
+As a block, the terrain domain is now clean enough to build on.
+
+It now fits the system in both wiring and semantic terms:
+- `HeightQueryCache` is the data authority,
+- `TerrainQueries` is the gameplay query layer,
+- `TerrainSystem` is the runtime/controller facade.
+
+That makes the current terrain architecture:
+- promising,
+- high leverage,
+- and finally explicit enough to support the next rewrite stages without misleading future agents.

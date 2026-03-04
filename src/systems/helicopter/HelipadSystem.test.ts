@@ -74,8 +74,8 @@ vi.mock('../../utils/Logger', () => ({
   Logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
 }));
 
-vi.mock('../terrain/ImprovedChunkManager', () => ({
-  ImprovedChunkManager: vi.fn()
+vi.mock('../terrain/TerrainSystem', () => ({
+  TerrainSystem: vi.fn()
 }));
 
 vi.mock('../assets/ModelLoader', () => ({
@@ -115,6 +115,8 @@ function createMockScene(): THREE.Scene {
 function createMockTerrainManager(heightValue = 10) {
   return {
     getHeightAt: vi.fn().mockReturnValue(heightValue),
+    isTerrainReady: vi.fn().mockReturnValue(true),
+    hasTerrainAt: vi.fn().mockReturnValue(true),
     getChunkAt: vi.fn().mockReturnValue({ id: 'chunk-1' }),
     registerCollisionObject: vi.fn(),
     unregisterCollisionObject: vi.fn(),
@@ -386,18 +388,18 @@ describe('HelipadSystem', () => {
 
     it('waits for valid terrain data before creating helipad', () => {
       const tm = createMockTerrainManager(-200);
-      tm.getChunkAt.mockReturnValue(undefined);
+      tm.hasTerrainAt.mockReturnValue(false);
       const gmm = createMockGameModeManager('open_frontier');
       system.setTerrainManager(tm as any);
       system.setGameModeManager(gmm as any);
       system.update(0.016);
-      // Height -200 < -100 and no chunk loaded -> should not create
+      // Height -200 < -100 and no terrain coverage -> should not create
       expect(scene.children.length).toBe(0);
     });
 
     it('creates helipad when terrain height > 0 even without chunk', async () => {
       const tm = createMockTerrainManager(5);
-      tm.getChunkAt.mockReturnValue(undefined);
+      tm.hasTerrainAt.mockReturnValue(false);
       const gmm = createMockGameModeManager('open_frontier');
       system.setTerrainManager(tm as any);
       system.setGameModeManager(gmm as any);
@@ -407,9 +409,9 @@ describe('HelipadSystem', () => {
       expect(scene.children.length).toBe(1);
     });
 
-    it('creates helipad when height > -100 and chunk loaded', async () => {
+    it('creates helipad when height > -100 and terrain is present', async () => {
       const tm = createMockTerrainManager(-50);
-      tm.getChunkAt.mockReturnValue({ id: 'chunk-1' });
+      tm.hasTerrainAt.mockReturnValue(true);
       const gmm = createMockGameModeManager('open_frontier');
       system.setTerrainManager(tm as any);
       system.setGameModeManager(gmm as any);

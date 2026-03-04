@@ -2,14 +2,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { AICoverSystem, CoverSpot } from './AICoverSystem';
 import { Combatant, CombatantState, Faction } from '../types';
-import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
-import * as HeightQueryCache from '../../terrain/HeightQueryCache';
+import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
 
 // Mock dependencies
-const mockChunkManager: ImprovedChunkManager = {
+const mockTerrainSystem: ITerrainRuntime = {
+  getHeightAt: vi.fn((x: number, z: number) => mockHeightQueryCache.getHeightAt(x, z)),
+  getEffectiveHeightAt: vi.fn((x: number, z: number) => mockHeightQueryCache.getHeightAt(x, z)),
+  isTerrainReady: vi.fn(() => true),
+  hasTerrainAt: vi.fn(() => true),
+  getActiveTerrainTileCount: vi.fn(() => 0),
+  updatePlayerPosition: vi.fn(),
+  registerCollisionObject: vi.fn(),
+  unregisterCollisionObject: vi.fn(),
   raycastTerrain: vi.fn(() => ({ hit: false, distance: undefined })),
-} as any;
+};
 
 const mockSandbagSystem: SandbagSystem = {
   getSandbagBounds: vi.fn(() => []),
@@ -82,7 +89,7 @@ describe('AICoverSystem', () => {
 
   beforeEach(() => {
     coverSystem = new AICoverSystem();
-    coverSystem.setChunkManager(mockChunkManager);
+    coverSystem.setTerrainSystem(mockTerrainSystem);
     coverSystem.setSandbagSystem(mockSandbagSystem);
     vi.clearAllMocks();
   });
@@ -95,7 +102,7 @@ describe('AICoverSystem', () => {
 
     it('should accept chunk manager', () => {
       const system = new AICoverSystem();
-      system.setChunkManager(mockChunkManager);
+      system.setTerrainSystem(mockTerrainSystem);
       expect(system).toBeDefined();
     });
 

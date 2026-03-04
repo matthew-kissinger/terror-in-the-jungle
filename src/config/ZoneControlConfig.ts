@@ -24,6 +24,7 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
 
   worldSize: 500,
   chunkRenderDistance: 5,
+  terrainSeed: 'random',
   terrain: {
     defaultBiome: 'denseJungle',
     biomeRules: [

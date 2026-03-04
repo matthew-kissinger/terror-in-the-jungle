@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { CombatantSystem } from '../combat/CombatantSystem';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
@@ -21,7 +21,7 @@ const _direction = new THREE.Vector3();
 export class MortarSystem implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
-  private chunkManager?: ImprovedChunkManager;
+  private terrainSystem?: ITerrainRuntime;
   private combatantSystem?: CombatantSystem;
   private impactEffectsPool?: ImpactEffectsPool;
   private explosionEffectsPool?: ExplosionEffectsPool;
@@ -55,11 +55,11 @@ export class MortarSystem implements GameSystem {
   constructor(
     scene: THREE.Scene,
     camera: THREE.Camera,
-    chunkManager?: ImprovedChunkManager
+    terrainSystem?: ITerrainRuntime
   ) {
     this.scene = scene;
     this.camera = camera;
-    this.chunkManager = chunkManager;
+    this.terrainSystem = terrainSystem;
 
     this.ballistics = new MortarBallistics();
     this.visuals = new MortarVisuals(scene);
@@ -367,8 +367,8 @@ export class MortarSystem implements GameSystem {
   }
 
   private getGroundHeight(x: number, z: number): number {
-    if (this.chunkManager) {
-      return this.chunkManager.getEffectiveHeightAt(x, z);
+    if (this.terrainSystem) {
+      return this.terrainSystem.getEffectiveHeightAt(x, z);
     }
     return 0;
   }

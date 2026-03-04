@@ -28,7 +28,7 @@ const STORAGE_KEY = 'pixelart-sandbox-settings';
 const DEFAULT_SETTINGS: GameSettings = {
   masterVolume: 70,
   mouseSensitivity: 5,
-  touchSensitivity: 5,
+  touchSensitivity: 3,
   controllerPreset: 'default',
   controllerMoveDeadZone: 15,
   controllerLookDeadZone: 15,

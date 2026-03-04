@@ -1,8 +1,7 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem, TerrainType } from '../../types';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
-import { getHeightQueryCache } from '../terrain/HeightQueryCache';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
 const FOOTSTEP_SOUND_PATHS: Record<TerrainType, string> = {
   [TerrainType.GRASS]: 'assets/optimized/footstepGrass.wav',
@@ -31,7 +30,7 @@ export class FootstepAudioSystem implements GameSystem {
   private listener: THREE.AudioListener;
   private audioLoader = new THREE.AudioLoader();
   private footstepBuffers: Partial<Record<TerrainType, AudioBuffer>> = {};
-  private chunkManager?: ImprovedChunkManager;
+  private terrainSystem?: ITerrainRuntime;
   
   // Audio pools for player (non-positional)
   private playerFootstepPool: THREE.Audio[] = [];
@@ -219,11 +218,11 @@ export class FootstepAudioSystem implements GameSystem {
    * Detect terrain type based on position
    */
   private detectTerrainType(position: THREE.Vector3): TerrainType {
-    if (!this.chunkManager) {
+    if (!this.terrainSystem) {
       return TerrainType.GRASS;
     }
     
-    const height = getHeightQueryCache().getHeightAt(position.x, position.z);
+    const height = this.terrainSystem.getHeightAt(position.x, position.z);
     const waterLevel = 1.0;
     const nearWaterThreshold = 2.0;
     
@@ -236,10 +235,10 @@ export class FootstepAudioSystem implements GameSystem {
     }
     
     const sampleDist = 1.0;
-    const h1 = getHeightQueryCache().getHeightAt(position.x + sampleDist, position.z);
-    const h2 = getHeightQueryCache().getHeightAt(position.x - sampleDist, position.z);
-    const h3 = getHeightQueryCache().getHeightAt(position.x, position.z + sampleDist);
-    const h4 = getHeightQueryCache().getHeightAt(position.x, position.z - sampleDist);
+    const h1 = this.terrainSystem.getHeightAt(position.x + sampleDist, position.z);
+    const h2 = this.terrainSystem.getHeightAt(position.x - sampleDist, position.z);
+    const h3 = this.terrainSystem.getHeightAt(position.x, position.z + sampleDist);
+    const h4 = this.terrainSystem.getHeightAt(position.x, position.z - sampleDist);
     
     const slopeX = Math.abs(h1 - h2) / (sampleDist * 2);
     const slopeZ = Math.abs(h3 - h4) / (sampleDist * 2);
@@ -313,10 +312,10 @@ export class FootstepAudioSystem implements GameSystem {
   }
 
   /**
-   * Set chunk manager for terrain detection
+   * Set terrain runtime for terrain detection.
    */
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.chunkManager = chunkManager;
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
   }
 
   private async loadFootstepBuffers(): Promise<void> {

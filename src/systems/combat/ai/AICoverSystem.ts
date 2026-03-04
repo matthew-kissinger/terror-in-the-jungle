@@ -1,9 +1,8 @@
 import * as THREE from 'three'
 import { Combatant, CombatantState } from '../types'
-import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager'
+import type { ITerrainRuntime } from '../../../types/SystemInterfaces'
 import { SandbagSystem } from '../../weapons/SandbagSystem'
 import { objectPool } from '../../../utils/ObjectPoolManager'
-import { getHeightQueryCache } from '../../terrain/HeightQueryCache'
 import { evaluateCoverQuality, evaluateSandbagCover } from './AICoverEvaluation'
 
 /**
@@ -37,7 +36,7 @@ interface ChunkCoverCache {
  * - Occupation status (don't stack AI on same cover)
  */
 export class AICoverSystem {
-  private chunkManager?: ImprovedChunkManager
+  private terrainSystem?: ITerrainRuntime
   private sandbagSystem?: SandbagSystem
 
   // Cache cover spots per chunk key (x_z)
@@ -51,8 +50,8 @@ export class AICoverSystem {
   // Cover occupation tracking
   private coverOccupation: Map<string, string> = new Map()  // coverKey -> combatantId
 
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.chunkManager = chunkManager
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem
   }
 
   setSandbagSystem(sandbagSystem: SandbagSystem): void {
@@ -241,10 +240,10 @@ export class AICoverSystem {
    * Get cover quality score for a position (0-1)
    */
   getCoverQuality(coverPosition: THREE.Vector3, threatPosition: THREE.Vector3): number {
-    if (!this.chunkManager) return 0.5
+    if (!this.terrainSystem) return 0.5
 
-    const coverHeight = getHeightQueryCache().getHeightAt(coverPosition.x, coverPosition.z)
-    const threatHeight = getHeightQueryCache().getHeightAt(threatPosition.x, threatPosition.z)
+    const coverHeight = this.terrainSystem.getHeightAt(coverPosition.x, coverPosition.z)
+    const threatHeight = this.terrainSystem.getHeightAt(threatPosition.x, threatPosition.z)
 
     // Height advantage score
     const heightAdvantage = Math.max(0, Math.min(1, (coverHeight - threatHeight) / 5))
@@ -292,7 +291,7 @@ export class AICoverSystem {
   }
 
   private generateCoverSpotsForChunk(chunkKey: string): CoverSpot[] {
-    if (!this.chunkManager) return []
+    if (!this.terrainSystem) return []
 
     const spots: CoverSpot[] = []
     const now = Date.now()
@@ -308,14 +307,14 @@ export class AICoverSystem {
         const worldX = chunkX + x
         const worldZ = chunkZ + z
 
-        const height = getHeightQueryCache().getHeightAt(worldX, worldZ)
+        const height = this.terrainSystem.getHeightAt(worldX, worldZ)
 
         // Check surrounding heights for elevation changes
         const heights = [
-          getHeightQueryCache().getHeightAt(worldX + 3, worldZ),
-          getHeightQueryCache().getHeightAt(worldX - 3, worldZ),
-          getHeightQueryCache().getHeightAt(worldX, worldZ + 3),
-          getHeightQueryCache().getHeightAt(worldX, worldZ - 3)
+          this.terrainSystem.getHeightAt(worldX + 3, worldZ),
+          this.terrainSystem.getHeightAt(worldX - 3, worldZ),
+          this.terrainSystem.getHeightAt(worldX, worldZ + 3),
+          this.terrainSystem.getHeightAt(worldX, worldZ - 3)
         ]
 
         const avgHeight = heights.reduce((a, b) => a + b, 0) / heights.length

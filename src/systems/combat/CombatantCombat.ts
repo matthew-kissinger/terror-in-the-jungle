@@ -7,7 +7,7 @@ import { PlayerHealthSystem } from '../player/PlayerHealthSystem';
 import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
 import { CombatantHitDetection } from './CombatantHitDetection';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { CombatantRenderer } from './CombatantRenderer';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
@@ -42,7 +42,7 @@ export class CombatantCombat {
   private ticketSystem?: TicketSystem;
   private audioManager?: AudioManager;
   private hudSystem?: IHUDSystem;
-  private chunkManager?: ImprovedChunkManager;
+  private terrainSystem?: ITerrainRuntime;
   private combatantRenderer?: CombatantRenderer;
   private sandbagSystem?: SandbagSystem;
   private playerSuppressionSystem?: PlayerSuppressionSystem;
@@ -181,7 +181,7 @@ export class CombatantCombat {
       }
 
       // Check terrain obstruction before firing - only for high/medium LOD combatants
-      if (this.chunkManager && combatant.lodLevel &&
+      if (this.terrainSystem && combatant.lodLevel &&
           (combatant.lodLevel === 'high' || combatant.lodLevel === 'medium')) {
         // Budget expensive terrain confirmation checks to avoid burst-frame spikes.
         if (!tryConsumeCombatFireRaycast()) {
@@ -198,7 +198,7 @@ export class CombatantCombat {
 
         this._fireDirection.subVectors(this._targetFirePos, this._muzzlePos).normalize();
 
-        const terrainHit = this.chunkManager.raycastTerrain(this._muzzlePos, this._fireDirection, distance);
+        const terrainHit = this.terrainSystem.raycastTerrain(this._muzzlePos, this._fireDirection, distance);
 
         if (terrainHit.hit && terrainHit.distance! < distance - 0.5) {
           // Terrain blocks shot, don't fire
@@ -306,8 +306,8 @@ export class CombatantCombat {
     }
 
     const hit = this.hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
-    const terrainHit = this.chunkManager
-      ? this.chunkManager.raycastTerrain(ray.origin, ray.direction, this.MAX_ENGAGEMENT_RANGE)
+    const terrainHit = this.terrainSystem
+      ? this.terrainSystem.raycastTerrain(ray.origin, ray.direction, this.MAX_ENGAGEMENT_RANGE)
       : { hit: false as const };
 
     if (hit && terrainHit.hit && terrainHit.distance !== undefined && terrainHit.distance < hit.distance - 0.5) {
@@ -369,7 +369,7 @@ export class CombatantCombat {
   }
 
   private isBlockedByHeightProfile(ray: THREE.Ray, maxDistance: number): boolean {
-    if (!this.chunkManager || typeof this.chunkManager.getEffectiveHeightAt !== 'function') {
+    if (!this.terrainSystem) {
       return false;
     }
 
@@ -383,7 +383,7 @@ export class CombatantCombat {
 
     for (let d = this.TERRAIN_SAMPLE_STEP; d < end; d += this.TERRAIN_SAMPLE_STEP) {
       this.scratchSamplePoint.copy(ray.origin).addScaledVector(ray.direction, d);
-      const terrainY = this.chunkManager.getEffectiveHeightAt(this.scratchSamplePoint.x, this.scratchSamplePoint.z);
+      const terrainY = this.terrainSystem.getEffectiveHeightAt(this.scratchSamplePoint.x, this.scratchSamplePoint.z);
       if (terrainY + this.TERRAIN_OCCLUSION_EPSILON >= this.scratchSamplePoint.y) {
         return true;
       }
@@ -393,7 +393,7 @@ export class CombatantCombat {
   }
 
   private findHeightProfileBlockDistance(ray: THREE.Ray, maxDistance: number): number {
-    if (!this.chunkManager || typeof this.chunkManager.getEffectiveHeightAt !== 'function') {
+    if (!this.terrainSystem) {
       return Math.min(maxDistance, this.MAX_ENGAGEMENT_RANGE);
     }
 
@@ -406,7 +406,7 @@ export class CombatantCombat {
 
     for (let d = this.TERRAIN_SAMPLE_STEP; d < end; d += this.TERRAIN_SAMPLE_STEP) {
       this.scratchSamplePoint.copy(ray.origin).addScaledVector(ray.direction, d);
-      const terrainY = this.chunkManager.getEffectiveHeightAt(this.scratchSamplePoint.x, this.scratchSamplePoint.z);
+      const terrainY = this.terrainSystem.getEffectiveHeightAt(this.scratchSamplePoint.x, this.scratchSamplePoint.z);
       if (terrainY + this.TERRAIN_OCCLUSION_EPSILON >= this.scratchSamplePoint.y) {
         return d;
       }
@@ -452,8 +452,8 @@ export class CombatantCombat {
     this.effects.setAudioManager(manager);
   }
 
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.chunkManager = chunkManager;
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
   }
 
   setSandbagSystem(sandbagSystem: SandbagSystem): void {

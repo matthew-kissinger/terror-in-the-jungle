@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { GameSystem, PlayerState } from '../../types';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { Faction } from '../combat/types';
 import { InventoryManager, WeaponSlot } from './InventoryManager';
@@ -18,14 +17,14 @@ import { Logger } from '../../utils/Logger';
 import type { HelicopterModel } from '../helicopter/HelicopterModel';
 import type { FirstPersonWeapon } from './FirstPersonWeapon';
 import type { HUDSystem } from '../../ui/hud/HUDSystem';
-import type { IGameRenderer } from '../../types/SystemInterfaces';
+import type { IGameRenderer, ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { PlayerSquadController } from '../combat/PlayerSquadController';
 
 export class PlayerController implements GameSystem {
   private static readonly SPAWN_STABILIZATION_MS = 2500;
   private static readonly SPAWN_STABILIZATION_MAX_DIST = 60;
   private camera: THREE.PerspectiveCamera;
-  private chunkManager?: ImprovedChunkManager;
+  private terrainSystem?: ITerrainRuntime;
   private gameModeManager?: GameModeManager;
   private helicopterModel?: HelicopterModel;
   private firstPersonWeapon?: FirstPersonWeapon;
@@ -96,7 +95,7 @@ export class PlayerController implements GameSystem {
     this.cameraController.updateCamera(this.input);
     this.updateHUD();
     this.updateWeaponSystems();
-    if (this.chunkManager) this.chunkManager.updatePlayerPosition(this.playerState.position);
+    if (this.terrainSystem) this.terrainSystem.updatePlayerPosition(this.playerState.position);
   }
 
   dispose(): void {
@@ -494,8 +493,8 @@ export class PlayerController implements GameSystem {
     }
 
     // Large jumps can outpace chunk streaming; force immediate position sync.
-    if (this.chunkManager && dist > 32) {
-      this.chunkManager.updatePlayerPosition(this.playerState.position);
+    if (this.terrainSystem && dist > 32) {
+      this.terrainSystem.updatePlayerPosition(this.playerState.position);
     }
 
     Logger.info(
@@ -622,7 +621,7 @@ export class PlayerController implements GameSystem {
   getHelicopterId(): string | null { return this.playerState.helicopterId; }
 
   // Dependency setters
-  setChunkManager(chunkManager: ImprovedChunkManager): void { this.chunkManager = chunkManager; this.movement.setChunkManager(chunkManager); }
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void { this.terrainSystem = terrainSystem; this.movement.setTerrainSystem(terrainSystem); }
   setGameModeManager(gameModeManager: GameModeManager): void { this.gameModeManager = gameModeManager; }
   setTicketSystem(ticketSystem: TicketSystem): void { this.ticketSystem = ticketSystem; }
   setHelicopterModel(helicopterModel: HelicopterModel): void { this.helicopterModel = helicopterModel; this.movement.setHelicopterModel(helicopterModel); this.cameraController.setHelicopterModel(helicopterModel); helicopterModel.setPlayerInput(this.input); }

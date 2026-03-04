@@ -12,14 +12,15 @@ export class GlobalBillboardSystem implements GameSystem {
   private assetLoader: AssetLoader;
 
   private gpuSystem: GPUBillboardSystem;
+  private initialized = false;
 
   private exclusionZones: Array<{ x: number; z: number; radius: number }> = [];
 
   /** The active vegetation types for the current biome/mode. */
   private activeTypes: VegetationTypeConfig[] = VEGETATION_TYPES;
 
-  /** The active biome (used by generators to pick vegetation palette). */
-  private activeBiome: BiomeConfig = getBiome('denseJungle');
+  /** Ordered biome set participating in the active mode/runtime. */
+  private activeBiomes: BiomeConfig[] = [getBiome('denseJungle')];
 
   constructor(scene: THREE.Scene, camera: THREE.Camera, assetLoader: AssetLoader) {
     this.scene = scene;
@@ -32,18 +33,39 @@ export class GlobalBillboardSystem implements GameSystem {
    * Configure which biome / vegetation types are active before init().
    * Call this from the game mode setup before init().
    */
-  configure(biomeId?: string): void {
-    if (biomeId) {
-      this.activeBiome = getBiome(biomeId);
-    }
+  configure(biomeIds?: string | string[]): void {
+    const ids = biomeIds === undefined
+      ? ['denseJungle']
+      : Array.isArray(biomeIds)
+        ? biomeIds
+        : [biomeIds];
 
-    // Filter vegetation types to only those present in the biome palette
-    const paletteIds = new Set(this.activeBiome.vegetationPalette.map(e => e.typeId));
+    const seen = new Set<string>();
+    this.activeBiomes = ids
+      .filter((id) => {
+        if (seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .map((id) => getBiome(id));
+
+    // Filter vegetation types to the union of all biome palettes in play.
+    const paletteIds = new Set(
+      this.activeBiomes.flatMap((biome) => biome.vegetationPalette.map((entry) => entry.typeId))
+    );
     this.activeTypes = VEGETATION_TYPES.filter(t => paletteIds.has(t.id));
+
+    if (this.initialized) {
+      this.rebuildGPUVegetationTypes();
+    }
   }
 
   getActiveBiome(): BiomeConfig {
-    return this.activeBiome;
+    return this.activeBiomes[0];
+  }
+
+  getActiveBiomes(): BiomeConfig[] {
+    return [...this.activeBiomes];
   }
 
   getActiveVegetationTypes(): VegetationTypeConfig[] {
@@ -52,7 +74,8 @@ export class GlobalBillboardSystem implements GameSystem {
 
   async init(): Promise<void> {
     await this.gpuSystem.initializeFromConfig(this.activeTypes);
-    Logger.info('World', `Billboard system initialized (${this.activeTypes.length} types, biome=${this.activeBiome.id})`);
+    this.initialized = true;
+    Logger.info('World', `Billboard system initialized (${this.activeTypes.length} types, biomes=${this.activeBiomes.map(b => b.id).join(',')})`);
   }
 
   update(deltaTime: number, fog?: THREE.FogExp2 | null): void {
@@ -61,7 +84,15 @@ export class GlobalBillboardSystem implements GameSystem {
 
   dispose(): void {
     this.gpuSystem.dispose();
+    this.initialized = false;
     Logger.info('World', 'Global Billboard System disposed');
+  }
+
+  private rebuildGPUVegetationTypes(): void {
+    this.gpuSystem.dispose();
+    this.gpuSystem = new GPUBillboardSystem(this.scene, this.assetLoader);
+    void this.gpuSystem.initializeFromConfig(this.activeTypes);
+    Logger.info('World', `Billboard vegetation reconfigured (${this.activeTypes.length} types, biomes=${this.activeBiomes.map(b => b.id).join(',')})`);
   }
 
   /**

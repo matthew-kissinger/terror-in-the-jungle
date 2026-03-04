@@ -6,13 +6,11 @@ import { ZoneManager, ZoneState } from '../world/ZoneManager';
 import { PlayerHealthSystem } from './PlayerHealthSystem';
 import { GameModeManager } from '../world/GameModeManager';
 import { InventoryManager } from './InventoryManager';
-import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 import { GameMode } from '../../config/gameModeTypes';
 import { RespawnUI } from './RespawnUI';
 import { RespawnMapController } from './RespawnMapController';
-import type { IFirstPersonWeapon, IPlayerController } from '../../types/SystemInterfaces';
+import type { IFirstPersonWeapon, IPlayerController, ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { WarSimulator } from '../strategy/WarSimulator';
-import type { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
 
 export class PlayerRespawnManager implements GameSystem {
   private scene: THREE.Scene;
@@ -24,7 +22,7 @@ export class PlayerRespawnManager implements GameSystem {
   private firstPersonWeapon?: IFirstPersonWeapon;
   private inventoryManager?: InventoryManager;
   private warSimulator?: WarSimulator;
-  private chunkManager?: ImprovedChunkManager;
+  private terrainSystem?: ITerrainRuntime;
 
   // Respawn state
   private isRespawnUIVisible = false;
@@ -125,8 +123,8 @@ export class PlayerRespawnManager implements GameSystem {
     this.warSimulator = warSimulator;
   }
 
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.chunkManager = chunkManager;
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
   }
 
   setRespawnCallback(callback: (position: THREE.Vector3) => void): void {
@@ -213,7 +211,10 @@ export class PlayerRespawnManager implements GameSystem {
 
   private respawn(position: THREE.Vector3): void {
     // Ensure spawn position is at correct terrain height
-    const terrainHeight = getHeightQueryCache().getHeightAt(position.x, position.z);
+    if (!this.terrainSystem) {
+      throw new Error('PlayerRespawnManager requires terrainSystem before terrain grounding');
+    }
+    const terrainHeight = this.terrainSystem.getHeightAt(position.x, position.z);
     position.y = terrainHeight + 2; // Add player height offset
 
     // Move player to spawn position
@@ -558,23 +559,10 @@ export class PlayerRespawnManager implements GameSystem {
   }
 
   private isTerrainReadyAt(x: number, z: number): boolean {
-    const cm = this.chunkManager as any;
-    if (!cm || typeof cm.isChunkLoaded !== 'function' || typeof cm.getChunkSize !== 'function') {
+    if (!this.terrainSystem) {
       return true;
     }
-    const chunkSize = Number(cm.getChunkSize());
-    if (!Number.isFinite(chunkSize) || chunkSize <= 0) return true;
-
-    const cx = Math.floor(x / chunkSize);
-    const cz = Math.floor(z / chunkSize);
-    for (let dz = -1; dz <= 1; dz++) {
-      for (let dx = -1; dx <= 1; dx++) {
-        if (!cm.isChunkLoaded(cx + dx, cz + dz)) {
-          return false;
-        }
-      }
-    }
-    return true;
+    return this.terrainSystem.isTerrainReady() && this.terrainSystem.hasTerrainAt(x, z);
   }
 
   private getCurrentGameMode(): GameMode | undefined {

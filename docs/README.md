@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-03-02
+Last updated: 2026-03-04
 
 ## Read Order
 
@@ -15,7 +15,7 @@ Last updated: 2026-03-02
 - `CODEBASE_BLOCKS.md` - Hub: coupling heatmap, tick graph, singletons, lifecycle, vocabulary.
 - `blocks/core.md` - Engine shell, boot sequence, tick dispatch, user lifecycle E2E.
 - `blocks/combat.md` - CombatantSystem, AI, spatial, squads, LOD (5ms budget).
-- `blocks/terrain.md` - Chunks, workers, height cache, DEM.
+- `blocks/terrain.md` - Terrain runtime, terrain queries, height authority, biomes, vegetation, DEM.
 - `blocks/strategy.md` - War sim, materialization, strategic director (A Shau only).
 - `blocks/player.md` - Movement, weapons, health, respawn, controls.
 - `blocks/weapons.md` - Grenades, mortar, sandbag, ammo, GunplayCore.
@@ -36,6 +36,8 @@ Last updated: 2026-03-02
   - Source of truth for perf capture commands, flags, artifacts, and validation semantics.
 - `ARCHITECTURE_RECOVERY_PLAN.md`
   - Current architecture risk register and prioritized implementation board.
+- `TERRAIN_REWRITE_MASTER_PLAN.md`
+  - Canonical terrain rewrite control document. This is the only terrain execution plan. Latest validated state includes A Shau preview-smoke evidence under `artifacts/terrain-smoke/2026-03-04T00-41-49-250Z`.
 - `ASHAU_VALLEY_IMPLEMENTATION_PLAN.md`
   - A Shau mode stabilization plan and validation checklist.
 - `AUDIO_ASSETS_NEEDED.md`
@@ -65,6 +67,7 @@ These docs predate the block map and overlap with specific sub-docs. Kept for re
 
 - Keep active docs concise and current.
 - Prefer status boards and acceptance criteria over long chronological logs.
+- Do not preserve debate trails or superseded execution plans in active terrain docs. Delete them once their conclusions are absorbed into the canonical plan.
 - Any perf-sensitive change must update:
   - `PROFILING_HARNESS.md` if capture behavior/flags changed
   - `ARCHITECTURE_RECOVERY_PLAN.md` with decision and evidence path

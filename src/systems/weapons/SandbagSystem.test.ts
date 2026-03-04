@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { SandbagSystem } from './SandbagSystem';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import { TerrainSystem } from '../terrain/TerrainSystem';
 import { InventoryManager } from '../player/InventoryManager';
 
 // Mock Logger
@@ -61,7 +61,7 @@ function createMockCamera(position = new THREE.Vector3(0, 5, 0)): THREE.Camera {
 }
 
 // Helper to create mock chunk manager
-function createMockChunkManager(): ImprovedChunkManager {
+function createMockChunkManager(): TerrainSystem {
   return {
     getEffectiveHeightAt: vi.fn((_x: number, _z: number) => {
       // Flat terrain at y=0 by default
@@ -97,16 +97,16 @@ function createMockInventoryManager(sandbagCount = 5): InventoryManager {
 describe('SandbagSystem', () => {
   let scene: THREE.Scene;
   let camera: THREE.Camera;
-  let chunkManager: ImprovedChunkManager;
+  let terrainSystem: TerrainSystem;
   let inventoryManager: InventoryManager;
   let sandbagSystem: SandbagSystem;
 
   beforeEach(async () => {
     scene = createMockScene();
     camera = createMockCamera();
-    chunkManager = createMockChunkManager();
+    terrainSystem = createMockChunkManager();
     inventoryManager = createMockInventoryManager(5);
-    sandbagSystem = new SandbagSystem(scene, camera, chunkManager);
+    sandbagSystem = new SandbagSystem(scene, camera, terrainSystem);
     sandbagSystem.setInventoryManager(inventoryManager);
     await sandbagSystem.init(); // Creates placement preview (async GLB load)
     await flushPromises();
@@ -141,7 +141,7 @@ describe('SandbagSystem', () => {
 
   describe('init', () => {
     it('should initialize without errors', async () => {
-      const freshSystem = new SandbagSystem(scene, camera, chunkManager);
+      const freshSystem = new SandbagSystem(scene, camera, terrainSystem);
       await expect(freshSystem.init()).resolves.toBeUndefined();
     });
   });
@@ -254,9 +254,9 @@ describe('SandbagSystem', () => {
 
     it('should use terrain height for preview Y position', () => {
       sandbagSystem.showPlacementPreview(true);
-      (chunkManager.getEffectiveHeightAt as any).mockReturnValue(5);
+      (terrainSystem.getEffectiveHeightAt as any).mockReturnValue(5);
       sandbagSystem.updatePreviewPosition(camera);
-      expect(chunkManager.getEffectiveHeightAt).toHaveBeenCalled();
+      expect(terrainSystem.getEffectiveHeightAt).toHaveBeenCalled();
     });
 
     it('should show green preview when placement valid', () => {
@@ -267,7 +267,7 @@ describe('SandbagSystem', () => {
 
     it('should show red preview when placement invalid', async () => {
       // No inventory manager - placement invalid
-      const systemNoInventory = new SandbagSystem(scene, camera, chunkManager);
+      const systemNoInventory = new SandbagSystem(scene, camera, terrainSystem);
       await systemNoInventory.init();
       await flushPromises();
       systemNoInventory.showPlacementPreview(true);
@@ -302,7 +302,7 @@ describe('SandbagSystem', () => {
     });
 
     it('should fail when no inventory manager', async () => {
-      const systemNoInventory = new SandbagSystem(scene, camera, chunkManager);
+      const systemNoInventory = new SandbagSystem(scene, camera, terrainSystem);
       await systemNoInventory.init();
       await flushPromises();
       systemNoInventory.showPlacementPreview(true);
@@ -375,7 +375,7 @@ describe('SandbagSystem', () => {
 
     it('should fail on steep slope', () => {
       // Mock steep terrain
-      (chunkManager.getEffectiveHeightAt as any).mockImplementation((x: number, _z: number) => {
+      (terrainSystem.getEffectiveHeightAt as any).mockImplementation((x: number, _z: number) => {
         return x * 2; // Very steep slope
       });
 
@@ -386,7 +386,7 @@ describe('SandbagSystem', () => {
 
     it('should succeed on gentle slope', () => {
       // Mock gentle terrain
-      (chunkManager.getEffectiveHeightAt as any).mockImplementation((x: number, _z: number) => {
+      (terrainSystem.getEffectiveHeightAt as any).mockImplementation((x: number, _z: number) => {
         return x * 0.1; // Gentle slope
       });
 
@@ -397,7 +397,7 @@ describe('SandbagSystem', () => {
 
     it('should fail when underwater', () => {
       // Mock underwater position
-      (chunkManager.getEffectiveHeightAt as any).mockReturnValue(-2);
+      (terrainSystem.getEffectiveHeightAt as any).mockReturnValue(-2);
 
       sandbagSystem.updatePreviewPosition(camera);
       const result = sandbagSystem.placeSandbag();
@@ -406,7 +406,7 @@ describe('SandbagSystem', () => {
 
     it('should succeed above water', () => {
       // Mock above water position
-      (chunkManager.getEffectiveHeightAt as any).mockReturnValue(2);
+      (terrainSystem.getEffectiveHeightAt as any).mockReturnValue(2);
 
       sandbagSystem.updatePreviewPosition(camera);
       const result = sandbagSystem.placeSandbag();
@@ -458,7 +458,7 @@ describe('SandbagSystem', () => {
     });
 
     it('should return false when no sandbags placed', () => {
-      const emptySystem = new SandbagSystem(scene, camera, chunkManager);
+      const emptySystem = new SandbagSystem(scene, camera, terrainSystem);
       const ray = new THREE.Ray(new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0));
       const hit = emptySystem.checkRayIntersection(ray);
       expect(hit).toBe(false);
@@ -505,7 +505,7 @@ describe('SandbagSystem', () => {
     });
 
     it('should return null when no sandbags placed', () => {
-      const emptySystem = new SandbagSystem(scene, camera, chunkManager);
+      const emptySystem = new SandbagSystem(scene, camera, terrainSystem);
       const ray = new THREE.Ray(new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0));
       const point = emptySystem.getRayIntersectionPoint(ray);
       expect(point).toBeNull();
@@ -599,7 +599,7 @@ describe('SandbagSystem', () => {
     });
 
     it('should return false when no sandbags placed', () => {
-      const emptySystem = new SandbagSystem(scene, camera, chunkManager);
+      const emptySystem = new SandbagSystem(scene, camera, terrainSystem);
       const testPos = new THREE.Vector3(0, 1, 0);
       const collision = emptySystem.checkCollision(testPos);
       expect(collision).toBe(false);
@@ -754,14 +754,14 @@ describe('SandbagSystem', () => {
     });
 
     it('should handle negative terrain height', () => {
-      (chunkManager.getEffectiveHeightAt as any).mockReturnValue(-10);
+      (terrainSystem.getEffectiveHeightAt as any).mockReturnValue(-10);
       sandbagSystem.showPlacementPreview(true);
       sandbagSystem.updatePreviewPosition(camera);
       expect(sandbagSystem).toBeDefined();
     });
 
     it('should handle very high terrain', () => {
-      (chunkManager.getEffectiveHeightAt as any).mockReturnValue(100);
+      (terrainSystem.getEffectiveHeightAt as any).mockReturnValue(100);
       sandbagSystem.showPlacementPreview(true);
       sandbagSystem.updatePreviewPosition(camera);
       expect(sandbagSystem).toBeDefined();
@@ -819,7 +819,7 @@ describe('SandbagSystem', () => {
 
   describe('Terrain Slope Validation', () => {
     it('should reject placement on 45 degree slope', () => {
-      (chunkManager.getEffectiveHeightAt as any).mockImplementation((x: number, _z: number) => {
+      (terrainSystem.getEffectiveHeightAt as any).mockImplementation((x: number, _z: number) => {
         return x; // 45 degree slope
       });
 
@@ -830,7 +830,7 @@ describe('SandbagSystem', () => {
     });
 
     it('should accept placement on 20 degree slope', () => {
-      (chunkManager.getEffectiveHeightAt as any).mockImplementation((x: number, _z: number) => {
+      (terrainSystem.getEffectiveHeightAt as any).mockImplementation((x: number, _z: number) => {
         return x * 0.36; // ~20 degree slope
       });
 
@@ -841,7 +841,7 @@ describe('SandbagSystem', () => {
     });
 
     it('should accept placement on flat terrain', () => {
-      (chunkManager.getEffectiveHeightAt as any).mockReturnValue(0);
+      (terrainSystem.getEffectiveHeightAt as any).mockReturnValue(0);
 
       sandbagSystem.showPlacementPreview(true);
       sandbagSystem.updatePreviewPosition(camera);
@@ -852,7 +852,7 @@ describe('SandbagSystem', () => {
 
   describe('Water Height Validation', () => {
     it('should reject placement at water level (y=0)', () => {
-      (chunkManager.getEffectiveHeightAt as any).mockReturnValue(0);
+      (terrainSystem.getEffectiveHeightAt as any).mockReturnValue(0);
 
       sandbagSystem.showPlacementPreview(true);
       sandbagSystem.updatePreviewPosition(camera);
@@ -862,7 +862,7 @@ describe('SandbagSystem', () => {
     });
 
     it('should reject placement below water (y < 1.0)', () => {
-      (chunkManager.getEffectiveHeightAt as any).mockReturnValue(-3);
+      (terrainSystem.getEffectiveHeightAt as any).mockReturnValue(-3);
 
       sandbagSystem.showPlacementPreview(true);
       sandbagSystem.updatePreviewPosition(camera);
@@ -871,7 +871,7 @@ describe('SandbagSystem', () => {
     });
 
     it('should accept placement well above water', () => {
-      (chunkManager.getEffectiveHeightAt as any).mockReturnValue(10);
+      (terrainSystem.getEffectiveHeightAt as any).mockReturnValue(10);
 
       sandbagSystem.showPlacementPreview(true);
       sandbagSystem.updatePreviewPosition(camera);

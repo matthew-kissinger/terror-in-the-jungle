@@ -63,7 +63,7 @@
 
 | Dep | Method | Domain |
 |-----|--------|--------|
-| ImprovedChunkManager | setChunkManager | Terrain |
+| TerrainSystem | setTerrainSystem | Terrain |
 | GameModeManager | setGameModeManager | World |
 | TicketSystem | setTicketSystem | World |
 | HelicopterModel | setHelicopterModel | Vehicle |
@@ -81,7 +81,7 @@
 
 **PlayerHealthSystem** receives (6): ZoneManager, TicketSystem, PlayerController, FirstPersonWeapon, PlayerRespawnManager, HUDSystem
 
-**PlayerRespawnManager** receives (8): PlayerHealthSystem, ZoneManager, GameModeManager, PlayerController, FirstPersonWeapon, InventoryManager, WarSimulator, ChunkManager
+**PlayerRespawnManager** receives (8): PlayerHealthSystem, ZoneManager, GameModeManager, PlayerController, FirstPersonWeapon, InventoryManager, WarSimulator, TerrainSystem
 
 ---
 

@@ -2,12 +2,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { AICoverFinding } from './AICoverFinding';
 import { Combatant, CombatantState, Faction } from '../types';
-import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
+import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
 
-const mockChunkManager: ImprovedChunkManager = {
+const mockTerrainSystem: ITerrainRuntime = {
+  getHeightAt: vi.fn((x: number, z: number) => mockHeightQueryCache.getHeightAt(x, z)),
+  getEffectiveHeightAt: vi.fn((x: number, z: number) => mockHeightQueryCache.getHeightAt(x, z)),
+  isTerrainReady: vi.fn(() => true),
+  hasTerrainAt: vi.fn(() => true),
+  getActiveTerrainTileCount: vi.fn(() => 0),
+  updatePlayerPosition: vi.fn(),
+  registerCollisionObject: vi.fn(),
+  unregisterCollisionObject: vi.fn(),
   raycastTerrain: vi.fn(() => ({ hit: false, distance: undefined })),
-} as any;
+};
 
 const mockSandbagSystem: SandbagSystem = {
   getSandbagBounds: vi.fn(() => []),
@@ -80,12 +88,12 @@ describe('AICoverFinding', () => {
 
   beforeEach(() => {
     coverFinding = new AICoverFinding();
-    coverFinding.setChunkManager(mockChunkManager);
+    coverFinding.setTerrainSystem(mockTerrainSystem);
     coverFinding.setSandbagSystem(mockSandbagSystem);
 
     vi.clearAllMocks();
     mockHeightQueryCache.getHeightAt = vi.fn(() => 0);
-    (mockChunkManager.raycastTerrain as any).mockImplementation(() => ({ hit: false, distance: undefined }));
+    (mockTerrainSystem.raycastTerrain as any).mockImplementation(() => ({ hit: false, distance: undefined }));
     (mockSandbagSystem.getSandbagBounds as any).mockReturnValue([]);
   });
 
@@ -198,7 +206,7 @@ describe('AICoverFinding', () => {
         return 0;
       });
 
-      (mockChunkManager.raycastTerrain as any).mockImplementation((_origin: THREE.Vector3, _dir: THREE.Vector3, maxDistance: number) => ({
+      (mockTerrainSystem.raycastTerrain as any).mockImplementation((_origin: THREE.Vector3, _dir: THREE.Vector3, maxDistance: number) => ({
         hit: true,
         distance: maxDistance - 2,
       }));
@@ -221,7 +229,7 @@ describe('AICoverFinding', () => {
         return 0;
       });
 
-      (mockChunkManager.raycastTerrain as any).mockImplementation(() => ({
+      (mockTerrainSystem.raycastTerrain as any).mockImplementation(() => ({
         hit: true,
         distance: 10,
       }));
@@ -240,7 +248,7 @@ describe('AICoverFinding', () => {
         return 0;
       });
 
-      (mockChunkManager.raycastTerrain as any).mockImplementation(() => ({
+      (mockTerrainSystem.raycastTerrain as any).mockImplementation(() => ({
         hit: false,
         distance: undefined,
       }));
@@ -260,7 +268,7 @@ describe('AICoverFinding', () => {
         return 0;
       });
 
-      (mockChunkManager.raycastTerrain as any).mockImplementation((_origin: THREE.Vector3, _dir: THREE.Vector3, maxDistance: number) => ({
+      (mockTerrainSystem.raycastTerrain as any).mockImplementation((_origin: THREE.Vector3, _dir: THREE.Vector3, maxDistance: number) => ({
         hit: true,
         distance: maxDistance - 2,
       }));
@@ -282,7 +290,7 @@ describe('AICoverFinding', () => {
         return 0;
       });
 
-      (mockChunkManager.raycastTerrain as any).mockImplementation((_origin: THREE.Vector3, _dir: THREE.Vector3, maxDistance: number) => ({
+      (mockTerrainSystem.raycastTerrain as any).mockImplementation((_origin: THREE.Vector3, _dir: THREE.Vector3, maxDistance: number) => ({
         hit: true,
         distance: maxDistance - 2,
       }));
@@ -352,7 +360,7 @@ describe('AICoverFinding', () => {
       const cover = coverFinding.findNearestCover(combatant, threatPos);
 
       expect(cover).toBeNull();
-      expect(mockChunkManager.raycastTerrain).not.toHaveBeenCalled();
+      expect(mockTerrainSystem.raycastTerrain).not.toHaveBeenCalled();
     });
 
     it('prefers sandbag cover when it scores higher than terrain', () => {
@@ -366,7 +374,7 @@ describe('AICoverFinding', () => {
         return 0;
       });
 
-      (mockChunkManager.raycastTerrain as any).mockImplementation((_origin: THREE.Vector3, _dir: THREE.Vector3, maxDistance: number) => ({
+      (mockTerrainSystem.raycastTerrain as any).mockImplementation((_origin: THREE.Vector3, _dir: THREE.Vector3, maxDistance: number) => ({
         hit: true,
         distance: maxDistance - 2,
       }));
@@ -390,7 +398,7 @@ describe('AICoverFinding', () => {
         return 0;
       });
 
-      (mockChunkManager.raycastTerrain as any).mockImplementation((_origin: THREE.Vector3, _dir: THREE.Vector3, maxDistance: number) => ({
+      (mockTerrainSystem.raycastTerrain as any).mockImplementation((_origin: THREE.Vector3, _dir: THREE.Vector3, maxDistance: number) => ({
         hit: true,
         distance: maxDistance - 2,
       }));

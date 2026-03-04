@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
 import { AssetLoader } from '../assets/AssetLoader';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { Combatant, CombatantState, Faction, isBlufor, isOpfor } from './types';
 import { TracerPool } from '../effects/TracerPool';
 import { MuzzleFlashSystem } from '../effects/MuzzleFlashSystem';
@@ -15,7 +15,6 @@ import { AudioManager } from '../audio/AudioManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { Logger } from '../../utils/Logger';
 import { VoiceCalloutSystem } from '../audio/VoiceCalloutSystem';
-import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 
 // Refactored modules
 import { CombatantFactory } from './CombatantFactory';
@@ -44,7 +43,7 @@ export class CombatantSystem implements GameSystem {
   private camera: THREE.Camera;
   private globalBillboardSystem: GlobalBillboardSystem;
   private assetLoader: AssetLoader;
-  private chunkManager?: ImprovedChunkManager;
+  private terrainSystem?: ITerrainRuntime;
   private ticketSystem?: TicketSystem;
   private playerHealthSystem?: PlayerHealthSystem;
   private zoneManager?: ZoneManager;
@@ -94,13 +93,13 @@ export class CombatantSystem implements GameSystem {
     camera: THREE.Camera,
     globalBillboardSystem: GlobalBillboardSystem,
     assetLoader: AssetLoader,
-    chunkManager?: ImprovedChunkManager
+    terrainSystem?: ITerrainRuntime
   ) {
     this.scene = scene;
     this.camera = camera;
     this.globalBillboardSystem = globalBillboardSystem;
     this.assetLoader = assetLoader;
-    this.chunkManager = chunkManager;
+    this.terrainSystem = terrainSystem;
 
     // Initialize effect pools
     this.tracerPool = new TracerPool(this.scene, 256);
@@ -119,8 +118,8 @@ export class CombatantSystem implements GameSystem {
       this.impactEffectsPool,
       this.combatantRenderer
     );
-    this.combatantMovement = new CombatantMovement(chunkManager, undefined);
-    this.squadManager = new SquadManager(this.combatantFactory, chunkManager);
+    this.combatantMovement = new CombatantMovement(terrainSystem, undefined);
+    this.squadManager = new SquadManager(this.combatantFactory, terrainSystem);
 
     // Initialize spatial grid (will be reinitialized when game mode is set)
     spatialGridManager.initialize(4000);
@@ -315,18 +314,11 @@ export class CombatantSystem implements GameSystem {
 
     // Ensure external materialized agents are grounded at current terrain height.
     // Strategic agents can travel long distances between height updates.
-    const terrainResolver =
-      (this.chunkManager as any)?.getTerrainHeightAt
-      ?? (this.chunkManager as any)?.getHeightAt
-      ?? (this.chunkManager as any)?.getEffectiveHeightAt;
-
     let terrainHeight = Number.NaN;
-    if (typeof terrainResolver === 'function') {
-      terrainHeight = Number(terrainResolver.call(this.chunkManager, data.x, data.z));
+    if (!this.terrainSystem) {
+      throw new Error('CombatantSystem requires terrainSystem before terrain-aware agent materialization');
     }
-    if (!Number.isFinite(terrainHeight)) {
-      terrainHeight = getHeightQueryCache().getHeightAt(data.x, data.z);
-    }
+    terrainHeight = Number(this.terrainSystem.getHeightAt(data.x, data.z));
     if (Number.isFinite(terrainHeight)) {
       position.y = terrainHeight + 3;
     }
@@ -428,9 +420,9 @@ export class CombatantSystem implements GameSystem {
   }
 
   // Setters for external systems
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.chunkManager = chunkManager;
-    this.setters.setChunkManager(chunkManager);
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
+    this.setters.setTerrainSystem(terrainSystem);
   }
 
   setCamera(camera: THREE.Camera): void {

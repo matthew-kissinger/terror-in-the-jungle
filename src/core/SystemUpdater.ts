@@ -65,7 +65,7 @@ export class SystemUpdater {
 
     this.trackSystemUpdate('Terrain', 2.0, () => {
       performanceTelemetry.beginSystem('Terrain');
-      if (refs.chunkManager && gameStarted) refs.chunkManager.update(deltaTime);
+      if (refs.terrainSystem && gameStarted) refs.terrainSystem.update(deltaTime);
       performanceTelemetry.endSystem('Terrain');
     });
 
@@ -179,7 +179,7 @@ export class SystemUpdater {
 
   private isTrackedSystem(system: GameSystem, refs: SystemReferences): boolean {
     return system === refs.combatantSystem
-      || system === refs.chunkManager
+      || system === refs.terrainSystem
       || system === refs.globalBillboardSystem
       || system === refs.playerController
       || system === refs.firstPersonWeapon

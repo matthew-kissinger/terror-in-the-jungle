@@ -6,7 +6,7 @@ import { HelicopterAnimation } from './HelicopterAnimation';
 import { HelicopterAudio } from './HelicopterAudio';
 import { HelicopterInteraction } from './HelicopterInteraction';
 import { createHelicopterGeometry } from './HelicopterGeometry';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import { TerrainSystem } from '../terrain/TerrainSystem';
 import { HelipadSystem, HelipadInfo } from './HelipadSystem';
 import { IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
 
@@ -112,7 +112,7 @@ function makeHelipadInfo(id = HELIPAD_ID, pos = HELIPAD_POS): HelipadInfo {
 describe('HelicopterModel', () => {
   let model: HelicopterModel;
   let scene: THREE.Scene;
-  let mockTerrainManager: ImprovedChunkManager;
+  let mockTerrainManager: TerrainSystem;
   let mockHelipadSystem: HelipadSystem;
   let mockPlayerController: IPlayerController;
   let mockHUDSystem: IHUDSystem;
@@ -131,10 +131,12 @@ describe('HelicopterModel', () => {
 
     mockTerrainManager = {
       getHeightAt: vi.fn().mockReturnValue(10),
+      isTerrainReady: vi.fn().mockReturnValue(true),
+      hasTerrainAt: vi.fn().mockReturnValue(true),
       getChunkAt: vi.fn().mockReturnValue({}),
       registerCollisionObject: vi.fn(),
       unregisterCollisionObject: vi.fn(),
-    } as unknown as ImprovedChunkManager;
+    } as unknown as TerrainSystem;
 
     mockHelipadSystem = {
       getHelipadPosition: vi.fn().mockReturnValue(HELIPAD_POS.clone()),

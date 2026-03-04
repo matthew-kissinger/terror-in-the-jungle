@@ -14,8 +14,8 @@ export class SystemConnector {
     camera: THREE.PerspectiveCamera,
     renderer?: IGameRenderer
   ): void {
-    // Connect systems with chunk manager
-    refs.playerController.setChunkManager(refs.chunkManager);
+    // Connect systems with terrain runtime
+    refs.playerController.setTerrainSystem(refs.terrainSystem);
     refs.playerController.setGameModeManager(refs.gameModeManager);
     refs.playerController.setTicketSystem(refs.ticketSystem);
     refs.playerController.setHelicopterModel(refs.helicopterModel);
@@ -24,7 +24,7 @@ export class SystemConnector {
     if (renderer) {
       refs.playerController.setRenderer(renderer);
     }
-    refs.combatantSystem.setChunkManager(refs.chunkManager);
+    refs.combatantSystem.setTerrainSystem(refs.terrainSystem);
     refs.combatantSystem.setCamera(camera);
     refs.firstPersonWeapon.setPlayerController(refs.playerController);
     refs.firstPersonWeapon.setCombatantSystem(refs.combatantSystem);
@@ -72,7 +72,7 @@ export class SystemConnector {
     refs.playerSquadController.mountIndicatorTo(layout.getSlot('stats'));
     refs.zoneManager.setCombatantSystem(refs.combatantSystem);
     refs.zoneManager.setCamera(camera);
-    refs.zoneManager.setChunkManager(refs.chunkManager);
+    refs.zoneManager.setTerrainSystem(refs.terrainSystem);
     refs.zoneManager.setSpatialGridManager(refs.spatialGridManager);
     refs.zoneManager.setSpatialQueryProvider((center, radius) => refs.combatantSystem.querySpatialRadius(center, radius));
     refs.zoneManager.setHUDSystem(refs.hudSystem);
@@ -89,10 +89,10 @@ export class SystemConnector {
     refs.playerRespawnManager.setFirstPersonWeapon(refs.firstPersonWeapon);
     refs.playerRespawnManager.setInventoryManager(refs.inventoryManager);
     refs.playerRespawnManager.setWarSimulator(refs.warSimulator);
-    refs.playerRespawnManager.setChunkManager(refs.chunkManager);
+    refs.playerRespawnManager.setTerrainSystem(refs.terrainSystem);
 
     // Connect helipad system
-    refs.helipadSystem.setTerrainManager(refs.chunkManager);
+    refs.helipadSystem.setTerrainManager(refs.terrainSystem);
     refs.helipadSystem.setVegetationSystem(refs.globalBillboardSystem);
     refs.helipadSystem.setGameModeManager(refs.gameModeManager);
     refs.helipadSystem.onHelipadsCreated((helipads) => {
@@ -102,7 +102,7 @@ export class SystemConnector {
     });
 
     // Connect helicopter model
-    refs.helicopterModel.setTerrainManager(refs.chunkManager);
+    refs.helicopterModel.setTerrainManager(refs.terrainSystem);
     refs.helicopterModel.setHelipadSystem(refs.helipadSystem);
     refs.helicopterModel.setPlayerController(refs.playerController);
     refs.helicopterModel.setHUDSystem(refs.hudSystem);
@@ -113,7 +113,7 @@ export class SystemConnector {
       refs.zoneManager,
       refs.combatantSystem,
       refs.ticketSystem,
-      refs.chunkManager,
+      refs.terrainSystem,
       refs.minimapSystem
     );
     refs.gameModeManager.setInfluenceMapSystem(refs.influenceMapSystem);
@@ -206,13 +206,13 @@ export class SystemConnector {
     }
 
     // Connect footstep audio system
-    refs.footstepAudioSystem.setChunkManager(refs.chunkManager);
+    refs.footstepAudioSystem.setTerrainSystem(refs.terrainSystem);
     refs.playerController.setFootstepAudioSystem(refs.footstepAudioSystem);
 
     // Inject benchmark dependencies via typed interface
     performanceTelemetry.injectBenchmarkDependencies({
       hitDetection: refs.combatantSystem.combatantCombat?.hitDetection,
-      chunkManager: refs.chunkManager,
+      terrainRuntime: refs.terrainSystem,
       combatants: refs.combatantSystem.combatants,
       spatialGridManager: refs.spatialGridManager
     });

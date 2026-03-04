@@ -5,7 +5,7 @@ import { AssetLoader } from '../systems/assets/AssetLoader';
 import { PlayerController } from '../systems/player/PlayerController';
 import { CombatantSystem } from '../systems/combat/CombatantSystem';
 import { Skybox } from '../systems/environment/Skybox';
-import { ImprovedChunkManager } from '../systems/terrain/ImprovedChunkManager';
+import { TerrainSystem } from '../systems/terrain/TerrainSystem';
 import { GlobalBillboardSystem } from '../systems/world/billboard/GlobalBillboardSystem';
 import { WaterSystem } from '../systems/environment/WaterSystem';
 
@@ -62,7 +62,7 @@ export class SystemManager {
 
   // Game systems
   public assetLoader!: AssetLoader;
-  public chunkManager!: ImprovedChunkManager;
+  public terrainSystem!: TerrainSystem;
   public globalBillboardSystem!: GlobalBillboardSystem;
   public playerController!: PlayerController;
   public combatantSystem!: CombatantSystem;
@@ -121,7 +121,7 @@ export class SystemManager {
 
     // Copy initialized references to public properties
     this.assetLoader = this.refs.assetLoader;
-    this.chunkManager = this.refs.chunkManager;
+    this.terrainSystem = this.refs.terrainSystem;
     this.globalBillboardSystem = this.refs.globalBillboardSystem;
     this.playerController = this.refs.playerController;
     this.combatantSystem = this.refs.combatantSystem;
@@ -189,10 +189,10 @@ export class SystemManager {
     Logger.info('core', `Pre-generating spawn area around (${spawnPos.x.toFixed(0)}, ${spawnPos.z.toFixed(0)})...`);
     markStartup('systems.pre-generate.begin');
 
-    if (this.chunkManager) {
+    if (this.terrainSystem) {
       // Generate chunks around the spawn position and wait for minimum playable ring.
-      this.chunkManager.updatePlayerPosition(spawnPos);
-      const chunkSize = this.chunkManager.getChunkSize();
+      this.terrainSystem.updatePlayerPosition(spawnPos);
+      const chunkSize = this.terrainSystem.getChunkSize();
       const centerX = Math.floor(spawnPos.x / chunkSize);
       const centerZ = Math.floor(spawnPos.z / chunkSize);
       const minPlayableRadius = 1;
@@ -200,18 +200,8 @@ export class SystemManager {
       const start = performance.now();
 
       while (performance.now() - start < timeoutMs) {
-        this.chunkManager.update(0.016);
-
-        let ready = true;
-        for (let x = centerX - minPlayableRadius; x <= centerX + minPlayableRadius; x++) {
-          for (let z = centerZ - minPlayableRadius; z <= centerZ + minPlayableRadius; z++) {
-            if (!this.chunkManager.isChunkLoaded(x, z)) {
-              ready = false;
-              break;
-            }
-          }
-          if (!ready) break;
-        }
+        this.terrainSystem.update(0.016);
+        const ready = this.terrainSystem.isTerrainReady();
 
         if (ready) {
           break;

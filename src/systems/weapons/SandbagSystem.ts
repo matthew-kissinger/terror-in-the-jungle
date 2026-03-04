@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { modelLoader } from '../assets/ModelLoader';
 import { StructureModels } from '../assets/modelPaths';
-import { ImprovedChunkManager } from '../terrain/ImprovedChunkManager';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { InventoryManager } from '../player/InventoryManager';
 import { TicketSystem } from '../world/TicketSystem';
 
@@ -20,7 +20,7 @@ interface PlacedSandbag {
 export class SandbagSystem implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
-  private chunkManager?: ImprovedChunkManager;
+  private terrainSystem?: ITerrainRuntime;
   private inventoryManager?: InventoryManager;
   private ticketSystem?: TicketSystem;
 
@@ -45,11 +45,11 @@ export class SandbagSystem implements GameSystem {
   constructor(
     scene: THREE.Scene,
     camera: THREE.Camera,
-    chunkManager?: ImprovedChunkManager
+    terrainSystem?: ITerrainRuntime
   ) {
     this.scene = scene;
     this.camera = camera;
-    this.chunkManager = chunkManager;
+    this.terrainSystem = terrainSystem;
   }
 
   async init(): Promise<void> {
@@ -168,7 +168,7 @@ export class SandbagSystem implements GameSystem {
   }
 
   private getTerrainSlope(position: THREE.Vector3): number {
-    if (!this.chunkManager) return 0;
+    if (!this.terrainSystem) return 0;
 
     // Sample height at 4 points around the placement position
     const sampleDistance = 0.5;
@@ -365,8 +365,8 @@ export class SandbagSystem implements GameSystem {
   }
 
   private getGroundHeight(x: number, z: number): number {
-    if (this.chunkManager) {
-      return this.chunkManager.getEffectiveHeightAt(x, z);
+    if (this.terrainSystem) {
+      return this.terrainSystem.getEffectiveHeightAt(x, z);
     }
     return 0;
   }

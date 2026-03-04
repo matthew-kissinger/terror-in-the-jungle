@@ -77,6 +77,9 @@ data/vietnam/reference/hydroviet-rivers/
 # Public DEM data (copied from data/ for runtime serving, too large for git)
 public/data/vietnam/
 
+# Example zoo (reference repos cloned for study, not part of project)
+example-zoo/
+
 # Local capture/debug screenshots
 gameplay-profile.png
 hud-current-state.png

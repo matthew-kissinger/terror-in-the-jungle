@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { Combatant, CombatantState, Squad } from '../types'
-import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager'
+import type { ITerrainRuntime } from '../../../types/SystemInterfaces'
 import { FlankingTacticsResolver } from './FlankingTacticsResolver'
 import { FlankingRoleManager } from './FlankingRoleManager'
 import { Logger } from '../../../utils/Logger'
@@ -55,7 +55,7 @@ export interface FlankingOperation {
  * - Abort conditions
  */
 export class AIFlankingSystem {
-  private chunkManager?: ImprovedChunkManager
+  private terrainSystem?: ITerrainRuntime
   private activeOperations: Map<string, FlankingOperation> = new Map()
 
   // Extracted modules
@@ -77,10 +77,10 @@ export class AIFlankingSystem {
     this.roleManager = new FlankingRoleManager()
   }
 
-  setChunkManager(chunkManager: ImprovedChunkManager): void {
-    this.chunkManager = chunkManager
-    this.tacticsResolver.setChunkManager(chunkManager)
-    this.roleManager.setChunkManager(chunkManager)
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem
+    this.tacticsResolver.setTerrainSystem(terrainSystem)
+    this.roleManager.setTerrainSystem(terrainSystem)
   }
 
   /**

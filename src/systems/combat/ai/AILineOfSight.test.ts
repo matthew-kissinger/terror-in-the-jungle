@@ -31,36 +31,36 @@ describe('AILineOfSight heightfield prefilter', () => {
 
   it('rejects blocked LOS by heightfield without terrain raycast', () => {
     const los = new AILineOfSight();
-    const chunkManager = {
-      getHeightAt: vi.fn(() => 10),
+    const terrainSystem = {
+      getEffectiveHeightAt: vi.fn(() => 10),
       raycastTerrain: vi.fn(() => ({ hit: false }))
     } as any;
-    los.setChunkManager(chunkManager);
+    los.setTerrainSystem(terrainSystem);
 
     const source = makeCombatant('a', 0, 0);
     const target = makeCombatant('b', 80, 0);
     const visible = los.canSeeTarget(source, target, new THREE.Vector3());
 
     expect(visible).toBe(false);
-    expect(chunkManager.raycastTerrain).not.toHaveBeenCalled();
+    expect(terrainSystem.raycastTerrain).not.toHaveBeenCalled();
     const stats = AILineOfSight.getCacheStats();
     expect(stats.prefilterRejects).toBeGreaterThan(0);
   });
 
   it('passes heightfield and falls back to terrain raycast', () => {
     const los = new AILineOfSight();
-    const chunkManager = {
-      getHeightAt: vi.fn(() => -2),
+    const terrainSystem = {
+      getEffectiveHeightAt: vi.fn(() => -2),
       raycastTerrain: vi.fn(() => ({ hit: false }))
     } as any;
-    los.setChunkManager(chunkManager);
+    los.setTerrainSystem(terrainSystem);
 
     const source = makeCombatant('a', 0, 0);
     const target = makeCombatant('b', 80, 0);
     const visible = los.canSeeTarget(source, target, new THREE.Vector3());
 
     expect(visible).toBe(true);
-    expect(chunkManager.raycastTerrain).toHaveBeenCalled();
+    expect(terrainSystem.raycastTerrain).toHaveBeenCalled();
     const stats = AILineOfSight.getCacheStats();
     expect(stats.prefilterPasses).toBeGreaterThan(0);
   });

@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { SquadManager } from './SquadManager'
 import { Combatant, CombatantState, Faction, Squad } from './types'
 import { CombatantFactory } from './CombatantFactory'
-import { ImprovedChunkManager } from '../world/ImprovedChunkManager'
 import { InfluenceMapSystem } from './ai/InfluenceMapSystem'
+import type { ITerrainRuntime } from '../../types/SystemInterfaces'
 
 // Mock Three.js Vector3
 vi.mock('three', () => ({
@@ -111,7 +111,7 @@ function createMockCombatant(overrides: Partial<Combatant> = {}): Combatant {
 describe('SquadManager', () => {
   let squadManager: SquadManager
   let mockFactory: CombatantFactory
-  let mockChunkManager: ImprovedChunkManager
+  let mockTerrainSystem: ITerrainRuntime
   let mockInfluenceMap: InfluenceMapSystem
   const THREE = require('three')
 
@@ -130,13 +130,23 @@ describe('SquadManager', () => {
       ),
     } as unknown as CombatantFactory
 
-    mockChunkManager = {} as ImprovedChunkManager
+    mockTerrainSystem = {
+      getHeightAt: vi.fn(() => 0),
+      getEffectiveHeightAt: vi.fn(() => 0),
+      isTerrainReady: vi.fn(() => true),
+      hasTerrainAt: vi.fn(() => true),
+      getActiveTerrainTileCount: vi.fn(() => 0),
+      updatePlayerPosition: vi.fn(),
+      registerCollisionObject: vi.fn(),
+      unregisterCollisionObject: vi.fn(),
+      raycastTerrain: vi.fn(() => ({ hit: false })),
+    }
     mockInfluenceMap = {
       findBestZoneTarget: vi.fn(() => null),
       findBestPositionNear: vi.fn(() => null),
     } as unknown as InfluenceMapSystem
 
-    squadManager = new SquadManager(mockFactory, mockChunkManager)
+    squadManager = new SquadManager(mockFactory, mockTerrainSystem)
   })
 
   describe('constructor', () => {
@@ -145,7 +155,7 @@ describe('SquadManager', () => {
     })
 
     it('should create instance with factory and chunk manager', () => {
-      const manager = new SquadManager(mockFactory, mockChunkManager)
+      const manager = new SquadManager(mockFactory, mockTerrainSystem)
       expect(manager).toBeDefined()
     })
 
@@ -402,10 +412,10 @@ describe('SquadManager', () => {
     })
   })
 
-  describe('setChunkManager', () => {
-    it('should store chunk manager reference', () => {
+  describe('setTerrainSystem', () => {
+    it('should store terrain system reference', () => {
       const manager = new SquadManager(mockFactory)
-      manager.setChunkManager(mockChunkManager)
+      manager.setTerrainSystem(mockTerrainSystem)
 
       expect(manager).toBeDefined()
     })

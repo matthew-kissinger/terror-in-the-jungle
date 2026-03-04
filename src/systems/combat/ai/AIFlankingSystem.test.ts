@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as THREE from 'three'
 import { AIFlankingSystem, FlankingStatus, FlankingRole, FlankingOperation } from './AIFlankingSystem'
 import { Combatant, CombatantState, Faction, Squad } from '../types'
-import { ImprovedChunkManager } from '../../terrain/ImprovedChunkManager'
+import { TerrainSystem } from '../../terrain/TerrainSystem'
 
 // Mock HeightQueryCache
 vi.mock('../../terrain/HeightQueryCache', () => ({
@@ -20,8 +20,8 @@ vi.mock('../../../utils/ObjectPoolManager', () => ({
 }))
 
 // Mock dependencies
-const mockChunkManager: ImprovedChunkManager = {
-  getTerrainHeightAt: vi.fn(() => 0),
+const mockChunkManager: TerrainSystem = {
+  getHeightAt: vi.fn(() => 0),
 } as any
 
 // Helper to create a mock combatant
@@ -97,7 +97,7 @@ describe('AIFlankingSystem', () => {
 
   beforeEach(() => {
     flankingSystem = new AIFlankingSystem()
-    flankingSystem.setChunkManager(mockChunkManager)
+    flankingSystem.setTerrainSystem(mockChunkManager)
     allCombatants = new Map()
     vi.clearAllMocks()
   })
@@ -110,7 +110,7 @@ describe('AIFlankingSystem', () => {
 
     it('should accept chunk manager', () => {
       const system = new AIFlankingSystem()
-      system.setChunkManager(mockChunkManager)
+      system.setTerrainSystem(mockChunkManager)
       expect(system).toBeDefined()
     })
   })

@@ -3,6 +3,7 @@ import { GameMode, ZoneConfig } from '../config/gameModeTypes';
 import { getGameModeConfig } from '../config/gameModes';
 import { getHeightQueryCache } from '../systems/terrain/HeightQueryCache';
 import { DEMHeightProvider } from '../systems/terrain/DEMHeightProvider';
+import { NoiseHeightProvider } from '../systems/terrain/NoiseHeightProvider';
 import { Logger } from '../utils/Logger';
 import { GrenadeType, Faction } from '../systems/combat/types';
 import { SettingsManager } from '../config/SettingsManager';
@@ -12,8 +13,6 @@ import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import { PersistenceSystem } from '../systems/strategy/PersistenceSystem';
 import type { GameEngine } from './GameEngine';
 import { markStartup } from './StartupTelemetry';
-import { toWorkerVegetationConfigs } from '../config/vegetationTypes';
-import { toWorkerBiomeConfig, BIOMES } from '../config/biomes';
 
 function getPrimaryUSBase(config: ReturnType<typeof getGameModeConfig>): ZoneConfig | undefined {
   return config.zones.find(z => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
@@ -70,21 +69,7 @@ export async function initializeSystems(engine: GameEngine): Promise<void> {
       Logger.info('engine-init', 'Skybox created');
     }
 
-    // Send default vegetation config to workers as a safety net. This is just
-    // a postMessage (microseconds). Chunk generation is deferred to
-    // startGameWithMode() where it runs at the actual mode spawn position.
     engine.systemManager.globalBillboardSystem.configure('denseJungle');
-    {
-      const activeTypes = engine.systemManager.globalBillboardSystem.getActiveVegetationTypes();
-      const activeBiome = engine.systemManager.globalBillboardSystem.getActiveBiome();
-      const workerPool = engine.systemManager.chunkManager.getWorkerPool?.();
-      if (workerPool) {
-        workerPool.sendVegetationConfig({
-          types: toWorkerVegetationConfigs(activeTypes),
-          biomePalette: toWorkerBiomeConfig(activeBiome).vegetationPalette,
-        });
-      }
-    }
 
     Logger.info('engine-init', 'World system ready!');
     engine.loadingScreen.updateProgress('entities', 1);
@@ -148,9 +133,10 @@ export async function startGameWithMode(engine: GameEngine, mode: GameMode): Pro
 
   engine.gameStarted = true;
 
-  // Load DEM data if this mode uses real terrain
+  // Configure terrain height source for this mode
   const config = getGameModeConfig(mode);
   if (config.heightSource?.type === 'dem') {
+    // DEM mode - load real terrain data (A Shau Valley, future Vietnam theaters)
     markStartup(`engine-init.start-game.${mode}.dem-load.begin`);
     Logger.info('engine-init', `Loading DEM terrain from ${config.heightSource.path}...`);
     try {
@@ -169,7 +155,7 @@ export async function startGameWithMode(engine: GameEngine, mode: GameMode): Pro
       heightCache.setProvider(demProvider);
 
       // Send DEM data to chunk worker pool
-      const workerPool = engine.systemManager.chunkManager.getWorkerPool?.();
+      const workerPool = engine.systemManager.terrainSystem.getWorkerPool?.();
       if (workerPool) {
         workerPool.sendHeightProvider(demProvider.getWorkerConfig());
       }
@@ -181,6 +167,18 @@ export async function startGameWithMode(engine: GameEngine, mode: GameMode): Pro
     }
     markStartup(`engine-init.start-game.${mode}.dem-load.end`);
 
+  } else {
+    // Procedural noise mode - resolve seed for terrain variety
+    const seedConfig = config.terrainSeed;
+    const seed = seedConfig === 'random' || seedConfig === undefined
+      ? Math.floor(Math.random() * 2147483647)
+      : seedConfig;
+
+    const noiseProvider = new NoiseHeightProvider(seed);
+    const heightCache = getHeightQueryCache();
+    heightCache.setProvider(noiseProvider);
+
+    Logger.info('engine-init', `Procedural terrain seed: ${seed}`);
   }
 
   // Configure renderer for mode-specific settings
@@ -192,45 +190,33 @@ export async function startGameWithMode(engine: GameEngine, mode: GameMode): Pro
     });
   }
 
+  const terrainSystem = engine.systemManager.terrainSystem;
+  const previousWorldSize = terrainSystem.getWorldSize();
+  const targetWorldSize = config.worldSize ?? previousWorldSize;
+  const worldSizeChanged = targetWorldSize !== previousWorldSize;
+
+  if (config.worldSize) {
+    terrainSystem.setWorldSize(config.worldSize);
+  }
+
   // Reconfigure chunk size if mode specifies a different value
-  if (config.chunkSize && config.chunkSize !== engine.systemManager.chunkManager.getChunkSize()) {
-    engine.systemManager.chunkManager.setChunkSize(config.chunkSize);
+  if (config.chunkSize && config.chunkSize !== terrainSystem.getChunkSize()) {
+    terrainSystem.setChunkSize(config.chunkSize);
   }
 
   // Update render distance if mode specifies it
   if (config.chunkRenderDistance) {
-    engine.systemManager.chunkManager.setRenderDistance(config.chunkRenderDistance);
+    terrainSystem.setRenderDistance(config.chunkRenderDistance);
   }
 
-  // Push biome rules to chunk manager so per-chunk classification works
+  // Re-bake heightmap with the new provider (seed or DEM) if world size
+  // didn't change (reconfigureWorld handles the case where it did).
+  if (!worldSizeChanged) {
+    terrainSystem.rebakeHeightmap();
+  }
+
   const defaultBiome = config.terrain?.defaultBiome ?? 'denseJungle';
-  engine.systemManager.chunkManager.setBiomeConfig(defaultBiome, config.terrain?.biomeRules);
-
-  // Configure biome / vegetation for this mode
-  engine.systemManager.globalBillboardSystem.configure(defaultBiome);
-
-  // Send vegetation + biome config to chunk workers
-  {
-    const activeTypes = engine.systemManager.globalBillboardSystem.getActiveVegetationTypes();
-    const activeBiome = engine.systemManager.globalBillboardSystem.getActiveBiome();
-    const workerPool = engine.systemManager.chunkManager.getWorkerPool?.();
-    if (workerPool) {
-      workerPool.sendVegetationConfig({
-        types: toWorkerVegetationConfigs(activeTypes),
-        biomePalette: toWorkerBiomeConfig(activeBiome).vegetationPalette,
-      });
-
-      const allPalettes: Record<string, any[]> = {};
-      for (const [id, biome] of Object.entries(BIOMES)) {
-        allPalettes[id] = biome.vegetationPalette;
-      }
-      workerPool.sendBiomeConfig({
-        biomeRules: config.terrain?.biomeRules ?? [],
-        defaultBiomeId: defaultBiome,
-        allBiomePalettes: allPalettes,
-      });
-    }
-  }
+  terrainSystem.setBiomeConfig(defaultBiome, config.terrain?.biomeRules);
 
   engine.systemManager.setGameMode(mode, { createPlayerSquad: mode !== GameMode.AI_SANDBOX });
 
@@ -305,13 +291,14 @@ async function runStartupFlow(engine: GameEngine): Promise<void> {
   markPhase('position-player', 'SYNCING INSERTION POINT', 'Validating terrain height and spawn safety...');
   try {
     const cfg = engine.systemManager.gameModeManager.getCurrentConfig();
+    const terrainSystem = engine.systemManager.terrainSystem;
     if (cfg.id === GameMode.AI_SANDBOX) {
       const pos = new THREE.Vector3(0, 0, 0);
-      pos.y = getHeightQueryCache().getHeightAt(pos.x, pos.z) + 2;
+      pos.y = terrainSystem.getHeightAt(pos.x, pos.z) + 2;
       engine.systemManager.playerController.setPosition(pos, 'startup.spawn.sandbox');
     } else {
       const pos = resolveModeSpawnPosition(cfg);
-      pos.y = getHeightQueryCache().getHeightAt(pos.x, pos.z) + 2;
+      pos.y = terrainSystem.getHeightAt(pos.x, pos.z) + 2;
       engine.systemManager.playerController.setPosition(pos, 'startup.spawn.mode-hq');
     }
   } catch {
@@ -319,7 +306,7 @@ async function runStartupFlow(engine: GameEngine): Promise<void> {
   }
 
   markPhase('flush-chunk-update', 'BUILDING LOCAL TERRAIN', 'Finalizing chunk data around insertion zone...');
-  engine.systemManager.chunkManager.update(0.016);
+  engine.systemManager.terrainSystem.update(0.016);
   await nextFrame();
 
   markPhase('renderer-visible', 'RENDERER ONLINE', 'Bringing visual systems to ready state...');
@@ -381,7 +368,7 @@ export function showWelcomeMessage(engine: GameEngine): void {
  World Features:
 - ${debugInfo.grassUsed} grass instances allocated
 - ${debugInfo.treeUsed} tree instances allocated
-- ${engine.systemManager.chunkManager.getLoadedChunkCount()} chunks loaded
+- ${engine.systemManager.terrainSystem.getActiveTerrainTileCount()} terrain tiles active
 - ${combatStats.us} US, ${combatStats.opfor} OPFOR combatants in battle
 
  Controls:

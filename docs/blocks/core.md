@@ -56,10 +56,9 @@ startGameWithMode(mode)   (GameEngineInit)
   |- if config.heightSource.type === 'dem':
   |    fetch DEM binary -> DEMHeightProvider -> HeightQueryCache + ChunkWorkerPool
   |- renderer.configureForWorldSize()      // camera far, fog density, shadow far
-  |- chunkManager set chunk size + render distance
-  |- chunkManager.setBiomeConfig()
-  |- globalBillboardSystem.configure(biome)
-  |- workerPool.sendVegetationConfig() + sendBiomeConfig()
+  |- terrainSystem.setWorldSize(config.worldSize)
+  |- terrainSystem set chunk size + render distance
+  |- terrainSystem.setBiomeConfig(defaultBiome, biomeRules)
   |- systemManager.setGameMode(mode)       // GameModeManager.setGameMode ->
   |                                        //   reseedForcesForMode (spawns AI forces)
   |- if warSimulator.enabled: load persisted war state (A Shau only)
@@ -71,7 +70,7 @@ startGame() / runStartupFlow()
   |- loadingScreen.hide()
   |- renderer.showSpawnLoadingIndicator()  // "DEPLOYING TO BATTLEFIELD" overlay
   |- playerController.setPosition()       // grounded at terrain height
-  |- chunkManager.update(0.016)
+  |- terrainSystem.update(0.016)
   |- await nextFrame()
   |- renderer.showRenderer()              // canvas becomes visible
   |- renderer.hideSpawnLoadingIndicator()
@@ -175,7 +174,7 @@ All files are in `src/core/` unless noted.
          - objectPool.warmup(240, 80, 32, 96)
          - new AssetLoader()
          - new GlobalBillboardSystem(scene, camera, assetLoader)
-         - new ImprovedChunkManager(scene, camera, assetLoader, billboard, {
+         - new TerrainSystem(scene, camera, assetLoader, billboard, {
              size:64, renderDistance:adaptive(3-6), loadDistance:+1, lodLevels:4
            })
        Phase 2 textures (progress: 0-1):
@@ -201,8 +200,6 @@ All files are in `src/core/` unless noted.
           119 setter calls (see Wiring section)
    - Back in initializeSystems (engine level):
      - asset check (skybox texture)
-     - globalBillboardSystem.configure('denseJungle')
-     - workerPool.sendVegetationConfig()
      - engine.isInitialized = true
      - hudSystem.setPlayAgainCallback(() => restartMatch(engine))
      - if sandbox.autoStart: startGameWithMode(AI_SANDBOX)
@@ -238,7 +235,7 @@ if playerSquadController && playerController:
 
 TRACKED GROUPS (name, budget):
   "Combat"      5.0ms  combatantSystem.update(dt)
-  "Terrain"     2.0ms  chunkManager.update(dt)         [gated: gameStarted]
+  "Terrain"     2.0ms  terrainSystem.update(dt)        [gated: gameStarted]
   "Billboards"  2.0ms  globalBillboardSystem.update(dt, fog)
   "Player"      1.0ms  playerController.update(dt)
                        firstPersonWeapon.update(dt)
@@ -302,8 +299,8 @@ Source: [SystemConnector.ts](https://github.com/matthew-kissinger/terror-in-the-
 
 | Receiver | Wired dependencies |
 |----------|--------------------|
-| **playerController** | chunkManager, gameModeManager, ticketSystem, helicopterModel, firstPersonWeapon, hudSystem, renderer, cameraShakeSystem, inventoryManager, grenadeSystem, mortarSystem, sandbagSystem, playerSquadController, footstepAudioSystem |
-| **combatantSystem** | chunkManager, camera, ticketSystem, playerHealthSystem, zoneManager, gameModeManager, hudSystem, audioManager, playerSuppressionSystem, voiceCalloutSystem. Plus direct property assigns: influenceMap, sandbagSystem. combatantCombat.setSandbagSystem, combatantAI.setSandbagSystem/setZoneManager/setSmokeCloudSystem, squadManager.setInfluenceMap |
+| **playerController** | terrainSystem, gameModeManager, ticketSystem, helicopterModel, firstPersonWeapon, hudSystem, renderer, cameraShakeSystem, inventoryManager, grenadeSystem, mortarSystem, sandbagSystem, playerSquadController, footstepAudioSystem |
+| **combatantSystem** | terrainSystem, camera, ticketSystem, playerHealthSystem, zoneManager, gameModeManager, hudSystem, audioManager, playerSuppressionSystem, voiceCalloutSystem. Plus direct property assigns: influenceMap, sandbagSystem. combatantCombat.setSandbagSystem, combatantAI.setSandbagSystem/setZoneManager/setSmokeCloudSystem, squadManager.setInfluenceMap |
 | **firstPersonWeapon** | playerController, combatantSystem, ticketSystem, hudSystem, zoneManager, inventoryManager, audioManager |
 | **hudSystem** | combatantSystem, zoneManager, ticketSystem, grenadeSystem, mortarSystem. Mounts: compassSystem, minimapSystem, playerHealthSystem, playerSquadController |
 | **ticketSystem** | zoneManager. matchRestartCallback: cancelPendingRespawn + resetForNewMatch + weapon.enable + respawnAtBase |
@@ -311,11 +308,11 @@ Source: [SystemConnector.ts](https://github.com/matthew-kissinger/terror-in-the-
 | **minimapSystem** | zoneManager, combatantSystem, warSimulator. Receives helipad markers via helipadSystem.onHelipadsCreated |
 | **fullMapSystem** | zoneManager, combatantSystem, gameModeManager, warSimulator. Receives helipad markers. |
 | **compassSystem** | zoneManager. Mounted into hudSystem grid slot 'compass'. |
-| **zoneManager** | combatantSystem, camera, chunkManager, spatialGridManager, spatialQueryProvider (lambda), hudSystem |
-| **playerRespawnManager** | playerHealthSystem, zoneManager, gameModeManager, playerController, firstPersonWeapon, inventoryManager, warSimulator, chunkManager |
-| **helipadSystem** | chunkManager (terrainManager), globalBillboardSystem (vegetationSystem), gameModeManager. onHelipadsCreated -> minimap + fullMap markers. |
-| **helicopterModel** | chunkManager (terrainManager), helipadSystem, playerController, hudSystem, audioManager listener |
-| **gameModeManager** | connectSystems(zoneManager, combatantSystem, ticketSystem, chunkManager, minimapSystem), influenceMapSystem, warSimulator |
+| **zoneManager** | combatantSystem, camera, terrainSystem, spatialGridManager, spatialQueryProvider (lambda), hudSystem |
+| **playerRespawnManager** | playerHealthSystem, zoneManager, gameModeManager, playerController, firstPersonWeapon, inventoryManager, warSimulator, terrainSystem |
+| **helipadSystem** | terrainSystem (terrainManager), globalBillboardSystem (vegetationSystem), gameModeManager. onHelipadsCreated -> minimap + fullMap markers. |
+| **helicopterModel** | terrainSystem (terrainManager), helipadSystem, playerController, hudSystem, audioManager listener |
+| **gameModeManager** | connectSystems(zoneManager, combatantSystem, ticketSystem, terrainSystem, minimapSystem), influenceMapSystem, warSimulator |
 | **cameraShakeSystem** | (no setters; receives from playerController.setCameraShakeSystem) |
 | **playerSuppressionSystem** | cameraShakeSystem, playerController |
 | **flashbangScreenEffect** | playerController. setSmokeCloudSystem global. |
@@ -325,10 +322,10 @@ Source: [SystemConnector.ts](https://github.com/matthew-kissinger/terror-in-the-
 | **ammoSupplySystem** | zoneManager, inventoryManager, firstPersonWeapon |
 | **weatherSystem** | audioManager, renderer |
 | **waterSystem** | weatherSystem |
-| **footstepAudioSystem** | chunkManager |
+| **footstepAudioSystem** | terrainSystem |
 | **warSimulator** | combatantSystem, zoneManager, ticketSystem, influenceMapSystem |
 | **strategicFeedback** | warSimulator, hudSystem, audioManager |
-| **performanceTelemetry** | hitDetection (from combatantCombat), chunkManager, combatants array, spatialGridManager. initGPUTiming(renderer). |
+| **performanceTelemetry** | hitDetection (from combatantCombat), terrainSystem, combatants array, spatialGridManager. initGPUTiming(renderer). |
 
 ---
 
@@ -382,6 +379,6 @@ GameEngineLoop tracks consecutive crashes within a 5s window. After 3 crashes it
 - [PROFILING_HARNESS.md](../PROFILING_HARNESS.md) - how perf captures use `window.__engine`
 - [AGENT_TESTING.md](../AGENT_TESTING.md) - agent validation workflows and perf baselines
 - [blocks/combat.md](combat.md) - CombatantSystem internals (5ms budget)
-- [blocks/terrain.md](terrain.md) - ImprovedChunkManager, workers, DEM
+- [blocks/terrain.md](terrain.md) - TerrainSystem, HeightQueryCache, workers, DEM
 - [blocks/ui.md](ui.md) - HUDSystem, StartScreen, minimap, touch controls
 - [blocks/world.md](world.md) - ZoneManager, TicketSystem, GameModeManager
