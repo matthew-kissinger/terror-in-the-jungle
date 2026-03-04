@@ -12,10 +12,10 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 
 | Priority | Workstream | Status | Notes |
 |---|---|---|---|
-| P0 | Harness integrity and measurement quality | IN_PROGRESS | Startup contamination and observer overhead still require careful run discipline. |
+| P0 | Harness integrity and measurement quality | IN_PROGRESS | Required Phase 1 scenarios are now behavior-valid. Remaining gap: `systemTop` snapshot quality is secondary to `userTimingByName`, so phase analysis should use user-timing totals as the authoritative tick-group source. |
 | P1 | Spatial ownership unification (F3) | DONE | Legacy SpatialOctree removed from CombatantSystem. All consumers (AI, LOD, spawn, hit detection) use SpatialGridManager singleton. Secondary sync and dedup feature flags removed. |
 | P2 | Heap growth triage in combat-heavy runs | IN_PROGRESS | New diagnostics added; source still mixed between transient waves and retained growth. |
-| P3 | A Shau gameplay flow and contact reliability | IN_PROGRESS | Immediate contact improved; sustained close-contact remains inconsistent. |
+| P3 | A Shau gameplay flow and contact reliability | IN_PROGRESS | Short harness capture is now behavior-valid (`270` shots / `150` hits on 2026-03-04). Remaining work is performance analysis, not basic contact acquisition. |
 | P4 | UI/HUD update budget discipline | DONE | UI Engine Phases 0-7 complete. 11 UIComponents migrated to CSS Modules + signals. Grid layout with 17 named slots. VisibilityManager wired. All touch controls on pointer events as UIComponent subclasses. UnifiedWeaponBar replaces 3 duplicates. Renderer subscribes to ViewportManager. 12 dead component files + 7 dead style files deleted. |
 | P5 | Terrain runtime stabilization | IN_PROGRESS | Terrain rewrite is active under `TERRAIN_REWRITE_MASTER_PLAN.md`: world-size authority, truthful terrain API, biome/vegetation runtime wiring, terrain block-boundary cleanup, and large-world startup cost reduction validated in preview smoke. |
 
@@ -69,6 +69,10 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: `TerrainMaterial.applyTerrainMaterialOptions()` updates existing shader uniform values in place (not replacing objects) on subsequent calls to preserve compiled shader references. First call creates uniforms and sets up `onBeforeCompile`; later calls only update `.value` fields.
 - Keep: Vegetation cell bounds check in `VegetationScatterer.generateCell()` limits scatter to `worldHalfExtent + visualMargin`, matching the terrain render overflow. Player can't walk there; it's visual filler only.
 - Keep: Helipad creation no longer has a synthetic fallback pad. Vehicle systems only activate when the active `GameModeConfig` explicitly declares `helipads`. Modes that omit helipads pay zero hidden vehicle cost and no longer mask config errors.
+- Keep: perf diagnostics are gated behind `import.meta.env.DEV` and `?perf=1`. Harness-only globals, renderer counters, and user-timing spans must stay out of production bundles.
+- Keep: `GameRenderer` captures per-frame `renderer.info` stats for perf harness sampling; this is harness evidence, not shipping HUD/debug behavior.
+- Keep: `MaterializationPipeline` materializes nearest squads first so large-map scenarios establish combat around the player before distant squads consume the budget.
+- Keep: `SpatialOctree` vertical world bounds scale with world size. Fixed Y bounds were invalid on mountainous maps and caused empty high-altitude hit-detection queries.
 
 ## Deferred Decisions
 
@@ -77,9 +81,12 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 ## Open Risks
 
 - High-intensity runs can still show heap growth warnings.
-- A/B startup variance can hide small wins/losses.
+- A/B startup variance can hide small wins/losses; first capture after a fresh boot should be treated as cold-start data.
 - ZoneManager no longer falls back to linear scan if spatial query returns empty; if SpatialGridManager has sync bugs, zone capture may stall.
 - The immediate A Shau terrain-startup spike has improved in preview smoke, but this is not yet a substitute for broader perf-harness evidence under sustained combat and camera motion.
+- `combat120` now has a valid harness run, but it fails on `peak_p99_frame_ms` and AI starvation. This is the clearest measured hotspot.
+- `open_frontier` and `frontier30m` are throughput-pass / tail-fail patterns: averages stay low while long-task and LoAF totals remain high.
+- `systemTop` remains a secondary signal in some captures; authoritative frame-budget analysis should use `browserStalls.totals.userTimingByName`.
 
 ## Required Evidence For Major Changes
 
@@ -89,11 +96,11 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 
 ## Next Execution Slice
 
-1. Isolate retained heap growth sources with focused captures and subsystem counters.
-2. A Shau sustained contact pressure improved (2026-03-03): StrategicDirector biases zone scoring toward player (1.5km radius, +3.0 score), AbstractCombatResolver reduces kill rate within 1km of player (30% multiplier), reinforcements spawn at forward-owned zones near player. Needs live validation.
-3. Re-baseline and lock regression checks after each accepted change. Deploy now gated on CI (lint+test+build). `perf:compare` wired into perf-check.yml workflow.
-4. Keep terrain rewrite progress aligned with `TERRAIN_REWRITE_MASTER_PLAN.md`; do not reintroduce chunk-era semantics into active runtime code. T-006 (CDLOD LOD transitions) done: XZ morphing in vertex shader, wireframe debug toggle.
-5. Re-run matched perf captures after the terrain startup-path changes so the recovery plan has sustained evidence, not just preview smoke evidence.
+1. Triage `combat120` AI starvation and `Combat` tick cost before considering higher-friction frontier work.
+2. Break down `open_frontier` / `frontier30m` tail spikes with the new user-timing, long-task, and LoAF evidence; prioritize terrain/render-path causes over average-frame improvements.
+3. Isolate A Shau `WarSim` heap waves and retained growth now that combat contact is behavior-valid.
+4. Re-baseline and lock regression checks after each accepted change. Deploy now gated on CI (lint+test+build). `perf:compare` wired into perf-check.yml workflow.
+5. Keep terrain rewrite progress aligned with `TERRAIN_REWRITE_MASTER_PLAN.md`; do not reintroduce chunk-era semantics into active runtime code. T-006 (CDLOD LOD transitions) done: XZ morphing in vertex shader, wireframe debug toggle.
 
 ## Update Rule
 

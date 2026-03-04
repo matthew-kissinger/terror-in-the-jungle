@@ -76,7 +76,7 @@ describe('SpatialOctree', () => {
       
       // Test various boundary positions
       octree.updatePosition('boundary-min', new THREE.Vector3(-1000, -50, -1000));
-      octree.updatePosition('boundary-max', new THREE.Vector3(1000, 100, 1000));
+      octree.updatePosition('boundary-max', new THREE.Vector3(1000, 1000, 1000));
       octree.updatePosition('boundary-x', new THREE.Vector3(1000, 0, 0));
       octree.updatePosition('boundary-z', new THREE.Vector3(0, 0, -1000));
       
@@ -94,7 +94,7 @@ describe('SpatialOctree', () => {
       expect(stats.totalEntities).toBe(1);
       
       // Query should find the entity even though it was clamped
-      const results = octree.queryRadius(new THREE.Vector3(1000, 0, 1000), 100);
+      const results = octree.queryRadius(new THREE.Vector3(1000, 500, 1000), 100);
       expect(results).toContain('outside');
     });
   });
@@ -284,6 +284,16 @@ describe('SpatialOctree', () => {
       const results = octree.queryRadius(new THREE.Vector3(0, 0, 0), 100);
       
       expect(results).toContain('on-boundary');
+    });
+
+    it('should query high-elevation entities on mountainous maps', () => {
+      const octree = new SpatialOctree(21000);
+
+      octree.updatePosition('ridge-target', new THREE.Vector3(620, 725, -884));
+
+      const results = octree.queryRadius(new THREE.Vector3(621, 726, -871), 600);
+
+      expect(results).toContain('ridge-target');
     });
 
     it('should be faster than linear scan for large datasets', () => {

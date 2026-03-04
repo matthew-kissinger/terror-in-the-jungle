@@ -50,6 +50,8 @@ export class GameRenderer {
 
     // Configure for pixel-perfect rendering
     PixelPerfectUtils.configureRenderer(this.renderer);
+    // Aggregate stats across the whole frame; the loop resets once before rendering.
+    this.renderer.info.autoReset = false;
     
     // Device-adaptive pixel ratio
     this.renderer.setPixelRatio(getMaxPixelRatio());
@@ -196,6 +198,10 @@ export class GameRenderer {
 
   hideSpawnLoadingIndicator(): void {
     this.loadingUI.hideSpawnLoadingIndicator();
+  }
+
+  beginFrameStats(): void {
+    this.renderer.info.reset();
   }
 
   getPerformanceStats(): {

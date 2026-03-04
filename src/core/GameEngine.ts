@@ -21,6 +21,7 @@ import * as Init from './GameEngineInit';
 import * as Input from './GameEngineInput';
 import * as Loop from './GameEngineLoop';
 import { markStartup } from './StartupTelemetry';
+import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
 
 export class GameEngine {
   // Core components (Public for split module access)
@@ -150,7 +151,11 @@ export class GameEngine {
         } else if (!show && this.performanceOverlay.isVisible()) {
           this.performanceOverlay.toggle();
         }
-        performanceTelemetry.setEnabled(this.performanceOverlay.isVisible() || this.sandboxEnabled);
+        performanceTelemetry.setEnabled(
+          this.performanceOverlay.isVisible()
+          || this.sandboxEnabled
+          || (import.meta.env.DEV && isPerfDiagnosticsEnabled())
+        );
         break;
       }
       case 'graphicsQuality': {

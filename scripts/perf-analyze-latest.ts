@@ -24,6 +24,29 @@ type RuntimeSample = {
   overBudgetPercent: number;
   heapUsedMb?: number;
   heapTotalMb?: number;
+  renderer?: {
+    drawCalls: number;
+    triangles: number;
+    geometries: number;
+    textures: number;
+    programs: number;
+  };
+  browserStalls?: {
+    totals?: {
+      longTaskCount?: number;
+      longTaskTotalDurationMs?: number;
+      longTaskMaxDurationMs?: number;
+      longAnimationFrameCount?: number;
+      longAnimationFrameTotalDurationMs?: number;
+      longAnimationFrameMaxDurationMs?: number;
+      longAnimationFrameBlockingDurationMs?: number;
+      userTimingByName?: Record<string, {
+        count?: number;
+        totalDurationMs?: number;
+        maxDurationMs?: number;
+      }>;
+    };
+  };
   combatBreakdown?: {
     totalMs: number;
     aiUpdateMs: number;
@@ -95,6 +118,44 @@ const heapPeakGrowth = heapSamples.length >= 2
 const heapRecoveryFromPeak = heapSamples.length >= 2
   ? heapPeak - heapEnd
   : 0;
+const rendererSamples = samples.filter(s => s.renderer);
+const avgDrawCalls = rendererSamples.length > 0
+  ? avg(rendererSamples.map(s => Number(s.renderer?.drawCalls ?? 0)))
+  : 0;
+const avgTriangles = rendererSamples.length > 0
+  ? avg(rendererSamples.map(s => Number(s.renderer?.triangles ?? 0)))
+  : 0;
+const maxTextures = rendererSamples.length > 0
+  ? Math.max(...rendererSamples.map(s => Number(s.renderer?.textures ?? 0)))
+  : 0;
+const maxGeometries = rendererSamples.length > 0
+  ? Math.max(...rendererSamples.map(s => Number(s.renderer?.geometries ?? 0)))
+  : 0;
+const stallSamples = samples.filter(s => s.browserStalls?.totals);
+const longTaskCount = stallSamples.length > 0
+  ? Math.max(...stallSamples.map(s => Number(s.browserStalls?.totals?.longTaskCount ?? 0)))
+  : 0;
+const longTaskMaxMs = stallSamples.length > 0
+  ? Math.max(...stallSamples.map(s => Number(s.browserStalls?.totals?.longTaskMaxDurationMs ?? 0)))
+  : 0;
+const loafCount = stallSamples.length > 0
+  ? Math.max(...stallSamples.map(s => Number(s.browserStalls?.totals?.longAnimationFrameCount ?? 0)))
+  : 0;
+const loafBlockingMs = stallSamples.length > 0
+  ? Math.max(...stallSamples.map(s => Number(s.browserStalls?.totals?.longAnimationFrameBlockingDurationMs ?? 0)))
+  : 0;
+const latestUserTiming = stallSamples.length > 0
+  ? (stallSamples[stallSamples.length - 1].browserStalls?.totals?.userTimingByName ?? {})
+  : {};
+const topUserTiming = Object.entries(latestUserTiming)
+  .map(([name, bucket]) => ({
+    name,
+    count: Number(bucket?.count ?? 0),
+    totalDurationMs: Number(bucket?.totalDurationMs ?? 0),
+    maxDurationMs: Number(bucket?.maxDurationMs ?? 0)
+  }))
+  .sort((a, b) => b.totalDurationMs - a.totalDurationMs)
+  .slice(0, 5);
 
 const topSystemCounts = new Map<string, number>();
 for (const s of samples) {
@@ -117,6 +178,22 @@ if (heapSamples.length > 0) {
   console.log(`Heap growth (MB): ${heapGrowth.toFixed(2)}`);
   console.log(`Heap peak growth (MB): ${heapPeakGrowth.toFixed(2)}`);
   console.log(`Heap recovered from peak (MB): ${heapRecoveryFromPeak.toFixed(2)}`);
+}
+if (rendererSamples.length > 0) {
+  console.log(`Avg draw calls: ${avgDrawCalls.toFixed(2)}`);
+  console.log(`Avg triangles: ${avgTriangles.toFixed(0)}`);
+  console.log(`Max textures: ${maxTextures}`);
+  console.log(`Max geometries: ${maxGeometries}`);
+}
+if (stallSamples.length > 0) {
+  console.log(`Long tasks observed: ${longTaskCount} (max ${longTaskMaxMs.toFixed(2)}ms)`);
+  console.log(`Long animation frames observed: ${loafCount} (blocking ${loafBlockingMs.toFixed(2)}ms)`);
+  if (topUserTiming.length > 0) {
+    console.log('User timing totals (latest cumulative snapshot):');
+    for (const entry of topUserTiming) {
+      console.log(`- ${entry.name}: total ${entry.totalDurationMs.toFixed(2)}ms, count ${entry.count}, max ${entry.maxDurationMs.toFixed(2)}ms`);
+    }
+  }
 }
 console.log('Dominant top systems:');
 for (const [name, count] of dominantSystems) {

@@ -6,6 +6,7 @@ import { ShotCommandFactory } from '../systems/player/weapon/ShotCommand';
 import { Logger } from '../utils/Logger';
 import { GameMode } from '../config/gameModeTypes';
 import { isOpfor } from '../systems/combat/types';
+import { isPerfUserTimingEnabled } from './PerfDiagnostics';
 
 interface SystemTimingEntry {
   name: string;
@@ -30,6 +31,7 @@ export class SystemUpdater {
   private readonly ASHAU_CONTACT_RADIUS = 250;
   private readonly ASHAU_CONTACT_ASSIST_DELAY_MS = 60_000;
   private readonly ASHAU_CONTACT_ASSIST_COOLDOWN_MS = 90_000;
+  private readonly perfUserTimingEnabled = import.meta.env.DEV && isPerfUserTimingEnabled();
 
   updateSystems(
     refs: SystemReferences,
@@ -161,17 +163,19 @@ export class SystemUpdater {
     });
 
     // Update remaining systems without tracking (lightweight systems)
-    performanceTelemetry.beginSystem('Other');
-    for (const system of systems) {
-      if (!this.isTrackedSystem(system, refs)) {
-        try {
-          system.update(deltaTime);
-        } catch (error) {
-          Logger.error('SystemUpdater', 'Untracked system threw error:', error);
+    this.withUserTiming('Other', () => {
+      performanceTelemetry.beginSystem('Other');
+      for (const system of systems) {
+        if (!this.isTrackedSystem(system, refs)) {
+          try {
+            system.update(deltaTime);
+          } catch (error) {
+            Logger.error('SystemUpdater', 'Untracked system threw error:', error);
+          }
         }
       }
-    }
-    performanceTelemetry.endSystem('Other');
+      performanceTelemetry.endSystem('Other');
+    });
 
     // End frame telemetry
     performanceTelemetry.endFrame();
@@ -243,7 +247,7 @@ export class SystemUpdater {
   private trackSystemUpdate(name: string, budgetMs: number, updateFn: () => void): void {
     const start = performance.now();
     try {
-      updateFn();
+      this.withUserTiming(name, updateFn);
     } catch (error) {
       Logger.error('SystemUpdater', `System "${name}" threw error:`, error);
     }
@@ -266,6 +270,27 @@ export class SystemUpdater {
         this.budgetWarningLastMs.set(name, now);
         Logger.warn('SystemUpdater', `"${name}" over budget: ${entry.emaMs.toFixed(2)}ms EMA vs ${entry.budgetMs}ms budget`);
       }
+    }
+  }
+
+  private withUserTiming(name: string, fn: () => void): void {
+    if (!import.meta.env.DEV || !this.perfUserTimingEnabled) {
+      fn();
+      return;
+    }
+
+    const measureName = `SystemUpdater.${name}`;
+    const startMark = `${measureName}.start`;
+    const endMark = `${measureName}.end`;
+
+    performance.mark(startMark);
+    try {
+      fn();
+    } finally {
+      performance.mark(endMark);
+      performance.measure(measureName, startMark, endMark);
+      performance.clearMarks(startMark);
+      performance.clearMarks(endMark);
     }
   }
 

@@ -3,6 +3,7 @@ import { GPUTimingTelemetry, GPUTelemetry } from './GPUTimingTelemetry'
 import { PerformanceBenchmark, BenchmarkResult, BenchmarkDependencies } from './PerformanceBenchmark'
 import { FrameTimingTracker } from './FrameTimingTracker'
 import { Logger } from '../../utils/Logger'
+import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics'
 import {
   SystemTiming,
   FrameData,
@@ -52,8 +53,8 @@ export class PerformanceTelemetry {
   private enabled = this.resolveInitialEnabledState()
 
   private constructor() {
-    // Expose to window for console debugging
-    if (typeof window !== 'undefined') {
+    // Expose to window only for harness/dev diagnostics.
+    if (import.meta.env.DEV && typeof window !== 'undefined' && isPerfDiagnosticsEnabled()) {
       (window as any).perf = {
         report: () => this.getReport(),
         validate: () => this.validate(),
@@ -302,49 +303,10 @@ export class PerformanceTelemetry {
   }
 
   private resolveInitialEnabledState(): boolean {
-    const fromGlobal = (globalThis as { __ENABLE_PERF_TELEMETRY__?: boolean }).__ENABLE_PERF_TELEMETRY__
-    if (typeof fromGlobal === 'boolean') {
-      return fromGlobal
+    if (!import.meta.env.DEV) {
+      return false
     }
-
-    const fromBuild = this.readBuildEnvTelemetryFlag()
-    if (fromBuild !== null) {
-      return fromBuild
-    }
-
-    if (typeof window !== 'undefined') {
-      try {
-        const params = new URLSearchParams(window.location.search)
-        const sandboxFlag = params.get('sandbox')
-        const perfFlag = params.get('perf')
-        const telemetryFlag = params.get('telemetry')
-        if (sandboxFlag === '1' || sandboxFlag === 'true') return true
-        if (perfFlag === '1' || perfFlag === 'true') return true
-        if (telemetryFlag === '1' || telemetryFlag === 'true') return true
-      } catch {
-        // ignore
-      }
-    }
-
-    return false
-  }
-
-  private readBuildEnvTelemetryFlag(): boolean | null {
-    try {
-      const env = (import.meta as { env?: { DEV?: boolean } }).env
-      if (env?.DEV === true) {
-        if (typeof window === 'undefined' || !window.location) return false
-        const host = (window.location.hostname || '').toLowerCase()
-        if (host === '' || host === 'localhost' || host === '127.0.0.1' || host === '::1') {
-          return true
-        }
-        // On non-local origins, don't enable telemetry by default even in DEV bundles.
-        return false
-      }
-    } catch {
-      // ignore and fall through
-    }
-    return null
+    return isPerfDiagnosticsEnabled()
   }
 
   /**

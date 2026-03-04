@@ -37,6 +37,7 @@ import { CombatantSystemUpdate } from './CombatantSystemUpdate';
 import { AILineOfSight } from './ai/AILineOfSight';
 import { getRaycastBudgetStats } from './ai/RaycastBudget';
 import { getCombatFireRaycastBudgetStats } from './ai/CombatFireRaycastBudget';
+import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
 
 export class CombatantSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -185,13 +186,15 @@ export class CombatantSystem implements GameSystem {
     // Update AI with all squads
     this.combatantAI.setSquads(this.squadManager.getAllSquads());
 
-    // Expose profiling to console for debugging
-    if (typeof window !== 'undefined') {
+    // Expose profiling only for harness/dev diagnostics.
+    if (import.meta.env.DEV && typeof window !== 'undefined' && isPerfDiagnosticsEnabled()) {
       (window as any).combatProfile = () => this.getCombatProfile();
     }
 
     Logger.info('Combat', 'Combatant System initialized');
-    Logger.info('Combat', 'Use window.combatProfile() in console to see combat performance breakdown');
+    if (import.meta.env.DEV && isPerfDiagnosticsEnabled()) {
+      Logger.info('Combat', 'Use window.combatProfile() in console to see combat performance breakdown');
+    }
   }
   /**
    * Get detailed combat profiling info for debugging performance

@@ -1,3 +1,5 @@
+import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
+
 export interface RuntimeMetricsSnapshot {
   frameCount: number;
   avgFrameMs: number;
@@ -35,7 +37,7 @@ export class RuntimeMetrics {
   private engagingCount = 0;
 
   constructor() {
-    if (typeof window !== 'undefined') {
+    if (import.meta.env.DEV && typeof window !== 'undefined' && isPerfDiagnosticsEnabled()) {
       // Use arrow functions to capture 'this' lexically instead of aliasing
       const getFrameCount = () => this.frameCount;
       const getAvgFrameMs = () => this.getAvgFrameMs();

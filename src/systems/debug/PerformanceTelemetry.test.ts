@@ -118,8 +118,8 @@ describe('PerformanceTelemetry', () => {
     benchmarkSpies.run.mockReturnValue(benchmarkResultMock)
   })
 
-  it('exposes perf API on window when available', async () => {
-    const { windowRef } = await loadTelemetry(true)
+  it('exposes perf API on window when diagnostics are enabled', async () => {
+    const { windowRef } = await loadTelemetry(true, { search: '?sandbox=true' })
     expect(windowRef).toBeDefined()
     expect(windowRef.perf).toBeDefined()
     expect(typeof windowRef.perf.report).toBe('function')
@@ -152,7 +152,7 @@ describe('PerformanceTelemetry', () => {
   })
 
   it('tracks frames and resets per-frame spatial grid counters', async () => {
-    const { instance } = await loadTelemetry()
+    const { instance } = await loadTelemetry(true, { search: '?sandbox=true' })
 
     instance.updateSpatialGridTelemetry({ queriesThisFrame: 9 })
     instance.beginFrame()
@@ -231,7 +231,7 @@ describe('PerformanceTelemetry', () => {
   })
 
   it('generates a complete telemetry report with computed fps', async () => {
-    const { instance } = await loadTelemetry()
+    const { instance } = await loadTelemetry(true, { search: '?sandbox=true' })
 
     frameTimingSpies.getAvgFrameTime.mockReturnValue(20)
     frameTimingSpies.getOverBudgetPercent.mockReturnValue(12.5)
@@ -253,7 +253,7 @@ describe('PerformanceTelemetry', () => {
   })
 
   it('uses zero fps when average frame time is zero', async () => {
-    const { instance } = await loadTelemetry()
+    const { instance } = await loadTelemetry(true, { search: '?sandbox=true' })
 
     frameTimingSpies.getAvgFrameTime.mockReturnValue(0)
     const report = instance.getReport()
@@ -262,7 +262,7 @@ describe('PerformanceTelemetry', () => {
   })
 
   it('returns structured validation data', async () => {
-    const { instance } = await loadTelemetry()
+    const { instance } = await loadTelemetry(true, { search: '?sandbox=true' })
 
     instance.updateSpatialGridTelemetry({ initialized: true, entityCount: 3, fallbackCount: 1 })
     instance.recordShot(true)
@@ -289,6 +289,11 @@ describe('PerformanceTelemetry', () => {
   it('defaults telemetry off when no explicit enable flags are present', async () => {
     const { instance } = await loadTelemetry(true, { telemetryEnabled: false, search: '' })
     expect(instance.isEnabled()).toBe(false)
+  })
+
+  it('does not expose perf API when diagnostics are disabled', async () => {
+    const { windowRef } = await loadTelemetry(true, { telemetryEnabled: false, search: '' })
+    expect(windowRef.perf).toBeUndefined()
   })
 
   it('enables telemetry automatically in sandbox query mode', async () => {

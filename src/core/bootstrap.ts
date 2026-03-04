@@ -4,6 +4,7 @@ import { TouchControlLayout } from '../ui/controls/TouchControlLayout';
 import { markStartup, resetStartupTelemetry } from './StartupTelemetry';
 import { AgentTier } from '../systems/strategy/types';
 import { Faction, isBlufor, isOpfor } from '../systems/combat/types';
+import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
 
 const ashauSessionTelemetry = {
   sessionStartEpochMs: Date.now(),
@@ -73,17 +74,19 @@ export async function bootstrapGame(): Promise<void> {
     engine.start();
     markStartup('bootstrap.engine-started');
 
-    // Expose engine root for perf harness scenario control.
-    (window as any).__engine = engine;
-    // Expose renderer for performance measurement scripts
-    (window as any).__renderer = engine.renderer;
-    // A Shau runtime diagnostics helper (manual validation/reporting)
-    ashauSessionTelemetry.sessionStartEpochMs = Date.now();
-    ashauSessionTelemetry.firstTacticalContactMs = null;
-    ashauSessionTelemetry.diagnosticsCalls = 0;
-    ashauSessionTelemetry.lastNearbyTactical250 = 0;
-    ashauSessionTelemetry.peakNearbyTactical250 = 0;
-    (window as any).__ashauDiagnostics = () => buildAShauDiagnostics(engine);
+    if (import.meta.env.DEV && isPerfDiagnosticsEnabled()) {
+      // Expose engine root for perf harness scenario control.
+      (window as any).__engine = engine;
+      // Expose renderer for performance measurement scripts.
+      (window as any).__renderer = engine.renderer;
+      // A Shau runtime diagnostics helper for harness/dev validation.
+      ashauSessionTelemetry.sessionStartEpochMs = Date.now();
+      ashauSessionTelemetry.firstTacticalContactMs = null;
+      ashauSessionTelemetry.diagnosticsCalls = 0;
+      ashauSessionTelemetry.lastNearbyTactical250 = 0;
+      ashauSessionTelemetry.peakNearbyTactical250 = 0;
+      (window as any).__ashauDiagnostics = () => buildAShauDiagnostics(engine);
+    }
 
     window.addEventListener('beforeunload', () => {
       touchLayout.dispose();

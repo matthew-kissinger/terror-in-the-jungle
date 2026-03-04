@@ -67,7 +67,7 @@ export class MaterializationPipeline {
     let dematerializeThisFrame = 0;
 
     // Collect squads that need materialization (for squad-coherent spawning)
-    const squadsToMaterialize = new Set<string>();
+    const squadsToMaterialize = new Map<string, number>();
 
     // First pass: count materialized, identify dematerialization candidates
     for (const agent of this.agents.values()) {
@@ -124,7 +124,10 @@ export class MaterializationPipeline {
       } else {
         // Candidate for materialization
         if (minDistSq < this.matRadiusSq) {
-          squadsToMaterialize.add(agent.squadId);
+          const currentBest = squadsToMaterialize.get(agent.squadId);
+          if (currentBest === undefined || minDistSq < currentBest) {
+            squadsToMaterialize.set(agent.squadId, minDistSq);
+          }
         }
 
         // Update tier for simulated vs strategic
@@ -137,7 +140,12 @@ export class MaterializationPipeline {
     }
 
     // Second pass: materialize squads (squad-coherent)
-    for (const squadId of squadsToMaterialize) {
+    const orderedSquadIds = [...squadsToMaterialize.entries()]
+      // Avoid spawn-order bias: materialize the squads actually closest to the player first.
+      .sort((a, b) => a[1] - b[1])
+      .map(([squadId]) => squadId);
+
+    for (const squadId of orderedSquadIds) {
       if (materializedCount >= this.config.maxMaterialized) break;
       if (materializeThisFrame >= this.MAX_MATERIALIZE_PER_FRAME) break;
 

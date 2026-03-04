@@ -1,9 +1,10 @@
 # Profiling Harness
 
-Last updated: 2026-02-26
+Last updated: 2026-03-04
 
 Mission linkage:
 - `docs/PERFORMANCE_FRONTIER_MISSION.md`
+- `docs/PERF_FRONTIER.md`
 
 ## Primary Commands
 
@@ -58,6 +59,13 @@ Each run writes to `artifacts/perf/<timestamp>/`:
 - optional deep files: `cpu-profile.cpuprofile`, `heap-sampling.json`, `chrome-trace.json`, `playwright-trace.zip`
 - `final-frame.png`
 
+`runtime-samples.json` is the authoritative per-sample artifact for:
+- frame timing (`avg`, `p95`, `p99`, max, hitch counts)
+- heap snapshots from `performance.memory`
+- `renderer.info` counters (`drawCalls`, `triangles`, `geometries`, `textures`, `programs`)
+- browser-stall totals (`longtask`, `long-animation-frame`)
+- harness-only `SystemUpdater.*` user-timing totals
+
 ## Validation Gates
 
 Automated checks include:
@@ -82,8 +90,29 @@ Current `peak_max_frame_ms` classification:
 4. Re-run same scenario.
 5. Keep only evidence-backed improvements.
 
+## Diagnostics Semantics
+
+- Perf diagnostics are enabled only for capture URLs that include `?perf=1`.
+- Diagnostics globals and user-timing spans are additionally gated by `import.meta.env.DEV`.
+- `scripts/perf-browser-observers.js` installs `PerformanceObserver` listeners for `longtask` and `long-animation-frame` during harness runs only.
+- `SystemUpdater` emits `performance.mark()` / `performance.measure()` spans during perf captures so tick-group totals can be recovered from the artifact without shipping overlay/debug code.
+- `GameRenderer` snapshots `renderer.info` once per frame for harness sampling; this data is recorded in artifacts, not rendered to gameplay UI.
+
+## Driver Expectations
+
+- The active driver must simulate movement, looking, and firing. Zero-shot or zero-hit runs are invalid unless the scenario explicitly disables combat.
+- Large-map modes may reposition the player to keep contact pressure realistic, but camera and player transforms must be resynchronized before aiming/firing.
+- `a_shau:short` requires live contact near high-elevation terrain. A regression here often means either materialization ordering drift or a spatial-query/world-bounds failure.
+
+## Known Caveats
+
+- Treat the first capture after a fresh boot as cold-start data and discard or label it accordingly.
+- `systemTop` inside `runtime-samples.json` is a quick snapshot, not the authoritative budget breakdown in every mode. Use `browserStalls.totals.userTimingByName` for phase analysis.
+- Chromium-only browser diagnostics (`longtask`, `long-animation-frame`) are valid for harness evidence but must remain out of production builds.
+
 ## Guardrails
 
 - Prefer headed captures on this machine for primary comparisons.
 - Use deep CDP for diagnosis, not default pass/fail loops.
 - Keep harness-only behavior out of normal gameplay validation.
+- After any harness/diagnostics edit, re-run `npm run validate` and confirm the production bundle contains no perf globals or observer code.

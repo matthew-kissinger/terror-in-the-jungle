@@ -38,6 +38,7 @@ export function animate(engine: GameEngine): void {
     // Collect GPU timing from previous frame
     performanceTelemetry.collectGPUTime();
 
+    engine.renderer.beginFrameStats();
     performanceTelemetry.beginSystem('RenderMain');
     performanceTelemetry.beginGPUTimer();
 

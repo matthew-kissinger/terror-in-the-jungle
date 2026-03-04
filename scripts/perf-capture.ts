@@ -79,6 +79,54 @@ type RuntimeSample = {
       aiSevereOverBudgetEvents: number;
     };
   };
+  renderer?: {
+    drawCalls: number;
+    triangles: number;
+    geometries: number;
+    textures: number;
+    programs: number;
+  };
+  browserStalls?: {
+    support: {
+      longtask: boolean;
+      longAnimationFrame: boolean;
+      userTiming: boolean;
+    };
+    totals: {
+      longTaskCount: number;
+      longTaskTotalDurationMs: number;
+      longTaskMaxDurationMs: number;
+      longAnimationFrameCount: number;
+      longAnimationFrameTotalDurationMs: number;
+      longAnimationFrameMaxDurationMs: number;
+      longAnimationFrameBlockingDurationMs: number;
+      userTimingByName?: Record<string, {
+        count: number;
+        totalDurationMs: number;
+        maxDurationMs: number;
+      }>;
+    };
+    recent: {
+      longTasks: {
+        count: number;
+        totalDurationMs: number;
+        maxDurationMs: number;
+        entries: Array<{ name: string; startTime: number; duration: number }>;
+      };
+      longAnimationFrames: {
+        count: number;
+        totalDurationMs: number;
+        maxDurationMs: number;
+        blockingDurationMs: number;
+        entries: Array<{ startTime: number; duration: number; blockingDuration: number }>;
+      };
+      userTimingByName?: Record<string, {
+        count: number;
+        totalDurationMs: number;
+        maxDurationMs: number;
+      }>;
+    };
+  };
   systemTop: Array<{ name: string; emaMs: number; peakMs: number }>;
 };
 
@@ -1000,11 +1048,18 @@ type ActiveScenarioOptions = {
 async function setupActiveScenarioDriver(page: Page, options: ActiveScenarioOptions): Promise<void> {
   if (!options.enabled) return;
 
-  await withTimeout(
-    'inject active scenario driver',
-    page.addScriptTag({ path: join(process.cwd(), 'scripts', 'perf-active-driver.js') }),
+  const driverInstalled = await safeAwait(
+    'check active scenario driver',
+    page.evaluate(() => Boolean((window as any).__perfHarnessDriver?.start)),
     SCENARIO_SETUP_TIMEOUT_MS
   );
+  if (!driverInstalled) {
+    await withTimeout(
+      'inject active scenario driver',
+      page.addScriptTag({ path: join(process.cwd(), 'scripts', 'perf-active-driver.js') }),
+      SCENARIO_SETUP_TIMEOUT_MS
+    );
+  }
 
   const setupResult = await withTimeout(
     'active scenario setup',
@@ -1136,19 +1191,20 @@ async function runCapture(): Promise<void> {
   const combatParam = enableCombat ? '1' : '0';
   const autostart = requestedMode === 'ai_sandbox' ? 'true' : 'false';
   const losPrefilterParam = losHeightPrefilter ? '1' : '0';
+  const diagnosticsQuery = 'perf=1';
   const query = sandboxMode
-    ? `?sandbox=true&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}`
-    : `?logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}`;
+    ? `?sandbox=true&${diagnosticsQuery}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}`
+    : `?${diagnosticsQuery}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}`;
   const url = `http://localhost:${port}/${query}`;
-  const preflightUrl = `http://localhost:${port}/`;
+  const preflightUrl = `http://localhost:${port}/?${diagnosticsQuery}`;
   const primaryPath = new URL(url).pathname + new URL(url).search;
   const prewarmPaths = sandboxMode
     ? [
-        '/',
-        '/?sandbox=true&autostart=false',
+        `/?${diagnosticsQuery}`,
+        `/?sandbox=true&${diagnosticsQuery}&autostart=false`,
         primaryPath.replace(`duration=${durationSeconds}`, 'duration=0')
       ]
-    : ['/', primaryPath];
+    : [`/?${diagnosticsQuery}`, primaryPath];
   const runHardTimeoutMs = Math.max(
     MIN_RUN_HARD_TIMEOUT_MS,
     (startupTimeoutSeconds + warmupSeconds + durationSeconds + 90) * 1000
@@ -1226,6 +1282,11 @@ async function runCapture(): Promise<void> {
     page = context.pages()[0] ?? await context.newPage();
     page.setDefaultTimeout(STEP_TIMEOUT_MS);
     page.setDefaultNavigationTimeout(navTimeoutMs);
+    await withTimeout(
+      'install browser perf observers',
+      page.addInitScript({ path: join(process.cwd(), 'scripts', 'perf-browser-observers.js') }),
+      STEP_TIMEOUT_MS
+    );
     page.on('console', msg => {
       const entry = { ts: nowIso(), type: msg.type(), text: msg.text() };
       consoleEntries.push(entry);
@@ -1341,9 +1402,24 @@ async function runCapture(): Promise<void> {
         page.evaluate(() => {
           (window as any).__metrics?.reset?.();
           (window as any).perf?.reset?.();
+          (window as any).__perfHarnessObservers?.reset?.();
         }),
         3000
       );
+      if (activePlayerScenario) {
+        await stopActiveScenarioDriver(page);
+        await setupActiveScenarioDriver(page, {
+          enabled: true,
+          mode: requestedMode,
+          compressFrontline,
+          allowWarpRecovery,
+          topUpHealth: activeTopUpHealth,
+          autoRespawn: activeAutoRespawn,
+          movementDecisionIntervalMs,
+          frontlineTriggerDistance,
+          maxCompressedPerFaction
+        });
+      }
     }
 
     stage = 'sample-runtime';
@@ -1360,6 +1436,9 @@ async function runCapture(): Promise<void> {
         const raw = await withTimeout('runtime sample', page.evaluate((shouldIncludeDetails: boolean) => {
           const metrics = (window as any).__metrics;
           const perf = (window as any).perf;
+          const renderer = (window as any).__renderer;
+          const rendererStats = renderer?.getPerformanceStats?.();
+          const browserStalls = (window as any).__perfHarnessObservers?.drain?.() ?? null;
           const basicValidation = perf?.validate?.();
           const report = shouldIncludeDetails ? perf?.report?.() : null;
           const combatProfile = shouldIncludeDetails ? (window as any).combatProfile?.() : null;
@@ -1382,6 +1461,80 @@ async function runCapture(): Promise<void> {
             heapUsedMb: memory?.usedJSHeapSize ? Number(memory.usedJSHeapSize) / (1024 * 1024) : undefined,
             heapTotalMb: memory?.totalJSHeapSize ? Number(memory.totalJSHeapSize) / (1024 * 1024) : undefined,
             uiErrorPanelVisible: Boolean(document.querySelector('.error-panel')),
+            renderer: rendererStats ? {
+              drawCalls: Number(rendererStats.drawCalls ?? 0),
+              triangles: Number(rendererStats.triangles ?? 0),
+              geometries: Number(rendererStats.geometries ?? 0),
+              textures: Number(rendererStats.textures ?? 0),
+              programs: Number(rendererStats.programs ?? 0)
+            } : undefined,
+            browserStalls: browserStalls ? {
+              support: {
+                longtask: Boolean(browserStalls.support?.longtask),
+                longAnimationFrame: Boolean(browserStalls.support?.longAnimationFrame),
+                userTiming: Boolean(browserStalls.support?.measure)
+              },
+              totals: {
+                longTaskCount: Number(browserStalls.totals?.longTaskCount ?? 0),
+                longTaskTotalDurationMs: Number(browserStalls.totals?.longTaskTotalDurationMs ?? 0),
+                longTaskMaxDurationMs: Number(browserStalls.totals?.longTaskMaxDurationMs ?? 0),
+                longAnimationFrameCount: Number(browserStalls.totals?.longAnimationFrameCount ?? 0),
+                longAnimationFrameTotalDurationMs: Number(browserStalls.totals?.longAnimationFrameTotalDurationMs ?? 0),
+                longAnimationFrameMaxDurationMs: Number(browserStalls.totals?.longAnimationFrameMaxDurationMs ?? 0),
+                longAnimationFrameBlockingDurationMs: Number(browserStalls.totals?.longAnimationFrameBlockingDurationMs ?? 0),
+                userTimingByName: browserStalls.totals?.userTimingByName && typeof browserStalls.totals.userTimingByName === 'object'
+                  ? Object.fromEntries(
+                      Object.entries(browserStalls.totals.userTimingByName).map(([name, value]: [string, any]) => [
+                        String(name),
+                        {
+                          count: Number(value?.count ?? 0),
+                          totalDurationMs: Number(value?.totalDurationMs ?? 0),
+                          maxDurationMs: Number(value?.maxDurationMs ?? 0)
+                        }
+                      ])
+                    )
+                  : undefined
+              },
+              recent: {
+                longTasks: {
+                  count: Number(browserStalls.recent?.longTasks?.count ?? 0),
+                  totalDurationMs: Number(browserStalls.recent?.longTasks?.totalDurationMs ?? 0),
+                  maxDurationMs: Number(browserStalls.recent?.longTasks?.maxDurationMs ?? 0),
+                  entries: Array.isArray(browserStalls.recent?.longTasks?.entries)
+                    ? browserStalls.recent.longTasks.entries.map((entry: any) => ({
+                        name: String(entry.name ?? 'longtask'),
+                        startTime: Number(entry.startTime ?? 0),
+                        duration: Number(entry.duration ?? 0)
+                      }))
+                    : []
+                },
+                longAnimationFrames: {
+                  count: Number(browserStalls.recent?.longAnimationFrames?.count ?? 0),
+                  totalDurationMs: Number(browserStalls.recent?.longAnimationFrames?.totalDurationMs ?? 0),
+                  maxDurationMs: Number(browserStalls.recent?.longAnimationFrames?.maxDurationMs ?? 0),
+                  blockingDurationMs: Number(browserStalls.recent?.longAnimationFrames?.blockingDurationMs ?? 0),
+                  entries: Array.isArray(browserStalls.recent?.longAnimationFrames?.entries)
+                    ? browserStalls.recent.longAnimationFrames.entries.map((entry: any) => ({
+                        startTime: Number(entry.startTime ?? 0),
+                        duration: Number(entry.duration ?? 0),
+                        blockingDuration: Number(entry.blockingDuration ?? 0)
+                      }))
+                    : []
+                },
+                userTimingByName: browserStalls.recent?.userTimingByName && typeof browserStalls.recent.userTimingByName === 'object'
+                  ? Object.fromEntries(
+                      Object.entries(browserStalls.recent.userTimingByName).map(([name, value]: [string, any]) => [
+                        String(name),
+                        {
+                          count: Number(value?.count ?? 0),
+                          totalDurationMs: Number(value?.totalDurationMs ?? 0),
+                          maxDurationMs: Number(value?.maxDurationMs ?? 0)
+                        }
+                      ])
+                    )
+                  : undefined
+              }
+            } : undefined,
             combatBreakdown: combatProfile?.timing
               ? {
                   totalMs: Number(combatProfile.timing.totalMs ?? 0),
@@ -1455,7 +1608,11 @@ async function runCapture(): Promise<void> {
         finalFrameCount = sample.frameCount;
         const denialRatePct = Number(sample.combatBreakdown?.raycastBudget?.denialRate ?? 0) * 100;
         const aiStarve = Number(sample.combatBreakdown?.aiScheduling?.aiBudgetExceededEvents ?? 0);
-        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h50=${Number(sample.hitch50Count ?? 0)} shots=${Number(sample.shotsThisSession ?? 0)} hits=${Number(sample.hitsThisSession ?? 0)} hitRate=${(Number(sample.hitRate ?? 0) * 100).toFixed(1)}% rayDeny=${denialRatePct.toFixed(1)}% aiStarve=${aiStarve}`);
+        const drawCalls = Number(sample.renderer?.drawCalls ?? 0);
+        const triangles = Number(sample.renderer?.triangles ?? 0);
+        const recentLongTasks = Number(sample.browserStalls?.recent?.longTasks?.count ?? 0);
+        const recentLoafs = Number(sample.browserStalls?.recent?.longAnimationFrames?.count ?? 0);
+        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h50=${Number(sample.hitch50Count ?? 0)} shots=${Number(sample.shotsThisSession ?? 0)} hits=${Number(sample.hitsThisSession ?? 0)} hitRate=${(Number(sample.hitRate ?? 0) * 100).toFixed(1)}% draw=${drawCalls} tri=${triangles} rayDeny=${denialRatePct.toFixed(1)}% aiStarve=${aiStarve} longTasks=${recentLongTasks} loafs=${recentLoafs}`);
       }
     }
     if (missedSamples > 0) {

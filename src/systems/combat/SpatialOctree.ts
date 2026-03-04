@@ -17,15 +17,20 @@ export class SpatialOctree implements ISpatialQuery {
   private worldBounds: THREE.Box3
   private queries: SpatialOctreeQueries
 
+  private createWorldBounds(worldSize: number): THREE.Box3 {
+    const halfSize = worldSize / 2
+    const verticalHalfSize = Math.max(512, halfSize)
+    return new THREE.Box3(
+      new THREE.Vector3(-halfSize, -verticalHalfSize, -halfSize),
+      new THREE.Vector3(halfSize, verticalHalfSize, halfSize)
+    )
+  }
+
   constructor(worldSize: number = 4000, maxEntitiesPerNode: number = 12, maxDepth: number = 6) {
     this.maxEntitiesPerNode = maxEntitiesPerNode
     this.maxDepth = maxDepth
 
-    const halfSize = worldSize / 2
-    this.worldBounds = new THREE.Box3(
-      new THREE.Vector3(-halfSize, -50, -halfSize),
-      new THREE.Vector3(halfSize, 100, halfSize)
-    )
+    this.worldBounds = this.createWorldBounds(worldSize)
 
     this.root = new OctreeNode(this.worldBounds.clone(), 0)
     this.queries = new SpatialOctreeQueries(this.entityPositions)
@@ -35,11 +40,7 @@ export class SpatialOctree implements ISpatialQuery {
    * Update world bounds dynamically
    */
   setWorldSize(worldSize: number): void {
-    const halfSize = worldSize / 2
-    this.worldBounds = new THREE.Box3(
-      new THREE.Vector3(-halfSize, -50, -halfSize),
-      new THREE.Vector3(halfSize, 100, halfSize)
-    )
+    this.worldBounds = this.createWorldBounds(worldSize)
 
     // Rebuild tree with new bounds
     const entities = Array.from(this.entityPositions.entries())

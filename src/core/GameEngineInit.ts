@@ -13,6 +13,7 @@ import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import { PersistenceSystem } from '../systems/strategy/PersistenceSystem';
 import type { GameEngine } from './GameEngine';
 import { markStartup } from './StartupTelemetry';
+import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
 
 function getPrimaryUSBase(config: ReturnType<typeof getGameModeConfig>): ZoneConfig | undefined {
   return config.zones.find(z => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
@@ -274,7 +275,11 @@ export function startGame(engine: GameEngine): void {
   if (showFPS && !engine.performanceOverlay.isVisible()) {
     engine.performanceOverlay.toggle();
   }
-  performanceTelemetry.setEnabled(engine.performanceOverlay.isVisible() || engine.sandboxEnabled);
+  performanceTelemetry.setEnabled(
+    engine.performanceOverlay.isVisible()
+    || engine.sandboxEnabled
+    || (import.meta.env.DEV && isPerfDiagnosticsEnabled())
+  );
 }
 
 async function runStartupFlow(engine: GameEngine): Promise<void> {

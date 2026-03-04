@@ -19,7 +19,7 @@ type CaptureResult = {
 
 const PORT = 4173;
 const HOST = '127.0.0.1';
-const APP_URL = `http://${HOST}:${PORT}/`;
+const APP_URL = `http://${HOST}:${PORT}/?sandbox=true`;
 const FIRST_CONTACT_TIMEOUT_MS = 180_000;
 const SUSTAINED_MARK_MS = 300_000;
 const POLL_MS = 1000;

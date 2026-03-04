@@ -235,7 +235,7 @@ async function getRuntimeState(page: Page): Promise<RuntimeStateSnapshot> {
         readyState: document.readyState,
         hasMetrics: Boolean(runtimeMetrics),
         hasPerf: Boolean((window as any).perf),
-        hasRenderer: Boolean((window as any).__engineRenderer),
+        hasRenderer: Boolean((window as any).__renderer),
         frameCount: runtimeMetrics ? Number(runtimeMetrics.frameCount ?? 0) : 0
       };
     }),
@@ -389,7 +389,7 @@ async function runBenchmark(): Promise<void> {
     }), METRIC_COLLECTION_TIMEOUT_MS) as PerformanceReport;
 
     const rendererStats = await withTimeout('collect renderer stats', page.evaluate(() => {
-      const renderer = (window as any).__engineRenderer;
+      const renderer = (window as any).__renderer;
       if (!renderer) return null;
       return renderer.getPerformanceStats();
     }), METRIC_COLLECTION_TIMEOUT_MS) as RendererStats | null;

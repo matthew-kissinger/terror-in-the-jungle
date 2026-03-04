@@ -48,10 +48,10 @@ npm run perf:update-baseline  # update baseline from latest capture
 
 ## Current Focus
 
-1. Perf harness stabilization: fix `startup_stabilized` detection, recapture baselines post-terrain-rewrite.
-2. Heap-growth triage and combat AI spike optimization.
-3. Live validation of A Shau sustained contact pressure (three-pronged fix deployed 2026-03-04).
-4. Phase 1 asset integration groundwork.
+1. Phase 1 perf frontier baselines captured for `combat120`, `openfrontier:short`, `ashau:short`, and `frontier30m`; see `docs/PERF_FRONTIER.md`.
+2. Combat AI starvation and `p99` tails in `combat120` are the clearest measured hotspot.
+3. Open-world tail stability remains the main issue in `open_frontier` / `frontier30m` despite good average frame times.
+4. A Shau harness is now behavior-valid after nearest-first materialization and high-elevation spatial-bounds fixes; next step is WarSim/heap analysis, not harness repair.
 
 ## Documentation Contract
 
