@@ -61,6 +61,29 @@ function normalizeLaunchSelection(
   };
 }
 
+const FACTION_DISPLAY_NAMES: Record<Faction, string> = {
+  [Faction.US]: 'US Forces',
+  [Faction.ARVN]: 'ARVN',
+  [Faction.NVA]: 'NVA',
+  [Faction.VC]: 'Viet Cong',
+};
+
+function resolveFactionLabels(definition: GameModeDefinition, alliance: Alliance): { blufor: string; opfor: string } {
+  const mix = definition.config.factionMix;
+  if (mix) {
+    const bluforFactions = mix[Alliance.BLUFOR];
+    const opforFactions = mix[Alliance.OPFOR];
+    const bluforLabel = bluforFactions?.length === 1
+      ? FACTION_DISPLAY_NAMES[bluforFactions[0]]
+      : 'BLUFOR';
+    const opforLabel = opforFactions?.length === 1
+      ? FACTION_DISPLAY_NAMES[opforFactions[0]]
+      : 'OPFOR';
+    return { blufor: bluforLabel, opfor: opforLabel };
+  }
+  return { blufor: 'US Forces', opfor: 'OPFOR' };
+}
+
 function applyLaunchSelection(engine: GameEngine, definition: GameModeDefinition, selection: GameLaunchSelection): void {
   engine.systemManager.loadoutService.setContextFromDefinition(
     definition,
@@ -72,6 +95,10 @@ function applyLaunchSelection(engine: GameEngine, definition: GameModeDefinition
   engine.systemManager.firstPersonWeapon.setPlayerFaction(selection.faction);
   engine.systemManager.combatantSystem.setPlayerFaction(selection.faction);
   engine.systemManager.zoneManager.setPlayerAlliance(selection.alliance);
+
+  // Set HUD faction labels from mode definition
+  const labels = resolveFactionLabels(definition, selection.alliance);
+  engine.systemManager.hudSystem.setFactionLabels(labels.blufor, labels.opfor);
 }
 
 /**

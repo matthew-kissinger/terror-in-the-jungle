@@ -85,7 +85,7 @@ function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: Minim
   const zoneRadius = zone.radius * scale;
 
   switch (zone.state) {
-    case ZoneState.US_CONTROLLED:
+    case ZoneState.BLUFOR_CONTROLLED:
       ctx.fillStyle = 'rgba(91, 140, 201, 0.3)';
       ctx.strokeStyle = 'rgba(91, 140, 201, 0.8)';
       break;
@@ -109,7 +109,7 @@ function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: Minim
   ctx.stroke();
 
   if (zone.isHomeBase) {
-    ctx.fillStyle = zone.state === ZoneState.US_CONTROLLED ? 'rgba(91, 140, 201, 0.9)' : 'rgba(201, 86, 74, 0.9)';
+    ctx.fillStyle = zone.state === ZoneState.BLUFOR_CONTROLLED ? 'rgba(91, 140, 201, 0.9)' : 'rgba(201, 86, 74, 0.9)';
     const baseSize = 12 * renderScale;
     ctx.fillRect(x - baseSize / 2, y - baseSize / 2, baseSize, baseSize);
   } else {

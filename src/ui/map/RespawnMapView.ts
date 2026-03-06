@@ -124,7 +124,7 @@ export class RespawnMapView {
 
     // Can spawn at BLUFOR controlled zones if game mode allows
     const canSpawnAtZones = this.gameModeManager?.canPlayerSpawnAtZones() ?? false;
-    if (canSpawnAtZones && !zone.isHomeBase && zone.state === ZoneState.US_CONTROLLED) {
+    if (canSpawnAtZones && !zone.isHomeBase && zone.state === ZoneState.BLUFOR_CONTROLLED) {
       return true;
     }
 
@@ -141,7 +141,7 @@ export class RespawnMapView {
 
     this.spawnableZones = this.zoneManager.getAllZones().filter(zone => {
       if (zone.isHomeBase && zone.owner !== null && isBlufor(zone.owner)) return true;
-      if (canSpawnAtZones && !zone.isHomeBase && zone.state === ZoneState.US_CONTROLLED) return true;
+      if (canSpawnAtZones && !zone.isHomeBase && zone.state === ZoneState.BLUFOR_CONTROLLED) return true;
       return false;
     });
   }
@@ -275,7 +275,7 @@ export class RespawnMapView {
     }
 
     switch (zone.state) {
-      case ZoneState.US_CONTROLLED:
+      case ZoneState.BLUFOR_CONTROLLED:
         return `rgba(92, 184, 92, ${alpha})`;
       case ZoneState.OPFOR_CONTROLLED:
         return `rgba(201, 86, 74, ${alpha})`;

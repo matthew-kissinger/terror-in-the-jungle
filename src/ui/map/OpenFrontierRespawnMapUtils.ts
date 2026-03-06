@@ -16,7 +16,7 @@ export function isZoneSpawnable(zone: CaptureZone, gameModeManager?: GameModeMan
 
   // Can spawn at US controlled zones if game mode allows
   const canSpawnAtZones = gameModeManager?.canPlayerSpawnAtZones() ?? false;
-  if (canSpawnAtZones && !zone.isHomeBase && zone.state === ZoneState.US_CONTROLLED) {
+  if (canSpawnAtZones && !zone.isHomeBase && zone.state === ZoneState.BLUFOR_CONTROLLED) {
     return true;
   }
 
@@ -41,7 +41,7 @@ export function getZoneColor(zone: CaptureZone, alpha: number, isSpawnable: bool
   }
 
   switch (zone.state) {
-    case ZoneState.US_CONTROLLED:
+    case ZoneState.BLUFOR_CONTROLLED:
       return `rgba(92, 184, 92, ${alpha})`;
     case ZoneState.OPFOR_CONTROLLED:
       return `rgba(201, 86, 74, ${alpha})`;

@@ -167,7 +167,7 @@ describe('Combat Flow Integration', () => {
         captureProgress: 100,
       }),
       scenario.createZone('C', 'Charlie', new THREE.Vector3(200, 0, 0), {
-        state: ZoneState.US_CONTROLLED,
+        state: ZoneState.BLUFOR_CONTROLLED,
         owner: Faction.US,
         captureProgress: 100,
       }),

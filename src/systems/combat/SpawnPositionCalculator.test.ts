@@ -235,7 +235,7 @@ describe('SpawnPositionCalculator', () => {
       const contestedPos = new THREE.Vector3(50, 0, 50);
       const capturedPos = new THREE.Vector3(500, 0, 500);
       const zones = [
-        createMockZone('captured', Faction.US, capturedPos, false, ZoneState.US_CONTROLLED),
+        createMockZone('captured', Faction.US, capturedPos, false, ZoneState.BLUFOR_CONTROLLED),
         createMockZone('contested', Faction.US, contestedPos, false, ZoneState.CONTESTED),
       ];
       const zoneManager = createMockZoneManager(zones);
@@ -251,8 +251,8 @@ describe('SpawnPositionCalculator', () => {
       const hqPos = new THREE.Vector3(500, 0, 500);
       const capturedPos = new THREE.Vector3(100, 0, 100);
       const zones = [
-        createMockZone('hq', Faction.US, hqPos, true, ZoneState.US_CONTROLLED),
-        createMockZone('captured', Faction.US, capturedPos, false, ZoneState.US_CONTROLLED),
+        createMockZone('hq', Faction.US, hqPos, true, ZoneState.BLUFOR_CONTROLLED),
+        createMockZone('captured', Faction.US, capturedPos, false, ZoneState.BLUFOR_CONTROLLED),
       ];
       const zoneManager = createMockZoneManager(zones);
 
@@ -288,7 +288,7 @@ describe('SpawnPositionCalculator', () => {
 
     it('should return position within expected radius of anchor zone', () => {
       const zonePos = new THREE.Vector3(75, 0, 75);
-      const zones = [createMockZone('zone1', Faction.US, zonePos, false, ZoneState.US_CONTROLLED)];
+      const zones = [createMockZone('zone1', Faction.US, zonePos, false, ZoneState.BLUFOR_CONTROLLED)];
       const zoneManager = createMockZoneManager(zones);
 
       for (let i = 0; i < 10; i++) {
@@ -301,7 +301,7 @@ describe('SpawnPositionCalculator', () => {
 
     it('should use HQ zone when no other zones available', () => {
       const hqPos = new THREE.Vector3(50, 0, 50);
-      const zones = [createMockZone('hq', Faction.US, hqPos, true, ZoneState.US_CONTROLLED)];
+      const zones = [createMockZone('hq', Faction.US, hqPos, true, ZoneState.BLUFOR_CONTROLLED)];
       const zoneManager = createMockZoneManager(zones);
 
       const result = SpawnPositionCalculator.getSpawnPosition(Faction.US, zoneManager);
@@ -352,8 +352,8 @@ describe('SpawnPositionCalculator', () => {
       const capturedPos = new THREE.Vector3(100, 0, 100);
       const hqPos = new THREE.Vector3(150, 0, 150);
       const zones = [
-        createMockZone('hq', Faction.US, hqPos, true, ZoneState.US_CONTROLLED),
-        createMockZone('captured', Faction.US, capturedPos, false, ZoneState.US_CONTROLLED),
+        createMockZone('hq', Faction.US, hqPos, true, ZoneState.BLUFOR_CONTROLLED),
+        createMockZone('captured', Faction.US, capturedPos, false, ZoneState.BLUFOR_CONTROLLED),
         createMockZone('contested', Faction.US, contestedPos, false, ZoneState.CONTESTED),
       ];
       const zoneManager = createMockZoneManager(zones);
@@ -370,7 +370,7 @@ describe('SpawnPositionCalculator', () => {
       const usPos = new THREE.Vector3(50, 0, 50);
       const opforPos = new THREE.Vector3(100, 0, 100);
       const zones = [
-        createMockZone('us_zone', Faction.US, usPos, false, ZoneState.US_CONTROLLED),
+        createMockZone('us_zone', Faction.US, usPos, false, ZoneState.BLUFOR_CONTROLLED),
         createMockZone('opfor_zone', Faction.NVA, opforPos, false, ZoneState.OPFOR_CONTROLLED),
       ];
       const zoneManager = createMockZoneManager(zones);

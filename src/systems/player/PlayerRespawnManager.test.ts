@@ -218,9 +218,9 @@ describe('PlayerRespawnManager', () => {
     // Create dependency mocks
     mockZoneManager = {
       getAllZones: vi.fn(() => [
-        createMockZone('us_base', 'US Base', new THREE.Vector3(0, 0, -50), ZoneState.US_CONTROLLED, true, Faction.US),
+        createMockZone('us_base', 'US Base', new THREE.Vector3(0, 0, -50), ZoneState.BLUFOR_CONTROLLED, true, Faction.US),
         createMockZone('opfor_base', 'OPFOR Base', new THREE.Vector3(0, 0, 50), ZoneState.OPFOR_CONTROLLED, true, Faction.NVA),
-        createMockZone('zone_a', 'Zone Alpha', new THREE.Vector3(100, 0, 100), ZoneState.US_CONTROLLED, false),
+        createMockZone('zone_a', 'Zone Alpha', new THREE.Vector3(100, 0, 100), ZoneState.BLUFOR_CONTROLLED, false),
         createMockZone('zone_b', 'Zone Bravo', new THREE.Vector3(-100, 0, 100), ZoneState.CONTESTED, false),
       ]),
     } as unknown as ZoneManager;
@@ -477,7 +477,7 @@ describe('PlayerRespawnManager', () => {
           faction: Faction.NVA,
         };
         vi.mocked(mockZoneManager.getAllZones).mockReturnValue([
-          createMockZone('us_base', 'US Base', new THREE.Vector3(0, 0, -50), ZoneState.US_CONTROLLED, true, Faction.US),
+          createMockZone('us_base', 'US Base', new THREE.Vector3(0, 0, -50), ZoneState.BLUFOR_CONTROLLED, true, Faction.US),
           createMockZone('opfor_base', 'OPFOR Base', new THREE.Vector3(0, 0, 50), ZoneState.OPFOR_CONTROLLED, true, Faction.NVA),
           createMockZone('zone_opfor', 'Zone Red', new THREE.Vector3(120, 0, 100), ZoneState.OPFOR_CONTROLLED, false, Faction.NVA),
         ] as any);
@@ -539,7 +539,7 @@ describe('PlayerRespawnManager', () => {
 
       it('should exclude home bases from non-base zone check', () => {
         vi.mocked(mockZoneManager.getAllZones).mockReturnValue([
-          createMockZone('us_base', 'US Base', new THREE.Vector3(0, 0, -50), ZoneState.US_CONTROLLED, true, Faction.US),
+          createMockZone('us_base', 'US Base', new THREE.Vector3(0, 0, -50), ZoneState.BLUFOR_CONTROLLED, true, Faction.US),
         ]);
         vi.mocked(mockGameModeManager.canPlayerSpawnAtZones).mockReturnValue(true);
 
@@ -629,8 +629,8 @@ describe('PlayerRespawnManager', () => {
         contactAssistStyle: 'pressure_front'
       });
       vi.mocked(mockZoneManager.getAllZones).mockReturnValue([
-        createMockZone('us_base', 'US Base', new THREE.Vector3(0, 0, -50), ZoneState.US_CONTROLLED, true, Faction.US),
-        { ...createMockZone('zone_us_forward', 'US Forward', new THREE.Vector3(100, 0, 100), ZoneState.US_CONTROLLED, false, Faction.US), ticketBleedRate: 2 },
+        createMockZone('us_base', 'US Base', new THREE.Vector3(0, 0, -50), ZoneState.BLUFOR_CONTROLLED, true, Faction.US),
+        { ...createMockZone('zone_us_forward', 'US Forward', new THREE.Vector3(100, 0, 100), ZoneState.BLUFOR_CONTROLLED, false, Faction.US), ticketBleedRate: 2 },
         { ...createMockZone('zone_obj', 'Objective', new THREE.Vector3(220, 0, 220), ZoneState.CONTESTED, false, null), ticketBleedRate: 6 },
       ] as any);
 
@@ -976,6 +976,22 @@ describe('PlayerRespawnManager', () => {
       expect(respawnManager['availableSpawnPoints'][0].id).toBe('default');
       expect(respawnManager['availableSpawnPoints'][0].name).toBe('Base');
     });
+
+    it('should include helipad spawn points for BLUFOR players', () => {
+      vi.mocked(mockGameModeManager.canPlayerSpawnAtZones).mockReturnValue(true);
+      const mockHelipadSystem = {
+        getAllHelipads: () => [
+          { id: 'helipad_main', position: new THREE.Vector3(40, 5, -1400), aircraft: 'UH1_HUEY', faction: 'US' },
+        ],
+      } as any;
+      respawnManager.setHelipadSystem(mockHelipadSystem);
+
+      respawnManager['updateAvailableSpawnPoints']();
+
+      const helipadSpawn = respawnManager['availableSpawnPoints'].find(p => p.id === 'helipad_main');
+      expect(helipadSpawn).toBeDefined();
+      expect(helipadSpawn!.name).toContain('Helipad');
+    });
   });
 
   describe('deploy session policy', () => {
@@ -1053,9 +1069,9 @@ describe('PlayerRespawnManager', () => {
         ],
       }));
       vi.mocked(mockZoneManager.getAllZones).mockReturnValue([
-        createMockZone('us_base', 'LZ Goodman', new THREE.Vector3(-500, 0, -500), ZoneState.US_CONTROLLED, true, Faction.US),
-        createMockZone('lz_stallion', 'LZ Stallion', preferredTarget.clone(), ZoneState.US_CONTROLLED, true, Faction.US),
-        createMockZone('lz_eagle', 'LZ Eagle', preferredTarget.clone().add(new THREE.Vector3(1200, 0, 900)), ZoneState.US_CONTROLLED, true, Faction.US),
+        createMockZone('us_base', 'LZ Goodman', new THREE.Vector3(-500, 0, -500), ZoneState.BLUFOR_CONTROLLED, true, Faction.US),
+        createMockZone('lz_stallion', 'LZ Stallion', preferredTarget.clone(), ZoneState.BLUFOR_CONTROLLED, true, Faction.US),
+        createMockZone('lz_eagle', 'LZ Eagle', preferredTarget.clone().add(new THREE.Vector3(1200, 0, 900)), ZoneState.BLUFOR_CONTROLLED, true, Faction.US),
       ] as any);
 
       void respawnManager.beginInitialDeploy();

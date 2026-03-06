@@ -21,6 +21,8 @@ export class TicketDisplay extends UIComponent {
   private opforTickets = this.signal(0);
   private isTDM = this.signal(false);
   private killTarget = this.signal(0);
+  private bluforLabel = this.signal('US Forces');
+  private opforLabel = this.signal('OPFOR');
 
   /** Threshold below which tickets pulse (conquest only) */
   private readonly LOW_THRESHOLD = 50;
@@ -53,15 +55,17 @@ export class TicketDisplay extends UIComponent {
       this.text('[data-ref="opfor-count"]', String(Math.round(this.opforTickets.value)));
     });
 
-    // Effect: mode switch (TDM vs standard)
+    // Effect: mode switch (TDM vs standard) + faction labels
     this.effect(() => {
       const tdm = this.isTDM.value;
+      const bLabel = this.bluforLabel.value;
+      const oLabel = this.opforLabel.value;
       const header = this.$('[data-ref="header"]');
-      const usLabel = this.$('[data-ref="us-label"]');
-      const opforLabel = this.$('[data-ref="opfor-label"]');
+      const usLabelEl = this.$('[data-ref="us-label"]');
+      const opforLabelEl = this.$('[data-ref="opfor-label"]');
 
-      if (usLabel) usLabel.textContent = tdm ? 'US Kills' : 'US Forces';
-      if (opforLabel) opforLabel.textContent = tdm ? 'OPFOR Kills' : 'OPFOR';
+      if (usLabelEl) usLabelEl.textContent = tdm ? `${bLabel} Kills` : bLabel;
+      if (opforLabelEl) opforLabelEl.textContent = tdm ? `${oLabel} Kills` : oLabel;
 
       if (header) {
         if (tdm) {
@@ -80,25 +84,42 @@ export class TicketDisplay extends UIComponent {
       }
     });
 
-    // Effect: low ticket warning (conquest only)
+    // Effect: urgency warnings (conquest: low tickets, TDM: approaching kill target)
     this.effect(() => {
       const us = this.usTickets.value;
-      const tdm = this.isTDM.value;
-      const el = this.$('[data-ref="us-faction"]');
-      if (!el || tdm) return;
-
-      el.classList.toggle(styles.critical, us <= this.CRITICAL_THRESHOLD);
-      el.classList.toggle(styles.low, us > this.CRITICAL_THRESHOLD && us <= this.LOW_THRESHOLD);
-    });
-
-    this.effect(() => {
       const opfor = this.opforTickets.value;
       const tdm = this.isTDM.value;
-      const el = this.$('[data-ref="opfor-faction"]');
-      if (!el || tdm) return;
+      const target = this.killTarget.value;
+      const usEl = this.$('[data-ref="us-faction"]');
+      const opforEl = this.$('[data-ref="opfor-faction"]');
 
-      el.classList.toggle(styles.critical, opfor <= this.CRITICAL_THRESHOLD);
-      el.classList.toggle(styles.low, opfor > this.CRITICAL_THRESHOLD && opfor <= this.LOW_THRESHOLD);
+      if (tdm && target > 0) {
+        // TDM: urgency when either team approaches the kill target
+        const leadKills = Math.max(us, opfor);
+        const ratio = leadKills / target;
+        const approaching = ratio >= 0.75;
+        const imminent = ratio >= 0.9;
+        // Highlight the leading team
+        const usLeads = us >= opfor;
+        if (usEl) {
+          usEl.classList.toggle(styles.critical, imminent && usLeads);
+          usEl.classList.toggle(styles.low, approaching && !imminent && usLeads);
+        }
+        if (opforEl) {
+          opforEl.classList.toggle(styles.critical, imminent && !usLeads);
+          opforEl.classList.toggle(styles.low, approaching && !imminent && !usLeads);
+        }
+      } else {
+        // Conquest: low ticket warning
+        if (usEl) {
+          usEl.classList.toggle(styles.critical, us <= this.CRITICAL_THRESHOLD);
+          usEl.classList.toggle(styles.low, us > this.CRITICAL_THRESHOLD && us <= this.LOW_THRESHOLD);
+        }
+        if (opforEl) {
+          opforEl.classList.toggle(styles.critical, opfor <= this.CRITICAL_THRESHOLD);
+          opforEl.classList.toggle(styles.low, opfor > this.CRITICAL_THRESHOLD && opfor <= this.LOW_THRESHOLD);
+        }
+      }
     });
   }
 
@@ -119,5 +140,13 @@ export class TicketDisplay extends UIComponent {
   setMode(isTDM: boolean, killTarget: number = 0): void {
     this.isTDM.value = isTDM;
     this.killTarget.value = killTarget;
+  }
+
+  /**
+   * Set faction display names (e.g. "ARVN" / "VC" instead of default "US Forces" / "OPFOR").
+   */
+  setFactionLabels(blufor: string, opfor: string): void {
+    this.bluforLabel.value = blufor;
+    this.opforLabel.value = opfor;
   }
 }

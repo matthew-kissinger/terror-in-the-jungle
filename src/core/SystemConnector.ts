@@ -97,6 +97,7 @@ export class SystemConnector {
     refs.playerRespawnManager.setGrenadeSystem(refs.grenadeSystem);
     refs.playerRespawnManager.setWarSimulator(refs.warSimulator);
     refs.playerRespawnManager.setTerrainSystem(refs.terrainSystem);
+    refs.playerRespawnManager.setHelipadSystem(refs.helipadSystem);
 
     // Connect helipad system
     refs.helipadSystem.setTerrainManager(refs.terrainSystem);

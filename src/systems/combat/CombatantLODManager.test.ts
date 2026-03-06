@@ -488,7 +488,7 @@ describe('CombatantLODManager', () => {
         radius: 20,
         height: 2,
         owner: Faction.US,
-        state: 'us_controlled',
+        state: 'blufor_controlled',
         captureProgress: 0,
         captureSpeed: 0,
         isHomeBase: true,

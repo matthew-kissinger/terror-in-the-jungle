@@ -131,7 +131,7 @@ export class ZoneInitializer {
       height: 20,
       owner: config.owner,
       state: config.owner ?
-        (isBlufor(config.owner) ? ZoneState.US_CONTROLLED : ZoneState.OPFOR_CONTROLLED) :
+        (isBlufor(config.owner) ? ZoneState.BLUFOR_CONTROLLED : ZoneState.OPFOR_CONTROLLED) :
         ZoneState.NEUTRAL,
       captureProgress: config.owner ? 100 : 0,
       captureSpeed: this.gameModeConfig?.captureSpeed || 1,

@@ -37,7 +37,7 @@ export class TicketBleedCalculator {
     // Count zone control
     capturableZones.forEach(zone => {
       switch (zone.state) {
-        case ZoneState.US_CONTROLLED:
+        case ZoneState.BLUFOR_CONTROLLED:
           usControlled++;
           break;
         case ZoneState.OPFOR_CONTROLLED:
@@ -51,23 +51,30 @@ export class TicketBleedCalculator {
     const opforControlRatio = opforControlled / totalZones;
 
     // Calculate bleed rates
-    // Faction loses tickets when they control less than 50% of zones
+    // Faction loses tickets when they control less than 50% of zones.
+    // Graduated: holding a supermajority (70%+) increases bleed against the weaker side.
     let usBleed = 0;
     let opforBleed = 0;
 
     if (usControlRatio < 0.5) {
-      usBleed = this.baseBleedRate * (0.5 - usControlRatio) * 2; // Double the deficit
+      usBleed = this.baseBleedRate * (0.5 - usControlRatio) * 2;
     }
 
     if (opforControlRatio < 0.5) {
       opforBleed = this.baseBleedRate * (0.5 - opforControlRatio) * 2;
     }
 
-    // If one faction controls all zones, enemy bleeds faster
-    if (usControlled === totalZones && totalZones > 0) {
-      opforBleed = this.baseBleedRate * 2;
-    } else if (opforControlled === totalZones && totalZones > 0) {
-      usBleed = this.baseBleedRate * 2;
+    // Supermajority acceleration: controlling 70%+ zones multiplies bleed
+    if (usControlRatio >= 1.0 && totalZones > 0) {
+      opforBleed = this.baseBleedRate * 3;   // Total control: 3x
+    } else if (usControlRatio >= 0.7) {
+      opforBleed *= 1.5;                      // Supermajority: 1.5x
+    }
+
+    if (opforControlRatio >= 1.0 && totalZones > 0) {
+      usBleed = this.baseBleedRate * 3;
+    } else if (opforControlRatio >= 0.7) {
+      usBleed *= 1.5;
     }
 
     return {

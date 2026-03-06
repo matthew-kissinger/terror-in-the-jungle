@@ -31,7 +31,7 @@ function isControlledByAlliance(zone: ZoneLike, alliance: Alliance): boolean {
   if (zone.isHomeBase) return isOwnedByAlliance(zone, alliance);
 
   switch (zone.state) {
-    case ZoneState.US_CONTROLLED:
+    case ZoneState.BLUFOR_CONTROLLED:
       return alliance === Alliance.BLUFOR;
     case ZoneState.OPFOR_CONTROLLED:
       return alliance === Alliance.OPFOR;

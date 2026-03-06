@@ -343,6 +343,10 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     });
   }
 
+  setFactionLabels(blufor: string, opfor: string): void {
+    this.elements.ticketDisplay.setFactionLabels(blufor, opfor);
+  }
+
   setGrenadeSystem(system: GrenadeSystem): void {
     this.grenadeSystem = system;
   }

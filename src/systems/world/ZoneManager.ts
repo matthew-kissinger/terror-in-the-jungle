@@ -13,7 +13,7 @@ import type { IHUDSystem, ITerrainRuntime } from '../../types/SystemInterfaces';
 
 export enum ZoneState {
   NEUTRAL = 'neutral',
-  US_CONTROLLED = 'us_controlled',
+  BLUFOR_CONTROLLED = 'blufor_controlled',
   OPFOR_CONTROLLED = 'opfor_controlled',
   CONTESTED = 'contested'
 }

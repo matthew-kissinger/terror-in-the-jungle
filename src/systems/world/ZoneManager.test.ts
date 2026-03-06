@@ -389,7 +389,7 @@ describe('ZoneManager', () => {
       
       // Simulate capture
       zone.owner = Faction.US;
-      zone.state = ZoneState.US_CONTROLLED;
+      zone.state = ZoneState.BLUFOR_CONTROLLED;
       zoneManager.update(0.1);
       
       expect(zoneManager['previousZoneState'].get('test_zone')).toBe(Faction.US);
@@ -406,7 +406,7 @@ describe('ZoneManager', () => {
       
       // Simulate US capturing zone
       zone.owner = Faction.US;
-      zone.state = ZoneState.US_CONTROLLED;
+      zone.state = ZoneState.BLUFOR_CONTROLLED;
       
       zoneManager.update(0.1);
       
@@ -442,7 +442,7 @@ describe('ZoneManager', () => {
       zoneManager['previousZoneState'].set('test_zone', null);
       
       zone.owner = Faction.US;
-      zone.state = ZoneState.US_CONTROLLED;
+      zone.state = ZoneState.BLUFOR_CONTROLLED;
       
       zoneManager.update(0.1);
       
@@ -586,7 +586,7 @@ describe('ZoneManager', () => {
         radius: 15,
         height: 20,
         owner: Faction.US,
-        state: ZoneState.US_CONTROLLED,
+        state: ZoneState.BLUFOR_CONTROLLED,
         captureProgress: 100,
         captureSpeed: 1,
         isHomeBase: false,
@@ -600,7 +600,7 @@ describe('ZoneManager', () => {
         radius: 15,
         height: 20,
         owner: Faction.US,
-        state: ZoneState.US_CONTROLLED,
+        state: ZoneState.BLUFOR_CONTROLLED,
         captureProgress: 100,
         captureSpeed: 1,
         isHomeBase: false,

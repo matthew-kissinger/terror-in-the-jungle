@@ -83,7 +83,7 @@ export class VictoryConditions {
 
     // Only check total control if there are capturable zones
     if (capturableZones.length > 0) {
-      const usControlled = capturableZones.filter(z => z.state === ZoneState.US_CONTROLLED).length;
+      const usControlled = capturableZones.filter(z => z.state === ZoneState.BLUFOR_CONTROLLED).length;
       const opforControlled = capturableZones.filter(z => z.state === ZoneState.OPFOR_CONTROLLED).length;
 
       if (usControlled === capturableZones.length) {

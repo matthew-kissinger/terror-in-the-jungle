@@ -353,8 +353,8 @@ export class FullMapSystem implements GameSystem {
   private getZoneColor(state: ZoneState, alpha: number): string {
     let color;
     switch (state) {
-      case ZoneState.US_CONTROLLED:
-        color = ZONE_COLORS.US_CONTROLLED;
+      case ZoneState.BLUFOR_CONTROLLED:
+        color = ZONE_COLORS.BLUFOR_CONTROLLED;
         break;
       case ZoneState.OPFOR_CONTROLLED:
         color = ZONE_COLORS.OPFOR_CONTROLLED;

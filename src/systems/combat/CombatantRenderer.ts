@@ -216,9 +216,9 @@ export class CombatantRenderer {
 
       // Death animation
       if (combatant.isDying && combatant.deathProgress !== undefined) {
-          const FALL_PHASE = 0.7 / 5.7;
-          const GROUND_PHASE = 4.0 / 5.7;
-          const FADEOUT_PHASE = 1.0 / 5.7;
+          const FALL_PHASE = 0.7 / 8.7;
+          const GROUND_PHASE = 6.0 / 8.7;
+          const FADEOUT_PHASE = 2.0 / 8.7;
 
           const progress = combatant.deathProgress;
           const animType = combatant.deathAnimationType || 'fallback';
@@ -265,17 +265,12 @@ export class CombatantRenderer {
               finalPosition.z += deathDir.z * (1.9 * spreadBias);
               finalPosition.x += this.scratchPerpDir.x * (seed - 0.5) * 1.8;
               finalPosition.z += this.scratchPerpDir.z * (seed - 0.5) * 1.8;
-              finalPosition.y -= 1.8;
+              finalPosition.y -= 1.8 + fadeProgress * 2.0;
               this.scratchSpinMatrix.makeRotationZ(Math.PI * (0.55 + seed * 0.35));
               matrix.multiply(this.scratchSpinMatrix);
               finalScaleX *= 1.25 + seed * 0.2;
               finalScaleY *= 0.18;
               finalScaleZ *= 1.18 + (1 - seed) * 0.15;
-              const flicker = 0.7 + 0.3 * Math.sin((fadeProgress + seed) * Math.PI * 10);
-              const fadeScale = Math.max(0, (1 - fadeProgress) * flicker);
-              finalScaleX *= fadeScale;
-              finalScaleY *= fadeScale;
-              finalScaleZ *= fadeScale;
             }
           } else if (animType === 'spinfall') {
             if (progress < FALL_PHASE) {
@@ -310,14 +305,10 @@ export class CombatantRenderer {
                 finalPosition.x += combatant.deathDirection.x * 2.5;
                 finalPosition.z += combatant.deathDirection.z * 2.5;
               }
-              finalPosition.y -= 4.0;
+              finalPosition.y -= 4.0 + fadeProgress * 2.0;
               this.scratchSpinMatrix.makeRotationZ(Math.PI * 2);
               matrix.multiply(this.scratchSpinMatrix);
               finalScaleY *= 0.7;
-              const fadeScale = 1 - fadeProgress;
-              finalScaleX *= fadeScale;
-              finalScaleY *= fadeScale;
-              finalScaleZ *= fadeScale;
             }
           } else if (animType === 'crumple') {
             if (progress < FALL_PHASE) {
@@ -346,12 +337,8 @@ export class CombatantRenderer {
                 finalPosition.x += combatant.deathDirection.x * 0.5;
                 finalPosition.z += combatant.deathDirection.z * 0.5;
               }
-              finalPosition.y -= 2.5;
+              finalPosition.y -= 2.5 + fadeProgress * 2.0;
               finalScaleY *= 0.2;
-              const fadeScale = 1 - fadeProgress;
-              finalScaleX *= fadeScale;
-              finalScaleY *= fadeScale;
-              finalScaleZ *= fadeScale;
             }
           } else {
             if (progress < FALL_PHASE) {
@@ -396,7 +383,7 @@ export class CombatantRenderer {
                 finalPosition.x += combatant.deathDirection.x * 1.5;
                 finalPosition.z += combatant.deathDirection.z * 1.5;
               }
-              finalPosition.y -= 3.5;
+              finalPosition.y -= 3.5 + fadeProgress * 2.0;
               if (combatant.deathDirection) {
                 this.scratchTiltAxis.set(-combatant.deathDirection.z, 0, combatant.deathDirection.x);
               } else {
@@ -405,10 +392,6 @@ export class CombatantRenderer {
               this.scratchTiltMatrix.makeRotationAxis(this.scratchTiltAxis.normalize(), Math.PI * 0.45);
               matrix.multiply(this.scratchTiltMatrix);
               finalScaleY *= 0.8;
-              const fadeScale = 1 - fadeProgress;
-              finalScaleX *= fadeScale;
-              finalScaleY *= fadeScale;
-              finalScaleZ *= fadeScale;
             }
           }
       }

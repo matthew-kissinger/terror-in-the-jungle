@@ -135,7 +135,7 @@ export class HUDZoneDisplay {
     let zoneClass = 'zone-neutral';
 
     switch (zone.state) {
-      case ZoneState.US_CONTROLLED:
+      case ZoneState.BLUFOR_CONTROLLED:
         zoneClass = 'zone-us';
         break;
       case ZoneState.OPFOR_CONTROLLED:
@@ -167,7 +167,7 @@ export class HUDZoneDisplay {
   }
 
   private getStatusText(zone: CaptureZone): string {
-    if (zone.state === ZoneState.US_CONTROLLED) return 'US';
+    if (zone.state === ZoneState.BLUFOR_CONTROLLED) return 'US';
     if (zone.state === ZoneState.OPFOR_CONTROLLED) return 'OPFOR';
     if (zone.state === ZoneState.NEUTRAL && zone.captureProgress <= 0) return 'Neutral';
     if (zone.state === ZoneState.NEUTRAL && zone.captureProgress > 0) {

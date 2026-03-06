@@ -61,7 +61,7 @@ describe('ZoneCaptureLogic', () => {
     const logic = new ZoneCaptureLogic();
     const zone = createZone();
     zone.owner = Faction.US;
-    zone.state = ZoneState.US_CONTROLLED;
+    zone.state = ZoneState.BLUFOR_CONTROLLED;
     zone.captureProgress = 100;
     zone.captureSpeed = 10;
 

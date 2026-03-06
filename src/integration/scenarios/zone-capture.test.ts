@@ -60,7 +60,7 @@ describe('Zone Capture Integration', () => {
     simulateCapture(zone, { us: 3, opfor: 0 }, 15);
 
     expect(zone.owner).toBe(Faction.US);
-    expect(zone.state).toBe(ZoneState.US_CONTROLLED);
+    expect(zone.state).toBe(ZoneState.BLUFOR_CONTROLLED);
     expect(zone.captureProgress).toBe(100);
   });
 
@@ -136,7 +136,7 @@ describe('Zone Capture Integration', () => {
   it('equally controlled zones produce no ticket bleed', () => {
     scenario.createZone('A', 'Alpha', new THREE.Vector3(0, 0, 0), {
       owner: Faction.US,
-      state: ZoneState.US_CONTROLLED,
+      state: ZoneState.BLUFOR_CONTROLLED,
       captureProgress: 100,
     });
     scenario.createZone('B', 'Bravo', new THREE.Vector3(100, 0, 0), {
@@ -182,7 +182,7 @@ describe('Zone Capture Integration', () => {
   it('owned zone can be neutralized and re-captured by opposing faction', () => {
     const zone = scenario.createZone('F', 'Foxtrot', new THREE.Vector3(0, 0, 0), {
       owner: Faction.US,
-      state: ZoneState.US_CONTROLLED,
+      state: ZoneState.BLUFOR_CONTROLLED,
       captureProgress: 100,
       captureSpeed: 10,
     });
@@ -202,7 +202,7 @@ describe('Zone Capture Integration', () => {
   it('home base zones are immune to capture', () => {
     const zone = scenario.createZone('HQ', 'US HQ', new THREE.Vector3(0, 0, 0), {
       owner: Faction.US,
-      state: ZoneState.US_CONTROLLED,
+      state: ZoneState.BLUFOR_CONTROLLED,
       captureProgress: 100,
       isHomeBase: true,
     });
@@ -239,7 +239,7 @@ describe('Zone Capture Integration', () => {
 
     // US captures zone A -> equal control
     zoneA.owner = Faction.US;
-    zoneA.state = ZoneState.US_CONTROLLED;
+    zoneA.state = ZoneState.BLUFOR_CONTROLLED;
     zoneA.captureProgress = 100;
 
     rates = scenario.captureLogic.calculateTicketBleedRate(scenario.zones);
@@ -249,7 +249,7 @@ describe('Zone Capture Integration', () => {
 
     // US captures zone B as well -> US has all zones
     zoneB.owner = Faction.US;
-    zoneB.state = ZoneState.US_CONTROLLED;
+    zoneB.state = ZoneState.BLUFOR_CONTROLLED;
 
     rates = scenario.captureLogic.calculateTicketBleedRate(scenario.zones);
     // US controls all zones - OPFOR bleeds, US does not

@@ -247,7 +247,7 @@ export const MAX_ZOOM = 30; // High enough for 21km worlds (~1px/unit at zoom 26
 
 // Zone color constants (RGBA values)
 export const ZONE_COLORS = {
-  US_CONTROLLED: { r: 91, g: 140, b: 201 },
+  BLUFOR_CONTROLLED: { r: 91, g: 140, b: 201 },
   OPFOR_CONTROLLED: { r: 201, g: 86, b: 74 },
   CONTESTED: { r: 212, g: 163, b: 68 },
   NEUTRAL: { r: 107, g: 119, b: 128 },

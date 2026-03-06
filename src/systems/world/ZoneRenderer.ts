@@ -272,7 +272,7 @@ export class ZoneRenderer {
 
   getMaterialForState(state: ZoneState): THREE.MeshBasicMaterial {
     switch (state) {
-      case ZoneState.US_CONTROLLED:
+      case ZoneState.BLUFOR_CONTROLLED:
         return this.usMaterial;
       case ZoneState.OPFOR_CONTROLLED:
         return this.opforMaterial;

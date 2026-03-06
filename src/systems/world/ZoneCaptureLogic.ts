@@ -30,14 +30,14 @@ export class ZoneCaptureLogic {
     if (zone.owner === Faction.US) {
       if (advantage >= 0) {
         zone.captureProgress = Math.min(100, zone.captureProgress + zone.captureSpeed * deltaTime * Math.max(0, advantage));
-        zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.US_CONTROLLED;
+        zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.BLUFOR_CONTROLLED;
       } else {
         if (dwell.opfor < this.CAPTURE_DWELL_SECONDS) {
-          zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.US_CONTROLLED;
+          zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.BLUFOR_CONTROLLED;
           return;
         }
         zone.captureProgress -= zone.captureSpeed * deltaTime * pressure;
-        zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.US_CONTROLLED;
+        zone.state = bothPresent ? ZoneState.CONTESTED : ZoneState.BLUFOR_CONTROLLED;
         if (zone.captureProgress <= 0) {
           zone.captureProgress = 0;
           zone.owner = null;
@@ -100,7 +100,7 @@ export class ZoneCaptureLogic {
     if (zone.captureProgress >= 100) {
       zone.captureProgress = 100;
       zone.owner = capturingFaction;
-      zone.state = isBlufor(capturingFaction) ? ZoneState.US_CONTROLLED : ZoneState.OPFOR_CONTROLLED;
+      zone.state = isBlufor(capturingFaction) ? ZoneState.BLUFOR_CONTROLLED : ZoneState.OPFOR_CONTROLLED;
       this.neutralCaptureFaction.delete(zone.id);
       Logger.info('world', ` Zone ${zone.name} captured by ${zone.owner}!`);
     }
@@ -116,7 +116,7 @@ export class ZoneCaptureLogic {
 
   getStateForOwner(owner: Faction | null): ZoneState {
     if (!owner) return ZoneState.NEUTRAL;
-    return isBlufor(owner) ? ZoneState.US_CONTROLLED : ZoneState.OPFOR_CONTROLLED;
+    return isBlufor(owner) ? ZoneState.BLUFOR_CONTROLLED : ZoneState.OPFOR_CONTROLLED;
   }
 
   calculateTicketBleedRate(zones: Map<string, CaptureZone>): { us: number; opfor: number } {

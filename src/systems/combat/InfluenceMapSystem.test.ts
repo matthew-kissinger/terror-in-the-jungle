@@ -509,7 +509,7 @@ describe('InfluenceMapSystem', () => {
 
     it('should skip home base zones', () => {
       const zones = [
-        createMockZone('homebase', new THREE.Vector3(0, 0, 0), Faction.US, ZoneState.US_CONTROLLED, true)
+        createMockZone('homebase', new THREE.Vector3(0, 0, 0), Faction.US, ZoneState.BLUFOR_CONTROLLED, true)
       ];
       system.setZones(zones);
 
@@ -523,7 +523,7 @@ describe('InfluenceMapSystem', () => {
 
     it('should skip already-owned zones that are not contested', () => {
       const zones = [
-        createMockZone('owned', new THREE.Vector3(0, 0, 0), Faction.US, ZoneState.US_CONTROLLED, false)
+        createMockZone('owned', new THREE.Vector3(0, 0, 0), Faction.US, ZoneState.BLUFOR_CONTROLLED, false)
       ];
       system.setZones(zones);
 

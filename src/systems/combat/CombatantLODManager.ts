@@ -650,8 +650,8 @@ export class CombatantLODManager {
 
   private updateDeathAnimations(deltaTime: number): void {
     const FALL_DURATION = 0.7;
-    const GROUND_TIME = 4.0;
-    const FADEOUT_DURATION = 1.0;
+    const GROUND_TIME = 6.0;
+    const FADEOUT_DURATION = 2.0;
     const TOTAL_DEATH_TIME = FALL_DURATION + GROUND_TIME + FADEOUT_DURATION;
 
     const toRemove: string[] = [];

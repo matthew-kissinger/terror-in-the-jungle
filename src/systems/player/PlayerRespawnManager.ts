@@ -11,6 +11,7 @@ import { RespawnMapController } from './RespawnMapController';
 import type { IFirstPersonWeapon, IPlayerController, ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { WarSimulator } from '../strategy/WarSimulator';
 import type { GrenadeSystem } from '../weapons/GrenadeSystem';
+import type { HelipadSystem } from '../helicopter/HelipadSystem';
 import { LoadoutService } from './LoadoutService';
 import {
   resolveInitialSpawnPosition,
@@ -46,6 +47,7 @@ export class PlayerRespawnManager implements GameSystem {
   private terrainSystem?: ITerrainRuntime;
   private loadoutService?: LoadoutService;
   private grenadeSystem?: GrenadeSystem;
+  private helipadSystem?: HelipadSystem;
 
   // Respawn state
   private isRespawnUIVisible = false;
@@ -179,6 +181,10 @@ export class PlayerRespawnManager implements GameSystem {
 
   setWarSimulator(warSimulator: WarSimulator): void {
     this.warSimulator = warSimulator;
+  }
+
+  setHelipadSystem(helipadSystem: HelipadSystem): void {
+    this.helipadSystem = helipadSystem;
   }
 
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {
@@ -409,6 +415,23 @@ export class PlayerRespawnManager implements GameSystem {
         safe: true
       }));
 
+    // Append helipad spawn points for BLUFOR players (Open Frontier)
+    if (this.helipadSystem && playerAlliance === Alliance.BLUFOR) {
+      const helipads = this.helipadSystem.getAllHelipads();
+      for (const hp of helipads) {
+        // Avoid duplicating if a zone already covers this helipad
+        const alreadyListed = this.availableSpawnPoints.some(sp => sp.id === hp.id);
+        if (!alreadyListed) {
+          this.availableSpawnPoints.push({
+            id: hp.id,
+            name: `Helipad: ${hp.aircraft.replace(/_/g, ' ')}`,
+            position: hp.position.clone(),
+            safe: true
+          });
+        }
+      }
+    }
+
     if (this.availableSpawnPoints.length === 0) {
       this.availableSpawnPoints = [{
         id: 'default',
@@ -540,6 +563,12 @@ export class PlayerRespawnManager implements GameSystem {
     const definition = this.gameModeManager?.getCurrentDefinition?.();
     if (!definition) {
       return this.availableSpawnPoints[0];
+    }
+
+    // In frontier mode, prefer helipad spawns so player starts near aircraft
+    if (definition.policies.deploy.flow === 'frontier') {
+      const helipadSpawn = this.availableSpawnPoints.find(sp => sp.id.startsWith('helipad_'));
+      if (helipadSpawn) return helipadSpawn;
     }
 
     const target = resolveInitialSpawnPosition(definition, this.getCurrentAlliance());
@@ -713,7 +742,7 @@ export class PlayerRespawnManager implements GameSystem {
     }
 
     return alliance === Alliance.BLUFOR
-      ? zone.state === ZoneState.US_CONTROLLED
+      ? zone.state === ZoneState.BLUFOR_CONTROLLED
       : zone.state === ZoneState.OPFOR_CONTROLLED;
   }
 }

@@ -236,7 +236,7 @@ describe('TicketSystem', () => {
 
     it('should have no ticket bleed if zones are equally controlled', () => {
       const zones = [
-        createMockCaptureZone('A', ZoneState.US_CONTROLLED),
+        createMockCaptureZone('A', ZoneState.BLUFOR_CONTROLLED),
         createMockCaptureZone('B', ZoneState.OPFOR_CONTROLLED),
       ];
       setupZones(zones);
@@ -267,8 +267,8 @@ describe('TicketSystem', () => {
 
     it('should apply ticket bleed to OPFOR if US controls more zones', () => {
       const zones = [
-        createMockCaptureZone('A', ZoneState.US_CONTROLLED),
-        createMockCaptureZone('B', ZoneState.US_CONTROLLED),
+        createMockCaptureZone('A', ZoneState.BLUFOR_CONTROLLED),
+        createMockCaptureZone('B', ZoneState.BLUFOR_CONTROLLED),
         createMockCaptureZone('C', ZoneState.NEUTRAL),
       ];
       setupZones(zones);
@@ -282,8 +282,8 @@ describe('TicketSystem', () => {
 
     it('should apply accelerated ticket bleed if US controls all zones', () => {
       const zones = [
-        createMockCaptureZone('A', ZoneState.US_CONTROLLED),
-        createMockCaptureZone('B', ZoneState.US_CONTROLLED),
+        createMockCaptureZone('A', ZoneState.BLUFOR_CONTROLLED),
+        createMockCaptureZone('B', ZoneState.BLUFOR_CONTROLLED),
       ];
       // Use setMaxTickets but avoid the update in setupZones to keep tickets at exactly initial
       mockZoneManager = createMockZoneManager(zones);
@@ -298,7 +298,7 @@ describe('TicketSystem', () => {
       ticketSystem.update(1); // 1 second passes
 
       const baseBleedRate = ticketSystem.getBaseBleedRate();
-      expect(ticketSystem.getTickets(Faction.NVA)).toBeCloseTo(initialOpforTickets - 2 * baseBleedRate);
+      expect(ticketSystem.getTickets(Faction.NVA)).toBeCloseTo(initialOpforTickets - 3 * baseBleedRate);
     });
 
     it('should apply accelerated ticket bleed if OPFOR controls all zones', () => {
@@ -317,7 +317,7 @@ describe('TicketSystem', () => {
       ticketSystem.update(1); // 1 second passes
 
       const baseBleedRate = ticketSystem.getBaseBleedRate();
-      expect(ticketSystem.getTickets(Faction.US)).toBeCloseTo(initialUSTickets - 2 * baseBleedRate);
+      expect(ticketSystem.getTickets(Faction.US)).toBeCloseTo(initialUSTickets - 3 * baseBleedRate);
     });
 
     it('should not apply ticket bleed if in SETUP phase', () => {
@@ -361,7 +361,7 @@ describe('TicketSystem', () => {
 
     it('should calculate correct bleed rates for mixed control', () => {
       const zones = [
-        createMockCaptureZone('A', ZoneState.US_CONTROLLED),
+        createMockCaptureZone('A', ZoneState.BLUFOR_CONTROLLED),
         createMockCaptureZone('B', ZoneState.OPFOR_CONTROLLED),
         createMockCaptureZone('C', ZoneState.NEUTRAL),
       ];
@@ -404,7 +404,7 @@ describe('TicketSystem', () => {
     });
 
     it('should declare US winner if US controls all zones (total control)', () => {
-      const zones = [createMockCaptureZone('A', ZoneState.US_CONTROLLED)];
+      const zones = [createMockCaptureZone('A', ZoneState.BLUFOR_CONTROLLED)];
       mockZoneManager = createMockZoneManager(zones);
       ticketSystem.setZoneManager(mockZoneManager);
 
