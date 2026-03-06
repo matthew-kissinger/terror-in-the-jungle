@@ -43,14 +43,11 @@ export interface SpawnPoint {
 
 export interface ScaleConfig {
   aiEngagementRange?: number;       // default 150
-  aiVisualRange?: number;           // default 130
   lodHighRange?: number;            // default 200
   lodMediumRange?: number;          // default 400
   lodLowRange?: number;             // default 600
-  patrolRadius?: number;            // default 20
-  spawnRadius?: { min: number; max: number }; // default {20, 50}
   influenceMapGridSize?: number;    // default 64
-  spatialBounds?: number;           // default 4000 (SpatialOctree/GridManager)
+  spatialBounds?: number;           // default 4000 (SpatialGridManager)
 }
 
 export interface WarSimulatorConfig {

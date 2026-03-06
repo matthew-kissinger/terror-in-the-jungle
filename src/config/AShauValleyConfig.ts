@@ -126,12 +126,9 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
   // Scale overrides for 21km battlefield
   scaleConfig: {
     aiEngagementRange: 200,
-    aiVisualRange: 180,
     lodHighRange: 300,
     lodMediumRange: 600,
     lodLowRange: 1000,
-    patrolRadius: 60,
-    spawnRadius: { min: 30, max: 80 },
     influenceMapGridSize: 128,
     spatialBounds: 22000
   },
