@@ -28,6 +28,7 @@ export class SystemConnector {
     this.wireGameMode(refs);
     this.wireStrategy(refs);
     this.wireEnvironment(refs, renderer);
+    this.wireBillboardTerrain(refs);
     this.wireTelemetry(refs, renderer);
   }
 
@@ -280,6 +281,15 @@ export class SystemConnector {
 
     if (refs.waterSystem) {
       refs.waterSystem.setWeatherSystem(refs.weatherSystem);
+    }
+  }
+
+  // ── Billboard terrain snapping ──
+
+  private wireBillboardTerrain(refs: SystemReferences): void {
+    const info = refs.terrainSystem.getHeightmapInfo();
+    if (info) {
+      refs.globalBillboardSystem.setTerrainHeightmap(info.texture, info.worldSize, info.gridSize);
     }
   }
 

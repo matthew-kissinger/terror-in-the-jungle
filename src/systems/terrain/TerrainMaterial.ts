@@ -56,6 +56,11 @@ vMorphFactor = morphFactor;
 
 vec3 nSample = texture2D(terrainNormalMap, vWorldUV).rgb * 2.0 - 1.0;
 vTerrainNormal = normalize(nSample);
+
+// Propagate correct terrain position to Three.js built-in 'transformed' variable
+// so that downstream chunks (worldpos_vertex, shadowmap_vertex, envmap) use the
+// GPU-displaced position instead of the raw attribute position.
+transformed = worldPos4.xyz;
 `;
 
 const TERRAIN_FRAGMENT_PARS = /* glsl */ `

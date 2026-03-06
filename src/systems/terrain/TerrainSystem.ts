@@ -186,6 +186,12 @@ export class TerrainSystem implements GameSystem {
     this.surfaceRuntime.setSurfaceWetness(clampedWetness);
   }
 
+  // ──── Heightmap info (for billboard terrain snapping) ────
+
+  getHeightmapInfo(): { texture: THREE.DataTexture; gridSize: number; worldSize: number } | null {
+    return this.surfaceRuntime.getHeightmapInfo();
+  }
+
   // ──── Height queries ────
 
   getHeightAt(x: number, z: number): number {
@@ -437,6 +443,16 @@ export class TerrainSystem implements GameSystem {
       cache.getProvider().getWorkerConfig(),
     );
     cache.setProvider(bakedProvider);
+
+    // Push heightmap texture to billboard system for GPU terrain snapping
+    this.pushHeightmapToBillboards();
+  }
+
+  private pushHeightmapToBillboards(): void {
+    const info = this.surfaceRuntime.getHeightmapInfo();
+    if (info) {
+      this.billboardSystem.setTerrainHeightmap(info.texture, info.worldSize, info.gridSize);
+    }
   }
 
   private applyVegetationConfig(): void {

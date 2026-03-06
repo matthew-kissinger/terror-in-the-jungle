@@ -87,7 +87,12 @@ export class GPUBillboardVegetation {
         fogDensity: { value: 0.006 },        // How much fog accumulates with distance
         fogHeightFalloff: { value: 0.03 },   // How quickly fog thins with altitude (lower = thicker at height)
         fogStartDistance: { value: 100.0 },  // Fog doesn't appear until this distance
-        fogEnabled: { value: false }
+        fogEnabled: { value: false },
+        // Terrain heightmap snapping uniforms
+        terrainHeightmap: { value: null as THREE.DataTexture | null },
+        terrainWorldSize: { value: 0.0 },
+        heightmapGridSize: { value: 0.0 },
+        terrainSnappingEnabled: { value: false },
       },
       vertexShader: BILLBOARD_VERTEX_SHADER,
       fragmentShader: BILLBOARD_FRAGMENT_SHADER,
@@ -101,6 +106,13 @@ export class GPUBillboardVegetation {
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.frustumCulled = false; // Disable frustum culling for instanced geometry
     this.scene.add(this.mesh);
+  }
+
+  setTerrainHeightmap(texture: THREE.DataTexture, worldSize: number, gridSize: number): void {
+    this.material.uniforms.terrainHeightmap.value = texture;
+    this.material.uniforms.terrainWorldSize.value = worldSize;
+    this.material.uniforms.heightmapGridSize.value = gridSize;
+    this.material.uniforms.terrainSnappingEnabled.value = true;
   }
 
   // Add instances for a chunk

@@ -105,6 +105,12 @@ export class TerrainSurfaceRuntime {
     }
   }
 
+  getHeightmapInfo(): { texture: THREE.DataTexture; gridSize: number; worldSize: number } | null {
+    const texture = this.heightmapGPU.getHeightTexture();
+    if (!texture) return null;
+    return { texture, gridSize: this.heightmapGPU.getGridSize(), worldSize: this.heightmapGPU.getWorldSize() };
+  }
+
   getBakedHeightmap(): { data: Float32Array; gridSize: number; worldSize: number } | null {
     const data = this.heightmapGPU.getHeightData();
     if (!data) return null;

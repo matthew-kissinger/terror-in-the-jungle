@@ -139,6 +139,7 @@ function makeMockBillboard(): any {
     addChunkInstances: vi.fn(),
     removeChunkInstances: vi.fn(),
     configure: vi.fn(),
+    setTerrainHeightmap: vi.fn(),
     getActiveVegetationTypes: vi.fn().mockReturnValue([
       { id: 'fern' },
     ]),
