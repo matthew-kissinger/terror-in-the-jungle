@@ -301,7 +301,7 @@ describe('TerrainSystem', () => {
 
       expect(mockBakeFromProvider).toHaveBeenLastCalledWith(
         expect.anything(),
-        512,
+        1024,
         3200,
       );
     });

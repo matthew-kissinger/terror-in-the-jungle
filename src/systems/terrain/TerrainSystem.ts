@@ -17,7 +17,7 @@ import { TerrainWorkerPool } from './TerrainWorkerPool';
 import {
   buildTerrainVegetationRuntimeConfig,
 } from './TerrainBiomeRuntimeConfig';
-import { createTerrainConfig, computeDefaultLODRanges, type TerrainSystemConfig, type TerrainRuntimeBootstrapConfig } from './TerrainConfig';
+import { createTerrainConfig, computeDefaultLODRanges, computeMaxLODLevels, type TerrainSystemConfig, type TerrainRuntimeBootstrapConfig } from './TerrainConfig';
 
 /**
  * Top-level terrain runtime facade. Implements GameSystem.
@@ -385,6 +385,14 @@ export class TerrainSystem implements GameSystem {
     if (newWorldSize === this.config.worldSize) return;
 
     this.config.worldSize = newWorldSize;
+    // Recompute LOD levels so vertex density stays sufficient at any world size.
+    // Without this, large worlds (3200m+) get LOD 0 tiles too coarse for the
+    // heightmap resolution, causing GPU mesh height to diverge from CPU queries.
+    this.config.maxLODLevels = computeMaxLODLevels(
+      newWorldSize,
+      this.config.visualMargin,
+      this.config.tileResolution - 1,
+    );
     this.config.lodRanges = computeDefaultLODRanges(newWorldSize, this.config.maxLODLevels);
     this.vegetationScatterer.setWorldBounds(newWorldSize, this.config.visualMargin);
 

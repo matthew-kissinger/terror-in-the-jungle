@@ -26,7 +26,8 @@ export function computeTerrainSurfaceGridSize(worldSize: number): number {
   const targetMetersPerSample =
     worldSize >= 16384 ? 48 :
     worldSize >= 8192 ? 32 :
-    worldSize >= 2048 ? 8 :
+    worldSize >= 4096 ? 8 :
+    worldSize >= 1024 ? 4 :
     16;
 
   const requestedGridSize = Math.ceil(worldSize / targetMetersPerSample);

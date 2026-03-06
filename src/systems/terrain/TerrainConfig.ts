@@ -50,6 +50,24 @@ const DEFAULT_SPLATMAP: SplatmapConfig = {
 };
 
 /**
+ * Compute max LOD levels needed so LOD 0 vertex spacing stays ≤ targetSpacing.
+ *
+ * LOD 0 tile size = quadtreeWorldSize / 2^maxLODLevels.
+ * Vertex spacing  = tileSize / tileQuads.
+ * Solve for maxLODLevels ≥ log2(quadtreeWorldSize / (targetSpacing * tileQuads)).
+ */
+export function computeMaxLODLevels(
+  worldSize: number,
+  visualMargin: number,
+  tileQuads: number = 32,
+  targetSpacing: number = 4,
+): number {
+  const quadtreeSize = worldSize + visualMargin * 2;
+  const needed = Math.ceil(Math.log2(quadtreeSize / (targetSpacing * tileQuads)));
+  return Math.max(4, Math.min(8, needed));
+}
+
+/**
  * Compute default LOD ranges from world size and max LOD levels.
  * lodRanges[i] = baseTileSize * 4 * 2^i
  */
