@@ -30,7 +30,6 @@ import { CombatantSpawnManager } from './CombatantSpawnManager';
 import { CombatantLODManager } from './CombatantLODManager';
 import { CombatantProfiler } from './CombatantProfiler';
 import { CombatantSystemDamage } from './CombatantSystemDamage';
-import { CombatantSystemSetters } from './CombatantSystemSetters';
 import { CombatantSystemUpdate } from './CombatantSystemUpdate';
 import { AILineOfSight } from './ai/AILineOfSight';
 import { getRaycastBudgetStats } from './ai/RaycastBudget';
@@ -65,7 +64,6 @@ export class CombatantSystem implements GameSystem {
   private lodManager: CombatantLODManager;
   private profiler: CombatantProfiler;
   private damageHandler: CombatantSystemDamage;
-  private setters: CombatantSystemSetters;
   private updateHelpers: CombatantSystemUpdate;
 
   // Effects pools
@@ -152,15 +150,6 @@ export class CombatantSystem implements GameSystem {
       this.combatants,
       this.squadManager,
       this.spawnManager
-    );
-
-    this.setters = new CombatantSystemSetters(
-      this.combatantMovement,
-      this.combatantCombat,
-      this.combatantAI,
-      this.squadManager,
-      this.spawnManager,
-      this.lodManager
     );
 
     this.updateHelpers = new CombatantSystemUpdate(
@@ -423,45 +412,58 @@ export class CombatantSystem implements GameSystem {
   // Setters for external systems
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {
     this.terrainSystem = terrainSystem;
-    this.setters.setTerrainSystem(terrainSystem);
+    this.combatantMovement.setTerrainSystem(terrainSystem);
+    this.squadManager.setTerrainSystem(terrainSystem);
+    this.combatantAI.setTerrainSystem(terrainSystem);
+    this.combatantCombat.setTerrainSystem(terrainSystem);
   }
 
   setCamera(camera: THREE.Camera): void {
     this.camera = camera;
-    this.setters.setCamera(camera);
+    this.combatantCombat.setCamera(camera);
   }
 
   setTicketSystem(ticketSystem: TicketSystem): void {
     this.ticketSystem = ticketSystem;
     this.damageHandler.setTicketSystem(ticketSystem);
-    this.setters.setTicketSystem(ticketSystem);
+    this.combatantCombat.setTicketSystem(ticketSystem);
+    this.combatantAI.setTicketSystem(ticketSystem);
+    this.combatantMovement.setTicketSystem(ticketSystem);
   }
 
   setPlayerHealthSystem(playerHealthSystem: PlayerHealthSystem): void {
     this.playerHealthSystem = playerHealthSystem;
-    this.setters.setPlayerHealthSystem(playerHealthSystem);
+    this.combatantCombat.setPlayerHealthSystem(playerHealthSystem);
   }
 
   setZoneManager(zoneManager: ZoneManager): void {
     this.zoneManager = zoneManager;
     this.updateHelpers.setZoneManager(zoneManager);
-    this.setters.setZoneManager(zoneManager);
+    this.combatantMovement.setZoneManager(zoneManager);
+    this.spawnManager.setZoneManager(zoneManager);
+    this.lodManager.setZoneManager(zoneManager);
   }
 
   setHUDSystem(hudSystem: IHUDSystem): void {
     this.hudSystem = hudSystem;
     this.damageHandler.setHUDSystem(hudSystem);
-    this.setters.setHUDSystem(hudSystem);
+    this.combatantCombat.setHUDSystem(hudSystem);
   }
 
   setGameModeManager(gameModeManager: GameModeManager): void {
     this.gameModeManager = gameModeManager;
-    this.setters.setGameModeManager(gameModeManager);
+    this.combatantMovement.setGameModeManager(gameModeManager);
+    this.spawnManager.setGameModeManager(gameModeManager);
+    this.lodManager.setGameModeManager(gameModeManager);
+    // Reinitialize spatial grid with correct world size
+    const worldSize = gameModeManager.getWorldSize();
+    spatialGridManager.reinitialize(worldSize);
+    Logger.info('combat', `Spatial grid reinitialized with world size ${worldSize}`);
   }
 
   setAudioManager(audioManager: AudioManager): void {
     this.audioManager = audioManager;
-    this.setters.setAudioManager(audioManager);
+    this.combatantCombat.setAudioManager(audioManager);
   }
 
   setPlayerFaction(faction: Faction): void {
@@ -469,20 +471,23 @@ export class CombatantSystem implements GameSystem {
   }
 
   setPlayerSuppressionSystem(system: import('../player/PlayerSuppressionSystem').PlayerSuppressionSystem): void {
-    this.setters.setPlayerSuppressionSystem(system);
+    this.combatantCombat.setPlayerSuppressionSystem(system);
   }
 
   // Game mode configuration methods
   setMaxCombatants(max: number): void {
-    this.setters.setMaxCombatants(max);
+    this.spawnManager.setMaxCombatants(max);
+    Logger.info('combat', `Max combatants set to ${max}`);
   }
 
   setSquadSizes(min: number, max: number): void {
-    this.setters.setSquadSizes(min, max);
+    this.spawnManager.setSquadSizes(min, max);
+    Logger.info('combat', `Squad sizes set to ${min}-${max}`);
   }
 
   setReinforcementInterval(interval: number): void {
-    this.setters.setReinforcementInterval(interval);
+    this.spawnManager.setReinforcementInterval(interval);
+    Logger.info('combat', `Reinforcement interval set to ${interval} seconds`);
   }
 
   setAutonomousSpawningEnabled(enabled: boolean): void {

@@ -42,7 +42,7 @@
 | Mode | Zones | Tickets | War Sim | Notes |
 |---|---|---|---|---|
 | ZONE_CONTROL | yes | yes | optional | standard conquest |
-| OPEN_FRONTIER | yes | yes | no | large-map conquest variant with helipads and respawn map |
+| OPEN_FRONTIER | yes | yes | no | 3200m world, 10 contested + 6 HQ zones, 3 helipads, 120 combatants, alliance factions (BLUFOR/OPFOR), zone-spawn respawn |
 | TEAM_DEATHMATCH | no | kill-based | no | |
 | AI_SANDBOX | no | no | no | dev/test mode |
 | A_SHAU_VALLEY | yes | yes | yes | 3000 agents, 21km DEM, 18 zones, 60-min matches |
@@ -114,11 +114,11 @@ gameEndCallback:
 
 ## Current Execution Status
 
-- runtime foundation is in progress
-- shared deploy and spawn policy is live
-- side/faction launch selection is live
-- command profile work is underway through the command coordinator and overlay stack
-- map-intel policy cleanup has not started yet
+- runtime foundation is live (GameModeRuntime, GameModeDefinition, policy bundles)
+- shared deploy and spawn policy is live (DeployFlowSession, ModeSpawnResolver)
+- side/faction launch selection is live (alliance-based BLUFOR/OPFOR with factionMix)
+- command profile is live (CommandModeOverlay, CommandTacticalMap, CommandInputManager)
+- map-intel policy is live (GameModeManager.applyMapIntelPolicy pushes fog/reveal to minimap and full map)
 
 ## GameModeManager Anti-Pattern Note
 
