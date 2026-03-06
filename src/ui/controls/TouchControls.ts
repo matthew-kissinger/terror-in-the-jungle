@@ -99,9 +99,6 @@ export class TouchControls {
 
     this.actionButtons.setOnAction((action: string) => {
       switch (action) {
-        case 'squad':
-          callbacks.onSquadCommand?.();
-          break;
         case 'jump':
           callbacks.onJump();
           break;

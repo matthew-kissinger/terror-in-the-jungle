@@ -44,6 +44,8 @@ export class FullMapSystem implements GameSystem {
   // Map settings
   private worldSize = 3200; // Will be updated based on game mode
   private isVisible = false;
+  private playerSquadId?: string;
+  private commandPosition?: THREE.Vector3;
 
   // Player tracking
   private playerPosition = new THREE.Vector3();
@@ -269,6 +271,10 @@ export class FullMapSystem implements GameSystem {
       this.drawCombatants(ctx);
     }
 
+    if (this.commandPosition) {
+      this.drawCommandMarker(ctx);
+    }
+
     // Draw player
     this.drawPlayer(ctx);
 
@@ -370,8 +376,10 @@ export class FullMapSystem implements GameSystem {
       const x = (this.worldSize / 2 - combatant.position.x) * scale;
       const y = (this.worldSize / 2 - combatant.position.z) * scale;
 
-      ctx.fillStyle = isBlufor(combatant.faction) ?
-        COMBATANT_COLORS.US : COMBATANT_COLORS.OPFOR;
+      const isPlayerSquad = combatant.squadId === this.playerSquadId;
+      ctx.fillStyle = isPlayerSquad
+        ? 'rgba(92, 184, 92, 0.92)'
+        : (isBlufor(combatant.faction) ? COMBATANT_COLORS.US : COMBATANT_COLORS.OPFOR);
       ctx.beginPath();
       ctx.arc(x, y, 3, 0, Math.PI * 2);
       ctx.fill();
@@ -456,8 +464,56 @@ export class FullMapSystem implements GameSystem {
     this.gameModeManager = manager;
   }
 
+  setPlayerSquadId(squadId: string | undefined): void {
+    this.playerSquadId = squadId;
+  }
+
+  setCommandPosition(position: THREE.Vector3 | undefined): void {
+    this.commandPosition = position;
+  }
+
   setHelipadMarkers(markers: HelipadMarker[]): void {
     this.helipadMarkers = markers;
+  }
+
+  private drawCommandMarker(ctx: CanvasRenderingContext2D): void {
+    if (!this.commandPosition) return;
+
+    const scale = MAP_SIZE / this.worldSize;
+    const playerX = (this.worldSize / 2 - this.playerPosition.x) * scale;
+    const playerY = (this.worldSize / 2 - this.playerPosition.z) * scale;
+    const x = (this.worldSize / 2 - this.commandPosition.x) * scale;
+    const y = (this.worldSize / 2 - this.commandPosition.z) * scale;
+
+    ctx.strokeStyle = 'rgba(92, 184, 92, 0.34)';
+    ctx.lineWidth = Math.max(1.5, 0.8 / this.inputHandler.getZoomLevel());
+    ctx.beginPath();
+    ctx.moveTo(playerX, playerY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(92, 184, 92, 0.92)';
+    ctx.lineWidth = Math.max(2, 1 / this.inputHandler.getZoomLevel());
+
+    ctx.beginPath();
+    ctx.moveTo(x, y - 12);
+    ctx.lineTo(x, y + 12);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(x - 12, y);
+    ctx.lineTo(x + 12, y);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(x, y, 9, 0, Math.PI * 2);
+    ctx.stroke();
+
+    const distanceMeters = Math.round(this.playerPosition.distanceTo(this.commandPosition));
+    ctx.fillStyle = 'rgba(216, 236, 198, 0.92)';
+    ctx.font = `bold ${Math.max(10, 12 / Math.sqrt(this.inputHandler.getZoomLevel()))}px Rajdhani`;
+    ctx.textAlign = 'left';
+    ctx.fillText(`${distanceMeters}m`, x + 14, y - 12);
   }
 
   private drawHelipadMarkers(ctx: CanvasRenderingContext2D): void {

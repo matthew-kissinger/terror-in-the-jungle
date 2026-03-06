@@ -9,7 +9,7 @@ import { PlayerController } from './PlayerController'
 import { AudioManager } from '../audio/AudioManager'
 import { ZoneManager } from '../world/ZoneManager'
 import { TicketSystem } from '../world/TicketSystem'
-import { InventoryManager, WeaponSlot } from './InventoryManager'
+import { InventoryManager } from './InventoryManager'
 import { PlayerStatsTracker } from './PlayerStatsTracker'
 import { WeaponRigManager } from './weapon/WeaponRigManager'
 import { WeaponAnimations } from './weapon/WeaponAnimations'
@@ -24,6 +24,8 @@ import { WeaponShotCommandBuilder } from './weapon/WeaponShotCommandBuilder'
 import { Logger } from '../../utils/Logger'
 import type { HUDSystem } from '../../ui/hud/HUDSystem'
 import { AmmoState } from '../weapons/AmmoManager'
+import type { LoadoutWeapon } from '../../ui/loadout/LoadoutTypes'
+import { Faction } from '../combat/types'
 
 const _zeroVelocity = new THREE.Vector3()
 
@@ -62,6 +64,7 @@ export class FirstPersonWeapon implements GameSystem {
   private zoneManager?: ZoneManager;
   private inventoryManager?: InventoryManager;
   private statsTracker?: PlayerStatsTracker;
+  private playerFaction: Faction = Faction.US;
 
   constructor(scene: THREE.Scene, camera: THREE.Camera, assetLoader: AssetLoader) {
     this.scene = scene
@@ -113,6 +116,7 @@ export class FirstPersonWeapon implements GameSystem {
 
     // Initialize rig manager (creates weapon models)
     await this.rigManager.init()
+    this.rigManager.setRifleFaction(this.playerFaction)
 
     // Update references after initialization
     this.animations.setPumpGripRef(this.rigManager.getPumpGripRef())
@@ -185,6 +189,11 @@ export class FirstPersonWeapon implements GameSystem {
     this.playerController = controller
   }
 
+  setPlayerFaction(faction: Faction): void {
+    this.playerFaction = faction
+    this.rigManager.setRifleFaction(faction)
+  }
+
   setCombatantSystem(combatantSystem: CombatantSystem): void {
     this.combatantSystem = combatantSystem
     this.firing.setCombatantSystem(combatantSystem)
@@ -198,14 +207,9 @@ export class FirstPersonWeapon implements GameSystem {
     this.inventoryManager = inventoryManager
     this.input.setInventoryManager(inventoryManager)
     inventoryManager.onSlotChange((slot) => {
-      if (slot === WeaponSlot.PRIMARY) {
-        this.switching.switchWeapon('rifle', (state) => this.onAmmoChange(state))
-      } else if (slot === WeaponSlot.SHOTGUN) {
-        this.switching.switchWeapon('shotgun', (state) => this.onAmmoChange(state))
-      } else if (slot === WeaponSlot.SMG) {
-        this.switching.switchWeapon('smg', (state) => this.onAmmoChange(state))
-      } else if (slot === WeaponSlot.PISTOL) {
-        this.switching.switchWeapon('pistol', (state) => this.onAmmoChange(state))
+      const weaponType = inventoryManager.getWeaponTypeForSlot(slot)
+      if (weaponType) {
+        this.switching.switchWeapon(weaponType, (state) => this.onAmmoChange(state))
       }
     })
   }
@@ -335,7 +339,7 @@ export class FirstPersonWeapon implements GameSystem {
    * Set the primary weapon (rifle, shotgun, SMG, or pistol)
    * Used for loadout selection at game start
    */
-  setPrimaryWeapon(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol'): void {
+  setPrimaryWeapon(weaponType: LoadoutWeapon | 'rifle' | 'shotgun' | 'smg' | 'pistol'): void {
     this.switching.switchWeapon(weaponType, (state) => this.onAmmoChange(state))
   }
 

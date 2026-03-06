@@ -2,7 +2,7 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { CombatantSystem } from '../combat/CombatantSystem';
-import { Faction, CombatantState, isBlufor, isOpfor } from '../combat/types';
+import { Alliance, Faction, CombatantState, getAlliance, isBlufor, isOpfor } from '../combat/types';
 import { spatialGridManager, SpatialGridManager } from '../combat/SpatialGridManager';
 import { ZoneRenderer } from './ZoneRenderer';
 import { ZoneCaptureLogic } from './ZoneCaptureLogic';
@@ -71,6 +71,7 @@ export class ZoneManager implements GameSystem {
   private occupants: Map<string, { us: number; opfor: number }> = new Map();
   private previousZoneState: Map<string, Faction | null> = new Map();
   private hudSystem?: IHUDSystem;
+  private playerAlliance: Alliance = Alliance.BLUFOR;
 
   // Optimization: Throttle occupant updates
   private lastOccupantUpdateTime = 0;
@@ -105,7 +106,11 @@ export class ZoneManager implements GameSystem {
       for (const zone of this.zones.values()) {
         const occupants = { us: 0, opfor: 0 };
         if (this.playerPosition.distanceTo(zone.position) <= zone.radius) {
-          occupants.us = 1;
+          if (this.playerAlliance === Alliance.BLUFOR) {
+            occupants.us = 1;
+          } else {
+            occupants.opfor = 1;
+          }
         }
         this.occupants.set(zone.id, occupants);
       }
@@ -120,7 +125,7 @@ export class ZoneManager implements GameSystem {
         let playerProxyCounted = false;
 
         // Optimized spatial query: find combatant IDs within zone radius
-        // Note: This includes the 'player_proxy' which correctly counts the player as Faction.US
+        // Note: This includes the player proxy, which should already mirror the selected faction.
         const nearbyIds = this.spatialQueryProvider
           ? this.spatialQueryProvider(zone.position, zone.radius)
           : this.spatialGridManager.queryRadius(zone.position, zone.radius);
@@ -144,7 +149,11 @@ export class ZoneManager implements GameSystem {
 
         // Ensure player can always capture even if player_proxy is briefly missing/desynced.
         if (combatants.size > 0 && nearbyIds.length === 0 && !playerProxyCounted && this.playerPosition.distanceTo(zone.position) <= zone.radius) {
-          occupants.us++;
+          if (this.playerAlliance === Alliance.BLUFOR) {
+            occupants.us++;
+          } else {
+            occupants.opfor++;
+          }
         }
 
         this.occupants.set(zone.id, occupants);
@@ -178,15 +187,16 @@ export class ZoneManager implements GameSystem {
       // Update capture state
       this.captureLogic.updateZoneCaptureState(zone, occupants, deltaTime);
 
-      // Detect capture by BLUFOR (player faction)
-      if (!(previousOwner != null && isBlufor(previousOwner)) && zone.owner !== null && isBlufor(zone.owner) && !zone.isHomeBase) {
+      const previousAlliance = previousOwner ? getAlliance(previousOwner) : null;
+      const currentAlliance = zone.owner ? getAlliance(zone.owner) : null;
+
+      if (previousAlliance !== this.playerAlliance && currentAlliance === this.playerAlliance && !zone.isHomeBase) {
         if (this.hudSystem && typeof this.hudSystem.addZoneCapture === 'function') {
           this.hudSystem.addZoneCapture(zone.name, false);
         }
       }
 
-      // Detect zone lost by BLUFOR (captured by OPFOR)
-      if (previousOwner != null && isBlufor(previousOwner) && zone.owner !== null && isOpfor(zone.owner) && !zone.isHomeBase) {
+      if (previousAlliance === this.playerAlliance && currentAlliance !== null && currentAlliance !== this.playerAlliance && !zone.isHomeBase) {
         if (this.hudSystem && typeof this.hudSystem.addZoneCapture === 'function') {
           this.hudSystem.addZoneCapture(zone.name, true);
         }
@@ -316,6 +326,10 @@ export class ZoneManager implements GameSystem {
 
   setHUDSystem(hudSystem: IHUDSystem): void {
     this.hudSystem = hudSystem;
+  }
+
+  setPlayerAlliance(alliance: Alliance): void {
+    this.playerAlliance = alliance;
   }
 
   dispose(): void {

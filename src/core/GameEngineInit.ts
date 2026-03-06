@@ -1,51 +1,77 @@
 import * as THREE from 'three';
-import { GameMode, ZoneConfig } from '../config/gameModeTypes';
+import { GameLaunchSelection, GameMode, GameModeDefinition, ZoneConfig } from '../config/gameModeTypes';
 import { getGameModeConfig } from '../config/gameModes';
+import { getGameModeDefinition, resolveLaunchSelection } from '../config/gameModeDefinitions';
 import { getHeightQueryCache } from '../systems/terrain/HeightQueryCache';
 import { DEMHeightProvider } from '../systems/terrain/DEMHeightProvider';
 import { NoiseHeightProvider } from '../systems/terrain/NoiseHeightProvider';
 import { Logger } from '../utils/Logger';
-import { GrenadeType, Faction } from '../systems/combat/types';
+import { Alliance, Faction } from '../systems/combat/types';
 import { SettingsManager } from '../config/SettingsManager';
 import { shouldUseTouchControls } from '../utils/DeviceDetector';
 import { tryLockLandscapeOrientation } from '../utils/Orientation';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import { PersistenceSystem } from '../systems/strategy/PersistenceSystem';
+import { resolveInitialSpawnPosition } from '../systems/world/runtime/ModeSpawnResolver';
+import { InitialDeployCancelledError } from '../systems/player/PlayerRespawnManager';
 import type { GameEngine } from './GameEngine';
 import { markStartup } from './StartupTelemetry';
 import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
 
-function getPrimaryUSBase(config: ReturnType<typeof getGameModeConfig>): ZoneConfig | undefined {
-  return config.zones.find(z => z.isHomeBase && z.owner === Faction.US && (z.id.includes('main') || z.id === 'us_base'));
+function getPrimaryAllianceBase(
+  config: ReturnType<typeof getGameModeConfig>,
+  alliance: Alliance
+): ZoneConfig | undefined {
+  const expectedOwner = alliance === Alliance.BLUFOR ? Faction.US : Faction.NVA;
+  const canonicalBaseId = alliance === Alliance.BLUFOR ? 'us_base' : 'opfor_base';
+  return config.zones.find(z => z.isHomeBase && z.owner === expectedOwner && (z.id.includes('main') || z.id === canonicalBaseId))
+    ?? config.zones.find(z => z.isHomeBase && z.owner !== null && (alliance === Alliance.BLUFOR ? z.owner === Faction.US || z.owner === Faction.ARVN : z.owner === Faction.NVA || z.owner === Faction.VC));
 }
 
-function resolveAShauInsertion(config: ReturnType<typeof getGameModeConfig>): THREE.Vector3 | null {
-  const hill937 = config.zones.find(z => z.id === 'zone_hill937');
-  const usForwardBase = config.zones.find(z => z.id === 'us_hq_east') ?? getPrimaryUSBase(config);
-  if (!hill937 || !usForwardBase) {
-    return null;
+function resolveModeSpawnPosition(
+  definition: GameModeDefinition,
+  alliance: Alliance = Alliance.BLUFOR
+): THREE.Vector3 {
+  const policySpawn = resolveInitialSpawnPosition(definition, alliance);
+  if (policySpawn) {
+    return policySpawn;
   }
-
-  const dir = new THREE.Vector3().subVectors(usForwardBase.position, hill937.position);
-  dir.y = 0;
-  const len = dir.length();
-  if (len < 1) {
-    return null;
-  }
-  dir.divideScalar(len);
-
-  // Spawn on the US-approach side of Hill 937 to shorten time-to-contact.
-  return hill937.position.clone().addScaledVector(dir, 240);
+  return getPrimaryAllianceBase(definition.config, alliance)?.position.clone() ?? new THREE.Vector3(0, 0, -50);
 }
 
-function resolveModeSpawnPosition(config: ReturnType<typeof getGameModeConfig>): THREE.Vector3 {
-  if (config.id === GameMode.A_SHAU_VALLEY) {
-    const insertion = resolveAShauInsertion(config);
-    if (insertion) {
-      return insertion;
-    }
+function normalizeLaunchSelection(
+  modeOrSelection: GameMode | GameLaunchSelection
+): GameLaunchSelection {
+  if (typeof modeOrSelection === 'string') {
+    const definition = getGameModeDefinition(modeOrSelection);
+    const resolved = resolveLaunchSelection(definition);
+    return {
+      mode: modeOrSelection,
+      alliance: resolved.alliance,
+      faction: resolved.faction,
+    };
   }
-  return getPrimaryUSBase(config)?.position.clone() ?? new THREE.Vector3(0, 0, -50);
+
+  const definition = getGameModeDefinition(modeOrSelection.mode);
+  const resolved = resolveLaunchSelection(definition, modeOrSelection);
+  return {
+    mode: modeOrSelection.mode,
+    alliance: resolved.alliance,
+    faction: resolved.faction,
+  };
+}
+
+function applyLaunchSelection(engine: GameEngine, definition: GameModeDefinition, selection: GameLaunchSelection): void {
+  engine.systemManager.loadoutService.setContextFromDefinition(
+    definition,
+    selection.alliance,
+    selection.faction
+  );
+  engine.systemManager.playerController.setPlayerFaction(selection.faction);
+  engine.systemManager.playerHealthSystem.setPlayerFaction(selection.faction);
+  engine.systemManager.firstPersonWeapon.setPlayerFaction(selection.faction);
+  engine.systemManager.combatantSystem.setPlayerFaction(selection.faction);
+  engine.systemManager.zoneManager.setPlayerAlliance(selection.alliance);
 }
 
 /**
@@ -125,147 +151,198 @@ export function restartMatch(engine: GameEngine): void {
 /**
  * Sets game mode and prepares for game start
  */
-export async function startGameWithMode(engine: GameEngine, mode: GameMode): Promise<void> {
-  if (!engine.isInitialized || engine.gameStarted) return;
-  markStartup(`engine-init.start-game.${mode}.begin`);
-  Logger.info('engine-init', `Starting game with mode: ${mode}`);
+export async function startGameWithMode(
+  engine: GameEngine,
+  modeOrSelection: GameMode | GameLaunchSelection
+): Promise<void> {
+  const launchSelection = normalizeLaunchSelection(modeOrSelection);
+  const mode = launchSelection.mode;
+  if (!engine.isInitialized || engine.gameStarted || engine.gameStartPending) return;
+  engine.gameStartPending = true;
 
-  if (shouldUseTouchControls()) {
-    tryLockLandscapeOrientation();
-  }
+  try {
+    markStartup(`engine-init.start-game.${mode}.begin`);
+    Logger.info('engine-init', `Starting game with mode: ${mode}`);
+    engine.loadingScreen.beginGameLaunch(launchSelection);
 
-  engine.gameStarted = true;
+    if (shouldUseTouchControls()) {
+      tryLockLandscapeOrientation();
+    }
 
-  // Configure terrain height source for this mode
-  const config = getGameModeConfig(mode);
-  if (config.heightSource?.type === 'dem') {
-    // DEM mode - load real terrain data (A Shau Valley, future Vietnam theaters)
-    markStartup(`engine-init.start-game.${mode}.dem-load.begin`);
-    Logger.info('engine-init', `Loading DEM terrain from ${config.heightSource.path}...`);
-    try {
-      const response = await fetch(config.heightSource.path);
-      if (!response.ok) throw new Error(`DEM fetch failed: ${response.status}`);
-      const buffer = await response.arrayBuffer();
-      const demProvider = new DEMHeightProvider(
-        new Float32Array(buffer),
-        config.heightSource.width,
-        config.heightSource.height,
-        config.heightSource.metersPerPixel
-      );
+    // Configure terrain height source for this mode
+    const definition = getGameModeDefinition(mode);
+    const config = getGameModeConfig(mode);
+    if (config.heightSource?.type === 'dem') {
+      // DEM mode - load real terrain data (A Shau Valley, future Vietnam theaters)
+      markStartup(`engine-init.start-game.${mode}.dem-load.begin`);
+      Logger.info('engine-init', `Loading DEM terrain from ${config.heightSource.path}...`);
+      try {
+        const response = await fetch(config.heightSource.path);
+        if (!response.ok) throw new Error(`DEM fetch failed: ${response.status}`);
+        const buffer = await response.arrayBuffer();
+        const demProvider = new DEMHeightProvider(
+          new Float32Array(buffer),
+          config.heightSource.width,
+          config.heightSource.height,
+          config.heightSource.metersPerPixel
+        );
 
-      // Update global height query cache to use DEM
-      const heightCache = getHeightQueryCache();
-      heightCache.setProvider(demProvider);
+        // Update global height query cache to use DEM
+        const heightCache = getHeightQueryCache();
+        heightCache.setProvider(demProvider);
 
-      // Send DEM data to chunk worker pool
-      const workerPool = engine.systemManager.terrainSystem.getWorkerPool?.();
-      if (workerPool) {
-        workerPool.sendHeightProvider(demProvider.getWorkerConfig());
+        // Send DEM data to chunk worker pool
+        const workerPool = engine.systemManager.terrainSystem.getWorkerPool?.();
+        if (workerPool) {
+          workerPool.sendHeightProvider(demProvider.getWorkerConfig());
+        }
+
+        Logger.info('engine-init', `DEM loaded: ${config.heightSource.width}x${config.heightSource.height}, ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB`);
+      } catch (error) {
+        Logger.error('engine-init', 'Failed to load DEM terrain:', error);
+        // Fall back to procedural noise - don't block the game
       }
+      markStartup(`engine-init.start-game.${mode}.dem-load.end`);
 
-      Logger.info('engine-init', `DEM loaded: ${config.heightSource.width}x${config.heightSource.height}, ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB`);
-    } catch (error) {
-      Logger.error('engine-init', 'Failed to load DEM terrain:', error);
-      // Fall back to procedural noise - don't block the game
+    } else {
+      // Procedural noise mode - resolve seed for terrain variety
+      const seedConfig = config.terrainSeed;
+      const seed = seedConfig === 'random' || seedConfig === undefined
+        ? Math.floor(Math.random() * 2147483647)
+        : seedConfig;
+
+      const noiseProvider = new NoiseHeightProvider(seed);
+      const heightCache = getHeightQueryCache();
+      heightCache.setProvider(noiseProvider);
+
+      Logger.info('engine-init', `Procedural terrain seed: ${seed}`);
     }
-    markStartup(`engine-init.start-game.${mode}.dem-load.end`);
 
-  } else {
-    // Procedural noise mode - resolve seed for terrain variety
-    const seedConfig = config.terrainSeed;
-    const seed = seedConfig === 'random' || seedConfig === undefined
-      ? Math.floor(Math.random() * 2147483647)
-      : seedConfig;
-
-    const noiseProvider = new NoiseHeightProvider(seed);
-    const heightCache = getHeightQueryCache();
-    heightCache.setProvider(noiseProvider);
-
-    Logger.info('engine-init', `Procedural terrain seed: ${seed}`);
-  }
-
-  // Configure renderer for mode-specific settings
-  if (config.cameraFar || config.fogDensity || config.shadowFar) {
-    engine.renderer.configureForWorldSize({
-      cameraFar: config.cameraFar,
-      fogDensity: config.fogDensity,
-      shadowFar: config.shadowFar
-    });
-  }
-
-  const terrainSystem = engine.systemManager.terrainSystem;
-  const previousWorldSize = terrainSystem.getPlayableWorldSize();
-  const targetWorldSize = config.worldSize ?? previousWorldSize;
-  const worldSizeChanged = targetWorldSize !== previousWorldSize;
-
-  if (config.worldSize) {
-    terrainSystem.setWorldSize(config.worldSize);
-    engine.systemManager.playerController.setWorldSize(config.worldSize);
-  }
-  terrainSystem.setVisualMargin(config.visualMargin ?? 200);
-
-  // Reconfigure chunk size if mode specifies a different value
-  if (config.chunkSize && config.chunkSize !== terrainSystem.getChunkSize()) {
-    terrainSystem.setChunkSize(config.chunkSize);
-  }
-
-  // Update render distance if mode specifies it
-  if (config.chunkRenderDistance) {
-    terrainSystem.setRenderDistance(config.chunkRenderDistance);
-  }
-
-  // Re-bake heightmap with the new provider (seed or DEM) if world size
-  // didn't change (reconfigureWorld handles the case where it did).
-  if (!worldSizeChanged) {
-    terrainSystem.rebakeHeightmap();
-  }
-
-  const defaultBiome = config.terrain?.defaultBiome ?? 'denseJungle';
-  terrainSystem.setBiomeConfig(defaultBiome, config.terrain?.biomeRules);
-
-  engine.systemManager.setGameMode(mode, { createPlayerSquad: mode !== GameMode.AI_SANDBOX });
-
-  // Load persisted war state if available (A Shau Valley mode)
-  if (config.warSimulator?.enabled && engine.systemManager.warSimulator.isEnabled()) {
-    const persistence = new PersistenceSystem();
-    const existingSave = persistence.getAutoSave(mode);
-    if (existingSave) {
-      Logger.info('engine-init', `Restoring war state: ${existingSave.agents.length} agents, ${existingSave.elapsedTime.toFixed(0)}s elapsed`);
-      engine.systemManager.warSimulator.loadWarState(existingSave);
+    // Configure renderer for mode-specific settings
+    if (config.cameraFar || config.fogDensity || config.shadowFar) {
+      engine.renderer.configureForWorldSize({
+        cameraFar: config.cameraFar,
+        fogDensity: config.fogDensity,
+        shadowFar: config.shadowFar
+      });
     }
+
+    const terrainSystem = engine.systemManager.terrainSystem;
+    const previousWorldSize = terrainSystem.getPlayableWorldSize();
+    const targetWorldSize = config.worldSize ?? previousWorldSize;
+    const worldSizeChanged = targetWorldSize !== previousWorldSize;
+
+    if (config.worldSize) {
+      terrainSystem.setWorldSize(config.worldSize);
+      engine.systemManager.playerController.setWorldSize(config.worldSize);
+    }
+    terrainSystem.setVisualMargin(config.visualMargin ?? 200);
+
+    // Reconfigure chunk size if mode specifies a different value
+    if (config.chunkSize && config.chunkSize !== terrainSystem.getChunkSize()) {
+      terrainSystem.setChunkSize(config.chunkSize);
+    }
+
+    // Update render distance if mode specifies it
+    if (config.chunkRenderDistance) {
+      terrainSystem.setRenderDistance(config.chunkRenderDistance);
+    }
+
+    // Re-bake heightmap with the new provider (seed or DEM) if world size
+    // didn't change (reconfigureWorld handles the case where it did).
+    if (!worldSizeChanged) {
+      terrainSystem.rebakeHeightmap();
+    }
+
+    const defaultBiome = config.terrain?.defaultBiome ?? 'denseJungle';
+    terrainSystem.setBiomeConfig(defaultBiome, config.terrain?.biomeRules);
+
+    engine.systemManager.setGameMode(mode, { createPlayerSquad: mode !== GameMode.AI_SANDBOX });
+    applyLaunchSelection(engine, definition, launchSelection);
+
+    // Load persisted war state if available (A Shau Valley mode)
+    if (config.warSimulator?.enabled && engine.systemManager.warSimulator.isEnabled()) {
+      const persistence = new PersistenceSystem();
+      const existingSave = persistence.getAutoSave(mode);
+      if (existingSave) {
+        Logger.info('engine-init', `Restoring war state: ${existingSave.agents.length} agents, ${existingSave.elapsedTime.toFixed(0)}s elapsed`);
+        engine.systemManager.warSimulator.loadWarState(existingSave);
+      }
+    }
+
+    const initialDeployPosition = await resolveInitialDeployPosition(engine, definition, launchSelection);
+
+    // Pre-generate around the player's actual chosen insertion point rather than
+    // a guessed default so startup work matches the selected route.
+    const spawnPos = initialDeployPosition.clone();
+    spawnPos.y = 5;
+    await engine.systemManager.preGenerateSpawnArea(spawnPos);
+    markStartup(`engine-init.start-game.${mode}.post-pre-generate`);
+
+    applyConfiguredLoadout(engine);
+    startGame(engine, initialDeployPosition);
+    markStartup(`engine-init.start-game.${mode}.end`);
+  } catch (error) {
+    if (error instanceof InitialDeployCancelledError) {
+      engine.gameStartPending = false;
+      engine.gameStarted = false;
+      engine.loadingScreen.showMainMenu();
+      Logger.info('engine-init', 'Initial deploy cancelled; returned to mode selection');
+      return;
+    }
+
+    engine.gameStartPending = false;
+    engine.gameStarted = false;
+    engine.loadingScreen.cancelGameLaunch();
+    Logger.error('engine-init', 'Failed to start game mode:', error);
+    const errorMessage = error instanceof Error
+      ? error.message
+      : 'An unexpected error occurred while preparing the selected mode.';
+    engine.loadingScreen.showError('Mode Startup Failed', errorMessage);
   }
-
-  // Pre-generate chunks at actual spawn position for this mode
-  const spawnPos = resolveModeSpawnPosition(config);
-  spawnPos.y = 5;
-  await engine.systemManager.preGenerateSpawnArea(spawnPos);
-  markStartup(`engine-init.start-game.${mode}.post-pre-generate`);
-
-  // Skip loadout selector - all weapons available via hotbar, default frag grenades
-  applyDefaultLoadout(engine);
-  startGame(engine);
-  markStartup(`engine-init.start-game.${mode}.end`);
 }
 
-/**
- * Apply default loadout (rifle + frag) for sandbox mode
- */
-function applyDefaultLoadout(engine: GameEngine): void {
-  engine.systemManager.firstPersonWeapon.setPrimaryWeapon('rifle');
-  engine.systemManager.grenadeSystem.setGrenadeType(GrenadeType.FRAG);
-  Logger.info('engine-init', 'Default loadout applied (rifle + frag)');
+async function resolveInitialDeployPosition(
+  engine: GameEngine,
+  definition: GameModeDefinition,
+  launchSelection: GameLaunchSelection
+): Promise<THREE.Vector3> {
+  if (engine.sandboxEnabled && engine.sandboxConfig?.autoStart) {
+    return resolveModeSpawnPosition(definition, launchSelection.alliance);
+  }
+
+  try {
+    return await engine.systemManager.playerRespawnManager.beginInitialDeploy();
+  } catch (error) {
+    if (error instanceof InitialDeployCancelledError) {
+      throw error;
+    }
+    Logger.warn('engine-init', 'Initial deploy flow unavailable, using mode spawn fallback', error);
+    return resolveModeSpawnPosition(definition, launchSelection.alliance);
+  }
+}
+
+function applyConfiguredLoadout(engine: GameEngine): void {
+  engine.systemManager.loadoutService.applyToRuntime({
+    inventoryManager: engine.systemManager.inventoryManager,
+    firstPersonWeapon: engine.systemManager.firstPersonWeapon,
+    grenadeSystem: engine.systemManager.grenadeSystem
+  });
+  Logger.info('engine-init', 'Configured deploy loadout applied');
 }
 
 /**
  * Main game start logic, pointer lock, shader compilation, and spawn positioning
  */
-export function startGame(engine: GameEngine): void {
-  if (!engine.gameStarted) return;
+export function startGame(engine: GameEngine, initialSpawnPosition?: THREE.Vector3): void {
+  if (engine.gameStarted) return;
+  engine.gameStarted = true;
+  engine.gameStartPending = false;
   if (engine.sandboxEnabled) {
     engine.systemManager.playerController.setPointerLockEnabled(false);
   }
 
-  void runStartupFlow(engine);
+  void runStartupFlow(engine, initialSpawnPosition);
 
   engine.renderer.showCrosshair();
   if (!engine.sandboxEnabled) showWelcomeMessage(engine);
@@ -282,7 +359,7 @@ export function startGame(engine: GameEngine): void {
   );
 }
 
-async function runStartupFlow(engine: GameEngine): Promise<void> {
+async function runStartupFlow(engine: GameEngine, initialSpawnPosition?: THREE.Vector3): Promise<void> {
   markStartup('engine-init.startup-flow.begin');
   const startTime = performance.now();
   const markPhase = (phase: string, status?: string, detail?: string) => {
@@ -299,17 +376,15 @@ async function runStartupFlow(engine: GameEngine): Promise<void> {
 
   markPhase('position-player', 'SYNCING INSERTION POINT', 'Validating terrain height and spawn safety...');
   try {
-    const cfg = engine.systemManager.gameModeManager.getCurrentConfig();
+    const definition = engine.systemManager.gameModeManager.getCurrentDefinition();
+    const loadoutContext = engine.systemManager.loadoutService.getContext();
     const terrainSystem = engine.systemManager.terrainSystem;
-    if (cfg.id === GameMode.AI_SANDBOX) {
-      const pos = new THREE.Vector3(0, 0, 0);
-      pos.y = terrainSystem.getHeightAt(pos.x, pos.z) + 2;
-      engine.systemManager.playerController.setPosition(pos, 'startup.spawn.sandbox');
-    } else {
-      const pos = resolveModeSpawnPosition(cfg);
-      pos.y = terrainSystem.getHeightAt(pos.x, pos.z) + 2;
-      engine.systemManager.playerController.setPosition(pos, 'startup.spawn.mode-hq');
-    }
+    const pos = initialSpawnPosition?.clone() ?? resolveModeSpawnPosition(definition, loadoutContext.alliance);
+    pos.y = terrainSystem.getHeightAt(pos.x, pos.z) + 2;
+    const reason = definition.policies.respawn.initialSpawnRule === 'origin'
+      ? 'startup.spawn.sandbox'
+      : 'startup.spawn.mode-hq';
+    engine.systemManager.playerController.setPosition(pos, reason);
   } catch {
     // Keep startup resilient; spawn fallback already exists elsewhere.
   }

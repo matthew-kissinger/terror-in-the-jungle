@@ -43,8 +43,8 @@ const createMockCanvasContext = () => {
   }
   
   sharedMockCanvasContext = {
-    fillStyle: '',
-    strokeStyle: '',
+    fillStyles: [] as string[],
+    strokeStyles: [] as string[],
     lineWidth: 1,
     font: '',
     textAlign: 'start' as CanvasTextAlign,
@@ -69,6 +69,26 @@ const createMockCanvasContext = () => {
       addColorStop: vi.fn(),
     })),
   };
+
+  let fillStyleValue = '';
+  Object.defineProperty(sharedMockCanvasContext, 'fillStyle', {
+    get: () => fillStyleValue,
+    set: (value: string) => {
+      fillStyleValue = value;
+      sharedMockCanvasContext.fillStyles.push(value);
+    },
+    configurable: true,
+  });
+
+  let strokeStyleValue = '';
+  Object.defineProperty(sharedMockCanvasContext, 'strokeStyle', {
+    get: () => strokeStyleValue,
+    set: (value: string) => {
+      strokeStyleValue = value;
+      sharedMockCanvasContext.strokeStyles.push(value);
+    },
+    configurable: true,
+  });
   
   return sharedMockCanvasContext;
 };
@@ -421,6 +441,28 @@ describe('FullMapSystem', () => {
       expect(mockCanvasContext.fill).toHaveBeenCalled();
     });
 
+    it('should draw the command marker when a command position is set', () => {
+      mockCanvasContext = sharedMockCanvasContext;
+      system.setCommandPosition(new THREE.Vector3(50, 0, -40));
+
+      (system as any).render();
+
+      expect(mockCanvasContext.moveTo).toHaveBeenCalled();
+      expect(mockCanvasContext.lineTo).toHaveBeenCalled();
+      expect(mockCanvasContext.arc).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        9,
+        0,
+        Math.PI * 2
+      );
+      expect(mockCanvasContext.fillText).toHaveBeenCalledWith(
+        '64m',
+        expect.any(Number),
+        expect.any(Number)
+      );
+    });
+
     it('should draw player marker', () => {
       mockCanvasContext = sharedMockCanvasContext;
       (system as any).render();
@@ -440,6 +482,17 @@ describe('FullMapSystem', () => {
       // Should only draw player, not the dead combatant
       const arcCalls = mockCanvasContext.arc.mock.calls;
       expect(arcCalls.length).toBeGreaterThan(0);
+    });
+
+    it('should support player squad highlighting on the full map', () => {
+      mockCanvasContext = sharedMockCanvasContext;
+      const testCombatant = createTestCombatant({ squadId: 'squad-player' });
+      system.setPlayerSquadId('squad-player');
+      mockCombatantSystem.getAllCombatants = vi.fn(() => [testCombatant]);
+
+      (system as any).render();
+
+      expect(mockCanvasContext.fillStyles).toContain('rgba(92, 184, 92, 0.92)');
     });
   });
 

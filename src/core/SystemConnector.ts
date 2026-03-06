@@ -70,6 +70,11 @@ export class SystemConnector {
     refs.minimapSystem.mountTo(layout.getSlot('minimap'));
     refs.playerHealthSystem.mountUI(layout.getSlot('health'));
     refs.playerSquadController.mountIndicatorTo(layout.getSlot('stats'));
+    refs.commandInputManager.mountTo(layout);
+    refs.commandInputManager.setZoneManager(refs.zoneManager);
+    refs.commandInputManager.setCombatantSystem(refs.combatantSystem);
+    refs.commandInputManager.setGameModeManager(refs.gameModeManager);
+    refs.commandInputManager.setPlayerController(refs.playerController);
     refs.zoneManager.setCombatantSystem(refs.combatantSystem);
     refs.zoneManager.setCamera(camera);
     refs.zoneManager.setTerrainSystem(refs.terrainSystem);
@@ -88,6 +93,8 @@ export class SystemConnector {
     refs.playerRespawnManager.setPlayerController(refs.playerController);
     refs.playerRespawnManager.setFirstPersonWeapon(refs.firstPersonWeapon);
     refs.playerRespawnManager.setInventoryManager(refs.inventoryManager);
+    refs.playerRespawnManager.setLoadoutService(refs.loadoutService);
+    refs.playerRespawnManager.setGrenadeSystem(refs.grenadeSystem);
     refs.playerRespawnManager.setWarSimulator(refs.warSimulator);
     refs.playerRespawnManager.setTerrainSystem(refs.terrainSystem);
 
@@ -165,6 +172,15 @@ export class SystemConnector {
     refs.playerController.setMortarSystem(refs.mortarSystem);
     refs.playerController.setSandbagSystem(refs.sandbagSystem);
     refs.playerController.setPlayerSquadController(refs.playerSquadController);
+    refs.playerController.setCommandInputManager(refs.commandInputManager);
+
+    refs.inventoryManager.setLoadout(refs.loadoutService.getCurrentLoadout());
+    const loadoutContext = refs.loadoutService.getContext();
+    refs.playerController.setPlayerFaction(loadoutContext.faction);
+    refs.playerHealthSystem.setPlayerFaction(loadoutContext.faction);
+    refs.firstPersonWeapon.setPlayerFaction(loadoutContext.faction);
+    refs.combatantSystem.setPlayerFaction(loadoutContext.faction);
+    refs.zoneManager.setPlayerAlliance(loadoutContext.alliance);
 
     // Connect combat systems with sandbag system via typed interface
     const combatantCombat = refs.combatantSystem.combatantCombat;

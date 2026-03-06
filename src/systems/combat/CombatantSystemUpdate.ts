@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState } from './types';
+import { Combatant, CombatantState, Faction } from './types';
 import { CombatantFactory } from './CombatantFactory';
 import { SquadManager } from './SquadManager';
 import { spatialGridManager } from './SpatialGridManager';
@@ -12,6 +12,7 @@ import { ZoneManager } from '../world/ZoneManager';
 export class CombatantSystemUpdate {
   private readonly SQUAD_OBJECTIVE_REASSIGN_INTERVAL = 10; // seconds
   private squadObjectiveTimer = 0;
+  private playerFaction: Faction = Faction.US;
 
   constructor(
     private combatants: Map<string, Combatant>,
@@ -71,8 +72,8 @@ export class CombatantSystemUpdate {
    */
   ensurePlayerProxy(): void {
     let proxy = this.combatants.get(this.playerProxyId);
-    if (!proxy) {
-      proxy = this.combatantFactory.createPlayerProxy(this.playerPosition);
+    if (!proxy || proxy.faction !== this.playerFaction) {
+      proxy = this.combatantFactory.createPlayerProxyForFaction(this.playerPosition, this.playerFaction);
       this.combatants.set(this.playerProxyId, proxy);
       spatialGridManager.syncEntity(this.playerProxyId, this.playerPosition);
     } else {
@@ -84,5 +85,9 @@ export class CombatantSystemUpdate {
 
   setZoneManager(zoneManager: ZoneManager): void {
     this.zoneManager = zoneManager;
+  }
+
+  setPlayerFaction(faction: Faction): void {
+    this.playerFaction = faction;
   }
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as THREE from 'three'
 import { WeaponRigManager } from './WeaponRigManager'
+import { Faction } from '../../combat/types'
 
 // Mock Logger
 vi.mock('../../../utils/Logger', () => ({
@@ -109,6 +110,7 @@ vi.mock('../../assets/ModelLoader', () => {
 vi.mock('../../assets/modelPaths', () => ({
   WeaponModels: {
     M16A1: 'weapons/m16a1.glb',
+    AK47: 'weapons/ak47.glb',
     ITHACA37: 'weapons/ithaca37.glb',
     M3_GREASE_GUN: 'weapons/m3-grease-gun.glb',
     M1911: 'weapons/m1911.glb',
@@ -168,8 +170,8 @@ describe('WeaponRigManager', () => {
     it('adds all weapon rigs to scene', async () => {
       await manager.init()
 
-      // Scene.add should be called 4 times (rifle, shotgun, SMG, pistol)
-      expect(scene.add).toHaveBeenCalledTimes(4)
+      // Scene.add should be called 5 times (M16, AK, shotgun, SMG, pistol)
+      expect(scene.add).toHaveBeenCalledTimes(5)
     })
 
     it('sets rifle visible and others hidden initially', async () => {
@@ -608,6 +610,20 @@ describe('WeaponRigManager', () => {
       newManager.setWeaponVisibility(false)
       // Should not throw
       expect(newManager.getCurrentRig()).toBeUndefined()
+    })
+  })
+
+  describe('setRifleFaction', () => {
+    beforeEach(async () => {
+      await manager.init()
+    })
+
+    it('switches the active rifle rig to AK for OPFOR factions', () => {
+      manager.setRifleFaction(Faction.NVA)
+
+      const rig = manager.getCurrentRig()
+      expect(rig?.visible).toBe(true)
+      expect(manager.getCurrentCore()).toBe(manager.getRifleCore())
     })
   })
 

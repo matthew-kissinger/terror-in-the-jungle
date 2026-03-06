@@ -9,7 +9,8 @@
  */
 
 import { UIComponent } from '../engine/UIComponent';
-import { GameMode } from '../../config/gameModeTypes';
+import { GameLaunchSelection, GameMode } from '../../config/gameModeTypes';
+import { Alliance, Faction } from '../../systems/combat/types';
 import { isTouchDevice } from '../../utils/DeviceDetector';
 import { isPortraitViewport, tryLockLandscapeOrientation } from '../../utils/Orientation';
 import { SettingsModal } from './SettingsModal';
@@ -17,6 +18,13 @@ import { HowToPlayModal } from './HowToPlayModal';
 import { LoadingProgress } from './LoadingProgress';
 import { LOADING_PHASES } from '../../config/loading';
 import { MODE_CARD_CONFIGS } from './ModeCard';
+import {
+  getFactionOptionsForAlliance,
+  getGameModeDefinition,
+  getPlayableAlliances,
+  resolveLaunchSelection
+} from '../../config/gameModeDefinitions';
+import { createDeploySession } from '../../systems/world/runtime/DeployFlowSession';
 import styles from './StartScreen.module.css';
 
 const SCREEN_ASSET_BASE_URL = import.meta.env.BASE_URL;
@@ -33,9 +41,10 @@ export class StartScreen extends UIComponent {
 
   private isVisible = true;
   private selectedGameMode: GameMode = GameMode.ZONE_CONTROL;
-  private onPlayCallback?: (mode: GameMode) => void;
+  private onPlayCallback?: (selection: GameLaunchSelection) => void;
   private initTimeoutId: number | null = null;
   private isInitialized = false;
+  private readonly launchSelections = new Map<GameMode, Pick<GameLaunchSelection, 'alliance' | 'faction'>>();
 
   // Fullscreen prompt state
   private fullscreenPrompt: HTMLDivElement | null = null;
@@ -47,6 +56,8 @@ export class StartScreen extends UIComponent {
   private menuGamepadRafId: number | null = null;
   private prevGamepadButtons = { a: false, dpadLeft: false, dpadRight: false };
   private quickStartHintText = '';
+  private isLaunching = false;
+  private launchMode: GameMode | null = null;
   private readonly modeOrder: GameMode[] = [
     GameMode.ZONE_CONTROL,
     GameMode.OPEN_FRONTIER,
@@ -92,7 +103,29 @@ export class StartScreen extends UIComponent {
         <div class="${styles.modeSelection}" data-ref="modeSection">
           <div class="${styles.modeCards}">${modeCardsHTML}</div>
           <div class="${styles.selectedModeDisplay}" data-ref="modeDisplay">
-            Selected: <strong>ZONE CONTROL</strong>
+            <div class="${styles.selectedModeHeader}">
+              <span class="${styles.selectedModeLabel}">
+                Selected: <strong data-ref="modeName">ZONE CONTROL</strong>
+              </span>
+              <span class="${styles.modeStatusBadge}" data-ref="modeStatus">Ready</span>
+            </div>
+            <div class="${styles.selectedModeFlow}" data-ref="flowSummary"></div>
+            <div class="${styles.selectionMatrix}">
+              <div class="${styles.selectionGroup}">
+                <div class="${styles.selectionGroupLabel}">Side</div>
+                <div class="${styles.selectionOptionRow}" data-ref="allianceOptions"></div>
+              </div>
+              <div class="${styles.selectionGroup}">
+                <div class="${styles.selectionGroupLabel}">Faction</div>
+                <div class="${styles.selectionOptionRow}" data-ref="factionOptions"></div>
+              </div>
+              <div class="${styles.selectionSummary}" data-ref="selectionSummary"></div>
+            </div>
+            <div class="${styles.selectedModeDescription}" data-ref="modeDescription"></div>
+            <div class="${styles.selectedModeSequenceBlock}">
+              <div class="${styles.selectedModeSequenceTitle}" data-ref="sequenceTitle"></div>
+              <ol class="${styles.selectedModeSequence}" data-ref="sequenceList"></ol>
+            </div>
           </div>
         </div>
 
@@ -144,6 +177,12 @@ export class StartScreen extends UIComponent {
       this.listen(card, 'click', (e) => e.preventDefault());
     }
 
+    const modeDisplay = this.$('[data-ref="modeDisplay"]');
+    if (modeDisplay) {
+      this.listen(modeDisplay, 'pointerdown', this.handleSelectionPointerDown);
+      this.listen(modeDisplay, 'click', this.handleSelectionPointerDown);
+    }
+
     // Button listeners
     const playBtn = this.$('[data-ref="play"]');
     if (playBtn) {
@@ -165,6 +204,7 @@ export class StartScreen extends UIComponent {
 
     this.listen(window, 'keydown', this.handleMenuKeyDown);
     this.startMenuGamepadLoop();
+    this.selectGameMode(this.selectedGameMode);
 
     // Start init timeout
     this.startInitTimeout();
@@ -188,6 +228,8 @@ export class StartScreen extends UIComponent {
 
   showMainMenu(): void {
     this.markInitialized();
+    this.cancelGameLaunch();
+    this.root.style.backgroundImage = `url("${START_SCREEN_IMAGE_URL}")`;
 
     const buttons = this.$('[data-ref="menuButtons"]');
     if (buttons) buttons.classList.add(styles.menuButtonsVisible);
@@ -201,6 +243,34 @@ export class StartScreen extends UIComponent {
     if (isTouchDevice()) this.showFullscreenPrompt();
   }
 
+  beginGameLaunch(selection: GameLaunchSelection): void {
+    this.isLaunching = true;
+    this.launchMode = selection.mode;
+    this.selectedGameMode = selection.mode;
+    this.launchSelections.set(selection.mode, {
+      alliance: selection.alliance,
+      faction: selection.faction,
+    });
+    this.root.classList.add(styles.menuLocked, styles.screenPreparing);
+    this.root.style.backgroundImage = `url("${LOADING_SCREEN_IMAGE_URL}")`;
+    this.setMenuButtonsEnabled(false);
+
+    const definition = getGameModeDefinition(selection.mode);
+    this.progress.setStatusText(`Preparing ${definition.config.name} deployment...`);
+    this.progress.setTipText('Deployment screen opens next. Confirm insertion and loadout before entering combat.');
+    this.selectGameMode(selection.mode);
+    this.updateQuickStartHint();
+  }
+
+  cancelGameLaunch(): void {
+    this.isLaunching = false;
+    this.launchMode = null;
+    this.root.classList.remove(styles.menuLocked, styles.screenPreparing);
+    this.root.style.backgroundImage = `url("${START_SCREEN_IMAGE_URL}")`;
+    this.setMenuButtonsEnabled(true);
+    this.selectGameMode(this.selectedGameMode);
+  }
+
   hide(): void {
     this.markInitialized();
     this.root.classList.add(styles.hidden);
@@ -212,7 +282,7 @@ export class StartScreen extends UIComponent {
     this.isVisible = true;
   }
 
-  onPlay(callback: (mode: GameMode) => void): void {
+  onPlay(callback: (selection: GameLaunchSelection) => void): void {
     this.onPlayCallback = callback;
   }
 
@@ -225,6 +295,7 @@ export class StartScreen extends UIComponent {
   }
 
   showError(title: string, message: string): void {
+    this.cancelGameLaunch();
     if (this.errorPanel) this.errorPanel.remove();
     this.clearInitTimeout();
 
@@ -296,6 +367,7 @@ export class StartScreen extends UIComponent {
   // --- Private ---
 
   private handlePlayClick = () => {
+    if (this.isLaunching) return;
     if (isTouchDevice() && !document.fullscreenElement) {
       const el = document.documentElement;
       if (el.requestFullscreen) {
@@ -305,11 +377,12 @@ export class StartScreen extends UIComponent {
       }
     }
     this.dismissFullscreenPrompt();
-    if (this.onPlayCallback) this.onPlayCallback(this.selectedGameMode);
+    if (this.onPlayCallback) this.onPlayCallback(this.getLaunchSelection(this.selectedGameMode));
   };
 
   private handleMenuKeyDown = (event: KeyboardEvent): void => {
     if (!this.isMenuInteractive()) return;
+    if (this.hasFocusedMenuControl()) return;
     if (event.code === 'Enter' || event.code === 'Space') {
       event.preventDefault();
       this.handlePlayClick();
@@ -338,23 +411,84 @@ export class StartScreen extends UIComponent {
 
   private selectGameMode(mode: GameMode): void {
     this.selectedGameMode = mode;
+    const definition = getGameModeDefinition(mode);
+    const deploySession = createDeploySession(definition, 'menu');
+    const launchSelection = this.getLaunchSelection(mode);
+    const isPreparing = this.isLaunching && this.launchMode === mode;
 
     for (const card of this.modeCards) {
       const isSelected = this.resolveGameMode(card.dataset.mode || '') === mode;
       card.classList.toggle(styles.modeCardSelected, isSelected);
     }
 
-    const modeName =
-      mode === GameMode.ZONE_CONTROL ? 'ZONE CONTROL'
-      : mode === GameMode.OPEN_FRONTIER ? 'OPEN FRONTIER'
-      : mode === GameMode.A_SHAU_VALLEY ? 'A SHAU VALLEY'
-      : 'TEAM DEATHMATCH';
+    const modeName = definition.config.name.toUpperCase();
+    const modeNameEl = this.$('[data-ref="modeName"]');
+    if (modeNameEl) modeNameEl.textContent = modeName;
 
-    const display = this.$('[data-ref="modeDisplay"]');
-    if (display) display.innerHTML = `Selected: <strong>${modeName}</strong>`;
+    const flowSummary = this.$('[data-ref="flowSummary"]');
+    if (flowSummary) {
+      flowSummary.textContent = `${deploySession.flowLabel} - ${deploySession.subheadline}`;
+    }
+
+    const allianceOptions = this.$('[data-ref="allianceOptions"]');
+    if (allianceOptions) {
+      const playableAlliances = getPlayableAlliances(definition);
+      allianceOptions.innerHTML = playableAlliances.map(alliance => `
+        <button
+          type="button"
+          class="${styles.selectionOption}${launchSelection.alliance === alliance ? ` ${styles.selectionOptionActive}` : ''}"
+          data-alliance="${alliance}"
+          ${this.isLaunching ? 'disabled' : ''}
+        >${this.getAllianceLabel(alliance)}</button>
+      `).join('');
+    }
+
+    const factionOptions = this.$('[data-ref="factionOptions"]');
+    if (factionOptions) {
+      const availableFactions = getFactionOptionsForAlliance(definition, launchSelection.alliance);
+      factionOptions.innerHTML = availableFactions.map(faction => `
+        <button
+          type="button"
+          class="${styles.selectionOption}${launchSelection.faction === faction ? ` ${styles.selectionOptionActive}` : ''}"
+          data-faction="${faction}"
+          ${this.isLaunching ? 'disabled' : ''}
+        >${this.getFactionLabel(faction)}</button>
+      `).join('');
+    }
+
+    const selectionSummary = this.$('[data-ref="selectionSummary"]');
+    if (selectionSummary) {
+      selectionSummary.textContent = `Operating as ${this.getFactionLabel(launchSelection.faction)} on the ${this.getAllianceLabel(launchSelection.alliance)} side.`;
+    }
+
+    const modeDescription = this.$('[data-ref="modeDescription"]');
+    if (modeDescription) {
+      modeDescription.textContent = definition.config.description;
+    }
+
+    const sequenceTitle = this.$('[data-ref="sequenceTitle"]');
+    if (sequenceTitle) {
+      sequenceTitle.textContent = deploySession.sequenceTitle;
+    }
+
+    const sequenceList = this.$('[data-ref="sequenceList"]');
+    if (sequenceList) {
+      sequenceList.innerHTML = deploySession.sequenceSteps.map(step => `<li>${step}</li>`).join('');
+    }
+
+    const modeStatus = this.$('[data-ref="modeStatus"]');
+    if (modeStatus) {
+      modeStatus.textContent = isPreparing ? 'Preparing' : 'Ready';
+      modeStatus.classList.toggle(styles.modeStatusPreparing, isPreparing);
+      modeStatus.classList.toggle(styles.modeStatusReady, !isPreparing);
+    }
 
     const playBtn = this.$('[data-ref="play"]');
-    if (playBtn) playBtn.textContent = `DEPLOY -- ${modeName}`;
+    if (playBtn) {
+      playBtn.textContent = isPreparing
+        ? `${this.getPreparingActionLabel(deploySession.flow)} ${this.getFactionLabel(launchSelection.faction)} -- ${modeName}`
+        : `${deploySession.actionLabel} ${this.getFactionLabel(launchSelection.faction)} -- ${modeName}`;
+    }
   }
 
   private cycleGameMode(direction: 1 | -1): void {
@@ -447,7 +581,7 @@ export class StartScreen extends UIComponent {
 
   private isMenuInteractive(): boolean {
     const buttons = this.$('[data-ref="menuButtons"]');
-    return !!buttons && buttons.classList.contains(styles.menuButtonsVisible);
+    return !this.isLaunching && !!buttons && buttons.classList.contains(styles.menuButtonsVisible);
   }
 
   private startMenuGamepadLoop(): void {
@@ -501,12 +635,14 @@ export class StartScreen extends UIComponent {
     const hintEl = this.$('[data-ref="quickStartHint"]');
     if (!hintEl) return;
     let text: string;
-    if (isTouchDevice()) {
-      text = 'Tap DEPLOY to enter battle.';
+    if (this.isLaunching) {
+      text = 'Preparing battlefield and opening the deploy screen...';
+    } else if (isTouchDevice()) {
+      text = 'Choose mode and side, then tap deploy to continue.';
     } else if (typeof navigator.getGamepads === 'function' && navigator.getGamepads().some(p => !!p)) {
-      text = 'Gamepad: A/Cross deploys, D-pad left/right changes mode.';
+      text = 'Gamepad: A/Cross deploys, D-pad left/right changes mode. Use side buttons for faction selection.';
     } else {
-      text = 'Keyboard: Enter deploys, Left/Right arrows change mode.';
+      text = 'Keyboard: Enter deploys, Left/Right arrows change mode, Tab reaches side and faction selectors.';
     }
     if (text !== this.quickStartHintText) {
       this.quickStartHintText = text;
@@ -518,5 +654,107 @@ export class StartScreen extends UIComponent {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  private setMenuButtonsEnabled(enabled: boolean): void {
+    const buttonRefs = ['play', 'settings', 'howToPlay'];
+    for (const ref of buttonRefs) {
+      const button = this.$(`[data-ref="${ref}"]`) as HTMLButtonElement | null;
+      if (button) {
+        button.disabled = !enabled;
+      }
+    }
+  }
+
+  private handleSelectionPointerDown = (event: Event): void => {
+    if (this.isLaunching) return;
+
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+
+    const allianceButton = target.closest<HTMLElement>('[data-alliance]');
+    if (allianceButton?.dataset.alliance) {
+      event.preventDefault();
+      this.updateLaunchSelection(this.selectedGameMode, {
+        alliance: allianceButton.dataset.alliance as Alliance,
+      });
+      this.selectGameMode(this.selectedGameMode);
+      return;
+    }
+
+    const factionButton = target.closest<HTMLElement>('[data-faction]');
+    if (factionButton?.dataset.faction) {
+      event.preventDefault();
+      const currentSelection = this.getLaunchSelection(this.selectedGameMode);
+      this.updateLaunchSelection(this.selectedGameMode, {
+        alliance: currentSelection.alliance,
+        faction: factionButton.dataset.faction as Faction,
+      });
+      this.selectGameMode(this.selectedGameMode);
+    }
+  };
+
+  private getLaunchSelection(mode: GameMode): GameLaunchSelection {
+    const definition = getGameModeDefinition(mode);
+    const resolved = resolveLaunchSelection(definition, this.launchSelections.get(mode));
+    this.launchSelections.set(mode, resolved);
+    return {
+      mode,
+      alliance: resolved.alliance,
+      faction: resolved.faction,
+    };
+  }
+
+  private updateLaunchSelection(
+    mode: GameMode,
+    selection: Partial<Pick<GameLaunchSelection, 'alliance' | 'faction'>>
+  ): void {
+    const definition = getGameModeDefinition(mode);
+    const currentSelection = this.launchSelections.get(mode);
+    this.launchSelections.set(mode, resolveLaunchSelection(definition, {
+      ...currentSelection,
+      ...selection,
+    }));
+  }
+
+  private getAllianceLabel(alliance: Alliance): string {
+    return alliance === Alliance.BLUFOR ? 'BLUFOR' : 'OPFOR';
+  }
+
+  private getFactionLabel(faction: Faction): string {
+    switch (faction) {
+      case Faction.ARVN:
+        return 'ARVN';
+      case Faction.NVA:
+        return 'NVA';
+      case Faction.VC:
+        return 'VC';
+      case Faction.US:
+      default:
+        return 'US';
+    }
+  }
+
+  private hasFocusedMenuControl(): boolean {
+    const activeElement = document.activeElement as HTMLElement | null;
+    if (!activeElement) {
+      return false;
+    }
+
+    return !!activeElement.closest(`.${styles.selectionOption}, .${styles.menuButton}, .${styles.modeCard}`);
+  }
+
+  private getPreparingActionLabel(flow: ReturnType<typeof createDeploySession>['flow']): string {
+    switch (flow) {
+      case 'frontier':
+        return 'PREPARING FRONTIER';
+      case 'air_assault':
+        return 'PREPARING INSERTION';
+      case 'sandbox':
+        return 'PREPARING SIMULATION';
+      case 'standard':
+      default:
+        return 'PREPARING DEPLOYMENT';
+    }
   }
 }

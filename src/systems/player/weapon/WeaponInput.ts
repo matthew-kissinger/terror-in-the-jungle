@@ -1,7 +1,7 @@
 import { WeaponAnimations } from './WeaponAnimations'
 import { WeaponReload } from './WeaponReload'
 import { WeaponRigManager } from './WeaponRigManager'
-import { InventoryManager, WeaponSlot } from '../InventoryManager'
+import { InventoryManager } from '../InventoryManager'
 
 /**
  * Handles weapon input: mouse/keyboard events, firing state, ADS
@@ -18,7 +18,7 @@ export class WeaponInput {
 
   private isGunSlot(): boolean {
     const slot = this.inventoryManager?.getCurrentSlot()
-    return !this.inventoryManager || slot === WeaponSlot.PRIMARY || slot === WeaponSlot.SHOTGUN || slot === WeaponSlot.SMG || slot === WeaponSlot.PISTOL
+    return !this.inventoryManager || (slot !== undefined && this.inventoryManager.isWeaponSlot(slot))
   }
 
   // Callbacks

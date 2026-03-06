@@ -5,7 +5,7 @@ import '../style.css';
 import { StartScreen } from '../ui/loading/StartScreen';
 import { SystemManager } from './SystemManager';
 import { GameRenderer } from './GameRenderer';
-import { GameMode } from '../config/gameModeTypes';
+import { GameLaunchSelection, GameMode } from '../config/gameModeTypes';
 import { PerformanceOverlay } from '../ui/debug/PerformanceOverlay';
 import { TimeIndicator } from '../ui/debug/TimeIndicator';
 import { LogOverlay } from '../ui/debug/LogOverlay';
@@ -39,6 +39,7 @@ export class GameEngine {
   public clock = new THREE.Clock();
   public isInitialized = false;
   public gameStarted = false;
+  public gameStartPending = false;
   public lastFrameDelta = 1 / 60;
   public currentPixelSize = 1;
   private settingsUnsubscribe?: () => void;
@@ -87,8 +88,8 @@ export class GameEngine {
 
   private setupMenuCallbacks(): void {
     // Play button starts the game with selected mode
-    this.loadingScreen.onPlay((mode: GameMode) => {
-      this.startGameWithMode(mode);
+    this.loadingScreen.onPlay((selection: GameLaunchSelection) => {
+      this.startGameWithMode(selection);
     });
 
     // Settings button opens settings panel (handled in StartScreen)
@@ -219,12 +220,12 @@ export class GameEngine {
     return Init.loadGameAssets(this);
   }
 
-  public startGameWithMode(mode: GameMode): Promise<void> {
-    return Init.startGameWithMode(this, mode);
+  public startGameWithMode(selection: GameLaunchSelection | GameMode): Promise<void> {
+    return Init.startGameWithMode(this, selection);
   }
 
-  public startGame(): void {
-    return Init.startGame(this);
+  public startGame(initialSpawnPosition?: THREE.Vector3): void {
+    return Init.startGame(this, initialSpawnPosition);
   }
 
   public showWelcomeMessage(): void {

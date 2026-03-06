@@ -146,3 +146,74 @@ export interface GameModeConfig {
     [Alliance.OPFOR]: Faction[];
   };
 }
+
+export type ObjectivePolicyKind = 'zone_control' | 'deathmatch' | 'sandbox' | 'warfront';
+export type DeployFlow = 'standard' | 'frontier' | 'air_assault' | 'sandbox';
+export type DeployMapVariant = 'standard' | 'frontier';
+export type InitialSpawnRule = 'homebase' | 'forward_insertion' | 'origin';
+export type RespawnFallbackRule = 'homebase' | 'pressure_front';
+export type ContactAssistStyle = 'none' | 'pressure_front';
+export type StrategicLayerMode = 'none' | 'optional' | 'required';
+export type CommandSurface = 'radial' | 'hybrid' | 'overlay';
+export type CommandScale = 'squad' | 'platoon' | 'company' | 'battalion';
+export type TeamComposition = 'single_faction' | 'alliance_mix';
+
+export interface ObjectivePolicyConfig {
+  kind: ObjectivePolicyKind;
+  usesZones: boolean;
+  usesTickets: boolean;
+  usesWarSimulator: boolean;
+}
+
+export interface DeployPolicyConfig {
+  flow: DeployFlow;
+  mapVariant: DeployMapVariant;
+  allowSpawnSelection: boolean;
+  allowLoadoutEditingOnRespawn: boolean;
+}
+
+export interface RespawnPolicyConfig {
+  allowControlledZoneSpawns: boolean;
+  initialSpawnRule: InitialSpawnRule;
+  fallbackRule: RespawnFallbackRule;
+  contactAssistStyle: ContactAssistStyle;
+}
+
+export interface MapIntelPolicyConfig {
+  tacticalRangeOverride: number | null;
+  showStrategicAgentsOnMinimap: boolean;
+  strategicLayer: StrategicLayerMode;
+}
+
+export interface CommandProfileConfig {
+  quickCommands: boolean;
+  surface: CommandSurface;
+  scale: CommandScale;
+}
+
+export interface TeamRulesConfig {
+  ownershipModel: 'alliance';
+  composition: TeamComposition;
+  playableAlliances: Alliance[];
+}
+
+export interface GameModePolicies {
+  objective: ObjectivePolicyConfig;
+  deploy: DeployPolicyConfig;
+  respawn: RespawnPolicyConfig;
+  mapIntel: MapIntelPolicyConfig;
+  command: CommandProfileConfig;
+  teamRules: TeamRulesConfig;
+}
+
+export interface GameModeDefinition {
+  id: GameMode;
+  config: GameModeConfig;
+  policies: GameModePolicies;
+}
+
+export interface GameLaunchSelection {
+  mode: GameMode;
+  alliance: Alliance;
+  faction: Faction;
+}

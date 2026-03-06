@@ -48,6 +48,7 @@ export class PlayerHealthSystem implements GameSystem {
   private ticketSystem?: TicketSystem;
   private hudSystem?: HUDSystem;
   private playerController?: PlayerController;
+  private playerFaction: Faction = Faction.US;
 
   constructor() {
     this.ui = new PlayerHealthUI();
@@ -213,7 +214,7 @@ export class PlayerHealthSystem implements GameSystem {
 
     // Apply ticket penalty for voluntary respawn
     if (this.ticketSystem) {
-      this.ticketSystem.removeTickets(Faction.US, 1); // Extra penalty for voluntary respawn
+      this.ticketSystem.removeTickets(this.playerFaction, 1); // Extra penalty for voluntary respawn
     }
   }
 
@@ -276,6 +277,10 @@ export class PlayerHealthSystem implements GameSystem {
 
   setHUDSystem(hudSystem: HUDSystem): void {
     this.hudSystem = hudSystem;
+  }
+
+  setPlayerFaction(faction: Faction): void {
+    this.playerFaction = faction;
   }
 
   /** Reset all player health state for a new match */

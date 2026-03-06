@@ -25,6 +25,7 @@ import { CompassSystem } from '../ui/compass/CompassSystem';
 import { HelipadSystem } from '../systems/helicopter/HelipadSystem';
 import { HelicopterModel } from '../systems/helicopter/HelicopterModel';
 import { PlayerSquadController } from '../systems/combat/PlayerSquadController';
+import { CommandInputManager } from '../systems/combat/CommandInputManager';
 import { InventoryManager } from '../systems/player/InventoryManager';
 import { GrenadeSystem } from '../systems/weapons/GrenadeSystem';
 import { MortarSystem } from '../systems/weapons/MortarSystem';
@@ -37,7 +38,7 @@ import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { VoiceCalloutSystem } from '../systems/audio/VoiceCalloutSystem';
-import { LoadoutSelector } from '../ui/loadout/LoadoutSelector';
+import { LoadoutService } from '../systems/player/LoadoutService';
 import { WarSimulator } from '../systems/strategy/WarSimulator';
 import { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
 import { SystemInitializer, SystemReferences } from './SystemInitializer';
@@ -84,6 +85,7 @@ export class SystemManager {
   public helipadSystem!: HelipadSystem;
   public helicopterModel!: HelicopterModel;
   public playerSquadController!: PlayerSquadController;
+  public commandInputManager!: CommandInputManager;
   public inventoryManager!: InventoryManager;
   public grenadeSystem!: GrenadeSystem;
   public mortarSystem!: MortarSystem;
@@ -95,7 +97,7 @@ export class SystemManager {
   public ammoSupplySystem!: AmmoSupplySystem;
   public footstepAudioSystem!: FootstepAudioSystem;
   public voiceCalloutSystem!: VoiceCalloutSystem;
-  public loadoutSelector!: LoadoutSelector;
+  public loadoutService!: LoadoutService;
   public warSimulator!: WarSimulator;
   public strategicFeedback!: StrategicFeedback;
 
@@ -143,6 +145,7 @@ export class SystemManager {
     this.helipadSystem = this.refs.helipadSystem;
     this.helicopterModel = this.refs.helicopterModel;
     this.playerSquadController = this.refs.playerSquadController;
+    this.commandInputManager = this.refs.commandInputManager;
     this.inventoryManager = this.refs.inventoryManager;
     this.grenadeSystem = this.refs.grenadeSystem;
     this.mortarSystem = this.refs.mortarSystem;
@@ -154,7 +157,7 @@ export class SystemManager {
     this.ammoSupplySystem = this.refs.ammoSupplySystem;
     this.footstepAudioSystem = this.refs.footstepAudioSystem;
     this.voiceCalloutSystem = this.refs.voiceCalloutSystem;
-    this.loadoutSelector = this.refs.loadoutSelector;
+    this.loadoutService = this.refs.loadoutService;
     this.warSimulator = this.refs.warSimulator;
     this.strategicFeedback = this.refs.strategicFeedback;
 
@@ -318,6 +321,7 @@ export class SystemManager {
     }
 
     this.minimapSystem.setPlayerSquadId(playerSquadId);
+    this.fullMapSystem.setPlayerSquadId(playerSquadId);
 
     Logger.info('core', ` Player squad setup complete: ${squad.id} with ${squad.members.length} members`);
   }

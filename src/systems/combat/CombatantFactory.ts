@@ -65,9 +65,13 @@ export class CombatantFactory {
   }
 
   createPlayerProxy(playerPosition: THREE.Vector3): Combatant {
+    return this.createPlayerProxyForFaction(playerPosition, Faction.US);
+  }
+
+  createPlayerProxyForFaction(playerPosition: THREE.Vector3, faction: Faction): Combatant {
     const proxy: Combatant = {
       id: 'player_proxy',
-      faction: Faction.US,
+      faction,
       position: playerPosition.clone(),
       velocity: new THREE.Vector3(),
       rotation: 0,
@@ -77,9 +81,9 @@ export class CombatantFactory {
       health: 100,
       maxHealth: 100,
       state: CombatantState.ENGAGING,
-      weaponSpec: this.createWeaponSpec(Faction.US),
-      gunCore: new GunplayCore(this.createWeaponSpec(Faction.US)),
-      skillProfile: this.createSkillProfile(Faction.US, 'leader'),
+      weaponSpec: this.createWeaponSpec(faction),
+      gunCore: new GunplayCore(this.createWeaponSpec(faction)),
+      skillProfile: this.createSkillProfile(faction, 'leader'),
       lastShotTime: 0,
       currentBurst: 0,
       burstCooldown: 0,

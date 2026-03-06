@@ -1,15 +1,23 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import * as THREE from 'three';
-import { PlayerRespawnManager } from './PlayerRespawnManager';
+import { InitialDeployCancelledError, PlayerRespawnManager } from './PlayerRespawnManager';
 import { ZoneManager, ZoneState } from '../world/ZoneManager';
 import { PlayerHealthSystem } from './PlayerHealthSystem';
 import { GameModeManager } from '../world/GameModeManager';
 import { InventoryManager } from './InventoryManager';
-import { Faction } from '../combat/types';
+import { Alliance, Faction } from '../combat/types';
 import { RespawnUI } from './RespawnUI';
 import { RespawnMapController } from './RespawnMapController';
 import { GameMode } from '../../config/gameModeTypes';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
+import { getGameModeDefinition } from '../../config/gameModeDefinitions';
+import { resolveInitialSpawnPosition } from '../world/runtime/ModeSpawnResolver';
+import {
+  DEFAULT_PLAYER_LOADOUT,
+  LoadoutEquipment,
+  LoadoutWeapon
+} from '../../ui/loadout/LoadoutTypes';
+import type { LoadoutService } from './LoadoutService';
 
 // Mock browser globals for Node.js environment
 if (typeof document === 'undefined') {
@@ -135,7 +143,7 @@ function createMockZone(
   position: THREE.Vector3,
   state: ZoneState = ZoneState.NEUTRAL,
   isHomeBase = false,
-  owner: Faction = Faction.NONE
+  owner: Faction | null = null
 ) {
   return {
     id,
@@ -161,6 +169,9 @@ describe('PlayerRespawnManager', () => {
   let mockFirstPersonWeapon: any;
   let mockInventoryManager: InventoryManager;
   let mockTerrainSystem: ITerrainRuntime;
+  let mockLoadoutService: LoadoutService;
+  let mockGrenadeSystem: any;
+  let loadoutContext: { mode: GameMode; alliance: Alliance; faction: Faction };
 
   beforeEach(() => {
     mockScene = new THREE.Scene();
@@ -174,8 +185,17 @@ describe('PlayerRespawnManager', () => {
       show: vi.fn(),
       hide: vi.fn(),
       dispose: vi.fn(),
+      configureSession: vi.fn(),
+      setMapInteractionEnabled: vi.fn(),
+      setLoadoutEditingEnabled: vi.fn(),
+      setLoadoutChangeCallback: vi.fn(),
+      setPresetCycleCallback: vi.fn(),
+      setPresetSaveCallback: vi.fn(),
       setRespawnClickCallback: vi.fn(),
+      setCancelClickCallback: vi.fn(),
       updateTimerDisplay: vi.fn(),
+      updateLoadout: vi.fn(),
+      updateLoadoutPresentation: vi.fn(),
       resetSelectedSpawn: vi.fn(),
       updateSelectedSpawn: vi.fn(),
       getMapContainer: vi.fn(() => document.createElement('div')),
@@ -213,6 +233,40 @@ describe('PlayerRespawnManager', () => {
       canPlayerSpawnAtZones: vi.fn(() => true),
       getRespawnTime: vi.fn(() => 5),
       getSpawnProtectionDuration: vi.fn(() => 3),
+      getRespawnPolicy: vi.fn(() => ({
+        allowControlledZoneSpawns: true,
+        initialSpawnRule: 'homebase',
+        fallbackRule: 'homebase',
+        contactAssistStyle: 'none'
+      })),
+      getDeploySession: vi.fn(() => ({
+        kind: 'respawn',
+        mode: GameMode.ZONE_CONTROL,
+        modeName: 'Zone Control',
+        modeDescription: 'Fast-paced combat.',
+        flow: 'standard',
+        mapVariant: 'standard',
+        flowLabel: 'Frontline deployment',
+        headline: 'RETURN TO BATTLE',
+        subheadline: 'Choose a controlled position and return to the fight.',
+        mapTitle: 'TACTICAL MAP - SELECT DEPLOYMENT',
+        selectedSpawnTitle: 'SELECTED SPAWN POINT',
+        emptySelectionText: 'Select a spawn point on the map',
+        readySelectionText: 'Ready to deploy',
+        countdownLabel: 'Deployment available in',
+        readyLabel: 'Ready for deployment',
+        actionLabel: 'DEPLOY',
+        secondaryActionLabel: null,
+        allowSpawnSelection: true,
+        allowLoadoutEditing: true,
+        sequenceTitle: 'Redeploy Checklist',
+        sequenceSteps: [
+          'Choose a spawn point before returning to the fight.',
+          'Configure 2 weapons and 1 equipment slot before deployment.',
+          'Redeploy as soon as the timer clears.',
+        ],
+      })),
+      getCurrentDefinition: vi.fn(() => getGameModeDefinition(GameMode.ZONE_CONTROL)),
       getCurrentMode: vi.fn(() => GameMode.ZONE_CONTROL),
       getWorldSize: vi.fn(() => 400),
     } as unknown as GameModeManager;
@@ -230,7 +284,79 @@ describe('PlayerRespawnManager', () => {
 
     mockInventoryManager = {
       reset: vi.fn(),
+      setLoadout: vi.fn(),
     } as unknown as InventoryManager;
+
+    loadoutContext = {
+      mode: GameMode.ZONE_CONTROL,
+      alliance: Alliance.BLUFOR,
+      faction: Faction.US,
+    };
+
+    mockLoadoutService = {
+      getCurrentLoadout: vi.fn(() => ({ ...DEFAULT_PLAYER_LOADOUT })),
+      getContext: vi.fn(() => ({ ...loadoutContext })),
+      getPresentationModel: vi.fn(() => ({
+        context: { ...loadoutContext },
+        factionLabel: loadoutContext.faction,
+        presetIndex: 0,
+        presetCount: 3,
+        presetName: 'Rifleman',
+        presetDescription: 'Balanced assault loadout for frontline pushes.',
+        presetDirty: false,
+        availableWeapons: [LoadoutWeapon.RIFLE, LoadoutWeapon.SHOTGUN, LoadoutWeapon.SMG, LoadoutWeapon.PISTOL],
+        availableEquipment: [
+          LoadoutEquipment.FRAG_GRENADE,
+          LoadoutEquipment.SMOKE_GRENADE,
+          LoadoutEquipment.FLASHBANG,
+          LoadoutEquipment.SANDBAG_KIT,
+          LoadoutEquipment.MORTAR_KIT,
+        ],
+      })),
+      setContextFromDefinition: vi.fn((definition: { id: GameMode }, alliance = loadoutContext.alliance, faction = loadoutContext.faction) => {
+        loadoutContext = {
+          mode: definition.id,
+          alliance,
+          faction,
+        };
+        return { ...DEFAULT_PLAYER_LOADOUT };
+      }),
+      cycleField: vi.fn((field: string, direction: 1 | -1) => {
+        if (field === 'primaryWeapon') {
+          return {
+            ...DEFAULT_PLAYER_LOADOUT,
+            primaryWeapon: direction === 1 ? LoadoutWeapon.SMG : LoadoutWeapon.RIFLE,
+          };
+        }
+        if (field === 'equipment') {
+          return {
+            ...DEFAULT_PLAYER_LOADOUT,
+            equipment: direction === 1
+              ? LoadoutEquipment.MORTAR_KIT
+              : LoadoutEquipment.FRAG_GRENADE,
+          };
+        }
+        return { ...DEFAULT_PLAYER_LOADOUT };
+      }),
+      cyclePreset: vi.fn(() => ({
+        primaryWeapon: LoadoutWeapon.SMG,
+        secondaryWeapon: LoadoutWeapon.PISTOL,
+        equipment: LoadoutEquipment.SMOKE_GRENADE,
+      })),
+      saveCurrentToActivePreset: vi.fn(() => ({
+        id: 'recon',
+        name: 'Recon',
+        description: 'Fast two-gun profile for maneuver and smoke cover.',
+        loadout: {
+          primaryWeapon: LoadoutWeapon.SMG,
+          secondaryWeapon: LoadoutWeapon.PISTOL,
+          equipment: LoadoutEquipment.SMOKE_GRENADE,
+        }
+      })),
+      applyToRuntime: vi.fn(),
+    } as unknown as LoadoutService;
+
+    mockGrenadeSystem = {};
 
     mockTerrainSystem = {
       getHeightAt: vi.fn(() => 0),
@@ -248,6 +374,8 @@ describe('PlayerRespawnManager', () => {
     };
 
     respawnManager.setTerrainSystem(mockTerrainSystem);
+    respawnManager.setLoadoutService(mockLoadoutService);
+    respawnManager.setGrenadeSystem(mockGrenadeSystem);
   });
 
   afterEach(() => {
@@ -259,7 +387,11 @@ describe('PlayerRespawnManager', () => {
       await respawnManager.init();
 
       expect(mockRespawnUI.setRespawnClickCallback).toHaveBeenCalled();
+      expect((mockRespawnUI as any).setCancelClickCallback).toHaveBeenCalled();
+      expect((mockRespawnUI as any).setPresetCycleCallback).toHaveBeenCalled();
+      expect((mockRespawnUI as any).setPresetSaveCallback).toHaveBeenCalled();
       expect(mockMapController.setZoneSelectedCallback).toHaveBeenCalled();
+      expect(mockRespawnUI.setLoadoutChangeCallback).toHaveBeenCalled();
     });
   });
 
@@ -332,11 +464,28 @@ describe('PlayerRespawnManager', () => {
       expect(zones).toEqual([]);
     });
 
-    it('should not include OPFOR base', () => {
-      const zones = respawnManager.getSpawnableZones();
+      it('should not include OPFOR base', () => {
+        const zones = respawnManager.getSpawnableZones();
 
-      expect(zones.every(z => z.id !== 'opfor_base')).toBe(true);
-    });
+        expect(zones.every(z => z.id !== 'opfor_base')).toBe(true);
+      });
+
+      it('returns OPFOR-controlled spawns when the selected alliance is OPFOR', () => {
+        loadoutContext = {
+          mode: GameMode.ZONE_CONTROL,
+          alliance: Alliance.OPFOR,
+          faction: Faction.NVA,
+        };
+        vi.mocked(mockZoneManager.getAllZones).mockReturnValue([
+          createMockZone('us_base', 'US Base', new THREE.Vector3(0, 0, -50), ZoneState.US_CONTROLLED, true, Faction.US),
+          createMockZone('opfor_base', 'OPFOR Base', new THREE.Vector3(0, 0, 50), ZoneState.OPFOR_CONTROLLED, true, Faction.NVA),
+          createMockZone('zone_opfor', 'Zone Red', new THREE.Vector3(120, 0, 100), ZoneState.OPFOR_CONTROLLED, false, Faction.NVA),
+        ] as any);
+
+        const zones = respawnManager.getSpawnableZones();
+
+        expect(zones.map(zone => zone.id)).toEqual(['opfor_base', 'zone_opfor']);
+      });
 
     it('should not include contested zones', () => {
       const zones = respawnManager.getSpawnableZones();
@@ -388,15 +537,30 @@ describe('PlayerRespawnManager', () => {
       expect(respawnManager.canSpawnAtZone()).toBe(false);
     });
 
-    it('should exclude home bases from non-base zone check', () => {
-      vi.mocked(mockZoneManager.getAllZones).mockReturnValue([
-        createMockZone('us_base', 'US Base', new THREE.Vector3(0, 0, -50), ZoneState.US_CONTROLLED, true, Faction.US),
-      ]);
-      vi.mocked(mockGameModeManager.canPlayerSpawnAtZones).mockReturnValue(true);
+      it('should exclude home bases from non-base zone check', () => {
+        vi.mocked(mockZoneManager.getAllZones).mockReturnValue([
+          createMockZone('us_base', 'US Base', new THREE.Vector3(0, 0, -50), ZoneState.US_CONTROLLED, true, Faction.US),
+        ]);
+        vi.mocked(mockGameModeManager.canPlayerSpawnAtZones).mockReturnValue(true);
 
-      expect(respawnManager.canSpawnAtZone()).toBe(false);
+        expect(respawnManager.canSpawnAtZone()).toBe(false);
+      });
+
+      it('returns true for OPFOR-controlled forward zones when the selected alliance is OPFOR', () => {
+        loadoutContext = {
+          mode: GameMode.ZONE_CONTROL,
+          alliance: Alliance.OPFOR,
+          faction: Faction.NVA,
+        };
+        vi.mocked(mockZoneManager.getAllZones).mockReturnValue([
+          createMockZone('opfor_base', 'OPFOR Base', new THREE.Vector3(0, 0, 50), ZoneState.OPFOR_CONTROLLED, true, Faction.NVA),
+          createMockZone('zone_opfor', 'Zone Red', new THREE.Vector3(120, 0, 100), ZoneState.OPFOR_CONTROLLED, false, Faction.NVA),
+        ] as any);
+        vi.mocked(mockGameModeManager.canPlayerSpawnAtZones).mockReturnValue(true);
+
+        expect(respawnManager.canSpawnAtZone()).toBe(true);
+      });
     });
-  });
 
   describe('respawnAtBase', () => {
     beforeEach(() => {
@@ -438,7 +602,11 @@ describe('PlayerRespawnManager', () => {
     it('should reset inventory', () => {
       respawnManager.respawnAtBase();
 
-      expect(mockInventoryManager.reset).toHaveBeenCalled();
+      expect(mockLoadoutService.applyToRuntime).toHaveBeenCalledWith(expect.objectContaining({
+        inventoryManager: mockInventoryManager,
+        firstPersonWeapon: mockFirstPersonWeapon,
+        grenadeSystem: mockGrenadeSystem,
+      }));
     });
 
     it('should enable weapon', () => {
@@ -454,11 +622,16 @@ describe('PlayerRespawnManager', () => {
     });
 
     it('should use A Shau pressure spawn policy near contested objective', () => {
-      vi.mocked(mockGameModeManager.getCurrentMode).mockReturnValue(GameMode.A_SHAU_VALLEY);
+      vi.mocked(mockGameModeManager.getRespawnPolicy).mockReturnValue({
+        allowControlledZoneSpawns: true,
+        initialSpawnRule: 'forward_insertion',
+        fallbackRule: 'pressure_front',
+        contactAssistStyle: 'pressure_front'
+      });
       vi.mocked(mockZoneManager.getAllZones).mockReturnValue([
         createMockZone('us_base', 'US Base', new THREE.Vector3(0, 0, -50), ZoneState.US_CONTROLLED, true, Faction.US),
         { ...createMockZone('zone_us_forward', 'US Forward', new THREE.Vector3(100, 0, 100), ZoneState.US_CONTROLLED, false, Faction.US), ticketBleedRate: 2 },
-        { ...createMockZone('zone_obj', 'Objective', new THREE.Vector3(220, 0, 220), ZoneState.CONTESTED, false, Faction.NONE), ticketBleedRate: 6 },
+        { ...createMockZone('zone_obj', 'Objective', new THREE.Vector3(220, 0, 220), ZoneState.CONTESTED, false, null), ticketBleedRate: 6 },
       ] as any);
 
       respawnManager.respawnAtBase();
@@ -563,6 +736,30 @@ describe('PlayerRespawnManager', () => {
       respawnManager.onPlayerDeath();
 
       expect(mockRespawnUI.show).toHaveBeenCalled();
+    });
+
+    it('should configure the respawn UI from deploy session policy', () => {
+      respawnManager.onPlayerDeath();
+
+      expect((mockLoadoutService as any).setContextFromDefinition).toHaveBeenCalledWith(
+        expect.objectContaining({ id: GameMode.ZONE_CONTROL }),
+        Alliance.BLUFOR,
+        Faction.US
+      );
+      expect((mockRespawnUI as any).configureSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: GameMode.ZONE_CONTROL,
+          flow: 'standard',
+          actionLabel: 'DEPLOY',
+        })
+      );
+      expect((mockRespawnUI as any).setMapInteractionEnabled).toHaveBeenCalledWith(true);
+      expect((mockRespawnUI as any).setLoadoutEditingEnabled).toHaveBeenCalledWith(true);
+      expect((mockRespawnUI as any).updateLoadout).toHaveBeenCalledWith(expect.objectContaining(DEFAULT_PLAYER_LOADOUT));
+      expect((mockRespawnUI as any).updateLoadoutPresentation).toHaveBeenCalledWith(expect.objectContaining({
+        factionLabel: 'US',
+        presetName: 'Rifleman',
+      }));
     });
 
     it('should show map', () => {
@@ -778,6 +975,169 @@ describe('PlayerRespawnManager', () => {
       expect(respawnManager['availableSpawnPoints']).toHaveLength(1);
       expect(respawnManager['availableSpawnPoints'][0].id).toBe('default');
       expect(respawnManager['availableSpawnPoints'][0].name).toBe('Base');
+    });
+  });
+
+  describe('deploy session policy', () => {
+    beforeEach(() => {
+      respawnManager.setZoneManager(mockZoneManager);
+      respawnManager.setGameModeManager(mockGameModeManager);
+    });
+
+    it('auto-selects a fallback spawn when manual spawn selection is disabled', () => {
+      vi.mocked((mockGameModeManager as any).getDeploySession).mockReturnValue({
+        kind: 'respawn',
+        mode: GameMode.TEAM_DEATHMATCH,
+        modeName: 'Team Deathmatch',
+        modeDescription: 'Pure combat.',
+        flow: 'standard',
+        mapVariant: 'standard',
+        flowLabel: 'Frontline deployment',
+        headline: 'RETURN TO BATTLE',
+        subheadline: 'Choose a controlled position and return to the fight.',
+        mapTitle: 'TACTICAL MAP - SELECT DEPLOYMENT',
+        selectedSpawnTitle: 'SELECTED SPAWN POINT',
+        emptySelectionText: 'Default insertion will be used',
+        readySelectionText: 'Ready to deploy',
+        countdownLabel: 'Deployment available in',
+        readyLabel: 'Ready for deployment',
+        actionLabel: 'DEPLOY',
+        secondaryActionLabel: null,
+        allowSpawnSelection: false,
+        allowLoadoutEditing: false,
+        sequenceTitle: 'Redeploy Checklist',
+        sequenceSteps: [
+          'Mode rules assign the spawn point automatically.',
+          'Mission loadout is locked for this deployment.',
+          'Redeploy as soon as the timer clears.',
+        ],
+      });
+
+      respawnManager.onPlayerDeath();
+
+      expect(respawnManager['selectedSpawnPoint']).toBe('us_base');
+      expect(mockRespawnUI.updateSelectedSpawn).toHaveBeenCalledWith('US Base');
+    });
+
+    it('preselects the preferred insertion point for initial deploy', async () => {
+      const definition = getGameModeDefinition(GameMode.A_SHAU_VALLEY);
+      const preferredTarget = resolveInitialSpawnPosition(definition, Alliance.BLUFOR);
+      vi.mocked((mockGameModeManager as any).getCurrentDefinition).mockReturnValue(definition);
+      vi.mocked((mockGameModeManager as any).getDeploySession).mockImplementation((kind: string) => ({
+        kind,
+        mode: GameMode.A_SHAU_VALLEY,
+        modeName: 'A Shau Valley',
+        modeDescription: 'Historical Vietnam campaign.',
+        flow: 'air_assault',
+        mapVariant: 'standard',
+        flowLabel: 'Air assault insertion',
+        headline: kind === 'initial' ? 'AIR ASSAULT STAGING' : 'AIR ASSAULT REINSERTION',
+        subheadline: 'Choose an insertion zone before the first lift carries you into the campaign.',
+        mapTitle: 'ASSAULT MAP - SELECT INSERTION',
+        selectedSpawnTitle: 'SELECTED INSERTION ZONE',
+        emptySelectionText: 'Select a spawn point on the map',
+        readySelectionText: 'Insertion route confirmed',
+        countdownLabel: 'Deployment available in',
+        readyLabel: 'Ready for deployment',
+        actionLabel: kind === 'initial' ? 'INSERT' : 'REINSERT',
+        secondaryActionLabel: kind === 'initial' ? 'BACK TO MODE SELECT' : null,
+        allowSpawnSelection: true,
+        allowLoadoutEditing: true,
+        sequenceTitle: kind === 'initial' ? 'Deployment Checklist' : 'Redeploy Checklist',
+        sequenceSteps: [
+          'Choose an insertion zone before deployment begins.',
+          'Configure 2 weapons and 1 equipment slot before deployment.',
+          kind === 'initial'
+            ? 'Insert once the staging plan and loadout are confirmed.'
+            : 'Redeploy as soon as the reinsert timer clears.',
+        ],
+      }));
+      vi.mocked(mockZoneManager.getAllZones).mockReturnValue([
+        createMockZone('us_base', 'LZ Goodman', new THREE.Vector3(-500, 0, -500), ZoneState.US_CONTROLLED, true, Faction.US),
+        createMockZone('lz_stallion', 'LZ Stallion', preferredTarget.clone(), ZoneState.US_CONTROLLED, true, Faction.US),
+        createMockZone('lz_eagle', 'LZ Eagle', preferredTarget.clone().add(new THREE.Vector3(1200, 0, 900)), ZoneState.US_CONTROLLED, true, Faction.US),
+      ] as any);
+
+      void respawnManager.beginInitialDeploy();
+
+      expect(respawnManager['selectedSpawnPoint']).toBe('lz_stallion');
+      expect(mockRespawnUI.updateSelectedSpawn).toHaveBeenCalledWith('LZ Stallion');
+    });
+
+    it('routes deploy loadout edits through the loadout service', async () => {
+      await respawnManager.init();
+      respawnManager.setInventoryManager(mockInventoryManager);
+      respawnManager.onPlayerDeath();
+
+      const callback = vi.mocked((mockRespawnUI as any).setLoadoutChangeCallback).mock.calls[0][0];
+      callback('equipment', 1);
+
+      expect((mockInventoryManager as any).setLoadout).toHaveBeenCalledWith(expect.objectContaining({
+        equipment: LoadoutEquipment.MORTAR_KIT,
+      }));
+      expect((mockRespawnUI as any).updateLoadout).toHaveBeenLastCalledWith(expect.objectContaining({
+        equipment: LoadoutEquipment.MORTAR_KIT,
+      }));
+      expect((mockRespawnUI as any).updateLoadoutPresentation).toHaveBeenCalled();
+    });
+
+    it('routes preset cycling through the loadout service', async () => {
+      await respawnManager.init();
+      respawnManager.setInventoryManager(mockInventoryManager);
+      respawnManager.onPlayerDeath();
+
+      const callback = vi.mocked((mockRespawnUI as any).setPresetCycleCallback).mock.calls[0][0];
+      callback(1);
+
+      expect((mockLoadoutService as any).cyclePreset).toHaveBeenCalledWith(1);
+      expect((mockInventoryManager as any).setLoadout).toHaveBeenCalledWith(expect.objectContaining({
+        primaryWeapon: LoadoutWeapon.SMG,
+        secondaryWeapon: LoadoutWeapon.PISTOL,
+        equipment: LoadoutEquipment.SMOKE_GRENADE,
+      }));
+      expect((mockRespawnUI as any).updateLoadout).toHaveBeenLastCalledWith(expect.objectContaining({
+        equipment: LoadoutEquipment.SMOKE_GRENADE,
+      }));
+    });
+
+    it('routes preset saves through the loadout service', async () => {
+      await respawnManager.init();
+      respawnManager.onPlayerDeath();
+
+      const callback = vi.mocked((mockRespawnUI as any).setPresetSaveCallback).mock.calls[0][0];
+      callback();
+
+      expect((mockLoadoutService as any).saveCurrentToActivePreset).toHaveBeenCalled();
+      expect((mockRespawnUI as any).updateLoadoutPresentation).toHaveBeenCalled();
+    });
+
+    it('resolves initial deploy instead of respawning immediately', async () => {
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      try {
+        const deployPromise = respawnManager.beginInitialDeploy();
+        respawnManager['confirmRespawn']();
+
+        await expect(deployPromise).resolves.toEqual(expect.objectContaining({
+          x: 0,
+          z: -50,
+        }));
+        expect(mockPlayerController.setPosition).not.toHaveBeenCalled();
+      } finally {
+        randomSpy.mockRestore();
+      }
+    });
+
+    it('rejects initial deploy when the player backs out to mode select', async () => {
+      await respawnManager.init();
+
+      const deployPromise = respawnManager.beginInitialDeploy();
+      const callback = vi.mocked((mockRespawnUI as any).setCancelClickCallback).mock.calls[0][0];
+      callback();
+
+      await expect(deployPromise).rejects.toBeInstanceOf(InitialDeployCancelledError);
+      expect(mockRespawnUI.hide).toHaveBeenCalled();
+      expect(mockMapController.clearSelection).toHaveBeenCalled();
+      expect(mockMapController.stopMapUpdateInterval).toHaveBeenCalled();
     });
   });
 

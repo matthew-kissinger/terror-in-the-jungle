@@ -1,16 +1,36 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { Faction, Alliance, getAlliance, isBlufor, isOpfor } from '../combat/types';
-import { ZoneManager, ZoneState } from '../world/ZoneManager';
+import { Alliance, getAlliance, getEnemyAlliance } from '../combat/types';
+import { ZoneManager, ZoneState, type CaptureZone } from '../world/ZoneManager';
 import { PlayerHealthSystem } from './PlayerHealthSystem';
 import { GameModeManager } from '../world/GameModeManager';
 import { InventoryManager } from './InventoryManager';
-import { GameMode } from '../../config/gameModeTypes';
 import { RespawnUI } from './RespawnUI';
 import { RespawnMapController } from './RespawnMapController';
 import type { IFirstPersonWeapon, IPlayerController, ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { WarSimulator } from '../strategy/WarSimulator';
+import type { GrenadeSystem } from '../weapons/GrenadeSystem';
+import { LoadoutService } from './LoadoutService';
+import {
+  resolveInitialSpawnPosition,
+  resolveRespawnFallbackPosition
+} from '../world/runtime/ModeSpawnResolver';
+import {
+  createDeploySession,
+  DeploySessionKind,
+  DeploySessionModel
+} from '../world/runtime/DeployFlowSession';
+import { getGameModeDefinition } from '../../config/gameModeDefinitions';
+import { GameMode } from '../../config/gameModeTypes';
+import type { LoadoutFieldKey, PlayerLoadout } from '../../ui/loadout/LoadoutTypes';
+
+export class InitialDeployCancelledError extends Error {
+  constructor() {
+    super('Initial deploy cancelled');
+    this.name = 'InitialDeployCancelledError';
+  }
+}
 
 export class PlayerRespawnManager implements GameSystem {
   private scene: THREE.Scene;
@@ -23,6 +43,8 @@ export class PlayerRespawnManager implements GameSystem {
   private inventoryManager?: InventoryManager;
   private warSimulator?: WarSimulator;
   private terrainSystem?: ITerrainRuntime;
+  private loadoutService?: LoadoutService;
+  private grenadeSystem?: GrenadeSystem;
 
   // Respawn state
   private isRespawnUIVisible = false;
@@ -33,6 +55,10 @@ export class PlayerRespawnManager implements GameSystem {
   private lastTimerDisplayHasSelection = false;
   private deathCount = 0;
   private respawnCount = 0;
+  private deploySession?: DeploySessionModel;
+  private activeDeployFlowKind: DeploySessionKind | null = null;
+  private pendingInitialDeployResolve?: (position: THREE.Vector3) => void;
+  private pendingInitialDeployReject?: (error: Error) => void;
 
   // UI and map modules
   private respawnUI: RespawnUI;
@@ -56,6 +82,18 @@ export class PlayerRespawnManager implements GameSystem {
   private setupUICallbacks(): void {
     this.respawnUI.setRespawnClickCallback(() => {
       this.confirmRespawn();
+    });
+    this.respawnUI.setCancelClickCallback(() => {
+      this.cancelActiveDeployFlow();
+    });
+    this.respawnUI.setLoadoutChangeCallback((field, direction) => {
+      this.handleLoadoutChange(field, direction);
+    });
+    this.respawnUI.setPresetCycleCallback((direction) => {
+      this.handlePresetCycle(direction);
+    });
+    this.respawnUI.setPresetSaveCallback(() => {
+      this.handlePresetSave();
     });
 
     this.mapController.setZoneSelectedCallback((zoneId: string, zoneName: string) => {
@@ -82,13 +120,21 @@ export class PlayerRespawnManager implements GameSystem {
   /** Cancel any pending respawn and hide UI (for match restart) */
   cancelPendingRespawn(): void {
     this.respawnTimer = 0;
+    if (this.activeDeployFlowKind === 'initial') {
+      this.cancelInitialDeploy(new InitialDeployCancelledError());
+      return;
+    }
     if (this.isRespawnUIVisible) {
       this.hideRespawnUI();
     }
   }
 
   dispose(): void {
-    this.hideRespawnUI();
+    if (this.activeDeployFlowKind === 'initial' && this.pendingInitialDeployReject) {
+      this.cancelInitialDeploy(new InitialDeployCancelledError());
+    } else {
+      this.hideRespawnUI();
+    }
     this.respawnUI.dispose();
     this.mapController.dispose();
   }
@@ -119,6 +165,17 @@ export class PlayerRespawnManager implements GameSystem {
     this.inventoryManager = inventoryManager;
   }
 
+  setLoadoutService(loadoutService: LoadoutService): void {
+    this.loadoutService = loadoutService;
+    if (this.isRespawnUIVisible) {
+      this.syncLoadoutPreview();
+    }
+  }
+
+  setGrenadeSystem(grenadeSystem: GrenadeSystem): void {
+    this.grenadeSystem = grenadeSystem;
+  }
+
   setWarSimulator(warSimulator: WarSimulator): void {
     this.warSimulator = warSimulator;
   }
@@ -142,14 +199,10 @@ export class PlayerRespawnManager implements GameSystem {
 
     // Check if game mode allows spawning at zones
     const canSpawnAtZones = this.gameModeManager?.canPlayerSpawnAtZones() ?? false;
+    const playerAlliance = this.getCurrentAlliance();
 
-    // Filter zones - only BLUFOR controlled zones (not OPFOR or contested)
     const zones = this.zoneManager.getAllZones().filter(z => {
-      // Only allow BLUFOR bases (not OPFOR bases)
-      if (z.isHomeBase && z.owner !== null && isBlufor(z.owner)) return true;
-      // Only allow fully BLUFOR-captured zones (not contested or OPFOR controlled)
-      if (canSpawnAtZones && !z.isHomeBase && z.state === ZoneState.US_CONTROLLED) return true;
-      return false;
+      return this.isZoneSpawnableForAlliance(z, playerAlliance, canSpawnAtZones);
     });
 
     Logger.info('player', ` Found ${zones.length} spawnable zones:`, zones.map(z => `${z.name} (${z.state})`));
@@ -170,8 +223,8 @@ export class PlayerRespawnManager implements GameSystem {
     }
 
     const zones = this.zoneManager.getAllZones();
-    // Only non-base zones that are fully US controlled (not contested or OPFOR)
-    return zones.some(zone => zone.state === ZoneState.US_CONTROLLED && !zone.isHomeBase);
+    const playerAlliance = this.getCurrentAlliance();
+    return zones.some(zone => this.isZoneSpawnableForAlliance(zone, playerAlliance, true) && !zone.isHomeBase);
   }
 
   respawnAtBase(): void {
@@ -180,21 +233,19 @@ export class PlayerRespawnManager implements GameSystem {
       return;
     }
 
-    const currentMode = this.getCurrentGameMode();
-    if (currentMode === GameMode.A_SHAU_VALLEY) {
-      const pressureSpawn = this.getAShauPressureSpawnPosition();
-      if (pressureSpawn) {
-        pressureSpawn.y = 5;
-        this.respawn(pressureSpawn);
-        return;
-      }
+    const pressureSpawn = this.getPolicyDrivenInsertionSuggestion();
+    if (pressureSpawn) {
+      pressureSpawn.y = 5;
+      this.respawn(pressureSpawn);
+      return;
     }
 
-    const usBase = this.zoneManager.getAllZones().find(
-      z => z.id === 'us_base' || (z.isHomeBase && z.owner !== null && isBlufor(z.owner))
+    const playerAlliance = this.getCurrentAlliance();
+    const homeBase = this.zoneManager.getAllZones().find(
+      z => z.isHomeBase && z.owner !== null && getAlliance(z.owner) === playerAlliance
     );
 
-    const basePos = usBase ? usBase.position.clone() : new THREE.Vector3(0, 5, -50);
+    const basePos = homeBase ? homeBase.position.clone() : new THREE.Vector3(0, 5, -50);
     basePos.y = 5;
     this.respawn(basePos);
   }
@@ -207,6 +258,19 @@ export class PlayerRespawnManager implements GameSystem {
 
     const target = zone.position.clone().add(new THREE.Vector3(5, 2, 5));
     this.respawn(target);
+  }
+
+  beginInitialDeploy(): Promise<THREE.Vector3> {
+    if (this.isRespawnUIVisible) {
+      return Promise.reject(new Error('Deploy UI is already active'));
+    }
+
+    this.respawnTimer = 0;
+    return new Promise((resolve, reject) => {
+      this.pendingInitialDeployResolve = resolve;
+      this.pendingInitialDeployReject = reject;
+      this.showDeployUI('initial');
+    });
   }
 
   private respawn(position: THREE.Vector3): void {
@@ -227,10 +291,7 @@ export class PlayerRespawnManager implements GameSystem {
       }
     }
 
-    // Reset inventory (including grenades)
-    if (this.inventoryManager) {
-      this.inventoryManager.reset();
-    }
+    this.applyActiveLoadout();
 
     // Re-enable weapon
     if (this.firstPersonWeapon && typeof this.firstPersonWeapon.enable === 'function') {
@@ -278,7 +339,7 @@ export class PlayerRespawnManager implements GameSystem {
     this.respawnTimer = respawnTime;
 
     // Show respawn UI immediately
-    this.showRespawnUI();
+    this.showDeployUI('respawn');
 
     // Trigger callback
     if (this.onDeathCallback) {
@@ -286,10 +347,17 @@ export class PlayerRespawnManager implements GameSystem {
     }
   }
 
-  private showRespawnUI(): void {
+  private showDeployUI(kind: DeploySessionKind): void {
     if (this.isRespawnUIVisible) return;
 
     this.isRespawnUIVisible = true;
+    this.activeDeployFlowKind = kind;
+    this.syncLoadoutContext();
+    this.deploySession = this.gameModeManager?.getDeploySession?.(kind)
+      ?? createDeploySession(getGameModeDefinition(GameMode.ZONE_CONTROL), kind);
+    this.respawnUI.configureSession(this.deploySession);
+    this.respawnUI.setMapInteractionEnabled(this.deploySession.allowSpawnSelection);
+    this.syncLoadoutPreview();
 
     // Update available spawn points
     this.updateAvailableSpawnPoints();
@@ -302,7 +370,7 @@ export class PlayerRespawnManager implements GameSystem {
     this.mapController.showMap(mapContainer);
 
     this.selectedSpawnPoint = undefined;
-    this.respawnUI.resetSelectedSpawn();
+    this.applyInitialSpawnSelection(kind === 'initial');
     this.lastTimerDisplaySecond = -1;
     this.lastTimerDisplayHasSelection = false;
 
@@ -323,14 +391,11 @@ export class PlayerRespawnManager implements GameSystem {
 
     const canSpawnAtZones = this.gameModeManager?.canPlayerSpawnAtZones() ?? false;
     const zones = this.zoneManager.getAllZones();
+    const playerAlliance = this.getCurrentAlliance();
 
     this.availableSpawnPoints = zones
       .filter(z => {
-        // Can only spawn at BLUFOR-owned bases (not OPFOR bases)
-        if (z.isHomeBase && z.owner !== null && isBlufor(z.owner)) return true;
-        // Can spawn at fully captured zones if game mode allows (must be BLUFOR controlled, not contested or OPFOR)
-        if (canSpawnAtZones && !z.isHomeBase && z.state === ZoneState.US_CONTROLLED) return true;
-        return false;
+        return this.isZoneSpawnableForAlliance(z, playerAlliance, canSpawnAtZones);
       })
       .map(z => ({
         id: z.id,
@@ -338,9 +403,21 @@ export class PlayerRespawnManager implements GameSystem {
         position: z.position.clone(),
         safe: true
       }));
+
+    if (this.availableSpawnPoints.length === 0) {
+      this.availableSpawnPoints = [{
+        id: 'default',
+        name: 'Base',
+        position: new THREE.Vector3(0, 5, -50),
+        safe: true
+      }];
+    }
   }
 
   private selectSpawnPointOnMap(zoneId: string, zoneName: string): void {
+    if (this.deploySession && !this.deploySession.allowSpawnSelection) {
+      return;
+    }
     this.selectedSpawnPoint = zoneId;
     this.respawnUI.updateSelectedSpawn(zoneName);
     this.updateTimerDisplay();
@@ -353,15 +430,17 @@ export class PlayerRespawnManager implements GameSystem {
     if (!spawnPoint) return;
 
     Logger.info('player', ` Deploying at ${spawnPoint.name}`);
+    const flowKind = this.activeDeployFlowKind;
     this.hideRespawnUI();
+    const finalPosition = this.createDeployPosition(spawnPoint.position);
 
-    // Add slight randomization to avoid spawn camping
-    const offset = new THREE.Vector3(
-      (Math.random() - 0.5) * 10,
-      2,
-      (Math.random() - 0.5) * 10
-    );
-    const finalPosition = spawnPoint.position.clone().add(offset);
+    if (flowKind === 'initial') {
+      const resolve = this.pendingInitialDeployResolve;
+      this.pendingInitialDeployResolve = undefined;
+      this.pendingInitialDeployReject = undefined;
+      resolve?.(finalPosition);
+      return;
+    }
 
     this.respawn(finalPosition);
   }
@@ -371,8 +450,26 @@ export class PlayerRespawnManager implements GameSystem {
     this.isRespawnUIVisible = false;
     this.respawnUI.hide();
     this.selectedSpawnPoint = undefined;
+    this.deploySession = undefined;
+    this.activeDeployFlowKind = null;
     this.mapController.clearSelection();
     this.mapController.stopMapUpdateInterval();
+  }
+
+  private cancelActiveDeployFlow(): void {
+    if (this.activeDeployFlowKind !== 'initial') {
+      return;
+    }
+
+    this.cancelInitialDeploy(new InitialDeployCancelledError());
+  }
+
+  private cancelInitialDeploy(error: Error): void {
+    const reject = this.pendingInitialDeployReject;
+    this.pendingInitialDeployResolve = undefined;
+    this.pendingInitialDeployReject = undefined;
+    this.hideRespawnUI();
+    reject?.(error);
   }
 
   private updateTimerDisplay(): void {
@@ -383,166 +480,120 @@ export class PlayerRespawnManager implements GameSystem {
     this.respawnUI.updateTimerDisplay(this.respawnTimer, hasSelection);
   }
 
-  getAShauPressureInsertionSuggestion(options?: { minOpfor250?: number }): THREE.Vector3 | null {
-    if (this.getCurrentGameMode() !== GameMode.A_SHAU_VALLEY) return null;
-    const pressureSpawn = this.getAShauPressureSpawnPosition();
+  private handleLoadoutChange(field: LoadoutFieldKey, direction: 1 | -1): void {
+    if (!this.deploySession?.allowLoadoutEditing || !this.loadoutService) {
+      return;
+    }
+
+    const updatedLoadout = this.updateLoadoutField(field, direction);
+    this.inventoryManager?.setLoadout(updatedLoadout);
+    this.respawnUI.updateLoadout(updatedLoadout);
+    this.syncLoadoutPresentation();
+  }
+
+  private handlePresetCycle(direction: 1 | -1): void {
+    if (!this.deploySession?.allowLoadoutEditing || !this.loadoutService) {
+      return;
+    }
+
+    const updatedLoadout = this.loadoutService.cyclePreset(direction);
+    this.inventoryManager?.setLoadout(updatedLoadout);
+    this.respawnUI.updateLoadout(updatedLoadout);
+    this.syncLoadoutPresentation();
+  }
+
+  private handlePresetSave(): void {
+    if (!this.deploySession?.allowLoadoutEditing || !this.loadoutService) {
+      return;
+    }
+
+    this.loadoutService.saveCurrentToActivePreset();
+    this.syncLoadoutPresentation();
+  }
+
+  private applyInitialSpawnSelection(preselectDefaultSpawn: boolean): void {
+    if (!preselectDefaultSpawn && this.deploySession?.allowSpawnSelection !== false) {
+      this.respawnUI.resetSelectedSpawn();
+      return;
+    }
+
+    const fallbackSpawn = this.getPreferredDeploySpawnPoint();
+    if (!fallbackSpawn) {
+      this.respawnUI.resetSelectedSpawn();
+      return;
+    }
+
+    this.selectedSpawnPoint = fallbackSpawn.id;
+    this.respawnUI.updateSelectedSpawn(fallbackSpawn.name);
+  }
+
+  private getPreferredDeploySpawnPoint(): { id: string; name: string; position: THREE.Vector3; safe: boolean } | undefined {
+    if (this.availableSpawnPoints.length === 0) {
+      return undefined;
+    }
+
+    const definition = this.gameModeManager?.getCurrentDefinition?.();
+    if (!definition) {
+      return this.availableSpawnPoints[0];
+    }
+
+    const target = resolveInitialSpawnPosition(definition, this.getCurrentAlliance());
+    let preferred = this.availableSpawnPoints[0];
+    let nearestDist = preferred.position.distanceToSquared(target);
+
+    for (let i = 1; i < this.availableSpawnPoints.length; i++) {
+      const candidate = this.availableSpawnPoints[i];
+      const dist = candidate.position.distanceToSquared(target);
+      if (dist < nearestDist) {
+        preferred = candidate;
+        nearestDist = dist;
+      }
+    }
+
+    return preferred;
+  }
+
+  private createDeployPosition(basePosition: THREE.Vector3): THREE.Vector3 {
+    const offset = new THREE.Vector3(
+      (Math.random() - 0.5) * 10,
+      2,
+      (Math.random() - 0.5) * 10
+    );
+    return basePosition.clone().add(offset);
+  }
+
+  getPolicyDrivenInsertionSuggestion(options?: { minOpfor250?: number }): THREE.Vector3 | null {
+    const respawnPolicy = this.gameModeManager?.getRespawnPolicy();
+    if (respawnPolicy?.contactAssistStyle !== 'pressure_front' && respawnPolicy?.fallbackRule !== 'pressure_front') {
+      return null;
+    }
+
+    const pressureSpawn = this.getPolicyDrivenPressureSpawnPosition();
     if (!pressureSpawn) return null;
-    const minOpfor250 = Math.max(0, Number(options?.minOpfor250 ?? 0));
-    if (minOpfor250 > 0) {
-      const opfor250 = this.countNearbyAgents(pressureSpawn, 250, Alliance.OPFOR);
-      if (opfor250 < minOpfor250) {
+    const minEnemy250 = Math.max(0, Number(options?.minOpfor250 ?? 0));
+    if (minEnemy250 > 0) {
+      const enemy250 = this.countNearbyAgents(pressureSpawn, 250, getEnemyAlliance(this.getCurrentAlliance()));
+      if (enemy250 < minEnemy250) {
         return null;
       }
     }
     return pressureSpawn ? pressureSpawn.clone() : null;
   }
 
-  private getAShauPressureSpawnPosition(): THREE.Vector3 | null {
+  getAShauPressureInsertionSuggestion(options?: { minOpfor250?: number }): THREE.Vector3 | null {
+    return this.getPolicyDrivenInsertionSuggestion(options);
+  }
+
+  private getPolicyDrivenPressureSpawnPosition(): THREE.Vector3 | null {
     if (!this.zoneManager) return null;
-    const zones = this.zoneManager.getAllZones();
-    const usForward = zones.filter(z => !z.isHomeBase && z.state === ZoneState.US_CONTROLLED);
-    if (usForward.length === 0) return null;
-
-    const enemyLike = zones.filter(z => (z.owner !== null && isOpfor(z.owner)) || z.state === ZoneState.CONTESTED || z.owner === null);
-    if (enemyLike.length === 0) {
-      return usForward[0].position.clone();
-    }
-
-    const contestedOrNeutral = enemyLike.filter(z => z.state === ZoneState.CONTESTED || z.owner === null);
-    const objectiveCandidates = contestedOrNeutral.length > 0 ? contestedOrNeutral : enemyLike;
-
-    let bestObjective = objectiveCandidates[0];
-    let bestObjectiveScore = -Infinity;
-    for (const zone of objectiveCandidates) {
-      const objectiveScore = zone.ticketBleedRate ?? 0;
-      if (objectiveScore > bestObjectiveScore) {
-        bestObjectiveScore = objectiveScore;
-        bestObjective = zone;
-      }
-    }
-
-    let nearestUS = usForward[0];
-    let nearestUSDist = Infinity;
-    for (const usZone of usForward) {
-      const d = usZone.position.distanceTo(bestObjective.position);
-      if (d < nearestUSDist) {
-        nearestUSDist = d;
-        nearestUS = usZone;
-      }
-    }
-
-    const enemyHotspot = this.getEnemyHotspotNear(bestObjective.position, 900);
-    const anchor = enemyHotspot ?? bestObjective.position;
-    const dir = new THREE.Vector3().subVectors(nearestUS.position, anchor);
-    dir.y = 0;
-    const len = dir.length();
-    if (len < 1) {
-      return nearestUS.position.clone();
-    }
-    dir.divideScalar(len);
-
-    // Insert on the US-facing side of the objective to cut dead travel while
-    // avoiding direct center-of-objective spawn.
-    const insertionOffsetMeters = enemyHotspot
-      ? Math.min(110, Math.max(55, nearestUSDist * 0.2))
-      : Math.min(160, Math.max(80, nearestUSDist * 0.3));
-    const anchorSpawn = anchor.clone().addScaledVector(dir, insertionOffsetMeters);
-    const sampled = this.selectBestRespawnCandidate(anchorSpawn, dir, nearestUS.position, bestObjective.position);
-    return sampled ?? anchorSpawn;
-  }
-
-  private getEnemyHotspotNear(objective: THREE.Vector3, maxRadius: number): THREE.Vector3 | null {
-    if (!this.warSimulator || !this.warSimulator.isEnabled()) return null;
-
-    const agents = this.warSimulator.getAllAgents();
-    const maxRadiusSq = maxRadius * maxRadius;
-    type Candidate = { x: number; z: number; d2: number };
-    const candidates: Candidate[] = [];
-
-    for (const agent of agents.values()) {
-      if (!agent.alive || !isOpfor(agent.faction)) continue;
-      const dx = agent.x - objective.x;
-      const dz = agent.z - objective.z;
-      const d2 = dx * dx + dz * dz;
-      if (d2 > maxRadiusSq) continue;
-
-      candidates.push({ x: agent.x, z: agent.z, d2 });
-    }
-
-    if (candidates.length === 0) return null;
-    candidates.sort((a, b) => a.d2 - b.d2);
-    const take = Math.min(10, candidates.length);
-    let sumX = 0;
-    let sumZ = 0;
-    for (let i = 0; i < take; i++) {
-      sumX += candidates[i].x;
-      sumZ += candidates[i].z;
-    }
-    return new THREE.Vector3(sumX / take, 0, sumZ / take);
-  }
-
-  private selectBestRespawnCandidate(
-    anchorSpawn: THREE.Vector3,
-    usFacingDir: THREE.Vector3,
-    nearestUSPos: THREE.Vector3,
-    objectivePos: THREE.Vector3
-  ): THREE.Vector3 | null {
-    const candidates = this.buildRespawnCandidates(anchorSpawn, usFacingDir);
-    if (candidates.length === 0) return null;
-
-    let best: { pos: THREE.Vector3; score: number } | null = null;
-    for (const candidate of candidates) {
-      if (!this.isTerrainReadyAt(candidate.x, candidate.z)) continue;
-      const score = this.scoreRespawnCandidate(candidate, nearestUSPos, objectivePos);
-      if (!best || score > best.score) {
-        best = { pos: candidate, score };
-      }
-    }
-
-    return best?.pos ?? null;
-  }
-
-  private buildRespawnCandidates(anchorSpawn: THREE.Vector3, usFacingDir: THREE.Vector3): THREE.Vector3[] {
-    const dir = usFacingDir.clone().normalize();
-    if (!Number.isFinite(dir.x) || !Number.isFinite(dir.z) || dir.lengthSq() < 0.0001) {
-      dir.set(0, 0, 1);
-    }
-    const lateral = new THREE.Vector3(-dir.z, 0, dir.x);
-    const offsets = [
-      { forward: 0, side: 0 },
-      { forward: -18, side: 0 },
-      { forward: 18, side: 0 },
-      { forward: -12, side: -14 },
-      { forward: -12, side: 14 },
-      { forward: 12, side: -14 },
-      { forward: 12, side: 14 },
-      { forward: -26, side: -10 },
-      { forward: -26, side: 10 },
-      { forward: -8, side: -22 },
-      { forward: -8, side: 22 }
-    ];
-
-    return offsets.map(o =>
-      anchorSpawn.clone()
-        .addScaledVector(dir, o.forward)
-        .addScaledVector(lateral, o.side)
-    );
-  }
-
-  private scoreRespawnCandidate(candidate: THREE.Vector3, nearestUSPos: THREE.Vector3, objectivePos: THREE.Vector3): number {
-    const opfor250 = this.countNearbyAgents(candidate, 250, Alliance.OPFOR);
-    const opfor400 = this.countNearbyAgents(candidate, 400, Alliance.OPFOR);
-    const us220 = this.countNearbyAgents(candidate, 220, Alliance.BLUFOR);
-    const dToObjective = candidate.distanceTo(objectivePos);
-    const dToUS = candidate.distanceTo(nearestUSPos);
-
-    // Heavily reward immediate/near tactical pressure, lightly penalize
-    // excessive objective stand-off and deep friendline bias.
-    return opfor250 * 8
-      + opfor400 * 2.5
-      - us220 * 1.25
-      - dToObjective * 0.01
-      - dToUS * 0.002;
+    const respawnPolicy = this.gameModeManager?.getRespawnPolicy();
+    if (!respawnPolicy) return null;
+    return resolveRespawnFallbackPosition(respawnPolicy, {
+      zones: this.zoneManager.getAllZones(),
+      alliance: this.getCurrentAlliance(),
+      warSimulator: this.warSimulator,
+      terrainReadyAt: (x: number, z: number) => this.isTerrainReadyAt(x, z)
+    });
   }
 
   private countNearbyAgents(center: THREE.Vector3, radius: number, alliance: Alliance): number {
@@ -565,14 +616,92 @@ export class PlayerRespawnManager implements GameSystem {
     return this.terrainSystem.isTerrainReady() && this.terrainSystem.hasTerrainAt(x, z);
   }
 
-  private getCurrentGameMode(): GameMode | undefined {
-    return this.gameModeManager?.getCurrentMode();
-  }
-
   getSessionRespawnStats(): { deaths: number; respawns: number } {
     return {
       deaths: this.deathCount,
       respawns: this.respawnCount
     };
+  }
+
+  private syncLoadoutPreview(): void {
+    const editingEnabled = !!this.loadoutService && !!this.deploySession?.allowLoadoutEditing;
+    this.respawnUI.setLoadoutEditingEnabled(editingEnabled);
+
+    const loadout = this.loadoutService?.getCurrentLoadout();
+    if (loadout) {
+      this.inventoryManager?.setLoadout(loadout);
+      this.respawnUI.updateLoadout(loadout);
+    }
+
+    this.syncLoadoutPresentation();
+  }
+
+  private updateLoadoutField(field: LoadoutFieldKey, direction: 1 | -1): PlayerLoadout {
+    if (!this.loadoutService) {
+      throw new Error('Loadout service is required before editing deploy loadouts');
+    }
+    return this.loadoutService.cycleField(field, direction);
+  }
+
+  private applyActiveLoadout(): void {
+    if (this.loadoutService) {
+      this.loadoutService.applyToRuntime({
+        inventoryManager: this.inventoryManager,
+        firstPersonWeapon: this.firstPersonWeapon,
+        grenadeSystem: this.grenadeSystem
+      });
+      return;
+    }
+
+    this.inventoryManager?.reset();
+  }
+
+  private syncLoadoutContext(): void {
+    if (!this.loadoutService) {
+      return;
+    }
+
+    const definition = this.gameModeManager?.getCurrentDefinition?.();
+    if (!definition) {
+      return;
+    }
+
+    const currentContext = this.loadoutService.getContext();
+    if (currentContext.mode === definition.id) {
+      this.loadoutService.setContextFromDefinition(definition, currentContext.alliance, currentContext.faction);
+      return;
+    }
+
+    this.loadoutService.setContextFromDefinition(definition);
+  }
+
+  private syncLoadoutPresentation(): void {
+    if (!this.loadoutService) {
+      return;
+    }
+
+    this.respawnUI.updateLoadoutPresentation(this.loadoutService.getPresentationModel());
+  }
+
+  private getCurrentAlliance(): Alliance {
+    return this.loadoutService?.getContext().alliance ?? Alliance.BLUFOR;
+  }
+
+  private isZoneSpawnableForAlliance(
+    zone: Pick<CaptureZone, 'isHomeBase' | 'owner' | 'state'>,
+    alliance: Alliance,
+    allowControlledZoneSpawns: boolean
+  ): boolean {
+    if (zone.isHomeBase) {
+      return zone.owner !== null && getAlliance(zone.owner) === alliance;
+    }
+
+    if (!allowControlledZoneSpawns) {
+      return false;
+    }
+
+    return alliance === Alliance.BLUFOR
+      ? zone.state === ZoneState.US_CONTROLLED
+      : zone.state === ZoneState.OPFOR_CONTROLLED;
   }
 }

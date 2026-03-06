@@ -5,12 +5,19 @@ import { WeaponAmmo } from './WeaponAmmo'
 import { AmmoManager, AmmoState } from '../../weapons/AmmoManager'
 import type { HUDSystem } from '../../../ui/hud/HUDSystem'
 import type { AudioManager } from '../../audio/AudioManager'
+import type { LoadoutWeapon } from '../../../ui/loadout/LoadoutTypes'
 
 /**
  * Handles weapon switching logic for rifle, shotgun, and SMG
  * Unified implementation to eliminate duplication
  */
 export class WeaponSwitching {
+  private static readonly RUNTIME_WEAPON_MAP: Record<LoadoutWeapon | 'rifle' | 'shotgun' | 'smg' | 'pistol', 'rifle' | 'shotgun' | 'smg' | 'pistol'> = {
+    rifle: 'rifle',
+    shotgun: 'shotgun',
+    smg: 'smg',
+    pistol: 'pistol'
+  }
   private rigManager: WeaponRigManager
   private input: WeaponInput
   private animations: WeaponAnimations
@@ -53,12 +60,13 @@ export class WeaponSwitching {
    * @returns true if switch was initiated, false if already on that weapon or switching
    */
   switchWeapon(
-    weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol',
+    weaponType: LoadoutWeapon | 'rifle' | 'shotgun' | 'smg' | 'pistol',
     onAmmoChange: (state: AmmoState) => void
   ): boolean {
-    const ammoManager = this.weaponAmmoMap[weaponType]()
+    const runtimeWeaponType = WeaponSwitching.RUNTIME_WEAPON_MAP[weaponType]
+    const ammoManager = this.weaponAmmoMap[runtimeWeaponType]()
     
-    if (this.rigManager.startWeaponSwitch(weaponType, this.hudSystem, this.audioManager, ammoManager)) {
+    if (this.rigManager.startWeaponSwitch(runtimeWeaponType, this.hudSystem, this.audioManager, ammoManager)) {
       this.input.setFiringActive(false)
       this.animations.setADS(false)
       this.ammo.setCurrentAmmoManager(ammoManager)

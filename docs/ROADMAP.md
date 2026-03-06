@@ -1,9 +1,11 @@
 # Terror in the Jungle - Roadmap
 
-Last updated: 2026-02-25
-Status: DRAFT - Awaiting alignment
+Last updated: 2026-03-06
+Status: ALIGNED - Aspirational roadmap, with active execution tracked in `GAME_MODES_EXECUTION_PLAN.md`
 
 > **Note:** This is an aspirational planning document. Phase dates and scope are not commitments. See `ARCHITECTURE_RECOVERY_PLAN.md` for active work status and `UI_ENGINE_PLAN.md` for UI migration status.
+> **Execution note:** Active implementation sequencing for game modes, deploy/loadout flow, command UX, map intel policy, faction generalization, and death presentation now lives in `GAME_MODES_EXECUTION_PLAN.md`.
+> **Handoff note:** Current phase status and recommended resume points live in `ACTIVE_GAME_MODES_HANDOFF.md`.
 
 ## Vision
 
@@ -20,30 +22,30 @@ Vietnam War is the first theater. The architecture should generalize to any war 
 | Domain | State | Key Limitation |
 |--------|-------|----------------|
 | Vehicles | 1 player-only UH-1 Huey | No NPC boarding, no weapons, no damage, no enemy aircraft, throttle sticks |
-| Weapons | 4 player + 2 NPC types | No loadout selection, all weapons always available |
+| Weapons | 4 player + 2 NPC types | Shared deploy/loadout flow is live, but field pickups and broader weapon expansion are still later-phase work |
 | AI | 8-state FSM, 2 factions (US/OPFOR) | No vehicle usage, no turret manning, limited tactical intelligence |
-| Squad | 5 commands via Z-menu | Conflicting mobile/PC controls, dead code paths, radial menu race condition on touch |
+| Squad | Single coordinator + quick strip + map-first desktop/touch overlay | No selected-squad panel yet, and gamepad still uses radial fallback |
 | Terrain | Noise + DEM terrain runtime | CDLOD transition validation and hydrology/gameplay integration are still incomplete |
 | Vegetation | 7+ billboard types with biome-aware runtime wiring | Needs in-engine smoke validation and visual tuning across modes |
 | Water | Global plane + shader rivers | No swimming, no boats, disabled in A Shau, shader is basic |
-| Assets | 75 GLBs generated (not yet integrated), all in-engine still procedural | Models staged in `deploy-3d-assets/`, engine still uses boxes/cylinders |
+| Assets | GLB integration has started for several live systems | More models remain staged in `deploy-3d-assets/`, but the engine is no longer fully procedural |
 | HUD/UI | UI Engine Phases 0-7 complete (CSS Modules + signals) | Squad UI scattered, no RTS command surface, no vehicle weapon HUD |
 | Scale | 3000 agents / 21km map | Heap growth warnings at current scale, architecture recovery P0-P3 active |
-| Factions | US vs OPFOR (labeled VC) | No NVA/ARVN/VC visual distinction, no faction switching |
+| Factions | US, ARVN, NVA, VC loadout contexts are live | Core world ownership logic still leaks US/OPFOR assumptions |
 
 ## Known Bugs (Confirmed)
 
 ### Helicopter Throttle
 - **Symptom:** Collective stays elevated after releasing W key
-- **Root cause:** PlayerMovement.ts lerps collective to 0.4 (hover point) on key release with autoHover on. With autoHover off, collective doesn't decay AT ALL.
+- **Root cause:** PlayerMovement.ts still lerps collective to 0.4 (hover point) on key release with autoHover on. With autoHover off, current code decays collective toward 0, but the overall control feel is still sticky and needs a clearer schema.
 - **Two-layer smoothing** (PlayerMovement lerp @ 2.0 + HelicopterPhysics lerp @ 8.0) compounds the stickiness.
 - **Fix needed:** Explicit control schema - hold for thrust, release for none, dedicated lock button for maintaining altitude.
 
 ### Squad Controls
-- **Dead code:** TouchActionButtons has no squad button but TouchControls wires a 'squad' case that never fires.
-- **Race condition:** SquadRadialMenu touchend fires command before touchmove can select correct segment.
-- **Split input paths:** Z-key handled in PlayerInput.ts, Shift+1-5 handled directly in PlayerSquadController.ts.
-- **See:** `docs/SQUAD_COMMAND_REARCHITECT.md` for full analysis.
+- **Current state:** Desktop and touch command entry now run through `CommandInputManager`, with a map-first overlay for placement orders.
+- **Remaining gap:** Gamepad still falls back to the radial menu while the map-first command surface is desktop/touch only.
+- **Remaining gap:** No selected-squad detail panel or map-click squad selection yet.
+- **See:** `docs/SQUAD_COMMAND_REARCHITECT.md` for current architecture and remaining work.
 
 ## Resolved Decisions
 
@@ -218,10 +220,17 @@ Not one monolith sandbox mode. Instead, composable blocks that can be combined:
 
 ---
 
-## Phase 4: Squad Command & RTS Layer
+## Phase 4: Squad Command & RTS Layer [PARTIALLY COMPLETE]
 **Goal:** Unified, intuitive command interface that scales from squad to army.
 **Dependencies:** Independent (can start parallel with Phase 3).
 **See:** `docs/SQUAD_COMMAND_REARCHITECT.md`
+
+Current state:
+- single command coordinator is live
+- `QuickCommandStrip` is live
+- desktop/touch command mode is now map-first for ground placement orders
+- minimap/full-map guidance for current command position is live
+- remaining work is selected-squad detail, map-click squad selection, and gamepad parity
 
 ### 4A. Input Unification
 - All squad input routed through single CommandInputManager
@@ -240,6 +249,7 @@ Not one monolith sandbox mode. Instead, composable blocks that can be combined:
 - UX must be extremely efficient: minimal menu depth, quick-access shortcuts, point-and-click on map
 - Player can snap back to FPS instantly (Escape or Z release)
 - Audio cues for incoming threats while in command view (gunfire near player, taking damage)
+- Desktop/touch overlay currently uses a local tactical map rather than a full detached command camera. That is the current stepping stone, not the final battalion-scale surface.
 
 ### 4C. Command Scaling
 - **Squad scale (8-16):** Direct orders to individual squad (follow, hold, assault, defend, retreat)
@@ -315,7 +325,7 @@ Not one monolith sandbox mode. Instead, composable blocks that can be combined:
 **Goal:** Loadout system, new weapons, turrets, animals.
 **Dependencies:** Phase 2C (weapon GLBs), Phase 3B (vehicle weapons).
 
-### 7A. Loadout System
+### 7A. Loadout System [FOUNDATION LIVE]
 - **Default presets** per faction (e.g., Rifleman = M16 + M1911 + frags, Support = M60 + M1911 + smoke)
 - **Custom loadouts:** player can build and save custom loadouts from faction weapon pool
 - **Changeable on respawn:** loadout selection screen appears on each respawn, not just match start
@@ -324,6 +334,7 @@ Not one monolith sandbox mode. Instead, composable blocks that can be combined:
 - Weapon swap at captured objectives: interact with ammo crate, choose replacement
 - Loadout screen shows weapon stats (damage, RPM, range, recoil)
 - Faction-specific weapon pools (US gets M16/M60, NVA gets AK-47/RPG-7)
+- Current implementation already has the shared deploy/respawn loadout loop, faction-aware pools, presets, and OPFOR AK first-person weapon switching. Field pickup, objective crate swapping, and deeper equipment expansion remain future work.
 
 ### 7B. Stationary Weapons
 - M2 .50 cal emplacement at objectives (sandbag ring + tripod)

@@ -23,6 +23,7 @@ import { zIndex, fontStack } from '../design/tokens';
 import { ViewportManager } from '../design/responsive';
 import type { HUDLayout } from '../layout/HUDLayout';
 import * as THREE from 'three';
+import type { InventorySlotDefinition } from '../../systems/player/InventoryManager';
 
 export class HUDElements {
   // Main containers
@@ -369,6 +370,18 @@ export class HUDElements {
     if (this.weaponSwitchFeedback) {
       this.weaponSwitchFeedback.show(weaponName, weaponIcon, ammo);
     }
+  }
+
+  setWeaponBarLayout(slotDefinitions: InventorySlotDefinition[], weaponCycleSlots: number[]): void {
+    this.unifiedWeaponBar.setSlotDefinitions(slotDefinitions.map(def => ({
+      enabled: def.enabled,
+      shortLabel: def.shortLabel,
+      fullLabel: def.fullLabel
+    })));
+    this.weaponPill.setSlotConfig(
+      slotDefinitions.map(def => def.shortLabel),
+      weaponCycleSlots
+    );
   }
 
   dispose(): void {

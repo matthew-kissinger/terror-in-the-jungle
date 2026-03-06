@@ -22,6 +22,7 @@ import { CompassSystem } from '../ui/compass/CompassSystem';
 import { HelipadSystem } from '../systems/helicopter/HelipadSystem';
 import { HelicopterModel } from '../systems/helicopter/HelicopterModel';
 import { PlayerSquadController } from '../systems/combat/PlayerSquadController';
+import { CommandInputManager } from '../systems/combat/CommandInputManager';
 import { InventoryManager } from '../systems/player/InventoryManager';
 import { GrenadeSystem } from '../systems/weapons/GrenadeSystem';
 import { MortarSystem } from '../systems/weapons/MortarSystem';
@@ -37,7 +38,7 @@ import { WeatherSystem } from '../systems/environment/WeatherSystem';
 
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { VoiceCalloutSystem } from '../systems/audio/VoiceCalloutSystem';
-import { LoadoutSelector } from '../ui/loadout/LoadoutSelector';
+import { LoadoutService } from '../systems/player/LoadoutService';
 import { WarSimulator } from '../systems/strategy/WarSimulator';
 import { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
 import { SpatialGridManager, spatialGridManager } from '../systems/combat/SpatialGridManager';
@@ -68,6 +69,7 @@ export interface SystemReferences {
   helipadSystem: HelipadSystem;
   helicopterModel: HelicopterModel;
   playerSquadController: PlayerSquadController;
+  commandInputManager: CommandInputManager;
   inventoryManager: InventoryManager;
   grenadeSystem: GrenadeSystem;
   mortarSystem: MortarSystem;
@@ -80,7 +82,7 @@ export interface SystemReferences {
   ammoSupplySystem: AmmoSupplySystem;
   footstepAudioSystem: FootstepAudioSystem;
   voiceCalloutSystem: VoiceCalloutSystem;
-  loadoutSelector: LoadoutSelector;
+  loadoutService: LoadoutService;
   warSimulator: WarSimulator;
   strategicFeedback: StrategicFeedback;
   spatialGridManager: SpatialGridManager;
@@ -172,6 +174,7 @@ export class SystemInitializer {
     // Initialize new squad/inventory/grenade systems
     const squadManager = (refs.combatantSystem as any).squadManager;
     refs.playerSquadController = new PlayerSquadController(squadManager);
+    refs.commandInputManager = new CommandInputManager(refs.playerSquadController);
     refs.inventoryManager = new InventoryManager();
     refs.inventoryManager.setSuppressUI(true); // UnifiedWeaponBar replaces built-in hotbar
     refs.grenadeSystem = new GrenadeSystem(scene, camera, refs.terrainSystem);
@@ -184,7 +187,7 @@ export class SystemInitializer {
     refs.ammoSupplySystem = new AmmoSupplySystem(scene, camera);
     refs.footstepAudioSystem = new FootstepAudioSystem(refs.audioManager.getListener());
     refs.voiceCalloutSystem = new VoiceCalloutSystem(scene, refs.audioManager.getListener());
-    refs.loadoutSelector = new LoadoutSelector();
+    refs.loadoutService = new LoadoutService();
     refs.warSimulator = new WarSimulator();
     refs.strategicFeedback = new StrategicFeedback();
     refs.spatialGridManager = spatialGridManager;
@@ -218,6 +221,7 @@ export class SystemInitializer {
       refs.skybox,
       refs.gameModeManager,
       refs.playerSquadController,
+      refs.commandInputManager,
       refs.inventoryManager,
       refs.grenadeSystem,
       refs.mortarSystem,
@@ -229,7 +233,6 @@ export class SystemInitializer {
       refs.influenceMapSystem,
       refs.ammoSupplySystem,
       refs.voiceCalloutSystem,
-      refs.loadoutSelector,
       refs.warSimulator,
       refs.strategicFeedback
     ];
@@ -240,8 +243,7 @@ export class SystemInitializer {
     const deferredSystems = new Set<GameSystem>([
       refs.helipadSystem,
       refs.helicopterModel,
-      refs.voiceCalloutSystem,
-      refs.loadoutSelector
+      refs.voiceCalloutSystem
     ]);
 
     const systems: GameSystem[] = allSystems.filter(system => !deferredSystems.has(system));

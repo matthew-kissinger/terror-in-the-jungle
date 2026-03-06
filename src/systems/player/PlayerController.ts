@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GameSystem, PlayerState } from '../../types';
 import { GameModeManager } from '../world/GameModeManager';
-import { Faction } from '../combat/types';
+import { Faction, getAlliance } from '../combat/types';
 import { InventoryManager, WeaponSlot } from './InventoryManager';
 import { TicketSystem } from '../world/TicketSystem';
 import { GrenadeSystem } from '../weapons/GrenadeSystem';
@@ -14,10 +14,12 @@ import { InputManager } from '../input/InputManager';
 import { PlayerMovement } from './PlayerMovement';
 import { PlayerCamera } from './PlayerCamera';
 import { Logger } from '../../utils/Logger';
+import { resolveInitialSpawnPosition } from '../world/runtime/ModeSpawnResolver';
 import type { HelicopterModel } from '../helicopter/HelicopterModel';
 import type { FirstPersonWeapon } from './FirstPersonWeapon';
 import type { HUDSystem } from '../../ui/hud/HUDSystem';
 import type { IGameRenderer, ITerrainRuntime } from '../../types/SystemInterfaces';
+import type { CommandInputManager } from '../combat/CommandInputManager';
 import type { PlayerSquadController } from '../combat/PlayerSquadController';
 
 export class PlayerController implements GameSystem {
@@ -39,8 +41,10 @@ export class PlayerController implements GameSystem {
   private rallyPointSystem?: RallyPointSystem;
   private footstepAudioSystem?: FootstepAudioSystem;
   private playerSquadController?: PlayerSquadController;
+  private commandInputManager?: CommandInputManager;
   private playerSquadId?: string;
   private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
+  private playerFaction: Faction = Faction.US;
   private playerState: PlayerState;
   private spawnStabilizationUntilMs = 0;
 
@@ -138,8 +142,8 @@ export class PlayerController implements GameSystem {
           this.inventoryManager.setCurrentSlot(slot);
         }
       },
-      onSquadCommand: () => this.playerSquadController?.toggleRadialMenu(),
-      onSquadQuickCommand: (slot: number) => this.playerSquadController?.issueQuickCommand(slot),
+      onSquadCommand: () => this.commandInputManager?.toggleCommandMode(),
+      onSquadQuickCommand: (slot: number) => this.commandInputManager?.issueQuickCommand(slot),
       onMenuPause: () => this.handleMenuPause(),
       onMenuResume: () => this.handleMenuResume(),
     });
@@ -196,12 +200,18 @@ export class PlayerController implements GameSystem {
     if (!isGameActive) return;
 
     switch (this.currentWeaponMode) {
-      case WeaponSlot.GRENADE:
-        if (this.grenadeSystem) {
+      case WeaponSlot.GRENADE: {
+        const equipmentAction = this.inventoryManager?.getEquipmentActionForSlot(WeaponSlot.GRENADE);
+        if (equipmentAction === 'grenade' && this.grenadeSystem) {
           this.grenadeSystem.startAiming();
           this.hudSystem?.showGrenadePowerMeter();
+        } else if (equipmentAction === 'sandbag') {
+          this.sandbagSystem?.placeSandbag();
+        } else if (equipmentAction === 'mortar') {
+          this.handleDeployMortar();
         }
         break;
+      }
       case WeaponSlot.SANDBAG:
         this.sandbagSystem?.placeSandbag();
         break;
@@ -216,7 +226,7 @@ export class PlayerController implements GameSystem {
   private actionFireStop(): void {
     switch (this.currentWeaponMode) {
       case WeaponSlot.GRENADE:
-        if (this.grenadeSystem) {
+        if (this.inventoryManager?.getEquipmentActionForSlot(WeaponSlot.GRENADE) === 'grenade' && this.grenadeSystem) {
           this.grenadeSystem.throwGrenade();
           this.hudSystem?.hideGrenadePowerMeter();
         }
@@ -259,6 +269,9 @@ export class PlayerController implements GameSystem {
   }
 
   private handleEscape(): void {
+    if (this.commandInputManager?.handleCancel()) {
+      return;
+    }
     if (this.playerState.isInHelicopter && this.helicopterModel) {
       this.helicopterModel.exitHelicopter();
     } else {
@@ -286,7 +299,7 @@ export class PlayerController implements GameSystem {
     const result = this.rallyPointSystem.placeRallyPoint(
       this.playerState.position.clone(),
       this.playerSquadId,
-      Faction.US
+      this.playerFaction
     );
 
     if (this.hudSystem) {
@@ -308,6 +321,10 @@ export class PlayerController implements GameSystem {
 
   private handleDeployMortar(): void {
     if (!this.mortarSystem) return;
+    if (this.inventoryManager && !this.inventoryManager.hasMortarKit()) {
+      this.hudSystem?.showMessage('Mortar kit not equipped', 2000);
+      return;
+    }
 
     if (this.mortarSystem.isCurrentlyDeployed()) {
       this.mortarSystem.undeployMortar();
@@ -356,9 +373,10 @@ export class PlayerController implements GameSystem {
   }
 
   private updateWeaponSystems(): void {
-    if (this.currentWeaponMode === WeaponSlot.SANDBAG && this.sandbagSystem) {
+    const equipmentAction = this.inventoryManager?.getEquipmentActionForSlot(this.currentWeaponMode) ?? null;
+    if ((this.currentWeaponMode === WeaponSlot.SANDBAG || equipmentAction === 'sandbag') && this.sandbagSystem) {
       this.sandbagSystem.updatePreviewPosition(this.camera);
-    } else if (this.currentWeaponMode === WeaponSlot.GRENADE && this.grenadeSystem) {
+    } else if ((this.currentWeaponMode === WeaponSlot.GRENADE && equipmentAction === 'grenade') && this.grenadeSystem) {
       if (this.grenadeSystem.isCurrentlyAiming()) {
         this.grenadeSystem.updateArc();
         if (this.hudSystem) {
@@ -380,37 +398,15 @@ export class PlayerController implements GameSystem {
       this.sandbagSystem.showPlacementPreview(false);
     }
 
-    switch (slot) {
-      case WeaponSlot.PRIMARY:
-      case WeaponSlot.SHOTGUN:
-      case WeaponSlot.SMG:
-      case WeaponSlot.PISTOL: {
-        if (this.firstPersonWeapon) {
-          this.firstPersonWeapon.setWeaponVisibility(true);
-          // Explicitly switch weapon model — acts as defensive fallback in case
-          // the InventoryManager onSlotChange → FirstPersonWeapon callback path
-          // didn't trigger (e.g. touch input race). setPrimaryWeapon is a no-op
-          // if the switch is already in progress.
-          const weaponMap: Record<number, 'rifle' | 'shotgun' | 'smg' | 'pistol'> = {
-            [WeaponSlot.PRIMARY]: 'rifle',
-            [WeaponSlot.SHOTGUN]: 'shotgun',
-            [WeaponSlot.SMG]: 'smg',
-            [WeaponSlot.PISTOL]: 'pistol',
-          };
-          this.firstPersonWeapon.setPrimaryWeapon(weaponMap[slot]);
-        }
-        break;
-      }
-      case WeaponSlot.GRENADE:
-        if (this.grenadeSystem) {
-          this.grenadeSystem.showGrenadeInHand(true);
-        }
-        break;
-      case WeaponSlot.SANDBAG:
-        if (this.sandbagSystem) {
-          this.sandbagSystem.showPlacementPreview(true);
-        }
-        break;
+    const equippedWeapon = this.inventoryManager?.getWeaponTypeForSlot(slot) ?? null;
+    const equipmentAction = this.inventoryManager?.getEquipmentActionForSlot(slot) ?? null;
+    if (equippedWeapon && this.firstPersonWeapon) {
+      this.firstPersonWeapon.setWeaponVisibility(true);
+      this.firstPersonWeapon.setPrimaryWeapon(equippedWeapon);
+    } else if (equipmentAction === 'grenade') {
+      this.grenadeSystem?.showGrenadeInHand(true);
+    } else if (equipmentAction === 'sandbag' || (slot === WeaponSlot.SANDBAG && this.inventoryManager?.hasSandbagKit())) {
+      this.sandbagSystem?.showPlacementPreview(true);
     }
 
     this.currentWeaponMode = slot;
@@ -426,7 +422,7 @@ export class PlayerController implements GameSystem {
       touchControls.setActiveWeaponSlot(slot as number);
 
       // Show/hide sandbag rotation buttons
-      if (slot === WeaponSlot.SANDBAG) {
+      if (equipmentAction === 'sandbag' || slot === WeaponSlot.SANDBAG) {
         touchControls.sandbagButtons.showButton();
       } else {
         touchControls.sandbagButtons.hideButton();
@@ -439,23 +435,11 @@ export class PlayerController implements GameSystem {
       return new THREE.Vector3(0, 5, -50);
     }
 
-    const config = this.gameModeManager.getCurrentConfig();
-
-    const usMainHQ = config.zones.find(z =>
-      z.isHomeBase &&
-      z.owner === Faction.US &&
-      (z.id.includes('main') || z.id === 'us_base')
-    );
-
-    if (usMainHQ) {
-      const spawnPos = usMainHQ.position.clone();
-      spawnPos.y = 5;
-      Logger.info('player', ` Spawning at US main HQ: ${spawnPos.x.toFixed(1)}, ${spawnPos.y.toFixed(1)}, ${spawnPos.z.toFixed(1)}`);
-      return spawnPos;
-    }
-
-    Logger.warn('player', 'Could not find US main HQ, using default spawn');
-    return new THREE.Vector3(0, 5, -50);
+    const definition = this.gameModeManager.getCurrentDefinition();
+    const spawnPos = resolveInitialSpawnPosition(definition, getAlliance(this.playerFaction));
+    spawnPos.y = 5;
+    Logger.info('player', ` Spawning at policy-resolved start: ${spawnPos.x.toFixed(1)}, ${spawnPos.y.toFixed(1)}, ${spawnPos.z.toFixed(1)}`);
+    return spawnPos;
   }
 
   // Public API methods
@@ -529,6 +513,10 @@ export class PlayerController implements GameSystem {
   setGameStarted(started: boolean): void {
     this.input.setGameStarted(started);
     this.input.setInputContext(started ? 'gameplay' : 'menu');
+  }
+  setPlayerFaction(faction: Faction): void {
+    this.playerFaction = faction;
+    this.firstPersonWeapon?.setPlayerFaction(faction);
   }
 
   applyRecoil(pitchDeltaRad: number, yawDeltaRad: number): void { this.cameraController.applyRecoil(pitchDeltaRad, yawDeltaRad); }
@@ -628,6 +616,7 @@ export class PlayerController implements GameSystem {
   setHelicopterModel(helicopterModel: HelicopterModel): void { this.helicopterModel = helicopterModel; this.movement.setHelicopterModel(helicopterModel); this.cameraController.setHelicopterModel(helicopterModel); helicopterModel.setPlayerInput(this.input); }
   setFirstPersonWeapon(firstPersonWeapon: FirstPersonWeapon): void {
     this.firstPersonWeapon = firstPersonWeapon;
+    firstPersonWeapon.setPlayerFaction(this.playerFaction);
     // Disable WeaponInput's direct mouse/key listeners - all input flows through PlayerController
     firstPersonWeapon.getWeaponInput().disableDirectListeners();
     // Wire touch-specific extras (weapon bar, mortar)
@@ -640,11 +629,14 @@ export class PlayerController implements GameSystem {
     hudSystem.setWeaponSelectCallback((slotIndex: number) => {
       this.inventoryManager?.setCurrentSlot(slotIndex as WeaponSlot);
     });
+    this.syncLoadoutHud();
   }
   setRenderer(renderer: IGameRenderer): void { this.gameRenderer = renderer; }
   setInventoryManager(inventoryManager: InventoryManager): void {
     this.inventoryManager = inventoryManager;
     inventoryManager.onSlotChange((slot: WeaponSlot) => this.handleWeaponSlotChange(slot));
+    inventoryManager.onLoadoutChange(() => this.syncLoadoutHud());
+    this.syncLoadoutHud();
   }
   setGrenadeSystem(grenadeSystem: GrenadeSystem): void { this.grenadeSystem = grenadeSystem; }
   setMortarSystem(mortarSystem: MortarSystem): void { this.mortarSystem = mortarSystem; }
@@ -654,4 +646,16 @@ export class PlayerController implements GameSystem {
   setFootstepAudioSystem(footstepAudioSystem: FootstepAudioSystem): void { this.footstepAudioSystem = footstepAudioSystem; this.movement.setFootstepAudioSystem(footstepAudioSystem); }
   setPlayerSquadId(squadId: string): void { this.playerSquadId = squadId; }
   setPlayerSquadController(playerSquadController: PlayerSquadController): void { this.playerSquadController = playerSquadController; }
+  setCommandInputManager(commandInputManager: CommandInputManager): void {
+    this.commandInputManager = commandInputManager;
+    commandInputManager.bindInputManager(this.input);
+  }
+
+  private syncLoadoutHud(): void {
+    if (!this.hudSystem || !this.inventoryManager) {
+      return;
+    }
+    this.hudSystem.setWeaponBarLayout(this.inventoryManager.getSlotDefinitions(), this.inventoryManager.getWeaponCycleSlots());
+    this.hudSystem.setActiveWeaponSlot(this.inventoryManager.getCurrentSlot());
+  }
 }

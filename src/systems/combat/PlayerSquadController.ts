@@ -4,22 +4,36 @@ import { SquadCommand } from './types';
 import { SquadManager } from './SquadManager';
 import { Logger } from '../../utils/Logger';
 import { SquadRadialMenu } from '../../ui/hud/SquadRadialMenu';
+import {
+  getQuickCommandOption,
+  getSquadCommandLabel,
+  SQUAD_QUICK_COMMAND_OPTIONS,
+  type SquadQuickCommandOption
+} from './SquadCommandPresentation';
+
+export interface SquadCommandState {
+  hasSquad: boolean;
+  currentCommand: SquadCommand;
+  isCommandModeOpen: boolean;
+  memberCount: number;
+  commandPosition?: THREE.Vector3;
+}
+
+type SquadCommandStateListener = (state: SquadCommandState) => void;
 
 export class PlayerSquadController implements GameSystem {
   private squadManager: SquadManager;
   private playerSquadId?: string;
   private playerPosition = new THREE.Vector3();
   private currentCommand: SquadCommand = SquadCommand.NONE;
-  private commandUIElement?: HTMLElement;
   private commandIndicatorElement?: HTMLElement;
-  private isUIVisible = false;
   private radialMenu: SquadRadialMenu;
+  private readonly commandStateListeners = new Set<SquadCommandStateListener>();
 
   constructor(squadManager: SquadManager) {
     this.squadManager = squadManager;
     this.radialMenu = new SquadRadialMenu();
     this.radialMenu.setCommandSelectedCallback((command) => this.issueCommand(command));
-    this.createCommandUI();
   }
 
   async init(): Promise<void> {
@@ -32,9 +46,6 @@ export class PlayerSquadController implements GameSystem {
 
   dispose(): void {
     this.radialMenu.dispose();
-    if (this.commandUIElement && this.commandUIElement.parentNode) {
-      this.commandUIElement.parentNode.removeChild(this.commandUIElement);
-    }
     if (this.commandIndicatorElement && this.commandIndicatorElement.parentNode) {
       this.commandIndicatorElement.parentNode.removeChild(this.commandIndicatorElement);
     }
@@ -49,6 +60,7 @@ export class PlayerSquadController implements GameSystem {
       this.currentCommand = SquadCommand.NONE;
       Logger.info('squad', ` Player now commanding squad: ${squadId} (${squad.members.length} members)`);
       this.updateCommandIndicator();
+      this.emitCommandState();
     }
   }
 
@@ -58,41 +70,50 @@ export class PlayerSquadController implements GameSystem {
 
   /** Entry point for centralized input routing (Shift+Digit from PlayerInput/InputManager). */
   issueQuickCommand(slot: number): void {
-    if (slot === 1) {
-      this.issueCommand(SquadCommand.FOLLOW_ME);
-    } else if (slot === 2) {
-      this.issueCommand(SquadCommand.HOLD_POSITION);
-    } else if (slot === 3) {
-      this.issueCommand(SquadCommand.PATROL_HERE);
-    } else if (slot === 4) {
-      this.issueCommand(SquadCommand.RETREAT);
-    } else if (slot === 5) {
-      this.issueCommand(SquadCommand.FREE_ROAM);
-    }
+    const option = getQuickCommandOption(slot);
+    if (!option) return;
+    this.issueCommand(option.command);
   }
 
-  private issueCommand(command: SquadCommand): void {
+  issueCommandAtPosition(command: SquadCommand, position: THREE.Vector3): void {
+    this.issueCommand(command, position);
+  }
+
+  getQuickCommandOptions(): SquadQuickCommandOption[] {
+    return SQUAD_QUICK_COMMAND_OPTIONS;
+  }
+
+  getCommandState(): SquadCommandState {
+    const squad = this.playerSquadId ? this.squadManager.getSquad(this.playerSquadId) : undefined;
+    return {
+      hasSquad: Boolean(squad),
+      currentCommand: this.currentCommand,
+      isCommandModeOpen: this.radialMenu.isOpen(),
+      memberCount: squad?.members.length ?? 0,
+      commandPosition: squad?.commandPosition
+    };
+  }
+
+  onCommandStateChange(listener: SquadCommandStateListener): () => void {
+    this.commandStateListeners.add(listener);
+    listener(this.getCommandState());
+    return () => this.commandStateListeners.delete(listener);
+  }
+
+  private issueCommand(command: SquadCommand, explicitPosition?: THREE.Vector3): void {
     if (!this.playerSquadId) return;
 
     const squad = this.squadManager.getSquad(this.playerSquadId);
     if (!squad) return;
 
     squad.currentCommand = command;
-    squad.commandPosition = this.playerPosition.clone();
+    squad.commandPosition = explicitPosition?.clone() ?? this.playerPosition.clone();
     this.currentCommand = command;
-
-    const commandNames: Record<SquadCommand, string> = {
-      [SquadCommand.FOLLOW_ME]: 'FOLLOW ME',
-      [SquadCommand.HOLD_POSITION]: 'HOLD POSITION',
-      [SquadCommand.PATROL_HERE]: 'PATROL HERE',
-      [SquadCommand.RETREAT]: 'RETREAT',
-      [SquadCommand.FREE_ROAM]: 'FREE ROAM',
-      [SquadCommand.NONE]: 'AUTO (NPC)'
-    };
-
-    Logger.info('squad', ` Squad Command Issued: ${commandNames[command]}`);
-    this.showCommandFeedback(commandNames[command]);
+    const commandLabel = getSquadCommandLabel(command, 'full');
+    Logger.info('squad', ` Squad Command Issued: ${commandLabel}`);
+    this.showCommandFeedback(commandLabel);
     this.updateCommandIndicator();
+    this.emitCommandState();
   }
 
   private showCommandFeedback(commandName: string): void {
@@ -137,51 +158,6 @@ export class PlayerSquadController implements GameSystem {
     }, 2000);
   }
 
-  private createCommandUI(): void {
-    this.commandUIElement = document.createElement('div');
-    this.commandUIElement.style.cssText = `
-      position: fixed;
-      bottom: 140px;
-      left: 16px;
-      background: rgba(10, 10, 14, 0.28);
-      border: 1px solid rgba(92, 184, 92, 0.2);
-      border-radius: 4px;
-      padding: 8px 10px;
-      color: rgba(92, 184, 92, 0.8);
-      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
-      font-size: 10px;
-      z-index: 1000;
-      backdrop-filter: blur(6px);
-      display: none;
-      min-width: 120px;
-    `;
-
-    this.commandUIElement.innerHTML = `
-      <div style="font-weight: bold; margin-bottom: 4px; color: rgba(92, 184, 92, 0.7); font-size: 9px;">SQUAD</div>
-      <div style="line-height: 1.4;">
-        <div>Shift+1 Follow Me</div>
-        <div>Shift+2 Hold Pos</div>
-        <div>Shift+3 Patrol</div>
-        <div>Shift+4 Retreat</div>
-        <div>Shift+5 Auto</div>
-        <div style="margin-top: 4px; opacity: 0.5; font-size: 9px;">Z Toggle</div>
-      </div>
-    `;
-
-    document.body.appendChild(this.commandUIElement);
-  }
-
-  private toggleCommandUI(): void {
-    if (!this.commandUIElement) return;
-
-    this.isUIVisible = !this.isUIVisible;
-    this.commandUIElement.style.display = this.isUIVisible ? 'block' : 'none';
-
-    if (this.isUIVisible) {
-      Logger.info('squad', ' Squad command UI opened');
-    }
-  }
-
   getPlayerSquadId(): string | undefined {
     return this.playerSquadId;
   }
@@ -190,12 +166,25 @@ export class PlayerSquadController implements GameSystem {
     return this.currentCommand;
   }
 
-  toggleRadialMenu(): void {
+  toggleCommandModeSurface(): void {
+    if (!this.playerSquadId) return;
+
     if (this.radialMenu.isOpen()) {
       this.radialMenu.executeCommand();
     } else {
       this.radialMenu.show();
     }
+    this.emitCommandState();
+  }
+
+  closeCommandModeSurface(): void {
+    if (!this.radialMenu.isOpen()) return;
+    this.radialMenu.hide();
+    this.emitCommandState();
+  }
+
+  toggleRadialMenu(): void {
+    this.toggleCommandModeSurface();
   }
 
   private createCommandIndicator(): void {
@@ -242,16 +231,7 @@ export class PlayerSquadController implements GameSystem {
     const commandText = this.commandIndicatorElement.querySelector<HTMLElement>('#current-command-text');
     if (!commandText) return;
 
-    const commandNames: Record<SquadCommand, string> = {
-      [SquadCommand.FOLLOW_ME]: 'FOLLOW',
-      [SquadCommand.HOLD_POSITION]: 'HOLD',
-      [SquadCommand.PATROL_HERE]: 'PATROL',
-      [SquadCommand.RETREAT]: 'RETREAT',
-      [SquadCommand.FREE_ROAM]: 'FREE',
-      [SquadCommand.NONE]: 'AUTO'
-    };
-
-    commandText.textContent = commandNames[this.currentCommand] ?? 'AUTO';
+    commandText.textContent = getSquadCommandLabel(this.currentCommand, 'short');
 
     const isActiveCommand = this.currentCommand !== SquadCommand.NONE && this.currentCommand !== SquadCommand.FREE_ROAM;
     commandText.style.color = isActiveCommand ? 'rgba(92, 184, 92, 0.9)' : 'rgba(220, 225, 230, 0.55)';
@@ -261,5 +241,12 @@ export class PlayerSquadController implements GameSystem {
     if (!this.playerSquadId) return undefined;
     const squad = this.squadManager.getSquad(this.playerSquadId);
     return squad?.commandPosition;
+  }
+
+  private emitCommandState(): void {
+    const state = this.getCommandState();
+    for (const listener of this.commandStateListeners) {
+      listener(state);
+    }
   }
 }

@@ -1,14 +1,16 @@
 # Docs Index
 
-Last updated: 2026-03-04
+Last updated: 2026-03-06
 
 ## Read Order
 
 1. `CODEBASE_BLOCKS.md` - **Start here.** Hub index for the block map: all systems, wiring, tick graph, singletons, vocabulary.
 2. `blocks/` - Per-domain sub-docs (core, combat, terrain, strategy, player, weapons, vehicle, world, ui, support).
-3. `ROADMAP.md` - Master plan with vision, phases, and sequencing.
-4. `ARCHITECTURE_RECOVERY_PLAN.md` - Runtime stability and performance.
-5. `PROFILING_HARNESS.md` - Perf capture commands, flags, artifacts.
+3. `GAME_MODES_EXECUTION_PLAN.md` - Canonical execution plan for game modes, deploy/loadout flow, command UX, tactical vs strategic map policy, and faction generalization.
+4. `ACTIVE_GAME_MODES_HANDOFF.md` - Current phase status, validated state, and exact resume points for another agent.
+5. `ROADMAP.md` - Master vision document. Aspirational and broader than the active game-mode execution plan.
+6. `ARCHITECTURE_RECOVERY_PLAN.md` - Runtime stability and performance.
+7. `PROFILING_HARNESS.md` - Perf capture commands, flags, artifacts.
 
 ## Block Map (Primary Reference)
 
@@ -21,13 +23,17 @@ Last updated: 2026-03-04
 - `blocks/weapons.md` - Grenades, mortar, sandbag, ammo, GunplayCore.
 - `blocks/vehicle.md` - Helicopters, per-aircraft config, helipads.
 - `blocks/world.md` - Zones, tickets, game modes, billboards.
-- `blocks/ui.md` - HUD (27 widgets), layout, touch controls, minimap, map, compass.
+- `blocks/ui.md` - HUD (30 widgets), layout, touch controls, minimap, map, compass.
 - `blocks/support.md` - Audio, effects, environment, input, assets, debug, config.
 
 ## Active Docs
 
+- `GAME_MODES_EXECUTION_PLAN.md`
+  - Canonical execution plan for making the current mode set feel like real products. Covers mode runtime architecture, deploy/loadout flow, command UX, map intel policy, team generalization, and death presentation cleanup.
+- `ACTIVE_GAME_MODES_HANDOFF.md`
+  - Live handoff note for the current execution track. Lists completed phases, validated state, remaining gaps, and the recommended next implementation entry points.
 - `ROADMAP.md`
-  - Master roadmap: 10-phase plan from asset overhaul through full Vietnam simulation engine. DRAFT status, awaiting alignment.
+  - Master roadmap: 10-phase plan from asset overhaul through full Vietnam simulation engine. Aspirational and now aligned with the active execution plan where overlap exists.
 - `ASSET_MANIFEST.md`
   - Comprehensive asset generation queue for Pixel Forge agent. 80+ assets with prompts, tri budgets, mesh part naming, scale specs. 4 priority sprints.
 - `SQUAD_COMMAND_REARCHITECT.md`
@@ -73,4 +79,5 @@ These docs predate the block map and overlap with specific sub-docs. Kept for re
   - `ARCHITECTURE_RECOVERY_PLAN.md` with decision and evidence path
 - Any new asset need must update `ASSET_MANIFEST.md`.
 - Any command/control change must update `SQUAD_COMMAND_REARCHITECT.md`.
+- Any game-mode, deploy/loadout, respawn-flow, map-intel, or death-presentation change must update `GAME_MODES_EXECUTION_PLAN.md`.
 - Any system addition/removal/rewiring must update the relevant `blocks/*.md` sub-doc.

@@ -466,6 +466,10 @@ export class CombatantSystem implements GameSystem {
     this.setters.setAudioManager(audioManager);
   }
 
+  setPlayerFaction(faction: Faction): void {
+    this.updateHelpers.setPlayerFaction(faction);
+  }
+
   setVoiceCalloutSystem(voiceCalloutSystem: VoiceCalloutSystem): void {
     this.setters.setVoiceCalloutSystem(voiceCalloutSystem);
   }

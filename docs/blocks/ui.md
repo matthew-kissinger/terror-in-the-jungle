@@ -15,7 +15,7 @@
 
 | Block | Modules | Budget | Update Rate | Fan-in | Notes |
 |---|---|---|---|---|---|
-| HUDSystem | 27 (see below) | 1ms | push + 5Hz poll | 7 | push-driven; owns HUDZoneDisplay |
+| HUDSystem | 29 (see below) | 1ms | push + 5Hz poll | 7 | push-driven; owns HUDZoneDisplay |
 | MinimapSystem | MinimapSystem + 3 helpers | 0.5ms | 20Hz | 3 | canvas 2D, downsampled position reads |
 | FullMapSystem | FullMapSystem + 6 helpers | 0.5ms | 20Hz (when open) | 4 | paused when closed |
 | CompassSystem | CompassSystem + 3 helpers | 0.5ms | 20Hz | 1 | reads player yaw only |
@@ -37,10 +37,10 @@ src/ui/
   design/      styles, tokens, responsive, index
   end/         MatchEndScreen
   engine/      UIComponent, css-modules.d, index
-  hud/         27 widget modules (see registry below)
+  hud/         30 widget modules (see registry below)
   layout/      HUDLayout, HUDLayoutStyles, VisibilityManager, types, index
   loading/     StartScreen, ModeCard, SettingsModal, HowToPlayModal, LoadingPanels, LoadingProgress
-  loadout/     LoadoutSelector, LoadoutGrenadePanel, LoadoutTypes
+  loadout/     LoadoutSelector (legacy), LoadoutGrenadePanel, LoadoutTypes
   map/         FullMapSystem, FullMapInput, FullMapStyles, FullMapDOMHelpers,
                RespawnMapView, OpenFrontierRespawnMap, OpenFrontierRespawnMapRenderer,
                OpenFrontierRespawnMapUtils
@@ -50,7 +50,7 @@ src/ui/
 
 ---
 
-## HUD Module Registry (27 modules in `ui/hud/`)
+## HUD Module Registry (30 modules in `ui/hud/`)
 
 | Module | File | Role |
 |---|---|---|
@@ -76,6 +76,9 @@ src/ui/
 | [ObjectiveDisplay]([GH]/ui/hud/ObjectiveDisplay.ts) | ui/hud/ObjectiveDisplay.ts | Primary objective text slot |
 | [MobileStatusBar]([GH]/ui/hud/MobileStatusBar.ts) | ui/hud/MobileStatusBar.ts | Compact status for portrait-fallback |
 | [MortarPanel]([GH]/ui/hud/MortarPanel.ts) | ui/hud/MortarPanel.ts | Mortar targeting UI overlay |
+| [CommandModeOverlay]([GH]/ui/hud/CommandModeOverlay.ts) | ui/hud/CommandModeOverlay.ts | Center-slot map-first command panel for desktop/touch command mode |
+| [CommandTacticalMap]([GH]/ui/hud/CommandTacticalMap.ts) | ui/hud/CommandTacticalMap.ts | Local tactical map used inside the command overlay for point placement orders |
+| [QuickCommandStrip]([GH]/ui/hud/QuickCommandStrip.ts) | ui/hud/QuickCommandStrip.ts | Always-visible squad command strip mounted into the HUD `command-bar` slot |
 | [SquadRadialMenu]([GH]/ui/hud/SquadRadialMenu.ts) | ui/hud/SquadRadialMenu.ts | Radial command menu for squad orders |
 | [DamageNumberSystem]([GH]/ui/hud/DamageNumberSystem.ts) | ui/hud/DamageNumberSystem.ts | Floating damage numbers in world space |
 | [HitMarkerFeedback]([GH]/ui/hud/HitMarkerFeedback.ts) | ui/hud/HitMarkerFeedback.ts | Crosshair hit flash |
@@ -88,14 +91,14 @@ src/ui/
 
 | Module | File | Role |
 |---|---|---|
-| [HUDLayout]([GH]/ui/layout/HUDLayout.ts) | ui/layout/HUDLayout.ts | Creates `#game-hud-root`, 18 named CSS Grid slots, `getSlot(region)` API |
+| [HUDLayout]([GH]/ui/layout/HUDLayout.ts) | ui/layout/HUDLayout.ts | Creates `#game-hud-root`, 19 named CSS Grid slots, `getSlot(region)` API |
 | [HUDLayoutStyles]([GH]/ui/layout/HUDLayoutStyles.ts) | ui/layout/HUDLayoutStyles.ts | CSS Grid template definitions (desktop, mobile-landscape, mobile-portrait) |
 | [VisibilityManager]([GH]/ui/layout/VisibilityManager.ts) | ui/layout/VisibilityManager.ts | Sets data-device/data-phase/data-vehicle/data-ads attributes on `#game-hud-root`; CSS rules handle visibility |
-| [types]([GH]/ui/layout/types.ts) | ui/layout/types.ts | `HUDRegion` type (18 values), `LayoutMode`, `UIState`, `LayoutComponent`, `LayoutRegistration` |
+| [types]([GH]/ui/layout/types.ts) | ui/layout/types.ts | `HUDRegion` type (19 values), `LayoutMode`, `UIState`, `LayoutComponent`, `LayoutRegistration` |
 
 ---
 
-## 18 Named HUD Regions
+## 19 Named HUD Regions
 
 Source: [types.ts]([GH]/ui/layout/types.ts) `HUDRegion` type
 
@@ -108,10 +111,11 @@ Source: [types.ts]([GH]/ui/layout/types.ts) `HUDRegion` type
 | `minimap` | Info | MinimapSystem canvas |
 | `objectives` | Info | ObjectiveDisplay / HUDZoneDisplay |
 | `stats` | Info | StatsPanel (within ScoreboardPanel) |
+| `command-bar` | Info | QuickCommandStrip |
 | `kill-feed` | Info | KillFeed |
 | `ammo` | Info | AmmoDisplay |
 | `weapon-bar` | Info | UnifiedWeaponBar |
-| `center` | Info | hit markers, damage numbers, grenade meter, mortar indicator |
+| `center` | Info | hit markers, damage numbers, grenade meter, mortar indicator, CommandModeOverlay |
 | `health` | Info | health bar / player status |
 | `status-bar` | Mobile | merged timer + tickets in one compact line |
 | `joystick` | Touch | VirtualJoystick (left side) |
@@ -120,7 +124,7 @@ Source: [types.ts]([GH]/ui/layout/types.ts) `HUDRegion` type
 | `action-btns` | Touch | reload, crouch, sprint buttons |
 | `menu` | Touch | TouchMenuButton |
 
-Visibility: `data-show="infantry"` on `weapon-bar` and `action-btns` - CSS hides these when `data-vehicle="helicopter"` is set on `#game-hud-root`. VisibilityManager sets/removes data attributes. Do not use JS `style.display` to hide/show slots.
+Visibility: `data-show="infantry"` on `weapon-bar`, `command-bar`, and `action-btns` - CSS hides these when `data-vehicle="helicopter"` is set on `#game-hud-root`. VisibilityManager sets/removes data attributes. Do not use JS `style.display` to hide/show slots.
 
 ---
 
@@ -149,7 +153,7 @@ Visibility: `data-show="infantry"` on `weapon-bar` and `action-btns` - CSS hides
 
 | Module | File | Role |
 |---|---|---|
-| [StartScreen]([GH]/ui/loading/StartScreen.ts) | ui/loading/StartScreen.ts | Main menu, mode carousel, deploy button |
+| [StartScreen]([GH]/ui/loading/StartScreen.ts) | ui/loading/StartScreen.ts | Main menu, mode cards, side/faction selection, deploy button |
 | [ModeCard]([GH]/ui/loading/ModeCard.ts) | ui/loading/ModeCard.ts | Individual mode card within the carousel |
 | [SettingsModal]([GH]/ui/loading/SettingsModal.ts) | ui/loading/SettingsModal.ts | Graphics/audio settings |
 | [HowToPlayModal]([GH]/ui/loading/HowToPlayModal.ts) | ui/loading/HowToPlayModal.ts | Controls reference modal |
@@ -170,9 +174,9 @@ Visibility: `data-show="infantry"` on `weapon-bar` and `action-btns` - CSS hides
 
 | Module | File | Role |
 |---|---|---|
-| [LoadoutSelector]([GH]/ui/loadout/LoadoutSelector.ts) | ui/loadout/LoadoutSelector.ts | Weapon loadout picker. DEFERRED (500ms after first frame). |
+| [LoadoutSelector]([GH]/ui/loadout/LoadoutSelector.ts) | ui/loadout/LoadoutSelector.ts | Legacy grenade picker component retained for isolated UI tests; no longer part of the startup or deploy flow. |
 | [LoadoutGrenadePanel]([GH]/ui/loadout/LoadoutGrenadePanel.ts) | ui/loadout/LoadoutGrenadePanel.ts | Grenade selection sub-panel |
-| [LoadoutTypes]([GH]/ui/loadout/LoadoutTypes.ts) | ui/loadout/LoadoutTypes.ts | Type definitions for loadout items |
+| [LoadoutTypes]([GH]/ui/loadout/LoadoutTypes.ts) | ui/loadout/LoadoutTypes.ts | Loadout item types plus faction-aware weapon/equipment pools and preset templates used by the shared deploy flow |
 
 ---
 
@@ -182,9 +186,9 @@ Visibility: `data-show="infantry"` on `weapon-bar` and `action-btns` - CSS hides
 |---|---|---|
 | [MinimapSystem]([GH]/ui/minimap/MinimapSystem.ts) | ui/minimap/MinimapSystem.ts | Canvas 2D minimap, 20Hz, blip rendering |
 | [MinimapDOMBuilder]([GH]/ui/minimap/MinimapDOMBuilder.ts) | ui/minimap/MinimapDOMBuilder.ts | Minimap container DOM construction |
-| [MinimapRenderer]([GH]/ui/minimap/MinimapRenderer.ts) | ui/minimap/MinimapRenderer.ts | Canvas rendering logic for blips and overlays |
+| [MinimapRenderer]([GH]/ui/minimap/MinimapRenderer.ts) | ui/minimap/MinimapRenderer.ts | Canvas rendering logic for tactical blips, helipads, and squad command guidance |
 | [MinimapStyles]([GH]/ui/minimap/MinimapStyles.ts) | ui/minimap/MinimapStyles.ts | Minimap CSS |
-| [FullMapSystem]([GH]/ui/map/FullMapSystem.ts) | ui/map/FullMapSystem.ts | Full-screen map overlay |
+| [FullMapSystem]([GH]/ui/map/FullMapSystem.ts) | ui/map/FullMapSystem.ts | Full-screen map overlay with player squad highlighting, squad command guidance, and command distance label |
 | [FullMapInput]([GH]/ui/map/FullMapInput.ts) | ui/map/FullMapInput.ts | Pan/zoom input for full map |
 | [FullMapStyles]([GH]/ui/map/FullMapStyles.ts) | ui/map/FullMapStyles.ts | Full map CSS |
 | [FullMapDOMHelpers]([GH]/ui/map/FullMapDOMHelpers.ts) | ui/map/FullMapDOMHelpers.ts | DOM helper utilities for full map |

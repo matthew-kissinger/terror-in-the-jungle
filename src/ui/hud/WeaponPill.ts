@@ -20,10 +20,9 @@ export class WeaponPill extends UIComponent {
   private magazine = this.signal(30);
   private reserve = this.signal(90);
 
-  private static readonly SLOT_LABELS = ['SG', 'GRN', 'AR', 'SB', 'SMG', 'PST'];
   private static readonly SLOT_COUNT = 6;
-  /** Gun-only slot indices for weapon cycling (skip GRENADE=1, SANDBAG=3) */
-  private static readonly GUN_SLOTS = [0, 2, 4, 5];
+  private slotLabels = ['SG', 'GRN', 'AR', 'SB', 'SMG', 'PST'];
+  private gunSlots = [0, 2, 4, 5];
 
   private onWeaponSelect?: (slotIndex: number) => void;
 
@@ -96,7 +95,7 @@ export class WeaponPill extends UIComponent {
     // Reactive: weapon name
     this.effect(() => {
       const idx = this.activeIndex.value;
-      this.text('[data-ref="name"]', WeaponPill.SLOT_LABELS[idx]);
+      this.text('[data-ref="name"]', this.slotLabels[idx] ?? 'WPN');
     });
 
     // Reactive: ammo display + color coding
@@ -136,11 +135,22 @@ export class WeaponPill extends UIComponent {
     this.reserve.value = reserve;
   }
 
+  setSlotConfig(labels: string[], gunSlots: number[]): void {
+    this.slotLabels = Array.from({ length: WeaponPill.SLOT_COUNT }, (_, index) => labels[index] ?? '--');
+    this.gunSlots = gunSlots.filter(slot => slot >= 0 && slot < WeaponPill.SLOT_COUNT);
+    if (!this.gunSlots.includes(this.activeIndex.value) && this.gunSlots.length > 0) {
+      this.activeIndex.value = this.gunSlots[0];
+    } else {
+      this.activeIndex.value = this.activeIndex.value;
+    }
+  }
+
   // --- Internal ---
 
   private cycleNext(): void {
     // Cycle forward through gun slots only (skip equipment slots)
-    const guns = WeaponPill.GUN_SLOTS;
+    const guns = this.gunSlots;
+    if (guns.length === 0) return;
     const currentGunIdx = guns.indexOf(this.activeIndex.value);
     const nextGunIdx = (currentGunIdx + 1) % guns.length;
     const next = guns[nextGunIdx >= 0 ? nextGunIdx : 0];
@@ -151,7 +161,8 @@ export class WeaponPill extends UIComponent {
 
   private cyclePrev(): void {
     // Cycle backward through gun slots only (skip equipment slots)
-    const guns = WeaponPill.GUN_SLOTS;
+    const guns = this.gunSlots;
+    if (guns.length === 0) return;
     const currentGunIdx = guns.indexOf(this.activeIndex.value);
     const prevGunIdx = (currentGunIdx - 1 + guns.length) % guns.length;
     const prev = guns[prevGunIdx >= 0 ? prevGunIdx : 0];

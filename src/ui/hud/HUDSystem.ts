@@ -19,6 +19,7 @@ import { IHUDSystem } from '../../types/SystemInterfaces';
 import { ViewportManager } from '../design/responsive';
 import { HUDLayout } from '../layout/HUDLayout';
 import type { GamePhase } from './GameStatusPanel';
+import type { InventorySlotDefinition } from '../../systems/player/InventoryManager';
 
 export class HUDSystem implements GameSystem, IHUDSystem {
   private combatantSystem?: CombatantSystem;
@@ -462,6 +463,10 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   setActiveWeaponSlot(slot: number): void {
     this.elements.unifiedWeaponBar.setActiveSlot(slot);
     this.elements.weaponPill.setActiveSlot(slot);
+  }
+
+  setWeaponBarLayout(slotDefinitions: InventorySlotDefinition[], weaponCycleSlots: number[]): void {
+    this.elements.setWeaponBarLayout(slotDefinitions, weaponCycleSlots);
   }
 
   // Scoreboard toggle

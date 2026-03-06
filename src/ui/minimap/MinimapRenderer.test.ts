@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import { renderMinimap } from './MinimapRenderer';
 
@@ -12,15 +12,15 @@ function createMockCtx() {
     lineWidth: 1,
     font: '',
     textAlign: 'center',
-    fillRect: () => {},
-    beginPath: () => {},
-    moveTo: () => {},
-    lineTo: () => {},
-    stroke: () => {},
-    fill: () => {},
+    fillRect: vi.fn(),
+    beginPath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    stroke: vi.fn(),
+    fill: vi.fn(),
     arc: () => { calls.arc++; },
-    fillText: () => {},
-    closePath: () => {}
+    fillText: vi.fn(),
+    closePath: vi.fn()
   } as unknown as CanvasRenderingContext2D;
   return { ctx, calls };
 }
@@ -88,5 +88,24 @@ describe('MinimapRenderer tactical range filtering', () => {
     } finally {
       (globalThis as any).__MINIMAP_TACTICAL_RANGE__ = prev;
     }
+  });
+
+  it('draws a guidance line when a command point is present', () => {
+    const { ctx } = createMockCtx();
+    const camera = createMockCamera();
+    const playerPosition = new THREE.Vector3(0, 2, 0);
+
+    renderMinimap({
+      ctx,
+      size: 200,
+      worldSize: 400,
+      playerPosition,
+      playerRotation: 0,
+      camera,
+      commandPosition: new THREE.Vector3(40, 2, -20)
+    });
+
+    expect((ctx.moveTo as any).mock.calls.length).toBeGreaterThan(0);
+    expect((ctx.lineTo as any).mock.calls.length).toBeGreaterThan(0);
   });
 });

@@ -76,6 +76,7 @@ export interface IPlayerController {
   enableControls(): void;
   setPointerLockEnabled(enabled: boolean): void;
   setGameStarted(started: boolean): void;
+  setPlayerFaction(faction: Faction): void;
 
   // Camera / feedback
   applyRecoil(pitchDeltaRad: number, yawDeltaRad: number): void;
@@ -143,6 +144,8 @@ export interface IFirstPersonWeapon {
   setZoneManager(system: any): void;
   setInventoryManager(system: any): void;
   setAudioManager(manager: any): void;
+  setPlayerFaction(faction: Faction): void;
+  setPrimaryWeapon(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol'): void;
   renderWeapon(renderer: THREE.WebGLRenderer): void;
   enable(): void;
   disable(): void;

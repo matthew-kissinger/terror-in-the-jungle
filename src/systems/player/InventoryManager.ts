@@ -1,13 +1,23 @@
 import { GameSystem } from '../../types';
 import { Logger } from '../../utils/Logger';
+import {
+  getEquipmentLabel,
+  getEquipmentShortLabel,
+  getWeaponLabel,
+  getWeaponShortLabel,
+  isGrenadeEquipment,
+  LoadoutEquipment,
+  type PlayerLoadout,
+  LoadoutWeapon
+} from '../../ui/loadout/LoadoutTypes';
 
 export enum WeaponSlot {
-  SHOTGUN = 0,   // Key 1
-  GRENADE = 1,   // Key 2
-  PRIMARY = 2,   // Key 3 (Rifle)
-  SANDBAG = 3,   // Key 4
-  SMG = 4,       // Key 5
-  PISTOL = 5     // Key 6
+  SHOTGUN = 0,   // Key 1 - secondary weapon slot once loadouts are active
+  GRENADE = 1,   // Key 2 - equipment slot once loadouts are active
+  PRIMARY = 2,   // Key 3 - primary weapon slot
+  SANDBAG = 3,   // Key 4 - legacy deployable slot
+  SMG = 4,       // Key 5 - reserved for future pickups
+  PISTOL = 5     // Key 6 - reserved for future pickups
 }
 
 export interface InventoryState {
@@ -20,24 +30,46 @@ export interface InventoryState {
   maxSandbags: number;
 }
 
-export class InventoryManager implements GameSystem {
-  private currentSlot: WeaponSlot = WeaponSlot.PRIMARY; // Start with Rifle (key 3)
-  private grenades: number = 3;
-  private maxGrenades: number = 3;
-  private mortarRounds: number = 3;
-  private maxMortarRounds: number = 3;
-  private sandbags: number = 5;
-  private maxSandbags: number = 5;
+export interface InventorySlotDefinition {
+  slot: WeaponSlot;
+  enabled: boolean;
+  shortLabel: string;
+  fullLabel: string;
+  kind: 'weapon' | 'throwable' | 'equipment';
+  weaponType?: LoadoutWeapon;
+}
 
-  private onSlotChangeCallbacks: ((slot: WeaponSlot) => void)[] = [];
+type EquipmentActionKind = 'grenade' | 'sandbag' | 'mortar';
+
+const LEGACY_SLOT_DEFINITIONS: InventorySlotDefinition[] = [
+  { slot: WeaponSlot.SHOTGUN, enabled: true, shortLabel: 'SG', fullLabel: 'Shotgun', kind: 'weapon', weaponType: LoadoutWeapon.SHOTGUN },
+  { slot: WeaponSlot.GRENADE, enabled: true, shortLabel: 'GRN', fullLabel: 'Grenade', kind: 'throwable' },
+  { slot: WeaponSlot.PRIMARY, enabled: true, shortLabel: 'AR', fullLabel: 'Rifle', kind: 'weapon', weaponType: LoadoutWeapon.RIFLE },
+  { slot: WeaponSlot.SANDBAG, enabled: true, shortLabel: 'SB', fullLabel: 'Sandbag', kind: 'equipment' },
+  { slot: WeaponSlot.SMG, enabled: true, shortLabel: 'SMG', fullLabel: 'SMG', kind: 'weapon', weaponType: LoadoutWeapon.SMG },
+  { slot: WeaponSlot.PISTOL, enabled: true, shortLabel: 'PST', fullLabel: 'Pistol', kind: 'weapon', weaponType: LoadoutWeapon.PISTOL },
+];
+
+export class InventoryManager implements GameSystem {
+  private currentSlot: WeaponSlot = WeaponSlot.PRIMARY;
+  private grenades = 3;
+  private maxGrenades = 3;
+  private mortarRounds = 3;
+  private maxMortarRounds = 3;
+  private sandbags = 5;
+  private maxSandbags = 5;
+
+  private activeLoadout: PlayerLoadout | null = null;
+  private slotDefinitions: InventorySlotDefinition[] = LEGACY_SLOT_DEFINITIONS.map(def => ({ ...def }));
+
+  private onSlotChangeCallbacks: Array<(slot: WeaponSlot) => void> = [];
   private onInventoryChangeCallback?: (state: InventoryState) => void;
+  private onLoadoutChangeCallbacks: Array<(slotDefinitions: InventorySlotDefinition[]) => void> = [];
 
   private uiElement?: HTMLElement;
   private boundOnKeyDown!: (event: KeyboardEvent) => void;
-  /** When true, skip built-in hotbar UI (UnifiedWeaponBar handles display). */
   private suppressBuiltInUI = false;
 
-  /** Suppress the built-in hotbar UI (call before init). */
   setSuppressUI(suppress: boolean): void {
     this.suppressBuiltInUI = suppress;
   }
@@ -48,11 +80,11 @@ export class InventoryManager implements GameSystem {
     if (!this.suppressBuiltInUI) {
       this.createUI();
     }
+    this.notifyLoadoutChange();
     this.notifyInventoryChange();
   }
 
-  update(_deltaTime: number): void {
-  }
+  update(_deltaTime: number): void {}
 
   dispose(): void {
     this.removeEventListeners();
@@ -61,91 +93,118 @@ export class InventoryManager implements GameSystem {
     }
   }
 
-  private setupEventListeners(): void {
-    this.boundOnKeyDown = this.onKeyDown.bind(this);
-    window.addEventListener('keydown', this.boundOnKeyDown);
+  setLoadout(loadout: PlayerLoadout): void {
+    this.activeLoadout = {
+      primaryWeapon: loadout.primaryWeapon,
+      secondaryWeapon: loadout.secondaryWeapon,
+      equipment: loadout.equipment,
+    };
+    this.slotDefinitions = this.createConfiguredSlotDefinitions(this.activeLoadout);
+    this.syncResourceCountsToLoadout();
+    const preferredSlot = this.isSlotEnabled(this.currentSlot)
+      ? this.currentSlot
+      : this.getPreferredInitialSlot();
+    this.notifyLoadoutChange();
+    this.switchToSlot(preferredSlot, true);
+    this.notifyInventoryChange();
   }
 
-  private removeEventListeners(): void {
-    window.removeEventListener('keydown', this.boundOnKeyDown);
+  clearLoadout(): void {
+    this.activeLoadout = null;
+    this.slotDefinitions = LEGACY_SLOT_DEFINITIONS.map(def => ({ ...def }));
+    this.notifyLoadoutChange();
+    this.switchToSlot(this.currentSlot, true);
+    this.notifyInventoryChange();
   }
 
-  private onKeyDown(event: KeyboardEvent): void {
-    switch (event.code) {
-      case 'Digit1':
-        if (!event.shiftKey && !event.ctrlKey && !event.altKey) {
-          this.switchToSlot(WeaponSlot.SHOTGUN);
-        }
-        break;
-      case 'Digit2':
-        if (!event.shiftKey && !event.ctrlKey && !event.altKey) {
-          this.switchToSlot(WeaponSlot.GRENADE);
-        }
-        break;
-      case 'Digit3':
-        if (!event.shiftKey && !event.ctrlKey && !event.altKey) {
-          this.switchToSlot(WeaponSlot.PRIMARY);
-        }
-        break;
-      case 'Digit4':
-        if (!event.shiftKey && !event.ctrlKey && !event.altKey) {
-          this.switchToSlot(WeaponSlot.SANDBAG);
-        }
-        break;
-      case 'Digit5':
-        if (!event.shiftKey && !event.ctrlKey && !event.altKey) {
-          this.switchToSlot(WeaponSlot.SMG);
-        }
-        break;
-      case 'Digit6':
-        if (!event.shiftKey && !event.ctrlKey && !event.altKey) {
-          this.switchToSlot(WeaponSlot.PISTOL);
-        }
-        break;
-      case 'KeyQ':
-        this.cycleWeapon();
-        break;
-    }
+  getActiveLoadout(): PlayerLoadout | null {
+    return this.activeLoadout
+      ? { ...this.activeLoadout }
+      : null;
   }
 
-  private switchToSlot(slot: WeaponSlot): void {
-    if (this.currentSlot === slot) return;
+  getEquippedEquipment(): LoadoutEquipment | null {
+    return this.activeLoadout?.equipment ?? null;
+  }
 
-    this.currentSlot = slot;
-    Logger.info('inventory', `Switched to: ${WeaponSlot[slot]}`);
-
-    // Notify all registered callbacks
-    for (const callback of this.onSlotChangeCallbacks) {
-      callback(slot);
+  getEquipmentActionForSlot(slot: WeaponSlot): EquipmentActionKind | null {
+    if (this.activeLoadout === null) {
+      if (slot === WeaponSlot.GRENADE) return 'grenade';
+      if (slot === WeaponSlot.SANDBAG) return 'sandbag';
+      return null;
     }
 
-    this.updateUI();
+    if (slot !== WeaponSlot.GRENADE) {
+      return null;
+    }
+
+    if (isGrenadeEquipment(this.activeLoadout.equipment)) {
+      return 'grenade';
+    }
+
+    if (this.activeLoadout.equipment === LoadoutEquipment.SANDBAG_KIT) {
+      return 'sandbag';
+    }
+
+    if (this.activeLoadout.equipment === LoadoutEquipment.MORTAR_KIT) {
+      return 'mortar';
+    }
+
+    return null;
   }
 
-  /**
-   * Explicit API for non-keyboard callers (touch/controller) to switch slots
-   * without synthesizing keyboard events.
-   */
-  setCurrentSlot(slot: WeaponSlot): void {
-    this.switchToSlot(slot);
+  getSlotDefinitions(): InventorySlotDefinition[] {
+    return this.slotDefinitions.map(def => ({ ...def }));
   }
 
-  private cycleWeapon(): void {
-    const nextSlot = (this.currentSlot + 1) % 6;
-    this.switchToSlot(nextSlot);
+  getEnabledSlots(): WeaponSlot[] {
+    return this.slotDefinitions.filter(def => def.enabled).map(def => def.slot);
+  }
+
+  getWeaponCycleSlots(): WeaponSlot[] {
+    return this.slotDefinitions
+      .filter(def => def.enabled && def.kind === 'weapon')
+      .map(def => def.slot);
+  }
+
+  isSlotEnabled(slot: WeaponSlot): boolean {
+    return this.slotDefinitions.some(def => def.slot === slot && def.enabled);
+  }
+
+  isWeaponSlot(slot: WeaponSlot): boolean {
+    const definition = this.getSlotDefinition(slot);
+    return definition?.enabled === true && definition.kind === 'weapon';
+  }
+
+  getWeaponTypeForSlot(slot: WeaponSlot): LoadoutWeapon | null {
+    const definition = this.getSlotDefinition(slot);
+    return definition?.enabled && definition.kind === 'weapon' && definition.weaponType
+      ? definition.weaponType
+      : null;
+  }
+
+  hasSandbagKit(): boolean {
+    return this.activeLoadout === null || this.activeLoadout.equipment === LoadoutEquipment.SANDBAG_KIT;
+  }
+
+  hasMortarKit(): boolean {
+    return this.activeLoadout === null || this.activeLoadout.equipment === LoadoutEquipment.MORTAR_KIT;
   }
 
   getCurrentSlot(): WeaponSlot {
     return this.currentSlot;
   }
 
+  setCurrentSlot(slot: WeaponSlot): void {
+    this.switchToSlot(slot);
+  }
+
   canUseGrenade(): boolean {
-    return this.grenades > 0;
+    return this.getEquipmentActionForSlot(WeaponSlot.GRENADE) === 'grenade' && this.grenades > 0;
   }
 
   useGrenade(): boolean {
     if (!this.canUseGrenade()) return false;
-
     this.grenades--;
     Logger.info('inventory', `Grenade used. Remaining: ${this.grenades}`);
     this.notifyInventoryChange();
@@ -153,12 +212,11 @@ export class InventoryManager implements GameSystem {
   }
 
   canUseMortarRound(): boolean {
-    return this.mortarRounds > 0;
+    return this.hasMortarKit() && this.mortarRounds > 0;
   }
 
   useMortarRound(): boolean {
     if (!this.canUseMortarRound()) return false;
-
     this.mortarRounds--;
     Logger.info('inventory', `Mortar round used. Remaining: ${this.mortarRounds}`);
     this.notifyInventoryChange();
@@ -166,24 +224,25 @@ export class InventoryManager implements GameSystem {
   }
 
   addGrenades(count: number): void {
+    if (this.activeLoadout !== null && !isGrenadeEquipment(this.activeLoadout.equipment)) return;
     this.grenades = Math.min(this.grenades + count, this.maxGrenades);
     Logger.info('inventory', `Grenades restocked: ${this.grenades}/${this.maxGrenades}`);
     this.notifyInventoryChange();
   }
 
   addMortarRounds(count: number): void {
+    if (!this.hasMortarKit()) return;
     this.mortarRounds = Math.min(this.mortarRounds + count, this.maxMortarRounds);
     Logger.info('inventory', `Mortar rounds restocked: ${this.mortarRounds}/${this.maxMortarRounds}`);
     this.notifyInventoryChange();
   }
 
   canUseSandbag(): boolean {
-    return this.sandbags > 0;
+    return this.hasSandbagKit() && this.sandbags > 0;
   }
 
   useSandbag(): boolean {
     if (!this.canUseSandbag()) return false;
-
     this.sandbags--;
     Logger.info('inventory', `Sandbag placed. Remaining: ${this.sandbags}`);
     this.notifyInventoryChange();
@@ -191,6 +250,7 @@ export class InventoryManager implements GameSystem {
   }
 
   addSandbags(count: number): void {
+    if (!this.hasSandbagKit()) return;
     this.sandbags = Math.min(this.sandbags + count, this.maxSandbags);
     Logger.info('inventory', `Sandbags restocked: ${this.sandbags}/${this.maxSandbags}`);
     this.notifyInventoryChange();
@@ -201,10 +261,17 @@ export class InventoryManager implements GameSystem {
   }
 
   reset(): void {
-    this.grenades = this.maxGrenades;
-    this.mortarRounds = this.maxMortarRounds;
-    this.sandbags = this.maxSandbags;
-    this.switchToSlot(WeaponSlot.PRIMARY);
+    if (this.activeLoadout === null) {
+      this.grenades = this.maxGrenades;
+      this.mortarRounds = this.maxMortarRounds;
+      this.sandbags = this.maxSandbags;
+    } else {
+      this.grenades = isGrenadeEquipment(this.activeLoadout.equipment) ? this.maxGrenades : 0;
+      this.mortarRounds = this.activeLoadout.equipment === LoadoutEquipment.MORTAR_KIT ? this.maxMortarRounds : 0;
+      this.sandbags = this.activeLoadout.equipment === LoadoutEquipment.SANDBAG_KIT ? this.maxSandbags : 0;
+    }
+
+    this.switchToSlot(this.getPreferredInitialSlot(), true);
     Logger.info('inventory', 'Inventory reset');
     this.notifyInventoryChange();
   }
@@ -229,11 +296,168 @@ export class InventoryManager implements GameSystem {
     this.onInventoryChangeCallback = callback;
   }
 
+  onLoadoutChange(callback: (slotDefinitions: InventorySlotDefinition[]) => void): void {
+    this.onLoadoutChangeCallbacks.push(callback);
+  }
+
+  private setupEventListeners(): void {
+    this.boundOnKeyDown = this.onKeyDown.bind(this);
+    window.addEventListener('keydown', this.boundOnKeyDown);
+  }
+
+  private removeEventListeners(): void {
+    window.removeEventListener('keydown', this.boundOnKeyDown);
+  }
+
+  private onKeyDown(event: KeyboardEvent): void {
+    switch (event.code) {
+      case 'Digit1':
+        if (!event.shiftKey && !event.ctrlKey && !event.altKey) this.switchToSlot(WeaponSlot.SHOTGUN);
+        break;
+      case 'Digit2':
+        if (!event.shiftKey && !event.ctrlKey && !event.altKey) this.switchToSlot(WeaponSlot.GRENADE);
+        break;
+      case 'Digit3':
+        if (!event.shiftKey && !event.ctrlKey && !event.altKey) this.switchToSlot(WeaponSlot.PRIMARY);
+        break;
+      case 'Digit4':
+        if (!event.shiftKey && !event.ctrlKey && !event.altKey) this.switchToSlot(WeaponSlot.SANDBAG);
+        break;
+      case 'Digit5':
+        if (!event.shiftKey && !event.ctrlKey && !event.altKey) this.switchToSlot(WeaponSlot.SMG);
+        break;
+      case 'Digit6':
+        if (!event.shiftKey && !event.ctrlKey && !event.altKey) this.switchToSlot(WeaponSlot.PISTOL);
+        break;
+      case 'KeyQ':
+        this.cycleWeapon();
+        break;
+    }
+  }
+
+  private switchToSlot(slot: WeaponSlot, forceNotify = false): void {
+    if (!this.isSlotEnabled(slot)) {
+      return;
+    }
+
+    if (!forceNotify && this.currentSlot === slot) {
+      return;
+    }
+
+    this.currentSlot = slot;
+    Logger.info('inventory', `Switched to: ${WeaponSlot[slot]}`);
+
+    for (const callback of this.onSlotChangeCallbacks) {
+      callback(slot);
+    }
+
+    this.updateUI();
+  }
+
+  private cycleWeapon(): void {
+    const enabledSlots = this.getEnabledSlots();
+    if (enabledSlots.length === 0) return;
+
+    const currentIndex = enabledSlots.indexOf(this.currentSlot);
+    const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+    const nextSlot = enabledSlots[(safeIndex + 1) % enabledSlots.length];
+    this.switchToSlot(nextSlot);
+  }
+
+  private getPreferredInitialSlot(): WeaponSlot {
+    if (this.isSlotEnabled(WeaponSlot.PRIMARY)) {
+      return WeaponSlot.PRIMARY;
+    }
+
+    const firstWeaponSlot = this.getWeaponCycleSlots()[0];
+    if (firstWeaponSlot !== undefined) {
+      return firstWeaponSlot;
+    }
+
+    return this.getEnabledSlots()[0] ?? WeaponSlot.PRIMARY;
+  }
+
+  private syncResourceCountsToLoadout(): void {
+    if (!this.activeLoadout) {
+      return;
+    }
+
+    this.grenades = isGrenadeEquipment(this.activeLoadout.equipment)
+      ? Math.min(this.grenades || this.maxGrenades, this.maxGrenades)
+      : 0;
+    this.sandbags = this.activeLoadout.equipment === LoadoutEquipment.SANDBAG_KIT
+      ? Math.min(this.sandbags || this.maxSandbags, this.maxSandbags)
+      : 0;
+    this.mortarRounds = this.activeLoadout.equipment === LoadoutEquipment.MORTAR_KIT
+      ? Math.min(this.mortarRounds || this.maxMortarRounds, this.maxMortarRounds)
+      : 0;
+  }
+
+  private getSlotDefinition(slot: WeaponSlot): InventorySlotDefinition | undefined {
+    return this.slotDefinitions.find(def => def.slot === slot);
+  }
+
   private notifyInventoryChange(): void {
     if (this.onInventoryChangeCallback) {
       this.onInventoryChangeCallback(this.getState());
     }
     this.updateUI();
+  }
+
+  private notifyLoadoutChange(): void {
+    const snapshot = this.getSlotDefinitions();
+    for (const callback of this.onLoadoutChangeCallbacks) {
+      callback(snapshot);
+    }
+  }
+
+  private createConfiguredSlotDefinitions(loadout: PlayerLoadout): InventorySlotDefinition[] {
+    return [
+      {
+        slot: WeaponSlot.SHOTGUN,
+        enabled: true,
+        shortLabel: getWeaponShortLabel(loadout.secondaryWeapon),
+        fullLabel: getWeaponLabel(loadout.secondaryWeapon),
+        kind: 'weapon',
+        weaponType: loadout.secondaryWeapon
+      },
+      {
+        slot: WeaponSlot.GRENADE,
+        enabled: true,
+        shortLabel: getEquipmentShortLabel(loadout.equipment),
+        fullLabel: getEquipmentLabel(loadout.equipment),
+        kind: isGrenadeEquipment(loadout.equipment) ? 'throwable' : 'equipment'
+      },
+      {
+        slot: WeaponSlot.PRIMARY,
+        enabled: true,
+        shortLabel: getWeaponShortLabel(loadout.primaryWeapon),
+        fullLabel: getWeaponLabel(loadout.primaryWeapon),
+        kind: 'weapon',
+        weaponType: loadout.primaryWeapon
+      },
+      {
+        slot: WeaponSlot.SANDBAG,
+        enabled: false,
+        shortLabel: '--',
+        fullLabel: 'Unused',
+        kind: 'equipment'
+      },
+      {
+        slot: WeaponSlot.SMG,
+        enabled: false,
+        shortLabel: '--',
+        fullLabel: 'Unused',
+        kind: 'equipment'
+      },
+      {
+        slot: WeaponSlot.PISTOL,
+        enabled: false,
+        shortLabel: '--',
+        fullLabel: 'Unused',
+        kind: 'equipment'
+      }
+    ];
   }
 
   private createUI(): void {
@@ -248,40 +472,14 @@ export class InventoryManager implements GameSystem {
       z-index: 1000;
     `;
 
-    this.uiElement.innerHTML = `
-      <div id="slot-shotgun" class="hotbar-slot" data-slot="0">
-        <div class="slot-key">1</div>
-        <div class="slot-icon">SG</div>
-        <div class="slot-label">SHOTGUN</div>
+    this.uiElement.innerHTML = Array.from({ length: 6 }, (_, index) => `
+      <div id="slot-${index}" class="hotbar-slot${index === this.currentSlot ? ' active' : ''}" data-slot="${index}">
+        <div class="slot-key">${index + 1}</div>
+        <div class="slot-icon" data-role="icon"></div>
+        <div class="slot-label" data-role="label"></div>
+        <div class="slot-count" data-role="count"></div>
       </div>
-      <div id="slot-grenade" class="hotbar-slot" data-slot="1">
-        <div class="slot-key">2</div>
-        <div class="slot-icon">GR</div>
-        <div class="slot-label">GRENADE</div>
-        <div class="slot-count" id="grenade-count">${this.grenades}</div>
-      </div>
-      <div id="slot-primary" class="hotbar-slot active" data-slot="2">
-        <div class="slot-key">3</div>
-        <div class="slot-icon">AR</div>
-        <div class="slot-label">RIFLE</div>
-      </div>
-      <div id="slot-sandbag" class="hotbar-slot" data-slot="3">
-        <div class="slot-key">4</div>
-        <div class="slot-icon">SB</div>
-        <div class="slot-label">SANDBAG</div>
-        <div class="slot-count" id="sandbag-count">${this.sandbags}</div>
-      </div>
-      <div id="slot-smg" class="hotbar-slot" data-slot="4">
-        <div class="slot-key">5</div>
-        <div class="slot-icon">SM</div>
-        <div class="slot-label">SMG</div>
-      </div>
-      <div id="slot-pistol" class="hotbar-slot" data-slot="5">
-        <div class="slot-key">6</div>
-        <div class="slot-icon">PT</div>
-        <div class="slot-label">PISTOL</div>
-      </div>
-    `;
+    `).join('');
 
     const styles = document.createElement('style');
     styles.textContent = `
@@ -297,7 +495,7 @@ export class InventoryManager implements GameSystem {
         align-items: center;
         justify-content: center;
         font-family: 'Rajdhani', sans-serif;
-        transition: border-color 0.15s, background 0.15s;
+        transition: border-color 0.15s, background 0.15s, opacity 0.15s;
         backdrop-filter: blur(4px);
         gap: 1px;
       }
@@ -305,6 +503,10 @@ export class InventoryManager implements GameSystem {
       .hotbar-slot.active {
         border-color: rgba(200, 230, 255, 0.6);
         background: rgba(200, 230, 255, 0.12);
+      }
+
+      .hotbar-slot.inactive {
+        opacity: 0.2;
       }
 
       .slot-key {
@@ -349,33 +551,43 @@ export class InventoryManager implements GameSystem {
 
     document.head.appendChild(styles);
     document.body.appendChild(this.uiElement);
+    this.updateUI();
   }
 
   private updateUI(): void {
     if (!this.uiElement) return;
 
     const slots = this.uiElement.querySelectorAll('.hotbar-slot');
-    slots.forEach((slot, index) => {
-      if (index === this.currentSlot) {
-        slot.classList.add('active');
-      } else {
-        slot.classList.remove('active');
+    slots.forEach(slotElement => {
+      const slotIndex = Number((slotElement as HTMLElement).dataset.slot);
+      const definition = this.getSlotDefinition(slotIndex as WeaponSlot);
+      const icon = slotElement.querySelector('[data-role="icon"]');
+      const label = slotElement.querySelector('[data-role="label"]');
+      const count = slotElement.querySelector('[data-role="count"]');
+      const enabled = definition?.enabled ?? false;
+
+      slotElement.classList.toggle('active', slotIndex === this.currentSlot && enabled);
+      slotElement.classList.toggle('inactive', !enabled);
+      (slotElement as HTMLElement).style.display = enabled ? 'flex' : 'none';
+
+      if (icon) icon.textContent = definition?.shortLabel ?? '--';
+      if (label) label.textContent = definition?.fullLabel ?? 'Disabled';
+
+      if (count) {
+        if (slotIndex === WeaponSlot.GRENADE && enabled) {
+          count.textContent = this.getEquipmentActionForSlot(WeaponSlot.GRENADE) === 'grenade'
+            ? String(this.grenades)
+            : this.getEquipmentActionForSlot(WeaponSlot.GRENADE) === 'sandbag'
+              ? String(this.sandbags)
+              : this.getEquipmentActionForSlot(WeaponSlot.GRENADE) === 'mortar'
+                ? String(this.mortarRounds)
+                : '';
+        } else if (slotIndex === WeaponSlot.SANDBAG && enabled) {
+          count.textContent = String(this.sandbags);
+        } else {
+          count.textContent = '';
+        }
       }
     });
-
-    const grenadeCount = this.uiElement.querySelector('#grenade-count');
-    if (grenadeCount) {
-      grenadeCount.textContent = String(this.grenades);
-    }
-
-    const mortarCount = this.uiElement.querySelector('#mortar-count');
-    if (mortarCount) {
-      mortarCount.textContent = String(this.mortarRounds);
-    }
-
-    const sandbagCount = this.uiElement.querySelector('#sandbag-count');
-    if (sandbagCount) {
-      sandbagCount.textContent = String(this.sandbags);
-    }
   }
 }

@@ -15,7 +15,14 @@ interface WeaponSlotEl {
   element: HTMLDivElement;
   index: number;
   label: string;
+  icon: HTMLSpanElement;
   keyHint: HTMLSpanElement;
+}
+
+interface WeaponBarSlotConfig {
+  enabled: boolean;
+  shortLabel: string;
+  fullLabel: string;
 }
 
 export class UnifiedWeaponBar {
@@ -26,9 +33,15 @@ export class UnifiedWeaponBar {
   private onWeaponSelect?: (slotIndex: number) => void;
   private styleEl?: HTMLStyleElement;
 
-  private static readonly SLOT_LABELS = ['SG', 'GRN', 'AR', 'SB', 'SMG', 'PST'];
-  private static readonly SLOT_NAMES = ['SHOTGUN', 'GRENADE', 'RIFLE', 'SANDBAG', 'SMG', 'PISTOL'];
   private static readonly STYLE_ID = 'unified-weapon-bar-styles';
+  private slotConfig: WeaponBarSlotConfig[] = [
+    { enabled: true, shortLabel: 'SG', fullLabel: 'Shotgun' },
+    { enabled: true, shortLabel: 'GRN', fullLabel: 'Grenade' },
+    { enabled: true, shortLabel: 'AR', fullLabel: 'Rifle' },
+    { enabled: true, shortLabel: 'SB', fullLabel: 'Sandbag' },
+    { enabled: true, shortLabel: 'SMG', fullLabel: 'SMG' },
+    { enabled: true, shortLabel: 'PST', fullLabel: 'Pistol' },
+  ];
 
   constructor() {
     this.container = document.createElement('div');
@@ -46,7 +59,7 @@ export class UnifiedWeaponBar {
     `;
 
     for (let i = 0; i < 6; i++) {
-      this.addSlot(i, UnifiedWeaponBar.SLOT_LABELS[i]);
+      this.addSlot(i, this.slotConfig[i].shortLabel);
     }
 
     this.injectStyles();
@@ -64,6 +77,32 @@ export class UnifiedWeaponBar {
       this.activeIndex = index;
       this.updateHighlight();
     }
+  }
+
+  setSlotDefinitions(definitions: WeaponBarSlotConfig[]): void {
+    this.slotConfig = Array.from({ length: 6 }, (_, index) => definitions[index] ?? {
+      enabled: false,
+      shortLabel: '--',
+      fullLabel: 'Disabled'
+    });
+
+    for (const slot of this.slots) {
+      const config = this.slotConfig[slot.index];
+      slot.label = config.shortLabel;
+      slot.icon.textContent = config.shortLabel;
+      slot.element.title = config.fullLabel;
+      slot.element.style.display = config.enabled ? 'flex' : 'none';
+      slot.element.classList.toggle('uwb-slot--disabled', !config.enabled);
+    }
+
+    if (!this.slotConfig[this.activeIndex]?.enabled) {
+      const firstEnabled = this.slotConfig.findIndex(config => config.enabled);
+      if (firstEnabled >= 0) {
+        this.activeIndex = firstEnabled;
+      }
+    }
+
+    this.updateHighlight();
   }
 
   /** Ammo is intentionally not rendered in hotkey bar; dedicated AmmoDisplay owns it. */
@@ -93,6 +132,7 @@ export class UnifiedWeaponBar {
     const slot = document.createElement('div');
     slot.className = 'uwb-slot';
     slot.dataset.slot = String(index);
+    slot.title = this.slotConfig[index]?.fullLabel ?? label;
 
     // Key hint (desktop only - hidden on touch via CSS)
     const keyHint = document.createElement('span');
@@ -118,7 +158,9 @@ export class UnifiedWeaponBar {
       slot.classList.add('uwb-slot--pressed');
       this.activeIndex = index;
       this.updateHighlight();
-      this.onWeaponSelect?.(index);
+      if (this.slotConfig[index]?.enabled) {
+        this.onWeaponSelect?.(index);
+      }
     };
 
     const onPointerUp = (e: PointerEvent): void => {
@@ -141,13 +183,14 @@ export class UnifiedWeaponBar {
     slot.addEventListener('pointerup', onPointerUp, { passive: false });
     slot.addEventListener('pointercancel', onPointerCancel, { passive: false });
 
-    this.slots.push({ element: slot, index, label, keyHint });
+    this.slots.push({ element: slot, index, label, icon, keyHint });
     this.container.appendChild(slot);
   }
 
   private updateHighlight(): void {
     for (const slot of this.slots) {
-      if (slot.index === this.activeIndex) {
+      const enabled = this.slotConfig[slot.index]?.enabled ?? false;
+      if (slot.index === this.activeIndex && enabled) {
         slot.element.classList.add('uwb-slot--active');
       } else {
         slot.element.classList.remove('uwb-slot--active');
@@ -190,6 +233,10 @@ export class UnifiedWeaponBar {
 
       .uwb-slot--pressed {
         transform: scale(0.92);
+      }
+
+      .uwb-slot--disabled {
+        opacity: 0.25;
       }
 
       .uwb-key {

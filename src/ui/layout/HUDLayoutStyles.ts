@@ -57,11 +57,12 @@ export const HUD_LAYOUT_STYLES = `
     box-sizing: border-box;
   }
 
-  /* Center-aligned slots (tickets, compass, center, status-bar) */
+  /* Center-aligned slots (tickets, compass, center, status-bar, command-bar) */
   .hud-slot[data-region="tickets"],
   .hud-slot[data-region="compass"],
   .hud-slot[data-region="center"],
-  .hud-slot[data-region="status-bar"] {
+  .hud-slot[data-region="status-bar"],
+  .hud-slot[data-region="command-bar"] {
     justify-content: center;
     align-items: center;
   }
@@ -135,6 +136,11 @@ export const HUD_LAYOUT_STYLES = `
     padding-right: 4px;
   }
 
+  .hud-slot[data-region="command-bar"] {
+    align-items: flex-end;
+    padding-bottom: 4px;
+  }
+
   /* Desktop gets a little more breathing room from the screen edge */
   [data-device="desktop"] .hud-slot[data-region="ammo"] {
     padding-bottom: 8px;
@@ -164,7 +170,8 @@ export const HUD_LAYOUT_STYLES = `
    *  game-status|  compass   | minimap
    *  stats      |            | objectives
    *             |  center    | kill-feed  <- top-right
-   *  health     | weapon-bar | ammo
+   *  health     | command-bar| ammo
+   *             | weapon-bar |
    * ========================================================= */
   #game-hud-root {
     display: grid;
@@ -174,13 +181,15 @@ export const HUD_LAYOUT_STYLES = `
       auto     /* game-status / compass / minimap bottom */
       auto     /* stats / . / objectives */
       1fr      /* center (flexible) / kill-feed top-right */
-      auto;    /* health / weapon-bar / ammo */
+      auto     /* health / command-bar / ammo */
+      auto;    /* . / weapon-bar / . */
     grid-template-areas:
       "timer        tickets     minimap"
       "game-status  compass     minimap"
       "stats        .           objectives"
       ".            center      kill-feed"
-      "health       weapon-bar  ammo";
+      "health       command-bar ammo"
+      ".            weapon-bar  .";
     gap: 4px;
   }
 
@@ -192,6 +201,7 @@ export const HUD_LAYOUT_STYLES = `
   .hud-slot[data-region="compass"]     { grid-area: compass; }
   .hud-slot[data-region="objectives"]  { grid-area: objectives; }
   .hud-slot[data-region="stats"]       { grid-area: stats; }
+  .hud-slot[data-region="command-bar"] { grid-area: command-bar; }
   .hud-slot[data-region="center"]      { grid-area: center; }
   .hud-slot[data-region="kill-feed"]   { grid-area: kill-feed; }
   .hud-slot[data-region="health"]      { grid-area: health; }
@@ -261,6 +271,7 @@ export const HUD_LAYOUT_STYLES = `
    *  minimap    | status-bar  | menu
    *  stats      |             |
    *             |             |
+   *             | command-bar |
    *  weapon-bar |             |
    *  health     |             |
    *  joystick   |             |
@@ -273,6 +284,7 @@ export const HUD_LAYOUT_STYLES = `
         auto     /* minimap / status-bar / menu */
         auto     /* stats (K/D under minimap) */
         1fr      /* flex space (center overlay lives here) */
+        auto     /* command strip */
         auto     /* weapon-bar */
         auto     /* health */
         auto     /* joystick */
@@ -281,6 +293,7 @@ export const HUD_LAYOUT_STYLES = `
         "minimap     status-bar  menu"
         "stats       .           ."
         ".           center      ."
+        ".           command-bar ."
         "weapon-bar  .           ."
         "health      .           ."
         "joystick    .           ."
@@ -303,6 +316,7 @@ export const HUD_LAYOUT_STYLES = `
    *             |             |
    *             |             |
    *             |             |
+   *             | command-bar |
    *  weapon-bar |             |
    *  health     |             |
    *  joystick   |             |
@@ -316,7 +330,7 @@ export const HUD_LAYOUT_STYLES = `
         auto     /* stats (K/D under minimap) */
         1fr      /* flex space */
         1fr      /* flex space (center overlay lives here) */
-        1fr      /* flex space */
+        auto     /* command strip */
         auto     /* weapon-bar */
         auto     /* health */
         auto     /* joystick */
@@ -326,7 +340,7 @@ export const HUD_LAYOUT_STYLES = `
         "stats       .           ."
         ".           .           ."
         ".           center      ."
-        ".           .           ."
+        ".           command-bar ."
         "weapon-bar  .           ."
         "health      .           ."
         "joystick    .           ."
@@ -370,7 +384,8 @@ export const HUD_LAYOUT_STYLES = `
   [data-ads="true"] .hud-slot[data-region="tickets"],
   [data-ads="true"] .hud-slot[data-region="status-bar"],
   [data-ads="true"] .hud-slot[data-region="kill-feed"],
-  [data-ads="true"] .hud-slot[data-region="action-btns"] {
+  [data-ads="true"] .hud-slot[data-region="action-btns"],
+  [data-ads="true"] .hud-slot[data-region="command-bar"] {
     opacity: 0.3;
     transition: opacity 0.15s ease;
   }

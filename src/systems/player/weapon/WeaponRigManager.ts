@@ -4,13 +4,15 @@ import { GunplayCore, WeaponSpec } from '../../weapons/GunplayCore'
 import type { IAmmoManager, IAudioManager, IHUDSystem } from '../../../types/SystemInterfaces'
 import { modelLoader } from '../../assets/ModelLoader'
 import { WeaponModels } from '../../assets/modelPaths'
+import { Faction, isBlufor } from '../../combat/types'
 
 /**
  * Manages weapon model creation and switching between rifle/shotgun/SMG
  */
 export class WeaponRigManager {
   private weaponScene: THREE.Scene
-  private rifleRig?: THREE.Group
+  private m16RifleRig?: THREE.Group
+  private akRifleRig?: THREE.Group
   private shotgunRig?: THREE.Group
   private smgRig?: THREE.Group
   private pistolRig?: THREE.Group
@@ -18,6 +20,8 @@ export class WeaponRigManager {
   private muzzleRef?: THREE.Object3D
   private magazineRef?: THREE.Object3D
   private pumpGripRef?: THREE.Object3D
+  private activeRifleFaction: Faction = Faction.US
+  private currentWeaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' = 'rifle'
 
   // Weapon cores
   private rifleCore: GunplayCore
@@ -83,18 +87,22 @@ export class WeaponRigManager {
 
   async init(): Promise<void> {
     // Load GLB weapon models in parallel
-    const [rifleScene, shotgunScene, smgScene, pistolScene] = await Promise.all([
+    const [m16Scene, akScene, shotgunScene, smgScene, pistolScene] = await Promise.all([
       modelLoader.loadModel(WeaponModels.M16A1),
+      modelLoader.loadModel(WeaponModels.AK47),
       modelLoader.loadModel(WeaponModels.ITHACA37),
       modelLoader.loadModel(WeaponModels.M3_GREASE_GUN),
       modelLoader.loadModel(WeaponModels.M1911),
     ])
 
-    // Configure each weapon rig: barrel along +X, use MeshBasicMaterial for
-    // first-person overlay (unlit, matches weapon scene rendering)
-    this.rifleRig = this.prepareWeaponRig(rifleScene, 1.5, false)
-    this.rifleRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
-    this.weaponScene.add(this.rifleRig)
+    this.m16RifleRig = this.prepareWeaponRig(m16Scene, 1.5, false)
+    this.m16RifleRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
+    this.weaponScene.add(this.m16RifleRig)
+
+    this.akRifleRig = this.prepareWeaponRig(akScene, 1.5, false)
+    this.akRifleRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
+    this.akRifleRig.visible = false
+    this.weaponScene.add(this.akRifleRig)
 
     this.shotgunRig = this.prepareWeaponRig(shotgunScene, 1.5, true)
     this.shotgunRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
@@ -111,8 +119,13 @@ export class WeaponRigManager {
     this.pistolRig.visible = false
     this.weaponScene.add(this.pistolRig)
 
-    // Start with rifle active
-    this.weaponRig = this.rifleRig
+    // Start with the BLUFOR rifle active
+    this.currentWeaponType = 'rifle'
+    this.weaponRig = this.getActiveRifleRig()
+    if (!this.weaponRig) {
+      throw new Error('Active rifle rig was not initialized')
+    }
+    this.setRifleRigVisibility(true)
     this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined
     this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined
     this.pumpGripRef = undefined
@@ -265,10 +278,7 @@ export class WeaponRigManager {
 
   startWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol', _hudSystem?: IHUDSystem, _audioManager?: IAudioManager, _ammoManager?: IAmmoManager): boolean {
     // Don't switch if already the current weapon
-    if ((weaponType === 'rifle' && this.weaponRig === this.rifleRig) ||
-        (weaponType === 'shotgun' && this.weaponRig === this.shotgunRig) ||
-        (weaponType === 'smg' && this.weaponRig === this.smgRig) ||
-        (weaponType === 'pistol' && this.weaponRig === this.pistolRig)) {
+    if (weaponType === this.currentWeaponType) {
       return false
     }
 
@@ -330,25 +340,28 @@ export class WeaponRigManager {
 
   private performWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol', hudSystem?: IHUDSystem, audioManager?: IAudioManager, ammoManager?: IAmmoManager): void {
     // Actually switch the visible weapon models
-    if (!this.rifleRig || !this.shotgunRig || !this.smgRig || !this.pistolRig) return
+    if (!this.m16RifleRig || !this.akRifleRig || !this.shotgunRig || !this.smgRig || !this.pistolRig) return
+
+    this.setRifleRigVisibility(false)
+    this.shotgunRig.visible = false
+    this.smgRig.visible = false
+    this.pistolRig.visible = false
+    this.currentWeaponType = weaponType
 
     switch (weaponType) {
       case 'rifle':
-        this.rifleRig.visible = true
-        this.shotgunRig.visible = false
-        this.smgRig.visible = false
-        this.pistolRig.visible = false
-        this.weaponRig = this.rifleRig
+        this.setRifleRigVisibility(true)
+        this.weaponRig = this.getActiveRifleRig()
+        if (!this.weaponRig) {
+          throw new Error('Active rifle rig was not initialized')
+        }
         this.gunCore = this.rifleCore
         this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined
         this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined
         this.pumpGripRef = undefined
         break
       case 'shotgun':
-        this.rifleRig.visible = false
         this.shotgunRig.visible = true
-        this.smgRig.visible = false
-        this.pistolRig.visible = false
         this.weaponRig = this.shotgunRig
         this.gunCore = this.shotgunCore
         this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined
@@ -356,10 +369,7 @@ export class WeaponRigManager {
         this.pumpGripRef = undefined // No pump grip animation
         break
       case 'smg':
-        this.rifleRig.visible = false
-        this.shotgunRig.visible = false
         this.smgRig.visible = true
-        this.pistolRig.visible = false
         this.weaponRig = this.smgRig
         this.gunCore = this.smgCore
         this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined
@@ -367,9 +377,6 @@ export class WeaponRigManager {
         this.pumpGripRef = undefined
         break
       case 'pistol':
-        this.rifleRig.visible = false
-        this.shotgunRig.visible = false
-        this.smgRig.visible = false
         this.pistolRig.visible = true
         this.weaponRig = this.pistolRig
         this.gunCore = this.pistolCore
@@ -405,9 +412,42 @@ export class WeaponRigManager {
     return this.isSwitchingWeapon
   }
 
+  setRifleFaction(faction: Faction): void {
+    this.activeRifleFaction = faction
+    if (this.currentWeaponType === 'rifle') {
+      const visible = this.weaponRig?.visible ?? true
+      this.setRifleRigVisibility(visible)
+      this.weaponRig = this.getActiveRifleRig()
+      this.muzzleRef = this.weaponRig?.getObjectByName('muzzle') || undefined
+      this.magazineRef = this.weaponRig?.getObjectByName('magazine') || undefined
+      this.pumpGripRef = undefined
+    }
+  }
+
   setWeaponVisibility(visible: boolean): void {
+    if (this.currentWeaponType === 'rifle') {
+      this.setRifleRigVisibility(visible)
+      return
+    }
+
     if (this.weaponRig) {
       this.weaponRig.visible = visible
+    }
+  }
+
+  private getActiveRifleRig(): THREE.Group | undefined {
+    return isBlufor(this.activeRifleFaction)
+      ? this.m16RifleRig
+      : this.akRifleRig
+  }
+
+  private setRifleRigVisibility(visible: boolean): void {
+    const useBluforRifle = isBlufor(this.activeRifleFaction)
+    if (this.m16RifleRig) {
+      this.m16RifleRig.visible = useBluforRifle ? visible : false
+    }
+    if (this.akRifleRig) {
+      this.akRifleRig.visible = useBluforRifle ? false : visible
     }
   }
 

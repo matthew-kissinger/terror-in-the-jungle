@@ -35,9 +35,7 @@ vi.mock('../input/InputManager', () => ({
     clearMouseMovement = vi.fn();
     unlockPointer = vi.fn();
     relockPointer = vi.fn();
-    getActiveInputMode = vi.fn().mockReturnValue('keyboardMouse');
-    onModeChange = vi.fn();
-    isContextBlocked = vi.fn().mockReturnValue(false);
+    onInputModeChange = vi.fn(() => () => {});
   },
 }));
 vi.mock('./PlayerMovement');
@@ -59,6 +57,7 @@ describe('PlayerController', () => {
   let mockFirstPersonWeapon: FirstPersonWeapon;
   let mockHUDSystem: HUDSystem;
   let mockRenderer: any;
+  let mockCommandInputManager: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -77,6 +76,24 @@ describe('PlayerController', () => {
     } as any;
 
     mockGameModeManager = {
+      getCurrentDefinition: vi.fn().mockReturnValue({
+        id: 'zone_control',
+        config: {
+          zones: [
+            {
+              id: 'us_base',
+              isHomeBase: true,
+              owner: Faction.US,
+              position: new THREE.Vector3(100, 0, 100),
+            },
+          ],
+        },
+        policies: {
+          respawn: {
+            initialSpawnRule: 'homebase',
+          },
+        },
+      }),
       getCurrentConfig: vi.fn().mockReturnValue({
         zones: [
           {
@@ -91,6 +108,37 @@ describe('PlayerController', () => {
 
     mockInventoryManager = {
       onSlotChange: vi.fn(),
+      onLoadoutChange: vi.fn(),
+      getSlotDefinitions: vi.fn(() => []),
+      getWeaponCycleSlots: vi.fn(() => [WeaponSlot.PRIMARY, WeaponSlot.SHOTGUN, WeaponSlot.SMG, WeaponSlot.PISTOL]),
+      getCurrentSlot: vi.fn(() => WeaponSlot.PRIMARY),
+      setCurrentSlot: vi.fn(),
+      getWeaponTypeForSlot: vi.fn((slot: WeaponSlot) => {
+        switch (slot) {
+          case WeaponSlot.PRIMARY:
+            return 'rifle';
+          case WeaponSlot.SHOTGUN:
+            return 'shotgun';
+          case WeaponSlot.SMG:
+            return 'smg';
+          case WeaponSlot.PISTOL:
+            return 'pistol';
+          default:
+            return null;
+        }
+      }),
+      getEquipmentActionForSlot: vi.fn((slot: WeaponSlot) => {
+        switch (slot) {
+          case WeaponSlot.GRENADE:
+            return 'grenade';
+          case WeaponSlot.SANDBAG:
+            return 'sandbag';
+          default:
+            return null;
+        }
+      }),
+      hasMortarKit: vi.fn(() => true),
+      hasSandbagKit: vi.fn(() => true),
     } as any;
 
     mockGrenadeSystem = {
@@ -138,6 +186,7 @@ describe('PlayerController', () => {
       showWeapon: vi.fn(),
       hideWeapon: vi.fn(),
       setWeaponVisibility: vi.fn(),
+      setPlayerFaction: vi.fn(),
       setFireingEnabled: vi.fn(),
       setPrimaryWeapon: vi.fn(),
       getWeaponInput: vi.fn().mockReturnValue({
@@ -162,12 +211,20 @@ describe('PlayerController', () => {
       updateGrenadePower: vi.fn(),
       showMessage: vi.fn(),
       setWeaponSelectCallback: vi.fn(),
+      setWeaponBarLayout: vi.fn(),
       setActiveWeaponSlot: vi.fn(),
       getLayout: vi.fn().mockReturnValue({ getSlot: vi.fn().mockReturnValue({}) }),
     } as any;
 
     mockRenderer = {
       showCrosshair: vi.fn(),
+    };
+
+    mockCommandInputManager = {
+      bindInputManager: vi.fn(),
+      toggleCommandMode: vi.fn(),
+      issueQuickCommand: vi.fn(),
+      handleCancel: vi.fn(() => false),
     };
   });
 
@@ -184,6 +241,34 @@ describe('PlayerController', () => {
       expect(position.z).toBe(-50);
     });
 
+  });
+
+  describe('Command Input Integration', () => {
+    it('binds the command input manager to the shared input manager', () => {
+      playerController.setCommandInputManager(mockCommandInputManager);
+
+      expect(mockCommandInputManager.bindInputManager).toHaveBeenCalledWith(playerController['input']);
+    });
+
+    it('routes squad command callbacks through the command input manager', () => {
+      playerController.setCommandInputManager(mockCommandInputManager);
+
+      const callbacks = (playerController['input'].setCallbacks as any).mock.calls[0][0];
+      callbacks.onSquadCommand();
+      callbacks.onSquadQuickCommand(3);
+
+      expect(mockCommandInputManager.toggleCommandMode).toHaveBeenCalled();
+      expect(mockCommandInputManager.issueQuickCommand).toHaveBeenCalledWith(3);
+    });
+
+    it('lets command input consume escape before pointer unlock logic runs', () => {
+      playerController.setCommandInputManager(mockCommandInputManager);
+      mockCommandInputManager.handleCancel.mockReturnValue(true);
+
+      playerController['handleEscape']();
+
+      expect(mockCommandInputManager.handleCancel).toHaveBeenCalled();
+    });
   });
 
   describe('init', () => {
@@ -574,6 +659,18 @@ describe('PlayerController', () => {
         expect.any(THREE.Vector3),
         'squad-alpha',
         Faction.US
+      );
+    });
+
+    it('should place rally point using the selected player faction', () => {
+      playerController.setPlayerFaction(Faction.NVA);
+
+      playerController['handleRallyPointPlacement']();
+
+      expect(mockRallyPointSystem.placeRallyPoint).toHaveBeenCalledWith(
+        expect.any(THREE.Vector3),
+        'squad-alpha',
+        Faction.NVA
       );
     });
 

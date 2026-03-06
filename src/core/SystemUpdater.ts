@@ -4,7 +4,6 @@ import { SystemReferences } from './SystemInitializer';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import { ShotCommandFactory } from '../systems/player/weapon/ShotCommand';
 import { Logger } from '../utils/Logger';
-import { GameMode } from '../config/gameModeTypes';
 import { isOpfor } from '../systems/combat/types';
 import { isPerfUserTimingEnabled } from './PerfDiagnostics';
 
@@ -52,6 +51,7 @@ export class SystemUpdater {
       // Update command position on minimap
       const commandPos = refs.playerSquadController.getCommandPosition();
       refs.minimapSystem.setCommandPosition(commandPos);
+      refs.fullMapSystem.setCommandPosition(commandPos);
 
       if (refs.voiceCalloutSystem) {
         refs.voiceCalloutSystem.setPlayerPosition(refs.playerController.getPosition());
@@ -209,8 +209,8 @@ export class SystemUpdater {
     gameStarted: boolean
   ): void {
     if (!gameStarted) return;
-    const mode = refs.gameModeManager?.getCurrentMode();
-    if (mode !== GameMode.A_SHAU_VALLEY) {
+    const respawnPolicy = refs.gameModeManager?.getRespawnPolicy();
+    if (respawnPolicy?.contactAssistStyle !== 'pressure_front') {
       this.ashauNoContactMs = 0;
       return;
     }
@@ -235,7 +235,7 @@ export class SystemUpdater {
     if (this.ashauNoContactMs < this.ASHAU_CONTACT_ASSIST_DELAY_MS) return;
     if (now - this.ashauLastAssistAtMs < this.ASHAU_CONTACT_ASSIST_COOLDOWN_MS) return;
 
-    const suggested = refs.playerRespawnManager?.getAShauPressureInsertionSuggestion?.({ minOpfor250: 1 });
+    const suggested = refs.playerRespawnManager?.getPolicyDrivenInsertionSuggestion?.({ minOpfor250: 1 });
     if (!suggested) return;
     suggested.y = playerPos.y;
     refs.playerController.setPosition(suggested, 'ashau.contact_assist');

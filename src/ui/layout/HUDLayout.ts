@@ -25,6 +25,7 @@ const ALL_REGIONS: HUDRegion[] = [
   'minimap',
   'objectives',
   'stats',
+  'command-bar',
   'kill-feed',
   'ammo',
   'weapon-bar',

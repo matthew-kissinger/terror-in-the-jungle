@@ -17,6 +17,7 @@ export type HUDRegion =
   | 'minimap'
   | 'objectives'
   | 'stats'
+  | 'command-bar'
   | 'kill-feed'
   | 'ammo'
   | 'weapon-bar'

@@ -60,14 +60,14 @@ export class RespawnMapController {
 
     mapContainer.innerHTML = '';
 
-    const isOpenFrontier = this.currentGameMode === GameMode.OPEN_FRONTIER;
-    Logger.info('respawn-map', ` Using map: ${isOpenFrontier ? 'OpenFrontierRespawnMap' : 'RespawnMapView'}`);
+    const useFrontierMap = this.gameModeManager?.getDeployPolicy().mapVariant === 'frontier';
+    Logger.info('respawn-map', ` Using map: ${useFrontierMap ? 'OpenFrontierRespawnMap' : 'RespawnMapView'}`);
 
-    const activeMap = isOpenFrontier ? this.openFrontierRespawnMap : this.respawnMapView;
+    const activeMap = useFrontierMap ? this.openFrontierRespawnMap : this.respawnMapView;
     this.activeMap = activeMap;
     const mapCanvas = activeMap.getCanvas();
 
-    mapCanvas.style.cssText = isOpenFrontier ? `
+    mapCanvas.style.cssText = useFrontierMap ? `
       width: 100%;
       height: 100%;
       max-width: 800px;
@@ -85,7 +85,7 @@ export class RespawnMapController {
     activeMap.updateSpawnableZones();
     activeMap.render();
 
-    if (isOpenFrontier) {
+    if (useFrontierMap) {
       this.openFrontierRespawnMap.resetView();
     }
 

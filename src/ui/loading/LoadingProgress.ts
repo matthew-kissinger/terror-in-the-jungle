@@ -118,6 +118,15 @@ export class LoadingProgress {
     this.percentText.textContent = '100%';
   }
 
+  setStatusText(text: string): void {
+    this.phaseText.textContent = text;
+  }
+
+  setTipText(text: string): void {
+    this.tipText.textContent = text;
+    this.lastTipTime = Date.now();
+  }
+
   getCurrentPhase(): string {
     return this.currentPhase;
   }

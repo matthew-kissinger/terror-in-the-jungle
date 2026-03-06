@@ -276,6 +276,15 @@ function drawCommandMarker(ctx: CanvasRenderingContext2D, state: MinimapRenderSt
 
   if (x < 0 || x > state.size || y < 0 || y > state.size) return;
 
+  const centerX = state.size / 2;
+  const centerY = state.size / 2;
+  ctx.strokeStyle = 'rgba(92, 184, 92, 0.35)';
+  ctx.lineWidth = 1.5 * renderScale;
+  ctx.beginPath();
+  ctx.moveTo(centerX, centerY);
+  ctx.lineTo(x, y);
+  ctx.stroke();
+
   ctx.strokeStyle = 'rgba(92, 184, 92, 0.8)';
   ctx.lineWidth = 2 * renderScale;
 

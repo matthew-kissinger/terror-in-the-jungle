@@ -1,7 +1,14 @@
 import { Logger } from '../../utils/Logger';
 import { GameSystem } from '../../types';
-import { GameMode, GameModeConfig } from '../../config/gameModeTypes';
-import { getGameModeConfig } from '../../config/gameModes';
+import {
+  DeployPolicyConfig,
+  GameMode,
+  GameModeConfig,
+  GameModeDefinition,
+  MapIntelPolicyConfig,
+  RespawnPolicyConfig
+} from '../../config/gameModeTypes';
+import { getGameModeDefinition } from '../../config/gameModeDefinitions';
 import { ZoneManager } from './ZoneManager';
 import { CombatantSystem } from '../combat/CombatantSystem';
 import { TicketSystem } from './TicketSystem';
@@ -9,10 +16,29 @@ import { MinimapSystem } from '../../ui/minimap/MinimapSystem';
 import { InfluenceMapSystem } from '../combat/InfluenceMapSystem';
 import type { WarSimulator } from '../strategy/WarSimulator';
 import type { ITerrainRuntimeController } from '../../types/SystemInterfaces';
+import {
+  createGameModeRuntime,
+  GameModeRuntime,
+  GameModeRuntimeContext,
+  GameModeRuntimeSystems
+} from './runtime/GameModeRuntime';
+import {
+  createDeploySession,
+  DeploySessionKind,
+  DeploySessionModel
+} from './runtime/DeployFlowSession';
+
+type GameModeDefinitionResolver = (mode: GameMode) => GameModeDefinition;
+type GameModeRuntimeFactory = (definition: GameModeDefinition) => GameModeRuntime;
+
+const MINIMAP_TACTICAL_RANGE_KEY = '__MINIMAP_TACTICAL_RANGE__';
+const MINIMAP_SHOW_STRATEGIC_AGENTS_KEY = '__MINIMAP_SHOW_STRATEGIC_AGENTS__';
 
 export class GameModeManager implements GameSystem {
   public currentMode: GameMode = GameMode.ZONE_CONTROL;
   private currentConfig: GameModeConfig;
+  private currentDefinition: GameModeDefinition;
+  private currentRuntime: GameModeRuntime;
 
   // Systems to configure
   private zoneManager?: ZoneManager;
@@ -26,8 +52,13 @@ export class GameModeManager implements GameSystem {
   // Callbacks
   private onModeChange?: (mode: GameMode, config: GameModeConfig) => void;
 
-  constructor() {
-    this.currentConfig = getGameModeConfig(this.currentMode);
+  constructor(
+    private readonly definitionResolver: GameModeDefinitionResolver = getGameModeDefinition,
+    private readonly runtimeFactory: GameModeRuntimeFactory = createGameModeRuntime
+  ) {
+    this.currentDefinition = this.definitionResolver(this.currentMode);
+    this.currentConfig = this.currentDefinition.config;
+    this.currentRuntime = this.runtimeFactory(this.currentDefinition);
   }
 
   async init(): Promise<void> {
@@ -76,26 +107,64 @@ export class GameModeManager implements GameSystem {
     return this.currentConfig;
   }
 
+  public getCurrentDefinition(): GameModeDefinition {
+    return this.currentDefinition;
+  }
+
+  public getCurrentRuntime(): GameModeRuntime {
+    return this.currentRuntime;
+  }
+
+  public getDeployPolicy(): DeployPolicyConfig {
+    return this.currentDefinition.policies.deploy;
+  }
+
+  public getRespawnPolicy(): RespawnPolicyConfig {
+    return this.currentDefinition.policies.respawn;
+  }
+
+  public getMapIntelPolicy(): MapIntelPolicyConfig {
+    return this.currentDefinition.policies.mapIntel;
+  }
+
+  public getDeploySession(kind: DeploySessionKind = 'respawn'): DeploySessionModel {
+    return createDeploySession(this.currentDefinition, kind);
+  }
+
   // Set game mode (called from menu)
   public setGameMode(mode: GameMode): void {
     if (mode === this.currentMode) {
       Logger.info('world', `GameModeManager: Re-applying current mode: ${mode}`);
       this.applyModeConfiguration();
+      this.currentRuntime.onReapply?.(this.createRuntimeContext(this.currentDefinition));
       return;
     }
 
+    const previousDefinition = this.currentDefinition;
+    const previousRuntime = this.currentRuntime;
+    const nextDefinition = this.definitionResolver(mode);
+    const nextRuntime = this.runtimeFactory(nextDefinition);
+
+    previousRuntime.onExit?.(this.createRuntimeContext(previousDefinition, { nextDefinition }));
+
     Logger.info('world', `GameModeManager: Switching game mode to: ${mode}`);
     this.currentMode = mode;
-    this.currentConfig = getGameModeConfig(mode);
+    this.currentDefinition = nextDefinition;
+    this.currentConfig = nextDefinition.config;
+    this.currentRuntime = nextRuntime;
     Logger.info('world', `GameModeManager: World size is now ${this.currentConfig.worldSize}, zones: ${this.currentConfig.zones.length}`);
+
+    // Apply configuration to connected systems
+    this.applyModeConfiguration();
+
+    this.currentRuntime.onEnter?.(
+      this.createRuntimeContext(this.currentDefinition, { previousDefinition })
+    );
 
     // Notify listeners
     if (this.onModeChange) {
       this.onModeChange(mode, this.currentConfig);
     }
-
-    // Apply configuration to connected systems
-    this.applyModeConfiguration();
   }
 
   // Apply mode-specific configuration
@@ -204,7 +273,7 @@ export class GameModeManager implements GameSystem {
 
   // Helper to check if player spawning at zones is allowed
   public canPlayerSpawnAtZones(): boolean {
-    return this.currentConfig.playerCanSpawnAtZones;
+    return this.currentDefinition.policies.respawn.allowControlledZoneSpawns;
   }
 
   // Get spawn protection duration
@@ -225,5 +294,51 @@ export class GameModeManager implements GameSystem {
   // Get view distance
   public getViewDistance(): number {
     return this.currentConfig.viewDistance;
+  }
+
+  private createRuntimeContext(
+    definition: GameModeDefinition,
+    options?: {
+      previousDefinition?: GameModeDefinition;
+      nextDefinition?: GameModeDefinition;
+    }
+  ): GameModeRuntimeContext {
+    return {
+      definition,
+      mode: definition.id,
+      config: definition.config,
+      previousDefinition: options?.previousDefinition,
+      previousMode: options?.previousDefinition?.id,
+      previousConfig: options?.previousDefinition?.config,
+      nextDefinition: options?.nextDefinition,
+      nextMode: options?.nextDefinition?.id,
+      nextConfig: options?.nextDefinition?.config,
+      services: {
+        applyMapIntelPolicy: (policy: MapIntelPolicyConfig) => this.applyMapIntelPolicy(policy)
+      },
+      ...this.getRuntimeSystems()
+    };
+  }
+
+  private getRuntimeSystems(): GameModeRuntimeSystems {
+    return {
+      zoneManager: this.zoneManager,
+      combatantSystem: this.combatantSystem,
+      ticketSystem: this.ticketSystem,
+      terrainSystem: this.terrainSystem,
+      minimapSystem: this.minimapSystem,
+      influenceMapSystem: this.influenceMapSystem,
+      warSimulator: this.warSimulator
+    };
+  }
+
+  private applyMapIntelPolicy(policy: MapIntelPolicyConfig): void {
+    const globals = globalThis as Record<string, unknown>;
+    if (policy.tacticalRangeOverride === null) {
+      delete globals[MINIMAP_TACTICAL_RANGE_KEY];
+    } else {
+      globals[MINIMAP_TACTICAL_RANGE_KEY] = policy.tacticalRangeOverride;
+    }
+    globals[MINIMAP_SHOW_STRATEGIC_AGENTS_KEY] = policy.showStrategicAgentsOnMinimap;
   }
 }

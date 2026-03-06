@@ -8,6 +8,7 @@ import { AudioManager } from '../audio/AudioManager';
 import { InventoryManager, WeaponSlot } from './InventoryManager';
 import { AmmoState } from '../weapons/AmmoManager';
 import type { HUDSystem } from '../../ui/hud/HUDSystem';
+import { Faction } from '../combat/types';
 
 // Create mock instances
 let mockRigManager: any;
@@ -142,6 +143,7 @@ describe('FirstPersonWeapon', () => {
     // Reset mock instances
     mockRigManager = {
       init: vi.fn().mockResolvedValue(undefined),
+      setRifleFaction: vi.fn(),
       getCurrentRig: vi.fn(() => ({})),
       getCurrentCore: vi.fn(() => mockGunCore),
       getSMGCore: vi.fn(() => mockGunCore),
@@ -253,6 +255,20 @@ describe('FirstPersonWeapon', () => {
 
     mockInventoryManager = {
       onSlotChange: vi.fn(),
+      getWeaponTypeForSlot: vi.fn((slot: WeaponSlot) => {
+        switch (slot) {
+          case WeaponSlot.PRIMARY:
+            return 'rifle';
+          case WeaponSlot.SHOTGUN:
+            return 'shotgun';
+          case WeaponSlot.SMG:
+            return 'smg';
+          case WeaponSlot.PISTOL:
+            return 'pistol';
+          default:
+            return null;
+        }
+      }),
     } as unknown as InventoryManager;
 
     // Reset mock core and ammo manager
@@ -276,6 +292,7 @@ describe('FirstPersonWeapon', () => {
       await weapon.init();
 
       expect(mockRigManager.init).toHaveBeenCalled();
+      expect(mockRigManager.setRifleFaction).toHaveBeenCalledWith(Faction.US);
       expect(mockAnimations.setPumpGripRef).toHaveBeenCalled();
       expect(mockReload.setMagazineRef).toHaveBeenCalled();
       expect(mockFiring.setMuzzleRef).toHaveBeenCalled();
@@ -588,6 +605,12 @@ describe('FirstPersonWeapon', () => {
       weapon.setPrimaryWeapon('smg');
 
       expect(mockSwitching.switchWeapon).toHaveBeenCalledWith('smg', expect.any(Function));
+    });
+
+    it('should update the visible rifle faction when player faction changes', () => {
+      weapon.setPlayerFaction(Faction.NVA);
+
+      expect(mockRigManager.setRifleFaction).toHaveBeenCalledWith(Faction.NVA);
     });
   });
 

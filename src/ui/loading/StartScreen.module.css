@@ -315,17 +315,168 @@
 }
 
 .selectedModeDisplay {
-  text-align: center;
+  text-align: left;
   color: var(--text-secondary);
   font-size: 0.75rem;
   margin-top: var(--space-1);
   letter-spacing: 0.06em;
-  opacity: 0.5;
+  opacity: 0.92;
+  background: rgba(8, 16, 24, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-xl);
+  padding: var(--space-3);
 }
 
 .selectedModeDisplay strong {
   color: var(--screen-accent);
   font-weight: var(--weight-semibold);
+}
+
+.selectedModeHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.selectedModeLabel {
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.modeStatusBadge {
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(127, 180, 217, 0.24);
+  background: rgba(127, 180, 217, 0.08);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: var(--weight-semibold);
+}
+
+.modeStatusReady {
+  color: rgba(127, 180, 217, 0.9);
+}
+
+.modeStatusPreparing {
+  color: rgba(242, 197, 111, 0.95);
+  border-color: rgba(242, 197, 111, 0.28);
+  background: rgba(242, 197, 111, 0.12);
+}
+
+.selectedModeFlow {
+  margin-top: var(--space-1);
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+  text-transform: none;
+}
+
+.selectionMatrix {
+  margin-top: var(--space-3);
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.selectionGroup {
+  display: grid;
+  gap: var(--space-1-5);
+}
+
+.selectionGroupLabel {
+  font-size: 0.62rem;
+  color: var(--screen-accent);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: var(--weight-semibold);
+}
+
+.selectionOptionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.selectionOption {
+  min-height: 38px;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(220, 225, 230, 0.86);
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.selectionOption:hover {
+  transform: translateY(-1px);
+  border-color: rgba(127, 180, 217, 0.35);
+  background: rgba(127, 180, 217, 0.08);
+}
+
+.selectionOption:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+.selectionOptionActive {
+  border-color: rgba(127, 180, 217, 0.45);
+  background: rgba(127, 180, 217, 0.14);
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px rgba(127, 180, 217, 0.12);
+}
+
+.selectionSummary {
+  color: rgba(220, 225, 230, 0.78);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  letter-spacing: 0.03em;
+}
+
+.selectedModeDescription {
+  margin-top: var(--space-2);
+  color: rgba(220, 225, 230, 0.82);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+}
+
+.selectedModeSequenceBlock {
+  margin-top: var(--space-3);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: var(--space-2);
+}
+
+.selectedModeSequenceTitle {
+  font-size: 0.62rem;
+  color: var(--screen-accent);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-2);
+}
+
+.selectedModeSequence {
+  margin: 0;
+  padding-left: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  color: rgba(220, 225, 230, 0.78);
+  font-size: 0.72rem;
+  line-height: 1.45;
 }
 
 /* --- Menu buttons --- */
@@ -374,6 +525,17 @@
   transform: translateY(0);
 }
 
+.menuButton:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.menuButton:disabled:hover {
+  box-shadow: none;
+  transform: none;
+}
+
 .playButton {
   font-size: var(--font-size-base);
   padding: 0.85rem 2.5rem;
@@ -412,6 +574,29 @@
   letter-spacing: 0.06em;
   opacity: 0.75;
   text-transform: uppercase;
+}
+
+.menuLocked .modeCard {
+  pointer-events: none;
+  opacity: 0.48;
+  transform: none;
+}
+
+.menuLocked .modeCardSelected {
+  opacity: 1;
+}
+
+.menuLocked .secondaryButton,
+.menuLocked .playButton {
+  cursor: not-allowed;
+}
+
+.menuLocked .selectionOption {
+  pointer-events: none;
+}
+
+.screenPreparing::before {
+  background: radial-gradient(ellipse at center, rgba(18, 22, 28, 0.18) 0%, rgba(5, 8, 12, 0.8) 100%);
 }
 
 /* --- Loading stats --- */
@@ -597,6 +782,15 @@
   .buttonRow {
     flex-direction: column;
     align-items: center;
+  }
+
+  .selectedModeHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .selectionOptionRow {
+    gap: var(--space-1-5);
   }
 }
 
