@@ -5,7 +5,11 @@ import { setSmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
 import { IGameRenderer } from '../types/SystemInterfaces';
 
 /**
- * Handles wiring up dependencies between game systems
+ * Handles wiring up dependencies between game systems.
+ *
+ * Organized into logical groups so the dependency graph is readable.
+ * Each private method wires one subsystem cluster; the public entry
+ * point calls them in the required topological order.
  */
 export class SystemConnector {
   connectSystems(
@@ -14,42 +18,34 @@ export class SystemConnector {
     camera: THREE.PerspectiveCamera,
     renderer?: IGameRenderer
   ): void {
-    // Connect systems with terrain runtime
+    this.wirePlayer(refs, camera, renderer);
+    this.wireCombat(refs, camera);
+    this.wireHUD(refs);
+    this.wireZones(refs, camera);
+    this.wireRespawn(refs);
+    this.wireVehicles(refs);
+    this.wireWeapons(refs);
+    this.wireGameMode(refs);
+    this.wireStrategy(refs);
+    this.wireEnvironment(refs, renderer);
+    this.wireTelemetry(refs, renderer);
+  }
+
+  // ── Player systems ──
+
+  private wirePlayer(refs: SystemReferences, camera: THREE.PerspectiveCamera, renderer?: IGameRenderer): void {
     refs.playerController.setTerrainSystem(refs.terrainSystem);
     refs.playerController.setGameModeManager(refs.gameModeManager);
     refs.playerController.setTicketSystem(refs.ticketSystem);
     refs.playerController.setHelicopterModel(refs.helicopterModel);
     refs.playerController.setFirstPersonWeapon(refs.firstPersonWeapon);
     refs.playerController.setHUDSystem(refs.hudSystem);
+    refs.playerController.setCameraShakeSystem(refs.cameraShakeSystem);
+    refs.playerController.setFootstepAudioSystem(refs.footstepAudioSystem);
     if (renderer) {
       refs.playerController.setRenderer(renderer);
     }
-    refs.combatantSystem.setTerrainSystem(refs.terrainSystem);
-    refs.combatantSystem.setCamera(camera);
-    refs.firstPersonWeapon.setPlayerController(refs.playerController);
-    refs.firstPersonWeapon.setCombatantSystem(refs.combatantSystem);
-    refs.firstPersonWeapon.setTicketSystem(refs.ticketSystem);
-    refs.firstPersonWeapon.setHUDSystem(refs.hudSystem);
-    refs.firstPersonWeapon.setZoneManager(refs.zoneManager);
-    refs.firstPersonWeapon.setInventoryManager(refs.inventoryManager);
-    refs.hudSystem.setCombatantSystem(refs.combatantSystem);
-    refs.hudSystem.setZoneManager(refs.zoneManager);
-    refs.hudSystem.setTicketSystem(refs.ticketSystem);
-    refs.ticketSystem.setZoneManager(refs.zoneManager);
 
-    // Wire match restart to reset player state
-    refs.ticketSystem.setMatchRestartCallback(() => {
-      refs.playerRespawnManager.cancelPendingRespawn();
-      refs.playerHealthSystem.resetForNewMatch();
-      refs.firstPersonWeapon.enable();
-      refs.playerRespawnManager.respawnAtBase();
-    });
-
-    refs.combatantSystem.setTicketSystem(refs.ticketSystem);
-    refs.combatantSystem.setPlayerHealthSystem(refs.playerHealthSystem);
-    refs.combatantSystem.setZoneManager(refs.zoneManager);
-    refs.combatantSystem.setGameModeManager(refs.gameModeManager);
-    refs.combatantSystem.setHUDSystem(refs.hudSystem);
     refs.playerHealthSystem.setZoneManager(refs.zoneManager);
     refs.playerHealthSystem.setTicketSystem(refs.ticketSystem);
     refs.playerHealthSystem.setPlayerController(refs.playerController);
@@ -57,36 +53,119 @@ export class SystemConnector {
     refs.playerHealthSystem.setCamera(camera);
     refs.playerHealthSystem.setRespawnManager(refs.playerRespawnManager);
     refs.playerHealthSystem.setHUDSystem(refs.hudSystem);
-    refs.minimapSystem.setZoneManager(refs.zoneManager);
-    refs.minimapSystem.setCombatantSystem(refs.combatantSystem);
-    refs.fullMapSystem.setZoneManager(refs.zoneManager);
-    refs.fullMapSystem.setCombatantSystem(refs.combatantSystem);
-    refs.fullMapSystem.setGameModeManager(refs.gameModeManager);
-    refs.compassSystem.setZoneManager(refs.zoneManager);
 
-    // Mount compass, minimap, health, and squad indicator into grid slots
+    refs.playerSuppressionSystem.setCameraShakeSystem(refs.cameraShakeSystem);
+    refs.playerSuppressionSystem.setPlayerController(refs.playerController);
+
+    refs.firstPersonWeapon.setPlayerController(refs.playerController);
+    refs.firstPersonWeapon.setCombatantSystem(refs.combatantSystem);
+    refs.firstPersonWeapon.setTicketSystem(refs.ticketSystem);
+    refs.firstPersonWeapon.setHUDSystem(refs.hudSystem);
+    refs.firstPersonWeapon.setZoneManager(refs.zoneManager);
+    refs.firstPersonWeapon.setInventoryManager(refs.inventoryManager);
+    refs.firstPersonWeapon.setAudioManager(refs.audioManager);
+
+    refs.footstepAudioSystem.setTerrainSystem(refs.terrainSystem);
+
+    // Apply initial loadout and faction
+    refs.inventoryManager.setLoadout(refs.loadoutService.getCurrentLoadout());
+    const loadoutContext = refs.loadoutService.getContext();
+    refs.playerController.setPlayerFaction(loadoutContext.faction);
+    refs.playerHealthSystem.setPlayerFaction(loadoutContext.faction);
+    refs.firstPersonWeapon.setPlayerFaction(loadoutContext.faction);
+    refs.combatantSystem.setPlayerFaction(loadoutContext.faction);
+    refs.zoneManager.setPlayerAlliance(loadoutContext.alliance);
+  }
+
+  // ── Combat systems ──
+
+  private wireCombat(refs: SystemReferences, camera: THREE.PerspectiveCamera): void {
+    refs.combatantSystem.setTerrainSystem(refs.terrainSystem);
+    refs.combatantSystem.setCamera(camera);
+    refs.combatantSystem.setTicketSystem(refs.ticketSystem);
+    refs.combatantSystem.setPlayerHealthSystem(refs.playerHealthSystem);
+    refs.combatantSystem.setZoneManager(refs.zoneManager);
+    refs.combatantSystem.setGameModeManager(refs.gameModeManager);
+    refs.combatantSystem.setHUDSystem(refs.hudSystem);
+    refs.combatantSystem.setAudioManager(refs.audioManager);
+    refs.combatantSystem.setPlayerSuppressionSystem(refs.playerSuppressionSystem);
+
+    // Internal sub-system wiring
+    const combatantCombat = refs.combatantSystem.combatantCombat;
+    if (combatantCombat) {
+      combatantCombat.setSandbagSystem(refs.sandbagSystem);
+    }
+    const combatantAI = refs.combatantSystem.combatantAI;
+    if (combatantAI) {
+      combatantAI.setSandbagSystem(refs.sandbagSystem);
+      combatantAI.setZoneManager(refs.zoneManager);
+      combatantAI.setSmokeCloudSystem(refs.smokeCloudSystem);
+    }
+    const squadManager = refs.combatantSystem.squadManager;
+    if (squadManager) {
+      squadManager.setInfluenceMap(refs.influenceMapSystem);
+    }
+    refs.combatantSystem.influenceMap = refs.influenceMapSystem;
+    refs.combatantSystem.sandbagSystem = refs.sandbagSystem;
+
+    if (refs.voiceCalloutSystem) {
+      refs.combatantSystem.setVoiceCalloutSystem(refs.voiceCalloutSystem);
+    }
+
+    refs.flashbangScreenEffect.setPlayerController(refs.playerController);
+    setSmokeCloudSystem(refs.smokeCloudSystem);
+  }
+
+  // ── HUD and UI ──
+
+  private wireHUD(refs: SystemReferences): void {
+    refs.hudSystem.setCombatantSystem(refs.combatantSystem);
+    refs.hudSystem.setZoneManager(refs.zoneManager);
+    refs.hudSystem.setTicketSystem(refs.ticketSystem);
+
+    // Mount UI components into grid slots
     const layout = refs.hudSystem.getLayout();
     refs.compassSystem.mountTo(layout.getSlot('compass'));
     refs.minimapSystem.mountTo(layout.getSlot('minimap'));
     refs.playerHealthSystem.mountUI(layout.getSlot('health'));
     refs.playerSquadController.mountIndicatorTo(layout.getSlot('stats'));
     refs.commandInputManager.mountTo(layout);
+
+    refs.compassSystem.setZoneManager(refs.zoneManager);
+    refs.minimapSystem.setZoneManager(refs.zoneManager);
+    refs.minimapSystem.setCombatantSystem(refs.combatantSystem);
+    refs.fullMapSystem.setZoneManager(refs.zoneManager);
+    refs.fullMapSystem.setCombatantSystem(refs.combatantSystem);
+    refs.fullMapSystem.setGameModeManager(refs.gameModeManager);
+
     refs.commandInputManager.setZoneManager(refs.zoneManager);
     refs.commandInputManager.setCombatantSystem(refs.combatantSystem);
     refs.commandInputManager.setGameModeManager(refs.gameModeManager);
     refs.commandInputManager.setPlayerController(refs.playerController);
+  }
+
+  // ── Zone capture ──
+
+  private wireZones(refs: SystemReferences, camera: THREE.PerspectiveCamera): void {
+    refs.ticketSystem.setZoneManager(refs.zoneManager);
+    refs.ticketSystem.setMatchRestartCallback(() => {
+      refs.playerRespawnManager.cancelPendingRespawn();
+      refs.playerHealthSystem.resetForNewMatch();
+      refs.firstPersonWeapon.enable();
+      refs.playerRespawnManager.respawnAtBase();
+    });
+
     refs.zoneManager.setCombatantSystem(refs.combatantSystem);
     refs.zoneManager.setCamera(camera);
     refs.zoneManager.setTerrainSystem(refs.terrainSystem);
     refs.zoneManager.setSpatialGridManager(refs.spatialGridManager);
     refs.zoneManager.setSpatialQueryProvider((center, radius) => refs.combatantSystem.querySpatialRadius(center, radius));
     refs.zoneManager.setHUDSystem(refs.hudSystem);
+  }
 
-    // Connect audio manager
-    refs.firstPersonWeapon.setAudioManager(refs.audioManager);
-    refs.combatantSystem.setAudioManager(refs.audioManager);
+  // ── Respawn ──
 
-    // Connect respawn manager
+  private wireRespawn(refs: SystemReferences): void {
     refs.playerRespawnManager.setPlayerHealthSystem(refs.playerHealthSystem);
     refs.playerRespawnManager.setZoneManager(refs.zoneManager);
     refs.playerRespawnManager.setGameModeManager(refs.gameModeManager);
@@ -98,8 +177,11 @@ export class SystemConnector {
     refs.playerRespawnManager.setWarSimulator(refs.warSimulator);
     refs.playerRespawnManager.setTerrainSystem(refs.terrainSystem);
     refs.playerRespawnManager.setHelipadSystem(refs.helipadSystem);
+  }
 
-    // Connect helipad system
+  // ── Vehicles ──
+
+  private wireVehicles(refs: SystemReferences): void {
     refs.helipadSystem.setTerrainManager(refs.terrainSystem);
     refs.helipadSystem.setVegetationSystem(refs.globalBillboardSystem);
     refs.helipadSystem.setGameModeManager(refs.gameModeManager);
@@ -109,14 +191,59 @@ export class SystemConnector {
       refs.fullMapSystem.setHelipadMarkers(markers);
     });
 
-    // Connect helicopter model
     refs.helicopterModel.setTerrainManager(refs.terrainSystem);
     refs.helicopterModel.setHelipadSystem(refs.helipadSystem);
     refs.helicopterModel.setPlayerController(refs.playerController);
     refs.helicopterModel.setHUDSystem(refs.hudSystem);
     refs.helicopterModel.setAudioListener(refs.audioManager.getListener());
+  }
 
-    // Connect game mode manager to systems
+  // ── Weapons ──
+
+  private wireWeapons(refs: SystemReferences): void {
+    refs.grenadeSystem.setCombatantSystem(refs.combatantSystem);
+    refs.grenadeSystem.setInventoryManager(refs.inventoryManager);
+    refs.grenadeSystem.setTicketSystem(refs.ticketSystem);
+    refs.grenadeSystem.setAudioManager(refs.audioManager);
+    refs.grenadeSystem.setPlayerController(refs.playerController);
+    refs.grenadeSystem.setFlashbangEffect(refs.flashbangScreenEffect);
+    refs.mortarSystem.setCombatantSystem(refs.combatantSystem);
+    refs.mortarSystem.setInventoryManager(refs.inventoryManager);
+    refs.mortarSystem.setAudioManager(refs.audioManager);
+    refs.mortarSystem.setTicketSystem(refs.ticketSystem);
+    refs.sandbagSystem.setInventoryManager(refs.inventoryManager);
+    refs.sandbagSystem.setTicketSystem(refs.ticketSystem);
+
+    refs.hudSystem.setGrenadeSystem(refs.grenadeSystem);
+    refs.hudSystem.setMortarSystem(refs.mortarSystem);
+
+    // Share effect pools between weapon systems
+    const impactEffectsPool = refs.combatantSystem.impactEffectsPool;
+    if (impactEffectsPool) {
+      refs.grenadeSystem.setImpactEffectsPool(impactEffectsPool);
+      refs.mortarSystem.setImpactEffectsPool(impactEffectsPool);
+    }
+    const explosionEffectsPool = refs.combatantSystem.explosionEffectsPool;
+    if (explosionEffectsPool) {
+      refs.grenadeSystem.setExplosionEffectsPool(explosionEffectsPool);
+      refs.mortarSystem.setExplosionEffectsPool(explosionEffectsPool);
+    }
+
+    if (refs.voiceCalloutSystem) {
+      refs.grenadeSystem.setVoiceCalloutSystem(refs.voiceCalloutSystem);
+    }
+
+    refs.playerController.setInventoryManager(refs.inventoryManager);
+    refs.playerController.setGrenadeSystem(refs.grenadeSystem);
+    refs.playerController.setMortarSystem(refs.mortarSystem);
+    refs.playerController.setSandbagSystem(refs.sandbagSystem);
+    refs.playerController.setPlayerSquadController(refs.playerSquadController);
+    refs.playerController.setCommandInputManager(refs.commandInputManager);
+  }
+
+  // ── Game mode orchestration ──
+
+  private wireGameMode(refs: SystemReferences): void {
     refs.gameModeManager.connectSystems(
       refs.zoneManager,
       refs.combatantSystem,
@@ -127,107 +254,46 @@ export class SystemConnector {
     );
     refs.gameModeManager.setInfluenceMapSystem(refs.influenceMapSystem);
 
-    // Connect camera shake system
-    refs.playerController.setCameraShakeSystem(refs.cameraShakeSystem);
-
-    // Connect player suppression system
-    refs.playerSuppressionSystem.setCameraShakeSystem(refs.cameraShakeSystem);
-    refs.playerSuppressionSystem.setPlayerController(refs.playerController);
-    refs.combatantSystem.setPlayerSuppressionSystem(refs.playerSuppressionSystem);
-
-    // Connect flashbang screen effect system
-    refs.flashbangScreenEffect.setPlayerController(refs.playerController);
-    setSmokeCloudSystem(refs.smokeCloudSystem);
-
-    // Connect weapon systems
-    refs.grenadeSystem.setCombatantSystem(refs.combatantSystem);
-    refs.grenadeSystem.setInventoryManager(refs.inventoryManager);
-    refs.grenadeSystem.setTicketSystem(refs.ticketSystem);
-    refs.grenadeSystem.setAudioManager(refs.audioManager);
-    refs.grenadeSystem.setPlayerController(refs.playerController);
-    refs.grenadeSystem.setFlashbangEffect(refs.flashbangScreenEffect);
-    refs.hudSystem.setGrenadeSystem(refs.grenadeSystem);
-    refs.hudSystem.setMortarSystem(refs.mortarSystem);
-    refs.mortarSystem.setCombatantSystem(refs.combatantSystem);
-    refs.mortarSystem.setInventoryManager(refs.inventoryManager);
-    refs.mortarSystem.setAudioManager(refs.audioManager);
-    refs.mortarSystem.setTicketSystem(refs.ticketSystem);
-    refs.sandbagSystem.setInventoryManager(refs.inventoryManager);
-    refs.sandbagSystem.setTicketSystem(refs.ticketSystem);
-
-    // Access internal effect pools via typed interface
-    const impactEffectsPool = refs.combatantSystem.impactEffectsPool;
-    if (impactEffectsPool) {
-      refs.grenadeSystem.setImpactEffectsPool(impactEffectsPool);
-      refs.mortarSystem.setImpactEffectsPool(impactEffectsPool);
-    }
-
-    const explosionEffectsPool = refs.combatantSystem.explosionEffectsPool;
-    if (explosionEffectsPool) {
-      refs.grenadeSystem.setExplosionEffectsPool(explosionEffectsPool);
-      refs.mortarSystem.setExplosionEffectsPool(explosionEffectsPool);
-    }
-
-    // Connect PlayerController with all weapon systems
-    refs.playerController.setInventoryManager(refs.inventoryManager);
-    refs.playerController.setGrenadeSystem(refs.grenadeSystem);
-    refs.playerController.setMortarSystem(refs.mortarSystem);
-    refs.playerController.setSandbagSystem(refs.sandbagSystem);
-    refs.playerController.setPlayerSquadController(refs.playerSquadController);
-    refs.playerController.setCommandInputManager(refs.commandInputManager);
-
-    refs.inventoryManager.setLoadout(refs.loadoutService.getCurrentLoadout());
-    const loadoutContext = refs.loadoutService.getContext();
-    refs.playerController.setPlayerFaction(loadoutContext.faction);
-    refs.playerHealthSystem.setPlayerFaction(loadoutContext.faction);
-    refs.firstPersonWeapon.setPlayerFaction(loadoutContext.faction);
-    refs.combatantSystem.setPlayerFaction(loadoutContext.faction);
-    refs.zoneManager.setPlayerAlliance(loadoutContext.alliance);
-
-    // Connect combat systems with sandbag system via typed interface
-    const combatantCombat = refs.combatantSystem.combatantCombat;
-    if (combatantCombat) {
-      combatantCombat.setSandbagSystem(refs.sandbagSystem);
-    }
-    const combatantAI = refs.combatantSystem.combatantAI;
-    if (combatantAI) {
-      combatantAI.setSandbagSystem(refs.sandbagSystem);
-      combatantAI.setZoneManager(refs.zoneManager);
-      combatantAI.setSmokeCloudSystem(refs.smokeCloudSystem);
-    }
-
-    // Connect influence map system via typed interface
-    const squadManager = refs.combatantSystem.squadManager;
-    if (squadManager) {
-      squadManager.setInfluenceMap(refs.influenceMapSystem);
-    }
-    // Direct property assignment for internal state
-    refs.combatantSystem.influenceMap = refs.influenceMapSystem;
-    refs.combatantSystem.sandbagSystem = refs.sandbagSystem;
-
-    // Connect ammo supply system
     refs.ammoSupplySystem.setZoneManager(refs.zoneManager);
     refs.ammoSupplySystem.setInventoryManager(refs.inventoryManager);
     refs.ammoSupplySystem.setFirstPersonWeapon(refs.firstPersonWeapon);
+  }
 
-    // Connect weather system
+  // ── Strategy (WarSimulator) ──
+
+  private wireStrategy(refs: SystemReferences): void {
+    refs.warSimulator.setCombatantSystem(refs.combatantSystem);
+    refs.warSimulator.setZoneManager(refs.zoneManager);
+    refs.warSimulator.setTicketSystem(refs.ticketSystem);
+    refs.warSimulator.setInfluenceMap(refs.influenceMapSystem);
+
+    refs.strategicFeedback.setWarSimulator(refs.warSimulator);
+    refs.strategicFeedback.setHUDSystem(refs.hudSystem);
+    refs.strategicFeedback.setAudioManager(refs.audioManager);
+
+    refs.gameModeManager.setWarSimulator(refs.warSimulator);
+    refs.minimapSystem.setWarSimulator(refs.warSimulator);
+    refs.fullMapSystem.setWarSimulator(refs.warSimulator);
+  }
+
+  // ── Environment (weather, water, terrain audio) ──
+
+  private wireEnvironment(refs: SystemReferences, renderer?: IGameRenderer): void {
     if (refs.weatherSystem) {
       refs.weatherSystem.setAudioManager(refs.audioManager);
       if (renderer) {
         refs.weatherSystem.setRenderer(renderer);
       }
     }
-    
-    // Connect water system
+
     if (refs.waterSystem) {
       refs.waterSystem.setWeatherSystem(refs.weatherSystem);
     }
+  }
 
-    // Connect footstep audio system
-    refs.footstepAudioSystem.setTerrainSystem(refs.terrainSystem);
-    refs.playerController.setFootstepAudioSystem(refs.footstepAudioSystem);
+  // ── Telemetry ──
 
-    // Inject benchmark dependencies via typed interface
+  private wireTelemetry(refs: SystemReferences, renderer?: IGameRenderer): void {
     performanceTelemetry.injectBenchmarkDependencies({
       hitDetection: refs.combatantSystem.combatantCombat?.hitDetection,
       terrainRuntime: refs.terrainSystem,
@@ -235,31 +301,8 @@ export class SystemConnector {
       spatialGridManager: refs.spatialGridManager
     });
 
-    // Initialize GPU timing if renderer is available
     if (renderer && renderer.renderer) {
       performanceTelemetry.initGPUTiming(renderer.renderer);
     }
-
-    // Connect voice callout system
-    if (refs.voiceCalloutSystem) {
-      refs.combatantSystem.setVoiceCalloutSystem(refs.voiceCalloutSystem);
-      refs.grenadeSystem.setVoiceCalloutSystem(refs.voiceCalloutSystem);
-    }
-
-    // Connect war simulator dependencies
-    refs.warSimulator.setCombatantSystem(refs.combatantSystem);
-    refs.warSimulator.setZoneManager(refs.zoneManager);
-    refs.warSimulator.setTicketSystem(refs.ticketSystem);
-    refs.warSimulator.setInfluenceMap(refs.influenceMapSystem);
-
-    // Connect strategic feedback
-    refs.strategicFeedback.setWarSimulator(refs.warSimulator);
-    refs.strategicFeedback.setHUDSystem(refs.hudSystem);
-    refs.strategicFeedback.setAudioManager(refs.audioManager);
-
-    // Connect war simulator to game mode manager and UI
-    refs.gameModeManager.setWarSimulator(refs.warSimulator);
-    refs.minimapSystem.setWarSimulator(refs.warSimulator);
-    refs.fullMapSystem.setWarSimulator(refs.warSimulator);
   }
 }

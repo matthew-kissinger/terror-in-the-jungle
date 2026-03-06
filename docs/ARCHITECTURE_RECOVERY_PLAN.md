@@ -29,6 +29,14 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 
 ## Keep Decisions (Recent)
 
+- Keep: `ZoneState.BLUFOR_CONTROLLED` (renamed from `US_CONTROLLED`). All zone ownership now uses alliance-level naming. 23 files updated.
+- Keep: `TicketDisplay.setFactionLabels()` for dynamic HUD faction names derived from `factionMix` config. `GameEngineInit.applyLaunchSelection()` resolves labels at mode start.
+- Keep: Helipad spawn points wired into `PlayerRespawnManager` for Open Frontier. BLUFOR players see helipads as spawn options; frontier deploy flow prefers helipad_main.
+- Keep: Graduated supermajority zone bleed in `TicketBleedCalculator`: 70%+ control = 1.5x multiplier, 100% = 3x (was flat 2x).
+- Keep: TDM kill-target urgency in `TicketDisplay`: 75% threshold = amber pulse, 90% = red pulse. Reuses existing `.low`/`.critical` CSS classes.
+- Keep: Death presentation: 6s ground persistence (was 4s), 2s fadeout (was 1s), ground-sinking replaces scale-to-zero.
+- Keep: `GameModeManager.applyModeConfiguration()` uses `objective.kind === 'deathmatch'` policy check instead of hardcoded `GameMode.TEAM_DEATHMATCH` comparison.
+- Keep: `SystemConnector` split into 11 named private methods (`wirePlayer`, `wireCombat`, `wireHUD`, etc.) for dependency graph readability.
 - Keep: CSS Grid HUD layout (`#game-hud-root`) with 17 named slots replacing 33+ position:fixed elements.
 - Keep: UnifiedWeaponBar (single weapon UI for desktop + touch, replaces TouchWeaponBar + InventoryManager hotbar + WeaponAmmoDisplay).
 - Keep: pointer events (pointerdown/up/cancel + setPointerCapture) on all touch controls, replacing touch events (zero touchstart/end/move listeners remain in controls).

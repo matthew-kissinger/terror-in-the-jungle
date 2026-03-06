@@ -199,11 +199,8 @@ export class GameModeManager implements GameSystem {
       this.ticketSystem.setMatchDuration(config.matchDuration);
       this.ticketSystem.setDeathPenalty(config.deathPenalty);
 
-      if (config.id === GameMode.TEAM_DEATHMATCH) {
-        this.ticketSystem.setTDMMode(true, config.maxTickets);
-      } else {
-        this.ticketSystem.setTDMMode(false, 0);
-      }
+      const isTDM = this.currentDefinition.policies.objective.kind === 'deathmatch';
+      this.ticketSystem.setTDMMode(isTDM, isTDM ? config.maxTickets : 0);
     }
 
     // Configure terrain runtime render distance
