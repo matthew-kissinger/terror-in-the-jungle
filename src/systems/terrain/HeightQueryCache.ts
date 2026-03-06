@@ -3,17 +3,19 @@ import type { IHeightProvider } from './IHeightProvider';
 import { NoiseHeightProvider } from './NoiseHeightProvider';
 
 /**
- * CPU-side height query system with LRU cache.
+ * CPU-side height query system with a bounded numeric-key cache.
  * Delegates to an IHeightProvider for actual height computation.
  * Always returns valid heights regardless of chunk loading state.
  */
 export class HeightQueryCache {
+  // Keep cache snapping fine enough that grounded motion on slopes does not
+  // visibly step between coarse height samples.
+  private static readonly CACHE_SCALE = 10;
+  private static readonly KEY_BIAS = 2_000_000;
+  private static readonly KEY_STRIDE = HeightQueryCache.KEY_BIAS * 2 + 1;
   private provider: IHeightProvider;
-  private cache: Map<string, number> = new Map();
+  private cache: Map<number, number> = new Map();
   private readonly maxCacheSize: number;
-  // Keep cache snapping fine enough that grounded player motion on slopes does
-  // not visibly step between coarse height samples.
-  private readonly CACHE_RESOLUTION = 0.1;
 
   constructor(provider?: IHeightProvider, maxCacheSize?: number);
   constructor(seed?: number, maxCacheSize?: number);
@@ -30,18 +32,19 @@ export class HeightQueryCache {
    * Get terrain height at world coordinates.
    */
   getHeightAt(worldX: number, worldZ: number): number {
-    // Snap to grid for cache efficiency
-    const snapX = Math.round(worldX / this.CACHE_RESOLUTION) * this.CACHE_RESOLUTION;
-    const snapZ = Math.round(worldZ / this.CACHE_RESOLUTION) * this.CACHE_RESOLUTION;
-    const key = `${snapX},${snapZ}`;
+    // Snap to grid for cache efficiency.
+    const quantizedX = Math.round(worldX * HeightQueryCache.CACHE_SCALE);
+    const quantizedZ = Math.round(worldZ * HeightQueryCache.CACHE_SCALE);
+    const key = this.toCacheKey(quantizedX, quantizedZ);
 
-    // Check cache (delete+re-set to maintain LRU order)
+    // Hot-path cache hits stay read-only to avoid delete/set churn.
     const cached = this.cache.get(key);
     if (cached !== undefined) {
-      this.cache.delete(key);
-      this.cache.set(key, cached);
       return cached;
     }
+
+    const snapX = quantizedX / HeightQueryCache.CACHE_SCALE;
+    const snapZ = quantizedZ / HeightQueryCache.CACHE_SCALE;
 
     // Generate height from provider
     const height = this.provider.getHeightAt(snapX, snapZ);
@@ -52,10 +55,17 @@ export class HeightQueryCache {
     // Evict oldest if over limit
     if (this.cache.size > this.maxCacheSize) {
       const firstKey = this.cache.keys().next().value;
-      if (firstKey) this.cache.delete(firstKey);
+      if (firstKey !== undefined) this.cache.delete(firstKey);
     }
 
     return height;
+  }
+
+  private toCacheKey(quantizedX: number, quantizedZ: number): number {
+    return (
+      (quantizedX + HeightQueryCache.KEY_BIAS) * HeightQueryCache.KEY_STRIDE
+      + (quantizedZ + HeightQueryCache.KEY_BIAS)
+    );
   }
 
   /**

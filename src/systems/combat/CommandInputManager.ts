@@ -53,6 +53,7 @@ export class CommandInputManager implements GameSystem {
     this.commandModeOverlay.setCallbacks({
       onQuickCommandSelected: (slot) => this.handleOverlayCommandSelection(slot),
       onMapPointSelected: (position) => this.applyPlacementCommand(position),
+      onSquadSelected: (squadId) => this.handleSquadSelection(squadId),
       onCloseRequested: () => this.closeOverlay()
     });
 
@@ -73,6 +74,13 @@ export class CommandInputManager implements GameSystem {
 
   update(deltaTime: number): void {
     if (!this.overlayVisible || !this.playerController) return;
+
+    if (this.inputMode === 'gamepad') {
+      const movement = this.inputManager?.getGamepadManager()?.getMovementVector();
+      if (movement && (movement.x !== 0 || movement.z !== 0)) {
+        this.commandModeOverlay.nudgeGamepadCursor(movement.x, movement.z, deltaTime);
+      }
+    }
 
     this.mapUpdateAccumulator += deltaTime;
     if (this.mapUpdateAccumulator < CommandInputManager.MAP_UPDATE_INTERVAL) {
@@ -134,9 +142,6 @@ export class CommandInputManager implements GameSystem {
     this.unsubscribeInputMode?.();
     this.unsubscribeInputMode = inputManager.onInputModeChange((mode) => {
       this.inputMode = mode;
-      if (mode === 'gamepad' && this.overlayVisible) {
-        this.closeOverlay(false);
-      }
       this.quickCommandStrip.setInputMode(mode);
       this.commandModeOverlay.setInputMode(mode);
       this.syncPresentation();
@@ -161,10 +166,6 @@ export class CommandInputManager implements GameSystem {
 
   toggleCommandMode(): void {
     if (!this.latestSquadState.hasSquad) return;
-    if (this.inputMode === 'gamepad') {
-      this.playerSquadController.toggleCommandModeSurface();
-      return;
-    }
     if (this.overlayVisible) {
       this.closeOverlay();
     } else {
@@ -173,6 +174,10 @@ export class CommandInputManager implements GameSystem {
   }
 
   issueQuickCommand(slot: number): void {
+    if (this.overlayVisible) {
+      this.handleOverlayCommandSelection(slot);
+      return;
+    }
     this.playerSquadController.issueQuickCommand(slot);
     if (this.overlayVisible) {
       this.closeOverlay();
@@ -191,11 +196,33 @@ export class CommandInputManager implements GameSystem {
     return false;
   }
 
+  handlePrimaryConfirm(): boolean {
+    if (!this.overlayVisible || this.inputMode !== 'gamepad') {
+      return false;
+    }
+    return this.commandModeOverlay.confirmGamepadAction();
+  }
+
+  handleSecondarySelect(): boolean {
+    if (!this.overlayVisible || this.inputMode !== 'gamepad') {
+      return false;
+    }
+    return this.commandModeOverlay.selectSquadAtCursor();
+  }
+
+  handleGamepadCancel(): boolean {
+    if (!this.overlayVisible || this.inputMode !== 'gamepad') {
+      return false;
+    }
+    this.closeOverlay();
+    return true;
+  }
+
   private openOverlay(): void {
     this.overlayVisible = true;
     this.pendingPlacementCommand = this.getDefaultPlacementCommand();
     this.mapUpdateAccumulator = CommandInputManager.MAP_UPDATE_INTERVAL;
-    this.inputManager?.unlockPointer();
+    this.inputManager?.unlockPointer?.();
     this.commandModeOverlay.setVisible(true);
     this.syncPresentation();
   }
@@ -205,7 +232,7 @@ export class CommandInputManager implements GameSystem {
     this.pendingPlacementCommand = this.getDefaultPlacementCommand();
     this.commandModeOverlay.setVisible(false);
     if (relockPointer) {
-      this.inputManager?.relockPointer();
+      this.inputManager?.relockPointer?.();
     }
     this.syncPresentation();
   }
@@ -223,7 +250,11 @@ export class CommandInputManager implements GameSystem {
       commandPosition: mergedState.commandPosition
         ? { x: mergedState.commandPosition.x, z: mergedState.commandPosition.z }
         : null,
-      pendingCommand: this.pendingPlacementCommand
+      pendingCommand: this.pendingPlacementCommand,
+      selectedSquadId: mergedState.selectedSquadId ?? null,
+      selectedLeaderId: mergedState.selectedLeaderId ?? null,
+      selectedFormation: mergedState.selectedFormation ?? null,
+      selectedFaction: mergedState.selectedFaction ?? null
     });
   }
 
@@ -237,7 +268,8 @@ export class CommandInputManager implements GameSystem {
       return;
     }
 
-    this.issueQuickCommand(slot);
+    this.playerSquadController.issueQuickCommand(slot);
+    this.closeOverlay();
   }
 
   private applyPlacementCommand(position: THREE.Vector3): void {
@@ -250,6 +282,13 @@ export class CommandInputManager implements GameSystem {
       position
     );
     this.closeOverlay();
+  }
+
+  private handleSquadSelection(squadId: string): void {
+    if (this.playerSquadController.selectSquad(squadId)) {
+      this.syncPresentation();
+      this.mapUpdateAccumulator = CommandInputManager.MAP_UPDATE_INTERVAL;
+    }
   }
 
   private getDefaultPlacementCommand(): SquadCommand | null {

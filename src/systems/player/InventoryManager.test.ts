@@ -1,110 +1,8 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { InventoryManager, WeaponSlot, InventoryState } from './InventoryManager';
-
-// Mock browser globals for Node.js environment
-if (typeof document === 'undefined') {
-  class MockEventTarget {
-    listeners: Record<string, Function[]> = {};
-    addEventListener(type: string, callback: Function) {
-      if (!this.listeners[type]) this.listeners[type] = [];
-      this.listeners[type].push(callback);
-    }
-    removeEventListener(type: string, callback: Function) {
-      if (!this.listeners[type]) return;
-      this.listeners[type] = this.listeners[type].filter(l => l !== callback);
-    }
-    dispatchEvent(event: any) {
-      const type = event.type;
-      if (this.listeners[type]) {
-        this.listeners[type].forEach(callback => callback(event));
-      }
-      return true;
-    }
-  }
-
-  class MockElement extends MockEventTarget {
-    parentNode: any = null;
-    children: any[] = [];
-    style: any = {};
-    innerHTML: string = '';
-    textContent: string = '';
-    className: string = '';
-    classList: {
-      add: (className: string) => void;
-      remove: (className: string) => void;
-      contains: (className: string) => boolean;
-      toggle: (className: string) => void;
-    };
-
-    constructor() {
-      super();
-      const classes = new Set<string>();
-      this.classList = {
-        add: (className: string) => { classes.add(className); },
-        remove: (className: string) => { classes.delete(className); },
-        contains: (className: string) => classes.has(className),
-        toggle: (className: string) => {
-          if (classes.has(className)) {
-            classes.delete(className);
-          } else {
-            classes.add(className);
-          }
-        }
-      };
-    }
-
-    appendChild(child: any) {
-      this.children.push(child);
-      child.parentNode = this;
-      return child;
-    }
-
-    removeChild(child: any) {
-      const index = this.children.indexOf(child);
-      if (index > -1) {
-        this.children.splice(index, 1);
-        child.parentNode = null;
-      }
-      return child;
-    }
-
-    createElement(tag: string) {
-      return new MockElement();
-    }
-
-    querySelector(selector: string) {
-      return new MockElement();
-    }
-
-    querySelectorAll(selector: string) {
-      return [new MockElement(), new MockElement(), new MockElement(), new MockElement(), new MockElement(), new MockElement()];
-    }
-
-    setAttribute(name: string, value: string) {}
-  }
-
-  const doc = new MockEventTarget() as any;
-  doc.body = new MockElement();
-  doc.head = new MockElement();
-  doc.createElement = (tag: string) => new MockElement();
-
-  vi.stubGlobal('document', doc);
-  vi.stubGlobal('window', new MockEventTarget());
-  vi.stubGlobal('KeyboardEvent', class {
-    type: string;
-    code: string;
-    shiftKey: boolean = false;
-    ctrlKey: boolean = false;
-    altKey: boolean = false;
-    constructor(type: string, init?: any) {
-      this.type = type;
-      this.code = init?.code || '';
-      this.shiftKey = init?.shiftKey || false;
-      this.ctrlKey = init?.ctrlKey || false;
-      this.altKey = init?.altKey || false;
-    }
-  });
-}
+import { InventoryManager, WeaponSlot } from './InventoryManager';
 
 // Mock Logger to avoid console output during tests
 vi.mock('../../utils/Logger', () => ({
@@ -122,6 +20,8 @@ describe('InventoryManager', () => {
   let removeEventListenerSpy: any;
 
   beforeEach(() => {
+    document.body.innerHTML = '';
+    document.head.innerHTML = '';
     addEventListenerSpy = vi.spyOn(window, 'addEventListener');
     removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
     inventoryManager = new InventoryManager();
@@ -577,48 +477,32 @@ describe('InventoryManager', () => {
     });
 
     it('should update UI on slot change', () => {
-      // Mock querySelector to return actual elements we can test
-      const mockSlot = {
-        classList: {
-          add: vi.fn(),
-          remove: vi.fn()
-        }
-      };
-
-      const querySelectorAllSpy = vi.spyOn(inventoryManager['uiElement']!, 'querySelectorAll' as any);
-      querySelectorAllSpy.mockReturnValue([mockSlot, mockSlot, mockSlot, mockSlot, mockSlot, mockSlot] as any);
+      const primarySlot = inventoryManager['uiElement']!.querySelector<HTMLElement>('[data-slot="2"]');
+      const shotgunSlot = inventoryManager['uiElement']!.querySelector<HTMLElement>('[data-slot="0"]');
 
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit1' }));
 
-      expect(querySelectorAllSpy).toHaveBeenCalledWith('.hotbar-slot');
+      expect(primarySlot?.classList.contains('active')).toBe(false);
+      expect(shotgunSlot?.classList.contains('active')).toBe(true);
     });
 
     it('should update grenade count in UI', () => {
-      // Get actual grenade count element
-      const grenadeCountEl = inventoryManager['uiElement']!.querySelector('#grenade-count') as any;
+      const grenadeCountEl = inventoryManager['uiElement']!.querySelector<HTMLElement>('[data-slot="1"] [data-role="count"]');
+      expect(grenadeCountEl?.textContent).toBe('3');
 
       inventoryManager.useGrenade();
 
-      // After using grenade, the textContent should be updated
-      // The mock querySelector always returns a new element, so we can't verify the update directly
-      // Instead, verify the method was called
-      const querySelectorSpy = vi.spyOn(inventoryManager['uiElement']!, 'querySelector' as any);
-      inventoryManager.useGrenade(); // Use again to trigger querySelector
-
-      expect(querySelectorSpy).toHaveBeenCalledWith('#grenade-count');
-      // Count should be 1 after two uses (started at 3)
-      expect(inventoryManager.getState().grenades).toBe(1);
+      expect(grenadeCountEl?.textContent).toBe('2');
+      expect(inventoryManager.getState().grenades).toBe(2);
     });
 
     it('should update sandbag count in UI', () => {
-      const mockElement = { textContent: '' };
-      const querySelectorSpy = vi.spyOn(inventoryManager['uiElement']!, 'querySelector' as any);
-      querySelectorSpy.mockReturnValue(mockElement as any);
+      const sandbagCountEl = inventoryManager['uiElement']!.querySelector<HTMLElement>('[data-slot="3"] [data-role="count"]');
+      expect(sandbagCountEl?.textContent).toBe('5');
 
       inventoryManager.useSandbag();
 
-      expect(querySelectorSpy).toHaveBeenCalledWith('#sandbag-count');
-      expect(mockElement.textContent).toBe('4');
+      expect(sandbagCountEl?.textContent).toBe('4');
     });
   });
 
@@ -634,17 +518,17 @@ describe('InventoryManager', () => {
     it('should remove UI element from DOM', async () => {
       await inventoryManager.init();
 
-      const removeChildSpy = vi.spyOn(inventoryManager['uiElement']!.parentNode!, 'removeChild');
-      inventoryManager['uiElement']!.parentNode = document.body;
+      const uiElement = inventoryManager['uiElement']!;
+      const removeChildSpy = vi.spyOn(document.body, 'removeChild');
 
       inventoryManager.dispose();
 
-      expect(removeChildSpy).toHaveBeenCalledWith(inventoryManager['uiElement']);
+      expect(removeChildSpy).toHaveBeenCalledWith(uiElement);
     });
 
     it('should not throw if UI element has no parent', async () => {
       await inventoryManager.init();
-      inventoryManager['uiElement']!.parentNode = null;
+      inventoryManager['uiElement']!.remove();
 
       expect(() => inventoryManager.dispose()).not.toThrow();
     });

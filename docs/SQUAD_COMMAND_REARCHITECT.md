@@ -1,7 +1,7 @@
 # Squad Command System - Rearchitecture Plan
 
 Last updated: 2026-03-06
-Status: COMMAND COORDINATOR + QUICK STRIP + MAP-FIRST OVERLAY LIVE, gamepad radial fallback still retained
+Status: COMMAND COORDINATOR + QUICK STRIP + MAP-FIRST OVERLAY LIVE ACROSS DESKTOP/TOUCH/GAMEPAD
 
 ## Problem Statement
 
@@ -56,16 +56,16 @@ Implemented now:
 - centralized squad-command entry through `CommandInputManager`
 - `QuickCommandStrip` mounted into the HUD layout `command-bar`
 - shared command state propagation from `PlayerSquadController` to HUD
-- `CommandModeOverlay` live for desktop and touch as a map-first command surface, with pointer-unlock / close semantics handled by the coordinator
-- `CommandTacticalMap` now handles point placement for HOLD, PATROL, and RETREAT on desktop and touch
+- `CommandModeOverlay` live across desktop, touch, and gamepad as a map-first command surface, with pointer-unlock / close semantics handled by the coordinator
+- `CommandTacticalMap` now handles point placement for HOLD, PATROL, and RETREAT plus friendly squad selection when no placement order is armed
 - minimap and full map now mirror the squad command position with guidance lines, while the full map also highlights the player squad
-- existing radial menu preserved as the gamepad fallback command-mode surface
+- selected-squad detail now renders inside the overlay (squad id, leader, formation, faction)
+- existing radial menu is retained only as a compatibility surface, not the primary command-mode path
 
 Still deferred:
 
 - touch cleanup for the dead `TouchActionButtons` squad path
 - higher-scale command adapters
-- full gamepad parity with the map-first overlay
 
 ## Target Architecture
 
@@ -166,7 +166,7 @@ Quick commands (no mode switch):
 1. **Cleanup:** Remove dead code, unify input routing (1-2 hours)
 2. **CommandInputManager:** Central command input router (DONE)
 3. **QuickCommandStrip:** Replace Shift+Digit shortcuts with visible UI (DONE)
-4. **CommandModeOverlay:** Replace SquadRadialMenu with map-based commands (PARTIAL - desktop/touch are map-first, gamepad still uses radial fallback)
+4. **CommandModeOverlay:** Replace SquadRadialMenu with map-based commands (DONE - overlay is map-first on desktop, touch, and gamepad)
 5. **UnitInfoPanel:** Selected unit status display
 6. **WaypointRenderer:** Visual feedback on map (PARTIAL - guidance lines now live in minimap/full-map renderers)
 7. **Scale adapters:** Different command vocabulary per unit count

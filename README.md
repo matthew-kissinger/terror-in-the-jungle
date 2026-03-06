@@ -42,18 +42,27 @@ npm run perf:capture:openfrontier:short
 npm run perf:capture:ashau:short
 npm run perf:capture:frontier30m
 npm run perf:analyze:latest
+npm run perf:compare -- --scenario combat120
+npm run perf:update-baseline -- --scenario combat120
 ```
 
 Artifacts are written to `artifacts/perf/<timestamp>/`.
+
+Current perf posture:
+- Close measured CPU tail hotspots and keep warm baselines honest before reaching for WebGPU, WASM, worker-offload, navmesh, or ECS-scale rewrites.
+- Treat frontier-tech work as follow-on to `docs/PERF_FRONTIER.md`, not as the current unblocker.
 
 ## Documentation
 
 Start at `docs/README.md`.
 
 Primary docs:
-- `docs/PERFORMANCE_FRONTIER_MISSION.md`
-- `docs/PROFILING_HARNESS.md`
+- `docs/README.md`
+- `docs/GAME_MODES_EXECUTION_PLAN.md`
+- `docs/PERF_FRONTIER.md`
 - `docs/ARCHITECTURE_RECOVERY_PLAN.md`
+- `docs/PROFILING_HARNESS.md`
+- `docs/TERRAIN_REWRITE_MASTER_PLAN.md`
 - `docs/ASHAU_VALLEY_IMPLEMENTATION_PLAN.md`
 - `data/vietnam/DATA_PIPELINE.md`
 

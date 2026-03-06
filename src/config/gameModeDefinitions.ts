@@ -49,6 +49,7 @@ function createBasePolicies(config: GameModeConfig): GameModePolicies {
     mapIntel: {
       tacticalRangeOverride: config.worldSize >= 10000 ? 900 : null,
       showStrategicAgentsOnMinimap: false,
+      showStrategicAgentsOnFullMap: usesWarSimulator,
       strategicLayer: usesWarSimulator ? 'optional' : 'none'
     },
     command: {
@@ -138,11 +139,13 @@ export function getGameModeDefinition(mode: GameMode): GameModeDefinition {
       policies.respawn.contactAssistStyle = 'none';
       policies.command.scale = 'squad';
       policies.mapIntel.tacticalRangeOverride = null;
+      policies.mapIntel.showStrategicAgentsOnFullMap = false;
       policies.mapIntel.strategicLayer = 'none';
       break;
     case GameMode.A_SHAU_VALLEY:
       policies.deploy.flow = 'air_assault';
       policies.command.scale = 'battalion';
+      policies.mapIntel.showStrategicAgentsOnFullMap = true;
       policies.mapIntel.strategicLayer = 'optional';
       break;
     case GameMode.ZONE_CONTROL:

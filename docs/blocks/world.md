@@ -30,7 +30,7 @@
 | TicketBleedCalculator | [strategy/tickets/TicketBleedCalculator.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/tickets/TicketBleedCalculator.ts) | Computes bleed rate from zone ownership counts |
 | TicketSystemPhases | [strategy/tickets/TicketSystemPhases.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/tickets/TicketSystemPhases.ts) | Tick-based drain, kill ticket deductions |
 | VictoryConditions | [strategy/tickets/VictoryConditions.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/tickets/VictoryConditions.ts) | Detects 0-ticket or timer-expiry, fires gameEndCallback |
-| GameModeManager | [strategy/GameModeManager.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/GameModeManager.ts) | Resolves active `GameModeDefinition`, creates a policy-backed runtime, and still fans legacy config into multiple systems while the refactor is in progress |
+| GameModeManager | [strategy/GameModeManager.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/GameModeManager.ts) | Resolves active `GameModeDefinition`, creates a policy-backed runtime, pushes map-intel policy into minimap/full-map systems, and still fans legacy config into multiple systems while the refactor is in progress |
 | GPUBillboardSystem | [terrain/billboard/GPUBillboardSystem.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/billboard/GPUBillboardSystem.ts) | Instanced mesh renderer for vegetation billboards |
 | GPUBillboardVegetation | [terrain/billboard/GPUBillboardVegetation.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/billboard/GPUBillboardVegetation.ts) | Vegetation placement, BillboardBufferManager |
 | BillboardShaders | [terrain/billboard/BillboardShaders.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/billboard/BillboardShaders.ts) | Custom GLSL for alpha-tested billboard materials |
@@ -76,6 +76,7 @@ Config resolution: `getGameModeConfig(mode)` in [config/gameModes.ts](https://gi
 | ticket counts | MinimapSystem | getter (TicketSystem) |
 | gameEndCallback fire | HUDSystem.handleGameEnd() | callback |
 | gameEndCallback fire | MatchEndScreen show | callback |
+| map intel policy | MinimapSystem, FullMapSystem | runtime service push (`GameModeManager.applyMapIntelPolicy`) |
 | GameModeConfig | HelicopterSystem | setter (GameModeManager) |
 | GameModeConfig | SpawnSystem | setter (GameModeManager) |
 | GameModeConfig | ZoneManager | setter (GameModeManager) |

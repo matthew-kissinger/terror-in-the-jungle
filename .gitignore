@@ -61,8 +61,7 @@ audio_backup/
 .mycel/
 public/assets/originals/
 
-# Performance baselines (machine-specific, should not be committed)
-perf-baselines.json
+# Performance artifacts
 .playwright-mcp/
 artifacts/
 

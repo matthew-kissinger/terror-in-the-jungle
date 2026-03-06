@@ -6,6 +6,7 @@ import { type BiomeClassificationRule } from '../../config/biomes';
 import { LOSAccelerator } from '../combat/LOSAccelerator';
 import { Logger } from '../../utils/Logger';
 import { getHeightQueryCache } from './HeightQueryCache';
+import { BakedHeightProvider } from './BakedHeightProvider';
 
 import { TerrainRenderRuntime } from './TerrainRenderRuntime';
 import { TerrainRaycastRuntime } from './TerrainRaycastRuntime';
@@ -103,6 +104,8 @@ export class TerrainSystem implements GameSystem {
       Logger.error('terrain', error instanceof Error ? error.message : 'Failed to initialize terrain surface');
       return;
     }
+
+    this.syncCpuHeightsToGpu();
 
     this.renderRuntime = new TerrainRenderRuntime(
       this.scene,
@@ -355,6 +358,7 @@ export class TerrainSystem implements GameSystem {
 
     const cache = getHeightQueryCache();
     this.surfaceRuntime.rebake(cache.getProvider(), this.config.worldSize, this.defaultBiomeId, this.biomeRules);
+    this.syncCpuHeightsToGpu();
 
     // Propagate new provider to workers
     const providerConfig = cache.getProvider().getWorkerConfig();
@@ -394,6 +398,7 @@ export class TerrainSystem implements GameSystem {
     if (this.isInitialized) {
       const cache = getHeightQueryCache();
       this.surfaceRuntime.rebake(cache.getProvider(), this.config.worldSize, this.defaultBiomeId, this.biomeRules);
+      this.syncCpuHeightsToGpu();
     }
 
     Logger.info('terrain', `Reconfigured: ${this.config.worldSize}m world, chunk=${this.chunkSize}, renderDist=${this.renderDistance}`);
@@ -401,6 +406,25 @@ export class TerrainSystem implements GameSystem {
 
   private computeWorldSize(): number {
     return this.explicitWorldSize ?? (this.chunkSize * this.renderDistance * 2);
+  }
+
+  /**
+   * After the GPU heightmap is baked, replace the HeightQueryCache provider
+   * with one that bilinear-interpolates the same baked grid. This ensures
+   * CPU height queries (collision, vegetation, BVH, AI) match the GPU surface.
+   */
+  private syncCpuHeightsToGpu(): void {
+    const baked = this.surfaceRuntime.getBakedHeightmap();
+    if (!baked) return;
+
+    const cache = getHeightQueryCache();
+    const bakedProvider = new BakedHeightProvider(
+      baked.data,
+      baked.gridSize,
+      baked.worldSize,
+      cache.getProvider().getWorkerConfig(),
+    );
+    cache.setProvider(bakedProvider);
   }
 
   private applyVegetationConfig(): void {

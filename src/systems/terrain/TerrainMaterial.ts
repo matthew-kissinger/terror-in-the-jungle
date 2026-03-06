@@ -8,6 +8,7 @@ const TERRAIN_VERTEX_PARS = /* glsl */ `
 uniform sampler2D terrainHeightmap;
 uniform sampler2D terrainNormalMap;
 uniform float terrainWorldSize;
+uniform float heightmapGridSize;
 uniform float tileGridResolution;
 uniform bool debugWireframe;
 
@@ -34,10 +35,17 @@ vec3 morphedPos = vec3(
 
 vec4 worldPos4 = instanceMatrix * vec4(morphedPos, 1.0);
 float halfWorld = terrainWorldSize * 0.5;
-vWorldUV = clamp(vec2(
+// Half-texel correction: GPU texture2D maps UV via pixelCoord = UV * gridSize - 0.5,
+// but the CPU BakedHeightProvider maps via gx = normalizedPos * (gridSize - 1).
+// Without correction these diverge by up to 0.5 texels at world edges (~3m for 3200m maps).
+// Remap UV so texel centers align with the bake-loop sample positions.
+float texelHalf = 0.5 / heightmapGridSize;
+float uvScale = (heightmapGridSize - 1.0) / heightmapGridSize;
+vec2 normalizedPos = vec2(
   (worldPos4.x + halfWorld) / terrainWorldSize,
   (worldPos4.z + halfWorld) / terrainWorldSize
-), 0.0, 1.0);
+);
+vWorldUV = clamp(normalizedPos * uvScale + texelHalf, 0.0, 1.0);
 
 float terrainH = texture2D(terrainHeightmap, vWorldUV).r;
 worldPos4.y = terrainH;
@@ -517,10 +525,13 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
 
   const tileGridRes = options.tileGridResolution ?? 32;
 
+  const heightmapGridSize = heightTexture.image?.width ?? 512;
+
   const uniforms: Record<string, { value: unknown }> = {
     terrainHeightmap: { value: heightTexture },
     terrainNormalMap: { value: normalTexture },
     terrainWorldSize: { value: worldSize },
+    heightmapGridSize: { value: heightmapGridSize },
     tileGridResolution: { value: tileGridRes },
     debugWireframe: { value: false },
     antiTilingStrength: { value: splatmap.antiTilingStrength },

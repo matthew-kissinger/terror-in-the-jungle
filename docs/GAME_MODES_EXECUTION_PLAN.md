@@ -39,9 +39,9 @@ Latest validation slice:
 | Phase 0. Truth Sync | complete | Canonical docs and handoff doc are now active. |
 | Phase 1. Runtime Foundation | in progress | Mode definitions, runtime hooks, deploy session model, and spawn resolver are live. Legacy config fan-out still remains. |
 | Phase 2. Deploy And Loadout | substantially complete | Shared deploy flow, side/faction selection, presets, and `2 weapons + 1 equipment` loadouts are live. |
-| Phase 3. Command Surface | in progress | Desktop/touch map-first command flow is live; gamepad parity and squad detail are still open. |
-| Phase 4. Map Intel Policy | not started | Tactical/strategic map behavior still depends on renderer globals and ad hoc switches. |
-| Phase 5. Mode Vertical Slices | not started | No dedicated product pass has landed yet. |
+| Phase 3. Command Surface | complete | Map-first command flow now spans desktop, touch, and gamepad, with selected-squad detail and squad selection inside the overlay. |
+| Phase 4. Map Intel Policy | in progress | Runtime-owned map intel now drives minimap/full-map policy; per-mode product tuning is still open. |
+| Phase 5. Mode Vertical Slices | in progress | Mode cards plus deploy/respawn copy now differentiate the exposed modes; objective/HUD-specific product passes are still open. |
 | Phase 6. Team And Faction Generalization | not started | Player-facing faction context exists, but world ownership logic still needs generalization. |
 | Phase 7. Death Presentation | not started | No death-presentation rewrite has landed yet. |
 
@@ -641,10 +641,12 @@ Current implementation note:
 
 - `CommandInputManager` now sits between gameplay input and `PlayerSquadController`, so squad command entry is centralized instead of being hard-wired straight to the radial menu
 - `QuickCommandStrip` is live in the HUD `command-bar` region and mirrors current command state while keeping quick commands visible across desktop, touch, and gamepad
-- `CommandModeOverlay` is now live for desktop and touch as a map-first command surface, with the coordinator handling pointer unlock on open and relock on close
+- `CommandModeOverlay` is now live across desktop, touch, and gamepad as the map-first command surface, with the coordinator handling pointer unlock on open and relock on close
 - `CommandTacticalMap` now lets HOLD, PATROL, and RETREAT arm first and then resolve on a local tactical map instead of firing as blind quick commands
 - `PlayerSquadController` is now the execution backend plus radial fallback instead of owning the visible quick-command UI
-- the radial menu now remains as the gamepad fallback command-mode surface instead of the only command-mode surface
+- the overlay now includes selected-squad detail for squad id, leader, formation, and faction
+- the tactical map now supports friendly squad selection when no ground-placement order is armed
+- gamepad command mode now uses the map-first overlay, with D-pad quick orders plus cursor-driven selection/confirmation
 - dead inline squad-help UI in `PlayerSquadController` has been removed so the strip is the one truthful quick-command surface
 - minimap and full map now mirror the squad command position with guidance lines, and the full map also shows player-squad highlighting plus a distance label on the placed command point
 
@@ -654,12 +656,6 @@ Acceptance:
 - desktop, touch, and gamepad have a coherent command story
 - point-and-click commanding is viable without pausing the game
 
-Remaining for this phase:
-
-- selected-squad detail panel inside command mode
-- map-click squad selection
-- gamepad parity with the map-first command surface
-
 ### Phase 4. Map Intel Policy
 
 Deliverables:
@@ -668,6 +664,13 @@ Deliverables:
 - tactical minimap cleanup
 - strategic full-map layer for modes that support it
 - A Shau tactical and strategic product pass
+
+Current implementation note:
+
+- `MapIntelPolicy` now threads from `GameModeDefinition` through `GameModeManager` into `MinimapSystem` and `FullMapSystem` instead of routing through renderer globals
+- tactical contact range is now runtime-owned on the minimap renderer
+- strategic-agent visibility is now explicit and separated for minimap vs full map
+- A Shau is the first mode with runtime-owned full-map strategic visibility, but the actual product pass and per-mode tuning are still pending
 
 Acceptance:
 
@@ -683,6 +686,12 @@ Deliverables:
 - Team Deathmatch product pass
 - Open Frontier product pass
 - A Shau Valley product pass on top of the new runtime
+
+Current implementation note:
+
+- mode cards now describe the exposed modes as distinct products instead of generic scale variants
+- deploy/initial/respawn session copy now differentiates Zone Control, Team Deathmatch, Open Frontier, and A Shau with mode-specific headlines, map titles, and readiness language
+- the remaining work in this phase is objective/HUD/pacing behavior, not just wording
 
 Acceptance:
 

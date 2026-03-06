@@ -18,7 +18,7 @@ npm run test:run
 npm run test:quick           # unit tests only (excludes integration)
 npm run test:integration     # integration scenario tests only
 npm run validate             # quick: type-check + unit tests + build
-npm run validate:full        # full: type-check + all tests + build
+npm run validate:full        # full: test + build + committed combat120 perf check
 npm run perf:capture
 npm run perf:analyze:latest
 ```
@@ -30,7 +30,7 @@ npm run perf:capture:combat120
 npm run perf:capture:openfrontier:short
 npm run perf:capture:ashau:short
 npm run perf:capture:frontier30m
-npm run perf:quick            # capture combat120 + compare baseline
+npm run perf:quick            # quick smoke capture only (not a committed baseline)
 npm run perf:compare          # compare latest capture against baselines
 npm run perf:update-baseline  # update baseline from latest capture
 ```
@@ -57,6 +57,7 @@ npm run perf:update-baseline  # update baseline from latest capture
 7. A March 4, 2026 attempt to reuse targets and throttle advancing threat reacquisition during flank movement was also reverted. The warm rerun improved mean frame time but collapsed combat pressure (`90 / 53` shots / hits) and worsened tail signals.
 8. Open-world tail stability remains terrain-led in `open_frontier` / `frontier30m`; current suspects are near-field BVH rebuild bursts plus height-query cost, not CDLOD tile selection alone.
 9. A Shau harness is now behavior-valid after nearest-first materialization and high-elevation spatial-bounds fixes; next step is terrain-tail reduction, then WarSim/heap isolation.
+10. March 6, 2026 fix: half-texel UV correction in `TerrainMaterial.ts` vertex shader. GPU `texture2D` addressed heightmap texels differently than CPU `BakedHeightProvider` bilinear interpolation, causing rendered terrain to drift up to 3.1m from collision/vegetation at map edges. Error scaled with world size (invisible in Zone Control at 500m, clear in Open Frontier at 3200m). Fix passes `heightmapGridSize` uniform and remaps UV to texel-center space.
 
 ## Documentation Contract
 

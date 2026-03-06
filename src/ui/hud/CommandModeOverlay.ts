@@ -14,6 +14,10 @@ export interface CommandModeOverlayState {
   memberCount: number;
   commandPosition?: { x: number; z: number } | null;
   pendingCommand: SquadCommand | null;
+  selectedSquadId?: string | null;
+  selectedLeaderId?: string | null;
+  selectedFormation?: string | null;
+  selectedFaction?: string | null;
 }
 
 interface OverlayButtonRefs {
@@ -30,6 +34,10 @@ export class CommandModeOverlay implements LayoutComponent {
   private readonly statusValue: HTMLSpanElement;
   private readonly squadValue: HTMLSpanElement;
   private readonly waypointValue: HTMLSpanElement;
+  private readonly selectedSquadValue: HTMLSpanElement;
+  private readonly selectedLeaderValue: HTMLSpanElement;
+  private readonly selectedFormationValue: HTMLSpanElement;
+  private readonly selectedFactionValue: HTMLSpanElement;
   private readonly hintValue: HTMLSpanElement;
   private readonly tacticalMap: CommandTacticalMap;
   private readonly commandButtons = new Map<number, OverlayButtonRefs>();
@@ -40,11 +48,16 @@ export class CommandModeOverlay implements LayoutComponent {
     currentCommand: SquadCommand.NONE,
     memberCount: 0,
     commandPosition: null,
-    pendingCommand: null
+    pendingCommand: null,
+    selectedSquadId: null,
+    selectedLeaderId: null,
+    selectedFormation: null,
+    selectedFaction: null
   };
   private onQuickCommandSelected?: (slot: number) => void;
   private onCloseRequested?: () => void;
   private onMapPointSelected?: (position: THREE.Vector3) => void;
+  private onSquadSelected?: (squadId: string) => void;
 
   constructor() {
     this.container = document.createElement('div');
@@ -100,9 +113,23 @@ export class CommandModeOverlay implements LayoutComponent {
 
     this.tacticalMap = new CommandTacticalMap();
     this.tacticalMap.setCallbacks({
-      onPointSelected: (position) => this.onMapPointSelected?.(position)
+      onPointSelected: (position) => this.onMapPointSelected?.(position),
+      onSquadSelected: (squadId) => this.onSquadSelected?.(squadId)
     });
     body.appendChild(this.tacticalMap.getElement());
+
+    const sidebar = document.createElement('div');
+    sidebar.className = 'command-mode-overlay__sidebar';
+    body.appendChild(sidebar);
+
+    const detailPanel = document.createElement('div');
+    detailPanel.className = 'command-mode-overlay__detail-panel';
+    sidebar.appendChild(detailPanel);
+
+    this.selectedSquadValue = this.appendDetailValue(detailPanel, 'Selected Squad');
+    this.selectedLeaderValue = this.appendDetailValue(detailPanel, 'Leader');
+    this.selectedFormationValue = this.appendDetailValue(detailPanel, 'Formation');
+    this.selectedFactionValue = this.appendDetailValue(detailPanel, 'Faction');
 
     const grid = document.createElement('div');
     grid.className = 'command-mode-overlay__grid';
@@ -111,7 +138,7 @@ export class CommandModeOverlay implements LayoutComponent {
       this.commandButtons.set(option.slot, refs);
       grid.appendChild(refs.button);
     }
-    body.appendChild(grid);
+    sidebar.appendChild(grid);
 
     const footer = document.createElement('div');
     footer.className = 'command-mode-overlay__footer';
@@ -135,15 +162,18 @@ export class CommandModeOverlay implements LayoutComponent {
     onQuickCommandSelected?: (slot: number) => void;
     onCloseRequested?: () => void;
     onMapPointSelected?: (position: THREE.Vector3) => void;
+    onSquadSelected?: (squadId: string) => void;
   }): void {
     this.onQuickCommandSelected = callbacks.onQuickCommandSelected;
     this.onCloseRequested = callbacks.onCloseRequested;
     this.onMapPointSelected = callbacks.onMapPointSelected;
+    this.onSquadSelected = callbacks.onSquadSelected;
   }
 
   setInputMode(inputMode: InputMode): void {
     if (this.inputMode === inputMode) return;
     this.inputMode = inputMode;
+    this.tacticalMap.setInputMode(inputMode);
     this.render();
   }
 
@@ -160,6 +190,18 @@ export class CommandModeOverlay implements LayoutComponent {
 
   setMapState(state: CommandTacticalMapRenderState): void {
     this.tacticalMap.setRenderState(state);
+  }
+
+  nudgeGamepadCursor(x: number, z: number, deltaTime: number): void {
+    this.tacticalMap.nudgeGamepadCursor(x, z, deltaTime);
+  }
+
+  confirmGamepadAction(): boolean {
+    return this.tacticalMap.confirmGamepadAction();
+  }
+
+  selectSquadAtCursor(): boolean {
+    return this.tacticalMap.selectSquadAtCursor();
   }
 
   mount(parent: HTMLElement): void {
@@ -179,6 +221,23 @@ export class CommandModeOverlay implements LayoutComponent {
   private appendSummaryValue(parent: HTMLElement, label: string): HTMLSpanElement {
     const item = document.createElement('div');
     item.className = 'command-mode-overlay__summary-item';
+
+    const key = document.createElement('span');
+    key.className = 'command-mode-overlay__summary-key';
+    key.textContent = label;
+
+    const value = document.createElement('span');
+    value.className = 'command-mode-overlay__summary-value';
+
+    item.appendChild(key);
+    item.appendChild(value);
+    parent.appendChild(item);
+    return value;
+  }
+
+  private appendDetailValue(parent: HTMLElement, label: string): HTMLSpanElement {
+    const item = document.createElement('div');
+    item.className = 'command-mode-overlay__detail-item';
 
     const key = document.createElement('span');
     key.className = 'command-mode-overlay__summary-key';
@@ -227,6 +286,16 @@ export class CommandModeOverlay implements LayoutComponent {
     this.waypointValue.textContent = this.state.commandPosition
       ? `${Math.round(this.state.commandPosition.x)} / ${Math.round(this.state.commandPosition.z)}`
       : 'FOLLOW PLAYER';
+    this.selectedSquadValue.textContent = this.state.selectedSquadId
+      ? this.state.selectedSquadId.replace(/[_-]/g, ' ').toUpperCase()
+      : 'NO ACTIVE SQUAD';
+    this.selectedLeaderValue.textContent = this.state.selectedLeaderId
+      ? this.state.selectedLeaderId.replace(/[_-]/g, ' ').toUpperCase()
+      : 'UNKNOWN';
+    this.selectedFormationValue.textContent = this.state.selectedFormation
+      ? this.state.selectedFormation.toUpperCase()
+      : 'UNSET';
+    this.selectedFactionValue.textContent = this.state.selectedFaction ?? 'UNASSIGNED';
     this.hintValue.textContent = this.getFooterHint();
     this.tacticalMap.setPlacementCommandLabel(
       this.state.pendingCommand
@@ -253,7 +322,7 @@ export class CommandModeOverlay implements LayoutComponent {
       case 'touch':
         return 'TAP';
       case 'gamepad':
-        return slot <= 4 ? `D-${['UP', 'R', 'DN', 'L'][slot - 1]}` : 'RADIAL';
+        return slot <= 4 ? `D-${['UP', 'R', 'DN', 'L'][slot - 1]}` : 'AUTO';
       default:
         return `SHIFT+${slot}`;
     }
@@ -264,7 +333,7 @@ export class CommandModeOverlay implements LayoutComponent {
       case 'touch':
         return 'Tap Hold, Patrol, or Retreat, then tap the map. Follow and Auto fire immediately.';
       case 'gamepad':
-        return 'Gamepad keeps the radial menu as the command-mode surface for now.';
+        return 'Use D-pad to arm orders, move the cursor with the left stick, A to confirm, and X to select a squad.';
       default:
         return 'Choose Hold, Patrol, or Retreat, then click the map. Follow and Auto fire immediately.';
     }
@@ -380,6 +449,12 @@ export class CommandModeOverlay implements LayoutComponent {
         align-items: start;
       }
 
+      .command-mode-overlay__sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
       .command-mode-overlay__summary {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -387,6 +462,22 @@ export class CommandModeOverlay implements LayoutComponent {
       }
 
       .command-mode-overlay__summary-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 10px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 12px;
+        background: rgba(26, 30, 28, 0.66);
+      }
+
+      .command-mode-overlay__detail-panel {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .command-mode-overlay__detail-item {
         display: flex;
         flex-direction: column;
         gap: 4px;

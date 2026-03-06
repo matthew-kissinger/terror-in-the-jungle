@@ -14,6 +14,7 @@ const _toAttacker = new THREE.Vector3()
  */
 export class AIStateEngage {
   private readonly MAX_FLANK_COVER_SEARCHES_PER_SUPPRESSION = 2
+  private readonly FLANK_DESTINATION_REUSE_RADIUS_SQ = 12 * 12
   private squads: Map<string, Squad> = new Map()
   private squadSuppressionCooldown: Map<string, number> = new Map()
   private coverSystem?: AICoverSystem
@@ -277,21 +278,19 @@ export class AIStateEngage {
     const lastSuppression = this.squadSuppressionCooldown.get(combatant.squadId) || 0
     if (Date.now() - lastSuppression < 10000) return false
 
-    const distance = combatant.position.distanceTo(targetPos)
-
-    if (distance < 30 || distance > 80) return false
+    const distanceSq = combatant.position.distanceToSquared(targetPos)
+    if (distanceSq < 30 * 30 || distanceSq > 80 * 80) return false
 
     const nearbyEnemies = countNearbyEnemies(combatant, 40, targetPos, allCombatants, spatialGrid)
 
-    let lowHealthSquadmate = false
-    squad.members.forEach(memberId => {
+    for (const memberId of squad.members) {
       const member = allCombatants.get(memberId)
       if (member && member.health < member.maxHealth * 0.4) {
-        lowHealthSquadmate = true
+        return true
       }
-    })
+    }
 
-    return nearbyEnemies >= 2 || lowHealthSquadmate
+    return nearbyEnemies >= 2
   }
 
   initiateSquadSuppression(
@@ -305,7 +304,8 @@ export class AIStateEngage {
     const squad = this.squads.get(combatant.squadId)
     if (!squad) return
 
-    this.squadSuppressionCooldown.set(combatant.squadId, Date.now())
+    const now = Date.now()
+    this.squadSuppressionCooldown.set(combatant.squadId, now)
 
     const flankCoverProbe = { position: new THREE.Vector3() } as Combatant
     let flankCoverSearches = 0
@@ -316,9 +316,17 @@ export class AIStateEngage {
 
       if (member.squadRole === 'leader' || index === 1) {
         member.state = CombatantState.SUPPRESSING
-        member.suppressionTarget = targetPos.clone()
-        member.suppressionEndTime = Date.now() + 3000 + Math.random() * 2000
-        member.lastKnownTargetPos = targetPos.clone()
+        if (member.suppressionTarget) {
+          member.suppressionTarget.copy(targetPos)
+        } else {
+          member.suppressionTarget = targetPos.clone()
+        }
+        member.suppressionEndTime = now + 3000 + Math.random() * 2000
+        if (member.lastKnownTargetPos) {
+          member.lastKnownTargetPos.copy(targetPos)
+        } else {
+          member.lastKnownTargetPos = targetPos.clone()
+        }
         member.alertTimer = 5.0
         member.isFullAuto = true
         member.skillProfile.burstLength = 8
@@ -336,18 +344,26 @@ export class AIStateEngage {
           targetPos.z + Math.sin(flankingAngle) * flankingDistance
         )
 
+        const existingDestination = member.destinationPoint
+        const hasReusableFlankDestination = !!existingDestination
+          && existingDestination.distanceToSquared(flankingPos) <= this.FLANK_DESTINATION_REUSE_RADIUS_SQ
+
         let coverNearFlank: THREE.Vector3 | null = null
-        if (flankCoverSearches < this.MAX_FLANK_COVER_SEARCHES_PER_SUPPRESSION) {
+        if (!hasReusableFlankDestination && flankCoverSearches < this.MAX_FLANK_COVER_SEARCHES_PER_SUPPRESSION) {
           flankCoverProbe.position.copy(flankingPos)
           coverNearFlank = findNearestCover(flankCoverProbe, targetPos)
           flankCoverSearches++
         }
 
         if (coverNearFlank) {
-          member.destinationPoint = coverNearFlank
-        } else if (member.destinationPoint) {
-          member.destinationPoint.copy(flankingPos)
-        } else {
+          if (existingDestination) {
+            existingDestination.copy(coverNearFlank)
+          } else {
+            member.destinationPoint = coverNearFlank
+          }
+        } else if (!hasReusableFlankDestination && existingDestination) {
+          existingDestination.copy(flankingPos)
+        } else if (!existingDestination) {
           member.destinationPoint = flankingPos.clone()
         }
         member.isFlankingMove = true

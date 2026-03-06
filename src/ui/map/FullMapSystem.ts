@@ -20,6 +20,7 @@ import { createLegend, createControls, createCompass } from './FullMapDOMHelpers
 import { shouldUseTouchControls } from '../../utils/DeviceDetector';
 import type { WarSimulator } from '../../systems/strategy/WarSimulator';
 import type { HelipadMarker } from '../minimap/MinimapRenderer';
+import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -46,6 +47,12 @@ export class FullMapSystem implements GameSystem {
   private isVisible = false;
   private playerSquadId?: string;
   private commandPosition?: THREE.Vector3;
+  private mapIntelPolicy: MapIntelPolicyConfig = {
+    tacticalRangeOverride: null,
+    showStrategicAgentsOnMinimap: false,
+    showStrategicAgentsOnFullMap: false,
+    strategicLayer: 'none',
+  };
 
   // Player tracking
   private playerPosition = new THREE.Vector3();
@@ -387,7 +394,7 @@ export class FullMapSystem implements GameSystem {
   }
 
   private drawStrategicAgents(ctx: CanvasRenderingContext2D): void {
-    if ((globalThis as any).__FULLMAP_SHOW_STRATEGIC_AGENTS__ !== true) return;
+    if (this.mapIntelPolicy.showStrategicAgentsOnFullMap !== true) return;
     if (!this.warSimulator || !this.warSimulator.isEnabled()) return;
 
     const scale = MAP_SIZE / this.worldSize;
@@ -470,6 +477,10 @@ export class FullMapSystem implements GameSystem {
 
   setCommandPosition(position: THREE.Vector3 | undefined): void {
     this.commandPosition = position;
+  }
+
+  setMapIntelPolicy(policy: MapIntelPolicyConfig): void {
+    this.mapIntelPolicy = { ...policy };
   }
 
   setHelipadMarkers(markers: HelipadMarker[]): void {

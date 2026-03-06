@@ -60,34 +60,34 @@ describe('MinimapRenderer tactical range filtering', () => {
   });
 
   it('allows explicit override range for diagnostics tuning', () => {
-    const prev = (globalThis as any).__MINIMAP_TACTICAL_RANGE__;
-    (globalThis as any).__MINIMAP_TACTICAL_RANGE__ = 3000;
-    try {
-      const { ctx, calls } = createMockCtx();
-      const camera = createMockCamera();
-      const playerPosition = new THREE.Vector3(0, 2, 0);
-      const combatantSystem = {
-        getAllCombatants: () => [
-          { state: 'patrolling', position: new THREE.Vector3(100, 0, 0), faction: 'OPFOR', squadId: 's1' },
-          { state: 'patrolling', position: new THREE.Vector3(1500, 0, 0), faction: 'OPFOR', squadId: 's2' }
-        ]
-      } as any;
+    const { ctx, calls } = createMockCtx();
+    const camera = createMockCamera();
+    const playerPosition = new THREE.Vector3(0, 2, 0);
+    const combatantSystem = {
+      getAllCombatants: () => [
+        { state: 'patrolling', position: new THREE.Vector3(100, 0, 0), faction: 'OPFOR', squadId: 's1' },
+        { state: 'patrolling', position: new THREE.Vector3(1500, 0, 0), faction: 'OPFOR', squadId: 's2' }
+      ]
+    } as any;
 
-      renderMinimap({
-        ctx,
-        size: 200,
-        worldSize: 21136,
-        playerPosition,
-        playerRotation: 0,
-        camera,
-        combatantSystem
-      });
+    renderMinimap({
+      ctx,
+      size: 200,
+      worldSize: 21136,
+      playerPosition,
+      playerRotation: 0,
+      camera,
+      combatantSystem,
+      mapIntelPolicy: {
+        tacticalRangeOverride: 3000,
+        showStrategicAgentsOnMinimap: false,
+        showStrategicAgentsOnFullMap: false,
+        strategicLayer: 'none',
+      }
+    });
 
-      // 1 player dot + 2 combatant dots (override permits both)
-      expect(calls.arc).toBe(3);
-    } finally {
-      (globalThis as any).__MINIMAP_TACTICAL_RANGE__ = prev;
-    }
+    // 1 player dot + 2 combatant dots (override permits both)
+    expect(calls.arc).toBe(3);
   });
 
   it('draws a guidance line when a command point is present', () => {

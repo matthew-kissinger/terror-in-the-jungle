@@ -121,7 +121,8 @@ export class SystemConnector {
       refs.combatantSystem,
       refs.ticketSystem,
       refs.terrainSystem,
-      refs.minimapSystem
+      refs.minimapSystem,
+      refs.fullMapSystem
     );
     refs.gameModeManager.setInfluenceMapSystem(refs.influenceMapSystem);
 

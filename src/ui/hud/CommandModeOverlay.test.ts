@@ -28,7 +28,11 @@ describe('CommandModeOverlay', () => {
       currentCommand: SquadCommand.PATROL_HERE,
       memberCount: 9,
       commandPosition: { x: 120, z: -80 },
-      pendingCommand: SquadCommand.HOLD_POSITION
+      pendingCommand: SquadCommand.HOLD_POSITION,
+      selectedSquadId: 'squad_alpha',
+      selectedLeaderId: 'leader_1',
+      selectedFormation: 'wedge',
+      selectedFaction: 'US'
     });
     overlay.setVisible(true);
 
@@ -37,6 +41,10 @@ describe('CommandModeOverlay', () => {
     expect(document.body.textContent).toContain('PATROL HERE');
     expect(document.body.textContent).toContain('9 TROOPS');
     expect(document.body.textContent).toContain('120 / -80');
+    expect(document.body.textContent).toContain('SQUAD ALPHA');
+    expect(document.body.textContent).toContain('LEADER 1');
+    expect(document.body.textContent).toContain('WEDGE');
+    expect(document.body.textContent).toContain('US');
     expect(holdButton?.classList.contains('command-mode-overlay__button--active')).toBe(true);
     expect(patrolButton?.classList.contains('command-mode-overlay__button--active')).toBe(false);
   });

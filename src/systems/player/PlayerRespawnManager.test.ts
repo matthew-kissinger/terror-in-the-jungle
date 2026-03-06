@@ -1127,6 +1127,25 @@ describe('PlayerRespawnManager', () => {
       }
     });
 
+    it('auto-confirms initial deploy when perf diagnostics are enabled', async () => {
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      (globalThis as any).__ENABLE_PERF_DIAGNOSTICS__ = true;
+      try {
+        const deployPromise = respawnManager.beginInitialDeploy();
+
+        await expect(deployPromise).resolves.toEqual(expect.objectContaining({
+          x: 0,
+          z: -50,
+        }));
+        expect(mockRespawnUI.show).toHaveBeenCalled();
+        expect(mockRespawnUI.hide).toHaveBeenCalled();
+        expect(mockPlayerController.setPosition).not.toHaveBeenCalled();
+      } finally {
+        delete (globalThis as any).__ENABLE_PERF_DIAGNOSTICS__;
+        randomSpy.mockRestore();
+      }
+    });
+
     it('rejects initial deploy when the player backs out to mode select', async () => {
       await respawnManager.init();
 
@@ -1250,6 +1269,37 @@ describe('PlayerRespawnManager', () => {
 
       const callPosition = vi.mocked(mockPlayerController.setPosition).mock.calls[0][0];
       expect(callPosition.y).toBe(12); // terrain height (10) + player offset (2)
+    });
+
+    it('prefers effective terrain height for respawn grounding', () => {
+      const testRespawnManager = new PlayerRespawnManager(mockScene, mockCamera);
+      const terrainRuntime = {
+        getHeightAt: vi.fn(() => 4),
+        getEffectiveHeightAt: vi.fn(() => 11),
+        getPlayableWorldSize: vi.fn(() => 400),
+        getWorldSize: vi.fn(() => 400),
+        isTerrainReady: vi.fn(() => true),
+        hasTerrainAt: vi.fn(() => true),
+        getActiveTerrainTileCount: vi.fn(() => 0),
+        setSurfaceWetness: vi.fn(),
+        updatePlayerPosition: vi.fn(),
+        registerCollisionObject: vi.fn(),
+        unregisterCollisionObject: vi.fn(),
+        raycastTerrain: vi.fn(() => ({ hit: false })),
+      } as ITerrainRuntime;
+
+      (testRespawnManager as any).respawnUI = mockRespawnUI;
+      (testRespawnManager as any).mapController = mockMapController;
+
+      testRespawnManager.setZoneManager(mockZoneManager);
+      testRespawnManager.setPlayerController(mockPlayerController);
+      testRespawnManager.setTerrainSystem(terrainRuntime);
+
+      testRespawnManager.respawnAtBase();
+
+      const callPosition = vi.mocked(mockPlayerController.setPosition).mock.calls[0][0];
+      expect(terrainRuntime.getEffectiveHeightAt).toHaveBeenCalled();
+      expect(callPosition.y).toBe(13);
     });
 
     it('should handle zone manager with no zones', () => {

@@ -891,6 +891,40 @@ describe('AIStateEngage', () => {
       expect(flanker.state).toBe(CombatantState.ADVANCING);
     });
 
+    it('reuses a nearby existing flank destination without rerunning cover search', () => {
+      const targetPos = new THREE.Vector3(50, 0, 0);
+      const leader = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 2, 0));
+      const suppressor = createMockCombatant('c2', Faction.US, new THREE.Vector3(5, 4, 0));
+      const flanker = createMockCombatant('c3', Faction.US, new THREE.Vector3(0, 7, 0));
+      leader.squadId = 'squad-1';
+      leader.squadRole = 'leader';
+      flanker.destinationPoint = new THREE.Vector3(50, 7, -20);
+
+      allCombatants.set('c1', leader);
+      allCombatants.set('c2', suppressor);
+      allCombatants.set('c3', flanker);
+
+      const squad: Squad = {
+        id: 'squad-1',
+        faction: Faction.US,
+        members: ['c1', 'c2', 'c3'],
+      } as Squad;
+      squads.set('squad-1', squad);
+      aiStateEngage.setSquads(squads);
+
+      const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.0);
+      findNearestCover.mockReturnValue(null);
+
+      aiStateEngage.initiateSquadSuppression(leader, targetPos, allCombatants, findNearestCover);
+
+      randomSpy.mockRestore();
+
+      expect(findNearestCover).not.toHaveBeenCalled();
+      expect(flanker.state).toBe(CombatantState.ADVANCING);
+      expect(flanker.destinationPoint).toBeDefined();
+      expect(flanker.destinationPoint?.distanceTo(new THREE.Vector3(50, 7, -20))).toBeLessThan(0.001);
+    });
+
     it('caps flank cover searches per suppression initiation for larger squads', () => {
       const targetPos = new THREE.Vector3(60, 0, 0);
       const leader = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 2, 0));

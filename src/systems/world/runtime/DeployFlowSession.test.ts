@@ -15,6 +15,7 @@ describe('createDeploySession', () => {
     expect(session.headline).toBe('OPEN FRONTIER');
     expect(session.actionLabel).toBe('STAGE INSERTION');
     expect(session.sequenceTitle).toBe('Launch Sequence');
+    expect(session.subheadline).toContain('helipads');
     expect(session.sequenceSteps[0]).toContain('frontier battlefield');
   });
 
@@ -30,6 +31,8 @@ describe('createDeploySession', () => {
     expect(session.actionLabel).toBe('REINSERT');
     expect(session.secondaryActionLabel).toBeNull();
     expect(session.allowLoadoutEditing).toBe(true);
+    expect(session.readyLabel).toBe('Ready for reinsertion');
+    expect(session.countdownLabel).toBe('Reinsertion available in');
     expect(session.sequenceTitle).toBe('Redeploy Checklist');
   });
 
@@ -44,5 +47,17 @@ describe('createDeploySession', () => {
     expect(session.secondaryActionLabel).toBe('BACK TO MODE SELECT');
     expect(session.allowLoadoutEditing).toBe(true);
     expect(session.sequenceSteps[0]).toContain('insertion zone');
+  });
+
+  it('builds kill-race deploy copy for team deathmatch', () => {
+    const session = createDeploySession(
+      getGameModeDefinition(GameMode.TEAM_DEATHMATCH),
+      'respawn'
+    );
+
+    expect(session.mapTitle).toBe('COMBAT MAP - SELECT SPAWN');
+    expect(session.selectedSpawnTitle).toBe('SELECTED COMBAT SPAWN');
+    expect(session.readySelectionText).toBe('Combat spawn confirmed');
+    expect(session.readyLabel).toBe('Ready for combat redeploy');
   });
 });

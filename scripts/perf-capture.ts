@@ -128,6 +128,16 @@ type RuntimeSample = {
     };
   };
   systemTop: Array<{ name: string; emaMs: number; peakMs: number }>;
+  harnessDriver?: {
+    mode: string;
+    movementState: string;
+    targetVisible: boolean;
+    respawnCount: number;
+    ammoRefillCount: number;
+    healthTopUpCount: number;
+    lastShotAt: number;
+    lastFireProbe?: Record<string, unknown> | null;
+  };
 };
 
 type CaptureSummary = {
@@ -469,7 +479,7 @@ function validateRun(
   runtimeSamples: RuntimeSample[],
   consoleEntries: ConsoleEntry[],
   durationSeconds: number,
-  options?: { hitValidation?: 'strict' | 'relaxed' | 'off'; sampleIntervalMs?: number }
+  options?: { hitValidation?: 'strict' | 'relaxed' | 'critical' | 'off'; sampleIntervalMs?: number }
 ): ValidationReport {
   const checks: ValidationCheck[] = [];
   const sampleCount = runtimeSamples.length;
@@ -637,9 +647,10 @@ function validateRun(
       : 0;
 
     const strict = hitValidationMode === 'strict';
+    const isBehaviorCritical = hitValidationMode === 'strict' || hitValidationMode === 'critical';
     checks.push({
       id: 'player_shots_recorded',
-      status: strict
+      status: isBehaviorCritical
         ? (maxShots >= 5 ? 'pass' : maxShots > 0 ? 'warn' : 'fail')
         : (maxShots >= 3 ? 'pass' : 'warn'),
       value: maxShots,
@@ -648,7 +659,7 @@ function validateRun(
 
     checks.push({
       id: 'player_hits_recorded',
-      status: strict
+      status: isBehaviorCritical
         ? (maxHits >= 1 ? 'pass' : 'fail')
         : (maxHits >= 1 ? 'pass' : 'warn'),
       value: maxHits,
@@ -657,7 +668,7 @@ function validateRun(
 
     checks.push({
       id: 'player_hit_rate_peak',
-      status: strict
+      status: isBehaviorCritical
         ? (peakHitRate >= 0.02 ? 'pass' : peakHitRate > 0 ? 'warn' : 'fail')
         : (peakHitRate >= 0.01 ? 'pass' : 'warn'),
       value: peakHitRate,
@@ -1442,6 +1453,9 @@ async function runCapture(): Promise<void> {
           const basicValidation = perf?.validate?.();
           const report = shouldIncludeDetails ? perf?.report?.() : null;
           const combatProfile = shouldIncludeDetails ? (window as any).combatProfile?.() : null;
+          const harnessDriver = shouldIncludeDetails
+            ? (window as any).__perfHarnessDriverState?.getDebugSnapshot?.() ?? null
+            : null;
           const memory = (performance as any).memory;
           const snapshot = metrics?.getSnapshot?.();
           return {
@@ -1586,6 +1600,18 @@ async function runCapture(): Promise<void> {
                   } : undefined
                 }
               : undefined,
+            harnessDriver: harnessDriver ? {
+              mode: String(harnessDriver.mode ?? ''),
+              movementState: String(harnessDriver.movementState ?? ''),
+              targetVisible: Boolean(harnessDriver.targetVisible),
+              respawnCount: Number(harnessDriver.respawnCount ?? 0),
+              ammoRefillCount: Number(harnessDriver.ammoRefillCount ?? 0),
+              healthTopUpCount: Number(harnessDriver.healthTopUpCount ?? 0),
+              lastShotAt: Number(harnessDriver.lastShotAt ?? 0),
+              lastFireProbe: harnessDriver.lastFireProbe && typeof harnessDriver.lastFireProbe === 'object'
+                ? harnessDriver.lastFireProbe
+                : null
+            } : undefined,
             systemTop: Array.isArray(report?.systemBreakdown)
               ? report.systemBreakdown.slice(0, 3).map((s: any) => ({
                   name: String(s.name ?? 'unknown'),
@@ -1612,7 +1638,14 @@ async function runCapture(): Promise<void> {
         const triangles = Number(sample.renderer?.triangles ?? 0);
         const recentLongTasks = Number(sample.browserStalls?.recent?.longTasks?.count ?? 0);
         const recentLoafs = Number(sample.browserStalls?.recent?.longAnimationFrames?.count ?? 0);
-        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h50=${Number(sample.hitch50Count ?? 0)} shots=${Number(sample.shotsThisSession ?? 0)} hits=${Number(sample.hitsThisSession ?? 0)} hitRate=${(Number(sample.hitRate ?? 0) * 100).toFixed(1)}% draw=${drawCalls} tri=${triangles} rayDeny=${denialRatePct.toFixed(1)}% aiStarve=${aiStarve} longTasks=${recentLongTasks} loafs=${recentLoafs}`);
+        const driverReason = typeof sample.harnessDriver?.lastFireProbe?.reason === 'string'
+          ? String(sample.harnessDriver?.lastFireProbe?.reason)
+          : '';
+        const driverMovement = sample.harnessDriver?.movementState ? String(sample.harnessDriver.movementState) : '';
+        const driverSuffix = driverReason || driverMovement
+          ? ` driver=${driverMovement || 'unknown'} probe=${driverReason || 'unknown'}`
+          : '';
+        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h50=${Number(sample.hitch50Count ?? 0)} shots=${Number(sample.shotsThisSession ?? 0)} hits=${Number(sample.hitsThisSession ?? 0)} hitRate=${(Number(sample.hitRate ?? 0) * 100).toFixed(1)}% draw=${drawCalls} tri=${triangles} rayDeny=${denialRatePct.toFixed(1)}% aiStarve=${aiStarve} longTasks=${recentLongTasks} loafs=${recentLoafs}${driverSuffix}`);
       }
     }
     if (missedSamples > 0) {
@@ -1642,9 +1675,9 @@ async function runCapture(): Promise<void> {
     } else if (cdpStarted) {
       logStep('⚠ Skipping heavy CDP shutdown capture due unstable startup or blocked runtime samples');
     }
-    const hitValidationMode: 'strict' | 'relaxed' | 'off' =
+    const hitValidationMode: 'strict' | 'relaxed' | 'critical' | 'off' =
       enableCombat && activePlayerScenario
-        ? (requestedMode === 'open_frontier' || requestedMode === 'a_shau_valley' ? 'relaxed' : 'strict')
+        ? (requestedMode === 'open_frontier' ? 'critical' : requestedMode === 'a_shau_valley' ? 'relaxed' : 'strict')
         : 'off';
     validation = validateRun(runtimeSamples, consoleEntries, durationSeconds, {
       hitValidation: hitValidationMode,

@@ -13,6 +13,7 @@ import { ZoneManager } from './ZoneManager';
 import { CombatantSystem } from '../combat/CombatantSystem';
 import { TicketSystem } from './TicketSystem';
 import { MinimapSystem } from '../../ui/minimap/MinimapSystem';
+import { FullMapSystem } from '../../ui/map/FullMapSystem';
 import { InfluenceMapSystem } from '../combat/InfluenceMapSystem';
 import type { WarSimulator } from '../strategy/WarSimulator';
 import type { ITerrainRuntimeController } from '../../types/SystemInterfaces';
@@ -31,9 +32,6 @@ import {
 type GameModeDefinitionResolver = (mode: GameMode) => GameModeDefinition;
 type GameModeRuntimeFactory = (definition: GameModeDefinition) => GameModeRuntime;
 
-const MINIMAP_TACTICAL_RANGE_KEY = '__MINIMAP_TACTICAL_RANGE__';
-const MINIMAP_SHOW_STRATEGIC_AGENTS_KEY = '__MINIMAP_SHOW_STRATEGIC_AGENTS__';
-
 export class GameModeManager implements GameSystem {
   public currentMode: GameMode = GameMode.ZONE_CONTROL;
   private currentConfig: GameModeConfig;
@@ -46,6 +44,7 @@ export class GameModeManager implements GameSystem {
   private ticketSystem?: TicketSystem;
   private terrainSystem?: ITerrainRuntimeController;
   private minimapSystem?: MinimapSystem;
+  private fullMapSystem?: FullMapSystem;
   private influenceMapSystem?: InfluenceMapSystem;
   private warSimulator?: WarSimulator;
 
@@ -80,13 +79,16 @@ export class GameModeManager implements GameSystem {
     combatantSystem: CombatantSystem,
     ticketSystem: TicketSystem,
     terrainSystem: ITerrainRuntimeController,
-    minimapSystem: MinimapSystem
+    minimapSystem: MinimapSystem,
+    fullMapSystem: FullMapSystem
   ): void {
     this.zoneManager = zoneManager;
     this.combatantSystem = combatantSystem;
     this.ticketSystem = ticketSystem;
     this.terrainSystem = terrainSystem;
     this.minimapSystem = minimapSystem;
+    this.fullMapSystem = fullMapSystem;
+    this.applyMapIntelPolicy(this.currentDefinition.policies.mapIntel);
   }
 
   public setInfluenceMapSystem(influenceMapSystem: InfluenceMapSystem): void {
@@ -333,12 +335,7 @@ export class GameModeManager implements GameSystem {
   }
 
   private applyMapIntelPolicy(policy: MapIntelPolicyConfig): void {
-    const globals = globalThis as Record<string, unknown>;
-    if (policy.tacticalRangeOverride === null) {
-      delete globals[MINIMAP_TACTICAL_RANGE_KEY];
-    } else {
-      globals[MINIMAP_TACTICAL_RANGE_KEY] = policy.tacticalRangeOverride;
-    }
-    globals[MINIMAP_SHOW_STRATEGIC_AGENTS_KEY] = policy.showStrategicAgentsOnMinimap;
+    this.minimapSystem?.setMapIntelPolicy(policy);
+    this.fullMapSystem?.setMapIntelPolicy(policy);
   }
 }

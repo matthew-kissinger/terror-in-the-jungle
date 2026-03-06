@@ -36,7 +36,7 @@
     "perf:compare": "npx tsx scripts/perf-compare.ts",
     "perf:update-baseline": "npx tsx scripts/perf-compare.ts --update-baseline",
     "validate": "npm run test:run && npm run build",
-    "validate:full": "npm run test:run && npm run build && npm run perf:quick && npm run perf:compare"
+    "validate:full": "npm run test:run && npm run build && npm run perf:capture:combat120 && npm run perf:compare -- --scenario combat120"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",

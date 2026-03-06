@@ -103,7 +103,7 @@ describe('HeightQueryCache', () => {
     });
   });
 
-  describe('LRU eviction', () => {
+  describe('Cache eviction', () => {
     it('should evict oldest entries when cache is full', () => {
       const maxLimit = 3;
       const cache = new HeightQueryCache(12345, maxLimit);
@@ -124,7 +124,7 @@ describe('HeightQueryCache', () => {
       expect(mockNoise).toHaveBeenCalled(); // Should have been recalculated
     });
 
-    it('should preserve recently accessed entries', () => {
+    it('does not promote cache hits when evicting', () => {
       const maxLimit = 3;
       const cache = new HeightQueryCache(12345, maxLimit);
       
@@ -132,22 +132,22 @@ describe('HeightQueryCache', () => {
       cache.getHeightAt(2, 2);
       cache.getHeightAt(3, 3);
       
-      // Access (1, 1) to make it most recent
+      // Cache hit should not reinsert the key.
       mockNoise.mockClear();
       cache.getHeightAt(1, 1);
       expect(mockNoise).not.toHaveBeenCalled(); // Cache hit
       
-      // Add one more, should evict (2, 2) which is now the oldest
+      // Add one more; FIFO eviction removes the earliest inserted entry.
       cache.getHeightAt(4, 4);
       
-      // (1, 1) should still be in cache
-      mockNoise.mockClear();
-      cache.getHeightAt(1, 1);
-      expect(mockNoise).not.toHaveBeenCalled();
-      
-      // (2, 2) should be evicted
+      // (2, 2) should still be cached immediately after the eviction.
       mockNoise.mockClear();
       cache.getHeightAt(2, 2);
+      expect(mockNoise).not.toHaveBeenCalled();
+
+      // (1, 1) should now be evicted despite the hit above.
+      mockNoise.mockClear();
+      cache.getHeightAt(1, 1);
       expect(mockNoise).toHaveBeenCalled();
     });
   });

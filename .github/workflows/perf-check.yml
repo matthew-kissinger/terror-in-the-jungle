@@ -48,17 +48,11 @@ jobs:
       - name: Build
         run: npm run build
       
-      - name: Capture control profile (combat off)
+      - name: Capture primary regression scenario (combat120)
         continue-on-error: true
         env:
           PERF_STARTUP_TIMEOUT: 90
-        run: xvfb-run -a npm run perf:capture -- --duration=20 --warmup=6 --combat=0 --reuse-dev-server=true --log-level=warn
-      
-      - name: Capture combat profile (active scenario)
-        continue-on-error: true
-        env:
-          PERF_STARTUP_TIMEOUT: 90
-        run: xvfb-run -a npm run perf:capture -- --duration=20 --warmup=8 --npcs=60 --combat=1 --active-player=1 --reuse-dev-server=true --log-level=warn
+        run: xvfb-run -a npm run perf:capture:combat120
       
       - name: Analyze latest capture
         if: always()
@@ -68,8 +62,8 @@ jobs:
       - name: Compare against baselines
         if: always()
         run: |
-          if ls artifacts/perf/*/capture-summary.json 1>/dev/null 2>&1; then
-            npm run perf:compare
+          if ls artifacts/perf/*/summary.json 1>/dev/null 2>&1; then
+            npm run perf:compare -- --scenario combat120
           else
             echo "No capture artifacts found, skipping comparison"
           fi

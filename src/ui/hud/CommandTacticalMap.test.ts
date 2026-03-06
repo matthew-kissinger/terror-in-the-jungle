@@ -136,6 +136,72 @@ describe('CommandTacticalMap', () => {
 
     map.dispose();
   });
+
+  it('selects a friendly squad when the map is clicked without an armed ground order', () => {
+    const map = new CommandTacticalMap();
+    const onSquadSelected = vi.fn();
+    map.setCallbacks({ onSquadSelected });
+    map.setRenderState({
+      playerPosition: new THREE.Vector3(0, 0, 0),
+      playerRotation: 0,
+      worldSize: 320,
+      playerSquadId: 'squad-player',
+      combatantSystem: {
+        getAllCombatants: () => [
+          { state: 'patrolling', squadId: 'squad-player', faction: 'US', position: new THREE.Vector3(0, 0, 0) },
+          { state: 'patrolling', squadId: 'squad-player', faction: 'US', position: new THREE.Vector3(4, 0, 0) },
+          { state: 'patrolling', squadId: 'squad-support', faction: 'US', position: new THREE.Vector3(40, 0, 0) },
+          { state: 'patrolling', squadId: 'squad-support', faction: 'US', position: new THREE.Vector3(44, 0, 0) },
+        ]
+      } as any
+    });
+    document.body.appendChild(map.getElement());
+
+    const canvas = document.querySelector<HTMLCanvasElement>('.command-tactical-map__canvas');
+    Object.defineProperty(canvas!, 'getBoundingClientRect', {
+      value: () => ({
+        left: 0,
+        top: 0,
+        width: 320,
+        height: 320,
+        right: 320,
+        bottom: 320,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      }),
+      configurable: true
+    });
+
+    canvas?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 202, clientY: 160, button: 0 }));
+
+    expect(onSquadSelected).toHaveBeenCalledWith('squad-support');
+
+    map.dispose();
+  });
+
+  it('supports gamepad cursor placement confirmation', () => {
+    const map = new CommandTacticalMap();
+    const onPointSelected = vi.fn();
+    map.setCallbacks({ onPointSelected });
+    map.setInputMode('gamepad');
+    map.setPlacementCommandLabel('RETREAT');
+    map.setRenderState({
+      playerPosition: new THREE.Vector3(0, 0, 0),
+      playerRotation: 0,
+      worldSize: 320
+    });
+    document.body.appendChild(map.getElement());
+
+    map.nudgeGamepadCursor(1, 0, 0.5);
+    expect(map.confirmGamepadAction()).toBe(true);
+
+    const placedPosition = onPointSelected.mock.calls[0]?.[0];
+    expect(placedPosition.x).toBeGreaterThan(0);
+    expect(placedPosition.z).toBeCloseTo(0, 5);
+
+    map.dispose();
+  });
 });
 
 function createCanvasContextStub() {

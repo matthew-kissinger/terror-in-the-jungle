@@ -415,9 +415,13 @@ Current state:
 **Goal:** Push to full-Vietnam simulation scale.
 **Dependencies:** All prior phases provide the systems to scale.
 
+Execution gate:
+- Do not start frontier-tech adoption from this phase while `docs/PERF_FRONTIER.md` and `docs/ARCHITECTURE_RECOVERY_PLAN.md` still show unresolved CPU tail hotspots in `combat120`, terrain-heavy short captures, or `frontier30m`.
+- Current priority remains evidence-backed CPU/harness closure first, then larger renderer/architecture bets.
+
 ### 10A. Performance Architecture
-- Evaluate ECS migration for combat entities (if object pooling insufficient)
-- Spatial partitioning optimization for 3D queries (octree or BVH)
+- Evaluate ECS migration for combat entities only if object pooling and current JS-level hot-path cleanup stop scaling further
+- Spatial partitioning optimization for 3D queries only after the current measured spatial/terrain bottlenecks are re-baselined
 - Render budget enforcement: adaptive LOD, aggressive culling, draw call batching
 - Memory pooling for ALL transient objects (bullets, effects, debris)
 - Profile and optimize per-phase with perf harness
@@ -457,7 +461,7 @@ Current state:
 - Desktop: Chrome, Firefox, Edge (keyboard + mouse)
 - Mobile: Chrome Android, Safari iOS (touch)
 - Gamepad: Xbox/PS controller support
-- WebGPU preferred, WebGL2 fallback
+- WebGL2 is the active runtime today; WebGPU remains a later frontier option once current CPU hotspots and regression baselines are stable
 
 ### Documentation Contract
 - Update this file after each phase completion

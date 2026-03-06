@@ -297,6 +297,70 @@ function getSequenceSteps(
   return steps;
 }
 
+function getModeSpecificSessionOverrides(
+  definition: GameModeDefinition,
+  kind: DeploySessionKind
+): Partial<DeploySessionModel> {
+  switch (definition.id) {
+    case GameMode.ZONE_CONTROL:
+      return {
+        subheadline:
+          kind === 'menu'
+            ? 'Hold the majority of the line and bleed the enemy out through zone control.'
+            : kind === 'initial'
+              ? 'Choose a controlled sector, then push into the live frontline.'
+              : 'Choose a controlled sector and reinforce the contested line.',
+        mapTitle: 'FRONTLINE MAP - SELECT DEPLOYMENT',
+        readySelectionText: 'Frontline spawn confirmed',
+        readyLabel: 'Ready for frontline deploy'
+      };
+    case GameMode.TEAM_DEATHMATCH:
+      return {
+        subheadline:
+          kind === 'menu'
+            ? 'Pure firefight mode with no capture baggage. Reach the kill target first.'
+            : kind === 'initial'
+              ? 'Pick a combat spawn and get into the kill race immediately.'
+              : 'Choose a combat spawn and get back into the firefight fast.',
+        mapTitle: 'COMBAT MAP - SELECT SPAWN',
+        selectedSpawnTitle: 'SELECTED COMBAT SPAWN',
+        emptySelectionText: 'Select a combat spawn on the map',
+        readySelectionText: 'Combat spawn confirmed',
+        countdownLabel: 'Combat redeploy available in',
+        readyLabel: 'Ready for combat redeploy'
+      };
+    case GameMode.OPEN_FRONTIER:
+      return {
+        subheadline:
+          kind === 'menu'
+            ? 'Stage from helipads and footholds, then maneuver across a wider operational front.'
+            : kind === 'initial'
+              ? 'Choose a foothold, review the route, and insert into the frontier fight.'
+              : 'Select a forward foothold or main base before re-entering the wider battle.',
+        mapTitle: 'FRONTIER OPERATIONS MAP - SELECT INSERTION',
+        selectedSpawnTitle: 'SELECTED FOOTHOLD',
+        readySelectionText: 'Frontier insertion confirmed',
+        readyLabel: 'Ready for insertion'
+      };
+    case GameMode.A_SHAU_VALLEY:
+      return {
+        subheadline:
+          kind === 'menu'
+            ? 'Insert into a battalion-scale war zone with tactical contacts and strategic front pressure.'
+            : kind === 'initial'
+              ? 'Choose an insertion zone before the first lift carries you into the valley fight.'
+              : 'Select a pressure-front insertion zone and rejoin the live campaign.',
+        mapTitle: 'A SHAU OPERATIONS MAP - SELECT INSERTION',
+        readySelectionText: 'Reinsert route confirmed',
+        countdownLabel: 'Reinsertion available in',
+        readyLabel: 'Ready for reinsertion'
+      };
+    case GameMode.AI_SANDBOX:
+    default:
+      return {};
+  }
+}
+
 export function createDeploySession(
   definition: GameModeDefinition,
   kind: DeploySessionKind
@@ -338,6 +402,7 @@ export function createDeploySession(
     allowSpawnSelection: deploy.allowSpawnSelection,
     allowLoadoutEditing,
     sequenceTitle: getSequenceTitle(kind),
-    sequenceSteps: getSequenceSteps(kind, flow, deploy.allowSpawnSelection, allowLoadoutEditing)
+    sequenceSteps: getSequenceSteps(kind, flow, deploy.allowSpawnSelection, allowLoadoutEditing),
+    ...getModeSpecificSessionOverrides(definition, kind)
   };
 }

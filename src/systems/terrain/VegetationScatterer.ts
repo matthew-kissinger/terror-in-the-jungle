@@ -121,15 +121,15 @@ export class VegetationScatterer {
     // Skip cells beyond the visual terrain margin (200m past world edge)
     const limit = this.worldHalfExtent + this.visualMargin;
     if (Math.abs(centerX) > limit || Math.abs(centerZ) > limit) return;
-    const centerHeight = cache.getHeightAt(centerX, centerZ);
-    const centerSlopeDeg = computeSlopeDeg(centerX, centerZ, 4, (x, z) => cache.getHeightAt(x, z));
+    const centerHeight = this.getAlignedHeight(cache, centerX, centerZ);
+    const centerSlopeDeg = computeSlopeDeg(centerX, centerZ, 4, (x, z) => this.getAlignedHeight(cache, x, z));
     const biomeId = classifyBiome(centerHeight, centerSlopeDeg, this.biomeRules, this.defaultBiomeId);
     const biomePalette = this.biomePalettes.get(biomeId) ?? this.biomePalettes.get(this.defaultBiomeId);
     if (!biomePalette || biomePalette.length === 0) return;
 
     // Height lookup in local cell coordinates
     const getHeight = (localX: number, localZ: number): number => {
-      return cache.getHeightAt(baseX + localX, baseZ + localZ);
+      return this.getAlignedHeight(cache, baseX + localX, baseZ + localZ);
     };
 
     const instances = ChunkVegetationGenerator.generateVegetation(
@@ -175,5 +175,23 @@ export class VegetationScatterer {
 
   dispose(): void {
     this.clear();
+  }
+
+  private getAlignedHeight(
+    cache: ReturnType<typeof getHeightQueryCache>,
+    worldX: number,
+    worldZ: number
+  ): number {
+    return cache.getHeightAt(
+      this.clampToPlayableBounds(worldX),
+      this.clampToPlayableBounds(worldZ)
+    );
+  }
+
+  private clampToPlayableBounds(value: number): number {
+    if (!Number.isFinite(this.worldHalfExtent)) {
+      return value;
+    }
+    return Math.max(-this.worldHalfExtent, Math.min(this.worldHalfExtent, value));
   }
 }

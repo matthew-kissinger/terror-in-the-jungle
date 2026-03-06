@@ -178,7 +178,7 @@ export class HelicopterInteraction {
 
     // Make sure exit position is above terrain
     if (this.terrainManager) {
-      const terrainHeight = this.terrainManager.getHeightAt(exitPosition.x, exitPosition.z);
+      const terrainHeight = this.terrainManager.getEffectiveHeightAt(exitPosition.x, exitPosition.z);
       exitPosition.y = Math.max(exitPosition.y, terrainHeight + 1.5); // Player height above terrain
     }
 

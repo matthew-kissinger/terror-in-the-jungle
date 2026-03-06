@@ -67,14 +67,20 @@ export class InventoryManager implements GameSystem {
   private onLoadoutChangeCallbacks: Array<(slotDefinitions: InventorySlotDefinition[]) => void> = [];
 
   private uiElement?: HTMLElement;
+  private uiStylesElement?: HTMLStyleElement;
   private boundOnKeyDown!: (event: KeyboardEvent) => void;
   private suppressBuiltInUI = false;
+  private isInitialized = false;
 
   setSuppressUI(suppress: boolean): void {
     this.suppressBuiltInUI = suppress;
   }
 
   async init(): Promise<void> {
+    if (this.isInitialized) {
+      return;
+    }
+
     Logger.info('inventory', 'Initializing Inventory Manager...');
     this.setupEventListeners();
     if (!this.suppressBuiltInUI) {
@@ -82,15 +88,26 @@ export class InventoryManager implements GameSystem {
     }
     this.notifyLoadoutChange();
     this.notifyInventoryChange();
+    this.isInitialized = true;
   }
 
   update(_deltaTime: number): void {}
 
   dispose(): void {
+    if (!this.isInitialized && !this.uiElement && !this.uiStylesElement) {
+      return;
+    }
+
     this.removeEventListeners();
     if (this.uiElement && this.uiElement.parentNode) {
       this.uiElement.parentNode.removeChild(this.uiElement);
     }
+    if (this.uiStylesElement && this.uiStylesElement.parentNode) {
+      this.uiStylesElement.parentNode.removeChild(this.uiStylesElement);
+    }
+    this.uiElement = undefined;
+    this.uiStylesElement = undefined;
+    this.isInitialized = false;
   }
 
   setLoadout(loadout: PlayerLoadout): void {
@@ -306,7 +323,9 @@ export class InventoryManager implements GameSystem {
   }
 
   private removeEventListeners(): void {
-    window.removeEventListener('keydown', this.boundOnKeyDown);
+    if (this.boundOnKeyDown) {
+      window.removeEventListener('keydown', this.boundOnKeyDown);
+    }
   }
 
   private onKeyDown(event: KeyboardEvent): void {
@@ -481,8 +500,8 @@ export class InventoryManager implements GameSystem {
       </div>
     `).join('');
 
-    const styles = document.createElement('style');
-    styles.textContent = `
+    this.uiStylesElement = document.createElement('style');
+    this.uiStylesElement.textContent = `
       .hotbar-slot {
         position: relative;
         width: 48px;
@@ -549,7 +568,7 @@ export class InventoryManager implements GameSystem {
       }
     `;
 
-    document.head.appendChild(styles);
+    document.head.appendChild(this.uiStylesElement);
     document.body.appendChild(this.uiElement);
     this.updateUI();
   }
@@ -560,6 +579,9 @@ export class InventoryManager implements GameSystem {
     const slots = this.uiElement.querySelectorAll('.hotbar-slot');
     slots.forEach(slotElement => {
       const slotIndex = Number((slotElement as HTMLElement).dataset.slot);
+      if (Number.isNaN(slotIndex)) {
+        return;
+      }
       const definition = this.getSlotDefinition(slotIndex as WeaponSlot);
       const icon = slotElement.querySelector('[data-role="icon"]');
       const label = slotElement.querySelector('[data-role="label"]');

@@ -17,6 +17,10 @@ export interface SquadCommandState {
   isCommandModeOpen: boolean;
   memberCount: number;
   commandPosition?: THREE.Vector3;
+  selectedSquadId?: string;
+  selectedLeaderId?: string;
+  selectedFormation?: string;
+  selectedFaction?: string;
 }
 
 type SquadCommandStateListener = (state: SquadCommandState) => void;
@@ -52,15 +56,13 @@ export class PlayerSquadController implements GameSystem {
   }
 
   assignPlayerSquad(squadId: string): void {
-    this.playerSquadId = squadId;
     const squad = this.squadManager.getSquad(squadId);
     if (squad) {
-      squad.isPlayerControlled = true;
-      squad.currentCommand = SquadCommand.NONE;
-      this.currentCommand = SquadCommand.NONE;
       Logger.info('squad', ` Player now commanding squad: ${squadId} (${squad.members.length} members)`);
-      this.updateCommandIndicator();
-      this.emitCommandState();
+      if (squad.currentCommand === undefined) {
+        squad.currentCommand = SquadCommand.NONE;
+      }
+      this.selectSquad(squadId);
     }
   }
 
@@ -90,7 +92,11 @@ export class PlayerSquadController implements GameSystem {
       currentCommand: this.currentCommand,
       isCommandModeOpen: this.radialMenu.isOpen(),
       memberCount: squad?.members.length ?? 0,
-      commandPosition: squad?.commandPosition
+      commandPosition: squad?.commandPosition,
+      selectedSquadId: squad?.id,
+      selectedLeaderId: squad?.leaderId,
+      selectedFormation: squad?.formation,
+      selectedFaction: squad?.faction,
     };
   }
 
@@ -160,6 +166,26 @@ export class PlayerSquadController implements GameSystem {
 
   getPlayerSquadId(): string | undefined {
     return this.playerSquadId;
+  }
+
+  selectSquad(squadId: string): boolean {
+    const squad = this.squadManager.getSquad(squadId);
+    if (!squad) return false;
+
+    const previousSquad = this.playerSquadId
+      ? this.squadManager.getSquad(this.playerSquadId)
+      : undefined;
+    if (previousSquad && previousSquad.id !== squad.id) {
+      previousSquad.isPlayerControlled = false;
+    }
+
+    this.playerSquadId = squad.id;
+    squad.isPlayerControlled = true;
+    squad.currentCommand ??= SquadCommand.NONE;
+    this.currentCommand = squad.currentCommand;
+    this.updateCommandIndicator();
+    this.emitCommandState();
+    return true;
   }
 
   getCurrentCommand(): SquadCommand {

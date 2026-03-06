@@ -26,6 +26,7 @@ export function computeTerrainSurfaceGridSize(worldSize: number): number {
   const targetMetersPerSample =
     worldSize >= 16384 ? 48 :
     worldSize >= 8192 ? 32 :
+    worldSize >= 2048 ? 8 :
     16;
 
   const requestedGridSize = Math.ceil(worldSize / targetMetersPerSample);
@@ -101,6 +102,12 @@ export class TerrainSurfaceRuntime {
     if (this.terrainMaterial) {
       updateTerrainMaterialWetness(this.terrainMaterial, this.surfaceWetness);
     }
+  }
+
+  getBakedHeightmap(): { data: Float32Array; gridSize: number; worldSize: number } | null {
+    const data = this.heightmapGPU.getHeightData();
+    if (!data) return null;
+    return { data, gridSize: this.heightmapGPU.getGridSize(), worldSize: this.heightmapGPU.getWorldSize() };
   }
 
   dispose(): void {

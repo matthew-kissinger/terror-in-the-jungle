@@ -6,6 +6,13 @@ import { GameModeManager } from '../world/GameModeManager';
 import { modelLoader } from '../assets/ModelLoader';
 import { StructureModels } from '../assets/modelPaths';
 
+const HELIPAD_TERRAIN_CLEARANCE = 0.02;
+const HELIPAD_MIN_FOUNDATION_DEPTH = 0.6;
+const HELIPAD_FOUNDATION_MESH_NAMES = new Set([
+  'Mesh_DirtSurround',
+  'Mesh_Pad',
+]);
+
 export interface HelipadInfo {
   id: string;
   position: THREE.Vector3;
@@ -94,7 +101,7 @@ export class HelipadSystem implements GameSystem {
     // Find the highest terrain point within the platform area
     const platformRadius = 12;
     const maxHeight = this.findMaxTerrainHeight(helipadPosition.x, helipadPosition.z, platformRadius);
-    helipadPosition.y = maxHeight + 0.1; // Flush with terrain
+    helipadPosition.y = maxHeight + HELIPAD_TERRAIN_CLEARANCE;
 
     const helipad = await this.loadHelipadModel();
     helipad.position.copy(helipadPosition);
@@ -152,6 +159,7 @@ export class HelipadSystem implements GameSystem {
 
   private async loadHelipadModel(): Promise<THREE.Group> {
     const scene = await modelLoader.loadModel(StructureModels.HELIPAD);
+    this.extendHelipadFoundation(scene);
 
     const helipadGroup = new THREE.Group();
     helipadGroup.add(scene);
@@ -168,6 +176,37 @@ export class HelipadSystem implements GameSystem {
     };
 
     return helipadGroup;
+  }
+
+  private extendHelipadFoundation(root: THREE.Object3D): void {
+    root.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+
+      const geometry = child.geometry as THREE.BufferGeometry & {
+        name?: string;
+        boundingBox?: THREE.Box3 | null;
+        computeBoundingBox?: () => void;
+      };
+      const meshName = child.name || geometry.name || '';
+      if (!HELIPAD_FOUNDATION_MESH_NAMES.has(meshName)) return;
+
+      if (!geometry.boundingBox && typeof geometry.computeBoundingBox === 'function') {
+        geometry.computeBoundingBox();
+      }
+
+      const bounds = geometry.boundingBox;
+      if (!bounds) return;
+
+      const currentHeight = bounds.max.y - bounds.min.y;
+      if (currentHeight <= 0) return;
+
+      const scaleY = Math.max(1, HELIPAD_MIN_FOUNDATION_DEPTH / currentHeight);
+      if (scaleY <= 1) return;
+
+      // Scale around the top face so the landing plane stays put while the base grows downward.
+      child.position.y += bounds.max.y * (1 - scaleY);
+      child.scale.y *= scaleY;
+    });
   }
 
   getHelipadPosition(id: string): THREE.Vector3 | null {

@@ -24,6 +24,7 @@ import {
 import { getGameModeDefinition } from '../../config/gameModeDefinitions';
 import { GameMode } from '../../config/gameModeTypes';
 import type { LoadoutFieldKey, PlayerLoadout } from '../../ui/loadout/LoadoutTypes';
+import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
 
 export class InitialDeployCancelledError extends Error {
   constructor() {
@@ -278,7 +279,7 @@ export class PlayerRespawnManager implements GameSystem {
     if (!this.terrainSystem) {
       throw new Error('PlayerRespawnManager requires terrainSystem before terrain grounding');
     }
-    const terrainHeight = this.terrainSystem.getHeightAt(position.x, position.z);
+    const terrainHeight = this.terrainSystem.getEffectiveHeightAt(position.x, position.z);
     position.y = terrainHeight + 2; // Add player height offset
 
     // Move player to spawn position
@@ -376,6 +377,10 @@ export class PlayerRespawnManager implements GameSystem {
 
     // Update buttons and timer
     this.updateTimerDisplay();
+
+    if (kind === 'initial' && this.shouldAutoConfirmInitialDeploy()) {
+      this.confirmRespawn();
+    }
   }
 
   private updateAvailableSpawnPoints(): void {
@@ -685,6 +690,13 @@ export class PlayerRespawnManager implements GameSystem {
 
   private getCurrentAlliance(): Alliance {
     return this.loadoutService?.getContext().alliance ?? Alliance.BLUFOR;
+  }
+
+  private shouldAutoConfirmInitialDeploy(): boolean {
+    return import.meta.env.DEV
+      && isPerfDiagnosticsEnabled()
+      && !!this.pendingInitialDeployResolve
+      && !!this.selectedSpawnPoint;
   }
 
   private isZoneSpawnableForAlliance(

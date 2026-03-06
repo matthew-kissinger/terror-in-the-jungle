@@ -182,6 +182,7 @@ export interface RespawnPolicyConfig {
 export interface MapIntelPolicyConfig {
   tacticalRangeOverride: number | null;
   showStrategicAgentsOnMinimap: boolean;
+  showStrategicAgentsOnFullMap: boolean;
   strategicLayer: StrategicLayerMode;
 }
 

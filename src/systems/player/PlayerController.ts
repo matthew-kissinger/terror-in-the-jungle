@@ -108,13 +108,19 @@ export class PlayerController implements GameSystem {
 
   private setupInputCallbacks(): void {
     this.input.setCallbacks({
-      onJump: () => this.movement.handleJump(),
+      onJump: () => {
+        if (this.commandInputManager?.handlePrimaryConfirm()) return;
+        this.movement.handleJump();
+      },
       onRunStart: () => this.movement.setRunning(true),
       onRunStop: () => this.movement.setRunning(false),
       onEscape: () => this.handleEscape(),
       onScoreboardToggle: (visible: boolean) => this.hudSystem?.toggleScoreboard(visible),
       onScoreboardTap: () => this.hudSystem?.toggleScoreboardVisibility(),
-      onEnterExitHelicopter: () => this.handleEnterExitHelicopter(),
+      onEnterExitHelicopter: () => {
+        if (this.commandInputManager?.handleSecondarySelect()) return;
+        this.handleEnterExitHelicopter();
+      },
       onToggleAutoHover: () => this.movement.toggleAutoHover(),
       onToggleMouseControl: () => this.handleToggleMouseControl(),
       onSandbagRotateLeft: () => this.sandbagSystem?.rotatePlacementPreview(-Math.PI / 8),
@@ -133,7 +139,10 @@ export class PlayerController implements GameSystem {
         if (button === 0) this.actionFireStop();
         else if (button === 2) this.actionADSStop();
       },
-      onReload: () => this.actionReload(),
+      onReload: () => {
+        if (this.commandInputManager?.handleGamepadCancel()) return;
+        this.actionReload();
+      },
       onGrenadeSwitch: () => this.handleTouchGrenadeSwitch(),
       onWeaponSlotChange: (slot: WeaponSlot) => {
         // Route through InventoryManager so FirstPersonWeapon's onSlotChange callback

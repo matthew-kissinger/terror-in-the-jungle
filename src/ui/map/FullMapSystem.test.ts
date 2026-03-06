@@ -494,6 +494,29 @@ describe('FullMapSystem', () => {
 
       expect(mockCanvasContext.fillStyles).toContain('rgba(92, 184, 92, 0.92)');
     });
+
+    it('should draw strategic agents only when map intel policy enables them', () => {
+      mockCanvasContext = sharedMockCanvasContext;
+      mockCanvasContext.arc.mockClear();
+      const mockWarSimulator = {
+        isEnabled: vi.fn(() => true),
+        getAgentPositionsForMap: vi.fn(() => [0, 100, 100, 2]),
+      } as any;
+
+      system.setWarSimulator(mockWarSimulator);
+      system.setMapIntelPolicy({
+        tacticalRangeOverride: null,
+        showStrategicAgentsOnMinimap: false,
+        showStrategicAgentsOnFullMap: true,
+        strategicLayer: 'optional',
+      });
+
+      (system as any).render();
+
+      // Player arc + strategic agent arc.
+      expect(mockCanvasContext.arc.mock.calls.length).toBeGreaterThanOrEqual(2);
+      expect(mockCanvasContext.fillStyles).toContain('rgba(91, 140, 201, 0.2)');
+    });
   });
 
   describe('dispose', () => {

@@ -8,7 +8,8 @@ Mission linkage:
 
 ## Primary Commands
 
-- Baseline: `npm run perf:baseline`
+- Baseline update from latest artifact: `npm run perf:update-baseline`
+- Legacy baseline wrapper: `npm run perf:baseline -- --scenario combat120`
 - Default capture (headed): `npm run perf:capture`
 - Headless capture: `npm run perf:capture:headless`
 - Deep debug capture: `npm run perf:capture -- --deep-cdp`
@@ -20,8 +21,14 @@ Mission linkage:
 - A Shau short: `npm run perf:capture:ashau:short`
 - 30-minute soak: `npm run perf:capture:frontier30m`
 - Analyze latest: `npm run perf:analyze:latest`
-- Compare against baseline: `npm run perf:compare`
+- Compare against tracked baselines: `npm run perf:compare`
 - Update baseline snapshot: `npm run perf:update-baseline`
+
+Tracked comparison scenarios:
+- `combat120`
+- `openfrontier:short` (internal baseline key: `openFrontier`)
+- `ashau:short` (internal baseline key: `ashau`)
+- `frontier30m`
 
 ## Scenario Controls
 
@@ -90,6 +97,11 @@ Current `peak_max_frame_ms` classification:
 3. Change one thing.
 4. Re-run same scenario.
 5. Keep only evidence-backed improvements.
+
+Baseline discipline:
+- `perf:quick` is a smoke capture, not a committed baseline scenario.
+- Use `perf:capture:combat120` + `perf:compare -- --scenario combat120` for the primary regression loop.
+- `validate:full` now runs the committed `combat120` capture before comparing against baselines.
 
 ## Diagnostics Semantics
 

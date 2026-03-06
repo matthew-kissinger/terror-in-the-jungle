@@ -10,16 +10,29 @@ vi.mock('three', () => {
     clone() { return new MockVector3(this.x, this.y, this.z); }
   }
 
+  class MockScale {
+    x = 1;
+    y = 1;
+    z = 1;
+    set = vi.fn((x: number, y: number, z: number) => {
+      this.x = x;
+      this.y = y;
+      this.z = z;
+      return this;
+    });
+  }
+
   class MockObject3D {
     position = new MockVector3();
     rotation = { x: 0, y: 0, z: 0 };
-    scale = { set: vi.fn() };
+    scale = new MockScale();
     userData: Record<string, any> = {};
     children: any[] = [];
     parent: any = null;
     name = '';
     receiveShadow = false;
     castShadow = false;
+    visible = true;
     add(child: any) { this.children.push(child); child.parent = this; }
     remove(child: any) { const i = this.children.indexOf(child); if (i >= 0) this.children.splice(i, 1); }
     traverse(fn: (obj: any) => void) {
@@ -54,7 +67,23 @@ vi.mock('three', () => {
     CylinderGeometry: class { dispose = vi.fn(); },
     RingGeometry: class { dispose = vi.fn(); },
     PlaneGeometry: class { dispose = vi.fn(); },
-    BoxGeometry: class { dispose = vi.fn(); },
+    BoxGeometry: class {
+      width: number;
+      height: number;
+      depth: number;
+      boundingBox: { min: MockVector3; max: MockVector3; };
+      dispose = vi.fn();
+      computeBoundingBox = vi.fn(() => this.boundingBox);
+      constructor(width = 1, height = 1, depth = 1) {
+        this.width = width;
+        this.height = height;
+        this.depth = depth;
+        this.boundingBox = {
+          min: new MockVector3(-width / 2, -height / 2, -depth / 2),
+          max: new MockVector3(width / 2, height / 2, depth / 2),
+        };
+      }
+    },
     SphereGeometry: class { dispose = vi.fn(); },
     MeshLambertMaterial: class {
       dispose = vi.fn();
@@ -83,12 +112,27 @@ vi.mock('../assets/ModelLoader', () => ({
     loadModel: vi.fn(async () => {
       const THREE = await import('three');
       const group = new THREE.Group();
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(1, 1, 1),
+      const dirt = new THREE.Mesh(
+        new THREE.BoxGeometry(14, 0.04, 14),
         new THREE.MeshLambertMaterial()
       );
-      mesh.receiveShadow = true;
-      group.add(mesh);
+      dirt.name = 'Mesh_DirtSurround';
+
+      const pad = new THREE.Mesh(
+        new THREE.BoxGeometry(10, 0.04, 10),
+        new THREE.MeshLambertMaterial()
+      );
+      pad.name = 'Mesh_Pad';
+
+      const light = new THREE.Mesh(
+        new THREE.BoxGeometry(0.2, 0.23, 0.2),
+        new THREE.MeshLambertMaterial()
+      );
+      light.name = 'Mesh_Light_N';
+
+      group.add(dirt);
+      group.add(pad);
+      group.add(light);
       return group;
     }),
   }
@@ -113,6 +157,16 @@ const DEFAULT_HELIPADS = [
 
 function createMockScene(): THREE.Scene {
   return new THREE.Scene();
+}
+
+function findMeshByName(root: any, name: string): any {
+  let found: any = null;
+  root.traverse((child: any) => {
+    if (child.isMesh && child.name === name) {
+      found = child;
+    }
+  });
+  return found;
 }
 
 function createMockTerrainManager(heightValue = 10) {
@@ -293,6 +347,28 @@ describe('HelipadSystem', () => {
       });
       expect(meshFound).toBe(true);
     });
+
+    it('extends the foundation downward without stretching the lights', () => {
+      const helipad = scene.children[0] as THREE.Group;
+      const dirt = findMeshByName(helipad, 'Mesh_DirtSurround');
+      const pad = findMeshByName(helipad, 'Mesh_Pad');
+      const light = findMeshByName(helipad, 'Mesh_Light_N');
+
+      expect(dirt).toBeDefined();
+      expect(pad).toBeDefined();
+      expect(light).toBeDefined();
+
+      expect(dirt.scale.y).toBeGreaterThan(1);
+      expect(pad.scale.y).toBeGreaterThan(1);
+      expect(dirt.position.y).toBeLessThan(0);
+      expect(pad.position.y).toBeLessThan(0);
+      expect(light.scale.y).toBe(1);
+
+      const dirtTop = dirt.position.y + dirt.geometry.boundingBox.max.y * dirt.scale.y;
+      const padTop = pad.position.y + pad.geometry.boundingBox.max.y * pad.scale.y;
+      expect(dirtTop).toBeCloseTo(dirt.geometry.boundingBox.max.y, 5);
+      expect(padTop).toBeCloseTo(pad.geometry.boundingBox.max.y, 5);
+    });
   });
 
   // ─── Terrain Height Sampling ──────────────────────────────────────
@@ -314,8 +390,8 @@ describe('HelipadSystem', () => {
       system.createHelipadWhenReady();
       await flushPromises();
       const helipad = scene.children[0];
-      // maxHeight (20) + 0.1 offset (flush with terrain)
-      expect(helipad.position.y).toBeCloseTo(20.1, 1);
+      // maxHeight (20) + small terrain clearance
+      expect(helipad.position.y).toBeCloseTo(20.02, 2);
     });
 
     it('handles zero terrain height', async () => {
@@ -325,7 +401,7 @@ describe('HelipadSystem', () => {
       system.createHelipadWhenReady();
       await flushPromises();
       const helipad = scene.children[0];
-      expect(helipad.position.y).toBeCloseTo(0.1, 1);
+      expect(helipad.position.y).toBeCloseTo(0.02, 2);
     });
 
     it('uses correct helipad position (40, z, -1400)', async () => {
@@ -688,8 +764,8 @@ describe('HelipadSystem', () => {
       system.createHelipadWhenReady();
       await flushPromises();
       const helipad = scene.children[0];
-      // Max height should be 50, position = 50 + 0.1
-      expect(helipad.position.y).toBeCloseTo(50.1, 1);
+      // Max height should be 50, position = 50 + small clearance
+      expect(helipad.position.y).toBeCloseTo(50.02, 2);
     });
 
     it('helipad position x and z are fixed regardless of terrain', async () => {
@@ -709,7 +785,7 @@ describe('HelipadSystem', () => {
       system.createHelipadWhenReady();
       await flushPromises();
       const helipad = scene.children[0];
-      expect(helipad.position.y).toBeCloseTo(-4.9, 1); // -5 + 0.1
+      expect(helipad.position.y).toBeCloseTo(-4.98, 2); // -5 + clearance
     });
   });
 });

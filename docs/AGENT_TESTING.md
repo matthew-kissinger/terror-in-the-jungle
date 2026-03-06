@@ -42,11 +42,16 @@ npm run test:integration # Only src/integration/ tests
 
 ```bash
 npm run perf:quick       # 30s headed capture, 60 NPCs
-npm run perf:compare     # Compare latest capture against baselines
 ```
 
-- `perf:quick` launches a headed browser, runs 30s of gameplay, writes artifacts to `artifacts/perf/<timestamp>/`.
-- `perf:compare` reads the latest artifact and compares against `perf-baselines.json`.
+- `perf:quick` launches a headed browser, runs 30s of gameplay, and writes artifacts to `artifacts/perf/<timestamp>/`.
+- `perf:quick` is a smoke loop only. It does not map to a committed regression baseline.
+- For baseline comparisons, use a committed scenario capture:
+
+```bash
+npm run perf:capture:combat120
+npm run perf:compare -- --scenario combat120
+```
 
 ### Scenario-Specific Captures
 
@@ -61,6 +66,8 @@ npm run perf:capture:ashau:short         # 60 NPCs, a_shau_valley, 180s
 ```bash
 npm run perf:compare                           # Auto-detect scenario from latest artifact
 npx tsx scripts/perf-compare.ts --scenario combat120  # Force scenario
+npx tsx scripts/perf-compare.ts --scenario openfrontier:short
+npx tsx scripts/perf-compare.ts --scenario frontier30m
 npx tsx scripts/perf-compare.ts --dir 2026-02-21T16-35-52-406Z  # Specific artifact
 ```
 
@@ -69,6 +76,7 @@ npx tsx scripts/perf-compare.ts --dir 2026-02-21T16-35-52-406Z  # Specific artif
 ```bash
 npm run perf:update-baseline                          # Auto-detect scenario, update baseline
 npx tsx scripts/perf-compare.ts --update-baseline combat120  # Explicit scenario
+npm run perf:baseline -- --scenario combat120        # Legacy wrapper
 ```
 
 This writes current measurements into `perf-baselines.json` as the new `lastMeasured` values.
@@ -76,7 +84,7 @@ This writes current measurements into `perf-baselines.json` as the new `lastMeas
 ## Full Validation Pipeline
 
 ```bash
-npm run validate:full    # test + build + perf:quick + perf:compare
+npm run validate:full    # test + build + combat120 capture + perf:compare
 ```
 
 - Runs everything sequentially. Takes 5-10 minutes.

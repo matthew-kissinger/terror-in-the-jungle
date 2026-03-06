@@ -1,14 +1,17 @@
 #!/usr/bin/env tsx
 
 /**
- * Performance baseline measurement script
+ * Legacy baseline-update wrapper.
  *
- * Launches the game in AI sandbox mode and captures frame time metrics.
- * Use this to establish a performance baseline and detect regressions.
+ * The authoritative baseline schema now lives in `perf-baselines.json` and the
+ * update flow lives in `scripts/perf-compare.ts --update-baseline`.
+ *
+ * This script remains as a compatibility entrypoint for `npm run perf:baseline`
+ * and forwards to the current baseline updater.
  */
 
 import { chromium, type Browser, type Page } from 'playwright';
-import { spawn, type ChildProcess } from 'child_process';
+import { spawn, spawnSync, type ChildProcess } from 'child_process';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
@@ -19,6 +22,38 @@ const BASELINE_FILE = join(process.cwd(), 'perf-baselines.json');
 const STEP_TIMEOUT_MS = 30_000;
 const METRIC_COLLECTION_TIMEOUT_MS = 8_000;
 const FRAME_PROGRESS_STALL_MS = 12_000;
+
+function buildPerfCompareArgs(): string[] {
+  const rawArgs = process.argv.slice(2);
+  const forwarded = ['tsx', 'scripts/perf-compare.ts', '--update-baseline'];
+
+  for (let i = 0; i < rawArgs.length; i++) {
+    const arg = rawArgs[i];
+    if (arg === '--scenario' && rawArgs[i + 1]) {
+      forwarded.push(rawArgs[++i]);
+      continue;
+    }
+    forwarded.push(arg);
+  }
+
+  return forwarded;
+}
+
+function runBaselineUpdateWrapper(): never {
+  const command = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+  const result = spawnSync(command, buildPerfCompareArgs(), {
+    cwd: process.cwd(),
+    stdio: 'inherit',
+    shell: process.platform === 'win32',
+  });
+
+  if (result.error) {
+    console.error('Failed to launch perf baseline updater:', result.error);
+    process.exit(1);
+  }
+
+  process.exit(result.status ?? 1);
+}
 
 // Regression thresholds
 const THRESHOLDS = {
@@ -697,12 +732,4 @@ function compareMetricAbsolute(
   };
 }
 
-// Run benchmark
-runBenchmark()
-  .then(() => {
-    process.exit(0);
-  })
-  .catch((err) => {
-    console.error('Fatal error:', err);
-    process.exit(1);
-  });
+runBaselineUpdateWrapper();

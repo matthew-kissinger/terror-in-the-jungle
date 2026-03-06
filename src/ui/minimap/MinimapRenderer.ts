@@ -3,6 +3,7 @@ import { ZoneManager, CaptureZone, ZoneState } from '../../systems/world/ZoneMan
 import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { isBlufor } from '../../systems/combat/types';
 import type { WarSimulator } from '../../systems/strategy/WarSimulator';
+import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -25,6 +26,7 @@ type MinimapRenderState = {
   playerSquadId?: string;
   commandPosition?: THREE.Vector3;
   helipadMarkers?: HelipadMarker[];
+  mapIntelPolicy?: MapIntelPolicyConfig;
 };
 
 type MinimapPosition = {
@@ -138,9 +140,8 @@ function drawCombatantIndicators(ctx: CanvasRenderingContext2D, state: MinimapRe
 
   const combatants = state.combatantSystem.getAllCombatants();
   const scale = state.size / state.worldSize;
-  const configuredRange = Number((globalThis as any).__MINIMAP_TACTICAL_RANGE__);
-  const tacticalRange = Number.isFinite(configuredRange)
-    ? configuredRange
+  const tacticalRange = state.mapIntelPolicy
+    ? (state.mapIntelPolicy.tacticalRangeOverride ?? Infinity)
     : (state.worldSize >= 10000 ? 900 : Infinity);
   const tacticalRangeSq = tacticalRange * tacticalRange;
 
@@ -175,7 +176,7 @@ function drawCombatantIndicators(ctx: CanvasRenderingContext2D, state: MinimapRe
 function drawStrategicAgents(ctx: CanvasRenderingContext2D, state: MinimapRenderState, renderScale: number): void {
   // Default off: these are abstract (non-materialized) war agents and can look
   // like "ghost enemies" on the minimap if shown as normal contacts.
-  if ((globalThis as any).__MINIMAP_SHOW_STRATEGIC_AGENTS__ !== true) return;
+  if (state.mapIntelPolicy?.showStrategicAgentsOnMinimap !== true) return;
   if (!state.warSimulator || !state.warSimulator.isEnabled()) return;
 
   const data = state.warSimulator.getAgentPositionsForMap();

@@ -99,6 +99,7 @@ type ExtractedMetrics = {
   sampleCount: number;
   durationSeconds: number;
   npcs: number;
+  requestedNpcs: number;
   mode: string;
   status: string;
 };
@@ -109,6 +110,16 @@ type ExtractedMetrics = {
 
 const ARTIFACT_ROOT = join(process.cwd(), 'artifacts', 'perf');
 const BASELINE_PATH = join(process.cwd(), 'perf-baselines.json');
+const SCENARIO_ALIASES: Record<string, string> = {
+  combat120: 'combat120',
+  openfrontier: 'openFrontier',
+  'openfrontier:short': 'openFrontier',
+  openfrontiershort: 'openFrontier',
+  ashau: 'ashau',
+  'ashau:short': 'ashau',
+  ashaushort: 'ashau',
+  frontier30m: 'frontier30m',
+};
 
 function avg(values: number[]): number {
   if (values.length === 0) return 0;
@@ -134,6 +145,13 @@ function loadBaselines(): BaselineFile | null {
 
 function saveBaselines(baselines: BaselineFile): void {
   writeFileSync(BASELINE_PATH, JSON.stringify(baselines, null, 2) + '\n', 'utf-8');
+}
+
+function normalizeScenarioName(name?: string | null): string | undefined {
+  if (!name) return undefined;
+  const trimmed = name.trim();
+  if (!trimmed) return undefined;
+  return SCENARIO_ALIASES[trimmed.toLowerCase()] ?? trimmed;
 }
 
 // ---------------------------------------------------------------------------
@@ -195,6 +213,7 @@ function extractMetrics(
     sampleCount: samples.length,
     durationSeconds: summary.durationSeconds,
     npcs: summary.npcs,
+    requestedNpcs: summary.requestedNpcs ?? summary.npcs,
     mode: summary.scenario?.mode ?? 'unknown',
     status: summary.status,
   };
@@ -206,11 +225,32 @@ function extractMetrics(
 
 function detectScenario(metrics: ExtractedMetrics): string | null {
   const mode = metrics.mode;
-  if (mode === 'ai_sandbox' && metrics.npcs >= 100) return 'combat120';
-  if (mode === 'open_frontier') return 'openFrontier';
-  if (mode === 'a_shau_valley') return 'ashau';
-  // Fallback: try to guess from NPC count and mode
-  if (mode === 'ai_sandbox') return 'combat120';
+  if (
+    mode === 'ai_sandbox'
+    && metrics.requestedNpcs >= 120
+    && metrics.durationSeconds >= 85
+  ) {
+    return 'combat120';
+  }
+  if (mode === 'open_frontier' && metrics.durationSeconds >= 1200) {
+    return 'frontier30m';
+  }
+  if (
+    mode === 'open_frontier'
+    && metrics.requestedNpcs >= 120
+    && metrics.durationSeconds >= 150
+    && metrics.durationSeconds < 600
+  ) {
+    return 'openFrontier';
+  }
+  if (
+    mode === 'a_shau_valley'
+    && metrics.requestedNpcs >= 60
+    && metrics.durationSeconds >= 150
+    && metrics.durationSeconds < 600
+  ) {
+    return 'ashau';
+  }
   return null;
 }
 
@@ -440,7 +480,7 @@ function main(): void {
   }
 
   // Determine scenario
-  let scenarioName = opts.scenario ?? null;
+  let scenarioName = normalizeScenarioName(opts.scenario ?? null) ?? null;
   if (!scenarioName) {
     scenarioName = detectScenario(metrics);
   }
@@ -449,7 +489,7 @@ function main(): void {
   if (opts.updateBaseline) {
     const updateTarget = opts.updateBaseline === 'auto'
       ? (scenarioName ?? null)
-      : opts.updateBaseline;
+      : (normalizeScenarioName(opts.updateBaseline) ?? opts.updateBaseline);
 
     if (!updateTarget) {
       console.error('Cannot auto-detect scenario for baseline update. Use --update-baseline <scenario>');

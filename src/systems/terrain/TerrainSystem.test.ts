@@ -295,6 +295,17 @@ describe('TerrainSystem', () => {
       );
     });
 
+    it('uses a denser render-surface bake grid for mid-size large worlds like open frontier', async () => {
+      await terrain.init();
+      terrain.setWorldSize(3200);
+
+      expect(mockBakeFromProvider).toHaveBeenLastCalledWith(
+        expect.anything(),
+        512,
+        3200,
+      );
+    });
+
     it('hasTerrainAt returns false outside explicit world bounds', async () => {
       await terrain.init();
       terrain.setWorldSize(100);

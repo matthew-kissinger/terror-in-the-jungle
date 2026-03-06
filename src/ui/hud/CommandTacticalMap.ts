@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import type { CombatantSystem } from '../../systems/combat/CombatantSystem';
+import { getAlliance } from '../../systems/combat/types';
 import type { ZoneManager } from '../../systems/world/ZoneManager';
 import { renderMinimap } from '../minimap/MinimapRenderer';
+import type { InputMode } from '../../systems/input/InputManager';
 
 export interface CommandTacticalMapRenderState {
   playerPosition: THREE.Vector3;
@@ -28,7 +30,11 @@ export class CommandTacticalMap {
   };
   private placementCommandLabel = 'HOLD POSITION';
   private placementArmed = false;
+  private inputMode: InputMode = 'keyboardMouse';
+  private cursorWorldPosition?: THREE.Vector3;
+  private cursorPinnedToDefault = true;
   private onPointSelected?: (position: THREE.Vector3) => void;
+  private onSquadSelected?: (squadId: string) => void;
 
   constructor() {
     this.container = document.createElement('div');
@@ -60,7 +66,6 @@ export class CommandTacticalMap {
     this.container.appendChild(frame);
 
     this.canvas.addEventListener('pointerdown', (event) => {
-      if (!this.placementArmed) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       event.preventDefault();
       const rect = this.canvas.getBoundingClientRect();
@@ -68,7 +73,16 @@ export class CommandTacticalMap {
       const scaleY = this.canvas.height / rect.height;
       const localX = (event.clientX - rect.left) * scaleX;
       const localY = (event.clientY - rect.top) * scaleY;
-      this.onPointSelected?.(this.minimapToWorld(localX, localY));
+      const worldPoint = this.minimapToWorld(localX, localY);
+      if (this.placementArmed) {
+        this.onPointSelected?.(worldPoint);
+        return;
+      }
+
+      const squadId = this.findSelectableSquadId(worldPoint);
+      if (squadId) {
+        this.onSquadSelected?.(squadId);
+      }
     });
 
     this.injectStyles();
@@ -79,8 +93,12 @@ export class CommandTacticalMap {
     return this.container;
   }
 
-  setCallbacks(callbacks: { onPointSelected?: (position: THREE.Vector3) => void }): void {
+  setCallbacks(callbacks: {
+    onPointSelected?: (position: THREE.Vector3) => void;
+    onSquadSelected?: (squadId: string) => void;
+  }): void {
     this.onPointSelected = callbacks.onPointSelected;
+    this.onSquadSelected = callbacks.onSquadSelected;
   }
 
   setPlacementCommandLabel(label: string, armed = true): void {
@@ -89,9 +107,59 @@ export class CommandTacticalMap {
     this.render();
   }
 
+  setInputMode(inputMode: InputMode): void {
+    if (this.inputMode === inputMode) return;
+    this.inputMode = inputMode;
+    this.render();
+  }
+
   setRenderState(state: CommandTacticalMapRenderState): void {
     this.renderState = state;
+    if (!this.cursorWorldPosition || this.cursorPinnedToDefault) {
+      this.cursorWorldPosition = state.commandPosition?.clone() ?? state.playerPosition.clone();
+      this.cursorPinnedToDefault = true;
+    }
     this.render();
+  }
+
+  nudgeGamepadCursor(x: number, z: number, deltaTime: number): void {
+    if (this.inputMode !== 'gamepad') return;
+    if (x === 0 && z === 0) return;
+
+    this.ensureCursorWorldPosition();
+
+    const speed = Math.max(90, this.renderState.worldSize * 0.75);
+    const rotatedX = x * speed * deltaTime;
+    const rotatedZ = z * speed * deltaTime;
+    const cos = Math.cos(this.renderState.playerRotation);
+    const sin = Math.sin(this.renderState.playerRotation);
+
+    this.cursorWorldPosition!.x += rotatedX * cos - rotatedZ * sin;
+    this.cursorWorldPosition!.z += rotatedX * sin + rotatedZ * cos;
+    this.cursorWorldPosition!.y = this.renderState.playerPosition.y;
+    this.cursorPinnedToDefault = false;
+    this.clampCursorToWindow();
+    this.render();
+  }
+
+  confirmGamepadAction(): boolean {
+    if (this.inputMode !== 'gamepad') return false;
+    this.ensureCursorWorldPosition();
+
+    if (this.placementArmed) {
+      this.onPointSelected?.(this.cursorWorldPosition!.clone());
+      return true;
+    }
+
+    return this.selectSquadAtCursor();
+  }
+
+  selectSquadAtCursor(): boolean {
+    this.ensureCursorWorldPosition();
+    const squadId = this.findSelectableSquadId(this.cursorWorldPosition!);
+    if (!squadId) return false;
+    this.onSquadSelected?.(squadId);
+    return true;
   }
 
   dispose(): void {
@@ -105,9 +173,15 @@ export class CommandTacticalMap {
     this.title.textContent = hasPlacementOrder
       ? `Place ${this.placementCommandLabel}`
       : 'Select Ground Order';
-    this.detail.textContent = hasPlacementOrder
-      ? `${Math.round(this.renderState.worldSize)}m tactical window centered on player`
-      : 'Choose Hold, Patrol, or Retreat, then place it on the map.';
+    if (hasPlacementOrder) {
+      this.detail.textContent = this.inputMode === 'gamepad'
+        ? `${Math.round(this.renderState.worldSize)}m window. Move the cursor with the left stick, then press A.`
+        : `${Math.round(this.renderState.worldSize)}m tactical window centered on player`;
+    } else {
+      this.detail.textContent = this.inputMode === 'gamepad'
+        ? 'Select a friendly squad with X or A, or arm Hold, Patrol, or Retreat with the D-pad.'
+        : 'Choose Hold, Patrol, or Retreat, then place it on the map.';
+    }
 
     renderMinimap({
       ctx: this.context,
@@ -130,6 +204,10 @@ export class CommandTacticalMap {
       playerSquadId: this.renderState.playerSquadId,
       commandPosition: this.renderState.commandPosition
     });
+
+    if (this.inputMode === 'gamepad') {
+      this.drawGamepadCursor();
+    }
   }
 
   private minimapToWorld(localX: number, localY: number): THREE.Vector3 {
@@ -146,6 +224,112 @@ export class CommandTacticalMap {
       this.renderState.playerPosition.y,
       this.renderState.playerPosition.z + dz
     );
+  }
+
+  private ensureCursorWorldPosition(): void {
+    if (!this.cursorWorldPosition) {
+      this.cursorWorldPosition = this.renderState.commandPosition?.clone() ?? this.renderState.playerPosition.clone();
+    }
+  }
+
+  private clampCursorToWindow(): void {
+    if (!this.cursorWorldPosition) return;
+
+    const dx = this.cursorWorldPosition.x - this.renderState.playerPosition.x;
+    const dz = this.cursorWorldPosition.z - this.renderState.playerPosition.z;
+    const cos = Math.cos(this.renderState.playerRotation);
+    const sin = Math.sin(this.renderState.playerRotation);
+    const rotatedX = dx * cos + dz * sin;
+    const rotatedZ = -dx * sin + dz * cos;
+    const halfWindow = this.renderState.worldSize * 0.5;
+    const clampedRotatedX = THREE.MathUtils.clamp(rotatedX, -halfWindow, halfWindow);
+    const clampedRotatedZ = THREE.MathUtils.clamp(rotatedZ, -halfWindow, halfWindow);
+    const worldDx = clampedRotatedX * cos - clampedRotatedZ * sin;
+    const worldDz = clampedRotatedX * sin + clampedRotatedZ * cos;
+
+    this.cursorWorldPosition.set(
+      this.renderState.playerPosition.x + worldDx,
+      this.renderState.playerPosition.y,
+      this.renderState.playerPosition.z + worldDz
+    );
+  }
+
+  private findSelectableSquadId(worldPoint: THREE.Vector3): string | null {
+    if (!this.renderState.combatantSystem || !this.renderState.playerSquadId) {
+      return null;
+    }
+
+    const combatants = this.renderState.combatantSystem.getAllCombatants();
+    const activeSquadLeader = combatants.find(
+      combatant => combatant.squadId === this.renderState.playerSquadId && combatant.state !== 'dead'
+    );
+    if (!activeSquadLeader) return null;
+
+    const friendlyAlliance = getAlliance(activeSquadLeader.faction);
+    const centroids = new Map<string, { count: number; x: number; z: number }>();
+    for (const combatant of combatants) {
+      if (combatant.state === 'dead' || !combatant.squadId) continue;
+      if (getAlliance(combatant.faction) !== friendlyAlliance) continue;
+
+      const entry = centroids.get(combatant.squadId) ?? { count: 0, x: 0, z: 0 };
+      entry.count += 1;
+      entry.x += combatant.position.x;
+      entry.z += combatant.position.z;
+      centroids.set(combatant.squadId, entry);
+    }
+
+    const selectionRadius = (this.renderState.worldSize / this.size) * 18;
+    const selectionRadiusSq = selectionRadius * selectionRadius;
+    let nearestSquadId: string | null = null;
+    let nearestDistanceSq = Number.POSITIVE_INFINITY;
+
+    for (const [squadId, centroid] of centroids) {
+      const centerX = centroid.x / centroid.count;
+      const centerZ = centroid.z / centroid.count;
+      const dx = centerX - worldPoint.x;
+      const dz = centerZ - worldPoint.z;
+      const distanceSq = dx * dx + dz * dz;
+      if (distanceSq > selectionRadiusSq || distanceSq >= nearestDistanceSq) {
+        continue;
+      }
+      nearestDistanceSq = distanceSq;
+      nearestSquadId = squadId;
+    }
+
+    return nearestSquadId;
+  }
+
+  private drawGamepadCursor(): void {
+    this.ensureCursorWorldPosition();
+    if (!this.cursorWorldPosition) return;
+
+    const scale = this.size / this.renderState.worldSize;
+    const dx = this.cursorWorldPosition.x - this.renderState.playerPosition.x;
+    const dz = this.cursorWorldPosition.z - this.renderState.playerPosition.z;
+    const cos = Math.cos(this.renderState.playerRotation);
+    const sin = Math.sin(this.renderState.playerRotation);
+    const rotatedX = dx * cos + dz * sin;
+    const rotatedZ = -dx * sin + dz * cos;
+    const cursorX = this.size / 2 + rotatedX * scale;
+    const cursorY = this.size / 2 + rotatedZ * scale;
+
+    this.context.strokeStyle = this.placementArmed
+      ? 'rgba(214, 165, 89, 0.92)'
+      : 'rgba(92, 184, 92, 0.92)';
+    this.context.lineWidth = 2;
+    this.context.beginPath();
+    this.context.arc(cursorX, cursorY, 8, 0, Math.PI * 2);
+    this.context.stroke();
+
+    this.context.beginPath();
+    this.context.moveTo(cursorX - 10, cursorY);
+    this.context.lineTo(cursorX + 10, cursorY);
+    this.context.stroke();
+
+    this.context.beginPath();
+    this.context.moveTo(cursorX, cursorY - 10);
+    this.context.lineTo(cursorX, cursorY + 10);
+    this.context.stroke();
   }
 
   private injectStyles(): void {

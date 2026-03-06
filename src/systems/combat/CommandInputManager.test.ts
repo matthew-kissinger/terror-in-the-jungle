@@ -44,10 +44,13 @@ describe('CommandInputManager', () => {
     layout.dispose();
   });
 
-  it('routes quick commands and gamepad command-mode toggles to the squad controller', () => {
+  it('opens the map-first overlay for gamepad instead of using the radial fallback', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);
+    manager.mountTo(layout);
     manager.bindInputManager({
+      unlockPointer: vi.fn(),
+      relockPointer: vi.fn(),
       onInputModeChange: vi.fn((cb) => {
         cb('gamepad');
         return () => {};
@@ -55,10 +58,10 @@ describe('CommandInputManager', () => {
     } as any);
 
     manager.toggleCommandMode();
-    manager.issueQuickCommand(2);
+    const overlay = layout.getSlot('center').querySelector<HTMLElement>('.command-mode-overlay');
 
-    expect(controller.toggleCommandModeSurface).toHaveBeenCalledTimes(1);
-    expect(controller.issueQuickCommand).toHaveBeenCalledWith(2);
+    expect(overlay?.dataset.visible).toBe('true');
+    expect(controller.toggleCommandModeSurface).not.toHaveBeenCalled();
 
     manager.dispose();
     layout.dispose();
@@ -156,11 +159,11 @@ describe('CommandInputManager', () => {
     } as any);
 
     manager.toggleCommandMode();
-    manager.issueQuickCommand(4);
+    manager.issueQuickCommand(1);
 
     const overlay = layout.getSlot('center').querySelector<HTMLElement>('.command-mode-overlay');
     expect(overlay?.dataset.visible).toBe('false');
-    expect(controller.issueQuickCommand).toHaveBeenCalledWith(4);
+    expect(controller.issueQuickCommand).toHaveBeenCalledWith(1);
     expect(relockPointer).toHaveBeenCalledTimes(1);
 
     manager.dispose();
@@ -221,6 +224,96 @@ describe('CommandInputManager', () => {
     layout.dispose();
   });
 
+  it('supports gamepad confirmation for armed placement orders in the overlay', () => {
+    const controller = createSquadControllerStub();
+    const manager = new CommandInputManager(controller as any);
+    manager.mountTo(layout);
+    manager.setGameModeManager({
+      getCurrentConfig: () => ({ minimapScale: 400 })
+    } as any);
+    manager.setPlayerController(createPlayerControllerStub(new THREE.Vector3(120, 5, -40)) as any);
+    manager.bindInputManager({
+      getGamepadManager: () => ({
+        getMovementVector: () => ({ x: 0, z: 0 }),
+      }),
+      unlockPointer: vi.fn(),
+      relockPointer: vi.fn(),
+      onInputModeChange: vi.fn((cb) => {
+        cb('gamepad');
+        return () => {};
+      })
+    } as any);
+
+    manager.toggleCommandMode();
+    manager.update(0.1);
+    manager.issueQuickCommand(2);
+
+    expect(controller.issueQuickCommand).not.toHaveBeenCalled();
+    expect(manager.handlePrimaryConfirm()).toBe(true);
+    expect(controller.issueCommandAtPosition).toHaveBeenCalledWith(
+      SquadCommand.HOLD_POSITION,
+      expect.objectContaining({ x: 120, y: 5, z: -40 })
+    );
+    expect(layout.getSlot('center').querySelector<HTMLElement>('.command-mode-overlay')?.dataset.visible).toBe('false');
+
+    manager.dispose();
+    layout.dispose();
+  });
+
+  it('selects friendly squads from the overlay tactical map', () => {
+    const controller = createSquadControllerStub();
+    const manager = new CommandInputManager(controller as any);
+    manager.mountTo(layout);
+    manager.setCombatantSystem({
+      getAllCombatants: () => [
+        { state: 'patrolling', squadId: 'squad-player', faction: 'US', position: new THREE.Vector3(0, 0, 0) },
+        { state: 'patrolling', squadId: 'squad-player', faction: 'US', position: new THREE.Vector3(4, 0, 0) },
+        { state: 'patrolling', squadId: 'squad-support', faction: 'US', position: new THREE.Vector3(40, 0, 0) },
+        { state: 'patrolling', squadId: 'squad-support', faction: 'US', position: new THREE.Vector3(44, 0, 0) },
+      ]
+    } as any);
+    manager.setGameModeManager({
+      getCurrentConfig: () => ({ minimapScale: 320 })
+    } as any);
+    manager.setPlayerController(createPlayerControllerStub(new THREE.Vector3(0, 0, 0)) as any);
+    manager.bindInputManager({
+      unlockPointer: vi.fn(),
+      relockPointer: vi.fn(),
+      onInputModeChange: vi.fn((cb) => {
+        cb('keyboardMouse');
+        return () => {};
+      })
+    } as any);
+
+    manager.toggleCommandMode();
+    manager.update(0.1);
+
+    const canvas = layout.getSlot('center').querySelector<HTMLCanvasElement>('.command-tactical-map__canvas');
+    expect(canvas).toBeTruthy();
+    Object.defineProperty(canvas!, 'getBoundingClientRect', {
+      value: () => ({
+        left: 0,
+        top: 0,
+        width: 320,
+        height: 320,
+        right: 320,
+        bottom: 320,
+        x: 0,
+        y: 0,
+        toJSON: () => ({})
+      }),
+      configurable: true
+    });
+
+    canvas?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 202, clientY: 160, button: 0 }));
+
+    expect(controller.selectSquad).toHaveBeenCalledWith('squad-support');
+    expect(layout.getSlot('center').textContent).toContain('SQUAD SUPPORT');
+
+    manager.dispose();
+    layout.dispose();
+  });
+
   it('executes direct overlay commands immediately instead of waiting for map placement', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);
@@ -253,6 +346,10 @@ function createSquadControllerStub() {
     isCommandModeOpen: boolean;
     memberCount: number;
     commandPosition?: { x: number; y: number; z: number } | undefined;
+    selectedSquadId?: string | undefined;
+    selectedLeaderId?: string | undefined;
+    selectedFormation?: string | undefined;
+    selectedFaction?: string | undefined;
   }) => void>();
 
   let state = {
@@ -260,7 +357,11 @@ function createSquadControllerStub() {
     currentCommand: SquadCommand.NONE,
     isCommandModeOpen: false,
     memberCount: 7,
-    commandPosition: undefined
+    commandPosition: undefined,
+    selectedSquadId: 'squad-player',
+    selectedLeaderId: 'leader-player',
+    selectedFormation: 'wedge',
+    selectedFaction: 'US'
   };
 
   return {
@@ -288,7 +389,16 @@ function createSquadControllerStub() {
       state = { ...state, currentCommand: command, commandPosition: position };
       emitState(listeners, state);
     }),
-    getPlayerSquadId: vi.fn(() => 'squad-player'),
+    selectSquad: vi.fn((squadId: string) => {
+      state = {
+        ...state,
+        selectedSquadId: squadId,
+        selectedLeaderId: squadId === 'squad-support' ? 'leader-support' : 'leader-player',
+      };
+      emitState(listeners, state);
+      return true;
+    }),
+    getPlayerSquadId: vi.fn(() => state.selectedSquadId),
     emit(nextState: typeof state) {
       state = nextState;
       emitState(listeners, state);
@@ -334,6 +444,10 @@ function emitState(
     isCommandModeOpen: boolean;
     memberCount: number;
     commandPosition?: { x: number; y: number; z: number } | undefined;
+    selectedSquadId?: string | undefined;
+    selectedLeaderId?: string | undefined;
+    selectedFormation?: string | undefined;
+    selectedFaction?: string | undefined;
   }) => void>,
   state: {
     hasSquad: boolean;
@@ -341,6 +455,10 @@ function emitState(
     isCommandModeOpen: boolean;
     memberCount: number;
     commandPosition?: { x: number; y: number; z: number } | undefined;
+    selectedSquadId?: string | undefined;
+    selectedLeaderId?: string | undefined;
+    selectedFormation?: string | undefined;
+    selectedFaction?: string | undefined;
   }
 ): void {
   for (const listener of listeners) {

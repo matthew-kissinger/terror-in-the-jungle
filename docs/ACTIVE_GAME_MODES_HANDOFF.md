@@ -19,9 +19,9 @@ Status: READY FOR HANDOFF
 | Phase 0. Truth Sync | complete | Canonical plan exists and active docs now point to it. |
 | Phase 1. Runtime Foundation | in progress | `GameModeDefinition`, policy-backed runtime hooks, deploy session model, and spawn resolver are live. `GameModeManager` still fans config into legacy systems. |
 | Phase 2. Deploy And Loadout | substantially complete | Shared first-spawn/respawn deploy flow is live. `2 weapons + 1 equipment` loadout model, faction pools, presets, and side/faction launch selection are wired. |
-| Phase 3. Command Surface | in progress | Command coordinator, quick strip, desktop/touch map-first overlay, tactical placement map, and map guidance are live. Gamepad still uses radial fallback. |
-| Phase 4. Map Intel Policy | not started | Tactical/strategic policy still depends on globals and ad hoc renderer toggles. |
-| Phase 5. Mode Vertical Slices | not started | No dedicated product pass yet for Zone Control, TDM, Open Frontier, or A Shau. |
+| Phase 3. Command Surface | complete | Command coordinator, quick strip, selected-squad detail, map-click squad selection, and map-first overlay are live across desktop, touch, and gamepad. |
+| Phase 4. Map Intel Policy | in progress | Runtime-owned minimap/full-map policy is live. Per-mode tactical/strategic product tuning is still open. |
+| Phase 5. Mode Vertical Slices | in progress | Mode cards and deploy/respawn copy now differentiate the exposed modes; objective/HUD-specific product passes are still open. |
 | Phase 6. Team And Faction Generalization | not started | Player-facing faction flow exists, but core world ownership logic still leaks US/OPFOR assumptions. |
 | Phase 7. Death Presentation | not started | Shrink/fade death presentation still needs replacement. |
 
@@ -44,46 +44,36 @@ Status: READY FOR HANDOFF
 - mode runtime seam exists through `GameModeDefinition`, runtime hooks, and policy bundles
 - spawn selection is policy-driven for startup and pressure-front fallback
 - command entry is centralized through `CommandInputManager`
-- desktop and touch command mode are now map-first for ground orders
+- command mode is now map-first across desktop, touch, and gamepad for ground orders
 - minimap and full map now mirror squad command placement with guidance
+- command mode now shows selected-squad detail and supports friendly squad selection directly from the tactical map
+- mode cards and deploy/respawn session copy now present Zone Control, TDM, Open Frontier, and A Shau as different products instead of generic scale variants
+- `MapIntelPolicy` now applies through runtime-owned minimap/full-map policy instead of renderer globals
 
 ## Current Gaps
 
 - `GameModeManager` is still a legacy fan-out point and not yet a thin coordinator
-- `MapIntelPolicy` is not the source of truth yet
-- strategic map visibility still depends on globals:
-  - `__MINIMAP_TACTICAL_RANGE__`
-  - `__MINIMAP_SHOW_STRATEGIC_AGENTS__`
-  - `__FULLMAP_SHOW_STRATEGIC_AGENTS__`
-- command overlay still lacks selected-squad detail and map-click squad selection
-- gamepad command flow still relies on radial fallback rather than the map-first surface
-- mode-specific objective and HUD behavior are not vertically sliced yet
+- `MapIntelPolicy` is now the source of truth for minimap/full-map visibility, but per-mode product tuning still needs a dedicated pass
+- mode-specific objective, HUD, and pacing behavior are only partially sliced; the current pass is strongest in mode selection and deploy/respawn surfaces
 - death presentation work has not started
 
 ## Resume Here
 
 ### Recommended Next Task
 
-Phase 4: `MapIntelPolicy`
+Phase 5: mode vertical slices
 
 Reason:
-- command placement and deploy flow are good enough to stop changing blindly
-- tactical vs strategic map policy is still undefined in code
-- mode differentiation will stay muddy until intel policy is explicit
+- deploy/loadout flow, command surface, and runtime-owned map intel are now in place together
+- the next highest-value work is making the shipped modes feel distinct instead of continuing to polish shared scaffolding
+- A Shau tactical/strategic map tuning and the smaller-mode product passes should now happen on top of the new runtime seams
 
 ### Exact Next Moves
 
-1. Replace renderer globals with runtime-owned map intel policy.
-2. Thread `MapIntelPolicy` from `GameModeDefinition` into minimap/full-map render paths.
-3. Define per-mode policy for:
-   - tactical contact range
-   - strategic-agent visibility
-   - full-map strategic overlays
-4. Use A Shau as the first full tactical/strategic split.
-5. After that, return to Phase 3 and finish:
-   - selected-squad detail panel
-   - map-click squad selection
-   - gamepad parity with the map-first overlay
+1. Start the A Shau tactical/strategic product pass on the new map-intel/runtime foundation.
+2. Do the Zone Control product pass next so the baseline mode gets the clearest player-facing identity lift.
+3. Follow with Team Deathmatch and Open Frontier product passes once the shared objective/HUD language is cleaner.
+4. After that, move to Phase 6 team/faction generalization on top of the now-explicit mode/runtime seams.
 
 ## Primary Code Entry Points
 
@@ -106,5 +96,4 @@ Reason:
 - do not add new `if (mode === ...)` branches outside the runtime/policy layer
 - do not bypass `LoadoutService` for spawn equipment changes
 - do not regress desktop/touch command mode back to radial-first
-- keep gamepad fallback working until parity exists
 - update `GAME_MODES_EXECUTION_PLAN.md` and the relevant `blocks/*.md` docs with every architectural change

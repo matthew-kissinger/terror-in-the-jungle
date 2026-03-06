@@ -122,12 +122,14 @@
       captureHoldUntil: 0,
       capturedZoneCount: 0,
       lastShotAt: Date.now(),
+      hasFired: false,
       lastAmmoRefillAt: 0,
       lastHealthTopUpAt: 0,
       deathHandled: false,
       respawnRetryAt: 0,
       frontlineInserted: false,
-      setupFastForwarded: false
+      setupFastForwarded: false,
+      forcedContactInsertCount: 0
     };
     const MAX_YAW_STEP = 0.09;
     const MAX_PITCH_STEP = 0.06;
@@ -477,6 +479,17 @@
           y: Number(aShauSuggestion.y || 0),
           z: Number(aShauSuggestion.z)
         };
+      }
+
+      if (opts.mode === 'open_frontier') {
+        const liveFront = getLeadChargePoint(systems) || getEnemyMassPoint(systems) || getEngagementCenter(systems);
+        if (liveFront) {
+          return {
+            x: Number(liveFront.x) + (Math.random() - 0.5) * 28,
+            y: Number(liveFront.y || 0),
+            z: Number(liveFront.z) + (Math.random() - 0.5) * 28
+          };
+        }
       }
 
       const usSpawn = getUSSpawn(systems);
@@ -896,6 +909,15 @@
     }
 
     function getModeObjective(systems, playerPos) {
+      if (opts.mode === 'open_frontier' && !state.hasFired) {
+        return (
+          getEnemyMassPoint(systems) ||
+          getLeadChargePoint(systems) ||
+          getObjectiveZoneTarget(systems, playerPos) ||
+          getEngagementCenter(systems) ||
+          getEnemySpawn(systems)
+        );
+      }
       if (modeProfile.objectiveBias === 'zone') {
         return (
           getObjectiveZoneTarget(systems, playerPos) ||
@@ -1155,6 +1177,9 @@
         }
       }
       const nearestOpfor = findNearestOpfor(systems, perceptionRange * perceptionRange);
+      const nearestDist = nearestOpfor
+        ? Math.hypot(nearestOpfor.position.x - playerPos.x, nearestOpfor.position.z - playerPos.z)
+        : Number.POSITIVE_INFINITY;
       const predictedTarget = nearestOpfor ? predictTargetPoint(nearestOpfor, playerPos) : null;
       const target = predictedTarget || nearestOpfor?.position || getModeObjective(systems, playerPos) || engagementCenter;
       state.targetVisible = false;
@@ -1201,9 +1226,6 @@
       const objectiveTarget = shouldBiasCombat
         ? (combatTarget || captureFocus?.target || getModeObjective(systems, playerPos) || engagementCenter)
         : (captureFocus?.target || getModeObjective(systems, playerPos) || engagementCenter);
-      const nearestDist = nearestOpfor
-        ? Math.hypot(nearestOpfor.position.x - playerPos.x, nearestOpfor.position.z - playerPos.z)
-        : Number.POSITIVE_INFINITY;
       const nearestPredicted = nearestOpfor ? predictTargetPoint(nearestOpfor, playerPos) : null;
       const predictedLockDistance = Math.max(95, Number(modeProfile.maxFireDistance || 0));
       const movementTarget = (nearestPredicted && nearestDist < predictedLockDistance) ? nearestPredicted : objectiveTarget;
@@ -1213,7 +1235,13 @@
       const farFromFight = !nearestOpfor
         || nearestDist > Math.max(200, Number(modeProfile.maxFireDistance || 0) + 10)
         || !state.targetVisible;
-      if (farFromFight && noContactTooLong && (nowMs - lastForcedContactInsertAt) > FORCE_CONTACT_REINSERT_COOLDOWN_MS) {
+      const maxForcedContactInserts = opts.mode === 'open_frontier' ? 1 : 2;
+      if (
+        farFromFight
+        && noContactTooLong
+        && state.forcedContactInsertCount < maxForcedContactInserts
+        && (nowMs - lastForcedContactInsertAt) > FORCE_CONTACT_REINSERT_COOLDOWN_MS
+      ) {
         const insertAnchor = getEnemyMassPoint(systems) || getLeadChargePoint(systems) || engagementCenter || movementTarget;
         if (insertAnchor && systems.playerController && systems.playerController.setPosition) {
           const nextPos = playerPos.clone ? playerPos.clone() : { x: Number(playerPos.x), y: Number(playerPos.y || 0), z: Number(playerPos.z) };
@@ -1230,6 +1258,7 @@
           if (Number.isFinite(h)) nextPos.y = Number(h) + 2;
           if (setHarnessPlayerPosition(systems, nextPos, 'harness.recovery.contact_insert')) {
             lastForcedContactInsertAt = nowMs;
+            state.forcedContactInsertCount++;
             state.stuckMs = 0;
             return;
           }
@@ -1280,7 +1309,12 @@
         }
 
         const now = Date.now();
-        if (captureFocus && captureFocus.hold && captureFocus.inside) {
+        const shouldStayOnCapturePoint = !(
+          opts.mode === 'open_frontier'
+          && !state.hasFired
+          && (!nearestOpfor || nearestDist > 140)
+        );
+        if (captureFocus && captureFocus.hold && captureFocus.inside && shouldStayOnCapturePoint) {
           setMovementState('hold');
           return;
         }
@@ -1412,6 +1446,14 @@
         });
         return;
       }
+      if (opts.mode === 'open_frontier' && dist > 120) {
+        updateFireProbe({
+          reason: 'target_out_of_effective_range',
+          targetDistance: dist,
+          maxEffectiveFireDistance: 120
+        });
+        return;
+      }
       const closeRange = dist < (opts.mode === 'open_frontier' ? 95 : 65);
       const eye = {
         x: playerPos.x,
@@ -1464,7 +1506,15 @@
         Number(shotRay.origin.y || 0) - Number(playerPos.y || 0),
         Number(shotRay.origin.z || 0) - Number(playerPos.z || 0)
       ) : Number.NaN;
+      const allowSpeculativeFire =
+        opts.mode === 'open_frontier'
+        && visibleNow
+        && shotAnalysis.reason === 'no_combatant_hit'
+        && dist <= 90;
       if (!shotAnalysis.landable) {
+        if (allowSpeculativeFire) {
+          setMovementState('hold');
+        } else {
         updateFireProbe({
           reason: 'shot_blocked',
           shotBlockReason: shotAnalysis.reason,
@@ -1487,6 +1537,7 @@
           } : null
         });
         return;
+        }
       }
 
       const forward = shotRay ? shotRay.direction : getCameraForward(camera);
@@ -1520,8 +1571,9 @@
 
       mouseDown();
       state.lastShotAt = Date.now();
+      state.hasFired = true;
       updateFireProbe({
-        reason: 'firing',
+        reason: allowSpeculativeFire ? 'speculative_fire' : 'firing',
         shotsFired: true,
         targetDistance: dist,
         aimDot: aimDot,

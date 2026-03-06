@@ -380,7 +380,7 @@ async function runStartupFlow(engine: GameEngine, initialSpawnPosition?: THREE.V
     const loadoutContext = engine.systemManager.loadoutService.getContext();
     const terrainSystem = engine.systemManager.terrainSystem;
     const pos = initialSpawnPosition?.clone() ?? resolveModeSpawnPosition(definition, loadoutContext.alliance);
-    pos.y = terrainSystem.getHeightAt(pos.x, pos.z) + 2;
+    pos.y = terrainSystem.getEffectiveHeightAt(pos.x, pos.z) + 2;
     const reason = definition.policies.respawn.initialSpawnRule === 'origin'
       ? 'startup.spawn.sandbox'
       : 'startup.spawn.mode-hq';

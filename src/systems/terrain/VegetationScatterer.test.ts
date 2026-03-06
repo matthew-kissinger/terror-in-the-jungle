@@ -27,6 +27,7 @@ import type { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSy
 import type { VegetationTypeConfig } from '../../config/vegetationTypes';
 import type { BiomeClassificationRule, BiomeVegetationEntry } from '../../config/biomes';
 import { ChunkVegetationGenerator } from './ChunkVegetationGenerator';
+import { getHeightQueryCache } from './HeightQueryCache';
 
 function makeMockBillboard(): GlobalBillboardSystem {
   return {
@@ -129,5 +130,23 @@ describe('VegetationScatterer', () => {
     const calls = vi.mocked(ChunkVegetationGenerator.generateVegetation).mock.calls;
     const classifiedPalette = calls[calls.length - 1][5];
     expect(classifiedPalette).toEqual(highlandPalette);
+  });
+
+  it('clamps overflow cell height sampling to playable bounds', () => {
+    scatterer.setWorldBounds(100, 50);
+
+    const cache = getHeightQueryCache() as any;
+    cache.getHeightAt.mockClear();
+
+    (scatterer as any).generateCell('1,0');
+
+    const calls = vi.mocked(ChunkVegetationGenerator.generateVegetation).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    const getHeight = calls[calls.length - 1][3] as (localX: number, localZ: number) => number;
+
+    cache.getHeightAt.mockClear();
+    getHeight(64, 0);
+
+    expect(cache.getHeightAt).toHaveBeenCalledWith(50, 0);
   });
 });

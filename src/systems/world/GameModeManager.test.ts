@@ -1,51 +1,79 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { getGameModeDefinition } from '../../config/gameModeDefinitions';
 import { GameMode } from '../../config/gameModeTypes';
 import { GameModeManager } from './GameModeManager';
 
-const MINIMAP_TACTICAL_RANGE_KEY = '__MINIMAP_TACTICAL_RANGE__';
-const MINIMAP_SHOW_STRATEGIC_AGENTS_KEY = '__MINIMAP_SHOW_STRATEGIC_AGENTS__';
-
-function getGlobalValue(key: string): unknown {
-  return (globalThis as Record<string, unknown>)[key];
-}
-
-function setGlobalValue(key: string, value: unknown): void {
-  (globalThis as Record<string, unknown>)[key] = value;
-}
-
-function clearGlobalValue(key: string): void {
-  delete (globalThis as Record<string, unknown>)[key];
-}
-
 describe('GameModeManager', () => {
-  const previousRange = getGlobalValue(MINIMAP_TACTICAL_RANGE_KEY);
-  const previousStrategic = getGlobalValue(MINIMAP_SHOW_STRATEGIC_AGENTS_KEY);
-
-  afterEach(() => {
-    if (previousRange === undefined) {
-      clearGlobalValue(MINIMAP_TACTICAL_RANGE_KEY);
-    } else {
-      setGlobalValue(MINIMAP_TACTICAL_RANGE_KEY, previousRange);
-    }
-
-    if (previousStrategic === undefined) {
-      clearGlobalValue(MINIMAP_SHOW_STRATEGIC_AGENTS_KEY);
-    } else {
-      setGlobalValue(MINIMAP_SHOW_STRATEGIC_AGENTS_KEY, previousStrategic);
-    }
-  });
-
   it('applies map intel policy from the active runtime', () => {
     const manager = new GameModeManager();
+    const mockZoneManager = {
+      setGameModeConfig: vi.fn(),
+      getAllZones: vi.fn(() => []),
+    } as any;
+    const mockCombatantSystem = {
+      setMaxCombatants: vi.fn(),
+      setSquadSizes: vi.fn(),
+      setReinforcementInterval: vi.fn(),
+      setAutonomousSpawningEnabled: vi.fn(),
+      reseedForcesForMode: vi.fn(),
+      clearCombatantsForExternalPopulation: vi.fn(),
+      combatantAI: {
+        setEngagementRange: vi.fn(),
+      },
+      setSpatialBounds: vi.fn(),
+    } as any;
+    const mockTicketSystem = {
+      setMaxTickets: vi.fn(),
+      setMatchDuration: vi.fn(),
+      setDeathPenalty: vi.fn(),
+      setTDMMode: vi.fn(),
+    } as any;
+    const mockTerrainSystem = {
+      setRenderDistance: vi.fn(),
+      getHeightAt: vi.fn(() => 0),
+    } as any;
+    const mockMinimapSystem = {
+      setMapIntelPolicy: vi.fn(),
+      setWorldScale: vi.fn(),
+    } as any;
+    const mockFullMapSystem = { setMapIntelPolicy: vi.fn() } as any;
+
+    manager.connectSystems(
+      mockZoneManager,
+      mockCombatantSystem,
+      mockTicketSystem,
+      mockTerrainSystem,
+      mockMinimapSystem,
+      mockFullMapSystem
+    );
 
     manager.setGameMode(GameMode.A_SHAU_VALLEY);
-    expect(getGlobalValue(MINIMAP_TACTICAL_RANGE_KEY)).toBe(900);
-    expect(getGlobalValue(MINIMAP_SHOW_STRATEGIC_AGENTS_KEY)).toBe(false);
+    expect(mockMinimapSystem.setMapIntelPolicy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        tacticalRangeOverride: 900,
+        showStrategicAgentsOnMinimap: false,
+      })
+    );
+    expect(mockFullMapSystem.setMapIntelPolicy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        showStrategicAgentsOnFullMap: true,
+        strategicLayer: 'optional',
+      })
+    );
 
     manager.setGameMode(GameMode.ZONE_CONTROL);
-    expect(MINIMAP_TACTICAL_RANGE_KEY in (globalThis as Record<string, unknown>)).toBe(false);
-    expect(getGlobalValue(MINIMAP_SHOW_STRATEGIC_AGENTS_KEY)).toBe(false);
+    expect(mockMinimapSystem.setMapIntelPolicy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        tacticalRangeOverride: null,
+        showStrategicAgentsOnMinimap: false,
+      })
+    );
+    expect(mockFullMapSystem.setMapIntelPolicy).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        showStrategicAgentsOnFullMap: false,
+        strategicLayer: 'none',
+      })
+    );
   });
 
   it('runs runtime exit, enter, and reapply hooks in order', () => {

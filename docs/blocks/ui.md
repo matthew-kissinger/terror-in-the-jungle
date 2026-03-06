@@ -76,8 +76,8 @@ src/ui/
 | [ObjectiveDisplay]([GH]/ui/hud/ObjectiveDisplay.ts) | ui/hud/ObjectiveDisplay.ts | Primary objective text slot |
 | [MobileStatusBar]([GH]/ui/hud/MobileStatusBar.ts) | ui/hud/MobileStatusBar.ts | Compact status for portrait-fallback |
 | [MortarPanel]([GH]/ui/hud/MortarPanel.ts) | ui/hud/MortarPanel.ts | Mortar targeting UI overlay |
-| [CommandModeOverlay]([GH]/ui/hud/CommandModeOverlay.ts) | ui/hud/CommandModeOverlay.ts | Center-slot map-first command panel for desktop/touch command mode |
-| [CommandTacticalMap]([GH]/ui/hud/CommandTacticalMap.ts) | ui/hud/CommandTacticalMap.ts | Local tactical map used inside the command overlay for point placement orders |
+| [CommandModeOverlay]([GH]/ui/hud/CommandModeOverlay.ts) | ui/hud/CommandModeOverlay.ts | Center-slot map-first command panel for desktop, touch, and gamepad with selected-squad detail |
+| [CommandTacticalMap]([GH]/ui/hud/CommandTacticalMap.ts) | ui/hud/CommandTacticalMap.ts | Local tactical map used inside the command overlay for point placement orders, squad picking, and gamepad cursor confirmation |
 | [QuickCommandStrip]([GH]/ui/hud/QuickCommandStrip.ts) | ui/hud/QuickCommandStrip.ts | Always-visible squad command strip mounted into the HUD `command-bar` slot |
 | [SquadRadialMenu]([GH]/ui/hud/SquadRadialMenu.ts) | ui/hud/SquadRadialMenu.ts | Radial command menu for squad orders |
 | [DamageNumberSystem]([GH]/ui/hud/DamageNumberSystem.ts) | ui/hud/DamageNumberSystem.ts | Floating damage numbers in world space |

@@ -1,6 +1,6 @@
 # Architecture Recovery Plan
 
-Last updated: 2026-03-04
+Last updated: 2026-03-06
 Scope: runtime architecture stabilization with performance and gameplay fidelity gates.
 
 ## Current Goal
@@ -25,7 +25,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 | P2 | Heap growth triage in combat-heavy runs | IN_PROGRESS | New diagnostics added. Latest Phase 2 evidence still points to churn-heavy waves rather than a proven unbounded leak. A frame-local `AITargetAcquisition` neighborhood cache improved warm `combat120` starvation (`16.82 -> 12.91`) and heap growth (`15.73MB -> 3.64MB`). A second accepted March 4 optimization in `AIStateEngage.initiateSquadSuppression()` (flank-probe elevation + probe allocation cleanup) reduced warm combat tails/stalls again (`Combat.maxDurationMs 259.7ms -> 218.6ms/182.3ms`, long tasks `74 -> 47/31`), but rare p99 spikes still appear in some runs. |
 | P3 | A Shau gameplay flow and contact reliability | IN_PROGRESS | Short harness capture is now behavior-valid (`270` shots / `150` hits on 2026-03-04). Remaining work is performance analysis, not basic contact acquisition. |
 | P4 | UI/HUD update budget discipline | DONE | UI Engine Phases 0-7 complete. 11 UIComponents migrated to CSS Modules + signals. Grid layout with 17 named slots. VisibilityManager wired. All touch controls on pointer events as UIComponent subclasses. UnifiedWeaponBar replaces 3 duplicates. Renderer subscribes to ViewportManager. 12 dead component files + 7 dead style files deleted. |
-| P5 | Terrain runtime stabilization | IN_PROGRESS | Terrain rewrite is active under `TERRAIN_REWRITE_MASTER_PLAN.md`: world-size authority, truthful terrain API, biome/vegetation runtime wiring, terrain block-boundary cleanup, and large-world startup cost reduction validated in preview smoke. Phase 2 warm captures still show terrain max-duration spikes of `849.6ms` (`open_frontier`), `869.7ms` (`frontier30m`), and `2225.2ms` (`a_shau_valley`). |
+| P5 | Terrain runtime stabilization | IN_PROGRESS | Terrain rewrite is active under `TERRAIN_REWRITE_MASTER_PLAN.md`: world-size authority, truthful terrain API, biome/vegetation runtime wiring, terrain block-boundary cleanup, and large-world startup cost reduction validated in preview smoke. Phase 2 warm captures still show terrain max-duration spikes of `849.6ms` (`open_frontier`), `869.7ms` (`frontier30m`), and `2225.2ms` (`a_shau_valley`). March 6 fix: half-texel UV correction in vertex shader eliminates render/collision/vegetation positional drift (up to 3.1m at map edges for Open Frontier). |
 
 ## Keep Decisions (Recent)
 
@@ -68,6 +68,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: VoiceCalloutSystem.test.ts deleted (1 trivial test for disabled system).
 - Keep: UI_ENGINE_PLAN.md archived to docs/archive/ (completed project, 1302 lines).
 - Keep: PROFILING_HARNESS.md updated with perf:quick, perf:compare, perf:update-baseline commands; stale spatial feature flag env vars removed.
+- Keep: repo-tracked perf baselines now cover the active Phase 1 scenario set (`combat120`, `openfrontier:short`, `ashau:short`, `frontier30m`). `perf:baseline` is now a compatibility wrapper over `perf-compare --update-baseline`, `validate:full` runs `combat120`, and CI checks `summary.json` from the committed regression scenario instead of the stale `capture-summary.json` path.
 - Keep: terrain startup no longer double-rebakes the render surface at mode start after a world-size change; `GameEngineInit` now lets `setWorldSize()` own that rebake path.
 - Keep: large-world terrain surface bake budget is scale-aware instead of fixed. `TerrainSurfaceRuntime` now reduces the render-only bake grid at A Shau scale from `1024` to `512`, while gameplay height authority remains on `HeightQueryCache`.
 - Keep: `TerrainRaycastRuntime` no longer computes unused vertex normals for the near-field LOS mesh.
@@ -83,6 +84,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: player death accounting is single-source in `PlayerHealthSystem`; `CombatantDamage` no longer applies a second HUD death increment for player-proxy lethal events.
 - Keep: active perf driver sustain policy is bounded and behavior-preserving (respawn debounce, cooldown-based low-health top-up without spawn-protection refresh, and ammo refill guardrails).
 - Keep: suppression-init cover-search budget is explicitly bounded in `AIStateEngage` (max 2 flank cover lookups per initiation) to constrain single-frame burst cost; promote to full perf-accepted status only after a clean warm A/B pair on the updated harness.
+- Keep (pending warm A/B confirmation): current low-overhead hotspot cleanup now targets read-side churn instead of broader behavior rewrites: `HeightQueryCache` uses numeric quantization keys with read-only hits, `TerrainRaycastRuntime` reuses near-field geometry buffers when grid size is unchanged, and `AIStateEngage` skips flank cover re-search when a flanker already has a nearby destination. Treat this as a candidate optimization slice until `combat120` / terrain captures confirm the net effect.
 - Keep: suppression flank-cover discovery remains in the suppression-init path only; a March 4 deferred recheck attempt in `AIStateMovement.ADVANCING` was reverted after warm captures increased hitch/AI-starvation risk without a clean pressure-matched win.
 - Keep: `MaterializationPipeline` materializes nearest squads first so large-map scenarios establish combat around the player before distant squads consume the budget.
 - Keep: `SpatialOctree` vertical world bounds scale with world size. Fixed Y bounds were invalid on mountainous maps and caused empty high-altitude hit-detection queries.
