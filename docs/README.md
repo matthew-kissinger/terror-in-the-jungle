@@ -44,6 +44,8 @@ Last updated: 2026-03-06
   - Current architecture risk register and prioritized implementation board.
 - `TERRAIN_REWRITE_MASTER_PLAN.md`
   - Canonical terrain rewrite control document. This is the only terrain execution plan. Latest validated state includes fully clean preview-smoke evidence under `artifacts/terrain-smoke/2026-03-04T00-54-47-243Z`.
+- `TERRAIN_RESEARCH.md`
+  - Industry research: CDLOD vs geoclipmaps vs GPU tessellation vs CBT, CPU/GPU height consistency patterns, WebGPU terrain options, virtual texturing, streaming, and pivot options for our architecture. Reference only - no code changes proposed.
 - `ASHAU_VALLEY_IMPLEMENTATION_PLAN.md`
   - A Shau mode stabilization plan and validation checklist.
 - `AUDIO_ASSETS_NEEDED.md`

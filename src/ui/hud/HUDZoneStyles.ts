@@ -105,6 +105,22 @@ export const HUDZoneStyles = `
     letter-spacing: 0.8px;
   }
 
+  /* Tactical status colors */
+  .status-secured { color: ${colors.success}; }
+  .status-hostile { color: ${colors.opfor}; }
+  .status-losing { color: ${colors.danger}; animation: ui-pulse 1s infinite; }
+  .status-attacking { color: ${colors.warning}; }
+
+  /* Urgent zone highlight (player losing a zone) */
+  .zone-urgent {
+    background: rgba(201, 86, 74, 0.15);
+    border-left: 2px solid ${colors.danger};
+  }
+
+  /* Contextual capture bar colors */
+  .capture-bar-losing { background: ${colors.danger}; }
+  .capture-bar-attacking { background: ${colors.warning}; }
+
   /* Mobile responsive adjustments */
   @media (max-width: 1024px) {
     .objectives-panel {

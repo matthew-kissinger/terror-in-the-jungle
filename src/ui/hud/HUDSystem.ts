@@ -130,6 +130,17 @@ export class HUDSystem implements GameSystem, IHUDSystem {
         const opforTickets = this.ticketSystem.getTickets(Faction.NVA);
         const timeRemaining = this.ticketSystem.getMatchTimeRemaining();
         this.elements.ticketDisplay.setTickets(usTickets, opforTickets);
+        // Update bleed indicator (conquest only)
+        if (!isTDM) {
+          const bleed = this.ticketSystem.getTicketBleedRate();
+          if (bleed.usTickets > 0) {
+            this.elements.ticketDisplay.setBleedIndicator('us', bleed.usTickets);
+          } else if (bleed.opforTickets > 0) {
+            this.elements.ticketDisplay.setBleedIndicator('opfor', bleed.opforTickets);
+          } else {
+            this.elements.ticketDisplay.setBleedIndicator(null);
+          }
+        }
         // Update match timer
         this.elements.matchTimer.setTime(timeRemaining);
         // Feed mobile status bar (merged timer + tickets)

@@ -79,6 +79,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: repo-tracked perf baselines now cover the active Phase 1 scenario set (`combat120`, `openfrontier:short`, `ashau:short`, `frontier30m`). `perf:baseline` is now a compatibility wrapper over `perf-compare --update-baseline`, `validate:full` runs `combat120`, and CI checks `summary.json` from the committed regression scenario instead of the stale `capture-summary.json` path.
 - Keep: terrain startup no longer double-rebakes the render surface at mode start after a world-size change; `GameEngineInit` now lets `setWorldSize()` own that rebake path.
 - Keep: large-world terrain surface bake budget is scale-aware instead of fixed. `TerrainSurfaceRuntime` now reduces the render-only bake grid at A Shau scale from `1024` to `512`, while gameplay height authority remains on `HeightQueryCache`.
+- Keep (confirmed 2026-03-06): `maxLODLevels` is now auto-scaled from world size via `computeMaxLODLevels()` in `TerrainConfig.ts`. At 4 fixed LOD levels, Open Frontier (3200m) had 225m LOD 0 tiles with 7m vertex spacing; the GPU mesh was too coarse to match the CPU heightmap (6.26m texel spacing), causing 1-10m render/collision divergence and floating vegetation/NPCs. Auto-scaling gives Open Frontier 5 levels (3.52m spacing), A Shau 8 levels (2.63m spacing). Heightmap grid for 1024-4095m worlds also increased from 512 to 1024 (4m/sample instead of 8m). TDM/ZC keep 4 levels (already fine).
 - Keep: `TerrainRaycastRuntime` no longer computes unused vertex normals for the near-field LOS mesh.
 - Keep: loading/start-screen asset URLs are base-aware; root-relative screen asset paths that produced preview/Page `404`s were removed.
 - Keep: CDLODQuadtree `range * 1.5` early-return removed. The skip created coverage holes when a parent subdivided but children fell outside `childRange * 1.5`, leaving terrain patches invisible (collision and vegetation still worked via HeightQueryCache). Every node now must either emit or subdivide.
@@ -99,7 +100,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 
 ## Deferred Decisions
 
-(None active.)
+- Terrain architecture pivot evaluation deferred. Full research documented in `docs/TERRAIN_RESEARCH.md` covering CDLOD vs geoclipmaps vs GPU tessellation vs CBT, WebGPU compute-driven quadtree, virtual texturing, heightmap streaming, and fragment-level displacement. Current CDLOD + InstancedMesh + BakedHeightProvider architecture is at or above industry standard. Primary evolutionary path is WebGPU compute-driven quadtree when Three.js WebGPU matures (UBO fix, Safari stability). No code changes needed now.
 
 ## Open Risks
 

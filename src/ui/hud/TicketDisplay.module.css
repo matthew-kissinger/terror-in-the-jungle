@@ -82,6 +82,22 @@
   display: none;
 }
 
+/* Bleed indicator - shows which side is losing tickets */
+.bleed {
+  font-size: var(--font-size-3xs, 8px);
+  color: var(--feedback-danger);
+  letter-spacing: -1px;
+  height: 10px;
+  line-height: 10px;
+  opacity: 0.8;
+  animation: bleedPulse 2s ease-in-out infinite;
+}
+
+@keyframes bleedPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
 /* Low ticket warning - subtle pulse on the count */
 .low .count {
   animation: ticketLow 1.5s ease-in-out infinite;

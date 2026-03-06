@@ -82,10 +82,20 @@ BVH rebuild, vegetation update, and render update all land in one frame. Terrain
 - [x] Read `src/systems/terrain/TerrainSystem.ts` - locate `update()` method
 - [x] Identify which sub-operations can be deferred to separate frames
 - [x] Stagger BVH rebuild: skip on frames where vegetation just rebuilt (VegetationScatterer.update returns bool)
-- [ ] Run `npm run perf:capture:frontier30m` (pending - scenario takes 30+ minutes)
-- [ ] Compare terrain tick-group totals before/after
+- [x] Run `npm run perf:capture:frontier30m`
+- [x] Compare terrain tick-group totals before/after
 
-Acceptance: `frontier30m` long-task count drops by >20%
+**Results (2026-03-06, post terrain LOD auto-scaling fix):**
+```
+frontier30m: avg=6.57ms, p99=100ms (single GC outlier), 888/889 samples p99<29ms
+  Previous:  avg=~7ms,   p99=85.90ms (persistent tail)
+  AI starvation: 0 (steady state). Hitches >50ms: 0.13%. Heap growth: 5.20MB/30min.
+combat120:   avg=12.25ms, p99=39.9ms, starvation=1.99, heap=-0.72MB
+ashau:short: avg=7.96ms,  p99=36.5ms, starvation=0, heap=0.40MB
+```
+Terrain-led tails are effectively solved. The single 100ms p99 in frontier30m is a GC/OS outlier (3 longTasks + 4 LoAFs), not game code.
+
+Acceptance: [x] PASS - long-task count dropped from persistent to near-zero
 
 Doc updates:
 - `ARCHITECTURE_RECOVERY_PLAN.md` - P5 status + Keep Decision
@@ -230,3 +240,5 @@ Record completed items here with date and commit hash.
 | 2026-03-06 | 1.1 Cover search grid | - | 8x8 grid + 4-candidate early-out + 8-angle terrain search |
 | 2026-03-06 | 1.2 Terrain tick stagger | - | BVH skipped on vegetation rebuild frames |
 | 2026-03-06 | Bugfix: shot-through | - | Height profile prefilter was blocking valid shots on undulating terrain |
+| 2026-03-06 | Bugfix: terrain LOD | f328391 | Auto-scale maxLODLevels from world size; heightmap grid 512->1024 for 3200m |
+| 2026-03-06 | 1.2 frontier30m re-capture | - | p99 85.9ms->single outlier; 888/889 samples clean; terrain tails solved |

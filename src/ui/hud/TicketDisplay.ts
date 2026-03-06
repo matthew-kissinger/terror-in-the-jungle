@@ -23,6 +23,8 @@ export class TicketDisplay extends UIComponent {
   private killTarget = this.signal(0);
   private bluforLabel = this.signal('US Forces');
   private opforLabel = this.signal('OPFOR');
+  private bleedSide = this.signal<'us' | 'opfor' | null>(null);
+  private bleedRate = this.signal(0);
 
   /** Threshold below which tickets pulse (conquest only) */
   private readonly LOW_THRESHOLD = 50;
@@ -35,11 +37,13 @@ export class TicketDisplay extends UIComponent {
       <div class="${styles.faction} ${styles.us}" data-ref="us-faction">
         <span class="${styles.label}" data-ref="us-label">US Forces</span>
         <span class="${styles.count}" data-ref="us-count">0</span>
+        <span class="${styles.bleed}" data-ref="us-bleed"></span>
       </div>
       <span class="${styles.separator}">|</span>
       <div class="${styles.faction} ${styles.opfor}" data-ref="opfor-faction">
         <span class="${styles.label}" data-ref="opfor-label">OPFOR</span>
         <span class="${styles.count}" data-ref="opfor-count">0</span>
+        <span class="${styles.bleed}" data-ref="opfor-bleed"></span>
       </div>
     `;
   }
@@ -81,6 +85,31 @@ export class TicketDisplay extends UIComponent {
       const target = this.killTarget.value;
       if (target > 0) {
         this.text('[data-ref="header"]', `FIRST TO ${target} KILLS`);
+      }
+    });
+
+    // Effect: bleed indicator (conquest only)
+    this.effect(() => {
+      const side = this.bleedSide.value;
+      const rate = this.bleedRate.value;
+      const tdm = this.isTDM.value;
+      const usBleed = this.$('[data-ref="us-bleed"]');
+      const opforBleed = this.$('[data-ref="opfor-bleed"]');
+      if (!usBleed || !opforBleed) return;
+
+      if (tdm || side === null || rate <= 0) {
+        usBleed.textContent = '';
+        opforBleed.textContent = '';
+        return;
+      }
+
+      const arrow = rate >= 2 ? '\u25bc\u25bc' : '\u25bc';
+      if (side === 'us') {
+        usBleed.textContent = arrow;
+        opforBleed.textContent = '';
+      } else {
+        usBleed.textContent = '';
+        opforBleed.textContent = arrow;
       }
     });
 
@@ -148,5 +177,15 @@ export class TicketDisplay extends UIComponent {
   setFactionLabels(blufor: string, opfor: string): void {
     this.bluforLabel.value = blufor;
     this.opforLabel.value = opfor;
+  }
+
+  /**
+   * Show which side is bleeding tickets and at what rate.
+   * rate >= 2 shows double arrow (strong bleed), rate > 0 shows single arrow.
+   * Pass null/0 to hide.
+   */
+  setBleedIndicator(side: 'us' | 'opfor' | null, rate: number = 0): void {
+    this.bleedSide.value = side;
+    this.bleedRate.value = rate;
   }
 }

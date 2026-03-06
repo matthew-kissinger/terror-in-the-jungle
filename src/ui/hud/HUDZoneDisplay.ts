@@ -1,5 +1,5 @@
 import { ZoneManager, ZoneState, CaptureZone } from '../../systems/world/ZoneManager';
-import { Faction, isBlufor, isOpfor } from '../../systems/combat/types';
+import { Faction, Alliance, isBlufor, isOpfor, getAlliance } from '../../systems/combat/types';
 import { HUDElements } from './HUDElements';
 
 export class HUDZoneDisplay {
@@ -7,9 +7,14 @@ export class HUDZoneDisplay {
   private readonly zoneElements = new Map<string, ZoneElementRefs>();
   private zoneOrder: string[] = [];
   private emptyStateEl?: HTMLDivElement;
+  private playerAlliance: Alliance = Alliance.BLUFOR;
 
   constructor(elements: HUDElements) {
     this.elements = elements;
+  }
+
+  setPlayerAlliance(alliance: Alliance): void {
+    this.playerAlliance = alliance;
   }
 
   updateObjectivesDisplay(zoneManager: ZoneManager, isTDM: boolean = false, playerPosition?: { x: number; y: number; z: number }): void {
@@ -132,8 +137,10 @@ export class HUDZoneDisplay {
   }
 
   private updateZoneElement(element: ZoneElementRefs, zone: CaptureZone, playerPosition?: { x: number; y: number; z: number }): void {
-    let zoneClass = 'zone-neutral';
+    const playerOwned = zone.owner !== null && getAlliance(zone.owner) === this.playerAlliance;
+    const enemyOwned = zone.owner !== null && getAlliance(zone.owner) !== this.playerAlliance;
 
+    let zoneClass = 'zone-neutral';
     switch (zone.state) {
       case ZoneState.BLUFOR_CONTROLLED:
         zoneClass = 'zone-us';
@@ -155,31 +162,55 @@ export class HUDZoneDisplay {
     element.nameEl.textContent = zone.name;
     element.distanceEl.textContent = `${distance}m`;
     element.iconEl.className = `zone-icon ${zoneClass}`;
-    element.statusTextEl.textContent = this.getStatusText(zone);
+
+    const statusText = this.getStatusText(zone);
+    element.statusTextEl.textContent = statusText;
+
+    // Tactical status coloring
+    element.statusTextEl.classList.toggle('status-losing', statusText === 'LOSING');
+    element.statusTextEl.classList.toggle('status-attacking', statusText === 'ATTACKING');
+    element.statusTextEl.classList.toggle('status-secured', statusText === 'SECURED');
+    element.statusTextEl.classList.toggle('status-hostile', statusText === 'HOSTILE');
+
+    // Highlight contested/losing zones
+    element.root.classList.toggle('zone-urgent', zone.state === ZoneState.CONTESTED && playerOwned);
 
     const showProgress = zone.state === ZoneState.CONTESTED || (zone.owner === null && zone.captureProgress > 0);
     if (showProgress) {
       element.progressContainer.style.display = 'block';
       element.progressBar.style.width = `${zone.captureProgress}%`;
+      // Color the progress bar contextually
+      if (playerOwned) {
+        element.progressBar.className = 'capture-bar capture-bar-losing';
+      } else if (enemyOwned) {
+        element.progressBar.className = 'capture-bar capture-bar-attacking';
+      } else {
+        element.progressBar.className = 'capture-bar';
+      }
     } else {
       element.progressContainer.style.display = 'none';
     }
   }
 
   private getStatusText(zone: CaptureZone): string {
-    if (zone.state === ZoneState.BLUFOR_CONTROLLED) return 'US';
-    if (zone.state === ZoneState.OPFOR_CONTROLLED) return 'OPFOR';
-    if (zone.state === ZoneState.NEUTRAL && zone.captureProgress <= 0) return 'Neutral';
-    if (zone.state === ZoneState.NEUTRAL && zone.captureProgress > 0) {
-      const pct = Math.max(0, Math.min(100, Math.round(zone.captureProgress)));
-      if (zone.owner !== null && isBlufor(zone.owner)) return `${zone.owner} ${pct}%`;
-      if (zone.owner !== null && isOpfor(zone.owner)) return `${zone.owner} ${pct}%`;
-      return `Capturing ${pct}%`;
+    const playerOwned = zone.owner !== null && getAlliance(zone.owner) === this.playerAlliance;
+    const enemyOwned = zone.owner !== null && getAlliance(zone.owner) !== this.playerAlliance;
+
+    if (zone.state === ZoneState.CONTESTED) {
+      if (playerOwned) return 'LOSING';
+      if (enemyOwned) return 'ATTACKING';
+      return 'CONTESTED';
     }
-    const pct = Math.max(0, Math.min(100, Math.round(zone.captureProgress)));
-    if (zone.owner !== null && isBlufor(zone.owner)) return `${zone.owner} ${pct}%`;
-    if (zone.owner !== null && isOpfor(zone.owner)) return `${zone.owner} ${pct}%`;
-    return `Contested ${pct}%`;
+
+    if (zone.state === ZoneState.NEUTRAL) {
+      if (zone.captureProgress <= 0) return 'NEUTRAL';
+      const pct = Math.max(0, Math.min(100, Math.round(zone.captureProgress)));
+      return `CAPTURING ${pct}%`;
+    }
+
+    if (playerOwned) return 'SECURED';
+    if (enemyOwned) return 'HOSTILE';
+    return 'NEUTRAL';
   }
 }
 
