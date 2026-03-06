@@ -7,7 +7,6 @@ import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { AudioManager } from '../audio/AudioManager';
 import { CombatantDamage } from './CombatantDamage';
 import { CombatantSuppression } from './CombatantSuppression';
-import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem';
 import { objectPool } from '../../utils/ObjectPoolManager';
 
 /**
@@ -25,7 +24,6 @@ export class CombatantCombatEffects {
   private muzzleFlashSystem: MuzzleFlashSystem;
   private impactEffectsPool: ImpactEffectsPool;
   private audioManager?: AudioManager;
-  private voiceCalloutSystem?: VoiceCalloutSystem;
   private damage: CombatantDamage;
   private suppression: CombatantSuppression;
 
@@ -51,10 +49,6 @@ export class CombatantCombatEffects {
 
   setAudioManager(manager: AudioManager): void {
     this.audioManager = manager;
-  }
-
-  setVoiceCalloutSystem(system: VoiceCalloutSystem): void {
-    this.voiceCalloutSystem = system;
   }
 
   /**
@@ -108,13 +102,7 @@ export class CombatantCombatEffects {
         // Only apply damage if hit has a combatant (not a player hit)
         if ('combatant' in hit) {
           const damage = combatant.gunCore.computeDamage(hit.distance, hit.headshot);
-          const wasAlive = hit.combatant.health > 0;
           this.damage.applyDamage(hit.combatant, damage, combatant, squads, hit.headshot, allCombatants);
-
-          // Voice callout: Target down (if kill confirmed)
-          if (wasAlive && hit.combatant.health <= 0 && this.voiceCalloutSystem && Math.random() < 0.4) {
-            this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.TARGET_DOWN, combatant.position);
-          }
 
           if (hit.headshot) {
             Logger.info('combat', ` Headshot! ${combatant.faction} -> ${hit.combatant.faction}`);

@@ -402,21 +402,6 @@ describe('LOSAccelerator', () => {
       expect(stats.queryCount).toBe(2);
     });
 
-    it('should return avgQueryTime', () => {
-      const origin = new THREE.Vector3(0, 0, 0);
-      const target = new THREE.Vector3(10, 0, 0);
-
-      accelerator.checkLineOfSight(origin, target, 100);
-
-      const stats = accelerator.getStats();
-      expect(stats.avgQueryTime).toBeGreaterThan(0);
-    });
-
-    it('should return avgQueryTime as 0 when no queries', () => {
-      const stats = accelerator.getStats();
-      expect(stats.avgQueryTime).toBe(0);
-    });
-
     it('should return cachedChunks count', () => {
       const mesh1 = createMockMesh(new THREE.Vector3(0, 0, 0), 10);
       const mesh2 = createMockMesh(new THREE.Vector3(10, 0, 0), 10);
@@ -441,18 +426,6 @@ describe('LOSAccelerator', () => {
 
       accelerator.checkLineOfSight(origin, target, 100);
       expect(accelerator.getStats().queryCount).toBe(2);
-    });
-
-    it('should track total query time', () => {
-      const origin = new THREE.Vector3(0, 0, 0);
-      const target = new THREE.Vector3(10, 0, 0);
-
-      accelerator.checkLineOfSight(origin, target, 100);
-      accelerator.checkLineOfSight(origin, target, 100);
-
-      const stats = accelerator.getStats();
-      expect(stats.avgQueryTime).toBeGreaterThan(0);
-      expect(stats.avgQueryTime).toBeLessThan(10); // Sanity check: should be < 10ms
     });
 
     it('should reset stats after REPORT_INTERVAL_MS', () => {
@@ -512,7 +485,6 @@ describe('LOSAccelerator', () => {
 
       const stats = accelerator.getStats();
       expect(stats.queryCount).toBe(0);
-      expect(stats.avgQueryTime).toBe(0);
     });
 
     it('should handle clear when already empty', () => {

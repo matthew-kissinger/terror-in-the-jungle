@@ -1,6 +1,6 @@
 # Project Notes
 
-Last updated: 2026-03-04
+Last updated: 2026-03-06
 
 ## Project
 
@@ -48,16 +48,13 @@ npm run perf:update-baseline  # update baseline from latest capture
 
 ## Current Focus
 
-1. Phase 1 perf frontier baselines captured for `combat120`, `openfrontier:short`, `ashau:short`, and `frontier30m`; see `docs/PERF_FRONTIER.md`.
-2. Deep `combat120` evidence localizes the worst tails to `CombatantAI.updateAI()` inside high-LOD full updates. A March 4, 2026 frame-local `AITargetAcquisition` neighborhood cache is now accepted: matched warm `combat120` improved from `15.10ms` to `14.59ms` average frame time and from `16.82` to `12.91` AI-starvation events/sample, but p99 still fails.
-3. `HeightQueryCache.getHeightAt()` remains a cross-cutting hotspot; a separate March 4, 2026 numeric-key linked-list LRU attempt was reverted because combat heap recovery regressed and warm evidence was inconsistent.
-4. A March 4, 2026 attempt to disable friendly-spacing work on visual-only high-LOD frames in `CombatantLODManager` was reverted. Warm means improved slightly, but hitch rate, long-task totals, and AI starvation regressed, including one rerun that under-shot badly (`54 / 32` shots / hits).
-5. March 4, 2026 diagnostic captures now show the worst nominal `suppressing` / `advancing` AI spikes are actually `AIStateEngage.handleEngaging()` transitions dominated by `initiateSquadSuppression()`, specifically the per-flanker fallback cover search path.
-6. March 4, 2026 accepted optimization: `AIStateEngage.initiateSquadSuppression()` now probes flank cover at member elevation (no hardcoded `y=0`) and reuses a tiny probe object instead of per-call member spread. Warm control `2026-03-04T18-56-58-892Z` vs post runs (`2026-03-04T19-00-58-280Z`, `2026-03-04T19-03-09-563Z`) shows lower combat tails/stalls (`Combat.maxDurationMs 259.7ms -> 218.6ms/182.3ms`, long tasks `74 -> 47/31`), but p99 spikes still need follow-up.
-7. A March 4, 2026 attempt to reuse targets and throttle advancing threat reacquisition during flank movement was also reverted. The warm rerun improved mean frame time but collapsed combat pressure (`90 / 53` shots / hits) and worsened tail signals.
-8. Open-world tail stability remains terrain-led in `open_frontier` / `frontier30m`; current suspects are near-field BVH rebuild bursts plus height-query cost, not CDLOD tile selection alone.
-9. A Shau harness is now behavior-valid after nearest-first materialization and high-elevation spatial-bounds fixes; next step is terrain-tail reduction, then WarSim/heap isolation.
-10. March 6, 2026 fix: half-texel UV correction in `TerrainMaterial.ts` vertex shader. GPU `texture2D` addressed heightmap texels differently than CPU `BakedHeightProvider` bilinear interpolation, causing rendered terrain to drift up to 3.1m from collision/vegetation at map edges. Error scaled with world size (invisible in Zone Control at 500m, clear in Open Frontier at 3200m). Fix passes `heightmapGridSize` uniform and remaps UV to texel-center space.
+1. `combat120` at WARN after micro-optimizations: p99 ~34ms (was 86.9ms), avg ~12.3ms (was 14.2ms), AI starvation ~3.6 (was 12.3). Cover search grid reduced (8x8 + early-out), terrain tick staggered (BVH skips vegetation-rebuild frames).
+2. Shot-through-terrain bug fixed: height profile prefilter was too aggressive on undulating terrain, falsely blocking valid shots in Open Frontier. BVH raycast now handles occlusion within 200m; prefilter only applies 200-280m.
+3. `frontier30m` soak tails remain FAIL (`p99=85.90ms`). Terrain-led; tick stagger landed but not yet re-measured.
+4. A Shau harness is behavior-valid; next step is terrain-tail reduction, then WarSim/heap isolation.
+5. Game modes Phases 6-7 complete. Mode product passes (Phase 5) are the next gameplay work.
+6. Dead code cleanup: VoiceCalloutSystem removed (was disabled, wired through 16 files), FRIENDLY_FIRE dead constants removed.
+7. See `docs/NEXT_WORK.md` for the active checklist.
 
 ## Documentation Contract
 

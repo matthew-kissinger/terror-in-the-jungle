@@ -57,7 +57,7 @@ export class TerrainRaycastRuntime {
     radius: number,
     getHeightAt: (x: number, z: number) => number,
   ): void {
-    const step = 4;
+    const step = 6;
     const halfSteps = Math.ceil(radius / step);
     const gridW = halfSteps * 2 + 1;
     this.ensureMeshBuffers(gridW);

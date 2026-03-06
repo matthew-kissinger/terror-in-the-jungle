@@ -2,8 +2,6 @@ import * as THREE from 'three'
 import { Combatant, CombatantState } from '../types'
 import { ISpatialQuery } from '../SpatialOctree'
 import { Logger } from '../../../utils/Logger'
-import { VoiceCalloutSystem, CalloutType } from '../../audio/VoiceCalloutSystem'
-
 const _toDestination = new THREE.Vector3()
 const _toTarget = new THREE.Vector3()
 const _toCover = new THREE.Vector3()
@@ -12,7 +10,6 @@ const _toCover = new THREE.Vector3()
  * Handles movement-related AI states (advancing, seeking cover)
  */
 export class AIStateMovement {
-  private voiceCalloutSystem?: VoiceCalloutSystem
   handleAdvancing(
     combatant: Combatant,
     deltaTime: number,
@@ -92,15 +89,10 @@ export class AIStateMovement {
 
     const distanceToCover = combatant.position.distanceTo(combatant.coverPosition);
     if (distanceToCover < 1.5) {
-      const wasInCover = combatant.inCover;
       combatant.inCover = true;
       combatant.state = CombatantState.ENGAGING;
       Logger.info('combat-ai', ` ${combatant.faction} unit reached cover, switching to peek-and-fire`);
       
-      // Voice callout: In cover (trigger when first reaching cover)
-      if (!wasInCover && this.voiceCalloutSystem && Math.random() < 0.25) {
-        this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.IN_COVER, combatant.position);
-      }
     }
 
     const toCover = _toCover.subVectors(combatant.coverPosition, combatant.position).normalize();
@@ -113,7 +105,4 @@ export class AIStateMovement {
     }
   }
 
-  setVoiceCalloutSystem(system: VoiceCalloutSystem): void {
-    this.voiceCalloutSystem = system;
-  }
 }

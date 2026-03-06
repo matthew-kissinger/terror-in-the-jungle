@@ -308,7 +308,7 @@ describe('AICoverFinding', () => {
       const threatPos = new THREE.Vector3(30, 0, 0);
 
       mockHeightQueryCache.getHeightAt = vi.fn((x: number, z: number) => {
-        if (x >= 4 && x <= 6 && Math.abs(z) <= 1) return 2;
+        if (x >= 3 && x <= 10 && Math.abs(z) <= 8) return 2;
         return 0;
       });
 
@@ -316,7 +316,7 @@ describe('AICoverFinding', () => {
 
       expect(cover).not.toBeNull();
       if (cover) {
-        expect(cover.x).toBeLessThan(6);
+        expect(cover.x).toBeLessThan(12);
       }
     });
 
@@ -325,7 +325,7 @@ describe('AICoverFinding', () => {
       const threatPos = new THREE.Vector3(-30, 0, 0);
 
       mockHeightQueryCache.getHeightAt = vi.fn((x: number, z: number) => {
-        if (x >= -6 && x <= -4 && Math.abs(z) <= 1) return 2;
+        if (x >= -10 && x <= -3 && Math.abs(z) <= 8) return 2;
         return 0;
       });
 
@@ -342,7 +342,7 @@ describe('AICoverFinding', () => {
       const threatPos = new THREE.Vector3(30, 0, 0);
 
       mockHeightQueryCache.getHeightAt = vi.fn((x: number, z: number) => {
-        if ((x >= 4 && x <= 6 && Math.abs(z) <= 1) || (x >= 14 && x <= 16 && Math.abs(z) <= 1)) return 2;
+        if ((x >= 3 && x <= 10 && Math.abs(z) <= 8) || (x >= 14 && x <= 20 && Math.abs(z) <= 8)) return 2;
         return 0;
       });
 

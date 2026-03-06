@@ -27,7 +27,6 @@ const PLAYER_HIT_ZONES: HitZone[] = [
 
 export class CombatantHitDetection {
   private readonly MAX_ENGAGEMENT_RANGE = 280
-  private readonly FRIENDLY_FIRE_ENABLED = false
 
   // Spatial grid manager reference (uses singleton by default)
   private gridManager: SpatialGridManager
@@ -154,7 +153,7 @@ export class CombatantHitDetection {
     for (const id of candidateIds) {
       const combatant = allCombatants.get(id)
       if (!combatant) continue
-      if (!this.FRIENDLY_FIRE_ENABLED && isAlly(combatant.faction, shooterFaction)) continue
+      if (isAlly(combatant.faction, shooterFaction)) continue
       if (combatant.state === CombatantState.DEAD) continue
 
       // Use cached hit zones (no allocation)

@@ -108,10 +108,6 @@ export class SystemConnector {
     refs.combatantSystem.influenceMap = refs.influenceMapSystem;
     refs.combatantSystem.sandbagSystem = refs.sandbagSystem;
 
-    if (refs.voiceCalloutSystem) {
-      refs.combatantSystem.setVoiceCalloutSystem(refs.voiceCalloutSystem);
-    }
-
     refs.flashbangScreenEffect.setPlayerController(refs.playerController);
     setSmokeCloudSystem(refs.smokeCloudSystem);
   }
@@ -227,10 +223,6 @@ export class SystemConnector {
     if (explosionEffectsPool) {
       refs.grenadeSystem.setExplosionEffectsPool(explosionEffectsPool);
       refs.mortarSystem.setExplosionEffectsPool(explosionEffectsPool);
-    }
-
-    if (refs.voiceCalloutSystem) {
-      refs.grenadeSystem.setVoiceCalloutSystem(refs.voiceCalloutSystem);
     }
 
     refs.playerController.setInventoryManager(refs.inventoryManager);

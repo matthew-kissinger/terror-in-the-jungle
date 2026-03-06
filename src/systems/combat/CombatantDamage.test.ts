@@ -8,7 +8,6 @@ import { AudioManager } from '../audio/AudioManager';
 import { CombatantRenderer } from './CombatantRenderer';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
-import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 import { spatialGridManager } from './SpatialGridManager';
 import { KillAssistTracker } from './KillAssistTracker';
@@ -42,10 +41,6 @@ const mockCameraShakeSystem: CameraShakeSystem = {
 
 const mockImpactEffectsPool: ImpactEffectsPool = {
   spawn: vi.fn(),
-} as any;
-
-const mockVoiceCalloutSystem: VoiceCalloutSystem = {
-  triggerCallout: vi.fn(),
 } as any;
 
 // Mock spatialGridManager
@@ -128,7 +123,6 @@ describe('CombatantDamage', () => {
     combatantDamage.setCombatantRenderer(mockCombatantRenderer);
     combatantDamage.setCameraShakeSystem(mockCameraShakeSystem);
     combatantDamage.setImpactEffectsPool(mockImpactEffectsPool);
-    combatantDamage.setVoiceCalloutSystem(mockVoiceCalloutSystem);
     combatantDamage.updatePlayerPosition(new THREE.Vector3(0, 0, 0));
 
     // Reset all mocks
@@ -202,21 +196,6 @@ describe('CombatantDamage', () => {
       expect(mockHUDSystem.addKillToFeed).not.toHaveBeenCalled();
     });
 
-    it('should trigger voice callout on hit (with probability)', () => {
-      const target = createMockCombatant('target-1', Faction.US, 100);
-      vi.spyOn(Math, 'random').mockReturnValue(0.1); // Ensure callout triggers
-      combatantDamage.applyDamage(target, 10);
-      expect(mockVoiceCalloutSystem.triggerCallout).toHaveBeenCalledWith(target, CalloutType.TAKING_FIRE, target.position);
-      vi.spyOn(Math, 'random').mockRestore();
-    });
-
-    it('should not trigger voice callout on hit (with probability)', () => {
-      const target = createMockCombatant('target-1', Faction.US, 100);
-      vi.spyOn(Math, 'random').mockReturnValue(0.9); // Ensure callout does not trigger
-      combatantDamage.applyDamage(target, 10);
-      expect(mockVoiceCalloutSystem.triggerCallout).not.toHaveBeenCalled();
-      vi.spyOn(Math, 'random').mockRestore();
-    });
   });
 
   describe('handleDeath (indirectly via applyDamage when health <= 0)', () => {
@@ -308,29 +287,6 @@ describe('CombatantDamage', () => {
       expect(target.deathDirection?.x).toBeCloseTo(0);
       expect(target.deathDirection?.y).toBeCloseTo(0);
       expect(target.deathDirection?.z).toBeCloseTo(-1);
-    });
-
-    it('should trigger "Man down!" callout for nearby allies (with probability)', () => {
-      const target = createMockCombatant('target-1', Faction.US, 10, CombatantState.IDLE, false, 'squad-1');
-      target.position.set(0, 0, 0); // Set target position to ensure ally is nearby
-      const attacker = createMockCombatant('attacker-1', Faction.NVA, 100);
-      const ally1 = createMockCombatant('ally-1', Faction.US, 100, CombatantState.IDLE, false, 'squad-1');
-      ally1.position.set(10, 0, 0);
-      const allCombatants = new Map<string, Combatant>();
-      allCombatants.set(target.id, target);
-      allCombatants.set(ally1.id, ally1);
-
-      (spatialGridManager.queryRadius as vi.Mock).mockReturnValue([ally1.id]);
-      vi.spyOn(Math, 'random').mockReturnValue(0.3); // Consistently return value that prevents TAKING_FIRE
-
-      combatantDamage.applyDamage(target, 20, attacker, undefined, false, allCombatants);
-      
-      // Now mock random again specifically for MAN_DOWN check
-      (Math.random as vi.Mock).mockReturnValueOnce(0.1); // Trigger MAN_DOWN callout
-
-      combatantDamage['triggerManDownCallout'](target, allCombatants); // Call directly to test
-      expect(mockVoiceCalloutSystem.triggerCallout).toHaveBeenCalledWith(ally1, CalloutType.MAN_DOWN, ally1.position);
-      vi.spyOn(Math, 'random').mockRestore();
     });
 
     it('should spawn death effects via ImpactEffectsPool', () => {
@@ -455,81 +411,4 @@ describe('CombatantDamage', () => {
     });
   });
 
-  describe('VoiceCalloutSystem integration', () => {
-    it('should trigger Man Down callout if spatialGridManager is not initialized but fallback behavior is used', () => {
-      (spatialGridManager.getIsInitialized as vi.Mock).mockReturnValue(false); // Simulate uninitialized grid
-
-      const target = createMockCombatant('target-1', Faction.US, 10, CombatantState.IDLE, false, 'squad-1');
-      target.position.set(0, 0, 0); // Set target position to ensure ally is nearby
-      const attacker = createMockCombatant('attacker-1', Faction.NVA, 100);
-      const ally1 = createMockCombatant('ally-1', Faction.US, 100, CombatantState.IDLE, false, 'squad-1');
-      ally1.position.set(10, 0, 0);
-      const allCombatants = new Map<string, Combatant>();
-      allCombatants.set(target.id, target);
-      allCombatants.set(ally1.id, ally1);
-
-      vi.spyOn(Math, 'random').mockReturnValue(0.3); // Consistently return value that prevents TAKING_FIRE
-
-      combatantDamage.applyDamage(target, 20, attacker, undefined, false, allCombatants);
-
-      // Now mock random again specifically for MAN_DOWN check
-      (Math.random as vi.Mock).mockReturnValueOnce(0.1); // Trigger MAN_DOWN callout
-
-      combatantDamage['triggerManDownCallout'](target, allCombatants); // Call directly to test
-      expect(mockVoiceCalloutSystem.triggerCallout).toHaveBeenCalledWith(ally1, CalloutType.MAN_DOWN, ally1.position);
-      vi.spyOn(Math, 'random').mockRestore();
-    });
-
-    it('should not trigger Man Down callout if no nearby allies', () => {
-      const target = createMockCombatant('target-1', Faction.US, 10, CombatantState.IDLE, false, 'squad-1');
-      const attacker = createMockCombatant('attacker-1', Faction.NVA, 100);
-      const allCombatants = new Map<string, Combatant>();
-      allCombatants.set(target.id, target);
-      
-      (spatialGridManager.queryRadius as vi.Mock).mockReturnValue([]); // No allies found
-
-      vi.spyOn(Math, 'random').mockReturnValueOnce(0.1); // Try to trigger man down callout
-
-      combatantDamage.applyDamage(target, 20, attacker, undefined, false, allCombatants);
-
-      expect(mockVoiceCalloutSystem.triggerCallout).not.toHaveBeenCalledWith(expect.anything(), CalloutType.MAN_DOWN, expect.anything());
-      vi.spyOn(Math, 'random').mockRestore();
-    });
-
-    it('should not trigger Man Down callout if nearby ally is dead', () => {
-      const target = createMockCombatant('target-1', Faction.US, 10, CombatantState.IDLE, false, 'squad-1');
-      const attacker = createMockCombatant('attacker-1', Faction.NVA, 100);
-      const deadAlly = createMockCombatant('dead-ally', Faction.US, 0, CombatantState.DEAD, false, 'squad-1');
-      deadAlly.position.set(10, 0, 0);
-      const allCombatants = new Map<string, Combatant>();
-      allCombatants.set(target.id, target);
-      allCombatants.set(deadAlly.id, deadAlly);
-
-      (spatialGridManager.queryRadius as vi.Mock).mockReturnValue([deadAlly.id]);
-      vi.spyOn(Math, 'random').mockReturnValueOnce(0.1);
-
-      combatantDamage.applyDamage(target, 20, attacker, undefined, false, allCombatants);
-
-      expect(mockVoiceCalloutSystem.triggerCallout).not.toHaveBeenCalledWith(expect.anything(), CalloutType.MAN_DOWN, expect.anything());
-      vi.spyOn(Math, 'random').mockRestore();
-    });
-
-    it('should not trigger Man Down callout if nearby ally is of different faction', () => {
-      const target = createMockCombatant('target-1', Faction.US, 10, CombatantState.IDLE, false, 'squad-1');
-      const attacker = createMockCombatant('attacker-1', Faction.NVA, 100);
-      const enemyAlly = createMockCombatant('enemy-ally', Faction.NVA, 100, CombatantState.IDLE, false, 'squad-2');
-      enemyAlly.position.set(10, 0, 0);
-      const allCombatants = new Map<string, Combatant>();
-      allCombatants.set(target.id, target);
-      allCombatants.set(enemyAlly.id, enemyAlly);
-
-      (spatialGridManager.queryRadius as vi.Mock).mockReturnValue([enemyAlly.id]);
-      vi.spyOn(Math, 'random').mockReturnValueOnce(0.1);
-
-      combatantDamage.applyDamage(target, 20, attacker, undefined, false, allCombatants);
-
-      expect(mockVoiceCalloutSystem.triggerCallout).not.toHaveBeenCalledWith(expect.anything(), CalloutType.MAN_DOWN, expect.anything());
-      vi.spyOn(Math, 'random').mockRestore();
-    });
-  });
 });

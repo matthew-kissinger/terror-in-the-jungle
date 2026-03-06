@@ -37,7 +37,6 @@ import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
-import { VoiceCalloutSystem } from '../systems/audio/VoiceCalloutSystem';
 import { LoadoutService } from '../systems/player/LoadoutService';
 import { WarSimulator } from '../systems/strategy/WarSimulator';
 import { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
@@ -96,7 +95,6 @@ export class SystemManager {
   public influenceMapSystem!: InfluenceMapSystem;
   public ammoSupplySystem!: AmmoSupplySystem;
   public footstepAudioSystem!: FootstepAudioSystem;
-  public voiceCalloutSystem!: VoiceCalloutSystem;
   public loadoutService!: LoadoutService;
   public warSimulator!: WarSimulator;
   public strategicFeedback!: StrategicFeedback;
@@ -156,7 +154,6 @@ export class SystemManager {
     this.influenceMapSystem = this.refs.influenceMapSystem;
     this.ammoSupplySystem = this.refs.ammoSupplySystem;
     this.footstepAudioSystem = this.refs.footstepAudioSystem;
-    this.voiceCalloutSystem = this.refs.voiceCalloutSystem;
     this.loadoutService = this.refs.loadoutService;
     this.warSimulator = this.refs.warSimulator;
     this.strategicFeedback = this.refs.strategicFeedback;

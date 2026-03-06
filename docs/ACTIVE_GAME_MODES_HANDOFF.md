@@ -22,8 +22,8 @@ Status: READY FOR HANDOFF
 | Phase 3. Command Surface | complete | Command coordinator, quick strip, selected-squad detail, map-click squad selection, and map-first overlay are live across desktop, touch, and gamepad. |
 | Phase 4. Map Intel Policy | in progress | Runtime-owned minimap/full-map policy is live. Per-mode tactical/strategic product tuning is still open. |
 | Phase 5. Mode Vertical Slices | in progress | Mode cards and deploy/respawn copy now differentiate the exposed modes; objective/HUD-specific product passes are still open. |
-| Phase 6. Team And Faction Generalization | not started | Player-facing faction flow exists, but core world ownership logic still leaks US/OPFOR assumptions. |
-| Phase 7. Death Presentation | not started | Shrink/fade death presentation still needs replacement. |
+| Phase 6. Team And Faction Generalization | complete | `ZoneState.BLUFOR_CONTROLLED` replaces `US_CONTROLLED` across 23 files. `TicketDisplay.setFactionLabels()` drives dynamic HUD names from `factionMix` config. Alliance-level ownership is now the norm. |
+| Phase 7. Death Presentation | complete | Ground-sinking replaces scale-to-zero. 6s ground persistence, 2s fadeout. Four animation types updated (shatter, spinfall, crumple, fallback). |
 
 ## Validated State
 
@@ -49,31 +49,32 @@ Status: READY FOR HANDOFF
 - command mode now shows selected-squad detail and supports friendly squad selection directly from the tactical map
 - mode cards and deploy/respawn session copy now present Zone Control, TDM, Open Frontier, and A Shau as different products instead of generic scale variants
 - `MapIntelPolicy` now applies through runtime-owned minimap/full-map policy instead of renderer globals
+- `ZoneState.BLUFOR_CONTROLLED` replaces `US_CONTROLLED` across 23 files; alliance-level zone ownership is the norm
+- `TicketDisplay.setFactionLabels()` drives dynamic HUD faction names from `factionMix` config
+- helipad spawn points wired into `PlayerRespawnManager` for Open Frontier BLUFOR players
+- graduated supermajority zone bleed: 70%+ = 1.5x, 100% = 3x (was flat 2x)
+- TDM kill-target urgency: 75% amber pulse, 90% red pulse
+- death presentation: ground-sinking replaces scale-to-zero, 6s ground persistence, 2s fadeout
+- `GameModeManager` uses `objective.kind === 'deathmatch'` policy check instead of hardcoded mode ID
+- `SystemConnector` split into 11 named private methods for dependency graph readability
 
 ## Current Gaps
 
 - `GameModeManager` is still a legacy fan-out point and not yet a thin coordinator
 - `MapIntelPolicy` is now the source of truth for minimap/full-map visibility, but per-mode product tuning still needs a dedicated pass
 - mode-specific objective, HUD, and pacing behavior are only partially sliced; the current pass is strongest in mode selection and deploy/respawn surfaces
-- death presentation work has not started
 
 ## Resume Here
 
 ### Recommended Next Task
 
-Phase 5: mode vertical slices
+See `docs/NEXT_WORK.md` for the active checklist.
 
-Reason:
-- deploy/loadout flow, command surface, and runtime-owned map intel are now in place together
-- the next highest-value work is making the shipped modes feel distinct instead of continuing to polish shared scaffolding
-- A Shau tactical/strategic map tuning and the smaller-mode product passes should now happen on top of the new runtime seams
-
-### Exact Next Moves
-
-1. Start the A Shau tactical/strategic product pass on the new map-intel/runtime foundation.
-2. Do the Zone Control product pass next so the baseline mode gets the clearest player-facing identity lift.
-3. Follow with Team Deathmatch and Open Frontier product passes once the shared objective/HUD language is cleaner.
-4. After that, move to Phase 6 team/faction generalization on top of the now-explicit mode/runtime seams.
+Current priorities:
+1. Validate recent perf micro-optimizations with warm `combat120` captures
+2. Continue perf tail closure if p99 still fails (AIStateEngage cover search, TerrainSystem tick decoupling)
+3. Mode vertical slice product passes (Zone Control, TDM, Open Frontier, A Shau)
+4. GameModeManager legacy fan-out slim-down
 
 ## Primary Code Entry Points
 

@@ -25,7 +25,7 @@ describe('HeightQueryCache', () => {
     it('should initialize with default cache size', () => {
       const cache = new HeightQueryCache();
       const stats = cache.getCacheStats();
-      expect(stats.maxSize).toBe(10000);
+      expect(stats.maxSize).toBe(20000);
       expect(stats.size).toBe(0);
     });
 

@@ -144,15 +144,19 @@ export class TerrainSystem implements GameSystem {
 
     this.renderRuntime.update();
 
-    // Update vegetation
-    this.vegetationScatterer.update(this.playerPosition);
+    // Update vegetation; returns true when cells were rebuilt
+    const vegetationRebuilt = this.vegetationScatterer.update(this.playerPosition);
 
-    this.raycastRuntime.updateNearFieldMesh(
-      this.playerPosition,
-      this.config.bvhRadius,
-      this.config.bvhRebuildThreshold,
-      (x, z) => this.getHeightAt(x, z),
-    );
+    // Stagger BVH rebuild: skip if vegetation just rebuilt this frame
+    // to avoid stacking two expensive operations in one tick
+    if (!vegetationRebuilt) {
+      this.raycastRuntime.updateNearFieldMesh(
+        this.playerPosition,
+        this.config.bvhRadius,
+        this.config.bvhRebuildThreshold,
+        (x, z) => this.getHeightAt(x, z),
+      );
+    }
   }
 
   dispose(): void {

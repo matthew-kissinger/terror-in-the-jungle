@@ -571,7 +571,7 @@ describe('CombatantCombat', () => {
       expect(result.point.x).toBeCloseTo(12, 5);
     });
 
-    it('should block hit when height profile indicates occlusion', () => {
+    it('should block hit when height profile indicates occlusion beyond BVH range', () => {
       const target = createMockCombatant('target-1', Faction.NVA, 100);
       const allCombatants = new Map<string, Combatant>();
       allCombatants.set('target-1', target);
@@ -579,18 +579,19 @@ describe('CombatantCombat', () => {
 
       vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue({
         combatant: target,
-        point: new THREE.Vector3(40, 1.2, 0),
-        distance: 40,
+        point: new THREE.Vector3(250, 1.2, 0),
+        distance: 250,
         headshot: false,
       });
       (mockTerrainSystem.raycastTerrain as any).mockReturnValue({ hit: false, distance: undefined });
-      (mockTerrainSystem.getEffectiveHeightAt as any).mockImplementation((x: number) => (x >= 12 ? 1.5 : 0));
+      // Terrain rises above ray height (1.2m) at x>=210, well beyond the 200m BVH bypass
+      (mockTerrainSystem.getEffectiveHeightAt as any).mockImplementation((x: number) => (x >= 210 ? 1.5 : 0));
 
       const result = combatantCombat.handlePlayerShot(ray, () => 50, allCombatants);
 
       expect(result.hit).toBe(false);
-      expect(result.point.x).toBeGreaterThan(11);
-      expect(result.point.x).toBeLessThan(14);
+      expect(result.point.x).toBeGreaterThan(209);
+      expect(result.point.x).toBeLessThan(214);
       expect(target.health).toBe(100);
     });
   });

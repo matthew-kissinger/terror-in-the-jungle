@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { CombatantAI } from './CombatantAI'
 import { Combatant, CombatantState, Faction, Squad, SquadCommand } from './types'
-import { CalloutType } from '../audio/VoiceCalloutSystem'
 
 // Mock Three.js Vector3
 vi.mock('three', () => ({
@@ -71,7 +70,6 @@ vi.mock('./ai/AIStateMovement', () => ({
   AIStateMovement: class {
     handleAdvancing = vi.fn()
     handleSeekingCover = vi.fn()
-    setVoiceCalloutSystem = vi.fn()
   },
 }))
 
@@ -114,17 +112,6 @@ vi.mock('./ai/AIFlankingSystem', () => ({
     updateFlankingOperation = vi.fn()
     cleanupOperations = vi.fn()
     setTerrainSystem = vi.fn()
-  },
-}))
-
-// Mock VoiceCalloutSystem
-const mockTriggerCallout = vi.fn()
-vi.mock('../audio/VoiceCalloutSystem', () => ({
-  VoiceCalloutSystem: vi.fn(),
-  CalloutType: {
-    MOVING: 'moving',
-    CONTACT: 'contact',
-    TAKING_FIRE: 'taking_fire',
   },
 }))
 
@@ -303,105 +290,6 @@ describe('CombatantAI', () => {
 
       expect(mockCombatant.nearMissCount).toBe(0)
       expect(mockCombatant.lastSuppressedTime).toBeUndefined()
-    })
-  })
-
-  describe('maybeTriggerMovementCallout', () => {
-    let mockVoiceSystem: any
-
-    beforeEach(() => {
-      mockTriggerCallout.mockClear()
-      mockVoiceSystem = { triggerCallout: mockTriggerCallout }
-      ai.setVoiceCalloutSystem(mockVoiceSystem)
-    })
-
-    it('should trigger callout on state change to ADVANCING', () => {
-      mockCombatant.state = CombatantState.PATROLLING
-      vi.spyOn(Math, 'random').mockReturnValue(0.1) // Below 0.2 threshold
-
-      // First update to establish previous state
-      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
-      mockTriggerCallout.mockClear()
-
-      // Change to ADVANCING
-      mockCombatant.state = CombatantState.ADVANCING
-      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
-
-      expect(mockTriggerCallout).toHaveBeenCalledWith(
-        mockCombatant,
-        CalloutType.MOVING,
-        mockCombatant.position
-      )
-    })
-
-    it('should trigger callout on state change to RETREATING', () => {
-      mockCombatant.state = CombatantState.PATROLLING
-      vi.spyOn(Math, 'random').mockReturnValue(0.1)
-
-      // First update to establish previous state
-      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
-      mockTriggerCallout.mockClear()
-
-      // Change to RETREATING
-      mockCombatant.state = CombatantState.RETREATING
-      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
-
-      expect(mockTriggerCallout).toHaveBeenCalledWith(
-        mockCombatant,
-        CalloutType.MOVING,
-        mockCombatant.position
-      )
-    })
-
-    it('should not trigger if state did not change', () => {
-      mockCombatant.state = CombatantState.ADVANCING
-      vi.spyOn(Math, 'random').mockReturnValue(0.1)
-
-      // First update
-      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
-      mockTriggerCallout.mockClear()
-
-      // Second update with same state
-      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
-
-      expect(mockTriggerCallout).not.toHaveBeenCalled()
-    })
-
-    it('should not trigger if random check fails', () => {
-      mockCombatant.state = CombatantState.ADVANCING
-      vi.spyOn(Math, 'random').mockReturnValue(0.9) // Above 0.2 threshold
-
-      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
-
-      expect(mockTriggerCallout).not.toHaveBeenCalled()
-    })
-
-    it('should not trigger if combatant is dead', () => {
-      mockCombatant.state = CombatantState.DEAD
-      vi.spyOn(Math, 'random').mockReturnValue(0.1)
-
-      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
-
-      expect(mockTriggerCallout).not.toHaveBeenCalled()
-    })
-
-    it('should not trigger if no voice callout system', () => {
-      ai.setVoiceCalloutSystem(undefined as any)
-      mockCombatant.state = CombatantState.ADVANCING
-      vi.spyOn(Math, 'random').mockReturnValue(0.1)
-
-      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
-
-      expect(mockTriggerCallout).not.toHaveBeenCalled()
-    })
-
-    it('should not trigger for non-movement states', () => {
-      mockCombatant.state = CombatantState.ENGAGING
-      vi.spyOn(Math, 'random').mockReturnValue(0.1)
-
-      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants)
-
-      expect(mockTriggerCallout).not.toHaveBeenCalled()
     })
   })
 

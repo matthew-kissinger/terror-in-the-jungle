@@ -37,7 +37,6 @@ import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
 
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
-import { VoiceCalloutSystem } from '../systems/audio/VoiceCalloutSystem';
 import { LoadoutService } from '../systems/player/LoadoutService';
 import { WarSimulator } from '../systems/strategy/WarSimulator';
 import { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
@@ -81,7 +80,6 @@ export interface SystemReferences {
   influenceMapSystem: InfluenceMapSystem;
   ammoSupplySystem: AmmoSupplySystem;
   footstepAudioSystem: FootstepAudioSystem;
-  voiceCalloutSystem: VoiceCalloutSystem;
   loadoutService: LoadoutService;
   warSimulator: WarSimulator;
   strategicFeedback: StrategicFeedback;
@@ -186,7 +184,6 @@ export class SystemInitializer {
     refs.smokeCloudSystem = new SmokeCloudSystem(scene, camera);
     refs.ammoSupplySystem = new AmmoSupplySystem(scene, camera);
     refs.footstepAudioSystem = new FootstepAudioSystem(refs.audioManager.getListener());
-    refs.voiceCalloutSystem = new VoiceCalloutSystem(scene, refs.audioManager.getListener());
     refs.loadoutService = new LoadoutService();
     refs.warSimulator = new WarSimulator();
     refs.strategicFeedback = new StrategicFeedback();
@@ -232,7 +229,6 @@ export class SystemInitializer {
       refs.smokeCloudSystem,
       refs.influenceMapSystem,
       refs.ammoSupplySystem,
-      refs.voiceCalloutSystem,
       refs.warSimulator,
       refs.strategicFeedback
     ];
@@ -242,8 +238,7 @@ export class SystemInitializer {
     // Defer non-critical systems so first interactive frame is not blocked.
     const deferredSystems = new Set<GameSystem>([
       refs.helipadSystem,
-      refs.helicopterModel,
-      refs.voiceCalloutSystem
+      refs.helicopterModel
     ]);
 
     const systems: GameSystem[] = allSystems.filter(system => !deferredSystems.has(system));

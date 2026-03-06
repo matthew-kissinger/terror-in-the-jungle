@@ -1,6 +1,6 @@
 # Perf Frontier
 
-Last updated: 2026-03-04
+Last updated: 2026-03-06
 Scope: Phase 1 measurement, harness validation, baseline capture state, and Phase 2 bottleneck analysis.
 
 ## Zoomed-Out Progress Snapshot (2026-03-04, Evening)
@@ -19,7 +19,7 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
 
 | Scenario | Latest artifact | Outcome | Key numbers | Current gate |
 |---|---|---|---|---|
-| `combat120` | `2026-03-04T21-40-18-916Z` | FAIL / behavior-valid | `avg=14.17ms`, `p99=86.90ms`, `shots/hits=246/133`, `ai_starvation=12.34` | Tail + starvation still fail despite improved pressure and throughput. |
+| `combat120` | `2026-03-06T13-29-32-508Z` | WARN / behavior-valid | `avg=12.79ms`, `p99=35.30ms`, `shots/hits=175/90`, `ai_starvation=3.94` | p99 improved 60% (was 86.90ms). Starvation improved 70%. Matched pair confirmed. |
 | `openfrontier:short` | `2026-03-04T13-43-12-583Z` | PASS | `avg=5.40ms`, `p99=21.30ms`, `shots/hits=29/13` | Throughput healthy on current branch; keep as control for terrain-heavy changes. |
 | `ashau:short` | `2026-03-04T07-46-50-552Z` | WARN / behavior-valid | `avg=8.93ms`, `p99=25.80ms`, `shots/hits=270/150` | Contact reliability fixed; remaining work is strategy/terrain tail analysis. |
 | `frontier30m` | `2026-03-04T07-57-32-230Z` | FAIL / behavior-valid | `avg=7.13ms`, `p99=85.90ms`, `shots/hits=156/85` | Soak still fails on tails/stalls, not mean frame time. |
@@ -27,18 +27,21 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
 ### Net progress since the original warm `combat120` baseline
 
 - Baseline anchor: `2026-03-04T07-50-37-054Z`.
-- Latest warm capture: `2026-03-04T21-40-18-916Z`.
-- Direction of travel is positive but incomplete:
-  - `avgFrameMs`: `15.10 -> 14.17`
-  - `ai_budget_starvation_events`: `16.82 -> 12.34`
-  - `shots/hits`: `212/130 -> 246/133`
-  - `peak_p99_frame_ms` remains fail-class (`100.00 -> 86.90`)
+- Latest warm capture: `2026-03-06T13-29-32-508Z`.
+- Direction of travel is strongly positive:
+  - `avgFrameMs`: `15.10 -> 12.79`
+  - `ai_budget_starvation_events`: `16.82 -> 3.94`
+  - `shots/hits`: `212/130 -> 175/90` (comparable pressure)
+  - `peak_p99_frame_ms`: `100.00 -> 35.30` (was FAIL, now WARN)
+- March 6 micro-optimizations (LOS timing removal, HeightQueryCache 20K + scratch normal, BVH 6m grid step) produced the largest single-session p99 improvement to date.
 
 ### What this means operationally
 
-- We are no longer blocked by harness validity; we are blocked by combat-tail closure and soak-tail closure.
-- The optimization program is making measurable forward movement, but it is not yet in “stabilized frontier” state.
-- Next acceptance gate should require two consecutive warm `combat120` runs with comparable pressure and no new tail regressions before promoting new baselines.
+- `combat120` has moved from FAIL to WARN. The p99 target is <16ms; current best is 30.9-35.3ms. The remaining gap is ~2x.
+- AI starvation is now in pass range for most samples.
+- The remaining combat tails are still `AIStateEngage.initiateSquadSuppression()` synchronous cover search bursts (57-58ms spikes visible in capture logs).
+- `frontier30m` soak tails remain the other open gate. Terrain tick-group decoupling is the next target there.
+- Baseline refresh should happen after committing the current accepted changes.
 
 ## Phase 1 Status
 

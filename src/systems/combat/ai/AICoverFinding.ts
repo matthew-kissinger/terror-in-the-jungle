@@ -70,7 +70,7 @@ export class AICoverFinding {
   findNearestCover(combatant: Combatant, threatPosition: THREE.Vector3): THREE.Vector3 | null {
     const MAX_SEARCH_RADIUS = 30;
     const MAX_SEARCH_RADIUS_SQ = MAX_SEARCH_RADIUS * MAX_SEARCH_RADIUS;
-    const SEARCH_SAMPLES = 16;
+    const SEARCH_SAMPLES = 8;
     const SANDBAG_PREFERRED_DISTANCE = 15;
     let bestCoverPos: THREE.Vector3 | null = null;
     let bestCoverScore = -Infinity;
@@ -203,7 +203,8 @@ export class AICoverFinding {
     const MIN_COVER_HEIGHT = 1.5;
     const searchRadiusSq = searchRadius * searchRadius;
 
-    const gridSize = 12;
+    const MAX_CANDIDATES = 4;
+    const gridSize = 8;
     const step = (searchRadius * 2) / gridSize;
 
     for (let x = -searchRadius; x <= searchRadius; x += step) {
@@ -246,6 +247,7 @@ export class AICoverFinding {
           const dotProduct = _coverToSample.dot(_coverToThreat);
           if (dotProduct > 0.5) {
             coverPositions.push(coverPos.clone());
+            if (coverPositions.length >= MAX_CANDIDATES) return coverPositions;
           }
         }
       }

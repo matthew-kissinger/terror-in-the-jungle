@@ -53,9 +53,6 @@ export class SystemUpdater {
       refs.minimapSystem.setCommandPosition(commandPos);
       refs.fullMapSystem.setCommandPosition(commandPos);
 
-      if (refs.voiceCalloutSystem) {
-        refs.voiceCalloutSystem.setPlayerPosition(refs.playerController.getPosition());
-      }
     }
 
     // Track timing for key systems (both local tracking and performance telemetry)

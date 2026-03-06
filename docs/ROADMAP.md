@@ -24,27 +24,25 @@ Vietnam War is the first theater. The architecture should generalize to any war 
 | Vehicles | 1 player-only UH-1 Huey | No NPC boarding, no weapons, no damage, no enemy aircraft, throttle sticks |
 | Weapons | 4 player + 2 NPC types | Shared deploy/loadout flow is live, but field pickups and broader weapon expansion are still later-phase work |
 | AI | 8-state FSM, 2 factions (US/OPFOR) | No vehicle usage, no turret manning, limited tactical intelligence |
-| Squad | Single coordinator + quick strip + map-first desktop/touch overlay | No selected-squad panel yet, and gamepad still uses radial fallback |
+| Squad | Single coordinator + quick strip + map-first overlay (desktop/touch/gamepad) | Selected-squad detail is live; gamepad uses map-first overlay; scale adapters deferred |
 | Terrain | Noise + DEM terrain runtime | CDLOD transition validation and hydrology/gameplay integration are still incomplete |
 | Vegetation | 7+ billboard types with biome-aware runtime wiring | Needs in-engine smoke validation and visual tuning across modes |
 | Water | Global plane + shader rivers | No swimming, no boats, disabled in A Shau, shader is basic |
 | Assets | GLB integration has started for several live systems | More models remain staged in `deploy-3d-assets/`, but the engine is no longer fully procedural |
-| HUD/UI | UI Engine Phases 0-7 complete (CSS Modules + signals) | Squad UI scattered, no RTS command surface, no vehicle weapon HUD |
+| HUD/UI | UI Engine Phases 0-7 complete (CSS Modules + signals) | Command overlay is live; no vehicle weapon HUD yet |
 | Scale | 3000 agents / 21km map | Heap growth warnings at current scale, architecture recovery P0-P3 active |
-| Factions | US, ARVN, NVA, VC loadout contexts are live | Core world ownership logic still leaks US/OPFOR assumptions |
+| Factions | US, ARVN, NVA, VC loadout contexts are live | Zone ownership generalized to BLUFOR/OPFOR alliance level; dynamic HUD faction labels from config |
 
 ## Known Bugs (Confirmed)
 
 ### Helicopter Throttle
-- **Symptom:** Collective stays elevated after releasing W key
-- **Root cause:** PlayerMovement.ts still lerps collective to 0.4 (hover point) on key release with autoHover on. With autoHover off, current code decays collective toward 0, but the overall control feel is still sticky and needs a clearer schema.
-- **Two-layer smoothing** (PlayerMovement lerp @ 2.0 + HelicopterPhysics lerp @ 8.0) compounds the stickiness.
-- **Fix needed:** Explicit control schema - hold for thrust, release for none, dedicated lock button for maintaining altitude.
+- **Symptom:** Collective decay and hover behavior can feel sticky at transitions
+- **Current state:** Per-aircraft AircraftPhysicsConfig is live (UH-1 Huey, UH-1C Gunship, AH-1 Cobra). W/S direct increment/decrement collective; release decays toward 0 (autoHover OFF, dt*3.0) or 0.4 (autoHover ON, dt*2.0).
+- **Remaining:** Single-layer smoothing pass (remove PlayerMovement lerp, keep HelicopterPhysics only), altitude lock key.
 
 ### Squad Controls
-- **Current state:** Desktop and touch command entry now run through `CommandInputManager`, with a map-first overlay for placement orders.
+- **Current state:** Desktop and touch command entry run through `CommandInputManager` with map-first overlay. Selected-squad detail panel is live.
 - **Remaining gap:** Gamepad still falls back to the radial menu while the map-first command surface is desktop/touch only.
-- **Remaining gap:** No selected-squad detail panel or map-click squad selection yet.
 - **See:** `docs/SQUAD_COMMAND_REARCHITECT.md` for current architecture and remaining work.
 
 ## Resolved Decisions

@@ -13,14 +13,13 @@ const _registeredChunkBox = new THREE.Box3();
  * - Caches BVH structures per chunk (already built in ImprovedChunk)
  * - Uses spatial culling to only check relevant chunks
  * - Leverages three-mesh-bvh for fast raycasting
- * - Tracks performance metrics for monitoring
+ * - Tracks query counts for monitoring (no per-query timing overhead)
  */
 export class LOSAccelerator {
   private chunkCache: Map<string, { mesh: THREE.Mesh; bounds: THREE.Box3 }> = new Map();
 
-  // Performance tracking
+  // Performance tracking (count-only to avoid per-query timing overhead)
   private queryCount = 0;
-  private totalQueryTime = 0;
   private lastReportTime = 0;
   private readonly REPORT_INTERVAL_MS = 5000;
 
@@ -64,7 +63,7 @@ export class LOSAccelerator {
     target: THREE.Vector3,
     maxDistance: number
   ): { clear: boolean; hitPoint?: THREE.Vector3; distance?: number } {
-    const startTime = performance.now();
+    this.recordQuery();
 
     // Calculate direction and distance
     _losDirection.subVectors(target, origin);
@@ -73,7 +72,6 @@ export class LOSAccelerator {
 
     // Early out if target is beyond max distance
     if (distance > maxDistance) {
-      this.recordQuery(performance.now() - startTime);
       return { clear: false };
     }
 
@@ -81,7 +79,6 @@ export class LOSAccelerator {
     const relevantMeshes = this.getRelevantChunks(origin, target);
 
     if (relevantMeshes.length === 0) {
-      this.recordQuery(performance.now() - startTime);
       return { clear: true };
     }
 
@@ -91,8 +88,6 @@ export class LOSAccelerator {
 
     // Raycast against relevant meshes (BVH acceleration happens automatically)
     const intersects = _losRaycaster.intersectObjects(relevantMeshes, false);
-
-    this.recordQuery(performance.now() - startTime);
 
     if (intersects.length > 0) {
       const hit = intersects[0];
@@ -142,24 +137,21 @@ export class LOSAccelerator {
   }
 
   /**
-   * Record query performance and periodically log metrics
+   * Record query count and periodically log metrics.
+   * No per-query timing to avoid performance.now() overhead in hot path.
    */
-  private recordQuery(timeMs: number): void {
+  private recordQuery(): void {
     this.queryCount++;
-    this.totalQueryTime += timeMs;
 
     const now = performance.now();
     if (now - this.lastReportTime > this.REPORT_INTERVAL_MS) {
-      const avgTime = this.totalQueryTime / this.queryCount;
       Logger.info('los',
-        `LOS queries: ${this.queryCount} total, ` +
-        `${avgTime.toFixed(3)}ms avg, ` +
+        `LOS queries: ${this.queryCount} in ${((now - this.lastReportTime) / 1000).toFixed(1)}s, ` +
         `${this.chunkCache.size} chunks cached`
       );
 
       // Reset counters
       this.queryCount = 0;
-      this.totalQueryTime = 0;
       this.lastReportTime = now;
     }
   }
@@ -167,10 +159,9 @@ export class LOSAccelerator {
   /**
    * Get current performance stats (for debugging/monitoring)
    */
-  getStats(): { queryCount: number; avgQueryTime: number; cachedChunks: number } {
+  getStats(): { queryCount: number; cachedChunks: number } {
     return {
       queryCount: this.queryCount,
-      avgQueryTime: this.queryCount > 0 ? this.totalQueryTime / this.queryCount : 0,
       cachedChunks: this.chunkCache.size
     };
   }
@@ -181,7 +172,6 @@ export class LOSAccelerator {
   clear(): void {
     this.chunkCache.clear();
     this.queryCount = 0;
-    this.totalQueryTime = 0;
     Logger.info('los', 'Cleared LOS accelerator cache');
   }
 }

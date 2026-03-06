@@ -12,7 +12,6 @@ import { CombatantRenderer } from './CombatantRenderer';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
-import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem';
 import { Logger } from '../../utils/Logger';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 import { tryConsumeCombatFireRaycast } from './ai/CombatFireRaycastBudget';
@@ -32,9 +31,9 @@ export interface CombatHitResult {
 
 export class CombatantCombat {
   private readonly MAX_ENGAGEMENT_RANGE = 280;
-  private readonly TERRAIN_SAMPLE_STEP = 1.25;
-  private readonly TERRAIN_OCCLUSION_EPSILON = 0.45;
-  private readonly CLOSE_RANGE_OCCLUSION_BYPASS = 35;
+  private readonly TERRAIN_SAMPLE_STEP = 2.0;
+  private readonly TERRAIN_OCCLUSION_EPSILON = 0.15;
+  private readonly CLOSE_RANGE_OCCLUSION_BYPASS = 200;
 
   private impactEffectsPool: ImpactEffectsPool;
   public hitDetection: CombatantHitDetection;
@@ -49,8 +48,6 @@ export class CombatantCombat {
   private cameraShakeSystem?: CameraShakeSystem;
   private camera?: THREE.Camera;
   private playerPosition: THREE.Vector3 = new THREE.Vector3();
-  private voiceCalloutSystem?: VoiceCalloutSystem;
-
   // Extracted modules
   private ballistics: CombatantBallistics;
   private damage: CombatantDamage;
@@ -133,9 +130,6 @@ export class CombatantCombat {
     if (combatant.currentBurst >= combatant.skillProfile.burstLength) {
       combatant.currentBurst = 0;
       combatant.burstCooldown = combatant.skillProfile.burstPauseMs / 1000;
-      if (this.voiceCalloutSystem && Math.random() < 0.15) {
-        this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.RELOADING, combatant.position);
-      }
       return;
     }
 
@@ -143,11 +137,6 @@ export class CombatantCombat {
     combatant.gunCore.registerShot();
     combatant.currentBurst++;
     combatant.lastShotTime = performance.now();
-
-    // Voice callout: First shot in burst - "Contact!" or "Engaging!"
-    if (combatant.currentBurst === 1 && this.voiceCalloutSystem && Math.random() < 0.3) {
-      this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.CONTACT, combatant.position);
-    }
 
     // Calculate accuracy multiplier
     let accuracyMultiplier = 1.0;
@@ -243,11 +232,6 @@ export class CombatantCombat {
         };
       } else {
         combatant.consecutiveMisses++;
-
-        // Voice callout: Taking fire (near miss on player triggers callout)
-        if (this.voiceCalloutSystem && Math.random() < 0.15) {
-          this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.TAKING_FIRE, combatant.position);
-        }
       }
     } else {
       hit = this.hitDetection.raycastCombatants(shotRay, combatant.faction, allCombatants);
@@ -267,17 +251,9 @@ export class CombatantCombat {
     combatant.gunCore.registerShot();
     combatant.currentBurst++;
 
-    // Voice callout: Suppressing fire
-    if (combatant.currentBurst === 1 && this.voiceCalloutSystem && Math.random() < 0.2) {
-      this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.SUPPRESSING, combatant.position);
-    }
-
     if (combatant.currentBurst >= combatant.skillProfile.burstLength) {
       combatant.currentBurst = 0;
       combatant.burstCooldown = combatant.skillProfile.burstPauseMs / 1000;
-      if (this.voiceCalloutSystem && Math.random() < 0.15) {
-        this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.RELOADING, combatant.position);
-      }
     }
 
     // Higher spread for suppressive fire - fire at area not point
@@ -474,12 +450,6 @@ export class CombatantCombat {
     this.camera = camera;
   }
 
-  setVoiceCalloutSystem(system: VoiceCalloutSystem): void {
-    this.voiceCalloutSystem = system;
-    this.damage.setVoiceCalloutSystem(system);
-    this.effects.setVoiceCalloutSystem(system);
-  }
-
   setCombatantRenderer(renderer: CombatantRenderer): void {
     this.combatantRenderer = renderer;
     this.damage.setCombatantRenderer(renderer);
@@ -487,7 +457,6 @@ export class CombatantCombat {
 
   setSpatialQueryProvider(provider: (center: THREE.Vector3, radius: number) => string[]): void {
     this.hitDetection.setQueryProvider(provider);
-    this.damage.setQueryProvider(provider);
     this.suppression.setQueryProvider(provider);
   }
 }

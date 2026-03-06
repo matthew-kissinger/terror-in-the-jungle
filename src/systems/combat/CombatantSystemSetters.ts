@@ -10,7 +10,6 @@ import { spatialGridManager } from './SpatialGridManager';
 import { CombatantMovement } from './CombatantMovement';
 import { CombatantCombat } from './CombatantCombat';
 import { CombatantAI } from './CombatantAI';
-import { VoiceCalloutSystem } from '../audio/VoiceCalloutSystem';
 import { SquadManager } from './SquadManager';
 import { CombatantSpawnManager } from './CombatantSpawnManager';
 import { CombatantLODManager } from './CombatantLODManager';
@@ -73,11 +72,6 @@ export class CombatantSystemSetters {
 
   setAudioManager(audioManager: AudioManager): void {
     this.combatantCombat.setAudioManager(audioManager);
-  }
-
-  setVoiceCalloutSystem(voiceCalloutSystem: VoiceCalloutSystem): void {
-    this.combatantCombat.setVoiceCalloutSystem(voiceCalloutSystem);
-    this.combatantAI.setVoiceCalloutSystem(voiceCalloutSystem);
   }
 
   setPlayerSuppressionSystem(system: import('../player/PlayerSuppressionSystem').PlayerSuppressionSystem): void {

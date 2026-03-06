@@ -67,13 +67,13 @@ export class VegetationScatterer {
   /**
    * Update each frame. Checks if player moved to a new cell and generates/removes vegetation.
    */
-  update(playerPosition: THREE.Vector3): void {
+  update(playerPosition: THREE.Vector3): boolean {
     const cellX = Math.floor(playerPosition.x / this.cellSize);
     const cellZ = Math.floor(playerPosition.z / this.cellSize);
 
     // Only rebuild if player moved to a different cell
     if (cellX === this.lastPlayerCellX && cellZ === this.lastPlayerCellZ) {
-      return;
+      return false;
     }
     this.lastPlayerCellX = cellX;
     this.lastPlayerCellZ = cellZ;
@@ -103,6 +103,8 @@ export class VegetationScatterer {
         this.activeCells.add(key);
       }
     }
+
+    return true;
   }
 
   private generateCell(cellKey: string): void {

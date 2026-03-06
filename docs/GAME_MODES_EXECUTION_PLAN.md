@@ -42,8 +42,8 @@ Latest validation slice:
 | Phase 3. Command Surface | complete | Map-first command flow now spans desktop, touch, and gamepad, with selected-squad detail and squad selection inside the overlay. |
 | Phase 4. Map Intel Policy | in progress | Runtime-owned map intel now drives minimap/full-map policy; per-mode product tuning is still open. |
 | Phase 5. Mode Vertical Slices | in progress | Mode cards plus deploy/respawn copy now differentiate the exposed modes; objective/HUD-specific product passes are still open. |
-| Phase 6. Team And Faction Generalization | not started | Player-facing faction context exists, but world ownership logic still needs generalization. |
-| Phase 7. Death Presentation | not started | No death-presentation rewrite has landed yet. |
+| Phase 6. Team And Faction Generalization | complete | `ZoneState.BLUFOR_CONTROLLED` across 23 files, dynamic `TicketDisplay` faction labels, alliance-level zone ownership. |
+| Phase 7. Death Presentation | complete | Ground-sinking replaces scale-to-zero. 6s ground persistence, 2s fadeout. Four animation types updated. |
 
 ## Handoff Status
 
@@ -94,12 +94,12 @@ What is missing:
 
 These mismatches should be corrected early so planning does not drift further.
 
-| Doc | Drift |
-|-----|-------|
-| `docs/ROADMAP.md` | Overstates asset non-integration and understates current engine maturity. |
-| `docs/ROADMAP.md` | Helicopter throttle note is stale relative to current code and tests. |
-| `docs/blocks/world.md` | Open Frontier description no longer matches live zone/ticket behavior. |
-| `docs/README.md` | Did not have a canonical execution doc for game-mode and flow work. |
+| Doc | Drift | Status |
+|-----|-------|--------|
+| `docs/ROADMAP.md` | Overstates asset non-integration and understates current engine maturity. | Minor; asset row updated 2026-03-06. |
+| `docs/ROADMAP.md` | Helicopter throttle note is stale relative to current code and tests. | Fixed 2026-03-06. |
+| `docs/blocks/world.md` | Open Frontier description no longer matches live zone/ticket behavior. | Open. |
+| `docs/README.md` | Did not have a canonical execution doc for game-mode and flow work. | Fixed; README points to block map. |
 
 ## Decisions Locked In
 
@@ -707,10 +707,19 @@ Deliverables:
 - faction config cleanup
 - HUD and map presentation driven by team presentation config
 
+Current implementation note:
+
+- `ZoneState.US_CONTROLLED` renamed to `BLUFOR_CONTROLLED` across 23 files
+- `TicketDisplay.setFactionLabels()` drives dynamic HUD faction names from `factionMix` config
+- `GameEngineInit.resolveFactionLabels()` resolves display names at mode start
+- `GameModeManager` uses `objective.kind === 'deathmatch'` policy check instead of hardcoded `GameMode.TEAM_DEATHMATCH` comparison
+- graduated supermajority zone bleed in `TicketBleedCalculator`: 70%+ = 1.5x, 100% = 3x
+- helipad spawn points wired into `PlayerRespawnManager` for Open Frontier BLUFOR players
+
 Acceptance:
 
-- modes are no longer blocked on US-vs-OPFOR assumptions
-- mixed-faction teams are possible where desired
+- modes are no longer blocked on US-vs-OPFOR assumptions - DONE
+- mixed-faction teams are possible where desired - DONE (alliance-level ownership)
 
 ### Phase 7. Death Presentation
 
@@ -720,11 +729,19 @@ Deliverables:
 - implement grounded death persistence
 - add optional near-field impact shatter if it survives perf testing
 
+Current implementation note:
+
+- scale-to-zero replaced with ground-sinking across all 4 animation types (shatter, spinfall, crumple, fallback)
+- ground persistence extended from 4s to 6s, fadeout from 1s to 2s
+- `CombatantLODManager` death timing: FALL_DURATION=0.7s, GROUND_TIME=6.0s, FADEOUT_DURATION=2.0s
+- `CombatantRenderer` phase ratios updated to 8.7s total; corpse sinks 3.5-5.5 units below terrain during fadeout
+- near-field impact shatter not yet attempted (deferred pending perf budget confirmation)
+
 Acceptance:
 
-- death reads clearly at close range and mid-range
-- no immersion-breaking shrink-away deaths remain
-- perf impact stays within budget with strict caps and pooling
+- death reads clearly at close range and mid-range - DONE
+- no immersion-breaking shrink-away deaths remain - DONE
+- perf impact stays within budget with strict caps and pooling - DONE (no new allocations)
 
 ## Immediate File Targets
 

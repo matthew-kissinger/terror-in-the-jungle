@@ -106,7 +106,7 @@ vi.mock('../combat/LOSAccelerator', () => ({
     unregisterChunk = vi.fn();
     checkLineOfSight = vi.fn().mockReturnValue({ clear: true });
     clear = vi.fn();
-    getStats = vi.fn().mockReturnValue({ queryCount: 0, avgQueryTime: 0, cachedChunks: 0 });
+    getStats = vi.fn().mockReturnValue({ queryCount: 0, cachedChunks: 0 });
   },
 }));
 

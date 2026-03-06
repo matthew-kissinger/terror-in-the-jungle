@@ -6,8 +6,6 @@ import { AudioManager } from '../audio/AudioManager';
 import { CombatantRenderer } from './CombatantRenderer';
 import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
-import { spatialGridManager } from './SpatialGridManager';
-import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem';
 import { Logger } from '../../utils/Logger';
 import { KillAssistTracker } from './KillAssistTracker';
 import { IHUDSystem } from '../../types/SystemInterfaces';
@@ -24,10 +22,7 @@ export class CombatantDamage {
   private combatantRenderer?: CombatantRenderer;
   private cameraShakeSystem?: CameraShakeSystem;
   private impactEffectsPool?: ImpactEffectsPool;
-  private voiceCalloutSystem?: VoiceCalloutSystem;
   private playerPosition: THREE.Vector3 = new THREE.Vector3();
-  private queryProvider: ((center: THREE.Vector3, radius: number) => string[]) | null = null;
-
   // Module-level scratch vectors (do not share with other modules)
   private readonly scratchDeathDir = new THREE.Vector3();
   private readonly scratchBloodPos = new THREE.Vector3();
@@ -59,14 +54,6 @@ export class CombatantDamage {
 
   setImpactEffectsPool(pool: ImpactEffectsPool): void {
     this.impactEffectsPool = pool;
-  }
-
-  setVoiceCalloutSystem(system: VoiceCalloutSystem): void {
-    this.voiceCalloutSystem = system;
-  }
-
-  setQueryProvider(provider: (center: THREE.Vector3, radius: number) => string[]): void {
-    this.queryProvider = provider;
   }
 
   updatePlayerPosition(position: THREE.Vector3): void {
@@ -118,11 +105,6 @@ export class CombatantDamage {
     target.health -= damage;
     target.lastHitTime = Date.now();
     target.suppressionLevel = Math.min(1.0, target.suppressionLevel + 0.3);
-
-    // Voice callout: Taking fire when hit
-    if (this.voiceCalloutSystem && Math.random() < 0.25) {
-      this.voiceCalloutSystem.triggerCallout(target, CalloutType.TAKING_FIRE, target.position);
-    }
 
     // Trigger damage flash effect in shader
     if (this.combatantRenderer) {
@@ -208,11 +190,6 @@ export class CombatantDamage {
 
     Logger.info('combat', `${target.faction} soldier eliminated${attacker ? ` by ${attacker.faction}` : ''}`);
 
-    // Voice callout: Man down (nearby allies call it out)
-    if (this.voiceCalloutSystem && attacker && allCombatants) {
-      this.triggerManDownCallout(target, allCombatants);
-    }
-
     // Death visual effects
     this.spawnDeathEffects(target);
 
@@ -255,51 +232,6 @@ export class CombatantDamage {
           squad.members.splice(index, 1);
         }
       }
-    }
-  }
-
-  /**
-   * Trigger "Man down!" callout from nearby allies.
-   */
-  private triggerManDownCallout(target: Combatant, allCombatants: Map<string, Combatant>): void {
-    const ALLY_SEARCH_RADIUS = 30;
-    const ALLY_SEARCH_RADIUS_SQ = ALLY_SEARCH_RADIUS * ALLY_SEARCH_RADIUS;
-    const nearbyAllies: Combatant[] = [];
-
-    if (this.queryProvider || spatialGridManager.getIsInitialized()) {
-      // Spatial query: only check combatants within 30 units
-      const nearbyIds = this.queryProvider
-        ? this.queryProvider(target.position, ALLY_SEARCH_RADIUS)
-        : spatialGridManager.queryRadius(target.position, ALLY_SEARCH_RADIUS);
-
-      for (const id of nearbyIds) {
-        const c = allCombatants.get(id);
-        if (!c) continue;
-        if (c.faction !== target.faction) continue;
-        if (c.state === CombatantState.DEAD) continue;
-        if (c.id === target.id) continue;
-
-        // Use squared distance for comparison (faster)
-        if (c.position.distanceToSquared(target.position) < ALLY_SEARCH_RADIUS_SQ) {
-          nearbyAllies.push(c);
-        }
-      }
-    } else {
-      // Fallback to old behavior if spatial grid not initialized
-      allCombatants.forEach(c => {
-        if (c.faction === target.faction &&
-            c.state !== CombatantState.DEAD &&
-            c.id !== target.id &&
-            c.position.distanceToSquared(target.position) < ALLY_SEARCH_RADIUS_SQ) {
-          nearbyAllies.push(c);
-        }
-      });
-    }
-
-    // One nearby ally calls out "Man down!"
-    if (nearbyAllies.length > 0 && Math.random() < 0.5 && this.voiceCalloutSystem) {
-      const caller = nearbyAllies[Math.floor(Math.random() * nearbyAllies.length)];
-      this.voiceCalloutSystem.triggerCallout(caller, CalloutType.MAN_DOWN, caller.position);
     }
   }
 

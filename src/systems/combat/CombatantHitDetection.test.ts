@@ -262,7 +262,7 @@ describe('CombatantHitDetection', () => {
       expect(result!.distance).toBeLessThan(20);
     });
 
-    it('should skip friendly faction when FRIENDLY_FIRE_ENABLED is false', () => {
+    it('should skip allied combatants', () => {
       const friendly = makeCombatant({
         id: 'friendly1',
         faction: Faction.US,

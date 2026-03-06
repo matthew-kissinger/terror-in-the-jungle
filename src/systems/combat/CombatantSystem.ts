@@ -14,8 +14,6 @@ import { ZoneManager } from '../world/ZoneManager';
 import { AudioManager } from '../audio/AudioManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { Logger } from '../../utils/Logger';
-import { VoiceCalloutSystem } from '../audio/VoiceCalloutSystem';
-
 // Refactored modules
 import { CombatantFactory } from './CombatantFactory';
 import { CombatantAI } from './CombatantAI';
@@ -468,10 +466,6 @@ export class CombatantSystem implements GameSystem {
 
   setPlayerFaction(faction: Faction): void {
     this.updateHelpers.setPlayerFaction(faction);
-  }
-
-  setVoiceCalloutSystem(voiceCalloutSystem: VoiceCalloutSystem): void {
-    this.setters.setVoiceCalloutSystem(voiceCalloutSystem);
   }
 
   setPlayerSuppressionSystem(system: import('../player/PlayerSuppressionSystem').PlayerSuppressionSystem): void {

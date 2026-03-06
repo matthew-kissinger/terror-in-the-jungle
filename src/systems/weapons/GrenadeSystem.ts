@@ -10,10 +10,8 @@ import { InventoryManager } from '../player/InventoryManager';
 import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
 import { PlayerStatsTracker } from '../player/PlayerStatsTracker';
-import { VoiceCalloutSystem } from '../audio/VoiceCalloutSystem';
 import { Grenade, GrenadePhysics, GrenadeSpawner } from './GrenadePhysics';
 import { GrenadeArcRenderer, GrenadeHandView, GrenadeCooking } from './GrenadeArcRenderer';
-import { triggerGrenadeCallout } from './GrenadeCallout';
 import { GrenadeEffects } from './GrenadeEffects';
 import type { IFlashbangScreenEffect, IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
 
@@ -27,7 +25,6 @@ export class GrenadeSystem implements GameSystem {
   private inventoryManager?: InventoryManager;
   private ticketSystem?: TicketSystem;
   private audioManager?: AudioManager;
-  private voiceCalloutSystem?: VoiceCalloutSystem;
   private playerController?: IPlayerController;
   private statsTracker?: PlayerStatsTracker;
 
@@ -287,7 +284,6 @@ export class GrenadeSystem implements GameSystem {
     const powerPercent = Math.round(this.throwPower * 100);
     const cookedTime = remainingFuseTime < this.FUSE_TIME ? ` (cooked ${(this.FUSE_TIME - remainingFuseTime).toFixed(1)}s)` : '';
     Logger.info('weapons', `Grenade thrown at ${powerPercent}% power${cookedTime}`);
-    triggerGrenadeCallout(grenade.position, this.voiceCalloutSystem, this.combatantSystem);
     return true;
   }
 
@@ -339,10 +335,6 @@ export class GrenadeSystem implements GameSystem {
 
   setAudioManager(audioManager: AudioManager): void {
     this.audioManager = audioManager;
-  }
-
-  setVoiceCalloutSystem(voiceCalloutSystem: VoiceCalloutSystem): void {
-    this.voiceCalloutSystem = voiceCalloutSystem;
   }
 
   setStatsTracker(statsTracker: PlayerStatsTracker): void {

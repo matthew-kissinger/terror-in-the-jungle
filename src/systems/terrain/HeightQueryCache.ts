@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import type { IHeightProvider } from './IHeightProvider';
 import { NoiseHeightProvider } from './NoiseHeightProvider';
 
+const _scratchNormal = new THREE.Vector3();
+
 /**
  * CPU-side height query system with a bounded numeric-key cache.
  * Delegates to an IHeightProvider for actual height computation.
@@ -19,7 +21,7 @@ export class HeightQueryCache {
 
   constructor(provider?: IHeightProvider, maxCacheSize?: number);
   constructor(seed?: number, maxCacheSize?: number);
-  constructor(providerOrSeed?: IHeightProvider | number, maxCacheSize: number = 10000) {
+  constructor(providerOrSeed?: IHeightProvider | number, maxCacheSize: number = 20000) {
     if (typeof providerOrSeed === 'object' && providerOrSeed !== null) {
       this.provider = providerOrSeed;
     } else {
@@ -77,14 +79,12 @@ export class HeightQueryCache {
     const eastHeight = this.getHeightAt(worldX + sampleDistance, worldZ);
     const westHeight = this.getHeightAt(worldX - sampleDistance, worldZ);
 
-    // Calculate normal from height differences
-    const normal = new THREE.Vector3(
+    // Reuse scratch vector to avoid per-call allocation
+    return _scratchNormal.set(
       (westHeight - eastHeight) / (2 * sampleDistance),
       1,
       (southHeight - northHeight) / (2 * sampleDistance)
-    );
-
-    return normal.normalize();
+    ).normalize();
   }
 
   /**

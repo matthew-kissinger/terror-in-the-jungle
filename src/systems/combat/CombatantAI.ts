@@ -13,13 +13,10 @@ import { AIStateDefend } from './ai/AIStateDefend'
 import { AITargeting } from './ai/AITargeting'
 import { AICoverSystem } from './ai/AICoverSystem'
 import { AIFlankingSystem } from './ai/AIFlankingSystem'
-import { VoiceCalloutSystem, CalloutType } from '../audio/VoiceCalloutSystem'
-
 /**
  * Thin orchestrator for AI state machine - delegates to focused state handler modules
  */
 export class CombatantAI {
-  private readonly FRIENDLY_FIRE_ENABLED = false
   private MAX_ENGAGEMENT_RANGE = 150
 
   // State handler modules
@@ -32,9 +29,7 @@ export class CombatantAI {
   // Tactical systems
   private coverSystem: AICoverSystem
   private flankingSystem: AIFlankingSystem
-  private voiceCalloutSystem?: VoiceCalloutSystem
   private ticketSystem?: TicketSystem
-  private lastStateById: Map<string, CombatantState> = new Map()
   private flankingUpdatedSquadsThisFrame: Set<string> = new Set()
 
   private squads: Map<string, Squad> = new Map()
@@ -68,11 +63,6 @@ export class CombatantAI {
     this.engageHandler.setSquads(squads)
   }
 
-  setVoiceCalloutSystem(system: VoiceCalloutSystem): void {
-    this.voiceCalloutSystem = system
-    this.movementHandler.setVoiceCalloutSystem(system)
-  }
-
   setTicketSystem(ticketSystem: TicketSystem): void {
     this.ticketSystem = ticketSystem
   }
@@ -88,8 +78,6 @@ export class CombatantAI {
     if (this.ticketSystem && !this.ticketSystem.isGameActive()) {
       return
     }
-
-    const lastState = this.lastStateById.get(combatant.id) ?? combatant.state
 
     // Apply squad command overrides before state machine processing
     this.applySquadCommandOverride(combatant, playerPosition)
@@ -194,8 +182,6 @@ export class CombatantAI {
     const key = this.getStateTimingKey(stateAtStart)
     this.aiStateMs[key] = (this.aiStateMs[key] || 0) + stateDuration
 
-    this.maybeTriggerMovementCallout(combatant, lastState)
-    this.lastStateById.set(combatant.id, combatant.state)
   }
 
   beginFrame(): void {
@@ -367,16 +353,6 @@ export class CombatantAI {
 
   private isCoverFlanked(combatant: Combatant, threatPos: THREE.Vector3): boolean {
     return this.targeting.isCoverFlanked(combatant, threatPos)
-  }
-
-  private maybeTriggerMovementCallout(combatant: Combatant, previousState: CombatantState): void {
-    if (!this.voiceCalloutSystem) return
-    if (combatant.state === CombatantState.DEAD) return
-    if (combatant.state !== CombatantState.ADVANCING && combatant.state !== CombatantState.RETREATING) return
-    if (combatant.state === previousState) return
-    if (Math.random() >= 0.2) return
-
-    this.voiceCalloutSystem.triggerCallout(combatant, CalloutType.MOVING, combatant.position)
   }
 
   // Public squad suppression initiator (called from CombatantSystem)
