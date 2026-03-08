@@ -132,7 +132,7 @@ describe('VegetationScatterer', () => {
     expect(classifiedPalette).toEqual(highlandPalette);
   });
 
-  it('clamps overflow cell height sampling to playable bounds', () => {
+  it('passes unclamped world coordinates to height cache (heightmap covers visual extent)', () => {
     scatterer.setWorldBounds(100, 50);
 
     const cache = getHeightQueryCache() as any;
@@ -147,6 +147,8 @@ describe('VegetationScatterer', () => {
     cache.getHeightAt.mockClear();
     getHeight(64, 0);
 
-    expect(cache.getHeightAt).toHaveBeenCalledWith(50, 0);
+    // baseX = 1*64 = 64, localX = 64 -> worldX = 128. No clamping:
+    // heightmap covers full visual extent (worldSize + 2*visualMargin).
+    expect(cache.getHeightAt).toHaveBeenCalledWith(128, 0);
   });
 });

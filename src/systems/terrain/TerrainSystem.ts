@@ -96,7 +96,7 @@ export class TerrainSystem implements GameSystem {
     try {
       terrainMaterial = this.surfaceRuntime.initialize(
         cache.getProvider(),
-        this.config.worldSize,
+        this.getVisualWorldSize(),
         this.defaultBiomeId,
         this.biomeRules,
       );
@@ -350,7 +350,7 @@ export class TerrainSystem implements GameSystem {
 
     if (this.isInitialized) {
       this.surfaceRuntime.updateBiomeMaterial(
-        this.config.worldSize,
+        this.getVisualWorldSize(),
         this.defaultBiomeId,
         this.biomeRules,
       );
@@ -399,7 +399,7 @@ export class TerrainSystem implements GameSystem {
       this.config.visualMargin,
       this.config.tileResolution - 1,
     );
-    this.config.lodRanges = computeDefaultLODRanges(newWorldSize, this.config.maxLODLevels);
+    this.config.lodRanges = computeDefaultLODRanges(newWorldSize, this.config.maxLODLevels, this.config.visualMargin);
     this.vegetationScatterer.setWorldBounds(newWorldSize, this.config.visualMargin);
 
     if (this.isInitialized) {
@@ -415,7 +415,7 @@ export class TerrainSystem implements GameSystem {
     // Re-bake heightmap at new world size if initialized
     if (this.isInitialized) {
       const cache = getHeightQueryCache();
-      this.surfaceRuntime.rebake(cache.getProvider(), this.config.worldSize, this.defaultBiomeId, this.biomeRules);
+      this.surfaceRuntime.rebake(cache.getProvider(), this.getVisualWorldSize(), this.defaultBiomeId, this.biomeRules);
       this.syncCpuHeightsToGpu();
     }
 
@@ -436,13 +436,11 @@ export class TerrainSystem implements GameSystem {
     if (!baked) return;
 
     const cache = getHeightQueryCache();
-    const meshQuadsPerEdge = (this.config.tileResolution - 1) * Math.pow(2, this.config.maxLODLevels);
     const bakedProvider = new BakedHeightProvider(
       baked.data,
       baked.gridSize,
       baked.worldSize,
       cache.getProvider().getWorkerConfig(),
-      meshQuadsPerEdge,
     );
     cache.setProvider(bakedProvider);
 

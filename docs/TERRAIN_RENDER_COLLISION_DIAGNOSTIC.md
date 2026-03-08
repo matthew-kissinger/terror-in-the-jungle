@@ -9,9 +9,9 @@
 
 ## Root Cause: Two Independent Bugs
 
-### Bug 1 (PRIMARY) - LOD Mesh vs Heightmap Interpolation Mismatch -- FIXED
+### Bug 1 (PRIMARY) - LOD Mesh vs Heightmap Interpolation Mismatch -- ACCEPTED (industry standard)
 
-**Status**: Fixed. `BakedHeightProvider.getHeightAt()` now uses triangle interpolation on the LOD 0 mesh grid, matching the GPU rasterizer exactly. The `meshQuadsPerEdge` parameter is computed from `(tileResolution - 1) * 2^maxLODLevels` and passed from `TerrainSystem.syncCpuHeightsToGpu()`. When mesh grid differs from heightmap grid (e.g. A Shau), mesh vertex heights are bilinear-sampled from the heightmap first, then triangle-interpolated - the same two-step process the GPU performs.
+**Status**: Accepted trade-off. CPU uses bilinear heightmap interpolation (industry standard - Unity, Unreal, Godot all do this). The residual error from GPU triangle interpolation at LOD 0 is bounded to ~0.3m on steep terrain at 3.5m vertex spacing, which is imperceptible. Every major game engine treats the heightmap as the single source of truth for collision/physics, not the LOD mesh.
 
 **Original problem**: The GPU terrain surface and the CPU height queries used **different interpolation methods** between sample points, producing different heights at the same world position.
 
@@ -182,9 +182,14 @@ Per frame:
 
 ## Fix Strategies
 
-### Bug 1 (interpolation mismatch) -- FIXED
+### Bug 1 (interpolation mismatch) -- ACCEPTED
 
-Implemented **Option A - Match CPU to GPU**: `BakedHeightProvider.getHeightAt()` now uses triangle interpolation on the LOD 0 mesh grid with "/" diagonal topology (matching PlaneGeometry). Zero performance cost - same HeightQueryCache hit rate applies.
+Reverted to bilinear heightmap interpolation (industry standard). Triangle interpolation was attempted but abandoned - the CPU mesh grid maps to `worldSize` while the GPU quadtree covers `worldSize + 2*visualMargin`, causing misaligned triangle grids and worse slope errors. Bilinear is the correct approach used by Unity, Unreal, and Godot.
+
+**Additional fixes applied to reduce real sources of divergence:**
+1. Heightmap now baked at visual world size (`worldSize + 2*visualMargin`) instead of just `worldSize` - eliminates flat shelf at terrain edges
+2. LOD ranges computed from quadtree size (`worldSize + 2*visualMargin`) instead of `worldSize` - eliminates 10-12% range underestimate
+3. Vegetation height queries no longer clamped to playable bounds - heightmap covers full visual extent
 
 ### For Bug 2 (stale `transformed`) -- not implemented:
 

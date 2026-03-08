@@ -184,16 +184,8 @@ export class VegetationScatterer {
     worldX: number,
     worldZ: number
   ): number {
-    return cache.getHeightAt(
-      this.clampToPlayableBounds(worldX),
-      this.clampToPlayableBounds(worldZ)
-    );
-  }
-
-  private clampToPlayableBounds(value: number): number {
-    if (!Number.isFinite(this.worldHalfExtent)) {
-      return value;
-    }
-    return Math.max(-this.worldHalfExtent, Math.min(this.worldHalfExtent, value));
+    // No clamping needed: the heightmap covers the full visual extent
+    // (worldSize + 2*visualMargin), so margin vegetation gets real heights.
+    return cache.getHeightAt(worldX, worldZ);
   }
 }
