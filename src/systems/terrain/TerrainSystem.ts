@@ -436,11 +436,13 @@ export class TerrainSystem implements GameSystem {
     if (!baked) return;
 
     const cache = getHeightQueryCache();
+    const meshQuadsPerEdge = (this.config.tileResolution - 1) * Math.pow(2, this.config.maxLODLevels);
     const bakedProvider = new BakedHeightProvider(
       baked.data,
       baked.gridSize,
       baked.worldSize,
       cache.getProvider().getWorkerConfig(),
+      meshQuadsPerEdge,
     );
     cache.setProvider(bakedProvider);
 
