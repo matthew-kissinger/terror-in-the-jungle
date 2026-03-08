@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { AssetLoader } from '../assets/AssetLoader';
-import { Combatant, CombatantState, Faction, isBlufor } from './types';
+import { Combatant, CombatantState, Faction } from './types';
 import { createOutlineMaterial } from './CombatantShaders';
 import { Logger } from '../../utils/Logger';
 

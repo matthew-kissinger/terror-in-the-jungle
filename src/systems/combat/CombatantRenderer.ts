@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction, isBlufor } from './types';
+import { Combatant, CombatantState, isBlufor } from './types';
 import { AssetLoader } from '../assets/AssetLoader';
 import { CombatantMeshFactory, disposeCombatantMeshes, updateCombatantTexture, type ViewDirection, type WalkFrameMap } from './CombatantMeshFactory';
 import { CombatantShaderSettingsManager, setDamageFlash, updateShaderUniforms, type NPCShaderSettings, type ShaderPreset, type ShaderUniformSettings } from './CombatantShaders';

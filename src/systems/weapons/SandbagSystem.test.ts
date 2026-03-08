@@ -118,9 +118,13 @@ describe('SandbagSystem', () => {
       expect(sandbagSystem).toBeDefined();
     });
 
-    it('should create placement preview via init', () => {
-      // Preview was created during init() and added to scene
-      expect(scene.add).toHaveBeenCalled; // Was called during init
+    it('should create placement preview via init', async () => {
+      // Re-init without clearing mocks so we can observe the scene.add call
+      const fresh = new SandbagSystem(scene, camera, terrainSystem);
+      fresh.setInventoryManager(inventoryManager);
+      await fresh.init();
+      await flushPromises();
+      expect(scene.add).toHaveBeenCalled();
     });
 
     it('should accept optional chunk manager', () => {

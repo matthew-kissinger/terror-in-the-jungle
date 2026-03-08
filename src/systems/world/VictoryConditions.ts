@@ -1,4 +1,4 @@
-import { Faction, isBlufor } from '../combat/types';
+import { Faction } from '../combat/types';
 import { ZoneManager, ZoneState } from './ZoneManager';
 import { GamePhase, PhaseTimings } from './TicketSystemPhases';
 

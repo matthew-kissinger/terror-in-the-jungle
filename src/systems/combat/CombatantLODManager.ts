@@ -5,7 +5,7 @@ import { CombatantCombat } from './CombatantCombat';
 import { CombatantMovement } from './CombatantMovement';
 import { CombatantRenderer } from './CombatantRenderer';
 import { SquadManager } from './SquadManager';
-import { SpatialGridManager, spatialGridManager } from './SpatialGridManager';
+import { spatialGridManager } from './SpatialGridManager';
 import { ZoneManager } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { estimateGPUTier, isMobileGPU } from '../../utils/DeviceDetector';

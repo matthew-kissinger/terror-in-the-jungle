@@ -3,7 +3,7 @@ import { injectSharedStyles } from '../ui/design/styles';
 import { TouchControlLayout } from '../ui/controls/TouchControlLayout';
 import { markStartup, resetStartupTelemetry } from './StartupTelemetry';
 import { AgentTier } from '../systems/strategy/types';
-import { Faction, isBlufor, isOpfor } from '../systems/combat/types';
+import { isBlufor, isOpfor } from '../systems/combat/types';
 import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
 
 const ashauSessionTelemetry = {

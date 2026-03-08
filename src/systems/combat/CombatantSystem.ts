@@ -3,7 +3,7 @@ import { GameSystem } from '../../types';
 import { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSystem';
 import { AssetLoader } from '../assets/AssetLoader';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
-import { Combatant, CombatantState, Faction, isBlufor, isOpfor } from './types';
+import { Combatant, CombatantState, Faction, isBlufor } from './types';
 import { TracerPool } from '../effects/TracerPool';
 import { MuzzleFlashSystem } from '../effects/MuzzleFlashSystem';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';

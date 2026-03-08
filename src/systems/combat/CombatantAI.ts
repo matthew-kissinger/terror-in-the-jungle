@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Combatant, CombatantState, Faction, Squad, SquadCommand, isBlufor } from './types'
+import { Combatant, CombatantState, Squad, SquadCommand, isBlufor } from './types'
 import type { ITerrainRuntime } from '../../types/SystemInterfaces'
 import { SandbagSystem } from '../weapons/SandbagSystem'
 import { SmokeCloudSystem } from '../effects/SmokeCloudSystem'

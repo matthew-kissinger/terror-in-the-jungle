@@ -164,7 +164,7 @@ export class GameScenario {
    * Advance simulation by one tick of `dt` seconds.
    * Syncs all combatant positions into the spatial grid.
    */
-  tick(dt: number): void {
+  tick(_dt: number): void {
     const playerPos = new THREE.Vector3(0, 0, 0);
     this.spatialGrid.syncAllPositions(this.combatants, playerPos);
   }

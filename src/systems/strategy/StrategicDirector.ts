@@ -1,4 +1,4 @@
-import { Faction, Alliance, getAlliance, isBlufor, isOpfor, getEnemyAlliance } from '../combat/types';
+import { Faction, getAlliance, isBlufor, isOpfor, getEnemyAlliance } from '../combat/types';
 import { WarSimulatorConfig } from '../../config/gameModeTypes';
 import { StrategicAgent, StrategicSquad, AgentTier } from './types';
 import { WarEventEmitter } from './WarEventEmitter';
@@ -161,18 +161,18 @@ export class StrategicDirector {
     // Strong squads: split between attack and defend
     let attackRatio: number;
     let defendRatio: number;
-    let patrolRatio: number;
+    let _patrolRatio: number;
 
     if (isDefensiveFaction) {
       // NVA: 20% attack, 50% defend, 30% patrol
       attackRatio = 0.2;
       defendRatio = 0.5;
-      patrolRatio = 0.3;
+      _patrolRatio = 0.3;
     } else {
       // US: 50% attack, 25% defend, 25% patrol
       attackRatio = 0.5;
       defendRatio = 0.25;
-      patrolRatio = 0.25;
+      _patrolRatio = 0.25;
     }
 
     const attackCount = Math.ceil(strong.length * attackRatio);
@@ -260,7 +260,7 @@ export class StrategicDirector {
   private handleReinforcements(elapsedTime: number, zones: CaptureZone[]): void {
     const cooldown = this.config.reinforcementCooldown;
 
-    for (const [faction, label] of [[Faction.US, 'US'], [Faction.NVA, 'NVA']] as const) {
+    for (const [faction, _label] of [[Faction.US, 'US'], [Faction.NVA, 'NVA']] as const) {
       const key = `reinforce_${faction}`;
       const lastTime = this.lastReinforcementTime[key] || 0;
       if (elapsedTime - lastTime < cooldown) continue;

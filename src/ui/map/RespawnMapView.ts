@@ -1,6 +1,6 @@
 import { Logger } from '../../utils/Logger';
 import { ZoneManager, CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
-import { Faction, isBlufor, isOpfor } from '../../systems/combat/types';
+import { isBlufor, isOpfor } from '../../systems/combat/types';
 import { GameModeManager } from '../../systems/world/GameModeManager';
 
 export class RespawnMapView {

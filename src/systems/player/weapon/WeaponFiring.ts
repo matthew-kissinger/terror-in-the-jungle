@@ -1,7 +1,6 @@
 import * as THREE from 'three'
 import { GunplayCore } from '../../weapons/GunplayCore'
 import { CombatantSystem } from '../../combat/CombatantSystem'
-import { CombatHitResult } from '../../combat/CombatantCombat'
 import { TracerPool } from '../../effects/TracerPool'
 import { MuzzleFlashSystem, MuzzleFlashVariant } from '../../effects/MuzzleFlashSystem'
 import { ImpactEffectsPool } from '../../effects/ImpactEffectsPool'

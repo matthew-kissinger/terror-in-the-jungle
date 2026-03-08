@@ -68,7 +68,7 @@ const FACTION_DISPLAY_NAMES: Record<Faction, string> = {
   [Faction.VC]: 'Viet Cong',
 };
 
-function resolveFactionLabels(definition: GameModeDefinition, alliance: Alliance): { blufor: string; opfor: string } {
+function resolveFactionLabels(definition: GameModeDefinition, _alliance: Alliance): { blufor: string; opfor: string } {
   const mix = definition.config.factionMix;
   if (mix) {
     const bluforFactions = mix[Alliance.BLUFOR];

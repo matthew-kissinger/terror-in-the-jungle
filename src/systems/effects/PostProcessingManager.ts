@@ -28,7 +28,7 @@ export class PostProcessingManager {
 
   constructor(
     renderer: THREE.WebGLRenderer,
-    scene: THREE.Scene,
+    _scene: THREE.Scene,
     _camera: THREE.Camera,
   ) {
     this.renderer = renderer;

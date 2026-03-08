@@ -1,5 +1,5 @@
 import { ZoneManager, ZoneState, CaptureZone } from '../../systems/world/ZoneManager';
-import { Faction, Alliance, isBlufor, isOpfor, getAlliance } from '../../systems/combat/types';
+import { Alliance, getAlliance } from '../../systems/combat/types';
 import { HUDElements } from './HUDElements';
 
 export class HUDZoneDisplay {

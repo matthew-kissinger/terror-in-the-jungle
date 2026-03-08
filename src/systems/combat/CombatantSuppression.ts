@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction, isOpfor, isAlly } from './types';
+import { Combatant, CombatantState, Faction, isOpfor } from './types';
 import { spatialGridManager } from './SpatialGridManager';
 import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 import { AudioManager } from '../audio/AudioManager';

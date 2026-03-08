@@ -1,9 +1,9 @@
-import { Faction, isBlufor } from '../combat/types';
+import { isBlufor } from '../combat/types';
 import { WarSimulatorConfig } from '../../config/gameModeTypes';
 import { AgentTier, StrategicAgent, StrategicSquad } from './types';
 import { WarEventEmitter } from './WarEventEmitter';
 import type { TicketSystem } from '../world/TicketSystem';
-import type { ZoneManager, CaptureZone } from '../world/ZoneManager';
+import type { ZoneManager } from '../world/ZoneManager';
 
 /**
  * Abstract Combat Resolver.

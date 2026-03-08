@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Faction, isBlufor, isOpfor } from '../../systems/combat/types';
+import { Faction, isOpfor } from '../../systems/combat/types';
 import { CaptureZone, ZoneManager, ZoneState } from '../../systems/world/ZoneManager';
 
 const _cameraPos = new THREE.Vector3();

@@ -138,7 +138,7 @@ export class TerrainSystem implements GameSystem {
     Logger.info('terrain', `TerrainSystem initialized: ${this.config.worldSize}m world, ${this.config.maxLODLevels} LOD levels`);
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
     if (!this.isInitialized) return;
     if (!this.renderRuntime) return;
 

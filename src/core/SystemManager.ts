@@ -193,9 +193,9 @@ export class SystemManager {
       // Generate chunks around the spawn position and wait for minimum playable ring.
       this.terrainSystem.updatePlayerPosition(spawnPos);
       const chunkSize = this.terrainSystem.getChunkSize();
-      const centerX = Math.floor(spawnPos.x / chunkSize);
-      const centerZ = Math.floor(spawnPos.z / chunkSize);
-      const minPlayableRadius = 1;
+      const _centerX = Math.floor(spawnPos.x / chunkSize);
+      const _centerZ = Math.floor(spawnPos.z / chunkSize);
+      const _minPlayableRadius = 1;
       const timeoutMs = 5000;
       const start = performance.now();
 

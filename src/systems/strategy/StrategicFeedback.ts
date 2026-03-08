@@ -1,5 +1,5 @@
 import { GameSystem } from '../../types';
-import { Faction, isBlufor } from '../combat/types';
+import { isBlufor } from '../combat/types';
 import { Logger } from '../../utils/Logger';
 import { WarEvent } from './types';
 import type { WarSimulator } from './WarSimulator';

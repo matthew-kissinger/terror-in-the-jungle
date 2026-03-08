@@ -70,9 +70,9 @@ describe('UIComponent', () => {
 
     it('build() runs exactly once across multiple element accesses', () => {
       const comp = new TestComponent();
-      comp.element; // triggers build
+      void comp.element; // triggers build
       comp.buildCalled = false; // reset flag
-      comp.element; // second access
+      void comp.element; // second access
       expect(comp.buildCalled).toBe(false); // should not re-trigger
     });
 

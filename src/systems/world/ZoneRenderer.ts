@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CaptureZone, ZoneState } from './ZoneManager';
-import { Faction, isBlufor, isOpfor } from '../combat/types';
+import { Faction, isOpfor } from '../combat/types';
 
 export class ZoneRenderer {
   private scene: THREE.Scene;

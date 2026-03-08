@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Combatant, CombatantState, Faction, Squad, isOpfor } from '../types'
+import { Combatant, CombatantState, Squad, isOpfor } from '../types'
 import { ISpatialQuery } from '../SpatialOctree'
 import { AICoverSystem } from './AICoverSystem'
 import { AIFlankingSystem } from './AIFlankingSystem'
