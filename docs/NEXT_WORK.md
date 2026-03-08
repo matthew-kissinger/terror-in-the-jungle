@@ -1,6 +1,6 @@
 # Next Work
 
-Last updated: 2026-03-08
+Last updated: 2026-03-09
 Status: ACTIVE - iterate top-down, check off items, update docs as fixes land
 
 ## How To Use This File
@@ -191,7 +191,8 @@ Identity: company-scale insertion and maneuver mode.
 - Helicopter: parked on helipads, manually piloted only. No auto-deploy, no NPC pilots, no transport mechanic. Functionally cosmetic.
 - Command surface: company-scale label, same squad command UI as Zone Control. No additional company-level mechanics.
 - Deploy flow: labeled "frontier" but uses same respawn UI with different text. Helipad priority on initial deploy is the main distinction.
-- Verdict: 60% distinct (pressure corridor + helipads + 4x world + double force), 40% reskin (same capture mechanics, cosmetic helicopter, label-only command scale). Future work needed: helicopter as tactical insertion platform, FOB progression, multi-stage objectives.
+- Verdict: 60% distinct (pressure corridor + helipads + 4x world + double force), 40% reskin (same capture mechanics, label-only command scale). Future work needed: FOB progression, multi-stage objectives.
+- Helicopter tactical insertion: implemented (2026-03-09) - G key deploys squad from helicopter when low/slow, 30s cooldown, HUD prompt.
 - Auto-start helicopter: deferred - would need NPC pilot AI or scripted flight path, out of scope for product pass.
 
 Doc updates:
@@ -212,7 +213,8 @@ Identity: battalion-scale war-zone mode.
 - Insertion flow: air_assault deploys player 120-240m from contested objective, forward toward enemy. StrategicDirector biases +3.0 within 1.5km of player. First contact ~60-120s.
 - Objective readability: 15 capturable zones overloaded the HUD. Fixed by adding priority-sorted zone display (contested first, then nearest) capped at 5 visible, with "+N more zones" overflow label.
 - Zone dominance bar provides aggregate view ("2 HELD / 1 CONTESTED / 4 HOSTILE") for quick situation assessment.
-- Remaining gaps (deferred): no mission briefing card, no "front line" map overlay, strategic agent dots unexplained on full map. These are content/UX tasks, not code blockers.
+- Remaining gaps (deferred): no "front line" map overlay, strategic agent dots unexplained on full map. These are content/UX tasks, not code blockers.
+- Mission briefing card: implemented (2026-03-09) - shows before deploy in A Shau only.
 
 Doc updates:
 - `GAME_MODES_EXECUTION_PLAN.md` Phase 4 + Phase 5 - A Shau status
@@ -317,3 +319,15 @@ Record completed items here with date and commit hash.
 | 2026-03-08 | Dynamic helipad foundation | - | TerrainFoundationUtils: engine-agnostic height sampling + foundation depth; HelipadSystem uses dynamic depth instead of fixed 0.6m; foundation fills terrain gap on slopes |
 | 2026-03-08 | Slope physics + navmesh pathfinding | - | SlopePhysics utility (player speed/slide/step-up, NPC slope penalty), NavmeshSystem (@recast-navigation WASM, solo/tiled, crowd sim), NavmeshMovementAdapter (LOD-gated steering), structure obstacle exclusion, 41 new tests |
 | 2026-03-08 | Magic number extraction | - | ~125 magic numbers replaced with named constants across 12 files; shared CombatantConfig.ts (NPC_Y_OFFSET/MAX_SPEED/HEALTH); per-file constants grouped by category |
+| 2026-03-09 | Lint cleanup | - | 103 problems -> 9 warnings; unused import removed, ~50 test vars prefixed, eslint --fix auto-fixable |
+| 2026-03-09 | SystemInterfaces type safety | - | 7 `any` params replaced with proper types (ITerrainRuntime, HelipadSystem, HelicopterControls, CombatantSystem, ZoneManager, InventoryManager, IAudioManager) |
+| 2026-03-09 | Deferred init timeout | - | 15s `withTimeout` wrapper on deferred system init in SystemManager; logs warning on timeout |
+| 2026-03-09 | import/no-cycle ESLint rule | - | eslint-import-resolver-typescript installed, maxDepth 3, ignoreExternal; no cycles detected |
+| 2026-03-09 | CI perf gate | - | perf-check.yml merged into ci.yml; deploy needs [lint, test, build, perf]; capture has continue-on-error |
+| 2026-03-09 | Shared test utilities | - | src/test-utils/ with mockCamera, createTestCombatant, mockTerrainRuntime, mockGameRenderer; 10 files migrated |
+| 2026-03-09 | Input system tests | - | InputContextManager (22 tests) + InputManager (43 tests); ~90% coverage from 0% |
+| 2026-03-09 | SpawnPointSelector extraction | - | 373 lines extracted from PlayerRespawnManager (857->594 lines); spawn point logic decoupled |
+| 2026-03-09 | Mission briefing card | - | MissionBriefing UIComponent for A Shau Valley; shows before deploy with op details + 30s auto-dismiss |
+| 2026-03-09 | SpectatorCamera | - | Post-death third-person follow cam; 'spectator' input context; target cycling, auto-advance, overhead fallback; 27 tests |
+| 2026-03-09 | GameEventBus | - | Typed singleton (65 lines, 8 events); queue-and-flush per frame; subscribers: AudioManager, HUDSystem, CameraShakeSystem; 8 tests |
+| 2026-03-09 | Helicopter tactical insertion | - | SquadDeployFromHelicopter: G key deploy, altitude(<15m)/speed(<5m/s)/30s cooldown checks, 4 terrain-snapped positions; HUD prompt; 18 tests |

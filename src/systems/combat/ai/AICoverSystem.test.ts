@@ -1,25 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
-import { AICoverSystem, CoverSpot } from './AICoverSystem';
+import { AICoverSystem } from './AICoverSystem';
 import { Combatant, CombatantState, Faction } from '../types';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
 import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
+import { mockTerrainRuntime, createTestCombatant } from '../../../test-utils';
 
 // Mock dependencies
-const mockTerrainSystem: ITerrainRuntime = {
+const mockTerrainSystem: ITerrainRuntime = mockTerrainRuntime({
   getHeightAt: vi.fn((x: number, z: number) => mockHeightQueryCache.getHeightAt(x, z)),
   getEffectiveHeightAt: vi.fn((x: number, z: number) => mockHeightQueryCache.getHeightAt(x, z)),
-  getPlayableWorldSize: vi.fn(() => 2000),
-  getWorldSize: vi.fn(() => 2000),
-  isTerrainReady: vi.fn(() => true),
-  hasTerrainAt: vi.fn(() => true),
-  getActiveTerrainTileCount: vi.fn(() => 0),
-  setSurfaceWetness: vi.fn(),
-  updatePlayerPosition: vi.fn(),
-  registerCollisionObject: vi.fn(),
-  unregisterCollisionObject: vi.fn(),
-  raycastTerrain: vi.fn(() => ({ hit: false, distance: undefined })),
-};
+});
 
 const mockSandbagSystem: SandbagSystem = {
   getSandbagBounds: vi.fn(() => []),
@@ -27,7 +18,7 @@ const mockSandbagSystem: SandbagSystem = {
 
 // Mock HeightQueryCache
 const mockHeightQueryCache = {
-  getHeightAt: vi.fn((x: number, z: number) => {
+  getHeightAt: vi.fn((x: number, _z: number) => {
     // Simple height function - elevated ridge at x=10
     if (x >= 8 && x <= 12) return 5;
     if (x >= 48 && x <= 52) return -3; // depression
@@ -39,7 +30,7 @@ vi.mock('../../terrain/HeightQueryCache', () => ({
   getHeightQueryCache: () => mockHeightQueryCache,
 }));
 
-// Helper to create a mock combatant
+// Helper to create a mock combatant (delegates to shared factory)
 function createMockCombatant(
   id: string,
   faction: Faction,
@@ -48,43 +39,15 @@ function createMockCombatant(
   state: CombatantState = CombatantState.IDLE,
   inCover: boolean = false
 ): Combatant {
-  return {
+  return createTestCombatant({
     id,
     faction,
-    health,
-    maxHealth: 100,
-    state,
     position: position.clone(),
-    velocity: new THREE.Vector3(),
-    rotation: 0,
-    visualRotation: 0,
-    rotationVelocity: 0,
-    scale: new THREE.Vector3(1, 1, 1),
-    weaponSpec: {} as any,
-    gunCore: {} as any,
-    skillProfile: {} as any,
-    lastShotTime: 0,
-    currentBurst: 0,
-    burstCooldown: 0,
-    target: undefined,
-    lastKnownTargetPos: undefined,
-    reactionTimer: 0,
-    suppressionLevel: 0,
-    alertTimer: 0,
-    isFullAuto: false,
-    panicLevel: 0,
-    lastHitTime: 0,
-    consecutiveMisses: 0,
-    wanderAngle: 0,
-    timeToDirectionChange: 0,
-    lastUpdateTime: 0,
-    updatePriority: 0,
-    lodLevel: 'high',
-    kills: 0,
-    deaths: 0,
+    health,
+    state,
     inCover,
     coverPosition: undefined,
-  } as Combatant;
+  });
 }
 
 describe('AICoverSystem', () => {
@@ -409,7 +372,7 @@ describe('AICoverSystem', () => {
     });
 
     it('should score elevated cover higher', () => {
-      mockHeightQueryCache.getHeightAt = vi.fn((x, z) => {
+      mockHeightQueryCache.getHeightAt = vi.fn((x, _z) => {
         if (x === 10) return 5; // Cover at elevation
         return 0; // Threat at ground level
       });
@@ -494,7 +457,7 @@ describe('AICoverSystem', () => {
 
     it('should limit spots per chunk to MAX_COVER_SPOTS_PER_CHUNK', () => {
       // Create scenario with many elevation changes
-      mockHeightQueryCache.getHeightAt = vi.fn((x, z) => {
+      mockHeightQueryCache.getHeightAt = vi.fn((x, _z) => {
         return Math.sin(x * 0.5) * 5; // Many height variations
       });
 
@@ -575,7 +538,7 @@ describe('AICoverSystem', () => {
 
   describe('Cover Spot Generation', () => {
     it('should generate spots for elevated terrain', () => {
-      mockHeightQueryCache.getHeightAt = vi.fn((x, z) => {
+      mockHeightQueryCache.getHeightAt = vi.fn((x, _z) => {
         if (x === 8 || x === 16 || x === 24) return 5; // Elevated positions
         return 0;
       });
@@ -613,7 +576,7 @@ describe('AICoverSystem', () => {
     });
 
     it('should sort and limit spots by height', () => {
-      mockHeightQueryCache.getHeightAt = vi.fn((x, z) => {
+      mockHeightQueryCache.getHeightAt = vi.fn((x, _z) => {
         return Math.sin(x * 0.3) * 5; // Sine wave pattern
       });
 

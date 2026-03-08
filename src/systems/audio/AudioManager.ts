@@ -6,6 +6,7 @@ import { AudioDuckingSystem } from './AudioDuckingSystem';
 import { AmbientSoundManager } from './AmbientSoundManager';
 import { AudioWeaponSounds } from './AudioWeaponSounds';
 import { Logger } from '../../utils/Logger';
+import { GameEventBus } from '../../core/GameEventBus';
 
 export class AudioManager implements GameSystem {
     private scene: THREE.Scene;
@@ -27,6 +28,7 @@ export class AudioManager implements GameSystem {
     private static loggedLoadFailures: Set<string> = new Set();
     private static loggedOptionalMissing: Set<string> = new Set();
     private hitFeedbackMissingLogged = false;
+    private eventUnsubscribes: (() => void)[] = [];
 
     constructor(scene: THREE.Scene, camera: THREE.Camera) {
         this.scene = scene;
@@ -75,6 +77,17 @@ export class AudioManager implements GameSystem {
 
         // Initialize sound pools
         this.poolManager.initializePools();
+
+        // Subscribe to game events (additive - direct play calls still work).
+        // npc_killed and explosion audio is still handled by direct calls from
+        // CombatantDamage/GrenadeEffects. These subscriptions are wired for
+        // events that lack a direct audio path today, and as migration targets
+        // for the direct-call paths once dual-emit is validated.
+        this.eventUnsubscribes.push(
+            GameEventBus.subscribe('zone_captured', (_e) => {
+                this.play('zoneCaptured', undefined, 0.6);
+            }),
+        );
 
         Logger.info('Audio', 'Audio system initialized');
     }
@@ -296,6 +309,10 @@ export class AudioManager implements GameSystem {
     }
 
     dispose(): void {
+        // Unsubscribe from game events
+        for (const unsub of this.eventUnsubscribes) unsub();
+        this.eventUnsubscribes.length = 0;
+
         // Dispose modules
         this.poolManager.dispose();
         this.ambientManager.dispose();

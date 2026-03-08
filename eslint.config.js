@@ -25,6 +25,13 @@ export default [
       "@typescript-eslint": tsEslint,
       import: importPlugin,
     },
+    settings: {
+      "import/resolver": {
+        typescript: {
+          project: ["./tsconfig.eslint.json"],
+        },
+      },
+    },
     rules: {
       ...tsEslint.configs.recommended.rules,
       "no-console": "warn",
@@ -36,6 +43,7 @@ export default [
         "varsIgnorePattern": "^_",
         "caughtErrorsIgnorePattern": "^_"
       }],
+      "import/no-cycle": ["warn", { maxDepth: 3, ignoreExternal: true }],
     },
   },
   {

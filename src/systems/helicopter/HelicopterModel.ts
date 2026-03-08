@@ -8,8 +8,10 @@ import { createHelicopterGeometry } from './HelicopterGeometry';
 import { HelicopterAnimation } from './HelicopterAnimation';
 import { HelicopterAudio } from './HelicopterAudio';
 import { HelicopterInteraction } from './HelicopterInteraction';
-import type { IHUDSystem, IPlayerController, ITerrainRuntime } from '../../types/SystemInterfaces';
+import { SquadDeployFromHelicopter } from './SquadDeployFromHelicopter';
+import type { IHUDSystem, IPlayerController, ITerrainRuntime, IAudioManager } from '../../types/SystemInterfaces';
 import type { PlayerInput } from '../player/PlayerInput';
+import type { HeightQueryCache } from '../terrain/HeightQueryCache';
 
 export class HelicopterModel implements GameSystem {
   private scene: THREE.Scene;
@@ -17,6 +19,7 @@ export class HelicopterModel implements GameSystem {
   private helipadSystem?: HelipadSystem;
   private playerController?: IPlayerController;
   private hudSystem?: IHUDSystem;
+  private audioManager?: IAudioManager;
   private helicopters: Map<string, THREE.Group> = new Map();
   private helicopterPhysics: Map<string, HelicopterPhysics> = new Map();
   private interactionRadius = 5.0;
@@ -25,6 +28,15 @@ export class HelicopterModel implements GameSystem {
   private animation: HelicopterAnimation;
   private audio: HelicopterAudio;
   private interaction: HelicopterInteraction;
+  private squadDeploy?: SquadDeployFromHelicopter;
+
+  // Deploy prompt polling (avoid per-frame checks)
+  private deployPromptAccumulator = 0;
+  private readonly DEPLOY_PROMPT_INTERVAL = 0.5; // check every 500ms
+  private isDeployPromptVisible = false;
+
+  // Callback for squad deploy events
+  private onSquadDeployCallback?: (helicopterId: string, positions: THREE.Vector3[]) => void;
 
   // Track which helipads already have helicopters
   private createdForHelipads: Set<string> = new Set();
@@ -66,6 +78,77 @@ export class HelicopterModel implements GameSystem {
 
   setAudioListener(listener: THREE.AudioListener): void {
     this.audio.setAudioListener(listener);
+  }
+
+  setAudioManager(audioManager: IAudioManager): void {
+    this.audioManager = audioManager;
+  }
+
+  setHeightQueryCache(cache: HeightQueryCache): void {
+    this.squadDeploy = new SquadDeployFromHelicopter(cache);
+  }
+
+  /**
+   * Register a callback to receive squad deploy events.
+   * The callback receives the helicopter ID and terrain-snapped spawn positions.
+   */
+  onSquadDeploy(callback: (helicopterId: string, positions: THREE.Vector3[]) => void): void {
+    this.onSquadDeployCallback = callback;
+  }
+
+  /**
+   * Attempt to deploy squad from the currently piloted helicopter.
+   * Called from PlayerController via input callback.
+   */
+  tryDeploySquad(): void {
+    if (!this.squadDeploy || !this.playerController) return;
+
+    const helicopterId = this.playerController.getHelicopterId();
+    if (!helicopterId) return;
+
+    const physics = this.helicopterPhysics.get(helicopterId);
+    if (!physics) return;
+
+    const state = physics.getState();
+    const snapshot = {
+      position: state.position.clone(),
+      velocity: state.velocity.clone(),
+      groundHeight: state.groundHeight,
+    };
+
+    const check = this.squadDeploy.canDeploy(helicopterId, snapshot);
+    if (!check.canDeploy) {
+      if (this.hudSystem) {
+        this.hudSystem.showMessage(check.reason ?? 'Cannot deploy here', 2000);
+      }
+      return;
+    }
+
+    const result = this.squadDeploy.deploySquad(helicopterId, snapshot);
+    if (!result.success) {
+      if (this.hudSystem) {
+        this.hudSystem.showMessage(result.reason ?? 'Deploy failed', 2000);
+      }
+      return;
+    }
+
+    // Play deploy sound
+    if (this.audioManager) {
+      this.audioManager.play('tacticalInsertionDrop', state.position.clone());
+    }
+
+    // Notify listeners
+    if (this.onSquadDeployCallback) {
+      this.onSquadDeployCallback(helicopterId, result.positions);
+    }
+
+    if (this.hudSystem) {
+      this.hudSystem.showMessage('Squad deployed!', 2000);
+      this.isDeployPromptVisible = false;
+      this.hudSystem.hideSquadDeployPrompt();
+    }
+
+    Logger.info('helicopter', `Squad deployed from ${helicopterId} at ${result.positions.length} positions`);
   }
 
   createHelicopterWhenReady(): void {
@@ -198,6 +281,46 @@ export class HelicopterModel implements GameSystem {
     });
 
     this.interaction.checkPlayerProximity();
+
+    // Poll deploy readiness at reduced frequency
+    this.updateDeployPrompt(deltaTime);
+  }
+
+  private updateDeployPrompt(deltaTime: number): void {
+    if (!this.squadDeploy || !this.hudSystem || !this.playerController) return;
+    if (!this.playerController.isInHelicopter()) {
+      if (this.isDeployPromptVisible) {
+        this.isDeployPromptVisible = false;
+        this.hudSystem.hideSquadDeployPrompt();
+      }
+      return;
+    }
+
+    this.deployPromptAccumulator += deltaTime;
+    if (this.deployPromptAccumulator < this.DEPLOY_PROMPT_INTERVAL) return;
+    this.deployPromptAccumulator = 0;
+
+    const helicopterId = this.playerController.getHelicopterId();
+    if (!helicopterId) return;
+
+    const physics = this.helicopterPhysics.get(helicopterId);
+    if (!physics) return;
+
+    const state = physics.getState();
+    const snapshot = {
+      position: state.position.clone(),
+      velocity: state.velocity.clone(),
+      groundHeight: state.groundHeight,
+    };
+
+    const check = this.squadDeploy.canDeploy(helicopterId, snapshot);
+    if (check.canDeploy && !this.isDeployPromptVisible) {
+      this.isDeployPromptVisible = true;
+      this.hudSystem.showSquadDeployPrompt();
+    } else if (!check.canDeploy && this.isDeployPromptVisible) {
+      this.isDeployPromptVisible = false;
+      this.hudSystem.hideSquadDeployPrompt();
+    }
   }
 
   tryEnterHelicopter(): void {
@@ -300,6 +423,7 @@ export class HelicopterModel implements GameSystem {
     this.helicopters.clear();
     this.helicopterPhysics.clear();
     this.createdForHelipads.clear();
+    this.squadDeploy?.dispose();
 
     Logger.debug('helicopter', 'HelicopterModel disposed');
   }

@@ -560,7 +560,7 @@ describe('ClusterManager', () => {
       clusterManager.reset()
 
       // Mock Date.now to control timing
-      const originalDateNow = Date.now
+      const _originalDateNow = Date.now
       let mockTime = 0
       vi.spyOn(Date, 'now').mockImplementation(() => mockTime)
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CDLODQuadtree, type CDLODTile, type FrustumPlane } from './CDLODQuadtree';
+import { CDLODQuadtree, type FrustumPlane } from './CDLODQuadtree';
 import { computeDefaultLODRanges } from './TerrainConfig';
 
 function makeFrustumAllVisible(): FrustumPlane[] {

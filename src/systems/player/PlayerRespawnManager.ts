@@ -1,8 +1,8 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
-import { Alliance, getAlliance, getEnemyAlliance } from '../combat/types';
-import { ZoneManager, ZoneState, type CaptureZone } from '../world/ZoneManager';
+import { getAlliance } from '../combat/types';
+import { ZoneManager } from '../world/ZoneManager';
 import { PlayerHealthSystem } from './PlayerHealthSystem';
 import { GameModeManager } from '../world/GameModeManager';
 import { InventoryManager } from './InventoryManager';
@@ -14,10 +14,6 @@ import type { GrenadeSystem } from '../weapons/GrenadeSystem';
 import type { HelipadSystem } from '../helicopter/HelipadSystem';
 import { LoadoutService } from './LoadoutService';
 import {
-  resolveInitialSpawnPosition,
-  resolveRespawnFallbackPosition
-} from '../world/runtime/ModeSpawnResolver';
-import {
   createDeploySession,
   DeploySessionKind,
   DeploySessionModel
@@ -28,6 +24,9 @@ import type { LoadoutFieldKey, PlayerLoadout } from '../../ui/loadout/LoadoutTyp
 import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
 import { InputContextManager } from '../input/InputContextManager';
 import type { RespawnSpawnPoint } from './RespawnSpawnPoint';
+import { SpawnPointSelector } from './SpawnPointSelector';
+import { MissionBriefing } from '../../ui/loading/MissionBriefing';
+import type { MissionBriefingInfo } from '../../ui/loading/MissionBriefing';
 
 export class InitialDeployCancelledError extends Error {
   constructor() {
@@ -41,15 +40,13 @@ export class PlayerRespawnManager implements GameSystem {
   private camera: THREE.Camera;
   private zoneManager?: ZoneManager;
   private playerHealthSystem?: PlayerHealthSystem;
-  private gameModeManager?: GameModeManager;
   private playerController?: IPlayerController;
   private firstPersonWeapon?: IFirstPersonWeapon;
   private inventoryManager?: InventoryManager;
-  private warSimulator?: WarSimulator;
   private terrainSystem?: ITerrainRuntime;
   private loadoutService?: LoadoutService;
   private grenadeSystem?: GrenadeSystem;
-  private helipadSystem?: HelipadSystem;
+  private gameModeManager?: GameModeManager;
 
   // Respawn state
   private isRespawnUIVisible = false;
@@ -69,6 +66,9 @@ export class PlayerRespawnManager implements GameSystem {
   private respawnUI: RespawnUI;
   private mapController: RespawnMapController;
 
+  // Spawn point selection delegate
+  private spawnPointSelector: SpawnPointSelector;
+
   private onRespawnCallback?: (position: THREE.Vector3) => void;
   private onDeathCallback?: () => void;
 
@@ -77,6 +77,7 @@ export class PlayerRespawnManager implements GameSystem {
     this.camera = camera;
     this.respawnUI = new RespawnUI();
     this.mapController = new RespawnMapController();
+    this.spawnPointSelector = new SpawnPointSelector();
   }
 
   async init(): Promise<void> {
@@ -146,6 +147,7 @@ export class PlayerRespawnManager implements GameSystem {
 
   setZoneManager(manager: ZoneManager): void {
     this.zoneManager = manager;
+    this.spawnPointSelector.setZoneManager(manager);
     this.mapController.setZoneManager(manager);
   }
 
@@ -155,6 +157,7 @@ export class PlayerRespawnManager implements GameSystem {
 
   setGameModeManager(manager: GameModeManager): void {
     this.gameModeManager = manager;
+    this.spawnPointSelector.setGameModeManager(manager);
     this.mapController.setGameModeManager(manager);
   }
 
@@ -172,6 +175,7 @@ export class PlayerRespawnManager implements GameSystem {
 
   setLoadoutService(loadoutService: LoadoutService): void {
     this.loadoutService = loadoutService;
+    this.spawnPointSelector.setLoadoutService(loadoutService);
     if (this.isRespawnUIVisible) {
       this.syncLoadoutPreview();
     }
@@ -182,15 +186,16 @@ export class PlayerRespawnManager implements GameSystem {
   }
 
   setWarSimulator(warSimulator: WarSimulator): void {
-    this.warSimulator = warSimulator;
+    this.spawnPointSelector.setWarSimulator(warSimulator);
   }
 
   setHelipadSystem(helipadSystem: HelipadSystem): void {
-    this.helipadSystem = helipadSystem;
+    this.spawnPointSelector.setHelipadSystem(helipadSystem);
   }
 
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {
     this.terrainSystem = terrainSystem;
+    this.spawnPointSelector.setTerrainSystem(terrainSystem);
   }
 
   setRespawnCallback(callback: (position: THREE.Vector3) => void): void {
@@ -202,38 +207,11 @@ export class PlayerRespawnManager implements GameSystem {
   }
 
   getSpawnableZones(): Array<{ id: string; name: string; position: THREE.Vector3 }> {
-    if (!this.zoneManager) {
-      return [];
-    }
-
-    // Check if game mode allows spawning at zones
-    const canSpawnAtZones = this.gameModeManager?.canPlayerSpawnAtZones() ?? false;
-    const playerAlliance = this.getCurrentAlliance();
-
-    const zones = this.zoneManager.getAllZones().filter(z => {
-      return this.isZoneSpawnableForAlliance(z, playerAlliance, canSpawnAtZones);
-    });
-
-    Logger.info('player', ` Found ${zones.length} spawnable zones:`, zones.map(z => `${z.name} (${z.state})`));
-
-    return zones.map(z => ({
-      id: z.id,
-      name: z.name,
-      position: z.position.clone()
-    }));
+    return this.spawnPointSelector.getSpawnableZones();
   }
 
   canSpawnAtZone(): boolean {
-    if (!this.zoneManager || !this.gameModeManager) return false;
-
-    // Check if game mode allows spawning at zones
-    if (!this.gameModeManager.canPlayerSpawnAtZones()) {
-      return false;
-    }
-
-    const zones = this.zoneManager.getAllZones();
-    const playerAlliance = this.getCurrentAlliance();
-    return zones.some(zone => this.isZoneSpawnableForAlliance(zone, playerAlliance, true) && !zone.isHomeBase);
+    return this.spawnPointSelector.canSpawnAtZone();
   }
 
   respawnAtBase(): void {
@@ -242,14 +220,14 @@ export class PlayerRespawnManager implements GameSystem {
       return;
     }
 
-    const pressureSpawn = this.getPolicyDrivenInsertionSuggestion();
+    const pressureSpawn = this.spawnPointSelector.getPolicyDrivenInsertionSuggestion();
     if (pressureSpawn) {
       pressureSpawn.y = 5;
       this.respawn(pressureSpawn);
       return;
     }
 
-    const playerAlliance = this.getCurrentAlliance();
+    const playerAlliance = this.spawnPointSelector.getCurrentAlliance();
     const homeBase = this.zoneManager.getAllZones().find(
       z => z.isHomeBase && z.owner !== null && getAlliance(z.owner) === playerAlliance
     );
@@ -269,9 +247,15 @@ export class PlayerRespawnManager implements GameSystem {
     this.respawn(target);
   }
 
-  beginInitialDeploy(): Promise<THREE.Vector3> {
+  async beginInitialDeploy(): Promise<THREE.Vector3> {
     if (this.isRespawnUIVisible) {
       return Promise.reject(new Error('Deploy UI is already active'));
+    }
+
+    // Show mission briefing for A Shau Valley before the deploy screen
+    const currentMode = this.gameModeManager?.getCurrentMode();
+    if (currentMode === GameMode.A_SHAU_VALLEY) {
+      await this.showMissionBriefing();
     }
 
     this.respawnTimer = 0;
@@ -280,6 +264,64 @@ export class PlayerRespawnManager implements GameSystem {
       this.pendingInitialDeployReject = reject;
       this.showDeployUI('initial');
     });
+  }
+
+  getPolicyDrivenInsertionSuggestion(options?: { minOpfor250?: number }): THREE.Vector3 | null {
+    return this.spawnPointSelector.getPolicyDrivenInsertionSuggestion(options);
+  }
+
+  getAShauPressureInsertionSuggestion(options?: { minOpfor250?: number }): THREE.Vector3 | null {
+    return this.spawnPointSelector.getAShauPressureInsertionSuggestion(options);
+  }
+
+  getSessionRespawnStats(): { deaths: number; respawns: number } {
+    return {
+      deaths: this.deathCount,
+      respawns: this.respawnCount
+    };
+  }
+
+  onPlayerDeath(): void {
+    Logger.info('player', ' Player eliminated!');
+    this.deathCount++;
+
+    // Re-check game mode when player dies in case it changed
+    if (this.gameModeManager) {
+      const currentGameMode = this.gameModeManager.getCurrentMode();
+      const worldSize = this.gameModeManager.getWorldSize();
+      Logger.info('player', ` Death screen: Current game mode is ${currentGameMode}, world size: ${worldSize}`);
+    }
+
+    // Disable player controls
+    if (this.playerController && typeof this.playerController.disableControls === 'function') {
+      this.playerController.disableControls();
+    }
+
+    // Hide weapon
+    if (this.firstPersonWeapon && typeof this.firstPersonWeapon.disable === 'function') {
+      this.firstPersonWeapon.disable();
+    }
+
+    // Start respawn timer
+    const respawnTime = this.gameModeManager?.getRespawnTime() ?? 5;
+    this.respawnTimer = respawnTime;
+
+    // Show respawn UI immediately
+    this.showDeployUI('respawn');
+
+    // Trigger callback
+    if (this.onDeathCallback) {
+      this.onDeathCallback();
+    }
+  }
+
+  // --- Private methods ---------------------------------------------------
+
+  /** Refresh available spawn points from the selector. */
+  private updateAvailableSpawnPoints(): void {
+    this.availableSpawnPoints = this.spawnPointSelector.buildAvailableSpawnPoints(
+      this.deploySession, this.activeDeployFlowKind
+    );
   }
 
   private respawn(position: THREE.Vector3): void {
@@ -322,40 +364,6 @@ export class PlayerRespawnManager implements GameSystem {
     }
   }
 
-  onPlayerDeath(): void {
-    Logger.info('player', ' Player eliminated!');
-    this.deathCount++;
-
-    // Re-check game mode when player dies in case it changed
-    if (this.gameModeManager) {
-      const currentGameMode = this.gameModeManager.getCurrentMode();
-      const worldSize = this.gameModeManager.getWorldSize();
-      Logger.info('player', ` Death screen: Current game mode is ${currentGameMode}, world size: ${worldSize}`);
-    }
-
-    // Disable player controls
-    if (this.playerController && typeof this.playerController.disableControls === 'function') {
-      this.playerController.disableControls();
-    }
-
-    // Hide weapon
-    if (this.firstPersonWeapon && typeof this.firstPersonWeapon.disable === 'function') {
-      this.firstPersonWeapon.disable();
-    }
-
-    // Start respawn timer
-    const respawnTime = this.gameModeManager?.getRespawnTime() ?? 5;
-    this.respawnTimer = respawnTime;
-
-    // Show respawn UI immediately
-    this.showDeployUI('respawn');
-
-    // Trigger callback
-    if (this.onDeathCallback) {
-      this.onDeathCallback();
-    }
-  }
-
   private showDeployUI(kind: DeploySessionKind): void {
     if (this.isRespawnUIVisible) return;
 
@@ -393,106 +401,6 @@ export class PlayerRespawnManager implements GameSystem {
 
     if (kind === 'initial' && this.shouldAutoConfirmInitialDeploy()) {
       this.confirmRespawn();
-    }
-  }
-
-  private updateAvailableSpawnPoints(): void {
-    if (!this.zoneManager) {
-      this.availableSpawnPoints = [{
-        id: 'default',
-        name: 'Base',
-        position: new THREE.Vector3(0, 5, -50),
-        safe: true,
-        kind: 'default',
-        selectionClass: 'default',
-      }];
-      return;
-    }
-
-    const definition = this.gameModeManager?.getCurrentDefinition?.();
-    const canSpawnAtZones = this.gameModeManager?.canPlayerSpawnAtZones() ?? false;
-    const zones = this.zoneManager.getAllZones();
-    const playerAlliance = this.getCurrentAlliance();
-
-    const spawnPoints: RespawnSpawnPoint[] = zones
-      .filter(z => {
-        return this.isZoneSpawnableForAlliance(z, playerAlliance, canSpawnAtZones);
-      })
-      .map(z => ({
-        id: z.id,
-        name: z.name,
-        position: z.position.clone(),
-        safe: true,
-        kind: z.isHomeBase ? 'home_base' : 'zone',
-        selectionClass: z.isHomeBase ? 'home_base' : 'nearest_controlled_zone',
-        sourceZoneId: z.id,
-      }));
-
-    // Append helipad spawn points for BLUFOR players. During initial deploy,
-    // runtime helipad instances may not exist yet, so fall back to mode config.
-    if (playerAlliance === Alliance.BLUFOR) {
-      const runtimeHelipads = this.helipadSystem?.getAllHelipads() ?? [];
-      const configuredHelipads = this.gameModeManager?.getCurrentConfig().helipads ?? [];
-      const helipadCandidates = runtimeHelipads.length > 0
-        ? runtimeHelipads.map(hp => ({
-            id: hp.id,
-            name: `Helipad: ${hp.aircraft.replace(/_/g, ' ')}`,
-            position: hp.position.clone(),
-            aircraft: hp.aircraft,
-          }))
-        : configuredHelipads.map(hp => ({
-            id: hp.id,
-            name: `Helipad: ${hp.aircraft.replace(/_/g, ' ')}`,
-            position: hp.position.clone(),
-            aircraft: hp.aircraft,
-          }));
-
-      for (const hp of helipadCandidates) {
-        const alreadyListed = spawnPoints.some(sp => sp.id === hp.id);
-        if (!alreadyListed) {
-          spawnPoints.push({
-            id: hp.id,
-            name: hp.name,
-            position: hp.position.clone(),
-            safe: true,
-            kind: 'helipad',
-            selectionClass: 'helipad',
-            priority: this.getHelipadSpawnPriority(hp.id, hp.aircraft),
-          });
-        }
-      }
-    }
-
-    if (
-      definition
-      && this.deploySession?.flow === 'air_assault'
-      && this.activeDeployFlowKind === 'initial'
-    ) {
-      const insertionTarget = resolveInitialSpawnPosition(definition, playerAlliance);
-      if (!this.terrainSystem || this.terrainSystem.hasTerrainAt(insertionTarget.x, insertionTarget.z)) {
-        spawnPoints.push({
-          id: 'direct_insertion',
-          name: 'Tactical Insertion',
-          position: insertionTarget,
-          safe: false,
-          kind: 'insertion',
-          selectionClass: 'direct_insertion',
-          priority: 100,
-        });
-      }
-    }
-
-    this.availableSpawnPoints = this.sortSpawnPointsByPriority(spawnPoints);
-
-    if (this.availableSpawnPoints.length === 0) {
-      this.availableSpawnPoints = [{
-        id: 'default',
-        name: 'Base',
-        position: new THREE.Vector3(0, 5, -50),
-        safe: true,
-        kind: 'default',
-        selectionClass: 'default',
-      }];
     }
   }
 
@@ -603,7 +511,9 @@ export class PlayerRespawnManager implements GameSystem {
       return;
     }
 
-    const fallbackSpawn = this.getPreferredDeploySpawnPoint();
+    const fallbackSpawn = this.spawnPointSelector.getPreferredDeploySpawnPoint(
+      this.availableSpawnPoints, this.activeDeployFlowKind
+    );
     if (!fallbackSpawn) {
       this.respawnUI.resetSelectedSpawn();
       return;
@@ -613,47 +523,6 @@ export class PlayerRespawnManager implements GameSystem {
     this.respawnUI.updateSelectedSpawn(fallbackSpawn.name);
   }
 
-  private getPreferredDeploySpawnPoint(): RespawnSpawnPoint | undefined {
-    if (this.availableSpawnPoints.length === 0) {
-      return undefined;
-    }
-
-    const definition = this.gameModeManager?.getCurrentDefinition?.();
-    if (!definition) {
-      return this.availableSpawnPoints[0];
-    }
-
-    // In frontier mode, prefer helipad spawns so player starts near aircraft
-    if (definition.policies.deploy.flow === 'frontier') {
-      const helipadSpawn = this.sortSpawnPointsByPriority(
-        this.availableSpawnPoints.filter(sp => sp.kind === 'helipad')
-      )[0];
-      if (helipadSpawn) return helipadSpawn;
-    }
-
-    if (definition.policies.deploy.flow === 'air_assault' && this.activeDeployFlowKind === 'initial') {
-      const directInsertion = this.availableSpawnPoints.find(sp => sp.selectionClass === 'direct_insertion');
-      if (directInsertion) {
-        return directInsertion;
-      }
-    }
-
-    const target = resolveInitialSpawnPosition(definition, this.getCurrentAlliance());
-    let preferred = this.availableSpawnPoints[0];
-    let nearestDist = preferred.position.distanceToSquared(target) - ((preferred.priority ?? 0) * 10_000);
-
-    for (let i = 1; i < this.availableSpawnPoints.length; i++) {
-      const candidate = this.availableSpawnPoints[i];
-      const dist = candidate.position.distanceToSquared(target) - ((candidate.priority ?? 0) * 10_000);
-      if (dist < nearestDist) {
-        preferred = candidate;
-        nearestDist = dist;
-      }
-    }
-
-    return preferred;
-  }
-
   private createDeployPosition(basePosition: THREE.Vector3): THREE.Vector3 {
     const offset = new THREE.Vector3(
       (Math.random() - 0.5) * 10,
@@ -661,70 +530,6 @@ export class PlayerRespawnManager implements GameSystem {
       (Math.random() - 0.5) * 10
     );
     return basePosition.clone().add(offset);
-  }
-
-  getPolicyDrivenInsertionSuggestion(options?: { minOpfor250?: number }): THREE.Vector3 | null {
-    const respawnPolicy = this.gameModeManager?.getRespawnPolicy();
-    if (respawnPolicy?.contactAssistStyle !== 'pressure_front' && respawnPolicy?.fallbackRule !== 'pressure_front') {
-      return null;
-    }
-
-    const pressureSpawn = this.getPolicyDrivenPressureSpawnPosition();
-    if (!pressureSpawn) return null;
-    const minEnemy250 = Math.max(0, Number(options?.minOpfor250 ?? 0));
-    if (minEnemy250 > 0) {
-      const enemy250 = this.countNearbyAgents(pressureSpawn, 250, getEnemyAlliance(this.getCurrentAlliance()));
-      if (enemy250 < minEnemy250) {
-        return null;
-      }
-    }
-    return pressureSpawn ? pressureSpawn.clone() : null;
-  }
-
-  getAShauPressureInsertionSuggestion(options?: { minOpfor250?: number }): THREE.Vector3 | null {
-    return this.getPolicyDrivenInsertionSuggestion(options);
-  }
-
-  private getPolicyDrivenPressureSpawnPosition(): THREE.Vector3 | null {
-    if (!this.zoneManager) return null;
-    const respawnPolicy = this.gameModeManager?.getRespawnPolicy();
-    if (!respawnPolicy) return null;
-    return resolveRespawnFallbackPosition(respawnPolicy, {
-      zones: this.zoneManager.getAllZones(),
-      alliance: this.getCurrentAlliance(),
-      warSimulator: this.warSimulator,
-      terrainReadyAt: (x: number, z: number) => this.isTerrainReadyAt(x, z)
-    });
-  }
-
-  private countNearbyAgents(center: THREE.Vector3, radius: number, alliance: Alliance): number {
-    if (!this.warSimulator || !this.warSimulator.isEnabled()) return 0;
-    const r2 = radius * radius;
-    let count = 0;
-    for (const agent of this.warSimulator.getAllAgents().values()) {
-      if (!agent.alive || getAlliance(agent.faction) !== alliance) continue;
-      const dx = agent.x - center.x;
-      const dz = agent.z - center.z;
-      if ((dx * dx + dz * dz) <= r2) count++;
-    }
-    return count;
-  }
-
-  private isTerrainReadyAt(x: number, z: number): boolean {
-    if (!this.terrainSystem) {
-      return true;
-    }
-    if (typeof this.terrainSystem.isAreaReadyAt === 'function') {
-      return this.terrainSystem.isAreaReadyAt(x, z);
-    }
-    return this.terrainSystem.isTerrainReady() && this.terrainSystem.hasTerrainAt(x, z);
-  }
-
-  getSessionRespawnStats(): { deaths: number; respawns: number } {
-    return {
-      deaths: this.deathCount,
-      respawns: this.respawnCount
-    };
   }
 
   private syncLoadoutPreview(): void {
@@ -787,8 +592,24 @@ export class PlayerRespawnManager implements GameSystem {
     this.respawnUI.updateLoadoutPresentation(this.loadoutService.getPresentationModel());
   }
 
-  private getCurrentAlliance(): Alliance {
-    return this.loadoutService?.getContext().alliance ?? Alliance.BLUFOR;
+  private async showMissionBriefing(): Promise<void> {
+    const config = this.gameModeManager?.getCurrentConfig();
+    if (!config) return;
+
+    const zoneCount = config.zones.length;
+    const worldSizeKm = (config.worldSize / 1000).toFixed(0);
+    const totalAgents = config.warSimulator?.totalAgents ?? config.maxCombatants;
+    const matchDurationMin = Math.round(config.matchDuration / 60);
+
+    const info: MissionBriefingInfo = {
+      zoneCount,
+      worldSizeKm,
+      totalAgents,
+      matchDurationMin,
+    };
+
+    const briefing = new MissionBriefing(info);
+    await briefing.show();
   }
 
   private shouldAutoConfirmInitialDeploy(): boolean {
@@ -798,59 +619,4 @@ export class PlayerRespawnManager implements GameSystem {
       && !!this.selectedSpawnPoint;
   }
 
-  private getHelipadSpawnPriority(helipadId: string, aircraft?: string): number {
-    let priority = 25;
-    const definition = this.gameModeManager?.getCurrentDefinition?.();
-    if (definition?.id !== GameMode.OPEN_FRONTIER) {
-      return priority;
-    }
-
-    if (helipadId === 'helipad_main' || helipadId.includes('main')) {
-      priority += 20;
-    }
-
-    if (aircraft === 'UH1_HUEY') {
-      priority += 10;
-    } else if (aircraft?.startsWith('UH1')) {
-      priority += 5;
-    }
-
-    return priority;
-  }
-
-  private isZoneSpawnableForAlliance(
-    zone: Pick<CaptureZone, 'isHomeBase' | 'owner' | 'state'>,
-    alliance: Alliance,
-    allowControlledZoneSpawns: boolean
-  ): boolean {
-    if (zone.isHomeBase) {
-      return zone.owner !== null && getAlliance(zone.owner) === alliance;
-    }
-
-    if (!allowControlledZoneSpawns) {
-      return false;
-    }
-
-    return alliance === Alliance.BLUFOR
-      ? zone.state === ZoneState.BLUFOR_CONTROLLED
-      : zone.state === ZoneState.OPFOR_CONTROLLED;
-  }
-
-  private sortSpawnPointsByPriority(spawnPoints: RespawnSpawnPoint[]): RespawnSpawnPoint[] {
-    const deduped = new Map<string, RespawnSpawnPoint>();
-    for (const spawnPoint of spawnPoints) {
-      const current = deduped.get(spawnPoint.id);
-      if (!current || (spawnPoint.priority ?? 0) > (current.priority ?? 0)) {
-        deduped.set(spawnPoint.id, spawnPoint);
-      }
-    }
-
-    return Array.from(deduped.values()).sort((a, b) => {
-      const priorityDelta = (b.priority ?? 0) - (a.priority ?? 0);
-      if (priorityDelta !== 0) {
-        return priorityDelta;
-      }
-      return a.name.localeCompare(b.name);
-    });
-  }
 }

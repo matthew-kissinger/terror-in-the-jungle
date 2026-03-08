@@ -6,6 +6,7 @@ import { ShotCommandFactory } from '../systems/player/weapon/ShotCommand';
 import { Logger } from '../utils/Logger';
 import { isOpfor } from '../systems/combat/types';
 import { isPerfUserTimingEnabled } from './PerfDiagnostics';
+import { GameEventBus } from './GameEventBus';
 
 interface SystemTimingEntry {
   name: string;
@@ -182,6 +183,9 @@ export class SystemUpdater {
       }
       performanceTelemetry.endSystem('Other');
     });
+
+    // Deliver queued game events for this frame
+    GameEventBus.flush();
 
     // End frame telemetry
     performanceTelemetry.endFrame();

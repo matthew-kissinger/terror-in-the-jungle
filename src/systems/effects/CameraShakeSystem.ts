@@ -1,6 +1,7 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
+import { GameEventBus } from '../../core/GameEventBus';
 
 interface ShakeState {
   intensity: number;
@@ -48,9 +49,22 @@ export class CameraShakeSystem implements GameSystem {
   private noiseOffset: number = 0;
   private readonly MAX_INTENSITY = MAX_INTENSITY;
   private readonly DEFAULT_FREQUENCY = DEFAULT_FREQUENCY;
+  private camera?: THREE.Camera;
+  private eventUnsubscribes: (() => void)[] = [];
 
   async init(): Promise<void> {
     Logger.info('effects', 'Initializing Camera Shake System...');
+
+    // Subscribe to explosion events for distance-based shake.
+    // GrenadeEffects already calls playerController.applyExplosionShake directly,
+    // so this subscription is a migration target. It will only fire when a camera
+    // reference has been set via setCamera().
+    this.eventUnsubscribes.push(
+      GameEventBus.subscribe('explosion', (e) => {
+        if (!this.camera) return;
+        this.shakeFromExplosion(e.position, this.camera.position, e.radius);
+      }),
+    );
   }
 
   update(deltaTime: number): void {
@@ -71,7 +85,13 @@ export class CameraShakeSystem implements GameSystem {
     }
   }
 
+  setCamera(camera: THREE.Camera): void {
+    this.camera = camera;
+  }
+
   dispose(): void {
+    for (const unsub of this.eventUnsubscribes) unsub();
+    this.eventUnsubscribes.length = 0;
     this.activeShakes = [];
   }
 

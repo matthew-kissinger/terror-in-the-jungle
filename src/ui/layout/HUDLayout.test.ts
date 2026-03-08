@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { HUDLayout } from './HUDLayout';
 import { ViewportManager } from '../design/responsive';
 import type { LayoutComponent, HUDRegion } from './types';

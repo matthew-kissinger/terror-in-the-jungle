@@ -67,7 +67,7 @@ describe('CameraShakeSystem', () => {
 
   describe('update()', () => {
     it('should advance noiseOffset by deltaTime * 10', () => {
-      const offset1 = system.getCurrentShakeOffset();
+      const _offset1 = system.getCurrentShakeOffset();
       system.shake(1.0, 1.0);
       const offset2 = system.getCurrentShakeOffset();
 

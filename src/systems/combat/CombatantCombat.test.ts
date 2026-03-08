@@ -1,11 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
-import { CombatantCombat, CombatHitResult } from './CombatantCombat';
+import { CombatantCombat } from './CombatantCombat';
 import { Combatant, CombatantState, Faction } from './types';
 import { TracerPool } from '../effects/TracerPool';
 import { MuzzleFlashSystem } from '../effects/MuzzleFlashSystem';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
-import { CombatantHitDetection } from './CombatantHitDetection';
 import { PlayerHealthSystem } from '../player/PlayerHealthSystem';
 import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
@@ -475,7 +474,7 @@ describe('CombatantCombat', () => {
       const allCombatants = new Map<string, Combatant>();
 
       const ray = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0));
-      const damageCalculator = (distance: number, isHeadshot: boolean) => 50;
+      const damageCalculator = (_distance: number, _isHeadshot: boolean) => 50;
 
       // Mock hitDetection
       vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue(null);
@@ -491,7 +490,7 @@ describe('CombatantCombat', () => {
       allCombatants.set('target-1', target);
 
       const ray = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0));
-      const damageCalculator = (distance: number, isHeadshot: boolean) => 100; // Lethal
+      const damageCalculator = (_distance: number, _isHeadshot: boolean) => 100; // Lethal
 
       vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue({
         combatant: target,

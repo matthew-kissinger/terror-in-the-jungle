@@ -4,21 +4,12 @@ import { AICoverFinding } from './AICoverFinding';
 import { Combatant, CombatantState, Faction } from '../types';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
 import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
+import { mockTerrainRuntime, createTestCombatant } from '../../../test-utils';
 
-const mockTerrainSystem: ITerrainRuntime = {
+const mockTerrainSystem: ITerrainRuntime = mockTerrainRuntime({
   getHeightAt: vi.fn((x: number, z: number) => mockHeightQueryCache.getHeightAt(x, z)),
   getEffectiveHeightAt: vi.fn((x: number, z: number) => mockHeightQueryCache.getHeightAt(x, z)),
-  getPlayableWorldSize: vi.fn(() => 2000),
-  getWorldSize: vi.fn(() => 2000),
-  isTerrainReady: vi.fn(() => true),
-  hasTerrainAt: vi.fn(() => true),
-  getActiveTerrainTileCount: vi.fn(() => 0),
-  setSurfaceWetness: vi.fn(),
-  updatePlayerPosition: vi.fn(),
-  registerCollisionObject: vi.fn(),
-  unregisterCollisionObject: vi.fn(),
-  raycastTerrain: vi.fn(() => ({ hit: false, distance: undefined })),
-};
+});
 
 const mockSandbagSystem: SandbagSystem = {
   getSandbagBounds: vi.fn(() => []),
@@ -41,44 +32,16 @@ function createMockCombatant(
   inCover: boolean = false,
   coverPosition?: THREE.Vector3
 ): Combatant {
-  return {
+  return createTestCombatant({
     id,
     faction,
     position: position.clone(),
-    velocity: new THREE.Vector3(),
-    rotation: 0,
-    visualRotation: 0,
-    rotationVelocity: 0,
-    scale: new THREE.Vector3(1, 1, 1),
     health,
-    maxHealth: 100,
     state,
-    weaponSpec: {} as any,
-    gunCore: {} as any,
-    skillProfile: {} as any,
-    lastShotTime: 0,
-    currentBurst: 0,
-    burstCooldown: 0,
-    target: undefined,
-    lastKnownTargetPos: undefined,
-    reactionTimer: 0,
-    suppressionLevel: 0,
-    alertTimer: 0,
-    isFullAuto: false,
-    panicLevel: 0,
-    lastHitTime: 0,
-    consecutiveMisses: 0,
-    wanderAngle: 0,
-    timeToDirectionChange: 0,
-    lastUpdateTime: 0,
-    updatePriority: 0,
-    lodLevel: 'high',
-    kills: 0,
-    deaths: 0,
     inCover,
     coverPosition,
     mesh: { position: position.clone() } as any,
-  } as Combatant;
+  });
 }
 
 function makeSandbagBounds(center: THREE.Vector3, size = new THREE.Vector3(2, 2, 2)): THREE.Box3 {

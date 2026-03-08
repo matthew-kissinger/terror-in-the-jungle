@@ -309,7 +309,7 @@ describe('PlayerMovement', () => {
     it('should stop movement when colliding with sandbag', () => {
       vi.mocked(mockInput.isKeyPressed).mockImplementation((key: string) => key === 'keyw');
       vi.mocked(mockSandbagSystem.checkCollision).mockReturnValue(true);
-      const initialPos = playerState.position.clone();
+      const _initialPos = playerState.position.clone();
 
       playerMovement.updateMovement(0.016, mockInput, mockCamera);
 
@@ -320,11 +320,11 @@ describe('PlayerMovement', () => {
 
     it('should allow sliding along sandbag in X direction', () => {
       vi.mocked(mockInput.isKeyPressed).mockImplementation((key: string) => key === 'keyw');
-      const initialPos = playerState.position.clone();
+      const _initialPos = playerState.position.clone();
 
       // Mock collision: block new position, allow slideX, block slideZ
       let callCount = 0;
-      vi.mocked(mockSandbagSystem.checkCollision).mockImplementation((pos: THREE.Vector3) => {
+      vi.mocked(mockSandbagSystem.checkCollision).mockImplementation((_pos: THREE.Vector3) => {
         callCount++;
         // First call: block the full new position
         if (callCount === 1) return true;

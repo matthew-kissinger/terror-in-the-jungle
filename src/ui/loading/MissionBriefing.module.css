@@ -1,0 +1,171 @@
+/**
+ * MissionBriefing - A Shau Valley pre-deploy briefing card.
+ * Military-style overlay with centered content card.
+ */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  color: var(--text-primary);
+  font-family: var(--font-primary);
+  animation: briefingFadeIn 0.6s ease-out;
+  padding: var(--space-4);
+  box-sizing: border-box;
+}
+
+.card {
+  background: rgba(15, 25, 35, 0.95);
+  border: 1px solid rgba(90, 143, 181, 0.4);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8) var(--space-10, 3rem);
+  max-width: 620px;
+  width: 100%;
+  text-align: center;
+  animation: briefingSlideUp 0.7s ease-out 0.15s backwards;
+}
+
+.classification {
+  font-size: var(--font-size-xs, 0.75rem);
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  color: rgba(255, 200, 80, 0.7);
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid rgba(255, 200, 80, 0.2);
+}
+
+.title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  margin-bottom: var(--space-2);
+  color: var(--text-primary);
+}
+
+.subtitle {
+  font-size: var(--font-size-base);
+  opacity: 0.6;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--space-8);
+}
+
+.divider {
+  width: 60px;
+  height: 1px;
+  background: var(--screen-glass-border-bright);
+  margin: 0 auto var(--space-6);
+}
+
+.briefingText {
+  font-size: var(--font-size-base);
+  line-height: 1.7;
+  opacity: 0.85;
+  margin-bottom: var(--space-6);
+  text-align: left;
+  padding: 0 var(--space-2);
+}
+
+.intelGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3) var(--space-6);
+  margin-bottom: var(--space-8);
+  padding: var(--space-4);
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(90, 143, 181, 0.15);
+}
+
+.intelItem {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-sm);
+}
+
+.intelLabel {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
+}
+
+.intelValue {
+  font-weight: var(--weight-bold);
+  color: var(--screen-accent);
+}
+
+.beginButton {
+  background: rgba(90, 143, 181, 0.4);
+  border: 1px solid var(--screen-accent);
+  color: var(--text-primary);
+  padding: var(--space-4) var(--space-10, 3rem);
+  font-size: var(--font-size-base);
+  font-family: var(--font-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  cursor: pointer;
+  border-radius: var(--radius-lg);
+  transition: background 0.25s ease, transform 0.15s ease;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  min-height: 48px;
+}
+
+.beginButton:hover {
+  background: rgba(90, 143, 181, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(127, 180, 217, 0.25);
+}
+
+.beginButton:active {
+  transform: scale(0.96);
+  transition: transform 0.1s ease;
+}
+
+/* --- Animations --- */
+
+@keyframes briefingFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes briefingSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 640px) {
+  .card {
+    padding: var(--space-6);
+  }
+
+  .title {
+    font-size: var(--font-size-xl);
+    letter-spacing: 0.1em;
+  }
+
+  .intelGrid {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+
+  .beginButton {
+    width: 100%;
+  }
+}

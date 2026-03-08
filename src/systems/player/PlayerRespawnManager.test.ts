@@ -74,19 +74,19 @@ if (typeof document === 'undefined') {
       return child;
     }
 
-    querySelector(selector: string) {
+    querySelector(_selector: string) {
       return new MockElement();
     }
 
-    querySelectorAll(selector: string) {
+    querySelectorAll(_selector: string) {
       return [new MockElement()];
     }
 
-    setAttribute(name: string, value: string) {}
-    getAttribute(name: string) { return ''; }
+    setAttribute(_name: string, _value: string) {}
+    getAttribute(_name: string) { return ''; }
 
     // Canvas-specific method
-    getContext(type: string) {
+    getContext(_type: string) {
       return {
         fillStyle: '',
         fillRect: vi.fn(),
@@ -112,8 +112,8 @@ if (typeof document === 'undefined') {
   const doc = new MockEventTarget() as any;
   doc.body = new MockElement();
   doc.head = new MockElement();
-  doc.createElement = (tag: string) => new MockElement();
-  doc.getElementById = (id: string) => new MockElement();
+  doc.createElement = (_tag: string) => new MockElement();
+  doc.getElementById = (_id: string) => new MockElement();
 
   vi.stubGlobal('document', doc);
   vi.stubGlobal('window', new MockEventTarget());
@@ -132,7 +132,7 @@ vi.mock('../../utils/Logger', () => ({
 // Mock HeightQueryCache
 vi.mock('../terrain/HeightQueryCache', () => ({
   getHeightQueryCache: vi.fn(() => ({
-    getHeightAt: vi.fn((x: number, z: number) => 0),
+    getHeightAt: vi.fn((_x: number, _z: number) => 0),
   })),
 }));
 
@@ -962,7 +962,7 @@ describe('PlayerRespawnManager', () => {
       respawnManager['updateAvailableSpawnPoints']();
 
       const originalZones = mockZoneManager.getAllZones();
-      respawnManager['availableSpawnPoints'].forEach((point, i) => {
+      respawnManager['availableSpawnPoints'].forEach((point, _i) => {
         const originalZone = originalZones.find(z => z.id === point.id);
         if (originalZone) {
           expect(point.position).not.toBe(originalZone.position);

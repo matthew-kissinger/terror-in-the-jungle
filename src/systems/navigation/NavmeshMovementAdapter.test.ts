@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { NavmeshMovementAdapter } from './NavmeshMovementAdapter';
 import type { Combatant } from '../combat/types';
 import type { Crowd, CrowdAgent } from '@recast-navigation/core';
+import { createTestCombatant } from '../../test-utils';
 
 function makeMockAgent(): CrowdAgent {
   return {
@@ -26,13 +27,14 @@ function makeMockCrowd(maxAgents = 64): { crowd: Crowd; agents: CrowdAgent[] } {
 }
 
 function makeCombatant(overrides: Partial<Combatant> = {}): Combatant {
-  return {
-    id: overrides.id ?? 'npc-1',
-    position: overrides.position ?? new THREE.Vector3(10, 3, 20),
-    velocity: overrides.velocity ?? new THREE.Vector3(1, 0, 1),
-    destinationPoint: overrides.destinationPoint ?? new THREE.Vector3(50, 3, 60),
-    lodLevel: overrides.lodLevel ?? 'high',
-  } as Combatant;
+  return createTestCombatant({
+    id: 'npc-1',
+    position: new THREE.Vector3(10, 3, 20),
+    velocity: new THREE.Vector3(1, 0, 1),
+    destinationPoint: new THREE.Vector3(50, 3, 60),
+    lodLevel: 'high',
+    ...overrides,
+  });
 }
 
 describe('NavmeshMovementAdapter', () => {

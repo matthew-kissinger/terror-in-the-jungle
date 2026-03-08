@@ -28,7 +28,7 @@ vi.mock('three', async () => {
 
   class MockPerspectiveCamera extends MockCamera {
     isPerspectiveCamera = true;
-    constructor(fov = 75, aspect = 1, near = 0.1, far = 1000) {
+    constructor(fov = 75, _aspect = 1, _near = 0.1, _far = 1000) {
       super();
       this.fov = fov;
     }
@@ -173,7 +173,7 @@ describe('WeaponAnimations', () => {
   // Recoil System (Spring Physics)
   describe('Recoil System (Spring Physics)', () => {
     it('applyRecoilImpulse() sets non-zero velocity', () => {
-      const initialVelocity = animations.getRecoilOffset() // This returns offset, but we want to check velocity
+      const _initialVelocity = animations.getRecoilOffset() // This returns offset, but we want to check velocity
       // @ts-ignore
       expect(animations.weaponRecoilVelocity.x).toBe(0)
       // @ts-ignore
@@ -368,7 +368,7 @@ describe('WeaponAnimations', () => {
     it(`Double-calling startPumpAnimation doesn't restart mid-animation`, () => {
       animations.startPumpAnimation()
       animations.update(0.1, false, new THREE.Vector3()) // Mid-animation
-      const progressMid = animations.getIsPumpAnimating()
+      const _progressMid = animations.getIsPumpAnimating()
       // @ts-ignore
       const pumpProgressBefore = animations.pumpAnimationProgress
 

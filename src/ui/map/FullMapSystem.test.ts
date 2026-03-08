@@ -95,7 +95,7 @@ const createMockCanvasContext = () => {
 
 // Mock DOM helpers
 const createMockDOM = () => {
-  const elements = new Map<string, any>();
+  const _elements = new Map<string, any>();
   const styleSheets = new Set<any>();
 
   const mockDocument = {

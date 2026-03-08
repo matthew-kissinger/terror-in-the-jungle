@@ -12,6 +12,7 @@ import { InfluenceMapGrid } from './InfluenceMapGrid';
 import { Faction, Combatant } from './types';
 import { CaptureZone, ZoneState } from '../world/ZoneManager';
 import type {} from '../world/ZoneManager';
+import { createTestCombatant } from '../../test-utils';
 
 // Helper to create a mock combatant
 function createMockCombatant(
@@ -20,22 +21,7 @@ function createMockCombatant(
   position: THREE.Vector3,
   state: string = 'idle'
 ): Combatant {
-  return {
-    id,
-    faction,
-    position,
-    velocity: new THREE.Vector3(),
-    rotation: 0,
-    visualRotation: 0,
-    rotationVelocity: 0,
-    scale: new THREE.Vector3(1, 1, 1),
-    health: 100,
-    maxHealth: 100,
-    state,
-    weaponSpec: {} as any,
-    gunCore: {} as any,
-    skillProfile: {} as any
-  } as Combatant;
+  return createTestCombatant({ id, faction, position, state } as Partial<Combatant>);
 }
 
 // Helper to create a mock zone
@@ -328,7 +314,7 @@ describe('InfluenceMapComputations', () => {
     it('should cap cover value at 1.0', () => {
       const params = createTestParams();
       // Add many sandbags at same location
-      const center = new THREE.Vector3(0, 0, 0);
+      const _center = new THREE.Vector3(0, 0, 0);
       for (let i = 0; i < 10; i++) {
         const bounds = new THREE.Box3(
           new THREE.Vector3(-2 - i, 0, -2 - i),

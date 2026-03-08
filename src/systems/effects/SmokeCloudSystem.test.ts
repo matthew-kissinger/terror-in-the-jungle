@@ -456,7 +456,7 @@ describe('SmokeCloudSystem', () => {
       const to = new THREE.Vector3(20, 0, 10);
 
       // Might not block yet due to small radius
-      const blockedEarly = smokeCloudSystem.isLineBlocked(from, to);
+      const _blockedEarly = smokeCloudSystem.isLineBlocked(from, to);
 
       // Later in expansion - larger effective radius
       smokeCloudSystem.update(1.9);

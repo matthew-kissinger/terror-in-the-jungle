@@ -188,7 +188,7 @@ describe('FootstepAudioSystem', () => {
     });
 
     it('should return ROCK if slope > 0.5', () => {
-      vi.mocked(mockTerrainSystem.getHeightAt).mockImplementation((x: number, z: number) => {
+      vi.mocked(mockTerrainSystem.getHeightAt).mockImplementation((x: number, _z: number) => {
         // Base height 10.
         // detectTerrainType checks center, center+1, center-1 for X and Z.
         // Logic: 

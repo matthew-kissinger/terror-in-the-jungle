@@ -107,6 +107,7 @@ export class InputManager extends PlayerInput {
       onMouseUp: (button) => this.runGameplay(() => callbacks.onMouseUp?.(button)),
       onReload: () => this.runGameplay(callbacks.onReload),
       onGrenadeSwitch: () => this.runGameplay(callbacks.onGrenadeSwitch),
+      onSquadDeploy: () => this.runGameplay(callbacks.onSquadDeploy),
       onSquadCommand: () => this.runGameplay(callbacks.onSquadCommand),
       onSquadQuickCommand: (slot) => this.runGameplay(() => callbacks.onSquadQuickCommand?.(slot)),
       // Escape/menu callbacks are always allowed so the player can recover from UI traps.

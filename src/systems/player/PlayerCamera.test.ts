@@ -591,7 +591,7 @@ describe('PlayerCamera', () => {
       // Following mode
       playerCamera.setHelicopterMouseControlEnabled(true);
       playerCamera.updateCamera(mockInput);
-      const followPosition = camera.position.clone();
+      const _followPosition = camera.position.clone();
 
       // Orbital mode
       playerCamera.setHelicopterMouseControlEnabled(false);

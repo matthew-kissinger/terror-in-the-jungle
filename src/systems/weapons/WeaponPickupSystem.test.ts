@@ -331,7 +331,7 @@ describe('WeaponPickupSystem', () => {
       const now = Date.now();
       vi.setSystemTime(now);
 
-      const id = weaponPickupSystem.spawnPickup(WeaponType.RIFLE, new THREE.Vector3(0, 0, 0));
+      const _id = weaponPickupSystem.spawnPickup(WeaponType.RIFLE, new THREE.Vector3(0, 0, 0));
       expect((weaponPickupSystem as any).pickups.size).toBe(1);
 
       // Advance time beyond PICKUP_LIFETIME (60000ms)
@@ -348,7 +348,7 @@ describe('WeaponPickupSystem', () => {
       const now = Date.now();
       vi.setSystemTime(now);
 
-      const id = weaponPickupSystem.spawnPickup(WeaponType.RIFLE, new THREE.Vector3(0, 0, 0));
+      const _id = weaponPickupSystem.spawnPickup(WeaponType.RIFLE, new THREE.Vector3(0, 0, 0));
       expect((weaponPickupSystem as any).pickups.size).toBe(1);
 
       // Advance time but not past PICKUP_LIFETIME
@@ -364,7 +364,7 @@ describe('WeaponPickupSystem', () => {
       mockPlayerController.getPosition = vi.fn().mockReturnValue(new THREE.Vector3(0, 0, 0));
 
       // Spawn pickup within radius
-      const PICKUP_RADIUS = (weaponPickupSystem as any).PICKUP_RADIUS;
+      const _PICKUP_RADIUS = (weaponPickupSystem as any).PICKUP_RADIUS;
       weaponPickupSystem.spawnPickup(WeaponType.RIFLE, new THREE.Vector3(1, 0, 0));
 
       weaponPickupSystem.update(0.016);

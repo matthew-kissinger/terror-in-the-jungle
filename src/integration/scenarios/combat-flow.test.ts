@@ -4,8 +4,8 @@ import { GameScenario } from '../harness/GameScenario';
 import {
   Faction,
   CombatantState,
-  isBlufor,
-  isOpfor,
+  _isBlufor,
+  _isOpfor,
 } from '../../systems/combat/types';
 import { ZoneState, CaptureZone } from '../../systems/world/ZoneManager';
 
@@ -114,12 +114,12 @@ describe('Combat Flow Integration', () => {
   // ---------------------------------------------------------------------------
 
   it('multiple squads maintain separate member lists', () => {
-    const { squad: s1, members: m1 } = scenario.spawnSquad(
+    const { squad: s1, members: _m1 } = scenario.spawnSquad(
       Faction.US,
       new THREE.Vector3(0, 0, 0),
       4,
     );
-    const { squad: s2, members: m2 } = scenario.spawnSquad(
+    const { squad: s2, members: _m2 } = scenario.spawnSquad(
       Faction.NVA,
       new THREE.Vector3(200, 0, 200),
       3,
@@ -240,7 +240,7 @@ describe('Combat Flow Integration', () => {
     scenario.ticketSystem.setMaxTickets(100);
 
     // Spawn squads for both sides
-    const { members: usMembers, squad: usSquad } = scenario.spawnSquad(
+    const { members: usMembers, squad: _usSquad } = scenario.spawnSquad(
       Faction.US,
       new THREE.Vector3(0, 0, 0),
       4,

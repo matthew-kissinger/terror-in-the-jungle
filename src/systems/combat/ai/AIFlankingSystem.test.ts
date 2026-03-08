@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as THREE from 'three'
-import { AIFlankingSystem, FlankingStatus, FlankingRole, FlankingOperation } from './AIFlankingSystem'
+import { AIFlankingSystem, FlankingStatus, FlankingRole } from './AIFlankingSystem'
 import { Combatant, CombatantState, Faction, Squad } from '../types'
 import { TerrainSystem } from '../../terrain/TerrainSystem'
 
 // Mock HeightQueryCache
 vi.mock('../../terrain/HeightQueryCache', () => ({
   getHeightQueryCache: () => ({
-    getHeightAt: vi.fn((x: number, z: number) => 0),
+    getHeightAt: vi.fn((_x: number, _z: number) => 0),
   }),
 }))
 

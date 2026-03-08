@@ -118,7 +118,7 @@ describe('DeathCamSystem', () => {
     });
 
     it('should store death position (cloned)', () => {
-      const originalPosition = deathPosition.clone();
+      const _originalPosition = deathPosition.clone();
       deathCamSystem.startDeathCam(deathPosition);
       
       // Modify original to verify clone
@@ -275,9 +275,9 @@ describe('DeathCamSystem', () => {
         deathCamSystem.update(1.0); // Complete transition at 1.6s
         
         // Now in orbit phase - camera should be moving in a circle
-        const posBefore = mockCamera.position.clone();
+        const _posBefore = mockCamera.position.clone();
         deathCamSystem.update(0.1); // Small update in orbit
-        
+
         // Camera should have been updated during orbit
         expect(mockCamera.lookAt).toHaveBeenCalled();
       });
@@ -294,7 +294,7 @@ describe('DeathCamSystem', () => {
       });
 
       it('should orbit camera around death position', () => {
-        const posBefore = new THREE.Vector3().copy(mockCamera.position);
+        const _posBefore = new THREE.Vector3().copy(mockCamera.position);
         
         deathCamSystem.update(0.1); // Small orbit step
         

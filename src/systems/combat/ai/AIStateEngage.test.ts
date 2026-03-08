@@ -3,8 +3,6 @@ import * as THREE from 'three';
 import { AIStateEngage } from './AIStateEngage';
 import { Combatant, CombatantState, Faction, Squad } from '../types';
 import { ISpatialQuery } from '../SpatialOctree';
-import { AICoverSystem } from './AICoverSystem';
-import { AIFlankingSystem } from './AIFlankingSystem';
 
 // Mock dependencies
 vi.mock('../../../utils/Logger', () => ({

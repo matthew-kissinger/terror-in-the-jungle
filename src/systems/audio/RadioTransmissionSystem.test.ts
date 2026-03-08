@@ -78,7 +78,7 @@ vi.mock('three', () => {
 describe('RadioTransmissionSystem', () => {
   let system: RadioTransmissionSystem;
   let mockListener: THREE.AudioListener;
-  let mockAudioLoader: THREE.AudioLoader;
+  let _mockAudioLoader: THREE.AudioLoader;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -86,7 +86,7 @@ describe('RadioTransmissionSystem', () => {
 
     system = new RadioTransmissionSystem();
     mockListener = new THREE.AudioListener();
-    mockAudioLoader = new THREE.AudioLoader();
+    _mockAudioLoader = new THREE.AudioLoader();
   });
 
   afterEach(() => {
@@ -229,7 +229,7 @@ describe('RadioTransmissionSystem', () => {
 
     it('should update nextTransmissionTime when called', () => {
       vi.setSystemTime(1000);
-      const before = system.getStatus().nextTransmissionIn;
+      const _before = system.getStatus().nextTransmissionIn;
 
       vi.setSystemTime(2000);
       (system as any).scheduleNextTransmission();

@@ -18,6 +18,7 @@ import type { PlayerHealthSystem } from '../../systems/player/PlayerHealthSystem
 import type { AudioManager } from '../../systems/audio/AudioManager';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 import { ViewportManager } from '../design/responsive';
+import { GameEventBus } from '../../core/GameEventBus';
 import { HUDLayout } from '../layout/HUDLayout';
 import type { GamePhase } from './GameStatusPanel';
 import type { InventorySlotDefinition } from '../../systems/player/InventoryManager';
@@ -43,6 +44,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private onPlayAgainCallback?: () => void;
   private hudLayout: HUDLayout;
   private viewportUnsubscribe?: () => void;
+  private eventUnsubscribes: (() => void)[] = [];
   private staticHudAccumulator = 0;
   private readonly STATIC_HUD_INTERVAL = 0.2; // 5Hz for mostly-static HUD text/state
 
@@ -110,6 +112,16 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     // Initialize ticket display
     this.elements.ticketDisplay.setTickets(300, 300);
     this.elements.mobileStatusBar.setTickets(300, 300);
+
+    // Subscribe to game events (additive - direct setter calls still work).
+    // player_kill, player_killed, zone_captured/lost are still handled via
+    // direct method calls from combat/zone systems. These subscriptions are
+    // migration targets: once dual-emit is validated, direct calls can be removed.
+    this.eventUnsubscribes.push(
+      GameEventBus.subscribe('match_phase_change', (e) => {
+        this.setPhase(e.phase === 'ended' ? 'ended' : e.phase === 'playing' ? 'playing' : 'loading');
+      }),
+    );
 
     Logger.info('hud', ' HUD System initialized');
   }
@@ -191,6 +203,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   }
 
   dispose(): void {
+    for (const unsub of this.eventUnsubscribes) unsub();
+    this.eventUnsubscribes.length = 0;
     this.viewportUnsubscribe?.();
     this.hudLayout.dispose();
     this.scoreboard.dispose();
@@ -424,6 +438,15 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
   updateHelicopterInstruments(collective: number, rpm: number, autoHover: boolean, engineBoost: boolean): void {
     this.elements.updateHelicopterInstruments(collective, rpm, autoHover, engineBoost);
+  }
+
+  // Squad deploy prompt methods (IHUDSystem)
+  showSquadDeployPrompt(): void {
+    this.showInteractionPrompt('Press G to deploy squad');
+  }
+
+  hideSquadDeployPrompt(): void {
+    this.hideInteractionPrompt();
   }
 
   // Mortar indicator methods (IHUDSystem)

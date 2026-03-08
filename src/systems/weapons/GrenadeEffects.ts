@@ -8,6 +8,7 @@ import { AudioManager } from '../audio/AudioManager';
 import { Grenade } from './GrenadePhysics';
 import { spawnSmokeCloud } from '../effects/SmokeCloudSystem';
 import type { IFlashbangScreenEffect, IPlayerController } from '../../types/SystemInterfaces';
+import { GameEventBus } from '../../core/GameEventBus';
 
 // Module-level scratch vectors for direction calculations
 const _lookDirection = new THREE.Vector3();
@@ -91,6 +92,12 @@ export class GrenadeEffects {
     if (playerController) {
       playerController.applyExplosionShake(grenade.position, this.DAMAGE_RADIUS);
     }
+
+    GameEventBus.emit('explosion', {
+      position: grenade.position,
+      radius: this.DAMAGE_RADIUS,
+      source: 'frag_grenade',
+    });
   }
 
   private explodeSmoke(
@@ -162,6 +169,12 @@ export class GrenadeEffects {
 
     // Apply disorientation to nearby NPCs
     this.applyNPCDisorientation(grenade.position, combatantSystem);
+
+    GameEventBus.emit('explosion', {
+      position: grenade.position,
+      radius: 20,
+      source: 'flashbang',
+    });
 
     Logger.info('weapons', 'Flashbang deployed - minimal damage, disorientation effect');
   }

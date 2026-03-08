@@ -1,10 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { HelicopterModel } from './HelicopterModel';
-import { HelicopterPhysics } from './HelicopterPhysics';
-import { HelicopterAnimation } from './HelicopterAnimation';
-import { HelicopterAudio } from './HelicopterAudio';
-import { HelicopterInteraction } from './HelicopterInteraction';
 import { createHelicopterGeometry } from './HelicopterGeometry';
 import { TerrainSystem } from '../terrain/TerrainSystem';
 import { HelipadSystem, HelipadInfo } from './HelipadSystem';

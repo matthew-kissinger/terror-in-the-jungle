@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as THREE from 'three';
 import { SpatialGridManager, SyncFrequency } from './SpatialGridManager';
-import { Combatant, CombatantState, Faction } from './types';
+import { Combatant, CombatantState } from './types';
+import { createTestCombatant } from '../../test-utils';
 
 // Helper to create a mock combatant
 function createMockCombatant(
@@ -9,39 +10,12 @@ function createMockCombatant(
   position: THREE.Vector3,
   state: CombatantState = CombatantState.IDLE
 ): Combatant {
-  return {
+  return createTestCombatant({
     id,
-    faction: Faction.US,
     position: position.clone(),
-    velocity: new THREE.Vector3(),
-    rotation: 0,
-    visualRotation: 0,
-    rotationVelocity: 0,
-    scale: new THREE.Vector3(1, 1, 1),
-    health: 100,
-    maxHealth: 100,
     state,
-    weaponSpec: {} as any,
-    gunCore: {} as any,
-    skillProfile: {} as any,
-    lastShotTime: 0,
-    currentBurst: 0,
-    burstCooldown: 0,
-    reactionTimer: 0,
-    suppressionLevel: 0,
-    alertTimer: 0,
-    isFullAuto: false,
-    panicLevel: 0,
-    lastHitTime: 0,
-    consecutiveMisses: 0,
-    wanderAngle: 0,
-    timeToDirectionChange: 0,
     lastUpdateTime: Date.now(),
-    updatePriority: 0,
-    lodLevel: 'high',
-    kills: 0,
-    deaths: 0,
-  };
+  });
 }
 
 describe('SpatialGridManager', () => {

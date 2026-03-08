@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { AIStatePatrol } from './AIStatePatrol';
 import { Combatant, CombatantState, Faction, Squad, SquadCommand } from '../types';
-import { ZoneManager } from '../../world/ZoneManager';
 import { clusterManager } from '../ClusterManager';
 
 vi.mock('../ClusterManager', () => ({

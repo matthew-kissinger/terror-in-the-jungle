@@ -4,6 +4,8 @@ import { CombatantHitDetection } from './CombatantHitDetection';
 import { Combatant, CombatantState, Faction } from './types';
 import { SpatialGridManager } from './SpatialGridManager';
 
+import { createTestCombatant } from '../../test-utils';
+
 // Mock Logger
 vi.mock('../../utils/Logger', () => ({
   Logger: {
@@ -22,23 +24,7 @@ vi.mock('../debug/PerformanceTelemetry', () => ({
 
 // Helper: Create a minimal Combatant object
 function makeCombatant(overrides: Partial<Combatant> = {}): Combatant {
-  return {
-    id: 'test-combatant',
-    faction: Faction.NVA,
-    position: new THREE.Vector3(0, 0, 0),
-    velocity: new THREE.Vector3(0, 0, 0),
-    rotation: 0,
-    visualRotation: 0,
-    rotationVelocity: 0,
-    scale: new THREE.Vector3(1, 1, 1),
-    health: 100,
-    maxHealth: 100,
-    state: CombatantState.IDLE,
-    weaponSpec: {} as any,
-    gunCore: {} as any,
-    skillProfile: {} as any,
-    ...overrides
-  };
+  return createTestCombatant({ faction: Faction.NVA, ...overrides });
 }
 
 // Helper: Create a ray

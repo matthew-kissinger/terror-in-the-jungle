@@ -1,54 +1,27 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { CombatantBallistics } from './CombatantBallistics';
-import { Combatant, CombatantState, Faction } from './types';
+import { Combatant } from './types';
+import { createTestCombatant } from '../../test-utils';
+
+const DEFAULT_SKILL_PROFILE = {
+  reactionDelayMs: 500,
+  aimJitterAmplitude: 2.0,
+  burstLength: 3,
+  burstPauseMs: 200,
+  leadingErrorFactor: 1.0,
+  suppressionResistance: 0.5,
+  visualRange: 100,
+  fieldOfView: 120,
+  firstShotAccuracy: 0.9,
+  burstDegradation: 0.1,
+};
 
 function createMockCombatant(overrides: Partial<Combatant> = {}): Combatant {
-  return {
-    id: 'test-combatant',
-    faction: Faction.US,
-    position: new THREE.Vector3(0, 0, 0),
-    velocity: new THREE.Vector3(0, 0, 0),
-    rotation: 0,
-    visualRotation: 0,
-    rotationVelocity: 0,
-    scale: new THREE.Vector3(1, 1, 1),
-    health: 100,
-    maxHealth: 100,
-    state: CombatantState.IDLE,
-    skillProfile: {
-      reactionDelayMs: 500,
-      aimJitterAmplitude: 2.0,
-      burstLength: 3,
-      burstPauseMs: 200,
-      leadingErrorFactor: 1.0,
-      suppressionResistance: 0.5,
-      visualRange: 100,
-      fieldOfView: 120,
-      firstShotAccuracy: 0.9,
-      burstDegradation: 0.1,
-    },
-    lastShotTime: 0,
-    currentBurst: 0,
-    burstCooldown: 0,
-    reactionTimer: 0,
-    suppressionLevel: 0,
-    alertTimer: 0,
-    isFullAuto: false,
-    panicLevel: 0,
-    lastHitTime: 0,
-    consecutiveMisses: 0,
-    wanderAngle: 0,
-    timeToDirectionChange: 0,
-    lastUpdateTime: 0,
-    updatePriority: 0,
-    lodLevel: 'high',
-    kills: 0,
-    deaths: 0,
-    weaponSpec: {} as any,
-    gunCore: {} as any,
+  return createTestCombatant({
+    skillProfile: DEFAULT_SKILL_PROFILE,
     ...overrides,
-  };
+  });
 }
 
 describe('CombatantBallistics', () => {

@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TicketSystem, GameState, TicketBleedRate } from './TicketSystem';
+import { TicketSystem } from './TicketSystem';
 import { Faction } from '../combat/types';
 import { ZoneManager, CaptureZone, ZoneState } from './ZoneManager';
-import { Logger } from '../../utils/Logger';
 
 // Mock Logger to prevent console output during tests
 vi.mock('../../utils/Logger', () => ({

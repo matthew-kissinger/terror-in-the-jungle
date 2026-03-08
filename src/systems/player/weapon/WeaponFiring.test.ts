@@ -9,7 +9,6 @@ import { ImpactEffectsPool } from '../../effects/ImpactEffectsPool'
 import { AudioManager } from '../../audio/AudioManager'
 import { PlayerStatsTracker } from '../PlayerStatsTracker'
 import { ShotCommand } from './ShotCommand'
-import { WeaponShotExecutor } from './WeaponShotExecutor'
 import { performanceTelemetry } from '../../debug/PerformanceTelemetry'
 import type { HUDSystem } from '../../../ui/hud/HUDSystem'
 

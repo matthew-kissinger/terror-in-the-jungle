@@ -107,5 +107,10 @@ export const SOUND_CONFIGS: Record<string, SoundConfig> = {
   killStreakSting: {
     path: 'assets/optimized/killStreakSting.wav',
     volume: 0.7
+  },
+  // Tactical insertion (squad deploy from helicopter)
+  tacticalInsertionDrop: {
+    path: 'assets/optimized/grenadeThrow.wav',
+    volume: 0.6
   }
 };

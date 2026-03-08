@@ -1,6 +1,6 @@
 # Project Notes
 
-Last updated: 2026-03-08
+Last updated: 2026-03-09
 
 ## Project
 
@@ -38,7 +38,7 @@ npm run perf:update-baseline  # update baseline from latest capture
 ## Runtime Landmarks
 
 - Entry: `src/main.ts`, `src/core/bootstrap.ts`
-- Engine: `src/core/GameEngine.ts`, `src/core/GameEngineInit.ts`, `src/core/SystemUpdater.ts`
+- Engine: `src/core/GameEngine.ts`, `src/core/GameEngineInit.ts`, `src/core/SystemUpdater.ts`, `src/core/GameEventBus.ts`
 - Modes: `src/config/gameModeTypes.ts`, `src/config/*Config.ts`
 - Combat: `src/systems/combat/*`
 - Navigation: `src/systems/navigation/*` (navmesh, crowd, movement adapter)
@@ -46,6 +46,7 @@ npm run perf:update-baseline  # update baseline from latest capture
 - Terrain: `src/systems/terrain/*`
 - Harness: `scripts/perf-capture.ts`, `scripts/perf-analyze-latest.ts`, `scripts/perf-compare.ts`
 - Integration tests: `src/integration/harness/`, `src/integration/scenarios/`
+- Test utilities: `src/test-utils/` (shared mocks and factories)
 
 ## Current Focus
 
@@ -58,7 +59,8 @@ npm run perf:update-baseline  # update baseline from latest capture
 7. Player-facing content pass (2026-03-08): 6 weapon types (added M60 LMG + M79 launcher), player tracers, grenade/kill-streak audio, graphics quality tiers control post-processing, AnimalSystem (ambient wildlife), structure placements on TDM/ZC/A Shau, ProgrammaticGunFactory deleted.
 8. Slope physics + navmesh pathfinding (2026-03-08): Player slope speed/slide/step-up gating, NPC slope penalty, @recast-navigation WASM navmesh (solo + tiled), crowd simulation with LOD-gated steering, structure footprint obstacles. 3040 tests passing.
 9. Magic number extraction (2026-03-08): ~125 magic numbers replaced with named constants across 12 files. Shared cross-file config in `src/config/CombatantConfig.ts` (NPC_Y_OFFSET, NPC_MAX_SPEED, NPC_HEALTH, OPFOR_OBJECTIVE_FOCUS_CHANCE). Single-file constants grouped by category at top of each module. 3040 tests passing.
-10. See `docs/NEXT_WORK.md` for the active checklist.
+10. Architecture + features pass (2026-03-09): 7 `any` types fixed in SystemInterfaces, `import/no-cycle` ESLint rule, deferred init timeout (15s), SpawnPointSelector extracted (PlayerRespawnManager 857->594 lines), GameEventBus (typed, queue-and-flush), SpectatorCamera (post-death follow cam), MissionBriefing (A Shau overlay), SquadDeployFromHelicopter (G key tactical insertion from helicopter), shared test utilities (`src/test-utils/`), InputContextManager+InputManager tests. CI perf job gates deploy. 3159 tests passing.
+11. See `docs/NEXT_WORK.md` for the active checklist.
 
 ## Documentation Contract
 

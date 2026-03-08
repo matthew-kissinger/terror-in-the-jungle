@@ -1,4 +1,4 @@
-export type InputContext = 'gameplay' | 'map' | 'menu' | 'modal';
+export type InputContext = 'gameplay' | 'map' | 'menu' | 'modal' | 'spectator';
 
 type InputContextListener = (context: InputContext) => void;
 

@@ -3,6 +3,7 @@ import { SystemReferences } from './SystemInitializer';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import { setSmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
 import { IGameRenderer } from '../types/SystemInterfaces';
+import { getHeightQueryCache } from '../systems/terrain/HeightQueryCache';
 
 /**
  * Handles wiring up dependencies between game systems.
@@ -77,6 +78,14 @@ export class SystemConnector {
     refs.firstPersonWeapon.setPlayerFaction(loadoutContext.faction);
     refs.combatantSystem.setPlayerFaction(loadoutContext.faction);
     refs.zoneManager.setPlayerAlliance(loadoutContext.alliance);
+
+    // Wire spectator candidate provider: returns alive teammates for post-death spectating
+    refs.playerController.setSpectatorCandidateProvider(() => {
+      const playerFaction = loadoutContext.faction;
+      return refs.combatantSystem.getAllCombatants()
+        .filter(c => c.faction === playerFaction && c.health > 0 && !c.isDying && !c.isPlayerProxy)
+        .map(c => ({ id: c.id, position: c.position, faction: c.faction }));
+    });
   }
 
   // ── Combat systems ──
@@ -195,6 +204,8 @@ export class SystemConnector {
     refs.helicopterModel.setPlayerController(refs.playerController);
     refs.helicopterModel.setHUDSystem(refs.hudSystem);
     refs.helicopterModel.setAudioListener(refs.audioManager.getListener());
+    refs.helicopterModel.setAudioManager(refs.audioManager);
+    refs.helicopterModel.setHeightQueryCache(getHeightQueryCache());
 
     refs.worldFeatureSystem.setTerrainManager(refs.terrainSystem);
     refs.worldFeatureSystem.setGameModeManager(refs.gameModeManager);

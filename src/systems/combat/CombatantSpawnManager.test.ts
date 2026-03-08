@@ -568,7 +568,7 @@ describe('CombatantSpawnManager', () => {
       spawnManager.setReinforcementInterval(10);
       spawnManager.spawnInitialForces(false);
 
-      const initialCount = combatants.size;
+      const _initialCount = combatants.size;
 
       // Trigger reinforcement wave (10 second interval)
       spawnManager.update(10.1, true);
@@ -636,7 +636,7 @@ describe('CombatantSpawnManager', () => {
       }
       toRemove.forEach(id => combatants.delete(id));
 
-      const beforeCount = combatants.size;
+      const _beforeCount = combatants.size;
 
       // Fast-forward past spawn check interval
       const futureDate = Date.now() + 4000;
@@ -981,7 +981,7 @@ describe('CombatantSpawnManager', () => {
         spawnManager.update(1.1, true, ticketSystem);
       }
 
-      const initialCount = combatants.size;
+      const _initialCount = combatants.size;
 
       // Simulate combat: mark combatants as dead
       const toKill: string[] = [];

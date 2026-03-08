@@ -20,6 +20,7 @@ import { CombatantBallistics } from './CombatantBallistics';
 import { CombatantDamage } from './CombatantDamage';
 import { CombatantSuppression } from './CombatantSuppression';
 import { CombatantCombatEffects } from './CombatantCombatEffects';
+import { GameEventBus } from '../../core/GameEventBus';
 
 export interface CombatHitResult {
   hit: boolean;
@@ -323,6 +324,15 @@ export class CombatantCombat {
           hit.headshot,
           weaponType
         );
+      }
+
+      if (killed) {
+        GameEventBus.emit('player_kill', {
+          victimId: hit.combatant.id,
+          victimFaction: hit.combatant.faction,
+          isHeadshot: hit.headshot,
+          weaponType,
+        });
       }
 
       return { hit: true, point: hit.point, killed, headshot: hit.headshot, damage };

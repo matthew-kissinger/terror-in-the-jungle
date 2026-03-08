@@ -17,7 +17,7 @@ const createMockDOM = () => {
   };
 
   const mockDocument = {
-    createElement: vi.fn((tagName: string) => {
+    createElement: vi.fn((_tagName: string) => {
       const element = {
         id: '',
         style: {

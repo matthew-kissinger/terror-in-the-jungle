@@ -203,7 +203,7 @@ describe("KillFeed", () => {
       
       const container = mockParent.querySelector(".kill-feed");
       const entry = container?.children[0] as HTMLElement;
-      const initialOpacity = entry?.style.opacity || "1";
+      const _initialOpacity = entry?.style.opacity || "1";
       
       vi.advanceTimersByTime(2999);
       killFeed.update(0);

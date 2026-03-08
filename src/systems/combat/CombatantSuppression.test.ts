@@ -4,6 +4,7 @@ import { CombatantSuppression } from './CombatantSuppression';
 import { Combatant, CombatantState, Faction } from './types';
 import { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
 import { AudioManager } from '../audio/AudioManager';
+import { createTestCombatant } from '../../test-utils';
 
 // Mock spatialGridManager
 vi.mock('./SpatialGridManager', () => ({
@@ -15,53 +16,25 @@ vi.mock('./SpatialGridManager', () => ({
 
 import { spatialGridManager } from './SpatialGridManager';
 
+const DEFAULT_SKILL_PROFILE = {
+  reactionDelayMs: 500,
+  aimJitterAmplitude: 2.0,
+  burstLength: 3,
+  burstPauseMs: 200,
+  leadingErrorFactor: 1.0,
+  suppressionResistance: 0.5,
+  visualRange: 100,
+  fieldOfView: 120,
+  firstShotAccuracy: 0.9,
+  burstDegradation: 0.1,
+};
+
 function createMockCombatant(overrides: Partial<Combatant> = {}): Combatant {
-  return {
-    id: 'test-combatant',
-    faction: Faction.US,
-    position: new THREE.Vector3(0, 0, 0),
-    velocity: new THREE.Vector3(0, 0, 0),
-    rotation: 0,
-    visualRotation: 0,
-    rotationVelocity: 0,
-    scale: new THREE.Vector3(1, 1, 1),
-    health: 100,
-    maxHealth: 100,
-    state: CombatantState.IDLE,
-    skillProfile: {
-      reactionDelayMs: 500,
-      aimJitterAmplitude: 2.0,
-      burstLength: 3,
-      burstPauseMs: 200,
-      leadingErrorFactor: 1.0,
-      suppressionResistance: 0.5,
-      visualRange: 100,
-      fieldOfView: 120,
-      firstShotAccuracy: 0.9,
-      burstDegradation: 0.1,
-    },
-    lastShotTime: 0,
-    currentBurst: 0,
-    burstCooldown: 0,
-    reactionTimer: 0,
-    suppressionLevel: 0,
-    alertTimer: 0,
-    isFullAuto: false,
-    panicLevel: 0,
-    lastHitTime: 0,
-    consecutiveMisses: 0,
-    wanderAngle: 0,
-    timeToDirectionChange: 0,
-    lastUpdateTime: 0,
-    updatePriority: 0,
-    lodLevel: 'high',
-    kills: 0,
-    deaths: 0,
-    weaponSpec: {} as any,
-    gunCore: {} as any,
+  return createTestCombatant({
+    skillProfile: DEFAULT_SKILL_PROFILE,
     nearMissCount: 0,
     ...overrides,
-  };
+  });
 }
 
 describe('CombatantSuppression', () => {

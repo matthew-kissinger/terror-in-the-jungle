@@ -114,12 +114,12 @@ describe('Zone Capture Integration', () => {
 
   it('captured zone triggers ticket bleed on opposing faction via TicketSystem', () => {
     // Set up two OPFOR-controlled zones
-    const zoneA = scenario.createZone('A', 'Alpha', new THREE.Vector3(0, 0, 0), {
+    const _zoneA = scenario.createZone('A', 'Alpha', new THREE.Vector3(0, 0, 0), {
       owner: Faction.NVA,
       state: ZoneState.OPFOR_CONTROLLED,
       captureProgress: 100,
     });
-    const zoneB = scenario.createZone('B', 'Bravo', new THREE.Vector3(100, 0, 0), {
+    const _zoneB = scenario.createZone('B', 'Bravo', new THREE.Vector3(100, 0, 0), {
       owner: Faction.NVA,
       state: ZoneState.OPFOR_CONTROLLED,
       captureProgress: 100,

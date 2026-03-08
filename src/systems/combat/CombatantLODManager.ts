@@ -16,8 +16,6 @@ import {
 } from './ai/CombatFireRaycastBudget';
 import { Logger } from '../../utils/Logger';
 
-import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
-
 // Stagger periods: how many frames between full AI updates per LOD tier
 const STAGGER_HIGH = 3;
 const STAGGER_MEDIUM = 5;

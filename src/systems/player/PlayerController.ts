@@ -13,6 +13,8 @@ import { FootstepAudioSystem } from '../audio/FootstepAudioSystem';
 import { InputManager } from '../input/InputManager';
 import { PlayerMovement } from './PlayerMovement';
 import { PlayerCamera } from './PlayerCamera';
+import { SpectatorCamera, type SpectatorCandidate } from './SpectatorCamera';
+import { InputContextManager } from '../input/InputContextManager';
 import { Logger } from '../../utils/Logger';
 import { resolveInitialSpawnPosition } from '../world/runtime/ModeSpawnResolver';
 import type { HelicopterModel } from '../helicopter/HelicopterModel';
@@ -54,6 +56,11 @@ export class PlayerController implements GameSystem {
   private playerState: PlayerState;
   private spawnStabilizationUntilMs = 0;
 
+  // Spectator camera (activates after death presentation)
+  private spectatorCamera: SpectatorCamera;
+  private spectatorCandidateProvider?: () => SpectatorCandidate[];
+  private spectatorClickHandler?: (e: MouseEvent) => void;
+
   // New modules
   private input: InputManager;
   private movement: PlayerMovement;
@@ -81,6 +88,7 @@ export class PlayerController implements GameSystem {
     this.input = new InputManager();
     this.movement = new PlayerMovement(this.playerState);
     this.cameraController = new PlayerCamera(camera, this.playerState);
+    this.spectatorCamera = new SpectatorCamera(camera);
 
     // Setup input callbacks
     this.setupInputCallbacks();
@@ -96,6 +104,18 @@ export class PlayerController implements GameSystem {
     // Poll gamepad before reading any input state
     this.input.pollGamepad();
 
+    // Spectator mode: only update spectator camera, skip normal gameplay
+    if (this.spectatorCamera.isActive()) {
+      const mouseMovement = this.input.getMouseMovement();
+      if (mouseMovement.x !== 0) {
+        this.spectatorCamera.applyMouseDelta(mouseMovement.x);
+      }
+      this.input.clearMouseMovement();
+      const candidates = this.spectatorCandidateProvider?.() ?? [];
+      this.spectatorCamera.update(deltaTime, candidates);
+      return;
+    }
+
     if (this.cameraShakeSystem) this.cameraShakeSystem.update(deltaTime);
     if (this.playerState.isInHelicopter) {
       this.updateHelicopterMode(deltaTime);
@@ -109,6 +129,7 @@ export class PlayerController implements GameSystem {
   }
 
   dispose(): void {
+    this.deactivateSpectator();
     this.input.dispose();
   }
 
@@ -157,6 +178,7 @@ export class PlayerController implements GameSystem {
           this.inventoryManager.setCurrentSlot(slot);
         }
       },
+      onSquadDeploy: () => this.handleSquadDeploy(),
       onSquadCommand: () => this.commandInputManager?.toggleCommandMode(),
       onSquadQuickCommand: (slot: number) => this.commandInputManager?.issueQuickCommand(slot),
       onMenuPause: () => this.handleMenuPause(),
@@ -301,6 +323,11 @@ export class PlayerController implements GameSystem {
     } else {
       this.helicopterModel.tryEnterHelicopter();
     }
+  }
+
+  private handleSquadDeploy(): void {
+    if (!this.helicopterModel || !this.playerState.isInHelicopter) return;
+    this.helicopterModel.tryDeploySquad();
   }
 
   private handleToggleMouseControl(): void {
@@ -523,7 +550,11 @@ export class PlayerController implements GameSystem {
       this.hudSystem.hideGrenadePowerMeter();
     }
   }
-  enableControls(): void { this.input.setControlsEnabled(true); this.input.relockPointer(); }
+  enableControls(): void {
+    this.deactivateSpectator();
+    this.input.setControlsEnabled(true);
+    this.input.relockPointer();
+  }
   setPointerLockEnabled(enabled: boolean): void { this.input.setPointerLockEnabled(enabled); }
   setGameStarted(started: boolean): void {
     this.input.setGameStarted(started);
@@ -623,6 +654,48 @@ export class PlayerController implements GameSystem {
   isInHelicopter(): boolean { return this.playerState.isInHelicopter; }
   getHelicopterId(): string | null { return this.playerState.helicopterId; }
 
+  // ── Spectator camera API ──
+
+  /**
+   * Activate spectator mode. Called after death presentation finishes.
+   * Sets input context to 'spectator' and starts following a teammate.
+   */
+  activateSpectator(): void {
+    const candidates = this.spectatorCandidateProvider?.() ?? [];
+    this.spectatorCamera.activate(candidates);
+    InputContextManager.getInstance().setContext('spectator');
+
+    // Direct click listener for target cycling (bypasses InputManager gameplay gate)
+    this.spectatorClickHandler = (e: MouseEvent) => {
+      if (!this.spectatorCamera.isActive()) return;
+      if (e.button === 0) this.spectatorCamera.nextTarget();
+      else if (e.button === 2) this.spectatorCamera.prevTarget();
+    };
+    document.addEventListener('mousedown', this.spectatorClickHandler);
+  }
+
+  /**
+   * Deactivate spectator mode. Called when respawning or deploying.
+   * Restores input context to 'gameplay'.
+   */
+  deactivateSpectator(): void {
+    if (!this.spectatorCamera.isActive()) return;
+    this.spectatorCamera.deactivate();
+
+    if (this.spectatorClickHandler) {
+      document.removeEventListener('mousedown', this.spectatorClickHandler);
+      this.spectatorClickHandler = undefined;
+    }
+
+    InputContextManager.getInstance().setContext('gameplay');
+  }
+
+  isSpectating(): boolean { return this.spectatorCamera.isActive(); }
+  getSpectatorTargetId(): string | null { return this.spectatorCamera.getCurrentTargetId(); }
+
+  /** Apply mouse look delta to spectator free-look rotation. */
+  applySpectatorMouseDelta(deltaX: number): void { this.spectatorCamera.applyMouseDelta(deltaX); }
+
   // Dependency setters
   setTerrainSystem(terrainSystem: ITerrainRuntime): void { this.terrainSystem = terrainSystem; this.movement.setTerrainSystem(terrainSystem); }
   setWorldSize(worldSize: number): void { this.movement.setWorldSize(worldSize); }
@@ -664,6 +737,9 @@ export class PlayerController implements GameSystem {
   setCommandInputManager(commandInputManager: CommandInputManager): void {
     this.commandInputManager = commandInputManager;
     commandInputManager.bindInputManager(this.input);
+  }
+  setSpectatorCandidateProvider(provider: () => SpectatorCandidate[]): void {
+    this.spectatorCandidateProvider = provider;
   }
 
   private syncLoadoutHud(): void {

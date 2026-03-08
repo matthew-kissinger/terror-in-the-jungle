@@ -184,10 +184,10 @@ export class SystemManager {
     Logger.info('core', `Starting deferred initialization for ${this.deferredSystems.length} systems...`);
     for (const system of this.deferredSystems) {
       try {
-        await system.init();
+        await withTimeout(system.init(), 15_000, system.constructor.name);
         this.systems.push(system);
       } catch (error) {
-        Logger.error('core', 'Deferred system init failed:', error);
+        Logger.warn('core', `Deferred system init failed (${system.constructor.name}):`, error);
       }
     }
     this.deferredSystems = [];
@@ -351,4 +351,13 @@ export class SystemManager {
   getSandbagSystem(): SandbagSystem {
     return this.sandbagSystem;
   }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} init timed out after ${ms}ms`)), ms)
+    ),
+  ]);
 }

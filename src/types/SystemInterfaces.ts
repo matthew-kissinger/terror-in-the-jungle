@@ -17,6 +17,10 @@ import type { HUDSystem } from '../ui/hud/HUDSystem';
 import type { InventoryManager } from '../systems/player/InventoryManager';
 import type { FirstPersonWeapon } from '../systems/player/FirstPersonWeapon';
 import type { PlayerController } from '../systems/player/PlayerController';
+import type { HelipadSystem } from '../systems/helicopter/HelipadSystem';
+import type { HelicopterControls } from '../systems/helicopter/HelicopterPhysics';
+import type { CombatantSystem } from '../systems/combat/CombatantSystem';
+import type { ZoneManager } from '../systems/world/ZoneManager';
 
 /**
  * HUD System interface - handles all UI display and feedback
@@ -58,6 +62,8 @@ export interface IHUDSystem {
   showMortarIndicator(): void;
   hideMortarIndicator(): void;
   updateMortarState(pitch: number, yaw: number, power: number, isAiming: boolean): void;
+  showSquadDeployPrompt(): void;
+  hideSquadDeployPrompt(): void;
 }
 
 /**
@@ -121,8 +127,8 @@ export interface IPlayerController {
  * Helicopter Model interface
  */
 export interface IHelicopterModel {
-  setTerrainManager(manager: any): void;
-  setHelipadSystem(system: any): void;
+  setTerrainManager(manager: ITerrainRuntime): void;
+  setHelipadSystem(system: HelipadSystem): void;
   setPlayerController(controller: IPlayerController): void;
   setHUDSystem(system: IHUDSystem): void;
   setAudioListener(listener: THREE.AudioListener): void;
@@ -130,7 +136,7 @@ export interface IHelicopterModel {
   tryEnterHelicopter(): void;
   getHelicopterPositionTo(id: string, target: THREE.Vector3): boolean;
   getHelicopterQuaternionTo(id: string, target: THREE.Quaternion): boolean;
-  setHelicopterControls(helicopterId: string, controls: any): void;
+  setHelicopterControls(helicopterId: string, controls: Partial<HelicopterControls>): void;
   getHelicopterState(helicopterId: string): { engineRPM: number } | null;
 }
 
@@ -139,11 +145,11 @@ export interface IHelicopterModel {
  */
 export interface IFirstPersonWeapon {
   setPlayerController(controller: PlayerController): void;
-  setCombatantSystem(system: any): void;
+  setCombatantSystem(system: CombatantSystem): void;
   setHUDSystem(system: IHUDSystem): void;
-  setZoneManager(system: any): void;
-  setInventoryManager(system: any): void;
-  setAudioManager(manager: any): void;
+  setZoneManager(system: ZoneManager): void;
+  setInventoryManager(system: InventoryManager): void;
+  setAudioManager(manager: IAudioManager): void;
   setPlayerFaction(faction: Faction): void;
   setPrimaryWeapon(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher'): void;
   renderWeapon(renderer: THREE.WebGLRenderer): void;

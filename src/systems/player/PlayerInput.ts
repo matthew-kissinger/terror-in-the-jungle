@@ -28,6 +28,7 @@ export interface InputCallbacks {
   onMouseUp?: (button: number) => void;
   onReload?: () => void;
   onGrenadeSwitch?: () => void;
+  onSquadDeploy?: () => void;
   onSquadCommand?: () => void;
   onSquadQuickCommand?: (slot: number) => void;
   onMenuPause?: () => void;
@@ -407,6 +408,11 @@ export class PlayerInput {
       if (event.code === 'ControlRight') {
         this.callbacks.onToggleMouseControl?.();
       }
+
+      // Squad deploy from helicopter with G key
+      if (event.code === 'KeyG') {
+        this.callbacks.onSquadDeploy?.();
+      }
     }
 
     // Sandbag rotation controls (when not in helicopter)
@@ -563,7 +569,7 @@ E - Enter/Exit Helicopter
 M - Toggle Mortar Camera View (when mortar deployed)
 1-6 - Switch Weapons
 R - Reload
-G - Throw Grenade
+G - Throw Grenade / Deploy Squad (in helicopter)
 B - Deploy/Undeploy Mortar
 F - Fire Mortar (when deployed)
 Z - Squad Commands

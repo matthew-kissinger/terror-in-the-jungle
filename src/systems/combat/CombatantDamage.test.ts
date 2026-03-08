@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { CombatantDamage } from './CombatantDamage';
 import { Combatant, CombatantState, Faction, Squad } from './types';
+import { createTestCombatant } from '../../test-utils';
 import { PlayerHealthSystem } from '../player/PlayerHealthSystem';
 import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
@@ -59,7 +60,7 @@ vi.mock('./KillAssistTracker', () => ({
   },
 }));
 
-// Helper to create a mock combatant
+// Helper to create a mock combatant (delegates to shared factory)
 function createMockCombatant(
   id: string,
   faction: Faction,
@@ -68,47 +69,19 @@ function createMockCombatant(
   isPlayerProxy: boolean = false,
   squadId?: string
 ): Combatant {
-  return {
+  return createTestCombatant({
     id,
     faction,
     health,
-    maxHealth: 100,
     state,
-    position: new THREE.Vector3(0, 0, 0),
     isPlayerProxy,
-    lastHitTime: 0,
-    suppressionLevel: 0,
-    deaths: 0,
-    kills: 0,
+    squadId,
     isDying: false,
     deathProgress: 0,
     deathStartTime: 0,
     deathAnimationType: null as any,
     deathDirection: undefined,
-    squadId,
-    velocity: new THREE.Vector3(),
-    rotation: 0,
-    visualRotation: 0,
-    rotationVelocity: 0,
-    scale: new THREE.Vector3(1, 1, 1),
-    weaponSpec: {} as any,
-    gunCore: {} as any,
-    skillProfile: {} as any,
-    damageHistory: [],
-    lastShotTime: 0,
-    currentBurst: 0,
-    burstCooldown: 0,
-    reactionTimer: 0,
-    alertTimer: 0,
-    isFullAuto: false,
-    panicLevel: 0,
-    consecutiveMisses: 0,
-    wanderAngle: 0,
-    timeToDirectionChange: 0,
-    lastUpdateTime: 0,
-    updatePriority: 0,
-    lodLevel: 'high',
-  } as Combatant;
+  });
 }
 
 describe('CombatantDamage', () => {

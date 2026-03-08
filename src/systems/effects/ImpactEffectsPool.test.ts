@@ -260,7 +260,6 @@ describe('ImpactEffectsPool', () => {
     performanceSpy = vi.spyOn(performance, 'now').mockImplementation(() => mockNow);
     randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
 
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const THREE = require('three');
     scene = new THREE.Scene();
     scene.add = vi.fn();
@@ -278,8 +277,7 @@ describe('ImpactEffectsPool', () => {
   it('pre-allocates effects and creates materials/textures', () => {
     expect(scene.add).toHaveBeenCalledTimes(2 * 3);
 
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const THREE = require('three');
+    const _THREE = require('three');
     expect(pointsMaterialCalls).toHaveLength(2);
     expect(pointsMaterialCalls[0]).toMatchObject({
       color: 0xcc0000,
@@ -308,7 +306,6 @@ describe('ImpactEffectsPool', () => {
   });
 
   it('spawns an effect and initializes positions/velocities', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const THREE = require('three');
     const position = new THREE.Vector3(10, 20, 30);
     const normal = new THREE.Vector3(0, 1, 0);
@@ -351,7 +348,6 @@ describe('ImpactEffectsPool', () => {
   });
 
   it('updates physics, damping, and fades at the correct times', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const THREE = require('three');
     pool.spawn(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0));
 
@@ -383,7 +379,6 @@ describe('ImpactEffectsPool', () => {
   });
 
   it('removes expired effects using swap-and-pop compaction', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const THREE = require('three');
     pool.spawn(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0));
     pool.spawn(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0));
@@ -411,7 +406,6 @@ describe('ImpactEffectsPool', () => {
   });
 
   it('recycles the oldest active effect when the pool is exhausted', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const THREE = require('three');
     const oneShotPool = new ImpactEffectsPool(scene, 1);
 
@@ -432,7 +426,6 @@ describe('ImpactEffectsPool', () => {
   });
 
   it('disposes pooled and active effects, materials, and textures', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const THREE = require('three');
     pool.spawn(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0));
 

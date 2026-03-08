@@ -323,7 +323,7 @@ describe("GunplayCore", () => {
     it("should interpolate damage between falloffStart and falloffEnd", () => {
       const gun = new GunplayCore(testSpec);
       // Midpoint between 20 and 50 is 35
-      const midpointDamage = (testSpec.damageNear + testSpec.damageFar) / 2; // (30 + 15) / 2 = 22.5
+      const _midpointDamage = (testSpec.damageNear + testSpec.damageFar) / 2; // (30 + 15) / 2 = 22.5
       expect(gun.computeDamage(35, false)).toBeCloseTo(22.5);
 
       // Quarter point (20 + (50-20)/4 = 27.5)
@@ -395,7 +395,7 @@ describe("GunplayCore", () => {
       // So the perturbed direction should be primarily offset in the -X (right) direction relative to camera's basis.
 
       const spreadRad = THREE.MathUtils.degToRad(spreadDeg);
-      const u_val = 0.1; // First value from pelletRandomValues
+      const _u_val = 0.1; // First value from pelletRandomValues
       const v_val = 0.2; // Second value from pelletRandomValues
       const r_calculated = spreadRad * Math.sqrt(v_val);
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { SquadManager } from './SquadManager'
-import { Combatant, CombatantState, Faction, Squad } from './types'
+import { Combatant, CombatantState, Faction } from './types'
 import { CombatantFactory } from './CombatantFactory'
 import { InfluenceMapSystem } from './InfluenceMapSystem'
 import type { ITerrainRuntime } from '../../types/SystemInterfaces'
@@ -54,7 +54,7 @@ vi.mock('three', () => ({
 // Mock HeightQueryCache
 vi.mock('../world/HeightQueryCache', () => ({
   getHeightQueryCache: vi.fn(() => ({
-    getHeightAt: vi.fn((x: number, z: number) => 0),
+    getHeightAt: vi.fn((_x: number, _z: number) => 0),
   })),
 }))
 

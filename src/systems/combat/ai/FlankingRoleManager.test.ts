@@ -8,7 +8,7 @@ import { TerrainSystem } from '../../terrain/TerrainSystem'
 // Mock HeightQueryCache
 vi.mock('../../terrain/HeightQueryCache', () => ({
   getHeightQueryCache: () => ({
-    getHeightAt: vi.fn((x: number, z: number) => 0),
+    getHeightAt: vi.fn((_x: number, _z: number) => 0),
   }),
 }))
 

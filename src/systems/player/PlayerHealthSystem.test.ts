@@ -1,10 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { PlayerHealthSystem } from './PlayerHealthSystem';
-import { PlayerRespawnManager } from './PlayerRespawnManager';
 import { PlayerHealthUI } from './PlayerHealthUI';
 import { PlayerHealthEffects } from './PlayerHealthEffects';
-import { Logger } from '../../utils/Logger';
 
 // Mock dependencies
 vi.mock('./PlayerHealthUI');

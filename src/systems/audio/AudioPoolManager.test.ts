@@ -168,8 +168,8 @@ describe('AudioPoolManager', () => {
     });
 
     it('should create object3DPool with correct size', () => {
-      const obj1 = manager.getPooledObject3D();
-      const obj2 = manager.getPooledObject3D();
+      const _obj1 = manager.getPooledObject3D();
+      const _obj2 = manager.getPooledObject3D();
 
       // Verify we can get at least 32 unique objects
       const objects: THREE.Object3D[] = [];

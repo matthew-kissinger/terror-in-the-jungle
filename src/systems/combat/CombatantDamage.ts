@@ -9,6 +9,7 @@ import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
 import { Logger } from '../../utils/Logger';
 import { KillAssistTracker } from './KillAssistTracker';
 import { IHUDSystem } from '../../types/SystemInterfaces';
+import { GameEventBus } from '../../core/GameEventBus';
 
 /**
  * Handles damage application and death processing for combatants.
@@ -97,6 +98,13 @@ export class CombatantDamage {
             isHeadshot,
             'rifle' // AI combatants use rifles
           );
+        }
+        if (killed && attacker) {
+          GameEventBus.emit('player_killed', {
+            killerId: attacker.id,
+            killerFaction: attacker.faction,
+            position: target.position,
+          });
         }
       }
       return;
@@ -222,6 +230,17 @@ export class CombatantDamage {
         'rifle' // AI combatants use rifles
       );
     }
+
+    // Emit typed event for subscribers (additive - existing direct calls remain)
+    GameEventBus.emit('npc_killed', {
+      killerId: attacker?.id ?? 'unknown',
+      victimId: target.id,
+      killerFaction: attacker?.faction ?? target.faction,
+      victimFaction: target.faction,
+      isHeadshot,
+      weaponType: attacker?.isPlayerProxy ? undefined : 'rifle',
+      position: target.position,
+    });
 
     // Update squad
     if (target.squadId && squads) {
