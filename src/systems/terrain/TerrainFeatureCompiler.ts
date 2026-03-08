@@ -3,9 +3,6 @@ import type {
   MapFeatureCircleFootprint,
   MapFeatureDefinition,
   MapFeatureRectFootprint,
-  TerrainFeatureStampPolicy,
-  TerrainFeatureSurfacePolicy,
-  TerrainFeatureVegetationPolicy,
 } from '../../config/gameModeTypes';
 import type {
   CompiledTerrainFeatureSet,

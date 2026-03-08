@@ -13,7 +13,7 @@ import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 
 // ── Animal type definitions ──
 
-type AnimalKind = 'egret' | 'water_buffalo' | 'macaque';
+type AnimalKind = 'egret' | 'water_buffalo' | 'macaque' | 'wild_boar' | 'king_cobra' | 'tiger';
 
 interface AnimalConfig {
   kind: AnimalKind;
@@ -22,12 +22,19 @@ interface AnimalConfig {
   perCell: number;
   /** Wander speed in m/s. 0 = stationary. */
   wanderSpeed: number;
+  /** Spawn weight for weighted random selection. Higher = more common. */
+  spawnWeight: number;
+  /** Minimum terrain height for spawning. */
+  minHeight: number;
 }
 
 const ANIMAL_CONFIGS: AnimalConfig[] = [
-  { kind: 'egret', modelPath: AnimalModels.EGRET, scale: 0.6, perCell: 2, wanderSpeed: 0.5 },
-  { kind: 'water_buffalo', modelPath: AnimalModels.WATER_BUFFALO, scale: 1.0, perCell: 1, wanderSpeed: 0 },
-  { kind: 'macaque', modelPath: AnimalModels.MACAQUE, scale: 0.4, perCell: 2, wanderSpeed: 0.4 },
+  { kind: 'egret', modelPath: AnimalModels.EGRET, scale: 0.6, perCell: 2, wanderSpeed: 0.5, spawnWeight: 0.3, minHeight: 0.2 },
+  { kind: 'water_buffalo', modelPath: AnimalModels.WATER_BUFFALO, scale: 1.0, perCell: 1, wanderSpeed: 0, spawnWeight: 0.25, minHeight: 0.2 },
+  { kind: 'macaque', modelPath: AnimalModels.MACAQUE, scale: 0.4, perCell: 2, wanderSpeed: 0.4, spawnWeight: 0.25, minHeight: 0.2 },
+  { kind: 'wild_boar', modelPath: AnimalModels.WILD_BOAR, scale: 0.5, perCell: 2, wanderSpeed: 0.3, spawnWeight: 0.3, minHeight: 1.0 },
+  { kind: 'king_cobra', modelPath: AnimalModels.KING_COBRA, scale: 0.3, perCell: 1, wanderSpeed: 0.1, spawnWeight: 0.15, minHeight: 0.1 },
+  { kind: 'tiger', modelPath: AnimalModels.TIGER, scale: 0.9, perCell: 1, wanderSpeed: 0, spawnWeight: 0.05, minHeight: 2.0 },
 ];
 
 const CELL_SIZE = 128;
@@ -157,45 +164,65 @@ export class AnimalSystem implements GameSystem {
     const cellSeed = this.hashCell(cellX, cellZ);
     let seedState = cellSeed;
 
-    for (const cfg of ANIMAL_CONFIGS) {
-      const template = this.templates.get(cfg.kind);
-      if (!template) continue;
+    // Pick animal type for this cell via weighted random selection
+    const cfg = this.pickWeightedAnimal(seedState);
+    seedState = this.nextRand(seedState);
+    if (!cfg) return null;
 
-      for (let i = 0; i < cfg.perCell; i++) {
-        // Pseudo-random position within cell
-        seedState = this.nextRand(seedState);
-        const lx = (seedState & 0xffff) / 0xffff * CELL_SIZE;
-        seedState = this.nextRand(seedState);
-        const lz = (seedState & 0xffff) / 0xffff * CELL_SIZE;
+    const template = this.templates.get(cfg.kind);
+    if (!template) return null;
 
-        const wx = baseX + lx;
-        const wz = baseZ + lz;
-        const wy = cache.getHeightAt(wx, wz);
+    for (let i = 0; i < cfg.perCell; i++) {
+      // Pseudo-random position within cell
+      seedState = this.nextRand(seedState);
+      const lx = ((seedState & 0xffff) / 0xffff) * CELL_SIZE;
+      seedState = this.nextRand(seedState);
+      const lz = ((seedState & 0xffff) / 0xffff) * CELL_SIZE;
 
-        // Skip underwater positions
-        if (wy < 0.2) continue;
+      const wx = baseX + lx;
+      const wz = baseZ + lz;
+      const wy = cache.getHeightAt(wx, wz);
 
-        const clone = template.clone();
-        clone.position.set(wx, wy, wz);
+      // Skip positions below the animal's minimum height threshold
+      if (wy < cfg.minHeight) continue;
 
-        // Random Y rotation
-        seedState = this.nextRand(seedState);
-        clone.rotation.y = ((seedState & 0xffff) / 0xffff) * Math.PI * 2;
+      const clone = template.clone();
+      clone.position.set(wx, wy, wz);
 
-        this.scene.add(clone);
-        animals.push({
-          object: clone,
-          kind: cfg.kind,
-          wanderSpeed: cfg.wanderSpeed,
-          wanderAngle: clone.rotation.y,
-          originX: wx,
-          originZ: wz,
-        });
-      }
+      // Random Y rotation
+      seedState = this.nextRand(seedState);
+      clone.rotation.y = ((seedState & 0xffff) / 0xffff) * Math.PI * 2;
+
+      this.scene.add(clone);
+      animals.push({
+        object: clone,
+        kind: cfg.kind,
+        wanderSpeed: cfg.wanderSpeed,
+        wanderAngle: clone.rotation.y,
+        originX: wx,
+        originZ: wz,
+      });
     }
 
     if (animals.length === 0) return null;
     return { key: cellKey, animals };
+  }
+
+  /** Weighted random selection from available animal configs. */
+  private pickWeightedAnimal(seed: number): AnimalConfig | null {
+    // Build pool of configs that have loaded templates
+    const available = ANIMAL_CONFIGS.filter((c) => this.templates.has(c.kind));
+    if (available.length === 0) return null;
+
+    const totalWeight = available.reduce((sum, c) => sum + c.spawnWeight, 0);
+    const roll = ((seed & 0xffff) / 0xffff) * totalWeight;
+
+    let cumulative = 0;
+    for (const cfg of available) {
+      cumulative += cfg.spawnWeight;
+      if (roll < cumulative) return cfg;
+    }
+    return available[available.length - 1];
   }
 
   private removeCell(cell: AnimalCell): void {

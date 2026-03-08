@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-03-06
+Last updated: 2026-03-08
 
 ## Read Order
 
@@ -46,8 +46,6 @@ Last updated: 2026-03-06
   - Canonical terrain rewrite control document. This is the only terrain execution plan. Latest validated state includes fully clean preview-smoke evidence under `artifacts/terrain-smoke/2026-03-04T00-54-47-243Z`.
 - `TERRAIN_RESEARCH.md`
   - Industry research: CDLOD vs geoclipmaps vs GPU tessellation vs CBT, CPU/GPU height consistency patterns, WebGPU terrain options, virtual texturing, streaming, and pivot options for our architecture. Reference only - no code changes proposed.
-- `ASHAU_VALLEY_IMPLEMENTATION_PLAN.md`
-  - A Shau mode stabilization plan and validation checklist.
 - `AUDIO_ASSETS_NEEDED.md`
   - Audio backlog/spec used by `src/systems/audio`.
 - `AGENT_TESTING.md`
@@ -60,13 +58,14 @@ Last updated: 2026-03-06
 These docs predate the block map and overlap with specific sub-docs. Kept for reference but prefer the block map for current state.
 
 - `FRONTEND_ARCHITECTURE_INVENTORY.md` - Overlaps with `blocks/ui.md`.
-- `FRONTEND_REARCHITECTURE_BACKLOG.md` - Phase board (3 phases done). Overlaps with `blocks/ui.md`.
 - `UI_STANDARDIZATION_GUIDE.md` - Standards still valid; component inventory overlaps with `blocks/ui.md`.
 - `CODEBASE_MAP.mmd` - Original Mermaid diagram, superseded by `CODEBASE_BLOCKS.md` + `blocks/`.
 
 ## Archive
 
 - `archive/` - Retired docs. Informational only, not part of active execution.
+- `archive/ASHAU_VALLEY_IMPLEMENTATION_PLAN.md` (archived 2026-03-08) - A Shau stabilization plan. Phases 2/4 superseded by MapIntelPolicy and product passes.
+- `archive/FRONTEND_REARCHITECTURE_BACKLOG.md` (archived 2026-03-08) - Phases 1-4 done, Phase 5 stale. Overlaps with `blocks/ui.md`.
 - `archive/UI_ENGINE_PLAN.md` - UI engine rewrite plan (Phases 0-7 complete).
 
 ## Documentation Rules

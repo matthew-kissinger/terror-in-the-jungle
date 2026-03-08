@@ -1,4 +1,4 @@
-import { ZoneManager, CaptureZone } from '../../systems/world/ZoneManager';
+import { ZoneManager } from '../../systems/world/ZoneManager';
 import { GameModeManager } from '../../systems/world/GameModeManager';
 import { OpenFrontierRespawnMapRenderer } from './OpenFrontierRespawnMapRenderer';
 import {

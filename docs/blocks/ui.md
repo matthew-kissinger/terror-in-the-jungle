@@ -42,7 +42,7 @@ src/ui/
   loading/     StartScreen, ModeCard, SettingsModal, HowToPlayModal, LoadingPanels, LoadingProgress
   loadout/     LoadoutSelector (legacy), LoadoutGrenadePanel, LoadoutTypes
   map/         FullMapSystem, FullMapInput, FullMapStyles, FullMapDOMHelpers,
-               RespawnMapView, OpenFrontierRespawnMap, OpenFrontierRespawnMapRenderer,
+               OpenFrontierRespawnMap, OpenFrontierRespawnMapRenderer,
                OpenFrontierRespawnMapUtils
   minimap/     MinimapSystem, MinimapDOMBuilder, MinimapRenderer, MinimapStyles
   MobilePauseOverlay.ts
@@ -192,8 +192,7 @@ Visibility: `data-show="infantry"` on `weapon-bar`, `command-bar`, and `action-b
 | [FullMapInput]([GH]/ui/map/FullMapInput.ts) | ui/map/FullMapInput.ts | Pan/zoom input for full map |
 | [FullMapStyles]([GH]/ui/map/FullMapStyles.ts) | ui/map/FullMapStyles.ts | Full map CSS |
 | [FullMapDOMHelpers]([GH]/ui/map/FullMapDOMHelpers.ts) | ui/map/FullMapDOMHelpers.ts | DOM helper utilities for full map |
-| [RespawnMapView]([GH]/ui/map/RespawnMapView.ts) | ui/map/RespawnMapView.ts | Respawn point selection overlay on full map |
-| [OpenFrontierRespawnMap]([GH]/ui/map/OpenFrontierRespawnMap.ts) | ui/map/OpenFrontierRespawnMap.ts | Open Frontier mode respawn map variant |
+| [OpenFrontierRespawnMap]([GH]/ui/map/OpenFrontierRespawnMap.ts) | ui/map/OpenFrontierRespawnMap.ts | Unified respawn map for all modes (replaced RespawnMapView) |
 | [OpenFrontierRespawnMapRenderer]([GH]/ui/map/OpenFrontierRespawnMapRenderer.ts) | ui/map/OpenFrontierRespawnMapRenderer.ts | Renderer for Open Frontier respawn map |
 | [OpenFrontierRespawnMapUtils]([GH]/ui/map/OpenFrontierRespawnMapUtils.ts) | ui/map/OpenFrontierRespawnMapUtils.ts | Utility functions for Open Frontier respawn map |
 | [CompassSystem]([GH]/ui/compass/CompassSystem.ts) | ui/compass/CompassSystem.ts | Heading compass strip, reads player yaw |

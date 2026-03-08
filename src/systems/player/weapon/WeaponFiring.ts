@@ -148,7 +148,7 @@ export class WeaponFiring {
    * Execute an M79 grenade launcher shot.
    * Spawns a grenade projectile instead of hitscan - damage comes from grenade explosion.
    */
-  private executeLauncherShot(command: ShotCommand): ShotResult {
+  private executeLauncherShot(_command: ShotCommand): ShotResult {
     // Play launcher-specific sound (falls back to rifle sound)
     if (this.audioManager) {
       this.audioManager.playPlayerWeaponSound('rifle')

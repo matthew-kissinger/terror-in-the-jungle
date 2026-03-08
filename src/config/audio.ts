@@ -26,6 +26,18 @@ export const SOUND_CONFIGS: Record<string, SoundConfig> = {
     path: 'assets/optimized/playerSMG.wav',
     volume: 0.75 // Lower than rifle, adjusts for rapid fire
   },
+  playerPistol: {
+    path: 'assets/optimized/playerGunshot.wav',
+    volume: 0.5 // Lighter than rifle, higher pitch applied via playback rate
+  },
+  playerLMG: {
+    path: 'assets/optimized/playerGunshot.wav',
+    volume: 0.9 // Heavier than rifle, deep sound
+  },
+  playerLauncher: {
+    path: 'assets/optimized/grenadeExplosion.wav',
+    volume: 0.4 // M79 thump, lower volume since explosion follows on impact
+  },
   otherGunshot: {
     path: 'assets/optimized/otherGunshot.wav',
     volume: 0.7, // Increased from 0.6

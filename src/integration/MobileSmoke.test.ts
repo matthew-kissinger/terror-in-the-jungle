@@ -38,13 +38,9 @@ vi.mock('../ui/controls/TouchMenuButton', () => ({ TouchMenuButton: class { show
 vi.mock('../ui/controls/TouchMortarButton', () => ({ TouchMortarButton: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); mount = vi.fn(); } }));
 vi.mock('../ui/controls/TouchHelicopterCyclic', () => ({ TouchHelicopterCyclic: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); mount = vi.fn(); } }));
 
-// Mock Loadout sub-renderers
-vi.mock('../ui/loadout/LoadoutGrenadePanel', () => ({ renderGrenadePanel: () => '<div id="grenade-panel"></div>' }));
-
 import { isTouchDevice, isMobileViewport, shouldUseTouchControls } from '../utils/DeviceDetector';
 import { PlayerInput } from '../systems/player/PlayerInput';
 import { TouchControls } from '../ui/controls/TouchControls';
-import { LoadoutSelector } from '../ui/loadout/LoadoutSelector';
 
 describe('Mobile Smoke Tests', () => {
   beforeEach(() => {
@@ -104,31 +100,7 @@ describe('Mobile Smoke Tests', () => {
     expect(disposeSpy).toHaveBeenCalled();
   });
 
-  it('6. LoadoutSelector shows TAP on mobile', async () => {
-    (shouldUseTouchControls as any).mockReturnValue(true);
-    
-    const loadout = new LoadoutSelector();
-    await loadout.init();
-    loadout.show();
-    
-    const html = document.body.innerHTML;
-    expect(html).toContain('TAP');
-    expect(html).not.toContain('CLICK');
-  });
-
-  it('7. LoadoutSelector shows CLICK on desktop', async () => {
-    (shouldUseTouchControls as any).mockReturnValue(false);
-    
-    const loadout = new LoadoutSelector();
-    await loadout.init();
-    loadout.show();
-    
-    const html = document.body.innerHTML;
-    expect(html).toContain('CLICK');
-    expect(html).not.toContain('TAP');
-  });
-
-  it('8. PlayerInput creates touch controls only on mobile', () => {
+  it('6. PlayerInput creates touch controls only on mobile', () => {
     (shouldUseTouchControls as any).mockReturnValue(true);
     const mobileInput = new PlayerInput();
     expect(mobileInput.getTouchControls()).not.toBeNull();

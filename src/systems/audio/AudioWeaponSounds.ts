@@ -80,11 +80,19 @@ export class AudioWeaponSounds {
                 pool = this.poolManager.getPlayerSMGPool();
                 configKey = 'playerSMG';
                 break;
+            case 'pistol':
+                pool = this.poolManager.getPlayerGunshotPool();
+                configKey = 'playerPistol';
+                break;
             case 'lmg':
                 pool = this.poolManager.getPlayerGunshotPool();
-                configKey = 'playerGunshot';
+                configKey = 'playerLMG';
                 break;
-            default: // rifle, pistol
+            case 'launcher':
+                pool = this.poolManager.getPlayerGunshotPool();
+                configKey = 'playerLauncher';
+                break;
+            default: // rifle
                 pool = this.poolManager.getPlayerGunshotPool();
                 configKey = 'playerGunshot';
         }
@@ -109,10 +117,20 @@ export class AudioWeaponSounds {
                 pitchMax = 1.18;
                 volumeVariation = 0.92 + Math.random() * 0.12;
                 break;
+            case 'pistol':
+                pitchMin = 1.10;
+                pitchMax = 1.20;
+                volumeVariation = 0.90 + Math.random() * 0.15; // Snappy, lighter feel
+                break;
             case 'lmg':
                 pitchMin = 0.85;
                 pitchMax = 0.95;
                 volumeVariation = 0.95 + Math.random() * 0.1; // Deep, heavy sound
+                break;
+            case 'launcher':
+                pitchMin = 0.70;
+                pitchMax = 0.80;
+                volumeVariation = 0.90 + Math.random() * 0.15; // Low thump
                 break;
         }
 

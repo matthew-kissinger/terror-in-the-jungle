@@ -25,7 +25,7 @@ Vietnam War is the first theater. The architecture should generalize to any war 
 | Weapons | 6 player weapon types | Shared deploy/loadout flow is live, but field pickups and broader weapon expansion are still later-phase work |
 | AI | 8-state FSM, 2 factions (US/OPFOR) | No vehicle usage, no turret manning, limited tactical intelligence |
 | Squad | Single coordinator + quick strip + map-first overlay (desktop/touch/gamepad) | Selected-squad detail is live; gamepad uses map-first overlay; scale adapters deferred |
-| Terrain | Noise + DEM terrain runtime | CDLOD transition validation and hydrology/gameplay integration are still incomplete |
+| Terrain | Noise + DEM terrain runtime, CDLOD rewrite live | CDLOD morphing (T-006) complete; hydrology/gameplay integration still incomplete |
 | Vegetation | 7+ billboard types with biome-aware runtime wiring | Needs in-engine smoke validation and visual tuning across modes |
 | Water | Global plane + shader rivers | No swimming, no boats, disabled in A Shau, shader is basic |
 | Assets | GLB integration has started for several live systems | More models remain staged in `deploy-3d-assets/`, but the engine is no longer fully procedural |
@@ -269,6 +269,7 @@ Current state:
 **Dependencies:** Phase 2F (textures), Phase 2E (vegetation types).
 
 ### 5A. Biome System
+*(Partially complete: BiomeClassifier, per-biome terrain material, and biome-driven vegetation scattering are live via T-003/T-007)*
 - Biome enum: DENSE_JUNGLE, HIGHLAND, RICE_PADDY, RIVERBANK, FIREBASE_CLEAR, PLANTATION, BAMBOO_GROVE, VILLAGE
 - Classification rules: height + slope + moisture + distance-to-water + noise
 - Per-biome config: ground texture, vegetation set + density, prop set, audio ambiance
@@ -282,6 +283,7 @@ Current state:
 - Landing zone generation (cleared areas with helipad markers)
 
 ### 5C. Improved Chunk System
+*(Superseded: chunk system replaced by CDLOD terrain rewrite, 2026-03-03)*
 - Better LOD transitions (geometry morphing, not popping)
 - Texture splatting per-vertex for biome blending
 - Chunk merging for distant terrain (reduce draw calls)

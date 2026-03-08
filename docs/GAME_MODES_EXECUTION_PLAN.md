@@ -758,7 +758,7 @@ These are the likely first files to touch when implementation starts:
 - `src/ui/loading/ModeCard.ts`
 - `src/systems/player/RespawnUI.ts`
 - `src/systems/player/LoadoutService.ts`
-- `src/ui/map/RespawnMapView.ts`
+- `src/ui/map/OpenFrontierRespawnMap.ts` (unified respawn map for all modes; RespawnMapView was removed)
 - `src/systems/player/PlayerRespawnManager.ts`
 - `src/systems/combat/PlayerSquadController.ts`
 - `src/ui/hud/SquadRadialMenu.ts`
