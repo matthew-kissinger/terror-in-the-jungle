@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import type { InputManager } from '../input/InputManager';
 import type { HUDLayout } from '../../ui/layout/HUDLayout';
-import { QuickCommandStrip } from '../../ui/hud/QuickCommandStrip';
 import { CommandModeOverlay } from '../../ui/hud/CommandModeOverlay';
 import type { InputMode } from '../input/InputManager';
 import type { SquadCommandState } from './PlayerSquadController';
@@ -18,7 +17,6 @@ export class CommandInputManager implements GameSystem {
   private static readonly MAP_UPDATE_INTERVAL = 1 / 20;
 
   private readonly playerSquadController: PlayerSquadController;
-  private readonly quickCommandStrip: QuickCommandStrip;
   private readonly commandModeOverlay: CommandModeOverlay;
   private layout?: HUDLayout;
   private inputManager?: InputManager;
@@ -44,12 +42,7 @@ export class CommandInputManager implements GameSystem {
 
   constructor(playerSquadController: PlayerSquadController) {
     this.playerSquadController = playerSquadController;
-    this.quickCommandStrip = new QuickCommandStrip();
     this.commandModeOverlay = new CommandModeOverlay();
-    this.quickCommandStrip.setCallbacks({
-      onCommandModeRequested: () => this.toggleCommandMode(),
-      onQuickCommandSelected: (slot) => this.issueQuickCommand(slot)
-    });
     this.commandModeOverlay.setCallbacks({
       onQuickCommandSelected: (slot) => this.handleOverlayCommandSelection(slot),
       onMapPointSelected: (position) => this.applyPlacementCommand(position),
@@ -109,27 +102,19 @@ export class CommandInputManager implements GameSystem {
     this.unsubscribeCommandState?.();
     this.unsubscribeInputMode?.();
     if (this.layout) {
-      this.layout.unregister(this.quickCommandStrip);
       this.layout.unregister(this.commandModeOverlay);
     }
     this.commandModeOverlay.dispose();
-    this.quickCommandStrip.dispose();
   }
 
   mountTo(layout: HUDLayout): void {
     if (this.layout === layout) return;
 
     if (this.layout) {
-      this.layout.unregister(this.quickCommandStrip);
       this.layout.unregister(this.commandModeOverlay);
     }
 
     this.layout = layout;
-    this.layout.register({
-      region: 'command-bar',
-      component: this.quickCommandStrip,
-      showContext: 'infantry'
-    });
     this.layout.register({
       region: 'center',
       component: this.commandModeOverlay,
@@ -142,7 +127,6 @@ export class CommandInputManager implements GameSystem {
     this.unsubscribeInputMode?.();
     this.unsubscribeInputMode = inputManager.onInputModeChange((mode) => {
       this.inputMode = mode;
-      this.quickCommandStrip.setInputMode(mode);
       this.commandModeOverlay.setInputMode(mode);
       this.syncPresentation();
     });
@@ -187,10 +171,6 @@ export class CommandInputManager implements GameSystem {
   handleCancel(): boolean {
     if (this.overlayVisible) {
       this.closeOverlay();
-      return true;
-    }
-    if (this.latestSquadState.isCommandModeOpen) {
-      this.playerSquadController.closeCommandModeSurface();
       return true;
     }
     return false;
@@ -240,9 +220,8 @@ export class CommandInputManager implements GameSystem {
   private syncPresentation(): void {
     const mergedState = {
       ...this.latestSquadState,
-      isCommandModeOpen: this.overlayVisible || this.latestSquadState.isCommandModeOpen
+      isCommandModeOpen: this.overlayVisible
     };
-    this.quickCommandStrip.setState(mergedState);
     this.commandModeOverlay.setState({
       hasSquad: mergedState.hasSquad,
       currentCommand: mergedState.currentCommand,

@@ -9,7 +9,7 @@
 | Block | Modules | Budget | Fan-in | Notes |
 |---|---|---|---|---|
 | HelicopterModel | HelicopterPhysics, HelicopterAnimation, HelicopterAudio, HelicopterInteraction | untracked | 5 | DEFERRED - created only when GameModeConfig has helipads |
-| HelipadSystem | (inline) | untracked | 3 | DEFERRED - places helipad meshes from config; creates HelicopterModel instances |
+| HelipadSystem | (inline) | untracked | 3 | DEFERRED - places helipad meshes from config with dynamic foundation depth; creates HelicopterModel instances |
 
 ---
 
@@ -68,6 +68,9 @@ Config fields in `AircraftPhysicsConfig`: mass, maxLiftForce, maxCyclicForce, ma
 
 ### Deferred Initialization
 Helipad creation is config-driven only. `HelipadSystem` is a no-op if `GameModeConfig.helipads` is empty or absent, and it no longer synthesizes a fallback helipad. HelicopterModel instances are created lazily only when `HelipadSystem` sees a populated config. Modes without helipads pay zero allocation cost and config mistakes are no longer masked at runtime.
+
+### Dynamic Foundation Depth
+Helipad placement uses `TerrainFoundationUtils.sampleTerrainHeightRange()` (~115 samples across 3 concentric rings + axis cross-sections) to measure the terrain height range within the platform footprint. `computeFoundationDepth()` then sizes the foundation mesh to cover the full gap between the platform surface and the lowest terrain point plus a 1.0m margin. On flat terrain: ~1.0m depth. On a hillside: foundation extends to fill any gap. The dirt surround and pad meshes are scaled downward from their top face so the landing surface stays fixed. This is engine-agnostic - the utilities accept a plain `(x, z) => height` callback and are shared with WorldFeatureSystem for firebases, airstrips, and future flat-platform features.
 
 ### Unoccupied Helicopter Gravity
 When a pilot exits mid-air, HelicopterPhysics zeroes all control inputs but continues integrating physics (gravity applies). The helicopter descends until it collides with terrain. There is no auto-land or despawn.

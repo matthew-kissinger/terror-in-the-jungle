@@ -71,7 +71,7 @@ describe('HUDLayout', () => {
     layout.init();
     const allRegions: HUDRegion[] = [
       'timer', 'tickets', 'game-status', 'compass', 'minimap',
-      'objectives', 'stats', 'command-bar', 'kill-feed', 'ammo', 'weapon-bar',
+      'objectives', 'stats', 'kill-feed', 'ammo', 'weapon-bar',
       'center', 'health', 'joystick', 'fire', 'ads', 'action-btns', 'menu',
     ];
     for (const region of allRegions) {

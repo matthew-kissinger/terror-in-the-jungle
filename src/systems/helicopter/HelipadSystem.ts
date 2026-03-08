@@ -6,6 +6,7 @@ import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { GameModeManager } from '../world/GameModeManager';
 import { modelLoader } from '../assets/ModelLoader';
 import { StructureModels } from '../assets/modelPaths';
+import { sampleTerrainHeightRange, computeFoundationDepth } from '../terrain/TerrainFoundationUtils';
 
 const HELIPAD_TERRAIN_CLEARANCE = 0.02;
 const HELIPAD_MIN_FOUNDATION_DEPTH = 0.6;
@@ -100,15 +101,23 @@ export class HelipadSystem implements GameSystem {
     const helipadPosition = config.position.clone();
 
     const platformRadius = 12;
+    const tm = this.terrainManager;
+    const { min: minHeight, max: maxHeight } = sampleTerrainHeightRange(
+      helipadPosition.x, helipadPosition.z, platformRadius,
+      (x, z) => tm.getHeightAt(x, z),
+    );
+
     if (config.preparedTerrain) {
-      helipadPosition.y = this.terrainManager.getHeightAt(helipadPosition.x, helipadPosition.z) + HELIPAD_TERRAIN_CLEARANCE;
+      helipadPosition.y = tm.getHeightAt(helipadPosition.x, helipadPosition.z) + HELIPAD_TERRAIN_CLEARANCE;
     } else {
-      // Legacy fallback when the map does not author a prepared landing zone.
-      const maxHeight = this.findMaxTerrainHeight(helipadPosition.x, helipadPosition.z, platformRadius);
       helipadPosition.y = maxHeight + HELIPAD_TERRAIN_CLEARANCE;
     }
 
-    const helipad = await this.loadHelipadModel();
+    const foundationDepth = computeFoundationDepth(
+      helipadPosition.y, minHeight, HELIPAD_MIN_FOUNDATION_DEPTH,
+    );
+
+    const helipad = await this.loadHelipadModel(foundationDepth);
     helipad.position.copy(helipadPosition);
 
     this.scene.add(helipad);
@@ -124,34 +133,6 @@ export class HelipadSystem implements GameSystem {
     Logger.info('helicopter', `Created helipad "${config.id}" at (${helipadPosition.x.toFixed(0)}, ${helipadPosition.y.toFixed(1)}, ${helipadPosition.z.toFixed(0)}) aircraft=${config.aircraft}`);
   }
 
-  private findMaxTerrainHeight(centerX: number, centerZ: number, radius: number): number {
-    if (!this.terrainManager) return 0;
-
-    let maxHeight = -Infinity;
-    const samplePoints = 16;
-
-    maxHeight = Math.max(maxHeight, this.terrainManager.getHeightAt(centerX, centerZ));
-
-    for (let ring = 1; ring <= 3; ring++) {
-      const ringRadius = (radius * ring) / 3;
-      const pointsInRing = samplePoints * ring;
-      for (let i = 0; i < pointsInRing; i++) {
-        const angle = (i / pointsInRing) * Math.PI * 2;
-        const x = centerX + Math.cos(angle) * ringRadius;
-        const z = centerZ + Math.sin(angle) * ringRadius;
-        maxHeight = Math.max(maxHeight, this.terrainManager.getHeightAt(x, z));
-      }
-    }
-
-    for (let i = 0; i <= 8; i++) {
-      const t = i / 8;
-      maxHeight = Math.max(maxHeight, this.terrainManager.getHeightAt(centerX + (t - 0.5) * radius * 2, centerZ));
-      maxHeight = Math.max(maxHeight, this.terrainManager.getHeightAt(centerX, centerZ + (t - 0.5) * radius * 2));
-    }
-
-    return maxHeight;
-  }
-
   private clearVegetationArea(centerX: number, centerZ: number, radius: number): void {
     if (!this.vegetationSystem) return;
 
@@ -162,9 +143,9 @@ export class HelipadSystem implements GameSystem {
     }
   }
 
-  private async loadHelipadModel(): Promise<THREE.Group> {
+  private async loadHelipadModel(foundationDepth: number): Promise<THREE.Group> {
     const scene = await modelLoader.loadModel(StructureModels.HELIPAD);
-    this.extendHelipadFoundation(scene);
+    this.extendHelipadFoundation(scene, foundationDepth);
 
     const helipadGroup = new THREE.Group();
     helipadGroup.add(scene);
@@ -183,7 +164,7 @@ export class HelipadSystem implements GameSystem {
     return helipadGroup;
   }
 
-  private extendHelipadFoundation(root: THREE.Object3D): void {
+  private extendHelipadFoundation(root: THREE.Object3D, requiredDepth: number): void {
     root.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
 
@@ -205,7 +186,7 @@ export class HelipadSystem implements GameSystem {
       const currentHeight = bounds.max.y - bounds.min.y;
       if (currentHeight <= 0) return;
 
-      const scaleY = Math.max(1, HELIPAD_MIN_FOUNDATION_DEPTH / currentHeight);
+      const scaleY = Math.max(1, requiredDepth / currentHeight);
       if (scaleY <= 1) return;
 
       // Scale around the top face so the landing plane stays put while the base grows downward.

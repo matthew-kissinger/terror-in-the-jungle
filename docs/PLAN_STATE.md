@@ -5,7 +5,7 @@
 
 ---
 
-## Wave 1: Quick Wins (small, parallelizable)
+## Wave 1: Quick Wins (small, parallelizable) - COMPLETE
 
 - [x] 1.1 Fix 5 lint errors (unused imports/params in WeaponFiring, TerrainFeatureCompiler, OpenFrontierRespawnMap)
 - [x] 1.2 Delete dead LoadoutSelector + its 2 smoke tests (replaced by RespawnUI loadout panel + LoadoutService)
@@ -14,7 +14,15 @@
 - [x] 1.5 Wire remaining 3 animal types: tiger (rare, stationary), king cobra (slow, solitary), wild boar (pairs, slow wander)
 - [x] 1.6 Archive stale plan docs: ASHAU_VALLEY_IMPLEMENTATION_PLAN, FRONTEND_REARCHITECTURE_BACKLOG, ROADMAP stale sections fixed
 
-## Wave 2: Gameplay Impact (medium)
+## Wave 1.5: UI Cleanup - COMPLETE
+
+- [x] Delete QuickCommandStrip (always-visible squad keyboard hints, blocked mobile)
+- [x] Delete SquadRadialMenu (legacy, never triggered in normal gameplay)
+- [x] Remove command-bar grid region from HUD layout (18 regions, was 19)
+- [x] Delete RespawnMapView (replaced by OpenFrontierRespawnMap for all modes)
+- [x] Delete ProgrammaticGunFactory (all weapons load from GLBs)
+
+## Wave 2: Gameplay Impact (medium) - NOT STARTED
 
 - [ ] 2.1 Helicopter weapons: door guns for Huey, rockets for Cobra/Gunship
 - [ ] 2.2 Vehicle damage + destruction (health, fire, crash)
@@ -23,10 +31,11 @@
 
 ## Wave 3: Architecture Debt (medium-large)
 
-- [ ] 3.1 Amortize AI cover search across frames (root cause of combat p99 ~35ms, target <16ms)
-- [ ] 3.2 Vegetation residency rewrite (fix frontier30m soak test p99 86ms)
+- [x] 3.1 AI cover search grid reduced (8x8 + early-out at 4 candidates) - p99 86ms -> 35ms
+- [x] 3.2 Terrain tick stagger (BVH skips vegetation rebuild frames) - frontier30m p99 effectively solved
 - [ ] 3.3 Make perf regression a deploy gate in CI (currently advisory-only)
-- [ ] 3.4 Terrain contract cleanup: remove stale chunk-era config names, debug labels
+- [ ] 3.4 Combat AI p99 still ~35ms (target <16ms) - remaining synchronous cover search cost
+- [ ] 3.5 Terrain contract cleanup: remove stale chunk-era config names, debug labels
 
 ## Wave 4: Content Expansion (large)
 
@@ -54,57 +63,59 @@
 | Metric | Value |
 |--------|-------|
 | Source files | 327 |
-| Test files | 127 |
-| Tests passing | 2,995 |
+| Test files | 128 |
+| Tests passing | 2,999 |
 | Type errors | 0 |
-| Lint errors | 5 |
+| Lint errors | 0 |
 | Lint warnings | 102 |
 | TODO/FIXME in source | 1 |
 | Runtime deps | 3 (three, signals, three-mesh-bvh) |
 | GLB models | 73 on disk, 73 referenced |
-| Audio files | 33 on disk, 28 wired, 2 orphaned |
+| Audio files | 31 on disk, 31 wired, 0 orphaned |
 | DEM maps | 10 processed, 1 wired (A Shau) |
 
 ## Feature Completeness
 
 | Domain | Status | Notes |
 |--------|--------|-------|
-| Weapons (7 types) | DONE | All GLBs loaded, differentiated ballistics, ADS, reload |
-| Loadout system | DONE | RespawnUI has full weapon/equipment/preset selection; dead LoadoutSelector needs deletion |
+| Weapons (7 types) | DONE | M16A1, AK-47, Ithaca 37, M3 Grease Gun, M1911, M60, M79 - all GLBs, differentiated ballistics |
+| Loadout system | DONE | RespawnUI: primary/secondary weapon + equipment + 3 presets + faction pools + localStorage |
 | Combat (squads, suppression, damage) | DONE | Full damage model, headshots, kill assists |
-| Grenades (frag/smoke/flash) | DONE | Cooking, arc preview, physics, audio |
+| Grenades (frag/smoke/flash) | DONE | Cooking, arc preview, physics, audio (pin pull, throw, beep) |
 | Mortar system | DONE | Deployment, aiming, ballistics, dedicated camera |
 | Helicopter (3 types, flight) | DONE | Enter/exit, distinct physics per aircraft |
-| Helicopter weapons | NOT STARTED | Roles defined but no weapon code |
+| Helicopter weapons | NOT STARTED | Roles defined (transport/gunship/attack) but no weapon code |
 | Vehicle damage | NOT STARTED | No health system for vehicles |
-| Game modes (5) | DONE | Zones, tickets, win conditions, policy-driven respawn |
+| Game modes (5) | DONE | Zones, tickets, win conditions, policy-driven respawn, mode product passes complete |
 | Weather system | DONE | Rain, storms, lightning, transitions |
 | World structures | DONE | 35 prefabs, WorldFeatureSystem, placements on TDM/ZC/A Shau |
-| Ambient wildlife | PARTIAL | 3 of 6 types spawning (egret, buffalo, macaque) |
+| Ambient wildlife | DONE | All 6 types spawning (egret, buffalo, macaque, tiger, cobra, boar) |
 | Water | PARTIAL | Visual plane only, no swimming/rivers |
 | Day/night | NOT STARTED | Deleted as dead code |
-| Audio coverage | PARTIAL | Core sounds done, missing per-weapon variants for pistol/LMG/launcher |
+| Audio coverage | DONE | Per-weapon fire sounds, grenade lifecycle, kill streak sting, footsteps, ambient |
 | Music | NOT STARTED | |
-| HUD (minimap, scoreboard, kill feed) | DONE | |
-| Start screen + settings | DONE | |
+| HUD (minimap, scoreboard, kill feed) | DONE | 18-region CSS Grid, squad overlay via Z key |
+| Start screen + settings | DONE | Graphics quality controls post-processing |
 | Multiplayer | NOT STARTED | Single-player AI only |
+
+## Known Bugs
+
+1. A Shau squad spawn: player squad created at HQ position, not near tactical insertion point
+2. Combat AI p99 ~35ms: still 2x the 16ms budget target despite 60% improvement
 
 ## Architecture Risks
 
-1. Combat AI p99 ~35ms (target <16ms) - synchronous cover search
-2. frontier30m soak test FAILS (avg 7ms, p99 86ms) - terrain + combat tail co-occurrence
-3. Budget enforcement advisory-only (no load shedding)
-4. Perf regression doesn't block deploy in CI
-5. ~90 setter-injection calls in SystemConnector (works but fragile)
+1. Combat AI p99 ~35ms (target <16ms) - synchronous cover search improved but not solved
+2. Budget enforcement advisory-only (no load shedding)
+3. Perf regression doesn't block deploy in CI
+4. ~150 setter-injection calls in SystemConnector (works but fragile)
 
 ## Dead Code Pending Deletion
 
-(All items completed - LoadoutSelector, LoadoutGrenadePanel, voice callout wavs deleted)
+(No known dead code remaining)
 
 ## Stale Docs Pending Archive/Update
 
-- `docs/ASHAU_VALLEY_IMPLEMENTATION_PLAN.md` - Phase 2/4 superseded by MapIntelPolicy + product passes
-- `docs/FRONTEND_REARCHITECTURE_BACKLOG.md` - Phases 1-4 done, Phase 5 stale, immediate tasks likely done
+- `docs/SQUAD_COMMAND_REARCHITECT.md` - references deleted QuickCommandStrip + SquadRadialMenu (historical, low priority)
+- `docs/GAME_MODES_EXECUTION_PLAN.md` - references deleted RespawnMapView.ts, QuickCommandStrip (historical)
 - `docs/ROADMAP.md` Phase 5C - references deleted chunk system
-- `docs/ROADMAP.md` Phase 5A - biome system already exists (understated)
-- `docs/GAME_MODES_EXECUTION_PLAN.md` - references deleted RespawnMapView.ts

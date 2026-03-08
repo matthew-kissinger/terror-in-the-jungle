@@ -147,7 +147,7 @@ Source: [PlayerInput.ts]([GH]/systems/player/PlayerInput.ts)
 | B | Deploy/undeploy mortar | Infantry |
 | M | Toggle mortar camera | Infantry |
 | F | Mortar fire | Infantry (mortar deployed) |
-| Z | Squad command menu | Infantry |
+| Z | Squad command overlay | Infantry |
 | Tab | Scoreboard | Any |
 | W/S | Collective up/down | Helicopter |
 | A/D | Yaw left/right | Helicopter |

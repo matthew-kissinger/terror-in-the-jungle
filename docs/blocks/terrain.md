@@ -210,6 +210,7 @@ The remaining concern is not authority confusion. It is whether `TerrainSystem` 
 | `StampedHeightProvider` | `src/systems/terrain/StampedHeightProvider.ts` | Wraps a base provider with terrain stamp overlays (flatten/raise for features) |
 | `TerrainFeatureCompiler` | `src/systems/terrain/TerrainFeatureCompiler.ts` | Compiles map feature definitions into terrain stamps, surface patches, and exclusion zones |
 | `TerrainFeatureTypes` | `src/systems/terrain/TerrainFeatureTypes.ts` | Shared type definitions for terrain stamps, surface patches, and exclusion zones |
+| `TerrainFoundationUtils` | `src/systems/terrain/TerrainFoundationUtils.ts` | Engine-agnostic height-range sampling and foundation depth computation for flat structures on terrain |
 | `TerrainQueries` | `src/systems/terrain/TerrainQueries.ts` | Collision object + LOS query facade |
 
 ### Vegetation/worker modules

@@ -314,3 +314,4 @@ Record completed items here with date and commit hash.
 | 2026-03-08 | 3.2 Terrain rewrite status | - | T-002/T-004/T-005 done, T-003/T-007 in_progress (asset-blocked), T-008 pending design |
 | 2026-03-08 | Doc sync | - | GAME_MODES_EXECUTION_PLAN Phase 1/4/5 status, ACTIVE_GAME_MODES_HANDOFF gaps/resume, ARCHITECTURE_RECOVERY_PLAN Keep Decisions |
 | 2026-03-08 | Player-facing 10-step plan | - | Tracers, grenade/kill-streak audio, graphics quality tiers, TDM/ZC/A Shau structures, AnimalSystem, M60 LMG, M79 launcher, ProgrammaticGunFactory deleted |
+| 2026-03-08 | Dynamic helipad foundation | - | TerrainFoundationUtils: engine-agnostic height sampling + foundation depth; HelipadSystem uses dynamic depth instead of fixed 0.6m; foundation fills terrain gap on slopes |

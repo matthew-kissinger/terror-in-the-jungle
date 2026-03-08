@@ -3,7 +3,6 @@ import { GameSystem } from '../../types';
 import { SquadCommand } from './types';
 import { SquadManager } from './SquadManager';
 import { Logger } from '../../utils/Logger';
-import { SquadRadialMenu } from '../../ui/hud/SquadRadialMenu';
 import {
   getQuickCommandOption,
   getSquadCommandLabel,
@@ -31,13 +30,10 @@ export class PlayerSquadController implements GameSystem {
   private playerPosition = new THREE.Vector3();
   private currentCommand: SquadCommand = SquadCommand.NONE;
   private commandIndicatorElement?: HTMLElement;
-  private radialMenu: SquadRadialMenu;
   private readonly commandStateListeners = new Set<SquadCommandStateListener>();
 
   constructor(squadManager: SquadManager) {
     this.squadManager = squadManager;
-    this.radialMenu = new SquadRadialMenu();
-    this.radialMenu.setCommandSelectedCallback((command) => this.issueCommand(command));
   }
 
   async init(): Promise<void> {
@@ -49,7 +45,6 @@ export class PlayerSquadController implements GameSystem {
   }
 
   dispose(): void {
-    this.radialMenu.dispose();
     if (this.commandIndicatorElement && this.commandIndicatorElement.parentNode) {
       this.commandIndicatorElement.parentNode.removeChild(this.commandIndicatorElement);
     }
@@ -90,7 +85,7 @@ export class PlayerSquadController implements GameSystem {
     return {
       hasSquad: Boolean(squad),
       currentCommand: this.currentCommand,
-      isCommandModeOpen: this.radialMenu.isOpen(),
+      isCommandModeOpen: false,
       memberCount: squad?.members.length ?? 0,
       commandPosition: squad?.commandPosition,
       selectedSquadId: squad?.id,
@@ -190,27 +185,6 @@ export class PlayerSquadController implements GameSystem {
 
   getCurrentCommand(): SquadCommand {
     return this.currentCommand;
-  }
-
-  toggleCommandModeSurface(): void {
-    if (!this.playerSquadId) return;
-
-    if (this.radialMenu.isOpen()) {
-      this.radialMenu.executeCommand();
-    } else {
-      this.radialMenu.show();
-    }
-    this.emitCommandState();
-  }
-
-  closeCommandModeSurface(): void {
-    if (!this.radialMenu.isOpen()) return;
-    this.radialMenu.hide();
-    this.emitCommandState();
-  }
-
-  toggleRadialMenu(): void {
-    this.toggleCommandModeSurface();
   }
 
   private createCommandIndicator(): void {

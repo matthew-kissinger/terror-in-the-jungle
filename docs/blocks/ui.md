@@ -78,8 +78,6 @@ src/ui/
 | [MortarPanel]([GH]/ui/hud/MortarPanel.ts) | ui/hud/MortarPanel.ts | Mortar targeting UI overlay |
 | [CommandModeOverlay]([GH]/ui/hud/CommandModeOverlay.ts) | ui/hud/CommandModeOverlay.ts | Center-slot map-first command panel for desktop, touch, and gamepad with selected-squad detail |
 | [CommandTacticalMap]([GH]/ui/hud/CommandTacticalMap.ts) | ui/hud/CommandTacticalMap.ts | Local tactical map used inside the command overlay for point placement orders, squad picking, and gamepad cursor confirmation |
-| [QuickCommandStrip]([GH]/ui/hud/QuickCommandStrip.ts) | ui/hud/QuickCommandStrip.ts | Always-visible squad command strip mounted into the HUD `command-bar` slot |
-| [SquadRadialMenu]([GH]/ui/hud/SquadRadialMenu.ts) | ui/hud/SquadRadialMenu.ts | Radial command menu for squad orders |
 | [DamageNumberSystem]([GH]/ui/hud/DamageNumberSystem.ts) | ui/hud/DamageNumberSystem.ts | Floating damage numbers in world space |
 | [HitMarkerFeedback]([GH]/ui/hud/HitMarkerFeedback.ts) | ui/hud/HitMarkerFeedback.ts | Crosshair hit flash |
 | [ScorePopupSystem]([GH]/ui/hud/ScorePopupSystem.ts) | ui/hud/ScorePopupSystem.ts | "+100 pts" popups |
@@ -91,14 +89,14 @@ src/ui/
 
 | Module | File | Role |
 |---|---|---|
-| [HUDLayout]([GH]/ui/layout/HUDLayout.ts) | ui/layout/HUDLayout.ts | Creates `#game-hud-root`, 19 named CSS Grid slots, `getSlot(region)` API |
+| [HUDLayout]([GH]/ui/layout/HUDLayout.ts) | ui/layout/HUDLayout.ts | Creates `#game-hud-root`, 18 named CSS Grid slots, `getSlot(region)` API |
 | [HUDLayoutStyles]([GH]/ui/layout/HUDLayoutStyles.ts) | ui/layout/HUDLayoutStyles.ts | CSS Grid template definitions (desktop, mobile-landscape, mobile-portrait) |
 | [VisibilityManager]([GH]/ui/layout/VisibilityManager.ts) | ui/layout/VisibilityManager.ts | Sets data-device/data-phase/data-vehicle/data-ads attributes on `#game-hud-root`; CSS rules handle visibility |
-| [types]([GH]/ui/layout/types.ts) | ui/layout/types.ts | `HUDRegion` type (19 values), `LayoutMode`, `UIState`, `LayoutComponent`, `LayoutRegistration` |
+| [types]([GH]/ui/layout/types.ts) | ui/layout/types.ts | `HUDRegion` type (18 values), `LayoutMode`, `UIState`, `LayoutComponent`, `LayoutRegistration` |
 
 ---
 
-## 19 Named HUD Regions
+## 18 Named HUD Regions
 
 Source: [types.ts]([GH]/ui/layout/types.ts) `HUDRegion` type
 
@@ -111,7 +109,6 @@ Source: [types.ts]([GH]/ui/layout/types.ts) `HUDRegion` type
 | `minimap` | Info | MinimapSystem canvas |
 | `objectives` | Info | ObjectiveDisplay / HUDZoneDisplay |
 | `stats` | Info | StatsPanel (within ScoreboardPanel) |
-| `command-bar` | Info | QuickCommandStrip |
 | `kill-feed` | Info | KillFeed |
 | `ammo` | Info | AmmoDisplay |
 | `weapon-bar` | Info | UnifiedWeaponBar |
@@ -124,7 +121,7 @@ Source: [types.ts]([GH]/ui/layout/types.ts) `HUDRegion` type
 | `action-btns` | Touch | reload, crouch, sprint buttons |
 | `menu` | Touch | TouchMenuButton |
 
-Visibility: `data-show="infantry"` on `weapon-bar`, `command-bar`, and `action-btns` - CSS hides these when `data-vehicle="helicopter"` is set on `#game-hud-root`. VisibilityManager sets/removes data attributes. Do not use JS `style.display` to hide/show slots.
+Visibility: `data-show="infantry"` on `weapon-bar` and `action-btns` - CSS hides these when `data-vehicle="helicopter"` is set on `#game-hud-root`. VisibilityManager sets/removes data attributes. Do not use JS `style.display` to hide/show slots.
 
 ---
 

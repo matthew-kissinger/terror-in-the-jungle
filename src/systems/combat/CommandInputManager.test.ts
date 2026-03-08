@@ -31,20 +31,19 @@ describe('CommandInputManager', () => {
     layout.init();
   });
 
-  it('mounts the quick command strip into the command-bar region', () => {
+  it('mounts the command overlay into the center region', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);
 
     manager.mountTo(layout);
 
-    expect(layout.getSlot('command-bar').querySelector('.quick-command-strip')).toBeTruthy();
     expect(layout.getSlot('center').querySelector('.command-mode-overlay')).toBeTruthy();
 
     manager.dispose();
     layout.dispose();
   });
 
-  it('opens the map-first overlay for gamepad instead of using the radial fallback', () => {
+  it('opens the map-first overlay for gamepad', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);
     manager.mountTo(layout);
@@ -61,61 +60,12 @@ describe('CommandInputManager', () => {
     const overlay = layout.getSlot('center').querySelector<HTMLElement>('.command-mode-overlay');
 
     expect(overlay?.dataset.visible).toBe('true');
-    expect(controller.toggleCommandModeSurface).not.toHaveBeenCalled();
 
     manager.dispose();
     layout.dispose();
   });
 
-  it('updates the strip when squad state changes', () => {
-    const controller = createSquadControllerStub();
-    const manager = new CommandInputManager(controller as any);
-    manager.mountTo(layout);
-
-    controller.emit({
-      hasSquad: true,
-      currentCommand: SquadCommand.RETREAT,
-      isCommandModeOpen: true,
-      memberCount: 8,
-      commandPosition: undefined
-    });
-
-    const retreatButton = layout.getSlot('command-bar').querySelector<HTMLButtonElement>('[data-action="slot-4"]');
-    const modeButton = layout.getSlot('command-bar').querySelector<HTMLButtonElement>('[data-action="mode"]');
-
-    expect(retreatButton?.classList.contains('quick-command-strip__button--active')).toBe(true);
-    expect(modeButton?.classList.contains('quick-command-strip__button--active')).toBe(true);
-    expect(layout.getSlot('command-bar').textContent).toContain('RETREAT');
-
-    manager.dispose();
-    layout.dispose();
-  });
-
-  it('binds input-mode updates into the strip', () => {
-    const controller = createSquadControllerStub();
-    const manager = new CommandInputManager(controller as any);
-    manager.mountTo(layout);
-
-    let listener: ((mode: 'keyboardMouse' | 'touch' | 'gamepad') => void) | undefined;
-    const unsubscribe = vi.fn();
-    manager.bindInputManager({
-      onInputModeChange: vi.fn((cb) => {
-        listener = cb;
-        cb('keyboardMouse');
-        return unsubscribe;
-      })
-    } as any);
-
-    listener?.('touch');
-    const strip = layout.getSlot('command-bar').querySelector<HTMLElement>('.quick-command-strip');
-    expect(strip?.dataset.inputMode).toBe('touch');
-
-    manager.dispose();
-    expect(unsubscribe).toHaveBeenCalledTimes(1);
-    layout.dispose();
-  });
-
-  it('opens the command overlay for keyboard/touch instead of toggling the radial fallback', () => {
+  it('opens the command overlay for keyboard/touch and closes on cancel', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);
     manager.mountTo(layout);
@@ -134,7 +84,6 @@ describe('CommandInputManager', () => {
     const overlay = layout.getSlot('center').querySelector<HTMLElement>('.command-mode-overlay');
     expect(overlay?.dataset.visible).toBe('true');
     expect(unlockPointer).toHaveBeenCalledTimes(1);
-    expect(controller.toggleCommandModeSurface).not.toHaveBeenCalled();
 
     manager.handleCancel();
     expect(overlay?.dataset.visible).toBe('false');
@@ -370,14 +319,6 @@ function createSquadControllerStub() {
       listeners.add(listener);
       listener(state);
       return () => listeners.delete(listener);
-    }),
-    toggleCommandModeSurface: vi.fn(() => {
-      state = { ...state, isCommandModeOpen: !state.isCommandModeOpen };
-      emitState(listeners, state);
-    }),
-    closeCommandModeSurface: vi.fn(() => {
-      state = { ...state, isCommandModeOpen: false };
-      emitState(listeners, state);
     }),
     issueQuickCommand: vi.fn((slot: number) => {
       const option = getQuickCommandOption(slot);
