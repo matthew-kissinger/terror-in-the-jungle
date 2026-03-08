@@ -192,6 +192,9 @@ export class SystemConnector {
     refs.helicopterModel.setPlayerController(refs.playerController);
     refs.helicopterModel.setHUDSystem(refs.hudSystem);
     refs.helicopterModel.setAudioListener(refs.audioManager.getListener());
+
+    refs.worldFeatureSystem.setTerrainManager(refs.terrainSystem);
+    refs.worldFeatureSystem.setGameModeManager(refs.gameModeManager);
   }
 
   // ── Weapons ──

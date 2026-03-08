@@ -468,6 +468,7 @@ export class CombatantSystem implements GameSystem {
 
   setPlayerFaction(faction: Faction): void {
     this.updateHelpers.setPlayerFaction(faction);
+    this.spawnManager.setPlayerFaction(faction);
   }
 
   setPlayerSuppressionSystem(system: import('../player/PlayerSuppressionSystem').PlayerSuppressionSystem): void {

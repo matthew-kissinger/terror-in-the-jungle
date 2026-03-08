@@ -27,7 +27,26 @@ interface DEMConfig {
   buffer: ArrayBuffer;
 }
 
-type HeightProviderConfig = NoiseConfig | DEMConfig;
+interface FlattenCircleStampConfig {
+  kind: 'flatten_circle';
+  centerX: number;
+  centerZ: number;
+  innerRadius: number;
+  outerRadius: number;
+  samplingRadius: number;
+  targetHeightMode: 'center' | 'average' | 'max';
+  heightOffset: number;
+  priority: number;
+  targetHeight: number;
+}
+
+interface StampedConfig {
+  type: 'stamped';
+  base: HeightProviderConfig;
+  stamps: FlattenCircleStampConfig[];
+}
+
+type HeightProviderConfig = NoiseConfig | DEMConfig | StampedConfig;
 
 // ── Perlin noise (must match NoiseHeightProvider exactly) ──
 
@@ -151,21 +170,79 @@ function sampleDEM(
 
 // ── Worker state ──
 
-let noiseGen: WorkerNoise | null = null;
-let demData: Float32Array | null = null;
-let demWidth = 0;
-let demHeight = 0;
-let demMetersPerPixel = 1;
-let demOriginX = 0;
-let demOriginZ = 0;
-let providerType: 'noise' | 'dem' = 'noise';
+let activeProviderConfig: HeightProviderConfig = { type: 'noise', seed: 12345 };
+const noiseCache = new Map<number, WorkerNoise>();
+const demBufferCache = new Map<ArrayBuffer, Float32Array>();
+
+function getNoise(seed: number): WorkerNoise {
+  let noise = noiseCache.get(seed);
+  if (!noise) {
+    noise = new WorkerNoise(seed);
+    noiseCache.set(seed, noise);
+  }
+  return noise;
+}
 
 function getHeight(worldX: number, worldZ: number): number {
-  if (providerType === 'dem' && demData) {
-    return sampleDEM(worldX, worldZ, demData, demWidth, demHeight, demMetersPerPixel, demOriginX, demOriginZ);
+  return sampleProviderHeight(activeProviderConfig, worldX, worldZ);
+}
+
+function sampleProviderHeight(config: HeightProviderConfig, worldX: number, worldZ: number): number {
+  switch (config.type) {
+    case 'noise':
+      return calculateNoiseHeight(worldX, worldZ, getNoise(config.seed));
+    case 'dem': {
+      let demData = demBufferCache.get(config.buffer);
+      if (!demData) {
+        demData = new Float32Array(config.buffer);
+        demBufferCache.set(config.buffer, demData);
+      }
+      return sampleDEM(worldX, worldZ, demData, config.width, config.height, config.metersPerPixel, config.originX, config.originZ);
+    }
+    case 'stamped': {
+      let height = sampleProviderHeight(config.base, worldX, worldZ);
+      for (const stamp of config.stamps) {
+        height = applyFlattenCircleStamp(height, worldX, worldZ, stamp);
+      }
+      return height;
+    }
+    default:
+      return 0;
   }
-  if (!noiseGen) noiseGen = new WorkerNoise(12345);
-  return calculateNoiseHeight(worldX, worldZ, noiseGen);
+}
+
+function applyFlattenCircleStamp(
+  baseHeight: number,
+  worldX: number,
+  worldZ: number,
+  stamp: FlattenCircleStampConfig,
+): number {
+  const dx = worldX - stamp.centerX;
+  const dz = worldZ - stamp.centerZ;
+  const distance = Math.sqrt(dx * dx + dz * dz);
+  if (distance >= stamp.outerRadius) {
+    return baseHeight;
+  }
+
+  const targetHeight = stamp.targetHeight + stamp.heightOffset;
+  if (distance <= stamp.innerRadius) {
+    return targetHeight;
+  }
+
+  const blend = smoothstep(stamp.outerRadius, stamp.innerRadius, distance);
+  return baseHeight + (targetHeight - baseHeight) * blend;
+}
+
+function smoothstep(edge0: number, edge1: number, value: number): number {
+  if (edge0 === edge1) {
+    return value < edge0 ? 0 : 1;
+  }
+  const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }
 
 // ── Message handling ──
@@ -199,20 +276,7 @@ self.onmessage = function (event: MessageEvent<WorkerMessage>) {
 
   switch (msg.type) {
     case 'setHeightProvider': {
-      const config = msg.config;
-      if (config.type === 'noise') {
-        noiseGen = new WorkerNoise(config.seed);
-        providerType = 'noise';
-        demData = null;
-      } else {
-        demData = new Float32Array(config.buffer);
-        demWidth = config.width;
-        demHeight = config.height;
-        demMetersPerPixel = config.metersPerPixel;
-        demOriginX = config.originX;
-        demOriginZ = config.originZ;
-        providerType = 'dem';
-      }
+      activeProviderConfig = msg.config;
       (self as unknown as Worker).postMessage({ type: 'providerReady' });
       break;
     }
@@ -241,8 +305,8 @@ self.onmessage = function (event: MessageEvent<WorkerMessage>) {
     case 'generate': {
       // Terrain geometry generation path used by message-driven worker tasks.
       const { chunkX, chunkZ, size, segments, seed, requestId } = msg;
-      if (providerType === 'noise' && !noiseGen) {
-        noiseGen = new WorkerNoise(seed);
+      if (activeProviderConfig.type === 'noise') {
+        activeProviderConfig = { type: 'noise', seed };
       }
 
       const baseX = chunkX * size;

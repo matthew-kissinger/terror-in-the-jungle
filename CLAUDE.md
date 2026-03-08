@@ -50,9 +50,9 @@ npm run perf:update-baseline  # update baseline from latest capture
 
 1. Terrain render/collision divergence fixed: `maxLODLevels` now auto-scales with world size (`computeMaxLODLevels` in TerrainConfig). Open Frontier: 5 LOD levels (was 4), 3.52m vertex spacing (was 7.03m), 1024 heightmap grid (was 512). Eliminates floating vegetation/NPCs on large maps.
 2. `combat120` at WARN after micro-optimizations: p99 ~34ms (was 86.9ms), avg ~12.3ms (was 14.2ms), AI starvation ~3.6 (was 12.3). Cover search grid reduced (8x8 + early-out), terrain tick staggered (BVH skips vegetation-rebuild frames).
-3. Shot-through-terrain bug fixed: height profile prefilter was too aggressive on undulating terrain, falsely blocking valid shots in Open Frontier. BVH raycast now handles occlusion within 200m; prefilter only applies 200-280m.
-4. `frontier30m` soak tails remain FAIL (`p99=85.90ms`). Terrain-led; tick stagger landed but not yet re-measured.
-5. A Shau harness is behavior-valid; next step is terrain-tail reduction, then WarSim/heap isolation.
+3. HeightQueryCache batch eviction: 10% batch evict on overflow (was per-miss FIFO). Heap recovery 94%/30.8% vs previous LRU 8.7%. No combat regression.
+4. Respawn map fixed for large worlds: dynamic WORLD_SIZE via `setMapWorldSize()`, max zoom scales with world size, left-click drag panning, pointer lock disabled during deploy UI, input context set to 'menu'. RespawnMapController unified to use OpenFrontierRespawnMap for all modes. Spawn point model refactored to `RespawnSpawnPoint` with kind/selectionClass/priority fields.
+5. A Shau harness is behavior-valid; next step is mode product passes, then WarSim/heap isolation.
 6. Game modes Phases 6-7 complete. Mode product passes (Phase 5) are the next gameplay work.
 7. See `docs/NEXT_WORK.md` for the active checklist.
 

@@ -496,7 +496,9 @@ export class PlayerInput {
     // Don't lock if controls are disabled (dead/respawning)
     if (!this.pointerLockEnabled) return;
     if (this.gameStarted && !this.isPointerLocked && this.isControlsEnabled) {
-      document.body.requestPointerLock();
+      // requestPointerLock returns a Promise; catch rejection when document
+      // state doesn't allow locking (e.g. not focused, embedded iframe).
+      Promise.resolve(document.body.requestPointerLock()).catch(() => {});
     }
   }
 
@@ -583,7 +585,7 @@ Escape - Release pointer lock / Exit helicopter
     if (this.gameStarted && this.pointerLockEnabled && !document.pointerLockElement) {
       // Small delay to avoid conflict with UI interaction
       setTimeout(() => {
-        document.body.requestPointerLock();
+        Promise.resolve(document.body.requestPointerLock()).catch(() => {});
       }, 100);
     }
   }

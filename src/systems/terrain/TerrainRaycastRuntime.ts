@@ -8,8 +8,14 @@ export class TerrainRaycastRuntime {
   private readonly losAccelerator: LOSAccelerator;
   private bvhMesh: THREE.Mesh | null = null;
   private readonly lastBvhCenter = new THREE.Vector3(NaN, NaN, NaN);
+  private readonly targetBvhCenter = new THREE.Vector3(NaN, NaN, NaN);
   private gridWidth = 0;
   private positionBuffer: Float32Array | null = null;
+  private halfSteps = 0;
+  private rebuildStep = 6;
+  private pendingRowIndex = 0;
+  private pendingRows = 0;
+  private rebuildQueued = false;
 
   constructor(losAccelerator: LOSAccelerator) {
     this.losAccelerator = losAccelerator;
@@ -24,14 +30,24 @@ export class TerrainRaycastRuntime {
     radius: number,
     rebuildThreshold: number,
     getHeightAt: (x: number, z: number) => number,
-  ): void {
+    maxRowsPerFrame: number = 12,
+  ): boolean {
+    const thresholdSq = rebuildThreshold * rebuildThreshold;
+    const hasCommittedCenter = Number.isFinite(this.lastBvhCenter.x) && Number.isFinite(this.lastBvhCenter.z);
     const dx = center.x - this.lastBvhCenter.x;
     const dz = center.z - this.lastBvhCenter.z;
-    if (dx * dx + dz * dz <= rebuildThreshold * rebuildThreshold) {
-      return;
+    const targetDx = center.x - this.targetBvhCenter.x;
+    const targetDz = center.z - this.targetBvhCenter.z;
+
+    if (this.rebuildQueued) {
+      if (targetDx * targetDx + targetDz * targetDz > thresholdSq) {
+        this.queueNearFieldRebuild(center, radius);
+      }
+    } else if (!hasCommittedCenter || dx * dx + dz * dz > thresholdSq) {
+      this.queueNearFieldRebuild(center, radius);
     }
 
-    this.rebuildNearFieldMesh(center, radius, getHeightAt);
+    return this.processPendingWork(getHeightAt, maxRowsPerFrame);
   }
 
   forceRebuildNearFieldMesh(
@@ -39,8 +55,8 @@ export class TerrainRaycastRuntime {
     radius: number,
     getHeightAt: (x: number, z: number) => number,
   ): void {
-    this.lastBvhCenter.set(NaN, NaN, NaN);
-    this.rebuildNearFieldMesh(center, radius, getHeightAt);
+    this.queueNearFieldRebuild(center, radius);
+    this.processPendingWork(getHeightAt, Math.max(1, this.pendingRows));
   }
 
   dispose(): void {
@@ -52,38 +68,73 @@ export class TerrainRaycastRuntime {
     this.losAccelerator.clear();
   }
 
-  private rebuildNearFieldMesh(
+  isReadyForPosition(center: THREE.Vector3, coverageRadius: number): boolean {
+    if (!this.bvhMesh || this.rebuildQueued) {
+      return false;
+    }
+    const dx = center.x - this.lastBvhCenter.x;
+    const dz = center.z - this.lastBvhCenter.z;
+    return dx * dx + dz * dz <= coverageRadius * coverageRadius;
+  }
+
+  getPendingRowCount(): number {
+    return this.pendingRows;
+  }
+
+  private queueNearFieldRebuild(
     center: THREE.Vector3,
     radius: number,
-    getHeightAt: (x: number, z: number) => number,
   ): void {
-    const step = 6;
-    const halfSteps = Math.ceil(radius / step);
-    const gridW = halfSteps * 2 + 1;
+    this.rebuildStep = 6;
+    this.halfSteps = Math.ceil(radius / this.rebuildStep);
+    const gridW = this.halfSteps * 2 + 1;
     this.ensureMeshBuffers(gridW);
+    this.targetBvhCenter.copy(center);
+    this.pendingRowIndex = 0;
+    this.pendingRows = gridW;
+    this.rebuildQueued = true;
+  }
 
+  private processPendingWork(
+    getHeightAt: (x: number, z: number) => number,
+    maxRowsPerFrame: number,
+  ): boolean {
+    if (!this.rebuildQueued || !this.bvhMesh || !this.positionBuffer) {
+      return false;
+    }
+
+    const gridW = this.gridWidth;
     const geometry = this.bvhMesh!.geometry as THREE.BufferGeometry;
     const positionAttr = geometry.getAttribute('position') as THREE.BufferAttribute;
     const positions = this.positionBuffer!;
+    const rowsToProcess = Math.max(1, Math.min(maxRowsPerFrame, this.pendingRows));
+    const startRow = this.pendingRowIndex;
+    const endRow = Math.min(gridW, startRow + rowsToProcess);
 
-    let vi = 0;
-    for (let iz = 0; iz < gridW; iz++) {
+    for (let iz = startRow; iz < endRow; iz++) {
       for (let ix = 0; ix < gridW; ix++) {
-        const wx = center.x + (ix - halfSteps) * step;
-        const wz = center.z + (iz - halfSteps) * step;
+        const wx = this.targetBvhCenter.x + (ix - this.halfSteps) * this.rebuildStep;
+        const wz = this.targetBvhCenter.z + (iz - this.halfSteps) * this.rebuildStep;
         const wy = getHeightAt(wx, wz);
+        const vi = iz * gridW + ix;
         positions[vi * 3] = wx;
         positions[vi * 3 + 1] = wy;
         positions[vi * 3 + 2] = wz;
-        vi++;
       }
     }
     positionAttr.needsUpdate = true;
-    geometry.computeBoundingBox();
-    geometry.computeBoundingSphere();
+    this.pendingRowIndex = endRow;
+    this.pendingRows = Math.max(0, gridW - endRow);
 
-    this.losAccelerator.registerChunk('bvh_nearfield', this.bvhMesh!);
-    this.lastBvhCenter.copy(center);
+    if (this.pendingRows === 0) {
+      geometry.computeBoundingBox();
+      geometry.computeBoundingSphere();
+      this.losAccelerator.registerChunk('bvh_nearfield', this.bvhMesh!);
+      this.lastBvhCenter.copy(this.targetBvhCenter);
+      this.rebuildQueued = false;
+    }
+
+    return true;
   }
 
   private ensureMeshBuffers(gridW: number): void {

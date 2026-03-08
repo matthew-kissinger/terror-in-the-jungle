@@ -1,0 +1,171 @@
+import * as THREE from 'three';
+import type { GameSystem } from '../../types';
+import type { MapFeatureDefinition, StaticModelPlacementConfig } from '../../config/gameModeTypes';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
+import { Logger } from '../../utils/Logger';
+import { modelLoader } from '../assets/ModelLoader';
+import { getModelPlacementProfile } from '../assets/ModelPlacementProfiles';
+import { prepareModelForPlacement } from '../assets/ModelPlacementUtils';
+import { GameModeManager } from './GameModeManager';
+import { getWorldFeaturePrefab } from './WorldFeaturePrefabs';
+
+const _rotatedOffset = new THREE.Vector3();
+const _upAxis = new THREE.Vector3(0, 1, 0);
+
+interface SpawnedFeatureObject {
+  id: string;
+  object: THREE.Object3D;
+  collisionRegistered: boolean;
+}
+
+export class WorldFeatureSystem implements GameSystem {
+  private readonly scene: THREE.Scene;
+  private terrainManager?: ITerrainRuntime;
+  private gameModeManager?: GameModeManager;
+  private spawnedObjects: SpawnedFeatureObject[] = [];
+  private buildInFlight = false;
+  private builtModeId: string | null = null;
+
+  constructor(scene: THREE.Scene) {
+    this.scene = scene;
+  }
+
+  async init(): Promise<void> {
+    Logger.info('world', 'Initializing World Feature System...');
+  }
+
+  setTerrainManager(terrainManager: ITerrainRuntime): void {
+    this.terrainManager = terrainManager;
+  }
+
+  setGameModeManager(gameModeManager: GameModeManager): void {
+    this.gameModeManager = gameModeManager;
+  }
+
+  update(_deltaTime: number): void {
+    if (!this.terrainManager || !this.gameModeManager || this.buildInFlight) {
+      return;
+    }
+
+    const config = this.gameModeManager.getCurrentConfig();
+    if (this.builtModeId === config.id) {
+      return;
+    }
+
+    const featuresToBuild = config.features?.filter((feature) => this.hasStaticPlacements(feature)) ?? [];
+    if (featuresToBuild.length === 0) {
+      this.clearSpawnedObjects();
+      this.builtModeId = config.id;
+      return;
+    }
+
+    if (!this.terrainManager.isTerrainReady()) {
+      return;
+    }
+
+    if (!this.terrainManager.hasTerrainAt(featuresToBuild[0].position.x, featuresToBuild[0].position.z)) {
+      return;
+    }
+
+    this.buildInFlight = true;
+    void this.rebuildForMode(config.id, featuresToBuild);
+  }
+
+  dispose(): void {
+    this.clearSpawnedObjects();
+  }
+
+  private async rebuildForMode(modeId: string, features: MapFeatureDefinition[]): Promise<void> {
+    this.clearSpawnedObjects();
+
+    try {
+      for (const feature of features) {
+        await this.spawnFeature(feature);
+      }
+      this.builtModeId = modeId;
+      Logger.info('world', `Spawned ${this.spawnedObjects.length} world feature objects for mode "${modeId}"`);
+    } finally {
+      this.buildInFlight = false;
+    }
+  }
+
+  private async spawnFeature(feature: MapFeatureDefinition): Promise<void> {
+    const placements = this.resolvePlacements(feature);
+    if (placements.length === 0 || !this.terrainManager) {
+      return;
+    }
+
+    const featureYaw = feature.placement?.yaw ?? 0;
+    for (let i = 0; i < placements.length; i++) {
+      const placement = placements[i];
+      const object = await modelLoader.loadModel(placement.modelPath);
+      prepareModelForPlacement(object, placement.modelPath);
+
+      if (placement.uniformScale && placement.uniformScale !== 1) {
+        object.scale.multiplyScalar(placement.uniformScale);
+      }
+
+      _rotatedOffset.copy(placement.offset).applyAxisAngle(_upAxis, featureYaw);
+      const worldX = feature.position.x + _rotatedOffset.x;
+      const worldZ = feature.position.z + _rotatedOffset.z;
+      const baseY = placement.terrainSnap === false
+        ? feature.position.y + _rotatedOffset.y
+        : this.terrainManager.getHeightAt(worldX, worldZ);
+
+      object.position.set(worldX, baseY + (placement.heightOffset ?? 0), worldZ);
+      object.rotation.y = featureYaw + (placement.yaw ?? 0);
+      object.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+      this.scene.add(object);
+
+      const profile = getModelPlacementProfile(placement.modelPath);
+      const objectId = `${feature.id}_${placement.id ?? i}`;
+      const collisionRegistered = placement.registerCollision === true && profile.collisionMode === 'bounds';
+      if (collisionRegistered) {
+        this.terrainManager.registerCollisionObject(objectId, object);
+      }
+
+      this.spawnedObjects.push({
+        id: objectId,
+        object,
+        collisionRegistered,
+      });
+    }
+  }
+
+  private resolvePlacements(feature: MapFeatureDefinition): StaticModelPlacementConfig[] {
+    const prefab = getWorldFeaturePrefab(feature);
+    const prefabPlacements = prefab?.placements ?? [];
+    const featurePlacements = feature.staticPlacements ?? [];
+    return [...prefabPlacements, ...featurePlacements];
+  }
+
+  private hasStaticPlacements(feature: MapFeatureDefinition): boolean {
+    return this.resolvePlacements(feature).length > 0;
+  }
+
+  private clearSpawnedObjects(): void {
+    for (const entry of this.spawnedObjects) {
+      this.scene.remove(entry.object);
+      if (entry.collisionRegistered && this.terrainManager) {
+        this.terrainManager.unregisterCollisionObject(entry.id);
+      }
+      entry.object.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry.dispose();
+          if (Array.isArray(child.material)) {
+            child.material.forEach((material) => material.dispose());
+          } else {
+            child.material.dispose();
+          }
+        }
+      });
+    }
+    this.spawnedObjects = [];
+    this.builtModeId = null;
+  }
+}

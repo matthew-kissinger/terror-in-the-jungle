@@ -29,7 +29,7 @@ describe('getGameModeDefinition', () => {
   it('exposes playable alliances and faction options for the selected mode', () => {
     const definition = getGameModeDefinition(GameMode.A_SHAU_VALLEY);
 
-    expect(getPlayableAlliances(definition)).toEqual([Alliance.BLUFOR, Alliance.OPFOR]);
+    expect(getPlayableAlliances(definition)).toEqual([Alliance.BLUFOR]);
     expect(getFactionOptionsForAlliance(definition, Alliance.BLUFOR)).toEqual([Faction.US, Faction.ARVN]);
     expect(getFactionOptionsForAlliance(definition, Alliance.OPFOR)).toEqual([Faction.NVA, Faction.VC]);
   });
@@ -41,8 +41,8 @@ describe('getGameModeDefinition', () => {
       alliance: Alliance.OPFOR,
       faction: Faction.NVA,
     })).toEqual({
-      alliance: Alliance.OPFOR,
-      faction: Faction.VC,
+      alliance: Alliance.BLUFOR,
+      faction: Faction.US,
     });
   });
 });

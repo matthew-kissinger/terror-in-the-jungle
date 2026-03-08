@@ -37,6 +37,12 @@ export interface PerformanceStats {
   systemTimings?: SystemTiming[];
   gpuTimeMs?: number;
   gpuTimingAvailable?: boolean;
+  terrainStreams?: Array<{
+    name: string;
+    budgetMs: number;
+    timeMs: number;
+    pendingUnits: number;
+  }>;
 }
 
 interface BudgetBarRefs {
@@ -150,6 +156,11 @@ export class PerformanceOverlay {
       `Combatants: US ${stats.usCombatants} / OPFOR ${stats.opforCombatants}`,
       `Vegetation: ${stats.vegetationActive} active / ${stats.vegetationReserved} reserved`,
       `Combat: last ${stats.combatLastMs.toFixed(2)} ms (avg ${stats.combatEmaMs.toFixed(2)} ms)`,
+      ...(stats.terrainStreams && stats.terrainStreams.length > 0
+        ? stats.terrainStreams.map(stream =>
+            `Terrain ${stream.name}: ${stream.timeMs.toFixed(2)} / ${stream.budgetMs.toFixed(2)} ms (pending ${stream.pendingUnits})`
+          )
+        : []),
       `LOD: high ${stats.combatLodHigh} / med ${stats.combatLodMedium} / low ${stats.combatLodLow} / culled ${stats.combatLodCulled} (total ${stats.combatantCount})`,
       stats.octreeNodes !== undefined
         ? `Octree: ${stats.octreeNodes} nodes / depth ${stats.octreeMaxDepth} / avg ${stats.octreeAvgPerLeaf?.toFixed(1)} per leaf`

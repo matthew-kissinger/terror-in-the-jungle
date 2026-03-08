@@ -35,6 +35,7 @@ import { SmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
 import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
+import { WorldFeatureSystem } from '../systems/world/WorldFeatureSystem';
 
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { LoadoutService } from '../systems/player/LoadoutService';
@@ -84,6 +85,7 @@ export interface SystemReferences {
   warSimulator: WarSimulator;
   strategicFeedback: StrategicFeedback;
   spatialGridManager: SpatialGridManager;
+  worldFeatureSystem: WorldFeatureSystem;
 }
 
 export interface InitializationResult {
@@ -168,6 +170,7 @@ export class SystemInitializer {
     refs.gameModeManager = new GameModeManager();
     refs.helipadSystem = new HelipadSystem(scene);
     refs.helicopterModel = new HelicopterModel(scene);
+    refs.worldFeatureSystem = new WorldFeatureSystem(scene);
 
     // Initialize new squad/inventory/grenade systems
     const squadManager = (refs.combatantSystem as any).squadManager;
@@ -215,6 +218,7 @@ export class SystemInitializer {
       refs.hudSystem,
       refs.helipadSystem,
       refs.helicopterModel,
+      refs.worldFeatureSystem,
       refs.skybox,
       refs.gameModeManager,
       refs.playerSquadController,

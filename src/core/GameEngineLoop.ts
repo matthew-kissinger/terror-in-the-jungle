@@ -167,6 +167,7 @@ export function updatePerformanceOverlay(engine: GameEngine, deltaTime: number):
   const terrainManager = engine.systemManager.terrainSystem;
   const workerStats = terrainManager.getWorkerStats?.();
   const activeTerrainTiles = terrainManager.getActiveTerrainTileCount();
+  const terrainStreams = terrainManager.getStreamingMetrics?.() ?? [];
   const fps = 1 / Math.max(0.0001, deltaTime);
   const logStats = Logger.getStats();
   const combatTelemetry = engine.systemManager.combatantSystem
@@ -204,6 +205,7 @@ export function updatePerformanceOverlay(engine: GameEngine, deltaTime: number):
     terrainWorkerQueue: workerStats?.queueLength ?? 0,
     terrainBusyWorkers: workerStats?.busyWorkers ?? 0,
     terrainTotalWorkers: workerStats?.totalWorkers ?? 0,
+    terrainStreams,
     usCombatants: combatStats.us,
     opforCombatants: combatStats.opfor,
     vegetationActive,

@@ -7,6 +7,7 @@ import { LOSAccelerator } from '../combat/LOSAccelerator';
 import { Logger } from '../../utils/Logger';
 import { getHeightQueryCache } from './HeightQueryCache';
 import { BakedHeightProvider } from './BakedHeightProvider';
+import type { CompiledTerrainFeatureSet } from './TerrainFeatureTypes';
 
 import { TerrainRenderRuntime } from './TerrainRenderRuntime';
 import { TerrainRaycastRuntime } from './TerrainRaycastRuntime';
@@ -14,6 +15,7 @@ import { TerrainSurfaceRuntime } from './TerrainSurfaceRuntime';
 import { TerrainQueries } from './TerrainQueries';
 import { VegetationScatterer } from './VegetationScatterer';
 import { TerrainWorkerPool } from './TerrainWorkerPool';
+import { TerrainStreamingScheduler } from './streaming/TerrainStreamingScheduler';
 import {
   buildTerrainVegetationRuntimeConfig,
 } from './TerrainBiomeRuntimeConfig';
@@ -39,10 +41,13 @@ export class TerrainSystem implements GameSystem {
   private vegetationScatterer: VegetationScatterer;
   private workerPool: TerrainWorkerPool;
   private raycastRuntime: TerrainRaycastRuntime;
+  private streamingScheduler: TerrainStreamingScheduler;
 
   // State
   private playerPosition = new THREE.Vector3();
+  private readinessProbe = new THREE.Vector3();
   private isInitialized = false;
+  private vegetationAddThrottleFrame = false;
 
   // Runtime bootstrap/config state
   private chunkSize = 64;
@@ -51,6 +56,11 @@ export class TerrainSystem implements GameSystem {
   private defaultBiomeId = 'denseJungle';
   private biomeRules: BiomeClassificationRule[] = [];
   private surfaceWetness = 0;
+  private terrainFeatures: CompiledTerrainFeatureSet = {
+    stamps: [],
+    surfacePatches: [],
+    vegetationExclusionZones: [],
+  };
 
   constructor(
     scene: THREE.Scene,
@@ -84,6 +94,7 @@ export class TerrainSystem implements GameSystem {
     this.vegetationScatterer = new VegetationScatterer(globalBillboardSystem, this.config.vegetationCellSize);
     this.vegetationScatterer.setWorldBounds(worldSize, this.config.visualMargin);
     this.workerPool = new TerrainWorkerPool();
+    this.streamingScheduler = new TerrainStreamingScheduler();
   }
 
   // ──── GameSystem interface ────
@@ -138,25 +149,44 @@ export class TerrainSystem implements GameSystem {
     Logger.info('terrain', `TerrainSystem initialized: ${this.config.worldSize}m world, ${this.config.maxLODLevels} LOD levels`);
   }
 
-  update(_deltaTime: number): void {
+  update(deltaTime: number): void {
     if (!this.isInitialized) return;
     if (!this.renderRuntime) return;
 
-    this.renderRuntime.update();
+    this.streamingScheduler.runStream('render', this.config.renderUpdateBudgetMs, () => {
+      this.renderRuntime!.update();
+      return { workUnits: 1, pendingUnits: 0 };
+    });
 
-    // Update vegetation; returns true when cells were rebuilt
-    const vegetationRebuilt = this.vegetationScatterer.update(this.playerPosition);
+    const vegetationBudget = this.computeVegetationFrameBudget(deltaTime);
+    this.streamingScheduler.runStream('vegetation', this.config.vegetationUpdateBudgetMs, budgetMs => {
+      const didWork = this.vegetationScatterer.updateBudgeted(this.playerPosition, {
+        maxAddsPerFrame: vegetationBudget.maxAddsPerFrame,
+        maxRemovalsPerFrame: Math.max(
+          vegetationBudget.maxRemovalsPerFrame,
+          Math.max(2, Math.floor(budgetMs * 6)),
+        ),
+      });
+      const pending = this.vegetationScatterer.getPendingCounts();
+      return {
+        workUnits: didWork ? 1 : 0,
+        pendingUnits: pending.adds + pending.removals,
+      };
+    });
 
-    // Stagger BVH rebuild: skip if vegetation just rebuilt this frame
-    // to avoid stacking two expensive operations in one tick
-    if (!vegetationRebuilt) {
-      this.raycastRuntime.updateNearFieldMesh(
+    this.streamingScheduler.runStream('collision', this.config.collisionUpdateBudgetMs, budgetMs => {
+      const didWork = this.raycastRuntime.updateNearFieldMesh(
         this.playerPosition,
         this.config.bvhRadius,
         this.config.bvhRebuildThreshold,
         (x, z) => this.getHeightAt(x, z),
+        Math.max(4, Math.floor(budgetMs * 10)),
       );
-    }
+      return {
+        workUnits: didWork ? 1 : 0,
+        pendingUnits: this.raycastRuntime.getPendingRowCount(),
+      };
+    });
   }
 
   dispose(): void {
@@ -184,6 +214,20 @@ export class TerrainSystem implements GameSystem {
     }
     this.surfaceWetness = clampedWetness;
     this.surfaceRuntime.setSurfaceWetness(clampedWetness);
+  }
+
+  setTerrainFeatures(features: CompiledTerrainFeatureSet): void {
+    this.terrainFeatures = {
+      stamps: features.stamps.slice(),
+      surfacePatches: features.surfacePatches.slice(),
+      vegetationExclusionZones: features.vegetationExclusionZones.slice(),
+    };
+    this.surfaceRuntime.setFeatureSurfacePatches(this.terrainFeatures.surfacePatches);
+    this.billboardSystem.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
+    this.vegetationScatterer.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
+    if (this.isInitialized) {
+      this.vegetationScatterer.regenerateAll();
+    }
   }
 
   // ──── Height queries ────
@@ -227,7 +271,22 @@ export class TerrainSystem implements GameSystem {
   }
 
   isTerrainReady(): boolean {
-    return this.isInitialized;
+    return this.isInitialized
+      && this.raycastRuntime.isReadyForPosition(
+        this.playerPosition,
+        Math.max(this.config.bvhRebuildThreshold, this.config.bvhRadius * 0.35),
+      );
+  }
+
+  isAreaReadyAt(x: number, z: number): boolean {
+    if (!this.hasTerrainAt(x, z)) {
+      return false;
+    }
+    this.readinessProbe.set(x, 0, z);
+    return this.raycastRuntime.isReadyForPosition(
+      this.readinessProbe,
+      Math.max(24, this.config.bvhRebuildThreshold),
+    );
   }
 
   hasTerrainAt(x: number, z: number): boolean {
@@ -282,6 +341,15 @@ export class TerrainSystem implements GameSystem {
 
   getChunkSize(): number {
     return this.chunkSize;
+  }
+
+  getStreamingMetrics(): Array<{ name: string; budgetMs: number; timeMs: number; pendingUnits: number }> {
+    return this.streamingScheduler.getMetrics().map(metric => ({
+      name: metric.name,
+      budgetMs: metric.budgetMs,
+      timeMs: metric.emaMs,
+      pendingUnits: metric.pendingUnits,
+    }));
   }
 
   // ──── Configuration ────
@@ -362,22 +430,44 @@ export class TerrainSystem implements GameSystem {
 
     const cache = getHeightQueryCache();
     this.surfaceRuntime.rebake(cache.getProvider(), this.config.worldSize, this.defaultBiomeId, this.biomeRules);
-    this.syncCpuHeightsToGpu();
-
-    // Propagate new provider to workers
-    const providerConfig = cache.getProvider().getWorkerConfig();
-    this.workerPool.sendHeightProvider(providerConfig);
-
-    this.raycastRuntime.forceRebuildNearFieldMesh(
-      this.playerPosition,
-      this.config.bvhRadius,
-      (x, z) => this.getHeightAt(x, z),
-    );
-
-    // Regenerate vegetation for new terrain
-    this.vegetationScatterer.regenerateAll();
+    this.propagateTerrainSourceChanges();
 
     Logger.info('terrain', 'Heightmap re-baked from updated provider');
+  }
+
+  private computeVegetationFrameBudget(deltaTime: number): {
+    maxAddsPerFrame: number;
+    maxRemovalsPerFrame: number;
+  } {
+    const baseAdds = Math.max(1, Math.floor(this.config.vegetationUpdateBudgetMs * 1.5));
+    const baseRemovals = Math.max(2, Math.floor(this.config.vegetationUpdateBudgetMs * 6));
+    const frameMs = Math.max(0, deltaTime * 1000);
+
+    // When traversal is already running hot, favor draining old cells and let new
+    // cell activation yield for a frame instead of compounding the hitch.
+    if (frameMs >= 24) {
+      this.vegetationAddThrottleFrame = false;
+      return {
+        maxAddsPerFrame: 0,
+        maxRemovalsPerFrame: Math.max(baseRemovals, 10),
+      };
+    }
+
+    // Moderate pressure still allows progress, but only every other frame.
+    if (frameMs >= 18) {
+      const allowAddsThisFrame = this.vegetationAddThrottleFrame;
+      this.vegetationAddThrottleFrame = !this.vegetationAddThrottleFrame;
+      return {
+        maxAddsPerFrame: allowAddsThisFrame ? baseAdds : 0,
+        maxRemovalsPerFrame: Math.max(baseRemovals, 6),
+      };
+    }
+
+    this.vegetationAddThrottleFrame = false;
+    return {
+      maxAddsPerFrame: baseAdds,
+      maxRemovalsPerFrame: baseRemovals,
+    };
   }
 
   private reconfigureWorld(): void {
@@ -410,7 +500,7 @@ export class TerrainSystem implements GameSystem {
     if (this.isInitialized) {
       const cache = getHeightQueryCache();
       this.surfaceRuntime.rebake(cache.getProvider(), this.config.worldSize, this.defaultBiomeId, this.biomeRules);
-      this.syncCpuHeightsToGpu();
+      this.propagateTerrainSourceChanges();
     }
 
     Logger.info('terrain', `Reconfigured: ${this.config.worldSize}m world, chunk=${this.chunkSize}, renderDist=${this.renderDistance}`);
@@ -445,5 +535,23 @@ export class TerrainSystem implements GameSystem {
     this.billboardSystem.configure(biomeIds);
     const activeTypes = this.billboardSystem.getActiveVegetationTypes();
     this.vegetationScatterer.configure(activeTypes, this.defaultBiomeId, biomePalettes, this.biomeRules);
+    this.billboardSystem.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
+    this.vegetationScatterer.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
+  }
+
+  private propagateTerrainSourceChanges(): void {
+    this.syncCpuHeightsToGpu();
+
+    const cache = getHeightQueryCache();
+    const providerConfig = cache.getProvider().getWorkerConfig();
+    this.workerPool.sendHeightProvider(providerConfig);
+
+    this.raycastRuntime.forceRebuildNearFieldMesh(
+      this.playerPosition,
+      this.config.bvhRadius,
+      (x, z) => this.getHeightAt(x, z),
+    );
+
+    this.vegetationScatterer.regenerateAll();
   }
 }

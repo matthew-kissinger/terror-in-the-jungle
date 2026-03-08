@@ -10,6 +10,10 @@ const {
   mockVegetationConfigure,
   mockVegetationSetWorldBounds,
   mockVegetationRegenerateAll,
+  mockVegetationSetExclusionZones,
+  mockVegetationUpdateBudgeted,
+  mockVegetationPendingCounts,
+  mockVegetationReadyAround,
 } = vi.hoisted(() => ({
   mockProviderGetHeightAt: vi.fn().mockReturnValue(10),
   mockCacheGetHeightAt: vi.fn().mockReturnValue(10),
@@ -18,6 +22,10 @@ const {
   mockVegetationConfigure: vi.fn(),
   mockVegetationSetWorldBounds: vi.fn(),
   mockVegetationRegenerateAll: vi.fn(),
+  mockVegetationSetExclusionZones: vi.fn(),
+  mockVegetationUpdateBudgeted: vi.fn().mockReturnValue(false),
+  mockVegetationPendingCounts: vi.fn().mockReturnValue({ adds: 0, removals: 0 }),
+  mockVegetationReadyAround: vi.fn().mockReturnValue(true),
 }));
 
 vi.mock('./HeightQueryCache', () => {
@@ -92,7 +100,11 @@ vi.mock('./VegetationScatterer', () => ({
     configure = mockVegetationConfigure;
     setWorldSize = vi.fn();
     setWorldBounds = mockVegetationSetWorldBounds;
+    setExclusionZones = mockVegetationSetExclusionZones;
     update = vi.fn();
+    updateBudgeted = mockVegetationUpdateBudgeted;
+    getPendingCounts = mockVegetationPendingCounts;
+    isReadyAround = mockVegetationReadyAround;
     clear = vi.fn();
     regenerateAll = mockVegetationRegenerateAll;
     getActiveCellCount = vi.fn().mockReturnValue(0);
@@ -139,6 +151,7 @@ function makeMockBillboard(): any {
     addChunkInstances: vi.fn(),
     removeChunkInstances: vi.fn(),
     configure: vi.fn(),
+    setExclusionZones: vi.fn(),
     setTerrainHeightmap: vi.fn(),
     getActiveVegetationTypes: vi.fn().mockReturnValue([
       { id: 'fern' },
@@ -172,6 +185,10 @@ describe('TerrainSystem', () => {
     mockVegetationConfigure.mockClear();
     mockVegetationSetWorldBounds.mockClear();
     mockVegetationRegenerateAll.mockClear();
+    mockVegetationSetExclusionZones.mockClear();
+    mockVegetationUpdateBudgeted.mockClear();
+    mockVegetationPendingCounts.mockClear();
+    mockVegetationReadyAround.mockClear();
     scene = makeMockScene();
     terrain = new TerrainSystem(
       scene,
@@ -193,6 +210,44 @@ describe('TerrainSystem', () => {
     it('update runs without error after init', async () => {
       await terrain.init();
       terrain.update(0.016);
+    });
+
+    it('backs off vegetation additions on unhealthy frames while keeping removals aggressive', async () => {
+      await terrain.init();
+
+      terrain.update(0.025);
+
+      expect(mockVegetationUpdateBudgeted).toHaveBeenCalledWith(
+        expect.any(THREE.Vector3),
+        expect.objectContaining({
+          maxAddsPerFrame: 0,
+          maxRemovalsPerFrame: 10,
+        }),
+      );
+    });
+
+    it('throttles moderate-pressure vegetation additions to every other frame', async () => {
+      await terrain.init();
+
+      terrain.update(0.019);
+      terrain.update(0.019);
+
+      expect(mockVegetationUpdateBudgeted).toHaveBeenNthCalledWith(
+        1,
+        expect.any(THREE.Vector3),
+        expect.objectContaining({
+          maxAddsPerFrame: 0,
+          maxRemovalsPerFrame: 6,
+        }),
+      );
+      expect(mockVegetationUpdateBudgeted).toHaveBeenNthCalledWith(
+        2,
+        expect.any(THREE.Vector3),
+        expect.objectContaining({
+          maxAddsPerFrame: 1,
+          maxRemovalsPerFrame: 6,
+        }),
+      );
     });
 
     it('dispose cleans up', async () => {

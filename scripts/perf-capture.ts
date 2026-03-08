@@ -127,6 +127,12 @@ type RuntimeSample = {
       }>;
     };
   };
+  terrainStreams?: Array<{
+    name: string;
+    budgetMs: number;
+    timeMs: number;
+    pendingUnits: number;
+  }>;
   systemTop: Array<{ name: string; emaMs: number; peakMs: number }>;
   harnessDriver?: {
     mode: string;
@@ -1447,12 +1453,16 @@ async function runCapture(): Promise<void> {
         const raw = await withTimeout('runtime sample', page.evaluate((shouldIncludeDetails: boolean) => {
           const metrics = (window as any).__metrics;
           const perf = (window as any).perf;
+          const engine = (window as any).__engine;
           const renderer = (window as any).__renderer;
           const rendererStats = renderer?.getPerformanceStats?.();
           const browserStalls = (window as any).__perfHarnessObservers?.drain?.() ?? null;
           const basicValidation = perf?.validate?.();
           const report = shouldIncludeDetails ? perf?.report?.() : null;
           const combatProfile = shouldIncludeDetails ? (window as any).combatProfile?.() : null;
+          const terrainStreams = shouldIncludeDetails
+            ? engine?.systemManager?.terrainSystem?.getStreamingMetrics?.() ?? null
+            : null;
           const harnessDriver = shouldIncludeDetails
             ? (window as any).__perfHarnessDriverState?.getDebugSnapshot?.() ?? null
             : null;
@@ -1549,6 +1559,14 @@ async function runCapture(): Promise<void> {
                   : undefined
               }
             } : undefined,
+            terrainStreams: Array.isArray(terrainStreams)
+              ? terrainStreams.map((stream: any) => ({
+                  name: String(stream?.name ?? 'unknown'),
+                  budgetMs: Number(stream?.budgetMs ?? 0),
+                  timeMs: Number(stream?.timeMs ?? 0),
+                  pendingUnits: Number(stream?.pendingUnits ?? 0),
+                }))
+              : undefined,
             combatBreakdown: combatProfile?.timing
               ? {
                   totalMs: Number(combatProfile.timing.totalMs ?? 0),
@@ -1638,6 +1656,13 @@ async function runCapture(): Promise<void> {
         const triangles = Number(sample.renderer?.triangles ?? 0);
         const recentLongTasks = Number(sample.browserStalls?.recent?.longTasks?.count ?? 0);
         const recentLoafs = Number(sample.browserStalls?.recent?.longAnimationFrames?.count ?? 0);
+        const topTerrainStream = Array.isArray(sample.terrainStreams) && sample.terrainStreams.length > 0
+          ? [...sample.terrainStreams].sort((a, b) => {
+              const pendingDelta = Number(b.pendingUnits ?? 0) - Number(a.pendingUnits ?? 0);
+              if (pendingDelta !== 0) return pendingDelta;
+              return Number(b.timeMs ?? 0) - Number(a.timeMs ?? 0);
+            })[0]
+          : null;
         const driverReason = typeof sample.harnessDriver?.lastFireProbe?.reason === 'string'
           ? String(sample.harnessDriver?.lastFireProbe?.reason)
           : '';
@@ -1645,7 +1670,10 @@ async function runCapture(): Promise<void> {
         const driverSuffix = driverReason || driverMovement
           ? ` driver=${driverMovement || 'unknown'} probe=${driverReason || 'unknown'}`
           : '';
-        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h50=${Number(sample.hitch50Count ?? 0)} shots=${Number(sample.shotsThisSession ?? 0)} hits=${Number(sample.hitsThisSession ?? 0)} hitRate=${(Number(sample.hitRate ?? 0) * 100).toFixed(1)}% draw=${drawCalls} tri=${triangles} rayDeny=${denialRatePct.toFixed(1)}% aiStarve=${aiStarve} longTasks=${recentLongTasks} loafs=${recentLoafs}${driverSuffix}`);
+        const terrainSuffix = topTerrainStream
+          ? ` terrain=${topTerrainStream.name}:${Number(topTerrainStream.timeMs ?? 0).toFixed(2)}ms/${Number(topTerrainStream.budgetMs ?? 0).toFixed(2)}ms pending=${Number(topTerrainStream.pendingUnits ?? 0)}`
+          : '';
+        logStep(`sample frame=${sample.frameCount} avg=${sample.avgFrameMs.toFixed(2)}ms p99=${Number(sample.p99FrameMs ?? 0).toFixed(2)}ms max=${Number(sample.maxFrameMs ?? 0).toFixed(2)}ms h50=${Number(sample.hitch50Count ?? 0)} shots=${Number(sample.shotsThisSession ?? 0)} hits=${Number(sample.hitsThisSession ?? 0)} hitRate=${(Number(sample.hitRate ?? 0) * 100).toFixed(1)}% draw=${drawCalls} tri=${triangles} rayDeny=${denialRatePct.toFixed(1)}% aiStarve=${aiStarve} longTasks=${recentLongTasks} loafs=${recentLoafs}${terrainSuffix}${driverSuffix}`);
       }
     }
     if (missedSamples > 0) {

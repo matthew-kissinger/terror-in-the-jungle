@@ -5,6 +5,8 @@ import { getGameModeDefinition, resolveLaunchSelection } from '../config/gameMod
 import { getHeightQueryCache } from '../systems/terrain/HeightQueryCache';
 import { DEMHeightProvider } from '../systems/terrain/DEMHeightProvider';
 import { NoiseHeightProvider } from '../systems/terrain/NoiseHeightProvider';
+import { compileTerrainFeatures } from '../systems/terrain/TerrainFeatureCompiler';
+import { StampedHeightProvider } from '../systems/terrain/StampedHeightProvider';
 import { Logger } from '../utils/Logger';
 import { Alliance, Faction } from '../systems/combat/types';
 import { SettingsManager } from '../config/SettingsManager';
@@ -17,6 +19,18 @@ import { InitialDeployCancelledError } from '../systems/player/PlayerRespawnMana
 import type { GameEngine } from './GameEngine';
 import { markStartup } from './StartupTelemetry';
 import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
+
+function applyCompiledTerrainFeatures(engine: GameEngine, config: ReturnType<typeof getGameModeConfig>): void {
+  const compiledFeatures = compileTerrainFeatures(config);
+  engine.systemManager.terrainSystem.setTerrainFeatures(compiledFeatures);
+
+  if (compiledFeatures.stamps.length === 0) {
+    return;
+  }
+
+  const heightCache = getHeightQueryCache();
+  heightCache.setProvider(new StampedHeightProvider(heightCache.getProvider(), compiledFeatures.stamps));
+}
 
 function getPrimaryAllianceBase(
   config: ReturnType<typeof getGameModeConfig>,
@@ -218,12 +232,6 @@ export async function startGameWithMode(
         const heightCache = getHeightQueryCache();
         heightCache.setProvider(demProvider);
 
-        // Send DEM data to chunk worker pool
-        const workerPool = engine.systemManager.terrainSystem.getWorkerPool?.();
-        if (workerPool) {
-          workerPool.sendHeightProvider(demProvider.getWorkerConfig());
-        }
-
         Logger.info('engine-init', `DEM loaded: ${config.heightSource.width}x${config.heightSource.height}, ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB`);
       } catch (error) {
         Logger.error('engine-init', 'Failed to load DEM terrain:', error);
@@ -244,6 +252,8 @@ export async function startGameWithMode(
 
       Logger.info('engine-init', `Procedural terrain seed: ${seed}`);
     }
+
+    applyCompiledTerrainFeatures(engine, config);
 
     // Configure renderer for mode-specific settings
     if (config.cameraFar || config.fogDensity || config.shadowFar) {

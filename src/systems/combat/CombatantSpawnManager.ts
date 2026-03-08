@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction, Alliance, isBlufor, isOpfor, SquadCommand } from './types';
+import { Combatant, CombatantState, Faction, Alliance, getAlliance, isBlufor, isOpfor, SquadCommand } from './types';
 import { CombatantFactory } from './CombatantFactory';
 import { SquadManager } from './SquadManager';
 import { ZoneManager } from '../world/ZoneManager';
@@ -40,6 +40,7 @@ export class CombatantSpawnManager {
   private reinforcementWaveIntervalSeconds = 15;
   private lastSpawnCheck = 0;
   private autonomousSpawningEnabled = true;
+  private playerFaction: Faction = Faction.US;
 
   // Squad size configuration
   private squadSizeMin = 3;
@@ -84,6 +85,10 @@ export class CombatantSpawnManager {
   setReinforcementInterval(interval: number): void {
     this.SPAWN_CHECK_INTERVAL = Math.max(5, interval) * 1000;
     this.reinforcementWaveIntervalSeconds = Math.max(5, interval);
+  }
+
+  setPlayerFaction(faction: Faction): void {
+    this.playerFaction = faction;
   }
 
   /**
@@ -136,8 +141,12 @@ export class CombatantSpawnManager {
     // Create player squad first if requested
     if (shouldCreatePlayerSquad) {
       Logger.info('Combat', 'Creating player squad...');
-      const playerSpawnPos = _scratchVec.copy(usBasePos).add(_offsetVec.set(0, 0, -15));
-      const { squad: playerSquad, members } = this.squadManager.createSquad(Faction.US, playerSpawnPos, 6);
+      const playerAlliance = getAlliance(this.playerFaction);
+      const playerHQs = SpawnPositionCalculator.getHQZonesForAlliance(playerAlliance, config);
+      const playerBasePos = playerAlliance === Alliance.BLUFOR ? usBasePos : opforBasePos;
+      const playerAnchor = playerHQs[0]?.position ?? playerBasePos;
+      const playerSpawnPos = _scratchVec.copy(playerAnchor).add(_offsetVec.set(0, 0, -15));
+      const { squad: playerSquad, members } = this.squadManager.createSquad(this.playerFaction, playerSpawnPos, 6);
       createdPlayerSquadId = playerSquad.id;
       playerSquad.isPlayerControlled = true;
       playerSquad.currentCommand = SquadCommand.NONE;
@@ -150,8 +159,10 @@ export class CombatantSpawnManager {
 
       Logger.info('Combat', `Player squad created: ${createdPlayerSquadId} with ${playerSquad.members.length} members at player spawn`);
 
-      // Reduce only US AI squads by 1 since we already spawned the player squad.
-      initialUSSquads = Math.max(0, initialUSSquads - 1);
+      // Reduce the AI count on whichever alliance received the player squad.
+      if (playerAlliance === Alliance.BLUFOR) {
+        initialUSSquads = Math.max(0, initialUSSquads - 1);
+      }
     }
 
     // Fallback to legacy base positions if no HQs configured

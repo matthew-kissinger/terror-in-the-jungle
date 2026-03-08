@@ -1,30 +1,25 @@
 import { GameMode } from '../../config/gameModeTypes';
-import { RespawnMapView } from '../../ui/map/RespawnMapView';
 import { OpenFrontierRespawnMap } from '../../ui/map/OpenFrontierRespawnMap';
 import { ZoneManager } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { Logger } from '../../utils/Logger';
+import type { RespawnSpawnPoint } from './RespawnSpawnPoint';
 
 /**
  * Coordinates between the main game and the respawn map view.
  */
 export class RespawnMapController {
-  private respawnMapView: RespawnMapView;
   private openFrontierRespawnMap: OpenFrontierRespawnMap;
   private currentGameMode: GameMode = GameMode.ZONE_CONTROL;
   private gameModeManager?: GameModeManager;
   private onZoneSelected?: (zoneId: string, zoneName: string) => void;
   private updateInterval?: number;
-  private activeMap: RespawnMapView | OpenFrontierRespawnMap;
 
   constructor() {
-    this.respawnMapView = new RespawnMapView();
     this.openFrontierRespawnMap = new OpenFrontierRespawnMap();
-    this.activeMap = this.respawnMapView;
   }
 
   setZoneManager(manager: ZoneManager): void {
-    this.respawnMapView.setZoneManager(manager);
     this.openFrontierRespawnMap.setZoneManager(manager);
   }
 
@@ -34,16 +29,17 @@ export class RespawnMapController {
       this.currentGameMode = manager.getCurrentMode();
       const worldSize = manager.getWorldSize();
       Logger.info('respawn-map', ` RespawnMapController: Game mode detected as ${this.currentGameMode} (world size: ${worldSize})`);
+      this.openFrontierRespawnMap.setWorldSize(worldSize);
     }
-    this.respawnMapView.setGameModeManager(manager);
     this.openFrontierRespawnMap.setGameModeManager(manager);
+  }
+
+  setSpawnPoints(spawnPoints: RespawnSpawnPoint[]): void {
+    this.openFrontierRespawnMap.setSpawnPoints(spawnPoints);
   }
 
   setZoneSelectedCallback(callback: (zoneId: string, zoneName: string) => void): void {
     this.onZoneSelected = callback;
-    this.respawnMapView.setZoneSelectedCallback((zoneId: string, zoneName: string) => {
-      this.onZoneSelected?.(zoneId, zoneName);
-    });
     this.openFrontierRespawnMap.setZoneSelectedCallback((zoneId: string, zoneName: string) => {
       this.onZoneSelected?.(zoneId, zoneName);
     });
@@ -60,34 +56,21 @@ export class RespawnMapController {
 
     mapContainer.innerHTML = '';
 
-    const useFrontierMap = this.gameModeManager?.getDeployPolicy().mapVariant === 'frontier';
-    Logger.info('respawn-map', ` Using map: ${useFrontierMap ? 'OpenFrontierRespawnMap' : 'RespawnMapView'}`);
+    Logger.info('respawn-map', ' Using map: OpenFrontierRespawnMap');
+    const mapCanvas = this.openFrontierRespawnMap.getCanvas();
 
-    const activeMap = useFrontierMap ? this.openFrontierRespawnMap : this.respawnMapView;
-    this.activeMap = activeMap;
-    const mapCanvas = activeMap.getCanvas();
-
-    mapCanvas.style.cssText = useFrontierMap ? `
+    mapCanvas.style.cssText = `
       width: 100%;
       height: 100%;
       max-width: 800px;
       max-height: 800px;
-    ` : `
-      width: 100%;
-      height: 100%;
-      max-width: 600px;
-      max-height: 600px;
     `;
 
     mapContainer.appendChild(mapCanvas);
 
-    activeMap.clearSelection();
-    activeMap.updateSpawnableZones();
-    activeMap.render();
-
-    if (useFrontierMap) {
-      this.openFrontierRespawnMap.resetView();
-    }
+    this.openFrontierRespawnMap.clearSelection();
+    this.openFrontierRespawnMap.render();
+    this.openFrontierRespawnMap.resetView();
 
     this.startMapUpdateInterval();
   }
@@ -96,8 +79,7 @@ export class RespawnMapController {
     this.stopMapUpdateInterval();
 
     this.updateInterval = window.setInterval(() => {
-      this.activeMap.updateSpawnableZones();
-      this.activeMap.render();
+      this.openFrontierRespawnMap.render();
     }, 1000);
   }
 
@@ -109,7 +91,6 @@ export class RespawnMapController {
   }
 
   clearSelection(): void {
-    this.respawnMapView.clearSelection();
     this.openFrontierRespawnMap.clearSelection();
   }
 

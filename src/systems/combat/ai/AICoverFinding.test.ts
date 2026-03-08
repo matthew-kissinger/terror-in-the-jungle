@@ -130,7 +130,7 @@ describe('AICoverFinding', () => {
 
       expect(cover).not.toBeNull();
       if (cover) {
-        expect(cover.x).toBeCloseTo(3, 3);
+        expect(cover.x).toBeCloseTo(3.65, 2);
         expect(cover.z).toBeCloseTo(0, 3);
       }
     });
@@ -159,7 +159,7 @@ describe('AICoverFinding', () => {
       expect(cover).toBeNull();
     });
 
-    it('positions sandbag cover two units behind the sandbag relative to the threat', () => {
+    it('positions sandbag cover just behind the sandbag thickness relative to the threat', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
       const threatPos = new THREE.Vector3(20, 0, 0);
       const sandbag = makeSandbagBounds(new THREE.Vector3(10, 0, 0), new THREE.Vector3(2, 4, 2));
@@ -169,7 +169,7 @@ describe('AICoverFinding', () => {
 
       expect(cover).not.toBeNull();
       if (cover) {
-        expect(cover.x).toBeCloseTo(8, 2);
+        expect(cover.x).toBeCloseTo(8.65, 2);
         expect(cover.z).toBeCloseTo(0, 2);
       }
     });

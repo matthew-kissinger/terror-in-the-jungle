@@ -166,6 +166,7 @@ export interface ITerrainRuntime {
   getVisualMargin?(): number;
   getWorldSize(): number;
   isTerrainReady(): boolean;
+  isAreaReadyAt?(x: number, z: number): boolean;
   hasTerrainAt(x: number, z: number): boolean;
   getActiveTerrainTileCount(): number;
   setSurfaceWetness(wetness: number): void;

@@ -1,6 +1,6 @@
 # Game Modes Execution Plan
 
-Last updated: 2026-03-06
+Last updated: 2026-03-08
 Status: ACTIVE - Canonical execution plan for game modes, deploy/loadout flow, command UX, map intel policy, and faction generalization
 
 ## Why This Exists
@@ -37,11 +37,11 @@ Latest validation slice:
 | Phase | State | Summary |
 |---|---|---|
 | Phase 0. Truth Sync | complete | Canonical docs and handoff doc are now active. |
-| Phase 1. Runtime Foundation | in progress | Mode definitions, runtime hooks, deploy session model, and spawn resolver are live. Legacy config fan-out still remains. |
+| Phase 1. Runtime Foundation | substantially complete | Mode definitions, runtime hooks, deploy session model, and spawn resolver are live. Config fan-out reviewed and accepted as thin coordinator. |
 | Phase 2. Deploy And Loadout | substantially complete | Shared deploy flow, side/faction selection, presets, and `2 weapons + 1 equipment` loadouts are live. |
 | Phase 3. Command Surface | complete | Map-first command flow now spans desktop, touch, and gamepad, with selected-squad detail and squad selection inside the overlay. |
-| Phase 4. Map Intel Policy | in progress | Runtime-owned map intel now drives minimap/full-map policy; per-mode product tuning is still open. |
-| Phase 5. Mode Vertical Slices | in progress | Mode cards plus deploy/respawn copy now differentiate the exposed modes; objective/HUD-specific product passes are still open. |
+| Phase 4. Map Intel Policy | substantially complete | Runtime-owned map intel drives minimap/full-map policy. A Shau strategic layer tuned (minimap excludes strategic agents, full map shows them). |
+| Phase 5. Mode Vertical Slices | substantially complete | Mode cards, deploy copy, and per-mode product passes done. Each mode has distinct HUD/objective behavior. Live gameplay testing remains. |
 | Phase 6. Team And Faction Generalization | complete | `ZoneState.BLUFOR_CONTROLLED` across 23 files, dynamic `TicketDisplay` faction labels, alliance-level zone ownership. |
 | Phase 7. Death Presentation | complete | Ground-sinking replaces scale-to-zero. 6s ground persistence, 2s fadeout. Four animation types updated. |
 
@@ -592,7 +592,7 @@ Current implementation note:
 - initial spawn insertion and pressure-front respawn fallback now resolve through a shared policy-driven spawn resolver instead of hardcoded A Shau branches
 - a shared deploy-session model now drives mode-aware deploy copy for the front menu and respawn UI, so deploy presentation is no longer duplicated as hardcoded strings
 - first spawn now waits on the same deploy-selection path as respawn, using policy-driven default insertion selection before startup flow positions the player
-- mode-specific config fan-out and several direct mode branches still remain outside the runtime layer
+- `applyModeConfiguration()` reviewed 2026-03-08: 94 lines of null-guarded setter calls across 8 systems. This IS a thin coordinator already - moving config into individual systems would couple them to `GameModeConfig`, which is worse. Accepted as-is.
 
 Acceptance:
 
@@ -670,7 +670,7 @@ Current implementation note:
 - `MapIntelPolicy` now threads from `GameModeDefinition` through `GameModeManager` into `MinimapSystem` and `FullMapSystem` instead of routing through renderer globals
 - tactical contact range is now runtime-owned on the minimap renderer
 - strategic-agent visibility is now explicit and separated for minimap vs full map
-- A Shau is the first mode with runtime-owned full-map strategic visibility, but the actual product pass and per-mode tuning are still pending
+- A Shau product pass completed 2026-03-08: strategic agents on full map (alpha 0.2-0.4), excluded from minimap, zone display capped at 5 visible with priority sort (contested first, then nearest), dominance bar for aggregate faction control
 
 Acceptance:
 
@@ -691,7 +691,10 @@ Current implementation note:
 
 - mode cards now describe the exposed modes as distinct products instead of generic scale variants
 - deploy/initial/respawn session copy now differentiates Zone Control, Team Deathmatch, Open Frontier, and A Shau with mode-specific headlines, map titles, and readiness language
-- the remaining work in this phase is objective/HUD/pacing behavior, not just wording
+- Zone Control (2026-03-08): zone dominance bar added showing faction control ratio; zone status already comprehensive (CAPTURING/LOSING/ATTACKING/CONTESTED/SECURED/HOSTILE), capture bars with contextual coloring, bleed pulse, compass markers, center-screen capture notifications
+- Team Deathmatch (2026-03-08): audit clean - zero conquest bleed-through. Zone HUD hidden via display:none, kill target display with 75%/90% urgency pulses, bleed indicator hidden, spawn logic uses home bases only, victory on kill count (not ticket depletion). Cleanly isolated via policy-driven routing
+- Open Frontier (2026-03-08): 60% distinct (pressure corridor + helipads + 4x world + double force), 40% reskin (same capture mechanics, cosmetic helicopter, label-only command scale). Helipads wired with terrain flattening, helipad_main preferred on initial deploy. Helicopter auto-start deferred (needs NPC pilot AI)
+- A Shau Valley (2026-03-08): 15-zone HUD overflow solved with priority-sorted display capped at 5 visible (contested first, then urgent, then nearest), overflow label for hidden zones. Zone dominance bar provides aggregate view. Strategic agents on full map only. Remaining gaps (deferred): mission briefing card, front-line map overlay, strategic agent legend
 
 Acceptance:
 

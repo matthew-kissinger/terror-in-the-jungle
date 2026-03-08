@@ -77,10 +77,13 @@ describe('VegetationScatterer', () => {
   });
 
   it('does not regenerate on same cell position', () => {
-    scatterer.update(new THREE.Vector3(10, 0, 10));
+    // Drain all pending additions (budgeted at 4 per frame)
+    const pos = new THREE.Vector3(10, 0, 10);
+    for (let i = 0; i < 20; i++) scatterer.update(pos);
     const count1 = (billboard.addChunkInstances as any).mock.calls.length;
 
-    scatterer.update(new THREE.Vector3(15, 0, 15)); // Same cell
+    // Same cell - no new additions
+    scatterer.update(new THREE.Vector3(15, 0, 15));
     const count2 = (billboard.addChunkInstances as any).mock.calls.length;
 
     expect(count2).toBe(count1);

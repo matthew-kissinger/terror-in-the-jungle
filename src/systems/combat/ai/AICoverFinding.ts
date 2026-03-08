@@ -20,6 +20,7 @@ const _intersection = new THREE.Vector3();
 const _coverToThreatCheck = new THREE.Vector3();
 const _coverToCombatant = new THREE.Vector3();
 const _ray = new THREE.Ray();
+const _sandbagSize = new THREE.Vector3();
 
 /**
  * Handles cover finding and cover viability checks
@@ -81,14 +82,16 @@ export class AICoverFinding {
 
       for (const bounds of sandbagBounds) {
         bounds.getCenter(_sandbagCenter);
+        bounds.getSize(_sandbagSize);
 
         const distanceToSandbagSq = combatant.position.distanceToSquared(_sandbagCenter);
 
         if (distanceToSandbagSq > MAX_SEARCH_RADIUS_SQ) continue;
 
         _threatToSandbag.subVectors(_sandbagCenter, threatPosition).normalize();
+        const coverOffset = Math.max(0.6, Math.min(_sandbagSize.x, _sandbagSize.z) * 0.5 + 0.35);
 
-        _coverPos.copy(_sandbagCenter).addScaledVector(_threatToSandbag, 2);
+        _coverPos.copy(_sandbagCenter).addScaledVector(_threatToSandbag, coverOffset);
 
         if (this.isSandbagCover(_coverPos, _sandbagCenter, bounds, threatPosition)) {
           const distanceToCombatantSq = combatant.position.distanceToSquared(_coverPos);
@@ -276,7 +279,8 @@ export class AICoverFinding {
     _threatEyePos.y += 1.7;
 
     _coverEyePos.copy(coverPos);
-    _coverEyePos.y += 1.7;
+    // Terrain defilade: combatant crouches behind terrain feature (no sandbag)
+    _coverEyePos.y += 0.9;
 
     _direction.subVectors(_coverEyePos, _threatEyePos).normalize();
 

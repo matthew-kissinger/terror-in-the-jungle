@@ -121,6 +121,57 @@ export const HUDZoneStyles = `
   .capture-bar-losing { background: ${colors.danger}; }
   .capture-bar-attacking { background: ${colors.warning}; }
 
+  /* Zone dominance bar */
+  .dominance-bar {
+    margin: 4px 0 6px;
+    padding: 0;
+  }
+
+  .dominance-track {
+    display: flex;
+    height: 4px;
+    background: ${colors.opfor};
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .dominance-fill {
+    height: 100%;
+    transition: width 0.4s ease;
+  }
+
+  .dominance-blufor { background: ${colors.us}; }
+  .dominance-contested {
+    background: repeating-linear-gradient(
+      -45deg,
+      ${colors.us},
+      ${colors.us} 2px,
+      ${colors.opfor} 2px,
+      ${colors.opfor} 4px
+    );
+  }
+
+  /* Zone overflow counter (when >5 zones exist) */
+  .zone-overflow {
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: rgba(220, 225, 230, 0.35);
+    text-align: center;
+    padding: 2px 0;
+  }
+
+  .dominance-label {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: rgba(220, 225, 230, 0.5);
+    margin-top: 2px;
+    text-align: center;
+  }
+
   /* Mobile responsive adjustments */
   @media (max-width: 1024px) {
     .objectives-panel {

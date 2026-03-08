@@ -64,6 +64,147 @@ export interface WarSimulatorConfig {
   reinforcementCooldown: number;    // seconds
 }
 
+export type MapFeatureKind = 'helipad' | 'airfield' | 'firebase' | 'village' | 'road';
+export type MapFeatureFootprintShape = 'circle' | 'rect' | 'strip' | 'polygon';
+export type TerrainFeatureSurfaceKind = 'packed_earth' | 'runway';
+export type TerrainFeatureTargetHeightMode = 'center' | 'average' | 'max';
+export type MapFeaturePrefabId =
+  | 'firebase_us_small'
+  | 'firebase_us_medium'
+  | 'firebase_artillery_small'
+  | 'firebase_hq_small'
+  | 'nva_bunker_cluster_small'
+  | 'nva_aa_site_small'
+  | 'nva_tunnel_camp_small'
+  | 'nva_trail_base_small'
+  | 'village_cluster_small'
+  | 'village_market_small'
+  | 'village_riverside_small'
+  | 'village_damaged_small'
+  | 'supply_depot_small'
+  | 'bridge_checkpoint_small'
+  | 'crossing_outpost_small'
+  | 'motor_pool_small'
+  | 'trail_checkpoint_small'
+  | 'airstrip_rough_small'
+  | 'airfield_support_compound_small';
+
+export interface StaticModelPlacementConfig {
+  id?: string;
+  modelPath: string;
+  offset: THREE.Vector3;
+  yaw?: number;
+  uniformScale?: number;
+  terrainSnap?: boolean;
+  heightOffset?: number;
+  registerCollision?: boolean;
+}
+
+export interface MapFeatureCircleFootprint {
+  shape: 'circle';
+  radius: number;
+}
+
+export interface MapFeatureRectFootprint {
+  shape: 'rect';
+  width: number;
+  length: number;
+}
+
+export interface MapFeatureStripFootprint {
+  shape: 'strip';
+  width: number;
+  length: number;
+}
+
+export interface MapFeaturePolygonFootprint {
+  shape: 'polygon';
+  points: Array<{ x: number; z: number }>;
+}
+
+export type MapFeatureFootprint =
+  | MapFeatureCircleFootprint
+  | MapFeatureRectFootprint
+  | MapFeatureStripFootprint
+  | MapFeaturePolygonFootprint;
+
+export interface TerrainFeaturePlacement {
+  yaw?: number;
+}
+
+export interface TerrainFeatureStampPolicy {
+  flatten?: boolean;
+  flatRadius?: number;
+  blendRadius?: number;
+  samplingRadius?: number;
+  targetHeightMode?: TerrainFeatureTargetHeightMode;
+  heightOffset?: number;
+  priority?: number;
+}
+
+export interface TerrainFeatureVegetationPolicy {
+  clear?: boolean;
+  exclusionRadius?: number;
+}
+
+export interface TerrainFeatureSurfacePolicy {
+  kind: TerrainFeatureSurfaceKind;
+  innerRadius?: number;
+  outerRadius?: number;
+  width?: number;
+  length?: number;
+  blend?: number;
+}
+
+export interface TerrainFeatureGameplayPolicy {
+  linkedZoneId?: string;
+  spawnIds?: string[];
+  owner?: Faction | null;
+}
+
+export interface MapFeatureBase {
+  id: string;
+  kind: MapFeatureKind;
+  name?: string;
+  position: THREE.Vector3;
+  placement?: TerrainFeaturePlacement;
+  footprint?: MapFeatureFootprint;
+  terrain?: TerrainFeatureStampPolicy;
+  vegetation?: TerrainFeatureVegetationPolicy;
+  surface?: TerrainFeatureSurfacePolicy;
+  gameplay?: TerrainFeatureGameplayPolicy;
+  prefabId?: MapFeaturePrefabId;
+  staticPlacements?: StaticModelPlacementConfig[];
+}
+
+export interface HelipadMapFeature extends MapFeatureBase {
+  kind: 'helipad';
+  aircraft: string;
+}
+
+export interface AirfieldMapFeature extends MapFeatureBase {
+  kind: 'airfield';
+}
+
+export interface FirebaseMapFeature extends MapFeatureBase {
+  kind: 'firebase';
+}
+
+export interface VillageMapFeature extends MapFeatureBase {
+  kind: 'village';
+}
+
+export interface RoadMapFeature extends MapFeatureBase {
+  kind: 'road';
+}
+
+export type MapFeatureDefinition =
+  | HelipadMapFeature
+  | AirfieldMapFeature
+  | FirebaseMapFeature
+  | VillageMapFeature
+  | RoadMapFeature;
+
 export interface GameModeConfig {
   id: GameMode;
   name: string;
@@ -132,6 +273,10 @@ export interface GameModeConfig {
     position: THREE.Vector3;
     aircraft: string; // key from AircraftModels (e.g. 'UH1_HUEY')
   }>;
+
+  // Authored map features that can shape terrain, suppress vegetation, and
+  // emit runtime structures. Prefer this over adding new top-level fields.
+  features?: MapFeatureDefinition[];
 
   // Optional war simulator for persistent large-scale battles
   warSimulator?: WarSimulatorConfig;

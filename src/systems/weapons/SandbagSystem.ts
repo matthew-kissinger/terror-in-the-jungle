@@ -2,13 +2,15 @@ import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
 import { modelLoader } from '../assets/ModelLoader';
+import { getModelPlacementProfile } from '../assets/ModelPlacementProfiles';
+import { prepareModelForPlacement } from '../assets/ModelPlacementUtils';
 import { StructureModels } from '../assets/modelPaths';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { InventoryManager } from '../player/InventoryManager';
 import { TicketSystem } from '../world/TicketSystem';
 
-/** Height of a sandbag wall in world units (used for placement Y offset). */
-export const SANDBAG_HEIGHT = 2.4;
+const SANDBAG_PROFILE = getModelPlacementProfile(StructureModels.SANDBAG_WALL);
+const SANDBAG_MIN_SPACING = SANDBAG_PROFILE.minSpacing ?? 2.15;
 
 interface PlacedSandbag {
   id: string;
@@ -27,9 +29,9 @@ export class SandbagSystem implements GameSystem {
   private sandbags: PlacedSandbag[] = [];
   private nextSandbagId = 0;
   private readonly MAX_SANDBAGS = 10;
-  private readonly MIN_SPACING = 3;
+  private readonly MIN_SPACING = SANDBAG_MIN_SPACING;
   private readonly MAX_SLOPE_DEGREES = 30;
-  private readonly MAX_WATER_HEIGHT = 1.0;
+  private readonly MAX_WATER_HEIGHT = 0.0;
 
   private placementPreview?: THREE.Object3D;
   private previewVisible = false;
@@ -109,6 +111,7 @@ export class SandbagSystem implements GameSystem {
         }
       });
 
+      prepareModelForPlacement(scene, StructureModels.SANDBAG_WALL);
       this.placementPreview = scene;
       this.placementPreview.visible = false;
       this.scene.add(this.placementPreview);
@@ -128,7 +131,7 @@ export class SandbagSystem implements GameSystem {
     this.previewPosition.copy(camera.position).add(direction.multiplyScalar(distance));
 
     const groundHeight = this.getGroundHeight(this.previewPosition.x, this.previewPosition.z);
-    this.previewPosition.y = groundHeight + SANDBAG_HEIGHT / 2;
+    this.previewPosition.y = groundHeight;
 
     // Calculate rotation to align with player facing direction (not perpendicular)
     const playerYaw = Math.atan2(direction.x, direction.z);
@@ -249,6 +252,7 @@ export class SandbagSystem implements GameSystem {
   private async placeSandbagAsync(pos: THREE.Vector3, rotY: number): Promise<void> {
     try {
       const sandbagModel = await modelLoader.loadModel(StructureModels.SANDBAG_WALL);
+      prepareModelForPlacement(sandbagModel, StructureModels.SANDBAG_WALL);
       sandbagModel.position.copy(pos);
       sandbagModel.rotation.y = rotY;
 

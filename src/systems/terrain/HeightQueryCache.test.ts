@@ -150,6 +150,34 @@ describe('HeightQueryCache', () => {
       cache.getHeightAt(1, 1);
       expect(mockNoise).toHaveBeenCalled();
     });
+
+    it('should batch-evict 10% when cache overflows', () => {
+      const maxLimit = 20;
+      const cache = new HeightQueryCache(12345, maxLimit);
+
+      // Fill cache to limit
+      for (let i = 0; i < maxLimit; i++) {
+        cache.getHeightAt(i * 10, 0);
+      }
+      expect(cache.getCacheStats().size).toBe(maxLimit);
+
+      // One more triggers batch eviction of ceil(20*0.1) = 2 entries
+      cache.getHeightAt(999, 0);
+      expect(cache.getCacheStats().size).toBe(maxLimit - 2 + 1); // 19
+
+      // Third entry (20,0) should still be cached (check before re-inserting evicted ones)
+      mockNoise.mockClear();
+      cache.getHeightAt(20, 0);
+      expect(mockNoise).not.toHaveBeenCalled();
+
+      // Oldest two entries (0,0) and (10,0) should have been evicted
+      mockNoise.mockClear();
+      cache.getHeightAt(0, 0);
+      expect(mockNoise).toHaveBeenCalled();
+      mockNoise.mockClear();
+      cache.getHeightAt(10, 0);
+      expect(mockNoise).toHaveBeenCalled();
+    });
   });
 
   describe('Coordinate collisions', () => {

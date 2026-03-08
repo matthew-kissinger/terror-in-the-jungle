@@ -112,6 +112,7 @@ export function togglePerformanceStats(engine: GameEngine): void {
   const terrainReady = engine.systemManager.terrainSystem.isTerrainReady();
   const terrainTiles = engine.systemManager.terrainSystem.getActiveTerrainTileCount();
   const workerStats = engine.systemManager.terrainSystem.getWorkerStats?.();
+  const terrainStreams = engine.systemManager.terrainSystem.getStreamingMetrics?.() ?? [];
   Logger.info('engine-input', `Vegetation: ${vegetationActive} active / ${vegetationReserved} reserved`);
   Logger.info('engine-input', `Combatants - US: ${combatStats.us}, OPFOR: ${combatStats.opfor}`);
   Logger.info(
@@ -121,6 +122,14 @@ export function togglePerformanceStats(engine: GameEngine): void {
       `worker queue ${workerStats?.queueLength ?? 0}, ` +
       `${workerStats?.busyWorkers ?? 0}/${workerStats?.totalWorkers ?? 0} workers busy`,
   );
+  if (terrainStreams.length > 0) {
+    for (const stream of terrainStreams) {
+      Logger.info(
+        'engine-input',
+        `Terrain stream ${stream.name}: ${stream.timeMs.toFixed(2)}ms / ${stream.budgetMs.toFixed(2)}ms, pending=${stream.pendingUnits}`,
+      );
+    }
+  }
   Logger.info('engine-input', `Chunks tracked: ${debugInfo.chunksTracked}`);
   Logger.info('engine-input', `Logs suppressed (total): ${logStats.suppressedTotal}`);
 }

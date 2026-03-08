@@ -54,10 +54,16 @@ export class HeightQueryCache {
     // Add to cache
     this.cache.set(key, height);
 
-    // Evict oldest if over limit
+    // Batch-evict oldest 10% when over limit, creating headroom so
+    // subsequent misses skip eviction until the freed space fills again.
     if (this.cache.size > this.maxCacheSize) {
-      const firstKey = this.cache.keys().next().value;
-      if (firstKey !== undefined) this.cache.delete(firstKey);
+      const evictCount = Math.max(1, Math.ceil(this.maxCacheSize * 0.1));
+      let count = 0;
+      for (const k of this.cache.keys()) {
+        if (count >= evictCount) break;
+        this.cache.delete(k);
+        count++;
+      }
     }
 
     return height;

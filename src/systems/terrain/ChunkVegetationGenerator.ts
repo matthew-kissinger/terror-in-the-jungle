@@ -10,6 +10,7 @@ const SLOPE_SAMPLE_DIST = 2.0;
 const TRUNK_SUPPRESS_RADIUS = 3.0;
 const TRUNK_SUPPRESS_RADIUS_SQ = TRUNK_SUPPRESS_RADIUS * TRUNK_SUPPRESS_RADIUS;
 const TRUNK_CELL_SIZE = TRUNK_SUPPRESS_RADIUS;
+type PoissonTemplatePoint = { x: number; y: number };
 
 function slopeDeg(
   lx: number, lz: number, size: number,
@@ -80,6 +81,8 @@ class TrunkGrid {
  * - Density modulated by low-frequency noise for natural patchiness
  */
 export class ChunkVegetationGenerator {
+  private static readonly poissonTemplateCache = new Map<string, ReadonlyArray<PoissonTemplatePoint>>();
+
   static generateVegetation(
     chunkX: number,
     chunkZ: number,
@@ -116,7 +119,8 @@ export class ChunkVegetationGenerator {
     // ---- CANOPY: shared poisson grid, slope + water rejection ----
     if (canopyTypes.length > 0) {
       const minDist = Math.max(...canopyTypes.map(t => t.poissonMinDistance ?? 16));
-      const points = MathUtils.poissonDiskSampling(size, size, minDist);
+      const points = this.getPoissonTemplate(size, minDist);
+      const offset = this.getPoissonOffset(chunkX, chunkZ, 1, size);
 
       const weights: { t: VegetationTypeConfig; w: number }[] = [];
       let total = 0;
@@ -133,7 +137,7 @@ export class ChunkVegetationGenerator {
         const instances: BillboardInstance[] = [];
 
         for (let i = 0; i < count && idx < points.length; i++, idx++) {
-          const p = points[idx];
+          const p = this.getShiftedPoissonPoint(points[idx], offset.x, offset.y, size);
           const h = getHeight(p.x, p.y);
           if (h < 0) continue;
           if (slopeDeg(p.x, p.y, size, getHeight) > MAX_CANOPY_SLOPE) continue;
@@ -154,7 +158,8 @@ export class ChunkVegetationGenerator {
     // ---- MID-LEVEL POISSON: shared grid, moderate slope rejection ----
     if (midPoissonTypes.length > 0) {
       const minDist = Math.max(...midPoissonTypes.map(t => t.poissonMinDistance ?? 8));
-      const points = MathUtils.poissonDiskSampling(size, size, minDist);
+      const points = this.getPoissonTemplate(size, minDist);
+      const offset = this.getPoissonOffset(chunkX, chunkZ, 2, size);
 
       const weights: { t: VegetationTypeConfig; w: number }[] = [];
       let total = 0;
@@ -171,7 +176,7 @@ export class ChunkVegetationGenerator {
         const instances: BillboardInstance[] = [];
 
         for (let i = 0; i < count && idx < points.length; i++, idx++) {
-          const p = points[idx];
+          const p = this.getShiftedPoissonPoint(points[idx], offset.x, offset.y, size);
           const h = getHeight(p.x, p.y);
           if (h < 0) continue;
           if (slopeDeg(p.x, p.y, size, getHeight) > MAX_MIDLEVEL_SLOPE) continue;
@@ -197,12 +202,13 @@ export class ChunkVegetationGenerator {
 
       if (vt.placement === 'poisson') {
         const minDist = vt.poissonMinDistance ?? 10;
-        const pts = MathUtils.poissonDiskSampling(size, size, minDist);
+        const pts = this.getPoissonTemplate(size, minDist);
+        const offset = this.getPoissonOffset(chunkX, chunkZ, this.hashString(vt.id), size);
         const maxCount = Math.floor(size * size * DENSITY_PER_UNIT * effectiveDensity);
         const limit = Math.min(pts.length, maxCount);
 
         for (let i = 0; i < limit; i++) {
-          const p = pts[i];
+          const p = this.getShiftedPoissonPoint(pts[i], offset.x, offset.y, size);
           const h = getHeight(p.x, p.y);
           if (h < 0) continue;
           if (trunkGrid.isNear(p.x, p.y)) continue;
@@ -236,5 +242,67 @@ export class ChunkVegetationGenerator {
     }
 
     return result;
+  }
+
+  private static getPoissonTemplate(size: number, radius: number): ReadonlyArray<PoissonTemplatePoint> {
+    const key = `${size}:${radius}`;
+    const cached = this.poissonTemplateCache.get(key);
+    if (cached) {
+      return cached;
+    }
+
+    const template = MathUtils.poissonDiskSampling(size, size, radius)
+      .map(point => ({ x: point.x, y: point.y }));
+    this.poissonTemplateCache.set(key, template);
+    return template;
+  }
+
+  private static getPoissonOffset(
+    chunkX: number,
+    chunkZ: number,
+    salt: number,
+    size: number,
+  ): { x: number; y: number } {
+    const hashX = this.hashInts(chunkX, chunkZ, salt);
+    const hashY = this.hashInts(chunkZ, chunkX, salt ^ 0x9e3779b9);
+    const maxUint32 = 0xffffffff;
+    return {
+      x: (hashX / maxUint32) * size,
+      y: (hashY / maxUint32) * size,
+    };
+  }
+
+  private static getShiftedPoissonPoint(
+    point: PoissonTemplatePoint,
+    offsetX: number,
+    offsetY: number,
+    size: number,
+  ): PoissonTemplatePoint {
+    return {
+      x: this.wrapCoordinate(point.x + offsetX, size),
+      y: this.wrapCoordinate(point.y + offsetY, size),
+    };
+  }
+
+  private static wrapCoordinate(value: number, size: number): number {
+    const wrapped = value % size;
+    return wrapped < 0 ? wrapped + size : wrapped;
+  }
+
+  private static hashString(value: string): number {
+    let hash = 2166136261;
+    for (let i = 0; i < value.length; i++) {
+      hash ^= value.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return hash >>> 0;
+  }
+
+  private static hashInts(a: number, b: number, salt: number): number {
+    let hash = Math.imul(a | 0, 73856093) ^ Math.imul(b | 0, 19349663) ^ (salt | 0);
+    hash ^= hash >>> 13;
+    hash = Math.imul(hash, 1274126177);
+    hash ^= hash >>> 16;
+    return hash >>> 0;
   }
 }

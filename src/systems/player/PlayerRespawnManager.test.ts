@@ -205,6 +205,7 @@ describe('PlayerRespawnManager', () => {
       setZoneSelectedCallback: vi.fn(),
       setZoneManager: vi.fn(),
       setGameModeManager: vi.fn(),
+      setSpawnPoints: vi.fn(),
       showMap: vi.fn(),
       clearSelection: vi.fn(),
       stopMapUpdateInterval: vi.fn(),
@@ -245,7 +246,7 @@ describe('PlayerRespawnManager', () => {
         modeName: 'Zone Control',
         modeDescription: 'Fast-paced combat.',
         flow: 'standard',
-        mapVariant: 'standard',
+        mapVariant: 'frontier',
         flowLabel: 'Frontline deployment',
         headline: 'RETURN TO BATTLE',
         subheadline: 'Choose a controlled position and return to the fight.',
@@ -266,6 +267,7 @@ describe('PlayerRespawnManager', () => {
           'Redeploy as soon as the timer clears.',
         ],
       })),
+      getCurrentConfig: vi.fn(() => ({ helipads: [] })),
       getCurrentDefinition: vi.fn(() => getGameModeDefinition(GameMode.ZONE_CONTROL)),
       getCurrentMode: vi.fn(() => GameMode.ZONE_CONTROL),
       getWorldSize: vi.fn(() => 400),
@@ -275,6 +277,7 @@ describe('PlayerRespawnManager', () => {
       setPosition: vi.fn(),
       enableControls: vi.fn(),
       disableControls: vi.fn(),
+      setPointerLockEnabled: vi.fn(),
     };
 
     mockFirstPersonWeapon = {
@@ -992,6 +995,22 @@ describe('PlayerRespawnManager', () => {
       expect(helipadSpawn).toBeDefined();
       expect(helipadSpawn!.name).toContain('Helipad');
     });
+
+    it('falls back to configured helipads during initial deploy before runtime helipads exist', () => {
+      vi.mocked(mockGameModeManager.canPlayerSpawnAtZones).mockReturnValue(true);
+      vi.mocked((mockGameModeManager as any).getCurrentConfig).mockReturnValue({
+        helipads: [
+          { id: 'helipad_main', position: new THREE.Vector3(40, 0, -1400), aircraft: 'UH1_HUEY' },
+        ],
+      });
+
+      respawnManager['updateAvailableSpawnPoints']();
+
+      const helipadSpawn = respawnManager['availableSpawnPoints'].find(p => p.id === 'helipad_main');
+      expect(helipadSpawn).toBeDefined();
+      expect(helipadSpawn?.kind).toBe('helipad');
+      expect(helipadSpawn?.priority).toBe(25);
+    });
   });
 
   describe('deploy session policy', () => {
@@ -1076,8 +1095,67 @@ describe('PlayerRespawnManager', () => {
 
       void respawnManager.beginInitialDeploy();
 
-      expect(respawnManager['selectedSpawnPoint']).toBe('lz_stallion');
-      expect(mockRespawnUI.updateSelectedSpawn).toHaveBeenCalledWith('LZ Stallion');
+      expect(respawnManager['selectedSpawnPoint']).toBe('direct_insertion');
+      expect(mockRespawnUI.updateSelectedSpawn).toHaveBeenCalledWith('Tactical Insertion');
+      expect((mockMapController as any).setSpawnPoints).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: 'direct_insertion',
+            selectionClass: 'direct_insertion',
+          }),
+        ])
+      );
+    });
+
+    it('prefers the main frontier helipad for initial deploy before runtime helipads exist', () => {
+      const definition = getGameModeDefinition(GameMode.OPEN_FRONTIER);
+      vi.mocked((mockGameModeManager as any).getCurrentDefinition).mockReturnValue(definition);
+      vi.mocked((mockGameModeManager as any).getCurrentConfig).mockReturnValue({
+        helipads: [
+          { id: 'helipad_main', position: new THREE.Vector3(40, 0, -1400), aircraft: 'UH1_HUEY' },
+          { id: 'helipad_west', position: new THREE.Vector3(-960, 0, -800), aircraft: 'UH1C_GUNSHIP' },
+          { id: 'helipad_east', position: new THREE.Vector3(1040, 0, -800), aircraft: 'AH1_COBRA' },
+        ],
+      });
+      vi.mocked((mockGameModeManager as any).getDeploySession).mockImplementation((kind: string) => ({
+        kind,
+        mode: GameMode.OPEN_FRONTIER,
+        modeName: 'Open Frontier',
+        modeDescription: 'Company-scale maneuver warfare.',
+        flow: 'frontier',
+        mapVariant: 'frontier',
+        flowLabel: 'Frontier insertion',
+        headline: kind === 'initial' ? 'OPEN FRONTIER' : 'FRONTIER REDEPLOYMENT',
+        subheadline: 'Choose a forward insertion point and move into the frontier.',
+        mapTitle: 'FRONTIER OPERATIONS MAP - SELECT INSERTION',
+        selectedSpawnTitle: 'SELECTED INSERTION ZONE',
+        emptySelectionText: 'Select a spawn point on the map',
+        readySelectionText: 'Insertion route confirmed',
+        countdownLabel: 'Deployment available in',
+        readyLabel: 'Ready for deployment',
+        actionLabel: kind === 'initial' ? 'PLAN INSERTION' : 'DEPLOY',
+        secondaryActionLabel: kind === 'initial' ? 'BACK TO MODE SELECT' : null,
+        allowSpawnSelection: true,
+        allowLoadoutEditing: true,
+        sequenceTitle: kind === 'initial' ? 'Deployment Checklist' : 'Redeploy Checklist',
+        sequenceSteps: [
+          'Choose an insertion zone before deployment begins.',
+          'Configure 2 weapons and 1 equipment slot before deployment.',
+          kind === 'initial'
+            ? 'Insert once the staging plan and loadout are confirmed.'
+            : 'Redeploy as soon as the timer clears.',
+        ],
+      }));
+      vi.mocked(mockZoneManager.getAllZones).mockReturnValue([
+        createMockZone('us_hq_main', 'US Main HQ', new THREE.Vector3(0, 0, -1400), ZoneState.BLUFOR_CONTROLLED, true, Faction.US),
+        createMockZone('us_hq_west', 'US West FOB', new THREE.Vector3(-1000, 0, -800), ZoneState.BLUFOR_CONTROLLED, true, Faction.US),
+        createMockZone('us_hq_east', 'US East FOB', new THREE.Vector3(1000, 0, -800), ZoneState.BLUFOR_CONTROLLED, true, Faction.US),
+      ] as any);
+
+      void respawnManager.beginInitialDeploy();
+
+      expect(respawnManager['selectedSpawnPoint']).toBe('helipad_main');
+      expect(mockRespawnUI.updateSelectedSpawn).toHaveBeenCalledWith('Helipad: UH1 HUEY');
     });
 
     it('routes deploy loadout edits through the loadout service', async () => {

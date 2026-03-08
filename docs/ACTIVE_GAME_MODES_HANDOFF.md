@@ -1,6 +1,6 @@
 # Game Modes Handoff
 
-Last updated: 2026-03-06
+Last updated: 2026-03-08
 Status: READY FOR HANDOFF
 
 ## Canonical Read Order
@@ -17,11 +17,11 @@ Status: READY FOR HANDOFF
 | Phase | State | Notes |
 |---|---|---|
 | Phase 0. Truth Sync | complete | Canonical plan exists and active docs now point to it. |
-| Phase 1. Runtime Foundation | in progress | `GameModeDefinition`, policy-backed runtime hooks, deploy session model, and spawn resolver are live. `GameModeManager` still fans config into legacy systems. |
+| Phase 1. Runtime Foundation | substantially complete | `GameModeDefinition`, policy-backed runtime hooks, deploy session model, and spawn resolver are live. Config fan-out reviewed and accepted as thin coordinator. |
 | Phase 2. Deploy And Loadout | substantially complete | Shared first-spawn/respawn deploy flow is live. `2 weapons + 1 equipment` loadout model, faction pools, presets, and side/faction launch selection are wired. |
 | Phase 3. Command Surface | complete | Command coordinator, quick strip, selected-squad detail, map-click squad selection, and map-first overlay are live across desktop, touch, and gamepad. |
-| Phase 4. Map Intel Policy | in progress | Runtime-owned minimap/full-map policy is live. Per-mode tactical/strategic product tuning is still open. |
-| Phase 5. Mode Vertical Slices | in progress | Mode cards and deploy/respawn copy now differentiate the exposed modes; objective/HUD-specific product passes are still open. |
+| Phase 4. Map Intel Policy | substantially complete | Runtime-owned minimap/full-map policy is live. A Shau strategic layer tuned (minimap excludes strategic agents, full map shows them). |
+| Phase 5. Mode Vertical Slices | substantially complete | All four mode product passes done. Zone dominance bar, priority zone display, mode-specific HUD isolation verified. Live gameplay testing remains. |
 | Phase 6. Team And Faction Generalization | complete | `ZoneState.BLUFOR_CONTROLLED` replaces `US_CONTROLLED` across 23 files. `TicketDisplay.setFactionLabels()` drives dynamic HUD names from `factionMix` config. Alliance-level ownership is now the norm. |
 | Phase 7. Death Presentation | complete | Ground-sinking replaces scale-to-zero. 6s ground persistence, 2s fadeout. Four animation types updated (shatter, spinfall, crumple, fallback). |
 
@@ -57,12 +57,17 @@ Status: READY FOR HANDOFF
 - death presentation: ground-sinking replaces scale-to-zero, 6s ground persistence, 2s fadeout
 - `GameModeManager` uses `objective.kind === 'deathmatch'` policy check instead of hardcoded mode ID
 - `SystemConnector` split into 11 named private methods for dependency graph readability
+- zone dominance bar shows faction control ratio (colored track + summary label)
+- priority-sorted zone display capped at 5 visible (contested first, then urgent, then nearest) with overflow label
+- `GameModeManager.applyModeConfiguration()` reviewed and accepted as thin coordinator (not refactored)
+- TDM cleanly isolated via policy-driven routing - zero conquest bleed-through confirmed
+- A Shau 15-zone HUD overload solved with priority sorting and overflow label
 
 ## Current Gaps
 
-- `GameModeManager` is still a legacy fan-out point and not yet a thin coordinator
-- `MapIntelPolicy` is now the source of truth for minimap/full-map visibility, but per-mode product tuning still needs a dedicated pass
-- mode-specific objective, HUD, and pacing behavior are only partially sliced; the current pass is strongest in mode selection and deploy/respawn surfaces
+- Open Frontier still 40% reskin: helicopter is cosmetic (no NPC pilots, no transport mechanic), command surface is label-only company-scale
+- A Shau deferred UX items: no mission briefing card, no front-line map overlay, strategic agent dots unexplained on full map
+- Near-field death impact shatter not yet attempted (deferred pending perf budget confirmation)
 
 ## Resume Here
 
@@ -71,10 +76,10 @@ Status: READY FOR HANDOFF
 See `docs/NEXT_WORK.md` for the active checklist.
 
 Current priorities:
-1. Validate recent perf micro-optimizations with warm `combat120` captures
-2. Continue perf tail closure if p99 still fails (AIStateEngage cover search, TerrainSystem tick decoupling)
-3. Mode vertical slice product passes (Zone Control, TDM, Open Frontier, A Shau)
-4. GameModeManager legacy fan-out slim-down
+1. Terrain rewrite remaining items (T-008 hydrology pending design)
+2. Content and systems expansion (asset generation, helicopter controls, sandbox infrastructure)
+3. Open Frontier mode identity deepening (helicopter as tactical insertion, FOB progression)
+4. Live gameplay testing for all four mode product passes
 
 ## Primary Code Entry Points
 

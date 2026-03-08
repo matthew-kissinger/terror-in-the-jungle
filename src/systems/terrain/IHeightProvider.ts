@@ -1,3 +1,5 @@
+import type { ResolvedTerrainStampConfig } from './TerrainFeatureTypes';
+
 /**
  * Abstraction for terrain height generation.
  * Implementations provide height data from different sources
@@ -23,4 +25,9 @@ export type HeightProviderConfig =
       originX: number;
       originZ: number;
       buffer: ArrayBuffer;
+    }
+  | {
+      type: 'stamped';
+      base: HeightProviderConfig;
+      stamps: ResolvedTerrainStampConfig[];
     };

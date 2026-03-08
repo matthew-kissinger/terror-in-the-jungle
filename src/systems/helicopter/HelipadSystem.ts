@@ -1,6 +1,7 @@
 import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { GameSystem } from '../../types';
+import { getConfiguredHelipads, type ResolvedHelipadFeature } from '../../config/mapFeatureResolvers';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { GameModeManager } from '../world/GameModeManager';
 import { modelLoader } from '../assets/ModelLoader';
@@ -75,14 +76,14 @@ export class HelipadSystem implements GameSystem {
 
     try {
       const currentConfig = this.gameModeManager.getCurrentConfig();
-      const configHelipads = currentConfig.helipads ?? [];
+      const configHelipads = this.resolveConfiguredHelipads();
 
       if (configHelipads.length === 0) {
         Logger.info('helicopter', `No helipads configured for mode "${currentConfig.id}"`);
         return;
       }
 
-      await Promise.all(configHelipads.map(cfg => this.createHelipad(cfg.id, cfg.position, cfg.aircraft)));
+      await Promise.all(configHelipads.map(cfg => this.createHelipad(cfg)));
 
       if (this.onHelipadsCreatedCallback && this.helipadMeta.size > 0) {
         this.onHelipadsCreatedCallback(this.getAllHelipads());
@@ -92,31 +93,35 @@ export class HelipadSystem implements GameSystem {
     }
   }
 
-  private async createHelipad(id: string, configPosition: THREE.Vector3, aircraft: string): Promise<void> {
+  private async createHelipad(config: ResolvedHelipadFeature): Promise<void> {
     if (!this.terrainManager) return;
-    if (this.helipads.has(id)) return;
+    if (this.helipads.has(config.id)) return;
 
-    const helipadPosition = configPosition.clone();
+    const helipadPosition = config.position.clone();
 
-    // Find the highest terrain point within the platform area
     const platformRadius = 12;
-    const maxHeight = this.findMaxTerrainHeight(helipadPosition.x, helipadPosition.z, platformRadius);
-    helipadPosition.y = maxHeight + HELIPAD_TERRAIN_CLEARANCE;
+    if (config.preparedTerrain) {
+      helipadPosition.y = this.terrainManager.getHeightAt(helipadPosition.x, helipadPosition.z) + HELIPAD_TERRAIN_CLEARANCE;
+    } else {
+      // Legacy fallback when the map does not author a prepared landing zone.
+      const maxHeight = this.findMaxTerrainHeight(helipadPosition.x, helipadPosition.z, platformRadius);
+      helipadPosition.y = maxHeight + HELIPAD_TERRAIN_CLEARANCE;
+    }
 
     const helipad = await this.loadHelipadModel();
     helipad.position.copy(helipadPosition);
 
     this.scene.add(helipad);
-    this.helipads.set(id, helipad);
-    this.helipadMeta.set(id, { id, position: helipadPosition.clone(), aircraft, faction: 'US' });
+    this.helipads.set(config.id, helipad);
+    this.helipadMeta.set(config.id, { id: config.id, position: helipadPosition.clone(), aircraft: config.aircraft, faction: 'US' });
 
     // Register helipad for collision detection
-    this.terrainManager.registerCollisionObject(id, helipad);
+    this.terrainManager.registerCollisionObject(config.id, helipad);
 
     // Clear vegetation around helipad
     this.clearVegetationArea(helipadPosition.x, helipadPosition.z, platformRadius + 1);
 
-    Logger.info('helicopter', `Created helipad "${id}" at (${helipadPosition.x.toFixed(0)}, ${helipadPosition.y.toFixed(1)}, ${helipadPosition.z.toFixed(0)}) aircraft=${aircraft}`);
+    Logger.info('helicopter', `Created helipad "${config.id}" at (${helipadPosition.x.toFixed(0)}, ${helipadPosition.y.toFixed(1)}, ${helipadPosition.z.toFixed(0)}) aircraft=${config.aircraft}`);
   }
 
   private findMaxTerrainHeight(centerX: number, centerZ: number, radius: number): number {
@@ -228,10 +233,10 @@ export class HelipadSystem implements GameSystem {
     const currentConfig = this.gameModeManager.getCurrentConfig();
     const supportsHelipad = currentConfig.id === 'open_frontier' || currentConfig.id === 'a_shau_valley';
     if (!supportsHelipad) return;
-    if (!currentConfig.helipads || currentConfig.helipads.length === 0) return;
+    const configHelipads = this.resolveConfiguredHelipads();
+    if (configHelipads.length === 0) return;
 
     // Check if terrain is loaded at the first helipad position
-    const configHelipads = currentConfig.helipads;
     const checkPos = configHelipads[0].position;
     const testHeight = this.terrainManager.getHeightAt(checkPos.x, checkPos.z);
     const hasTerrain = this.terrainManager.isTerrainReady() && this.terrainManager.hasTerrainAt(checkPos.x, checkPos.z);
@@ -262,5 +267,10 @@ export class HelipadSystem implements GameSystem {
     this.helipads.clear();
     this.helipadMeta.clear();
     Logger.info('helicopter', 'HelipadSystem disposed');
+  }
+
+  private resolveConfiguredHelipads(): ResolvedHelipadFeature[] {
+    if (!this.gameModeManager) return [];
+    return getConfiguredHelipads(this.gameModeManager.getCurrentConfig());
   }
 }

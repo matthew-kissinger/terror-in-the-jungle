@@ -60,7 +60,7 @@ function createBasePolicies(config: GameModeConfig): GameModePolicies {
     teamRules: {
       ownershipModel: 'alliance',
       composition: config.factionMix ? 'alliance_mix' : 'single_faction',
-      playableAlliances: [Alliance.BLUFOR, Alliance.OPFOR]
+      playableAlliances: [Alliance.BLUFOR]
     }
   };
 }

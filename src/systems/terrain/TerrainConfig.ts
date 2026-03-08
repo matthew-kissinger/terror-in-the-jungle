@@ -29,12 +29,15 @@ export interface TerrainSystemConfig {
   maxLODLevels: number;
   lodRanges: number[]; // Per-level max distance from camera
   tileResolution: number; // Vertices per tile edge (e.g. 33 for 32 quads)
-  heightProvider: 'noise' | 'dem';
+  heightProvider: 'noise' | 'dem' | 'stamped';
   splatmap: SplatmapConfig;
   vegetationCellSize: number; // Cell size for vegetation scatter (metres)
   bvhRadius: number; // Near-field BVH mesh radius for raycasts
   bvhRebuildThreshold: number; // Rebuild BVH when player moves this far
   updateBudgetMs: number; // Per-frame budget for terrain update
+  renderUpdateBudgetMs: number;
+  collisionUpdateBudgetMs: number;
+  vegetationUpdateBudgetMs: number;
 }
 
 /** Default 4-layer splatmap matching the existing biome textures. */
@@ -98,6 +101,9 @@ export function createTerrainConfig(overrides: Partial<TerrainSystemConfig> = {}
     bvhRadius: overrides.bvhRadius ?? 200,
     bvhRebuildThreshold: overrides.bvhRebuildThreshold ?? 50,
     updateBudgetMs: overrides.updateBudgetMs ?? 2,
+    renderUpdateBudgetMs: overrides.renderUpdateBudgetMs ?? 0.4,
+    collisionUpdateBudgetMs: overrides.collisionUpdateBudgetMs ?? 0.8,
+    vegetationUpdateBudgetMs: overrides.vegetationUpdateBudgetMs ?? 0.8,
   };
 }
 

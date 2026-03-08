@@ -40,6 +40,7 @@ import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { LoadoutService } from '../systems/player/LoadoutService';
 import { WarSimulator } from '../systems/strategy/WarSimulator';
 import { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
+import { WorldFeatureSystem } from '../systems/world/WorldFeatureSystem';
 import { SystemInitializer, SystemReferences } from './SystemInitializer';
 import { SystemConnector } from './SystemConnector';
 import { SystemUpdater } from './SystemUpdater';
@@ -98,6 +99,7 @@ export class SystemManager {
   public loadoutService!: LoadoutService;
   public warSimulator!: WarSimulator;
   public strategicFeedback!: StrategicFeedback;
+  public worldFeatureSystem!: WorldFeatureSystem;
 
   async initializeSystems(
     scene: THREE.Scene,
@@ -157,6 +159,7 @@ export class SystemManager {
     this.loadoutService = this.refs.loadoutService;
     this.warSimulator = this.refs.warSimulator;
     this.strategicFeedback = this.refs.strategicFeedback;
+    this.worldFeatureSystem = this.refs.worldFeatureSystem;
 
     // Connect systems together
     this.connector.connectSystems(this.refs, scene, camera, renderer);
@@ -201,7 +204,7 @@ export class SystemManager {
 
       while (performance.now() - start < timeoutMs) {
         this.terrainSystem.update(0.016);
-        const ready = this.terrainSystem.isTerrainReady();
+        const ready = this.terrainSystem.isAreaReadyAt?.(spawnPos.x, spawnPos.z) ?? this.terrainSystem.isTerrainReady();
 
         if (ready) {
           break;

@@ -19,7 +19,7 @@ type CaptureResult = {
 
 const PORT = 4173;
 const HOST = '127.0.0.1';
-const APP_URL = `http://${HOST}:${PORT}/?sandbox=true`;
+const APP_URL = `http://${HOST}:${PORT}/?sandbox=true&autostart=0&perf=1`;
 const FIRST_CONTACT_TIMEOUT_MS = 180_000;
 const SUSTAINED_MARK_MS = 300_000;
 const POLL_MS = 1000;
@@ -134,7 +134,7 @@ async function runCapture(): Promise<CaptureResult> {
     await page.waitForFunction(() => {
       const engine = (window as any).__engine;
       return !!engine && typeof engine.startGameWithMode === 'function';
-    }, { timeout: 120_000 });
+    }, undefined, { timeout: 120_000 });
     console.log('[ashau-capture] engine ready, starting A Shau...');
 
     await page.evaluate(async () => {
@@ -142,7 +142,7 @@ async function runCapture(): Promise<CaptureResult> {
       await engine.startGameWithMode('a_shau_valley');
     });
 
-    await page.waitForFunction(() => typeof (window as any).__ashauDiagnostics === 'function', { timeout: 120_000 });
+    await page.waitForFunction(() => typeof (window as any).__ashauDiagnostics === 'function', undefined, { timeout: 120_000 });
     console.log('[ashau-capture] diagnostics hook ready');
 
     // Let initial chunk/materialization settle.

@@ -3,6 +3,7 @@ import type { AssetLoader } from '../assets/AssetLoader';
 import type { IHeightProvider } from './IHeightProvider';
 import type { SplatmapConfig } from './TerrainConfig';
 import type { BiomeClassificationRule } from '../../config/biomes';
+import type { TerrainSurfacePatch } from './TerrainFeatureTypes';
 import { HeightmapGPU } from './HeightmapGPU';
 import {
   createTerrainMaterial,
@@ -47,6 +48,10 @@ export class TerrainSurfaceRuntime {
   private readonly tileGridResolution: number;
   private terrainMaterial: THREE.MeshStandardMaterial | null = null;
   private surfaceWetness = 0;
+  private featureSurfacePatches: TerrainSurfacePatch[] = [];
+  private currentWorldSize = 0;
+  private currentDefaultBiomeId = 'denseJungle';
+  private currentBiomeRules: BiomeClassificationRule[] = [];
 
   constructor(assetLoader: AssetLoader, splatmap: SplatmapConfig, tileGridResolution = 32) {
     this.assetLoader = assetLoader;
@@ -61,6 +66,9 @@ export class TerrainSurfaceRuntime {
     defaultBiomeId: string,
     biomeRules: BiomeClassificationRule[],
   ): THREE.MeshStandardMaterial {
+    this.currentWorldSize = worldSize;
+    this.currentDefaultBiomeId = defaultBiomeId;
+    this.currentBiomeRules = biomeRules.slice();
     this.heightmapGPU.bakeFromProvider(provider, computeTerrainSurfaceGridSize(worldSize), worldSize);
     const heightTexture = this.heightmapGPU.getHeightTexture();
     const normalTexture = this.heightmapGPU.getNormalTexture();
@@ -77,16 +85,23 @@ export class TerrainSurfaceRuntime {
       biomeConfig: buildTerrainBiomeMaterialConfig(this.assetLoader, defaultBiomeId, biomeRules),
       surfaceWetness: this.surfaceWetness,
       tileGridResolution: this.tileGridResolution,
+      surfacePatches: this.featureSurfacePatches,
     });
 
     return this.terrainMaterial;
   }
 
   updateBiomeMaterial(worldSize: number, defaultBiomeId: string, biomeRules: BiomeClassificationRule[]): void {
+    this.currentWorldSize = worldSize;
+    this.currentDefaultBiomeId = defaultBiomeId;
+    this.currentBiomeRules = biomeRules.slice();
     this.updateMaterial(worldSize, defaultBiomeId, biomeRules);
   }
 
   rebake(provider: IHeightProvider, worldSize: number, defaultBiomeId: string, biomeRules: BiomeClassificationRule[]): void {
+    this.currentWorldSize = worldSize;
+    this.currentDefaultBiomeId = defaultBiomeId;
+    this.currentBiomeRules = biomeRules.slice();
     this.heightmapGPU.bakeFromProvider(provider, computeTerrainSurfaceGridSize(worldSize), worldSize);
     this.updateMaterial(worldSize, defaultBiomeId, biomeRules);
   }
@@ -102,6 +117,13 @@ export class TerrainSurfaceRuntime {
     this.surfaceWetness = THREE.MathUtils.clamp(surfaceWetness, 0, 1);
     if (this.terrainMaterial) {
       updateTerrainMaterialWetness(this.terrainMaterial, this.surfaceWetness);
+    }
+  }
+
+  setFeatureSurfacePatches(surfacePatches: TerrainSurfacePatch[]): void {
+    this.featureSurfacePatches = surfacePatches.slice();
+    if (this.terrainMaterial) {
+      this.updateMaterialArguments();
     }
   }
 
@@ -131,13 +153,39 @@ export class TerrainSurfaceRuntime {
       throw new Error('Terrain textures are unavailable during terrain surface update');
     }
 
+    this.updateMaterialArguments(worldSize, defaultBiomeId, biomeRules, heightTexture, normalTexture);
+  }
+
+  private updateMaterialArguments(
+    worldSize?: number,
+    defaultBiomeId?: string,
+    biomeRules?: BiomeClassificationRule[],
+    heightTexture?: THREE.DataTexture,
+    normalTexture?: THREE.DataTexture,
+  ): void {
+    if (!this.terrainMaterial) {
+      throw new Error('Terrain material is unavailable during terrain surface update');
+    }
+
+    const resolvedWorldSize = worldSize ?? this.heightmapGPU.getWorldSize();
+    const resolvedHeightTexture = heightTexture ?? this.heightmapGPU.getHeightTexture();
+    const resolvedNormalTexture = normalTexture ?? this.heightmapGPU.getNormalTexture();
+    if (!resolvedHeightTexture || !resolvedNormalTexture) {
+      throw new Error('Terrain textures are unavailable during terrain surface update');
+    }
+
     updateTerrainMaterialTextures(
       this.terrainMaterial,
-      heightTexture,
-      normalTexture,
-      worldSize,
-      buildTerrainBiomeMaterialConfig(this.assetLoader, defaultBiomeId, biomeRules),
+      resolvedHeightTexture,
+      resolvedNormalTexture,
+      resolvedWorldSize,
+      buildTerrainBiomeMaterialConfig(
+        this.assetLoader,
+        defaultBiomeId ?? this.currentDefaultBiomeId,
+        biomeRules ?? this.currentBiomeRules,
+      ),
       this.splatmap,
+      this.featureSurfacePatches,
     );
     updateTerrainMaterialWetness(this.terrainMaterial, this.surfaceWetness);
   }

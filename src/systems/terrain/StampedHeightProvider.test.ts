@@ -1,0 +1,107 @@
+import { describe, expect, it } from 'vitest';
+import type { IHeightProvider } from './IHeightProvider';
+import { StampedHeightProvider } from './StampedHeightProvider';
+
+class FlatHeightProvider implements IHeightProvider {
+  constructor(private readonly baseHeight: number) {}
+
+  getHeightAt(): number {
+    return this.baseHeight;
+  }
+
+  getWorkerConfig() {
+    return { type: 'noise' as const, seed: 12345 };
+  }
+}
+
+class SlopedHeightProvider implements IHeightProvider {
+  getHeightAt(worldX: number): number {
+    return worldX;
+  }
+
+  getWorkerConfig() {
+    return { type: 'noise' as const, seed: 12345 };
+  }
+}
+
+describe('StampedHeightProvider', () => {
+  it('flattens the inner radius to the resolved target height', () => {
+    const provider = new StampedHeightProvider(new FlatHeightProvider(12), [
+      {
+        kind: 'flatten_circle',
+        centerX: 0,
+        centerZ: 0,
+        innerRadius: 5,
+        outerRadius: 8,
+        samplingRadius: 5,
+        targetHeightMode: 'max',
+        heightOffset: 0,
+        priority: 100,
+      },
+    ]);
+
+    expect(provider.getHeightAt(0, 0)).toBe(12);
+    expect(provider.getHeightAt(4, 0)).toBe(12);
+  });
+
+  it('blends between the target height and base terrain across the outer ring', () => {
+    const provider = new StampedHeightProvider(new FlatHeightProvider(0), [
+      {
+        kind: 'flatten_circle',
+        centerX: 0,
+        centerZ: 0,
+        innerRadius: 4,
+        outerRadius: 8,
+        samplingRadius: 4,
+        targetHeightMode: 'center',
+        heightOffset: 10,
+        priority: 100,
+      },
+    ]);
+
+    expect(provider.getHeightAt(2, 0)).toBe(10);
+    expect(provider.getHeightAt(10, 0)).toBe(0);
+    expect(provider.getHeightAt(6, 0)).toBeGreaterThan(0);
+    expect(provider.getHeightAt(6, 0)).toBeLessThan(10);
+  });
+
+  it('resolves max target heights from the source provider', () => {
+    const provider = new StampedHeightProvider(new SlopedHeightProvider(), [
+      {
+        kind: 'flatten_circle',
+        centerX: 0,
+        centerZ: 0,
+        innerRadius: 4,
+        outerRadius: 6,
+        samplingRadius: 4,
+        targetHeightMode: 'max',
+        heightOffset: 0,
+        priority: 100,
+      },
+    ]);
+
+    expect(provider.getHeightAt(0, 0)).toBeGreaterThan(0);
+  });
+
+  it('serializes a stamped worker config with resolved target heights', () => {
+    const provider = new StampedHeightProvider(new FlatHeightProvider(3), [
+      {
+        kind: 'flatten_circle',
+        centerX: 0,
+        centerZ: 0,
+        innerRadius: 2,
+        outerRadius: 4,
+        samplingRadius: 2,
+        targetHeightMode: 'center',
+        heightOffset: 0,
+        priority: 100,
+      },
+    ]);
+
+    const config = provider.getWorkerConfig();
+    expect(config.type).toBe('stamped');
+    if (config.type === 'stamped') {
+      expect(config.stamps[0].targetHeight).toBe(3);
+    }
+  });
+});

@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 import type { SplatmapConfig } from './TerrainConfig';
+import type { TerrainSurfacePatch } from './TerrainFeatureTypes';
 
 const MAX_BIOME_TEXTURES = 8;
 const MAX_BIOME_RULES = 8;
+const MAX_FEATURE_SURFACE_PATCHES = 16;
 
 const TERRAIN_VERTEX_PARS = /* glsl */ `
 uniform sampler2D terrainHeightmap;
@@ -85,6 +87,18 @@ uniform float biomeRuleEnabled[8];
 uniform float antiTilingStrength;
 uniform float triplanarSlopeThreshold;
 uniform float environmentWetness;
+uniform float featureSurfacePatchCount;
+uniform float featureSurfaceShape[16];
+uniform float featureSurfaceType[16];
+uniform float featureSurfaceX[16];
+uniform float featureSurfaceZ[16];
+uniform float featureSurfaceInnerRadius[16];
+uniform float featureSurfaceOuterRadius[16];
+uniform float featureSurfaceHalfWidth[16];
+uniform float featureSurfaceHalfLength[16];
+uniform float featureSurfaceBlend[16];
+uniform float featureSurfaceYawCos[16];
+uniform float featureSurfaceYawSin[16];
 uniform bool debugWireframe;
 
 varying vec3 vWorldPosition;
@@ -103,6 +117,46 @@ vec2 rotateUv(vec2 uv, float angle) {
   float s = sin(angle);
   float c = cos(angle);
   return mat2(c, -s, s, c) * uv;
+}
+
+float computeFeatureSurfaceMask(int patchIndex, vec2 worldPos) {
+  float shape = featureSurfaceShape[patchIndex];
+  vec2 center = vec2(featureSurfaceX[patchIndex], featureSurfaceZ[patchIndex]);
+
+  if (shape < 1.5) {
+    float innerRadius = featureSurfaceInnerRadius[patchIndex];
+    float outerRadius = max(innerRadius, featureSurfaceOuterRadius[patchIndex]);
+    float dist = distance(worldPos, center);
+    return 1.0 - smoothstep(innerRadius, outerRadius, dist);
+  }
+
+  vec2 offset = worldPos - center;
+  float yawCos = featureSurfaceYawCos[patchIndex];
+  float yawSin = featureSurfaceYawSin[patchIndex];
+  vec2 localPos = vec2(
+    offset.x * yawCos + offset.y * yawSin,
+    -offset.x * yawSin + offset.y * yawCos
+  );
+  vec2 halfSize = vec2(featureSurfaceHalfWidth[patchIndex], featureSurfaceHalfLength[patchIndex]);
+  vec2 q = abs(localPos) - halfSize;
+  float outsideDistance = length(max(q, vec2(0.0)));
+  float sdf = outsideDistance + min(max(q.x, q.y), 0.0);
+  float blend = max(0.01, featureSurfaceBlend[patchIndex]);
+  return 1.0 - smoothstep(0.0, blend, max(sdf, 0.0));
+}
+
+float featureSurfaceWeight(float surfaceTypeId, vec2 worldPos) {
+  float weight = 0.0;
+  for (int i = 0; i < 16; i++) {
+    if (float(i) >= featureSurfacePatchCount) {
+      continue;
+    }
+    if (abs(featureSurfaceType[i] - surfaceTypeId) > 0.1) {
+      continue;
+    }
+    weight = max(weight, computeFeatureSurfaceMask(i, worldPos));
+  }
+  return clamp(weight, 0.0, 1.0);
 }
 
 float biomeElevationWeight(float elevation, float minElevation, float maxElevation, float blendWidth) {
@@ -264,6 +318,22 @@ vec3 applyCliffRockAccent(vec3 color, float slopeUp, float elevation, vec2 world
   vec4 rockPlanar = sampleBiomeTexture(1.0, worldUv, uvOffset);
   return mix(color, rockPlanar.rgb, rockBlend);
 }
+
+vec3 applyFeatureSurfaceColor(vec3 color, vec2 worldPos) {
+  float packedEarthWeight = featureSurfaceWeight(1.0, worldPos);
+  if (packedEarthWeight > 0.001) {
+    vec3 packedEarthColor = vec3(0.47, 0.38, 0.24);
+    color = mix(color, packedEarthColor, packedEarthWeight * 0.78);
+  }
+
+  float runwayWeight = featureSurfaceWeight(2.0, worldPos);
+  if (runwayWeight > 0.001) {
+    vec3 runwayColor = vec3(0.41, 0.39, 0.36);
+    color = mix(color, runwayColor, runwayWeight * 0.82);
+  }
+
+  return color;
+}
 `;
 
 const TERRAIN_FRAGMENT_MAP = /* glsl */ `
@@ -296,6 +366,7 @@ vec3 finalColor = biomeSample.rgb * macroVariation(vWorldPosition.xz);
 finalColor = jungleHumidityTint(finalColor, slopeUp, vWorldPosition.y);
 finalColor = applyLowlandWetness(finalColor, slopeUp, vWorldPosition.y);
 finalColor = applyCliffRockAccent(finalColor, slopeUp, vWorldPosition.y, vWorldPosition.xz, uvOffset);
+finalColor = applyFeatureSurfaceColor(finalColor, vWorldPosition.xz);
 diffuseColor.rgb = finalColor;
 if (debugWireframe) {
   // Color-code LOD levels for visual debugging
@@ -327,6 +398,14 @@ float wetness = lowlandWetnessMask(
   vWorldPosition.y
 );
 roughnessSample = mix(roughnessSample, roughnessSample * 0.72, wetness);
+float packedEarthWeight = featureSurfaceWeight(1.0, vWorldPosition.xz);
+if (packedEarthWeight > 0.001) {
+  roughnessSample = mix(roughnessSample, 0.96, packedEarthWeight);
+}
+float runwayWeight = featureSurfaceWeight(2.0, vWorldPosition.xz);
+if (runwayWeight > 0.001) {
+  roughnessSample = mix(roughnessSample, 0.82, runwayWeight);
+}
 roughnessFactor *= roughnessSample;
 `;
 
@@ -363,6 +442,7 @@ export interface TerrainMaterialOptions {
   biomeConfig: TerrainBiomeMaterialConfig;
   surfaceWetness?: number;
   tileGridResolution?: number;
+  surfacePatches?: TerrainSurfacePatch[];
 }
 
 export function createTerrainMaterial(options: TerrainMaterialOptions): THREE.MeshStandardMaterial {
@@ -385,6 +465,7 @@ export function updateTerrainMaterialTextures(
   worldSize: number,
   biomeConfig: TerrainBiomeMaterialConfig,
   splatmap?: SplatmapConfig,
+  surfacePatches?: TerrainSurfacePatch[],
 ): void {
   applyTerrainMaterialOptions(material, {
     heightTexture,
@@ -397,6 +478,7 @@ export function updateTerrainMaterialTextures(
       antiTilingStrength: 0.3,
     },
     surfaceWetness: readCurrentSurfaceWetness(material),
+    surfacePatches,
   });
   material.needsUpdate = true;
 }
@@ -493,6 +575,7 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
   const { heightTexture, normalTexture, worldSize, biomeConfig, splatmap } = options;
   const layers = biomeConfig.layers;
   const rules = biomeConfig.rules;
+  const surfacePatches = options.surfacePatches ?? [];
   const surfaceWetness = THREE.MathUtils.clamp(options.surfaceWetness ?? 0, 0, 1);
 
   if (layers.length === 0) {
@@ -513,6 +596,17 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
   const ruleMinUpDot = new Float32Array(MAX_BIOME_RULES);
   const rulePriority = new Float32Array(MAX_BIOME_RULES);
   const ruleEnabled = new Float32Array(MAX_BIOME_RULES);
+  const featureSurfaceShape = new Float32Array(MAX_FEATURE_SURFACE_PATCHES);
+  const featureSurfaceType = new Float32Array(MAX_FEATURE_SURFACE_PATCHES);
+  const featureSurfaceX = new Float32Array(MAX_FEATURE_SURFACE_PATCHES);
+  const featureSurfaceZ = new Float32Array(MAX_FEATURE_SURFACE_PATCHES);
+  const featureSurfaceInnerRadius = new Float32Array(MAX_FEATURE_SURFACE_PATCHES);
+  const featureSurfaceOuterRadius = new Float32Array(MAX_FEATURE_SURFACE_PATCHES);
+  const featureSurfaceHalfWidth = new Float32Array(MAX_FEATURE_SURFACE_PATCHES);
+  const featureSurfaceHalfLength = new Float32Array(MAX_FEATURE_SURFACE_PATCHES);
+  const featureSurfaceBlend = new Float32Array(MAX_FEATURE_SURFACE_PATCHES);
+  const featureSurfaceYawCos = new Float32Array(MAX_FEATURE_SURFACE_PATCHES);
+  const featureSurfaceYawSin = new Float32Array(MAX_FEATURE_SURFACE_PATCHES);
 
   for (let i = 0; i < MAX_BIOME_TEXTURES; i++) {
     const layer = layers[i] ?? layers[0];
@@ -540,6 +634,37 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
     ruleEnabled[i] = 1;
   }
 
+  for (let i = 0; i < MAX_FEATURE_SURFACE_PATCHES; i++) {
+    const patch = surfacePatches[i];
+    if (!patch) {
+      featureSurfaceShape[i] = 0;
+      featureSurfaceType[i] = 0;
+      featureSurfaceBlend[i] = 1;
+      featureSurfaceYawCos[i] = 1;
+      continue;
+    }
+
+    featureSurfaceX[i] = patch.x;
+    featureSurfaceZ[i] = patch.z;
+    featureSurfaceType[i] = patch.surface === 'runway' ? 2 : 1;
+    if (patch.shape === 'circle') {
+      featureSurfaceShape[i] = 1;
+      featureSurfaceInnerRadius[i] = patch.innerRadius;
+      featureSurfaceOuterRadius[i] = patch.outerRadius;
+      featureSurfaceBlend[i] = Math.max(0.1, patch.outerRadius - patch.innerRadius);
+      featureSurfaceYawCos[i] = 1;
+      featureSurfaceYawSin[i] = 0;
+      continue;
+    }
+
+    featureSurfaceShape[i] = 2;
+    featureSurfaceHalfWidth[i] = patch.width * 0.5;
+    featureSurfaceHalfLength[i] = patch.length * 0.5;
+    featureSurfaceBlend[i] = patch.blend;
+    featureSurfaceYawCos[i] = Math.cos(patch.yaw);
+    featureSurfaceYawSin[i] = Math.sin(patch.yaw);
+  }
+
   const tileGridRes = options.tileGridResolution ?? 32;
 
   const heightmapGridSize = heightTexture.image?.width ?? 512;
@@ -554,6 +679,18 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
     antiTilingStrength: { value: splatmap.antiTilingStrength },
     triplanarSlopeThreshold: { value: splatmap.triplanarSlopeThreshold },
     environmentWetness: { value: surfaceWetness },
+    featureSurfacePatchCount: { value: Math.min(surfacePatches.length, MAX_FEATURE_SURFACE_PATCHES) },
+    featureSurfaceShape: { value: featureSurfaceShape },
+    featureSurfaceType: { value: featureSurfaceType },
+    featureSurfaceX: { value: featureSurfaceX },
+    featureSurfaceZ: { value: featureSurfaceZ },
+    featureSurfaceInnerRadius: { value: featureSurfaceInnerRadius },
+    featureSurfaceOuterRadius: { value: featureSurfaceOuterRadius },
+    featureSurfaceHalfWidth: { value: featureSurfaceHalfWidth },
+    featureSurfaceHalfLength: { value: featureSurfaceHalfLength },
+    featureSurfaceBlend: { value: featureSurfaceBlend },
+    featureSurfaceYawCos: { value: featureSurfaceYawCos },
+    featureSurfaceYawSin: { value: featureSurfaceYawSin },
     biomeTileScale: { value: biomeTileScale },
     biomeRoughness: { value: biomeRoughness },
     biomeRuleBiomeSlot: { value: ruleBiomeSlot },

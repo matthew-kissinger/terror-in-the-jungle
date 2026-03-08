@@ -1,26 +1,24 @@
-import { ZoneManager, CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
+import { CaptureZone, ZoneState } from '../../systems/world/ZoneManager';
 import { Faction, isOpfor } from '../../systems/combat/types';
-import { GameModeManager } from '../../systems/world/GameModeManager';
+import type { RespawnSpawnPoint } from '../../systems/player/RespawnSpawnPoint';
 
 export const MAP_SIZE = 800;
-export const WORLD_SIZE = 3200;
 
-/**
- * Checks if a player can spawn at the given zone
- */
-export function isZoneSpawnable(zone: CaptureZone, gameModeManager?: GameModeManager): boolean {
-  // Can spawn at US home base
-  if (zone.isHomeBase && zone.owner === Faction.US) {
-    return true;
-  }
+/** Current world size for map coordinate mapping. Set via setMapWorldSize(). */
+export let WORLD_SIZE = 3200;
 
-  // Can spawn at US controlled zones if game mode allows
-  const canSpawnAtZones = gameModeManager?.canPlayerSpawnAtZones() ?? false;
-  if (canSpawnAtZones && !zone.isHomeBase && zone.state === ZoneState.BLUFOR_CONTROLLED) {
-    return true;
-  }
+/** Update the world size used by all map coordinate functions. */
+export function setMapWorldSize(size: number): void {
+  if (size > 0) WORLD_SIZE = size;
+}
 
-  return false;
+/** Max zoom scales with world size so zones remain selectable on large maps. */
+export function getMaxZoom(): number {
+  return Math.max(2, WORLD_SIZE / 1600);
+}
+
+export function zoneHasSpawnPoint(zone: CaptureZone, spawnPoints: RespawnSpawnPoint[]): boolean {
+  return spawnPoints.some(spawnPoint => spawnPoint.sourceZoneId === zone.id || spawnPoint.id === zone.id);
 }
 
 /**
@@ -74,40 +72,16 @@ export function getMapZoneRadius(zone: CaptureZone): number {
 /**
  * Returns the zone at the given canvas position, accounting for zoom and pan
  */
-export function getZoneAtPosition(
+export function transformCanvasToMapSpace(
   canvasX: number,
   canvasY: number,
   zoomLevel: number,
-  panOffset: { x: number; y: number },
-  zoneManager?: ZoneManager
-): CaptureZone | undefined {
-  if (!zoneManager) return undefined;
-
-  const zones = zoneManager.getAllZones();
-
-  // Account for zoom and pan
+  panOffset: { x: number; y: number }
+): { x: number; y: number } {
   const centerX = MAP_SIZE / 2;
   const centerY = MAP_SIZE / 2;
-
-  // Convert canvas coords to world space accounting for zoom and pan
-  const adjustedX = (canvasX - centerX - panOffset.x) / zoomLevel + centerX;
-  const adjustedY = (canvasY - centerY - panOffset.y) / zoomLevel + centerY;
-
-  for (const zone of zones) {
-    // World to map coordinates
-    const { x, y } = worldToMap(zone.position.x, zone.position.z);
-
-    // Zone radius on map - slightly larger for easier clicking
-    const radius = Math.max(getMapZoneRadius(zone), 20);
-
-    const dx = adjustedX - x;
-    const dy = adjustedY - y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    if (distance <= radius) {
-      return zone;
-    }
-  }
-
-  return undefined;
+  return {
+    x: (canvasX - centerX - panOffset.x) / zoomLevel + centerX,
+    y: (canvasY - centerY - panOffset.y) / zoomLevel + centerY
+  };
 }

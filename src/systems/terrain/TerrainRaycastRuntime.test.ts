@@ -55,4 +55,26 @@ describe('TerrainRaycastRuntime', () => {
     expect(secondMesh).not.toBe(firstMesh);
     expect(losAccelerator.unregisterChunk).toHaveBeenCalledWith('bvh_nearfield');
   });
+
+  it('continues draining a queued rebuild when the target center is unchanged', () => {
+    const { runtime, losAccelerator } = createRuntime();
+    const center = new THREE.Vector3(0, 0, 0);
+
+    runtime.updateNearFieldMesh(center, 180, 50, () => 0, 4);
+    const pendingAfterFirstSlice = runtime.getPendingRowCount();
+
+    runtime.updateNearFieldMesh(center, 180, 50, () => 0, 4);
+    const pendingAfterSecondSlice = runtime.getPendingRowCount();
+
+    expect(pendingAfterFirstSlice).toBeGreaterThan(0);
+    expect(pendingAfterSecondSlice).toBeLessThan(pendingAfterFirstSlice);
+
+    for (let i = 0; i < 20 && runtime.getPendingRowCount() > 0; i++) {
+      runtime.updateNearFieldMesh(center, 180, 50, () => 0, 4);
+    }
+
+    expect(runtime.getPendingRowCount()).toBe(0);
+    expect(runtime.isReadyForPosition(center, 50)).toBe(true);
+    expect(losAccelerator.registerChunk).toHaveBeenCalledWith('bvh_nearfield', expect.any(THREE.Mesh));
+  });
 });

@@ -1,18 +1,18 @@
 import { ZoneManager, CaptureZone } from '../../systems/world/ZoneManager';
-import { GameModeManager } from '../../systems/world/GameModeManager';
-import { 
-  MAP_SIZE, 
-  WORLD_SIZE, 
-  isZoneSpawnable, 
-  getZoneColor, 
-  worldToMap, 
-  getMapZoneRadius 
+import {
+  MAP_SIZE,
+  WORLD_SIZE,
+  getZoneColor,
+  worldToMap,
+  getMapZoneRadius,
+  zoneHasSpawnPoint
 } from './OpenFrontierRespawnMapUtils';
+import type { RespawnSpawnPoint } from '../../systems/player/RespawnSpawnPoint';
 
 export interface RenderState {
   zoomLevel: number;
   panOffset: { x: number; y: number };
-  selectedZoneId?: string;
+  selectedSpawnPointId?: string;
 }
 
 export class OpenFrontierRespawnMapRenderer {
@@ -20,7 +20,7 @@ export class OpenFrontierRespawnMapRenderer {
     ctx: CanvasRenderingContext2D,
     state: RenderState,
     zoneManager?: ZoneManager,
-    gameModeManager?: GameModeManager
+    spawnPoints: RespawnSpawnPoint[] = []
   ): void {
     const size = MAP_SIZE;
 
@@ -46,27 +46,29 @@ export class OpenFrontierRespawnMapRenderer {
 
       // Draw zones in layers for better visibility
       // First pass: draw zone areas
-      zones.forEach(zone => this.drawZoneArea(ctx, zone, gameModeManager));
+      zones.forEach(zone => this.drawZoneArea(ctx, zone, spawnPoints));
 
       // Second pass: draw zone borders and icons
-      zones.forEach(zone => this.drawZoneBorderAndIcon(ctx, zone, gameModeManager));
+      zones.forEach(zone => this.drawZoneBorderAndIcon(ctx, zone, spawnPoints));
 
       // Third pass: draw zone labels
-      zones.forEach(zone => this.drawZoneLabel(ctx, zone, gameModeManager));
+      zones.forEach(zone => this.drawZoneLabel(ctx, zone, spawnPoints));
     }
 
-    // Draw selected zone highlight
-    if (state.selectedZoneId && zoneManager) {
-      const zone = zoneManager.getAllZones().find(z => z.id === state.selectedZoneId);
-      if (zone) {
-        this.drawSelectionHighlight(ctx, zone);
+    spawnPoints.forEach(spawnPoint => this.drawSpawnPoint(ctx, spawnPoint));
+
+    // Draw selected spawn highlight
+    if (state.selectedSpawnPointId) {
+      const spawnPoint = spawnPoints.find(point => point.id === state.selectedSpawnPointId);
+      if (spawnPoint) {
+        this.drawSelectionHighlight(ctx, spawnPoint);
       }
     }
 
     ctx.restore();
 
     // Draw minimap overlay
-    this.drawMinimap(ctx, state, zoneManager);
+    this.drawMinimap(ctx, state, zoneManager, spawnPoints);
 
     // Draw controls hint
     this.drawControlsHint(ctx);
@@ -107,12 +109,12 @@ export class OpenFrontierRespawnMapRenderer {
 
   private static drawZoneArea(
     ctx: CanvasRenderingContext2D, 
-    zone: CaptureZone, 
-    gameModeManager?: GameModeManager
+    zone: CaptureZone,
+    spawnPoints: RespawnSpawnPoint[]
   ): void {
     const { x, y } = worldToMap(zone.position.x, zone.position.z);
     const radius = getMapZoneRadius(zone);
-    const isSpawnable = isZoneSpawnable(zone, gameModeManager);
+    const isSpawnable = zoneHasSpawnPoint(zone, spawnPoints);
 
     // Zone area fill
     ctx.fillStyle = getZoneColor(zone, 0.2, isSpawnable);
@@ -123,12 +125,12 @@ export class OpenFrontierRespawnMapRenderer {
 
   private static drawZoneBorderAndIcon(
     ctx: CanvasRenderingContext2D, 
-    zone: CaptureZone, 
-    gameModeManager?: GameModeManager
+    zone: CaptureZone,
+    spawnPoints: RespawnSpawnPoint[]
   ): void {
     const { x, y } = worldToMap(zone.position.x, zone.position.z);
     const radius = getMapZoneRadius(zone);
-    const isSpawnable = isZoneSpawnable(zone, gameModeManager);
+    const isSpawnable = zoneHasSpawnPoint(zone, spawnPoints);
 
     // Zone border
     ctx.strokeStyle = getZoneColor(zone, 0.8, isSpawnable);
@@ -167,12 +169,12 @@ export class OpenFrontierRespawnMapRenderer {
 
   private static drawZoneLabel(
     ctx: CanvasRenderingContext2D, 
-    zone: CaptureZone, 
-    gameModeManager?: GameModeManager
+    zone: CaptureZone,
+    spawnPoints: RespawnSpawnPoint[]
   ): void {
     const { x, y } = worldToMap(zone.position.x, zone.position.z);
     const radius = getMapZoneRadius(zone);
-    const isSpawnable = isZoneSpawnable(zone, gameModeManager);
+    const isSpawnable = zoneHasSpawnPoint(zone, spawnPoints);
 
     // Zone name with background for better readability
     const name = zone.name.toUpperCase();
@@ -196,9 +198,28 @@ export class OpenFrontierRespawnMapRenderer {
     ctx.fillText(name, x, y - radius - 8);
   }
 
-  private static drawSelectionHighlight(ctx: CanvasRenderingContext2D, zone: CaptureZone): void {
-    const { x, y } = worldToMap(zone.position.x, zone.position.z);
-    const radius = getMapZoneRadius(zone) + 10;
+  private static drawSpawnPoint(ctx: CanvasRenderingContext2D, spawnPoint: RespawnSpawnPoint): void {
+    const { x, y } = worldToMap(spawnPoint.position.x, spawnPoint.position.z);
+    const color = spawnPoint.selectionClass === 'direct_insertion'
+      ? 'rgba(255, 214, 102, 0.95)'
+      : spawnPoint.kind === 'helipad'
+        ? 'rgba(111, 196, 255, 0.95)'
+        : 'rgba(92, 184, 92, 0.95)';
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.beginPath();
+    ctx.arc(x, y, 11, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, y, 7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  private static drawSelectionHighlight(ctx: CanvasRenderingContext2D, spawnPoint: RespawnSpawnPoint): void {
+    const { x, y } = worldToMap(spawnPoint.position.x, spawnPoint.position.z);
+    const radius = 18;
 
     // Animated selection ring
     const time = Date.now() / 1000;
@@ -219,7 +240,8 @@ export class OpenFrontierRespawnMapRenderer {
   private static drawMinimap(
     ctx: CanvasRenderingContext2D, 
     state: RenderState, 
-    zoneManager?: ZoneManager
+    zoneManager?: ZoneManager,
+    spawnPoints: RespawnSpawnPoint[] = []
   ): void {
     const minimapSize = 120;
     const margin = 10;
@@ -247,6 +269,18 @@ export class OpenFrontierRespawnMapRenderer {
       });
     }
 
+    spawnPoints.forEach(spawnPoint => {
+      const scale = minimapSize / WORLD_SIZE;
+      const zx = x + (WORLD_SIZE / 2 - spawnPoint.position.x) * scale;
+      const zy = y + (WORLD_SIZE / 2 - spawnPoint.position.z) * scale;
+      ctx.fillStyle = spawnPoint.selectionClass === 'direct_insertion'
+        ? 'rgba(255, 214, 102, 0.95)'
+        : 'rgba(92, 184, 92, 0.95)';
+      ctx.beginPath();
+      ctx.arc(zx, zy, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
     // Draw viewport rectangle
     const viewScale = minimapSize / MAP_SIZE;
     const viewWidth = minimapSize / state.zoomLevel;
@@ -267,7 +301,7 @@ export class OpenFrontierRespawnMapRenderer {
     ctx.font = '11px Rajdhani, sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText('Scroll: Zoom', 15, MAP_SIZE - 45);
-    ctx.fillText('Shift+Drag: Pan', 15, MAP_SIZE - 30);
+    ctx.fillText('Drag: Pan', 15, MAP_SIZE - 30);
     ctx.fillText('Click: Select spawn', 15, MAP_SIZE - 15);
   }
 }

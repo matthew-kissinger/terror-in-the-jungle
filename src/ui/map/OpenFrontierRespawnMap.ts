@@ -1,11 +1,14 @@
 import { ZoneManager, CaptureZone } from '../../systems/world/ZoneManager';
 import { GameModeManager } from '../../systems/world/GameModeManager';
 import { OpenFrontierRespawnMapRenderer } from './OpenFrontierRespawnMapRenderer';
-import { 
-  MAP_SIZE, 
-  isZoneSpawnable, 
-  getZoneAtPosition 
+import {
+  MAP_SIZE,
+  setMapWorldSize,
+  getMaxZoom,
+  transformCanvasToMapSpace,
+  worldToMap
 } from './OpenFrontierRespawnMapUtils';
+import type { RespawnSpawnPoint } from '../../systems/player/RespawnSpawnPoint';
 
 export class OpenFrontierRespawnMap {
   private zoneManager?: ZoneManager;
@@ -20,13 +23,16 @@ export class OpenFrontierRespawnMap {
   private onZoneSelected?: (zoneId: string, zoneName: string) => void;
 
   // Spawn zones
-  private spawnableZones: CaptureZone[] = [];
+  private spawnPoints: RespawnSpawnPoint[] = [];
 
   // Zoom and pan state
   private zoomLevel = 1;
   private panOffset = { x: 0, y: 0 };
   private isPanning = false;
+  private isMouseDown = false;
+  private mouseStartPos = { x: 0, y: 0 };
   private lastMousePos = { x: 0, y: 0 };
+  private static readonly DRAG_THRESHOLD = 5;
 
   // Touch state
   private touchIdentifier: number | null = null;
@@ -37,13 +43,17 @@ export class OpenFrontierRespawnMap {
   private pinchStartZoom = 1;
 
   // Event handler references
-  private handleClick = (e: MouseEvent) => {
-    if (this.isPanning) return;
-
-    const rect = this.mapCanvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (MAP_SIZE / rect.width);
-    const y = (e.clientY - rect.top) * (MAP_SIZE / rect.height);
-    this.handleMapClick(x, y);
+  private handleMouseDown = (e: MouseEvent) => {
+    if (e.button === 0 || e.button === 1) {
+      e.preventDefault();
+      this.isMouseDown = true;
+      this.isPanning = false;
+      const rect = this.mapCanvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (MAP_SIZE / rect.width);
+      const y = (e.clientY - rect.top) * (MAP_SIZE / rect.height);
+      this.mouseStartPos = { x, y };
+      this.lastMousePos = { x, y };
+    }
   };
 
   private handleMouseMove = (e: MouseEvent) => {
@@ -51,45 +61,59 @@ export class OpenFrontierRespawnMap {
     const x = (e.clientX - rect.left) * (MAP_SIZE / rect.width);
     const y = (e.clientY - rect.top) * (MAP_SIZE / rect.height);
 
-    if (this.isPanning) {
-      const dx = x - this.lastMousePos.x;
-      const dy = y - this.lastMousePos.y;
-      this.panOffset.x += dx;
-      this.panOffset.y += dy;
-      this.lastMousePos = { x, y };
-      this.render();
+    if (this.isMouseDown) {
+      const dx = x - this.mouseStartPos.x;
+      const dy = y - this.mouseStartPos.y;
+      const moved = Math.sqrt(dx * dx + dy * dy);
+
+      if (moved > OpenFrontierRespawnMap.DRAG_THRESHOLD || this.isPanning) {
+        this.isPanning = true;
+        this.mapCanvas.style.cursor = 'move';
+        const panDx = x - this.lastMousePos.x;
+        const panDy = y - this.lastMousePos.y;
+        this.panOffset.x += panDx;
+        this.panOffset.y += panDy;
+        this.lastMousePos = { x, y };
+        this.render();
+      }
     } else {
-      const zone = getZoneAtPosition(x, y, this.zoomLevel, this.panOffset, this.zoneManager);
-      this.mapCanvas.style.cursor = zone && isZoneSpawnable(zone, this.gameModeManager) ? 'pointer' : 'default';
+      const spawnPoint = this.getSpawnPointAtPosition(x, y);
+      this.mapCanvas.style.cursor = spawnPoint ? 'pointer' : 'default';
     }
   };
 
-  private handleWheel = (e: WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    this.zoomLevel = Math.max(0.5, Math.min(2, this.zoomLevel * delta));
-    this.render();
-  };
+  private handleMouseUp = (e: MouseEvent) => {
+    if (!this.isMouseDown) return;
 
-  private handleMouseDown = (e: MouseEvent) => {
-    if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
-      this.isPanning = true;
+    if (!this.isPanning) {
+      // Short click - select zone
       const rect = this.mapCanvas.getBoundingClientRect();
       const x = (e.clientX - rect.left) * (MAP_SIZE / rect.width);
       const y = (e.clientY - rect.top) * (MAP_SIZE / rect.height);
-      this.lastMousePos = { x, y };
-      this.mapCanvas.style.cursor = 'move';
+      this.handleMapClick(x, y);
     }
-  };
 
-  private handleMouseUp = () => {
+    this.isMouseDown = false;
     this.isPanning = false;
     this.mapCanvas.style.cursor = 'default';
   };
 
   private handleMouseLeave = () => {
+    this.isMouseDown = false;
     this.isPanning = false;
     this.mapCanvas.style.cursor = 'default';
+  };
+
+  private handleWheel = (e: WheelEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    this.zoomLevel = Math.max(0.5, Math.min(getMaxZoom(), this.zoomLevel * delta));
+    this.render();
+  };
+
+  private handleContextMenu = (e: Event) => {
+    e.preventDefault();
   };
 
   // Touch event handlers
@@ -128,7 +152,7 @@ export class OpenFrontierRespawnMap {
       const distance = Math.sqrt(dx * dx + dy * dy);
       if (this.pinchStartDistance > 0) {
         const scale = distance / this.pinchStartDistance;
-        this.zoomLevel = Math.max(0.5, Math.min(2, this.pinchStartZoom * scale));
+        this.zoomLevel = Math.max(0.5, Math.min(getMaxZoom(), this.pinchStartZoom * scale));
         this.render();
       }
       return;
@@ -144,7 +168,7 @@ export class OpenFrontierRespawnMap {
       const dy = y - this.touchStartPos.y;
       const moved = Math.sqrt(dx * dx + dy * dy);
 
-      if (moved > 5 || this.isTouchPanning) {
+      if (moved > OpenFrontierRespawnMap.DRAG_THRESHOLD || this.isTouchPanning) {
         // Pan the map
         this.isTouchPanning = true;
         const panDx = x - this.lastTouchPos.x;
@@ -153,10 +177,6 @@ export class OpenFrontierRespawnMap {
         this.panOffset.y += panDy;
         this.lastTouchPos = { x, y };
         this.render();
-      } else {
-        // Hover zone detection
-        const zone = getZoneAtPosition(x, y, this.zoomLevel, this.panOffset, this.zoneManager);
-        this.mapCanvas.style.cursor = zone && isZoneSpawnable(zone, this.gameModeManager) ? 'pointer' : 'default';
       }
     }
   };
@@ -172,7 +192,7 @@ export class OpenFrontierRespawnMap {
     }
 
     if (!this.isTouchPanning) {
-      // Tap — treat as click for spawn selection
+      // Tap - treat as click for spawn selection
       const touch = e.changedTouches[0];
       if (touch) {
         const rect = this.mapCanvas.getBoundingClientRect();
@@ -197,12 +217,12 @@ export class OpenFrontierRespawnMap {
   }
 
   private setupEventListeners(): void {
-    this.mapCanvas.addEventListener('click', this.handleClick);
-    this.mapCanvas.addEventListener('mousemove', this.handleMouseMove);
-    this.mapCanvas.addEventListener('wheel', this.handleWheel);
     this.mapCanvas.addEventListener('mousedown', this.handleMouseDown);
+    this.mapCanvas.addEventListener('mousemove', this.handleMouseMove);
     this.mapCanvas.addEventListener('mouseup', this.handleMouseUp);
     this.mapCanvas.addEventListener('mouseleave', this.handleMouseLeave);
+    this.mapCanvas.addEventListener('wheel', this.handleWheel, { passive: false });
+    this.mapCanvas.addEventListener('contextmenu', this.handleContextMenu);
 
     // Touch events for mobile support
     this.mapCanvas.addEventListener('touchstart', this.handleTouchStart, { passive: false });
@@ -212,29 +232,20 @@ export class OpenFrontierRespawnMap {
   }
 
   private handleMapClick(canvasX: number, canvasY: number): void {
-    const zone = getZoneAtPosition(canvasX, canvasY, this.zoomLevel, this.panOffset, this.zoneManager);
+    const spawnPoint = this.getSpawnPointAtPosition(canvasX, canvasY);
 
-    if (zone && isZoneSpawnable(zone, this.gameModeManager)) {
-      this.selectedZoneId = zone.id;
+    if (spawnPoint) {
+      this.selectedZoneId = spawnPoint.id;
 
       if (this.onZoneSelected) {
-        this.onZoneSelected(zone.id, zone.name);
+        this.onZoneSelected(spawnPoint.id, spawnPoint.name);
       }
 
       this.render();
     }
   }
 
-  updateSpawnableZones(): void {
-    if (!this.zoneManager) {
-      this.spawnableZones = [];
-      return;
-    }
-
-    this.spawnableZones = this.zoneManager.getAllZones().filter(zone => {
-      return isZoneSpawnable(zone, this.gameModeManager);
-    });
-  }
+  updateSpawnableZones(): void {}
 
   render(): void {
     OpenFrontierRespawnMapRenderer.render(
@@ -242,10 +253,10 @@ export class OpenFrontierRespawnMap {
       {
         zoomLevel: this.zoomLevel,
         panOffset: this.panOffset,
-        selectedZoneId: this.selectedZoneId
+        selectedSpawnPointId: this.selectedZoneId
       },
       this.zoneManager,
-      this.gameModeManager
+      this.spawnPoints
     );
   }
 
@@ -256,16 +267,29 @@ export class OpenFrontierRespawnMap {
 
   setZoneManager(manager: ZoneManager): void {
     this.zoneManager = manager;
-    this.updateSpawnableZones();
+  }
+
+  setWorldSize(size: number): void {
+    setMapWorldSize(size);
   }
 
   setGameModeManager(manager: GameModeManager): void {
     this.gameModeManager = manager;
-    this.updateSpawnableZones();
   }
 
   setZoneSelectedCallback(callback: (zoneId: string, zoneName: string) => void): void {
     this.onZoneSelected = callback;
+  }
+
+  setSpawnPoints(spawnPoints: RespawnSpawnPoint[]): void {
+    this.spawnPoints = spawnPoints.map(spawnPoint => ({
+      ...spawnPoint,
+      position: spawnPoint.position.clone()
+    }));
+    if (this.selectedZoneId && !this.spawnPoints.some(spawnPoint => spawnPoint.id === this.selectedZoneId)) {
+      this.selectedZoneId = undefined;
+    }
+    this.render();
   }
 
   clearSelection(): void {
@@ -284,12 +308,12 @@ export class OpenFrontierRespawnMap {
   }
 
   dispose(): void {
-    this.mapCanvas.removeEventListener('click', this.handleClick);
-    this.mapCanvas.removeEventListener('mousemove', this.handleMouseMove);
-    this.mapCanvas.removeEventListener('wheel', this.handleWheel);
     this.mapCanvas.removeEventListener('mousedown', this.handleMouseDown);
+    this.mapCanvas.removeEventListener('mousemove', this.handleMouseMove);
     this.mapCanvas.removeEventListener('mouseup', this.handleMouseUp);
     this.mapCanvas.removeEventListener('mouseleave', this.handleMouseLeave);
+    this.mapCanvas.removeEventListener('wheel', this.handleWheel);
+    this.mapCanvas.removeEventListener('contextmenu', this.handleContextMenu);
 
     // Touch events
     this.mapCanvas.removeEventListener('touchstart', this.handleTouchStart);
@@ -304,5 +328,20 @@ export class OpenFrontierRespawnMap {
     this.onZoneSelected = undefined;
     this.zoneManager = undefined;
     this.gameModeManager = undefined;
+  }
+
+  private getSpawnPointAtPosition(canvasX: number, canvasY: number): RespawnSpawnPoint | undefined {
+    const adjusted = transformCanvasToMapSpace(canvasX, canvasY, this.zoomLevel, this.panOffset);
+
+    for (const spawnPoint of this.spawnPoints) {
+      const { x, y } = worldToMap(spawnPoint.position.x, spawnPoint.position.z);
+      const dx = adjusted.x - x;
+      const dy = adjusted.y - y;
+      if ((dx * dx + dy * dy) <= (20 * 20)) {
+        return spawnPoint;
+      }
+    }
+
+    return undefined;
   }
 }

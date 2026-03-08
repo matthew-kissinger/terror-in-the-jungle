@@ -5,6 +5,7 @@ import { type BiomeClassificationRule, type BiomeVegetationEntry } from '../../c
 import { classifyBiome, computeSlopeDeg } from './BiomeClassifier';
 import { ChunkVegetationGenerator } from './ChunkVegetationGenerator';
 import { getHeightQueryCache } from './HeightQueryCache';
+import type { TerrainExclusionZone } from './TerrainFeatureTypes';
 
 /**
  * Cell-based vegetation scatterer. Replaces per-chunk vegetation generation.
@@ -18,6 +19,9 @@ export class VegetationScatterer {
   private billboardSystem: GlobalBillboardSystem;
   private cellSize: number;
   private activeCells: Set<string> = new Set();
+  private targetCells: Set<string> = new Set();
+  private pendingAdditions: string[] = [];
+  private pendingRemovals: string[] = [];
   private maxCellDistance: number; // In cells
   private lastPlayerCellX = NaN;
   private lastPlayerCellZ = NaN;
@@ -29,6 +33,7 @@ export class VegetationScatterer {
   private biomePalettes: Map<string, BiomeVegetationEntry[]> = new Map();
   private defaultBiomeId = 'denseJungle';
   private biomeRules: BiomeClassificationRule[] = [];
+  private exclusionZones: TerrainExclusionZone[] = [];
 
   constructor(
     billboardSystem: GlobalBillboardSystem,
@@ -64,43 +69,50 @@ export class VegetationScatterer {
     this.biomeRules = biomeRules.slice();
   }
 
+  setExclusionZones(zones: TerrainExclusionZone[]): void {
+    this.exclusionZones = zones.slice();
+  }
+
   /**
    * Update each frame. Checks if player moved to a new cell and generates/removes vegetation.
    */
   update(playerPosition: THREE.Vector3): boolean {
+    return this.updateBudgeted(playerPosition, { maxAddsPerFrame: 4, maxRemovalsPerFrame: 8 });
+  }
+
+  updateBudgeted(
+    playerPosition: THREE.Vector3,
+    options: { maxAddsPerFrame: number; maxRemovalsPerFrame: number }
+  ): boolean {
     const cellX = Math.floor(playerPosition.x / this.cellSize);
     const cellZ = Math.floor(playerPosition.z / this.cellSize);
 
-    // Only rebuild if player moved to a different cell
-    if (cellX === this.lastPlayerCellX && cellZ === this.lastPlayerCellZ) {
-      return false;
-    }
-    this.lastPlayerCellX = cellX;
-    this.lastPlayerCellZ = cellZ;
-
-    const neededCells = new Set<string>();
-
-    // Determine which cells should be active
-    for (let dx = -this.maxCellDistance; dx <= this.maxCellDistance; dx++) {
-      for (let dz = -this.maxCellDistance; dz <= this.maxCellDistance; dz++) {
-        const key = `${cellX + dx},${cellZ + dz}`;
-        neededCells.add(key);
-      }
+    if (cellX !== this.lastPlayerCellX || cellZ !== this.lastPlayerCellZ) {
+      this.lastPlayerCellX = cellX;
+      this.lastPlayerCellZ = cellZ;
+      this.rebuildResidencyTargets(cellX, cellZ);
     }
 
-    // Remove cells that are no longer needed
-    for (const key of this.activeCells) {
-      if (!neededCells.has(key)) {
-        this.billboardSystem.removeChunkInstances(key);
-        this.activeCells.delete(key);
-      }
-    }
+    return this.processPendingWork(options.maxAddsPerFrame, options.maxRemovalsPerFrame);
+  }
 
-    // Generate cells that are newly needed
-    for (const key of neededCells) {
-      if (!this.activeCells.has(key)) {
-        this.generateCell(key);
-        this.activeCells.add(key);
+  getPendingCounts(): { adds: number; removals: number } {
+    return {
+      adds: this.pendingAdditions.length,
+      removals: this.pendingRemovals.length,
+    };
+  }
+
+  isReadyAround(playerPosition: THREE.Vector3, radiusCells: number = 1): boolean {
+    const centerCellX = Math.floor(playerPosition.x / this.cellSize);
+    const centerCellZ = Math.floor(playerPosition.z / this.cellSize);
+
+    for (let dx = -radiusCells; dx <= radiusCells; dx++) {
+      for (let dz = -radiusCells; dz <= radiusCells; dz++) {
+        const key = `${centerCellX + dx},${centerCellZ + dz}`;
+        if (!this.activeCells.has(key)) {
+          return false;
+        }
       }
     }
 
@@ -143,8 +155,9 @@ export class VegetationScatterer {
       biomePalette,
     );
 
-    if (instances.size > 0) {
-      this.billboardSystem.addChunkInstances(cellKey, instances);
+    const filteredInstances = this.filterExcludedInstances(instances);
+    if (filteredInstances.size > 0) {
+      this.billboardSystem.addChunkInstances(cellKey, filteredInstances);
     }
   }
 
@@ -156,6 +169,9 @@ export class VegetationScatterer {
       this.billboardSystem.removeChunkInstances(key);
     }
     this.activeCells.clear();
+    this.targetCells.clear();
+    this.pendingAdditions = [];
+    this.pendingRemovals = [];
     this.lastPlayerCellX = NaN;
     this.lastPlayerCellZ = NaN;
   }
@@ -179,6 +195,59 @@ export class VegetationScatterer {
     this.clear();
   }
 
+  private rebuildResidencyTargets(cellX: number, cellZ: number): void {
+    const neededCells = new Set<string>();
+
+    for (let dx = -this.maxCellDistance; dx <= this.maxCellDistance; dx++) {
+      for (let dz = -this.maxCellDistance; dz <= this.maxCellDistance; dz++) {
+        neededCells.add(`${cellX + dx},${cellZ + dz}`);
+      }
+    }
+
+    this.targetCells = neededCells;
+    this.pendingRemovals = this.pendingRemovals.filter(key => neededCells.has(key));
+    this.pendingAdditions = this.pendingAdditions.filter(key => neededCells.has(key));
+
+    for (const key of this.activeCells) {
+      if (!neededCells.has(key) && !this.pendingRemovals.includes(key)) {
+        this.pendingRemovals.push(key);
+      }
+    }
+
+    const additions = Array.from(neededCells)
+      .filter(key => !this.activeCells.has(key) && !this.pendingAdditions.includes(key))
+      .sort((a, b) => this.getCellDistanceToCenter(a, cellX, cellZ) - this.getCellDistanceToCenter(b, cellX, cellZ));
+
+    this.pendingAdditions.push(...additions);
+  }
+
+  private processPendingWork(maxAddsPerFrame: number, maxRemovalsPerFrame: number): boolean {
+    let didWork = false;
+
+    for (let i = 0; i < Math.max(0, maxRemovalsPerFrame) && this.pendingRemovals.length > 0; i++) {
+      const key = this.pendingRemovals.shift()!;
+      this.billboardSystem.removeChunkInstances(key);
+      this.activeCells.delete(key);
+      didWork = true;
+    }
+
+    for (let i = 0; i < Math.max(0, maxAddsPerFrame) && this.pendingAdditions.length > 0; i++) {
+      const key = this.pendingAdditions.shift()!;
+      this.generateCell(key);
+      this.activeCells.add(key);
+      didWork = true;
+    }
+
+    return didWork;
+  }
+
+  private getCellDistanceToCenter(cellKey: string, centerCellX: number, centerCellZ: number): number {
+    const [cxStr, czStr] = cellKey.split(',');
+    const cellX = parseInt(cxStr, 10);
+    const cellZ = parseInt(czStr, 10);
+    return Math.abs(cellX - centerCellX) + Math.abs(cellZ - centerCellZ);
+  }
+
   private getAlignedHeight(
     cache: ReturnType<typeof getHeightQueryCache>,
     worldX: number,
@@ -187,5 +256,31 @@ export class VegetationScatterer {
     // No clamping needed: the heightmap covers the full visual extent
     // (worldSize + 2*visualMargin), so margin vegetation gets real heights.
     return cache.getHeightAt(worldX, worldZ);
+  }
+
+  private filterExcludedInstances(instancesByType: Map<string, THREE.Object3D[] | any[]>): Map<string, any[]> {
+    if (this.exclusionZones.length === 0) {
+      return instancesByType as Map<string, any[]>;
+    }
+
+    const filtered = new Map<string, any[]>();
+    for (const [typeId, instances] of instancesByType) {
+      const nextInstances = instances.filter((instance: any) => !this.isExcluded(instance.position.x, instance.position.z));
+      if (nextInstances.length > 0) {
+        filtered.set(typeId, nextInstances);
+      }
+    }
+    return filtered;
+  }
+
+  private isExcluded(worldX: number, worldZ: number): boolean {
+    for (const zone of this.exclusionZones) {
+      const dx = worldX - zone.x;
+      const dz = worldZ - zone.z;
+      if (dx * dx + dz * dz <= zone.radius * zone.radius) {
+        return true;
+      }
+    }
+    return false;
   }
 }

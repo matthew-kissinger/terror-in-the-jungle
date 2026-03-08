@@ -5,6 +5,7 @@ import { GPUBillboardSystem } from './GPUBillboardSystem';
 import { Logger } from '../../../utils/Logger';
 import { VegetationTypeConfig, VEGETATION_TYPES } from '../../../config/vegetationTypes';
 import { BiomeConfig, getBiome } from '../../../config/biomes';
+import type { TerrainExclusionZone } from '../../terrain/TerrainFeatureTypes';
 
 export class GlobalBillboardSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -123,6 +124,13 @@ export class GlobalBillboardSystem implements GameSystem {
     this.exclusionZones.push({ x, z, radius });
     Logger.info('World', `Added vegetation exclusion zone at (${x}, ${z}) with radius ${radius}`);
     this.clearVegetationInArea(x, z, radius);
+  }
+
+  setExclusionZones(zones: TerrainExclusionZone[]): void {
+    this.exclusionZones = zones.map((zone) => ({ x: zone.x, z: zone.z, radius: zone.radius }));
+    for (const zone of this.exclusionZones) {
+      this.clearVegetationInArea(zone.x, zone.z, zone.radius);
+    }
   }
 
   private clearVegetationInArea(x: number, z: number, radius: number): void {

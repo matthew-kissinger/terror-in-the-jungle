@@ -56,6 +56,12 @@ type RuntimeSample = {
     influenceMapMs: number;
     aiStateMs?: Record<string, number>;
   };
+  terrainStreams?: Array<{
+    name: string;
+    budgetMs: number;
+    timeMs: number;
+    pendingUnits: number;
+  }>;
   systemTop: Array<{ name: string; emaMs: number; peakMs: number }>;
 };
 
@@ -66,6 +72,19 @@ function listCaptureDirs(): string[] {
   return readdirSync(root, { withFileTypes: true })
     .filter(d => d.isDirectory())
     .map(d => d.name)
+    .filter(name => {
+      const summaryPath = join(root, name, 'summary.json');
+      const samplesPath = join(root, name, 'runtime-samples.json');
+      if (!existsSync(summaryPath) || !existsSync(samplesPath)) return false;
+      try {
+        const summary = JSON.parse(readFileSync(summaryPath, 'utf-8'));
+        const samples = JSON.parse(readFileSync(samplesPath, 'utf-8'));
+        const finalFrameCount = Number(summary?.finalFrameCount ?? 0);
+        return Array.isArray(samples) && (samples.length > 0 || finalFrameCount > 0);
+      } catch {
+        return false;
+      }
+    })
     .sort();
 }
 
@@ -76,7 +95,7 @@ function avg(values: number[]): number {
 
 const dirs = listCaptureDirs();
 if (dirs.length === 0) {
-  console.error('No capture artifacts found under artifacts/perf');
+  console.error('No complete capture artifacts found under artifacts/perf');
   process.exit(1);
 }
 
@@ -85,11 +104,6 @@ const latestDir = join(root, latest);
 const summaryPath = join(latestDir, 'summary.json');
 const validationPath = join(latestDir, 'validation.json');
 const samplesPath = join(latestDir, 'runtime-samples.json');
-
-if (!existsSync(summaryPath)) {
-  console.error(`Missing summary.json in ${latestDir}`);
-  process.exit(1);
-}
 
 const summary = JSON.parse(readFileSync(summaryPath, 'utf-8'));
 const validation = existsSync(validationPath)
@@ -165,6 +179,73 @@ for (const s of samples) {
 const dominantSystems = [...topSystemCounts.entries()]
   .sort((a, b) => b[1] - a[1])
   .slice(0, 3);
+const terrainStreamSamples = samples.filter(s => Array.isArray(s.terrainStreams) && s.terrainStreams.length > 0);
+const terrainBuckets = new Map<string, {
+  sampleCount: number;
+  timeMs: number[];
+  budgetMs: number[];
+  pendingUnits: number[];
+  pendingSequence: number[];
+  overBudgetSamples: number;
+}>();
+for (const sample of terrainStreamSamples) {
+  for (const stream of sample.terrainStreams ?? []) {
+    const bucket = terrainBuckets.get(stream.name) ?? {
+      sampleCount: 0,
+      timeMs: [],
+      budgetMs: [],
+      pendingUnits: [],
+      pendingSequence: [],
+      overBudgetSamples: 0
+    };
+    bucket.sampleCount += 1;
+    bucket.timeMs.push(Number(stream.timeMs ?? 0));
+    bucket.budgetMs.push(Number(stream.budgetMs ?? 0));
+    bucket.pendingUnits.push(Number(stream.pendingUnits ?? 0));
+    bucket.pendingSequence.push(Number(stream.pendingUnits ?? 0));
+    if (Number(stream.timeMs ?? 0) > Number(stream.budgetMs ?? 0)) {
+      bucket.overBudgetSamples += 1;
+    }
+    terrainBuckets.set(stream.name, bucket);
+  }
+}
+const terrainSummary = [...terrainBuckets.entries()]
+  .map(([name, bucket]) => ({
+    name,
+    samples: bucket.sampleCount,
+    avgTimeMs: avg(bucket.timeMs),
+    peakTimeMs: bucket.timeMs.length > 0 ? Math.max(...bucket.timeMs) : 0,
+    avgBudgetMs: avg(bucket.budgetMs),
+    avgPendingUnits: avg(bucket.pendingUnits),
+    peakPendingUnits: bucket.pendingUnits.length > 0 ? Math.max(...bucket.pendingUnits) : 0,
+    overBudgetRate: bucket.sampleCount > 0 ? bucket.overBudgetSamples / bucket.sampleCount : 0,
+    firstPendingUnits: bucket.pendingSequence.length > 0 ? bucket.pendingSequence[0] : 0,
+    lastPendingUnits: bucket.pendingSequence.length > 0 ? bucket.pendingSequence[bucket.pendingSequence.length - 1] : 0,
+    zeroPendingSamples: bucket.pendingSequence.filter(v => v === 0).length,
+  }))
+  .sort((a, b) => {
+    const pendingDelta = b.avgPendingUnits - a.avgPendingUnits;
+    if (Math.abs(pendingDelta) > 0.001) return pendingDelta;
+    return b.avgTimeMs - a.avgTimeMs;
+  });
+const terrainQueueFlags = terrainSummary.flatMap(stream => {
+  const flags: string[] = [];
+  const pendingDidNotDrain = stream.peakPendingUnits >= 8
+    && stream.zeroPendingSamples === 0
+    && stream.lastPendingUnits >= stream.firstPendingUnits;
+  if (pendingDidNotDrain) {
+    flags.push(
+      `${stream.name}: pending queue did not drain (start ${stream.firstPendingUnits.toFixed(0)}, ` +
+      `end ${stream.lastPendingUnits.toFixed(0)}, peak ${stream.peakPendingUnits.toFixed(0)})`
+    );
+  }
+  if (stream.overBudgetRate >= 0.5) {
+    flags.push(
+      `${stream.name}: over budget in ${(stream.overBudgetRate * 100).toFixed(1)}% of sampled frames`
+    );
+  }
+  return flags;
+});
 
 console.log(`Artifact: ${latestDir}`);
 console.log(`Status: ${summary.status}`);
@@ -198,6 +279,22 @@ if (stallSamples.length > 0) {
 console.log('Dominant top systems:');
 for (const [name, count] of dominantSystems) {
   console.log(`- ${name}: ${count} samples`);
+}
+if (terrainSummary.length > 0) {
+  console.log('Terrain stream summary:');
+  for (const stream of terrainSummary) {
+    console.log(
+      `- ${stream.name}: avg ${stream.avgTimeMs.toFixed(2)}ms / ${stream.avgBudgetMs.toFixed(2)}ms, ` +
+      `peak ${stream.peakTimeMs.toFixed(2)}ms, avg pending ${stream.avgPendingUnits.toFixed(1)}, ` +
+      `peak pending ${stream.peakPendingUnits.toFixed(0)}, over-budget ${(stream.overBudgetRate * 100).toFixed(1)}%`
+    );
+  }
+  if (terrainQueueFlags.length > 0) {
+    console.log('Terrain queue flags:');
+    for (const flag of terrainQueueFlags) {
+      console.log(`- ${flag}`);
+    }
+  }
 }
 
 const combatSamples = samples

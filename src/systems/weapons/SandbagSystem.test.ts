@@ -29,9 +29,10 @@ vi.mock('../assets/ModelLoader', () => ({
   },
 }));
 
-vi.mock('../assets/modelPaths', () => ({
-  StructureModels: { SANDBAG_WALL: 'structures/sandbag-wall.glb' },
-}));
+vi.mock('../assets/modelPaths', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../assets/modelPaths')>();
+  return { ...actual };
+});
 
 const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0));
 
@@ -352,7 +353,7 @@ describe('SandbagSystem', () => {
       sandbagSystem.placeSandbag();
       await flushPromises(); // Wait for sandbag to register
 
-      // Try to place second too close (MIN_SPACING = 3)
+      // Try to place second too close (MIN_SPACING ~= 2.15)
       camera.position.set(2, 5, 0);
       sandbagSystem.updatePreviewPosition(camera); // Re-validate after first placed
       const result = sandbagSystem.placeSandbag();
@@ -368,7 +369,7 @@ describe('SandbagSystem', () => {
       sandbagSystem.placeSandbag();
       await flushPromises();
 
-      // Place second far enough (MIN_SPACING = 3)
+      // Place second far enough for the normalized wall footprint
       camera.position.set(10, 5, 0);
       sandbagSystem.updatePreviewPosition(camera);
       const result = sandbagSystem.placeSandbag();
@@ -861,7 +862,6 @@ describe('SandbagSystem', () => {
       sandbagSystem.showPlacementPreview(true);
       sandbagSystem.updatePreviewPosition(camera);
       const result = sandbagSystem.placeSandbag();
-      // y=0 is at water level, preview position will be 0 + 1.2 = 1.2, which is > MAX_WATER_HEIGHT (1.0)
       expect(result).toBe(true);
     });
 
@@ -885,7 +885,7 @@ describe('SandbagSystem', () => {
   });
 
   describe('Spacing Validation', () => {
-    it('should enforce minimum spacing of 3 units', async () => {
+    it('should enforce normalized sandbag spacing', async () => {
       sandbagSystem.showPlacementPreview(true);
 
       // Place first sandbag
@@ -899,8 +899,8 @@ describe('SandbagSystem', () => {
       sandbagSystem.updatePreviewPosition(camera);
       expect(sandbagSystem.placeSandbag()).toBe(false);
 
-      // Try at 3.5 units away (should succeed)
-      camera.position.set(3.5, 5, 0);
+      // Try just beyond the normalized spacing threshold (should succeed)
+      camera.position.set(2.5, 5, 0);
       sandbagSystem.updatePreviewPosition(camera);
       expect(sandbagSystem.placeSandbag()).toBe(true);
     });
@@ -924,8 +924,8 @@ describe('SandbagSystem', () => {
       sandbagSystem.updatePreviewPosition(camera);
       expect(sandbagSystem.placeSandbag()).toBe(false);
 
-      // Test spacing diagonally
-      camera.position.set(2, 5, 2);
+      // Test spacing diagonally (1.5, 1.5) = ~2.12 < minSpacing 2.15
+      camera.position.set(1.5, 5, 1.5);
       sandbagSystem.updatePreviewPosition(camera);
       expect(sandbagSystem.placeSandbag()).toBe(false);
     });

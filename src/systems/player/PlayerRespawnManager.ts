@@ -26,6 +26,8 @@ import { getGameModeDefinition } from '../../config/gameModeDefinitions';
 import { GameMode } from '../../config/gameModeTypes';
 import type { LoadoutFieldKey, PlayerLoadout } from '../../ui/loadout/LoadoutTypes';
 import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
+import { InputContextManager } from '../input/InputContextManager';
+import type { RespawnSpawnPoint } from './RespawnSpawnPoint';
 
 export class InitialDeployCancelledError extends Error {
   constructor() {
@@ -53,7 +55,7 @@ export class PlayerRespawnManager implements GameSystem {
   private isRespawnUIVisible = false;
   private respawnTimer = 0;
   private selectedSpawnPoint?: string;
-  private availableSpawnPoints: Array<{ id: string; name: string; position: THREE.Vector3; safe: boolean }> = [];
+  private availableSpawnPoints: RespawnSpawnPoint[] = [];
   private lastTimerDisplaySecond: number = -1;
   private lastTimerDisplayHasSelection = false;
   private deathCount = 0;
@@ -368,6 +370,11 @@ export class PlayerRespawnManager implements GameSystem {
 
     // Update available spawn points
     this.updateAvailableSpawnPoints();
+    this.mapController.setSpawnPoints(this.availableSpawnPoints);
+
+    // Release pointer lock and set menu context so the cursor is free
+    InputContextManager.getInstance().setContext('menu');
+    this.playerController?.setPointerLockEnabled(false);
 
     // Show the UI
     this.respawnUI.show();
@@ -395,16 +402,19 @@ export class PlayerRespawnManager implements GameSystem {
         id: 'default',
         name: 'Base',
         position: new THREE.Vector3(0, 5, -50),
-        safe: true
+        safe: true,
+        kind: 'default',
+        selectionClass: 'default',
       }];
       return;
     }
 
+    const definition = this.gameModeManager?.getCurrentDefinition?.();
     const canSpawnAtZones = this.gameModeManager?.canPlayerSpawnAtZones() ?? false;
     const zones = this.zoneManager.getAllZones();
     const playerAlliance = this.getCurrentAlliance();
 
-    this.availableSpawnPoints = zones
+    const spawnPoints: RespawnSpawnPoint[] = zones
       .filter(z => {
         return this.isZoneSpawnableForAlliance(z, playerAlliance, canSpawnAtZones);
       })
@@ -412,32 +422,76 @@ export class PlayerRespawnManager implements GameSystem {
         id: z.id,
         name: z.name,
         position: z.position.clone(),
-        safe: true
+        safe: true,
+        kind: z.isHomeBase ? 'home_base' : 'zone',
+        selectionClass: z.isHomeBase ? 'home_base' : 'nearest_controlled_zone',
+        sourceZoneId: z.id,
       }));
 
-    // Append helipad spawn points for BLUFOR players (Open Frontier)
-    if (this.helipadSystem && playerAlliance === Alliance.BLUFOR) {
-      const helipads = this.helipadSystem.getAllHelipads();
-      for (const hp of helipads) {
-        // Avoid duplicating if a zone already covers this helipad
-        const alreadyListed = this.availableSpawnPoints.some(sp => sp.id === hp.id);
-        if (!alreadyListed) {
-          this.availableSpawnPoints.push({
+    // Append helipad spawn points for BLUFOR players. During initial deploy,
+    // runtime helipad instances may not exist yet, so fall back to mode config.
+    if (playerAlliance === Alliance.BLUFOR) {
+      const runtimeHelipads = this.helipadSystem?.getAllHelipads() ?? [];
+      const configuredHelipads = this.gameModeManager?.getCurrentConfig().helipads ?? [];
+      const helipadCandidates = runtimeHelipads.length > 0
+        ? runtimeHelipads.map(hp => ({
             id: hp.id,
             name: `Helipad: ${hp.aircraft.replace(/_/g, ' ')}`,
             position: hp.position.clone(),
-            safe: true
+            aircraft: hp.aircraft,
+          }))
+        : configuredHelipads.map(hp => ({
+            id: hp.id,
+            name: `Helipad: ${hp.aircraft.replace(/_/g, ' ')}`,
+            position: hp.position.clone(),
+            aircraft: hp.aircraft,
+          }));
+
+      for (const hp of helipadCandidates) {
+        const alreadyListed = spawnPoints.some(sp => sp.id === hp.id);
+        if (!alreadyListed) {
+          spawnPoints.push({
+            id: hp.id,
+            name: hp.name,
+            position: hp.position.clone(),
+            safe: true,
+            kind: 'helipad',
+            selectionClass: 'helipad',
+            priority: this.getHelipadSpawnPriority(hp.id, hp.aircraft),
           });
         }
       }
     }
+
+    if (
+      definition
+      && this.deploySession?.flow === 'air_assault'
+      && this.activeDeployFlowKind === 'initial'
+    ) {
+      const insertionTarget = resolveInitialSpawnPosition(definition, playerAlliance);
+      if (!this.terrainSystem || this.terrainSystem.hasTerrainAt(insertionTarget.x, insertionTarget.z)) {
+        spawnPoints.push({
+          id: 'direct_insertion',
+          name: 'Tactical Insertion',
+          position: insertionTarget,
+          safe: false,
+          kind: 'insertion',
+          selectionClass: 'direct_insertion',
+          priority: 100,
+        });
+      }
+    }
+
+    this.availableSpawnPoints = this.sortSpawnPointsByPriority(spawnPoints);
 
     if (this.availableSpawnPoints.length === 0) {
       this.availableSpawnPoints = [{
         id: 'default',
         name: 'Base',
         position: new THREE.Vector3(0, 5, -50),
-        safe: true
+        safe: true,
+        kind: 'default',
+        selectionClass: 'default',
       }];
     }
   }
@@ -482,6 +536,10 @@ export class PlayerRespawnManager implements GameSystem {
     this.activeDeployFlowKind = null;
     this.mapController.clearSelection();
     this.mapController.stopMapUpdateInterval();
+
+    // Restore gameplay input context and pointer lock
+    InputContextManager.getInstance().setContext('gameplay');
+    this.playerController?.setPointerLockEnabled(true);
   }
 
   private cancelActiveDeployFlow(): void {
@@ -555,7 +613,7 @@ export class PlayerRespawnManager implements GameSystem {
     this.respawnUI.updateSelectedSpawn(fallbackSpawn.name);
   }
 
-  private getPreferredDeploySpawnPoint(): { id: string; name: string; position: THREE.Vector3; safe: boolean } | undefined {
+  private getPreferredDeploySpawnPoint(): RespawnSpawnPoint | undefined {
     if (this.availableSpawnPoints.length === 0) {
       return undefined;
     }
@@ -567,17 +625,26 @@ export class PlayerRespawnManager implements GameSystem {
 
     // In frontier mode, prefer helipad spawns so player starts near aircraft
     if (definition.policies.deploy.flow === 'frontier') {
-      const helipadSpawn = this.availableSpawnPoints.find(sp => sp.id.startsWith('helipad_'));
+      const helipadSpawn = this.sortSpawnPointsByPriority(
+        this.availableSpawnPoints.filter(sp => sp.kind === 'helipad')
+      )[0];
       if (helipadSpawn) return helipadSpawn;
+    }
+
+    if (definition.policies.deploy.flow === 'air_assault' && this.activeDeployFlowKind === 'initial') {
+      const directInsertion = this.availableSpawnPoints.find(sp => sp.selectionClass === 'direct_insertion');
+      if (directInsertion) {
+        return directInsertion;
+      }
     }
 
     const target = resolveInitialSpawnPosition(definition, this.getCurrentAlliance());
     let preferred = this.availableSpawnPoints[0];
-    let nearestDist = preferred.position.distanceToSquared(target);
+    let nearestDist = preferred.position.distanceToSquared(target) - ((preferred.priority ?? 0) * 10_000);
 
     for (let i = 1; i < this.availableSpawnPoints.length; i++) {
       const candidate = this.availableSpawnPoints[i];
-      const dist = candidate.position.distanceToSquared(target);
+      const dist = candidate.position.distanceToSquared(target) - ((candidate.priority ?? 0) * 10_000);
       if (dist < nearestDist) {
         preferred = candidate;
         nearestDist = dist;
@@ -646,6 +713,9 @@ export class PlayerRespawnManager implements GameSystem {
   private isTerrainReadyAt(x: number, z: number): boolean {
     if (!this.terrainSystem) {
       return true;
+    }
+    if (typeof this.terrainSystem.isAreaReadyAt === 'function') {
+      return this.terrainSystem.isAreaReadyAt(x, z);
     }
     return this.terrainSystem.isTerrainReady() && this.terrainSystem.hasTerrainAt(x, z);
   }
@@ -728,6 +798,26 @@ export class PlayerRespawnManager implements GameSystem {
       && !!this.selectedSpawnPoint;
   }
 
+  private getHelipadSpawnPriority(helipadId: string, aircraft?: string): number {
+    let priority = 25;
+    const definition = this.gameModeManager?.getCurrentDefinition?.();
+    if (definition?.id !== GameMode.OPEN_FRONTIER) {
+      return priority;
+    }
+
+    if (helipadId === 'helipad_main' || helipadId.includes('main')) {
+      priority += 20;
+    }
+
+    if (aircraft === 'UH1_HUEY') {
+      priority += 10;
+    } else if (aircraft?.startsWith('UH1')) {
+      priority += 5;
+    }
+
+    return priority;
+  }
+
   private isZoneSpawnableForAlliance(
     zone: Pick<CaptureZone, 'isHomeBase' | 'owner' | 'state'>,
     alliance: Alliance,
@@ -744,5 +834,23 @@ export class PlayerRespawnManager implements GameSystem {
     return alliance === Alliance.BLUFOR
       ? zone.state === ZoneState.BLUFOR_CONTROLLED
       : zone.state === ZoneState.OPFOR_CONTROLLED;
+  }
+
+  private sortSpawnPointsByPriority(spawnPoints: RespawnSpawnPoint[]): RespawnSpawnPoint[] {
+    const deduped = new Map<string, RespawnSpawnPoint>();
+    for (const spawnPoint of spawnPoints) {
+      const current = deduped.get(spawnPoint.id);
+      if (!current || (spawnPoint.priority ?? 0) > (current.priority ?? 0)) {
+        deduped.set(spawnPoint.id, spawnPoint);
+      }
+    }
+
+    return Array.from(deduped.values()).sort((a, b) => {
+      const priorityDelta = (b.priority ?? 0) - (a.priority ?? 0);
+      if (priorityDelta !== 0) {
+        return priorityDelta;
+      }
+      return a.name.localeCompare(b.name);
+    });
   }
 }

@@ -8,6 +8,7 @@ const _coverToCombatant = new THREE.Vector3()
 const _sandbagCenter = new THREE.Vector3()
 const _threatToSandbag = new THREE.Vector3()
 const _sandbagOffset = new THREE.Vector3()
+const _sandbagSize = new THREE.Vector3()
 
 export function evaluateSandbagCover(
   sandbagSystem: SandbagSystem | undefined,
@@ -24,21 +25,23 @@ export function evaluateSandbagCover(
   for (const bounds of sandbagBounds) {
     const center = _sandbagCenter
     bounds.getCenter(center)
+    bounds.getSize(_sandbagSize)
 
     if (combatantPos.distanceTo(center) > maxRadius) continue
 
     // Position behind sandbag relative to threat
     const threatToSandbag = _threatToSandbag.subVectors(center, threatPos).normalize()
+    const coverOffset = Math.max(0.6, Math.min(_sandbagSize.x, _sandbagSize.z) * 0.5 + 0.35)
 
     const coverPos = objectPool.getVector3().copy(
-      _sandbagOffset.copy(center).add(threatToSandbag.multiplyScalar(2))
+      _sandbagOffset.copy(center).add(threatToSandbag.multiplyScalar(coverOffset))
     )
 
     spots.push({
       position: coverPos,
       score: 0,
       coverType: 'sandbag',
-      height: 1.2,  // Standard sandbag height
+      height: _sandbagSize.y,
       lastEvaluatedTime: now
     })
   }

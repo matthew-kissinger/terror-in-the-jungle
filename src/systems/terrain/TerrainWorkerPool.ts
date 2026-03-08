@@ -1,6 +1,39 @@
 import { Logger } from '../../utils/Logger';
 import type { HeightProviderConfig } from './IHeightProvider';
 
+function cloneHeightProviderConfig(config: HeightProviderConfig): HeightProviderConfig {
+  switch (config.type) {
+    case 'dem':
+      return {
+        ...config,
+        buffer: config.buffer.slice(0),
+      };
+    case 'stamped':
+      return {
+        ...config,
+        base: cloneHeightProviderConfig(config.base),
+        stamps: config.stamps.map((stamp) => ({ ...stamp })),
+      };
+    case 'noise':
+    default:
+      return { ...config };
+  }
+}
+
+function collectTransferables(config: HeightProviderConfig, transferables: Transferable[]): void {
+  switch (config.type) {
+    case 'dem':
+      transferables.push(config.buffer);
+      return;
+    case 'stamped':
+      collectTransferables(config.base, transferables);
+      return;
+    case 'noise':
+    default:
+      return;
+  }
+}
+
 /**
  * Clean worker pool for terrain operations.
  * Workers are proper ES module files bundled by Vite.
@@ -88,13 +121,10 @@ export class TerrainWorkerPool {
    */
   sendHeightProvider(config: HeightProviderConfig): void {
     for (const worker of this.workers) {
-      if (config.type === 'dem') {
-        // Clone the buffer for each worker (transferred buffers can't be reused)
-        const clonedBuffer = config.buffer.slice(0);
-        worker.postMessage({ type: 'setHeightProvider', config: { ...config, buffer: clonedBuffer } }, [clonedBuffer]);
-      } else {
-        worker.postMessage({ type: 'setHeightProvider', config });
-      }
+      const clonedConfig = cloneHeightProviderConfig(config);
+      const transferables: Transferable[] = [];
+      collectTransferables(clonedConfig, transferables);
+      worker.postMessage({ type: 'setHeightProvider', config: clonedConfig }, transferables);
     }
   }
 
