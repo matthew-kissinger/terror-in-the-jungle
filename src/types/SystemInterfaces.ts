@@ -145,7 +145,7 @@ export interface IFirstPersonWeapon {
   setInventoryManager(system: any): void;
   setAudioManager(manager: any): void;
   setPlayerFaction(faction: Faction): void;
-  setPrimaryWeapon(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol'): void;
+  setPrimaryWeapon(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher'): void;
   renderWeapon(renderer: THREE.WebGLRenderer): void;
   enable(): void;
   disable(): void;

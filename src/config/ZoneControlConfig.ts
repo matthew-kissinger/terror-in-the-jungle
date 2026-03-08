@@ -59,6 +59,104 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
   minimapScale: 400,
   viewDistance: 180,
 
+  features: [
+    // US firebase near home base
+    {
+      id: 'firebase_us',
+      kind: 'firebase' as const,
+      name: 'US Firebase',
+      position: new THREE.Vector3(0, 0, -95),
+      placement: { yaw: Math.PI },
+      footprint: { shape: 'circle' as const, radius: 26 },
+      terrain: {
+        flatten: true,
+        flatRadius: 18,
+        blendRadius: 28,
+        samplingRadius: 18,
+        targetHeightMode: 'max' as const,
+      },
+      vegetation: { clear: true, exclusionRadius: 30 },
+      surface: { kind: 'packed_earth' as const, innerRadius: 18, outerRadius: 24 },
+      prefabId: 'firebase_us_small' as const,
+    },
+    // NVA bunker cluster at OPFOR base
+    {
+      id: 'nva_bunkers',
+      kind: 'firebase' as const,
+      name: 'NVA Bunker Cluster',
+      position: new THREE.Vector3(0, 0, 215),
+      placement: { yaw: 0 },
+      footprint: { shape: 'circle' as const, radius: 22 },
+      terrain: {
+        flatten: true,
+        flatRadius: 14,
+        blendRadius: 22,
+        samplingRadius: 14,
+        targetHeightMode: 'max' as const,
+      },
+      vegetation: { clear: true, exclusionRadius: 24 },
+      surface: { kind: 'packed_earth' as const, innerRadius: 14, outerRadius: 20 },
+      prefabId: 'nva_bunker_cluster_small' as const,
+    },
+    // Village near zone Alpha (west)
+    {
+      id: 'village_alpha',
+      kind: 'village' as const,
+      name: 'West Village',
+      position: new THREE.Vector3(-145, 0, 5),
+      placement: { yaw: Math.PI * 0.3 },
+      footprint: { shape: 'circle' as const, radius: 20 },
+      terrain: {
+        flatten: true,
+        flatRadius: 10,
+        blendRadius: 20,
+        samplingRadius: 12,
+        targetHeightMode: 'average' as const,
+      },
+      vegetation: { clear: true, exclusionRadius: 22 },
+      surface: { kind: 'packed_earth' as const, innerRadius: 10, outerRadius: 16 },
+      prefabId: 'village_cluster_small' as const,
+    },
+    // Trail checkpoint near Bravo (center-south)
+    {
+      id: 'trail_bravo',
+      kind: 'road' as const,
+      name: 'Bravo Trail Post',
+      position: new THREE.Vector3(5, 0, 95),
+      placement: { yaw: Math.PI * 0.5 },
+      footprint: { shape: 'circle' as const, radius: 14 },
+      terrain: {
+        flatten: true,
+        flatRadius: 8,
+        blendRadius: 14,
+        samplingRadius: 8,
+        targetHeightMode: 'average' as const,
+      },
+      vegetation: { clear: true, exclusionRadius: 16 },
+      surface: { kind: 'packed_earth' as const, innerRadius: 8, outerRadius: 12 },
+      prefabId: 'trail_checkpoint_small' as const,
+    },
+    // NVA trail base near Charlie (east)
+    {
+      id: 'nva_trail_charlie',
+      kind: 'firebase' as const,
+      name: 'East Trail Base',
+      position: new THREE.Vector3(145, 0, 5),
+      placement: { yaw: -Math.PI * 0.3 },
+      footprint: { shape: 'circle' as const, radius: 18 },
+      terrain: {
+        flatten: true,
+        flatRadius: 12,
+        blendRadius: 18,
+        samplingRadius: 12,
+        targetHeightMode: 'max' as const,
+      },
+      vegetation: { clear: true, exclusionRadius: 20 },
+      surface: { kind: 'packed_earth' as const, innerRadius: 12, outerRadius: 16 },
+      prefabId: 'nva_trail_base_small' as const,
+    },
+  ],
+
   zones: [
     // US Base - pushed back further
     {

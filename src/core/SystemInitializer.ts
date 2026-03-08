@@ -36,6 +36,7 @@ import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
 import { WorldFeatureSystem } from '../systems/world/WorldFeatureSystem';
+import { AnimalSystem } from '../systems/world/AnimalSystem';
 
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { LoadoutService } from '../systems/player/LoadoutService';
@@ -86,6 +87,7 @@ export interface SystemReferences {
   strategicFeedback: StrategicFeedback;
   spatialGridManager: SpatialGridManager;
   worldFeatureSystem: WorldFeatureSystem;
+  animalSystem: AnimalSystem;
 }
 
 export interface InitializationResult {
@@ -171,6 +173,7 @@ export class SystemInitializer {
     refs.helipadSystem = new HelipadSystem(scene);
     refs.helicopterModel = new HelicopterModel(scene);
     refs.worldFeatureSystem = new WorldFeatureSystem(scene);
+    refs.animalSystem = new AnimalSystem(scene, camera);
 
     // Initialize new squad/inventory/grenade systems
     const squadManager = (refs.combatantSystem as any).squadManager;
@@ -219,6 +222,7 @@ export class SystemInitializer {
       refs.helipadSystem,
       refs.helicopterModel,
       refs.worldFeatureSystem,
+      refs.animalSystem,
       refs.skybox,
       refs.gameModeManager,
       refs.playerSquadController,

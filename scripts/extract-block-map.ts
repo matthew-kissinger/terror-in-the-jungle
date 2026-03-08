@@ -248,7 +248,7 @@ const TICK_GROUPS: Record<string, { group: string; budgetMs: number }> = {
 };
 
 const DEFERRED_SYSTEMS = new Set([
-  'HelipadSystem', 'HelicopterModel', 'VoiceCalloutSystem', 'LoadoutSelector'
+  'HelipadSystem', 'HelicopterModel', 'LoadoutSelector'
 ]);
 
 // --- Main ---

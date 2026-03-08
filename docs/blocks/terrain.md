@@ -108,6 +108,7 @@ Runtime config/metrics:
 - `GrenadeSystem`
 - `MortarSystem`
 - `SandbagSystem`
+- `WorldFeatureSystem`
 
 This is a high-coupling block.
 
@@ -205,6 +206,10 @@ The remaining concern is not authority confusion. It is whether `TerrainSystem` 
 | `IHeightProvider` | `src/systems/terrain/IHeightProvider.ts` | Height-provider interface |
 | `NoiseHeightProvider` | `src/systems/terrain/NoiseHeightProvider.ts` | Procedural terrain source |
 | `DEMHeightProvider` | `src/systems/terrain/DEMHeightProvider.ts` | DEM terrain source |
+| `BakedHeightProvider` | `src/systems/terrain/BakedHeightProvider.ts` | Bilinear-interpolated pre-baked heightmap grid (CPU-side match for GPU vertex shader) |
+| `StampedHeightProvider` | `src/systems/terrain/StampedHeightProvider.ts` | Wraps a base provider with terrain stamp overlays (flatten/raise for features) |
+| `TerrainFeatureCompiler` | `src/systems/terrain/TerrainFeatureCompiler.ts` | Compiles map feature definitions into terrain stamps, surface patches, and exclusion zones |
+| `TerrainFeatureTypes` | `src/systems/terrain/TerrainFeatureTypes.ts` | Shared type definitions for terrain stamps, surface patches, and exclusion zones |
 | `TerrainQueries` | `src/systems/terrain/TerrainQueries.ts` | Collision object + LOS query facade |
 
 ### Vegetation/worker modules
@@ -220,6 +225,7 @@ The remaining concern is not authority confusion. It is whether `TerrainSystem` 
 | Module | File | Role |
 |--------|------|------|
 | `TerrainConfig` | `src/systems/terrain/TerrainConfig.ts` | Runtime config and terrain bootstrap config shape |
+| `TerrainBiomeRuntimeConfig` | `src/systems/terrain/TerrainBiomeRuntimeConfig.ts` | Resolves biome IDs, vegetation palettes, and material config from biome rules + asset loader |
 
 ---
 

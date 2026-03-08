@@ -62,8 +62,6 @@ These docs predate the block map and overlap with specific sub-docs. Kept for re
 - `FRONTEND_ARCHITECTURE_INVENTORY.md` - Overlaps with `blocks/ui.md`.
 - `FRONTEND_REARCHITECTURE_BACKLOG.md` - Phase board (3 phases done). Overlaps with `blocks/ui.md`.
 - `UI_STANDARDIZATION_GUIDE.md` - Standards still valid; component inventory overlaps with `blocks/ui.md`.
-- `PERFORMANCE_FRONTIER_MISSION.md` - Operating model still valid; spatial track (F3) is complete. See `blocks/combat.md` for current spatial architecture.
-- `PHASE1_ASSET_INVENTORY.md` - Asset staging plan. See `ASSET_MANIFEST.md` for full queue.
 - `CODEBASE_MAP.mmd` - Original Mermaid diagram, superseded by `CODEBASE_BLOCKS.md` + `blocks/`.
 
 ## Archive

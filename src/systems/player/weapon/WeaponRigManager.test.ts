@@ -170,8 +170,8 @@ describe('WeaponRigManager', () => {
     it('adds all weapon rigs to scene', async () => {
       await manager.init()
 
-      // Scene.add should be called 5 times (M16, AK, shotgun, SMG, pistol)
-      expect(scene.add).toHaveBeenCalledTimes(5)
+      // Scene.add should be called 7 times (M16, AK, shotgun, SMG, pistol, M60, M79)
+      expect(scene.add).toHaveBeenCalledTimes(7)
     })
 
     it('sets rifle visible and others hidden initially', async () => {

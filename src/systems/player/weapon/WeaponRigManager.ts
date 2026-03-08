@@ -16,18 +16,22 @@ export class WeaponRigManager {
   private shotgunRig?: THREE.Group
   private smgRig?: THREE.Group
   private pistolRig?: THREE.Group
+  private m60Rig?: THREE.Group
+  private m79Rig?: THREE.Group
   private weaponRig?: THREE.Group // Current active weapon rig root
   private muzzleRef?: THREE.Object3D
   private magazineRef?: THREE.Object3D
   private pumpGripRef?: THREE.Object3D
   private activeRifleFaction: Faction = Faction.US
-  private currentWeaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' = 'rifle'
+  private currentWeaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' = 'rifle'
 
   // Weapon cores
   private rifleCore: GunplayCore
   private shotgunCore: GunplayCore
   private smgCore: GunplayCore
   private pistolCore: GunplayCore
+  private lmgCore: GunplayCore
+  private launcherCore: GunplayCore
   private gunCore: GunplayCore // Current active weapon core
 
   // Base position (relative to screen)
@@ -38,7 +42,7 @@ export class WeaponRigManager {
   private switchAnimationProgress = 0
   private readonly SWITCH_ANIMATION_TIME = 0.4 // 400ms total switch time
   private switchOffset = { y: 0, rotX: 0 }
-  private pendingWeaponSwitch?: 'rifle' | 'shotgun' | 'smg' | 'pistol'
+  private pendingWeaponSwitch?: 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher'
 
   constructor(weaponScene: THREE.Scene) {
     this.weaponScene = weaponScene
@@ -77,22 +81,42 @@ export class WeaponRigManager {
       headshotMultiplier: 1.6, penetrationPower: 0.7
     }
 
+    const lmgSpec: WeaponSpec = {
+      name: 'LMG', rpm: 550, adsTime: 0.3,
+      baseSpreadDeg: 1.5, bloomPerShotDeg: 0.12,
+      recoilPerShotDeg: 0.8, recoilHorizontalDeg: 0.5,
+      damageNear: 38, damageFar: 28, falloffStart: 25, falloffEnd: 80,
+      headshotMultiplier: 1.5, penetrationPower: 1.2
+    }
+
+    const launcherSpec: WeaponSpec = {
+      name: 'Grenade Launcher', rpm: 30, adsTime: 0.25,
+      baseSpreadDeg: 0.5, bloomPerShotDeg: 0,
+      recoilPerShotDeg: 3.0, recoilHorizontalDeg: 0.5,
+      damageNear: 0, damageFar: 0, falloffStart: 0, falloffEnd: 0,
+      headshotMultiplier: 1.0, penetrationPower: 0
+    }
+
     // Initialize all weapon cores
     this.rifleCore = new GunplayCore(rifleSpec)
     this.shotgunCore = new GunplayCore(shotgunSpec)
     this.smgCore = new GunplayCore(smgSpec)
     this.pistolCore = new GunplayCore(pistolSpec)
+    this.lmgCore = new GunplayCore(lmgSpec)
+    this.launcherCore = new GunplayCore(launcherSpec)
     this.gunCore = this.rifleCore // Start with rifle
   }
 
   async init(): Promise<void> {
     // Load GLB weapon models in parallel
-    const [m16Scene, akScene, shotgunScene, smgScene, pistolScene] = await Promise.all([
+    const [m16Scene, akScene, shotgunScene, smgScene, pistolScene, m60Scene, m79Scene] = await Promise.all([
       modelLoader.loadModel(WeaponModels.M16A1),
       modelLoader.loadModel(WeaponModels.AK47),
       modelLoader.loadModel(WeaponModels.ITHACA37),
       modelLoader.loadModel(WeaponModels.M3_GREASE_GUN),
       modelLoader.loadModel(WeaponModels.M1911),
+      modelLoader.loadModel(WeaponModels.M60),
+      modelLoader.loadModel(WeaponModels.M79),
     ])
 
     this.m16RifleRig = this.prepareWeaponRig(m16Scene, 1.5, false)
@@ -118,6 +142,16 @@ export class WeaponRigManager {
     this.pistolRig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
     this.pistolRig.visible = false
     this.weaponScene.add(this.pistolRig)
+
+    this.m60Rig = this.prepareWeaponRig(m60Scene, 1.5, false)
+    this.m60Rig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
+    this.m60Rig.visible = false
+    this.weaponScene.add(this.m60Rig)
+
+    this.m79Rig = this.prepareWeaponRig(m79Scene, 1.5, false)
+    this.m79Rig.position.set(this.basePosition.x, this.basePosition.y, this.basePosition.z)
+    this.m79Rig.visible = false
+    this.weaponScene.add(this.m79Rig)
 
     // Start with the BLUFOR rifle active
     this.currentWeaponType = 'rifle'
@@ -276,7 +310,15 @@ export class WeaponRigManager {
     return this.pistolCore
   }
 
-  startWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol', _hudSystem?: IHUDSystem, _audioManager?: IAudioManager, _ammoManager?: IAmmoManager): boolean {
+  getLMGCore(): GunplayCore {
+    return this.lmgCore
+  }
+
+  getLauncherCore(): GunplayCore {
+    return this.launcherCore
+  }
+
+  startWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher', _hudSystem?: IHUDSystem, _audioManager?: IAudioManager, _ammoManager?: IAmmoManager): boolean {
     // Don't switch if already the current weapon
     if (weaponType === this.currentWeaponType) {
       return false
@@ -338,14 +380,16 @@ export class WeaponRigManager {
     }
   }
 
-  private performWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol', hudSystem?: IHUDSystem, audioManager?: IAudioManager, ammoManager?: IAmmoManager): void {
+  private performWeaponSwitch(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher', hudSystem?: IHUDSystem, audioManager?: IAudioManager, ammoManager?: IAmmoManager): void {
     // Actually switch the visible weapon models
-    if (!this.m16RifleRig || !this.akRifleRig || !this.shotgunRig || !this.smgRig || !this.pistolRig) return
+    if (!this.m16RifleRig || !this.akRifleRig || !this.shotgunRig || !this.smgRig || !this.pistolRig || !this.m60Rig || !this.m79Rig) return
 
     this.setRifleRigVisibility(false)
     this.shotgunRig.visible = false
     this.smgRig.visible = false
     this.pistolRig.visible = false
+    this.m60Rig.visible = false
+    this.m79Rig.visible = false
     this.currentWeaponType = weaponType
 
     switch (weaponType) {
@@ -384,12 +428,28 @@ export class WeaponRigManager {
         this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined
         this.pumpGripRef = undefined
         break
+      case 'lmg':
+        this.m60Rig.visible = true
+        this.weaponRig = this.m60Rig
+        this.gunCore = this.lmgCore
+        this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined
+        this.magazineRef = this.weaponRig.getObjectByName('magazine') || undefined
+        this.pumpGripRef = undefined
+        break
+      case 'launcher':
+        this.m79Rig.visible = true
+        this.weaponRig = this.m79Rig
+        this.gunCore = this.launcherCore
+        this.muzzleRef = this.weaponRig.getObjectByName('muzzle') || undefined
+        this.magazineRef = undefined // M79 is break-action, no detachable magazine
+        this.pumpGripRef = undefined
+        break
     }
 
     // Notify HUD about weapon switch
     if (hudSystem && hudSystem.showWeaponSwitch) {
-      const weaponNames = { rifle: 'RIFLE', shotgun: 'SHOTGUN', smg: 'SMG', pistol: 'PISTOL' }
-      const weaponIcons = { rifle: 'AR', shotgun: 'SG', smg: 'SM', pistol: 'PT' }
+      const weaponNames = { rifle: 'RIFLE', shotgun: 'SHOTGUN', smg: 'SMG', pistol: 'PISTOL', lmg: 'LMG', launcher: 'LAUNCHER' }
+      const weaponIcons = { rifle: 'AR', shotgun: 'SG', smg: 'SM', pistol: 'PT', lmg: 'MG', launcher: 'GL' }
       const ammoState = ammoManager?.getState() || { currentMagazine: 0, reserveAmmo: 0 }
       hudSystem.showWeaponSwitch(
         weaponNames[weaponType],

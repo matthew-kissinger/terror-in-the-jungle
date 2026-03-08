@@ -3,8 +3,7 @@
 Last updated: 2026-03-04
 
 Mission linkage:
-- `docs/PERFORMANCE_FRONTIER_MISSION.md`
-- `docs/PERF_FRONTIER.md`
+- `docs/ARCHITECTURE_RECOVERY_PLAN.md`
 
 ## Primary Commands
 

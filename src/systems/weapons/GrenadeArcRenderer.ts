@@ -366,8 +366,9 @@ export class GrenadeCooking {
   }
 
   private playBeep(audioManager?: AudioManager): void {
-    // TODO(audio): Re-enable when a dedicated grenade cook beep asset is authored.
-    void audioManager;
+    if (audioManager) {
+      audioManager.play('grenadeBeep');
+    }
   }
 
   private explodeInHand(

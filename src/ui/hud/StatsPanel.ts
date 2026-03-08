@@ -11,6 +11,7 @@
 
 import { UIComponent } from '../engine/UIComponent';
 import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
+import type { AudioManager } from '../../systems/audio/AudioManager';
 import styles from './StatsPanel.module.css';
 
 /** Kill streak milestones and their display text + color */
@@ -38,12 +39,17 @@ export class StatsPanel extends UIComponent {
   private readonly STREAK_TIMEOUT = 10_000; // 10s
   private streakTimerId: ReturnType<typeof setTimeout> | null = null;
   private streakFadeTimerId: ReturnType<typeof setTimeout> | null = null;
+  private audioManager?: AudioManager;
 
   // Streak overlay element (fixed-position, mounted separately)
   private streakOverlay: HTMLDivElement | null = null;
 
   constructor(private statsTracker: PlayerStatsTracker) {
     super();
+  }
+
+  setAudioManager(audioManager: AudioManager): void {
+    this.audioManager = audioManager;
   }
 
   protected build(): void {
@@ -152,6 +158,11 @@ export class StatsPanel extends UIComponent {
 
   private showStreak(message: string, color: string): void {
     if (!this.streakOverlay) return;
+
+    // Play kill streak audio sting
+    if (this.audioManager) {
+      this.audioManager.play('killStreakSting');
+    }
 
     // Clear any pending timers
     if (this.streakTimerId !== null) clearTimeout(this.streakTimerId);

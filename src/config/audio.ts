@@ -77,5 +77,23 @@ export const SOUND_CONFIGS: Record<string, SoundConfig> = {
   bulletWhiz: {
     path: 'assets/optimized/bulletWhiz.wav',
     volume: 0.4
+  },
+  // Grenade lifecycle sounds
+  grenadePinPull: {
+    path: 'assets/optimized/grenadePinPull.wav',
+    volume: 0.6
+  },
+  grenadeThrow: {
+    path: 'assets/optimized/grenadeThrow.wav',
+    volume: 0.5
+  },
+  grenadeBeep: {
+    path: 'assets/optimized/grenadeBeep.wav',
+    volume: 0.4
+  },
+  // Kill streak sting
+  killStreakSting: {
+    path: 'assets/optimized/killStreakSting.wav',
+    volume: 0.7
   }
 };

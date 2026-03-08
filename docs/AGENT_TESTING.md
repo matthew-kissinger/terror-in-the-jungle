@@ -22,7 +22,7 @@ npm run validate         # test:run + build (sequential)
 npm run deadcode         # knip scan for unused files/exports
 ```
 
-- Runs full test suite with verbose reporter, then TypeScript check + Vite production build.
+- Runs full test suite with verbose reporter, then Vite production build.
 - Catches type errors that tests alone miss (tests use jsdom, build uses full tsc).
 - `deadcode` is advisory, not a green gate. Use it to build cleanup backlog and catch stale imports/exports.
 - Exit code 0 = pass, non-zero = failure in either step.

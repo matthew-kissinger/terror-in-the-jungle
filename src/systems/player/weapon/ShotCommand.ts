@@ -15,7 +15,7 @@ export interface ShotCommand {
   ray: THREE.Ray
 
   /** Weapon type for audio and effects */
-  weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol'
+  weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher'
 
   /** Damage calculator that takes distance and headshot flag */
   damage: (distance: number, headshot: boolean) => number
@@ -83,7 +83,7 @@ export class ShotCommandFactory {
   static createSingleShot(
     origin: THREE.Vector3,
     direction: THREE.Vector3,
-    weaponType: 'rifle' | 'smg' | 'pistol',
+    weaponType: 'rifle' | 'smg' | 'pistol' | 'lmg' | 'launcher',
     damage: (distance: number, headshot: boolean) => number,
     isADS: boolean
   ): ShotCommand {

@@ -15,6 +15,7 @@ import { StatsPanel } from './StatsPanel';
 import type { GrenadeSystem } from '../../systems/weapons/GrenadeSystem';
 import type { MortarSystem } from '../../systems/weapons/MortarSystem';
 import type { PlayerHealthSystem } from '../../systems/player/PlayerHealthSystem';
+import type { AudioManager } from '../../systems/audio/AudioManager';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 import { ViewportManager } from '../design/responsive';
 import { HUDLayout } from '../layout/HUDLayout';
@@ -356,6 +357,10 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
   setFactionLabels(blufor: string, opfor: string): void {
     this.elements.ticketDisplay.setFactionLabels(blufor, opfor);
+  }
+
+  setAudioManager(audioManager: AudioManager): void {
+    this.personalStatsPanel.setAudioManager(audioManager);
   }
 
   setGrenadeSystem(system: GrenadeSystem): void {

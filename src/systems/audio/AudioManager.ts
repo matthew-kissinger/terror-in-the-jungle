@@ -262,7 +262,7 @@ export class AudioManager implements GameSystem {
      * Enhanced weapon sound playback with pitch/volume variation and layered sounds
      * @param weaponType - Type of weapon: 'rifle', 'shotgun', or 'smg'
      */
-    playPlayerWeaponSound(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' = 'rifle'): void {
+    playPlayerWeaponSound(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' = 'rifle'): void {
         this.weaponSounds.playPlayerWeaponSound(weaponType);
     }
 

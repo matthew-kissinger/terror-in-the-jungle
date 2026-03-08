@@ -25,6 +25,7 @@ import { Logger } from '../../utils/Logger'
 import type { HUDSystem } from '../../ui/hud/HUDSystem'
 import { AmmoState } from '../weapons/AmmoManager'
 import type { LoadoutWeapon } from '../../ui/loadout/LoadoutTypes'
+import type { GrenadeSystem } from '../weapons/GrenadeSystem'
 import { Faction } from '../combat/types'
 
 const _zeroVelocity = new THREE.Vector3()
@@ -247,13 +248,17 @@ export class FirstPersonWeapon implements GameSystem {
 
     // Determine weapon type
     const isShotgun = gunCore.isShotgun()
-    let weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' = 'rifle'
+    let weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' = 'rifle'
     if (isShotgun) {
       weaponType = 'shotgun'
     } else if (gunCore === this.rigManager.getSMGCore()) {
       weaponType = 'smg'
     } else if (gunCore === this.rigManager.getPistolCore()) {
       weaponType = 'pistol'
+    } else if (gunCore === this.rigManager.getLMGCore()) {
+      weaponType = 'lmg'
+    } else if (gunCore === this.rigManager.getLauncherCore()) {
+      weaponType = 'launcher'
     }
 
     // Create shot command with all needed data
@@ -301,6 +306,10 @@ export class FirstPersonWeapon implements GameSystem {
     this.firing.setStatsTracker(statsTracker)
   }
 
+  setGrenadeSystem(grenadeSystem: GrenadeSystem): void {
+    this.firing.setGrenadeSystem(grenadeSystem)
+  }
+
   setZoneManager(zoneManager: ZoneManager): void {
     this.zoneManager = zoneManager
     this.ammo.setZoneManager(zoneManager)
@@ -339,7 +348,7 @@ export class FirstPersonWeapon implements GameSystem {
    * Set the primary weapon (rifle, shotgun, SMG, or pistol)
    * Used for loadout selection at game start
    */
-  setPrimaryWeapon(weaponType: LoadoutWeapon | 'rifle' | 'shotgun' | 'smg' | 'pistol'): void {
+  setPrimaryWeapon(weaponType: LoadoutWeapon | 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher'): void {
     this.switching.switchWeapon(weaponType, (state) => this.onAmmoChange(state))
   }
 

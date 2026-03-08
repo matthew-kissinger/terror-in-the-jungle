@@ -12,7 +12,7 @@
 
 | Block | File | Tick | Deps | Fan-In |
 |-------|------|------|------|--------|
-| [GrenadeSystem]([GH]/systems/weapons/GrenadeSystem.ts) | systems/weapons/GrenadeSystem.ts | Weapons (1ms) | 7 | 2 |
+| [GrenadeSystem]([GH]/systems/weapons/GrenadeSystem.ts) | systems/weapons/GrenadeSystem.ts | Weapons (1ms) | 6 | 2 |
 | [MortarSystem]([GH]/systems/weapons/MortarSystem.ts) | systems/weapons/MortarSystem.ts | Weapons (1ms) | 4 | 2 |
 | [SandbagSystem]([GH]/systems/weapons/SandbagSystem.ts) | systems/weapons/SandbagSystem.ts | Weapons (1ms) | 2 | 1 |
 | [AmmoSupplySystem]([GH]/systems/weapons/AmmoSupplySystem.ts) | systems/weapons/AmmoSupplySystem.ts | Weapons (1ms) | 3 | 0 |
@@ -29,7 +29,6 @@ All files are flat in `src/systems/weapons/` (no subdirectories).
 | [GrenadePhysics]([GH]/systems/weapons/GrenadePhysics.ts) | GrenadePhysics.ts | Projectile integration, bounce, fuse. Also exports `GrenadeSpawner` class. |
 | [GrenadeEffects]([GH]/systems/weapons/GrenadeEffects.ts) | GrenadeEffects.ts | Explosion VFX, delegates to shared pools |
 | [GrenadeArcRenderer]([GH]/systems/weapons/GrenadeArcRenderer.ts) | GrenadeArcRenderer.ts | Predictive arc line. Also exports `GrenadeHandView` and `GrenadeCooking` classes. |
-| [GrenadeCallout]([GH]/systems/weapons/GrenadeCallout.ts) | GrenadeCallout.ts | "Grenade!" voice/UI callout trigger |
 | [MortarBallistics]([GH]/systems/weapons/MortarBallistics.ts) | MortarBallistics.ts | Parabolic flight math, terrain intersection |
 | [MortarCamera]([GH]/systems/weapons/MortarCamera.ts) | MortarCamera.ts | Top-down targeting camera mode |
 | [MortarRoundManager]([GH]/systems/weapons/MortarRoundManager.ts) | MortarRoundManager.ts | Active rounds list, per-round lifecycle |
@@ -44,7 +43,7 @@ Note: `GrenadeSpawner`, `GrenadeHandView`, `GrenadeCooking`, and `RecoilPattern`
 
 ## Wiring
 
-### GrenadeSystem receives (7):
+### GrenadeSystem receives (6):
 
 | Dep | Method |
 |-----|--------|
@@ -54,7 +53,6 @@ Note: `GrenadeSpawner`, `GrenadeHandView`, `GrenadeCooking`, and `RecoilPattern`
 | AudioManager | setAudioManager |
 | PlayerController | setPlayerController |
 | FlashbangScreenEffect | setFlashbangEffect |
-| VoiceCalloutSystem | setVoiceCalloutSystem |
 
 Also receives `ImpactEffectsPool` + `ExplosionEffectsPool` from CombatantSystem via setter.
 

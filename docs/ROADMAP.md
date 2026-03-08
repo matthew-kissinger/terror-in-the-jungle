@@ -22,7 +22,7 @@ Vietnam War is the first theater. The architecture should generalize to any war 
 | Domain | State | Key Limitation |
 |--------|-------|----------------|
 | Vehicles | 1 player-only UH-1 Huey | No NPC boarding, no weapons, no damage, no enemy aircraft, throttle sticks |
-| Weapons | 4 player + 2 NPC types | Shared deploy/loadout flow is live, but field pickups and broader weapon expansion are still later-phase work |
+| Weapons | 6 player weapon types | Shared deploy/loadout flow is live, but field pickups and broader weapon expansion are still later-phase work |
 | AI | 8-state FSM, 2 factions (US/OPFOR) | No vehicle usage, no turret manning, limited tactical intelligence |
 | Squad | Single coordinator + quick strip + map-first overlay (desktop/touch/gamepad) | Selected-squad detail is live; gamepad uses map-first overlay; scale adapters deferred |
 | Terrain | Noise + DEM terrain runtime | CDLOD transition validation and hydrology/gameplay integration are still incomplete |
@@ -144,15 +144,15 @@ Not one monolith sandbox mode. Instead, composable blocks that can be combined:
 - LOD strategy for GLB models (distance-based swap or billboard fallback)
 
 ### 2B. Helicopter Model Swap
-- Replace HelicopterGeometry.ts + HelicopterGeometryParts.ts with Huey.glb
+- Replace HelicopterGeometry.ts with Huey.glb
 - Wire named mesh parts: mainRotor (spin), doorGunLeft/Right (aim), cockpitGlass (transparency)
 - Adjust collision bounds and interaction radius to match new geometry
 - Add gunship variant loading (UH-1C.glb with rocket pods + minigun parts)
 
 ### 2C. Weapon Viewmodel Swap
-- Replace ProgrammaticGunFactory.ts with GLB loading
+- ~~Replace ProgrammaticGunFactory with GLB loading~~ DONE (deleted; 7 GLBs wired via WeaponRigManager)
 - Wire animation clips from GLB (reload, fire recoil, ADS transition)
-- Map muzzle flash spawn point to named `muzzle` mesh part
+- ~~Map muzzle flash spawn point to named `muzzle` mesh part~~ DONE (auto-discovered from GLB node names)
 - Weapon-specific animations: M60 belt feed, shotgun pump, pistol slide
 
 ### 2D. Structure Integration

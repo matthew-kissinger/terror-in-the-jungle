@@ -187,7 +187,9 @@ export class GrenadeSystem implements GameSystem {
 
     this.cooking.startCooking();
 
-    // TODO(audio): Re-enable pin-pull SFX when dedicated asset is authored.
+    if (this.audioManager) {
+      this.audioManager.play('grenadePinPull');
+    }
   }
 
   adjustPower(delta: number): void {
@@ -274,7 +276,9 @@ export class GrenadeSystem implements GameSystem {
     const grenade = this.spawner.spawnGrenade(startPos, throwVelocity, remainingFuseTime, this.nextGrenadeId++, this.currentGrenadeType);
     this.grenades.push(grenade);
 
-    // TODO(audio): Re-enable throw SFX when dedicated asset is authored.
+    if (this.audioManager) {
+      this.audioManager.play('grenadeThrow');
+    }
 
     // Track grenade throw in stats
     if (this.statsTracker) {
@@ -389,6 +393,25 @@ export class GrenadeSystem implements GameSystem {
 
   getGrenadeType(): GrenadeType {
     return this.currentGrenadeType;
+  }
+
+  /**
+   * Spawn a grenade projectile with a given position and velocity.
+   * Used by the M79 grenade launcher - no cooking/aiming flow, just physics + fuse.
+   */
+  spawnProjectile(position: THREE.Vector3, velocity: THREE.Vector3, fuseTime: number): void {
+    const grenade = this.spawner.spawnGrenade(position, velocity, fuseTime, this.nextGrenadeId++, GrenadeType.FRAG);
+    this.grenades.push(grenade);
+
+    if (this.audioManager) {
+      this.audioManager.play('grenadeThrow');
+    }
+
+    if (this.statsTracker) {
+      this.statsTracker.addGrenadeThrow();
+    }
+
+    Logger.info('weapons', `M79 grenade launched (fuse ${fuseTime.toFixed(1)}s)`);
   }
 
 }

@@ -11,7 +11,7 @@ These domains are smaller, mostly untracked in the tick loop. Audio, Effects, an
 
 Key constraints:
 - AudioManager has fan-in 7 (third highest in the codebase). It is injected widely but has no setter deps itself.
-- FootstepAudioSystem and VoiceCalloutSystem are fully wired but disabled by compile-time flags. Do not re-enable without authored assets.
+- FootstepAudioSystem is active (`FOOTSTEP_AUDIO_ENABLED=true`). VoiceCalloutSystem was deleted (2026-03-06).
 - Effects pools (ExplosionEffectsPool, ImpactEffectsPool, TracerPool, MuzzleFlashSystem) are OWNED and ticked by CombatantSystem - they live under `systems/effects/` but are not standalone blocks.
 - SmokeCloudSystem uses a module-level `setSmokeCloudSystem()` function for wiring, not a setter method.
 - ObjectPoolManager is warmed to 240 Vector3 / 80 Quaternion / 32 Raycaster / 96 Matrix4 at boot. It is the primary GC-pressure mitigation for hot combat loops.
@@ -27,8 +27,7 @@ Key constraints:
 | Block | File | Tick | Status |
 |-------|------|------|--------|
 | [AudioManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/audio/AudioManager.ts) | systems/audio/AudioManager.ts | untracked | Active |
-| [FootstepAudioSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/audio/FootstepAudioSystem.ts) | systems/audio/FootstepAudioSystem.ts | untracked | DISABLED (`FOOTSTEP_AUDIO_ENABLED=false`) |
-| [VoiceCalloutSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/audio/VoiceCalloutSystem.ts) | systems/audio/VoiceCalloutSystem.ts | untracked | DISABLED (`CALLOUT_AUDIO_ENABLED=false`), wired through 14 files |
+| [FootstepAudioSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/audio/FootstepAudioSystem.ts) | systems/audio/FootstepAudioSystem.ts | untracked | Active (`FOOTSTEP_AUDIO_ENABLED=true`) |
 | [RadioTransmissionSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/audio/RadioTransmissionSystem.ts) | systems/audio/RadioTransmissionSystem.ts | untracked | Active |
 
 ### Modules (owned by AudioManager)
@@ -77,14 +76,7 @@ AudioContext is suspended until first user interaction (click/keydown/touchend).
 - AI footsteps only within 30m, max 5 concurrent.
 - Terrain detection: height < waterLevel -> WATER, < waterLevel+2 -> MUD, slope > 0.5 -> ROCK, else GRASS.
 - Walk intervals: GRASS 0.5s, MUD 0.55s, WATER 0.52s, ROCK 0.48s. Run: ~0.3s shorter each.
-- Re-enable path: author 4 WAV assets, set `FOOTSTEP_AUDIO_ENABLED=true`.
-
-### VoiceCalloutSystem - Key Notes
-
-- `CalloutType` enum: CONTACT, TAKING_FIRE, GRENADE, MAN_DOWN, RELOADING, TARGET_DOWN, SUPPRESSING, MOVING, IN_COVER.
-- Global cooldown 5s per combatant. Same-type cooldown 10s.
-- Only plays within 50m of player. Positional audio, refDistance 8, maxDistance 50.
-- Re-enable path: author `voiceCalloutUS.wav` and `voiceCalloutOPFOR.wav`, set `CALLOUT_AUDIO_ENABLED=true`.
+- Terrain-based footstep sounds (grass/mud/water/rock) with assets in `public/assets/optimized/`.
 
 ### RadioTransmissionSystem - Key Notes
 

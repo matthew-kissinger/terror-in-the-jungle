@@ -41,13 +41,13 @@ The game source code is at `C:\Users\Mattm\X\games-3d\terror-in-the-jungle`. Ref
 
 - **Asset loading:** `src/systems/assets/AssetLoader.ts` - loads textures, applies mipmaps, downscales
 - **Helicopter rendering:** `src/systems/helicopter/HelicopterGeometry.ts` - current procedural mesh (to be replaced by GLB)
-- **Weapon rendering:** `src/systems/combat/ProgrammaticGunFactory.ts` - current box-geometry weapons (to be replaced)
+- **Weapon rendering:** `src/systems/player/weapon/WeaponRigManager.ts` - loads GLB weapon models (M16, AK-47, Ithaca 37, M3 Grease Gun, M1911, M60, M79)
 - **NPC sprites:** `src/systems/combat/CombatantMeshFactory.ts` - billboard sprite system (18 InstancedMesh)
 - **Vegetation:** `src/systems/terrain/ChunkVegetationGenerator.ts` - billboard placement on terrain
 - **Terrain textures:** Applied via `THREE.MeshStandardMaterial` to chunk geometry
 - **GLB loading:** Will use `THREE.GLTFLoader` - named mesh parts accessed via `model.getObjectByName('partName')`
 
-**Current state:** 75 GLB models have been generated (see `deploy-3d-assets/README.md`) but are not yet integrated into the engine. All in-engine 3D objects still use procedural geometry (boxes, cylinders, planes). All vegetation and NPCs are 2D billboard sprites. This manifest covers the full replacement of procedural geometry with the generated models PLUS any additional assets needed for the roadmap.
+**Current state:** 75 GLB models generated (see `deploy-3d-assets/README.md`). Weapons (7 GLBs), helicopter (3 GLBs), and structures (19 prefab layouts via WorldFeatureSystem) are integrated. Animals (3 of 6 GLBs) spawn as ambient wildlife via AnimalSystem. NPCs remain 2D billboard sprites. This manifest covers remaining integration and additional assets needed for the roadmap.
 
 ### Art Direction
 

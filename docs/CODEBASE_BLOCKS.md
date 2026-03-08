@@ -5,7 +5,7 @@
 
 [GH]: https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src
 
-**250 classes. 43 GameSystems. 100 wiring edges. 7 singletons. 9 tick groups.**
+**250 classes. 44 GameSystems. 150 wiring edges. 7 singletons. 9 tick groups.**
 
 ---
 
@@ -39,7 +39,7 @@ Most-depended-on blocks. Touch these and you touch everything.
 | [HUDSystem]([GH]/ui/hud/HUDSystem.ts) | 7 | 5 | Combat, FPWeapon, Helicopter, PlayerCtrl, PlayerHealth, StratFeedback, ZoneMgr |
 | [TerrainSystem]([GH]/systems/terrain/TerrainSystem.ts) | 7 | 0 | Combat, Footstep, Helicopter, Helipad, PlayerCtrl, PlayerRespawn, ZoneMgr |
 | [InventoryManager]([GH]/systems/player/InventoryManager.ts) | 7 | 0 | AmmoSupply, FPWeapon, Grenade, Mortar, PlayerCtrl, PlayerRespawn, Sandbag |
-| [PlayerController]([GH]/systems/player/PlayerController.ts) | 7 | **13** | FPWeapon, Flashbang, Grenade, Helicopter, PlayerHealth, PlayerRespawn, Suppression |
+| [PlayerController]([GH]/systems/player/PlayerController.ts) | 7 | **15** | FPWeapon, Flashbang, Grenade, Helicopter, PlayerHealth, PlayerRespawn, Suppression |
 
 **Mutual dependencies** (bidirectional wiring):
 CombatantSystem <-> ZoneManager, PlayerController <-> FirstPersonWeapon, CombatantSystem <-> HUDSystem, PlayerHealthSystem <-> PlayerRespawnManager
@@ -69,7 +69,7 @@ TRACKED (budgeted, EMA-monitored):
 UNTRACKED (catch-all loop):
   assetLoader, audioManager, skybox, playerHealth, playerRespawn,
   helipad, helicopter, gameMode, squadCtrl, inventory, camShake,
-  suppression, flashbang, smoke, influence, voice, loadout, footstep
+  suppression, flashbang, smoke, influence, loadout, footstep
 
 performanceTelemetry.endFrame()
 
@@ -101,14 +101,14 @@ POST-TICK RENDER:
 ```
 BOOT       main.ts -> bootstrap.ts -> new GameEngine()
 CONSTRUCT  SystemInitializer: 37 systems created in dependency order
-WIRE       SystemConnector: 100 setter calls
+WIRE       SystemConnector: 150 setter calls
 INIT       system.init() per non-deferred system
 MENU       StartScreen. Player picks mode.
 MODE_START Load DEM (if A Shau) -> configure chunks/billboard/weather ->
            GameModeManager.applyModeConfiguration() ->
            WarSimulator.configure() -> pre-generate 3x3 spawn area -> init zones
 GAME_START Position player, enable combat, start ambient audio.
-           Deferred: HelipadSystem, HelicopterModel, VoiceCallout, Loadout (500ms)
+           Deferred: HelipadSystem, HelicopterModel, Loadout (500ms)
 TICK       RAF loop -> SystemUpdater.updateSystems() per frame
 MATCH_END  TicketSystem -> HUDSystem.handleGameEnd()
 RESTART    clearCombatants, resetTickets, respawnPlayer
@@ -120,7 +120,7 @@ RESTART    clearCombatants, resetTickets, respawnPlayer
 
 | Pattern | Where | How |
 |---------|-------|-----|
-| **Setter injection** | [SystemConnector]([GH]/core/SystemConnector.ts) (100 edges) | `refs.A.setB(refs.C)`. No compile-time safety. |
+| **Setter injection** | [SystemConnector]([GH]/core/SystemConnector.ts) (150 edges) | `refs.A.setB(refs.C)`. No compile-time safety. |
 | **Batched pub/sub** | [WarEventEmitter]([GH]/systems/strategy/WarEventEmitter.ts) only | `.emit()` queues, `.flush()` delivers batch. StrategicFeedback subscribes. |
 | **Callback 1:1** | TicketSystem, HelipadSystem, HUDSystem, SettingsManager | `.setCallback(fn)` or `.onChange(fn)` |
 | **Direct push** | FPWeapon->HUD, Combat->HUD, StratFeedback->HUD | Cross-system method calls |

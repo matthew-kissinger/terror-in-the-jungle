@@ -3,7 +3,7 @@
 > Self-contained reference for the Combat domain.
 > Base URL: `https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src`
 
-**4 GameSystem blocks. 46+ internal modules. 5ms tick budget (largest). Fan-in: 8 (third most depended-on).**
+**5 GameSystem blocks. 46+ internal modules. 5ms tick budget (largest). Fan-in: 8 (third most depended-on).**
 
 ---
 
@@ -31,6 +31,7 @@
 | [InfluenceMapSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/InfluenceMapSystem.ts) | systems/combat/InfluenceMapSystem.ts | untracked (throttled 500ms) | - | 0 | 2 |
 | [PlayerSquadController](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/PlayerSquadController.ts) | systems/combat/PlayerSquadController.ts | pre-tick explicit | - | 0 | 1 |
 | [RallyPointSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/RallyPointSystem.ts) | systems/combat/RallyPointSystem.ts | untracked | - | 0 | 0 |
+| [CommandInputManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CommandInputManager.ts) | systems/combat/CommandInputManager.ts | untracked | - | 0 | 0 |
 
 ---
 
@@ -42,7 +43,6 @@
 |-------|------|-------|
 | [CombatantSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantSystem.ts) | systems/combat/CombatantSystem.ts | Central block; owns combatants Map; exposes materializeAgent / dematerializeAgent |
 | [CombatantSystemDamage](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantSystemDamage.ts) | systems/combat/CombatantSystemDamage.ts | Explosion AoE delegation; uses KillAssistTracker |
-| [CombatantSystemSetters](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantSystemSetters.ts) | systems/combat/CombatantSystemSetters.ts | 102-line setter boilerplate; fans deps into sub-modules |
 | [CombatantSystemUpdate](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantSystemUpdate.ts) | systems/combat/CombatantSystemUpdate.ts | Squad objective reassignment (10s interval); player proxy helpers |
 | [CombatantProfiler](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantProfiler.ts) | systems/combat/CombatantProfiler.ts | Per-frame timing breakdown; exposes window.combatProfile() |
 
@@ -197,7 +197,7 @@ spatialGridManager.syncEntity(combatant.id, combatant.position)
 
 ## Wiring
 
-### Receives (setter injection via CombatantSystemSetters)
+### Receives (setter injection via CombatantSystem)
 
 | Dep | Setter | Purpose |
 |-----|--------|---------|
@@ -209,7 +209,6 @@ spatialGridManager.syncEntity(combatant.id, combatant.position)
 | [HUDSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/ui/hud/HUDSystem.ts) | setHUDSystem | Kill feed; damage numbers |
 | [AudioManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/audio/AudioManager.ts) | setAudioManager | Weapon sounds |
 | [PlayerSuppressionSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/player/PlayerSuppressionSystem.ts) | setPlayerSuppressionSystem | Player suppression from NPC near-miss fire |
-| [VoiceCalloutSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/audio/VoiceCalloutSystem.ts) | setVoiceCalloutSystem | Voice callouts (CALLOUT_AUDIO_ENABLED=false; wired, disabled) |
 
 ### Depended on by (fan-in 8)
 
@@ -339,7 +338,7 @@ File: [systems/combat/types.ts](https://github.com/matthew-kissinger/terror-in-t
 | state | CombatantState | State machine current state |
 | lodLevel | 'high'\|'medium'\|'low'\|'culled' | Set by LODManager each frame |
 | skillProfile | AISkillProfile | reactionDelayMs, aimJitterAmplitude, visualRange, fieldOfView |
-| isDying / deathProgress | boolean / number | Death animation (fall 0.7s + ground 4s + fade 1s) |
+| isDying / deathProgress | boolean / number | Death animation (fall 0.7s + ground 6s + fade 2s) |
 | squadId / squadRole | string / 'leader'\|'follower' | Optional squad membership |
 | inCover / coverPosition | boolean / Vector3 | Cover state |
 | suppressionLevel | number | Decays 0.3/s; affects accuracy |

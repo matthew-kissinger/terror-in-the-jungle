@@ -64,6 +64,7 @@ export class SystemConnector {
     refs.firstPersonWeapon.setZoneManager(refs.zoneManager);
     refs.firstPersonWeapon.setInventoryManager(refs.inventoryManager);
     refs.firstPersonWeapon.setAudioManager(refs.audioManager);
+    refs.firstPersonWeapon.setGrenadeSystem(refs.grenadeSystem);
 
     refs.footstepAudioSystem.setTerrainSystem(refs.terrainSystem);
 
@@ -118,6 +119,7 @@ export class SystemConnector {
     refs.hudSystem.setCombatantSystem(refs.combatantSystem);
     refs.hudSystem.setZoneManager(refs.zoneManager);
     refs.hudSystem.setTicketSystem(refs.ticketSystem);
+    refs.hudSystem.setAudioManager(refs.audioManager);
 
     // Mount UI components into grid slots
     const layout = refs.hudSystem.getLayout();

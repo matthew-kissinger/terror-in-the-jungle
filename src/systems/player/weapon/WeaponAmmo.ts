@@ -9,6 +9,8 @@ export class WeaponAmmo {
   private shotgunAmmo: AmmoManager
   private smgAmmo: AmmoManager
   private pistolAmmo: AmmoManager
+  private lmgAmmo: AmmoManager
+  private launcherAmmo: AmmoManager
   private currentAmmoManager: AmmoManager
 
   // Callbacks
@@ -59,6 +61,24 @@ export class WeaponAmmo {
       if (this.onAmmoChange) this.onAmmoChange(state)
     })
 
+    // LMG (M60): 100 round belt, 200 reserve
+    this.lmgAmmo = new AmmoManager(100, 200)
+    this.lmgAmmo.setOnReloadComplete(() => {
+      if (this.onReloadComplete) this.onReloadComplete()
+    })
+    this.lmgAmmo.setOnAmmoChange((state) => {
+      if (this.onAmmoChange) this.onAmmoChange(state)
+    })
+
+    // Launcher (M79): 1 round (break-action), 10 reserve
+    this.launcherAmmo = new AmmoManager(1, 10)
+    this.launcherAmmo.setOnReloadComplete(() => {
+      if (this.onReloadComplete) this.onReloadComplete()
+    })
+    this.launcherAmmo.setOnAmmoChange((state) => {
+      if (this.onAmmoChange) this.onAmmoChange(state)
+    })
+
     // Start with rifle ammo active
     this.currentAmmoManager = this.rifleAmmo
   }
@@ -79,6 +99,14 @@ export class WeaponAmmo {
     return this.pistolAmmo
   }
 
+  getLMGAmmo(): AmmoManager {
+    return this.lmgAmmo
+  }
+
+  getLauncherAmmo(): AmmoManager {
+    return this.launcherAmmo
+  }
+
   getCurrentAmmoManager(): AmmoManager {
     return this.currentAmmoManager
   }
@@ -93,6 +121,8 @@ export class WeaponAmmo {
     this.shotgunAmmo.setZoneManager(zoneManager)
     this.smgAmmo.setZoneManager(zoneManager)
     this.pistolAmmo.setZoneManager(zoneManager)
+    this.lmgAmmo.setZoneManager(zoneManager)
+    this.launcherAmmo.setZoneManager(zoneManager)
   }
 
   resetAll(): void {
@@ -100,6 +130,8 @@ export class WeaponAmmo {
     this.shotgunAmmo.reset()
     this.smgAmmo.reset()
     this.pistolAmmo.reset()
+    this.lmgAmmo.reset()
+    this.launcherAmmo.reset()
   }
 
   getAmmoState(): any {

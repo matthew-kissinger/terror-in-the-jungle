@@ -4,7 +4,9 @@ export enum LoadoutWeapon {
   RIFLE = 'rifle',
   SHOTGUN = 'shotgun',
   SMG = 'smg',
-  PISTOL = 'pistol'
+  PISTOL = 'pistol',
+  LMG = 'lmg',
+  LAUNCHER = 'launcher'
 }
 
 export enum LoadoutEquipment {
@@ -51,6 +53,8 @@ export const LOADOUT_WEAPON_ORDER: LoadoutWeapon[] = [
   LoadoutWeapon.SHOTGUN,
   LoadoutWeapon.SMG,
   LoadoutWeapon.PISTOL,
+  LoadoutWeapon.LMG,
+  LoadoutWeapon.LAUNCHER,
 ];
 
 export const LOADOUT_WEAPON_OPTIONS: ReadonlyArray<LoadoutFieldOption<LoadoutWeapon>> = [
@@ -58,6 +62,8 @@ export const LOADOUT_WEAPON_OPTIONS: ReadonlyArray<LoadoutFieldOption<LoadoutWea
   { value: LoadoutWeapon.SHOTGUN, label: 'Shotgun', shortLabel: 'SG' },
   { value: LoadoutWeapon.SMG, label: 'SMG', shortLabel: 'SMG' },
   { value: LoadoutWeapon.PISTOL, label: 'Pistol', shortLabel: 'PST' },
+  { value: LoadoutWeapon.LMG, label: 'LMG', shortLabel: 'MG' },
+  { value: LoadoutWeapon.LAUNCHER, label: 'Grenade Launcher', shortLabel: 'GL' },
 ];
 
 export const LOADOUT_EQUIPMENT_ORDER: LoadoutEquipment[] = [
@@ -92,6 +98,8 @@ const LOADOUT_POOL_BY_FACTION: Record<
       LoadoutWeapon.SHOTGUN,
       LoadoutWeapon.SMG,
       LoadoutWeapon.PISTOL,
+      LoadoutWeapon.LMG,
+      LoadoutWeapon.LAUNCHER,
     ],
     equipment: [
       LoadoutEquipment.FRAG_GRENADE,
@@ -139,6 +147,7 @@ const LOADOUT_POOL_BY_FACTION: Record<
       LoadoutWeapon.SHOTGUN,
       LoadoutWeapon.SMG,
       LoadoutWeapon.PISTOL,
+      LoadoutWeapon.LMG,
     ],
     equipment: [
       LoadoutEquipment.FRAG_GRENADE,

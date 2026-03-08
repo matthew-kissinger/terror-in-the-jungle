@@ -265,7 +265,8 @@ Doc updates:
 - [ ] Vegetation billboard remakes
 - [ ] Terrain textures
 - [ ] Helicopter GLBs (UH-1 Huey, UH-1C Gunship)
-- [ ] Weapon viewmodel GLBs
+- [x] Weapon viewmodel GLBs (7 wired: M16A1, AK-47, Ithaca 37, M3 Grease Gun, M1911, M60, M79)
+- [x] Animal GLBs (3 of 6 wired: egret, water_buffalo, macaque via AnimalSystem)
 
 ### 4.2 Helicopter controls overhaul (Roadmap Phase 3A)
 - [ ] Fix collective throttle stickiness (documented known bug)
@@ -312,3 +313,4 @@ Record completed items here with date and commit hash.
 | 2026-03-08 | 3.1 GameModeManager review | - | 94-line thin coordinator accepted as-is; validate passes (128 files, 3053 tests) |
 | 2026-03-08 | 3.2 Terrain rewrite status | - | T-002/T-004/T-005 done, T-003/T-007 in_progress (asset-blocked), T-008 pending design |
 | 2026-03-08 | Doc sync | - | GAME_MODES_EXECUTION_PLAN Phase 1/4/5 status, ACTIVE_GAME_MODES_HANDOFF gaps/resume, ARCHITECTURE_RECOVERY_PLAN Keep Decisions |
+| 2026-03-08 | Player-facing 10-step plan | - | Tracers, grenade/kill-streak audio, graphics quality tiers, TDM/ZC/A Shau structures, AnimalSystem, M60 LMG, M79 launcher, ProgrammaticGunFactory deleted |

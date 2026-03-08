@@ -56,9 +56,8 @@ Scope: visual consistency, CSS debt reduction, component strategy for game UI.
 
 ## Next Iteration (Design + Implementation)
 
-1. Run `npm run ui:matrix` and review screenshots/metrics.
-2. Resolve any overlap/offscreen/crowding warnings.
-3. Migrate remaining legacy inline HUD components to CSS modules.
-4. Introduce a `ui-surface` primitive style class family for all overlays.
-5. Add a visual QA gate to PR checklist using matrix report artifacts.
+1. Resolve any overlap/offscreen/crowding warnings.
+2. Migrate remaining legacy inline HUD components to CSS modules.
+3. Introduce a `ui-surface` primitive style class family for all overlays.
+4. Add a visual QA gate to PR checklist.
 

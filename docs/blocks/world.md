@@ -23,17 +23,19 @@
 | GameModeRuntime | `systems/world/runtime/GameModeRuntime.ts` | Runtime lifecycle hooks (`onEnter`, `onExit`, `onReapply`) backed by mode policies |
 | DeployFlowSession | `systems/world/runtime/DeployFlowSession.ts` | Shared deploy-session model that projects mode policy into front-menu and respawn UI copy/behavior |
 | ModeSpawnResolver | `systems/world/runtime/ModeSpawnResolver.ts` | Shared policy-driven initial spawn and pressure-front respawn position resolver used by startup and respawn flow |
-| ZoneCaptureLogic | [strategy/zones/ZoneCaptureLogic.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/zones/ZoneCaptureLogic.ts) | Counts BLUFOR/OPFOR in radius, advances capture progress, flips ownership |
-| ZoneInitializer | [strategy/zones/ZoneInitializer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/zones/ZoneInitializer.ts) | Reads GameModeConfig.zones, creates zone state objects |
-| ZoneRenderer | [strategy/zones/ZoneRenderer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/zones/ZoneRenderer.ts) | Zone ring meshes, colored by ownership faction |
-| ZoneTerrainAdapter | [strategy/zones/ZoneTerrainAdapter.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/zones/ZoneTerrainAdapter.ts) | Grounds zone center Y to terrain height |
-| TicketBleedCalculator | [strategy/tickets/TicketBleedCalculator.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/tickets/TicketBleedCalculator.ts) | Computes bleed rate from zone ownership counts |
-| TicketSystemPhases | [strategy/tickets/TicketSystemPhases.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/tickets/TicketSystemPhases.ts) | Tick-based drain, kill ticket deductions |
-| VictoryConditions | [strategy/tickets/VictoryConditions.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/tickets/VictoryConditions.ts) | Detects 0-ticket or timer-expiry, fires gameEndCallback |
-| GameModeManager | [strategy/GameModeManager.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/GameModeManager.ts) | Resolves active `GameModeDefinition`, creates a policy-backed runtime, pushes map-intel policy into minimap/full-map systems, and still fans legacy config into multiple systems while the refactor is in progress |
-| GPUBillboardSystem | [terrain/billboard/GPUBillboardSystem.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/billboard/GPUBillboardSystem.ts) | Instanced mesh renderer for vegetation billboards |
-| GPUBillboardVegetation | [terrain/billboard/GPUBillboardVegetation.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/billboard/GPUBillboardVegetation.ts) | Vegetation placement, BillboardBufferManager |
-| BillboardShaders | [terrain/billboard/BillboardShaders.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/billboard/BillboardShaders.ts) | Custom GLSL for alpha-tested billboard materials |
+| ZoneCaptureLogic | [systems/world/ZoneCaptureLogic.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world/ZoneCaptureLogic.ts) | Counts BLUFOR/OPFOR in radius, advances capture progress, flips ownership |
+| ZoneInitializer | [systems/world/ZoneInitializer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world/ZoneInitializer.ts) | Reads GameModeConfig.zones, creates zone state objects |
+| ZoneRenderer | [systems/world/ZoneRenderer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world/ZoneRenderer.ts) | Zone ring meshes, colored by ownership faction |
+| ZoneTerrainAdapter | [systems/world/ZoneTerrainAdapter.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world/ZoneTerrainAdapter.ts) | Grounds zone center Y to terrain height |
+| TicketBleedCalculator | [systems/world/TicketBleedCalculator.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world/TicketBleedCalculator.ts) | Computes bleed rate from zone ownership counts |
+| TicketSystemPhases | [systems/world/TicketSystemPhases.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world/TicketSystemPhases.ts) | Tick-based drain, kill ticket deductions |
+| VictoryConditions | [systems/world/VictoryConditions.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world/VictoryConditions.ts) | Detects 0-ticket or timer-expiry, fires gameEndCallback |
+| GameModeManager | [systems/world/GameModeManager.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world/GameModeManager.ts) | Resolves active `GameModeDefinition`, creates a policy-backed runtime, pushes map-intel policy into minimap/full-map systems, and still fans legacy config into multiple systems while the refactor is in progress |
+| AnimalSystem | [systems/world/AnimalSystem.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world/AnimalSystem.ts) | Ambient wildlife spawning, cell-based (128m cells), purely cosmetic |
+| WorldFeatureSystem | [systems/world/WorldFeatureSystem.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world/WorldFeatureSystem.ts) | Structure placement with terrain flatten and vegetation clear |
+| GPUBillboardSystem | [world/billboard/GPUBillboardSystem.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world/billboard/GPUBillboardSystem.ts) | Instanced mesh renderer for vegetation billboards |
+| GPUBillboardVegetation | [world/billboard/BillboardBufferManager.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world/billboard/BillboardBufferManager.ts) | Vegetation placement class (defined in BillboardBufferManager.ts) |
+| BillboardShaders | [world/billboard/BillboardShaders.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world/billboard/BillboardShaders.ts) | Custom GLSL for alpha-tested billboard materials |
 
 ---
 
@@ -132,7 +134,7 @@ GameModeManager still calls setters on multiple systems when mode changes. This 
 - [docs/blocks/ui.md](../blocks/ui.md) - HUDZoneDisplay, TicketDisplay consumers
 - [docs/blocks/vehicle.md](../blocks/vehicle.md) - HelipadSystem reads GameModeConfig
 - [docs/ARCHITECTURE_RECOVERY_PLAN.md](../ARCHITECTURE_RECOVERY_PLAN.md) - spatial unification, heap triage
-- [src/systems/strategy/](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy) - full strategy directory
-- [src/systems/terrain/billboard/](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/billboard) - billboard directory
+- [src/systems/world/](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world) - full world directory
+- [src/systems/world/billboard/](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/world/billboard) - billboard directory
 - [src/config/gameModes.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/config/gameModes.ts) - mode config factory
 - [src/config/gameModeTypes.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/config/gameModeTypes.ts) - GameModeConfig type definition

@@ -170,35 +170,48 @@ export class GameEngine {
   private applyGraphicsQuality(quality: string): void {
     const renderer = this.renderer.renderer;
     const moonLight = this.renderer.moonLight;
+    const pp = this.renderer.postProcessing;
 
     switch (quality) {
       case 'low':
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1));
+        renderer.shadowMap.enabled = false;
         if (moonLight) {
+          moonLight.castShadow = false;
           moonLight.shadow.mapSize.width = 512;
           moonLight.shadow.mapSize.height = 512;
         }
+        if (pp) pp.setPixelSize(4);
         break;
       case 'medium':
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        renderer.shadowMap.enabled = true;
         if (moonLight) {
+          moonLight.castShadow = true;
           moonLight.shadow.mapSize.width = 2048;
           moonLight.shadow.mapSize.height = 2048;
         }
+        if (pp) pp.setPixelSize(3);
         break;
       case 'high':
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
         if (moonLight) {
+          moonLight.castShadow = true;
           moonLight.shadow.mapSize.width = 4096;
           moonLight.shadow.mapSize.height = 4096;
         }
+        if (pp) pp.setPixelSize(1.5);
         break;
       case 'ultra':
         renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
         if (moonLight) {
+          moonLight.castShadow = true;
           moonLight.shadow.mapSize.width = 4096;
           moonLight.shadow.mapSize.height = 4096;
         }
+        if (pp) pp.setPixelSize(1);
         break;
     }
 

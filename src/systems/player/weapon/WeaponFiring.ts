@@ -10,12 +10,14 @@ import { ShotCommand, ShotResult } from './ShotCommand'
 import { performanceTelemetry } from '../../debug/PerformanceTelemetry'
 import { WeaponShotExecutor } from './WeaponShotExecutor'
 import type { HUDSystem } from '../../../ui/hud/HUDSystem'
+import type { GrenadeSystem } from '../../weapons/GrenadeSystem'
 
 // Module-level scratch vectors to avoid per-shot allocations
 const _negDirection = new THREE.Vector3()
 const _muzzlePos = new THREE.Vector3()
 const _cameraPos = new THREE.Vector3()
 const _forward = new THREE.Vector3()
+const _tracerEnd = new THREE.Vector3()
 
 /**
  * Handles weapon firing execution. Uses command pattern to avoid temporal coupling.
@@ -36,6 +38,7 @@ export class WeaponFiring {
   private muzzleRef?: THREE.Object3D
   private shotExecutor?: WeaponShotExecutor
   private overlayScene: THREE.Scene
+  private grenadeSystem?: GrenadeSystem
 
   constructor(
     camera: THREE.Camera,
@@ -81,6 +84,10 @@ export class WeaponFiring {
     this.gunCore = gunCore
   }
 
+  setGrenadeSystem(grenadeSystem: GrenadeSystem): void {
+    this.grenadeSystem = grenadeSystem
+  }
+
   private initializeShotExecutor(): void {
     if (this.combatantSystem) {
       this.shotExecutor = new WeaponShotExecutor(
@@ -103,6 +110,11 @@ export class WeaponFiring {
       return { hit: false, killed: false, headshot: false, damageDealt: 0 }
     }
 
+    // Launcher fires a grenade projectile instead of hitscan
+    if (command.weaponType === 'launcher') {
+      return this.executeLauncherShot(command)
+    }
+
     // Play weapon-specific sound
     if (this.audioManager) {
       this.audioManager.playPlayerWeaponSound(command.weaponType)
@@ -123,10 +135,48 @@ export class WeaponFiring {
     // Spawn muzzle flash
     this.spawnMuzzleFlash()
 
+    // Spawn tracer
+    this.spawnTracer(command, result)
+
     // Record in telemetry
     performanceTelemetry.recordShot(result.hit)
 
     return result
+  }
+
+  /**
+   * Execute an M79 grenade launcher shot.
+   * Spawns a grenade projectile instead of hitscan - damage comes from grenade explosion.
+   */
+  private executeLauncherShot(command: ShotCommand): ShotResult {
+    // Play launcher-specific sound (falls back to rifle sound)
+    if (this.audioManager) {
+      this.audioManager.playPlayerWeaponSound('rifle')
+    }
+
+    // Spawn muzzle flash
+    this.spawnMuzzleFlash()
+
+    // Spawn grenade projectile via GrenadeSystem
+    if (this.grenadeSystem) {
+      this.camera.getWorldPosition(_cameraPos)
+      this.camera.getWorldDirection(_forward)
+
+      // Start grenade slightly ahead of camera
+      const startPos = _cameraPos.clone().addScaledVector(_forward, 1.5)
+
+      // M79 muzzle velocity ~40 m/s, slight upward arc
+      const velocity = _forward.clone().multiplyScalar(40)
+      velocity.y += 3.0 // Slight upward boost for natural arc
+
+      // Shorter fuse than hand grenades (2.0s vs 3.5s)
+      this.grenadeSystem.spawnProjectile(startPos, velocity, 2.0)
+    }
+
+    // Record in telemetry (no hit - damage comes from explosion)
+    performanceTelemetry.recordShot(false)
+
+    return { hit: false, killed: false, headshot: false, damageDealt: 0 }
   }
 
   private spawnMuzzleFlash(): void {
@@ -153,6 +203,30 @@ export class WeaponFiring {
     _muzzlePos.y += 0.03
 
     this.muzzleFlashSystem.spawnPlayer(this.overlayScene, _muzzlePos, _forward, variant)
+  }
+
+  private spawnTracer(command: ShotCommand, result: ShotResult): void {
+    this.camera.getWorldPosition(_cameraPos)
+    this.camera.getWorldDirection(_forward)
+    // Start tracer slightly ahead of camera to avoid first-person clipping
+    _cameraPos.addScaledVector(_forward, 2)
+
+    if (command.weaponType === 'shotgun' && command.pelletRays) {
+      // Spawn 1 tracer per 3 pellets
+      for (let i = 0; i < command.pelletRays.length; i += 3) {
+        const pelletRay = command.pelletRays[i]
+        const range = result.distance ?? 25
+        _tracerEnd.copy(pelletRay.origin).addScaledVector(pelletRay.direction, range)
+        this.tracerPool.spawn(_cameraPos, _tracerEnd, 100)
+      }
+    } else {
+      if (result.hitPoint) {
+        _tracerEnd.copy(result.hitPoint)
+      } else {
+        _tracerEnd.copy(command.ray.origin).addScaledVector(command.ray.direction, 200)
+      }
+      this.tracerPool.spawn(_cameraPos, _tracerEnd, 120)
+    }
   }
 
   getGunCore(): GunplayCore {

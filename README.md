@@ -1,71 +1,64 @@
 # Terror in the Jungle
 
-Browser-based 3D FPS focused on large-scale jungle combat, stable frame pacing, and testable AI behavior.
+Browser-based 3D FPS set in Vietnam. Large-scale AI combat, stable frame pacing, testable scenarios.
 
-Live build:
-- https://matthew-kissinger.github.io/terror-in-the-jungle/
+**Play:** https://matthew-kissinger.github.io/terror-in-the-jungle/
+
+## Prerequisites
+
+- Node 22 (pinned in `.nvmrc`)
+- Modern browser with WebGL2
 
 ## Quick Start
 
 ```bash
 npm install
 npm run dev
-```
-
-Core commands:
-
-```bash
 npm run build
-npm run test:run
-npm run perf:capture
-npm run perf:analyze:latest
 ```
 
 ## Game Modes
 
-| Mode | World Size | Max Materialized Combatants | Match Length |
-|---|---:|---:|---:|
-| Zone Control | 500 | 20 | 3 min |
-| Open Frontier | 3200 | 120 | 15 min |
-| Team Deathmatch | 400 | 30 | 5 min |
-| AI Sandbox | 200 (default) | configurable | 60 min |
-| A Shau Valley | 21136 | 60 (materialized), 3000 strategic | 60 min |
+| Mode | World Size | Combatants | Match Length | Description |
+|------|---:|---:|---:|---|
+| Zone Control | 500m | 20 | 3 min | Combat over 3 strategic zones. Control the majority to drain enemy tickets. |
+| Team Deathmatch | 400m | 30 | 5 min | Pure tactical combat. First team to the kill target wins. |
+| Open Frontier | 3200m | 120 | 15 min | Large-scale warfare across 10 zones with helicopters. |
+| A Shau Valley | 21km | 60 materialized / 3000 strategic | 60 min | Historical campaign on real DEM terrain with war simulator. |
+| AI Sandbox | 200m | 40 (configurable) | 60 min | Automated AI combat for performance testing. |
+
+Three flyable helicopters: UH-1 Huey (transport), UH-1C Gunship, AH-1 Cobra (attack).
+
+## Development
+
+```bash
+npm run dev                # Vite dev server
+npm run build              # Type-check + production build
+npm run test:run           # All tests
+npm run test:quick         # Unit tests only (dot reporter)
+npm run test:integration   # Integration scenario tests
+npm run validate           # Type-check + unit tests + build
+npm run validate:full      # validate + combat120 perf capture + baseline comparison
+npm run lint               # ESLint
+npm run lint:fix           # ESLint with auto-fix
+```
 
 ## Profiling
 
-Main loop:
-
 ```bash
-npm run perf:capture
-npm run perf:capture:combat120
-npm run perf:capture:openfrontier:short
-npm run perf:capture:ashau:short
-npm run perf:capture:frontier30m
-npm run perf:analyze:latest
-npm run perf:compare -- --scenario combat120
-npm run perf:update-baseline -- --scenario combat120
+npm run perf:capture                # Default headed capture
+npm run perf:capture:combat120      # 120 NPC combat stress test
+npm run perf:compare                # Compare latest capture against baselines
+npm run perf:update-baseline        # Update baseline from latest capture
+npm run perf:analyze:latest         # Analyze most recent capture artifacts
 ```
 
 Artifacts are written to `artifacts/perf/<timestamp>/`.
 
-Current perf posture:
-- Close measured CPU tail hotspots and keep warm baselines honest before reaching for WebGPU, WASM, worker-offload, navmesh, or ECS-scale rewrites.
-- Treat frontier-tech work as follow-on to `docs/PERF_FRONTIER.md`, not as the current unblocker.
+## Tech Stack
+
+Three.js r182, TypeScript 5.9, Vite 7.3, Vitest 4.0, Playwright 1.58.
 
 ## Documentation
 
-Start at `docs/README.md`.
-
-Primary docs:
-- `docs/README.md`
-- `docs/GAME_MODES_EXECUTION_PLAN.md`
-- `docs/PERF_FRONTIER.md`
-- `docs/ARCHITECTURE_RECOVERY_PLAN.md`
-- `docs/PROFILING_HARNESS.md`
-- `docs/TERRAIN_REWRITE_MASTER_PLAN.md`
-- `docs/ASHAU_VALLEY_IMPLEMENTATION_PLAN.md`
-- `data/vietnam/DATA_PIPELINE.md`
-
-## License
-
-MIT
+See [docs/README.md](docs/README.md) for the full docs index and block map.

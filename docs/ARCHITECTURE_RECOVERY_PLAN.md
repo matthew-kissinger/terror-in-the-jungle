@@ -24,7 +24,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 | P1 | Spatial ownership unification (F3) | DONE | Legacy SpatialOctree removed from CombatantSystem. All consumers (AI, LOD, spawn, hit detection) use SpatialGridManager singleton. Secondary sync and dedup feature flags removed. |
 | P2 | Heap growth triage in combat-heavy runs | IN_PROGRESS | New diagnostics added. Latest Phase 2 evidence still points to churn-heavy waves rather than a proven unbounded leak. A frame-local `AITargetAcquisition` neighborhood cache improved warm `combat120` starvation (`16.82 -> 12.91`) and heap growth (`15.73MB -> 3.64MB`). A second accepted March 4 optimization in `AIStateEngage.initiateSquadSuppression()` (flank-probe elevation + probe allocation cleanup) reduced warm combat tails/stalls again (`Combat.maxDurationMs 259.7ms -> 218.6ms/182.3ms`, long tasks `74 -> 47/31`), but rare p99 spikes still appear in some runs. |
 | P3 | A Shau gameplay flow and contact reliability | IN_PROGRESS | Short harness capture is now behavior-valid (`270` shots / `150` hits on 2026-03-04). Remaining work is performance analysis, not basic contact acquisition. |
-| P4 | UI/HUD update budget discipline | DONE | UI Engine Phases 0-7 complete. 11 UIComponents migrated to CSS Modules + signals. Grid layout with 17 named slots. VisibilityManager wired. All touch controls on pointer events as UIComponent subclasses. UnifiedWeaponBar replaces 3 duplicates. Renderer subscribes to ViewportManager. 12 dead component files + 7 dead style files deleted. |
+| P4 | UI/HUD update budget discipline | DONE | UI Engine Phases 0-7 complete. 19 CSS Modules + signals. Grid layout with 19 named slots. VisibilityManager wired. All touch controls on pointer events as UIComponent subclasses. UnifiedWeaponBar replaces 3 duplicates. Renderer subscribes to ViewportManager. 12 dead component files + 7 dead style files deleted. |
 | P5 | Terrain runtime stabilization | IN_PROGRESS | Terrain rewrite is active under `TERRAIN_REWRITE_MASTER_PLAN.md`: world-size authority, truthful terrain API, biome/vegetation runtime wiring, terrain block-boundary cleanup, and large-world startup cost reduction validated in preview smoke. Phase 2 warm captures still show terrain max-duration spikes of `849.6ms` (`open_frontier`), `869.7ms` (`frontier30m`), and `2225.2ms` (`a_shau_valley`). March 6 fix: half-texel UV correction in vertex shader eliminates render/collision/vegetation positional drift (up to 3.1m at map edges for Open Frontier). |
 
 ## Keep Decisions (Recent)
@@ -37,7 +37,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: Death presentation: 6s ground persistence (was 4s), 2s fadeout (was 1s), ground-sinking replaces scale-to-zero.
 - Keep: `GameModeManager.applyModeConfiguration()` uses `objective.kind === 'deathmatch'` policy check instead of hardcoded `GameMode.TEAM_DEATHMATCH` comparison.
 - Keep: `SystemConnector` split into 11 named private methods (`wirePlayer`, `wireCombat`, `wireHUD`, etc.) for dependency graph readability.
-- Keep: CSS Grid HUD layout (`#game-hud-root`) with 17 named slots replacing 33+ position:fixed elements.
+- Keep: CSS Grid HUD layout (`#game-hud-root`) with 19 named slots replacing 33+ position:fixed elements.
 - Keep: UnifiedWeaponBar (single weapon UI for desktop + touch, replaces TouchWeaponBar + InventoryManager hotbar + WeaponAmmoDisplay).
 - Keep: pointer events (pointerdown/up/cancel + setPointerCapture) on all touch controls, replacing touch events (zero touchstart/end/move listeners remain in controls).
 - Keep: VisibilityManager drives HUD visibility via data attributes on #game-hud-root; CSS rules respond to data-phase, data-vehicle, data-ads, data-device, data-layout.
@@ -47,6 +47,13 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: single compact fullscreen prompt on mobile entry (auto-fades 6s); landscape prompt removed as redundant (Deploy tap auto-enters fullscreen + locks landscape).
 - Keep: squared-distance and allocation reductions in spatial queries.
 - Keep: AI target acquisition scratch-buffer reuse.
+- Keep: 6 weapon types (`rifle|shotgun|smg|pistol|lmg|launcher`). M60 LMG and M79 grenade launcher wired through WeaponRigManager, GunplayCore, ShotCommand, WeaponAmmo, WeaponSwitching, LoadoutTypes, AudioWeaponSounds.
+- Keep: M79 launcher fires grenade projectile via `GrenadeSystem.spawnProjectile()` instead of hitscan. Separate from hand-thrown grenade cooking flow.
+- Keep: Player tracer spawning in `WeaponFiring.spawnTracer()`. TracerPool already existed for NPC shots; now shared.
+- Keep: `applyGraphicsQuality()` controls post-processing pixel size per tier (low=4, med=3, high=1.5, ultra=1) and toggles shadows.
+- Keep: `AnimalSystem` cell-based ambient wildlife (egret, water_buffalo, macaque). Deterministic per-cell xorshift32 PRNG, ~20-25 active within 200m. No combat interaction.
+- Keep: Structure feature placements on TDM (4), Zone Control (5), A Shau (+10 to 16 total). All use existing WorldFeatureSystem + prefab layouts.
+- Delete: `ProgrammaticGunFactory.ts` (dead code; all weapons load from GLBs via WeaponRigManager).
 - Keep: frame-local AI neighborhood cache in `AITargetAcquisition`; patrol/defend cluster-density checks now reuse the widest per-combatant spatial query issued that frame.
 - Keep: heap validation expansion (`growth`, `peak`, `recovery`) in harness output.
 - Keep: Single SpatialGridManager as sole spatial owner. Legacy SpatialOctree direct usage removed from CombatantSystem and all sub-modules.

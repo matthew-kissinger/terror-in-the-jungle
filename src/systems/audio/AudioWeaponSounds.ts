@@ -63,7 +63,7 @@ export class AudioWeaponSounds {
      * Enhanced weapon sound playback with pitch/volume variation and layered sounds
      * @param weaponType - Type of weapon: 'rifle', 'shotgun', or 'smg'
      */
-    playPlayerWeaponSound(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' = 'rifle'): void {
+    playPlayerWeaponSound(weaponType: 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher' = 'rifle'): void {
         // Mark combat time for audio ducking
         this.duckingSystem.markCombatSound();
 
@@ -80,7 +80,11 @@ export class AudioWeaponSounds {
                 pool = this.poolManager.getPlayerSMGPool();
                 configKey = 'playerSMG';
                 break;
-            default: // rifle
+            case 'lmg':
+                pool = this.poolManager.getPlayerGunshotPool();
+                configKey = 'playerGunshot';
+                break;
+            default: // rifle, pistol
                 pool = this.poolManager.getPlayerGunshotPool();
                 configKey = 'playerGunshot';
         }
@@ -104,6 +108,11 @@ export class AudioWeaponSounds {
                 pitchMin = 1.08;
                 pitchMax = 1.18;
                 volumeVariation = 0.92 + Math.random() * 0.12;
+                break;
+            case 'lmg':
+                pitchMin = 0.85;
+                pitchMax = 0.95;
+                volumeVariation = 0.95 + Math.random() * 0.1; // Deep, heavy sound
                 break;
         }
 

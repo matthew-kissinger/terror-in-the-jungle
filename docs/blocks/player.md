@@ -1,7 +1,7 @@
 # Player Domain
 
 > Self-contained reference. 8 GameSystem blocks, 21 internal modules, 1ms tick budget.
-> PlayerController has the highest setter fan-out in the codebase (13 deps).
+> PlayerController has the highest setter fan-out in the codebase (15 deps).
 
 [GH]: https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src
 
@@ -11,9 +11,9 @@
 
 | Block | File | Tick | Budget | Deps | Fan-In |
 |-------|------|------|--------|------|--------|
-| [PlayerController]([GH]/systems/player/PlayerController.ts) | systems/player/PlayerController.ts | Player | 1ms | 13 | 7 |
-| [FirstPersonWeapon]([GH]/systems/player/FirstPersonWeapon.ts) | systems/player/FirstPersonWeapon.ts | Player | 1ms | 7 | 4 |
-| [PlayerHealthSystem]([GH]/systems/player/PlayerHealthSystem.ts) | systems/player/PlayerHealthSystem.ts | untracked | - | 6 | 2 |
+| [PlayerController]([GH]/systems/player/PlayerController.ts) | systems/player/PlayerController.ts | Player | 1ms | 15 | 7 |
+| [FirstPersonWeapon]([GH]/systems/player/FirstPersonWeapon.ts) | systems/player/FirstPersonWeapon.ts | Player | 1ms | 8 | 4 |
+| [PlayerHealthSystem]([GH]/systems/player/PlayerHealthSystem.ts) | systems/player/PlayerHealthSystem.ts | untracked | - | 7 | 2 |
 | [PlayerRespawnManager]([GH]/systems/player/PlayerRespawnManager.ts) | systems/player/PlayerRespawnManager.ts | untracked | - | 8 | 1 |
 | [InventoryManager]([GH]/systems/player/InventoryManager.ts) | systems/player/InventoryManager.ts | untracked | - | 0 | 7 |
 | [PlayerSuppressionSystem]([GH]/systems/player/PlayerSuppressionSystem.ts) | systems/player/PlayerSuppressionSystem.ts | untracked | - | 2 | 1 |
@@ -37,7 +37,9 @@
 | [DeathCamOverlay]([GH]/systems/player/DeathCamOverlay.ts) | systems/player/DeathCamOverlay.ts | Death camera overlay |
 | [RespawnUI]([GH]/systems/player/RespawnUI.ts) | systems/player/RespawnUI.ts | Respawn interface |
 | [RespawnMapController]([GH]/systems/player/RespawnMapController.ts) | systems/player/RespawnMapController.ts | Respawn map interaction |
-| [ProgrammaticGunFactory]([GH]/systems/player/ProgrammaticGunFactory.ts) | systems/player/ProgrammaticGunFactory.ts | Procedural gun geometry |
+| [LoadoutService]([GH]/systems/player/LoadoutService.ts) | systems/player/LoadoutService.ts | Weapon loadout selection and persistence |
+| [RespawnSpawnPoint]([GH]/systems/player/RespawnSpawnPoint.ts) | systems/player/RespawnSpawnPoint.ts | Spawn point type definitions |
+| ~~ProgrammaticGunFactory~~ | *(deleted 2026-03-08)* | Dead code - all weapons load GLBs via WeaponRigManager |
 
 ### FirstPersonWeapon Internals
 
@@ -59,7 +61,7 @@
 
 ## Wiring
 
-**PlayerController** receives (13 deps - highest fan-out):
+**PlayerController** receives (15 deps - highest fan-out):
 
 | Dep | Method | Domain |
 |-----|--------|--------|
@@ -76,10 +78,12 @@
 | MortarSystem | setMortarSystem | Weapons |
 | SandbagSystem | setSandbagSystem | Weapons |
 | PlayerSquadController | setPlayerSquadController | Combat |
+| Renderer | setRenderer | Core |
+| CommandInputManager | setCommandInputManager | Combat |
 
-**FirstPersonWeapon** receives (7): PlayerController, CombatantSystem, TicketSystem, HUDSystem, ZoneManager, AudioManager, InventoryManager
+**FirstPersonWeapon** receives (8): PlayerController, CombatantSystem, TicketSystem, HUDSystem, ZoneManager, AudioManager, InventoryManager, GrenadeSystem
 
-**PlayerHealthSystem** receives (6): ZoneManager, TicketSystem, PlayerController, FirstPersonWeapon, PlayerRespawnManager, HUDSystem
+**PlayerHealthSystem** receives (7): ZoneManager, TicketSystem, PlayerController, FirstPersonWeapon, PlayerRespawnManager, HUDSystem, Camera
 
 **PlayerRespawnManager** receives (8): PlayerHealthSystem, ZoneManager, GameModeManager, PlayerController, FirstPersonWeapon, InventoryManager, WarSimulator, TerrainSystem
 

@@ -74,7 +74,7 @@ interface PersistedLoadoutState {
 }
 
 type LoadoutListener = (loadout: PlayerLoadout) => void;
-type RuntimeWeaponType = 'rifle' | 'shotgun' | 'smg' | 'pistol';
+type RuntimeWeaponType = 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher';
 
 const STORAGE_KEY = 'titj.player-loadout.v2';
 const LEGACY_STORAGE_KEY = 'titj.player-loadout.v1';

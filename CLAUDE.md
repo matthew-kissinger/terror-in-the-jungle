@@ -54,7 +54,8 @@ npm run perf:update-baseline  # update baseline from latest capture
 4. Respawn map fixed for large worlds: dynamic WORLD_SIZE via `setMapWorldSize()`, max zoom scales with world size, left-click drag panning, pointer lock disabled during deploy UI, input context set to 'menu'. RespawnMapController unified to use OpenFrontierRespawnMap for all modes. Spawn point model refactored to `RespawnSpawnPoint` with kind/selectionClass/priority fields.
 5. A Shau harness is behavior-valid; next step is mode product passes, then WarSim/heap isolation.
 6. Game modes Phases 6-7 complete. Mode product passes (Phase 5) are the next gameplay work.
-7. See `docs/NEXT_WORK.md` for the active checklist.
+7. Player-facing content pass (2026-03-08): 6 weapon types (added M60 LMG + M79 launcher), player tracers, grenade/kill-streak audio, graphics quality tiers control post-processing, AnimalSystem (ambient wildlife), structure placements on TDM/ZC/A Shau, ProgrammaticGunFactory deleted.
+8. See `docs/NEXT_WORK.md` for the active checklist.
 
 ## Documentation Contract
 

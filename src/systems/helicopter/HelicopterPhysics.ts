@@ -32,10 +32,10 @@ export interface HelicopterState {
 const DEFAULT_PHYSICS: AircraftPhysicsConfig = {
   mass: 2200,
   maxLiftForce: 36000,
-  maxCyclicForce: 8000,
+  maxCyclicForce: 10000,
   maxYawRate: 1.8,
-  maxHorizontalSpeed: 55,
-  velocityDamping: 0.95,
+  maxHorizontalSpeed: 60,
+  velocityDamping: 0.96,
   angularDamping: 0.85,
   autoLevelStrength: 3.0,
   groundEffectHeight: 8.0,
@@ -189,12 +189,28 @@ export class HelicopterPhysics {
     _lift.set(0, liftForce, 0);
 
     // Horizontal forces from cyclic (relative to helicopter orientation)
+    // Lift vector tilt: banking redirects a fraction of lift into horizontal thrust,
+    // simulating the nose-down dive effect of real helicopter banking.
+    const cyclicMag = Math.abs(this.smoothedControls.cyclicPitch) + Math.abs(this.smoothedControls.cyclicRoll);
+    const liftTiltBonus = Math.min(cyclicMag, 1.0) * liftForce * 0.15;
+    const effectiveCyclicForce = maxCyclicForce + liftTiltBonus;
+
     _cyclicForce.set(
-      -this.smoothedControls.cyclicPitch * maxCyclicForce,
+      -this.smoothedControls.cyclicPitch * effectiveCyclicForce,
       0,
-      -this.smoothedControls.cyclicRoll * maxCyclicForce
+      -this.smoothedControls.cyclicRoll * effectiveCyclicForce
     );
     _cyclicForce.applyQuaternion(this.state.quaternion);
+
+    // Deceleration brake: pulling cyclic against current velocity direction
+    // produces stronger force, simulating flare/air-brake effect.
+    const hVelX = this.state.velocity.x;
+    const hVelZ = this.state.velocity.z;
+    const cyclicDotVel = _cyclicForce.x * hVelX + _cyclicForce.z * hVelZ;
+    if (cyclicDotVel < 0 && (hVelX * hVelX + hVelZ * hVelZ) > 4) {
+      _cyclicForce.x *= 1.4;
+      _cyclicForce.z *= 1.4;
+    }
 
     // Total force -> acceleration
     const totalForce = _gravity.add(_lift).add(_cyclicForce);

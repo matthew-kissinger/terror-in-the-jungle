@@ -208,9 +208,9 @@ describe('GrenadeSystem', () => {
     it('should start cooking when aiming', () => {
       grenadeSystem.startAiming();
       grenadeSystem.startCooking();
-      
+
       expect(grenadeSystem.getAimingState().cookingTime).toBe(0);
-      expect(mockAudioManager.play).not.toHaveBeenCalledWith('grenadePinPull');
+      expect(mockAudioManager.play).toHaveBeenCalledWith('grenadePinPull');
     });
 
     it('should not start cooking if not aiming', () => {

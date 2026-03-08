@@ -9,7 +9,7 @@
 
 The Core domain is the outermost shell. It owns nothing domain-specific - no AI, no terrain, no HUD state. What it does:
 
-- Constructs and wires all 38 game systems (SystemInitializer + SystemConnector)
+- Constructs and wires all ~44 game systems (SystemInitializer + SystemConnector)
 - Drives the RAF tick loop and dispatches updates in budget-monitored groups (SystemUpdater)
 - Owns the Three.js WebGLRenderer, scene, camera, and post-processing pipeline (GameRenderer)
 - Manages the full user lifecycle: menu -> loading -> gameplay -> match-end -> restart
@@ -17,7 +17,7 @@ The Core domain is the outermost shell. It owns nothing domain-specific - no AI,
 
 **To work in this domain in isolation:**
 - You do not need to understand any system internals. Systems are black boxes here.
-- The only coupling contract is `SystemReferences` (39-field interface in SystemInitializer.ts) and the `GameSystem` interface (`init/update/dispose`).
+- The only coupling contract is `SystemReferences` (40-field interface in SystemInitializer.ts) and the `GameSystem` interface (`init/update/dispose`).
 - Setter injection in SystemConnector.ts is the wiring layer. There is no compile-time safety for missing wires - bugs appear at runtime.
 - The tick order in SystemUpdater.ts is the source of truth for update sequencing. Do not re-order without checking downstream dependencies.
 - `GameEngineInit.ts` is where mode-start and restart logic lives. `GameEngine.ts` is a thin coordinator that delegates to the four split modules.
@@ -84,7 +84,7 @@ startGame() / runStartupFlow()
   |- combatantSystem.enableCombat()
   |- requestBackgroundTask(renderer.precompileShaders, 1000ms)
   |- requestBackgroundTask(startDeferredInitialization, 500ms)
-  |    Deferred: HelipadSystem, HelicopterModel, VoiceCalloutSystem
+  |    Deferred: HelipadSystem, HelicopterModel
   |
 GAMEPLAY  (RAF tick loop, always running)
   |- Player fights, captures zones, drives tickets
@@ -127,9 +127,9 @@ All files are in `src/core/` unless noted.
 | GameEngineInput | [GameEngineInput.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameEngineInput.ts) | Window keyboard event listeners. Debug toggle handlers: F1 (perf stats), F2 (overlay), F3 (log), F4 (time), P (post-processing), [ / ] (pixel size), K (voluntary respawn). |
 | GameEngineLoop | [GameEngineLoop.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameEngineLoop.ts) | animate() RAF loop. Calls updateSystems, skybox, mortar camera check, GPU timing, render main scene, render weapon + grenade overlays, post-processing endFrame, runtime metrics. Crash guard: 3 crashes in 5s shows fatal overlay. |
 | GameRenderer | [GameRenderer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameRenderer.ts) | Three.js WebGLRenderer (no antialias, high-performance), Scene, PerspectiveCamera (75 FOV). FogExp2 (0x5a7a6a, density 0.004), AmbientLight, DirectionalLight (moonLight, casts shadows), HemisphereLight. PostProcessingManager, CrosshairUI, LoadingUI. Device-adaptive shadow/pixel-ratio via DeviceDetector. configureForWorldSize() adjusts camera far / fog / shadow for mode. |
-| SystemManager | [SystemManager.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemManager.ts) | Holds 38 public system refs. Delegates to Initializer/Connector/Updater/Disposer. Owns setGameMode(), preGenerateSpawnArea(), startDeferredInitialization(), waitForPlayerSquad(). |
-| SystemInitializer | [SystemInitializer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemInitializer.ts) | Constructs all 38 systems in dependency order across 4 phases (core, textures, audio, world). Defines `SystemReferences` interface (39 fields). Defers 4 systems. Pre-initializes AssetLoader + AudioManager (skipped in main init loop). Warms ObjectPool to 240/80/32/96. |
-| SystemConnector | [SystemConnector.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemConnector.ts) | 120+ setter-injection calls. THE wiring layer. Groups: PlayerController, CombatantSystem, FirstPersonWeapon, HUDSystem, TicketSystem, PlayerHealthSystem, Minimap/FullMap/Compass, ZoneManager, AudioManager, PlayerRespawnManager, HelipadSystem, HelicopterModel, GameModeManager, CameraShakeSystem, Suppression, Flashbang, WeaponSystems (grenade/mortar/sandbag/ammo), FootstepAudio, WarSimulator, StrategicFeedback. Also mounts Compass/Minimap/Health/SquadIndicator/CommandStrip into HUD grid slots and now feeds zone/combatant/mode/player refs into `CommandInputManager` for the map-first command surface. |
+| SystemManager | [SystemManager.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemManager.ts) | Holds ~44 public system refs. Delegates to Initializer/Connector/Updater/Disposer. Owns setGameMode(), preGenerateSpawnArea(), startDeferredInitialization(), waitForPlayerSquad(). |
+| SystemInitializer | [SystemInitializer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemInitializer.ts) | Constructs all ~44 systems in dependency order across 4 phases (core, textures, audio, world). Defines `SystemReferences` interface (40 fields). Defers 4 systems. Pre-initializes AssetLoader + AudioManager (skipped in main init loop). Warms ObjectPool to 240/80/32/96. |
+| SystemConnector | [SystemConnector.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemConnector.ts) | ~150 setter-injection calls. THE wiring layer. Groups: PlayerController, CombatantSystem, FirstPersonWeapon, HUDSystem, TicketSystem, PlayerHealthSystem, Minimap/FullMap/Compass, ZoneManager, AudioManager, PlayerRespawnManager, HelipadSystem, HelicopterModel, GameModeManager, CameraShakeSystem, Suppression, Flashbang, WeaponSystems (grenade/mortar/sandbag/ammo), FootstepAudio, WarSimulator, StrategicFeedback. Also mounts Compass/Minimap/Health/SquadIndicator/CommandStrip into HUD grid slots and now feeds zone/combatant/mode/player refs into `CommandInputManager` for the map-first command surface. |
 | SystemUpdater | [SystemUpdater.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemUpdater.ts) | Per-frame dispatch. 9 tracked groups with EMA budgets (alpha=0.1). Budget overrun warning at 150% EMA, 10s cooldown. TacticalUI throttled to 20Hz. AShauAssist: teleports player to contact if 60s no-opfor within 250m (90s cooldown). Untracked systems run in a catch-all loop. |
 | SystemDisposer | [SystemDisposer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemDisposer.ts) | Iterates systems array calling `system.dispose()`. |
 | RuntimeMetrics | [RuntimeMetrics.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/RuntimeMetrics.ts) | Ring buffer (300 samples) for frame timing. Tracks avg, p95, p99 (500ms recompute throttle), max, hitch33/50/100 counts. Accumulates combatant/firing/engaging counts. Exposed as `window.__metrics`. |
@@ -186,22 +186,22 @@ All files are in `src/core/` unless noted.
          - new AudioManager(scene, camera)
          - await audioManager.init()
        Phase 4 world (progress: 0-1):
-         - Construct all remaining 33 systems (PlayerController, CombatantSystem,
+         - Construct all remaining systems (PlayerController, CombatantSystem,
            Skybox, WaterSystem, WeatherSystem, FirstPersonWeapon, ZoneManager,
            TicketSystem, PlayerHealthSystem, PlayerRespawnManager, HUDSystem,
            MinimapSystem, FullMapSystem, CompassSystem, GameModeManager,
-           HelipadSystem, HelicopterModel, PlayerSquadController, CommandInputManager,
-           InventoryManager,
+           HelipadSystem, HelicopterModel, WorldFeatureSystem, AnimalSystem,
+           PlayerSquadController, CommandInputManager,
+           InventoryManager, LoadoutService,
            GrenadeSystem, MortarSystem, SandbagSystem, CameraShakeSystem,
            PlayerSuppressionSystem, FlashbangScreenEffect, SmokeCloudSystem,
            InfluenceMapSystem, AmmoSupplySystem, FootstepAudioSystem,
-           VoiceCalloutSystem, WarSimulator, StrategicFeedback,
+           WarSimulator, StrategicFeedback,
            spatialGridManager singleton)
-         - Separate deferred list: HelipadSystem, HelicopterModel,
-           VoiceCalloutSystem
+         - Separate deferred list: HelipadSystem, HelicopterModel
          - await system.init() for all non-deferred, non-pre-initialized systems
      -> SystemConnector.connectSystems(refs, scene, camera, renderer)
-          120+ setter calls (see Wiring section)
+          ~150 setter calls (see Wiring section)
    - Back in initializeSystems (engine level):
      - asset check (skybox texture)
      - engine.isInitialized = true
@@ -235,7 +235,6 @@ ShotCommandFactory.resetPool()
 if playerSquadController && playerController:
   playerSquadController.updatePlayerPosition(playerPos)
   minimapSystem.setCommandPosition(commandPos)
-  voiceCalloutSystem.setPlayerPosition(playerPos)
 
 TRACKED GROUPS (name, budget):
   "Combat"      5.0ms  combatantSystem.update(dt)
@@ -269,7 +268,7 @@ UNTRACKED ("Other" telemetry bucket - catch-all for non-reference-equal systems)
   helipadSystem, helicopterModel, gameModeManager, playerSquadController,
   inventoryManager, cameraShakeSystem, playerSuppressionSystem,
   flashbangScreenEffect, smokeCloudSystem, influenceMapSystem,
-  footstepAudioSystem, voiceCalloutSystem
+  footstepAudioSystem
 
 performanceTelemetry.endFrame()
 ```
@@ -299,13 +298,13 @@ isTrackedSystem() uses reference equality against refs fields to determine which
 
 Source: [SystemConnector.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemConnector.ts)
 
-120+ setter-injection calls. No compile-time safety - missing wires silently produce undefined at call sites. All wiring happens in `connectSystems()`, called synchronously after `initializeSystems()` returns.
+~150 setter-injection calls. No compile-time safety - missing wires silently produce undefined at call sites. All wiring happens in `connectSystems()`, called synchronously after `initializeSystems()` returns.
 
 | Receiver | Wired dependencies |
 |----------|--------------------|
 | **playerController** | terrainSystem, gameModeManager, ticketSystem, helicopterModel, firstPersonWeapon, hudSystem, renderer, cameraShakeSystem, inventoryManager, grenadeSystem, mortarSystem, sandbagSystem, playerSquadController, footstepAudioSystem, commandInputManager |
-| **combatantSystem** | terrainSystem, camera, ticketSystem, playerHealthSystem, zoneManager, gameModeManager, hudSystem, audioManager, playerSuppressionSystem, voiceCalloutSystem. Plus direct property assigns: influenceMap, sandbagSystem. combatantCombat.setSandbagSystem, combatantAI.setSandbagSystem/setZoneManager/setSmokeCloudSystem, squadManager.setInfluenceMap |
-| **firstPersonWeapon** | playerController, combatantSystem, ticketSystem, hudSystem, zoneManager, inventoryManager, audioManager |
+| **combatantSystem** | terrainSystem, camera, ticketSystem, playerHealthSystem, zoneManager, gameModeManager, hudSystem, audioManager, playerSuppressionSystem. Plus direct property assigns: influenceMap, sandbagSystem. combatantCombat.setSandbagSystem, combatantAI.setSandbagSystem/setZoneManager/setSmokeCloudSystem, squadManager.setInfluenceMap |
+| **firstPersonWeapon** | playerController, combatantSystem, ticketSystem, hudSystem, zoneManager, inventoryManager, audioManager, grenadeSystem |
 | **hudSystem** | combatantSystem, zoneManager, ticketSystem, grenadeSystem, mortarSystem. Mounts: compassSystem, minimapSystem, playerHealthSystem, playerSquadController |
 | **ticketSystem** | zoneManager. matchRestartCallback: cancelPendingRespawn + resetForNewMatch + weapon.enable + respawnAtBase |
 | **playerHealthSystem** | zoneManager, ticketSystem, playerController, firstPersonWeapon, camera, playerRespawnManager, hudSystem |
@@ -321,7 +320,7 @@ Source: [SystemConnector.ts](https://github.com/matthew-kissinger/terror-in-the-
 | **cameraShakeSystem** | (no setters; receives from playerController.setCameraShakeSystem) |
 | **playerSuppressionSystem** | cameraShakeSystem, playerController |
 | **flashbangScreenEffect** | playerController. setSmokeCloudSystem global. |
-| **grenadeSystem** | combatantSystem, inventoryManager, ticketSystem, audioManager, playerController, flashbangEffect, voiceCalloutSystem, impactEffectsPool (from combatantSystem), explosionEffectsPool |
+| **grenadeSystem** | combatantSystem, inventoryManager, ticketSystem, audioManager, playerController, flashbangEffect, impactEffectsPool (from combatantSystem), explosionEffectsPool |
 | **mortarSystem** | combatantSystem, inventoryManager, audioManager, ticketSystem, impactEffectsPool, explosionEffectsPool |
 | **sandbagSystem** | inventoryManager, ticketSystem |
 | **ammoSupplySystem** | zoneManager, inventoryManager, firstPersonWeapon |
@@ -337,13 +336,12 @@ Source: [SystemConnector.ts](https://github.com/matthew-kissinger/terror-in-the-
 ## Key Patterns
 
 ### Deferred Systems
-Four systems are excluded from the main init loop and initialized 500ms after the first interactive frame via `requestBackgroundTask`:
+Two systems are excluded from the main init loop and initialized 500ms after the first interactive frame via `requestBackgroundTask`:
 
 | System | Why Deferred |
 |--------|--------------|
 | HelipadSystem | Helipad placement scans terrain; not needed for first frame |
 | HelicopterModel | Large geometry load; not needed until player approaches helipad |
-| VoiceCalloutSystem | Audio assets optional; CALLOUT_AUDIO_ENABLED=false currently |
 
 They are fully wired before deferral (SystemConnector runs on all refs including these). They are added to the main `systems` array after init completes so they participate in the untracked update loop.
 
