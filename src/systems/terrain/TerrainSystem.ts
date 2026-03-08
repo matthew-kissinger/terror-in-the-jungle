@@ -96,7 +96,7 @@ export class TerrainSystem implements GameSystem {
     try {
       terrainMaterial = this.surfaceRuntime.initialize(
         cache.getProvider(),
-        this.getVisualWorldSize(),
+        this.config.worldSize,
         this.defaultBiomeId,
         this.biomeRules,
       );
@@ -184,12 +184,6 @@ export class TerrainSystem implements GameSystem {
     }
     this.surfaceWetness = clampedWetness;
     this.surfaceRuntime.setSurfaceWetness(clampedWetness);
-  }
-
-  // ──── Heightmap info (for billboard terrain snapping) ────
-
-  getHeightmapInfo(): { texture: THREE.DataTexture; gridSize: number; worldSize: number } | null {
-    return this.surfaceRuntime.getHeightmapInfo();
   }
 
   // ──── Height queries ────
@@ -350,7 +344,7 @@ export class TerrainSystem implements GameSystem {
 
     if (this.isInitialized) {
       this.surfaceRuntime.updateBiomeMaterial(
-        this.getVisualWorldSize(),
+        this.config.worldSize,
         this.defaultBiomeId,
         this.biomeRules,
       );
@@ -399,7 +393,7 @@ export class TerrainSystem implements GameSystem {
       this.config.visualMargin,
       this.config.tileResolution - 1,
     );
-    this.config.lodRanges = computeDefaultLODRanges(newWorldSize, this.config.maxLODLevels, this.config.visualMargin);
+    this.config.lodRanges = computeDefaultLODRanges(newWorldSize, this.config.maxLODLevels);
     this.vegetationScatterer.setWorldBounds(newWorldSize, this.config.visualMargin);
 
     if (this.isInitialized) {
@@ -415,7 +409,7 @@ export class TerrainSystem implements GameSystem {
     // Re-bake heightmap at new world size if initialized
     if (this.isInitialized) {
       const cache = getHeightQueryCache();
-      this.surfaceRuntime.rebake(cache.getProvider(), this.getVisualWorldSize(), this.defaultBiomeId, this.biomeRules);
+      this.surfaceRuntime.rebake(cache.getProvider(), this.config.worldSize, this.defaultBiomeId, this.biomeRules);
       this.syncCpuHeightsToGpu();
     }
 
@@ -443,16 +437,6 @@ export class TerrainSystem implements GameSystem {
       cache.getProvider().getWorkerConfig(),
     );
     cache.setProvider(bakedProvider);
-
-    // Push heightmap texture to billboard system for GPU terrain snapping
-    this.pushHeightmapToBillboards();
-  }
-
-  private pushHeightmapToBillboards(): void {
-    const info = this.surfaceRuntime.getHeightmapInfo();
-    if (info) {
-      this.billboardSystem.setTerrainHeightmap(info.texture, info.worldSize, info.gridSize);
-    }
   }
 
   private applyVegetationConfig(): void {

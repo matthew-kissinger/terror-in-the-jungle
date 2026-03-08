@@ -143,10 +143,6 @@ export class GlobalBillboardSystem implements GameSystem {
     return instances.filter(inst => !this.isInExclusionZone(inst.position.x, inst.position.z));
   }
 
-  setTerrainHeightmap(texture: THREE.DataTexture, worldSize: number, gridSize: number): void {
-    this.gpuSystem.setTerrainHeightmap(texture, worldSize, gridSize);
-  }
-
   getDebugInfo(): { [key: string]: number } {
     return this.gpuSystem.getDebugInfo();
   }

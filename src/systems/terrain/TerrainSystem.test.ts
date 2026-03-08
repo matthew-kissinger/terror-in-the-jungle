@@ -289,11 +289,10 @@ describe('TerrainSystem', () => {
       await terrain.init();
       terrain.setWorldSize(21136);
 
-      // Heightmap is baked at visual world size (worldSize + 2*visualMargin)
       expect(mockBakeFromProvider).toHaveBeenLastCalledWith(
         expect.anything(),
         512,
-        21136 + 200 * 2,
+        21136,
       );
     });
 
@@ -301,11 +300,10 @@ describe('TerrainSystem', () => {
       await terrain.init();
       terrain.setWorldSize(3200);
 
-      // Heightmap is baked at visual world size (worldSize + 2*visualMargin)
       expect(mockBakeFromProvider).toHaveBeenLastCalledWith(
         expect.anything(),
         1024,
-        3200 + 200 * 2,
+        3200,
       );
     });
 

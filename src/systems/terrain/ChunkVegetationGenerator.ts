@@ -141,7 +141,7 @@ export class ChunkVegetationGenerator {
           if (dn < 0.15) continue;
           const s = MathUtils.randomInRange(0.9, 1.1);
           instances.push({
-            position: new THREE.Vector3(baseX + p.x, ct.yOffset, baseZ + p.y),
+            position: new THREE.Vector3(baseX + p.x, h + ct.yOffset, baseZ + p.y),
             scale: new THREE.Vector3(s, s, 1),
             rotation: 0,
           });
@@ -179,7 +179,7 @@ export class ChunkVegetationGenerator {
           if (dn < 0.1) continue;
           const s = MathUtils.randomInRange(0.9, 1.1);
           instances.push({
-            position: new THREE.Vector3(baseX + p.x, mt.yOffset, baseZ + p.y),
+            position: new THREE.Vector3(baseX + p.x, h + mt.yOffset, baseZ + p.y),
             scale: new THREE.Vector3(s, s, 1),
             rotation: 0,
           });
@@ -208,7 +208,7 @@ export class ChunkVegetationGenerator {
           if (trunkGrid.isNear(p.x, p.y)) continue;
           const s = MathUtils.randomInRange(0.9, 1.1);
           instances.push({
-            position: new THREE.Vector3(baseX + p.x, vt.yOffset, baseZ + p.y),
+            position: new THREE.Vector3(baseX + p.x, h + vt.yOffset, baseZ + p.y),
             scale: new THREE.Vector3(s, s, 1),
             rotation: 0,
           });
@@ -225,7 +225,7 @@ export class ChunkVegetationGenerator {
           if (Math.random() > dn) continue;
           const s = MathUtils.randomInRange(0.9, 1.1);
           instances.push({
-            position: new THREE.Vector3(baseX + lx, vt.yOffset, baseZ + lz),
+            position: new THREE.Vector3(baseX + lx, h + vt.yOffset, baseZ + lz),
             scale: new THREE.Vector3(s, s, 1),
             rotation: 0,
           });

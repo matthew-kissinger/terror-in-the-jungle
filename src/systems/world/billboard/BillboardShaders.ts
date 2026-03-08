@@ -15,12 +15,6 @@ export const BILLBOARD_VERTEX_SHADER = `
   uniform float fogStartDistance;  // Distance before fog begins
   uniform bool fogEnabled;
 
-  // Terrain heightmap snapping
-  uniform sampler2D terrainHeightmap;
-  uniform float terrainWorldSize;
-  uniform float heightmapGridSize;
-  uniform bool terrainSnappingEnabled;
-
   attribute vec3 position;
   attribute vec2 uv;
 
@@ -40,21 +34,6 @@ export const BILLBOARD_VERTEX_SHADER = `
 
     // Calculate distance for LOD/fade
     vec3 worldPos = instancePosition;
-
-    // Snap billboard Y to GPU terrain surface (matches TerrainMaterial UV logic)
-    if (terrainSnappingEnabled) {
-      float halfWorld = terrainWorldSize * 0.5;
-      float texelHalf = 0.5 / heightmapGridSize;
-      float uvScale = (heightmapGridSize - 1.0) / heightmapGridSize;
-      vec2 terrainUV = vec2(
-        (worldPos.x + halfWorld) / terrainWorldSize,
-        (worldPos.z + halfWorld) / terrainWorldSize
-      );
-      terrainUV = clamp(terrainUV * uvScale + texelHalf, 0.0, 1.0);
-      float terrainH = texture2D(terrainHeightmap, terrainUV).r;
-      // instancePosition.y stores the ground offset (yOffset from vegetation config)
-      worldPos.y = terrainH + instancePosition.y;
-    }
 
     vDistance = length(cameraPosition - worldPos);
 

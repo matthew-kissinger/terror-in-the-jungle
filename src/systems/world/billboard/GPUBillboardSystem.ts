@@ -13,11 +13,6 @@ export class GPUBillboardSystem {
   private scene: THREE.Scene;
   private assetLoader: AssetLoader;
 
-  // Cached terrain heightmap info for late-initialized vegetation types
-  private terrainHeightmap: THREE.DataTexture | null = null;
-  private terrainWorldSize = 0;
-  private terrainGridSize = 0;
-
   constructor(scene: THREE.Scene, assetLoader: AssetLoader) {
     this.scene = scene;
     this.assetLoader = assetLoader;
@@ -47,23 +42,11 @@ export class GPUBillboardSystem {
       };
 
       const vegetation = new GPUBillboardVegetation(this.scene, config);
-      if (this.terrainHeightmap) {
-        vegetation.setTerrainHeightmap(this.terrainHeightmap, this.terrainWorldSize, this.terrainGridSize);
-      }
       this.vegetationTypes.set(vegType.id, vegetation);
       Logger.info('vegetation', `GPU billboard ${vegType.id} configured (max ${vegType.maxInstances})`);
     }
 
     Logger.info('vegetation', `GPU billboard system initialized with ${this.vegetationTypes.size} types`);
-  }
-
-  setTerrainHeightmap(texture: THREE.DataTexture, worldSize: number, gridSize: number): void {
-    this.terrainHeightmap = texture;
-    this.terrainWorldSize = worldSize;
-    this.terrainGridSize = gridSize;
-    for (const veg of this.vegetationTypes.values()) {
-      veg.setTerrainHeightmap(texture, worldSize, gridSize);
-    }
   }
 
   addChunkInstances(

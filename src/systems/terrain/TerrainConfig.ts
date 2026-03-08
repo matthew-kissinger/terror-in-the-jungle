@@ -70,14 +70,9 @@ export function computeMaxLODLevels(
 /**
  * Compute default LOD ranges from world size and max LOD levels.
  * lodRanges[i] = baseTileSize * 4 * 2^i
- *
- * baseTileSize uses the quadtree extent (worldSize + 2*visualMargin) because
- * that's what the CDLODQuadtree actually covers. Using just worldSize produces
- * ranges 10-12% too tight, making margin tiles unnecessarily coarse.
  */
-export function computeDefaultLODRanges(worldSize: number, maxLODLevels: number, visualMargin = 0): number[] {
-  const quadtreeSize = worldSize + visualMargin * 2;
-  const baseTileSize = quadtreeSize / Math.pow(2, maxLODLevels);
+export function computeDefaultLODRanges(worldSize: number, maxLODLevels: number): number[] {
+  const baseTileSize = worldSize / Math.pow(2, maxLODLevels);
   const ranges: number[] = [];
   for (let i = 0; i < maxLODLevels; i++) {
     ranges.push(baseTileSize * 4 * Math.pow(2, i));
@@ -90,13 +85,12 @@ export function computeDefaultLODRanges(worldSize: number, maxLODLevels: number,
  */
 export function createTerrainConfig(overrides: Partial<TerrainSystemConfig> = {}): TerrainSystemConfig {
   const worldSize = overrides.worldSize ?? 1024;
-  const visualMargin = overrides.visualMargin ?? 200;
   const maxLODLevels = overrides.maxLODLevels ?? 6;
   return {
     worldSize,
-    visualMargin,
+    visualMargin: overrides.visualMargin ?? 200,
     maxLODLevels,
-    lodRanges: overrides.lodRanges ?? computeDefaultLODRanges(worldSize, maxLODLevels, visualMargin),
+    lodRanges: overrides.lodRanges ?? computeDefaultLODRanges(worldSize, maxLODLevels),
     tileResolution: overrides.tileResolution ?? 33,
     heightProvider: overrides.heightProvider ?? 'noise',
     splatmap: overrides.splatmap ?? DEFAULT_SPLATMAP,
