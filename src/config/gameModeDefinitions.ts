@@ -144,6 +144,7 @@ export function getGameModeDefinition(mode: GameMode): GameModeDefinition {
       break;
     case GameMode.A_SHAU_VALLEY:
       policies.deploy.flow = 'air_assault';
+      policies.deploy.mapVariant = 'frontier';
       policies.command.scale = 'battalion';
       policies.mapIntel.showStrategicAgentsOnFullMap = true;
       policies.mapIntel.strategicLayer = 'optional';

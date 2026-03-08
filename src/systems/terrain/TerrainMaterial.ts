@@ -57,10 +57,11 @@ vMorphFactor = morphFactor;
 vec3 nSample = texture2D(terrainNormalMap, vWorldUV).rgb * 2.0 - 1.0;
 vTerrainNormal = normalize(nSample);
 
-// Propagate correct terrain position to Three.js built-in 'transformed' variable
-// so that downstream chunks (worldpos_vertex, shadowmap_vertex, envmap) use the
-// GPU-displaced position instead of the raw attribute position.
-transformed = worldPos4.xyz;
+// Set transformed to local-space position so any Three.js includes that apply
+// instanceMatrix get the correct single application.  worldpos_vertex is
+// replaced below to use worldPos4 directly (which already includes instanceMatrix
+// and heightmap displacement).
+transformed = morphedPos;
 `;
 
 const TERRAIN_FRAGMENT_PARS = /* glsl */ `
@@ -455,6 +456,17 @@ function applyTerrainMaterialOptions(
       `
       vec4 mvPosition = modelViewMatrix * worldPos4;
       gl_Position = projectionMatrix * mvPosition;
+      `,
+    );
+    // worldPos4 already includes instanceMatrix + heightmap displacement.
+    // The default worldpos_vertex would apply instanceMatrix to 'transformed'
+    // a second time, producing wildly wrong shadow/fog coordinates.
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <worldpos_vertex>',
+      `
+      #if defined( USE_ENVMAP ) || defined( DISTANCE ) || defined ( USE_SHADOWMAP ) || defined ( USE_TRANSMISSION )
+        vec4 worldPosition = modelMatrix * worldPos4;
+      #endif
       `,
     );
 
