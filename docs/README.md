@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-03-08
+Last updated: 2026-03-09
 
 ## Read Order
 
@@ -36,8 +36,6 @@ Last updated: 2026-03-08
   - Master roadmap: 10-phase plan from asset overhaul through full Vietnam simulation engine. Aspirational and now aligned with the active execution plan where overlap exists.
 - `ASSET_MANIFEST.md`
   - Comprehensive asset generation queue for Pixel Forge agent. 80+ assets with prompts, tri budgets, mesh part naming, scale specs. 4 priority sprints.
-- `SQUAD_COMMAND_REARCHITECT.md`
-  - Squad command system analysis and redesign plan. Documents current bugs (dead code, race conditions, split input paths) and target architecture for scale-aware command interface.
 - `PROFILING_HARNESS.md`
   - Source of truth for perf capture commands, flags, artifacts, and validation semantics.
 - `ARCHITECTURE_RECOVERY_PLAN.md`
@@ -57,7 +55,6 @@ Last updated: 2026-03-08
 
 These docs predate the block map and overlap with specific sub-docs. Kept for reference but prefer the block map for current state.
 
-- `FRONTEND_ARCHITECTURE_INVENTORY.md` - Overlaps with `blocks/ui.md`.
 - `UI_STANDARDIZATION_GUIDE.md` - Standards still valid; component inventory overlaps with `blocks/ui.md`.
 - `CODEBASE_MAP.mmd` - Original Mermaid diagram, superseded by `CODEBASE_BLOCKS.md` + `blocks/`.
 
@@ -67,6 +64,9 @@ These docs predate the block map and overlap with specific sub-docs. Kept for re
 - `archive/ASHAU_VALLEY_IMPLEMENTATION_PLAN.md` (archived 2026-03-08) - A Shau stabilization plan. Phases 2/4 superseded by MapIntelPolicy and product passes.
 - `archive/FRONTEND_REARCHITECTURE_BACKLOG.md` (archived 2026-03-08) - Phases 1-4 done, Phase 5 stale. Overlaps with `blocks/ui.md`.
 - `archive/UI_ENGINE_PLAN.md` - UI engine rewrite plan (Phases 0-7 complete).
+- `archive/GAME_STATE_ANALYSIS.md` (archived 2026-03-09) - Point-in-time codebase snapshot from 2026-03-06. Largely superseded by PLAN_STATE.md and CLAUDE.md.
+- `archive/SQUAD_COMMAND_REARCHITECT.md` (archived 2026-03-09) - Squad command analysis. QuickCommandStrip + SquadRadialMenu deleted; remaining command system is stable (Z key overlay).
+- `archive/FRONTEND_ARCHITECTURE_INVENTORY.md` (archived 2026-03-09) - Superseded by `blocks/ui.md`.
 
 ## Documentation Rules
 
@@ -77,6 +77,5 @@ These docs predate the block map and overlap with specific sub-docs. Kept for re
   - `PROFILING_HARNESS.md` if capture behavior/flags changed
   - `ARCHITECTURE_RECOVERY_PLAN.md` with decision and evidence path
 - Any new asset need must update `ASSET_MANIFEST.md`.
-- Any command/control change must update `SQUAD_COMMAND_REARCHITECT.md`.
 - Any game-mode, deploy/loadout, respawn-flow, map-intel, or death-presentation change must update `GAME_MODES_EXECUTION_PLAN.md`.
 - Any system addition/removal/rewiring must update the relevant `blocks/*.md` sub-doc.

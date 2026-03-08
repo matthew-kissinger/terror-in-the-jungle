@@ -1,7 +1,7 @@
 # Plan State
 
 > Persistent tracker for agent loops, session compactions, and prioritization.
-> Updated: 2026-03-08
+> Updated: 2026-03-09
 
 ---
 
@@ -33,7 +33,7 @@
 
 - [x] 3.1 AI cover search grid reduced (8x8 + early-out at 4 candidates) - p99 86ms -> 35ms
 - [x] 3.2 Terrain tick stagger (BVH skips vegetation rebuild frames) - frontier30m p99 effectively solved
-- [ ] 3.3 Make perf regression a deploy gate in CI (currently advisory-only)
+- [x] 3.3 Make perf regression a deploy gate in CI (merged perf-check.yml into ci.yml, deploy needs perf job)
 - [ ] 3.4 Combat AI p99 still ~35ms (target <16ms) - remaining synchronous cover search cost
 - [ ] 3.5 Terrain contract cleanup: remove stale chunk-era config names, debug labels
 
@@ -62,14 +62,14 @@
 
 | Metric | Value |
 |--------|-------|
-| Source files | 327 |
-| Test files | 128 |
-| Tests passing | 2,999 |
+| Source files | ~340 |
+| Test files | 136 |
+| Tests passing | 3,159 |
 | Type errors | 0 |
 | Lint errors | 0 |
-| Lint warnings | 102 |
+| Lint warnings | 9 (7 intentional no-console + 2 false positives) |
 | TODO/FIXME in source | 1 |
-| Runtime deps | 3 (three, signals, three-mesh-bvh) |
+| Runtime deps | 4 (three, signals, three-mesh-bvh, @recast-navigation) |
 | GLB models | 73 on disk, 73 referenced |
 | Audio files | 31 on disk, 31 wired, 0 orphaned |
 | DEM maps | 10 processed, 1 wired (A Shau) |
@@ -107,8 +107,7 @@
 
 1. Combat AI p99 ~35ms (target <16ms) - synchronous cover search improved but not solved
 2. Budget enforcement advisory-only (no load shedding)
-3. Perf regression doesn't block deploy in CI
-4. ~150 setter-injection calls in SystemConnector (works but fragile)
+3. ~150 setter-injection calls in SystemConnector (works but fragile, GameEventBus is foundation for gradual reduction)
 
 ## Dead Code Pending Deletion
 
@@ -116,6 +115,7 @@
 
 ## Stale Docs Pending Archive/Update
 
-- `docs/SQUAD_COMMAND_REARCHITECT.md` - references deleted QuickCommandStrip + SquadRadialMenu (historical, low priority)
-- `docs/GAME_MODES_EXECUTION_PLAN.md` - references deleted RespawnMapView.ts, QuickCommandStrip (historical)
-- `docs/ROADMAP.md` Phase 5C - references deleted chunk system
+- `docs/GAME_MODES_EXECUTION_PLAN.md` - references deleted RespawnMapView.ts (historical, low priority)
+- `docs/ROADMAP.md` Phase 5C - references deleted chunk system (historical)
+
+Archived (2026-03-09): GAME_STATE_ANALYSIS.md, SQUAD_COMMAND_REARCHITECT.md, FRONTEND_ARCHITECTURE_INVENTORY.md

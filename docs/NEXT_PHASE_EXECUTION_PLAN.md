@@ -1,6 +1,6 @@
 # Next Phase Execution Plan
 
-Last updated: 2026-03-08
+Last updated: 2026-03-09
 
 ## Objective
 
@@ -33,7 +33,7 @@ Status: In progress
 
 ### Phase 1A: Remove avoidable generation waste
 
-Status: In progress
+Status: Complete
 
 Tasks:
 - [x] Add terrain stream metrics to perf artifacts so vegetation can be measured separately.
@@ -48,7 +48,7 @@ Acceptance:
 
 ### Phase 1B: Make scheduler adaptive
 
-Status: In progress
+Status: Complete
 
 Tasks:
 - [x] Add vegetation shedding policy for frame pressure.
@@ -62,7 +62,7 @@ Acceptance:
 
 ### Phase 1C: If still hot, change representation
 
-Status: In progress
+Status: Decision made - scheduler tuning complete, remaining issue is representation (backlog grows under traversal, not a cost issue)
 
 Tasks:
 - [x] Decide whether distant mid-level vegetation should downgrade to a cheaper representation.
@@ -78,7 +78,7 @@ Decision:
 
 ## Track 2: A Shau Product Pass
 
-Status: Pending
+Status: Partially complete (mission briefing card added 2026-03-09, spectator cam added)
 
 ### Goals
 
@@ -146,7 +146,7 @@ Acceptance:
 
 ## Track 5: Tooling
 
-Status: In progress
+Status: Complete
 
 ### Goals
 
@@ -173,11 +173,12 @@ Validation recipe:
 
 ## Recommended execution order
 
-1. Finish Track 1 Phase 1A.
-2. Add Track 3 debug/overlay visibility so live tuning is easier.
-3. Run headed/manual A Shau traversal once the stream surfaces are visible.
-4. Decide whether Track 1 needs scheduler tuning only or a representation change.
-5. Start Track 2 product pass once terrain tail behavior is clearer.
+1. ~~Finish Track 1 Phase 1A.~~ Done
+2. ~~Add Track 3 debug/overlay visibility so live tuning is easier.~~ Done
+3. ~~Run headed/manual A Shau traversal once the stream surfaces are visible.~~ Done
+4. ~~Decide whether Track 1 needs scheduler tuning only or a representation change.~~ Decision: representation change needed (Phase 1C)
+5. Continue Track 2 product pass (insertion readability, objective guidance).
+6. Track 1 Phase 1C: implement staged vegetation activation or distant representation split.
 
 ## Progress log
 

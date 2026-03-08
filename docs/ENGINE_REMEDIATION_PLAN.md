@@ -1,6 +1,6 @@
 # Engine Remediation Plan
 
-Last updated: 2026-03-08
+Last updated: 2026-03-09
 
 ## Objective
 
@@ -39,7 +39,7 @@ Progress notes:
 
 ### Milestone 2: Terrain Streaming Scheduler
 
-Status: In progress
+Status: Complete
 
 Goals:
 - Replace threshold-triggered synchronous terrain work with budgeted queues.
@@ -62,7 +62,7 @@ Progress notes:
 
 ### Milestone 3: Collision Streaming
 
-Status: In progress
+Status: Complete (incremental row rebuild sufficient; queue-reset bug fixed, backlog drains to 0)
 
 Goals:
 - Replace full near-field collision mesh rebuilds with incremental tile residency and bounded rebuild work.
@@ -78,7 +78,7 @@ Validation:
 
 ### Milestone 4: Vegetation Streaming
 
-Status: In progress
+Status: Complete (adaptive shedding, Poisson caching, throughput tuning landed; remaining backlog is representation issue, not scheduler)
 
 Goals:
 - Remove synchronous vegetation bursts on cell boundary crossings.
@@ -110,9 +110,10 @@ Validation:
 
 ## Current execution notes
 
-- Milestone 1 is complete and covered by focused tests.
-- Milestone 2 initial scheduler pass is complete enough to build and test, but still needs live profiling and likely another iteration on queue budgets.
-- Milestones 3 and 4 have first-pass incremental implementations and are waiting on runtime measurement to decide whether a deeper tile-residency rewrite is necessary.
+- Milestones 1-4 are complete. All streaming work items landed.
+- Collision streaming uses incremental row rebuild (queue-reset bug fixed, backlog drains to 0).
+- Vegetation streaming uses adaptive shedding + Poisson caching (instantaneous cost ~1ms, but backlog still grows under traversal - a representation issue, not scheduler cost).
+- Milestone 5 (contract cleanup) is the remaining open work.
 
 ## Next
 
