@@ -255,6 +255,11 @@ export async function startGameWithMode(
 
     applyCompiledTerrainFeatures(engine, config);
 
+    // Initialize navmesh WASM (non-blocking, degrades gracefully)
+    if (!engine.systemManager.navmeshSystem.isReady()) {
+      await engine.systemManager.navmeshSystem.init();
+    }
+
     // Configure renderer for mode-specific settings
     if (config.cameraFar || config.fogDensity || config.shadowFar) {
       engine.renderer.configureForWorldSize({
@@ -293,6 +298,12 @@ export async function startGameWithMode(
 
     const defaultBiome = config.terrain?.defaultBiome ?? 'denseJungle';
     terrainSystem.setBiomeConfig(defaultBiome, config.terrain?.biomeRules);
+
+    // Generate navmesh after terrain height provider and stamps are finalized
+    if (engine.systemManager.navmeshSystem.isWasmReady()) {
+      const navWorldSize = config.worldSize ?? terrainSystem.getPlayableWorldSize();
+      await engine.systemManager.navmeshSystem.generateNavmesh(navWorldSize, config.features);
+    }
 
     engine.systemManager.setGameMode(mode, { createPlayerSquad: mode !== GameMode.AI_SANDBOX });
     applyLaunchSelection(engine, definition, launchSelection);

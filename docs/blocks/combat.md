@@ -97,10 +97,19 @@
 | [CombatantSpawnManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantSpawnManager.ts) | systems/combat/CombatantSpawnManager.ts | Progressive spawn queue (1s delay, max 24 enqueued); reinforcement waves (15s default) |
 | [SpawnPositionCalculator](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/SpawnPositionCalculator.ts) | systems/combat/SpawnPositionCalculator.ts | Zone-aware spawn position selection |
 | [RespawnManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/RespawnManager.ts) | systems/combat/RespawnManager.ts | NPC respawn with rally-point-first fallback |
-| [CombatantMovement](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantMovement.ts) | systems/combat/CombatantMovement.ts | Position integration; terrain grounding via HeightQueryCache; delegates to MovementStates |
+| [CombatantMovement](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantMovement.ts) | systems/combat/CombatantMovement.ts | Position integration; terrain grounding via HeightQueryCache; delegates to MovementStates; navmesh intercept (high/medium LOD use crowd-steered velocity, low/culled use beeline); slope speed penalty via SlopePhysics |
 | [CombatantMovementStates](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantMovementStates.ts) | systems/combat/CombatantMovementStates.ts | updatePatrolMovement, updateCombatMovement, updateCoverSeekingMovement, updateDefendingMovement |
 | [CombatantMovementCommands](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantMovementCommands.ts) | systems/combat/CombatantMovementCommands.ts | handlePlayerCommand, handleRejoiningMovement; uses ObjectPoolManager |
 | [clusterManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/ClusterManager.ts) (singleton) | systems/combat/ClusterManager.ts | Spacing forces (min 4m), target distribution, reaction stagger for clustered NPCs |
+
+### Navigation (Navmesh)
+
+| Class / Export | File | Notes |
+|----------------|------|-------|
+| [NavmeshSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/navigation/NavmeshSystem.ts) | systems/navigation/NavmeshSystem.ts | Top-level lifecycle: WASM init, solo/tiled navmesh generation, crowd simulation, tile streaming, structure obstacles |
+| [NavmeshHeightfieldBuilder](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/navigation/NavmeshHeightfieldBuilder.ts) | systems/navigation/NavmeshHeightfieldBuilder.ts | Converts HeightQueryCache -> indexed BufferGeometry for Recast input |
+| [NavmeshMovementAdapter](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/navigation/NavmeshMovementAdapter.ts) | systems/navigation/NavmeshMovementAdapter.ts | Bridges Recast Crowd with CombatantMovement; register/unregister agents; target debounce; XZ velocity override |
+| [SlopePhysics](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/terrain/SlopePhysics.ts) | systems/terrain/SlopePhysics.ts | Pure-function slope utility: speed multiplier, walkability check, slide velocity, step-up gating |
 
 ### Rendering
 

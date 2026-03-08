@@ -13,6 +13,18 @@ vi.mock('../terrain/TerrainSystem');
 vi.mock('../weapons/SandbagSystem');
 vi.mock('../audio/FootstepAudioSystem');
 vi.mock('../../utils/Logger');
+vi.mock('../terrain/HeightQueryCache', () => {
+  const flatNormal = { x: 0, y: 1, z: 0 };
+  const mockCache = {
+    getNormalAt: vi.fn().mockReturnValue(flatNormal),
+    getSlopeAt: vi.fn().mockReturnValue(0),
+    getHeightAt: vi.fn().mockReturnValue(0),
+  };
+  return {
+    getHeightQueryCache: vi.fn().mockReturnValue(mockCache),
+    HeightQueryCache: vi.fn(),
+  };
+});
 
 describe('PlayerMovement', () => {
   let playerMovement: PlayerMovement;

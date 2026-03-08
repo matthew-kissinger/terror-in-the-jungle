@@ -42,6 +42,7 @@ import { WarSimulator } from '../systems/strategy/WarSimulator';
 import { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
 import { WorldFeatureSystem } from '../systems/world/WorldFeatureSystem';
 import { AnimalSystem } from '../systems/world/AnimalSystem';
+import { NavmeshSystem } from '../systems/navigation/NavmeshSystem';
 import { SystemInitializer, SystemReferences } from './SystemInitializer';
 import { SystemConnector } from './SystemConnector';
 import { SystemUpdater } from './SystemUpdater';
@@ -102,6 +103,7 @@ export class SystemManager {
   public strategicFeedback!: StrategicFeedback;
   public worldFeatureSystem!: WorldFeatureSystem;
   public animalSystem!: AnimalSystem;
+  public navmeshSystem!: NavmeshSystem;
 
   async initializeSystems(
     scene: THREE.Scene,
@@ -163,6 +165,7 @@ export class SystemManager {
     this.strategicFeedback = this.refs.strategicFeedback;
     this.worldFeatureSystem = this.refs.worldFeatureSystem;
     this.animalSystem = this.refs.animalSystem;
+    this.navmeshSystem = this.refs.navmeshSystem;
 
     // Connect systems together
     this.connector.connectSystems(this.refs, scene, camera, renderer);

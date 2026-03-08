@@ -1,6 +1,6 @@
 # Project Notes
 
-Last updated: 2026-03-06
+Last updated: 2026-03-08
 
 ## Project
 
@@ -15,7 +15,7 @@ Terror in the Jungle is a browser-based 3D combat game focused on:
 npm run dev
 npm run build
 npm run test:run
-npm run test:quick           # unit tests only (excludes integration)
+npm run test:quick           # all tests with dot reporter (fast output)
 npm run test:integration     # integration scenario tests only
 npm run validate             # quick: type-check + unit tests + build
 npm run validate:full        # full: test + build + committed combat120 perf check
@@ -41,6 +41,7 @@ npm run perf:update-baseline  # update baseline from latest capture
 - Engine: `src/core/GameEngine.ts`, `src/core/GameEngineInit.ts`, `src/core/SystemUpdater.ts`
 - Modes: `src/config/gameModeTypes.ts`, `src/config/*Config.ts`
 - Combat: `src/systems/combat/*`
+- Navigation: `src/systems/navigation/*` (navmesh, crowd, movement adapter)
 - Strategy (A Shau): `src/systems/strategy/*`
 - Terrain: `src/systems/terrain/*`
 - Harness: `scripts/perf-capture.ts`, `scripts/perf-analyze-latest.ts`, `scripts/perf-compare.ts`
@@ -55,7 +56,9 @@ npm run perf:update-baseline  # update baseline from latest capture
 5. A Shau harness is behavior-valid; next step is mode product passes, then WarSim/heap isolation.
 6. Game modes Phases 6-7 complete. Mode product passes (Phase 5) are the next gameplay work.
 7. Player-facing content pass (2026-03-08): 6 weapon types (added M60 LMG + M79 launcher), player tracers, grenade/kill-streak audio, graphics quality tiers control post-processing, AnimalSystem (ambient wildlife), structure placements on TDM/ZC/A Shau, ProgrammaticGunFactory deleted.
-8. See `docs/NEXT_WORK.md` for the active checklist.
+8. Slope physics + navmesh pathfinding (2026-03-08): Player slope speed/slide/step-up gating, NPC slope penalty, @recast-navigation WASM navmesh (solo + tiled), crowd simulation with LOD-gated steering, structure footprint obstacles. 3040 tests passing.
+9. Magic number extraction (2026-03-08): ~125 magic numbers replaced with named constants across 12 files. Shared cross-file config in `src/config/CombatantConfig.ts` (NPC_Y_OFFSET, NPC_MAX_SPEED, NPC_HEALTH, OPFOR_OBJECTIVE_FOCUS_CHANCE). Single-file constants grouped by category at top of each module. 3040 tests passing.
+10. See `docs/NEXT_WORK.md` for the active checklist.
 
 ## Documentation Contract
 

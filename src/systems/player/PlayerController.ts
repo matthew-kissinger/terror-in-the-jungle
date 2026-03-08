@@ -22,6 +22,12 @@ import type { IGameRenderer, ITerrainRuntime } from '../../types/SystemInterface
 import type { CommandInputManager } from '../combat/CommandInputManager';
 import type { PlayerSquadController } from '../combat/PlayerSquadController';
 
+// ── Player physics defaults ──
+const PLAYER_WALK_SPEED = 10;
+const PLAYER_RUN_SPEED = 20;
+const PLAYER_JUMP_FORCE = 12;
+const PLAYER_GRAVITY = -25;
+
 export class PlayerController implements GameSystem {
   private static readonly SPAWN_STABILIZATION_MS = 2500;
   private static readonly SPAWN_STABILIZATION_MAX_DIST = 60;
@@ -60,13 +66,13 @@ export class PlayerController implements GameSystem {
     this.playerState = {
       position: new THREE.Vector3(0, 5, -50),
       velocity: new THREE.Vector3(0, 0, 0),
-      speed: 10,
-      runSpeed: 20,
+      speed: PLAYER_WALK_SPEED,
+      runSpeed: PLAYER_RUN_SPEED,
       isRunning: false,
       isGrounded: false,
       isJumping: false,
-      jumpForce: 12,
-      gravity: -25,
+      jumpForce: PLAYER_JUMP_FORCE,
+      gravity: PLAYER_GRAVITY,
       isInHelicopter: false,
       helicopterId: null
     };

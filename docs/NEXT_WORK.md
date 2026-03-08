@@ -315,3 +315,5 @@ Record completed items here with date and commit hash.
 | 2026-03-08 | Doc sync | - | GAME_MODES_EXECUTION_PLAN Phase 1/4/5 status, ACTIVE_GAME_MODES_HANDOFF gaps/resume, ARCHITECTURE_RECOVERY_PLAN Keep Decisions |
 | 2026-03-08 | Player-facing 10-step plan | - | Tracers, grenade/kill-streak audio, graphics quality tiers, TDM/ZC/A Shau structures, AnimalSystem, M60 LMG, M79 launcher, ProgrammaticGunFactory deleted |
 | 2026-03-08 | Dynamic helipad foundation | - | TerrainFoundationUtils: engine-agnostic height sampling + foundation depth; HelipadSystem uses dynamic depth instead of fixed 0.6m; foundation fills terrain gap on slopes |
+| 2026-03-08 | Slope physics + navmesh pathfinding | - | SlopePhysics utility (player speed/slide/step-up, NPC slope penalty), NavmeshSystem (@recast-navigation WASM, solo/tiled, crowd sim), NavmeshMovementAdapter (LOD-gated steering), structure obstacle exclusion, 41 new tests |
+| 2026-03-08 | Magic number extraction | - | ~125 magic numbers replaced with named constants across 12 files; shared CombatantConfig.ts (NPC_Y_OFFSET/MAX_SPEED/HEALTH); per-file constants grouped by category |

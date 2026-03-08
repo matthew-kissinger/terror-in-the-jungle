@@ -14,8 +14,8 @@
 | Domain | Doc | Blocks | Biggest class | Budget |
 |--------|-----|--------|---------------|--------|
 | [Core](blocks/core.md) | Engine shell | 0 (11 modules) | [GameEngine]([GH]/core/GameEngine.ts) | - |
-| [Combat](blocks/combat.md) | NPC AI, spatial, squads | 4 (48+ modules) | [CombatantSystem]([GH]/systems/combat/CombatantSystem.ts) | 5ms |
-| [Terrain](blocks/terrain.md) | Terrain runtime, height authority, queries | 2 (active split block) | [TerrainSystem]([GH]/systems/terrain/TerrainSystem.ts) | 2ms |
+| [Combat](blocks/combat.md) | NPC AI, spatial, squads, navmesh | 4 (48+ modules) | [CombatantSystem]([GH]/systems/combat/CombatantSystem.ts) | 5ms |
+| [Terrain](blocks/terrain.md) | Terrain runtime, height authority, slope physics | 2 (active split block) | [TerrainSystem]([GH]/systems/terrain/TerrainSystem.ts) | 2ms |
 | [Strategy](blocks/strategy.md) | War sim, materialization | 2 (5 modules) | [WarSimulator]([GH]/systems/strategy/WarSimulator.ts) | 2ms |
 | [Player](blocks/player.md) | Movement, weapon, health | 8 (21 modules) | [PlayerController]([GH]/systems/player/PlayerController.ts) | 1ms |
 | [Weapons](blocks/weapons.md) | Grenades, mortar, sandbag | 5 (16 modules) | [GrenadeSystem]([GH]/systems/weapons/GrenadeSystem.ts) | 1ms |

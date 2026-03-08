@@ -14,6 +14,7 @@ import { ZoneManager } from '../world/ZoneManager';
 import { AudioManager } from '../audio/AudioManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { Logger } from '../../utils/Logger';
+import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 // Refactored modules
 import { CombatantFactory } from './CombatantFactory';
 import { CombatantAI } from './CombatantAI';
@@ -35,6 +36,7 @@ import { AILineOfSight } from './ai/AILineOfSight';
 import { getRaycastBudgetStats } from './ai/RaycastBudget';
 import { getCombatFireRaycastBudgetStats } from './ai/CombatFireRaycastBudget';
 import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
+import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 
 export class CombatantSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -310,7 +312,7 @@ export class CombatantSystem implements GameSystem {
     }
     terrainHeight = Number(this.terrainSystem.getHeightAt(data.x, data.z));
     if (Number.isFinite(terrainHeight)) {
-      position.y = terrainHeight + 3;
+      position.y = terrainHeight + NPC_Y_OFFSET;
     }
 
     const combatant = this.combatantFactory.createCombatant(
@@ -339,6 +341,9 @@ export class CombatantSystem implements GameSystem {
       health: c.health,
       alive: c.state !== CombatantState.DEAD
     };
+
+    // Unregister from navmesh crowd before removal
+    this.combatantMovement.unregisterNavmeshAgent(combatantId);
 
     spatialGridManager.removeEntity(combatantId);
     this.combatants.delete(combatantId);
@@ -473,6 +478,10 @@ export class CombatantSystem implements GameSystem {
 
   setPlayerSuppressionSystem(system: import('../player/PlayerSuppressionSystem').PlayerSuppressionSystem): void {
     this.combatantCombat.setPlayerSuppressionSystem(system);
+  }
+
+  setNavmeshSystem(navmeshSystem: NavmeshSystem): void {
+    this.combatantMovement.setNavmeshSystem(navmeshSystem);
   }
 
   // Game mode configuration methods

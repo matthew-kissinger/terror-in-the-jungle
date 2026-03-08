@@ -12,6 +12,24 @@ import {
   updateDefendingMovement,
   updatePatrolMovement
 } from './CombatantMovementStates';
+import { getHeightQueryCache } from '../terrain/HeightQueryCache';
+import { computeSlopeSpeedMultiplier } from '../terrain/SlopePhysics';
+import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
+import type { NavmeshSystem } from '../navigation/NavmeshSystem';
+import type { NavmeshMovementAdapter } from '../navigation/NavmeshMovementAdapter';
+
+// ── Rotation spring-damper ──
+const ROTATION_SPRING = 15;
+const ROTATION_DAMPING = 10;
+const MAX_DELTA_TIME = 0.1;
+const DEFAULT_DELTA_TIME = 0.016;
+
+// ── Terrain sample intervals by LOD (ms) ──
+const TERRAIN_SAMPLE_INTERVAL_HIGH = 80;
+const TERRAIN_SAMPLE_INTERVAL_MEDIUM = 140;
+const TERRAIN_SAMPLE_INTERVAL_LOW = 220;
+const TERRAIN_SAMPLE_INTERVAL_CULLED = 320;
+const TERRAIN_SAMPLE_MOVE_THRESHOLD_SQ = 1.0;
 
 export class CombatantMovement {
   private static readonly TAU = Math.PI * 2;
@@ -20,6 +38,8 @@ export class CombatantMovement {
   private ticketSystem?: TicketSystem;
   private gameModeManager?: GameModeManager;
   private spatialGridManager?: SpatialGridManager;
+  private navmeshSystem?: NavmeshSystem;
+  private navmeshAdapter?: NavmeshMovementAdapter | null;
   private readonly _spacingForce = new THREE.Vector3();
 
   constructor(terrainSystem?: ITerrainRuntime, zoneManager?: ZoneManager) {
@@ -51,6 +71,10 @@ export class CombatantMovement {
     // Dead/dying NPCs: freeze in place, no movement or spacing forces
     if (combatant.isDying || combatant.state === CombatantState.DEAD) {
       combatant.velocity.set(0, 0, 0);
+      // Unregister from navmesh crowd to free the agent slot
+      if (this.navmeshAdapter?.hasAgent(combatant.id)) {
+        this.navmeshAdapter.unregisterAgent(combatant.id);
+      }
       return;
     }
 
@@ -75,13 +99,37 @@ export class CombatantMovement {
       combatant.velocity.add(this._spacingForce);
     }
 
+    // Navmesh intercept: override beeline velocity with crowd-steered velocity
+    // for high/medium LOD NPCs that have a registered crowd agent.
+    if (this.navmeshAdapter) {
+      const useNavmesh = combatant.lodLevel === 'high' || combatant.lodLevel === 'medium';
+      if (useNavmesh) {
+        if (!this.navmeshAdapter.hasAgent(combatant.id)) {
+          this.navmeshAdapter.registerAgent(combatant);
+        }
+        this.navmeshAdapter.updateAgentTarget(combatant);
+        this.navmeshAdapter.applyAgentVelocity(combatant);
+      } else if (this.navmeshAdapter.hasAgent(combatant.id)) {
+        // Low/culled LOD: unregister from crowd, fall back to beeline
+        this.navmeshAdapter.unregisterAgent(combatant.id);
+      }
+    }
+
+    // Apply slope speed penalty for NPCs on walkable slopes
+    if (combatant.velocity.lengthSq() > 0.01) {
+      const slope = getHeightQueryCache().getSlopeAt(combatant.position.x, combatant.position.z);
+      const slopeMultiplier = computeSlopeSpeedMultiplier(slope);
+      combatant.velocity.x *= slopeMultiplier;
+      combatant.velocity.z *= slopeMultiplier;
+    }
+
     // Apply velocity normally - LOD scaling handled in CombatantSystem
     combatant.position.addScaledVector(combatant.velocity, deltaTime);
 
     // Keep on terrain with sampled/cached updates to avoid per-frame height churn at scale.
     if (!options?.disableTerrainSample) {
       const terrainHeight = this.getTerrainHeightForCombatant(combatant);
-      combatant.position.y = terrainHeight + 3;
+      combatant.position.y = terrainHeight + NPC_Y_OFFSET;
     }
   }
 
@@ -96,15 +144,15 @@ export class CombatantMovement {
     if (!Number.isFinite(combatant.rotationVelocity)) {
       combatant.rotationVelocity = 0;
     }
-    const safeDeltaTime = Number.isFinite(deltaTime) ? Math.max(0, Math.min(deltaTime, 0.1)) : 0.016;
+    const safeDeltaTime = Number.isFinite(deltaTime) ? Math.max(0, Math.min(deltaTime, MAX_DELTA_TIME)) : DEFAULT_DELTA_TIME;
 
     // Normalize to -PI..PI range using modulo math (bounded cost).
     let rotationDifference = combatant.rotation - combatant.visualRotation;
     rotationDifference = ((rotationDifference + Math.PI) % CombatantMovement.TAU + CombatantMovement.TAU) % CombatantMovement.TAU - Math.PI;
 
     // Apply smooth interpolation with velocity for natural movement
-    const rotationAcceleration = rotationDifference * 15; // Spring constant
-    const rotationDamping = combatant.rotationVelocity * 10; // Damping
+    const rotationAcceleration = rotationDifference * ROTATION_SPRING;
+    const rotationDamping = combatant.rotationVelocity * ROTATION_DAMPING;
 
     combatant.rotationVelocity += (rotationAcceleration - rotationDamping) * safeDeltaTime;
     combatant.visualRotation += combatant.rotationVelocity * safeDeltaTime;
@@ -124,9 +172,9 @@ export class CombatantMovement {
   private getTerrainHeightForCombatant(combatant: Combatant): number {
     const now = performance.now();
     const intervalMs =
-      combatant.lodLevel === 'high' ? 80 :
-      combatant.lodLevel === 'medium' ? 140 :
-      combatant.lodLevel === 'low' ? 220 : 320;
+      combatant.lodLevel === 'high' ? TERRAIN_SAMPLE_INTERVAL_HIGH :
+      combatant.lodLevel === 'medium' ? TERRAIN_SAMPLE_INTERVAL_MEDIUM :
+      combatant.lodLevel === 'low' ? TERRAIN_SAMPLE_INTERVAL_LOW : TERRAIN_SAMPLE_INTERVAL_CULLED;
 
     const lastX = combatant.terrainSampleX;
     const lastZ = combatant.terrainSampleZ;
@@ -142,7 +190,7 @@ export class CombatantMovement {
       const dx = combatant.position.x - Number(lastX);
       const dz = combatant.position.z - Number(lastZ);
       const movedSq = dx * dx + dz * dz;
-      if (movedSq < 1.0 && (now - Number(lastT)) < intervalMs) {
+      if (movedSq < TERRAIN_SAMPLE_MOVE_THRESHOLD_SQ && (now - Number(lastT)) < intervalMs) {
         return Number(lastH);
       }
     }
@@ -165,6 +213,26 @@ export class CombatantMovement {
 
   setGameModeManager(gameModeManager: GameModeManager): void {
     this.gameModeManager = gameModeManager;
+  }
+
+  setNavmeshSystem(navmeshSystem: NavmeshSystem): void {
+    this.navmeshSystem = navmeshSystem;
+    // Adapter is retrieved lazily when navmesh becomes ready
+    this.navmeshAdapter = navmeshSystem.getAdapter();
+  }
+
+  /** Refresh the adapter reference (call after navmesh generation). */
+  refreshNavmeshAdapter(): void {
+    if (this.navmeshSystem) {
+      this.navmeshAdapter = this.navmeshSystem.getAdapter();
+    }
+  }
+
+  /** Unregister a combatant from the navmesh crowd (used on death/dematerialization). */
+  unregisterNavmeshAgent(id: string): void {
+    if (this.navmeshAdapter?.hasAgent(id)) {
+      this.navmeshAdapter.unregisterAgent(id);
+    }
   }
 
   private getEnemyBasePosition(faction: Faction): THREE.Vector3 {

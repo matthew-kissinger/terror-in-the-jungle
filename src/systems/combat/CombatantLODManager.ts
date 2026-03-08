@@ -16,11 +16,43 @@ import {
 } from './ai/CombatFireRaycastBudget';
 import { Logger } from '../../utils/Logger';
 
+import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
+
 // Stagger periods: how many frames between full AI updates per LOD tier
 const STAGGER_HIGH = 3;
 const STAGGER_MEDIUM = 5;
 const STAGGER_LOW = 8;
 const STAGGER_CULLED_NEAR = 12;
+
+// ── Death animation timing (seconds) ──
+const DEATH_FALL_DURATION = 0.7;
+const DEATH_GROUND_TIME = 6.0;
+const DEATH_FADEOUT_DURATION = 2.0;
+const DEATH_TOTAL_TIME = DEATH_FALL_DURATION + DEATH_GROUND_TIME + DEATH_FADEOUT_DURATION;
+
+// ── Distant AI simulation ──
+const DISTANT_SIM_TIME_STEP = 30; // seconds per sim step
+const DISTANT_SIM_SPEED = 4; // m/s for distant movement
+const DISTANT_SIM_RANDOM_OFFSET = 20; // meters random scatter
+const DISTANT_CULLED_DEFAULT_Y = 3; // approximate terrain Y for culled units
+
+// ── LOD ranges by GPU tier (meters) ──
+const LOD_RANGES_DESKTOP = { high: 200, medium: 400, low: 600 };
+const LOD_RANGES_MEDIUM_GPU = { high: 120, medium: 250, low: 450 };
+const LOD_RANGES_LOW_GPU = { high: 60, medium: 120, low: 250 };
+
+// ── Update caps by GPU tier ──
+const UPDATE_CAPS_DESKTOP = { high: 20, medium: 24 };
+const UPDATE_CAPS_MEDIUM_GPU = { high: 12, medium: 16 };
+const UPDATE_CAPS_LOW_GPU = { high: 8, medium: 10 };
+
+// ── FPS scaling ──
+const FPS_TARGET_DESKTOP = 30;
+const FPS_TARGET_MOBILE = 45;
+const FPS_RESPONSIVE_THRESHOLD = 90;
+const FPS_MAX_SCALE_DESKTOP = 3.0;
+const FPS_MAX_SCALE_MOBILE = 4.0;
+const FPS_MIN_SCALE = 0.75;
 
 /**
  * Manages LOD (Level of Detail) calculations and update scheduling for combatants
@@ -109,27 +141,25 @@ export class CombatantLODManager {
     const gpuTier = estimateGPUTier();
     const isMobile = isMobileGPU();
 
-    // Default desktop high settings
-    this.highLODRange = 200;
-    this.mediumLODRange = 400;
-    this.lowLODRange = 600;
+    this.highLODRange = LOD_RANGES_DESKTOP.high;
+    this.mediumLODRange = LOD_RANGES_DESKTOP.medium;
+    this.lowLODRange = LOD_RANGES_DESKTOP.low;
 
     if (isMobile || gpuTier === 'low') {
-      // Aggressive mobile/low-tier scaling
-      this.highLODRange = 60;
-      this.mediumLODRange = 120;
-      this.lowLODRange = 250;
-      this.maxHighFullUpdatesPerFrame = 8;
-      this.maxMediumFullUpdatesPerFrame = 10;
+      this.highLODRange = LOD_RANGES_LOW_GPU.high;
+      this.mediumLODRange = LOD_RANGES_LOW_GPU.medium;
+      this.lowLODRange = LOD_RANGES_LOW_GPU.low;
+      this.maxHighFullUpdatesPerFrame = UPDATE_CAPS_LOW_GPU.high;
+      this.maxMediumFullUpdatesPerFrame = UPDATE_CAPS_LOW_GPU.medium;
     } else if (gpuTier === 'medium') {
-      this.highLODRange = 120;
-      this.mediumLODRange = 250;
-      this.lowLODRange = 450;
-      this.maxHighFullUpdatesPerFrame = 12;
-      this.maxMediumFullUpdatesPerFrame = 16;
+      this.highLODRange = LOD_RANGES_MEDIUM_GPU.high;
+      this.mediumLODRange = LOD_RANGES_MEDIUM_GPU.medium;
+      this.lowLODRange = LOD_RANGES_MEDIUM_GPU.low;
+      this.maxHighFullUpdatesPerFrame = UPDATE_CAPS_MEDIUM_GPU.high;
+      this.maxMediumFullUpdatesPerFrame = UPDATE_CAPS_MEDIUM_GPU.medium;
     } else {
-      this.maxHighFullUpdatesPerFrame = 20;
-      this.maxMediumFullUpdatesPerFrame = 24;
+      this.maxHighFullUpdatesPerFrame = UPDATE_CAPS_DESKTOP.high;
+      this.maxMediumFullUpdatesPerFrame = UPDATE_CAPS_DESKTOP.medium;
     }
   }
 
@@ -160,15 +190,13 @@ export class CombatantLODManager {
     const fps = 1 / Math.max(0.001, this.frameDeltaEma);
     
     // Target higher FPS for scaling on mobile
-    const targetFps = isMobileGPU() ? 45 : 30;
+    const targetFps = isMobileGPU() ? FPS_TARGET_MOBILE : FPS_TARGET_DESKTOP;
 
     if (fps < targetFps) {
-      // Scale intervals up when under target FPS
-      const maxScale = isMobileGPU() ? 4.0 : 3.0;
+      const maxScale = isMobileGPU() ? FPS_MAX_SCALE_MOBILE : FPS_MAX_SCALE_DESKTOP;
       this.intervalScale = Math.min(maxScale, targetFps / Math.max(10, fps));
-    } else if (fps > 90) {
-      // Slightly reduce intervals to feel more responsive on high FPS
-      this.intervalScale = Math.max(0.75, 90 / fps);
+    } else if (fps > FPS_RESPONSIVE_THRESHOLD) {
+      this.intervalScale = Math.max(FPS_MIN_SCALE, FPS_RESPONSIVE_THRESHOLD / fps);
     } else {
       this.intervalScale = 1.0;
     }
@@ -649,10 +677,7 @@ export class CombatantLODManager {
   }
 
   private updateDeathAnimations(deltaTime: number): void {
-    const FALL_DURATION = 0.7;
-    const GROUND_TIME = 6.0;
-    const FADEOUT_DURATION = 2.0;
-    const TOTAL_DEATH_TIME = FALL_DURATION + GROUND_TIME + FADEOUT_DURATION;
+    const TOTAL_DEATH_TIME = DEATH_TOTAL_TIME;
 
     const toRemove: string[] = [];
 
@@ -714,9 +739,7 @@ export class CombatantLODManager {
 
   private simulateDistantAI(combatant: Combatant): void {
     if (!this.zoneManager) return;
-    const simulationTimeStep = 30;
-    const normalMovementSpeed = 4;
-    const distanceToMove = normalMovementSpeed * simulationTimeStep;
+    const distanceToMove = DISTANT_SIM_SPEED * DISTANT_SIM_TIME_STEP;
 
     const zones = this.zoneManager.getAllZones();
     const targetZones = zones.filter(zone => {
@@ -746,14 +769,12 @@ export class CombatantLODManager {
       combatant.rotation = Math.atan2(direction.z, direction.x);
 
       const randomOffset = this._scratchOffset.set(
-        (Math.random() - 0.5) * 20,
+        (Math.random() - 0.5) * DISTANT_SIM_RANDOM_OFFSET,
         0,
-        (Math.random() - 0.5) * 20
+        (Math.random() - 0.5) * DISTANT_SIM_RANDOM_OFFSET
       );
       combatant.position.add(randomOffset);
-      // Culled distant simulation is approximate by design; avoid expensive terrain
-      // height sampling on non-rendered actors to prevent far-NPC herd spikes.
-      combatant.position.y = 3;
+      combatant.position.y = DISTANT_CULLED_DEFAULT_Y;
     }
   }
 

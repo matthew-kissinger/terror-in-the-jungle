@@ -27,6 +27,7 @@ export class SystemConnector {
     this.wireWeapons(refs);
     this.wireGameMode(refs);
     this.wireStrategy(refs);
+    this.wireNavigation(refs);
     this.wireEnvironment(refs, renderer);
     this.wireTelemetry(refs, renderer);
   }
@@ -271,6 +272,12 @@ export class SystemConnector {
     refs.gameModeManager.setWarSimulator(refs.warSimulator);
     refs.minimapSystem.setWarSimulator(refs.warSimulator);
     refs.fullMapSystem.setWarSimulator(refs.warSimulator);
+  }
+
+  // ── Navigation (navmesh) ──
+
+  private wireNavigation(refs: SystemReferences): void {
+    refs.combatantSystem.setNavmeshSystem(refs.navmeshSystem);
   }
 
   // ── Environment (weather, water, terrain audio) ──

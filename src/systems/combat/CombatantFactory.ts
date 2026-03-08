@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { Combatant, CombatantState, AISkillProfile, Faction, isOpfor } from './types';
 import { WeaponSpec, GunplayCore } from '../weapons/GunplayCore';
+import { NPC_HEALTH, OPFOR_OBJECTIVE_FOCUS_CHANCE } from '../../config/CombatantConfig';
+
+// ── Skill profile randomization ──
+const REACTION_DELAY_JITTER = 100; // +/- ms
+const AIM_JITTER_AMPLITUDE_JITTER = 0.3; // +/- units
 
 export class CombatantFactory {
   private nextCombatantId = 0;
@@ -26,8 +31,8 @@ export class CombatantFactory {
       rotationVelocity: 0,
       scale: new THREE.Vector3(1, 1, 1),
 
-      health: 100,
-      maxHealth: 100,
+      health: NPC_HEALTH,
+      maxHealth: NPC_HEALTH,
       state: CombatantState.PATROLLING,
 
       weaponSpec,
@@ -53,7 +58,7 @@ export class CombatantFactory {
       updatePriority: 0,
       lodLevel: 'high',
 
-      isObjectiveFocused: isOpfor(faction) && Math.random() < 0.4,
+      isObjectiveFocused: isOpfor(faction) && Math.random() < OPFOR_OBJECTIVE_FOCUS_CHANCE,
 
       kills: 0,
       deaths: 0,
@@ -78,8 +83,8 @@ export class CombatantFactory {
       visualRotation: 0,
       rotationVelocity: 0,
       scale: new THREE.Vector3(1, 1, 1),
-      health: 100,
-      maxHealth: 100,
+      health: NPC_HEALTH,
+      maxHealth: NPC_HEALTH,
       state: CombatantState.ENGAGING,
       weaponSpec: this.createWeaponSpec(faction),
       gunCore: new GunplayCore(this.createWeaponSpec(faction)),
@@ -193,8 +198,8 @@ export class CombatantFactory {
     };
 
     const baseProfile = { ...profiles[faction] };
-    baseProfile.reactionDelayMs += (Math.random() - 0.5) * 100;
-    baseProfile.aimJitterAmplitude += (Math.random() - 0.5) * 0.3;
+    baseProfile.reactionDelayMs += (Math.random() - 0.5) * REACTION_DELAY_JITTER;
+    baseProfile.aimJitterAmplitude += (Math.random() - 0.5) * AIM_JITTER_AMPLITUDE_JITTER;
     return baseProfile;
   }
 }

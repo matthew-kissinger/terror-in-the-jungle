@@ -9,18 +9,52 @@ interface ShakeState {
   frequency: number; // Shake frequency in Hz
 }
 
+// ── Shake parameters ──
+const MAX_INTENSITY = 2.5;
+const DEFAULT_FREQUENCY = 20;
+const NOISE_TIME_SCALE = 10;
+
+// Explosion shake
+const EXPLOSION_SHAKE_RADIUS_MULT = 1.5;
+const EXPLOSION_INTENSITY = 1.5;
+const EXPLOSION_BASE_DURATION = 0.3;
+const EXPLOSION_DURATION_SCALE = 0.2;
+const EXPLOSION_FREQUENCY = 25;
+
+// Damage shake
+const DAMAGE_INTENSITY_DIVISOR = 50;
+const DAMAGE_MAX_INTENSITY = 1.2;
+const DAMAGE_BASE_DURATION = 0.15;
+const DAMAGE_DURATION_SCALE = 0.15;
+const DAMAGE_FREQUENCY = 30;
+
+// Nearby death shake
+const DEATH_SHAKE_MAX_DISTANCE = 20;
+const DEATH_SHAKE_INTENSITY = 0.15;
+const DEATH_SHAKE_DURATION = 0.2;
+const DEATH_SHAKE_FREQUENCY = 15;
+
+// Recoil shake
+const RECOIL_INTENSITY = 0.08;
+const RECOIL_DURATION = 0.06;
+const RECOIL_FREQUENCY = 25;
+
+// Envelope
+const SHAKE_FADE_FRACTION = 0.3;
+const SHAKE_MAX_ANGLE_PER_UNIT = 0.6; // degrees
+
 export class CameraShakeSystem implements GameSystem {
   private activeShakes: ShakeState[] = [];
-  private noiseOffset: number = 0; // For Perlin-like noise
-  private readonly MAX_INTENSITY = 2.5; // Cap intensity to prevent nausea
-  private readonly DEFAULT_FREQUENCY = 20; // Default shake frequency (Hz)
+  private noiseOffset: number = 0;
+  private readonly MAX_INTENSITY = MAX_INTENSITY;
+  private readonly DEFAULT_FREQUENCY = DEFAULT_FREQUENCY;
 
   async init(): Promise<void> {
     Logger.info('effects', 'Initializing Camera Shake System...');
   }
 
   update(deltaTime: number): void {
-    this.noiseOffset += deltaTime * 10; // Advance noise time
+    this.noiseOffset += deltaTime * NOISE_TIME_SCALE;
 
     // Update and remove expired shakes
     for (let i = this.activeShakes.length - 1; i >= 0; i--) {
@@ -65,16 +99,14 @@ export class CameraShakeSystem implements GameSystem {
   shakeFromExplosion(explosionPos: THREE.Vector3, playerPos: THREE.Vector3, maxRadius: number): void {
     const distance = explosionPos.distanceTo(playerPos);
 
-    if (distance > maxRadius * 1.5) return; // No shake beyond 1.5x radius
+    const effectiveRadius = maxRadius * EXPLOSION_SHAKE_RADIUS_MULT;
+    if (distance > effectiveRadius) return;
 
-    // Falloff curve: full intensity at epicenter, 0 at 1.5x radius
-    const falloff = Math.max(0, 1 - (distance / (maxRadius * 1.5)));
-    const intensity = 1.5 * falloff * falloff; // Quadratic falloff for more punch
+    const falloff = Math.max(0, 1 - (distance / effectiveRadius));
+    const intensity = EXPLOSION_INTENSITY * falloff * falloff;
+    const duration = EXPLOSION_BASE_DURATION + (EXPLOSION_DURATION_SCALE * falloff);
 
-    // Longer shake for closer explosions
-    const duration = 0.3 + (0.2 * falloff);
-
-    this.shake(intensity, duration, 25); // Higher frequency for explosions
+    this.shake(intensity, duration, EXPLOSION_FREQUENCY);
   }
 
   /**
@@ -82,11 +114,10 @@ export class CameraShakeSystem implements GameSystem {
    * @param damageAmount Amount of damage taken
    */
   shakeFromDamage(damageAmount: number): void {
-    // Scale: 10 damage = 0.2 intensity, 50 damage = 1.0 intensity
-    const intensity = Math.min(damageAmount / 50, 1.2);
-    const duration = 0.15 + (intensity * 0.15); // 0.15-0.3s based on damage
+    const intensity = Math.min(damageAmount / DAMAGE_INTENSITY_DIVISOR, DAMAGE_MAX_INTENSITY);
+    const duration = DAMAGE_BASE_DURATION + (intensity * DAMAGE_DURATION_SCALE);
 
-    this.shake(intensity, duration, 30); // Fast shake for hit feedback
+    this.shake(intensity, duration, DAMAGE_FREQUENCY);
   }
 
   /**
@@ -96,23 +127,19 @@ export class CameraShakeSystem implements GameSystem {
    */
   shakeFromNearbyDeath(deathPos: THREE.Vector3, playerPos: THREE.Vector3): void {
     const distance = deathPos.distanceTo(playerPos);
-    const MAX_DEATH_SHAKE_DISTANCE = 20; // Only shake if death is within 20 units
+    if (distance > DEATH_SHAKE_MAX_DISTANCE) return;
 
-    if (distance > MAX_DEATH_SHAKE_DISTANCE) return;
+    const falloff = Math.max(0, 1 - (distance / DEATH_SHAKE_MAX_DISTANCE));
+    const intensity = DEATH_SHAKE_INTENSITY * falloff;
 
-    // Falloff: full intensity at 0, zero at max distance
-    const falloff = Math.max(0, 1 - (distance / MAX_DEATH_SHAKE_DISTANCE));
-    const intensity = 0.15 * falloff; // Subtle shake
-    const duration = 0.2;
-
-    this.shake(intensity, duration, 15); // Low frequency for body impact
+    this.shake(intensity, DEATH_SHAKE_DURATION, DEATH_SHAKE_FREQUENCY);
   }
 
   /**
    * Apply subtle recoil shake from weapon firing
    */
   shakeFromRecoil(): void {
-    this.shake(0.08, 0.06, 25); // Very subtle, short shake
+    this.shake(RECOIL_INTENSITY, RECOIL_DURATION, RECOIL_FREQUENCY);
   }
 
   /**
@@ -131,7 +158,7 @@ export class CameraShakeSystem implements GameSystem {
     for (const shake of this.activeShakes) {
       // Calculate decay envelope (smooth fade out)
       const remainingTime = shake.duration - shake.elapsed;
-      const fadeOut = Math.min(1, remainingTime / (shake.duration * 0.3)); // Fade last 30%
+      const fadeOut = Math.min(1, remainingTime / (shake.duration * SHAKE_FADE_FRACTION));
       const envelope = fadeOut;
 
       // Use noise-like oscillation based on frequency
@@ -147,7 +174,7 @@ export class CameraShakeSystem implements GameSystem {
       const noiseY = (Math.sin(timePhase * 1.3 + 50) + Math.sin(timePhase * 2.1 + 150) * 0.5) / 1.5;
 
       // Apply intensity and envelope
-      const maxAngleRad = THREE.MathUtils.degToRad(shake.intensity * 0.6); // Max 0.6 deg per unit
+      const maxAngleRad = THREE.MathUtils.degToRad(shake.intensity * SHAKE_MAX_ANGLE_PER_UNIT);
       totalYaw += noiseX * maxAngleRad * envelope;
       totalPitch += noiseY * maxAngleRad * envelope;
     }
@@ -167,7 +194,7 @@ export class CameraShakeSystem implements GameSystem {
    */
   getTotalIntensity(): number {
     return this.activeShakes.reduce((sum, shake) => {
-      const fadeOut = Math.min(1, (shake.duration - shake.elapsed) / (shake.duration * 0.3));
+      const fadeOut = Math.min(1, (shake.duration - shake.elapsed) / (shake.duration * SHAKE_FADE_FRACTION));
       return sum + (shake.intensity * fadeOut);
     }, 0);
   }

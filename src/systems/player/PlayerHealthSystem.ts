@@ -23,20 +23,27 @@ export interface PlayerState {
   invulnerabilityTime: number;
 }
 
+// ── Player health constants ──
+const PLAYER_MAX_HEALTH = 150;
+const PLAYER_RESPAWN_TIME = 3.0;
+const HEALTH_REGEN_DELAY = 5.0;
+const HEALTH_REGEN_RATE = 20;
+const LOW_HEALTH_THRESHOLD = 30;
+
 export class PlayerHealthSystem implements GameSystem {
   private playerState: PlayerState = {
-    health: 150,
-    maxHealth: 150,
+    health: PLAYER_MAX_HEALTH,
+    maxHealth: PLAYER_MAX_HEALTH,
     isAlive: true,
     isDead: false,
     deathTime: 0,
-    respawnTime: 3.0,
+    respawnTime: PLAYER_RESPAWN_TIME,
     invulnerabilityTime: 0
   };
 
-  private healthRegenDelay = 5.0;
+  private healthRegenDelay = HEALTH_REGEN_DELAY;
   private lastDamageTime = 0;
-  private readonly healthRegenRate = 20;
+  private readonly healthRegenRate = HEALTH_REGEN_RATE;
 
   // Modules
   private ui: PlayerHealthUI;
@@ -126,7 +133,7 @@ export class PlayerHealthSystem implements GameSystem {
   }
 
   private updateLowHealthEffects(): void {
-    const isLowHealth = this.playerState.health < 30;
+    const isLowHealth = this.playerState.health < LOW_HEALTH_THRESHOLD;
     this.ui.setLowHealthEffect(isLowHealth);
 
     if (isLowHealth) {

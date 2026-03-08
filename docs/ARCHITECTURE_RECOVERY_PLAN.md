@@ -1,6 +1,6 @@
 # Architecture Recovery Plan
 
-Last updated: 2026-03-06
+Last updated: 2026-03-08
 Scope: runtime architecture stabilization with performance and gameplay fidelity gates.
 
 ## Current Goal
@@ -54,6 +54,10 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: `AnimalSystem` cell-based ambient wildlife (egret, water_buffalo, macaque). Deterministic per-cell xorshift32 PRNG, ~20-25 active within 200m. No combat interaction.
 - Keep: Structure feature placements on TDM (4), Zone Control (5), A Shau (+10 to 16 total). All use existing WorldFeatureSystem + prefab layouts.
 - Delete: `ProgrammaticGunFactory.ts` (dead code; all weapons load from GLBs via WeaponRigManager).
+- Keep: `SlopePhysics.ts` pure-function utility for terrain slope speed penalty, slide, and step-up gating. Player speed reduced on slopes (blocked above ~60 deg with downhill slide), step-up gating prevents teleporting onto structures (MAX_STEP_HEIGHT=0.5m). NPCs get XZ velocity slope penalty only (navmesh handles pathing).
+- Keep: `NavmeshSystem` with `@recast-navigation/core` + `/three` + `/wasm` (v0.43.0). WASM chunk 727KB (218KB gzip), code-split. Solo navmesh for worldSize <= 3200m, TileCache tiled navmesh for larger maps. MAX_CROWD_AGENTS=64. Graceful degradation to beeline if WASM fails.
+- Keep: `NavmeshMovementAdapter` bridges Recast Crowd with CombatantMovement. LOD-gated: high/medium LOD NPCs use crowd-steered velocity, low/culled use beeline. State handlers still decide WHERE (zone scoring, cover), navmesh decides HOW (path around obstacles). Death/dematerialization unregisters agents from crowd.
+- Keep: Structure footprint obstacles baked into navmesh. Solo maps: obstacle wall meshes (cylinder/box) passed as additional input to `threeToSoloNavMesh`. Tiled maps: `TileCache.addCylinderObstacle`/`addBoxObstacle` with incremental `update()` processing. Circle footprints -> cylinder, rect/strip footprints -> box.
 - Keep: frame-local AI neighborhood cache in `AITargetAcquisition`; patrol/defend cluster-density checks now reuse the widest per-combatant spatial query issued that frame.
 - Keep: heap validation expansion (`growth`, `peak`, `recovery`) in harness output.
 - Keep: Single SpatialGridManager as sole spatial owner. Legacy SpatialOctree direct usage removed from CombatantSystem and all sub-modules.
@@ -148,7 +152,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 4. Break down `TerrainRaycastRuntime` near-field rebuild and vegetation update cost inside `TerrainSystem.update()` for `open_frontier`, `frontier30m`, and `a_shau_valley`.
 5. Re-baseline and lock regression checks after each accepted change. Deploy now gated on CI (lint+test+build). `perf:compare` wired into perf-check.yml workflow.
 6. Keep terrain rewrite progress aligned with `TERRAIN_REWRITE_MASTER_PLAN.md`; do not reintroduce chunk-era semantics into active runtime code. T-006 (CDLOD LOD transitions) done: XZ morphing in vertex shader, wireframe debug toggle.
-7. Hold WebGPU, WASM, worker offload, and navmesh adoption until the low-friction CPU fixes above are re-measured against warm baselines.
+7. Navmesh pathfinding adopted (2026-03-08): `@recast-navigation` WASM with solo/tiled navmesh, crowd simulation, structure obstacle exclusion, LOD-gated steering. Hold WebGPU, worker offload until warm baselines re-measured.
 
 ## Update Rule
 

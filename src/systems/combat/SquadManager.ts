@@ -5,6 +5,7 @@ import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { InfluenceMapSystem } from './InfluenceMapSystem';
 import { CaptureZone } from '../world/ZoneManager';
 import { Logger } from '../../utils/Logger';
+import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 
 export class SquadManager {
   private squads: Map<string, Squad> = new Map();
@@ -35,7 +36,7 @@ export class SquadManager {
 
     for (let i = 0; i < squadSize; i++) {
       const position = this.calculateFormationPosition(centerPosition, i);
-      position.y = this.getTerrainHeight(position.x, position.z) + 3;
+      position.y = this.getTerrainHeight(position.x, position.z) + NPC_Y_OFFSET;
 
       const role = i === 0 ? 'leader' : 'follower';
       const combatant = this.combatantFactory.createCombatant(

@@ -9,6 +9,45 @@ const _toTarget = new THREE.Vector3()
 const _flankingPos = new THREE.Vector3()
 const _toAttacker = new THREE.Vector3()
 
+// ── Engagement thresholds ──
+const CLOSE_RANGE_DISTANCE = 15
+const CLOSE_RANGE_BURST = 8
+const CLOSE_RANGE_PAUSE_MS = 200
+const PANIC_HIT_WINDOW = 2.0 // seconds since last hit
+const PANIC_INCREMENT = 0.3
+const PANIC_THRESHOLD = 0.5
+const PANIC_BURST = 10
+const PANIC_PAUSE_MS = 150
+const PANIC_DECAY_RATE = 0.2
+const NEARBY_ENEMY_RADIUS = 20
+const NEARBY_ENEMY_BURST_THRESHOLD = 2
+const NEARBY_ENEMY_BURST = 6
+
+// ── Cover behavior ──
+const COVER_BURST_LENGTH = 2
+const COVER_BURST_PAUSE_MS = 1500
+
+// ── Suppression ──
+const SUPPRESSION_BURST = 12
+const SUPPRESSION_PAUSE_MS = 100
+const SUPPRESSION_ALERT_TIMER = 5.0
+const SUPPRESSION_FIRE_BURST = 8
+const SUPPRESSION_FIRE_PAUSE_MS = 150
+const SUPPRESSION_BASE_DURATION_MS = 3000
+const SUPPRESSION_JITTER_MS = 2000
+const SUPPRESSION_COOLDOWN_MS = 10000
+
+// ── Squad suppression initiation ──
+const SQUAD_MIN_SIZE_FOR_SUPPRESSION = 3
+const SUPPRESSION_MIN_DISTANCE = 30
+const SUPPRESSION_MAX_DISTANCE = 80
+const SUPPRESSION_ENEMY_SCAN_RADIUS = 40
+const SUPPRESSION_HEALTH_THRESHOLD = 0.4
+
+// ── Flanking ──
+const FLANK_BASE_DISTANCE = 25
+const FLANK_DISTANCE_JITTER = 15
+
 /**
  * Handles engaging and suppressing combat states
  */
@@ -77,8 +116,8 @@ export class AIStateEngage {
 
     // Peek-and-fire behavior when in cover
     if (combatant.inCover) {
-      combatant.skillProfile.burstLength = 2
-      combatant.skillProfile.burstPauseMs = 1500
+      combatant.skillProfile.burstLength = COVER_BURST_LENGTH
+      combatant.skillProfile.burstPauseMs = COVER_BURST_PAUSE_MS
 
       // Use improved cover evaluation
       if (this.coverSystem && combatant.coverPosition) {
@@ -110,22 +149,22 @@ export class AIStateEngage {
       }
     } else {
       // Normal engagement behavior when not in cover
-      if (targetDistance < 15) {
+      if (targetDistance < CLOSE_RANGE_DISTANCE) {
         combatant.isFullAuto = true
-        combatant.skillProfile.burstLength = 8
-        combatant.skillProfile.burstPauseMs = 200
+        combatant.skillProfile.burstLength = CLOSE_RANGE_BURST
+        combatant.skillProfile.burstPauseMs = CLOSE_RANGE_PAUSE_MS
       }
 
       const timeSinceHit = (Date.now() - combatant.lastHitTime) / 1000
-      if (timeSinceHit < 2.0) {
-        combatant.panicLevel = Math.min(1.0, combatant.panicLevel + 0.3)
-        if (combatant.panicLevel > 0.5) {
+      if (timeSinceHit < PANIC_HIT_WINDOW) {
+        combatant.panicLevel = Math.min(1.0, combatant.panicLevel + PANIC_INCREMENT)
+        if (combatant.panicLevel > PANIC_THRESHOLD) {
           combatant.isFullAuto = true
-          combatant.skillProfile.burstLength = 10
-          combatant.skillProfile.burstPauseMs = 150
+          combatant.skillProfile.burstLength = PANIC_BURST
+          combatant.skillProfile.burstPauseMs = PANIC_PAUSE_MS
         }
       } else {
-        combatant.panicLevel = Math.max(0, combatant.panicLevel - deltaTime * 0.2)
+        combatant.panicLevel = Math.max(0, combatant.panicLevel - deltaTime * PANIC_DECAY_RATE)
       }
 
       // Check if should seek cover - use improved cover system if available
@@ -154,10 +193,10 @@ export class AIStateEngage {
         }
       }
 
-      const nearbyEnemyCount = countNearbyEnemies(combatant, 20, playerPosition, allCombatants, spatialGrid)
-      if (nearbyEnemyCount > 2) {
+      const nearbyEnemyCount = countNearbyEnemies(combatant, NEARBY_ENEMY_RADIUS, playerPosition, allCombatants, spatialGrid)
+      if (nearbyEnemyCount > NEARBY_ENEMY_BURST_THRESHOLD) {
         combatant.isFullAuto = true
-        combatant.skillProfile.burstLength = 6
+        combatant.skillProfile.burstLength = NEARBY_ENEMY_BURST
       }
 
       // Check if squad should initiate flanking maneuver (uses new flanking system)
@@ -197,8 +236,8 @@ export class AIStateEngage {
       combatant.lastKnownTargetPos = combatant.target.position.clone()
       combatant.state = CombatantState.SUPPRESSING
       combatant.isFullAuto = true
-      combatant.skillProfile.burstLength = 12
-      combatant.skillProfile.burstPauseMs = 100
+      combatant.skillProfile.burstLength = SUPPRESSION_BURST
+      combatant.skillProfile.burstPauseMs = SUPPRESSION_PAUSE_MS
       combatant.inCover = false
       return
     }
@@ -273,19 +312,19 @@ export class AIStateEngage {
     if (!combatant.squadId) return false
 
     const squad = this.squads.get(combatant.squadId)
-    if (!squad || squad.members.length < 3) return false
+    if (!squad || squad.members.length < SQUAD_MIN_SIZE_FOR_SUPPRESSION) return false
 
     const lastSuppression = this.squadSuppressionCooldown.get(combatant.squadId) || 0
-    if (Date.now() - lastSuppression < 10000) return false
+    if (Date.now() - lastSuppression < SUPPRESSION_COOLDOWN_MS) return false
 
     const distanceSq = combatant.position.distanceToSquared(targetPos)
-    if (distanceSq < 30 * 30 || distanceSq > 80 * 80) return false
+    if (distanceSq < SUPPRESSION_MIN_DISTANCE * SUPPRESSION_MIN_DISTANCE || distanceSq > SUPPRESSION_MAX_DISTANCE * SUPPRESSION_MAX_DISTANCE) return false
 
-    const nearbyEnemies = countNearbyEnemies(combatant, 40, targetPos, allCombatants, spatialGrid)
+    const nearbyEnemies = countNearbyEnemies(combatant, SUPPRESSION_ENEMY_SCAN_RADIUS, targetPos, allCombatants, spatialGrid)
 
     for (const memberId of squad.members) {
       const member = allCombatants.get(memberId)
-      if (member && member.health < member.maxHealth * 0.4) {
+      if (member && member.health < member.maxHealth * SUPPRESSION_HEALTH_THRESHOLD) {
         return true
       }
     }
@@ -321,22 +360,22 @@ export class AIStateEngage {
         } else {
           member.suppressionTarget = targetPos.clone()
         }
-        member.suppressionEndTime = now + 3000 + Math.random() * 2000
+        member.suppressionEndTime = now + SUPPRESSION_BASE_DURATION_MS + Math.random() * SUPPRESSION_JITTER_MS
         if (member.lastKnownTargetPos) {
           member.lastKnownTargetPos.copy(targetPos)
         } else {
           member.lastKnownTargetPos = targetPos.clone()
         }
-        member.alertTimer = 5.0
+        member.alertTimer = SUPPRESSION_ALERT_TIMER
         member.isFullAuto = true
-        member.skillProfile.burstLength = 8
-        member.skillProfile.burstPauseMs = 150
+        member.skillProfile.burstLength = SUPPRESSION_FIRE_BURST
+        member.skillProfile.burstPauseMs = SUPPRESSION_FIRE_PAUSE_MS
       } else {
         member.state = CombatantState.ADVANCING
 
         const flankLeft = index % 2 === 0
         const flankingAngle = this.calculateFlankingAngle(member.position, targetPos, flankLeft)
-        const flankingDistance = 25 + Math.random() * 15
+        const flankingDistance = FLANK_BASE_DISTANCE + Math.random() * FLANK_DISTANCE_JITTER
 
         const flankingPos = _flankingPos.set(
           targetPos.x + Math.cos(flankingAngle) * flankingDistance,

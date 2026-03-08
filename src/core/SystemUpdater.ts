@@ -68,6 +68,15 @@ export class SystemUpdater {
       performanceTelemetry.endSystem('Terrain');
     });
 
+    this.trackSystemUpdate('Navigation', 2.0, () => {
+      performanceTelemetry.beginSystem('Navigation');
+      if (refs.navmeshSystem) {
+        const pos = refs.playerController?.getPosition();
+        refs.navmeshSystem.update(deltaTime, pos);
+      }
+      performanceTelemetry.endSystem('Navigation');
+    });
+
     this.trackSystemUpdate('Billboards', 2.0, () => {
       performanceTelemetry.beginSystem('Billboards');
       if (refs.globalBillboardSystem) {
