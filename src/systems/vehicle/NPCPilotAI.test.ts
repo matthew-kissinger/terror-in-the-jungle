@@ -12,7 +12,7 @@ function createMission(overrides?: Partial<PilotMission>): PilotMission {
   };
 }
 
-function tick(ai: NPCPilotAI, pos: THREE.Vector3, vel: THREE.Vector3, n: number, dt = 1 / 60) {
+function _tick(ai: NPCPilotAI, pos: THREE.Vector3, vel: THREE.Vector3, n: number, dt = 1 / 60) {
   const quat = new THREE.Quaternion();
   for (let i = 0; i < n; i++) {
     const controls = ai.update(dt, pos, vel, quat, 0);

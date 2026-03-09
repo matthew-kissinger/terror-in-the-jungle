@@ -30,7 +30,7 @@ const SPEED_KP = 0.015;
 const TAKEOFF_ALTITUDE = 30;
 const WAYPOINT_REACH_DIST = 50;
 const LANDING_APPROACH_DIST = 30;
-const LANDING_DESCENT_RATE = 2.0;
+const _LANDING_DESCENT_RATE = 2.0;
 const GROUNDED_THRESHOLD = 1.5;
 
 const _toTarget = new THREE.Vector3();
