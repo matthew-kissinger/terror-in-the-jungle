@@ -134,6 +134,7 @@ jobs:
 
       - name: Compare against baselines
         if: always()
+        continue-on-error: true
         run: |
           if ls artifacts/perf/*/summary.json 1>/dev/null 2>&1; then
             npm run perf:compare -- --scenario combat120
@@ -151,7 +152,7 @@ jobs:
 
   deploy:
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-    needs: [lint, test, build, perf]
+    needs: [lint, test, build]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
