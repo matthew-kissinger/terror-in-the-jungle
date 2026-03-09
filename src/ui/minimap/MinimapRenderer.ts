@@ -8,6 +8,17 @@ import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
 
+import { icon as iconUrl } from '../icons/IconRegistry';
+
+let helipadIcon: HTMLImageElement | null = null;
+function getHelipadIcon(): HTMLImageElement {
+  if (!helipadIcon) {
+    helipadIcon = new Image();
+    helipadIcon.src = iconUrl('map-helipad');
+  }
+  return helipadIcon;
+}
+
 export type HelipadMarker = {
   id: string;
   position: THREE.Vector3;
@@ -324,12 +335,22 @@ function drawHelipadMarkers(ctx: CanvasRenderingContext2D, state: MinimapRenderS
     ctx.lineWidth = 1.5 * renderScale;
     ctx.stroke();
 
-    // H letter
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-    ctx.font = `bold ${Math.round(10 * renderScale)}px Rajdhani`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('H', x, y);
+    // Helipad icon or fallback H letter
+    const icon = getHelipadIcon();
+    if (icon.complete && icon.naturalWidth > 0) {
+      const imgSize = iconSize * 1.5;
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(icon, x - imgSize / 2, y - imgSize / 2, imgSize, imgSize);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.font = `bold ${Math.round(10 * renderScale)}px Rajdhani`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('H', x, y);
+    }
   }
 }
 

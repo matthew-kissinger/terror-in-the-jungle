@@ -16,6 +16,7 @@
  */
 
 import { UIComponent } from '../engine/UIComponent';
+import { icon } from '../icons/IconRegistry';
 import styles from './TouchControls.module.css';
 
 const SLOT_LABELS = ['SG', 'GRN', 'AR', 'SB', 'SMG', 'PST'];
@@ -222,7 +223,25 @@ export class TouchActionButtons extends UIComponent {
   private addButton(key: string, label: string): void {
     const btn = document.createElement('div');
     btn.className = styles.actionBtn;
-    btn.textContent = label;
+    btn.setAttribute('aria-label', label);
+
+    const iconMap: Record<string, string> = {
+      'R': 'icon-reload.png',
+      'JUMP': 'icon-jump.png',
+    };
+
+    const iconFile = iconMap[label];
+    if (iconFile) {
+      const iconEl = document.createElement('img');
+      iconEl.src = icon(iconFile.replace('.png', ''));
+      iconEl.alt = label;
+      iconEl.draggable = false;
+      iconEl.style.cssText = 'width: 55%; height: 55%; object-fit: contain; pointer-events: none; image-rendering: pixelated;';
+      btn.appendChild(iconEl);
+    } else {
+      btn.textContent = label;
+    }
+
     this.buttons.push({ element: btn, key, label });
     this.root.appendChild(btn);
   }

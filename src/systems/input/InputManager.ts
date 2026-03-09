@@ -93,6 +93,7 @@ export class InputManager extends PlayerInput {
       onScoreboardTap: () => this.runGameplay(callbacks.onScoreboardTap),
       onEnterExitHelicopter: () => this.runGameplay(callbacks.onEnterExitHelicopter),
       onToggleAutoHover: () => this.runGameplay(callbacks.onToggleAutoHover),
+      onToggleAltitudeLock: () => this.runGameplay(callbacks.onToggleAltitudeLock),
       onToggleMouseControl: () => this.runGameplay(callbacks.onToggleMouseControl),
       onSandbagRotateLeft: () => this.runGameplay(callbacks.onSandbagRotateLeft),
       onSandbagRotateRight: () => this.runGameplay(callbacks.onSandbagRotateRight),
@@ -110,6 +111,8 @@ export class InputManager extends PlayerInput {
       onSquadDeploy: () => this.runGameplay(callbacks.onSquadDeploy),
       onSquadCommand: () => this.runGameplay(callbacks.onSquadCommand),
       onSquadQuickCommand: (slot) => this.runGameplay(() => callbacks.onSquadQuickCommand?.(slot)),
+      onHelicopterWeaponSwitch: (index) => this.runGameplay(() => callbacks.onHelicopterWeaponSwitch?.(index)),
+      onAirSupportMenu: () => this.runGameplay(callbacks.onAirSupportMenu),
       // Escape/menu callbacks are always allowed so the player can recover from UI traps.
       onEscape: () => callbacks.onEscape?.(),
       onMenuPause: () => callbacks.onMenuPause?.(),

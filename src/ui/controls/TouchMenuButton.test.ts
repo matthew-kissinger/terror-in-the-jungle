@@ -23,9 +23,11 @@ describe('TouchMenuButton', () => {
     expect(el!.className).toContain('menuBtn');
   });
 
-  it('renders three hamburger lines', () => {
+  it('renders menu icon', () => {
     const el = document.getElementById('touch-menu-btn')!;
-    expect(el.children.length).toBe(3);
+    const img = el.querySelector('img') as HTMLImageElement;
+    expect(img).toBeTruthy();
+    expect(img.src).toContain('icon-menu.png');
   });
 
   it('starts with overlay not visible', () => {

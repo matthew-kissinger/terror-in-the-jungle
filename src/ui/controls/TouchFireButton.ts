@@ -5,6 +5,7 @@
 
 import { BaseTouchButton } from './BaseTouchButton';
 import { haptics } from './HapticFeedback';
+import { icon } from '../icons/IconRegistry';
 import styles from './TouchControls.module.css';
 
 export class TouchFireButton extends BaseTouchButton {
@@ -15,7 +16,13 @@ export class TouchFireButton extends BaseTouchButton {
   protected build(): void {
     this.root.className = styles.fireBtn;
     this.root.id = 'touch-fire-btn';
-    this.root.textContent = 'FIRE';
+    const iconEl = document.createElement('img');
+    iconEl.src = icon('icon-fire');
+    iconEl.alt = 'Fire';
+    iconEl.draggable = false;
+    iconEl.style.cssText = 'width: 50%; height: 50%; object-fit: contain; pointer-events: none; image-rendering: pixelated;';
+    this.root.appendChild(iconEl);
+    this.root.setAttribute('aria-label', 'Fire');
   }
 
   protected onMount(): void {

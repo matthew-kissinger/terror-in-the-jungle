@@ -9,6 +9,7 @@
  */
 
 import { UIComponent } from '../engine/UIComponent';
+import { icon } from '../icons/IconRegistry';
 import styles from './CrosshairSystem.module.css';
 
 export type CrosshairMode = 'infantry' | 'helicopter_transport' | 'helicopter_gunship' | 'helicopter_attack';
@@ -34,7 +35,8 @@ export class CrosshairSystem extends UIComponent {
         <div data-ref="spreadRing" class="${styles.spreadRing}"></div>
       </div>
       <div data-ref="pipper" class="${styles.pipperReticle}" style="display:none">
-        <div class="${styles.pipperCircle}"></div>
+        <img data-ref="pipperGun" src="${icon('reticle-cobra-gun')}" alt="Gun reticle" width="48" height="48" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);object-fit:contain;image-rendering:pixelated;pointer-events:none;" draggable="false">
+        <img data-ref="pipperRocket" src="${icon('reticle-rocket')}" alt="Rocket reticle" width="48" height="48" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);object-fit:contain;image-rendering:pixelated;pointer-events:none;display:none;" draggable="false">
         <div class="${styles.pipperDot}"></div>
       </div>
     `;

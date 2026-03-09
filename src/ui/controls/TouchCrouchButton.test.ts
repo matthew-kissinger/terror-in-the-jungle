@@ -26,7 +26,9 @@ describe('TouchCrouchButton', () => {
 
   it('creates the crouch button element', () => {
     expect(button).toBeTruthy();
-    expect(button.textContent).toBe('CRCH');
+    const img = button.querySelector('img') as HTMLImageElement;
+    expect(img).toBeTruthy();
+    expect(img.src).toContain('icon-crouch.png');
     expect(button.className).toContain('crouchBtn');
   });
 

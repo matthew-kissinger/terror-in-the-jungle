@@ -137,8 +137,14 @@ export interface IHelicopterModel {
   setPlayerController(controller: IPlayerController): void;
   setHUDSystem(system: IHUDSystem): void;
   setAudioListener(listener: THREE.AudioListener): void;
+  setCombatantSystem(cs: CombatantSystem): void;
+  setGrenadeSystem(gs: GrenadeSystem): void;
   exitHelicopter(): void;
   tryEnterHelicopter(): void;
+  startFiring(helicopterId: string): void;
+  stopFiring(helicopterId: string): void;
+  switchHelicopterWeapon(helicopterId: string, index: number): void;
+  getWeaponStatus(helicopterId: string): { name: string; ammo: number; maxAmmo: number } | null;
   getHelicopterPositionTo(id: string, target: THREE.Vector3): boolean;
   getHelicopterQuaternionTo(id: string, target: THREE.Quaternion): boolean;
   setHelicopterControls(helicopterId: string, controls: Partial<HelicopterControls>): void;

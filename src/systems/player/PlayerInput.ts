@@ -14,6 +14,7 @@ export interface InputCallbacks {
   onScoreboardTap?: () => void;
   onEnterExitHelicopter?: () => void;
   onToggleAutoHover?: () => void;
+  onToggleAltitudeLock?: () => void;
   onToggleMouseControl?: () => void;
   onSandbagRotateLeft?: () => void;
   onSandbagRotateRight?: () => void;
@@ -31,6 +32,8 @@ export interface InputCallbacks {
   onSquadDeploy?: () => void;
   onSquadCommand?: () => void;
   onSquadQuickCommand?: (slot: number) => void;
+  onHelicopterWeaponSwitch?: (index: number) => void;
+  onAirSupportMenu?: () => void;
   onMenuPause?: () => void;
   onMenuResume?: () => void;
 }
@@ -413,6 +416,18 @@ export class PlayerInput {
       if (event.code === 'KeyG') {
         this.callbacks.onSquadDeploy?.();
       }
+
+      // Altitude lock with H key
+      if (event.code === 'KeyH') {
+        this.callbacks.onToggleAltitudeLock?.();
+      }
+
+      // Weapon switching with 1/2 keys
+      if (event.code === 'Digit1') {
+        this.callbacks.onHelicopterWeaponSwitch?.(0);
+      } else if (event.code === 'Digit2') {
+        this.callbacks.onHelicopterWeaponSwitch?.(1);
+      }
     }
 
     // Sandbag rotation controls (when not in helicopter)
@@ -427,6 +442,11 @@ export class PlayerInput {
     // Reload with R key (when not rotating sandbag)
     if (!this.isInHelicopter && this.currentWeaponMode !== WeaponSlot.SANDBAG && event.code === 'KeyR') {
       this.callbacks.onReload?.();
+    }
+
+    // Air support menu with T key (when not in helicopter and not in sandbag mode)
+    if (!this.isInHelicopter && this.currentWeaponMode !== WeaponSlot.SANDBAG && event.code === 'KeyT') {
+      this.callbacks.onAirSupportMenu?.();
     }
 
     // Rally point placement with V key (when not in helicopter)

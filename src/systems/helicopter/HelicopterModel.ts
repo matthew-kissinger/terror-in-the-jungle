@@ -9,6 +9,14 @@ import { HelicopterAnimation } from './HelicopterAnimation';
 import { HelicopterAudio } from './HelicopterAudio';
 import { HelicopterInteraction } from './HelicopterInteraction';
 import { SquadDeployFromHelicopter } from './SquadDeployFromHelicopter';
+import { HelicopterWeaponSystem } from './HelicopterWeaponSystem';
+import { HelicopterHealthSystem } from './HelicopterHealthSystem';
+import { HelicopterDoorGunner } from './HelicopterDoorGunner';
+import type { CombatantSystem } from '../combat/CombatantSystem';
+import type { GrenadeSystem } from '../weapons/GrenadeSystem';
+import type { VehicleManager } from '../vehicle/VehicleManager';
+import { HelicopterVehicleAdapter } from '../vehicle/HelicopterVehicleAdapter';
+import { Faction } from '../combat/types';
 import type { IHUDSystem, IPlayerController, ITerrainRuntime, IAudioManager } from '../../types/SystemInterfaces';
 import type { PlayerInput } from '../player/PlayerInput';
 import type { HeightQueryCache } from '../terrain/HeightQueryCache';
@@ -29,6 +37,11 @@ export class HelicopterModel implements GameSystem {
   private audio: HelicopterAudio;
   private interaction: HelicopterInteraction;
   private squadDeploy?: SquadDeployFromHelicopter;
+  private weaponSystem: HelicopterWeaponSystem;
+  private healthSystem: HelicopterHealthSystem;
+  private doorGunner: HelicopterDoorGunner;
+
+  private vehicleManager?: VehicleManager;
 
   // Deploy prompt polling (avoid per-frame checks)
   private deployPromptAccumulator = 0;
@@ -47,6 +60,10 @@ export class HelicopterModel implements GameSystem {
     this.animation = new HelicopterAnimation();
     this.audio = new HelicopterAudio();
     this.interaction = new HelicopterInteraction(this.helicopters, this.interactionRadius);
+    this.weaponSystem = new HelicopterWeaponSystem(scene);
+    this.healthSystem = new HelicopterHealthSystem();
+    this.healthSystem.onDestroyed((heliId, position) => this.handleHelicopterDestroyed(heliId, position));
+    this.doorGunner = new HelicopterDoorGunner(scene);
   }
 
   async init(): Promise<void> {
@@ -70,6 +87,8 @@ export class HelicopterModel implements GameSystem {
   setHUDSystem(hudSystem: IHUDSystem): void {
     this.hudSystem = hudSystem;
     this.interaction.setHUDSystem(hudSystem);
+    this.weaponSystem.setHUDSystem(hudSystem);
+    this.healthSystem.setHUDSystem(hudSystem);
   }
 
   setPlayerInput(playerInput: PlayerInput): void {
@@ -82,6 +101,22 @@ export class HelicopterModel implements GameSystem {
 
   setAudioManager(audioManager: IAudioManager): void {
     this.audioManager = audioManager;
+    this.weaponSystem.setAudioManager(audioManager);
+    this.healthSystem.setAudioManager(audioManager);
+    this.doorGunner.setAudioManager(audioManager);
+  }
+
+  setCombatantSystem(cs: CombatantSystem): void {
+    this.weaponSystem.setCombatantSystem(cs);
+    this.doorGunner.setCombatantSystem(cs);
+  }
+
+  setGrenadeSystem(gs: GrenadeSystem): void {
+    this.weaponSystem.setGrenadeSystem(gs);
+  }
+
+  setVehicleManager(vm: VehicleManager): void {
+    this.vehicleManager = vm;
   }
 
   setHeightQueryCache(cache: HeightQueryCache): void {
@@ -211,11 +246,20 @@ export class HelicopterModel implements GameSystem {
     }
     this.helicopterPhysics.set(helicopterId, physics);
 
+    this.weaponSystem.initWeapons(helicopterId, aircraftConfig.weapons);
+    this.healthSystem.initHealth(helicopterId, aircraftConfig.role);
+    this.doorGunner.initGunners(helicopterId, aircraftConfig.weapons);
     this.animation.initialize(helicopterId);
     this.audio.initialize(helicopterId, helicopter);
 
     if (this.terrainManager) {
       this.terrainManager.registerCollisionObject(helicopterId, helicopter);
+    }
+
+    // Register with VehicleManager
+    if (this.vehicleManager) {
+      const adapter = new HelicopterVehicleAdapter(helicopterId, aircraftKey, Faction.US, this);
+      this.vehicleManager.register(adapter);
     }
 
     Logger.debug('helicopter', `Created ${aircraftKey} "${helicopterId}" at (${helicopterPosition.x.toFixed(0)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(0)})`);
@@ -286,6 +330,30 @@ export class HelicopterModel implements GameSystem {
     this.updateDeployPrompt(deltaTime);
   }
 
+  private handleHelicopterDestroyed(heliId: string, position: THREE.Vector3): void {
+    // Force pilot out if they're in this helicopter
+    const isPiloted = this.playerController?.isInHelicopter() &&
+                      this.playerController.getHelicopterId() === heliId;
+    if (isPiloted) {
+      this.interaction.exitHelicopter();
+      if (this.hudSystem) {
+        this.hudSystem.showMessage('Helicopter destroyed!', 3000);
+      }
+    }
+
+    // Hide the helicopter (remove from scene but keep in maps for respawn later)
+    const helicopter = this.helicopters.get(heliId);
+    if (helicopter) {
+      helicopter.visible = false;
+    }
+
+    // Stop weapon/audio systems for this helicopter
+    this.weaponSystem.dispose(heliId);
+    this.audio.dispose(heliId);
+
+    Logger.info('helicopter', `${heliId} destroyed at (${position.x.toFixed(0)}, ${position.y.toFixed(0)}, ${position.z.toFixed(0)})`);
+  }
+
   private updateDeployPrompt(deltaTime: number): void {
     if (!this.squadDeploy || !this.hudSystem || !this.playerController) return;
     if (!this.playerController.isInHelicopter()) {
@@ -327,6 +395,48 @@ export class HelicopterModel implements GameSystem {
     this.interaction.tryEnterHelicopter();
   }
 
+  startFiring(heliId: string): void { this.weaponSystem.startFiring(heliId); }
+  stopFiring(heliId: string): void { this.weaponSystem.stopFiring(heliId); }
+  switchHelicopterWeapon(heliId: string, index: number): void { this.weaponSystem.switchWeapon(heliId, index); }
+  getWeaponStatus(heliId: string): { name: string; ammo: number; maxAmmo: number } | null { return this.weaponSystem.getWeaponStatus(heliId); }
+  getWeaponCount(heliId: string): number { return this.weaponSystem.getWeaponCount(heliId); }
+
+  applyDamage(heliId: string, damage: number): void {
+    const pos = this.getHelicopterPosition(heliId);
+    if (!pos) return;
+    this.healthSystem.applyDamage(heliId, damage, pos);
+  }
+
+  getHealthPercent(heliId: string): number { return this.healthSystem.getHealthPercent(heliId); }
+  isHelicopterDestroyed(heliId: string): boolean { return this.healthSystem.isDestroyed(heliId); }
+
+  /**
+   * Check if a ray hits any helicopter. Used for NPC/player shots against helicopters.
+   * Returns the hit helicopter ID and point, or null.
+   */
+  checkRayHit(ray: THREE.Ray, maxDistance = 400): { heliId: string; point: THREE.Vector3; distance: number } | null {
+    const sphere = new THREE.Sphere();
+    let closest: { heliId: string; point: THREE.Vector3; distance: number } | null = null;
+
+    for (const [id, helicopter] of this.helicopters) {
+      if (this.healthSystem.isDestroyed(id)) continue;
+
+      // Use a 4m radius sphere centered on helicopter position (approximation)
+      sphere.set(helicopter.position, 4.0);
+      const intersectPoint = new THREE.Vector3();
+
+      if (ray.intersectSphere(sphere, intersectPoint)) {
+        const dist = ray.origin.distanceTo(intersectPoint);
+        if (dist > maxDistance) continue;
+        if (!closest || dist < closest.distance) {
+          closest = { heliId: id, point: intersectPoint.clone(), distance: dist };
+        }
+      }
+    }
+
+    return closest;
+  }
+
   exitHelicopter(): void {
     this.interaction.exitHelicopter();
   }
@@ -340,6 +450,8 @@ export class HelicopterModel implements GameSystem {
       : null;
 
     for (const [id, helicopter] of this.helicopters) {
+      if (this.healthSystem.isDestroyed(id)) continue;
+
       const physics = this.helicopterPhysics.get(id);
       if (!physics) continue;
 
@@ -382,8 +494,29 @@ export class HelicopterModel implements GameSystem {
 
       if (isPiloted && this.playerController) {
         this.playerController.updatePlayerPosition(state.position);
+
+        // Update weapon system for piloted helicopter
+        this.weaponSystem.update(
+          deltaTime, id, state.position, helicopter.quaternion,
+          state.isGrounded, helipadHeight !== undefined,
+        );
+
+        // Repair when grounded on helipad
+        if (state.isGrounded && helipadHeight !== undefined) {
+          this.healthSystem.repair(id, deltaTime);
+        }
+
+        // Push health to HUD
+        this.healthSystem.updateHUD(id);
       }
+
+      // Door gunner AI fires on all airborne helicopters (piloted or not)
+      this.doorGunner.update(deltaTime, id, state.position, helicopter.quaternion, state.isGrounded);
     }
+
+    // Tick weapon effects once per frame
+    this.weaponSystem.updateEffects(deltaTime);
+    this.doorGunner.updateEffects(deltaTime);
   }
 
   setHelicopterControls(helicopterId: string, controls: Partial<HelicopterControls>): void {
@@ -419,6 +552,9 @@ export class HelicopterModel implements GameSystem {
     });
     this.audio.disposeAll();
     this.animation.disposeAll();
+    this.weaponSystem.disposeAll();
+    this.healthSystem.disposeAll();
+    this.doorGunner.disposeAll();
 
     this.helicopters.forEach((helicopter, id) => {
       this.scene.remove(helicopter);

@@ -27,15 +27,9 @@ const PLAYER_COLLISION_RADIUS = 0.5;
 const LANDING_SOUND_THRESHOLD = -5;
 const BOUNDARY_BOUNCE_FACTOR = 0.5;
 
-// ── Helicopter control rates ──
-const HELI_COLLECTIVE_RATE = 2.0;
+// ── Helicopter control targets ──
+// PlayerMovement emits raw target values; HelicopterPhysics.smoothControlInputs() handles ramping.
 const HELI_AUTOHOVER_TARGET = 0.4;
-const HELI_AUTOHOVER_RATE = 2.0;
-const HELI_DECAY_RATE = 3.0;
-const HELI_YAW_RATE = 3.0;
-const HELI_YAW_CENTER_RATE = 8.0;
-const HELI_CYCLIC_RATE = 2.0;
-const HELI_CYCLIC_LEVEL_RATE = 4.0;
 const HELI_TOUCH_JOYSTICK_DEADZONE = 0.1;
 const HELI_TOUCH_CYCLIC_DEADZONE = 0.05;
 const HELI_MOUSE_SENSITIVITY_DEFAULT = 0.5;
@@ -56,6 +50,8 @@ export class PlayerMovement {
     autoHover: true
   };
   private isRunning = false;
+  private altitudeLock = false;
+  private lockedCollective = HELI_AUTOHOVER_TARGET;
 
   constructor(playerState: PlayerState) {
     this.playerState = playerState;
@@ -110,6 +106,14 @@ export class PlayerMovement {
   toggleAutoHover(): void {
     this.helicopterControls.autoHover = !this.helicopterControls.autoHover;
     Logger.info('player', ` Auto-hover ${this.helicopterControls.autoHover ? 'enabled' : 'disabled'}`);
+  }
+
+  toggleAltitudeLock(): void {
+    this.altitudeLock = !this.altitudeLock;
+    if (this.altitudeLock) {
+      this.lockedCollective = this.helicopterControls.collective;
+    }
+    Logger.info('player', `Altitude lock ${this.altitudeLock ? 'ON' : 'OFF'} (collective ${this.lockedCollective.toFixed(2)})`);
   }
 
   getHelicopterControls(): HelicopterControls {
@@ -315,79 +319,54 @@ export class PlayerMovement {
   }
 
   updateHelicopterControls(deltaTime: number, input: PlayerInput, hudSystem?: IHUDSystem): void {
-    // Check if touch controls are in helicopter dual-joystick mode
+    // Raw target values - HelicopterPhysics.smoothControlInputs() handles all ramping.
     const touchControls = input.getTouchControls();
     const hasTouchHeliMode = touchControls?.isInHelicopterMode() ?? false;
 
     // --- Collective (vertical thrust) ---
     if (hasTouchHeliMode) {
-      // Left joystick Y axis: up (negative z) = increase collective, down = decrease
       const touchMove = input.getTouchMovementVector();
       const collectiveInput = -touchMove.z; // Invert: joystick up = more thrust
       if (Math.abs(collectiveInput) > HELI_TOUCH_JOYSTICK_DEADZONE) {
-        const target = (collectiveInput + 1) / 2; // Map [-1,1] to [0,1]
-        this.helicopterControls.collective = THREE.MathUtils.lerp(
-          this.helicopterControls.collective, target, deltaTime * HELI_DECAY_RATE
-        );
-      } else if (this.helicopterControls.autoHover) {
-        this.helicopterControls.collective = THREE.MathUtils.lerp(this.helicopterControls.collective, HELI_AUTOHOVER_TARGET, deltaTime * HELI_AUTOHOVER_RATE);
+        this.helicopterControls.collective = (collectiveInput + 1) / 2; // Map [-1,1] to [0,1]
+        this.altitudeLock = false; // Manual input disengages altitude lock
       } else {
-        this.helicopterControls.collective = THREE.MathUtils.lerp(this.helicopterControls.collective, 0.0, deltaTime * HELI_DECAY_RATE);
+        this.helicopterControls.collective = this.getIdleCollective();
       }
     } else if (input.isKeyPressed('keyw')) {
-      this.helicopterControls.collective = Math.min(1.0, this.helicopterControls.collective + HELI_COLLECTIVE_RATE * deltaTime);
+      this.helicopterControls.collective = 1.0;
+      this.altitudeLock = false;
     } else if (input.isKeyPressed('keys')) {
-      this.helicopterControls.collective = Math.max(0.0, this.helicopterControls.collective - HELI_COLLECTIVE_RATE * deltaTime);
-    } else if (this.helicopterControls.autoHover) {
-      this.helicopterControls.collective = THREE.MathUtils.lerp(this.helicopterControls.collective, HELI_AUTOHOVER_TARGET, deltaTime * HELI_AUTOHOVER_RATE);
+      this.helicopterControls.collective = 0.0;
+      this.altitudeLock = false;
     } else {
-      this.helicopterControls.collective = THREE.MathUtils.lerp(this.helicopterControls.collective, 0.0, deltaTime * HELI_DECAY_RATE);
+      this.helicopterControls.collective = this.getIdleCollective();
     }
 
     // --- Yaw (tail rotor, turning) ---
     if (hasTouchHeliMode) {
-      // Left joystick X axis: right = yaw right (negative), left = yaw left (positive)
       const touchMove = input.getTouchMovementVector();
-      if (Math.abs(touchMove.x) > HELI_TOUCH_JOYSTICK_DEADZONE) {
-        this.helicopterControls.yaw = -touchMove.x;
-      } else {
-        this.helicopterControls.yaw = THREE.MathUtils.lerp(this.helicopterControls.yaw, 0, deltaTime * HELI_YAW_CENTER_RATE);
-      }
+      this.helicopterControls.yaw = Math.abs(touchMove.x) > HELI_TOUCH_JOYSTICK_DEADZONE ? -touchMove.x : 0;
     } else if (input.isKeyPressed('keya')) {
-      this.helicopterControls.yaw = Math.min(1.0, this.helicopterControls.yaw + HELI_YAW_RATE * deltaTime);
+      this.helicopterControls.yaw = 1.0;
     } else if (input.isKeyPressed('keyd')) {
-      this.helicopterControls.yaw = Math.max(-1.0, this.helicopterControls.yaw - HELI_YAW_RATE * deltaTime);
+      this.helicopterControls.yaw = -1.0;
     } else {
-      this.helicopterControls.yaw = THREE.MathUtils.lerp(this.helicopterControls.yaw, 0, deltaTime * HELI_YAW_CENTER_RATE);
+      this.helicopterControls.yaw = 0;
     }
 
     // --- Cyclic Pitch/Roll ---
-    // Touch cyclic (right joystick) overrides keyboard when active
     const touchCyclic = input.getTouchCyclicInput();
     const hasTouchCyclic = Math.abs(touchCyclic.pitch) > HELI_TOUCH_CYCLIC_DEADZONE || Math.abs(touchCyclic.roll) > HELI_TOUCH_CYCLIC_DEADZONE;
 
     if (hasTouchCyclic) {
-      // Direct mapping from touch joystick position
       this.helicopterControls.cyclicPitch = touchCyclic.pitch;
       this.helicopterControls.cyclicRoll = touchCyclic.roll;
-    } else if (input.isKeyPressed('arrowup')) {
-      this.helicopterControls.cyclicPitch = Math.min(1.0, this.helicopterControls.cyclicPitch + HELI_CYCLIC_RATE * deltaTime);
-    } else if (input.isKeyPressed('arrowdown')) {
-      this.helicopterControls.cyclicPitch = Math.max(-1.0, this.helicopterControls.cyclicPitch - HELI_CYCLIC_RATE * deltaTime);
     } else {
-      this.helicopterControls.cyclicPitch = THREE.MathUtils.lerp(this.helicopterControls.cyclicPitch, 0, deltaTime * HELI_CYCLIC_LEVEL_RATE);
-    }
-
-    // Cyclic Roll (Arrow Left/Right) - left/right banking
-    // Skip keyboard roll when touch cyclic is active (already set above)
-    if (!hasTouchCyclic) {
-      if (input.isKeyPressed('arrowleft')) {
-        this.helicopterControls.cyclicRoll = Math.max(-1.0, this.helicopterControls.cyclicRoll - HELI_CYCLIC_RATE * deltaTime);
-      } else if (input.isKeyPressed('arrowright')) {
-        this.helicopterControls.cyclicRoll = Math.min(1.0, this.helicopterControls.cyclicRoll + HELI_CYCLIC_RATE * deltaTime);
-      } else {
-        this.helicopterControls.cyclicRoll = THREE.MathUtils.lerp(this.helicopterControls.cyclicRoll, 0, deltaTime * HELI_CYCLIC_LEVEL_RATE);
-      }
+      this.helicopterControls.cyclicPitch = input.isKeyPressed('arrowup') ? 1.0
+        : input.isKeyPressed('arrowdown') ? -1.0 : 0;
+      this.helicopterControls.cyclicRoll = input.isKeyPressed('arrowright') ? 1.0
+        : input.isKeyPressed('arrowleft') ? -1.0 : 0;
     }
 
     // Send controls to helicopter model
@@ -395,9 +374,9 @@ export class PlayerMovement {
       this.helicopterModel.setHelicopterControls(this.playerState.helicopterId, this.helicopterControls);
     }
 
-    // Update helicopter instruments HUD with real engine RPM from physics
+    // Update helicopter instruments HUD
     if (hudSystem) {
-      let rpm = this.helicopterControls.collective * 0.8 + 0.2; // fallback
+      let rpm = this.helicopterControls.collective * 0.8 + 0.2;
       if (this.helicopterModel && this.playerState.helicopterId) {
         const state = this.helicopterModel.getHelicopterState(this.playerState.helicopterId);
         if (state) rpm = state.engineRPM;
@@ -414,6 +393,13 @@ export class PlayerMovement {
         this.helicopterControls.engineBoost
       );
     }
+  }
+
+  /** Collective target when no W/S key is pressed. */
+  private getIdleCollective(): number {
+    if (this.altitudeLock) return this.lockedCollective;
+    if (this.helicopterControls.autoHover) return HELI_AUTOHOVER_TARGET;
+    return 0;
   }
 
   addMouseControlToHelicopter(mouseMovement: { x: number; y: number }, mouseSensitivity: number = HELI_MOUSE_SENSITIVITY_DEFAULT): void {

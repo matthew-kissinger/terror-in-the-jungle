@@ -399,8 +399,9 @@ export class GrenadeSystem implements GameSystem {
    * Spawn a grenade projectile with a given position and velocity.
    * Used by the M79 grenade launcher - no cooking/aiming flow, just physics + fuse.
    */
-  spawnProjectile(position: THREE.Vector3, velocity: THREE.Vector3, fuseTime: number): void {
+  spawnProjectile(position: THREE.Vector3, velocity: THREE.Vector3, fuseTime: number, killFeedWeaponType?: string): void {
     const grenade = this.spawner.spawnGrenade(position, velocity, fuseTime, this.nextGrenadeId++, GrenadeType.FRAG);
+    if (killFeedWeaponType) grenade.killFeedWeaponType = killFeedWeaponType;
     this.grenades.push(grenade);
 
     if (this.audioManager) {

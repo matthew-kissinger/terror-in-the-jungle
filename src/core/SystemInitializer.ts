@@ -38,6 +38,10 @@ import { WeatherSystem } from '../systems/environment/WeatherSystem';
 import { WorldFeatureSystem } from '../systems/world/WorldFeatureSystem';
 import { AnimalSystem } from '../systems/world/AnimalSystem';
 import { NavmeshSystem } from '../systems/navigation/NavmeshSystem';
+import { AirSupportManager } from '../systems/airsupport/AirSupportManager';
+import { AAEmplacementSystem } from '../systems/airsupport/AAEmplacement';
+import { VehicleManager } from '../systems/vehicle/VehicleManager';
+import { NPCVehicleController } from '../systems/vehicle/NPCVehicleController';
 
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
 import { LoadoutService } from '../systems/player/LoadoutService';
@@ -90,6 +94,10 @@ export interface SystemReferences {
   worldFeatureSystem: WorldFeatureSystem;
   animalSystem: AnimalSystem;
   navmeshSystem: NavmeshSystem;
+  airSupportManager: AirSupportManager;
+  aaEmplacementSystem: AAEmplacementSystem;
+  vehicleManager: VehicleManager;
+  npcVehicleController: NPCVehicleController;
 }
 
 export interface InitializationResult {
@@ -177,6 +185,10 @@ export class SystemInitializer {
     refs.worldFeatureSystem = new WorldFeatureSystem(scene);
     refs.animalSystem = new AnimalSystem(scene, camera);
     refs.navmeshSystem = new NavmeshSystem();
+    refs.airSupportManager = new AirSupportManager(scene);
+    refs.aaEmplacementSystem = new AAEmplacementSystem(scene);
+    refs.vehicleManager = new VehicleManager();
+    refs.npcVehicleController = new NPCVehicleController();
 
     // Initialize new squad/inventory/grenade systems
     const squadManager = (refs.combatantSystem as any).squadManager;
@@ -241,7 +253,10 @@ export class SystemInitializer {
       refs.influenceMapSystem,
       refs.ammoSupplySystem,
       refs.warSimulator,
-      refs.strategicFeedback
+      refs.strategicFeedback,
+      refs.airSupportManager,
+      refs.aaEmplacementSystem,
+      refs.vehicleManager
     ];
 
     onProgress('world', 0.5);

@@ -112,5 +112,39 @@ export const SOUND_CONFIGS: Record<string, SoundConfig> = {
   tacticalInsertionDrop: {
     path: 'assets/optimized/grenadeThrow.wav',
     volume: 0.6
+  },
+  // Helicopter weapon sounds
+  minigunBurst: {
+    path: 'assets/optimized/otherGunshot.wav',
+    volume: 0.6,
+    refDistance: 20,
+    maxDistance: 200,
+    rolloffFactor: 1.2
+  },
+  rocketLaunch: {
+    path: 'assets/optimized/grenadeExplosion.wav',
+    volume: 0.5,
+    refDistance: 25,
+    maxDistance: 250,
+    rolloffFactor: 1.0
+  },
+  doorGunBurst: {
+    path: 'assets/optimized/otherGunshot.wav',
+    volume: 0.55,
+    refDistance: 15,
+    maxDistance: 150,
+    rolloffFactor: 1.3
+  },
+  // Air support sounds (reuse existing audio assets)
+  airSupportRadio: {
+    path: 'assets/optimized/grenadeBeep.wav',
+    volume: 0.4
+  },
+  napalmExplosion: {
+    path: 'assets/optimized/grenadeExplosion.wav',
+    volume: 1.0,
+    refDistance: 30,
+    maxDistance: 400,
+    rolloffFactor: 1.0
   }
 };

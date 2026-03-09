@@ -67,7 +67,10 @@ export enum CombatantState {
   RETREATING = 'retreating',
   SEEKING_COVER = 'seeking_cover',
   DEFENDING = 'defending',
-  DEAD = 'dead'
+  DEAD = 'dead',
+  BOARDING = 'boarding',
+  IN_VEHICLE = 'in_vehicle',
+  DISMOUNTING = 'dismounting'
 }
 
 export interface Combatant {
@@ -137,6 +140,8 @@ export interface Combatant {
   terrainSampleZ?: number;
   terrainSampleHeight?: number;
   terrainSampleTimeMs?: number;
+  vehicleId?: string;
+  vehicleSeatIndex?: number;
 }
 
 export enum SquadCommand {

@@ -274,6 +274,155 @@
   border-color: var(--accent);
 }
 
+/* --- Airspeed section --- */
+.airspeedValue {
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  text-align: center;
+  background: rgba(255, 255, 255, 0.08);
+  padding: var(--space-1) var(--space-1-5);
+  border-radius: var(--radius-sm);
+  min-width: 40px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Heading section --- */
+.headingSection {
+  flex-direction: row;
+  gap: 4px;
+}
+
+.headingLabel {
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  min-width: 18px;
+  text-align: center;
+}
+
+.headingDegrees {
+  font-size: var(--font-size-3xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- VSI section --- */
+.vsiSection {
+  flex-direction: row;
+  gap: 3px;
+}
+
+.vsiArrow {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.vsiUp {
+  border-bottom: 6px solid var(--success);
+}
+
+.vsiDown {
+  border-top: 6px solid var(--danger);
+}
+
+.vsiNeutral {
+  border-bottom: 6px solid var(--text-muted);
+  opacity: 0.4;
+}
+
+.vsiValue {
+  font-size: var(--font-size-2xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  min-width: 24px;
+  text-align: center;
+}
+
+/* --- Weapon section --- */
+.weaponSection {
+  display: none;
+  flex-direction: row;
+  gap: 6px;
+}
+
+.weaponSectionVisible {
+  display: flex;
+}
+
+.weaponName {
+  font-size: var(--font-size-2xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.weaponAmmo {
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Damage section --- */
+.damageSection {
+  flex-direction: row;
+  gap: 4px;
+  width: 60px;
+}
+
+.damageBarOuter {
+  flex: 1;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.damageFill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.2s ease, background 0.3s ease;
+}
+
+.damageGreen {
+  background: var(--success);
+}
+
+.damageAmber {
+  background: var(--accent);
+}
+
+.damageRed {
+  background: var(--danger);
+}
+
+.damageValue {
+  font-size: var(--font-size-3xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  min-width: 24px;
+  text-align: right;
+}
+
+/* --- Icon images in labels --- */
+.elevationLabel img,
+.instrumentLabel img {
+  opacity: 0.7;
+  image-rendering: pixelated;
+}
+
+.statusBox img {
+  image-rendering: pixelated;
+}
+
 /* Responsive */
 @media (pointer: coarse) and (orientation: landscape) {
   .container {
@@ -322,5 +471,14 @@
   .touchMode .elevationValue {
     min-width: 28px;
     font-size: 10px;
+  }
+
+  .touchMode .airspeedValue {
+    min-width: 28px;
+    font-size: 10px;
+  }
+
+  .damageSection {
+    width: 44px;
   }
 }

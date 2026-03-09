@@ -15,6 +15,7 @@
 
 import { UIComponent } from '../engine/UIComponent';
 import { isTouchDevice } from '../../utils/DeviceDetector';
+import { iconHtml } from '../icons/IconRegistry';
 import type { AircraftRole } from '../../systems/helicopter/AircraftConfigs';
 import styles from './HelicopterHUD.module.css';
 
@@ -66,11 +67,12 @@ export class HelicopterHUD extends UIComponent {
     this.root.innerHTML = `
       <div data-ref="elevation" class="${styles.panel}">
         <div data-ref="elevValue" class="${styles.elevationValue}">0m</div>
-        <div class="${styles.elevationLabel}">ELEV</div>
+        <div class="${styles.elevationLabel}">${iconHtml('icon-altimeter', { width: 12, alt: 'ELEV', css: 'vertical-align:middle;' })}</div>
         <div data-ref="airspeedValue" class="${styles.airspeedValue}">0</div>
-        <div class="${styles.elevationLabel}">SPD</div>
+        <div class="${styles.elevationLabel}">${iconHtml('icon-airspeed', { width: 12, alt: 'SPD', css: 'vertical-align:middle;' })}</div>
       </div>
       <div data-ref="headingPanel" class="${styles.panel} ${styles.headingSection}">
+        ${iconHtml('icon-compass-needle', { width: 12, css: 'vertical-align:middle;opacity:0.7;margin-right:2px;' })}
         <div data-ref="headingLabel" class="${styles.headingLabel}">N</div>
         <div data-ref="headingDegrees" class="${styles.headingDegrees}">000</div>
       </div>
@@ -98,8 +100,12 @@ export class HelicopterHUD extends UIComponent {
           <div data-ref="rpmValue" class="${styles.rpmValue}">0%</div>
         </div>
         <div class="${styles.statusRow}">
-          <div data-ref="hoverBox" class="${styles.statusBox}">H</div>
-          <div data-ref="boostBox" class="${styles.statusBox}">B</div>
+          <div data-ref="hoverBox" class="${styles.statusBox}">
+            ${iconHtml('icon-auto-hover', { width: 10, alt: 'H', css: 'pointer-events:none;opacity:0.7;' })}
+          </div>
+          <div data-ref="boostBox" class="${styles.statusBox}">
+            ${iconHtml('icon-boost', { width: 10, alt: 'B', css: 'pointer-events:none;opacity:0.7;' })}
+          </div>
         </div>
       </div>
       <div data-ref="weaponRow" class="${styles.panel} ${styles.weaponSection}">
@@ -107,7 +113,7 @@ export class HelicopterHUD extends UIComponent {
         <div data-ref="weaponAmmoEl" class="${styles.weaponAmmo}">0</div>
       </div>
       <div data-ref="damageBar" class="${styles.panel} ${styles.damageSection}">
-        <div class="${styles.instrumentLabel}">HP</div>
+        <div class="${styles.instrumentLabel}">${iconHtml('icon-engine-health', { width: 12, alt: 'HP', css: 'vertical-align:middle;' })}</div>
         <div class="${styles.damageBarOuter}">
           <div data-ref="damageFill" class="${styles.damageFill}"></div>
         </div>

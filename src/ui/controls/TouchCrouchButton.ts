@@ -4,6 +4,7 @@
  */
 
 import { BaseTouchButton } from './BaseTouchButton';
+import { icon } from '../icons/IconRegistry';
 import styles from './TouchCrouchButton.module.css';
 
 export class TouchCrouchButton extends BaseTouchButton {
@@ -14,7 +15,13 @@ export class TouchCrouchButton extends BaseTouchButton {
   protected build(): void {
     this.root.className = styles.crouchBtn;
     this.root.id = 'touch-crouch-btn';
-    this.root.textContent = 'CRCH';
+    const iconEl = document.createElement('img');
+    iconEl.src = icon('icon-crouch');
+    iconEl.alt = 'Crouch';
+    iconEl.draggable = false;
+    iconEl.style.cssText = 'width: 50%; height: 50%; object-fit: contain; pointer-events: none; image-rendering: pixelated;';
+    this.root.appendChild(iconEl);
+    this.root.setAttribute('aria-label', 'Crouch');
   }
 
   protected onMount(): void {

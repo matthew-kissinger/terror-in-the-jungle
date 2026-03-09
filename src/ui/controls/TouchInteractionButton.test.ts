@@ -26,7 +26,9 @@ describe('TouchInteractionButton', () => {
 
   it('creates the interaction button element', () => {
     expect(button).toBeTruthy();
-    expect(button.textContent).toBe('E');
+    const img = button.querySelector('img') as HTMLImageElement;
+    expect(img).toBeTruthy();
+    expect(img.src).toContain('icon-interact.png');
     expect(button.className).toContain('interactBtn');
   });
 

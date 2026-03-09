@@ -28,7 +28,9 @@ describe('TouchADSButton', () => {
   it('creates the ADS button element with correct ID and styles', () => {
     expect(button).toBeTruthy();
     expect(button.id).toBe('touch-ads-btn');
-    expect(button.textContent).toBe('ADS');
+    const img = button.querySelector('img') as HTMLImageElement;
+    expect(img).toBeTruthy();
+    expect(img.src).toContain('icon-ads.png');
     expect(button.className).toContain('adsBtn');
   });
 

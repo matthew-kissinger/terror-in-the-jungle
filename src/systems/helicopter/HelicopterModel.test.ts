@@ -96,6 +96,56 @@ vi.mock('./HelicopterGeometry', () => ({
   })
 }));
 
+vi.mock('./HelicopterHealthSystem', () => ({
+  HelicopterHealthSystem: class {
+    setHUDSystem = vi.fn();
+    setAudioManager = vi.fn();
+    onDestroyed = vi.fn();
+    initHealth = vi.fn();
+    applyDamage = vi.fn();
+    repair = vi.fn();
+    getHealthPercent = vi.fn().mockReturnValue(1);
+    isDestroyed = vi.fn().mockReturnValue(false);
+    isCritical = vi.fn().mockReturnValue(false);
+    isSmoking = vi.fn().mockReturnValue(false);
+    isWarning = vi.fn().mockReturnValue(false);
+    updateHUD = vi.fn();
+    dispose = vi.fn();
+    disposeAll = vi.fn();
+  }
+}));
+
+vi.mock('./HelicopterWeaponSystem', () => ({
+  HelicopterWeaponSystem: class {
+    setCombatantSystem = vi.fn();
+    setGrenadeSystem = vi.fn();
+    setAudioManager = vi.fn();
+    setHUDSystem = vi.fn();
+    initWeapons = vi.fn();
+    startFiring = vi.fn();
+    stopFiring = vi.fn();
+    switchWeapon = vi.fn();
+    update = vi.fn();
+    updateEffects = vi.fn();
+    getWeaponStatus = vi.fn().mockReturnValue(null);
+    getWeaponCount = vi.fn().mockReturnValue(0);
+    dispose = vi.fn();
+    disposeAll = vi.fn();
+  }
+}));
+
+vi.mock('./HelicopterDoorGunner', () => ({
+  HelicopterDoorGunner: class {
+    setCombatantSystem = vi.fn();
+    setAudioManager = vi.fn();
+    initGunners = vi.fn();
+    update = vi.fn();
+    updateEffects = vi.fn();
+    dispose = vi.fn();
+    disposeAll = vi.fn();
+  }
+}));
+
 vi.mock('../../utils/Logger');
 
 const HELIPAD_POS = new THREE.Vector3(100, 10, 100);

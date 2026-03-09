@@ -45,8 +45,10 @@ describe('TouchActionButtons', () => {
     expect(buttons).toHaveLength(3);
     // First child is the weapon cycler pill (contains chevrons + label)
     expect(buttons[0].className).toContain('weaponCycler');
-    expect(buttons[1].textContent).toBe('R');
-    expect(buttons[2].textContent).toBe('JUMP');
+    const reloadImg = buttons[1].querySelector('img') as HTMLImageElement;
+    expect(reloadImg?.src).toContain('icon-reload.png');
+    const jumpImg = buttons[2].querySelector('img') as HTMLImageElement;
+    expect(jumpImg?.src).toContain('icon-jump.png');
   });
 
   it('arranges buttons in a column layout', () => {

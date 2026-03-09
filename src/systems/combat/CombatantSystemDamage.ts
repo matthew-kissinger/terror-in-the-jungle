@@ -40,7 +40,7 @@ export class CombatantSystemDamage {
   /**
    * Apply explosion damage to all combatants within radius
    */
-  applyExplosionDamage(center: THREE.Vector3, radius: number, maxDamage: number, attackerId?: string): void {
+  applyExplosionDamage(center: THREE.Vector3, radius: number, maxDamage: number, attackerId?: string, weaponType = 'grenade'): void {
     let hitCount = 0;
     const killedCombatants: Combatant[] = [];
 
@@ -132,7 +132,7 @@ export class CombatantSystemDamage {
           victimName,
           victim.faction,
           false, // Explosions don't have headshot tracking
-          'grenade'
+          weaponType
         );
       });
     }

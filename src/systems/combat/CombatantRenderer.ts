@@ -167,7 +167,9 @@ export class CombatantRenderer {
 
       // Determine render state
       let stateKey: string;
-      if (combatant.state === CombatantState.ENGAGING || combatant.state === CombatantState.SUPPRESSING) {
+      if (combatant.state === CombatantState.IN_VEHICLE || combatant.state === CombatantState.BOARDING || combatant.state === CombatantState.DISMOUNTING) {
+        stateKey = 'mounted';
+      } else if (combatant.state === CombatantState.ENGAGING || combatant.state === CombatantState.SUPPRESSING) {
         stateKey = 'firing';
       } else {
         stateKey = 'walking';
@@ -207,7 +209,7 @@ export class CombatantRenderer {
       let finalScaleY = combatant.scale.y;
       let finalScaleZ = combatant.scale.z;
 
-      // Walking Y bob (not for firing or dying)
+      // Walking Y bob (not for firing, dying, or mounted)
       if (stateKey === 'walking' && !combatant.isDying) {
         const bobPhase = this.stableHash01(combatant.id) * Math.PI * 2;
         const bobY = Math.sin(this.elapsedTime * BOB_SPEED + bobPhase) * BOB_AMPLITUDE;
@@ -409,8 +411,9 @@ export class CombatantRenderer {
         this.scratchOutlineMatrix.multiply(this.scratchScaleMatrix);
         outlineMesh.setMatrixAt(index, this.scratchOutlineMatrix);
       }
+      // No ground marker for mounted NPCs (they're airborne in vehicles)
       const markerMesh = this.factionGroundMarkers.get(key);
-      if (markerMesh) {
+      if (markerMesh && stateKey !== 'mounted') {
         this.scratchMarkerMatrix.makeRotationX(-Math.PI / 2);
         this.scratchMarkerMatrix.setPosition(combatant.position.x, 0.1, combatant.position.z);
         markerMesh.setMatrixAt(index, this.scratchMarkerMatrix);

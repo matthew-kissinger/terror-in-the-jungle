@@ -78,6 +78,15 @@ export class CombatantMovement {
       return;
     }
 
+    // Vehicle-bound NPCs: position controlled by NPCVehicleController, skip all movement
+    if (combatant.state === CombatantState.IN_VEHICLE || combatant.state === CombatantState.DISMOUNTING) {
+      combatant.velocity.set(0, 0, 0);
+      if (this.navmeshAdapter?.hasAgent(combatant.id)) {
+        this.navmeshAdapter.unregisterAgent(combatant.id);
+      }
+      return;
+    }
+
     // Movement based on state
     if (combatant.state === CombatantState.PATROLLING) {
       updatePatrolMovement(combatant, deltaTime, squads, combatants, {

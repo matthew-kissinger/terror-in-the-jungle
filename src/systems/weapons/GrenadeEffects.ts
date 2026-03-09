@@ -84,7 +84,8 @@ export class GrenadeEffects {
         grenade.position,
         this.DAMAGE_RADIUS,
         this.MAX_DAMAGE,
-        'PLAYER'
+        'PLAYER',
+        grenade.killFeedWeaponType ?? 'grenade'
       );
     }
 

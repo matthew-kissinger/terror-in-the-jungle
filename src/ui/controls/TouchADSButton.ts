@@ -8,6 +8,7 @@
  */
 
 import { BaseTouchButton } from './BaseTouchButton';
+import { icon } from '../icons/IconRegistry';
 import styles from './TouchControls.module.css';
 
 export type ADSBehavior = 'hold' | 'toggle';
@@ -33,7 +34,13 @@ export class TouchADSButton extends BaseTouchButton {
   protected build(): void {
     this.root.className = styles.adsBtn;
     this.root.id = 'touch-ads-btn';
-    this.root.textContent = 'ADS';
+    const iconEl = document.createElement('img');
+    iconEl.src = icon('icon-ads');
+    iconEl.alt = 'Aim Down Sights';
+    iconEl.draggable = false;
+    iconEl.style.cssText = 'width: 50%; height: 50%; object-fit: contain; pointer-events: none; image-rendering: pixelated;';
+    this.root.appendChild(iconEl);
+    this.root.setAttribute('aria-label', 'Aim Down Sights');
   }
 
   protected onMount(): void {

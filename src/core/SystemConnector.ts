@@ -29,6 +29,7 @@ export class SystemConnector {
     this.wireGameMode(refs);
     this.wireStrategy(refs);
     this.wireNavigation(refs);
+    this.wireAirSupport(refs);
     this.wireEnvironment(refs, renderer);
     this.wireTelemetry(refs, renderer);
   }
@@ -205,10 +206,21 @@ export class SystemConnector {
     refs.helicopterModel.setHUDSystem(refs.hudSystem);
     refs.helicopterModel.setAudioListener(refs.audioManager.getListener());
     refs.helicopterModel.setAudioManager(refs.audioManager);
+    refs.helicopterModel.setCombatantSystem(refs.combatantSystem);
+    refs.helicopterModel.setGrenadeSystem(refs.grenadeSystem);
     refs.helicopterModel.setHeightQueryCache(getHeightQueryCache());
 
     refs.worldFeatureSystem.setTerrainManager(refs.terrainSystem);
     refs.worldFeatureSystem.setGameModeManager(refs.gameModeManager);
+
+    // Wire VehicleManager: helicopter vehicle registration happens via
+    // HelicopterModel.onHelicopterCreated() callback (future). For now,
+    // VehicleManager is available for manual registration.
+    refs.helicopterModel.setVehicleManager(refs.vehicleManager);
+
+    // Wire NPCVehicleController for NPC boarding/riding/dismounting
+    refs.npcVehicleController.setVehicleManager(refs.vehicleManager);
+    refs.npcVehicleController.setCombatantProvider(() => refs.combatantSystem.combatants);
   }
 
   // ── Weapons ──
@@ -289,6 +301,30 @@ export class SystemConnector {
 
   private wireNavigation(refs: SystemReferences): void {
     refs.combatantSystem.setNavmeshSystem(refs.navmeshSystem);
+  }
+
+  // ── Air Support ──
+
+  private wireAirSupport(refs: SystemReferences): void {
+    refs.airSupportManager.setCombatantSystem(refs.combatantSystem);
+    refs.airSupportManager.setGrenadeSystem(refs.grenadeSystem);
+    refs.airSupportManager.setAudioManager(refs.audioManager);
+    refs.airSupportManager.setHUDSystem(refs.hudSystem);
+    refs.airSupportManager.setTerrainSystem(refs.terrainSystem);
+
+    const explosionEffectsPool = refs.combatantSystem.explosionEffectsPool;
+    if (explosionEffectsPool) {
+      refs.airSupportManager.setExplosionEffectsPool(explosionEffectsPool);
+    }
+
+    refs.playerController.setAirSupportManager(refs.airSupportManager);
+
+    refs.aaEmplacementSystem.setHelicopterModel(refs.helicopterModel);
+    refs.aaEmplacementSystem.setAudioManager(refs.audioManager);
+    refs.aaEmplacementSystem.setTerrainSystem(refs.terrainSystem);
+    if (explosionEffectsPool) {
+      refs.aaEmplacementSystem.setExplosionEffectsPool(explosionEffectsPool);
+    }
   }
 
   // ── Environment (weather, water, terrain audio) ──

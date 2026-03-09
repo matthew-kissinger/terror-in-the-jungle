@@ -23,6 +23,7 @@ import type { HUDSystem } from '../../ui/hud/HUDSystem';
 import type { IGameRenderer, ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { CommandInputManager } from '../combat/CommandInputManager';
 import type { PlayerSquadController } from '../combat/PlayerSquadController';
+import type { AirSupportManager } from '../airsupport/AirSupportManager';
 
 // ── Player physics defaults ──
 const PLAYER_WALK_SPEED = 10;
@@ -50,7 +51,9 @@ export class PlayerController implements GameSystem {
   private footstepAudioSystem?: FootstepAudioSystem;
   private playerSquadController?: PlayerSquadController;
   private commandInputManager?: CommandInputManager;
+  private airSupportManager?: AirSupportManager;
   private playerSquadId?: string;
+  private airSupportCycleIndex = 0;
   private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
   private playerFaction: Faction = Faction.US;
   private playerState: PlayerState;
@@ -150,6 +153,7 @@ export class PlayerController implements GameSystem {
         this.handleEnterExitHelicopter();
       },
       onToggleAutoHover: () => this.movement.toggleAutoHover(),
+      onToggleAltitudeLock: () => this.movement.toggleAltitudeLock(),
       onToggleMouseControl: () => this.handleToggleMouseControl(),
       onSandbagRotateLeft: () => this.sandbagSystem?.rotatePlacementPreview(-Math.PI / 8),
       onSandbagRotateRight: () => this.sandbagSystem?.rotatePlacementPreview(Math.PI / 8),
@@ -180,6 +184,12 @@ export class PlayerController implements GameSystem {
         }
       },
       onSquadDeploy: () => this.handleSquadDeploy(),
+      onHelicopterWeaponSwitch: (index: number) => {
+        if (this.playerState.isInHelicopter && this.helicopterModel && this.playerState.helicopterId) {
+          this.helicopterModel.switchHelicopterWeapon(this.playerState.helicopterId, index);
+        }
+      },
+      onAirSupportMenu: () => this.handleAirSupportRequest(),
       onSquadCommand: () => this.commandInputManager?.toggleCommandMode(),
       onSquadQuickCommand: (slot: number) => this.commandInputManager?.issueQuickCommand(slot),
       onMenuPause: () => this.handleMenuPause(),
@@ -237,6 +247,11 @@ export class PlayerController implements GameSystem {
     const isGameActive = this.ticketSystem ? this.ticketSystem.isGameActive() : true;
     if (!isGameActive) return;
 
+    if (this.playerState.isInHelicopter && this.helicopterModel && this.playerState.helicopterId) {
+      this.helicopterModel.startFiring(this.playerState.helicopterId);
+      return;
+    }
+
     switch (this.currentWeaponMode) {
       case WeaponSlot.GRENADE: {
         const equipmentAction = this.inventoryManager?.getEquipmentActionForSlot(WeaponSlot.GRENADE);
@@ -262,6 +277,11 @@ export class PlayerController implements GameSystem {
 
   /** Stop firing - routes to weapon system based on current weapon mode */
   private actionFireStop(): void {
+    if (this.playerState.isInHelicopter && this.helicopterModel && this.playerState.helicopterId) {
+      this.helicopterModel.stopFiring(this.playerState.helicopterId);
+      return;
+    }
+
     switch (this.currentWeaponMode) {
       case WeaponSlot.GRENADE:
         if (this.inventoryManager?.getEquipmentActionForSlot(WeaponSlot.GRENADE) === 'grenade' && this.grenadeSystem) {
@@ -329,6 +349,26 @@ export class PlayerController implements GameSystem {
   private handleSquadDeploy(): void {
     if (!this.helicopterModel || !this.playerState.isInHelicopter) return;
     this.helicopterModel.tryDeploySquad();
+  }
+
+  private handleAirSupportRequest(): void {
+    if (!this.airSupportManager) return;
+    // Cycle through air support types on each press
+    const types = this.airSupportManager.getSupportTypes();
+    const type = types[this.airSupportCycleIndex % types.length];
+    this.airSupportCycleIndex++;
+
+    // Target: 100m in front of player's look direction
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+    forward.y = 0;
+    forward.normalize();
+    const targetPos = this.playerState.position.clone().add(forward.clone().multiplyScalar(100));
+
+    this.airSupportManager.requestSupport({
+      type,
+      targetPosition: targetPos,
+      approachDirection: forward,
+    });
   }
 
   private handleToggleMouseControl(): void {
@@ -751,6 +791,7 @@ export class PlayerController implements GameSystem {
   setFootstepAudioSystem(footstepAudioSystem: FootstepAudioSystem): void { this.footstepAudioSystem = footstepAudioSystem; this.movement.setFootstepAudioSystem(footstepAudioSystem); }
   setPlayerSquadId(squadId: string): void { this.playerSquadId = squadId; }
   setPlayerSquadController(playerSquadController: PlayerSquadController): void { this.playerSquadController = playerSquadController; }
+  setAirSupportManager(airSupportManager: AirSupportManager): void { this.airSupportManager = airSupportManager; }
   setCommandInputManager(commandInputManager: CommandInputManager): void {
     this.commandInputManager = commandInputManager;
     commandInputManager.bindInputManager(this.input);

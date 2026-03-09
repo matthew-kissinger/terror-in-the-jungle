@@ -11,6 +11,7 @@
 import { UIComponent } from '../engine/UIComponent';
 import { FocusTrap } from '../engine/FocusTrap';
 import { isTouchDevice } from '../../utils/DeviceDetector';
+import { iconHtml } from '../icons/IconRegistry';
 import styles from './OnboardingOverlay.module.css';
 
 const TUTORIAL_SEEN_KEY = 'terror_tutorial_seen';
@@ -21,13 +22,17 @@ interface TutorialPage {
   content: string;
 }
 
+function hintImg(filename: string, alt: string): string {
+  return iconHtml(filename.replace('.png', ''), { width: 24, alt, css: 'vertical-align:middle;margin-right:6px;' });
+}
+
 function buildPages(isTouch: boolean): TutorialPage[] {
   return [
     {
       title: 'MOVEMENT',
       content: isTouch
         ? `
-          <p class="${styles.pageText}">Use the left joystick to move and drag the screen to look around.</p>
+          <p class="${styles.pageText}">${hintImg('hint-joystick.png', 'Joystick')}Use the left joystick to move and drag the screen to look around.</p>
           <ul class="${styles.pageList}">
             <li>Left Joystick -- Move</li>
             <li>Drag Screen -- Look around</li>
@@ -36,7 +41,7 @@ function buildPages(isTouch: boolean): TutorialPage[] {
           </ul>
         `
         : `
-          <p class="${styles.pageText}">WASD to move, Mouse to look. Hold Shift to sprint, Space to jump.</p>
+          <p class="${styles.pageText}">${hintImg('hint-wasd.png', 'WASD keys')}WASD to move, ${hintImg('hint-mouse.png', 'Mouse')}Mouse to look. Hold Shift to sprint, Space to jump.</p>
           <ul class="${styles.pageList}">
             <li>W/A/S/D -- Move forward/left/back/right</li>
             <li>Mouse -- Look around</li>
@@ -49,7 +54,7 @@ function buildPages(isTouch: boolean): TutorialPage[] {
       title: 'COMBAT',
       content: isTouch
         ? `
-          <p class="${styles.pageText}">Use the FIRE and ADS buttons to engage enemies. Swipe the weapon bar to switch weapons.</p>
+          <p class="${styles.pageText}">${hintImg('hint-swipe.png', 'Swipe')}Use the FIRE and ADS buttons to engage enemies. Swipe the weapon bar to switch weapons.</p>
           <ul class="${styles.pageList}">
             <li>Fire Button -- Fire weapon</li>
             <li>ADS Button -- Aim down sights</li>
@@ -59,7 +64,7 @@ function buildPages(isTouch: boolean): TutorialPage[] {
           </ul>
         `
         : `
-          <p class="${styles.pageText}">Left-click to fire, right-click to aim down sights. Switch weapons with number keys.</p>
+          <p class="${styles.pageText}">${hintImg('hint-mouse.png', 'Mouse')}Left-click to fire, right-click to aim down sights. Switch weapons with number keys.</p>
           <ul class="${styles.pageList}">
             <li>Left Click -- Fire weapon</li>
             <li>Right Click -- Aim down sights</li>
@@ -81,7 +86,7 @@ function buildPages(isTouch: boolean): TutorialPage[] {
           </ul>
         `
         : `
-          <p class="${styles.pageText}">Press E near a helicopter to enter. Master altitude and rotation to navigate the battlefield.</p>
+          <p class="${styles.pageText}">${hintImg('hint-e-key.png', 'E key')}Press E near a helicopter to enter. Master altitude and rotation to navigate the battlefield.</p>
           <ul class="${styles.pageList}">
             <li>E -- Enter/Exit helicopter</li>
             <li>W/S -- Collective (altitude up/down)</li>

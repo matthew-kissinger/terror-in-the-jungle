@@ -5,6 +5,7 @@
  */
 
 import { UIComponent } from '../engine/UIComponent';
+import { icon } from '../icons/IconRegistry';
 import styles from './TouchControls.module.css';
 
 export class TouchMenuButton extends UIComponent {
@@ -20,12 +21,13 @@ export class TouchMenuButton extends UIComponent {
     this.root.className = styles.menuBtn;
     this.root.id = 'touch-menu-btn';
 
-    // Create hamburger icon (3 horizontal lines)
-    for (let i = 0; i < 3; i++) {
-      const line = document.createElement('div');
-      line.className = styles.menuLine;
-      this.root.appendChild(line);
-    }
+    const iconEl = document.createElement('img');
+    iconEl.src = icon('icon-menu');
+    iconEl.alt = 'Menu';
+    iconEl.draggable = false;
+    iconEl.style.cssText = 'width: 60%; height: 60%; object-fit: contain; pointer-events: none; image-rendering: pixelated;';
+    this.root.appendChild(iconEl);
+    this.root.setAttribute('aria-label', 'Menu');
   }
 
   protected onMount(): void {

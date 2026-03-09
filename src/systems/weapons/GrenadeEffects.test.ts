@@ -356,7 +356,8 @@ describe('GrenadeEffects', () => {
         fragGrenade.position,
         15, // DAMAGE_RADIUS
         150, // MAX_DAMAGE
-        'PLAYER'
+        'PLAYER',
+        'grenade'
       );
     });
 

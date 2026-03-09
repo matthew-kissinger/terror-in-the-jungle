@@ -247,14 +247,6 @@
   cursor: pointer;
 }
 
-.menuLine {
-  width: 18px;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 1px;
-  pointer-events: none;
-}
-
 /* Pause overlay */
 .pauseOverlay {
   position: fixed;
@@ -638,9 +630,6 @@
     height: 34px;
   }
 
-  .menuLine {
-    width: 16px;
-  }
 
   .actionContainer {
     gap: 8px;

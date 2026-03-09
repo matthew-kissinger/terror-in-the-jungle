@@ -1,6 +1,6 @@
 import { Faction } from '../../systems/combat/types';
 import { colors } from '../design/tokens';
-import { getWeaponIconElement } from './WeaponIconRegistry';
+import { getWeaponIconElement, icon as iconUrl } from '../icons/IconRegistry';
 import styles from './KillFeed.module.css';
 
 export type WeaponType =
@@ -188,6 +188,14 @@ export class KillFeed {
     killerSpan.textContent = entry.killerName;
     killerSpan.style.color = this.getFactionColor(entry.killerFaction);
 
+    const killArrow = document.createElement('img');
+    killArrow.src = iconUrl('icon-kill-arrow');
+    killArrow.alt = '';
+    killArrow.width = 10;
+    killArrow.height = 10;
+    killArrow.draggable = false;
+    killArrow.style.cssText = 'display:inline-block;vertical-align:middle;object-fit:contain;image-rendering:pixelated;opacity:0.5;margin:0 2px;';
+
     const weaponContainer = document.createElement('span');
     const weaponClasses = [styles.weaponIcon];
     if (entry.isHeadshot) weaponClasses.push(styles.weaponIconHeadshot);
@@ -199,7 +207,14 @@ export class KillFeed {
     if (entry.isHeadshot) {
       headshotSpan = document.createElement('span');
       headshotSpan.className = styles.headshotTag;
-      headshotSpan.textContent = 'HS';
+      const hsIcon = document.createElement('img');
+      hsIcon.src = iconUrl('icon-headshot');
+      hsIcon.alt = 'Headshot';
+      hsIcon.width = 12;
+      hsIcon.height = 12;
+      hsIcon.draggable = false;
+      hsIcon.style.cssText = 'vertical-align: middle; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 0 2px rgba(0,0,0,0.8));';
+      headshotSpan.appendChild(hsIcon);
     }
 
     const victimSpan = document.createElement('span');
@@ -212,6 +227,7 @@ export class KillFeed {
     if (headshotSpan) {
       element.appendChild(headshotSpan);
     }
+    element.appendChild(killArrow);
     element.appendChild(victimSpan);
 
     return element;

@@ -6,6 +6,7 @@
  */
 
 import { BaseTouchButton } from './BaseTouchButton';
+import { icon } from '../icons/IconRegistry';
 import styles from './TouchControls.module.css';
 
 export class TouchInteractionButton extends BaseTouchButton {
@@ -17,7 +18,13 @@ export class TouchInteractionButton extends BaseTouchButton {
     this.root.className = styles.interactBtn;
     this.root.id = 'touch-interaction-btn';
     this.root.style.display = 'none'; // Start hidden
-    this.root.textContent = 'E';
+    const iconEl = document.createElement('img');
+    iconEl.src = icon('icon-interact');
+    iconEl.alt = 'Interact';
+    iconEl.draggable = false;
+    iconEl.style.cssText = 'width: 50%; height: 50%; object-fit: contain; pointer-events: none; image-rendering: pixelated;';
+    this.root.appendChild(iconEl);
+    this.root.setAttribute('aria-label', 'Interact');
   }
 
   protected onMount(): void {

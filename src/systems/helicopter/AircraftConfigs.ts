@@ -26,6 +26,13 @@ export interface AircraftWeaponMount {
   type: 'nose_turret' | 'side_mount' | 'rocket_pod';
   firingMode: 'pilot' | 'crew';
   ammoCapacity: number;
+  localPosition: [number, number, number];
+  fireRate: number;          // rounds per second
+  damage: number;            // per-hit (hitscan) or max (explosive)
+  damageRadius?: number;     // explosion radius (rockets)
+  projectileSpeed?: number;  // m/s; 0 or undefined = hitscan
+  spreadDeg?: number;        // cone spread degrees
+  tracerInterval?: number;   // emit tracer every N rounds
 }
 
 export interface AircraftConfig {
@@ -76,7 +83,7 @@ export const AIRCRAFT_CONFIGS: Record<string, AircraftConfig> = {
     seats: 2,
     role: 'gunship',
     weapons: [
-      { name: 'M60 Door Gun', type: 'side_mount', firingMode: 'crew', ammoCapacity: 500 },
+      { name: 'M60 Door Gun', type: 'side_mount', firingMode: 'crew', ammoCapacity: 500, localPosition: [-1.5, 0.3, -0.5], fireRate: 9, damage: 20, spreadDeg: 3 },
     ],
   },
 
@@ -99,8 +106,8 @@ export const AIRCRAFT_CONFIGS: Record<string, AircraftConfig> = {
     seats: 1,
     role: 'attack',
     weapons: [
-      { name: 'M134 Minigun', type: 'nose_turret', firingMode: 'pilot', ammoCapacity: 4000 },
-      { name: 'Rocket Pod', type: 'rocket_pod', firingMode: 'pilot', ammoCapacity: 14 },
+      { name: 'M134 Minigun', type: 'nose_turret', firingMode: 'pilot', ammoCapacity: 4000, localPosition: [0, -0.3, 2.5], fireRate: 50, damage: 15, spreadDeg: 2.5, tracerInterval: 3 },
+      { name: 'Rocket Pod', type: 'rocket_pod', firingMode: 'pilot', ammoCapacity: 14, localPosition: [-1.2, -0.2, 1.0], fireRate: 3.3, damage: 150, damageRadius: 8, projectileSpeed: 150 },
     ],
   },
 };

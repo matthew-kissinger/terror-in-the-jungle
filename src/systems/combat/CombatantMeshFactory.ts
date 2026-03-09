@@ -58,7 +58,8 @@ export class CombatantMeshFactory {
       back:  this.assetLoader.getTexture(`${assetPrefix}-fire-back`),
       side:  this.assetLoader.getTexture(`${assetPrefix}-fire-side`),
     };
-    return { walk, fire };
+    const mounted: THREE.Texture | undefined = this.assetLoader.getTexture(`${assetPrefix}-mounted`);
+    return { walk, fire, mounted };
   }
 
   createFactionBillboards(): CombatantMeshAssets {
@@ -114,7 +115,7 @@ export class CombatantMeshFactory {
     };
 
     for (const cfg of FACTION_SPRITE_CONFIGS) {
-      const { walk, fire } = this.loadFactionTextures(cfg.assetPrefix);
+      const { walk, fire, mounted } = this.loadFactionTextures(cfg.assetPrefix);
 
       for (const dir of DIRECTIONS) {
         const w = walk[dir];
@@ -128,6 +129,14 @@ export class CombatantMeshFactory {
           createMeshSet(fire[dir]!, `${cfg.factionKey}_firing_${dir}`, cfg.outlineColor, cfg.markerColor);
         }
       }
+
+      // Mounted sprite: single front-facing texture used for all view directions (seated in vehicle)
+      if (mounted) {
+        for (const dir of DIRECTIONS) {
+          soldierTextures.set(`${cfg.factionKey}_mounted_${dir}`, mounted);
+          createMeshSet(mounted, `${cfg.factionKey}_mounted_${dir}`, cfg.outlineColor, cfg.markerColor, 32);
+        }
+      }
     }
 
     // Player squad reuses the player's faction textures (US by default) with a distinct green outline
@@ -137,6 +146,11 @@ export class CombatantMeshFactory {
       if (w.a && w.b) walkFrameTextures.set(`SQUAD_${dir}`, { a: w.a, b: w.b });
       if (w.a) createMeshSet(w.a, `SQUAD_walking_${dir}`, SQUAD_OUTLINE_COLOR, SQUAD_MARKER_COLOR);
       if (playerTextures.fire[dir]) createMeshSet(playerTextures.fire[dir]!, `SQUAD_firing_${dir}`, SQUAD_OUTLINE_COLOR, SQUAD_MARKER_COLOR);
+    }
+    if (playerTextures.mounted) {
+      for (const dir of DIRECTIONS) {
+        createMeshSet(playerTextures.mounted, `SQUAD_mounted_${dir}`, SQUAD_OUTLINE_COLOR, SQUAD_MARKER_COLOR, 32);
+      }
     }
 
     Logger.info('combat', `Created directional soldier meshes: ${factionMeshes.size} meshes (${factionMeshes.size * 3} draw calls)`);
@@ -154,6 +168,11 @@ export const updateCombatantTexture = (
   let stateKey: string;
 
   switch (combatant.state) {
+    case CombatantState.IN_VEHICLE:
+    case CombatantState.BOARDING:
+    case CombatantState.DISMOUNTING:
+      stateKey = 'mounted';
+      break;
     case CombatantState.ENGAGING:
     case CombatantState.SUPPRESSING:
       stateKey = 'firing';

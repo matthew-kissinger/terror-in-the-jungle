@@ -58,9 +58,18 @@
 }
 
 .weaponIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 10px;
   font-weight: bold;
   text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+  min-width: 14px;
+  height: 14px;
+}
+
+.weaponIcon img {
+  image-rendering: pixelated;
 }
 
 .weaponIconHeadshot {
@@ -68,11 +77,17 @@
 }
 
 .headshotTag {
+  display: inline-flex;
+  align-items: center;
   color: rgba(255, 200, 120, 0.9);
   font-size: 9px;
   font-weight: 700;
   font-family: 'Rajdhani', sans-serif;
   letter-spacing: 0.5px;
+}
+
+.headshotTag img {
+  image-rendering: pixelated;
 }
 
 @keyframes slideIn {

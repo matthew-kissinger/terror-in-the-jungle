@@ -26,7 +26,9 @@ describe('TouchFireButton', () => {
 
   it('creates the fire button element', () => {
     expect(button).toBeTruthy();
-    expect(button.textContent).toBe('FIRE');
+    const img = button.querySelector('img') as HTMLImageElement;
+    expect(img).toBeTruthy();
+    expect(img.src).toContain('icon-fire.png');
     expect(button.className).toContain('fireBtn');
   });
 

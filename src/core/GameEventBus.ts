@@ -18,6 +18,10 @@ export interface GameEvents {
   explosion: { position: THREE.Vector3; radius: number; source: string };
   grenade_thrown: { position: THREE.Vector3; faction: Faction };
   match_phase_change: { phase: 'loading' | 'playing' | 'ended'; mode: string };
+  recon_reveal: { position: THREE.Vector3; radius: number; enemyCount: number };
+  air_support_inbound: { type: string; targetPosition: THREE.Vector3; eta: number };
+  air_support_active: { type: string; missionId: string };
+  air_support_complete: { type: string; missionId: string };
 }
 
 type Callback<K extends keyof GameEvents> = (event: GameEvents[K]) => void;

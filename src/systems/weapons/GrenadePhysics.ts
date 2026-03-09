@@ -12,6 +12,8 @@ export interface Grenade {
   mesh: THREE.Mesh;
   fuseTime: number;
   isActive: boolean;
+  /** Kill feed weapon type override (default: 'grenade'). */
+  killFeedWeaponType?: string;
 }
 
 type GroundHeightFn = (x: number, z: number) => number;

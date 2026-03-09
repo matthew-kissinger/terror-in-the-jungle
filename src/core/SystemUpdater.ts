@@ -147,6 +147,14 @@ export class SystemUpdater {
       performanceTelemetry.endSystem('WarSim');
     });
 
+    this.trackSystemUpdate('AirSupport', 1.0, () => {
+      performanceTelemetry.beginSystem('AirSupport');
+      if (refs.airSupportManager) refs.airSupportManager.update(deltaTime);
+      if (refs.aaEmplacementSystem) refs.aaEmplacementSystem.update(deltaTime);
+      if (refs.npcVehicleController) refs.npcVehicleController.update(deltaTime);
+      performanceTelemetry.endSystem('AirSupport');
+    });
+
     // Keep A Shau sessions from drifting into long no-contact dead time.
     this.trackSystemUpdate('AShauAssist', 0.2, () => {
       performanceTelemetry.beginSystem('AShauAssist');
@@ -210,7 +218,9 @@ export class SystemUpdater {
       || system === refs.waterSystem
       || system === refs.weatherSystem
       || system === refs.warSimulator
-      || system === refs.strategicFeedback;
+      || system === refs.strategicFeedback
+      || system === refs.airSupportManager
+      || system === refs.aaEmplacementSystem;
   }
 
   private updateAShauContactAssist(

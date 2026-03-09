@@ -96,6 +96,11 @@ export class AssetLoader implements GameSystem {
       'arvn-fire-front.webp',
       'arvn-fire-back.webp',
       'arvn-fire-side.webp',
+      // Mounted (vehicle-seated) sprites - one per faction
+      'us-mounted.webp',
+      'vc-mounted.webp',
+      'nva-mounted.webp',
+      'arvn-mounted.webp',
       // UI/Player
       'first-person.png',
       // Environment

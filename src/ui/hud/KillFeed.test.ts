@@ -89,89 +89,104 @@ describe('KillFeed', () => {
       killFeed.addKill('Killer', Faction.US, 'Victim', Faction.NVA, true);
       const container = mockParent.querySelector('.container');
       const entry = container?.children[0];
-      expect(entry?.textContent).toContain('HS');
+      const hsImg = entry?.querySelector('.headshotTag img') as HTMLImageElement | null;
+      expect(hsImg).not.toBeNull();
+      expect(hsImg?.alt).toBe('Headshot');
     });
 
     it('should not show headshot indicator when isHeadshot is false', () => {
       killFeed.addKill('Killer', Faction.US, 'Victim', Faction.NVA, false);
       const container = mockParent.querySelector('.container');
       const entry = container?.children[0];
-      expect(entry?.textContent).not.toContain('HS');
+      expect(entry?.querySelector('.headshotTag')).toBeNull();
     });
 
-    it('should display rifle weapon icon', () => {
+    it('should display rifle weapon icon as img', () => {
       killFeed.addKill('K', Faction.US, 'V', Faction.NVA, false, 'rifle');
       const container = mockParent.querySelector('.container');
-      expect(container?.textContent).toContain('[AR]');
+      const img = container?.querySelector('.weaponIcon img') as HTMLImageElement | null;
+      expect(img).not.toBeNull();
+      expect(img?.src).toContain('icon-rifle.png');
     });
 
-    it('should display shotgun weapon icon', () => {
+    it('should display shotgun weapon icon as img', () => {
       killFeed.addKill('K', Faction.US, 'V', Faction.NVA, false, 'shotgun');
       const container = mockParent.querySelector('.container');
-      expect(container?.textContent).toContain('[SG]');
+      const img = container?.querySelector('.weaponIcon img') as HTMLImageElement | null;
+      expect(img?.src).toContain('icon-shotgun.png');
     });
 
-    it('should display smg weapon icon', () => {
+    it('should display smg weapon icon as img', () => {
       killFeed.addKill('K', Faction.US, 'V', Faction.NVA, false, 'smg');
       const container = mockParent.querySelector('.container');
-      expect(container?.textContent).toContain('[SM]');
+      const img = container?.querySelector('.weaponIcon img') as HTMLImageElement | null;
+      expect(img?.src).toContain('icon-smg.png');
     });
 
-    it('should display pistol weapon icon', () => {
+    it('should display pistol weapon icon as img', () => {
       killFeed.addKill('K', Faction.US, 'V', Faction.NVA, false, 'pistol');
       const container = mockParent.querySelector('.container');
-      expect(container?.textContent).toContain('[PI]');
+      const img = container?.querySelector('.weaponIcon img') as HTMLImageElement | null;
+      expect(img?.src).toContain('icon-pistol.png');
     });
 
-    it('should display lmg weapon icon', () => {
+    it('should display lmg weapon icon as img', () => {
       killFeed.addKill('K', Faction.US, 'V', Faction.NVA, false, 'lmg');
       const container = mockParent.querySelector('.container');
-      expect(container?.textContent).toContain('[LM]');
+      const img = container?.querySelector('.weaponIcon img') as HTMLImageElement | null;
+      expect(img?.src).toContain('icon-lmg.png');
     });
 
-    it('should display launcher weapon icon', () => {
+    it('should display launcher weapon icon as img', () => {
       killFeed.addKill('K', Faction.US, 'V', Faction.NVA, false, 'launcher');
       const container = mockParent.querySelector('.container');
-      expect(container?.textContent).toContain('[RL]');
+      const img = container?.querySelector('.weaponIcon img') as HTMLImageElement | null;
+      expect(img?.src).toContain('icon-launcher.png');
     });
 
-    it('should display grenade weapon icon', () => {
+    it('should display grenade weapon icon as img', () => {
       killFeed.addKill('K', Faction.US, 'V', Faction.NVA, false, 'grenade');
       const container = mockParent.querySelector('.container');
-      expect(container?.textContent).toContain('[GR]');
+      const img = container?.querySelector('.weaponIcon img') as HTMLImageElement | null;
+      expect(img?.src).toContain('icon-grenade.png');
     });
 
-    it('should display mortar weapon icon', () => {
+    it('should display mortar weapon icon as img', () => {
       killFeed.addKill('K', Faction.US, 'V', Faction.NVA, false, 'mortar');
       const container = mockParent.querySelector('.container');
-      expect(container?.textContent).toContain('[MT]');
+      const img = container?.querySelector('.weaponIcon img') as HTMLImageElement | null;
+      expect(img?.src).toContain('icon-mortar.png');
     });
 
-    it('should display melee weapon icon', () => {
+    it('should display melee weapon icon as img', () => {
       killFeed.addKill('K', Faction.US, 'V', Faction.NVA, false, 'melee');
       const container = mockParent.querySelector('.container');
-      expect(container?.textContent).toContain('[ML]');
+      const img = container?.querySelector('.weaponIcon img') as HTMLImageElement | null;
+      expect(img?.src).toContain('icon-melee.png');
     });
 
-    it('should display helicopter minigun weapon icon', () => {
+    it('should display helicopter minigun weapon icon as img', () => {
       killFeed.addKill('K', Faction.US, 'V', Faction.NVA, false, 'helicopter_minigun');
       const container = mockParent.querySelector('.container');
-      expect(container?.textContent).toContain('[MG]');
+      const img = container?.querySelector('.weaponIcon img') as HTMLImageElement | null;
+      expect(img?.src).toContain('icon-minigun.png');
     });
 
-    it('should display helicopter rocket weapon icon', () => {
+    it('should display helicopter rocket weapon icon as img', () => {
       killFeed.addKill('K', Faction.US, 'V', Faction.NVA, false, 'helicopter_rocket');
       const container = mockParent.querySelector('.container');
-      expect(container?.textContent).toContain('[RK]');
+      const img = container?.querySelector('.weaponIcon img') as HTMLImageElement | null;
+      expect(img?.src).toContain('icon-rocket-pod.png');
     });
 
-    it('should display helicopter doorgun weapon icon', () => {
+    it('should display helicopter doorgun weapon icon as img', () => {
       killFeed.addKill('K', Faction.US, 'V', Faction.NVA, false, 'helicopter_doorgun');
       const container = mockParent.querySelector('.container');
-      expect(container?.textContent).toContain('[DG]');
+      const img = container?.querySelector('.weaponIcon img') as HTMLImageElement | null;
+      expect(img?.src).toContain('icon-door-gun.png');
     });
 
-    it('should display unknown weapon icon', () => {
+    it('should display unknown weapon icon as text fallback', () => {
       killFeed.addKill('K', Faction.US, 'V', Faction.NVA, false, 'unknown');
       const container = mockParent.querySelector('.container');
       expect(container?.textContent).toContain('--');
@@ -593,7 +608,8 @@ describe('KillFeed', () => {
       const entry = container?.children[0] as HTMLElement;
       const hsTag = entry.querySelector('.headshotTag') as HTMLElement;
       expect(hsTag).not.toBeNull();
-      expect(hsTag.textContent).toBe('HS');
+      const hsImg = hsTag.querySelector('img') as HTMLImageElement;
+      expect(hsImg.alt).toBe('Headshot');
     });
 
     it('should apply slide-out class on expired entries', () => {
@@ -636,8 +652,10 @@ describe('KillFeed', () => {
     it('should handle headshot with explosive weapon', () => {
       killFeed.addKill('K', Faction.US, 'V', Faction.NVA, true, 'grenade');
       const container = mockParent.querySelector('.container');
-      expect(container?.textContent).toContain('HS');
-      expect(container?.textContent).toContain('[GR]');
+      const hsImg = container?.querySelector('.headshotTag img') as HTMLImageElement | null;
+      expect(hsImg?.alt).toBe('Headshot');
+      const weaponImg = container?.querySelector('.weaponIcon img') as HTMLImageElement | null;
+      expect(weaponImg?.src).toContain('icon-grenade.png');
     });
   });
 });
