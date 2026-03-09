@@ -6,6 +6,7 @@
  */
 
 import { UIComponent } from '../engine/UIComponent';
+import { applyDeadZone } from './joystickMath';
 import styles from './TouchControls.module.css';
 
 export class TouchHelicopterCyclic extends UIComponent {
@@ -107,21 +108,11 @@ export class TouchHelicopterCyclic extends UIComponent {
     this.thumb.style.left = `${(baseSize - this.THUMB_SIZE) / 2 + dx}px`;
     this.thumb.style.top = `${(baseSize - this.THUMB_SIZE) / 2 + dy}px`;
 
-    // Normalize output
+    // Normalize output with dead zone
     const hp = this.maxDistance || this.FALLBACK_BASE / 2;
-    let roll = Math.max(-1, Math.min(1, dx / hp));
-    let pitch = Math.max(-1, Math.min(1, -dy / hp));
-
-    const mag = Math.sqrt(roll * roll + pitch * pitch);
-    if (mag < this.DEAD_ZONE) {
-      roll = 0;
-      pitch = 0;
-    } else if (mag > 0) {
-      const remapped = (mag - this.DEAD_ZONE) / (1 - this.DEAD_ZONE);
-      const scale = remapped / mag;
-      roll *= scale;
-      pitch *= scale;
-    }
+    const rawRoll = Math.max(-1, Math.min(1, dx / hp));
+    const rawPitch = Math.max(-1, Math.min(1, -dy / hp));
+    const { x: roll, y: pitch } = applyDeadZone(rawRoll, rawPitch, this.DEAD_ZONE);
 
     this.cyclicRoll = roll;
     this.cyclicPitch = pitch;

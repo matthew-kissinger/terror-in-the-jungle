@@ -1,0 +1,107 @@
+/**
+ * KillFeed - Kill event entries, top-right corner
+ *
+ * Slide-in from right on entry, slide-out + fade on expiry.
+ * Kill streak entries get gold border + glow pulse.
+ * Headshot entries get gold accent on weapon icon area.
+ */
+
+.container {
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding-top: 4px;
+  padding-right: 8px;
+  pointer-events: none;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  padding: 3px 6px;
+  background: rgba(8, 12, 18, 0.45);
+  border-left: 2px solid rgba(220, 225, 230, 0.1);
+  border-radius: 0 2px 2px 0;
+  transition: opacity 0.3s ease;
+  backdrop-filter: blur(4px);
+  animation: slideIn 0.15s ease-out;
+}
+
+.entryExplosive {
+  border-left-color: rgba(212, 163, 68, 0.4);
+}
+
+.entrySlideOut {
+  animation: slideOut 0.25s ease-in forwards;
+}
+
+.entryStreak {
+  border-left: 2px solid rgba(212, 163, 68, 0.8);
+  animation: slideIn 0.15s ease-out, streakGlow 0.6s ease-out;
+}
+
+.killerName {
+  font-weight: bold;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+}
+
+.victimName {
+  font-weight: bold;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+}
+
+.weaponIcon {
+  font-size: 10px;
+  font-weight: bold;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+}
+
+.weaponIconHeadshot {
+  color: rgba(212, 163, 68, 0.9);
+}
+
+.headshotTag {
+  color: rgba(255, 200, 120, 0.9);
+  font-size: 9px;
+  font-weight: 700;
+  font-family: 'Rajdhani', sans-serif;
+  letter-spacing: 0.5px;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(60px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(60px);
+    opacity: 0;
+  }
+}
+
+@keyframes streakGlow {
+  0% {
+    box-shadow: 0 0 8px rgba(212, 163, 68, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(212, 163, 68, 0);
+  }
+}

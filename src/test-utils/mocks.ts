@@ -140,6 +140,10 @@ export function mockGameRenderer(
     hideSpawnLoadingIndicator: vi.fn(),
     showRenderer: vi.fn(),
     showCrosshair: vi.fn(),
+    hideCrosshair: vi.fn(),
+    showCrosshairAgain: vi.fn(),
+    setCrosshairMode: vi.fn(),
+    setCrosshairSpread: vi.fn(),
     onWindowResize: vi.fn(),
     ...overrides,
   };

@@ -21,10 +21,18 @@ export interface AircraftPhysicsConfig {
 
 export type AircraftRole = 'transport' | 'attack' | 'gunship';
 
+export interface AircraftWeaponMount {
+  name: string;
+  type: 'nose_turret' | 'side_mount' | 'rocket_pod';
+  firingMode: 'pilot' | 'crew';
+  ammoCapacity: number;
+}
+
 export interface AircraftConfig {
   physics: AircraftPhysicsConfig;
   seats: number;
   role: AircraftRole;
+  weapons: AircraftWeaponMount[];
 }
 
 // --- Base configs ---
@@ -50,6 +58,7 @@ export const AIRCRAFT_CONFIGS: Record<string, AircraftConfig> = {
     physics: HUEY_PHYSICS,
     seats: 4,
     role: 'transport',
+    weapons: [],
   },
 
   // UH-1C Gunship: heavier armed variant. Sluggish but tough.
@@ -66,6 +75,9 @@ export const AIRCRAFT_CONFIGS: Record<string, AircraftConfig> = {
     },
     seats: 2,
     role: 'gunship',
+    weapons: [
+      { name: 'M60 Door Gun', type: 'side_mount', firingMode: 'crew', ammoCapacity: 500 },
+    ],
   },
 
   // AH-1 Cobra: light attack heli. Fast, agile, twitchy.
@@ -86,6 +98,10 @@ export const AIRCRAFT_CONFIGS: Record<string, AircraftConfig> = {
     },
     seats: 1,
     role: 'attack',
+    weapons: [
+      { name: 'M134 Minigun', type: 'nose_turret', firingMode: 'pilot', ammoCapacity: 4000 },
+      { name: 'Rocket Pod', type: 'rocket_pod', firingMode: 'pilot', ammoCapacity: 14 },
+    ],
   },
 };
 

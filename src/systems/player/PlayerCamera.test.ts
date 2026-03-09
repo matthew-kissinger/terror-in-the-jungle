@@ -39,6 +39,7 @@ describe('PlayerCamera', () => {
       isJumping: false,
       jumpForce: 10,
       gravity: -20,
+      isCrouching: false,
       isInHelicopter: false,
       helicopterId: null
     } as PlayerState;

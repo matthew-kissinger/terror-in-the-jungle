@@ -8,14 +8,19 @@
  */
 
 import { UIComponent } from '../engine/UIComponent';
+import { FocusTrap } from '../engine/FocusTrap';
 import { isTouchDevice } from '../../utils/DeviceDetector';
 import styles from './HowToPlayModal.module.css';
 
 export class HowToPlayModal extends UIComponent {
   private visible = this.signal(false);
+  private focusTrap: FocusTrap | null = null;
 
   protected build(): void {
     this.root.className = styles.overlay;
+    this.root.setAttribute('role', 'dialog');
+    this.root.setAttribute('aria-modal', 'true');
+    this.root.setAttribute('aria-label', 'How To Play');
 
     const isTouch = isTouchDevice();
 
@@ -60,7 +65,25 @@ export class HowToPlayModal extends UIComponent {
       <li>Back -- Scoreboard</li>
     `;
 
+    const heliDesktopControls = `
+      <li>W/S -- Collective (altitude)</li>
+      <li>A/D -- Yaw (rotation)</li>
+      <li>Arrows -- Cyclic (pitch/roll)</li>
+      <li>Shift -- Engine boost</li>
+      <li>Space -- Auto-hover toggle</li>
+      <li>E -- Enter/Exit</li>
+      <li>G -- Deploy squad (low hover)</li>
+      <li>RCtrl -- Camera mode</li>
+    `;
+
+    const heliMobileControls = `
+      <li>Left Joystick -- Collective + Yaw</li>
+      <li>Right Joystick -- Cyclic (pitch/roll)</li>
+    `;
+
     const primaryControls = isTouch ? touchControls : kbmControls;
+    const heliControls = isTouch ? heliMobileControls : heliDesktopControls;
+
     const secondarySection = isTouch
       ? ''
       : `
@@ -77,6 +100,9 @@ export class HowToPlayModal extends UIComponent {
 
         ${secondarySection}
 
+        <h3 class="${styles.heading}">HELICOPTER CONTROLS</h3>
+        <ul class="${styles.list}">${heliControls}</ul>
+
         <h3 class="${styles.heading}">OBJECTIVE</h3>
         <p class="${styles.text}">Capture and hold zones to drain enemy tickets. The team that runs out of tickets first loses.</p>
 
@@ -88,15 +114,23 @@ export class HowToPlayModal extends UIComponent {
           <li>Stay mobile to avoid being targeted</li>
         </ul>
 
-        <button class="${styles.closeBtn}" data-ref="close" type="button">CLOSE</button>
+        <button class="${styles.closeBtn}" data-ref="close" type="button" aria-label="Close">CLOSE</button>
       </div>
     `;
   }
 
   protected onMount(): void {
+    this.focusTrap = new FocusTrap(this.root);
+
     // Visibility toggle
     this.effect(() => {
-      this.toggleClass(styles.visible, this.visible.value);
+      const vis = this.visible.value;
+      this.toggleClass(styles.visible, vis);
+      if (vis) {
+        this.focusTrap?.activate();
+      } else {
+        this.focusTrap?.deactivate();
+      }
     });
 
     // Close button
@@ -106,11 +140,23 @@ export class HowToPlayModal extends UIComponent {
       this.listen(closeBtn, 'click', (e) => e.preventDefault());
     }
 
+    // Escape key to close
+    this.listen(this.root, 'keydown', (e) => {
+      if (e.key === 'Escape' && this.visible.value) {
+        this.hide();
+      }
+    });
+
     // Click backdrop to close
     this.listen(this.root, 'pointerdown', (e) => {
       if (e.target === this.root) this.hide();
     });
     this.listen(this.root, 'click', (e) => e.preventDefault());
+  }
+
+  protected onUnmount(): void {
+    this.focusTrap?.dispose();
+    this.focusTrap = null;
   }
 
   // --- Public API ---

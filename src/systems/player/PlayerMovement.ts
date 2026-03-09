@@ -21,6 +21,8 @@ const _upVector = new THREE.Vector3(0, 1, 0);
 const MOVEMENT_ACCELERATION = 5;
 const FRICTION_RATE = 8;
 const PLAYER_EYE_HEIGHT = 2;
+const PLAYER_CROUCH_EYE_HEIGHT = 1.2;
+const CROUCH_SPEED_MULTIPLIER = 0.5;
 const PLAYER_COLLISION_RADIUS = 0.5;
 const LANDING_SOUND_THRESHOLD = -5;
 const BOUNDARY_BOUNCE_FACTOR = 0.5;
@@ -79,6 +81,14 @@ export class PlayerMovement {
     this.helicopterModel = helicopterModel;
   }
 
+  setCrouching(crouching: boolean): void {
+    this.playerState.isCrouching = crouching;
+  }
+
+  isCrouching(): boolean {
+    return this.playerState.isCrouching;
+  }
+
   setRunning(running: boolean): void {
     this.isRunning = running;
     this.playerState.isRunning = running;
@@ -114,7 +124,10 @@ export class PlayerMovement {
     }
 
     const moveVector = _moveVector.set(0, 0, 0);
-    const baseSpeed = this.playerState.isRunning ? this.playerState.runSpeed : this.playerState.speed;
+    let baseSpeed = this.playerState.isRunning ? this.playerState.runSpeed : this.playerState.speed;
+    if (this.playerState.isCrouching) {
+      baseSpeed *= CROUCH_SPEED_MULTIPLIER;
+    }
 
     // Query slope at current position for speed penalty + slide
     const heightCache = getHeightQueryCache();
@@ -225,11 +238,12 @@ export class PlayerMovement {
 
     // Check ground collision using TerrainSystem if available, otherwise use flat baseline
     // getEffectiveHeightAt includes collision objects (helipad, helicopter, etc.)
-    let groundHeight = PLAYER_EYE_HEIGHT; // flat world fallback
+    const eyeHeight = this.playerState.isCrouching ? PLAYER_CROUCH_EYE_HEIGHT : PLAYER_EYE_HEIGHT;
+    let groundHeight = eyeHeight; // flat world fallback
     if (this.terrainSystem) {
       const terrainHeight = Number(this.terrainSystem.getEffectiveHeightAt(newPosition.x, newPosition.z));
       if (Number.isFinite(terrainHeight)) {
-        groundHeight = terrainHeight + PLAYER_EYE_HEIGHT;
+        groundHeight = terrainHeight + eyeHeight;
       }
     }
 
@@ -242,7 +256,7 @@ export class PlayerMovement {
       // Recompute ground height at original position
       if (this.terrainSystem) {
         const th = Number(this.terrainSystem.getEffectiveHeightAt(this.playerState.position.x, this.playerState.position.z));
-        if (Number.isFinite(th)) groundHeight = th + PLAYER_EYE_HEIGHT;
+        if (Number.isFinite(th)) groundHeight = th + eyeHeight;
       }
     }
 
@@ -250,7 +264,7 @@ export class PlayerMovement {
     if (this.sandbagSystem) {
       const sandbagTop = this.sandbagSystem.getStandingHeight(newPosition.x, newPosition.z);
       if (sandbagTop !== null) {
-        const sandbagGround = sandbagTop + PLAYER_EYE_HEIGHT;
+        const sandbagGround = sandbagTop + eyeHeight;
         if (sandbagGround > groundHeight) {
           groundHeight = sandbagGround;
         }
@@ -387,6 +401,11 @@ export class PlayerMovement {
       if (this.helicopterModel && this.playerState.helicopterId) {
         const state = this.helicopterModel.getHelicopterState(this.playerState.helicopterId);
         if (state) rpm = state.engineRPM;
+
+        const flightData = this.helicopterModel.getFlightData(this.playerState.helicopterId);
+        if (flightData) {
+          hudSystem.updateHelicopterFlightData(flightData.airspeed, flightData.heading, flightData.verticalSpeed);
+        }
       }
       hudSystem.updateHelicopterInstruments(
         this.helicopterControls.collective,

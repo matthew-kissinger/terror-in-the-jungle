@@ -7,6 +7,7 @@
  */
 
 export { UIComponent } from './UIComponent';
+export { FocusTrap } from './FocusTrap';
 
 // Re-export layout types for convenience
 export type { LayoutComponent, HUDRegion, UIState, LayoutMode } from '../layout/types';

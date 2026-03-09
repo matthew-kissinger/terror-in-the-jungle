@@ -1,16 +1,32 @@
 /**
  * ADS (Aim Down Sights) button for mobile touch controls.
- * Toggle mode: tap to aim, tap again to stop. Uses pointer events.
+ * Supports two modes (persisted in localStorage):
+ * - 'toggle': tap to aim, tap again to stop (default)
+ * - 'hold': activate on pointerdown, deactivate on pointerup
  *
  * PC/controller ADS remains hold-to-aim (handled by right-click in PlayerInput).
  */
 
-import { UIComponent } from '../engine/UIComponent';
+import { BaseTouchButton } from './BaseTouchButton';
 import styles from './TouchControls.module.css';
 
-export class TouchADSButton extends UIComponent {
+export type ADSBehavior = 'hold' | 'toggle';
+
+const ADS_STORAGE_KEY = 'terror_ads_mode';
+
+function loadADSBehavior(): ADSBehavior {
+  try {
+    const stored = localStorage.getItem(ADS_STORAGE_KEY);
+    if (stored === 'hold' || stored === 'toggle') return stored;
+  } catch {
+    // localStorage unavailable
+  }
+  return 'toggle';
+}
+
+export class TouchADSButton extends BaseTouchButton {
   private isActive = false;
-  private activePointerId: number | null = null;
+  private adsBehavior: ADSBehavior = loadADSBehavior();
 
   private onADSToggle?: (active: boolean) => void;
 
@@ -21,9 +37,34 @@ export class TouchADSButton extends UIComponent {
   }
 
   protected onMount(): void {
-    this.listen(this.root, 'pointerdown', this.handlePointerDown, { passive: false });
-    this.listen(this.root, 'pointerup', this.handlePointerUp, { passive: false });
-    this.listen(this.root, 'pointercancel', this.handlePointerCancel, { passive: false });
+    this.bindPress(this.root, {
+      onDown: () => {
+        if (this.adsBehavior === 'hold') {
+          this.isActive = true;
+          this.updateVisual();
+          this.onADSToggle?.(true);
+        }
+      },
+      onUp: () => {
+        if (this.adsBehavior === 'toggle') {
+          this.isActive = !this.isActive;
+          this.updateVisual();
+          this.onADSToggle?.(this.isActive);
+        } else {
+          // hold mode: release
+          this.isActive = false;
+          this.updateVisual();
+          this.onADSToggle?.(false);
+        }
+      },
+      onCancel: () => {
+        if (this.adsBehavior === 'hold' && this.isActive) {
+          this.isActive = false;
+          this.updateVisual();
+          this.onADSToggle?.(false);
+        }
+      },
+    });
   }
 
   setOnADSToggle(callback: (active: boolean) => void): void {
@@ -34,48 +75,26 @@ export class TouchADSButton extends UIComponent {
   resetADS(): void {
     if (this.isActive) {
       this.isActive = false;
-      this.activePointerId = null;
+      this.releaseAllPointers();
       this.updateVisual();
       this.onADSToggle?.(false);
     }
   }
 
-  private handlePointerDown = (e: PointerEvent): void => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    // Ignore if another pointer is already tracked (multi-touch guard)
-    if (this.activePointerId !== null) return;
-    this.activePointerId = e.pointerId;
-    if (typeof this.root.setPointerCapture === 'function') {
-      this.root.setPointerCapture(e.pointerId);
-    }
-  };
+  getADSBehavior(): ADSBehavior {
+    return this.adsBehavior;
+  }
 
-  private handlePointerUp = (e: PointerEvent): void => {
-    if (e.pointerId !== this.activePointerId) return;
-    e.preventDefault();
-    e.stopPropagation();
-    this.activePointerId = null;
-    if (typeof this.root.releasePointerCapture === 'function' && this.root.hasPointerCapture(e.pointerId)) {
-      this.root.releasePointerCapture(e.pointerId);
+  setADSBehavior(behavior: ADSBehavior): void {
+    this.adsBehavior = behavior;
+    try {
+      localStorage.setItem(ADS_STORAGE_KEY, behavior);
+    } catch {
+      // localStorage unavailable
     }
-
-    // Toggle ADS on tap release
-    this.isActive = !this.isActive;
-    this.updateVisual();
-    this.onADSToggle?.(this.isActive);
-  };
-
-  private handlePointerCancel = (e: PointerEvent): void => {
-    if (e.pointerId !== this.activePointerId) return;
-    e.preventDefault();
-    this.activePointerId = null;
-    if (typeof this.root.releasePointerCapture === 'function' && this.root.hasPointerCapture(e.pointerId)) {
-      this.root.releasePointerCapture(e.pointerId);
-    }
-    // Cancel does not toggle — leave state as-is
-  };
+    // Reset ADS when switching modes to avoid stuck state
+    this.resetADS();
+  }
 
   private updateVisual(): void {
     this.root.classList.toggle(styles.adsActive, this.isActive);

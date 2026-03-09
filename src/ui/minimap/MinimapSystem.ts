@@ -36,8 +36,16 @@ export class MinimapSystem implements GameSystem {
   // Minimap settings
   private MINIMAP_SIZE = MINIMAP_SIZE;
   private WORLD_SIZE = DEFAULT_WORLD_SIZE;
+  private baseWorldSize = DEFAULT_WORLD_SIZE;
+  private zoomLevel = 1.0;
+  private readonly MIN_ZOOM = 0.5;
+  private readonly MAX_ZOOM = 4.0;
   private readonly UPDATE_INTERVAL = 100;
   private lastUpdateTime = 0;
+
+  // Pinch zoom state
+  private activePointers: Map<number, { x: number; y: number }> = new Map();
+  private lastPinchDist = 0;
 
   // Player tracking
   private playerPosition = new THREE.Vector3();
@@ -63,7 +71,50 @@ export class MinimapSystem implements GameSystem {
     // Add to DOM (grid slot or body)
     (parent ?? document.body).appendChild(this.minimapContainer);
 
+    // Prevent browser gestures on the minimap container
+    this.minimapContainer.style.touchAction = 'none';
+
+    // Pinch-to-zoom event listeners
+    this.minimapContainer.addEventListener('pointerdown', (e: PointerEvent) => {
+      this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (this.activePointers.size === 2) {
+        this.lastPinchDist = this.getPinchDistance();
+      }
+    });
+
+    this.minimapContainer.addEventListener('pointermove', (e: PointerEvent) => {
+      if (!this.activePointers.has(e.pointerId)) return;
+      this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (this.activePointers.size === 2) {
+        const dist = this.getPinchDistance();
+        if (this.lastPinchDist > 0) {
+          const scale = dist / this.lastPinchDist;
+          this.zoomLevel = Math.max(this.MIN_ZOOM, Math.min(this.MAX_ZOOM, this.zoomLevel * scale));
+          this.WORLD_SIZE = this.baseWorldSize / this.zoomLevel;
+        }
+        this.lastPinchDist = dist;
+      }
+    });
+
+    const endPointer = (e: PointerEvent) => {
+      this.activePointers.delete(e.pointerId);
+      if (this.activePointers.size < 2) {
+        this.lastPinchDist = 0;
+      }
+    };
+    this.minimapContainer.addEventListener('pointerup', endPointer);
+    this.minimapContainer.addEventListener('pointercancel', endPointer);
+
     Logger.info('minimap', ' Minimap System initialized');
+  }
+
+  private getPinchDistance(): number {
+    const pts = Array.from(this.activePointers.values());
+    if (pts.length < 2) return 0;
+    const dx = pts[1].x - pts[0].x;
+    const dy = pts[1].y - pts[0].y;
+    return Math.sqrt(dx * dx + dy * dy);
   }
 
   update(_deltaTime: number): void {
@@ -100,8 +151,20 @@ export class MinimapSystem implements GameSystem {
 
   // Game mode configuration
   setWorldScale(scale: number): void {
-    this.WORLD_SIZE = scale;
+    this.baseWorldSize = scale;
+    this.WORLD_SIZE = scale / this.zoomLevel;
     Logger.info('minimap', ` Minimap world scale set to ${scale}`);
+  }
+
+  /** Get current zoom level (1.0 = default, >1 = zoomed in). */
+  getZoomLevel(): number {
+    return this.zoomLevel;
+  }
+
+  /** Set zoom level programmatically. Clamped to min/max. */
+  setZoomLevel(zoom: number): void {
+    this.zoomLevel = Math.max(this.MIN_ZOOM, Math.min(this.MAX_ZOOM, zoom));
+    this.WORLD_SIZE = this.baseWorldSize / this.zoomLevel;
   }
 
   setPlayerSquadId(squadId: string | undefined): void {

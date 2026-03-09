@@ -1,7 +1,13 @@
 import { Faction } from '../../systems/combat/types';
 import { colors } from '../design/tokens';
+import { getWeaponIconElement } from './WeaponIconRegistry';
+import styles from './KillFeed.module.css';
 
-export type WeaponType = 'rifle' | 'shotgun' | 'smg' | 'grenade' | 'mortar' | 'melee' | 'unknown';
+export type WeaponType =
+  | 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher'
+  | 'grenade' | 'mortar' | 'melee'
+  | 'helicopter_minigun' | 'helicopter_rocket' | 'helicopter_doorgun'
+  | 'unknown';
 
 interface KillEntry {
   id: string;
@@ -11,9 +17,14 @@ interface KillEntry {
   victimFaction: Faction;
   isHeadshot: boolean;
   weaponType: WeaponType;
+  isStreak: boolean;
   timestamp: number;
   opacity: number;
 }
+
+const EXPLOSIVE_TYPES: ReadonlySet<string> = new Set([
+  'grenade', 'mortar', 'launcher', 'helicopter_rocket',
+]);
 
 export class KillFeed {
   private container: HTMLDivElement;
@@ -21,8 +32,9 @@ export class KillFeed {
   private entryElements: Map<string, HTMLElement> = new Map();
   private entryIdCounter: number = 0;
   private readonly MAX_ENTRIES = 6;
-  private readonly ENTRY_LIFETIME = 5000; // 5 seconds
-  private readonly FADE_START = 3000; // Start fading after 3 seconds
+  private readonly ENTRY_LIFETIME = 5000;
+  private readonly FADE_START = 3000;
+  private readonly SLIDE_OUT_DURATION = 250;
 
   constructor() {
     this.container = this.createContainer();
@@ -30,7 +42,7 @@ export class KillFeed {
 
   private createContainer(): HTMLDivElement {
     const container = document.createElement('div');
-    container.className = 'kill-feed';
+    container.className = styles.container;
     return container;
   }
 
@@ -40,7 +52,8 @@ export class KillFeed {
     victimName: string,
     victimFaction: Faction,
     isHeadshot: boolean = false,
-    weaponType: WeaponType = 'unknown'
+    weaponType: WeaponType = 'unknown',
+    isStreak: boolean = false
   ): void {
     const entry: KillEntry = {
       id: `kill-${Date.now()}-${++this.entryIdCounter}`,
@@ -50,17 +63,16 @@ export class KillFeed {
       victimFaction,
       isHeadshot,
       weaponType,
+      isStreak,
       timestamp: Date.now(),
-      opacity: 1.0
+      opacity: 1.0,
     };
 
     this.entries.push(entry);
 
-    // Remove oldest entries if we exceed max
     if (this.entries.length > this.MAX_ENTRIES) {
       const removed = this.entries.shift();
       if (removed) {
-        // Clean up DOM element for removed entry
         const element = this.entryElements.get(removed.id);
         if (element && element.parentNode) {
           element.parentNode.removeChild(element);
@@ -76,7 +88,6 @@ export class KillFeed {
     const now = Date.now();
     let needsRender = false;
 
-    // Update opacity for fading entries
     this.entries.forEach(entry => {
       const age = now - entry.timestamp;
 
@@ -87,7 +98,6 @@ export class KillFeed {
       }
     });
 
-    // Remove expired entries
     const originalLength = this.entries.length;
     const expiredIds: string[] = [];
     this.entries = this.entries.filter(entry => {
@@ -99,13 +109,17 @@ export class KillFeed {
       return true;
     });
 
-    // Clean up DOM elements for expired entries
     expiredIds.forEach(id => {
       const element = this.entryElements.get(id);
-      if (element && element.parentNode) {
-        element.parentNode.removeChild(element);
+      if (element) {
+        element.classList.add(styles.entrySlideOut);
+        setTimeout(() => {
+          if (element.parentNode) {
+            element.parentNode.removeChild(element);
+          }
+          this.entryElements.delete(id);
+        }, this.SLIDE_OUT_DURATION);
       }
-      this.entryElements.delete(id);
     });
 
     if (this.entries.length !== originalLength || needsRender) {
@@ -114,10 +128,8 @@ export class KillFeed {
   }
 
   private render(): void {
-    // Build set of current entry IDs
     const currentIds = new Set(this.entries.map(entry => entry.id));
 
-    // Remove DOM elements for entries that no longer exist
     const idsToRemove: string[] = [];
     this.entryElements.forEach((element, id) => {
       if (!currentIds.has(id)) {
@@ -129,18 +141,14 @@ export class KillFeed {
     });
     idsToRemove.forEach(id => this.entryElements.delete(id));
 
-    // Update or create elements for each entry (newest at bottom)
     this.entries.forEach((entry, index) => {
       const existingElement = this.entryElements.get(entry.id);
 
       if (existingElement) {
-        // Update existing element opacity and styles
         this.updateEntryElement(existingElement, entry);
-        
-        // Ensure correct order - move element if needed
+
         const currentIndex = Array.from(this.container.children).indexOf(existingElement);
         if (currentIndex !== index) {
-          // Insert at correct position
           if (index === this.container.children.length) {
             this.container.appendChild(existingElement);
           } else {
@@ -151,17 +159,15 @@ export class KillFeed {
           }
         }
       } else {
-        // Create new element
         const entryElement = this.createEntryElement(entry);
         entryElement.setAttribute('data-entry-id', entry.id);
-        
-        // Insert at correct position (newest at bottom)
+
         if (index === this.container.children.length) {
           this.container.appendChild(entryElement);
         } else {
           this.container.insertBefore(entryElement, this.container.children[index]);
         }
-        
+
         this.entryElements.set(entry.id, entryElement);
       }
     });
@@ -169,68 +175,40 @@ export class KillFeed {
 
   private createEntryElement(entry: KillEntry): HTMLDivElement {
     const element = document.createElement('div');
-    const isExplosive = entry.weaponType === 'grenade' || entry.weaponType === 'mortar';
+    const isExplosive = EXPLOSIVE_TYPES.has(entry.weaponType);
 
-    element.style.cssText = `
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 5px;
-      padding: 3px 6px;
-      background: rgba(8, 12, 18, ${0.45 * entry.opacity});
-      border-left: 2px solid ${isExplosive ? `rgba(212, 163, 68, ${0.4 * entry.opacity})` : `rgba(220, 225, 230, ${0.1 * entry.opacity})`};
-      border-radius: 0 2px 2px 0;
-      opacity: ${entry.opacity};
-      transition: opacity 0.3s ease;
-      backdrop-filter: blur(4px);
-      animation: slideIn 0.15s ease-out;
-    `;
+    const entryClasses = [styles.entry];
+    if (isExplosive) entryClasses.push(styles.entryExplosive);
+    if (entry.isStreak) entryClasses.push(styles.entryStreak);
+    element.className = entryClasses.join(' ');
+    element.style.opacity = `${entry.opacity}`;
 
-    // Killer name
     const killerSpan = document.createElement('span');
+    killerSpan.className = styles.killerName;
     killerSpan.textContent = entry.killerName;
-    killerSpan.style.cssText = `
-      color: ${this.getFactionColor(entry.killerFaction)};
-      font-weight: bold;
-      text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
-    `;
+    killerSpan.style.color = this.getFactionColor(entry.killerFaction);
 
-    // Weapon icon
-    const weaponSpan = document.createElement('span');
-    const weaponIcon = this.getWeaponIcon(entry.weaponType);
-    weaponSpan.textContent = weaponIcon.text;
-    weaponSpan.style.cssText = `
-      color: ${weaponIcon.color};
-      font-size: ${weaponIcon.size};
-      font-weight: bold;
-      text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
-    `;
+    const weaponContainer = document.createElement('span');
+    const weaponClasses = [styles.weaponIcon];
+    if (entry.isHeadshot) weaponClasses.push(styles.weaponIconHeadshot);
+    weaponContainer.className = weaponClasses.join(' ');
+    const iconElement = getWeaponIconElement(entry.weaponType);
+    weaponContainer.appendChild(iconElement);
 
-    // Headshot indicator (after weapon, before victim)
     let headshotSpan: HTMLSpanElement | null = null;
     if (entry.isHeadshot) {
       headshotSpan = document.createElement('span');
+      headshotSpan.className = styles.headshotTag;
       headshotSpan.textContent = 'HS';
-      headshotSpan.style.cssText = `
-        color: rgba(255, 200, 120, 0.9);
-        font-size: 9px;
-        font-weight: 700;
-        font-family: 'Rajdhani', sans-serif;
-        letter-spacing: 0.5px;
-      `;
     }
 
-    // Victim name
     const victimSpan = document.createElement('span');
+    victimSpan.className = styles.victimName;
     victimSpan.textContent = entry.victimName;
-    victimSpan.style.cssText = `
-      color: ${this.getFactionColor(entry.victimFaction)};
-      font-weight: bold;
-      text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
-    `;
+    victimSpan.style.color = this.getFactionColor(entry.victimFaction);
 
     element.appendChild(killerSpan);
-    element.appendChild(weaponSpan);
+    element.appendChild(weaponContainer);
     if (headshotSpan) {
       element.appendChild(headshotSpan);
     }
@@ -240,31 +218,7 @@ export class KillFeed {
   }
 
   private updateEntryElement(element: HTMLElement, entry: KillEntry): void {
-    const isExplosive = entry.weaponType === 'grenade' || entry.weaponType === 'mortar';
-    
-    // Update opacity and styles
     element.style.opacity = `${entry.opacity}`;
-    element.style.background = `rgba(0, 0, 0, ${0.6 * entry.opacity})`;
-    element.style.border = `1px solid ${isExplosive ? `rgba(255, 100, 50, ${0.3 * entry.opacity})` : `rgba(255, 255, 255, ${0.2 * entry.opacity})`}`;
-  }
-
-  private getWeaponIcon(weaponType: WeaponType): { text: string; color: string; size: string } {
-    switch (weaponType) {
-      case 'rifle':
-        return { text: '[AR]', color: 'rgba(255, 255, 255, 0.6)', size: '10px' };
-      case 'shotgun':
-        return { text: '[SG]', color: 'rgba(255, 255, 255, 0.6)', size: '10px' };
-      case 'smg':
-        return { text: '[SM]', color: 'rgba(255, 255, 255, 0.6)', size: '10px' };
-      case 'grenade':
-        return { text: '[GR]', color: 'rgba(255, 180, 100, 0.7)', size: '10px' };
-      case 'mortar':
-        return { text: '[MT]', color: 'rgba(255, 140, 100, 0.7)', size: '10px' };
-      case 'melee':
-        return { text: '[ML]', color: 'rgba(255, 255, 255, 0.6)', size: '10px' };
-      default:
-        return { text: '--', color: 'rgba(255, 255, 255, 0.4)', size: '10px' };
-    }
   }
 
   private getFactionColor(faction: Faction): string {
@@ -284,43 +238,6 @@ export class KillFeed {
 
   attachToDOM(parent: HTMLElement): void {
     parent.appendChild(this.container);
-    this.injectStyles();
-  }
-
-  private injectStyles(): void {
-    // Check if styles already exist
-    if (document.getElementById('kill-feed-styles')) return;
-
-    const style = document.createElement('style');
-    style.id = 'kill-feed-styles';
-    style.textContent = `
-      .kill-feed {
-        /* Positioned by grid slot [data-region="kill-feed"], top-right corner */
-        width: 220px;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 2px;
-        padding-top: 4px;
-        padding-right: 8px;
-        pointer-events: none;
-        font-family: 'Rajdhani', sans-serif;
-        font-size: 11px;
-        font-weight: 600;
-      }
-
-      @keyframes slideIn {
-        from {
-          transform: translateX(60px);
-          opacity: 0;
-        }
-        to {
-          transform: translateX(0);
-          opacity: 1;
-        }
-      }
-    `;
-    document.head.appendChild(style);
   }
 
   dispose(): void {
@@ -328,13 +245,6 @@ export class KillFeed {
       this.container.parentNode.removeChild(this.container);
     }
 
-    // Clean up injected styles
-    const styleElement = document.getElementById('kill-feed-styles');
-    if (styleElement && styleElement.parentNode) {
-      styleElement.parentNode.removeChild(styleElement);
-    }
-
-    // Clean up DOM elements map
     this.entryElements.clear();
     this.entries = [];
   }

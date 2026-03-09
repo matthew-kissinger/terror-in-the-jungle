@@ -237,6 +237,22 @@ export class HUDElements {
     this.helicopterHUD.setInstruments(collective, rpm, autoHover, engineBoost);
   }
 
+  updateHelicopterFlightData(airspeed: number, heading: number, verticalSpeed: number): void {
+    this.helicopterHUD.setFlightData(airspeed, heading, verticalSpeed);
+  }
+
+  setHelicopterAircraftRole(role: import('../../systems/helicopter/AircraftConfigs').AircraftRole): void {
+    this.helicopterHUD.setAircraftRole(role);
+  }
+
+  setHelicopterWeaponStatus(name: string, ammo: number): void {
+    this.helicopterHUD.setWeaponStatus(name, ammo);
+  }
+
+  setHelicopterDamage(healthPercent: number): void {
+    this.helicopterHUD.setDamage(healthPercent);
+  }
+
   // Mortar indicator methods
   showMortarIndicator(): void {
     this.mortarPanel.show();

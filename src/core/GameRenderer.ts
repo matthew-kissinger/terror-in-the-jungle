@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { PixelPerfectUtils } from '../utils/PixelPerfect';
 import { PostProcessingManager } from '../systems/effects/PostProcessingManager';
-import { CrosshairUI } from './CrosshairUI';
+import { CrosshairSystem } from '../ui/hud/CrosshairSystem';
+import type { CrosshairMode } from '../ui/hud/CrosshairSystem';
 import { LoadingUI } from './LoadingUI';
 import { Logger } from '../utils/Logger';
 import { estimateGPUTier, isMobileGPU, shouldEnableShadows, getShadowMapSize, getMaxPixelRatio } from '../utils/DeviceDetector';
@@ -19,7 +20,7 @@ export class GameRenderer {
   public moonLight?: THREE.DirectionalLight;
   public hemisphereLight?: THREE.HemisphereLight;
 
-  private crosshairUI = new CrosshairUI();
+  private crosshairSystem = new CrosshairSystem();
   private loadingUI = new LoadingUI();
   private viewportUnsubscribe?: () => void;
 
@@ -52,13 +53,13 @@ export class GameRenderer {
     PixelPerfectUtils.configureRenderer(this.renderer);
     // Aggregate stats across the whole frame; the loop resets once before rendering.
     this.renderer.info.autoReset = false;
-    
+
     // Device-adaptive pixel ratio
     this.renderer.setPixelRatio(getMaxPixelRatio());
 
     const initialViewport = ViewportManager.getInstance().info;
     this.renderer.setSize(initialViewport.width, initialViewport.height);
-    
+
     // Device-adaptive shadow settings
     this.renderer.shadowMap.enabled = shouldEnableShadows();
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -106,7 +107,7 @@ export class GameRenderer {
 
     this.moonLight.shadow.camera.near = 0.5;
     this.moonLight.shadow.camera.far = 300;
-    
+
     // Smaller shadow frustum on weaker devices to keep resolution up
     const shadowRange = gpuTier === 'high' ? 100 : 70;
     this.moonLight.shadow.camera.left = -shadowRange;
@@ -175,17 +176,27 @@ export class GameRenderer {
     this.applyViewport(ViewportManager.getInstance().info);
   }
 
-
   showCrosshair(): void {
-    this.crosshairUI.showCrosshair();
+    if (!this.crosshairSystem.mounted) {
+      this.crosshairSystem.mount(document.body);
+    }
+    this.crosshairSystem.showCrosshair();
   }
 
   hideCrosshair(): void {
-    this.crosshairUI.hideCrosshair();
+    this.crosshairSystem.hideCrosshair();
   }
 
   showCrosshairAgain(): void {
-    this.crosshairUI.showCrosshairAgain();
+    this.crosshairSystem.showCrosshairAgain();
+  }
+
+  setCrosshairMode(mode: CrosshairMode): void {
+    this.crosshairSystem.setMode(mode);
+  }
+
+  setCrosshairSpread(radius: number): void {
+    this.crosshairSystem.setSpread(radius);
   }
 
   showSpawnLoadingIndicator(): void {
@@ -262,7 +273,7 @@ export class GameRenderer {
 
     // Clean up UI modules
     this.loadingUI.dispose();
-    this.crosshairUI.dispose();
+    this.crosshairSystem.dispose();
 
     // Clean up Three.js resources
     this.renderer.dispose();

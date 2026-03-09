@@ -53,6 +53,7 @@ describe('PlayerMovement', () => {
       health: 100,
       maxHealth: 100,
       isADS: false,
+      isCrouching: false,
       isInHelicopter: false,
       helicopterId: null,
       currentWeaponIndex: 0,

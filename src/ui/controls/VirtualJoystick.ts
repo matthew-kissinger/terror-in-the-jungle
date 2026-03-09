@@ -6,6 +6,7 @@
  */
 
 import { UIComponent } from '../engine/UIComponent';
+import { applyDeadZone } from './joystickMath';
 import styles from './TouchControls.module.css';
 
 export class VirtualJoystick extends UIComponent {
@@ -146,21 +147,10 @@ export class VirtualJoystick extends UIComponent {
     this.thumb.style.left = `${(baseSize - this.THUMB_SIZE) / 2 + dx}px`;
     this.thumb.style.top = `${(baseSize - this.THUMB_SIZE) / 2 + dy}px`;
 
-    // Normalise output
-    let normX = this.maxDistance > 0 ? dx / this.maxDistance : 0;
-    let normY = this.maxDistance > 0 ? dy / this.maxDistance : 0;
-
-    // Apply dead zone
-    const rawMagnitude = Math.sqrt(normX * normX + normY * normY);
-    if (rawMagnitude < this.DEAD_ZONE) {
-      normX = 0;
-      normY = 0;
-    } else if (rawMagnitude > 0) {
-      const remapped = (rawMagnitude - this.DEAD_ZONE) / (1 - this.DEAD_ZONE);
-      const scale = remapped / rawMagnitude;
-      normX *= scale;
-      normY *= scale;
-    }
+    // Normalise output with dead zone
+    const rawX = this.maxDistance > 0 ? dx / this.maxDistance : 0;
+    const rawY = this.maxDistance > 0 ? dy / this.maxDistance : 0;
+    const { x: normX, y: normY } = applyDeadZone(rawX, rawY, this.DEAD_ZONE);
 
     this.output.x = normX;
     this.output.z = normY;

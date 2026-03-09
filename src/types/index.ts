@@ -46,6 +46,7 @@ export interface PlayerState {
   isJumping: boolean;
   jumpForce: number;
   gravity: number;
+  isCrouching: boolean;
   isInHelicopter: boolean;
   helicopterId: string | null;
 }

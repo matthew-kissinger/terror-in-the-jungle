@@ -6,7 +6,7 @@
  * Uses pointer events with setPointerCapture for unified input handling.
  */
 
-import { UIComponent } from '../engine/UIComponent';
+import { BaseTouchButton } from './BaseTouchButton';
 import styles from './TouchControls.module.css';
 
 export interface TouchMortarCallbacks {
@@ -18,7 +18,7 @@ export interface TouchMortarCallbacks {
   onToggleMortarCamera: () => void;
 }
 
-export class TouchMortarButton extends UIComponent {
+export class TouchMortarButton extends BaseTouchButton {
   // Sub-elements
   private deployButton!: HTMLDivElement;
   private deployedContainer!: HTMLDivElement;
@@ -31,17 +31,11 @@ export class TouchMortarButton extends UIComponent {
   private deployed = false;
   private callbacks?: TouchMortarCallbacks;
 
-  // Aim pad tracking
+  // Aim pad tracking (drag, not press - handled manually)
   private aimPointerId: number | null = null;
   private aimLastX = 0;
   private aimLastY = 0;
   private readonly AIM_SENSITIVITY = 0.3;
-
-  // Active pointer tracking per button
-  private deployPointerId: number | null = null;
-  private firePointerId: number | null = null;
-  private undeployPointerId: number | null = null;
-  private cameraPointerId: number | null = null;
 
   protected build(): void {
     this.root.className = styles.mortarContainer;
@@ -92,19 +86,20 @@ export class TouchMortarButton extends UIComponent {
   }
 
   protected onMount(): void {
-    // Deploy button
-    this.bindPressButton(this.deployButton, 'deploy');
+    this.bindPress(this.deployButton, {
+      onDown: () => this.callbacks?.onDeploy(),
+    });
+    this.bindPress(this.fireButton, {
+      onDown: () => this.callbacks?.onFire(),
+    });
+    this.bindPress(this.undeployButton, {
+      onDown: () => this.callbacks?.onUndeploy(),
+    });
+    this.bindPress(this.cameraButton, {
+      onDown: () => this.callbacks?.onToggleMortarCamera(),
+    });
 
-    // Fire button
-    this.bindPressButton(this.fireButton, 'fire');
-
-    // Undeploy button
-    this.bindPressButton(this.undeployButton, 'undeploy');
-
-    // Camera button
-    this.bindPressButton(this.cameraButton, 'camera');
-
-    // Aim pad
+    // Aim pad uses drag (pointermove), not simple press
     this.listen(this.aimPad, 'pointerdown', (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
@@ -151,65 +146,6 @@ export class TouchMortarButton extends UIComponent {
         this.aimPad.releasePointerCapture(e.pointerId);
       }
     }, { passive: false });
-  }
-
-  private bindPressButton(btn: HTMLDivElement, action: string): void {
-    this.listen(btn, 'pointerdown', (e: PointerEvent) => {
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
-      e.preventDefault();
-      e.stopPropagation();
-      const pid = this.getPointerId(action);
-      if (pid !== null) return;
-      this.setPointerId(action, e.pointerId);
-      if (typeof btn.setPointerCapture === 'function') btn.setPointerCapture(e.pointerId);
-      btn.classList.add(styles.pressed);
-      this.invokeCallback(action);
-    }, { passive: false });
-
-    this.listen(btn, 'pointerup', (e: PointerEvent) => {
-      if (e.pointerId !== this.getPointerId(action)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      this.setPointerId(action, null);
-      btn.classList.remove(styles.pressed);
-      if (typeof btn.releasePointerCapture === 'function' && btn.hasPointerCapture(e.pointerId)) btn.releasePointerCapture(e.pointerId);
-    }, { passive: false });
-
-    this.listen(btn, 'pointercancel', (e: PointerEvent) => {
-      if (e.pointerId !== this.getPointerId(action)) return;
-      e.preventDefault();
-      this.setPointerId(action, null);
-      btn.classList.remove(styles.pressed);
-      if (typeof btn.releasePointerCapture === 'function' && btn.hasPointerCapture(e.pointerId)) btn.releasePointerCapture(e.pointerId);
-    }, { passive: false });
-  }
-
-  private getPointerId(action: string): number | null {
-    switch (action) {
-      case 'deploy': return this.deployPointerId;
-      case 'fire': return this.firePointerId;
-      case 'undeploy': return this.undeployPointerId;
-      case 'camera': return this.cameraPointerId;
-      default: return null;
-    }
-  }
-
-  private setPointerId(action: string, id: number | null): void {
-    switch (action) {
-      case 'deploy': this.deployPointerId = id; break;
-      case 'fire': this.firePointerId = id; break;
-      case 'undeploy': this.undeployPointerId = id; break;
-      case 'camera': this.cameraPointerId = id; break;
-    }
-  }
-
-  private invokeCallback(action: string): void {
-    switch (action) {
-      case 'deploy': this.callbacks?.onDeploy(); break;
-      case 'fire': this.callbacks?.onFire(); break;
-      case 'undeploy': this.callbacks?.onUndeploy(); break;
-      case 'camera': this.callbacks?.onToggleMortarCamera(); break;
-    }
   }
 
   setCallbacks(callbacks: TouchMortarCallbacks): void {

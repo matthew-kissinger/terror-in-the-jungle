@@ -5,11 +5,10 @@
  * Uses pointer events with setPointerCapture for unified input handling.
  */
 
-import { UIComponent } from '../engine/UIComponent';
+import { BaseTouchButton } from './BaseTouchButton';
 import styles from './TouchControls.module.css';
 
-export class TouchInteractionButton extends UIComponent {
-  private activePointerId: number | null = null;
+export class TouchInteractionButton extends BaseTouchButton {
   private isVisible = false;
 
   private onInteract?: () => void;
@@ -22,48 +21,14 @@ export class TouchInteractionButton extends UIComponent {
   }
 
   protected onMount(): void {
-    this.listen(this.root, 'pointerdown', this.handlePointerDown, { passive: false });
-    this.listen(this.root, 'pointerup', this.handlePointerUp, { passive: false });
-    this.listen(this.root, 'pointercancel', this.handlePointerCancel, { passive: false });
+    this.bindPress(this.root, {
+      onDown: () => this.onInteract?.(),
+    });
   }
 
   setCallback(onInteract: () => void): void {
     this.onInteract = onInteract;
   }
-
-  private handlePointerDown = (e: PointerEvent): void => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (this.activePointerId !== null) return;
-    this.activePointerId = e.pointerId;
-    if (typeof this.root.setPointerCapture === 'function') {
-      this.root.setPointerCapture(e.pointerId);
-    }
-    this.root.classList.add(styles.pressed);
-    this.onInteract?.();
-  };
-
-  private handlePointerUp = (e: PointerEvent): void => {
-    if (e.pointerId !== this.activePointerId) return;
-    e.preventDefault();
-    e.stopPropagation();
-    this.activePointerId = null;
-    this.root.classList.remove(styles.pressed);
-    if (typeof this.root.releasePointerCapture === 'function' && this.root.hasPointerCapture(e.pointerId)) {
-      this.root.releasePointerCapture(e.pointerId);
-    }
-  };
-
-  private handlePointerCancel = (e: PointerEvent): void => {
-    if (e.pointerId !== this.activePointerId) return;
-    e.preventDefault();
-    this.activePointerId = null;
-    this.root.classList.remove(styles.pressed);
-    if (typeof this.root.releasePointerCapture === 'function' && this.root.hasPointerCapture(e.pointerId)) {
-      this.root.releasePointerCapture(e.pointerId);
-    }
-  };
 
   /** Show the button (called when interaction becomes available). */
   showButton(): void {
@@ -77,9 +42,7 @@ export class TouchInteractionButton extends UIComponent {
     if (!this.isVisible) return;
     this.isVisible = false;
     this.root.style.display = 'none';
-    if (this.activePointerId !== null) {
-      this.activePointerId = null;
-    }
+    this.releaseAllPointers();
   }
 
   /** Don't auto-show - button is only shown when interaction is available. */

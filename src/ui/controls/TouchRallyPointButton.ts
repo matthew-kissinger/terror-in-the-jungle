@@ -5,15 +5,14 @@
  * Uses pointer events with setPointerCapture for unified input handling.
  */
 
-import { UIComponent } from '../engine/UIComponent';
+import { BaseTouchButton } from './BaseTouchButton';
 import styles from './TouchControls.module.css';
 
 /** Hold duration threshold to open squad command menu (ms). */
 const HOLD_THRESHOLD_MS = 300;
 
-export class TouchRallyPointButton extends UIComponent {
+export class TouchRallyPointButton extends BaseTouchButton {
   private isVisible = false;
-  private activePointerId: number | null = null;
   private holdTimer: ReturnType<typeof setTimeout> | null = null;
   private didOpenMenu = false;
 
@@ -33,9 +32,28 @@ export class TouchRallyPointButton extends UIComponent {
   }
 
   protected onMount(): void {
-    this.listen(this.root, 'pointerdown', this.handlePointerDown, { passive: false });
-    this.listen(this.root, 'pointerup', this.handlePointerUp, { passive: false });
-    this.listen(this.root, 'pointercancel', this.handlePointerCancel, { passive: false });
+    this.bindPress(this.root, {
+      onDown: () => {
+        this.didOpenMenu = false;
+        this.clearHoldTimer();
+        this.holdTimer = setTimeout(() => {
+          this.holdTimer = null;
+          this.didOpenMenu = true;
+          this.root.classList.remove(styles.pressed);
+          this.onSquadCommand?.();
+        }, HOLD_THRESHOLD_MS);
+      },
+      onUp: () => {
+        this.clearHoldTimer();
+        if (!this.didOpenMenu) {
+          this.onPlaceRallyPoint?.();
+        }
+      },
+      onCancel: () => {
+        this.clearHoldTimer();
+        this.didOpenMenu = false;
+      },
+    });
   }
 
   setCallback(onPlaceRallyPoint: () => void): void {
@@ -52,58 +70,6 @@ export class TouchRallyPointButton extends UIComponent {
       this.holdTimer = null;
     }
   }
-
-  private handlePointerDown = (e: PointerEvent): void => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    if (this.activePointerId !== null) return;
-    this.activePointerId = e.pointerId;
-    this.didOpenMenu = false;
-    if (typeof this.root.setPointerCapture === 'function') {
-      this.root.setPointerCapture(e.pointerId);
-    }
-    this.root.classList.add(styles.pressed);
-
-    // Start hold timer — if held long enough, open squad command menu
-    this.clearHoldTimer();
-    this.holdTimer = setTimeout(() => {
-      this.holdTimer = null;
-      this.didOpenMenu = true;
-      this.root.classList.remove(styles.pressed);
-      this.onSquadCommand?.();
-    }, HOLD_THRESHOLD_MS);
-  };
-
-  private handlePointerUp = (e: PointerEvent): void => {
-    if (e.pointerId !== this.activePointerId) return;
-    e.preventDefault();
-    e.stopPropagation();
-    this.activePointerId = null;
-    this.root.classList.remove(styles.pressed);
-    this.clearHoldTimer();
-
-    // If hold did NOT trigger the radial menu, treat as tap → place rally
-    if (!this.didOpenMenu) {
-      this.onPlaceRallyPoint?.();
-    }
-
-    if (typeof this.root.releasePointerCapture === 'function' && this.root.hasPointerCapture(e.pointerId)) {
-      this.root.releasePointerCapture(e.pointerId);
-    }
-  };
-
-  private handlePointerCancel = (e: PointerEvent): void => {
-    if (e.pointerId !== this.activePointerId) return;
-    e.preventDefault();
-    this.activePointerId = null;
-    this.root.classList.remove(styles.pressed);
-    this.clearHoldTimer();
-    this.didOpenMenu = false;
-    if (typeof this.root.releasePointerCapture === 'function' && this.root.hasPointerCapture(e.pointerId)) {
-      this.root.releasePointerCapture(e.pointerId);
-    }
-  };
 
   showButton(): void {
     if (this.isVisible) return;

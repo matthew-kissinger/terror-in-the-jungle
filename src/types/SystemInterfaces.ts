@@ -18,6 +18,7 @@ import type { InventoryManager } from '../systems/player/InventoryManager';
 import type { FirstPersonWeapon } from '../systems/player/FirstPersonWeapon';
 import type { PlayerController } from '../systems/player/PlayerController';
 import type { HelipadSystem } from '../systems/helicopter/HelipadSystem';
+import type { AircraftRole } from '../systems/helicopter/AircraftConfigs';
 import type { HelicopterControls } from '../systems/helicopter/HelicopterPhysics';
 import type { CombatantSystem } from '../systems/combat/CombatantSystem';
 import type { ZoneManager } from '../systems/world/ZoneManager';
@@ -39,6 +40,10 @@ export interface IHUDSystem {
   showGrenadePowerMeter(): void;
   hideGrenadePowerMeter(): void;
   updateHelicopterInstruments(collective: number, rpm: number, autoHover: boolean, engineBoost: boolean): void;
+  updateHelicopterFlightData(airspeed: number, heading: number, verticalSpeed: number): void;
+  setHelicopterAircraftRole(role: import('../systems/helicopter/AircraftConfigs').AircraftRole): void;
+  setHelicopterWeaponStatus(name: string, ammo: number): void;
+  setHelicopterDamage(healthPercent: number): void;
   showHelicopterMouseIndicator(): void;
   hideHelicopterMouseIndicator(): void;
   showHelicopterInstruments(): void;
@@ -138,6 +143,8 @@ export interface IHelicopterModel {
   getHelicopterQuaternionTo(id: string, target: THREE.Quaternion): boolean;
   setHelicopterControls(helicopterId: string, controls: Partial<HelicopterControls>): void;
   getHelicopterState(helicopterId: string): { engineRPM: number } | null;
+  getFlightData(helicopterId: string): { airspeed: number; heading: number; verticalSpeed: number } | null;
+  getAircraftRole(helicopterId: string): AircraftRole;
 }
 
 /**
@@ -237,5 +244,9 @@ export interface IGameRenderer {
   hideSpawnLoadingIndicator(): void;
   showRenderer(): void;
   showCrosshair(): void;
+  hideCrosshair(): void;
+  showCrosshairAgain(): void;
+  setCrosshairMode(mode: import('../ui/hud/CrosshairSystem').CrosshairMode): void;
+  setCrosshairSpread(radius: number): void;
   onWindowResize(): void;
 }

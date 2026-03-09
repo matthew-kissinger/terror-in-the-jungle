@@ -15,6 +15,7 @@ import { isTouchDevice } from '../../utils/DeviceDetector';
 import { isPortraitViewport, tryLockLandscapeOrientation } from '../../utils/Orientation';
 import { SettingsModal } from './SettingsModal';
 import { HowToPlayModal } from './HowToPlayModal';
+import { OnboardingOverlay } from '../onboarding/OnboardingOverlay';
 import { LoadingProgress } from './LoadingProgress';
 import { LOADING_PHASES } from '../../config/loading';
 import { MODE_CARD_CONFIGS } from './ModeCard';
@@ -34,6 +35,7 @@ const LOADING_SCREEN_IMAGE_URL = `${SCREEN_ASSET_BASE_URL}assets/ui/screens/load
 export class StartScreen extends UIComponent {
   private settingsModal: SettingsModal;
   private howToPlayModal: HowToPlayModal;
+  private onboardingOverlay: OnboardingOverlay;
 
   // Built lazily in build()
   private progress!: LoadingProgress;
@@ -69,6 +71,7 @@ export class StartScreen extends UIComponent {
     super();
     this.settingsModal = new SettingsModal();
     this.howToPlayModal = new HowToPlayModal();
+    this.onboardingOverlay = new OnboardingOverlay();
     this.preloadScreenImages();
   }
 
@@ -134,6 +137,7 @@ export class StartScreen extends UIComponent {
           <div class="${styles.buttonRow}">
             <button class="${styles.menuButton} ${styles.secondaryButton}" data-ref="settings">SETTINGS</button>
             <button class="${styles.menuButton} ${styles.secondaryButton}" data-ref="howToPlay">CONTROLS</button>
+            <button class="${styles.menuButton} ${styles.secondaryButton}" data-ref="tutorial">TUTORIAL</button>
           </div>
           <div class="${styles.quickStartHint}" data-ref="quickStartHint"></div>
         </div>
@@ -161,6 +165,7 @@ export class StartScreen extends UIComponent {
     // Mount child modals to body
     this.settingsModal.mount(document.body);
     this.howToPlayModal.mount(document.body);
+    this.onboardingOverlay.mount(document.body);
 
     // Initialize loading phases
     for (const phase of LOADING_PHASES) {
@@ -200,6 +205,12 @@ export class StartScreen extends UIComponent {
     if (howToPlayBtn) {
       this.listen(howToPlayBtn, 'pointerdown', () => this.howToPlayModal.show());
       this.listen(howToPlayBtn, 'click', (e) => e.preventDefault());
+    }
+
+    const tutorialBtn = this.$('[data-ref="tutorial"]');
+    if (tutorialBtn) {
+      this.listen(tutorialBtn, 'pointerdown', () => this.onboardingOverlay.show());
+      this.listen(tutorialBtn, 'click', (e) => e.preventDefault());
     }
 
     this.listen(window, 'keydown', this.handleMenuKeyDown);
@@ -360,6 +371,7 @@ export class StartScreen extends UIComponent {
 
     this.settingsModal.dispose();
     this.howToPlayModal.dispose();
+    this.onboardingOverlay.dispose();
 
     super.dispose();
   }
@@ -657,7 +669,7 @@ export class StartScreen extends UIComponent {
   }
 
   private setMenuButtonsEnabled(enabled: boolean): void {
-    const buttonRefs = ['play', 'settings', 'howToPlay'];
+    const buttonRefs = ['play', 'settings', 'howToPlay', 'tutorial'];
     for (const ref of buttonRefs) {
       const button = this.$(`[data-ref="${ref}"]`) as HTMLButtonElement | null;
       if (button) {

@@ -440,6 +440,22 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.updateHelicopterInstruments(collective, rpm, autoHover, engineBoost);
   }
 
+  updateHelicopterFlightData(airspeed: number, heading: number, verticalSpeed: number): void {
+    this.elements.updateHelicopterFlightData(airspeed, heading, verticalSpeed);
+  }
+
+  setHelicopterAircraftRole(role: import('../../systems/helicopter/AircraftConfigs').AircraftRole): void {
+    this.elements.setHelicopterAircraftRole(role);
+  }
+
+  setHelicopterWeaponStatus(name: string, ammo: number): void {
+    this.elements.setHelicopterWeaponStatus(name, ammo);
+  }
+
+  setHelicopterDamage(healthPercent: number): void {
+    this.elements.setHelicopterDamage(healthPercent);
+  }
+
   // Squad deploy prompt methods (IHUDSystem)
   showSquadDeployPrompt(): void {
     this.showInteractionPrompt('Press G to deploy squad');

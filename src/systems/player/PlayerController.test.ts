@@ -180,6 +180,7 @@ describe('PlayerController', () => {
       tryEnterHelicopter: vi.fn(),
       exitHelicopter: vi.fn(),
       setPlayerInput: vi.fn(),
+      getAircraftRole: vi.fn().mockReturnValue('transport'),
     } as any;
 
     mockFirstPersonWeapon = {
@@ -206,6 +207,10 @@ describe('PlayerController', () => {
       updateHelicopterMouseMode: vi.fn(),
       showHelicopterInstruments: vi.fn(),
       hideHelicopterInstruments: vi.fn(),
+      setHelicopterAircraftRole: vi.fn(),
+      updateHelicopterFlightData: vi.fn(),
+      setHelicopterWeaponStatus: vi.fn(),
+      setHelicopterDamage: vi.fn(),
       showGrenadePowerMeter: vi.fn(),
       hideGrenadePowerMeter: vi.fn(),
       updateGrenadePower: vi.fn(),
@@ -218,6 +223,10 @@ describe('PlayerController', () => {
 
     mockRenderer = {
       showCrosshair: vi.fn(),
+      hideCrosshair: vi.fn(),
+      showCrosshairAgain: vi.fn(),
+      setCrosshairMode: vi.fn(),
+      setCrosshairSpread: vi.fn(),
     };
 
     mockCommandInputManager = {

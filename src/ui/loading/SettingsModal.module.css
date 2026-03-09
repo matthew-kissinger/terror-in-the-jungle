@@ -117,6 +117,30 @@
   font-size: var(--font-size-sm);
 }
 
+.fieldset {
+  border: none;
+  padding: 0;
+  margin: var(--space-4) 0 0;
+}
+
+.legend {
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+  margin-bottom: var(--space-2);
+  padding: 0;
+}
+
+.hint {
+  margin: var(--space-1) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  opacity: 0.7;
+}
+
 .closeBtn {
   margin-top: var(--space-5);
   width: 100%;

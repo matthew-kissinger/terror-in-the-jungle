@@ -396,6 +396,22 @@ export class HelicopterModel implements GameSystem {
     return physics ? physics.getState() : null;
   }
 
+  getFlightData(helicopterId: string): { airspeed: number; heading: number; verticalSpeed: number } | null {
+    const physics = this.helicopterPhysics.get(helicopterId);
+    if (!physics) return null;
+    return {
+      airspeed: physics.getAirspeed(),
+      heading: physics.getHeading(),
+      verticalSpeed: physics.getVerticalSpeed(),
+    };
+  }
+
+  getAircraftRole(helicopterId: string): import('./AircraftConfigs').AircraftRole {
+    const helicopter = this.helicopters.get(helicopterId);
+    const aircraftKey = helicopter?.userData.model || 'UH1_HUEY';
+    return getAircraftConfig(aircraftKey).role;
+  }
+
   dispose(): void {
     this.helicopters.forEach((_, id) => {
       this.audio.dispose(id);

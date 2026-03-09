@@ -16,6 +16,7 @@ vi.mock('./VirtualJoystick', () => ({
     dispose = vi.fn();
     mount = vi.fn();
     setSprintCallbacks = vi.fn();
+    setHelicopterMode = vi.fn();
 
     constructor() {
       joystickInstances.push(this);
@@ -30,6 +31,7 @@ vi.mock('./TouchLook', () => ({
     dispose = vi.fn();
     mount = vi.fn();
     consumeDelta = vi.fn().mockReturnValue({ x: 1.2, y: -0.4 });
+    setADS = vi.fn();
 
     constructor() {
       lookInstances.push(this);
@@ -102,10 +104,23 @@ vi.mock('./TouchRallyPointButton', () => ({
   TouchRallyPointButton: class {
     show = vi.fn();
     hide = vi.fn();
+    hideButton = vi.fn();
+    showButton = vi.fn();
     dispose = vi.fn();
     mount = vi.fn();
     setCallback = vi.fn();
     setSquadCommandCallback = vi.fn();
+  },
+}));
+
+vi.mock('./TouchCrouchButton', () => ({
+  TouchCrouchButton: class {
+    show = vi.fn();
+    hide = vi.fn();
+    dispose = vi.fn();
+    mount = vi.fn();
+    setOnCrouchToggle = vi.fn();
+    resetCrouch = vi.fn();
   },
 }));
 
@@ -223,6 +238,12 @@ describe('TouchControls', () => {
       onSprintStart: vi.fn(),
       onSprintStop: vi.fn(),
       onWeaponSelect: vi.fn(),
+      onADSToggle: vi.fn(),
+      onCrouchToggle: vi.fn(),
+      onEnterExitHelicopter: vi.fn(),
+      onSandbagRotateLeft: vi.fn(),
+      onSandbagRotateRight: vi.fn(),
+      onRallyPointPlace: vi.fn(),
     };
 
     controls.setCallbacks(callbacks);

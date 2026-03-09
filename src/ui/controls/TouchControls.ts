@@ -17,6 +17,7 @@ import { TouchADSButton } from './TouchADSButton';
 import { TouchInteractionButton } from './TouchInteractionButton';
 import { TouchSandbagButtons } from './TouchSandbagButtons';
 import { TouchRallyPointButton } from './TouchRallyPointButton';
+import { TouchCrouchButton } from './TouchCrouchButton';
 import { TouchMenuButton } from './TouchMenuButton';
 import { TouchMortarButton } from './TouchMortarButton';
 import { TouchHelicopterCyclic } from './TouchHelicopterCyclic';
@@ -32,6 +33,7 @@ export interface TouchControlCallbacks {
   onSprintStop: () => void;
   onWeaponSelect: (slotIndex: number) => void;
   onADSToggle: (active: boolean) => void;
+  onCrouchToggle?: (crouching: boolean) => void;
   onScoreboardTap?: () => void;
   onEnterExitHelicopter: () => void;
   onSandbagRotateLeft: () => void;
@@ -51,6 +53,7 @@ export class TouchControls {
   readonly interactionButton: TouchInteractionButton;
   readonly sandbagButtons: TouchSandbagButtons;
   readonly rallyPointButton: TouchRallyPointButton;
+  readonly crouchButton: TouchCrouchButton;
   readonly menuButton: TouchMenuButton;
   readonly mortarButton: TouchMortarButton;
   readonly helicopterCyclic: TouchHelicopterCyclic;
@@ -66,6 +69,7 @@ export class TouchControls {
     this.interactionButton = new TouchInteractionButton();
     this.sandbagButtons = new TouchSandbagButtons();
     this.rallyPointButton = new TouchRallyPointButton();
+    this.crouchButton = new TouchCrouchButton();
     this.menuButton = new TouchMenuButton();
     this.mortarButton = new TouchMortarButton();
     this.helicopterCyclic = new TouchHelicopterCyclic();
@@ -80,6 +84,7 @@ export class TouchControls {
     this.interactionButton.mount(body);
     this.sandbagButtons.mount(body);
     this.rallyPointButton.mount(body);
+    this.crouchButton.mount(body);
     this.menuButton.mount(body);
     this.mortarButton.mount(body);
     this.helicopterCyclic.mount(body);
@@ -119,6 +124,9 @@ export class TouchControls {
     this.adsButton.setOnADSToggle((active: boolean) => {
       this.look.setADS(active);
       callbacks.onADSToggle(active);
+    });
+    this.crouchButton.setOnCrouchToggle((crouching: boolean) => {
+      callbacks.onCrouchToggle?.(crouching);
     });
     this.interactionButton.setCallback(callbacks.onEnterExitHelicopter);
     this.sandbagButtons.setCallbacks(callbacks.onSandbagRotateLeft, callbacks.onSandbagRotateRight);
@@ -179,6 +187,7 @@ export class TouchControls {
     this.interactionButton.show();
     this.sandbagButtons.show();
     this.rallyPointButton.show();
+    this.crouchButton.show();
     this.menuButton.show();
     // mortarButton removed from mobile HUD — mortar is desktop-only for now
     // helicopterCyclic is NOT shown here; it's shown/hidden by enterHelicopterMode/exitHelicopterMode
@@ -195,6 +204,7 @@ export class TouchControls {
     this.interactionButton.hide();
     this.sandbagButtons.hide();
     this.rallyPointButton.hide();
+    this.crouchButton.hide();
     this.menuButton.hide();
     this.mortarButton.hide();
     this.helicopterCyclic.hide();
@@ -216,6 +226,7 @@ export class TouchControls {
     this.actionButtons.hide();
     this.rallyPointButton.hideButton();
     this.sandbagButtons.hide();
+    this.crouchButton.hide();
     this.look.hide();
 
     // Show helicopter cyclic joystick (right side)
@@ -240,6 +251,7 @@ export class TouchControls {
     this.adsButton.show();
     this.actionButtons.show();
     this.rallyPointButton.showButton();
+    this.crouchButton.show();
     this.look.show();
 
     // Reset left joystick to infantry mode
@@ -269,6 +281,7 @@ export class TouchControls {
     this.interactionButton.dispose();
     this.sandbagButtons.dispose();
     this.rallyPointButton.dispose();
+    this.crouchButton.dispose();
     this.menuButton.dispose();
     this.mortarButton.dispose();
     this.helicopterCyclic.dispose();

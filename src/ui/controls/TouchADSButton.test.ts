@@ -19,6 +19,7 @@ describe('TouchADSButton', () => {
 
   beforeEach(() => {
     document.body.innerHTML = '';
+    localStorage.removeItem('terror_ads_mode');
     adsButton = new TouchADSButton();
     adsButton.mount(document.body);
     button = document.getElementById('touch-ads-btn') as HTMLDivElement;
@@ -31,38 +32,75 @@ describe('TouchADSButton', () => {
     expect(button.className).toContain('adsBtn');
   });
 
-  it('toggle-ADS: first tap activates, second tap deactivates', () => {
-    const onADSToggle = vi.fn();
-    adsButton.setOnADSToggle(onADSToggle);
+  describe('toggle mode (default)', () => {
+    it('first tap activates, second tap deactivates', () => {
+      const onADSToggle = vi.fn();
+      adsButton.setOnADSToggle(onADSToggle);
 
-    // First tap: pointerdown then pointerup = ADS ON
-    button.dispatchEvent(pointerEvent('pointerdown'));
-    button.dispatchEvent(pointerEvent('pointerup'));
-    expect(onADSToggle).toHaveBeenCalledWith(true);
-    expect(onADSToggle).toHaveBeenCalledTimes(1);
+      // First tap: pointerdown then pointerup = ADS ON
+      button.dispatchEvent(pointerEvent('pointerdown'));
+      button.dispatchEvent(pointerEvent('pointerup'));
+      expect(onADSToggle).toHaveBeenCalledWith(true);
+      expect(onADSToggle).toHaveBeenCalledTimes(1);
 
-    // Second tap: pointerdown then pointerup = ADS OFF
-    button.dispatchEvent(pointerEvent('pointerdown'));
-    button.dispatchEvent(pointerEvent('pointerup'));
-    expect(onADSToggle).toHaveBeenCalledWith(false);
-    expect(onADSToggle).toHaveBeenCalledTimes(2);
+      // Second tap: pointerdown then pointerup = ADS OFF
+      button.dispatchEvent(pointerEvent('pointerdown'));
+      button.dispatchEvent(pointerEvent('pointerup'));
+      expect(onADSToggle).toHaveBeenCalledWith(false);
+      expect(onADSToggle).toHaveBeenCalledTimes(2);
+    });
+
+    it('pointerdown alone does not toggle', () => {
+      const onADSToggle = vi.fn();
+      adsButton.setOnADSToggle(onADSToggle);
+
+      button.dispatchEvent(pointerEvent('pointerdown'));
+      expect(onADSToggle).not.toHaveBeenCalled();
+    });
+
+    it('pointercancel does not toggle state', () => {
+      const onADSToggle = vi.fn();
+      adsButton.setOnADSToggle(onADSToggle);
+
+      button.dispatchEvent(pointerEvent('pointerdown'));
+      button.dispatchEvent(pointerEvent('pointercancel'));
+      expect(onADSToggle).not.toHaveBeenCalled();
+    });
   });
 
-  it('pointerdown alone does not toggle', () => {
-    const onADSToggle = vi.fn();
-    adsButton.setOnADSToggle(onADSToggle);
+  describe('hold mode', () => {
+    it('activates on pointerdown and deactivates on pointerup', () => {
+      adsButton.setADSBehavior('hold');
+      const onADSToggle = vi.fn();
+      adsButton.setOnADSToggle(onADSToggle);
 
-    button.dispatchEvent(pointerEvent('pointerdown'));
-    expect(onADSToggle).not.toHaveBeenCalled();
-  });
+      button.dispatchEvent(pointerEvent('pointerdown'));
+      expect(onADSToggle).toHaveBeenCalledWith(true);
 
-  it('pointercancel does not toggle state', () => {
-    const onADSToggle = vi.fn();
-    adsButton.setOnADSToggle(onADSToggle);
+      button.dispatchEvent(pointerEvent('pointerup'));
+      expect(onADSToggle).toHaveBeenCalledWith(false);
+    });
 
-    button.dispatchEvent(pointerEvent('pointerdown'));
-    button.dispatchEvent(pointerEvent('pointercancel'));
-    expect(onADSToggle).not.toHaveBeenCalled();
+    it('deactivates on pointercancel', () => {
+      adsButton.setADSBehavior('hold');
+      const onADSToggle = vi.fn();
+      adsButton.setOnADSToggle(onADSToggle);
+
+      button.dispatchEvent(pointerEvent('pointerdown'));
+      expect(onADSToggle).toHaveBeenCalledWith(true);
+
+      button.dispatchEvent(pointerEvent('pointercancel'));
+      expect(onADSToggle).toHaveBeenCalledWith(false);
+    });
+
+    it('persists setting to localStorage', () => {
+      adsButton.setADSBehavior('hold');
+      expect(localStorage.getItem('terror_ads_mode')).toBe('hold');
+      expect(adsButton.getADSBehavior()).toBe('hold');
+
+      adsButton.setADSBehavior('toggle');
+      expect(localStorage.getItem('terror_ads_mode')).toBe('toggle');
+    });
   });
 
   it('button shows active styling when toggled on', () => {

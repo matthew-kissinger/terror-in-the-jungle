@@ -343,6 +343,23 @@ export class HelicopterPhysics {
     this.smoothedControls = { ...this.controls };
   }
 
+  getAirspeed(): number {
+    const vx = this.state.velocity.x;
+    const vz = this.state.velocity.z;
+    return Math.sqrt(vx * vx + vz * vz);
+  }
+
+  getHeading(): number {
+    _euler.setFromQuaternion(this.state.quaternion, 'YXZ');
+    let degrees = THREE.MathUtils.radToDeg(_euler.y);
+    degrees = ((degrees % 360) + 360) % 360;
+    return degrees;
+  }
+
+  getVerticalSpeed(): number {
+    return this.state.velocity.y;
+  }
+
   // Get engine sound parameters
   getEngineAudioParams(): { rpm: number; load: number } {
     const load = Math.abs(this.smoothedControls.collective) +

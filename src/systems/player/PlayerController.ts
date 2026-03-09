@@ -80,6 +80,7 @@ export class PlayerController implements GameSystem {
       isJumping: false,
       jumpForce: PLAYER_JUMP_FORCE,
       gravity: PLAYER_GRAVITY,
+      isCrouching: false,
       isInHelicopter: false,
       helicopterId: null
     };
@@ -613,6 +614,18 @@ export class PlayerController implements GameSystem {
       this.hudSystem.showHelicopterMouseIndicator();
       this.hudSystem.updateHelicopterMouseMode(this.cameraController.getHelicopterMouseControlEnabled());
       this.hudSystem.showHelicopterInstruments();
+
+      if (this.helicopterModel) {
+        const role = this.helicopterModel.getAircraftRole(helicopterId);
+        this.hudSystem.setHelicopterAircraftRole(role);
+
+        if (this.gameRenderer) {
+          const crosshairMode = role === 'attack' ? 'helicopter_attack'
+            : role === 'gunship' ? 'helicopter_gunship'
+            : 'helicopter_transport';
+          this.gameRenderer.setCrosshairMode(crosshairMode);
+        }
+      }
     }
 
     // Switch touch controls to helicopter dual-joystick mode
@@ -639,6 +652,10 @@ export class PlayerController implements GameSystem {
     if (this.hudSystem) {
       this.hudSystem.hideHelicopterMouseIndicator();
       this.hudSystem.hideHelicopterInstruments();
+    }
+
+    if (this.gameRenderer) {
+      this.gameRenderer.setCrosshairMode('infantry');
     }
 
     // Restore touch controls to infantry mode
