@@ -465,7 +465,7 @@ export class StartScreen extends UIComponent {
           class="${styles.selectionOption}${launchSelection.faction === faction ? ` ${styles.selectionOptionActive}` : ''}"
           data-faction="${faction}"
           ${this.isLaunching ? 'disabled' : ''}
-        >${iconHtml(this.getFactionEmblemIcon(faction), { width: 16, css: 'vertical-align:middle;margin-right:4px;' })}${this.getFactionLabel(faction)}</button>
+        >${iconHtml(this.getFactionEmblemIcon(faction), { width: 22, css: 'vertical-align:middle;margin-right:6px;image-rendering:pixelated;' })}${this.getFactionLabel(faction)}</button>
       `).join('');
     }
 
@@ -527,7 +527,7 @@ export class StartScreen extends UIComponent {
       <div class="${styles.modeCard}${selectedClass}${tdmClass}" data-mode="${mode}">
         <div class="${styles.modeCardIndicator}"></div>
         <div class="${styles.modeCardHeader}">
-          ${iconHtml(config.icon.replace('.png', ''), { width: 24, css: 'flex-shrink:0;opacity:0.8;' })}
+          ${iconHtml(config.icon.replace('.png', ''), { width: 32, css: 'flex-shrink:0;opacity:0.85;image-rendering:pixelated;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6));' })}
           <div style="display:flex;flex-direction:column;">
             <span class="${styles.modeCardTitle}">${config.title}</span>
             <span class="${styles.modeCardSubtitle}">${config.subtitle}</span>

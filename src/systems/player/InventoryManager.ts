@@ -513,7 +513,7 @@ export class InventoryManager implements GameSystem {
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        font-family: 'Rajdhani', sans-serif;
+        font-family: var(--font-primary, 'Rajdhani', sans-serif);
         transition: border-color 0.15s, background 0.15s, opacity 0.15s;
         backdrop-filter: blur(4px);
         gap: 1px;
@@ -535,7 +535,7 @@ export class InventoryManager implements GameSystem {
         font-size: 9px;
         color: rgba(255, 255, 255, 0.35);
         font-weight: 600;
-        font-family: 'Rajdhani', sans-serif;
+        font-family: var(--font-primary, 'Rajdhani', sans-serif);
       }
 
       .slot-icon {

@@ -140,6 +140,6 @@ export const breakpoints = {
 
 export const fontStack = {
   ui: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif",
-  hud: "'Rajdhani', 'Segoe UI', sans-serif",
-  mono: "'Courier New', monospace",
+  hud: "var(--font-primary, 'Rajdhani', sans-serif)",
+  mono: "var(--font-mono, 'JetBrains Mono', monospace)",
 } as const;

@@ -40,7 +40,7 @@ export const COMPASS_STYLES = `
     .compass-cardinal {
       position: absolute;
       color: rgba(220, 225, 230, 0.7);
-      font-family: 'Rajdhani', sans-serif;
+      font-family: var(--font-primary, 'Rajdhani', sans-serif);
       font-weight: 700;
       font-size: 15px;
       letter-spacing: 0.5px;
@@ -54,7 +54,7 @@ export const COMPASS_STYLES = `
     .compass-degree {
       position: absolute;
       color: rgba(220, 225, 230, 0.25);
-      font-family: 'Rajdhani', sans-serif;
+      font-family: var(--font-primary, 'Rajdhani', sans-serif);
       font-size: 9px;
       font-weight: 600;
       top: 50%;
@@ -86,7 +86,7 @@ export const COMPASS_STYLES = `
       left: 50%;
       transform: translateX(-50%);
       color: rgba(220, 225, 230, 0.65);
-      font-family: 'Rajdhani', sans-serif;
+      font-family: var(--font-primary, 'Rajdhani', sans-serif);
       font-size: 12px;
       font-weight: 700;
       padding: 1px 6px;
@@ -122,7 +122,7 @@ export const COMPASS_STYLES = `
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: 'Rajdhani', sans-serif;
+      font-family: var(--font-primary, 'Rajdhani', sans-serif);
       font-weight: 700;
       font-size: 9px;
       border-radius: 50%;

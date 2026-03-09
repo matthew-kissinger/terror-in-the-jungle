@@ -8,8 +8,9 @@
 
 :root {
   /* === Fonts === */
+  --font-heading: 'Teko', 'Rajdhani', sans-serif;
   --font-primary: 'Rajdhani', -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', 'Courier New', monospace;
 
   /* === Surfaces === */
   --surface-void: var(--color-jungle-950);

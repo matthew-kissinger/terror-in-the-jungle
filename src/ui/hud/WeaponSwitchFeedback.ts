@@ -72,7 +72,7 @@ export class WeaponSwitchFeedback {
       }
 
       .weapon-switch-name {
-        font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+        font-family: var(--font-primary, 'Rajdhani', sans-serif);
         font-size: 18px;
         font-weight: 700;
         color: rgba(220, 225, 230, 0.9);
@@ -86,7 +86,7 @@ export class WeaponSwitchFeedback {
       }
 
       .weapon-switch-ammo {
-        font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+        font-family: var(--font-primary, 'Rajdhani', sans-serif);
         font-size: 13px;
         font-weight: 600;
         color: rgba(220, 225, 230, 0.55);

@@ -13,7 +13,7 @@ export class PlayerHealthUI {
       border: none;
       border-radius: 50px;
       color: rgba(220, 225, 230, 0.9);
-      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+      font-family: var(--font-primary, 'Rajdhani', sans-serif);
       font-size: 14px;
       font-weight: 700;
       letter-spacing: 0.3px;

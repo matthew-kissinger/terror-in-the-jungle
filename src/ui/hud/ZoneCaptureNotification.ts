@@ -46,13 +46,14 @@ export class ZoneCaptureNotification {
       text-align: center;
       animation: zoneNotifyFadeIn 0.3s ease-out;
       backdrop-filter: blur(8px);
-      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+      font-family: var(--font-primary, 'Rajdhani', sans-serif);
     `;
 
     notification.innerHTML = `
       <div style="
-        font-size: 24px;
-        font-weight: 700;
+        font-family: var(--font-heading, 'Teko', sans-serif);
+        font-size: 28px;
+        font-weight: 500;
         color: ${color};
         margin-bottom: 6px;
         letter-spacing: 2px;

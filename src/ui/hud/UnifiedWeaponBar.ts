@@ -11,11 +11,26 @@
  * Mounts into the 'weapon-bar' grid slot.
  */
 
+import { icon as iconUrl } from '../icons/IconRegistry';
+
+/** Maps shortLabel -> icon registry name for weapon bar slots */
+const SLOT_ICON_MAP: Record<string, string> = {
+  SG: 'icon-shotgun',
+  GRN: 'icon-grenade',
+  FRG: 'icon-grenade',
+  AR: 'icon-rifle',
+  SB: 'icon-sandbag',
+  SMG: 'icon-smg',
+  PST: 'icon-pistol',
+  LMG: 'icon-lmg',
+  LNCR: 'icon-launcher',
+};
+
 interface WeaponSlotEl {
   element: HTMLDivElement;
   index: number;
   label: string;
-  icon: HTMLSpanElement;
+  iconContainer: HTMLDivElement;
   keyHint: HTMLSpanElement;
 }
 
@@ -89,7 +104,7 @@ export class UnifiedWeaponBar {
     for (const slot of this.slots) {
       const config = this.slotConfig[slot.index];
       slot.label = config.shortLabel;
-      slot.icon.textContent = config.shortLabel;
+      this.setSlotIcon(slot.iconContainer, config.shortLabel);
       slot.element.title = config.fullLabel;
       slot.element.style.display = config.enabled ? 'flex' : 'none';
       slot.element.classList.toggle('uwb-slot--disabled', !config.enabled);
@@ -139,13 +154,13 @@ export class UnifiedWeaponBar {
     keyHint.className = 'uwb-key';
     keyHint.textContent = String(index + 1);
 
-    // Icon / label
-    const icon = document.createElement('span');
-    icon.className = 'uwb-icon';
-    icon.textContent = label;
+    // Icon container (img or text fallback)
+    const iconContainer = document.createElement('div');
+    iconContainer.className = 'uwb-icon';
+    this.setSlotIcon(iconContainer, label);
 
     slot.appendChild(keyHint);
-    slot.appendChild(icon);
+    slot.appendChild(iconContainer);
 
     // Pointer events for weapon selection
     const onPointerDown = (e: PointerEvent): void => {
@@ -183,8 +198,24 @@ export class UnifiedWeaponBar {
     slot.addEventListener('pointerup', onPointerUp, { passive: false });
     slot.addEventListener('pointercancel', onPointerCancel, { passive: false });
 
-    this.slots.push({ element: slot, index, label, icon, keyHint });
+    this.slots.push({ element: slot, index, label, iconContainer, keyHint });
     this.container.appendChild(slot);
+  }
+
+  private setSlotIcon(container: HTMLDivElement, shortLabel: string): void {
+    container.innerHTML = '';
+    const iconName = SLOT_ICON_MAP[shortLabel];
+    if (iconName) {
+      const img = document.createElement('img');
+      img.src = iconUrl(iconName);
+      img.alt = shortLabel;
+      img.width = 22;
+      img.height = 22;
+      img.draggable = false;
+      container.appendChild(img);
+    } else {
+      container.textContent = shortLabel;
+    }
   }
 
   private updateHighlight(): void {
@@ -251,14 +282,32 @@ export class UnifiedWeaponBar {
       }
 
       .uwb-icon {
-        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
         font-weight: 700;
         color: rgba(255, 255, 255, 0.55);
         line-height: 1;
       }
 
+      .uwb-icon img {
+        width: 22px;
+        height: 22px;
+        object-fit: contain;
+        image-rendering: pixelated;
+        opacity: 0.6;
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
+        transition: opacity 0.15s;
+      }
+
       .uwb-slot--active .uwb-icon {
         color: rgba(255, 255, 255, 0.95);
+      }
+
+      .uwb-slot--active .uwb-icon img {
+        opacity: 1;
+        filter: drop-shadow(0 0 4px rgba(217, 119, 6, 0.4)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
       }
 
       /* Hide entire weapon bar on touch - WeaponPill replaces it */
@@ -279,6 +328,10 @@ export class UnifiedWeaponBar {
         }
         .uwb-icon {
           font-size: 10px;
+        }
+        .uwb-icon img {
+          width: 18px;
+          height: 18px;
         }
       }
     `;

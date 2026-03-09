@@ -120,7 +120,7 @@ export class RespawnUI {
       background: rgba(0, 0, 0, 0.95);
       display: none;
       z-index: 10000;
-      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+      font-family: var(--font-primary, 'Rajdhani', sans-serif);
     `;
 
     const mainLayout = document.createElement('div');
@@ -143,9 +143,10 @@ export class RespawnUI {
     this.headerTitle = document.createElement('h1');
     this.headerTitle.id = 'respawn-header-title';
     this.headerTitle.style.cssText = `
+      font-family: var(--font-heading, 'Teko', sans-serif);
       color: rgba(201, 86, 74, 0.95);
-      font-size: clamp(24px, 6vw, 48px);
-      font-weight: bold;
+      font-size: clamp(28px, 7vw, 56px);
+      font-weight: 500;
       text-transform: uppercase;
       margin: 0;
       letter-spacing: clamp(2px, 1vw, 8px);

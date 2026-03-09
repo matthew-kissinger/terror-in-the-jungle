@@ -54,7 +54,7 @@ export const MINIMAP_STYLES = `
     left: 4px;
     color: rgba(220, 225, 230, 0.45);
     font-size: 8px;
-    font-family: 'Rajdhani', sans-serif;
+    font-family: var(--font-primary, 'Rajdhani', sans-serif);
     font-weight: 600;
     pointer-events: none;
   }

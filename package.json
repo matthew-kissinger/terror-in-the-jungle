@@ -61,6 +61,9 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "@fontsource-variable/jetbrains-mono": "^5.2.8",
+    "@fontsource/rajdhani": "^5.2.7",
+    "@fontsource/teko": "^5.2.7",
     "@preact/signals-core": "^1.13.0",
     "@recast-navigation/core": "^0.43.0",
     "@recast-navigation/three": "^0.43.0",
