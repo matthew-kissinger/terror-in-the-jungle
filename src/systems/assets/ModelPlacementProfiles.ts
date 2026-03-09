@@ -1,4 +1,4 @@
-import { BuildingModels, StructureModels } from './modelPaths';
+import { BuildingModels, PropModels, StructureModels } from './modelPaths';
 
 export type ModelGroundingMode = 'bounds_center_bottom';
 export type ModelCollisionMode = 'none' | 'bounds';
@@ -18,6 +18,7 @@ export interface ModelPlacementProfile {
   coverHeight?: number;
   minSpacing?: number;
   coverOffset?: number;
+  displayScale?: number;
 }
 
 export const DEFAULT_MODEL_PLACEMENT_PROFILE: ModelPlacementProfile = {
@@ -31,14 +32,14 @@ const PROFILE_OVERRIDES: Record<string, ModelPlacementProfile> = {
     groundingMode: 'bounds_center_bottom',
     normalizeBy: 'height',
     expectedDimensions: {
-      width: 2.1,
-      height: 1.4,
-      depth: 0.8,
+      width: 4.2,
+      height: 2.8,
+      depth: 1.6,
     },
     collisionMode: 'bounds',
-    coverHeight: 1.15,
-    minSpacing: 2.15,
-    coverOffset: 0.75,
+    coverHeight: 2.3,
+    minSpacing: 4.3,
+    coverOffset: 1.5,
   },
   [StructureModels.HELIPAD]: {
     groundingMode: 'bounds_center_bottom',
@@ -90,6 +91,30 @@ const PROFILE_OVERRIDES: Record<string, ModelPlacementProfile> = {
     groundingMode: 'bounds_center_bottom',
     normalizeBy: 'none',
     collisionMode: 'none',
+  },
+  [StructureModels.FUEL_DRUM]: {
+    groundingMode: 'bounds_center_bottom',
+    normalizeBy: 'none',
+    collisionMode: 'none',
+    displayScale: 0.5,
+  },
+  [StructureModels.SUPPLY_CRATE]: {
+    groundingMode: 'bounds_center_bottom',
+    normalizeBy: 'none',
+    collisionMode: 'none',
+    displayScale: 0.5,
+  },
+  [StructureModels.AMMO_CRATE]: {
+    groundingMode: 'bounds_center_bottom',
+    normalizeBy: 'none',
+    collisionMode: 'none',
+    displayScale: 0.5,
+  },
+  [PropModels.WOODEN_BARREL]: {
+    groundingMode: 'bounds_center_bottom',
+    normalizeBy: 'none',
+    collisionMode: 'none',
+    displayScale: 0.5,
   },
 };
 

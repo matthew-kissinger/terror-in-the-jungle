@@ -66,7 +66,7 @@ export interface WarSimulatorConfig {
 
 export type MapFeatureKind = 'helipad' | 'airfield' | 'firebase' | 'village' | 'road';
 export type MapFeatureFootprintShape = 'circle' | 'rect' | 'strip' | 'polygon';
-export type TerrainFeatureSurfaceKind = 'packed_earth' | 'runway';
+export type TerrainFeatureSurfaceKind = 'packed_earth' | 'runway' | 'dirt_road' | 'gravel_road' | 'jungle_trail';
 export type TerrainFeatureTargetHeightMode = 'center' | 'average' | 'max';
 export type MapFeaturePrefabId =
   | 'firebase_us_small'

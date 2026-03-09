@@ -1,0 +1,106 @@
+import { StructureModels, GroundVehicleModels } from '../assets/modelPaths';
+
+export type FirebaseZone = 'perimeter' | 'interior' | 'entrance' | 'corner';
+
+export interface FirebaseStructureEntry {
+  modelPath: string;
+  zone: FirebaseZone;
+  weight: number;
+  registerCollision?: boolean;
+  facesOutward?: boolean;
+}
+
+export interface FirebaseTemplate {
+  id: string;
+  footprintRadius: number;
+  structureCount: { min: number; max: number };
+  zones: {
+    perimeter: { innerRadius: number; outerRadius: number };
+    interior: { radius: number };
+    entrance: { angle: number; width: number };
+  };
+  pool: FirebaseStructureEntry[];
+}
+
+export const FIREBASE_TEMPLATES: Record<string, FirebaseTemplate> = {
+  us_small: {
+    id: 'us_small',
+    footprintRadius: 25,
+    structureCount: { min: 5, max: 7 },
+    zones: {
+      perimeter: { innerRadius: 16, outerRadius: 22 },
+      interior: { radius: 14 },
+      entrance: { angle: 0, width: 6 },
+    },
+    pool: [
+      { modelPath: StructureModels.GUARD_TOWER, zone: 'corner', weight: 3, registerCollision: true, facesOutward: true },
+      { modelPath: StructureModels.COMMAND_TENT, zone: 'interior', weight: 2 },
+      { modelPath: StructureModels.AMMO_BUNKER, zone: 'interior', weight: 1 },
+      { modelPath: StructureModels.AID_STATION, zone: 'interior', weight: 1 },
+      { modelPath: StructureModels.GENERATOR_SHED, zone: 'interior', weight: 1 },
+      { modelPath: StructureModels.WATER_TOWER, zone: 'interior', weight: 1, registerCollision: true },
+      { modelPath: StructureModels.SUPPLY_CRATE, zone: 'interior', weight: 2 },
+      { modelPath: StructureModels.FUEL_DRUM, zone: 'interior', weight: 2 },
+      { modelPath: StructureModels.FIREBASE_GATE, zone: 'entrance', weight: 1 },
+    ],
+  },
+
+  us_medium: {
+    id: 'us_medium',
+    footprintRadius: 35,
+    structureCount: { min: 9, max: 13 },
+    zones: {
+      perimeter: { innerRadius: 24, outerRadius: 32 },
+      interior: { radius: 22 },
+      entrance: { angle: 0, width: 8 },
+    },
+    pool: [
+      { modelPath: StructureModels.GUARD_TOWER, zone: 'corner', weight: 4, registerCollision: true, facesOutward: true },
+      { modelPath: StructureModels.TOC_BUNKER, zone: 'interior', weight: 1, registerCollision: true },
+      { modelPath: StructureModels.BARRACKS_TENT, zone: 'interior', weight: 2 },
+      { modelPath: StructureModels.COMMAND_TENT, zone: 'interior', weight: 1 },
+      { modelPath: StructureModels.AMMO_BUNKER, zone: 'interior', weight: 1 },
+      { modelPath: StructureModels.AID_STATION, zone: 'interior', weight: 1 },
+      { modelPath: StructureModels.COMMS_TOWER, zone: 'interior', weight: 1, registerCollision: true },
+      { modelPath: StructureModels.WATER_TOWER, zone: 'interior', weight: 1, registerCollision: true },
+      { modelPath: StructureModels.GENERATOR_SHED, zone: 'interior', weight: 1 },
+      { modelPath: StructureModels.SUPPLY_CRATE, zone: 'interior', weight: 2 },
+      { modelPath: StructureModels.FUEL_DRUM, zone: 'interior', weight: 2 },
+      { modelPath: StructureModels.AMMO_CRATE, zone: 'interior', weight: 1 },
+      { modelPath: StructureModels.FIREBASE_GATE, zone: 'entrance', weight: 1 },
+    ],
+  },
+
+  us_large: {
+    id: 'us_large',
+    footprintRadius: 50,
+    structureCount: { min: 15, max: 21 },
+    zones: {
+      perimeter: { innerRadius: 35, outerRadius: 46 },
+      interior: { radius: 33 },
+      entrance: { angle: 0, width: 10 },
+    },
+    pool: [
+      { modelPath: StructureModels.GUARD_TOWER, zone: 'corner', weight: 5, registerCollision: true, facesOutward: true },
+      { modelPath: StructureModels.TOC_BUNKER, zone: 'interior', weight: 1, registerCollision: true },
+      { modelPath: StructureModels.BARRACKS_TENT, zone: 'interior', weight: 3 },
+      { modelPath: StructureModels.COMMAND_TENT, zone: 'interior', weight: 1 },
+      { modelPath: StructureModels.AMMO_BUNKER, zone: 'interior', weight: 2 },
+      { modelPath: StructureModels.AID_STATION, zone: 'interior', weight: 1 },
+      { modelPath: StructureModels.ARTILLERY_PIT, zone: 'interior', weight: 1, registerCollision: true },
+      { modelPath: StructureModels.COMMS_TOWER, zone: 'interior', weight: 1, registerCollision: true },
+      { modelPath: StructureModels.WATER_TOWER, zone: 'interior', weight: 1, registerCollision: true },
+      { modelPath: StructureModels.GENERATOR_SHED, zone: 'interior', weight: 2 },
+      { modelPath: StructureModels.MORTAR_PIT, zone: 'perimeter', weight: 2, registerCollision: true },
+      { modelPath: StructureModels.SUPPLY_CRATE, zone: 'interior', weight: 3 },
+      { modelPath: StructureModels.FUEL_DRUM, zone: 'interior', weight: 3 },
+      { modelPath: StructureModels.AMMO_CRATE, zone: 'interior', weight: 2 },
+      { modelPath: StructureModels.FIREBASE_GATE, zone: 'entrance', weight: 1 },
+      { modelPath: GroundVehicleModels.M35_TRUCK, zone: 'interior', weight: 1, registerCollision: true },
+    ],
+  },
+};
+
+export function getFirebaseTemplate(templateId: string): FirebaseTemplate | undefined {
+  return FIREBASE_TEMPLATES[templateId];
+}

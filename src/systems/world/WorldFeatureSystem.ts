@@ -12,6 +12,14 @@ import { getWorldFeaturePrefab } from './WorldFeaturePrefabs';
 const _rotatedOffset = new THREE.Vector3();
 const _upAxis = new THREE.Vector3(0, 1, 0);
 
+/**
+ * Global scale multiplier for placed structures.
+ * NPC billboards are 7 units tall (PlaneGeometry 5x7) but real structures
+ * are modeled at roughly 1:1 meter scale. This multiplier brings structures
+ * to a visually proportional size next to the oversized billboard soldiers.
+ */
+const STRUCTURE_SCALE = 2.5;
+
 interface SpawnedFeatureObject {
   id: string;
   object: THREE.Object3D;
@@ -101,8 +109,14 @@ export class WorldFeatureSystem implements GameSystem {
       const object = await modelLoader.loadModel(placement.modelPath);
       prepareModelForPlacement(object, placement.modelPath);
 
+      const profile = getModelPlacementProfile(placement.modelPath);
+
+      object.scale.multiplyScalar(STRUCTURE_SCALE);
       if (placement.uniformScale && placement.uniformScale !== 1) {
         object.scale.multiplyScalar(placement.uniformScale);
+      }
+      if (profile.displayScale !== undefined && profile.displayScale !== 1) {
+        object.scale.multiplyScalar(profile.displayScale);
       }
 
       _rotatedOffset.copy(placement.offset).applyAxisAngle(_upAxis, featureYaw);
@@ -121,8 +135,6 @@ export class WorldFeatureSystem implements GameSystem {
         }
       });
       this.scene.add(object);
-
-      const profile = getModelPlacementProfile(placement.modelPath);
       const objectId = `${feature.id}_${placement.id ?? i}`;
       const collisionRegistered = placement.registerCollision === true && profile.collisionMode === 'bounds';
       if (collisionRegistered) {

@@ -894,13 +894,13 @@ describe('SandbagSystem', () => {
       expect(sandbagSystem.placeSandbag()).toBe(true);
       await flushPromises();
 
-      // Try at 2 units away (should fail)
-      camera.position.set(2, 5, 0);
+      // Try at 3 units away (should fail - minSpacing is 4.3)
+      camera.position.set(3, 5, 0);
       sandbagSystem.updatePreviewPosition(camera);
       expect(sandbagSystem.placeSandbag()).toBe(false);
 
       // Try just beyond the normalized spacing threshold (should succeed)
-      camera.position.set(2.5, 5, 0);
+      camera.position.set(5, 5, 0);
       sandbagSystem.updatePreviewPosition(camera);
       expect(sandbagSystem.placeSandbag()).toBe(true);
     });
@@ -914,18 +914,18 @@ describe('SandbagSystem', () => {
       sandbagSystem.placeSandbag();
       await flushPromises();
 
-      // Test spacing in +X direction
-      camera.position.set(2, 5, 0);
+      // Test spacing in +X direction (4 < minSpacing 4.3)
+      camera.position.set(4, 5, 0);
       sandbagSystem.updatePreviewPosition(camera);
       expect(sandbagSystem.placeSandbag()).toBe(false);
 
       // Test spacing in +Z direction
-      camera.position.set(0, 5, 2);
+      camera.position.set(0, 5, 4);
       sandbagSystem.updatePreviewPosition(camera);
       expect(sandbagSystem.placeSandbag()).toBe(false);
 
-      // Test spacing diagonally (1.5, 1.5) = ~2.12 < minSpacing 2.15
-      camera.position.set(1.5, 5, 1.5);
+      // Test spacing diagonally (3, 3) = ~4.24 < minSpacing 4.3
+      camera.position.set(3, 5, 3);
       sandbagSystem.updatePreviewPosition(camera);
       expect(sandbagSystem.placeSandbag()).toBe(false);
     });

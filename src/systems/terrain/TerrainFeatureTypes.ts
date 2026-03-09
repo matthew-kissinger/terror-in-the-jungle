@@ -19,7 +19,7 @@ export interface ResolvedFlattenCircleTerrainStamp extends FlattenCircleTerrainS
 export type TerrainStampConfig = FlattenCircleTerrainStamp;
 export type ResolvedTerrainStampConfig = ResolvedFlattenCircleTerrainStamp;
 
-export type TerrainSurfaceKind = 'packed_earth' | 'runway';
+export type TerrainSurfaceKind = 'packed_earth' | 'runway' | 'dirt_road' | 'gravel_road' | 'jungle_trail';
 export type TerrainSurfacePatchShape = 'circle' | 'rect';
 
 export interface CircleTerrainSurfacePatch {

@@ -10,13 +10,15 @@ const _v1 = new THREE.Vector3();
 
 import { icon as iconUrl } from '../icons/IconRegistry';
 
-let helipadIcon: HTMLImageElement | null = null;
-function getHelipadIcon(): HTMLImageElement {
-  if (!helipadIcon) {
-    helipadIcon = new Image();
-    helipadIcon.src = iconUrl('map-helipad');
+// Lazy-loaded icon cache for canvas drawImage
+const iconCache: Record<string, HTMLImageElement> = {};
+function getIcon(name: string): HTMLImageElement {
+  if (!iconCache[name]) {
+    const img = new Image();
+    img.src = iconUrl(name);
+    iconCache[name] = img;
   }
-  return helipadIcon;
+  return iconCache[name];
 }
 
 export type HelipadMarker = {
@@ -119,10 +121,20 @@ function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: Minim
   ctx.lineWidth = 2 * renderScale;
   ctx.stroke();
 
-  if (zone.isHomeBase) {
+  // Zone center marker: icon with canvas fallback
+  const markerIconName = zone.isHomeBase ? 'map-firebase' : 'map-zone-flag';
+  const markerIcon = getIcon(markerIconName);
+  const markerSize = (zone.isHomeBase ? 12 : 10) * renderScale;
+
+  if (markerIcon.complete && markerIcon.naturalWidth > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(markerIcon, x - markerSize / 2, y - markerSize / 2, markerSize, markerSize);
+    ctx.restore();
+  } else if (zone.isHomeBase) {
     ctx.fillStyle = zone.state === ZoneState.BLUFOR_CONTROLLED ? 'rgba(91, 140, 201, 0.9)' : 'rgba(201, 86, 74, 0.9)';
-    const baseSize = 12 * renderScale;
-    ctx.fillRect(x - baseSize / 2, y - baseSize / 2, baseSize, baseSize);
+    ctx.fillRect(x - markerSize / 2, y - markerSize / 2, markerSize, markerSize);
   } else {
     ctx.beginPath();
     ctx.moveTo(x, y - 8 * renderScale);
@@ -134,7 +146,7 @@ function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: Minim
   }
 
   ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-  ctx.font = `${Math.round(10 * renderScale)}px Rajdhani`;
+  ctx.font = `${Math.round(10 * renderScale)}px Rajdhani, sans-serif`;
   ctx.textAlign = 'center';
   ctx.fillText(zone.name, x, y + zoneRadius + 12 * renderScale);
 
@@ -170,13 +182,27 @@ function drawCombatantIndicators(ctx: CanvasRenderingContext2D, state: MinimapRe
 
     const isPlayerSquad = combatant.squadId === state.playerSquadId && isBlufor(combatant.faction);
     if (isPlayerSquad) {
-      ctx.fillStyle = 'rgba(92, 184, 92, 0.8)';
+      // Squad members get a distinct icon
+      const squadIcon = getIcon('map-squad-member');
+      const sqIconSize = 6 * renderScale;
+      if (squadIcon.complete && squadIcon.naturalWidth > 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.85;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(squadIcon, x - sqIconSize / 2, y - sqIconSize / 2, sqIconSize, sqIconSize);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = 'rgba(92, 184, 92, 0.8)';
+        ctx.beginPath();
+        ctx.arc(x, y, 2 * renderScale, 0, Math.PI * 2);
+        ctx.fill();
+      }
     } else {
       ctx.fillStyle = isBlufor(combatant.faction) ? 'rgba(91, 140, 201, 0.6)' : 'rgba(201, 86, 74, 0.6)';
+      ctx.beginPath();
+      ctx.arc(x, y, 2 * renderScale, 0, Math.PI * 2);
+      ctx.fill();
     }
-    ctx.beginPath();
-    ctx.arc(x, y, 2 * renderScale, 0, Math.PI * 2);
-    ctx.fill();
   });
 }
 
@@ -231,15 +257,25 @@ function drawStrategicAgents(ctx: CanvasRenderingContext2D, state: MinimapRender
 function drawPlayer(ctx: CanvasRenderingContext2D, size: number, renderScale: number): void {
   const centerX = size / 2;
   const centerY = size / 2;
+  const playerIcon = getIcon('map-player');
+  const iconSize = 10 * renderScale;
 
-  ctx.fillStyle = 'rgba(220, 225, 230, 0.95)';
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, 4 * renderScale, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = 'rgba(220, 225, 230, 0.95)';
-  ctx.lineWidth = 2 * renderScale;
-  ctx.stroke();
+  if (playerIcon.complete && playerIcon.naturalWidth > 0) {
+    ctx.save();
+    ctx.globalAlpha = 0.95;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(playerIcon, centerX - iconSize / 2, centerY - iconSize / 2, iconSize, iconSize);
+    ctx.restore();
+  } else {
+    // Fallback: circle
+    ctx.fillStyle = 'rgba(220, 225, 230, 0.95)';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 4 * renderScale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(220, 225, 230, 0.95)';
+    ctx.lineWidth = 2 * renderScale;
+    ctx.stroke();
+  }
 }
 
 function drawViewCone(ctx: CanvasRenderingContext2D, camera: THREE.Camera, size: number, renderScale: number): void {
@@ -336,7 +372,7 @@ function drawHelipadMarkers(ctx: CanvasRenderingContext2D, state: MinimapRenderS
     ctx.stroke();
 
     // Helipad icon or fallback H letter
-    const icon = getHelipadIcon();
+    const icon = getIcon('map-helipad');
     if (icon.complete && icon.naturalWidth > 0) {
       const imgSize = iconSize * 1.5;
       ctx.save();
@@ -346,7 +382,7 @@ function drawHelipadMarkers(ctx: CanvasRenderingContext2D, state: MinimapRenderS
       ctx.restore();
     } else {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-      ctx.font = `bold ${Math.round(10 * renderScale)}px Rajdhani`;
+      ctx.font = `bold ${Math.round(10 * renderScale)}px Rajdhani, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('H', x, y);

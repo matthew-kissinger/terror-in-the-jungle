@@ -1,5 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
+
+// Image is not available in non-jsdom test environments; stub before module import
+if (typeof globalThis.Image === 'undefined') {
+  globalThis.Image = class MockImage {
+    src = '';
+    complete = false;
+    naturalWidth = 0;
+  } as unknown as typeof Image;
+}
+
 import { renderMinimap } from './MinimapRenderer';
 
 function createMockCtx() {
@@ -12,6 +22,7 @@ function createMockCtx() {
     lineWidth: 1,
     font: '',
     textAlign: 'center',
+    textBaseline: 'alphabetic',
     fillRect: vi.fn(),
     beginPath: vi.fn(),
     moveTo: vi.fn(),

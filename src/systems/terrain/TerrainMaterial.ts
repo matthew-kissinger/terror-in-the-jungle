@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { SplatmapConfig } from './TerrainConfig';
-import type { TerrainSurfacePatch } from './TerrainFeatureTypes';
+import type { TerrainSurfaceKind, TerrainSurfacePatch } from './TerrainFeatureTypes';
 
 const MAX_BIOME_TEXTURES = 8;
 const MAX_BIOME_RULES = 8;
@@ -332,6 +332,24 @@ vec3 applyFeatureSurfaceColor(vec3 color, vec2 worldPos) {
     color = mix(color, runwayColor, runwayWeight * 0.82);
   }
 
+  float dirtRoadWeight = featureSurfaceWeight(3.0, worldPos);
+  if (dirtRoadWeight > 0.001) {
+    vec3 dirtRoadColor = vec3(0.45, 0.35, 0.22);
+    color = mix(color, dirtRoadColor, dirtRoadWeight * 0.70);
+  }
+
+  float gravelRoadWeight = featureSurfaceWeight(4.0, worldPos);
+  if (gravelRoadWeight > 0.001) {
+    vec3 gravelRoadColor = vec3(0.48, 0.44, 0.38);
+    color = mix(color, gravelRoadColor, gravelRoadWeight * 0.75);
+  }
+
+  float jungleTrailWeight = featureSurfaceWeight(5.0, worldPos);
+  if (jungleTrailWeight > 0.001) {
+    vec3 jungleTrailColor = vec3(0.32, 0.26, 0.18);
+    color = mix(color, jungleTrailColor, jungleTrailWeight * 0.50);
+  }
+
   return color;
 }
 `;
@@ -405,6 +423,18 @@ if (packedEarthWeight > 0.001) {
 float runwayWeight = featureSurfaceWeight(2.0, vWorldPosition.xz);
 if (runwayWeight > 0.001) {
   roughnessSample = mix(roughnessSample, 0.82, runwayWeight);
+}
+float dirtRoadWeightR = featureSurfaceWeight(3.0, vWorldPosition.xz);
+if (dirtRoadWeightR > 0.001) {
+  roughnessSample = mix(roughnessSample, 0.94, dirtRoadWeightR);
+}
+float gravelRoadWeightR = featureSurfaceWeight(4.0, vWorldPosition.xz);
+if (gravelRoadWeightR > 0.001) {
+  roughnessSample = mix(roughnessSample, 0.90, gravelRoadWeightR);
+}
+float jungleTrailWeightR = featureSurfaceWeight(5.0, vWorldPosition.xz);
+if (jungleTrailWeightR > 0.001) {
+  roughnessSample = mix(roughnessSample, 0.95, jungleTrailWeightR);
 }
 roughnessFactor *= roughnessSample;
 `;
@@ -571,6 +601,17 @@ function applyTerrainMaterialOptions(
   };
 }
 
+function surfaceKindToShaderId(kind: TerrainSurfaceKind): number {
+  switch (kind) {
+    case 'packed_earth': return 1.0;
+    case 'runway': return 2.0;
+    case 'dirt_road': return 3.0;
+    case 'gravel_road': return 4.0;
+    case 'jungle_trail': return 5.0;
+    default: return 1.0;
+  }
+}
+
 function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Record<string, { value: unknown }> } {
   const { heightTexture, normalTexture, worldSize, biomeConfig, splatmap } = options;
   const layers = biomeConfig.layers;
@@ -646,7 +687,7 @@ function createShaderBindings(options: TerrainMaterialOptions): { uniforms: Reco
 
     featureSurfaceX[i] = patch.x;
     featureSurfaceZ[i] = patch.z;
-    featureSurfaceType[i] = patch.surface === 'runway' ? 2 : 1;
+    featureSurfaceType[i] = surfaceKindToShaderId(patch.surface);
     if (patch.shape === 'circle') {
       featureSurfaceShape[i] = 1;
       featureSurfaceInnerRadius[i] = patch.innerRadius;

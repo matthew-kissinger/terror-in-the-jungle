@@ -14,7 +14,7 @@ describe('prepareModelForPlacement', () => {
 
     const prepared = prepareModelForPlacement(group, StructureModels.SANDBAG_WALL);
 
-    expect(prepared.size.y).toBeCloseTo(1.4, 2);
+    expect(prepared.size.y).toBeCloseTo(2.8, 2);
     expect(prepared.bounds.min.y).toBeCloseTo(0, 4);
     expect(prepared.bounds.getCenter(new THREE.Vector3()).x).toBeCloseTo(0, 4);
     expect(prepared.bounds.getCenter(new THREE.Vector3()).z).toBeCloseTo(0, 4);
