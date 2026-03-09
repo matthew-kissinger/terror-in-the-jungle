@@ -3,7 +3,6 @@ import { Logger } from '../../utils/Logger';
 import { CombatantState } from '../combat/types';
 import type { Combatant } from '../combat/types';
 import type { VehicleManager } from './VehicleManager';
-import type { IVehicle } from './IVehicle';
 
 const BOARD_RANGE = 5; // meters - NPC must be within this to board
 const DISMOUNT_DELAY = 0.5; // seconds of dismount animation

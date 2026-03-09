@@ -1,6 +1,6 @@
 # Next Work
 
-Last updated: 2026-03-09
+Last updated: 2026-03-10
 Status: ACTIVE - iterate top-down, check off items, update docs as fixes land
 
 ## How To Use This File
@@ -275,7 +275,29 @@ Doc updates:
 - [ ] Single-layer smoothing (remove PlayerMovement lerp)
 - [ ] Altitude lock key
 
-### 4.3 Sandbox test infrastructure (Roadmap Phase 1.5)
+### 4.3 Structure scale + procedural world generation
+- [x] STRUCTURE_SCALE 2.0->2.5 with per-category displayScale (props at 0.5x)
+- [x] Prefab layout offsets rescaled 1.25x for proper spacing
+- [x] Procedural firebase generator (3 templates: us_small/medium/large)
+- [x] Procedural airfield generator (2 templates: us_airbase/forward_strip)
+- [ ] Wire procedural generators into WorldFeaturePrefabs (replace hardcoded layouts)
+- [ ] Add airfield features to Open Frontier / A Shau mode configs
+
+### 4.4 Fixed-wing aircraft + NPC pilots
+- [x] FixedWingPhysics: lift/drag/stall/bank-and-pull turns, ground roll
+- [x] FixedWingConfigs: AC-47 Spooky, F-4 Phantom, A-1 Skyraider
+- [x] NPCPilotAI: 7-state FSM (idle/takeoff/fly_to/orbit/attack_run/rtb/landing)
+- [x] NPCPilotManager: registry with VehicleStateProvider interface
+- [ ] Wire NPCPilotManager into SystemUpdater + SystemConnector
+- [ ] Wire FixedWingPhysics into VehicleManager for player-pilotable fixed-wing
+- [ ] NPC helicopter transport missions (takeoff, fly to LZ, deploy squad, RTB)
+
+### 4.5 Road surface types
+- [x] TerrainSurfaceKind: dirt_road, gravel_road, jungle_trail in shader
+- [ ] Road network generation (splines, intersections, pathfinding)
+- [ ] Road surface patches in mode configs for connecting firebases/villages
+
+### 4.6 Sandbox test infrastructure (Roadmap Phase 1.5)
 - [ ] System toggle debug panel
 - [ ] Asset preview block
 - [ ] Terrain sandbox
@@ -333,3 +355,4 @@ Record completed items here with date and commit hash.
 | 2026-03-09 | Helicopter tactical insertion | - | SquadDeployFromHelicopter: G key deploy, altitude(<15m)/speed(<5m/s)/30s cooldown checks, 4 terrain-snapped positions; HUD prompt; 18 tests |
 | 2026-03-09 | UI/UX overhaul (7 phases) | - | BaseTouchButton refactor (-128 lines), joystickMath utility, WeaponIconRegistry (13 types), KillFeed CSS module + animations, FocusTrap, modal a11y (ARIA/fieldsets/Escape), HelicopterHUD flight instruments (airspeed/heading/VSI/weapon/damage), CrosshairSystem (4 modes), AircraftWeaponMount configs, OnboardingOverlay (5-page opt-in tutorial), mobile gestures (swipe weapons, ADS hold, crouch, haptics, grenade quick-throw, minimap pinch zoom), UI icon manifest |
 | 2026-03-10 | Icon integration + IconRegistry | - | 50 pixel-art PNG icons wired into UI. Centralized IconRegistry (`src/ui/icons/IconRegistry.ts`) replaces scattered `import.meta.env.BASE_URL` paths across 16 files. Old WeaponIconRegistry deleted. All touch buttons use icon images. Kill feed has kill-arrow + headshot icons. Faction emblems on start screen. Hint icons in onboarding. Compass needle + helicopter reticles wired. 3398 tests passing. |
+| 2026-03-10 | Structure scale + procedural gen | ce9464b | STRUCTURE_SCALE 2.0->2.5 with displayScale (props 0.5x). Procedural firebase (3 templates) + airfield (2 templates) generators. Fixed-wing physics (AC-47/F-4/A-1). NPC pilot AI (7-state FSM). Road surface types (dirt/gravel/jungle_trail). 44 new tests, 3442 total. |

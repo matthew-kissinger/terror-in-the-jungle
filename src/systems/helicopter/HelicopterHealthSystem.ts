@@ -43,7 +43,7 @@ export class HelicopterHealthSystem {
     if (!h || h.isDestroyed) return;
 
     h.current = Math.max(0, h.current - damage);
-    const percent = h.current / h.max;
+    const _percent = h.current / h.max;
 
     Logger.debug('helicopter', `${heliId} took ${damage.toFixed(0)} damage (${h.current.toFixed(0)}/${h.max} HP)`);
 

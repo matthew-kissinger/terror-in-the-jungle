@@ -1,6 +1,6 @@
 # Project Notes
 
-Last updated: 2026-03-09
+Last updated: 2026-03-10
 
 ## Project
 
@@ -44,6 +44,8 @@ npm run perf:update-baseline  # update baseline from latest capture
 - Navigation: `src/systems/navigation/*` (navmesh, crowd, movement adapter)
 - Strategy (A Shau): `src/systems/strategy/*`
 - Terrain: `src/systems/terrain/*`
+- Vehicles: `src/systems/vehicle/*` (IVehicle, FixedWingPhysics, NPCPilotAI, NPCPilotManager)
+- World features: `src/systems/world/*` (WorldFeatureSystem, FirebaseLayoutGenerator, AirfieldLayoutGenerator)
 - Harness: `scripts/perf-capture.ts`, `scripts/perf-analyze-latest.ts`, `scripts/perf-compare.ts`
 - UI: `src/ui/hud/` (HUD, KillFeed, CrosshairSystem, HelicopterHUD), `src/ui/controls/` (touch buttons, BaseTouchButton), `src/ui/icons/` (IconRegistry), `src/ui/onboarding/`, `src/ui/loading/` (start screen, modals), `src/ui/engine/` (UIComponent, FocusTrap)
 - Integration tests: `src/integration/harness/`, `src/integration/scenarios/`
@@ -63,7 +65,8 @@ npm run perf:update-baseline  # update baseline from latest capture
 10. Architecture + features pass (2026-03-09): 7 `any` types fixed in SystemInterfaces, `import/no-cycle` ESLint rule, deferred init timeout (15s), SpawnPointSelector extracted (PlayerRespawnManager 857->594 lines), GameEventBus (typed, queue-and-flush), SpectatorCamera (post-death follow cam), MissionBriefing (A Shau overlay), SquadDeployFromHelicopter (G key tactical insertion from helicopter), shared test utilities (`src/test-utils/`), InputContextManager+InputManager tests. CI perf job gates deploy. 3159 tests passing.
 11. UI/UX overhaul (2026-03-09): BaseTouchButton shared pointer handling (-128 lines net across 6 buttons), joystickMath dead-zone utility, KillFeed refactored to CSS module with slide-out/streak-glow animations, FocusTrap utility for modals, SettingsModal/HowToPlayModal accessibility (ARIA, fieldsets, Escape-to-close, helicopter controls section, graphics quality descriptions), HelicopterHUD flight instruments (airspeed/heading/VSI/weapon status/damage bar), CrosshairSystem replaces CrosshairUI (4 modes: infantry/helicopter_transport/gunship/attack pipper), AircraftWeaponMount configs, OnboardingOverlay (5-page opt-in tutorial from start screen), mobile gestures (weapon swipe, ADS hold mode, crouch button, haptic feedback, grenade quick-throw, minimap pinch zoom).
 12. Icon integration (2026-03-10): 50 pixel-art PNG icons (252KB) in `public/assets/ui/icons/`. Centralized `IconRegistry` (`src/ui/icons/IconRegistry.ts`) with `icon()`, `iconImg()`, `iconHtml()`, weapon icon lookups. All 16 UI consumers migrated from scattered `import.meta.env.BASE_URL` paths. Old `WeaponIconRegistry` deleted. Touch buttons, kill feed, helicopter HUD, crosshair reticles, faction emblems, onboarding hints, minimap markers all use PNG icons. `scripts/optimize-icons.mjs` handles optimization. Icon manifest at `docs/UI_ICON_MANIFEST.md`. 3398 tests passing.
-13. See `docs/NEXT_WORK.md` for the active checklist.
+13. Structure scale + procedural generation + vehicle systems (2026-03-10): STRUCTURE_SCALE 2.0->2.5 with per-category displayScale (props at 0.5x). Procedural firebase generator (3 templates, seeded RNG, zone-based). Procedural airfield generator (runway/taxiway surface patches). Fixed-wing flight physics (lift/drag/stall/bank-and-pull, AC-47/F-4/A-1 configs). NPC pilot AI (7-state FSM with PD controllers). Road surface types (dirt_road/gravel_road/jungle_trail) in terrain shader. 3442 tests passing.
+14. See `docs/NEXT_WORK.md` for the active checklist.
 
 ## Documentation Contract
 

@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import type { AirSupportMission } from './AirSupportTypes';
 import type { CombatantSystem } from '../combat/CombatantSystem';
 import { GameEventBus } from '../../core/GameEventBus';

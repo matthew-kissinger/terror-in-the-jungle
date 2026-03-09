@@ -1,6 +1,6 @@
 # Architecture Recovery Plan
 
-Last updated: 2026-03-08
+Last updated: 2026-03-10
 Scope: runtime architecture stabilization with performance and gameplay fidelity gates.
 
 ## Current Goal
@@ -102,6 +102,11 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: `TerrainMaterial.applyTerrainMaterialOptions()` updates existing shader uniform values in place (not replacing objects) on subsequent calls to preserve compiled shader references. First call creates uniforms and sets up `onBeforeCompile`; later calls only update `.value` fields.
 - Keep: Vegetation cell bounds check in `VegetationScatterer.generateCell()` limits scatter to `worldHalfExtent + visualMargin`, matching the terrain render overflow. Player can't walk there; it's visual filler only.
 - Keep: Helipad creation no longer has a synthetic fallback pad. Vehicle systems only activate when the active `GameModeConfig` explicitly declares `helipads`. Modes that omit helipads pay zero hidden vehicle cost and no longer mask config errors.
+- Keep: `STRUCTURE_SCALE = 2.5` with per-category `displayScale` override in `ModelPlacementProfile`. Props (FUEL_DRUM, SUPPLY_CRATE, AMMO_CRATE, WOODEN_BARREL) at `displayScale: 0.5` to avoid oversized props while buildings/towers get full scale. All 19 prefab layout offsets rescaled by 1.25x (2.5/2.0) to maintain proper spacing.
+- Keep: Procedural firebase/airfield generators (`FirebaseLayoutGenerator`, `AirfieldLayoutGenerator`) using seeded PRNG (mulberry32), zone-based placement, and minimum spacing enforcement. Templates define structure pools with weights; generators produce `StaticModelPlacementConfig[]` compatible with existing `WorldFeatureSystem.spawnFeature()`. Generated once at mode init, cached (0ms runtime cost).
+- Keep: `FixedWingPhysics` as standalone physics module for fixed-wing aircraft. Speed-based lift (`L = 0.5 * rho * v^2 * S * Cl`), drag proportional to v^2, stall below aircraft-specific speed, bank-and-pull turns. Three aircraft configs (AC-47 Spooky, F-4 Phantom, A-1 Skyraider) with distinct flight envelopes. Same quaternion integration pattern as `HelicopterPhysics`.
+- Keep: `NPCPilotAI` as FSM with PD controllers for autonomous helicopter flight. 7 states (idle/takeoff/fly_to/orbit/attack_run/rtb/landing). `NPCPilotManager` decoupled from concrete vehicle systems via `VehicleStateProvider` interface. Not yet wired into SystemUpdater/SystemConnector (runtime integration deferred).
+- Keep: Road surface types (`dirt_road`, `gravel_road`, `jungle_trail`) as shader-only additions in `TerrainMaterial.ts`. No runtime cost; surface patches use existing `TerrainSurfacePatch` system. Road network generation (splines, intersections) deferred to future session.
 - Keep: perf diagnostics are gated behind `import.meta.env.DEV` and `?perf=1`. Harness-only globals, renderer counters, and user-timing spans must stay out of production bundles.
 - Keep: `GameRenderer` captures per-frame `renderer.info` stats for perf harness sampling; this is harness evidence, not shipping HUD/debug behavior.
 - Keep: player death accounting is single-source in `PlayerHealthSystem`; `CombatantDamage` no longer applies a second HUD death increment for player-proxy lethal events.
