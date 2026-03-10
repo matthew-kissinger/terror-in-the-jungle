@@ -56,6 +56,7 @@ function createMockTerrainSystem(heightAt: (x: number, z: number) => number): IT
   return {
     getHeightAt: vi.fn(heightAt),
     getEffectiveHeightAt: vi.fn(heightAt),
+    getSlopeAt: vi.fn(() => 0),
     getPlayableWorldSize: vi.fn(() => 1000),
     getWorldSize: vi.fn(() => 1000),
     isTerrainReady: vi.fn(() => true),

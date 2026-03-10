@@ -30,6 +30,20 @@ import type { MissionBriefingInfo } from '../../ui/loading/MissionBriefing';
 import { DeployFlowController } from './DeployFlowController';
 import { InitialDeployCancelledError } from './InitialDeployCancelledError';
 
+interface PlayerRespawnManagerDependencies {
+  playerHealthSystem: PlayerHealthSystem;
+  zoneManager: ZoneManager;
+  gameModeManager: GameModeManager;
+  playerController: IPlayerController;
+  firstPersonWeapon: IFirstPersonWeapon;
+  inventoryManager: InventoryManager;
+  loadoutService: LoadoutService;
+  grenadeSystem: GrenadeSystem;
+  warSimulator: WarSimulator;
+  terrainSystem: ITerrainRuntime;
+  helipadSystem: HelipadSystem;
+}
+
 export class PlayerRespawnManager implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.Camera;
@@ -150,6 +164,20 @@ export class PlayerRespawnManager implements GameSystem {
     }
     this.respawnUI.dispose();
     this.mapController.dispose();
+  }
+
+  configureDependencies(dependencies: PlayerRespawnManagerDependencies): void {
+    this.setPlayerHealthSystem(dependencies.playerHealthSystem);
+    this.setZoneManager(dependencies.zoneManager);
+    this.setGameModeManager(dependencies.gameModeManager);
+    this.setPlayerController(dependencies.playerController);
+    this.setFirstPersonWeapon(dependencies.firstPersonWeapon);
+    this.setInventoryManager(dependencies.inventoryManager);
+    this.setLoadoutService(dependencies.loadoutService);
+    this.setGrenadeSystem(dependencies.grenadeSystem);
+    this.setWarSimulator(dependencies.warSimulator);
+    this.setTerrainSystem(dependencies.terrainSystem);
+    this.setHelipadSystem(dependencies.helipadSystem);
   }
 
   setZoneManager(manager: ZoneManager): void {

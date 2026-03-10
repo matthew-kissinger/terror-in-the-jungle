@@ -3,7 +3,7 @@ import type { GameSystem } from '../../types';
 import { Logger } from '../../utils/Logger';
 import { modelLoader } from '../assets/ModelLoader';
 import { AnimalModels } from '../assets/modelPaths';
-import { getHeightQueryCache } from '../terrain/HeightQueryCache';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
 /**
  * Ambient wildlife system. Spawns small groups of animals near the player
@@ -59,6 +59,7 @@ interface AnimalCell {
 export class AnimalSystem implements GameSystem {
   private scene: THREE.Scene;
   private camera: THREE.PerspectiveCamera;
+  private terrainSystem?: ITerrainRuntime;
 
   private templates: Map<AnimalKind, THREE.Group> = new Map();
   private activeCells: Map<string, AnimalCell> = new Map();
@@ -69,6 +70,10 @@ export class AnimalSystem implements GameSystem {
   constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
     this.scene = scene;
     this.camera = camera;
+  }
+
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
   }
 
   async init(): Promise<void> {
@@ -157,7 +162,6 @@ export class AnimalSystem implements GameSystem {
 
     const baseX = cellX * CELL_SIZE;
     const baseZ = cellZ * CELL_SIZE;
-    const cache = getHeightQueryCache();
     const animals: SpawnedAnimal[] = [];
 
     // Deterministic seed per cell for repeatable placement
@@ -181,7 +185,7 @@ export class AnimalSystem implements GameSystem {
 
       const wx = baseX + lx;
       const wz = baseZ + lz;
-      const wy = cache.getHeightAt(wx, wz);
+      const wy = this.getTerrainHeight(wx, wz);
 
       // Skip positions below the animal's minimum height threshold
       if (wy < cfg.minHeight) continue;
@@ -248,8 +252,6 @@ export class AnimalSystem implements GameSystem {
   }
 
   private updateWander(dt: number): void {
-    const cache = getHeightQueryCache();
-
     for (const cell of this.activeCells.values()) {
       for (const animal of cell.animals) {
         if (animal.wanderSpeed <= 0) continue;
@@ -276,7 +278,7 @@ export class AnimalSystem implements GameSystem {
           continue;
         }
 
-        const nextY = cache.getHeightAt(nextX, nextZ);
+        const nextY = this.getTerrainHeight(nextX, nextZ);
         if (nextY < 0.2) {
           // Would walk underwater; reverse
           animal.wanderAngle += Math.PI;
@@ -305,5 +307,9 @@ export class AnimalSystem implements GameSystem {
     state ^= state >> 17;
     state ^= state << 5;
     return state >>> 0;
+  }
+
+  private getTerrainHeight(x: number, z: number): number {
+    return this.terrainSystem?.getHeightAt(x, z) ?? 0;
   }
 }

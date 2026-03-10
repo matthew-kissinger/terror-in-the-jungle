@@ -149,7 +149,6 @@ export class CombatantRenderer {
 
     combatants.forEach(combatant => {
       if (combatant.state === CombatantState.DEAD && !combatant.isDying) return;
-      if (combatant.isPlayerProxy) return;
       if (combatant.position.distanceToSquared(playerPosition) > RENDER_DISTANCE_SQ) return;
 
       // Compute NPC forward direction

@@ -35,25 +35,30 @@ export function updateSpooky(
   audioManager: IAudioManager | undefined,
   tracerPool: TracerPool | undefined,
   getTerrainHeight: (x: number, z: number) => number,
+  physicsControlled = false,
 ): void {
   const { aircraft, targetPosition } = mission;
-  const speed = 40; // m/s orbital speed
 
-  // Advance orbit angle
-  const angularSpeed = speed / ORBIT_RADIUS;
-  mission.missionData.orbitAngle += angularSpeed * dt;
-  const angle = mission.missionData.orbitAngle;
+  // Flight positioning: skip if physics controller is handling it
+  if (!physicsControlled) {
+    const speed = 40; // m/s orbital speed
 
-  // Position aircraft on orbit circle
-  aircraft.position.x = targetPosition.x + ORBIT_RADIUS * Math.cos(angle);
-  aircraft.position.z = targetPosition.z + ORBIT_RADIUS * Math.sin(angle);
+    // Advance orbit angle
+    const angularSpeed = speed / ORBIT_RADIUS;
+    mission.missionData.orbitAngle += angularSpeed * dt;
+    const angle = mission.missionData.orbitAngle;
 
-  // Terrain-following altitude
-  const terrainH = getTerrainHeight(aircraft.position.x, aircraft.position.z);
-  aircraft.position.y = terrainH + 300;
+    // Position aircraft on orbit circle
+    aircraft.position.x = targetPosition.x + ORBIT_RADIUS * Math.cos(angle);
+    aircraft.position.z = targetPosition.z + ORBIT_RADIUS * Math.sin(angle);
 
-  // Face tangent to orbit (left pylon turn)
-  aircraft.rotation.set(0, angle + Math.PI / 2, -BANK_ANGLE);
+    // Terrain-following altitude
+    const terrainH = getTerrainHeight(aircraft.position.x, aircraft.position.z);
+    aircraft.position.y = terrainH + 300;
+
+    // Face tangent to orbit (left pylon turn)
+    aircraft.rotation.set(0, angle + Math.PI / 2, -BANK_ANGLE);
+  }
 
   // Weapon fire logic
   mission.missionData.nextBurstAt -= dt;

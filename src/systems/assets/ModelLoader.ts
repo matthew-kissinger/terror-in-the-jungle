@@ -8,6 +8,8 @@ interface LoadedModel {
   animations: THREE.AnimationClip[];
 }
 
+const SHARED_MODEL_INSTANCE_KEY = '__sharedModelInstance';
+
 /**
  * Loads and caches GLB/GLTF 3D models.
  * All models use flat shading and Y-up coordinate system.
@@ -20,11 +22,16 @@ export class ModelLoader {
   /**
    * Load a GLB model by its relative path under public/models/.
    * Returns a clone of the cached scene so each caller gets an independent instance.
+   * The clone shares geometry/material references with the cached source scene.
+   * Use disposeInstance() when removing a clone from the world.
    * Example: loadModel('weapons/m16a1.glb')
    */
   async loadModel(relativePath: string): Promise<THREE.Group> {
     const model = await this.loadModelRaw(relativePath);
-    return model.scene.clone();
+    const instance = model.scene.clone();
+    instance.userData[SHARED_MODEL_INSTANCE_KEY] = true;
+    instance.userData.modelPath = relativePath;
+    return instance;
   }
 
   /**
@@ -97,6 +104,15 @@ export class ModelLoader {
    */
   isCached(relativePath: string): boolean {
     return this.cache.has(relativePath);
+  }
+
+  disposeInstance(instance: THREE.Object3D): void {
+    instance.removeFromParent();
+    delete instance.userData[SHARED_MODEL_INSTANCE_KEY];
+  }
+
+  isSharedInstance(instance: THREE.Object3D): boolean {
+    return instance.userData[SHARED_MODEL_INSTANCE_KEY] === true;
   }
 
   dispose(): void {

@@ -240,6 +240,14 @@ export class TerrainSystem implements GameSystem {
     return this.terrainQueries.getEffectiveHeightAt(x, z);
   }
 
+  getSlopeAt(x: number, z: number): number {
+    return this.terrainQueries.getSlopeAt(x, z);
+  }
+
+  getNormalAt(x: number, z: number, target?: THREE.Vector3): THREE.Vector3 {
+    return this.terrainQueries.getNormalAt(x, z, target);
+  }
+
   // ──── Collision objects ────
 
   registerCollisionObject(id: string, object: THREE.Object3D): void {

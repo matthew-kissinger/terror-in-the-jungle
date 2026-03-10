@@ -33,6 +33,7 @@ export class WarSimulator implements GameSystem {
   // State
   private enabled = false;
   private config: WarSimulatorConfig | null = null;
+  private currentGameMode = 'zone_control';
   private agents: Map<string, StrategicAgent> = new Map();
   private squads: Map<string, StrategicSquad> = new Map();
   private elapsedTime = 0;
@@ -427,6 +428,10 @@ export class WarSimulator implements GameSystem {
     this.influenceMap = system;
   }
 
+  setCurrentGameMode(gameMode: string): void {
+    this.currentGameMode = gameMode;
+  }
+
   // -- Queries --
 
   getAllSquads(): Map<string, StrategicSquad> {
@@ -489,7 +494,7 @@ export class WarSimulator implements GameSystem {
     return {
       schemaVersion: WAR_STATE_SCHEMA_VERSION,
       timestamp: Date.now(),
-      gameMode: 'a_shau_valley',
+      gameMode: this.currentGameMode,
       elapsedTime: this.elapsedTime,
       agents: Array.from(this.agents.values()),
       squads: Array.from(this.squads.values()),

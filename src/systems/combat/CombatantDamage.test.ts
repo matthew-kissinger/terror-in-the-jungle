@@ -66,7 +66,6 @@ function createMockCombatant(
   faction: Faction,
   health: number,
   state: CombatantState = CombatantState.IDLE,
-  isPlayerProxy: boolean = false,
   squadId?: string
 ): Combatant {
   return createTestCombatant({
@@ -74,7 +73,6 @@ function createMockCombatant(
     faction,
     health,
     state,
-    isPlayerProxy,
     squadId,
     isDying: false,
     deathProgress: 0,
@@ -134,41 +132,12 @@ describe('CombatantDamage', () => {
       expect(KillAssistTracker.trackDamage).toHaveBeenCalledWith(target, 'attacker-1', 10);
     });
 
-    it('should handle player proxy damage via PlayerHealthSystem', () => {
-      const playerProxy = createMockCombatant('player-proxy', Faction.US, 100, CombatantState.IDLE, true);
-      combatantDamage.applyDamage(playerProxy, 30);
-      expect(mockPlayerHealthSystem.takeDamage).toHaveBeenCalledWith(30, undefined, playerProxy.position);
-      expect(playerProxy.health).toBe(100); // Player proxy health handled by PlayerHealthSystem
+    it('should keep combatant damage on the combatant path', () => {
+      const target = createMockCombatant('target-1', Faction.US, 100);
+      combatantDamage.applyDamage(target, 30);
+      expect(mockPlayerHealthSystem.takeDamage).not.toHaveBeenCalled();
+      expect(target.health).toBe(70);
     });
-
-    it('should trigger player kill feed if player proxy dies', () => {
-      const playerProxy = createMockCombatant('player-proxy', Faction.US, 100, CombatantState.IDLE, true);
-      const attacker = createMockCombatant('attacker-0001', Faction.NVA, 100);
-      (mockPlayerHealthSystem.takeDamage as vi.Mock).mockReturnValue(true); // Player dies
-
-      combatantDamage.applyDamage(playerProxy, 100, attacker);
-
-      expect(mockHUDSystem.addDeath).not.toHaveBeenCalled();
-      expect(mockHUDSystem.addKillToFeed).toHaveBeenCalledWith(
-        'NVA-0001',
-        Faction.NVA,
-        'PLAYER',
-        Faction.US,
-        false,
-        'rifle'
-      );
-    });
-
-    it('should not trigger player death HUD if player proxy does not die', () => {
-      const playerProxy = createMockCombatant('player-proxy', Faction.US, 100, CombatantState.IDLE, true);
-      (mockPlayerHealthSystem.takeDamage as vi.Mock).mockReturnValue(false); // Player does not die
-
-      combatantDamage.applyDamage(playerProxy, 10);
-
-      expect(mockHUDSystem.addDeath).not.toHaveBeenCalled();
-      expect(mockHUDSystem.addKillToFeed).not.toHaveBeenCalled();
-    });
-
   });
 
   describe('handleDeath (indirectly via applyDamage when health <= 0)', () => {
@@ -187,11 +156,11 @@ describe('CombatantDamage', () => {
       expect(attacker.kills).toBe(1);
     });
 
-    it('should not increment attacker kills if attacker is player proxy', () => {
+    it('should increment attacker kills for any lethal combatant attacker', () => {
       const target = createMockCombatant('target-1', Faction.US, 10);
-      const playerProxyAttacker = createMockCombatant('player-proxy', Faction.US, 100, CombatantState.IDLE, true);
-      combatantDamage.applyDamage(target, 20, playerProxyAttacker);
-      expect(playerProxyAttacker.kills).toBe(0);
+      const attacker = createMockCombatant('attacker-2', Faction.US, 100, CombatantState.IDLE);
+      combatantDamage.applyDamage(target, 20, attacker);
+      expect(attacker.kills).toBe(1);
     });
 
     it('should process kill assists via KillAssistTracker', () => {
@@ -319,7 +288,7 @@ describe('CombatantDamage', () => {
     });
 
     it('should remove dead combatant from squad', () => {
-      const target = createMockCombatant('target-1', Faction.US, 10, CombatantState.IDLE, false, 'squad-A');
+      const target = createMockCombatant('target-1', Faction.US, 10, CombatantState.IDLE, 'squad-A');
       const squadA: Squad = { id: 'squad-A', faction: Faction.US, members: ['target-1', 'member-2'], formation: 'line' };
       const squads = new Map<string, Squad>([['squad-A', squadA]]);
 
@@ -367,16 +336,15 @@ describe('CombatantDamage', () => {
       );
     });
 
-    it('should use "PLAYER" for player proxy as victim', () => {
-      const playerProxy = createMockCombatant('player-proxy', Faction.US, 100, CombatantState.IDLE, true);
+    it('should format combatant victims from their id suffix', () => {
+      const target = createMockCombatant('player-proxy', Faction.US, 100, CombatantState.IDLE);
       const attacker = createMockCombatant('attacker-1', Faction.NVA, 100);
-      (mockPlayerHealthSystem.takeDamage as vi.Mock).mockReturnValue(true); // Player dies
 
-      combatantDamage.applyDamage(playerProxy, 100, attacker);
+      combatantDamage.applyDamage(target, 100, attacker);
       expect(mockHUDSystem.addKillToFeed).toHaveBeenCalledWith(
         expect.any(String),
         expect.any(String),
-        'PLAYER',
+        'US-roxy',
         expect.any(String),
         expect.any(Boolean),
         expect.any(String)

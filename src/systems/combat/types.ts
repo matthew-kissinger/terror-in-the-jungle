@@ -53,6 +53,28 @@ export interface AISkillProfile {
   burstDegradation: number;
 }
 
+export interface ITargetable {
+  id: string;
+  faction: Faction;
+  position: THREE.Vector3;
+  velocity: THREE.Vector3;
+  health: number;
+  state: CombatantState;
+  isDying?: boolean;
+  kind?: 'combatant' | 'player';
+}
+
+export function isPlayerTarget(target: ITargetable | null | undefined): boolean {
+  return !!target && (target.kind === 'player' || target.id === 'PLAYER');
+}
+
+export function isTargetAlive(target: ITargetable | null | undefined): boolean {
+  return !!target
+    && target.health > 0
+    && target.state !== CombatantState.DEAD
+    && !target.isDying;
+}
+
 export enum CombatantState {
   IDLE = 'idle',
   PATROLLING = 'patrolling',
@@ -69,7 +91,7 @@ export enum CombatantState {
   DISMOUNTING = 'dismounting'
 }
 
-export interface Combatant {
+export interface Combatant extends ITargetable {
   id: string;
   faction: Faction;
   position: THREE.Vector3;
@@ -88,7 +110,7 @@ export interface Combatant {
   lastShotTime: number;
   currentBurst: number;
   burstCooldown: number;
-  target?: Combatant | null;
+  target?: ITargetable | null;
   lastKnownTargetPos?: THREE.Vector3;
   reactionTimer: number;
   suppressionLevel: number;
@@ -109,7 +131,6 @@ export interface Combatant {
   updatePriority: number;
   lodLevel: 'high' | 'medium' | 'low' | 'culled';
   distanceSq?: number;
-  isPlayerProxy?: boolean;
   isObjectiveFocused?: boolean;
   isRejoiningSquad?: boolean;
   coverPosition?: THREE.Vector3;

@@ -19,6 +19,17 @@ import type { GrenadeSystem } from '../weapons/GrenadeSystem';
 import type { IAudioManager, IHUDSystem, ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 import { AircraftModels } from '../assets/modelPaths';
+import { NPCFlightController, buildAirSupportMission } from './NPCFlightController';
+import { FIXED_WING_CONFIGS } from '../vehicle/FixedWingConfigs';
+
+interface AirSupportManagerDependencies {
+  combatantSystem: CombatantSystem;
+  grenadeSystem: GrenadeSystem;
+  audioManager: IAudioManager;
+  hudSystem: IHUDSystem;
+  terrainSystem: ITerrainRuntime;
+  explosionEffectsPool?: ExplosionEffectsPool;
+}
 
 const OUTBOUND_DURATION = 10; // seconds to fly away before cleanup
 const DEFAULT_APPROACH = new THREE.Vector3(0, 0, 1); // south to north
@@ -42,6 +53,7 @@ export class AirSupportManager implements GameSystem {
   private activeMissions: AirSupportMission[] = [];
   private pendingRequests: Array<{ request: AirSupportRequest; requestedAt: number }> = [];
   private cooldowns: Map<AirSupportType, number> = new Map();
+  private flightControllers: Map<string, NPCFlightController> = new Map();
   private gameElapsed = 0;
 
   constructor(scene: THREE.Scene) {
@@ -52,6 +64,17 @@ export class AirSupportManager implements GameSystem {
 
   async init(): Promise<void> {
     Logger.debug('air-support', 'Initializing Air Support Manager...');
+  }
+
+  configureDependencies(dependencies: AirSupportManagerDependencies): void {
+    this.setCombatantSystem(dependencies.combatantSystem);
+    this.setGrenadeSystem(dependencies.grenadeSystem);
+    this.setAudioManager(dependencies.audioManager);
+    this.setHUDSystem(dependencies.hudSystem);
+    this.setTerrainSystem(dependencies.terrainSystem);
+    if (dependencies.explosionEffectsPool) {
+      this.setExplosionEffectsPool(dependencies.explosionEffectsPool);
+    }
   }
 
   // ── Dependency setters ──
@@ -180,6 +203,7 @@ export class AirSupportManager implements GameSystem {
     }
     this.activeMissions.length = 0;
     this.pendingRequests.length = 0;
+    this.flightControllers.clear();
     this.tracerPool.dispose();
   }
 
@@ -232,6 +256,27 @@ export class AirSupportManager implements GameSystem {
       missionData: {},
     };
 
+    // Create physics-driven flight controller for supported mission types
+    const physicsConfig = this.getPhysicsConfig(request.type);
+    if (physicsConfig) {
+      const startPos = request.targetPosition.clone()
+        .addScaledVector(approachDir, -500);
+      startPos.y = (this.terrainSystem?.getHeightAt(startPos.x, startPos.z) ?? 0) + config.altitude;
+
+      const fc = new NPCFlightController(aircraft, startPos, physicsConfig);
+      const missionType = request.type === 'spooky' ? 'orbit' as const
+        : request.type === 'recon' ? 'flyover' as const
+        : 'attack_run' as const;
+      fc.setMission(buildAirSupportMission(
+        request.targetPosition,
+        approachDir,
+        config.altitude,
+        config.speed,
+        missionType,
+      ));
+      this.flightControllers.set(mission.id, fc);
+    }
+
     // Initialize mission-specific state
     switch (request.type) {
       case 'spooky': initSpooky(mission); break;
@@ -250,12 +295,30 @@ export class AirSupportManager implements GameSystem {
   }
 
   private updateMission(mission: AirSupportMission, dt: number): void {
+    // Update physics-driven flight if available
+    const fc = this.flightControllers.get(mission.id);
+    if (fc && mission.state !== 'outbound') {
+      const terrainH = this.terrainSystem?.getHeightAt(
+        mission.aircraft.position.x, mission.aircraft.position.z
+      ) ?? 0;
+      fc.update(dt, terrainH);
+      // Physics controller syncs aircraft position/quaternion automatically
+    }
+
     if (mission.state === 'outbound') {
-      // Just fly away in approach direction
-      const speed = AIR_SUPPORT_CONFIGS[mission.type].speed;
-      mission.aircraft.position.x += mission.approachDirection.x * speed * dt;
-      mission.aircraft.position.z += mission.approachDirection.z * speed * dt;
-      mission.aircraft.position.y += 10 * dt; // climb out
+      if (fc) {
+        // Let physics handle outbound flight too
+        const terrainH = this.terrainSystem?.getHeightAt(
+          mission.aircraft.position.x, mission.aircraft.position.z
+        ) ?? 0;
+        fc.update(dt, terrainH);
+      } else {
+        // Legacy: direct manipulation for non-physics missions
+        const speed = AIR_SUPPORT_CONFIGS[mission.type].speed;
+        mission.aircraft.position.x += mission.approachDirection.x * speed * dt;
+        mission.aircraft.position.z += mission.approachDirection.z * speed * dt;
+        mission.aircraft.position.y += 10 * dt; // climb out
+      }
       return;
     }
 
@@ -268,7 +331,7 @@ export class AirSupportManager implements GameSystem {
 
     switch (mission.type) {
       case 'spooky':
-        updateSpooky(mission, dt, this.combatantSystem, this.audioManager, this.tracerPool, getHeight);
+        updateSpooky(mission, dt, this.combatantSystem, this.audioManager, this.tracerPool, getHeight, this.flightControllers.has(mission.id));
         // Spooky auto-transitions to outbound when duration expires
         if (mission.elapsed >= mission.duration) {
           mission.state = 'outbound';
@@ -289,12 +352,36 @@ export class AirSupportManager implements GameSystem {
     }
   }
 
+  /**
+   * Get the FixedWingPhysicsConfig for a mission type, if physics-driven flight is available.
+   * Currently enabled for spooky (AC-47) only; other missions use legacy direct positioning.
+   */
+  private getPhysicsConfig(type: AirSupportType) {
+    switch (type) {
+      case 'spooky': return FIXED_WING_CONFIGS.AC47_SPOOKY?.physics;
+      default: return undefined;
+    }
+  }
+
   private cleanupMission(mission: AirSupportMission): void {
+    const fc = this.flightControllers.get(mission.id);
+    if (fc) {
+      fc.dispose();
+      this.flightControllers.delete(mission.id);
+    }
+    if (typeof (this.modelLoader as any).isSharedInstance === 'function'
+      && this.modelLoader.isSharedInstance(mission.aircraft)) {
+      this.modelLoader.disposeInstance(mission.aircraft);
+      return;
+    }
+
     this.scene.remove(mission.aircraft);
     mission.aircraft.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.geometry?.dispose();
-        if (child.material instanceof THREE.Material) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach((material) => material.dispose());
+        } else if (child.material instanceof THREE.Material) {
           child.material.dispose();
         }
       }

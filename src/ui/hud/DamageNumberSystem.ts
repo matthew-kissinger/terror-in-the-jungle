@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Logger } from '../../utils/Logger';
 import { zIndex } from '../design/tokens';
+import { playElementAnimation } from '../engine/playElementAnimation';
 
 const _scratchProjection = new THREE.Vector3();
 const _screenResult = { x: 0, y: 0, z: 0 };
@@ -98,10 +99,6 @@ export class DamageNumberSystem {
         }
       }
 
-      .damage-number {
-        animation: damageFloat 0.8s ease-out forwards;
-      }
-
       .damage-number.normal {
         color: rgba(220, 225, 230, 0.95);
       }
@@ -155,9 +152,20 @@ export class DamageNumberSystem {
       element.classList.add('normal');
     }
 
-    // Force reflow to restart animation
     element.style.display = 'block';
-    void element.offsetWidth; // Trigger reflow
+    playElementAnimation(
+      element,
+      [
+        { opacity: 0, transform: 'translate(-50%, -50%) scale(0.8)' },
+        { opacity: 1, transform: 'translate(-50%, -50%) scale(1.2)', offset: 0.15 },
+        { opacity: 0, transform: `translate(-50%, calc(-50% - ${this.FLOAT_DISTANCE}px)) scale(0.9)` }
+      ],
+      {
+        duration: this.ANIMATION_DURATION,
+        easing: 'ease-out',
+        fill: 'forwards'
+      }
+    );
 
     // Update initial position
     this.updateDamageNumberPosition(damageNumber);

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant } from '../types';
+import { Combatant, Faction, ITargetable } from '../types';
 import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
 import { SmokeCloudSystem } from '../../effects/SmokeCloudSystem';
@@ -47,6 +47,10 @@ export class AITargeting {
     this.lineOfSight.setSmokeCloudSystem(smokeCloudSystem);
   }
 
+  setPlayerFaction(faction: Faction): void {
+    this.targetAcquisition.setPlayerFaction(faction);
+  }
+
   /**
    * Clear the LOS cache. Call once per frame.
    */
@@ -59,7 +63,7 @@ export class AITargeting {
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
     spatialGrid?: ISpatialQuery
-  ): Combatant | null {
+  ): ITargetable | null {
     return this.targetAcquisition.findNearestEnemy(
       combatant,
       playerPosition,
@@ -70,7 +74,7 @@ export class AITargeting {
 
   canSeeTarget(
     combatant: Combatant,
-    target: Combatant,
+    target: ITargetable,
     playerPosition: THREE.Vector3
   ): boolean {
     return this.lineOfSight.canSeeTarget(combatant, target, playerPosition);

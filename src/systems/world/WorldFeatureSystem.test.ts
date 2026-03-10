@@ -58,6 +58,26 @@ describe('WorldFeatureSystem', () => {
     expect(scene.children.length).toBeGreaterThan(0);
   });
 
+  it('spawns generator-backed airfield placements for airfield features', async () => {
+    currentConfig = {
+      id: GameMode.A_SHAU_VALLEY,
+      features: [
+        {
+          id: 'test_airfield',
+          kind: 'airfield',
+          position: new THREE.Vector3(120, 0, -80),
+          placement: { yaw: Math.PI * 0.25 },
+          templateId: 'forward_strip',
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+
+    expect(scene.children.length).toBeGreaterThanOrEqual(6);
+  });
+
   it('clears previously spawned objects when switching to a mode without static features', async () => {
     system.update(0.016);
     await flushPromises();

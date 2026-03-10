@@ -60,6 +60,7 @@ export interface WarSimulatorConfig {
 type MapFeatureKind = 'helipad' | 'airfield' | 'firebase' | 'village' | 'road';
 type TerrainFeatureSurfaceKind = 'packed_earth' | 'runway' | 'dirt_road' | 'gravel_road' | 'jungle_trail';
 type TerrainFeatureTargetHeightMode = 'center' | 'average' | 'max';
+type AirfieldTemplateId = 'us_airbase' | 'forward_strip';
 type MapFeaturePrefabId =
   | 'firebase_us_small'
   | 'firebase_us_medium'
@@ -77,6 +78,7 @@ type MapFeaturePrefabId =
   | 'bridge_checkpoint_small'
   | 'crossing_outpost_small'
   | 'motor_pool_small'
+  | 'motor_pool_heavy'
   | 'trail_checkpoint_small'
   | 'airstrip_rough_small'
   | 'airfield_support_compound_small';
@@ -178,6 +180,8 @@ export interface HelipadMapFeature extends MapFeatureBase {
 
 export interface AirfieldMapFeature extends MapFeatureBase {
   kind: 'airfield';
+  templateId?: AirfieldTemplateId;
+  seedHint?: string;
 }
 
 export interface FirebaseMapFeature extends MapFeatureBase {

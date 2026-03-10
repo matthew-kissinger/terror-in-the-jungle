@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant } from './types';
+import { Combatant, isPlayerTarget } from './types';
 
 /**
  * Handles ballistics calculations for AI combatants.
@@ -38,7 +38,7 @@ export class CombatantBallistics {
     }
 
     // Use scratch for target position
-    if (combatant.target.id === 'PLAYER') {
+    if (isPlayerTarget(combatant.target)) {
       this.scratchTargetPos.copy(playerPosition);
       this.scratchTargetPos.y -= 0.6;
     } else {
@@ -47,7 +47,7 @@ export class CombatantBallistics {
 
     this.scratchToTarget.subVectors(this.scratchTargetPos, combatant.position);
 
-    if (combatant.target.id !== 'PLAYER' && combatant.target.velocity.length() > 0.1) {
+    if (!isPlayerTarget(combatant.target) && combatant.target.velocity.length() > 0.1) {
       const timeToTarget = this.scratchToTarget.length() / 800;
       const leadAmount = combatant.skillProfile.leadingErrorFactor;
       this.scratchToTarget.addScaledVector(combatant.target.velocity, timeToTarget * leadAmount);

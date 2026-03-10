@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction, Squad, isBlufor } from './types';
+import { Combatant, CombatantState, Squad, isBlufor } from './types';
 import { PlayerHealthSystem } from '../player/PlayerHealthSystem';
 import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
@@ -79,37 +79,6 @@ export class CombatantDamage {
       return;
     }
 
-    if ((target as any).isPlayerProxy) {
-      if (this.playerHealthSystem) {
-        const killed = this.playerHealthSystem.takeDamage(
-          damage,
-          attacker?.position,
-          target.position
-        );
-        if (killed && this.hudSystem && attacker) {
-          // PlayerHealthSystem already records the player death in HUD/stats.
-          // This path only contributes kill-feed context for the attacker.
-          const killerName = `${attacker.faction}-${attacker.id.slice(-4)}`;
-          this.hudSystem.addKillToFeed(
-            killerName,
-            attacker.faction,
-            'PLAYER',
-            Faction.US,
-            isHeadshot,
-            'rifle' // AI combatants use rifles
-          );
-        }
-        if (killed && attacker) {
-          GameEventBus.emit('player_killed', {
-            killerId: attacker.id,
-            killerFaction: attacker.faction,
-            position: target.position,
-          });
-        }
-      }
-      return;
-    }
-
     target.health -= damage;
     target.lastHitTime = Date.now();
     target.suppressionLevel = Math.min(1.0, target.suppressionLevel + 0.3);
@@ -146,7 +115,7 @@ export class CombatantDamage {
     target.deaths++;
 
     // Increment kill count for attacker (if exists and is not player proxy)
-    if (attacker && !attacker.isPlayerProxy) {
+    if (attacker) {
       attacker.kills++;
     }
 
@@ -218,7 +187,7 @@ export class CombatantDamage {
     }
 
     // Add to kill feed (AI-on-AI kills)
-    if (this.hudSystem && attacker && !attacker.isPlayerProxy) {
+    if (this.hudSystem && attacker) {
       const killerName = `${attacker.faction}-${attacker.id.slice(-4)}`;
       const victimName = `${target.faction}-${target.id.slice(-4)}`;
       this.hudSystem.addKillToFeed(
@@ -238,7 +207,7 @@ export class CombatantDamage {
       killerFaction: attacker?.faction ?? target.faction,
       victimFaction: target.faction,
       isHeadshot,
-      weaponType: attacker?.isPlayerProxy ? undefined : 'rifle',
+      weaponType: attacker ? 'rifle' : undefined,
       position: target.position,
     });
 

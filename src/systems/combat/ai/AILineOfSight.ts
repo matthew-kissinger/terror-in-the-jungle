@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant } from '../types';
+import { Combatant, ITargetable } from '../types';
 import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
 import { SmokeCloudSystem } from '../../effects/SmokeCloudSystem';
@@ -107,7 +107,7 @@ export class AILineOfSight {
    */
   canSeeTarget(
     combatant: Combatant,
-    target: Combatant,
+    target: ITargetable,
     playerPosition: THREE.Vector3
   ): boolean {
     const targetPos = target.id === 'PLAYER' ? playerPosition : target.position;

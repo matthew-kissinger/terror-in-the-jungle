@@ -5,7 +5,7 @@
 
 [GH]: https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src
 
-**250 classes. 44 GameSystems. 150 wiring edges. 7 singletons. 9 tick groups.**
+**250 classes. 41 GameSystems. 150 wiring edges (reduced via composer refactors). 8 singletons. 11 tick groups.**
 
 ---
 
@@ -55,16 +55,18 @@ ShotCommandFactory.resetPool()
 playerSquadController.updatePlayerPosition()
 
 TRACKED (budgeted, EMA-monitored):
-  Combat    5.0ms  combatantSystem.update(dt)
-  Terrain   2.0ms  terrainSystem.update(dt)
+  Combat     5.0ms  combatantSystem.update(dt)
+  Terrain    2.0ms  terrainSystem.update(dt)
+  Navigation 2.0ms  navmeshSystem.update(dt, playerPos)
   Billboards 2.0ms  globalBillboardSystem.update(dt)
-  Player    1.0ms  playerController + firstPersonWeapon
-  Weapons   1.0ms  grenade + mortar + sandbag + ammoSupply
-  HUD       1.0ms  hudSystem.update(dt)
+  Player     1.0ms  playerController + firstPersonWeapon
+  Weapons    1.0ms  grenade + mortar + sandbag + ammoSupply
+  HUD        1.0ms  hudSystem.update(dt)
   TacticalUI 0.5ms  minimap + compass (20Hz throttle)
-  WarSim    2.0ms  warSimulator + strategicFeedback (A Shau only)
-  AShauAssist 0.2ms  contact-assist teleport (A Shau, 60s no-contact)
-  World     1.0ms  zoneManager + ticketSystem + weather + water
+  WarSim     2.0ms  warSimulator + strategicFeedback (A Shau only)
+  AirSupport 1.0ms  airSupportManager + aaEmplacement + npcVehicleController
+  ModeRuntime 0.2ms  scheduled game-mode runtime hook
+  World      1.0ms  zoneManager + ticketSystem + weather + water
 
 UNTRACKED (catch-all loop):
   assetLoader, audioManager, skybox, playerHealth, playerRespawn,
@@ -78,7 +80,7 @@ POST-TICK RENDER:
   grenade overlay -> postProcessing.endFrame -> metrics
 ```
 
-**Total tracked: 15.7ms** of 16.6ms frame budget (60fps).
+**Total tracked: 18.7ms** of 16.6ms frame budget (60fps).
 
 ---
 
@@ -93,6 +95,7 @@ POST-TICK RENDER:
 | `objectPool` | `export const` | [ObjectPoolManager]([GH]/utils/ObjectPoolManager.ts) | Vector3/Quaternion pools |
 | `InputContextManager.getInstance()` | class static | [InputContextManager]([GH]/systems/input/InputContextManager.ts) | gameplay/map/menu/modal |
 | `ViewportManager.getInstance()` | class static | [ViewportManager]([GH]/ui/design/responsive.ts) | Breakpoints, isTouch |
+| `GameEventBus` | static methods | [GameEventBus]([GH]/core/GameEventBus.ts) | Typed queue-and-flush event bus |
 
 ---
 
@@ -100,8 +103,8 @@ POST-TICK RENDER:
 
 ```
 BOOT       main.ts -> bootstrap.ts -> new GameEngine()
-CONSTRUCT  SystemInitializer: 37 systems created in dependency order
-WIRE       SystemConnector: 150 setter calls
+CONSTRUCT  SystemInitializer: 41 systems created in dependency order
+WIRE       SystemConnector: setter calls via 3 runtime composers
 INIT       system.init() per non-deferred system
 MENU       StartScreen. Player picks mode.
 MODE_START Load DEM (if A Shau) -> configure chunks/billboard/weather ->

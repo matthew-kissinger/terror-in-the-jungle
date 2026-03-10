@@ -12,7 +12,6 @@ import {
   updateDefendingMovement,
   updatePatrolMovement
 } from './CombatantMovementStates';
-import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 import { computeSlopeSpeedMultiplier } from '../terrain/SlopePhysics';
 import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
@@ -125,8 +124,8 @@ export class CombatantMovement {
     }
 
     // Apply slope speed penalty for NPCs on walkable slopes
-    if (combatant.velocity.lengthSq() > 0.01) {
-      const slope = getHeightQueryCache().getSlopeAt(combatant.position.x, combatant.position.z);
+    if (combatant.velocity.lengthSq() > 0.01 && this.terrainSystem) {
+      const slope = this.terrainSystem.getSlopeAt(combatant.position.x, combatant.position.z);
       const slopeMultiplier = computeSlopeSpeedMultiplier(slope);
       combatant.velocity.x *= slopeMultiplier;
       combatant.velocity.z *= slopeMultiplier;

@@ -4,6 +4,8 @@ import type {
   MapFeatureDefinition,
   MapFeatureRectFootprint,
 } from '../../config/gameModeTypes';
+import { AIRFIELD_TEMPLATES } from '../world/AirfieldTemplates';
+import { generateAirfieldLayout } from '../world/AirfieldLayoutGenerator';
 import type {
   CompiledTerrainFeatureSet,
   TerrainExclusionZone,
@@ -49,6 +51,11 @@ function compileFeature(feature: MapFeatureDefinition, compiled: CompiledTerrain
     compiled.surfacePatches.push(surfacePatch);
   }
 
+  const generatedSurfacePatches = compileGeneratedSurfacePatches(feature);
+  if (generatedSurfacePatches.length > 0) {
+    compiled.surfacePatches.push(...generatedSurfacePatches);
+  }
+
   const exclusionZone = compileVegetationExclusion(feature);
   if (exclusionZone) {
     compiled.vegetationExclusionZones.push(exclusionZone);
@@ -84,6 +91,10 @@ function compileTerrainStamp(feature: MapFeatureDefinition): TerrainStampConfig 
 }
 
 function compileSurfacePatch(feature: MapFeatureDefinition): TerrainSurfacePatch | null {
+  if (feature.kind === 'airfield' && feature.templateId) {
+    return null;
+  }
+
   const surface = feature.surface;
   if (!surface) return null;
 
@@ -116,6 +127,24 @@ function compileSurfacePatch(feature: MapFeatureDefinition): TerrainSurfacePatch
     surface: surface.kind,
     priority: feature.terrain?.priority ?? defaultPriorityForFeature(feature),
   };
+}
+
+function compileGeneratedSurfacePatches(feature: MapFeatureDefinition): TerrainSurfacePatch[] {
+  if (feature.kind !== 'airfield' || !feature.templateId) {
+    return [];
+  }
+
+  const template = AIRFIELD_TEMPLATES[feature.templateId];
+  if (!template) {
+    return [];
+  }
+
+  return generateAirfieldLayout(
+    template,
+    feature.position,
+    feature.placement?.yaw ?? 0,
+    feature.seedHint ?? feature.id,
+  ).surfacePatches;
 }
 
 function compileVegetationExclusion(feature: MapFeatureDefinition): TerrainExclusionZone | null {

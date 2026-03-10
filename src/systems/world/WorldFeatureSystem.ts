@@ -6,6 +6,8 @@ import { Logger } from '../../utils/Logger';
 import { modelLoader } from '../assets/ModelLoader';
 import { getModelPlacementProfile } from '../assets/ModelPlacementProfiles';
 import { prepareModelForPlacement } from '../assets/ModelPlacementUtils';
+import { AIRFIELD_TEMPLATES } from './AirfieldTemplates';
+import { generateAirfieldLayout } from './AirfieldLayoutGenerator';
 import { GameModeManager } from './GameModeManager';
 import { getWorldFeaturePrefab } from './WorldFeaturePrefabs';
 
@@ -26,6 +28,11 @@ interface SpawnedFeatureObject {
   collisionRegistered: boolean;
 }
 
+interface WorldFeatureSystemDependencies {
+  terrainManager: ITerrainRuntime;
+  gameModeManager: GameModeManager;
+}
+
 export class WorldFeatureSystem implements GameSystem {
   private readonly scene: THREE.Scene;
   private terrainManager?: ITerrainRuntime;
@@ -40,6 +47,11 @@ export class WorldFeatureSystem implements GameSystem {
 
   async init(): Promise<void> {
     Logger.info('world', 'Initializing World Feature System...');
+  }
+
+  configureDependencies(dependencies: WorldFeatureSystemDependencies): void {
+    this.setTerrainManager(dependencies.terrainManager);
+    this.setGameModeManager(dependencies.gameModeManager);
   }
 
   setTerrainManager(terrainManager: ITerrainRuntime): void {
@@ -152,30 +164,54 @@ export class WorldFeatureSystem implements GameSystem {
   private resolvePlacements(feature: MapFeatureDefinition): StaticModelPlacementConfig[] {
     const prefab = getWorldFeaturePrefab(feature);
     const prefabPlacements = prefab?.placements ?? [];
+    const generatedPlacements = this.resolveGeneratedPlacements(feature);
     const featurePlacements = feature.staticPlacements ?? [];
-    return [...prefabPlacements, ...featurePlacements];
+    return [...prefabPlacements, ...generatedPlacements, ...featurePlacements];
   }
 
   private hasStaticPlacements(feature: MapFeatureDefinition): boolean {
     return this.resolvePlacements(feature).length > 0;
   }
 
+  private resolveGeneratedPlacements(feature: MapFeatureDefinition): StaticModelPlacementConfig[] {
+    if (feature.kind !== 'airfield' || !feature.templateId) {
+      return [];
+    }
+
+    const template = AIRFIELD_TEMPLATES[feature.templateId];
+    if (!template) {
+      Logger.warn('world', `Unknown airfield template "${feature.templateId}" on feature "${feature.id}"`);
+      return [];
+    }
+
+    return generateAirfieldLayout(
+      template,
+      feature.position,
+      feature.placement?.yaw ?? 0,
+      feature.seedHint ?? feature.id,
+    ).placements;
+  }
+
   private clearSpawnedObjects(): void {
     for (const entry of this.spawnedObjects) {
-      this.scene.remove(entry.object);
+      if (typeof (modelLoader as any).disposeInstance === 'function') {
+        modelLoader.disposeInstance(entry.object);
+      } else {
+        this.scene.remove(entry.object);
+        entry.object.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.geometry.dispose();
+            if (Array.isArray(child.material)) {
+              child.material.forEach((material) => material.dispose());
+            } else {
+              child.material.dispose();
+            }
+          }
+        });
+      }
       if (entry.collisionRegistered && this.terrainManager) {
         this.terrainManager.unregisterCollisionObject(entry.id);
       }
-      entry.object.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-          if (Array.isArray(child.material)) {
-            child.material.forEach((material) => material.dispose());
-          } else {
-            child.material.dispose();
-          }
-        }
-      });
     }
     this.spawnedObjects = [];
     this.builtModeId = null;

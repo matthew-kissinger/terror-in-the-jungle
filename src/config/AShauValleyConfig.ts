@@ -254,18 +254,21 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       name: 'Ta Bat Rough Airstrip',
       position: geoToWorld(16.27, 107.16),
       placement: { yaw: Math.PI * 0.18 },
-      footprint: { shape: 'rect', width: 28, length: 120 },
+      templateId: 'forward_strip',
+      footprint: { shape: 'circle', radius: 88 },
+      terrain: {
+        flatten: true,
+        flatRadius: 58,
+        blendRadius: 86,
+        gradeRadius: 126,
+        gradeStrength: 0.16,
+        samplingRadius: 54,
+        targetHeightMode: 'average',
+      },
       vegetation: {
         clear: true,
-        exclusionRadius: 28,
+        exclusionRadius: 92,
       },
-      surface: {
-        kind: 'runway',
-        width: 28,
-        length: 120,
-        blend: 10,
-      },
-      prefabId: 'airstrip_rough_small',
     },
     {
       id: 'tabat_support_compound',
@@ -291,6 +294,31 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
         outerRadius: 22,
       },
       prefabId: 'airfield_support_compound_small',
+    },
+    {
+      id: 'tabat_motor_pool',
+      kind: 'firebase',
+      name: 'Ta Bat Armored Yard',
+      position: geoToWorld(16.2728, 107.1668),
+      placement: { yaw: Math.PI * 0.18 },
+      footprint: { shape: 'circle', radius: 34 },
+      terrain: {
+        flatten: true,
+        flatRadius: 22,
+        blendRadius: 34,
+        samplingRadius: 22,
+        targetHeightMode: 'average',
+      },
+      vegetation: {
+        clear: true,
+        exclusionRadius: 38,
+      },
+      surface: {
+        kind: 'packed_earth',
+        innerRadius: 22,
+        outerRadius: 30,
+      },
+      prefabId: 'motor_pool_heavy',
     },
     // Firebase Ripcord - US hilltop firebase (eastern ridgeline)
     {

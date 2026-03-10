@@ -20,6 +20,20 @@ import { Faction } from '../combat/types';
 import type { IHUDSystem, IPlayerController, ITerrainRuntime, IAudioManager } from '../../types/SystemInterfaces';
 import type { PlayerInput } from '../player/PlayerInput';
 import type { HeightQueryCache } from '../terrain/HeightQueryCache';
+import { modelLoader } from '../assets/ModelLoader';
+
+interface HelicopterModelDependencies {
+  terrainManager: ITerrainRuntime;
+  helipadSystem: HelipadSystem;
+  playerController: IPlayerController;
+  hudSystem: IHUDSystem;
+  audioListener: THREE.AudioListener;
+  audioManager: IAudioManager;
+  combatantSystem: CombatantSystem;
+  grenadeSystem: GrenadeSystem;
+  heightQueryCache: HeightQueryCache;
+  vehicleManager: VehicleManager;
+}
 
 export class HelicopterModel implements GameSystem {
   private scene: THREE.Scene;
@@ -68,6 +82,19 @@ export class HelicopterModel implements GameSystem {
 
   async init(): Promise<void> {
     Logger.debug('helicopter', ' Initializing Helicopter Model System...');
+  }
+
+  configureDependencies(dependencies: HelicopterModelDependencies): void {
+    this.setTerrainManager(dependencies.terrainManager);
+    this.setHelipadSystem(dependencies.helipadSystem);
+    this.setPlayerController(dependencies.playerController);
+    this.setHUDSystem(dependencies.hudSystem);
+    this.setAudioListener(dependencies.audioListener);
+    this.setAudioManager(dependencies.audioManager);
+    this.setCombatantSystem(dependencies.combatantSystem);
+    this.setGrenadeSystem(dependencies.grenadeSystem);
+    this.setHeightQueryCache(dependencies.heightQueryCache);
+    this.setVehicleManager(dependencies.vehicleManager);
   }
 
   setTerrainManager(terrainManager: ITerrainRuntime): void {
@@ -487,7 +514,10 @@ export class HelicopterModel implements GameSystem {
       physics.update(deltaTime, terrainHeight, helipadHeight);
 
       const state = physics.getState();
-      helicopter.position.copy(state.position);
+      const visualState = typeof physics.getInterpolatedState === 'function'
+        ? physics.getInterpolatedState()
+        : state;
+      helicopter.position.copy(visualState.position);
 
       const finalQuaternion = this.animation.updateVisualTilt(helicopter, id, physics, deltaTime);
       helicopter.quaternion.copy(finalQuaternion);
@@ -561,15 +591,22 @@ export class HelicopterModel implements GameSystem {
       if (this.terrainManager) {
         this.terrainManager.unregisterCollisionObject(id);
       }
-      helicopter.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-          if (Array.isArray(child.material)) {
-            child.material.forEach(mat => mat.dispose());
-          } else {
-            child.material.dispose();
-          }
+      helicopter.children.forEach((child) => {
+        if (typeof (modelLoader as any).isSharedInstance === 'function'
+          && modelLoader.isSharedInstance(child)) {
+          modelLoader.disposeInstance(child);
+          return;
         }
+        child.traverse((node) => {
+          if (node instanceof THREE.Mesh) {
+            node.geometry.dispose();
+            if (Array.isArray(node.material)) {
+              node.material.forEach((material) => material.dispose());
+            } else {
+              node.material.dispose();
+            }
+          }
+        });
       });
     });
     this.helicopters.clear();

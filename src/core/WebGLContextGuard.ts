@@ -3,12 +3,13 @@ import { PostProcessingManager } from '../systems/effects/PostProcessingManager'
 import type { GameRenderer } from './GameRenderer';
 
 /**
- * Handles WebGL context loss and restoration.
+ * Handles WebGL context loss and best-effort renderer recovery.
  * On mobile devices, context loss is common when switching tabs or when the OS
- * reclaims GPU memory. This class shows a recovery overlay and rebuilds GPU
- * resources once the context is restored.
+ * reclaims GPU memory. This class shows a recovery overlay and rebuilds the
+ * renderer/post stack when the context comes back, but it does not guarantee
+ * every GPU resource owned by the wider runtime can be fully restored.
  */
-export class WebGLContextRecovery {
+export class WebGLContextGuard {
   private canvas: HTMLCanvasElement;
   private renderer: GameRenderer;
   private overlay: HTMLDivElement | null = null;
@@ -124,7 +125,7 @@ export class WebGLContextRecovery {
 
     this.contextLost = false;
     this.hideOverlay();
-    Logger.info('WebGL', 'WebGL context recovery complete');
+    Logger.info('WebGL', 'WebGL context guard finished best-effort recovery');
   }
 
   dispose(): void {

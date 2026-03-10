@@ -97,15 +97,7 @@ export class MortarSystem implements GameSystem {
   dispose(): void {
     // Remove mortar tube
     if (this.mortarTube) {
-      this.scene.remove(this.mortarTube);
-      this.mortarTube.traverse(child => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-          if (child.material instanceof THREE.Material) {
-            child.material.dispose();
-          }
-        }
-      });
+      this.disposeMortarTube(this.mortarTube);
     }
 
     // Dispose modules
@@ -193,15 +185,7 @@ export class MortarSystem implements GameSystem {
 
     // Remove mortar tube
     if (this.mortarTube) {
-      this.scene.remove(this.mortarTube);
-      this.mortarTube.traverse(child => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-          if (child.material instanceof THREE.Material) {
-            child.material.dispose();
-          }
-        }
-      });
+      this.disposeMortarTube(this.mortarTube);
       this.mortarTube = undefined;
     }
 
@@ -444,5 +428,22 @@ export class MortarSystem implements GameSystem {
    */
   getMortarCamera(): THREE.OrthographicCamera | undefined {
     return this.isUsingMortarCamera() && this.mortarCameraModule ? this.mortarCameraModule.getCamera() : undefined;
+  }
+
+  private disposeMortarTube(tube: THREE.Group): void {
+    if (typeof (modelLoader as any).disposeInstance === 'function') {
+      modelLoader.disposeInstance(tube);
+      return;
+    }
+
+    this.scene.remove(tube);
+    tube.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.geometry.dispose();
+        if (child.material instanceof THREE.Material) {
+          child.material.dispose();
+        }
+      }
+    });
   }
 }

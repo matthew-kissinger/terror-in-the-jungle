@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Combatant, CombatantState, Squad, SquadCommand } from '../types'
+import { Combatant, CombatantState, ITargetable, Squad, SquadCommand, isPlayerTarget } from '../types'
 import { ZoneManager } from '../../world/ZoneManager'
 import { Logger } from '../../../utils/Logger'
 import { ISpatialQuery } from '../SpatialOctree'
@@ -40,10 +40,10 @@ export class AIStatePatrol {
       playerPosition: THREE.Vector3,
       allCombatants: Map<string, Combatant>,
       spatialGrid?: ISpatialQuery
-    ) => Combatant | null,
+    ) => ITargetable | null,
     canSeeTarget: (
       combatant: Combatant,
-      target: Combatant,
+      target: ITargetable,
       playerPosition: THREE.Vector3
     ) => boolean,
     shouldEngage: (combatant: Combatant, distance: number) => boolean,
@@ -75,7 +75,7 @@ export class AIStatePatrol {
 
     const enemy = findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid);
     if (enemy) {
-      const targetPos = enemy.id === 'PLAYER' ? playerPosition : enemy.position;
+      const targetPos = isPlayerTarget(enemy) ? playerPosition : enemy.position;
       const distance = combatant.position.distanceTo(targetPos);
       const toTarget = _toTarget.subVectors(targetPos, combatant.position).normalize();
       combatant.rotation = Math.atan2(toTarget.z, toTarget.x);

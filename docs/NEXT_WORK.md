@@ -1,7 +1,7 @@
 # Next Work
 
 Last updated: 2026-03-10
-Status: ACTIVE - iterate top-down, check off items, update docs as fixes land
+Status: ACTIVE - shipping baseline is stable; use this file for polish/perf/content follow-up, not boot/deploy remediation
 
 ## How To Use This File
 
@@ -11,6 +11,12 @@ Work top-down. Each item has acceptance criteria. When an item is done:
 3. Move to the next item
 
 Items within a tier are priority-ordered. Do not skip tiers unless blocked.
+
+## Current Baseline (2026-03-10)
+
+- Local release gates are green: `lint`, `deadcode`, `test:run`, `build`, `smoke:prod`
+- Built app is validated under the deployed base path: `http://127.0.0.1:4173/terror-in-the-jungle/`
+- Consultation-critical architecture debt is closed enough for shipping; remaining work is performance, bundle weight, and content/product expansion
 
 ---
 
@@ -100,7 +106,7 @@ Acceptance: [x] PASS - long-task count dropped from persistent to near-zero
 Doc updates:
 - `ARCHITECTURE_RECOVERY_PLAN.md` - P5 status + Keep Decision
 - `PERF_FRONTIER.md` - scenario health matrix
-- `TERRAIN_REWRITE_MASTER_PLAN.md` - note if T-005 block boundaries are affected
+- `docs/blocks/terrain.md` - note if T-005 block boundaries are affected
 
 ### 1.3 HeightQueryCache batch eviction
 Current FIFO eviction deletes one entry per miss. With 20K cap and BVH rebuilds needing ~4.5K queries, this is less acute than before but still suboptimal under sustained movement.
@@ -150,7 +156,6 @@ Identity: platoon-scale frontline capture mode.
 - Spawn rules: fixed base + controlled zones, appropriate for platoon-scale; NPC reinforcements prioritize contested zones
 
 Doc updates:
-- `GAME_MODES_EXECUTION_PLAN.md` Phase 5 - Zone Control status
 - `docs/blocks/world.md` - if zone behavior changes
 
 ### 2.2 Team Deathmatch product pass
@@ -173,7 +178,6 @@ Identity: kill-race firefight mode.
 - TDM is cleanly isolated via policy-driven routing (`objective.kind = 'deathmatch'`)
 
 Doc updates:
-- `GAME_MODES_EXECUTION_PLAN.md` Phase 5 - TDM status
 - `docs/blocks/world.md` - if ticket/objective behavior changes
 
 ### 2.3 Open Frontier product pass
@@ -196,7 +200,6 @@ Identity: company-scale insertion and maneuver mode.
 - Auto-start helicopter: deferred - would need NPC pilot AI or scripted flight path, out of scope for product pass.
 
 Doc updates:
-- `GAME_MODES_EXECUTION_PLAN.md` Phase 5 - Open Frontier status
 - `docs/blocks/world.md` - if spawn/deploy behavior changes
 
 ### 2.4 A Shau Valley product pass
@@ -217,7 +220,6 @@ Identity: battalion-scale war-zone mode.
 - Mission briefing card: implemented (2026-03-09) - shows before deploy in A Shau only.
 
 Doc updates:
-- `GAME_MODES_EXECUTION_PLAN.md` Phase 4 + Phase 5 - A Shau status
 - `ARCHITECTURE_RECOVERY_PLAN.md` P3 - A Shau gameplay flow status
 
 ---
@@ -241,12 +243,10 @@ Doc updates:
 - The method IS a thin coordinator already. No action required.
 
 Doc updates:
-- `GAME_MODES_EXECUTION_PLAN.md` Phase 1 status
 - `ARCHITECTURE_RECOVERY_PLAN.md` - Keep Decision
-- `ACTIVE_GAME_MODES_HANDOFF.md` - update Current Gaps
 
 ### 3.2 Terrain rewrite remaining items
-Priority order from TERRAIN_REWRITE_MASTER_PLAN.md:
+Priority order (from archived TERRAIN_REWRITE_MASTER_PLAN.md):
 
 - [x] T-002: Height fidelity split (GPU-baked vs provider/cache) - done
 - [x] T-003: Dead vegetation/biome config paths - in_progress (biome rules wired, visual tuning pending)
@@ -256,7 +256,7 @@ Priority order from TERRAIN_REWRITE_MASTER_PLAN.md:
 - [ ] T-008: Hydrology system layer - pending (design task, blocked on river gameplay requirements)
 
 Doc updates:
-- `TERRAIN_REWRITE_MASTER_PLAN.md` - update status per item
+- `docs/blocks/terrain.md` - update status per item
 - `ARCHITECTURE_RECOVERY_PLAN.md` P5
 
 ---
@@ -280,8 +280,9 @@ Doc updates:
 - [x] Prefab layout offsets rescaled 1.25x for proper spacing
 - [x] Procedural firebase generator (3 templates: us_small/medium/large)
 - [x] Procedural airfield generator (2 templates: us_airbase/forward_strip)
-- [ ] Wire procedural generators into WorldFeaturePrefabs (replace hardcoded layouts)
-- [ ] Add airfield features to Open Frontier / A Shau mode configs
+- [x] Wire procedural airfield generators into live world-feature spawning + terrain surface compilation
+- [x] Add generator-backed airfield features to Open Frontier / A Shau mode configs
+- [x] Add separate heavy motor-pool staging areas to Open Frontier / A Shau
 
 ### 4.4 Fixed-wing aircraft + NPC pilots
 - [x] FixedWingPhysics: lift/drag/stall/bank-and-pull turns, ground roll
@@ -356,3 +357,4 @@ Record completed items here with date and commit hash.
 | 2026-03-09 | UI/UX overhaul (7 phases) | - | BaseTouchButton refactor (-128 lines), joystickMath utility, WeaponIconRegistry (13 types), KillFeed CSS module + animations, FocusTrap, modal a11y (ARIA/fieldsets/Escape), HelicopterHUD flight instruments (airspeed/heading/VSI/weapon/damage), CrosshairSystem (4 modes), AircraftWeaponMount configs, OnboardingOverlay (5-page opt-in tutorial), mobile gestures (swipe weapons, ADS hold, crouch, haptics, grenade quick-throw, minimap pinch zoom), UI icon manifest |
 | 2026-03-10 | Icon integration + IconRegistry | - | 50 pixel-art PNG icons wired into UI. Centralized IconRegistry (`src/ui/icons/IconRegistry.ts`) replaces scattered `import.meta.env.BASE_URL` paths across 16 files. Old WeaponIconRegistry deleted. All touch buttons use icon images. Kill feed has kill-arrow + headshot icons. Faction emblems on start screen. Hint icons in onboarding. Compass needle + helicopter reticles wired. 3398 tests passing. |
 | 2026-03-10 | Structure scale + procedural gen | ce9464b | STRUCTURE_SCALE 2.0->2.5 with displayScale (props 0.5x). Procedural firebase (3 templates) + airfield (2 templates) generators. Fixed-wing physics (AC-47/F-4/A-1). NPC pilot AI (7-state FSM). Road surface types (dirt/gravel/jungle_trail). 44 new tests, 3442 total. |
+| 2026-03-10 | Open Frontier / A Shau vehicle staging | - | Generator-backed airfields now live in Open Frontier and A Shau Valley. Separate heavy motor pools stage jeeps, trucks, APCs, and M48 tanks. Fixed-wing and ground vehicles remain static world content; helicopters remain the only player-usable vehicles. |

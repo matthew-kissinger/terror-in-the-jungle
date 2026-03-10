@@ -50,13 +50,13 @@ export class RadioTransmissionSystem implements GameSystem {
       'Ghostly_AM_transmiss-1758412869898.ogg',
       'Ghostly_AM_transmiss-1758412899150.ogg',
       'Ghostly_AM_transmiss-1758412906034.ogg',
-      'Ghostly_AM_transmiss-#1-1758412910164.ogg',
-      'Ghostly_AM_transmiss-#2-1758412922184.ogg',
-      'Ghostly_AM_transmiss-#3-1758412924602.ogg',
+      'Ghostly_AM_transmiss-1-1758412910164.ogg',
+      'Ghostly_AM_transmiss-2-1758412922184.ogg',
+      'Ghostly_AM_transmiss-3-1758412924602.ogg',
       'Ghostly_AM_transmiss-1758412930192.ogg',
-      'Ghostly_AM_transmiss-#1-1758412939997.ogg',
-      'Ghostly_AM_transmiss-#2-1758412942235.ogg',
-      'Ghostly_AM_transmiss-#3-1758412951987.ogg'
+      'Ghostly_AM_transmiss-1-1758412939997.ogg',
+      'Ghostly_AM_transmiss-2-1758412942235.ogg',
+      'Ghostly_AM_transmiss-3-1758412951987.ogg'
     ];
 
     this.transmissions = transmissionFiles.map(filename => ({

@@ -26,7 +26,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 | P2 | Heap growth triage in combat-heavy runs | IN_PROGRESS | New diagnostics added. Latest Phase 2 evidence still points to churn-heavy waves rather than a proven unbounded leak. A frame-local `AITargetAcquisition` neighborhood cache improved warm `combat120` starvation (`16.82 -> 12.91`) and heap growth (`15.73MB -> 3.64MB`). A second accepted March 4 optimization in `AIStateEngage.initiateSquadSuppression()` (flank-probe elevation + probe allocation cleanup) reduced warm combat tails/stalls again (`Combat.maxDurationMs 259.7ms -> 218.6ms/182.3ms`, long tasks `74 -> 47/31`), but rare p99 spikes still appear in some runs. |
 | P3 | A Shau gameplay flow and contact reliability | IN_PROGRESS | Short harness capture is now behavior-valid (`270` shots / `150` hits on 2026-03-04). Remaining work is performance analysis, not basic contact acquisition. |
 | P4 | UI/HUD update budget discipline | DONE | UI Engine Phases 0-7 complete. 19 CSS Modules + signals. Grid layout with 18 named slots. VisibilityManager wired. All touch controls on pointer events as UIComponent subclasses. UnifiedWeaponBar replaces 3 duplicates. Renderer subscribes to ViewportManager. 12 dead component files + 7 dead style files deleted. QuickCommandStrip + SquadRadialMenu deleted (command-bar grid region removed). |
-| P5 | Terrain runtime stabilization | IN_PROGRESS | Terrain rewrite is active under `TERRAIN_REWRITE_MASTER_PLAN.md`: world-size authority, truthful terrain API, biome/vegetation runtime wiring, terrain block-boundary cleanup, and large-world startup cost reduction validated in preview smoke. Phase 2 warm captures still show terrain max-duration spikes of `849.6ms` (`open_frontier`), `869.7ms` (`frontier30m`), and `2225.2ms` (`a_shau_valley`). March 6 fix: half-texel UV correction in vertex shader eliminates render/collision/vegetation positional drift (up to 3.1m at map edges for Open Frontier). |
+| P5 | Terrain runtime stabilization | IN_PROGRESS | Terrain CDLOD rewrite complete (see `archive/TERRAIN_REWRITE_MASTER_PLAN.md`). World-size authority, truthful terrain API, biome/vegetation runtime wiring, block-boundary cleanup, and large-world startup cost reduction validated. Terrain-led tails effectively solved (frontier30m near-zero long tasks). March 6 fix: half-texel UV correction eliminates render/collision/vegetation positional drift. Remaining: T-008 hydrology. |
 
 ## Keep Decisions (Recent)
 
@@ -36,7 +36,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: production boot validation in CI via a real built-app smoke (`smoke:prod`). Deploy now depends on lint + tests + build + smoke.
 - Keep: `StartupFlowController` as the canonical startup phase state for `menu_ready -> mode_preparing -> deploy_select -> spawn_warming -> live`.
 - Keep: `DeployFlowController` as the canonical owner of deploy-session kind, selected spawn, and pending initial-deploy resolution.
-- Keep: `SimulationScheduler` inside `SystemUpdater` for cadence-based groups (`tactical_ui`, `war_sim`, `world_state`, `ashau_assist`).
+- Keep: `SimulationScheduler` inside `SystemUpdater` for cadence-based groups (`tactical_ui`, `war_sim`, `world_state`, `mode_runtime`).
 - Keep: A Shau no-contact recovery as an explicit redeploy suggestion via HUD message, not a silent player teleport.
 - Keep: `SystemConnector` is no longer the only giant wiring blob. Startup/player/deploy moved into `StartupPlayerRuntimeComposer`, combat/world/game-mode/environment into `GameplayRuntimeComposer`, and strategy/vehicle/air-support into `OperationalRuntimeComposer`. Root connector is now mostly orchestration, navigation, and telemetry.
 - Keep: startup cancellation is now a shared contract in `InitialDeployCancelledError.ts` instead of living inside `PlayerRespawnManager`, which reduces startup-path coupling.
@@ -72,7 +72,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: heap validation expansion (`growth`, `peak`, `recovery`) in harness output.
 - Keep: Single SpatialGridManager as sole spatial owner. Legacy SpatialOctree direct usage removed from CombatantSystem and all sub-modules.
 - Keep: ISpatialQuery interface for AI state handlers (decouples AI from concrete spatial implementation).
-- Keep: spatialGridManager injected through SystemReferences in core orchestration (SystemInitializer, SystemConnector, SystemUpdater).
+- Keep: spatialGridManager injected through the typed core runtime map (`SystemKeyToType` / registry-backed orchestration in SystemInitializer, SystemConnector, and SystemUpdater).
 - Keep: DayNightCycle removed entirely (conflicted with WeatherSystem; rebuild if needed for night modes).
 - Keep: LoadingScreen facade deleted; GameEngine uses StartScreen directly.
 - Keep: gameModes.ts barrel re-exports removed; consumers import from gameModeTypes.ts or specific config files.
@@ -98,7 +98,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: UI_ENGINE_PLAN.md archived to docs/archive/ (completed project, 1302 lines).
 - Keep: PROFILING_HARNESS.md updated with perf:quick, perf:compare, perf:update-baseline commands; stale spatial feature flag env vars removed.
 - Keep: repo-tracked perf baselines now cover the active Phase 1 scenario set (`combat120`, `openfrontier:short`, `ashau:short`, `frontier30m`). `perf:baseline` is now a compatibility wrapper over `perf-compare --update-baseline`, `validate:full` runs `combat120`, and CI checks `summary.json` from the committed regression scenario instead of the stale `capture-summary.json` path.
-- Keep: `GameModeManager.applyModeConfiguration()` reviewed and accepted as thin coordinator (94 lines, 8 systems, null-guarded setter calls). Moving config into individual systems would couple them to `GameModeConfig`. `GameModeRuntime.onEnter()` hook exists for mode-specific custom logic.
+- Keep: `GameModeManager.applyModeConfiguration()` reviewed and accepted as thin coordinator (94 lines, 8 systems, null-guarded setter calls). Moving config into individual systems would couple them to `GameModeConfig`. `GameModeRuntime` now owns lifecycle hooks plus scheduled `update()` logic for mode-specific behavior.
 - Keep: Zone dominance bar in `HUDZoneDisplay` showing faction control ratio (BLUFOR/contested/OPFOR percentages) with colored track and summary label ("2 HELD / 1 CONTESTED / 4 HOSTILE").
 - Keep: Priority-sorted zone display capped at 5 visible zones (contested first, then player-owned-under-attack, then nearest). Overflow label shows "+N more zones" count. Solves A Shau 15-zone HUD overload.
 - Keep: terrain startup no longer double-rebakes the render surface at mode start after a world-size change; `GameEngineInit` now lets `setWorldSize()` own that rebake path.
@@ -126,6 +126,19 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: suppression flank-cover discovery remains in the suppression-init path only; a March 4 deferred recheck attempt in `AIStateMovement.ADVANCING` was reverted after warm captures increased hitch/AI-starvation risk without a clean pressure-matched win.
 - Keep: `MaterializationPipeline` materializes nearest squads first so large-map scenarios establish combat around the player before distant squads consume the budget.
 - Keep: `SpatialOctree` vertical world bounds scale with world size. Fixed Y bounds were invalid on mountainous maps and caused empty high-altitude hit-detection queries.
+- Keep (2026-03-10): consultation correctness slice is live: `GameEngineLoop` is start/stop owned and cancelled on dispose, engine teardown resets shared runtime singletons/caches, NPC tracer lifetimes are enforced in milliseconds, `ObjectPoolManager` no longer allocates `Set` entries on hot borrows, and `ModelLoader.disposeInstance()` is the safe shared-instance detach contract.
+- Keep (2026-03-10): `RadioTransmissionSystem` is now live runtime code instead of dead inventory. `StrategicFeedback` and `WeatherLightning` use typed optional audio hooks (`playDistantCombat`, `playThunder`) instead of loose casts/empty stubs.
+- Keep (2026-03-10): terrain material/runtime direction remains `THREE.WebGLRenderer` + `MeshStandardMaterial.onBeforeCompile` for the active game. This matches current official Three.js guidance: `WebGLRenderer` is still the recommended choice for pure WebGL 2 applications, while `WebGPURenderer`/TSL requires porting custom material and post-processing paths first.
+- Keep (2026-03-10): terrain biome textures are now validated across every shipped game mode in tests. Each mode's configured biomes must resolve to on-disk assets and produce terrain material bindings before CI goes green.
+- Keep (2026-03-10): `SystemRegistry` is now the typed source of truth for runtime system ownership. `SystemManager` exposes registry-backed getters instead of mirroring a giant mutable public field bag.
+- Keep (2026-03-10): startup/runtime composer types now narrow from `SystemKeyToType` instead of maintaining a second hand-written system reference interface.
+- Keep (2026-03-10): `PlayerController` startup wiring now goes through `configureDependencies()` plus focused `PlayerCombatController` / `PlayerVehicleController` helpers. Compatibility setters still exist, but the boot path no longer depends on the old setter chain.
+- Keep (2026-03-10): `HUDSystem` and `HelicopterModel` now support grouped dependency configuration, reducing the highest-risk connector bursts without changing runtime behavior.
+- Keep (2026-03-10): the grouped dependency pattern now also covers `CombatantSystem`, `GameModeManager`, `PlayerRespawnManager`, `AirSupportManager`, `HelipadSystem`, and `WorldFeatureSystem`. Composer fallbacks exist only to keep older tests/mocks stable during migration.
+- Keep (2026-03-10): player and helicopter simulation now run on a shared fixed-step pattern (`FixedStepRunner`, 60Hz simulation) with interpolated helicopter visuals, eliminating the previously documented frame-rate-dependent movement drift.
+- Keep (2026-03-10): `RespawnUI` is now a `UIComponent` + CSS Modules implementation that preserves the existing `PlayerRespawnManager` contract while removing the old imperative body-style builder.
+- Keep (2026-03-10): more gameplay systems now consume terrain through `ITerrainRuntime` (`getHeightAt`, `getEffectiveHeightAt`, `getSlopeAt`, `getNormalAt`) instead of reaching directly into `HeightQueryCache`.
+- Keep (2026-03-10): production audio asset paths are now URL-safe. `RadioTransmissionSystem` no longer depends on `#` characters in static filenames, so built-app smoke under the deployed base path no longer 404s those assets.
 
 ## Deferred Decisions
 
@@ -161,13 +174,12 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 
 ## Next Execution Slice
 
-1. Replace the highest-risk hot-path setter bursts with runtime dependency objects instead of adding more composers by default.
-2. Push scheduler ownership deeper: keep movement-coupled systems every frame for now, but continue moving cadence-safe world, strategy, and passive UI work behind declared scheduling contracts.
+1. Finish the remaining constructor/runtime-dependency cleanup for the next cold-path clusters (`CombatantSystem`, any remaining helicopter helpers, and selected HUD-adjacent services) now that the core player/vehicle path is no longer setter-only.
+2. Continue pushing cadence-safe world, strategy, and passive UI work behind declared scheduling contracts while leaving movement/weapon-feel systems every frame.
 3. Continue `combat120` tail reduction in `AIStateEngage.initiateSquadSuppression()` with pressure-matched evidence only.
 4. Break down `TerrainRaycastRuntime` near-field rebuild and vegetation update cost inside `TerrainSystem.update()` for `open_frontier`, `frontier30m`, and `a_shau_valley`.
-5. Continue targeted bundle reduction around deploy-only UI/runtime now that the start-game pipeline can defer safely.
-6. Re-baseline and lock regression checks after each accepted change. Deploy is now gated on CI by built-app smoke as well as lint/test/build.
-7. Keep terrain rewrite progress aligned with `TERRAIN_REWRITE_MASTER_PLAN.md`; do not reintroduce chunk-era semantics into active runtime code.
+5. Re-baseline and lock regression checks after each accepted change. Deploy is now gated on CI by built-app smoke as well as lint/test/build.
+6. Keep terrain rewrite progress aligned with `blocks/terrain.md`; do not reintroduce chunk-era semantics into active runtime code.
 
 ## Update Rule
 

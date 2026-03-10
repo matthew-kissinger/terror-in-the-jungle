@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Combatant, CombatantState, Squad, isOpfor } from '../types'
+import { Combatant, CombatantState, ITargetable, Squad, isOpfor, isPlayerTarget, isTargetAlive } from '../types'
 import { ISpatialQuery } from '../SpatialOctree'
 import { AICoverSystem } from './AICoverSystem'
 import { AIFlankingSystem } from './AIFlankingSystem'
@@ -79,7 +79,7 @@ export class AIStateEngage {
     spatialGrid: ISpatialQuery | undefined,
     canSeeTarget: (
       combatant: Combatant,
-      target: Combatant,
+      target: ITargetable,
       playerPosition: THREE.Vector3
     ) => boolean,
     shouldSeekCover: (combatant: Combatant) => boolean,
@@ -93,7 +93,8 @@ export class AIStateEngage {
     ) => number,
     isCoverFlanked: (combatant: Combatant, threatPos: THREE.Vector3) => boolean
   ): void {
-    if (!combatant.target || combatant.target.state === CombatantState.DEAD) {
+    const target = combatant.target
+    if (!target || !isTargetAlive(target)) {
       combatant.state = combatant.previousState === CombatantState.DEFENDING ?
         CombatantState.DEFENDING : CombatantState.PATROLLING
       combatant.target = null
@@ -107,7 +108,7 @@ export class AIStateEngage {
       return
     }
 
-    const targetPos = combatant.target.id === 'PLAYER' ? playerPosition : combatant.target.position
+    const targetPos = isPlayerTarget(target) ? playerPosition : target.position
     const toTargetDir = _toTarget.subVectors(targetPos, combatant.position).normalize()
     combatant.rotation = Math.atan2(toTargetDir.z, toTargetDir.x)
 
@@ -232,8 +233,8 @@ export class AIStateEngage {
       }
     }
 
-    if (!canSeeTarget(combatant, combatant.target, playerPosition)) {
-      combatant.lastKnownTargetPos = combatant.target.position.clone()
+    if (!canSeeTarget(combatant, target, playerPosition)) {
+      combatant.lastKnownTargetPos = target.position.clone()
       combatant.state = CombatantState.SUPPRESSING
       combatant.isFullAuto = true
       combatant.skillProfile.burstLength = SUPPRESSION_BURST
@@ -242,7 +243,7 @@ export class AIStateEngage {
       return
     }
 
-    combatant.lastKnownTargetPos = combatant.target.position.clone()
+    combatant.lastKnownTargetPos = target.position.clone()
   }
 
   handleSuppressing(combatant: Combatant, deltaTime: number): void {
@@ -271,7 +272,7 @@ export class AIStateEngage {
     playerPosition: THREE.Vector3,
     canSeeTarget: (
       combatant: Combatant,
-      target: Combatant,
+      target: ITargetable,
       playerPosition: THREE.Vector3
     ) => boolean
   ): void {
@@ -279,11 +280,15 @@ export class AIStateEngage {
     combatant.reactionTimer -= deltaTime
 
     if (combatant.reactionTimer <= 0 && combatant.target) {
-      const targetPos = combatant.target.id === 'PLAYER' ? playerPosition : combatant.target.position
+      const target = combatant.target
+      if (!target) {
+        return
+      }
+      const targetPos = isPlayerTarget(target) ? playerPosition : target.position
       const toTarget = _toTarget.subVectors(targetPos, combatant.position).normalize()
       combatant.rotation = Math.atan2(toTarget.z, toTarget.x)
 
-      if (canSeeTarget(combatant, combatant.target, playerPosition)) {
+      if (canSeeTarget(combatant, target, playerPosition)) {
         combatant.state = CombatantState.ENGAGING
         combatant.currentBurst = 0
       } else {

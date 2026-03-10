@@ -24,6 +24,9 @@ import type { IGameRenderer, ITerrainRuntime } from '../../types/SystemInterface
 import type { CommandInputManager } from '../combat/CommandInputManager';
 import type { PlayerSquadController } from '../combat/PlayerSquadController';
 import type { AirSupportManager } from '../airsupport/AirSupportManager';
+import type { PlayerCombatControllerDependencies, PlayerControllerDependencies, PlayerVehicleControllerDependencies } from './PlayerControllerDependencies';
+import { PlayerCombatController } from './PlayerCombatController';
+import { PlayerVehicleController } from './PlayerVehicleController';
 
 // ── Player physics defaults ──
 const PLAYER_WALK_SPEED = 10;
@@ -53,7 +56,6 @@ export class PlayerController implements GameSystem {
   private commandInputManager?: CommandInputManager;
   private airSupportManager?: AirSupportManager;
   private playerSquadId?: string;
-  private airSupportCycleIndex = 0;
   private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
   private playerFaction: Faction = Faction.US;
   private playerState: PlayerState;
@@ -68,6 +70,8 @@ export class PlayerController implements GameSystem {
   private input: InputManager;
   private movement: PlayerMovement;
   private cameraController: PlayerCamera;
+  private combatController = new PlayerCombatController();
+  private vehicleController = new PlayerVehicleController();
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
@@ -244,74 +248,31 @@ export class PlayerController implements GameSystem {
 
   /** Start firing - routes to weapon system based on current weapon mode */
   private actionFireStart(): void {
-    const isGameActive = this.ticketSystem ? this.ticketSystem.isGameActive() : true;
-    if (!isGameActive) return;
-
-    if (this.playerState.isInHelicopter && this.helicopterModel && this.playerState.helicopterId) {
-      this.helicopterModel.startFiring(this.playerState.helicopterId);
-      return;
-    }
-
-    switch (this.currentWeaponMode) {
-      case WeaponSlot.GRENADE: {
-        const equipmentAction = this.inventoryManager?.getEquipmentActionForSlot(WeaponSlot.GRENADE);
-        if (equipmentAction === 'grenade' && this.grenadeSystem) {
-          this.grenadeSystem.startAiming();
-          this.hudSystem?.showGrenadePowerMeter();
-        } else if (equipmentAction === 'sandbag') {
-          this.sandbagSystem?.placeSandbag();
-        } else if (equipmentAction === 'mortar') {
-          this.handleDeployMortar();
-        }
-        break;
-      }
-      case WeaponSlot.SANDBAG:
-        this.sandbagSystem?.placeSandbag();
-        break;
-      default:
-        // Gun slots - delegate to WeaponInput
-        this.firstPersonWeapon?.getWeaponInput()?.triggerFireStart();
-        break;
-    }
+    this.combatController.beginFire(this.playerState, this.currentWeaponMode, this.camera);
   }
 
   /** Stop firing - routes to weapon system based on current weapon mode */
   private actionFireStop(): void {
-    if (this.playerState.isInHelicopter && this.helicopterModel && this.playerState.helicopterId) {
-      this.helicopterModel.stopFiring(this.playerState.helicopterId);
-      return;
-    }
-
-    switch (this.currentWeaponMode) {
-      case WeaponSlot.GRENADE:
-        if (this.inventoryManager?.getEquipmentActionForSlot(WeaponSlot.GRENADE) === 'grenade' && this.grenadeSystem) {
-          this.grenadeSystem.throwGrenade();
-          this.hudSystem?.hideGrenadePowerMeter();
-        }
-        break;
-      default:
-        this.firstPersonWeapon?.getWeaponInput()?.triggerFireStop();
-        break;
-    }
+    this.combatController.endFire(this.playerState, this.currentWeaponMode);
   }
 
   /** Start ADS - delegates to WeaponInput */
   private actionADSStart(): void {
-    this.firstPersonWeapon?.getWeaponInput()?.triggerADS(true);
+    this.combatController.startADS();
   }
 
   /** Stop ADS - delegates to WeaponInput */
   private actionADSStop(): void {
-    this.firstPersonWeapon?.getWeaponInput()?.triggerADS(false);
+    this.combatController.stopADS();
   }
 
   /** Reload - delegates to WeaponInput */
   private actionReload(): void {
-    this.firstPersonWeapon?.getWeaponInput()?.triggerReload();
+    this.combatController.reload();
   }
 
   private handleTouchGrenadeSwitch(): void {
-    this.inventoryManager?.setCurrentSlot(WeaponSlot.GRENADE);
+    this.combatController.toggleGrenadeSlot();
   }
 
   private handleMenuPause(): void {
@@ -338,42 +299,19 @@ export class PlayerController implements GameSystem {
   }
 
   private handleEnterExitHelicopter(): void {
-    if (!this.helicopterModel) return;
-    if (this.playerState.isInHelicopter) {
-      this.helicopterModel.exitHelicopter();
-    } else {
-      this.helicopterModel.tryEnterHelicopter();
-    }
+    this.vehicleController.handleEnterExitHelicopter(this.playerState);
   }
 
   private handleSquadDeploy(): void {
-    if (!this.helicopterModel || !this.playerState.isInHelicopter) return;
-    this.helicopterModel.tryDeploySquad();
+    this.vehicleController.handleSquadDeploy(this.playerState);
   }
 
   private handleAirSupportRequest(): void {
-    if (!this.airSupportManager) return;
-    // Cycle through air support types on each press
-    const types = this.airSupportManager.getSupportTypes();
-    const type = types[this.airSupportCycleIndex % types.length];
-    this.airSupportCycleIndex++;
-
-    // Target: 100m in front of player's look direction
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
-    forward.y = 0;
-    forward.normalize();
-    const targetPos = this.playerState.position.clone().add(forward.clone().multiplyScalar(100));
-
-    this.airSupportManager.requestSupport({
-      type,
-      targetPosition: targetPos,
-      approachDirection: forward,
-    });
+    this.vehicleController.handleAirSupportRequest(this.playerState.position, this.camera);
   }
 
   private handleToggleMouseControl(): void {
-    const enabled = this.cameraController.toggleHelicopterMouseControl();
-    if (this.hudSystem) this.hudSystem.updateHelicopterMouseMode(enabled);
+    this.vehicleController.handleToggleMouseControl(this.cameraController);
   }
 
   private handleRallyPointPlacement(): void {
@@ -403,52 +341,23 @@ export class PlayerController implements GameSystem {
   }
 
   private handleDeployMortar(): void {
-    if (!this.mortarSystem) return;
-    if (this.inventoryManager && !this.inventoryManager.hasMortarKit()) {
-      this.hudSystem?.showMessage('Mortar kit not equipped', 2000);
-      return;
-    }
-
-    if (this.mortarSystem.isCurrentlyDeployed()) {
-      this.mortarSystem.undeployMortar();
-    } else {
-      // Get player direction from camera
-      const direction = new THREE.Vector3();
-      this.camera.getWorldDirection(direction);
-      direction.y = 0; // Keep horizontal
-      direction.normalize();
-
-      this.mortarSystem.deployMortar(this.playerState.position, direction);
-    }
+    this.combatController.toggleMortar(this.camera, this.playerState.position);
   }
 
   private handleMortarFire(): void {
-    if (this.mortarSystem) {
-      this.mortarSystem.fireMortarRound();
-    }
+    this.combatController.fireMortar();
   }
 
   private handleMortarAdjustPitch(delta: number): void {
-    if (this.mortarSystem && this.mortarSystem.isCurrentlyDeployed()) {
-      this.mortarSystem.adjustPitch(delta * 2);
-    }
+    this.combatController.adjustMortarPitch(delta);
   }
 
   private handleMortarAdjustYaw(delta: number): void {
-    if (this.mortarSystem && this.mortarSystem.isCurrentlyDeployed()) {
-      this.mortarSystem.adjustYaw(delta * 2);
-    }
+    this.combatController.adjustMortarYaw(delta);
   }
 
   private updateHelicopterMode(deltaTime: number): void {
-    this.movement.updateHelicopterControls(deltaTime, this.input, this.hudSystem);
-
-    // Add mouse control if enabled
-    if (this.cameraController.getHelicopterMouseControlEnabled() && this.input.getIsPointerLocked()) {
-      const mouseMovement = this.input.getMouseMovement();
-      this.movement.addMouseControlToHelicopter(mouseMovement);
-      this.input.clearMouseMovement();
-    }
+    this.vehicleController.updateHelicopterMode(deltaTime, this.movement, this.input, this.cameraController);
   }
 
   private updateHUD(): void {
@@ -456,18 +365,7 @@ export class PlayerController implements GameSystem {
   }
 
   private updateWeaponSystems(): void {
-    const equipmentAction = this.inventoryManager?.getEquipmentActionForSlot(this.currentWeaponMode) ?? null;
-    if ((this.currentWeaponMode === WeaponSlot.SANDBAG || equipmentAction === 'sandbag') && this.sandbagSystem) {
-      this.sandbagSystem.updatePreviewPosition(this.camera);
-    } else if ((this.currentWeaponMode === WeaponSlot.GRENADE && equipmentAction === 'grenade') && this.grenadeSystem) {
-      if (this.grenadeSystem.isCurrentlyAiming()) {
-        this.grenadeSystem.updateArc();
-        if (this.hudSystem) {
-          const aimingState = this.grenadeSystem.getAimingState();
-          this.hudSystem.updateGrenadePower(aimingState.power);
-        }
-      }
-    }
+    this.combatController.updateSupportSystems(this.currentWeaponMode, this.camera, this.input);
   }
 
   private handleWeaponSlotChange(slot: WeaponSlot): void {
@@ -624,7 +522,7 @@ export class PlayerController implements GameSystem {
   equipWeapon(): void {
     if (this.firstPersonWeapon) {
       this.firstPersonWeapon.showWeapon();
-      this.firstPersonWeapon.setFireingEnabled(true);
+      this.firstPersonWeapon.setFiringEnabled(true);
     }
     if (this.gameRenderer) {
       this.gameRenderer.showCrosshair();
@@ -634,45 +532,22 @@ export class PlayerController implements GameSystem {
   unequipWeapon(): void {
     if (this.firstPersonWeapon) {
       this.firstPersonWeapon.hideWeapon();
-      this.firstPersonWeapon.setFireingEnabled(false);
+      this.firstPersonWeapon.setFiringEnabled(false);
     }
   }
 
   enterHelicopter(helicopterId: string, helicopterPosition: THREE.Vector3): void {
     Logger.info('player', `  ENTERING HELICOPTER: ${helicopterId}`);
-    this.playerState.isInHelicopter = true;
-    this.playerState.helicopterId = helicopterId;
-
-    this.setPosition(helicopterPosition, 'helicopter.enter');
-    this.playerState.velocity.set(0, 0, 0);
-    this.playerState.isRunning = false;
-
-    this.input.setInHelicopter(true);
     this.unequipWeapon();
-
-    if (this.hudSystem) {
-      this.hudSystem.showHelicopterMouseIndicator();
-      this.hudSystem.updateHelicopterMouseMode(this.cameraController.getHelicopterMouseControlEnabled());
-      this.hudSystem.showHelicopterInstruments();
-
-      if (this.helicopterModel) {
-        const role = this.helicopterModel.getAircraftRole(helicopterId);
-        this.hudSystem.setHelicopterAircraftRole(role);
-
-        if (this.gameRenderer) {
-          const crosshairMode = role === 'attack' ? 'helicopter_attack'
-            : role === 'gunship' ? 'helicopter_gunship'
-            : 'helicopter_transport';
-          this.gameRenderer.setCrosshairMode(crosshairMode);
-        }
-      }
-    }
-
-    // Switch touch controls to helicopter dual-joystick mode
-    const touchControls = this.input.getTouchControls();
-    if (touchControls) {
-      touchControls.enterHelicopterMode();
-    }
+    this.vehicleController.enterHelicopter(
+      this.playerState,
+      helicopterPosition,
+      helicopterId,
+      (position, reason) => this.setPosition(position, reason),
+      this.input,
+      this.gameRenderer,
+      this.cameraController,
+    );
 
     Logger.info('player', ` Player entered helicopter at position (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)})`);
     Logger.info('player', `  CAMERA MODE: Switched to helicopter camera (flight sim style)`);
@@ -681,28 +556,14 @@ export class PlayerController implements GameSystem {
   exitHelicopter(exitPosition: THREE.Vector3): void {
     const helicopterId = this.playerState.helicopterId;
     Logger.info('player', `  EXITING HELICOPTER: ${helicopterId}`);
-
-    this.playerState.isInHelicopter = false;
-    this.playerState.helicopterId = null;
-
-    this.setPosition(exitPosition, 'helicopter.exit');
-    this.input.setInHelicopter(false);
+    this.vehicleController.exitHelicopter(
+      this.playerState,
+      exitPosition,
+      (position, reason) => this.setPosition(position, reason),
+      this.input,
+      this.gameRenderer,
+    );
     this.equipWeapon();
-
-    if (this.hudSystem) {
-      this.hudSystem.hideHelicopterMouseIndicator();
-      this.hudSystem.hideHelicopterInstruments();
-    }
-
-    if (this.gameRenderer) {
-      this.gameRenderer.setCrosshairMode('infantry');
-    }
-
-    // Restore touch controls to infantry mode
-    const touchControls = this.input.getTouchControls();
-    if (touchControls) {
-      touchControls.exitHelicopterMode();
-    }
 
     Logger.info('player', ` Player exited helicopter to position (${exitPosition.x.toFixed(1)}, ${exitPosition.y.toFixed(1)}, ${exitPosition.z.toFixed(1)})`);
     Logger.info('player', `  CAMERA MODE: Switched to first-person camera`);
@@ -753,17 +614,87 @@ export class PlayerController implements GameSystem {
   /** Apply mouse look delta to spectator free-look rotation. */
   applySpectatorMouseDelta(deltaX: number): void { this.spectatorCamera.applyMouseDelta(deltaX); }
 
+  configureDependencies(dependencies: PlayerControllerDependencies): void {
+    this.terrainSystem = dependencies.terrainSystem;
+    this.movement.setTerrainSystem(dependencies.terrainSystem);
+    this.gameModeManager = dependencies.gameModeManager;
+    this.ticketSystem = dependencies.ticketSystem;
+    this.helicopterModel = dependencies.helicopterModel;
+    this.movement.setHelicopterModel(dependencies.helicopterModel);
+    this.cameraController.setHelicopterModel(dependencies.helicopterModel);
+    dependencies.helicopterModel.setPlayerInput(this.input);
+    this.firstPersonWeapon = dependencies.firstPersonWeapon;
+    this.firstPersonWeapon.setPlayerFaction(this.playerFaction);
+    this.firstPersonWeapon.getWeaponInput().disableDirectListeners();
+    this.hudSystem = dependencies.hudSystem;
+    this.gameRenderer = dependencies.renderer;
+    this.inventoryManager = dependencies.inventoryManager;
+    this.grenadeSystem = dependencies.grenadeSystem;
+    this.mortarSystem = dependencies.mortarSystem;
+    this.sandbagSystem = dependencies.sandbagSystem;
+    this.movement.setSandbagSystem(dependencies.sandbagSystem);
+    this.cameraShakeSystem = dependencies.cameraShakeSystem;
+    this.cameraController.setCameraShakeSystem(dependencies.cameraShakeSystem);
+    this.rallyPointSystem = dependencies.rallyPointSystem;
+    this.footstepAudioSystem = dependencies.footstepAudioSystem;
+    this.movement.setFootstepAudioSystem(dependencies.footstepAudioSystem);
+    this.playerSquadController = dependencies.playerSquadController;
+    this.commandInputManager = dependencies.commandInputManager;
+    dependencies.commandInputManager.bindInputManager(this.input);
+    this.airSupportManager = dependencies.airSupportManager;
+
+    this.configureCombatController({
+      firstPersonWeapon: dependencies.firstPersonWeapon,
+      helicopterModel: dependencies.helicopterModel,
+      hudSystem: dependencies.hudSystem,
+      inventoryManager: dependencies.inventoryManager,
+      grenadeSystem: dependencies.grenadeSystem,
+      mortarSystem: dependencies.mortarSystem,
+      sandbagSystem: dependencies.sandbagSystem,
+      ticketSystem: dependencies.ticketSystem,
+    });
+    this.configureVehicleController({
+      helicopterModel: dependencies.helicopterModel,
+      hudSystem: dependencies.hudSystem,
+      airSupportManager: dependencies.airSupportManager,
+    });
+
+    dependencies.hudSystem.setWeaponSelectCallback((slotIndex: number) => {
+      this.inventoryManager?.setCurrentSlot(slotIndex as WeaponSlot);
+    });
+    this.inventoryManager.onSlotChange((slot: WeaponSlot) => this.handleWeaponSlotChange(slot));
+    this.inventoryManager.onLoadoutChange(() => this.syncLoadoutHud());
+    this.syncLoadoutHud();
+    this.wireTouchExtras();
+  }
+
+  configureCombatController(dependencies: PlayerCombatControllerDependencies): void {
+    this.combatController.configure(dependencies);
+  }
+
+  configureVehicleController(dependencies: PlayerVehicleControllerDependencies): void {
+    this.vehicleController.configure(dependencies);
+  }
+
   // Dependency setters
   setTerrainSystem(terrainSystem: ITerrainRuntime): void { this.terrainSystem = terrainSystem; this.movement.setTerrainSystem(terrainSystem); }
   setWorldSize(worldSize: number): void { this.movement.setWorldSize(worldSize); }
   setGameModeManager(gameModeManager: GameModeManager): void { this.gameModeManager = gameModeManager; }
-  setTicketSystem(ticketSystem: TicketSystem): void { this.ticketSystem = ticketSystem; }
-  setHelicopterModel(helicopterModel: HelicopterModel): void { this.helicopterModel = helicopterModel; this.movement.setHelicopterModel(helicopterModel); this.cameraController.setHelicopterModel(helicopterModel); helicopterModel.setPlayerInput(this.input); }
+  setTicketSystem(ticketSystem: TicketSystem): void { this.ticketSystem = ticketSystem; this.configureCombatController({ ticketSystem }); }
+  setHelicopterModel(helicopterModel: HelicopterModel): void {
+    this.helicopterModel = helicopterModel;
+    this.movement.setHelicopterModel(helicopterModel);
+    this.cameraController.setHelicopterModel(helicopterModel);
+    helicopterModel.setPlayerInput(this.input);
+    this.configureCombatController({ helicopterModel });
+    this.configureVehicleController({ helicopterModel });
+  }
   setFirstPersonWeapon(firstPersonWeapon: FirstPersonWeapon): void {
     this.firstPersonWeapon = firstPersonWeapon;
     firstPersonWeapon.setPlayerFaction(this.playerFaction);
     // Disable WeaponInput's direct mouse/key listeners - all input flows through PlayerController
     firstPersonWeapon.getWeaponInput().disableDirectListeners();
+    this.configureCombatController({ firstPersonWeapon });
     // Wire touch-specific extras (weapon bar, mortar)
     this.wireTouchExtras();
   }
@@ -774,6 +705,8 @@ export class PlayerController implements GameSystem {
     hudSystem.setWeaponSelectCallback((slotIndex: number) => {
       this.inventoryManager?.setCurrentSlot(slotIndex as WeaponSlot);
     });
+    this.configureCombatController({ hudSystem });
+    this.configureVehicleController({ hudSystem });
     this.syncLoadoutHud();
   }
   setRenderer(renderer: IGameRenderer): void { this.gameRenderer = renderer; }
@@ -781,17 +714,25 @@ export class PlayerController implements GameSystem {
     this.inventoryManager = inventoryManager;
     inventoryManager.onSlotChange((slot: WeaponSlot) => this.handleWeaponSlotChange(slot));
     inventoryManager.onLoadoutChange(() => this.syncLoadoutHud());
+    this.configureCombatController({ inventoryManager });
     this.syncLoadoutHud();
   }
-  setGrenadeSystem(grenadeSystem: GrenadeSystem): void { this.grenadeSystem = grenadeSystem; }
-  setMortarSystem(mortarSystem: MortarSystem): void { this.mortarSystem = mortarSystem; }
-  setSandbagSystem(sandbagSystem: SandbagSystem): void { this.sandbagSystem = sandbagSystem; this.movement.setSandbagSystem(sandbagSystem); }
+  setGrenadeSystem(grenadeSystem: GrenadeSystem): void { this.grenadeSystem = grenadeSystem; this.configureCombatController({ grenadeSystem }); }
+  setMortarSystem(mortarSystem: MortarSystem): void { this.mortarSystem = mortarSystem; this.configureCombatController({ mortarSystem }); }
+  setSandbagSystem(sandbagSystem: SandbagSystem): void {
+    this.sandbagSystem = sandbagSystem;
+    this.movement.setSandbagSystem(sandbagSystem);
+    this.configureCombatController({ sandbagSystem });
+  }
   setCameraShakeSystem(cameraShakeSystem: CameraShakeSystem): void { this.cameraShakeSystem = cameraShakeSystem; this.cameraController.setCameraShakeSystem(cameraShakeSystem); }
   setRallyPointSystem(rallyPointSystem: RallyPointSystem): void { this.rallyPointSystem = rallyPointSystem; }
   setFootstepAudioSystem(footstepAudioSystem: FootstepAudioSystem): void { this.footstepAudioSystem = footstepAudioSystem; this.movement.setFootstepAudioSystem(footstepAudioSystem); }
   setPlayerSquadId(squadId: string): void { this.playerSquadId = squadId; }
   setPlayerSquadController(playerSquadController: PlayerSquadController): void { this.playerSquadController = playerSquadController; }
-  setAirSupportManager(airSupportManager: AirSupportManager): void { this.airSupportManager = airSupportManager; }
+  setAirSupportManager(airSupportManager: AirSupportManager): void {
+    this.airSupportManager = airSupportManager;
+    this.configureVehicleController({ airSupportManager });
+  }
   setCommandInputManager(commandInputManager: CommandInputManager): void {
     this.commandInputManager = commandInputManager;
     commandInputManager.bindInputManager(this.input);

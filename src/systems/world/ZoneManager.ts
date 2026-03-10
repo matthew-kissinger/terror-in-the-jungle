@@ -122,10 +122,8 @@ export class ZoneManager implements GameSystem {
       // Use spatial grid to query combatants near each zone - O(zones * nearby_entities)
       for (const zone of this.zones.values()) {
         const occupants = { us: 0, opfor: 0 };
-        let playerProxyCounted = false;
 
         // Optimized spatial query: find combatant IDs within zone radius
-        // Note: This includes the player proxy, which should already mirror the selected faction.
         const nearbyIds = this.spatialQueryProvider
           ? this.spatialQueryProvider(zone.position, zone.radius)
           : this.spatialGridManager.queryRadius(zone.position, zone.radius);
@@ -137,18 +135,14 @@ export class ZoneManager implements GameSystem {
         // Skip dead combatants (state can be enum or string depending on version)
         if (combatant.state === CombatantState.DEAD || (combatant as any).state === 'dead') continue;
 
-          if (isBlufor(combatant.faction)) {
-            occupants.us++;
-            if ((combatant as any).isPlayerProxy || combatant.id === 'player_proxy') {
-              playerProxyCounted = true;
-            }
-          } else if (isOpfor(combatant.faction)) {
-            occupants.opfor++;
-          }
+        if (isBlufor(combatant.faction)) {
+          occupants.us++;
+        } else if (isOpfor(combatant.faction)) {
+          occupants.opfor++;
         }
+      }
 
-        // Ensure player can always capture even if player_proxy is briefly missing/desynced.
-        if (combatants.size > 0 && nearbyIds.length === 0 && !playerProxyCounted && this.playerPosition.distanceTo(zone.position) <= zone.radius) {
+        if (this.camera && this.playerPosition.distanceTo(zone.position) <= zone.radius) {
           if (this.playerAlliance === Alliance.BLUFOR) {
             occupants.us++;
           } else {

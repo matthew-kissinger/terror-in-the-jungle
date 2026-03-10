@@ -14,7 +14,10 @@ import { CombatantSystem } from '../combat/CombatantSystem';
 import { TicketSystem } from './TicketSystem';
 import { MinimapSystem } from '../../ui/minimap/MinimapSystem';
 import { FullMapSystem } from '../../ui/map/FullMapSystem';
+import type { HUDSystem } from '../../ui/hud/HUDSystem';
 import { InfluenceMapSystem } from '../combat/InfluenceMapSystem';
+import type { PlayerController } from '../player/PlayerController';
+import type { PlayerRespawnManager } from '../player/PlayerRespawnManager';
 import type { WarSimulator } from '../strategy/WarSimulator';
 import type { ITerrainRuntimeController } from '../../types/SystemInterfaces';
 import {
@@ -32,6 +35,20 @@ import {
 type GameModeDefinitionResolver = (mode: GameMode) => GameModeDefinition;
 type GameModeRuntimeFactory = (definition: GameModeDefinition) => GameModeRuntime;
 
+interface GameModeManagerDependencies {
+  zoneManager: ZoneManager;
+  combatantSystem: CombatantSystem;
+  ticketSystem: TicketSystem;
+  terrainSystem: ITerrainRuntimeController;
+  minimapSystem: MinimapSystem;
+  fullMapSystem: FullMapSystem;
+  influenceMapSystem: InfluenceMapSystem;
+  warSimulator?: WarSimulator;
+  hudSystem: HUDSystem;
+  playerController: PlayerController;
+  playerRespawnManager: PlayerRespawnManager;
+}
+
 export class GameModeManager implements GameSystem {
   public currentMode: GameMode = GameMode.ZONE_CONTROL;
   private currentConfig: GameModeConfig;
@@ -47,6 +64,9 @@ export class GameModeManager implements GameSystem {
   private fullMapSystem?: FullMapSystem;
   private influenceMapSystem?: InfluenceMapSystem;
   private warSimulator?: WarSimulator;
+  private hudSystem?: HUDSystem;
+  private playerController?: PlayerController;
+  private playerRespawnManager?: PlayerRespawnManager;
 
   // Callbacks
   private onModeChange?: (mode: GameMode, config: GameModeConfig) => void;
@@ -91,12 +111,43 @@ export class GameModeManager implements GameSystem {
     this.applyMapIntelPolicy(this.currentDefinition.policies.mapIntel);
   }
 
+  public configureDependencies(dependencies: GameModeManagerDependencies): void {
+    this.connectSystems(
+      dependencies.zoneManager,
+      dependencies.combatantSystem,
+      dependencies.ticketSystem,
+      dependencies.terrainSystem,
+      dependencies.minimapSystem,
+      dependencies.fullMapSystem
+    );
+    this.setInfluenceMapSystem(dependencies.influenceMapSystem);
+    if (dependencies.warSimulator) {
+      this.setWarSimulator(dependencies.warSimulator);
+    }
+    this.setHUDSystem(dependencies.hudSystem);
+    this.setPlayerController(dependencies.playerController);
+    this.setPlayerRespawnManager(dependencies.playerRespawnManager);
+  }
+
   public setInfluenceMapSystem(influenceMapSystem: InfluenceMapSystem): void {
     this.influenceMapSystem = influenceMapSystem;
   }
 
   public setWarSimulator(warSimulator: WarSimulator): void {
     this.warSimulator = warSimulator;
+    this.warSimulator.setCurrentGameMode(this.currentConfig.id);
+  }
+
+  public setHUDSystem(hudSystem: HUDSystem): void {
+    this.hudSystem = hudSystem;
+  }
+
+  public setPlayerController(playerController: PlayerController): void {
+    this.playerController = playerController;
+  }
+
+  public setPlayerRespawnManager(playerRespawnManager: PlayerRespawnManager): void {
+    this.playerRespawnManager = playerRespawnManager;
   }
 
   // Get current mode
@@ -131,6 +182,14 @@ export class GameModeManager implements GameSystem {
 
   public getDeploySession(kind: DeploySessionKind = 'respawn'): DeploySessionModel {
     return createDeploySession(this.currentDefinition, kind);
+  }
+
+  public updateRuntime(deltaTime: number, gameStarted: boolean): void {
+    this.currentRuntime.update?.(
+      this.createRuntimeContext(this.currentDefinition),
+      deltaTime,
+      gameStarted
+    );
   }
 
   // Set game mode (called from menu)
@@ -206,6 +265,10 @@ export class GameModeManager implements GameSystem {
     // Configure terrain runtime render distance
     if (this.terrainSystem) {
       this.terrainSystem.setRenderDistance(config.chunkRenderDistance);
+    }
+
+    if (this.warSimulator) {
+      this.warSimulator.setCurrentGameMode(config.id);
     }
 
     // Configure minimap scale (local player-centered view area)
@@ -327,7 +390,10 @@ export class GameModeManager implements GameSystem {
       terrainSystem: this.terrainSystem,
       minimapSystem: this.minimapSystem,
       influenceMapSystem: this.influenceMapSystem,
-      warSimulator: this.warSimulator
+      warSimulator: this.warSimulator,
+      hudSystem: this.hudSystem,
+      playerController: this.playerController,
+      playerRespawnManager: this.playerRespawnManager
     };
   }
 

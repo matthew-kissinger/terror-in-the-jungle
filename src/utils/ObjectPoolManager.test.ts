@@ -534,6 +534,18 @@ describe('ObjectPoolManager', () => {
       expect(stats.vector3Available).toBe(10);
     });
 
+    it('reset() should clear pools and telemetry', () => {
+      const vector = manager.getVector3();
+      manager.releaseVector3(vector);
+
+      manager.reset();
+
+      const stats = manager.getStats();
+      expect(stats.vector3Available).toBe(0);
+      expect(stats.vector3InUse).toBe(0);
+      expect(stats.vector3Borrowed).toBe(0);
+    });
+
     it('should handle stress test with many borrows', () => {
       manager.warmup(50, 30, 20, 25);
 

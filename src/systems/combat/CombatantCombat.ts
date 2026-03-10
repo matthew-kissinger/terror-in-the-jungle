@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction, Squad } from './types';
+import { Combatant, CombatantState, Faction, Squad, isPlayerTarget } from './types';
 import { TracerPool } from '../effects/TracerPool';
 import { MuzzleFlashSystem } from '../effects/MuzzleFlashSystem';
 import { ImpactEffectsPool } from '../effects/ImpactEffectsPool';
@@ -160,7 +160,7 @@ export class CombatantCombat {
     }
 
     // Add distance-based accuracy degradation
-    const targetPos = combatant.target?.id === 'PLAYER' ? playerPosition : combatant.target?.position;
+    const targetPos = isPlayerTarget(combatant.target) ? playerPosition : combatant.target?.position;
     if (targetPos) {
       const distance = combatant.position.distanceTo(targetPos);
 
@@ -202,7 +202,7 @@ export class CombatantCombat {
 
     // Check hit results
     let hit: { combatant: Combatant; distance: number; point: THREE.Vector3; headshot: boolean } | { point: THREE.Vector3; distance: number; headshot: boolean } | null = null;
-    if (combatant.target && combatant.target.id === 'PLAYER') {
+    if (isPlayerTarget(combatant.target)) {
       const playerHit = this.hitDetection.checkPlayerHit(shotRay, playerPosition);
       if (playerHit.hit) {
         const damage = combatant.gunCore.computeDamage(

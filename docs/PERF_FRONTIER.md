@@ -15,33 +15,9 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
 | Phase 4 (execution loop) | IN_PROGRESS | Multiple low-friction experiments completed; accepted wins are retained, regressions reverted. |
 | Phase 5 (validation loop) | IN_PROGRESS | `test:run` and `validate` are run after accepted changes; baseline refresh is pending the next stable warm capture set. |
 
-### Scenario health matrix (latest warm evidence in this branch)
+### Current scenario status (2026-03-10)
 
-| Scenario | Latest artifact | Outcome | Key numbers | Current gate |
-|---|---|---|---|---|
-| `combat120` | `2026-03-06T13-29-32-508Z` | WARN / behavior-valid | `avg=12.79ms`, `p99=35.30ms`, `shots/hits=175/90`, `ai_starvation=3.94` | p99 improved 60% (was 86.90ms). Starvation improved 70%. Matched pair confirmed. |
-| `openfrontier:short` | `2026-03-04T13-43-12-583Z` | PASS | `avg=5.40ms`, `p99=21.30ms`, `shots/hits=29/13` | Throughput healthy on current branch; keep as control for terrain-heavy changes. |
-| `ashau:short` | `2026-03-04T07-46-50-552Z` | WARN / behavior-valid | `avg=8.93ms`, `p99=25.80ms`, `shots/hits=270/150` | Contact reliability fixed; remaining work is strategy/terrain tail analysis. |
-| `frontier30m` | `2026-03-04T07-57-32-230Z` | FAIL / behavior-valid | `avg=7.13ms`, `p99=85.90ms`, `shots/hits=156/85` | Soak still fails on tails/stalls, not mean frame time. |
-
-### Net progress since the original warm `combat120` baseline
-
-- Baseline anchor: `2026-03-04T07-50-37-054Z`.
-- Latest warm capture: `2026-03-06T13-29-32-508Z`.
-- Direction of travel is strongly positive:
-  - `avgFrameMs`: `15.10 -> 12.79`
-  - `ai_budget_starvation_events`: `16.82 -> 3.94`
-  - `shots/hits`: `212/130 -> 175/90` (comparable pressure)
-  - `peak_p99_frame_ms`: `100.00 -> 35.30` (was FAIL, now WARN)
-- March 6 micro-optimizations (LOS timing removal, HeightQueryCache 20K + scratch normal, BVH 6m grid step) produced the largest single-session p99 improvement to date.
-
-### What this means operationally
-
-- `combat120` has moved from FAIL to WARN. The p99 target is <16ms; current best is 30.9-35.3ms. The remaining gap is ~2x.
-- AI starvation is now in pass range for most samples.
-- The remaining combat tails are still `AIStateEngage.initiateSquadSuppression()` synchronous cover search bursts (57-58ms spikes visible in capture logs).
-- `frontier30m` soak tails remain the other open gate. Terrain tick-group decoupling is the next target there.
-- Baseline refresh should happen after committing the current accepted changes.
+`combat120` is at WARN (p99 ~30-35ms, target <16ms). `frontier30m` terrain-led tails are effectively solved. See `NEXT_WORK.md` for the latest capture results and acceptance decisions.
 
 ## Phase 1 Status
 

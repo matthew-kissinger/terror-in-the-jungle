@@ -187,12 +187,7 @@ export class StrategicFeedback implements GameSystem {
     const maxDist = 5000;
     const volume = Math.max(0.02, (1 - distance / maxDist) * 0.15 * intensity);
 
-    // Use existing weapon sounds at low volume for distant battle effect
-    // AudioManager may not have playDistantCombat - cast to any for optional call
-    const mgr = this.audioManager as unknown as Record<string, unknown>;
-    if (typeof mgr.playDistantCombat === 'function') {
-      (mgr.playDistantCombat as (v: number) => void)(volume);
-    }
+    this.audioManager.playDistantCombat?.(volume);
   }
 
   private getCompassDirection(dx: number, dz: number): string {

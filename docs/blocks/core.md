@@ -13,12 +13,12 @@ The Core domain is the outermost shell. It owns nothing domain-specific - no AI,
 - Drives the RAF tick loop and dispatches updates in budget-monitored groups (SystemUpdater)
 - Owns the Three.js WebGLRenderer, scene, camera, and post-processing pipeline (GameRenderer)
 - Manages the full user lifecycle: menu -> loading -> gameplay -> match-end -> restart
-- Exposes `window.__engine`, `window.__renderer`, `window.__metrics` for the perf harness
+- Exposes `window.__engine`, `window.__renderer`, and in dev/perf sessions `window.__metrics` for the perf harness
 
 **To work in this domain in isolation:**
 - You do not need to understand any system internals. Systems are black boxes here.
-- The only coupling contract is `SystemReferences` (40-field interface in SystemInitializer.ts) and the `GameSystem` interface (`init/update/dispose`).
-- Setter injection is still the dominant wiring pattern, but startup/player/deploy now routes through `StartupPlayerRuntimeComposer.ts`, combat/world/game-mode/environment through `GameplayRuntimeComposer.ts`, and strategy/vehicle/air-support through `OperationalRuntimeComposer.ts` instead of living entirely inline in `SystemConnector.ts`. There is still no compile-time safety for missing wires - bugs appear at runtime.
+- The core type contract is now `SystemKeyToType` + `SystemRegistry` plus the `GameSystem` interface (`init/update/dispose`).
+- Setter injection is no longer the only boot path. Startup/player wiring uses grouped dependency objects, and HUD/helicopter runtime wiring now does as well. Some cold-path systems still use ordered setters, so missing wires can still surface at runtime.
 - The tick order in SystemUpdater.ts is the source of truth for update sequencing. Do not re-order without checking downstream dependencies.
 - `GameEngineInit.ts` is now a coordinator and lazy-loads the mode/deploy startup pipeline after `Play`, but the underlying startup/runtime contracts are still mostly setter-driven and order-sensitive.
 
@@ -38,9 +38,10 @@ bootstrap.ts
   |- new GameEngine()                      // constructor: StartScreen + GameRenderer +
   |                                        //   SystemManager + overlays + event listeners
   |- engine.initialize()                   // async: construct + wire + init all systems
-  |- engine.start()                        // begins RAF loop (always running; guards on
-  |                                        //   isInitialized && gameStarted per frame)
-  |- window.__engine / __renderer / __metrics exposed for perf harness
+  |- engine.start()                        // begins engine-owned RAF loop; start/stop/dispose
+  |                                        //   now control scheduling explicitly
+  |- window.__engine / __renderer exposed for perf harness
+  |- window.__metrics exposed only in dev + `?perf=1`
   |
 MAIN MENU  (StartScreen)
   |- Mode carousel  (5 modes: Zone Control, Open Frontier, TDM, AI Sandbox, A Shau Valley)
@@ -91,7 +92,7 @@ startGame() / runStartupFlow()
   |- startupFlow.enterLive()
   |    Deferred: HelipadSystem, HelicopterModel
   |
-GAMEPLAY  (RAF tick loop, always running)
+GAMEPLAY  (engine-owned RAF tick loop while running)
   |- Player fights, captures zones, drives tickets
   |- Tab key: Scoreboard
   |- M key: Full Map (FullMapSystem, pauses tactical UI at 20Hz)
@@ -135,21 +136,22 @@ All files are in `src/core/` unless noted.
 | InitialDeployStartup | [InitialDeployStartup.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/InitialDeployStartup.ts) | Initial deploy stage. Resolves initial insertion position, advances startup phases, pre-generates around the chosen insertion, and applies the configured loadout. |
 | LiveEntryActivator | [LiveEntryActivator.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/LiveEntryActivator.ts) | Live-entry stage. Handles spawn loading overlay flow, initial player positioning, renderer reveal, audio/combat activation, deferred init handoff, and final transition to `live`. |
 | GameEngineInput | [GameEngineInput.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameEngineInput.ts) | Window keyboard event listeners. Debug toggle handlers: F1 (perf stats), F2 (overlay), F3 (log), F4 (time), P (post-processing), [ / ] (pixel size), K (voluntary respawn). |
-| GameEngineLoop | [GameEngineLoop.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameEngineLoop.ts) | animate() RAF loop. Calls updateSystems, skybox, mortar camera check, GPU timing, render main scene, render weapon + grenade overlays, post-processing endFrame, runtime metrics. Crash guard: 3 crashes in 5s shows fatal overlay. |
+| GameEngineLoop | [GameEngineLoop.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameEngineLoop.ts) | Engine-owned RAF loop. `start()`/`stop()` schedule and cancel RAF explicitly, and dispose clears the live frame id. Calls updateSystems, skybox, mortar camera check, GPU timing, render main scene, render weapon + grenade overlays, post-processing endFrame, and dev/perf-only runtime metrics. Crash guard: 3 crashes in 5s shows fatal overlay while the loop is running. |
 | GameRenderer | [GameRenderer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameRenderer.ts) | Three.js WebGLRenderer (no antialias, high-performance), Scene, PerspectiveCamera (75 FOV). FogExp2 (0x5a7a6a, density 0.004), AmbientLight, DirectionalLight (moonLight, casts shadows), HemisphereLight. PostProcessingManager, CrosshairUI, LoadingUI. Device-adaptive shadow/pixel-ratio via DeviceDetector. configureForWorldSize() adjusts camera far / fog / shadow for mode. |
-| SystemManager | [SystemManager.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemManager.ts) | Holds ~44 public system refs. Delegates to Initializer/Connector/Updater/Disposer. Owns setGameMode(), preGenerateSpawnArea(), startDeferredInitialization(), waitForPlayerSquad(). |
-| SystemInitializer | [SystemInitializer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemInitializer.ts) | Constructs all ~44 systems in dependency order across 4 phases (core, textures, audio, world). Defines `SystemReferences` interface (40 fields). Defers 4 systems. Pre-initializes AssetLoader + AudioManager (skipped in main init loop). Warms ObjectPool to 240/80/32/96. |
+| SystemManager | [SystemManager.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemManager.ts) | Thin orchestration facade over `SystemRegistry`. Delegates to Initializer/Connector/Updater/Disposer, exposes registry-backed getters for active systems, and owns setGameMode(), preGenerateSpawnArea(), startDeferredInitialization(), waitForPlayerSquad(). |
+| SystemInitializer | [SystemInitializer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemInitializer.ts) | Constructs all major systems in dependency order across 4 phases (core, textures, audio, world). Populates a mutable `SystemKeyToType`-shaped refs object, then hands those systems to the registry/connector path. Defers 2 systems. Pre-initializes AssetLoader + AudioManager (skipped in main init loop). Warms ObjectPool to 240/80/32/96. |
+| SystemRegistry | [SystemRegistry.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemRegistry.ts) | Typed runtime system map. Defines `SystemKeyToType`, centralizes register/get/require, and is now the source of truth for `SystemManager` accessors and composer typings. |
 | StartupPlayerRuntimeComposer | [StartupPlayerRuntimeComposer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/StartupPlayerRuntimeComposer.ts) | Typed grouped composition for startup-critical player/UI/deploy wiring. Owns the player runtime cluster, HUD mounting/config, deploy wiring, initial loadout application, and spectator-provider setup. |
 | GameplayRuntimeComposer | [GameplayRuntimeComposer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameplayRuntimeComposer.ts) | Typed grouped composition for combat, world/zone wiring, weapons, game-mode runtime hookup, and environment runtime setup. Owns restart callback wiring, combat/support effect-pool sharing, map-mode connections, and weather/water renderer-aware setup. |
 | OperationalRuntimeComposer | [OperationalRuntimeComposer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/OperationalRuntimeComposer.ts) | Typed grouped composition for strategy/map, helicopter/vehicle, and air-support runtime wiring. Owns war-sim/map bindings, helipad marker propagation, helicopter runtime dependencies, NPC vehicle provider wiring, and air-support/AA effect-pool hookups. |
 | SystemConnector | [SystemConnector.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemConnector.ts) | Remaining top-level wiring layer. Now delegates startup/player/deploy to `StartupPlayerRuntimeComposer`, combat/world/game-mode/environment to `GameplayRuntimeComposer`, strategy/vehicle/air-support to `OperationalRuntimeComposer`, and keeps only navigation + telemetry inline. |
-| SystemUpdater | [SystemUpdater.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemUpdater.ts) | Tracked update dispatch with EMA budgets and a `SimulationScheduler` for cadence-based groups. Tactical UI, war sim, world-state, and A Shau assist now run through explicit scheduler buckets; movement-coupled systems remain every-frame. A Shau assist now suggests manual redeploy instead of teleporting the player. |
-| SimulationScheduler | [SimulationScheduler.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SimulationScheduler.ts) | Small cadence scheduler for non-render update groups. Owns accumulated delta and group intervals (`tactical_ui`, `war_sim`, `air_support`, `world_state`, `ashau_assist`). |
+| SystemUpdater | [SystemUpdater.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemUpdater.ts) | Tracked update dispatch with EMA budgets and a `SimulationScheduler` for cadence-based groups. Tactical UI, war sim, world-state, and per-mode runtime hooks now run through explicit scheduler buckets; movement-coupled systems remain every-frame. A Shau assist now lives behind `GameModeRuntime.update()` and only suggests manual redeploy. |
+| SimulationScheduler | [SimulationScheduler.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SimulationScheduler.ts) | Small cadence scheduler for non-render update groups. Owns accumulated delta and group intervals (`tactical_ui`, `war_sim`, `air_support`, `world_state`, `mode_runtime`). |
 | SystemDisposer | [SystemDisposer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemDisposer.ts) | Iterates systems array calling `system.dispose()`. |
-| RuntimeMetrics | [RuntimeMetrics.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/RuntimeMetrics.ts) | Ring buffer (300 samples) for frame timing. Tracks avg, p95, p99 (500ms recompute throttle), max, hitch33/50/100 counts. Accumulates combatant/firing/engaging counts. Exposed as `window.__metrics`. |
+| RuntimeMetrics | [RuntimeMetrics.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/RuntimeMetrics.ts) | Ring buffer (300 samples) for frame timing. Tracks avg, p95, p99 (500ms recompute throttle), max, hitch33/50/100 counts. Accumulates combatant/firing/engaging counts. Constructed only in dev + perf-diagnostics sessions and exposed as `window.__metrics`. |
 | CrosshairUI | [CrosshairUI.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/CrosshairUI.ts) | Tactical crosshair DOM element: center dot, 4 lines with pulse animation, 4 corner brackets, spread indicator circle. Created lazily on showCrosshair(). |
 | LoadingUI | [LoadingUI.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/LoadingUI.ts) | "DEPLOYING TO BATTLEFIELD" spawn-loading overlay. Shows during runStartupFlow. Fade-out on hide (450ms). Status + detail text updated via setSpawnLoadingStatus(). |
-| WebGLContextRecovery | [WebGLContextRecovery.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/WebGLContextRecovery.ts) | Listens for webglcontextlost/webglcontextrestored. On lost: sets contextLost=true, shows "Recovering graphics" overlay, loop skips frames. On restored: resize renderer, rebuild PostProcessingManager, force shadow map update. |
+| WebGLContextGuard | [WebGLContextGuard.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/WebGLContextGuard.ts) | Listens for `webglcontextlost`/`webglcontextrestored`. On lost: sets `contextLost=true`, shows a recovery overlay, and the loop skips render work. On restored: resizes the renderer, rebuilds `PostProcessingManager`, forces a shadow-map refresh, and performs best-effort renderer recovery only. |
 | StartupTelemetry | [StartupTelemetry.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/StartupTelemetry.ts) | markStartup(name) breadcrumbs with ms timestamps from reset. Exposed as `window.__startupTelemetry.getSnapshot()`. Called at every major init phase boundary. |
 | SandboxModeDetector | [SandboxModeDetector.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SandboxModeDetector.ts) | URL param parsing for perf harness: `?sandbox=1&npcs=40&combat=1&autostart=1&duration=0`. Returns SandboxConfig used to skip pointer lock, skip loadout, autostart mode, gate combat. |
 | bootstrap.ts | [bootstrap.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/bootstrap.ts) | bootstrapGame(): reset telemetry, inject styles, init TouchControlLayout, construct GameEngine, await initialize(), start(). Exposes window globals. Registers beforeunload + HMR dispose. Shows fatal error overlay on bootstrap failure. |
@@ -176,8 +178,9 @@ All files are in `src/core/` unless noted.
    - new GameRenderer()                     // Three.js renderer + scene + camera +
    |                                        //   lighting + post-processing
    - new SystemManager()                    // empty shell, no systems yet
-   - new PerformanceOverlay/TimeIndicator/LogOverlay/RuntimeMetrics
-   - new WebGLContextRecovery(renderer)
+   - new PerformanceOverlay/TimeIndicator/LogOverlay
+   - new RuntimeMetrics only in dev + `?perf=1`
+   - new WebGLContextGuard(renderer)
    - Input.setupEventListeners(this)        // window resize + keydown
    - setupMenuCallbacks()                   // onPlay, onSettings, onHowToPlay,
    |                                        //   SettingsManager.onChange subscriber
@@ -192,7 +195,7 @@ All files are in `src/core/` unless noted.
          - new AssetLoader()
          - new GlobalBillboardSystem(scene, camera, assetLoader)
          - new TerrainSystem(scene, camera, assetLoader, billboard, {
-             size:64, renderDistance:adaptive(3-6), loadDistance:+1, lodLevels:4
+             size:64, renderDistance:adaptive(3-6), loadDistance:+1, lodLevels:auto-scaled
            })
        Phase 2 textures (progress: 0-1):
          - await assetLoader.init()          // loads all textures
@@ -273,14 +276,20 @@ TRACKED GROUPS (name, budget):
                        mortarSystem.update(dt)
                        sandbagSystem.update(dt)
                        ammoSupplySystem.update(dt)
+  "Navigation"  2.0ms  navmeshSystem.update(dt)        [if navmeshSystem exists]
   "HUD"         1.0ms  hudSystem.update(dt)
   "TacticalUI"  0.5ms  [scheduled 20Hz]
                          if !fullMapVisible: minimapSystem + compassSystem
                          if fullMapVisible:  fullMapSystem
+  "AirSupport"  1.0ms  airSupportManager.update(dt)
+                       aaEmplacementSystem.update(dt)
+                       npcVehicleController.update(dt)
+                       [only if respective systems exist]
   "WarSim"      2.0ms  [scheduled 10Hz] warSimulator.setPlayerPosition() + warSimulator.update(dt)
                        strategicFeedback.setPlayerPosition()
                        [only updates if warSimulator.isEnabled() - A Shau only]
-  "AShauAssist" 0.2ms  [scheduled 1Hz] if 60s with no opfor within 250m:
+  "ModeRuntime" 0.2ms  [scheduled 1Hz] gameModeManager.updateRuntime(dt, gameStarted)
+                         A Shau runtime warns after 60s with no opfor within 250m
                          if redeploy suggestion exists -> hudSystem.showMessage(...)
                          [90s cooldown between suggestions]
   "World"       1.0ms  [scheduled 15Hz] zoneManager.update(dt)
@@ -298,7 +307,7 @@ UNTRACKED ("Other" telemetry bucket - catch-all for non-reference-equal systems)
 performanceTelemetry.endFrame()
 ```
 
-**Total tracked budget: 15.7ms** (Combat 5 + Terrain 2 + Billboards 2 + Player 1 + Weapons 1 + HUD 1 + TacticalUI 0.5 + WarSim 2 + AShauAssist 0.2 + World 1)
+**Total tracked budget: 18.7ms** (Combat 5 + Terrain 2 + Billboards 2 + Player 1 + Weapons 1 + Navigation 2 + HUD 1 + TacticalUI 0.5 + AirSupport 1 + WarSim 2 + ModeRuntime 0.2 + World 1)
 
 Post-tick render (in GameEngineLoop, after updateSystems):
 ```
@@ -323,14 +332,14 @@ isTrackedSystem() uses reference equality against refs fields to determine which
 
 Source: [SystemConnector.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemConnector.ts)
 
-Setter injection is still the main pattern. Startup/player/deploy now goes through `StartupPlayerRuntimeComposer.ts`, combat/world/game-mode/environment goes through `GameplayRuntimeComposer.ts`, and strategy/vehicle/air-support goes through `OperationalRuntimeComposer.ts`. The root connector is now mostly orchestration plus navigation/telemetry, but missing wires can still silently produce undefined at call sites because the underlying systems still accept setter injection.
+Setter injection is no longer the dominant runtime pattern. Startup/player/deploy goes through `StartupPlayerRuntimeComposer.ts`, combat/world/game-mode/environment goes through `GameplayRuntimeComposer.ts`, and strategy/vehicle/air-support goes through `OperationalRuntimeComposer.ts`. The high-fan-in runtime clusters now accept grouped dependency configuration; remaining direct setters are mostly compatibility or lower-risk service wiring.
 
 | Receiver | Wired dependencies |
 |----------|--------------------|
-| **playerController** | terrainSystem, gameModeManager, ticketSystem, helicopterModel, firstPersonWeapon, hudSystem, renderer, cameraShakeSystem, inventoryManager, grenadeSystem, mortarSystem, sandbagSystem, playerSquadController, footstepAudioSystem, commandInputManager, spectatorCandidateProvider |
-| **combatantSystem** | terrainSystem, camera, ticketSystem, playerHealthSystem, zoneManager, gameModeManager, hudSystem, audioManager, playerSuppressionSystem. Plus direct property assigns: influenceMap, sandbagSystem. combatantCombat.setSandbagSystem, combatantAI.setSandbagSystem/setZoneManager/setSmokeCloudSystem, squadManager.setInfluenceMap |
+| **playerController** | grouped `configureDependencies(...)` for terrainSystem, gameModeManager, ticketSystem, helicopterModel, firstPersonWeapon, hudSystem, renderer, cameraShakeSystem, inventoryManager, grenadeSystem, mortarSystem, sandbagSystem, playerSquadController, footstepAudioSystem, commandInputManager. Separate spectatorCandidateProvider callback remains. |
+| **combatantSystem** | grouped `configureDependencies(...)` for terrainSystem, camera, ticketSystem, playerHealthSystem, zoneManager, gameModeManager, hudSystem, audioManager, playerSuppressionSystem. Plus direct property assigns: influenceMap, sandbagSystem. combatantCombat.setSandbagSystem, combatantAI.setSandbagSystem/setZoneManager/setSmokeCloudSystem, squadManager.setInfluenceMap |
 | **firstPersonWeapon** | playerController, combatantSystem, ticketSystem, hudSystem, zoneManager, inventoryManager, audioManager, grenadeSystem |
-| **hudSystem** | combatantSystem, zoneManager, ticketSystem, grenadeSystem, mortarSystem. Mounts: compassSystem, minimapSystem, playerHealthSystem, playerSquadController |
+| **hudSystem** | grouped `configureDependencies(...)` for combatantSystem, zoneManager, ticketSystem, audioManager, grenadeSystem, mortarSystem. Mounts: compassSystem, minimapSystem, playerHealthSystem, playerSquadController |
 | **ticketSystem** | zoneManager. matchRestartCallback: cancelPendingRespawn + resetForNewMatch + weapon.enable + respawnAtBase |
 | **playerHealthSystem** | zoneManager, ticketSystem, playerController, firstPersonWeapon, camera, playerRespawnManager, hudSystem |
 | **minimapSystem** | zoneManager, combatantSystem, warSimulator. Receives helipad markers via helipadSystem.onHelipadsCreated |
@@ -338,10 +347,10 @@ Setter injection is still the main pattern. Startup/player/deploy now goes throu
 | **commandInputManager** | inputManager binding from PlayerController, plus zoneManager, combatantSystem, gameModeManager, playerController, HUDLayout mounting |
 | **compassSystem** | zoneManager. Mounted into hudSystem grid slot 'compass'. |
 | **zoneManager** | combatantSystem, camera, terrainSystem, spatialGridManager, spatialQueryProvider (lambda), hudSystem |
-| **playerRespawnManager** | playerHealthSystem, zoneManager, gameModeManager, playerController, firstPersonWeapon, inventoryManager, loadoutService, grenadeSystem, warSimulator, terrainSystem, helipadSystem |
-| **helipadSystem** | terrainSystem (terrainManager), globalBillboardSystem (vegetationSystem), gameModeManager. onHelipadsCreated -> minimap + fullMap markers. |
-| **helicopterModel** | terrainSystem (terrainManager), helipadSystem, playerController, hudSystem, audioManager listener |
-| **gameModeManager** | connectSystems(zoneManager, combatantSystem, ticketSystem, terrainSystem, minimapSystem), influenceMapSystem, warSimulator |
+| **playerRespawnManager** | grouped `configureDependencies(...)` for playerHealthSystem, zoneManager, gameModeManager, playerController, firstPersonWeapon, inventoryManager, loadoutService, grenadeSystem, warSimulator, terrainSystem, helipadSystem |
+| **helipadSystem** | grouped `configureDependencies(...)` for terrainSystem (terrainManager), globalBillboardSystem (vegetationSystem), gameModeManager. onHelipadsCreated -> minimap + fullMap markers. |
+| **helicopterModel** | grouped `configureDependencies(...)` for terrainSystem, helipadSystem, playerController, hudSystem, audio listener/manager, combatantSystem, grenadeSystem, heightQueryCache, vehicleManager |
+| **gameModeManager** | grouped `configureDependencies(...)` for zoneManager, combatantSystem, ticketSystem, terrainSystem, minimapSystem, fullMapSystem, influenceMapSystem, warSimulator, hudSystem, playerController, playerRespawnManager |
 | **cameraShakeSystem** | (no setters; receives from playerController.setCameraShakeSystem) |
 | **playerSuppressionSystem** | cameraShakeSystem, playerController |
 | **flashbangScreenEffect** | playerController. setSmokeCloudSystem global. |
@@ -377,7 +386,7 @@ They are fully wired before deferral (SystemConnector runs on all refs including
 - `hudRuntime`: HUD mounting, minimap/full-map/compass, command-input map-first bindings
 - `deployRuntime`: respawn/deploy flow wiring, loadout service handoff, terrain/helipad/war-sim dependencies
 
-This does not eliminate setter injection. It does eliminate a large inline startup/player/deploy chain from `SystemConnector.ts`, and it gives that path focused tests.
+This does not eliminate all setter injection. It does remove the old startup/player/deploy setter burst from `SystemConnector.ts`, and it gives that path focused tests.
 
 ### Operational Runtime Composition
 `OperationalRuntimeComposer.ts` is the second extraction from `SystemConnector.ts`. It groups three operational clusters explicitly:
@@ -412,7 +421,7 @@ URL param `?sandbox=1` skips pointer lock, auto-starts AI_SANDBOX mode, gates co
 `SettingsManager.onChange()` subscribed in `setupMenuCallbacks()`. Changes to `masterVolume`, `enableShadows`, `showFPS`, `graphicsQuality` apply immediately to live systems. `mouseSensitivity` is read per-frame by PlayerInput directly from SettingsManager.
 
 ### Frame Loop Resilience
-GameEngineLoop tracks consecutive crashes within a 5s window. After 3 crashes it shows the fatal error overlay. In sandbox mode the overlay is suppressed and errors are logged only. The RAF loop always continues - it never calls `cancelAnimationFrame`.
+GameEngineLoop tracks consecutive crashes within a 5s window. After 3 crashes it shows the fatal error overlay. In sandbox mode the overlay is suppressed and errors are logged only. While the engine is running, render/update errors do not stop the loop; when the engine stops or disposes, the active RAF is explicitly cancelled.
 
 ---
 
@@ -422,7 +431,7 @@ GameEngineLoop tracks consecutive crashes within a 5s window. After 3 crashes it
 |--------|--------|-------|
 | `window.__engine` | bootstrap.ts | GameEngine instance |
 | `window.__renderer` | bootstrap.ts | GameRenderer instance |
-| `window.__metrics` | RuntimeMetrics constructor | Live frame metrics (frameCount, avgFrameMs, p95, p99, max, hitch counts, combatant stats) |
+| `window.__metrics` | RuntimeMetrics constructor (dev + `?perf=1` only) | Live frame metrics (frameCount, avgFrameMs, p95, p99, max, hitch counts, combatant stats) |
 | `window.__startupTelemetry` | StartupTelemetry module | `{ getSnapshot() }` - all markStartup() breadcrumbs |
 | `window.__ashauDiagnostics` | bootstrap.ts | Function returning A Shau session telemetry snapshot |
 

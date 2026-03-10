@@ -8,8 +8,12 @@
 
 | Block | Modules | Budget | Fan-in | Notes |
 |---|---|---|---|---|
-| HelicopterModel | HelicopterPhysics, HelicopterAnimation, HelicopterAudio, HelicopterInteraction | untracked | 5 | DEFERRED - created only when GameModeConfig has helipads |
-| HelipadSystem | (inline) | untracked | 3 | DEFERRED - places helipad meshes from config with dynamic foundation depth; creates HelicopterModel instances |
+| HelicopterModel | HelicopterPhysics, HelicopterAnimation, HelicopterAudio, HelicopterInteraction, HelicopterWeaponSystem, HelicopterHealthSystem, HelicopterDoorGunner | untracked | 5 | DEFERRED - created only when GameModeConfig has helipads |
+| HelipadSystem | (inline) | untracked | 3 | DEFERRED - places helipad meshes from config with dynamic foundation depth; now wired through grouped runtime dependencies |
+| SquadDeployFromHelicopter | (inline) | untracked | 2 | G key tactical insertion from low/slow helicopter |
+| VehicleManager | (inline) | untracked | 2 | Vehicle registry and lifecycle |
+| NPCVehicleController | NPCPilotAI | AirSupport group (1ms) | 2 | NPC pilot FSM, wired in SystemUpdater AirSupport group |
+| FixedWingPhysics | (inline) | not yet wired | 0 | Speed-based lift/drag/stall/bank-and-pull, ground roll; live staging content now uses parked fixed-wing assets only |
 
 ---
 
@@ -21,10 +25,21 @@
 | HelicopterAnimation | [helicopter/HelicopterAnimation.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/helicopter/HelicopterAnimation.ts) | Rotor spin, tilt blend, per-frame mesh transforms |
 | HelicopterAudio | [helicopter/HelicopterAudio.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/helicopter/HelicopterAudio.ts) | Engine RPM audio, rotor pitch variation |
 | HelicopterInteraction | [helicopter/HelicopterInteraction.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/helicopter/HelicopterInteraction.ts) | Proximity check, enter/exit, findNearestHelicopter() |
-| HelicopterModel | [helicopter/HelicopterModel.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/helicopter/HelicopterModel.ts) | Top-level block class; owns physics + animation + audio instances |
-| AircraftConfigs | [helicopter/AircraftConfigs.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/helicopter/AircraftConfigs.ts) | Per-aircraft AircraftPhysicsConfig definitions |
+| HelicopterModel | [helicopter/HelicopterModel.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/helicopter/HelicopterModel.ts) | Top-level block class; owns physics + animation + audio instances; accepts grouped runtime dependencies |
+| AircraftConfigs | [helicopter/AircraftConfigs.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/helicopter/AircraftConfigs.ts) | Per-aircraft AircraftPhysicsConfig + AircraftWeaponMount definitions |
+| HelicopterWeaponSystem | [helicopter/HelicopterWeaponSystem.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/helicopter/HelicopterWeaponSystem.ts) | Pilot-operated weapons: hitscan minigun (50rps, 15dmg) + projectile rockets (150m/s, 150dmg, 8m radius). Rearm on helipad. |
+| HelicopterHealthSystem | [helicopter/HelicopterHealthSystem.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/helicopter/HelicopterHealthSystem.ts) | Role-based HP (transport:500, gunship:600, attack:400). Repair on helipad at 50HP/s. Destruction forces pilot exit. |
+| HelicopterDoorGunner | [helicopter/HelicopterDoorGunner.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/helicopter/HelicopterDoorGunner.ts) | NPC AI for crew weapons (M60 on UH-1C). 200m target acquisition, hitscan with spread. |
+| SquadDeployFromHelicopter | [helicopter/SquadDeployFromHelicopter.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/helicopter/SquadDeployFromHelicopter.ts) | G key deploy: altitude(<15m)/speed(<5m/s)/30s cooldown, 4 terrain-snapped positions |
 | HelicopterGeometry | [helicopter/HelicopterGeometry.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/helicopter/HelicopterGeometry.ts) | createHelicopterGeometry() - procedural helicopter mesh construction |
-| HelipadSystem | [helicopter/HelipadSystem.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/helicopter/HelipadSystem.ts) | Reads GameModeConfig.helipads, places meshes, spawns HelicopterModel per helipad |
+| HelipadSystem | [helicopter/HelipadSystem.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/helicopter/HelipadSystem.ts) | Reads GameModeConfig.helipads, accepts grouped runtime dependencies, places meshes, spawns HelicopterModel per helipad |
+| VehicleManager | [vehicle/VehicleManager.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/vehicle/VehicleManager.ts) | Vehicle registry, spawn/track/despawn lifecycle |
+| FixedWingPhysics | [vehicle/FixedWingPhysics.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/vehicle/FixedWingPhysics.ts) | Speed-based lift (L=0.5*rho*v^2*S*Cl), drag, stall, bank-and-pull turns, ground roll; not yet bound to active vehicles |
+| FixedWingConfigs | [vehicle/FixedWingConfigs.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/vehicle/FixedWingConfigs.ts) | AC47_SPOOKY (stall:35, max:80), F4_PHANTOM (stall:60, max:200), A1_SKYRAIDER (stall:40, max:120) |
+| NPCPilotAI | [vehicle/NPCPilotAI.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/vehicle/NPCPilotAI.ts) | 7-state FSM (idle/takeoff/fly_to/orbit/attack_run/rtb/landing). PD controllers for altitude/heading/speed. |
+| NPCVehicleController | [vehicle/NPCVehicleController.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/vehicle/NPCVehicleController.ts) | Registry of NPC pilots, ticked in SystemUpdater AirSupport group |
+| HelicopterVehicleAdapter | [vehicle/HelicopterVehicleAdapter.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/vehicle/HelicopterVehicleAdapter.ts) | IVehicle adapter bridging HelicopterModel to the vehicle interface |
+| IVehicle | [vehicle/IVehicle.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/vehicle/IVehicle.ts) | Shared vehicle interface (enter/exit, damage, physics, render) |
 
 ---
 
@@ -47,10 +62,12 @@ Config fields in `AircraftPhysicsConfig`: mass, maxLiftForce, maxCyclicForce, ma
 | Dep | Source | Injected Via |
 |---|---|---|
 | GameModeConfig.helipads | GameModeManager | constructor (HelipadSystem) |
-| TerrainSystem | Terrain domain | setter (`setTerrainManager`) for helipad placement and helicopter grounding |
+| TerrainSystem | Terrain domain | grouped dependency config / targeted setter for helipad placement and helicopter grounding |
 | scene (THREE.Scene) | GameRenderer | constructor |
 | PlayerState / controls | PlayerSystem | setter (HelicopterInteraction) |
 | camera | GameRenderer | setter (HelicopterModel - cockpit view) |
+
+Operational runtime wiring now prefers `configureDependencies(...)` on both `HelipadSystem` and `HelicopterModel`; legacy targeted setters remain as compatibility surfaces inside those blocks.
 
 ### Deps Out (what vehicle blocks provide)
 
@@ -109,10 +126,22 @@ HUDSystem reads `helicopterModel.physics.engineRPM` (real physics state). The ol
 
 Touch has no collective or yaw controls. Gamepad has no flight axis mappings - enter/exit only.
 
+### Helicopter Weapons (Live)
+- **HelicopterWeaponSystem**: pilot-operated. Hitscan minigun (50rps, 15dmg, TracerPool(32) + MuzzleFlashSystem(16)). Projectile rockets via GrenadeSystem.spawnProjectile (150m/s, 150dmg, 8m radius). Rearm on helipad (minigun 100/s, rockets 1/s). Weapon switch 1/2 keys.
+- **HelicopterDoorGunner**: NPC AI for crew weapons (M60 on UH-1C). querySpatialRadius target acquisition (200m, 0.5s scan). Hitscan firing with spread. Dedicated TracerPool(16) + MuzzleFlashSystem(8).
+- **AircraftWeaponMount** configs: UH1_HUEY (none), UH1C_GUNSHIP (M60 door gun), AH1_COBRA (M134 minigun + rocket pod).
+
+### Fixed-Wing Aircraft (Code exists, not yet wired to vehicles)
+- **FixedWingPhysics**: speed-based lift, drag, stall, bank-and-pull turns, ground roll. States: grounded/airborne/stalled.
+- **FixedWingConfigs**: AC47_SPOOKY, F4_PHANTOM, A1_SKYRAIDER with distinct stall/max speeds.
+- **NPCPilotAI**: 7-state FSM (idle/takeoff/fly_to/orbit/attack_run/rtb/landing). PD controllers.
+- **NPCVehicleController**: ticked in SystemUpdater AirSupport group. Wired via OperationalRuntimeComposer.
+- **Current content use**: Open Frontier and A Shau Valley now place parked UH-1/A-1/F-4 aircraft at generator-backed airfields and stage M151/M35/M113/M48 vehicles in separate heavy motor pools. Those are static world features with collision, not playable vehicles.
+
 ### Future Work
-- Weapon mounts (config field `weapons` present in AircraftPhysicsConfig stub)
-- Troop transport (`seats` field in config, not yet wired)
-- Per-aircraft weapon loadouts
+- Wire FixedWingPhysics into VehicleManager for player-pilotable fixed-wing
+- NPC helicopter transport missions (takeoff, fly to LZ, deploy squad, RTB)
+- Ground vehicles (runtime interaction for M151 / M113 / M48 still missing; current mode content is static staging only)
 
 ---
 

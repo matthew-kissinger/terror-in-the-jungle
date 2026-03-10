@@ -25,15 +25,15 @@ describe('SimulationScheduler', () => {
   it('can reset individual and all group accumulators', () => {
     const scheduler = new SimulationScheduler([
       { id: 'world_state', intervalSeconds: 0.5 },
-      { id: 'ashau_assist', intervalSeconds: 1.0 },
+      { id: 'mode_runtime', intervalSeconds: 1.0 },
     ]);
 
     expect(scheduler.consume('world_state', 0.3)).toBeNull();
     scheduler.reset('world_state');
     expect(scheduler.consume('world_state', 0.3)).toBeNull();
 
-    expect(scheduler.consume('ashau_assist', 0.8)).toBeNull();
+    expect(scheduler.consume('mode_runtime', 0.8)).toBeNull();
     scheduler.reset();
-    expect(scheduler.consume('ashau_assist', 0.3)).toBeNull();
+    expect(scheduler.consume('mode_runtime', 0.3)).toBeNull();
   });
 });

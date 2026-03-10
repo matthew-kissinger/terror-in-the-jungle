@@ -110,7 +110,7 @@ export class HelicopterDoorGunner {
     for (const id of nearbyIds) {
       const combatants = this.combatantSystem.getAllCombatants();
       const c = combatants.find(c => c.id === id);
-      if (!c || c.health <= 0 || c.isDying || c.isPlayerProxy) continue;
+      if (!c || c.health <= 0 || c.isDying) continue;
 
       // Only shoot enemies (OPFOR from gunship's perspective = US heli vs OPFOR NPCs)
       // Simple heuristic: shoot any enemy faction

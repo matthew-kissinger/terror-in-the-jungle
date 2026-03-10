@@ -61,7 +61,7 @@ describe('ZoneManager', () => {
     vi.clearAllMocks();
     mockScene = new THREE.Scene();
     mockCamera = new THREE.PerspectiveCamera();
-    mockCamera.position.set(0, 0, 0);
+    mockCamera.position.set(100, 0, 100);
 
     mockSpatialGrid = {
       queryRadius: vi.fn(() => []),

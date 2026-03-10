@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { SandbagSystem } from './SandbagSystem';
+import { modelLoader } from '../assets/ModelLoader';
 import { TerrainSystem } from '../terrain/TerrainSystem';
 import { InventoryManager } from '../player/InventoryManager';
 
@@ -33,6 +34,8 @@ vi.mock('../assets/modelPaths', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../assets/modelPaths')>();
   return { ...actual };
 });
+
+const mockLoadModel = vi.mocked(modelLoader.loadModel);
 
 const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0));
 
@@ -76,6 +79,9 @@ function createMockChunkManager(): TerrainSystem {
 function createMockInventoryManager(sandbagCount = 5): InventoryManager {
   let count = sandbagCount;
   return {
+    addSandbags: vi.fn((added: number) => {
+      count += added;
+    }),
     canUseSandbag: vi.fn(() => count > 0),
     hasItem: vi.fn((item: string) => item === 'sandbag' && count > 0),
     useItem: vi.fn((item: string) => {
@@ -297,6 +303,17 @@ describe('SandbagSystem', () => {
     it('should consume inventory when placing', () => {
       sandbagSystem.placeSandbag();
       expect(inventoryManager.useSandbag).toHaveBeenCalledTimes(1);
+    });
+
+    it('should restore inventory when async placement fails', async () => {
+      mockLoadModel.mockRejectedValueOnce(new Error('load failed'));
+
+      expect(sandbagSystem.placeSandbag()).toBe(true);
+      await flushPromises();
+
+      expect(inventoryManager.useSandbag).toHaveBeenCalledTimes(1);
+      expect((inventoryManager as any).addSandbags).toHaveBeenCalledWith(1);
+      expect(sandbagSystem.getSandbagCount()).toBe(0);
     });
 
     it('should add mesh to scene after async load', async () => {

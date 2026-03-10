@@ -157,7 +157,6 @@ Max intensity capped at 2.5 (nausea guard). Uses summed pseudo-Perlin (3 sine wa
 | [WeatherSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/environment/WeatherSystem.ts) | systems/environment/WeatherSystem.ts | World group (1ms budget) | AudioManager (rain sfx) |
 | [WaterSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/environment/WaterSystem.ts) | systems/environment/WaterSystem.ts | World group (1ms budget) | WeatherSystem |
 | [Skybox](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/environment/Skybox.ts) | systems/environment/Skybox.ts | untracked (static) | none |
-| [RiverWaterSystem](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/environment/RiverWaterSystem.ts) | systems/environment/RiverWaterSystem.ts | untracked | none |
 
 ### WeatherSystem - Key Notes
 
@@ -180,12 +179,28 @@ Inline sub-module files (extracted helpers, not separate classes in WeatherSyste
 - Underwater overlay div for immersed camera tint.
 - `setWeatherSystem(ws)` setter wires the dependency.
 
-### RiverWaterSystem - Key Notes
+---
 
-- Zero textures. Fully procedural GLSL (river vertex + fragment shaders).
-- Loads river segment JSON from `public/data/vietnam/` at runtime.
-- `RiverSegment` data: world-space `[x, z]` point arrays, width in meters.
-- Uses HeightQueryCache to pin river geometry to terrain height.
+## Air Support Domain
+
+### Blocks
+
+| Block | File | Tick | Status |
+|-------|------|------|--------|
+| [AirSupportManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/airsupport/AirSupportManager.ts) | systems/airsupport/AirSupportManager.ts | AirSupport group (1ms) | Active |
+| [AAEmplacement](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/airsupport/AAEmplacement.ts) | systems/airsupport/AAEmplacement.ts | AirSupport group (1ms) | Active |
+
+### Modules (owned by AirSupportManager)
+
+| Module | File | Role |
+|--------|------|------|
+| [NapalmMission](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/airsupport/NapalmMission.ts) | systems/airsupport/NapalmMission.ts | Area denial fire effect |
+| [ReconMission](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/airsupport/ReconMission.ts) | systems/airsupport/ReconMission.ts | Aerial reconnaissance |
+| [RocketRunMission](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/airsupport/RocketRunMission.ts) | systems/airsupport/RocketRunMission.ts | Rocket attack run |
+| [SpookyMission](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/airsupport/SpookyMission.ts) | systems/airsupport/SpookyMission.ts | AC-47 Spooky gunship support |
+
+Air support is wired via `OperationalRuntimeComposer` and ticked in the SystemUpdater `AirSupport` tracked group (1ms budget). AirSupportManager, AAEmplacement, and NPCVehicleController all update in this group.
+`OperationalRuntimeComposer` now prefers `AirSupportManager.configureDependencies(...)` for combat/audio/HUD/terrain wiring and only falls back to the older setter chain for older tests/mocks.
 
 ---
 
@@ -235,6 +250,7 @@ Inline sub-module files (extracted helpers, not separate classes in WeatherSyste
 ### ModelLoader - Key Notes
 
 - `loadModel(relativePath)` returns a clone of the cached scene (independent instance per caller).
+- `disposeInstance()` / `releaseInstance()` is the safe detach path for a caller-owned clone; shared cached geometry/materials stay owned by the loader.
 - Flat shading applied to all MeshStandardMaterial meshes at load time.
 - Path resolution via `config/paths.ts:getModelPath()`.
 - Singleton export: `import { modelLoader } from './ModelLoader'`.
@@ -293,6 +309,7 @@ perf.recordShot() / recordHit()
 ```
 
 FrameTimingTracker is owned by PerformanceTelemetry (not a separate singleton). GPUTimingTelemetry requires `init(renderer)` call after renderer is ready.
+Additional release-path note: `RuntimeMetrics` frame sampling is no longer always-on in production. The extra frame-history ring buffer only exists in dev + perf-diagnostics sessions.
 
 ---
 

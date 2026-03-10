@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Combatant, CombatantState } from '../types'
+import { Combatant, CombatantState, ITargetable, isPlayerTarget } from '../types'
 import { ISpatialQuery } from '../SpatialOctree'
 import { Logger } from '../../../utils/Logger'
 const _toDestination = new THREE.Vector3()
@@ -21,10 +21,10 @@ export class AIStateMovement {
       playerPosition: THREE.Vector3,
       allCombatants: Map<string, Combatant>,
       spatialGrid?: ISpatialQuery
-    ) => Combatant | null,
+    ) => ITargetable | null,
     canSeeTarget: (
       combatant: Combatant,
-      target: Combatant,
+      target: ITargetable,
       playerPosition: THREE.Vector3
     ) => boolean
   ): void {
@@ -45,7 +45,7 @@ export class AIStateMovement {
 
     const enemy = findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid);
     if (enemy) {
-      const targetPos = enemy.id === 'PLAYER' ? playerPosition : enemy.position;
+      const targetPos = isPlayerTarget(enemy) ? playerPosition : enemy.position;
       const distance = combatant.position.distanceTo(targetPos);
 
       // At very close range, ALWAYS react - can't ignore enemy right next to you
@@ -77,7 +77,7 @@ export class AIStateMovement {
     allCombatants: Map<string, Combatant>,
     canSeeTarget: (
       combatant: Combatant,
-      target: Combatant,
+      target: ITargetable,
       playerPosition: THREE.Vector3
     ) => boolean
   ): void {

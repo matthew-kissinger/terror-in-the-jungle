@@ -1,7 +1,7 @@
 # Player Domain
 
-> Self-contained reference. 8 GameSystem blocks, 21 internal modules, 1ms tick budget.
-> PlayerController has the highest setter fan-out in the codebase (15 deps).
+> Self-contained reference. 8 GameSystem blocks, 23 internal modules, 1ms tick budget.
+> PlayerController is still a high-fanout coordinator, but startup wiring now goes through grouped dependency objects instead of the old full setter chain.
 
 [GH]: https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src
 
@@ -30,12 +30,14 @@
 |--------|------|------|
 | [PlayerCamera]([GH]/systems/player/PlayerCamera.ts) | systems/player/PlayerCamera.ts | First-person camera math, pitch/yaw |
 | [PlayerInput]([GH]/systems/player/PlayerInput.ts) | systems/player/PlayerInput.ts | Keyboard/mouse/touch input, sensitivity |
-| [PlayerMovement]([GH]/systems/player/PlayerMovement.ts) | systems/player/PlayerMovement.ts | Velocity, grounding, gravity, helicopter controls, world boundary bounce-back |
+| [PlayerMovement]([GH]/systems/player/PlayerMovement.ts) | systems/player/PlayerMovement.ts | Fixed-step movement/grounding, gravity, helicopter controls, world boundary bounce-back |
+| [PlayerCombatController]([GH]/systems/player/PlayerCombatController.ts) | systems/player/PlayerCombatController.ts | Weapon, grenade, mortar, sandbag combat actions behind PlayerController |
+| [PlayerVehicleController]([GH]/systems/player/PlayerVehicleController.ts) | systems/player/PlayerVehicleController.ts | Helicopter enter/exit, flight-mode support, squad deploy, air support requests |
 | [PlayerStatsTracker]([GH]/systems/player/PlayerStatsTracker.ts) | systems/player/PlayerStatsTracker.ts | K/D/assist stats |
 | [PlayerHealthEffects]([GH]/systems/player/PlayerHealthEffects.ts) | systems/player/PlayerHealthEffects.ts | Visual health feedback (vignette, red flash) |
 | [PlayerHealthUI]([GH]/systems/player/PlayerHealthUI.ts) | systems/player/PlayerHealthUI.ts | Health bar DOM rendering |
 | [DeathCamOverlay]([GH]/systems/player/DeathCamOverlay.ts) | systems/player/DeathCamOverlay.ts | Death camera overlay |
-| [RespawnUI]([GH]/systems/player/RespawnUI.ts) | systems/player/RespawnUI.ts | Respawn interface |
+| [RespawnUI]([GH]/systems/player/RespawnUI.ts) | systems/player/RespawnUI.ts | Respawn/deploy UIComponent with CSS Modules, map host, loadout controls |
 | [RespawnMapController]([GH]/systems/player/RespawnMapController.ts) | systems/player/RespawnMapController.ts | Respawn map interaction |
 | [LoadoutService]([GH]/systems/player/LoadoutService.ts) | systems/player/LoadoutService.ts | Weapon loadout selection and persistence |
 | [DeployFlowController]([GH]/systems/player/DeployFlowController.ts) | systems/player/DeployFlowController.ts | Owns deploy-session state, selected spawn point, and initial-deploy resolution |
@@ -63,25 +65,25 @@
 
 ## Wiring
 
-**PlayerController** receives (15 deps - highest fan-out):
+**PlayerController** startup runtime receives one grouped dependency object (plus a small compatibility surface that still exists for tests/cold paths):
 
 | Dep | Method | Domain |
 |-----|--------|--------|
-| TerrainSystem | setTerrainSystem | Terrain |
-| GameModeManager | setGameModeManager | World |
-| TicketSystem | setTicketSystem | World |
-| HelicopterModel | setHelicopterModel | Vehicle |
-| FirstPersonWeapon | setFirstPersonWeapon | Player |
-| HUDSystem | setHUDSystem | UI |
-| CameraShakeSystem | setCameraShakeSystem | Effects |
-| FootstepAudioSystem | setFootstepAudioSystem | Audio |
-| InventoryManager | setInventoryManager | Player |
-| GrenadeSystem | setGrenadeSystem | Weapons |
-| MortarSystem | setMortarSystem | Weapons |
-| SandbagSystem | setSandbagSystem | Weapons |
-| PlayerSquadController | setPlayerSquadController | Combat |
-| Renderer | setRenderer | Core |
-| CommandInputManager | setCommandInputManager | Combat |
+| TerrainSystem | configureDependencies | Terrain |
+| GameModeManager | configureDependencies | World |
+| TicketSystem | configureDependencies | World |
+| HelicopterModel | configureDependencies | Vehicle |
+| FirstPersonWeapon | configureDependencies | Player |
+| HUDSystem | configureDependencies | UI |
+| CameraShakeSystem | configureDependencies | Effects |
+| FootstepAudioSystem | configureDependencies | Audio |
+| InventoryManager | configureDependencies | Player |
+| GrenadeSystem | configureDependencies | Weapons |
+| MortarSystem | configureDependencies | Weapons |
+| SandbagSystem | configureDependencies | Weapons |
+| PlayerSquadController | configureDependencies | Combat |
+| Renderer | configureDependencies | Core |
+| CommandInputManager | configureDependencies | Combat |
 
 **FirstPersonWeapon** receives (8): PlayerController, CombatantSystem, TicketSystem, HUDSystem, ZoneManager, AudioManager, InventoryManager, GrenadeSystem
 
@@ -93,6 +95,7 @@ Internal note:
 - `PlayerRespawnManager` no longer owns the pending initial-deploy promise and selected-spawn state directly.
 - `DeployFlowController` is now the state holder for deploy session kind, session model, visibility, selected spawn, and initial-deploy resolve/reject flow.
 - `InitialDeployCancelledError` is now a standalone contract used by both core startup code and player deploy code, instead of being defined inside `PlayerRespawnManager`.
+- `RespawnUI` is now a `UIComponent` mounted by the respawn flow, but it preserves the existing `PlayerRespawnManager` callback/update contract so the gameplay flow did not need a parallel rewrite.
 
 ---
 
@@ -126,8 +129,8 @@ HelicopterInteraction.checkPlayerProximity()
     playerController.disableFootMovement()
 
 During flight:
-  PlayerMovement reads input -> physics.setControls()
-  HelicopterModel.updateHelicopterPhysics() applies controls
+  PlayerMovement reads input -> fixed-step helicopter control updates
+  HelicopterModel.updateHelicopterPhysics() applies controls through fixed-step HelicopterPhysics
   playerController.setPosition(physics.state.position)
   camera follows helicopter
 

@@ -45,6 +45,7 @@ export class GunplayCore {
   private recoilIndex = 0;
   private recoil = new RecoilPattern(9001);
   private accumulatedRecoil = 0; // Track total vertical recoil
+  private pelletRayPool: THREE.Ray[] = [];
 
   constructor(spec: WeaponSpec) {
     this.spec = spec;
@@ -134,9 +135,11 @@ export class GunplayCore {
     const pelletSpread = this.spec.pelletSpreadDeg || 0;
 
     if (pelletCount === 1 || pelletSpread === 0) {
-      // Single pellet or no spread - just return one ray
-      // Clone from scratch ray since it will be stored in an array
-      return [this.computeShotRay(camera, 0).clone()];
+      const ray = this.ensurePelletRay(0);
+      const shotRay = this.computeShotRay(camera, 0);
+      ray.origin.copy(shotRay.origin);
+      ray.direction.copy(shotRay.direction);
+      return [ray];
     }
 
     const rays: THREE.Ray[] = [];
@@ -170,9 +173,10 @@ export class GunplayCore {
         .addScaledVector(_realUp, _offset.y)
         .normalize();
 
-      // Individual Ray allocation is necessary here as they are stored in an array,
-      // but we reuse the vectors for initialization.
-      rays.push(new THREE.Ray(_origin.clone(), _perturbed.clone()));
+      const ray = this.ensurePelletRay(i);
+      ray.origin.copy(_origin);
+      ray.direction.copy(_perturbed);
+      rays.push(ray);
     }
 
     return rays;
@@ -180,6 +184,13 @@ export class GunplayCore {
 
   isShotgun(): boolean {
     return (this.spec.pelletCount || 1) > 1;
+  }
+
+  private ensurePelletRay(index: number): THREE.Ray {
+    if (!this.pelletRayPool[index]) {
+      this.pelletRayPool[index] = new THREE.Ray(new THREE.Vector3(), new THREE.Vector3(0, 0, -1));
+    }
+    return this.pelletRayPool[index];
   }
 }
 

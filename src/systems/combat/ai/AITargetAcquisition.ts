@@ -1,22 +1,20 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction, isOpfor } from '../types';
+import { Combatant, CombatantState, Faction, ITargetable, isAlly } from '../types';
 import { ISpatialQuery } from '../SpatialOctree';
 import { clusterManager } from '../ClusterManager';
 
 // Module-level scratch vectors
-const _playerProxy: Combatant = {
+const _playerTarget: ITargetable = {
   id: 'PLAYER',
+  kind: 'player',
   faction: Faction.US,
   position: new THREE.Vector3(),
   velocity: new THREE.Vector3(),
   state: CombatantState.ENGAGING,
   health: 100,
-  maxHealth: 100,
-  kills: 0,
-  deaths: 0
-} as Combatant;
+};
 
-const _potentialTargetsScratch: Combatant[] = [];
+const _potentialTargetsScratch: ITargetable[] = [];
 const CLUSTER_RADIUS = 15;
 const CLUSTER_RADIUS_SQ = CLUSTER_RADIUS * CLUSTER_RADIUS;
 const CLUSTER_THRESHOLD = 4;
@@ -32,6 +30,7 @@ type SpatialQueryCacheEntry = {
  */
 export class AITargetAcquisition {
   private readonly spatialQueryCache = new Map<string, SpatialQueryCacheEntry>();
+  private playerFaction: Faction = Faction.US;
 
   beginFrame(): void {
     this.spatialQueryCache.clear();
@@ -73,7 +72,7 @@ export class AITargetAcquisition {
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
     spatialGrid?: ISpatialQuery
-  ): Combatant | null {
+  ): ITargetable | null {
     const visualRange = combatant.skillProfile.visualRange;
     const visualRangeSq = visualRange * visualRange;
     const potentialTargets = _potentialTargetsScratch;
@@ -81,12 +80,12 @@ export class AITargetAcquisition {
     let inCluster = false;
 
     // Check player as potential target for OPFOR
-    if (isOpfor(combatant.faction)) {
+    if (!isAlly(combatant.faction, this.playerFaction)) {
       const playerDistanceSq = combatant.position.distanceToSquared(playerPosition);
       if (playerDistanceSq < visualRangeSq) {
-        // Reuse player proxy instead of creating new object
-        _playerProxy.position.copy(playerPosition);
-        potentialTargets.push(_playerProxy);
+        _playerTarget.faction = this.playerFaction;
+        _playerTarget.position.copy(playerPosition);
+        potentialTargets.push(_playerTarget);
       }
     }
 
@@ -155,7 +154,7 @@ export class AITargetAcquisition {
       return target;
     }
 
-    let nearestEnemy: Combatant | null = null;
+    let nearestEnemy: ITargetable | null = null;
     let minDistanceSq = Infinity;
 
     for (const target of potentialTargets) {
@@ -211,7 +210,7 @@ export class AITargetAcquisition {
     let count = 0;
     const radiusSq = radius * radius;
 
-    if (isOpfor(combatant.faction)) {
+    if (!isAlly(combatant.faction, this.playerFaction)) {
       if (combatant.position.distanceToSquared(playerPosition) < radiusSq) {
         count++;
       }
@@ -240,6 +239,10 @@ export class AITargetAcquisition {
     }
 
     return count;
+  }
+
+  setPlayerFaction(faction: Faction): void {
+    this.playerFaction = faction;
   }
 
   private getNearbyIds(

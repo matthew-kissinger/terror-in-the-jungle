@@ -101,6 +101,21 @@ describe('GameModeManager', () => {
     ]);
   });
 
+  it('passes scheduled runtime updates through the active mode runtime', () => {
+    const events: string[] = [];
+    const manager = new GameModeManager(getGameModeDefinition, definition => ({
+      definition,
+      update: (_context, deltaTime, gameStarted) => {
+        events.push(`${definition.id}:${deltaTime}:${gameStarted}`);
+      }
+    }));
+
+    manager.setGameMode(GameMode.AI_SANDBOX);
+    manager.updateRuntime(0.5, true);
+
+    expect(events).toEqual(['ai_sandbox:0.5:true']);
+  });
+
   it('exposes current deploy and respawn policies', () => {
     const manager = new GameModeManager();
     manager.setGameMode(GameMode.OPEN_FRONTIER);

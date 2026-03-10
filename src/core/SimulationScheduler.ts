@@ -3,7 +3,7 @@ type SimulationGroupId =
   | 'war_sim'
   | 'air_support'
   | 'world_state'
-  | 'ashau_assist';
+  | 'mode_runtime';
 
 interface SimulationGroupConfig {
   id: SimulationGroupId;
@@ -16,7 +16,7 @@ const DEFAULT_GROUPS: SimulationGroupConfig[] = [
   // Air support still contains movement-coupled systems, so keep it every frame for now.
   { id: 'air_support', intervalSeconds: 0 },
   { id: 'world_state', intervalSeconds: 1 / 15 },
-  { id: 'ashau_assist', intervalSeconds: 1.0 },
+  { id: 'mode_runtime', intervalSeconds: 1.0 },
 ];
 
 export class SimulationScheduler {

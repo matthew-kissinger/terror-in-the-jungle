@@ -1,8 +1,8 @@
 import { getHeightQueryCache, type HeightQueryCache } from '../systems/terrain/HeightQueryCache';
-import { SystemReferences } from './SystemInitializer';
+import type { SystemKeyToType } from './SystemRegistry';
 
 type OperationalRuntimeRefs = Pick<
-  SystemReferences,
+  SystemKeyToType,
   | 'aaEmplacementSystem'
   | 'airSupportManager'
   | 'audioManager'
@@ -18,6 +18,7 @@ type OperationalRuntimeRefs = Pick<
   | 'minimapSystem'
   | 'npcVehicleController'
   | 'playerController'
+  | 'radioTransmissionSystem'
   | 'strategicFeedback'
   | 'terrainSystem'
   | 'ticketSystem'
@@ -56,6 +57,7 @@ interface OperationalRuntimeGroups {
     | 'minimapSystem'
     | 'npcVehicleController'
     | 'playerController'
+    | 'radioTransmissionSystem'
     | 'terrainSystem'
     | 'vehicleManager'
     | 'worldFeatureSystem'
@@ -108,6 +110,7 @@ export function createOperationalRuntimeGroups(
       minimapSystem: refs.minimapSystem,
       npcVehicleController: refs.npcVehicleController,
       playerController: refs.playerController,
+      radioTransmissionSystem: refs.radioTransmissionSystem,
       terrainSystem: refs.terrainSystem,
       vehicleManager: refs.vehicleManager,
       worldFeatureSystem: refs.worldFeatureSystem,
@@ -154,46 +157,89 @@ function wireVehicleRuntime(
   runtime: OperationalRuntimeGroups['vehicleRuntime'],
   heightQueryCache: HeightQueryCache
 ): void {
-  runtime.helipadSystem.setTerrainManager(runtime.terrainSystem);
-  runtime.helipadSystem.setVegetationSystem(runtime.globalBillboardSystem);
-  runtime.helipadSystem.setGameModeManager(runtime.gameModeManager);
+  runtime.radioTransmissionSystem.setAudioListener(runtime.audioManager.getListener());
+
+  if (typeof runtime.helipadSystem.configureDependencies === 'function') {
+    runtime.helipadSystem.configureDependencies({
+      terrainManager: runtime.terrainSystem,
+      vegetationSystem: runtime.globalBillboardSystem,
+      gameModeManager: runtime.gameModeManager,
+    });
+  } else {
+    runtime.helipadSystem.setTerrainManager(runtime.terrainSystem);
+    runtime.helipadSystem.setVegetationSystem(runtime.globalBillboardSystem);
+    runtime.helipadSystem.setGameModeManager(runtime.gameModeManager);
+  }
   runtime.helipadSystem.onHelipadsCreated((helipads) => {
     const markers = helipads.map(hp => ({ id: hp.id, position: hp.position }));
     runtime.minimapSystem.setHelipadMarkers(markers);
     runtime.fullMapSystem.setHelipadMarkers(markers);
   });
 
-  runtime.helicopterModel.setTerrainManager(runtime.terrainSystem);
-  runtime.helicopterModel.setHelipadSystem(runtime.helipadSystem);
-  runtime.helicopterModel.setPlayerController(runtime.playerController);
-  runtime.helicopterModel.setHUDSystem(runtime.hudSystem);
-  runtime.helicopterModel.setAudioListener(runtime.audioManager.getListener());
-  runtime.helicopterModel.setAudioManager(runtime.audioManager);
-  runtime.helicopterModel.setCombatantSystem(runtime.combatantSystem);
-  runtime.helicopterModel.setGrenadeSystem(runtime.grenadeSystem);
-  runtime.helicopterModel.setHeightQueryCache(heightQueryCache);
-  runtime.helicopterModel.setVehicleManager(runtime.vehicleManager);
+  if (typeof runtime.helicopterModel.configureDependencies === 'function') {
+    runtime.helicopterModel.configureDependencies({
+      terrainManager: runtime.terrainSystem,
+      helipadSystem: runtime.helipadSystem,
+      playerController: runtime.playerController,
+      hudSystem: runtime.hudSystem,
+      audioListener: runtime.audioManager.getListener(),
+      audioManager: runtime.audioManager,
+      combatantSystem: runtime.combatantSystem,
+      grenadeSystem: runtime.grenadeSystem,
+      heightQueryCache,
+      vehicleManager: runtime.vehicleManager,
+    });
+  } else {
+    runtime.helicopterModel.setTerrainManager(runtime.terrainSystem);
+    runtime.helicopterModel.setHelipadSystem(runtime.helipadSystem);
+    runtime.helicopterModel.setPlayerController(runtime.playerController);
+    runtime.helicopterModel.setHUDSystem(runtime.hudSystem);
+    runtime.helicopterModel.setAudioListener(runtime.audioManager.getListener());
+    runtime.helicopterModel.setAudioManager(runtime.audioManager);
+    runtime.helicopterModel.setCombatantSystem(runtime.combatantSystem);
+    runtime.helicopterModel.setGrenadeSystem(runtime.grenadeSystem);
+    runtime.helicopterModel.setHeightQueryCache(heightQueryCache);
+    runtime.helicopterModel.setVehicleManager(runtime.vehicleManager);
+  }
 
-  runtime.worldFeatureSystem.setTerrainManager(runtime.terrainSystem);
-  runtime.worldFeatureSystem.setGameModeManager(runtime.gameModeManager);
+  if (typeof runtime.worldFeatureSystem.configureDependencies === 'function') {
+    runtime.worldFeatureSystem.configureDependencies({
+      terrainManager: runtime.terrainSystem,
+      gameModeManager: runtime.gameModeManager,
+    });
+  } else {
+    runtime.worldFeatureSystem.setTerrainManager(runtime.terrainSystem);
+    runtime.worldFeatureSystem.setGameModeManager(runtime.gameModeManager);
+  }
 
   runtime.npcVehicleController.setVehicleManager(runtime.vehicleManager);
   runtime.npcVehicleController.setCombatantProvider(() => runtime.combatantSystem.combatants);
 }
 
 function wireAirSupportRuntime(runtime: OperationalRuntimeGroups['airSupportRuntime']): void {
-  runtime.airSupportManager.setCombatantSystem(runtime.combatantSystem);
-  runtime.airSupportManager.setGrenadeSystem(runtime.grenadeSystem);
-  runtime.airSupportManager.setAudioManager(runtime.audioManager);
-  runtime.airSupportManager.setHUDSystem(runtime.hudSystem);
-  runtime.airSupportManager.setTerrainSystem(runtime.terrainSystem);
-
   const explosionEffectsPool = runtime.combatantSystem.explosionEffectsPool;
-  if (explosionEffectsPool) {
-    runtime.airSupportManager.setExplosionEffectsPool(explosionEffectsPool);
+  if (typeof runtime.airSupportManager.configureDependencies === 'function') {
+    runtime.airSupportManager.configureDependencies({
+      combatantSystem: runtime.combatantSystem,
+      grenadeSystem: runtime.grenadeSystem,
+      audioManager: runtime.audioManager,
+      hudSystem: runtime.hudSystem,
+      terrainSystem: runtime.terrainSystem,
+      explosionEffectsPool,
+    });
+  } else {
+    runtime.airSupportManager.setCombatantSystem(runtime.combatantSystem);
+    runtime.airSupportManager.setGrenadeSystem(runtime.grenadeSystem);
+    runtime.airSupportManager.setAudioManager(runtime.audioManager);
+    runtime.airSupportManager.setHUDSystem(runtime.hudSystem);
+    runtime.airSupportManager.setTerrainSystem(runtime.terrainSystem);
+
+    if (explosionEffectsPool) {
+      runtime.airSupportManager.setExplosionEffectsPool(explosionEffectsPool);
+    }
   }
 
-  runtime.playerController.setAirSupportManager(runtime.airSupportManager);
+  runtime.playerController.configureVehicleController({ airSupportManager: runtime.airSupportManager });
 
   runtime.aaEmplacementSystem.setHelicopterModel(runtime.helicopterModel);
   runtime.aaEmplacementSystem.setAudioManager(runtime.audioManager);

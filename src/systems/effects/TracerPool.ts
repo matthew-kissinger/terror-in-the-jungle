@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Logger } from '../../utils/Logger';
 
 interface Tracer {
   group: THREE.Group;
@@ -63,6 +64,10 @@ export class TracerPool {
   }
 
   spawn(start: THREE.Vector3, end: THREE.Vector3, lifetimeMs = 150): void {
+    if (import.meta.env.DEV && lifetimeMs > 0 && lifetimeMs < 1) {
+      Logger.warn('effects', `TracerPool.spawn received suspicious lifetimeMs=${lifetimeMs}. Did the caller pass seconds instead of milliseconds?`);
+    }
+
     const tracer = this.pool.pop() || this.active.shift();
     if (!tracer) return;
 
@@ -74,7 +79,7 @@ export class TracerPool {
     (tracer.coreLine.material as THREE.LineBasicMaterial).opacity = 0.9;
     (tracer.glowLine.material as THREE.LineBasicMaterial).opacity = 0.5;
     tracer.group.visible = true;
-    tracer.aliveUntil = performance.now() + lifetimeMs;
+    tracer.aliveUntil = performance.now() + Math.max(1, lifetimeMs);
     this.active.push(tracer);
   }
 

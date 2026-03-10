@@ -37,16 +37,18 @@ import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
+import { RadioTransmissionSystem } from '../systems/audio/RadioTransmissionSystem';
 import { LoadoutService } from '../systems/player/LoadoutService';
 import { WarSimulator } from '../systems/strategy/WarSimulator';
 import { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
 import { WorldFeatureSystem } from '../systems/world/WorldFeatureSystem';
 import { AnimalSystem } from '../systems/world/AnimalSystem';
 import { NavmeshSystem } from '../systems/navigation/NavmeshSystem';
-import { SystemInitializer, SystemReferences } from './SystemInitializer';
+import { SystemInitializer, type MutableSystemReferences } from './SystemInitializer';
 import { SystemConnector } from './SystemConnector';
 import { SystemUpdater } from './SystemUpdater';
 import { SystemDisposer } from './SystemDisposer';
+import { SystemRegistry, type SystemKeyToType } from './SystemRegistry';
 import { markStartup } from './StartupTelemetry';
 
 export class SystemManager {
@@ -59,51 +61,10 @@ export class SystemManager {
   private connector = new SystemConnector();
   private updater = new SystemUpdater();
   private disposer = new SystemDisposer();
+  private registry = new SystemRegistry();
   
   // System references object for passing to modules
-  private refs: SystemReferences = {} as SystemReferences;
-
-  // Game systems
-  public assetLoader!: AssetLoader;
-  public terrainSystem!: TerrainSystem;
-  public globalBillboardSystem!: GlobalBillboardSystem;
-  public playerController!: PlayerController;
-  public combatantSystem!: CombatantSystem;
-  public skybox!: Skybox;
-  public waterSystem!: WaterSystem;
-
-  public weatherSystem!: WeatherSystem;
-  public firstPersonWeapon!: FirstPersonWeapon;
-  public zoneManager!: ZoneManager;
-  public hudSystem!: HUDSystem;
-  public ticketSystem!: TicketSystem;
-  public playerHealthSystem!: PlayerHealthSystem;
-  public minimapSystem!: MinimapSystem;
-  public audioManager!: AudioManager;
-  public gameModeManager!: GameModeManager;
-  public playerRespawnManager!: PlayerRespawnManager;
-  public fullMapSystem!: FullMapSystem;
-  public compassSystem!: CompassSystem;
-  public helipadSystem!: HelipadSystem;
-  public helicopterModel!: HelicopterModel;
-  public playerSquadController!: PlayerSquadController;
-  public commandInputManager!: CommandInputManager;
-  public inventoryManager!: InventoryManager;
-  public grenadeSystem!: GrenadeSystem;
-  public mortarSystem!: MortarSystem;
-  public sandbagSystem!: SandbagSystem;
-  public cameraShakeSystem!: CameraShakeSystem;
-  public playerSuppressionSystem!: PlayerSuppressionSystem;
-  public smokeCloudSystem!: SmokeCloudSystem;
-  public influenceMapSystem!: InfluenceMapSystem;
-  public ammoSupplySystem!: AmmoSupplySystem;
-  public footstepAudioSystem!: FootstepAudioSystem;
-  public loadoutService!: LoadoutService;
-  public warSimulator!: WarSimulator;
-  public strategicFeedback!: StrategicFeedback;
-  public worldFeatureSystem!: WorldFeatureSystem;
-  public animalSystem!: AnimalSystem;
-  public navmeshSystem!: NavmeshSystem;
+  private refs: MutableSystemReferences = {};
 
   async initializeSystems(
     scene: THREE.Scene,
@@ -125,50 +86,11 @@ export class SystemManager {
     this.deferredSystems = result.deferredSystems;
     this.scene = result.scene;
 
-    // Copy initialized references to public properties
-    this.assetLoader = this.refs.assetLoader;
-    this.terrainSystem = this.refs.terrainSystem;
-    this.globalBillboardSystem = this.refs.globalBillboardSystem;
-    this.playerController = this.refs.playerController;
-    this.combatantSystem = this.refs.combatantSystem;
-    this.skybox = this.refs.skybox;
-    this.waterSystem = this.refs.waterSystem;
-
-    this.weatherSystem = this.refs.weatherSystem;
-    this.firstPersonWeapon = this.refs.firstPersonWeapon;
-    this.zoneManager = this.refs.zoneManager;
-    this.hudSystem = this.refs.hudSystem;
-    this.ticketSystem = this.refs.ticketSystem;
-    this.playerHealthSystem = this.refs.playerHealthSystem;
-    this.minimapSystem = this.refs.minimapSystem;
-    this.audioManager = this.refs.audioManager;
-    this.gameModeManager = this.refs.gameModeManager;
-    this.playerRespawnManager = this.refs.playerRespawnManager;
-    this.fullMapSystem = this.refs.fullMapSystem;
-    this.compassSystem = this.refs.compassSystem;
-    this.helipadSystem = this.refs.helipadSystem;
-    this.helicopterModel = this.refs.helicopterModel;
-    this.playerSquadController = this.refs.playerSquadController;
-    this.commandInputManager = this.refs.commandInputManager;
-    this.inventoryManager = this.refs.inventoryManager;
-    this.grenadeSystem = this.refs.grenadeSystem;
-    this.mortarSystem = this.refs.mortarSystem;
-    this.sandbagSystem = this.refs.sandbagSystem;
-    this.cameraShakeSystem = this.refs.cameraShakeSystem;
-    this.playerSuppressionSystem = this.refs.playerSuppressionSystem;
-    this.smokeCloudSystem = this.refs.smokeCloudSystem;
-    this.influenceMapSystem = this.refs.influenceMapSystem;
-    this.ammoSupplySystem = this.refs.ammoSupplySystem;
-    this.footstepAudioSystem = this.refs.footstepAudioSystem;
-    this.loadoutService = this.refs.loadoutService;
-    this.warSimulator = this.refs.warSimulator;
-    this.strategicFeedback = this.refs.strategicFeedback;
-    this.worldFeatureSystem = this.refs.worldFeatureSystem;
-    this.animalSystem = this.refs.animalSystem;
-    this.navmeshSystem = this.refs.navmeshSystem;
+    this.registry.clear();
+    this.registry.registerFrom(this.refs);
 
     // Connect systems together
-    this.connector.connectSystems(this.refs, scene, camera, renderer);
+    this.connector.connectSystems(this.refs as SystemKeyToType, scene, camera, renderer);
   }
 
   startDeferredInitialization(): void {
@@ -227,7 +149,7 @@ export class SystemManager {
   }
 
   updateSystems(deltaTime: number, gameStarted: boolean = true): void {
-    this.updater.updateSystems(this.refs, this.systems, this.scene, deltaTime, gameStarted);
+    this.updater.updateSystems(this.refs as SystemKeyToType, this.systems, this.scene, deltaTime, gameStarted);
   }
 
   getSystemTimings(): Array<{ name: string; timeMs: number; budgetMs: number }> {
@@ -240,6 +162,10 @@ export class SystemManager {
 
   dispose(): void {
     this.disposer.dispose(this.systems);
+    this.disposer.dispose(this.deferredSystems);
+    this.systems = [];
+    this.deferredSystems = [];
+    this.registry.clear();
   }
 
   setGameMode(mode: GameMode, options?: { createPlayerSquad?: boolean }): void {
@@ -333,24 +259,65 @@ export class SystemManager {
   }
 
   getPlayerSquadController(): PlayerSquadController {
-    return this.playerSquadController;
+    return this.registry.require('playerSquadController');
   }
 
   getInventoryManager(): InventoryManager {
-    return this.inventoryManager;
+    return this.registry.require('inventoryManager');
   }
 
   getGrenadeSystem(): GrenadeSystem {
-    return this.grenadeSystem;
+    return this.registry.require('grenadeSystem');
   }
 
   getMortarSystem(): MortarSystem {
-    return this.mortarSystem;
+    return this.registry.require('mortarSystem');
   }
 
   getSandbagSystem(): SandbagSystem {
-    return this.sandbagSystem;
+    return this.registry.require('sandbagSystem');
   }
+
+  get assetLoader(): AssetLoader { return this.registry.require('assetLoader'); }
+  get terrainSystem(): TerrainSystem { return this.registry.require('terrainSystem'); }
+  get globalBillboardSystem(): GlobalBillboardSystem { return this.registry.require('globalBillboardSystem'); }
+  get playerController(): PlayerController { return this.registry.require('playerController'); }
+  get combatantSystem(): CombatantSystem { return this.registry.require('combatantSystem'); }
+  get skybox(): Skybox { return this.registry.require('skybox'); }
+  get waterSystem(): WaterSystem { return this.registry.require('waterSystem'); }
+  get weatherSystem(): WeatherSystem { return this.registry.require('weatherSystem'); }
+  get firstPersonWeapon(): FirstPersonWeapon { return this.registry.require('firstPersonWeapon'); }
+  get zoneManager(): ZoneManager { return this.registry.require('zoneManager'); }
+  get hudSystem(): HUDSystem { return this.registry.require('hudSystem'); }
+  get ticketSystem(): TicketSystem { return this.registry.require('ticketSystem'); }
+  get playerHealthSystem(): PlayerHealthSystem { return this.registry.require('playerHealthSystem'); }
+  get minimapSystem(): MinimapSystem { return this.registry.require('minimapSystem'); }
+  get audioManager(): AudioManager { return this.registry.require('audioManager'); }
+  get gameModeManager(): GameModeManager { return this.registry.require('gameModeManager'); }
+  get playerRespawnManager(): PlayerRespawnManager { return this.registry.require('playerRespawnManager'); }
+  get fullMapSystem(): FullMapSystem { return this.registry.require('fullMapSystem'); }
+  get compassSystem(): CompassSystem { return this.registry.require('compassSystem'); }
+  get helipadSystem(): HelipadSystem { return this.registry.require('helipadSystem'); }
+  get helicopterModel(): HelicopterModel { return this.registry.require('helicopterModel'); }
+  get playerSquadController(): PlayerSquadController { return this.registry.require('playerSquadController'); }
+  get commandInputManager(): CommandInputManager { return this.registry.require('commandInputManager'); }
+  get inventoryManager(): InventoryManager { return this.registry.require('inventoryManager'); }
+  get grenadeSystem(): GrenadeSystem { return this.registry.require('grenadeSystem'); }
+  get mortarSystem(): MortarSystem { return this.registry.require('mortarSystem'); }
+  get sandbagSystem(): SandbagSystem { return this.registry.require('sandbagSystem'); }
+  get cameraShakeSystem(): CameraShakeSystem { return this.registry.require('cameraShakeSystem'); }
+  get playerSuppressionSystem(): PlayerSuppressionSystem { return this.registry.require('playerSuppressionSystem'); }
+  get smokeCloudSystem(): SmokeCloudSystem { return this.registry.require('smokeCloudSystem'); }
+  get influenceMapSystem(): InfluenceMapSystem { return this.registry.require('influenceMapSystem'); }
+  get ammoSupplySystem(): AmmoSupplySystem { return this.registry.require('ammoSupplySystem'); }
+  get footstepAudioSystem(): FootstepAudioSystem { return this.registry.require('footstepAudioSystem'); }
+  get radioTransmissionSystem(): RadioTransmissionSystem { return this.registry.require('radioTransmissionSystem'); }
+  get loadoutService(): LoadoutService { return this.registry.require('loadoutService'); }
+  get warSimulator(): WarSimulator { return this.registry.require('warSimulator'); }
+  get strategicFeedback(): StrategicFeedback { return this.registry.require('strategicFeedback'); }
+  get worldFeatureSystem(): WorldFeatureSystem { return this.registry.require('worldFeatureSystem'); }
+  get animalSystem(): AnimalSystem { return this.registry.require('animalSystem'); }
+  get navmeshSystem(): NavmeshSystem { return this.registry.require('navmeshSystem'); }
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {

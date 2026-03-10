@@ -141,24 +141,27 @@ describe('HelicopterPhysics', () => {
   });
 
   describe('Ground Interaction', () => {
+    // Fixed-step runner uses 1/60s steps; use 0.02s to guarantee at least one step fires
+    const DT = 0.02;
+
     it('should detect ground correctly', () => {
       const highPos = new THREE.Vector3(0, 100, 0);
       physics = new HelicopterPhysics(highPos);
-      
+
       // Not grounded yet
-      physics.update(0.016, 0); // Terrain at 0
+      physics.update(DT, 0); // Terrain at 0
       expect(physics.getState().isGrounded).toBe(false);
-      
+
       // Force position near ground
       physics.getState().position.y = 0.5;
-      physics.update(0.016, 0);
+      physics.update(DT, 0);
       expect(physics.getState().isGrounded).toBe(true);
     });
 
     it('should clamp position to minimum height above ground', () => {
       physics.getState().position.y = -10; // Underground
-      physics.update(0.016, 0); // Terrain at 0
-      
+      physics.update(DT, 0); // Terrain at 0
+
       // Should be clamped to groundHeight + 0.5
       expect(physics.getState().position.y).toBeGreaterThanOrEqual(0.5);
     });
@@ -166,11 +169,11 @@ describe('HelicopterPhysics', () => {
     it('should bounce on hard landing', () => {
       physics = new HelicopterPhysics(new THREE.Vector3(0, 10, 0));
       physics.getState().velocity.y = -10; // Fast descent
-      
+
       // Move to ground level
       physics.getState().position.y = 0.5;
-      physics.update(0.016, 0);
-      
+      physics.update(DT, 0);
+
       // Should bounce (positive velocity)
       expect(physics.getState().velocity.y).toBeGreaterThan(0);
     });
@@ -212,23 +215,25 @@ describe('HelicopterPhysics', () => {
   });
 
   describe('Helipad Interaction', () => {
+    const DT = 0.02; // Ensure fixed-step fires
+
     it('should use helipad height if provided and higher than terrain', () => {
       const terrainHeight = 10;
       const helipadHeight = 20;
-      
+
       physics.getState().position.y = 25;
-      physics.update(0.016, terrainHeight, helipadHeight);
-      
+      physics.update(DT, terrainHeight, helipadHeight);
+
       expect(physics.getState().groundHeight).toBe(helipadHeight);
     });
 
     it('should ignore helipad height if lower than terrain', () => {
       const terrainHeight = 20;
       const helipadHeight = 10;
-      
+
       physics.getState().position.y = 25;
-      physics.update(0.016, terrainHeight, helipadHeight);
-      
+      physics.update(DT, terrainHeight, helipadHeight);
+
       expect(physics.getState().groundHeight).toBe(terrainHeight);
     });
   });

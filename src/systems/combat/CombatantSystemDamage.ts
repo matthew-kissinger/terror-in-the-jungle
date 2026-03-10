@@ -71,7 +71,7 @@ export class CombatantSystemDamage {
           // Increment kill count for attacker (if exists and is not player proxy)
           if (attackerId) {
             const attacker = this.combatants.get(attackerId);
-            if (attacker && !attacker.isPlayerProxy) {
+            if (attacker) {
               attacker.kills++;
             }
           }

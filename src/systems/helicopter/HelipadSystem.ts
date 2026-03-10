@@ -22,6 +22,12 @@ export interface HelipadInfo {
   faction: string;
 }
 
+interface HelipadSystemDependencies {
+  terrainManager: ITerrainRuntime;
+  vegetationSystem: { clearArea?: (x: number, z: number, radius: number) => void; addExclusionZone?: (x: number, z: number, radius: number) => void };
+  gameModeManager: GameModeManager;
+}
+
 export class HelipadSystem implements GameSystem {
   private scene: THREE.Scene;
   private terrainManager?: ITerrainRuntime;
@@ -37,6 +43,12 @@ export class HelipadSystem implements GameSystem {
 
   async init(): Promise<void> {
     Logger.info('helicopter', 'Initializing Helipad System...');
+  }
+
+  configureDependencies(dependencies: HelipadSystemDependencies): void {
+    this.setTerrainManager(dependencies.terrainManager);
+    this.setVegetationSystem(dependencies.vegetationSystem);
+    this.setGameModeManager(dependencies.gameModeManager);
   }
 
   setTerrainManager(terrainManager: ITerrainRuntime): void {
@@ -230,20 +242,24 @@ export class HelipadSystem implements GameSystem {
 
   dispose(): void {
     this.helipads.forEach((helipad, id) => {
-      this.scene.remove(helipad);
+      if (typeof (modelLoader as any).disposeInstance === 'function') {
+        modelLoader.disposeInstance(helipad);
+      } else {
+        this.scene.remove(helipad);
+        helipad.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.geometry.dispose();
+            if (Array.isArray(child.material)) {
+              child.material.forEach((material) => material.dispose());
+            } else {
+              child.material.dispose();
+            }
+          }
+        });
+      }
       if (this.terrainManager) {
         this.terrainManager.unregisterCollisionObject(id);
       }
-      helipad.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          child.geometry.dispose();
-          if (Array.isArray(child.material)) {
-            child.material.forEach(mat => mat.dispose());
-          } else {
-            child.material.dispose();
-          }
-        }
-      });
     });
     this.helipads.clear();
     this.helipadMeta.clear();

@@ -23,6 +23,15 @@ import { HUDLayout } from '../layout/HUDLayout';
 import type { GamePhase } from './GameStatusPanel';
 import type { InventorySlotDefinition } from '../../systems/player/InventoryManager';
 
+interface HUDSystemDependencies {
+  combatantSystem: CombatantSystem;
+  zoneManager: ZoneManager;
+  ticketSystem: TicketSystem;
+  audioManager: AudioManager;
+  grenadeSystem: GrenadeSystem;
+  mortarSystem: MortarSystem;
+}
+
 export class HUDSystem implements GameSystem, IHUDSystem {
   private combatantSystem?: CombatantSystem;
   private zoneManager?: ZoneManager;
@@ -213,6 +222,15 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.styles.dispose();
     this.matchEndScreen.dispose();
     Logger.info('hud', 'HUD System disposed');
+  }
+
+  configureDependencies(dependencies: HUDSystemDependencies): void {
+    this.setCombatantSystem(dependencies.combatantSystem);
+    this.setZoneManager(dependencies.zoneManager);
+    this.setTicketSystem(dependencies.ticketSystem);
+    this.setAudioManager(dependencies.audioManager);
+    this.setGrenadeSystem(dependencies.grenadeSystem);
+    this.setMortarSystem(dependencies.mortarSystem);
   }
 
   // Public API

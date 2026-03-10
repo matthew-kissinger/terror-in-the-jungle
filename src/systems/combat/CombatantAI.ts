@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Combatant, CombatantState, Squad, SquadCommand, isBlufor } from './types'
+import { Combatant, CombatantState, Faction, ITargetable, Squad, SquadCommand, isBlufor } from './types'
 import type { ITerrainRuntime } from '../../types/SystemInterfaces'
 import { SandbagSystem } from '../weapons/SandbagSystem'
 import { SmokeCloudSystem } from '../effects/SmokeCloudSystem'
@@ -309,13 +309,13 @@ export class CombatantAI {
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
     spatialGrid?: ISpatialQuery
-  ): Combatant | null {
+  ): ITargetable | null {
     return this.targeting.findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid)
   }
 
   canSeeTarget(
     combatant: Combatant,
-    target: Combatant,
+    target: ITargetable,
     playerPosition: THREE.Vector3
   ): boolean {
     return this.targeting.canSeeTarget(combatant, target, playerPosition)
@@ -378,6 +378,10 @@ export class CombatantAI {
 
   setEngagementRange(range: number): void {
     this.MAX_ENGAGEMENT_RANGE = range
+  }
+
+  setPlayerFaction(faction: Faction): void {
+    this.targeting.setPlayerFaction(faction)
   }
 
   getEngagementRange(): number {

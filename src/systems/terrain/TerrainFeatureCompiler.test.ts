@@ -104,4 +104,55 @@ describe('compileTerrainFeatures', () => {
       expect(compiled.stamps[0].gradeStrength).toBeGreaterThan(0);
     }
   });
+
+  it('emits generated runway and taxiway surface patches for authored airfields', () => {
+    const compiled = compileTerrainFeatures({
+      id: GameMode.A_SHAU_VALLEY,
+      name: 'Airfield Mode',
+      description: 'test',
+      worldSize: 5000,
+      chunkRenderDistance: 6,
+      maxTickets: 100,
+      matchDuration: 60,
+      deathPenalty: 1,
+      playerCanSpawnAtZones: true,
+      respawnTime: 5,
+      spawnProtectionDuration: 2,
+      maxCombatants: 20,
+      squadSize: { min: 4, max: 6 },
+      reinforcementInterval: 30,
+      zones: [],
+      captureRadius: 25,
+      captureSpeed: 5,
+      minimapScale: 400,
+      viewDistance: 200,
+      features: [
+        {
+          id: 'tabat_airfield',
+          kind: 'airfield',
+          position: new THREE.Vector3(100, 0, 200),
+          placement: { yaw: Math.PI * 0.35 },
+          templateId: 'forward_strip',
+          footprint: { shape: 'circle', radius: 88 },
+          terrain: {
+            flatten: true,
+            flatRadius: 58,
+            blendRadius: 86,
+            samplingRadius: 54,
+            targetHeightMode: 'average',
+          },
+          vegetation: {
+            clear: true,
+            exclusionRadius: 92,
+          },
+        },
+      ],
+    });
+
+    expect(compiled.stamps).toHaveLength(1);
+    expect(compiled.vegetationExclusionZones).toHaveLength(1);
+    expect(compiled.surfacePatches).toHaveLength(2);
+    expect(compiled.surfacePatches.some((patch) => patch.shape === 'rect' && patch.surface === 'runway')).toBe(true);
+    expect(compiled.surfacePatches.some((patch) => patch.shape === 'rect' && patch.surface === 'packed_earth')).toBe(true);
+  });
 });

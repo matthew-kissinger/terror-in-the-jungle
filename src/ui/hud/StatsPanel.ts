@@ -4,7 +4,7 @@
  * Two layouts: vertical (desktop) and horizontal (mobile), switched via CSS.
  * Kill streak overlay is a separate fixed-position element for center-screen display.
  *
- * Note: Kill streak audio stings are disabled (TODO in original code).
+ * Kill streak milestones can trigger the shared `killStreakSting` audio cue when available.
  *
  * Replaces: PersonalStatsPanel (old class with injected global styles)
  */

@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { SystemReferences } from './SystemInitializer';
 import { IGameRenderer } from '../types/SystemInterfaces';
+import type { SystemKeyToType } from './SystemRegistry';
 
 type StartupPlayerRuntimeRefs = Pick<
-  SystemReferences,
+  SystemKeyToType,
   | 'audioManager'
   | 'cameraShakeSystem'
   | 'combatantSystem'
@@ -199,23 +199,23 @@ function wirePlayerRuntime(
     zoneManager,
   } = runtime;
 
-  playerController.setTerrainSystem(terrainSystem);
-  playerController.setGameModeManager(gameModeManager);
-  playerController.setTicketSystem(ticketSystem);
-  playerController.setHelicopterModel(helicopterModel);
-  playerController.setFirstPersonWeapon(firstPersonWeapon);
-  playerController.setHUDSystem(hudSystem);
-  playerController.setCameraShakeSystem(cameraShakeSystem);
-  playerController.setFootstepAudioSystem(footstepAudioSystem);
-  playerController.setInventoryManager(inventoryManager);
-  playerController.setGrenadeSystem(grenadeSystem);
-  playerController.setMortarSystem(mortarSystem);
-  playerController.setSandbagSystem(sandbagSystem);
-  playerController.setPlayerSquadController(playerSquadController);
-  playerController.setCommandInputManager(commandInputManager);
-  if (options.renderer) {
-    playerController.setRenderer(options.renderer);
-  }
+  playerController.configureDependencies({
+    terrainSystem,
+    gameModeManager,
+    helicopterModel,
+    firstPersonWeapon,
+    hudSystem,
+    ticketSystem,
+    renderer: options.renderer,
+    inventoryManager,
+    grenadeSystem,
+    mortarSystem,
+    sandbagSystem,
+    cameraShakeSystem,
+    footstepAudioSystem,
+    playerSquadController,
+    commandInputManager,
+  });
 
   playerHealthSystem.setZoneManager(zoneManager);
   playerHealthSystem.setTicketSystem(ticketSystem);
@@ -243,7 +243,7 @@ function wirePlayerRuntime(
   playerController.setSpectatorCandidateProvider(() => {
     const loadoutContext = loadoutService.getContext();
     return combatantSystem.getAllCombatants()
-      .filter(c => c.faction === loadoutContext.faction && c.health > 0 && !c.isDying && !c.isPlayerProxy)
+      .filter(c => c.faction === loadoutContext.faction && c.health > 0 && !c.isDying)
       .map(c => ({ id: c.id, position: c.position, faction: c.faction }));
   });
 }
@@ -279,12 +279,23 @@ function wireHUDRuntime(runtime: StartupPlayerRuntimeGroups['hudRuntime']): void
     zoneManager,
   } = runtime;
 
-  hudSystem.setCombatantSystem(combatantSystem);
-  hudSystem.setZoneManager(zoneManager);
-  hudSystem.setTicketSystem(ticketSystem);
-  hudSystem.setAudioManager(audioManager);
-  hudSystem.setGrenadeSystem(grenadeSystem);
-  hudSystem.setMortarSystem(mortarSystem);
+  if (typeof hudSystem.configureDependencies === 'function') {
+    hudSystem.configureDependencies({
+      combatantSystem,
+      zoneManager,
+      ticketSystem,
+      audioManager,
+      grenadeSystem,
+      mortarSystem,
+    });
+  } else {
+    hudSystem.setCombatantSystem(combatantSystem);
+    hudSystem.setZoneManager(zoneManager);
+    hudSystem.setTicketSystem(ticketSystem);
+    hudSystem.setAudioManager(audioManager);
+    hudSystem.setGrenadeSystem(grenadeSystem);
+    hudSystem.setMortarSystem(mortarSystem);
+  }
 
   const layout = hudSystem.getLayout();
   compassSystem.mountTo(layout.getSlot('compass'));
@@ -307,6 +318,23 @@ function wireHUDRuntime(runtime: StartupPlayerRuntimeGroups['hudRuntime']): void
 }
 
 function wireDeployRuntime(runtime: StartupPlayerRuntimeGroups['deployRuntime']): void {
+  if (typeof runtime.playerRespawnManager.configureDependencies === 'function') {
+    runtime.playerRespawnManager.configureDependencies({
+      playerHealthSystem: runtime.playerHealthSystem,
+      zoneManager: runtime.zoneManager,
+      gameModeManager: runtime.gameModeManager,
+      playerController: runtime.playerController,
+      firstPersonWeapon: runtime.firstPersonWeapon,
+      inventoryManager: runtime.inventoryManager,
+      loadoutService: runtime.loadoutService,
+      grenadeSystem: runtime.grenadeSystem,
+      warSimulator: runtime.warSimulator,
+      terrainSystem: runtime.terrainSystem,
+      helipadSystem: runtime.helipadSystem,
+    });
+    return;
+  }
+
   runtime.playerRespawnManager.setPlayerHealthSystem(runtime.playerHealthSystem);
   runtime.playerRespawnManager.setZoneManager(runtime.zoneManager);
   runtime.playerRespawnManager.setGameModeManager(runtime.gameModeManager);

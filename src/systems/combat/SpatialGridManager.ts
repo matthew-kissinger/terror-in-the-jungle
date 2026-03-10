@@ -283,6 +283,25 @@ export class SpatialGridManager {
     this.queryTimesSumMs = 0
   }
 
+  reset(): void {
+    this.grid = null
+    this.isInitialized = false
+    this.worldSize = 0
+    this.frameCounter = 0
+    this.telemetry = {
+      initialized: false,
+      entityCount: 0,
+      queriesThisFrame: 0,
+      avgQueryTimeMs: 0,
+      fallbackCount: 0,
+      lastSyncMs: 0,
+      lastRebuildMs: 0
+    }
+    this.queryTimesMs = []
+    this.queryTimesSumMs = 0
+    this.loggedUninitializedMethods.clear()
+  }
+
   /**
    * Reset frame counters (call at start of each frame)
    */

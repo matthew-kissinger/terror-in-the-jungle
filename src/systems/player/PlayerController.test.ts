@@ -188,7 +188,7 @@ describe('PlayerController', () => {
       hideWeapon: vi.fn(),
       setWeaponVisibility: vi.fn(),
       setPlayerFaction: vi.fn(),
-      setFireingEnabled: vi.fn(),
+      setFiringEnabled: vi.fn(),
       setPrimaryWeapon: vi.fn(),
       getWeaponInput: vi.fn().mockReturnValue({
         disableDirectListeners: vi.fn(),
@@ -491,7 +491,7 @@ describe('PlayerController', () => {
       playerController.equipWeapon();
 
       expect(mockFirstPersonWeapon.showWeapon).toHaveBeenCalled();
-      expect(mockFirstPersonWeapon.setFireingEnabled).toHaveBeenCalledWith(true);
+      expect(mockFirstPersonWeapon.setFiringEnabled).toHaveBeenCalledWith(true);
       expect(mockRenderer.showCrosshair).toHaveBeenCalled();
     });
 
@@ -499,7 +499,7 @@ describe('PlayerController', () => {
       playerController.unequipWeapon();
 
       expect(mockFirstPersonWeapon.hideWeapon).toHaveBeenCalled();
-      expect(mockFirstPersonWeapon.setFireingEnabled).toHaveBeenCalledWith(false);
+      expect(mockFirstPersonWeapon.setFiringEnabled).toHaveBeenCalledWith(false);
     });
 
     it('should handle weapon slot change to primary', async () => {
@@ -576,7 +576,7 @@ describe('PlayerController', () => {
       playerController.enterHelicopter('heli-1', helicopterPos);
 
       expect(mockFirstPersonWeapon.hideWeapon).toHaveBeenCalled();
-      expect(mockFirstPersonWeapon.setFireingEnabled).toHaveBeenCalledWith(false);
+      expect(mockFirstPersonWeapon.setFiringEnabled).toHaveBeenCalledWith(false);
     });
 
     it('should show helicopter HUD on enter', () => {
@@ -621,7 +621,7 @@ describe('PlayerController', () => {
       playerController.exitHelicopter(exitPos);
 
       expect(mockFirstPersonWeapon.showWeapon).toHaveBeenCalled();
-      expect(mockFirstPersonWeapon.setFireingEnabled).toHaveBeenCalledWith(true);
+      expect(mockFirstPersonWeapon.setFiringEnabled).toHaveBeenCalledWith(true);
     });
 
     it('should hide helicopter HUD on exit', () => {

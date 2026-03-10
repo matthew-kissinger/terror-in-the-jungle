@@ -177,6 +177,8 @@ export interface IFirstPersonWeapon {
 export interface ITerrainRuntime {
   getHeightAt(x: number, z: number): number;
   getEffectiveHeightAt(x: number, z: number): number;
+  getSlopeAt(x: number, z: number): number;
+  getNormalAt(x: number, z: number, target?: THREE.Vector3): THREE.Vector3;
   /** Playable world extent used for gameplay, collision, and movement boundaries. */
   getPlayableWorldSize(): number;
   /** Total visual terrain coverage, including render-only overflow beyond the playable map. */
@@ -209,6 +211,8 @@ export interface ITerrainRuntimeController extends ITerrainRuntime {
 export interface IAudioManager {
   getListener(): THREE.AudioListener;
   play(soundName: string, position?: THREE.Vector3, volume?: number): void;
+  playDistantCombat?(volume: number): void;
+  playThunder?(volume?: number): void;
   playWeaponSwitchSound(): void;
 }
 

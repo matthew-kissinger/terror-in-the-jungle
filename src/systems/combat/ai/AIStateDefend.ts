@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState } from '../types';
+import { Combatant, CombatantState, ITargetable, isPlayerTarget } from '../types';
 import { ISpatialQuery } from '../SpatialOctree';
 import { ZoneManager } from '../../world/ZoneManager';
 import { clusterManager } from '../ClusterManager';
@@ -29,10 +29,10 @@ export class AIStateDefend {
       playerPosition: THREE.Vector3,
       allCombatants: Map<string, Combatant>,
       spatialGrid?: ISpatialQuery
-    ) => Combatant | null,
+    ) => ITargetable | null,
     canSeeTarget: (
       combatant: Combatant,
-      target: Combatant,
+      target: ITargetable,
       playerPosition: THREE.Vector3
     ) => boolean,
     getClusterDensity?: (
@@ -44,7 +44,7 @@ export class AIStateDefend {
     // Check for nearby enemies - defenders engage if threatened
     const enemy = findNearestEnemy(combatant, playerPosition, allCombatants, spatialGrid);
     if (enemy) {
-      const targetPos = enemy.id === 'PLAYER' ? playerPosition : enemy.position;
+      const targetPos = isPlayerTarget(enemy) ? playerPosition : enemy.position;
       const distance = combatant.position.distanceTo(targetPos);
 
       // At very close range (<15m), defenders should ALWAYS react regardless of facing

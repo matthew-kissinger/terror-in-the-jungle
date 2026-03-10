@@ -23,6 +23,7 @@ export class CombatantFactory {
 
     const combatant: Combatant = {
       id,
+      kind: 'combatant',
       faction,
       position: position.clone(),
       velocity: new THREE.Vector3(),
@@ -67,48 +68,6 @@ export class CombatantFactory {
     };
 
     return combatant;
-  }
-
-  createPlayerProxy(playerPosition: THREE.Vector3): Combatant {
-    return this.createPlayerProxyForFaction(playerPosition, Faction.US);
-  }
-
-  createPlayerProxyForFaction(playerPosition: THREE.Vector3, faction: Faction): Combatant {
-    const proxy: Combatant = {
-      id: 'player_proxy',
-      faction,
-      position: playerPosition.clone(),
-      velocity: new THREE.Vector3(),
-      rotation: 0,
-      visualRotation: 0,
-      rotationVelocity: 0,
-      scale: new THREE.Vector3(1, 1, 1),
-      health: NPC_HEALTH,
-      maxHealth: NPC_HEALTH,
-      state: CombatantState.ENGAGING,
-      weaponSpec: this.createWeaponSpec(faction),
-      gunCore: new GunplayCore(this.createWeaponSpec(faction)),
-      skillProfile: this.createSkillProfile(faction, 'leader'),
-      lastShotTime: 0,
-      currentBurst: 0,
-      burstCooldown: 0,
-      reactionTimer: 0,
-      suppressionLevel: 0,
-      alertTimer: 0,
-      isFullAuto: false,
-      panicLevel: 0,
-      lastHitTime: 0,
-      consecutiveMisses: 0,
-      wanderAngle: 0,
-      timeToDirectionChange: 0,
-      lastUpdateTime: 0,
-      updatePriority: 0,
-      lodLevel: 'high',
-      isPlayerProxy: true,
-      kills: 0,
-      deaths: 0
-    };
-    return proxy;
   }
 
   private createWeaponSpec(faction: Faction): WeaponSpec {

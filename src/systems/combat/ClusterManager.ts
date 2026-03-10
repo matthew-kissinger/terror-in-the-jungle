@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Combatant, CombatantState } from './types'
+import { Combatant, CombatantState, ITargetable } from './types'
 import { SpatialGridManager } from './SpatialGridManager'
 
 /**
@@ -169,9 +169,9 @@ export class ClusterManager {
    */
   assignDistributedTarget(
     combatant: Combatant,
-    potentialTargets: Combatant[],
+    potentialTargets: ITargetable[],
     allCombatants: Map<string, Combatant>
-  ): Combatant | null {
+  ): ITargetable | null {
     if (potentialTargets.length === 0) return null
     if (potentialTargets.length === 1) return potentialTargets[0]
 
@@ -183,7 +183,7 @@ export class ClusterManager {
     }
 
     // Score targets - prefer less-targeted enemies
-    let bestTarget: Combatant | null = null
+    let bestTarget: ITargetable | null = null
     let bestScore = -Infinity
 
     for (const target of potentialTargets) {

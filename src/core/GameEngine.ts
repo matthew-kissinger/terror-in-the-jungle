@@ -13,9 +13,13 @@ import { RuntimeMetrics } from './RuntimeMetrics';
 import { SandboxConfig, getSandboxConfig, isSandboxMode } from './SandboxModeDetector';
 import { SettingsManager } from '../config/SettingsManager';
 import { MobilePauseOverlay } from '../ui/MobilePauseOverlay';
-import { WebGLContextRecovery } from './WebGLContextRecovery';
+import { WebGLContextGuard } from './WebGLContextGuard';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import { StartupFlowController } from './StartupFlowController';
+import { GameEventBus } from './GameEventBus';
+import { objectPool } from '../utils/ObjectPoolManager';
+import { resetHeightQueryCache } from '../systems/terrain/HeightQueryCache';
+import { spatialGridManager } from '../systems/combat/SpatialGridManager';
 
 // Import split modules
 import * as Init from './GameEngineInit';
@@ -32,7 +36,7 @@ export class GameEngine {
   public performanceOverlay: PerformanceOverlay;
   public timeIndicator: TimeIndicator;
   public logOverlay: LogOverlay;
-  public runtimeMetrics: RuntimeMetrics;
+  public runtimeMetrics?: RuntimeMetrics;
   public sandboxConfig: SandboxConfig | null;
   public readonly sandboxEnabled: boolean;
   public readonly startupFlow = new StartupFlowController();
@@ -44,9 +48,12 @@ export class GameEngine {
   public gameStartPending = false;
   public lastFrameDelta = 1 / 60;
   public currentPixelSize = 1;
+  public animationFrameId: number | null = null;
+  public isLoopRunning = false;
+  public isDisposed = false;
   private settingsUnsubscribe?: () => void;
   private mobilePauseOverlay?: MobilePauseOverlay;
-  private contextRecovery: WebGLContextRecovery;
+  private contextRecovery: WebGLContextGuard;
 
   constructor() {
     Logger.info('core', ' Initializing engine...');
@@ -65,9 +72,11 @@ export class GameEngine {
     this.performanceOverlay = new PerformanceOverlay();
     this.timeIndicator = new TimeIndicator();
     this.logOverlay = new LogOverlay();
-    this.runtimeMetrics = new RuntimeMetrics();
+    if (import.meta.env.DEV && isPerfDiagnosticsEnabled()) {
+      this.runtimeMetrics = new RuntimeMetrics();
+    }
 
-    this.contextRecovery = new WebGLContextRecovery(this.renderer);
+    this.contextRecovery = new WebGLContextGuard(this.renderer);
     this.setupEventListeners();
     this.setupMenuCallbacks();
     this.mobilePauseOverlay = new MobilePauseOverlay(this);
@@ -272,11 +281,7 @@ export class GameEngine {
   }
 
   public start(): void {
-    this.animate();
-  }
-
-  private animate(): void {
-    Loop.animate(this);
+    Loop.start(this);
   }
 
   /** True while WebGL context is lost (checked by game loop to skip rendering) */
@@ -285,6 +290,12 @@ export class GameEngine {
   }
 
   public dispose(): void {
+    if (this.isDisposed) {
+      return;
+    }
+    this.isDisposed = true;
+    Loop.stop(this);
+    Loop.resetState();
     if (this.settingsUnsubscribe) {
       this.settingsUnsubscribe();
     }
@@ -292,11 +303,16 @@ export class GameEngine {
     this.mobilePauseOverlay?.dispose();
     Input.disposeEventListeners();
     this.loadingScreen.dispose();
-    this.renderer.dispose();
     this.systemManager.dispose();
+    this.renderer.dispose();
     this.performanceOverlay.dispose();
     this.timeIndicator.dispose();
     this.logOverlay.dispose();
+    GameEventBus.clear();
+    performanceTelemetry.reset();
+    objectPool.reset();
+    resetHeightQueryCache();
+    spatialGridManager.reset();
     Logger.info('core', 'Engine disposed');
   }
 }

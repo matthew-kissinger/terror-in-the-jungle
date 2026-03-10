@@ -131,6 +131,20 @@ describe('SpatialGridManager', () => {
     });
   });
 
+  describe('reset', () => {
+    it('should clear initialization state and telemetry', () => {
+      manager.initialize(4000);
+      manager.syncEntity('e1', new THREE.Vector3(100, 0, 100));
+
+      manager.reset();
+
+      expect(manager.getIsInitialized()).toBe(false);
+      expect(manager.getGrid()).toBeNull();
+      expect(manager.getTelemetry().entityCount).toBe(0);
+      expect(manager.getTelemetry().initialized).toBe(false);
+    });
+  });
+
   describe('syncAllPositions', () => {
     it('should fail if not initialized', () => {
       const combatants = new Map<string, Combatant>([

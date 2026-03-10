@@ -403,7 +403,7 @@ export class FirstPersonWeapon implements GameSystem {
     Logger.info('weapon', 'Weapon shown (exited helicopter)')
   }
 
-  setFireingEnabled(enabled: boolean): void {
+  setFiringEnabled(enabled: boolean): void {
     this.isEnabled = enabled
     this.input.setEnabled(enabled)
     if (!enabled) {

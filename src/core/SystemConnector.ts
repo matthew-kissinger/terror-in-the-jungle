@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SystemReferences } from './SystemInitializer';
+import type { SystemKeyToType } from './SystemRegistry';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
 import { IGameRenderer } from '../types/SystemInterfaces';
 import {
@@ -24,7 +24,7 @@ import {
  */
 export class SystemConnector {
   connectSystems(
-    refs: SystemReferences,
+    refs: SystemKeyToType,
     _scene: THREE.Scene,
     camera: THREE.PerspectiveCamera,
     renderer?: IGameRenderer
@@ -38,13 +38,13 @@ export class SystemConnector {
 
   // ── Navigation (navmesh) ──
 
-  private wireNavigation(refs: SystemReferences): void {
+  private wireNavigation(refs: SystemKeyToType): void {
     refs.combatantSystem.setNavmeshSystem(refs.navmeshSystem);
   }
 
   // ── Telemetry ──
 
-  private wireTelemetry(refs: SystemReferences, renderer?: IGameRenderer): void {
+  private wireTelemetry(refs: SystemKeyToType, renderer?: IGameRenderer): void {
     performanceTelemetry.injectBenchmarkDependencies({
       hitDetection: refs.combatantSystem.combatantCombat?.hitDetection,
       terrainRuntime: refs.terrainSystem,

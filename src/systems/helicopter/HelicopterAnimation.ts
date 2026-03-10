@@ -134,7 +134,9 @@ export class HelicopterAnimation {
     currentVisualTilt.slerp(targetVisualTilt, Math.min(deltaTime * lerpRate, 1.0));
 
     // Combine physics rotation with visual tilt
-    const state = physics.getState();
+    const state = typeof physics.getInterpolatedState === 'function'
+      ? physics.getInterpolatedState()
+      : physics.getState();
     _finalQuaternion.copy(state.quaternion);
     _finalQuaternion.multiply(currentVisualTilt);
 

@@ -1,5 +1,6 @@
 import { Logger } from '../../utils/Logger';
 import { zIndex } from '../design/tokens';
+import { playElementAnimation } from '../engine/playElementAnimation';
 
 interface ScorePopup {
   element: HTMLDivElement;
@@ -94,10 +95,6 @@ export class ScorePopupSystem {
           transform: translate(-50%, calc(-50% - 150px)) scale(0.9);
           bottom: auto;
         }
-      }
-
-      .score-popup {
-        animation: scorePopupFloat 2s ease-out forwards;
       }
 
       .score-popup.capture {
@@ -210,9 +207,21 @@ export class ScorePopupSystem {
     const verticalOffset = stackIndex * 45;
     element.style.bottom = `calc(50% + ${verticalOffset}px)`;
 
-    // Force reflow to restart animation
     element.style.display = 'block';
-    void element.offsetWidth; // Trigger reflow
+    playElementAnimation(
+      element,
+      [
+        { opacity: 0, transform: 'translate(-50%, -50%) scale(0.5)' },
+        { opacity: 1, transform: 'translate(-50%, -50%) scale(1.3)', offset: 0.15 },
+        { opacity: 1, transform: 'translate(-50%, -50%) scale(1)', offset: 0.2 },
+        { opacity: 0, transform: 'translate(-50%, calc(-50% - 150px)) scale(0.9)' }
+      ],
+      {
+        duration: this.ANIMATION_DURATION,
+        easing: 'ease-out',
+        fill: 'forwards'
+      }
+    );
   }
 
   update(): void {

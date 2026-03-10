@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { AircraftPhysicsConfig } from './AircraftConfigs';
+import { FixedStepRunner } from '../../utils/FixedStepRunner';
 
 const _gravity = new THREE.Vector3();
 const _lift = new THREE.Vector3();
@@ -45,17 +46,29 @@ const DEFAULT_PHYSICS: AircraftPhysicsConfig = {
 };
 
 export class HelicopterPhysics {
+  static readonly FIXED_STEP_SECONDS = 1 / 60;
   private state: HelicopterState;
+  private previousState: HelicopterState;
   private controls: HelicopterControls;
 
   private readonly GRAVITY = -9.81;
   private readonly cfg: AircraftPhysicsConfig;
   private smoothedControls: HelicopterControls;
   private worldHalfExtent = 0;
+  private readonly stepper = new FixedStepRunner(HelicopterPhysics.FIXED_STEP_SECONDS);
 
   constructor(initialPosition: THREE.Vector3, config?: AircraftPhysicsConfig) {
     this.cfg = config ?? DEFAULT_PHYSICS;
     this.state = {
+      position: initialPosition.clone(),
+      velocity: new THREE.Vector3(),
+      angularVelocity: new THREE.Vector3(),
+      quaternion: new THREE.Quaternion(),
+      engineRPM: 0,
+      isGrounded: true,
+      groundHeight: initialPosition.y
+    };
+    this.previousState = {
       position: initialPosition.clone(),
       velocity: new THREE.Vector3(),
       angularVelocity: new THREE.Vector3(),
@@ -78,6 +91,19 @@ export class HelicopterPhysics {
   }
 
   update(deltaTime: number, terrainHeight: number, helipadHeight?: number): void {
+    this.stepper.step(deltaTime, (fixedDeltaTime) => {
+      this.previousState.position.copy(this.state.position);
+      this.previousState.velocity.copy(this.state.velocity);
+      this.previousState.angularVelocity.copy(this.state.angularVelocity);
+      this.previousState.quaternion.copy(this.state.quaternion);
+      this.previousState.engineRPM = this.state.engineRPM;
+      this.previousState.isGrounded = this.state.isGrounded;
+      this.previousState.groundHeight = this.state.groundHeight;
+      this.simulateStep(fixedDeltaTime, terrainHeight, helipadHeight);
+    });
+  }
+
+  private simulateStep(deltaTime: number, terrainHeight: number, helipadHeight?: number): void {
     // Update ground height - use helipad height if available and higher than terrain
     let effectiveGroundHeight = terrainHeight;
     if (helipadHeight !== undefined && helipadHeight > terrainHeight) {
@@ -322,6 +348,19 @@ export class HelicopterPhysics {
     return this.state;
   }
 
+  getInterpolatedState(): HelicopterState {
+    const alpha = this.stepper.getInterpolationAlpha();
+    return {
+      position: this.previousState.position.clone().lerp(this.state.position, alpha),
+      velocity: this.previousState.velocity.clone().lerp(this.state.velocity, alpha),
+      angularVelocity: this.previousState.angularVelocity.clone().lerp(this.state.angularVelocity, alpha),
+      quaternion: this.previousState.quaternion.clone().slerp(this.state.quaternion, alpha),
+      engineRPM: THREE.MathUtils.lerp(this.previousState.engineRPM, this.state.engineRPM, alpha),
+      isGrounded: alpha < 1 ? this.previousState.isGrounded : this.state.isGrounded,
+      groundHeight: THREE.MathUtils.lerp(this.previousState.groundHeight, this.state.groundHeight, alpha),
+    };
+  }
+
   getControls(): Readonly<HelicopterControls> {
     return this.controls;
   }
@@ -341,6 +380,14 @@ export class HelicopterPhysics {
     this.controls.yaw = 0;
     this.controls.engineBoost = false;
     this.smoothedControls = { ...this.controls };
+    this.previousState.position.copy(position);
+    this.previousState.velocity.set(0, 0, 0);
+    this.previousState.angularVelocity.set(0, 0, 0);
+    this.previousState.quaternion.identity();
+    this.previousState.engineRPM = 0.2;
+    this.previousState.isGrounded = true;
+    this.previousState.groundHeight = position.y;
+    this.stepper.reset();
   }
 
   getAirspeed(): number {

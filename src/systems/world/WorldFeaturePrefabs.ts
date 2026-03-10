@@ -161,6 +161,20 @@ const PREFABS: Record<string, WorldFeaturePrefabDefinition> = {
       { modelPath: StructureModels.FUEL_DRUM, offset: new THREE.Vector3(-5, 0, 8.75), yaw: 0 },
     ],
   },
+  motor_pool_heavy: {
+    placements: [
+      { modelPath: BuildingModels.WAREHOUSE, offset: new THREE.Vector3(0, 0, -14), yaw: Math.PI, registerCollision: true },
+      { modelPath: StructureModels.COMMS_TOWER, offset: new THREE.Vector3(-20, 0, -4), yaw: 0, registerCollision: true },
+      { modelPath: StructureModels.GENERATOR_SHED, offset: new THREE.Vector3(20, 0, -4), yaw: Math.PI * 0.5, registerCollision: true },
+      { modelPath: GroundVehicleModels.M35_TRUCK, offset: new THREE.Vector3(-18, 0, 12), yaw: Math.PI * 0.5, registerCollision: true },
+      { modelPath: GroundVehicleModels.M151_JEEP, offset: new THREE.Vector3(-4, 0, 13), yaw: Math.PI * 0.45, registerCollision: true },
+      { modelPath: GroundVehicleModels.M113_APC, offset: new THREE.Vector3(12, 0, 10), yaw: Math.PI * 0.58, registerCollision: true },
+      { modelPath: GroundVehicleModels.M48_PATTON, offset: new THREE.Vector3(24, 0, 14), yaw: Math.PI * 0.6, registerCollision: true },
+      { modelPath: StructureModels.AMMO_CRATE, offset: new THREE.Vector3(-10, 0, 20), yaw: 0 },
+      { modelPath: StructureModels.SUPPLY_CRATE, offset: new THREE.Vector3(2, 0, 20), yaw: 0 },
+      { modelPath: StructureModels.FUEL_DRUM, offset: new THREE.Vector3(14, 0, 20), yaw: 0 },
+    ],
+  },
   trail_checkpoint_small: {
     placements: [
       { modelPath: StructureModels.GUARD_TOWER, offset: new THREE.Vector3(0, 0, 0), yaw: Math.PI * 0.1, registerCollision: true },

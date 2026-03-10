@@ -1,10 +1,14 @@
 # Terrain System Research: Architecture, Industry Practices, and Future Options
 
-Last updated: 2026-03-06
+Last updated: 2026-03-10
 
 This document is the result of a deep end-to-end analysis of our terrain system, comparison against industry standard approaches, and research into what options exist for improving or rearchitecting terrain rendering at scale.
 
 **No code changes are proposed here.** This is a reference for architectural decision-making.
+
+Alignment note (2026-03-10): current official Three.js guidance still treats `WebGLRenderer` as the recommended choice for pure WebGL 2 applications. `WebGPURenderer` and TSL are the migration path when an application needs WebGPU features and is ready to port custom material/post-processing code. Our active terrain runtime stays on `WebGLRenderer` and `onBeforeCompile` for now.
+
+Validation note (2026-03-10): repo tests now verify every shipped game mode resolves real terrain texture assets, builds biome material bindings, and can create live `TerrainMaterial` instances with bound uniforms/textures. Terrain renderer policy is therefore documented and regression-gated, not just aspirational.
 
 ---
 
@@ -254,7 +258,7 @@ The [WebGPU-Erosion-Simulation](https://github.com/GPU-Gang/WebGPU-Erosion-Simul
 
 ### 5.3 Three.js WebGPU Renderer (TSL)
 
-**Status:** Production-ready since r171 (September 2025), automatic WebGL2 fallback.
+**Status:** Available and improving, but not the default recommendation for our current stack.
 
 **What works:**
 - `import { WebGPURenderer } from 'three/webgpu'` with zero-config fallback
@@ -268,7 +272,11 @@ The [WebGPU-Erosion-Simulation](https://github.com/GPU-Gang/WebGPU-Erosion-Simul
 - TSL maturity gaps (memory leaks, missing features)
 - Safari quirks (no timestamp queries, stricter validation)
 
-**Assessment:** Our single-InstancedMesh terrain would benefit since it's already batched. But the UBO issue is a risk for non-instanced objects (combatants, vegetation). Classification: "ready for experimentation, not yet for migration" given our frame-time-tail sensitivity.
+**Official alignment note:** Three.js currently documents `WebGLRenderer` as the recommended choice for pure WebGL 2 applications. `WebGPURenderer` is the next-generation path, but:
+- `onBeforeCompile()` material customizations are not supported there and must be ported to node materials/TSL.
+- `EffectComposer`-style post-processing is not a drop-in match and also requires migration.
+
+**Assessment:** Our terrain surface is heavily invested in `MeshStandardMaterial.onBeforeCompile` shader injection, and the broader runtime still uses a WebGL-first post stack. So even though the terrain itself is already well batched, the correct posture is still "experiment later, do not migrate yet."
 
 ### 5.4 Mesh Shaders - Not Available
 

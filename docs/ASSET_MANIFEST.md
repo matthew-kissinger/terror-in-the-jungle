@@ -1,6 +1,6 @@
 # Asset Manifest - Terror in the Jungle
 
-Last updated: 2026-02-25
+Last updated: 2026-03-10
 Status: DRAFT - Generation queue for Pixel Forge agent
 
 ## Generated Assets (75 GLBs)
@@ -19,18 +19,18 @@ See `deploy-3d-assets/README.md` for the complete inventory with tri counts and 
 | Animals | 6 | Water buffalo, tiger, macaque, king cobra, egret, wild boar |
 | Props | 1 | Wooden barrel |
 
-**Integration status:** Assets are generated but not yet wired into the engine. The generation queue below documents remaining specs and any assets still needed beyond what has been generated.
+**Integration status:** Weapons (7 GLBs), helicopters (3 GLBs loaded via ModelLoader), structures and generated world features, and animals (all 6 GLBs via AnimalSystem) are integrated. NPCs remain 2D billboard sprites. Open Frontier and A Shau now stage fixed-wing aircraft and ground vehicles as static airfield/motor-pool content. Fixed-wing aircraft are not yet player-pilotable, and ground vehicles/watercraft still lack live runtime interaction.
 
 ## Context for Asset Generation Agent
 
 ### What This Game Is
 
-Terror in the Jungle is a **browser-based 3D war simulation engine** built on Three.js r182 (WebGPU/WebGL). It is NOT a single game - it is an engine that powers multiple game modes at different scales:
+Terror in the Jungle is a **browser-based 3D war simulation engine** built on Three.js r182 with a `WebGLRenderer` runtime today. `WebGPURenderer`/TSL is a deferred migration path, not the current shipping target. It is NOT a single game - it is an engine that powers multiple game modes at different scales:
 
 - **Squad Skirmish (8v8):** Fast tactical FPS. Player leads a fire team, issues move/hold/assault orders to 4-8 AI squad members. Small jungle map, single objective.
 - **Zone Control (30-60 per side):** Multiple capture zones across a medium map. Player commands 2-4 squads while fighting alongside them.
-- **Open Frontier (60-120 per side):** Large map with vehicle combat (helicopters, jeeps, APCs). Player is both ground combatant and field commander.
-- **A Shau Valley (1500+ per side):** Historical 21km DEM terrain. Full combined arms: helicopters, air support, artillery, multiple factions (US+ARVN vs NVA+VC). Player directs battalion-level operations via RTS overlay while fighting in first person.
+- **Open Frontier (60-120 per side):** Large map with helicopter gameplay plus staged airfield and armored-yard content. Player is both ground combatant and field commander.
+- **A Shau Valley (1500+ per side):** Historical 21km DEM terrain. Full combined arms framing: helicopters, air support, artillery, staged airfield/armor support areas, multiple factions (US+ARVN vs NVA+VC). Player directs battalion-level operations via RTS overlay while fighting in first person.
 - **Theater (future):** Full Vietnam map simulation with province-level control and strategic campaign.
 
 The core loop: **Play in first person AND command simultaneously.** The player holds a rifle AND a radio. They can snap between FPS combat and overhead tactical map view in real-time (no time slowdown). All commanding happens under fire.
@@ -40,14 +40,14 @@ The core loop: **Play in first person AND command simultaneously.** The player h
 The game source code is at `C:\Users\Mattm\X\games-3d\terror-in-the-jungle`. Reference it if you need to understand how an asset is loaded, rendered, or animated. Key files:
 
 - **Asset loading:** `src/systems/assets/AssetLoader.ts` - loads textures, applies mipmaps, downscales
-- **Helicopter rendering:** `src/systems/helicopter/HelicopterGeometry.ts` - current procedural mesh (to be replaced by GLB)
+- **Helicopter rendering:** `src/systems/helicopter/HelicopterModel.ts` - loads GLB models via ModelLoader (UH-1 Huey, UH-1C Gunship, AH-1 Cobra)
 - **Weapon rendering:** `src/systems/player/weapon/WeaponRigManager.ts` - loads GLB weapon models (M16, AK-47, Ithaca 37, M3 Grease Gun, M1911, M60, M79)
 - **NPC sprites:** `src/systems/combat/CombatantMeshFactory.ts` - billboard sprite system (18 InstancedMesh)
 - **Vegetation:** `src/systems/terrain/ChunkVegetationGenerator.ts` - billboard placement on terrain
 - **Terrain textures:** Applied via `THREE.MeshStandardMaterial` to chunk geometry
 - **GLB loading:** Will use `THREE.GLTFLoader` - named mesh parts accessed via `model.getObjectByName('partName')`
 
-**Current state:** 75 GLB models generated (see `deploy-3d-assets/README.md`). Weapons (7 GLBs), helicopter (3 GLBs), and structures (19 prefab layouts via WorldFeatureSystem) are integrated. Animals (3 of 6 GLBs) spawn as ambient wildlife via AnimalSystem. NPCs remain 2D billboard sprites. This manifest covers remaining integration and additional assets needed for the roadmap.
+**Current state:** 75 GLB models generated (see `deploy-3d-assets/README.md`). Weapons (7 GLBs), helicopters (3 GLBs), generator-backed airfields/static structure layouts, and all 6 animals are integrated. NPCs remain 2D billboard sprites. Fixed-wing aircraft have physics code and now appear as staged parked assets in Open Frontier/A Shau, but they still have no live vehicle integration. Ground vehicles are staged statically in those modes and still await runtime driving/support systems. Watercraft remain unwired.
 
 ### Art Direction
 
@@ -1044,6 +1044,56 @@ All 512x512 WebP, transparent background. Each faction needs 9 sprites (3 direct
 9. Match End Background (11.4)
 10. Damage indicator, hit marker, kill skull (11.16-11.18)
 11. Mangrove, Rubber Tree vegetation (9.12, 9.13)
+
+---
+
+## Audio Assets Needed
+
+> Merged from `AUDIO_ASSETS_NEEDED.md` (2026-03-10). Replace placeholder reuse with distinct combat assets.
+
+**Technical constraints:** OGG Vorbis, mono, 44.1/48kHz. Keep clips short and dry; runtime pitch variation adds diversity.
+
+### Priority 1 - Weapon Variants + Feedback
+
+- `playerGunshot2.ogg`, `playerGunshot3.ogg`
+- `playerShotgun2.ogg`, `playerShotgun3.ogg`
+- `playerSMG2.ogg`, `playerSMG3.ogg`
+- `otherGunshot2.ogg`, `otherGunshot3.ogg`
+- `emptyClick.ogg`
+- `impactBody.ogg`
+- `impactHeadshot.ogg`
+
+### Priority 2 - Reload Sequence
+
+- `reloadMagOut.ogg`, `reloadMagIn.ogg`, `reloadChamber.ogg`
+
+### Priority 3 - Material Impacts
+
+- `impactMetal.ogg`, `impactDirt.ogg`, `impactVegetation.ogg`, `impactWater.ogg`
+
+---
+
+## Build Now Asset Backlog
+
+> Merged from `BUILD_NOW_ASSET_BACKLOG.md` (2026-03-10). Priority based on world readability.
+
+### Priority 1 - Route and Village Readability
+
+- `trail-road-straight`, `trail-road-curve`, `trail-road-t-junction`, `trail-road-crossroads`
+- `checkpoint-barrier`, `small-guard-post`
+- `village-hut-variant-a`, `village-hut-variant-b`, `village-prop-pack-a`
+
+### Priority 2 - Airfield Readability
+
+- `airfield-control-tower`, `revetment-wall-segment`, `runway-marker-set`, `windsock-set`, `maintenance-shed`
+
+### Priority 3 - Terrain Landmark Variety
+
+- `rock-outcrop-large`, `rock-outcrop-medium`, `ridge-bunker-segment`, `hilltop-observation-post`, `riverbank-clutter-pack`
+
+### Replacement Candidates
+
+Re-evaluate once broad placement is live: `sandbag-wall`, `helipad` foundation treatment, low-variety village shells, any asset with poor pivot/silhouette/scale in prefab placement.
 
 ---
 

@@ -4,7 +4,6 @@ import { ZoneManager, ZoneState, CaptureZone } from '../world/ZoneManager';
 import { GameModeConfig } from '../../config/gameModeTypes';
 import { Logger } from '../../utils/Logger';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
-import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 
 // Module-level scratch vectors to avoid per-call allocations
 const _spawnPos = new THREE.Vector3();
@@ -181,7 +180,6 @@ export class SpawnPositionCalculator {
     }
     fallbackY = anchorHeight;
 
-    const heightCache = getHeightQueryCache();
     let bestAcceptedScore = Number.POSITIVE_INFINITY;
     let bestAcceptedX = anchor.x;
     let bestAcceptedZ = anchor.z;
@@ -214,7 +212,7 @@ export class SpawnPositionCalculator {
         continue;
       }
 
-      const slope = heightCache.getSlopeAt(candidateX, candidateZ);
+      const slope = terrainSystem.getSlopeAt(candidateX, candidateZ);
       let maxLocalDrop = 0;
       let missingProbe = false;
       for (const sampleAngle of SAFE_SPAWN_SAMPLE_ANGLES) {

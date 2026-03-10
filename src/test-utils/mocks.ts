@@ -82,6 +82,8 @@ export function mockTerrainRuntime(
   return {
     getHeightAt: vi.fn((_x: number, _z: number) => 0),
     getEffectiveHeightAt: vi.fn((_x: number, _z: number) => 0),
+    getSlopeAt: vi.fn((_x: number, _z: number) => 0),
+    getNormalAt: vi.fn((_x: number, _z: number, target?: THREE.Vector3) => (target ?? new THREE.Vector3()).set(0, 1, 0)),
     getPlayableWorldSize: vi.fn(() => 2000),
     getVisualWorldSize: vi.fn(() => 2400),
     getVisualMargin: vi.fn(() => 200),

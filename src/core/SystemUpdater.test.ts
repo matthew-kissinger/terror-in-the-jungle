@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { SystemUpdater } from './SystemUpdater';
-import type { SystemReferences } from './SystemInitializer';
+import type { SystemKeyToType } from './SystemRegistry';
 
-function createRefs(overrides: Partial<SystemReferences> = {}): SystemReferences {
+function createRefs(overrides: Partial<SystemKeyToType> = {}): SystemKeyToType {
   return {
     spatialGridManager: {
       resetFrameTelemetry: vi.fn(),
@@ -47,6 +47,7 @@ function createRefs(overrides: Partial<SystemReferences> = {}): SystemReferences
     },
     gameModeManager: {
       getRespawnPolicy: vi.fn(() => ({ contactAssistStyle: 'none' })),
+      updateRuntime: vi.fn(),
     },
     playerRespawnManager: {
       getPolicyDrivenInsertionSuggestion: vi.fn(() => new THREE.Vector3(50, 2, 50)),
@@ -58,7 +59,7 @@ function createRefs(overrides: Partial<SystemReferences> = {}): SystemReferences
       setPlayerPosition: vi.fn(),
     },
     ...overrides,
-  } as unknown as SystemReferences;
+  } as unknown as SystemKeyToType;
 }
 
 describe('SystemUpdater', () => {
@@ -79,23 +80,16 @@ describe('SystemUpdater', () => {
     expect(refs.waterSystem.update).toHaveBeenCalledWith(0.07);
   });
 
-  it('suggests manual redeploy in A Shau instead of teleporting the player', () => {
+  it('does not contain A Shau contact-assist logic (removed from core)', () => {
     const updater = new SystemUpdater();
-    const refs = createRefs({
-      gameModeManager: {
-        getRespawnPolicy: vi.fn(() => ({ contactAssistStyle: 'pressure_front' })),
-      },
-    });
+    const refs = createRefs();
 
+    // Run many frames - should never trigger any player teleport or HUD message
     for (let i = 0; i < 61; i++) {
       updater.updateSystems(refs, [], undefined, 1, true);
     }
 
-    expect(refs.hudSystem.showMessage).toHaveBeenCalledWith(
-      'No nearby contact. Open the map and redeploy to the active front.',
-      5000
-    );
+    expect(refs.hudSystem.showMessage).not.toHaveBeenCalled();
     expect(refs.playerController.setPosition).not.toHaveBeenCalled();
-    expect(refs.playerHealthSystem.applySpawnProtection).not.toHaveBeenCalled();
   });
 });

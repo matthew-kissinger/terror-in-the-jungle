@@ -42,6 +42,8 @@ export class GameScenario {
     this.terrainRuntime = {
       getHeightAt: (_x: number, _z: number) => 0,
       getEffectiveHeightAt: (_x: number, _z: number) => 0,
+      getSlopeAt: (_x: number, _z: number) => 0,
+      getNormalAt: (_x: number, _z: number, target?: THREE.Vector3) => (target ?? new THREE.Vector3()).set(0, 1, 0),
       getPlayableWorldSize: () => worldSize,
       getWorldSize: () => worldSize,
       raycastTerrain: () => ({ hit: false }),

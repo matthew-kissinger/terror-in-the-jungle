@@ -15,6 +15,7 @@ import {
   isWalkableSlope,
   SLOPE_SLIDE_STRENGTH,
 } from '../terrain/SlopePhysics';
+import { FixedStepRunner } from '../../utils/FixedStepRunner';
 
 const _moveVector = new THREE.Vector3();
 const _cameraDirection = new THREE.Vector3();
@@ -22,6 +23,7 @@ const _cameraRight = new THREE.Vector3();
 const _worldMoveVector = new THREE.Vector3();
 const _horizontalVelocity = new THREE.Vector3();
 const _upVector = new THREE.Vector3(0, 1, 0);
+const _terrainNormal = new THREE.Vector3(0, 1, 0);
 
 // ── Player movement tuning ──
 const MOVEMENT_ACCELERATION = 5;
@@ -41,6 +43,7 @@ const HELI_TOUCH_CYCLIC_DEADZONE = 0.05;
 const HELI_MOUSE_SENSITIVITY_DEFAULT = 0.5;
 
 export class PlayerMovement {
+  static readonly FIXED_STEP_SECONDS = 0.016;
   private playerState: PlayerState;
   private terrainSystem?: ITerrainRuntime;
   private sandbagSystem?: SandbagSystem;
@@ -58,6 +61,7 @@ export class PlayerMovement {
   private isRunning = false;
   private altitudeLock = false;
   private lockedCollective = HELI_AUTOHOVER_TARGET;
+  private readonly movementStepper = new FixedStepRunner(PlayerMovement.FIXED_STEP_SECONDS, 1.0);
 
   constructor(playerState: PlayerState) {
     this.playerState = playerState;
@@ -127,6 +131,12 @@ export class PlayerMovement {
   }
 
   updateMovement(deltaTime: number, input: PlayerInput, camera: THREE.Camera): void {
+    this.movementStepper.step(deltaTime, (fixedDeltaTime) => {
+      this.simulateMovementStep(fixedDeltaTime, input, camera);
+    });
+  }
+
+  private simulateMovementStep(deltaTime: number, input: PlayerInput, camera: THREE.Camera): void {
     // Don't allow movement when in helicopter
     if (this.playerState.isInHelicopter) {
       this.playerState.velocity.set(0, 0, 0);
@@ -140,8 +150,7 @@ export class PlayerMovement {
     }
 
     // Query slope at current position for speed penalty + slide
-    const heightCache = getHeightQueryCache();
-    const normal = heightCache.getNormalAt(this.playerState.position.x, this.playerState.position.z);
+    const normal = this.sampleTerrainNormal(this.playerState.position.x, this.playerState.position.z);
     const slopeValue = 1 - normal.y;
     const normalX = normal.x;
     const normalZ = normal.z;
@@ -275,7 +284,7 @@ export class PlayerMovement {
         this.playerState.position.z,
       ));
       const targetTerrainHeight = Number(this.terrainSystem.getHeightAt(newPosition.x, newPosition.z));
-      const targetSlopeValue = heightCache.getSlopeAt(newPosition.x, newPosition.z);
+      const targetSlopeValue = this.sampleTerrainSlope(newPosition.x, newPosition.z);
       const terrainRise = Number.isFinite(currentTerrainHeight) && Number.isFinite(targetTerrainHeight)
         ? targetTerrainHeight - currentTerrainHeight
         : 0;
@@ -314,13 +323,14 @@ export class PlayerMovement {
     // Check for landing and play landing sound
     const wasGrounded = this.playerState.isGrounded;
 
+    const impactVelocityY = this.playerState.velocity.y;
     if (newPosition.y <= groundHeight) {
       // Player is on or below ground
       newPosition.y = groundHeight;
 
       // Play landing sound if we just landed
-      if (!wasGrounded && this.playerState.velocity.y < LANDING_SOUND_THRESHOLD && this.footstepAudioSystem) {
-        this.footstepAudioSystem.playLandingSound(newPosition, Math.abs(this.playerState.velocity.y));
+      if (!wasGrounded && impactVelocityY < LANDING_SOUND_THRESHOLD && this.footstepAudioSystem) {
+        this.footstepAudioSystem.playLandingSound(newPosition, Math.abs(impactVelocityY));
       }
 
       this.playerState.velocity.y = 0;
@@ -468,5 +478,19 @@ export class PlayerMovement {
       position.z = -halfExtent;
       this.playerState.velocity.z = Math.abs(this.playerState.velocity.z) * BOUNDARY_BOUNCE_FACTOR;
     }
+  }
+
+  private sampleTerrainNormal(x: number, z: number): THREE.Vector3 {
+    if (this.terrainSystem && typeof this.terrainSystem.getNormalAt === 'function') {
+      return this.terrainSystem.getNormalAt(x, z, _terrainNormal);
+    }
+    return _terrainNormal.copy(getHeightQueryCache().getNormalAt(x, z));
+  }
+
+  private sampleTerrainSlope(x: number, z: number): number {
+    if (this.terrainSystem && typeof this.terrainSystem.getSlopeAt === 'function') {
+      return this.terrainSystem.getSlopeAt(x, z);
+    }
+    return getHeightQueryCache().getSlopeAt(x, z);
   }
 }

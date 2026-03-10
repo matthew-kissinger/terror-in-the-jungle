@@ -22,10 +22,10 @@
 - [x] Delete RespawnMapView (replaced by OpenFrontierRespawnMap for all modes)
 - [x] Delete ProgrammaticGunFactory (all weapons load from GLBs)
 
-## Wave 2: Gameplay Impact (medium) - NOT STARTED
+## Wave 2: Gameplay Impact (medium) - PARTIAL
 
-- [ ] 2.1 Helicopter weapons: door guns for Huey, rockets for Cobra/Gunship
-- [ ] 2.2 Vehicle damage + destruction (health, fire, crash)
+- [x] 2.1 Helicopter weapons: minigun, rockets, door gunner NPC AI, rearm on helipad
+- [x] 2.2 Vehicle damage + destruction (role-based HP, repair on helipad, destruction forces pilot exit)
 - [ ] 2.3 Weapon sound variants (2-3 per weapon type) + impact/body/headshot sounds (requires asset generation)
 - [ ] 2.4 Wire 1-2 additional DEM maps as game modes (Ia Drang, Khe Sanh - data ready in data/vietnam/converted/)
 
@@ -45,7 +45,7 @@
 - [x] 3.15 Cleanup pass complete: `eslint`, `knip`, tests, build, and production smoke all pass cleanly
 - [ ] 3.4 Combat AI p99 still ~35ms (target <16ms) - remaining synchronous cover search cost
 - [ ] 3.5 Terrain contract cleanup: remove stale chunk-era config names, debug labels
-- [ ] 3.9 Reduce initial JS bundle surface without reintroducing fragile chunking (partial: mode-start pipeline is deferred, but current build still emits `710-727kB` main runtime chunks)
+- [ ] 3.9 Reduce initial JS bundle surface without reintroducing fragile chunking (partial: mode-start pipeline is deferred, a small release-loop diagnostics trim landed, but current build still emits `710-734kB` main runtime chunks)
 - [ ] 3.10 Decide whether remaining connector bursts should become constructor/runtime dependency objects or stay grouped setters
 - [x] 3.11 Zone Control firebase pass: widen base layout, soften home-base terrain grading, spread firebase towers, and add terrain-safe squad anchoring to stop cliff-edge starts
 
@@ -56,10 +56,35 @@
 - [ ] 4.3 Music/soundtrack
 - [ ] 4.4 Day/night cycle
 
+## Wave 5: Open Items (absorbed from archived execution plans)
+
+### From NEXT_PHASE_EXECUTION_PLAN (Tracks 2-4)
+
+- [ ] 5.1 A Shau insertion readability: explicit insertion-type language in deploy summary
+- [ ] 5.2 A Shau insertion: distinguish tactical/safer-LZ/aggressive-forward in UI/policy
+- [ ] 5.3 A Shau insertion: review default insertion bias against current objective pressure
+- [ ] 5.4 A Shau objective readability: improve first-entry guidance
+- [ ] 5.5 A Shau objective readability: surface active pressure/front-line direction more clearly
+- [ ] 5.6 Remove/rename stale chunk-era config that no longer controls runtime behavior
+- [ ] 5.7 Decide whether worker pool APIs are real runtime dependencies or legacy compatibility
+- [ ] 5.8 Visual balance pass: palms against canopy trees
+- [ ] 5.9 Review A Shau and Open Frontier landmark readability
+- [ ] 5.10 Tune LZ/helipad authored spaces to feel deliberate
+
+### From NEXT_PHASE_REFACTOR_PLAN (Tracks 2-4)
+
+- [ ] 5.11 Replace remaining hot-path setter chains with constructor or grouped runtime dependency injection
+- [ ] 5.12 Leave low-value or cold-path systems on setters until hot-path/core wiring is stable
+- [ ] 5.13 Split current tracked groups into smaller declared groups where cadence can differ safely
+- [ ] 5.14 Keep movement/weapon-feel/input-coupled systems every frame
+- [ ] 5.15 Move more world/strategy/passive-UI work behind scheduler contracts
+- [ ] 5.16 Add tests for cadence and accumulated-delta behavior when groups are skipped
+- [ ] 5.17 Continue identifying deploy-only UI/runtime that can defer without touching the menu path
+
 ## Far Horizon (not sized, not sequenced)
 
 - Watercraft (PBR, sampan - GLBs exist, blocked on water engine)
-- Fixed-wing aircraft (Spooky, Phantom, Skyraider - GLBs exist, no code)
+- Fixed-wing aircraft (Spooky, Phantom, Skyraider - flight code exists; Open Frontier and A Shau now stage static parked aircraft, but there is still no live vehicle runtime)
 - Multiplayer/networking
 - Destructible structures
 - Swimming/river gameplay (T-008 hydrology)
@@ -74,14 +99,14 @@
 
 | Metric | Value |
 |--------|-------|
-| Source files | 539 TS/TSX under `src/` |
-| Test files | 167 |
-| Tests passing | 3,470 |
+| Source files | 376 TS/TSX under `src/` |
+| Test files | 174 |
+| Tests passing | 3,612 |
 | Type errors | 0 |
 | Lint errors | 0 |
 | Lint warnings | 0 |
 | Dead-code scan | Passing (`npm run deadcode`) |
-| TODO/FIXME in source | 1 |
+| TODO/FIXME in source | 0 |
 | Runtime deps | 8 (`three`, `signals`, `three-mesh-bvh`, `@recast-navigation/*`, 3 font packages) |
 | GLB models | 75 on disk |
 | Audio files | 31 on disk, 31 wired, 0 orphaned |
@@ -98,11 +123,11 @@
 | Grenades (frag/smoke/flash) | DONE | Cooking, arc preview, physics, audio (pin pull, throw, beep) |
 | Mortar system | DONE | Deployment, aiming, ballistics, dedicated camera |
 | Helicopter (3 types, flight) | DONE | Enter/exit, distinct physics per aircraft |
-| Helicopter weapons | NOT STARTED | Roles defined (transport/gunship/attack) but no weapon code |
-| Vehicle damage | NOT STARTED | No health system for vehicles |
+| Helicopter weapons | DONE | Minigun (50rps hitscan), rockets (projectile, 8m radius), door gunner NPC AI, rearm on helipad |
+| Vehicle damage | DONE | Role-based HP (transport:500/gunship:600/attack:400), repair on helipad, destruction forces pilot exit |
 | Game modes (5) | DONE | Zones, tickets, win conditions, policy-driven respawn, mode product passes complete |
 | Weather system | DONE | Rain, storms, lightning, transitions |
-| World structures | DONE | 35 prefabs, WorldFeatureSystem, placements on TDM/ZC/A Shau |
+| World structures | DONE | prefab compounds plus generator-backed airfields; Open Frontier and A Shau now stage planes and separate heavy motor pools |
 | Ambient wildlife | DONE | All 6 types spawning (egret, buffalo, macaque, tiger, cobra, boar) |
 | Water | PARTIAL | Visual plane only, no swimming/rivers |
 | Day/night | NOT STARTED | Deleted as dead code |
@@ -115,20 +140,30 @@
 ## Known Bugs / Active Defects
 
 1. Combat AI p99 still sits around ~35ms in heavy scenarios, well above the 16ms target.
-2. Initial bundle remains large (`~710-727kB` main runtime chunks), so startup is now stable but still heavy.
-3. `SystemConnector` is materially smaller now, but the underlying systems still rely on setter injection and runtime ordering inside the new grouped composers.
+2. Initial bundle remains large (`~710-734kB` main runtime chunks), so startup is now stable but still heavy.
+3. There is no current release-blocking boot/deploy defect; remaining issues are perf and packaging quality, not functional stability.
+4. Open Frontier and A Shau airfields now stage fixed-wing aircraft, jeeps, APCs, and tanks as static world content only; helicopters remain the only playable vehicles.
 
 ## Current Release Posture
 
-- Current branch state is a clean stabilization baseline for focused playtesting.
+- Current branch state is a playable, shippable stabilization baseline for focused playtesting.
 - Required local gates are green: `lint`, `deadcode`, `test:run`, `build`, and `smoke:prod`.
-- This is good enough to push and start structured gameplay validation, but not yet a polished release candidate because perf and bundle-size debt remain.
+- This is ready to push and deploy for structured gameplay validation. Remaining work is release polish: perf tails, bundle weight, and content expansion.
+
+## Residual Architecture Backlog
+
+Consultation-critical findings are closed. What remains is non-blocking cleanup and polish.
+
+1. **System registration still spans multiple files** -- `SystemRegistry` removed the public property bag, but adding a new system still usually touches `SystemInitializer` and one or more composers.
+2. **Compatibility setters still exist on some large systems** -- the boot/runtime path now prefers grouped `configureDependencies()` on the high-fan-in clusters, but compatibility setters remain for tests and older call sites.
+3. **Legacy UI still exists outside the newest component path** -- `RespawnUI` is migrated, but parts of the older HUD/admin surface still use imperative DOM patterns.
+4. **Singleton lifecycle is improved, not universal** -- the major consultation caches/singletons reset on engine teardown, but there is still no single repo-wide dispose contract for every singleton-like helper.
 
 ## Architecture Risks
 
 1. Combat AI p99 ~35ms (target <16ms) - synchronous cover search improved but not solved
 2. Scheduler enforcement is only partial - some cadence-safe groups moved off every-frame updates, but core simulation is still largely serial on the main thread
-3. Startup/player/deploy, gameplay runtime, and operational runtime are now grouped in dedicated composers, but the core runtime still depends heavily on setter injection inside those clusters
+3. Startup/player/deploy, gameplay runtime, and operational runtime are now grouped in dedicated composers; the remaining order-sensitive wiring is lower risk than the old monolithic connector path, but not fully eliminated
 4. Startup orchestration is improved and the mode-start pipeline now defers until `Play`, but runtime contracts are still order-sensitive across multiple systems
 5. Production boot is fixed and deferred chunks now exist for mode startup, but bundle weight is still high enough to remain a product risk
 6. Terrain grading is now system-level instead of config-only, but it still only supports circular flatten stamps; more complex compound footprints still need authored support beyond radius-based grading
@@ -143,10 +178,7 @@
 - added a `knip` tag allowance for the intentionally lazy-loaded `prepareModeStartup` startup path
 - dead-code cleanup is no longer an active backlog item; remaining work is architectural and performance-oriented, not cleanup-oriented
 
-## Stale Docs Pending Archive/Update
+## Doc Cleanup Log
 
-- `docs/GAME_MODES_EXECUTION_PLAN.md` - references deleted RespawnMapView.ts (historical, low priority)
-- `docs/ROADMAP.md` Phase 5C - references deleted chunk system (historical)
-- `docs/PLAN_STATE.md` should be kept aligned with `NEXT_PHASE_REFACTOR_PLAN.md` as phase-2 composition and bundle work lands
-
-Archived (2026-03-09): GAME_STATE_ANALYSIS.md, SQUAD_COMMAND_REARCHITECT.md, FRONTEND_ARCHITECTURE_INVENTORY.md
+- 2026-03-09: Archived GAME_STATE_ANALYSIS.md, SQUAD_COMMAND_REARCHITECT.md, FRONTEND_ARCHITECTURE_INVENTORY.md
+- 2026-03-10: Archived 10 completed/superseded docs (execution plans, research, consultation). Merged AUDIO_ASSETS_NEEDED and BUILD_NOW_ASSET_BACKLOG into ASSET_MANIFEST. Deleted CODEBASE_MAP.mmd. Consultation report findings captured in Known Architecture Debt above.

@@ -45,8 +45,8 @@ export class RespawnManager {
     return this.pendingRespawns;
   }
 
-  setPendingRespawns(resppawns: PendingRespawn[]): void {
-    this.pendingRespawns = resppawns;
+  setPendingRespawns(respawns: PendingRespawn[]): void {
+    this.pendingRespawns = respawns;
   }
 
   clearPendingRespawns(): void {

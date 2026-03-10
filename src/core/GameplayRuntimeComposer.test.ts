@@ -58,7 +58,10 @@ function createRefs() {
     fullMapSystem: {},
     gameModeManager: {
       connectSystems: vi.fn(),
+      setHUDSystem: vi.fn(),
       setInfluenceMapSystem: vi.fn(),
+      setPlayerController: vi.fn(),
+      setPlayerRespawnManager: vi.fn(),
     },
     grenadeSystem: {
       setAudioManager: vi.fn(),
@@ -197,6 +200,9 @@ describe('GameplayRuntimeComposer', () => {
       refs.fullMapSystem
     );
     expect(refs.gameModeManager.setInfluenceMapSystem).toHaveBeenCalledWith(refs.influenceMapSystem);
+    expect(refs.gameModeManager.setHUDSystem).toHaveBeenCalledWith(refs.hudSystem);
+    expect(refs.gameModeManager.setPlayerController).toHaveBeenCalledWith(refs.playerController);
+    expect(refs.gameModeManager.setPlayerRespawnManager).toHaveBeenCalledWith(refs.playerRespawnManager);
     expect(refs.ammoSupplySystem.setZoneManager).toHaveBeenCalledWith(refs.zoneManager);
     expect(refs.ammoSupplySystem.setInventoryManager).toHaveBeenCalledWith(refs.inventoryManager);
     expect(refs.ammoSupplySystem.setFirstPersonWeapon).toHaveBeenCalledWith(refs.firstPersonWeapon);

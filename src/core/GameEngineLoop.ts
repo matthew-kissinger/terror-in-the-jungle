@@ -9,21 +9,62 @@ const CRASH_WINDOW_MS = 5000; // 5 seconds
 const MAX_CRASHES = 3;
 let errorOverlayShown = false;
 
+export function start(engine: GameEngine): void {
+  if (engine.isLoopRunning || engine.isDisposed) {
+    return;
+  }
+
+  engine.isLoopRunning = true;
+  scheduleNextFrame(engine);
+}
+
+export function stop(engine: GameEngine): void {
+  engine.isLoopRunning = false;
+  if (engine.animationFrameId !== null) {
+    cancelAnimationFrame(engine.animationFrameId);
+    engine.animationFrameId = null;
+  }
+}
+
+export function resetState(): void {
+  crashCount = 0;
+  lastCrashTime = 0;
+  errorOverlayShown = false;
+}
+
+function scheduleNextFrame(engine: GameEngine): void {
+  if (!engine.isLoopRunning || engine.isDisposed) {
+    engine.animationFrameId = null;
+    return;
+  }
+
+  engine.animationFrameId = requestAnimationFrame(() => animate(engine));
+}
+
 /**
  * Main game loop animation frame
  */
 export function animate(engine: GameEngine): void {
-  requestAnimationFrame(() => animate(engine));
+  if (!engine.isLoopRunning || engine.isDisposed) {
+    engine.animationFrameId = null;
+    return;
+  }
 
-  if (!engine.isInitialized || !engine.gameStarted) return;
-
-  // Skip rendering while WebGL context is lost
-  if (engine.contextLost) return;
-
-  const deltaTime = Math.min(engine.clock.getDelta(), 0.1);
-  engine.lastFrameDelta = deltaTime;
+  engine.animationFrameId = null;
 
   try {
+    if (!engine.isInitialized || !engine.gameStarted) {
+      return;
+    }
+
+    // Skip rendering while WebGL context is lost
+    if (engine.contextLost) {
+      return;
+    }
+
+    const deltaTime = Math.min(engine.clock.getDelta(), 0.1);
+    engine.lastFrameDelta = deltaTime;
+
     // Update all systems
     engine.systemManager.updateSystems(deltaTime, engine.gameStarted);
 
@@ -114,6 +155,8 @@ export function animate(engine: GameEngine): void {
     }
 
     // Continue the loop - don't let a single crash stop the game
+  } finally {
+    scheduleNextFrame(engine);
   }
 }
 
@@ -141,6 +184,8 @@ function showFrameLoopError(engine: GameEngine, error: unknown): void {
  * Updates runtime metrics
  */
 function updateRuntimeMetrics(engine: GameEngine, deltaTime: number): void {
+  if (!engine.runtimeMetrics) return;
+
   engine.runtimeMetrics.updateFrame(deltaTime);
 
   const combatSystem = engine.systemManager.combatantSystem;

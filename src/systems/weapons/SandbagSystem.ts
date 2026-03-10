@@ -41,6 +41,8 @@ export class SandbagSystem implements GameSystem {
   private placementValid = false;
   private pulseTime = 0;
   private previewReady = false;
+  private placementPreviewMaterial?: THREE.MeshStandardMaterial;
+  private pendingPlacements = 0;
 
   private raycaster = new THREE.Raycaster();
 
@@ -77,14 +79,21 @@ export class SandbagSystem implements GameSystem {
       this.scene.remove(this.placementPreview);
       this.disposeObject3D(this.placementPreview);
     }
+    this.placementPreviewMaterial?.dispose();
+    this.placementPreviewMaterial = undefined;
   }
 
   private disposeObject3D(obj: THREE.Object3D): void {
+    if (typeof (modelLoader as any).disposeInstance === 'function') {
+      modelLoader.disposeInstance(obj);
+      return;
+    }
+
     obj.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.geometry.dispose();
         if (Array.isArray(child.material)) {
-          child.material.forEach(m => m.dispose());
+          child.material.forEach((material) => material.dispose());
         } else if (child.material instanceof THREE.Material) {
           child.material.dispose();
         }
@@ -104,6 +113,7 @@ export class SandbagSystem implements GameSystem {
         emissive: 0x00ff00,
         emissiveIntensity: 0.2
       });
+      this.placementPreviewMaterial = previewMaterial;
 
       scene.traverse((child) => {
         if (child instanceof THREE.Mesh) {
@@ -202,7 +212,7 @@ export class SandbagSystem implements GameSystem {
     }
 
     // Check max sandbags
-    if (this.sandbags.length >= this.MAX_SANDBAGS) {
+    if (this.sandbags.length + this.pendingPlacements >= this.MAX_SANDBAGS) {
       return false;
     }
 
@@ -243,9 +253,11 @@ export class SandbagSystem implements GameSystem {
     // Async load a fresh GLB clone for placement
     const pos = this.previewPosition.clone();
     const rotY = this.placementPreview?.rotation.y ?? 0;
+    if (!this.inventoryManager.useSandbag()) {
+      return false;
+    }
+    this.pendingPlacements++;
     void this.placeSandbagAsync(pos, rotY);
-
-    this.inventoryManager.useSandbag();
     return true;
   }
 
@@ -279,7 +291,10 @@ export class SandbagSystem implements GameSystem {
 
       Logger.info('weapons', `Sandbag placed at (${pos.x.toFixed(1)}, ${pos.z.toFixed(1)}). Total: ${this.sandbags.length}/${this.MAX_SANDBAGS}`);
     } catch (err) {
+      this.inventoryManager?.addSandbags(1);
       Logger.warn('weapons', 'Failed to load sandbag model for placement', err);
+    } finally {
+      this.pendingPlacements = Math.max(0, this.pendingPlacements - 1);
     }
   }
 

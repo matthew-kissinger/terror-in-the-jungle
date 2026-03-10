@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { setSmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
 import { IGameRenderer } from '../types/SystemInterfaces';
-import { SystemReferences } from './SystemInitializer';
+import type { SystemKeyToType } from './SystemRegistry';
 
 type GameplayRuntimeRefs = Pick<
-  SystemReferences,
+  SystemKeyToType,
+  | 'animalSystem'
   | 'ammoSupplySystem'
   | 'audioManager'
   | 'combatantSystem'
@@ -52,6 +53,7 @@ interface GameplayRuntimeGroups {
   >;
   worldRuntime: Pick<
     GameplayRuntimeRefs,
+    | 'animalSystem'
     | 'combatantSystem'
     | 'firstPersonWeapon'
     | 'hudSystem'
@@ -81,9 +83,12 @@ interface GameplayRuntimeGroups {
     | 'firstPersonWeapon'
     | 'fullMapSystem'
     | 'gameModeManager'
+    | 'hudSystem'
     | 'influenceMapSystem'
     | 'inventoryManager'
     | 'minimapSystem'
+    | 'playerController'
+    | 'playerRespawnManager'
     | 'terrainSystem'
     | 'ticketSystem'
     | 'zoneManager'
@@ -123,6 +128,7 @@ export function createGameplayRuntimeGroups(
     },
     worldRuntime: {
       combatantSystem: refs.combatantSystem,
+      animalSystem: refs.animalSystem,
       firstPersonWeapon: refs.firstPersonWeapon,
       hudSystem: refs.hudSystem,
       playerHealthSystem: refs.playerHealthSystem,
@@ -149,9 +155,12 @@ export function createGameplayRuntimeGroups(
       firstPersonWeapon: refs.firstPersonWeapon,
       fullMapSystem: refs.fullMapSystem,
       gameModeManager: refs.gameModeManager,
+      hudSystem: refs.hudSystem,
       influenceMapSystem: refs.influenceMapSystem,
       inventoryManager: refs.inventoryManager,
       minimapSystem: refs.minimapSystem,
+      playerController: refs.playerController,
+      playerRespawnManager: refs.playerRespawnManager,
       terrainSystem: refs.terrainSystem,
       ticketSystem: refs.ticketSystem,
       zoneManager: refs.zoneManager,
@@ -179,15 +188,29 @@ function wireCombatRuntime(
   runtime: GameplayRuntimeGroups['combatRuntime'],
   camera: THREE.PerspectiveCamera
 ): void {
-  runtime.combatantSystem.setTerrainSystem(runtime.terrainSystem);
-  runtime.combatantSystem.setCamera(camera);
-  runtime.combatantSystem.setTicketSystem(runtime.ticketSystem);
-  runtime.combatantSystem.setPlayerHealthSystem(runtime.playerHealthSystem);
-  runtime.combatantSystem.setZoneManager(runtime.zoneManager);
-  runtime.combatantSystem.setGameModeManager(runtime.gameModeManager);
-  runtime.combatantSystem.setHUDSystem(runtime.hudSystem);
-  runtime.combatantSystem.setAudioManager(runtime.audioManager);
-  runtime.combatantSystem.setPlayerSuppressionSystem(runtime.playerSuppressionSystem);
+  if (typeof runtime.combatantSystem.configureDependencies === 'function') {
+    runtime.combatantSystem.configureDependencies({
+      terrainSystem: runtime.terrainSystem,
+      camera,
+      ticketSystem: runtime.ticketSystem,
+      playerHealthSystem: runtime.playerHealthSystem,
+      zoneManager: runtime.zoneManager,
+      gameModeManager: runtime.gameModeManager,
+      hudSystem: runtime.hudSystem,
+      audioManager: runtime.audioManager,
+      playerSuppressionSystem: runtime.playerSuppressionSystem,
+    });
+  } else {
+    runtime.combatantSystem.setTerrainSystem(runtime.terrainSystem);
+    runtime.combatantSystem.setCamera(camera);
+    runtime.combatantSystem.setTicketSystem(runtime.ticketSystem);
+    runtime.combatantSystem.setPlayerHealthSystem(runtime.playerHealthSystem);
+    runtime.combatantSystem.setZoneManager(runtime.zoneManager);
+    runtime.combatantSystem.setGameModeManager(runtime.gameModeManager);
+    runtime.combatantSystem.setHUDSystem(runtime.hudSystem);
+    runtime.combatantSystem.setAudioManager(runtime.audioManager);
+    runtime.combatantSystem.setPlayerSuppressionSystem(runtime.playerSuppressionSystem);
+  }
 
   const combatantCombat = runtime.combatantSystem.combatantCombat;
   if (combatantCombat) {
@@ -230,6 +253,7 @@ function wireWorldRuntime(
     runtime.combatantSystem.querySpatialRadius(center, radius)
   );
   runtime.zoneManager.setHUDSystem(runtime.hudSystem);
+  runtime.animalSystem?.setTerrainSystem(runtime.terrainSystem);
 }
 
 function wireWeaponRuntime(runtime: GameplayRuntimeGroups['weaponRuntime']): void {
@@ -261,15 +285,33 @@ function wireWeaponRuntime(runtime: GameplayRuntimeGroups['weaponRuntime']): voi
 }
 
 function wireGameModeRuntime(runtime: GameplayRuntimeGroups['gameModeRuntime']): void {
-  runtime.gameModeManager.connectSystems(
-    runtime.zoneManager,
-    runtime.combatantSystem,
-    runtime.ticketSystem,
-    runtime.terrainSystem,
-    runtime.minimapSystem,
-    runtime.fullMapSystem
-  );
-  runtime.gameModeManager.setInfluenceMapSystem(runtime.influenceMapSystem);
+  if (typeof runtime.gameModeManager.configureDependencies === 'function') {
+    runtime.gameModeManager.configureDependencies({
+      zoneManager: runtime.zoneManager,
+      combatantSystem: runtime.combatantSystem,
+      ticketSystem: runtime.ticketSystem,
+      terrainSystem: runtime.terrainSystem,
+      minimapSystem: runtime.minimapSystem,
+      fullMapSystem: runtime.fullMapSystem,
+      influenceMapSystem: runtime.influenceMapSystem,
+      hudSystem: runtime.hudSystem,
+      playerController: runtime.playerController,
+      playerRespawnManager: runtime.playerRespawnManager,
+    });
+  } else {
+    runtime.gameModeManager.connectSystems(
+      runtime.zoneManager,
+      runtime.combatantSystem,
+      runtime.ticketSystem,
+      runtime.terrainSystem,
+      runtime.minimapSystem,
+      runtime.fullMapSystem
+    );
+    runtime.gameModeManager.setInfluenceMapSystem(runtime.influenceMapSystem);
+    runtime.gameModeManager.setHUDSystem(runtime.hudSystem);
+    runtime.gameModeManager.setPlayerController(runtime.playerController);
+    runtime.gameModeManager.setPlayerRespawnManager(runtime.playerRespawnManager);
+  }
 
   runtime.ammoSupplySystem.setZoneManager(runtime.zoneManager);
   runtime.ammoSupplySystem.setInventoryManager(runtime.inventoryManager);

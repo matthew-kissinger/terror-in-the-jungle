@@ -6,13 +6,13 @@ Last updated: 2026-03-10
 
 1. `CODEBASE_BLOCKS.md` - **Start here.** Hub index for the block map: all systems, wiring, tick graph, singletons, vocabulary.
 2. `blocks/` - Per-domain sub-docs (core, combat, terrain, strategy, player, weapons, vehicle, world, ui, support).
-3. `GAME_MODES_EXECUTION_PLAN.md` - Canonical execution plan for game modes, deploy/loadout flow, command UX, tactical vs strategic map policy, and faction generalization.
-4. `ACTIVE_GAME_MODES_HANDOFF.md` - Current phase status, validated state, and exact resume points for another agent.
-5. `ROADMAP.md` - Master vision document. Aspirational and broader than the active game-mode execution plan.
-6. `ARCHITECTURE_RECOVERY_PLAN.md` - Runtime stability and performance.
-7. `PROFILING_HARNESS.md` - Perf capture commands, flags, artifacts.
-8. `NEXT_PHASE_REFACTOR_PLAN.md` - Post-stabilization refactor plan for startup flow, system composition, bundle loading, and loop budgeting.
-9. `DEPLOYMENT_VALIDATION.md` - Pre-push and pre-deploy release gate plus manual verification checklist.
+3. `ROADMAP.md` - Master vision document. Aspirational 10-phase plan.
+4. `ARCHITECTURE_RECOVERY_PLAN.md` - Runtime stability and performance decisions.
+5. `PROFILING_HARNESS.md` - Perf capture commands, flags, artifacts.
+6. `PERF_FRONTIER.md` - Bottleneck analysis and phase framework.
+7. `DEPLOYMENT_VALIDATION.md` - Pre-push gate and manual verification checklist.
+8. `PLAN_STATE.md` - Wave tracker, feature completeness, known architecture debt.
+9. `NEXT_WORK.md` - Active checklist (work top-down).
 
 ## Block Map (Primary Reference)
 
@@ -28,60 +28,22 @@ Last updated: 2026-03-10
 - `blocks/ui.md` - HUD (30 widgets), layout, touch controls, minimap, map, compass.
 - `blocks/support.md` - Audio, effects, environment, input, assets, debug, config.
 
-## Active Docs
+## Reference Docs
 
-- `GAME_MODES_EXECUTION_PLAN.md`
-  - Canonical execution plan for making the current mode set feel like real products. Covers mode runtime architecture, deploy/loadout flow, command UX, map intel policy, team generalization, and death presentation cleanup.
-- `ACTIVE_GAME_MODES_HANDOFF.md`
-  - Live handoff note for the current execution track. Lists completed phases, validated state, remaining gaps, and the recommended next implementation entry points.
-- `ROADMAP.md`
-  - Master roadmap: 10-phase plan from asset overhaul through full Vietnam simulation engine. Aspirational and now aligned with the active execution plan where overlap exists.
-- `ASSET_MANIFEST.md`
-  - Comprehensive asset generation queue for Pixel Forge agent. 80+ assets with prompts, tri budgets, mesh part naming, scale specs. 4 priority sprints.
-- `PROFILING_HARNESS.md`
-  - Source of truth for perf capture commands, flags, artifacts, and validation semantics.
-- `ARCHITECTURE_RECOVERY_PLAN.md`
-  - Current architecture risk register and prioritized implementation board.
-- `NEXT_PHASE_REFACTOR_PLAN.md`
-  - Current Phase 2 refactor plan after the deployed boot fix. Focuses on `GameEngineInit`, `SystemConnector`, scheduler expansion, and bundle surface reduction.
-- `DEPLOYMENT_VALIDATION.md`
-  - Release-readiness checklist for local validation, CI expectations, and manual menu/deploy/live verification before push.
-- `TERRAIN_REWRITE_MASTER_PLAN.md`
-  - Canonical terrain rewrite control document. This is the only terrain execution plan. Latest validated state includes fully clean preview-smoke evidence under `artifacts/terrain-smoke/2026-03-04T00-54-47-243Z`.
-- `TERRAIN_RESEARCH.md`
-  - Industry research: CDLOD vs geoclipmaps vs GPU tessellation vs CBT, CPU/GPU height consistency patterns, WebGPU terrain options, virtual texturing, streaming, and pivot options for our architecture. Reference only - no code changes proposed.
-- `AUDIO_ASSETS_NEEDED.md`
-  - Audio backlog/spec used by `src/systems/audio`.
-- `AGENT_TESTING.md`
-  - Agent validation workflows, including `test:frontier` for fast gameplay-critical validation and `deadcode` (`knip`) for cleanup passes.
-- `../data/vietnam/DATA_PIPELINE.md`
-  - Real-terrain data status and integration pipeline for Vietnam maps.
-
-## Partially Superseded
-
-These docs predate the block map and overlap with specific sub-docs. Kept for reference but prefer the block map for current state.
-
-- `UI_STANDARDIZATION_GUIDE.md` - Standards still valid; component inventory overlaps with `blocks/ui.md`.
-- `CODEBASE_MAP.mmd` - Original Mermaid diagram, superseded by `CODEBASE_BLOCKS.md` + `blocks/`.
+- `ASSET_MANIFEST.md` - All asset backlogs (GLB generation queue, audio needs, build-now priorities).
+- `UI_ICON_MANIFEST.md` - Icon registry reference (50 pixel-art PNGs).
+- `TERRAIN_RESEARCH.md` - Industry research (CDLOD, geoclipmaps, WebGPU terrain). Reference only.
+- `AGENT_TESTING.md` - Agent validation workflows and perf baselines.
+- `../data/vietnam/DATA_PIPELINE.md` - Real-terrain data status and integration pipeline.
 
 ## Archive
 
-- `archive/` - Retired docs. Informational only, not part of active execution.
-- `archive/ASHAU_VALLEY_IMPLEMENTATION_PLAN.md` (archived 2026-03-08) - A Shau stabilization plan. Phases 2/4 superseded by MapIntelPolicy and product passes.
-- `archive/FRONTEND_REARCHITECTURE_BACKLOG.md` (archived 2026-03-08) - Phases 1-4 done, Phase 5 stale. Overlaps with `blocks/ui.md`.
-- `archive/UI_ENGINE_PLAN.md` - UI engine rewrite plan (Phases 0-7 complete).
-- `archive/GAME_STATE_ANALYSIS.md` (archived 2026-03-09) - Point-in-time codebase snapshot from 2026-03-06. Largely superseded by PLAN_STATE.md and CLAUDE.md.
-- `archive/SQUAD_COMMAND_REARCHITECT.md` (archived 2026-03-09) - Squad command analysis. QuickCommandStrip + SquadRadialMenu deleted; remaining command system is stable (Z key overlay).
-- `archive/FRONTEND_ARCHITECTURE_INVENTORY.md` (archived 2026-03-09) - Superseded by `blocks/ui.md`.
+- `archive/` - Retired docs. See `archive/README.md` for index.
 
 ## Documentation Rules
 
 - Keep active docs concise and current.
 - Prefer status boards and acceptance criteria over long chronological logs.
-- Do not preserve debate trails or superseded execution plans in active terrain docs. Delete them once their conclusions are absorbed into the canonical plan.
-- Any perf-sensitive change must update:
-  - `PROFILING_HARNESS.md` if capture behavior/flags changed
-  - `ARCHITECTURE_RECOVERY_PLAN.md` with decision and evidence path
+- Any perf-sensitive change must update `PROFILING_HARNESS.md` (if capture flags changed) and `ARCHITECTURE_RECOVERY_PLAN.md` (with decision and evidence).
 - Any new asset need must update `ASSET_MANIFEST.md`.
-- Any game-mode, deploy/loadout, respawn-flow, map-intel, or death-presentation change must update `GAME_MODES_EXECUTION_PLAN.md`.
 - Any system addition/removal/rewiring must update the relevant `blocks/*.md` sub-doc.

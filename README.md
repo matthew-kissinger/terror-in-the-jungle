@@ -23,11 +23,11 @@ npm run build
 |------|---:|---:|---:|---|
 | Zone Control | 500m | 20 | 3 min | Combat over 3 strategic zones. Control the majority to drain enemy tickets. |
 | Team Deathmatch | 400m | 30 | 5 min | Pure tactical combat. First team to the kill target wins. |
-| Open Frontier | 3200m | 120 | 15 min | Large-scale warfare across 10 zones with helicopters. |
-| A Shau Valley | 21km | 60 materialized / 3000 strategic | 60 min | Historical campaign on real DEM terrain with war simulator. |
+| Open Frontier | 3200m | 120 | 15 min | Large-scale warfare across 10 zones with helicopters, a rear-area airfield, and a staged armored yard. |
+| A Shau Valley | 21km | 60 materialized / 3000 strategic | 60 min | Historical campaign on real DEM terrain with war simulator, upgraded Ta Bat airfield, and a staged armored yard. |
 | AI Sandbox | 200m | 40 (configurable) | 60 min | Automated AI combat for performance testing. |
 
-Three flyable helicopters: UH-1 Huey (transport), UH-1C Gunship, AH-1 Cobra (attack).
+Three flyable helicopters: UH-1 Huey (transport), UH-1C Gunship, AH-1 Cobra (attack). Open Frontier and A Shau also stage parked fixed-wing aircraft plus jeeps/APCs/tanks as static world content.
 
 ## Development
 

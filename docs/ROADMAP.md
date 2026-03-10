@@ -1,11 +1,9 @@
 # Terror in the Jungle - Roadmap
 
-Last updated: 2026-03-06
-Status: ALIGNED - Aspirational roadmap, with active execution tracked in `GAME_MODES_EXECUTION_PLAN.md`
+Last updated: 2026-03-10
+Status: ALIGNED - Aspirational roadmap. Active execution tracked in `PLAN_STATE.md` and `NEXT_WORK.md`.
 
-> **Note:** This is an aspirational planning document. Phase dates and scope are not commitments. See `ARCHITECTURE_RECOVERY_PLAN.md` for active work status and `UI_ENGINE_PLAN.md` for UI migration status.
-> **Execution note:** Active implementation sequencing for game modes, deploy/loadout flow, command UX, map intel policy, faction generalization, and death presentation now lives in `GAME_MODES_EXECUTION_PLAN.md`.
-> **Handoff note:** Current phase status and recommended resume points live in `ACTIVE_GAME_MODES_HANDOFF.md`.
+> **Note:** This is an aspirational planning document. Phase dates and scope are not commitments. See `ARCHITECTURE_RECOVERY_PLAN.md` for active work status and `PLAN_STATE.md` for wave tracking.
 
 ## Vision
 
@@ -16,34 +14,23 @@ Core loop: **Play in first person AND command simultaneously.** The player is bo
 Vietnam War is the first theater. The architecture should generalize to any war with different factions, terrain, vehicles, and doctrine.
 
 **Three.js reference:** https://threejs.org/docs/llms-full.txt
+Current alignment: ship on `WebGLRenderer` now. `WebGPURenderer`/TSL stays deferred until terrain materials and post-processing are ported off `onBeforeCompile` and the current WebGL path stops being the most compatible option.
 
 ## Current State Summary
 
 | Domain | State | Key Limitation |
 |--------|-------|----------------|
-| Vehicles | 1 player-only UH-1 Huey | No NPC boarding, no weapons, no damage, no enemy aircraft, throttle sticks |
-| Weapons | 6 player weapon types | Shared deploy/loadout flow is live, but field pickups and broader weapon expansion are still later-phase work |
+| Vehicles | UH-1 Huey, UH-1C Gunship, AH-1 Cobra (player-pilotable) | Helicopter weapons/damage/HUD are live. Open Frontier and A Shau stage parked fixed-wing aircraft plus separate armored yards. Fixed-wing physics exist but are not yet wired to live vehicles; no drivable ground vehicles yet. |
+| Weapons | 7 weapon models across 6 types (M16A1, AK-47, Ithaca 37, M3, M1911, M60, M79) | GLB viewmodels, differentiated ballistics, player tracers, per-weapon audio. Field pickups and weapon expansion are later-phase. |
 | AI | 8-state FSM, 2 factions (US/OPFOR) | No vehicle usage, no turret manning, limited tactical intelligence |
-| Squad | Single coordinator + quick strip + map-first overlay (desktop/touch/gamepad) | Selected-squad detail is live; gamepad uses map-first overlay; scale adapters deferred |
-| Terrain | Noise + DEM terrain runtime, CDLOD rewrite live | CDLOD morphing (T-006) complete; hydrology/gameplay integration still incomplete |
-| Vegetation | 7+ billboard types with biome-aware runtime wiring | Needs in-engine smoke validation and visual tuning across modes |
+| Squad | Single coordinator + Z-key command overlay (desktop/touch) | Selected-squad detail is live; gamepad parity deferred; scale adapters deferred |
+| Terrain | Noise + DEM terrain runtime, CDLOD rewrite live | CDLOD morphing complete; auto-scaled LOD levels per world size; hydrology/gameplay integration still incomplete |
+| Vegetation | 7+ billboard types with biome-aware runtime wiring, Poisson cache, adaptive scheduling | Staged activation or distant representation change needed for traversal backlog |
 | Water | Global plane + shader rivers | No swimming, no boats, disabled in A Shau, shader is basic |
-| Assets | GLB integration has started for several live systems | More models remain staged in `deploy-3d-assets/`, but the engine is no longer fully procedural |
-| HUD/UI | UI Engine Phases 0-7 complete (CSS Modules + signals) | Command overlay is live; no vehicle weapon HUD yet |
-| Scale | 3000 agents / 21km map | Heap growth warnings at current scale, architecture recovery P0-P3 active |
+| Assets | 75 GLBs generated; weapons, structures, animals wired into engine | More models remain staged in `deploy-3d-assets/`; vegetation billboard remakes pending |
+| HUD/UI | UI Engine is the active path. StartScreen and RespawnUI are on `UIComponent` + CSS Modules/signals; IconRegistry, CrosshairSystem, HelicopterHUD, OnboardingOverlay, and mobile gestures are live | Some legacy raw-DOM HUD/admin surfaces still remain and should migrate opportunistically |
+| Scale | 3000 agents / 21km map | combat120 tails still need work; terrain texture/material validation now covers every shipped mode |
 | Factions | US, ARVN, NVA, VC loadout contexts are live | Zone ownership generalized to BLUFOR/OPFOR alliance level; dynamic HUD faction labels from config |
-
-## Known Bugs (Confirmed)
-
-### Helicopter Throttle
-- **Symptom:** Collective decay and hover behavior can feel sticky at transitions
-- **Current state:** Per-aircraft AircraftPhysicsConfig is live (UH-1 Huey, UH-1C Gunship, AH-1 Cobra). W/S direct increment/decrement collective; release decays toward 0 (autoHover OFF, dt*3.0) or 0.4 (autoHover ON, dt*2.0).
-- **Remaining:** Single-layer smoothing pass (remove PlayerMovement lerp, keep HelicopterPhysics only), altitude lock key.
-
-### Squad Controls
-- **Current state:** Desktop and touch command entry run through `CommandInputManager` with map-first overlay. Selected-squad detail panel is live.
-- **Remaining gap:** Gamepad still falls back to the radial menu while the map-first command surface is desktop/touch only.
-- **See:** `docs/SQUAD_COMMAND_REARCHITECT.md` for current architecture and remaining work.
 
 ## Resolved Decisions
 
@@ -221,7 +208,7 @@ Not one monolith sandbox mode. Instead, composable blocks that can be combined:
 ## Phase 4: Squad Command & RTS Layer [PARTIALLY COMPLETE]
 **Goal:** Unified, intuitive command interface that scales from squad to army.
 **Dependencies:** Independent (can start parallel with Phase 3).
-**See:** `docs/SQUAD_COMMAND_REARCHITECT.md`
+**See:** `docs/archive/SQUAD_COMMAND_REARCHITECT.md` (archived)
 
 Current state:
 - single command coordinator is live

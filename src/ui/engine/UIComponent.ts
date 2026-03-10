@@ -102,7 +102,11 @@ export abstract class UIComponent {
     this.onUnmount();
     for (const d of this._disposers) d();
     this._disposers = [];
-    this.root.remove();
+    if (typeof (this.root as HTMLElement & { remove?: () => void }).remove === 'function') {
+      this.root.remove();
+    } else if (this.root.parentElement) {
+      this.root.parentElement.removeChild(this.root);
+    }
     this._mounted = false;
   }
 

@@ -261,6 +261,18 @@ export class AudioManager implements GameSystem {
         }
     }
 
+    playDistantCombat(volume: number): void {
+        const clampedVolume = Math.max(0.01, Math.min(1, volume));
+        const soundName = Math.random() < 0.25 ? 'grenadeExplosion' : 'otherGunshot';
+        this.play(soundName, undefined, clampedVolume);
+    }
+
+    playThunder(volume: number = 0.4): void {
+        // Reuse the deepest available low-frequency asset until a dedicated
+        // thunder recording is added to the audio manifest.
+        this.play('grenadeExplosion', undefined, Math.max(0.05, Math.min(1, volume)));
+    }
+
     // Get the audio listener for other systems
     getListener(): THREE.AudioListener {
         return this.listener;

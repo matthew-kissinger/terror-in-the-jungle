@@ -44,61 +44,17 @@ import { VehicleManager } from '../systems/vehicle/VehicleManager';
 import { NPCVehicleController } from '../systems/vehicle/NPCVehicleController';
 
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
+import { RadioTransmissionSystem } from '../systems/audio/RadioTransmissionSystem';
 import { LoadoutService } from '../systems/player/LoadoutService';
 import { WarSimulator } from '../systems/strategy/WarSimulator';
 import { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
-import { SpatialGridManager, spatialGridManager } from '../systems/combat/SpatialGridManager';
+import { spatialGridManager } from '../systems/combat/SpatialGridManager';
 import { objectPool } from '../utils/ObjectPoolManager';
 import { markStartup } from './StartupTelemetry';
+import type { SystemKeyToType } from './SystemRegistry';
 
-export interface SystemReferences {
-  assetLoader: AssetLoader;
-  terrainSystem: TerrainSystem;
-  globalBillboardSystem: GlobalBillboardSystem;
-  playerController: PlayerController;
-  combatantSystem: CombatantSystem;
-  skybox: Skybox;
-  waterSystem: WaterSystem;
-
-  weatherSystem: WeatherSystem;
-  firstPersonWeapon: FirstPersonWeapon;
-  zoneManager: ZoneManager;
-  hudSystem: HUDSystem;
-  ticketSystem: TicketSystem;
-  playerHealthSystem: PlayerHealthSystem;
-  minimapSystem: MinimapSystem;
-  audioManager: AudioManager;
-  gameModeManager: GameModeManager;
-  playerRespawnManager: PlayerRespawnManager;
-  fullMapSystem: FullMapSystem;
-  compassSystem: CompassSystem;
-  helipadSystem: HelipadSystem;
-  helicopterModel: HelicopterModel;
-  playerSquadController: PlayerSquadController;
-  commandInputManager: CommandInputManager;
-  inventoryManager: InventoryManager;
-  grenadeSystem: GrenadeSystem;
-  mortarSystem: MortarSystem;
-  sandbagSystem: SandbagSystem;
-  cameraShakeSystem: CameraShakeSystem;
-  playerSuppressionSystem: PlayerSuppressionSystem;
-  flashbangScreenEffect: FlashbangScreenEffect;
-  smokeCloudSystem: SmokeCloudSystem;
-  influenceMapSystem: InfluenceMapSystem;
-  ammoSupplySystem: AmmoSupplySystem;
-  footstepAudioSystem: FootstepAudioSystem;
-  loadoutService: LoadoutService;
-  warSimulator: WarSimulator;
-  strategicFeedback: StrategicFeedback;
-  spatialGridManager: SpatialGridManager;
-  worldFeatureSystem: WorldFeatureSystem;
-  animalSystem: AnimalSystem;
-  navmeshSystem: NavmeshSystem;
-  airSupportManager: AirSupportManager;
-  aaEmplacementSystem: AAEmplacementSystem;
-  vehicleManager: VehicleManager;
-  npcVehicleController: NPCVehicleController;
-}
+export type SystemReferences = SystemKeyToType;
+export type MutableSystemReferences = Partial<SystemReferences>;
 
 interface InitializationResult {
   systems: GameSystem[];
@@ -111,7 +67,7 @@ interface InitializationResult {
  */
 export class SystemInitializer {
   async initializeSystems(
-    refs: SystemReferences,
+    refs: MutableSystemReferences,
     scene: THREE.Scene,
     camera: THREE.PerspectiveCamera,
     onProgress: (phase: string, progress: number) => void,
@@ -205,6 +161,7 @@ export class SystemInitializer {
     refs.smokeCloudSystem = new SmokeCloudSystem(scene, camera);
     refs.ammoSupplySystem = new AmmoSupplySystem(scene, camera);
     refs.footstepAudioSystem = new FootstepAudioSystem(refs.audioManager.getListener());
+    refs.radioTransmissionSystem = new RadioTransmissionSystem();
     refs.loadoutService = new LoadoutService();
     refs.warSimulator = new WarSimulator();
     refs.strategicFeedback = new StrategicFeedback();
@@ -252,6 +209,7 @@ export class SystemInitializer {
       refs.smokeCloudSystem,
       refs.influenceMapSystem,
       refs.ammoSupplySystem,
+      refs.radioTransmissionSystem,
       refs.warSimulator,
       refs.strategicFeedback,
       refs.airSupportManager,

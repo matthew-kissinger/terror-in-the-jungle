@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { HeightQueryCache } from './HeightQueryCache';
+import { HeightQueryCache, getHeightQueryCache, resetHeightQueryCache } from './HeightQueryCache';
 import { NoiseGenerator } from '../../utils/NoiseGenerator';
 
 // Automatically mock NoiseGenerator
@@ -9,6 +9,7 @@ describe('HeightQueryCache', () => {
   let mockNoise: any;
 
   beforeEach(() => {
+    resetHeightQueryCache();
     vi.clearAllMocks();
     
     // Set up default mock behavior for NoiseGenerator
@@ -228,6 +229,16 @@ describe('HeightQueryCache', () => {
       mockNoise.mockReturnValue(0.5);
       
       expect(cache.isUnderwater(0, 0)).toBe(false);
+    });
+  });
+
+  describe('singleton reset', () => {
+    it('should recreate the shared cache after resetHeightQueryCache()', () => {
+      const first = getHeightQueryCache();
+      resetHeightQueryCache();
+      const second = getHeightQueryCache();
+
+      expect(second).not.toBe(first);
     });
   });
 });

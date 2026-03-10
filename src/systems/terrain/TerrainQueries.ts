@@ -44,6 +44,15 @@ export class TerrainQueries {
     return height;
   }
 
+  getSlopeAt(x: number, z: number): number {
+    return getHeightQueryCache().getSlopeAt(x, z);
+  }
+
+  getNormalAt(x: number, z: number, target?: THREE.Vector3): THREE.Vector3 {
+    const normal = getHeightQueryCache().getNormalAt(x, z);
+    return (target ?? _queryPos).copy(normal);
+  }
+
   /**
    * Check collision with registered objects.
    */

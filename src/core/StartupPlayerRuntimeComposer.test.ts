@@ -28,9 +28,9 @@ function createRefs() {
     combatantSystem: {
       setPlayerFaction: vi.fn(),
       getAllCombatants: vi.fn(() => [
-        { id: 'alpha', faction: Faction.US, health: 100, isDying: false, isPlayerProxy: false, position: new THREE.Vector3(1, 0, 1) },
-        { id: 'bravo', faction: Faction.US, health: 0, isDying: false, isPlayerProxy: false, position: new THREE.Vector3(2, 0, 2) },
-        { id: 'charlie', faction: Faction.NVA, health: 100, isDying: false, isPlayerProxy: false, position: new THREE.Vector3(3, 0, 3) },
+        { id: 'alpha', faction: Faction.US, health: 100, isDying: false, position: new THREE.Vector3(1, 0, 1) },
+        { id: 'bravo', faction: Faction.US, health: 0, isDying: false, position: new THREE.Vector3(2, 0, 2) },
+        { id: 'charlie', faction: Faction.NVA, health: 100, isDying: false, position: new THREE.Vector3(3, 0, 3) },
       ]),
     },
     commandInputManager: {
@@ -90,6 +90,7 @@ function createRefs() {
     },
     mortarSystem: {},
     playerController: {
+      configureDependencies: vi.fn(),
       setCameraShakeSystem: vi.fn(),
       setCommandInputManager: vi.fn(),
       setFirstPersonWeapon: vi.fn(),
@@ -169,8 +170,13 @@ describe('StartupPlayerRuntimeComposer', () => {
 
     wireStartupPlayerRuntime(createStartupPlayerRuntimeGroups(refs), { camera, renderer });
 
-    expect(refs.playerController.setTerrainSystem).toHaveBeenCalledWith(refs.terrainSystem);
-    expect(refs.playerController.setRenderer).toHaveBeenCalledWith(renderer);
+    expect(refs.playerController.configureDependencies).toHaveBeenCalledWith(expect.objectContaining({
+      terrainSystem: refs.terrainSystem,
+      renderer,
+      helicopterModel: refs.helicopterModel,
+      firstPersonWeapon: refs.firstPersonWeapon,
+      hudSystem: refs.hudSystem,
+    }));
     expect(refs.playerHealthSystem.setRespawnManager).toHaveBeenCalledWith(refs.playerRespawnManager);
     expect(refs.hudSystem.setGrenadeSystem).toHaveBeenCalledWith(refs.grenadeSystem);
     expect(refs.hudSystem.setMortarSystem).toHaveBeenCalledWith(refs.mortarSystem);

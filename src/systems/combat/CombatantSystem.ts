@@ -37,6 +37,19 @@ import { getRaycastBudgetStats } from './ai/RaycastBudget';
 import { getCombatFireRaycastBudgetStats } from './ai/CombatFireRaycastBudget';
 import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
+import type { PlayerSuppressionSystem } from '../player/PlayerSuppressionSystem';
+
+interface CombatantSystemDependencies {
+  terrainSystem: ITerrainRuntime;
+  camera: THREE.Camera;
+  ticketSystem: TicketSystem;
+  playerHealthSystem: PlayerHealthSystem;
+  zoneManager: ZoneManager;
+  gameModeManager: GameModeManager;
+  hudSystem: IHUDSystem;
+  audioManager: AudioManager;
+  playerSuppressionSystem: PlayerSuppressionSystem;
+}
 
 export class CombatantSystem implements GameSystem {
   private scene: THREE.Scene;
@@ -78,9 +91,6 @@ export class CombatantSystem implements GameSystem {
   public readonly combatants: Map<string, Combatant> = new Map();
   private playerPosition = new THREE.Vector3();
   private autonomousSpawningEnabled = true;
-
-  // Player proxy
-  private playerProxyId: string = 'player_proxy';
   private combatEnabled = false;
 
   // Player squad
@@ -156,9 +166,6 @@ export class CombatantSystem implements GameSystem {
 
     this.updateHelpers = new CombatantSystemUpdate(
       this.combatants,
-      this.playerProxyId,
-      this.playerPosition,
-      this.combatantFactory,
       this.squadManager
     );
 
@@ -213,9 +220,6 @@ export class CombatantSystem implements GameSystem {
       this.profiler.profiling.aiUpdateMs = 0;
       return;
     }
-
-    // Ensure player proxy exists
-    this.updateHelpers.ensurePlayerProxy();
 
     // Update spawn manager (progressive spawns, reinforcement waves, respawns)
     if (this.autonomousSpawningEnabled) {
@@ -414,6 +418,18 @@ export class CombatantSystem implements GameSystem {
     };
   }
 
+  configureDependencies(dependencies: CombatantSystemDependencies): void {
+    this.setTerrainSystem(dependencies.terrainSystem);
+    this.setCamera(dependencies.camera);
+    this.setTicketSystem(dependencies.ticketSystem);
+    this.setPlayerHealthSystem(dependencies.playerHealthSystem);
+    this.setZoneManager(dependencies.zoneManager);
+    this.setGameModeManager(dependencies.gameModeManager);
+    this.setHUDSystem(dependencies.hudSystem);
+    this.setAudioManager(dependencies.audioManager);
+    this.setPlayerSuppressionSystem(dependencies.playerSuppressionSystem);
+  }
+
   // Setters for external systems
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {
     this.terrainSystem = terrainSystem;
@@ -473,11 +489,11 @@ export class CombatantSystem implements GameSystem {
   }
 
   setPlayerFaction(faction: Faction): void {
-    this.updateHelpers.setPlayerFaction(faction);
+    this.combatantAI.setPlayerFaction(faction);
     this.spawnManager.setPlayerFaction(faction);
   }
 
-  setPlayerSuppressionSystem(system: import('../player/PlayerSuppressionSystem').PlayerSuppressionSystem): void {
+  setPlayerSuppressionSystem(system: PlayerSuppressionSystem): void {
     this.combatantCombat.setPlayerSuppressionSystem(system);
   }
 

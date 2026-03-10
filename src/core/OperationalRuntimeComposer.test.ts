@@ -77,7 +77,10 @@ function createRefs() {
       setVehicleManager: vi.fn(),
     },
     playerController: {
-      setAirSupportManager: vi.fn(),
+      configureVehicleController: vi.fn(),
+    },
+    radioTransmissionSystem: {
+      setAudioListener: vi.fn(),
     },
     strategicFeedback: {
       setAudioManager: vi.fn(),
@@ -175,7 +178,9 @@ describe('OperationalRuntimeComposer', () => {
     expect(refs.airSupportManager.setHUDSystem).toHaveBeenCalledWith(refs.hudSystem);
     expect(refs.airSupportManager.setTerrainSystem).toHaveBeenCalledWith(refs.terrainSystem);
     expect(refs.airSupportManager.setExplosionEffectsPool).toHaveBeenCalledWith(explosionEffectsPool);
-    expect(refs.playerController.setAirSupportManager).toHaveBeenCalledWith(refs.airSupportManager);
+    expect(refs.playerController.configureVehicleController).toHaveBeenCalledWith({
+      airSupportManager: refs.airSupportManager,
+    });
     expect(refs.aaEmplacementSystem.setHelicopterModel).toHaveBeenCalledWith(refs.helicopterModel);
     expect(refs.aaEmplacementSystem.setAudioManager).toHaveBeenCalledWith(refs.audioManager);
     expect(refs.aaEmplacementSystem.setTerrainSystem).toHaveBeenCalledWith(refs.terrainSystem);

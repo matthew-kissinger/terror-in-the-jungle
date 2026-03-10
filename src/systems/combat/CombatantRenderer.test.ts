@@ -245,7 +245,7 @@ describe('CombatantRenderer', () => {
       expect(deadCombatant.billboardIndex).toBeUndefined();
     });
 
-    it('should skip player proxy combatants', () => {
+    it('does not special-case legacy proxy flags during rendering', () => {
       const combatants = new Map<string, Combatant>();
       const proxyCombatant = createMockCombatant(
         'proxy-1',
@@ -259,7 +259,7 @@ describe('CombatantRenderer', () => {
 
       renderer.updateBillboards(combatants, playerPosition);
 
-      expect(proxyCombatant.billboardIndex).toBeUndefined();
+      expect(proxyCombatant.billboardIndex).toBeDefined();
     });
 
     it('should cull combatants beyond render distance', () => {

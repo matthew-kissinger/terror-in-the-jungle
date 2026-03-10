@@ -5,6 +5,7 @@ import { GameSystem } from '../../types';
 import { AssetLoader } from '../assets/AssetLoader';
 import { getAssetPath } from '../../config/paths';
 import { WeatherSystem } from './WeatherSystem';
+import { playElementAnimation } from '../../ui/engine/playElementAnimation';
 
 interface WaterUniforms {
   time?: { value: number };
@@ -149,9 +150,18 @@ export class WaterSystem implements GameSystem {
       if (this.overlay) {
         if (isUnderwater) {
           this.overlay.style.display = 'block';
-          // Force reflow
-          void this.overlay.offsetWidth;
-          this.overlay.style.opacity = '0.4';
+          playElementAnimation(
+            this.overlay,
+            [
+              { opacity: 0 },
+              { opacity: 0.4 }
+            ],
+            {
+              duration: 250,
+              easing: 'ease-out',
+              fill: 'forwards'
+            }
+          );
         } else {
           this.overlay.style.opacity = '0';
           // Hide after transition
