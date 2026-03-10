@@ -43,7 +43,7 @@
 
 | Mode | Zones | Tickets | War Sim | Notes |
 |---|---|---|---|---|
-| ZONE_CONTROL | yes | yes | optional | standard conquest |
+| ZONE_CONTROL | yes | yes | optional | widened conquest layout; US firebase and OPFOR bunker home bases now use larger graded staging areas instead of compact cliff-prone pads |
 | OPEN_FRONTIER | yes | yes | no | 3200m world, 10 contested + 6 HQ zones, 3 helipads, 120 combatants, alliance factions (BLUFOR/OPFOR), zone-spawn respawn |
 | TEAM_DEATHMATCH | no | kill-based | no | |
 | AI_SANDBOX | no | no | no | dev/test mode |

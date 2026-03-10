@@ -43,6 +43,7 @@
 - [ ] 3.5 Terrain contract cleanup: remove stale chunk-era config names, debug labels
 - [ ] 3.9 Reduce initial JS bundle surface without reintroducing fragile chunking (partial: mode-start pipeline now deferred; main runtime `730.27kB -> 722.03kB`)
 - [ ] 3.10 Decide whether remaining connector bursts should become constructor/runtime dependency objects or stay grouped setters
+- [x] 3.11 Zone Control firebase pass: widen base layout, soften home-base terrain grading, spread firebase towers, and add terrain-safe squad anchoring to stop cliff-edge starts
 
 ## Wave 4: Content Expansion (large)
 
@@ -119,6 +120,7 @@
 3. Startup/player/deploy, gameplay runtime, and operational runtime are now grouped in dedicated composers, but the core runtime still depends heavily on setter injection inside those clusters
 4. Startup orchestration is improved and the mode-start pipeline now defers until `Play`, but runtime contracts are still order-sensitive across multiple systems
 5. Production boot is fixed and deferred chunks now exist for mode startup, but bundle weight is still high enough to remain a product risk
+6. Zone Control staging is materially better after the firebase pass, but authored terrain-feature grading is still config-driven and easy to overdo on steep hillsides in other modes
 
 ## Dead Code Pending Deletion
 

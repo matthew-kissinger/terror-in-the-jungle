@@ -94,7 +94,7 @@
 | Class / Export | File | Notes |
 |----------------|------|-------|
 | [CombatantFactory](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantFactory.ts) | systems/combat/CombatantFactory.ts | createCombatant(); assigns AISkillProfile per faction |
-| [CombatantSpawnManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantSpawnManager.ts) | systems/combat/CombatantSpawnManager.ts | Progressive spawn queue (1s delay, max 24 enqueued); reinforcement waves (15s default) |
+| [CombatantSpawnManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantSpawnManager.ts) | systems/combat/CombatantSpawnManager.ts | Progressive spawn queue (1s delay, max 24 enqueued); reinforcement waves (15s default); tighter initial HQ staging offsets for base openings |
 | [SpawnPositionCalculator](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/SpawnPositionCalculator.ts) | systems/combat/SpawnPositionCalculator.ts | Zone-aware spawn position selection |
 | [RespawnManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/RespawnManager.ts) | systems/combat/RespawnManager.ts | NPC respawn with rally-point-first fallback |
 | [CombatantMovement](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantMovement.ts) | systems/combat/CombatantMovement.ts | Position integration; terrain grounding via HeightQueryCache; delegates to MovementStates; navmesh intercept (high/medium LOD use crowd-steered velocity, low/culled use beeline); slope speed penalty via SlopePhysics |
@@ -123,7 +123,7 @@
 
 | Class | File | Notes |
 |-------|------|-------|
-| [SquadManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/SquadManager.ts) | systems/combat/SquadManager.ts | Squad CRUD; createSquad (wedge formation); reinforcement; optional InfluenceMapSystem |
+| [SquadManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/SquadManager.ts) | systems/combat/SquadManager.ts | Squad CRUD; createSquad (wedge formation) now terrain-anchors squads and retracts unsafe edge positions before grounding; optional InfluenceMapSystem |
 | [PlayerSquadController](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/PlayerSquadController.ts) | systems/combat/PlayerSquadController.ts | SquadCommand dispatch (Shift+1-5); radial menu; command indicator |
 
 ### LOD Manager

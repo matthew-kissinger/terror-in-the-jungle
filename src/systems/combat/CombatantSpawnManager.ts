@@ -145,7 +145,7 @@ export class CombatantSpawnManager {
       const playerHQs = SpawnPositionCalculator.getHQZonesForAlliance(playerAlliance, config);
       const playerBasePos = playerAlliance === Alliance.BLUFOR ? usBasePos : opforBasePos;
       const playerAnchor = playerHQs[0]?.position ?? playerBasePos;
-      const playerSpawnPos = _scratchVec.copy(playerAnchor).add(_offsetVec.set(0, 0, -15));
+      const playerSpawnPos = _scratchVec.copy(playerAnchor).add(_offsetVec.set(0, 0, -8));
       const { squad: playerSquad, members } = this.squadManager.createSquad(this.playerFaction, playerSpawnPos, 6);
       createdPlayerSquadId = playerSquad.id;
       playerSquad.isPlayerControlled = true;
@@ -178,11 +178,11 @@ export class CombatantSpawnManager {
       const totalSpawnRounds = Math.max(initialUSSquads, initialOPFORSquads);
       for (let i = 0; i < totalSpawnRounds; i++) {
         if (i < initialUSSquads) {
-          const posUS = _spawnPos.copy(usHQs[i % usHQs.length].position).add(SpawnPositionCalculator.randomSpawnOffset(20, 40));
+          const posUS = _spawnPos.copy(usHQs[i % usHQs.length].position).add(SpawnPositionCalculator.randomSpawnOffset(12, 28));
           this.spawnSquad(Faction.US, posUS, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
         }
         if (i < initialOPFORSquads) {
-          const posOP = _scratchVec.copy(opforHQs[i % opforHQs.length].position).add(SpawnPositionCalculator.randomSpawnOffset(20, 40));
+          const posOP = _scratchVec.copy(opforHQs[i % opforHQs.length].position).add(SpawnPositionCalculator.randomSpawnOffset(12, 28));
           this.spawnSquad(this.pickOpforFaction(), posOP, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
         }
       }

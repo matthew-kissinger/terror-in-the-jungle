@@ -207,7 +207,7 @@ The remaining concern is not authority confusion. It is whether `TerrainSystem` 
 | `NoiseHeightProvider` | `src/systems/terrain/NoiseHeightProvider.ts` | Procedural terrain source |
 | `DEMHeightProvider` | `src/systems/terrain/DEMHeightProvider.ts` | DEM terrain source |
 | `BakedHeightProvider` | `src/systems/terrain/BakedHeightProvider.ts` | Bilinear-interpolated pre-baked heightmap grid (CPU-side match for GPU vertex shader) |
-| `StampedHeightProvider` | `src/systems/terrain/StampedHeightProvider.ts` | Wraps a base provider with terrain stamp overlays (flatten/raise for features) |
+| `StampedHeightProvider` | `src/systems/terrain/StampedHeightProvider.ts` | Wraps a base provider with terrain stamp overlays (flatten/raise for features); current firebase fixes rely on wider authored blend rings and average-height targets rather than hard hilltop plateaus |
 | `TerrainFeatureCompiler` | `src/systems/terrain/TerrainFeatureCompiler.ts` | Compiles map feature definitions into terrain stamps, surface patches, and exclusion zones |
 | `TerrainFeatureTypes` | `src/systems/terrain/TerrainFeatureTypes.ts` | Shared type definitions for terrain stamps, surface patches, and exclusion zones |
 | `TerrainFoundationUtils` | `src/systems/terrain/TerrainFoundationUtils.ts` | Engine-agnostic height-range sampling and foundation depth computation for flat structures on terrain |

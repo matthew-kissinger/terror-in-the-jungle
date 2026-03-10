@@ -7,6 +7,21 @@ import { CaptureZone } from '../world/ZoneManager';
 import { Logger } from '../../utils/Logger';
 import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 
+const FORMATION_SPACING = 4;
+const SAFE_ANCHOR_SCAN_RADII = [0, 6, 12, 18];
+const SAFE_SCAN_ANGLES = [
+  0,
+  Math.PI * 0.25,
+  Math.PI * 0.5,
+  Math.PI * 0.75,
+  Math.PI,
+  Math.PI * 1.25,
+  Math.PI * 1.5,
+  Math.PI * 1.75,
+];
+const SAFE_POSITION_RETRACT_FACTORS = [1, 0.8, 0.6, 0.4, 0.2, 0];
+const MAX_FORMATION_HEIGHT_DELTA = 1.75;
+
 export class SquadManager {
   private squads: Map<string, Squad> = new Map();
   private nextSquadId = 0;
@@ -33,9 +48,14 @@ export class SquadManager {
     };
 
     const members: Combatant[] = [];
+    const anchorPosition = this.resolveSafeSquadAnchor(centerPosition, squadSize);
 
     for (let i = 0; i < squadSize; i++) {
-      const position = this.calculateFormationPosition(centerPosition, i);
+      const position = this.stabilizeFormationPosition(
+        anchorPosition,
+        this.calculateFormationPosition(anchorPosition, i),
+        squadSize,
+      );
       position.y = this.getTerrainHeight(position.x, position.z) + NPC_Y_OFFSET;
 
       const role = i === 0 ? 'leader' : 'follower';
@@ -71,9 +91,9 @@ export class SquadManager {
       const column = (index - 1) % 3 - 1; // -1, 0, 1 for left, center, right
 
       offset = new THREE.Vector3(
-        column * 4, // 4 meters apart horizontally
+        column * FORMATION_SPACING,
         0,
-        -row * 4 // 4 meters behind each row
+        -row * FORMATION_SPACING
       );
 
       // Add small random variation to avoid perfect grid
@@ -114,7 +134,106 @@ export class SquadManager {
     if (!this.terrainSystem) {
       throw new Error('SquadManager requires terrainSystem before terrain height queries');
     }
-    return this.terrainSystem.getHeightAt(x, z);
+    return this.terrainSystem.getEffectiveHeightAt(x, z);
+  }
+
+  private resolveSafeSquadAnchor(centerPosition: THREE.Vector3, squadSize: number): THREE.Vector3 {
+    if (!this.terrainSystem) {
+      return centerPosition.clone();
+    }
+
+    const footprintRadius = this.getFormationFootprintRadius(squadSize);
+    let bestX = centerPosition.x;
+    let bestZ = centerPosition.z;
+    let bestScore = Number.POSITIVE_INFINITY;
+
+    for (const radius of SAFE_ANCHOR_SCAN_RADII) {
+      if (radius === 0) {
+        const score = this.scoreFormationAnchor(centerPosition.x, centerPosition.z, footprintRadius);
+        if (score < bestScore) {
+          bestScore = score;
+          bestX = centerPosition.x;
+          bestZ = centerPosition.z;
+        }
+        continue;
+      }
+
+      for (const angle of SAFE_SCAN_ANGLES) {
+        const candidateX = centerPosition.x + Math.cos(angle) * radius;
+        const candidateZ = centerPosition.z + Math.sin(angle) * radius;
+        const score = this.scoreFormationAnchor(candidateX, candidateZ, footprintRadius);
+        if (score < bestScore) {
+          bestScore = score;
+          bestX = candidateX;
+          bestZ = candidateZ;
+        }
+      }
+    }
+
+    return new THREE.Vector3(bestX, centerPosition.y, bestZ);
+  }
+
+  private stabilizeFormationPosition(
+    anchorPosition: THREE.Vector3,
+    desiredPosition: THREE.Vector3,
+    squadSize: number,
+  ): THREE.Vector3 {
+    if (!this.terrainSystem) {
+      return desiredPosition;
+    }
+
+    const anchorHeight = this.getTerrainHeight(anchorPosition.x, anchorPosition.z);
+    const footingRadius = Math.max(2.5, this.getFormationFootprintRadius(squadSize) * 0.3);
+
+    for (const factor of SAFE_POSITION_RETRACT_FACTORS) {
+      const candidateX = anchorPosition.x + (desiredPosition.x - anchorPosition.x) * factor;
+      const candidateZ = anchorPosition.z + (desiredPosition.z - anchorPosition.z) * factor;
+      if (this.isFormationFootingSafe(candidateX, candidateZ, anchorHeight, footingRadius)) {
+        return new THREE.Vector3(candidateX, desiredPosition.y, candidateZ);
+      }
+    }
+
+    return anchorPosition.clone();
+  }
+
+  private scoreFormationAnchor(x: number, z: number, footprintRadius: number): number {
+    const centerHeight = this.getTerrainHeight(x, z);
+    const probeRadius = Math.max(4, footprintRadius * 0.8);
+    let maxDelta = 0;
+
+    for (const angle of SAFE_SCAN_ANGLES) {
+      const sampleHeight = this.getTerrainHeight(
+        x + Math.cos(angle) * probeRadius,
+        z + Math.sin(angle) * probeRadius,
+      );
+      maxDelta = Math.max(maxDelta, Math.abs(sampleHeight - centerHeight));
+    }
+
+    return maxDelta;
+  }
+
+  private isFormationFootingSafe(x: number, z: number, anchorHeight: number, footingRadius: number): boolean {
+    const centerHeight = this.getTerrainHeight(x, z);
+    if (Math.abs(centerHeight - anchorHeight) > MAX_FORMATION_HEIGHT_DELTA) {
+      return false;
+    }
+
+    for (const angle of SAFE_SCAN_ANGLES) {
+      const sampleHeight = this.getTerrainHeight(
+        x + Math.cos(angle) * footingRadius,
+        z + Math.sin(angle) * footingRadius,
+      );
+      if (Math.abs(sampleHeight - centerHeight) > MAX_FORMATION_HEIGHT_DELTA) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private getFormationFootprintRadius(squadSize: number): number {
+    const rowsBehindLeader = Math.max(0, Math.ceil((squadSize - 1) / 3) - 1);
+    return Math.max(6, Math.hypot(FORMATION_SPACING, rowsBehindLeader * FORMATION_SPACING) + 2);
   }
 
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {

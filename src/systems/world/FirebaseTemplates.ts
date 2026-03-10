@@ -25,12 +25,12 @@ export interface FirebaseTemplate {
 export const FIREBASE_TEMPLATES: Record<string, FirebaseTemplate> = {
   us_small: {
     id: 'us_small',
-    footprintRadius: 25,
-    structureCount: { min: 5, max: 7 },
+    footprintRadius: 34,
+    structureCount: { min: 6, max: 8 },
     zones: {
-      perimeter: { innerRadius: 16, outerRadius: 22 },
-      interior: { radius: 14 },
-      entrance: { angle: 0, width: 6 },
+      perimeter: { innerRadius: 22, outerRadius: 30 },
+      interior: { radius: 18 },
+      entrance: { angle: 0, width: 8 },
     },
     pool: [
       { modelPath: StructureModels.GUARD_TOWER, zone: 'corner', weight: 3, registerCollision: true, facesOutward: true },
@@ -47,12 +47,12 @@ export const FIREBASE_TEMPLATES: Record<string, FirebaseTemplate> = {
 
   us_medium: {
     id: 'us_medium',
-    footprintRadius: 35,
-    structureCount: { min: 9, max: 13 },
+    footprintRadius: 46,
+    structureCount: { min: 10, max: 14 },
     zones: {
-      perimeter: { innerRadius: 24, outerRadius: 32 },
-      interior: { radius: 22 },
-      entrance: { angle: 0, width: 8 },
+      perimeter: { innerRadius: 30, outerRadius: 40 },
+      interior: { radius: 26 },
+      entrance: { angle: 0, width: 10 },
     },
     pool: [
       { modelPath: StructureModels.GUARD_TOWER, zone: 'corner', weight: 4, registerCollision: true, facesOutward: true },
@@ -73,12 +73,12 @@ export const FIREBASE_TEMPLATES: Record<string, FirebaseTemplate> = {
 
   us_large: {
     id: 'us_large',
-    footprintRadius: 50,
+    footprintRadius: 60,
     structureCount: { min: 15, max: 21 },
     zones: {
-      perimeter: { innerRadius: 35, outerRadius: 46 },
-      interior: { radius: 33 },
-      entrance: { angle: 0, width: 10 },
+      perimeter: { innerRadius: 40, outerRadius: 55 },
+      interior: { radius: 38 },
+      entrance: { angle: 0, width: 12 },
     },
     pool: [
       { modelPath: StructureModels.GUARD_TOWER, zone: 'corner', weight: 5, registerCollision: true, facesOutward: true },

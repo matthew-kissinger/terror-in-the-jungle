@@ -290,6 +290,30 @@ describe('SquadManager', () => {
       expect(squad1.id).toContain('squad_US_0')
       expect(squad2.id).toContain('squad_US_1')
     })
+
+    it('should move the squad anchor away from a narrow cliff band when a safer nearby point exists', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.5)
+      vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockImplementation(
+        (x: number) => (x >= 8 && x <= 12 ? 12 : 0),
+      )
+
+      const position = new THREE.Vector3(10, 0, 0)
+      const { members } = squadManager.createSquad(Faction.US, position, 4)
+
+      expect(Math.abs(members[0].position.x - 10)).toBeGreaterThanOrEqual(4)
+      vi.restoreAllMocks()
+    })
+
+    it('should pull followers inward when the formation edge drops away sharply', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.5)
+      vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockImplementation((x: number) => (x >= 3.5 ? 10 : 0))
+
+      const position = new THREE.Vector3(0, 0, 0)
+      const { members } = squadManager.createSquad(Faction.US, position, 4)
+
+      expect(members[3].position.x).toBeLessThan(3.5)
+      vi.restoreAllMocks()
+    })
   })
 
   describe('removeSquadMember', () => {
