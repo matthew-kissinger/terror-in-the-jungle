@@ -15,6 +15,7 @@ import { SettingsManager } from '../config/SettingsManager';
 import { MobilePauseOverlay } from '../ui/MobilePauseOverlay';
 import { WebGLContextRecovery } from './WebGLContextRecovery';
 import { performanceTelemetry } from '../systems/debug/PerformanceTelemetry';
+import { StartupFlowController } from './StartupFlowController';
 
 // Import split modules
 import * as Init from './GameEngineInit';
@@ -34,6 +35,7 @@ export class GameEngine {
   public runtimeMetrics: RuntimeMetrics;
   public sandboxConfig: SandboxConfig | null;
   public readonly sandboxEnabled: boolean;
+  public readonly startupFlow = new StartupFlowController();
 
   // State (Public for split module access)
   public clock = new THREE.Clock();

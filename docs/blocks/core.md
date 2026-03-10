@@ -18,9 +18,9 @@ The Core domain is the outermost shell. It owns nothing domain-specific - no AI,
 **To work in this domain in isolation:**
 - You do not need to understand any system internals. Systems are black boxes here.
 - The only coupling contract is `SystemReferences` (40-field interface in SystemInitializer.ts) and the `GameSystem` interface (`init/update/dispose`).
-- Setter injection in SystemConnector.ts is the wiring layer. There is no compile-time safety for missing wires - bugs appear at runtime.
+- Setter injection is still the dominant wiring pattern, but startup/player/deploy now routes through `StartupPlayerRuntimeComposer.ts`, combat/world/game-mode/environment through `GameplayRuntimeComposer.ts`, and strategy/vehicle/air-support through `OperationalRuntimeComposer.ts` instead of living entirely inline in `SystemConnector.ts`. There is still no compile-time safety for missing wires - bugs appear at runtime.
 - The tick order in SystemUpdater.ts is the source of truth for update sequencing. Do not re-order without checking downstream dependencies.
-- `GameEngineInit.ts` is where mode-start and restart logic lives. `GameEngine.ts` is a thin coordinator that delegates to the four split modules.
+- `GameEngineInit.ts` is now a coordinator and lazy-loads the mode/deploy startup pipeline after `Play`, but the underlying startup/runtime contracts are still mostly setter-driven and order-sensitive.
 
 ---
 
@@ -52,7 +52,9 @@ MAIN MENU  (StartScreen)
 [SELECT MODE + SIDE/FACTION + DEPLOY]
   |
 startGameWithMode(mode)   (GameEngineInit)
+  |- lazy-load ModeStartupPreparer + InitialDeployStartup only after Play
   |- guard: isInitialized && !gameStarted
+  |- startupFlow.beginModePreparation(selection)
   |- tryLockLandscapeOrientation() on touch devices
   |- if config.heightSource.type === 'dem':
   |    fetch DEM binary -> DEMHeightProvider -> HeightQueryCache + ChunkWorkerPool
@@ -63,9 +65,11 @@ startGameWithMode(mode)   (GameEngineInit)
   |- terrainSystem.setBiomeConfig(defaultBiome, biomeRules)
   |- systemManager.setGameMode(mode)       // GameModeManager.setGameMode ->
   |                                        //   reseedForcesForMode (spawns AI forces)
+  |- startupFlow.enterDeploySelect()
   |- openInitialDeploy()                   // shared deploy flow, spawn + loadout selection
   |    |- [BACK TO MODE SELECT]            // clean return path, not treated as startup failure
   |- if warSimulator.enabled: load persisted war state (A Shau only)
+  |- startupFlow.enterSpawnWarming()
   |- preGenerateSpawnArea(spawnPos)        // around chosen insertion, 3x3 chunk ring, then initZones
   |- startGame()
   |
@@ -84,6 +88,7 @@ startGame() / runStartupFlow()
   |- combatantSystem.enableCombat()
   |- requestBackgroundTask(renderer.precompileShaders, 1000ms)
   |- requestBackgroundTask(startDeferredInitialization, 500ms)
+  |- startupFlow.enterLive()
   |    Deferred: HelipadSystem, HelicopterModel
   |
 GAMEPLAY  (RAF tick loop, always running)
@@ -122,15 +127,24 @@ All files are in `src/core/` unless noted.
 
 | Module | File | Role |
 |--------|------|------|
-| GameEngine | [GameEngine.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameEngine.ts) | Top-level coordinator. Owns StartScreen, GameRenderer, SystemManager, overlays. Delegates all logic to Init/Input/Loop split modules. Holds clock, isInitialized, gameStarted flags. |
-| GameEngineInit | [GameEngineInit.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameEngineInit.ts) | Async init, startGameWithMode(), DEM loading, explicit launch selection normalization (mode + alliance + faction), shared initial deploy selection, spawn positioning, restartMatch(). Initial deploy now opens before spawn-area pre-generation so terrain prep targets the player's chosen insertion. |
+| GameEngine | [GameEngine.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameEngine.ts) | Top-level coordinator. Owns StartScreen, GameRenderer, SystemManager, overlays, and the `StartupFlowController`. Delegates runtime logic to Init/Input/Loop split modules. Holds clock, isInitialized, gameStarted flags. |
+| GameEngineInit | [GameEngineInit.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameEngineInit.ts) | Startup coordinator. Handles engine-level init, restart, error/cancel behavior, and lazy-loads the mode/deploy startup pipeline before delegating launch work to `ModeStartupPreparer`, `InitialDeployStartup`, and `LiveEntryActivator`. |
+| StartupFlowController | [StartupFlowController.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/StartupFlowController.ts) | Typed startup state machine for `booting -> menu_ready -> mode_preparing -> deploy_select -> spawn_warming -> live` plus startup-error handling. State authority only; not a UI owner. |
+| ModeStartupPreparer | [ModeStartupPreparer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/ModeStartupPreparer.ts) | Mode-preparation stage. Normalizes launch selection, configures terrain height source, applies terrain features, configures renderer/terrain/navmesh, applies faction/loadout context, and restores persisted war state. |
+| ModeSpawnPosition | [ModeSpawnPosition.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/ModeSpawnPosition.ts) | Shared spawn fallback resolver for startup and live-entry paths. Keeps initial-spawn policy logic out of the heavier mode-preparation module so the menu boot path can defer that code until `Play`. |
+| InitialDeployStartup | [InitialDeployStartup.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/InitialDeployStartup.ts) | Initial deploy stage. Resolves initial insertion position, advances startup phases, pre-generates around the chosen insertion, and applies the configured loadout. |
+| LiveEntryActivator | [LiveEntryActivator.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/LiveEntryActivator.ts) | Live-entry stage. Handles spawn loading overlay flow, initial player positioning, renderer reveal, audio/combat activation, deferred init handoff, and final transition to `live`. |
 | GameEngineInput | [GameEngineInput.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameEngineInput.ts) | Window keyboard event listeners. Debug toggle handlers: F1 (perf stats), F2 (overlay), F3 (log), F4 (time), P (post-processing), [ / ] (pixel size), K (voluntary respawn). |
 | GameEngineLoop | [GameEngineLoop.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameEngineLoop.ts) | animate() RAF loop. Calls updateSystems, skybox, mortar camera check, GPU timing, render main scene, render weapon + grenade overlays, post-processing endFrame, runtime metrics. Crash guard: 3 crashes in 5s shows fatal overlay. |
 | GameRenderer | [GameRenderer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameRenderer.ts) | Three.js WebGLRenderer (no antialias, high-performance), Scene, PerspectiveCamera (75 FOV). FogExp2 (0x5a7a6a, density 0.004), AmbientLight, DirectionalLight (moonLight, casts shadows), HemisphereLight. PostProcessingManager, CrosshairUI, LoadingUI. Device-adaptive shadow/pixel-ratio via DeviceDetector. configureForWorldSize() adjusts camera far / fog / shadow for mode. |
 | SystemManager | [SystemManager.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemManager.ts) | Holds ~44 public system refs. Delegates to Initializer/Connector/Updater/Disposer. Owns setGameMode(), preGenerateSpawnArea(), startDeferredInitialization(), waitForPlayerSquad(). |
 | SystemInitializer | [SystemInitializer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemInitializer.ts) | Constructs all ~44 systems in dependency order across 4 phases (core, textures, audio, world). Defines `SystemReferences` interface (40 fields). Defers 4 systems. Pre-initializes AssetLoader + AudioManager (skipped in main init loop). Warms ObjectPool to 240/80/32/96. |
-| SystemConnector | [SystemConnector.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemConnector.ts) | ~150 setter-injection calls. THE wiring layer. Groups: PlayerController, CombatantSystem, FirstPersonWeapon, HUDSystem, TicketSystem, PlayerHealthSystem, Minimap/FullMap/Compass, ZoneManager, AudioManager, PlayerRespawnManager, HelipadSystem, HelicopterModel, GameModeManager, CameraShakeSystem, Suppression, Flashbang, WeaponSystems (grenade/mortar/sandbag/ammo), FootstepAudio, WarSimulator, StrategicFeedback. Also mounts Compass/Minimap/Health/SquadIndicator/CommandStrip into HUD grid slots and now feeds zone/combatant/mode/player refs into `CommandInputManager` for the map-first command surface. |
-| SystemUpdater | [SystemUpdater.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemUpdater.ts) | Per-frame dispatch. 9 tracked groups with EMA budgets (alpha=0.1). Budget overrun warning at 150% EMA, 10s cooldown. TacticalUI throttled to 20Hz. AShauAssist: teleports player to contact if 60s no-opfor within 250m (90s cooldown). Untracked systems run in a catch-all loop. |
+| StartupPlayerRuntimeComposer | [StartupPlayerRuntimeComposer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/StartupPlayerRuntimeComposer.ts) | Typed grouped composition for startup-critical player/UI/deploy wiring. Owns the player runtime cluster, HUD mounting/config, deploy wiring, initial loadout application, and spectator-provider setup. |
+| GameplayRuntimeComposer | [GameplayRuntimeComposer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameplayRuntimeComposer.ts) | Typed grouped composition for combat, world/zone wiring, weapons, game-mode runtime hookup, and environment runtime setup. Owns restart callback wiring, combat/support effect-pool sharing, map-mode connections, and weather/water renderer-aware setup. |
+| OperationalRuntimeComposer | [OperationalRuntimeComposer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/OperationalRuntimeComposer.ts) | Typed grouped composition for strategy/map, helicopter/vehicle, and air-support runtime wiring. Owns war-sim/map bindings, helipad marker propagation, helicopter runtime dependencies, NPC vehicle provider wiring, and air-support/AA effect-pool hookups. |
+| SystemConnector | [SystemConnector.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemConnector.ts) | Remaining top-level wiring layer. Now delegates startup/player/deploy to `StartupPlayerRuntimeComposer`, combat/world/game-mode/environment to `GameplayRuntimeComposer`, strategy/vehicle/air-support to `OperationalRuntimeComposer`, and keeps only navigation + telemetry inline. |
+| SystemUpdater | [SystemUpdater.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemUpdater.ts) | Tracked update dispatch with EMA budgets and a `SimulationScheduler` for cadence-based groups. Tactical UI, war sim, world-state, and A Shau assist now run through explicit scheduler buckets; movement-coupled systems remain every-frame. A Shau assist now suggests manual redeploy instead of teleporting the player. |
+| SimulationScheduler | [SimulationScheduler.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SimulationScheduler.ts) | Small cadence scheduler for non-render update groups. Owns accumulated delta and group intervals (`tactical_ui`, `war_sim`, `air_support`, `world_state`, `ashau_assist`). |
 | SystemDisposer | [SystemDisposer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemDisposer.ts) | Iterates systems array calling `system.dispose()`. |
 | RuntimeMetrics | [RuntimeMetrics.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/RuntimeMetrics.ts) | Ring buffer (300 samples) for frame timing. Tracks avg, p95, p99 (500ms recompute throttle), max, hitch33/50/100 counts. Accumulates combatant/firing/engaging counts. Exposed as `window.__metrics`. |
 | CrosshairUI | [CrosshairUI.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/CrosshairUI.ts) | Tactical crosshair DOM element: center dot, 4 lines with pulse animation, 4 corner brackets, spread indicator circle. Created lazily on showCrosshair(). |
@@ -201,7 +215,10 @@ All files are in `src/core/` unless noted.
          - Separate deferred list: HelipadSystem, HelicopterModel
          - await system.init() for all non-deferred, non-pre-initialized systems
      -> SystemConnector.connectSystems(refs, scene, camera, renderer)
-          ~150 setter calls (see Wiring section)
+          -> StartupPlayerRuntimeComposer wires startup/player/deploy cluster
+          -> GameplayRuntimeComposer wires combat/world/game-mode/environment cluster
+          -> OperationalRuntimeComposer wires strategy/vehicle/air-support cluster
+          -> remaining inline wiring: navigation + telemetry
    - Back in initializeSystems (engine level):
      - asset check (skybox texture)
      - engine.isInitialized = true
@@ -214,6 +231,16 @@ All files are in `src/core/` unless noted.
    - animate()                              // RAF loop begins (guards on isInitialized
                                             //   && gameStarted; menu shows while loop runs)
    - marks: bootstrap.engine-started
+
+6. first user [PLAY]
+   - GameEngineInit dynamically imports:
+     - ModeStartupPreparer.ts
+     - InitialDeployStartup.ts
+   - Menu path no longer pays their code cost up front
+   - Current validated build shape:
+     - `ModeStartupPreparer` deferred chunk: 8.53kB minified
+     - `InitialDeployStartup` deferred chunk: 1.02kB minified
+     - main runtime chunk reduced to 722.03kB from the prior 730.27kB
 ```
 
 ---
@@ -247,18 +274,16 @@ TRACKED GROUPS (name, budget):
                        sandbagSystem.update(dt)
                        ammoSupplySystem.update(dt)
   "HUD"         1.0ms  hudSystem.update(dt)
-  "TacticalUI"  0.5ms  [throttled 20Hz = 1/20s accumulator]
+  "TacticalUI"  0.5ms  [scheduled 20Hz]
                          if !fullMapVisible: minimapSystem + compassSystem
                          if fullMapVisible:  fullMapSystem
-  "WarSim"      2.0ms  warSimulator.setPlayerPosition() + warSimulator.update(dt)
+  "WarSim"      2.0ms  [scheduled 10Hz] warSimulator.setPlayerPosition() + warSimulator.update(dt)
                        strategicFeedback.setPlayerPosition()
                        [only updates if warSimulator.isEnabled() - A Shau only]
-  "AShauAssist" 0.2ms  [A Shau mode only] if 60s with no opfor within 250m:
-                         playerRespawnManager.getAShauPressureInsertionSuggestion()
-                         playerController.setPosition(suggested)
-                         playerHealthSystem.applySpawnProtection(2s)
-                         [90s cooldown between assists]
-  "World"       1.0ms  zoneManager.update(dt)
+  "AShauAssist" 0.2ms  [scheduled 1Hz] if 60s with no opfor within 250m:
+                         if redeploy suggestion exists -> hudSystem.showMessage(...)
+                         [90s cooldown between suggestions]
+  "World"       1.0ms  [scheduled 15Hz] zoneManager.update(dt)
                        [gated: gameStarted] ticketSystem.update(dt)
                                             weatherSystem.update(dt)
                        waterSystem.update(dt)
@@ -298,11 +323,11 @@ isTrackedSystem() uses reference equality against refs fields to determine which
 
 Source: [SystemConnector.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/SystemConnector.ts)
 
-~150 setter-injection calls. No compile-time safety - missing wires silently produce undefined at call sites. All wiring happens in `connectSystems()`, called synchronously after `initializeSystems()` returns.
+Setter injection is still the main pattern. Startup/player/deploy now goes through `StartupPlayerRuntimeComposer.ts`, combat/world/game-mode/environment goes through `GameplayRuntimeComposer.ts`, and strategy/vehicle/air-support goes through `OperationalRuntimeComposer.ts`. The root connector is now mostly orchestration plus navigation/telemetry, but missing wires can still silently produce undefined at call sites because the underlying systems still accept setter injection.
 
 | Receiver | Wired dependencies |
 |----------|--------------------|
-| **playerController** | terrainSystem, gameModeManager, ticketSystem, helicopterModel, firstPersonWeapon, hudSystem, renderer, cameraShakeSystem, inventoryManager, grenadeSystem, mortarSystem, sandbagSystem, playerSquadController, footstepAudioSystem, commandInputManager |
+| **playerController** | terrainSystem, gameModeManager, ticketSystem, helicopterModel, firstPersonWeapon, hudSystem, renderer, cameraShakeSystem, inventoryManager, grenadeSystem, mortarSystem, sandbagSystem, playerSquadController, footstepAudioSystem, commandInputManager, spectatorCandidateProvider |
 | **combatantSystem** | terrainSystem, camera, ticketSystem, playerHealthSystem, zoneManager, gameModeManager, hudSystem, audioManager, playerSuppressionSystem. Plus direct property assigns: influenceMap, sandbagSystem. combatantCombat.setSandbagSystem, combatantAI.setSandbagSystem/setZoneManager/setSmokeCloudSystem, squadManager.setInfluenceMap |
 | **firstPersonWeapon** | playerController, combatantSystem, ticketSystem, hudSystem, zoneManager, inventoryManager, audioManager, grenadeSystem |
 | **hudSystem** | combatantSystem, zoneManager, ticketSystem, grenadeSystem, mortarSystem. Mounts: compassSystem, minimapSystem, playerHealthSystem, playerSquadController |
@@ -313,7 +338,7 @@ Source: [SystemConnector.ts](https://github.com/matthew-kissinger/terror-in-the-
 | **commandInputManager** | inputManager binding from PlayerController, plus zoneManager, combatantSystem, gameModeManager, playerController, HUDLayout mounting |
 | **compassSystem** | zoneManager. Mounted into hudSystem grid slot 'compass'. |
 | **zoneManager** | combatantSystem, camera, terrainSystem, spatialGridManager, spatialQueryProvider (lambda), hudSystem |
-| **playerRespawnManager** | playerHealthSystem, zoneManager, gameModeManager, playerController, firstPersonWeapon, inventoryManager, warSimulator, terrainSystem |
+| **playerRespawnManager** | playerHealthSystem, zoneManager, gameModeManager, playerController, firstPersonWeapon, inventoryManager, loadoutService, grenadeSystem, warSimulator, terrainSystem, helipadSystem |
 | **helipadSystem** | terrainSystem (terrainManager), globalBillboardSystem (vegetationSystem), gameModeManager. onHelipadsCreated -> minimap + fullMap markers. |
 | **helicopterModel** | terrainSystem (terrainManager), helipadSystem, playerController, hudSystem, audioManager listener |
 | **gameModeManager** | connectSystems(zoneManager, combatantSystem, ticketSystem, terrainSystem, minimapSystem), influenceMapSystem, warSimulator |
@@ -344,6 +369,35 @@ Two systems are excluded from the main init loop and initialized 500ms after the
 | HelicopterModel | Large geometry load; not needed until player approaches helipad |
 
 They are fully wired before deferral (SystemConnector runs on all refs including these). They are added to the main `systems` array after init completes so they participate in the untracked update loop.
+
+### Startup Runtime Composition
+`StartupPlayerRuntimeComposer.ts` is the first cut away from one giant connector method. It groups three clusters explicitly:
+
+- `playerRuntime`: player controller, health, suppression, weapon, footstep audio, initial loadout/faction, spectator-provider wiring
+- `hudRuntime`: HUD mounting, minimap/full-map/compass, command-input map-first bindings
+- `deployRuntime`: respawn/deploy flow wiring, loadout service handoff, terrain/helipad/war-sim dependencies
+
+This does not eliminate setter injection. It does eliminate a large inline startup/player/deploy chain from `SystemConnector.ts`, and it gives that path focused tests.
+
+### Operational Runtime Composition
+`OperationalRuntimeComposer.ts` is the second extraction from `SystemConnector.ts`. It groups three operational clusters explicitly:
+
+- `strategyRuntime`: war sim, strategic feedback, and strategic map bindings
+- `vehicleRuntime`: helipads, helicopter runtime dependencies, world-feature terrain/game-mode setup, NPC vehicle provider wiring
+- `airSupportRuntime`: air-support manager, AA emplacements, player air-support handoff, and explosion-effect pool sharing
+
+This still is not constructor injection. It does remove another dense callback-heavy cluster from the connector and gives the operational runtime path focused tests.
+
+### Gameplay Runtime Composition
+`GameplayRuntimeComposer.ts` is the third extraction from `SystemConnector.ts`. It groups the remaining high-churn core-runtime setup:
+
+- `combatRuntime`: combatant system, suppression, AI/support helpers, influence-map and smoke/flashbang hookups
+- `worldRuntime`: zone manager, ticket restart callback, spatial query wiring, terrain/HUD/world ownership
+- `weaponRuntime`: grenade/mortar/sandbag wiring plus shared combat effect pools
+- `gameModeRuntime`: game-mode cross-system hookup and ammo-supply runtime dependencies
+- `environmentRuntime`: weather/audio/renderer wiring and water-weather coupling
+
+At this point `SystemConnector.ts` is almost only an orchestration shell. The next architectural step is not “more composers by default”; it is deciding where constructor or runtime dependency objects should replace setter bursts in the underlying systems.
 
 ### Pre-Initialized Systems
 `AssetLoader` and `AudioManager` are `await`-ed explicitly in SystemInitializer phases 2 and 3. They are added to the main init loop but skipped via `preInitializedSystems` set (their `init()` is not called again).

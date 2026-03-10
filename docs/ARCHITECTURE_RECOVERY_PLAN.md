@@ -7,6 +7,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 
 - Deliver stable large-scale combat with consistent frame tails.
 - Stabilize A Shau mode flow so it is testable and tactically coherent.
+- Reduce core startup and wiring fragility now that the deployed boot path is stable again.
 
 ## Progress Checkpoint (2026-03-04, Evening)
 
@@ -32,6 +33,15 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: `ZoneState.BLUFOR_CONTROLLED` (renamed from `US_CONTROLLED`). All zone ownership now uses alliance-level naming. 23 files updated.
 - Keep: `TicketDisplay.setFactionLabels()` for dynamic HUD faction names derived from `factionMix` config. `GameEngineInit.applyLaunchSelection()` resolves labels at mode start.
 - Keep: Helipad spawn points wired into `PlayerRespawnManager` for Open Frontier. BLUFOR players see helipads as spawn options; frontier deploy flow prefers helipad_main.
+- Keep: production boot validation in CI via a real built-app smoke (`smoke:prod`). Deploy now depends on lint + tests + build + smoke.
+- Keep: `StartupFlowController` as the canonical startup phase state for `menu_ready -> mode_preparing -> deploy_select -> spawn_warming -> live`.
+- Keep: `DeployFlowController` as the canonical owner of deploy-session kind, selected spawn, and pending initial-deploy resolution.
+- Keep: `SimulationScheduler` inside `SystemUpdater` for cadence-based groups (`tactical_ui`, `war_sim`, `world_state`, `ashau_assist`).
+- Keep: A Shau no-contact recovery as an explicit redeploy suggestion via HUD message, not a silent player teleport.
+- Keep: `SystemConnector` is no longer the only giant wiring blob. Startup/player/deploy moved into `StartupPlayerRuntimeComposer`, combat/world/game-mode/environment into `GameplayRuntimeComposer`, and strategy/vehicle/air-support into `OperationalRuntimeComposer`. Root connector is now mostly orchestration, navigation, and telemetry.
+- Keep: startup cancellation is now a shared contract in `InitialDeployCancelledError.ts` instead of living inside `PlayerRespawnManager`, which reduces startup-path coupling.
+- Keep: `ModeSpawnPosition.ts` is the shared spawn-fallback contract for deploy/live-entry paths, letting `GameEngineInit` defer `ModeStartupPreparer` and `InitialDeployStartup` until the user clicks `Play`.
+- Keep: start-game boot surface is now partially deferred. Validated build output shows a new `ModeStartupPreparer` chunk (8.53kB minified) and main runtime dropped from `730.27kB` to `722.03kB` without regressing the production smoke path.
 - Keep: Graduated supermajority zone bleed in `TicketBleedCalculator`: 70%+ control = 1.5x multiplier, 100% = 3x (was flat 2x).
 - Keep: TDM kill-target urgency in `TicketDisplay`: 75% threshold = amber pulse, 90% = red pulse. Reuses existing `.low`/`.critical` CSS classes.
 - Keep: Death presentation: 6s ground persistence (was 4s), 2s fadeout (was 1s), ground-sinking replaces scale-to-zero.
@@ -151,13 +161,13 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 
 ## Next Execution Slice
 
-1. Continue `combat120` tail reduction in `AIStateEngage.initiateSquadSuppression()`: the flank-probe cleanup is accepted, and remaining outliers still point to synchronous per-flanker cover search bursts. Keep work in this init path; do not reintroduce deferred `ADVANCING` flank-cover retries unless a pressure-matched warm A/B proves a win.
-2. Normalize `combat120` acceptance loops for pressure comparability (treat shots/hits drift as a first-class acceptance signal when active-driver movement stays compressed).
-3. `HeightQueryCache` batch eviction accepted (2026-03-08): batch-evict 10% on overflow instead of per-miss FIFO. Heap recovery 94%/30.8% (matched pair) vs previous LRU 8.7%. No combat pressure collapse. The numeric-key linked-list LRU attempt remains reverted.
+1. Replace the highest-risk hot-path setter bursts with runtime dependency objects instead of adding more composers by default.
+2. Push scheduler ownership deeper: keep movement-coupled systems every frame for now, but continue moving cadence-safe world, strategy, and passive UI work behind declared scheduling contracts.
+3. Continue `combat120` tail reduction in `AIStateEngage.initiateSquadSuppression()` with pressure-matched evidence only.
 4. Break down `TerrainRaycastRuntime` near-field rebuild and vegetation update cost inside `TerrainSystem.update()` for `open_frontier`, `frontier30m`, and `a_shau_valley`.
-5. Re-baseline and lock regression checks after each accepted change. Deploy now gated on CI (lint+test+build). `perf:compare` wired into perf-check.yml workflow.
-6. Keep terrain rewrite progress aligned with `TERRAIN_REWRITE_MASTER_PLAN.md`; do not reintroduce chunk-era semantics into active runtime code. T-006 (CDLOD LOD transitions) done: XZ morphing in vertex shader, wireframe debug toggle.
-7. Navmesh pathfinding adopted (2026-03-08): `@recast-navigation` WASM with solo/tiled navmesh, crowd simulation, structure obstacle exclusion, LOD-gated steering. Hold WebGPU, worker offload until warm baselines re-measured.
+5. Continue targeted bundle reduction around deploy-only UI/runtime now that the start-game pipeline can defer safely.
+6. Re-baseline and lock regression checks after each accepted change. Deploy is now gated on CI by built-app smoke as well as lint/test/build.
+7. Keep terrain rewrite progress aligned with `TERRAIN_REWRITE_MASTER_PLAN.md`; do not reintroduce chunk-era semantics into active runtime code.
 
 ## Update Rule
 

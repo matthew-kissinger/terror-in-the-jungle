@@ -34,14 +34,17 @@ Three flyable helicopters: UH-1 Huey (transport), UH-1C Gunship, AH-1 Cobra (att
 ```bash
 npm run dev                # Vite dev server
 npm run build              # Type-check + production build
+npm run smoke:prod         # Built-app Playwright smoke against the deployed base path
 npm run test:run           # All tests
 npm run test:quick         # Unit tests only (dot reporter)
 npm run test:integration   # Integration scenario tests
-npm run validate           # Type-check + unit tests + build
+npm run validate           # Lint + tests + build + production smoke
 npm run validate:full      # validate + combat120 perf capture + baseline comparison
 npm run lint               # ESLint
 npm run lint:fix           # ESLint with auto-fix
 ```
+
+`smoke:prod` serves `dist/` under `/terror-in-the-jungle`, loads the built app in Chromium, fails on page/runtime errors, and verifies the real menu -> deploy transition.
 
 ## Profiling
 
@@ -62,3 +65,5 @@ Three.js r182, TypeScript 5.9, Vite 7.3, Vitest 4.0, Playwright 1.58.
 ## Documentation
 
 See [docs/README.md](docs/README.md) for the full docs index and block map.
+
+Before commit/push or deploy, use [docs/DEPLOYMENT_VALIDATION.md](docs/DEPLOYMENT_VALIDATION.md) for the current release-readiness checklist.

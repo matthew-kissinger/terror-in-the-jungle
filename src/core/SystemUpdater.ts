@@ -7,6 +7,7 @@ import { Logger } from '../utils/Logger';
 import { isOpfor } from '../systems/combat/types';
 import { isPerfUserTimingEnabled } from './PerfDiagnostics';
 import { GameEventBus } from './GameEventBus';
+import { SimulationScheduler } from './SimulationScheduler';
 
 interface SystemTimingEntry {
   name: string;
@@ -24,8 +25,7 @@ export class SystemUpdater {
   private readonly BUDGET_WARN_THRESHOLD = 1.5; // Warn when EMA exceeds 150% of budget
   private readonly BUDGET_WARN_COOLDOWN_MS = 10_000;
   private budgetWarningLastMs: Map<string, number> = new Map();
-  private tacticalUiAccumulator = 0;
-  private readonly TACTICAL_UI_INTERVAL = 1 / 20; // 20 Hz is enough for map/compass updates
+  private readonly scheduler = new SimulationScheduler();
   private ashauNoContactMs = 0;
   private ashauLastAssistAtMs = 0;
   private readonly ASHAU_CONTACT_RADIUS = 250;
@@ -106,7 +106,11 @@ export class SystemUpdater {
     // Gate UI systems - skip if game hasn't started or full map is visible
     const fullMapVisible = refs.fullMapSystem?.getIsVisible() || false;
     const shouldUpdateUI = gameStarted && !fullMapVisible;
-    this.tacticalUiAccumulator += deltaTime;
+    const tacticalDelta = this.scheduler.consume('tactical_ui', deltaTime);
+    const warSimDelta = this.scheduler.consume('war_sim', deltaTime);
+    const airSupportDelta = this.scheduler.consume('air_support', deltaTime);
+    const worldDelta = this.scheduler.consume('world_state', deltaTime);
+    const ashauAssistDelta = this.scheduler.consume('ashau_assist', deltaTime);
 
     this.trackSystemUpdate('HUD', 1.0, () => {
       performanceTelemetry.beginSystem('HUD');
@@ -118,17 +122,12 @@ export class SystemUpdater {
       performanceTelemetry.beginSystem('TacticalUI');
 
       // Minimap/compass/full-map updates are throttled to reduce DOM/canvas churn.
-      if (shouldUpdateUI && this.tacticalUiAccumulator >= this.TACTICAL_UI_INTERVAL) {
-        const tacticalDelta = this.tacticalUiAccumulator;
-        this.tacticalUiAccumulator = 0;
+      if (tacticalDelta !== null && shouldUpdateUI) {
         if (refs.minimapSystem) refs.minimapSystem.update(tacticalDelta);
         if (refs.compassSystem) refs.compassSystem.update(tacticalDelta);
       }
 
-      // Full map updates when visible, on same tactical cadence.
-      if (refs.fullMapSystem && fullMapVisible && this.tacticalUiAccumulator >= this.TACTICAL_UI_INTERVAL) {
-        const tacticalDelta = this.tacticalUiAccumulator;
-        this.tacticalUiAccumulator = 0;
+      if (tacticalDelta !== null && refs.fullMapSystem && fullMapVisible) {
         refs.fullMapSystem.update(tacticalDelta);
       }
 
@@ -138,10 +137,10 @@ export class SystemUpdater {
     // War Simulator (only active for A Shau Valley mode)
     this.trackSystemUpdate('WarSim', 2.0, () => {
       performanceTelemetry.beginSystem('WarSim');
-      if (refs.warSimulator && refs.playerController) {
+      if (warSimDelta !== null && refs.warSimulator && refs.playerController) {
         const pos = refs.playerController.getPosition();
         refs.warSimulator.setPlayerPosition(pos.x, pos.y, pos.z);
-        refs.warSimulator.update(deltaTime);
+        refs.warSimulator.update(warSimDelta);
         refs.strategicFeedback.setPlayerPosition(pos.x, pos.z);
       }
       performanceTelemetry.endSystem('WarSim');
@@ -149,31 +148,37 @@ export class SystemUpdater {
 
     this.trackSystemUpdate('AirSupport', 1.0, () => {
       performanceTelemetry.beginSystem('AirSupport');
-      if (refs.airSupportManager) refs.airSupportManager.update(deltaTime);
-      if (refs.aaEmplacementSystem) refs.aaEmplacementSystem.update(deltaTime);
-      if (refs.npcVehicleController) refs.npcVehicleController.update(deltaTime);
+      if (airSupportDelta !== null) {
+        if (refs.airSupportManager) refs.airSupportManager.update(airSupportDelta);
+        if (refs.aaEmplacementSystem) refs.aaEmplacementSystem.update(airSupportDelta);
+        if (refs.npcVehicleController) refs.npcVehicleController.update(airSupportDelta);
+      }
       performanceTelemetry.endSystem('AirSupport');
     });
 
     // Keep A Shau sessions from drifting into long no-contact dead time.
     this.trackSystemUpdate('AShauAssist', 0.2, () => {
       performanceTelemetry.beginSystem('AShauAssist');
-      this.updateAShauContactAssist(refs, deltaTime, gameStarted);
+      if (ashauAssistDelta !== null) {
+        this.updateAShauContactAssist(refs, ashauAssistDelta, gameStarted);
+      }
       performanceTelemetry.endSystem('AShauAssist');
     });
 
     // Gate World systems - skip weather and tickets during menu/loading
     this.trackSystemUpdate('World', 1.0, () => {
       performanceTelemetry.beginSystem('World');
-      if (refs.zoneManager) refs.zoneManager.update(deltaTime);
+      if (worldDelta !== null) {
+        if (refs.zoneManager) refs.zoneManager.update(worldDelta);
 
-      // Gate ticket and weather systems before game starts
-      if (gameStarted) {
-        if (refs.ticketSystem) refs.ticketSystem.update(deltaTime);
-        if (refs.weatherSystem) refs.weatherSystem.update(deltaTime);
+        // Gate ticket and weather systems before game starts
+        if (gameStarted) {
+          if (refs.ticketSystem) refs.ticketSystem.update(worldDelta);
+          if (refs.weatherSystem) refs.weatherSystem.update(worldDelta);
+        }
+
+        if (refs.waterSystem) refs.waterSystem.update(worldDelta);
       }
-
-      if (refs.waterSystem) refs.waterSystem.update(deltaTime);
       performanceTelemetry.endSystem('World');
     });
 
@@ -257,9 +262,9 @@ export class SystemUpdater {
 
     const suggested = refs.playerRespawnManager?.getPolicyDrivenInsertionSuggestion?.({ minOpfor250: 1 });
     if (!suggested) return;
-    suggested.y = playerPos.y;
-    refs.playerController.setPosition(suggested, 'ashau.contact_assist');
-    refs.playerHealthSystem?.applySpawnProtection?.(2);
+
+    refs.hudSystem?.showMessage('No nearby contact. Open the map and redeploy to the active front.', 5000);
+    Logger.info('SystemUpdater', 'A Shau contact assist suggested a manual frontline redeploy');
     this.ashauNoContactMs = 0;
     this.ashauLastAssistAtMs = now;
   }

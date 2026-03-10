@@ -27,13 +27,8 @@ import type { RespawnSpawnPoint } from './RespawnSpawnPoint';
 import { SpawnPointSelector } from './SpawnPointSelector';
 import { MissionBriefing } from '../../ui/loading/MissionBriefing';
 import type { MissionBriefingInfo } from '../../ui/loading/MissionBriefing';
-
-export class InitialDeployCancelledError extends Error {
-  constructor() {
-    super('Initial deploy cancelled');
-    this.name = 'InitialDeployCancelledError';
-  }
-}
+import { DeployFlowController } from './DeployFlowController';
+import { InitialDeployCancelledError } from './InitialDeployCancelledError';
 
 export class PlayerRespawnManager implements GameSystem {
   private scene: THREE.Scene;
@@ -51,16 +46,12 @@ export class PlayerRespawnManager implements GameSystem {
   // Respawn state
   private isRespawnUIVisible = false;
   private respawnTimer = 0;
-  private selectedSpawnPoint?: string;
   private availableSpawnPoints: RespawnSpawnPoint[] = [];
   private lastTimerDisplaySecond: number = -1;
   private lastTimerDisplayHasSelection = false;
   private deathCount = 0;
   private respawnCount = 0;
-  private deploySession?: DeploySessionModel;
-  private activeDeployFlowKind: DeploySessionKind | null = null;
-  private pendingInitialDeployResolve?: (position: THREE.Vector3) => void;
-  private pendingInitialDeployReject?: (error: Error) => void;
+  private readonly deployFlow = new DeployFlowController();
 
   // UI and map modules
   private respawnUI: RespawnUI;
@@ -78,6 +69,22 @@ export class PlayerRespawnManager implements GameSystem {
     this.respawnUI = new RespawnUI();
     this.mapController = new RespawnMapController();
     this.spawnPointSelector = new SpawnPointSelector();
+  }
+
+  private get selectedSpawnPoint(): string | undefined {
+    return this.deployFlow.getState().selectedSpawnPoint ?? undefined;
+  }
+
+  private set selectedSpawnPoint(value: string | undefined) {
+    this.deployFlow.setSelectedSpawnPoint(value ?? null);
+  }
+
+  private get deploySession(): DeploySessionModel | undefined {
+    return this.deployFlow.getState().session ?? undefined;
+  }
+
+  private get activeDeployFlowKind(): DeploySessionKind | null {
+    return this.deployFlow.getState().kind;
   }
 
   async init(): Promise<void> {
@@ -136,7 +143,7 @@ export class PlayerRespawnManager implements GameSystem {
   }
 
   dispose(): void {
-    if (this.activeDeployFlowKind === 'initial' && this.pendingInitialDeployReject) {
+    if (this.activeDeployFlowKind === 'initial' && this.deployFlow.getState().hasPendingInitialDeploy) {
       this.cancelInitialDeploy(new InitialDeployCancelledError());
     } else {
       this.hideRespawnUI();
@@ -259,9 +266,7 @@ export class PlayerRespawnManager implements GameSystem {
     }
 
     this.respawnTimer = 0;
-    return new Promise((resolve, reject) => {
-      this.pendingInitialDeployResolve = resolve;
-      this.pendingInitialDeployReject = reject;
+    return this.deployFlow.beginInitialDeploy(() => {
       this.showDeployUI('initial');
     });
   }
@@ -368,12 +373,12 @@ export class PlayerRespawnManager implements GameSystem {
     if (this.isRespawnUIVisible) return;
 
     this.isRespawnUIVisible = true;
-    this.activeDeployFlowKind = kind;
     this.syncLoadoutContext();
-    this.deploySession = this.gameModeManager?.getDeploySession?.(kind)
+    const deploySession = this.gameModeManager?.getDeploySession?.(kind)
       ?? createDeploySession(getGameModeDefinition(GameMode.ZONE_CONTROL), kind);
-    this.respawnUI.configureSession(this.deploySession);
-    this.respawnUI.setMapInteractionEnabled(this.deploySession.allowSpawnSelection);
+    this.deployFlow.open(kind, deploySession);
+    this.respawnUI.configureSession(deploySession);
+    this.respawnUI.setMapInteractionEnabled(deploySession.allowSpawnSelection);
     this.syncLoadoutPreview();
 
     // Update available spawn points
@@ -420,15 +425,11 @@ export class PlayerRespawnManager implements GameSystem {
     if (!spawnPoint) return;
 
     Logger.info('player', ` Deploying at ${spawnPoint.name}`);
-    const flowKind = this.activeDeployFlowKind;
-    this.hideRespawnUI();
     const finalPosition = this.createDeployPosition(spawnPoint.position);
+    const flowKind = this.deployFlow.confirm(finalPosition);
+    this.hideRespawnUI();
 
     if (flowKind === 'initial') {
-      const resolve = this.pendingInitialDeployResolve;
-      this.pendingInitialDeployResolve = undefined;
-      this.pendingInitialDeployReject = undefined;
-      resolve?.(finalPosition);
       return;
     }
 
@@ -439,9 +440,7 @@ export class PlayerRespawnManager implements GameSystem {
   private hideRespawnUI(): void {
     this.isRespawnUIVisible = false;
     this.respawnUI.hide();
-    this.selectedSpawnPoint = undefined;
-    this.deploySession = undefined;
-    this.activeDeployFlowKind = null;
+    this.deployFlow.close();
     this.mapController.clearSelection();
     this.mapController.stopMapUpdateInterval();
 
@@ -459,11 +458,8 @@ export class PlayerRespawnManager implements GameSystem {
   }
 
   private cancelInitialDeploy(error: Error): void {
-    const reject = this.pendingInitialDeployReject;
-    this.pendingInitialDeployResolve = undefined;
-    this.pendingInitialDeployReject = undefined;
+    this.deployFlow.cancelInitialDeploy(error);
     this.hideRespawnUI();
-    reject?.(error);
   }
 
   private updateTimerDisplay(): void {
@@ -613,9 +609,10 @@ export class PlayerRespawnManager implements GameSystem {
   }
 
   private shouldAutoConfirmInitialDeploy(): boolean {
+    const deployState = this.deployFlow.getState();
     return import.meta.env.DEV
       && isPerfDiagnosticsEnabled()
-      && !!this.pendingInitialDeployResolve
+      && deployState.hasPendingInitialDeploy
       && !!this.selectedSpawnPoint;
   }
 

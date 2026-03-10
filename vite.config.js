@@ -16,11 +16,6 @@ export default defineConfig({
       deleteOriginFile: false
     })
   ],
-  resolve: {
-    alias: [
-      { find: /^three$/, replacement: 'three/src/Three.js' }
-    ]
-  },
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
@@ -31,9 +26,6 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('three/examples/jsm')) return 'three-examples'
-            // All three/src/* in one chunk to avoid circular-dep TDZ errors
-            if (id.includes('three/src')) return 'three'
             if (id.includes('three-mesh-bvh')) return 'bvh'
             if (id.includes('three')) return 'three'
           }

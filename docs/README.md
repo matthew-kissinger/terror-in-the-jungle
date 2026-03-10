@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-03-09
+Last updated: 2026-03-10
 
 ## Read Order
 
@@ -11,6 +11,8 @@ Last updated: 2026-03-09
 5. `ROADMAP.md` - Master vision document. Aspirational and broader than the active game-mode execution plan.
 6. `ARCHITECTURE_RECOVERY_PLAN.md` - Runtime stability and performance.
 7. `PROFILING_HARNESS.md` - Perf capture commands, flags, artifacts.
+8. `NEXT_PHASE_REFACTOR_PLAN.md` - Post-stabilization refactor plan for startup flow, system composition, bundle loading, and loop budgeting.
+9. `DEPLOYMENT_VALIDATION.md` - Pre-push and pre-deploy release gate plus manual verification checklist.
 
 ## Block Map (Primary Reference)
 
@@ -40,6 +42,10 @@ Last updated: 2026-03-09
   - Source of truth for perf capture commands, flags, artifacts, and validation semantics.
 - `ARCHITECTURE_RECOVERY_PLAN.md`
   - Current architecture risk register and prioritized implementation board.
+- `NEXT_PHASE_REFACTOR_PLAN.md`
+  - Current Phase 2 refactor plan after the deployed boot fix. Focuses on `GameEngineInit`, `SystemConnector`, scheduler expansion, and bundle surface reduction.
+- `DEPLOYMENT_VALIDATION.md`
+  - Release-readiness checklist for local validation, CI expectations, and manual menu/deploy/live verification before push.
 - `TERRAIN_REWRITE_MASTER_PLAN.md`
   - Canonical terrain rewrite control document. This is the only terrain execution plan. Latest validated state includes fully clean preview-smoke evidence under `artifacts/terrain-smoke/2026-03-04T00-54-47-243Z`.
 - `TERRAIN_RESEARCH.md`

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import * as THREE from 'three';
-import { InitialDeployCancelledError, PlayerRespawnManager } from './PlayerRespawnManager';
+import { PlayerRespawnManager } from './PlayerRespawnManager';
+import { InitialDeployCancelledError } from './InitialDeployCancelledError';
 import { ZoneManager, ZoneState } from '../world/ZoneManager';
 import { PlayerHealthSystem } from './PlayerHealthSystem';
 import { GameModeManager } from '../world/GameModeManager';

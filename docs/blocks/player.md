@@ -14,7 +14,7 @@
 | [PlayerController]([GH]/systems/player/PlayerController.ts) | systems/player/PlayerController.ts | Player | 1ms | 15 | 7 |
 | [FirstPersonWeapon]([GH]/systems/player/FirstPersonWeapon.ts) | systems/player/FirstPersonWeapon.ts | Player | 1ms | 8 | 4 |
 | [PlayerHealthSystem]([GH]/systems/player/PlayerHealthSystem.ts) | systems/player/PlayerHealthSystem.ts | untracked | - | 7 | 2 |
-| [PlayerRespawnManager]([GH]/systems/player/PlayerRespawnManager.ts) | systems/player/PlayerRespawnManager.ts | untracked | - | 8 | 1 |
+| [PlayerRespawnManager]([GH]/systems/player/PlayerRespawnManager.ts) | systems/player/PlayerRespawnManager.ts | untracked | - | 11 | 1 |
 | [InventoryManager]([GH]/systems/player/InventoryManager.ts) | systems/player/InventoryManager.ts | untracked | - | 0 | 7 |
 | [PlayerSuppressionSystem]([GH]/systems/player/PlayerSuppressionSystem.ts) | systems/player/PlayerSuppressionSystem.ts | untracked | - | 2 | 1 |
 | [FlashbangScreenEffect]([GH]/systems/player/FlashbangScreenEffect.ts) | systems/player/FlashbangScreenEffect.ts | untracked | - | 1 | 1 |
@@ -38,6 +38,8 @@
 | [RespawnUI]([GH]/systems/player/RespawnUI.ts) | systems/player/RespawnUI.ts | Respawn interface |
 | [RespawnMapController]([GH]/systems/player/RespawnMapController.ts) | systems/player/RespawnMapController.ts | Respawn map interaction |
 | [LoadoutService]([GH]/systems/player/LoadoutService.ts) | systems/player/LoadoutService.ts | Weapon loadout selection and persistence |
+| [DeployFlowController]([GH]/systems/player/DeployFlowController.ts) | systems/player/DeployFlowController.ts | Owns deploy-session state, selected spawn point, and initial-deploy resolution |
+| [InitialDeployCancelledError]([GH]/systems/player/InitialDeployCancelledError.ts) | systems/player/InitialDeployCancelledError.ts | Shared startup/deploy cancellation contract |
 | [RespawnSpawnPoint]([GH]/systems/player/RespawnSpawnPoint.ts) | systems/player/RespawnSpawnPoint.ts | Spawn point type definitions |
 | ~~ProgrammaticGunFactory~~ | *(deleted 2026-03-08)* | Dead code - all weapons load GLBs via WeaponRigManager |
 
@@ -85,7 +87,12 @@
 
 **PlayerHealthSystem** receives (7): ZoneManager, TicketSystem, PlayerController, FirstPersonWeapon, PlayerRespawnManager, HUDSystem, Camera
 
-**PlayerRespawnManager** receives (8): PlayerHealthSystem, ZoneManager, GameModeManager, PlayerController, FirstPersonWeapon, InventoryManager, WarSimulator, TerrainSystem
+**PlayerRespawnManager** receives (11): PlayerHealthSystem, ZoneManager, GameModeManager, PlayerController, FirstPersonWeapon, InventoryManager, LoadoutService, GrenadeSystem, WarSimulator, TerrainSystem, HelipadSystem
+
+Internal note:
+- `PlayerRespawnManager` no longer owns the pending initial-deploy promise and selected-spawn state directly.
+- `DeployFlowController` is now the state holder for deploy session kind, session model, visibility, selected spawn, and initial-deploy resolve/reject flow.
+- `InitialDeployCancelledError` is now a standalone contract used by both core startup code and player deploy code, instead of being defined inside `PlayerRespawnManager`.
 
 ---
 
@@ -99,8 +106,9 @@ PlayerHealthSystem.takeDamage()
     firstPersonWeapon.disable()
     hudSystem.addDeath()
     deathCam activates
-    playerRespawnManager.startRespawnTimer()
-      -> after delay: respawnAtBase() or pressure insertion (A Shau)
+    playerRespawnManager.showDeployUI('respawn')
+      -> DeployFlowController owns active session + selected spawn
+      -> RespawnUI / RespawnMapController confirm deployment
       -> playerController.setPosition(), enable(), playerHealthSystem.heal()
 ```
 

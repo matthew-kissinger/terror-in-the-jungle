@@ -1,0 +1,293 @@
+import * as THREE from 'three';
+import { setSmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
+import { IGameRenderer } from '../types/SystemInterfaces';
+import { SystemReferences } from './SystemInitializer';
+
+type GameplayRuntimeRefs = Pick<
+  SystemReferences,
+  | 'ammoSupplySystem'
+  | 'audioManager'
+  | 'combatantSystem'
+  | 'firstPersonWeapon'
+  | 'flashbangScreenEffect'
+  | 'fullMapSystem'
+  | 'gameModeManager'
+  | 'grenadeSystem'
+  | 'hudSystem'
+  | 'influenceMapSystem'
+  | 'inventoryManager'
+  | 'minimapSystem'
+  | 'mortarSystem'
+  | 'playerController'
+  | 'playerHealthSystem'
+  | 'playerRespawnManager'
+  | 'playerSuppressionSystem'
+  | 'sandbagSystem'
+  | 'smokeCloudSystem'
+  | 'spatialGridManager'
+  | 'terrainSystem'
+  | 'ticketSystem'
+  | 'weatherSystem'
+  | 'waterSystem'
+  | 'zoneManager'
+>;
+
+export interface GameplayRuntimeGroups {
+  combatRuntime: Pick<
+    GameplayRuntimeRefs,
+    | 'audioManager'
+    | 'combatantSystem'
+    | 'flashbangScreenEffect'
+    | 'gameModeManager'
+    | 'hudSystem'
+    | 'influenceMapSystem'
+    | 'playerController'
+    | 'playerHealthSystem'
+    | 'playerSuppressionSystem'
+    | 'sandbagSystem'
+    | 'smokeCloudSystem'
+    | 'terrainSystem'
+    | 'ticketSystem'
+    | 'zoneManager'
+  >;
+  worldRuntime: Pick<
+    GameplayRuntimeRefs,
+    | 'combatantSystem'
+    | 'firstPersonWeapon'
+    | 'hudSystem'
+    | 'playerHealthSystem'
+    | 'playerRespawnManager'
+    | 'spatialGridManager'
+    | 'terrainSystem'
+    | 'ticketSystem'
+    | 'zoneManager'
+  >;
+  weaponRuntime: Pick<
+    GameplayRuntimeRefs,
+    | 'audioManager'
+    | 'combatantSystem'
+    | 'flashbangScreenEffect'
+    | 'grenadeSystem'
+    | 'inventoryManager'
+    | 'mortarSystem'
+    | 'playerController'
+    | 'sandbagSystem'
+    | 'ticketSystem'
+  >;
+  gameModeRuntime: Pick<
+    GameplayRuntimeRefs,
+    | 'ammoSupplySystem'
+    | 'combatantSystem'
+    | 'firstPersonWeapon'
+    | 'fullMapSystem'
+    | 'gameModeManager'
+    | 'influenceMapSystem'
+    | 'inventoryManager'
+    | 'minimapSystem'
+    | 'terrainSystem'
+    | 'ticketSystem'
+    | 'zoneManager'
+  >;
+  environmentRuntime: Pick<
+    GameplayRuntimeRefs,
+    | 'audioManager'
+    | 'weatherSystem'
+    | 'waterSystem'
+  >;
+}
+
+export interface GameplayRuntimeOptions {
+  camera: THREE.PerspectiveCamera;
+  renderer?: IGameRenderer;
+}
+
+export function createGameplayRuntimeGroups(
+  refs: GameplayRuntimeRefs
+): GameplayRuntimeGroups {
+  return {
+    combatRuntime: {
+      audioManager: refs.audioManager,
+      combatantSystem: refs.combatantSystem,
+      flashbangScreenEffect: refs.flashbangScreenEffect,
+      gameModeManager: refs.gameModeManager,
+      hudSystem: refs.hudSystem,
+      influenceMapSystem: refs.influenceMapSystem,
+      playerController: refs.playerController,
+      playerHealthSystem: refs.playerHealthSystem,
+      playerSuppressionSystem: refs.playerSuppressionSystem,
+      sandbagSystem: refs.sandbagSystem,
+      smokeCloudSystem: refs.smokeCloudSystem,
+      terrainSystem: refs.terrainSystem,
+      ticketSystem: refs.ticketSystem,
+      zoneManager: refs.zoneManager,
+    },
+    worldRuntime: {
+      combatantSystem: refs.combatantSystem,
+      firstPersonWeapon: refs.firstPersonWeapon,
+      hudSystem: refs.hudSystem,
+      playerHealthSystem: refs.playerHealthSystem,
+      playerRespawnManager: refs.playerRespawnManager,
+      spatialGridManager: refs.spatialGridManager,
+      terrainSystem: refs.terrainSystem,
+      ticketSystem: refs.ticketSystem,
+      zoneManager: refs.zoneManager,
+    },
+    weaponRuntime: {
+      audioManager: refs.audioManager,
+      combatantSystem: refs.combatantSystem,
+      flashbangScreenEffect: refs.flashbangScreenEffect,
+      grenadeSystem: refs.grenadeSystem,
+      inventoryManager: refs.inventoryManager,
+      mortarSystem: refs.mortarSystem,
+      playerController: refs.playerController,
+      sandbagSystem: refs.sandbagSystem,
+      ticketSystem: refs.ticketSystem,
+    },
+    gameModeRuntime: {
+      ammoSupplySystem: refs.ammoSupplySystem,
+      combatantSystem: refs.combatantSystem,
+      firstPersonWeapon: refs.firstPersonWeapon,
+      fullMapSystem: refs.fullMapSystem,
+      gameModeManager: refs.gameModeManager,
+      influenceMapSystem: refs.influenceMapSystem,
+      inventoryManager: refs.inventoryManager,
+      minimapSystem: refs.minimapSystem,
+      terrainSystem: refs.terrainSystem,
+      ticketSystem: refs.ticketSystem,
+      zoneManager: refs.zoneManager,
+    },
+    environmentRuntime: {
+      audioManager: refs.audioManager,
+      weatherSystem: refs.weatherSystem,
+      waterSystem: refs.waterSystem,
+    },
+  };
+}
+
+export function wireGameplayRuntime(
+  groups: GameplayRuntimeGroups,
+  options: GameplayRuntimeOptions
+): void {
+  wireCombatRuntime(groups.combatRuntime, options.camera);
+  wireWorldRuntime(groups.worldRuntime, options.camera);
+  wireWeaponRuntime(groups.weaponRuntime);
+  wireGameModeRuntime(groups.gameModeRuntime);
+  wireEnvironmentRuntime(groups.environmentRuntime, options.renderer);
+}
+
+function wireCombatRuntime(
+  runtime: GameplayRuntimeGroups['combatRuntime'],
+  camera: THREE.PerspectiveCamera
+): void {
+  runtime.combatantSystem.setTerrainSystem(runtime.terrainSystem);
+  runtime.combatantSystem.setCamera(camera);
+  runtime.combatantSystem.setTicketSystem(runtime.ticketSystem);
+  runtime.combatantSystem.setPlayerHealthSystem(runtime.playerHealthSystem);
+  runtime.combatantSystem.setZoneManager(runtime.zoneManager);
+  runtime.combatantSystem.setGameModeManager(runtime.gameModeManager);
+  runtime.combatantSystem.setHUDSystem(runtime.hudSystem);
+  runtime.combatantSystem.setAudioManager(runtime.audioManager);
+  runtime.combatantSystem.setPlayerSuppressionSystem(runtime.playerSuppressionSystem);
+
+  const combatantCombat = runtime.combatantSystem.combatantCombat;
+  if (combatantCombat) {
+    combatantCombat.setSandbagSystem(runtime.sandbagSystem);
+  }
+  const combatantAI = runtime.combatantSystem.combatantAI;
+  if (combatantAI) {
+    combatantAI.setSandbagSystem(runtime.sandbagSystem);
+    combatantAI.setZoneManager(runtime.zoneManager);
+    combatantAI.setSmokeCloudSystem(runtime.smokeCloudSystem);
+  }
+  const squadManager = runtime.combatantSystem.squadManager;
+  if (squadManager) {
+    squadManager.setInfluenceMap(runtime.influenceMapSystem);
+  }
+
+  runtime.combatantSystem.influenceMap = runtime.influenceMapSystem;
+  runtime.combatantSystem.sandbagSystem = runtime.sandbagSystem;
+  runtime.flashbangScreenEffect.setPlayerController(runtime.playerController);
+  setSmokeCloudSystem(runtime.smokeCloudSystem);
+}
+
+function wireWorldRuntime(
+  runtime: GameplayRuntimeGroups['worldRuntime'],
+  camera: THREE.PerspectiveCamera
+): void {
+  runtime.ticketSystem.setZoneManager(runtime.zoneManager);
+  runtime.ticketSystem.setMatchRestartCallback(() => {
+    runtime.playerRespawnManager.cancelPendingRespawn();
+    runtime.playerHealthSystem.resetForNewMatch();
+    runtime.firstPersonWeapon.enable();
+    runtime.playerRespawnManager.respawnAtBase();
+  });
+
+  runtime.zoneManager.setCombatantSystem(runtime.combatantSystem);
+  runtime.zoneManager.setCamera(camera);
+  runtime.zoneManager.setTerrainSystem(runtime.terrainSystem);
+  runtime.zoneManager.setSpatialGridManager(runtime.spatialGridManager);
+  runtime.zoneManager.setSpatialQueryProvider((center, radius) =>
+    runtime.combatantSystem.querySpatialRadius(center, radius)
+  );
+  runtime.zoneManager.setHUDSystem(runtime.hudSystem);
+}
+
+function wireWeaponRuntime(runtime: GameplayRuntimeGroups['weaponRuntime']): void {
+  runtime.grenadeSystem.setCombatantSystem(runtime.combatantSystem);
+  runtime.grenadeSystem.setInventoryManager(runtime.inventoryManager);
+  runtime.grenadeSystem.setTicketSystem(runtime.ticketSystem);
+  runtime.grenadeSystem.setAudioManager(runtime.audioManager);
+  runtime.grenadeSystem.setPlayerController(runtime.playerController);
+  runtime.grenadeSystem.setFlashbangEffect(runtime.flashbangScreenEffect);
+
+  runtime.mortarSystem.setCombatantSystem(runtime.combatantSystem);
+  runtime.mortarSystem.setInventoryManager(runtime.inventoryManager);
+  runtime.mortarSystem.setAudioManager(runtime.audioManager);
+  runtime.mortarSystem.setTicketSystem(runtime.ticketSystem);
+
+  runtime.sandbagSystem.setInventoryManager(runtime.inventoryManager);
+  runtime.sandbagSystem.setTicketSystem(runtime.ticketSystem);
+
+  const impactEffectsPool = runtime.combatantSystem.impactEffectsPool;
+  if (impactEffectsPool) {
+    runtime.grenadeSystem.setImpactEffectsPool(impactEffectsPool);
+    runtime.mortarSystem.setImpactEffectsPool(impactEffectsPool);
+  }
+  const explosionEffectsPool = runtime.combatantSystem.explosionEffectsPool;
+  if (explosionEffectsPool) {
+    runtime.grenadeSystem.setExplosionEffectsPool(explosionEffectsPool);
+    runtime.mortarSystem.setExplosionEffectsPool(explosionEffectsPool);
+  }
+}
+
+function wireGameModeRuntime(runtime: GameplayRuntimeGroups['gameModeRuntime']): void {
+  runtime.gameModeManager.connectSystems(
+    runtime.zoneManager,
+    runtime.combatantSystem,
+    runtime.ticketSystem,
+    runtime.terrainSystem,
+    runtime.minimapSystem,
+    runtime.fullMapSystem
+  );
+  runtime.gameModeManager.setInfluenceMapSystem(runtime.influenceMapSystem);
+
+  runtime.ammoSupplySystem.setZoneManager(runtime.zoneManager);
+  runtime.ammoSupplySystem.setInventoryManager(runtime.inventoryManager);
+  runtime.ammoSupplySystem.setFirstPersonWeapon(runtime.firstPersonWeapon);
+}
+
+function wireEnvironmentRuntime(
+  runtime: GameplayRuntimeGroups['environmentRuntime'],
+  renderer?: IGameRenderer
+): void {
+  if (runtime.weatherSystem) {
+    runtime.weatherSystem.setAudioManager(runtime.audioManager);
+    if (renderer) {
+      runtime.weatherSystem.setRenderer(renderer);
+    }
+  }
+
+  if (runtime.waterSystem) {
+    runtime.waterSystem.setWeatherSystem(runtime.weatherSystem);
+  }
+}

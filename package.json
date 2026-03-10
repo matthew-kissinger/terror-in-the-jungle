@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "smoke:prod": "npx tsx scripts/prod-smoke.ts",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "perf:baseline": "npx tsx scripts/perf-baseline.ts",
@@ -39,7 +40,7 @@
     "perf:quick": "npx tsx scripts/perf-capture.ts --headed --duration 30 --warmup 8 --npcs 60",
     "perf:compare": "npx tsx scripts/perf-compare.ts",
     "perf:update-baseline": "npx tsx scripts/perf-compare.ts --update-baseline",
-    "validate": "npm run test:run && npm run build",
+    "validate": "npm run lint && npm run test:run && npm run build && npm run smoke:prod",
     "validate:full": "npm run test:run && npm run build && npm run perf:capture:combat120 && npm run perf:compare -- --scenario combat120"
   },
   "devDependencies": {
