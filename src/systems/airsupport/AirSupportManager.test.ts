@@ -45,13 +45,6 @@ function createMockHUD() {
   } as any;
 }
 
-function createMockCombatantSystem() {
-  return {
-    applyExplosionDamage: vi.fn(),
-    querySpatialRadius: vi.fn().mockReturnValue([]),
-  } as any;
-}
-
 function createMockTerrainSystem() {
   return {
     getHeightAt: vi.fn().mockReturnValue(0),

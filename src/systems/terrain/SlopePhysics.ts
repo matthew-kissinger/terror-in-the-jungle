@@ -8,9 +8,6 @@
 /** Slope value (1 - normal.y) above which movement is fully blocked (~60 deg). */
 export const MAX_WALKABLE_SLOPE = 0.5;
 
-/** Slope value where gentle->crawl transition begins (~45 deg). */
-export const CRAWL_SLOPE_THRESHOLD = 0.3;
-
 /** Maximum vertical step the player can climb in one frame (meters). */
 export const MAX_STEP_HEIGHT = 0.5;
 

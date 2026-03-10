@@ -73,7 +73,3 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
     ],
   },
 };
-
-export function getAirfieldTemplate(templateId: string): AirfieldTemplate | undefined {
-  return AIRFIELD_TEMPLATES[templateId];
-}

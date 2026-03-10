@@ -4,13 +4,13 @@ import { CameraShakeSystem } from '../effects/CameraShakeSystem';
 import { Logger } from '../../utils/Logger';
 import type { IPlayerController } from '../../types/SystemInterfaces';
 
-export interface NearMissEvent {
+interface NearMissEvent {
   direction: THREE.Vector3; // Direction from player to bullet
   intensity: number; // 0-1 based on proximity
   timestamp: number;
 }
 
-export interface SuppressionState {
+interface SuppressionState {
   level: number; // 0-1 suppression level
   nearMissCount: number; // Track recent near misses
   lastNearMissTime: number; // Timestamp of last near miss

@@ -8,12 +8,14 @@ import { ZoneManager } from '../world/ZoneManager';
 import { GameModeManager } from '../world/GameModeManager';
 import { Logger } from '../../utils/Logger';
 import { spatialGridManager } from './SpatialGridManager';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
+import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 
 // Module-level scratch vectors
 const _squadCentroid = new THREE.Vector3();
 const _spawnPos = new THREE.Vector3();
 
-export interface PendingRespawn {
+interface PendingRespawn {
   squadId: string;
   respawnTime: number;
   originalId: string;
@@ -27,6 +29,7 @@ export class RespawnManager {
   private squadManager: SquadManager;
   private combatantFactory: CombatantFactory;
   private pendingRespawns: PendingRespawn[] = [];
+  private terrainSystem?: ITerrainRuntime;
 
   constructor(
     combatants: Map<string, Combatant>,
@@ -48,6 +51,10 @@ export class RespawnManager {
 
   clearPendingRespawns(): void {
     this.pendingRespawns = [];
+  }
+
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
   }
 
   /**
@@ -147,15 +154,26 @@ export class RespawnManager {
     if (rallyPointSystem) {
       const rallyPos = rallyPointSystem.getRallyPointPosition(squadId);
       if (rallyPos && rallyPointSystem.consumeRallyPointUse(squadId)) {
-        spawnPos = rallyPos;
+        spawnPos = _spawnPos.copy(rallyPos);
         spawnedAtRallyPoint = true;
         Logger.info('combat', ` Respawning at rally point`);
       } else {
-        spawnPos = SpawnPositionCalculator.getBaseSpawnPosition(squad.faction, zoneManager, gameModeManager?.getCurrentConfig());
+        spawnPos = SpawnPositionCalculator.getBaseSpawnPosition(
+          squad.faction,
+          zoneManager,
+          gameModeManager?.getCurrentConfig(),
+          this.terrainSystem,
+        );
       }
     } else {
-      spawnPos = SpawnPositionCalculator.getBaseSpawnPosition(squad.faction, zoneManager, gameModeManager?.getCurrentConfig());
+      spawnPos = SpawnPositionCalculator.getBaseSpawnPosition(
+        squad.faction,
+        zoneManager,
+        gameModeManager?.getCurrentConfig(),
+        this.terrainSystem,
+      );
     }
+    this.resolveSpawnHeight(spawnPos);
 
     const distanceFromSquad = spawnPos.distanceTo(_squadCentroid);
 
@@ -204,7 +222,12 @@ export class RespawnManager {
     const anchors = SpawnPositionCalculator.getFactionAnchors(faction, zoneManager);
     if (anchors.length === 0) {
       // Fallback: spawn near default base pos
-      const pos = SpawnPositionCalculator.getSpawnPosition(faction, zoneManager, gameModeManager?.getCurrentConfig());
+      const pos = SpawnPositionCalculator.getSpawnPosition(
+        faction,
+        zoneManager,
+        gameModeManager?.getCurrentConfig(),
+        this.terrainSystem,
+      );
       if (this.combatants.size < maxCombatants) {
         spawnSquadFn(faction, pos, SpawnPositionCalculator.randomSquadSize(squadSizeMin, squadSizeMax));
       }
@@ -214,7 +237,7 @@ export class RespawnManager {
     for (let i = 0; i < maxSquadsThisWave; i++) {
       if (this.combatants.size >= maxCombatants) break;
       const anchor = anchors[i % anchors.length];
-      const pos = _spawnPos.copy(anchor).add(SpawnPositionCalculator.randomSpawnOffset(20, 50));
+      const pos = SpawnPositionCalculator.findSafeSpawnPositionNearAnchor(anchor, 20, 50, this.terrainSystem, _spawnPos);
       spawnSquadFn(faction, pos, SpawnPositionCalculator.randomSquadSize(squadSizeMin, squadSizeMax));
     }
   }
@@ -227,5 +250,15 @@ export class RespawnManager {
       else if (isOpfor(c.faction)) opfor++;
     }
     return { blufor, opfor };
+  }
+
+  private resolveSpawnHeight(position: THREE.Vector3): void {
+    if (!this.terrainSystem) {
+      return;
+    }
+    const terrainHeight = Number(this.terrainSystem.getEffectiveHeightAt(position.x, position.z));
+    if (Number.isFinite(terrainHeight)) {
+      position.y = terrainHeight + NPC_Y_OFFSET;
+    }
   }
 }

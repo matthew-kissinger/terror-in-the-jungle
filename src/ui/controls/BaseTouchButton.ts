@@ -14,7 +14,7 @@
 import { UIComponent } from '../engine/UIComponent';
 import styles from './TouchControls.module.css';
 
-export interface BindPressOptions {
+interface BindPressOptions {
   onDown?: () => void;
   onUp?: () => void;
   onCancel?: () => void;

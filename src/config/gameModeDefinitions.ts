@@ -86,7 +86,7 @@ export function getFactionOptionsForAlliance(
     : [Faction.NVA];
 }
 
-export function resolveDefaultFactionForAlliance(
+function resolveDefaultFactionForAlliance(
   definition: GameModeDefinition,
   alliance: Alliance
 ): Faction {

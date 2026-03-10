@@ -8,7 +8,7 @@ import type { ExplosionEffectsPool } from '../effects/ExplosionEffectsPool';
 
 // ── Configuration ──
 
-export interface AAEmplacementConfig {
+interface AAEmplacementConfig {
   type: 'zpu4' | '37mm';
   position: THREE.Vector3;
   faction: 'NVA' | 'VC';

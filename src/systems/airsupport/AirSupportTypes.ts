@@ -21,7 +21,7 @@ export interface AirSupportMission {
   missionData: Record<string, number>;
 }
 
-export interface AirSupportConfig {
+interface AirSupportConfig {
   /** Seconds before aircraft arrives after request */
   delay: number;
   /** Seconds the mission is active */

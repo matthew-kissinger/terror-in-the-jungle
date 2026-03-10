@@ -94,9 +94,9 @@
 | Class / Export | File | Notes |
 |----------------|------|-------|
 | [CombatantFactory](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantFactory.ts) | systems/combat/CombatantFactory.ts | createCombatant(); assigns AISkillProfile per faction |
-| [CombatantSpawnManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantSpawnManager.ts) | systems/combat/CombatantSpawnManager.ts | Progressive spawn queue (1s delay, max 24 enqueued); reinforcement waves (15s default); tighter initial HQ staging offsets for base openings |
-| [SpawnPositionCalculator](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/SpawnPositionCalculator.ts) | systems/combat/SpawnPositionCalculator.ts | Zone-aware spawn position selection |
-| [RespawnManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/RespawnManager.ts) | systems/combat/RespawnManager.ts | NPC respawn with rally-point-first fallback |
+| [CombatantSpawnManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantSpawnManager.ts) | systems/combat/CombatantSpawnManager.ts | Progressive spawn queue (1s delay, max 24 enqueued); reinforcement waves (15s default); initial HQ staging and direct squad spawns now re-evaluate the local terrain before creating squads |
+| [SpawnPositionCalculator](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/SpawnPositionCalculator.ts) | systems/combat/SpawnPositionCalculator.ts | Zone-aware spawn position selection; now scores terrain slope and local drop-offs instead of using blind annulus offsets |
+| [RespawnManager](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/RespawnManager.ts) | systems/combat/RespawnManager.ts | NPC respawn with rally-point-first fallback; respawn/base-wave spawns now use the same terrain-aware candidate search as initial squads |
 | [CombatantMovement](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantMovement.ts) | systems/combat/CombatantMovement.ts | Position integration; terrain grounding via HeightQueryCache; delegates to MovementStates; navmesh intercept (high/medium LOD use crowd-steered velocity, low/culled use beeline); slope speed penalty via SlopePhysics |
 | [CombatantMovementStates](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantMovementStates.ts) | systems/combat/CombatantMovementStates.ts | updatePatrolMovement, updateCombatMovement, updateCoverSeekingMovement, updateDefendingMovement |
 | [CombatantMovementCommands](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/combat/CombatantMovementCommands.ts) | systems/combat/CombatantMovementCommands.ts | handlePlayerCommand, handleRejoiningMovement; uses ObjectPoolManager |
@@ -433,4 +433,4 @@ Run unit only: `npm run test:quick`. Run all: `npm run test:run`.
 
 ---
 
-*Last updated: 2026-03-02*
+*Last updated: 2026-03-10*

@@ -34,13 +34,6 @@ export interface ZoneConfig {
   ticketBleedRate: number;
 }
 
-export interface SpawnPoint {
-  id: string;
-  position: THREE.Vector3;
-  faction: Faction;
-  isHQ: boolean;
-}
-
 export interface ScaleConfig {
   aiEngagementRange?: number;       // default 150
   lodHighRange?: number;            // default 200
@@ -64,11 +57,10 @@ export interface WarSimulatorConfig {
   reinforcementCooldown: number;    // seconds
 }
 
-export type MapFeatureKind = 'helipad' | 'airfield' | 'firebase' | 'village' | 'road';
-export type MapFeatureFootprintShape = 'circle' | 'rect' | 'strip' | 'polygon';
-export type TerrainFeatureSurfaceKind = 'packed_earth' | 'runway' | 'dirt_road' | 'gravel_road' | 'jungle_trail';
-export type TerrainFeatureTargetHeightMode = 'center' | 'average' | 'max';
-export type MapFeaturePrefabId =
+type MapFeatureKind = 'helipad' | 'airfield' | 'firebase' | 'village' | 'road';
+type TerrainFeatureSurfaceKind = 'packed_earth' | 'runway' | 'dirt_road' | 'gravel_road' | 'jungle_trail';
+type TerrainFeatureTargetHeightMode = 'center' | 'average' | 'max';
+type MapFeaturePrefabId =
   | 'firebase_us_small'
   | 'firebase_us_medium'
   | 'firebase_artillery_small'
@@ -111,43 +103,45 @@ export interface MapFeatureRectFootprint {
   length: number;
 }
 
-export interface MapFeatureStripFootprint {
+interface MapFeatureStripFootprint {
   shape: 'strip';
   width: number;
   length: number;
 }
 
-export interface MapFeaturePolygonFootprint {
+interface MapFeaturePolygonFootprint {
   shape: 'polygon';
   points: Array<{ x: number; z: number }>;
 }
 
-export type MapFeatureFootprint =
+type MapFeatureFootprint =
   | MapFeatureCircleFootprint
   | MapFeatureRectFootprint
   | MapFeatureStripFootprint
   | MapFeaturePolygonFootprint;
 
-export interface TerrainFeaturePlacement {
+interface TerrainFeaturePlacement {
   yaw?: number;
 }
 
-export interface TerrainFeatureStampPolicy {
+interface TerrainFeatureStampPolicy {
   flatten?: boolean;
   flatRadius?: number;
   blendRadius?: number;
+  gradeRadius?: number;
+  gradeStrength?: number;
   samplingRadius?: number;
   targetHeightMode?: TerrainFeatureTargetHeightMode;
   heightOffset?: number;
   priority?: number;
 }
 
-export interface TerrainFeatureVegetationPolicy {
+interface TerrainFeatureVegetationPolicy {
   clear?: boolean;
   exclusionRadius?: number;
 }
 
-export interface TerrainFeatureSurfacePolicy {
+interface TerrainFeatureSurfacePolicy {
   kind: TerrainFeatureSurfaceKind;
   innerRadius?: number;
   outerRadius?: number;
@@ -156,13 +150,13 @@ export interface TerrainFeatureSurfacePolicy {
   blend?: number;
 }
 
-export interface TerrainFeatureGameplayPolicy {
+interface TerrainFeatureGameplayPolicy {
   linkedZoneId?: string;
   spawnIds?: string[];
   owner?: Faction | null;
 }
 
-export interface MapFeatureBase {
+interface MapFeatureBase {
   id: string;
   kind: MapFeatureKind;
   name?: string;
@@ -289,16 +283,16 @@ export interface GameModeConfig {
   };
 }
 
-export type ObjectivePolicyKind = 'zone_control' | 'deathmatch' | 'sandbox' | 'warfront';
+type ObjectivePolicyKind = 'zone_control' | 'deathmatch' | 'sandbox' | 'warfront';
 export type DeployFlow = 'standard' | 'frontier' | 'air_assault' | 'sandbox';
 export type DeployMapVariant = 'standard' | 'frontier';
 export type InitialSpawnRule = 'homebase' | 'forward_insertion' | 'origin';
 export type RespawnFallbackRule = 'homebase' | 'pressure_front';
 export type ContactAssistStyle = 'none' | 'pressure_front';
 export type StrategicLayerMode = 'none' | 'optional' | 'required';
-export type CommandSurface = 'radial' | 'hybrid' | 'overlay';
+type CommandSurface = 'radial' | 'hybrid' | 'overlay';
 export type CommandScale = 'squad' | 'platoon' | 'company' | 'battalion';
-export type TeamComposition = 'single_faction' | 'alliance_mix';
+type TeamComposition = 'single_faction' | 'alliance_mix';
 
 export interface ObjectivePolicyConfig {
   kind: ObjectivePolicyKind;

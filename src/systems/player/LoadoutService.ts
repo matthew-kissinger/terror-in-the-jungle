@@ -31,7 +31,7 @@ export interface LoadoutContext {
   faction: Faction;
 }
 
-export interface LoadoutPresetSlot {
+interface LoadoutPresetSlot {
   id: string;
   name: string;
   description: string;

@@ -1,12 +1,12 @@
 import { zIndex } from '../design/tokens';
 
-export interface SystemTiming {
+interface SystemTiming {
   name: string;
   timeMs: number;
   budgetMs: number;
 }
 
-export interface PerformanceStats {
+interface PerformanceStats {
   fps: number;
   frameTimeMs: number;
   drawCalls: number;

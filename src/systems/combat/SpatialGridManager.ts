@@ -15,7 +15,7 @@ export enum SyncFrequency {
   EVERY_30_FRAMES = 30 // CULLED (>500m)
 }
 
-export interface SpatialGridTelemetry {
+interface SpatialGridTelemetry {
   initialized: boolean
   entityCount: number
   queriesThisFrame: number

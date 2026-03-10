@@ -162,8 +162,3 @@ export function getHeightQueryCache(seed?: number): HeightQueryCache {
   }
   return heightQueryCacheInstance;
 }
-
-export function resetHeightQueryCache(seed?: number): HeightQueryCache {
-  heightQueryCacheInstance = new HeightQueryCache(seed);
-  return heightQueryCacheInstance;
-}

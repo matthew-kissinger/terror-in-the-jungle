@@ -2,7 +2,7 @@ import { Logger } from '../../utils/Logger';
 
 export type GamePhase = 'SETUP' | 'COMBAT' | 'OVERTIME' | 'ENDED';
 
-export interface PhaseConfig {
+interface PhaseConfig {
   setupDuration: number;
   combatDuration: number;
   overtimeDuration: number;

@@ -3,7 +3,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { getModelPath } from '../../config/paths';
 import { Logger } from '../../utils/Logger';
 
-export interface LoadedModel {
+interface LoadedModel {
   scene: THREE.Group;
   animations: THREE.AnimationClip[];
 }

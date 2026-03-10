@@ -10,6 +10,7 @@ import { Logger } from '../../utils/Logger';
 import { SpawnPositionCalculator } from './SpawnPositionCalculator';
 import { RespawnManager } from './RespawnManager';
 import { spatialGridManager } from './SpatialGridManager';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 
 // Module-level scratch vectors to avoid per-call allocations
 const _spawnPos = new THREE.Vector3();
@@ -27,6 +28,7 @@ export class CombatantSpawnManager {
   private zoneManager?: ZoneManager;
   private gameModeManager?: GameModeManager;
   private rallyPointSystem?: RallyPointSystem;
+  private terrainSystem?: ITerrainRuntime;
   private respawnManager: RespawnManager;
 
   // Spawn configuration
@@ -71,6 +73,11 @@ export class CombatantSpawnManager {
 
   setRallyPointSystem(rallyPointSystem: RallyPointSystem): void {
     this.rallyPointSystem = rallyPointSystem;
+  }
+
+  setTerrainSystem(terrainSystem: ITerrainRuntime): void {
+    this.terrainSystem = terrainSystem;
+    this.respawnManager.setTerrainSystem(terrainSystem);
   }
 
   setMaxCombatants(max: number): void {
@@ -145,7 +152,13 @@ export class CombatantSpawnManager {
       const playerHQs = SpawnPositionCalculator.getHQZonesForAlliance(playerAlliance, config);
       const playerBasePos = playerAlliance === Alliance.BLUFOR ? usBasePos : opforBasePos;
       const playerAnchor = playerHQs[0]?.position ?? playerBasePos;
-      const playerSpawnPos = _scratchVec.copy(playerAnchor).add(_offsetVec.set(0, 0, -8));
+      const playerSpawnPos = SpawnPositionCalculator.findSafeSpawnPositionNearAnchor(
+        playerAnchor,
+        4,
+        12,
+        this.terrainSystem,
+        _scratchVec,
+      );
       const { squad: playerSquad, members } = this.squadManager.createSquad(this.playerFaction, playerSpawnPos, 6);
       createdPlayerSquadId = playerSquad.id;
       playerSquad.isPlayerControlled = true;
@@ -168,21 +181,41 @@ export class CombatantSpawnManager {
     // Fallback to legacy base positions if no HQs configured
     if (usHQs.length === 0 || opforHQs.length === 0) {
       for (let i = 0; i < initialUSSquads; i++) {
-        this.spawnSquad(Faction.US, usBasePos, avgSquadSize);
+        this.spawnSquad(
+          Faction.US,
+          SpawnPositionCalculator.findSafeSpawnPositionNearAnchor(usBasePos, 12, 28, this.terrainSystem, _spawnPos),
+          avgSquadSize,
+        );
       }
       for (let i = 0; i < initialOPFORSquads; i++) {
-        this.spawnSquad(this.pickOpforFaction(), opforBasePos, avgSquadSize);
+        this.spawnSquad(
+          this.pickOpforFaction(),
+          SpawnPositionCalculator.findSafeSpawnPositionNearAnchor(opforBasePos, 12, 28, this.terrainSystem, _scratchVec),
+          avgSquadSize,
+        );
       }
     } else {
       // Distribute squads across all configured HQs.
       const totalSpawnRounds = Math.max(initialUSSquads, initialOPFORSquads);
       for (let i = 0; i < totalSpawnRounds; i++) {
         if (i < initialUSSquads) {
-          const posUS = _spawnPos.copy(usHQs[i % usHQs.length].position).add(SpawnPositionCalculator.randomSpawnOffset(12, 28));
+          const posUS = SpawnPositionCalculator.findSafeSpawnPositionNearAnchor(
+            usHQs[i % usHQs.length].position,
+            12,
+            28,
+            this.terrainSystem,
+            _spawnPos,
+          );
           this.spawnSquad(Faction.US, posUS, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
         }
         if (i < initialOPFORSquads) {
-          const posOP = _scratchVec.copy(opforHQs[i % opforHQs.length].position).add(SpawnPositionCalculator.randomSpawnOffset(12, 28));
+          const posOP = SpawnPositionCalculator.findSafeSpawnPositionNearAnchor(
+            opforHQs[i % opforHQs.length].position,
+            12,
+            28,
+            this.terrainSystem,
+            _scratchVec,
+          );
           this.spawnSquad(this.pickOpforFaction(), posOP, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
         }
       }
@@ -317,9 +350,20 @@ export class CombatantSpawnManager {
         let pos: THREE.Vector3;
         if (anchors.length > 0) {
           const anchor = anchors[(i + Math.floor(Math.random() * anchors.length)) % anchors.length];
-          pos = _spawnPos.copy(anchor).add(SpawnPositionCalculator.randomSpawnOffset(20, 50));
+          pos = SpawnPositionCalculator.findSafeSpawnPositionNearAnchor(
+            anchor,
+            20,
+            50,
+            this.terrainSystem,
+            _spawnPos,
+          );
         } else {
-          pos = SpawnPositionCalculator.getSpawnPosition(faction, this.zoneManager, this.gameModeManager?.getCurrentConfig());
+          pos = SpawnPositionCalculator.getSpawnPosition(
+            faction,
+            this.zoneManager,
+            this.gameModeManager?.getCurrentConfig(),
+            this.terrainSystem,
+          );
         }
         const squadSize = SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax);
         if (this.shouldQueueSpawnsForCurrentMode()) {
@@ -345,7 +389,10 @@ export class CombatantSpawnManager {
     }
 
     const clampedSize = Math.max(1, Math.min(size, remaining));
-    const { members } = this.squadManager.createSquad(faction, centerPos, clampedSize);
+    const resolvedCenter = this.terrainSystem
+      ? SpawnPositionCalculator.findSafeSpawnPositionNearAnchor(centerPos, 0, 18, this.terrainSystem, _scratchVec)
+      : centerPos;
+    const { members } = this.squadManager.createSquad(faction, resolvedCenter, clampedSize);
 
     // Add all squad members to our combatants map and spatial grid
     members.forEach(combatant => {

@@ -421,6 +421,7 @@ export class CombatantSystem implements GameSystem {
     this.squadManager.setTerrainSystem(terrainSystem);
     this.combatantAI.setTerrainSystem(terrainSystem);
     this.combatantCombat.setTerrainSystem(terrainSystem);
+    this.spawnManager.setTerrainSystem(terrainSystem);
   }
 
   setCamera(camera: THREE.Camera): void {

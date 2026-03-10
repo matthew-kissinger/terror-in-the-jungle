@@ -37,7 +37,7 @@ export function startLiveGame(engine: GameEngine, initialSpawnPosition?: THREE.V
   );
 }
 
-export async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: THREE.Vector3): Promise<void> {
+async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: THREE.Vector3): Promise<void> {
   markStartup('engine-init.startup-flow.begin');
   const startTime = performance.now();
   const markPhase = (phase: string, status?: string, detail?: string) => {

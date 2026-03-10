@@ -37,7 +37,7 @@ export interface TerrainConfig {
 // Built-in biome presets
 // ---------------------------------------------------------------------------
 
-export const BIOME_DENSE_JUNGLE: BiomeConfig = {
+const BIOME_DENSE_JUNGLE: BiomeConfig = {
   id: 'denseJungle',
   name: 'Dense Jungle',
   groundTexture: 'jungle-floor',
@@ -58,7 +58,7 @@ export const BIOME_DENSE_JUNGLE: BiomeConfig = {
   ],
 };
 
-export const BIOME_HIGHLAND: BiomeConfig = {
+const BIOME_HIGHLAND: BiomeConfig = {
   id: 'highland',
   name: 'Highland',
   groundTexture: 'rocky-highland',
@@ -74,7 +74,7 @@ export const BIOME_HIGHLAND: BiomeConfig = {
   ],
 };
 
-export const BIOME_RICE_PADDY: BiomeConfig = {
+const BIOME_RICE_PADDY: BiomeConfig = {
   id: 'ricePaddy',
   name: 'Rice Paddy',
   groundTexture: 'rice-paddy',
@@ -87,7 +87,7 @@ export const BIOME_RICE_PADDY: BiomeConfig = {
   ],
 };
 
-export const BIOME_RIVERBANK: BiomeConfig = {
+const BIOME_RIVERBANK: BiomeConfig = {
   id: 'riverbank',
   name: 'Riverbank',
   groundTexture: 'river-bank',
@@ -102,7 +102,7 @@ export const BIOME_RIVERBANK: BiomeConfig = {
   ],
 };
 
-export const BIOME_CLEARED: BiomeConfig = {
+const BIOME_CLEARED: BiomeConfig = {
   id: 'cleared',
   name: 'Cleared Area',
   groundTexture: 'firebase-ground',
@@ -113,7 +113,7 @@ export const BIOME_CLEARED: BiomeConfig = {
   ],
 };
 
-export const BIOME_TALL_GRASS: BiomeConfig = {
+const BIOME_TALL_GRASS: BiomeConfig = {
   id: 'tallGrass',
   name: 'Tall Grass',
   groundTexture: 'tall-grass',
@@ -126,7 +126,7 @@ export const BIOME_TALL_GRASS: BiomeConfig = {
   ],
 };
 
-export const BIOME_MUD_TRAIL: BiomeConfig = {
+const BIOME_MUD_TRAIL: BiomeConfig = {
   id: 'mudTrail',
   name: 'Mud Trail',
   groundTexture: 'mud-ground',
@@ -138,7 +138,7 @@ export const BIOME_MUD_TRAIL: BiomeConfig = {
   ],
 };
 
-export const BIOME_BAMBOO_GROVE: BiomeConfig = {
+const BIOME_BAMBOO_GROVE: BiomeConfig = {
   id: 'bambooGrove',
   name: 'Bamboo Grove',
   groundTexture: 'bamboo-floor',
@@ -151,7 +151,7 @@ export const BIOME_BAMBOO_GROVE: BiomeConfig = {
   ],
 };
 
-export const BIOME_SWAMP: BiomeConfig = {
+const BIOME_SWAMP: BiomeConfig = {
   id: 'swamp',
   name: 'Swamp',
   groundTexture: 'swamp',
@@ -164,7 +164,7 @@ export const BIOME_SWAMP: BiomeConfig = {
   ],
 };
 
-export const BIOME_DEFOLIATED: BiomeConfig = {
+const BIOME_DEFOLIATED: BiomeConfig = {
   id: 'defoliated',
   name: 'Defoliated Zone',
   groundTexture: 'defoliated-ground',
@@ -176,7 +176,7 @@ export const BIOME_DEFOLIATED: BiomeConfig = {
 };
 
 /** All built-in biomes keyed by id for fast lookup. */
-export const BIOMES: Record<string, BiomeConfig> = {
+const BIOMES: Record<string, BiomeConfig> = {
   [BIOME_DENSE_JUNGLE.id]: BIOME_DENSE_JUNGLE,
   [BIOME_HIGHLAND.id]:     BIOME_HIGHLAND,
   [BIOME_RICE_PADDY.id]:   BIOME_RICE_PADDY,
@@ -196,20 +196,4 @@ export function getBiome(id: string): BiomeConfig {
     throw new Error(`Unknown biome id: ${id}`);
   }
   return biome;
-}
-
-/**
- * Serialisable biome subset sent to the chunk worker.
- * Only the vegetation palette is needed — ground texture is handled on the main thread.
- */
-export interface WorkerBiomeConfig {
-  id: string;
-  vegetationPalette: BiomeVegetationEntry[];
-}
-
-export function toWorkerBiomeConfig(biome: BiomeConfig): WorkerBiomeConfig {
-  return {
-    id: biome.id,
-    vegetationPalette: biome.vegetationPalette,
-  };
 }

@@ -9,7 +9,7 @@
 import { BaseTouchButton } from './BaseTouchButton';
 import styles from './TouchControls.module.css';
 
-export interface TouchMortarCallbacks {
+interface TouchMortarCallbacks {
   onDeploy: () => void;
   onUndeploy: () => void;
   onFire: () => void;

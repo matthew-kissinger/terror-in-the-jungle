@@ -1,6 +1,6 @@
 import { TerrainBudgetMetrics, type TerrainStreamMetric } from './TerrainBudgetMetrics';
 
-export interface TerrainStreamResult {
+interface TerrainStreamResult {
   workUnits: number;
   pendingUnits: number;
 }

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { MapFeatureDefinition, StaticModelPlacementConfig } from '../../config/gameModeTypes';
 import { AircraftModels, BuildingModels, GroundVehicleModels, StructureModels } from '../assets/modelPaths';
 
-export interface WorldFeaturePrefabDefinition {
+interface WorldFeaturePrefabDefinition {
   placements: StaticModelPlacementConfig[];
 }
 

@@ -40,42 +40,6 @@ export function tryConsumeRaycast(): boolean {
 }
 
 /**
- * Get the number of raycasts used this frame.
- */
-export function getRaycastsUsedThisFrame(): number {
-  return raycastsThisFrame;
-}
-
-/**
- * Get how many times the budget was exhausted this frame
- * (i.e., how many raycasts were denied).
- */
-export function getBudgetExhaustedCount(): number {
-  return budgetExhaustedCount;
-}
-
-/**
- * Get the total number of frames where budget was fully exhausted.
- */
-export function getTotalBudgetExhaustedFrames(): number {
-  return totalBudgetExhaustedFrames;
-}
-
-/**
- * Set the maximum raycasts allowed per frame.
- */
-export function setMaxRaycastsPerFrame(max: number): void {
-  maxRaycasts = max;
-}
-
-/**
- * Get the current max raycasts per frame setting.
- */
-export function getMaxRaycastsPerFrame(): number {
-  return maxRaycasts;
-}
-
-/**
  * Get profiling stats for the raycast budget system.
  */
 export function getRaycastBudgetStats(): {

@@ -5,7 +5,7 @@
 import { MIN_ZOOM, MAX_ZOOM } from './FullMapStyles';
 import { InputContextManager } from '../../systems/input/InputContextManager';
 
-export interface FullMapInputCallbacks {
+interface FullMapInputCallbacks {
   onShow: () => void;
   onHide: () => void;
   onRender: () => void;

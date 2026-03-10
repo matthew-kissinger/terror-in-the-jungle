@@ -5,7 +5,7 @@
  * Interface for a function that starts a synthesized sound
  * @returns duration of the sound in seconds
  */
-export type SynthesisStarter = (destination: AudioNode) => number;
+type SynthesisStarter = (destination: AudioNode) => number;
 
 /**
  * Procedural footstep audio synthesis

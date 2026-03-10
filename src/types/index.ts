@@ -23,19 +23,6 @@ export interface BillboardInstance {
   velocity?: THREE.Vector3;
 }
 
-export interface TerrainConfig {
-  size: number;
-  segments: number;
-  textureRepeat: number;
-}
-
-export interface WorldConfig {
-  terrainSize: number;
-  grassDensity: number;
-  treeDensity: number;
-  enemyCount: number;
-}
-
 export interface PlayerState {
   position: THREE.Vector3;
   velocity: THREE.Vector3;
@@ -51,37 +38,10 @@ export interface PlayerState {
   helicopterId: string | null;
 }
 
-export interface EnemyState {
-  id: string;
-  type: 'soldier';
-  position: THREE.Vector3;
-  velocity: THREE.Vector3;
-  wanderTarget: THREE.Vector3;
-  wanderTimer: number;
-  speed: number;
-}
-
 export interface GameSystem {
   init(): Promise<void>;
   update(deltaTime: number): void;
   dispose(): void;
-}
-
-export interface ChunkCoordinate {
-  x: number;
-  z: number;
-}
-
-export interface NoiseConfig {
-
-  seed: number;
-
-  octaves: number;
-
-  persistence: number;
-
-  scale: number;
-
 }
 
 

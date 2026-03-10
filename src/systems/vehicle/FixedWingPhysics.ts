@@ -16,9 +16,9 @@ const GRAVITY = 9.81;
 const GROUND_FRICTION = 0.3;
 const ROTATION_SPEED_FRACTION = 0.8; // fraction of stall speed for takeoff rotation
 
-export type FixedWingState = 'grounded' | 'airborne' | 'stalled';
+type FixedWingState = 'grounded' | 'airborne' | 'stalled';
 
-export interface FixedWingControls {
+interface FixedWingControls {
   throttle: number; // 0-1
   pitch: number; // -1 to 1 (pull up positive)
   roll: number; // -1 to 1 (right positive)

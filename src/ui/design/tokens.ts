@@ -94,43 +94,6 @@ export const zIndex = {
   squadRadial: 20000,
 } as const;
 
-export const spacing = {
-  xs: '4px',
-  sm: '8px',
-  md: '12px',
-  lg: '16px',
-  xl: '24px',
-  '2xl': '32px',
-  '3xl': '48px',
-  '4xl': '64px',
-} as const;
-
-export const fontSize = {
-  xs: 'clamp(0.625rem, 1.2vw, 0.75rem)',    // 10-12px
-  sm: 'clamp(0.6875rem, 1.4vw, 0.875rem)',  // 11-14px
-  base: 'clamp(0.75rem, 1.6vw, 1rem)',      // 12-16px
-  lg: 'clamp(0.875rem, 2vw, 1.125rem)',      // 14-18px
-  xl: 'clamp(1rem, 2.5vw, 1.375rem)',        // 16-22px
-  '2xl': 'clamp(1.25rem, 3vw, 1.75rem)',     // 20-28px
-  '3xl': 'clamp(1.5rem, 4vw, 2.5rem)',       // 24-40px
-} as const;
-
-export const touchTarget = {
-  minimum: '44px',
-  standard: '48px',
-  large: '64px',
-  xlarge: '80px',
-} as const;
-
-export const borderRadius = {
-  sm: '4px',
-  md: '8px',
-  lg: '12px',
-  xl: '20px',
-  pill: '50px',
-  circle: '50%',
-} as const;
-
 export const breakpoints = {
   phone: 480,
   tablet: 768,

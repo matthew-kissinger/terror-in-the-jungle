@@ -464,7 +464,7 @@ export interface TerrainBiomeMaterialConfig {
   rules: TerrainBiomeRuleConfig[];
 }
 
-export interface TerrainMaterialOptions {
+interface TerrainMaterialOptions {
   heightTexture: THREE.DataTexture;
   normalTexture: THREE.DataTexture;
   worldSize: number;

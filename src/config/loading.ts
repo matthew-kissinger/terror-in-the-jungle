@@ -1,10 +1,10 @@
-export interface LoadingPhaseConfig {
+interface LoadingPhaseConfig {
   id: string;
   weight: number;
   label: string;
 }
 
-export interface LoadingTipConfig {
+interface LoadingTipConfig {
   text: string;
   category: 'controls' | 'gameplay' | 'lore' | 'tips';
 }
@@ -33,5 +33,3 @@ export const LOADING_TIPS: LoadingTipConfig[] = [
   { text: "Control high ground for better visibility", category: 'tips' },
   { text: "Suppressive fire keeps enemies pinned", category: 'tips' }
 ];
-
-export const TIP_ROTATION_INTERVAL = 3000;

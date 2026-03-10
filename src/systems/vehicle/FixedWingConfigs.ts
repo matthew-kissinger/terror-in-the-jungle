@@ -16,7 +16,7 @@ export interface FixedWingPhysicsConfig {
   inputSmoothRate: number;
 }
 
-export interface FixedWingConfig {
+interface FixedWingConfig {
   physics: FixedWingPhysicsConfig;
   role: 'transport' | 'fighter' | 'attack';
 }
@@ -79,7 +79,3 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
     role: 'attack',
   },
 };
-
-export function getFixedWingConfig(aircraftKey: string): FixedWingConfig {
-  return FIXED_WING_CONFIGS[aircraftKey] ?? FIXED_WING_CONFIGS.A1_SKYRAIDER;
-}

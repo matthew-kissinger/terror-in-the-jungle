@@ -12,7 +12,7 @@ interface SaveEnvelope {
   state: WarState;
 }
 
-export interface SaveMetadata {
+interface SaveMetadata {
   slot: number;
   gameMode: string;
   elapsedTime: number;

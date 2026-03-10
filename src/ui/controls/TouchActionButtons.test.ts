@@ -15,17 +15,6 @@ function pointerDownEvent(opts: Partial<PointerEventInit> = {}): PointerEvent {
   });
 }
 
-function pointerUpEvent(opts: Partial<PointerEventInit> = {}): PointerEvent {
-  return new PointerEvent('pointerup', {
-    bubbles: true,
-    cancelable: true,
-    button: 0,
-    pointerId: 1,
-    pointerType: 'touch',
-    ...opts,
-  });
-}
-
 describe('TouchActionButtons', () => {
   let actions: TouchActionButtons;
   let container: HTMLDivElement;
@@ -86,8 +75,6 @@ describe('TouchActionButtons', () => {
       actions.setOnWeaponSelect(onWeaponSelect);
 
       const weaponCycler = buttons[0];
-      // Get the label element (middle child of cycler)
-      const label = weaponCycler.children[1] as HTMLElement;
 
       // Simulate swipe right on the label area (>40px)
       weaponCycler.dispatchEvent(new PointerEvent('pointerdown', {
@@ -147,13 +134,11 @@ describe('TouchActionButtons', () => {
 
       // First set up previous weapon by cycling once
       const weaponCycler = buttons[0];
-      const prevChevron = weaponCycler.children[0] as HTMLElement;
       const nextChevron = weaponCycler.children[2] as HTMLElement;
 
       // Cycle to next weapon via chevron to establish history
       nextChevron.dispatchEvent(pointerDownEvent());
       expect(onWeaponSelect).toHaveBeenCalledTimes(1);
-      const firstSlot = onWeaponSelect.mock.calls[0][0];
 
       onWeaponSelect.mockClear();
 

@@ -4,7 +4,6 @@ import { Logger } from '../../../utils/Logger';
 import { GPUBillboardVegetation, GPUVegetationConfig } from './BillboardBufferManager';
 import { VegetationTypeConfig } from '../../../config/vegetationTypes';
 
-export type { GPUVegetationConfig };
 
 export class GPUBillboardSystem {
   private vegetationTypes: Map<string, GPUBillboardVegetation> = new Map();

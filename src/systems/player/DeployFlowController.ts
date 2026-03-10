@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { DeploySessionKind, DeploySessionModel } from '../world/runtime/DeployFlowSession';
 
-export interface DeployFlowState {
+interface DeployFlowState {
   kind: DeploySessionKind | null;
   session: DeploySessionModel | null;
   selectedSpawnPoint: string | null;

@@ -71,21 +71,38 @@ function applyResolvedStamp(
       const dx = worldX - stamp.centerX;
       const dz = worldZ - stamp.centerZ;
       const distance = Math.sqrt(dx * dx + dz * dz);
-      if (distance >= stamp.outerRadius) {
+      if (distance >= stamp.gradeRadius) {
         return baseHeight;
       }
 
       const target = stamp.targetHeight + stamp.heightOffset;
-      if (distance <= stamp.innerRadius) {
-        return target;
+      const influence = getFlattenCircleInfluence(distance, stamp);
+      if (influence <= 0) {
+        return baseHeight;
       }
-
-      const blend = smoothstep(stamp.outerRadius, stamp.innerRadius, distance);
-      return baseHeight + (target - baseHeight) * blend;
+      return baseHeight + (target - baseHeight) * influence;
     }
     default:
       return baseHeight;
   }
+}
+
+function getFlattenCircleInfluence(distance: number, stamp: ResolvedTerrainStampConfig): number {
+  if (distance <= stamp.innerRadius) {
+    return 1;
+  }
+
+  const gradeStrength = stamp.gradeRadius > stamp.outerRadius ? clamp(stamp.gradeStrength, 0, 1) : 0;
+  if (distance <= stamp.outerRadius) {
+    const innerBlend = smoothstep(stamp.outerRadius, stamp.innerRadius, distance);
+    return gradeStrength + (1 - gradeStrength) * innerBlend;
+  }
+
+  if (gradeStrength <= 0) {
+    return 0;
+  }
+
+  return gradeStrength * smoothstep(stamp.gradeRadius, stamp.outerRadius, distance);
 }
 
 function sampleTargetHeight(

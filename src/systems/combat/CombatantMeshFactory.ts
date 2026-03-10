@@ -10,7 +10,7 @@ export type ViewDirection = 'front' | 'back' | 'side';
 /** Walk frame A/B textures per direction, keyed by "{faction}_{direction}". */
 export type WalkFrameMap = Map<string, { a: THREE.Texture; b: THREE.Texture }>;
 
-export interface CombatantMeshAssets {
+interface CombatantMeshAssets {
   factionMeshes: Map<string, THREE.InstancedMesh>;
   factionAuraMeshes: Map<string, THREE.InstancedMesh>;
   factionGroundMarkers: Map<string, THREE.InstancedMesh>;

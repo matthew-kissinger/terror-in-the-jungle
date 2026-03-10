@@ -93,7 +93,7 @@ export async function loadGameAssets(engine: GameEngine): Promise<void> {
  * Restarts the current match in-place (same mode). Resets tickets, combatants, player, day/night, weather.
  * Used by the Match End "Play Again" button.
  */
-export function restartMatch(engine: GameEngine): void {
+function restartMatch(engine: GameEngine): void {
   const mode = engine.systemManager.gameModeManager.getCurrentMode();
   Logger.info('engine-init', `Restarting match with mode: ${mode}`);
   engine.systemManager.setGameMode(mode, { createPlayerSquad: true });

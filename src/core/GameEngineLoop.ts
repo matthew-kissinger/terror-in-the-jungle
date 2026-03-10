@@ -140,7 +140,7 @@ function showFrameLoopError(engine: GameEngine, error: unknown): void {
 /**
  * Updates runtime metrics
  */
-export function updateRuntimeMetrics(engine: GameEngine, deltaTime: number): void {
+function updateRuntimeMetrics(engine: GameEngine, deltaTime: number): void {
   engine.runtimeMetrics.updateFrame(deltaTime);
 
   const combatSystem = engine.systemManager.combatantSystem;
@@ -158,7 +158,7 @@ export function updateRuntimeMetrics(engine: GameEngine, deltaTime: number): voi
 /**
  * Updates the real-time performance overlay data
  */
-export function updatePerformanceOverlay(engine: GameEngine, deltaTime: number): void {
+function updatePerformanceOverlay(engine: GameEngine, deltaTime: number): void {
   if (!engine.performanceOverlay.isVisible()) return;
 
   const perfStats = engine.renderer.getPerformanceStats();
@@ -230,7 +230,7 @@ export function updatePerformanceOverlay(engine: GameEngine, deltaTime: number):
 /**
  * Updates the log overlay with recent log entries
  */
-export function updateLogOverlay(engine: GameEngine): void {
+function updateLogOverlay(engine: GameEngine): void {
   if (!engine.logOverlay.isVisible()) return;
 
   const recent = Logger.getRecent(12);

@@ -21,7 +21,7 @@ export interface ModelPlacementProfile {
   displayScale?: number;
 }
 
-export const DEFAULT_MODEL_PLACEMENT_PROFILE: ModelPlacementProfile = {
+const DEFAULT_MODEL_PLACEMENT_PROFILE: ModelPlacementProfile = {
   groundingMode: 'bounds_center_bottom',
   normalizeBy: 'none',
   collisionMode: 'none',

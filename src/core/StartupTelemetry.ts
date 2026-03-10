@@ -1,4 +1,4 @@
-export interface StartupMark {
+interface StartupMark {
   name: string;
   atMs: number;
   sinceStartMs: number;
@@ -51,4 +51,3 @@ export function resetStartupTelemetry(): void {
 export function markStartup(name: string): void {
   telemetry.mark(name);
 }
-

@@ -1,11 +1,11 @@
-export type SimulationGroupId =
+type SimulationGroupId =
   | 'tactical_ui'
   | 'war_sim'
   | 'air_support'
   | 'world_state'
   | 'ashau_assist';
 
-export interface SimulationGroupConfig {
+interface SimulationGroupConfig {
   id: SimulationGroupId;
   intervalSeconds: number;
 }

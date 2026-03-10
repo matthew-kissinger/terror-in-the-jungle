@@ -12,7 +12,8 @@ import '@fontsource-variable/jetbrains-mono/wght.css';
 import './ui/engine/theme.css';
 
 import { bootstrapGame } from './core/bootstrap';
+import { Logger } from './utils/Logger';
 
 bootstrapGame().catch((err) => {
-  console.error('[bootstrap]', err);
+  Logger.error('bootstrap', 'Bootstrap entry failed', err);
 });

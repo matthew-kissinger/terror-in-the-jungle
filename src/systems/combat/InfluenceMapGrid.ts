@@ -15,7 +15,7 @@ export interface InfluenceCell {
 /**
  * Grid bounds helper result
  */
-export interface GridBounds {
+interface GridBounds {
   minX: number;
   maxX: number;
   minZ: number;

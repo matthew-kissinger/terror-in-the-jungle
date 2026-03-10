@@ -23,7 +23,7 @@ import { TouchMortarButton } from './TouchMortarButton';
 import { TouchHelicopterCyclic } from './TouchHelicopterCyclic';
 import type { HUDLayout } from '../layout/HUDLayout';
 
-export interface TouchControlCallbacks {
+interface TouchControlCallbacks {
   onFireStart: () => void;
   onFireStop: () => void;
   onJump: () => void;

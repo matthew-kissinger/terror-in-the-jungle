@@ -37,7 +37,7 @@ export interface LoadoutOptionPool {
   presetTemplates: LoadoutPresetTemplate[];
 }
 
-export interface LoadoutFieldOption<TValue extends string> {
+interface LoadoutFieldOption<TValue extends string> {
   value: TValue;
   label: string;
   shortLabel: string;
@@ -48,16 +48,7 @@ export type LoadoutFieldKey =
   | 'secondaryWeapon'
   | 'equipment';
 
-export const LOADOUT_WEAPON_ORDER: LoadoutWeapon[] = [
-  LoadoutWeapon.RIFLE,
-  LoadoutWeapon.SHOTGUN,
-  LoadoutWeapon.SMG,
-  LoadoutWeapon.PISTOL,
-  LoadoutWeapon.LMG,
-  LoadoutWeapon.LAUNCHER,
-];
-
-export const LOADOUT_WEAPON_OPTIONS: ReadonlyArray<LoadoutFieldOption<LoadoutWeapon>> = [
+const LOADOUT_WEAPON_OPTIONS: ReadonlyArray<LoadoutFieldOption<LoadoutWeapon>> = [
   { value: LoadoutWeapon.RIFLE, label: 'Rifle', shortLabel: 'AR' },
   { value: LoadoutWeapon.SHOTGUN, label: 'Shotgun', shortLabel: 'SG' },
   { value: LoadoutWeapon.SMG, label: 'SMG', shortLabel: 'SMG' },
@@ -66,15 +57,7 @@ export const LOADOUT_WEAPON_OPTIONS: ReadonlyArray<LoadoutFieldOption<LoadoutWea
   { value: LoadoutWeapon.LAUNCHER, label: 'Grenade Launcher', shortLabel: 'GL' },
 ];
 
-export const LOADOUT_EQUIPMENT_ORDER: LoadoutEquipment[] = [
-  LoadoutEquipment.FRAG_GRENADE,
-  LoadoutEquipment.SMOKE_GRENADE,
-  LoadoutEquipment.FLASHBANG,
-  LoadoutEquipment.SANDBAG_KIT,
-  LoadoutEquipment.MORTAR_KIT,
-];
-
-export const LOADOUT_EQUIPMENT_OPTIONS: ReadonlyArray<LoadoutFieldOption<LoadoutEquipment>> = [
+const LOADOUT_EQUIPMENT_OPTIONS: ReadonlyArray<LoadoutFieldOption<LoadoutEquipment>> = [
   { value: LoadoutEquipment.FRAG_GRENADE, label: 'Frag Grenade', shortLabel: 'FRG' },
   { value: LoadoutEquipment.SMOKE_GRENADE, label: 'Smoke Grenade', shortLabel: 'SMK' },
   { value: LoadoutEquipment.FLASHBANG, label: 'Flashbang', shortLabel: 'FLS' },

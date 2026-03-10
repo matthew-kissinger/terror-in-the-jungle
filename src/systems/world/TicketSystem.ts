@@ -6,8 +6,6 @@ import { TicketSystemPhases, GamePhase } from './TicketSystemPhases';
 import { TicketBleedCalculator, TicketBleedRate } from './TicketBleedCalculator';
 import { VictoryConditions, VictoryReason } from './VictoryConditions';
 
-export type { TicketBleedRate } from './TicketBleedCalculator';
-
 export interface GameState {
   gameActive: boolean;
   winner?: Faction;

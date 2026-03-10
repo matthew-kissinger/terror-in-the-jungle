@@ -23,7 +23,7 @@ function roundUpToPowerOfTwo(value: number): number {
   return result;
 }
 
-export function computeTerrainSurfaceGridSize(worldSize: number): number {
+function computeTerrainSurfaceGridSize(worldSize: number): number {
   const targetMetersPerSample =
     worldSize >= 16384 ? 48 :
     worldSize >= 8192 ? 32 :

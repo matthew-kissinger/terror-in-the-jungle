@@ -5,6 +5,7 @@ import { markStartup, resetStartupTelemetry } from './StartupTelemetry';
 import { AgentTier } from '../systems/strategy/types';
 import { isBlufor, isOpfor } from '../systems/combat/types';
 import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
+import { Logger } from '../utils/Logger';
 
 const ashauSessionTelemetry = {
   sessionStartEpochMs: Date.now(),
@@ -100,7 +101,7 @@ export async function bootstrapGame(): Promise<void> {
       });
     }
   } catch (error) {
-    console.error('Bootstrap failed:', error);
+    Logger.error('bootstrap', 'Bootstrap failed', error);
     const message = error instanceof Error ? error.message : String(error);
     showFatalError(message);
   }

@@ -35,7 +35,7 @@ export interface AircraftWeaponMount {
   tracerInterval?: number;   // emit tracer every N rounds
 }
 
-export interface AircraftConfig {
+interface AircraftConfig {
   physics: AircraftPhysicsConfig;
   seats: number;
   role: AircraftRole;

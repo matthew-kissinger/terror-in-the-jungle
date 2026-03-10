@@ -190,34 +190,3 @@ export const VEGETATION_TYPES: VegetationTypeConfig[] = [
   },
 ];
 
-/** Lookup helper — returns undefined if id is unknown. */
-export function getVegetationType(id: string): VegetationTypeConfig | undefined {
-  return VEGETATION_TYPES.find(v => v.id === id);
-}
-
-/**
- * Serialisable subset sent to the chunk worker via postMessage.
- * Mirrors VegetationTypeConfig but drops the textureName (workers don't load textures).
- */
-export interface WorkerVegetationTypeConfig {
-  id: string;
-  yOffset: number;
-  baseDensity: number;
-  placement: 'random' | 'poisson';
-  poissonMinDistance?: number;
-  tier: 'groundCover' | 'midLevel' | 'canopy';
-}
-
-/** Strip texture/GPU fields for worker transport. */
-export function toWorkerVegetationConfigs(
-  types: VegetationTypeConfig[],
-): WorkerVegetationTypeConfig[] {
-  return types.map(t => ({
-    id: t.id,
-    yOffset: t.yOffset,
-    baseDensity: t.baseDensity,
-    placement: t.placement,
-    poissonMinDistance: t.poissonMinDistance,
-    tier: t.tier,
-  }));
-}

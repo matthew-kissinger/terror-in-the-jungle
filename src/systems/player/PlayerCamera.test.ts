@@ -319,8 +319,6 @@ describe('PlayerCamera', () => {
     });
 
     it('should clamp pitch to +/- 0.4*PI', () => {
-      const maxPitch = Math.PI * 0.4;
-
       // Try to pitch down beyond limit
       mockInput.getMouseMovement = vi.fn(() => ({ x: 0, y: -100 }));
       playerCamera.updateCamera(mockInput);
@@ -437,8 +435,6 @@ describe('PlayerCamera', () => {
 
   describe('applyRecoil', () => {
     it('should add pitch delta (clamped to maxPitch)', () => {
-      const maxPitch = Math.PI / 2 - 0.1;
-
       playerCamera.applyRecoil(0.1, 0);
       playerCamera.updateCamera(mockInput);
 

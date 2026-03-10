@@ -4,6 +4,11 @@ import { Faction, Alliance } from './types';
 import { ZoneManager, ZoneState, CaptureZone } from '../world/ZoneManager';
 import { GameModeConfig } from '../../config/gameModeTypes';
 import * as THREE from 'three';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
+
+const mockHeightQueryCache = {
+  getSlopeAt: vi.fn().mockReturnValue(0),
+};
 
 vi.mock('three', () => ({
   Vector3: class {
@@ -20,6 +25,9 @@ vi.mock('three', () => ({
 }));
 
 vi.mock('../../utils/Logger', () => ({ Logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
+vi.mock('../terrain/HeightQueryCache', () => ({
+  getHeightQueryCache: vi.fn(() => mockHeightQueryCache),
+}));
 
 function createMockZone(id: string, owner: Faction | null, position: THREE.Vector3, isHomeBase = false, state = ZoneState.NEUTRAL): CaptureZone {
   return {
@@ -44,9 +52,28 @@ function createMockZoneManager(zones: CaptureZone[]): ZoneManager {
   } as unknown as ZoneManager;
 }
 
+function createMockTerrainSystem(heightAt: (x: number, z: number) => number): ITerrainRuntime {
+  return {
+    getHeightAt: vi.fn(heightAt),
+    getEffectiveHeightAt: vi.fn(heightAt),
+    getPlayableWorldSize: vi.fn(() => 1000),
+    getWorldSize: vi.fn(() => 1000),
+    isTerrainReady: vi.fn(() => true),
+    isAreaReadyAt: vi.fn(() => true),
+    hasTerrainAt: vi.fn(() => true),
+    getActiveTerrainTileCount: vi.fn(() => 1),
+    setSurfaceWetness: vi.fn(),
+    updatePlayerPosition: vi.fn(),
+    registerCollisionObject: vi.fn(),
+    unregisterCollisionObject: vi.fn(),
+    raycastTerrain: vi.fn(() => ({ hit: false })),
+  } as unknown as ITerrainRuntime;
+}
+
 describe('SpawnPositionCalculator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockHeightQueryCache.getSlopeAt.mockReturnValue(0);
   });
 
   describe('getBasePositions', () => {
@@ -576,6 +603,40 @@ describe('SpawnPositionCalculator', () => {
       const length = result.length();
       expect(length).toBeGreaterThanOrEqual(1000);
       expect(length).toBeLessThanOrEqual(2000);
+    });
+  });
+
+  describe('findSafeSpawnPositionNearAnchor', () => {
+    it('avoids steep cliff candidates when terrain is available', () => {
+      const terrainSystem = createMockTerrainSystem((x, z) => {
+        if (x > 12 && z > -5 && z < 5) {
+          return 40;
+        }
+        return 0;
+      });
+      mockHeightQueryCache.getSlopeAt.mockImplementation((x: number, z: number) => (
+        x > 12 && z > -5 && z < 5 ? 0.7 : 0.05
+      ));
+
+      const randomSpy = vi.spyOn(Math, 'random');
+      randomSpy
+        .mockReturnValueOnce(0.95) // fallback radius
+        .mockReturnValueOnce(0.0)  // fallback angle
+        .mockReturnValueOnce(0.95) // candidate 1 radius
+        .mockReturnValueOnce(0.0)  // candidate 1 angle -> cliff
+        .mockReturnValueOnce(0.3)  // candidate 2 radius
+        .mockReturnValueOnce(0.5); // candidate 2 angle -> safe left side
+
+      const result = SpawnPositionCalculator.findSafeSpawnPositionNearAnchor(
+        new THREE.Vector3(0, 0, 0),
+        10,
+        20,
+        terrainSystem,
+      );
+
+      expect(result.x > 12 && result.z > -5 && result.z < 5).toBe(false);
+      expect(result.y).toBe(0);
+      randomSpy.mockRestore();
     });
   });
 });

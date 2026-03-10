@@ -100,7 +100,3 @@ export const FIREBASE_TEMPLATES: Record<string, FirebaseTemplate> = {
     ],
   },
 };
-
-export function getFirebaseTemplate(templateId: string): FirebaseTemplate | undefined {
-  return FIREBASE_TEMPLATES[templateId];
-}

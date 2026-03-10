@@ -33,7 +33,7 @@ type StartupPlayerRuntimeRefs = Pick<
   | 'zoneManager'
 >;
 
-export interface StartupPlayerRuntimeGroups {
+interface StartupPlayerRuntimeGroups {
   playerRuntime: Pick<
     StartupPlayerRuntimeRefs,
     | 'audioManager'
@@ -94,7 +94,7 @@ export interface StartupPlayerRuntimeGroups {
   >;
 }
 
-export interface StartupPlayerRuntimeOptions {
+interface StartupPlayerRuntimeOptions {
   camera: THREE.PerspectiveCamera;
   renderer?: IGameRenderer;
 }

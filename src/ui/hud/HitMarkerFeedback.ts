@@ -4,7 +4,7 @@
 
 import { zIndex } from '../design/tokens';
 
-export type HitMarkerType = 'hit' | 'headshot' | 'kill';
+type HitMarkerType = 'hit' | 'headshot' | 'kill';
 
 export class HitMarkerFeedback {
   private container: HTMLDivElement;

@@ -16,6 +16,10 @@ const DEFAULT_HELIPAD_FLAT_RADIUS = 8;
 const DEFAULT_HELIPAD_BLEND_RADIUS = 13;
 const DEFAULT_HELIPAD_SURFACE_OUTER_RADIUS = 12.5;
 const DEFAULT_HELIPAD_EXCLUSION_RADIUS = 13;
+const DEFAULT_FIREBASE_GRADE_STRENGTH = 0.35;
+const DEFAULT_VILLAGE_GRADE_STRENGTH = 0.2;
+const DEFAULT_AIRFIELD_GRADE_STRENGTH = 0.25;
+const DEFAULT_ROAD_GRADE_STRENGTH = 0.18;
 
 export function compileTerrainFeatures(config: GameModeConfig): CompiledTerrainFeatureSet {
   const features = config.features ?? [];
@@ -60,6 +64,8 @@ function compileTerrainStamp(feature: MapFeatureDefinition): TerrainStampConfig 
 
   const innerRadius = terrain.flatRadius ?? Math.min(circle.radius, defaultFlatRadiusForFeature(feature));
   const outerRadius = Math.max(innerRadius, terrain.blendRadius ?? Math.max(circle.radius, defaultBlendRadiusForFeature(feature)));
+  const gradeRadius = resolveGradeRadius(feature, circle.radius, outerRadius);
+  const gradeStrength = resolveGradeStrength(feature, terrain.gradeStrength, gradeRadius, outerRadius);
   const samplingRadius = terrain.samplingRadius ?? innerRadius;
 
   return {
@@ -68,6 +74,8 @@ function compileTerrainStamp(feature: MapFeatureDefinition): TerrainStampConfig 
     centerZ: feature.position.z,
     innerRadius,
     outerRadius,
+    gradeRadius,
+    gradeStrength,
     samplingRadius,
     targetHeightMode: terrain.targetHeightMode ?? 'max',
     heightOffset: terrain.heightOffset ?? 0,
@@ -160,6 +168,56 @@ function defaultBlendRadiusForFeature(feature: MapFeatureDefinition): number {
   }
 }
 
+function resolveGradeRadius(feature: MapFeatureDefinition, footprintRadius: number, outerRadius: number): number {
+  const authored = feature.terrain?.gradeRadius;
+  if (typeof authored === 'number') {
+    return Math.max(outerRadius, authored);
+  }
+
+  switch (feature.kind) {
+    case 'firebase':
+      return Math.max(outerRadius + footprintRadius * 1.35, footprintRadius * 3.4);
+    case 'village':
+      return Math.max(outerRadius + footprintRadius, footprintRadius * 2.4);
+    case 'airfield':
+      return Math.max(outerRadius + footprintRadius * 1.1, footprintRadius * 2.6);
+    case 'road':
+      return Math.max(outerRadius + footprintRadius * 0.75, footprintRadius * 2);
+    case 'helipad':
+    default:
+      return outerRadius;
+  }
+}
+
+function resolveGradeStrength(
+  feature: MapFeatureDefinition,
+  authoredStrength: number | undefined,
+  gradeRadius: number,
+  outerRadius: number,
+): number {
+  if (gradeRadius <= outerRadius) {
+    return 0;
+  }
+
+  if (typeof authoredStrength === 'number') {
+    return clamp(authoredStrength, 0, 1);
+  }
+
+  switch (feature.kind) {
+    case 'firebase':
+      return DEFAULT_FIREBASE_GRADE_STRENGTH;
+    case 'village':
+      return DEFAULT_VILLAGE_GRADE_STRENGTH;
+    case 'airfield':
+      return DEFAULT_AIRFIELD_GRADE_STRENGTH;
+    case 'road':
+      return DEFAULT_ROAD_GRADE_STRENGTH;
+    case 'helipad':
+    default:
+      return 0;
+  }
+}
+
 function defaultSurfaceOuterRadiusForFeature(feature: MapFeatureDefinition): number {
   switch (feature.kind) {
     case 'helipad':
@@ -193,4 +251,8 @@ function defaultPriorityForFeature(feature: MapFeatureDefinition): number {
     default:
       return 100;
   }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
 }

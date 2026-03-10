@@ -8,7 +8,7 @@ import {
 import { CommandTacticalMap, type CommandTacticalMapRenderState } from './CommandTacticalMap';
 import * as THREE from 'three';
 
-export interface CommandModeOverlayState {
+interface CommandModeOverlayState {
   hasSquad: boolean;
   currentCommand: SquadCommand;
   memberCount: number;

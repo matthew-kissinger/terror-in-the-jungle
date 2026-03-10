@@ -5,7 +5,7 @@ import type { AirfieldTemplate, AirfieldStructureEntry } from './AirfieldTemplat
 
 const MIN_SPACING = 6;
 
-export interface AirfieldLayout {
+interface AirfieldLayout {
   placements: StaticModelPlacementConfig[];
   surfacePatches: RectTerrainSurfacePatch[];
 }

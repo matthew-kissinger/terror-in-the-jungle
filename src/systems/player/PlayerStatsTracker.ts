@@ -1,6 +1,6 @@
 import { Logger } from '../../utils/Logger';
 
-export interface PlayerStats {
+interface PlayerStats {
   kills: number;
   deaths: number;
   zonesCaptured: number;

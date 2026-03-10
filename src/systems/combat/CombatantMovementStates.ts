@@ -47,7 +47,7 @@ const STRAFE_AMPLITUDE = 0.5;
 
 const _moveVec = new THREE.Vector3();
 const _moveVec2 = new THREE.Vector3();
-export interface PatrolMovementDependencies {
+interface PatrolMovementDependencies {
   zoneManager?: ZoneManager;
   getEnemyBasePosition: (faction: Faction) => THREE.Vector3;
 }

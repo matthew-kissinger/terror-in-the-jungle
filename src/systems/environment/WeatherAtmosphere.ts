@@ -1,7 +1,7 @@
 import { WeatherState } from '../../config/gameModeTypes';
 import { IGameRenderer } from '../../types/SystemInterfaces';
 
-export interface WeatherParams {
+interface WeatherParams {
   fogDensity: number;
   ambientIntensity: number;
   moonIntensity: number;
@@ -69,7 +69,7 @@ export function updateAtmosphere(
   }
 }
 
-export function getWeatherParams(
+function getWeatherParams(
   state: WeatherState,
   baseValues: AtmosphereBaseValues
 ): WeatherParams {
@@ -122,7 +122,7 @@ export function getBlendedRainIntensity(
   return current * (1 - transitionProgress) + target * transitionProgress;
 }
 
-export function getRainIntensity(state: WeatherState): number {
+function getRainIntensity(state: WeatherState): number {
   switch (state) {
     case WeatherState.CLEAR: return 0.0;
     case WeatherState.LIGHT_RAIN: return 0.3;

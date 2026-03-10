@@ -9,12 +9,12 @@ const DEPLOY_COOLDOWN_S = 30; // seconds between deploys per helicopter
 const DEPLOY_OFFSET_DISTANCE = 3; // meters from helicopter center
 const DEPLOY_POSITIONS_COUNT = 4;
 
-export interface DeployCheck {
+interface DeployCheck {
   canDeploy: boolean;
   reason?: string;
 }
 
-export interface DeployResult {
+interface DeployResult {
   success: boolean;
   positions: THREE.Vector3[];
   reason?: string;

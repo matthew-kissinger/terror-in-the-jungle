@@ -6,23 +6,10 @@ import { Logger } from '../../utils/Logger'
 import { isPerfDiagnosticsEnabled } from '../../core/PerfDiagnostics'
 import {
   SystemTiming,
-  FrameData,
   SpatialGridTelemetry,
   TelemetryReport,
   TerrainMergerTelemetry
 } from './PerformanceTypes'
-
-// Re-export types for convenience
-export type {
-  SystemTiming,
-  FrameData,
-  SpatialGridTelemetry,
-  TelemetryReport,
-  GPUTelemetry,
-  BenchmarkResult,
-  BenchmarkDependencies,
-  TerrainMergerTelemetry
-}
 
 export class PerformanceTelemetry {
   private static instance: PerformanceTelemetry | null = null

@@ -28,10 +28,6 @@ export function isAlly(a: Faction, b: Faction): boolean {
   return FACTION_ALLIANCE[a] === FACTION_ALLIANCE[b];
 }
 
-export function isEnemy(a: Faction, b: Faction): boolean {
-  return FACTION_ALLIANCE[a] !== FACTION_ALLIANCE[b];
-}
-
 export function isBlufor(faction: Faction): boolean {
   return FACTION_ALLIANCE[faction] === Alliance.BLUFOR;
 }

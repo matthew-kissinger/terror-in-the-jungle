@@ -5,8 +5,6 @@ import { CombatantMeshFactory, disposeCombatantMeshes, updateCombatantTexture, t
 import { CombatantShaderSettingsManager, setDamageFlash, updateShaderUniforms, type NPCShaderSettings, type ShaderPreset, type ShaderUniformSettings } from './CombatantShaders';
 import { Logger } from '../../utils/Logger';
 
-export type { NPCShaderSettings, ShaderPreset } from './CombatantShaders';
-
 /** Walk animation interval in seconds. */
 const WALK_FRAME_INTERVAL = 0.4;
 

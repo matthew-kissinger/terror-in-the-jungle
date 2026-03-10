@@ -14,7 +14,7 @@ import { PersistenceSystem } from '../systems/strategy/PersistenceSystem';
 import type { GameEngine } from './GameEngine';
 import { markStartup } from './StartupTelemetry';
 
-export interface PreparedModeStartup {
+interface PreparedModeStartup {
   mode: GameMode;
   launchSelection: GameLaunchSelection;
   definition: GameModeDefinition;
@@ -203,6 +203,9 @@ export function normalizeLaunchSelection(
   };
 }
 
+/**
+ * @lintignore Lazy-loaded by the startup pipeline; Knip does not resolve this dynamic import path.
+ */
 export async function prepareModeStartup(
   engine: GameEngine,
   launchSelection: GameLaunchSelection

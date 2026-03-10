@@ -45,14 +45,14 @@ export const enum GamepadButton {
 }
 
 // Standard Gamepad axis indices
-export const enum GamepadAxis {
+const enum GamepadAxis {
   LEFT_X = 0,
   LEFT_Y = 1,
   RIGHT_X = 2,
   RIGHT_Y = 3,
 }
 
-export interface GamepadCallbacks {
+interface GamepadCallbacks {
   onJump?: () => void;
   onReload?: () => void;
   onInteract?: () => void;

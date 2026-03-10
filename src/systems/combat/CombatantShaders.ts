@@ -16,14 +16,14 @@ export interface ShaderUniformSettings {
   auraIntensity: number;
 }
 
-export const defaultShaderUniformSettings: ShaderUniformSettings = {
+const defaultShaderUniformSettings: ShaderUniformSettings = {
   celShadingEnabled: 1.0,
   rimLightingEnabled: 1.0,
   auraEnabled: 1.0,
   auraIntensity: 0.5
 };
 
-export const shaderPresets: Record<ShaderPreset, NPCShaderSettings> = {
+const shaderPresets: Record<ShaderPreset, NPCShaderSettings> = {
   default: {
     celShadingEnabled: true,
     rimLightingEnabled: true,
@@ -56,7 +56,7 @@ export const shaderPresets: Record<ShaderPreset, NPCShaderSettings> = {
   }
 };
 
-export const presetToUniformSettings = (settings: NPCShaderSettings): ShaderUniformSettings => ({
+const presetToUniformSettings = (settings: NPCShaderSettings): ShaderUniformSettings => ({
   celShadingEnabled: settings.celShadingEnabled ? 1.0 : 0.0,
   rimLightingEnabled: settings.rimLightingEnabled ? 1.0 : 0.0,
   auraEnabled: settings.auraEnabled ? 1.0 : 0.0,
@@ -157,7 +157,7 @@ export const createOutlineMaterial = (
   });
 };
 
-export const getOutlineVertexShader = (): string => {
+function getOutlineVertexShader(): string {
   return `
       varying vec2 vUv;
 
@@ -169,9 +169,9 @@ export const getOutlineVertexShader = (): string => {
         gl_Position = projectionMatrix * modelViewMatrix * worldPos;
       }
     `;
-};
+}
 
-export const getOutlineFragmentShader = (): string => {
+function getOutlineFragmentShader(): string {
   return `
       uniform sampler2D map;
       uniform vec3 outlineColor;
@@ -196,86 +196,4 @@ export const getOutlineFragmentShader = (): string => {
         gl_FragColor = vec4(outlineColor * brightness, texColor.a);
       }
     `;
-};
-
-export const getNPCFragmentShader = (): string => {
-  return `
-      uniform sampler2D map;
-      uniform float faction;
-      uniform float combatState;
-      uniform float time;
-      uniform float damaged;
-      uniform float celShadingEnabled;
-      uniform float rimLightingEnabled;
-      uniform float auraEnabled;
-      uniform float auraIntensity;
-      uniform vec3 ambientLight;
-      uniform vec3 sunDirection;
-
-      varying vec2 vUv;
-      varying vec3 vWorldPosition;
-      varying vec3 vNormal;
-      varying vec3 vViewDirection;
-
-      vec3 applyCelShading(vec3 color) {
-        float NdotL = dot(normalize(vNormal), normalize(sunDirection));
-        float lightIntensity = NdotL * 0.5 + 0.5;
-        float celBands = 3.0;
-        lightIntensity = floor(lightIntensity * celBands) / celBands;
-        vec3 shadedColor = color * (0.4 + lightIntensity * 0.6);
-        return shadedColor;
-      }
-
-      float calculateRimLight() {
-        float rim = 1.0 - max(0.0, dot(vViewDirection, vNormal));
-        rim = pow(rim, 2.0);
-        return rim;
-      }
-
-      vec3 getFactionColor() {
-        return mix(vec3(0.2, 0.4, 1.0), vec3(1.0, 0.2, 0.2), faction);
-      }
-
-      void main() {
-        vec4 texColor = texture2D(map, vUv);
-        if (texColor.a < 0.5) discard;
-
-        vec3 finalColor = texColor.rgb;
-
-        if (celShadingEnabled > 0.5) {
-          finalColor = applyCelShading(finalColor);
-        }
-
-        if (auraEnabled > 0.5) {
-          vec3 factionColor = getFactionColor();
-          float edgeAlpha = 1.0 - smoothstep(0.5, 0.9, texColor.a);
-          float pulse = 1.0 + sin(time * 3.0 + vWorldPosition.x * 0.1) * 0.3 * combatState;
-          float auraStrength = auraIntensity * (0.3 + combatState * 0.4) * pulse;
-          finalColor = mix(finalColor, finalColor + factionColor * 0.5, edgeAlpha * auraStrength);
-        }
-
-        if (rimLightingEnabled > 0.5) {
-          float rim = calculateRimLight();
-          vec3 rimColor = getFactionColor();
-          float rimIntensity = 0.3 + combatState * 0.4;
-          finalColor += rimColor * rim * rimIntensity;
-        }
-
-        if (damaged > 0.0) {
-          vec3 flashColor = vec3(1.0, 0.8, 0.8);
-          finalColor = mix(finalColor, flashColor, damaged * 0.7);
-        }
-
-        if (combatState > 0.0) {
-          vec3 combatTint = getFactionColor() * 0.15;
-          finalColor = mix(finalColor, finalColor + combatTint, combatState);
-        }
-
-        // Keep combatants readable at mid/far ranges in jungle lighting.
-        finalColor = finalColor * 1.18 + vec3(0.045);
-        finalColor = clamp(finalColor, 0.0, 1.0);
-
-        gl_FragColor = vec4(finalColor, texColor.a);
-      }
-    `;
-};
+}

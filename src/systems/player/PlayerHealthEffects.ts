@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Logger } from '../../utils/Logger';
 
-export interface DamageIndicator {
+interface DamageIndicator {
   direction: number;
   intensity: number;
   timestamp: number;

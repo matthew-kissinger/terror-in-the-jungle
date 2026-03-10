@@ -9,7 +9,7 @@ import {
 } from './OpenFrontierRespawnMapUtils';
 import type { RespawnSpawnPoint } from '../../systems/player/RespawnSpawnPoint';
 
-export interface RenderState {
+interface RenderState {
   zoomLevel: number;
   panOffset: { x: number; y: number };
   selectedSpawnPointId?: string;

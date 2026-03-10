@@ -1,6 +1,6 @@
 import type { GameLaunchSelection, GameMode } from '../config/gameModeTypes';
 
-export type StartupPhase =
+type StartupPhase =
   | 'booting'
   | 'menu_ready'
   | 'mode_preparing'
@@ -9,7 +9,7 @@ export type StartupPhase =
   | 'live'
   | 'startup_error';
 
-export interface StartupState {
+interface StartupState {
   phase: StartupPhase;
   mode: GameMode | null;
   selection: GameLaunchSelection | null;

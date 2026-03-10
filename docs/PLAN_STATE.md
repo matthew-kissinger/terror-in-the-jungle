@@ -39,9 +39,13 @@
 - [x] 3.6 Reduce `SystemConnector` setter wiring for startup/player/deploy path (`StartupPlayerRuntimeComposer`)
 - [x] 3.7 Reduce `SystemConnector` setter wiring for strategy/vehicle/air-support path (`OperationalRuntimeComposer`)
 - [x] 3.8 Reduce `SystemConnector` setter wiring for combat/world/game-mode/environment path (`GameplayRuntimeComposer`)
+- [x] 3.12 Delete dead file-level code flagged by `knip` (18 unused files removed; unused `@recast-navigation/wasm` dependency removed)
+- [x] 3.13 Terrain feature grading now supports authored shoulders (`gradeRadius` / `gradeStrength`) instead of only flat-core + hard blend rings
+- [x] 3.14 Spawn/nav reliability pass: terrain-aware spawn scoring now covers squad staging, reinforcements, and respawns
+- [x] 3.15 Cleanup pass complete: `eslint`, `knip`, tests, build, and production smoke all pass cleanly
 - [ ] 3.4 Combat AI p99 still ~35ms (target <16ms) - remaining synchronous cover search cost
 - [ ] 3.5 Terrain contract cleanup: remove stale chunk-era config names, debug labels
-- [ ] 3.9 Reduce initial JS bundle surface without reintroducing fragile chunking (partial: mode-start pipeline now deferred; main runtime `730.27kB -> 722.03kB`)
+- [ ] 3.9 Reduce initial JS bundle surface without reintroducing fragile chunking (partial: mode-start pipeline is deferred, but current build still emits `710-727kB` main runtime chunks)
 - [ ] 3.10 Decide whether remaining connector bursts should become constructor/runtime dependency objects or stay grouped setters
 - [x] 3.11 Zone Control firebase pass: widen base layout, soften home-base terrain grading, spread firebase towers, and add terrain-safe squad anchoring to stop cliff-edge starts
 
@@ -70,15 +74,16 @@
 
 | Metric | Value |
 |--------|-------|
-| Source files | 546 TS/TSX under `src/` |
+| Source files | 539 TS/TSX under `src/` |
 | Test files | 167 |
-| Tests passing | 3,463 |
+| Tests passing | 3,470 |
 | Type errors | 0 |
 | Lint errors | 0 |
-| Lint warnings | 16 |
+| Lint warnings | 0 |
+| Dead-code scan | Passing (`npm run deadcode`) |
 | TODO/FIXME in source | 1 |
-| Runtime deps | 4 (three, signals, three-mesh-bvh, @recast-navigation) |
-| GLB models | 73 on disk, 73 referenced |
+| Runtime deps | 8 (`three`, `signals`, `three-mesh-bvh`, `@recast-navigation/*`, 3 font packages) |
+| GLB models | 75 on disk |
 | Audio files | 31 on disk, 31 wired, 0 orphaned |
 | DEM maps | 10 processed, 1 wired (A Shau) |
 | Built-app smoke | Passing (`menu -> deploy` under deployed base path) |
@@ -113,6 +118,12 @@
 2. Initial bundle remains large (`~710-727kB` main runtime chunks), so startup is now stable but still heavy.
 3. `SystemConnector` is materially smaller now, but the underlying systems still rely on setter injection and runtime ordering inside the new grouped composers.
 
+## Current Release Posture
+
+- Current branch state is a clean stabilization baseline for focused playtesting.
+- Required local gates are green: `lint`, `deadcode`, `test:run`, `build`, and `smoke:prod`.
+- This is good enough to push and start structured gameplay validation, but not yet a polished release candidate because perf and bundle-size debt remain.
+
 ## Architecture Risks
 
 1. Combat AI p99 ~35ms (target <16ms) - synchronous cover search improved but not solved
@@ -120,16 +131,17 @@
 3. Startup/player/deploy, gameplay runtime, and operational runtime are now grouped in dedicated composers, but the core runtime still depends heavily on setter injection inside those clusters
 4. Startup orchestration is improved and the mode-start pipeline now defers until `Play`, but runtime contracts are still order-sensitive across multiple systems
 5. Production boot is fixed and deferred chunks now exist for mode startup, but bundle weight is still high enough to remain a product risk
-6. Zone Control staging is materially better after the firebase pass, but authored terrain-feature grading is still config-driven and easy to overdo on steep hillsides in other modes
+6. Terrain grading is now system-level instead of config-only, but it still only supports circular flatten stamps; more complex compound footprints still need authored support beyond radius-based grading
 
-## Dead Code Pending Deletion
+## Dead Code Status
 
-- `knip` currently flags 18 unused files, mostly old scripts plus shelved/experimental modules:
-- `src/systems/environment/RiverWaterSystem.ts`
-- `src/systems/vehicle/NPCPilotManager.ts`
-- `src/workers/BVHWorker.ts`
-- several old perf/asset scripts under `scripts/` and `data/vietnam/scripts/`
-- 1 unused dependency currently flagged: `@recast-navigation/wasm`
+- `npm run deadcode` now passes cleanly.
+- File-level cleanup is complete for the current pass:
+- removed 18 unused files, including shelved terrain/perf scripts, `RiverWaterSystem`, `NPCPilotManager`, and the unused BVH worker
+- removed the unused `@recast-navigation/wasm` dependency
+- de-exported speculative internal interfaces/types across core, terrain, combat, vehicle, player, UI, and test-helper modules
+- added a `knip` tag allowance for the intentionally lazy-loaded `prepareModeStartup` startup path
+- dead-code cleanup is no longer an active backlog item; remaining work is architectural and performance-oriented, not cleanup-oriented
 
 ## Stale Docs Pending Archive/Update
 

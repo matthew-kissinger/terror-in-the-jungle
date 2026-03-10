@@ -32,7 +32,7 @@ type GameplayRuntimeRefs = Pick<
   | 'zoneManager'
 >;
 
-export interface GameplayRuntimeGroups {
+interface GameplayRuntimeGroups {
   combatRuntime: Pick<
     GameplayRuntimeRefs,
     | 'audioManager'
@@ -96,7 +96,7 @@ export interface GameplayRuntimeGroups {
   >;
 }
 
-export interface GameplayRuntimeOptions {
+interface GameplayRuntimeOptions {
   camera: THREE.PerspectiveCamera;
   renderer?: IGameRenderer;
 }

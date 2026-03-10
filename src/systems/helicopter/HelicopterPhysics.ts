@@ -18,7 +18,7 @@ export interface HelicopterControls {
   autoHover: boolean;     // Stabilization assist
 }
 
-export interface HelicopterState {
+interface HelicopterState {
   position: THREE.Vector3;
   velocity: THREE.Vector3;
   angularVelocity: THREE.Vector3;

@@ -27,7 +27,7 @@ type OperationalRuntimeRefs = Pick<
   | 'zoneManager'
 >;
 
-export interface OperationalRuntimeGroups {
+interface OperationalRuntimeGroups {
   strategyRuntime: Pick<
     OperationalRuntimeRefs,
     | 'audioManager'
@@ -74,7 +74,7 @@ export interface OperationalRuntimeGroups {
   >;
 }
 
-export interface OperationalRuntimeOptions {
+interface OperationalRuntimeOptions {
   heightQueryCache?: HeightQueryCache;
 }
 

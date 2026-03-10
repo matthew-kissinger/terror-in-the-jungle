@@ -2,7 +2,7 @@
  * Shared test mock factories for Terror in the Jungle.
  *
  * Usage in test files:
- *   import { createTestCombatant, mockTerrainRuntime, mockCamera } from '../../test-utils';
+ *   import { createTestCombatant, mockTerrainRuntime } from '../../test-utils';
  *
  * Note: Logger mocking cannot be shared via import because vi.mock() factories
  * are hoisted above all imports. Use the inline pattern directly in each test:
@@ -13,24 +13,7 @@
 import { vi } from 'vitest';
 import * as THREE from 'three';
 import { Combatant, CombatantState, Faction } from '../systems/combat/types';
-import type { ITerrainRuntime, IGameRenderer } from '../types/SystemInterfaces';
-
-// ---------------------------------------------------------------------------
-// Camera
-// ---------------------------------------------------------------------------
-
-/**
- * Create a real THREE.PerspectiveCamera.
- * Works in vitest/node because three.js math is pure JS.
- */
-export function mockCamera(
-  fov = 75,
-  aspect = 1,
-  near = 0.1,
-  far = 1000,
-): THREE.PerspectiveCamera {
-  return new THREE.PerspectiveCamera(fov, aspect, near, far);
-}
+import type { ITerrainRuntime } from '../types/SystemInterfaces';
 
 // ---------------------------------------------------------------------------
 // Combatant
@@ -116,36 +99,4 @@ export function mockTerrainRuntime(
   };
 }
 
-// ---------------------------------------------------------------------------
-// IGameRenderer
-// ---------------------------------------------------------------------------
-
-/**
- * Create a mock IGameRenderer with the minimum surface used by most tests.
- */
-export function mockGameRenderer(
-  overrides: Partial<Record<keyof IGameRenderer, any>> = {},
-): IGameRenderer {
-  return {
-    renderer: {} as THREE.WebGLRenderer,
-    scene: new THREE.Scene(),
-    camera: mockCamera(),
-    postProcessing: undefined,
-    fog: undefined,
-    ambientLight: undefined,
-    moonLight: undefined,
-    hemisphereLight: undefined,
-    getPerformanceStats: vi.fn(() => ({})),
-    showSpawnLoadingIndicator: vi.fn(),
-    hideSpawnLoadingIndicator: vi.fn(),
-    showRenderer: vi.fn(),
-    showCrosshair: vi.fn(),
-    hideCrosshair: vi.fn(),
-    showCrosshairAgain: vi.fn(),
-    setCrosshairMode: vi.fn(),
-    setCrosshairSpread: vi.fn(),
-    onWindowResize: vi.fn(),
-    ...overrides,
-  };
-}
 

@@ -20,7 +20,7 @@ export enum WeaponSlot {
   PISTOL = 5     // Key 6 - reserved for future pickups
 }
 
-export interface InventoryState {
+interface InventoryState {
   currentSlot: WeaponSlot;
   grenades: number;
   maxGrenades: number;

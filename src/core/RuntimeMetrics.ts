@@ -1,6 +1,6 @@
 import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
 
-export interface RuntimeMetricsSnapshot {
+interface RuntimeMetricsSnapshot {
   frameCount: number;
   avgFrameMs: number;
   p95FrameMs: number;

@@ -3,7 +3,7 @@ import { colors } from '../design/tokens';
 import { getWeaponIconElement, icon as iconUrl } from '../icons/IconRegistry';
 import styles from './KillFeed.module.css';
 
-export type WeaponType =
+type WeaponType =
   | 'rifle' | 'shotgun' | 'smg' | 'pistol' | 'lmg' | 'launcher'
   | 'grenade' | 'mortar' | 'melee'
   | 'helicopter_minigun' | 'helicopter_rocket' | 'helicopter_doorgun'
@@ -22,7 +22,7 @@ interface KillEntry {
   opacity: number;
 }
 
-const EXPLOSIVE_TYPES: ReadonlySet<string> = new Set([
+const EXPLOSIVE_TYPES: ReadonlySet<WeaponType> = new Set([
   'grenade', 'mortar', 'launcher', 'helicopter_rocket',
 ]);
 

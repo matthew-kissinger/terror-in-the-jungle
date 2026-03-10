@@ -9,7 +9,7 @@ const _bounds = new THREE.Box3();
 const _size = new THREE.Vector3();
 const _center = new THREE.Vector3();
 
-export interface PreparedModelPlacement {
+interface PreparedModelPlacement {
   profile: ModelPlacementProfile;
   bounds: THREE.Box3;
   size: THREE.Vector3;
@@ -27,12 +27,12 @@ export function prepareModelForPlacement(root: THREE.Object3D, modelPath: string
   };
 }
 
-export function computeWorldBounds(root: THREE.Object3D): THREE.Box3 {
+function computeWorldBounds(root: THREE.Object3D): THREE.Box3 {
   root.updateMatrixWorld(true);
   return new THREE.Box3().setFromObject(root);
 }
 
-export function normalizeModel(root: THREE.Object3D, profile: ModelPlacementProfile): void {
+function normalizeModel(root: THREE.Object3D, profile: ModelPlacementProfile): void {
   applyExpectedScale(root, profile);
   recenterAndGround(root, profile);
 }

@@ -1,6 +1,6 @@
 import { WarEvent } from './types';
 
-export type WarEventListener = (events: WarEvent[]) => void;
+type WarEventListener = (events: WarEvent[]) => void;
 
 /**
  * Simple pub/sub for war events. The WarSimulator emits batches of events

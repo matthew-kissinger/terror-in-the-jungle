@@ -4,7 +4,7 @@ import type { Faction } from '../systems/combat/types';
 /**
  * Typed game event definitions. Each key maps to a payload type.
  */
-export interface GameEvents {
+interface GameEvents {
   npc_killed: {
     killerId: string; victimId: string;
     killerFaction: Faction; victimFaction: Faction;

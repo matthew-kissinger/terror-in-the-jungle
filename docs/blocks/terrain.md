@@ -207,7 +207,7 @@ The remaining concern is not authority confusion. It is whether `TerrainSystem` 
 | `NoiseHeightProvider` | `src/systems/terrain/NoiseHeightProvider.ts` | Procedural terrain source |
 | `DEMHeightProvider` | `src/systems/terrain/DEMHeightProvider.ts` | DEM terrain source |
 | `BakedHeightProvider` | `src/systems/terrain/BakedHeightProvider.ts` | Bilinear-interpolated pre-baked heightmap grid (CPU-side match for GPU vertex shader) |
-| `StampedHeightProvider` | `src/systems/terrain/StampedHeightProvider.ts` | Wraps a base provider with terrain stamp overlays (flatten/raise for features); current firebase fixes rely on wider authored blend rings and average-height targets rather than hard hilltop plateaus |
+| `StampedHeightProvider` | `src/systems/terrain/StampedHeightProvider.ts` | Wraps a base provider with terrain stamp overlays (flatten/raise for features); flatten-circle stamps now support a graded shoulder (`gradeRadius`, `gradeStrength`) so bases can transition back into terrain instead of ending at a cliff lip |
 | `TerrainFeatureCompiler` | `src/systems/terrain/TerrainFeatureCompiler.ts` | Compiles map feature definitions into terrain stamps, surface patches, and exclusion zones |
 | `TerrainFeatureTypes` | `src/systems/terrain/TerrainFeatureTypes.ts` | Shared type definitions for terrain stamps, surface patches, and exclusion zones |
 | `TerrainFoundationUtils` | `src/systems/terrain/TerrainFoundationUtils.ts` | Engine-agnostic height-range sampling and foundation depth computation for flat structures on terrain |
@@ -270,6 +270,7 @@ Real runtime behavior:
 - live weather now drives terrain surface wetness through the runtime, so rain changes terrain darkness/roughness rather than only particles and fog
 - terrain ground textures now use linear mipmapped filtering instead of nearest/no-mipmap sprite filtering
 - render-only surface bake density now scales with world size; A Shau uses a 512-grid render surface instead of a fixed 1024-grid bake
+- authored circle stamps now support a two-stage terrain grade: flat core -> soft blend ring -> graded shoulder back into source terrain
 - loading/start-screen terrain-adjacent UI assets now use base-aware paths instead of hard-coded root-relative URLs
 - automated preview smoke now confirms shader-clean, terrain-warning-clean, request-error-clean startup in both `zone_control` and `a_shau_valley`
 - A Shau biome coverage has been retuned toward dense jungle and bamboo uplands, with highland rock constrained to upper ridges and cliff accents
@@ -345,7 +346,16 @@ The material stack is now materially better than the earlier prototype state:
 What is still missing is a canonical screenshot-based review loop on live A Shau and one small mode.
 Until that exists, the shader stack is improved but not yet visually signed off.
 
-### 5. Stale docs
+### 6. Terrain grading still has footprint limits
+
+The firebase hillside problem is materially better than before because flatten-circle stamps now preserve partial target influence past the blend ring.
+
+The remaining limitation is geometric:
+- the grading system is still radius-based
+- rect/strip/polygon compounds still do not get the same authored shoulder model
+- large multi-structure compounds can still need more explicit terrain shaping than one circle can express
+
+### 7. Stale docs
 
 Architecture docs elsewhere still describe the deleted chunk architecture.
 

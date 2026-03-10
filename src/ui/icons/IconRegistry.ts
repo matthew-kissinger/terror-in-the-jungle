@@ -28,7 +28,7 @@ export function icon(name: string): string {
 
 // ---- DOM helpers ----
 
-export interface IconImgOptions {
+interface IconImgOptions {
   /** Width in px (default: 14) */
   width?: number;
   /** Height in px (default: same as width) */
@@ -50,7 +50,7 @@ const BASE_STYLE = 'object-fit:contain;image-rendering:pixelated;';
  * iconImg('icon-fire', { width: 24, alt: 'Fire' })
  * ```
  */
-export function iconImg(name: string, opts: IconImgOptions = {}): HTMLImageElement {
+function iconImg(name: string, opts: IconImgOptions = {}): HTMLImageElement {
   const w = opts.width ?? 14;
   const h = opts.height ?? w;
   const img = document.createElement('img');
@@ -85,7 +85,7 @@ export function iconHtml(name: string, opts: IconImgOptions = {}): string {
 
 // ---- Weapon icon lookup ----
 
-export interface WeaponIconData {
+interface WeaponIconData {
   /** Filename without extension (e.g. 'icon-rifle') */
   iconFile: string;
   /** Short text for screen readers / fallback alt text */
@@ -135,9 +135,3 @@ export function getWeaponIconElement(weaponType: string, size = 14): HTMLElement
   return span;
 }
 
-/** Build an icon URL for a weapon (null for unknown). */
-export function getWeaponIconUrl(weaponType: string): string | null {
-  const data = WEAPON_ICONS[weaponType];
-  if (!data?.iconFile) return null;
-  return icon(data.iconFile);
-}

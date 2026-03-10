@@ -31,7 +31,7 @@ export function handleRejoiningMovement(
   }
 }
 
-export function getSquadCentroid(squad: Squad, combatants: Map<string, Combatant>): THREE.Vector3 | undefined {
+function getSquadCentroid(squad: Squad, combatants: Map<string, Combatant>): THREE.Vector3 | undefined {
   const squadMembers = squad.members
     .map(id => combatants.get(id))
     .filter(c => c && !c.isRejoiningSquad);

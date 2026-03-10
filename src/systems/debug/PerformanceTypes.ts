@@ -1,5 +1,4 @@
 import { GPUTelemetry } from './GPUTimingTelemetry'
-import { BenchmarkResult } from './PerformanceBenchmark'
 
 export interface SystemTiming {
   name: string
@@ -48,4 +47,4 @@ export interface TelemetryReport {
   terrainMerger?: TerrainMergerTelemetry
 }
 
-export type { GPUTelemetry, BenchmarkResult }
+export type { GPUTelemetry }

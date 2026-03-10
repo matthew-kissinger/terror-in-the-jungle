@@ -46,7 +46,7 @@ export interface GameModeRuntime {
   onReapply?(context: GameModeRuntimeContext): void;
 }
 
-export class PolicyBackedGameModeRuntime implements GameModeRuntime {
+class PolicyBackedGameModeRuntime implements GameModeRuntime {
   constructor(public readonly definition: GameModeDefinition) {}
 
   onEnter(context: GameModeRuntimeContext): void {

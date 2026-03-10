@@ -2,12 +2,12 @@ import type { AssetLoader } from '../assets/AssetLoader';
 import { getBiome, type BiomeClassificationRule, type BiomeVegetationEntry } from '../../config/biomes';
 import type { TerrainBiomeMaterialConfig, TerrainBiomeRuleConfig } from './TerrainMaterial';
 
-export interface TerrainVegetationRuntimeConfig {
+interface TerrainVegetationRuntimeConfig {
   biomeIds: string[];
   biomePalettes: Map<string, BiomeVegetationEntry[]>;
 }
 
-export function getConfiguredBiomeIds(
+function getConfiguredBiomeIds(
   defaultBiomeId: string,
   biomeRules: BiomeClassificationRule[],
 ): string[] {

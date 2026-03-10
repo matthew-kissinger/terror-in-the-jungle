@@ -13,7 +13,7 @@ import type { FirstPersonWeapon } from './FirstPersonWeapon';
 
 const _cameraDir = new THREE.Vector3();
 
-export interface PlayerState {
+interface PlayerState {
   health: number;
   maxHealth: number;
   isAlive: boolean;

@@ -4,13 +4,13 @@ import { GamePhase, PhaseTimings } from './TicketSystemPhases';
 
 export type VictoryReason = 'KILL_TARGET_REACHED' | 'TICKETS_DEPLETED' | 'TOTAL_CONTROL' | 'TIME_LIMIT' | 'ADMIN_COMMAND';
 
-export interface VictoryResult {
+interface VictoryResult {
   winner: Faction | null;
   reason: VictoryReason | null;
   shouldEnterOvertime: boolean;
 }
 
-export interface VictoryCheckParams {
+interface VictoryCheckParams {
   // TDM params
   isTDM: boolean;
   killTarget: number;

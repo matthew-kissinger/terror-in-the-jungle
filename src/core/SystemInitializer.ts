@@ -100,7 +100,7 @@ export interface SystemReferences {
   npcVehicleController: NPCVehicleController;
 }
 
-export interface InitializationResult {
+interface InitializationResult {
   systems: GameSystem[];
   deferredSystems: GameSystem[];
   scene: THREE.Scene;

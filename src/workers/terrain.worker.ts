@@ -33,6 +33,8 @@ interface FlattenCircleStampConfig {
   centerZ: number;
   innerRadius: number;
   outerRadius: number;
+  gradeRadius: number;
+  gradeStrength: number;
   samplingRadius: number;
   targetHeightMode: 'center' | 'average' | 'max';
   heightOffset: number;
@@ -220,17 +222,34 @@ function applyFlattenCircleStamp(
   const dx = worldX - stamp.centerX;
   const dz = worldZ - stamp.centerZ;
   const distance = Math.sqrt(dx * dx + dz * dz);
-  if (distance >= stamp.outerRadius) {
+  if (distance >= stamp.gradeRadius) {
     return baseHeight;
   }
 
   const targetHeight = stamp.targetHeight + stamp.heightOffset;
+  const influence = getFlattenCircleInfluence(distance, stamp);
+  if (influence <= 0) {
+    return baseHeight;
+  }
+  return baseHeight + (targetHeight - baseHeight) * influence;
+}
+
+function getFlattenCircleInfluence(distance: number, stamp: FlattenCircleStampConfig): number {
   if (distance <= stamp.innerRadius) {
-    return targetHeight;
+    return 1;
   }
 
-  const blend = smoothstep(stamp.outerRadius, stamp.innerRadius, distance);
-  return baseHeight + (targetHeight - baseHeight) * blend;
+  const gradeStrength = stamp.gradeRadius > stamp.outerRadius ? clamp(stamp.gradeStrength, 0, 1) : 0;
+  if (distance <= stamp.outerRadius) {
+    const innerBlend = smoothstep(stamp.outerRadius, stamp.innerRadius, distance);
+    return gradeStrength + (1 - gradeStrength) * innerBlend;
+  }
+
+  if (gradeStrength <= 0) {
+    return 0;
+  }
+
+  return gradeStrength * smoothstep(stamp.gradeRadius, stamp.outerRadius, distance);
 }
 
 function smoothstep(edge0: number, edge1: number, value: number): number {

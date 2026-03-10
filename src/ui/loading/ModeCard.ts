@@ -2,7 +2,7 @@
  * ModeCard - single game mode selection card component.
  */
 
-export interface ModeCardConfig {
+interface ModeCardConfig {
   title: string;
   subtitle: string;
   description: string;

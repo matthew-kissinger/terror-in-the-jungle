@@ -42,7 +42,7 @@ describe('FocusTrap', () => {
     expect(document.activeElement).toBe(btn3);
 
     const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
-    const prevented = !btn3.dispatchEvent(event);
+    btn3.dispatchEvent(event);
     // The handler calls preventDefault, but dispatchEvent returns !defaultPrevented
     // Check focus moved to first
     expect(document.activeElement).toBe(btn1);

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export type PilotState = 'idle' | 'takeoff' | 'fly_to' | 'orbit' | 'attack_run' | 'rtb' | 'landing';
+type PilotState = 'idle' | 'takeoff' | 'fly_to' | 'orbit' | 'attack_run' | 'rtb' | 'landing';
 
 export interface PilotMission {
   waypoints: THREE.Vector3[];
@@ -12,7 +12,7 @@ export interface PilotMission {
   attackTarget?: THREE.Vector3; // target for attack runs
 }
 
-export interface PilotControls {
+interface PilotControls {
   collective?: number;
   cyclicPitch?: number;
   cyclicRoll?: number;

@@ -3,85 +3,10 @@
  * media helpers, and shared keyframe animations.
  */
 
-import { colors, fontStack, borderRadius, zIndex } from './tokens';
-
-/** Glass morphism background mixin */
-export function glassPanel(opacity = 0.4): string {
-  return `
-    background: rgba(20, 35, 50, ${opacity});
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid ${colors.glassBorder};
-    border-radius: ${borderRadius.xl};
-  `;
-}
-
-/** HUD-style glass (darker, thinner) */
-export function hudGlass(): string {
-  return `
-    background: ${colors.hudGlass};
-    backdrop-filter: blur(6px) saturate(1.1);
-    -webkit-backdrop-filter: blur(6px) saturate(1.1);
-    border: 1px solid ${colors.hudBorder};
-    border-radius: ${borderRadius.md};
-  `;
-}
-
-/** Touch-safe interaction styles */
-export function touchSafe(minHeight = '44px'): string {
-  return `
-    min-height: ${minHeight};
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    user-select: none;
-    -webkit-user-select: none;
-  `;
-}
-
-/** Button style variants */
-export function buttonStyle(variant: 'primary' | 'secondary' | 'ghost' = 'primary'): string {
-  const base = `
-    padding: 0.75rem 2rem;
-    font-family: ${fontStack.ui};
-    font-weight: 400;
-    border-radius: ${borderRadius.pill};
-    cursor: pointer;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    ${touchSafe()}
-  `;
-
-  switch (variant) {
-    case 'primary':
-      return `${base}
-        background: linear-gradient(135deg, ${colors.secondary}, ${colors.primary});
-        color: white;
-        border: 1px solid ${colors.glassBorderBright};
-        font-weight: 500;
-      `;
-    case 'secondary':
-      return `${base}
-        background: ${colors.buttonBg};
-        color: ${colors.textPrimary};
-        border: 1px solid ${colors.glassBorder};
-      `;
-    case 'ghost':
-      return `${base}
-        background: rgba(255, 255, 255, 0.05);
-        color: ${colors.textPrimary};
-        border: 1px solid rgba(255, 255, 255, 0.1);
-      `;
-  }
-}
-
-/** Media query helper */
-export function media(maxWidth: number, styles: string): string {
-  return `@media (max-width: ${maxWidth}px) { ${styles} }`;
-}
+import { colors, fontStack, zIndex } from './tokens';
 
 /** Shared keyframe animations */
-export const sharedAnimations = `
+const sharedAnimations = `
   @keyframes ds-fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }

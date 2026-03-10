@@ -11,7 +11,7 @@ import { BaseTouchButton } from './BaseTouchButton';
 import { icon } from '../icons/IconRegistry';
 import styles from './TouchControls.module.css';
 
-export type ADSBehavior = 'hold' | 'toggle';
+type ADSBehavior = 'hold' | 'toggle';
 
 const ADS_STORAGE_KEY = 'terror_ads_mode';
 

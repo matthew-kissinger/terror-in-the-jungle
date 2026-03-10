@@ -32,11 +32,6 @@ export const GroundVehicleModels = {
   PT76: 'vehicles/ground/pt76.glb',
 } as const;
 
-export const WatercraftModels = {
-  SAMPAN: 'vehicles/watercraft/sampan.glb',
-  PBR: 'vehicles/watercraft/pbr.glb',
-} as const;
-
 export const StructureModels = {
   HELIPAD: 'structures/helipad.glb',
   SANDBAG_WALL: 'structures/sandbag-wall.glb',

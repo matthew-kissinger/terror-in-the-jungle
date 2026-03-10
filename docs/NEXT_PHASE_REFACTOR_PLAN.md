@@ -24,6 +24,7 @@ Phase 1 fixed the deployed boot failure, added a real production smoke gate, int
 - Initial bundle cost is still too high, even after deferring `ModeStartupPreparer` and `InitialDeployStartup`.
 - `SystemUpdater` is only partially budgeted by cadence; many groups still run every frame because the boundaries are too coarse.
 - Core docs now match the code again, but the code still has service-locator shape and startup-order fragility.
+- Cleanup debt is no longer the blocking issue: `eslint`, `knip`, tests, build, and `smoke:prod` are all green.
 
 ## Refactor Tracks
 
@@ -115,6 +116,7 @@ Acceptance:
 
 Every accepted slice must pass:
 
+- `npm run deadcode`
 - `npm run lint`
 - `npm run test:run`
 - `npm run build`
@@ -147,3 +149,4 @@ The next high-leverage follow-up is inside the systems themselves:
 - replace remaining hot-path setter bursts with runtime dependency objects, starting with combat/world/player-adjacent systems
 - push more cadence-safe work behind `SimulationScheduler` once those boundaries are explicit
 - continue boot-surface reduction only around deploy-only UI/runtime after those contracts are cleaner
+- run longer battle-test passes against terrain grading and spawn/nav reliability so the new authored-base shaping gets real gameplay coverage

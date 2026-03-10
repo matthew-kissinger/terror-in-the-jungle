@@ -5,7 +5,7 @@ export type ControllerPreset = 'default' | 'southpaw';
 export type ControllerLookCurve = 'precision' | 'linear';
 export type ControllerDpadMode = 'weapons' | 'quickCommands';
 
-export interface GameSettings {
+interface GameSettings {
   masterVolume: number;       // 0-100
   mouseSensitivity: number;   // 1-10 (UI scale), mapped to 0.001-0.005 internally
   touchSensitivity: number;   // 1-10 (UI scale), mapped to 0.006-0.024 internally

@@ -11,7 +11,7 @@
  * terrain internals.
  */
 
-export interface TerrainHeightRange {
+interface TerrainHeightRange {
   min: number;
   max: number;
 }

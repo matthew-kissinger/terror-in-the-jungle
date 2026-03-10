@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CDLODQuadtree, type FrustumPlane } from './CDLODQuadtree';
 import { CDLODRenderer } from './CDLODRenderer';
 
-export interface TerrainRenderRuntimeConfig {
+interface TerrainRenderRuntimeConfig {
   worldSize: number;
   visualMargin: number;
   maxLODLevels: number;
