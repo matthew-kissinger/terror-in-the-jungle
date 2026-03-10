@@ -6,6 +6,7 @@ import { PlayerInput } from './PlayerInput';
 import { TerrainSystem } from '../terrain/TerrainSystem';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { FootstepAudioSystem } from '../audio/FootstepAudioSystem';
+import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 
 // Mock dependencies
 vi.mock('./PlayerInput');
@@ -82,6 +83,7 @@ describe('PlayerMovement', () => {
 
     // Setup mock terrain system
     mockTerrainSystem = {
+      getHeightAt: vi.fn().mockReturnValue(0),
       getEffectiveHeightAt: vi.fn().mockReturnValue(0),
       getPlayableWorldSize: vi.fn().mockReturnValue(0),
       getWorldSize: vi.fn().mockReturnValue(0)
@@ -290,6 +292,31 @@ describe('PlayerMovement', () => {
 
       // Should clamp to default ground height (2)
       expect(playerState.position.y).toBe(2);
+    });
+
+    it('should allow climbing a walkable uphill slope without false step blocking', () => {
+      vi.mocked(mockInput.isKeyPressed).mockImplementation((key: string) => key === 'keyd');
+      vi.mocked(mockTerrainSystem.getHeightAt).mockImplementation((x: number) => Math.max(0, x));
+      vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockImplementation((x: number) => Math.max(0, x));
+      vi.mocked(getHeightQueryCache().getSlopeAt).mockReturnValue(0.4);
+
+      playerMovement.updateMovement(0.2, mockInput, mockCamera);
+
+      expect(playerState.position.x).toBeGreaterThan(0.5);
+      expect(playerState.position.y).toBeGreaterThan(2.5);
+    });
+
+    it('should stop cleanly when trying to move into an unwalkable uphill slope', () => {
+      vi.mocked(mockInput.isKeyPressed).mockImplementation((key: string) => key === 'keyd');
+      vi.mocked(mockTerrainSystem.getHeightAt).mockImplementation((x: number) => Math.max(0, x));
+      vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockImplementation((x: number) => Math.max(0, x));
+      vi.mocked(getHeightQueryCache().getSlopeAt).mockReturnValue(0.7);
+
+      playerMovement.updateMovement(0.2, mockInput, mockCamera);
+
+      expect(playerState.position.x).toBe(0);
+      expect(playerState.position.y).toBe(2);
+      expect(playerState.velocity.x).toBe(0);
     });
   });
 

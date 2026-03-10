@@ -8,7 +8,13 @@ import { FootstepAudioSystem } from '../audio/FootstepAudioSystem';
 import { PlayerInput } from './PlayerInput';
 import { IHUDSystem, IHelicopterModel } from '../../types/SystemInterfaces';
 import { getHeightQueryCache } from '../terrain/HeightQueryCache';
-import { computeSlopeSpeedMultiplier, computeSlopeSlideVelocity, SLOPE_SLIDE_STRENGTH, MAX_STEP_HEIGHT } from '../terrain/SlopePhysics';
+import {
+  canStepUp,
+  computeSlopeSpeedMultiplier,
+  computeSlopeSlideVelocity,
+  isWalkableSlope,
+  SLOPE_SLIDE_STRENGTH,
+} from '../terrain/SlopePhysics';
 
 const _moveVector = new THREE.Vector3();
 const _cameraDirection = new THREE.Vector3();
@@ -244,23 +250,53 @@ export class PlayerMovement {
     // getEffectiveHeightAt includes collision objects (helipad, helicopter, etc.)
     const eyeHeight = this.playerState.isCrouching ? PLAYER_CROUCH_EYE_HEIGHT : PLAYER_EYE_HEIGHT;
     let groundHeight = eyeHeight; // flat world fallback
+    let currentGroundHeight = this.playerState.position.y;
     if (this.terrainSystem) {
-      const terrainHeight = Number(this.terrainSystem.getEffectiveHeightAt(newPosition.x, newPosition.z));
-      if (Number.isFinite(terrainHeight)) {
-        groundHeight = terrainHeight + eyeHeight;
+      const currentEffectiveHeight = Number(this.terrainSystem.getEffectiveHeightAt(
+        this.playerState.position.x,
+        this.playerState.position.z,
+      ));
+      if (Number.isFinite(currentEffectiveHeight)) {
+        currentGroundHeight = currentEffectiveHeight + eyeHeight;
+      }
+
+      const targetEffectiveHeight = Number(this.terrainSystem.getEffectiveHeightAt(newPosition.x, newPosition.z));
+      if (Number.isFinite(targetEffectiveHeight)) {
+        groundHeight = targetEffectiveHeight + eyeHeight;
       }
     }
 
-    // Step-up gating: prevent teleporting onto structure tops (helipads, etc.)
-    if (this.playerState.isGrounded && groundHeight - this.playerState.position.y > MAX_STEP_HEIGHT) {
-      newPosition.x = this.playerState.position.x;
-      newPosition.z = this.playerState.position.z;
-      this.playerState.velocity.x = 0;
-      this.playerState.velocity.z = 0;
-      // Recompute ground height at original position
-      if (this.terrainSystem) {
-        const th = Number(this.terrainSystem.getEffectiveHeightAt(this.playerState.position.x, this.playerState.position.z));
-        if (Number.isFinite(th)) groundHeight = th + eyeHeight;
+    // Terrain slope blocking is separate from structure step-up blocking:
+    // walkable hills should ground smoothly, but unwalkable uphill faces should
+    // stop horizontal motion instead of alternating between tiny climbs and snaps.
+    if (this.playerState.isGrounded && this.terrainSystem) {
+      const currentTerrainHeight = Number(this.terrainSystem.getHeightAt(
+        this.playerState.position.x,
+        this.playerState.position.z,
+      ));
+      const targetTerrainHeight = Number(this.terrainSystem.getHeightAt(newPosition.x, newPosition.z));
+      const targetSlopeValue = heightCache.getSlopeAt(newPosition.x, newPosition.z);
+      const terrainRise = Number.isFinite(currentTerrainHeight) && Number.isFinite(targetTerrainHeight)
+        ? targetTerrainHeight - currentTerrainHeight
+        : 0;
+      const effectiveRise = groundHeight - currentGroundHeight;
+      const obstacleStepRise = Math.max(0, effectiveRise - Math.max(terrainRise, 0));
+      const blockedBySteepTerrain = terrainRise > 0.05 && !isWalkableSlope(targetSlopeValue);
+      const blockedByRaisedSurface = obstacleStepRise > 0.05 && !canStepUp(currentGroundHeight, groundHeight);
+
+      if (blockedBySteepTerrain || blockedByRaisedSurface) {
+        newPosition.x = this.playerState.position.x;
+        newPosition.z = this.playerState.position.z;
+        this.playerState.velocity.x = 0;
+        this.playerState.velocity.z = 0;
+
+        const resetGroundHeight = Number(this.terrainSystem.getEffectiveHeightAt(
+          this.playerState.position.x,
+          this.playerState.position.z,
+        ));
+        if (Number.isFinite(resetGroundHeight)) {
+          groundHeight = resetGroundHeight + eyeHeight;
+        }
       }
     }
 
