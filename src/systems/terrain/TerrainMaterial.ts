@@ -4,7 +4,11 @@ import type { TerrainSurfaceKind, TerrainSurfacePatch } from './TerrainFeatureTy
 
 const MAX_BIOME_TEXTURES = 8;
 const MAX_BIOME_RULES = 8;
-const MAX_FEATURE_SURFACE_PATCHES = 16;
+// Keep this conservative for mobile GPUs.
+// Large float-array uniforms in fragment shaders can exceed low-end WebGL
+// uniform budgets and fail terrain material compilation, resulting in an
+// invisible-but-collidable terrain surface.
+const MAX_FEATURE_SURFACE_PATCHES = 8;
 
 const TERRAIN_VERTEX_PARS = /* glsl */ `
 uniform sampler2D terrainHeightmap;
@@ -88,17 +92,17 @@ uniform float antiTilingStrength;
 uniform float triplanarSlopeThreshold;
 uniform float environmentWetness;
 uniform float featureSurfacePatchCount;
-uniform float featureSurfaceShape[16];
-uniform float featureSurfaceType[16];
-uniform float featureSurfaceX[16];
-uniform float featureSurfaceZ[16];
-uniform float featureSurfaceInnerRadius[16];
-uniform float featureSurfaceOuterRadius[16];
-uniform float featureSurfaceHalfWidth[16];
-uniform float featureSurfaceHalfLength[16];
-uniform float featureSurfaceBlend[16];
-uniform float featureSurfaceYawCos[16];
-uniform float featureSurfaceYawSin[16];
+uniform float featureSurfaceShape[${MAX_FEATURE_SURFACE_PATCHES}];
+uniform float featureSurfaceType[${MAX_FEATURE_SURFACE_PATCHES}];
+uniform float featureSurfaceX[${MAX_FEATURE_SURFACE_PATCHES}];
+uniform float featureSurfaceZ[${MAX_FEATURE_SURFACE_PATCHES}];
+uniform float featureSurfaceInnerRadius[${MAX_FEATURE_SURFACE_PATCHES}];
+uniform float featureSurfaceOuterRadius[${MAX_FEATURE_SURFACE_PATCHES}];
+uniform float featureSurfaceHalfWidth[${MAX_FEATURE_SURFACE_PATCHES}];
+uniform float featureSurfaceHalfLength[${MAX_FEATURE_SURFACE_PATCHES}];
+uniform float featureSurfaceBlend[${MAX_FEATURE_SURFACE_PATCHES}];
+uniform float featureSurfaceYawCos[${MAX_FEATURE_SURFACE_PATCHES}];
+uniform float featureSurfaceYawSin[${MAX_FEATURE_SURFACE_PATCHES}];
 uniform bool debugWireframe;
 
 varying vec3 vWorldPosition;
@@ -147,7 +151,7 @@ float computeFeatureSurfaceMask(int patchIndex, vec2 worldPos) {
 
 float featureSurfaceWeight(float surfaceTypeId, vec2 worldPos) {
   float weight = 0.0;
-  for (int i = 0; i < 16; i++) {
+  for (int i = 0; i < ${MAX_FEATURE_SURFACE_PATCHES}; i++) {
     if (float(i) >= featureSurfacePatchCount) {
       continue;
     }
