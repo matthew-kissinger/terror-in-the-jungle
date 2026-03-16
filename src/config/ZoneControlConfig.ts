@@ -88,13 +88,13 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
       footprint: { shape: 'circle' as const, radius: 30 },
       terrain: {
         flatten: true,
-        flatRadius: 18,
-        blendRadius: 50,
-        samplingRadius: 18,
+        flatRadius: 28,
+        blendRadius: 60,
+        samplingRadius: 24,
         targetHeightMode: 'average' as const,
       },
-      vegetation: { clear: true, exclusionRadius: 34 },
-      surface: { kind: 'packed_earth' as const, innerRadius: 18, outerRadius: 26 },
+      vegetation: { clear: true, exclusionRadius: 38 },
+      surface: { kind: 'packed_earth' as const, innerRadius: 28, outerRadius: 36 },
       prefabId: 'nva_bunker_cluster_small' as const,
     },
     // Village near zone Alpha (west)

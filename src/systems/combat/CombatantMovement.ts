@@ -16,6 +16,7 @@ import { computeSlopeSpeedMultiplier } from '../terrain/SlopePhysics';
 import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 import type { NavmeshMovementAdapter } from '../navigation/NavmeshMovementAdapter';
+import { StuckDetector } from './StuckDetector';
 
 // ── Rotation spring-damper ──
 const ROTATION_SPRING = 15;
@@ -40,6 +41,7 @@ export class CombatantMovement {
   private navmeshSystem?: NavmeshSystem;
   private navmeshAdapter?: NavmeshMovementAdapter | null;
   private readonly _spacingForce = new THREE.Vector3();
+  private readonly stuckDetector = new StuckDetector();
 
   constructor(terrainSystem?: ITerrainRuntime, zoneManager?: ZoneManager) {
     this.terrainSystem = terrainSystem;
@@ -74,6 +76,7 @@ export class CombatantMovement {
       if (this.navmeshAdapter?.hasAgent(combatant.id)) {
         this.navmeshAdapter.unregisterAgent(combatant.id);
       }
+      this.stuckDetector.remove(combatant.id);
       return;
     }
 
@@ -123,8 +126,12 @@ export class CombatantMovement {
       }
     }
 
-    // Apply slope speed penalty for NPCs on walkable slopes
-    if (combatant.velocity.lengthSq() > 0.01 && this.terrainSystem) {
+    // Apply slope speed penalty only for beeline NPCs (no navmesh agent).
+    // Navmesh-steered NPCs already respect slope via WALKABLE_SLOPE_ANGLE=40°
+    // in the Recast config — applying slope penalty on top double-penalizes
+    // and can zero velocity at slope transitions, causing NPCs to get stuck.
+    const hasNavmeshAgent = this.navmeshAdapter?.hasAgent(combatant.id) ?? false;
+    if (!hasNavmeshAgent && combatant.velocity.lengthSq() > 0.01 && this.terrainSystem) {
       const slope = this.terrainSystem.getSlopeAt(combatant.position.x, combatant.position.z);
       const slopeMultiplier = computeSlopeSpeedMultiplier(slope);
       combatant.velocity.x *= slopeMultiplier;
@@ -139,6 +146,9 @@ export class CombatantMovement {
       const terrainHeight = this.getTerrainHeightForCombatant(combatant);
       combatant.position.y = terrainHeight + NPC_Y_OFFSET;
     }
+
+    // Stuck detection — runs after final position is settled
+    this.stuckDetector.checkAndRecover(combatant, performance.now());
   }
 
   updateRotation(combatant: Combatant, deltaTime: number): void {
@@ -241,6 +251,12 @@ export class CombatantMovement {
     if (this.navmeshAdapter?.hasAgent(id)) {
       this.navmeshAdapter.unregisterAgent(id);
     }
+    this.stuckDetector.remove(id);
+  }
+
+  /** Reset stuck detection state (call on round/mode transitions). */
+  resetStuckDetector(): void {
+    this.stuckDetector.clear();
   }
 
   private getEnemyBasePosition(faction: Faction): THREE.Vector3 {
