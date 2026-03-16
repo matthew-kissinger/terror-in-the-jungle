@@ -552,6 +552,10 @@ function applyTerrainMaterialOptions(
   material.userData.terrainUniforms = shaderBindings.uniforms;
   material.userData.terrainSurfaceWetness = shaderBindings.uniforms.environmentWetness.value;
 
+  // Unique program cache key so Three.js never serves a cached plain
+  // MeshStandardMaterial program for this terrain shader.
+  material.customProgramCacheKey = () => 'TerrainCDLOD_v1';
+
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, shaderBindings.uniforms);
 

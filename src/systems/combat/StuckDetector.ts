@@ -1,6 +1,8 @@
 import type { Combatant } from './types';
 import { NPC_MAX_SPEED } from '../../config/CombatantConfig';
 
+export type StuckRecoveryAction = 'none' | 'nudge' | 'unregister_navmesh';
+
 // ── Tuning constants ──
 const STUCK_CHECK_INTERVAL_MS = 1500;
 const STUCK_MOVE_THRESHOLD_SQ = 1.0; // 1m — if moved less than this, count as stuck
@@ -28,8 +30,9 @@ export class StuckDetector {
   /**
    * Check if a combatant is stuck and attempt recovery if so.
    * Call once per frame after final position is settled.
+   * Returns the recovery action taken so callers can react (e.g. unregister from navmesh).
    */
-  checkAndRecover(combatant: Combatant, now: number): void {
+  checkAndRecover(combatant: Combatant, now: number): StuckRecoveryAction {
     const record = this.records.get(combatant.id);
 
     if (!record) {
@@ -40,11 +43,11 @@ export class StuckDetector {
         stuckTicks: 0,
         recoveryCount: 0,
       });
-      return;
+      return 'none';
     }
 
     // Interval gate — skip if not enough time has passed
-    if (now - record.lastCheckTime < STUCK_CHECK_INTERVAL_MS) return;
+    if (now - record.lastCheckTime < STUCK_CHECK_INTERVAL_MS) return 'none';
 
     // Measure XZ displacement since last check
     const dx = combatant.position.x - record.lastCheckX;
@@ -63,19 +66,21 @@ export class StuckDetector {
     record.lastCheckTime = now;
 
     if (record.stuckTicks >= STUCK_TICK_THRESHOLD) {
-      this.recoverStuck(combatant, record);
+      const action = this.recoverStuck(combatant, record);
       record.stuckTicks = 0;
+      return action;
     }
+    return 'none';
   }
 
-  private recoverStuck(combatant: Combatant, record: StuckRecord): void {
+  private recoverStuck(combatant: Combatant, record: StuckRecord): StuckRecoveryAction {
     record.recoveryCount++;
 
     if (record.recoveryCount > STUCK_MAX_RECOVERIES) {
-      // Too many failed nudges — clear destination so the state machine re-evaluates
+      // Too many failed nudges — signal navmesh unregistration so NPC falls back to beeline
       combatant.destinationPoint = undefined;
       record.recoveryCount = 0;
-      return;
+      return 'unregister_navmesh';
     }
 
     if (combatant.destinationPoint) {
@@ -89,6 +94,7 @@ export class StuckDetector {
       combatant.velocity.x = Math.cos(angle) * NPC_MAX_SPEED;
       combatant.velocity.z = Math.sin(angle) * NPC_MAX_SPEED;
     }
+    return 'nudge';
   }
 
   /** Remove tracking for a combatant (call on death/despawn). */

@@ -16,7 +16,8 @@ import { computeSlopeSpeedMultiplier } from '../terrain/SlopePhysics';
 import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 import type { NavmeshMovementAdapter } from '../navigation/NavmeshMovementAdapter';
-import { StuckDetector } from './StuckDetector';
+import { StuckDetector, type StuckRecoveryAction } from './StuckDetector';
+import { Logger } from '../../utils/Logger';
 
 // ── Rotation spring-damper ──
 const ROTATION_SPRING = 15;
@@ -118,8 +119,14 @@ export class CombatantMovement {
         if (!this.navmeshAdapter.hasAgent(combatant.id)) {
           this.navmeshAdapter.registerAgent(combatant);
         }
-        this.navmeshAdapter.updateAgentTarget(combatant);
-        this.navmeshAdapter.applyAgentVelocity(combatant);
+        const targetReachable = this.navmeshAdapter.updateAgentTarget(combatant);
+        if (targetReachable) {
+          this.navmeshAdapter.applyAgentVelocity(combatant);
+        } else {
+          // Pathfinding failed — unregister from navmesh so beeline takes over
+          Logger.warn('combat', `NPC ${combatant.id} navmesh target unreachable, falling back to beeline`);
+          this.navmeshAdapter.unregisterAgent(combatant.id);
+        }
       } else if (this.navmeshAdapter.hasAgent(combatant.id)) {
         // Low/culled LOD: unregister from crowd, fall back to beeline
         this.navmeshAdapter.unregisterAgent(combatant.id);
@@ -148,7 +155,11 @@ export class CombatantMovement {
     }
 
     // Stuck detection — runs after final position is settled
-    this.stuckDetector.checkAndRecover(combatant, performance.now());
+    const stuckAction: StuckRecoveryAction = this.stuckDetector.checkAndRecover(combatant, performance.now());
+    if (stuckAction === 'unregister_navmesh' && this.navmeshAdapter?.hasAgent(combatant.id)) {
+      Logger.warn('combat', `NPC ${combatant.id} stuck after max recoveries, unregistering from navmesh`);
+      this.navmeshAdapter.unregisterAgent(combatant.id);
+    }
   }
 
   updateRotation(combatant: Combatant, deltaTime: number): void {
