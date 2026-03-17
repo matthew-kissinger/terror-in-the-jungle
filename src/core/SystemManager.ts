@@ -37,12 +37,12 @@ import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
-import { RadioTransmissionSystem } from '../systems/audio/RadioTransmissionSystem';
+
 import { LoadoutService } from '../systems/player/LoadoutService';
 import { WarSimulator } from '../systems/strategy/WarSimulator';
 import { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
 import { WorldFeatureSystem } from '../systems/world/WorldFeatureSystem';
-import { AnimalSystem } from '../systems/world/AnimalSystem';
+
 import { NavmeshSystem } from '../systems/navigation/NavmeshSystem';
 import { SystemInitializer, type MutableSystemReferences } from './SystemInitializer';
 import { SystemConnector } from './SystemConnector';
@@ -311,12 +311,10 @@ export class SystemManager {
   get influenceMapSystem(): InfluenceMapSystem { return this.registry.require('influenceMapSystem'); }
   get ammoSupplySystem(): AmmoSupplySystem { return this.registry.require('ammoSupplySystem'); }
   get footstepAudioSystem(): FootstepAudioSystem { return this.registry.require('footstepAudioSystem'); }
-  get radioTransmissionSystem(): RadioTransmissionSystem { return this.registry.require('radioTransmissionSystem'); }
   get loadoutService(): LoadoutService { return this.registry.require('loadoutService'); }
   get warSimulator(): WarSimulator { return this.registry.require('warSimulator'); }
   get strategicFeedback(): StrategicFeedback { return this.registry.require('strategicFeedback'); }
   get worldFeatureSystem(): WorldFeatureSystem { return this.registry.require('worldFeatureSystem'); }
-  get animalSystem(): AnimalSystem { return this.registry.require('animalSystem'); }
   get navmeshSystem(): NavmeshSystem { return this.registry.require('navmeshSystem'); }
 }
 

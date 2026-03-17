@@ -32,13 +32,13 @@ import type { SmokeCloudSystem } from '../systems/effects/SmokeCloudSystem';
 import type { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import type { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import type { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
-import type { RadioTransmissionSystem } from '../systems/audio/RadioTransmissionSystem';
+
 import type { LoadoutService } from '../systems/player/LoadoutService';
 import type { WarSimulator } from '../systems/strategy/WarSimulator';
 import type { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
 import type { SpatialGridManager } from '../systems/combat/SpatialGridManager';
 import type { WorldFeatureSystem } from '../systems/world/WorldFeatureSystem';
-import type { AnimalSystem } from '../systems/world/AnimalSystem';
+
 import type { NavmeshSystem } from '../systems/navigation/NavmeshSystem';
 import type { AirSupportManager } from '../systems/airsupport/AirSupportManager';
 import type { AAEmplacementSystem } from '../systems/airsupport/AAEmplacement';
@@ -80,13 +80,11 @@ export interface SystemKeyToType {
   influenceMapSystem: InfluenceMapSystem;
   ammoSupplySystem: AmmoSupplySystem;
   footstepAudioSystem: FootstepAudioSystem;
-  radioTransmissionSystem: RadioTransmissionSystem;
   loadoutService: LoadoutService;
   warSimulator: WarSimulator;
   strategicFeedback: StrategicFeedback;
   spatialGridManager: SpatialGridManager;
   worldFeatureSystem: WorldFeatureSystem;
-  animalSystem: AnimalSystem;
   navmeshSystem: NavmeshSystem;
   airSupportManager: AirSupportManager;
   aaEmplacementSystem: AAEmplacementSystem;
@@ -168,13 +166,11 @@ const SYSTEM_KEYS: readonly SystemKey[] = [
   'influenceMapSystem',
   'ammoSupplySystem',
   'footstepAudioSystem',
-  'radioTransmissionSystem',
   'loadoutService',
   'warSimulator',
   'strategicFeedback',
   'spatialGridManager',
   'worldFeatureSystem',
-  'animalSystem',
   'navmeshSystem',
   'airSupportManager',
   'aaEmplacementSystem',

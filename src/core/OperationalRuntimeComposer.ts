@@ -18,7 +18,6 @@ type OperationalRuntimeRefs = Pick<
   | 'minimapSystem'
   | 'npcVehicleController'
   | 'playerController'
-  | 'radioTransmissionSystem'
   | 'strategicFeedback'
   | 'terrainSystem'
   | 'ticketSystem'
@@ -57,7 +56,6 @@ interface OperationalRuntimeGroups {
     | 'minimapSystem'
     | 'npcVehicleController'
     | 'playerController'
-    | 'radioTransmissionSystem'
     | 'terrainSystem'
     | 'vehicleManager'
     | 'worldFeatureSystem'
@@ -110,7 +108,6 @@ export function createOperationalRuntimeGroups(
       minimapSystem: refs.minimapSystem,
       npcVehicleController: refs.npcVehicleController,
       playerController: refs.playerController,
-      radioTransmissionSystem: refs.radioTransmissionSystem,
       terrainSystem: refs.terrainSystem,
       vehicleManager: refs.vehicleManager,
       worldFeatureSystem: refs.worldFeatureSystem,
@@ -157,8 +154,6 @@ function wireVehicleRuntime(
   runtime: OperationalRuntimeGroups['vehicleRuntime'],
   heightQueryCache: HeightQueryCache
 ): void {
-  runtime.radioTransmissionSystem.setAudioListener(runtime.audioManager.getListener());
-
   if (typeof runtime.helipadSystem.configureDependencies === 'function') {
     runtime.helipadSystem.configureDependencies({
       terrainManager: runtime.terrainSystem,

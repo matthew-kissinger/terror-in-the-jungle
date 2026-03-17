@@ -36,7 +36,7 @@ import { InfluenceMapSystem } from '../systems/combat/InfluenceMapSystem';
 import { AmmoSupplySystem } from '../systems/weapons/AmmoSupplySystem';
 import { WeatherSystem } from '../systems/environment/WeatherSystem';
 import { WorldFeatureSystem } from '../systems/world/WorldFeatureSystem';
-import { AnimalSystem } from '../systems/world/AnimalSystem';
+
 import { NavmeshSystem } from '../systems/navigation/NavmeshSystem';
 import { AirSupportManager } from '../systems/airsupport/AirSupportManager';
 import { AAEmplacementSystem } from '../systems/airsupport/AAEmplacement';
@@ -44,7 +44,7 @@ import { VehicleManager } from '../systems/vehicle/VehicleManager';
 import { NPCVehicleController } from '../systems/vehicle/NPCVehicleController';
 
 import { FootstepAudioSystem } from '../systems/audio/FootstepAudioSystem';
-import { RadioTransmissionSystem } from '../systems/audio/RadioTransmissionSystem';
+
 import { LoadoutService } from '../systems/player/LoadoutService';
 import { WarSimulator } from '../systems/strategy/WarSimulator';
 import { StrategicFeedback } from '../systems/strategy/StrategicFeedback';
@@ -139,7 +139,7 @@ export class SystemInitializer {
     refs.helipadSystem = new HelipadSystem(scene);
     refs.helicopterModel = new HelicopterModel(scene);
     refs.worldFeatureSystem = new WorldFeatureSystem(scene);
-    refs.animalSystem = new AnimalSystem(scene, camera);
+
     refs.navmeshSystem = new NavmeshSystem();
     refs.airSupportManager = new AirSupportManager(scene);
     refs.aaEmplacementSystem = new AAEmplacementSystem(scene);
@@ -161,7 +161,7 @@ export class SystemInitializer {
     refs.smokeCloudSystem = new SmokeCloudSystem(scene, camera);
     refs.ammoSupplySystem = new AmmoSupplySystem(scene, camera);
     refs.footstepAudioSystem = new FootstepAudioSystem(refs.audioManager.getListener());
-    refs.radioTransmissionSystem = new RadioTransmissionSystem();
+
     refs.loadoutService = new LoadoutService();
     refs.warSimulator = new WarSimulator();
     refs.strategicFeedback = new StrategicFeedback();
@@ -194,7 +194,6 @@ export class SystemInitializer {
       refs.helipadSystem,
       refs.helicopterModel,
       refs.worldFeatureSystem,
-      refs.animalSystem,
       refs.skybox,
       refs.gameModeManager,
       refs.playerSquadController,
@@ -209,7 +208,6 @@ export class SystemInitializer {
       refs.smokeCloudSystem,
       refs.influenceMapSystem,
       refs.ammoSupplySystem,
-      refs.radioTransmissionSystem,
       refs.warSimulator,
       refs.strategicFeedback,
       refs.airSupportManager,

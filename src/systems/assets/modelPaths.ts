@@ -84,15 +84,6 @@ export const BuildingModels = {
   BUNKER_NVA: 'buildings/bunker-nva.glb',
 } as const;
 
-export const AnimalModels = {
-  EGRET: 'animals/egret.glb',
-  WATER_BUFFALO: 'animals/water-buffalo.glb',
-  MACAQUE: 'animals/macaque.glb',
-  TIGER: 'animals/tiger.glb',
-  KING_COBRA: 'animals/king-cobra.glb',
-  WILD_BOAR: 'animals/wild-boar.glb',
-} as const;
-
 export const PropModels = {
   WOODEN_BARREL: 'props/wooden-barrel.glb',
 } as const;

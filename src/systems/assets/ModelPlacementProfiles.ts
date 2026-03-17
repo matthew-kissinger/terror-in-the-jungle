@@ -60,19 +60,16 @@ const PROFILE_OVERRIDES: Record<string, ModelPlacementProfile> = {
     groundingMode: 'bounds_center_bottom',
     normalizeBy: 'none',
     collisionMode: 'none',
-    displayScale: 0.9,
   },
   [StructureModels.COMMS_TOWER]: {
     groundingMode: 'bounds_center_bottom',
     normalizeBy: 'none',
     collisionMode: 'none',
-    displayScale: 0.85,
   },
   [StructureModels.WATER_TOWER]: {
     groundingMode: 'bounds_center_bottom',
     normalizeBy: 'none',
     collisionMode: 'none',
-    displayScale: 0.9,
   },
   [StructureModels.SANDBAG_BUNKER]: {
     groundingMode: 'bounds_center_bottom',

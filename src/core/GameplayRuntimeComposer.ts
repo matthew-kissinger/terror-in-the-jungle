@@ -5,7 +5,6 @@ import type { SystemKeyToType } from './SystemRegistry';
 
 type GameplayRuntimeRefs = Pick<
   SystemKeyToType,
-  | 'animalSystem'
   | 'ammoSupplySystem'
   | 'audioManager'
   | 'combatantSystem'
@@ -53,7 +52,6 @@ interface GameplayRuntimeGroups {
   >;
   worldRuntime: Pick<
     GameplayRuntimeRefs,
-    | 'animalSystem'
     | 'combatantSystem'
     | 'firstPersonWeapon'
     | 'hudSystem'
@@ -128,7 +126,6 @@ export function createGameplayRuntimeGroups(
     },
     worldRuntime: {
       combatantSystem: refs.combatantSystem,
-      animalSystem: refs.animalSystem,
       firstPersonWeapon: refs.firstPersonWeapon,
       hudSystem: refs.hudSystem,
       playerHealthSystem: refs.playerHealthSystem,
@@ -253,7 +250,6 @@ function wireWorldRuntime(
     runtime.combatantSystem.querySpatialRadius(center, radius)
   );
   runtime.zoneManager.setHUDSystem(runtime.hudSystem);
-  runtime.animalSystem?.setTerrainSystem(runtime.terrainSystem);
 }
 
 function wireWeaponRuntime(runtime: GameplayRuntimeGroups['weaponRuntime']): void {
