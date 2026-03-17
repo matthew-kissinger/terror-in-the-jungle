@@ -13,6 +13,9 @@ import { getWorldFeaturePrefab } from './WorldFeaturePrefabs';
 
 const _rotatedOffset = new THREE.Vector3();
 const _upAxis = new THREE.Vector3(0, 1, 0);
+const _placementBounds = new THREE.Box3();
+const _placementSize = new THREE.Vector3();
+const _placementNormal = new THREE.Vector3();
 
 /**
  * Global scale multiplier for placed structures.
@@ -21,6 +24,19 @@ const _upAxis = new THREE.Vector3(0, 1, 0);
  * to a visually proportional size next to the oversized billboard soldiers.
  */
 const STRUCTURE_SCALE = 2.5;
+const WORLD_FEATURE_FLAT_SPAN_TARGET = 0.7;
+const WORLD_FEATURE_MIN_SEARCH_RADIUS = 1.5;
+const WORLD_FEATURE_MAX_SEARCH_RADIUS_SMALL = 8;
+const WORLD_FEATURE_MAX_SEARCH_RADIUS_LARGE = 3.5;
+const WORLD_FEATURE_SAMPLE_DIRECTIONS = 8;
+
+interface TerrainPlacementCandidate {
+  x: number;
+  z: number;
+  y: number;
+  score: number;
+  heightSpan: number;
+}
 
 interface SpawnedFeatureObject {
   id: string;
@@ -134,11 +150,19 @@ export class WorldFeatureSystem implements GameSystem {
       _rotatedOffset.copy(placement.offset).applyAxisAngle(_upAxis, featureYaw);
       const worldX = feature.position.x + _rotatedOffset.x;
       const worldZ = feature.position.z + _rotatedOffset.z;
-      const baseY = placement.terrainSnap === false
-        ? feature.position.y + _rotatedOffset.y
-        : this.terrainManager.getHeightAt(worldX, worldZ);
+      const terrainPlacement = placement.terrainSnap === false
+        ? {
+            x: worldX,
+            y: feature.position.y + _rotatedOffset.y,
+            z: worldZ,
+          }
+        : this.resolveTerrainPlacement(worldX, worldZ, object);
 
-      object.position.set(worldX, baseY + (placement.heightOffset ?? 0), worldZ);
+      object.position.set(
+        terrainPlacement.x,
+        terrainPlacement.y + (placement.heightOffset ?? 0),
+        terrainPlacement.z
+      );
       object.rotation.y = featureYaw + (placement.yaw ?? 0);
       object.traverse((child) => {
         if (child instanceof THREE.Mesh) {
@@ -215,5 +239,135 @@ export class WorldFeatureSystem implements GameSystem {
     }
     this.spawnedObjects = [];
     this.builtModeId = null;
+  }
+
+  private resolveTerrainPlacement(
+    baseX: number,
+    baseZ: number,
+    object: THREE.Object3D,
+  ): { x: number; y: number; z: number } {
+    if (!this.terrainManager) {
+      return { x: baseX, y: 0, z: baseZ };
+    }
+
+    const footprintRadius = this.estimatePlacementFootprintRadius(object);
+    const baseCandidate = this.scoreTerrainPlacementCandidate(baseX, baseZ, baseX, baseZ, footprintRadius);
+    if (baseCandidate.score === Number.POSITIVE_INFINITY) {
+      return {
+        x: baseX,
+        y: this.terrainManager.getHeightAt(baseX, baseZ),
+        z: baseZ,
+      };
+    }
+
+    if (baseCandidate.heightSpan <= WORLD_FEATURE_FLAT_SPAN_TARGET) {
+      return baseCandidate;
+    }
+
+    const maxSearchRadius = footprintRadius <= 4.5
+      ? WORLD_FEATURE_MAX_SEARCH_RADIUS_SMALL
+      : WORLD_FEATURE_MAX_SEARCH_RADIUS_LARGE;
+    const searchRadius = THREE.MathUtils.clamp(
+      footprintRadius * 0.8,
+      WORLD_FEATURE_MIN_SEARCH_RADIUS,
+      maxSearchRadius,
+    );
+
+    let best = baseCandidate;
+    const ringRadii = [searchRadius * 0.5, searchRadius];
+    for (const radius of ringRadii) {
+      for (let sampleIndex = 0; sampleIndex < WORLD_FEATURE_SAMPLE_DIRECTIONS; sampleIndex++) {
+        const angle = (sampleIndex / WORLD_FEATURE_SAMPLE_DIRECTIONS) * Math.PI * 2;
+        const candidate = this.scoreTerrainPlacementCandidate(
+          baseX + Math.cos(angle) * radius,
+          baseZ + Math.sin(angle) * radius,
+          baseX,
+          baseZ,
+          footprintRadius,
+        );
+        if (candidate.score < best.score) {
+          best = candidate;
+        }
+      }
+    }
+
+    return best;
+  }
+
+  private estimatePlacementFootprintRadius(object: THREE.Object3D): number {
+    object.updateMatrixWorld(true);
+    _placementBounds.setFromObject(object);
+    _placementBounds.getSize(_placementSize);
+    return THREE.MathUtils.clamp(
+      Math.max(_placementSize.x, _placementSize.z) * 0.5,
+      1.25,
+      10,
+    );
+  }
+
+  private scoreTerrainPlacementCandidate(
+    x: number,
+    z: number,
+    baseX: number,
+    baseZ: number,
+    footprintRadius: number,
+  ): TerrainPlacementCandidate {
+    if (!this.terrainManager?.hasTerrainAt(x, z)) {
+      return { x, y: 0, z, score: Number.POSITIVE_INFINITY, heightSpan: Number.POSITIVE_INFINITY };
+    }
+
+    const sampleRadius = THREE.MathUtils.clamp(footprintRadius * 0.55, 1.1, 5.5);
+    const samples = [
+      [0, 0],
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+      [0.7, 0.7],
+      [-0.7, 0.7],
+      [0.7, -0.7],
+      [-0.7, -0.7],
+    ] as const;
+
+    let minHeight = Number.POSITIVE_INFINITY;
+    let maxHeight = Number.NEGATIVE_INFINITY;
+    let sumHeight = 0;
+    let centerHeight = 0;
+
+    for (let i = 0; i < samples.length; i++) {
+      const [offsetX, offsetZ] = samples[i];
+      const sampleX = x + offsetX * sampleRadius;
+      const sampleZ = z + offsetZ * sampleRadius;
+      if (!this.terrainManager.hasTerrainAt(sampleX, sampleZ)) {
+        return { x, y: 0, z, score: Number.POSITIVE_INFINITY, heightSpan: Number.POSITIVE_INFINITY };
+      }
+
+      const height = this.terrainManager.getHeightAt(sampleX, sampleZ);
+      if (i === 0) {
+        centerHeight = height;
+      }
+      minHeight = Math.min(minHeight, height);
+      maxHeight = Math.max(maxHeight, height);
+      sumHeight += height;
+    }
+
+    const meanHeight = sumHeight / samples.length;
+    const heightSpan = maxHeight - minHeight;
+    const normalY = typeof (this.terrainManager as any).getNormalAt === 'function'
+      ? Number(this.terrainManager.getNormalAt(x, z, _placementNormal).y)
+      : 1;
+    const slopePenalty = 1 - THREE.MathUtils.clamp(normalY, 0, 1);
+    const centerBias = Math.abs(centerHeight - meanHeight);
+    const distancePenalty = Math.hypot(x - baseX, z - baseZ) * 0.18;
+    const score = heightSpan * 5 + centerBias * 2 + slopePenalty * 8 + distancePenalty;
+    const groundedY = meanHeight + Math.min(heightSpan * 0.15, 0.18);
+
+    return {
+      x,
+      y: groundedY,
+      z,
+      score,
+      heightSpan,
+    };
   }
 }

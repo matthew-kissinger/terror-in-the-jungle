@@ -1,14 +1,14 @@
 import type { Combatant } from './types';
-import { NPC_MAX_SPEED } from '../../config/CombatantConfig';
 
-export type StuckRecoveryAction = 'none' | 'nudge' | 'unregister_navmesh';
+export type StuckRecoveryAction = 'none' | 'backtrack';
 
-// ── Tuning constants ──
-const STUCK_CHECK_INTERVAL_MS = 1500;
-const STUCK_MOVE_THRESHOLD_SQ = 1.0; // 1m — if moved less than this, count as stuck
-const STUCK_TICK_THRESHOLD = 3; // 3 consecutive stuck checks (~4.5s) = confirmed stuck
-const STUCK_NUDGE_DISTANCE = 8.0; // meters to shift destination on recovery
-const STUCK_MAX_RECOVERIES = 3; // after this many nudges, clear destination entirely
+const STUCK_CHECK_INTERVAL_MS = 600;
+const STUCK_MOVE_THRESHOLD_SQ = 0.25;
+const STUCK_PROGRESS_IMPROVEMENT_SQ = 0.5;
+const STUCK_TICK_THRESHOLD = 2;
+const STUCK_PINNED_RADIUS_SQ = 2.25;
+const STUCK_PINNED_RELEASE_RADIUS_SQ = 6.25;
+const STUCK_PINNED_DWELL_MS = 1200;
 
 interface StuckRecord {
   lastCheckX: number;
@@ -16,23 +16,31 @@ interface StuckRecord {
   lastCheckTime: number;
   stuckTicks: number;
   recoveryCount: number;
+  lastAnchorDistanceSq: number;
+  lastAnchorX?: number;
+  lastAnchorZ?: number;
+  localAreaOriginX: number;
+  localAreaOriginZ: number;
+  localAreaDwellMs: number;
+  localAreaMaxRadiusSq: number;
 }
 
 /**
- * Tracks NPC positions over time and detects/recovers stuck agents.
+ * Tracks short-horizon terrain stalls and requests deterministic recovery.
  *
- * Fast path (99%+ of calls): Map lookup + timestamp comparison.
- * No per-frame allocations.
+ * This detector no longer mutates destinations or injects random impulses.
+ * It watches whether a combatant both moves and makes progress toward its
+ * current movement anchor, then asks the caller to trigger a backtrack when
+ * that progress stalls for too long.
  */
 export class StuckDetector {
   private records = new Map<string, StuckRecord>();
 
-  /**
-   * Check if a combatant is stuck and attempt recovery if so.
-   * Call once per frame after final position is settled.
-   * Returns the recovery action taken so callers can react (e.g. unregister from navmesh).
-   */
   checkAndRecover(combatant: Combatant, now: number): StuckRecoveryAction {
+    const anchor = combatant.movementAnchor ?? combatant.destinationPoint;
+    const anchorDistanceSq = anchor
+      ? combatant.position.distanceToSquared(anchor)
+      : Number.POSITIVE_INFINITY;
     const record = this.records.get(combatant.id);
 
     if (!record) {
@@ -42,82 +50,125 @@ export class StuckDetector {
         lastCheckTime: now,
         stuckTicks: 0,
         recoveryCount: 0,
+        lastAnchorDistanceSq: anchorDistanceSq,
+        lastAnchorX: anchor?.x,
+        lastAnchorZ: anchor?.z,
+        localAreaOriginX: combatant.position.x,
+        localAreaOriginZ: combatant.position.z,
+        localAreaDwellMs: 0,
+        localAreaMaxRadiusSq: 0,
       });
       return 'none';
     }
 
-    // Interval gate — skip if not enough time has passed
-    if (now - record.lastCheckTime < STUCK_CHECK_INTERVAL_MS) return 'none';
+    const deltaMs = now - record.lastCheckTime;
+    if (deltaMs < STUCK_CHECK_INTERVAL_MS) {
+      return 'none';
+    }
 
-    // Measure XZ displacement since last check
     const dx = combatant.position.x - record.lastCheckX;
     const dz = combatant.position.z - record.lastCheckZ;
-    const distSq = dx * dx + dz * dz;
+    const movedSq = dx * dx + dz * dz;
 
-    if (distSq < STUCK_MOVE_THRESHOLD_SQ) {
+    const anchorChanged = this.hasAnchorChanged(record, anchor);
+    if (anchorChanged) {
+      record.stuckTicks = 0;
+      record.recoveryCount = 0;
+      this.resetLocalArea(record, combatant.position.x, combatant.position.z);
+    }
+
+    const wantsMovement = combatant.velocity.lengthSq() > 0.01;
+    const madeAnchorProgress = anchor
+      ? anchorDistanceSq + STUCK_PROGRESS_IMPROVEMENT_SQ < record.lastAnchorDistanceSq
+      : false;
+    const localDx = combatant.position.x - record.localAreaOriginX;
+    const localDz = combatant.position.z - record.localAreaOriginZ;
+    const localRadiusSq = localDx * localDx + localDz * localDz;
+    const escapedLocalArea = localRadiusSq > STUCK_PINNED_RELEASE_RADIUS_SQ;
+
+    if (madeAnchorProgress || escapedLocalArea) {
+      this.resetLocalArea(record, combatant.position.x, combatant.position.z);
+    } else if (wantsMovement) {
+      record.localAreaDwellMs += deltaMs;
+      record.localAreaMaxRadiusSq = Math.max(record.localAreaMaxRadiusSq, localRadiusSq);
+    }
+
+    const pinnedInArea =
+      record.localAreaDwellMs >= STUCK_PINNED_DWELL_MS &&
+      localRadiusSq <= STUCK_PINNED_RADIUS_SQ;
+
+    if (!wantsMovement) {
+      record.stuckTicks = 0;
+      record.recoveryCount = 0;
+      this.resetLocalArea(record, combatant.position.x, combatant.position.z);
+    } else if ((movedSq < STUCK_MOVE_THRESHOLD_SQ || pinnedInArea) && !madeAnchorProgress) {
       record.stuckTicks++;
     } else {
       record.stuckTicks = 0;
-      record.recoveryCount = 0; // moving again — reset recovery counter
+      if (madeAnchorProgress || escapedLocalArea) {
+        record.recoveryCount = 0;
+      }
     }
 
     record.lastCheckX = combatant.position.x;
     record.lastCheckZ = combatant.position.z;
     record.lastCheckTime = now;
+    record.lastAnchorDistanceSq = anchorDistanceSq;
+    record.lastAnchorX = anchor?.x;
+    record.lastAnchorZ = anchor?.z;
 
-    if (record.stuckTicks >= STUCK_TICK_THRESHOLD) {
-      const action = this.recoverStuck(combatant, record);
+    if (
+      record.stuckTicks >= STUCK_TICK_THRESHOLD &&
+      combatant.movementLastGoodPosition
+    ) {
       record.stuckTicks = 0;
-      return action;
+      record.recoveryCount++;
+      return 'backtrack';
     }
+
     return 'none';
   }
 
-  private recoverStuck(combatant: Combatant, record: StuckRecord): StuckRecoveryAction {
-    record.recoveryCount++;
-
-    if (record.recoveryCount > STUCK_MAX_RECOVERIES) {
-      // Too many failed nudges — signal navmesh unregistration so NPC falls back to beeline
-      combatant.destinationPoint = undefined;
-      record.recoveryCount = 0;
-      return 'unregister_navmesh';
-    }
-
-    if (combatant.destinationPoint) {
-      // Nudge destination in a random direction
-      const angle = Math.random() * Math.PI * 2;
-      combatant.destinationPoint.x += Math.cos(angle) * STUCK_NUDGE_DISTANCE;
-      combatant.destinationPoint.z += Math.sin(angle) * STUCK_NUDGE_DISTANCE;
-    } else {
-      // No destination — give a random velocity impulse for one frame
-      const angle = Math.random() * Math.PI * 2;
-      combatant.velocity.x = Math.cos(angle) * NPC_MAX_SPEED;
-      combatant.velocity.z = Math.sin(angle) * NPC_MAX_SPEED;
-    }
-    return 'nudge';
-  }
-
-  /** Remove tracking for a combatant (call on death/despawn). */
   remove(id: string): void {
     this.records.delete(id);
   }
 
-  /** Clear all records (call on round reset). */
   clear(): void {
     this.records.clear();
   }
 
-  /** Visible for testing. */
   getRecord(id: string): StuckRecord | undefined {
     return this.records.get(id);
   }
+
+  private hasAnchorChanged(
+    record: StuckRecord,
+    anchor: Combatant['movementAnchor'] | Combatant['destinationPoint'],
+  ): boolean {
+    if (!anchor) {
+      return Number.isFinite(record.lastAnchorDistanceSq);
+    }
+
+    if (!Number.isFinite(record.lastAnchorX) || !Number.isFinite(record.lastAnchorZ)) {
+      return true;
+    }
+
+    const dx = anchor.x - Number(record.lastAnchorX);
+    const dz = anchor.z - Number(record.lastAnchorZ);
+    return dx * dx + dz * dz > 4;
+  }
+
+  private resetLocalArea(record: StuckRecord, x: number, z: number): void {
+    record.localAreaOriginX = x;
+    record.localAreaOriginZ = z;
+    record.localAreaDwellMs = 0;
+    record.localAreaMaxRadiusSq = 0;
+  }
 }
 
-// Export constants for testing
 export {
   STUCK_CHECK_INTERVAL_MS,
   STUCK_MOVE_THRESHOLD_SQ,
+  STUCK_PINNED_DWELL_MS,
   STUCK_TICK_THRESHOLD,
-  STUCK_NUDGE_DISTANCE,
-  STUCK_MAX_RECOVERIES,
 };

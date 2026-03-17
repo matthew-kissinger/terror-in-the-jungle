@@ -108,6 +108,10 @@ export class GameModeManager implements GameSystem {
     this.terrainSystem = terrainSystem;
     this.minimapSystem = minimapSystem;
     this.fullMapSystem = fullMapSystem;
+    const fullMapRuntimeTarget = this.fullMapSystem as unknown as {
+      setTerrainRuntime?: (runtime: ITerrainRuntimeController) => void;
+    };
+    fullMapRuntimeTarget.setTerrainRuntime?.(terrainSystem);
     this.applyMapIntelPolicy(this.currentDefinition.policies.mapIntel);
   }
 
@@ -304,7 +308,12 @@ export class GameModeManager implements GameSystem {
         }
         this.warSimulator.configure(
           config.warSimulator,
-          (x: number, z: number) => this.terrainSystem!.getHeightAt(x, z)
+          (x: number, z: number) => this.terrainSystem!.getHeightAt(x, z),
+          {
+            worldSize: config.worldSize,
+            zones: config.zones,
+            features: config.features,
+          },
         );
 
         // Spawn strategic forces from zone config

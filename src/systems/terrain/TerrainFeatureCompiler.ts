@@ -6,6 +6,7 @@ import type {
 } from '../../config/gameModeTypes';
 import { AIRFIELD_TEMPLATES } from '../world/AirfieldTemplates';
 import { generateAirfieldLayout } from '../world/AirfieldLayoutGenerator';
+import { compileTerrainFlow } from './TerrainFlowCompiler';
 import type {
   CompiledTerrainFeatureSet,
   TerrainExclusionZone,
@@ -23,17 +24,26 @@ const DEFAULT_VILLAGE_GRADE_STRENGTH = 0.2;
 const DEFAULT_AIRFIELD_GRADE_STRENGTH = 0.25;
 const DEFAULT_ROAD_GRADE_STRENGTH = 0.18;
 
-export function compileTerrainFeatures(config: GameModeConfig): CompiledTerrainFeatureSet {
+export function compileTerrainFeatures(
+  config: GameModeConfig,
+  getTerrainHeight?: ((x: number, z: number) => number) | null,
+): CompiledTerrainFeatureSet {
   const features = config.features ?? [];
   const compiled: CompiledTerrainFeatureSet = {
     stamps: [],
     surfacePatches: [],
     vegetationExclusionZones: [],
+    flowPaths: [],
   };
 
   for (const feature of features) {
     compileFeature(feature, compiled);
   }
+
+  const terrainFlow = compileTerrainFlow(config, getTerrainHeight);
+  compiled.stamps.push(...terrainFlow.stamps);
+  compiled.surfacePatches.push(...terrainFlow.surfacePatches);
+  compiled.flowPaths.push(...terrainFlow.flowPaths);
 
   compiled.stamps.sort((a, b) => a.priority - b.priority);
   compiled.surfacePatches.sort((a, b) => a.priority - b.priority);

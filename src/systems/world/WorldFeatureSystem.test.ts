@@ -31,6 +31,7 @@ describe('WorldFeatureSystem', () => {
       isTerrainReady: vi.fn(() => true),
       hasTerrainAt: vi.fn(() => true),
       getHeightAt: vi.fn(() => 5),
+      getNormalAt: vi.fn((_x: number, _z: number, target?: THREE.Vector3) => (target ?? new THREE.Vector3()).set(0, 1, 0)),
       registerCollisionObject: vi.fn(),
       unregisterCollisionObject: vi.fn(),
     };
@@ -91,5 +92,46 @@ describe('WorldFeatureSystem', () => {
     await flushPromises();
 
     expect(scene.children.length).toBe(0);
+  });
+
+  it('nudges terrain-snapped placements away from cliff lips onto flatter nearby ground', async () => {
+    terrainManager.getHeightAt = vi.fn((x: number, z: number) => {
+      if (Math.abs(x - 10) < 1.2 && Math.abs(z - 20) < 1.2) {
+        return 11;
+      }
+      return 5;
+    });
+    terrainManager.getNormalAt = vi.fn((x: number, z: number, target?: THREE.Vector3) => {
+      const normal = target ?? new THREE.Vector3();
+      if (Math.abs(x - 10) < 1.2 && Math.abs(z - 20) < 1.2) {
+        return normal.set(0.5, 0.7, 0);
+      }
+      return normal.set(0, 1, 0);
+    });
+    currentConfig = {
+      id: GameMode.ZONE_CONTROL,
+      features: [
+        {
+          id: 'rough_motor_pool',
+          kind: 'village',
+          position: new THREE.Vector3(10, 0, 20),
+          staticPlacements: [
+            {
+              modelPath: 'mock_vehicle.glb',
+              offset: new THREE.Vector3(0, 0, 0),
+              registerCollision: true,
+            },
+          ],
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+
+    expect(scene.children.length).toBe(1);
+    const placed = scene.children[0];
+    expect(placed.position.x).toBeGreaterThan(10.5);
+    expect(placed.position.y).toBeLessThan(8);
   });
 });

@@ -5,17 +5,21 @@ import { handlePlayerCommand, handleRejoiningMovement } from './CombatantMovemen
 import { NPC_MAX_SPEED } from '../../config/CombatantConfig';
 
 // ── Movement speeds (m/s) ──
-const SQUAD_FOLLOW_SPEED = 3;
-const PATROL_SPEED = 4;
-const PATROL_CLOSE_SPEED = 2;
-const PATROL_LONG_DISTANCE_SPEED = NPC_MAX_SPEED;
-const FALLBACK_ADVANCE_SPEED = 3;
+const TRAVERSAL_RUN_SPEED = Math.max(NPC_MAX_SPEED + 2.5, 8.5);
+const SQUAD_FOLLOW_SPEED = 5.75;
+const PATROL_SPEED = 6.0;
+const PATROL_CLOSE_SPEED = 3.75;
+const PATROL_LONG_DISTANCE_SPEED = TRAVERSAL_RUN_SPEED;
+const FALLBACK_ADVANCE_SPEED = 6.0;
 const WANDER_SPEED = 2;
-const COMBAT_APPROACH_SPEED = 3;
+const COMBAT_APPROACH_SPEED = 3.25;
+const ADVANCING_TRAVERSE_SPEED = 6.5;
+const ADVANCING_CLOSE_SPEED = 4.25;
 const COMBAT_RETREAT_SPEED = 2;
 const COMBAT_STRAFE_SPEED = 2;
-const COVER_SEEKING_SPEED = NPC_MAX_SPEED;
-const DEFEND_SPEED = 3;
+const COVER_SEEKING_SPEED = Math.max(NPC_MAX_SPEED + 1.0, 7.0);
+const DEFEND_SPEED = 4.75;
+const SUPPRESS_HOLD_SPEED = 0;
 
 // ── Distances (meters) ──
 const SQUAD_FOLLOW_DISTANCE = 6;
@@ -26,6 +30,9 @@ const ENGAGEMENT_DISTANCE = 30;
 const ENGAGEMENT_TOLERANCE = 10;
 const COVER_ARRIVAL_RADIUS = 2;
 const DEFEND_ARRIVAL_RADIUS = 2;
+const ADVANCE_ARRIVAL_RADIUS = 3;
+const ADVANCE_CLOSE_DISTANCE = 16;
+const ADVANCE_LONG_DISTANCE = 55;
 
 // ── Zone scoring ──
 const ZONE_EVAL_INTERVAL_MS = 3000;
@@ -208,6 +215,46 @@ export function updateCombatMovement(combatant: Combatant): void {
     combatant.velocity.copy(_moveVec2).multiplyScalar(strafeAngle * COMBAT_STRAFE_SPEED);
   }
 }
+
+export function updateAdvancingMovement(combatant: Combatant): void {
+  const anchor = combatant.destinationPoint ?? combatant.target?.position;
+  if (!anchor) {
+    combatant.velocity.set(0, 0, 0);
+    return;
+  }
+
+  _moveVec.subVectors(anchor, combatant.position);
+  const distance = _moveVec.length();
+  if (combatant.destinationPoint && distance < ADVANCE_ARRIVAL_RADIUS) {
+    combatant.velocity.set(0, 0, 0);
+    return;
+  }
+
+  _moveVec.normalize();
+  let speed = ADVANCING_TRAVERSE_SPEED;
+  if (distance < ADVANCE_CLOSE_DISTANCE) {
+    speed = ADVANCING_CLOSE_SPEED;
+  } else if (distance > ADVANCE_LONG_DISTANCE) {
+    speed = TRAVERSAL_RUN_SPEED;
+  }
+
+  combatant.velocity.set(_moveVec.x * speed, 0, _moveVec.z * speed);
+  combatant.rotation = Math.atan2(_moveVec.z, _moveVec.x);
+}
+
+export function updateSuppressingMovement(combatant: Combatant): void {
+  combatant.velocity.set(0, 0, 0);
+  if (combatant.suppressionTarget) {
+    _moveVec.subVectors(combatant.suppressionTarget, combatant.position);
+    if (_moveVec.lengthSq() > 0.0001) {
+      combatant.rotation = Math.atan2(_moveVec.z, _moveVec.x);
+    }
+  }
+  if (SUPPRESS_HOLD_SPEED > 0) {
+    combatant.velocity.multiplyScalar(SUPPRESS_HOLD_SPEED);
+  }
+}
+
 export function updateCoverSeekingMovement(combatant: Combatant): void {
   if (!combatant.destinationPoint) {
     combatant.velocity.set(0, 0, 0);

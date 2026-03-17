@@ -1,6 +1,6 @@
 # Architecture Recovery Plan
 
-Last updated: 2026-03-10
+Last updated: 2026-03-17
 Scope: runtime architecture stabilization with performance and gameplay fidelity gates.
 
 ## Current Goal
@@ -60,13 +60,27 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: 6 weapon types (`rifle|shotgun|smg|pistol|lmg|launcher`). M60 LMG and M79 grenade launcher wired through WeaponRigManager, GunplayCore, ShotCommand, WeaponAmmo, WeaponSwitching, LoadoutTypes, AudioWeaponSounds.
 - Keep: M79 launcher fires grenade projectile via `GrenadeSystem.spawnProjectile()` instead of hitscan. Separate from hand-thrown grenade cooking flow.
 - Keep: Player tracer spawning in `WeaponFiring.spawnTracer()`. TracerPool already existed for NPC shots; now shared.
+- Keep (2026-03-17): player fire resolution is now barrel-aligned instead of camera-center-only. `WeaponFiring` first resolves the reticle aim point, then rebuilds the live shot ray and visible tracer from a per-weapon muzzle-derived world start projected out of the overlay weapon camera. This preserves reticle correctness while fixing close-range muzzle/tracer disconnects across different gun barrel positions.
 - Keep: `applyGraphicsQuality()` controls post-processing pixel size per tier (low=4, med=3, high=1.5, ultra=1) and toggles shadows.
 - Keep: `AnimalSystem` cell-based ambient wildlife (egret, water_buffalo, macaque). Deterministic per-cell xorshift32 PRNG, ~20-25 active within 200m. No combat interaction.
 - Keep: Structure feature placements on TDM (4), Zone Control (5), A Shau (+10 to 16 total). All use existing WorldFeatureSystem + prefab layouts.
 - Delete: `ProgrammaticGunFactory.ts` (dead code; all weapons load from GLBs via WeaponRigManager).
-- Keep: `SlopePhysics.ts` pure-function utility for terrain slope speed penalty, slide, and step-up gating. Player speed reduced on slopes (blocked above ~60 deg with downhill slide), step-up gating prevents teleporting onto structures (MAX_STEP_HEIGHT=0.5m). NPCs get XZ velocity slope penalty only (navmesh handles pathing).
+- Keep: `SlopePhysics.ts` as the walkability/slide/step utility, not the primary locomotion model. Player uphill feel now comes from support-plane movement on a smoothed gameplay surface, while unwalkable slopes still block/slide. NPC infantry no longer rely on shared runtime slope-speed penalties.
 - Keep: `NavmeshSystem` with `@recast-navigation/core` + `/three` + `/wasm` (v0.43.0). WASM chunk 727KB (218KB gzip), code-split. Solo navmesh for worldSize <= 3200m, TileCache tiled navmesh for larger maps. MAX_CROWD_AGENTS=64. Graceful degradation to beeline if WASM fails.
-- Keep: `NavmeshMovementAdapter` bridges Recast Crowd with CombatantMovement. LOD-gated: high/medium LOD NPCs use crowd-steered velocity, low/culled use beeline. State handlers still decide WHERE (zone scoring, cover), navmesh decides HOW (path around obstacles). Death/dematerialization unregisters agents from crowd.
+- Keep: `NavmeshSystem` as optional infrastructure, not infantry movement authority. Current ground-combat locomotion uses one terrain-aware solver across LOD tiers with contouring/backtrack; Recast remains available for future helper/hint work but is no longer trusted as the core hill-combat answer.
+- Keep: `GameplaySurfaceSampling.ts` as the shared gameplay-terrain read model. Player and NPC movement now sample a smoothed support surface instead of relying on raw single-point slope queries.
+- Keep: `StrategicRoutePlanner` as the strategic/far movement layer. `WarSimulator` now converts squad objectives into shared waypoint plans built from zones plus route-friendly authored features, and `GameModeManager` passes mode topology into `WarSimulator.configure()`. Strategic movement no longer defaults to pure straight-line chasing across hostile terrain.
+- Keep: movement harness telemetry in `PerformanceTelemetry`/`perf-capture`: player support-surface quality, uphill/downhill samples, terrain blocks/slides, and NPC contour/backtrack/low-progress/LOD metrics now travel with the existing perf artifact path.
+- Keep (2026-03-17): harness movement telemetry now includes pinned-area dwell metrics for both player and NPCs. This catches jittering-in-place and ditch/cliff dithering that plain displacement or anchor-progress counters miss.
+- Keep (2026-03-17): NPC terrain-aware locomotion now uses support-surface projection, higher traversal-state speeds, meaningful lip tolerance, and uphill/contour-biased recovery candidates. In the latest `zonecontrol` capture (`2026-03-17T04-08-15-602Z`), player average actual speed improved `6.85 -> 7.62`, NPC pinned samples dropped `6227 -> 3793`, NPC average progress per sample improved `0.0222 -> 0.0368`, flank-arc usage rose `1248 -> 9382`, and backtrack activations fell `30 -> 21`.
+- Keep (2026-03-17): future movement playback / heatmap work is harness-first, not shipping-UI-first. The right artifact shape for this game is aggregated jungle pressure data plus sampled tracks, not raw full-frame traces for every NPC.
+- Keep (2026-03-17): terrain-flow compilation now feeds all three surfaces from one source of truth: terrain stamps/surface patches, full-map topo/trail overlays, and minimap trail hints. `GameModeConfig.terrainFlow` is now the mode-level policy hook for that compile step.
+- Keep (2026-03-17): terrain-flow corridors now shape the gameplay height surface with continuous `flatten_capsule` stamps, and long route segments are split by route spacing so trails follow grade changes instead of averaging whole hillsides into a single flatten span.
+- Keep (2026-03-17): match-end traversal stats now come from a dedicated `MovementStatsTracker`, not from perf diagnostics. Shipping results stay compact while harness-only detail remains in `PerformanceTelemetry`.
+- Keep (2026-03-17): harness movement review now has a second artifact layer. `perf-capture.ts` writes `movement-artifacts.json` with sparse occupancy cells, hotspot cells, and sampled player/NPC tracks, which is the intended basis for a future terrain-relative viewer.
+- Keep (2026-03-17): harness movement review now also writes `movement-terrain-context.json` and a self-contained `movement-viewer.html`, so terrain-relative playback/heat review is available from the artifact without adding shipping UI weight.
+- Keep (2026-03-17): `WorldFeatureSystem` now does slope/ledge-aware terrain placement search for terrain-snapped objects so cars/props/structures are biased onto flatter nearby ground instead of pure center-height snapping onto cliff lips.
+- Keep (2026-03-17): terrain-flow corridor layering was corrected. Route/shoulder stamps now sit below authored HQ/firebase pads, home-base shoulders bias to `max` height, and route corridors start from zone-edge insets instead of zone centers. This directly addresses Zone Control OPFOR HQ bowl/lip failures without returning to broad flattening.
 - Keep: Structure footprint obstacles baked into navmesh. Solo maps: obstacle wall meshes (cylinder/box) passed as additional input to `threeToSoloNavMesh`. Tiled maps: `TileCache.addCylinderObstacle`/`addBoxObstacle` with incremental `update()` processing. Circle footprints -> cylinder, rect/strip footprints -> box.
 - Keep: frame-local AI neighborhood cache in `AITargetAcquisition`; patrol/defend cluster-density checks now reuse the widest per-combatant spatial query issued that frame.
 - Keep: heap validation expansion (`growth`, `peak`, `recovery`) in harness output.
@@ -150,6 +164,8 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - A/B startup variance can hide small wins/losses; first capture after a fresh boot should be treated as cold-start data.
 - ZoneManager no longer falls back to linear scan if spatial query returns empty; if SpatialGridManager has sync bugs, zone capture may stall.
 - The immediate A Shau terrain-startup spike has improved in preview smoke, but this is not yet a substitute for broader perf-harness evidence under sustained combat and camera motion.
+- The new strategic route-guidance layer has focused unit and wiring coverage, but it still needs harness evidence on `openfrontier:short` and `ashau:short` before its battlefield-shape and frame-tail impact are considered accepted.
+- Terrain support remains the clearest gameplay-architecture gap, but the first corridor/shoulder layer is now live. The remaining risk is upstream generation quality: routes are still shaping an already-generated procedural surface, so HQ/water/deformation/path-meshing issues may require earlier terrain-flow integration instead of more post-pass deformation.
 - `combat120` now has a valid harness run, but it fails on `peak_p99_frame_ms` and AI starvation. This is the clearest measured hotspot.
 - Deep `combat120` capture localizes the worst tails to `CombatantAI.updateAI()` inside high-LOD full updates. March 4 diagnostic probes now show those nominal `suppressing` / `advancing` spikes are actually `AIStateEngage.handleEngaging()` work that transitions into those states.
 - The accepted March 4, 2026 frame-local `AITargetAcquisition` cache reduced matched warm `combat120` starvation (`16.82 -> 12.91`), average frame time (`15.10ms -> 14.59ms`), and heap growth (`15.73MB -> 3.64MB`) under slightly higher combat pressure, but `peak_p99_frame_ms` still fails and `SystemUpdater.Combat.maxDurationMs` rose slightly (`224.4ms -> 233.6ms`).
@@ -177,9 +193,11 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 1. Finish the remaining constructor/runtime-dependency cleanup for the next cold-path clusters (`CombatantSystem`, any remaining helicopter helpers, and selected HUD-adjacent services) now that the core player/vehicle path is no longer setter-only.
 2. Continue pushing cadence-safe world, strategy, and passive UI work behind declared scheduling contracts while leaving movement/weapon-feel systems every frame.
 3. Continue `combat120` tail reduction in `AIStateEngage.initiateSquadSuppression()` with pressure-matched evidence only.
-4. Break down `TerrainRaycastRuntime` near-field rebuild and vegetation update cost inside `TerrainSystem.update()` for `open_frontier`, `frontier30m`, and `a_shau_valley`.
-5. Re-baseline and lock regression checks after each accepted change. Deploy is now gated on CI by built-app smoke as well as lint/test/build.
-6. Keep terrain rewrite progress aligned with `blocks/terrain.md`; do not reintroduce chunk-era semantics into active runtime code.
+4. Use the new `movement-viewer.html` / `movement-terrain-context.json` artifact pair to decide whether the next terrain pass should move route influence upstream into generation rather than adding more post-pass deformation on top of procedural terrain.
+5. Revisit HQ/water/deformation edge cases only after the upstream terrain-flow direction is chosen; do not paper over them with another round of high-priority corridor flattening.
+6. Break down `TerrainRaycastRuntime` near-field rebuild and vegetation update cost inside `TerrainSystem.update()` for `open_frontier`, `frontier30m`, and `a_shau_valley`.
+7. Re-baseline and lock regression checks after each accepted change. Deploy is now gated on CI by built-app smoke as well as lint/test/build.
+8. Keep terrain rewrite progress aligned with `blocks/terrain.md`; do not reintroduce chunk-era semantics into active runtime code.
 
 ## Update Rule
 

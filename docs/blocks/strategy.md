@@ -1,6 +1,6 @@
 # Strategy Domain
 
-War simulation layer. Active only in A Shau Valley mode. Sits ABOVE CombatantSystem - CS knows nothing about WarSimulator. The bridge is MaterializationPipeline, which creates and destroys combatants in CombatantSystem based on player proximity.
+War simulation layer. Active in the large-scale war modes (currently Open Frontier and A Shau Valley). Sits ABOVE CombatantSystem - CS knows nothing about WarSimulator. The bridge is MaterializationPipeline, which creates and destroys combatants in CombatantSystem based on player proximity.
 
 ---
 
@@ -21,6 +21,7 @@ War simulation layer. Active only in A Shau Valley mode. Sits ABOVE CombatantSys
 | MaterializationPipeline | [strategy/MaterializationPipeline.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/MaterializationPipeline.ts) | STRATEGIC->SIMULATED->MATERIALIZED tier transitions. 800m mat / 900m demat / 100m hysteresis. Max 60 materialized. |
 | AbstractCombatResolver | [strategy/AbstractCombatResolver.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/AbstractCombatResolver.ts) | Squad-vs-squad abstract combat for SIMULATED/STRATEGIC agents. Runs every 2s. |
 | StrategicDirector | [strategy/StrategicDirector.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/StrategicDirector.ts) | Zone-objective assignment for all squads. Runs every 5s. |
+| StrategicRoutePlanner | [strategy/StrategicRoutePlanner.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/StrategicRoutePlanner.ts) | Builds cheap squad route plans from zones plus route-friendly authored features. Samples terrain cost along candidate edges and returns shared waypoints for far movement. |
 | WarEventEmitter | [strategy/WarEventEmitter.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/WarEventEmitter.ts) | Batched pub/sub. ONLY formal event bus in the codebase. subscribe() returns unsubscribe fn. emit() queues, flush() delivers batch. |
 | PersistenceSystem | [strategy/PersistenceSystem.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/PersistenceSystem.ts) | JSON save/load of WarState (~360KB). 3 localStorage slots (slot 0 = auto-save). Auto-save every 60s. |
 | StrategicFeedback | [strategy/StrategicFeedback.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/systems/strategy/StrategicFeedback.ts) | Subscribes to WarEventEmitter. Drives HUD messages + distant audio for war events. No per-frame work. |
@@ -32,8 +33,8 @@ War simulation layer. Active only in A Shau Valley mode. Sits ABOVE CombatantSys
 
 | Tier | Memory | Distance | Behavior |
 |------|--------|----------|----------|
-| STRATEGIC | ~120 bytes | >3000m | Position + stats only. No per-frame position updates. |
-| SIMULATED | ~120 bytes | <3000m | Lerp movement toward squad objective destination. No rendering. |
+| STRATEGIC | ~120 bytes | >3000m | Cheap waypoint travel + stats only. No rendering or full combat AI. |
+| SIMULATED | ~120 bytes | <3000m | Cheap waypoint travel inside the player-adjacent war bubble. No rendering. |
 | MATERIALIZED | ~2KB | <800m | Full Combatant in CombatantSystem. AI, physics, rendering active. |
 
 Hysteresis: materialize at 800m, dematerialize at 900m (100m gap prevents thrashing).
@@ -58,9 +59,10 @@ Defined in [strategy/types.ts](https://github.com/matthew-kissinger/terror-in-th
 | tier | AgentTier | STRATEGIC / SIMULATED / MATERIALIZED |
 | squadId | string | Parent squad |
 | isLeader | boolean | First member of squad |
-| destX, destZ | number | Movement destination set by StrategicDirector |
+| destX, destZ | number | Current strategic travel target. Usually the squad's current route waypoint or final objective anchor. |
 | speed | number | 3.5-5.0 m/s (randomized on spawn) |
 | combatState | string | idle / moving / fighting / dead |
+| formationSlot | number? | Stable per-squad slot used for final objective spread. |
 | combatantId | string? | Set when MATERIALIZED. Links to CombatantSystem entity. |
 
 ---
@@ -80,6 +82,9 @@ Defined in [strategy/types.ts](https://github.com/matthew-kissinger/terror-in-th
 | strength | number | 0-1 ratio of alive members |
 | combatActive | boolean | True if currently engaged with an enemy squad |
 | lastCombatTime | number | Timestamp of last abstract combat tick |
+| routeGoalKey | string? | Cached route target identity used to detect objective changes. |
+| routeWaypoints | StrategicRouteWaypoint[]? | Shared squad waypoint plan. Built by WarSimulator via StrategicRoutePlanner. |
+| routeWaypointIndex | number? | Current waypoint index inside routeWaypoints. |
 
 ---
 
@@ -106,11 +111,15 @@ pipeline.update(playerX, playerY, playerZ, velX, velZ)
         agent.tier = MATERIALIZED, agent.combatantId = returned ID
 
 if gameActive: updateSimulatedMovement(dt)
+  for each alive squad:
+    ensure squad route plan exists for current objective
   for each SIMULATED/STRATEGIC alive agent:
-    move toward destX/destZ at agent.speed
+    destX/destZ = squad current waypoint or final objective anchor
+    move toward that target at agent.speed
     terrain-align y via getTerrainHeight(x, z)
     stop within 2m of destination
   recalculate squad centroids + strength ratios
+  advance squad route index when centroid reaches the current waypoint
 
 if gameActive: resolver.update(elapsedTime)   // abstract combat, 2s interval
 if gameActive: director.update(elapsedTime)   // objective reassignment, 5s interval
@@ -158,7 +167,7 @@ Runs on `directorUpdateInterval` (5000ms). Evaluates battlefield and assigns squ
 
 **Reinforcements:** when faction drops below 70% alive, respawn up to 30 dead agents at HQ positions. Cooldown: `reinforcementCooldown` seconds (90s in A Shau config). Emits `reinforcements_arriving`.
 
-**Order propagation:** each agent gets `destX/destZ` = squad objective position + 30m random formation spread offset.
+**Order propagation:** objective changes clear stale routes. Agents inherit either the squad's current route waypoint or a stable final-objective formation spread; `WarSimulator` refreshes the per-frame travel target from the active route plan.
 
 ---
 
@@ -256,7 +265,7 @@ Schema version checked on load. Mismatch = load rejected with warning.
 | Consumer | What it uses |
 |----------|-------------|
 | FullMap | getAgentPositionsForMap() -> Float32Array |
-| GameModeManager | configure(), spawnStrategicForces(), disable() |
+| GameModeManager | configure() with war config + height query + route topology, spawnStrategicForces(), disable() |
 | Minimap | getAllAgents(), getAllSquads() |
 | PlayerRespawn | getAllSquads() (pressure insertion logic) |
 | StrategicFeedback | events.subscribe() |

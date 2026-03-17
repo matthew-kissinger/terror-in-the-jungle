@@ -152,6 +152,26 @@ interface TerrainFeatureSurfacePolicy {
   blend?: number;
 }
 
+export interface TerrainFlowPolicyConfig {
+  enabled: boolean;
+  routeStamping?: 'full' | 'map_only';
+  routeWidth?: number;
+  routeBlend?: number;
+  routeSpacing?: number;
+  routeSurface?: TerrainFeatureSurfaceKind;
+  routePriority?: number;
+  routeTerrainWidthScale?: number;
+  routeGradeStrength?: number;
+  routeTargetHeightMode?: 'center' | 'average' | 'max';
+  zoneShoulderPadding?: number;
+  zoneShoulderBlend?: number;
+  zoneShoulderGradeStrength?: number;
+  zoneShoulderTargetHeightMode?: 'center' | 'average' | 'max';
+  homeBaseShoulderTargetHeightMode?: 'center' | 'average' | 'max';
+  connectObjectivePairs?: boolean;
+  maxRoutesPerAnchor?: number;
+}
+
 interface TerrainFeatureGameplayPolicy {
   linkedZoneId?: string;
   spawnIds?: string[];
@@ -264,6 +284,11 @@ export interface GameModeConfig {
 
   // Terrain biome / vegetation configuration
   terrain?: TerrainConfig;
+
+  // Optional terrain-flow policy that derives jungle trails, softened
+  // approaches, and map-visible corridor overlays from the active objective
+  // topology. Intended for mode-aware route shaping, not hard lane authoring.
+  terrainFlow?: TerrainFlowPolicyConfig;
 
   // Helipad placements - where helicopters spawn on the map
   helipads?: Array<{

@@ -1,6 +1,9 @@
+import * as THREE from 'three';
 import { describe, it, expect } from 'vitest';
 import { WarSimulator } from './WarSimulator';
 import { Faction } from '../combat/types';
+import { AgentTier, StrategicAgent, StrategicSquad } from './types';
+import { StrategicRoutePlanner } from './StrategicRoutePlanner';
 
 type SpawnZone = {
   id: string;
@@ -138,5 +141,90 @@ describe('WarSimulator.spawnStrategicForces frontline seeding', () => {
     simulator.spawnStrategicForces(zones);
     const secondCount = simulator.getAgentCount();
     expect(secondCount).toBe(120);
+  });
+});
+
+describe('WarSimulator strategic routing', () => {
+  it('drives simulated agents through squad route waypoints instead of direct-line objectives', () => {
+    const simulator = createConfiguredSimulator(1, 1);
+    const heightQuery = () => 0;
+    (simulator as any).getTerrainHeight = heightQuery;
+    (simulator as any).routePlanner = new StrategicRoutePlanner(
+      {
+        worldSize: 1600,
+        zones: [
+          { id: 'us_base', position: new THREE.Vector3(0, 0, 0), radius: 30, isHomeBase: true },
+          { id: 'objective', position: new THREE.Vector3(1000, 0, 0), radius: 30, isHomeBase: false },
+        ],
+        features: [
+          {
+            id: 'trail_gap',
+            kind: 'road',
+            name: 'Trail Gap',
+            position: new THREE.Vector3(500, 0, 240),
+            footprint: { shape: 'circle', radius: 24 },
+            surface: { kind: 'jungle_trail', innerRadius: 16, outerRadius: 24 },
+          },
+        ],
+      },
+      (x, z) => {
+        const ridgeX = Math.max(0, 240 - Math.abs(x - 500));
+        const ridgeZ = Math.max(0, 180 - Math.abs(z));
+        return ridgeX * ridgeZ * 0.005;
+      },
+    );
+
+    const agent: StrategicAgent = {
+      id: 'ws_agent_0',
+      faction: Faction.US,
+      x: 0,
+      z: 0,
+      y: 0,
+      health: 100,
+      alive: true,
+      tier: AgentTier.SIMULATED,
+      squadId: 'ws_squad_0',
+      isLeader: true,
+      destX: 0,
+      destZ: 0,
+      speed: 100,
+      combatState: 'idle',
+      formationSlot: 0,
+    };
+    const squad: StrategicSquad = {
+      id: 'ws_squad_0',
+      faction: Faction.US,
+      members: [agent.id],
+      leaderId: agent.id,
+      x: 0,
+      z: 0,
+      objectiveZoneId: 'objective',
+      objectiveX: 1000,
+      objectiveZ: 0,
+      stance: 'attack',
+      strength: 1,
+      combatActive: false,
+      lastCombatTime: 0,
+    };
+
+    simulator.getAllAgents().set(agent.id, agent);
+    simulator.getAllSquads().set(squad.id, squad);
+
+    (simulator as any).updateSimulatedMovement(1, Number.POSITIVE_INFINITY);
+
+    expect(agent.destZ).toBeGreaterThan(150);
+    expect(squad.routeWaypoints?.some((waypoint) => waypoint.sourceId === 'feature:trail_gap')).toBe(true);
+
+    agent.x = 500;
+    agent.z = 240;
+    squad.x = 500;
+    squad.z = 240;
+
+    (simulator as any).advanceSquadRoute(squad);
+    (simulator as any).updateSimulatedMovement(1, Number.POSITIVE_INFINITY);
+
+    expect(squad.routeWaypointIndex).toBeGreaterThan(0);
+    expect(agent.destX).toBeGreaterThan(900);
+    expect(Math.abs(agent.destZ)).toBeLessThan(10);
   });
 });

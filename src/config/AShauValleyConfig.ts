@@ -95,6 +95,19 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       { biomeId: 'bambooGrove', elevationMin: 950, elevationMax: 1450, slopeMax: 16, priority: 1 },
     ]
   },
+  terrainFlow: {
+    enabled: true,
+    routeStamping: 'map_only',
+    routeWidth: 42,
+    routeBlend: 12,
+    routeSpacing: 60,
+    routeSurface: 'jungle_trail',
+    zoneShoulderPadding: 0,
+    zoneShoulderBlend: 0,
+    zoneShoulderGradeStrength: 0,
+    connectObjectivePairs: false,
+    maxRoutesPerAnchor: 2,
+  },
 
   // Renderer overrides for tall terrain
   cameraFar: 4000,

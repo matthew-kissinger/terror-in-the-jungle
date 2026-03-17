@@ -123,6 +123,8 @@ describe('PerformanceTelemetry', () => {
     expect(windowRef).toBeDefined()
     expect(windowRef.perf).toBeDefined()
     expect(typeof windowRef.perf.report).toBe('function')
+    expect(typeof windowRef.perf.getMovement).toBe('function')
+    expect(typeof windowRef.perf.getMovementArtifacts).toBe('function')
     expect(typeof windowRef.perf.validate).toBe('function')
     expect(typeof windowRef.perf.benchmark).toBe('function')
     expect(typeof windowRef.perf.reset).toBe('function')
@@ -202,6 +204,66 @@ describe('PerformanceTelemetry', () => {
     expect(report.hitDetection.shotsThisSession).toBe(3)
     expect(report.hitDetection.hitsThisSession).toBe(2)
     expect(report.hitDetection.hitRate).toBeCloseTo(2 / 3)
+  })
+
+  it('tracks movement telemetry and exposes averaged summaries', async () => {
+    const { instance } = await loadTelemetry(true, { search: '?sandbox=true' })
+
+    instance.recordPlayerMovementSample(true, 0.9, 0.1, 5, 4.5, 0.08, false, false, true, 0.7, 0.2, 0.1)
+    instance.recordPlayerMovementSample(true, 0.8, 0.2, 5, 4.0, -0.05, true, true, false, 0.7, 0.3, 0.15)
+    instance.recordNPCMovementSample('npc-high', 'high', 'contour', 1.5, false, true, false, false, 0.7, 0.2, 0.2, true)
+    instance.recordNPCMovementSample('npc-high', 'high', 'contour', 0.4, true, false, false, false, 0.7, 0.35, 0.3, true)
+    instance.recordNPCMovementSample('npc-low', 'low', 'backtrack', 0.1, true, false, true, true, 0.7, 20.1, 20.1, true)
+    instance.recordNPCMovementSample('npc-low', 'low', 'backtrack', 0.1, true, false, false, false, 0.7, 20.2, 20.15, true)
+
+    const movement = instance.getMovementTelemetry()
+    expect(movement.player.samples).toBe(2)
+    expect(movement.player.uphillSamples).toBe(1)
+    expect(movement.player.downhillSamples).toBe(1)
+    expect(movement.player.slideSamples).toBe(1)
+    expect(movement.player.blockedByTerrain).toBe(1)
+    expect(movement.player.walkabilityTransitions).toBe(1)
+    expect(movement.player.pinnedAreaEvents).toBe(1)
+    expect(movement.player.pinnedSamples).toBe(1)
+    expect(movement.player.avgPinnedSeconds).toBeGreaterThan(1.2)
+    expect(movement.player.avgSupportNormalY).toBeCloseTo(0.85)
+    expect(movement.npc.samples).toBe(4)
+    expect(movement.npc.contourActivations).toBe(1)
+    expect(movement.npc.backtrackActivations).toBe(1)
+    expect(movement.npc.arrivalCount).toBe(1)
+    expect(movement.npc.lowProgressEvents).toBe(3)
+    expect(movement.npc.pinnedAreaEvents).toBe(2)
+    expect(movement.npc.pinnedSamples).toBe(2)
+    expect(movement.npc.byIntent.contour).toBe(2)
+    expect(movement.npc.byIntent.backtrack).toBe(2)
+    expect(movement.npc.samplesByLod.high).toBe(2)
+    expect(movement.npc.samplesByLod.low).toBe(2)
+    expect(movement.npc.lowProgressByLod.low).toBe(2)
+    expect(movement.npc.pinnedByLod.high).toBe(1)
+    expect(movement.npc.pinnedByLod.low).toBe(1)
+
+    const report = instance.getReport()
+    expect(report.movement.player.samples).toBe(2)
+    expect(report.movement.npc.contourActivations).toBe(1)
+
+    const artifacts = instance.getMovementArtifacts()
+    expect(artifacts.cellSize).toBeGreaterThan(0)
+    expect(artifacts.playerOccupancy.length).toBeGreaterThan(0)
+    expect(artifacts.npcOccupancy.length).toBeGreaterThan(0)
+    expect(artifacts.hotspots).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'terrain_blocked' }),
+        expect.objectContaining({ kind: 'player_pinned' }),
+        expect.objectContaining({ kind: 'npc_pinned' }),
+        expect.objectContaining({ kind: 'npc_backtrack' }),
+      ])
+    )
+    expect(artifacts.tracks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'player', subject: 'player' }),
+        expect.objectContaining({ subject: 'npc' }),
+      ])
+    )
   })
 
   it('handles zero shots without divide-by-zero in hit rate', async () => {

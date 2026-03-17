@@ -63,6 +63,7 @@ export async function initializeSystems(engine: GameEngine): Promise<void> {
     markStartup('engine-init.initialize-systems.end');
 
     if (engine.sandboxEnabled && engine.sandboxConfig?.autoStart) {
+      engine.startupFlow.showMenu();
       markStartup('engine-init.autostart.begin');
       void startGameWithMode(engine, GameMode.AI_SANDBOX);
       return;

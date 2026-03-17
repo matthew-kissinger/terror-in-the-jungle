@@ -10,12 +10,18 @@ import { IHUDSystem, IHelicopterModel } from '../../types/SystemInterfaces';
 import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 import {
   canStepUp,
-  computeSlopeSpeedMultiplier,
   computeSlopeSlideVelocity,
   isWalkableSlope,
   SLOPE_SLIDE_STRENGTH,
 } from '../terrain/SlopePhysics';
 import { FixedStepRunner } from '../../utils/FixedStepRunner';
+import { performanceTelemetry } from '../debug/PerformanceTelemetry';
+import { movementStatsTracker } from './MovementStatsTracker';
+import {
+  computeForwardGrade,
+  computeSlopeValueFromNormal,
+  computeSmoothedSupportNormal,
+} from '../terrain/GameplaySurfaceSampling';
 
 const _moveVector = new THREE.Vector3();
 const _cameraDirection = new THREE.Vector3();
@@ -24,6 +30,12 @@ const _worldMoveVector = new THREE.Vector3();
 const _horizontalVelocity = new THREE.Vector3();
 const _upVector = new THREE.Vector3(0, 1, 0);
 const _terrainNormal = new THREE.Vector3(0, 1, 0);
+const _previousTerrainNormal = new THREE.Vector3(0, 1, 0);
+const _terrainFlowDirection = new THREE.Vector3();
+const _terrainFlowTargetVelocity = new THREE.Vector3();
+const _uphillDirection = new THREE.Vector3();
+const _contourA = new THREE.Vector3();
+const _contourB = new THREE.Vector3();
 
 // ── Player movement tuning ──
 const MOVEMENT_ACCELERATION = 5;
@@ -34,6 +46,14 @@ const CROUCH_SPEED_MULTIPLIER = 0.5;
 const PLAYER_COLLISION_RADIUS = 0.5;
 const LANDING_SOUND_THRESHOLD = -5;
 const BOUNDARY_BOUNCE_FACTOR = 0.5;
+const PLAYER_SUPPORT_SAMPLE_DISTANCE = 1.35;
+const PLAYER_SUPPORT_FOOTPRINT_RADIUS = 0.8;
+const PLAYER_SUPPORT_LOOKAHEAD = 0.95;
+const PLAYER_SUPPORT_NORMAL_SMOOTHING = 0.35;
+const PLAYER_STEEP_FLOW_SPEED_FACTOR = 0.82;
+const PLAYER_STEEP_FLOW_MIN_SPEED = 1.4;
+const PLAYER_STEEP_FLOW_LERP = 0.58;
+const PLAYER_TERRAIN_LIP_RISE = 0.45;
 
 // ── Helicopter control targets ──
 // PlayerMovement emits raw target values; HelicopterPhysics.smoothControlInputs() handles ramping.
@@ -62,6 +82,9 @@ export class PlayerMovement {
   private altitudeLock = false;
   private lockedCollective = HELI_AUTOHOVER_TARGET;
   private readonly movementStepper = new FixedStepRunner(PlayerMovement.FIXED_STEP_SECONDS, 1.0);
+  private readonly supportNormal = new THREE.Vector3(0, 1, 0);
+  private readonly sampledSupportNormal = new THREE.Vector3(0, 1, 0);
+  private lastGroundWalkable = true;
 
   constructor(playerState: PlayerState) {
     this.playerState = playerState;
@@ -149,14 +172,6 @@ export class PlayerMovement {
       baseSpeed *= CROUCH_SPEED_MULTIPLIER;
     }
 
-    // Query slope at current position for speed penalty + slide
-    const normal = this.sampleTerrainNormal(this.playerState.position.x, this.playerState.position.z);
-    const slopeValue = 1 - normal.y;
-    const normalX = normal.x;
-    const normalZ = normal.z;
-    const speedMultiplier = this.playerState.isGrounded ? computeSlopeSpeedMultiplier(slopeValue) : 1.0;
-    const currentSpeed = baseSpeed * speedMultiplier;
-
     // Calculate movement direction based on camera orientation
     // Check touch joystick first, then fall back to keyboard
     const touchMove = input.getTouchMovementVector();
@@ -180,14 +195,16 @@ export class PlayerMovement {
       }
     }
 
-    // Normalize movement vector
+    let requestedSpeed = 0;
+    let requestedMoveX = 0;
+    let requestedMoveZ = 0;
+
     if (moveVector.length() > 0) {
       moveVector.normalize();
 
-      // Apply camera rotation to movement
       const cameraDirection = _cameraDirection;
       camera.getWorldDirection(cameraDirection);
-      cameraDirection.y = 0; // Keep movement horizontal
+      cameraDirection.y = 0;
       cameraDirection.normalize();
 
       const cameraRight = _cameraRight;
@@ -196,10 +213,47 @@ export class PlayerMovement {
       const worldMoveVector = _worldMoveVector.set(0, 0, 0);
       worldMoveVector.addScaledVector(cameraDirection, -moveVector.z);
       worldMoveVector.addScaledVector(cameraRight, moveVector.x);
+      requestedMoveX = worldMoveVector.x;
+      requestedMoveZ = worldMoveVector.z;
+      requestedSpeed = baseSpeed;
+    }
+
+    _previousTerrainNormal.copy(this.supportNormal);
+    const normal = this.sampleSupportNormal(
+      this.playerState.position.x,
+      this.playerState.position.z,
+      requestedMoveX,
+      requestedMoveZ,
+      this.supportNormal,
+      true,
+    );
+    const supportNormalDelta = 1 - THREE.MathUtils.clamp(_previousTerrainNormal.dot(normal), -1, 1);
+    const supportSlopeValue = computeSlopeValueFromNormal(normal);
+    const walkableSupport = !this.playerState.isGrounded || isWalkableSlope(supportSlopeValue);
+    const walkabilityTransition = this.playerState.isGrounded && walkableSupport !== this.lastGroundWalkable;
+    const grade = computeForwardGrade(
+      this.sampleTerrainHeight.bind(this),
+      this.playerState.position.x,
+      this.playerState.position.z,
+      requestedMoveX,
+      requestedMoveZ,
+      PLAYER_SUPPORT_LOOKAHEAD,
+    );
+
+    // Normalize movement vector
+    if (moveVector.length() > 0) {
+      const worldMoveVector = _worldMoveVector.set(requestedMoveX, 0, requestedMoveZ);
+      if (this.playerState.isGrounded) {
+        worldMoveVector.projectOnPlane(normal);
+        if (worldMoveVector.lengthSq() < 0.0001) {
+          worldMoveVector.set(requestedMoveX, 0, requestedMoveZ);
+        }
+      }
+      worldMoveVector.normalize();
 
       // Apply movement with acceleration (only horizontal components)
-      const acceleration = currentSpeed * MOVEMENT_ACCELERATION;
-      const targetVelocity = worldMoveVector.multiplyScalar(currentSpeed);
+      const acceleration = baseSpeed * MOVEMENT_ACCELERATION;
+      const targetVelocity = worldMoveVector.multiplyScalar(baseSpeed);
       const horizontalVelocity = _horizontalVelocity.set(this.playerState.velocity.x, 0, this.playerState.velocity.z);
 
       horizontalVelocity.lerp(targetVelocity, Math.min(deltaTime * acceleration, 1));
@@ -214,11 +268,12 @@ export class PlayerMovement {
       this.playerState.velocity.z *= frictionFactor;
     }
 
-    // Slide downhill when on an unwalkable slope
-    if (speedMultiplier === 0 && this.playerState.isGrounded) {
-      const slide = computeSlopeSlideVelocity(normalX, normalZ, SLOPE_SLIDE_STRENGTH);
+    let sliding = false;
+    if (this.playerState.isGrounded && !walkableSupport) {
+      const slide = computeSlopeSlideVelocity(normal.x, normal.z, SLOPE_SLIDE_STRENGTH);
       this.playerState.velocity.x = slide.x;
       this.playerState.velocity.z = slide.z;
+      sliding = true;
     }
 
     // Apply gravity
@@ -275,29 +330,39 @@ export class PlayerMovement {
       }
     }
 
-    // Terrain slope blocking is separate from structure step-up blocking:
-    // walkable hills should ground smoothly, but unwalkable uphill faces should
-    // stop horizontal motion instead of alternating between tiny climbs and snaps.
+    // Terrain should bias movement flow, not become an authority wall. Steep
+    // faces redirect motion along the contour; only raised collision surfaces
+    // retain hard step-up blocking.
+    let blockedByTerrain = false;
     if (this.playerState.isGrounded && this.terrainSystem) {
       const currentTerrainHeight = Number(this.terrainSystem.getHeightAt(
         this.playerState.position.x,
         this.playerState.position.z,
       ));
       const targetTerrainHeight = Number(this.terrainSystem.getHeightAt(newPosition.x, newPosition.z));
-      const targetSlopeValue = this.sampleTerrainSlope(newPosition.x, newPosition.z);
+      const targetSupportNormal = this.sampleSupportNormal(
+        newPosition.x,
+        newPosition.z,
+        requestedMoveX !== 0 || requestedMoveZ !== 0 ? requestedMoveX : this.playerState.velocity.x,
+        requestedMoveX !== 0 || requestedMoveZ !== 0 ? requestedMoveZ : this.playerState.velocity.z,
+        _terrainNormal,
+        false,
+      );
+      const targetSlopeValue = computeSlopeValueFromNormal(targetSupportNormal);
       const terrainRise = Number.isFinite(currentTerrainHeight) && Number.isFinite(targetTerrainHeight)
         ? targetTerrainHeight - currentTerrainHeight
         : 0;
       const effectiveRise = groundHeight - currentGroundHeight;
       const obstacleStepRise = Math.max(0, effectiveRise - Math.max(terrainRise, 0));
-      const blockedBySteepTerrain = terrainRise > 0.05 && !isWalkableSlope(targetSlopeValue);
+      const blockedBySteepTerrain = terrainRise > PLAYER_TERRAIN_LIP_RISE && !isWalkableSlope(targetSlopeValue);
       const blockedByRaisedSurface = obstacleStepRise > 0.05 && !canStepUp(currentGroundHeight, groundHeight);
 
-      if (blockedBySteepTerrain || blockedByRaisedSurface) {
+      if (blockedByRaisedSurface) {
         newPosition.x = this.playerState.position.x;
         newPosition.z = this.playerState.position.z;
         this.playerState.velocity.x = 0;
         this.playerState.velocity.z = 0;
+        blockedByTerrain = true;
 
         const resetGroundHeight = Number(this.terrainSystem.getEffectiveHeightAt(
           this.playerState.position.x,
@@ -305,6 +370,20 @@ export class PlayerMovement {
         ));
         if (Number.isFinite(resetGroundHeight)) {
           groundHeight = resetGroundHeight + eyeHeight;
+        }
+      } else if (blockedBySteepTerrain) {
+        blockedByTerrain = this.applySteepTerrainFlow(
+          newPosition,
+          targetSupportNormal,
+          requestedMoveX,
+          requestedMoveZ,
+          deltaTime,
+        );
+        if (blockedByTerrain) {
+          const flowedGroundHeight = Number(this.terrainSystem.getEffectiveHeightAt(newPosition.x, newPosition.z));
+          if (Number.isFinite(flowedGroundHeight)) {
+            groundHeight = flowedGroundHeight + eyeHeight;
+          }
         }
       }
     }
@@ -351,6 +430,35 @@ export class PlayerMovement {
     }
 
     this.playerState.position.copy(newPosition);
+    const actualHorizontalSpeed = Math.hypot(this.playerState.velocity.x, this.playerState.velocity.z);
+    performanceTelemetry.recordPlayerMovementSample(
+      this.playerState.isGrounded,
+      normal.y,
+      supportNormalDelta,
+      requestedSpeed,
+      actualHorizontalSpeed,
+      grade,
+      sliding,
+      blockedByTerrain,
+      walkabilityTransition,
+      deltaTime,
+      this.playerState.position.x,
+      this.playerState.position.z,
+    );
+    movementStatsTracker.recordPlayerSample(
+      this.playerState.isGrounded,
+      requestedSpeed,
+      actualHorizontalSpeed,
+      grade,
+      sliding,
+      blockedByTerrain,
+      deltaTime,
+      this.playerState.position.x,
+      this.playerState.position.z,
+    );
+    if (this.playerState.isGrounded) {
+      this.lastGroundWalkable = walkableSupport;
+    }
 
     // Play footstep sounds when moving on ground
     if (this.footstepAudioSystem && !this.playerState.isInHelicopter) {
@@ -480,17 +588,108 @@ export class PlayerMovement {
     }
   }
 
-  private sampleTerrainNormal(x: number, z: number): THREE.Vector3 {
-    if (this.terrainSystem && typeof this.terrainSystem.getNormalAt === 'function') {
-      return this.terrainSystem.getNormalAt(x, z, _terrainNormal);
+  private applySteepTerrainFlow(
+    newPosition: THREE.Vector3,
+    targetSupportNormal: THREE.Vector3,
+    requestedMoveX: number,
+    requestedMoveZ: number,
+    deltaTime: number,
+  ): boolean {
+    const downhillLength = Math.hypot(targetSupportNormal.x, targetSupportNormal.z);
+    if (downhillLength <= 0.001) {
+      return false;
     }
-    return _terrainNormal.copy(getHeightQueryCache().getNormalAt(x, z));
+
+    _uphillDirection.set(
+      -targetSupportNormal.x / downhillLength,
+      0,
+      -targetSupportNormal.z / downhillLength,
+    );
+
+    const desiredDirection = _terrainFlowDirection.set(
+      requestedMoveX !== 0 || requestedMoveZ !== 0 ? requestedMoveX : this.playerState.velocity.x,
+      0,
+      requestedMoveX !== 0 || requestedMoveZ !== 0 ? requestedMoveZ : this.playerState.velocity.z,
+    );
+    if (desiredDirection.lengthSq() <= 0.0001) {
+      return false;
+    }
+
+    desiredDirection.projectOnPlane(targetSupportNormal);
+    desiredDirection.y = 0;
+
+    const uphillDot = downhillLength > 0.001 ? desiredDirection.dot(_uphillDirection) : 0;
+    if (uphillDot > 0) {
+      desiredDirection.addScaledVector(_uphillDirection, -uphillDot);
+    }
+
+    if (desiredDirection.lengthSq() <= 0.0001) {
+      _contourA.set(-_uphillDirection.z, 0, _uphillDirection.x);
+      _contourB.set(_uphillDirection.z, 0, -_uphillDirection.x);
+      const contourAAlignment = _contourA.dot(_horizontalVelocity.set(this.playerState.velocity.x, 0, this.playerState.velocity.z));
+      const contourBAlignment = _contourB.dot(_horizontalVelocity);
+      desiredDirection.copy(contourAAlignment >= contourBAlignment ? _contourA : _contourB);
+    }
+
+    desiredDirection.normalize();
+
+    const currentSpeed = Math.hypot(this.playerState.velocity.x, this.playerState.velocity.z);
+    const flowedSpeed = Math.max(PLAYER_STEEP_FLOW_MIN_SPEED, currentSpeed * PLAYER_STEEP_FLOW_SPEED_FACTOR);
+    const targetVelocity = _terrainFlowTargetVelocity.copy(desiredDirection).multiplyScalar(flowedSpeed);
+    this.playerState.velocity.x = THREE.MathUtils.lerp(
+      this.playerState.velocity.x,
+      targetVelocity.x,
+      PLAYER_STEEP_FLOW_LERP,
+    );
+    this.playerState.velocity.z = THREE.MathUtils.lerp(
+      this.playerState.velocity.z,
+      targetVelocity.z,
+      PLAYER_STEEP_FLOW_LERP,
+    );
+    newPosition.x = this.playerState.position.x + this.playerState.velocity.x * deltaTime;
+    newPosition.z = this.playerState.position.z + this.playerState.velocity.z * deltaTime;
+    return true;
   }
 
-  private sampleTerrainSlope(x: number, z: number): number {
-    if (this.terrainSystem && typeof this.terrainSystem.getSlopeAt === 'function') {
-      return this.terrainSystem.getSlopeAt(x, z);
+  private sampleSupportNormal(
+    x: number,
+    z: number,
+    moveX: number,
+    moveZ: number,
+    target: THREE.Vector3,
+    smooth: boolean,
+  ): THREE.Vector3 {
+    computeSmoothedSupportNormal(
+      this.sampleTerrainHeight.bind(this),
+      x,
+      z,
+      this.sampledSupportNormal,
+      {
+        sampleDistance: PLAYER_SUPPORT_SAMPLE_DISTANCE,
+        footprintRadius: PLAYER_SUPPORT_FOOTPRINT_RADIUS,
+        lookaheadDistance: PLAYER_SUPPORT_LOOKAHEAD,
+        moveX,
+        moveZ,
+      },
+    );
+
+    if (!this.playerState.isGrounded) {
+      return target.copy(this.sampledSupportNormal);
     }
-    return getHeightQueryCache().getSlopeAt(x, z);
+
+    if (!smooth) {
+      return target.copy(this.sampledSupportNormal);
+    }
+
+    return target
+      .lerp(this.sampledSupportNormal, PLAYER_SUPPORT_NORMAL_SMOOTHING)
+      .normalize();
+  }
+
+  private sampleTerrainHeight(x: number, z: number): number {
+    if (this.terrainSystem) {
+      return this.terrainSystem.getHeightAt(x, z);
+    }
+    return getHeightQueryCache().getHeightAt(x, z);
   }
 }

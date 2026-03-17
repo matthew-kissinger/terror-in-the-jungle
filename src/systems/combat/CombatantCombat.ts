@@ -354,6 +354,57 @@ export class CombatantCombat {
     return { hit: false, point: this.scratchEndPoint };
   }
 
+  previewPlayerShot(
+    ray: THREE.Ray,
+    allCombatants: Map<string, Combatant>,
+  ): CombatHitResult {
+    if (this.sandbagSystem) {
+      const hitSandbag = this.sandbagSystem.checkRayIntersection(ray);
+      if (hitSandbag) {
+        const intersectionPoint = this.sandbagSystem.getRayIntersectionPoint(ray);
+        if (intersectionPoint) {
+          return { hit: false, point: intersectionPoint };
+        }
+      }
+    }
+
+    const hit = this.hitDetection.raycastCombatants(ray, Faction.US, allCombatants);
+    const terrainHit = this.terrainSystem
+      ? this.terrainSystem.raycastTerrain(ray.origin, ray.direction, this.MAX_ENGAGEMENT_RANGE)
+      : { hit: false as const };
+
+    if (hit && terrainHit.hit && terrainHit.distance !== undefined && terrainHit.distance < hit.distance - 0.5) {
+      if (terrainHit.point) {
+        return { hit: false, point: terrainHit.point };
+      }
+      this.scratchEndPoint.copy(ray.origin).addScaledVector(ray.direction, terrainHit.distance);
+      return { hit: false, point: this.scratchEndPoint };
+    }
+
+    if (hit && this.isBlockedByHeightProfile(ray, hit.distance)) {
+      const blockDistance = this.findHeightProfileBlockDistance(ray, hit.distance);
+      this.scratchEndPoint.copy(ray.origin).addScaledVector(ray.direction, blockDistance);
+      return { hit: false, point: this.scratchEndPoint };
+    }
+
+    if (hit) {
+      return { hit: true, point: hit.point, headshot: hit.headshot };
+    }
+
+    if (terrainHit.hit) {
+      if (terrainHit.point) {
+        return { hit: false, point: terrainHit.point };
+      }
+      if (terrainHit.distance !== undefined) {
+        this.scratchEndPoint.copy(ray.origin).addScaledVector(ray.direction, terrainHit.distance);
+        return { hit: false, point: this.scratchEndPoint };
+      }
+    }
+
+    this.scratchEndPoint.copy(ray.origin).addScaledVector(ray.direction, this.MAX_ENGAGEMENT_RANGE);
+    return { hit: false, point: this.scratchEndPoint };
+  }
+
   private isBlockedByHeightProfile(ray: THREE.Ray, maxDistance: number): boolean {
     if (!this.terrainSystem) {
       return false;

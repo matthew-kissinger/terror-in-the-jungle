@@ -5,6 +5,11 @@ import { execSync, spawn, type ChildProcess } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Socket } from 'net';
+import {
+  renderMovementArtifactViewerHtml,
+  type MovementArtifactReportForViewer,
+  type MovementTerrainOverlayArtifact,
+} from './perfMovementViewerTemplate';
 
 type ConsoleEntry = {
   ts: string;
@@ -133,6 +138,43 @@ type RuntimeSample = {
     timeMs: number;
     pendingUnits: number;
   }>;
+  movement?: {
+    player: {
+      samples: number;
+      groundedSamples: number;
+      uphillSamples: number;
+      downhillSamples: number;
+      blockedByTerrain: number;
+      slideSamples: number;
+      walkabilityTransitions: number;
+      pinnedAreaEvents: number;
+      pinnedSamples: number;
+      avgPinnedSeconds: number;
+      maxPinnedSeconds: number;
+      avgPinnedRadius: number;
+      avgSupportNormalY: number;
+      avgSupportNormalDelta: number;
+      avgRequestedSpeed: number;
+      avgActualSpeed: number;
+    };
+    npc: {
+      samples: number;
+      contourActivations: number;
+      backtrackActivations: number;
+      arrivalCount: number;
+      lowProgressEvents: number;
+      pinnedAreaEvents: number;
+      pinnedSamples: number;
+      avgPinnedSeconds: number;
+      maxPinnedSeconds: number;
+      avgPinnedRadius: number;
+      avgProgressPerSample: number;
+      byIntent: Record<string, number>;
+      samplesByLod: Record<string, number>;
+      lowProgressByLod: Record<string, number>;
+      pinnedByLod: Record<string, number>;
+    };
+  };
   systemTop: Array<{ name: string; emaMs: number; peakMs: number }>;
   harnessDriver?: {
     mode: string;
@@ -187,6 +229,11 @@ type CaptureSummary = {
     runtimePreflightMs: number;
     runtimePreflightOk: boolean;
   };
+};
+
+type MovementViewerPayload = {
+  movementArtifacts: MovementArtifactReportForViewer;
+  terrainContext: MovementTerrainOverlayArtifact;
 };
 
 type StartupDiagnostics = {
@@ -479,6 +526,115 @@ function percentile(values: number[], p: number): number {
   const sorted = [...values].sort((a, b) => a - b);
   const idx = Math.min(sorted.length - 1, Math.max(0, Math.floor((sorted.length - 1) * p)));
   return sorted[idx];
+}
+
+function chooseContourStep(heightRange: number): number {
+  if (heightRange > 220) return 30;
+  if (heightRange > 120) return 20;
+  if (heightRange > 60) return 10;
+  if (heightRange > 24) return 5;
+  return 2;
+}
+
+async function captureMovementViewerPayload(page: Page): Promise<MovementViewerPayload | null> {
+  const [movementArtifacts, terrainContext] = await Promise.all([
+    safeAwait(
+      'movement-artifacts',
+      page.evaluate(() => (window as any).perf?.getMovementArtifacts?.() ?? null),
+      3_000
+    ),
+    safeAwait(
+      'movement-terrain-context',
+      page.evaluate(() => {
+        const engine = (window as any).__engine;
+        const systems = engine?.systemManager;
+        const terrain = systems?.terrainSystem;
+        const gameModeManager = systems?.gameModeManager;
+        if (!terrain || !gameModeManager) {
+          return null;
+        }
+
+        const config = gameModeManager.getCurrentConfig?.();
+        const worldSize = Number(
+          config?.worldSize
+          ?? terrain.getPlayableWorldSize?.()
+          ?? terrain.getWorldSize?.()
+          ?? 0
+        );
+        if (!Number.isFinite(worldSize) || worldSize <= 0) {
+          return null;
+        }
+
+        const mode = String(config?.id ?? gameModeManager.getCurrentMode?.() ?? 'unknown');
+        const resolution = worldSize > 10000 ? 52 : worldSize > 3000 ? 68 : 84;
+        const samples: number[] = [];
+        let minHeight = Number.POSITIVE_INFINITY;
+        let maxHeight = Number.NEGATIVE_INFINITY;
+        for (let row = 0; row <= resolution; row++) {
+          for (let col = 0; col <= resolution; col++) {
+            const normalizedX = col / resolution;
+            const normalizedZ = row / resolution;
+            const worldX = worldSize * 0.5 - normalizedX * worldSize;
+            const worldZ = worldSize * 0.5 - normalizedZ * worldSize;
+            const height = Number(terrain.getHeightAt(worldX, worldZ) ?? 0);
+            samples.push(height);
+            if (height < minHeight) minHeight = height;
+            if (height > maxHeight) maxHeight = height;
+          }
+        }
+
+        const flowPaths = (terrain.getTerrainFlowPaths?.() ?? []).map((path: any) => ({
+          id: String(path.id ?? ''),
+          width: Number(path.width ?? 0),
+          surface: String(path.surface ?? ''),
+          points: Array.isArray(path.points)
+            ? path.points.map((point: any) => ({
+                x: Number(point.x ?? 0),
+                z: Number(point.z ?? 0),
+              }))
+            : [],
+        }));
+
+        const zones = Array.isArray(config?.zones)
+          ? config.zones.map((zone: any) => ({
+              id: String(zone.id ?? ''),
+              name: String(zone.name ?? ''),
+              x: Number(zone.position?.x ?? 0),
+              z: Number(zone.position?.z ?? 0),
+              radius: Number(zone.radius ?? 0),
+              isHomeBase: Boolean(zone.isHomeBase),
+            }))
+          : [];
+
+        return {
+          mode,
+          worldSize,
+          resolution,
+          minHeight: Number.isFinite(minHeight) ? minHeight : 0,
+          maxHeight: Number.isFinite(maxHeight) ? maxHeight : 0,
+          heights: samples,
+          flowPaths,
+          zones,
+        };
+      }),
+      8_000
+    ),
+  ]);
+
+  if (!movementArtifacts || !terrainContext) {
+    return null;
+  }
+
+  const normalizedMovement = movementArtifacts as MovementArtifactReportForViewer;
+  const terrain = terrainContext as Omit<MovementTerrainOverlayArtifact, 'contourStep'>;
+  const contourStep = chooseContourStep(Math.max(1, terrain.maxHeight - terrain.minHeight));
+  return {
+    movementArtifacts: normalizedMovement,
+    terrainContext: {
+      ...terrain,
+      contourStep,
+    },
+  };
 }
 
 function validateRun(
@@ -1050,6 +1206,133 @@ async function warmupRuntime(page: Page, warmupSeconds: number): Promise<void> {
   }
 }
 
+async function dismissMissionBriefingIfPresent(page: Page): Promise<boolean> {
+  const dismissed = await safeAwait(
+    'dismiss mission briefing',
+    page.evaluate(() => {
+      const btn = document.querySelector('[data-ref="beginBtn"]') as HTMLButtonElement | null;
+      if (!btn) return false;
+      btn.click();
+      return true;
+    }),
+    3000
+  );
+  return dismissed === true;
+}
+
+async function startRequestedMode(page: Page, requestedMode: string, startupTimeoutSeconds: number): Promise<void> {
+  await withTimeout(
+    'wait __engine',
+    page.waitForFunction(() => Boolean((window as any).__engine), undefined, { timeout: startupTimeoutSeconds * 1000 }),
+    startupTimeoutSeconds * 1000 + 1000
+  );
+
+  const modeStartResult = await safeAwait(
+    `kick mode ${requestedMode}`,
+    page.evaluate((mode: string) => {
+      const w = window as any;
+      const engine = w.__engine;
+      if (!engine || typeof engine.startGameWithMode !== 'function') {
+        return { ok: false, reason: 'engine unavailable' };
+      }
+
+      const existing = w.__perfHarnessModeStart;
+      if (existing?.mode === mode && !existing.result) {
+        return { ok: true, reused: true };
+      }
+
+      const startState: {
+        mode: string;
+        result: { ok: boolean; reason?: string } | null;
+      } = {
+        mode,
+        result: null,
+      };
+      w.__perfHarnessModeStart = startState;
+
+      Promise.resolve()
+        .then(() => engine.startGameWithMode(mode))
+        .then(() => {
+          startState.result = { ok: true };
+        })
+        .catch((error) => {
+          startState.result = {
+            ok: false,
+            reason: error instanceof Error ? error.message : String(error),
+          };
+        });
+
+      return { ok: true };
+    }, requestedMode),
+    STEP_TIMEOUT_MS
+  );
+
+  if (!modeStartResult?.ok) {
+    throw new Error(`Failed to start requested mode ${requestedMode}: ${modeStartResult?.reason ?? 'unknown'}`);
+  }
+
+  const deadline = Date.now() + Math.max(startupTimeoutSeconds * 1000, STEP_TIMEOUT_MS);
+  let missionBriefingDismissed = false;
+
+  while (Date.now() < deadline) {
+    if (!missionBriefingDismissed && await dismissMissionBriefingIfPresent(page)) {
+      missionBriefingDismissed = true;
+      logStep('🪂 Mission briefing dismissed for harness startup');
+    }
+
+    const modeState = await safeAwait(
+      `poll mode ${requestedMode} start`,
+      page.evaluate(() => {
+        const w = window as any;
+        const engine = w.__engine;
+        const flowState = engine?.startupFlow?.getState?.() ?? null;
+        return {
+          result: w.__perfHarnessModeStart?.result ?? null,
+          gameStarted: Boolean(engine?.gameStarted),
+          gameStartPending: Boolean(engine?.gameStartPending),
+          phase: String(flowState?.phase ?? ''),
+          briefingVisible: Boolean(document.querySelector('[data-ref="beginBtn"]')),
+          errorPanelVisible: Boolean(document.querySelector('.error-panel')),
+        };
+      }),
+      3000
+    );
+
+    if (modeState?.result && !modeState.result.ok) {
+      throw new Error(`Failed to start requested mode ${requestedMode}: ${modeState.result.reason ?? 'unknown'}`);
+    }
+
+    if (modeState?.gameStarted || modeState?.phase === 'live') {
+      return;
+    }
+
+    await sleep(250);
+  }
+
+  const finalModeState = await safeAwait(
+    `final mode ${requestedMode} start state`,
+    page.evaluate(() => {
+      const w = window as any;
+      const engine = w.__engine;
+      const flowState = engine?.startupFlow?.getState?.() ?? null;
+      return {
+        result: w.__perfHarnessModeStart?.result ?? null,
+        gameStarted: Boolean(engine?.gameStarted),
+        gameStartPending: Boolean(engine?.gameStartPending),
+        phase: String(flowState?.phase ?? ''),
+        briefingVisible: Boolean(document.querySelector('[data-ref="beginBtn"]')),
+      };
+    }),
+    3000
+  );
+
+  throw new Error(
+    `Failed to start requested mode ${requestedMode}: timeout` +
+    ` (phase=${finalModeState?.phase ?? 'unknown'}, gameStarted=${finalModeState?.gameStarted ? 1 : 0},` +
+    ` gameStartPending=${finalModeState?.gameStartPending ? 1 : 0}, briefingVisible=${finalModeState?.briefingVisible ? 1 : 0})`
+  );
+}
+
 type ActiveScenarioOptions = {
   enabled: boolean;
   mode: string;
@@ -1203,6 +1486,8 @@ async function runCapture(): Promise<void> {
   let finalFrameCount = 0;
   const consoleEntries: ConsoleEntry[] = [];
   const runtimeSamples: RuntimeSample[] = [];
+  let movementArtifacts: MovementArtifactReportForViewer | null = null;
+  let movementViewerPayload: MovementViewerPayload | null = null;
   const probeRoundTripMs: number[] = [];
   const startedAt = nowIso();
   const combatParam = enableCombat ? '1' : '0';
@@ -1351,30 +1636,7 @@ async function runCapture(): Promise<void> {
     logStep(`📍 Navigating to ${url}`);
     await withTimeout('page.goto', page.goto(url, { waitUntil: 'commit' }), navTimeoutMs);
     if (requestedMode !== 'ai_sandbox') {
-      await withTimeout(
-        'wait __engine',
-        page.waitForFunction(() => Boolean((window as any).__engine), undefined, { timeout: startupTimeoutSeconds * 1000 }),
-        startupTimeoutSeconds * 1000 + 1000
-      );
-      const modeStartResult = await safeAwait(
-        `start mode ${requestedMode}`,
-        page.evaluate(async (mode: string) => {
-          const engine = (window as any).__engine;
-          if (!engine || typeof engine.startGameWithMode !== 'function') {
-            return { ok: false, reason: 'engine unavailable' };
-          }
-          try {
-            await engine.startGameWithMode(mode);
-            return { ok: true };
-          } catch (error) {
-            return { ok: false, reason: error instanceof Error ? error.message : String(error) };
-          }
-        }, requestedMode),
-        STEP_TIMEOUT_MS
-      );
-      if (!modeStartResult || !modeStartResult.ok) {
-        throw new Error(`Failed to start requested mode ${requestedMode}: ${modeStartResult?.reason ?? 'unknown'}`);
-      }
+      await startRequestedMode(page, requestedMode, startupTimeoutSeconds);
     }
     startupState = await waitForRendering(page, startupTimeoutSeconds, startupFrameThreshold);
     startupTimeline = await safeAwait(
@@ -1459,6 +1721,7 @@ async function runCapture(): Promise<void> {
           const browserStalls = (window as any).__perfHarnessObservers?.drain?.() ?? null;
           const basicValidation = perf?.validate?.();
           const report = shouldIncludeDetails ? perf?.report?.() : null;
+          const movement = perf?.getMovement?.() ?? report?.movement ?? null;
           const combatProfile = shouldIncludeDetails ? (window as any).combatProfile?.() : null;
           const terrainStreams = shouldIncludeDetails
             ? engine?.systemManager?.terrainSystem?.getStreamingMetrics?.() ?? null
@@ -1567,6 +1830,71 @@ async function runCapture(): Promise<void> {
                   pendingUnits: Number(stream?.pendingUnits ?? 0),
                 }))
               : undefined,
+            movement: movement ? {
+              player: {
+                samples: Number(movement.player?.samples ?? 0),
+                groundedSamples: Number(movement.player?.groundedSamples ?? 0),
+                uphillSamples: Number(movement.player?.uphillSamples ?? 0),
+                downhillSamples: Number(movement.player?.downhillSamples ?? 0),
+                blockedByTerrain: Number(movement.player?.blockedByTerrain ?? 0),
+                slideSamples: Number(movement.player?.slideSamples ?? 0),
+                walkabilityTransitions: Number(movement.player?.walkabilityTransitions ?? 0),
+                pinnedAreaEvents: Number(movement.player?.pinnedAreaEvents ?? 0),
+                pinnedSamples: Number(movement.player?.pinnedSamples ?? 0),
+                avgPinnedSeconds: Number(movement.player?.avgPinnedSeconds ?? 0),
+                maxPinnedSeconds: Number(movement.player?.maxPinnedSeconds ?? 0),
+                avgPinnedRadius: Number(movement.player?.avgPinnedRadius ?? 0),
+                avgSupportNormalY: Number(movement.player?.avgSupportNormalY ?? 1),
+                avgSupportNormalDelta: Number(movement.player?.avgSupportNormalDelta ?? 0),
+                avgRequestedSpeed: Number(movement.player?.avgRequestedSpeed ?? 0),
+                avgActualSpeed: Number(movement.player?.avgActualSpeed ?? 0)
+              },
+              npc: {
+                samples: Number(movement.npc?.samples ?? 0),
+                contourActivations: Number(movement.npc?.contourActivations ?? 0),
+                backtrackActivations: Number(movement.npc?.backtrackActivations ?? 0),
+                arrivalCount: Number(movement.npc?.arrivalCount ?? 0),
+                lowProgressEvents: Number(movement.npc?.lowProgressEvents ?? 0),
+                pinnedAreaEvents: Number(movement.npc?.pinnedAreaEvents ?? 0),
+                pinnedSamples: Number(movement.npc?.pinnedSamples ?? 0),
+                avgPinnedSeconds: Number(movement.npc?.avgPinnedSeconds ?? 0),
+                maxPinnedSeconds: Number(movement.npc?.maxPinnedSeconds ?? 0),
+                avgPinnedRadius: Number(movement.npc?.avgPinnedRadius ?? 0),
+                avgProgressPerSample: Number(movement.npc?.avgProgressPerSample ?? 0),
+                byIntent: movement.npc?.byIntent && typeof movement.npc.byIntent === 'object'
+                  ? Object.fromEntries(
+                      Object.entries(movement.npc.byIntent).map(([key, value]: [string, unknown]) => [
+                        String(key),
+                        Number(value ?? 0)
+                      ])
+                    )
+                  : {},
+                samplesByLod: movement.npc?.samplesByLod && typeof movement.npc.samplesByLod === 'object'
+                  ? Object.fromEntries(
+                      Object.entries(movement.npc.samplesByLod).map(([key, value]: [string, unknown]) => [
+                        String(key),
+                        Number(value ?? 0)
+                      ])
+                    )
+                  : {},
+                lowProgressByLod: movement.npc?.lowProgressByLod && typeof movement.npc.lowProgressByLod === 'object'
+                  ? Object.fromEntries(
+                      Object.entries(movement.npc.lowProgressByLod).map(([key, value]: [string, unknown]) => [
+                        String(key),
+                        Number(value ?? 0)
+                      ])
+                    )
+                  : {},
+                pinnedByLod: movement.npc?.pinnedByLod && typeof movement.npc.pinnedByLod === 'object'
+                  ? Object.fromEntries(
+                      Object.entries(movement.npc.pinnedByLod).map(([key, value]: [string, unknown]) => [
+                        String(key),
+                        Number(value ?? 0)
+                      ])
+                    )
+                  : {}
+              }
+            } : undefined,
             combatBreakdown: combatProfile?.timing
               ? {
                   totalMs: Number(combatProfile.timing.totalMs ?? 0),
@@ -1742,6 +2070,25 @@ async function runCapture(): Promise<void> {
     }
 
     stage = 'write-artifacts';
+    if (page) {
+      movementViewerPayload = await safeAwait(
+        'movement-viewer-payload',
+        captureMovementViewerPayload(page),
+        10_000
+      );
+      movementArtifacts = movementViewerPayload?.movementArtifacts ?? null;
+      if (movementArtifacts) {
+        writeFileSync(join(artifactDir, 'movement-artifacts.json'), JSON.stringify(movementArtifacts, null, 2), 'utf-8');
+      }
+      if (movementViewerPayload?.terrainContext) {
+        writeFileSync(join(artifactDir, 'movement-terrain-context.json'), JSON.stringify(movementViewerPayload.terrainContext, null, 2), 'utf-8');
+        writeFileSync(
+          join(artifactDir, 'movement-viewer.html'),
+          renderMovementArtifactViewerHtml(movementViewerPayload.movementArtifacts, movementViewerPayload.terrainContext),
+          'utf-8'
+        );
+      }
+    }
     if (cpuProfile?.profile) {
       writeFileSync(join(artifactDir, 'cpu-profile.cpuprofile'), JSON.stringify(cpuProfile.profile, null, 2), 'utf-8');
     }

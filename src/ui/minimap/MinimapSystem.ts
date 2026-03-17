@@ -9,6 +9,7 @@ import { renderMinimap, HelipadMarker } from './MinimapRenderer';
 import { isMobileViewport } from '../../utils/DeviceDetector';
 import type { WarSimulator } from '../../systems/strategy/WarSimulator';
 import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
+import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes';
 
 // Reusable scratch vectors to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -21,6 +22,7 @@ export class MinimapSystem implements GameSystem {
   private playerSquadId?: string;
   private commandPosition?: THREE.Vector3;
   private helipadMarkers: HelipadMarker[] = [];
+  private terrainFlowPaths: TerrainFlowPath[] = [];
   private mapIntelPolicy: MapIntelPolicyConfig = {
     tacticalRangeOverride: null,
     showStrategicAgentsOnMinimap: false,
@@ -180,6 +182,10 @@ export class MinimapSystem implements GameSystem {
     this.helipadMarkers = markers;
   }
 
+  setTerrainFlowPaths(paths: TerrainFlowPath[]): void {
+    this.terrainFlowPaths = paths.slice();
+  }
+
   setMapIntelPolicy(policy: MapIntelPolicyConfig): void {
     this.mapIntelPolicy = { ...policy };
   }
@@ -198,7 +204,8 @@ export class MinimapSystem implements GameSystem {
       playerSquadId: this.playerSquadId,
       commandPosition: this.commandPosition,
       helipadMarkers: this.helipadMarkers,
-      mapIntelPolicy: this.mapIntelPolicy
+      mapIntelPolicy: this.mapIntelPolicy,
+      terrainFlowPaths: this.terrainFlowPaths,
     });
   }
 

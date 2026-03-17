@@ -28,6 +28,14 @@ function makeStats(overrides: Partial<MatchStats> = {}): MatchStats {
     bestKillStreak: 5,
     shotsFired: 200,
     shotsHit: 90,
+    movementSummary: {
+      distanceMeters: 1240,
+      climbSeconds: 42.5,
+      pinnedSeconds: 3.2,
+      pinnedEvents: 1,
+      terrainRedirects: 6,
+      slideSeconds: 1.4,
+    },
     ...overrides,
   };
 }
@@ -139,6 +147,18 @@ describe('MatchEndScreen', () => {
     expect(texts).toContain('15');
     expect(texts).toContain('7');
     expect(texts).toContain('5');
+  });
+
+  it('shows traversal summary stats', () => {
+    screen.show(Faction.US, makeGameState(), makeStats());
+    const labels = Array.from(document.querySelectorAll('.statLabel')).map((el) => el.textContent);
+    const values = Array.from(document.querySelectorAll('.statValue')).map((el) => el.textContent?.trim());
+    expect(labels).toContain('Distance Covered');
+    expect(labels).toContain('Climb Time');
+    expect(labels).toContain('Pinned Time');
+    expect(values).toContain('1240m');
+    expect(values).toContain('42.5s');
+    expect(values).toContain('3.2s');
   });
 
   it('shows ticket labels for non-TDM modes', () => {

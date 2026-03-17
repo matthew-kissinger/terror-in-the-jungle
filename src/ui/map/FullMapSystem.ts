@@ -21,6 +21,8 @@ import { shouldUseTouchControls } from '../../utils/DeviceDetector';
 import type { WarSimulator } from '../../systems/strategy/WarSimulator';
 import type { HelipadMarker } from '../minimap/MinimapRenderer';
 import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
+import type { ITerrainRuntime } from '../../types/SystemInterfaces';
+import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
@@ -31,7 +33,11 @@ export class FullMapSystem implements GameSystem {
   private combatantSystem?: CombatantSystem;
   private gameModeManager?: GameModeManager;
   private warSimulator?: WarSimulator;
+  private terrainRuntime?: ITerrainRuntime;
   private helipadMarkers: HelipadMarker[] = [];
+  private terrainFlowPaths: TerrainFlowPath[] = [];
+  private terrainBackdrop: HTMLCanvasElement | null = null;
+  private terrainBackdropWorldSize = 0;
 
   // Canvas elements
   private mapCanvas: HTMLCanvasElement;
@@ -168,7 +174,11 @@ export class FullMapSystem implements GameSystem {
 
     // Update world size from game mode if needed
     if (this.gameModeManager) {
-      this.worldSize = this.gameModeManager.getWorldSize();
+      const nextWorldSize = this.gameModeManager.getWorldSize();
+      if (nextWorldSize !== this.worldSize) {
+        this.worldSize = nextWorldSize;
+        this.invalidateTerrainBackdrop();
+      }
     }
 
     // Render map when visible
@@ -258,8 +268,10 @@ export class FullMapSystem implements GameSystem {
     ctx.scale(zoomLevel, zoomLevel);
     ctx.translate(-size / 2, -size / 2);
 
+    this.drawTerrainBackdrop(ctx);
     // Draw grid
     this.drawGrid(ctx);
+    this.drawTerrainFlowPaths(ctx);
 
     // Draw zones
     if (this.zoneManager) {
@@ -303,6 +315,113 @@ export class FullMapSystem implements GameSystem {
       ctx.lineTo(MAP_SIZE, i);
       ctx.stroke();
     }
+  }
+
+  private drawTerrainBackdrop(ctx: CanvasRenderingContext2D): void {
+    const backdrop = this.getTerrainBackdrop();
+    if (!backdrop) {
+      return;
+    }
+    ctx.save();
+    ctx.globalAlpha = 0.92;
+    ctx.drawImage(backdrop, 0, 0, MAP_SIZE, MAP_SIZE);
+    ctx.restore();
+  }
+
+  private getTerrainBackdrop(): HTMLCanvasElement | null {
+    if (!this.terrainRuntime) {
+      return null;
+    }
+    if (this.terrainBackdrop && this.terrainBackdropWorldSize === this.worldSize) {
+      return this.terrainBackdrop;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = MAP_SIZE;
+    canvas.height = MAP_SIZE;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return null;
+    }
+
+    const resolution = this.worldSize > 10000 ? 52 : this.worldSize > 3000 ? 68 : 84;
+    const cellSize = MAP_SIZE / resolution;
+    const heights: number[][] = [];
+    let minHeight = Number.POSITIVE_INFINITY;
+    let maxHeight = Number.NEGATIVE_INFINITY;
+
+    for (let row = 0; row <= resolution; row++) {
+      heights[row] = [];
+      for (let col = 0; col <= resolution; col++) {
+        const worldX = this.sampleWorldX(col / resolution);
+        const worldZ = this.sampleWorldZ(row / resolution);
+        const height = this.terrainRuntime.getHeightAt(worldX, worldZ);
+        heights[row][col] = height;
+        if (height < minHeight) minHeight = height;
+        if (height > maxHeight) maxHeight = height;
+      }
+    }
+
+    const heightRange = Math.max(1, maxHeight - minHeight);
+    const contourStep = chooseContourStep(heightRange);
+
+    for (let row = 0; row < resolution; row++) {
+      for (let col = 0; col < resolution; col++) {
+        const height = heights[row][col];
+        const east = heights[row][Math.min(col + 1, resolution)];
+        const south = heights[Math.min(row + 1, resolution)][col];
+        const slope = Math.min(1, Math.hypot(east - height, south - height) / 18);
+        const normalized = (height - minHeight) / heightRange;
+        const red = Math.round(24 + normalized * 38 + slope * 10);
+        const green = Math.round(34 + normalized * 54 - slope * 4);
+        const blue = Math.round(24 + normalized * 18);
+        ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, 0.78)`;
+        ctx.fillRect(col * cellSize, row * cellSize, cellSize + 1, cellSize + 1);
+
+        const contourBand = Math.floor(height / contourStep);
+        const eastBand = Math.floor(east / contourStep);
+        const southBand = Math.floor(south / contourStep);
+        if (contourBand !== eastBand || contourBand !== southBand) {
+          ctx.fillStyle = 'rgba(220, 224, 196, 0.12)';
+          ctx.fillRect(col * cellSize, row * cellSize, cellSize + 0.5, Math.max(1, cellSize * 0.15));
+        }
+      }
+    }
+
+    this.terrainBackdrop = canvas;
+    this.terrainBackdropWorldSize = this.worldSize;
+    return this.terrainBackdrop;
+  }
+
+  private drawTerrainFlowPaths(ctx: CanvasRenderingContext2D): void {
+    if (this.terrainFlowPaths.length === 0) {
+      return;
+    }
+
+    const scale = MAP_SIZE / this.worldSize;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(162, 130, 78, 0.42)';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    for (const path of this.terrainFlowPaths) {
+      if (path.points.length < 2) continue;
+      ctx.lineWidth = Math.max(1.5, path.width * scale * 0.34);
+      ctx.beginPath();
+      for (let i = 0; i < path.points.length; i++) {
+        const point = path.points[i];
+        const x = (this.worldSize / 2 - point.x) * scale;
+        const y = (this.worldSize / 2 - point.z) * scale;
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+    }
+
+    ctx.restore();
   }
 
   private drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone): void {
@@ -467,6 +586,11 @@ export class FullMapSystem implements GameSystem {
     this.warSimulator = simulator;
   }
 
+  setTerrainRuntime(terrainRuntime: ITerrainRuntime): void {
+    this.terrainRuntime = terrainRuntime;
+    this.invalidateTerrainBackdrop();
+  }
+
   setGameModeManager(manager: GameModeManager): void {
     this.gameModeManager = manager;
   }
@@ -481,6 +605,10 @@ export class FullMapSystem implements GameSystem {
 
   setMapIntelPolicy(policy: MapIntelPolicyConfig): void {
     this.mapIntelPolicy = { ...policy };
+  }
+
+  setTerrainFlowPaths(paths: TerrainFlowPath[]): void {
+    this.terrainFlowPaths = paths.slice();
   }
 
   setHelipadMarkers(markers: HelipadMarker[]): void {
@@ -569,4 +697,25 @@ export class FullMapSystem implements GameSystem {
     }
     Logger.info('ui', 'Full Map System disposed');
   }
+
+  private invalidateTerrainBackdrop(): void {
+    this.terrainBackdrop = null;
+    this.terrainBackdropWorldSize = 0;
+  }
+
+  private sampleWorldX(normalizedX: number): number {
+    return this.worldSize * 0.5 - normalizedX * this.worldSize;
+  }
+
+  private sampleWorldZ(normalizedZ: number): number {
+    return this.worldSize * 0.5 - normalizedZ * this.worldSize;
+  }
+}
+
+function chooseContourStep(heightRange: number): number {
+  if (heightRange > 1000) return 100;
+  if (heightRange > 500) return 50;
+  if (heightRange > 200) return 25;
+  if (heightRange > 80) return 10;
+  return 5;
 }

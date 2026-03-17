@@ -4,9 +4,11 @@ import { CombatantSystem } from '../../systems/combat/CombatantSystem';
 import { isBlufor } from '../../systems/combat/types';
 import type { WarSimulator } from '../../systems/strategy/WarSimulator';
 import type { MapIntelPolicyConfig } from '../../config/gameModeTypes';
+import type { TerrainFlowPath } from '../../systems/terrain/TerrainFeatureTypes';
 
 // Reusable scratch vector to avoid per-frame allocations
 const _v1 = new THREE.Vector3();
+const _flowPoint = new THREE.Vector3();
 
 import { icon as iconUrl } from '../icons/IconRegistry';
 
@@ -40,6 +42,7 @@ type MinimapRenderState = {
   commandPosition?: THREE.Vector3;
   helipadMarkers?: HelipadMarker[];
   mapIntelPolicy?: MapIntelPolicyConfig;
+  terrainFlowPaths?: TerrainFlowPath[];
 };
 
 type MinimapPosition = {
@@ -55,6 +58,7 @@ export function renderMinimap(state: MinimapRenderState): void {
   ctx.fillRect(0, 0, size, size);
 
   drawGrid(ctx, size, renderScale);
+  drawTerrainFlowPaths(ctx, state, renderScale);
 
   if (state.zoneManager) {
     const zones = state.zoneManager.getAllZones();
@@ -87,6 +91,45 @@ function drawGrid(ctx: CanvasRenderingContext2D, size: number, renderScale: numb
     ctx.lineTo(size, i);
     ctx.stroke();
   }
+}
+
+function drawTerrainFlowPaths(
+  ctx: CanvasRenderingContext2D,
+  state: MinimapRenderState,
+  renderScale: number,
+): void {
+  if (!state.terrainFlowPaths || state.terrainFlowPaths.length === 0) return;
+
+  const scale = state.size / state.worldSize;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(166, 142, 94, 0.32)';
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  for (const path of state.terrainFlowPaths) {
+    if (path.points.length < 2) continue;
+
+    ctx.lineWidth = Math.max(1.25 * renderScale, path.width * scale * 0.18);
+    let started = false;
+
+    for (const point of path.points) {
+      _flowPoint.set(point.x, 0, point.z);
+      const { x, y } = worldToMinimap(_flowPoint, state, scale);
+      if (!started) {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        started = true;
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+
+    if (started) {
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
 }
 
 function drawZone(ctx: CanvasRenderingContext2D, zone: CaptureZone, state: MinimapRenderState, renderScale: number): void {

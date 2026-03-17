@@ -26,7 +26,7 @@ export class WeaponShotExecutor {
 
   executeSingleShot(command: ShotCommand): ShotResult {
     // Use the ray from the command - no recalculation
-    const result = this.combatantSystem.handlePlayerShot(command.ray, command.damage)
+    const result = this.combatantSystem.handlePlayerShot(command.ray, command.damage, command.weaponType)
 
     if (result.hit) {
       // Spawn impact effect
@@ -75,7 +75,14 @@ export class WeaponShotExecutor {
       }
     }
 
-    return { hit: false, killed: false, headshot: false, damageDealt: 0 }
+    return {
+      hit: false,
+      hitPoint: result.point,
+      killed: false,
+      headshot: false,
+      damageDealt: 0,
+      distance: this.camera.position.distanceTo(result.point),
+    }
   }
 
   executeShotgunShot(command: ShotCommand): ShotResult {
@@ -91,7 +98,7 @@ export class WeaponShotExecutor {
 
     // Fire each pellet
     for (const pelletRay of command.pelletRays) {
-      const result = this.combatantSystem.handlePlayerShot(pelletRay, command.damage)
+      const result = this.combatantSystem.handlePlayerShot(pelletRay, command.damage, command.weaponType)
 
       if (result.hit) {
         anyHit = true

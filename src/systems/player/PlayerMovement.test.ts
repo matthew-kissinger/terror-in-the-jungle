@@ -6,7 +6,6 @@ import { PlayerInput } from './PlayerInput';
 import { TerrainSystem } from '../terrain/TerrainSystem';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { FootstepAudioSystem } from '../audio/FootstepAudioSystem';
-import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 
 // Mock dependencies
 vi.mock('./PlayerInput');
@@ -298,7 +297,6 @@ describe('PlayerMovement', () => {
       vi.mocked(mockInput.isKeyPressed).mockImplementation((key: string) => key === 'keyd');
       vi.mocked(mockTerrainSystem.getHeightAt).mockImplementation((x: number) => Math.max(0, x));
       vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockImplementation((x: number) => Math.max(0, x));
-      vi.mocked(getHeightQueryCache().getSlopeAt).mockReturnValue(0.4);
 
       playerMovement.updateMovement(0.2, mockInput, mockCamera);
 
@@ -306,17 +304,27 @@ describe('PlayerMovement', () => {
       expect(playerState.position.y).toBeGreaterThan(2.5);
     });
 
-    it('should stop cleanly when trying to move into an unwalkable uphill slope', () => {
+    it('redirects steep uphill input into contour flow instead of stalling', () => {
       vi.mocked(mockInput.isKeyPressed).mockImplementation((key: string) => key === 'keyd');
-      vi.mocked(mockTerrainSystem.getHeightAt).mockImplementation((x: number) => Math.max(0, x));
-      vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockImplementation((x: number) => Math.max(0, x));
-      vi.mocked(getHeightQueryCache().getSlopeAt).mockReturnValue(0.7);
+      vi.mocked(mockTerrainSystem.getHeightAt).mockImplementation((x: number) => Math.max(0, x * 2));
+      vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockImplementation((x: number) => Math.max(0, x * 2));
+      playerState.position.set(1, 4, 0);
 
       playerMovement.updateMovement(0.2, mockInput, mockCamera);
 
-      expect(playerState.position.x).toBeLessThan(0.25);
-      expect(playerState.position.y).toBeLessThan(2.25);
-      expect(playerState.velocity.x).toBeLessThanOrEqual(0.2);
+      expect(playerState.position.distanceToSquared(new THREE.Vector3(1, 4, 0))).toBeGreaterThan(0.05);
+      expect(Math.hypot(playerState.velocity.x, playerState.velocity.z)).toBeGreaterThan(0.5);
+    });
+
+    it('keeps uphill movement responsive on a walkable support plane', () => {
+      vi.mocked(mockInput.isKeyPressed).mockImplementation((key: string) => key === 'keyd');
+      vi.mocked(mockTerrainSystem.getHeightAt).mockImplementation((x: number) => Math.max(0, x));
+      vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockImplementation((x: number) => Math.max(0, x));
+
+      playerMovement.updateMovement(0.016, mockInput, mockCamera);
+      const flatEquivalentSpeed = playerState.speed * 0.25;
+
+      expect(playerState.velocity.x).toBeGreaterThan(flatEquivalentSpeed);
     });
   });
 

@@ -9,6 +9,7 @@ import { HUDStyles } from './HUDStyles';
 import { HUDElements } from './HUDElements';
 import { HUDZoneDisplay } from './HUDZoneDisplay';
 import { PlayerStatsTracker } from '../../systems/player/PlayerStatsTracker';
+import { movementStatsTracker } from '../../systems/player/MovementStatsTracker';
 import { MatchEndScreen, MatchStats } from '../end/MatchEndScreen';
 import { ScoreboardPanel } from './ScoreboardPanel';
 import { StatsPanel } from './StatsPanel';
@@ -294,6 +295,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
   startMatch(): void {
     this.statsTracker.startMatch();
+    movementStatsTracker.startMatch();
     this.hudLayout.setPhase('playing');
     Logger.info('hud', ' Match statistics tracking started');
   }
@@ -349,7 +351,8 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       grenadeKills: playerStats.grenadeKills,
       bestKillStreak: playerStats.bestKillStreak,
       shotsFired: playerStats.shotsFired,
-      shotsHit: playerStats.shotsHit
+      shotsHit: playerStats.shotsHit,
+      movementSummary: movementStatsTracker.getPlayerSummary(),
     };
 
     Logger.info('hud', ' Showing match end screen with stats:', matchStats);

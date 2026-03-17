@@ -40,6 +40,7 @@ describe('WeaponFiring', () => {
   let statsTracker: PlayerStatsTracker
   let hudSystem: HUDSystem
   let overlayScene: THREE.Scene
+  let overlayCamera: THREE.Camera
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -47,6 +48,8 @@ describe('WeaponFiring', () => {
     camera = new THREE.PerspectiveCamera()
     camera.position.set(0, 0, 0)
     camera.quaternion.set(0, 0, 0, 1)
+    camera.updateProjectionMatrix()
+    camera.updateMatrixWorld(true)
 
     gunCore = new GunplayCore({} as any)
     tracerPool = new TracerPool({} as any)
@@ -60,6 +63,10 @@ describe('WeaponFiring', () => {
       spawnDamageNumber: vi.fn()
     } as any
     overlayScene = new THREE.Scene()
+    overlayCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10)
+    overlayCamera.position.z = 1
+    overlayCamera.updateProjectionMatrix()
+    overlayCamera.updateMatrixWorld(true)
 
     weaponFiring = new WeaponFiring(
       camera,
@@ -67,8 +74,14 @@ describe('WeaponFiring', () => {
       tracerPool,
       muzzleFlashSystem,
       impactEffectsPool,
-      overlayScene
+      overlayScene,
+      overlayCamera,
     )
+
+    vi.mocked((combatantSystem as any).resolvePlayerAimPoint).mockReturnValue({
+      hit: false,
+      point: new THREE.Vector3(0, 0, -50),
+    })
   })
 
   it('should initialize correctly', () => {
@@ -145,7 +158,15 @@ describe('WeaponFiring', () => {
     })
 
     it('should return default result if combatant system is missing', () => {
-      const emptyWeaponFiring = new WeaponFiring(camera, gunCore, tracerPool, muzzleFlashSystem, impactEffectsPool, overlayScene)
+      const emptyWeaponFiring = new WeaponFiring(
+        camera,
+        gunCore,
+        tracerPool,
+        muzzleFlashSystem,
+        impactEffectsPool,
+        overlayScene,
+        overlayCamera,
+      )
       const result = emptyWeaponFiring.executeShot(command)
       expect(result).toEqual({ hit: false, killed: false, headshot: false, damageDealt: 0 })
     })
@@ -219,12 +240,46 @@ describe('WeaponFiring', () => {
     })
 
     it('should track stats correctly when optional components are missing', () => {
-      const basicWeaponFiring = new WeaponFiring(camera, gunCore, tracerPool, muzzleFlashSystem, impactEffectsPool, overlayScene)
+      const basicWeaponFiring = new WeaponFiring(
+        camera,
+        gunCore,
+        tracerPool,
+        muzzleFlashSystem,
+        impactEffectsPool,
+        overlayScene,
+        overlayCamera,
+      )
       basicWeaponFiring.setCombatantSystem(combatantSystem)
       
       const result = basicWeaponFiring.executeShot(command)
       expect(result.hit).toBe(true)
       // Should not crash even if statsTracker/audioManager/hudSystem are missing
+    })
+
+    it('fires and traces from a barrel-aligned world start instead of camera center', () => {
+      const muzzleRef = new THREE.Object3D()
+      weaponFiring.setMuzzleRef(muzzleRef)
+
+      vi.spyOn(muzzleRef, 'getWorldPosition').mockImplementation((target) => {
+        target.set(0.62, -0.28, -0.72)
+        return target
+      })
+      vi.mocked((combatantSystem as any).resolvePlayerAimPoint).mockReturnValue({
+        hit: false,
+        point: new THREE.Vector3(0, 0, -40),
+      })
+
+      weaponFiring.executeShot(command)
+
+      const firedRay = vi.mocked(combatantSystem.handlePlayerShot).mock.calls[0][0] as THREE.Ray
+      expect(firedRay.origin.x).toBeGreaterThan(0.05)
+      expect(firedRay.origin.y).toBeLessThan(0)
+      expect(firedRay.direction.z).toBeLessThan(-0.9)
+      expect(tracerPool.spawn).toHaveBeenCalledWith(
+        expect.objectContaining({ x: expect.any(Number), y: expect.any(Number), z: expect.any(Number) }),
+        expect.objectContaining({ x: 0, y: 0, z: -10 }),
+        120
+      )
     })
   })
 

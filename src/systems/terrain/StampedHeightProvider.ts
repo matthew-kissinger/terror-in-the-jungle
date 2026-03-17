@@ -46,17 +46,28 @@ export class StampedHeightProvider implements IHeightProvider {
   }
 
   private resolveTargetHeight(stamp: TerrainStampConfig): number {
-    if (stamp.kind !== 'flatten_circle') {
-      return this.baseProvider.getHeightAt(stamp.centerX, stamp.centerZ);
+    switch (stamp.kind) {
+      case 'flatten_circle':
+        return sampleTargetHeight(
+          this.baseProvider,
+          stamp.centerX,
+          stamp.centerZ,
+          stamp.samplingRadius,
+          stamp.targetHeightMode,
+        );
+      case 'flatten_capsule':
+        return sampleCapsuleTargetHeight(
+          this.baseProvider,
+          stamp.startX,
+          stamp.startZ,
+          stamp.endX,
+          stamp.endZ,
+          stamp.samplingRadius,
+          stamp.targetHeightMode,
+        );
+      default:
+        return 0;
     }
-
-    return sampleTargetHeight(
-      this.baseProvider,
-      stamp.centerX,
-      stamp.centerZ,
-      stamp.samplingRadius,
-      stamp.targetHeightMode,
-    );
   }
 }
 
@@ -76,7 +87,27 @@ function applyResolvedStamp(
       }
 
       const target = stamp.targetHeight + stamp.heightOffset;
-      const influence = getFlattenCircleInfluence(distance, stamp);
+      const influence = getFlattenInfluence(distance, stamp);
+      if (influence <= 0) {
+        return baseHeight;
+      }
+      return baseHeight + (target - baseHeight) * influence;
+    }
+    case 'flatten_capsule': {
+      const distance = distanceToSegment(
+        worldX,
+        worldZ,
+        stamp.startX,
+        stamp.startZ,
+        stamp.endX,
+        stamp.endZ,
+      );
+      if (distance >= stamp.gradeRadius) {
+        return baseHeight;
+      }
+
+      const target = stamp.targetHeight + stamp.heightOffset;
+      const influence = getFlattenInfluence(distance, stamp);
       if (influence <= 0) {
         return baseHeight;
       }
@@ -87,7 +118,10 @@ function applyResolvedStamp(
   }
 }
 
-function getFlattenCircleInfluence(distance: number, stamp: ResolvedTerrainStampConfig): number {
+function getFlattenInfluence(
+  distance: number,
+  stamp: Pick<ResolvedTerrainStampConfig, 'innerRadius' | 'outerRadius' | 'gradeRadius' | 'gradeStrength'>,
+): number {
   if (distance <= stamp.innerRadius) {
     return 1;
   }
@@ -139,6 +173,83 @@ function sampleTargetHeight(
   }
 }
 
+function sampleCapsuleTargetHeight(
+  provider: IHeightProvider,
+  startX: number,
+  startZ: number,
+  endX: number,
+  endZ: number,
+  samplingRadius: number,
+  mode: TerrainStampTargetHeightMode,
+): number {
+  const length = Math.hypot(endX - startX, endZ - startZ);
+  if (length < 0.001) {
+    return sampleTargetHeight(provider, startX, startZ, samplingRadius, mode);
+  }
+
+  const centerlineSamples: number[] = [];
+  const samples: number[] = [];
+  const midX = (startX + endX) * 0.5;
+  const midZ = (startZ + endZ) * 0.5;
+  const midHeight = provider.getHeightAt(midX, midZ);
+  centerlineSamples.push(midHeight);
+  samples.push(midHeight);
+
+  const dirX = (endX - startX) / length;
+  const dirZ = (endZ - startZ) / length;
+  const rightX = -dirZ;
+  const rightZ = dirX;
+  const axialSamples = clampInt(
+    Math.ceil(length / Math.max(8, samplingRadius * 2.5)),
+    2,
+    10,
+  );
+  const lateralOffset = Math.max(0, samplingRadius * 0.55);
+
+  for (let i = 0; i <= axialSamples; i++) {
+    const t = i / axialSamples;
+    const x = lerp(startX, endX, t);
+    const z = lerp(startZ, endZ, t);
+    const centerHeight = provider.getHeightAt(x, z);
+    centerlineSamples.push(centerHeight);
+    samples.push(centerHeight);
+    if (lateralOffset > 0) {
+      samples.push(provider.getHeightAt(x + rightX * lateralOffset, z + rightZ * lateralOffset));
+      samples.push(provider.getHeightAt(x - rightX * lateralOffset, z - rightZ * lateralOffset));
+    }
+  }
+
+  switch (mode) {
+    case 'center':
+      return centerlineSamples.reduce((sum, sample) => sum + sample, 0) / centerlineSamples.length;
+    case 'average':
+      return samples.reduce((sum, sample) => sum + sample, 0) / samples.length;
+    case 'max':
+    default:
+      return samples.reduce((maxHeight, sample) => Math.max(maxHeight, sample), -Infinity);
+  }
+}
+
+function distanceToSegment(
+  x: number,
+  z: number,
+  startX: number,
+  startZ: number,
+  endX: number,
+  endZ: number,
+): number {
+  const dx = endX - startX;
+  const dz = endZ - startZ;
+  const lengthSq = dx * dx + dz * dz;
+  if (lengthSq <= 0.0001) {
+    return Math.hypot(x - startX, z - startZ);
+  }
+  const t = clamp(((x - startX) * dx + (z - startZ) * dz) / lengthSq, 0, 1);
+  const nearestX = startX + dx * t;
+  const nearestZ = startZ + dz * t;
+  return Math.hypot(x - nearestX, z - nearestZ);
+}
+
 function smoothstep(edge0: number, edge1: number, value: number): number {
   if (edge0 === edge1) {
     return value < edge0 ? 0 : 1;
@@ -149,4 +260,12 @@ function smoothstep(edge0: number, edge1: number, value: number): number {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function clampInt(value: number, min: number, max: number): number {
+  return Math.min(Math.max(Math.trunc(value), min), max);
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
 }

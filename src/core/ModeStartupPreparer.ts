@@ -29,14 +29,20 @@ const FACTION_DISPLAY_NAMES: Record<Faction, string> = {
 };
 
 function applyCompiledTerrainFeatures(engine: GameEngine, config: ReturnType<typeof getGameModeConfig>): void {
-  const compiledFeatures = compileTerrainFeatures(config);
+  const heightCache = getHeightQueryCache();
+  const compiledFeatures = compileTerrainFeatures(
+    config,
+    (x, z) => heightCache.getHeightAt(x, z),
+  );
   engine.systemManager.terrainSystem.setTerrainFeatures(compiledFeatures);
+  engine.systemManager.minimapSystem.setTerrainFlowPaths(compiledFeatures.flowPaths);
+  engine.systemManager.fullMapSystem.setTerrainFlowPaths(compiledFeatures.flowPaths);
+  engine.systemManager.fullMapSystem.setTerrainRuntime(engine.systemManager.terrainSystem);
 
   if (compiledFeatures.stamps.length === 0) {
     return;
   }
 
-  const heightCache = getHeightQueryCache();
   heightCache.setProvider(new StampedHeightProvider(heightCache.getProvider(), compiledFeatures.stamps));
 }
 

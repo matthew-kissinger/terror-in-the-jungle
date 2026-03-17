@@ -6,18 +6,31 @@ import { MuzzleFlashSystem, MuzzleFlashVariant } from '../../effects/MuzzleFlash
 import { ImpactEffectsPool } from '../../effects/ImpactEffectsPool'
 import { AudioManager } from '../../audio/AudioManager'
 import { PlayerStatsTracker } from '../PlayerStatsTracker'
-import { ShotCommand, ShotResult } from './ShotCommand'
+import { ShotCommand, ShotCommandFactory, ShotResult } from './ShotCommand'
 import { performanceTelemetry } from '../../debug/PerformanceTelemetry'
 import { WeaponShotExecutor } from './WeaponShotExecutor'
 import type { HUDSystem } from '../../../ui/hud/HUDSystem'
 import type { GrenadeSystem } from '../../weapons/GrenadeSystem'
 
 // Module-level scratch vectors to avoid per-shot allocations
-const _negDirection = new THREE.Vector3()
 const _muzzlePos = new THREE.Vector3()
+const _overlayMuzzleNdc = new THREE.Vector3()
 const _cameraPos = new THREE.Vector3()
+const _cameraRight = new THREE.Vector3()
+const _cameraUp = new THREE.Vector3()
+const _cameraQuat = new THREE.Quaternion()
 const _forward = new THREE.Vector3()
+const _muzzleRayPoint = new THREE.Vector3()
+const _barrelOrigin = new THREE.Vector3()
+const _aimPoint = new THREE.Vector3()
+const _barrelDirection = new THREE.Vector3()
 const _tracerEnd = new THREE.Vector3()
+const _pelletDirection = new THREE.Vector3()
+const _barrelRotation = new THREE.Quaternion()
+
+const PLAYER_BARREL_WORLD_DISTANCE = 0.95
+const PLAYER_BARREL_FALLBACK_RIGHT = 0.18
+const PLAYER_BARREL_FALLBACK_UP = -0.14
 
 /**
  * Handles weapon firing execution. Uses command pattern to avoid temporal coupling.
@@ -38,6 +51,7 @@ export class WeaponFiring {
   private muzzleRef?: THREE.Object3D
   private shotExecutor?: WeaponShotExecutor
   private overlayScene: THREE.Scene
+  private overlayCamera?: THREE.Camera
   private grenadeSystem?: GrenadeSystem
 
   constructor(
@@ -46,7 +60,8 @@ export class WeaponFiring {
     tracerPool: TracerPool,
     muzzleFlashSystem: MuzzleFlashSystem,
     impactEffectsPool: ImpactEffectsPool,
-    overlayScene: THREE.Scene
+    overlayScene: THREE.Scene,
+    overlayCamera?: THREE.Camera,
   ) {
     this.camera = camera
     this.gunCore = gunCore
@@ -54,6 +69,7 @@ export class WeaponFiring {
     this.muzzleFlashSystem = muzzleFlashSystem
     this.impactEffectsPool = impactEffectsPool
     this.overlayScene = overlayScene
+    this.overlayCamera = overlayCamera
   }
 
   setCombatantSystem(combatantSystem: CombatantSystem): void {
@@ -120,12 +136,14 @@ export class WeaponFiring {
       this.audioManager.playPlayerWeaponSound(command.weaponType)
     }
 
+    const resolvedCommand = this.resolveBarrelAlignedCommand(command, _barrelOrigin, _aimPoint)
+
     // Execute based on weapon type
     let result: ShotResult
-    if (command.weaponType === 'shotgun' && command.pelletRays) {
-      result = this.shotExecutor.executeShotgunShot(command)
+    if (resolvedCommand.weaponType === 'shotgun' && resolvedCommand.pelletRays) {
+      result = this.shotExecutor.executeShotgunShot(resolvedCommand)
     } else {
-      result = this.shotExecutor.executeSingleShot(command)
+      result = this.shotExecutor.executeSingleShot(resolvedCommand)
     }
 
     if (this.statsTracker) {
@@ -136,7 +154,7 @@ export class WeaponFiring {
     this.spawnMuzzleFlash()
 
     // Spawn tracer
-    this.spawnTracer(command, result)
+    this.spawnTracer(resolvedCommand, result, _barrelOrigin, _aimPoint)
 
     // Record in telemetry
     performanceTelemetry.recordShot(result.hit)
@@ -205,28 +223,101 @@ export class WeaponFiring {
     this.muzzleFlashSystem.spawnPlayer(this.overlayScene, _muzzlePos, _forward, variant)
   }
 
-  private spawnTracer(command: ShotCommand, result: ShotResult): void {
-    this.camera.getWorldPosition(_cameraPos)
-    this.camera.getWorldDirection(_forward)
-    // Start tracer slightly ahead of camera to avoid first-person clipping
-    _cameraPos.addScaledVector(_forward, 2)
-
+  private spawnTracer(
+    command: ShotCommand,
+    result: ShotResult,
+    tracerStart: THREE.Vector3,
+    fallbackEnd: THREE.Vector3,
+  ): void {
     if (command.weaponType === 'shotgun' && command.pelletRays) {
       // Spawn 1 tracer per 3 pellets
       for (let i = 0; i < command.pelletRays.length; i += 3) {
         const pelletRay = command.pelletRays[i]
         const range = result.distance ?? 25
         _tracerEnd.copy(pelletRay.origin).addScaledVector(pelletRay.direction, range)
-        this.tracerPool.spawn(_cameraPos, _tracerEnd, 100)
+        this.tracerPool.spawn(tracerStart, _tracerEnd, 100)
       }
     } else {
       if (result.hitPoint) {
         _tracerEnd.copy(result.hitPoint)
       } else {
-        _tracerEnd.copy(command.ray.origin).addScaledVector(command.ray.direction, 200)
+        _tracerEnd.copy(fallbackEnd)
       }
-      this.tracerPool.spawn(_cameraPos, _tracerEnd, 120)
+      this.tracerPool.spawn(tracerStart, _tracerEnd, 120)
     }
+  }
+
+  private resolveBarrelAlignedCommand(
+    command: ShotCommand,
+    barrelOriginTarget: THREE.Vector3,
+    aimPointTarget: THREE.Vector3,
+  ): ShotCommand {
+    this.resolveTracerStart(barrelOriginTarget)
+    this.resolveAimPoint(command, aimPointTarget)
+
+    _barrelDirection.subVectors(aimPointTarget, barrelOriginTarget)
+    if (_barrelDirection.lengthSq() <= 0.0001) {
+      _barrelDirection.copy(command.ray.direction)
+    } else {
+      _barrelDirection.normalize()
+    }
+
+    if (command.weaponType === 'shotgun' && command.pelletRays) {
+      _barrelRotation.setFromUnitVectors(command.ray.direction, _barrelDirection)
+      const pelletDirections = command.pelletRays.map((pelletRay) =>
+        _pelletDirection.copy(pelletRay.direction).applyQuaternion(_barrelRotation).normalize().clone()
+      )
+      return ShotCommandFactory.createShotgunShot(
+        barrelOriginTarget,
+        _barrelDirection,
+        pelletDirections,
+        command.damage,
+        command.isADS,
+      )
+    }
+
+    return ShotCommandFactory.createSingleShot(
+      barrelOriginTarget,
+      _barrelDirection,
+      command.weaponType === 'shotgun' ? 'rifle' : command.weaponType,
+      command.damage,
+      command.isADS,
+    )
+  }
+
+  private resolveAimPoint(command: ShotCommand, target: THREE.Vector3): THREE.Vector3 {
+    if (this.combatantSystem) {
+      const preview = this.combatantSystem.resolvePlayerAimPoint(command.ray)
+      return target.copy(preview.point)
+    }
+
+    return target.copy(command.ray.origin).addScaledVector(command.ray.direction, 200)
+  }
+
+  private resolveTracerStart(target: THREE.Vector3): THREE.Vector3 {
+    this.camera.getWorldPosition(_cameraPos)
+    this.camera.getWorldDirection(_forward)
+
+    if (this.muzzleRef && this.overlayCamera) {
+      this.muzzleRef.getWorldPosition(_muzzlePos)
+      _overlayMuzzleNdc.copy(_muzzlePos).project(this.overlayCamera)
+      const ndcX = THREE.MathUtils.clamp(_overlayMuzzleNdc.x, -0.98, 0.98)
+      const ndcY = THREE.MathUtils.clamp(_overlayMuzzleNdc.y, -0.98, 0.98)
+      _muzzleRayPoint.set(ndcX, ndcY, 0.5).unproject(this.camera)
+      _barrelDirection.subVectors(_muzzleRayPoint, _cameraPos)
+      if (_barrelDirection.lengthSq() > 0.0001) {
+        _barrelDirection.normalize()
+        return target.copy(_cameraPos).addScaledVector(_barrelDirection, PLAYER_BARREL_WORLD_DISTANCE)
+      }
+    }
+
+    this.camera.getWorldQuaternion(_cameraQuat)
+    _cameraRight.set(1, 0, 0).applyQuaternion(_cameraQuat).normalize()
+    _cameraUp.set(0, 1, 0).applyQuaternion(_cameraQuat).normalize()
+    return target.copy(_cameraPos)
+      .addScaledVector(_cameraRight, PLAYER_BARREL_FALLBACK_RIGHT)
+      .addScaledVector(_cameraUp, PLAYER_BARREL_FALLBACK_UP)
+      .addScaledVector(_forward, PLAYER_BARREL_WORLD_DISTANCE)
   }
 
   getGunCore(): GunplayCore {

@@ -240,21 +240,64 @@ export class StrategicDirector {
     squad.objectiveX = zone.position.x + (Math.random() - 0.5) * zone.radius;
     squad.objectiveZ = zone.position.z + (Math.random() - 0.5) * zone.radius;
     squad.stance = stance;
+    squad.routeGoalKey = undefined;
+    squad.routeWaypoints = undefined;
+    squad.routeWaypointIndex = 0;
   }
 
   private propagateOrders(): void {
     for (const squad of this.squads.values()) {
+      const routeWaypoint = this.getCurrentRouteWaypoint(squad);
+      const baseX = routeWaypoint?.x ?? squad.objectiveX;
+      const baseZ = routeWaypoint?.z ?? squad.objectiveZ;
+      const useFormationSpread = !routeWaypoint || routeWaypoint.kind === 'objective';
+
       for (const memberId of squad.members) {
         const agent = this.agents.get(memberId);
         if (!agent || !agent.alive || agent.tier === AgentTier.MATERIALIZED) continue;
 
-        // Set destination with slight offset per agent for formation spread
-        const offsetAngle = Math.random() * Math.PI * 2;
-        const offsetDist = Math.random() * 30; // 30m formation spread
-        agent.destX = squad.objectiveX + Math.cos(offsetAngle) * offsetDist;
-        agent.destZ = squad.objectiveZ + Math.sin(offsetAngle) * offsetDist;
+        if (!useFormationSpread) {
+          agent.destX = baseX;
+          agent.destZ = baseZ;
+          continue;
+        }
+
+        const offset = this.getFormationOffset(squad, memberId);
+        agent.destX = baseX + offset.x;
+        agent.destZ = baseZ + offset.z;
       }
     }
+  }
+
+  private getCurrentRouteWaypoint(squad: StrategicSquad) {
+    if (!squad.routeWaypoints || squad.routeWaypoints.length === 0) {
+      return null;
+    }
+
+    const routeIndex = Math.min(
+      squad.routeWaypointIndex ?? 0,
+      squad.routeWaypoints.length - 1,
+    );
+    return squad.routeWaypoints[routeIndex];
+  }
+
+  private getFormationOffset(
+    squad: StrategicSquad,
+    memberId: string,
+  ): { x: number; z: number } {
+    const slot = squad.members.indexOf(memberId);
+    if (slot <= 0) {
+      return { x: 0, z: 0 };
+    }
+
+    const adjustedSlot = slot - 1;
+    const ring = Math.floor(adjustedSlot / 6) + 1;
+    const angle = (adjustedSlot % 6) / 6 * Math.PI * 2;
+    const radius = ring * 12;
+    return {
+      x: Math.cos(angle) * radius,
+      z: Math.sin(angle) * radius,
+    };
   }
 
   private handleReinforcements(elapsedTime: number, zones: CaptureZone[]): void {

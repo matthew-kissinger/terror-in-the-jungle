@@ -12,6 +12,7 @@ import { UIComponent } from '../engine/UIComponent';
 import { Logger } from '../../utils/Logger';
 import { Faction } from '../../systems/combat/types';
 import { GameState } from '../../systems/world/TicketSystem';
+import type { PlayerMovementSummary } from '../../systems/player/MovementStatsTracker';
 import styles from './MatchEndScreen.module.css';
 
 export interface MatchStats {
@@ -35,6 +36,7 @@ export interface MatchStats {
   bestKillStreak: number;
   shotsFired: number;
   shotsHit: number;
+  movementSummary: PlayerMovementSummary;
 }
 
 interface Award {
@@ -239,6 +241,26 @@ export class MatchEndScreen extends UIComponent {
             <div class="${styles.statRow}">
               <span class="${styles.statLabel}">Grenade Kills</span>
               <span class="${styles.statValue}">${stats.grenadeKills}</span>
+            </div>
+          </div>
+
+          <div class="${styles.statsSection}">
+            <div class="${styles.statsSectionTitle}">Traversal</div>
+            <div class="${styles.statRow}">
+              <span class="${styles.statLabel}">Distance Covered</span>
+              <span class="${styles.statValue}">${stats.movementSummary.distanceMeters.toFixed(0)}m</span>
+            </div>
+            <div class="${styles.statRow}">
+              <span class="${styles.statLabel}">Climb Time</span>
+              <span class="${styles.statValue}">${stats.movementSummary.climbSeconds.toFixed(1)}s</span>
+            </div>
+            <div class="${styles.statRow}">
+              <span class="${styles.statLabel}">Pinned Time</span>
+              <span class="${styles.statValue}">${stats.movementSummary.pinnedSeconds.toFixed(1)}s</span>
+            </div>
+            <div class="${styles.statRow}">
+              <span class="${styles.statLabel}">Terrain Redirects</span>
+              <span class="${styles.statValue}">${stats.movementSummary.terrainRedirects}</span>
             </div>
           </div>
         </div>

@@ -5,7 +5,7 @@ Status: COMPLETE - 50 pixel-art PNG icons, all wired via IconRegistry
 
 ## Overview
 
-50 pixel-art PNG icons for HUD, touch controls, kill feed, helicopter instruments, minimap, reticles, faction emblems, and onboarding. White silhouettes on transparent background. Optimized to ~252KB total by `scripts/optimize-icons.mjs` (palette PNG, sharp trim+resize).
+50 pixel-art PNG icons for HUD, touch controls, kill feed, helicopter instruments, minimap, reticles, faction emblems, and onboarding. White silhouettes on transparent background. Optimized to ~252KB total as palette PNGs with trim/resize processing.
 
 ## Architecture
 
@@ -147,7 +147,7 @@ getWeaponIconUrl('rifle')
 
 ## Optimization
 
-- `scripts/optimize-icons.mjs` handles trim, resize to target size, palette PNG compression
-- `scripts/optimize-icons.mjs` also programmatically generates `icon-menu.png` and `icon-ads.png` from SVG primitives
+- the icon pipeline trims, resizes to target size, and preserves palette-friendly PNG compression
+- the icon pipeline also generated `icon-menu.png` and `icon-ads.png` from simple SVG primitives
 - Total footprint: ~252KB (50 files)
 - Format: PNG (optimal for small pixel art; WebP marginal at these sizes)

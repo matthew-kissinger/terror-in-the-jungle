@@ -25,7 +25,16 @@ export interface StrategicAgent {
   destZ: number;
   speed: number;
   combatState: 'idle' | 'moving' | 'fighting' | 'dead';
+  formationSlot?: number;
   combatantId?: string;  // set when materialized -> links to CombatantSystem entity
+}
+
+export interface StrategicRouteWaypoint {
+  x: number;
+  z: number;
+  arrivalRadius: number;
+  kind: 'route_node' | 'objective';
+  sourceId?: string;
 }
 
 /**
@@ -45,6 +54,9 @@ export interface StrategicSquad {
   strength: number;         // 0-1 ratio of alive members
   combatActive: boolean;    // true if engaged with enemy squad
   lastCombatTime: number;   // timestamp of last abstract combat tick
+  routeGoalKey?: string;
+  routeWaypoints?: StrategicRouteWaypoint[];
+  routeWaypointIndex?: number;
 }
 
 /**

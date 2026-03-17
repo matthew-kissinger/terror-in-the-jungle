@@ -358,9 +358,14 @@ export class CombatantSystem implements GameSystem {
   // Public API
   handlePlayerShot(
     ray: THREE.Ray,
-    damageCalculator: (distance: number, isHeadshot: boolean) => number
+    damageCalculator: (distance: number, isHeadshot: boolean) => number,
+    weaponType = 'rifle',
   ): CombatHitResult {
-    return this.combatantCombat.handlePlayerShot(ray, damageCalculator, this.combatants);
+    return this.combatantCombat.handlePlayerShot(ray, damageCalculator, this.combatants, weaponType);
+  }
+
+  resolvePlayerAimPoint(ray: THREE.Ray): CombatHitResult {
+    return this.combatantCombat.previewPlayerShot(ray, this.combatants);
   }
 
   checkPlayerHit(ray: THREE.Ray): { hit: boolean; point: THREE.Vector3; headshot: boolean } {

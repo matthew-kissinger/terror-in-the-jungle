@@ -60,6 +60,7 @@ export class TerrainSystem implements GameSystem {
     stamps: [],
     surfacePatches: [],
     vegetationExclusionZones: [],
+    flowPaths: [],
   };
 
   constructor(
@@ -221,6 +222,7 @@ export class TerrainSystem implements GameSystem {
       stamps: features.stamps.slice(),
       surfacePatches: features.surfacePatches.slice(),
       vegetationExclusionZones: features.vegetationExclusionZones.slice(),
+      flowPaths: features.flowPaths.slice(),
     };
     this.surfaceRuntime.setFeatureSurfacePatches(this.terrainFeatures.surfacePatches);
     this.billboardSystem.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
@@ -234,6 +236,10 @@ export class TerrainSystem implements GameSystem {
 
   getHeightAt(x: number, z: number): number {
     return this.terrainQueries.getHeightAt(x, z);
+  }
+
+  getTerrainFlowPaths() {
+    return this.terrainFeatures.flowPaths.slice();
   }
 
   getEffectiveHeightAt(x: number, z: number): number {

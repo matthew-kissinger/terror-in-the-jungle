@@ -91,6 +91,15 @@ export enum CombatantState {
   DISMOUNTING = 'dismounting'
 }
 
+export type CombatantMovementIntent =
+  | 'route_follow'
+  | 'direct_push'
+  | 'contour'
+  | 'flank_arc'
+  | 'cover_hop'
+  | 'backtrack'
+  | 'hold'
+
 export interface Combatant extends ITargetable {
   id: string;
   faction: Faction;
@@ -157,6 +166,13 @@ export interface Combatant extends ITargetable {
   terrainSampleZ?: number;
   terrainSampleHeight?: number;
   terrainSampleTimeMs?: number;
+  movementIntent?: CombatantMovementIntent;
+  movementAnchor?: THREE.Vector3;
+  movementLastProgressTimeMs?: number;
+  movementLastProgressDistanceSq?: number;
+  movementLastGoodPosition?: THREE.Vector3;
+  movementBacktrackPoint?: THREE.Vector3;
+  movementContourSign?: -1 | 1;
   vehicleId?: string;
   vehicleSeatIndex?: number;
 }

@@ -94,7 +94,8 @@ export class FirstPersonWeapon implements GameSystem {
       this.tracerPool,
       this.muzzleFlashSystem,
       this.impactEffectsPool,
-      this.model.getWeaponScene()
+      this.model.getWeaponScene(),
+      this.model.getWeaponCamera(),
     )
 
     // Initialize ammo management

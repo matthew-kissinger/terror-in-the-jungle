@@ -4,10 +4,9 @@ import { createTestCombatant } from '../../test-utils';
 import {
   StuckDetector,
   STUCK_CHECK_INTERVAL_MS,
+  STUCK_PINNED_DWELL_MS,
   STUCK_TICK_THRESHOLD,
-  STUCK_MAX_RECOVERIES,
 } from './StuckDetector';
-
 
 describe('StuckDetector', () => {
   let detector: StuckDetector;
@@ -17,7 +16,12 @@ describe('StuckDetector', () => {
   });
 
   it('creates a record on first call without triggering recovery', () => {
-    const c = createTestCombatant({ id: 'npc1', position: new THREE.Vector3(10, 0, 20) });
+    const anchor = new THREE.Vector3(20, 0, 20);
+    const c = createTestCombatant({
+      id: 'npc1',
+      position: new THREE.Vector3(10, 0, 20),
+      movementAnchor: anchor,
+    });
     detector.checkAndRecover(c, 0);
 
     const record = detector.getRecord('npc1');
@@ -26,38 +30,50 @@ describe('StuckDetector', () => {
     expect(record!.lastCheckZ).toBe(20);
     expect(record!.stuckTicks).toBe(0);
     expect(record!.recoveryCount).toBe(0);
+    expect(record!.lastAnchorDistanceSq).toBeCloseTo(100);
   });
 
   it('skips check when within interval', () => {
-    const c = createTestCombatant({ id: 'npc1', position: new THREE.Vector3(10, 0, 20) });
+    const c = createTestCombatant({
+      id: 'npc1',
+      position: new THREE.Vector3(10, 0, 20),
+      movementAnchor: new THREE.Vector3(20, 0, 20),
+    });
     detector.checkAndRecover(c, 0);
 
-    // Move slightly but check too soon — should not update record
-    c.position.set(10, 0, 20);
     detector.checkAndRecover(c, STUCK_CHECK_INTERVAL_MS - 1);
 
     const record = detector.getRecord('npc1');
     expect(record!.stuckTicks).toBe(0);
-    expect(record!.lastCheckTime).toBe(0); // unchanged
+    expect(record!.lastCheckTime).toBe(0);
   });
 
-  it('resets stuckTicks when NPC has moved', () => {
-    const c = createTestCombatant({ id: 'npc1', position: new THREE.Vector3(0, 0, 0) });
+  it('resets stuckTicks when NPC has moved meaningfully', () => {
+    const c = createTestCombatant({
+      id: 'npc1',
+      position: new THREE.Vector3(0, 0, 0),
+      movementAnchor: new THREE.Vector3(10, 0, 0),
+    });
     detector.checkAndRecover(c, 0);
 
-    // Move well beyond threshold
-    c.position.set(5, 0, 5);
+    c.position.set(3, 0, 0);
+    c.velocity.set(2, 0, 0);
     detector.checkAndRecover(c, STUCK_CHECK_INTERVAL_MS);
 
     const record = detector.getRecord('npc1');
     expect(record!.stuckTicks).toBe(0);
+    expect(record!.recoveryCount).toBe(0);
   });
 
-  it('increments stuckTicks when NPC has not moved', () => {
-    const c = createTestCombatant({ id: 'npc1', position: new THREE.Vector3(10, 0, 10) });
+  it('increments stuckTicks when NPC wants movement but does not move or progress', () => {
+    const c = createTestCombatant({
+      id: 'npc1',
+      position: new THREE.Vector3(10, 0, 10),
+      movementAnchor: new THREE.Vector3(50, 0, 50),
+    });
+    c.velocity.set(2, 0, 0);
     detector.checkAndRecover(c, 0);
 
-    // Don't move — check at interval
     detector.checkAndRecover(c, STUCK_CHECK_INTERVAL_MS);
     expect(detector.getRecord('npc1')!.stuckTicks).toBe(1);
 
@@ -65,89 +81,87 @@ describe('StuckDetector', () => {
     expect(detector.getRecord('npc1')!.stuckTicks).toBe(2);
   });
 
-  it('triggers recovery after STUCK_TICK_THRESHOLD consecutive stuck checks', () => {
-    const dest = new THREE.Vector3(50, 0, 50);
+  it('requests deterministic backtrack after repeated stalls', () => {
     const c = createTestCombatant({
       id: 'npc1',
       position: new THREE.Vector3(10, 0, 10),
-      destinationPoint: dest,
+      movementAnchor: new THREE.Vector3(50, 0, 50),
+      movementLastGoodPosition: new THREE.Vector3(6, 0, 6),
     });
+    c.velocity.set(2, 0, 0);
 
     detector.checkAndRecover(c, 0);
 
-    // Simulate stuck for threshold checks
+    let action: ReturnType<StuckDetector['checkAndRecover']> = 'none';
     for (let i = 1; i <= STUCK_TICK_THRESHOLD; i++) {
-      detector.checkAndRecover(c, STUCK_CHECK_INTERVAL_MS * i);
+      action = detector.checkAndRecover(c, STUCK_CHECK_INTERVAL_MS * i);
     }
 
-    // Destination should have been nudged
-    const moved = dest.x !== 50 || dest.z !== 50;
-    expect(moved).toBe(true);
-    // stuckTicks reset after recovery
+    expect(action).toBe('backtrack');
     expect(detector.getRecord('npc1')!.stuckTicks).toBe(0);
     expect(detector.getRecord('npc1')!.recoveryCount).toBe(1);
   });
 
-  it('sets random velocity when stuck with no destination', () => {
+  it('treats local-area dithering as stuck even when the NPC wiggles around', () => {
+    const c = createTestCombatant({
+      id: 'npc-jitter',
+      position: new THREE.Vector3(0, 0, 0),
+      movementAnchor: new THREE.Vector3(0, 0, 50),
+      movementLastGoodPosition: new THREE.Vector3(-3, 0, 0),
+    });
+    c.velocity.set(2, 0, 0);
+
+    detector.checkAndRecover(c, 0);
+
+    c.position.set(0.6, 0, 0);
+    detector.checkAndRecover(c, STUCK_CHECK_INTERVAL_MS);
+    expect(detector.getRecord('npc-jitter')!.stuckTicks).toBe(0);
+    expect(detector.getRecord('npc-jitter')!.localAreaDwellMs).toBe(STUCK_CHECK_INTERVAL_MS);
+
+    c.position.set(-0.6, 0, 0);
+    detector.checkAndRecover(c, STUCK_PINNED_DWELL_MS);
+    expect(detector.getRecord('npc-jitter')!.stuckTicks).toBe(1);
+
+    c.position.set(0.5, 0, 0);
+    const action = detector.checkAndRecover(c, STUCK_CHECK_INTERVAL_MS * 3);
+    expect(action).toBe('backtrack');
+  });
+
+  it('does not request backtrack without a last good position', () => {
     const c = createTestCombatant({
       id: 'npc1',
       position: new THREE.Vector3(10, 0, 10),
-      destinationPoint: undefined,
+      movementAnchor: new THREE.Vector3(50, 0, 50),
     });
-    c.velocity.set(0, 0, 0);
+    c.velocity.set(2, 0, 0);
 
     detector.checkAndRecover(c, 0);
+
+    let action: ReturnType<StuckDetector['checkAndRecover']> = 'none';
     for (let i = 1; i <= STUCK_TICK_THRESHOLD; i++) {
-      detector.checkAndRecover(c, STUCK_CHECK_INTERVAL_MS * i);
+      action = detector.checkAndRecover(c, STUCK_CHECK_INTERVAL_MS * i);
     }
 
-    // Should have a non-zero velocity impulse
-    expect(c.velocity.lengthSq()).toBeGreaterThan(0);
+    expect(action).toBe('none');
   });
 
-  it('clears destination after STUCK_MAX_RECOVERIES nudges', () => {
+  it('resets recoveryCount when NPC starts moving again', () => {
     const c = createTestCombatant({
       id: 'npc1',
       position: new THREE.Vector3(10, 0, 10),
-      destinationPoint: new THREE.Vector3(50, 0, 50),
+      movementAnchor: new THREE.Vector3(50, 0, 50),
+      movementLastGoodPosition: new THREE.Vector3(6, 0, 6),
     });
+    c.velocity.set(2, 0, 0);
 
     detector.checkAndRecover(c, 0);
-
-    let t = 0;
-    for (let recovery = 0; recovery <= STUCK_MAX_RECOVERIES; recovery++) {
-      // Each recovery takes STUCK_TICK_THRESHOLD checks
-      for (let i = 0; i < STUCK_TICK_THRESHOLD; i++) {
-        t += STUCK_CHECK_INTERVAL_MS;
-        detector.checkAndRecover(c, t);
-      }
-      // Re-assign destination after each nudge (simulating state machine re-set)
-      if (recovery < STUCK_MAX_RECOVERIES) {
-        c.destinationPoint = new THREE.Vector3(50, 0, 50);
-      }
-    }
-
-    // After max recoveries, destination should be cleared
-    expect(c.destinationPoint).toBeUndefined();
-  });
-
-  it('resets recoveryCount when NPC starts moving', () => {
-    const c = createTestCombatant({
-      id: 'npc1',
-      position: new THREE.Vector3(10, 0, 10),
-      destinationPoint: new THREE.Vector3(50, 0, 50),
-    });
-
-    detector.checkAndRecover(c, 0);
-
-    // Get stuck once to increment recovery
     for (let i = 1; i <= STUCK_TICK_THRESHOLD; i++) {
       detector.checkAndRecover(c, STUCK_CHECK_INTERVAL_MS * i);
     }
     expect(detector.getRecord('npc1')!.recoveryCount).toBe(1);
 
-    // Now move significantly
     c.position.set(20, 0, 20);
+    c.velocity.set(2, 0, 0);
     detector.checkAndRecover(c, STUCK_CHECK_INTERVAL_MS * (STUCK_TICK_THRESHOLD + 1));
 
     expect(detector.getRecord('npc1')!.recoveryCount).toBe(0);
@@ -175,14 +189,23 @@ describe('StuckDetector', () => {
   });
 
   it('tracks multiple combatants independently', () => {
-    const c1 = createTestCombatant({ id: 'npc1', position: new THREE.Vector3(0, 0, 0) });
-    const c2 = createTestCombatant({ id: 'npc2', position: new THREE.Vector3(100, 0, 100) });
+    const c1 = createTestCombatant({
+      id: 'npc1',
+      position: new THREE.Vector3(0, 0, 0),
+      movementAnchor: new THREE.Vector3(20, 0, 0),
+    });
+    const c2 = createTestCombatant({
+      id: 'npc2',
+      position: new THREE.Vector3(100, 0, 100),
+      movementAnchor: new THREE.Vector3(130, 0, 100),
+    });
+    c1.velocity.set(2, 0, 0);
+    c2.velocity.set(2, 0, 0);
 
     detector.checkAndRecover(c1, 0);
     detector.checkAndRecover(c2, 0);
 
-    // c1 stays stuck, c2 moves
-    c2.position.set(110, 0, 110);
+    c2.position.set(103, 0, 100);
     detector.checkAndRecover(c1, STUCK_CHECK_INTERVAL_MS);
     detector.checkAndRecover(c2, STUCK_CHECK_INTERVAL_MS);
 

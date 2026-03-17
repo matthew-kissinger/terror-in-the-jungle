@@ -36,7 +36,10 @@ describe('GameModeManager', () => {
       setMapIntelPolicy: vi.fn(),
       setWorldScale: vi.fn(),
     } as any;
-    const mockFullMapSystem = { setMapIntelPolicy: vi.fn() } as any;
+    const mockFullMapSystem = {
+      setMapIntelPolicy: vi.fn(),
+      setTerrainRuntime: vi.fn(),
+    } as any;
 
     manager.connectSystems(
       mockZoneManager,
@@ -46,6 +49,8 @@ describe('GameModeManager', () => {
       mockMinimapSystem,
       mockFullMapSystem
     );
+
+    expect(mockFullMapSystem.setTerrainRuntime).toHaveBeenCalledWith(mockTerrainSystem);
 
     manager.setGameMode(GameMode.A_SHAU_VALLEY);
     expect(mockMinimapSystem.setMapIntelPolicy).toHaveBeenLastCalledWith(

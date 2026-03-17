@@ -42,10 +42,27 @@ interface FlattenCircleStampConfig {
   targetHeight: number;
 }
 
+interface FlattenCapsuleStampConfig {
+  kind: 'flatten_capsule';
+  startX: number;
+  startZ: number;
+  endX: number;
+  endZ: number;
+  innerRadius: number;
+  outerRadius: number;
+  gradeRadius: number;
+  gradeStrength: number;
+  samplingRadius: number;
+  targetHeightMode: 'center' | 'average' | 'max';
+  heightOffset: number;
+  priority: number;
+  targetHeight: number;
+}
+
 interface StampedConfig {
   type: 'stamped';
   base: HeightProviderConfig;
-  stamps: FlattenCircleStampConfig[];
+  stamps: Array<FlattenCircleStampConfig | FlattenCapsuleStampConfig>;
 }
 
 type HeightProviderConfig = NoiseConfig | DEMConfig | StampedConfig;
@@ -204,7 +221,7 @@ function sampleProviderHeight(config: HeightProviderConfig, worldX: number, worl
     case 'stamped': {
       let height = sampleProviderHeight(config.base, worldX, worldZ);
       for (const stamp of config.stamps) {
-        height = applyFlattenCircleStamp(height, worldX, worldZ, stamp);
+        height = applyResolvedStamp(height, worldX, worldZ, stamp);
       }
       return height;
     }
@@ -213,28 +230,57 @@ function sampleProviderHeight(config: HeightProviderConfig, worldX: number, worl
   }
 }
 
-function applyFlattenCircleStamp(
+function applyResolvedStamp(
   baseHeight: number,
   worldX: number,
   worldZ: number,
-  stamp: FlattenCircleStampConfig,
+  stamp: FlattenCircleStampConfig | FlattenCapsuleStampConfig,
 ): number {
-  const dx = worldX - stamp.centerX;
-  const dz = worldZ - stamp.centerZ;
-  const distance = Math.sqrt(dx * dx + dz * dz);
-  if (distance >= stamp.gradeRadius) {
-    return baseHeight;
-  }
+  switch (stamp.kind) {
+    case 'flatten_circle': {
+      const dx = worldX - stamp.centerX;
+      const dz = worldZ - stamp.centerZ;
+      const distance = Math.sqrt(dx * dx + dz * dz);
+      if (distance >= stamp.gradeRadius) {
+        return baseHeight;
+      }
 
-  const targetHeight = stamp.targetHeight + stamp.heightOffset;
-  const influence = getFlattenCircleInfluence(distance, stamp);
-  if (influence <= 0) {
-    return baseHeight;
+      const targetHeight = stamp.targetHeight + stamp.heightOffset;
+      const influence = getFlattenInfluence(distance, stamp);
+      if (influence <= 0) {
+        return baseHeight;
+      }
+      return baseHeight + (targetHeight - baseHeight) * influence;
+    }
+    case 'flatten_capsule': {
+      const distance = distanceToSegment(
+        worldX,
+        worldZ,
+        stamp.startX,
+        stamp.startZ,
+        stamp.endX,
+        stamp.endZ,
+      );
+      if (distance >= stamp.gradeRadius) {
+        return baseHeight;
+      }
+
+      const targetHeight = stamp.targetHeight + stamp.heightOffset;
+      const influence = getFlattenInfluence(distance, stamp);
+      if (influence <= 0) {
+        return baseHeight;
+      }
+      return baseHeight + (targetHeight - baseHeight) * influence;
+    }
+    default:
+      return baseHeight;
   }
-  return baseHeight + (targetHeight - baseHeight) * influence;
 }
 
-function getFlattenCircleInfluence(distance: number, stamp: FlattenCircleStampConfig): number {
+function getFlattenInfluence(
+  distance: number,
+  stamp: Pick<FlattenCircleStampConfig | FlattenCapsuleStampConfig, 'innerRadius' | 'outerRadius' | 'gradeRadius' | 'gradeStrength'>,
+): number {
   if (distance <= stamp.innerRadius) {
     return 1;
   }
@@ -250,6 +296,26 @@ function getFlattenCircleInfluence(distance: number, stamp: FlattenCircleStampCo
   }
 
   return gradeStrength * smoothstep(stamp.gradeRadius, stamp.outerRadius, distance);
+}
+
+function distanceToSegment(
+  x: number,
+  z: number,
+  startX: number,
+  startZ: number,
+  endX: number,
+  endZ: number,
+): number {
+  const dx = endX - startX;
+  const dz = endZ - startZ;
+  const lengthSq = dx * dx + dz * dz;
+  if (lengthSq <= 0.0001) {
+    return Math.hypot(x - startX, z - startZ);
+  }
+  const t = clamp(((x - startX) * dx + (z - startZ) * dz) / lengthSq, 0, 1);
+  const nearestX = startX + dx * t;
+  const nearestZ = startZ + dz * t;
+  return Math.hypot(x - nearestX, z - nearestZ);
 }
 
 function smoothstep(edge0: number, edge1: number, value: number): number {

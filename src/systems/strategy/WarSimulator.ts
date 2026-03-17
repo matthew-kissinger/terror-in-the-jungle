@@ -13,6 +13,7 @@ import { MaterializationPipeline } from './MaterializationPipeline';
 import { AbstractCombatResolver } from './AbstractCombatResolver';
 import { StrategicDirector } from './StrategicDirector';
 import { PersistenceSystem } from './PersistenceSystem';
+import { StrategicRoutePlanner, type StrategicRouteTopologyInput } from './StrategicRoutePlanner';
 import type { CombatantSystem } from '../combat/CombatantSystem';
 import type { ZoneManager } from '../world/ZoneManager';
 import type { TicketSystem } from '../world/TicketSystem';
@@ -55,6 +56,7 @@ export class WarSimulator implements GameSystem {
   private resolver: AbstractCombatResolver | null = null;
   private director: StrategicDirector | null = null;
   private persistence: PersistenceSystem | null = null;
+  private routePlanner: StrategicRoutePlanner | null = null;
 
   // Dependencies (set via setters)
   private combatantSystem: CombatantSystem | null = null;
@@ -129,7 +131,8 @@ export class WarSimulator implements GameSystem {
 
   configure(
     config: WarSimulatorConfig,
-    heightQuery: (x: number, z: number) => number
+    heightQuery: (x: number, z: number) => number,
+    routeTopology?: StrategicRouteTopologyInput,
   ): void {
     this.config = config;
     this.getTerrainHeight = heightQuery;
@@ -139,6 +142,9 @@ export class WarSimulator implements GameSystem {
 
     // Initialize persistence
     this.persistence = new PersistenceSystem();
+    this.routePlanner = routeTopology
+      ? new StrategicRoutePlanner(routeTopology, heightQuery)
+      : null;
 
     // Initialize subsystems
     this.pipeline = new MaterializationPipeline(
@@ -182,6 +188,7 @@ export class WarSimulator implements GameSystem {
     this.pipeline = null;
     this.resolver = null;
     this.director = null;
+    this.routePlanner = null;
     this.elapsedTime = 0;
   }
 
@@ -312,7 +319,8 @@ export class WarSimulator implements GameSystem {
           destX: x,
           destZ: z,
           speed: 3.5 + Math.random() * 1.5, // 3.5-5.0 m/s
-          combatState: 'idle'
+          combatState: 'idle',
+          formationSlot: j,
         };
 
         this.agents.set(agentId, agent);
@@ -331,7 +339,8 @@ export class WarSimulator implements GameSystem {
         stance: isOpfor(faction) ? 'defend' : 'patrol',
         strength: 1.0,
         combatActive: false,
-        lastCombatTime: 0
+        lastCombatTime: 0,
+        routeWaypointIndex: 0,
       };
 
       this.squads.set(squadId, squad);
@@ -343,11 +352,23 @@ export class WarSimulator implements GameSystem {
   private updateSimulatedMovement(deltaTime: number, budgetStart: number): void {
     const MOVEMENT_BUDGET_MS = 0.5;
 
+    for (const squad of this.squads.values()) {
+      if (squad.strength <= 0) continue;
+      this.ensureSquadRoutePlan(squad);
+    }
+
     for (const agent of this.agents.values()) {
       if (performance.now() - budgetStart > MOVEMENT_BUDGET_MS + 1.5) break;
 
       if (!agent.alive || agent.tier === AgentTier.MATERIALIZED) continue;
       if (agent.combatState === 'dead' || agent.combatState === 'fighting') continue;
+
+      const squad = this.squads.get(agent.squadId);
+      if (squad) {
+        const destination = this.getAgentTravelDestination(agent, squad);
+        agent.destX = destination.x;
+        agent.destZ = destination.z;
+      }
 
       // Move toward destination
       const dx = agent.destX - agent.x;
@@ -389,10 +410,153 @@ export class WarSimulator implements GameSystem {
         squad.x = sx / alive;
         squad.z = sz / alive;
         squad.strength = alive / squad.members.length;
+        this.advanceSquadRoute(squad);
       } else {
         squad.strength = 0;
       }
     }
+  }
+
+  private ensureSquadRoutePlan(squad: StrategicSquad): void {
+    const goalKey = this.buildSquadRouteGoalKey(squad);
+    if (
+      squad.routeGoalKey === goalKey
+      && squad.routeWaypoints
+      && squad.routeWaypoints.length > 0
+    ) {
+      return;
+    }
+
+    squad.routeGoalKey = goalKey;
+    squad.routeWaypointIndex = 0;
+    squad.routeWaypoints = this.routePlanner
+      ? this.routePlanner.findRoute(
+          squad.x,
+          squad.z,
+          squad.objectiveX,
+          squad.objectiveZ,
+          squad.objectiveZoneId,
+        )
+      : [{
+          x: squad.objectiveX,
+          z: squad.objectiveZ,
+          arrivalRadius: this.resolveSquadGoalRadius(squad),
+          kind: 'objective',
+        }];
+  }
+
+  private buildSquadRouteGoalKey(squad: StrategicSquad): string {
+    return [
+      squad.objectiveZoneId ?? 'point',
+      Math.round(squad.objectiveX),
+      Math.round(squad.objectiveZ),
+    ].join(':');
+  }
+
+  private resolveSquadGoalRadius(squad: StrategicSquad): number {
+    if (!this.zoneManager || !squad.objectiveZoneId) {
+      return 26;
+    }
+
+    const zone = this.zoneManager.getAllZones().find((entry) => entry.id === squad.objectiveZoneId);
+    if (!zone) {
+      return 26;
+    }
+
+    return Math.min(Math.max(zone.radius * 0.8, 20), 90);
+  }
+
+  private advanceSquadRoute(squad: StrategicSquad): void {
+    if (!squad.routeWaypoints || squad.routeWaypoints.length === 0) {
+      return;
+    }
+
+    let routeIndex = Math.min(
+      squad.routeWaypointIndex ?? 0,
+      squad.routeWaypoints.length - 1,
+    );
+
+    while (routeIndex < squad.routeWaypoints.length - 1) {
+      const waypoint = squad.routeWaypoints[routeIndex];
+      if (distanceSq2D(squad.x, squad.z, waypoint.x, waypoint.z) > waypoint.arrivalRadius * waypoint.arrivalRadius) {
+        break;
+      }
+
+      routeIndex++;
+    }
+
+    squad.routeWaypointIndex = routeIndex;
+  }
+
+  private getAgentTravelDestination(
+    agent: StrategicAgent,
+    squad: StrategicSquad,
+  ): { x: number; z: number } {
+    const waypoint = this.getCurrentSquadWaypoint(squad);
+    if (!waypoint) {
+      return { x: squad.objectiveX, z: squad.objectiveZ };
+    }
+
+    const routeIndex = Math.min(
+      squad.routeWaypointIndex ?? 0,
+      Math.max((squad.routeWaypoints?.length ?? 1) - 1, 0),
+    );
+    const lastIndex = Math.max((squad.routeWaypoints?.length ?? 1) - 1, 0);
+    if (!squad.routeWaypoints || routeIndex < lastIndex || waypoint.kind !== 'objective') {
+      return { x: waypoint.x, z: waypoint.z };
+    }
+
+    return this.applyFormationOffset(agent, squad, waypoint.x, waypoint.z, routeIndex);
+  }
+
+  private getCurrentSquadWaypoint(squad: StrategicSquad) {
+    if (!squad.routeWaypoints || squad.routeWaypoints.length === 0) {
+      return null;
+    }
+
+    const routeIndex = Math.min(
+      squad.routeWaypointIndex ?? 0,
+      squad.routeWaypoints.length - 1,
+    );
+    return squad.routeWaypoints[routeIndex];
+  }
+
+  private applyFormationOffset(
+    agent: StrategicAgent,
+    squad: StrategicSquad,
+    baseX: number,
+    baseZ: number,
+    routeIndex: number,
+  ): { x: number; z: number } {
+    const slot = agent.formationSlot ?? squad.members.indexOf(agent.id);
+    if (slot <= 0) {
+      return { x: baseX, z: baseZ };
+    }
+
+    const sourceWaypoint = routeIndex > 0
+      ? squad.routeWaypoints?.[routeIndex - 1]
+      : undefined;
+    let dirX = baseX - (sourceWaypoint?.x ?? squad.x);
+    let dirZ = baseZ - (sourceWaypoint?.z ?? squad.z);
+    const dirLength = Math.hypot(dirX, dirZ);
+    if (dirLength > 0.001) {
+      dirX /= dirLength;
+      dirZ /= dirLength;
+    } else {
+      dirX = 0;
+      dirZ = 1;
+    }
+
+    const perpX = -dirZ;
+    const perpZ = dirX;
+    const adjustedSlot = slot - 1;
+    const column = (adjustedSlot % 3) - 1;
+    const row = Math.floor(adjustedSlot / 3) + 1;
+
+    return {
+      x: baseX + perpX * column * 9 - dirX * row * 10,
+      z: baseZ + perpZ * column * 9 - dirZ * row * 10,
+    };
   }
 
   // -- Player tracking --
@@ -559,4 +723,10 @@ export class WarSimulator implements GameSystem {
 
     Logger.info('war-sim', `Loaded war state: ${this.agents.size} agents, ${this.squads.size} squads, ${state.elapsedTime.toFixed(0)}s elapsed`);
   }
+}
+
+function distanceSq2D(ax: number, az: number, bx: number, bz: number): number {
+  const dx = bx - ax;
+  const dz = bz - az;
+  return dx * dx + dz * dz;
 }

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Faction, Squad, isBlufor } from './types';
+import { Combatant, CombatantMovementIntent, CombatantState, Faction, Squad, isBlufor } from './types';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { ZoneManager } from '../world/ZoneManager';
 import { TicketSystem } from '../world/TicketSystem';
@@ -7,17 +7,24 @@ import { GameModeManager } from '../world/GameModeManager';
 import { clusterManager } from './ClusterManager';
 import { SpatialGridManager } from './SpatialGridManager';
 import {
+  updateAdvancingMovement,
   updateCombatMovement,
   updateCoverSeekingMovement,
   updateDefendingMovement,
-  updatePatrolMovement
+  updatePatrolMovement,
+  updateSuppressingMovement
 } from './CombatantMovementStates';
-import { computeSlopeSpeedMultiplier } from '../terrain/SlopePhysics';
 import { NPC_Y_OFFSET } from '../../config/CombatantConfig';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 import type { NavmeshMovementAdapter } from '../navigation/NavmeshMovementAdapter';
 import { StuckDetector, type StuckRecoveryAction } from './StuckDetector';
 import { Logger } from '../../utils/Logger';
+import { performanceTelemetry } from '../debug/PerformanceTelemetry';
+import {
+  computeSlopeValueFromNormal,
+  computeSmoothedSupportNormal,
+} from '../terrain/GameplaySurfaceSampling';
+import { isWalkableSlope } from '../terrain/SlopePhysics';
 
 // ── Rotation spring-damper ──
 const ROTATION_SPRING = 15;
@@ -31,6 +38,39 @@ const TERRAIN_SAMPLE_INTERVAL_MEDIUM = 140;
 const TERRAIN_SAMPLE_INTERVAL_LOW = 220;
 const TERRAIN_SAMPLE_INTERVAL_CULLED = 320;
 const TERRAIN_SAMPLE_MOVE_THRESHOLD_SQ = 1.0;
+const NPC_SUPPORT_SAMPLE_DISTANCE = 1.2;
+const NPC_SUPPORT_FOOTPRINT_RADIUS = 0.65;
+const NPC_SUPPORT_LOOKAHEAD = 0.85;
+const NPC_FORWARD_PROBE_DISTANCE = 1.35;
+const NPC_TERRAIN_LIP_RISE = 0.45;
+const NPC_TRAVERSAL_MIN_UPHILL_SPEED_FACTOR = 0.86;
+const NPC_COMBAT_MIN_UPHILL_SPEED_FACTOR = 0.8;
+const NPC_TRAVERSAL_UPHILL_DRAG = 0.12;
+const NPC_COMBAT_UPHILL_DRAG = 0.2;
+const NPC_CONTOUR_FORWARD_BLEND = 0.42;
+const NPC_BACKTRACK_ARRIVAL_RADIUS_SQ = 2.25;
+const NPC_PROGRESS_EPSILON_SQ = 0.5;
+const NPC_LOW_PROGRESS_DELTA_SQ = 0.02;
+const NPC_RECOVERY_BASE_RADIUS = 2.5;
+const NPC_RECOVERY_RADIUS_STEP = 1.25;
+const NPC_RECOVERY_MAX_RADIUS = 6.5;
+const NPC_RECOVERY_HEADING_SAMPLES = 8;
+const NPC_RECOVERY_LAST_GOOD_MAX_DISTANCE_SQ = 100;
+
+const _desiredDirection = new THREE.Vector3();
+const _anchorDirection = new THREE.Vector3();
+const _surfaceFlowDirection = new THREE.Vector3();
+const _supportNormal = new THREE.Vector3(0, 1, 0);
+const _aheadSupportNormal = new THREE.Vector3(0, 1, 0);
+const _candidateSupportNormal = new THREE.Vector3(0, 1, 0);
+const _contourLeft = new THREE.Vector3();
+const _contourRight = new THREE.Vector3();
+const _blendedDirection = new THREE.Vector3();
+const _uphillDirection = new THREE.Vector3();
+const _pseudoAnchor = new THREE.Vector3();
+const _recoveryDirection = new THREE.Vector3();
+const _recoveryCandidate = new THREE.Vector3();
+const _recoveryForward = new THREE.Vector3();
 
 export class CombatantMovement {
   private static readonly TAU = Math.PI * 2;
@@ -78,6 +118,7 @@ export class CombatantMovement {
         this.navmeshAdapter.unregisterAgent(combatant.id);
       }
       this.stuckDetector.remove(combatant.id);
+      performanceTelemetry.removeNPCMovementTracker(combatant.id);
       return;
     }
 
@@ -87,6 +128,7 @@ export class CombatantMovement {
       if (this.navmeshAdapter?.hasAgent(combatant.id)) {
         this.navmeshAdapter.unregisterAgent(combatant.id);
       }
+      performanceTelemetry.removeNPCMovementTracker(combatant.id);
       return;
     }
 
@@ -98,6 +140,10 @@ export class CombatantMovement {
       });
     } else if (combatant.state === CombatantState.ENGAGING) {
       updateCombatMovement(combatant);
+    } else if (combatant.state === CombatantState.ADVANCING) {
+      updateAdvancingMovement(combatant);
+    } else if (combatant.state === CombatantState.SUPPRESSING) {
+      updateSuppressingMovement(combatant);
     } else if (combatant.state === CombatantState.SEEKING_COVER) {
       updateCoverSeekingMovement(combatant);
     } else if (combatant.state === CombatantState.DEFENDING) {
@@ -111,39 +157,15 @@ export class CombatantMovement {
       combatant.velocity.add(this._spacingForce);
     }
 
-    // Navmesh intercept: override beeline velocity with crowd-steered velocity
-    // for high/medium LOD NPCs that have a registered crowd agent.
-    if (this.navmeshAdapter) {
-      const useNavmesh = combatant.lodLevel === 'high' || combatant.lodLevel === 'medium';
-      if (useNavmesh) {
-        if (!this.navmeshAdapter.hasAgent(combatant.id)) {
-          this.navmeshAdapter.registerAgent(combatant);
-        }
-        const targetReachable = this.navmeshAdapter.updateAgentTarget(combatant);
-        if (targetReachable) {
-          this.navmeshAdapter.applyAgentVelocity(combatant);
-        } else {
-          // Pathfinding failed — unregister from navmesh so beeline takes over
-          Logger.warn('combat', `NPC ${combatant.id} navmesh target unreachable, falling back to beeline`);
-          this.navmeshAdapter.unregisterAgent(combatant.id);
-        }
-      } else if (this.navmeshAdapter.hasAgent(combatant.id)) {
-        // Low/culled LOD: unregister from crowd, fall back to beeline
-        this.navmeshAdapter.unregisterAgent(combatant.id);
-      }
+    // Infantry movement is now driven by a single terrain-aware solver.
+    // Recast crowd authority caused too many hill-specific stalls to remain
+    // the primary answer for combat locomotion.
+    if (this.navmeshAdapter?.hasAgent(combatant.id)) {
+      this.navmeshAdapter.unregisterAgent(combatant.id);
     }
 
-    // Apply slope speed penalty only for beeline NPCs (no navmesh agent).
-    // Navmesh-steered NPCs already respect slope via WALKABLE_SLOPE_ANGLE=40°
-    // in the Recast config — applying slope penalty on top double-penalizes
-    // and can zero velocity at slope transitions, causing NPCs to get stuck.
-    const hasNavmeshAgent = this.navmeshAdapter?.hasAgent(combatant.id) ?? false;
-    if (!hasNavmeshAgent && combatant.velocity.lengthSq() > 0.01 && this.terrainSystem) {
-      const slope = this.terrainSystem.getSlopeAt(combatant.position.x, combatant.position.z);
-      const slopeMultiplier = computeSlopeSpeedMultiplier(slope);
-      combatant.velocity.x *= slopeMultiplier;
-      combatant.velocity.z *= slopeMultiplier;
-    }
+    const now = performance.now();
+    const steering = this.applyTerrainAwareVelocity(combatant, now);
 
     // Apply velocity normally - LOD scaling handled in CombatantSystem
     combatant.position.addScaledVector(combatant.velocity, deltaTime);
@@ -154,12 +176,31 @@ export class CombatantMovement {
       combatant.position.y = terrainHeight + NPC_Y_OFFSET;
     }
 
-    // Stuck detection — runs after final position is settled
-    const stuckAction: StuckRecoveryAction = this.stuckDetector.checkAndRecover(combatant, performance.now());
-    if (stuckAction === 'unregister_navmesh' && this.navmeshAdapter?.hasAgent(combatant.id)) {
-      Logger.warn('combat', `NPC ${combatant.id} stuck after max recoveries, unregistering from navmesh`);
-      this.navmeshAdapter.unregisterAgent(combatant.id);
+    const progress = this.updateProgressTracking(combatant, steering.anchorDistanceBeforeSq, now);
+
+    const stuckAction: StuckRecoveryAction = this.stuckDetector.checkAndRecover(combatant, now);
+    const backtrackActivated = stuckAction === 'backtrack' && this.activateBacktrack(combatant);
+    if (backtrackActivated) {
+      Logger.warn('combat', `NPC ${combatant.id} stalled on terrain, backtracking to last good progress point`);
     }
+
+    const telemetryIntent: CombatantMovementIntent = backtrackActivated
+      ? 'backtrack'
+      : (combatant.movementIntent ?? 'hold');
+    performanceTelemetry.recordNPCMovementSample(
+      combatant.id,
+      combatant.lodLevel,
+      telemetryIntent,
+      progress.progressDelta,
+      progress.lowProgress,
+      steering.contourActivated,
+      backtrackActivated,
+      progress.arrived,
+      deltaTime,
+      combatant.position.x,
+      combatant.position.z,
+      telemetryIntent !== 'hold' && combatant.velocity.lengthSq() > 0.01,
+    );
   }
 
   updateRotation(combatant: Combatant, deltaTime: number): void {
@@ -190,6 +231,514 @@ export class CombatantMovement {
     combatant.visualRotation = ((combatant.visualRotation % CombatantMovement.TAU) + CombatantMovement.TAU) % CombatantMovement.TAU;
   }
 
+  private applyTerrainAwareVelocity(
+    combatant: Combatant,
+    now: number,
+  ): { anchorDistanceBeforeSq: number; contourActivated: boolean } {
+    const anchor = this.resolveMovementAnchor(combatant);
+    if (anchor) {
+      this.setMovementAnchor(combatant, anchor, now);
+    } else {
+      combatant.movementAnchor = undefined;
+    }
+
+    const baseSpeed = combatant.velocity.length();
+    if (baseSpeed <= 0.01) {
+      combatant.velocity.set(0, 0, 0);
+      combatant.movementIntent = anchor ? this.resolveMovementIntent(combatant) : 'hold';
+      return {
+        anchorDistanceBeforeSq: anchor ? combatant.position.distanceToSquared(anchor) : Number.POSITIVE_INFINITY,
+        contourActivated: false,
+      };
+    }
+
+    const desiredDirection = _desiredDirection.copy(combatant.velocity).setY(0);
+    if (desiredDirection.lengthSq() <= 0.0001) {
+      combatant.velocity.set(0, 0, 0);
+      combatant.movementIntent = 'hold';
+      return {
+        anchorDistanceBeforeSq: Number.POSITIVE_INFINITY,
+        contourActivated: false,
+      };
+    }
+    desiredDirection.normalize();
+
+    const activeAnchor = anchor
+      ?? _pseudoAnchor.copy(combatant.position).addScaledVector(desiredDirection, NPC_FORWARD_PROBE_DISTANCE * 4);
+    const anchorDirection = _anchorDirection.subVectors(activeAnchor, combatant.position).setY(0);
+    if (anchorDirection.lengthSq() > 0.0001) {
+      anchorDirection.normalize();
+    } else {
+      anchorDirection.copy(desiredDirection);
+    }
+
+    const supportNormal = this.sampleSupportNormal(
+      combatant.position.x,
+      combatant.position.z,
+      desiredDirection.x,
+      desiredDirection.z,
+      _supportNormal,
+    );
+
+    const baseIntent = this.resolveMovementIntent(combatant);
+    let finalDirection = this.projectDirectionOnSurface(
+      desiredDirection,
+      supportNormal,
+      anchorDirection,
+      _surfaceFlowDirection,
+    );
+    if (finalDirection.lengthSq() <= 0.0001) {
+      finalDirection = desiredDirection;
+    }
+    let contourActivated = false;
+    let finalIntent = baseIntent;
+
+    if (anchor && this.isForwardBlocked(combatant.position, finalDirection)) {
+      const contourDirection = this.chooseContourDirection(
+        combatant,
+        finalDirection,
+        anchorDirection,
+        supportNormal,
+      );
+      if (contourDirection.lengthSq() > 0.0001) {
+        finalDirection = contourDirection;
+        contourActivated = true;
+        finalIntent = combatant.movementBacktrackPoint
+          ? 'backtrack'
+          : combatant.isFlankingMove
+            ? 'flank_arc'
+            : 'contour';
+      }
+    }
+
+    const speedFactor = this.computeDirectionalSpeedFactor(combatant, finalDirection, finalIntent);
+    combatant.velocity.x = finalDirection.x * baseSpeed * speedFactor;
+    combatant.velocity.z = finalDirection.z * baseSpeed * speedFactor;
+    combatant.movementIntent = finalIntent;
+
+    if (
+      combatant.state !== CombatantState.ENGAGING &&
+      combatant.state !== CombatantState.SUPPRESSING &&
+      finalDirection.lengthSq() > 0.001
+    ) {
+      combatant.rotation = Math.atan2(finalDirection.z, finalDirection.x);
+    }
+
+    return {
+      anchorDistanceBeforeSq: anchor ? combatant.position.distanceToSquared(anchor) : Number.POSITIVE_INFINITY,
+      contourActivated,
+    };
+  }
+
+  private resolveMovementAnchor(combatant: Combatant): THREE.Vector3 | undefined {
+    if (combatant.movementBacktrackPoint) {
+      const backtrackDistSq = combatant.position.distanceToSquared(combatant.movementBacktrackPoint);
+      if (backtrackDistSq <= NPC_BACKTRACK_ARRIVAL_RADIUS_SQ) {
+        combatant.movementBacktrackPoint = undefined;
+      } else {
+        return combatant.movementBacktrackPoint;
+      }
+    }
+
+    return this.resolvePrimaryGoalAnchor(combatant);
+  }
+
+  private resolvePrimaryGoalAnchor(combatant: Combatant): THREE.Vector3 | undefined {
+    if (combatant.state === CombatantState.SEEKING_COVER && combatant.coverPosition) {
+      return combatant.coverPosition;
+    }
+    if (combatant.destinationPoint) {
+      return combatant.destinationPoint;
+    }
+    if (combatant.state === CombatantState.ENGAGING && combatant.target) {
+      return combatant.target.position;
+    }
+    return undefined;
+  }
+
+  private resolveMovementIntent(combatant: Combatant): CombatantMovementIntent {
+    if (combatant.movementBacktrackPoint) return 'backtrack';
+    if (combatant.state === CombatantState.SEEKING_COVER) return 'cover_hop';
+    if (combatant.isFlankingMove) return 'flank_arc';
+    if (combatant.state === CombatantState.PATROLLING || combatant.state === CombatantState.DEFENDING) {
+      return 'route_follow';
+    }
+    if (combatant.state === CombatantState.ADVANCING || combatant.state === CombatantState.ENGAGING) {
+      return 'direct_push';
+    }
+    return 'hold';
+  }
+
+  private setMovementAnchor(combatant: Combatant, anchor: THREE.Vector3, now: number): void {
+    const anchorChanged = !combatant.movementAnchor
+      || combatant.movementAnchor.distanceToSquared(anchor) > 4;
+
+    if (combatant.movementAnchor) {
+      combatant.movementAnchor.copy(anchor);
+    } else {
+      combatant.movementAnchor = anchor.clone();
+    }
+
+    if (!anchorChanged) {
+      return;
+    }
+
+    combatant.movementLastProgressTimeMs = now;
+    combatant.movementLastProgressDistanceSq = combatant.position.distanceToSquared(anchor);
+    if (combatant.movementLastGoodPosition) {
+      combatant.movementLastGoodPosition.copy(combatant.position);
+    } else {
+      combatant.movementLastGoodPosition = combatant.position.clone();
+    }
+    combatant.movementContourSign = undefined;
+  }
+
+  private sampleSupportNormal(
+    x: number,
+    z: number,
+    moveX: number,
+    moveZ: number,
+    target: THREE.Vector3,
+  ): THREE.Vector3 {
+    return computeSmoothedSupportNormal(
+      (sampleX, sampleZ) => this.getTerrainHeight(sampleX, sampleZ),
+      x,
+      z,
+      target,
+      {
+        sampleDistance: NPC_SUPPORT_SAMPLE_DISTANCE,
+        footprintRadius: NPC_SUPPORT_FOOTPRINT_RADIUS,
+        lookaheadDistance: NPC_SUPPORT_LOOKAHEAD,
+        moveX,
+        moveZ,
+      },
+    );
+  }
+
+  private isForwardBlocked(position: THREE.Vector3, direction: THREE.Vector3): boolean {
+    const currentHeight = this.getTerrainHeight(position.x, position.z);
+    const aheadX = position.x + direction.x * NPC_FORWARD_PROBE_DISTANCE;
+    const aheadZ = position.z + direction.z * NPC_FORWARD_PROBE_DISTANCE;
+    const aheadHeight = this.getTerrainHeight(aheadX, aheadZ);
+
+    if (aheadHeight <= currentHeight + NPC_TERRAIN_LIP_RISE) {
+      return false;
+    }
+
+    const aheadNormal = this.sampleSupportNormal(
+      aheadX,
+      aheadZ,
+      direction.x,
+      direction.z,
+      _aheadSupportNormal,
+    );
+    return !isWalkableSlope(computeSlopeValueFromNormal(aheadNormal));
+  }
+
+  private projectDirectionOnSurface(
+    direction: THREE.Vector3,
+    supportNormal: THREE.Vector3,
+    fallbackDirection: THREE.Vector3,
+    target: THREE.Vector3,
+  ): THREE.Vector3 {
+    target.copy(direction).projectOnPlane(supportNormal);
+    target.y = 0;
+    if (target.lengthSq() <= 0.0001) {
+      target.copy(fallbackDirection).setY(0);
+    }
+    if (target.lengthSq() <= 0.0001) {
+      target.copy(direction).setY(0);
+    }
+    if (target.lengthSq() <= 0.0001) {
+      return target.set(0, 0, 0);
+    }
+    return target.normalize();
+  }
+
+  private chooseContourDirection(
+    combatant: Combatant,
+    desiredDirection: THREE.Vector3,
+    anchorDirection: THREE.Vector3,
+    supportNormal: THREE.Vector3,
+  ): THREE.Vector3 {
+    const downhillLength = Math.hypot(supportNormal.x, supportNormal.z);
+    let uphillX = 0;
+    let uphillZ = 0;
+
+    if (downhillLength > 0.001) {
+      uphillX = -supportNormal.x / downhillLength;
+      uphillZ = -supportNormal.z / downhillLength;
+    } else {
+      uphillX = desiredDirection.x;
+      uphillZ = desiredDirection.z;
+    }
+
+    _contourLeft.set(-uphillZ, 0, uphillX).normalize();
+    _contourRight.set(uphillZ, 0, -uphillX).normalize();
+
+    const leftScore = this.scoreContourDirection(combatant, _contourLeft, anchorDirection, -1);
+    const rightScore = this.scoreContourDirection(combatant, _contourRight, anchorDirection, 1);
+    const useLeft = leftScore >= rightScore;
+    const chosenSign: -1 | 1 = useLeft ? -1 : 1;
+    const chosenDirection = useLeft ? _contourLeft : _contourRight;
+
+    combatant.movementContourSign = chosenSign;
+    _blendedDirection.copy(chosenDirection)
+      .multiplyScalar(1 - NPC_CONTOUR_FORWARD_BLEND)
+      .addScaledVector(anchorDirection, NPC_CONTOUR_FORWARD_BLEND);
+    if (_blendedDirection.lengthSq() > 0.0001) {
+      _blendedDirection.normalize();
+      if (!this.isForwardBlocked(combatant.position, _blendedDirection)) {
+        chosenDirection.copy(_blendedDirection);
+      }
+    }
+
+    return chosenDirection;
+  }
+
+  private scoreContourDirection(
+    combatant: Combatant,
+    direction: THREE.Vector3,
+    anchorDirection: THREE.Vector3,
+    sign: -1 | 1,
+  ): number {
+    const currentHeight = this.getTerrainHeight(combatant.position.x, combatant.position.z);
+    const aheadX = combatant.position.x + direction.x * NPC_FORWARD_PROBE_DISTANCE;
+    const aheadZ = combatant.position.z + direction.z * NPC_FORWARD_PROBE_DISTANCE;
+    const aheadHeight = this.getTerrainHeight(aheadX, aheadZ);
+    const aheadNormal = this.sampleSupportNormal(
+      aheadX,
+      aheadZ,
+      direction.x,
+      direction.z,
+      _candidateSupportNormal,
+    );
+    const aheadSlopeValue = computeSlopeValueFromNormal(aheadNormal);
+    const flowFactor = this.computeDirectionalSpeedFactor(combatant, direction, combatant.movementIntent);
+    let score = direction.dot(anchorDirection) * 1.5 + aheadNormal.y * 1.5 + flowFactor * 2;
+    if (!isWalkableSlope(aheadSlopeValue)) {
+      score -= 0.75;
+    }
+    score -= Math.max(0, aheadHeight - currentHeight - NPC_TERRAIN_LIP_RISE) * 0.35;
+    if (combatant.movementContourSign === sign) {
+      score += 0.25;
+    }
+    return score;
+  }
+
+  private computeDirectionalSpeedFactor(
+    combatant: Combatant,
+    direction: THREE.Vector3,
+    intent: CombatantMovementIntent = combatant.movementIntent ?? this.resolveMovementIntent(combatant),
+  ): number {
+    const currentHeight = this.getTerrainHeight(combatant.position.x, combatant.position.z);
+    const aheadHeight = this.getTerrainHeight(
+      combatant.position.x + direction.x * NPC_FORWARD_PROBE_DISTANCE,
+      combatant.position.z + direction.z * NPC_FORWARD_PROBE_DISTANCE,
+    );
+    const uphillGrade = Math.max(0, (aheadHeight - currentHeight) / NPC_FORWARD_PROBE_DISTANCE);
+    const traversalIntent =
+      intent === 'route_follow' ||
+      intent === 'backtrack' ||
+      intent === 'flank_arc' ||
+      intent === 'cover_hop' ||
+      (intent === 'direct_push' && combatant.state === CombatantState.ADVANCING);
+    const minSpeedFactor = traversalIntent
+      ? NPC_TRAVERSAL_MIN_UPHILL_SPEED_FACTOR
+      : NPC_COMBAT_MIN_UPHILL_SPEED_FACTOR;
+    const uphillDrag = traversalIntent ? NPC_TRAVERSAL_UPHILL_DRAG : NPC_COMBAT_UPHILL_DRAG;
+    return THREE.MathUtils.clamp(1 - uphillGrade * uphillDrag, minSpeedFactor, 1);
+  }
+
+  private updateProgressTracking(
+    combatant: Combatant,
+    anchorDistanceBeforeSq: number,
+    now: number,
+  ): { progressDelta: number; lowProgress: boolean; arrived: boolean } {
+    if (!combatant.movementAnchor || !Number.isFinite(anchorDistanceBeforeSq)) {
+      return { progressDelta: 0, lowProgress: false, arrived: false };
+    }
+
+    const anchorDistanceAfterSq = combatant.position.distanceToSquared(combatant.movementAnchor);
+    const progressDelta = Math.max(0, Math.sqrt(anchorDistanceBeforeSq) - Math.sqrt(anchorDistanceAfterSq));
+    const improved = anchorDistanceBeforeSq - anchorDistanceAfterSq > NPC_PROGRESS_EPSILON_SQ;
+    const isBacktracking = Boolean(
+      combatant.movementBacktrackPoint &&
+      combatant.movementAnchor.distanceToSquared(combatant.movementBacktrackPoint) < 0.01,
+    );
+    const arrived = isBacktracking && anchorDistanceAfterSq <= NPC_BACKTRACK_ARRIVAL_RADIUS_SQ;
+
+    if (improved) {
+      combatant.movementLastProgressTimeMs = now;
+      combatant.movementLastProgressDistanceSq = anchorDistanceAfterSq;
+      if (combatant.movementLastGoodPosition) {
+        combatant.movementLastGoodPosition.copy(combatant.position);
+      } else {
+        combatant.movementLastGoodPosition = combatant.position.clone();
+      }
+    }
+
+    if (arrived) {
+      combatant.movementBacktrackPoint = undefined;
+    }
+
+    const lowProgress = combatant.velocity.lengthSq() > 0.01 && progressDelta * progressDelta < NPC_LOW_PROGRESS_DELTA_SQ;
+    return { progressDelta, lowProgress, arrived };
+  }
+
+  private activateBacktrack(combatant: Combatant): boolean {
+    const recoveryPoint = this.selectRecoveryPoint(combatant);
+    if (!recoveryPoint) {
+      return false;
+    }
+
+    if (combatant.movementBacktrackPoint) {
+      combatant.movementBacktrackPoint.copy(recoveryPoint);
+    } else {
+      combatant.movementBacktrackPoint = recoveryPoint.clone();
+    }
+    combatant.movementIntent = 'backtrack';
+    combatant.movementContourSign = undefined;
+    return true;
+  }
+
+  private selectRecoveryPoint(combatant: Combatant): THREE.Vector3 | undefined {
+    const currentPos = combatant.position;
+    const goalAnchor = this.resolvePrimaryGoalAnchor(combatant);
+    const currentGoalDistSq = goalAnchor
+      ? currentPos.distanceToSquared(goalAnchor)
+      : Number.POSITIVE_INFINITY;
+    const lastGoodPosition = combatant.movementLastGoodPosition;
+    const recoveryCount = this.stuckDetector.getRecord(combatant.id)?.recoveryCount ?? 1;
+    const baseRadius = Math.min(
+      NPC_RECOVERY_MAX_RADIUS,
+      NPC_RECOVERY_BASE_RADIUS + Math.max(0, recoveryCount - 1) * NPC_RECOVERY_RADIUS_STEP,
+    );
+    const currentHeight = this.getTerrainHeight(currentPos.x, currentPos.z);
+
+    if (goalAnchor) {
+      _recoveryForward.subVectors(goalAnchor, currentPos).setY(0);
+      if (_recoveryForward.lengthSq() > 0.0001) {
+        _recoveryForward.normalize();
+      }
+    }
+    if (_recoveryForward.lengthSq() <= 0.0001) {
+      _recoveryForward.copy(combatant.velocity).setY(0);
+      if (_recoveryForward.lengthSq() > 0.0001) {
+        _recoveryForward.normalize();
+      } else {
+        _recoveryForward.set(1, 0, 0);
+      }
+    }
+
+    let bestScore = Number.NEGATIVE_INFINITY;
+    let bestPoint: THREE.Vector3 | undefined;
+
+    const evaluateCandidate = (candidate: THREE.Vector3): void => {
+      const candidateDir = _recoveryDirection.subVectors(candidate, currentPos).setY(0);
+      const distanceSq = candidateDir.lengthSq();
+      if (distanceSq < 1) {
+        return;
+      }
+      candidateDir.normalize();
+
+      const candidateHeight = this.getTerrainHeight(candidate.x, candidate.z);
+      const candidateNormal = this.sampleSupportNormal(
+        candidate.x,
+        candidate.z,
+        candidateDir.x,
+        candidateDir.z,
+        _candidateSupportNormal,
+      );
+      const flowFactor = this.computeDirectionalSpeedFactor(combatant, candidateDir);
+      const goalImprovement = Number.isFinite(currentGoalDistSq) && goalAnchor
+        ? Math.sqrt(currentGoalDistSq) - candidate.distanceTo(goalAnchor)
+        : 0;
+      const lastGoodBonus = lastGoodPosition
+        ? Math.max(0, 6 - candidate.distanceTo(lastGoodPosition)) * 0.25
+        : 0;
+
+      const score =
+        candidateDir.dot(_recoveryForward) * 1.25 +
+        goalImprovement * 0.65 +
+        flowFactor * 2 +
+        candidateNormal.y * 1.5 +
+        lastGoodBonus -
+        Math.max(0, candidateHeight - currentHeight) * 0.3;
+
+      if (score > bestScore) {
+        bestScore = score;
+        if (bestPoint) {
+          bestPoint.copy(candidate);
+        } else {
+          bestPoint = candidate.clone();
+        }
+      }
+    };
+
+    if (
+      lastGoodPosition &&
+      currentPos.distanceToSquared(lastGoodPosition) > 1 &&
+      currentPos.distanceToSquared(lastGoodPosition) <= NPC_RECOVERY_LAST_GOOD_MAX_DISTANCE_SQ
+    ) {
+      evaluateCandidate(lastGoodPosition);
+    }
+
+    const localSupportNormal = this.sampleSupportNormal(
+      currentPos.x,
+      currentPos.z,
+      _recoveryForward.x,
+      _recoveryForward.z,
+      _supportNormal,
+    );
+    const downhillLength = Math.hypot(localSupportNormal.x, localSupportNormal.z);
+    if (downhillLength > 0.001) {
+      _uphillDirection.set(
+        -localSupportNormal.x / downhillLength,
+        0,
+        -localSupportNormal.z / downhillLength,
+      );
+      _recoveryCandidate.set(
+        currentPos.x + _uphillDirection.x * baseRadius,
+        currentPos.y,
+        currentPos.z + _uphillDirection.z * baseRadius,
+      );
+      evaluateCandidate(_recoveryCandidate);
+
+      _contourLeft.set(-_uphillDirection.z, 0, _uphillDirection.x).normalize();
+      _contourRight.set(_uphillDirection.z, 0, -_uphillDirection.x).normalize();
+
+      _recoveryCandidate.set(
+        currentPos.x + _contourLeft.x * baseRadius,
+        currentPos.y,
+        currentPos.z + _contourLeft.z * baseRadius,
+      );
+      evaluateCandidate(_recoveryCandidate);
+
+      _recoveryCandidate.set(
+        currentPos.x + _contourRight.x * baseRadius,
+        currentPos.y,
+        currentPos.z + _contourRight.z * baseRadius,
+      );
+      evaluateCandidate(_recoveryCandidate);
+    }
+
+    const forwardAngle = Math.atan2(_recoveryForward.z, _recoveryForward.x);
+    const radii = [baseRadius, Math.min(NPC_RECOVERY_MAX_RADIUS, baseRadius * 1.5)];
+    for (const radius of radii) {
+      for (let i = 0; i < NPC_RECOVERY_HEADING_SAMPLES; i++) {
+        const angle = forwardAngle + (i / NPC_RECOVERY_HEADING_SAMPLES) * Math.PI * 2;
+        _recoveryCandidate.set(
+          currentPos.x + Math.cos(angle) * radius,
+          currentPos.y,
+          currentPos.z + Math.sin(angle) * radius,
+        );
+        evaluateCandidate(_recoveryCandidate);
+      }
+    }
+
+    return bestPoint;
+  }
 
   private getTerrainHeight(x: number, z: number): number {
     if (!this.terrainSystem) {
@@ -263,6 +812,7 @@ export class CombatantMovement {
       this.navmeshAdapter.unregisterAgent(id);
     }
     this.stuckDetector.remove(id);
+    performanceTelemetry.removeNPCMovementTracker(id);
   }
 
   /** Reset stuck detection state (call on round/mode transitions). */

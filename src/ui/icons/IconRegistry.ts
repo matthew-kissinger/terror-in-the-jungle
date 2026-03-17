@@ -5,8 +5,8 @@
  * `iconImg()` instead of manually building paths. This makes it trivial
  * to change asset directory, format, or add cache-busting later.
  *
- * Icons are pixel-art PNGs in `public/assets/ui/icons/`, optimized by
- * `scripts/optimize-icons.mjs` (palette PNG, ~252KB total for 50 icons).
+ * Icons are pixel-art PNGs in `public/assets/ui/icons/`, stored as
+ * palette-optimized PNGs (~252KB total for 50 icons).
  *
  * Size categories:
  *   icon-*    48px   Touch buttons, HUD indicators, weapon icons
