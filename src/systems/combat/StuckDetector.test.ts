@@ -7,7 +7,7 @@ import {
   STUCK_TICK_THRESHOLD,
   STUCK_MAX_RECOVERIES,
 } from './StuckDetector';
-import { CombatantState } from './types';
+
 
 describe('StuckDetector', () => {
   let detector: StuckDetector;
