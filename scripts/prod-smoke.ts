@@ -118,16 +118,32 @@ async function runSmoke(): Promise<SmokeResult> {
     });
 
     await page.goto(`http://${HOST}:${PORT}${BASE_PATH}/`, { waitUntil: 'domcontentloaded', timeout: START_TIMEOUT_MS });
+
+    // Wait for START GAME button on TitleScreen (new flow)
+    // Falls back to old data-ref="play" for backward compatibility
     await page.waitForFunction(() => {
-      const button = document.querySelector<HTMLButtonElement>('button[data-ref="play"]');
-      if (!button) return false;
-      const style = window.getComputedStyle(button);
+      const startBtn = document.querySelector<HTMLButtonElement>('button[data-ref="start"]');
+      const playBtn = document.querySelector<HTMLButtonElement>('button[data-ref="play"]');
+      const btn = startBtn ?? playBtn;
+      if (!btn) return false;
+      const style = window.getComputedStyle(btn);
       return style.display !== 'none' && style.visibility !== 'hidden';
     }, undefined, { timeout: START_TIMEOUT_MS });
-    const playButton = page.locator('button[data-ref="play"]');
-    const menuText = await playButton.textContent();
 
-    await playButton.click();
+    const startButton = page.locator('button[data-ref="start"]');
+    const playButton = page.locator('button[data-ref="play"]');
+    const menuButton = await startButton.isVisible() ? startButton : playButton;
+    const menuText = await menuButton.textContent();
+
+    // Click START GAME -> opens ModeSelectScreen
+    await menuButton.click();
+
+    // Click first mode card (Zone Control) to start the game
+    const modeCard = page.locator('[data-mode]').first();
+    await modeCard.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    if (await modeCard.isVisible()) {
+      await modeCard.click();
+    }
 
     const deployUi = page.locator('#respawn-ui');
     const errorPanel = page.locator('[data-action="retry"]');
