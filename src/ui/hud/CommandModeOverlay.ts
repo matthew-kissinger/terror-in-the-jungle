@@ -582,31 +582,79 @@ export class CommandModeOverlay implements LayoutComponent {
 
       @media (max-width: 620px) {
         .command-mode-overlay {
-          padding: 10px;
+          padding: 8px;
+          align-items: flex-end;
         }
 
         .command-mode-overlay__panel {
-          width: min(100%, 420px);
-          gap: 12px;
-          padding: 14px;
+          width: 100%;
+          max-height: 85vh;
+          gap: 10px;
+          padding: 12px;
+          border-radius: 14px 14px 0 0;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
         }
 
-        .command-mode-overlay__header,
-        .command-mode-overlay__footer,
-        .command-mode-overlay__body,
-        .command-mode-overlay__summary,
-        .command-mode-overlay__grid {
+        .command-mode-overlay__header {
+          flex-direction: row;
+          align-items: center;
+        }
+
+        .command-mode-overlay__title {
+          font-size: 20px;
+        }
+
+        .command-mode-overlay__close {
+          min-width: 56px;
+          min-height: 40px;
+          font-size: 13px;
+        }
+
+        .command-mode-overlay__body {
           grid-template-columns: 1fr;
-          flex-direction: column;
+        }
+
+        .command-mode-overlay__summary {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .command-mode-overlay__summary-item {
+          padding: 6px 8px;
+        }
+
+        .command-mode-overlay__detail-panel {
+          display: none;
         }
 
         .command-mode-overlay__grid {
           display: grid;
-          grid-template-columns: 1fr;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+
+        .command-mode-overlay__button {
+          min-height: 56px;
+          padding: 10px;
+          border-radius: 10px;
+        }
+
+        .command-mode-overlay__button-label {
+          font-size: 14px;
+        }
+
+        .command-mode-overlay__footer {
+          flex-direction: column;
+          gap: 4px;
         }
 
         .command-mode-overlay__note {
           text-align: left;
+          font-size: 11px;
+        }
+
+        .command-mode-overlay__hint {
+          font-size: 11px;
         }
       }
     `;

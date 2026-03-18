@@ -135,14 +135,14 @@ export const HUD_LAYOUT_STYLES = `
   [data-device="touch"] .hud-slot[data-region="minimap"] {
     justify-content: flex-start;
     align-items: flex-start;
-    padding: 2px;
+    padding: 0;
   }
 
   /* On mobile, stats (K/D) sits directly under the minimap — left-aligned */
   [data-device="touch"] .hud-slot[data-region="stats"] {
     justify-content: flex-start;
     align-items: flex-start;
-    padding-left: 2px;
+    padding-left: 0;
   }
 
   /* Ammo: bottom-right — align-items: flex-end so it sticks to the bottom
@@ -290,7 +290,7 @@ export const HUD_LAYOUT_STYLES = `
    * ========================================================= */
   @media (pointer: coarse) and (orientation: landscape) {
     #game-hud-root {
-      grid-template-columns: minmax(100px, 1fr) minmax(140px, 2fr) minmax(80px, 1fr);
+      grid-template-columns: auto minmax(140px, 2fr) minmax(80px, 1fr);
       grid-template-rows:
         auto     /* minimap / status-bar / menu */
         auto     /* stats (K/D under minimap) */
@@ -331,7 +331,7 @@ export const HUD_LAYOUT_STYLES = `
    * ========================================================= */
   @media (pointer: coarse) and (orientation: portrait) {
     #game-hud-root {
-      grid-template-columns: minmax(80px, 1fr) minmax(120px, 2fr) minmax(80px, 1fr);
+      grid-template-columns: auto minmax(120px, 2fr) minmax(80px, 1fr);
       grid-template-rows:
         auto     /* minimap / status-bar / menu */
         auto     /* stats (K/D under minimap) */
