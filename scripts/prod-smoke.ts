@@ -132,8 +132,9 @@ async function runSmoke(): Promise<SmokeResult> {
 
     const startButton = page.locator('button[data-ref="start"]');
     const playButton = page.locator('button[data-ref="play"]');
-    const menuButton = await startButton.isVisible() ? startButton : playButton;
-    const menuText = await menuButton.textContent();
+    const hasStart = await startButton.count() > 0;
+    const menuButton = hasStart ? startButton : playButton;
+    const menuText = await menuButton.textContent({ timeout: 5000 }).catch(() => 'unknown');
 
     // Click START GAME -> opens ModeSelectScreen
     await menuButton.click();
