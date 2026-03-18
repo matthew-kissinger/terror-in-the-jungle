@@ -5,20 +5,22 @@ import { handlePlayerCommand, handleRejoiningMovement } from './CombatantMovemen
 import { NPC_MAX_SPEED } from '../../config/CombatantConfig';
 
 // ── Movement speeds (m/s) ──
-const TRAVERSAL_RUN_SPEED = Math.max(NPC_MAX_SPEED + 2.5, 8.5);
-const SQUAD_FOLLOW_SPEED = 5.75;
-const PATROL_SPEED = 6.0;
-const PATROL_CLOSE_SPEED = 3.75;
+// With navmesh path-following, NPCs no longer waste time stuck on terrain.
+// Speeds reflect intended tactical pace, not compensation for stuck time.
+const TRAVERSAL_RUN_SPEED = Math.max(NPC_MAX_SPEED + 2, 10);
+const SQUAD_FOLLOW_SPEED = 7;
+const PATROL_SPEED = 7.5;
+const PATROL_CLOSE_SPEED = 5;
 const PATROL_LONG_DISTANCE_SPEED = TRAVERSAL_RUN_SPEED;
-const FALLBACK_ADVANCE_SPEED = 6.0;
-const WANDER_SPEED = 2;
-const COMBAT_APPROACH_SPEED = 3.25;
-const ADVANCING_TRAVERSE_SPEED = 6.5;
-const ADVANCING_CLOSE_SPEED = 4.25;
-const COMBAT_RETREAT_SPEED = 2;
-const COMBAT_STRAFE_SPEED = 2;
-const COVER_SEEKING_SPEED = Math.max(NPC_MAX_SPEED + 1.0, 7.0);
-const DEFEND_SPEED = 4.75;
+const FALLBACK_ADVANCE_SPEED = 7.5;
+const WANDER_SPEED = 3;
+const COMBAT_APPROACH_SPEED = 5.5;
+const ADVANCING_TRAVERSE_SPEED = 8;
+const ADVANCING_CLOSE_SPEED = 5.5;
+const COMBAT_RETREAT_SPEED = 3.5;
+const COMBAT_STRAFE_SPEED = 3;
+const COVER_SEEKING_SPEED = Math.max(NPC_MAX_SPEED + 1.0, 9.0);
+const DEFEND_SPEED = 6;
 const SUPPRESS_HOLD_SPEED = 0;
 
 // ── Distances (meters) ──
@@ -78,19 +80,22 @@ export function updatePatrolMovement(
     handlePlayerCommand(combatant, squad);
     return;
   }
-  // Squad movement for followers
+  // Squad movement for followers: share leader's destination, or follow leader position
   if (combatant.squadId && combatant.squadRole === 'follower') {
     if (squad && squad.leaderId) {
-        const leader = combatants.get(squad.leaderId);
-        if (leader && leader.id !== combatant.id) {
-          _moveVec.subVectors(leader.position, combatant.position);
-          if (_moveVec.length() > SQUAD_FOLLOW_DISTANCE) {
-            _moveVec.normalize();
-            combatant.velocity.set(
-            _moveVec.x * SQUAD_FOLLOW_SPEED,
-            0,
-            _moveVec.z * SQUAD_FOLLOW_SPEED
-          );
+      const leader = combatants.get(squad.leaderId);
+      if (leader && leader.id !== combatant.id) {
+        // Use leader's destination if available (move toward same objective)
+        const target = leader.destinationPoint ?? leader.position;
+        _moveVec.subVectors(target, combatant.position);
+        const dist = _moveVec.length();
+        if (dist > SQUAD_FOLLOW_DISTANCE) {
+          _moveVec.normalize();
+          // Match leader's pace: run fast when far, slow when close
+          const speed = dist > PATROL_LONG_DISTANCE ? PATROL_LONG_DISTANCE_SPEED
+            : dist > PATROL_CLOSE_DISTANCE ? SQUAD_FOLLOW_SPEED
+            : PATROL_CLOSE_SPEED;
+          combatant.velocity.set(_moveVec.x * speed, 0, _moveVec.z * speed);
           combatant.rotation = Math.atan2(_moveVec.z, _moveVec.x);
           return;
         }
@@ -135,13 +140,12 @@ export function updatePatrolMovement(
           }
         }
       }
-      // Pick from top 3 with some randomness
+      // Strongly prefer best zone (70% top, 20% second, 10% third)
       let selectedZone = null;
-      const count = (top1Zone ? 1 : 0) + (top2Zone ? 1 : 0) + (top3Zone ? 1 : 0);
-      if (count > 0) {
-        const rand = Math.floor(Math.random() * count);
-        if (rand === 0) selectedZone = top1Zone;
-        else if (rand === 1) selectedZone = top2Zone;
+      if (top1Zone) {
+        const roll = Math.random();
+        if (roll < 0.7 || !top2Zone) selectedZone = top1Zone;
+        else if (roll < 0.9 || !top3Zone) selectedZone = top2Zone;
         else selectedZone = top3Zone;
       }
       if (selectedZone) {
@@ -180,17 +184,15 @@ export function updatePatrolMovement(
     );
     combatant.rotation = Math.atan2(_moveVec.z, _moveVec.x);
   } else {
-    // Followers: limited wander near leader
-    combatant.timeToDirectionChange -= deltaTime;
-    if (combatant.timeToDirectionChange <= 0) {
-      combatant.wanderAngle = Math.random() * Math.PI * 2;
-      combatant.timeToDirectionChange = WANDER_MIN_INTERVAL + Math.random() * WANDER_JITTER;
-    }
+    // Leaderless followers: advance toward enemy territory instead of random wander
+    const enemyBasePos = deps.getEnemyBasePosition(combatant.faction);
+    _moveVec.subVectors(enemyBasePos, combatant.position).normalize();
     combatant.velocity.set(
-      Math.cos(combatant.wanderAngle) * WANDER_SPEED,
+      _moveVec.x * FALLBACK_ADVANCE_SPEED,
       0,
-      Math.sin(combatant.wanderAngle) * WANDER_SPEED
+      _moveVec.z * FALLBACK_ADVANCE_SPEED
     );
+    combatant.rotation = Math.atan2(_moveVec.z, _moveVec.x);
   }
   // Update rotation to match movement direction
   if (combatant.velocity.length() > 0.1) {

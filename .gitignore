@@ -79,6 +79,7 @@ public/data/vietnam/
 
 # Example zoo (reference repos cloned for study, not part of project)
 example-zoo/
+examples/
 
 # Local capture/debug screenshots
 gameplay-profile.png

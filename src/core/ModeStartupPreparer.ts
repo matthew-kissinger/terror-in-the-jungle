@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { GameLaunchSelection, GameMode, GameModeDefinition } from '../config/gameModeTypes';
 import { getGameModeConfig } from '../config/gameModes';
 import { getGameModeDefinition, resolveLaunchSelection } from '../config/gameModeDefinitions';
@@ -162,6 +163,24 @@ async function configureTerrainAndNavigation(
   if (engine.systemManager.navmeshSystem.isWasmReady()) {
     const navWorldSize = config.worldSize ?? terrainSystem.getPlayableWorldSize();
     await engine.systemManager.navmeshSystem.generateNavmesh(navWorldSize, config.features);
+
+    // Validate that all zones are reachable from each other via navmesh
+    if (config.zones?.length && engine.systemManager.navmeshSystem.isReady()) {
+      const heightCache = getHeightQueryCache();
+      const zonePositions = config.zones.map(z => {
+        const y = heightCache.getHeightAt(z.position.x, z.position.z);
+        return new THREE.Vector3(z.position.x, y, z.position.z);
+      });
+
+      const result = engine.systemManager.navmeshSystem.validateConnectivity(zonePositions);
+      if (!result.connected) {
+        const zoneNames = config.zones.map(z => z.name);
+        for (const island of result.islands) {
+          const names = island.map(i => zoneNames[i]).join(', ');
+          Logger.warn('Navigation', `Disconnected island: [${names}]`);
+        }
+      }
+    }
   }
 }
 

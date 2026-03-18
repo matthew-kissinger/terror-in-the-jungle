@@ -81,6 +81,8 @@ function createMockCombatantMovement(): CombatantMovement {
   return {
     updateMovement: vi.fn(),
     updateRotation: vi.fn(),
+    resetPathQueryBudget: vi.fn(),
+    removePathCache: vi.fn(),
   } as unknown as CombatantMovement;
 }
 

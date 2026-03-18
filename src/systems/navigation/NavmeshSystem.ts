@@ -4,15 +4,32 @@ import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 import { buildHeightfieldMesh } from './NavmeshHeightfieldBuilder';
 import { NavmeshMovementAdapter } from './NavmeshMovementAdapter';
 
-import type { Crowd, NavMesh, TileCache, Obstacle } from '@recast-navigation/core';
+import type { Crowd, NavMesh, NavMeshQuery, TileCache, Obstacle } from '@recast-navigation/core';
 import type { MapFeatureDefinition } from '../../config/gameModeTypes';
+
+/** Result of a connectivity validation across multiple points. */
+export interface ConnectivityResult {
+  /** True if all points can reach each other via navmesh paths. */
+  connected: boolean;
+  /** Groups of point indices that can reach each other. Single group = fully connected. */
+  islands: number[][];
+}
+
+/** Default search extents for navmesh queries. Y is large to handle elevation. */
+const QUERY_HALF_EXTENTS = { x: 2, y: 50, z: 2 };
+
+/** Tolerance for isPointOnNavmesh distance check. */
+const ON_NAVMESH_DISTANCE_SQ = 4.0; // 2m
 
 // Recast navigation config constants
 const NAVMESH_CELL_SIZE = 4.0;
 const AGENT_RADIUS = 0.5;
 const AGENT_HEIGHT = 3.0;
-const WALKABLE_SLOPE_ANGLE = 40;
-const WALKABLE_CLIMB = 0.4;
+// 45° aligns with terrain solver's crawl-zone boundary (SlopePhysics slopeDot=0.7).
+// Below 45° = full speed on navmesh. Above 45° = terrain solver handles as crawl/block.
+const WALKABLE_SLOPE_ANGLE = 45;
+// 0.6m handles terrain lips from stamped corridors without creating vertical steps.
+const WALKABLE_CLIMB = 0.6;
 const MAX_CROWD_AGENTS = 64;
 const TILE_SIZE = 256;
 const TILE_RADIUS = 3;
@@ -38,6 +55,7 @@ interface NavmeshTileKey {
  */
 export class NavmeshSystem {
   private navMesh: NavMesh | null = null;
+  private navMeshQuery: NavMeshQuery | null = null;
   private tileCache: TileCache | null = null;
   private crowd: Crowd | null = null;
   private adapter: NavmeshMovementAdapter | null = null;
@@ -61,6 +79,7 @@ export class NavmeshSystem {
   // Module references (lazy loaded)
   private recastInit: typeof import('@recast-navigation/core').init | null = null;
   private CrowdClass: typeof import('@recast-navigation/core').Crowd | null = null;
+  private NavMeshQueryClass: typeof import('@recast-navigation/core').NavMeshQuery | null = null;
   private threeToSoloNavMeshFn: typeof import('@recast-navigation/three').threeToSoloNavMesh | null = null;
   private threeToTileCacheFn: typeof import('@recast-navigation/three').threeToTileCache | null = null;
 
@@ -74,6 +93,7 @@ export class NavmeshSystem {
       const three = await import('@recast-navigation/three');
       this.recastInit = core.init;
       this.CrowdClass = core.Crowd;
+      this.NavMeshQueryClass = core.NavMeshQuery;
       this.threeToSoloNavMeshFn = three.threeToSoloNavMesh;
       this.threeToTileCacheFn = three.threeToTileCache;
 
@@ -235,6 +255,13 @@ export class NavmeshSystem {
 
     this.adapter = new NavmeshMovementAdapter(this.crowd);
     Logger.info('Navigation', `Crowd initialized (maxAgents=${MAX_CROWD_AGENTS})`);
+
+    // Create query object for pathfinding
+    if (this.NavMeshQueryClass) {
+      this.navMeshQuery = new this.NavMeshQueryClass(this.navMesh, { maxNodes: 2048 });
+      this.navMeshQuery.defaultQueryHalfExtents = { ...QUERY_HALF_EXTENTS };
+      Logger.info('Navigation', 'NavMeshQuery initialized');
+    }
   }
 
   /**
@@ -400,6 +427,112 @@ export class NavmeshSystem {
     }
   }
 
+  // ── Path Query API ─────────────────────────────────────────────────
+
+  /**
+   * Compute a walkable path between two world positions.
+   * Returns waypoint array on success, null if unreachable or navmesh unavailable.
+   * Positions are at terrain level (caller handles NPC_Y_OFFSET).
+   */
+  queryPath(start: THREE.Vector3, end: THREE.Vector3): THREE.Vector3[] | null {
+    if (!this.navMeshQuery) return null;
+
+    const result = this.navMeshQuery.computePath(
+      { x: start.x, y: start.y, z: start.z },
+      { x: end.x, y: end.y, z: end.z },
+    );
+
+    if (!result.success || result.path.length === 0) return null;
+
+    const waypoints: THREE.Vector3[] = [];
+    for (const p of result.path) {
+      waypoints.push(new THREE.Vector3(p.x, p.y, p.z));
+    }
+    return waypoints;
+  }
+
+  /**
+   * Find the closest point on the navmesh to a world position.
+   * Returns the snapped position or null if nothing within searchRadius.
+   */
+  findNearestPoint(point: THREE.Vector3, searchRadius = 5): THREE.Vector3 | null {
+    if (!this.navMeshQuery) return null;
+
+    const half = { x: searchRadius, y: 50, z: searchRadius };
+    const result = this.navMeshQuery.findClosestPoint(
+      { x: point.x, y: point.y, z: point.z },
+      { halfExtents: half },
+    );
+
+    if (!result.success || result.polyRef === 0) return null;
+    return new THREE.Vector3(result.point.x, result.point.y, result.point.z);
+  }
+
+  /**
+   * Check whether a world position is on (or very near) walkable navmesh.
+   */
+  isPointOnNavmesh(point: THREE.Vector3, tolerance = 2): boolean {
+    if (!this.navMeshQuery) return false;
+
+    const half = { x: tolerance, y: 50, z: tolerance };
+    const result = this.navMeshQuery.findNearestPoly(
+      { x: point.x, y: point.y, z: point.z },
+      { halfExtents: half },
+    );
+
+    if (!result.success || result.nearestRef === 0) return false;
+
+    const dx = result.nearestPoint.x - point.x;
+    const dz = result.nearestPoint.z - point.z;
+    return (dx * dx + dz * dz) <= ON_NAVMESH_DISTANCE_SQ;
+  }
+
+  /**
+   * Validate whether a set of world positions can all reach each other via navmesh.
+   * Uses union-find over pairwise path queries.
+   */
+  validateConnectivity(points: THREE.Vector3[]): ConnectivityResult {
+    if (!this.navMeshQuery || points.length < 2) {
+      return { connected: true, islands: [points.map((_, i) => i)] };
+    }
+
+    // Union-find with path compression
+    const parent = points.map((_, i) => i);
+    const find = (x: number): number => {
+      while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+      return x;
+    };
+    const union = (a: number, b: number): void => { parent[find(a)] = find(b); };
+
+    for (let i = 0; i < points.length; i++) {
+      for (let j = i + 1; j < points.length; j++) {
+        // Skip if already in the same group
+        if (find(i) === find(j)) continue;
+        const path = this.queryPath(points[i], points[j]);
+        if (path !== null) union(i, j);
+      }
+    }
+
+    // Group into islands
+    const groups = new Map<number, number[]>();
+    for (let i = 0; i < points.length; i++) {
+      const root = find(i);
+      if (!groups.has(root)) groups.set(root, []);
+      groups.get(root)!.push(i);
+    }
+
+    const islands = [...groups.values()];
+    const connected = islands.length === 1;
+
+    if (!connected) {
+      Logger.warn('Navigation', `Connectivity check: ${islands.length} disconnected islands among ${points.length} points`);
+    }
+
+    return { connected, islands };
+  }
+
+  // ── Adapter / Lifecycle ───────────────────────────────────────────
+
   /** Get the movement adapter for wiring to CombatantMovement. */
   getAdapter(): NavmeshMovementAdapter | null {
     return this.adapter;
@@ -410,6 +543,10 @@ export class NavmeshSystem {
     if (this.adapter) {
       this.adapter.dispose();
       this.adapter = null;
+    }
+    if (this.navMeshQuery) {
+      this.navMeshQuery.destroy();
+      this.navMeshQuery = null;
     }
     if (this.crowd) {
       this.crowd.destroy();

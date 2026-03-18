@@ -2,6 +2,8 @@ import type { Combatant } from './types';
 
 export type StuckRecoveryAction = 'none' | 'backtrack';
 
+// Stuck detection is a guardrail, not a primary navigation system.
+// Intervals must be long enough for contour logic to complete before triggering backtrack.
 const STUCK_CHECK_INTERVAL_MS = 600;
 const STUCK_MOVE_THRESHOLD_SQ = 0.25;
 const STUCK_PROGRESS_IMPROVEMENT_SQ = 0.5;

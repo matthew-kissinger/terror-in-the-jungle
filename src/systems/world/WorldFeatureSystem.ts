@@ -10,6 +10,7 @@ import { AIRFIELD_TEMPLATES } from './AirfieldTemplates';
 import { generateAirfieldLayout } from './AirfieldLayoutGenerator';
 import { GameModeManager } from './GameModeManager';
 import { getWorldFeaturePrefab } from './WorldFeaturePrefabs';
+import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 
 const _rotatedOffset = new THREE.Vector3();
 const _upAxis = new THREE.Vector3(0, 1, 0);
@@ -53,6 +54,7 @@ export class WorldFeatureSystem implements GameSystem {
   private readonly scene: THREE.Scene;
   private terrainManager?: ITerrainRuntime;
   private gameModeManager?: GameModeManager;
+  private navmeshSystem?: NavmeshSystem;
   private spawnedObjects: SpawnedFeatureObject[] = [];
   private buildInFlight = false;
   private builtModeId: string | null = null;
@@ -76,6 +78,10 @@ export class WorldFeatureSystem implements GameSystem {
 
   setGameModeManager(gameModeManager: GameModeManager): void {
     this.gameModeManager = gameModeManager;
+  }
+
+  setNavmeshSystem(navmeshSystem: NavmeshSystem): void {
+    this.navmeshSystem = navmeshSystem;
   }
 
   update(_deltaTime: number): void {
@@ -359,7 +365,23 @@ export class WorldFeatureSystem implements GameSystem {
     const slopePenalty = 1 - THREE.MathUtils.clamp(normalY, 0, 1);
     const centerBias = Math.abs(centerHeight - meanHeight);
     const distancePenalty = Math.hypot(x - baseX, z - baseZ) * 0.18;
-    const score = heightSpan * 5 + centerBias * 2 + slopePenalty * 8 + distancePenalty;
+
+    // Corner height divergence: reject if any corner is too far from center
+    const cornerMaxDivergence = Math.max(
+      Math.abs(maxHeight - centerHeight),
+      Math.abs(minHeight - centerHeight),
+    );
+    const cornerPenalty = cornerMaxDivergence > 1.5 ? 50 : cornerMaxDivergence * 3;
+
+    // Navmesh walkability: penalize placements on unwalkable terrain
+    let navmeshPenalty = 0;
+    if (this.navmeshSystem?.isReady()) {
+      if (!this.navmeshSystem.isPointOnNavmesh(new THREE.Vector3(x, meanHeight, z))) {
+        navmeshPenalty = 20; // strong penalty for off-navmesh placement
+      }
+    }
+
+    const score = heightSpan * 5 + centerBias * 2 + slopePenalty * 8 + distancePenalty + cornerPenalty + navmeshPenalty;
     const groundedY = meanHeight + Math.min(heightSpan * 0.15, 0.18);
 
     return {

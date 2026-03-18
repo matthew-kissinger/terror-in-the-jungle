@@ -69,6 +69,7 @@ export class CombatantLODManager {
   private playerPosition: THREE.Vector3;
   private gameModeManager?: GameModeManager;
   private zoneManager?: ZoneManager;
+  private navmeshSystem?: import('../navigation/NavmeshSystem').NavmeshSystem;
 
   // Performance scaling parameters
   private highLODRange = 200;
@@ -180,6 +181,10 @@ export class CombatantLODManager {
     this.zoneManager = zoneManager;
   }
 
+  setNavmeshSystem(navmeshSystem: import('../navigation/NavmeshSystem').NavmeshSystem): void {
+    this.navmeshSystem = navmeshSystem;
+  }
+
   /**
    * Update FPS EMA and adjust interval scaling
    */
@@ -278,8 +283,9 @@ export class CombatantLODManager {
     deathMs = performance.now() - deathStart;
 
     if (enableAI) {
-      // Reset per-frame raycast budget
+      // Reset per-frame budgets
       resetRaycastBudget();
+      this.combatantMovement.resetPathQueryBudget();
       // Adaptive cap: reduce expensive NPC fire terrain checks when interval scale rises.
       const fireRaycastCap = Math.max(4, Math.min(24, Math.round(16 / Math.max(1, this.intervalScale))));
       setMaxCombatFireRaycastsPerFrame(fireRaycastCap);
@@ -746,34 +752,53 @@ export class CombatantLODManager {
       );
     });
 
-    if (targetZones.length > 0) {
-      let nearestZone = targetZones[0];
-      let minDistance = combatant.position.distanceTo(nearestZone.position);
+    if (targetZones.length === 0) return;
 
-      for (const zone of targetZones) {
-        const distance = combatant.position.distanceTo(zone.position);
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearestZone = zone;
-        }
+    let nearestZone = targetZones[0];
+    let minDistance = combatant.position.distanceTo(nearestZone.position);
+
+    for (const zone of targetZones) {
+      const distance = combatant.position.distanceTo(zone.position);
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestZone = zone;
       }
-
-      const direction = this._scratchDirection
-        .subVectors(nearestZone.position, combatant.position)
-        .normalize();
-
-      const movement = direction.multiplyScalar(distanceToMove);
-      combatant.position.add(movement);
-      combatant.rotation = Math.atan2(direction.z, direction.x);
-
-      const randomOffset = this._scratchOffset.set(
-        (Math.random() - 0.5) * DISTANT_SIM_RANDOM_OFFSET,
-        0,
-        (Math.random() - 0.5) * DISTANT_SIM_RANDOM_OFFSET
-      );
-      combatant.position.add(randomOffset);
-      combatant.position.y = DISTANT_CULLED_DEFAULT_Y;
     }
+
+    // Try navmesh path for first waypoint direction (avoids beelining through mountains)
+    const navSystem = this.navmeshSystem;
+    if (navSystem?.isReady()) {
+      const path = navSystem.queryPath(combatant.position, nearestZone.position);
+      if (path && path.length > 1) {
+        // Steer toward the first real waypoint (skip start position)
+        const wp = path[Math.min(1, path.length - 1)];
+        const direction = this._scratchDirection
+          .subVectors(wp, combatant.position)
+          .setY(0)
+          .normalize();
+        combatant.position.addScaledVector(direction, distanceToMove);
+        combatant.rotation = Math.atan2(direction.x, direction.z);
+        combatant.position.y = DISTANT_CULLED_DEFAULT_Y;
+        return;
+      }
+    }
+
+    // Fallback: direct beeline
+    const direction = this._scratchDirection
+      .subVectors(nearestZone.position, combatant.position)
+      .normalize();
+
+    const movement = direction.multiplyScalar(distanceToMove);
+    combatant.position.add(movement);
+    combatant.rotation = Math.atan2(direction.z, direction.x);
+
+    const randomOffset = this._scratchOffset.set(
+      (Math.random() - 0.5) * DISTANT_SIM_RANDOM_OFFSET,
+      0,
+      (Math.random() - 0.5) * DISTANT_SIM_RANDOM_OFFSET
+    );
+    combatant.position.add(randomOffset);
+    combatant.position.y = DISTANT_CULLED_DEFAULT_Y;
   }
 
   private getStablePhaseOffsetMs(id: string, periodMs: number): number {

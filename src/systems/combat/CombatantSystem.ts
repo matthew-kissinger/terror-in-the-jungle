@@ -504,6 +504,7 @@ export class CombatantSystem implements GameSystem {
 
   setNavmeshSystem(navmeshSystem: NavmeshSystem): void {
     this.combatantMovement.setNavmeshSystem(navmeshSystem);
+    this.lodManager.setNavmeshSystem(navmeshSystem);
   }
 
   // Game mode configuration methods

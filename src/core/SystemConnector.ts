@@ -40,6 +40,7 @@ export class SystemConnector {
 
   private wireNavigation(refs: SystemKeyToType): void {
     refs.combatantSystem.setNavmeshSystem(refs.navmeshSystem);
+    refs.worldFeatureSystem.setNavmeshSystem(refs.navmeshSystem);
   }
 
   // ── Telemetry ──

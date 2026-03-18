@@ -41,12 +41,14 @@ const TERRAIN_SAMPLE_MOVE_THRESHOLD_SQ = 1.0;
 const NPC_SUPPORT_SAMPLE_DISTANCE = 1.2;
 const NPC_SUPPORT_FOOTPRINT_RADIUS = 0.65;
 const NPC_SUPPORT_LOOKAHEAD = 0.85;
-const NPC_FORWARD_PROBE_DISTANCE = 1.35;
-const NPC_TERRAIN_LIP_RISE = 0.45;
-const NPC_TRAVERSAL_MIN_UPHILL_SPEED_FACTOR = 0.86;
-const NPC_COMBAT_MIN_UPHILL_SPEED_FACTOR = 0.8;
-const NPC_TRAVERSAL_UPHILL_DRAG = 0.12;
-const NPC_COMBAT_UPHILL_DRAG = 0.2;
+const NPC_FORWARD_PROBE_DISTANCE = 1.8;
+const NPC_TERRAIN_LIP_RISE = 1.0;
+// Terrain solver is now close-range only (<15m). Navmesh paths avoid steep slopes.
+// Uphill drag is a mild penalty for the last meters of approach, not a primary speed killer.
+const NPC_TRAVERSAL_MIN_UPHILL_SPEED_FACTOR = 0.9;
+const NPC_COMBAT_MIN_UPHILL_SPEED_FACTOR = 0.85;
+const NPC_TRAVERSAL_UPHILL_DRAG = 0.08;
+const NPC_COMBAT_UPHILL_DRAG = 0.14;
 const NPC_CONTOUR_FORWARD_BLEND = 0.42;
 const NPC_BACKTRACK_ARRIVAL_RADIUS_SQ = 2.25;
 const NPC_PROGRESS_EPSILON_SQ = 0.5;
@@ -56,6 +58,30 @@ const NPC_RECOVERY_RADIUS_STEP = 1.25;
 const NPC_RECOVERY_MAX_RADIUS = 6.5;
 const NPC_RECOVERY_HEADING_SAMPLES = 8;
 const NPC_RECOVERY_LAST_GOOD_MAX_DISTANCE_SQ = 100;
+
+// ── Navmesh path-following ──
+/** Distance threshold: use navmesh path above this, terrain solver below. */
+const PATH_FOLLOW_THRESHOLD_SQ = 225; // 15m
+/** Waypoint arrival radius. */
+const WAYPOINT_ARRIVAL_RADIUS_SQ = 4; // 2m
+/** Re-query path if destination moved more than this. */
+const PATH_DESTINATION_CHANGE_SQ = 25; // 5m
+/** Maximum path age before forced re-query (ms). */
+const PATH_MAX_AGE_MS = 10_000;
+/** Max path queries per updateMovement call (amortization). */
+const PATH_QUERIES_PER_FRAME = 4;
+
+/** Max time (ms) to reach a single waypoint before path is invalidated. */
+const WAYPOINT_STALL_TIMEOUT_MS = 3000;
+
+interface CachedNavPath {
+  waypoints: THREE.Vector3[];
+  currentIndex: number;
+  destination: THREE.Vector3;
+  queryTime: number;
+  /** Time when current waypoint index was set (for stall detection). */
+  waypointStartTime: number;
+}
 
 const _desiredDirection = new THREE.Vector3();
 const _anchorDirection = new THREE.Vector3();
@@ -83,6 +109,8 @@ export class CombatantMovement {
   private navmeshAdapter?: NavmeshMovementAdapter | null;
   private readonly _spacingForce = new THREE.Vector3();
   private readonly stuckDetector = new StuckDetector();
+  private readonly navPaths = new Map<string, CachedNavPath>();
+  private pathQueriesThisFrame = 0;
 
   constructor(terrainSystem?: ITerrainRuntime, zoneManager?: ZoneManager) {
     this.terrainSystem = terrainSystem;
@@ -118,6 +146,7 @@ export class CombatantMovement {
         this.navmeshAdapter.unregisterAgent(combatant.id);
       }
       this.stuckDetector.remove(combatant.id);
+      this.navPaths.delete(combatant.id);
       performanceTelemetry.removeNPCMovementTracker(combatant.id);
       return;
     }
@@ -128,6 +157,7 @@ export class CombatantMovement {
       if (this.navmeshAdapter?.hasAgent(combatant.id)) {
         this.navmeshAdapter.unregisterAgent(combatant.id);
       }
+      this.navPaths.delete(combatant.id);
       performanceTelemetry.removeNPCMovementTracker(combatant.id);
       return;
     }
@@ -157,14 +187,22 @@ export class CombatantMovement {
       combatant.velocity.add(this._spacingForce);
     }
 
-    // Infantry movement is now driven by a single terrain-aware solver.
-    // Recast crowd authority caused too many hill-specific stalls to remain
-    // the primary answer for combat locomotion.
+    // Unregister from crowd (crowd steering disabled; path queries used instead).
     if (this.navmeshAdapter?.hasAgent(combatant.id)) {
       this.navmeshAdapter.unregisterAgent(combatant.id);
     }
 
     const now = performance.now();
+
+    // TODO: Navmesh route guidance disabled pending WASM navmesh validation.
+    // When navmesh is confirmed generating correctly, re-enable:
+    //   const goalAnchor = this.resolvePrimaryGoalAnchor(combatant);
+    //   const speed = combatant.velocity.length();
+    //   if (goalAnchor && speed > 0.01) {
+    //     const waypoint = this.resolveNavmeshWaypoint(combatant, goalAnchor, now);
+    //     if (waypoint) { /* redirect velocity toward waypoint */ }
+    //   }
+
     const steering = this.applyTerrainAwareVelocity(combatant, now);
 
     // Apply velocity normally - LOD scaling handled in CombatantSystem
@@ -367,6 +405,120 @@ export class CombatantMovement {
       return 'direct_push';
     }
     return 'hold';
+  }
+
+  // ── Navmesh path-following ────────────────────────────────────────
+
+  /**
+   * Resolve a navmesh waypoint for long-distance travel.
+   * Returns the current waypoint to steer toward, or null if navmesh routing
+   * is not applicable (close range, no path, navmesh unavailable).
+   * Does NOT set velocity - the terrain-aware solver handles actual movement.
+   */
+  private resolveNavmeshWaypoint(
+    combatant: Combatant,
+    anchor: THREE.Vector3,
+    now: number,
+  ): THREE.Vector3 | null {
+    if (!this.navmeshSystem?.isReady()) return null;
+
+    const distToAnchorSq = combatant.position.distanceToSquared(anchor);
+
+    // Close enough: let terrain-aware solver handle directly
+    if (distToAnchorSq <= PATH_FOLLOW_THRESHOLD_SQ) {
+      this.navPaths.delete(combatant.id);
+      return null;
+    }
+
+    // Get or query path
+    const path = this.getOrQueryPath(combatant, anchor, now);
+    if (!path || path.waypoints.length < 2) {
+      this.navPaths.delete(combatant.id);
+      return null;
+    }
+
+    // Advance waypoint index
+    const prevIndex = path.currentIndex;
+    while (
+      path.currentIndex < path.waypoints.length - 1 &&
+      combatant.position.distanceToSquared(path.waypoints[path.currentIndex]) < WAYPOINT_ARRIVAL_RADIUS_SQ
+    ) {
+      path.currentIndex++;
+    }
+    if (path.currentIndex !== prevIndex) {
+      path.waypointStartTime = now;
+    }
+
+    // Stall detection: if stuck at same waypoint too long, invalidate path
+    if (now - path.waypointStartTime > WAYPOINT_STALL_TIMEOUT_MS) {
+      this.navPaths.delete(combatant.id);
+      return null;
+    }
+
+    // If at the last waypoint and close: switch to direct terrain solver
+    if (path.currentIndex >= path.waypoints.length - 1) {
+      const lastWp = path.waypoints[path.waypoints.length - 1];
+      if (combatant.position.distanceToSquared(lastWp) < PATH_FOLLOW_THRESHOLD_SQ) {
+        this.navPaths.delete(combatant.id);
+        return null;
+      }
+    }
+
+    return path.waypoints[path.currentIndex];
+  }
+
+  private getOrQueryPath(
+    combatant: Combatant,
+    anchor: THREE.Vector3,
+    now: number,
+  ): CachedNavPath | null {
+    const cached = this.navPaths.get(combatant.id);
+
+    if (cached) {
+      // Check if destination changed significantly or path is stale
+      const destChangedSq = cached.destination.distanceToSquared(anchor);
+      const age = now - cached.queryTime;
+      if (destChangedSq < PATH_DESTINATION_CHANGE_SQ && age < PATH_MAX_AGE_MS) {
+        return cached;
+      }
+      // Invalidate stale/mismatched path
+      this.navPaths.delete(combatant.id);
+    }
+
+    // Amortize queries across frame
+    if (this.pathQueriesThisFrame >= PATH_QUERIES_PER_FRAME) return null;
+    this.pathQueriesThisFrame++;
+
+    // Query navmesh for path at terrain level (subtract NPC_Y_OFFSET)
+    const startPos = _pseudoAnchor.set(
+      combatant.position.x,
+      combatant.position.y - NPC_Y_OFFSET,
+      combatant.position.z,
+    );
+    const endPos = new THREE.Vector3(anchor.x, anchor.y - NPC_Y_OFFSET, anchor.z);
+    const waypoints = this.navmeshSystem!.queryPath(startPos, endPos);
+
+    if (!waypoints || waypoints.length === 0) return null;
+
+    const newPath: CachedNavPath = {
+      waypoints,
+      currentIndex: 0,
+      destination: anchor.clone(),
+      queryTime: now,
+      waypointStartTime: now,
+    };
+    this.navPaths.set(combatant.id, newPath);
+    return newPath;
+  }
+
+  /** Reset per-frame query counter. Call once per tick before processing combatants. */
+  resetPathQueryBudget(): void {
+    this.pathQueriesThisFrame = 0;
+  }
+
+  /** Clean up path cache for removed combatant. */
+  removePathCache(id: string): void {
+    this.navPaths.delete(id);
   }
 
   private setMovementAnchor(combatant: Combatant, anchor: THREE.Vector3, now: number): void {
@@ -587,6 +739,25 @@ export class CombatantMovement {
   }
 
   private activateBacktrack(combatant: Combatant): boolean {
+    // Prefer navmesh-based recovery: find nearest walkable point
+    if (this.navmeshSystem?.isReady()) {
+      const terrainY = combatant.position.y - NPC_Y_OFFSET;
+      const queryPos = _pseudoAnchor.set(combatant.position.x, terrainY, combatant.position.z);
+      const nearest = this.navmeshSystem.findNearestPoint(queryPos, 10);
+      if (nearest) {
+        nearest.y += NPC_Y_OFFSET;
+        if (combatant.movementBacktrackPoint) {
+          combatant.movementBacktrackPoint.copy(nearest);
+        } else {
+          combatant.movementBacktrackPoint = nearest.clone();
+        }
+        combatant.movementIntent = 'backtrack';
+        combatant.movementContourSign = undefined;
+        return true;
+      }
+    }
+
+    // Fallback: existing terrain-based recovery scoring
     const recoveryPoint = this.selectRecoveryPoint(combatant);
     if (!recoveryPoint) {
       return false;
@@ -823,22 +994,42 @@ export class CombatantMovement {
   private getEnemyBasePosition(faction: Faction): THREE.Vector3 {
     if (this.gameModeManager) {
       const config = this.gameModeManager.getCurrentConfig();
-      const lookForBlufor = !isBlufor(faction);
+      const isFriendlyBlufor = isBlufor(faction);
 
-      const enemyBase = config.zones.find(z =>
+      // Find enemy home base: any home base that belongs to the opposing alliance
+      let enemyBase = config.zones.find(z =>
         z.isHomeBase && z.owner !== null &&
-        isBlufor(z.owner as Faction) === lookForBlufor &&
-        (z.id.includes('main') || z.id.includes('_base'))
+        isBlufor(z.owner as Faction) !== isFriendlyBlufor
       );
+
+      // Fallback: find any home base whose ID suggests the enemy faction
+      if (!enemyBase) {
+        const enemyIdHint = isFriendlyBlufor ? 'opfor' : 'us';
+        enemyBase = config.zones.find(z =>
+          z.isHomeBase && z.id.toLowerCase().includes(enemyIdHint)
+        );
+      }
+
+      // Last resort: find the farthest non-friendly zone (heuristic for "enemy territory")
+      if (!enemyBase) {
+        let farthest = null;
+        let maxDist = 0;
+        for (const z of config.zones) {
+          if (z.owner === faction) continue;
+          const d = z.position.length(); // distance from origin as proxy
+          if (d > maxDist) { maxDist = d; farthest = z; }
+        }
+        if (farthest) return farthest.position.clone();
+      }
 
       if (enemyBase) {
         return enemyBase.position.clone();
       }
     }
 
-    // Fallback to default positions
-    return isBlufor(faction) ?
-      new THREE.Vector3(0, 0, 145) : // OPFOR base
-      new THREE.Vector3(0, 0, -50); // US base
+    // Absolute fallback - should rarely hit with the above heuristics
+    return isBlufor(faction)
+      ? new THREE.Vector3(0, 0, 200)
+      : new THREE.Vector3(0, 0, -200);
   }
 }

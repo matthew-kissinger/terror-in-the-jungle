@@ -24,6 +24,10 @@ function mockNavmeshSystem(adapter: ReturnType<typeof mockNavmeshAdapter> | null
     update: vi.fn(),
     isReady: vi.fn(() => !!adapter),
     isWasmReady: vi.fn(() => !!adapter),
+    queryPath: vi.fn(() => null), // default: no path available, fall through to terrain solver
+    findNearestPoint: vi.fn(() => null),
+    isPointOnNavmesh: vi.fn(() => false),
+    validateConnectivity: vi.fn(() => ({ connected: true, islands: [[0]] })),
     dispose: vi.fn(),
   };
 }

@@ -638,6 +638,30 @@ Decision delta:
 
 Next pass:
 
+### 2026-03-17 Design Review and Direction Change
+
+Owner direction from playtest review:
+
+- NPC movement must be active, intelligent, reactive, never stuck, performant through elegance
+- NPCs are too slow since slope penalty and navigation changes - should burst near player speed
+- terrain generation needs more config control per mode, not wholesale redesign
+- ZC/TDM: deterministic seeds for consistency; OF: procedural
+- water: deferred (separate design doc when ready)
+- A Shau: same unified engine, mode-specific config
+- objective flat areas too narrow - structures overflow onto slopes and cliff walls
+- no global flattening
+
+Direction change:
+
+- the terrain-aware velocity solver (wall-follower with 1.35m lookahead) has a ceiling
+- tuning magic numbers (speed constants, stuck thresholds, slope angles) treats symptoms
+- the navmesh already exists, is built from terrain at 1.0m cell resolution, and supports path queries
+- crowd steering was disabled because crowd forces fought slopes - but path queries are independent of crowd
+- the structural fix: expose navmesh path queries, have NPCs follow waypoint paths, keep terrain-aware solver only for last-meter tactical movement
+- execution plan: `docs/EXECUTION_PLAN_2026_03_17.md`
+
+This supersedes the previous "tune locomotion solver" trajectory for long-distance NPC movement. The locomotion solver work (support-plane, contour, backtrack improvements) remains valid for local tactical movement within ~10m of the final waypoint.
+
 ## Current Next Pass
 
 Use the new telemetry plus the terrain compiler read to drive the terrain-support pass:

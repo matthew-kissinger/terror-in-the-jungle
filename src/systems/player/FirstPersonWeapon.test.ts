@@ -185,6 +185,7 @@ describe('FirstPersonWeapon', () => {
 
     mockModel = {
       getWeaponScene: vi.fn(() => new THREE.Scene()),
+      getWeaponCamera: vi.fn(() => new THREE.PerspectiveCamera()),
       updateTransform: vi.fn(),
       render: vi.fn(),
       dispose: vi.fn(),

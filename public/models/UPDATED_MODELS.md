@@ -49,3 +49,80 @@ TOC bunker, sandbag bunker, and NVA bunker had solid box walls with dark "entran
 - Tower scale issue (PLAYTEST_ISSUES.md #3): the models themselves are correctly proportioned now. If the 3-layer scale chain (native * STRUCTURE_SCALE * displayScale) still produces wrong sizes, adjust displayScale values - the native GLB dimensions are intentional.
 - Sandbag bunker is now only 100 tris (was 244) - the firing slit gap removed some wall geometry
 - Comms tower is now 208 tris (was 244) - simpler without guy wires
+
+---
+
+## Animals (new - `animals/` directory)
+
+6 animal GLBs completely rebuilt with proper scene hierarchy for procedural animation. Old models had all parts as flat siblings under root - unusable for rigging.
+
+### Hierarchy Convention
+
+Every animal uses named meshes in a parent-child hierarchy:
+
+```
+root
+  body              <- main parent, all parts are children
+    head            <- rotation.y for look direction
+    front_left_leg  <- rotation.x for walk cycle
+    front_right_leg <- rotation.x for walk cycle
+    back_left_leg   <- rotation.x for walk cycle
+    back_right_leg  <- rotation.x for walk cycle
+    tail            <- rotation.z for swish
+```
+
+### Animation Integration
+
+```typescript
+// Find parts by name via traverse
+animal.traverse((child: THREE.Object3D) => {
+  if (child.name === 'front_left_leg') child.rotation.x = legAngle;
+});
+
+// Diagonal gait: FL+BR swing together, FR+BL swing opposite
+const phase = (time / walkCycleDuration) % 1;
+const legAngle = Math.sin(phase * Math.PI * 2) * 0.2; // ~0.2 rad amplitude
+// front_left_leg.rotation.x = legAngle
+// back_right_leg.rotation.x = legAngle
+// front_right_leg.rotation.x = -legAngle
+// back_left_leg.rotation.x = -legAngle
+
+// Head look: head.rotation.y = lookAngle
+// Tail swish: tail.rotation.z = Math.sin(time * 3) * 0.15
+// Body bob: body.position.y += Math.sin(phase * Math.PI * 4) * 0.02
+```
+
+### Animal Models
+
+| Model | File | Tris | Size | Animated Parts | Notes |
+|-------|------|------|------|----------------|-------|
+| Water Buffalo | `animals/water-buffalo.glb` | 288 | 32KB | 4 legs, head, tail | Large work animal. Shoulder hump. Horns on head. |
+| Tiger | `animals/tiger.glb` | 352 | 42KB | 4 legs, head, tail | Low stance predator. Stripes on body. Green eyes. |
+| Wild Boar | `animals/wild-boar.glb` | 300 | 37KB | 4 legs, head, tail | Compact build, high shoulders. Tusks on head. |
+| King Cobra | `animals/king-cobra.glb` | 168 | 17KB | neck (sway) | No legs. Body coils on ground, raised neck + hood. Animate neck.rotation.y for sway. |
+| Macaque | `animals/macaque.glb` | 252 | 23KB | left_arm, right_arm, head, tail, front_left_leg, front_right_leg | Sitting pose. Arms instead of front legs. |
+| Egret | `animals/egret.glb` | 188 | 23KB | front_left_leg, front_right_leg, head, left_wing, right_wing, tail | Wading bird. 2 long legs (no back legs). Wings for optional flap. |
+
+### Special Cases
+
+- **Cobra**: No legs. Animate `neck.rotation.y` for side-to-side sway. Head and hood are children of neck.
+- **Macaque**: Sitting pose with `left_arm`/`right_arm` instead of front legs. `front_left_leg`/`front_right_leg` are bent sitting legs.
+- **Egret**: Only 2 legs (`front_left_leg`, `front_right_leg`). Has `left_wing`/`right_wing` for optional flap animation.
+
+### Leg Pivot Note
+
+Legs pivot from their geometric center (cylinder midpoint), not from the hip joint. This is a limitation of the primitive geometry system. At the small amplitudes used (0.15-0.25 rad), it looks natural. Keep walk cycle amplitude below 0.3 rad to avoid visible clipping with body.
+
+### Model Registry Addition Needed
+
+```typescript
+// Add to modelPaths.ts
+export const AnimalModels = {
+  WATER_BUFFALO: 'animals/water-buffalo.glb',
+  TIGER: 'animals/tiger.glb',
+  WILD_BOAR: 'animals/wild-boar.glb',
+  KING_COBRA: 'animals/king-cobra.glb',
+  MACAQUE: 'animals/macaque.glb',
+  EGRET: 'animals/egret.glb',
+} as const;
+```

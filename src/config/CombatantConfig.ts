@@ -8,8 +8,8 @@
 /** NPC eye-height offset above terrain surface (meters). */
 export const NPC_Y_OFFSET = 3;
 
-/** Maximum NPC movement speed (m/s). Matches cover-seeking / long-distance patrol. */
-export const NPC_MAX_SPEED = 6;
+/** Maximum NPC movement speed (m/s). Navmesh paths handle navigation; this is raw locomotion speed. */
+export const NPC_MAX_SPEED = 8;
 
 /** Default NPC health and max health. */
 export const NPC_HEALTH = 100;

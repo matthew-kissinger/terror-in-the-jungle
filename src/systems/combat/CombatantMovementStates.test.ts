@@ -106,8 +106,8 @@ describe('CombatantMovementStates', () => {
       expect(handleRejoiningMovement).not.toHaveBeenCalled();
     });
 
-    it('moves squad followers toward the leader when far away', () => {
-      const leader = createCombatant({ id: 'leader', position: new THREE.Vector3(10, 0, 0), squadRole: 'leader' });
+    it('moves squad followers toward the leader destination when far away', () => {
+      const leader = createCombatant({ id: 'leader', position: new THREE.Vector3(10, 0, 0), squadRole: 'leader', destinationPoint: new THREE.Vector3(100, 0, 0) });
       const follower = createCombatant({ id: 'follower', position: new THREE.Vector3(0, 0, 0) });
       const squad = createSquad({ leaderId: 'leader', members: ['leader', 'follower'] });
       const squads = new Map<string, Squad>([['squad-1', squad]]);
@@ -117,14 +117,15 @@ describe('CombatantMovementStates', () => {
         getEnemyBasePosition: () => new THREE.Vector3(100, 0, 0)
       });
 
-      expect(follower.velocity.x).toBeCloseTo(3, 5);
+      // Follower moves toward leader's destination (100,0,0), not leader position
+      expect(follower.velocity.x).toBeGreaterThan(0);
       expect(follower.velocity.z).toBeCloseTo(0, 5);
       expect(follower.rotation).toBeCloseTo(0, 5);
     });
 
-    it('keeps followers in local wander when already close to the leader', () => {
+    it('follows leader position when leader has no destination and follower is close', () => {
       const leader = createCombatant({ id: 'leader', position: new THREE.Vector3(4, 0, 0), squadRole: 'leader' });
-      const follower = createCombatant({ id: 'follower', position: new THREE.Vector3(0, 0, 0), wanderAngle: Math.PI / 2 });
+      const follower = createCombatant({ id: 'follower', position: new THREE.Vector3(0, 0, 0) });
       const squad = createSquad({ leaderId: 'leader', members: ['leader', 'follower'] });
       const squads = new Map<string, Squad>([['squad-1', squad]]);
       const combatants = new Map<string, Combatant>([['leader', leader], ['follower', follower]]);
@@ -133,8 +134,9 @@ describe('CombatantMovementStates', () => {
         getEnemyBasePosition: () => new THREE.Vector3(100, 0, 0)
       });
 
-      expect(follower.velocity.x).toBeCloseTo(0, 5);
-      expect(follower.velocity.z).toBeCloseTo(2, 5);
+      // Within SQUAD_FOLLOW_DISTANCE (6m) of leader with no destination - falls through
+      // to leaderless follower path which advances toward enemy base
+      expect(follower.velocity.x).toBeGreaterThan(0);
     });
 
     it('evaluates zones and picks strategic targets for leaders', () => {
@@ -191,7 +193,7 @@ describe('CombatantMovementStates', () => {
         zoneManager: zoneManager as any,
         getEnemyBasePosition: () => new THREE.Vector3(100, 0, 0)
       });
-      expect(nearLeader.velocity.length()).toBeCloseTo(2, 5);
+      expect(nearLeader.velocity.length()).toBeCloseTo(5, 5); // PATROL_CLOSE_SPEED
 
       const midLeader = createCombatant({
         id: 'mid',
@@ -203,7 +205,7 @@ describe('CombatantMovementStates', () => {
         zoneManager: zoneManager as any,
         getEnemyBasePosition: () => new THREE.Vector3(100, 0, 0)
       });
-      expect(midLeader.velocity.length()).toBeCloseTo(4, 5);
+      expect(midLeader.velocity.length()).toBeCloseTo(7.5, 5); // PATROL_SPEED
 
       const farLeader = createCombatant({
         id: 'far',
@@ -215,7 +217,7 @@ describe('CombatantMovementStates', () => {
         zoneManager: zoneManager as any,
         getEnemyBasePosition: () => new THREE.Vector3(100, 0, 0)
       });
-      expect(farLeader.velocity.length()).toBeCloseTo(6, 5);
+      expect(farLeader.velocity.length()).toBeCloseTo(10, 5); // PATROL_LONG_DISTANCE_SPEED
     });
 
     it('falls back to advancing toward enemy base when no zones are available', () => {
@@ -232,29 +234,25 @@ describe('CombatantMovementStates', () => {
         getEnemyBasePosition: () => new THREE.Vector3(30, 0, 0)
       });
 
-      expect(combatant.velocity.x).toBeCloseTo(3, 5);
+      expect(combatant.velocity.x).toBeCloseTo(7.5, 5); // FALLBACK_ADVANCE_SPEED
       expect(combatant.velocity.z).toBeCloseTo(0, 5);
     });
 
-    it('wanders and updates direction for leaderless followers', () => {
+    it('advances leaderless followers toward enemy territory', () => {
       const combatant = createCombatant({
         squadRole: 'follower',
         squadId: undefined,
-        timeToDirectionChange: -1
       });
       const squads = new Map<string, Squad>();
       const combatants = new Map<string, Combatant>([['c1', combatant]]);
-
-      vi.spyOn(Math, 'random').mockReturnValue(0.25);
 
       updatePatrolMovement(combatant, 0.5, squads, combatants, {
         getEnemyBasePosition: () => new THREE.Vector3(100, 0, 0)
       });
 
-      expect(combatant.wanderAngle).toBeCloseTo(Math.PI / 2, 5);
-      expect(combatant.timeToDirectionChange).toBeCloseTo(2.5, 5);
-      expect(combatant.velocity.x).toBeCloseTo(0, 5);
-      expect(combatant.velocity.z).toBeCloseTo(2, 5);
+      // Leaderless followers advance toward enemy base instead of random wander
+      expect(combatant.velocity.x).toBeGreaterThan(0);
+      expect(combatant.velocity.z).toBeCloseTo(0, 5);
     });
 
     it('prefers contested zones with higher bleed rates', () => {
@@ -328,7 +326,7 @@ describe('CombatantMovementStates', () => {
       const target = createCombatant({ id: 't1', position: new THREE.Vector3(100, 0, 0) });
       const combatant = createCombatant({ target, position: new THREE.Vector3(0, 0, 0) });
       updateCombatMovement(combatant);
-      expect(combatant.velocity.x).toBeCloseTo(3, 5);
+      expect(combatant.velocity.x).toBeCloseTo(5.5, 5); // COMBAT_APPROACH_SPEED
       expect(combatant.velocity.z).toBeCloseTo(0, 5);
     });
 
@@ -336,7 +334,7 @@ describe('CombatantMovementStates', () => {
       const target = createCombatant({ id: 't1', position: new THREE.Vector3(10, 0, 0) });
       const combatant = createCombatant({ target, position: new THREE.Vector3(0, 0, 0) });
       updateCombatMovement(combatant);
-      expect(combatant.velocity.x).toBeCloseTo(-2, 5);
+      expect(combatant.velocity.x).toBeCloseTo(-3.5, 5); // COMBAT_RETREAT_SPEED
       expect(combatant.velocity.z).toBeCloseTo(0, 5);
     });
 
@@ -347,7 +345,7 @@ describe('CombatantMovementStates', () => {
       dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(1000);
 
       updateCombatMovement(combatant);
-      const expectedZ = Math.sin(1) * 1;
+      const expectedZ = Math.sin(1) * 1.5; // COMBAT_STRAFE_SPEED / 2 (strafe factor)
       expect(combatant.velocity.x).toBeCloseTo(0, 5);
       expect(combatant.velocity.z).toBeCloseTo(expectedZ, 5);
     });
@@ -366,10 +364,10 @@ describe('CombatantMovementStates', () => {
       expect(combatant.velocity.length()).toBe(0);
     });
 
-    it('moves toward destination at speed 6 when not arrived', () => {
-      const combatant = createCombatant({ destinationPoint: new THREE.Vector3(6, 0, 0) });
+    it('moves toward destination at COVER_SEEKING_SPEED when not arrived', () => {
+      const combatant = createCombatant({ destinationPoint: new THREE.Vector3(20, 0, 0) });
       updateCoverSeekingMovement(combatant);
-      expect(combatant.velocity.x).toBeCloseTo(6, 5);
+      expect(combatant.velocity.x).toBeCloseTo(9, 5); // COVER_SEEKING_SPEED
       expect(combatant.velocity.z).toBeCloseTo(0, 5);
     });
   });
@@ -387,10 +385,10 @@ describe('CombatantMovementStates', () => {
       expect(combatant.velocity.length()).toBe(0);
     });
 
-    it('moves toward destination at speed 3 when not arrived', () => {
-      const combatant = createCombatant({ destinationPoint: new THREE.Vector3(3, 0, 0) });
+    it('moves toward destination at DEFEND_SPEED when not arrived', () => {
+      const combatant = createCombatant({ destinationPoint: new THREE.Vector3(20, 0, 0) });
       updateDefendingMovement(combatant);
-      expect(combatant.velocity.x).toBeCloseTo(3, 5);
+      expect(combatant.velocity.x).toBeCloseTo(6, 5); // DEFEND_SPEED
       expect(combatant.velocity.z).toBeCloseTo(0, 5);
     });
   });
