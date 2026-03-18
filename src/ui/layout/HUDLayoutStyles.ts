@@ -55,12 +55,15 @@ export const HUD_LAYOUT_STYLES = `
 
   /* Prevent accidental use of expensive GPU filters on mobile.
      blur() and backdrop-filter cause extra compositing passes
-     that can drop mobile from 60fps to 20-30fps. */
-  #game-hud-root *,
-  #game-hud-root *::before,
-  #game-hud-root *::after {
-    -webkit-backdrop-filter: none !important;
-    backdrop-filter: none !important;
+     that can drop mobile from 60fps to 20-30fps.
+     Desktop keeps blur for frosted-glass HUD panels. */
+  @media (pointer: coarse) {
+    #game-hud-root *,
+    #game-hud-root *::before,
+    #game-hud-root *::after {
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+    }
   }
 
   /* Slots are grid children. Each one is a named region. */

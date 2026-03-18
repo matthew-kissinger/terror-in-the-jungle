@@ -7,9 +7,7 @@
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.85);
   z-index: 10001;
   justify-content: center;
   align-items: center;
@@ -21,13 +19,13 @@
 }
 
 .card {
-  background: var(--screen-glass-dense);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(8, 16, 24, 0.96);
   border: 1px solid var(--screen-glass-border-bright);
   border-radius: var(--radius-2xl);
   padding: var(--space-6) var(--space-8);
   max-width: min(460px, 90vw);
+  max-height: 90vh;
+  overflow-y: auto;
   width: 100%;
   box-sizing: border-box;
   color: var(--text-primary);

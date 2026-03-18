@@ -2,7 +2,7 @@ import { Logger } from '../utils/Logger';
 import * as THREE from 'three';
 import '../style.css';
 
-import { StartScreen } from '../ui/loading/StartScreen';
+import { GameUI } from '../ui/screens/GameUI';
 import { SystemManager } from './SystemManager';
 import { GameRenderer } from './GameRenderer';
 import { GameLaunchSelection, GameMode } from '../config/gameModeTypes';
@@ -30,7 +30,7 @@ import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
 
 export class GameEngine {
   // Core components (Public for split module access)
-  public loadingScreen: StartScreen;
+  public loadingScreen: GameUI;
   public renderer: GameRenderer;
   public systemManager: SystemManager;
   public performanceOverlay: PerformanceOverlay;
@@ -62,8 +62,8 @@ export class GameEngine {
     this.sandboxEnabled = isSandboxMode();
     this.sandboxConfig = this.sandboxEnabled ? getSandboxConfig() : null;
 
-    // Create start screen immediately
-    this.loadingScreen = new StartScreen();
+    // Create UI screen state machine (replaces old StartScreen)
+    this.loadingScreen = new GameUI();
     this.loadingScreen.mount(document.body);
 
     // Create renderer and system manager

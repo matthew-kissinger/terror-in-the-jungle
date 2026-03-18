@@ -1,0 +1,262 @@
+/**
+ * TitleScreen - Minimal title + loading bar + START GAME.
+ * Opaque dark background, no backdrop-filter. Fits viewport.
+ */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  background: rgba(8, 12, 18, 0.96);
+  font-family: var(--font-primary);
+  color: var(--text-primary);
+  transition: opacity 0.5s ease;
+}
+
+.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.content {
+  text-align: center;
+  width: 100%;
+  max-width: 480px;
+  padding: 0 var(--space-4);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+/* Title */
+
+.title {
+  font-family: var(--font-heading);
+  font-size: clamp(2rem, 6vw, 3.4rem);
+  font-weight: 500;
+  color: var(--text-primary);
+  text-shadow: 0 0 40px rgba(127, 180, 217, 0.3);
+  margin: 0;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  animation: ui-fadeInUp 0.8s ease-out;
+}
+
+/* Loading */
+
+.loadingSection {
+  width: 100%;
+  max-width: 320px;
+}
+
+.progressBar {
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: var(--space-2);
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--screen-accent-dim), var(--screen-accent));
+  transition: width 0.5s ease;
+  border-radius: 2px;
+  box-shadow: 0 0 12px var(--screen-accent);
+}
+
+.phaseText {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  height: 20px;
+}
+
+/* Menu buttons (shown after load) */
+
+.menuSection {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  animation: ui-fadeInUp 0.5s ease-out;
+}
+
+.menuVisible {
+  display: flex;
+}
+
+.startButton {
+  padding: 0.85rem 3rem;
+  min-height: 48px;
+  min-width: 240px;
+  background: linear-gradient(135deg, var(--screen-accent-dim), var(--screen-accent));
+  border: 1px solid rgba(127, 180, 217, 0.3);
+  border-radius: var(--radius-pill);
+  color: white;
+  font-family: var(--font-primary);
+  font-size: var(--font-size-base);
+  font-weight: var(--weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.startButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 28px rgba(90, 143, 181, 0.35);
+}
+
+.startButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.settingsLink {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-primary);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: var(--space-2) var(--space-4);
+  transition: color 0.2s;
+  touch-action: manipulation;
+  min-height: 44px;
+}
+
+.settingsLink:hover {
+  color: var(--text-primary);
+}
+
+/* Preparing state */
+
+.preparing .startButton {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.preparingText {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  opacity: 0.7;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Error panel */
+
+.errorPanel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(12, 18, 28, 0.96);
+  border: 1px solid rgba(255, 80, 80, 0.4);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-6) var(--space-8);
+  max-width: 460px;
+  width: 90%;
+  z-index: 10001;
+  animation: ui-scaleIn 0.3s ease-out;
+}
+
+.errorTitle {
+  color: var(--screen-danger);
+  font-size: var(--font-size-lg);
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-3);
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.errorMessage {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+  margin-bottom: var(--space-5);
+  text-align: center;
+}
+
+.errorActions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: center;
+}
+
+.errorButton {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--screen-glass-border-bright);
+  color: var(--screen-accent);
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  min-height: 40px;
+  touch-action: manipulation;
+  transition: all 0.2s;
+}
+
+.errorButton:hover {
+  background: rgba(127, 180, 217, 0.12);
+}
+
+.errorButtonPrimary {
+  border-color: rgba(255, 80, 80, 0.4);
+  color: var(--screen-danger);
+}
+
+/* Fullscreen prompt (mobile) */
+
+.fullscreenPrompt {
+  position: absolute;
+  bottom: 0.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-1-5) var(--space-3);
+  background: rgba(8, 16, 24, 0.7);
+  border: 1px solid rgba(127, 180, 217, 0.2);
+  border-radius: var(--radius-lg);
+  color: rgba(127, 180, 217, 0.8);
+  cursor: pointer;
+  touch-action: manipulation;
+  font-size: 0.7rem;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.05em;
+  transition: opacity 0.3s;
+}
+
+.fullscreenPromptFading {
+  opacity: 0;
+}
+
+/* Load stats */
+
+.loadingStats {
+  position: absolute;
+  bottom: 0.75rem;
+  left: 0.75rem;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  opacity: 0.2;
+  font-variant-numeric: tabular-nums;
+}

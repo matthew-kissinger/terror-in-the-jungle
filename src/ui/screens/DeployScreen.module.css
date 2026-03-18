@@ -1,0 +1,378 @@
+/**
+ * DeployScreen - Hero map + compact sidebar.
+ * Replaces old RespawnUI. Opaque dark background.
+ * Two modes: 'initial' (full sidebar) and 'respawn' (stripped).
+ */
+
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: none;
+  background: rgba(6, 8, 12, 0.97);
+  color: var(--text-primary);
+  font-family: var(--font-primary);
+}
+
+.visible {
+  display: flex;
+}
+
+.layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Header */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.headerTitle {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: clamp(18px, 4vw, 28px);
+  font-weight: 500;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: rgba(92, 184, 92, 0.9);
+}
+
+.headerStatus {
+  font-size: 13px;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* Map panel (hero element) */
+
+.mapPanel {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.map {
+  flex: 1;
+  min-height: 300px;
+  border: 1px solid rgba(92, 184, 92, 0.25);
+  border-radius: 6px;
+  background: rgba(8, 12, 18, 0.9);
+  overflow: hidden;
+}
+
+/* Side panel */
+
+.sidePanel {
+  display: flex;
+  width: min(340px, 40%);
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  overflow-y: auto;
+}
+
+/* Panels */
+
+.panel {
+  border-radius: 6px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 12, 16, 0.7);
+}
+
+.panelTitle {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(92, 184, 92, 0.8);
+  font-weight: 700;
+}
+
+/* Selected spawn */
+
+.selectedName {
+  margin-bottom: 4px;
+  font-size: 16px;
+  font-weight: 700;
+  color: white;
+}
+
+.statusText {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Sequence steps */
+
+.sequenceSteps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sequenceStep {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.sequenceBadge {
+  display: flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(92, 184, 92, 0.3);
+  border-radius: 999px;
+  color: rgba(92, 184, 92, 0.9);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.sequenceBody {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* Timer + action buttons */
+
+.controlPanel {
+  composes: panel;
+}
+
+.timer {
+  margin-bottom: 12px;
+  color: rgba(212, 163, 68, 0.9);
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.buttonStack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.actionButton {
+  width: 100%;
+  padding: 12px 16px;
+  min-height: 44px;
+  border-radius: 6px;
+  border: 1px solid rgba(92, 184, 92, 0.45);
+  background: rgba(92, 184, 92, 0.18);
+  color: rgba(92, 184, 92, 0.95);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+  touch-action: manipulation;
+}
+
+.actionButton:hover:not(:disabled) {
+  background: rgba(92, 184, 92, 0.28);
+  transform: scale(1.02);
+}
+
+.actionButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.secondaryButton {
+  width: 100%;
+  padding: 10px 16px;
+  min-height: 40px;
+  border-radius: 6px;
+  border: 1px solid rgba(140, 140, 140, 0.25);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s;
+  touch-action: manipulation;
+}
+
+.secondaryButton:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Loadout (compact) */
+
+.loadoutPanel {
+  composes: panel;
+}
+
+.loadoutStatus {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.presetMeta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  margin-bottom: 8px;
+}
+
+.presetInfo {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.presetName {
+  overflow: hidden;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presetDescription {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.factionPill {
+  align-self: start;
+  padding: 4px 8px;
+  border: 1px solid rgba(92, 184, 92, 0.3);
+  border-radius: 999px;
+  background: rgba(92, 184, 92, 0.12);
+  color: rgba(92, 184, 92, 0.9);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.presetButtons,
+.loadoutButtons {
+  display: flex;
+  gap: 6px;
+}
+
+.smallButton {
+  min-width: 52px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(140, 140, 140, 0.25);
+  background: rgba(46, 46, 46, 0.8);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  touch-action: manipulation;
+}
+
+.smallButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.loadoutRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.loadoutLabel {
+  color: var(--text-secondary);
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.loadoutValue {
+  min-height: 20px;
+  overflow: hidden;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Legend */
+
+.legend {
+  composes: panel;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.legendSwatch {
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.legendLabel {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+/* Responsive */
+
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+  }
+
+  .sidePanel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    max-height: 40vh;
+  }
+
+  .map {
+    min-height: 40vh;
+  }
+
+  .loadoutRow {
+    grid-template-columns: 1fr;
+  }
+}

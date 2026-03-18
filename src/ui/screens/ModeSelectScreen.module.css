@@ -1,0 +1,151 @@
+/**
+ * ModeSelectScreen - 4-card mode picker.
+ * 2x2 grid (desktop), vertical list (mobile portrait).
+ * Opaque background, no scroll, no backdrop-filter.
+ */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  background: rgba(8, 12, 18, 0.96);
+  font-family: var(--font-primary);
+  color: var(--text-primary);
+  animation: ui-fadeIn 0.3s ease-out;
+}
+
+.visible {
+  display: flex;
+}
+
+.content {
+  width: 100%;
+  max-width: 600px;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.heading {
+  font-family: var(--font-heading);
+  font-size: clamp(1.2rem, 3vw, 1.6rem);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: 0;
+  text-align: center;
+}
+
+/* Mode cards grid */
+
+.cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.card {
+  background: rgba(12, 22, 32, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 72px;
+}
+
+.card:hover {
+  border-color: rgba(127, 180, 217, 0.3);
+  background: rgba(127, 180, 217, 0.06);
+  transform: translateY(-1px);
+}
+
+.card:active {
+  transform: scale(0.98);
+}
+
+.cardIcon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  image-rendering: pixelated;
+  opacity: 0.85;
+}
+
+.cardInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cardName {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--screen-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+}
+
+.cardStat {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+
+/* TDM variant */
+.cardTdm .cardName {
+  color: var(--screen-tdm-accent);
+}
+
+/* Back button */
+
+.backButton {
+  align-self: center;
+  padding: var(--space-2) var(--space-6);
+  min-height: 44px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  font-family: var(--font-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s;
+  touch-action: manipulation;
+}
+
+.backButton:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Mobile portrait: single column list */
+@media (max-width: 560px) {
+  .cards {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+
+  .card {
+    padding: var(--space-3);
+    min-height: 56px;
+  }
+}

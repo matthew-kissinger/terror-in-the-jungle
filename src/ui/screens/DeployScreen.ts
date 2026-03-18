@@ -1,13 +1,23 @@
-import { UIComponent } from '../../ui/engine/UIComponent';
-import styles from './RespawnUI.module.css';
-import type { DeploySessionModel } from '../world/runtime/DeployFlowSession';
-import type { LoadoutPresentationModel } from './LoadoutService';
+/**
+ * DeployScreen - Hero map + compact sidebar.
+ *
+ * Replaces old RespawnUI. Two modes:
+ * - 'initial': full sidebar with loadout, sequence, legend
+ * - 'respawn': stripped to map + spawn + countdown deploy button
+ *
+ * Exposes the same API surface that PlayerRespawnManager expects.
+ */
+
+import { UIComponent } from '../engine/UIComponent';
+import type { DeploySessionModel } from '../../systems/world/runtime/DeployFlowSession';
+import type { LoadoutPresentationModel } from '../../systems/player/LoadoutService';
 import {
   getEquipmentLabel,
   getWeaponLabel,
   type LoadoutFieldKey,
   type PlayerLoadout,
-} from '../../ui/loadout/LoadoutTypes';
+} from '../loadout/LoadoutTypes';
+import styles from './DeployScreen.module.css';
 
 interface LoadoutFieldControl {
   value: HTMLDivElement;
@@ -16,17 +26,15 @@ interface LoadoutFieldControl {
 }
 
 const LOADOUT_FIELD_ORDER: Array<{ key: LoadoutFieldKey; label: string }> = [
-  { key: 'primaryWeapon', label: 'Primary Weapon' },
-  { key: 'secondaryWeapon', label: 'Secondary Weapon' },
+  { key: 'primaryWeapon', label: 'Primary' },
+  { key: 'secondaryWeapon', label: 'Secondary' },
   { key: 'equipment', label: 'Equipment' },
 ];
 
-export class RespawnUI extends UIComponent {
+export class DeployScreen extends UIComponent {
   private mapContainer?: HTMLDivElement;
   private headerTitle?: HTMLHeadingElement;
   private headerStatus?: HTMLDivElement;
-  private mapTitle?: HTMLHeadingElement;
-  private selectedTitle?: HTMLHeadingElement;
   private selectedName?: HTMLDivElement;
   private selectedStatus?: HTMLDivElement;
   private sequenceTitle?: HTMLHeadingElement;
@@ -65,6 +73,8 @@ export class RespawnUI extends UIComponent {
     (this.root.style as CSSStyleDeclaration & { cssText?: string }).cssText = 'display: none;';
 
     const layout = this.createDiv(styles.layout);
+
+    // Header
     const header = this.createDiv(styles.header);
     this.headerTitle = this.createHeading('h1', 'respawn-header-title', styles.headerTitle, 'RETURN TO BATTLE');
     this.headerStatus = this.createDiv(styles.headerStatus, 'respawn-header-status');
@@ -72,13 +82,12 @@ export class RespawnUI extends UIComponent {
     header.appendChild(this.headerTitle);
     header.appendChild(this.headerStatus);
 
-    const contentArea = this.createDiv(styles.contentArea);
+    // Map panel (hero)
     const mapPanel = this.createDiv(styles.mapPanel);
-    this.mapTitle = this.createHeading('h2', undefined, styles.mapTitle, 'TACTICAL MAP - SELECT DEPLOYMENT');
     this.mapContainer = this.createDiv(styles.map, 'respawn-map');
-    mapPanel.appendChild(this.mapTitle);
     mapPanel.appendChild(this.mapContainer);
 
+    // Side panel
     const sidePanel = this.createDiv(styles.sidePanel);
     sidePanel.appendChild(this.createSelectedPanel());
     sidePanel.appendChild(this.createSequencePanel());
@@ -86,12 +95,14 @@ export class RespawnUI extends UIComponent {
     sidePanel.appendChild(this.createControlsPanel());
     sidePanel.appendChild(this.createLegendPanel());
 
-    contentArea.appendChild(mapPanel);
-    contentArea.appendChild(sidePanel);
-    layout.appendChild(header);
-    layout.appendChild(contentArea);
+    layout.appendChild(mapPanel);
+    layout.appendChild(sidePanel);
+
+    this.root.appendChild(header);
     this.root.appendChild(layout);
   }
+
+  // --- Public API (same as old RespawnUI) ---
 
   getContainer(): HTMLDivElement {
     return this.root;
@@ -105,10 +116,8 @@ export class RespawnUI extends UIComponent {
     this.deploySession = session;
     if (this.headerTitle) this.headerTitle.textContent = session.headline;
     if (this.headerStatus) this.headerStatus.textContent = session.subheadline;
-    if (this.mapTitle) this.mapTitle.textContent = session.mapTitle;
     if (this.sequenceTitle) this.sequenceTitle.textContent = session.sequenceTitle;
     this.renderSequenceSteps(session.sequenceSteps);
-    if (this.selectedTitle) this.selectedTitle.textContent = session.selectedSpawnTitle;
     if (this.respawnButton) this.respawnButton.textContent = session.actionLabel;
     if (this.secondaryActionButton) {
       this.secondaryActionButton.textContent = session.secondaryActionLabel ?? '';
@@ -143,22 +152,22 @@ export class RespawnUI extends UIComponent {
       this.loadoutPanel.style.opacity = enabled ? '1' : '0.55';
     }
     for (const control of this.loadoutControls.values()) {
-      this.applyLoadoutButtonState(control.previousButton, enabled);
-      this.applyLoadoutButtonState(control.nextButton, enabled);
+      this.applyButtonState(control.previousButton, enabled);
+      this.applyButtonState(control.nextButton, enabled);
     }
-    if (this.presetPreviousButton) this.applyLoadoutButtonState(this.presetPreviousButton, enabled);
-    if (this.presetNextButton) this.applyLoadoutButtonState(this.presetNextButton, enabled);
+    if (this.presetPreviousButton) this.applyButtonState(this.presetPreviousButton, enabled);
+    if (this.presetNextButton) this.applyButtonState(this.presetNextButton, enabled);
     if (this.presetSaveButton) {
       const saveEnabled = enabled && (this.loadoutPresentation?.presetDirty ?? true);
-      this.applyLoadoutButtonState(this.presetSaveButton, saveEnabled);
+      this.applyButtonState(this.presetSaveButton, saveEnabled);
     }
-    this.refreshLoadoutPresentationState(enabled);
+    this.refreshLoadoutState(enabled);
   }
 
   updateLoadout(loadout: PlayerLoadout): void {
-    this.updateLoadoutFieldValue('primaryWeapon', getWeaponLabel(loadout.primaryWeapon));
-    this.updateLoadoutFieldValue('secondaryWeapon', getWeaponLabel(loadout.secondaryWeapon));
-    this.updateLoadoutFieldValue('equipment', getEquipmentLabel(loadout.equipment));
+    this.updateFieldValue('primaryWeapon', getWeaponLabel(loadout.primaryWeapon));
+    this.updateFieldValue('secondaryWeapon', getWeaponLabel(loadout.secondaryWeapon));
+    this.updateFieldValue('equipment', getEquipmentLabel(loadout.equipment));
   }
 
   updateLoadoutPresentation(model: LoadoutPresentationModel): void {
@@ -170,7 +179,7 @@ export class RespawnUI extends UIComponent {
     if (this.loadoutPresetDescription) {
       this.loadoutPresetDescription.textContent = model.presetDescription;
     }
-    this.refreshLoadoutPresentationState(this.deploySession?.allowLoadoutEditing === true);
+    this.refreshLoadoutState(this.deploySession?.allowLoadoutEditing === true);
   }
 
   show(): void {
@@ -196,7 +205,7 @@ export class RespawnUI extends UIComponent {
     if (this.respawnButton) {
       const enabled = respawnTimer <= 0 && hasSelectedSpawn;
       this.respawnButton.disabled = !enabled;
-      this.respawnButton.style.opacity = enabled ? '1' : '0.5';
+      this.respawnButton.style.opacity = enabled ? '1' : '0.45';
       this.respawnButton.style.cursor = enabled ? 'pointer' : 'not-allowed';
     }
   }
@@ -227,14 +236,16 @@ export class RespawnUI extends UIComponent {
     super.dispose();
   }
 
+  // --- Private: Panel builders ---
+
   private createSelectedPanel(): HTMLDivElement {
     const panel = this.createDiv(styles.panel);
-    this.selectedTitle = this.createHeading('h3', undefined, styles.panelTitle, 'SELECTED SPAWN POINT');
+    const title = this.createHeading('h3', undefined, styles.panelTitle, 'SPAWN POINT');
     this.selectedName = this.createDiv(styles.selectedName, 'selected-spawn-name');
     this.selectedName.textContent = 'NONE';
     this.selectedStatus = this.createDiv(styles.statusText, 'selected-spawn-status');
     this.selectedStatus.textContent = 'Select a spawn point on the map';
-    panel.appendChild(this.selectedTitle);
+    panel.appendChild(title);
     panel.appendChild(this.selectedName);
     panel.appendChild(this.selectedStatus);
     return panel;
@@ -244,7 +255,6 @@ export class RespawnUI extends UIComponent {
     const panel = this.createDiv(styles.panel, 'respawn-sequence-panel');
     this.sequenceTitle = this.createHeading('h3', 'respawn-sequence-title', styles.panelTitle, 'Deployment Checklist');
     this.sequenceSteps = this.createDiv(styles.sequenceSteps, 'respawn-sequence-steps');
-    this.renderSequenceSteps([]);
     panel.appendChild(this.sequenceTitle);
     panel.appendChild(this.sequenceSteps);
     return panel;
@@ -257,16 +267,15 @@ export class RespawnUI extends UIComponent {
     this.loadoutStatus = this.createDiv(styles.loadoutStatus, 'respawn-loadout-status');
     this.loadoutStatus.textContent = 'Two weapon slots and one equipment slot. Adjust before deploying.';
     panel.appendChild(this.loadoutStatus);
-    panel.appendChild(this.createLoadoutPresetPanel());
+    panel.appendChild(this.createPresetPanel());
 
     for (const field of LOADOUT_FIELD_ORDER) {
-      panel.appendChild(this.createLoadoutFieldRow(field.key, field.label));
+      panel.appendChild(this.createLoadoutRow(field.key, field.label));
     }
-
     return panel;
   }
 
-  private createLoadoutPresetPanel(): HTMLDivElement {
+  private createPresetPanel(): HTMLDivElement {
     const panel = this.createDiv(undefined, 'respawn-loadout-preset-panel');
     const meta = this.createDiv(styles.presetMeta);
     const info = this.createDiv(styles.presetInfo);
@@ -282,9 +291,9 @@ export class RespawnUI extends UIComponent {
     meta.appendChild(this.loadoutFactionValue);
 
     const buttons = this.createDiv(styles.presetButtons);
-    this.presetPreviousButton = this.createPresetButton('respawn-loadout-preset-prev', 'Prev Preset', () => this.onPresetCycle?.(-1));
-    this.presetNextButton = this.createPresetButton('respawn-loadout-preset-next', 'Next Preset', () => this.onPresetCycle?.(1));
-    this.presetSaveButton = this.createPresetButton('respawn-loadout-preset-save', 'Save Preset', () => this.onPresetSave?.());
+    this.presetPreviousButton = this.makeButton('respawn-loadout-preset-prev', 'Prev Preset', () => this.onPresetCycle?.(-1));
+    this.presetNextButton = this.makeButton('respawn-loadout-preset-next', 'Next Preset', () => this.onPresetCycle?.(1));
+    this.presetSaveButton = this.makeButton('respawn-loadout-preset-save', 'Save Preset', () => this.onPresetSave?.());
     buttons.appendChild(this.presetPreviousButton);
     buttons.appendChild(this.presetNextButton);
     buttons.appendChild(this.presetSaveButton);
@@ -294,32 +303,32 @@ export class RespawnUI extends UIComponent {
     return panel;
   }
 
-  private createLoadoutFieldRow(field: LoadoutFieldKey, label: string): HTMLDivElement {
+  private createLoadoutRow(field: LoadoutFieldKey, label: string): HTMLDivElement {
     const row = this.createDiv(styles.loadoutRow);
     const valueBlock = this.createDiv();
-    const labelElement = this.createDiv(styles.loadoutLabel);
-    labelElement.textContent = label;
-    const valueElement = this.createDiv(styles.loadoutValue, `loadout-${field}-value`);
-    valueElement.textContent = '--';
-    valueBlock.appendChild(labelElement);
-    valueBlock.appendChild(valueElement);
+    const labelEl = this.createDiv(styles.loadoutLabel);
+    labelEl.textContent = label;
+    const valueEl = this.createDiv(styles.loadoutValue, `loadout-${field}-value`);
+    valueEl.textContent = '--';
+    valueBlock.appendChild(labelEl);
+    valueBlock.appendChild(valueEl);
 
     const buttons = this.createDiv(styles.loadoutButtons);
-    const previousButton = this.createLoadoutButton(field, -1, 'PREV');
-    const nextButton = this.createLoadoutButton(field, 1, 'NEXT');
-    buttons.appendChild(previousButton);
-    buttons.appendChild(nextButton);
+    const prev = this.makeButton(undefined, 'PREV', () => this.onLoadoutChange?.(field, -1));
+    const next = this.makeButton(undefined, 'NEXT', () => this.onLoadoutChange?.(field, 1));
+    buttons.appendChild(prev);
+    buttons.appendChild(next);
 
     row.appendChild(valueBlock);
     row.appendChild(buttons);
-    this.loadoutControls.set(field, { value: valueElement, previousButton, nextButton });
+    this.loadoutControls.set(field, { value: valueEl, previousButton: prev, nextButton: next });
     return row;
   }
 
   private createControlsPanel(): HTMLDivElement {
     const panel = this.createDiv(styles.controlPanel);
     this.timerDisplay = this.createDiv(styles.timer, 'respawn-timer');
-    this.respawnButton = this.createButton('respawn-button', styles.actionButton, () => this.onRespawnClick?.());
+    this.respawnButton = this.makeActionButton('respawn-button', styles.actionButton, () => this.onRespawnClick?.());
     this.respawnButton.textContent = 'DEPLOY';
     this.respawnButton.disabled = true;
     this.respawnButton.style.opacity = '0.5';
@@ -332,7 +341,7 @@ export class RespawnUI extends UIComponent {
       if (!this.respawnButton) return;
       this.respawnButton.style.transform = 'scale(1)';
     };
-    this.secondaryActionButton = this.createButton('respawn-secondary-button', styles.secondaryButton, () => this.onCancelClick?.());
+    this.secondaryActionButton = this.makeActionButton('respawn-secondary-button', styles.secondaryButton, () => this.onCancelClick?.());
     this.secondaryActionButton.style.display = 'none';
 
     const stack = this.createDiv(styles.buttonStack);
@@ -366,21 +375,23 @@ export class RespawnUI extends UIComponent {
     return panel;
   }
 
-  private createLoadoutButton(field: LoadoutFieldKey, direction: 1 | -1, label: string): HTMLButtonElement {
-    const button = this.createButton(undefined, styles.smallButton, () => this.onLoadoutChange?.(field, direction));
-    button.textContent = label;
-    return button;
-  }
+  // --- Private helpers ---
 
-  private createPresetButton(id: string, label: string, onPress: () => void): HTMLButtonElement {
-    const button = this.createButton(id, styles.smallButton, onPress);
-    button.textContent = label;
-    return button;
-  }
-
-  private createButton(id: string | undefined, className: string, onPress: () => void): HTMLButtonElement {
+  private makeButton(id: string | undefined, label: string, onPress: () => void): HTMLButtonElement {
     const button = document.createElement('button');
     if (id) button.id = id;
+    button.type = 'button';
+    button.className = styles.smallButton;
+    button.textContent = label;
+    button.addEventListener('pointerdown', () => {
+      if (!button.disabled) onPress();
+    });
+    return button;
+  }
+
+  private makeActionButton(id: string, className: string, onPress: () => void): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.id = id;
     button.type = 'button';
     button.className = className;
     button.addEventListener('pointerdown', () => {
@@ -390,42 +401,34 @@ export class RespawnUI extends UIComponent {
   }
 
   private createDiv(className?: string, id?: string): HTMLDivElement {
-    const element = document.createElement('div');
-    if (id) element.id = id;
-    if (className) element.className = className;
-    return element;
+    const el = document.createElement('div');
+    if (id) el.id = id;
+    if (className) el.className = className;
+    return el;
   }
 
   private createHeading<K extends 'h1' | 'h2' | 'h3' | 'h4'>(
-    tag: K,
-    id: string | undefined,
-    className: string | undefined,
-    text: string,
+    tag: K, id: string | undefined, className: string | undefined, text: string,
   ): HTMLHeadingElement {
-    const element = document.createElement(tag) as HTMLHeadingElement;
-    if (id) element.id = id;
-    if (className) element.className = className;
-    element.textContent = text;
-    return element;
+    const el = document.createElement(tag) as HTMLHeadingElement;
+    if (id) el.id = id;
+    if (className) el.className = className;
+    el.textContent = text;
+    return el;
   }
 
-  private updateLoadoutFieldValue(field: LoadoutFieldKey, value: string): void {
+  private updateFieldValue(field: LoadoutFieldKey, value: string): void {
     const control = this.loadoutControls.get(field);
-    if (control) {
-      control.value.textContent = value;
-    }
+    if (control) control.value.textContent = value;
   }
 
   private renderSequenceSteps(steps: string[]): void {
     if (!this.sequenceSteps) return;
-    while (this.sequenceSteps.children.length > 0) {
-      this.sequenceSteps.removeChild(this.sequenceSteps.children[0] as Node);
-    }
-
-    steps.forEach((step, index) => {
-      const row = this.createDiv(styles.sequenceStep, `respawn-sequence-step-${index}`);
+    this.sequenceSteps.innerHTML = '';
+    steps.forEach((step, i) => {
+      const row = this.createDiv(styles.sequenceStep, `respawn-sequence-step-${i}`);
       const badge = this.createDiv(styles.sequenceBadge);
-      badge.textContent = String(index + 1);
+      badge.textContent = String(i + 1);
       const body = this.createDiv(styles.sequenceBody);
       body.textContent = step;
       row.appendChild(badge);
@@ -434,28 +437,26 @@ export class RespawnUI extends UIComponent {
     });
   }
 
-  private applyLoadoutButtonState(button: HTMLButtonElement, enabled: boolean): void {
+  private applyButtonState(button: HTMLButtonElement, enabled: boolean): void {
     button.disabled = !enabled;
-    button.style.opacity = enabled ? '1' : '0.45';
+    button.style.opacity = enabled ? '1' : '0.4';
     button.style.cursor = enabled ? 'pointer' : 'not-allowed';
   }
 
-  private refreshLoadoutPresentationState(editingEnabled: boolean): void {
+  private refreshLoadoutState(editingEnabled: boolean): void {
     if (!this.loadoutStatus) return;
     if (!editingEnabled) {
       this.loadoutStatus.textContent = 'Mission loadout locked for this deployment.';
       return;
     }
-
     if (this.loadoutPresentation) {
       this.loadoutStatus.textContent = `${this.loadoutPresentation.factionLabel} preset ${this.loadoutPresentation.presetIndex + 1}/${this.loadoutPresentation.presetCount}. Adjust two weapons and one equipment slot before deploying.`;
       if (this.presetSaveButton) {
         this.presetSaveButton.disabled = !this.loadoutPresentation.presetDirty;
-        this.applyLoadoutButtonState(this.presetSaveButton, this.loadoutPresentation.presetDirty);
+        this.applyButtonState(this.presetSaveButton, this.loadoutPresentation.presetDirty);
       }
       return;
     }
-
     this.loadoutStatus.textContent = 'Two weapon slots and one equipment slot. Adjust before deploying.';
   }
 }

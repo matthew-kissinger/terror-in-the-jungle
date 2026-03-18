@@ -39,12 +39,13 @@ src/ui/
   engine/      UIComponent, css-modules.d, index
   hud/         30 widget modules (see registry below)
   layout/      HUDLayout, HUDLayoutStyles, VisibilityManager, types, index
-  loading/     StartScreen, ModeCard, SettingsModal, HowToPlayModal, LoadingPanels, LoadingProgress
+  loading/     SettingsModal, ModeCard, LoadingProgress
   loadout/     LoadoutSelector (legacy), LoadoutGrenadePanel, LoadoutTypes
   map/         FullMapSystem, FullMapInput, FullMapStyles, FullMapDOMHelpers,
                OpenFrontierRespawnMap, OpenFrontierRespawnMapRenderer,
                OpenFrontierRespawnMapUtils
   minimap/     MinimapSystem, MinimapDOMBuilder, MinimapRenderer, MinimapStyles
+  screens/     GameUI, TitleScreen, ModeSelectScreen, DeployScreen
   MobilePauseOverlay.ts
 ```
 
@@ -146,15 +147,21 @@ Visibility: `data-show="infantry"` on `weapon-bar` and `action-btns` - CSS hides
 
 ---
 
-## Loading / Menu Module Registry (in `ui/loading/`)
+## Screen Module Registry (in `ui/screens/`)
 
 | Module | File | Role |
 |---|---|---|
-| [StartScreen]([GH]/ui/loading/StartScreen.ts) | ui/loading/StartScreen.ts | Main menu, mode cards, side/faction selection, deploy button |
-| [ModeCard]([GH]/ui/loading/ModeCard.ts) | ui/loading/ModeCard.ts | Individual mode card within the carousel |
-| [SettingsModal]([GH]/ui/loading/SettingsModal.ts) | ui/loading/SettingsModal.ts | Graphics/audio settings |
-| [HowToPlayModal]([GH]/ui/loading/HowToPlayModal.ts) | ui/loading/HowToPlayModal.ts | Controls reference modal |
-| [LoadingPanels]([GH]/ui/loading/LoadingPanels.ts) | ui/loading/LoadingPanels.ts | Loading state panel layout |
+| [GameUI]([GH]/ui/screens/GameUI.ts) | ui/screens/GameUI.ts | Screen state machine: LOADING -> TITLE -> MODE SELECT -> PREPARING -> HIDDEN. Drop-in replacement for old StartScreen. |
+| [TitleScreen]([GH]/ui/screens/TitleScreen.ts) | ui/screens/TitleScreen.ts | Minimal title + loading bar + START GAME button + settings link |
+| [ModeSelectScreen]([GH]/ui/screens/ModeSelectScreen.ts) | ui/screens/ModeSelectScreen.ts | 4-card responsive grid (2x2 desktop, 1-col mobile). Tap card to start mode. |
+| [DeployScreen]([GH]/ui/screens/DeployScreen.ts) | ui/screens/DeployScreen.ts | Hero map + compact sidebar. Replaces old RespawnUI. Used by PlayerRespawnManager for both initial deploy and respawn. |
+
+## Loading / Menu Support (in `ui/loading/`)
+
+| Module | File | Role |
+|---|---|---|
+| [SettingsModal]([GH]/ui/loading/SettingsModal.ts) | ui/loading/SettingsModal.ts | Graphics/audio/controls settings. Absorbs controls reference and gameplay tips as collapsible sections. |
+| [ModeCard]([GH]/ui/loading/ModeCard.ts) | ui/loading/ModeCard.ts | Mode card config data (title, stat line, icon) used by ModeSelectScreen |
 | [LoadingProgress]([GH]/ui/loading/LoadingProgress.ts) | ui/loading/LoadingProgress.ts | Progress bar driven by bootstrap events |
 
 ---
@@ -285,7 +292,7 @@ POLL (20Hz, own update()):
 
 ## Mobile Entry
 
-Deploy button on StartScreen: calls `document.documentElement.requestFullscreen()` then `screen.orientation.lock('landscape')`. Compact fullscreen prompt auto-fades after 6 seconds. Touch controls activate only in fullscreen landscape.
+START GAME button on TitleScreen: calls `document.documentElement.requestFullscreen()` then `screen.orientation.lock('landscape')`. Compact fullscreen prompt auto-fades after 6 seconds. Touch controls activate only in fullscreen landscape.
 
 ---
 

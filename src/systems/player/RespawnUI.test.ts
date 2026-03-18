@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { RespawnUI } from './RespawnUI';
+import { DeployScreen } from '../../ui/screens/DeployScreen';
 import type { LoadoutPresentationModel } from './LoadoutService';
 import type { DeploySessionModel } from '../world/runtime/DeployFlowSession';
 import {
@@ -71,8 +71,8 @@ class MockHTMLElement {
   }
 }
 
-describe('RespawnUI', () => {
-  let ui: RespawnUI;
+describe('DeployScreen', () => {
+  let ui: DeployScreen;
   let elementMap: Map<string, MockHTMLElement>;
   let mockBody: MockHTMLElement;
   let mockHead: MockHTMLElement;
@@ -131,7 +131,7 @@ describe('RespawnUI', () => {
       head: mockHead,
     } as any;
 
-    ui = new RespawnUI();
+    ui = new DeployScreen();
   });
 
   afterEach(() => {

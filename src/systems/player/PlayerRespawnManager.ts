@@ -6,7 +6,7 @@ import { ZoneManager } from '../world/ZoneManager';
 import { PlayerHealthSystem } from './PlayerHealthSystem';
 import { GameModeManager } from '../world/GameModeManager';
 import { InventoryManager } from './InventoryManager';
-import { RespawnUI } from './RespawnUI';
+import { DeployScreen } from '../../ui/screens/DeployScreen';
 import { RespawnMapController } from './RespawnMapController';
 import type { IFirstPersonWeapon, IPlayerController, ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { WarSimulator } from '../strategy/WarSimulator';
@@ -68,7 +68,7 @@ export class PlayerRespawnManager implements GameSystem {
   private readonly deployFlow = new DeployFlowController();
 
   // UI and map modules
-  private respawnUI: RespawnUI;
+  private respawnUI: DeployScreen;
   private mapController: RespawnMapController;
 
   // Spawn point selection delegate
@@ -80,7 +80,7 @@ export class PlayerRespawnManager implements GameSystem {
   constructor(scene: THREE.Scene, camera: THREE.Camera) {
     this.scene = scene;
     this.camera = camera;
-    this.respawnUI = new RespawnUI();
+    this.respawnUI = new DeployScreen();
     this.mapController = new RespawnMapController();
     this.spawnPointSelector = new SpawnPointSelector();
   }

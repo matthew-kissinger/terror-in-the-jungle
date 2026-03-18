@@ -27,6 +27,8 @@
   gap: 5px;
   padding: 3px 6px;
   background: rgba(8, 12, 18, 0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   border-left: 2px solid rgba(220, 225, 230, 0.1);
   border-radius: 0 2px 2px 0;
   transition: opacity 0.3s ease;

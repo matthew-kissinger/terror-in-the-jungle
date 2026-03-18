@@ -35,7 +35,7 @@ bootstrap.ts
   |- resetStartupTelemetry()
   |- injectSharedStyles()
   |- new TouchControlLayout().init()       // CSS custom properties for touch sizing
-  |- new GameEngine()                      // constructor: StartScreen + GameRenderer +
+  |- new GameEngine()                      // constructor: GameUI + GameRenderer +
   |                                        //   SystemManager + overlays + event listeners
   |- engine.initialize()                   // async: construct + wire + init all systems
   |- engine.start()                        // begins engine-owned RAF loop; start/stop/dispose
@@ -43,14 +43,13 @@ bootstrap.ts
   |- window.__engine / __renderer exposed for perf harness
   |- window.__metrics exposed only in dev + `?perf=1`
   |
-MAIN MENU  (StartScreen)
-  |- Mode carousel  (5 modes: Zone Control, Open Frontier, TDM, AI Sandbox, A Shau Valley)
-  |- Side/faction selection per mode
+MAIN MENU  (GameUI: TitleScreen -> ModeSelectScreen)
+  |- TitleScreen: loading bar, then START GAME button
+  |- ModeSelectScreen: 4-card grid (Zone Control, Open Frontier, TDM, A Shau Valley)
   |- [SETTINGS]     -> SettingsModal (mouse sens, touch sens, FPS toggle, pixel size, volume,
-  |                                   graphics quality, shadows)
-  |- [HOW TO PLAY]  -> HowToPlayModal
+  |                                   graphics quality, shadows, controls ref, tips)
   |
-[SELECT MODE + SIDE/FACTION + DEPLOY]
+[TAP MODE CARD -> auto-resolves default alliance/faction]
   |
 startGameWithMode(mode)   (GameEngineInit)
   |- lazy-load ModeStartupPreparer + InitialDeployStartup only after Play
@@ -128,7 +127,7 @@ All files are in `src/core/` unless noted.
 
 | Module | File | Role |
 |--------|------|------|
-| GameEngine | [GameEngine.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameEngine.ts) | Top-level coordinator. Owns StartScreen, GameRenderer, SystemManager, overlays, and the `StartupFlowController`. Delegates runtime logic to Init/Input/Loop split modules. Holds clock, isInitialized, gameStarted flags. |
+| GameEngine | [GameEngine.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameEngine.ts) | Top-level coordinator. Owns GameUI (screen state machine), GameRenderer, SystemManager, overlays, and the `StartupFlowController`. Delegates runtime logic to Init/Input/Loop split modules. Holds clock, isInitialized, gameStarted flags. |
 | GameEngineInit | [GameEngineInit.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/GameEngineInit.ts) | Startup coordinator. Handles engine-level init, restart, error/cancel behavior, and lazy-loads the mode/deploy startup pipeline before delegating launch work to `ModeStartupPreparer`, `InitialDeployStartup`, and `LiveEntryActivator`. |
 | StartupFlowController | [StartupFlowController.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/StartupFlowController.ts) | Typed startup state machine for `booting -> menu_ready -> mode_preparing -> deploy_select -> spawn_warming -> live` plus startup-error handling. State authority only; not a UI owner. |
 | ModeStartupPreparer | [ModeStartupPreparer.ts](https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src/core/ModeStartupPreparer.ts) | Mode-preparation stage. Normalizes launch selection, configures terrain height source, applies terrain features, configures renderer/terrain/navmesh, applies faction/loadout context, and restores persisted war state. |
@@ -174,7 +173,7 @@ All files are in `src/core/` unless noted.
 
 3. GameEngine constructor
    - isSandboxMode() / getSandboxConfig()   // URL param detection
-   - new StartScreen().mount(document.body) // main menu rendered immediately
+   - new GameUI().mount(document.body)      // screen state machine (title + mode select)
    - new GameRenderer()                     // Three.js renderer + scene + camera +
    |                                        //   lighting + post-processing
    - new SystemManager()                    // empty shell, no systems yet
@@ -445,5 +444,5 @@ GameEngineLoop tracks consecutive crashes within a 5s window. After 3 crashes it
 - [AGENT_TESTING.md](../AGENT_TESTING.md) - agent validation workflows and perf baselines
 - [blocks/combat.md](combat.md) - CombatantSystem internals (5ms budget)
 - [blocks/terrain.md](terrain.md) - TerrainSystem, HeightQueryCache, workers, DEM
-- [blocks/ui.md](ui.md) - HUDSystem, StartScreen, minimap, touch controls
+- [blocks/ui.md](ui.md) - HUDSystem, GameUI/screens, minimap, touch controls
 - [blocks/world.md](world.md) - ZoneManager, TicketSystem, GameModeManager

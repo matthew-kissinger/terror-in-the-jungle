@@ -7,7 +7,7 @@ import { PlayerHealthSystem } from './PlayerHealthSystem';
 import { GameModeManager } from '../world/GameModeManager';
 import { InventoryManager } from './InventoryManager';
 import { Alliance, Faction } from '../combat/types';
-import { RespawnUI } from './RespawnUI';
+import { DeployScreen } from '../../ui/screens/DeployScreen';
 import { RespawnMapController } from './RespawnMapController';
 import { GameMode } from '../../config/gameModeTypes';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
@@ -161,7 +161,7 @@ describe('PlayerRespawnManager', () => {
   let respawnManager: PlayerRespawnManager;
   let mockScene: THREE.Scene;
   let mockCamera: THREE.Camera;
-  let mockRespawnUI: RespawnUI;
+  let mockDeployScreen: DeployScreen;
   let mockMapController: RespawnMapController;
   let mockZoneManager: ZoneManager;
   let mockPlayerHealthSystem: PlayerHealthSystem;
@@ -182,7 +182,7 @@ describe('PlayerRespawnManager', () => {
     respawnManager = new PlayerRespawnManager(mockScene, mockCamera);
 
     // Create mocks for UI modules and inject them
-    mockRespawnUI = {
+    mockDeployScreen = {
       show: vi.fn(),
       hide: vi.fn(),
       dispose: vi.fn(),
@@ -200,7 +200,7 @@ describe('PlayerRespawnManager', () => {
       resetSelectedSpawn: vi.fn(),
       updateSelectedSpawn: vi.fn(),
       getMapContainer: vi.fn(() => document.createElement('div')),
-    } as unknown as RespawnUI;
+    } as unknown as DeployScreen;
 
     mockMapController = {
       setZoneSelectedCallback: vi.fn(),
@@ -214,7 +214,7 @@ describe('PlayerRespawnManager', () => {
     } as unknown as RespawnMapController;
 
     // Inject mocks into the instance
-    (respawnManager as any).respawnUI = mockRespawnUI;
+    (respawnManager as any).respawnUI = mockDeployScreen;
     (respawnManager as any).mapController = mockMapController;
 
     // Create dependency mocks
@@ -390,12 +390,12 @@ describe('PlayerRespawnManager', () => {
     it('should setup UI callbacks on init', async () => {
       await respawnManager.init();
 
-      expect(mockRespawnUI.setRespawnClickCallback).toHaveBeenCalled();
-      expect((mockRespawnUI as any).setCancelClickCallback).toHaveBeenCalled();
-      expect((mockRespawnUI as any).setPresetCycleCallback).toHaveBeenCalled();
-      expect((mockRespawnUI as any).setPresetSaveCallback).toHaveBeenCalled();
+      expect(mockDeployScreen.setRespawnClickCallback).toHaveBeenCalled();
+      expect((mockDeployScreen as any).setCancelClickCallback).toHaveBeenCalled();
+      expect((mockDeployScreen as any).setPresetCycleCallback).toHaveBeenCalled();
+      expect((mockDeployScreen as any).setPresetSaveCallback).toHaveBeenCalled();
       expect(mockMapController.setZoneSelectedCallback).toHaveBeenCalled();
-      expect(mockRespawnUI.setLoadoutChangeCallback).toHaveBeenCalled();
+      expect(mockDeployScreen.setLoadoutChangeCallback).toHaveBeenCalled();
     });
   });
 
@@ -739,7 +739,7 @@ describe('PlayerRespawnManager', () => {
     it('should show respawn UI', () => {
       respawnManager.onPlayerDeath();
 
-      expect(mockRespawnUI.show).toHaveBeenCalled();
+      expect(mockDeployScreen.show).toHaveBeenCalled();
     });
 
     it('should configure the respawn UI from deploy session policy', () => {
@@ -750,17 +750,17 @@ describe('PlayerRespawnManager', () => {
         Alliance.BLUFOR,
         Faction.US
       );
-      expect((mockRespawnUI as any).configureSession).toHaveBeenCalledWith(
+      expect((mockDeployScreen as any).configureSession).toHaveBeenCalledWith(
         expect.objectContaining({
           mode: GameMode.ZONE_CONTROL,
           flow: 'standard',
           actionLabel: 'DEPLOY',
         })
       );
-      expect((mockRespawnUI as any).setMapInteractionEnabled).toHaveBeenCalledWith(true);
-      expect((mockRespawnUI as any).setLoadoutEditingEnabled).toHaveBeenCalledWith(true);
-      expect((mockRespawnUI as any).updateLoadout).toHaveBeenCalledWith(expect.objectContaining(DEFAULT_PLAYER_LOADOUT));
-      expect((mockRespawnUI as any).updateLoadoutPresentation).toHaveBeenCalledWith(expect.objectContaining({
+      expect((mockDeployScreen as any).setMapInteractionEnabled).toHaveBeenCalledWith(true);
+      expect((mockDeployScreen as any).setLoadoutEditingEnabled).toHaveBeenCalledWith(true);
+      expect((mockDeployScreen as any).updateLoadout).toHaveBeenCalledWith(expect.objectContaining(DEFAULT_PLAYER_LOADOUT));
+      expect((mockDeployScreen as any).updateLoadoutPresentation).toHaveBeenCalledWith(expect.objectContaining({
         factionLabel: 'US',
         presetName: 'Rifleman',
       }));
@@ -783,7 +783,7 @@ describe('PlayerRespawnManager', () => {
     it('should update timer display', () => {
       respawnManager.onPlayerDeath();
 
-      expect(mockRespawnUI.updateTimerDisplay).toHaveBeenCalled();
+      expect(mockDeployScreen.updateTimerDisplay).toHaveBeenCalled();
     });
   });
 
@@ -797,13 +797,13 @@ describe('PlayerRespawnManager', () => {
     it('should update UI with zone name', () => {
       respawnManager['selectSpawnPointOnMap']('zone_a', 'Zone Alpha');
 
-      expect(mockRespawnUI.updateSelectedSpawn).toHaveBeenCalledWith('Zone Alpha');
+      expect(mockDeployScreen.updateSelectedSpawn).toHaveBeenCalledWith('Zone Alpha');
     });
 
     it('should update timer display', () => {
       respawnManager['selectSpawnPointOnMap']('zone_a', 'Zone Alpha');
 
-      expect(mockRespawnUI.updateTimerDisplay).toHaveBeenCalled();
+      expect(mockDeployScreen.updateTimerDisplay).toHaveBeenCalled();
     });
   });
 
@@ -857,7 +857,7 @@ describe('PlayerRespawnManager', () => {
 
       respawnManager['confirmRespawn']();
 
-      expect(mockRespawnUI.hide).toHaveBeenCalled();
+      expect(mockDeployScreen.hide).toHaveBeenCalled();
       expect(respawnManager['isRespawnUIVisible']).toBe(false);
     });
 
@@ -894,7 +894,7 @@ describe('PlayerRespawnManager', () => {
 
       respawnManager.update(1);
 
-      expect(mockRespawnUI.updateTimerDisplay).toHaveBeenCalledWith(4, false);
+      expect(mockDeployScreen.updateTimerDisplay).toHaveBeenCalledWith(4, false);
     });
 
     it('should not update timer when UI is hidden', () => {
@@ -904,7 +904,7 @@ describe('PlayerRespawnManager', () => {
       respawnManager.update(1);
 
       expect(respawnManager['respawnTimer']).toBe(5);
-      expect(mockRespawnUI.updateTimerDisplay).not.toHaveBeenCalled();
+      expect(mockDeployScreen.updateTimerDisplay).not.toHaveBeenCalled();
     });
 
     it('should not update timer when timer is zero or negative', () => {
@@ -924,7 +924,7 @@ describe('PlayerRespawnManager', () => {
 
       respawnManager.update(1);
 
-      expect(mockRespawnUI.updateTimerDisplay).toHaveBeenCalledWith(4, true);
+      expect(mockDeployScreen.updateTimerDisplay).toHaveBeenCalledWith(4, true);
     });
 
     it('should handle fractional deltaTime correctly', () => {
@@ -1052,7 +1052,7 @@ describe('PlayerRespawnManager', () => {
       respawnManager.onPlayerDeath();
 
       expect(respawnManager['selectedSpawnPoint']).toBe('us_base');
-      expect(mockRespawnUI.updateSelectedSpawn).toHaveBeenCalledWith('US Base');
+      expect(mockDeployScreen.updateSelectedSpawn).toHaveBeenCalledWith('US Base');
     });
 
     it('preselects the preferred insertion point for initial deploy', async () => {
@@ -1097,7 +1097,7 @@ describe('PlayerRespawnManager', () => {
       void respawnManager.beginInitialDeploy();
 
       expect(respawnManager['selectedSpawnPoint']).toBe('direct_insertion');
-      expect(mockRespawnUI.updateSelectedSpawn).toHaveBeenCalledWith('Tactical Insertion');
+      expect(mockDeployScreen.updateSelectedSpawn).toHaveBeenCalledWith('Tactical Insertion');
       expect((mockMapController as any).setSpawnPoints).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({
@@ -1156,7 +1156,7 @@ describe('PlayerRespawnManager', () => {
       void respawnManager.beginInitialDeploy();
 
       expect(respawnManager['selectedSpawnPoint']).toBe('helipad_main');
-      expect(mockRespawnUI.updateSelectedSpawn).toHaveBeenCalledWith('Helipad: UH1 HUEY');
+      expect(mockDeployScreen.updateSelectedSpawn).toHaveBeenCalledWith('Helipad: UH1 HUEY');
     });
 
     it('routes deploy loadout edits through the loadout service', async () => {
@@ -1164,16 +1164,16 @@ describe('PlayerRespawnManager', () => {
       respawnManager.setInventoryManager(mockInventoryManager);
       respawnManager.onPlayerDeath();
 
-      const callback = vi.mocked((mockRespawnUI as any).setLoadoutChangeCallback).mock.calls[0][0];
+      const callback = vi.mocked((mockDeployScreen as any).setLoadoutChangeCallback).mock.calls[0][0];
       callback('equipment', 1);
 
       expect((mockInventoryManager as any).setLoadout).toHaveBeenCalledWith(expect.objectContaining({
         equipment: LoadoutEquipment.MORTAR_KIT,
       }));
-      expect((mockRespawnUI as any).updateLoadout).toHaveBeenLastCalledWith(expect.objectContaining({
+      expect((mockDeployScreen as any).updateLoadout).toHaveBeenLastCalledWith(expect.objectContaining({
         equipment: LoadoutEquipment.MORTAR_KIT,
       }));
-      expect((mockRespawnUI as any).updateLoadoutPresentation).toHaveBeenCalled();
+      expect((mockDeployScreen as any).updateLoadoutPresentation).toHaveBeenCalled();
     });
 
     it('routes preset cycling through the loadout service', async () => {
@@ -1181,7 +1181,7 @@ describe('PlayerRespawnManager', () => {
       respawnManager.setInventoryManager(mockInventoryManager);
       respawnManager.onPlayerDeath();
 
-      const callback = vi.mocked((mockRespawnUI as any).setPresetCycleCallback).mock.calls[0][0];
+      const callback = vi.mocked((mockDeployScreen as any).setPresetCycleCallback).mock.calls[0][0];
       callback(1);
 
       expect((mockLoadoutService as any).cyclePreset).toHaveBeenCalledWith(1);
@@ -1190,7 +1190,7 @@ describe('PlayerRespawnManager', () => {
         secondaryWeapon: LoadoutWeapon.PISTOL,
         equipment: LoadoutEquipment.SMOKE_GRENADE,
       }));
-      expect((mockRespawnUI as any).updateLoadout).toHaveBeenLastCalledWith(expect.objectContaining({
+      expect((mockDeployScreen as any).updateLoadout).toHaveBeenLastCalledWith(expect.objectContaining({
         equipment: LoadoutEquipment.SMOKE_GRENADE,
       }));
     });
@@ -1199,11 +1199,11 @@ describe('PlayerRespawnManager', () => {
       await respawnManager.init();
       respawnManager.onPlayerDeath();
 
-      const callback = vi.mocked((mockRespawnUI as any).setPresetSaveCallback).mock.calls[0][0];
+      const callback = vi.mocked((mockDeployScreen as any).setPresetSaveCallback).mock.calls[0][0];
       callback();
 
       expect((mockLoadoutService as any).saveCurrentToActivePreset).toHaveBeenCalled();
-      expect((mockRespawnUI as any).updateLoadoutPresentation).toHaveBeenCalled();
+      expect((mockDeployScreen as any).updateLoadoutPresentation).toHaveBeenCalled();
     });
 
     it('resolves initial deploy instead of respawning immediately', async () => {
@@ -1232,8 +1232,8 @@ describe('PlayerRespawnManager', () => {
           x: 0,
           z: -50,
         }));
-        expect(mockRespawnUI.show).toHaveBeenCalled();
-        expect(mockRespawnUI.hide).toHaveBeenCalled();
+        expect(mockDeployScreen.show).toHaveBeenCalled();
+        expect(mockDeployScreen.hide).toHaveBeenCalled();
         expect(mockPlayerController.setPosition).not.toHaveBeenCalled();
       } finally {
         delete (globalThis as any).__ENABLE_PERF_DIAGNOSTICS__;
@@ -1245,11 +1245,11 @@ describe('PlayerRespawnManager', () => {
       await respawnManager.init();
 
       const deployPromise = respawnManager.beginInitialDeploy();
-      const callback = vi.mocked((mockRespawnUI as any).setCancelClickCallback).mock.calls[0][0];
+      const callback = vi.mocked((mockDeployScreen as any).setCancelClickCallback).mock.calls[0][0];
       callback();
 
       await expect(deployPromise).rejects.toBeInstanceOf(InitialDeployCancelledError);
-      expect(mockRespawnUI.hide).toHaveBeenCalled();
+      expect(mockDeployScreen.hide).toHaveBeenCalled();
       expect(mockMapController.clearSelection).toHaveBeenCalled();
       expect(mockMapController.stopMapUpdateInterval).toHaveBeenCalled();
     });
@@ -1261,13 +1261,13 @@ describe('PlayerRespawnManager', () => {
 
       respawnManager.dispose();
 
-      expect(mockRespawnUI.hide).toHaveBeenCalled();
+      expect(mockDeployScreen.hide).toHaveBeenCalled();
     });
 
     it('should dispose respawn UI', () => {
       respawnManager.dispose();
 
-      expect(mockRespawnUI.dispose).toHaveBeenCalled();
+      expect(mockDeployScreen.dispose).toHaveBeenCalled();
     });
 
     it('should dispose map controller', () => {
@@ -1353,7 +1353,7 @@ describe('PlayerRespawnManager', () => {
       } as ITerrainRuntime;
 
       // Inject mocks
-      (testRespawnManager as any).respawnUI = mockRespawnUI;
+      (testRespawnManager as any).respawnUI = mockDeployScreen;
       (testRespawnManager as any).mapController = mockMapController;
 
       testRespawnManager.setZoneManager(mockZoneManager);
@@ -1383,7 +1383,7 @@ describe('PlayerRespawnManager', () => {
         raycastTerrain: vi.fn(() => ({ hit: false })),
       } as ITerrainRuntime;
 
-      (testRespawnManager as any).respawnUI = mockRespawnUI;
+      (testRespawnManager as any).respawnUI = mockDeployScreen;
       (testRespawnManager as any).mapController = mockMapController;
 
       testRespawnManager.setZoneManager(mockZoneManager);
@@ -1416,7 +1416,7 @@ describe('PlayerRespawnManager', () => {
     it('should wire respawn button callback correctly', async () => {
       await respawnManager.init();
 
-      const callback = vi.mocked(mockRespawnUI.setRespawnClickCallback).mock.calls[0][0];
+      const callback = vi.mocked(mockDeployScreen.setRespawnClickCallback).mock.calls[0][0];
       expect(callback).toBeDefined();
 
       // Setup for confirm respawn
@@ -1441,7 +1441,7 @@ describe('PlayerRespawnManager', () => {
       callback('zone_a', 'Zone Alpha');
 
       expect(respawnManager['selectedSpawnPoint']).toBe('zone_a');
-      expect(mockRespawnUI.updateSelectedSpawn).toHaveBeenCalledWith('Zone Alpha');
+      expect(mockDeployScreen.updateSelectedSpawn).toHaveBeenCalledWith('Zone Alpha');
     });
   });
 });

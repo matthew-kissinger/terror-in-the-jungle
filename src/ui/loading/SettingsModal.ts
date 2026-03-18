@@ -155,6 +155,16 @@ export class SettingsModal extends UIComponent {
           </label>
         </div>
 
+        <details class="${styles.fieldset}">
+          <summary class="${styles.legend}" style="cursor:pointer;list-style:none;">Controls Reference</summary>
+          ${this.buildControlsSection(isTouch)}
+        </details>
+
+        <details class="${styles.fieldset}">
+          <summary class="${styles.legend}" style="cursor:pointer;list-style:none;">Gameplay Tips</summary>
+          ${this.buildTipsSection(isTouch)}
+        </details>
+
         <button class="${styles.closeBtn}" data-ref="close" type="button" aria-label="Close">CLOSE</button>
       </div>
     `;
@@ -369,6 +379,44 @@ export class SettingsModal extends UIComponent {
         haptics.setEnabled(hapticCheck.checked);
       });
     }
+  }
+
+  private buildControlsSection(isTouch: boolean): string {
+    const kbm = `
+      <div class="${styles.hint}"><strong>Keyboard &amp; Mouse</strong></div>
+      <div class="${styles.hint}">WASD - Move | Shift - Sprint | Space - Jump</div>
+      <div class="${styles.hint}">Mouse - Look | Left Click - Fire | Right Click - ADS</div>
+      <div class="${styles.hint}">R - Reload | G - Grenade | 1-6 - Weapons | TAB - Scoreboard</div>
+    `;
+    const touch = `
+      <div class="${styles.hint}"><strong>Touch Controls</strong></div>
+      <div class="${styles.hint}">Left Joystick - Move | Drag Screen - Look</div>
+      <div class="${styles.hint}">Fire/ADS/Sprint/Jump Buttons on screen</div>
+    `;
+    const gamepad = isTouch ? '' : `
+      <div class="${styles.hint}" style="margin-top:8px"><strong>Gamepad</strong></div>
+      <div class="${styles.hint}">Sticks - Move/Look | RT - Fire | LT - ADS | A - Jump</div>
+      <div class="${styles.hint}">B - Reload | LB - Grenade | D-Pad - Weapons</div>
+    `;
+    const heli = `
+      <div class="${styles.hint}" style="margin-top:8px"><strong>Helicopter</strong></div>
+      <div class="${styles.hint}">${isTouch ? 'Joysticks for Collective/Yaw + Cyclic' : 'W/S - Altitude | A/D - Yaw | Arrows - Cyclic | E - Enter/Exit | G - Deploy squad'}</div>
+    `;
+    return `${isTouch ? touch : kbm}${gamepad}${heli}`;
+  }
+
+  private buildTipsSection(isTouch: boolean): string {
+    return `
+      <div class="${styles.hint}">Headshots deal 70% more damage</div>
+      <div class="${styles.hint}">Use vegetation and terrain for cover</div>
+      <div class="${styles.hint}">Stay mobile to avoid being targeted</div>
+      <div class="${styles.hint}">Click spawn points on the respawn map to choose where to deploy</div>
+      ${isTouch ? '' : `<div class="${styles.hint}">Z - Squad command overlay | TAB - Scoreboard</div>`}
+      <div class="${styles.hint}" style="margin-top:8px"><strong>Objectives</strong></div>
+      <div class="${styles.hint}">Zone Control: Capture and hold zones to drain enemy tickets</div>
+      <div class="${styles.hint}">TDM: Eliminate enemies to deplete their tickets</div>
+      <div class="${styles.hint}">A Shau Valley: Strategic warfare with thousands of agents</div>
+    `;
   }
 
   private onADSBehaviorChange?: (behavior: 'hold' | 'toggle') => void;

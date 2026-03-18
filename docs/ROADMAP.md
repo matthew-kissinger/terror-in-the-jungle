@@ -28,7 +28,7 @@ Current alignment: ship on `WebGLRenderer` now. `WebGPURenderer`/TSL stays defer
 | Vegetation | 7+ billboard types with biome-aware runtime wiring, Poisson cache, adaptive scheduling | Staged activation or distant representation change needed for traversal backlog |
 | Water | Global plane + shader rivers | No swimming, no boats, disabled in A Shau, shader is basic |
 | Assets | 75 GLBs generated; weapons, structures, animals wired into engine | More models remain staged in `deploy-3d-assets/`; vegetation billboard remakes pending |
-| HUD/UI | UI Engine is the active path. StartScreen and RespawnUI are on `UIComponent` + CSS Modules/signals; IconRegistry, CrosshairSystem, HelicopterHUD, OnboardingOverlay, and mobile gestures are live | Some legacy raw-DOM HUD/admin surfaces still remain and should migrate opportunistically |
+| HUD/UI | UI Engine is the active path. GameUI screen state machine (TitleScreen + ModeSelectScreen + DeployScreen) replaces old StartScreen/RespawnUI. SettingsModal absorbs controls reference + tutorial. IconRegistry, CrosshairSystem, HelicopterHUD, and mobile gestures are live. Opaque backgrounds replace `backdrop-filter: blur()` on all screen overlays. | Some legacy raw-DOM HUD/admin surfaces still remain and should migrate opportunistically |
 | Scale | 3000 agents / 21km map | combat120 tails still need work; terrain texture/material validation now covers every shipped mode |
 | Factions | US, ARVN, NVA, VC loadout contexts are live | Zone ownership generalized to BLUFOR/OPFOR alliance level; dynamic HUD faction labels from config |
 
