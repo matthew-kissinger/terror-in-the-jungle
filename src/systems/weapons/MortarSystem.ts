@@ -156,6 +156,7 @@ export class MortarSystem implements GameSystem {
 
       this.mortarTube = scene;
       this.mortarTube.position.copy(pos);
+      this.mortarTube.matrixAutoUpdate = true;
       this.scene.add(this.mortarTube);
 
       if (this.tubePosition) {

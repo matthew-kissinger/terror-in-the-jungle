@@ -166,6 +166,7 @@ export class SmokeCloudSystem implements GameSystem {
     cloud.group.position.copy(position);
     cloud.group.position.y += 0.5;
     cloud.group.visible = true;
+    this.scene.add(cloud.group);
 
     const spriteCount = cloud.sprites.length;
     for (let i = 0; i < spriteCount; i++) {
@@ -250,7 +251,7 @@ export class SmokeCloudSystem implements GameSystem {
   private createCloud(): SmokeCloud {
     const group = new THREE.Group();
     group.visible = false;
-    this.scene.add(group);
+    group.matrixAutoUpdate = true;
 
     const sprites: THREE.Sprite[] = [];
     const offsets = new Float32Array(this.SPRITES_PER_CLOUD * 3);
@@ -288,6 +289,7 @@ export class SmokeCloudSystem implements GameSystem {
   private deactivateCloud(index: number): void {
     const cloud = this.clouds[index];
     cloud.group.visible = false;
+    this.scene.remove(cloud.group);
 
     const spriteCount = cloud.sprites.length;
     for (let i = 0; i < spriteCount; i++) {

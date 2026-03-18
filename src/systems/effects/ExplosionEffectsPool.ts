@@ -53,17 +53,22 @@ export class ExplosionEffectsPool {
     effect.flash.position.copy(position);
     effect.flash.intensity = 8;
     effect.flash.visible = true;
+    this.scene.add(effect.flash);
 
     // Position flash sprite - larger
     effect.flashSprite.position.copy(position);
     effect.flashSprite.scale.set(15, 15, 1);
     effect.flashSprite.material.opacity = 1;
     effect.flashSprite.visible = true;
+    this.scene.add(effect.flashSprite);
 
     // Initialize particles
     initializeSmokeParticles(effect, position);
     initializeFireParticles(effect, position);
     initializeDebrisParticles(effect, position);
+    this.scene.add(effect.smokeParticles);
+    this.scene.add(effect.fireParticles);
+    this.scene.add(effect.debrisParticles);
 
     // Initialize shockwave ring
     effect.shockwaveRing.position.copy(position);
@@ -71,6 +76,7 @@ export class ExplosionEffectsPool {
     effect.shockwaveRing.scale.set(0.1, 0.1, 1);
     (effect.shockwaveRing.material as THREE.MeshBasicMaterial).opacity = 0.6;
     effect.shockwaveRing.visible = true;
+    this.scene.add(effect.shockwaveRing);
 
     // Set timing - explosion lasts 3 seconds (smoke lingers)
     effect.startTime = now;
@@ -88,13 +94,19 @@ export class ExplosionEffectsPool {
       const remaining = effect.aliveUntil - now;
 
       if (remaining <= 0) {
-        // Hide and return to pool
+        // Hide and remove from scene
         effect.flash.visible = false;
         effect.flashSprite.visible = false;
         effect.smokeParticles.visible = false;
         effect.fireParticles.visible = false;
         effect.debrisParticles.visible = false;
         effect.shockwaveRing.visible = false;
+        this.scene.remove(effect.flash);
+        this.scene.remove(effect.flashSprite);
+        this.scene.remove(effect.smokeParticles);
+        this.scene.remove(effect.fireParticles);
+        this.scene.remove(effect.debrisParticles);
+        this.scene.remove(effect.shockwaveRing);
         const last = this.active[this.active.length - 1];
         this.active[i] = last;
         this.active.pop();

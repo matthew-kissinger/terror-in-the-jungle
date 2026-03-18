@@ -240,6 +240,7 @@ export class AirSupportManager implements GameSystem {
 
     // Scale aircraft
     aircraft.scale.setScalar(2.0);
+    aircraft.matrixAutoUpdate = true;
     this.scene.add(aircraft);
 
     const approachDir = request.approachDirection?.clone().normalize() ?? DEFAULT_APPROACH.clone();

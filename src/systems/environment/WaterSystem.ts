@@ -86,7 +86,8 @@ export class WaterSystem implements GameSystem {
     this.water.position.y = this.WATER_LEVEL;
     this.updateWaterScale();
     
-    // Add to scene
+    // Add to scene - dynamic: follows camera XZ
+    this.water.matrixAutoUpdate = true;
     this.scene.add(this.water);
     
     // Set initial sun position (matches directional light)

@@ -30,8 +30,9 @@
   border-left: 2px solid rgba(220, 225, 230, 0.1);
   border-radius: 0 2px 2px 0;
   transition: opacity 0.3s ease;
-  backdrop-filter: blur(4px);
   animation: slideIn 0.15s ease-out;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 .entryExplosive {
@@ -92,22 +93,22 @@
 
 @keyframes slideIn {
   from {
-    transform: translateX(60px);
+    transform: translate3d(60px, 0, 0);
     opacity: 0;
   }
   to {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
     opacity: 1;
   }
 }
 
 @keyframes slideOut {
   from {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
     opacity: 1;
   }
   to {
-    transform: translateX(60px);
+    transform: translate3d(60px, 0, 0);
     opacity: 0;
   }
 }

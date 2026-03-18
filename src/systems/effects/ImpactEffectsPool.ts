@@ -104,7 +104,7 @@ export class ImpactEffectsPool {
     particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     const particles = new THREE.Points(particleGeometry, this.particleMaterial);
     particles.visible = false;
-    this.scene.add(particles);
+    particles.matrixAutoUpdate = true;
 
     // Create sparks (blood spray)
     const sparkCount = 15;  // More blood spray
@@ -113,13 +113,13 @@ export class ImpactEffectsPool {
     sparkGeometry.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
     const sparks = new THREE.Points(sparkGeometry, this.sparkMaterial);
     sparks.visible = false;
-    this.scene.add(sparks);
+    sparks.matrixAutoUpdate = true;
 
     // Create decal sprite
     const decal = new THREE.Sprite(this.decalMaterial.clone());
     decal.scale.set(0.2, 0.2, 1);
     decal.visible = false;
-    this.scene.add(decal);
+    decal.matrixAutoUpdate = true;
 
     // Create velocity array for particles
     const velocity: THREE.Vector3[] = [];
@@ -146,6 +146,7 @@ export class ImpactEffectsPool {
     effect.decal.position.addScaledVector(normal, 0.01); // Offset slightly
     effect.decal.visible = true;
     effect.decal.material.opacity = 0.5;
+    this.scene.add(effect.decal);
 
     // Initialize particle positions and velocities
     const particlePositions = effect.particles.geometry.attributes.position as THREE.BufferAttribute;
@@ -188,6 +189,8 @@ export class ImpactEffectsPool {
 
     effect.particles.visible = true;
     effect.sparks.visible = true;
+    this.scene.add(effect.particles);
+    this.scene.add(effect.sparks);
     (effect.particles.material as THREE.PointsMaterial).opacity = 0.8;
     (effect.sparks.material as THREE.PointsMaterial).opacity = 1;
 
@@ -208,10 +211,13 @@ export class ImpactEffectsPool {
       const remaining = effect.aliveUntil - now;
 
       if (remaining <= 0) {
-        // Hide and return to pool
+        // Hide, remove from scene, return to pool
         effect.particles.visible = false;
         effect.sparks.visible = false;
         effect.decal.visible = false;
+        this.scene.remove(effect.particles);
+        this.scene.remove(effect.sparks);
+        this.scene.remove(effect.decal);
         const last = this.active[this.active.length - 1];
         this.active[i] = last;
         this.active.pop();

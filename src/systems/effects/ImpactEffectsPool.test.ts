@@ -275,7 +275,9 @@ describe('ImpactEffectsPool', () => {
   });
 
   it('pre-allocates effects and creates materials/textures', () => {
-    expect(scene.add).toHaveBeenCalledTimes(2 * 3);
+    // Effects are no longer added to scene at creation time;
+    // they are added on spawn and removed on deactivation.
+    expect(scene.add).toHaveBeenCalledTimes(0);
 
     const _THREE = require('three');
     expect(pointsMaterialCalls).toHaveLength(2);

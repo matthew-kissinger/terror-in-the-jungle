@@ -10,6 +10,7 @@ export class AssetLoader implements GameSystem {
   private loadedTextures: Map<string, THREE.Texture> = new Map();
 
   async init(): Promise<void> {
+    THREE.Cache.enabled = true;
     await this.discoverAssets();
     await this.loadTextures();
   }

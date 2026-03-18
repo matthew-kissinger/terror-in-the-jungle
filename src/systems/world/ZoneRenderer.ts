@@ -50,6 +50,7 @@ export class ZoneRenderer {
     zone.zoneMesh.rotation.x = -Math.PI / 2;
     zone.zoneMesh.position.copy(zone.position);
     zone.zoneMesh.position.y = terrainHeight + 0.1;
+    zone.zoneMesh.matrixAutoUpdate = true;
     this.scene.add(zone.zoneMesh);
 
     // Create flag pole
@@ -58,6 +59,7 @@ export class ZoneRenderer {
     zone.flagPole = new THREE.Mesh(poleGeometry, poleMaterial);
     zone.flagPole.position.copy(zone.position);
     zone.flagPole.position.y = terrainHeight + zone.height / 2;
+    zone.flagPole.matrixAutoUpdate = true;
     this.scene.add(zone.flagPole);
 
     // Create both flags (US and OPFOR)
@@ -75,6 +77,7 @@ export class ZoneRenderer {
     zone.usFlagMesh.position.x += 2.5;
     zone.usFlagMesh.position.y = terrainHeight;
     zone.usFlagMesh.visible = zone.owner === Faction.US;
+    zone.usFlagMesh.matrixAutoUpdate = true;
     this.scene.add(zone.usFlagMesh);
 
     // OPFOR Flag (red)
@@ -89,6 +92,7 @@ export class ZoneRenderer {
     zone.opforFlagMesh.position.x += 2.5;
     zone.opforFlagMesh.position.y = terrainHeight;
     zone.opforFlagMesh.visible = zone.owner !== null && isOpfor(zone.owner);
+    zone.opforFlagMesh.matrixAutoUpdate = true;
     this.scene.add(zone.opforFlagMesh);
 
     // Initialize flag height based on ownership
@@ -118,6 +122,7 @@ export class ZoneRenderer {
     zone.progressRing.position.copy(zone.position);
     zone.progressRing.position.y = terrainHeight + 0.2;
     zone.progressRing.visible = false;
+    zone.progressRing.matrixAutoUpdate = true;
     this.scene.add(zone.progressRing);
 
     // Add zone name text
@@ -148,6 +153,7 @@ export class ZoneRenderer {
     sprite.position.copy(zone.position);
     sprite.position.y = zone.position.y + zone.height + 3;
     sprite.scale.set(10, 2.5, 1);
+    sprite.matrixAutoUpdate = true;
     this.scene.add(sprite);
 
     zone.labelSprite = sprite;

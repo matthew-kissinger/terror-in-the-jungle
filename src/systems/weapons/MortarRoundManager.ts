@@ -34,6 +34,7 @@ export class MortarRoundManager {
    */
   spawnRound(mesh: THREE.Group, position: THREE.Vector3, velocity: THREE.Vector3, fuseTime: number): void {
     mesh.position.copy(position);
+    mesh.matrixAutoUpdate = true;
     this.scene.add(mesh);
 
     const round: MortarRound = {

@@ -81,6 +81,15 @@ export class VirtualJoystick extends UIComponent {
     this.listen(this.root, 'pointermove', this.handlePointerMove, { passive: false });
     this.listen(this.root, 'pointerup', this.handlePointerUp, { passive: false });
     this.listen(this.root, 'pointercancel', this.handlePointerCancel, { passive: false });
+
+    // Safety listeners: reset on tab switch, notification overlay, or app backgrounding
+    const safeReset = () => this.resetThumb();
+    for (const event of ['blur', 'pagehide'] as const) {
+      window.addEventListener(event, safeReset);
+    }
+    window.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.resetThumb();
+    });
   }
 
   setSprintCallbacks(onStart: () => void, onStop: () => void): void {
@@ -167,6 +176,7 @@ export class VirtualJoystick extends UIComponent {
   }
 
   private resetThumb(): void {
+    this.activePointerId = null;
     this.thumb.style.left = `calc(50% - ${this.THUMB_SIZE / 2}px)`;
     this.thumb.style.top = `calc(50% - ${this.THUMB_SIZE / 2}px)`;
     this.output.x = 0;

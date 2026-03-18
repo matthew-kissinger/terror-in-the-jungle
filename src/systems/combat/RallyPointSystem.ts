@@ -3,6 +3,7 @@ import { GameSystem } from '../../types';
 import { Faction, isBlufor, getAlliance } from './types';
 import { ZoneManager } from '../world/ZoneManager';
 import { Logger } from '../../utils/Logger';
+import { freezeTransform } from '../../utils/SceneUtils';
 
 interface RallyPoint {
   position: THREE.Vector3;
@@ -263,6 +264,7 @@ export class RallyPointSystem implements GameSystem {
     poleMesh.position.copy(rallyPoint.position);
     poleMesh.position.y += this.POLE_HEIGHT / 2;
     this.scene.add(poleMesh);
+    freezeTransform(poleMesh);
     rallyPoint.poleMesh = poleMesh;
 
     // Create flag
@@ -283,6 +285,7 @@ export class RallyPointSystem implements GameSystem {
     flagMesh.position.x += this.FLAG_WIDTH / 2; // Offset from pole
 
     this.scene.add(flagMesh);
+    freezeTransform(flagMesh);
     rallyPoint.flagMesh = flagMesh;
   }
 

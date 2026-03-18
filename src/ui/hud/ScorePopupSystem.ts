@@ -63,7 +63,9 @@ export class ScorePopupSystem {
         0 0 4px rgba(0, 0, 0, 0.7);
       display: none;
       white-space: nowrap;
-      transform: translate(-50%, -50%);
+      transform: translate3d(-50%, -50%, 0);
+      will-change: transform, opacity;
+      backface-visibility: hidden;
       bottom: 50%;
       left: 50%;
     `;

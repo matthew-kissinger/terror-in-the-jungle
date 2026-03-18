@@ -98,7 +98,8 @@ export class Skybox implements GameSystem {
     this.skyboxMesh = new THREE.Mesh(geometry, material);
     this.skyboxMesh.renderOrder = -1; // Render first (behind everything)
     
-    // Add to scene
+    // Add to scene - dynamic: follows camera position
+    this.skyboxMesh.matrixAutoUpdate = true;
     this.scene.add(this.skyboxMesh);
 
     Logger.info('environment', 'Equirectangular skybox created with proper mapping');

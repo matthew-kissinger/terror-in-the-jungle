@@ -147,6 +147,7 @@ export class AudioWeaponSounds {
             const tempObj = this.getPooledObject3D();
             tempObj.position.copy(position);
             tempObj.add(sound);
+            tempObj.matrixAutoUpdate = true;
             this.scene.add(tempObj);
 
             sound.play();
@@ -170,6 +171,7 @@ export class AudioWeaponSounds {
             const tempObj = this.getPooledObject3D();
             tempObj.position.copy(position);
             tempObj.add(sound);
+            tempObj.matrixAutoUpdate = true;
             this.scene.add(tempObj);
 
             sound.play();
@@ -189,6 +191,7 @@ export class AudioWeaponSounds {
             const tempObj = this.getPooledObject3D();
             tempObj.position.copy(position);
             tempObj.add(sound);
+            tempObj.matrixAutoUpdate = true;
             this.scene.add(tempObj);
 
             sound.play();
@@ -221,6 +224,7 @@ export class AudioWeaponSounds {
         const tempObj = this.getPooledObject3D();
         tempObj.position.copy(position);
         tempObj.add(sound);
+        tempObj.matrixAutoUpdate = true;
         this.scene.add(tempObj);
 
         // Apply weapon-specific pitch variation

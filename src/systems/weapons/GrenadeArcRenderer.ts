@@ -212,6 +212,7 @@ export class GrenadeArcRenderer {
     this.arcVisualization = new THREE.Line(geometry, material);
     this.arcVisualization.visible = false;
     this.arcVisualization.frustumCulled = false; // Ensure it's always rendered if visible
+    this.arcVisualization.matrixAutoUpdate = true;
     this.scene.add(this.arcVisualization);
 
     // Create landing indicator - a ring showing impact point and radius
@@ -228,6 +229,7 @@ export class GrenadeArcRenderer {
     this.landingIndicator = new THREE.Mesh(ringGeometry, ringMaterial);
     this.landingIndicator.rotation.x = -Math.PI / 2; // Lay flat on ground
     this.landingIndicator.visible = false;
+    this.landingIndicator.matrixAutoUpdate = true;
     this.scene.add(this.landingIndicator);
   }
 }

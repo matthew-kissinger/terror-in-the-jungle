@@ -26,7 +26,7 @@ export function createExplosionEffect(
   // Bright flash light - brighter and larger radius
   const flash = new THREE.PointLight(0xffaa44, 0, 80);
   flash.visible = false;
-  scene.add(flash);
+  flash.matrixAutoUpdate = true;
 
   // Flash sprite for visual burst - larger initial size
   const flashSpriteMaterial = new THREE.SpriteMaterial({
@@ -38,7 +38,7 @@ export function createExplosionEffect(
   const flashSprite = new THREE.Sprite(flashSpriteMaterial);
   flashSprite.scale.set(12, 12, 1);
   flashSprite.visible = false;
-  scene.add(flashSprite);
+  flashSprite.matrixAutoUpdate = true;
 
   // Smoke particles (80 particles for denser cloud)
   const smokeCount = 80;
@@ -56,7 +56,7 @@ export function createExplosionEffect(
   });
   const smokeParticles = new THREE.Points(smokeGeometry, smokeMaterial);
   smokeParticles.visible = false;
-  scene.add(smokeParticles);
+  smokeParticles.matrixAutoUpdate = true;
 
   // Fire particles (60 bright particles for more intensity)
   const fireCount = 60;
@@ -74,7 +74,7 @@ export function createExplosionEffect(
   });
   const fireParticles = new THREE.Points(fireGeometry, fireMaterial);
   fireParticles.visible = false;
-  scene.add(fireParticles);
+  fireParticles.matrixAutoUpdate = true;
 
   // Debris particles (50 dark particles flying outward)
   const debrisCount = 50;
@@ -92,7 +92,7 @@ export function createExplosionEffect(
   });
   const debrisParticles = new THREE.Points(debrisGeometry, debrisMaterial);
   debrisParticles.visible = false;
-  scene.add(debrisParticles);
+  debrisParticles.matrixAutoUpdate = true;
 
   // Shockwave ring on ground
   const ringGeometry = new THREE.RingGeometry(0.1, 0.5, 32);
@@ -107,7 +107,7 @@ export function createExplosionEffect(
   const shockwaveRing = new THREE.Mesh(ringGeometry, ringMaterial);
   shockwaveRing.rotation.x = -Math.PI / 2;
   shockwaveRing.visible = false;
-  scene.add(shockwaveRing);
+  shockwaveRing.matrixAutoUpdate = true;
 
   // Velocity arrays
   const smokeVelocities: THREE.Vector3[] = [];

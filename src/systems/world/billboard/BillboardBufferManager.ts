@@ -100,6 +100,8 @@ export class GPUBillboardVegetation {
     // Create mesh
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.frustumCulled = false; // Disable frustum culling for instanced geometry
+    this.mesh.matrixAutoUpdate = false;
+    this.mesh.matrixWorldAutoUpdate = false;
     this.scene.add(this.mesh);
   }
 

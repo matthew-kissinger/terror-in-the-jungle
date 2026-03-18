@@ -29,6 +29,7 @@ export class MortarVisuals {
 
     this.trajectoryLine = new THREE.Line(geometry, material);
     this.trajectoryLine.visible = false;
+    this.trajectoryLine.matrixAutoUpdate = true;
     this.scene.add(this.trajectoryLine);
   }
 
@@ -46,6 +47,7 @@ export class MortarVisuals {
     this.landingIndicator = new THREE.Mesh(centerGeometry, centerMaterial);
     this.landingIndicator.rotation.x = -Math.PI / 2; // Lay flat
     this.landingIndicator.visible = false;
+    this.landingIndicator.matrixAutoUpdate = true;
     this.scene.add(this.landingIndicator);
 
     // Damage radius ring
@@ -65,6 +67,7 @@ export class MortarVisuals {
     this.damageRing = new THREE.Mesh(ringGeometry, ringMaterial);
     this.damageRing.rotation.x = -Math.PI / 2; // Lay flat
     this.damageRing.visible = false;
+    this.damageRing.matrixAutoUpdate = true;
     this.scene.add(this.damageRing);
   }
 

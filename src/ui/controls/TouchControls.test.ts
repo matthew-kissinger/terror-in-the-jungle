@@ -113,17 +113,6 @@ vi.mock('./TouchRallyPointButton', () => ({
   },
 }));
 
-vi.mock('./TouchCrouchButton', () => ({
-  TouchCrouchButton: class {
-    show = vi.fn();
-    hide = vi.fn();
-    dispose = vi.fn();
-    mount = vi.fn();
-    setOnCrouchToggle = vi.fn();
-    resetCrouch = vi.fn();
-  },
-}));
-
 vi.mock('./TouchMenuButton', () => ({
   TouchMenuButton: class {
     show = vi.fn();
@@ -239,7 +228,6 @@ describe('TouchControls', () => {
       onSprintStop: vi.fn(),
       onWeaponSelect: vi.fn(),
       onADSToggle: vi.fn(),
-      onCrouchToggle: vi.fn(),
       onEnterExitHelicopter: vi.fn(),
       onSandbagRotateLeft: vi.fn(),
       onSandbagRotateRight: vi.fn(),

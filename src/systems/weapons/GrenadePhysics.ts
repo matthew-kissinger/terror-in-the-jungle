@@ -124,6 +124,7 @@ export class GrenadeSpawner {
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.copy(position);
     mesh.castShadow = true;
+    mesh.matrixAutoUpdate = true;
     this.scene.add(mesh);
 
     return {

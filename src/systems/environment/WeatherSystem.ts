@@ -133,6 +133,8 @@ export class WeatherSystem implements GameSystem {
     this.rainMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.rainMesh.frustumCulled = false; // Rain follows camera, bounding sphere won't be accurate
     this.rainMesh.visible = false;
+    this.rainMesh.matrixAutoUpdate = false;
+    this.rainMesh.matrixWorldAutoUpdate = false;
     this.scene.add(this.rainMesh);
 
     // Initialize positions randomly around origin

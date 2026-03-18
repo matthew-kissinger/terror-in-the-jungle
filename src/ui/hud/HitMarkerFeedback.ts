@@ -58,6 +58,8 @@ export class HitMarkerFeedback {
         height: 30px;
         transform: translate(-50%, -50%);
         pointer-events: none;
+        will-change: transform, opacity;
+        backface-visibility: hidden;
       }
 
       .hit-marker-cross::before,

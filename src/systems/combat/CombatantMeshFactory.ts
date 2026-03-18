@@ -88,6 +88,8 @@ export class CombatantMeshFactory {
       mesh.frustumCulled = false;
       mesh.count = 0;
       mesh.renderOrder = 10;
+      mesh.matrixAutoUpdate = false;
+      mesh.matrixWorldAutoUpdate = false;
       this.scene.add(mesh);
       factionMeshes.set(key, mesh);
 
@@ -97,6 +99,8 @@ export class CombatantMeshFactory {
       outlineMesh.frustumCulled = false;
       outlineMesh.count = 0;
       outlineMesh.renderOrder = 9;
+      outlineMesh.matrixAutoUpdate = false;
+      outlineMesh.matrixWorldAutoUpdate = false;
       this.scene.add(outlineMesh);
       factionAuraMeshes.set(key, outlineMesh);
       factionMaterials.set(key, outlineMaterial);
@@ -110,6 +114,8 @@ export class CombatantMeshFactory {
       markerMesh.frustumCulled = false;
       markerMesh.count = 0;
       markerMesh.renderOrder = 0;
+      markerMesh.matrixAutoUpdate = false;
+      markerMesh.matrixWorldAutoUpdate = false;
       this.scene.add(markerMesh);
       factionGroundMarkers.set(key, markerMesh);
     };

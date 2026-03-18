@@ -3,6 +3,7 @@ import type { GameSystem } from '../../types';
 import type { MapFeatureDefinition, StaticModelPlacementConfig } from '../../config/gameModeTypes';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { Logger } from '../../utils/Logger';
+import { freezeTransform } from '../../utils/SceneUtils';
 import { modelLoader } from '../assets/ModelLoader';
 import { getModelPlacementProfile } from '../assets/ModelPlacementProfiles';
 import { prepareModelForPlacement } from '../assets/ModelPlacementUtils';
@@ -177,6 +178,7 @@ export class WorldFeatureSystem implements GameSystem {
         }
       });
       this.scene.add(object);
+      freezeTransform(object);
       const objectId = `${feature.id}_${placement.id ?? i}`;
       const collisionRegistered = placement.registerCollision === true && profile.collisionMode === 'bounds';
       if (collisionRegistered) {

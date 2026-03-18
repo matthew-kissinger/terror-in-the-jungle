@@ -5,6 +5,7 @@ import { CrosshairSystem } from '../ui/hud/CrosshairSystem';
 import type { CrosshairMode } from '../ui/hud/CrosshairSystem';
 import { LoadingUI } from './LoadingUI';
 import { Logger } from '../utils/Logger';
+import { freezeTransform } from '../utils/SceneUtils';
 import { estimateGPUTier, isMobileGPU, shouldEnableShadows, getShadowMapSize, getMaxPixelRatio } from '../utils/DeviceDetector';
 import { ViewportInfo, ViewportManager } from '../ui/design/responsive';
 
@@ -26,6 +27,9 @@ export class GameRenderer {
 
   constructor() {
     this.scene = new THREE.Scene();
+    this.scene.matrixAutoUpdate = false;
+    this.scene.matrixWorldAutoUpdate = false;
+
     this.camera = new THREE.PerspectiveCamera(
       75,
       window.innerWidth / window.innerHeight,
@@ -95,6 +99,7 @@ export class GameRenderer {
 
     this.ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
     this.scene.add(this.ambientLight);
+    freezeTransform(this.ambientLight);
 
     this.moonLight = new THREE.DirectionalLight(0xfffacd, 2.0);
     this.moonLight.position.set(0, 80, -50);
@@ -120,6 +125,7 @@ export class GameRenderer {
     this.moonLight.shadow.blurSamples = gpuTier === 'high' ? 25 : 10;
 
     this.scene.add(this.moonLight);
+    freezeTransform(this.moonLight);
 
     // Hemisphere light for atmosphere
     // Sky: filtered light from above
@@ -130,6 +136,7 @@ export class GameRenderer {
       0.8
     );
     this.scene.add(this.hemisphereLight);
+    freezeTransform(this.hemisphereLight);
 
     Logger.info('Renderer', 'Atmosphere initialized');
   }

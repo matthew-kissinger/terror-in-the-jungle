@@ -8,6 +8,7 @@ import { StructureModels } from '../assets/modelPaths';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { InventoryManager } from '../player/InventoryManager';
 import { TicketSystem } from '../world/TicketSystem';
+import { freezeTransform } from '../../utils/SceneUtils';
 
 const SANDBAG_PROFILE = getModelPlacementProfile(StructureModels.SANDBAG_WALL);
 const SANDBAG_MIN_SPACING = SANDBAG_PROFILE.minSpacing ?? 2.15;
@@ -277,6 +278,7 @@ export class SandbagSystem implements GameSystem {
       });
 
       this.scene.add(sandbagModel);
+      freezeTransform(sandbagModel);
 
       const bounds = new THREE.Box3().setFromObject(sandbagModel);
 

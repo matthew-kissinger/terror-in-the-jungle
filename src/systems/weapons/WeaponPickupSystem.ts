@@ -203,6 +203,7 @@ export class WeaponPickupSystem implements GameSystem {
     // Flash effect
     const flash = new THREE.PointLight(0x00ff00, 2, 5);
     flash.position.copy(position);
+    flash.matrixAutoUpdate = true;
     this.scene.add(flash);
 
     setTimeout(() => {
@@ -229,6 +230,7 @@ export class WeaponPickupSystem implements GameSystem {
     const billboard = new THREE.Mesh(geometry, material);
     billboard.position.copy(position);
     billboard.position.y = this.BILLBOARD_HEIGHT;
+    billboard.matrixAutoUpdate = true;
     this.scene.add(billboard);
 
     const id = `pickup_${this.nextPickupId++}`;

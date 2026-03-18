@@ -240,6 +240,7 @@ export class MuzzleFlashSystem {
     this.npcLif   = npc.lives;
     this.npcSiz   = npc.sizes;
     this.npcMesh  = npc.points;
+    this.npcMesh.matrixAutoUpdate = true;
     scene.add(this.npcMesh);
   }
 

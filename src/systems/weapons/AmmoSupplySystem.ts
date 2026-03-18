@@ -5,6 +5,7 @@ import { ZoneManager, CaptureZone } from '../world/ZoneManager';
 import { InventoryManager } from '../player/InventoryManager';
 import { FirstPersonWeapon } from '../player/FirstPersonWeapon';
 import { Faction } from '../combat/types';
+import { freezeTransform } from '../../utils/SceneUtils';
 
 interface AmmoCrate {
   position: THREE.Vector3;
@@ -195,6 +196,7 @@ export class AmmoSupplySystem implements GameSystem {
     crateGroup.position.y += this.CRATE_SIZE / 2; // Sit on ground
 
     this.scene.add(crateGroup);
+    freezeTransform(crateGroup);
 
     const crate: AmmoCrate = {
       position: zone.position.clone(),

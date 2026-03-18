@@ -122,6 +122,7 @@ export class AAEmplacementSystem implements GameSystem {
       mesh.position.y = h;
     }
 
+    mesh.matrixAutoUpdate = true;
     this.scene.add(mesh);
 
     this.emplacements.push({

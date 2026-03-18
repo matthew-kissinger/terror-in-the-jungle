@@ -34,6 +34,8 @@ export class CDLODRenderer {
     this.mesh.frustumCulled = false; // Quadtree already culls
     this.mesh.count = 0;
     this.mesh.name = 'CDLODTerrain';
+    this.mesh.matrixAutoUpdate = false;
+    this.mesh.matrixWorldAutoUpdate = false;
 
     // Per-instance attributes
     const lodData = new Float32Array(maxInstances);

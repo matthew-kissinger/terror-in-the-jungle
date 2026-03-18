@@ -245,6 +245,7 @@ export class AudioManager implements GameSystem {
             const tempObj = new THREE.Object3D();
             tempObj.position.copy(position);
             tempObj.add(sound);
+            tempObj.matrixAutoUpdate = true;
             this.scene.add(tempObj);
 
             sound.play();

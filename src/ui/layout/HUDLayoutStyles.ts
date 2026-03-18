@@ -45,6 +45,22 @@ export const HUD_LAYOUT_STYLES = `
       env(safe-area-inset-bottom, 0px)
       env(safe-area-inset-left, 0px);
     -webkit-tap-highlight-color: transparent;
+    contain: layout style;
+  }
+
+  /* Scope layout recalculations to each slot independently */
+  .hud-slot {
+    contain: layout style;
+  }
+
+  /* Prevent accidental use of expensive GPU filters on mobile.
+     blur() and backdrop-filter cause extra compositing passes
+     that can drop mobile from 60fps to 20-30fps. */
+  #game-hud-root *,
+  #game-hud-root *::before,
+  #game-hud-root *::after {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
 
   /* Slots are grid children. Each one is a named region. */
