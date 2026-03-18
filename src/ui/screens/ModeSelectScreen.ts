@@ -8,7 +8,6 @@
 import { UIComponent } from '../engine/UIComponent';
 import { GameMode } from '../../config/gameModeTypes';
 import { iconHtml } from '../icons/IconRegistry';
-import { MODE_CARD_CONFIGS } from '../loading/ModeCard';
 import styles from './ModeSelectScreen.module.css';
 
 interface ModeEntry {
