@@ -38,6 +38,15 @@ export class VirtualJoystick extends UIComponent {
   /** Whether helicopter mode label is shown */
   private helicopterMode = false;
 
+  /** Timestamp of last pointer activity — for stuck-pointer safety */
+  private lastPointerActivityMs = 0;
+
+  /** Safety check interval id */
+  private safetyIntervalId: ReturnType<typeof setInterval> | null = null;
+
+  /** Max time (ms) a pointer can be active without movement before force-reset */
+  private readonly STUCK_POINTER_TIMEOUT = 2000;
+
   constructor() {
     super();
     this.maxDistance = this.FALLBACK_BASE / 2;
@@ -82,6 +91,9 @@ export class VirtualJoystick extends UIComponent {
     this.listen(this.root, 'pointerup', this.handlePointerUp, { passive: false });
     this.listen(this.root, 'pointercancel', this.handlePointerCancel, { passive: false });
 
+    // Global pointerup safety: catch missed pointerup when overlays steal events
+    this.listen(window, 'pointerup', this.handleGlobalPointerUp, { passive: false });
+
     // Safety listeners: reset on tab switch, notification overlay, or app backgrounding
     const safeReset = () => this.resetThumb();
     for (const event of ['blur', 'pagehide'] as const) {
@@ -90,6 +102,13 @@ export class VirtualJoystick extends UIComponent {
     window.addEventListener('visibilitychange', () => {
       if (document.hidden) this.resetThumb();
     });
+
+    // Periodic safety check for stuck pointer (overlay steals focus, missed events)
+    this.safetyIntervalId = setInterval(() => {
+      if (this.activePointerId !== null && Date.now() - this.lastPointerActivityMs > this.STUCK_POINTER_TIMEOUT) {
+        this.resetThumb();
+      }
+    }, 500);
   }
 
   setSprintCallbacks(onStart: () => void, onStop: () => void): void {
@@ -101,6 +120,7 @@ export class VirtualJoystick extends UIComponent {
     e.preventDefault();
     if (this.activePointerId !== null) return;
     this.activePointerId = e.pointerId;
+    this.lastPointerActivityMs = Date.now();
 
     if (typeof this.root.setPointerCapture === 'function') {
       this.root.setPointerCapture(e.pointerId);
@@ -117,7 +137,16 @@ export class VirtualJoystick extends UIComponent {
   private handlePointerMove = (e: PointerEvent): void => {
     e.preventDefault();
     if (e.pointerId !== this.activePointerId) return;
+    this.lastPointerActivityMs = Date.now();
     this.updateThumb(e.clientX, e.clientY);
+  };
+
+  /** Global safety: catch pointerup events that may have been missed on the joystick zone */
+  private handleGlobalPointerUp = (e: PointerEvent): void => {
+    if (e.pointerId === this.activePointerId) {
+      this.activePointerId = null;
+      this.resetThumb();
+    }
   };
 
   private handlePointerUp = (e: PointerEvent): void => {
@@ -196,5 +225,13 @@ export class VirtualJoystick extends UIComponent {
     this.root.style.display = 'none';
     this.resetThumb();
     this.activePointerId = null;
+  }
+
+  override dispose(): void {
+    if (this.safetyIntervalId !== null) {
+      clearInterval(this.safetyIntervalId);
+      this.safetyIntervalId = null;
+    }
+    super.dispose();
   }
 }

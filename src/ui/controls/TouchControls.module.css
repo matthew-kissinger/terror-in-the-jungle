@@ -226,13 +226,13 @@
   position: fixed;
   top: max(12px, env(safe-area-inset-top, 0px));
   right: max(12px, env(safe-area-inset-right, 0px));
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.45);
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
@@ -330,7 +330,7 @@
   left: 0;
   bottom: 0;
   width: 40%;
-  height: 60%;
+  height: 45%;
   z-index: var(--tc-z-overlay);
   touch-action: none;
   pointer-events: auto;
@@ -417,16 +417,16 @@
   composes: btn;
   position: fixed;
   left: max(var(--tc-edge-inset), env(safe-area-inset-left, 0px));
-  /* Position above joystick + weapon pill + health bar to avoid overlap */
-  bottom: calc(var(--tc-joystick-base) + var(--tc-weapon-h) + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + 56px);
-  min-width: 44px;
-  height: 32px;
-  padding: 0 8px;
-  border-radius: 16px;
+  /* Position above joystick base with enough clearance for weapon pill */
+  bottom: calc(var(--tc-joystick-base) + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + 68px);
+  min-width: 48px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 18px;
   background: rgba(100, 255, 100, 0.2);
   border: 1px solid rgba(150, 255, 150, 0.3);
   z-index: var(--tc-z-controls);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.5px;
   color: rgba(255, 255, 255, 0.8);
@@ -626,8 +626,8 @@
 
 @media (max-width: 480px) {
   .menuBtn {
-    width: 34px;
-    height: 34px;
+    width: 42px;
+    height: 42px;
   }
 
 
