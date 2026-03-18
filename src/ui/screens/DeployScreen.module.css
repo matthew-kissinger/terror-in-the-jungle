@@ -354,7 +354,11 @@
   font-size: 11px;
 }
 
-/* Responsive */
+/* Sequence panel - class used for mobile hiding */
+
+.sequencePanel {}
+
+/* Responsive - tablet */
 
 @media (max-width: 768px) {
   .layout {
@@ -374,5 +378,93 @@
 
   .loadoutRow {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Responsive - mobile phones */
+
+@media (pointer: coarse) and (max-width: 600px) {
+  .root {
+    flex-direction: column;
+  }
+
+  .header {
+    padding: 6px 12px;
+  }
+
+  .headerTitle {
+    font-size: 16px;
+    letter-spacing: 2px;
+  }
+
+  .headerStatus {
+    font-size: 11px;
+    display: none;
+  }
+
+  .layout {
+    flex-direction: column;
+  }
+
+  .mapPanel {
+    flex: 1;
+    padding: 6px;
+    min-height: 0;
+  }
+
+  .map {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .sidePanel {
+    width: 100%;
+    max-height: 35vh;
+    padding: 8px;
+    gap: 6px;
+    border-left: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .panel {
+    padding: 8px 10px;
+  }
+
+  .panelTitle {
+    margin: 0 0 4px;
+    font-size: 10px;
+  }
+
+  /* Hide non-essential panels on mobile to save space */
+  .sequencePanel {
+    display: none;
+  }
+
+  .legend {
+    display: none;
+  }
+
+  /* Compact loadout on mobile */
+  .loadoutStatus {
+    display: none;
+  }
+
+  .presetMeta {
+    margin-bottom: 4px;
+  }
+
+  .loadoutRow {
+    grid-template-columns: 1fr;
+    padding-top: 4px;
+  }
+
+  .actionButton {
+    min-height: 48px;
+    font-size: 15px;
+  }
+
+  .timer {
+    margin-bottom: 8px;
+    font-size: 13px;
   }
 }

@@ -316,9 +316,13 @@ export class HUDElements {
 
     // Feedback systems mount to the center slot too
     this.killFeed.attachToDOM(layout.getSlot('kill-feed'));
-    if (this.damageNumbers) this.damageNumbers.attachToDOM(layout.getSlot('center'));
+    // Mount damage numbers and hit markers to document.body instead of the center
+    // grid slot. The HUD grid uses `contain: layout style` which creates a new
+    // containing block, breaking `position: fixed` on these full-viewport overlays
+    // and causing worldToScreen projections to be offset from their intended positions.
+    if (this.damageNumbers) this.damageNumbers.attachToDOM(document.body);
     if (this.scorePopups) this.scorePopups.attachToDOM(layout.getSlot('center'));
-    if (this.hitMarkerFeedback) this.hitMarkerFeedback.attachToDOM(layout.getSlot('center'));
+    if (this.hitMarkerFeedback) this.hitMarkerFeedback.attachToDOM(document.body);
     if (this.weaponSwitchFeedback) this.weaponSwitchFeedback.attachToDOM(layout.getSlot('center'));
     if (this.zoneCaptureNotification) this.zoneCaptureNotification.mount(layout.getSlot('center'));
 

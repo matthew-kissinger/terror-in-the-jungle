@@ -64,6 +64,8 @@ export class RespawnMapController {
       height: 100%;
       max-width: 800px;
       max-height: 800px;
+      object-fit: contain;
+      display: block;
     `;
 
     mapContainer.appendChild(mapCanvas);
