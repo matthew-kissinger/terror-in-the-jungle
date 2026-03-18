@@ -38,8 +38,7 @@ vi.mock('../../utils/Logger');
 function createReadySystem(): NavmeshSystem {
   const system = new NavmeshSystem();
   // Inject internal state to simulate successful init + generation
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const s = system as any;
+  const s = system as Record<string, unknown>;
   s.wasmReady = true;
   s.navMesh = { destroy: vi.fn() }; // fake NavMesh
   s.NavMeshQueryClass = MockNavMeshQuery;
