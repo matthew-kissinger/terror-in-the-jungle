@@ -252,7 +252,7 @@ export class DeployScreen extends UIComponent {
   }
 
   private createSequencePanel(): HTMLDivElement {
-    const panel = this.createDiv(styles.panel, 'respawn-sequence-panel');
+    const panel = this.createDiv(`${styles.panel} ${styles.sequencePanel}`, 'respawn-sequence-panel');
     this.sequenceTitle = this.createHeading('h3', 'respawn-sequence-title', styles.panelTitle, 'Deployment Checklist');
     this.sequenceSteps = this.createDiv(styles.sequenceSteps, 'respawn-sequence-steps');
     panel.appendChild(this.sequenceTitle);
