@@ -14,6 +14,7 @@ import type { PlayerSquadController } from '../combat/PlayerSquadController';
 import type { CommandInputManager } from '../combat/CommandInputManager';
 import type { AirSupportManager } from '../airsupport/AirSupportManager';
 import type { TicketSystem } from '../world/TicketSystem';
+import type { FullMapSystem } from '../../ui/map/FullMapSystem';
 
 export interface PlayerCombatControllerDependencies {
   helicopterModel?: HelicopterModel;
@@ -49,5 +50,6 @@ export interface PlayerControllerDependencies {
   footstepAudioSystem: FootstepAudioSystem;
   playerSquadController: PlayerSquadController;
   commandInputManager: CommandInputManager;
+  fullMapSystem: FullMapSystem;
   airSupportManager?: AirSupportManager;
 }

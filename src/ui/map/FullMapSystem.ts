@@ -194,6 +194,10 @@ export class FullMapSystem implements GameSystem {
     return this.isVisible;
   }
 
+  toggleVisibility(): void {
+    this.inputHandler.toggle();
+  }
+
   private show(): void {
     this.isVisible = true;
     this.inputHandler.setIsVisible(true);

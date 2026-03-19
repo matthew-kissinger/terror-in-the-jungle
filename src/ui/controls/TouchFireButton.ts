@@ -60,6 +60,10 @@ export class TouchFireButton extends BaseTouchButton {
 
   hide(): void {
     this.root.style.display = 'none';
+    this.cancelActivePress();
+  }
+
+  cancelActivePress(): void {
     if (this.wasPressed) {
       this.wasPressed = false;
       this.releaseAllPointers();

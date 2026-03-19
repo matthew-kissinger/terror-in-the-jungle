@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { InputContextManager } from '../../systems/input/InputContextManager';
 
 const joystickInstances: any[] = [];
 const lookInstances: any[] = [];
@@ -17,6 +18,7 @@ vi.mock('./VirtualJoystick', () => ({
     mount = vi.fn();
     setSprintCallbacks = vi.fn();
     setHelicopterMode = vi.fn();
+    cancelActiveTouch = vi.fn();
 
     constructor() {
       joystickInstances.push(this);
@@ -32,6 +34,7 @@ vi.mock('./TouchLook', () => ({
     mount = vi.fn();
     consumeDelta = vi.fn().mockReturnValue({ x: 1.2, y: -0.4 });
     setADS = vi.fn();
+    cancelActiveLook = vi.fn();
 
     constructor() {
       lookInstances.push(this);
@@ -46,6 +49,7 @@ vi.mock('./TouchFireButton', () => ({
     dispose = vi.fn();
     mount = vi.fn();
     setCallbacks = vi.fn();
+    cancelActivePress = vi.fn();
 
     constructor() {
       fireInstances.push(this);
@@ -62,6 +66,7 @@ vi.mock('./TouchActionButtons', () => ({
     setOnAction = vi.fn();
     setOnWeaponSelect = vi.fn();
     setActiveSlot = vi.fn();
+    cancelActiveGesture = vi.fn();
 
     constructor() {
       actionInstances.push(this);
@@ -77,6 +82,7 @@ vi.mock('./TouchADSButton', () => ({
     mount = vi.fn();
     setOnADSToggle = vi.fn();
     resetADS = vi.fn();
+    cancelActivePress = vi.fn();
   },
 }));
 
@@ -110,6 +116,7 @@ vi.mock('./TouchRallyPointButton', () => ({
     mount = vi.fn();
     setCallback = vi.fn();
     setSquadCommandCallback = vi.fn();
+    cancelActivePress = vi.fn();
   },
 }));
 
@@ -148,6 +155,7 @@ import { TouchControls } from './TouchControls';
 describe('TouchControls', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
+    (InputContextManager as any).instance = null;
     joystickInstances.length = 0;
     lookInstances.length = 0;
     fireInstances.length = 0;
@@ -232,6 +240,7 @@ describe('TouchControls', () => {
       onSandbagRotateLeft: vi.fn(),
       onSandbagRotateRight: vi.fn(),
       onRallyPointPlace: vi.fn(),
+      onMapToggle: vi.fn(),
     };
 
     controls.setCallbacks(callbacks);
@@ -244,13 +253,29 @@ describe('TouchControls', () => {
     const actionRouter = actionInstances[0].setOnAction.mock.calls[0][0] as (action: string) => void;
     actionRouter('jump');
     actionRouter('reload');
+    actionRouter('command');
+    actionRouter('map');
 
     expect(callbacks.onJump).toHaveBeenCalledTimes(1);
     expect(callbacks.onReload).toHaveBeenCalledTimes(1);
+    expect(callbacks.onRallyPointPlace).not.toHaveBeenCalled();
+    expect(callbacks.onMapToggle).toHaveBeenCalledTimes(1);
 
     // Weapon select is wired through setOnWeaponSelect, not through action router
     const weaponRouter = actionInstances[0].setOnWeaponSelect.mock.calls[0][0] as (slot: number) => void;
     weaponRouter(3);
     expect(callbacks.onWeaponSelect).toHaveBeenCalledWith(3);
+  });
+
+  it('cancels active touch interactions when input context leaves gameplay', () => {
+    const controls = new TouchControls();
+    const contextManager = InputContextManager.getInstance();
+
+    contextManager.setContext('menu');
+
+    expect(joystickInstances[0].cancelActiveTouch).toHaveBeenCalledTimes(1);
+    expect(lookInstances[0].cancelActiveLook).toHaveBeenCalledTimes(1);
+    expect(fireInstances[0].cancelActivePress).toHaveBeenCalledTimes(1);
+    expect(actionInstances[0].cancelActiveGesture).toHaveBeenCalledTimes(1);
   });
 });

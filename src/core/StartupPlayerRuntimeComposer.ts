@@ -42,6 +42,7 @@ interface StartupPlayerRuntimeGroups {
     | 'commandInputManager'
     | 'firstPersonWeapon'
     | 'footstepAudioSystem'
+    | 'fullMapSystem'
     | 'gameModeManager'
     | 'grenadeSystem'
     | 'helicopterModel'
@@ -110,6 +111,7 @@ export function createStartupPlayerRuntimeGroups(
       commandInputManager: refs.commandInputManager,
       firstPersonWeapon: refs.firstPersonWeapon,
       footstepAudioSystem: refs.footstepAudioSystem,
+      fullMapSystem: refs.fullMapSystem,
       gameModeManager: refs.gameModeManager,
       grenadeSystem: refs.grenadeSystem,
       helicopterModel: refs.helicopterModel,
@@ -181,6 +183,7 @@ function wirePlayerRuntime(
     commandInputManager,
     firstPersonWeapon,
     footstepAudioSystem,
+    fullMapSystem,
     gameModeManager,
     grenadeSystem,
     helicopterModel,
@@ -213,6 +216,7 @@ function wirePlayerRuntime(
     sandbagSystem,
     cameraShakeSystem,
     footstepAudioSystem,
+    fullMapSystem,
     playerSquadController,
     commandInputManager,
   });

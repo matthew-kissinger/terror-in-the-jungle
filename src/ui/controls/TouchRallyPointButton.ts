@@ -88,5 +88,11 @@ export class TouchRallyPointButton extends BaseTouchButton {
 
   hide(): void {
     this.hideButton();
+    this.cancelActivePress();
+  }
+
+  cancelActivePress(): void {
+    this.clearHoldTimer();
+    this.didOpenMenu = false;
   }
 }

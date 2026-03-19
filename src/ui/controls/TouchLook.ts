@@ -141,6 +141,10 @@ export class TouchLook extends UIComponent {
 
   hide(): void {
     this.root.style.display = 'none';
+    this.cancelActiveLook();
+  }
+
+  cancelActiveLook(): void {
     this.activePointerId = null;
     this.delta.x = 0;
     this.delta.y = 0;

@@ -98,6 +98,7 @@ export class InputManager extends PlayerInput {
       onSandbagRotateLeft: () => this.runGameplay(callbacks.onSandbagRotateLeft),
       onSandbagRotateRight: () => this.runGameplay(callbacks.onSandbagRotateRight),
       onRallyPointPlace: () => this.runGameplay(callbacks.onRallyPointPlace),
+      onMapToggle: () => this.runGameplay(callbacks.onMapToggle),
       onToggleMortarCamera: () => this.runGameplay(callbacks.onToggleMortarCamera),
       onDeployMortar: () => this.runGameplay(callbacks.onDeployMortar),
       onMortarFire: () => this.runGameplay(callbacks.onMortarFire),
@@ -126,4 +127,3 @@ export class InputManager extends PlayerInput {
     action();
   }
 }
-

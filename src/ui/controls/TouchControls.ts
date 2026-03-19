@@ -21,6 +21,7 @@ import { TouchMenuButton } from './TouchMenuButton';
 import { TouchMortarButton } from './TouchMortarButton';
 import { TouchHelicopterCyclic } from './TouchHelicopterCyclic';
 import type { HUDLayout } from '../layout/HUDLayout';
+import { InputContextManager } from '../../systems/input/InputContextManager';
 
 interface TouchControlCallbacks {
   onFireStart: () => void;
@@ -38,6 +39,7 @@ interface TouchControlCallbacks {
   onSandbagRotateRight: () => void;
   onRallyPointPlace: () => void;
   onSquadCommand?: () => void;
+  onMapToggle?: () => void;
   onMenuPause?: () => void;
   onMenuResume?: () => void;
 }
@@ -56,6 +58,8 @@ export class TouchControls {
   readonly helicopterCyclic: TouchHelicopterCyclic;
 
   private visible = false;
+  private readonly contextManager = InputContextManager.getInstance();
+  private readonly unsubscribeContext: () => void;
 
   constructor() {
     this.joystick = new VirtualJoystick();
@@ -84,6 +88,12 @@ export class TouchControls {
     this.mortarButton.mount(body);
     this.helicopterCyclic.mount(body);
 
+    this.unsubscribeContext = this.contextManager.onChange((context) => {
+      if (context !== 'gameplay') {
+        this.cancelActiveInteractions();
+      }
+    });
+
     // Start hidden until game starts
     this.hide();
   }
@@ -107,6 +117,12 @@ export class TouchControls {
           break;
         case 'scoreboard':
           callbacks.onScoreboardTap?.();
+          break;
+        case 'command':
+          callbacks.onSquadCommand?.();
+          break;
+        case 'map':
+          callbacks.onMapToggle?.();
           break;
       }
     });
@@ -200,6 +216,15 @@ export class TouchControls {
     this.helicopterCyclic.hide();
   }
 
+  cancelActiveInteractions(): void {
+    this.joystick.cancelActiveTouch();
+    this.look.cancelActiveLook();
+    this.fireButton.cancelActivePress();
+    this.adsButton.cancelActivePress();
+    this.actionButtons.cancelActiveGesture();
+    this.rallyPointButton.cancelActivePress();
+  }
+
   /**
    * Enter helicopter mode: dual joystick layout.
    * Left joystick = collective (Y) + yaw (X).
@@ -261,6 +286,7 @@ export class TouchControls {
   }
 
   dispose(): void {
+    this.unsubscribeContext();
     this.joystick.dispose();
     this.look.dispose();
     this.fireButton.dispose();
