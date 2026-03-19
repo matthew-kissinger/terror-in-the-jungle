@@ -10,6 +10,10 @@ import {
 } from './OpenFrontierRespawnMapUtils';
 import type { RespawnSpawnPoint } from '../../systems/player/RespawnSpawnPoint';
 
+const DEFAULT_ZOOM = 1;
+const VIEW_PADDING = 96;
+const SINGLE_SPAWN_ZOOM = 2.2;
+
 export class OpenFrontierRespawnMap {
   private zoneManager?: ZoneManager;
   private gameModeManager?: GameModeManager;
@@ -302,8 +306,66 @@ export class OpenFrontierRespawnMap {
   }
 
   resetView(): void {
-    this.zoomLevel = 1;
+    this.zoomLevel = DEFAULT_ZOOM;
     this.panOffset = { x: 0, y: 0 };
+    this.render();
+  }
+
+  setSelectedSpawnPoint(spawnPointId: string | undefined): void {
+    this.selectedZoneId = spawnPointId;
+    this.render();
+  }
+
+  focusSpawnPoints(preferredSpawnPointId?: string): void {
+    if (this.spawnPoints.length === 0) {
+      this.resetView();
+      return;
+    }
+
+    if (this.spawnPoints.length === 1) {
+      const point = worldToMap(this.spawnPoints[0].position.x, this.spawnPoints[0].position.z);
+      this.zoomLevel = Math.min(getMaxZoom(), SINGLE_SPAWN_ZOOM);
+      this.panOffset = {
+        x: (MAP_SIZE / 2 - point.x) * this.zoomLevel,
+        y: (MAP_SIZE / 2 - point.y) * this.zoomLevel
+      };
+      this.render();
+      return;
+    }
+
+    const mapPoints = this.spawnPoints.map(spawnPoint => ({
+      id: spawnPoint.id,
+      ...worldToMap(spawnPoint.position.x, spawnPoint.position.z)
+    }));
+    const minX = Math.min(...mapPoints.map(point => point.x));
+    const maxX = Math.max(...mapPoints.map(point => point.x));
+    const minY = Math.min(...mapPoints.map(point => point.y));
+    const maxY = Math.max(...mapPoints.map(point => point.y));
+    const boundsWidth = Math.max(1, maxX - minX);
+    const boundsHeight = Math.max(1, maxY - minY);
+    const availableViewSize = Math.max(1, MAP_SIZE - VIEW_PADDING * 2);
+    const fitZoom = Math.min(
+      getMaxZoom(),
+      Math.max(
+        DEFAULT_ZOOM,
+        Math.min(availableViewSize / boundsWidth, availableViewSize / boundsHeight)
+      )
+    );
+
+    this.zoomLevel = fitZoom;
+
+    const preferredPoint = preferredSpawnPointId
+      ? mapPoints.find(point => point.id === preferredSpawnPointId)
+      : undefined;
+    const centerPoint = preferredPoint ?? {
+      x: (minX + maxX) * 0.5,
+      y: (minY + maxY) * 0.5
+    };
+
+    this.panOffset = {
+      x: (MAP_SIZE / 2 - centerPoint.x) * this.zoomLevel,
+      y: (MAP_SIZE / 2 - centerPoint.y) * this.zoomLevel
+    };
     this.render();
   }
 

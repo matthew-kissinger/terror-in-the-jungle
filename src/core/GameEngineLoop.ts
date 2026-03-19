@@ -38,13 +38,13 @@ function scheduleNextFrame(engine: GameEngine): void {
     return;
   }
 
-  engine.animationFrameId = requestAnimationFrame(() => animate(engine));
+  engine.animationFrameId = requestAnimationFrame((timestamp) => animate(engine, timestamp));
 }
 
 /**
  * Main game loop animation frame
  */
-export function animate(engine: GameEngine): void {
+export function animate(engine: GameEngine, timestamp?: number): void {
   if (!engine.isLoopRunning || engine.isDisposed) {
     engine.animationFrameId = null;
     return;
@@ -62,6 +62,7 @@ export function animate(engine: GameEngine): void {
       return;
     }
 
+    engine.clock.update(timestamp);
     const deltaTime = Math.min(engine.clock.getDelta(), 0.1);
     engine.lastFrameDelta = deltaTime;
 
