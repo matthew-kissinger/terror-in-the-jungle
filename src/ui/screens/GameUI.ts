@@ -16,6 +16,7 @@ import {
   getGameModeDefinition,
   resolveLaunchSelection,
 } from '../../config/gameModeDefinitions';
+import { GameEventBus } from '../../core/GameEventBus';
 
 type UIState = 'loading' | 'title' | 'mode_select' | 'preparing' | 'hidden';
 
@@ -28,6 +29,7 @@ export class GameUI extends UIComponent {
   private onPlayCallback?: (selection: GameLaunchSelection) => void;
   private isLaunching = false;
   private launchMode: GameMode | null = null;
+  private unsubModeProgress?: () => void;
 
   constructor() {
     super();
@@ -42,6 +44,9 @@ export class GameUI extends UIComponent {
   }
 
   protected onMount(): void {
+    // Remove boot splash now that JS UI is ready
+    document.getElementById('boot-splash')?.remove();
+
     // Mount children to body (not to this.root)
     this.titleScreen.mount(document.body);
     this.modeSelectScreen.mount(document.body);
@@ -88,17 +93,28 @@ export class GameUI extends UIComponent {
     this.titleScreen.showScreen();
     const definition = getGameModeDefinition(selection.mode);
     this.titleScreen.showPreparing(definition.config.name);
+
+    // Wire mode startup progress into the loading bar
+    this.titleScreen.initModeLoadProgress();
+    this.unsubModeProgress?.();
+    this.unsubModeProgress = GameEventBus.subscribe('mode_load_progress', (ev) => {
+      this.titleScreen.updateModeLoadProgress(ev.phase, ev.progress, ev.label);
+    });
   }
 
   cancelGameLaunch(): void {
     this.isLaunching = false;
     this.launchMode = null;
+    this.unsubModeProgress?.();
+    this.unsubModeProgress = undefined;
     this.titleScreen.cancelPreparing();
     this.showMainMenu();
   }
 
   hide(): void {
     this.state = 'hidden';
+    this.unsubModeProgress?.();
+    this.unsubModeProgress = undefined;
     this.titleScreen.hideScreen();
     this.modeSelectScreen.hide();
   }
@@ -130,6 +146,8 @@ export class GameUI extends UIComponent {
   }
 
   override dispose(): void {
+    this.unsubModeProgress?.();
+    this.unsubModeProgress = undefined;
     this.titleScreen.dispose();
     this.modeSelectScreen.dispose();
     this.settingsModal.dispose();

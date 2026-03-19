@@ -1,6 +1,6 @@
 # Deployment Validation
 
-Last updated: 2026-03-10
+Last updated: 2026-03-19
 
 ## Goal
 
@@ -53,24 +53,24 @@ Deploy only runs on `push` to `master` after those jobs pass.
 ## Current Known Risks Before Push
 
 - Main runtime bundle is still heavy (`~710-734kB` chunks), so deploy stability is better than startup cost.
-- Startup boot is lighter than before, but only part of the start-game path is deferred today (`ModeStartupPreparer` 9.37kB, `InitialDeployStartup` 1.02kB).
+- Startup boot is lighter than before. Start-game path is partially deferred (`ModeStartupPreparer`, `InitialDeployStartup`). Inline boot splash eliminates blank-page period. Per-texture/audio progress reporting gives users visual feedback during the heaviest init phase.
 - Perf captures are not part of the default deploy gate; use `npm run validate:full` when a change touches hot paths materially.
 
 ## Current Validated State
 
-Latest local validation on 2026-03-10:
+Latest local validation on 2026-03-19:
 
-- `npm run validate` passed
-- `npm run deadcode` passed
-- `174` test files, `3,612` passing tests, `2` skipped
-- built-app smoke passed under `http://127.0.0.1:4173/terror-in-the-jungle/`
-- menu button text during smoke: `CONTINUE TO DEPLOY US -- ZONE CONTROL`
-- production radio transmission assets were normalized to URL-safe filenames; deployed base-path smoke no longer reports 404s for transmission audio
-- Open Frontier and A Shau now ship generator-backed airfields plus separate heavy motor-pool staging without breaking the built-app deploy flow
+- `npm run build` passed
+- `npm run test:quick` passed: `177` test files, `3,591` passing tests, `2` skipped
+- `index.html` now includes an inline boot splash (CSS-only pulsing bar, visible <100ms before JS loads)
+- Granular texture/audio loading progress wired through SystemInitializer
+- Progress bar transition: 0.15s linear (was 0.5s ease)
+- Navmesh slow-phase hint visible during mode startup
 - current large chunks:
-  - `three`: `710.48kB`
-  - `index`: `734.05kB`
-  - `recast-navigation.wasm-compat`: `727.30kB`
+  - `three`: ~691kB
+  - `index`: ~748kB
+  - `recast-navigation.wasm-compat`: ~710kB
+  - `ui`: ~404kB
 
 ## Recommended Pre-Push Sequence
 

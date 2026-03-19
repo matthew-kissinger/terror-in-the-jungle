@@ -1,7 +1,9 @@
 # Next Work
 
-Last updated: 2026-03-10
+Last updated: 2026-03-19
 Status: ACTIVE - shipping baseline is stable; use this file for polish/perf/content follow-up, not boot/deploy remediation
+
+> **Wave / debt board:** persistent priorities and backlog context live in [`PLAN_STATE.md`](./PLAN_STATE.md). This file is the ordered operational checklist.
 
 ## How To Use This File
 
@@ -359,3 +361,5 @@ Record completed items here with date and commit hash.
 | 2026-03-10 | Structure scale + procedural gen | ce9464b | STRUCTURE_SCALE 2.0->2.5 with displayScale (props 0.5x). Procedural firebase (3 templates) + airfield (2 templates) generators. Fixed-wing physics (AC-47/F-4/A-1). NPC pilot AI (7-state FSM). Road surface types (dirt/gravel/jungle_trail). 44 new tests, 3442 total. |
 | 2026-03-10 | Open Frontier / A Shau vehicle staging | - | Generator-backed airfields now live in Open Frontier and A Shau Valley. Separate heavy motor pools stage jeeps, trucks, APCs, and M48 tanks. Fixed-wing and ground vehicles remain static world content; helicopters remain the only player-usable vehicles. |
 | 2026-03-18 | Mobile vehicle controls + sensitivity | - | VehicleActionBar (EXIT/FIRE/STAB/LOOK) for helicopter mode. Touch sensitivity halved (0.003-0.015). TouchActionButtons test fixed for 5-button layout. Fire visibility gated by aircraft role. Auto-hover wired through touch. 3586 tests. |
+| 2026-03-19 | Asset + doc hygiene | - | Removed unused UI PNGs (emblems, hints, obsolete controls); `deploy-3d-assets/` is catalog-only (no duplicate GLBs); manifests + `optimize-assets` aligned; `start-screen.webp` removed; governance clutter docs deleted; canonical orientation in `docs/README.md`. |
+| 2026-03-19 | Startup/loading perf | - | Inline boot splash in index.html (CSS-only, <100ms visible). Granular per-texture + per-audio progress (onProgress callbacks in AssetLoader/AudioManager, wired through SystemInitializer). Progress bar transition 0.5s->0.15s linear. Navmesh slow-phase hint in TitleScreen. GameUI.onMount removes boot splash. 3591 tests passing. |

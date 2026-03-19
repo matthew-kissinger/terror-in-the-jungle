@@ -69,11 +69,11 @@ export class AudioManager implements GameSystem {
         document.addEventListener('touchend', resumeAudio);
     }
 
-    async init(): Promise<void> {
+    async init(onProgress?: (loaded: number, total: number) => void): Promise<void> {
         Logger.info('Audio', 'Initializing audio system...');
 
         // Load all audio buffers
-        await this.loadAllAudio();
+        await this.loadAllAudio(onProgress);
 
         // Initialize sound pools
         this.poolManager.initializePools();
@@ -97,10 +97,13 @@ export class AudioManager implements GameSystem {
         this.ambientManager.start();
     }
 
-    private async loadAllAudio(): Promise<void> {
+    private async loadAllAudio(onProgress?: (loaded: number, total: number) => void): Promise<void> {
+        const entries = Object.entries(this.soundConfigs);
+        const total = entries.length;
+        let loaded = 0;
         const loadPromises: Promise<{key: string, buffer?: AudioBuffer}>[] = [];
 
-        for (const [key, config] of Object.entries(this.soundConfigs)) {
+        for (const [key, config] of entries) {
             loadPromises.push(
                 this.loadAudio(key, config.path)
                     .then(buffer => ({ key, buffer }))
@@ -111,6 +114,11 @@ export class AudioManager implements GameSystem {
                             Logger.warn('Audio', `Optional audio ${key} not found: ${config.path}`);
                         }
                         return { key, buffer: undefined };
+                    })
+                    .then(result => {
+                        loaded++;
+                        onProgress?.(loaded, total);
+                        return result;
                     })
             );
         }

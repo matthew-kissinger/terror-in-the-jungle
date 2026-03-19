@@ -1,6 +1,6 @@
 # Architecture Recovery Plan
 
-Last updated: 2026-03-17
+Last updated: 2026-03-19
 Scope: runtime architecture stabilization with performance and gameplay fidelity gates.
 
 ## Current Goal
@@ -153,6 +153,7 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep (2026-03-10): `RespawnUI` is now a `UIComponent` + CSS Modules implementation that preserves the existing `PlayerRespawnManager` contract while removing the old imperative body-style builder.
 - Keep (2026-03-10): more gameplay systems now consume terrain through `ITerrainRuntime` (`getHeightAt`, `getEffectiveHeightAt`, `getSlopeAt`, `getNormalAt`) instead of reaching directly into `HeightQueryCache`.
 - Keep (2026-03-10): production audio asset paths are now URL-safe. `RadioTransmissionSystem` no longer depends on `#` characters in static filenames, so built-app smoke under the deployed base path no longer 404s those assets.
+- Keep (2026-03-19): startup loading UX improvements. Inline boot splash in `index.html` (CSS-only pulsing bar, visible <100ms, removed by `GameUI.onMount()`). `AssetLoader.init()` and `AudioManager.init()` accept optional `onProgress(loaded, total)` callbacks for granular per-file progress reporting, wired through `SystemInitializer` into the loading bar. Progress bar transition changed from `0.5s ease` to `0.15s linear`. `TitleScreen.updateModeLoadProgress()` appends a slow-phase hint during navmesh generation. No bundle size or throughput changes.
 
 ## Deferred Decisions
 

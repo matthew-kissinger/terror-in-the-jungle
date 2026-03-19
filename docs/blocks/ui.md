@@ -39,7 +39,7 @@ src/ui/
   engine/      UIComponent, css-modules.d, index
   hud/         30 widget modules (see registry below)
   layout/      HUDLayout, HUDLayoutStyles, VisibilityManager, types, index
-  loading/     SettingsModal, ModeCard, LoadingProgress
+  loading/     SettingsModal, LoadingProgress
   loadout/     LoadoutSelector (legacy), LoadoutGrenadePanel, LoadoutTypes
   map/         FullMapSystem, FullMapInput, FullMapStyles, FullMapDOMHelpers,
                OpenFrontierRespawnMap, OpenFrontierRespawnMapRenderer,
@@ -162,7 +162,6 @@ Visibility: `data-show="infantry"` on `weapon-bar` and `action-btns` - CSS hides
 | Module | File | Role |
 |---|---|---|
 | [SettingsModal]([GH]/ui/loading/SettingsModal.ts) | ui/loading/SettingsModal.ts | Graphics/audio/controls settings. Absorbs controls reference and gameplay tips as collapsible sections. |
-| [ModeCard]([GH]/ui/loading/ModeCard.ts) | ui/loading/ModeCard.ts | Mode card config data (title, stat line, icon) used by ModeSelectScreen |
 | [LoadingProgress]([GH]/ui/loading/LoadingProgress.ts) | ui/loading/LoadingProgress.ts | Progress bar driven by bootstrap events |
 
 ---
@@ -290,6 +289,14 @@ POLL (20Hz, own update()):
 ```
 
 ---
+
+## Boot Splash
+
+`index.html` contains an inline `#boot-splash` div with the game title and a CSS-only pulsing progress bar. This is visible within ~100ms on cold load, before any JS module graph loads. `GameUI.onMount()` removes `#boot-splash` from the DOM. No external CSS or JS dependencies.
+
+## Loading Progress
+
+`LoadingProgress` drives the progress bar on `TitleScreen`. During boot, `SystemInitializer` wires per-texture and per-audio `onProgress(loaded, total)` callbacks from `AssetLoader.init()` and `AudioManager.init()`. The progress bar transition is `0.15s linear` for responsive feel during rapid increments. During mode startup, `TitleScreen.updateModeLoadProgress()` receives phase events via `GameEventBus` and appends a slow-phase hint ("this may take a few seconds") during the navmesh generation phase.
 
 ## Mobile Entry
 

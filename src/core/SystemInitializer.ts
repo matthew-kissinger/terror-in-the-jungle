@@ -102,20 +102,26 @@ export class SystemInitializer {
     // GPUTerrain disabled - going with web workers approach instead
     onProgress('core', 1);
 
-    // Phase 2: Load textures
+    // Phase 2+3: Load textures and audio concurrently (they share no dependencies)
     onProgress('textures', 0);
-    markStartup('systems.assets.begin');
-    await refs.assetLoader.init();
-    markStartup('systems.assets.end');
-    onProgress('textures', 1);
-
-    // Phase 3: Load audio
     onProgress('audio', 0);
     refs.audioManager = new AudioManager(scene, camera);
+    markStartup('systems.assets.begin');
     markStartup('systems.audio.begin');
-    await refs.audioManager.init();
-    markStartup('systems.audio.end');
-    onProgress('audio', 1);
+    await Promise.all([
+      refs.assetLoader.init((loaded, total) => {
+        onProgress('textures', total > 0 ? loaded / total : 1);
+      }).then(() => {
+        markStartup('systems.assets.end');
+        onProgress('textures', 1);
+      }),
+      refs.audioManager.init((loaded, total) => {
+        onProgress('audio', total > 0 ? loaded / total : 1);
+      }).then(() => {
+        markStartup('systems.audio.end');
+        onProgress('audio', 1);
+      }),
+    ]);
 
     // Phase 4: Initialize world systems
     onProgress('world', 0);
@@ -141,6 +147,10 @@ export class SystemInitializer {
     refs.worldFeatureSystem = new WorldFeatureSystem(scene);
 
     refs.navmeshSystem = new NavmeshSystem();
+    // Prewarm WASM download+compile now so it's ready when mode startup needs it.
+    // Fire-and-forget: init() is idempotent and configureTerrainAndNavigation() will
+    // await it again if not yet complete.
+    refs.navmeshSystem.init().catch(() => {});
     refs.airSupportManager = new AirSupportManager(scene);
     refs.aaEmplacementSystem = new AAEmplacementSystem(scene);
     refs.vehicleManager = new VehicleManager();

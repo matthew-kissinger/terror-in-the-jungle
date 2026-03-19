@@ -21,6 +21,7 @@ export class TitleScreen extends UIComponent {
   private fullscreenPrompt: HTMLDivElement | null = null;
   private fullscreenAutoTimerId: ReturnType<typeof setTimeout> | null = null;
   private fullscreenFadeTimerId: ReturnType<typeof setTimeout> | null = null;
+  private modeLoadProgress: LoadingProgress | null = null;
 
   private onStartCallback?: () => void;
   private onSettingsCallback?: () => void;
@@ -124,6 +125,46 @@ export class TitleScreen extends UIComponent {
     }
     const startBtn = this.$('[data-ref="start"]') as HTMLButtonElement | null;
     if (startBtn) startBtn.disabled = true;
+  }
+
+  /** Reset the progress bar for mode startup phases. */
+  initModeLoadProgress(): void {
+    this.modeLoadProgress = new LoadingProgress(
+      this.$('[data-ref="fill"]') as HTMLDivElement,
+      document.createElement('span'),
+      this.$('[data-ref="phase"]') as HTMLDivElement,
+      document.createElement('div'),
+      null
+    );
+    const phases = [
+      { id: 'terrain', weight: 0.10, label: 'Loading terrain' },
+      { id: 'features', weight: 0.15, label: 'Compiling features' },
+      { id: 'navmesh', weight: 0.45, label: 'Generating navigation mesh' },
+      { id: 'spawning', weight: 0.20, label: 'Spawning combatants' },
+      { id: 'finalize', weight: 0.10, label: 'Finalizing' },
+    ];
+    for (const p of phases) {
+      this.modeLoadProgress.addPhase(p.id, p.weight, p.label);
+    }
+    // Show the loading section, hide preparing text
+    const loading = this.$('[data-ref="loading"]');
+    if (loading) (loading as HTMLElement).style.display = '';
+    const fill = this.$('[data-ref="fill"]') as HTMLElement | null;
+    if (fill) fill.style.width = '0%';
+  }
+
+  /** Update mode startup progress from a GameEventBus event. */
+  updateModeLoadProgress(phase: string, progress: number, label: string): void {
+    if (!this.modeLoadProgress) return;
+    this.modeLoadProgress.updateProgress(phase, progress);
+    const text = this.$('[data-ref="preparingText"]');
+    if (text) {
+      if (phase === 'navmesh' && progress < 1) {
+        text.textContent = label + ' (this may take a few seconds)';
+      } else {
+        text.textContent = label;
+      }
+    }
   }
 
   cancelPreparing(): void {

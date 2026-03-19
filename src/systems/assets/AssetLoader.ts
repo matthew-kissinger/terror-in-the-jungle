@@ -9,10 +9,10 @@ export class AssetLoader implements GameSystem {
   private textureLoader = new THREE.TextureLoader();
   private loadedTextures: Map<string, THREE.Texture> = new Map();
 
-  async init(): Promise<void> {
+  async init(onProgress?: (loaded: number, total: number) => void): Promise<void> {
     THREE.Cache.enabled = true;
     await this.discoverAssets();
-    await this.loadTextures();
+    await this.loadTextures(onProgress);
   }
 
   update(_deltaTime: number): void {
@@ -153,8 +153,12 @@ export class AssetLoader implements GameSystem {
     return AssetCategory.UNKNOWN;
   }
 
-  private async loadTextures(): Promise<void> {
-    const loadPromises = Array.from(this.assets.values()).map(async (asset) => {
+  private async loadTextures(onProgress?: (loaded: number, total: number) => void): Promise<void> {
+    const assets = Array.from(this.assets.values());
+    const total = assets.length;
+    let loaded = 0;
+
+    const loadPromises = assets.map(async (asset) => {
       try {
         const texture = await this.loadTexture(asset.path);
 
@@ -176,6 +180,8 @@ export class AssetLoader implements GameSystem {
       } catch (error) {
         Logger.warn('assets', `Failed to load texture: ${asset.path}`, error);
       }
+      loaded++;
+      onProgress?.(loaded, total);
     });
 
     await Promise.all(loadPromises);

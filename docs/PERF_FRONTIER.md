@@ -1,6 +1,8 @@
 # Perf Frontier
 
-Last updated: 2026-03-06
+**Document status:** REFERENCE — perf mission narrative and phase framework; **latest numbers** live in `NEXT_WORK.md` and capture artifacts.
+
+Last updated: 2026-03-19
 Scope: Phase 1 measurement, harness validation, baseline capture state, and Phase 2 bottleneck analysis.
 
 ## Zoomed-Out Progress Snapshot (2026-03-04, Evening)
@@ -18,6 +20,16 @@ Scope: Phase 1 measurement, harness validation, baseline capture state, and Phas
 ### Current scenario status (2026-03-10)
 
 `combat120` is at WARN (p99 ~30-35ms, target <16ms). `frontier30m` terrain-led tails are effectively solved. See `NEXT_WORK.md` for the latest capture results and acceptance decisions.
+
+### Startup/loading improvements (2026-03-19)
+
+Cold-start UX improved without changing bundle size:
+- Inline boot splash in `index.html`: CSS-only pulsing bar visible within ~100ms, before any JS loads. Removed by `GameUI.onMount()`.
+- Granular texture loading progress: `AssetLoader.init()` reports per-texture completion via `onProgress(loaded, total)` callback, wired through `SystemInitializer`.
+- Granular audio loading progress: same pattern in `AudioManager.init()`.
+- Progress bar transition: `0.5s ease` -> `0.15s linear` for responsive feel during rapid increments.
+- Navmesh slow-phase hint: "this may take a few seconds" appended during the navmesh generation phase.
+- These are UX improvements, not throughput changes. Bundle weight and WASM init cost are unchanged.
 
 ## Phase 1 Status
 

@@ -1,6 +1,6 @@
 # Project Notes
 
-Last updated: 2026-03-18
+Last updated: 2026-03-19
 
 ## Project
 
@@ -17,8 +17,8 @@ npm run build
 npm run test:run
 npm run test:quick           # all tests with dot reporter (fast output)
 npm run test:integration     # integration scenario tests only
-npm run validate             # quick: type-check + unit tests + build
-npm run validate:full        # full: test + build + committed combat120 perf check
+npm run validate             # lint + test:run + build + smoke:prod
+npm run validate:full        # test:run + build + combat120 capture + perf:compare
 npm run perf:capture
 npm run perf:analyze:latest
 ```
@@ -48,7 +48,7 @@ npm run perf:update-baseline  # update baseline from latest capture
 - World features: `src/systems/world/*` (WorldFeatureSystem, FirebaseLayoutGenerator, AirfieldLayoutGenerator)
 - Harness: `scripts/perf-capture.ts`, `scripts/perf-analyze-latest.ts`, `scripts/perf-compare.ts`
 - Scene utilities: `src/utils/SceneUtils.ts` (freezeTransform for static object matrix optimization)
-- UI: `src/ui/hud/` (HUD, KillFeed, CrosshairSystem, HelicopterHUD), `src/ui/controls/` (touch buttons, BaseTouchButton, VehicleActionBar), `src/ui/icons/` (IconRegistry), `src/ui/screens/` (GameUI, TitleScreen, ModeSelectScreen, DeployScreen), `src/ui/loading/` (SettingsModal, LoadingProgress, ModeCard), `src/ui/engine/` (UIComponent, FocusTrap)
+- UI: `src/ui/hud/` (HUD, KillFeed, CrosshairSystem, HelicopterHUD), `src/ui/controls/` (touch buttons, BaseTouchButton, VehicleActionBar), `src/ui/icons/` (IconRegistry), `src/ui/screens/` (GameUI, TitleScreen, ModeSelectScreen, DeployScreen), `src/ui/loading/` (SettingsModal, LoadingProgress), `src/ui/engine/` (UIComponent, FocusTrap)
 - Integration tests: `src/integration/harness/`, `src/integration/scenarios/`
 - Test utilities: `src/test-utils/` (shared mocks and factories)
 
@@ -65,7 +65,7 @@ npm run perf:update-baseline  # update baseline from latest capture
 9. Magic number extraction (2026-03-08): ~125 magic numbers replaced with named constants across 12 files. Shared cross-file config in `src/config/CombatantConfig.ts` (NPC_Y_OFFSET, NPC_MAX_SPEED, NPC_HEALTH, OPFOR_OBJECTIVE_FOCUS_CHANCE). Single-file constants grouped by category at top of each module. 3040 tests passing.
 10. Architecture + features pass (2026-03-09): 7 `any` types fixed in SystemInterfaces, `import/no-cycle` ESLint rule, deferred init timeout (15s), SpawnPointSelector extracted (PlayerRespawnManager 857->594 lines), GameEventBus (typed, queue-and-flush), SpectatorCamera (post-death follow cam), MissionBriefing (A Shau overlay), SquadDeployFromHelicopter (G key tactical insertion from helicopter), shared test utilities (`src/test-utils/`), InputContextManager+InputManager tests. CI perf job gates deploy. 3159 tests passing.
 11. UI/UX overhaul (2026-03-09): BaseTouchButton shared pointer handling (-128 lines net across 6 buttons), joystickMath dead-zone utility, KillFeed refactored to CSS module with slide-out/streak-glow animations, FocusTrap utility for modals, SettingsModal/HowToPlayModal accessibility (ARIA, fieldsets, Escape-to-close, helicopter controls section, graphics quality descriptions), HelicopterHUD flight instruments (airspeed/heading/VSI/weapon status/damage bar), CrosshairSystem replaces CrosshairUI (4 modes: infantry/helicopter_transport/gunship/attack pipper), AircraftWeaponMount configs, OnboardingOverlay (5-page opt-in tutorial from start screen), mobile gestures (weapon swipe, ADS hold mode, crouch button, haptic feedback, grenade quick-throw, minimap pinch zoom).
-12. Icon integration (2026-03-10): 50 pixel-art PNG icons (252KB) in `public/assets/ui/icons/`. Centralized `IconRegistry` (`src/ui/icons/IconRegistry.ts`) with `icon()`, `iconImg()`, `iconHtml()`, weapon icon lookups. All 16 UI consumers migrated from scattered `import.meta.env.BASE_URL` paths. Old `WeaponIconRegistry` deleted. Touch buttons, kill feed, helicopter HUD, crosshair reticles, faction emblems, onboarding hints, minimap markers all use PNG icons. `scripts/optimize-icons.mjs` handles optimization. Icon manifest at `docs/UI_ICON_MANIFEST.md`. 3398 tests passing.
+12. Icon integration (2026-03-10; trimmed 2026-03-19): **38** pixel-art PNGs in `public/assets/ui/icons/`. `IconRegistry` centralizes paths; unused emblem/hint/crouch/grenade-throw/map-village assets removed from tree (recover via git if needed). Optimization: `npm run assets:optimize`. See `docs/UI_ICON_MANIFEST.md`.
 13. Structure scale + procedural generation + vehicle systems (2026-03-10): STRUCTURE_SCALE 2.0->2.5 with per-category displayScale (props at 0.5x). Procedural firebase generator (3 templates, seeded RNG, zone-based). Procedural airfield generator (runway/taxiway surface patches) is now live in Open Frontier and A Shau, with separate heavy motor-pool staging for M151/M35/M113/M48 assets. Fixed-wing flight physics (lift/drag/stall/bank-and-pull, AC-47/F-4/A-1 configs). NPC pilot AI (7-state FSM with PD controllers). Road surface types (dirt_road/gravel_road/jungle_trail) in terrain shader. 3612+ tests passing.
 14. Docs reorganized (2026-03-10): 10 completed docs archived, 3 backlogs merged into ASSET_MANIFEST, consultation report findings captured in PLAN_STATE known debt. Active doc set: CODEBASE_BLOCKS + blocks/, ROADMAP, ARCHITECTURE_RECOVERY_PLAN, PROFILING_HARNESS, PERF_FRONTIER, DEPLOYMENT_VALIDATION, ASSET_MANIFEST, UI_ICON_MANIFEST, TERRAIN_RESEARCH, PLAN_STATE, NEXT_WORK.
 15. Codebase hardening pass (2026-03-10): Doc drift fixes (CODEBASE_BLOCKS tick graph, system count, singletons, lifecycle). New test coverage: HelicopterHealthSystem (26 tests), HelicopterDoorGunner (20 tests), NPCPilotAI (42 tests), WeatherLightning (15 tests), NPCFlightController (11 tests). NPC pilot wiring: NPCFlightController bridges NPCPilotAI FSM + FixedWingPhysics for physics-driven air support flight. Spooky mission uses physics-based orbit. 3612+ tests passing.
@@ -74,7 +74,8 @@ npm run perf:update-baseline  # update baseline from latest capture
 18. HUD visibility fix + UI screen redesign (2026-03-17): `backdrop-filter` ban scoped to `@media (pointer: coarse)` only - desktop HUD panels restored (ammo, tickets, timer, kill feed get frosted-glass blur back). Kill feed `.entry` backdrop-filter restored. UI screens redesigned: `GameUI` state machine replaces `StartScreen` (TitleScreen + ModeSelectScreen), `DeployScreen` replaces `RespawnUI` with hero-map layout. Opaque `rgba(8,12,18,0.96)` backgrounds replace blur on all screen overlays. HowToPlayModal + OnboardingOverlay absorbed into SettingsModal as collapsible `<details>` sections. 10 files deleted (StartScreen, RespawnUI, HowToPlayModal, OnboardingOverlay + their CSS/tests), 7 new files created (`src/ui/screens/`). UI code reduced from ~4,500 lines to ~2,900 lines (-35%). 3569 tests passing.
 19. Mobile vehicle controls + sensitivity tuning (2026-03-18): VehicleActionBar component (EXIT/FIRE/STAB/LOOK buttons for helicopter mode). Touch sensitivity range halved (0.003-0.015, was 0.006-0.024), accel exponent 1.35->1.15, dead zone 0.5->1.5px. TouchActionButtons test fixed for 5-button layout (CMD+MAP added in PR #36). Fire button visibility gated by aircraft role (attack/gunship only). Auto-hover wired through touch controls. 3586 tests passing.
 20. Open Frontier navmesh perf fix (2026-03-18): World-size-aware navmesh parameters prevent browser crash/hang on 3200m maps. Cell size scales with world size (cs=1.0 for <=800m, 1.5 for <=1600m, 2.0 for >1600m). Heightfield sampling scales similarly (4/6/8m). Large worlds use coarser Recast params (ch=0.4, maxEdgeLen=24, minRegionArea=16, detailSampleDist=12). Memory guard aborts solo build >300MB. Tiled threshold reverted to strict greater-than (3200m stays solo). Connectivity validation reduced from all-pairs to home-base representatives. 3584 tests passing.
-21. See `docs/NEXT_WORK.md` for the active checklist.
+21. Startup/loading performance (2026-03-19): Inline boot splash in `index.html` (CSS-only pulsing bar, visible <100ms, removed by GameUI.onMount). Granular texture/audio loading progress (per-file `onProgress` callbacks in AssetLoader.init and AudioManager.init, wired through SystemInitializer). Progress bar transition `0.5s ease` -> `0.15s linear` for responsive feel. Navmesh slow-phase hint ("this may take a few seconds") in TitleScreen. 3591 tests passing.
+22. See `docs/NEXT_WORK.md` for the active checklist.
 
 ## Documentation Contract
 

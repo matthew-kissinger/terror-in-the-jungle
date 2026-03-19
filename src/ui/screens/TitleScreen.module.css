@@ -67,7 +67,7 @@
 .progressFill {
   height: 100%;
   background: linear-gradient(90deg, var(--screen-accent-dim), var(--screen-accent));
-  transition: width 0.5s ease;
+  transition: width 0.15s linear;
   border-radius: 2px;
   box-shadow: 0 0 12px var(--screen-accent);
 }

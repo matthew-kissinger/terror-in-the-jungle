@@ -1,7 +1,9 @@
 # Plan State
 
 > Persistent tracker for agent loops, session compactions, and prioritization.
-> Updated: 2026-03-10
+> Updated: 2026-03-19
+
+> **Operational checklist:** day-to-day ordered tasks and acceptance criteria are in [`NEXT_WORK.md`](./NEXT_WORK.md).
 
 ---
 
@@ -43,8 +45,8 @@
 - [x] 3.13 Terrain feature grading now supports authored shoulders (`gradeRadius` / `gradeStrength`) instead of only flat-core + hard blend rings
 - [x] 3.14 Spawn/nav reliability pass: terrain-aware spawn scoring now covers squad staging, reinforcements, and respawns
 - [x] 3.15 Cleanup pass complete: `eslint`, `knip`, tests, build, and production smoke all pass cleanly
-- [ ] 3.4 Combat AI p99 still ~35ms (target <16ms) - remaining synchronous cover search cost
-- [ ] 3.5 Terrain contract cleanup: remove stale chunk-era config names, debug labels
+- [ ] 3.16 Combat AI p99 still ~35ms (target <16ms) - remaining synchronous cover search cost
+- [ ] 3.17 Terrain contract cleanup: remove stale chunk-era config names, debug labels
 - [ ] 3.9 Reduce initial JS bundle surface without reintroducing fragile chunking (partial: mode-start pipeline is deferred, a small release-loop diagnostics trim landed, but current build still emits `710-734kB` main runtime chunks)
 - [ ] 3.10 Decide whether remaining connector bursts should become constructor/runtime dependency objects or stay grouped setters
 - [x] 3.11 Zone Control firebase pass: widen base layout, soften home-base terrain grading, spread firebase towers, and add terrain-safe squad anchoring to stop cliff-edge starts
@@ -99,9 +101,9 @@
 
 | Metric | Value |
 |--------|-------|
-| Source files | 376 TS/TSX under `src/` |
-| Test files | 174 |
-| Tests passing | 3,612 |
+| Source files | ~372 TS/TSX under `src/` |
+| Test files | 177 |
+| Tests passing | 3,591 |
 | Type errors | 0 |
 | Lint errors | 0 |
 | Lint warnings | 0 |
@@ -143,6 +145,7 @@
 2. Initial bundle remains large (`~710-734kB` main runtime chunks), so startup is now stable but still heavy.
 3. There is no current release-blocking boot/deploy defect; remaining issues are perf and packaging quality, not functional stability.
 4. Open Frontier and A Shau airfields now stage fixed-wing aircraft, jeeps, APCs, and tanks as static world content only; helicopters remain the only playable vehicles.
+5. Cold-start UX improved: inline boot splash in `index.html` (visible <100ms), granular per-texture/audio progress reporting, faster progress bar transition (0.15s linear), navmesh slow-phase hint.
 
 ## Current Release Posture
 
