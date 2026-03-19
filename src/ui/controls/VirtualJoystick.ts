@@ -223,6 +223,10 @@ export class VirtualJoystick extends UIComponent {
 
   hide(): void {
     this.root.style.display = 'none';
+    this.cancelActiveTouch();
+  }
+
+  cancelActiveTouch(): void {
     this.resetThumb();
     this.activePointerId = null;
   }

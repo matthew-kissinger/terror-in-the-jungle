@@ -38,6 +38,7 @@ interface ActionButton {
 
 export class TouchActionButtons extends UIComponent {
   private buttons: ActionButton[] = [];
+  private activeActionPresses = new Map<HTMLElement, number>();
   private activeIndex = 2; // Default: AR (slot 2)
   private previousIndex = 0; // Last weapon for quick-switch
   private weaponLabelEl?: HTMLElement;
@@ -65,6 +66,8 @@ export class TouchActionButtons extends UIComponent {
     this.root.id = 'touch-action-buttons';
 
     this.addWeaponCycler();
+    this.addButton('command', 'CMD');
+    this.addButton('map', 'MAP');
     this.addButton('reload', 'R');
     this.addButton('jump', 'JUMP');
   }
@@ -77,6 +80,7 @@ export class TouchActionButtons extends UIComponent {
         e.preventDefault();
         e.stopPropagation();
         element.classList.add(styles.pressed);
+        this.activeActionPresses.set(element, e.pointerId);
         if (typeof element.setPointerCapture === 'function') element.setPointerCapture(e.pointerId);
         this.onAction?.(key);
       }, { passive: false });
@@ -84,12 +88,14 @@ export class TouchActionButtons extends UIComponent {
       this.listen(element, 'pointerup', (e: PointerEvent) => {
         e.preventDefault();
         element.classList.remove(styles.pressed);
+        this.activeActionPresses.delete(element);
         if (typeof element.releasePointerCapture === 'function' && element.hasPointerCapture(e.pointerId)) element.releasePointerCapture(e.pointerId);
       }, { passive: false });
 
       this.listen(element, 'pointercancel', (e: PointerEvent) => {
         e.preventDefault();
         element.classList.remove(styles.pressed);
+        this.activeActionPresses.delete(element);
         if (typeof element.releasePointerCapture === 'function' && element.hasPointerCapture(e.pointerId)) element.releasePointerCapture(e.pointerId);
       }, { passive: false });
     }
@@ -208,6 +214,23 @@ export class TouchActionButtons extends UIComponent {
 
   setOnGrenadeQuickThrow(callback: () => void): void {
     this.onGrenadeQuickThrow = callback;
+  }
+
+  cancelActiveGesture(): void {
+    this.swipePointerId = null;
+    if (this.longPressTimer !== null) {
+      clearTimeout(this.longPressTimer);
+      this.longPressTimer = null;
+    }
+    this.longPressTriggered = false;
+
+    for (const [element, pointerId] of this.activeActionPresses) {
+      element.classList.remove(styles.pressed);
+      if (typeof element.releasePointerCapture === 'function' && element.hasPointerCapture(pointerId)) {
+        element.releasePointerCapture(pointerId);
+      }
+    }
+    this.activeActionPresses.clear();
   }
 
   setActiveSlot(index: number): void {

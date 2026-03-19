@@ -27,6 +27,7 @@ import type { AirSupportManager } from '../airsupport/AirSupportManager';
 import type { PlayerCombatControllerDependencies, PlayerControllerDependencies, PlayerVehicleControllerDependencies } from './PlayerControllerDependencies';
 import { PlayerCombatController } from './PlayerCombatController';
 import { PlayerVehicleController } from './PlayerVehicleController';
+import type { FullMapSystem } from '../../ui/map/FullMapSystem';
 
 // ── Player physics defaults ──
 const PLAYER_WALK_SPEED = 10;
@@ -54,6 +55,7 @@ export class PlayerController implements GameSystem {
   private footstepAudioSystem?: FootstepAudioSystem;
   private playerSquadController?: PlayerSquadController;
   private commandInputManager?: CommandInputManager;
+  private fullMapSystem?: FullMapSystem;
   private airSupportManager?: AirSupportManager;
   private playerSquadId?: string;
   private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
@@ -162,6 +164,7 @@ export class PlayerController implements GameSystem {
       onSandbagRotateLeft: () => this.sandbagSystem?.rotatePlacementPreview(-Math.PI / 8),
       onSandbagRotateRight: () => this.sandbagSystem?.rotatePlacementPreview(Math.PI / 8),
       onRallyPointPlace: () => this.handleRallyPointPlacement(),
+      onMapToggle: () => this.fullMapSystem?.toggleVisibility(),
       onToggleMortarCamera: () => this.handleToggleMortarCamera(),
       onDeployMortar: () => this.handleDeployMortar(),
       onMortarFire: () => this.handleMortarFire(),
@@ -640,6 +643,7 @@ export class PlayerController implements GameSystem {
     this.movement.setFootstepAudioSystem(dependencies.footstepAudioSystem);
     this.playerSquadController = dependencies.playerSquadController;
     this.commandInputManager = dependencies.commandInputManager;
+    this.fullMapSystem = dependencies.fullMapSystem;
     dependencies.commandInputManager.bindInputManager(this.input);
     this.airSupportManager = dependencies.airSupportManager;
 

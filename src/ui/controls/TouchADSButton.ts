@@ -121,4 +121,8 @@ export class TouchADSButton extends BaseTouchButton {
     this.root.style.display = 'none';
     this.resetADS();
   }
+
+  cancelActivePress(): void {
+    this.resetADS();
+  }
 }

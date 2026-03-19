@@ -19,6 +19,7 @@ export interface InputCallbacks {
   onSandbagRotateLeft?: () => void;
   onSandbagRotateRight?: () => void;
   onRallyPointPlace?: () => void;
+  onMapToggle?: () => void;
   onToggleMortarCamera?: () => void;
   onDeployMortar?: () => void;
   onMortarFire?: () => void;
@@ -130,6 +131,7 @@ export class PlayerInput {
         onSandbagRotateLeft: () => callbacks.onSandbagRotateLeft?.(),
         onSandbagRotateRight: () => callbacks.onSandbagRotateRight?.(),
         onRallyPointPlace: () => callbacks.onRallyPointPlace?.(),
+        onMapToggle: () => callbacks.onMapToggle?.(),
         onSquadCommand: () => callbacks.onSquadCommand?.(),
         onMenuPause: () => callbacks.onMenuPause?.(),
         onMenuResume: () => callbacks.onMenuResume?.(),
@@ -454,8 +456,12 @@ export class PlayerInput {
       this.callbacks.onRallyPointPlace?.();
     }
 
+    if (!this.isInHelicopter && event.code === 'KeyM' && this.isTouchMode) {
+      this.callbacks.onMapToggle?.();
+    }
+
     // Mortar camera toggle with M key (when not in helicopter)
-    if (!this.isInHelicopter && event.code === 'KeyM') {
+    if (!this.isInHelicopter && event.code === 'KeyM' && !this.isTouchMode) {
       this.callbacks.onToggleMortarCamera?.();
     }
 
