@@ -135,6 +135,9 @@ export class PlayerInput {
         onSquadCommand: () => callbacks.onSquadCommand?.(),
         onMenuPause: () => callbacks.onMenuPause?.(),
         onMenuResume: () => callbacks.onMenuResume?.(),
+        onToggleAutoHover: () => callbacks.onToggleAutoHover?.(),
+        onVehicleFireStart: () => callbacks.onMouseDown?.(0),
+        onVehicleFireStop: () => callbacks.onMouseUp?.(0),
       });
     }
 

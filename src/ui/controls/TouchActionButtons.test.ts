@@ -28,15 +28,23 @@ describe('TouchActionButtons', () => {
     buttons = Array.from(container.children) as HTMLDivElement[];
   });
 
-  it('creates weapon cycler, Reload, and Jump buttons', () => {
+  it('creates weapon cycler, CMD, MAP, Reload, and Jump buttons', () => {
     expect(container).toBeTruthy();
-    // 3 children: weapon cycler pill + 2 action buttons (reload, jump)
-    expect(buttons).toHaveLength(3);
+    // 5 children: weapon cycler pill + command + map + reload + jump
+    expect(buttons).toHaveLength(5);
     // First child is the weapon cycler pill (contains chevrons + label)
     expect(buttons[0].className).toContain('weaponCycler');
-    const reloadImg = buttons[1].querySelector('img') as HTMLImageElement;
+    // Command and map buttons (text-only, no icons)
+    expect(buttons[1].textContent).toBe('CMD');
+    expect(buttons[2].textContent).toBe('MAP');
+    // Reload and jump buttons (queried by aria-label for resilience)
+    const reloadBtn = container.querySelector('[aria-label="R"]') as HTMLDivElement;
+    const jumpBtn = container.querySelector('[aria-label="JUMP"]') as HTMLDivElement;
+    expect(reloadBtn).toBeTruthy();
+    expect(jumpBtn).toBeTruthy();
+    const reloadImg = reloadBtn.querySelector('img') as HTMLImageElement;
     expect(reloadImg?.src).toContain('icon-reload.png');
-    const jumpImg = buttons[2].querySelector('img') as HTMLImageElement;
+    const jumpImg = jumpBtn.querySelector('img') as HTMLImageElement;
     expect(jumpImg?.src).toContain('icon-jump.png');
   });
 
@@ -48,9 +56,11 @@ describe('TouchActionButtons', () => {
     const onAction = vi.fn();
     actions.setOnAction(onAction);
 
-    // buttons[0] is weapon cycler (not an action button), buttons[1]=reload, buttons[2]=jump
-    buttons[1].dispatchEvent(pointerDownEvent());
-    buttons[2].dispatchEvent(pointerDownEvent());
+    // Query by aria-label for resilience to button order changes
+    const reloadBtn = container.querySelector('[aria-label="R"]') as HTMLDivElement;
+    const jumpBtn = container.querySelector('[aria-label="JUMP"]') as HTMLDivElement;
+    reloadBtn.dispatchEvent(pointerDownEvent());
+    jumpBtn.dispatchEvent(pointerDownEvent());
 
     expect(onAction).toHaveBeenNthCalledWith(1, 'reload');
     expect(onAction).toHaveBeenNthCalledWith(2, 'jump');

@@ -20,6 +20,7 @@ import { TouchRallyPointButton } from './TouchRallyPointButton';
 import { TouchMenuButton } from './TouchMenuButton';
 import { TouchMortarButton } from './TouchMortarButton';
 import { TouchHelicopterCyclic } from './TouchHelicopterCyclic';
+import { VehicleActionBar } from './VehicleActionBar';
 import type { HUDLayout } from '../layout/HUDLayout';
 import { InputContextManager } from '../../systems/input/InputContextManager';
 
@@ -42,6 +43,9 @@ interface TouchControlCallbacks {
   onMapToggle?: () => void;
   onMenuPause?: () => void;
   onMenuResume?: () => void;
+  onToggleAutoHover?: () => void;
+  onVehicleFireStart?: () => void;
+  onVehicleFireStop?: () => void;
 }
 
 export class TouchControls {
@@ -56,6 +60,7 @@ export class TouchControls {
   readonly menuButton: TouchMenuButton;
   readonly mortarButton: TouchMortarButton;
   readonly helicopterCyclic: TouchHelicopterCyclic;
+  readonly vehicleActionBar: VehicleActionBar;
 
   private visible = false;
   private readonly contextManager = InputContextManager.getInstance();
@@ -73,6 +78,7 @@ export class TouchControls {
     this.menuButton = new TouchMenuButton();
     this.mortarButton = new TouchMortarButton();
     this.helicopterCyclic = new TouchHelicopterCyclic();
+    this.vehicleActionBar = new VehicleActionBar();
 
     // Mount all to document.body
     const body = document.body;
@@ -87,6 +93,7 @@ export class TouchControls {
     this.menuButton.mount(body);
     this.mortarButton.mount(body);
     this.helicopterCyclic.mount(body);
+    this.vehicleActionBar.mount(body);
 
     this.unsubscribeContext = this.contextManager.onChange((context) => {
       if (context !== 'gameplay') {
@@ -146,6 +153,16 @@ export class TouchControls {
     );
     this.menuButton.setSquadCallback(() => callbacks.onSquadCommand?.());
     this.menuButton.setScoreboardCallback(() => callbacks.onScoreboardTap?.());
+
+    // Wire vehicle action bar
+    this.vehicleActionBar.setCallbacks({
+      onExitVehicle: () => callbacks.onEnterExitHelicopter(),
+      onVehicleFireStart: () => callbacks.onVehicleFireStart?.(),
+      onVehicleFireStop: () => callbacks.onVehicleFireStop?.(),
+      onToggleAutoHover: () => callbacks.onToggleAutoHover?.(),
+      onLookDown: () => this.look.show(),
+      onLookUp: () => { if (this.inHelicopterMode) this.look.hide(); },
+    });
   }
 
   /**
@@ -214,6 +231,7 @@ export class TouchControls {
     this.menuButton.hide();
     this.mortarButton.hide();
     this.helicopterCyclic.hide();
+    this.vehicleActionBar.hide();
   }
 
   cancelActiveInteractions(): void {
@@ -243,8 +261,9 @@ export class TouchControls {
     this.sandbagButtons.hide();
     this.look.hide();
 
-    // Show helicopter cyclic joystick (right side)
+    // Show helicopter cyclic joystick (right side) and vehicle action bar
     this.helicopterCyclic.show();
+    this.vehicleActionBar.show();
 
     // Set left joystick to helicopter throttle mode
     this.joystick.setHelicopterMode(true);
@@ -259,6 +278,7 @@ export class TouchControls {
 
     // Hide helicopter controls
     this.helicopterCyclic.hide();
+    this.vehicleActionBar.hide();
 
     // Restore infantry controls
     this.fireButton.show();
@@ -298,5 +318,6 @@ export class TouchControls {
     this.menuButton.dispose();
     this.mortarButton.dispose();
     this.helicopterCyclic.dispose();
+    this.vehicleActionBar.dispose();
   }
 }

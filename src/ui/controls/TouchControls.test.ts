@@ -150,6 +150,24 @@ vi.mock('./TouchHelicopterCyclic', () => ({
   },
 }));
 
+const vehicleActionBarInstances: any[] = [];
+
+vi.mock('./VehicleActionBar', () => ({
+  VehicleActionBar: class {
+    show = vi.fn();
+    hide = vi.fn();
+    dispose = vi.fn();
+    mount = vi.fn();
+    setCallbacks = vi.fn();
+    setFireVisible = vi.fn();
+    setAutoHoverActive = vi.fn();
+
+    constructor() {
+      vehicleActionBarInstances.push(this);
+    }
+  },
+}));
+
 import { TouchControls } from './TouchControls';
 
 describe('TouchControls', () => {
@@ -160,6 +178,7 @@ describe('TouchControls', () => {
     lookInstances.length = 0;
     fireInstances.length = 0;
     actionInstances.length = 0;
+    vehicleActionBarInstances.length = 0;
   });
 
   it('constructor creates all sub-components', () => {
@@ -265,6 +284,33 @@ describe('TouchControls', () => {
     const weaponRouter = actionInstances[0].setOnWeaponSelect.mock.calls[0][0] as (slot: number) => void;
     weaponRouter(3);
     expect(callbacks.onWeaponSelect).toHaveBeenCalledWith(3);
+  });
+
+  it('enterHelicopterMode() shows vehicleActionBar', () => {
+    const controls = new TouchControls();
+    controls.show();
+
+    controls.enterHelicopterMode();
+
+    expect(vehicleActionBarInstances[0].show).toHaveBeenCalledTimes(1);
+  });
+
+  it('exitHelicopterMode() hides vehicleActionBar', () => {
+    const controls = new TouchControls();
+    controls.show();
+    controls.enterHelicopterMode();
+
+    controls.exitHelicopterMode();
+
+    expect(vehicleActionBarInstances[0].hide).toHaveBeenCalled();
+  });
+
+  it('dispose() disposes vehicleActionBar', () => {
+    const controls = new TouchControls();
+
+    controls.dispose();
+
+    expect(vehicleActionBarInstances[0].dispose).toHaveBeenCalledTimes(1);
   });
 
   it('cancels active touch interactions when input context leaves gameplay', () => {

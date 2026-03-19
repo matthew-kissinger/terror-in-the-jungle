@@ -651,6 +651,77 @@
   }
 }
 
+/* ==========================================================================
+   Vehicle action bar (helicopter/vehicle mode buttons)
+   ========================================================================== */
+
+.vehicleActionBar {
+  position: fixed;
+  right: max(var(--tc-edge-inset), env(safe-area-inset-right, 0px));
+  bottom: calc(60% + 12px);
+  display: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  z-index: var(--tc-z-controls);
+  touch-action: none;
+  pointer-events: auto;
+}
+
+.vehicleBtn {
+  composes: btn;
+  width: var(--tc-action-size);
+  height: var(--tc-action-size);
+  background: rgba(30, 80, 30, 0.4);
+  border: 2px solid rgba(80, 200, 80, 0.4);
+  font-size: var(--tc-font-size-sm);
+  color: rgba(80, 200, 80, 0.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.vehicleBtn.pressed {
+  background: rgba(40, 120, 40, 0.6);
+  transform: scale(0.9);
+}
+
+.vehicleBtnActive {
+  background: rgba(40, 140, 40, 0.6);
+  border-color: rgba(100, 255, 100, 0.6);
+  box-shadow: 0 0 12px rgba(80, 200, 80, 0.3);
+}
+
+.vehicleExitBtn {
+  composes: btn;
+  width: var(--tc-action-size);
+  height: var(--tc-action-size);
+  background: rgba(200, 50, 30, 0.5);
+  border: 2px solid rgba(255, 80, 60, 0.5);
+  font-size: var(--tc-font-size-sm);
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.vehicleExitBtn.pressed {
+  background: rgba(220, 60, 40, 0.7);
+  transform: scale(0.9);
+}
+
+.vehicleFireBtn {
+  composes: btn;
+  width: var(--tc-action-size);
+  height: var(--tc-action-size);
+  background: rgba(200, 50, 30, 0.45);
+  border: 2px solid rgba(255, 80, 60, 0.45);
+  font-size: var(--tc-font-size-sm);
+  color: rgba(255, 100, 80, 0.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.vehicleFireBtn.pressed {
+  background: rgba(230, 60, 40, 0.7);
+  transform: scale(0.9);
+}
+
 /* Helicopter left joystick label overlay - shown when in helicopter mode */
 .heliThrottleLabel {
   position: absolute;

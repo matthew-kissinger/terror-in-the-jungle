@@ -1,6 +1,6 @@
 # Project Notes
 
-Last updated: 2026-03-10
+Last updated: 2026-03-18
 
 ## Project
 
@@ -48,7 +48,7 @@ npm run perf:update-baseline  # update baseline from latest capture
 - World features: `src/systems/world/*` (WorldFeatureSystem, FirebaseLayoutGenerator, AirfieldLayoutGenerator)
 - Harness: `scripts/perf-capture.ts`, `scripts/perf-analyze-latest.ts`, `scripts/perf-compare.ts`
 - Scene utilities: `src/utils/SceneUtils.ts` (freezeTransform for static object matrix optimization)
-- UI: `src/ui/hud/` (HUD, KillFeed, CrosshairSystem, HelicopterHUD), `src/ui/controls/` (touch buttons, BaseTouchButton), `src/ui/icons/` (IconRegistry), `src/ui/screens/` (GameUI, TitleScreen, ModeSelectScreen, DeployScreen), `src/ui/loading/` (SettingsModal, LoadingProgress, ModeCard), `src/ui/engine/` (UIComponent, FocusTrap)
+- UI: `src/ui/hud/` (HUD, KillFeed, CrosshairSystem, HelicopterHUD), `src/ui/controls/` (touch buttons, BaseTouchButton, VehicleActionBar), `src/ui/icons/` (IconRegistry), `src/ui/screens/` (GameUI, TitleScreen, ModeSelectScreen, DeployScreen), `src/ui/loading/` (SettingsModal, LoadingProgress, ModeCard), `src/ui/engine/` (UIComponent, FocusTrap)
 - Integration tests: `src/integration/harness/`, `src/integration/scenarios/`
 - Test utilities: `src/test-utils/` (shared mocks and factories)
 
@@ -72,7 +72,8 @@ npm run perf:update-baseline  # update baseline from latest capture
 16. Navmesh path query API + NPC movement overhaul (2026-03-17): NavmeshSystem exposes queryPath/findNearestPoint/isPointOnNavmesh/validateConnectivity via @recast-navigation NavMeshQuery. Connectivity validation wired into ModeStartupPreparer. WALKABLE_SLOPE_ANGLE 40->45, WALKABLE_CLIMB 0.4->0.6. NPC speeds raised 30-70% (NPC_MAX_SPEED 6->8, patrol 7.5, combat approach 5.5, traversal run 10). Forward probe tolerance increased (lip rise 0.45->1.0m). Follower NPCs share leader destination instead of random wander. Zone selection weighted 70/20/10 toward best zone. Leaderless followers advance toward enemy territory. Enemy base fallback uses cascading zone lookups. Navmesh-aware structure placement scoring. Navmesh route guidance infrastructure built but disabled pending WASM validation. Stale docs/artifacts cleaned (.firehose/, tasks.md, memory files). 3561+ tests passing.
 17. Engine optimizations + mobile hardening (2026-03-17): Scene graph matrix freeze (`freezeTransform` utility, scene-level `matrixAutoUpdate`/`matrixWorldAutoUpdate` disabled, ~700 static objects frozen, ~50 dynamic objects explicitly opted in). THREE.Cache enabled globally. Effect pool scene management (TracerPool/ExplosionEffectsPool/ImpactEffectsPool/SmokeCloudSystem: inactive effects removed from scene entirely, re-added on spawn). CSS performance hardening (HUD `contain: layout style`, `backdrop-filter` ban on HUD subtree, `will-change`/`translate3d` on animated elements). InputContextManager decoupled input (`isMovementAllowed()`/`isFireAllowed()` for scoreboard-style overlays). Mobile fixes: joystick reset on blur/pagehide/visibilitychange, TouchCrouchButton deleted (crouch removed from gameplay). 3599 tests passing.
 18. HUD visibility fix + UI screen redesign (2026-03-17): `backdrop-filter` ban scoped to `@media (pointer: coarse)` only - desktop HUD panels restored (ammo, tickets, timer, kill feed get frosted-glass blur back). Kill feed `.entry` backdrop-filter restored. UI screens redesigned: `GameUI` state machine replaces `StartScreen` (TitleScreen + ModeSelectScreen), `DeployScreen` replaces `RespawnUI` with hero-map layout. Opaque `rgba(8,12,18,0.96)` backgrounds replace blur on all screen overlays. HowToPlayModal + OnboardingOverlay absorbed into SettingsModal as collapsible `<details>` sections. 10 files deleted (StartScreen, RespawnUI, HowToPlayModal, OnboardingOverlay + their CSS/tests), 7 new files created (`src/ui/screens/`). UI code reduced from ~4,500 lines to ~2,900 lines (-35%). 3569 tests passing.
-19. See `docs/NEXT_WORK.md` for the active checklist.
+19. Mobile vehicle controls + sensitivity tuning (2026-03-18): VehicleActionBar component (EXIT/FIRE/STAB/LOOK buttons for helicopter mode). Touch sensitivity range halved (0.003-0.015, was 0.006-0.024), accel exponent 1.35->1.15, dead zone 0.5->1.5px. TouchActionButtons test fixed for 5-button layout (CMD+MAP added in PR #36). Fire button visibility gated by aircraft role (attack/gunship only). Auto-hover wired through touch controls. 3586 tests passing.
+20. See `docs/NEXT_WORK.md` for the active checklist.
 
 ## Documentation Contract
 

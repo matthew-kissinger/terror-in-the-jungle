@@ -8,7 +8,7 @@ export type ControllerDpadMode = 'weapons' | 'quickCommands';
 interface GameSettings {
   masterVolume: number;       // 0-100
   mouseSensitivity: number;   // 1-10 (UI scale), mapped to 0.001-0.005 internally
-  touchSensitivity: number;   // 1-10 (UI scale), mapped to 0.006-0.024 internally
+  touchSensitivity: number;   // 1-10 (UI scale), mapped to 0.003-0.015 internally
   controllerPreset: ControllerPreset;
   controllerMoveDeadZone: number; // 5-30 percent
   controllerLookDeadZone: number; // 5-30 percent
@@ -75,10 +75,10 @@ export class SettingsManager {
     return 0.001 + (uiValue - 1) * (0.004 / 9);
   }
 
-  /** Returns touch look sensitivity (0.006 - 0.024). Tuned for Fortnite-level mobile responsiveness. */
+  /** Returns touch look sensitivity (0.003 - 0.015). Tuned for comfortable mobile aiming. */
   getTouchSensitivityRaw(): number {
     const uiValue = this.settings.touchSensitivity; // 1-10
-    return 0.006 + (uiValue - 1) * (0.018 / 9);
+    return 0.003 + (uiValue - 1) * (0.012 / 9);
   }
 
   /** Returns controller move stick dead zone as 0-1 fraction. */

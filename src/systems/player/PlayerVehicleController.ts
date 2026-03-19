@@ -104,6 +104,12 @@ export class PlayerVehicleController {
     }
 
     input.getTouchControls()?.enterHelicopterMode();
+
+    // Set vehicle fire button visibility based on aircraft role
+    if (this.deps.helicopterModel) {
+      const role = this.deps.helicopterModel.getAircraftRole(helicopterId);
+      input.getTouchControls()?.vehicleActionBar.setFireVisible(role === 'attack' || role === 'gunship');
+    }
   }
 
   exitHelicopter(

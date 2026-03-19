@@ -23,13 +23,13 @@ export class TouchLook extends UIComponent {
   private sensitivity = 0.006;
 
   /** Dead zone in CSS pixels - movements below this are ignored to prevent jitter */
-  private deadZone = 0.5;
+  private deadZone = 1.5;
 
   /**
    * Acceleration exponent. 1.0 = linear (raw), >1.0 = super-linear (fast swipe boost).
-   * 1.35 tuned for Fortnite-style feel: precise aim at low speed, fast 180s on flicks.
+   * 1.15 provides gentle acceleration: precise aim at low speed, moderate boost on flicks.
    */
-  private accelExponent = 1.35;
+  private accelExponent = 1.15;
 
   /** ADS (aim-down-sight) sensitivity multiplier. Applied on top of base sensitivity. */
   private adsSensitivityMultiplier = 0.45;

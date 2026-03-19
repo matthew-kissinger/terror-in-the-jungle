@@ -31,8 +31,8 @@ src/ui/
   compass/     CompassSystem, CompassDOMBuilder, CompassStyles, CompassZoneMarkers
   controls/    TouchControls, TouchLook, TouchFireButton, TouchADSButton, TouchActionButtons,
                TouchInteractionButton, TouchMenuButton, TouchMortarButton, TouchRallyPointButton,
-               TouchSandbagButtons, TouchHelicopterCyclic, VirtualJoystick, GamepadManager,
-               TouchControlLayout
+               TouchSandbagButtons, TouchHelicopterCyclic, VehicleActionBar, VirtualJoystick,
+               GamepadManager, TouchControlLayout
   debug/       PerformanceOverlay, LogOverlay, TimeIndicator
   design/      styles, tokens, responsive, index
   end/         MatchEndScreen
@@ -119,14 +119,14 @@ Source: [types.ts]([GH]/ui/layout/types.ts) `HUDRegion` type
 | `joystick` | Touch | VirtualJoystick (left side) |
 | `fire` | Touch | TouchFireButton |
 | `ads` | Touch | TouchADSButton |
-| `action-btns` | Touch | reload, crouch, sprint buttons |
+| `action-btns` | Touch | weapon cycler, CMD, MAP, reload, jump buttons |
 | `menu` | Touch | TouchMenuButton |
 
 Visibility: `data-show="infantry"` on `weapon-bar` and `action-btns` - CSS hides these when `data-vehicle="helicopter"` is set on `#game-hud-root`. VisibilityManager sets/removes data attributes. Do not use JS `style.display` to hide/show slots.
 
 ---
 
-## Touch Control Module Registry (14 modules in `ui/controls/`)
+## Touch Control Module Registry (15 modules in `ui/controls/`)
 
 | Module | File | Role |
 |---|---|---|
@@ -134,13 +134,14 @@ Visibility: `data-show="infantry"` on `weapon-bar` and `action-btns` - CSS hides
 | [TouchLook]([GH]/ui/controls/TouchLook.ts) | ui/controls/TouchLook.ts | Right-side swipe -> camera yaw/pitch |
 | [TouchFireButton]([GH]/ui/controls/TouchFireButton.ts) | ui/controls/TouchFireButton.ts | Fire button, pointer events |
 | [TouchADSButton]([GH]/ui/controls/TouchADSButton.ts) | ui/controls/TouchADSButton.ts | Aim-down-sights toggle |
-| [TouchActionButtons]([GH]/ui/controls/TouchActionButtons.ts) | ui/controls/TouchActionButtons.ts | Reload, crouch, sprint buttons |
+| [TouchActionButtons]([GH]/ui/controls/TouchActionButtons.ts) | ui/controls/TouchActionButtons.ts | Weapon cycler, CMD, MAP, reload, jump buttons (5 total) |
 | [TouchInteractionButton]([GH]/ui/controls/TouchInteractionButton.ts) | ui/controls/TouchInteractionButton.ts | Context interaction (enter helicopter, pick up weapon) |
 | [TouchMenuButton]([GH]/ui/controls/TouchMenuButton.ts) | ui/controls/TouchMenuButton.ts | Pause/menu button |
 | [TouchMortarButton]([GH]/ui/controls/TouchMortarButton.ts) | ui/controls/TouchMortarButton.ts | Opens mortar targeting mode |
 | [TouchRallyPointButton]([GH]/ui/controls/TouchRallyPointButton.ts) | ui/controls/TouchRallyPointButton.ts | Places squad rally point |
 | [TouchSandbagButtons]([GH]/ui/controls/TouchSandbagButtons.ts) | ui/controls/TouchSandbagButtons.ts | Place/remove sandbag buttons |
 | [TouchHelicopterCyclic]([GH]/ui/controls/TouchHelicopterCyclic.ts) | ui/controls/TouchHelicopterCyclic.ts | Cyclic joystick for helicopter (no collective/yaw on touch) |
+| [VehicleActionBar]([GH]/ui/controls/VehicleActionBar.ts) | ui/controls/VehicleActionBar.ts | Helicopter action buttons (EXIT, FIRE, STAB hover, LOOK free-look) |
 | [VirtualJoystick]([GH]/ui/controls/VirtualJoystick.ts) | ui/controls/VirtualJoystick.ts | Reusable floating joystick widget |
 | [GamepadManager]([GH]/ui/controls/GamepadManager.ts) | ui/controls/GamepadManager.ts | Gamepad API polling, axis/button mapping |
 | [TouchControlLayout]([GH]/ui/controls/TouchControlLayout.ts) | ui/controls/TouchControlLayout.ts | Positions touch controls on screen, CSS custom properties |
