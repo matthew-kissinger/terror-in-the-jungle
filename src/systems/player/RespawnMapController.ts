@@ -71,10 +71,17 @@ export class RespawnMapController {
     mapContainer.appendChild(mapCanvas);
 
     this.openFrontierRespawnMap.clearSelection();
-    this.openFrontierRespawnMap.render();
-    this.openFrontierRespawnMap.resetView();
+    this.openFrontierRespawnMap.focusSpawnPoints();
 
     this.startMapUpdateInterval();
+  }
+
+  focusSpawnPoints(preferredSpawnPointId?: string): void {
+    this.openFrontierRespawnMap.focusSpawnPoints(preferredSpawnPointId);
+  }
+
+  setSelectedSpawnPoint(spawnPointId: string | undefined): void {
+    this.openFrontierRespawnMap.setSelectedSpawnPoint(spawnPointId);
   }
 
   private startMapUpdateInterval(): void {

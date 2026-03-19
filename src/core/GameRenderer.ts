@@ -27,8 +27,6 @@ export class GameRenderer {
 
   constructor() {
     this.scene = new THREE.Scene();
-    this.scene.matrixAutoUpdate = false;
-    this.scene.matrixWorldAutoUpdate = false;
 
     this.camera = new THREE.PerspectiveCamera(
       75,

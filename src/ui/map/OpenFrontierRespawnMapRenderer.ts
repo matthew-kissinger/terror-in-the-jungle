@@ -55,7 +55,7 @@ export class OpenFrontierRespawnMapRenderer {
       zones.forEach(zone => this.drawZoneLabel(ctx, zone, spawnPoints));
     }
 
-    spawnPoints.forEach(spawnPoint => this.drawSpawnPoint(ctx, spawnPoint));
+    spawnPoints.forEach(spawnPoint => this.drawSpawnPoint(ctx, spawnPoint, state.zoomLevel));
 
     // Draw selected spawn highlight
     if (state.selectedSpawnPointId) {
@@ -198,22 +198,28 @@ export class OpenFrontierRespawnMapRenderer {
     ctx.fillText(name, x, y - radius - 8);
   }
 
-  private static drawSpawnPoint(ctx: CanvasRenderingContext2D, spawnPoint: RespawnSpawnPoint): void {
+  private static drawSpawnPoint(
+    ctx: CanvasRenderingContext2D,
+    spawnPoint: RespawnSpawnPoint,
+    zoomLevel: number
+  ): void {
     const { x, y } = worldToMap(spawnPoint.position.x, spawnPoint.position.z);
     const color = spawnPoint.selectionClass === 'direct_insertion'
       ? 'rgba(255, 214, 102, 0.95)'
       : spawnPoint.kind === 'helipad'
         ? 'rgba(111, 196, 255, 0.95)'
         : 'rgba(92, 184, 92, 0.95)';
+    const outerRadius = Math.max(11, 16 / Math.sqrt(Math.max(zoomLevel, 0.75)));
+    const innerRadius = Math.max(7, 11 / Math.sqrt(Math.max(zoomLevel, 0.75)));
 
     ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
     ctx.beginPath();
-    ctx.arc(x, y, 11, 0, Math.PI * 2);
+    ctx.arc(x, y, outerRadius, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(x, y, 7, 0, Math.PI * 2);
+    ctx.arc(x, y, innerRadius, 0, Math.PI * 2);
     ctx.fill();
   }
 

@@ -81,6 +81,13 @@ export class SystemUpdater {
       performanceTelemetry.endSystem('Billboards');
     });
 
+    this.trackSystemUpdate('Vehicles', 1.0, () => {
+      performanceTelemetry.beginSystem('Vehicles');
+      if (refs.helicopterModel) refs.helicopterModel.update(deltaTime);
+      if (refs.vehicleManager) refs.vehicleManager.update(deltaTime);
+      performanceTelemetry.endSystem('Vehicles');
+    });
+
     this.trackSystemUpdate('Player', 1.0, () => {
       performanceTelemetry.beginSystem('Player');
       if (refs.playerController) refs.playerController.update(deltaTime);
@@ -202,6 +209,8 @@ export class SystemUpdater {
     return system === refs.combatantSystem
       || system === refs.terrainSystem
       || system === refs.globalBillboardSystem
+      || system === refs.helicopterModel
+      || system === refs.vehicleManager
       || system === refs.playerController
       || system === refs.firstPersonWeapon
       || system === refs.grenadeSystem

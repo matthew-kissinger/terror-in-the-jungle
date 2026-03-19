@@ -127,18 +127,27 @@ export class NavmeshSystem {
     }
 
     this.worldSize = worldSize;
-    this.isTiled = worldSize > TILED_THRESHOLD;
+    this.isTiled = worldSize >= TILED_THRESHOLD;
 
     const start = performance.now();
 
+    let generated = false;
     if (this.isTiled) {
-      await this.generateTiledNavmesh(worldSize, features);
+      generated = await this.generateTiledNavmesh(worldSize, features);
     } else {
-      this.generateSoloNavmesh(worldSize, features);
+      generated = this.generateSoloNavmesh(worldSize, features);
+      if (!generated) {
+        Logger.warn(
+          'Navigation',
+          `Solo navmesh generation failed (worldSize=${worldSize}, features=${features?.length ?? 0}); retrying tiled fallback`
+        );
+        this.isTiled = true;
+        generated = await this.generateTiledNavmesh(worldSize, features);
+      }
     }
 
     // Add structure obstacles (tiled navmesh only - solo bakes obstacles into heightfield)
-    if (this.isTiled && features?.length) {
+    if (generated && this.isTiled && features?.length) {
       this.addObstaclesFromFeatures(features);
     }
 
@@ -146,7 +155,7 @@ export class NavmeshSystem {
     Logger.info('Navigation', `Navmesh generated in ${elapsed.toFixed(1)}ms (${this.isTiled ? 'tiled' : 'solo'}, worldSize=${worldSize})`);
   }
 
-  private generateSoloNavmesh(worldSize: number, features?: MapFeatureDefinition[]): void {
+  private generateSoloNavmesh(worldSize: number, features?: MapFeatureDefinition[]): boolean {
     const heightCache = getHeightQueryCache();
     const halfSize = worldSize / 2;
     const geometry = buildHeightfieldMesh(
@@ -181,7 +190,9 @@ export class NavmeshSystem {
 
     if (!result.success || !result.navMesh) {
       Logger.error('Navigation', 'Solo navmesh generation failed');
-      return;
+      geometry.dispose();
+      for (const m of obstacleMeshes) m.geometry.dispose();
+      return false;
     }
 
     this.navMesh = result.navMesh;
@@ -189,9 +200,10 @@ export class NavmeshSystem {
 
     geometry.dispose();
     for (const m of obstacleMeshes) m.geometry.dispose();
+    return true;
   }
 
-  private async generateTiledNavmesh(worldSize: number, _features?: MapFeatureDefinition[]): Promise<void> {
+  private async generateTiledNavmesh(worldSize: number, _features?: MapFeatureDefinition[]): Promise<boolean> {
     // For tiled navmesh, we generate initial tiles around origin
     // Additional tiles are streamed in update()
     const heightCache = getHeightQueryCache();
@@ -227,7 +239,7 @@ export class NavmeshSystem {
     if (!result.success || !result.navMesh) {
       Logger.error('Navigation', 'Tiled navmesh generation failed');
       geometry.dispose();
-      return;
+      return false;
     }
 
     this.navMesh = result.navMesh;
@@ -243,6 +255,7 @@ export class NavmeshSystem {
     }
 
     geometry.dispose();
+    return true;
   }
 
   private createCrowd(): void {

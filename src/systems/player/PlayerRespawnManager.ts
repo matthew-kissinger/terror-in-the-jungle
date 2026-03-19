@@ -442,6 +442,7 @@ export class PlayerRespawnManager implements GameSystem {
       return;
     }
     this.selectedSpawnPoint = zoneId;
+    this.mapController.setSelectedSpawnPoint?.(zoneId);
     this.respawnUI.updateSelectedSpawn(zoneName);
     this.updateTimerDisplay();
   }
@@ -544,7 +545,9 @@ export class PlayerRespawnManager implements GameSystem {
     }
 
     this.selectedSpawnPoint = fallbackSpawn.id;
+    this.mapController.setSelectedSpawnPoint?.(fallbackSpawn.id);
     this.respawnUI.updateSelectedSpawn(fallbackSpawn.name);
+    this.mapController.focusSpawnPoints?.(fallbackSpawn.id);
   }
 
   private createDeployPosition(basePosition: THREE.Vector3): THREE.Vector3 {

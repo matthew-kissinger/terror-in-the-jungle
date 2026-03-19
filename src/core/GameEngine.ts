@@ -42,7 +42,7 @@ export class GameEngine {
   public readonly startupFlow = new StartupFlowController();
 
   // State (Public for split module access)
-  public clock = new THREE.Clock();
+  public clock = new THREE.Timer();
   public isInitialized = false;
   public gameStarted = false;
   public gameStartPending = false;
@@ -79,6 +79,7 @@ export class GameEngine {
     this.contextRecovery = new WebGLContextGuard(this.renderer);
     this.setupEventListeners();
     this.setupMenuCallbacks();
+    this.clock.connect(document);
     this.mobilePauseOverlay = new MobilePauseOverlay(this);
     this.mobilePauseOverlay.setup();
   }
@@ -299,6 +300,7 @@ export class GameEngine {
     if (this.settingsUnsubscribe) {
       this.settingsUnsubscribe();
     }
+    this.clock.dispose();
     this.contextRecovery.dispose();
     this.mobilePauseOverlay?.dispose();
     Input.disposeEventListeners();
