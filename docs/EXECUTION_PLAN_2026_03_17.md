@@ -3,6 +3,8 @@
 Status: COMPLETE (Layer 1-2 + speed tuning + behavioral fixes shipped; Layer 3A/3C/3D deferred)
 Date: 2026-03-17
 
+> **Continued iteration** on movement, terrain-flow, and validation lives in [`MOVEMENT_NAV_CHECKIN.md`](./MOVEMENT_NAV_CHECKIN.md) and issue notes in [`PLAYTEST_ISSUES.md`](./PLAYTEST_ISSUES.md).
+
 ## Problem Statement
 
 NPCs cannot navigate terrain. They use a reactive 1.35m-lookahead wall-follower that probes terrain each frame, gets blocked by slopes, oscillates, and eventually triggers stuck-recovery hacks that backtrack to other stuck positions. The system has no spatial model of where NPCs can and cannot go.

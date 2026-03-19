@@ -1,5 +1,7 @@
 # Movement / Nav Check-In
 
+**Document status:** ACTIVE — running log for movement, navmesh, and terrain-flow workstreams.
+
 Last updated: 2026-03-17
 Scope: player hill feel, NPC hill traversal, combat approach behavior on hilly terrain, terrain-level support changes
 

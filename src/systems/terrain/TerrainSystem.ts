@@ -48,6 +48,7 @@ export class TerrainSystem implements GameSystem {
   private readinessProbe = new THREE.Vector3();
   private isInitialized = false;
   private vegetationAddThrottleFrame = false;
+  private frameCounter = 0;
 
   // Runtime bootstrap/config state
   private chunkSize = 64;
@@ -154,12 +155,15 @@ export class TerrainSystem implements GameSystem {
     if (!this.isInitialized) return;
     if (!this.renderRuntime) return;
 
+    this.frameCounter++;
+
     this.streamingScheduler.runStream('render', this.config.renderUpdateBudgetMs, () => {
       this.renderRuntime!.update();
       return { workUnits: 1, pendingUnits: 0 };
     });
 
     const vegetationBudget = this.computeVegetationFrameBudget(deltaTime);
+    let vegetationDidWork = false;
     this.streamingScheduler.runStream('vegetation', this.config.vegetationUpdateBudgetMs, budgetMs => {
       const didWork = this.vegetationScatterer.updateBudgeted(this.playerPosition, {
         maxAddsPerFrame: vegetationBudget.maxAddsPerFrame,
@@ -168,6 +172,7 @@ export class TerrainSystem implements GameSystem {
           Math.max(2, Math.floor(budgetMs * 6)),
         ),
       });
+      vegetationDidWork = didWork;
       const pending = this.vegetationScatterer.getPendingCounts();
       return {
         workUnits: didWork ? 1 : 0,
@@ -175,19 +180,24 @@ export class TerrainSystem implements GameSystem {
       };
     });
 
-    this.streamingScheduler.runStream('collision', this.config.collisionUpdateBudgetMs, budgetMs => {
-      const didWork = this.raycastRuntime.updateNearFieldMesh(
-        this.playerPosition,
-        this.config.bvhRadius,
-        this.config.bvhRebuildThreshold,
-        (x, z) => this.getHeightAt(x, z),
-        Math.max(4, Math.floor(budgetMs * 10)),
-      );
-      return {
-        workUnits: didWork ? 1 : 0,
-        pendingUnits: this.raycastRuntime.getPendingRowCount(),
-      };
-    });
+    // Stagger collision rebuild: skip on frames where vegetation did work
+    // to avoid compounding expensive terrain operations in the same frame.
+    const skipCollision = vegetationDidWork && (this.frameCounter % 2 === 0);
+    if (!skipCollision) {
+      this.streamingScheduler.runStream('collision', this.config.collisionUpdateBudgetMs, budgetMs => {
+        const didWork = this.raycastRuntime.updateNearFieldMesh(
+          this.playerPosition,
+          this.config.bvhRadius,
+          this.config.bvhRebuildThreshold,
+          (x, z) => this.getHeightAt(x, z),
+          Math.max(4, Math.floor(budgetMs * 10)),
+        );
+        return {
+          workUnits: didWork ? 1 : 0,
+          pendingUnits: this.raycastRuntime.getPendingRowCount(),
+        };
+      });
+    }
   }
 
   dispose(): void {

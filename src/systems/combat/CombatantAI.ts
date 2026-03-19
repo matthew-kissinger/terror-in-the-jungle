@@ -72,21 +72,27 @@ export class CombatantAI {
     deltaTime: number,
     playerPosition: THREE.Vector3,
     allCombatants: Map<string, Combatant>,
-    spatialGrid?: ISpatialQuery
+    spatialGrid?: ISpatialQuery,
+    lodLevel: 'high' | 'medium' = 'high'
   ): void {
     // Stop AI updates if game is not active
     if (this.ticketSystem && !this.ticketSystem.isGameActive()) {
       return
     }
 
+    const isMediumLOD = lodLevel === 'medium'
+
     // Apply squad command overrides before state machine processing
-    this.applySquadCommandOverride(combatant, playerPosition)
+    // At MEDIUM LOD, skip for non-player-controlled squads
+    if (!isMediumLOD || this.isPlayerControlledSquad(combatant)) {
+      this.applySquadCommandOverride(combatant, playerPosition)
+    }
 
     // Decay suppression effects over time
     this.decaySuppressionEffects(combatant, deltaTime)
 
-    // Update flanking operations for squad members
-    if (combatant.squadId) {
+    // Update flanking operations for squad members (skip at MEDIUM LOD)
+    if (!isMediumLOD && combatant.squadId) {
       const operation = this.flankingSystem.getActiveOperation(combatant.squadId)
       if (operation && !this.flankingUpdatedSquadsThisFrame.has(combatant.squadId)) {
         const squad = this.squads.get(combatant.squadId)
@@ -125,18 +131,34 @@ export class CombatantAI {
         break
 
       case CombatantState.ENGAGING:
-        this.engageHandler.handleEngaging(
-          combatant,
-          deltaTime,
-          playerPosition,
-          allCombatants,
-          spatialGrid,
-          this.canSeeTarget.bind(this),
-          this.shouldSeekCover.bind(this),
-          this.findNearestCover.bind(this),
-          this.countNearbyEnemies.bind(this),
-          this.isCoverFlanked.bind(this)
-        )
+        if (isMediumLOD) {
+          // Simplified engagement: skip countNearbyEnemies, isCoverFlanked, suppression initiation
+          this.engageHandler.handleEngaging(
+            combatant,
+            deltaTime,
+            playerPosition,
+            allCombatants,
+            spatialGrid,
+            this.canSeeTarget.bind(this),
+            this.shouldSeekCoverMediumLOD.bind(this),
+            this.findNearestCover.bind(this),
+            this.countNearbyEnemiesNoop,
+            this.isCoverFlankedNoop
+          )
+        } else {
+          this.engageHandler.handleEngaging(
+            combatant,
+            deltaTime,
+            playerPosition,
+            allCombatants,
+            spatialGrid,
+            this.canSeeTarget.bind(this),
+            this.shouldSeekCover.bind(this),
+            this.findNearestCover.bind(this),
+            this.countNearbyEnemies.bind(this),
+            this.isCoverFlanked.bind(this)
+          )
+        }
         break
 
       case CombatantState.SUPPRESSING:
@@ -287,6 +309,25 @@ export class CombatantAI {
         break
     }
   }
+
+  private isPlayerControlledSquad(combatant: Combatant): boolean {
+    if (!combatant.squadId) return false
+    const squad = this.squads.get(combatant.squadId)
+    return !!squad?.isPlayerControlled
+  }
+
+  /**
+   * Simplified cover check for MEDIUM LOD: only seek cover if health is low.
+   * Avoids expensive spatial queries and flanking evaluation.
+   */
+  private shouldSeekCoverMediumLOD(combatant: Combatant): boolean {
+    if (combatant.inCover) return false
+    return combatant.health < combatant.maxHealth * 0.4
+  }
+
+  // Noop stubs for MEDIUM LOD to avoid spatial grid queries
+  private countNearbyEnemiesNoop = (): number => 0
+  private isCoverFlankedNoop = (): boolean => false
 
   private decaySuppressionEffects(combatant: Combatant, deltaTime: number): void {
     if (combatant.lastSuppressedTime) {

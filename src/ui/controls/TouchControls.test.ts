@@ -314,7 +314,7 @@ describe('TouchControls', () => {
   });
 
   it('cancels active touch interactions when input context leaves gameplay', () => {
-    const controls = new TouchControls();
+    new TouchControls();
     const contextManager = InputContextManager.getInstance();
 
     contextManager.setContext('menu');

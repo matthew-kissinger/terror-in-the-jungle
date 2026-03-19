@@ -872,6 +872,43 @@ function validateRun(
     });
   }
 
+  // GPU resource trend analysis: detect monotonic growth in geometries/textures
+  const rendererSamples = runtimeSamples.filter(s => s.renderer && typeof s.renderer.geometries === 'number');
+  if (rendererSamples.length >= 4) {
+    const geoValues = rendererSamples.map(s => s.renderer!.geometries);
+    const texValues = rendererSamples.map(s => s.renderer!.textures);
+
+    const isMonotonic = (values: number[]): boolean => {
+      let increases = 0;
+      for (let i = 1; i < values.length; i++) {
+        if (values[i] > values[i - 1]) increases++;
+      }
+      // Monotonic if >80% of transitions are increases
+      return increases / (values.length - 1) > 0.8;
+    };
+
+    const geoGrowth = geoValues[geoValues.length - 1] - geoValues[0];
+    const texGrowth = texValues[texValues.length - 1] - texValues[0];
+
+    if (isMonotonic(geoValues) && geoGrowth > 10) {
+      checks.push({
+        id: 'gpu_geometry_leak',
+        status: 'warn',
+        value: geoGrowth,
+        message: `Monotonic geometry growth: ${geoValues[0]} -> ${geoValues[geoValues.length - 1]} (+${geoGrowth})`
+      });
+    }
+
+    if (isMonotonic(texValues) && texGrowth > 5) {
+      checks.push({
+        id: 'gpu_texture_leak',
+        status: 'warn',
+        value: texGrowth,
+        message: `Monotonic texture growth: ${texValues[0]} -> ${texValues[texValues.length - 1]} (+${texGrowth})`
+      });
+    }
+  }
+
   return {
     overall: getOverallStatus(checks),
     checks
@@ -894,6 +931,32 @@ async function withTimeout<T>(label: string, promise: Promise<T>, timeoutMs: num
 
 async function sleep(ms: number): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Force GC via CDP and return heap measurement.
+ * Double-collects with a brief gap for finalizers.
+ */
+async function forceGCAndMeasureHeap(
+  cdp: CDPSession,
+  page: Page
+): Promise<{ heapUsedMb: number; heapTotalMb: number }> {
+  try {
+    await cdp.send('HeapProfiler.collectGarbage');
+    await sleep(100);
+    await cdp.send('HeapProfiler.collectGarbage');
+    await sleep(50);
+  } catch {
+    // CDP may not support HeapProfiler.collectGarbage in all contexts
+  }
+  const memory = await page.evaluate(() => {
+    const mem = (performance as any).memory;
+    return {
+      heapUsedMb: mem?.usedJSHeapSize ? Number(mem.usedJSHeapSize) / (1024 * 1024) : 0,
+      heapTotalMb: mem?.totalJSHeapSize ? Number(mem.totalJSHeapSize) / (1024 * 1024) : 0,
+    };
+  });
+  return memory;
 }
 
 async function startDevServer(port: number): Promise<ChildProcess> {
@@ -1570,7 +1633,8 @@ async function runCapture(): Promise<void> {
         '--disable-background-timer-throttling',
         '--disable-backgrounding-occluded-windows',
         '--disable-renderer-backgrounding',
-        '--disable-frame-rate-limit'
+        '--disable-frame-rate-limit',
+        '--enable-precise-memory-info',
       ],
       viewport: { width: 1920, height: 1080 }
     });
@@ -1703,6 +1767,17 @@ async function runCapture(): Promise<void> {
 
     stage = 'sample-runtime';
     logStep(`🎯 Capturing profiling data for ${durationSeconds}s`);
+
+    // Force GC before baseline heap measurement for reliable recovery ratios
+    if (cdpStarted && cdp && page) {
+      try {
+        const gcBaseline = await forceGCAndMeasureHeap(cdp, page);
+        logStep(`📊 Forced-GC baseline heap: ${gcBaseline.heapUsedMb.toFixed(2)} MB`);
+      } catch {
+        logStep('⚠ Forced GC baseline measurement failed');
+      }
+    }
+
     const startMs = Date.now();
     let missedSamples = 0;
     let sampleTick = 0;
@@ -2006,6 +2081,20 @@ async function runCapture(): Promise<void> {
     }
     if (missedSamples > 0) {
       logStep(`⚠ Missed ${missedSamples} runtime samples due to main-thread blocking`);
+    }
+
+    // Force GC before final heap measurement for reliable recovery ratios
+    if (cdpStarted && cdp && page && runtimeSamples.length > 0) {
+      try {
+        const gcFinal = await forceGCAndMeasureHeap(cdp, page);
+        logStep(`📊 Forced-GC final heap: ${gcFinal.heapUsedMb.toFixed(2)} MB`);
+        // Override last sample's heap values with GC'd measurement
+        const lastSample = runtimeSamples[runtimeSamples.length - 1];
+        lastSample.heapUsedMb = gcFinal.heapUsedMb;
+        lastSample.heapTotalMb = gcFinal.heapTotalMb;
+      } catch {
+        logStep('⚠ Forced GC final measurement failed');
+      }
     }
 
     stage = 'stop-cdp';

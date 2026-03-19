@@ -109,11 +109,20 @@ export class NavmeshSystem {
   private threeToSoloNavMeshFn: typeof import('@recast-navigation/three').threeToSoloNavMesh | null = null;
   private threeToTileCacheFn: typeof import('@recast-navigation/three').threeToTileCache | null = null;
 
+  private initPromise: Promise<void> | null = null;
+
   /**
    * Initialize WASM module. Must complete before any navmesh ops.
-   * Gracefully degrades if WASM fails.
+   * Gracefully degrades if WASM fails. Idempotent - safe to call multiple times.
    */
   async init(): Promise<void> {
+    if (this.wasmReady) return;
+    if (this.initPromise) return this.initPromise;
+    this.initPromise = this.doInit();
+    return this.initPromise;
+  }
+
+  private async doInit(): Promise<void> {
     try {
       const core = await import('@recast-navigation/core');
       const three = await import('@recast-navigation/three');

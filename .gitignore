@@ -65,6 +65,9 @@ public/assets/originals/
 .playwright-mcp/
 artifacts/
 
+# Local scratch / locks (not source)
+tmp/*.lock
+
 # Vietnam terrain data (large binary files, downloaded via scripts)
 data/vietnam/terrain-tiles/
 data/vietnam/big-map/z13/

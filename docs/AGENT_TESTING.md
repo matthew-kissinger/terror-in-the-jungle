@@ -15,17 +15,16 @@ npm run lint             # ESLint on src/
 - Exit code 0 = pass, 1 = test failures.
 - Run after any code change. If tests fail, fix before proceeding.
 
-## Standard Validation (< 2 minutes)
+## Standard Validation (~2–5 minutes)
 
 ```bash
-npm run validate         # test:run + build (sequential)
+npm run validate         # lint + test:run + build + smoke:prod
 npm run deadcode         # knip scan for unused files/exports
 ```
 
-- Runs full test suite with verbose reporter, then Vite production build.
-- Catches type errors that tests alone miss (tests use jsdom, build uses full tsc).
+- `validate` runs ESLint on `src/`, the full Vitest suite, TypeScript + Vite production build, then `scripts/prod-smoke.ts` against the built app.
 - `deadcode` is advisory, not a green gate. Use it to build cleanup backlog and catch stale imports/exports.
-- Exit code 0 = pass, non-zero = failure in either step.
+- Exit code 0 = pass, non-zero = first failing step.
 
 ## Integration Tests (< 30 seconds)
 
@@ -84,11 +83,12 @@ This writes current measurements into `perf-baselines.json` as the new `lastMeas
 ## Full Validation Pipeline
 
 ```bash
-npm run validate:full    # test + build + combat120 capture + perf:compare
+npm run validate:full    # test:run + build + perf:capture:combat120 + perf:compare (combat120)
 ```
 
-- Runs everything sequentially. Takes 5-10 minutes.
-- Use before committing performance-sensitive changes.
+- Does **not** run `lint` or `smoke:prod` by default—use `npm run validate` for those gates.
+- Includes a headed `combat120` capture and baseline compare; allow ~5–15 minutes.
+- Use before merging performance-sensitive changes.
 
 ## Interpreting Exit Codes
 

@@ -570,7 +570,7 @@ export class CombatantLODManager {
   private updateCombatantFull(combatant: Combatant, deltaTime: number): void {
     const fullStart = performance.now();
     const aiStart = performance.now();
-    this.combatantAI.updateAI(combatant, deltaTime, this.playerPosition, this.combatants, spatialGridManager);
+    this.combatantAI.updateAI(combatant, deltaTime, this.playerPosition, this.combatants, spatialGridManager, 'high');
     const aiMs = performance.now() - aiStart;
     const now = performance.now();
     if (aiMs > 50 && now - this.lastAiSpikeLogMs > this.AI_LOG_THROTTLE_MS) {
@@ -616,7 +616,7 @@ export class CombatantLODManager {
   }
 
   private updateCombatantMedium(combatant: Combatant, deltaTime: number): void {
-    this.combatantAI.updateAI(combatant, deltaTime, this.playerPosition, this.combatants, spatialGridManager);
+    this.combatantAI.updateAI(combatant, deltaTime, this.playerPosition, this.combatants, spatialGridManager, 'medium');
     this.combatantMovement.updateMovement(
       combatant,
       deltaTime,

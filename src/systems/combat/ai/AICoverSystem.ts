@@ -299,8 +299,8 @@ export class AICoverSystem {
     const chunkX = parseInt(chunkXStr) * this.CHUNK_SIZE
     const chunkZ = parseInt(chunkZStr) * this.CHUNK_SIZE
 
-    // Sample terrain for height variations
-    const SAMPLE_STEP = 8
+    // Sample terrain for height variations (10m step -> 9 samples per 32m chunk)
+    const SAMPLE_STEP = 10
 
     for (let x = 0; x < this.CHUNK_SIZE; x += SAMPLE_STEP) {
       for (let z = 0; z < this.CHUNK_SIZE; z += SAMPLE_STEP) {
@@ -309,15 +309,11 @@ export class AICoverSystem {
 
         const height = this.terrainSystem.getHeightAt(worldX, worldZ)
 
-        // Check surrounding heights for elevation changes
-        const heights = [
-          this.terrainSystem.getHeightAt(worldX + 3, worldZ),
-          this.terrainSystem.getHeightAt(worldX - 3, worldZ),
-          this.terrainSystem.getHeightAt(worldX, worldZ + 3),
-          this.terrainSystem.getHeightAt(worldX, worldZ - 3)
-        ]
+        // Check 2 diagonal heights instead of 4 cardinal (saves 2 height queries per sample)
+        const h1 = this.terrainSystem.getHeightAt(worldX + 3, worldZ + 3)
+        const h2 = this.terrainSystem.getHeightAt(worldX - 3, worldZ - 3)
 
-        const avgHeight = heights.reduce((a, b) => a + b, 0) / heights.length
+        const avgHeight = (h1 + h2) * 0.5
         const heightVariation = height - avgHeight
 
         // Elevated positions (ridges, hills) make good cover
@@ -329,6 +325,8 @@ export class AICoverSystem {
             height: heightVariation,
             lastEvaluatedTime: now
           })
+          // Early-out once we have enough spots
+          if (spots.length >= this.MAX_COVER_SPOTS_PER_CHUNK) break
         }
 
         // Depressions can also provide cover
@@ -340,8 +338,10 @@ export class AICoverSystem {
             height: Math.abs(heightVariation),
             lastEvaluatedTime: now
           })
+          if (spots.length >= this.MAX_COVER_SPOTS_PER_CHUNK) break
         }
       }
+      if (spots.length >= this.MAX_COVER_SPOTS_PER_CHUNK) break
     }
 
     // Limit spots per chunk

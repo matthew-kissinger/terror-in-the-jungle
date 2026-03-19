@@ -1,6 +1,8 @@
-# Terror in the Jungle - 3D Game Assets
+# Terror in the Jungle - 3D Game Assets (catalog)
 
-75 low-poly GLB models for the Vietnam War browser game. All models are Y-up, face +Z, ground at Y=0, flat-shaded materials. Load with Three.js `GLTFLoader`.
+**Runtime copies:** These files are **not** stored here anymore. All GLBs ship from `public/models/` (identical relative paths, e.g. `public/models/weapons/m16a1.glb`). This README remains the **authoring catalog** (counts, trivia, integration notes).
+
+75 low-poly GLB models for the Vietnam War browser game. All models are Y-up, face +Z, ground at Y=0, flat-shaded materials. Load with Three.js `GLTFLoader` from `public/models/`.
 
 ## Weapons (9)
 

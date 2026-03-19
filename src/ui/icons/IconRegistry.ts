@@ -5,16 +5,13 @@
  * `iconImg()` instead of manually building paths. This makes it trivial
  * to change asset directory, format, or add cache-busting later.
  *
- * Icons are pixel-art PNGs in `public/assets/ui/icons/`, stored as
- * palette-optimized PNGs (~252KB total for 50 icons).
+ * Icons are pixel-art PNGs in `public/assets/ui/icons/` (see `docs/UI_ICON_MANIFEST.md`).
  *
- * Size categories:
- *   icon-*    48px   Touch buttons, HUD indicators, weapon icons
- *   emblem-*  128px  Faction emblems
+ * Filename prefixes:
+ *   icon-*    48px   Touch, HUD, weapon icons
  *   map-*     32px   Minimap markers
- *   mode-*    64px   Game mode cards
- *   hint-*    96px   Onboarding tutorial hints
- *   reticle-* 120px  Helicopter weapon pipper overlays
+ *   mode-*    64px   Mode select cards
+ *   reticle-* 120px  Helicopter pipper overlays
  */
 
 const ICON_BASE = `${import.meta.env.BASE_URL}assets/ui/icons`;

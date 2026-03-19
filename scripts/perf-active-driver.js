@@ -129,7 +129,9 @@
       respawnRetryAt: 0,
       frontlineInserted: false,
       setupFastForwarded: false,
-      forcedContactInsertCount: 0
+      forcedContactInsertCount: 0,
+      stuckRecoveryMode: false,
+      stuckRecoveryUntil: 0
     };
     const MAX_YAW_STEP = 0.09;
     const MAX_PITCH_STEP = 0.06;
@@ -634,6 +636,34 @@
       if (terrain.isTerrainReady && !terrain.isTerrainReady()) return false;
       if (terrain.hasTerrainAt) return terrain.hasTerrainAt(Number(x), Number(z));
       return true;
+    }
+
+    /** Probe terrain slope at a given angle/distance from position. Returns slope in degrees. */
+    function probeTerrainSlope(systems, pos, angleDeg, distance) {
+      var terrain = systems && systems.terrainSystem;
+      if (!terrain || !terrain.getHeightAt) return 0;
+      var rad = angleDeg * Math.PI / 180;
+      var probeX = Number(pos.x) + Math.sin(rad) * distance;
+      var probeZ = Number(pos.z) + Math.cos(rad) * distance;
+      var hHere = Number(terrain.getHeightAt(Number(pos.x), Number(pos.z)));
+      var hThere = Number(terrain.getHeightAt(probeX, probeZ));
+      if (!Number.isFinite(hHere) || !Number.isFinite(hThere)) return 0;
+      var rise = hThere - hHere;
+      return Math.abs(Math.atan2(rise, distance)) * 180 / Math.PI;
+    }
+
+    /** Find a clear movement yaw (degrees) that avoids steep slopes. Returns null if all blocked. */
+    function findClearDirection(systems, pos, preferredYawDeg) {
+      var SLOPE_LIMIT = 35;
+      var PROBE_DIST = 8;
+      // Try preferred direction first, then 90deg offsets, then 180
+      var offsets = [0, 90, -90, 45, -45, 135, -135, 180];
+      for (var i = 0; i < offsets.length; i++) {
+        var testYaw = preferredYawDeg + offsets[i];
+        var slope = probeTerrainSlope(systems, pos, testYaw, PROBE_DIST);
+        if (slope < SLOPE_LIMIT) return testYaw;
+      }
+      return null;
     }
 
     function groundPlayerIfNeeded(systems, playerPos) {
@@ -1283,7 +1313,25 @@
           }
         }
 
-        if ((dist > 400 || playerPos.y > 140) && opts.allowWarpRecovery && state.stuckMs > 10000) {
+        // Stuck recovery: 3s threshold triggers retreat, 8s escalates to teleport
+        if (state.stuckMs > 3000 && !state.stuckRecoveryMode) {
+          state.stuckRecoveryMode = true;
+          state.stuckRecoveryUntil = Date.now() + 2000;
+          setMovementState('retreat');
+        }
+        if (state.stuckRecoveryMode && Date.now() < state.stuckRecoveryUntil) {
+          // Alternate strafes during recovery
+          if (Math.random() < 0.3) {
+            setMovementPattern(Math.random() < 0.5 ? ['KeyS', 'KeyA'] : ['KeyS', 'KeyD']);
+          }
+          return;
+        }
+        if (state.stuckRecoveryMode && Date.now() >= state.stuckRecoveryUntil) {
+          state.stuckRecoveryMode = false;
+        }
+
+        if (state.stuckMs > 8000) {
+          // Escalate: teleport to engagement area
           const anchor = engagementCenter || movementTarget;
           if (anchor) {
             const offsetAngle = Math.random() * Math.PI * 2;
@@ -1303,6 +1351,8 @@
               nextPos.y = Number(height) + 2;
             }
             if (setHarnessPlayerPosition(systems, nextPos, 'harness.recovery.stuck')) {
+              state.stuckMs = 0;
+              state.stuckRecoveryMode = false;
               return;
             }
           }
@@ -1325,6 +1375,25 @@
         }
         if (now - state.lastMovementDecisionAt >= modeProfile.decisionIntervalMs) {
           state.lastMovementDecisionAt = now;
+
+          // Slope probe: check if current movement direction leads into steep terrain
+          var cameraController = systems.playerController ? systems.playerController.cameraController : null;
+          var currentYawDeg = cameraController ? (Number(cameraController.yaw || 0) * 180 / Math.PI) : 0;
+          var forwardSlope = probeTerrainSlope(systems, playerPos, currentYawDeg, 8);
+          if (forwardSlope > 35) {
+            var clearDir = findClearDirection(systems, playerPos, currentYawDeg);
+            if (clearDir !== null && clearDir !== currentYawDeg) {
+              // Rotate camera toward clear direction and advance
+              var clearRad = clearDir * Math.PI / 180;
+              syncCameraAim(camera, cameraController, clearRad, Number(cameraController ? cameraController.pitch || 0 : camera.rotation.x || 0));
+              setMovementState('advance');
+              return;
+            }
+            // All directions blocked - retreat
+            setMovementState('retreat');
+            return;
+          }
+
           const noNearbyEnemy = !nearestOpfor || nearestDist > (opts.mode === 'open_frontier' ? 140 : 95);
           if (captureFocus && !captureFocus.inside && noNearbyEnemy) {
             setMovementState('sprint');

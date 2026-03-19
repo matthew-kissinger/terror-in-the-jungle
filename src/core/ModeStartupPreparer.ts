@@ -13,7 +13,13 @@ import { shouldUseTouchControls } from '../utils/DeviceDetector';
 import { tryLockLandscapeOrientation } from '../utils/Orientation';
 import { PersistenceSystem } from '../systems/strategy/PersistenceSystem';
 import type { GameEngine } from './GameEngine';
+import { GameEventBus } from './GameEventBus';
 import { markStartup } from './StartupTelemetry';
+
+/** Yield to the browser so it can repaint (progress bar, etc.) between heavy sync phases. */
+function yieldToRenderer(): Promise<void> {
+  return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+}
 
 interface PreparedModeStartup {
   mode: GameMode;
@@ -162,6 +168,8 @@ async function configureTerrainAndNavigation(
 
   if (engine.systemManager.navmeshSystem.isWasmReady()) {
     const navWorldSize = config.worldSize ?? terrainSystem.getPlayableWorldSize();
+    // Yield before WASM navmesh generation so the progress bar renders "Generating navigation mesh..."
+    await yieldToRenderer();
     await engine.systemManager.navmeshSystem.generateNavmesh(navWorldSize, config.features);
 
     // Validate navmesh connectivity using representative home bases (not all-pairs).
@@ -251,13 +259,35 @@ export async function prepareModeStartup(
   const definition = getGameModeDefinition(mode);
   const config = getGameModeConfig(mode);
 
-  await configureHeightSource(engine, mode, config);
-  applyCompiledTerrainFeatures(engine, config);
-  await configureTerrainAndNavigation(engine, config);
+  const emitProgress = (phase: string, progress: number, label: string): void => {
+    GameEventBus.emit('mode_load_progress', { phase, progress, label });
+    GameEventBus.flush();
+  };
 
+  emitProgress('terrain', 0, 'Loading terrain...');
+  await configureHeightSource(engine, mode, config);
+  emitProgress('terrain', 1, 'Terrain loaded');
+  await yieldToRenderer();
+
+  emitProgress('features', 0, 'Compiling features...');
+  applyCompiledTerrainFeatures(engine, config);
+  emitProgress('features', 1, 'Features compiled');
+  await yieldToRenderer();
+
+  emitProgress('navmesh', 0, 'Generating navigation mesh...');
+  await configureTerrainAndNavigation(engine, config);
+  emitProgress('navmesh', 1, 'Navigation ready');
+  await yieldToRenderer();
+
+  emitProgress('spawning', 0, 'Spawning combatants...');
   engine.systemManager.setGameMode(mode, { createPlayerSquad: mode !== GameMode.AI_SANDBOX });
   applyLaunchSelection(engine, definition, launchSelection);
+  emitProgress('spawning', 1, 'Combatants spawned');
+  await yieldToRenderer();
+
+  emitProgress('finalize', 0, 'Finalizing...');
   restorePersistentWarState(engine, mode, config);
+  emitProgress('finalize', 1, 'Ready');
 
   return {
     mode,

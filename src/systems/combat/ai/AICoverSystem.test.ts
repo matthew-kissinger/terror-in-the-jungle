@@ -538,8 +538,9 @@ describe('AICoverSystem', () => {
 
   describe('Cover Spot Generation', () => {
     it('should generate spots for elevated terrain', () => {
+      // SAMPLE_STEP=10 samples at x=0,10,20,30; diagonal queries at (x+3,z+3) and (x-3,z-3)
       mockHeightQueryCache.getHeightAt = vi.fn((x, _z) => {
-        if (x === 8 || x === 16 || x === 24) return 5; // Elevated positions
+        if (x === 10 || x === 20 || x === 30) return 5; // Elevated at sample points
         return 0;
       });
 
@@ -552,22 +553,21 @@ describe('AICoverSystem', () => {
     });
 
     it('should generate spots for depressions', () => {
-      // The algorithm samples at (worldX, worldZ) and checks surrounding points at ±3
-      // For a depression at worldX=8, it checks heights at (11,8), (5,8), (8,11), (8,5)
+      // SAMPLE_STEP=10 samples at x=0,10,20,30; diagonal queries at (x+3,z+3) and (x-3,z-3)
+      // Depression at sample points: center height is low, diagonals are at ground level
       mockHeightQueryCache.getHeightAt = vi.fn((x, z) => {
-        // Depression at x=8
-        if (x === 8 && z === 0) return -3;
-        if (x === 8 && z === 8) return -3;
-        if (x === 8 && z === 16) return -3;
-        if (x === 8 && z === 24) return -3;
-        // Surrounding points at ground level
+        // Depression at sample points (x=0, x=10, x=20, x=30)
+        if (x === 0 && z === 0) return -3;
+        if (x === 10 && z === 0) return -3;
+        if (x === 10 && z === 10) return -3;
+        if (x === 20 && z === 0) return -3;
+        // Surrounding diagonal points at ground level
         return 0;
       });
 
       const chunkKey = '0_0';
       const spots = coverSystem['generateCoverSpotsForChunk'](chunkKey);
 
-      // The code generates spots when heightVariation < -1.5
       // height = -3, avgHeight = 0, heightVariation = -3 - 0 = -3 (< -1.5)
       // Height stored as Math.abs(heightVariation) = 3
       expect(spots.length).toBeGreaterThan(0);

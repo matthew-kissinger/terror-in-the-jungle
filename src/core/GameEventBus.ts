@@ -22,6 +22,7 @@ interface GameEvents {
   air_support_inbound: { type: string; targetPosition: THREE.Vector3; eta: number };
   air_support_active: { type: string; missionId: string };
   air_support_complete: { type: string; missionId: string };
+  mode_load_progress: { phase: string; progress: number; label: string };
 }
 
 type Callback<K extends keyof GameEvents> = (event: GameEvents[K]) => void;

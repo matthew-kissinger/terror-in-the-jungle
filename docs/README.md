@@ -1,6 +1,6 @@
 # Docs Index
 
-Last updated: 2026-03-10
+Last updated: 2026-03-19
 
 ## Read Order
 
@@ -31,10 +31,17 @@ Last updated: 2026-03-10
 ## Reference Docs
 
 - `ASSET_MANIFEST.md` - All asset backlogs (GLB generation queue, audio needs, build-now priorities).
-- `UI_ICON_MANIFEST.md` - Icon registry reference (50 pixel-art PNGs).
+- `UI_ICON_MANIFEST.md` - Icon registry reference (38 pixel-art PNGs).
 - `TERRAIN_RESEARCH.md` - Industry research (CDLOD, geoclipmaps, WebGPU terrain). Reference only.
 - `AGENT_TESTING.md` - Agent validation workflows and perf baselines.
 - `../data/vietnam/DATA_PIPELINE.md` - Real-terrain data status and integration pipeline.
+
+## Repository layout (non-sources under `docs/`)
+
+- **`public/models/`** — GLBs served to the game (canonical binary path).
+- **`deploy-3d-assets/`** — Catalog [`README.md`](../deploy-3d-assets/README.md) only (no duplicate `.glb` in git).
+- **`.agents/skills/`** — Optional Cursor agent bundles; not part of the shipped game.
+- **`../.analysis/`** — Multi-agent research notes; not the operational backlog (`PLAN_STATE` / `NEXT_WORK`).
 
 ## Archive
 

@@ -20,7 +20,7 @@ npm run test:run                 # all tests
 npm run test:quick               # all tests with dot reporter
 npm run test:integration         # integration scenario tests only
 npm run validate                 # lint + test + build + smoke
-npm run validate:full            # validate + committed perf check
+npm run validate:full            # test + build + combat120 capture + perf:compare (no lint/smoke)
 npm run lint                     # eslint
 npm run deadcode                 # knip dead code scan
 npm run perf:capture:combat120   # perf capture: 120 NPCs
@@ -65,7 +65,7 @@ Systems-based orchestration with ~23 subsystems managed by SystemManager.
 | Effects | `src/systems/effects/` | TracerPool, MuzzleFlashSystem, PostProcessingManager |
 | Environment | `src/systems/environment/` | WeatherSystem, WaterSystem, Skybox |
 | UI | `src/ui/` | HUD (18-region CSS Grid), touch controls, minimap, modals |
-| Icons | `src/ui/icons/` | IconRegistry (centralized, 50 pixel-art PNGs) |
+| Icons | `src/ui/icons/` | IconRegistry (centralized, 38 pixel-art PNGs; see `docs/UI_ICON_MANIFEST.md`) |
 
 ### Config
 - Game modes: `src/config/gameModeTypes.ts`, `src/config/*Config.ts`
@@ -76,7 +76,7 @@ Systems-based orchestration with ~23 subsystems managed by SystemManager.
 
 - ~376 source files, ~170 test files, 3,482+ tests passing
 - 133K LOC TypeScript
-- 75 GLB models, 50 UI icons, 31 audio files
+- 75 GLB models, 38 UI icons, 31 audio files
 - 25 CSS modules
 - 8 runtime dependencies (three, signals, three-mesh-bvh, @recast-navigation, fonts)
 - Build output: ~714KB main + ~694KB three.js + ~392KB UI chunk (gzipped)
@@ -108,6 +108,7 @@ Reference docs: ARCHITECTURE_RECOVERY_PLAN, PROFILING_HARNESS, PERF_FRONTIER, DE
 - Perf captures via `scripts/perf-capture.ts`
 
 ### Documentation Contract
+- Start from `docs/README.md` (read order + repo layout: `public/models/`, `deploy-3d-assets/` catalog, `.agents/`, `.analysis/`).
 - Update `docs/ARCHITECTURE_RECOVERY_PLAN.md` after architecture/perf decisions
 - Update `docs/PROFILING_HARNESS.md` when capture flags/semantics change
 - Update relevant `docs/blocks/*.md` when systems change

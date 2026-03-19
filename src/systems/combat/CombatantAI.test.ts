@@ -602,4 +602,129 @@ describe('CombatantAI', () => {
       })
     })
   })
+
+  describe('AI fidelity LOD', () => {
+    it('should skip flanking updates at MEDIUM LOD', () => {
+      mockCombatant.squadId = 'squad1'
+      const mockOperation = { id: 'op1' }
+      const mockSquad = { id: 'squad1', members: ['c1'], isPlayerControlled: false } as Squad
+      const squads = new Map([['squad1', mockSquad]])
+      ai.setSquads(squads)
+
+      const flankingSystem = (ai as any).flankingSystem
+      flankingSystem.getActiveOperation.mockReturnValue(mockOperation)
+
+      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants, mockSpatialGrid, 'medium')
+
+      expect(flankingSystem.updateFlankingOperation).not.toHaveBeenCalled()
+    })
+
+    it('should still update flanking at HIGH LOD', () => {
+      mockCombatant.squadId = 'squad1'
+      const mockOperation = { id: 'op1' }
+      const mockSquad = { id: 'squad1', members: ['c1'], isPlayerControlled: false } as Squad
+      const squads = new Map([['squad1', mockSquad]])
+      ai.setSquads(squads)
+
+      const flankingSystem = (ai as any).flankingSystem
+      flankingSystem.getActiveOperation.mockReturnValue(mockOperation)
+
+      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants, mockSpatialGrid, 'high')
+
+      expect(flankingSystem.updateFlankingOperation).toHaveBeenCalled()
+    })
+
+    it('should use simplified engagement at MEDIUM LOD', () => {
+      mockCombatant.state = CombatantState.ENGAGING
+      mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.NVA })
+
+      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants, mockSpatialGrid, 'medium')
+
+      const engageHandler = (ai as any).engageHandler
+      expect(engageHandler.handleEngaging).toHaveBeenCalled()
+      // At MEDIUM LOD, the countNearbyEnemies and isCoverFlanked callbacks should be noop stubs
+      const call = engageHandler.handleEngaging.mock.calls[0]
+      // The countNearbyEnemies callback (index 8) should return 0 (noop)
+      expect(call[8]()).toBe(0)
+      // The isCoverFlanked callback (index 9) should return false (noop)
+      expect(call[9]()).toBe(false)
+    })
+
+    it('should skip squad command override for non-player squads at MEDIUM LOD', () => {
+      const squad: Squad = {
+        id: 'squad1',
+        faction: Faction.US,
+        members: ['c1'],
+        formation: 'wedge',
+        isPlayerControlled: false,
+        currentCommand: SquadCommand.FOLLOW_ME,
+      } as Squad
+      const squads = new Map([['squad1', squad]])
+      ai.setSquads(squads)
+      mockCombatant.faction = Faction.US
+      mockCombatant.squadId = 'squad1'
+      mockCombatant.state = CombatantState.ENGAGING
+
+      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants, mockSpatialGrid, 'medium')
+
+      // State should still be ENGAGING because squad command override was skipped
+      const engageHandler = (ai as any).engageHandler
+      expect(engageHandler.handleEngaging).toHaveBeenCalled()
+    })
+
+    it('should still apply squad command override for player-controlled squads at MEDIUM LOD', () => {
+      const squad: Squad = {
+        id: 'squad1',
+        faction: Faction.US,
+        members: ['c1'],
+        formation: 'wedge',
+        isPlayerControlled: true,
+        currentCommand: SquadCommand.FOLLOW_ME,
+      } as Squad
+      const squads = new Map([['squad1', squad]])
+      ai.setSquads(squads)
+      mockCombatant.faction = Faction.US
+      mockCombatant.squadId = 'squad1'
+      mockCombatant.state = CombatantState.ENGAGING
+      mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.NVA })
+
+      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants, mockSpatialGrid, 'medium')
+
+      // FOLLOW_ME should interrupt ENGAGING even at MEDIUM LOD for player squads
+      expect(mockCombatant.state).toBe(CombatantState.PATROLLING)
+      expect(mockCombatant.target).toBeNull()
+    })
+
+    it('should use simplified cover check at MEDIUM LOD (low health seeks cover)', () => {
+      mockCombatant.state = CombatantState.ENGAGING
+      mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.NVA })
+      mockCombatant.health = 30
+      mockCombatant.maxHealth = 100
+      mockCombatant.inCover = false
+
+      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants, mockSpatialGrid, 'medium')
+
+      const engageHandler = (ai as any).engageHandler
+      expect(engageHandler.handleEngaging).toHaveBeenCalled()
+      // The shouldSeekCover callback (index 6) should return true for low health
+      const call = engageHandler.handleEngaging.mock.calls[0]
+      const shouldSeekCoverFn = call[6]
+      expect(shouldSeekCoverFn(mockCombatant)).toBe(true)
+    })
+
+    it('should not seek cover at MEDIUM LOD when health is adequate', () => {
+      mockCombatant.state = CombatantState.ENGAGING
+      mockCombatant.target = createMockCombatant({ id: 'enemy1', faction: Faction.NVA })
+      mockCombatant.health = 80
+      mockCombatant.maxHealth = 100
+      mockCombatant.inCover = false
+
+      ai.updateAI(mockCombatant, 0.016, mockPlayerPosition, mockAllCombatants, mockSpatialGrid, 'medium')
+
+      const engageHandler = (ai as any).engageHandler
+      const call = engageHandler.handleEngaging.mock.calls[0]
+      const shouldSeekCoverFn = call[6]
+      expect(shouldSeekCoverFn(mockCombatant)).toBe(false)
+    })
+  })
 })

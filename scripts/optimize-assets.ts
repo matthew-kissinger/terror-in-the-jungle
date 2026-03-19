@@ -63,10 +63,6 @@ for (const faction of ['nva', 'arvn']) {
   }
 }
 
-const SCREEN_NAME_MAP: Record<string, string> = {
-  'start-screen_raw': 'start-screen',
-};
-
 const CATEGORIES: Record<string, CategoryConfig> = {
   vegetation: {
     src: 'public/assets/source/vegetation',
@@ -119,7 +115,6 @@ const CATEGORIES: Record<string, CategoryConfig> = {
     trimAlpha: false,
     cleanEdges: false,
     enforcePOT: false,
-    nameMap: SCREEN_NAME_MAP,
   },
 };
 
@@ -296,7 +291,7 @@ async function processCategory(
   }
 
   const files = readdirSync(srcDir)
-    .filter(f => isImageFile(f) && (!isRawFile(f) || (name === 'screens' && f === 'start-screen_raw.png')))
+    .filter(f => isImageFile(f) && (!isRawFile(f) || name === 'screens'))
     .sort();
 
   if (files.length === 0) {

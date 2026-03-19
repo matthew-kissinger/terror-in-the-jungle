@@ -1,5 +1,7 @@
 # Playtest Issues - 2026-03-17
 
+**Document status:** REFERENCE — snapshot of issues and evidence from 2026-03-17; supplement with `MOVEMENT_NAV_CHECKIN.md` for ongoing nav work.
+
 Validated against current `master` with `master == origin/master` on 2026-03-17 before the latest movement/nav terrain-flow changes were committed.
 
 Purpose:

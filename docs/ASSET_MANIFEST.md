@@ -5,8 +5,7 @@ Status: DRAFT - Generation queue for Pixel Forge agent
 
 ## Generated Assets (75 GLBs)
 
-75 GLB models have been generated via Pixel Forge and are staged in `deploy-3d-assets/`.
-See `deploy-3d-assets/README.md` for the complete inventory with tri counts and file sizes.
+75 GLB models have been generated via Pixel Forge. **Shipped path:** `public/models/**` (Vite static assets). **`deploy-3d-assets/`** keeps the [catalog only](../deploy-3d-assets/README.md) (no duplicate binaries in repo).
 
 | Category | Count | Examples |
 |----------|-------|---------|
