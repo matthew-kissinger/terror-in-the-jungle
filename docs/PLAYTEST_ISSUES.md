@@ -138,9 +138,9 @@ This is the single most important reason low-LOD NPCs still fail. The current fa
 - Low and culled NPCs do not use navmesh crowding and fall back to beeline movement.
 - `NavmeshSystem` still uses:
   - `MAX_CROWD_AGENTS = 64`
-  - `NAVMESH_CELL_SIZE = 4.0`, which becomes `cs = 1.0`
-  - `WALKABLE_CLIMB = 0.4`
-  - `WALKABLE_SLOPE_ANGLE = 40`
+  - `NAVMESH_CELL_SIZE = 4.0`, with cs scaled by world size (1.0 for <=800m, 1.5 for <=1600m, 2.0 for >1600m)
+  - `WALKABLE_CLIMB = 0.6`
+  - `WALKABLE_SLOPE_ANGLE = 45`
 - `StuckDetector` checks every `1500ms`, confirms stuck after three failed intervals, then nudges or unregisters navmesh after repeated failures.
 
 ### What is actually broken now

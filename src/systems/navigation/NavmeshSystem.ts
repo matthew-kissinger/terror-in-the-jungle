@@ -34,8 +34,34 @@ const MAX_CROWD_AGENTS = 64;
 const TILE_SIZE = 256;
 const TILE_RADIUS = 3;
 
-// Threshold: maps larger than this use tiled navmesh
+// Threshold: maps strictly larger than this use tiled navmesh.
+// Open Frontier (3200m) stays on solo - tiled is only needed for A Shau (21136m).
 const TILED_THRESHOLD = 3200;
+
+// Memory safety: if estimated voxel memory exceeds this, force tiled build.
+const SOLO_MEMORY_LIMIT_MB = 300;
+// Approximate bytes per voxel column (compact heightfield + contour + poly mesh overhead).
+const BYTES_PER_VOXEL_COLUMN = 8;
+
+/**
+ * Scale navmesh cell size (cs) with world size to keep voxel grid bounded.
+ * Small maps need fine resolution for structure navigation; large open maps don't.
+ */
+function getNavmeshCellSize(worldSize: number): number {
+  if (worldSize <= 800) return 1.0;
+  if (worldSize <= 1600) return 1.5;
+  return 2.0; // 3200m at cs=2.0 -> 1600x1600 = 2.56M columns (vs 10.2M at cs=1.0)
+}
+
+/**
+ * Scale heightfield mesh sampling to match navmesh resolution.
+ * No point sampling terrain finer than the navmesh can represent.
+ */
+function getHeightfieldCellSize(worldSize: number): number {
+  if (worldSize <= 800) return NAVMESH_CELL_SIZE;   // 4.0
+  if (worldSize <= 1600) return 6.0;
+  return 8.0; // 3200/8 = 401x401 = 161K verts (vs 641K at cellSize=4)
+}
 
 // Tile streaming budget
 const MAX_TILES_PER_FRAME = 2;
@@ -127,7 +153,7 @@ export class NavmeshSystem {
     }
 
     this.worldSize = worldSize;
-    this.isTiled = worldSize >= TILED_THRESHOLD;
+    this.isTiled = worldSize > TILED_THRESHOLD;
 
     const start = performance.now();
 
@@ -156,13 +182,27 @@ export class NavmeshSystem {
   }
 
   private generateSoloNavmesh(worldSize: number, features?: MapFeatureDefinition[]): boolean {
+    const cs = getNavmeshCellSize(worldSize);
+    const hfCellSize = getHeightfieldCellSize(worldSize);
+
+    // Memory guard: estimate voxel grid and abort if too large for solo build
+    const voxelColumns = Math.ceil(worldSize / cs) * Math.ceil(worldSize / cs);
+    const estimatedMB = voxelColumns * BYTES_PER_VOXEL_COLUMN / (1024 * 1024);
+    if (estimatedMB > SOLO_MEMORY_LIMIT_MB) {
+      Logger.warn(
+        'Navigation',
+        `Solo navmesh would require ~${estimatedMB.toFixed(0)}MB (${voxelColumns.toLocaleString()} voxel columns) - exceeds ${SOLO_MEMORY_LIMIT_MB}MB limit`
+      );
+      return false;
+    }
+
     const heightCache = getHeightQueryCache();
     const halfSize = worldSize / 2;
     const geometry = buildHeightfieldMesh(
       (x, z) => heightCache.getHeightAt(x, z),
       -halfSize, -halfSize,
       worldSize, worldSize,
-      NAVMESH_CELL_SIZE
+      hfCellSize
     );
 
     const mesh = new THREE.Mesh(geometry);
@@ -171,20 +211,23 @@ export class NavmeshSystem {
     const obstacleMeshes = this.buildObstacleMeshes(features, heightCache);
     const inputMeshes = [mesh, ...obstacleMeshes];
 
-    const cs = NAVMESH_CELL_SIZE * 0.25;
+    // Scale Recast params for large open terrain: coarser vertical resolution,
+    // longer polygon edges, larger minimum regions, less detail mesh refinement.
+    const isLargeWorld = worldSize > 1600;
+    const ch = isLargeWorld ? 0.4 : 0.2;
     const result = this.threeToSoloNavMeshFn!(inputMeshes, {
       cs,
-      ch: 0.2,
+      ch,
       walkableSlopeAngle: WALKABLE_SLOPE_ANGLE,
-      walkableHeight: Math.ceil(AGENT_HEIGHT / 0.2),
-      walkableClimb: Math.ceil(WALKABLE_CLIMB / 0.2),
+      walkableHeight: Math.ceil(AGENT_HEIGHT / ch),
+      walkableClimb: Math.ceil(WALKABLE_CLIMB / ch),
       walkableRadius: Math.ceil(AGENT_RADIUS / cs),
-      maxEdgeLen: 12,
+      maxEdgeLen: isLargeWorld ? 24 : 12,
       maxSimplificationError: 1.3,
-      minRegionArea: 8,
-      mergeRegionArea: 20,
+      minRegionArea: isLargeWorld ? 16 : 8,
+      mergeRegionArea: isLargeWorld ? 40 : 20,
       maxVertsPerPoly: 6,
-      detailSampleDist: 6,
+      detailSampleDist: isLargeWorld ? 12 : 6,
       detailSampleMaxError: 1,
     });
 
@@ -212,26 +255,29 @@ export class NavmeshSystem {
     // Generate a small initial mesh for the tileCache setup
     const initExtent = TILE_SIZE * (TILE_RADIUS * 2 + 1);
     const initHalf = Math.min(initExtent / 2, halfSize);
+    const hfCellSize = getHeightfieldCellSize(worldSize);
     const geometry = buildHeightfieldMesh(
       (x, z) => heightCache.getHeightAt(x, z),
       -initHalf, -initHalf,
       initHalf * 2, initHalf * 2,
-      NAVMESH_CELL_SIZE
+      hfCellSize
     );
 
     const mesh = new THREE.Mesh(geometry);
-    const cs = NAVMESH_CELL_SIZE * 0.25;
+    const cs = getNavmeshCellSize(worldSize);
+    const isLargeWorld = worldSize > 1600;
+    const ch = isLargeWorld ? 0.4 : 0.2;
     const result = this.threeToTileCacheFn!([mesh], {
       cs,
-      ch: 0.2,
+      ch,
       walkableSlopeAngle: WALKABLE_SLOPE_ANGLE,
-      walkableHeight: Math.ceil(AGENT_HEIGHT / 0.2),
-      walkableClimb: Math.ceil(WALKABLE_CLIMB / 0.2),
+      walkableHeight: Math.ceil(AGENT_HEIGHT / ch),
+      walkableClimb: Math.ceil(WALKABLE_CLIMB / ch),
       walkableRadius: Math.ceil(AGENT_RADIUS / cs),
       maxSimplificationError: 1.3,
-      mergeRegionArea: 20,
+      mergeRegionArea: isLargeWorld ? 40 : 20,
       maxVertsPerPoly: 6,
-      detailSampleDist: 6,
+      detailSampleDist: isLargeWorld ? 12 : 6,
       detailSampleMaxError: 1,
       tileSize: Math.ceil(TILE_SIZE / cs),
     });

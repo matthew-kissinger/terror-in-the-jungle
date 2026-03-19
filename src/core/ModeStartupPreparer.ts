@@ -164,20 +164,28 @@ async function configureTerrainAndNavigation(
     const navWorldSize = config.worldSize ?? terrainSystem.getPlayableWorldSize();
     await engine.systemManager.navmeshSystem.generateNavmesh(navWorldSize, config.features);
 
-    // Validate that all zones are reachable from each other via navmesh
+    // Validate navmesh connectivity using representative home bases (not all-pairs).
+    // For 16 zones, all-pairs requires up to 120 path queries. Home-base check needs 1-2.
     if (config.zones?.length && engine.systemManager.navmeshSystem.isReady()) {
       const heightCache = getHeightQueryCache();
-      const zonePositions = config.zones.map(z => {
+      const homeBases = config.zones.filter(z => z.isHomeBase);
+
+      // If no home bases defined, fall back to first and last zone as representatives
+      const representatives = homeBases.length >= 2
+        ? homeBases
+        : [config.zones[0], config.zones[config.zones.length - 1]];
+
+      const repPositions = representatives.map(z => {
         const y = heightCache.getHeightAt(z.position.x, z.position.z);
         return new THREE.Vector3(z.position.x, y, z.position.z);
       });
 
-      const result = engine.systemManager.navmeshSystem.validateConnectivity(zonePositions);
+      const result = engine.systemManager.navmeshSystem.validateConnectivity(repPositions);
       if (!result.connected) {
-        const zoneNames = config.zones.map(z => z.name);
+        const repNames = representatives.map(z => z.name);
         for (const island of result.islands) {
-          const names = island.map(i => zoneNames[i]).join(', ');
-          Logger.warn('Navigation', `Disconnected island: [${names}]`);
+          const names = island.map(i => repNames[i]).join(', ');
+          Logger.warn('Navigation', `Disconnected home bases: [${names}]`);
         }
       }
     }

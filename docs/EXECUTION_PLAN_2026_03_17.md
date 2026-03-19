@@ -7,7 +7,7 @@ Date: 2026-03-17
 
 NPCs cannot navigate terrain. They use a reactive 1.35m-lookahead wall-follower that probes terrain each frame, gets blocked by slopes, oscillates, and eventually triggers stuck-recovery hacks that backtrack to other stuck positions. The system has no spatial model of where NPCs can and cannot go.
 
-Meanwhile, a Recast navmesh is already built from the terrain heightfield at 1.0m cell resolution. It encodes walkable surfaces. It supports pathfinding queries. Nobody queries it. The crowd steering was disabled because crowd forces fought terrain slopes, but path queries are independent of crowd steering.
+Meanwhile, a Recast navmesh is already built from the terrain heightfield at world-size-scaled cell resolution (cs=1.0 for <=800m, 1.5 for <=1600m, 2.0 for >1600m). It encodes walkable surfaces. It supports pathfinding queries. Nobody queries it. The crowd steering was disabled because crowd forces fought terrain slopes, but path queries are independent of crowd steering.
 
 Structure placement has no navigability awareness. Flat zones are hand-tuned radii that don't account for actual structure footprints. No post-generation step validates that objectives are reachable from spawns.
 

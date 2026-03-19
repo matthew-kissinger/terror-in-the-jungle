@@ -655,7 +655,7 @@ Direction change:
 
 - the terrain-aware velocity solver (wall-follower with 1.35m lookahead) has a ceiling
 - tuning magic numbers (speed constants, stuck thresholds, slope angles) treats symptoms
-- the navmesh already exists, is built from terrain at 1.0m cell resolution, and supports path queries
+- the navmesh already exists, is built from terrain at world-size-scaled cell resolution (cs=1.0 for <=800m, 1.5 for <=1600m, 2.0 for >1600m), and supports path queries
 - crowd steering was disabled because crowd forces fought slopes - but path queries are independent of crowd
 - the structural fix: expose navmesh path queries, have NPCs follow waypoint paths, keep terrain-aware solver only for last-meter tactical movement
 - execution plan: `docs/EXECUTION_PLAN_2026_03_17.md`
