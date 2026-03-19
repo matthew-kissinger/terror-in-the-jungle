@@ -39,6 +39,17 @@ export function isPerfDiagnosticsEnabled(): boolean {
   }
 }
 
+/**
+ * Production-safe diagnostics flag: enabled via `?diag=1` query param.
+ * Exposes only lightweight, read-only metrics (no engine internals).
+ */
+export function isDiagEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return new URLSearchParams(window.location.search).get('diag') === '1';
+  } catch { return false; }
+}
+
 export function isPerfUserTimingEnabled(): boolean {
   return isPerfDiagnosticsEnabled()
     && typeof performance !== 'undefined'

@@ -83,6 +83,19 @@ export function iconHtml(name: string, opts: IconImgOptions = {}): string {
   return `<img src="${icon(name)}" alt="${alt}" width="${w}" height="${h}" style="${css}" draggable="false">`;
 }
 
+// ---- Preload ----
+
+/**
+ * Preload a set of icons by creating hidden Image objects to warm the browser cache.
+ * Call early (e.g. after engine init) with critical icon names.
+ */
+export function preloadIcons(names: string[]): void {
+  for (const name of names) {
+    const img = new Image();
+    img.src = icon(name);
+  }
+}
+
 // ---- Weapon icon lookup ----
 
 interface WeaponIconData {

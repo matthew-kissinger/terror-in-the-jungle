@@ -18,6 +18,7 @@ export class CrosshairSystem extends UIComponent {
   private mode = this.signal<CrosshairMode>('infantry');
   private spreadRadius = this.signal(15);
   private isVisible = this.signal(true);
+  private pipperIconsLoaded = false;
 
   protected build(): void {
     this.root.className = styles.container;
@@ -35,8 +36,8 @@ export class CrosshairSystem extends UIComponent {
         <div data-ref="spreadRing" class="${styles.spreadRing}"></div>
       </div>
       <div data-ref="pipper" class="${styles.pipperReticle}" style="display:none">
-        <img data-ref="pipperGun" src="${icon('reticle-cobra-gun')}" alt="Gun reticle" width="48" height="48" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);object-fit:contain;image-rendering:pixelated;pointer-events:none;" draggable="false">
-        <img data-ref="pipperRocket" src="${icon('reticle-rocket')}" alt="Rocket reticle" width="48" height="48" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);object-fit:contain;image-rendering:pixelated;pointer-events:none;display:none;" draggable="false">
+        <img data-ref="pipperGun" data-icon="reticle-cobra-gun" alt="Gun reticle" width="48" height="48" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);object-fit:contain;image-rendering:pixelated;pointer-events:none;" draggable="false">
+        <img data-ref="pipperRocket" data-icon="reticle-rocket" alt="Rocket reticle" width="48" height="48" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);object-fit:contain;image-rendering:pixelated;pointer-events:none;display:none;" draggable="false">
         <div class="${styles.pipperDot}"></div>
       </div>
     `;
@@ -67,6 +68,7 @@ export class CrosshairSystem extends UIComponent {
         case 'helicopter_attack':
           infantry.style.display = 'none';
           pipper.style.display = '';
+          this.loadPipperIcons();
           break;
         case 'helicopter_transport':
         case 'helicopter_gunship':
@@ -114,5 +116,17 @@ export class CrosshairSystem extends UIComponent {
 
   setSpread(radius: number): void {
     this.spreadRadius.value = Math.max(0, radius);
+  }
+
+  private loadPipperIcons(): void {
+    if (this.pipperIconsLoaded) return;
+    this.pipperIconsLoaded = true;
+    const imgs = this.root.querySelectorAll<HTMLImageElement>('[data-icon]');
+    for (const img of imgs) {
+      const name = img.getAttribute('data-icon');
+      if (name && !img.src) {
+        img.src = icon(name);
+      }
+    }
   }
 }

@@ -5,8 +5,8 @@ export const DEFAULT_WORLD_SIZE = 300;
 
 export const MINIMAP_STYLES = `
   .minimap-container {
-    width: clamp(110px, 13vw, 180px);
-    height: clamp(110px, 13vw, 180px);
+    width: clamp(80px, 22vw, 180px);
+    height: clamp(80px, 22vw, 180px);
     border: 1px solid ${colors.hudBorder};
     border-radius: 6px;
     overflow: hidden;

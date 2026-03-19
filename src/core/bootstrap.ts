@@ -4,8 +4,9 @@ import { TouchControlLayout } from '../ui/controls/TouchControlLayout';
 import { markStartup, resetStartupTelemetry } from './StartupTelemetry';
 import { AgentTier } from '../systems/strategy/types';
 import { isBlufor, isOpfor } from '../systems/combat/types';
-import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
+import { isPerfDiagnosticsEnabled, isDiagEnabled } from './PerfDiagnostics';
 import { Logger } from '../utils/Logger';
+import { preloadIcons } from '../ui/icons/IconRegistry';
 
 const ashauSessionTelemetry = {
   sessionStartEpochMs: Date.now(),
@@ -75,6 +76,13 @@ export async function bootstrapGame(): Promise<void> {
     engine.start();
     markStartup('bootstrap.engine-started');
 
+    // Warm browser cache for critical HUD icons
+    preloadIcons([
+      'icon-rifle', 'icon-shotgun', 'icon-smg', 'icon-pistol',
+      'icon-lmg', 'icon-launcher', 'icon-grenade',
+      'icon-minigun', 'icon-rocket-pod', 'icon-door-gun',
+    ]);
+
     if (import.meta.env.DEV && isPerfDiagnosticsEnabled()) {
       // Expose engine root for perf harness scenario control.
       (window as any).__engine = engine;
@@ -87,6 +95,32 @@ export async function bootstrapGame(): Promise<void> {
       ashauSessionTelemetry.lastNearbyTactical250 = 0;
       ashauSessionTelemetry.peakNearbyTactical250 = 0;
       (window as any).__ashauDiagnostics = () => buildAShauDiagnostics(engine);
+    }
+
+    if (isDiagEnabled()) {
+      (window as any).__rendererInfo = () => {
+        const info = engine.renderer?.renderer?.info;
+        return {
+          geometries: info?.memory?.geometries ?? 0,
+          textures: info?.memory?.textures ?? 0,
+          programs: info?.programs?.length ?? 0,
+          drawCalls: info?.render?.calls ?? 0,
+          triangles: info?.render?.triangles ?? 0,
+        };
+      };
+
+      (window as any).__engineHealth = () => {
+        const snap = engine.runtimeMetrics?.getSnapshot();
+        const avgMs = snap?.avgFrameMs ?? 0;
+        return {
+          mode: engine.systemManager.gameModeManager.getCurrentMode(),
+          fps: avgMs > 0 ? Math.round(1000 / avgMs) : 0,
+          avgFrameMs: avgMs,
+          p99FrameMs: snap?.p99FrameMs ?? 0,
+          combatantCount: snap?.combatantCount ?? 0,
+          heapUsedMB: Math.round((performance as any).memory?.usedJSHeapSize / 1048576) || 0,
+        };
+      };
     }
 
     window.addEventListener('beforeunload', () => {

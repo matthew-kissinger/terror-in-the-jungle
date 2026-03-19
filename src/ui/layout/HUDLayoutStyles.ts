@@ -74,6 +74,7 @@ export const HUD_LAYOUT_STYLES = `
     min-width: 0;
     min-height: 0;
     box-sizing: border-box;
+    overflow: hidden;
   }
 
   /* Center-aligned slots (tickets, compass, center, status-bar) */
@@ -290,7 +291,7 @@ export const HUD_LAYOUT_STYLES = `
    * ========================================================= */
   @media (pointer: coarse) and (orientation: landscape) {
     #game-hud-root {
-      grid-template-columns: auto minmax(140px, 2fr) minmax(80px, 1fr);
+      grid-template-columns: auto minmax(100px, 2fr) minmax(60px, 1fr);
       grid-template-rows:
         auto     /* minimap / status-bar / menu */
         auto     /* stats (K/D under minimap) */
@@ -331,7 +332,7 @@ export const HUD_LAYOUT_STYLES = `
    * ========================================================= */
   @media (pointer: coarse) and (orientation: portrait) {
     #game-hud-root {
-      grid-template-columns: auto minmax(120px, 2fr) minmax(80px, 1fr);
+      grid-template-columns: auto minmax(80px, 2fr) minmax(60px, 1fr);
       grid-template-rows:
         auto     /* minimap / status-bar / menu */
         auto     /* stats (K/D under minimap) */

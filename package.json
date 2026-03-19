@@ -46,7 +46,14 @@
     "perf:compare": "npx tsx scripts/perf-compare.ts",
     "perf:update-baseline": "npx tsx scripts/perf-compare.ts --update-baseline",
     "validate": "npm run lint && npm run test:run && npm run build && npm run smoke:prod",
-    "validate:full": "npm run test:run && npm run build && npm run perf:capture:combat120 && npm run perf:compare -- --scenario combat120"
+    "validate:full": "npm run test:run && npm run build && npm run perf:capture:combat120 && npm run perf:compare -- --scenario combat120",
+    "probe": "npx tsx scripts/engine-health-probe.ts",
+    "probe:all": "npx tsx scripts/engine-health-probe.ts --all-modes",
+    "check:hud": "npx tsx scripts/hud-layout-validator.ts",
+    "check:memory": "npx tsx scripts/memory-growth-tracker.ts",
+    "check:assets": "npx tsx scripts/asset-load-analyzer.ts",
+    "check:states": "npx tsx scripts/state-coverage-probe.ts",
+    "profile:modes": "npx tsx scripts/mode-load-profiler.ts"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",
@@ -62,9 +69,10 @@
     "sharp": "^0.34.5",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1",
+    "vite": "^8.0.0",
     "vite-plugin-compression": "^0.5.1",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "webgl-memory": "^1.1.3"
   },
   "dependencies": {
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
