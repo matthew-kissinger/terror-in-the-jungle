@@ -115,6 +115,11 @@ vi.mock('three', () => {
     side: any
     depthWrite: boolean
     depthTest: boolean
+    blending: any
+    blendSrc: any
+    blendDst: any
+    blendSrcAlpha: any
+    blendDstAlpha: any
     dispose = vi.fn()
 
     constructor(params: any) {
@@ -125,6 +130,11 @@ vi.mock('three', () => {
       this.side = params.side
       this.depthWrite = params.depthWrite
       this.depthTest = params.depthTest
+      this.blending = params.blending
+      this.blendSrc = params.blendSrc
+      this.blendDst = params.blendDst
+      this.blendSrcAlpha = params.blendSrcAlpha
+      this.blendDstAlpha = params.blendDstAlpha
     }
   }
 
@@ -166,6 +176,9 @@ vi.mock('three', () => {
     Camera,
     DynamicDrawUsage: 35048,
     DoubleSide: 'DoubleSide',
+    CustomBlending: 5,
+    OneFactor: 201,
+    OneMinusSrcAlphaFactor: 205,
   }
 })
 

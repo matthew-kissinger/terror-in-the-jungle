@@ -94,7 +94,13 @@ export class GPUBillboardVegetation {
       transparent: true,
       side: THREE.DoubleSide,
       depthWrite: true,
-      depthTest: true
+      depthTest: true,
+      // Premultiplied alpha blending - eliminates dark halos at texture edges
+      blending: THREE.CustomBlending,
+      blendSrc: THREE.OneFactor,
+      blendDst: THREE.OneMinusSrcAlphaFactor,
+      blendSrcAlpha: THREE.OneFactor,
+      blendDstAlpha: THREE.OneMinusSrcAlphaFactor
     });
 
     // Create mesh

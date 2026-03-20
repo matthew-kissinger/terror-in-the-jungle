@@ -128,8 +128,8 @@ export const BILLBOARD_FRAGMENT_SHADER = `
   void main() {
     vec4 texColor = texture2D(map, vUv);
 
-    // Alpha test for transparency
-    if (texColor.a < 0.5) discard;
+    // Alpha test - low threshold keeps soft anti-aliased edges
+    if (texColor.a < 0.1) discard;
 
     // Distance-based fade
     float fadeFactor = 1.0;
@@ -147,6 +147,8 @@ export const BILLBOARD_FRAGMENT_SHADER = `
       shaded = mix(shaded, fogColor, vFogFactor);
     }
 
-    gl_FragColor = vec4(shaded, texColor.a * fadeFactor);
+    // Premultiplied alpha output - prevents dark halos from bilinear filtering
+    float finalAlpha = texColor.a * fadeFactor;
+    gl_FragColor = vec4(shaded * finalAlpha, finalAlpha);
   }
 `;
