@@ -37,6 +37,13 @@ vi.mock('./LiveEntryActivator', () => ({
 }));
 
 function createEngineStub() {
+  const settingsModal = {
+    show: vi.fn(),
+    hide: vi.fn(),
+    isVisible: vi.fn(() => false),
+    setOnVisibilityChange: vi.fn(),
+  };
+
   return {
     renderer: {
       scene: {},
@@ -55,6 +62,7 @@ function createEngineStub() {
       updateProgress: vi.fn(),
       beginGameLaunch: vi.fn(),
       cancelGameLaunch: vi.fn(),
+      getSettingsModal: vi.fn(() => settingsModal),
       showMainMenu: vi.fn(),
       showError: vi.fn(),
     },
@@ -63,6 +71,7 @@ function createEngineStub() {
       assetLoader: { getTexture: vi.fn().mockReturnValue(undefined) },
       globalBillboardSystem: { configure: vi.fn() },
       hudSystem: { setPlayAgainCallback: vi.fn() },
+      playerController: { setSettingsModal: vi.fn() },
     },
   } as any;
 }
@@ -84,6 +93,9 @@ describe('GameEngineInit sandbox autostart', () => {
     expect(engine.startupFlow.getState().phase).toBe('mode_preparing');
     expect(engine.loadingScreen.showMainMenu).not.toHaveBeenCalled();
     expect(engine.loadingScreen.beginGameLaunch).toHaveBeenCalledTimes(1);
+    expect(engine.systemManager.playerController.setSettingsModal).toHaveBeenCalledWith(
+      engine.loadingScreen.getSettingsModal(),
+    );
     expect(mocks.prepareModeStartup).toHaveBeenCalledWith(
       engine,
       expect.objectContaining({

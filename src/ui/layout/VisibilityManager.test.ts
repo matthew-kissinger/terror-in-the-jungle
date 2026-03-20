@@ -67,6 +67,7 @@ describe('VisibilityManager', () => {
   it('setVehicle() convenience method', () => {
     vm.setVehicle('helicopter');
     expect(root.dataset.vehicle).toBe('helicopter');
+    expect(root.dataset.actorMode).toBe('helicopter');
   });
 
   it('setADS() convenience method', () => {
@@ -74,6 +75,39 @@ describe('VisibilityManager', () => {
     expect(root.dataset.ads).toBe('true');
     vm.setADS(false);
     expect(root.dataset.ads).toBe('false');
+  });
+
+  it('keeps actorMode and vehicle in sync when state is set directly', () => {
+    vm.setState({ actorMode: 'car' });
+    expect(root.dataset.actorMode).toBe('car');
+    expect(root.dataset.vehicle).toBe('car');
+
+    vm.setState({ vehicle: 'turret' });
+    expect(root.dataset.actorMode).toBe('turret');
+    expect(root.dataset.vehicle).toBe('turret');
+  });
+
+  it('clears scoreboard visibility when a modal overlay opens', () => {
+    vm.setState({ scoreboardVisible: true });
+    expect(root.dataset.scoreboardVisible).toBe('true');
+
+    vm.setOverlay('map');
+
+    expect(root.dataset.overlay).toBe('map');
+    expect(root.dataset.scoreboardVisible).toBe('false');
+  });
+
+  it('tracks interaction state on the root dataset', () => {
+    vm.setInteraction({
+      kind: 'vehicle-enter',
+      promptText: 'Press E to enter helicopter',
+      buttonLabel: 'ENTER',
+    });
+
+    expect(root.dataset.interaction).toBe('vehicle-enter');
+
+    vm.setInteraction(null);
+    expect(root.dataset.interaction).toBe('none');
   });
 
   it('getState() returns snapshot (not reference)', () => {

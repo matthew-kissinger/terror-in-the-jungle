@@ -37,6 +37,37 @@ export type HUDRegion =
  */
 export type LayoutMode = 'desktop' | 'mobile-landscape' | 'mobile-portrait';
 
+export type GameplayInputMode = 'keyboardMouse' | 'touch' | 'gamepad';
+export type ActorMode = 'infantry' | 'helicopter' | 'plane' | 'car' | 'turret';
+export type GameplayOverlay = 'none' | 'map' | 'command' | 'pause' | 'settings';
+export type VehicleKind = Exclude<ActorMode, 'infantry'>;
+
+export interface VehicleCapabilities {
+  canExit: boolean;
+  canFirePrimary: boolean;
+  canCycleWeapons: boolean;
+  canFreeLook: boolean;
+  canStabilize: boolean;
+  canDeploySquad: boolean;
+  canOpenMap: boolean;
+  canOpenCommand: boolean;
+}
+
+export interface VehicleUIContext {
+  kind: VehicleKind;
+  role: string;
+  capabilities: VehicleCapabilities;
+  hudVariant: 'flight' | 'groundVehicle' | 'turret';
+  weaponCount: number;
+}
+
+export interface InteractionContext {
+  kind: 'none' | 'vehicle-enter' | 'vehicle-exit' | 'squad-deploy' | 'interact';
+  promptText: string;
+  buttonLabel?: string;
+  targetId?: string;
+}
+
 /**
  * UI state that drives visibility via data attributes.
  * Instead of components toggling their own display,
@@ -46,10 +77,22 @@ export type LayoutMode = 'desktop' | 'mobile-landscape' | 'mobile-portrait';
 export interface UIState {
   /** Input device type */
   device: 'desktop' | 'touch';
+  /** Active input mode */
+  inputMode: GameplayInputMode;
   /** Current game phase */
   phase: 'menu' | 'loading' | 'playing' | 'paused' | 'ended';
-  /** Current vehicle context */
-  vehicle: 'infantry' | 'helicopter';
+  /** Current actor context */
+  vehicle: ActorMode;
+  /** Current actor context (explicit alias for future vehicle work) */
+  actorMode: ActorMode;
+  /** Active modal overlay */
+  overlay: GameplayOverlay;
+  /** Whether the scoreboard overlay is visible */
+  scoreboardVisible: boolean;
+  /** Contextual interaction prompt/button state */
+  interaction: InteractionContext | null;
+  /** Vehicle-specific HUD and control capabilities */
+  vehicleContext: VehicleUIContext | null;
   /** Whether player is aiming down sights */
   ads: boolean;
   /** Layout mode (derived from viewport) */

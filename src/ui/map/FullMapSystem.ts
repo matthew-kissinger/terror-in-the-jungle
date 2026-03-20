@@ -66,6 +66,7 @@ export class FullMapSystem implements GameSystem {
 
   // Input handling
   private inputHandler: FullMapInput;
+  private visibilityListeners = new Set<(visible: boolean) => void>();
 
   constructor(camera: THREE.Camera) {
     this.camera = camera;
@@ -198,6 +199,12 @@ export class FullMapSystem implements GameSystem {
     this.inputHandler.toggle();
   }
 
+  onVisibilityChange(listener: (visible: boolean) => void): () => void {
+    this.visibilityListeners.add(listener);
+    listener(this.isVisible);
+    return () => this.visibilityListeners.delete(listener);
+  }
+
   private show(): void {
     this.isVisible = true;
     this.inputHandler.setIsVisible(true);
@@ -211,6 +218,7 @@ export class FullMapSystem implements GameSystem {
     // Auto-fit to show all zones when opening the map
     this.autoFitView();
     this.render();
+    this.emitVisibility();
   }
 
   private autoFitView(): void {
@@ -254,6 +262,7 @@ export class FullMapSystem implements GameSystem {
     if (this.mapToggleButton) {
       this.mapToggleButton.style.display = 'flex';
     }
+    this.emitVisibility();
   }
 
   private render(): void {
@@ -302,6 +311,12 @@ export class FullMapSystem implements GameSystem {
     this.drawPlayer(ctx);
 
     ctx.restore();
+  }
+
+  private emitVisibility(): void {
+    for (const listener of this.visibilityListeners) {
+      listener(this.isVisible);
+    }
   }
 
   private drawGrid(ctx: CanvasRenderingContext2D): void {

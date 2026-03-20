@@ -111,6 +111,14 @@ export class HUDLayout {
   }
 
   /**
+   * Preferred accessor for gameplay HUD/presentation state.
+   * Kept alongside getVisibilityManager() while older call sites migrate.
+   */
+  getPresentationController(): VisibilityManager {
+    return this.visibilityManager;
+  }
+
+  /**
    * Register a component into a grid region.
    * The component will be mounted into the slot and tracked for disposal.
    */

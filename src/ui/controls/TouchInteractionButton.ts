@@ -11,6 +11,7 @@ import styles from './TouchControls.module.css';
 
 export class TouchInteractionButton extends BaseTouchButton {
   private isVisible = false;
+  private label = 'ENTER';
 
   private onInteract?: () => void;
 
@@ -18,12 +19,20 @@ export class TouchInteractionButton extends BaseTouchButton {
     this.root.className = styles.interactBtn;
     this.root.id = 'touch-interaction-btn';
     this.root.style.display = 'none'; // Start hidden
+    const iconWrap = document.createElement('div');
+    iconWrap.className = styles.interactIconWrap;
     const iconEl = document.createElement('img');
     iconEl.src = icon('icon-interact');
     iconEl.alt = 'Interact';
     iconEl.draggable = false;
     iconEl.style.cssText = 'width: 50%; height: 50%; object-fit: contain; pointer-events: none; image-rendering: pixelated;';
-    this.root.appendChild(iconEl);
+    iconWrap.appendChild(iconEl);
+    const labelEl = document.createElement('div');
+    labelEl.className = styles.interactLabel;
+    labelEl.textContent = this.label;
+    labelEl.setAttribute('data-ref', 'label');
+    this.root.appendChild(iconWrap);
+    this.root.appendChild(labelEl);
     this.root.setAttribute('aria-label', 'Interact');
   }
 
@@ -35,6 +44,15 @@ export class TouchInteractionButton extends BaseTouchButton {
 
   setCallback(onInteract: () => void): void {
     this.onInteract = onInteract;
+  }
+
+  setLabel(label: string): void {
+    this.label = label;
+    const labelEl = this.root.querySelector('[data-ref="label"]');
+    if (labelEl) {
+      labelEl.textContent = label;
+    }
+    this.root.setAttribute('aria-label', label);
   }
 
   /** Show the button (called when interaction becomes available). */

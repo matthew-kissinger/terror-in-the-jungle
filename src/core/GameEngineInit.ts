@@ -40,6 +40,7 @@ export async function initializeSystems(engine: GameEngine): Promise<void> {
       (phase: string, progress: number) => engine.loadingScreen.updateProgress(phase, progress),
       engine.renderer
     );
+    engine.systemManager.playerController.setSettingsModal(engine.loadingScreen.getSettingsModal());
 
     engine.loadingScreen.updateProgress('entities', 0);
     Logger.info('engine-init', 'Systems initialized, loading assets...');

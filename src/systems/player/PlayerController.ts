@@ -29,6 +29,18 @@ import { PlayerCombatController } from './PlayerCombatController';
 import { PlayerVehicleController } from './PlayerVehicleController';
 import type { FullMapSystem } from '../../ui/map/FullMapSystem';
 
+interface SettingsModalController {
+  show(): void;
+  hide(): void;
+  isVisible(): boolean;
+  setOnVisibilityChange(callback: (visible: boolean) => void): void;
+  setGameplayMenuActions?(actions: {
+    onResume: () => void;
+    onSquadCommands: () => void;
+    onQuitToMenu: () => void;
+  }): void;
+}
+
 // ── Player physics defaults ──
 const PLAYER_WALK_SPEED = 10;
 const PLAYER_RUN_SPEED = 20;
@@ -57,11 +69,16 @@ export class PlayerController implements GameSystem {
   private commandInputManager?: CommandInputManager;
   private fullMapSystem?: FullMapSystem;
   private airSupportManager?: AirSupportManager;
+  private settingsModal?: SettingsModalController;
+  private unsubscribeInputMode?: () => void;
+  private unsubscribeCommandVisibility?: () => void;
+  private unsubscribeMapVisibility?: () => void;
   private playerSquadId?: string;
   private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
   private playerFaction: Faction = Faction.US;
   private playerState: PlayerState;
   private spawnStabilizationUntilMs = 0;
+  private gameStarted = false;
 
   // Spectator camera (activates after death presentation)
   private spectatorCamera: SpectatorCamera;
@@ -140,6 +157,9 @@ export class PlayerController implements GameSystem {
 
   dispose(): void {
     this.deactivateSpectator();
+    this.unsubscribeInputMode?.();
+    this.unsubscribeCommandVisibility?.();
+    this.unsubscribeMapVisibility?.();
     this.input.dispose();
   }
 
@@ -199,8 +219,7 @@ export class PlayerController implements GameSystem {
       onAirSupportMenu: () => this.handleAirSupportRequest(),
       onSquadCommand: () => this.commandInputManager?.toggleCommandMode(),
       onSquadQuickCommand: (slot: number) => this.commandInputManager?.issueQuickCommand(slot),
-      onMenuPause: () => this.handleMenuPause(),
-      onMenuResume: () => this.handleMenuResume(),
+      onMenuOpen: () => this.handleMenuOpen(),
     });
   }
 
@@ -278,27 +297,60 @@ export class PlayerController implements GameSystem {
     this.combatController.toggleGrenadeSlot();
   }
 
-  private handleMenuPause(): void {
+  private handleMenuPause(overlay: 'pause' | 'settings' = 'settings'): void {
     this.input.setControlsEnabled(false);
+    if (!this.input.getIsTouchMode()) {
+      this.input.setPointerLockEnabled(false);
+    }
     this.input.setInputContext('menu');
+    this.input.getTouchControls()?.beginModalOverlays();
     this.playerState.velocity.set(0, 0, 0);
     this.playerState.isRunning = false;
+    this.hudSystem?.setOverlay?.(overlay);
+    this.hudSystem?.setPhase?.('paused');
   }
 
   private handleMenuResume(): void {
     this.input.setControlsEnabled(true);
+    if (!this.input.getIsTouchMode()) {
+      this.input.setPointerLockEnabled(true);
+    }
     this.input.setInputContext('gameplay');
+    this.input.getTouchControls()?.endModalOverlays();
+    this.hudSystem?.setOverlay?.('none');
+    if (this.gameStarted) {
+      this.hudSystem?.setPhase?.('playing');
+    }
+  }
+
+  private handleMenuOpen(): void {
+    if (this.settingsModal?.isVisible()) {
+      this.settingsModal.hide();
+      return;
+    }
+    this.settingsModal?.show();
   }
 
   private handleEscape(): void {
     if (this.commandInputManager?.handleCancel()) {
       return;
     }
+    if (this.settingsModal?.isVisible()) {
+      this.settingsModal.hide();
+      return;
+    }
+    if (this.fullMapSystem?.getIsVisible()) {
+      return;
+    }
     if (this.playerState.isInHelicopter && this.helicopterModel) {
       this.helicopterModel.exitHelicopter();
-    } else {
-      document.exitPointerLock();
+      return;
     }
+    if (this.gameStarted && this.settingsModal) {
+      this.settingsModal.show();
+      return;
+    }
+    document.exitPointerLock();
   }
 
   private handleEnterExitHelicopter(): void {
@@ -499,6 +551,7 @@ export class PlayerController implements GameSystem {
   }
   setPointerLockEnabled(enabled: boolean): void { this.input.setPointerLockEnabled(enabled); }
   setGameStarted(started: boolean): void {
+    this.gameStarted = started;
     this.input.setGameStarted(started);
     this.input.setInputContext(started ? 'gameplay' : 'menu');
   }
@@ -645,6 +698,23 @@ export class PlayerController implements GameSystem {
     this.commandInputManager = dependencies.commandInputManager;
     this.fullMapSystem = dependencies.fullMapSystem;
     dependencies.commandInputManager.bindInputManager(this.input);
+    if (typeof dependencies.commandInputManager.onVisibilityChange === 'function') {
+      this.unsubscribeCommandVisibility?.();
+      this.unsubscribeCommandVisibility = dependencies.commandInputManager.onVisibilityChange((visible) => {
+        this.hudSystem?.setOverlay?.(visible ? 'command' : 'none');
+      });
+    }
+    if (typeof dependencies.fullMapSystem.onVisibilityChange === 'function') {
+      this.unsubscribeMapVisibility?.();
+      this.unsubscribeMapVisibility = dependencies.fullMapSystem.onVisibilityChange((visible) => {
+        this.hudSystem?.setOverlay?.(visible ? 'map' : 'none');
+        if (visible) {
+          this.input.getTouchControls()?.beginModalOverlays();
+        } else {
+          this.input.getTouchControls()?.endModalOverlays();
+        }
+      });
+    }
     this.airSupportManager = dependencies.airSupportManager;
 
     this.configureCombatController({
@@ -666,6 +736,19 @@ export class PlayerController implements GameSystem {
     dependencies.hudSystem.setWeaponSelectCallback((slotIndex: number) => {
       this.inventoryManager?.setCurrentSlot(slotIndex as WeaponSlot);
     });
+    if (typeof dependencies.hudSystem.getPresentationController === 'function') {
+      this.input.getTouchControls()?.bindPresentation(dependencies.hudSystem.getPresentationController());
+    }
+    this.unsubscribeInputMode?.();
+    this.unsubscribeInputMode = this.input.onInputModeChange((mode) => {
+      this.hudSystem?.setInputMode?.(mode);
+    });
+    const initialInputMode = typeof this.input.getLastInputMode === 'function'
+      ? this.input.getLastInputMode()
+      : this.input.getIsTouchMode()
+        ? 'touch'
+        : 'keyboardMouse';
+    dependencies.hudSystem.setInputMode?.(initialInputMode);
     this.inventoryManager.onSlotChange((slot: WeaponSlot) => this.handleWeaponSlotChange(slot));
     this.inventoryManager.onLoadoutChange(() => this.syncLoadoutHud());
     this.syncLoadoutHud();
@@ -711,6 +794,19 @@ export class PlayerController implements GameSystem {
     });
     this.configureCombatController({ hudSystem });
     this.configureVehicleController({ hudSystem });
+    if (typeof hudSystem.getPresentationController === 'function') {
+      this.input.getTouchControls()?.bindPresentation(hudSystem.getPresentationController());
+    }
+    this.unsubscribeInputMode?.();
+    this.unsubscribeInputMode = this.input.onInputModeChange((mode) => {
+      this.hudSystem?.setInputMode?.(mode);
+    });
+    const inputMode = typeof this.input.getLastInputMode === 'function'
+      ? this.input.getLastInputMode()
+      : this.input.getIsTouchMode()
+        ? 'touch'
+        : 'keyboardMouse';
+    this.hudSystem.setInputMode?.(inputMode);
     this.syncLoadoutHud();
   }
   setRenderer(renderer: IGameRenderer): void { this.gameRenderer = renderer; }
@@ -737,9 +833,36 @@ export class PlayerController implements GameSystem {
     this.airSupportManager = airSupportManager;
     this.configureVehicleController({ airSupportManager });
   }
+  setSettingsModal(settingsModal: SettingsModalController): void {
+    this.settingsModal = settingsModal;
+    settingsModal.setGameplayMenuActions?.({
+      onResume: () => settingsModal.hide(),
+      onSquadCommands: () => {
+        settingsModal.hide();
+        this.commandInputManager?.toggleCommandMode();
+      },
+      onQuitToMenu: () => window.location.reload(),
+    });
+    settingsModal.setOnVisibilityChange((visible) => {
+      if (!this.gameStarted) {
+        return;
+      }
+      if (visible) {
+        this.handleMenuPause('settings');
+      } else {
+        this.handleMenuResume();
+      }
+    });
+  }
   setCommandInputManager(commandInputManager: CommandInputManager): void {
     this.commandInputManager = commandInputManager;
     commandInputManager.bindInputManager(this.input);
+    if (typeof commandInputManager.onVisibilityChange === 'function') {
+      this.unsubscribeCommandVisibility?.();
+      this.unsubscribeCommandVisibility = commandInputManager.onVisibilityChange((visible) => {
+        this.hudSystem?.setOverlay?.(visible ? 'command' : 'none');
+      });
+    }
   }
   setSpectatorCandidateProvider(provider: () => SpectatorCandidate[]): void {
     this.spectatorCandidateProvider = provider;

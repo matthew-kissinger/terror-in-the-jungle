@@ -116,8 +116,7 @@ export class InputManager extends PlayerInput {
       onAirSupportMenu: () => this.runGameplay(callbacks.onAirSupportMenu),
       // Escape/menu callbacks are always allowed so the player can recover from UI traps.
       onEscape: () => callbacks.onEscape?.(),
-      onMenuPause: () => callbacks.onMenuPause?.(),
-      onMenuResume: () => callbacks.onMenuResume?.(),
+      onMenuOpen: () => callbacks.onMenuOpen?.(),
     };
   }
 

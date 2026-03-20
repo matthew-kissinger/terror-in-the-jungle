@@ -17,6 +17,7 @@ interface CategoryConfig {
   trimAlpha: boolean;
   cleanEdges: boolean;
   enforcePOT: boolean;
+  pixelArt?: boolean;
   nameMap?: Record<string, string>;
 }
 
@@ -81,9 +82,10 @@ const CATEGORIES: Record<string, CategoryConfig> = {
     format: 'webp',
     quality: 95,
     maxDim: 512,
-    trimAlpha: true,
-    cleanEdges: true,
+    trimAlpha: false,
+    cleanEdges: false,
     enforcePOT: true,
+    pixelArt: true,
     nameMap: SOLDIER_NAME_MAP,
   },
   textures: {
@@ -224,11 +226,12 @@ async function processFile(
     }
 
     // Resize to fit within maxDim
+    const resizeKernel = config.pixelArt ? sharp.kernel.nearest : sharp.kernel.lanczos3;
     if (config.maxDim && (w > config.maxDim || h > config.maxDim)) {
       pipeline = pipeline.resize(config.maxDim, config.maxDim, {
         fit: 'inside',
         withoutEnlargement: true,
-        kernel: sharp.kernel.lanczos3,
+        kernel: resizeKernel,
       });
       const ratio = Math.min(config.maxDim / w, config.maxDim / h);
       w = Math.round(w * ratio);
@@ -243,7 +246,7 @@ async function processFile(
         pipeline = pipeline.resize(potW, potH, {
           fit: 'contain',
           background: { r: 0, g: 0, b: 0, alpha: 0 },
-          kernel: sharp.kernel.lanczos3,
+          kernel: resizeKernel,
         });
         w = potW;
         h = potH;

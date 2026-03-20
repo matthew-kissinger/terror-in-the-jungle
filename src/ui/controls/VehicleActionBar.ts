@@ -13,6 +13,7 @@
 
 import { UIComponent } from '../engine/UIComponent';
 import styles from './TouchControls.module.css';
+import type { VehicleUIContext } from '../layout/types';
 
 interface VehicleActionCallbacks {
   onExitVehicle?: () => void;
@@ -36,7 +37,8 @@ export class VehicleActionBar extends UIComponent {
   private hoverBtn!: HTMLDivElement;
   private lookBtn!: HTMLDivElement;
   private autoHoverActive = false;
-  private helicopterWeaponIndex = 0;
+  private vehicleWeaponIndex = 0;
+  private vehicleContext: VehicleUIContext | null = null;
 
   protected build(): void {
     this.root.className = styles.vehicleActionBar;
@@ -91,8 +93,9 @@ export class VehicleActionBar extends UIComponent {
     this.listen(this.wpnBtn, 'pointerdown', (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      this.helicopterWeaponIndex = this.helicopterWeaponIndex === 0 ? 1 : 0;
-      this.callbacks.onHelicopterWeaponCycle?.(this.helicopterWeaponIndex);
+      const weaponCount = Math.max(this.vehicleContext?.weaponCount ?? 2, 1);
+      this.vehicleWeaponIndex = (this.vehicleWeaponIndex + 1) % weaponCount;
+      this.callbacks.onHelicopterWeaponCycle?.(this.vehicleWeaponIndex);
     }, { passive: false });
 
     this.listen(this.mapBtn, 'pointerdown', (e: PointerEvent) => {
@@ -137,6 +140,20 @@ export class VehicleActionBar extends UIComponent {
     this.callbacks = callbacks;
   }
 
+  setVehicleContext(context: VehicleUIContext | null): void {
+    this.vehicleContext = context;
+    this.vehicleWeaponIndex = 0;
+
+    const capabilities = context?.capabilities;
+    this.exitBtn.style.display = capabilities?.canExit ? 'flex' : 'none';
+    this.fireBtn.style.display = capabilities?.canFirePrimary ? 'flex' : 'none';
+    this.wpnBtn.style.display = capabilities?.canCycleWeapons ? 'flex' : 'none';
+    this.mapBtn.style.display = capabilities?.canOpenMap ? 'flex' : 'none';
+    this.cmdBtn.style.display = capabilities?.canOpenCommand ? 'flex' : 'none';
+    this.hoverBtn.style.display = capabilities?.canStabilize ? 'flex' : 'none';
+    this.lookBtn.style.display = capabilities?.canFreeLook ? 'flex' : 'none';
+  }
+
   show(): void {
     this.root.style.display = 'flex';
   }
@@ -153,7 +170,7 @@ export class VehicleActionBar extends UIComponent {
   setWeaponCycleVisible(visible: boolean): void {
     this.wpnBtn.style.display = visible ? 'flex' : 'none';
     if (!visible) {
-      this.helicopterWeaponIndex = 0;
+      this.vehicleWeaponIndex = 0;
     }
   }
 

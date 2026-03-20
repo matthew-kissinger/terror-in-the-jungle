@@ -11,18 +11,19 @@
   display: flex;
   align-items: center;
   gap: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background:
+    linear-gradient(180deg, rgba(251, 191, 36, 0.08), transparent 70%),
+    rgba(15, 21, 14, 0.9);
+  border: 1px solid var(--ops-line);
   border-radius: var(--radius-pill, 50px);
   padding: 3px 2px;
   pointer-events: auto;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
   min-width: 120px;
   height: 38px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--ops-shadow);
 }
 
 .chevron {
@@ -34,7 +35,7 @@
   border-radius: 50%;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--ops-data);
   font-size: 20px;
   font-weight: bold;
   padding: 0;
@@ -46,8 +47,8 @@
 }
 
 .chevron:active {
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.9);
+  background: rgba(251, 191, 36, 0.12);
+  color: var(--ops-accent-bright);
 }
 
 .info {
@@ -64,9 +65,9 @@
 .weaponName {
   font-size: 14px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--ops-accent-bright);
   letter-spacing: 0.5px;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  text-shadow: var(--shadow-text);
   font-family: var(--font-primary, 'Rajdhani', sans-serif);
   line-height: 1;
 }
@@ -74,9 +75,9 @@
 .ammo {
   font-size: 12px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--ops-data);
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  text-shadow: var(--shadow-text);
   font-family: var(--font-primary, 'Rajdhani', sans-serif);
   line-height: 1;
   transition: color var(--duration-fast, 150ms) ease;
@@ -100,7 +101,7 @@
 
 /* On weapon cycle, brief highlight */
 .pill.switching {
-  box-shadow: 0 0 16px rgba(255, 255, 255, 0.15), 0 2px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--ops-glow);
 }
 
 /* Desktop: hidden (UnifiedWeaponBar handles desktop) */

@@ -23,6 +23,13 @@ import { GameEventBus } from '../../core/GameEventBus';
 import { HUDLayout } from '../layout/HUDLayout';
 import type { GamePhase } from './GameStatusPanel';
 import type { InventorySlotDefinition } from '../../systems/player/InventoryManager';
+import type {
+  ActorMode,
+  GameplayInputMode,
+  GameplayOverlay,
+  InteractionContext,
+  VehicleUIContext,
+} from '../layout/types';
 
 interface HUDSystemDependencies {
   combatantSystem: CombatantSystem;
@@ -69,6 +76,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.matchEndScreen = new MatchEndScreen();
     this.scoreboardCombatantProxy = this.createScoreboardCombatantProxy();
     this.scoreboard = new ScoreboardPanel(this.statsTracker, this.scoreboardCombatantProxy);
+    this.scoreboard.setOnClose(() => this.toggleScoreboard(false));
     this.personalStatsPanel = new StatsPanel(this.statsTracker);
 
     // Setup return to menu callback
@@ -92,6 +100,10 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   /** Get the grid layout system (for component migration). */
   getLayout(): HUDLayout {
     return this.hudLayout;
+  }
+
+  getPresentationController() {
+    return this.hudLayout.getPresentationController();
   }
 
   async init(): Promise<void> {
@@ -296,7 +308,11 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   startMatch(): void {
     this.statsTracker.startMatch();
     movementStatsTracker.startMatch();
-    this.hudLayout.setPhase('playing');
+    this.hudLayout.setState({
+      phase: 'playing',
+      overlay: 'none',
+      scoreboardVisible: false,
+    });
     Logger.info('hud', ' Match statistics tracking started');
   }
 
@@ -356,7 +372,14 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     };
 
     Logger.info('hud', ' Showing match end screen with stats:', matchStats);
-    this.hudLayout.setPhase('ended');
+    this.hudLayout.setState({
+      phase: 'ended',
+      overlay: 'none',
+      scoreboardVisible: false,
+      actorMode: 'infantry',
+      interaction: null,
+      vehicleContext: null,
+    });
     this.matchEndScreen.show(winner, gameState, matchStats);
   }
 
@@ -449,12 +472,15 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   // Helicopter instruments methods (only visible in helicopter)
   showHelicopterInstruments(): void {
     this.elements.showHelicopterInstruments();
-    this.hudLayout.setState({ vehicle: 'helicopter' });
+    this.hudLayout.setState({ actorMode: 'helicopter' });
   }
 
   hideHelicopterInstruments(): void {
     this.elements.hideHelicopterInstruments();
-    this.hudLayout.setState({ vehicle: 'infantry' });
+    this.hudLayout.setState({
+      actorMode: 'infantry',
+      vehicleContext: null,
+    });
   }
 
   updateHelicopterInstruments(collective: number, rpm: number, autoHover: boolean, engineBoost: boolean): void {
@@ -553,6 +579,7 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   toggleScoreboard(visible: boolean): void {
     this.isScoreboardVisible = visible;
     this.scoreboard.toggle(visible);
+    this.hudLayout.setState({ scoreboardVisible: visible });
   }
 
   /** Toggle scoreboard visibility (for touch: tap to show, tap again to hide). */
@@ -566,12 +593,43 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   }
 
   /** Set the vehicle context (hides infantry-only slots in helicopter). */
-  setVehicle(vehicle: 'infantry' | 'helicopter'): void {
-    this.hudLayout.setState({ vehicle });
+  setVehicle(vehicle: ActorMode): void {
+    this.hudLayout.setState({ actorMode: vehicle });
   }
 
   /** Set ADS state (dims non-essential HUD when aiming). */
   setADS(ads: boolean): void {
     this.hudLayout.setState({ ads });
+  }
+
+  setOverlay(overlay: GameplayOverlay): void {
+    if (overlay !== 'none' && this.isScoreboardVisible) {
+      this.toggleScoreboard(false);
+    }
+    this.hudLayout.setState({ overlay });
+  }
+
+  setInputMode(inputMode: GameplayInputMode): void {
+    this.hudLayout.setState({ inputMode });
+  }
+
+  setInteractionContext(context: InteractionContext | null): void {
+    this.hudLayout.setState({ interaction: context });
+    if (context) {
+      this.elements.showInteractionPrompt(context.promptText);
+    } else {
+      this.elements.hideInteractionPrompt();
+    }
+  }
+
+  setVehicleContext(context: VehicleUIContext | null): void {
+    this.hudLayout.setState({
+      vehicleContext: context,
+      actorMode: context?.kind ?? 'infantry',
+    });
+  }
+
+  isScoreboardCurrentlyVisible(): boolean {
+    return this.isScoreboardVisible;
   }
 }

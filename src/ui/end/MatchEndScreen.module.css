@@ -1,14 +1,9 @@
 /**
- * MatchEndScreen - Full-screen match results overlay.
- * Victory/defeat theming, two-column stats, awards badges.
+ * MatchEndScreen - after-action report surface.
  */
 
 .screen {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  composes: overlayRoot from '../screens/ScreenPrimitives.module.css';
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -16,127 +11,155 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   z-index: 10000;
-  color: var(--text-primary);
-  font-family: var(--font-primary);
-  animation: fadeIn var(--duration-slow) ease-out;
-  box-sizing: border-box;
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
 
 .victory {
-  background: var(--victory-bg);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(74, 222, 128, 0.16), transparent 28%),
+    radial-gradient(circle at 82% 10%, rgba(251, 191, 36, 0.12), transparent 24%),
+    linear-gradient(180deg, rgba(7, 14, 8, 0.96), rgba(4, 7, 5, 0.98));
 }
 
 .defeat {
-  background: var(--defeat-bg);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(248, 113, 113, 0.16), transparent 28%),
+    radial-gradient(circle at 82% 10%, rgba(251, 191, 36, 0.08), transparent 24%),
+    linear-gradient(180deg, rgba(17, 8, 8, 0.96), rgba(8, 5, 5, 0.98));
 }
 
-/* --- Header --- */
+.reportShell {
+  width: min(1180px, 100%);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: clamp(16px, 2vw, 28px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 2vw, 22px);
+}
 
 .header {
+  composes: heroPanel from '../screens/ScreenPrimitives.module.css';
   text-align: center;
-  margin-top: auto;
-  margin-bottom: var(--space-8);
-  animation: slideDown var(--duration-reveal) ease-out;
+}
+
+.reportLabel {
+  composes: heroEyebrow from '../screens/ScreenPrimitives.module.css';
+  display: block;
+  margin-bottom: var(--space-2);
 }
 
 .title {
+  margin: 0;
   font-family: var(--font-heading);
-  font-size: var(--font-size-3xl);
+  font-size: clamp(3rem, 9vw, 6.4rem);
   font-weight: 500;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  letter-spacing: 0.15em;
-  margin-bottom: var(--space-2);
-  text-shadow: 0 0 20px currentColor;
+  line-height: 0.88;
 }
 
 .victory .title {
-  color: var(--feedback-success);
+  color: #86efac;
 }
 
 .defeat .title {
-  color: var(--feedback-danger);
+  color: #fca5a5;
 }
 
 .subtitle {
-  font-size: var(--font-size-xl);
-  opacity: 0.8;
-  letter-spacing: 0.1em;
+  margin-top: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--font-size-lg);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-/* --- Stats panel --- */
+.reportMeta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.metaCard {
+  composes: briefPanel from '../screens/ScreenPrimitives.module.css';
+}
+
+.metaLabel {
+  composes: dataTerm from '../screens/ScreenPrimitives.module.css';
+}
+
+.metaValue {
+  margin-top: var(--space-2);
+  color: #fff7e2;
+  font-family: var(--font-mono);
+  font-size: clamp(1.1rem, 3vw, 1.5rem);
+  font-weight: var(--weight-bold);
+}
 
 .statsPanel {
-  background: rgba(20, 35, 50, 0.9);
-  border: 1px solid var(--screen-glass-border-bright);
-  border-radius: var(--radius-xl);
-  padding: var(--space-8);
-  width: 90%;
-  max-width: 800px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-8);
-  animation: fadeInUp 0.8s ease-out 0.2s backwards;
+  gap: var(--space-4);
   flex-shrink: 0;
-}
-
-.victory .statsPanel {
-  border-color: var(--feedback-success);
-}
-
-.defeat .statsPanel {
-  border-color: var(--feedback-danger);
 }
 
 .statsColumn {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-4);
 }
 
 .statsSection {
-  margin-bottom: var(--space-2);
+  composes: briefPanel from '../screens/ScreenPrimitives.module.css';
 }
 
 .statsSectionTitle {
-  font-size: var(--font-size-base);
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
   margin-bottom: var(--space-3);
-  color: var(--screen-accent);
-  border-bottom: 1px solid var(--screen-glass-border-bright);
-  padding-bottom: var(--space-2);
+  color: var(--ops-accent-bright);
+  font-size: var(--font-size-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 
 .statRow {
   display: flex;
   justify-content: space-between;
-  padding: var(--space-1) 0;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
   font-size: var(--font-size-base);
 }
 
+.statRow:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
 .statLabel {
-  opacity: 0.8;
+  color: var(--text-secondary);
 }
 
 .statValue {
+  color: #f4f0e2;
+  font-family: var(--font-mono);
   font-weight: var(--weight-bold);
-  color: var(--screen-accent);
+  text-align: right;
 }
 
 .statHighlight {
-  color: var(--feedback-success);
+  color: #fde68a;
 }
-
-/* --- Ticket comparison --- */
 
 .ticketComparison {
   display: flex;
   justify-content: space-around;
-  margin: var(--space-4) 0;
+  align-items: center;
+  margin: var(--space-3) 0;
   padding: var(--space-4);
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.18);
 }
 
 .factionScore {
@@ -144,16 +167,18 @@
 }
 
 .factionName {
-  font-size: var(--font-size-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  opacity: 0.7;
   margin-bottom: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
 }
 
 .factionTickets {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--weight-bold);
+  font-family: var(--font-heading);
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 500;
+  letter-spacing: 0.06em;
 }
 
 .factionUS .factionTickets {
@@ -167,24 +192,24 @@
 .vsDivider {
   display: flex;
   align-items: center;
-  font-size: var(--font-size-xl);
-  opacity: 0.5;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-lg);
 }
 
-/* --- Awards --- */
-
 .awardsSection {
-  margin-top: var(--space-8);
-  animation: fadeInUp 1s ease-out 0.6s backwards;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
 .awardsTitle {
-  text-align: center;
-  font-size: var(--font-size-xl);
+  color: var(--ops-accent-bright);
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  letter-spacing: 0.15em;
-  margin-bottom: var(--space-4);
-  color: var(--screen-accent);
+  text-align: center;
 }
 
 .awardsContainer {
@@ -195,21 +220,10 @@
 }
 
 .awardBadge {
-  background: rgba(20, 35, 50, 0.4);
-  border: 1px solid var(--screen-glass-border-bright);
-  border-radius: var(--radius-lg);
-  padding: var(--space-4) var(--space-6);
-  min-width: 150px;
+  composes: briefPanel from '../screens/ScreenPrimitives.module.css';
+  min-width: 180px;
   text-align: center;
-  transition: all 0.3s ease;
-}
-
-.victory .awardBadge {
-  border-color: var(--feedback-success);
-}
-
-.defeat .awardBadge {
-  border-color: var(--feedback-danger);
+  transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out);
 }
 
 .awardBadge:hover {
@@ -217,214 +231,73 @@
 }
 
 .victory .awardBadge:hover {
-  box-shadow: 0 5px 15px rgba(92, 184, 92, 0.3);
+  box-shadow: 0 12px 28px rgba(74, 222, 128, 0.16);
 }
 
 .defeat .awardBadge:hover {
-  box-shadow: 0 5px 15px rgba(239, 68, 68, 0.3);
+  box-shadow: 0 12px 28px rgba(248, 113, 113, 0.16);
 }
 
 .awardName {
-  font-size: var(--font-size-base);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
   margin-bottom: var(--space-2);
   color: var(--text-primary);
+  font-size: var(--font-size-sm);
   font-weight: var(--weight-bold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .awardValue {
-  font-size: var(--font-size-lg);
-  color: var(--screen-accent);
+  color: var(--ops-accent-bright);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
   font-weight: var(--weight-bold);
 }
 
 .victory .awardValue {
-  color: var(--feedback-success);
+  color: #86efac;
 }
 
 .defeat .awardValue {
-  color: var(--feedback-danger);
+  color: #fca5a5;
 }
 
-/* --- Action buttons --- */
-
 .actions {
-  margin-top: var(--space-8);
-  margin-bottom: auto;
   display: flex;
+  justify-content: center;
   gap: var(--space-4);
-  animation: fadeInUp 1s ease-out 0.4s backwards;
-  flex-shrink: 0;
   padding-bottom: var(--space-4);
 }
 
 .button {
-  background: rgba(90, 143, 181, 0.3);
-  border: 1px solid var(--screen-glass-border-bright);
-  color: var(--text-primary);
-  padding: var(--space-4) var(--space-8);
-  font-size: var(--font-size-base);
-  font-family: var(--font-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  cursor: pointer;
-  border-radius: var(--radius-lg);
-  transition: all 0.3s ease;
-  touch-action: manipulation;
-  -webkit-user-select: none;
-  user-select: none;
-  min-height: 48px;
-}
-
-.button:hover {
-  background: rgba(90, 143, 181, 0.5);
-  border-color: var(--screen-accent);
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(127, 180, 217, 0.2);
-}
-
-.button:active {
-  transform: scale(0.96);
-  transition: transform 0.1s ease;
+  composes: secondaryButton from '../screens/ScreenPrimitives.module.css';
+  min-width: 220px;
+  justify-content: center;
 }
 
 .buttonPrimary {
-  background: rgba(90, 143, 181, 0.5);
-  border-color: var(--screen-accent);
+  border-color: var(--ops-line-strong);
+  background: linear-gradient(135deg, rgba(180, 83, 9, 0.22), rgba(245, 158, 11, 0.32)), rgba(0, 0, 0, 0.15);
+  color: #fff7e2;
 }
 
 .buttonPrimary:hover {
-  background: var(--screen-accent-dim);
+  border-color: var(--ops-accent);
+  box-shadow: var(--ops-glow);
 }
 
-/* --- Animations --- */
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* --- Responsive --- */
-
-@media (max-width: 768px) {
-  .screen {
-    padding: var(--space-4) env(safe-area-inset-right, 0px) var(--space-4) env(safe-area-inset-left, 0px);
-  }
-
-  .header {
-    margin-bottom: var(--space-4);
-  }
-
-  .title {
-    letter-spacing: 0.1em;
-  }
-
-  .subtitle {
-    font-size: var(--font-size-lg);
-  }
-
+@media (max-width: 900px) {
+  .reportMeta,
   .statsPanel {
     grid-template-columns: 1fr;
-    padding: var(--space-6);
-    gap: var(--space-6);
-  }
-
-  .statsColumn {
-    gap: var(--space-4);
-  }
-
-  .factionTickets {
-    font-size: var(--font-size-xl);
-  }
-
-  .ticketComparison {
-    padding: var(--space-2);
-    gap: var(--space-2);
-  }
-
-  .vsDivider {
-    font-size: var(--font-size-base);
   }
 
   .actions {
     flex-direction: column;
-    width: 90%;
-    max-width: 300px;
-    margin-top: var(--space-4);
+    align-items: stretch;
   }
 
   .button {
     width: 100%;
-    padding: var(--space-3) var(--space-6);
-  }
-}
-
-@media (max-width: 480px) {
-  .screen {
-    padding: var(--space-2) env(safe-area-inset-right, 0px) var(--space-2) env(safe-area-inset-left, 0px);
-  }
-
-  .header {
-    margin-bottom: var(--space-3);
-  }
-
-  .statsPanel {
-    padding: var(--space-3);
-    width: 95%;
-    gap: var(--space-4);
-  }
-
-  .statsSectionTitle {
-    font-size: var(--font-size-sm);
-    margin-bottom: var(--space-2);
-  }
-
-  .statRow {
-    font-size: var(--font-size-sm);
-  }
-
-  .awardBadge {
-    padding: var(--space-3);
-    min-width: 120px;
-  }
-
-  .awardName {
-    font-size: var(--font-size-sm);
-  }
-
-  .awardValue {
-    font-size: var(--font-size-base);
-  }
-
-  .awardsSection {
-    margin-top: var(--space-4);
-  }
-
-  .awardsTitle {
-    font-size: var(--font-size-base);
-    margin-bottom: var(--space-2);
   }
 }

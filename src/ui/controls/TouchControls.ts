@@ -23,6 +23,14 @@ import { TouchHelicopterCyclic } from './TouchHelicopterCyclic';
 import { VehicleActionBar } from './VehicleActionBar';
 import type { HUDLayout } from '../layout/HUDLayout';
 import { InputContextManager } from '../../systems/input/InputContextManager';
+import type { GameplayPresentationController } from '../layout/GameplayPresentationController';
+import type {
+  ActorMode,
+  GameplayOverlay,
+  InteractionContext,
+  UIState,
+  VehicleUIContext,
+} from '../layout/types';
 
 interface TouchControlCallbacks {
   onFireStart: () => void;
@@ -41,8 +49,7 @@ interface TouchControlCallbacks {
   onRallyPointPlace: () => void;
   onSquadCommand?: () => void;
   onMapToggle?: () => void;
-  onMenuPause?: () => void;
-  onMenuResume?: () => void;
+  onMenuOpen?: () => void;
   onToggleAutoHover?: () => void;
   onVehicleFireStart?: () => void;
   onVehicleFireStop?: () => void;
@@ -68,6 +75,11 @@ export class TouchControls {
   private modalOverlayDepth = 0;
   private readonly contextManager = InputContextManager.getInstance();
   private readonly unsubscribeContext: () => void;
+  private unsubscribePresentation?: () => void;
+  private actorMode: ActorMode = 'infantry';
+  private currentOverlay: GameplayOverlay = 'none';
+  private interaction: InteractionContext | null = null;
+  private vehicleContext: VehicleUIContext | null = null;
 
   constructor() {
     this.joystick = new VirtualJoystick();
@@ -150,12 +162,7 @@ export class TouchControls {
     this.sandbagButtons.setCallbacks(callbacks.onSandbagRotateLeft, callbacks.onSandbagRotateRight);
     this.rallyPointButton.setCallback(callbacks.onRallyPointPlace);
     this.rallyPointButton.setSquadCommandCallback(() => callbacks.onSquadCommand?.());
-    this.menuButton.setCallbacks(
-      () => callbacks.onMenuPause?.(),
-      () => callbacks.onMenuResume?.(),
-    );
-    this.menuButton.setSquadCallback(() => callbacks.onSquadCommand?.());
-    this.menuButton.setScoreboardCallback(() => callbacks.onScoreboardTap?.());
+    this.menuButton.setOpenCallback?.(() => callbacks.onMenuOpen?.());
 
     // Wire vehicle action bar
     this.vehicleActionBar.setCallbacks({
@@ -164,10 +171,19 @@ export class TouchControls {
       onVehicleFireStop: () => callbacks.onVehicleFireStop?.(),
       onToggleAutoHover: () => callbacks.onToggleAutoHover?.(),
       onLookDown: () => this.look.show(),
-      onLookUp: () => { if (this.inHelicopterMode) this.look.hide(); },
+      onLookUp: () => {
+        if (this.actorMode !== 'infantry') this.look.hide();
+      },
       onMapToggle: () => callbacks.onMapToggle?.(),
       onSquadCommand: () => callbacks.onSquadCommand?.(),
       onHelicopterWeaponCycle: (index: number) => callbacks.onHelicopterWeaponSwitch?.(index),
+    });
+  }
+
+  bindPresentation(controller: GameplayPresentationController): void {
+    this.unsubscribePresentation?.();
+    this.unsubscribePresentation = controller.onChange((state) => {
+      this.applyPresentationState(state);
     });
   }
 
@@ -210,6 +226,14 @@ export class TouchControls {
     ];
   }
 
+  applyPresentationState(state: Readonly<UIState>): void {
+    this.currentOverlay = state.overlay;
+    this.interaction = state.interaction;
+    this.vehicleContext = state.vehicleContext;
+    this.applyActorContext(state.actorMode, state.vehicleContext);
+    this.applyInteractionContext(state.interaction);
+  }
+
   /**
    * Re-parent eligible touch controls into grid layout slots.
    * Fire/ADS stay as fixed-position viewport overlays (thumb-arc ergonomics).
@@ -219,10 +243,9 @@ export class TouchControls {
     // Fire + ADS are NOT slotted into the grid; they stay fixed-position
     // with thumb-arc CSS positioning for ergonomic reach.
 
-    // Action buttons are infantry-only (mortar, rally point, sandbag)
-    const actionSlot = layout.getSlot('action-btns');
-    actionSlot.dataset.show = 'infantry';
-    this.actionButtons.mountTo(actionSlot);
+    // Action buttons stay mounted at body level because they render as
+    // fixed-position overlays on touch. Reparenting them into the mobile
+    // placeholder slot causes the entire action stack to disappear.
 
     this.menuButton.mountTo(layout.getSlot('menu'));
     // joystick + look stay as overlays
@@ -250,14 +273,9 @@ export class TouchControls {
     if (this.visible) return;
     this.visible = true;
     this.joystick.show();
-    this.look.show();
-    this.fireButton.show();
-    this.actionButtons.show();
-    this.adsButton.show();
-    this.interactionButton.show();
-    this.sandbagButtons.show();
-    this.rallyPointButton.show();
     this.menuButton.show();
+    this.applyActorContext(this.actorMode, this.vehicleContext);
+    this.applyInteractionContext(this.interaction);
     // mortarButton removed from mobile HUD — mortar is desktop-only for now
     // helicopterCyclic is NOT shown here; it's shown/hidden by enterHelicopterMode/exitHelicopterMode
   }
@@ -295,45 +313,14 @@ export class TouchControls {
    * Hides infantry controls (fire, ADS, action buttons, rally).
    */
   enterHelicopterMode(): void {
-    if (this.inHelicopterMode) return;
-    this.inHelicopterMode = true;
-
-    // Hide infantry-specific controls
-    this.fireButton.hide();
-    this.adsButton.hide();
-    this.actionButtons.hide();
-    this.rallyPointButton.hideButton();
-    this.sandbagButtons.hide();
-    this.look.hide();
-
-    // Show helicopter cyclic joystick (right side) and vehicle action bar
-    this.helicopterCyclic.show();
-    this.vehicleActionBar.show();
-
-    // Set left joystick to helicopter throttle mode
-    this.joystick.setHelicopterMode(true);
+    this.applyActorContext('helicopter', this.vehicleContext);
   }
 
   /**
    * Exit helicopter mode: restore infantry controls.
    */
   exitHelicopterMode(): void {
-    if (!this.inHelicopterMode) return;
-    this.inHelicopterMode = false;
-
-    // Hide helicopter controls
-    this.helicopterCyclic.hide();
-    this.vehicleActionBar.hide();
-
-    // Restore infantry controls
-    this.fireButton.show();
-    this.adsButton.show();
-    this.actionButtons.show();
-    this.rallyPointButton.showButton();
-    this.look.show();
-
-    // Reset left joystick to infantry mode
-    this.joystick.setHelicopterMode(false);
+    this.applyActorContext('infantry', null);
   }
 
   /** Whether currently in helicopter dual-joystick mode. */
@@ -352,6 +339,7 @@ export class TouchControls {
 
   dispose(): void {
     this.unsubscribeContext();
+    this.unsubscribePresentation?.();
     this.joystick.dispose();
     this.look.dispose();
     this.fireButton.dispose();
@@ -364,5 +352,50 @@ export class TouchControls {
     this.mortarButton.dispose();
     this.helicopterCyclic.dispose();
     this.vehicleActionBar.dispose();
+  }
+
+  private applyActorContext(actorMode: ActorMode, vehicleContext: VehicleUIContext | null): void {
+    this.actorMode = actorMode;
+    this.inHelicopterMode = actorMode === 'helicopter';
+    const showInfantryControls = this.visible && actorMode === 'infantry';
+    const showVehicleControls = this.visible && actorMode !== 'infantry';
+
+    this.joystick.setHelicopterMode?.(showVehicleControls);
+
+    if (showInfantryControls) {
+      this.fireButton.show();
+      this.adsButton.show();
+      this.actionButtons.show();
+      this.sandbagButtons.show();
+      this.rallyPointButton.showButton();
+      this.look.show();
+      this.helicopterCyclic.hide();
+      this.vehicleActionBar.hide();
+    } else {
+      this.fireButton.hide();
+      this.adsButton.hide();
+      this.actionButtons.hide();
+      this.sandbagButtons.hide();
+      this.rallyPointButton.hideButton();
+      this.look.hide();
+      if (showVehicleControls) {
+        this.helicopterCyclic.show();
+        this.vehicleActionBar.setVehicleContext(vehicleContext);
+        this.vehicleActionBar.show();
+      } else {
+        this.helicopterCyclic.hide();
+        this.vehicleActionBar.hide();
+      }
+    }
+  }
+
+  private applyInteractionContext(interaction: InteractionContext | null): void {
+    if (this.actorMode !== 'infantry' || !this.visible || !interaction || this.currentOverlay !== 'none') {
+      this.interactionButton.hideButton?.();
+      return;
+    }
+
+    this.interactionButton.setLabel?.(interaction.buttonLabel ?? 'ENTER');
+    this.interactionButton.showButton?.();
   }
 }

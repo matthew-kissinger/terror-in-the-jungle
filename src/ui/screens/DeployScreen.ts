@@ -35,8 +35,13 @@ export class DeployScreen extends UIComponent {
   private mapContainer?: HTMLDivElement;
   private headerTitle?: HTMLHeadingElement;
   private headerStatus?: HTMLDivElement;
+  private headerModeValue?: HTMLDivElement;
+  private headerFlowValue?: HTMLDivElement;
+  private headerLoadoutValue?: HTMLDivElement;
+  private mapTitle?: HTMLDivElement;
   private selectedName?: HTMLDivElement;
   private selectedStatus?: HTMLDivElement;
+  private selectedTitle?: HTMLHeadingElement;
   private sequenceTitle?: HTMLHeadingElement;
   private sequenceSteps?: HTMLDivElement;
   private timerDisplay?: HTMLDivElement;
@@ -72,19 +77,46 @@ export class DeployScreen extends UIComponent {
     this.root.style.display = 'none';
     (this.root.style as CSSStyleDeclaration & { cssText?: string }).cssText = 'display: none;';
 
+    const stage = this.createDiv(styles.stage);
     const layout = this.createDiv(styles.layout);
 
     // Header
     const header = this.createDiv(styles.header);
+    const headerCopy = this.createDiv(styles.headerCopy);
     this.headerTitle = this.createHeading('h1', 'respawn-header-title', styles.headerTitle, 'RETURN TO BATTLE');
     this.headerStatus = this.createDiv(styles.headerStatus, 'respawn-header-status');
     this.headerStatus.textContent = 'Choose a controlled position and return to the fight.';
-    header.appendChild(this.headerTitle);
-    header.appendChild(this.headerStatus);
+    headerCopy.appendChild(this.headerTitle);
+    headerCopy.appendChild(this.headerStatus);
+
+    const headerMeta = this.createDiv(styles.headerMeta);
+    const modeRow = this.createMetaRow('Mode', 'Zone Control');
+    this.headerModeValue = modeRow.value;
+    const flowRow = this.createMetaRow('Flow', 'Frontline deployment');
+    this.headerFlowValue = flowRow.value;
+    const loadoutRow = this.createMetaRow('Loadout', 'Editable');
+    this.headerLoadoutValue = loadoutRow.value;
+    headerMeta.appendChild(modeRow.row);
+    headerMeta.appendChild(flowRow.row);
+    headerMeta.appendChild(loadoutRow.row);
+
+    header.appendChild(headerCopy);
+    header.appendChild(headerMeta);
 
     // Map panel (hero)
     const mapPanel = this.createDiv(styles.mapPanel);
+    const mapHeader = this.createDiv(styles.mapHeader);
+    const mapEyebrow = this.createDiv(styles.mapEyebrow);
+    mapEyebrow.textContent = 'Deploy Surface';
+    this.mapTitle = this.createDiv(styles.mapTitle, 'respawn-map-title');
+    this.mapTitle.textContent = 'TACTICAL MAP - SELECT DEPLOYMENT';
+    const mapHelper = this.createDiv(styles.mapHelper);
+    mapHelper.textContent = 'Select a route, confirm a spawn, and deploy when the timer clears.';
     this.mapContainer = this.createDiv(styles.map, 'respawn-map');
+    mapHeader.appendChild(mapEyebrow);
+    mapHeader.appendChild(this.mapTitle);
+    mapHeader.appendChild(mapHelper);
+    mapPanel.appendChild(mapHeader);
     mapPanel.appendChild(this.mapContainer);
 
     // Side panel
@@ -98,8 +130,10 @@ export class DeployScreen extends UIComponent {
     layout.appendChild(mapPanel);
     layout.appendChild(sidePanel);
 
-    this.root.appendChild(header);
-    this.root.appendChild(layout);
+    stage.appendChild(header);
+    stage.appendChild(layout);
+
+    this.root.appendChild(stage);
   }
 
   // --- Public API (same as old RespawnUI) ---
@@ -114,8 +148,18 @@ export class DeployScreen extends UIComponent {
 
   configureSession(session: DeploySessionModel): void {
     this.deploySession = session;
+    if (this.root.dataset) {
+      this.root.dataset.deployKind = session.kind;
+    }
     if (this.headerTitle) this.headerTitle.textContent = session.headline;
     if (this.headerStatus) this.headerStatus.textContent = session.subheadline;
+    if (this.headerModeValue) this.headerModeValue.textContent = session.modeName;
+    if (this.headerFlowValue) this.headerFlowValue.textContent = session.flowLabel;
+    if (this.headerLoadoutValue) {
+      this.headerLoadoutValue.textContent = session.allowLoadoutEditing ? 'Editable' : 'Locked';
+    }
+    if (this.mapTitle) this.mapTitle.textContent = session.mapTitle;
+    if (this.selectedTitle) this.selectedTitle.textContent = session.selectedSpawnTitle;
     if (this.sequenceTitle) this.sequenceTitle.textContent = session.sequenceTitle;
     this.renderSequenceSteps(session.sequenceSteps);
     if (this.respawnButton) this.respawnButton.textContent = session.actionLabel;
@@ -150,6 +194,9 @@ export class DeployScreen extends UIComponent {
   setLoadoutEditingEnabled(enabled: boolean): void {
     if (this.loadoutPanel) {
       this.loadoutPanel.style.opacity = enabled ? '1' : '0.55';
+    }
+    if (this.headerLoadoutValue) {
+      this.headerLoadoutValue.textContent = enabled ? 'Editable' : 'Locked';
     }
     for (const control of this.loadoutControls.values()) {
       this.applyButtonState(control.previousButton, enabled);
@@ -240,12 +287,12 @@ export class DeployScreen extends UIComponent {
 
   private createSelectedPanel(): HTMLDivElement {
     const panel = this.createDiv(styles.panel);
-    const title = this.createHeading('h3', undefined, styles.panelTitle, 'SPAWN POINT');
+    this.selectedTitle = this.createHeading('h3', undefined, styles.panelTitle, 'SPAWN POINT');
     this.selectedName = this.createDiv(styles.selectedName, 'selected-spawn-name');
     this.selectedName.textContent = 'NONE';
     this.selectedStatus = this.createDiv(styles.statusText, 'selected-spawn-status');
     this.selectedStatus.textContent = 'Select a spawn point on the map';
-    panel.appendChild(title);
+    panel.appendChild(this.selectedTitle);
     panel.appendChild(this.selectedName);
     panel.appendChild(this.selectedStatus);
     return panel;
@@ -405,6 +452,17 @@ export class DeployScreen extends UIComponent {
     if (id) el.id = id;
     if (className) el.className = className;
     return el;
+  }
+
+  private createMetaRow(label: string, value: string): { row: HTMLDivElement; value: HTMLDivElement } {
+    const row = this.createDiv(styles.metaRow);
+    const term = this.createDiv(styles.metaLabel);
+    term.textContent = label;
+    const valueEl = this.createDiv(styles.metaValue);
+    valueEl.textContent = value;
+    row.appendChild(term);
+    row.appendChild(valueEl);
+    return { row, value: valueEl };
   }
 
   private createHeading<K extends 'h1' | 'h2' | 'h3' | 'h4'>(

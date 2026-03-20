@@ -26,6 +26,7 @@ interface PlayerScore {
 
 export class ScoreboardPanel extends UIComponent {
   private isVisible = false;
+  private onClose?: () => void;
 
   constructor(
     private statsTracker: PlayerStatsTracker,
@@ -39,6 +40,14 @@ export class ScoreboardPanel extends UIComponent {
     this.root.innerHTML = `<div class="${styles.content}"></div>`;
   }
 
+  protected onMount(): void {
+    this.listen(this.root, 'pointerdown', (e) => {
+      if (e.target === this.root) {
+        this.onClose?.();
+      }
+    });
+  }
+
   // --- Public API ---
 
   toggle(visible: boolean): void {
@@ -47,6 +56,10 @@ export class ScoreboardPanel extends UIComponent {
     if (visible) {
       this.refresh();
     }
+  }
+
+  setOnClose(callback: () => void): void {
+    this.onClose = callback;
   }
 
   // --- Private ---

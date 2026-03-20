@@ -34,7 +34,7 @@ vi.mock('../ui/controls/TouchADSButton', () => ({ TouchADSButton: class { show =
 vi.mock('../ui/controls/TouchInteractionButton', () => ({ TouchInteractionButton: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); mount = vi.fn(); setCallback = vi.fn(); } }));
 vi.mock('../ui/controls/TouchSandbagButtons', () => ({ TouchSandbagButtons: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); mount = vi.fn(); setCallbacks = vi.fn(); } }));
 vi.mock('../ui/controls/TouchRallyPointButton', () => ({ TouchRallyPointButton: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); mount = vi.fn(); setCallback = vi.fn(); showButton = vi.fn(); } }));
-vi.mock('../ui/controls/TouchMenuButton', () => ({ TouchMenuButton: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); mount = vi.fn(); setCallbacks = vi.fn(); setSquadCallback = vi.fn(); setScoreboardCallback = vi.fn(); } }));
+vi.mock('../ui/controls/TouchMenuButton', () => ({ TouchMenuButton: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); mount = vi.fn(); setOpenCallback = vi.fn(); } }));
 vi.mock('../ui/controls/TouchMortarButton', () => ({ TouchMortarButton: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); mount = vi.fn(); } }));
 vi.mock('../ui/controls/TouchHelicopterCyclic', () => ({ TouchHelicopterCyclic: class { show = vi.fn(); hide = vi.fn(); dispose = vi.fn(); mount = vi.fn(); } }));
 

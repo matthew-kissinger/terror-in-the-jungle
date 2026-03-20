@@ -1,151 +1,192 @@
 /**
- * ModeSelectScreen - 4-card mode picker.
- * 2x2 grid (desktop), vertical list (mobile portrait).
- * Opaque background, no scroll, no backdrop-filter.
+ * ModeSelectScreen - operation dossiers instead of flat cards.
  */
 
 .screen {
-  position: fixed;
-  inset: 0;
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  composes: overlayRoot from './ScreenPrimitives.module.css';
+  display: none !important;
+  pointer-events: none;
   z-index: 9999;
-  background: rgba(8, 12, 18, 0.96);
-  font-family: var(--font-primary);
-  color: var(--text-primary);
   animation: ui-fadeIn 0.3s ease-out;
+  overflow: auto;
 }
 
 .visible {
-  display: flex;
+  display: flex !important;
+  pointer-events: auto;
 }
 
 .content {
-  width: 100%;
-  max-width: 600px;
-  padding: var(--space-4);
+  composes: screenStage from './ScreenPrimitives.module.css';
+  justify-content: center;
+}
+
+.topRail {
+  composes: topRail from './ScreenPrimitives.module.css';
+}
+
+.railGroup {
+  composes: railGroup from './ScreenPrimitives.module.css';
+}
+
+.railItem {
+  composes: railItem from './ScreenPrimitives.module.css';
+}
+
+.railLabel {
+  composes: railLabel from './ScreenPrimitives.module.css';
+}
+
+.railValue {
+  composes: railValue from './ScreenPrimitives.module.css';
+}
+
+.headerPanel {
+  composes: heroPanel from './ScreenPrimitives.module.css';
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  container-type: inline-size;
+}
+
+.headerCopy {
+  max-width: 42rem;
+}
+
+.headingLabel {
+  composes: heroEyebrow from './ScreenPrimitives.module.css';
+  display: block;
+}
+
+.heading {
+  margin: 0;
+  color: #f4f0e2;
+  font-family: var(--font-heading);
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 0.95;
+}
+
+.headingBody {
+  margin: var(--space-3) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+}
+
+.headerMeta {
+  composes: briefPanel from './ScreenPrimitives.module.css';
+  min-width: min(100%, 320px);
+}
+
+.metaRow {
+  composes: dataRow from './ScreenPrimitives.module.css';
+}
+
+.metaLabel {
+  composes: dataTerm from './ScreenPrimitives.module.css';
+}
+
+.metaValue {
+  composes: dataValue from './ScreenPrimitives.module.css';
+  text-align: right;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.card {
+  composes: dossierCard from './ScreenPrimitives.module.css';
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
 
-.heading {
-  font-family: var(--font-heading);
-  font-size: clamp(1.2rem, 3vw, 1.6rem);
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-  margin: 0;
-  text-align: center;
+.cardHeader {
+  composes: dossierHeader from './ScreenPrimitives.module.css';
 }
 
-/* Mode cards grid */
-
-.cards {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
-}
-
-.card {
-  background: rgba(12, 22, 32, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-xl);
-  padding: var(--space-4);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 72px;
-}
-
-.card:hover {
-  border-color: rgba(127, 180, 217, 0.3);
-  background: rgba(127, 180, 217, 0.06);
-  transform: translateY(-1px);
-}
-
-.card:active {
-  transform: scale(0.98);
-}
-
-.cardIcon {
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  image-rendering: pixelated;
-  opacity: 0.85;
+.cardIconWrap {
+  composes: dossierIcon from './ScreenPrimitives.module.css';
 }
 
 .cardInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
   min-width: 0;
 }
 
+.cardLabel {
+  composes: dossierLabel from './ScreenPrimitives.module.css';
+}
+
 .cardName {
-  font-family: var(--font-heading);
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: var(--screen-accent);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  line-height: 1.2;
+  composes: dossierTitle from './ScreenPrimitives.module.css';
 }
 
-.cardStat {
-  font-size: 0.7rem;
-  color: var(--text-secondary);
-  letter-spacing: 0.04em;
-  opacity: 0.7;
+.cardTagline {
+  composes: dossierTagline from './ScreenPrimitives.module.css';
 }
 
-/* TDM variant */
-.cardTdm .cardName {
-  color: var(--screen-tdm-accent);
+.cardIndex {
+  composes: dossierIndex from './ScreenPrimitives.module.css';
 }
 
-/* Back button */
+.cardMetrics {
+  composes: metricGrid from './ScreenPrimitives.module.css';
+}
+
+.metricCell {
+  composes: metricCell from './ScreenPrimitives.module.css';
+}
+
+.metricLabel {
+  composes: metricLabel from './ScreenPrimitives.module.css';
+}
+
+.metricValue {
+  composes: metricValue from './ScreenPrimitives.module.css';
+}
+
+.cardTdm::before {
+  border-left-color: rgba(248, 113, 113, 0.85);
+}
+
+.cardTdm:hover {
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(248, 113, 113, 0.22);
+}
+
+.cardTdm .cardLabel,
+.cardTdm .metricValue:last-child {
+  color: #fca5a5;
+}
 
 .backButton {
-  align-self: center;
-  padding: var(--space-2) var(--space-6);
-  min-height: 44px;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-pill);
-  color: var(--text-secondary);
-  font-family: var(--font-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--weight-medium);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  cursor: pointer;
-  transition: all 0.2s;
-  touch-action: manipulation;
+  composes: secondaryButton from './ScreenPrimitives.module.css';
+  align-self: flex-start;
 }
 
-.backButton:hover {
-  color: var(--text-primary);
-  border-color: rgba(255, 255, 255, 0.2);
+@container (max-width: 800px) {
+  .headerPanel {
+    flex-direction: column;
+  }
+
+  .headerMeta {
+    width: 100%;
+  }
 }
 
-/* Mobile portrait: single column list */
 @media (max-width: 560px) {
   .cards {
     grid-template-columns: 1fr;
-    gap: var(--space-2);
+    gap: var(--space-3);
   }
 
   .card {
     padding: var(--space-3);
-    min-height: 56px;
   }
 }

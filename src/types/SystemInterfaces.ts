@@ -22,6 +22,13 @@ import type { AircraftRole } from '../systems/helicopter/AircraftConfigs';
 import type { HelicopterControls } from '../systems/helicopter/HelicopterPhysics';
 import type { CombatantSystem } from '../systems/combat/CombatantSystem';
 import type { ZoneManager } from '../systems/world/ZoneManager';
+import type {
+  ActorMode,
+  GameplayInputMode,
+  GameplayOverlay,
+  InteractionContext,
+  VehicleUIContext,
+} from '../ui/layout/types';
 
 /**
  * HUD System interface - handles all UI display and feedback
@@ -51,8 +58,12 @@ export interface IHUDSystem {
   spawnScorePopup(type: 'capture' | 'defend' | 'secured' | 'kill' | 'headshot' | 'assist', points: number, multiplier?: number): void;
   startMatch(): void;
   setPhase(phase: 'menu' | 'loading' | 'playing' | 'paused' | 'ended'): void;
-  setVehicle(vehicle: 'infantry' | 'helicopter'): void;
+  setVehicle(vehicle: ActorMode): void;
   setADS(ads: boolean): void;
+  setOverlay(overlay: GameplayOverlay): void;
+  setInputMode(inputMode: GameplayInputMode): void;
+  setInteractionContext(context: InteractionContext | null): void;
+  setVehicleContext(context: VehicleUIContext | null): void;
   toggleScoreboard(visible: boolean): void;
   toggleScoreboardVisibility(): void;
   updateTickets(usTickets: number, opforTickets: number): void;

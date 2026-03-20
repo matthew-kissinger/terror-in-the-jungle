@@ -5,7 +5,7 @@
 > HUDSystem.update() does only 5Hz zone/ticket polling.
 > UIComponent is the abstract base class for all widget modules; it uses @preact/signals-core for reactive state.
 > All DOM mounting goes through HUDLayout.getSlot() to preserve the CSS Grid structure.
-> VisibilityManager controls slot visibility via data-phase and data-vehicle CSS attributes (not JS style manipulation).
+> GameplayPresentationController / VisibilityManager drive HUD state via data-device, data-phase, data-actor-mode, data-overlay, and data-ads attributes (not per-widget JS style toggles).
 
 [GH]: https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src
 
@@ -38,14 +38,14 @@ src/ui/
   end/         MatchEndScreen
   engine/      UIComponent, css-modules.d, index
   hud/         30 widget modules (see registry below)
-  layout/      HUDLayout, HUDLayoutStyles, VisibilityManager, types, index
+  layout/      HUDLayout, HUDLayoutStyles, GameplayPresentationController, VisibilityManager, types, index
   loading/     SettingsModal, LoadingProgress
   loadout/     LoadoutSelector (legacy), LoadoutGrenadePanel, LoadoutTypes
   map/         FullMapSystem, FullMapInput, FullMapStyles, FullMapDOMHelpers,
                OpenFrontierRespawnMap, OpenFrontierRespawnMapRenderer,
                OpenFrontierRespawnMapUtils
   minimap/     MinimapSystem, MinimapDOMBuilder, MinimapRenderer, MinimapStyles
-  screens/     GameUI, TitleScreen, ModeSelectScreen, DeployScreen
+  screens/     GameUI, TitleScreen, ModeSelectScreen, DeployScreen, ScreenPrimitives.module.css
   MobilePauseOverlay.ts
 ```
 
@@ -92,7 +92,8 @@ src/ui/
 |---|---|---|
 | [HUDLayout]([GH]/ui/layout/HUDLayout.ts) | ui/layout/HUDLayout.ts | Creates `#game-hud-root`, 18 named CSS Grid slots, `getSlot(region)` API |
 | [HUDLayoutStyles]([GH]/ui/layout/HUDLayoutStyles.ts) | ui/layout/HUDLayoutStyles.ts | CSS Grid template definitions (desktop, mobile-landscape, mobile-portrait) |
-| [VisibilityManager]([GH]/ui/layout/VisibilityManager.ts) | ui/layout/VisibilityManager.ts | Sets data-device/data-phase/data-vehicle/data-ads attributes on `#game-hud-root`; CSS rules handle visibility |
+| [GameplayPresentationController]([GH]/ui/layout/GameplayPresentationController.ts) | ui/layout/GameplayPresentationController.ts | Canonical gameplay HUD state for phase, device, input mode, actor mode, overlay, scoreboard, interaction prompt, and vehicle context |
+| [VisibilityManager]([GH]/ui/layout/VisibilityManager.ts) | ui/layout/VisibilityManager.ts | Back-compatible alias over GameplayPresentationController used by older HUD/layout callers |
 | [types]([GH]/ui/layout/types.ts) | ui/layout/types.ts | `HUDRegion` type (18 values), `LayoutMode`, `UIState`, `LayoutComponent`, `LayoutRegistration` |
 
 ---
@@ -122,7 +123,7 @@ Source: [types.ts]([GH]/ui/layout/types.ts) `HUDRegion` type
 | `action-btns` | Touch | weapon cycler, CMD, MAP, reload, jump buttons |
 | `menu` | Touch | TouchMenuButton |
 
-Visibility: `data-show="infantry"` on `weapon-bar` and `action-btns` - CSS hides these when `data-vehicle="helicopter"` is set on `#game-hud-root`. VisibilityManager sets/removes data attributes. Do not use JS `style.display` to hide/show slots.
+Visibility: desktop/touch shells read `data-show="infantry"` plus `data-actor-mode` / `data-overlay` off `#game-hud-root`. `action-btns` remains a named region for layout bookkeeping, but the touch infantry action stack renders as a body-level fixed overlay so it survives mobile slot suppression.
 
 ---
 
@@ -136,12 +137,12 @@ Visibility: `data-show="infantry"` on `weapon-bar` and `action-btns` - CSS hides
 | [TouchADSButton]([GH]/ui/controls/TouchADSButton.ts) | ui/controls/TouchADSButton.ts | Aim-down-sights toggle |
 | [TouchActionButtons]([GH]/ui/controls/TouchActionButtons.ts) | ui/controls/TouchActionButtons.ts | Weapon cycler, CMD, MAP, reload, jump buttons (5 total) |
 | [TouchInteractionButton]([GH]/ui/controls/TouchInteractionButton.ts) | ui/controls/TouchInteractionButton.ts | Context interaction (enter helicopter, pick up weapon) |
-| [TouchMenuButton]([GH]/ui/controls/TouchMenuButton.ts) | ui/controls/TouchMenuButton.ts | Pause/menu button |
+| [TouchMenuButton]([GH]/ui/controls/TouchMenuButton.ts) | ui/controls/TouchMenuButton.ts | Launcher for the shared gameplay pause/settings surface |
 | [TouchMortarButton]([GH]/ui/controls/TouchMortarButton.ts) | ui/controls/TouchMortarButton.ts | Opens mortar targeting mode |
 | [TouchRallyPointButton]([GH]/ui/controls/TouchRallyPointButton.ts) | ui/controls/TouchRallyPointButton.ts | Places squad rally point |
 | [TouchSandbagButtons]([GH]/ui/controls/TouchSandbagButtons.ts) | ui/controls/TouchSandbagButtons.ts | Place/remove sandbag buttons |
 | [TouchHelicopterCyclic]([GH]/ui/controls/TouchHelicopterCyclic.ts) | ui/controls/TouchHelicopterCyclic.ts | Cyclic joystick for helicopter (no collective/yaw on touch) |
-| [VehicleActionBar]([GH]/ui/controls/VehicleActionBar.ts) | ui/controls/VehicleActionBar.ts | Helicopter action buttons (EXIT, FIRE, STAB hover, LOOK free-look) |
+| [VehicleActionBar]([GH]/ui/controls/VehicleActionBar.ts) | ui/controls/VehicleActionBar.ts | Capability-driven vehicle action stack (EXIT, FIRE, WPN, MAP, CMD, STAB, LOOK) shared by helicopter and future vehicle modes |
 | [VirtualJoystick]([GH]/ui/controls/VirtualJoystick.ts) | ui/controls/VirtualJoystick.ts | Reusable floating joystick widget |
 | [GamepadManager]([GH]/ui/controls/GamepadManager.ts) | ui/controls/GamepadManager.ts | Gamepad API polling, axis/button mapping |
 | [TouchControlLayout]([GH]/ui/controls/TouchControlLayout.ts) | ui/controls/TouchControlLayout.ts | Positions touch controls on screen, CSS custom properties |
@@ -153,15 +154,16 @@ Visibility: `data-show="infantry"` on `weapon-bar` and `action-btns` - CSS hides
 | Module | File | Role |
 |---|---|---|
 | [GameUI]([GH]/ui/screens/GameUI.ts) | ui/screens/GameUI.ts | Screen state machine: LOADING -> TITLE -> MODE SELECT -> PREPARING -> HIDDEN. Drop-in replacement for old StartScreen. |
-| [TitleScreen]([GH]/ui/screens/TitleScreen.ts) | ui/screens/TitleScreen.ts | Minimal title + loading bar + START GAME button + settings link |
-| [ModeSelectScreen]([GH]/ui/screens/ModeSelectScreen.ts) | ui/screens/ModeSelectScreen.ts | 4-card responsive grid (2x2 desktop, 1-col mobile). Tap card to start mode. |
-| [DeployScreen]([GH]/ui/screens/DeployScreen.ts) | ui/screens/DeployScreen.ts | Hero map + compact sidebar. Replaces old RespawnUI. Used by PlayerRespawnManager for both initial deploy and respawn. |
+| [TitleScreen]([GH]/ui/screens/TitleScreen.ts) | ui/screens/TitleScreen.ts | Operations-table entry briefing with boot-status rail, mission brief panel, loading bar, START GAME, and settings utility |
+| [ModeSelectScreen]([GH]/ui/screens/ModeSelectScreen.ts) | ui/screens/ModeSelectScreen.ts | Dossier-based mode picker with richer tempo/scale/theater metadata instead of flat cards |
+| [DeployScreen]([GH]/ui/screens/DeployScreen.ts) | ui/screens/DeployScreen.ts | Command-surface deploy map with session-aware briefing metadata, map-first selection, and preserved RespawnUI API for PlayerRespawnManager |
+| [ScreenPrimitives.module.css]([GH]/ui/screens/ScreenPrimitives.module.css) | ui/screens/ScreenPrimitives.module.css | Shared opaque screen primitives for the operations-table redesign (rails, hero panels, buttons, dossier cards, data rows) |
 
 ## Loading / Menu Support (in `ui/loading/`)
 
 | Module | File | Role |
 |---|---|---|
-| [SettingsModal]([GH]/ui/loading/SettingsModal.ts) | ui/loading/SettingsModal.ts | Graphics/audio/controls settings. Absorbs controls reference and gameplay tips as collapsible sections. |
+| [SettingsModal]([GH]/ui/loading/SettingsModal.ts) | ui/loading/SettingsModal.ts | Shared settings + gameplay pause surface for title/menu utility, desktop `Escape`, and touch menu access; includes resume, squad-command, and quit actions in-match |
 | [LoadingProgress]([GH]/ui/loading/LoadingProgress.ts) | ui/loading/LoadingProgress.ts | Progress bar driven by bootstrap events |
 
 ---
@@ -170,7 +172,7 @@ Visibility: `data-show="infantry"` on `weapon-bar` and `action-btns` - CSS hides
 
 | Module | File | Role |
 |---|---|---|
-| [MatchEndScreen]([GH]/ui/end/MatchEndScreen.ts) | ui/end/MatchEndScreen.ts | Victory/defeat overlay, triggered by gameEndCallback |
+| [MatchEndScreen]([GH]/ui/end/MatchEndScreen.ts) | ui/end/MatchEndScreen.ts | After-action report overlay with verdict banner, summary metrics, awards, and replay/menu actions |
 
 ---
 

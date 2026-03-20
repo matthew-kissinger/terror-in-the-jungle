@@ -39,6 +39,7 @@ export class CommandInputManager implements GameSystem {
   private readonly mapPlayerPosition = new THREE.Vector3();
   private unsubscribeCommandState?: () => void;
   private unsubscribeInputMode?: () => void;
+  private visibilityListeners = new Set<(visible: boolean) => void>();
 
   constructor(playerSquadController: PlayerSquadController) {
     this.playerSquadController = playerSquadController;
@@ -158,6 +159,12 @@ export class CommandInputManager implements GameSystem {
     this.playerController = playerController;
   }
 
+  onVisibilityChange(listener: (visible: boolean) => void): () => void {
+    this.visibilityListeners.add(listener);
+    listener(this.overlayVisible);
+    return () => this.visibilityListeners.delete(listener);
+  }
+
   toggleCommandMode(): void {
     if (!this.latestSquadState.hasSquad) return;
     if (this.overlayVisible) {
@@ -215,6 +222,7 @@ export class CommandInputManager implements GameSystem {
     this.inputManager?.unlockPointer?.();
     this.openOverlayTouchPassThrough();
     this.commandModeOverlay.setVisible(true);
+    this.emitVisibility();
     this.syncPresentation();
   }
 
@@ -226,6 +234,7 @@ export class CommandInputManager implements GameSystem {
     if (relockPointer) {
       this.inputManager?.relockPointer?.();
     }
+    this.emitVisibility();
     this.syncPresentation();
   }
 
@@ -256,6 +265,12 @@ export class CommandInputManager implements GameSystem {
       selectedFormation: mergedState.selectedFormation ?? null,
       selectedFaction: mergedState.selectedFaction ?? null
     });
+  }
+
+  private emitVisibility(): void {
+    for (const listener of this.visibilityListeners) {
+      listener(this.overlayVisible);
+    }
   }
 
   private handleOverlayCommandSelection(slot: number): void {

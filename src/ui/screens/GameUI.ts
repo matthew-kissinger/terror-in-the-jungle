@@ -19,6 +19,9 @@ import {
 import { GameEventBus } from '../../core/GameEventBus';
 
 type UIState = 'loading' | 'title' | 'mode_select' | 'preparing' | 'hidden';
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (callback: () => void) => { finished: Promise<void> };
+};
 
 export class GameUI extends UIComponent {
   private titleScreen: TitleScreen;
@@ -112,11 +115,13 @@ export class GameUI extends UIComponent {
   }
 
   hide(): void {
-    this.state = 'hidden';
-    this.unsubModeProgress?.();
-    this.unsubModeProgress = undefined;
-    this.titleScreen.hideScreen();
-    this.modeSelectScreen.hide();
+    this.runViewTransition(() => {
+      this.state = 'hidden';
+      this.unsubModeProgress?.();
+      this.unsubModeProgress = undefined;
+      this.titleScreen.hideScreen();
+      this.modeSelectScreen.hide();
+    });
   }
 
   show(): void {
@@ -157,15 +162,19 @@ export class GameUI extends UIComponent {
   // --- Private ---
 
   private showModeSelect(): void {
-    this.state = 'mode_select';
-    this.titleScreen.hideScreen();
-    this.modeSelectScreen.show();
+    this.runViewTransition(() => {
+      this.state = 'mode_select';
+      this.titleScreen.hideScreen();
+      this.modeSelectScreen.show();
+    });
   }
 
   private showTitle(): void {
-    this.state = 'title';
-    this.modeSelectScreen.hide();
-    this.titleScreen.showScreen();
+    this.runViewTransition(() => {
+      this.state = 'title';
+      this.modeSelectScreen.hide();
+      this.titleScreen.showScreen();
+    });
   }
 
   private handleModeSelected(mode: GameMode): void {
@@ -182,5 +191,14 @@ export class GameUI extends UIComponent {
     };
 
     this.onPlayCallback?.(selection);
+  }
+
+  private runViewTransition(update: () => void): void {
+    const doc = document as ViewTransitionDocument;
+    if (typeof doc.startViewTransition === 'function') {
+      doc.startViewTransition(() => update());
+      return;
+    }
+    update();
   }
 }

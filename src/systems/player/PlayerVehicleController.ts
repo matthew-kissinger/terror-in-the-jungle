@@ -4,6 +4,27 @@ import type { PlayerMovement } from './PlayerMovement';
 import type { PlayerCamera } from './PlayerCamera';
 import type { PlayerInput } from './PlayerInput';
 import type { PlayerVehicleControllerDependencies } from './PlayerControllerDependencies';
+import type { VehicleUIContext } from '../../ui/layout/types';
+
+function createHelicopterUIContext(role: 'transport' | 'attack' | 'gunship'): VehicleUIContext {
+  const armed = role === 'attack' || role === 'gunship';
+  return {
+    kind: 'helicopter',
+    role,
+    hudVariant: 'flight',
+    weaponCount: armed ? 2 : 0,
+    capabilities: {
+      canExit: true,
+      canFirePrimary: armed,
+      canCycleWeapons: armed,
+      canFreeLook: true,
+      canStabilize: true,
+      canDeploySquad: role === 'transport',
+      canOpenMap: true,
+      canOpenCommand: true,
+    },
+  };
+}
 
 export class PlayerVehicleController {
   private deps: PlayerVehicleControllerDependencies = {};
@@ -97,6 +118,7 @@ export class PlayerVehicleController {
 
     if (this.deps.helicopterModel) {
       const role = this.deps.helicopterModel.getAircraftRole(helicopterId);
+      this.deps.hudSystem?.setVehicleContext?.(createHelicopterUIContext(role));
       this.deps.hudSystem?.setHelicopterAircraftRole(role);
       if (gameRenderer) {
         const crosshairMode = role === 'attack'
@@ -106,17 +128,6 @@ export class PlayerVehicleController {
             : 'helicopter_transport';
         gameRenderer.setCrosshairMode(crosshairMode);
       }
-    }
-
-    input.getTouchControls()?.enterHelicopterMode();
-
-    // Set vehicle fire + weapon-cycle visibility based on aircraft role
-    if (this.deps.helicopterModel) {
-      const role = this.deps.helicopterModel.getAircraftRole(helicopterId);
-      const armed = role === 'attack' || role === 'gunship';
-      const bar = input.getTouchControls()?.vehicleActionBar;
-      bar?.setFireVisible(armed);
-      bar?.setWeaponCycleVisible(armed);
     }
   }
 
@@ -133,7 +144,7 @@ export class PlayerVehicleController {
     input.setInHelicopter(false);
     this.deps.hudSystem?.hideHelicopterMouseIndicator();
     this.deps.hudSystem?.hideHelicopterInstruments();
+    this.deps.hudSystem?.setVehicleContext?.(null);
     gameRenderer?.setCrosshairMode('infantry');
-    input.getTouchControls()?.exitHelicopterMode();
   }
 }

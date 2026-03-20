@@ -36,10 +36,12 @@
 /* --- Shared panel base --- */
 .panel {
   width: 60px;
-  background: var(--surface-panel);
-  border: 1px solid var(--border-subtle);
+  background:
+    linear-gradient(180deg, rgba(251, 191, 36, 0.08), transparent 70%),
+    rgba(15, 21, 14, 0.92);
+  border: 1px solid var(--ops-line);
   border-radius: var(--radius-md);
-  backdrop-filter: blur(6px);
+  box-shadow: var(--ops-shadow);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -65,7 +67,7 @@
   font-weight: var(--weight-bold);
   color: var(--text-primary);
   text-align: center;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(251, 191, 36, 0.08);
   padding: var(--space-1) var(--space-1-5);
   border-radius: var(--radius-sm);
   min-width: 40px;
@@ -75,7 +77,7 @@
 .elevationLabel {
   font-size: var(--font-size-3xs);
   font-weight: var(--weight-semibold);
-  color: var(--text-muted);
+  color: var(--ops-data);
   text-align: center;
   margin-top: var(--space-1);
   text-transform: uppercase;
@@ -98,18 +100,18 @@
 .mouseIcon {
   width: 20px;
   height: 26px;
-  border: 2px solid var(--text-secondary);
+  border: 2px solid var(--ops-data);
   border-radius: 8px 8px 12px 12px;
   position: relative;
   margin-bottom: var(--space-1);
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(251, 191, 36, 0.05);
   transition: border-color var(--duration-fast) var(--ease-out),
               background var(--duration-fast) var(--ease-out);
 }
 
 .mouseIconFreeLook {
-  border-color: var(--info);
-  background: rgba(100, 200, 255, 0.1);
+  border-color: var(--ops-accent);
+  background: rgba(251, 191, 36, 0.12);
 }
 
 .mouseWheel {
@@ -119,7 +121,7 @@
   transform: translateX(-50%);
   width: 2px;
   height: 6px;
-  background: var(--text-secondary);
+  background: var(--ops-data);
   border-radius: 1px;
 }
 
@@ -134,7 +136,7 @@
 }
 
 .mouseStatusFreeLook {
-  color: var(--info);
+  color: var(--ops-accent);
 }
 
 .mouseLabel {
@@ -161,7 +163,7 @@
 
 .instrumentLabel {
   font-size: 8px;
-  color: var(--text-muted);
+  color: var(--ops-data);
   text-align: center;
   margin-bottom: 2px;
   text-transform: uppercase;
@@ -171,10 +173,10 @@
 .thrustBar {
   width: 12px;
   height: 30px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid var(--ops-line);
   position: relative;
   border-radius: 2px;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(7, 10, 8, 0.7);
 }
 
 .touchMode .thrustBar {
@@ -303,7 +305,7 @@
 
 .headingDegrees {
   font-size: var(--font-size-3xs);
-  color: var(--text-muted);
+  color: var(--ops-data);
   font-variant-numeric: tabular-nums;
 }
 
@@ -348,6 +350,7 @@
   display: none;
   flex-direction: row;
   gap: 6px;
+  min-width: 112px;
 }
 
 .weaponSectionVisible {

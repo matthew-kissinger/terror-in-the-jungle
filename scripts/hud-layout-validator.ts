@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { chromium, type Page } from 'playwright';
+import { chromium, type BrowserContextOptions, type Page } from 'playwright';
 import { spawn, type ChildProcess } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -14,6 +14,9 @@ interface ElementInfo {
   selector: string;
   rect: { x: number; y: number; width: number; height: number };
   visible: boolean;
+  region: string | null;
+  parentSlotRegion: string | null;
+  isSlot: boolean;
 }
 
 interface Overlap {
@@ -27,7 +30,17 @@ interface ClippedElement {
   clippedBy: string;
 }
 
+interface DeviceProfile {
+  id: string;
+  width: number;
+  height: number;
+  isMobile?: boolean;
+  hasTouch?: boolean;
+  deviceScaleFactor?: number;
+}
+
 interface ViewportResult {
+  id: string;
   width: number;
   height: number;
   elements: ElementInfo[];
@@ -65,12 +78,13 @@ const HUD_SELECTORS = [
   '.vehicle-action-bar',
 ].join(', ');
 
-const VIEWPORTS = [
-  { width: 1920, height: 1080 },
-  { width: 1366, height: 768 },
-  { width: 414, height: 896 },
-  { width: 390, height: 844 },
-  { width: 360, height: 800 },
+const DEVICES: DeviceProfile[] = [
+  { id: 'desktop-1920x1080', width: 1920, height: 1080, deviceScaleFactor: 1 },
+  { id: 'desktop-1366x768', width: 1366, height: 768, deviceScaleFactor: 1 },
+  { id: 'phone-414x896', width: 414, height: 896, isMobile: true, hasTouch: true, deviceScaleFactor: 3 },
+  { id: 'phone-390x844', width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 3 },
+  { id: 'phone-360x800', width: 360, height: 800, isMobile: true, hasTouch: true, deviceScaleFactor: 3 },
+  { id: 'phone-844x390', width: 844, height: 390, isMobile: true, hasTouch: true, deviceScaleFactor: 3 },
 ];
 
 const OVERLAP_THRESHOLD = 4; // px in both dimensions
@@ -115,11 +129,17 @@ async function isPortOpen(port: number, host = '127.0.0.1'): Promise<boolean> {
 
 async function startDevServer(port: number): Promise<ChildProcess> {
   console.log(`Starting dev server on port ${port}`);
-  const server = spawn('npm', ['run', 'dev', '--', '--port', String(port), '--host'], {
-    cwd: process.cwd(),
-    stdio: 'pipe',
-    shell: true,
-  });
+  const server = process.platform === 'win32'
+    ? spawn('cmd.exe', ['/d', '/s', '/c', `npm run dev -- --port ${port} --host`], {
+        cwd: process.cwd(),
+        stdio: 'pipe',
+        shell: false,
+      })
+    : spawn('npm', ['run', 'dev', '--', '--port', String(port), '--host'], {
+        cwd: process.cwd(),
+        stdio: 'pipe',
+        shell: false,
+      });
 
   return new Promise((resolve, reject) => {
     let output = '';
@@ -152,6 +172,22 @@ async function startDevServer(port: number): Promise<ChildProcess> {
 
 async function killDevServer(server: ChildProcess): Promise<void> {
   console.log('Stopping dev server');
+  if (!server.pid) {
+    return;
+  }
+
+  if (process.platform === 'win32') {
+    await new Promise<void>((resolve) => {
+      const killer = spawn('taskkill', ['/PID', String(server.pid), '/T', '/F'], {
+        stdio: 'ignore',
+        shell: false,
+      });
+      killer.on('close', () => resolve());
+      killer.on('error', () => resolve());
+    });
+    return;
+  }
+
   server.kill('SIGTERM');
   await new Promise<void>((resolve) => {
     const timeout = setTimeout(() => {
@@ -192,10 +228,14 @@ async function queryHudElements(page: Page, selectors: string): Promise<ElementI
         if (dataRegion) selector += `[data-region="${dataRegion}"]`;
         const dataHud = el.getAttribute('data-hud');
         if (dataHud) selector += `[data-hud="${dataHud}"]`;
+        const parentSlot = el.closest<HTMLElement>('.hud-slot[data-region]');
         return {
           selector,
           rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
           visible,
+          region: dataRegion,
+          parentSlotRegion: parentSlot?.dataset.region ?? null,
+          isSlot: el.classList.contains('hud-slot'),
         };
       })
       .filter((info) => info.visible);
@@ -212,6 +252,10 @@ function computeOverlaps(elements: ElementInfo[]): Overlap[] {
     const a = elements[i];
     for (let j = i + 1; j < elements.length; j++) {
       const b = elements[j];
+      if ((a.isSlot && a.region !== null && a.region === b.parentSlotRegion)
+        || (b.isSlot && b.region !== null && b.region === a.parentSlotRegion)) {
+        continue;
+      }
       const overlapX = Math.max(0, Math.min(a.rect.x + a.rect.width, b.rect.x + b.rect.width) - Math.max(a.rect.x, b.rect.x));
       const overlapY = Math.max(0, Math.min(a.rect.y + a.rect.height, b.rect.y + b.rect.height) - Math.max(a.rect.y, b.rect.y));
       if (overlapX > OVERLAP_THRESHOLD && overlapY > OVERLAP_THRESHOLD) {
@@ -239,6 +283,27 @@ function computeClipped(elements: ElementInfo[], vpWidth: number, vpHeight: numb
     }
   }
   return clipped;
+}
+
+function buildContextOptions(device: DeviceProfile): BrowserContextOptions {
+  return {
+    viewport: { width: device.width, height: device.height },
+    isMobile: device.isMobile ?? false,
+    hasTouch: device.hasTouch ?? false,
+    deviceScaleFactor: device.deviceScaleFactor ?? 1,
+  };
+}
+
+async function openGameplayPage(browser: Awaited<ReturnType<typeof chromium.launch>>, url: string, device: DeviceProfile): Promise<Page> {
+  const context = await browser.newContext(buildContextOptions(device));
+  const page = await context.newPage();
+  await page.goto(url, { waitUntil: 'commit', timeout: STEP_TIMEOUT_MS });
+  await page.waitForFunction(() => !!(window as any).__engine, undefined, { timeout: STEP_TIMEOUT_MS });
+  await page.evaluate(() => { (window as any).__engine.startGameWithMode('tdm'); });
+  await page.waitForFunction(() => (window as any).__engine?.gameStarted, undefined, { timeout: GAMEPLAY_TIMEOUT_MS });
+  await page.waitForSelector('#game-hud-root', { timeout: GAMEPLAY_TIMEOUT_MS }).catch(() => {});
+  await sleep(2000);
+  return page;
 }
 
 // ---------------------------------------------------------------------------
@@ -275,45 +340,22 @@ async function main(): Promise<void> {
   };
 
   try {
-    // Load game and enter gameplay once at a comfortable resolution
-    const context = await browser.newContext({
-      viewport: { width: 1920, height: 1080 },
-    });
-    const page = await context.newPage();
-
     const url = `http://localhost:${port}/terror-in-the-jungle/?perf=1`;
-    console.log(`Navigating to ${url}`);
-    await page.goto(url, { waitUntil: 'commit', timeout: STEP_TIMEOUT_MS });
-
-    // Wait for engine, start TDM programmatically
-    console.log('Waiting for engine');
-    await page.waitForFunction(() => !!(window as any).__engine, undefined, { timeout: STEP_TIMEOUT_MS });
-    console.log('Starting TDM mode');
-    await page.evaluate(() => { (window as any).__engine.startGameWithMode('tdm'); });
-    await page.waitForFunction(() => (window as any).__engine?.gameStarted, undefined, { timeout: GAMEPLAY_TIMEOUT_MS });
-
-    // Wait for HUD to appear
-    await page.waitForSelector('#game-hud-root', { timeout: GAMEPLAY_TIMEOUT_MS }).catch(() => {});
-    await sleep(2000); // let HUD settle
-
-    // Iterate viewports
-    for (const vp of VIEWPORTS) {
-      const label = `${vp.width}x${vp.height}`;
-      console.log(`Testing viewport ${label}`);
-
-      await page.setViewportSize(vp);
-      await sleep(500); // layout reflow
-
+    for (const device of DEVICES) {
+      const label = `${device.width}x${device.height}`;
+      console.log(`Testing device ${device.id} (${label})`);
+      const page = await openGameplayPage(browser, url, device);
       const elements = await queryHudElements(page, HUD_SELECTORS);
       const overlaps = computeOverlaps(elements);
-      const clipped = computeClipped(elements, vp.width, vp.height);
+      const clipped = computeClipped(elements, device.width, device.height);
 
-      const screenshotPath = join(outDir, `hud-${vp.width}x${vp.height}.png`);
+      const screenshotPath = join(outDir, `hud-${device.id}.png`);
       await page.screenshot({ path: screenshotPath, fullPage: false });
 
       report.viewports.push({
-        width: vp.width,
-        height: vp.height,
+        id: device.id,
+        width: device.width,
+        height: device.height,
         elements,
         overlaps,
         clipped,
@@ -327,9 +369,8 @@ async function main(): Promise<void> {
       if (clipped.length > 0 && report.overall !== 'fail') {
         report.overall = 'warn';
       }
+      await page.context().close();
     }
-
-    await context.close();
   } finally {
     await browser.close();
     if (server) {
@@ -353,7 +394,7 @@ async function main(): Promise<void> {
   console.log('-'.repeat(44));
 
   for (const vp of report.viewports) {
-    const label = `${vp.width}x${vp.height}`;
+    const label = `${vp.id} (${vp.width}x${vp.height})`;
     console.log(
       label.padEnd(14) +
       String(vp.elements.length).padEnd(10) +

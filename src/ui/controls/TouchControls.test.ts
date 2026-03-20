@@ -96,9 +96,12 @@ vi.mock('./TouchInteractionButton', () => ({
     element = document.createElement('div');
     show = vi.fn();
     hide = vi.fn();
+    showButton = vi.fn();
+    hideButton = vi.fn();
     dispose = vi.fn();
     mount = vi.fn();
     setCallback = vi.fn();
+    setLabel = vi.fn();
   },
 }));
 
@@ -135,9 +138,7 @@ vi.mock('./TouchMenuButton', () => ({
     hide = vi.fn();
     dispose = vi.fn();
     mount = vi.fn();
-    setCallbacks = vi.fn();
-    setSquadCallback = vi.fn();
-    setScoreboardCallback = vi.fn();
+    setOpenCallback = vi.fn();
   },
 }));
 
@@ -171,6 +172,7 @@ vi.mock('./VehicleActionBar', () => ({
     dispose = vi.fn();
     mount = vi.fn();
     setCallbacks = vi.fn();
+    setVehicleContext = vi.fn();
     setFireVisible = vi.fn();
     setWeaponCycleVisible = vi.fn();
     setAutoHoverActive = vi.fn();
@@ -273,6 +275,7 @@ describe('TouchControls', () => {
       onSandbagRotateRight: vi.fn(),
       onRallyPointPlace: vi.fn(),
       onMapToggle: vi.fn(),
+      onMenuOpen: vi.fn(),
     };
 
     controls.setCallbacks(callbacks);

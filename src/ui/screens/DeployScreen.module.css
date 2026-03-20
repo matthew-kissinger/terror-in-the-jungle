@@ -1,167 +1,205 @@
 /**
- * DeployScreen - Hero map + compact sidebar.
- * Replaces old RespawnUI. Opaque dark background.
- * Two modes: 'initial' (full sidebar) and 'respawn' (stripped).
+ * DeployScreen - operations-table deploy and respawn surface.
  */
 
 .root {
-  position: fixed;
-  inset: 0;
+  composes: overlayRoot from './ScreenPrimitives.module.css';
+  flex-direction: column;
   z-index: 10000;
   display: none;
-  flex-direction: column;
-  background: rgba(6, 8, 12, 0.97);
-  color: var(--text-primary);
-  font-family: var(--font-primary);
 }
 
 .visible {
   display: flex;
 }
 
+.stage {
+  composes: screenStage from './ScreenPrimitives.module.css';
+}
+
 .layout {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 420px);
+  gap: clamp(16px, 2vw, 24px);
   flex: 1;
   min-height: 0;
 }
 
-/* Header */
-
 .header {
+  composes: heroPanel from './ScreenPrimitives.module.css';
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 12px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  flex-shrink: 0;
+  gap: var(--space-5);
+}
+
+.headerCopy {
+  max-width: 44rem;
 }
 
 .headerTitle {
   margin: 0;
+  color: #f4f0e2;
   font-family: var(--font-heading);
-  font-size: clamp(18px, 4vw, 28px);
+  font-size: clamp(2rem, 5vw, 3.4rem);
   font-weight: 500;
-  letter-spacing: 3px;
+  letter-spacing: 0.1em;
+  line-height: 0.94;
   text-transform: uppercase;
-  color: rgba(92, 184, 92, 0.9);
 }
 
 .headerStatus {
-  font-size: 13px;
+  margin-top: var(--space-3);
   color: var(--text-secondary);
-  letter-spacing: 1px;
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+}
+
+.headerMeta {
+  composes: briefPanel from './ScreenPrimitives.module.css';
+  min-width: min(100%, 320px);
+}
+
+.metaRow {
+  composes: dataRow from './ScreenPrimitives.module.css';
+}
+
+.metaLabel {
+  composes: dataTerm from './ScreenPrimitives.module.css';
+}
+
+.metaValue {
+  composes: dataValue from './ScreenPrimitives.module.css';
+  text-align: right;
+}
+
+.mapPanel {
+  composes: heroPanel from './ScreenPrimitives.module.css';
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: clamp(16px, 2vw, 22px);
+}
+
+.mapHeader {
+  margin-bottom: var(--space-4);
+}
+
+.mapEyebrow {
+  composes: sectionLabel from './ScreenPrimitives.module.css';
+  margin-bottom: var(--space-2);
+}
+
+.mapTitle {
+  margin: 0 0 var(--space-2);
+  color: #f4f0e2;
+  font-family: var(--font-heading);
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  font-weight: 500;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
-/* Map panel (hero element) */
-
-.mapPanel {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  flex-direction: column;
-  padding: 16px;
+.mapHelper {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
 }
 
 .map {
   flex: 1;
-  min-height: 300px;
-  border: 1px solid rgba(92, 184, 92, 0.25);
-  border-radius: 6px;
-  background: rgba(8, 12, 18, 0.9);
+  min-height: 360px;
+  border: 1px solid var(--ops-line);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    radial-gradient(circle at 15% 12%, rgba(168, 200, 122, 0.08), transparent 24%),
+    radial-gradient(circle at 80% 70%, rgba(245, 158, 11, 0.08), transparent 24%),
+    var(--ops-map-surface);
+  background-size: 140px 140px, 140px 140px, 100% 100%, 100% 100%, 100% 100%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
   overflow: hidden;
 }
 
-/* Side panel */
-
 .sidePanel {
   display: flex;
-  width: min(340px, 40%);
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  gap: var(--space-3);
+  min-height: 0;
   overflow-y: auto;
 }
 
-/* Panels */
-
 .panel {
-  border-radius: 6px;
-  padding: 12px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(10, 12, 16, 0.7);
+  composes: briefPanel from './ScreenPrimitives.module.css';
 }
 
 .panelTitle {
-  margin: 0 0 8px;
-  font-size: 11px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: rgba(92, 184, 92, 0.8);
-  font-weight: 700;
+  composes: sectionLabel from './ScreenPrimitives.module.css';
+  margin-bottom: var(--space-2);
 }
 
-/* Selected spawn */
-
 .selectedName {
-  margin-bottom: 4px;
-  font-size: 16px;
-  font-weight: 700;
-  color: white;
+  margin-bottom: var(--space-2);
+  color: #fff7e2;
+  font-family: var(--font-heading);
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  line-height: 0.95;
+  text-transform: uppercase;
 }
 
 .statusText {
   color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.4;
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
 }
-
-/* Sequence steps */
 
 .sequenceSteps {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-3);
 }
 
 .sequenceStep {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--space-3);
   align-items: start;
 }
 
 .sequenceBadge {
   display: flex;
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(92, 184, 92, 0.3);
+  border: 1px solid var(--ops-line-strong);
   border-radius: 999px;
-  color: rgba(92, 184, 92, 0.9);
-  font-size: 10px;
-  font-weight: 700;
+  color: #fde68a;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  font-weight: var(--weight-bold);
 }
 
 .sequenceBody {
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
 }
 
-/* Timer + action buttons */
-
 .controlPanel {
-  composes: panel;
+  composes: briefPanel from './ScreenPrimitives.module.css';
+  border-color: var(--ops-line-strong);
 }
 
 .timer {
-  margin-bottom: 12px;
+  margin-bottom: var(--space-4);
   color: rgba(212, 163, 68, 0.9);
-  font-size: 14px;
-  letter-spacing: 1px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.08em;
   text-align: center;
   text-transform: uppercase;
 }
@@ -169,303 +207,165 @@
 .buttonStack {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .actionButton {
+  composes: primaryButton from './ScreenPrimitives.module.css';
   width: 100%;
-  padding: 12px 16px;
-  min-height: 44px;
-  border-radius: 6px;
-  border: 1px solid rgba(92, 184, 92, 0.45);
-  background: rgba(92, 184, 92, 0.18);
-  color: rgba(92, 184, 92, 0.95);
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.15s, transform 0.15s;
-  touch-action: manipulation;
-}
-
-.actionButton:hover:not(:disabled) {
-  background: rgba(92, 184, 92, 0.28);
-  transform: scale(1.02);
-}
-
-.actionButton:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
+  justify-content: center;
 }
 
 .secondaryButton {
+  composes: secondaryButton from './ScreenPrimitives.module.css';
   width: 100%;
-  padding: 10px 16px;
-  min-height: 40px;
-  border-radius: 6px;
-  border: 1px solid rgba(140, 140, 140, 0.25);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.15s;
-  touch-action: manipulation;
+  justify-content: center;
 }
-
-.secondaryButton:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-/* Loadout (compact) */
 
 .loadoutPanel {
-  composes: panel;
+  composes: briefPanel from './ScreenPrimitives.module.css';
 }
 
 .loadoutStatus {
   color: var(--text-secondary);
-  font-size: 11px;
-  line-height: 1.4;
-  margin-bottom: 8px;
+  font-size: var(--font-size-xs);
+  line-height: 1.6;
+  margin-bottom: var(--space-3);
 }
 
 .presetMeta {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: var(--space-3);
   align-items: start;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-3);
 }
 
 .presetInfo {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
 }
 
 .presetName {
   overflow: hidden;
-  color: #fff;
-  font-size: 15px;
-  font-weight: 700;
+  color: #fff7e2;
+  font-size: var(--font-size-lg);
+  font-weight: var(--weight-bold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .presetDescription {
   color: var(--text-secondary);
-  font-size: 11px;
-  line-height: 1.4;
+  font-size: var(--font-size-xs);
+  line-height: 1.5;
 }
 
 .factionPill {
-  align-self: start;
-  padding: 4px 8px;
-  border: 1px solid rgba(92, 184, 92, 0.3);
-  border-radius: 999px;
-  background: rgba(92, 184, 92, 0.12);
-  color: rgba(92, 184, 92, 0.9);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  composes: statusChip from './ScreenPrimitives.module.css';
+  color: #fff7e2;
 }
 
 .presetButtons,
 .loadoutButtons {
   display: flex;
-  gap: 6px;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .smallButton {
-  min-width: 52px;
-  min-height: 32px;
-  padding: 6px 10px;
-  border-radius: 4px;
-  border: 1px solid rgba(140, 140, 140, 0.25);
-  background: rgba(46, 46, 46, 0.8);
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
-  touch-action: manipulation;
+  composes: secondaryButton from './ScreenPrimitives.module.css';
+  min-height: 34px;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-xs);
 }
 
 .smallButton:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+  transform: none;
 }
 
 .loadoutRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: var(--space-3);
   align-items: center;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: var(--space-3);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .loadoutLabel {
-  color: var(--text-secondary);
-  font-size: 10px;
-  letter-spacing: 1px;
+  color: var(--text-muted);
+  font-size: var(--font-size-2xs);
+  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
 .loadoutValue {
   min-height: 20px;
   overflow: hidden;
-  color: #fff;
-  font-size: 15px;
-  font-weight: 700;
+  color: #fff7e2;
+  font-size: var(--font-size-base);
+  font-weight: var(--weight-bold);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Legend */
-
 .legend {
-  composes: panel;
+  composes: briefPanel from './ScreenPrimitives.module.css';
 }
 
 .legendItem {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .legendSwatch {
   width: 16px;
   height: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .legendLabel {
   color: var(--text-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
-
-/* Sequence panel - class used for mobile hiding */
 
 .sequencePanel {}
 
-/* Responsive - tablet */
-
-@media (max-width: 768px) {
+@media (max-width: 960px) {
   .layout {
-    flex-direction: column;
-  }
-
-  .sidePanel {
-    width: 100%;
-    border-left: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
-    max-height: 40vh;
-  }
-
-  .map {
-    min-height: 40vh;
-  }
-
-  .loadoutRow {
     grid-template-columns: 1fr;
-  }
-}
-
-/* Responsive - mobile phones */
-
-@media (pointer: coarse) and (max-width: 600px) {
-  .root {
-    flex-direction: column;
   }
 
   .header {
-    padding: 6px 12px;
-  }
-
-  .headerTitle {
-    font-size: 16px;
-    letter-spacing: 2px;
-  }
-
-  .headerStatus {
-    font-size: 11px;
-    display: none;
-  }
-
-  .layout {
     flex-direction: column;
   }
 
-  .mapPanel {
-    flex: 1;
-    padding: 6px;
-    min-height: 0;
-  }
-
-  .map {
-    flex: 1;
-    min-height: 0;
+  .headerMeta {
+    width: 100%;
   }
 
   .sidePanel {
-    width: 100%;
-    max-height: 35vh;
-    padding: 8px;
-    gap: 6px;
-    border-left: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    overflow: visible;
   }
+}
 
-  .panel {
-    padding: 8px 10px;
-  }
-
-  .panelTitle {
-    margin: 0 0 4px;
-    font-size: 10px;
-  }
-
-  /* Hide non-essential panels on mobile to save space */
-  .sequencePanel {
-    display: none;
-  }
-
-  .legend {
-    display: none;
-  }
-
-  /* Compact loadout on mobile */
-  .loadoutStatus {
-    display: none;
-  }
-
-  .presetMeta {
-    margin-bottom: 4px;
+@media (pointer: coarse) and (max-width: 600px) {
+  .map {
+    min-height: 260px;
   }
 
   .loadoutRow {
     grid-template-columns: 1fr;
-    padding-top: 4px;
   }
 
-  .actionButton {
-    min-height: 48px;
-    font-size: 15px;
-  }
-
-  .timer {
-    margin-bottom: 8px;
-    font-size: 13px;
+  .presetMeta {
+    grid-template-columns: 1fr;
   }
 }

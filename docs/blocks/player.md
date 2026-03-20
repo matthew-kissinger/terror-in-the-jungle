@@ -121,11 +121,13 @@ PlayerHealthSystem.takeDamage()
 
 ```
 HelicopterInteraction.checkPlayerProximity()
-  if within 5m: hudSystem.showInteractionPrompt("Press E")
+  if within radius and not in exit cooldown:
+    hudSystem.setInteractionContext({ kind: 'vehicle-enter', promptText, buttonLabel: 'ENTER' })
   [E pressed]: HelicopterInteraction.tryEnterHelicopter()
     playerController.enterHelicopter(id, pos, quat)
+    hudSystem.setVehicleContext(helicopterUiContext)
     hudSystem.showHelicopterInstruments()
-    hudSystem.setState({vehicle: 'helicopter'})  // CSS hides infantry UI
+    gameplay presentation switches actorMode -> helicopter
     playerController.disableFootMovement()
 
 During flight:
@@ -136,6 +138,8 @@ During flight:
 
 [E pressed again]: exitHelicopter()
   playerController.exitHelicopter()
+  HelicopterInteraction suppresses immediate re-entry prompt for 1s
+  hudSystem.setVehicleContext(null)
   hudSystem.hideHelicopterInstruments()
 ```
 
@@ -159,6 +163,7 @@ Source: [PlayerInput.ts]([GH]/systems/player/PlayerInput.ts)
 | M | Toggle mortar camera | Infantry |
 | F | Mortar fire | Infantry (mortar deployed) |
 | Z | Squad command overlay | Infantry |
+| Shift+1..5 | Squad quick commands | Infantry |
 | Tab | Scoreboard | Any |
 | W/S | Collective up/down | Helicopter |
 | A/D | Yaw left/right | Helicopter |

@@ -114,6 +114,63 @@ describe('VehicleActionBar', () => {
     expect(onCmd).toHaveBeenCalledTimes(1);
   });
 
+  it('setVehicleContext toggles buttons from capabilities', () => {
+    bar.setVehicleContext({
+      kind: 'helicopter',
+      role: 'transport',
+      hudVariant: 'flight',
+      weaponCount: 0,
+      capabilities: {
+        canExit: true,
+        canFirePrimary: false,
+        canCycleWeapons: false,
+        canFreeLook: true,
+        canStabilize: true,
+        canDeploySquad: true,
+        canOpenMap: true,
+        canOpenCommand: true,
+      },
+    });
+
+    expect((document.querySelector('[aria-label="EXIT"]') as HTMLDivElement).style.display).toBe('flex');
+    expect((document.querySelector('[aria-label="FIRE"]') as HTMLDivElement).style.display).toBe('none');
+    expect((document.querySelector('[aria-label="WPN"]') as HTMLDivElement).style.display).toBe('none');
+    expect((document.querySelector('[aria-label="MAP"]') as HTMLDivElement).style.display).toBe('flex');
+    expect((document.querySelector('[aria-label="CMD"]') as HTMLDivElement).style.display).toBe('flex');
+    expect((document.querySelector('[aria-label="STAB"]') as HTMLDivElement).style.display).toBe('flex');
+    expect((document.querySelector('[aria-label="LOOK"]') as HTMLDivElement).style.display).toBe('flex');
+  });
+
+  it('cycles weapons using the configured vehicle weapon count', () => {
+    const onCycle = vi.fn();
+    bar.setCallbacks({ onHelicopterWeaponCycle: onCycle });
+    bar.setVehicleContext({
+      kind: 'plane',
+      role: 'strike',
+      hudVariant: 'flight',
+      weaponCount: 3,
+      capabilities: {
+        canExit: true,
+        canFirePrimary: true,
+        canCycleWeapons: true,
+        canFreeLook: true,
+        canStabilize: false,
+        canDeploySquad: false,
+        canOpenMap: true,
+        canOpenCommand: false,
+      },
+    });
+
+    const wpnBtn = document.querySelector('[aria-label="WPN"]')!;
+    wpnBtn.dispatchEvent(pointerEvent('pointerdown'));
+    wpnBtn.dispatchEvent(pointerEvent('pointerdown'));
+    wpnBtn.dispatchEvent(pointerEvent('pointerdown'));
+
+    expect(onCycle).toHaveBeenNthCalledWith(1, 1);
+    expect(onCycle).toHaveBeenNthCalledWith(2, 2);
+    expect(onCycle).toHaveBeenNthCalledWith(3, 0);
+  });
+
   it('STAB fires onToggleAutoHover callback', () => {
     const onHover = vi.fn();
     bar.setCallbacks({ onToggleAutoHover: onHover });

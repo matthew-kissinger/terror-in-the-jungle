@@ -21,12 +21,23 @@ import { isTouchDevice } from '../../utils/DeviceDetector';
 import { haptics } from '../controls/HapticFeedback';
 import styles from './SettingsModal.module.css';
 
+interface GameplayMenuActions {
+  onResume: () => void;
+  onSquadCommands: () => void;
+  onQuitToMenu: () => void;
+}
+
 export class SettingsModal extends UIComponent {
   private visible = this.signal(false);
+  private gameplayActionsEnabled = this.signal(false);
   private focusTrap: FocusTrap | null = null;
+  private onVisibilityChange?: (visible: boolean) => void;
+  private gameplayMenuActions?: GameplayMenuActions;
 
   protected build(): void {
-    this.root.className = styles.overlay;
+    this.root.className = `${styles.overlay} settings-modal`;
+    this.root.id = 'settings-modal';
+    this.root.setAttribute('data-ref', 'settings-modal');
     this.root.setAttribute('role', 'dialog');
     this.root.setAttribute('aria-modal', 'true');
     this.root.setAttribute('aria-label', 'Settings');
@@ -62,6 +73,15 @@ export class SettingsModal extends UIComponent {
     this.root.innerHTML = `
       <div class="${styles.card}">
         <h2 class="${styles.title}">SETTINGS</h2>
+
+        <section class="${styles.gameplayActions}" data-ref="gameplay-actions">
+          <div class="${styles.sectionTitle}">Field Menu</div>
+          <div class="${styles.gameplayActionsGrid}">
+            <button class="${styles.secondaryBtn}" data-ref="resume" type="button">Resume</button>
+            <button class="${styles.secondaryBtn}" data-ref="squad" type="button">Squad Commands</button>
+            <button class="${styles.secondaryBtn}" data-ref="quit" type="button">Quit to Menu</button>
+          </div>
+        </section>
 
         <fieldset class="${styles.fieldset}">
           <legend class="${styles.legend}">Graphics</legend>
@@ -177,6 +197,7 @@ export class SettingsModal extends UIComponent {
     this.effect(() => {
       const vis = this.visible.value;
       this.toggleClass(styles.visible, vis);
+      this.onVisibilityChange?.(vis);
       if (vis) {
         this.focusTrap?.activate();
       } else {
@@ -191,9 +212,35 @@ export class SettingsModal extends UIComponent {
       this.listen(closeBtn, 'click', (e) => e.preventDefault());
     }
 
-    // Escape key to close
-    this.listen(this.root, 'keydown', (e) => {
+    this.effect(() => {
+      const gameplayActions = this.$('[data-ref="gameplay-actions"]');
+      if (!gameplayActions) return;
+      gameplayActions.classList.toggle(styles.gameplayActionsVisible, this.gameplayActionsEnabled.value);
+    });
+
+    const resumeBtn = this.$('[data-ref="resume"]');
+    if (resumeBtn) {
+      this.listen(resumeBtn, 'pointerdown', () => this.gameplayMenuActions?.onResume());
+      this.listen(resumeBtn, 'click', (e) => e.preventDefault());
+    }
+
+    const squadBtn = this.$('[data-ref="squad"]');
+    if (squadBtn) {
+      this.listen(squadBtn, 'pointerdown', () => this.gameplayMenuActions?.onSquadCommands());
+      this.listen(squadBtn, 'click', (e) => e.preventDefault());
+    }
+
+    const quitBtn = this.$('[data-ref="quit"]');
+    if (quitBtn) {
+      this.listen(quitBtn, 'pointerdown', () => this.gameplayMenuActions?.onQuitToMenu());
+      this.listen(quitBtn, 'click', (e) => e.preventDefault());
+    }
+
+    // Escape closes the modal even if focus has drifted away from the card.
+    this.listen(document, 'keydown', (e) => {
       if (e.key === 'Escape' && this.visible.value) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
         this.hide();
       }
     });
@@ -221,6 +268,19 @@ export class SettingsModal extends UIComponent {
 
   hide(): void {
     this.visible.value = false;
+  }
+
+  isVisible(): boolean {
+    return this.visible.value;
+  }
+
+  setOnVisibilityChange(callback: (visible: boolean) => void): void {
+    this.onVisibilityChange = callback;
+  }
+
+  setGameplayMenuActions(actions: GameplayMenuActions | null): void {
+    this.gameplayMenuActions = actions ?? undefined;
+    this.gameplayActionsEnabled.value = Boolean(actions);
   }
 
   // --- Settings binding ---
@@ -387,6 +447,7 @@ export class SettingsModal extends UIComponent {
       <div class="${styles.hint}">WASD - Move | Shift - Sprint | Space - Jump</div>
       <div class="${styles.hint}">Mouse - Look | Left Click - Fire | Right Click - ADS</div>
       <div class="${styles.hint}">R - Reload | G - Grenade | 1-6 - Weapons | TAB - Scoreboard</div>
+      <div class="${styles.hint}">Z - Squad command overlay | Shift+1..5 - quick commands</div>
     `;
     const touch = `
       <div class="${styles.hint}"><strong>Touch Controls</strong></div>

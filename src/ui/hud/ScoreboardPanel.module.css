@@ -16,7 +16,7 @@
   justify-content: center;
   align-items: center;
   z-index: 200;
-  pointer-events: none;
+  pointer-events: auto;
   color: var(--text-primary);
   backdrop-filter: blur(6px);
 }

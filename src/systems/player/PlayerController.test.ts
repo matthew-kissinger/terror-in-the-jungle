@@ -58,9 +58,14 @@ describe('PlayerController', () => {
   let mockHUDSystem: HUDSystem;
   let mockRenderer: any;
   let mockCommandInputManager: any;
+  let mockSettingsModal: any;
+  let settingsModalVisible = false;
+  let settingsModalVisibilityListener: ((visible: boolean) => void) | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    settingsModalVisible = false;
+    settingsModalVisibilityListener = undefined;
 
     // Create camera
     mockCamera = new THREE.PerspectiveCamera();
@@ -235,6 +240,21 @@ describe('PlayerController', () => {
       issueQuickCommand: vi.fn(),
       handleCancel: vi.fn(() => false),
     };
+
+    mockSettingsModal = {
+      show: vi.fn(() => {
+        settingsModalVisible = true;
+        settingsModalVisibilityListener?.(true);
+      }),
+      hide: vi.fn(() => {
+        settingsModalVisible = false;
+        settingsModalVisibilityListener?.(false);
+      }),
+      isVisible: vi.fn(() => settingsModalVisible),
+      setOnVisibilityChange: vi.fn((callback: (visible: boolean) => void) => {
+        settingsModalVisibilityListener = callback;
+      }),
+    };
   });
 
   describe('Constructor', () => {
@@ -277,6 +297,32 @@ describe('PlayerController', () => {
       playerController['handleEscape']();
 
       expect(mockCommandInputManager.handleCancel).toHaveBeenCalled();
+    });
+
+    it('opens settings on escape during gameplay and pauses player input', () => {
+      playerController.setSettingsModal(mockSettingsModal);
+      playerController.setGameStarted(true);
+
+      playerController['handleEscape']();
+
+      expect(mockSettingsModal.show).toHaveBeenCalledTimes(1);
+      expect(playerController['input'].setControlsEnabled).toHaveBeenCalledWith(false);
+      expect(playerController['input'].setInputContext).toHaveBeenCalledWith('menu');
+      expect(playerController['input'].setPointerLockEnabled).toHaveBeenCalledWith(false);
+    });
+
+    it('closes settings on escape when the modal is already visible', () => {
+      playerController.setSettingsModal(mockSettingsModal);
+      playerController.setGameStarted(true);
+      mockSettingsModal.show();
+      vi.clearAllMocks();
+
+      playerController['handleEscape']();
+
+      expect(mockSettingsModal.hide).toHaveBeenCalledTimes(1);
+      expect(playerController['input'].setControlsEnabled).toHaveBeenCalledWith(true);
+      expect(playerController['input'].setInputContext).toHaveBeenCalledWith('gameplay');
+      expect(playerController['input'].setPointerLockEnabled).toHaveBeenCalledWith(true);
     });
   });
 

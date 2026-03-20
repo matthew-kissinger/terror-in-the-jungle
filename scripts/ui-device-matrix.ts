@@ -36,7 +36,7 @@ interface SnapshotResult {
   metrics: ScenarioMetrics;
 }
 
-const BASE_URL = process.env.MATRIX_BASE_URL ?? 'http://localhost:5173/terror-in-the-jungle/';
+const BASE_URL = process.env.MATRIX_BASE_URL ?? 'http://127.0.0.1:9100/terror-in-the-jungle/?perf=1';
 const TS = new Date().toISOString().replace(/[:.]/g, '-');
 const OUT_DIR = path.resolve('artifacts', 'ui-matrix', TS);
 const REPORT_PATH = path.join(OUT_DIR, 'report.md');
@@ -44,8 +44,9 @@ const REPORT_PATH = path.join(OUT_DIR, 'report.md');
 const DEVICES: DeviceProfile[] = [
   { id: 'desktop-1080', label: 'Desktop 1080p', viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 },
   { id: 'desktop-1366', label: 'Desktop 1366x768', viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1 },
-  { id: 'tablet-landscape', label: 'Tablet Landscape', viewport: { width: 1024, height: 768 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 },
+  { id: 'phone-414', label: 'Phone Portrait 414x896', viewport: { width: 414, height: 896 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 },
   { id: 'phone-portrait', label: 'Phone Portrait', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 },
+  { id: 'phone-360', label: 'Phone Portrait 360x800', viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 },
   { id: 'phone-landscape', label: 'Phone Landscape', viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 },
 ];
 
@@ -286,4 +287,3 @@ main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
-

@@ -35,8 +35,7 @@ export interface InputCallbacks {
   onSquadQuickCommand?: (slot: number) => void;
   onHelicopterWeaponSwitch?: (index: number) => void;
   onAirSupportMenu?: () => void;
-  onMenuPause?: () => void;
-  onMenuResume?: () => void;
+  onMenuOpen?: () => void;
 }
 
 export class PlayerInput {
@@ -133,8 +132,7 @@ export class PlayerInput {
         onRallyPointPlace: () => callbacks.onRallyPointPlace?.(),
         onMapToggle: () => callbacks.onMapToggle?.(),
         onSquadCommand: () => callbacks.onSquadCommand?.(),
-        onMenuPause: () => callbacks.onMenuPause?.(),
-        onMenuResume: () => callbacks.onMenuResume?.(),
+        onMenuOpen: () => callbacks.onMenuOpen?.(),
         onToggleAutoHover: () => callbacks.onToggleAutoHover?.(),
         onVehicleFireStart: () => callbacks.onMouseDown?.(0),
         onVehicleFireStop: () => callbacks.onMouseUp?.(0),
@@ -603,9 +601,10 @@ G - Throw Grenade / Deploy Squad (in helicopter)
 B - Deploy/Undeploy Mortar
 F - Fire Mortar (when deployed)
 Z - Squad Commands
+Shift+1..5 - Squad Quick Commands
 TAB - Scoreboard
 ${pointerLockHint}
-Escape - Release pointer lock / Exit helicopter
+Escape - Open settings (on foot) / Exit helicopter
     `);
   }
 

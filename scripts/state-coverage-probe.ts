@@ -72,14 +72,34 @@ async function waitForPort(host: string, port: number, timeoutMs: number): Promi
 }
 
 function startDevServer(host: string, port: number): ChildProcess {
+  if (process.platform === 'win32') {
+    return spawn('cmd.exe', ['/d', '/s', '/c', `npm run dev -- --host ${host} --port ${port}`], {
+      cwd: process.cwd(),
+      stdio: 'ignore',
+      shell: false,
+    });
+  }
   return spawn('npm', ['run', 'dev', '--', '--host', host, '--port', String(port)], {
+    cwd: process.cwd(),
     stdio: 'ignore',
-    shell: true,
+    shell: false,
   });
 }
 
 async function stopDevServer(proc: ChildProcess): Promise<void> {
   if (proc.killed) return;
+  if (!proc.pid) return;
+  if (process.platform === 'win32') {
+    await new Promise<void>((resolve) => {
+      const killer = spawn('taskkill', ['/PID', String(proc.pid), '/T', '/F'], {
+        stdio: 'ignore',
+        shell: false,
+      });
+      killer.on('close', () => resolve());
+      killer.on('error', () => resolve());
+    });
+    return;
+  }
   proc.kill('SIGTERM');
   await sleep(1000);
   if (!proc.killed) {

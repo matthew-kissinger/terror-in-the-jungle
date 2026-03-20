@@ -53,6 +53,7 @@ describe('SettingsModal', () => {
 
   it('has role="dialog" and aria-modal on mount', () => {
     const root = modal.element;
+    expect(root.getAttribute('data-ref')).toBe('settings-modal');
     expect(root.getAttribute('role')).toBe('dialog');
     expect(root.getAttribute('aria-modal')).toBe('true');
     expect(root.getAttribute('aria-label')).toBe('Settings');
@@ -104,10 +105,21 @@ describe('SettingsModal', () => {
 
   it('Escape key closes modal when visible', () => {
     modal.show();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     const root = modal.element;
-    root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     // After pressing Escape, the visible signal should be false
     // We check by looking at the class list (visible class removed)
     expect(root.classList.contains('visible')).toBe(false);
+  });
+
+  it('reports visibility changes through the public callback', () => {
+    const callback = vi.fn();
+    modal.setOnVisibilityChange(callback);
+
+    modal.show();
+    modal.hide();
+
+    expect(callback).toHaveBeenNthCalledWith(1, true);
+    expect(callback).toHaveBeenNthCalledWith(2, false);
   });
 });

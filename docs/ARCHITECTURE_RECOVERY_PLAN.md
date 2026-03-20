@@ -1,6 +1,6 @@
 # Architecture Recovery Plan
 
-Last updated: 2026-03-19
+Last updated: 2026-03-20
 Scope: runtime architecture stabilization with performance and gameplay fidelity gates.
 
 ## Current Goal
@@ -50,10 +50,12 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: CSS Grid HUD layout (`#game-hud-root`) with 18 named slots replacing 33+ position:fixed elements.
 - Keep: UnifiedWeaponBar (single weapon UI for desktop + touch, replaces TouchWeaponBar + InventoryManager hotbar + WeaponAmmoDisplay).
 - Keep: pointer events (pointerdown/up/cancel + setPointerCapture) on all touch controls, replacing touch events (zero touchstart/end/move listeners remain in controls).
-- Keep: VisibilityManager drives HUD visibility via data attributes on #game-hud-root; CSS rules respond to data-phase, data-vehicle, data-ads, data-device, data-layout.
+- Keep: gameplay HUD visibility is now owned by `GameplayPresentationController` / `VisibilityManager`; CSS responds to `data-phase`, `data-actor-mode`, `data-overlay`, `data-ads`, `data-device`, and `data-layout` on `#game-hud-root` instead of scattered widget toggles.
 - Keep: data-show="infantry" on weapon-bar and action-btns slots (hidden in helicopter via CSS rule).
 - Keep: score/touch/gameplay HUD ownership under `#game-hud-root` instead of direct gameplay body mounts.
 - Keep: `InputManager` + `InputContextManager` as central gameplay action gate for map/menu/modal contexts.
+- Keep (2026-03-20): touch gameplay pause/settings is shared with desktop `Escape`; `TouchMenuButton` is only a launcher now, not a separate pause overlay owner.
+- Keep (2026-03-20): vehicle HUD/actions are capability-driven via `VehicleUIContext`, with helicopters as the first concrete implementation so planes/cars can reuse the same actor-mode/overlay contract later.
 - Keep: single compact fullscreen prompt on mobile entry (auto-fades 6s); landscape prompt removed as redundant (Deploy tap auto-enters fullscreen + locks landscape).
 - Keep: squared-distance and allocation reductions in spatial queries.
 - Keep: AI target acquisition scratch-buffer reuse.

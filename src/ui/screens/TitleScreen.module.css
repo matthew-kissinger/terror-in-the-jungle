@@ -1,20 +1,14 @@
 /**
- * TitleScreen - Minimal title + loading bar + START GAME.
- * Opaque dark background, no backdrop-filter. Fits viewport.
+ * TitleScreen - operations-table entry briefing.
  */
 
 .screen {
-  position: fixed;
-  inset: 0;
+  composes: overlayRoot from './ScreenPrimitives.module.css';
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   z-index: 9999;
-  background: rgba(8, 12, 18, 0.96);
-  font-family: var(--font-primary);
-  color: var(--text-primary);
   transition: opacity 0.5s ease;
+  overflow: auto;
 }
 
 .hidden {
@@ -23,72 +17,162 @@
 }
 
 .content {
-  text-align: center;
-  width: 100%;
-  max-width: 480px;
-  padding: 0 var(--space-4);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-6);
+  composes: screenStage from './ScreenPrimitives.module.css';
+  justify-content: center;
 }
 
-/* Title */
+.topRail {
+  composes: topRail from './ScreenPrimitives.module.css';
+}
+
+.railGroup {
+  composes: railGroup from './ScreenPrimitives.module.css';
+}
+
+.railItem {
+  composes: railItem from './ScreenPrimitives.module.css';
+}
+
+.railLabel {
+  composes: railLabel from './ScreenPrimitives.module.css';
+}
+
+.railValue {
+  composes: railValue from './ScreenPrimitives.module.css';
+}
+
+.heroShell {
+  composes: heroShell from './ScreenPrimitives.module.css';
+}
+
+.heroPanel {
+  composes: heroPanel from './ScreenPrimitives.module.css';
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.eyebrow {
+  composes: heroEyebrow from './ScreenPrimitives.module.css';
+}
 
 .title {
-  font-family: var(--font-heading);
-  font-size: clamp(2rem, 6vw, 3.4rem);
-  font-weight: 500;
-  color: var(--text-primary);
-  text-shadow: 0 0 40px rgba(127, 180, 217, 0.3);
-  margin: 0;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  line-height: 1.1;
+  composes: heroTitle from './ScreenPrimitives.module.css';
   animation: ui-fadeInUp 0.8s ease-out;
 }
 
-/* Loading */
+.subtitle {
+  composes: heroSubtitle from './ScreenPrimitives.module.css';
+}
+
+.chipRow {
+  composes: statusChipRow from './ScreenPrimitives.module.css';
+}
+
+.chip {
+  composes: statusChip from './ScreenPrimitives.module.css';
+}
+
+.briefPanel {
+  composes: briefPanel from './ScreenPrimitives.module.css';
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.panelLabel {
+  composes: sectionLabel from './ScreenPrimitives.module.css';
+}
+
+.panelTitle {
+  composes: sectionTitle from './ScreenPrimitives.module.css';
+}
+
+.panelBody {
+  composes: sectionBody from './ScreenPrimitives.module.css';
+  margin-bottom: var(--space-4);
+}
+
+.briefList {
+  composes: dataList from './ScreenPrimitives.module.css';
+}
+
+.briefRow {
+  composes: dataRow from './ScreenPrimitives.module.css';
+}
+
+.briefTerm {
+  composes: dataTerm from './ScreenPrimitives.module.css';
+}
+
+.briefValue {
+  composes: dataValue from './ScreenPrimitives.module.css';
+}
 
 .loadingSection {
-  width: 100%;
-  max-width: 320px;
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.loadingHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.loadingLabel {
+  color: var(--ops-accent-bright);
+  font-size: var(--font-size-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.loadingHint {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
 }
 
 .progressBar {
   width: 100%;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 2px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
   overflow: hidden;
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 .progressFill {
   height: 100%;
-  background: linear-gradient(90deg, var(--screen-accent-dim), var(--screen-accent));
+  background: linear-gradient(90deg, var(--ops-accent-dim), var(--ops-accent));
   transition: width 0.15s linear;
-  border-radius: 2px;
-  box-shadow: 0 0 12px var(--screen-accent);
+  border-radius: 999px;
+  box-shadow: 0 0 18px rgba(245, 158, 11, 0.4);
 }
 
 .phaseText {
-  font-size: var(--font-size-sm);
+  min-height: 18px;
   color: var(--text-secondary);
-  letter-spacing: 0.06em;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  opacity: 0.6;
-  height: 20px;
+  opacity: 0.88;
 }
-
-/* Menu buttons (shown after load) */
 
 .menuSection {
   display: none;
-  flex-direction: column;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
-  animation: ui-fadeInUp 0.5s ease-out;
+  margin-top: var(--space-5);
+  animation: ui-fadeInUp 0.45s ease-out;
 }
 
 .menuVisible {
@@ -96,27 +180,13 @@
 }
 
 .startButton {
-  padding: 0.85rem 3rem;
-  min-height: 48px;
+  composes: primaryButton from './ScreenPrimitives.module.css';
   min-width: 240px;
-  background: linear-gradient(135deg, var(--screen-accent-dim), var(--screen-accent));
-  border: 1px solid rgba(127, 180, 217, 0.3);
-  border-radius: var(--radius-pill);
-  color: white;
-  font-family: var(--font-primary);
-  font-size: var(--font-size-base);
-  font-weight: var(--weight-bold);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  cursor: pointer;
-  transition: all 0.25s ease;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
 }
 
-.startButton:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 28px rgba(90, 143, 181, 0.35);
+.settingsLink {
+  composes: secondaryButton from './ScreenPrimitives.module.css';
+  min-width: 180px;
 }
 
 .startButton:disabled {
@@ -125,50 +195,32 @@
   transform: none;
 }
 
-.settingsLink {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: var(--font-primary);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: var(--space-2) var(--space-4);
-  transition: color 0.2s;
-  touch-action: manipulation;
-  min-height: 44px;
-}
-
-.settingsLink:hover {
-  color: var(--text-primary);
-}
-
-/* Preparing state */
-
 .preparing .startButton {
   opacity: 0.6;
   cursor: wait;
 }
 
 .preparingText {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-  opacity: 0.7;
-  letter-spacing: 0.06em;
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  background: rgba(245, 158, 11, 0.08);
+  color: #f8edd1;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  line-height: 1.6;
   text-transform: uppercase;
 }
-
-/* Error panel */
 
 .errorPanel {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: rgba(12, 18, 28, 0.96);
-  border: 1px solid rgba(255, 80, 80, 0.4);
-  border-radius: var(--radius-2xl);
+  background: linear-gradient(180deg, rgba(20, 10, 9, 0.98), rgba(10, 7, 7, 0.95));
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
   padding: var(--space-6) var(--space-8);
   max-width: 460px;
   width: 90%;
@@ -177,7 +229,7 @@
 }
 
 .errorTitle {
-  color: var(--screen-danger);
+  color: #fca5a5;
   font-size: var(--font-size-lg);
   font-weight: var(--weight-semibold);
   margin-bottom: var(--space-3);
@@ -200,48 +252,31 @@
 }
 
 .errorButton {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--screen-glass-border-bright);
-  color: var(--screen-accent);
-  padding: var(--space-2) var(--space-5);
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: var(--weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  composes: secondaryButton from './ScreenPrimitives.module.css';
   min-height: 40px;
-  touch-action: manipulation;
-  transition: all 0.2s;
-}
-
-.errorButton:hover {
-  background: rgba(127, 180, 217, 0.12);
+  padding: var(--space-2) var(--space-5);
 }
 
 .errorButtonPrimary {
-  border-color: rgba(255, 80, 80, 0.4);
-  color: var(--screen-danger);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: #fca5a5;
 }
-
-/* Fullscreen prompt (mobile) */
 
 .fullscreenPrompt {
   position: absolute;
-  bottom: 0.6rem;
+  bottom: 1rem;
   left: 50%;
   transform: translateX(-50%);
-  padding: var(--space-1-5) var(--space-3);
-  background: rgba(8, 16, 24, 0.7);
-  border: 1px solid rgba(127, 180, 217, 0.2);
-  border-radius: var(--radius-lg);
-  color: rgba(127, 180, 217, 0.8);
+  padding: var(--space-2) var(--space-4);
+  background: rgba(13, 19, 14, 0.92);
+  border: 1px solid rgba(245, 158, 11, 0.24);
+  color: #fde68a;
   cursor: pointer;
   touch-action: manipulation;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: var(--weight-semibold);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   transition: opacity 0.3s;
 }
 
@@ -249,14 +284,40 @@
   opacity: 0;
 }
 
-/* Load stats */
+.footerBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
 
-.loadingStats {
-  position: absolute;
-  bottom: 0.75rem;
-  left: 0.75rem;
-  font-size: 0.65rem;
-  color: var(--text-secondary);
-  opacity: 0.2;
+.footerLabel {
+  color: var(--text-muted);
+  font-size: var(--font-size-2xs);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.footerValue {
+  color: var(--ops-data);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .heroPanel {
+    padding: var(--space-5);
+  }
+
+  .title {
+    font-size: clamp(2.6rem, 15vw, 4.6rem);
+  }
+
+  .footerBar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }

@@ -14,16 +14,64 @@ interface ModeEntry {
   key: string;
   mode: GameMode;
   name: string;
-  stat: string;
   icon: string;
+  tagline: string;
+  tempo: string;
+  scale: string;
+  duration: string;
+  theater: string;
   isTdm: boolean;
 }
 
 const MODE_ENTRIES: ModeEntry[] = [
-  { key: 'zone_control', mode: GameMode.ZONE_CONTROL, name: 'ZONE CONTROL', stat: '60 AI, 3 min', icon: 'mode-conquest', isTdm: false },
-  { key: 'open_frontier', mode: GameMode.OPEN_FRONTIER, name: 'OPEN FRONTIER', stat: '120 AI, 15 min', icon: 'mode-frontier', isTdm: false },
-  { key: 'tdm', mode: GameMode.TEAM_DEATHMATCH, name: 'TDM', stat: '30 AI, 5 min', icon: 'mode-tdm', isTdm: true },
-  { key: 'a_shau_valley', mode: GameMode.A_SHAU_VALLEY, name: 'A SHAU VALLEY', stat: '3000 AI, 60 min', icon: 'mode-ashau', isTdm: false },
+  {
+    key: 'zone_control',
+    mode: GameMode.ZONE_CONTROL,
+    name: 'ZONE CONTROL',
+    icon: 'mode-conquest',
+    tagline: 'Frontline capture with short, readable engagements and rapid redeploy cadence.',
+    tempo: 'Fast',
+    scale: 'Platoon / 60 AI',
+    duration: '3 min',
+    theater: 'Multi-zone frontline',
+    isTdm: false,
+  },
+  {
+    key: 'open_frontier',
+    mode: GameMode.OPEN_FRONTIER,
+    name: 'OPEN FRONTIER',
+    icon: 'mode-frontier',
+    tagline: 'Open map pressure with deeper routes, broad maneuvering, and live strategic spacing.',
+    tempo: 'Medium',
+    scale: 'Company / 120 AI',
+    duration: '15 min',
+    theater: 'Wide frontier theater',
+    isTdm: false,
+  },
+  {
+    key: 'tdm',
+    mode: GameMode.TEAM_DEATHMATCH,
+    name: 'TEAM DEATHMATCH',
+    icon: 'mode-tdm',
+    tagline: 'Tighter combat loop with immediate contact, short downtime, and kill-driven scoring.',
+    tempo: 'Very fast',
+    scale: 'Squad / 30 AI',
+    duration: '5 min',
+    theater: 'Close combat arena',
+    isTdm: true,
+  },
+  {
+    key: 'a_shau_valley',
+    mode: GameMode.A_SHAU_VALLEY,
+    name: 'A SHAU VALLEY',
+    icon: 'mode-ashau',
+    tagline: 'Warfront-scale campaign across a historic valley with strategic pressure and deep insertion.',
+    tempo: 'Escalating',
+    scale: 'Battalion / 3000 AI',
+    duration: '60 min',
+    theater: 'Historic campaign valley',
+    isTdm: false,
+  },
 ];
 
 export class ModeSelectScreen extends UIComponent {
@@ -33,14 +81,39 @@ export class ModeSelectScreen extends UIComponent {
   protected build(): void {
     this.root.className = styles.screen;
 
-    const cardsHtml = MODE_ENTRIES.map(entry => {
+    const cardsHtml = MODE_ENTRIES.map((entry, index) => {
       const tdmClass = entry.isTdm ? ` ${styles.cardTdm}` : '';
       return `
         <div class="${styles.card}${tdmClass}" data-mode="${entry.mode}">
-          ${iconHtml(entry.icon, { width: 36, css: 'flex-shrink:0;opacity:0.85;image-rendering:pixelated;' })}
-          <div class="${styles.cardInfo}">
-            <span class="${styles.cardName}">${entry.name}</span>
-            <span class="${styles.cardStat}">${entry.stat}</span>
+          <div class="${styles.cardHeader}">
+            <div class="${styles.cardIconWrap}">
+              ${iconHtml(entry.icon, { width: 30, css: 'opacity:0.9;image-rendering:pixelated;' })}
+            </div>
+            <div class="${styles.cardInfo}">
+              <span class="${styles.cardLabel}">Operation Profile</span>
+              <span class="${styles.cardName}">${entry.name}</span>
+              <p class="${styles.cardTagline}">${entry.tagline}</p>
+            </div>
+            <span class="${styles.cardIndex}">0${index + 1}</span>
+          </div>
+
+          <div class="${styles.cardMetrics}">
+            <div class="${styles.metricCell}">
+              <span class="${styles.metricLabel}">Tempo</span>
+              <span class="${styles.metricValue}">${entry.tempo}</span>
+            </div>
+            <div class="${styles.metricCell}">
+              <span class="${styles.metricLabel}">Command</span>
+              <span class="${styles.metricValue}">${entry.scale}</span>
+            </div>
+            <div class="${styles.metricCell}">
+              <span class="${styles.metricLabel}">Duration</span>
+              <span class="${styles.metricValue}">${entry.duration}</span>
+            </div>
+            <div class="${styles.metricCell}">
+              <span class="${styles.metricLabel}">Theater</span>
+              <span class="${styles.metricValue}">${entry.theater}</span>
+            </div>
           </div>
         </div>
       `;
@@ -48,7 +121,45 @@ export class ModeSelectScreen extends UIComponent {
 
     this.root.innerHTML = `
       <div class="${styles.content}">
-        <h2 class="${styles.heading}">SELECT MODE</h2>
+        <div class="${styles.topRail}">
+          <div class="${styles.railGroup}">
+            <div class="${styles.railItem}">
+              <span class="${styles.railLabel}">Selection</span>
+              <span class="${styles.railValue}">Operation Profiles</span>
+            </div>
+            <div class="${styles.railItem}">
+              <span class="${styles.railLabel}">Output</span>
+              <span class="${styles.railValue}">Launch to deploy flow</span>
+            </div>
+          </div>
+          <div class="${styles.railGroup}">
+            <div class="${styles.railItem}">
+              <span class="${styles.railLabel}">Interface</span>
+              <span class="${styles.railValue}">Dossier-based briefing</span>
+            </div>
+          </div>
+        </div>
+
+        <section class="${styles.headerPanel}">
+          <div class="${styles.headerCopy}">
+            <span class="${styles.headingLabel}">Mode Selection</span>
+            <h2 class="${styles.heading}">Choose An Operation Profile</h2>
+            <p class="${styles.headingBody}">
+              Each dossier summarizes combat rhythm, command scale, and terrain context before you step into the deploy table.
+            </p>
+          </div>
+          <div class="${styles.headerMeta}">
+            <div class="${styles.metaRow}">
+              <span class="${styles.metaLabel}">Flow</span>
+              <span class="${styles.metaValue}">Title → Mode → Deploy</span>
+            </div>
+            <div class="${styles.metaRow}">
+              <span class="${styles.metaLabel}">Intent</span>
+              <span class="${styles.metaValue}">Pick by tempo, not by guesswork</span>
+            </div>
+          </div>
+        </section>
+
         <div class="${styles.cards}">${cardsHtml}</div>
         <button class="${styles.backButton}" data-ref="back" type="button">BACK</button>
       </div>
@@ -58,17 +169,15 @@ export class ModeSelectScreen extends UIComponent {
   protected onMount(): void {
     const cards = this.$all('[data-mode]');
     for (const card of cards) {
-      this.listen(card, 'pointerdown', () => {
+      this.listen(card, 'click', () => {
         const mode = card.dataset.mode as GameMode;
         this.onModeSelect?.(mode);
       });
-      this.listen(card, 'click', (e) => e.preventDefault());
     }
 
     const backBtn = this.$('[data-ref="back"]');
     if (backBtn) {
-      this.listen(backBtn, 'pointerdown', () => this.onBack?.());
-      this.listen(backBtn, 'click', (e) => e.preventDefault());
+      this.listen(backBtn, 'click', () => this.onBack?.());
     }
 
     this.listen(window, 'keydown', (e) => {

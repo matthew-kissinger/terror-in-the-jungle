@@ -371,13 +371,34 @@ export const HUD_LAYOUT_STYLES = `
    * Also hide readouts that are irrelevant while flying:
    *   stats (kill counter), game-status (phase label), ammo.
    * ========================================================= */
+  [data-actor-mode="helicopter"] .hud-slot[data-show="infantry"],
+  [data-actor-mode="plane"] .hud-slot[data-show="infantry"],
+  [data-actor-mode="car"] .hud-slot[data-show="infantry"],
+  [data-actor-mode="turret"] .hud-slot[data-show="infantry"],
   [data-vehicle="helicopter"] .hud-slot[data-show="infantry"] {
     display: none !important;
   }
 
+  [data-actor-mode="helicopter"] .hud-slot[data-region="stats"],
+  [data-actor-mode="helicopter"] .hud-slot[data-region="game-status"],
+  [data-actor-mode="helicopter"] .hud-slot[data-region="ammo"],
+  [data-actor-mode="helicopter"] .hud-slot[data-region="weapon-bar"],
+  [data-actor-mode="plane"] .hud-slot[data-region="stats"],
+  [data-actor-mode="plane"] .hud-slot[data-region="game-status"],
+  [data-actor-mode="plane"] .hud-slot[data-region="ammo"],
+  [data-actor-mode="plane"] .hud-slot[data-region="weapon-bar"],
+  [data-actor-mode="car"] .hud-slot[data-region="stats"],
+  [data-actor-mode="car"] .hud-slot[data-region="game-status"],
+  [data-actor-mode="car"] .hud-slot[data-region="ammo"],
+  [data-actor-mode="car"] .hud-slot[data-region="weapon-bar"],
+  [data-actor-mode="turret"] .hud-slot[data-region="stats"],
+  [data-actor-mode="turret"] .hud-slot[data-region="game-status"],
+  [data-actor-mode="turret"] .hud-slot[data-region="ammo"],
+  [data-actor-mode="turret"] .hud-slot[data-region="weapon-bar"],
   [data-vehicle="helicopter"] .hud-slot[data-region="stats"],
   [data-vehicle="helicopter"] .hud-slot[data-region="game-status"],
-  [data-vehicle="helicopter"] .hud-slot[data-region="ammo"] {
+  [data-vehicle="helicopter"] .hud-slot[data-region="ammo"],
+  [data-vehicle="helicopter"] .hud-slot[data-region="weapon-bar"] {
     display: none !important;
   }
 

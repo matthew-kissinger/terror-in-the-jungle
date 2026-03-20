@@ -3,17 +3,18 @@ import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { Logger } from '../../utils/Logger';
 import { IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
 import { shouldUseTouchControls } from '../../utils/DeviceDetector';
-import type { PlayerInput } from '../player/PlayerInput';
+
+const POST_EXIT_INTERACTION_COOLDOWN_MS = 1000;
 
 export class HelicopterInteraction {
   private helicopters: Map<string, THREE.Group>;
   private playerController?: IPlayerController;
   private hudSystem?: IHUDSystem;
   private terrainManager?: ITerrainRuntime;
-  private playerInput?: PlayerInput;
   private interactionRadius: number;
   private isPlayerNearHelicopter = false;
   private nearestHelicopterId: string | null = null;
+  private suppressInteractionUntilMs = 0;
 
   constructor(
     helicopters: Map<string, THREE.Group>,
@@ -27,9 +28,7 @@ export class HelicopterInteraction {
     this.playerController = playerController;
   }
 
-  setPlayerInput(playerInput: PlayerInput): void {
-    this.playerInput = playerInput;
-  }
+  setPlayerInput(_playerInput: unknown): void {}
 
   setHUDSystem(hudSystem: IHUDSystem): void {
     this.hudSystem = hudSystem;
@@ -61,13 +60,14 @@ export class HelicopterInteraction {
       return;
     }
 
+    if (Date.now() < this.suppressInteractionUntilMs) {
+      this.clearInteractionPrompt();
+      return;
+    }
+
     // If player is in helicopter, don't show interaction prompt
     if (this.playerController.isInHelicopter()) {
-      if (this.isPlayerNearHelicopter) {
-        this.isPlayerNearHelicopter = false;
-        this.nearestHelicopterId = null;
-        this.hudSystem.hideInteractionPrompt();
-      }
+      this.clearInteractionPrompt();
       return;
     }
 
@@ -93,21 +93,16 @@ export class HelicopterInteraction {
         Logger.debug('helicopter', `Player near ${nearest.id} (${nearest.distance.toFixed(1)}m) - SHOWING PROMPT`);
 
         const isTouchDevice = shouldUseTouchControls();
-        const promptText = isTouchDevice ? 'Tap button to enter helicopter' : 'Press E to enter helicopter';
-        this.hudSystem.showInteractionPrompt(promptText);
-
-        if (isTouchDevice && this.playerInput) {
-          const touchControls = this.playerInput.getTouchControls();
-          touchControls?.interactionButton.showButton();
-        }
+        const promptText = isTouchDevice ? 'Tap ENTER to board helicopter' : 'Press E to enter helicopter';
+        this.hudSystem.setInteractionContext?.({
+          kind: 'vehicle-enter',
+          promptText,
+          buttonLabel: 'ENTER',
+          targetId: nearest.id,
+        });
       } else {
         this.nearestHelicopterId = null;
-        this.hudSystem.hideInteractionPrompt();
-
-        if (shouldUseTouchControls() && this.playerInput) {
-          const touchControls = this.playerInput.getTouchControls();
-          touchControls?.interactionButton.hideButton();
-        }
+        this.hudSystem.setInteractionContext?.(null);
       }
     }
   }
@@ -115,6 +110,10 @@ export class HelicopterInteraction {
   tryEnterHelicopter(): void {
     if (!this.playerController) {
       Logger.warn('helicopter', 'Cannot enter helicopter - no player controller');
+      return;
+    }
+
+    if (Date.now() < this.suppressInteractionUntilMs) {
       return;
     }
 
@@ -139,16 +138,7 @@ export class HelicopterInteraction {
     Logger.debug('helicopter', `PLAYER ENTERING ${nearest.id}`);
     this.playerController.enterHelicopter(nearest.id, nearest.group.position.clone());
 
-    this.isPlayerNearHelicopter = false;
-    this.nearestHelicopterId = null;
-
-    if (this.hudSystem) {
-      this.hudSystem.hideInteractionPrompt();
-    }
-    if (shouldUseTouchControls() && this.playerInput) {
-      const touchControls = this.playerInput.getTouchControls();
-      touchControls?.interactionButton.hideButton();
-    }
+    this.clearInteractionPrompt();
   }
 
   exitHelicopter(): void {
@@ -184,5 +174,13 @@ export class HelicopterInteraction {
 
     Logger.debug('helicopter', `  PLAYER EXITING HELICOPTER!`);
     this.playerController.exitHelicopter(exitPosition);
+    this.suppressInteractionUntilMs = Date.now() + POST_EXIT_INTERACTION_COOLDOWN_MS;
+    this.clearInteractionPrompt();
+  }
+
+  private clearInteractionPrompt(): void {
+    this.isPlayerNearHelicopter = false;
+    this.nearestHelicopterId = null;
+    this.hudSystem?.setInteractionContext?.(null);
   }
 }
