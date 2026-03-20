@@ -24,7 +24,8 @@ export const ZONE_CONTROL_CONFIG: GameModeConfig = {
   worldSize: 800,
   visualMargin: 360,
   chunkRenderDistance: 5,
-  terrainSeed: 'random',
+  terrainSeed: 42,
+  navmeshAsset: '/data/navmesh/zone_control-42.bin',
   terrain: {
     defaultBiome: 'denseJungle',
     biomeRules: [

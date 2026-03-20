@@ -10,7 +10,8 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
 
   worldSize: 3200, // ~2x2 miles
   chunkRenderDistance: 10,
-  terrainSeed: 'random',
+  terrainSeed: 42,
+  navmeshAsset: '/data/navmesh/open_frontier-42.bin',
   terrain: {
     defaultBiome: 'denseJungle',
     biomeRules: [

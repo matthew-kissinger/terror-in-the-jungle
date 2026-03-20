@@ -49,6 +49,18 @@ export class HeightmapGPU {
   }
 
   /**
+   * Upload a pre-computed height grid directly (from worker bake or pre-baked asset).
+   * Skips the per-sample provider loop entirely.
+   */
+  uploadPrebakedGrid(data: Float32Array, gridSize: number, worldSize: number): void {
+    this.gridSize = gridSize;
+    this.worldSize = worldSize;
+    this.heightData = new Float32Array(data);
+    this.createHeightTexture(this.heightData, gridSize, gridSize);
+    this.generateNormalMap(this.heightData, gridSize, gridSize, worldSize);
+  }
+
+  /**
    * Bake a noise-based height provider into a grid texture.
    */
   bakeFromProvider(provider: IHeightProvider, gridSize: number, worldSize: number): void {

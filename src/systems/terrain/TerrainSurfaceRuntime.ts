@@ -23,7 +23,7 @@ function roundUpToPowerOfTwo(value: number): number {
   return result;
 }
 
-function computeTerrainSurfaceGridSize(worldSize: number): number {
+export function computeTerrainSurfaceGridSize(worldSize: number): number {
   const targetMetersPerSample =
     worldSize >= 16384 ? 48 :
     worldSize >= 8192 ? 32 :
@@ -96,6 +96,42 @@ export class TerrainSurfaceRuntime {
     this.currentDefaultBiomeId = defaultBiomeId;
     this.currentBiomeRules = biomeRules.slice();
     this.updateMaterial(worldSize, defaultBiomeId, biomeRules);
+  }
+
+  /**
+   * Initialize from a pre-baked Float32Array heightmap grid (from worker or asset).
+   * Skips the synchronous per-sample provider loop.
+   */
+  initializeFromPrebakedGrid(
+    data: Float32Array,
+    gridSize: number,
+    worldSize: number,
+    defaultBiomeId: string,
+    biomeRules: BiomeClassificationRule[],
+  ): THREE.MeshStandardMaterial {
+    this.currentWorldSize = worldSize;
+    this.currentDefaultBiomeId = defaultBiomeId;
+    this.currentBiomeRules = biomeRules.slice();
+    this.heightmapGPU.uploadPrebakedGrid(data, gridSize, worldSize);
+    const heightTexture = this.heightmapGPU.getHeightTexture();
+    const normalTexture = this.heightmapGPU.getNormalTexture();
+
+    if (!heightTexture || !normalTexture) {
+      throw new Error('Failed to create terrain heightmap textures from pre-baked grid');
+    }
+
+    this.terrainMaterial = createTerrainMaterial({
+      heightTexture,
+      normalTexture,
+      worldSize,
+      splatmap: this.splatmap,
+      biomeConfig: buildTerrainBiomeMaterialConfig(this.assetLoader, defaultBiomeId, biomeRules),
+      surfaceWetness: this.surfaceWetness,
+      tileGridResolution: this.tileGridResolution,
+      surfacePatches: this.featureSurfacePatches,
+    });
+
+    return this.terrainMaterial;
   }
 
   rebake(provider: IHeightProvider, worldSize: number, defaultBiomeId: string, biomeRules: BiomeClassificationRule[]): void {

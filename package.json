@@ -10,7 +10,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "npx tsx scripts/prebake-navmesh.ts",
     "build": "tsc && vite build",
+    "navmesh:generate": "npx tsx scripts/prebake-navmesh.ts",
     "preview": "vite preview",
     "smoke:prod": "npx tsx scripts/prod-smoke.ts",
     "lint": "eslint src/",

@@ -10,7 +10,8 @@ export const TEAM_DEATHMATCH_CONFIG: GameModeConfig = {
 
   worldSize: 400,
   chunkRenderDistance: 6,
-  terrainSeed: 'random',
+  terrainSeed: 42,
+  navmeshAsset: '/data/navmesh/tdm-42.bin',
   terrain: {
     defaultBiome: 'denseJungle',
     biomeRules: [

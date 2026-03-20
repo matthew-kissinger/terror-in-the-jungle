@@ -143,7 +143,8 @@ export class ChunkVegetationGenerator {
           if (slopeDeg(p.x, p.y, size, getHeight) > MAX_CANOPY_SLOPE) continue;
           const dn = densityNoise(baseX + p.x, baseZ + p.y);
           if (dn < 0.15) continue;
-          const s = MathUtils.randomInRange(0.9, 1.1);
+          const hs = this.hashInts(chunkX + idx, chunkZ, 0xCAFE0001);
+          const s = 0.9 + (hs / 0xffffffff) * 0.2;
           instances.push({
             position: new THREE.Vector3(baseX + p.x, h + ct.yOffset, baseZ + p.y),
             scale: new THREE.Vector3(s, s, 1),
@@ -182,7 +183,8 @@ export class ChunkVegetationGenerator {
           if (slopeDeg(p.x, p.y, size, getHeight) > MAX_MIDLEVEL_SLOPE) continue;
           const dn = densityNoise(baseX + p.x, baseZ + p.y);
           if (dn < 0.1) continue;
-          const s = MathUtils.randomInRange(0.9, 1.1);
+          const hs = this.hashInts(chunkX + idx, chunkZ, 0xCAFE0002);
+          const s = 0.9 + (hs / 0xffffffff) * 0.2;
           instances.push({
             position: new THREE.Vector3(baseX + p.x, h + mt.yOffset, baseZ + p.y),
             scale: new THREE.Vector3(s, s, 1),
@@ -199,11 +201,12 @@ export class ChunkVegetationGenerator {
       const biomeDensity = densityMap.get(vt.id)!;
       const effectiveDensity = vt.baseDensity * biomeDensity;
       const instances: BillboardInstance[] = [];
+      const typeSalt = this.hashString(vt.id);
 
       if (vt.placement === 'poisson') {
         const minDist = vt.poissonMinDistance ?? 10;
         const pts = this.getPoissonTemplate(size, minDist);
-        const offset = this.getPoissonOffset(chunkX, chunkZ, this.hashString(vt.id), size);
+        const offset = this.getPoissonOffset(chunkX, chunkZ, typeSalt, size);
         const maxCount = Math.floor(size * size * DENSITY_PER_UNIT * effectiveDensity);
         const limit = Math.min(pts.length, maxCount);
 
@@ -212,7 +215,8 @@ export class ChunkVegetationGenerator {
           const h = getHeight(p.x, p.y);
           if (h < 0) continue;
           if (trunkGrid.isNear(p.x, p.y)) continue;
-          const s = MathUtils.randomInRange(0.9, 1.1);
+          const hs = this.hashInts(chunkX + i, chunkZ, typeSalt ^ 0xCAFE0003);
+          const s = 0.9 + (hs / 0xffffffff) * 0.2;
           instances.push({
             position: new THREE.Vector3(baseX + p.x, h + vt.yOffset, baseZ + p.y),
             scale: new THREE.Vector3(s, s, 1),
@@ -222,14 +226,18 @@ export class ChunkVegetationGenerator {
       } else {
         const count = Math.floor(size * size * DENSITY_PER_UNIT * effectiveDensity);
         for (let i = 0; i < count; i++) {
-          const lx = Math.random() * size;
-          const lz = Math.random() * size;
+          const hx = this.hashInts(chunkX * 1000 + i, chunkZ, typeSalt);
+          const hz = this.hashInts(chunkZ * 1000 + i, chunkX, typeSalt ^ 0x9e3779b9);
+          const lx = (hx / 0xffffffff) * size;
+          const lz = (hz / 0xffffffff) * size;
           const h = getHeight(lx, lz);
           if (h < 0) continue;
           if (trunkGrid.isNear(lx, lz)) continue;
           const dn = densityNoise(baseX + lx, baseZ + lz);
-          if (Math.random() > dn) continue;
-          const s = MathUtils.randomInRange(0.9, 1.1);
+          const hDensity = this.hashInts(chunkX + i, chunkZ + i, typeSalt ^ 0x12345678);
+          if ((hDensity / 0xffffffff) > dn) continue;
+          const hs = this.hashInts(chunkX, chunkZ, typeSalt ^ (i * 7919));
+          const s = 0.9 + (hs / 0xffffffff) * 0.2;
           instances.push({
             position: new THREE.Vector3(baseX + lx, h + vt.yOffset, baseZ + lz),
             scale: new THREE.Vector3(s, s, 1),

@@ -242,6 +242,28 @@ export class TerrainSystem implements GameSystem {
     }
   }
 
+  /**
+   * Async version of setTerrainFeatures - yields during vegetation regeneration
+   * to avoid blocking the main thread on large maps.
+   */
+  async setTerrainFeaturesAsync(
+    features: CompiledTerrainFeatureSet,
+    onVegetationProgress?: (done: number, total: number) => void,
+  ): Promise<void> {
+    this.terrainFeatures = {
+      stamps: features.stamps.slice(),
+      surfacePatches: features.surfacePatches.slice(),
+      vegetationExclusionZones: features.vegetationExclusionZones.slice(),
+      flowPaths: features.flowPaths.slice(),
+    };
+    this.surfaceRuntime.setFeatureSurfacePatches(this.terrainFeatures.surfacePatches);
+    this.billboardSystem.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
+    this.vegetationScatterer.setExclusionZones(this.terrainFeatures.vegetationExclusionZones);
+    if (this.isInitialized) {
+      await this.vegetationScatterer.regenerateAllAsync(onVegetationProgress);
+    }
+  }
+
   // ──── Height queries ────
 
   getHeightAt(x: number, z: number): number {

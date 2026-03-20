@@ -301,6 +301,14 @@ export interface GameModeConfig {
   // emit runtime structures. Prefer this over adding new top-level fields.
   features?: MapFeatureDefinition[];
 
+  // Pre-baked navmesh asset path (e.g. '/data/navmesh/open_frontier-42.bin').
+  // When set, the navmesh is fetched from this path instead of generated at runtime.
+  navmeshAsset?: string;
+
+  // Pre-baked heightmap asset path (e.g. '/data/heightmaps/open_frontier-42.f32').
+  // When set, the heightmap Float32Array is fetched instead of sampling the noise provider.
+  heightmapAsset?: string;
+
   // Optional war simulator for persistent large-scale battles
   warSimulator?: WarSimulatorConfig;
 

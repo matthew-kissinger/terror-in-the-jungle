@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GameLaunchSelection, GameMode, GameModeDefinition } from '../config/gameModeTypes';
 import { getGameModeConfig } from '../config/gameModes';
 import { getGameModeDefinition, resolveLaunchSelection } from '../config/gameModeDefinitions';
+import { pickRandomVariant } from '../config/MapSeedRegistry';
 import { getHeightQueryCache } from '../systems/terrain/HeightQueryCache';
 import { DEMHeightProvider } from '../systems/terrain/DEMHeightProvider';
 import { NoiseHeightProvider } from '../systems/terrain/NoiseHeightProvider';
@@ -35,22 +36,32 @@ const FACTION_DISPLAY_NAMES: Record<Faction, string> = {
   [Faction.VC]: 'Viet Cong',
 };
 
-function applyCompiledTerrainFeatures(engine: GameEngine, config: ReturnType<typeof getGameModeConfig>): void {
+async function applyCompiledTerrainFeatures(
+  engine: GameEngine,
+  config: ReturnType<typeof getGameModeConfig>,
+  emitProgress: (phase: string, progress: number, label: string) => void,
+): Promise<void> {
   const heightCache = getHeightQueryCache();
   const compiledFeatures = compileTerrainFeatures(
     config,
     (x, z) => heightCache.getHeightAt(x, z),
   );
-  engine.systemManager.terrainSystem.setTerrainFeatures(compiledFeatures);
+
+  if (compiledFeatures.stamps.length > 0) {
+    heightCache.setProvider(new StampedHeightProvider(heightCache.getProvider(), compiledFeatures.stamps));
+  }
+
   engine.systemManager.minimapSystem.setTerrainFlowPaths(compiledFeatures.flowPaths);
   engine.systemManager.fullMapSystem.setTerrainFlowPaths(compiledFeatures.flowPaths);
   engine.systemManager.fullMapSystem.setTerrainRuntime(engine.systemManager.terrainSystem);
 
-  if (compiledFeatures.stamps.length === 0) {
-    return;
-  }
-
-  heightCache.setProvider(new StampedHeightProvider(heightCache.getProvider(), compiledFeatures.stamps));
+  // Use async path - yields between vegetation cell batches to avoid blocking main thread
+  await engine.systemManager.terrainSystem.setTerrainFeaturesAsync(
+    compiledFeatures,
+    (done, total) => {
+      emitProgress('vegetation', done / total, `Placing vegetation (${done}/${total})...`);
+    },
+  );
 }
 
 function resolveFactionLabels(definition: GameModeDefinition): { blufor: string; opfor: string } {
@@ -117,6 +128,38 @@ async function configureHeightSource(
     return;
   }
 
+  // Try seed rotation: pick a random pre-baked variant if available
+  const variant = pickRandomVariant(mode);
+  if (variant) {
+    // Override config's fixed seed/asset paths with the selected variant
+    config.terrainSeed = variant.seed;
+    config.navmeshAsset = variant.navmeshAsset;
+    config.heightmapAsset = variant.heightmapAsset;
+    Logger.info('engine-init', `Selected map variant: seed=${variant.seed}`);
+  }
+
+  // Try loading a pre-baked heightmap
+  if (config.heightmapAsset) {
+    try {
+      const response = await fetch(config.heightmapAsset);
+      if (response.ok) {
+        const buffer = await response.arrayBuffer();
+        const gridData = new Float32Array(buffer);
+        const gridSize = Math.round(Math.sqrt(gridData.length));
+        // Store on config for TerrainSystem to pick up
+        (config as any).__prebakedHeightmap = { data: gridData, gridSize };
+        // Still need a NoiseHeightProvider for the HeightQueryCache (used by terrain features compiler)
+        const seed = typeof config.terrainSeed === 'number' ? config.terrainSeed : 42;
+        getHeightQueryCache().setProvider(new NoiseHeightProvider(seed));
+        Logger.info('engine-init', `Pre-baked heightmap loaded: ${gridSize}x${gridSize} (${(buffer.byteLength / 1024).toFixed(0)}KB), seed=${seed}`);
+        return;
+      }
+      Logger.warn('engine-init', `Pre-baked heightmap not found (${response.status}), falling back to procedural`);
+    } catch (error) {
+      Logger.warn('engine-init', 'Failed to fetch pre-baked heightmap, falling back to procedural:', error);
+    }
+  }
+
   const seedConfig = config.terrainSeed;
   const seed = seedConfig === 'random' || seedConfig === undefined
     ? Math.floor(Math.random() * 2147483647)
@@ -131,7 +174,8 @@ async function configureTerrainAndNavigation(
   config: ReturnType<typeof getGameModeConfig>
 ): Promise<void> {
   if (!engine.systemManager.navmeshSystem.isReady()) {
-    await engine.systemManager.navmeshSystem.init();
+    const hasPrebakedAsset = !!config.navmeshAsset;
+    await engine.systemManager.navmeshSystem.init(hasPrebakedAsset);
   }
 
   if (config.cameraFar || config.fogDensity || config.shadowFar) {
@@ -170,7 +214,7 @@ async function configureTerrainAndNavigation(
     const navWorldSize = config.worldSize ?? terrainSystem.getPlayableWorldSize();
     // Yield before WASM navmesh generation so the progress bar renders "Generating navigation mesh..."
     await yieldToRenderer();
-    await engine.systemManager.navmeshSystem.generateNavmesh(navWorldSize, config.features);
+    await engine.systemManager.navmeshSystem.generateNavmesh(navWorldSize, config.features, config.navmeshAsset);
 
     // Validate navmesh connectivity using representative home bases (not all-pairs).
     // For 16 zones, all-pairs requires up to 120 path queries. Home-base check needs 1-2.
@@ -270,8 +314,10 @@ export async function prepareModeStartup(
   await yieldToRenderer();
 
   emitProgress('features', 0, 'Compiling features...');
-  applyCompiledTerrainFeatures(engine, config);
+  // applyCompiledTerrainFeatures is now async - vegetation regeneration yields between batches
+  await applyCompiledTerrainFeatures(engine, config, emitProgress);
   emitProgress('features', 1, 'Features compiled');
+  emitProgress('vegetation', 1, 'Vegetation placed');
   await yieldToRenderer();
 
   emitProgress('navmesh', 0, 'Generating navigation mesh...');

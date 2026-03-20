@@ -128,32 +128,38 @@ export class NavmeshSystem {
   /**
    * Initialize WASM module. Must complete before any navmesh ops.
    * Gracefully degrades if WASM fails. Idempotent - safe to call multiple times.
+   * @param skipWorker If true, don't spawn the navmesh worker (used when pre-baked asset is expected).
    */
-  async init(): Promise<void> {
+  async init(skipWorker = false): Promise<void> {
     if (this.wasmReady) return;
     if (this.initPromise) return this.initPromise;
-    this.initPromise = this.doInit();
+    this.initPromise = this.doInit(skipWorker);
     return this.initPromise;
   }
 
-  private async doInit(): Promise<void> {
+  private async doInit(skipWorker: boolean): Promise<void> {
     try {
       const core = await import('@recast-navigation/core');
-      const three = await import('@recast-navigation/three');
       this.recastInit = core.init;
       this.CrowdClass = core.Crowd;
       this.NavMeshQueryClass = core.NavMeshQuery;
-      this.threeToSoloNavMeshFn = three.threeToSoloNavMesh;
-      this.threeToTileCacheFn = three.threeToTileCache;
-      this.getPositionsAndIndicesFn = three.getPositionsAndIndices;
       this.importNavMeshFn = core.importNavMesh;
+
+      // Only load @recast-navigation/three and spawn worker if we might generate at runtime
+      if (!skipWorker) {
+        const three = await import('@recast-navigation/three');
+        this.threeToSoloNavMeshFn = three.threeToSoloNavMesh;
+        this.threeToTileCacheFn = three.threeToTileCache;
+        this.getPositionsAndIndicesFn = three.getPositionsAndIndices;
+      }
 
       await core.init();
       this.wasmReady = true;
       Logger.info('Navigation', 'Recast WASM initialized');
 
-      // Spawn navmesh worker (non-blocking)
-      this.spawnWorker();
+      if (!skipWorker) {
+        this.spawnWorker();
+      }
     } catch (error) {
       Logger.warn('Navigation', 'WASM init failed - all NPCs will use beeline movement:', error);
       this.wasmReady = false;
@@ -204,13 +210,55 @@ export class NavmeshSystem {
   }
 
   /**
+   * Load a pre-baked navmesh binary from a static asset URL.
+   * Returns true on success, false if fetch fails or asset is missing.
+   */
+  async loadPrebakedNavmesh(assetUrl: string, worldSize: number): Promise<boolean> {
+    if (!this.wasmReady || !this.importNavMeshFn) {
+      Logger.warn('Navigation', 'Cannot load pre-baked navmesh - WASM not ready');
+      return false;
+    }
+
+    try {
+      const response = await fetch(assetUrl);
+      if (!response.ok) {
+        Logger.warn('Navigation', `Pre-baked navmesh fetch failed: ${response.status} ${assetUrl}`);
+        return false;
+      }
+
+      const buffer = await response.arrayBuffer();
+      const navMeshData = new Uint8Array(buffer);
+      const imported = this.importNavMeshFn(navMeshData);
+
+      this.navMesh = imported.navMesh;
+      this.worldSize = worldSize;
+      this.isTiled = false;
+      this.createCrowd();
+
+      Logger.info('Navigation', `Pre-baked navmesh loaded: ${(navMeshData.byteLength / 1024).toFixed(1)}KB from ${assetUrl}`);
+      return true;
+    } catch (error) {
+      Logger.warn('Navigation', `Pre-baked navmesh load failed:`, error);
+      return false;
+    }
+  }
+
+  /**
    * Generate navmesh from terrain heightfield.
+   * Tries pre-baked asset first if navmeshAsset is provided.
    * Solo navmesh for small maps, tiled for large maps (A Shau).
    */
-  async generateNavmesh(worldSize: number, features?: MapFeatureDefinition[]): Promise<void> {
+  async generateNavmesh(worldSize: number, features?: MapFeatureDefinition[], navmeshAsset?: string): Promise<void> {
     if (!this.wasmReady) {
       Logger.warn('Navigation', 'Skipping navmesh generation - WASM not ready');
       return;
+    }
+
+    // Try pre-baked asset first
+    if (navmeshAsset) {
+      const loaded = await this.loadPrebakedNavmesh(navmeshAsset, worldSize);
+      if (loaded) return;
+      Logger.info('Navigation', 'Falling back to runtime navmesh generation');
     }
 
     this.worldSize = worldSize;

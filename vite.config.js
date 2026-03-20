@@ -3,7 +3,7 @@ import compression from 'vite-plugin-compression'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: '/terror-in-the-jungle/',
+  base: '/',
   plugins: [
     compression({
       algorithm: 'gzip',

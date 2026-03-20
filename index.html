@@ -32,5 +32,12 @@
       <style>@keyframes boot-pulse{0%{width:20%;margin-left:0}100%{width:40%;margin-left:60%}}</style>
     </div>
     <script type="module" src="/src/main.ts"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>

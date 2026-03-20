@@ -184,7 +184,10 @@ export class TitleScreen extends UIComponent {
 
   showPreparing(modeName: string): void {
     const menu = this.$('[data-ref="menu"]');
-    if (menu) menu.classList.add(styles.preparing);
+    if (menu) {
+      menu.classList.add(styles.preparing);
+      (menu as HTMLElement).style.display = 'none';
+    }
     const text = this.$('[data-ref="preparingText"]');
     if (text) {
       text.textContent = `Preparing ${modeName}...`;
@@ -204,10 +207,11 @@ export class TitleScreen extends UIComponent {
       null
     );
     const phases = [
-      { id: 'terrain', weight: 0.10, label: 'Loading terrain' },
-      { id: 'features', weight: 0.15, label: 'Compiling features' },
-      { id: 'navmesh', weight: 0.45, label: 'Generating navigation mesh' },
-      { id: 'spawning', weight: 0.20, label: 'Spawning combatants' },
+      { id: 'terrain', weight: 0.05, label: 'Loading terrain' },
+      { id: 'features', weight: 0.05, label: 'Compiling features' },
+      { id: 'vegetation', weight: 0.50, label: 'Placing vegetation' },
+      { id: 'navmesh', weight: 0.15, label: 'Loading navigation mesh' },
+      { id: 'spawning', weight: 0.15, label: 'Spawning combatants' },
       { id: 'finalize', weight: 0.10, label: 'Finalizing' },
     ];
     for (const p of phases) {
@@ -226,17 +230,16 @@ export class TitleScreen extends UIComponent {
     this.modeLoadProgress.updateProgress(phase, progress);
     const text = this.$('[data-ref="preparingText"]');
     if (text) {
-      if (phase === 'navmesh' && progress < 1) {
-        text.textContent = label + ' (this may take a few seconds)';
-      } else {
-        text.textContent = label;
-      }
+      text.textContent = label;
     }
   }
 
   cancelPreparing(): void {
     const menu = this.$('[data-ref="menu"]');
-    if (menu) menu.classList.remove(styles.preparing);
+    if (menu) {
+      menu.classList.remove(styles.preparing);
+      (menu as HTMLElement).style.display = '';
+    }
     const text = this.$('[data-ref="preparingText"]');
     if (text) text.style.display = 'none';
     const startBtn = this.$('[data-ref="start"]') as HTMLButtonElement | null;

@@ -187,6 +187,41 @@ export class VegetationScatterer {
     }
   }
 
+  /**
+   * Async version of regenerateAll that yields between batches to avoid
+   * blocking the main thread. For small cell counts (<5), falls back to sync.
+   */
+  async regenerateAllAsync(
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<void> {
+    const keys = [...this.activeCells];
+    if (keys.length < 5) {
+      this.regenerateAll();
+      onProgress?.(keys.length, keys.length);
+      return;
+    }
+
+    const BATCH_SIZE = 3;
+    const total = keys.length;
+    let done = 0;
+
+    for (let i = 0; i < total; i += BATCH_SIZE) {
+      const end = Math.min(i + BATCH_SIZE, total);
+      for (let j = i; j < end; j++) {
+        this.billboardSystem.removeChunkInstances(keys[j]);
+        this.generateCell(keys[j]);
+      }
+      done = end;
+      onProgress?.(done, total);
+
+      if (done < total) {
+        await new Promise<void>(resolve =>
+          requestAnimationFrame(() => setTimeout(resolve, 0))
+        );
+      }
+    }
+  }
+
   getActiveCellCount(): number {
     return this.activeCells.size;
   }
