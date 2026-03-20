@@ -86,6 +86,6 @@
     "@recast-navigation/core": "^0.43.0",
     "@recast-navigation/three": "^0.43.0",
     "three": "^0.183.0",
-    "three-mesh-bvh": "^0.9.8"
+    "three-mesh-bvh": "^0.9.9"
   }
 }
