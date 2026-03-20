@@ -91,4 +91,10 @@ export interface LayoutRegistration {
   deviceFilter?: ('desktop' | 'touch')[];
   /** Optional: data-show attribute value for CSS visibility */
   showContext?: string;
+  /**
+   * When set, `showContext` is applied to this element (not the grid slot),
+   * and the component mounts here. The host is removed on unregister.
+   * Use when multiple components share one slot with different visibility rules.
+   */
+  mountParent?: HTMLElement;
 }

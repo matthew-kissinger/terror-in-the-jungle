@@ -5,6 +5,8 @@
  * Buttons:
  * - EXIT (red) - exit vehicle
  * - FIRE (red) - vehicle weapon fire (attack/gunship only)
+ * - WPN (green) - cycle cockpit weapons (attack/gunship only)
+ * - MAP / CMD (green) - full map / squad command (touch parity with infantry action column)
  * - STAB (green) - toggle auto-hover stabilization
  * - LOOK (green) - hold-to-look free camera
  */
@@ -19,15 +21,22 @@ interface VehicleActionCallbacks {
   onToggleAutoHover?: () => void;
   onLookDown?: () => void;
   onLookUp?: () => void;
+  onMapToggle?: () => void;
+  onSquadCommand?: () => void;
+  onHelicopterWeaponCycle?: (index: number) => void;
 }
 
 export class VehicleActionBar extends UIComponent {
   private callbacks: VehicleActionCallbacks = {};
   private exitBtn!: HTMLDivElement;
   private fireBtn!: HTMLDivElement;
+  private wpnBtn!: HTMLDivElement;
+  private mapBtn!: HTMLDivElement;
+  private cmdBtn!: HTMLDivElement;
   private hoverBtn!: HTMLDivElement;
   private lookBtn!: HTMLDivElement;
   private autoHoverActive = false;
+  private helicopterWeaponIndex = 0;
 
   protected build(): void {
     this.root.className = styles.vehicleActionBar;
@@ -37,24 +46,29 @@ export class VehicleActionBar extends UIComponent {
     this.exitBtn = this.createButton('EXIT', styles.vehicleExitBtn);
     this.fireBtn = this.createButton('FIRE', styles.vehicleFireBtn);
     this.fireBtn.style.display = 'none';
+    this.wpnBtn = this.createButton('WPN', styles.vehicleBtn);
+    this.wpnBtn.style.display = 'none';
+    this.mapBtn = this.createButton('MAP', styles.vehicleBtn);
+    this.cmdBtn = this.createButton('CMD', styles.vehicleBtn);
     this.hoverBtn = this.createButton('STAB', styles.vehicleBtn);
     this.lookBtn = this.createButton('LOOK', styles.vehicleBtn);
 
     this.root.appendChild(this.exitBtn);
     this.root.appendChild(this.fireBtn);
+    this.root.appendChild(this.wpnBtn);
+    this.root.appendChild(this.mapBtn);
+    this.root.appendChild(this.cmdBtn);
     this.root.appendChild(this.hoverBtn);
     this.root.appendChild(this.lookBtn);
   }
 
   protected onMount(): void {
-    // EXIT
     this.listen(this.exitBtn, 'pointerdown', (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
       this.callbacks.onExitVehicle?.();
     }, { passive: false });
 
-    // FIRE (pointerdown/up for hold-to-fire)
     this.listen(this.fireBtn, 'pointerdown', (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
@@ -74,14 +88,31 @@ export class VehicleActionBar extends UIComponent {
       this.callbacks.onVehicleFireStop?.();
     }, { passive: false });
 
-    // HOVER toggle
+    this.listen(this.wpnBtn, 'pointerdown', (e: PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.helicopterWeaponIndex = this.helicopterWeaponIndex === 0 ? 1 : 0;
+      this.callbacks.onHelicopterWeaponCycle?.(this.helicopterWeaponIndex);
+    }, { passive: false });
+
+    this.listen(this.mapBtn, 'pointerdown', (e: PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.callbacks.onMapToggle?.();
+    }, { passive: false });
+
+    this.listen(this.cmdBtn, 'pointerdown', (e: PointerEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.callbacks.onSquadCommand?.();
+    }, { passive: false });
+
     this.listen(this.hoverBtn, 'pointerdown', (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
       this.callbacks.onToggleAutoHover?.();
     }, { passive: false });
 
-    // LOOK (hold-to-look)
     this.listen(this.lookBtn, 'pointerdown', (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
@@ -116,6 +147,14 @@ export class VehicleActionBar extends UIComponent {
 
   setFireVisible(visible: boolean): void {
     this.fireBtn.style.display = visible ? 'flex' : 'none';
+  }
+
+  /** Minigun / rockets etc. — mirrors desktop 1/2 weapon keys. */
+  setWeaponCycleVisible(visible: boolean): void {
+    this.wpnBtn.style.display = visible ? 'flex' : 'none';
+    if (!visible) {
+      this.helicopterWeaponIndex = 0;
+    }
   }
 
   setAutoHoverActive(active: boolean): void {

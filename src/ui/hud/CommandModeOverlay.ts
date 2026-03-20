@@ -58,6 +58,7 @@ export class CommandModeOverlay implements LayoutComponent {
   private onCloseRequested?: () => void;
   private onMapPointSelected?: (position: THREE.Vector3) => void;
   private onSquadSelected?: (squadId: string) => void;
+  private backdropPointerId: number | null = null;
 
   constructor() {
     this.container = document.createElement('div');
@@ -66,6 +67,20 @@ export class CommandModeOverlay implements LayoutComponent {
       if (event.target === this.container) {
         this.onCloseRequested?.();
       }
+    });
+    this.container.addEventListener('pointerdown', (event: PointerEvent) => {
+      if (event.target === this.container) {
+        this.backdropPointerId = event.pointerId;
+      }
+    });
+    this.container.addEventListener('pointerup', (event: PointerEvent) => {
+      if (event.pointerId === this.backdropPointerId && event.target === this.container) {
+        this.onCloseRequested?.();
+      }
+      this.backdropPointerId = null;
+    });
+    this.container.addEventListener('pointercancel', () => {
+      this.backdropPointerId = null;
     });
 
     this.panel = document.createElement('div');
@@ -258,7 +273,48 @@ export class CommandModeOverlay implements LayoutComponent {
     button.className = 'command-mode-overlay__button';
     button.dataset.action = `slot-${slot}`;
     button.title = fullLabel;
-    button.addEventListener('click', () => this.onQuickCommandSelected?.(slot));
+
+    let downAt = 0;
+    let longHold: ReturnType<typeof setTimeout> | null = null;
+    let holdIssued = false;
+
+    button.addEventListener('click', (e) => {
+      if (this.inputMode === 'touch') {
+        e.preventDefault();
+        return;
+      }
+      this.onQuickCommandSelected?.(slot);
+    });
+
+    button.addEventListener('pointerdown', (e: PointerEvent) => {
+      if (this.inputMode !== 'touch') return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      downAt = performance.now();
+      holdIssued = false;
+      longHold = window.setTimeout(() => {
+        longHold = null;
+        holdIssued = true;
+        this.onQuickCommandSelected?.(slot);
+      }, 420);
+    });
+
+    button.addEventListener('pointerup', () => {
+      if (this.inputMode !== 'touch') return;
+      if (longHold !== null) {
+        clearTimeout(longHold);
+        longHold = null;
+      }
+      if (!holdIssued && performance.now() - downAt < 650) {
+        this.onQuickCommandSelected?.(slot);
+      }
+    });
+
+    button.addEventListener('pointercancel', () => {
+      if (longHold !== null) {
+        clearTimeout(longHold);
+        longHold = null;
+      }
+    });
 
     const hint = document.createElement('span');
     hint.className = 'command-mode-overlay__button-hint';
@@ -275,6 +331,7 @@ export class CommandModeOverlay implements LayoutComponent {
   private render(): void {
     this.container.dataset.visible = this.visible ? 'true' : 'false';
     this.container.dataset.inputMode = this.inputMode;
+    this.container.dataset.touchRadial = this.inputMode === 'touch' ? 'true' : 'false';
     this.panel.setAttribute('aria-hidden', this.visible ? 'false' : 'true');
 
     this.statusValue.textContent = this.state.hasSquad
@@ -320,7 +377,7 @@ export class CommandModeOverlay implements LayoutComponent {
   private getButtonHint(slot: number): string {
     switch (this.inputMode) {
       case 'touch':
-        return 'TAP';
+        return 'TAP / HOLD';
       case 'gamepad':
         return slot <= 4 ? `D-${['UP', 'R', 'DN', 'L'][slot - 1]}` : 'AUTO';
       default:
@@ -331,7 +388,7 @@ export class CommandModeOverlay implements LayoutComponent {
   private getFooterHint(): string {
     switch (this.inputMode) {
       case 'touch':
-        return 'Tap Hold, Patrol, or Retreat, then tap the map. Follow and Auto fire immediately.';
+        return 'Quick tap or hold a command. For Hold/Patrol/Retreat, then tap the map. Follow / Auto fire immediately.';
       case 'gamepad':
         return 'Use D-pad to arm orders, move the cursor with the left stick, A to confirm, and X to select a squad.';
       default:
@@ -578,6 +635,28 @@ export class CommandModeOverlay implements LayoutComponent {
         .command-mode-overlay__grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
+      }
+
+      .command-mode-overlay[data-touch-radial="true"] .command-mode-overlay__grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+        gap: 14px;
+        justify-content: center;
+      }
+
+      .command-mode-overlay[data-touch-radial="true"] .command-mode-overlay__button {
+        min-height: 76px;
+        border-radius: 50%;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        max-width: 132px;
+        width: 100%;
+        justify-self: center;
+      }
+
+      .command-mode-overlay[data-touch-radial="true"] .command-mode-overlay__button:nth-child(5) {
+        grid-column: 1 / -1;
       }
 
       @media (max-width: 620px) {

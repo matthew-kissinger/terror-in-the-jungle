@@ -63,7 +63,7 @@ export class VirtualJoystick extends UIComponent {
     // Helicopter mode label (hidden by default)
     this.heliLabel = document.createElement('div');
     this.heliLabel.className = styles.heliThrottleLabel;
-    this.heliLabel.textContent = 'THROTTLE';
+    this.heliLabel.textContent = 'LIFT / YAW';
 
     // Thumb
     this.thumb = document.createElement('div');
@@ -76,7 +76,7 @@ export class VirtualJoystick extends UIComponent {
     this.root.appendChild(this.base);
   }
 
-  /** Show/hide the helicopter throttle label on the joystick base. */
+  /** Show/hide the helicopter lift+yaw hint on the joystick base. */
   setHelicopterMode(enabled: boolean): void {
     this.helicopterMode = enabled;
     this.heliLabel.style.display = enabled ? 'block' : 'none';

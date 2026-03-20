@@ -101,8 +101,14 @@ export class CommandInputManager implements GameSystem {
   dispose(): void {
     this.unsubscribeCommandState?.();
     this.unsubscribeInputMode?.();
+    if (this.overlayVisible) {
+      this.overlayVisible = false;
+      this.closeOverlayTouchPassThrough();
+      this.commandModeOverlay.setVisible(false);
+    }
     if (this.layout) {
       this.layout.unregister(this.commandModeOverlay);
+      this.layout = undefined;
     }
     this.commandModeOverlay.dispose();
   }
@@ -115,10 +121,14 @@ export class CommandInputManager implements GameSystem {
     }
 
     this.layout = layout;
+    /** Host lives inside `center` so we do not set `data-show` on the whole slot (avoids hiding HelicopterHUD in heli). */
+    const host = document.createElement('div');
+    host.className = 'command-mode-overlay-host';
+    host.style.cssText = 'position:relative;min-width:0;min-height:0;display:contents;';
     this.layout.register({
       region: 'center',
       component: this.commandModeOverlay,
-      showContext: 'infantry'
+      mountParent: host,
     });
   }
 
@@ -203,6 +213,7 @@ export class CommandInputManager implements GameSystem {
     this.pendingPlacementCommand = this.getDefaultPlacementCommand();
     this.mapUpdateAccumulator = CommandInputManager.MAP_UPDATE_INTERVAL;
     this.inputManager?.unlockPointer?.();
+    this.openOverlayTouchPassThrough();
     this.commandModeOverlay.setVisible(true);
     this.syncPresentation();
   }
@@ -211,10 +222,20 @@ export class CommandInputManager implements GameSystem {
     this.overlayVisible = false;
     this.pendingPlacementCommand = this.getDefaultPlacementCommand();
     this.commandModeOverlay.setVisible(false);
+    this.closeOverlayTouchPassThrough();
     if (relockPointer) {
       this.inputManager?.relockPointer?.();
     }
     this.syncPresentation();
+  }
+
+  /** Let squad / tactical map receive touches above body-level touch controls (see TouchControls.beginModalOverlays). */
+  private openOverlayTouchPassThrough(): void {
+    this.inputManager?.getTouchControls()?.beginModalOverlays();
+  }
+
+  private closeOverlayTouchPassThrough(): void {
+    this.inputManager?.getTouchControls()?.endModalOverlays();
   }
 
   private syncPresentation(): void {

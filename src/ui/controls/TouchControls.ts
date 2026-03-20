@@ -46,6 +46,7 @@ interface TouchControlCallbacks {
   onToggleAutoHover?: () => void;
   onVehicleFireStart?: () => void;
   onVehicleFireStop?: () => void;
+  onHelicopterWeaponSwitch?: (index: number) => void;
 }
 
 export class TouchControls {
@@ -63,6 +64,8 @@ export class TouchControls {
   readonly vehicleActionBar: VehicleActionBar;
 
   private visible = false;
+  /** When >0, touch HUD roots use `pointer-events: none` so modals/maps above can receive input. */
+  private modalOverlayDepth = 0;
   private readonly contextManager = InputContextManager.getInstance();
   private readonly unsubscribeContext: () => void;
 
@@ -162,7 +165,49 @@ export class TouchControls {
       onToggleAutoHover: () => callbacks.onToggleAutoHover?.(),
       onLookDown: () => this.look.show(),
       onLookUp: () => { if (this.inHelicopterMode) this.look.hide(); },
+      onMapToggle: () => callbacks.onMapToggle?.(),
+      onSquadCommand: () => callbacks.onSquadCommand?.(),
+      onHelicopterWeaponCycle: (index: number) => callbacks.onHelicopterWeaponSwitch?.(index),
     });
+  }
+
+  /**
+   * Squad UI and similar fullscreen layers sit under body-level touch controls (z-index).
+   * Suppress touch capture while those layers are open (ref-counted).
+   */
+  beginModalOverlays(): void {
+    this.modalOverlayDepth++;
+    this.applyModalOverlayPointerPolicy();
+  }
+
+  endModalOverlays(): void {
+    this.modalOverlayDepth = Math.max(0, this.modalOverlayDepth - 1);
+    this.applyModalOverlayPointerPolicy();
+  }
+
+  private applyModalOverlayPointerPolicy(): void {
+    const block = this.modalOverlayDepth > 0;
+    const pe = block ? 'none' : '';
+    for (const el of this.modalBlockingRoots()) {
+      el.style.pointerEvents = pe;
+    }
+  }
+
+  private modalBlockingRoots(): HTMLElement[] {
+    return [
+      this.joystick.element,
+      this.look.element,
+      this.fireButton.element,
+      this.actionButtons.element,
+      this.adsButton.element,
+      this.interactionButton.element,
+      this.sandbagButtons.element,
+      this.rallyPointButton.element,
+      this.menuButton.element,
+      this.mortarButton.element,
+      this.helicopterCyclic.element,
+      this.vehicleActionBar.element,
+    ];
   }
 
   /**

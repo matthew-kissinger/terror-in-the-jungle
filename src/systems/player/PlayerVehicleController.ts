@@ -21,7 +21,12 @@ export class PlayerVehicleController {
   ): void {
     movement.updateHelicopterControls(deltaTime, input, this.deps.hudSystem);
 
-    if (cameraController.getHelicopterMouseControlEnabled() && input.getIsPointerLocked()) {
+    const touchHeli = input.getTouchControls()?.isInHelicopterMode() ?? false;
+    if (
+      !touchHeli
+      && cameraController.getHelicopterMouseControlEnabled()
+      && input.getIsPointerLocked()
+    ) {
       const mouseMovement = input.getMouseMovement();
       movement.addMouseControlToHelicopter(mouseMovement);
       input.clearMouseMovement();
@@ -105,10 +110,13 @@ export class PlayerVehicleController {
 
     input.getTouchControls()?.enterHelicopterMode();
 
-    // Set vehicle fire button visibility based on aircraft role
+    // Set vehicle fire + weapon-cycle visibility based on aircraft role
     if (this.deps.helicopterModel) {
       const role = this.deps.helicopterModel.getAircraftRole(helicopterId);
-      input.getTouchControls()?.vehicleActionBar.setFireVisible(role === 'attack' || role === 'gunship');
+      const armed = role === 'attack' || role === 'gunship';
+      const bar = input.getTouchControls()?.vehicleActionBar;
+      bar?.setFireVisible(armed);
+      bar?.setWeaponCycleVisible(armed);
     }
   }
 

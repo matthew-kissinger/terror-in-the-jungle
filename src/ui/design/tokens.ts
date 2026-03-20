@@ -67,6 +67,8 @@ export const zIndex = {
   touchJoystick: 1000,
   touchButtons: 1001,
   touchMenu: 1002,
+  /** Full tactical map / touch-blocking modals that must sit above thumb controls */
+  fullMapAboveTouch: 1010,
 
   // Grenade / interaction prompts
   interactionPrompt: 1000,

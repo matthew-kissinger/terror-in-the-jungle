@@ -14,7 +14,7 @@ export const MAP_STYLES = `
     height: 100%;
     background: rgba(0, 0, 0, 0.85);
     backdrop-filter: blur(10px);
-    z-index: ${zIndex.fullMap};
+    z-index: ${zIndex.fullMapAboveTouch};
   }
 
   .full-map-container.visible {

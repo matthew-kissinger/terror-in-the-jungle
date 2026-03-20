@@ -24,15 +24,18 @@ describe('VehicleActionBar', () => {
     bar.mount(document.body);
   });
 
-  it('creates EXIT, FIRE, STAB, and LOOK buttons', () => {
+  it('creates EXIT, FIRE, WPN, MAP, CMD, STAB, and LOOK buttons', () => {
     const root = document.getElementById('vehicle-action-bar')!;
     expect(root).toBeTruthy();
     const buttons = Array.from(root.children) as HTMLDivElement[];
-    expect(buttons).toHaveLength(4);
+    expect(buttons).toHaveLength(7);
     expect(buttons[0].textContent).toBe('EXIT');
     expect(buttons[1].textContent).toBe('FIRE');
-    expect(buttons[2].textContent).toBe('STAB');
-    expect(buttons[3].textContent).toBe('LOOK');
+    expect(buttons[2].textContent).toBe('WPN');
+    expect(buttons[3].textContent).toBe('MAP');
+    expect(buttons[4].textContent).toBe('CMD');
+    expect(buttons[5].textContent).toBe('STAB');
+    expect(buttons[6].textContent).toBe('LOOK');
   });
 
   it('starts hidden', () => {
@@ -81,6 +84,34 @@ describe('VehicleActionBar', () => {
 
     bar.setFireVisible(false);
     expect(fireBtn.style.display).toBe('none');
+  });
+
+  it('WPN toggles helicopter weapon index when visible', () => {
+    const onCycle = vi.fn();
+    bar.setCallbacks({ onHelicopterWeaponCycle: onCycle });
+    bar.setWeaponCycleVisible(true);
+
+    const wpnBtn = document.querySelector('[aria-label="WPN"]')!;
+    wpnBtn.dispatchEvent(pointerEvent('pointerdown'));
+    expect(onCycle).toHaveBeenCalledWith(1);
+
+    wpnBtn.dispatchEvent(pointerEvent('pointerdown'));
+    expect(onCycle).toHaveBeenCalledWith(0);
+
+    bar.setWeaponCycleVisible(false);
+    expect((wpnBtn as HTMLDivElement).style.display).toBe('none');
+  });
+
+  it('MAP and CMD fire callbacks', () => {
+    const onMap = vi.fn();
+    const onCmd = vi.fn();
+    bar.setCallbacks({ onMapToggle: onMap, onSquadCommand: onCmd });
+
+    document.querySelector('[aria-label="MAP"]')!.dispatchEvent(pointerEvent('pointerdown'));
+    document.querySelector('[aria-label="CMD"]')!.dispatchEvent(pointerEvent('pointerdown'));
+
+    expect(onMap).toHaveBeenCalledTimes(1);
+    expect(onCmd).toHaveBeenCalledTimes(1);
   });
 
   it('STAB fires onToggleAutoHover callback', () => {

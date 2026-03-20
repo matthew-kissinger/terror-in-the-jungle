@@ -11,6 +11,7 @@ const actionInstances: any[] = [];
 
 vi.mock('./VirtualJoystick', () => ({
   VirtualJoystick: class {
+    element = document.createElement('div');
     output = { x: 0.5, z: -0.25 };
     show = vi.fn();
     hide = vi.fn();
@@ -28,6 +29,7 @@ vi.mock('./VirtualJoystick', () => ({
 
 vi.mock('./TouchLook', () => ({
   TouchLook: class {
+    element = document.createElement('div');
     show = vi.fn();
     hide = vi.fn();
     dispose = vi.fn();
@@ -44,6 +46,7 @@ vi.mock('./TouchLook', () => ({
 
 vi.mock('./TouchFireButton', () => ({
   TouchFireButton: class {
+    element = document.createElement('div');
     show = vi.fn();
     hide = vi.fn();
     dispose = vi.fn();
@@ -59,6 +62,7 @@ vi.mock('./TouchFireButton', () => ({
 
 vi.mock('./TouchActionButtons', () => ({
   TouchActionButtons: class {
+    element = document.createElement('div');
     show = vi.fn();
     hide = vi.fn();
     dispose = vi.fn();
@@ -76,6 +80,7 @@ vi.mock('./TouchActionButtons', () => ({
 
 vi.mock('./TouchADSButton', () => ({
   TouchADSButton: class {
+    element = document.createElement('div');
     show = vi.fn();
     hide = vi.fn();
     dispose = vi.fn();
@@ -88,6 +93,7 @@ vi.mock('./TouchADSButton', () => ({
 
 vi.mock('./TouchInteractionButton', () => ({
   TouchInteractionButton: class {
+    element = document.createElement('div');
     show = vi.fn();
     hide = vi.fn();
     dispose = vi.fn();
@@ -98,6 +104,7 @@ vi.mock('./TouchInteractionButton', () => ({
 
 vi.mock('./TouchSandbagButtons', () => ({
   TouchSandbagButtons: class {
+    element = document.createElement('div');
     show = vi.fn();
     hide = vi.fn();
     dispose = vi.fn();
@@ -108,6 +115,7 @@ vi.mock('./TouchSandbagButtons', () => ({
 
 vi.mock('./TouchRallyPointButton', () => ({
   TouchRallyPointButton: class {
+    element = document.createElement('div');
     show = vi.fn();
     hide = vi.fn();
     hideButton = vi.fn();
@@ -122,6 +130,7 @@ vi.mock('./TouchRallyPointButton', () => ({
 
 vi.mock('./TouchMenuButton', () => ({
   TouchMenuButton: class {
+    element = document.createElement('div');
     show = vi.fn();
     hide = vi.fn();
     dispose = vi.fn();
@@ -134,6 +143,7 @@ vi.mock('./TouchMenuButton', () => ({
 
 vi.mock('./TouchMortarButton', () => ({
   TouchMortarButton: class {
+    element = document.createElement('div');
     show = vi.fn();
     hide = vi.fn();
     dispose = vi.fn();
@@ -143,6 +153,7 @@ vi.mock('./TouchMortarButton', () => ({
 
 vi.mock('./TouchHelicopterCyclic', () => ({
   TouchHelicopterCyclic: class {
+    element = document.createElement('div');
     show = vi.fn();
     hide = vi.fn();
     dispose = vi.fn();
@@ -154,12 +165,14 @@ const vehicleActionBarInstances: any[] = [];
 
 vi.mock('./VehicleActionBar', () => ({
   VehicleActionBar: class {
+    element = document.createElement('div');
     show = vi.fn();
     hide = vi.fn();
     dispose = vi.fn();
     mount = vi.fn();
     setCallbacks = vi.fn();
     setFireVisible = vi.fn();
+    setWeaponCycleVisible = vi.fn();
     setAutoHoverActive = vi.fn();
 
     constructor() {
@@ -323,5 +336,21 @@ describe('TouchControls', () => {
     expect(lookInstances[0].cancelActiveLook).toHaveBeenCalledTimes(1);
     expect(fireInstances[0].cancelActivePress).toHaveBeenCalledTimes(1);
     expect(actionInstances[0].cancelActiveGesture).toHaveBeenCalledTimes(1);
+  });
+
+  it('beginModalOverlays / endModalOverlays sets pointer-events on touch roots (ref-counted)', () => {
+    const controls = new TouchControls();
+
+    controls.beginModalOverlays();
+    expect(joystickInstances[0].element.style.pointerEvents).toBe('none');
+    expect(vehicleActionBarInstances[0].element.style.pointerEvents).toBe('none');
+
+    controls.beginModalOverlays();
+    controls.endModalOverlays();
+    expect(joystickInstances[0].element.style.pointerEvents).toBe('none');
+
+    controls.endModalOverlays();
+    expect(joystickInstances[0].element.style.pointerEvents).toBe('');
+    expect(vehicleActionBarInstances[0].element.style.pointerEvents).toBe('');
   });
 });

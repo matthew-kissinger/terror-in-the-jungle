@@ -132,6 +132,29 @@ describe('HUDLayout', () => {
     layout.dispose();
   });
 
+  it('register() mounts into mountParent and applies showContext to host', () => {
+    layout.init();
+    const comp = mockComponent();
+    const host = document.createElement('div');
+    layout.register({
+      region: 'center',
+      component: comp,
+      mountParent: host,
+      showContext: 'infantry',
+    });
+
+    const slot = layout.getSlot('center');
+    expect(host.parentElement).toBe(slot);
+    expect(host.dataset.show).toBe('infantry');
+    expect(slot.dataset.show).toBeUndefined();
+    expect(comp.mountCalls[0]).toBe(host);
+
+    layout.unregister(comp);
+    expect(host.parentElement).toBeNull();
+
+    layout.dispose();
+  });
+
   it('unregister() unmounts component', () => {
     layout.init();
     const comp = mockComponent();

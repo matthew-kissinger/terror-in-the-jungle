@@ -138,6 +138,7 @@ export class PlayerInput {
         onToggleAutoHover: () => callbacks.onToggleAutoHover?.(),
         onVehicleFireStart: () => callbacks.onMouseDown?.(0),
         onVehicleFireStop: () => callbacks.onMouseUp?.(0),
+        onHelicopterWeaponSwitch: (index: number) => callbacks.onHelicopterWeaponSwitch?.(index),
       });
     }
 
@@ -459,7 +460,7 @@ export class PlayerInput {
       this.callbacks.onRallyPointPlace?.();
     }
 
-    if (!this.isInHelicopter && event.code === 'KeyM' && this.isTouchMode) {
+    if (event.code === 'KeyM' && this.isTouchMode) {
       this.callbacks.onMapToggle?.();
     }
 
@@ -491,13 +492,13 @@ export class PlayerInput {
       }
     }
 
-    // Squad command menu with Z key (when not in helicopter)
-    if (!this.isInHelicopter && event.code === 'KeyZ') {
+    // Squad command menu (infantry + helicopter — digit 1/2 are heli weapons without Shift)
+    if (event.code === 'KeyZ') {
       this.callbacks.onSquadCommand?.();
     }
 
-    // Squad quick commands (centralized path; replaces PlayerSquadController direct key listener).
-    if (!this.isInHelicopter && event.shiftKey) {
+    // Squad quick commands (Shift+1..5; helicopter digital weapons use plain 1/2 above)
+    if (event.shiftKey) {
       if (event.code === 'Digit1') {
         this.callbacks.onSquadQuickCommand?.(1);
       } else if (event.code === 'Digit2') {

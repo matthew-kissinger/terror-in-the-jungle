@@ -29,8 +29,11 @@ export function isMobileViewport(): boolean {
 
 /**
  * Returns true when touch controls should be active.
- * Touch capability is required; small viewport is optional
- * but used as a heuristic.
+ * Currently: any hardware touch surface (`maxTouchPoints` / `ontouchstart`).
+ *
+ * Tradeoff: touch-capable laptops/desktops get mobile overlay controls and
+ * touch-oriented input semantics (e.g. synthetic pointer lock for look).
+ * A future setting or primary-pointer heuristic could narrow this (see plan: hybrid devices).
  */
 export function shouldUseTouchControls(): boolean {
   return isTouchDevice();

@@ -115,6 +115,19 @@ heapGrowthMb     13.17 MB     <20      <80     13.17    PASS
 - **FAIL**: Value exceeds warn threshold. Regression likely; do not merge.
 - **Last**: Previous baseline measurement for comparison.
 
+## Manual smoke: mobile HUD / helicopter / PC safety
+
+After changes under `src/ui/controls/`, `src/ui/hud/`, `src/ui/map/`, `src/ui/layout/`, or `src/systems/player/PlayerVehicleController.ts`, spot-check that **keyboard/mouse and gamepad** are unchanged and **touch** modals sit above thumb layers.
+
+| Area | Touch | Gamepad | KB/Mouse |
+|------|-------|---------|----------|
+| Infantry | joystick, look, fire, ADS, action bar | as today | pointer lock, mouse look |
+| Helicopter | left lift/yaw, right cyclic, vehicle bar (WPN/MAP/CMD/LOOK), no stray mouse cyclic add | as today | W/S, arrows, RCtrl mouse mode |
+| Squad overlay | backdrop + grid tappable; short tap vs hold | cursor | Shift+digits, Esc |
+| Full map | opens above touch (`z-index` + touch `pointer-events: none` while open) | if bound | M / bound key |
+
+Automated coverage: `HUDLayout` `mountParent` + `showContext`, `CommandInputManager` modal hooks, `PlayerVehicleController` skips `addMouseControlToHelicopter` when `isInHelicopterMode()`, `TouchControls` modal ref-count.
+
 ## What to Do on Failure
 
 1. **Test failure**: Read the failing test name and assertion. Fix the code or update the test.

@@ -38,6 +38,33 @@ describe('CommandInputManager', () => {
     manager.mountTo(layout);
 
     expect(layout.getSlot('center').querySelector('.command-mode-overlay')).toBeTruthy();
+    expect(layout.getSlot('center').dataset.show).toBeUndefined();
+
+    manager.dispose();
+    layout.dispose();
+  });
+
+  it('calls TouchControls modal overlay hooks when opening and closing squad UI', () => {
+    const begin = vi.fn();
+    const end = vi.fn();
+    const controller = createSquadControllerStub();
+    const manager = new CommandInputManager(controller as any);
+    manager.mountTo(layout);
+    manager.bindInputManager({
+      unlockPointer: vi.fn(),
+      relockPointer: vi.fn(),
+      getTouchControls: () => ({ beginModalOverlays: begin, endModalOverlays: end }),
+      onInputModeChange: vi.fn((cb) => {
+        cb('touch');
+        return () => {};
+      }),
+    } as any);
+
+    manager.toggleCommandMode();
+    expect(begin).toHaveBeenCalledTimes(1);
+
+    manager.handleCancel();
+    expect(end).toHaveBeenCalledTimes(1);
 
     manager.dispose();
     layout.dispose();
@@ -50,6 +77,7 @@ describe('CommandInputManager', () => {
     manager.bindInputManager({
       unlockPointer: vi.fn(),
       relockPointer: vi.fn(),
+      getTouchControls: () => undefined,
       onInputModeChange: vi.fn((cb) => {
         cb('gamepad');
         return () => {};
@@ -74,6 +102,7 @@ describe('CommandInputManager', () => {
     manager.bindInputManager({
       unlockPointer,
       relockPointer,
+      getTouchControls: () => undefined,
       onInputModeChange: vi.fn((cb) => {
         cb('keyboardMouse');
         return () => {};
@@ -101,6 +130,7 @@ describe('CommandInputManager', () => {
     manager.bindInputManager({
       unlockPointer: vi.fn(),
       relockPointer,
+      getTouchControls: () => undefined,
       onInputModeChange: vi.fn((cb) => {
         cb('keyboardMouse');
         return () => {};
@@ -130,6 +160,7 @@ describe('CommandInputManager', () => {
     manager.bindInputManager({
       unlockPointer: vi.fn(),
       relockPointer: vi.fn(),
+      getTouchControls: () => undefined,
       onInputModeChange: vi.fn((cb) => {
         cb('keyboardMouse');
         return () => {};
@@ -187,6 +218,7 @@ describe('CommandInputManager', () => {
       }),
       unlockPointer: vi.fn(),
       relockPointer: vi.fn(),
+      getTouchControls: () => undefined,
       onInputModeChange: vi.fn((cb) => {
         cb('gamepad');
         return () => {};
@@ -228,6 +260,7 @@ describe('CommandInputManager', () => {
     manager.bindInputManager({
       unlockPointer: vi.fn(),
       relockPointer: vi.fn(),
+      getTouchControls: () => undefined,
       onInputModeChange: vi.fn((cb) => {
         cb('keyboardMouse');
         return () => {};
@@ -270,6 +303,7 @@ describe('CommandInputManager', () => {
     manager.bindInputManager({
       unlockPointer: vi.fn(),
       relockPointer: vi.fn(),
+      getTouchControls: () => undefined,
       onInputModeChange: vi.fn((cb) => {
         cb('keyboardMouse');
         return () => {};

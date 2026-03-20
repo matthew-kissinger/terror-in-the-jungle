@@ -117,13 +117,17 @@ export class HUDLayout {
   register(registration: LayoutRegistration): void {
     this.registrations.push(registration);
     const slot = this.getSlot(registration.region);
+    const parent = registration.mountParent ?? slot;
 
-    // Set optional show context for CSS visibility rules
-    if (registration.showContext) {
-      slot.dataset.show = registration.showContext;
+    if (registration.mountParent && registration.mountParent.parentElement !== slot) {
+      slot.appendChild(registration.mountParent);
     }
 
-    registration.component.mount(slot);
+    if (registration.showContext) {
+      parent.dataset.show = registration.showContext;
+    }
+
+    registration.component.mount(parent);
   }
 
   /**
@@ -131,10 +135,16 @@ export class HUDLayout {
    */
   unregister(component: LayoutComponent): void {
     const idx = this.registrations.findIndex((r) => r.component === component);
-    if (idx !== -1) {
-      this.registrations[idx].component.unmount();
-      this.registrations.splice(idx, 1);
+    if (idx === -1) return;
+    const reg = this.registrations[idx];
+    reg.component.unmount();
+    if (reg.mountParent) {
+      reg.mountParent.remove();
+    } else if (reg.showContext) {
+      const slot = this.getSlot(reg.region);
+      delete slot.dataset.show;
     }
+    this.registrations.splice(idx, 1);
   }
 
   /**
