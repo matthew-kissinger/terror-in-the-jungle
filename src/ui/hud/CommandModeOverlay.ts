@@ -275,7 +275,8 @@ export class CommandModeOverlay implements LayoutComponent {
     button.title = fullLabel;
 
     let downAt = 0;
-    let longHold: ReturnType<typeof setTimeout> | null = null;
+    /** Browser timer id (`window.setTimeout` is a number; Node typings use Timeout). */
+    let longHold: number | null = null;
     let holdIssued = false;
 
     button.addEventListener('click', (e) => {
