@@ -50,6 +50,7 @@ prompts/
 # Python
 __pycache__/
 *.py
+!scripts/fix-vegetation-alpha.py
 *.py[cod]
 *$py.class
 .Python
