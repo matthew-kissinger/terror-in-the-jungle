@@ -3,6 +3,7 @@ import { Logger } from '../../utils/Logger';
 import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 import { buildHeightfieldMesh } from './NavmeshHeightfieldBuilder';
 import { NavmeshMovementAdapter } from './NavmeshMovementAdapter';
+import { computeNavmeshCacheKey, getCachedNavmesh, setCachedNavmesh } from './NavmeshCache';
 
 import type { Crowd, NavMesh, NavMeshQuery, TileCache, Obstacle } from '@recast-navigation/core';
 import type { MapFeatureDefinition } from '../../config/gameModeTypes';
@@ -50,7 +51,7 @@ const BYTES_PER_VOXEL_COLUMN = 8;
 function getNavmeshCellSize(worldSize: number): number {
   if (worldSize <= 800) return 1.0;
   if (worldSize <= 1600) return 1.5;
-  return 2.0; // 3200m at cs=2.0 -> 1600x1600 = 2.56M columns (vs 10.2M at cs=1.0)
+  return 3.0; // 3200m at cs=3.0 -> 1067x1067 = 1.14M columns (was 2.56M at cs=2.0)
 }
 
 /**
@@ -60,7 +61,7 @@ function getNavmeshCellSize(worldSize: number): number {
 function getHeightfieldCellSize(worldSize: number): number {
   if (worldSize <= 800) return NAVMESH_CELL_SIZE;   // 4.0
   if (worldSize <= 1600) return 6.0;
-  return 8.0; // 3200/8 = 401x401 = 161K verts (vs 641K at cellSize=4)
+  return 12.0; // 3200/12 = 267x267 = 71K verts (was 161K at cellSize=8)
 }
 
 // Tile streaming budget
@@ -68,6 +69,9 @@ const MAX_TILES_PER_FRAME = 2;
 
 // Obstacle height for structure exclusion
 const OBSTACLE_HEIGHT = 10.0;
+
+// Worker generation timeout (ms)
+const WORKER_TIMEOUT_MS = 60_000;
 
 interface NavmeshTileKey {
   tx: number;
@@ -102,12 +106,22 @@ export class NavmeshSystem {
   private obstacles: Obstacle[] = [];
   private obstacleUpdatePending = false;
 
+  // Worker state
+  private navmeshWorker: Worker | null = null;
+  private workerReady = false;
+  private pendingGeneration: {
+    resolve: (data: Uint8Array) => void;
+    reject: (err: Error) => void;
+  } | null = null;
+
   // Module references (lazy loaded)
   private recastInit: typeof import('@recast-navigation/core').init | null = null;
   private CrowdClass: typeof import('@recast-navigation/core').Crowd | null = null;
   private NavMeshQueryClass: typeof import('@recast-navigation/core').NavMeshQuery | null = null;
   private threeToSoloNavMeshFn: typeof import('@recast-navigation/three').threeToSoloNavMesh | null = null;
   private threeToTileCacheFn: typeof import('@recast-navigation/three').threeToTileCache | null = null;
+  private getPositionsAndIndicesFn: typeof import('@recast-navigation/three').getPositionsAndIndices | null = null;
+  private importNavMeshFn: typeof import('@recast-navigation/core').importNavMesh | null = null;
 
   private initPromise: Promise<void> | null = null;
 
@@ -131,13 +145,51 @@ export class NavmeshSystem {
       this.NavMeshQueryClass = core.NavMeshQuery;
       this.threeToSoloNavMeshFn = three.threeToSoloNavMesh;
       this.threeToTileCacheFn = three.threeToTileCache;
+      this.getPositionsAndIndicesFn = three.getPositionsAndIndices;
+      this.importNavMeshFn = core.importNavMesh;
 
       await core.init();
       this.wasmReady = true;
       Logger.info('Navigation', 'Recast WASM initialized');
+
+      // Spawn navmesh worker (non-blocking)
+      this.spawnWorker();
     } catch (error) {
       Logger.warn('Navigation', 'WASM init failed - all NPCs will use beeline movement:', error);
       this.wasmReady = false;
+    }
+  }
+
+  private spawnWorker(): void {
+    try {
+      this.navmeshWorker = new Worker(
+        new URL('../../workers/navmesh.worker.ts', import.meta.url),
+        { type: 'module' },
+      );
+
+      this.navmeshWorker.onmessage = (event: MessageEvent) => {
+        const msg = event.data;
+        if (msg.type === 'ready') {
+          this.workerReady = true;
+          Logger.info('Navigation', 'Navmesh worker ready');
+        } else if (msg.type === 'result') {
+          this.pendingGeneration?.resolve(msg.navMeshData);
+          this.pendingGeneration = null;
+        } else if (msg.type === 'error') {
+          this.pendingGeneration?.reject(new Error(msg.message));
+          this.pendingGeneration = null;
+        }
+      };
+
+      this.navmeshWorker.onerror = (err) => {
+        Logger.warn('Navigation', 'Navmesh worker error:', err.message);
+        this.workerReady = false;
+        this.pendingGeneration?.reject(new Error('Worker crashed'));
+        this.pendingGeneration = null;
+      };
+    } catch (err) {
+      Logger.warn('Navigation', 'Failed to spawn navmesh worker, will use main thread:', err);
+      this.workerReady = false;
     }
   }
 
@@ -170,7 +222,7 @@ export class NavmeshSystem {
     if (this.isTiled) {
       generated = await this.generateTiledNavmesh(worldSize, features);
     } else {
-      generated = this.generateSoloNavmesh(worldSize, features);
+      generated = await this.generateSoloNavmesh(worldSize, features);
       if (!generated) {
         Logger.warn(
           'Navigation',
@@ -190,7 +242,7 @@ export class NavmeshSystem {
     Logger.info('Navigation', `Navmesh generated in ${elapsed.toFixed(1)}ms (${this.isTiled ? 'tiled' : 'solo'}, worldSize=${worldSize})`);
   }
 
-  private generateSoloNavmesh(worldSize: number, features?: MapFeatureDefinition[]): boolean {
+  private async generateSoloNavmesh(worldSize: number, features?: MapFeatureDefinition[]): Promise<boolean> {
     const cs = getNavmeshCellSize(worldSize);
     const hfCellSize = getHeightfieldCellSize(worldSize);
 
@@ -203,6 +255,41 @@ export class NavmeshSystem {
         `Solo navmesh would require ~${estimatedMB.toFixed(0)}MB (${voxelColumns.toLocaleString()} voxel columns) - exceeds ${SOLO_MEMORY_LIMIT_MB}MB limit`
       );
       return false;
+    }
+
+    // Build Recast config
+    const isLargeWorld = worldSize > 1600;
+    const ch = isLargeWorld ? 0.4 : 0.2;
+    const recastConfig: Record<string, number> = {
+      cs,
+      ch,
+      walkableSlopeAngle: WALKABLE_SLOPE_ANGLE,
+      walkableHeight: Math.ceil(AGENT_HEIGHT / ch),
+      walkableClimb: Math.ceil(WALKABLE_CLIMB / ch),
+      walkableRadius: Math.ceil(AGENT_RADIUS / cs),
+      maxEdgeLen: isLargeWorld ? 24 : 12,
+      maxSimplificationError: 1.3,
+      minRegionArea: isLargeWorld ? 16 : 8,
+      mergeRegionArea: isLargeWorld ? 40 : 20,
+      maxVertsPerPoly: 6,
+      detailSampleDist: isLargeWorld ? 12 : 6,
+      detailSampleMaxError: 1,
+    };
+
+    // Check IndexedDB cache
+    let cacheKey: string | null = null;
+    try {
+      cacheKey = await computeNavmeshCacheKey(worldSize, recastConfig);
+      const cached = await getCachedNavmesh(cacheKey);
+      if (cached && this.importNavMeshFn) {
+        const imported = this.importNavMeshFn(cached);
+        this.navMesh = imported.navMesh;
+        this.createCrowd();
+        Logger.info('Navigation', `Navmesh loaded from cache (worldSize=${worldSize})`);
+        return true;
+      }
+    } catch {
+      // Cache miss or error - proceed to generation
     }
 
     const heightCache = getHeightQueryCache();
@@ -220,25 +307,16 @@ export class NavmeshSystem {
     const obstacleMeshes = this.buildObstacleMeshes(features, heightCache);
     const inputMeshes = [mesh, ...obstacleMeshes];
 
-    // Scale Recast params for large open terrain: coarser vertical resolution,
-    // longer polygon edges, larger minimum regions, less detail mesh refinement.
-    const isLargeWorld = worldSize > 1600;
-    const ch = isLargeWorld ? 0.4 : 0.2;
-    const result = this.threeToSoloNavMeshFn!(inputMeshes, {
-      cs,
-      ch,
-      walkableSlopeAngle: WALKABLE_SLOPE_ANGLE,
-      walkableHeight: Math.ceil(AGENT_HEIGHT / ch),
-      walkableClimb: Math.ceil(WALKABLE_CLIMB / ch),
-      walkableRadius: Math.ceil(AGENT_RADIUS / cs),
-      maxEdgeLen: isLargeWorld ? 24 : 12,
-      maxSimplificationError: 1.3,
-      minRegionArea: isLargeWorld ? 16 : 8,
-      mergeRegionArea: isLargeWorld ? 40 : 20,
-      maxVertsPerPoly: 6,
-      detailSampleDist: isLargeWorld ? 12 : 6,
-      detailSampleMaxError: 1,
-    });
+    // Try off-thread generation via worker
+    if (this.workerReady && this.getPositionsAndIndicesFn && this.importNavMeshFn) {
+      const workerResult = await this.generateViaWorker(inputMeshes, recastConfig, cacheKey);
+      geometry.dispose();
+      for (const m of obstacleMeshes) m.geometry.dispose();
+      return workerResult;
+    }
+
+    // Fallback: main-thread generation
+    const result = this.threeToSoloNavMeshFn!(inputMeshes, recastConfig);
 
     if (!result.success || !result.navMesh) {
       Logger.error('Navigation', 'Solo navmesh generation failed');
@@ -252,6 +330,56 @@ export class NavmeshSystem {
 
     geometry.dispose();
     for (const m of obstacleMeshes) m.geometry.dispose();
+    return true;
+  }
+
+  private async generateViaWorker(
+    inputMeshes: THREE.Mesh[],
+    recastConfig: Record<string, number>,
+    cacheKey: string | null,
+  ): Promise<boolean> {
+    // Extract raw geometry arrays on main thread
+    const [positions, indices] = this.getPositionsAndIndicesFn!(inputMeshes);
+
+    // Send to worker with transferable buffers
+    const navMeshData = await new Promise<Uint8Array>((resolve, reject) => {
+      this.pendingGeneration = { resolve, reject };
+
+      const timeoutId = setTimeout(() => {
+        if (this.pendingGeneration) {
+          this.pendingGeneration = null;
+          this.navmeshWorker?.terminate();
+          this.navmeshWorker = null;
+          this.workerReady = false;
+          reject(new Error('Worker timed out'));
+        }
+      }, WORKER_TIMEOUT_MS);
+
+      // Clear timeout when resolved/rejected
+      const origResolve = resolve;
+      const origReject = reject;
+      this.pendingGeneration = {
+        resolve: (data) => { clearTimeout(timeoutId); origResolve(data); },
+        reject: (err) => { clearTimeout(timeoutId); origReject(err); },
+      };
+
+      this.navmeshWorker!.postMessage(
+        { type: 'generate', requestId: 1, positions, indices, config: recastConfig },
+        [positions.buffer, indices.buffer],
+      );
+    });
+
+    // Reconstruct NavMesh from serialized data on main thread
+    const imported = this.importNavMeshFn!(navMeshData);
+    this.navMesh = imported.navMesh;
+    this.createCrowd();
+
+    // Fire-and-forget cache write
+    if (cacheKey) {
+      setCachedNavmesh(cacheKey, navMeshData).catch(() => {});
+    }
+
+    Logger.info('Navigation', 'Navmesh generated via worker');
     return true;
   }
 
@@ -608,6 +736,11 @@ export class NavmeshSystem {
 
   /** Dispose of all resources. */
   dispose(): void {
+    this.navmeshWorker?.terminate();
+    this.navmeshWorker = null;
+    this.workerReady = false;
+    this.pendingGeneration = null;
+
     if (this.adapter) {
       this.adapter.dispose();
       this.adapter = null;

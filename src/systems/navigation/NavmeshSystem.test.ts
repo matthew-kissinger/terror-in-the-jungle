@@ -22,11 +22,15 @@ vi.mock('@recast-navigation/core', () => ({
   init: vi.fn().mockRejectedValue(new Error('WASM not available in tests')),
   Crowd: vi.fn(),
   NavMeshQuery: MockNavMeshQuery,
+  importNavMesh: vi.fn(),
+  exportNavMesh: vi.fn(),
 }));
 vi.mock('@recast-navigation/three', () => ({
   threeToSoloNavMesh: vi.fn(),
   threeToTileCache: vi.fn(),
+  getPositionsAndIndices: vi.fn(),
 }));
+vi.mock('./NavmeshCache');
 vi.mock('../../utils/Logger');
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -364,6 +368,26 @@ describe('NavmeshSystem path queries', () => {
       system = createReadySystem();
       system.dispose();
       expect(mockQueryDestroy).toHaveBeenCalledTimes(1);
+    });
+
+    it('terminates worker on dispose', () => {
+      system = createReadySystem();
+      const mockTerminate = vi.fn();
+      const s = system as Record<string, unknown>;
+      s.navmeshWorker = { terminate: mockTerminate };
+      s.workerReady = true;
+      system.dispose();
+      expect(mockTerminate).toHaveBeenCalledTimes(1);
+      expect(s.navmeshWorker).toBeNull();
+      expect(s.workerReady).toBe(false);
+    });
+
+    it('clears pending generation on dispose', () => {
+      system = createReadySystem();
+      const s = system as Record<string, unknown>;
+      s.pendingGeneration = { resolve: vi.fn(), reject: vi.fn() };
+      system.dispose();
+      expect(s.pendingGeneration).toBeNull();
     });
   });
 });
