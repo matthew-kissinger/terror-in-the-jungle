@@ -3,11 +3,15 @@ import { GameLaunchSelection, GameMode, GameModeDefinition } from '../config/gam
 import { getGameModeConfig } from '../config/gameModes';
 import { getGameModeDefinition, resolveLaunchSelection } from '../config/gameModeDefinitions';
 import { pickRandomVariant } from '../config/MapSeedRegistry';
+import { BakedHeightProvider } from '../systems/terrain/BakedHeightProvider';
 import { getHeightQueryCache } from '../systems/terrain/HeightQueryCache';
 import { DEMHeightProvider } from '../systems/terrain/DEMHeightProvider';
 import { NoiseHeightProvider } from '../systems/terrain/NoiseHeightProvider';
 import { compileTerrainFeatures } from '../systems/terrain/TerrainFeatureCompiler';
 import { StampedHeightProvider } from '../systems/terrain/StampedHeightProvider';
+import { bakeStampedHeightmapGrid } from '../systems/terrain/TerrainStampGridBaker';
+import type { CompiledTerrainFeatureSet } from '../systems/terrain/TerrainFeatureTypes';
+import type { PreparedHeightmapGrid, PreparedTerrainSource } from '../systems/terrain/PreparedTerrainSource';
 import { Logger } from '../utils/Logger';
 import { Alliance, Faction } from '../systems/combat/types';
 import { shouldUseTouchControls } from '../utils/DeviceDetector';
@@ -36,21 +40,45 @@ const FACTION_DISPLAY_NAMES: Record<Faction, string> = {
   [Faction.VC]: 'Viet Cong',
 };
 
-async function applyCompiledTerrainFeatures(
-  engine: GameEngine,
+interface CompiledStartupTerrainFeatures {
+  compiledFeatures: CompiledTerrainFeatureSet;
+  preparedTerrainSource: PreparedTerrainSource;
+}
+
+function compileStartupTerrainFeatures(
   config: ReturnType<typeof getGameModeConfig>,
-  emitProgress: (phase: string, progress: number, label: string) => void,
-): Promise<void> {
+  preparedTerrainSource: PreparedTerrainSource,
+): CompiledStartupTerrainFeatures {
   const heightCache = getHeightQueryCache();
+  const baseProvider = heightCache.getProvider();
   const compiledFeatures = compileTerrainFeatures(
     config,
     (x, z) => heightCache.getHeightAt(x, z),
   );
 
   if (compiledFeatures.stamps.length > 0) {
-    heightCache.setProvider(new StampedHeightProvider(heightCache.getProvider(), compiledFeatures.stamps));
+    heightCache.setProvider(new StampedHeightProvider(baseProvider, compiledFeatures.stamps));
+    if (preparedTerrainSource.preparedHeightmap) {
+      preparedTerrainSource = {
+        ...preparedTerrainSource,
+        preparedHeightmap: bakeStampedPreparedHeightmap(
+          preparedTerrainSource.preparedHeightmap,
+          config.worldSize,
+          baseProvider,
+          compiledFeatures.stamps,
+        ),
+      };
+    }
   }
 
+  return { compiledFeatures, preparedTerrainSource };
+}
+
+async function applyCompiledTerrainFeatures(
+  engine: GameEngine,
+  compiledFeatures: CompiledTerrainFeatureSet,
+  emitProgress: (phase: string, progress: number, label: string) => void,
+): Promise<void> {
   engine.systemManager.minimapSystem.setTerrainFlowPaths(compiledFeatures.flowPaths);
   engine.systemManager.fullMapSystem.setTerrainFlowPaths(compiledFeatures.flowPaths);
   engine.systemManager.fullMapSystem.setTerrainRuntime(engine.systemManager.terrainSystem);
@@ -62,6 +90,24 @@ async function applyCompiledTerrainFeatures(
       emitProgress('vegetation', done / total, `Placing vegetation (${done}/${total})...`);
     },
   );
+}
+
+function bakeStampedPreparedHeightmap(
+  preparedHeightmap: PreparedHeightmapGrid,
+  worldSize: number,
+  baseProvider: Parameters<typeof bakeStampedHeightmapGrid>[3],
+  stamps: CompiledTerrainFeatureSet['stamps'],
+): PreparedHeightmapGrid {
+  return {
+    ...preparedHeightmap,
+    data: bakeStampedHeightmapGrid(
+      preparedHeightmap.data,
+      preparedHeightmap.gridSize,
+      worldSize,
+      baseProvider,
+      stamps,
+    ),
+  };
 }
 
 function resolveFactionLabels(definition: GameModeDefinition): { blufor: string; opfor: string } {
@@ -96,11 +142,12 @@ function applyLaunchSelection(engine: GameEngine, definition: GameModeDefinition
   engine.systemManager.hudSystem.setFactionLabels(labels.blufor, labels.opfor);
 }
 
-async function configureHeightSource(
-  engine: GameEngine,
+export async function configureHeightSource(
+  _engine: GameEngine,
   mode: GameMode,
   config: ReturnType<typeof getGameModeConfig>
-): Promise<void> {
+): Promise<PreparedTerrainSource> {
+  markStartup(`engine-init.start-game.${mode}.height-source.begin`);
   if (config.heightSource?.type === 'dem') {
     markStartup(`engine-init.start-game.${mode}.dem-load.begin`);
     Logger.info('engine-init', `Loading DEM terrain from ${config.heightSource.path}...`);
@@ -125,7 +172,8 @@ async function configureHeightSource(
       Logger.error('engine-init', 'Failed to load DEM terrain:', error);
     }
     markStartup(`engine-init.start-game.${mode}.dem-load.end`);
-    return;
+    markStartup(`engine-init.start-game.${mode}.height-source.end`);
+    return { kind: 'dem' };
   }
 
   // Try seed rotation: pick a random pre-baked variant if available
@@ -146,13 +194,24 @@ async function configureHeightSource(
         const buffer = await response.arrayBuffer();
         const gridData = new Float32Array(buffer);
         const gridSize = Math.round(Math.sqrt(gridData.length));
-        // Store on config for TerrainSystem to pick up
-        (config as any).__prebakedHeightmap = { data: gridData, gridSize };
-        // Still need a NoiseHeightProvider for the HeightQueryCache (used by terrain features compiler)
+        if (gridSize * gridSize !== gridData.length) {
+          throw new Error(`Heightmap asset is not a square grid: ${gridData.length} samples`);
+        }
         const seed = typeof config.terrainSeed === 'number' ? config.terrainSeed : 42;
-        getHeightQueryCache().setProvider(new NoiseHeightProvider(seed));
+        const workerConfig = new NoiseHeightProvider(seed).getWorkerConfig();
+        getHeightQueryCache().setProvider(
+          new BakedHeightProvider(gridData, gridSize, config.worldSize, workerConfig),
+        );
         Logger.info('engine-init', `Pre-baked heightmap loaded: ${gridSize}x${gridSize} (${(buffer.byteLength / 1024).toFixed(0)}KB), seed=${seed}`);
-        return;
+        markStartup(`engine-init.start-game.${mode}.height-source.end`);
+        return {
+          kind: 'prebaked',
+          preparedHeightmap: {
+            data: gridData,
+            gridSize,
+            workerConfig,
+          },
+        };
       }
       Logger.warn('engine-init', `Pre-baked heightmap not found (${response.status}), falling back to procedural`);
     } catch (error) {
@@ -167,12 +226,16 @@ async function configureHeightSource(
 
   getHeightQueryCache().setProvider(new NoiseHeightProvider(seed));
   Logger.info('engine-init', `Procedural terrain seed: ${seed}`);
+  markStartup(`engine-init.start-game.${mode}.height-source.end`);
+  return { kind: 'procedural' };
 }
 
 async function configureTerrainAndNavigation(
   engine: GameEngine,
-  config: ReturnType<typeof getGameModeConfig>
+  config: ReturnType<typeof getGameModeConfig>,
+  preparedTerrainSource: PreparedTerrainSource,
 ): Promise<void> {
+  markStartup(`engine-init.start-game.${config.id}.terrain-config.begin`);
   if (!engine.systemManager.navmeshSystem.isReady()) {
     const hasPrebakedAsset = !!config.navmeshAsset;
     await engine.systemManager.navmeshSystem.init(hasPrebakedAsset);
@@ -187,6 +250,7 @@ async function configureTerrainAndNavigation(
   }
 
   const terrainSystem = engine.systemManager.terrainSystem;
+  terrainSystem.setPreparedHeightmap(preparedTerrainSource.preparedHeightmap ?? null);
   const previousWorldSize = terrainSystem.getPlayableWorldSize();
   const targetWorldSize = config.worldSize ?? previousWorldSize;
   const worldSizeChanged = targetWorldSize !== previousWorldSize;
@@ -209,12 +273,15 @@ async function configureTerrainAndNavigation(
 
   const defaultBiome = config.terrain?.defaultBiome ?? 'denseJungle';
   terrainSystem.setBiomeConfig(defaultBiome, config.terrain?.biomeRules);
+  markStartup(`engine-init.start-game.${config.id}.terrain-config.end`);
 
   if (engine.systemManager.navmeshSystem.isWasmReady()) {
     const navWorldSize = config.worldSize ?? terrainSystem.getPlayableWorldSize();
     // Yield before WASM navmesh generation so the progress bar renders "Generating navigation mesh..."
     await yieldToRenderer();
+    markStartup(`engine-init.start-game.${config.id}.navmesh.begin`);
     await engine.systemManager.navmeshSystem.generateNavmesh(navWorldSize, config.features, config.navmeshAsset);
+    markStartup(`engine-init.start-game.${config.id}.navmesh.end`);
 
     // Validate navmesh connectivity using representative home bases (not all-pairs).
     // For 16 zones, all-pairs requires up to 120 path queries. Home-base check needs 1-2.
@@ -301,7 +368,7 @@ export async function prepareModeStartup(
   }
 
   const definition = getGameModeDefinition(mode);
-  const config = getGameModeConfig(mode);
+  const config = { ...getGameModeConfig(mode) };
 
   const emitProgress = (phase: string, progress: number, label: string): void => {
     GameEventBus.emit('mode_load_progress', { phase, progress, label });
@@ -309,24 +376,35 @@ export async function prepareModeStartup(
   };
 
   emitProgress('terrain', 0, 'Loading terrain...');
-  await configureHeightSource(engine, mode, config);
+  const preparedTerrainSource = await configureHeightSource(engine, mode, config);
   emitProgress('terrain', 1, 'Terrain loaded');
   await yieldToRenderer();
 
   emitProgress('features', 0, 'Compiling features...');
-  // applyCompiledTerrainFeatures is now async - vegetation regeneration yields between batches
-  await applyCompiledTerrainFeatures(engine, config, emitProgress);
+  markStartup(`engine-init.start-game.${mode}.terrain-features.compile.begin`);
+  const startupTerrain = compileStartupTerrainFeatures(config, preparedTerrainSource);
+  markStartup(`engine-init.start-game.${mode}.terrain-features.compile.end`);
   emitProgress('features', 1, 'Features compiled');
-  emitProgress('vegetation', 1, 'Vegetation placed');
   await yieldToRenderer();
 
-  emitProgress('navmesh', 0, 'Generating navigation mesh...');
-  await configureTerrainAndNavigation(engine, config);
+  emitProgress('world', 0, 'Preparing world...');
+  emitProgress('navmesh', 0, 'Loading navigation...');
+  await configureTerrainAndNavigation(engine, config, startupTerrain.preparedTerrainSource);
+  emitProgress('world', 1, 'World ready');
   emitProgress('navmesh', 1, 'Navigation ready');
   await yieldToRenderer();
 
+  emitProgress('vegetation', 0, 'Applying terrain features...');
+  markStartup(`engine-init.start-game.${mode}.terrain-features.apply.begin`);
+  await applyCompiledTerrainFeatures(engine, startupTerrain.compiledFeatures, emitProgress);
+  markStartup(`engine-init.start-game.${mode}.terrain-features.apply.end`);
+  emitProgress('vegetation', 1, 'Terrain features ready');
+  await yieldToRenderer();
+
   emitProgress('spawning', 0, 'Spawning combatants...');
+  markStartup(`engine-init.start-game.${mode}.set-game-mode.begin`);
   engine.systemManager.setGameMode(mode, { createPlayerSquad: mode !== GameMode.AI_SANDBOX });
+  markStartup(`engine-init.start-game.${mode}.set-game-mode.end`);
   applyLaunchSelection(engine, definition, launchSelection);
   emitProgress('spawning', 1, 'Combatants spawned');
   await yieldToRenderer();

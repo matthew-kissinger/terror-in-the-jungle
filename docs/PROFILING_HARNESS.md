@@ -19,6 +19,7 @@ Mission linkage:
 - Open Frontier short: `npm run perf:capture:openfrontier:short`
 - A Shau short: `npm run perf:capture:ashau:short`
 - 30-minute soak: `npm run perf:capture:frontier30m`
+- Production startup benchmark: `npm run perf:startup:openfrontier`
 - Analyze latest: `npm run perf:analyze:latest`
 - Compare against tracked baselines: `npm run perf:compare`
 - Update baseline snapshot: `npm run perf:update-baseline`
@@ -67,6 +68,12 @@ Each run writes to `artifacts/perf/<timestamp>/`:
 - `console.json`
 - optional deep files: `cpu-profile.cpuprofile`, `heap-sampling.json`, `chrome-trace.json`, `playwright-trace.zip`
 - `final-frame.png`
+
+`perf-startup-ui.ts` writes a separate artifact shape under `artifacts/perf/<timestamp>/startup-ui-<mode>/`:
+
+- `summary.json`
+- `startup-marks.json`
+- `console.json`
 
 `runtime-samples.json` is the authoritative per-sample artifact for:
 - frame timing (`avg`, `p95`, `p99`, max, hitch counts)
@@ -138,6 +145,9 @@ Baseline discipline:
 
 - Perf diagnostics are enabled only for capture URLs that include `?perf=1`.
 - Diagnostics globals and user-timing spans are additionally gated by `import.meta.env.DEV`.
+- Startup benchmarking is now split:
+  - `perf-capture.ts` remains the dev-only runtime/combat harness.
+  - `perf-startup-ui.ts` is the authoritative public-build startup benchmark for `mode click -> deploy ready` and `mode click -> playable`.
 - `scripts/perf-browser-observers.js` installs `PerformanceObserver` listeners for `longtask` and `long-animation-frame` during harness runs only.
 - `scripts/perf-active-driver.js` provides the harness-only active-player driver used by `perf-capture.ts` for movement, aiming, firing, and pressure-maintenance loops.
 - `window.perf.getMovement()` is now the light-weight movement telemetry accessor for harness sampling. Use it when movement quality matters without requiring full `perf.report()` detail samples.

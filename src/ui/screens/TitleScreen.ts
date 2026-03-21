@@ -139,7 +139,8 @@ export class TitleScreen extends UIComponent {
     const phases = [
       { id: 'terrain', weight: 0.05, label: 'Loading terrain' },
       { id: 'features', weight: 0.05, label: 'Compiling features' },
-      { id: 'vegetation', weight: 0.50, label: 'Placing vegetation' },
+      { id: 'world', weight: 0.25, label: 'Preparing world' },
+      { id: 'vegetation', weight: 0.25, label: 'Applying terrain features' },
       { id: 'navmesh', weight: 0.15, label: 'Loading navigation mesh' },
       { id: 'spawning', weight: 0.15, label: 'Spawning combatants' },
       { id: 'finalize', weight: 0.10, label: 'Finalizing' },

@@ -42,7 +42,9 @@ export async function prepareInitialDeploy(
   modeNameForTelemetry: string
 ): Promise<THREE.Vector3> {
   engine.startupFlow.enterDeploySelect();
+  markStartup(`engine-init.start-game.${modeNameForTelemetry}.deploy-select.begin`);
   const initialDeployPosition = await resolveInitialDeployPosition(engine, definition, launchSelection);
+  markStartup(`engine-init.start-game.${modeNameForTelemetry}.deploy-select.end`);
 
   engine.startupFlow.enterSpawnWarming();
   const spawnPos = initialDeployPosition.clone();

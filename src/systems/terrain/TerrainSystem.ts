@@ -5,9 +5,12 @@ import type { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSy
 import { type BiomeClassificationRule } from '../../config/biomes';
 import { LOSAccelerator } from '../combat/LOSAccelerator';
 import { Logger } from '../../utils/Logger';
+import { markStartup } from '../../core/StartupTelemetry';
 import { getHeightQueryCache } from './HeightQueryCache';
 import { BakedHeightProvider } from './BakedHeightProvider';
+import type { IHeightProvider } from './IHeightProvider';
 import type { CompiledTerrainFeatureSet } from './TerrainFeatureTypes';
+import type { PreparedHeightmapGrid } from './PreparedTerrainSource';
 
 import { TerrainRenderRuntime } from './TerrainRenderRuntime';
 import { TerrainRaycastRuntime } from './TerrainRaycastRuntime';
@@ -57,6 +60,7 @@ export class TerrainSystem implements GameSystem {
   private defaultBiomeId = 'denseJungle';
   private biomeRules: BiomeClassificationRule[] = [];
   private surfaceWetness = 0;
+  private preparedHeightmap: PreparedHeightmapGrid | null = null;
   private terrainFeatures: CompiledTerrainFeatureSet = {
     stamps: [],
     surfacePatches: [],
@@ -107,12 +111,7 @@ export class TerrainSystem implements GameSystem {
     const cache = getHeightQueryCache();
     let terrainMaterial: THREE.MeshStandardMaterial;
     try {
-      terrainMaterial = this.surfaceRuntime.initialize(
-        cache.getProvider(),
-        this.config.worldSize,
-        this.defaultBiomeId,
-        this.biomeRules,
-      );
+      terrainMaterial = this.createSurfaceMaterial(cache.getProvider());
     } catch (error) {
       Logger.error('terrain', error instanceof Error ? error.message : 'Failed to initialize terrain surface');
       return;
@@ -410,6 +409,10 @@ export class TerrainSystem implements GameSystem {
     this.reconfigureWorld();
   }
 
+  setPreparedHeightmap(preparedHeightmap: PreparedHeightmapGrid | null): void {
+    this.preparedHeightmap = preparedHeightmap;
+  }
+
   setWorldSize(worldSize: number): void {
     if (!Number.isFinite(worldSize) || worldSize <= 0) return;
     this.explicitWorldSize = worldSize;
@@ -474,8 +477,7 @@ export class TerrainSystem implements GameSystem {
   rebakeHeightmap(): void {
     if (!this.isInitialized) return;
 
-    const cache = getHeightQueryCache();
-    this.surfaceRuntime.rebake(cache.getProvider(), this.config.worldSize, this.defaultBiomeId, this.biomeRules);
+    this.rebakeSurfaceHeightmap();
     this.propagateTerrainSourceChanges();
 
     Logger.info('terrain', 'Heightmap re-baked from updated provider');
@@ -544,8 +546,7 @@ export class TerrainSystem implements GameSystem {
 
     // Re-bake heightmap at new world size if initialized
     if (this.isInitialized) {
-      const cache = getHeightQueryCache();
-      this.surfaceRuntime.rebake(cache.getProvider(), this.config.worldSize, this.defaultBiomeId, this.biomeRules);
+      this.rebakeSurfaceHeightmap();
       this.propagateTerrainSourceChanges();
     }
 
@@ -554,6 +555,56 @@ export class TerrainSystem implements GameSystem {
 
   private computeWorldSize(): number {
     return this.explicitWorldSize ?? (this.chunkSize * this.renderDistance * 2);
+  }
+
+  private createSurfaceMaterial(provider: IHeightProvider): THREE.MeshStandardMaterial {
+    if (this.preparedHeightmap) {
+      markStartup('terrain.heightmap.from-prebaked.begin');
+      const material = this.surfaceRuntime.initializeFromPrebakedGrid(
+        this.preparedHeightmap.data,
+        this.preparedHeightmap.gridSize,
+        this.config.worldSize,
+        this.defaultBiomeId,
+        this.biomeRules,
+      );
+      markStartup('terrain.heightmap.from-prebaked.end');
+      return material;
+    }
+
+    markStartup('terrain.heightmap.from-provider.begin');
+    const material = this.surfaceRuntime.initialize(
+      provider,
+      this.config.worldSize,
+      this.defaultBiomeId,
+      this.biomeRules,
+    );
+    markStartup('terrain.heightmap.from-provider.end');
+    return material;
+  }
+
+  private rebakeSurfaceHeightmap(): void {
+    if (this.preparedHeightmap) {
+      markStartup('terrain.heightmap.from-prebaked.begin');
+      this.surfaceRuntime.rebakeFromPrebakedGrid(
+        this.preparedHeightmap.data,
+        this.preparedHeightmap.gridSize,
+        this.config.worldSize,
+        this.defaultBiomeId,
+        this.biomeRules,
+      );
+      markStartup('terrain.heightmap.from-prebaked.end');
+      return;
+    }
+
+    const cache = getHeightQueryCache();
+    markStartup('terrain.heightmap.from-provider.begin');
+    this.surfaceRuntime.rebake(
+      cache.getProvider(),
+      this.config.worldSize,
+      this.defaultBiomeId,
+      this.biomeRules,
+    );
+    markStartup('terrain.heightmap.from-provider.end');
   }
 
   /**

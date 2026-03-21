@@ -7,6 +7,7 @@ const {
   mockCacheGetHeightAt,
   mockSampleHeight,
   mockBakeFromProvider,
+  mockUploadPrebakedGrid,
   mockVegetationConfigure,
   mockVegetationSetWorldBounds,
   mockVegetationRegenerateAll,
@@ -19,6 +20,7 @@ const {
   mockCacheGetHeightAt: vi.fn().mockReturnValue(10),
   mockSampleHeight: vi.fn().mockReturnValue(999),
   mockBakeFromProvider: vi.fn(),
+  mockUploadPrebakedGrid: vi.fn(),
   mockVegetationConfigure: vi.fn(),
   mockVegetationSetWorldBounds: vi.fn(),
   mockVegetationRegenerateAll: vi.fn(),
@@ -50,6 +52,7 @@ vi.mock('./HeightmapGPU', () => ({
   HeightmapGPU: class {
     bakeFromProvider = mockBakeFromProvider;
     uploadDEM = vi.fn();
+    uploadPrebakedGrid = mockUploadPrebakedGrid;
     sampleHeight = mockSampleHeight;
     getHeightTexture = vi.fn().mockReturnValue({ needsUpdate: false });
     getNormalTexture = vi.fn().mockReturnValue({ needsUpdate: false });
@@ -182,6 +185,7 @@ describe('TerrainSystem', () => {
     mockCacheGetHeightAt.mockClear();
     mockSampleHeight.mockClear();
     mockBakeFromProvider.mockClear();
+    mockUploadPrebakedGrid.mockClear();
     mockVegetationConfigure.mockClear();
     mockVegetationSetWorldBounds.mockClear();
     mockVegetationRegenerateAll.mockClear();
@@ -358,6 +362,23 @@ describe('TerrainSystem', () => {
       expect(mockBakeFromProvider).toHaveBeenLastCalledWith(
         expect.anything(),
         1024,
+        3200,
+      );
+    });
+
+    it('uses prepared heightmap uploads instead of provider rebakes when supplied', async () => {
+      await terrain.init();
+
+      terrain.setPreparedHeightmap({
+        data: new Float32Array(16),
+        gridSize: 4,
+        workerConfig: { type: 'noise', seed: 12345 },
+      });
+      terrain.setWorldSize(3200);
+
+      expect(mockUploadPrebakedGrid).toHaveBeenCalledWith(
+        expect.any(Float32Array),
+        4,
         3200,
       );
     });

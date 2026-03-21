@@ -142,6 +142,20 @@ export class TerrainSurfaceRuntime {
     this.updateMaterial(worldSize, defaultBiomeId, biomeRules);
   }
 
+  rebakeFromPrebakedGrid(
+    data: Float32Array,
+    gridSize: number,
+    worldSize: number,
+    defaultBiomeId: string,
+    biomeRules: BiomeClassificationRule[],
+  ): void {
+    this.currentWorldSize = worldSize;
+    this.currentDefaultBiomeId = defaultBiomeId;
+    this.currentBiomeRules = biomeRules.slice();
+    this.heightmapGPU.uploadPrebakedGrid(data, gridSize, worldSize);
+    this.updateMaterial(worldSize, defaultBiomeId, biomeRules);
+  }
+
   getMaterial(): THREE.MeshStandardMaterial {
     if (!this.terrainMaterial) {
       throw new Error('Terrain material requested before initialization');

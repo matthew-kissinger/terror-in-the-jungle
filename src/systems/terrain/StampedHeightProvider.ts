@@ -14,10 +14,7 @@ export class StampedHeightProvider implements IHeightProvider {
 
   constructor(baseProvider: IHeightProvider, stamps: TerrainStampConfig[]) {
     this.baseProvider = baseProvider;
-    this.stamps = stamps
-      .slice()
-      .sort((a, b) => a.priority - b.priority)
-      .map((stamp) => this.resolveStamp(stamp));
+    this.stamps = resolveTerrainStamps(baseProvider, stamps);
   }
 
   getHeightAt(worldX: number, worldZ: number): number {
@@ -37,41 +34,22 @@ export class StampedHeightProvider implements IHeightProvider {
       stamps: this.stamps.map((stamp) => ({ ...stamp })),
     };
   }
-
-  private resolveStamp(stamp: TerrainStampConfig): ResolvedTerrainStampConfig {
-    return {
-      ...stamp,
-      targetHeight: this.resolveTargetHeight(stamp),
-    };
-  }
-
-  private resolveTargetHeight(stamp: TerrainStampConfig): number {
-    switch (stamp.kind) {
-      case 'flatten_circle':
-        return sampleTargetHeight(
-          this.baseProvider,
-          stamp.centerX,
-          stamp.centerZ,
-          stamp.samplingRadius,
-          stamp.targetHeightMode,
-        );
-      case 'flatten_capsule':
-        return sampleCapsuleTargetHeight(
-          this.baseProvider,
-          stamp.startX,
-          stamp.startZ,
-          stamp.endX,
-          stamp.endZ,
-          stamp.samplingRadius,
-          stamp.targetHeightMode,
-        );
-      default:
-        return 0;
-    }
-  }
 }
 
-function applyResolvedStamp(
+export function resolveTerrainStamps(
+  baseProvider: IHeightProvider,
+  stamps: TerrainStampConfig[],
+): ResolvedTerrainStampConfig[] {
+  return stamps
+    .slice()
+    .sort((a, b) => a.priority - b.priority)
+    .map((stamp) => ({
+      ...stamp,
+      targetHeight: resolveTargetHeight(baseProvider, stamp),
+    }));
+}
+
+export function applyResolvedStamp(
   baseHeight: number,
   worldX: number,
   worldZ: number,
@@ -115,6 +93,34 @@ function applyResolvedStamp(
     }
     default:
       return baseHeight;
+  }
+}
+
+function resolveTargetHeight(
+  baseProvider: IHeightProvider,
+  stamp: TerrainStampConfig,
+): number {
+  switch (stamp.kind) {
+    case 'flatten_circle':
+      return sampleTargetHeight(
+        baseProvider,
+        stamp.centerX,
+        stamp.centerZ,
+        stamp.samplingRadius,
+        stamp.targetHeightMode,
+      );
+    case 'flatten_capsule':
+      return sampleCapsuleTargetHeight(
+        baseProvider,
+        stamp.startX,
+        stamp.startZ,
+        stamp.endX,
+        stamp.endZ,
+        stamp.samplingRadius,
+        stamp.targetHeightMode,
+      );
+    default:
+      return 0;
   }
 }
 
