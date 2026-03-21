@@ -7,7 +7,7 @@ import { extname, join, normalize } from 'path';
 
 const HOST = '127.0.0.1';
 const PORT = Number(process.env.PROD_SMOKE_PORT ?? 4173);
-const BASE_PATH = '/terror-in-the-jungle';
+const BASE_PATH = '';
 const DIST_ROOT = join(process.cwd(), 'dist');
 const INDEX_PATH = join(DIST_ROOT, 'index.html');
 const START_TIMEOUT_MS = 90_000;
