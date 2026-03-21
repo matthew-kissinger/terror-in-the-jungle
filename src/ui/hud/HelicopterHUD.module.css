@@ -87,7 +87,8 @@
   letter-spacing: 0.5px;
 }
 
-.touchMode .elevationLabel {
+.touchMode .elevationLabel,
+.touchMode .instrumentLabel {
   display: none;
 }
 

@@ -142,21 +142,26 @@ export class MatchEndScreen extends UIComponent {
       </div>
     ` : '';
 
+    const grenadeKillRow = stats.grenadeKills > 0 ? `
+              <div class="${styles.statRow}">
+                <span class="${styles.statLabel}">Grenade Kills</span>
+                <span class="${styles.statValue} ${styles.statHighlight}">${stats.grenadeKills}</span>
+              </div>` : '';
+
     return `
       <div class="${styles.reportShell}">
         <div class="${styles.header}">
-          <div class="${styles.reportLabel}">After Action Report</div>
           <div class="${styles.title}">${isVictory ? 'VICTORY' : 'DEFEAT'}</div>
           <div class="${styles.subtitle}">${winner} wins the battle</div>
         </div>
 
         <div class="${styles.reportMeta}">
           <div class="${styles.metaCard}">
-            <div class="${styles.metaLabel}">Match Duration</div>
+            <div class="${styles.metaLabel}">Duration</div>
             <div class="${styles.metaValue}">${durationText}</div>
           </div>
           <div class="${styles.metaCard}">
-            <div class="${styles.metaLabel}">Player K/D</div>
+            <div class="${styles.metaLabel}">K/D</div>
             <div class="${styles.metaValue}">${kd}</div>
           </div>
           <div class="${styles.metaCard}">
@@ -180,25 +185,6 @@ export class MatchEndScreen extends UIComponent {
                   <div class="${styles.factionTickets}">${Math.round(stats.opforTickets)}</div>
                 </div>
               </div>
-              <div class="${styles.statRow}">
-                <span class="${styles.statLabel}">Match Duration</span>
-                <span class="${styles.statValue}">${durationText}</span>
-              </div>
-            </div>
-
-            <div class="${styles.statsSection}">
-              <div class="${styles.statsSectionTitle}">Team Combat Totals</div>
-              <div class="${styles.ticketComparison}">
-                <div class="${styles.factionScore} ${styles.factionUS}">
-                  <div class="${styles.factionName}">US K/D</div>
-                  <div class="${styles.factionTickets}">${stats.usTeamKills} / ${stats.usTeamDeaths}</div>
-                </div>
-                <div class="${styles.vsDivider}">VS</div>
-                <div class="${styles.factionScore} ${styles.factionOPFOR}">
-                  <div class="${styles.factionName}">OPFOR K/D</div>
-                  <div class="${styles.factionTickets}">${stats.opforTeamKills} / ${stats.opforTeamDeaths}</div>
-                </div>
-              </div>
             </div>
 
             <div class="${styles.statsSection}">
@@ -209,22 +195,17 @@ export class MatchEndScreen extends UIComponent {
               </div>
               <div class="${styles.statRow}">
                 <span class="${styles.statLabel}">Assists</span>
-                <span class="${styles.statValue} ${styles.statHighlight}">${stats.assists}</span>
+                <span class="${styles.statValue}">${stats.assists}</span>
               </div>
               <div class="${styles.statRow}">
                 <span class="${styles.statLabel}">Deaths</span>
                 <span class="${styles.statValue}">${stats.deaths}</span>
               </div>
-              <div class="${styles.statRow}">
-                <span class="${styles.statLabel}">K/D Ratio</span>
-                <span class="${styles.statValue}">${kd}</span>
-              </div>
               ${!gameState.isTDM ? `
               <div class="${styles.statRow}">
                 <span class="${styles.statLabel}">Zones Captured</span>
                 <span class="${styles.statValue} ${styles.statHighlight}">${stats.zonesCaptured}</span>
-              </div>
-              ` : ''}
+              </div>` : ''}${grenadeKillRow}
             </div>
           </div>
 
@@ -236,10 +217,6 @@ export class MatchEndScreen extends UIComponent {
                 <span class="${styles.statValue}">${stats.damageDealt.toLocaleString()}</span>
               </div>
               <div class="${styles.statRow}">
-                <span class="${styles.statLabel}">Accuracy</span>
-                <span class="${styles.statValue}">${accuracy}%</span>
-              </div>
-              <div class="${styles.statRow}">
                 <span class="${styles.statLabel}">Headshots</span>
                 <span class="${styles.statValue}">${stats.headshots} <span style="opacity:0.6; font-size:0.9em">(${headshotPct}%)</span></span>
               </div>
@@ -247,37 +224,9 @@ export class MatchEndScreen extends UIComponent {
                 <span class="${styles.statLabel}">Longest Kill</span>
                 <span class="${styles.statValue}">${stats.longestKill}m</span>
               </div>
-            </div>
-
-            <div class="${styles.statsSection}">
-              <div class="${styles.statsSectionTitle}">Explosives</div>
               <div class="${styles.statRow}">
-                <span class="${styles.statLabel}">Grenades Thrown</span>
-                <span class="${styles.statValue}">${stats.grenadesThrown}</span>
-              </div>
-              <div class="${styles.statRow}">
-                <span class="${styles.statLabel}">Grenade Kills</span>
-                <span class="${styles.statValue}">${stats.grenadeKills}</span>
-              </div>
-            </div>
-
-            <div class="${styles.statsSection}">
-              <div class="${styles.statsSectionTitle}">Traversal</div>
-              <div class="${styles.statRow}">
-                <span class="${styles.statLabel}">Distance Covered</span>
-                <span class="${styles.statValue}">${stats.movementSummary.distanceMeters.toFixed(0)}m</span>
-              </div>
-              <div class="${styles.statRow}">
-                <span class="${styles.statLabel}">Climb Time</span>
-                <span class="${styles.statValue}">${stats.movementSummary.climbSeconds.toFixed(1)}s</span>
-              </div>
-              <div class="${styles.statRow}">
-                <span class="${styles.statLabel}">Pinned Time</span>
-                <span class="${styles.statValue}">${stats.movementSummary.pinnedSeconds.toFixed(1)}s</span>
-              </div>
-              <div class="${styles.statRow}">
-                <span class="${styles.statLabel}">Terrain Redirects</span>
-                <span class="${styles.statValue}">${stats.movementSummary.terrainRedirects}</span>
+                <span class="${styles.statLabel}">Best Streak</span>
+                <span class="${styles.statValue}">${stats.bestKillStreak}</span>
               </div>
             </div>
           </div>

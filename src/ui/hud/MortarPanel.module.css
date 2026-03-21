@@ -107,3 +107,10 @@
     font-size: var(--font-size-2xs);
   }
 }
+
+@media (max-width: 480px) {
+  .container {
+    width: 120px;
+    padding: var(--space-1) var(--space-1-5);
+  }
+}

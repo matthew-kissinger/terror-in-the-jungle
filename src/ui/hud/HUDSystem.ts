@@ -20,6 +20,7 @@ import type { AudioManager } from '../../systems/audio/AudioManager';
 import { IHUDSystem } from '../../types/SystemInterfaces';
 import { ViewportManager } from '../design/responsive';
 import { GameEventBus } from '../../core/GameEventBus';
+import { InputContextManager } from '../../systems/input/InputContextManager';
 import { HUDLayout } from '../layout/HUDLayout';
 import type { GamePhase } from './GameStatusPanel';
 import type { InventorySlotDefinition } from '../../systems/player/InventoryManager';
@@ -387,6 +388,10 @@ export class HUDSystem implements GameSystem, IHUDSystem {
       shotsHit: playerStats.shotsHit,
       movementSummary: movementStatsTracker.getPlayerSummary(),
     };
+
+    // Release pointer lock and set menu context so the user can interact with the end screen
+    document.exitPointerLock();
+    InputContextManager.getInstance().setContext('menu');
 
     Logger.info('hud', ' Showing match end screen with stats:', matchStats);
     this.hudLayout.setState({

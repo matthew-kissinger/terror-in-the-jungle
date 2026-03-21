@@ -19,6 +19,8 @@
   user-select: none;
   font-family: var(--font-primary, 'Rajdhani', sans-serif);
   white-space: nowrap;
+  overflow: hidden;
+  max-width: calc(100vw - 32px);
   height: 28px;
   box-shadow: var(--ops-shadow);
   justify-content: center;

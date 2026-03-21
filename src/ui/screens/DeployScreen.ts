@@ -106,14 +106,11 @@ export class DeployScreen extends UIComponent {
     // Map panel (hero)
     const mapPanel = this.createDiv(styles.mapPanel);
     const mapHeader = this.createDiv(styles.mapHeader);
-    const mapEyebrow = this.createDiv(styles.mapEyebrow);
-    mapEyebrow.textContent = 'Deploy Surface';
     this.mapTitle = this.createDiv(styles.mapTitle, 'respawn-map-title');
-    this.mapTitle.textContent = 'TACTICAL MAP - SELECT DEPLOYMENT';
+    this.mapTitle.textContent = 'SELECT SPAWN POINT';
     const mapHelper = this.createDiv(styles.mapHelper);
-    mapHelper.textContent = 'Select a route, confirm a spawn, and deploy when the timer clears.';
+    mapHelper.textContent = 'Click a zone on the map to select your deployment point.';
     this.mapContainer = this.createDiv(styles.map, 'respawn-map');
-    mapHeader.appendChild(mapEyebrow);
     mapHeader.appendChild(this.mapTitle);
     mapHeader.appendChild(mapHelper);
     mapPanel.appendChild(mapHeader);

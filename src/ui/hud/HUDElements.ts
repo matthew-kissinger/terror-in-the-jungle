@@ -124,7 +124,7 @@ export class HUDElements {
     this.killCounter.mount(this.hudContainer);
     this.ammoDisplay.mount(this.hudContainer);
     this.interactionPromptPanel.mount(this.hudContainer);
-    this.helicopterHUD.mount(this.hudContainer);
+    this.helicopterHUD.mount(document.body);
     this.grenadeMeter.mount(this.hudContainer);
     this.mortarPanel.mount(this.hudContainer);
     // Removed respawn button from HUD
@@ -308,7 +308,10 @@ export class HUDElements {
 
     // Phase 4 UIComponent elements
     this.helicopterHUD.unmount();
-    this.helicopterHUD.mount(layout.getSlot('center'));
+    // Mount to document.body instead of grid slot — the HUD grid uses
+    // `contain: layout style` which creates a new containing block,
+    // breaking position:fixed and causing the panels to offset toward center.
+    this.helicopterHUD.mount(document.body);
 
     // Legacy HTMLDivElement elements
     layout.getSlot('objectives').appendChild(this.objectivesList);

@@ -90,7 +90,6 @@ export class ModeSelectScreen extends UIComponent {
               ${iconHtml(entry.icon, { width: 30, css: 'opacity:0.9;image-rendering:pixelated;' })}
             </div>
             <div class="${styles.cardInfo}">
-              <span class="${styles.cardLabel}">Operation Profile</span>
               <span class="${styles.cardName}">${entry.name}</span>
               <p class="${styles.cardTagline}">${entry.tagline}</p>
             </div>
@@ -121,43 +120,8 @@ export class ModeSelectScreen extends UIComponent {
 
     this.root.innerHTML = `
       <div class="${styles.content}">
-        <div class="${styles.topRail}">
-          <div class="${styles.railGroup}">
-            <div class="${styles.railItem}">
-              <span class="${styles.railLabel}">Selection</span>
-              <span class="${styles.railValue}">Operation Profiles</span>
-            </div>
-            <div class="${styles.railItem}">
-              <span class="${styles.railLabel}">Output</span>
-              <span class="${styles.railValue}">Launch to deploy flow</span>
-            </div>
-          </div>
-          <div class="${styles.railGroup}">
-            <div class="${styles.railItem}">
-              <span class="${styles.railLabel}">Interface</span>
-              <span class="${styles.railValue}">Dossier-based briefing</span>
-            </div>
-          </div>
-        </div>
-
         <section class="${styles.headerPanel}">
-          <div class="${styles.headerCopy}">
-            <span class="${styles.headingLabel}">Mode Selection</span>
-            <h2 class="${styles.heading}">Choose An Operation Profile</h2>
-            <p class="${styles.headingBody}">
-              Each dossier summarizes combat rhythm, command scale, and terrain context before you step into the deploy table.
-            </p>
-          </div>
-          <div class="${styles.headerMeta}">
-            <div class="${styles.metaRow}">
-              <span class="${styles.metaLabel}">Flow</span>
-              <span class="${styles.metaValue}">Title → Mode → Deploy</span>
-            </div>
-            <div class="${styles.metaRow}">
-              <span class="${styles.metaLabel}">Intent</span>
-              <span class="${styles.metaValue}">Pick by tempo, not by guesswork</span>
-            </div>
-          </div>
+          <h2 class="${styles.heading}">SELECT MODE</h2>
         </section>
 
         <div class="${styles.cards}">${cardsHtml}</div>

@@ -297,21 +297,11 @@ export class WeaponFiring {
   private resolveTracerStart(target: THREE.Vector3): THREE.Vector3 {
     this.camera.getWorldPosition(_cameraPos)
     this.camera.getWorldDirection(_forward)
-
-    if (this.muzzleRef && this.overlayCamera) {
-      this.muzzleRef.getWorldPosition(_muzzlePos)
-      _overlayMuzzleNdc.copy(_muzzlePos).project(this.overlayCamera)
-      const ndcX = THREE.MathUtils.clamp(_overlayMuzzleNdc.x, -0.98, 0.98)
-      const ndcY = THREE.MathUtils.clamp(_overlayMuzzleNdc.y, -0.98, 0.98)
-      _muzzleRayPoint.set(ndcX, ndcY, 0.5).unproject(this.camera)
-      _barrelDirection.subVectors(_muzzleRayPoint, _cameraPos)
-      if (_barrelDirection.lengthSq() > 0.0001) {
-        _barrelDirection.normalize()
-        return target.copy(_cameraPos).addScaledVector(_barrelDirection, PLAYER_BARREL_WORLD_DISTANCE)
-      }
-    }
-
     this.camera.getWorldQuaternion(_cameraQuat)
+
+    // Camera-relative offset to approximate barrel position.
+    // Avoids NDC projection which can clamp to screen edges during recoil,
+    // creating a visible second ray from the wrong origin.
     _cameraRight.set(1, 0, 0).applyQuaternion(_cameraQuat).normalize()
     _cameraUp.set(0, 1, 0).applyQuaternion(_cameraQuat).normalize()
     return target.copy(_cameraPos)

@@ -9,6 +9,11 @@
   display: none;
 }
 
+/* Fully opaque on respawn so the game canvas doesn't bleed through */
+.root[data-deploy-kind="respawn"] {
+  background: rgba(4, 8, 5, 1);
+}
+
 .visible {
   display: flex;
 }
@@ -84,11 +89,6 @@
 
 .mapHeader {
   margin-bottom: var(--space-4);
-}
-
-.mapEyebrow {
-  composes: sectionLabel from './ScreenPrimitives.module.css';
-  margin-bottom: var(--space-2);
 }
 
 .mapTitle {
@@ -356,9 +356,19 @@
   }
 }
 
+@media (pointer: coarse) and (max-width: 960px) {
+  .sequencePanel {
+    display: none;
+  }
+
+  .legend {
+    display: none;
+  }
+}
+
 @media (pointer: coarse) and (max-width: 600px) {
   .map {
-    min-height: 260px;
+    min-height: 200px;
   }
 
   .loadoutRow {
@@ -367,5 +377,32 @@
 
   .presetMeta {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .headerTitle {
+    font-size: clamp(1.4rem, 5vw, 2rem);
+  }
+
+  .headerStatus {
+    font-size: var(--font-size-sm);
+  }
+
+  .headerMeta {
+    display: none;
+  }
+
+  .mapTitle {
+    font-size: clamp(1rem, 3vw, 1.4rem);
+  }
+
+  .loadoutStatus {
+    font-size: var(--font-size-2xs);
+  }
+
+  .smallButton {
+    min-height: 30px;
+    padding: var(--space-1-5) var(--space-2);
   }
 }

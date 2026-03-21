@@ -212,3 +212,10 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 480px) {
+  .card {
+    padding: var(--space-4) var(--space-5);
+    max-height: calc(100dvh - 32px);
+  }
+}

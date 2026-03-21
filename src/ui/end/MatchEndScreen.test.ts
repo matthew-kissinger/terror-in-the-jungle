@@ -149,16 +149,13 @@ describe('MatchEndScreen', () => {
     expect(texts).toContain('5');
   });
 
-  it('shows traversal summary stats', () => {
-    screen.show(Faction.US, makeGameState(), makeStats());
+  it('shows accuracy and damage stats', () => {
+    screen.show(Faction.US, makeGameState(), makeStats({ headshots: 5, longestKill: 120 }));
     const labels = Array.from(document.querySelectorAll('.statLabel')).map((el) => el.textContent);
-    const values = Array.from(document.querySelectorAll('.statValue')).map((el) => el.textContent?.trim());
-    expect(labels).toContain('Distance Covered');
-    expect(labels).toContain('Climb Time');
-    expect(labels).toContain('Pinned Time');
-    expect(values).toContain('1240m');
-    expect(values).toContain('42.5s');
-    expect(values).toContain('3.2s');
+    expect(labels).toContain('Total Damage');
+    expect(labels).toContain('Headshots');
+    expect(labels).toContain('Longest Kill');
+    expect(labels).toContain('Best Streak');
   });
 
   it('shows ticket labels for non-TDM modes', () => {

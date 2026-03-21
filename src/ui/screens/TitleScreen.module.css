@@ -1,5 +1,5 @@
 /**
- * TitleScreen - operations-table entry briefing.
+ * TitleScreen - centered title + loading + buttons.
  */
 
 .screen {
@@ -19,97 +19,39 @@
 .content {
   composes: screenStage from './ScreenPrimitives.module.css';
   justify-content: center;
-}
-
-.topRail {
-  composes: topRail from './ScreenPrimitives.module.css';
-}
-
-.railGroup {
-  composes: railGroup from './ScreenPrimitives.module.css';
-}
-
-.railItem {
-  composes: railItem from './ScreenPrimitives.module.css';
-}
-
-.railLabel {
-  composes: railLabel from './ScreenPrimitives.module.css';
-}
-
-.railValue {
-  composes: railValue from './ScreenPrimitives.module.css';
-}
-
-.heroShell {
-  composes: heroShell from './ScreenPrimitives.module.css';
+  align-items: center;
 }
 
 .heroPanel {
-  composes: heroPanel from './ScreenPrimitives.module.css';
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--ops-line);
+  background: linear-gradient(180deg, rgba(19, 26, 18, 0.96), rgba(8, 12, 9, 0.92));
+  box-shadow: var(--ops-shadow);
+  padding: clamp(24px, 4vw, 48px);
+  max-width: 720px;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-}
-
-.eyebrow {
-  composes: heroEyebrow from './ScreenPrimitives.module.css';
+  align-items: center;
+  text-align: center;
 }
 
 .title {
-  composes: heroTitle from './ScreenPrimitives.module.css';
+  margin: 0;
+  color: #f6f0dd;
+  font-family: var(--font-heading);
+  font-size: clamp(3.2rem, 9vw, 7rem);
+  font-weight: 500;
+  line-height: 0.88;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
   animation: ui-fadeInUp 0.8s ease-out;
 }
 
-.subtitle {
-  composes: heroSubtitle from './ScreenPrimitives.module.css';
-}
-
-.chipRow {
-  composes: statusChipRow from './ScreenPrimitives.module.css';
-}
-
-.chip {
-  composes: statusChip from './ScreenPrimitives.module.css';
-}
-
-.briefPanel {
-  composes: briefPanel from './ScreenPrimitives.module.css';
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.panelLabel {
-  composes: sectionLabel from './ScreenPrimitives.module.css';
-}
-
-.panelTitle {
-  composes: sectionTitle from './ScreenPrimitives.module.css';
-}
-
-.panelBody {
-  composes: sectionBody from './ScreenPrimitives.module.css';
-  margin-bottom: var(--space-4);
-}
-
-.briefList {
-  composes: dataList from './ScreenPrimitives.module.css';
-}
-
-.briefRow {
-  composes: dataRow from './ScreenPrimitives.module.css';
-}
-
-.briefTerm {
-  composes: dataTerm from './ScreenPrimitives.module.css';
-}
-
-.briefValue {
-  composes: dataValue from './ScreenPrimitives.module.css';
-}
-
 .loadingSection {
+  width: 100%;
   margin-top: var(--space-6);
   padding-top: var(--space-4);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -118,7 +60,7 @@
 .loadingHeader {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: center;
   gap: var(--space-3);
   margin-bottom: var(--space-3);
 }
@@ -129,13 +71,6 @@
   font-weight: var(--weight-semibold);
   letter-spacing: 0.18em;
   text-transform: uppercase;
-}
-
-.loadingHint {
-  color: var(--text-muted);
-  font-size: var(--font-size-xs);
-  font-family: var(--font-mono);
-  letter-spacing: 0.04em;
 }
 
 .progressBar {
@@ -170,6 +105,7 @@
   display: none;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: var(--space-3);
   margin-top: var(--space-5);
   animation: ui-fadeInUp 0.45s ease-out;
@@ -284,29 +220,6 @@
   opacity: 0;
 }
 
-.footerBar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding-top: var(--space-2);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.footerLabel {
-  color: var(--text-muted);
-  font-size: var(--font-size-2xs);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.footerValue {
-  color: var(--ops-data);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  font-variant-numeric: tabular-nums;
-}
-
 @media (max-width: 720px) {
   .heroPanel {
     padding: var(--space-5);
@@ -315,9 +228,47 @@
   .title {
     font-size: clamp(2.6rem, 15vw, 4.6rem);
   }
+}
 
-  .footerBar {
-    flex-direction: column;
-    align-items: flex-start;
+@media (max-width: 480px) {
+  .heroPanel {
+    padding: var(--space-4);
+  }
+
+  .startButton {
+    min-width: 200px;
+  }
+
+  .settingsLink {
+    min-width: 140px;
+  }
+
+  .loadingSection {
+    margin-top: var(--space-4);
+    padding-top: var(--space-3);
+  }
+
+  .menuSection {
+    margin-top: var(--space-4);
+  }
+}
+
+/* Short viewports: keep everything above the fold */
+@media (max-height: 500px) {
+  .title {
+    font-size: clamp(2rem, 8vw, 3rem);
+  }
+
+  .heroPanel {
+    padding: var(--space-3);
+  }
+
+  .loadingSection {
+    margin-top: var(--space-3);
+    padding-top: var(--space-2);
+  }
+
+  .menuSection {
+    margin-top: var(--space-3);
   }
 }

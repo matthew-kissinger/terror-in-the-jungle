@@ -31,106 +31,36 @@ export class TitleScreen extends UIComponent {
 
     this.root.innerHTML = `
       <div class="${styles.content}">
-        <div class="${styles.topRail}">
-          <div class="${styles.railGroup}">
-            <div class="${styles.railItem}">
-              <span class="${styles.railLabel}">Theater</span>
-              <span class="${styles.railValue}">A Shau / Frontier</span>
+        <section class="${styles.heroPanel}">
+          <h1 class="${styles.title}">TERROR IN THE JUNGLE</h1>
+
+          <div class="${styles.loadingSection}" data-ref="loading">
+            <div class="${styles.loadingHeader}">
+              <span class="${styles.loadingLabel}">Loading</span>
             </div>
-            <div class="${styles.railItem}">
-              <span class="${styles.railLabel}">Command Net</span>
-              <span class="${styles.railValue}">BLUFOR READY</span>
+            <div class="${styles.progressBar}">
+              <div class="${styles.progressFill}" data-ref="fill" style="width: 0%"></div>
             </div>
+            <div class="${styles.phaseText}" data-ref="phase">Initializing...</div>
           </div>
-          <div class="${styles.railGroup}">
-            <div class="${styles.railItem}">
-              <span class="${styles.railLabel}">Simulation</span>
-              <span class="${styles.railValue}">Three.js r182</span>
-            </div>
-            <div class="${styles.railItem}">
-              <span class="${styles.railLabel}">Scale</span>
-              <span class="${styles.railValue}">Up to 3000 agents</span>
-            </div>
+
+          <div class="${styles.menuSection}" data-ref="menu">
+            <button class="${styles.startButton}" data-ref="start" type="button">START GAME</button>
+            <button class="${styles.settingsLink}" data-ref="settings" type="button">SETTINGS</button>
           </div>
-        </div>
 
-        <div class="${styles.heroShell}">
-          <section class="${styles.heroPanel}">
-            <p class="${styles.eyebrow}">Operations Table</p>
-            <h1 class="${styles.title}">TERROR IN THE JUNGLE</h1>
-            <p class="${styles.subtitle}">
-              Air cavalry, layered fronts, and large-map jungle combat staged as a live field command briefing.
-            </p>
-
-            <div class="${styles.chipRow}">
-              <span class="${styles.chip}">Tactical Deploy Flow</span>
-              <span class="${styles.chip}">Large-Scale AI Combat</span>
-              <span class="${styles.chip}">Historic Terrain Theater</span>
-            </div>
-
-            <div class="${styles.loadingSection}" data-ref="loading">
-              <div class="${styles.loadingHeader}">
-                <span class="${styles.loadingLabel}">Boot Sequence</span>
-                <span class="${styles.loadingHint}">Preparing field systems</span>
-              </div>
-              <div class="${styles.progressBar}">
-                <div class="${styles.progressFill}" data-ref="fill" style="width: 0%"></div>
-              </div>
-              <div class="${styles.phaseText}" data-ref="phase">Initializing...</div>
-            </div>
-
-            <div class="${styles.menuSection}" data-ref="menu">
-              <button class="${styles.startButton}" data-ref="start" type="button">START GAME</button>
-              <button class="${styles.settingsLink}" data-ref="settings" type="button">SETTINGS</button>
-            </div>
-
-            <div class="${styles.preparingText}" data-ref="preparingText" style="display:none"></div>
-          </section>
-
-          <aside class="${styles.briefPanel}">
-            <span class="${styles.panelLabel}">Mission Brief</span>
-            <h2 class="${styles.panelTitle}">Field Command</h2>
-            <p class="${styles.panelBody}">
-              Choose an operation profile, load the terrain stack, and move into a live battle with tactical deployment control.
-            </p>
-
-            <div class="${styles.briefList}">
-              <div class="${styles.briefRow}">
-                <span class="${styles.briefTerm}">Modes</span>
-                <span class="${styles.briefValue}">Zone / Frontier / TDM / A Shau</span>
-              </div>
-              <div class="${styles.briefRow}">
-                <span class="${styles.briefTerm}">Insertions</span>
-                <span class="${styles.briefValue}">Map-first spawn selection</span>
-              </div>
-              <div class="${styles.briefRow}">
-                <span class="${styles.briefTerm}">Readiness</span>
-                <span class="${styles.briefValue}">Terrain + navmesh + combatant bootstrap</span>
-              </div>
-              <div class="${styles.briefRow}">
-                <span class="${styles.briefTerm}">Focus</span>
-                <span class="${styles.briefValue}">Stable frame-time tails under load</span>
-              </div>
-            </div>
-          </aside>
-        </div>
-
-        <div class="${styles.footerBar}">
-          <span class="${styles.footerLabel}">System Status</span>
-          <span class="${styles.footerValue}" data-ref="loadTime">Cold start</span>
-        </div>
+          <div class="${styles.preparingText}" data-ref="preparingText" style="display:none"></div>
+        </section>
       </div>
     `;
 
-    // Initialize LoadingProgress with DOM refs
-    // percentText is not shown in the minimal design, pass a dummy span
     const dummyPercent = document.createElement('span');
     this.progress = new LoadingProgress(
       this.$('[data-ref="fill"]') as HTMLDivElement,
       dummyPercent,
       this.$('[data-ref="phase"]') as HTMLDivElement,
-      document.createElement('div'), // no tip text
-      this.$('[data-ref="loadTime"]') as HTMLSpanElement | null
+      document.createElement('div'),
+      null
     );
   }
 

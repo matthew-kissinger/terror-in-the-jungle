@@ -1,5 +1,5 @@
 /**
- * ModeSelectScreen - operation dossiers instead of flat cards.
+ * ModeSelectScreen - mode cards in a responsive grid.
  */
 
 .screen {
@@ -21,42 +21,13 @@
   justify-content: center;
 }
 
-.topRail {
-  composes: topRail from './ScreenPrimitives.module.css';
-}
-
-.railGroup {
-  composes: railGroup from './ScreenPrimitives.module.css';
-}
-
-.railItem {
-  composes: railItem from './ScreenPrimitives.module.css';
-}
-
-.railLabel {
-  composes: railLabel from './ScreenPrimitives.module.css';
-}
-
-.railValue {
-  composes: railValue from './ScreenPrimitives.module.css';
-}
-
 .headerPanel {
-  composes: heroPanel from './ScreenPrimitives.module.css';
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  container-type: inline-size;
-}
-
-.headerCopy {
-  max-width: 42rem;
-}
-
-.headingLabel {
-  composes: heroEyebrow from './ScreenPrimitives.module.css';
-  display: block;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--ops-line);
+  background: linear-gradient(180deg, rgba(19, 26, 18, 0.96), rgba(8, 12, 9, 0.92));
+  box-shadow: var(--ops-shadow);
+  padding: clamp(16px, 2vw, 24px);
 }
 
 .heading {
@@ -68,31 +39,6 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   line-height: 0.95;
-}
-
-.headingBody {
-  margin: var(--space-3) 0 0;
-  color: var(--text-secondary);
-  font-size: var(--font-size-base);
-  line-height: 1.6;
-}
-
-.headerMeta {
-  composes: briefPanel from './ScreenPrimitives.module.css';
-  min-width: min(100%, 320px);
-}
-
-.metaRow {
-  composes: dataRow from './ScreenPrimitives.module.css';
-}
-
-.metaLabel {
-  composes: dataTerm from './ScreenPrimitives.module.css';
-}
-
-.metaValue {
-  composes: dataValue from './ScreenPrimitives.module.css';
-  text-align: right;
 }
 
 .cards {
@@ -118,10 +64,6 @@
 
 .cardInfo {
   min-width: 0;
-}
-
-.cardLabel {
-  composes: dossierLabel from './ScreenPrimitives.module.css';
 }
 
 .cardName {
@@ -152,15 +94,10 @@
   composes: metricValue from './ScreenPrimitives.module.css';
 }
 
-.cardTdm::before {
-  border-left-color: rgba(248, 113, 113, 0.85);
-}
-
 .cardTdm:hover {
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.32), 0 0 0 1px rgba(248, 113, 113, 0.22);
 }
 
-.cardTdm .cardLabel,
 .cardTdm .metricValue:last-child {
   color: #fca5a5;
 }
@@ -170,23 +107,43 @@
   align-self: flex-start;
 }
 
-@container (max-width: 800px) {
-  .headerPanel {
-    flex-direction: column;
-  }
-
-  .headerMeta {
-    width: 100%;
-  }
-}
-
 @media (max-width: 560px) {
+  .headerPanel {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .heading {
+    font-size: clamp(1.4rem, 5vw, 2rem);
+  }
+
   .cards {
     grid-template-columns: 1fr;
-    gap: var(--space-3);
+    gap: var(--space-2);
   }
 
   .card {
-    padding: var(--space-3);
+    padding: var(--space-2-5) var(--space-3);
+    gap: 0;
+  }
+
+  .cardTagline {
+    display: none;
+  }
+
+  .cardMetrics {
+    display: none;
+  }
+
+  .cardIndex {
+    display: none;
+  }
+
+  .cardIconWrap {
+    width: 36px;
+    height: 36px;
+  }
+
+  .backButton {
+    min-height: 40px;
   }
 }

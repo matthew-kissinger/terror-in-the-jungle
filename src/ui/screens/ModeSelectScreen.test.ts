@@ -18,14 +18,13 @@ describe('ModeSelectScreen', () => {
     screen.dispose();
   });
 
-  it('renders all operation dossiers with richer mission metadata', () => {
+  it('renders all mode cards with key metadata', () => {
     expect(document.querySelectorAll('[data-mode]')).toHaveLength(4);
 
     const text = document.body.textContent ?? '';
-    expect(text).toContain('Operation Profile');
+    expect(text).toContain('SELECT MODE');
     expect(text).toContain('Platoon / 60 AI');
     expect(text).toContain('Battalion / 3000 AI');
-    expect(text).toContain('Dossier-based briefing');
   });
 
   it('emits the selected mode on click', () => {

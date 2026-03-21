@@ -122,3 +122,10 @@
     font-size: var(--font-size-2xs);
   }
 }
+
+@media (max-width: 480px) {
+  .container {
+    width: 130px;
+    margin-top: 60px;
+  }
+}

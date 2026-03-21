@@ -51,52 +51,6 @@
   gap: clamp(12px, 2vw, 20px);
 }
 
-.topRail {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.railGroup {
-  display: flex;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.railItem {
-  min-width: 128px;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--ops-line);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.02));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-.railLabel {
-  display: block;
-  margin-bottom: var(--space-1);
-  color: var(--text-muted);
-  font-size: var(--font-size-2xs);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.railValue {
-  display: block;
-  color: var(--ops-data);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.03em;
-}
-
-.heroShell {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
-  gap: clamp(16px, 2vw, 24px);
-  align-items: stretch;
-}
 
 .heroPanel {
   position: relative;
@@ -107,51 +61,6 @@
   padding: clamp(18px, 3vw, 32px);
 }
 
-.heroPanel::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(90deg, transparent 0 66%, rgba(168, 200, 122, 0.08) 66% 67%, transparent 67%),
-    radial-gradient(circle at top right, rgba(251, 191, 36, 0.12), transparent 32%);
-}
-
-.heroEyebrow {
-  margin: 0 0 var(--space-2);
-  color: var(--ops-olive);
-  font-size: var(--font-size-xs);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-}
-
-.heroTitle {
-  margin: 0;
-  color: #f6f0dd;
-  font-family: var(--font-heading);
-  font-size: clamp(3.2rem, 9vw, 7rem);
-  font-weight: 500;
-  line-height: 0.88;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  text-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
-}
-
-.heroSubtitle {
-  max-width: 38rem;
-  margin: var(--space-4) 0 0;
-  color: var(--text-secondary);
-  font-size: clamp(0.95rem, 1.8vw, 1.15rem);
-  line-height: 1.6;
-}
-
-.statusChipRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-}
 
 .statusChip {
   padding: var(--space-1-5) var(--space-3);
@@ -310,14 +219,6 @@
   transition: transform var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out);
 }
 
-.dossierCard::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-left: 3px solid var(--ops-accent);
-  opacity: 0.65;
-  pointer-events: none;
-}
 
 .dossierCard:hover {
   transform: translateY(-3px);
@@ -352,16 +253,6 @@
   font-family: var(--font-mono);
   font-size: var(--font-size-lg);
   letter-spacing: 0.12em;
-}
-
-.dossierLabel {
-  display: block;
-  margin-bottom: var(--space-1);
-  color: var(--ops-olive);
-  font-size: var(--font-size-2xs);
-  font-weight: var(--weight-semibold);
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
 }
 
 .dossierTitle {
@@ -414,12 +305,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-}
-
-@media (max-width: 960px) {
-  .heroShell {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 640px) {
