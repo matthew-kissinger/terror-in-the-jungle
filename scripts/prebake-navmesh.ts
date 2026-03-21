@@ -228,6 +228,26 @@ function validateConnectivity(
 // ── Main ─────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  // Check if all expected assets already exist (skip expensive regeneration)
+  const allExpectedAssets: string[] = [];
+  for (const mode of MODES) {
+    const variants = getMapVariants(mode.mode);
+    const seeds = variants.length > 0
+      ? variants.map(v => v.seed)
+      : (typeof mode.config.terrainSeed === 'number' ? [mode.config.terrainSeed] : []);
+    for (const seed of seeds) {
+      allExpectedAssets.push(resolve(NAVMESH_DIR, `${mode.id}-${seed}.bin`));
+      allExpectedAssets.push(resolve(HEIGHTMAP_DIR, `${mode.id}-${seed}.f32`));
+    }
+  }
+  if (allExpectedAssets.length > 0 && allExpectedAssets.every(f => existsSync(f))) {
+    console.log(`All ${allExpectedAssets.length} pre-baked assets already exist, skipping generation.`);
+    console.log('Run with --force to regenerate.');
+    if (!process.argv.includes('--force')) {
+      return;
+    }
+  }
+
   console.log('Initializing Recast WASM...');
   await init();
   console.log('Recast WASM ready.\n');
