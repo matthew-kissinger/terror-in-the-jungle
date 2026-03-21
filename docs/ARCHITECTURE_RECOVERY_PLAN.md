@@ -33,7 +33,12 @@ Scope: runtime architecture stabilization with performance and gameplay fidelity
 - Keep: `ZoneState.BLUFOR_CONTROLLED` (renamed from `US_CONTROLLED`). All zone ownership now uses alliance-level naming. 23 files updated.
 - Keep: `TicketDisplay.setFactionLabels()` for dynamic HUD faction names derived from `factionMix` config. `GameEngineInit.applyLaunchSelection()` resolves labels at mode start.
 - Keep: Helipad spawn points wired into `PlayerRespawnManager` for Open Frontier. BLUFOR players see helipads as spawn options; frontier deploy flow prefers helipad_main.
-- Keep: production boot validation in CI via a real built-app smoke (`smoke:prod`). Deploy now depends on lint + tests + build + smoke.
+- Keep: production boot validation in CI via a real built-app smoke (`smoke:prod`). Deploy to Cloudflare Pages depends on lint + tests + build + smoke.
+- Keep: async chunked vegetation regeneration (`VegetationScatterer.regenerateAllAsync`) with rAF+setTimeout yield between batches. Eliminates 10-15s Open Frontier startup hang. Sync path retained for small cell counts (<5).
+- Keep: `MapSeedRegistry` for pre-baked map seed rotation. Each mode has multiple connectivity-validated seed variants; runtime picks randomly per session, avoids back-to-back repeats via sessionStorage.
+- Keep: `HeightmapGPU.uploadPrebakedGrid()` for pre-computed heightmap loading. Skips the synchronous 1M-sample noise loop during startup.
+- Keep: deterministic vegetation placement in `ChunkVegetationGenerator` - all `Math.random()` replaced with `hashInts()` seeded from chunk coordinates. Ensures reproducible terrain across sessions for the same seed.
+- Keep: prebake script skip-when-assets-exist pattern. `scripts/prebake-navmesh.ts` checks for all expected output files before initializing WASM; `--force` flag to regenerate. Prevents 20+ minute CI build timeouts.
 - Keep: `StartupFlowController` as the canonical startup phase state for `menu_ready -> mode_preparing -> deploy_select -> spawn_warming -> live`.
 - Keep: `DeployFlowController` as the canonical owner of deploy-session kind, selected spawn, and pending initial-deploy resolution.
 - Keep: `SimulationScheduler` inside `SystemUpdater` for cadence-based groups (`tactical_ui`, `war_sim`, `world_state`, `mode_runtime`).

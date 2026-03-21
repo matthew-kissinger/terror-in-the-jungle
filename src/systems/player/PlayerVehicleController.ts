@@ -111,6 +111,11 @@ export class PlayerVehicleController {
     playerState.isRunning = false;
 
     input.setInHelicopter(true);
+    // Set helicopter input context if InputManager is available (gates equipment keys)
+    if ('setInputContext' in input) {
+      (input as any).setInputContext('helicopter');
+    }
+    cameraController.saveInfantryAngles();
 
     this.deps.hudSystem?.showHelicopterMouseIndicator();
     this.deps.hudSystem?.updateHelicopterMouseMode(cameraController.getHelicopterMouseControlEnabled());
@@ -137,11 +142,16 @@ export class PlayerVehicleController {
     setPosition: (position: THREE.Vector3, reason: string) => void,
     input: PlayerInput,
     gameRenderer: { setCrosshairMode(mode: 'infantry'): void } | undefined,
+    cameraController?: PlayerCamera,
   ): void {
     playerState.isInHelicopter = false;
     playerState.helicopterId = null;
     setPosition(exitPosition, 'helicopter.exit');
     input.setInHelicopter(false);
+    if ('setInputContext' in input) {
+      (input as any).setInputContext('gameplay');
+    }
+    cameraController?.restoreInfantryAngles();
     this.deps.hudSystem?.hideHelicopterMouseIndicator();
     this.deps.hudSystem?.hideHelicopterInstruments();
     this.deps.hudSystem?.setVehicleContext?.(null);

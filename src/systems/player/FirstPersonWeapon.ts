@@ -370,6 +370,9 @@ export class FirstPersonWeapon implements GameSystem {
   }
 
   private onAmmoChange(state: AmmoState): void {
+    // Suppress HUD updates during weapon switch to prevent old weapon ammo flicker
+    if (this.rigManager.isSwitching()) return
+
     // Update HUD if available
     if (this.hudSystem) {
       this.hudSystem.updateAmmoDisplay(state.currentMagazine, state.reserveAmmo)

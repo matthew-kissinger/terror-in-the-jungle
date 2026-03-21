@@ -291,7 +291,7 @@ export class HUDElements {
     this.gameStatusPanel.mount(layout.getSlot('game-status'));
 
     this.killCounter.unmount();
-    this.killCounter.mount(layout.getSlot('stats'));
+    this.killCounter.mount(layout.getSlot('game-status'));
 
     this.ammoDisplay.unmount();
     this.ammoDisplay.mount(layout.getSlot('ammo'));

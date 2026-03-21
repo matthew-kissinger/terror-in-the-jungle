@@ -11,7 +11,7 @@
   top: 50%;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  z-index: 10;
+  z-index: var(--z-crosshair);
 }
 
 .hidden {
@@ -142,7 +142,12 @@
 
 @keyframes crosshairPulse {
   0%, 100% { opacity: 0.9; }
-  50% { opacity: 0.5; }
+  50% { opacity: 0.85; }
+}
+
+/* Disable pulse during ADS for clarity */
+:global([data-ads="true"]) .line {
+  animation: none;
 }
 
 /* --- Attack helicopter pipper reticle --- */

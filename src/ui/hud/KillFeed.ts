@@ -30,6 +30,7 @@ export class KillFeed {
   private container: HTMLDivElement;
   private entries: KillEntry[] = [];
   private entryElements: Map<string, HTMLElement> = new Map();
+  private pendingTimeouts: Set<ReturnType<typeof setTimeout>> = new Set();
   private entryIdCounter: number = 0;
   private readonly MAX_ENTRIES = 6;
   private readonly ENTRY_LIFETIME = 5000;
@@ -113,12 +114,19 @@ export class KillFeed {
       const element = this.entryElements.get(id);
       if (element) {
         element.classList.add(styles.entrySlideOut);
-        setTimeout(() => {
+        const removeElement = (): void => {
           if (element.parentNode) {
             element.parentNode.removeChild(element);
           }
           this.entryElements.delete(id);
-        }, this.SLIDE_OUT_DURATION);
+        };
+        element.addEventListener('animationend', removeElement, { once: true });
+        // Fallback in case animationend doesn't fire (e.g., element detached)
+        const fallback = setTimeout(() => {
+          removeElement();
+          this.pendingTimeouts.delete(fallback);
+        }, this.SLIDE_OUT_DURATION + 50);
+        this.pendingTimeouts.add(fallback);
       }
     });
 
@@ -256,12 +264,24 @@ export class KillFeed {
     parent.appendChild(this.container);
   }
 
+  unmount(): void {
+    this.dispose();
+  }
+
   dispose(): void {
+    for (const timeout of this.pendingTimeouts) {
+      clearTimeout(timeout);
+    }
+    this.pendingTimeouts.clear();
+
+    for (const element of this.entryElements.values()) {
+      element.remove();
+    }
+    this.entryElements.clear();
+    this.entries = [];
+
     if (this.container.parentNode) {
       this.container.parentNode.removeChild(this.container);
     }
-
-    this.entryElements.clear();
-    this.entries = [];
   }
 }

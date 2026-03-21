@@ -14,15 +14,18 @@
    * The lower-left is clear during helicopter mode because weapon-bar/ammo/stats
    * are all hidden by the vehicle="helicopter" CSS rules.
    */
-  left: max(14px, env(safe-area-inset-left, 0px));
+  left: max(4px, env(safe-area-inset-left, 0px));
   bottom: max(60px, env(safe-area-inset-bottom, 0px));
   display: none;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 6px;
   pointer-events: none;
   user-select: none;
-  z-index: 160;
+  z-index: var(--z-hud-overlay);
+  max-height: calc(100dvh - 120px);
+  overflow-y: auto;
+  scrollbar-width: none;
 }
 
 .touchMode {
@@ -86,6 +89,11 @@
 
 .touchMode .elevationLabel {
   display: none;
+}
+
+.touchMode .mouseSection,
+.touchMode .mouseSectionVisible {
+  display: none !important;
 }
 
 /* --- Mouse mode section --- */
@@ -429,6 +437,8 @@
 /* Responsive */
 @media (pointer: coarse) and (orientation: landscape) {
   .container {
+    bottom: auto;
+    left: auto;
     top: max(58px, env(safe-area-inset-top, 0px));
     right: max(8px, env(safe-area-inset-right, 0px));
   }
@@ -436,6 +446,8 @@
 
 @media (pointer: coarse) and (orientation: portrait) {
   .container {
+    bottom: auto;
+    left: auto;
     top: max(88px, env(safe-area-inset-top, 0px));
     right: max(8px, env(safe-area-inset-right, 0px));
   }
@@ -462,6 +474,7 @@
 @media (max-width: 480px) {
   .container {
     top: auto;
+    left: auto;
     bottom: calc(150px + env(safe-area-inset-bottom, 0px));
     right: max(8px, env(safe-area-inset-right, 0px));
   }

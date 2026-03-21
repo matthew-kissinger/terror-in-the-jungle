@@ -62,8 +62,12 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   private hudLayout: HUDLayout;
   private viewportUnsubscribe?: () => void;
   private eventUnsubscribes: (() => void)[] = [];
-  private staticHudAccumulator = 0;
-  private readonly STATIC_HUD_INTERVAL = 0.2; // 5Hz for mostly-static HUD text/state
+  private timerAccumulator = 0;
+  private ticketAccumulator = 0;
+  private objectiveAccumulator = 0;
+  private readonly TIMER_INTERVAL = 1.0;      // 1Hz - timer only needs second ticks
+  private readonly TICKET_INTERVAL = 0.1;     // 10Hz - ticket counts should feel responsive
+  private readonly OBJECTIVE_INTERVAL = 0.5;  // 2Hz - zone/objective display
 
   constructor(camera?: THREE.Camera, ticketSystem?: TicketSystem, playerHealthSystem?: PlayerHealthSystem, _playerRespawnManager?: unknown) {
     this.camera = camera;
@@ -150,21 +154,30 @@ export class HUDSystem implements GameSystem, IHUDSystem {
 
   update(deltaTime: number): void {
     const isTDM = this.ticketSystem ? this.ticketSystem.isTDMMode() : false;
-    this.staticHudAccumulator += deltaTime;
-    if (this.staticHudAccumulator >= this.STATIC_HUD_INTERVAL) {
-      // Update objectives display
+
+    this.objectiveAccumulator += deltaTime;
+    this.ticketAccumulator += deltaTime;
+    this.timerAccumulator += deltaTime;
+
+    // 2Hz - objectives
+    if (this.objectiveAccumulator >= this.OBJECTIVE_INTERVAL) {
       if (this.zoneManager) {
         this.zoneDisplay.updateObjectivesDisplay(this.zoneManager, isTDM, this.camera?.position);
       }
-
-      // Update game status and tickets
       if (this.ticketSystem) {
         this.updateGameStatus(this.ticketSystem);
+      }
+      this.objectiveAccumulator = 0;
+    }
+
+    // 10Hz - tickets and bleed
+    if (this.ticketAccumulator >= this.TICKET_INTERVAL) {
+      if (this.ticketSystem) {
         this.elements.ticketDisplay.setMode(isTDM, this.ticketSystem.getKillTarget());
         const usTickets = this.ticketSystem.getTickets(Faction.US);
         const opforTickets = this.ticketSystem.getTickets(Faction.NVA);
-        const timeRemaining = this.ticketSystem.getMatchTimeRemaining();
         this.elements.ticketDisplay.setTickets(usTickets, opforTickets);
+        this.elements.mobileStatusBar.setTickets(usTickets, opforTickets);
         // Update bleed indicator (conquest only)
         if (!isTDM) {
           const bleed = this.ticketSystem.getTicketBleedRate();
@@ -176,14 +189,18 @@ export class HUDSystem implements GameSystem, IHUDSystem {
             this.elements.ticketDisplay.setBleedIndicator(null);
           }
         }
-        // Update match timer
+      }
+      this.ticketAccumulator = 0;
+    }
+
+    // 1Hz - match timer
+    if (this.timerAccumulator >= this.TIMER_INTERVAL) {
+      if (this.ticketSystem) {
+        const timeRemaining = this.ticketSystem.getMatchTimeRemaining();
         this.elements.matchTimer.setTime(timeRemaining);
-        // Feed mobile status bar (merged timer + tickets)
-        this.elements.mobileStatusBar.setTickets(usTickets, opforTickets);
         this.elements.mobileStatusBar.setTime(timeRemaining);
       }
-
-      this.staticHudAccumulator = 0;
+      this.timerAccumulator = 0;
     }
 
     // Update grenade power meter

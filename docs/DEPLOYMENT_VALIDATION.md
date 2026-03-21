@@ -1,6 +1,6 @@
 # Deployment Validation
 
-Last updated: 2026-03-19
+Last updated: 2026-03-20
 
 ## Goal
 
@@ -39,16 +39,20 @@ Run these against the local built app or a preview deployment:
 4. Respawn deploy confirm returns cleanly to live gameplay.
 5. No fatal console/runtime errors appear during menu/start/deploy flow.
 
-## GitHub Pages / CI Expectations
+## Cloudflare Pages / CI Expectations
 
-The current deploy pipeline in `.github/workflows/ci.yml` requires:
+The deploy pipeline in `.github/workflows/ci.yml` deploys to Cloudflare Pages (`terror-in-the-jungle.pages.dev`).
+
+Required gates before deploy:
 
 - `lint`
 - `test`
-- `build`
+- `build` (includes `prebuild` which skips if pre-baked assets exist)
 - `smoke`
 
-Deploy only runs on `push` to `master` after those jobs pass.
+Deploy only runs on `push` to `master` after those jobs pass. Requires `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` GitHub secrets.
+
+Vite `base` is `/` (was `/terror-in-the-jungle/` when on GitHub Pages). The smoke test's `BASE_PATH` must match.
 
 ## Current Known Risks Before Push
 
@@ -58,19 +62,20 @@ Deploy only runs on `push` to `master` after those jobs pass.
 
 ## Current Validated State
 
-Latest local validation on 2026-03-19:
+Latest local validation on 2026-03-20:
 
 - `npm run build` passed
-- `npm run test:quick` passed: `177` test files, `3,591` passing tests, `2` skipped
-- `index.html` now includes an inline boot splash (CSS-only pulsing bar, visible <100ms before JS loads)
-- Granular texture/audio loading progress wired through SystemInitializer
-- Progress bar transition: 0.15s linear (was 0.5s ease)
-- Navmesh slow-phase hint visible during mode startup
+- `npm run test:quick` passed: `179` test files, `3,614` passing tests, `2` skipped
+- Live deployment verified at `https://terror-in-the-jungle.pages.dev/`
+- Open Frontier startup: no hang, progress bar advances smoothly through vegetation phase
+- Map seed rotation: 5 OF / 3 ZC / 3 TDM pre-baked variants, random per session
+- Pre-baked assets (heightmaps + navmeshes) served from `public/data/`
+- Service worker caches immutable hashed assets and pre-baked data
 - current large chunks:
   - `three`: ~691kB
-  - `index`: ~748kB
+  - `index`: ~758kB
   - `recast-navigation.wasm-compat`: ~710kB
-  - `ui`: ~404kB
+  - `ui`: ~425kB
 
 ## Recommended Pre-Push Sequence
 

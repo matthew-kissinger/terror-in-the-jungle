@@ -1,6 +1,6 @@
 # Project Notes
 
-Last updated: 2026-03-19
+Last updated: 2026-03-21
 
 ## Project
 
@@ -39,7 +39,7 @@ npm run perf:update-baseline  # update baseline from latest capture
 
 - Entry: `src/main.ts`, `src/core/bootstrap.ts`
 - Engine: `src/core/GameEngine.ts`, `src/core/GameEngineInit.ts`, `src/core/SystemUpdater.ts`, `src/core/GameEventBus.ts`
-- Modes: `src/config/gameModeTypes.ts`, `src/config/*Config.ts`
+- Modes: `src/config/gameModeTypes.ts`, `src/config/*Config.ts`, `src/config/MapSeedRegistry.ts`
 - Combat: `src/systems/combat/*`
 - Navigation: `src/systems/navigation/*` (navmesh, crowd, movement adapter)
 - Strategy (A Shau): `src/systems/strategy/*`
@@ -75,7 +75,9 @@ npm run perf:update-baseline  # update baseline from latest capture
 19. Mobile vehicle controls + sensitivity tuning (2026-03-18): VehicleActionBar component (EXIT/FIRE/STAB/LOOK buttons for helicopter mode). Touch sensitivity range halved (0.003-0.015, was 0.006-0.024), accel exponent 1.35->1.15, dead zone 0.5->1.5px. TouchActionButtons test fixed for 5-button layout (CMD+MAP added in PR #36). Fire button visibility gated by aircraft role (attack/gunship only). Auto-hover wired through touch controls. 3586 tests passing.
 20. Open Frontier navmesh perf fix (2026-03-18): World-size-aware navmesh parameters prevent browser crash/hang on 3200m maps. Cell size scales with world size (cs=1.0 for <=800m, 1.5 for <=1600m, 2.0 for >1600m). Heightfield sampling scales similarly (4/6/8m). Large worlds use coarser Recast params (ch=0.4, maxEdgeLen=24, minRegionArea=16, detailSampleDist=12). Memory guard aborts solo build >300MB. Tiled threshold reverted to strict greater-than (3200m stays solo). Connectivity validation reduced from all-pairs to home-base representatives. 3584 tests passing.
 21. Startup/loading performance (2026-03-19): Inline boot splash in `index.html` (CSS-only pulsing bar, visible <100ms, removed by GameUI.onMount). Granular texture/audio loading progress (per-file `onProgress` callbacks in AssetLoader.init and AudioManager.init, wired through SystemInitializer). Progress bar transition `0.5s ease` -> `0.15s linear` for responsive feel. Navmesh slow-phase hint ("this may take a few seconds") in TitleScreen. 3591 tests passing.
-22. See `docs/NEXT_WORK.md` for the active checklist.
+22. Async startup + map seed rotation + Cloudflare deploy (2026-03-20): Open Frontier 10-15s hang eliminated. `VegetationScatterer.regenerateAllAsync()` yields between batches of 3 cells via rAF+setTimeout. `HeightmapGPU.uploadPrebakedGrid()` accepts pre-computed Float32Arrays. `MapSeedRegistry` rotates pre-baked seeds per session (5 OF, 3 ZC, 3 TDM variants). Prebake script (`scripts/prebake-navmesh.ts`) generates heightmaps + navmeshes for all variants with connectivity validation; skips when assets exist (`--force` to regenerate). Vegetation determinism: all `Math.random()` in `ChunkVegetationGenerator` replaced with `hashInts()`. Progress bar reweighted (vegetation 50%, was hidden inside features). Deployed to Cloudflare Pages (`terror-in-the-jungle.pages.dev`). CI: lint+test+build+smoke gate deploy; `vite base` changed from `/terror-in-the-jungle/` to `/`. Service worker caches immutable assets. 3614 tests passing.
+23. Frontend/UX hardening pass (2026-03-21): 30 issues fixed across HUD, input, vehicle transitions, CSS. Critical: fire-stop callback bypass context gating (`runRelease`), helicopter entry reordered for atomic HUD swap, ammo display suppressed during weapon switch. HelicopterHUD repositioned flush-left (`align-items: flex-start`), mobile media queries fixed (conflicting position properties). KillFeed uses `animationend` + timeout tracking. Camera saves/restores infantry angles across helicopter transitions. HUD update rates split (timer 1Hz, tickets 10Hz, objectives 2Hz). `'helicopter'` input context added - equipment keys (grenade/sandbag/mortar) gated to infantry-only via `runInfantry`. Helicopter exit uses world quaternion for directional offset. Z-index tier system in primitives.css. `backdrop-filter` removed from gameplay HUD elements. Crosshair pulse reduced + disabled during ADS. Dead code removed from WeaponPill. 3616 tests passing.
+24. See `docs/NEXT_WORK.md` for the active checklist.
 
 ## Documentation Contract
 

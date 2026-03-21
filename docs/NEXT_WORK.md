@@ -1,6 +1,6 @@
 # Next Work
 
-Last updated: 2026-03-19
+Last updated: 2026-03-20
 Status: ACTIVE - shipping baseline is stable; use this file for polish/perf/content follow-up, not boot/deploy remediation
 
 > **Wave / debt board:** persistent priorities and backlog context live in [`PLAN_STATE.md`](./PLAN_STATE.md). This file is the ordered operational checklist.
@@ -14,11 +14,13 @@ Work top-down. Each item has acceptance criteria. When an item is done:
 
 Items within a tier are priority-ordered. Do not skip tiers unless blocked.
 
-## Current Baseline (2026-03-10)
+## Current Baseline (2026-03-20)
 
 - Local release gates are green: `lint`, `deadcode`, `test:run`, `build`, `smoke:prod`
-- Built app is validated under the deployed base path: `http://127.0.0.1:4173/terror-in-the-jungle/`
-- Consultation-critical architecture debt is closed enough for shipping; remaining work is performance, bundle weight, and content/product expansion
+- Live deployment at `https://terror-in-the-jungle.pages.dev/` (Cloudflare Pages, CI-gated)
+- Open Frontier startup hang eliminated (async vegetation + pre-baked heightmaps)
+- Map seed rotation: 5 OF / 3 ZC / 3 TDM variants, random per session
+- 3,614 tests passing, 179 test files
 
 ---
 

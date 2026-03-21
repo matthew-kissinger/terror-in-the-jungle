@@ -140,8 +140,6 @@ export class WeaponPill extends UIComponent {
     this.gunSlots = gunSlots.filter(slot => slot >= 0 && slot < WeaponPill.SLOT_COUNT);
     if (!this.gunSlots.includes(this.activeIndex.value) && this.gunSlots.length > 0) {
       this.activeIndex.value = this.gunSlots[0];
-    } else {
-      this.activeIndex.value = this.activeIndex.value;
     }
   }
 
@@ -153,7 +151,7 @@ export class WeaponPill extends UIComponent {
     if (guns.length === 0) return;
     const currentGunIdx = guns.indexOf(this.activeIndex.value);
     const nextGunIdx = (currentGunIdx + 1) % guns.length;
-    const next = guns[nextGunIdx >= 0 ? nextGunIdx : 0];
+    const next = guns[nextGunIdx];
     this.activeIndex.value = next;
     this.onWeaponSelect?.(next);
     this.flashSwitch();

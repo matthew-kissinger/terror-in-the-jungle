@@ -28,6 +28,10 @@ export class PlayerCamera {
   private helicopterCameraHeight = 8;
   private helicopterMouseControlEnabled = true;
 
+  // Saved infantry angles for helicopter enter/exit transitions
+  private savedInfantryYaw = Math.PI;
+  private savedInfantryPitch = 0;
+
   constructor(camera: THREE.PerspectiveCamera, playerState: PlayerState) {
     this.camera = camera;
     this.playerState = playerState;
@@ -160,6 +164,18 @@ export class PlayerCamera {
       _lookTarget.y += 2;
       this.camera.lookAt(_lookTarget);
     }
+  }
+
+  /** Save current infantry yaw/pitch before entering helicopter. */
+  saveInfantryAngles(): void {
+    this.savedInfantryYaw = this.yaw;
+    this.savedInfantryPitch = this.pitch;
+  }
+
+  /** Restore saved infantry yaw/pitch after exiting helicopter. */
+  restoreInfantryAngles(): void {
+    this.yaw = this.savedInfantryYaw;
+    this.pitch = this.savedInfantryPitch;
   }
 
   // Apply recoil to camera

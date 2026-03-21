@@ -143,6 +143,8 @@ export class VehicleActionBar extends UIComponent {
   setVehicleContext(context: VehicleUIContext | null): void {
     this.vehicleContext = context;
     this.vehicleWeaponIndex = 0;
+    // Clear pressed state to prevent stuck visual on context change
+    this.fireBtn.classList.remove(styles.pressed);
 
     const capabilities = context?.capabilities;
     this.exitBtn.style.display = capabilities?.canExit ? 'flex' : 'none';

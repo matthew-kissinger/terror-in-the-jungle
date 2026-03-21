@@ -88,27 +88,27 @@ export class InputManager extends PlayerInput {
       ...callbacks,
       onJump: () => this.runGameplay(callbacks.onJump),
       onRunStart: () => this.runGameplay(callbacks.onRunStart),
-      onRunStop: () => this.runGameplay(callbacks.onRunStop),
+      onRunStop: () => this.runRelease(callbacks.onRunStop),
       onScoreboardToggle: (visible) => this.runGameplay(() => callbacks.onScoreboardToggle?.(visible)),
       onScoreboardTap: () => this.runGameplay(callbacks.onScoreboardTap),
       onEnterExitHelicopter: () => this.runGameplay(callbacks.onEnterExitHelicopter),
       onToggleAutoHover: () => this.runGameplay(callbacks.onToggleAutoHover),
       onToggleAltitudeLock: () => this.runGameplay(callbacks.onToggleAltitudeLock),
       onToggleMouseControl: () => this.runGameplay(callbacks.onToggleMouseControl),
-      onSandbagRotateLeft: () => this.runGameplay(callbacks.onSandbagRotateLeft),
-      onSandbagRotateRight: () => this.runGameplay(callbacks.onSandbagRotateRight),
+      onSandbagRotateLeft: () => this.runInfantry(callbacks.onSandbagRotateLeft),
+      onSandbagRotateRight: () => this.runInfantry(callbacks.onSandbagRotateRight),
       onRallyPointPlace: () => this.runGameplay(callbacks.onRallyPointPlace),
       onMapToggle: () => this.runGameplay(callbacks.onMapToggle),
-      onToggleMortarCamera: () => this.runGameplay(callbacks.onToggleMortarCamera),
-      onDeployMortar: () => this.runGameplay(callbacks.onDeployMortar),
-      onMortarFire: () => this.runGameplay(callbacks.onMortarFire),
-      onMortarAdjustPitch: (delta) => this.runGameplay(() => callbacks.onMortarAdjustPitch?.(delta)),
-      onMortarAdjustYaw: (delta) => this.runGameplay(() => callbacks.onMortarAdjustYaw?.(delta)),
+      onToggleMortarCamera: () => this.runInfantry(callbacks.onToggleMortarCamera),
+      onDeployMortar: () => this.runInfantry(callbacks.onDeployMortar),
+      onMortarFire: () => this.runInfantry(callbacks.onMortarFire),
+      onMortarAdjustPitch: (delta) => this.runInfantry(() => callbacks.onMortarAdjustPitch?.(delta)),
+      onMortarAdjustYaw: (delta) => this.runInfantry(() => callbacks.onMortarAdjustYaw?.(delta)),
       onWeaponSlotChange: (slot) => this.runGameplay(() => callbacks.onWeaponSlotChange?.(slot)),
       onMouseDown: (button) => this.runGameplay(() => callbacks.onMouseDown?.(button)),
-      onMouseUp: (button) => this.runGameplay(() => callbacks.onMouseUp?.(button)),
+      onMouseUp: (button) => this.runRelease(() => callbacks.onMouseUp?.(button)),
       onReload: () => this.runGameplay(callbacks.onReload),
-      onGrenadeSwitch: () => this.runGameplay(callbacks.onGrenadeSwitch),
+      onGrenadeSwitch: () => this.runInfantry(callbacks.onGrenadeSwitch),
       onSquadDeploy: () => this.runGameplay(callbacks.onSquadDeploy),
       onSquadCommand: () => this.runGameplay(callbacks.onSquadCommand),
       onSquadQuickCommand: (slot) => this.runGameplay(() => callbacks.onSquadQuickCommand?.(slot)),
@@ -123,6 +123,19 @@ export class InputManager extends PlayerInput {
   private runGameplay(action: (() => void) | undefined): void {
     if (!action) return;
     if (!this.contextManager.isGameplay()) return;
+    action();
+  }
+
+  /** Release/stop callbacks must always fire regardless of context to prevent stuck state. */
+  private runRelease(action: (() => void) | undefined): void {
+    if (!action) return;
+    action();
+  }
+
+  /** Infantry-only actions (equipment: grenades, sandbags, mortar) - blocked in helicopter context. */
+  private runInfantry(action: (() => void) | undefined): void {
+    if (!action) return;
+    if (!this.contextManager.isInfantryGameplay()) return;
     action();
   }
 }

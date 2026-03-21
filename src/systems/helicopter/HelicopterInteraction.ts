@@ -4,7 +4,7 @@ import { Logger } from '../../utils/Logger';
 import { IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
 import { shouldUseTouchControls } from '../../utils/DeviceDetector';
 
-const POST_EXIT_INTERACTION_COOLDOWN_MS = 1000;
+const POST_EXIT_INTERACTION_COOLDOWN_MS = 300;
 
 export class HelicopterInteraction {
   private helicopters: Map<string, THREE.Group>;
@@ -160,11 +160,11 @@ export class HelicopterInteraction {
       return;
     }
 
-    // Calculate exit position (beside the helicopter door)
+    // Calculate exit position (beside the helicopter door, on its right side)
     const helicopterPosition = helicopter.position;
     const exitPosition = helicopterPosition.clone();
-    exitPosition.x += 3; // Move 3 units to the right (door side)
-    exitPosition.y = helicopterPosition.y; // Same height as helicopter
+    const rightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(helicopter.quaternion);
+    exitPosition.addScaledVector(rightVector, 3);
 
     // Make sure exit position is above terrain
     if (this.terrainManager) {

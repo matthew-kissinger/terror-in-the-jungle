@@ -331,6 +331,8 @@ export class TouchControls {
   /** Update the weapon cycler's active slot (synced from PlayerController). */
   setActiveWeaponSlot(slot: number): void {
     this.actionButtons.setActiveSlot(slot);
+    // Reset ADS when switching weapons to prevent stale ADS visual state
+    this.adsButton.resetADS();
   }
 
   isVisible(): boolean {

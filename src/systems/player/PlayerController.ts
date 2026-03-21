@@ -306,6 +306,11 @@ export class PlayerController implements GameSystem {
     this.input.getTouchControls()?.beginModalOverlays();
     this.playerState.velocity.set(0, 0, 0);
     this.playerState.isRunning = false;
+    // Cancel any active auxiliary weapon aiming
+    if (this.grenadeSystem?.isCurrentlyAiming()) {
+      this.grenadeSystem.cancelThrow();
+      this.hudSystem?.hideGrenadePowerMeter();
+    }
     this.hudSystem?.setOverlay?.(overlay);
     this.hudSystem?.setPhase?.('paused');
   }
@@ -594,7 +599,7 @@ export class PlayerController implements GameSystem {
 
   enterHelicopter(helicopterId: string, helicopterPosition: THREE.Vector3): void {
     Logger.info('player', `  ENTERING HELICOPTER: ${helicopterId}`);
-    this.unequipWeapon();
+    // Swap HUD context first so the vehicle UI is ready before the weapon disappears
     this.vehicleController.enterHelicopter(
       this.playerState,
       helicopterPosition,
@@ -604,6 +609,7 @@ export class PlayerController implements GameSystem {
       this.gameRenderer,
       this.cameraController,
     );
+    this.unequipWeapon();
 
     Logger.info('player', ` Player entered helicopter at position (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)})`);
     Logger.info('player', `  CAMERA MODE: Switched to helicopter camera (flight sim style)`);
@@ -618,6 +624,7 @@ export class PlayerController implements GameSystem {
       (position, reason) => this.setPosition(position, reason),
       this.input,
       this.gameRenderer,
+      this.cameraController,
     );
     this.equipWeapon();
 

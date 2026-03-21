@@ -117,16 +117,13 @@ describe('InputManager', () => {
       expect(onJump).toHaveBeenCalledTimes(1);
     });
 
-    it('gates onRunStart and onRunStop', () => {
+    it('gates onRunStart in non-gameplay context', () => {
       const onRunStart = vi.fn();
-      const onRunStop = vi.fn();
-      input.setCallbacks({ onRunStart, onRunStop });
+      input.setCallbacks({ onRunStart });
       contextManager.setContext('menu');
 
       document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ShiftLeft' }));
-      document.dispatchEvent(new KeyboardEvent('keyup', { code: 'ShiftLeft' }));
       expect(onRunStart).not.toHaveBeenCalled();
-      expect(onRunStop).not.toHaveBeenCalled();
     });
 
     it('gates onEnterExitHelicopter', () => {
@@ -454,6 +451,24 @@ describe('InputManager', () => {
       const wrapped = (input as any).wrapCallbacks({ onScoreboardToggle });
       wrapped.onScoreboardToggle(true);
       expect(onScoreboardToggle).toHaveBeenCalledWith(true);
+    });
+
+    it('allows onMouseUp in non-gameplay context (release callbacks bypass gating)', () => {
+      const onMouseUp = vi.fn();
+      contextManager.setContext('modal');
+
+      const wrapped = (input as any).wrapCallbacks({ onMouseUp });
+      wrapped.onMouseUp(0);
+      expect(onMouseUp).toHaveBeenCalledWith(0);
+    });
+
+    it('allows onRunStop in non-gameplay context (release callbacks bypass gating)', () => {
+      const onRunStop = vi.fn();
+      contextManager.setContext('menu');
+
+      const wrapped = (input as any).wrapCallbacks({ onRunStop });
+      wrapped.onRunStop();
+      expect(onRunStop).toHaveBeenCalledTimes(1);
     });
 
     it('handles undefined callbacks gracefully in runGameplay', () => {

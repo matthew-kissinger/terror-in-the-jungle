@@ -15,7 +15,6 @@
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
   padding: var(--space-2) var(--space-2-5);
-  backdrop-filter: blur(6px);
 }
 
 .visible {
