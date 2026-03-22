@@ -20,6 +20,10 @@
 
 .stage {
   composes: screenStage from './ScreenPrimitives.module.css';
+  flex: 1;
+  min-height: 0;
+  max-height: 100%;
+  padding-bottom: calc(clamp(16px, 2vw, 28px) + max(16px, env(safe-area-inset-bottom, 0px)));
 }
 
 .layout {
@@ -123,11 +127,19 @@
 }
 
 .sidePanel {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: var(--space-3);
   min-height: 0;
+}
+
+.sideScroll {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--space-3);
   overflow-y: auto;
+  padding-right: 4px;
 }
 
 .panel {
@@ -192,6 +204,7 @@
 .controlPanel {
   composes: briefPanel from './ScreenPrimitives.module.css';
   border-color: var(--ops-line-strong);
+  position: relative;
 }
 
 .timer {
@@ -341,6 +354,7 @@
 @media (max-width: 960px) {
   .layout {
     grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .header {
@@ -351,12 +365,46 @@
     width: 100%;
   }
 
+  .map {
+    min-height: 280px;
+  }
+
   .sidePanel {
-    overflow: visible;
+    min-height: 0;
   }
 }
 
 @media (pointer: coarse) and (max-width: 960px) {
+  .stage {
+    gap: var(--space-3);
+  }
+
+  .header {
+    gap: var(--space-3);
+    padding: var(--space-4);
+  }
+
+  .headerStatus {
+    font-size: var(--font-size-sm);
+    line-height: 1.45;
+  }
+
+  .mapPanel {
+    padding: var(--space-3);
+  }
+
+  .sidePanel {
+    gap: var(--space-2);
+  }
+
+  .sideScroll {
+    padding-bottom: var(--space-2);
+  }
+
+  .controlPanel {
+    padding: var(--space-3);
+  }
+
   .sequencePanel {
     display: none;
   }
@@ -367,8 +415,20 @@
 }
 
 @media (pointer: coarse) and (max-width: 600px) {
+  .layout {
+    gap: var(--space-3);
+  }
+
+  .header {
+    padding: var(--space-3);
+  }
+
   .map {
-    min-height: 200px;
+    min-height: clamp(180px, 30dvh, 260px);
+  }
+
+  .map {
+    height: clamp(180px, 30dvh, 260px);
   }
 
   .loadoutRow {
@@ -404,5 +464,53 @@
   .smallButton {
     min-height: 30px;
     padding: var(--space-1-5) var(--space-2);
+  }
+}
+
+@media (pointer: coarse) and (max-height: 520px) {
+  .stage {
+    gap: var(--space-2);
+  }
+
+  .header {
+    padding: var(--space-3);
+  }
+
+  .headerStatus {
+    display: none;
+  }
+
+  .mapPanel {
+    padding: var(--space-2-5);
+  }
+
+  .mapHeader {
+    margin-bottom: var(--space-2);
+  }
+
+  .mapHelper {
+    display: none;
+  }
+
+  .map {
+    min-height: clamp(144px, 26dvh, 200px);
+    height: clamp(144px, 26dvh, 200px);
+  }
+
+  .selectedName {
+    font-size: clamp(1rem, 3vw, 1.3rem);
+  }
+
+  .timer {
+    margin-bottom: var(--space-2);
+  }
+
+  .buttonStack {
+    gap: var(--space-2);
+  }
+
+  .actionButton,
+  .secondaryButton {
+    min-height: 44px;
   }
 }

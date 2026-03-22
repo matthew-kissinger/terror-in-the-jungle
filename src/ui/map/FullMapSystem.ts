@@ -46,7 +46,7 @@ export class FullMapSystem implements GameSystem {
 
   // Mobile toggle button
   private mapToggleButton: HTMLDivElement | null = null;
-  private mapCloseButton: HTMLDivElement | null = null;
+  private mapCloseButton: HTMLButtonElement | null = null;
 
   // Map settings
   private worldSize = 3200; // Will be updated based on game mode
@@ -133,15 +133,17 @@ export class FullMapSystem implements GameSystem {
 
     // Add mobile close button inside map content
     if (shouldUseTouchControls()) {
-      this.mapCloseButton = document.createElement('div');
+      this.mapCloseButton = document.createElement('button');
+      this.mapCloseButton.type = 'button';
       this.mapCloseButton.className = 'map-close-button';
       this.mapCloseButton.textContent = '✕';
-      this.mapCloseButton.addEventListener('touchstart', (e: TouchEvent) => {
+      this.mapCloseButton.setAttribute('aria-label', 'Close map');
+      this.mapCloseButton.addEventListener('pointerdown', (e: PointerEvent) => {
         e.preventDefault();
         e.stopPropagation();
         this.inputHandler.toggle();
       }, { passive: false });
-      mapContent.appendChild(this.mapCloseButton);
+      this.mapContainer.appendChild(this.mapCloseButton);
     }
 
     this.mapContainer.appendChild(mapContent);

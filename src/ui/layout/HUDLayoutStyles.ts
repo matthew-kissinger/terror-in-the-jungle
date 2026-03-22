@@ -365,6 +365,13 @@ export const HUD_LAYOUT_STYLES = `
     display: none !important;
   }
 
+  /* Fullscreen tactical map should own the entire interaction surface.
+   * Keep the gameplay HUD from intercepting taps underneath it. */
+  [data-overlay="map"] .hud-slot,
+  [data-overlay="command"] .hud-slot {
+    pointer-events: none !important;
+  }
+
   /* =========================================================
    * VEHICLE-BASED VISIBILITY
    * Hide infantry-only controls when in helicopter.

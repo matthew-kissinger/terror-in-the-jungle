@@ -4,7 +4,7 @@
 > HUD has NO polling loop for most data - other systems push via direct method calls.
 > HUDSystem.update() does only 5Hz zone/ticket polling.
 > UIComponent is the abstract base class for all widget modules; it uses @preact/signals-core for reactive state.
-> All DOM mounting goes through HUDLayout.getSlot() to preserve the CSS Grid structure.
+> Most HUD widgets mount through `HUDLayout.getSlot()` to preserve the CSS Grid structure; mobile-safe fullscreen overlays and fixed touch controls can mount at `document.body`.
 > GameplayPresentationController / VisibilityManager drive HUD state via data-device, data-phase, data-actor-mode, data-overlay, and data-ads attributes (not per-widget JS style toggles).
 
 [GH]: https://github.com/matthew-kissinger/terror-in-the-jungle/blob/master/src
@@ -77,7 +77,7 @@ src/ui/
 | [ObjectiveDisplay]([GH]/ui/hud/ObjectiveDisplay.ts) | ui/hud/ObjectiveDisplay.ts | Primary objective text slot |
 | [MobileStatusBar]([GH]/ui/hud/MobileStatusBar.ts) | ui/hud/MobileStatusBar.ts | Compact status for portrait-fallback |
 | [MortarPanel]([GH]/ui/hud/MortarPanel.ts) | ui/hud/MortarPanel.ts | Mortar targeting UI overlay |
-| [CommandModeOverlay]([GH]/ui/hud/CommandModeOverlay.ts) | ui/hud/CommandModeOverlay.ts | Center-slot map-first command panel for desktop, touch, and gamepad with selected-squad detail |
+| [CommandModeOverlay]([GH]/ui/hud/CommandModeOverlay.ts) | ui/hud/CommandModeOverlay.ts | Fullscreen tactical command surface with map-first desktop layout and mobile-safe fixed overlay behavior |
 | [CommandTacticalMap]([GH]/ui/hud/CommandTacticalMap.ts) | ui/hud/CommandTacticalMap.ts | Local tactical map used inside the command overlay for point placement orders, squad picking, and gamepad cursor confirmation |
 | [DamageNumberSystem]([GH]/ui/hud/DamageNumberSystem.ts) | ui/hud/DamageNumberSystem.ts | Floating damage numbers in world space |
 | [HitMarkerFeedback]([GH]/ui/hud/HitMarkerFeedback.ts) | ui/hud/HitMarkerFeedback.ts | Crosshair hit flash |
@@ -114,16 +114,16 @@ Source: [types.ts]([GH]/ui/layout/types.ts) `HUDRegion` type
 | `kill-feed` | Info | KillFeed |
 | `ammo` | Info | AmmoDisplay |
 | `weapon-bar` | Info | UnifiedWeaponBar |
-| `center` | Info | hit markers, damage numbers, grenade meter, mortar indicator, CommandModeOverlay |
+| `center` | Info | hit markers, damage numbers, grenade meter, mortar indicator |
 | `health` | Info | health bar / player status |
 | `status-bar` | Mobile | merged timer + tickets in one compact line |
 | `joystick` | Touch | VirtualJoystick (left side) |
 | `fire` | Touch | TouchFireButton |
 | `ads` | Touch | TouchADSButton |
 | `action-btns` | Touch | weapon cycler, CMD, MAP, reload, jump buttons |
-| `menu` | Touch | TouchMenuButton |
+| `menu` | Touch | TouchMenuButton (layout bookkeeping; live button mounts fixed on touch) |
 
-Visibility: desktop/touch shells read `data-show="infantry"` plus `data-actor-mode` / `data-overlay` off `#game-hud-root`. `action-btns` remains a named region for layout bookkeeping, but the touch infantry action stack renders as a body-level fixed overlay so it survives mobile slot suppression.
+Visibility: desktop/touch shells read `data-show="infantry"` plus `data-actor-mode` / `data-overlay` off `#game-hud-root`. `action-btns` and `menu` remain named regions for layout bookkeeping, but the live touch action stack and menu button render as body-level fixed overlays so they survive mobile slot suppression. Fullscreen tactical overlays (`map`, `command`) also mount body-level and suppress HUD slot pointer events while open.
 
 ---
 

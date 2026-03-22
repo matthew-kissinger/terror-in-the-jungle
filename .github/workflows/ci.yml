@@ -131,6 +131,41 @@ jobs:
       - name: Production smoke
         run: npm run smoke:prod
 
+  mobile-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [lint, test]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Build
+        run: npm run build
+
+      - name: Mobile UI gate
+        run: npm run check:mobile-ui
+
+      - name: Upload mobile UI artifacts
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: mobile-ui-artifacts
+          path: artifacts/mobile-ui/**
+          retention-days: 7
+
   perf:
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -180,7 +215,7 @@ jobs:
 
   deploy:
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-    needs: [lint, test, build, smoke]
+    needs: [lint, test, build, smoke, mobile-ui]
     runs-on: ubuntu-latest
     steps:
       - name: Download build artifact

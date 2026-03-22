@@ -54,6 +54,7 @@
     "probe": "npx tsx scripts/engine-health-probe.ts",
     "probe:all": "npx tsx scripts/engine-health-probe.ts --all-modes",
     "check:hud": "npx tsx scripts/hud-layout-validator.ts",
+    "check:mobile-ui": "npx tsx scripts/mobile-ui-check.ts",
     "check:memory": "npx tsx scripts/memory-growth-tracker.ts",
     "check:assets": "npx tsx scripts/asset-load-analyzer.ts",
     "check:states": "npx tsx scripts/state-coverage-probe.ts",

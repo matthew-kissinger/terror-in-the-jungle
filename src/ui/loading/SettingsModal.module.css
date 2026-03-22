@@ -12,6 +12,12 @@
   justify-content: center;
   align-items: center;
   touch-action: manipulation;
+  padding:
+    max(16px, env(safe-area-inset-top, 0px))
+    max(16px, env(safe-area-inset-right, 0px))
+    max(16px, env(safe-area-inset-bottom, 0px))
+    max(16px, env(safe-area-inset-left, 0px));
+  box-sizing: border-box;
 }
 
 .visible {
@@ -22,20 +28,36 @@
   background: rgba(8, 16, 24, 0.96);
   border: 1px solid var(--screen-glass-border-bright);
   border-radius: var(--radius-2xl);
-  padding: var(--space-6) var(--space-8);
   max-width: min(460px, 90vw);
-  max-height: 90vh;
-  overflow-y: auto;
+  max-height: min(90vh, calc(100dvh - 32px));
   width: 100%;
   box-sizing: border-box;
   color: var(--text-primary);
   font-family: var(--font-primary);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-8) var(--space-4);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.scrollBody {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--space-8) var(--space-6);
 }
 
 .title {
   color: var(--text-primary);
-  margin: 0 0 var(--space-5);
+  margin: 0;
   font-weight: var(--weight-semibold);
   font-size: var(--font-size-lg);
   letter-spacing: 0.15em;
@@ -54,8 +76,8 @@
 
 .gameplayActions {
   display: none;
-  margin-bottom: var(--space-5);
-  padding: var(--space-4);
+  margin: 0 var(--space-8);
+  padding: var(--space-4) 0 var(--space-4);
   border: 1px solid var(--ops-line);
   border-radius: var(--radius-xl);
   background:
@@ -162,9 +184,8 @@
 }
 
 .closeBtn {
-  margin-top: var(--space-5);
-  width: 100%;
-  padding: var(--space-2);
+  padding: 0 var(--space-4);
+  min-width: 92px;
   min-height: 44px;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
@@ -215,7 +236,39 @@
 
 @media (max-width: 480px) {
   .card {
-    padding: var(--space-4) var(--space-5);
     max-height: calc(100dvh - 32px);
+  }
+
+  .topBar {
+    padding: var(--space-4) var(--space-5) var(--space-3);
+  }
+
+  .gameplayActions {
+    margin: 0 var(--space-5);
+  }
+
+  .scrollBody {
+    padding: 0 var(--space-5) var(--space-5);
+  }
+}
+
+@media (pointer: coarse) and (max-height: 520px) {
+  .overlay {
+    align-items: stretch;
+  }
+
+  .card {
+    max-width: none;
+    max-height: none;
+    height: 100%;
+    border-radius: var(--radius-xl);
+  }
+
+  .topBar {
+    padding-bottom: var(--space-3);
+  }
+
+  .sectionTitle {
+    margin-top: 0;
   }
 }

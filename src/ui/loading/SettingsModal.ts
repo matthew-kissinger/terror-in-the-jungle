@@ -72,7 +72,10 @@ export class SettingsModal extends UIComponent {
 
     this.root.innerHTML = `
       <div class="${styles.card}">
-        <h2 class="${styles.title}">SETTINGS</h2>
+        <div class="${styles.topBar}">
+          <h2 class="${styles.title}">SETTINGS</h2>
+          <button class="${styles.closeBtn}" data-ref="close" type="button" aria-label="Close">CLOSE</button>
+        </div>
 
         <section class="${styles.gameplayActions}" data-ref="gameplay-actions">
           <div class="${styles.sectionTitle}">Field Menu</div>
@@ -83,109 +86,109 @@ export class SettingsModal extends UIComponent {
           </div>
         </section>
 
-        <fieldset class="${styles.fieldset}">
-          <legend class="${styles.legend}">Graphics</legend>
+        <div class="${styles.scrollBody}" data-ref="scroll-body">
+          <fieldset class="${styles.fieldset}">
+            <legend class="${styles.legend}">Graphics</legend>
 
-          <div class="${styles.field}">
-            <label class="${styles.label}" for="setting-graphicsQuality">Graphics Quality</label>
-            <select id="setting-graphicsQuality" data-setting="graphicsQuality" class="${styles.select}">
-              <option value="low">Low</option>
-              <option value="medium" selected>Medium</option>
-              <option value="high">High</option>
-              <option value="ultra">Ultra</option>
-            </select>
-            <p class="${styles.hint}" data-ref="graphicsHint">Moderate pixel (3x), shadows on</p>
-          </div>
+            <div class="${styles.field}">
+              <label class="${styles.label}" for="setting-graphicsQuality">Graphics Quality</label>
+              <select id="setting-graphicsQuality" data-setting="graphicsQuality" class="${styles.select}">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+                <option value="ultra">Ultra</option>
+              </select>
+              <p class="${styles.hint}" data-ref="graphicsHint">Moderate pixel (3x), shadows on</p>
+            </div>
+
+            <div class="${styles.field}">
+              <label class="${styles.check}">
+                <input type="checkbox" checked data-setting="enableShadows"> Enable Shadows
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset class="${styles.fieldset}">
+            <legend class="${styles.legend}">Audio</legend>
+
+            <div class="${styles.field}">
+              <label class="${styles.label}" for="setting-masterVolume">Master Volume <span data-ref="volumeLabel">70</span>%</label>
+              <input type="range" id="setting-masterVolume" min="0" max="100" value="70" data-setting="masterVolume" class="${styles.range}">
+            </div>
+          </fieldset>
+
+          <fieldset class="${styles.fieldset}">
+            <legend class="${styles.legend}">Mouse &amp; Touch</legend>
+
+            <div class="${styles.field}">
+              <label class="${styles.label}" for="setting-mouseSensitivity">Mouse Sensitivity <span data-ref="sensLabel">5</span></label>
+              <input type="range" id="setting-mouseSensitivity" min="1" max="10" value="5" data-setting="mouseSensitivity" class="${styles.range}">
+            </div>
+
+            ${touchSensitivityRow}
+            ${touchControlsRows}
+          </fieldset>
+
+          <fieldset class="${styles.fieldset}">
+            <legend class="${styles.legend}">Controller</legend>
+
+            <div class="${styles.field}">
+              <label class="${styles.label}" for="setting-controllerPreset">Controller Preset</label>
+              <select id="setting-controllerPreset" data-setting="controllerPreset" class="${styles.select}">
+                <option value="default" selected>Default Shooter</option>
+                <option value="southpaw">Southpaw (sticks swapped)</option>
+              </select>
+            </div>
+
+            <div class="${styles.field}">
+              <label class="${styles.label}" for="setting-controllerDpadMode">D-Pad Mode</label>
+              <select id="setting-controllerDpadMode" data-setting="controllerDpadMode" class="${styles.select}">
+                <option value="weapons" selected>Weapon Slots</option>
+                <option value="quickCommands">Squad Quick Commands</option>
+              </select>
+            </div>
+
+            <div class="${styles.field}">
+              <label class="${styles.label}" for="setting-controllerLookCurve">Controller Look Curve</label>
+              <select id="setting-controllerLookCurve" data-setting="controllerLookCurve" class="${styles.select}">
+                <option value="precision" selected>Precision</option>
+                <option value="linear">Linear</option>
+              </select>
+            </div>
+
+            <div class="${styles.field}">
+              <label class="${styles.label}" for="setting-controllerMoveDeadZone">Move Dead Zone <span data-ref="moveDeadZoneLabel">15</span>%</label>
+              <input type="range" id="setting-controllerMoveDeadZone" min="5" max="30" value="15" data-setting="controllerMoveDeadZone" class="${styles.range}">
+            </div>
+
+            <div class="${styles.field}">
+              <label class="${styles.label}" for="setting-controllerLookDeadZone">Look Dead Zone <span data-ref="lookDeadZoneLabel">15</span>%</label>
+              <input type="range" id="setting-controllerLookDeadZone" min="5" max="30" value="15" data-setting="controllerLookDeadZone" class="${styles.range}">
+            </div>
+
+            <div class="${styles.field}">
+              <label class="${styles.check}">
+                <input type="checkbox" data-setting="controllerInvertY"> Invert Controller Look Y
+              </label>
+            </div>
+          </fieldset>
 
           <div class="${styles.field}">
             <label class="${styles.check}">
-              <input type="checkbox" checked data-setting="enableShadows"> Enable Shadows
+              <input type="checkbox" data-setting="showFPS"> Show FPS Counter
             </label>
           </div>
-        </fieldset>
 
-        <fieldset class="${styles.fieldset}">
-          <legend class="${styles.legend}">Audio</legend>
+          <details class="${styles.fieldset}">
+            <summary class="${styles.legend}" style="cursor:pointer;list-style:none;">Controls Reference</summary>
+            ${this.buildControlsSection(isTouch)}
+          </details>
 
-          <div class="${styles.field}">
-            <label class="${styles.label}" for="setting-masterVolume">Master Volume <span data-ref="volumeLabel">70</span>%</label>
-            <input type="range" id="setting-masterVolume" min="0" max="100" value="70" data-setting="masterVolume" class="${styles.range}">
-          </div>
-        </fieldset>
-
-        <fieldset class="${styles.fieldset}">
-          <legend class="${styles.legend}">Mouse &amp; Touch</legend>
-
-          <div class="${styles.field}">
-            <label class="${styles.label}" for="setting-mouseSensitivity">Mouse Sensitivity <span data-ref="sensLabel">5</span></label>
-            <input type="range" id="setting-mouseSensitivity" min="1" max="10" value="5" data-setting="mouseSensitivity" class="${styles.range}">
-          </div>
-
-          ${touchSensitivityRow}
-          ${touchControlsRows}
-        </fieldset>
-
-        <fieldset class="${styles.fieldset}">
-          <legend class="${styles.legend}">Controller</legend>
-
-          <div class="${styles.field}">
-            <label class="${styles.label}" for="setting-controllerPreset">Controller Preset</label>
-            <select id="setting-controllerPreset" data-setting="controllerPreset" class="${styles.select}">
-              <option value="default" selected>Default Shooter</option>
-              <option value="southpaw">Southpaw (sticks swapped)</option>
-            </select>
-          </div>
-
-          <div class="${styles.field}">
-            <label class="${styles.label}" for="setting-controllerDpadMode">D-Pad Mode</label>
-            <select id="setting-controllerDpadMode" data-setting="controllerDpadMode" class="${styles.select}">
-              <option value="weapons" selected>Weapon Slots</option>
-              <option value="quickCommands">Squad Quick Commands</option>
-            </select>
-          </div>
-
-          <div class="${styles.field}">
-            <label class="${styles.label}" for="setting-controllerLookCurve">Controller Look Curve</label>
-            <select id="setting-controllerLookCurve" data-setting="controllerLookCurve" class="${styles.select}">
-              <option value="precision" selected>Precision</option>
-              <option value="linear">Linear</option>
-            </select>
-          </div>
-
-          <div class="${styles.field}">
-            <label class="${styles.label}" for="setting-controllerMoveDeadZone">Move Dead Zone <span data-ref="moveDeadZoneLabel">15</span>%</label>
-            <input type="range" id="setting-controllerMoveDeadZone" min="5" max="30" value="15" data-setting="controllerMoveDeadZone" class="${styles.range}">
-          </div>
-
-          <div class="${styles.field}">
-            <label class="${styles.label}" for="setting-controllerLookDeadZone">Look Dead Zone <span data-ref="lookDeadZoneLabel">15</span>%</label>
-            <input type="range" id="setting-controllerLookDeadZone" min="5" max="30" value="15" data-setting="controllerLookDeadZone" class="${styles.range}">
-          </div>
-
-          <div class="${styles.field}">
-            <label class="${styles.check}">
-              <input type="checkbox" data-setting="controllerInvertY"> Invert Controller Look Y
-            </label>
-          </div>
-        </fieldset>
-
-        <div class="${styles.field}">
-          <label class="${styles.check}">
-            <input type="checkbox" data-setting="showFPS"> Show FPS Counter
-          </label>
+          <details class="${styles.fieldset}">
+            <summary class="${styles.legend}" style="cursor:pointer;list-style:none;">Gameplay Tips</summary>
+            ${this.buildTipsSection(isTouch)}
+          </details>
         </div>
-
-        <details class="${styles.fieldset}">
-          <summary class="${styles.legend}" style="cursor:pointer;list-style:none;">Controls Reference</summary>
-          ${this.buildControlsSection(isTouch)}
-        </details>
-
-        <details class="${styles.fieldset}">
-          <summary class="${styles.legend}" style="cursor:pointer;list-style:none;">Gameplay Tips</summary>
-          ${this.buildTipsSection(isTouch)}
-        </details>
-
-        <button class="${styles.closeBtn}" data-ref="close" type="button" aria-label="Close">CLOSE</button>
       </div>
     `;
   }

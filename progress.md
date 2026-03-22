@@ -42,3 +42,16 @@ Original prompt: can you add relevant skills and maybe look for one to help with
   - extend `VehicleUIContext` beyond helicopters when planes/cars land
   - align remaining desktop-only HUD visuals with the operations-table language
   - consider lifting the command/map/settings/device probes into CI once runtime cost is acceptable
+
+2026-03-21
+- Mobile-safe overlay pass started to address real Android/iPhone traps that were still reachable on built prod flows.
+- Implemented the first structural fixes:
+  - `SettingsModal` now keeps `Close` in a persistent top bar and moves long settings content into a dedicated internal scroll body.
+  - `ModeSelectScreen` now keeps `Back` in a sticky header row instead of placing the only exit action after the full card stack.
+  - `DeployScreen` now separates selected-spawn summary, a scrollable middle body, and a persistent controls panel so `Deploy` / secondary action no longer depend on hidden overflow.
+  - `TouchControls` no longer reparents the mobile menu button into the HUD menu slot, preserving its fixed z-layer above the action stack.
+  - Short-landscape touch control positions were lowered to stop the action column / vehicle bar from invading the menu button hit area.
+- Still in progress:
+  - add a built-app `check:mobile-ui` Playwright flow with actionability + hit-test assertions
+  - update tests and CI/package wiring
+  - rerun mobile viewport validation and spot-check screenshots

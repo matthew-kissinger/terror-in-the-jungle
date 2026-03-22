@@ -31,14 +31,14 @@ describe('CommandInputManager', () => {
     layout.init();
   });
 
-  it('mounts the command overlay into the center region', () => {
+  it('mounts the command overlay as a body-level modal', () => {
     const controller = createSquadControllerStub();
     const manager = new CommandInputManager(controller as any);
 
     manager.mountTo(layout);
 
-    expect(layout.getSlot('center').querySelector('.command-mode-overlay')).toBeTruthy();
-    expect(layout.getSlot('center').dataset.show).toBeUndefined();
+    expect(document.body.querySelector('.command-mode-overlay')).toBeTruthy();
+    expect(layout.getSlot('center').querySelector('.command-mode-overlay')).toBeNull();
 
     manager.dispose();
     layout.dispose();
@@ -85,7 +85,7 @@ describe('CommandInputManager', () => {
     } as any);
 
     manager.toggleCommandMode();
-    const overlay = layout.getSlot('center').querySelector<HTMLElement>('.command-mode-overlay');
+    const overlay = document.body.querySelector<HTMLElement>('.command-mode-overlay');
 
     expect(overlay?.dataset.visible).toBe('true');
 
@@ -110,7 +110,7 @@ describe('CommandInputManager', () => {
     } as any);
 
     manager.toggleCommandMode();
-    const overlay = layout.getSlot('center').querySelector<HTMLElement>('.command-mode-overlay');
+    const overlay = document.body.querySelector<HTMLElement>('.command-mode-overlay');
     expect(overlay?.dataset.visible).toBe('true');
     expect(unlockPointer).toHaveBeenCalledTimes(1);
 
@@ -140,7 +140,7 @@ describe('CommandInputManager', () => {
     manager.toggleCommandMode();
     manager.issueQuickCommand(1);
 
-    const overlay = layout.getSlot('center').querySelector<HTMLElement>('.command-mode-overlay');
+    const overlay = document.body.querySelector<HTMLElement>('.command-mode-overlay');
     expect(overlay?.dataset.visible).toBe('false');
     expect(controller.issueQuickCommand).toHaveBeenCalledWith(1);
     expect(relockPointer).toHaveBeenCalledTimes(1);
@@ -170,12 +170,12 @@ describe('CommandInputManager', () => {
     manager.toggleCommandMode();
     manager.update(0.1);
 
-    layout.getSlot('center').querySelector<HTMLButtonElement>('[data-action="slot-2"]')?.click();
+    document.body.querySelector<HTMLButtonElement>('[data-action="slot-2"]')?.click();
 
     expect(controller.issueQuickCommand).not.toHaveBeenCalled();
     expect(controller.issueCommandAtPosition).not.toHaveBeenCalled();
 
-    const canvas = layout.getSlot('center').querySelector<HTMLCanvasElement>('.command-tactical-map__canvas');
+    const canvas = document.body.querySelector<HTMLCanvasElement>('.command-tactical-map__canvas');
     expect(canvas).toBeTruthy();
     Object.defineProperty(canvas!, 'getBoundingClientRect', {
       value: () => ({
@@ -198,7 +198,7 @@ describe('CommandInputManager', () => {
       SquadCommand.HOLD_POSITION,
       expect.objectContaining({ x: 120, y: 5, z: -40 })
     );
-    expect(layout.getSlot('center').querySelector<HTMLElement>('.command-mode-overlay')?.dataset.visible).toBe('false');
+    expect(document.body.querySelector<HTMLElement>('.command-mode-overlay')?.dataset.visible).toBe('false');
 
     manager.dispose();
     layout.dispose();
@@ -235,7 +235,7 @@ describe('CommandInputManager', () => {
       SquadCommand.HOLD_POSITION,
       expect.objectContaining({ x: 120, y: 5, z: -40 })
     );
-    expect(layout.getSlot('center').querySelector<HTMLElement>('.command-mode-overlay')?.dataset.visible).toBe('false');
+    expect(document.body.querySelector<HTMLElement>('.command-mode-overlay')?.dataset.visible).toBe('false');
 
     manager.dispose();
     layout.dispose();
@@ -270,7 +270,7 @@ describe('CommandInputManager', () => {
     manager.toggleCommandMode();
     manager.update(0.1);
 
-    const canvas = layout.getSlot('center').querySelector<HTMLCanvasElement>('.command-tactical-map__canvas');
+    const canvas = document.body.querySelector<HTMLCanvasElement>('.command-tactical-map__canvas');
     expect(canvas).toBeTruthy();
     Object.defineProperty(canvas!, 'getBoundingClientRect', {
       value: () => ({
@@ -290,7 +290,7 @@ describe('CommandInputManager', () => {
     canvas?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 202, clientY: 160, button: 0 }));
 
     expect(controller.selectSquad).toHaveBeenCalledWith('squad-support');
-    expect(layout.getSlot('center').textContent).toContain('SQUAD SUPPORT');
+    expect(document.body.textContent).toContain('SQUAD SUPPORT');
 
     manager.dispose();
     layout.dispose();
@@ -311,11 +311,11 @@ describe('CommandInputManager', () => {
     } as any);
 
     manager.toggleCommandMode();
-    layout.getSlot('center').querySelector<HTMLButtonElement>('[data-action="slot-1"]')?.click();
+    document.body.querySelector<HTMLButtonElement>('[data-action="slot-1"]')?.click();
 
     expect(controller.issueQuickCommand).toHaveBeenCalledWith(1);
     expect(controller.issueCommandAtPosition).not.toHaveBeenCalled();
-    expect(layout.getSlot('center').querySelector<HTMLElement>('.command-mode-overlay')?.dataset.visible).toBe('false');
+    expect(document.body.querySelector<HTMLElement>('.command-mode-overlay')?.dataset.visible).toBe('false');
 
     manager.dispose();
     layout.dispose();

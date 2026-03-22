@@ -119,13 +119,15 @@ export class ModeSelectScreen extends UIComponent {
     }).join('');
 
     this.root.innerHTML = `
-      <div class="${styles.content}">
-        <section class="${styles.headerPanel}">
-          <h2 class="${styles.heading}">SELECT MODE</h2>
+      <div class="${styles.content}" data-ref="mode-select-content">
+        <section class="${styles.headerPanel}" data-ref="mode-select-header">
+          <div class="${styles.headerBar}">
+            <button class="${styles.backButton}" data-ref="back" type="button">BACK</button>
+            <h2 class="${styles.heading}">SELECT MODE</h2>
+          </div>
         </section>
 
         <div class="${styles.cards}">${cardsHtml}</div>
-        <button class="${styles.backButton}" data-ref="back" type="button">BACK</button>
       </div>
     `;
   }

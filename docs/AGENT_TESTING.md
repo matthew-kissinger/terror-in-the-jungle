@@ -19,10 +19,12 @@ npm run lint             # ESLint on src/
 
 ```bash
 npm run validate         # lint + test:run + build + smoke:prod
+npm run check:mobile-ui  # built-app phone viewport flow gate (Chromium)
 npm run deadcode         # knip scan for unused files/exports
 ```
 
 - `validate` runs ESLint on `src/`, the full Vitest suite, TypeScript + Vite production build, then `scripts/prod-smoke.ts` against the built app.
+- `check:mobile-ui` serves `dist/`, drives the real title -> settings -> mode select -> deploy -> gameplay -> map -> command -> settings flow, and fails when required controls are offscreen or lose hit-testing on the phone viewport matrix.
 - `deadcode` is advisory, not a green gate. Use it to build cleanup backlog and catch stale imports/exports.
 - Exit code 0 = pass, non-zero = first failing step.
 
@@ -118,6 +120,11 @@ heapGrowthMb     13.17 MB     <20      <80     13.17    PASS
 ## Manual smoke: mobile HUD / helicopter / PC safety
 
 After changes under `src/ui/controls/`, `src/ui/hud/`, `src/ui/map/`, `src/ui/layout/`, or `src/systems/player/PlayerVehicleController.ts`, spot-check that **keyboard/mouse and gamepad** are unchanged and **touch** modals sit above thumb layers.
+
+Primary automated gate: `npm run check:mobile-ui`
+- Baseline matrix: `390x844`, `844x390`, `740x360`, `667x375`
+- Artifacts: `artifacts/mobile-ui/<timestamp>/mobile-ui-check/`
+- Optional exploratory Safari/WebKit pass: `npm run check:mobile-ui -- --include-webkit`
 
 | Area | Touch | Gamepad | KB/Mouse |
 |------|-------|---------|----------|

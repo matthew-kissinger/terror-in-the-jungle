@@ -119,10 +119,12 @@ export class DeployScreen extends UIComponent {
     // Side panel
     const sidePanel = this.createDiv(styles.sidePanel);
     sidePanel.appendChild(this.createSelectedPanel());
-    sidePanel.appendChild(this.createSequencePanel());
-    sidePanel.appendChild(this.createLoadoutPanel());
+    const sideScroll = this.createDiv(styles.sideScroll, 'respawn-side-scroll');
+    sideScroll.appendChild(this.createSequencePanel());
+    sideScroll.appendChild(this.createLoadoutPanel());
+    sideScroll.appendChild(this.createLegendPanel());
+    sidePanel.appendChild(sideScroll);
     sidePanel.appendChild(this.createControlsPanel());
-    sidePanel.appendChild(this.createLegendPanel());
 
     layout.appendChild(mapPanel);
     layout.appendChild(sidePanel);
@@ -283,7 +285,7 @@ export class DeployScreen extends UIComponent {
   // --- Private: Panel builders ---
 
   private createSelectedPanel(): HTMLDivElement {
-    const panel = this.createDiv(styles.panel);
+    const panel = this.createDiv(styles.panel, 'respawn-selected-panel');
     this.selectedTitle = this.createHeading('h3', undefined, styles.panelTitle, 'SPAWN POINT');
     this.selectedName = this.createDiv(styles.selectedName, 'selected-spawn-name');
     this.selectedName.textContent = 'NONE';
@@ -370,7 +372,7 @@ export class DeployScreen extends UIComponent {
   }
 
   private createControlsPanel(): HTMLDivElement {
-    const panel = this.createDiv(styles.controlPanel);
+    const panel = this.createDiv(styles.controlPanel, 'respawn-controls-panel');
     this.timerDisplay = this.createDiv(styles.timer, 'respawn-timer');
     this.respawnButton = this.makeActionButton('respawn-button', styles.actionButton, () => this.onRespawnClick?.());
     this.respawnButton.textContent = 'DEPLOY';

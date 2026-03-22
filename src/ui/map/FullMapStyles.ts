@@ -15,6 +15,7 @@ export const MAP_STYLES = `
     background: rgba(0, 0, 0, 0.85);
     backdrop-filter: blur(10px);
     z-index: ${zIndex.fullMapAboveTouch};
+    pointer-events: none;
   }
 
   .full-map-container.visible {
@@ -31,6 +32,7 @@ export const MAP_STYLES = `
     border: 2px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+    pointer-events: auto;
   }
 
   .map-canvas {
@@ -168,13 +170,13 @@ export const MAP_STYLES = `
 
   /* Mobile close button inside the map */
   .map-close-button {
-    position: absolute;
-    top: 10px;
-    right: 60px;
-    z-index: ${zIndex.fullMapOverlay};
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top, 0px));
+    right: max(12px, env(safe-area-inset-right, 0px));
+    z-index: ${zIndex.fullMapOverlay + 1};
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
     background: rgba(255, 80, 80, 0.3);
     border: 1px solid rgba(255, 80, 80, 0.5);
     color: rgba(255, 255, 255, 0.9);
@@ -183,9 +185,10 @@ export const MAP_STYLES = `
     display: flex;
     align-items: center;
     justify-content: center;
-    touch-action: none;
+    touch-action: manipulation;
     pointer-events: auto;
     cursor: pointer;
+    padding: 0;
   }
 
   .map-close-button:active {

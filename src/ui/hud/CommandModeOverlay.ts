@@ -404,12 +404,16 @@ export class CommandModeOverlay implements LayoutComponent {
     style.id = CommandModeOverlay.STYLE_ID;
     style.textContent = `
       .command-mode-overlay {
-        position: absolute;
+        position: fixed;
         inset: 0;
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 18px;
+        padding:
+          max(12px, env(safe-area-inset-top, 0px))
+          max(12px, env(safe-area-inset-right, 0px))
+          max(12px, env(safe-area-inset-bottom, 0px))
+          max(12px, env(safe-area-inset-left, 0px));
         pointer-events: none;
         opacity: 0;
         transition: opacity 140ms ease;
@@ -710,6 +714,82 @@ export class CommandModeOverlay implements LayoutComponent {
         .command-mode-overlay__grid {
           display: grid;
           grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+
+        .command-mode-overlay__button {
+          min-height: 56px;
+          padding: 10px;
+          border-radius: 10px;
+        }
+
+        .command-mode-overlay__button-label {
+          font-size: 14px;
+        }
+
+        .command-mode-overlay__footer {
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .command-mode-overlay__note {
+          text-align: left;
+          font-size: 11px;
+        }
+
+        .command-mode-overlay__hint {
+          font-size: 11px;
+        }
+      }
+
+      @media (pointer: coarse) and (max-height: 520px) {
+        .command-mode-overlay {
+          padding: 8px;
+          align-items: flex-end;
+        }
+
+        .command-mode-overlay__panel {
+          width: min(100%, 560px);
+          max-height: calc(100dvh - 16px);
+          gap: 10px;
+          padding: 12px;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .command-mode-overlay__header {
+          align-items: center;
+        }
+
+        .command-mode-overlay__title {
+          font-size: 20px;
+        }
+
+        .command-mode-overlay__close {
+          min-width: 56px;
+          min-height: 40px;
+          font-size: 13px;
+        }
+
+        .command-mode-overlay__body {
+          grid-template-columns: 1fr;
+        }
+
+        .command-mode-overlay__summary {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .command-mode-overlay__summary-item {
+          padding: 6px 8px;
+        }
+
+        .command-mode-overlay__detail-panel {
+          display: none;
+        }
+
+        .command-mode-overlay__grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 8px;
         }
 

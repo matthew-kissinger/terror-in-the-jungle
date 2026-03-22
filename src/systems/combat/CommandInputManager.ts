@@ -107,30 +107,17 @@ export class CommandInputManager implements GameSystem {
       this.closeOverlayTouchPassThrough();
       this.commandModeOverlay.setVisible(false);
     }
-    if (this.layout) {
-      this.layout.unregister(this.commandModeOverlay);
-      this.layout = undefined;
-    }
+    this.commandModeOverlay.unmount();
+    this.layout = undefined;
     this.commandModeOverlay.dispose();
   }
 
   mountTo(layout: HUDLayout): void {
     if (this.layout === layout) return;
 
-    if (this.layout) {
-      this.layout.unregister(this.commandModeOverlay);
-    }
-
+    this.commandModeOverlay.unmount();
     this.layout = layout;
-    /** Host lives inside `center` so we do not set `data-show` on the whole slot (avoids hiding HelicopterHUD in heli). */
-    const host = document.createElement('div');
-    host.className = 'command-mode-overlay-host';
-    host.style.cssText = 'position:relative;min-width:0;min-height:0;display:contents;';
-    this.layout.register({
-      region: 'center',
-      component: this.commandModeOverlay,
-      mountParent: host,
-    });
+    this.commandModeOverlay.mount(document.body);
   }
 
   bindInputManager(inputManager: InputManager): void {

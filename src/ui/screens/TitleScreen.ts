@@ -249,6 +249,7 @@ export class TitleScreen extends UIComponent {
   }
 
   private startInitTimeout(): void {
+    const timeoutMs = isTouchDevice() ? 120_000 : 30_000;
     this.initTimeoutId = window.setTimeout(() => {
       if (!this.isInitialized) {
         this.showError(
@@ -256,7 +257,7 @@ export class TitleScreen extends UIComponent {
           'The game is taking longer than expected. Try refreshing the page.'
         );
       }
-    }, 30000);
+    }, timeoutMs);
   }
 
   private clearInitTimeout(): void {

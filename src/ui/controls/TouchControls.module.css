@@ -597,8 +597,8 @@
 
 @media (max-width: 480px) {
   .menuBtn {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
   }
 
 
@@ -619,6 +619,34 @@
   .mortarDeployBtn {
     width: 60px;
     height: 60px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 440px) {
+  .fireBtn {
+    bottom: max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px));
+  }
+
+  .adsBtn {
+    bottom: max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px));
+  }
+
+  .actionContainer {
+    bottom: calc(max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + var(--tc-ads-size) + 12px);
+    gap: 8px;
+  }
+
+  .actionBtn,
+  .vehicleBtn,
+  .vehicleExitBtn,
+  .vehicleFireBtn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .vehicleActionBar {
+    bottom: calc(max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + var(--tc-joystick-base) + 12px);
+    gap: 6px;
   }
 }
 
