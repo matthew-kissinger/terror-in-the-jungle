@@ -35,6 +35,15 @@ export class TouchLook extends UIComponent {
   private adsSensitivityMultiplier = 0.45;
   private isADS = false;
 
+  /** Timestamp of last pointer activity - for stuck-pointer safety */
+  private lastPointerActivityMs = 0;
+
+  /** Safety check interval id */
+  private safetyIntervalId: ReturnType<typeof setInterval> | null = null;
+
+  /** Max time (ms) a pointer can be active without movement before force-reset */
+  private readonly STUCK_POINTER_TIMEOUT = 2000;
+
   protected build(): void {
     this.root.className = styles.lookZone;
     this.root.id = 'touch-look-zone';
@@ -45,6 +54,23 @@ export class TouchLook extends UIComponent {
     this.listen(this.root, 'pointermove', this.handlePointerMove, { passive: false });
     this.listen(this.root, 'pointerup', this.handlePointerUp, { passive: false });
     this.listen(this.root, 'pointercancel', this.handlePointerCancel, { passive: false });
+
+    // Global pointerup safety: catch missed pointerup when overlays steal events
+    this.listen(window, 'pointerup', this.handleGlobalPointerUp, { passive: false });
+
+    // Safety listeners: reset on tab switch, notification overlay, or app backgrounding
+    this.listen(window, 'blur', this.handleSafetyReset);
+    this.listen(window, 'pagehide', this.handleSafetyReset);
+    this.listen(document, 'visibilitychange', () => {
+      if (document.hidden) this.forceReset();
+    });
+
+    // Periodic safety check for stuck pointer (overlay steals focus, missed events)
+    this.safetyIntervalId = setInterval(() => {
+      if (this.activePointerId !== null && Date.now() - this.lastPointerActivityMs > this.STUCK_POINTER_TIMEOUT) {
+        this.forceReset();
+      }
+    }, 500);
   }
 
   setSensitivity(s: number): void {
@@ -64,11 +90,30 @@ export class TouchLook extends UIComponent {
     this.isADS = active;
   }
 
+  /** Global safety: catch pointerup events missed on the look zone */
+  private handleGlobalPointerUp = (e: PointerEvent): void => {
+    if (e.pointerId === this.activePointerId) {
+      this.activePointerId = null;
+    }
+  };
+
+  private handleSafetyReset = (): void => {
+    this.forceReset();
+  };
+
+  /** Force-reset all pointer state (stuck-pointer recovery) */
+  private forceReset(): void {
+    this.activePointerId = null;
+    this.delta.x = 0;
+    this.delta.y = 0;
+  }
+
   private handlePointerDown = (e: PointerEvent): void => {
     e.preventDefault();
     if (this.activePointerId !== null) return;
 
     this.activePointerId = e.pointerId;
+    this.lastPointerActivityMs = Date.now();
     if (typeof this.root.setPointerCapture === 'function') {
       this.root.setPointerCapture(e.pointerId);
     }
@@ -79,6 +124,7 @@ export class TouchLook extends UIComponent {
   private handlePointerMove = (e: PointerEvent): void => {
     e.preventDefault();
     if (e.pointerId !== this.activePointerId) return;
+    this.lastPointerActivityMs = Date.now();
 
     let dx = e.clientX - this.lastX;
     let dy = e.clientY - this.lastY;
@@ -148,5 +194,13 @@ export class TouchLook extends UIComponent {
     this.activePointerId = null;
     this.delta.x = 0;
     this.delta.y = 0;
+  }
+
+  override dispose(): void {
+    if (this.safetyIntervalId !== null) {
+      clearInterval(this.safetyIntervalId);
+      this.safetyIntervalId = null;
+    }
+    super.dispose();
   }
 }

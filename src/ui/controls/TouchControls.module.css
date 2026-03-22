@@ -636,6 +636,12 @@
     gap: 8px;
   }
 
+  /* Hide CMD and MAP buttons on short landscape to prevent overlap with menu button */
+  .actionContainer > .actionBtn[data-action="command"],
+  .actionContainer > .actionBtn[data-action="map"] {
+    display: none;
+  }
+
   .actionBtn,
   .vehicleBtn,
   .vehicleExitBtn,

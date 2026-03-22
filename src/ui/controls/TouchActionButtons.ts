@@ -247,6 +247,7 @@ export class TouchActionButtons extends UIComponent {
     const btn = document.createElement('div');
     btn.className = styles.actionBtn;
     btn.setAttribute('aria-label', label);
+    btn.dataset.action = key;
 
     const iconMap: Record<string, string> = {
       'R': 'icon-reload.png',

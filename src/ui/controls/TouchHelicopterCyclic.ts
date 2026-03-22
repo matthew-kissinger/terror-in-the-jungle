@@ -19,6 +19,15 @@ export class TouchHelicopterCyclic extends UIComponent {
   private baseX = 0;
   private baseY = 0;
 
+  /** Timestamp of last pointer activity - for stuck-pointer safety */
+  private lastPointerActivityMs = 0;
+
+  /** Safety check interval id */
+  private safetyIntervalId: ReturnType<typeof setInterval> | null = null;
+
+  /** Max time (ms) a pointer can be active without movement before force-reset */
+  private readonly STUCK_POINTER_TIMEOUT = 2000;
+
   /** Current normalized cyclic values: pitch [-1,1] (up=forward), roll [-1,1] (right=bank right) */
   private cyclicPitch = 0;
   private cyclicRoll = 0;
@@ -58,6 +67,42 @@ export class TouchHelicopterCyclic extends UIComponent {
     this.listen(this.root, 'pointermove', this.handlePointerMove, { passive: false });
     this.listen(this.root, 'pointerup', this.handlePointerUp, { passive: false });
     this.listen(this.root, 'pointercancel', this.handlePointerUp, { passive: false });
+
+    // Global pointerup safety: catch missed pointerup when overlays steal events
+    this.listen(window, 'pointerup', this.handleGlobalPointerUp, { passive: false });
+
+    // Safety listeners: reset on tab switch or app backgrounding
+    this.listen(window, 'blur', this.handleSafetyReset);
+    this.listen(window, 'pagehide', this.handleSafetyReset);
+    this.listen(document, 'visibilitychange', () => {
+      if (document.hidden) this.forceReset();
+    });
+
+    // Periodic safety check for stuck pointer
+    this.safetyIntervalId = setInterval(() => {
+      if (this.pointerId !== null && Date.now() - this.lastPointerActivityMs > this.STUCK_POINTER_TIMEOUT) {
+        this.forceReset();
+      }
+    }, 500);
+  }
+
+  /** Global safety: catch pointerup events missed on the cyclic zone */
+  private handleGlobalPointerUp = (e: PointerEvent): void => {
+    if (e.pointerId === this.pointerId) {
+      this.forceReset();
+    }
+  };
+
+  private handleSafetyReset = (): void => {
+    this.forceReset();
+  };
+
+  /** Force-reset all pointer state (stuck-pointer recovery) */
+  private forceReset(): void {
+    this.pointerId = null;
+    this.cyclicPitch = 0;
+    this.cyclicRoll = 0;
+    this.resetThumb();
   }
 
   private handlePointerDown = (e: PointerEvent): void => {
@@ -65,6 +110,7 @@ export class TouchHelicopterCyclic extends UIComponent {
     e.stopPropagation();
     if (this.pointerId !== null) return;
     this.pointerId = e.pointerId;
+    this.lastPointerActivityMs = Date.now();
     this.root.setPointerCapture(e.pointerId);
 
     const rect = this.base.getBoundingClientRect();
@@ -79,6 +125,7 @@ export class TouchHelicopterCyclic extends UIComponent {
     e.preventDefault();
     e.stopPropagation();
     if (e.pointerId !== this.pointerId) return;
+    this.lastPointerActivityMs = Date.now();
     this.updateFromPointer(e.clientX, e.clientY);
   };
 
@@ -138,9 +185,14 @@ export class TouchHelicopterCyclic extends UIComponent {
     if (!this.isVisible) return;
     this.isVisible = false;
     this.root.style.display = 'none';
-    this.pointerId = null;
-    this.cyclicPitch = 0;
-    this.cyclicRoll = 0;
-    this.resetThumb();
+    this.forceReset();
+  }
+
+  override dispose(): void {
+    if (this.safetyIntervalId !== null) {
+      clearInterval(this.safetyIntervalId);
+      this.safetyIntervalId = null;
+    }
+    super.dispose();
   }
 }

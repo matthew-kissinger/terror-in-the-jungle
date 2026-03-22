@@ -110,9 +110,11 @@ export class TouchControls {
     this.helicopterCyclic.mount(body);
     this.vehicleActionBar.mount(body);
 
+    let prevContext = this.contextManager.getContext();
     this.unsubscribeContext = this.contextManager.onChange((context) => {
-      if (context !== 'gameplay') {
+      if (context !== prevContext) {
         this.cancelActiveInteractions();
+        prevContext = context;
       }
     });
 
@@ -192,6 +194,9 @@ export class TouchControls {
    * Suppress touch capture while those layers are open (ref-counted).
    */
   beginModalOverlays(): void {
+    if (this.modalOverlayDepth === 0) {
+      this.cancelActiveInteractions();
+    }
     this.modalOverlayDepth++;
     this.applyModalOverlayPointerPolicy();
   }

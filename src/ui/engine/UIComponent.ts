@@ -224,15 +224,33 @@ export abstract class UIComponent {
   /**
    * Add an event listener that auto-removes on unmount.
    */
+  protected listen<K extends keyof WindowEventMap>(
+    target: Window,
+    event: K,
+    handler: (e: WindowEventMap[K]) => void,
+    options?: AddEventListenerOptions,
+  ): void;
+  protected listen<K extends keyof DocumentEventMap>(
+    target: Document,
+    event: K,
+    handler: (e: DocumentEventMap[K]) => void,
+    options?: AddEventListenerOptions,
+  ): void;
   protected listen<K extends keyof HTMLElementEventMap>(
-    target: HTMLElement | Window | Document,
+    target: HTMLElement,
     event: K,
     handler: (e: HTMLElementEventMap[K]) => void,
     options?: AddEventListenerOptions,
+  ): void;
+  protected listen(
+    target: HTMLElement | Window | Document,
+    event: string,
+    handler: EventListener,
+    options?: AddEventListenerOptions,
   ): void {
-    target.addEventListener(event, handler as EventListener, options);
+    target.addEventListener(event, handler, options);
     this._disposers.push(() => {
-      target.removeEventListener(event, handler as EventListener, options);
+      target.removeEventListener(event, handler, options);
     });
   }
 }

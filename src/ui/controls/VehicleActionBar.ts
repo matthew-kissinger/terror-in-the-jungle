@@ -37,6 +37,8 @@ export class VehicleActionBar extends UIComponent {
   private hoverBtn!: HTMLDivElement;
   private lookBtn!: HTMLDivElement;
   private autoHoverActive = false;
+  private fireActive = false;
+  private lookActive = false;
   private vehicleWeaponIndex = 0;
   private vehicleContext: VehicleUIContext | null = null;
 
@@ -74,18 +76,21 @@ export class VehicleActionBar extends UIComponent {
     this.listen(this.fireBtn, 'pointerdown', (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      this.fireActive = true;
       this.fireBtn.classList.add(styles.pressed);
       this.callbacks.onVehicleFireStart?.();
     }, { passive: false });
 
     this.listen(this.fireBtn, 'pointerup', (e: PointerEvent) => {
       e.preventDefault();
+      this.fireActive = false;
       this.fireBtn.classList.remove(styles.pressed);
       this.callbacks.onVehicleFireStop?.();
     }, { passive: false });
 
     this.listen(this.fireBtn, 'pointercancel', (e: PointerEvent) => {
       e.preventDefault();
+      this.fireActive = false;
       this.fireBtn.classList.remove(styles.pressed);
       this.callbacks.onVehicleFireStop?.();
     }, { passive: false });
@@ -119,18 +124,21 @@ export class VehicleActionBar extends UIComponent {
     this.listen(this.lookBtn, 'pointerdown', (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      this.lookActive = true;
       this.lookBtn.classList.add(styles.pressed);
       this.callbacks.onLookDown?.();
     }, { passive: false });
 
     this.listen(this.lookBtn, 'pointerup', (e: PointerEvent) => {
       e.preventDefault();
+      this.lookActive = false;
       this.lookBtn.classList.remove(styles.pressed);
       this.callbacks.onLookUp?.();
     }, { passive: false });
 
     this.listen(this.lookBtn, 'pointercancel', (e: PointerEvent) => {
       e.preventDefault();
+      this.lookActive = false;
       this.lookBtn.classList.remove(styles.pressed);
       this.callbacks.onLookUp?.();
     }, { passive: false });
@@ -161,6 +169,16 @@ export class VehicleActionBar extends UIComponent {
   }
 
   hide(): void {
+    if (this.fireActive) {
+      this.fireActive = false;
+      this.fireBtn.classList.remove(styles.pressed);
+      this.callbacks.onVehicleFireStop?.();
+    }
+    if (this.lookActive) {
+      this.lookActive = false;
+      this.lookBtn.classList.remove(styles.pressed);
+      this.callbacks.onLookUp?.();
+    }
     this.root.style.display = 'none';
   }
 

@@ -10,7 +10,7 @@ import { UIComponent } from '../engine/UIComponent';
 import { LoadingProgress } from '../loading/LoadingProgress';
 import { LOADING_PHASES } from '../../config/loading';
 import { isTouchDevice } from '../../utils/DeviceDetector';
-import { isPortraitViewport, tryLockLandscapeOrientation } from '../../utils/Orientation';
+import { isPortraitViewport, requestFullscreenCompat, tryLockLandscapeOrientation } from '../../utils/Orientation';
 import styles from './TitleScreen.module.css';
 
 export class TitleScreen extends UIComponent {
@@ -231,12 +231,9 @@ export class TitleScreen extends UIComponent {
   private handleStart = (): void => {
     if (!this.isMenuVisible()) return;
     if (isTouchDevice() && !document.fullscreenElement) {
-      const el = document.documentElement;
-      if (el.requestFullscreen) {
-        el.requestFullscreen()
-          .then(() => tryLockLandscapeOrientation())
-          .catch(() => {});
-      }
+      requestFullscreenCompat(document.documentElement)
+        .then(() => tryLockLandscapeOrientation())
+        .catch(() => {});
     }
     this.dismissFullscreenPrompt();
     this.onStartCallback?.();
@@ -282,15 +279,10 @@ export class TitleScreen extends UIComponent {
 
     prompt.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      const el = document.documentElement;
-      if (el.requestFullscreen) {
-        el.requestFullscreen()
-          .then(() => tryLockLandscapeOrientation())
-          .catch(() => {})
-          .finally(() => this.dismissFullscreenPrompt());
-      } else {
-        this.dismissFullscreenPrompt();
-      }
+      requestFullscreenCompat(document.documentElement)
+        .then(() => tryLockLandscapeOrientation())
+        .catch(() => {})
+        .finally(() => this.dismissFullscreenPrompt());
     });
     prompt.addEventListener('click', (e) => e.preventDefault());
     this.root.appendChild(prompt);

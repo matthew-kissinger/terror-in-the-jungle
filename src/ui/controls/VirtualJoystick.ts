@@ -95,11 +95,9 @@ export class VirtualJoystick extends UIComponent {
     this.listen(window, 'pointerup', this.handleGlobalPointerUp, { passive: false });
 
     // Safety listeners: reset on tab switch, notification overlay, or app backgrounding
-    const safeReset = () => this.resetThumb();
-    for (const event of ['blur', 'pagehide'] as const) {
-      window.addEventListener(event, safeReset);
-    }
-    window.addEventListener('visibilitychange', () => {
+    this.listen(window, 'blur', () => this.resetThumb());
+    this.listen(window, 'pagehide', () => this.resetThumb());
+    this.listen(document, 'visibilitychange', () => {
       if (document.hidden) this.resetThumb();
     });
 
