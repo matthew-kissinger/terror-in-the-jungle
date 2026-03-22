@@ -435,31 +435,30 @@
   image-rendering: pixelated;
 }
 
-/* Responsive */
+/* Responsive: mobile touch devices */
 @media (pointer: coarse) and (orientation: landscape) {
   .container {
     bottom: auto;
     left: auto;
     top: max(58px, env(safe-area-inset-top, 0px));
     right: max(8px, env(safe-area-inset-right, 0px));
+    max-height: calc(50dvh - 70px);
+    overflow-y: auto;
   }
 }
 
 @media (pointer: coarse) and (orientation: portrait) {
+  /* Bottom-left: infantry HUD slots are hidden in helicopter mode so this area is free */
   .container {
-    bottom: auto;
-    left: auto;
-    top: max(88px, env(safe-area-inset-top, 0px));
-    right: max(8px, env(safe-area-inset-right, 0px));
+    top: auto;
+    right: auto;
+    bottom: max(60px, env(safe-area-inset-bottom, 0px));
+    left: max(4px, env(safe-area-inset-left, 0px));
   }
 }
 
-@media (max-width: 768px) {
-  .container {
-    bottom: max(60px, env(safe-area-inset-bottom, 0px));
-    left: max(10px, env(safe-area-inset-left, 0px));
-  }
-
+/* Compact panel sizing for narrower screens */
+@media (pointer: coarse) and (max-width: 768px) {
   .panel {
     width: 50px;
     padding: var(--space-1-5) var(--space-1);
@@ -472,25 +471,18 @@
   }
 }
 
-@media (max-width: 480px) {
-  .container {
-    top: auto;
-    left: auto;
-    bottom: calc(150px + env(safe-area-inset-bottom, 0px));
-    right: max(8px, env(safe-area-inset-right, 0px));
-  }
-
-  .touchMode .panel {
+@media (pointer: coarse) and (max-width: 480px) {
+  .panel {
     width: 44px;
     padding: 5px;
   }
 
-  .touchMode .elevationValue {
+  .elevationValue {
     min-width: 28px;
     font-size: 10px;
   }
 
-  .touchMode .airspeedValue {
+  .airspeedValue {
     min-width: 28px;
     font-size: 10px;
   }

@@ -138,5 +138,6 @@
   --z-scoreboard: 500;
   --z-touch-controls: 1000;
   --z-screen: 9999;
-  --z-modal: 10001;
+  --z-modal: 10000;
+  --z-modal-overlay: 10001;
 }

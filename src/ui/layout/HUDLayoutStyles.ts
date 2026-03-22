@@ -38,7 +38,9 @@ export const HUD_LAYOUT_STYLES = `
     font-family: ${fontStack.hud};
     color: ${colors.textPrimary};
     box-sizing: border-box;
-    /* Safe area insets for notched/edge-to-edge devices */
+    /* Safe area insets for notched/edge-to-edge devices.
+       Fixed-position elements (touch controls, HelicopterHUD) handle their own
+       safe-area insets. Do NOT add safe-area-inset to grid-slot children. */
     padding:
       env(safe-area-inset-top, 0px)
       env(safe-area-inset-right, 0px)

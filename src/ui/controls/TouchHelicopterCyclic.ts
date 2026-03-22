@@ -78,6 +78,9 @@ export class TouchHelicopterCyclic extends UIComponent {
       if (document.hidden) this.forceReset();
     });
 
+    // Reset on fullscreen transition (viewport resize invalidates zone bounds)
+    this.listen(document, 'fullscreenchange' as keyof DocumentEventMap, () => this.forceReset());
+
     // Periodic safety check for stuck pointer
     this.safetyIntervalId = setInterval(() => {
       if (this.pointerId !== null && Date.now() - this.lastPointerActivityMs > this.STUCK_POINTER_TIMEOUT) {

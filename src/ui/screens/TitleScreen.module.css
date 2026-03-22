@@ -161,7 +161,7 @@
   padding: var(--space-6) var(--space-8);
   max-width: 460px;
   width: 90%;
-  z-index: 10001;
+  z-index: var(--z-modal-overlay);
   animation: ui-scaleIn 0.3s ease-out;
 }
 

@@ -8,7 +8,7 @@
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.85);
-  z-index: 10001;
+  z-index: var(--z-modal-overlay);
   justify-content: center;
   align-items: center;
   touch-action: manipulation;

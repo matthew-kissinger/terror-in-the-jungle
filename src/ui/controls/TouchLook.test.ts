@@ -46,12 +46,13 @@ describe('TouchLook', () => {
   it('multiple pointer moves accumulate before consume', () => {
     zone.dispatchEvent(pointerEvent('pointerdown', 100, 100));
     zone.dispatchEvent(pointerEvent('pointermove', 110, 105));
-    zone.dispatchEvent(pointerEvent('pointermove', 130, 115));
+    zone.dispatchEvent(pointerEvent('pointermove', 118, 110));
 
     const delta = look.consumeDelta();
-    // (10+20)px * 0.006 = 0.18, (5+10)px * 0.006 = 0.09 (sensitivity = 0.006)
-    expect(delta.x).toBeCloseTo(0.18, 5);
-    expect(delta.y).toBeCloseTo(0.09, 5);
+    // (10+8)px * 0.006 = 0.108, (5+5)px * 0.006 = 0.06 (sensitivity = 0.006)
+    // magnitude = sqrt(0.108² + 0.06²) ≈ 0.124 (under MAX_DELTA_PER_CONSUME of 0.15)
+    expect(delta.x).toBeCloseTo(0.108, 5);
+    expect(delta.y).toBeCloseTo(0.06, 5);
   });
 
   it('consumeDelta returns accumulated delta and resets to zero', () => {
@@ -109,5 +110,17 @@ describe('TouchLook', () => {
     // So output is 3.16 * 0.006 = ~0.019 instead of linear 10 * 0.006 = 0.06
     expect(Math.abs(curvedDelta.x)).toBeLessThan(0.06);
     expect(Math.abs(curvedDelta.x)).toBeGreaterThan(0);
+  });
+
+  it('clamps large accumulated delta to prevent camera snap', () => {
+    zone.dispatchEvent(pointerEvent('pointerdown', 100, 100));
+    // 400px jump simulates coordinate-space glitch during fullscreen transition
+    zone.dispatchEvent(pointerEvent('pointermove', 500, 500));
+
+    const delta = look.consumeDelta();
+    const mag = Math.sqrt(delta.x * delta.x + delta.y * delta.y);
+    // MAX_DELTA_PER_CONSUME is 0.15
+    expect(mag).toBeLessThanOrEqual(0.151);
+    expect(mag).toBeGreaterThan(0);
   });
 });

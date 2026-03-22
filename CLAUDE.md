@@ -1,6 +1,6 @@
 # Project Notes
 
-Last updated: 2026-03-21
+Last updated: 2026-03-22
 
 ## Project
 
@@ -77,7 +77,8 @@ npm run perf:update-baseline  # update baseline from latest capture
 21. Startup/loading performance (2026-03-19): Inline boot splash in `index.html` (CSS-only pulsing bar, visible <100ms, removed by GameUI.onMount). Granular texture/audio loading progress (per-file `onProgress` callbacks in AssetLoader.init and AudioManager.init, wired through SystemInitializer). Progress bar transition `0.5s ease` -> `0.15s linear` for responsive feel. Navmesh slow-phase hint ("this may take a few seconds") in TitleScreen. 3591 tests passing.
 22. Async startup + map seed rotation + Cloudflare deploy (2026-03-20): Open Frontier 10-15s hang eliminated. `VegetationScatterer.regenerateAllAsync()` yields between batches of 3 cells via rAF+setTimeout. `HeightmapGPU.uploadPrebakedGrid()` accepts pre-computed Float32Arrays. `MapSeedRegistry` rotates pre-baked seeds per session (5 OF, 3 ZC, 3 TDM variants). Prebake script (`scripts/prebake-navmesh.ts`) generates heightmaps + navmeshes for all variants with connectivity validation; skips when assets exist (`--force` to regenerate). Vegetation determinism: all `Math.random()` in `ChunkVegetationGenerator` replaced with `hashInts()`. Progress bar reweighted (vegetation 50%, was hidden inside features). Deployed to Cloudflare Pages (`terror-in-the-jungle.pages.dev`). CI: lint+test+build+smoke gate deploy; `vite base` changed from `/terror-in-the-jungle/` to `/`. Service worker caches immutable assets. 3614 tests passing.
 23. Frontend/UX hardening pass (2026-03-21): 30 issues fixed across HUD, input, vehicle transitions, CSS. Critical: fire-stop callback bypass context gating (`runRelease`), helicopter entry reordered for atomic HUD swap, ammo display suppressed during weapon switch. HelicopterHUD repositioned flush-left (`align-items: flex-start`), mobile media queries fixed (conflicting position properties). KillFeed uses `animationend` + timeout tracking. Camera saves/restores infantry angles across helicopter transitions. HUD update rates split (timer 1Hz, tickets 10Hz, objectives 2Hz). `'helicopter'` input context added - equipment keys (grenade/sandbag/mortar) gated to infantry-only via `runInfantry`. Helicopter exit uses world quaternion for directional offset. Z-index tier system in primitives.css. `backdrop-filter` removed from gameplay HUD elements. Crosshair pulse reduced + disabled during ADS. Dead code removed from WeaponPill. 3616 tests passing.
-24. See `docs/NEXT_WORK.md` for the active checklist.
+24. Mobile fullscreen + HUD fix (2026-03-22): Root cause analysis of 5 mobile bugs. Added `fullscreenchange` listeners to TouchControls orchestrator + VirtualJoystick/TouchLook/TouchHelicopterCyclic (resets pointer captures on viewport change). TouchLook `consumeDelta()` clamped to 0.15 rad magnitude (prevents camera snap from coordinate-space glitches). HelicopterHUD portrait repositioned to bottom-left (was top-right, overlapping minimap). Removed conflicting `max-width:480px` breakpoint. lookZone expanded to 100% height (was 70%, leaving dead zones). Z-index consolidated: `--z-modal:10000` + `--z-modal-overlay:10001` in primitives.css, hardcoded values in 5 CSS files replaced with vars. Mobile-ui CI gate fixed (MAP button visibility check for short landscape). 3621 tests passing.
+25. See `docs/NEXT_WORK.md` for the active checklist.
 
 ## Documentation Contract
 

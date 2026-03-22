@@ -80,6 +80,7 @@ export class TouchControls {
   private currentOverlay: GameplayOverlay = 'none';
   private interaction: InteractionContext | null = null;
   private vehicleContext: VehicleUIContext | null = null;
+  private readonly handleFullscreenChange = (): void => this.cancelActiveInteractions();
 
   constructor() {
     this.joystick = new VirtualJoystick();
@@ -117,6 +118,10 @@ export class TouchControls {
         prevContext = context;
       }
     });
+
+    // Reset all pointer captures on fullscreen transition (viewport resize invalidates zones)
+    document.addEventListener('fullscreenchange', this.handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', this.handleFullscreenChange);
 
     // Start hidden until game starts
     this.hide();
@@ -348,6 +353,8 @@ export class TouchControls {
   }
 
   dispose(): void {
+    document.removeEventListener('fullscreenchange', this.handleFullscreenChange);
+    document.removeEventListener('webkitfullscreenchange', this.handleFullscreenChange);
     this.unsubscribeContext();
     this.unsubscribePresentation?.();
     this.joystick.dispose();

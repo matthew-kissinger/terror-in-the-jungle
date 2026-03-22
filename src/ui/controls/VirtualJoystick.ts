@@ -101,6 +101,9 @@ export class VirtualJoystick extends UIComponent {
       if (document.hidden) this.resetThumb();
     });
 
+    // Reset on fullscreen transition (viewport resize invalidates zone bounds)
+    this.listen(document, 'fullscreenchange' as keyof DocumentEventMap, () => this.resetThumb());
+
     // Periodic safety check for stuck pointer (overlay steals focus, missed events)
     this.safetyIntervalId = setInterval(() => {
       if (this.activePointerId !== null && Date.now() - this.lastPointerActivityMs > this.STUCK_POINTER_TIMEOUT) {

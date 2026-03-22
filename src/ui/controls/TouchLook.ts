@@ -44,6 +44,10 @@ export class TouchLook extends UIComponent {
   /** Max time (ms) a pointer can be active without movement before force-reset */
   private readonly STUCK_POINTER_TIMEOUT = 2000;
 
+  /** Max accumulated delta magnitude per consume cycle.
+   *  Prevents camera snap from coordinate-space changes (e.g. fullscreen transition). */
+  private readonly MAX_DELTA_PER_CONSUME = 0.15;
+
   protected build(): void {
     this.root.className = styles.lookZone;
     this.root.id = 'touch-look-zone';
@@ -64,6 +68,9 @@ export class TouchLook extends UIComponent {
     this.listen(document, 'visibilitychange', () => {
       if (document.hidden) this.forceReset();
     });
+
+    // Reset on fullscreen transition (viewport resize invalidates zone bounds)
+    this.listen(document, 'fullscreenchange' as keyof DocumentEventMap, () => this.forceReset());
 
     // Periodic safety check for stuck pointer (overlay steals focus, missed events)
     this.safetyIntervalId = setInterval(() => {
@@ -172,12 +179,21 @@ export class TouchLook extends UIComponent {
     }
   };
 
-  /** Read and clear accumulated delta */
+  /** Read and clear accumulated delta, clamped to prevent camera snap */
   consumeDelta(): { x: number; y: number } {
-    const x = this.delta.x;
-    const y = this.delta.y;
+    let x = this.delta.x;
+    let y = this.delta.y;
     this.delta.x = 0;
     this.delta.y = 0;
+
+    // Clamp magnitude to prevent camera snap from coordinate-space glitches
+    const mag = Math.sqrt(x * x + y * y);
+    if (mag > this.MAX_DELTA_PER_CONSUME) {
+      const scale = this.MAX_DELTA_PER_CONSUME / mag;
+      x *= scale;
+      y *= scale;
+    }
+
     return { x, y };
   }
 
