@@ -548,14 +548,16 @@ async function main(): Promise<void> {
       headless: !options.headed,
       args: ['--use-angle=swiftshader', '--enable-webgl'],
     });
-    browsers.webkit = await webkit.launch({
-      headless: !options.headed,
-    });
 
     const reports: DeviceReport[] = [];
     const deviceCases = options.includeWebkit
       ? [...DEFAULT_DEVICE_CASES, ...WEBKIT_DEVICE_CASES]
       : DEFAULT_DEVICE_CASES;
+    if (options.includeWebkit) {
+      browsers.webkit = await webkit.launch({
+        headless: !options.headed,
+      });
+    }
     for (const device of deviceCases) {
       console.log(`Checking ${device.id} (${device.browserKind})`);
       const browser = browsers[device.browserKind];
