@@ -69,6 +69,7 @@ type Actionability = {
   withinViewport: boolean;
   hitProbeSupported: boolean;
   ownsHitTarget: boolean;
+  elementPointerEvents: string;
   pointerBlockedByAncestor: string | null;
 };
 
@@ -328,23 +329,18 @@ async function assertActionable(page: Page, selector: string, label: string): Pr
         rect.bottom <= viewportHeight + edgeTolerance,
       hitProbeSupported,
       ownsHitTarget: hitStack.some((nodeAtPoint) => nodeAtPoint === el || el.contains(nodeAtPoint)),
+      elementPointerEvents: style.pointerEvents,
       pointerBlockedByAncestor,
     };
   }, { selector, label });
 
-  if (!state.isVisible || !state.withinViewport) {
+  if (!state.isVisible || !state.withinViewport || state.elementPointerEvents === 'none') {
     throw new Error(
       `${label} failed actionability: ${JSON.stringify(state)}`
     );
   }
 
-  if (!state.hitProbeSupported) {
-    try {
-      await locator.tap({ trial: true, timeout: 10_000 });
-    } catch (error) {
-      throw new Error(`${label} failed tap trial: ${String(error)}`);
-    }
-  } else if (!state.ownsHitTarget) {
+  if (state.hitProbeSupported && !state.ownsHitTarget) {
     throw new Error(`${label} failed hit test: ${JSON.stringify(state)}`);
   }
 
