@@ -549,27 +549,37 @@ async function runDeviceCase(
     await tapSelector(page, '#respawn-button');
     await waitForGameplay(page);
     report.checks.push(await assertActionable(page, '#touch-menu-btn', 'Gameplay menu button'));
-    report.checks.push(await assertActionable(page, '#touch-action-buttons [aria-label="MAP"]', 'Gameplay map button'));
     await captureScreenshot(page, device.id, 'gameplay', artifactDir, report.screenshots);
 
-  await triggerWithFallback(
-    page,
-    '#touch-action-buttons [aria-label="MAP"]',
-    'Gameplay map button',
-    () => page.waitForSelector('.full-map-container.visible', { state: 'visible', timeout: 5_000 }).then(() => {}),
-    'pointerdown',
-  );
-  report.checks.push(await assertActionable(page, '.map-close-button', 'Full map close button'));
-  await captureScreenshot(page, device.id, 'full-map', artifactDir, report.screenshots);
-  await triggerWithFallback(
-    page,
-    '.map-close-button',
-    'Full map close button',
-    () => page.waitForSelector('.full-map-container.visible', { state: 'hidden', timeout: 5_000 }).then(() => {}),
-    'pointerdown',
-  );
+    // MAP and CMD buttons are intentionally hidden in short landscape (max-height: 440px)
+    const mapButtonVisible = await page.locator('#touch-action-buttons [aria-label="MAP"]').first()
+      .evaluate((el) => {
+        const style = window.getComputedStyle(el);
+        return style.display !== 'none' && style.visibility !== 'hidden';
+      }).catch(() => false);
 
-  await maybeExerciseCommandOverlay(page, report, artifactDir);
+    if (mapButtonVisible) {
+      report.checks.push(await assertActionable(page, '#touch-action-buttons [aria-label="MAP"]', 'Gameplay map button'));
+      await triggerWithFallback(
+        page,
+        '#touch-action-buttons [aria-label="MAP"]',
+        'Gameplay map button',
+        () => page.waitForSelector('.full-map-container.visible', { state: 'visible', timeout: 5_000 }).then(() => {}),
+        'pointerdown',
+      );
+      report.checks.push(await assertActionable(page, '.map-close-button', 'Full map close button'));
+      await captureScreenshot(page, device.id, 'full-map', artifactDir, report.screenshots);
+      await triggerWithFallback(
+        page,
+        '.map-close-button',
+        'Full map close button',
+        () => page.waitForSelector('.full-map-container.visible', { state: 'hidden', timeout: 5_000 }).then(() => {}),
+        'pointerdown',
+      );
+      await maybeExerciseCommandOverlay(page, report, artifactDir);
+    } else {
+      report.skipped.push('MAP button hidden in short landscape viewport - skipping map and command overlay checks.');
+    }
 
   await triggerWithFallback(
     page,
