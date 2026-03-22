@@ -514,3 +514,57 @@
     min-height: 44px;
   }
 }
+
+@media (pointer: coarse) and (max-height: 520px) and (min-width: 600px) {
+  .layout {
+    grid-template-columns: minmax(0, 1.2fr) minmax(300px, 340px);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .header {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-2-5);
+  }
+
+  .headerMeta {
+    display: none;
+  }
+
+  .headerTitle {
+    font-size: clamp(1.35rem, 3vw, 1.9rem);
+  }
+
+  .map {
+    min-height: clamp(150px, 38dvh, 210px);
+    height: clamp(150px, 38dvh, 210px);
+  }
+
+  .sidePanel {
+    min-height: 0;
+  }
+
+  .sideScroll {
+    gap: var(--space-2);
+  }
+
+  .panel,
+  .controlPanel,
+  .loadoutPanel {
+    padding: var(--space-2-5);
+  }
+
+  .timer {
+    margin-bottom: var(--space-1-5);
+  }
+
+  .buttonStack {
+    gap: var(--space-1-5);
+  }
+
+  .actionButton,
+  .secondaryButton {
+    min-height: 40px;
+  }
+}

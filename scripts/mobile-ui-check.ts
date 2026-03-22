@@ -239,6 +239,17 @@ async function dispatchPointerDown(page: Page, selector: string): Promise<void> 
   });
 }
 
+async function scrollSelectorIntoView(page: Page, selector: string): Promise<void> {
+  const locator = page.locator(selector).first();
+  await locator.waitFor({ state: 'attached', timeout: 120_000 });
+  await locator.evaluate((element) => {
+    (element as HTMLElement).scrollIntoView({
+      block: 'nearest',
+      inline: 'nearest',
+    });
+  });
+}
+
 async function triggerWithFallback(
   page: Page,
   selector: string,
@@ -273,7 +284,20 @@ async function triggerWithFallback(
 async function assertActionable(page: Page, selector: string, label: string): Promise<Actionability> {
   const locator = page.locator(selector).first();
   await locator.waitFor({ state: 'attached', timeout: 120_000 });
-  await locator.scrollIntoViewIfNeeded();
+  await page.waitForFunction((target) => {
+    const el = document.querySelector<HTMLElement>(target);
+    if (!el) return false;
+    const style = window.getComputedStyle(el);
+    const rect = el.getBoundingClientRect();
+    return (
+      style.display !== 'none' &&
+      style.visibility !== 'hidden' &&
+      Number(style.opacity) !== 0 &&
+      style.pointerEvents !== 'none' &&
+      rect.width >= 1 &&
+      rect.height >= 1
+    );
+  }, selector, { timeout: 30_000 });
 
   const state = await locator.evaluate((element, payload) => {
     const el = element as HTMLElement;
@@ -485,6 +509,7 @@ async function runDeviceCase(
     await tapSelector(page, 'button[data-ref="start"]');
     await page.waitForSelector(`[data-mode="${mode}"]`, { state: 'visible', timeout: 120_000 });
     report.checks.push(await assertActionable(page, '[data-ref="back"]', 'Mode select back button'));
+    report.checks.push(await assertScrollOwner(page, '[data-ref="mode-select-content"]', 'Mode select scroll body'));
 
     const availableModes = await page.locator('[data-mode]').evaluateAll((elements) =>
       elements
@@ -492,6 +517,7 @@ async function runDeviceCase(
         .filter((value) => value.length > 0)
     );
     for (const availableMode of availableModes) {
+      await scrollSelectorIntoView(page, `[data-mode="${availableMode}"]`);
       report.checks.push(
         await assertActionable(page, `[data-mode="${availableMode}"]`, `Mode card ${availableMode}`)
       );
