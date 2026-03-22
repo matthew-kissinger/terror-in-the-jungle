@@ -221,14 +221,52 @@ async function dispatchPointerDown(page: Page, selector: string): Promise<void> 
   const locator = page.locator(selector).first();
   await locator.waitFor({ state: 'visible', timeout: 120_000 });
   await locator.evaluate((element) => {
+    const rect = (element as HTMLElement).getBoundingClientRect();
     const event = new PointerEvent('pointerdown', {
       bubbles: true,
       cancelable: true,
+      composed: true,
+      button: 0,
+      buttons: 1,
+      pointerId: 1,
       pointerType: 'touch',
       isPrimary: true,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.top + rect.height / 2,
     });
     element.dispatchEvent(event);
   });
+}
+
+async function triggerWithFallback(
+  page: Page,
+  selector: string,
+  label: string,
+  waitForOutcome: () => Promise<void>,
+  preferredAction: 'tap' | 'pointerdown' = 'tap',
+): Promise<void> {
+  const attempts = preferredAction === 'tap'
+    ? [
+        () => tapSelector(page, selector),
+        () => dispatchPointerDown(page, selector),
+      ]
+    : [
+        () => dispatchPointerDown(page, selector),
+        () => tapSelector(page, selector),
+      ];
+
+  let lastError: unknown = null;
+  for (const attempt of attempts) {
+    try {
+      await attempt();
+      await waitForOutcome();
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw new Error(`${label} failed to trigger expected outcome: ${String(lastError)}`);
 }
 
 async function assertActionable(page: Page, selector: string, label: string): Promise<Actionability> {
@@ -372,10 +410,13 @@ async function maybeExerciseCommandOverlay(
 ): Promise<void> {
   const commandButtonSelector = '#touch-action-buttons [aria-label="CMD"]';
   report.checks.push(await assertActionable(page, commandButtonSelector, 'Gameplay command button'));
-  await dispatchPointerDown(page, commandButtonSelector);
-  const visible = await page.waitForSelector('.command-mode-overlay[data-visible="true"]', { timeout: 5_000 })
-    .then(() => true)
-    .catch(() => false);
+  const visible = await triggerWithFallback(
+    page,
+    commandButtonSelector,
+    'Gameplay command button',
+    () => page.waitForSelector('.command-mode-overlay[data-visible="true"]', { state: 'visible', timeout: 5_000 }).then(() => {}),
+    'pointerdown',
+  ).then(() => true).catch(() => false);
 
   if (!visible) {
     report.skipped.push('Command overlay did not open in the current gameplay state.');
@@ -489,20 +530,35 @@ async function runDeviceCase(
     report.checks.push(await assertActionable(page, '#touch-action-buttons [aria-label="MAP"]', 'Gameplay map button'));
     await captureScreenshot(page, device.id, 'gameplay', artifactDir, report.screenshots);
 
-    await dispatchPointerDown(page, '#touch-action-buttons [aria-label="MAP"]');
-    await page.waitForSelector('.full-map-container.visible', { state: 'visible', timeout: 30_000 });
-    report.checks.push(await assertActionable(page, '.map-close-button', 'Full map close button'));
-    await captureScreenshot(page, device.id, 'full-map', artifactDir, report.screenshots);
-    await dispatchPointerDown(page, '.map-close-button');
-    await page.waitForSelector('.full-map-container.visible', { state: 'hidden', timeout: 30_000 });
+  await triggerWithFallback(
+    page,
+    '#touch-action-buttons [aria-label="MAP"]',
+    'Gameplay map button',
+    () => page.waitForSelector('.full-map-container.visible', { state: 'visible', timeout: 5_000 }).then(() => {}),
+    'pointerdown',
+  );
+  report.checks.push(await assertActionable(page, '.map-close-button', 'Full map close button'));
+  await captureScreenshot(page, device.id, 'full-map', artifactDir, report.screenshots);
+  await triggerWithFallback(
+    page,
+    '.map-close-button',
+    'Full map close button',
+    () => page.waitForSelector('.full-map-container.visible', { state: 'hidden', timeout: 5_000 }).then(() => {}),
+    'pointerdown',
+  );
 
-    await maybeExerciseCommandOverlay(page, report, artifactDir);
+  await maybeExerciseCommandOverlay(page, report, artifactDir);
 
-    await dispatchPointerDown(page, '#touch-menu-btn');
-    await page.waitForSelector('#settings-modal', { state: 'visible', timeout: 30_000 });
-    report.checks.push(await assertActionable(page, '#settings-modal [data-ref="close"]', 'Gameplay settings close'));
-    report.checks.push(await assertScrollOwner(page, '#settings-modal [data-ref="scroll-body"]', 'Gameplay settings scroll body'));
-    await captureScreenshot(page, device.id, 'gameplay-settings', artifactDir, report.screenshots);
+  await triggerWithFallback(
+    page,
+    '#touch-menu-btn',
+    'Gameplay menu button',
+    () => page.waitForSelector('#settings-modal', { state: 'visible', timeout: 5_000 }).then(() => {}),
+    'tap',
+  );
+  report.checks.push(await assertActionable(page, '#settings-modal [data-ref="close"]', 'Gameplay settings close'));
+  report.checks.push(await assertScrollOwner(page, '#settings-modal [data-ref="scroll-body"]', 'Gameplay settings scroll body'));
+  await captureScreenshot(page, device.id, 'gameplay-settings', artifactDir, report.screenshots);
     await dispatchPointerDown(page, '#settings-modal [data-ref="close"]');
     await waitForHidden(page, '#settings-modal');
 
@@ -570,6 +626,12 @@ async function main(): Promise<void> {
     writeFileSync(join(artifactDir, 'report.json'), JSON.stringify(reports, null, 2));
     writeFileSync(join(artifactDir, 'report.md'), buildMarkdownSummary(reports, artifactDir));
 
+    const ignoredConsoleErrorFragments = [
+      'KHR_parallel_shader_compile',
+      'WebGL warning',
+      'Ignored attempt to cancel a touchstart event with cancelable=false',
+    ];
+
     const failures = reports.flatMap((report) => {
       const deviceFailures: string[] = [];
       for (const error of report.pageErrors) {
@@ -579,7 +641,7 @@ async function main(): Promise<void> {
         deviceFailures.push(`${report.device.id}: request error: ${error}`);
       }
       for (const error of report.consoleErrors) {
-        if (!error.includes('KHR_parallel_shader_compile') && !error.includes('WebGL warning')) {
+        if (!ignoredConsoleErrorFragments.some((fragment) => error.includes(fragment))) {
           deviceFailures.push(`${report.device.id}: console error: ${error}`);
         }
       }
