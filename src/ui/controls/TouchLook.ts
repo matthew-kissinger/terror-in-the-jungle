@@ -69,8 +69,12 @@ export class TouchLook extends UIComponent {
       if (document.hidden) this.forceReset();
     });
 
-    // Reset on fullscreen transition (viewport resize invalidates zone bounds)
-    this.listen(document, 'fullscreenchange' as keyof DocumentEventMap, () => this.forceReset());
+    // On fullscreen/resize, clear accumulated delta to prevent camera snap,
+    // but keep active pointer alive — the user's finger is still on screen.
+    this.listen(document, 'fullscreenchange' as keyof DocumentEventMap, () => {
+      this.delta.x = 0;
+      this.delta.y = 0;
+    });
 
     // Periodic safety check for stuck pointer (overlay steals focus, missed events)
     this.safetyIntervalId = setInterval(() => {

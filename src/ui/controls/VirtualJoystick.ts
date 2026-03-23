@@ -41,6 +41,9 @@ export class VirtualJoystick extends UIComponent {
   /** Timestamp of last pointer activity — for stuck-pointer safety */
   private lastPointerActivityMs = 0;
 
+  /** Set when viewport geometry changes; next pointermove recalculates base coords */
+  private geometryDirty = false;
+
   /** Safety check interval id */
   private safetyIntervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -101,8 +104,9 @@ export class VirtualJoystick extends UIComponent {
       if (document.hidden) this.resetThumb();
     });
 
-    // Reset on fullscreen transition (viewport resize invalidates zone bounds)
-    this.listen(document, 'fullscreenchange' as keyof DocumentEventMap, () => this.resetThumb());
+    // Mark geometry dirty on viewport changes so next pointermove recalculates base coords
+    this.listen(window, 'resize', () => { this.geometryDirty = true; });
+    this.listen(document, 'fullscreenchange' as keyof DocumentEventMap, () => { this.geometryDirty = true; });
 
     // Periodic safety check for stuck pointer (overlay steals focus, missed events)
     this.safetyIntervalId = setInterval(() => {
@@ -139,6 +143,16 @@ export class VirtualJoystick extends UIComponent {
     e.preventDefault();
     if (e.pointerId !== this.activePointerId) return;
     this.lastPointerActivityMs = Date.now();
+
+    // Recalculate base position after viewport geometry change (fullscreen, orientation)
+    if (this.geometryDirty) {
+      const rect = this.base.getBoundingClientRect();
+      this.baseX = rect.left + rect.width / 2;
+      this.baseY = rect.top + rect.height / 2;
+      this.maxDistance = rect.width / 2;
+      this.geometryDirty = false;
+    }
+
     this.updateThumb(e.clientX, e.clientY);
   };
 

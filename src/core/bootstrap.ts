@@ -1,6 +1,5 @@
 import { GameEngine } from './GameEngine';
 import { injectSharedStyles } from '../ui/design/styles';
-import { TouchControlLayout } from '../ui/controls/TouchControlLayout';
 import { markStartup, resetStartupTelemetry } from './StartupTelemetry';
 import { AgentTier } from '../systems/strategy/types';
 import { isBlufor, isOpfor } from '../systems/combat/types';
@@ -62,10 +61,6 @@ export async function bootstrapGame(): Promise<void> {
   // Inject shared design system CSS before any UI is created
   injectSharedStyles();
 
-  // Init responsive touch control sizing (sets CSS custom properties)
-  const touchLayout = new TouchControlLayout();
-  touchLayout.init();
-
   const engine = new GameEngine();
   markStartup('bootstrap.engine-constructed');
 
@@ -124,13 +119,11 @@ export async function bootstrapGame(): Promise<void> {
     }
 
     window.addEventListener('beforeunload', () => {
-      touchLayout.dispose();
       engine.dispose();
     });
 
     if (import.meta.hot) {
       import.meta.hot.dispose(() => {
-        touchLayout.dispose();
         engine.dispose();
       });
     }
