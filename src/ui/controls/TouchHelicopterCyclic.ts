@@ -38,6 +38,9 @@ export class TouchHelicopterCyclic extends UIComponent {
   /** Dead zone as fraction of maxDistance (0-1). */
   private readonly DEAD_ZONE = 0.08;
 
+  /** Set when viewport geometry changes; next pointermove recalculates base coords */
+  private geometryDirty = false;
+
   protected build(): void {
     this.root.className = styles.heliCyclicZone;
     this.root.id = 'touch-helicopter-cyclic';
@@ -78,8 +81,9 @@ export class TouchHelicopterCyclic extends UIComponent {
       if (document.hidden) this.forceReset();
     });
 
-    // Reset on fullscreen transition (viewport resize invalidates zone bounds)
-    this.listen(document, 'fullscreenchange' as keyof DocumentEventMap, () => this.forceReset());
+    // Mark geometry dirty on viewport changes so next pointermove recalculates base coords
+    this.listen(window, 'resize', () => { this.geometryDirty = true; });
+    this.listen(document, 'fullscreenchange' as keyof DocumentEventMap, () => { this.geometryDirty = true; });
 
     // Periodic safety check for stuck pointer
     this.safetyIntervalId = setInterval(() => {
@@ -129,6 +133,16 @@ export class TouchHelicopterCyclic extends UIComponent {
     e.stopPropagation();
     if (e.pointerId !== this.pointerId) return;
     this.lastPointerActivityMs = Date.now();
+
+    // Recalculate base position after viewport geometry change (fullscreen, orientation)
+    if (this.geometryDirty) {
+      const rect = this.base.getBoundingClientRect();
+      this.maxDistance = rect.width / 2;
+      this.baseX = rect.left + this.maxDistance;
+      this.baseY = rect.top + this.maxDistance;
+      this.geometryDirty = false;
+    }
+
     this.updateFromPointer(e.clientX, e.clientY);
   };
 

@@ -230,13 +230,18 @@ export class TitleScreen extends UIComponent {
 
   private handleStart = (): void => {
     if (!this.isMenuVisible()) return;
-    if (isTouchDevice() && !document.fullscreenElement) {
-      requestFullscreenCompat(document.documentElement)
-        .then(() => tryLockLandscapeOrientation())
-        .catch(() => {});
-    }
     this.dismissFullscreenPrompt();
     this.onStartCallback?.();
+
+    // Request fullscreen AFTER firing the start callback so the mode load
+    // doesn't race with viewport resize cascades from fullscreen entry.
+    if (isTouchDevice() && !document.fullscreenElement) {
+      requestAnimationFrame(() => {
+        requestFullscreenCompat(document.documentElement)
+          .then(() => tryLockLandscapeOrientation())
+          .catch(() => {});
+      });
+    }
   };
 
   private isMenuVisible(): boolean {
