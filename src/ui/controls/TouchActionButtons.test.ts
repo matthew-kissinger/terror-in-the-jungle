@@ -144,7 +144,7 @@ describe('TouchActionButtons', () => {
 
       // First set up previous weapon by cycling once
       const weaponCycler = buttons[0];
-      const nextChevron = weaponCycler.children[2] as HTMLElement;
+      const nextChevron = weaponCycler.children[3] as HTMLElement; // prev, label, ammo, next
 
       // Cycle to next weapon via chevron to establish history
       nextChevron.dispatchEvent(pointerDownEvent());

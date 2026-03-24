@@ -23,6 +23,7 @@
   min-height: 0;
   max-height: 100%;
   overflow-y: auto;
+  padding-top: max(8px, env(safe-area-inset-top, 0px));
   padding-bottom: calc(clamp(16px, 2vw, 28px) + max(16px, env(safe-area-inset-bottom, 0px)));
 }
 
@@ -31,11 +32,10 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  overflow: hidden;
   border: 1px solid var(--ops-line);
   background: linear-gradient(180deg, rgba(19, 26, 18, 0.96), rgba(8, 12, 9, 0.92));
   box-shadow: var(--ops-shadow);
-  padding: clamp(16px, 2vw, 24px);
+  padding: clamp(12px, 2vw, 24px) clamp(16px, 2vw, 24px);
 }
 
 .headerBar {
@@ -49,11 +49,11 @@
   margin: 0;
   color: #f4f0e2;
   font-family: var(--font-heading);
-  font-size: clamp(2rem, 5vw, 3.4rem);
+  font-size: clamp(1.2rem, 4vw, 3.4rem);
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  line-height: 0.95;
+  line-height: 1.1;
 }
 
 .cards {

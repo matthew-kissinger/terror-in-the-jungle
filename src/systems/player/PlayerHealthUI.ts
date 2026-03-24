@@ -79,6 +79,20 @@ export class PlayerHealthUI {
         height: 3px;
       }
     }
+
+    /* On touch, match minimap width exactly so they align as one column */
+    @media (pointer: coarse) and (max-width: 480px) {
+      .health-display {
+        width: 100px;
+        box-sizing: border-box;
+      }
+    }
+    @media (pointer: coarse) and (min-width: 481px) and (max-width: 1024px) {
+      .health-display {
+        width: 130px;
+        box-sizing: border-box;
+      }
+    }
   `;
 
   constructor() {

@@ -58,7 +58,10 @@
     "check:memory": "npx tsx scripts/memory-growth-tracker.ts",
     "check:assets": "npx tsx scripts/asset-load-analyzer.ts",
     "check:states": "npx tsx scripts/state-coverage-probe.ts",
-    "profile:modes": "npx tsx scripts/mode-load-profiler.ts"
+    "profile:modes": "npx tsx scripts/mode-load-profiler.ts",
+    "playtest:mobile": "npx tsx scripts/mobile-playtest.ts",
+    "playtest:mobile:quick": "npx tsx scripts/mobile-playtest.ts --landscape-only",
+    "playtest:mobile:flow": "npx tsx scripts/mobile-playtest.ts --flow-only"
   },
   "devDependencies": {
     "@types/node": "^25.2.3",

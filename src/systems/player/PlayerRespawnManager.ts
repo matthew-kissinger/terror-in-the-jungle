@@ -473,9 +473,11 @@ export class PlayerRespawnManager implements GameSystem {
     this.mapController.clearSelection();
     this.mapController.stopMapUpdateInterval();
 
-    // Restore gameplay input context and pointer lock
+    // Restore gameplay input context and pointer lock (desktop only)
     InputContextManager.getInstance().setContext('gameplay');
-    this.playerController?.setPointerLockEnabled(true);
+    if (!this.playerController?.getIsTouchMode()) {
+      this.playerController?.setPointerLockEnabled(true);
+    }
   }
 
   private cancelActiveDeployFlow(): void {

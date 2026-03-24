@@ -23,6 +23,8 @@
   flex: 1;
   min-height: 0;
   max-height: 100%;
+  overflow-y: auto;
+  padding-top: max(8px, env(safe-area-inset-top, 0px));
   padding-bottom: calc(clamp(16px, 2vw, 28px) + max(16px, env(safe-area-inset-bottom, 0px)));
 }
 

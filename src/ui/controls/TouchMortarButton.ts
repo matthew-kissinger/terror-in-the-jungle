@@ -107,9 +107,7 @@ export class TouchMortarButton extends BaseTouchButton {
       this.aimPointerId = e.pointerId;
       this.aimLastX = e.clientX;
       this.aimLastY = e.clientY;
-      if (typeof this.aimPad.setPointerCapture === 'function') {
-        this.aimPad.setPointerCapture(e.pointerId);
-      }
+      try { this.aimPad.setPointerCapture(e.pointerId); } catch { /* CDP/synthetic events */ }
       this.aimPad.classList.add(styles.pressed);
     }, { passive: false });
 

@@ -555,6 +555,7 @@ export class PlayerController implements GameSystem {
     this.input.relockPointer();
   }
   setPointerLockEnabled(enabled: boolean): void { this.input.setPointerLockEnabled(enabled); }
+  getIsTouchMode(): boolean { return this.input.getIsTouchMode(); }
   setGameStarted(started: boolean): void {
     this.gameStarted = started;
     this.input.setGameStarted(started);
@@ -746,6 +747,8 @@ export class PlayerController implements GameSystem {
     if (typeof dependencies.hudSystem.getPresentationController === 'function') {
       this.input.getTouchControls()?.bindPresentation(dependencies.hudSystem.getPresentationController());
     }
+    // Ammo updates are forwarded to TouchActionButtons via DOM event 'hud:ammo'
+    // dispatched by HUDSystem.updateAmmoDisplay(). No direct wiring needed.
     this.unsubscribeInputMode?.();
     this.unsubscribeInputMode = this.input.onInputModeChange((mode) => {
       this.hudSystem?.setInputMode?.(mode);

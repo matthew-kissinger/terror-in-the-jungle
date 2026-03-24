@@ -57,6 +57,15 @@ export class VehicleActionBar extends UIComponent {
     this.hoverBtn = this.createButton('STAB', styles.vehicleBtn);
     this.lookBtn = this.createButton('LOOK', styles.vehicleBtn);
 
+    // Data-action attributes for CSS targeting
+    this.exitBtn.dataset.action = 'exit';
+    this.fireBtn.dataset.action = 'fire';
+    this.wpnBtn.dataset.action = 'weapon';
+    this.mapBtn.dataset.action = 'map';
+    this.cmdBtn.dataset.action = 'command';
+    this.hoverBtn.dataset.action = 'hover';
+    this.lookBtn.dataset.action = 'look';
+
     this.root.appendChild(this.exitBtn);
     this.root.appendChild(this.fireBtn);
     this.root.appendChild(this.wpnBtn);
@@ -161,7 +170,9 @@ export class VehicleActionBar extends UIComponent {
     this.mapBtn.style.display = capabilities?.canOpenMap ? 'flex' : 'none';
     this.cmdBtn.style.display = capabilities?.canOpenCommand ? 'flex' : 'none';
     this.hoverBtn.style.display = capabilities?.canStabilize ? 'flex' : 'none';
-    this.lookBtn.style.display = capabilities?.canFreeLook ? 'flex' : 'none';
+    // LOOK hidden on touch - free-look is handled by the cyclic joystick
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    this.lookBtn.style.display = (!isTouchDevice && capabilities?.canFreeLook) ? 'flex' : 'none';
   }
 
   show(): void {

@@ -55,6 +55,15 @@ export const HUD_LAYOUT_STYLES = `
     contain: layout style;
   }
 
+  /* On mobile, override the safe-area grid padding. Touch controls
+     handle their own safe-area insets independently. The grid only
+     needs minimal edge spacing so the minimap sits flush in the corner. */
+  @media (pointer: coarse) {
+    #game-hud-root {
+      padding: 0 4px;
+    }
+  }
+
   /* Prevent accidental use of expensive GPU filters on mobile.
      blur() and backdrop-filter cause extra compositing passes
      that can drop mobile from 60fps to 20-30fps.
@@ -86,6 +95,34 @@ export const HUD_LAYOUT_STYLES = `
   .hud-slot[data-region="status-bar"] {
     justify-content: center;
     align-items: center;
+  }
+
+  /* On mobile, status-bar is viewport-centered (absolute, not grid-bound).
+     Timer/score + SQD stack vertically, centered on screen regardless
+     of which grid column the slot was assigned to. */
+  [data-device="touch"] .hud-slot[data-region="status-bar"] {
+    grid-area: unset;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 0;
+    gap: 0;
+    pointer-events: none; /* don't block minimap/menu taps */
+    overflow: visible;
+  }
+  /* Children (timer bar, squad indicator) still need tap events */
+  [data-device="touch"] .hud-slot[data-region="status-bar"] > * {
+    pointer-events: auto;
+  }
+
+  /* On mobile, health aligns top-left under stats/minimap */
+  [data-device="touch"] .hud-slot[data-region="health"] {
+    justify-content: flex-start;
+    align-items: flex-start;
   }
 
   /* Weapon-bar: centered on desktop, left-aligned on touch */
@@ -141,11 +178,12 @@ export const HUD_LAYOUT_STYLES = `
     padding: 0;
   }
 
-  /* On mobile, stats (K/D) sits directly under the minimap — left-aligned */
+  /* On mobile, stats (SQD) sits in center column directly under status-bar */
   [data-device="touch"] .hud-slot[data-region="stats"] {
-    justify-content: flex-start;
+    justify-content: center;
     align-items: flex-start;
-    padding-left: 0;
+    padding: 0;
+    margin-top: 0;
   }
 
   /* Ammo: bottom-right — align-items: flex-end so it sticks to the bottom
@@ -252,12 +290,13 @@ export const HUD_LAYOUT_STYLES = `
 
   /* On mobile, hide the individual timer/tickets/compass/game-status/kill-feed
    * since MobileStatusBar handles the essential info in one compact line.
-   * Stats (K/D) stays visible — positioned under the minimap. */
+   * Stats slot hidden on touch — squad indicator mounts inside status-bar. */
   [data-device="touch"] .hud-slot[data-region="timer"],
   [data-device="touch"] .hud-slot[data-region="tickets"],
   [data-device="touch"] .hud-slot[data-region="compass"],
   [data-device="touch"] .hud-slot[data-region="game-status"],
-  [data-device="touch"] .hud-slot[data-region="kill-feed"] {
+  [data-device="touch"] .hud-slot[data-region="kill-feed"],
+  [data-device="touch"] .hud-slot[data-region="stats"] {
     display: none !important;
   }
 
@@ -269,91 +308,73 @@ export const HUD_LAYOUT_STYLES = `
     display: none !important;
   }
 
-  /* On mobile, hide the separate ammo display — WeaponPill already shows ammo */
-  [data-device="touch"] .hud-slot[data-region="ammo"] {
+  /* On mobile, hide ammo + weapon-bar slots — TouchActionButtons weapon cycler
+   * is the unified weapon display (shows name + ammo + switch in one widget). */
+  [data-device="touch"] .hud-slot[data-region="ammo"],
+  [data-device="touch"] .hud-slot[data-region="weapon-bar"] {
     display: none !important;
   }
 
   /* =========================================================
    * MOBILE LANDSCAPE (touch + width > height)
    *
-   * Simplified grid - fire/ADS/actions are fixed-position.
-   * Status-bar at top-center provides timer+tickets.
-   * Stats (K/D) sits directly under the minimap.
-   * Right column kept empty — touch controls are fixed-pos.
-   * Weapon-bar + health bottom-left, nothing in screen center.
+   * Info column top-left (minimap, health tight below it).
+   * Stats (SQD) moved to center column below status-bar.
+   * Bottom-left is EMPTY — sacred joystick zone.
+   * Bottom-right is EMPTY — sacred fire/ADS zone.
+   * All touch controls are fixed-position, not in grid.
+   * Center slot for transient notifications only.
    *
    *  minimap    | status-bar  | menu
-   *  stats      |             |
-   *             |  center     |
-   *  weapon-bar |             |
    *  health     |             |
-   *  joystick   |             |
-   *  joystick   |             |
+   *             |  center     |
+   *             |             |
    * ========================================================= */
   @media (pointer: coarse) and (orientation: landscape) {
     #game-hud-root {
       grid-template-columns: auto minmax(100px, 2fr) minmax(60px, 1fr);
       grid-template-rows:
         auto     /* minimap / status-bar / menu */
-        auto     /* stats (K/D under minimap) */
-        1fr      /* flex space (center overlay lives here) */
-        auto     /* weapon-bar */
         auto     /* health */
-        auto     /* joystick */
-        auto;    /* joystick */
+        1fr      /* center notifications */
+        1fr;     /* empty - joystick/fire zones */
       grid-template-areas:
         "minimap     status-bar  menu"
-        "stats       .           ."
-        ".           center      ."
-        "weapon-bar  .           ."
         "health      .           ."
-        "joystick    .           ."
-        "joystick    .           .";
-      gap: 2px;
+        ".           center      ."
+        ".           .           .";
+      gap: 0;
     }
   }
 
   /* =========================================================
    * MOBILE PORTRAIT (touch + height > width)
    *
-   * Status-bar at top, stats (K/D) under minimap.
-   * Weapon pill + health bottom-left.
-   * Fire/ADS are fixed-position, not in grid.
-   * Right column kept empty — fire/ADS/actions are fixed-pos.
-   * Nothing in screen center.
+   * Same principle — info top-left, bottom half clear.
+   * Stats (SQD) in center column below status-bar.
    *
    *  minimap    | status-bar  | menu
-   *  stats      |             |
+   *  health     |             |
    *             |             |
    *             |  center     |
-   *  weapon-bar |             |
-   *  health     |             |
-   *  joystick   |             |
-   *  joystick   |             |
+   *             |             |
    * ========================================================= */
   @media (pointer: coarse) and (orientation: portrait) {
     #game-hud-root {
       grid-template-columns: auto minmax(80px, 2fr) minmax(60px, 1fr);
       grid-template-rows:
         auto     /* minimap / status-bar / menu */
-        auto     /* stats (K/D under minimap) */
-        1fr      /* flex space */
-        1fr      /* flex space (center overlay lives here) */
-        auto     /* weapon-bar */
         auto     /* health */
-        auto     /* joystick */
-        1fr;     /* joystick */
+        1fr      /* flex space */
+        1fr      /* center notifications */
+        1fr;     /* empty - joystick/fire zones */
       grid-template-areas:
         "minimap     status-bar  menu"
-        "stats       .           ."
+        "health      .           ."
         ".           .           ."
         ".           center      ."
-        "weapon-bar  .           ."
-        "health      .           ."
-        "joystick    .           ."
-        "joystick    .           .";
-      gap: 2px;
+        ".           .           .";
+      gap: 0;
     }
   }
 
@@ -392,10 +413,12 @@ export const HUD_LAYOUT_STYLES = `
   [data-actor-mode="helicopter"] .hud-slot[data-region="game-status"],
   [data-actor-mode="helicopter"] .hud-slot[data-region="ammo"],
   [data-actor-mode="helicopter"] .hud-slot[data-region="weapon-bar"],
+  [data-actor-mode="helicopter"] .hud-slot[data-region="health"],
   [data-actor-mode="plane"] .hud-slot[data-region="stats"],
   [data-actor-mode="plane"] .hud-slot[data-region="game-status"],
   [data-actor-mode="plane"] .hud-slot[data-region="ammo"],
   [data-actor-mode="plane"] .hud-slot[data-region="weapon-bar"],
+  [data-actor-mode="plane"] .hud-slot[data-region="health"],
   [data-actor-mode="car"] .hud-slot[data-region="stats"],
   [data-actor-mode="car"] .hud-slot[data-region="game-status"],
   [data-actor-mode="car"] .hud-slot[data-region="ammo"],
@@ -407,7 +430,8 @@ export const HUD_LAYOUT_STYLES = `
   [data-vehicle="helicopter"] .hud-slot[data-region="stats"],
   [data-vehicle="helicopter"] .hud-slot[data-region="game-status"],
   [data-vehicle="helicopter"] .hud-slot[data-region="ammo"],
-  [data-vehicle="helicopter"] .hud-slot[data-region="weapon-bar"] {
+  [data-vehicle="helicopter"] .hud-slot[data-region="weapon-bar"],
+  [data-vehicle="helicopter"] .hud-slot[data-region="health"] {
     display: none !important;
   }
 

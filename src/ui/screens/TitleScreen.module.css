@@ -12,8 +12,7 @@
 }
 
 .hidden {
-  opacity: 0;
-  visibility: hidden;
+  display: none;
   pointer-events: none;
 }
 
@@ -200,21 +199,28 @@
 }
 
 .fullscreenPrompt {
-  position: absolute;
-  bottom: 1rem;
+  position: fixed;
+  bottom: max(1rem, env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%);
-  padding: var(--space-2) var(--space-4);
-  background: rgba(13, 19, 14, 0.92);
-  border: 1px solid rgba(245, 158, 11, 0.24);
+  padding: var(--space-3) var(--space-5);
+  background: rgba(13, 19, 14, 0.95);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 8px;
   color: #fde68a;
   cursor: pointer;
   touch-action: manipulation;
-  font-size: 0.72rem;
+  pointer-events: auto;
+  z-index: 10;
+  font-size: 0.82rem;
   font-weight: var(--weight-semibold);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   transition: opacity 0.3s;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .fullscreenPromptFading {

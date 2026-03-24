@@ -125,9 +125,7 @@ export class TouchLook extends UIComponent {
 
     this.activePointerId = e.pointerId;
     this.lastPointerActivityMs = Date.now();
-    if (typeof this.root.setPointerCapture === 'function') {
-      this.root.setPointerCapture(e.pointerId);
-    }
+    try { this.root.setPointerCapture(e.pointerId); } catch { /* CDP/synthetic events */ }
     this.lastX = e.clientX;
     this.lastY = e.clientY;
   };

@@ -10,6 +10,7 @@
 
 import { UIComponent } from '../engine/UIComponent';
 import { FocusTrap } from '../engine/FocusTrap';
+import { requestFullscreenCompat } from '../../utils/Orientation';
 import {
   SettingsManager,
   GraphicsQuality,
@@ -82,6 +83,7 @@ export class SettingsModal extends UIComponent {
           <div class="${styles.gameplayActionsGrid}">
             <button class="${styles.secondaryBtn}" data-ref="resume" type="button">Resume</button>
             <button class="${styles.secondaryBtn}" data-ref="squad" type="button">Squad Commands</button>
+            <button class="${styles.secondaryBtn}" data-ref="fullscreen" type="button">Toggle Fullscreen</button>
             <button class="${styles.secondaryBtn}" data-ref="quit" type="button">Quit to Menu</button>
           </div>
         </section>
@@ -231,6 +233,30 @@ export class SettingsModal extends UIComponent {
     if (squadBtn) {
       this.listen(squadBtn, 'pointerdown', () => this.gameplayMenuActions?.onSquadCommands());
       this.listen(squadBtn, 'click', (e) => e.preventDefault());
+    }
+
+    const fullscreenBtn = this.$('[data-ref="fullscreen"]');
+    if (fullscreenBtn && document.fullscreenEnabled) {
+      // Must use 'click' event - Android Chrome requires it for fullscreen user gesture.
+      // Check visual state (viewport vs screen) not document.fullscreenElement
+      // because Chrome can have stale fullscreen state.
+      this.listen(fullscreenBtn, 'click', () => {
+        const isVisuallyFullscreen =
+          window.matchMedia('(display-mode: fullscreen)').matches ||
+          window.matchMedia('(display-mode: standalone)').matches ||
+          window.innerHeight >= screen.availHeight - 50;
+        if (isVisuallyFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        } else {
+          // Use different element than stale fullscreenElement to avoid no-op
+          const target = document.fullscreenElement === document.documentElement
+            ? document.body : document.documentElement;
+          requestFullscreenCompat(target as HTMLElement).catch(() => {});
+        }
+      });
+    } else if (fullscreenBtn) {
+      // Device doesn't support fullscreen - hide the button
+      (fullscreenBtn as HTMLElement).style.display = 'none';
     }
 
     const quitBtn = this.$('[data-ref="quit"]');

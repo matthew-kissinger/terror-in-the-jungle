@@ -1,0 +1,22 @@
+{
+  "name": "Terror in the Jungle",
+  "short_name": "TITJ",
+  "description": "Browser-based 3D combat game",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#080c12",
+  "theme_color": "#0a0e0c",
+  "icons": [
+    {
+      "src": "/favicon-64x64.png",
+      "sizes": "64x64",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-180x180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

@@ -175,6 +175,10 @@ export class PlayerInput {
   }
 
   setPointerLockEnabled(enabled: boolean): void {
+    // Never re-enable pointer lock on touch devices - pointer lock freezes
+    // clientX/clientY to 0,0 (per W3C spec), breaking all joystick input.
+    if (enabled && this.isTouchMode) return;
+
     this.pointerLockEnabled = enabled;
 
     if (!enabled) {
@@ -527,6 +531,8 @@ export class PlayerInput {
   }
 
   private requestPointerLock(): void {
+    // Never lock on touch devices (belt-and-suspenders with setPointerLockEnabled guard)
+    if (this.isTouchMode) return;
     // Don't lock if controls are disabled (dead/respawning)
     if (!this.pointerLockEnabled) return;
     if (this.gameStarted && !this.isPointerLocked && this.isControlsEnabled) {

@@ -437,23 +437,97 @@
 
 /* Responsive: mobile touch devices */
 @media (pointer: coarse) and (orientation: landscape) {
+  /* Bottom-center strip between joystick zones — clear of both joysticks.
+     Compact horizontal layout shows key flight data without overlapping
+     the minimap column or right-side vehicle buttons. */
   .container {
-    bottom: auto;
-    left: auto;
-    top: max(58px, env(safe-area-inset-top, 0px));
-    right: max(8px, env(safe-area-inset-right, 0px));
-    max-height: calc(50dvh - 70px);
-    overflow-y: auto;
+    top: auto;
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: max(4px, env(safe-area-inset-bottom, 0px));
+    max-height: 52px;
+    overflow: hidden;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 3px;
+    max-width: 55%;
+  }
+
+  /* Compact all panels: horizontal internal layout, uniform thin strip */
+  .container .panel {
+    width: auto;
+    min-width: unset;
+    max-height: 32px;
+    padding: 2px 6px;
+    overflow: hidden;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Force all nested flex containers to row layout */
+  .container .panel > * {
+    flex-direction: row;
+    align-items: center;
+    gap: 3px;
+  }
+
+  /* Shrink text for compact strip */
+  .container .elevationValue,
+  .container .airspeedValue {
+    font-size: 11px;
+    min-width: unset;
+    padding: 0;
+  }
+
+  /* Damage section inline */
+  .container .damageSection {
+    flex-direction: row;
+    align-items: center;
+    width: auto;
+    gap: 3px;
+  }
+
+  .container .damageSection .damageBar {
+    width: 20px;
+    height: 10px;
+  }
+
+  /* Hide status icons row to save space */
+  .container .statusBox {
+    display: none;
   }
 }
 
 @media (pointer: coarse) and (orientation: portrait) {
-  /* Bottom-left: infantry HUD slots are hidden in helicopter mode so this area is free */
+  /* Below minimap column, left-aligned. Minimap is 100px on phones. */
   .container {
-    top: auto;
+    bottom: auto;
     right: auto;
-    bottom: max(60px, env(safe-area-inset-bottom, 0px));
+    top: 108px;
     left: max(4px, env(safe-area-inset-left, 0px));
+    max-height: calc(65dvh - 116px); /* don't extend into joystick zone */
+    overflow-y: auto;
+    gap: 3px;
+  }
+
+  /* Smaller text to prevent clipping in narrow panels */
+  .container .panel {
+    padding: 3px 5px;
+    width: 80px;
+  }
+
+  .container .elevationValue,
+  .container .airspeedValue {
+    font-size: 10px;
+    min-width: unset;
+    padding: 0;
+  }
+
+  .container .damageSection {
+    width: 80px;
   }
 }
 
@@ -473,21 +547,21 @@
 
 @media (pointer: coarse) and (max-width: 480px) {
   .panel {
-    width: 44px;
-    padding: 5px;
+    width: 80px;
+    padding: 3px 5px;
   }
 
   .elevationValue {
-    min-width: 28px;
+    min-width: unset;
     font-size: 10px;
   }
 
   .airspeedValue {
-    min-width: 28px;
+    min-width: unset;
     font-size: 10px;
   }
 
   .damageSection {
-    width: 44px;
+    width: 80px;
   }
 }

@@ -65,6 +65,7 @@ public/assets/originals/
 # Performance artifacts
 .playwright-mcp/
 artifacts/
+playtest-results/
 
 # Local scratch / locks (not source)
 tmp/*.lock

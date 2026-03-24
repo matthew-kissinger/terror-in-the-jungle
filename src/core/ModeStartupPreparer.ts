@@ -15,7 +15,7 @@ import type { PreparedHeightmapGrid, PreparedTerrainSource } from '../systems/te
 import { Logger } from '../utils/Logger';
 import { Alliance, Faction } from '../systems/combat/types';
 import { shouldUseTouchControls } from '../utils/DeviceDetector';
-import { tryLockLandscapeOrientation } from '../utils/Orientation';
+// Orientation lock removed - let user choose portrait/landscape
 import { PersistenceSystem } from '../systems/strategy/PersistenceSystem';
 import type { GameEngine } from './GameEngine';
 import { GameEventBus } from './GameEventBus';
@@ -363,9 +363,8 @@ export async function prepareModeStartup(
   launchSelection: GameLaunchSelection
 ): Promise<PreparedModeStartup> {
   const mode = launchSelection.mode;
-  if (shouldUseTouchControls()) {
-    tryLockLandscapeOrientation();
-  }
+  // Don't force landscape - let user choose orientation.
+  // Fullscreen is requested on START tap; layout works in any orientation.
 
   const definition = getGameModeDefinition(mode);
   const config = { ...getGameModeConfig(mode) };

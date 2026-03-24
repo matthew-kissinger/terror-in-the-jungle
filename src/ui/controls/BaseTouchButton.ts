@@ -54,9 +54,7 @@ export abstract class BaseTouchButton extends UIComponent {
       e.stopPropagation();
       if (binding.pointerId !== null) return;
       binding.pointerId = e.pointerId;
-      if (typeof element.setPointerCapture === 'function') {
-        element.setPointerCapture(e.pointerId);
-      }
+      try { element.setPointerCapture(e.pointerId); } catch { /* CDP/synthetic events */ }
       element.classList.add(binding.pressedClass);
       binding.onDown?.();
     }, { passive: false });

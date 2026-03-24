@@ -244,7 +244,6 @@ export class TouchControls {
    * Joystick and look stay as viewport overlays (need large touch zones).
    */
   mountToLayout(layout: HUDLayout): void {
-    void layout;
     // Fire + ADS are NOT slotted into the grid; they stay fixed-position
     // with thumb-arc CSS positioning for ergonomic reach.
 
@@ -256,7 +255,8 @@ export class TouchControls {
     // menu slot strips its fixed layer/z-index and lets the action stack
     // intercept taps on short landscape phones.
     // joystick + look stay as overlays
-    // contextual buttons (interaction, sandbag, rally, mortar) keep their positioning for now
+    // contextual buttons (interaction, sandbag, mortar) keep their fixed positioning
+    // Rally button disabled on mobile (broken)
   }
 
   /**

@@ -138,7 +138,8 @@ describe('VehicleActionBar', () => {
     expect((document.querySelector('[aria-label="MAP"]') as HTMLDivElement).style.display).toBe('flex');
     expect((document.querySelector('[aria-label="CMD"]') as HTMLDivElement).style.display).toBe('flex');
     expect((document.querySelector('[aria-label="STAB"]') as HTMLDivElement).style.display).toBe('flex');
-    expect((document.querySelector('[aria-label="LOOK"]') as HTMLDivElement).style.display).toBe('flex');
+    // LOOK is hidden on touch devices (jsdom has ontouchstart), free-look handled by cyclic joystick
+    expect((document.querySelector('[aria-label="LOOK"]') as HTMLDivElement).style.display).toBe('none');
   });
 
   it('cycles weapons using the configured vehicle weapon count', () => {

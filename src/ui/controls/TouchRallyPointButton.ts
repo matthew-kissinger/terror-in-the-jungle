@@ -83,6 +83,12 @@ export class TouchRallyPointButton extends BaseTouchButton {
     this.root.style.display = 'none';
   }
 
+  /** Reparent into HUD grid for proper vertical flow (below health). */
+  mountToGrid(parent: HTMLElement): void {
+    this.root.classList.add(styles.rallyGridded);
+    this.reparentTo(parent);
+  }
+
   /** Don't auto-show - only shown when player can place rally points */
   show(): void {}
 

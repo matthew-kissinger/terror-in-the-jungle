@@ -2,10 +2,10 @@ export function isPortraitViewport(): boolean {
   return window.innerHeight > window.innerWidth;
 }
 
-/** Request fullscreen with vendor prefix fallback for older iOS Safari. */
+/** Request fullscreen with vendor prefix fallback and navigationUI hide. */
 export function requestFullscreenCompat(el: HTMLElement): Promise<void> {
   if (el.requestFullscreen) {
-    return el.requestFullscreen();
+    return el.requestFullscreen({ navigationUI: 'hide' });
   }
   const webkitEl = el as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> };
   if (typeof webkitEl.webkitRequestFullscreen === 'function') {

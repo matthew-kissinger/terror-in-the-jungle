@@ -118,7 +118,7 @@ export class TouchHelicopterCyclic extends UIComponent {
     if (this.pointerId !== null) return;
     this.pointerId = e.pointerId;
     this.lastPointerActivityMs = Date.now();
-    this.root.setPointerCapture(e.pointerId);
+    try { this.root.setPointerCapture(e.pointerId); } catch { /* CDP/synthetic events */ }
 
     const rect = this.base.getBoundingClientRect();
     this.maxDistance = rect.width / 2;

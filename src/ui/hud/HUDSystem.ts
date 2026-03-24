@@ -463,6 +463,11 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.updateAmmoDisplay(magazine, reserve);
     // Also update the mobile WeaponPill ammo display
     this.elements.weaponPill.setAmmo(magazine, reserve);
+    // Broadcast ammo update via DOM event for TouchActionButtons weapon cycler.
+    // Also persist on data attributes so late-mounting components can read initial values.
+    document.documentElement.dataset.ammoMag = String(magazine);
+    document.documentElement.dataset.ammoRes = String(reserve);
+    document.dispatchEvent(new CustomEvent('hud:ammo', { detail: { magazine, reserve } }));
   }
 
   showInteractionPrompt(text: string): void {
@@ -580,6 +585,14 @@ export class HUDSystem implements GameSystem, IHUDSystem {
   // Weapon switch feedback method
   showWeaponSwitch(weaponName: string, weaponIcon: string, ammo: string): void {
     this.elements.showWeaponSwitch(weaponName, weaponIcon, ammo);
+    // Parse ammo string and dispatch for mobile weapon cycler (updateAmmoDisplay
+    // is suppressed during weapon switch, so the cycler never gets initial values)
+    const parts = ammo.split('/').map(s => parseInt(s.trim(), 10));
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      document.documentElement.dataset.ammoMag = String(parts[0]);
+      document.documentElement.dataset.ammoRes = String(parts[1]);
+      document.dispatchEvent(new CustomEvent('hud:ammo', { detail: { magazine: parts[0], reserve: parts[1] } }));
+    }
   }
 
   // Unified weapon bar API (shared across desktop bar + mobile pill)

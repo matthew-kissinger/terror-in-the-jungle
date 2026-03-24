@@ -65,13 +65,32 @@ export class TitleScreen extends UIComponent {
   }
 
   protected onMount(): void {
+    // Clear stale fullscreen state on mount. Android Chrome can retain
+    // document.fullscreenElement after back-navigation/swipe-exit, making
+    // future requestFullscreen() calls no-op. exitFullscreen() doesn't
+    // require a user gesture, so it's safe to call on mount.
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+
     for (const phase of LOADING_PHASES) {
       this.progress.addPhase(phase.id, phase.weight, phase.label);
     }
 
     const startBtn = this.$('[data-ref="start"]');
     if (startBtn) {
-      this.listen(startBtn, 'click', () => this.deferAction(this.handleStart));
+      this.listen(startBtn, 'click', () => {
+        // Request fullscreen SYNCHRONOUSLY in click handler (user gesture required).
+        // Android Chrome can retain stale fullscreenElement across reloads.
+        // requestFullscreen() on the SAME element is a no-op per spec.
+        // Workaround: use a DIFFERENT element than the stale one.
+        if (isTouchDevice() && document.fullscreenEnabled) {
+          const target = document.fullscreenElement === document.documentElement
+            ? document.body : document.documentElement;
+          requestFullscreenCompat(target as HTMLElement).catch(() => {});
+        }
+        this.deferAction(this.handleStart);
+      });
     }
 
     const settingsBtn = this.$('[data-ref="settings"]');
@@ -232,16 +251,8 @@ export class TitleScreen extends UIComponent {
     if (!this.isMenuVisible()) return;
     this.dismissFullscreenPrompt();
     this.onStartCallback?.();
-
-    // Request fullscreen AFTER firing the start callback so the mode load
-    // doesn't race with viewport resize cascades from fullscreen entry.
-    if (isTouchDevice() && !document.fullscreenElement) {
-      requestAnimationFrame(() => {
-        requestFullscreenCompat(document.documentElement)
-          .then(() => tryLockLandscapeOrientation())
-          .catch(() => {});
-      });
-    }
+    // Fullscreen is requested synchronously in the click handler (before deferAction)
+    // so the user gesture chain is preserved. No duplicate request here.
   };
 
   private isMenuVisible(): boolean {
@@ -276,29 +287,38 @@ export class TitleScreen extends UIComponent {
 
   private showFullscreenPrompt(): void {
     if (this.fullscreenPrompt) return;
+    // Already visually fullscreen (PWA or standalone) - skip prompt.
+    // Don't trust document.fullscreenElement alone - Chrome can report stale state.
+    const isVisuallyFullscreen =
+      window.matchMedia('(display-mode: fullscreen)').matches ||
+      window.matchMedia('(display-mode: standalone)').matches;
+    if (isVisuallyFullscreen) return;
+
     const prompt = document.createElement('div');
     prompt.className = styles.fullscreenPrompt;
-    prompt.textContent = isPortraitViewport()
-      ? 'TAP FOR FULLSCREEN + LANDSCAPE'
-      : 'TAP FOR FULLSCREEN';
+    prompt.textContent = 'TAP FOR FULLSCREEN';
 
-    prompt.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      requestFullscreenCompat(document.documentElement)
-        .then(() => tryLockLandscapeOrientation())
+    // Mount to document.body (NOT this.root) - Android Chrome can fail
+    // silently on fullscreen requests from elements inside scroll containers
+    // or nested component trees. Body-level mounting is most reliable.
+    prompt.addEventListener('click', () => {
+      // Use different element than stale fullscreenElement to avoid no-op
+      const target = document.fullscreenElement === document.documentElement
+        ? document.body : document.documentElement;
+      requestFullscreenCompat(target as HTMLElement)
         .catch(() => {})
         .finally(() => this.dismissFullscreenPrompt());
     });
-    prompt.addEventListener('click', (e) => e.preventDefault());
-    this.root.appendChild(prompt);
+    document.body.appendChild(prompt);
     this.fullscreenPrompt = prompt;
 
+    // Auto-dismiss after 10 seconds (longer than before to give user time)
     this.fullscreenAutoTimerId = setTimeout(() => {
       if (this.fullscreenPrompt) {
         this.fullscreenPrompt.classList.add(styles.fullscreenPromptFading);
         this.fullscreenFadeTimerId = setTimeout(() => this.dismissFullscreenPrompt(), 300);
       }
-    }, 6000);
+    }, 10000);
   }
 
   private dismissFullscreenPrompt(): void {

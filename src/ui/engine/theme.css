@@ -83,14 +83,14 @@
   --button-secondary-bg: rgba(255, 255, 255, 0.05);
   --button-secondary-bg-hover: rgba(255, 255, 255, 0.1);
 
-  /* === Screen / Menu chrome (blue) === */
-  --screen-accent: #7fb4d9;
-  --screen-accent-dim: #5a8fb5;
-  --screen-accent-bright: #9fcfeb;
-  --screen-glass: rgba(8, 16, 24, 0.55);
-  --screen-glass-dense: rgba(8, 16, 24, 0.95);
-  --screen-glass-border: rgba(127, 180, 217, 0.12);
-  --screen-glass-border-bright: rgba(127, 180, 217, 0.3);
+  /* === Screen / Menu chrome (amber/military) === */
+  --screen-accent: #c9952e;
+  --screen-accent-dim: #a07828;
+  --screen-accent-bright: #e8c46a;
+  --screen-glass: rgba(10, 14, 12, 0.55);
+  --screen-glass-dense: rgba(10, 14, 12, 0.95);
+  --screen-glass-border: rgba(200, 170, 80, 0.12);
+  --screen-glass-border-bright: rgba(200, 170, 80, 0.3);
   --screen-danger: #d97a70;
   --screen-tdm-accent: #c9564a;
 

@@ -127,9 +127,7 @@ export class VirtualJoystick extends UIComponent {
     this.activePointerId = e.pointerId;
     this.lastPointerActivityMs = Date.now();
 
-    if (typeof this.root.setPointerCapture === 'function') {
-      this.root.setPointerCapture(e.pointerId);
-    }
+    try { this.root.setPointerCapture(e.pointerId); } catch { /* CDP/synthetic events */ }
 
     const rect = this.base.getBoundingClientRect();
     this.baseX = rect.left + rect.width / 2;

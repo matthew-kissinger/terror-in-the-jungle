@@ -279,6 +279,7 @@ describe('PlayerRespawnManager', () => {
       enableControls: vi.fn(),
       disableControls: vi.fn(),
       setPointerLockEnabled: vi.fn(),
+      getIsTouchMode: vi.fn().mockReturnValue(false),
     };
 
     mockFirstPersonWeapon = {

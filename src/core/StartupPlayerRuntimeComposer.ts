@@ -305,7 +305,13 @@ function wireHUDRuntime(runtime: StartupPlayerRuntimeGroups['hudRuntime']): void
   compassSystem.mountTo(layout.getSlot('compass'));
   minimapSystem.mountTo(layout.getSlot('minimap'));
   playerHealthSystem.mountUI(layout.getSlot('health'));
-  playerSquadController.mountIndicatorTo(layout.getSlot('stats'));
+  // On touch, mount squad indicator under status-bar (timer/score) so it
+  // flows tight beneath it. On desktop, it goes in the stats column.
+  const isTouchMount = typeof window !== 'undefined' &&
+    ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  playerSquadController.mountIndicatorTo(
+    layout.getSlot(isTouchMount ? 'status-bar' : 'stats')
+  );
   commandInputManager.mountTo(layout);
 
   compassSystem.setZoneManager(zoneManager);

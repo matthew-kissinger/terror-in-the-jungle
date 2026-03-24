@@ -23,8 +23,8 @@ const SLOT_LABELS = ['SG', 'GRN', 'AR', 'SB', 'SMG', 'PST'];
 const SLOT_COUNT = 6;
 const GRENADE_SLOT = 1;
 
-/** Gun-only slot indices for weapon cycling (skip GRENADE=1, SANDBAG=3) */
-const GUN_SLOTS = [0, 2, 4, 5]; // SHOTGUN, PRIMARY, SMG, PISTOL
+/** All inventory slot indices for cycling (weapons + equipment) */
+const ALL_SLOTS = [0, 1, 2, 3, 4, 5]; // SG, GRN, AR, SB, SMG, PST
 
 const SWIPE_THRESHOLD = 40; // px
 const DOUBLE_TAP_WINDOW = 300; // ms
@@ -42,6 +42,7 @@ export class TouchActionButtons extends UIComponent {
   private activeIndex = 2; // Default: AR (slot 2)
   private previousIndex = 0; // Last weapon for quick-switch
   private weaponLabelEl?: HTMLElement;
+  private weaponAmmoEl?: HTMLElement;
   private weaponCyclerEl?: HTMLElement;
   private weaponPrevEl?: HTMLElement;
   private weaponNextEl?: HTMLElement;
@@ -81,7 +82,7 @@ export class TouchActionButtons extends UIComponent {
         e.stopPropagation();
         element.classList.add(styles.pressed);
         this.activeActionPresses.set(element, e.pointerId);
-        if (typeof element.setPointerCapture === 'function') element.setPointerCapture(e.pointerId);
+        try { element.setPointerCapture(e.pointerId); } catch { /* CDP/synthetic events */ }
         this.onAction?.(key);
       }, { passive: false });
 
@@ -132,9 +133,7 @@ export class TouchActionButtons extends UIComponent {
         this.swipePointerId = e.pointerId;
         this.longPressTriggered = false;
 
-        if (typeof this.weaponCyclerEl!.setPointerCapture === 'function') {
-          this.weaponCyclerEl!.setPointerCapture(e.pointerId);
-        }
+        try { this.weaponCyclerEl!.setPointerCapture(e.pointerId); } catch { /* CDP/synthetic events */ }
 
         // Start long-press timer if current slot is grenade
         if (this.activeIndex === GRENADE_SLOT) {
@@ -202,6 +201,16 @@ export class TouchActionButtons extends UIComponent {
         }
       }, { passive: false });
     }
+
+    // Listen for ammo updates from HUDSystem via DOM event
+    document.addEventListener('hud:ammo', ((e: CustomEvent<{ magazine: number; reserve: number }>) => {
+      this.updateAmmo(e.detail.magazine, e.detail.reserve);
+    }) as EventListener);
+
+    // Pick up initial ammo if weapon was equipped before this component mounted
+    const mag = parseInt(document.documentElement.dataset.ammoMag || '', 10);
+    const res = parseInt(document.documentElement.dataset.ammoRes || '', 10);
+    if (!isNaN(mag) && !isNaN(res)) this.updateAmmo(mag, res);
   }
 
   setOnAction(callback: (action: string) => void): void {
@@ -282,12 +291,17 @@ export class TouchActionButtons extends UIComponent {
     label.className = styles.weaponCyclerLabel;
     label.textContent = SLOT_LABELS[this.activeIndex];
 
+    const ammo = document.createElement('div');
+    ammo.className = styles.weaponCyclerAmmo;
+    this.weaponAmmoEl = ammo;
+
     const nextBtn = document.createElement('div');
     nextBtn.className = styles.weaponCyclerChevron;
     nextBtn.textContent = '\u203A';
 
     row.appendChild(prevBtn);
     row.appendChild(label);
+    row.appendChild(ammo);
     row.appendChild(nextBtn);
     this.root.appendChild(row);
 
@@ -298,9 +312,9 @@ export class TouchActionButtons extends UIComponent {
   }
 
   private cycleNext(): void {
-    const currentGunIdx = GUN_SLOTS.indexOf(this.activeIndex);
-    const nextGunIdx = (currentGunIdx + 1) % GUN_SLOTS.length;
-    const next = GUN_SLOTS[nextGunIdx >= 0 ? nextGunIdx : 0];
+    const currentGunIdx = ALL_SLOTS.indexOf(this.activeIndex);
+    const nextGunIdx = (currentGunIdx + 1) % ALL_SLOTS.length;
+    const next = ALL_SLOTS[nextGunIdx >= 0 ? nextGunIdx : 0];
     this.previousIndex = this.activeIndex;
     this.activeIndex = next;
     this.updateWeaponLabel();
@@ -309,9 +323,9 @@ export class TouchActionButtons extends UIComponent {
   }
 
   private cyclePrev(): void {
-    const currentGunIdx = GUN_SLOTS.indexOf(this.activeIndex);
-    const prevGunIdx = (currentGunIdx - 1 + GUN_SLOTS.length) % GUN_SLOTS.length;
-    const prev = GUN_SLOTS[prevGunIdx >= 0 ? prevGunIdx : 0];
+    const currentGunIdx = ALL_SLOTS.indexOf(this.activeIndex);
+    const prevGunIdx = (currentGunIdx - 1 + ALL_SLOTS.length) % ALL_SLOTS.length;
+    const prev = ALL_SLOTS[prevGunIdx >= 0 ? prevGunIdx : 0];
     this.previousIndex = this.activeIndex;
     this.activeIndex = prev;
     this.updateWeaponLabel();
@@ -340,6 +354,13 @@ export class TouchActionButtons extends UIComponent {
     if (this.weaponCyclerEl) {
       this.weaponCyclerEl.classList.add(styles.weaponCyclerActive);
       setTimeout(() => this.weaponCyclerEl?.classList.remove(styles.weaponCyclerActive), 200);
+    }
+  }
+
+  /** Update the ammo count shown in the weapon cycler. */
+  updateAmmo(magazine: number, reserve: number): void {
+    if (this.weaponAmmoEl) {
+      this.weaponAmmoEl.textContent = `${magazine}/${reserve}`;
     }
   }
 

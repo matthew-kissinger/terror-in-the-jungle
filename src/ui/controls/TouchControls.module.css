@@ -214,6 +214,17 @@
   line-height: 1;
 }
 
+.weaponCyclerAmmo {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ops-data, rgba(168, 200, 122, 0.8));
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  font-family: var(--font-primary);
+  line-height: 1;
+  margin-left: 2px;
+}
+
 .weaponCyclerActive {
   box-shadow: 0 0 14px rgba(255, 255, 255, 0.15), 0 2px 8px rgba(0, 0, 0, 0.3);
 }
@@ -254,10 +265,11 @@
 .interactBtn {
   composes: btn;
   position: fixed;
-  right: calc(var(--tc-ads-size) + max(var(--tc-edge-inset), env(safe-area-inset-right, 0px)) + 16px);
-  bottom: max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px));
-  width: 76px;
-  height: 76px;
+  /* Center-right, clear of fire/ADS/action button column */
+  right: calc(var(--tc-ads-size) + max(var(--tc-edge-inset), env(safe-area-inset-right, 0px)) + var(--tc-fire-size) + 16px);
+  bottom: 36%;
+  width: 68px;
+  height: 68px;
   flex-direction: column;
   gap: 4px;
   background:
@@ -301,7 +313,7 @@
   left: 0;
   bottom: 0;
   width: 40%;
-  height: 45%;
+  height: 65%;
   z-index: var(--tc-z-overlay);
   touch-action: none;
   pointer-events: auto;
@@ -387,13 +399,13 @@
 .rallyBtn {
   composes: btn;
   position: fixed;
+  /* Below minimap, left-aligned - doesn't compete with status-bar */
   left: max(var(--tc-edge-inset), env(safe-area-inset-left, 0px));
-  /* Position above joystick base with enough clearance for weapon pill */
-  bottom: calc(var(--tc-joystick-base) + max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + 68px);
+  top: calc(max(8px, env(safe-area-inset-top, 0px)) + 100px);
   min-width: 48px;
-  height: 36px;
+  height: 32px;
   padding: 0 10px;
-  border-radius: 18px;
+  border-radius: 16px;
   background: rgba(100, 255, 100, 0.2);
   border: 1px solid rgba(150, 255, 150, 0.3);
   z-index: var(--tc-z-controls);
@@ -408,11 +420,35 @@
   transform: scale(0.9);
 }
 
-/* Landscape: position rally button to the right of the joystick to avoid minimap overlap */
+/* When RALLY is slotted into the HUD grid (near menu button) */
+.rallyGridded {
+  position: static !important;
+  z-index: auto !important;
+  inset: auto !important;
+  align-self: start;
+  justify-self: end;
+  grid-column: 3;
+}
+
+/* Portrait: below hamburger, right-aligned with its right edge */
+@media (orientation: portrait) {
+  .rallyGridded {
+    grid-row: 2;
+    /* Hamburger is fixed right: max(12px, safe-area). Grid has safe-area padding.
+       So within grid, hamburger's right edge is ~12px from column edge. */
+    margin-right: 12px;
+  }
+}
+
+/* Landscape: left of hamburger, vertically centered with it */
 @media (orientation: landscape) {
-  .rallyBtn {
-    left: calc(var(--tc-joystick-base) + max(var(--tc-edge-inset), env(safe-area-inset-left, 0px)) + 12px);
-    bottom: max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px));
+  .rallyGridded {
+    grid-row: 1;
+    /* Hamburger: top 12px, height 48px, center at 36px.
+       RALLY height 32px, so top = 36 - 16 = 20px for center alignment. */
+    margin-top: 20px;
+    /* 48px hamburger + 12px edge offset + 8px gap */
+    margin-right: 68px;
   }
 }
 
@@ -536,7 +572,7 @@
   right: 0;
   bottom: 0;
   width: 40%;
-  height: 60%;
+  height: 65%;
   z-index: var(--tc-z-overlay);
   touch-action: none;
   pointer-events: auto;
@@ -622,6 +658,32 @@
   }
 }
 
+/* Landscape: vehicle action bar becomes 2-column layout with compact buttons */
+@media (orientation: landscape) {
+  .vehicleActionBar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    max-width: calc(36px * 2 + 4px) !important;
+    justify-content: flex-end;
+    align-content: flex-start;
+    gap: 4px !important;
+    right: max(4px, env(safe-area-inset-right, 0px)) !important;
+    top: 60px; /* below hamburger (48px + 12px) */
+    bottom: auto;
+  }
+
+  .vehicleBtn,
+  .vehicleExitBtn,
+  .vehicleFireBtn {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 8px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
+    border-radius: 8px;
+  }
+}
+
 @media (orientation: landscape) and (max-height: 440px) {
   .fireBtn {
     bottom: max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px));
@@ -646,13 +708,20 @@
   .vehicleBtn,
   .vehicleExitBtn,
   .vehicleFireBtn {
-    min-width: 44px;
-    min-height: 44px;
+    min-width: 40px;
+    min-height: 40px;
+    width: 40px;
+    height: 40px;
+    font-size: 9px;
   }
 
   .vehicleActionBar {
-    bottom: calc(max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + var(--tc-joystick-base) + 12px);
-    gap: 6px;
+    gap: 4px;
+  }
+
+  .interactBtn {
+    width: 60px;
+    height: 60px;
   }
 }
 
@@ -663,14 +732,16 @@
 .vehicleActionBar {
   position: fixed;
   right: max(var(--tc-edge-inset), env(safe-area-inset-right, 0px));
-  bottom: calc(56% + 14px);
+  bottom: calc(max(var(--tc-edge-inset), env(safe-area-inset-bottom, 0px)) + var(--tc-joystick-base) + 12px);
   display: none;
   flex-direction: column;
   align-items: flex-end;
-  gap: 8px;
+  gap: 6px;
   z-index: var(--tc-z-controls);
   touch-action: none;
   pointer-events: auto;
+  max-height: calc(100dvh - var(--tc-joystick-base) - 80px);
+  overflow-y: auto;
 }
 
 .vehicleBtn {

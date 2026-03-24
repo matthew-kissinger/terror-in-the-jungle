@@ -97,6 +97,7 @@ export interface IPlayerController {
   disableControls(): void;
   enableControls(): void;
   setPointerLockEnabled(enabled: boolean): void;
+  getIsTouchMode(): boolean;
   setGameStarted(started: boolean): void;
   setPlayerFaction(faction: Faction): void;
 
