@@ -243,7 +243,7 @@ export class TouchControls {
    * Fire/ADS stay as fixed-position viewport overlays (thumb-arc ergonomics).
    * Joystick and look stay as viewport overlays (need large touch zones).
    */
-  mountToLayout(layout: HUDLayout): void {
+  mountToLayout(_layout: HUDLayout): void {
     // Fire + ADS are NOT slotted into the grid; they stay fixed-position
     // with thumb-arc CSS positioning for ergonomic reach.
 

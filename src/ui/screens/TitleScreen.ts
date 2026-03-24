@@ -10,7 +10,7 @@ import { UIComponent } from '../engine/UIComponent';
 import { LoadingProgress } from '../loading/LoadingProgress';
 import { LOADING_PHASES } from '../../config/loading';
 import { isTouchDevice } from '../../utils/DeviceDetector';
-import { isPortraitViewport, requestFullscreenCompat, tryLockLandscapeOrientation } from '../../utils/Orientation';
+import { requestFullscreenCompat } from '../../utils/Orientation';
 import styles from './TitleScreen.module.css';
 
 export class TitleScreen extends UIComponent {

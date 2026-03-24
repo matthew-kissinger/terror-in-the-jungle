@@ -14,8 +14,7 @@ import type { CompiledTerrainFeatureSet } from '../systems/terrain/TerrainFeatur
 import type { PreparedHeightmapGrid, PreparedTerrainSource } from '../systems/terrain/PreparedTerrainSource';
 import { Logger } from '../utils/Logger';
 import { Alliance, Faction } from '../systems/combat/types';
-import { shouldUseTouchControls } from '../utils/DeviceDetector';
-// Orientation lock removed - let user choose portrait/landscape
+// shouldUseTouchControls + orientation lock removed - layout works in any orientation
 import { PersistenceSystem } from '../systems/strategy/PersistenceSystem';
 import type { GameEngine } from './GameEngine';
 import { GameEventBus } from './GameEventBus';
