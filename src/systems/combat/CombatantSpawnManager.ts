@@ -99,6 +99,17 @@ export class CombatantSpawnManager {
   }
 
   /**
+   * Pick a BLUFOR faction from the current game mode's factionMix config.
+   * Falls back to US if not configured.
+   */
+  private pickBluforFaction(): Faction {
+    const config = this.gameModeManager?.getCurrentConfig();
+    const bluforFactions = config?.factionMix?.[Alliance.BLUFOR];
+    if (!bluforFactions || bluforFactions.length === 0) return Faction.US;
+    return bluforFactions[Math.floor(Math.random() * bluforFactions.length)];
+  }
+
+  /**
    * Pick an OPFOR faction from the current game mode's factionMix config.
    * Falls back to NVA if not configured.
    */
@@ -182,7 +193,7 @@ export class CombatantSpawnManager {
     if (usHQs.length === 0 || opforHQs.length === 0) {
       for (let i = 0; i < initialUSSquads; i++) {
         this.spawnSquad(
-          Faction.US,
+          this.pickBluforFaction(),
           SpawnPositionCalculator.findSafeSpawnPositionNearAnchor(usBasePos, 12, 28, this.terrainSystem, _spawnPos),
           avgSquadSize,
         );
@@ -206,7 +217,7 @@ export class CombatantSpawnManager {
             this.terrainSystem,
             _spawnPos,
           );
-          this.spawnSquad(Faction.US, posUS, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
+          this.spawnSquad(this.pickBluforFaction(), posUS, SpawnPositionCalculator.randomSquadSize(this.squadSizeMin, this.squadSizeMax));
         }
         if (i < initialOPFORSquads) {
           const posOP = SpawnPositionCalculator.findSafeSpawnPositionNearAnchor(
@@ -283,7 +294,7 @@ export class CombatantSpawnManager {
     this.reinforcementWaveTimer += deltaTime;
     if (this.reinforcementWaveTimer >= this.reinforcementWaveIntervalSeconds) {
       this.reinforcementWaveTimer = 0;
-      this.spawnReinforcementWave(Faction.US);
+      this.spawnReinforcementWave(this.pickBluforFaction());
       this.spawnReinforcementWave(this.pickOpforFaction());
     }
 
@@ -375,7 +386,7 @@ export class CombatantSpawnManager {
       }
     };
 
-    ensureFactionStrength(Faction.US, counts.blufor);
+    ensureFactionStrength(this.pickBluforFaction(), counts.blufor);
     ensureFactionStrength(this.pickOpforFaction(), counts.opfor);
   }
 
@@ -430,9 +441,10 @@ export class CombatantSpawnManager {
     opforBasePos: THREE.Vector3,
     avgSquadSize: number
   ): Array<{faction: Faction, position: THREE.Vector3, size: number}> {
+    const blufor = this.pickBluforFaction();
     const opfor = this.pickOpforFaction();
     const defaultQueue = [
-      { faction: Faction.US, position: new THREE.Vector3(usBasePos.x + 10, usBasePos.y, usBasePos.z + 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) },
+      { faction: blufor, position: new THREE.Vector3(usBasePos.x + 10, usBasePos.y, usBasePos.z + 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) },
       { faction: opfor, position: new THREE.Vector3(opforBasePos.x - 10, opforBasePos.y, opforBasePos.z - 5), size: Math.max(2, Math.floor(avgSquadSize * 0.6)) }
     ];
 
@@ -463,11 +475,11 @@ export class CombatantSpawnManager {
 
     const pushSize = Math.max(3, Math.floor(avgSquadSize * 0.7));
     const pressureQueue: Array<{faction: Faction, position: THREE.Vector3, size: number}> = [
-      { faction: Faction.US, position: createForwardPoint(usBasePos, laneDistance * 0.24, -55), size: pushSize },
+      { faction: blufor, position: createForwardPoint(usBasePos, laneDistance * 0.24, -55), size: pushSize },
       { faction: opfor, position: createBackwardPoint(opforBasePos, laneDistance * 0.24, 55), size: pushSize },
-      { faction: Faction.US, position: createForwardPoint(usBasePos, laneDistance * 0.34, 45), size: pushSize },
+      { faction: blufor, position: createForwardPoint(usBasePos, laneDistance * 0.34, 45), size: pushSize },
       { faction: opfor, position: createBackwardPoint(opforBasePos, laneDistance * 0.34, -45), size: pushSize },
-      { faction: Faction.US, position: createForwardPoint(usBasePos, laneDistance * 0.42, -20), size: Math.max(2, Math.floor(avgSquadSize * 0.5)) },
+      { faction: blufor, position: createForwardPoint(usBasePos, laneDistance * 0.42, -20), size: Math.max(2, Math.floor(avgSquadSize * 0.5)) },
       { faction: opfor, position: createBackwardPoint(opforBasePos, laneDistance * 0.42, 20), size: Math.max(2, Math.floor(avgSquadSize * 0.5)) }
     ];
 

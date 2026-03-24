@@ -52,7 +52,7 @@ export class AITargetAcquisition {
       if (id === combatant.id) continue;
 
       const other = allCombatants.get(id);
-      if (!other || other.state === CombatantState.DEAD || other.faction !== combatant.faction) {
+      if (!other || other.state === CombatantState.DEAD || !isAlly(other.faction, combatant.faction)) {
         continue;
       }
 
@@ -101,7 +101,7 @@ export class AITargetAcquisition {
 
         const distSq = combatant.position.distanceToSquared(other.position);
 
-        if (other.faction === combatant.faction) {
+        if (isAlly(other.faction, combatant.faction)) {
           if (id !== combatant.id && distSq < CLUSTER_RADIUS_SQ) {
             nearbyFriendlies++;
           }
@@ -121,7 +121,7 @@ export class AITargetAcquisition {
 
         const distSq = combatant.position.distanceToSquared(other.position);
 
-        if (other.faction === combatant.faction) {
+        if (isAlly(other.faction, combatant.faction)) {
           if (other.id !== combatant.id && distSq < CLUSTER_RADIUS_SQ) {
             nearbyFriendlies++;
           }
@@ -222,7 +222,7 @@ export class AITargetAcquisition {
       for (const id of nearbyIds) {
         const other = allCombatants.get(id);
         if (!other) continue;
-        if (other.faction !== combatant.faction &&
+        if (!isAlly(other.faction, combatant.faction) &&
             other.state !== CombatantState.DEAD &&
             other.position.distanceToSquared(combatant.position) < radiusSq) {
           count++;
@@ -230,7 +230,7 @@ export class AITargetAcquisition {
       }
     } else {
       allCombatants.forEach(other => {
-        if (other.faction !== combatant.faction &&
+        if (!isAlly(other.faction, combatant.faction) &&
             other.state !== CombatantState.DEAD &&
             other.position.distanceToSquared(combatant.position) < radiusSq) {
           count++;

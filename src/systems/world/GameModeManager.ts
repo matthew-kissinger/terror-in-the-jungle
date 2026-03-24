@@ -307,7 +307,7 @@ export class GameModeManager implements GameSystem {
           throw new Error('GameModeManager requires terrainSystem before WarSimulator configuration');
         }
         this.warSimulator.configure(
-          config.warSimulator,
+          { ...config.warSimulator, factionMix: config.factionMix },
           (x: number, z: number) => this.terrainSystem!.getHeightAt(x, z),
           {
             worldSize: config.worldSize,

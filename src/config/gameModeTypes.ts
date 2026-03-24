@@ -55,6 +55,11 @@ export interface WarSimulatorConfig {
   maxMaterialized: number;          // hard cap
   squadSize: { min: number; max: number };
   reinforcementCooldown: number;    // seconds
+  /** Faction composition per alliance. If omitted, defaults to US vs NVA. */
+  factionMix?: {
+    [Alliance.BLUFOR]: Faction[];
+    [Alliance.OPFOR]: Faction[];
+  };
 }
 
 type MapFeatureKind = 'helipad' | 'airfield' | 'firebase' | 'village' | 'road';

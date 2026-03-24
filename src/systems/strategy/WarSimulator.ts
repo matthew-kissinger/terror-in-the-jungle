@@ -244,33 +244,45 @@ export class WarSimulator implements GameSystem {
     const hqSquads = Math.max(1, Math.ceil(squadsPerFaction * 0.45));
     const zoneSquads = Math.max(0, squadsPerFaction - hqSquads - frontlineSquads);
 
-    // Spawn US forces
+    // Spawn BLUFOR forces (pick from factionMix, default US)
     const usHQSquads = hqSquads;
     const usZoneSquads = zoneSquads;
-    this.spawnFactionForces(Faction.US, usHQs, [], usHQSquads, squadMin, squadMax);
+    this.spawnFactionForces(this.pickBluforFaction(), usHQs, [], usHQSquads, squadMin, squadMax);
     if (usZoneSquads > 0 && usZones.length > 0) {
-      this.spawnFactionForces(Faction.US, usZones, [], usZoneSquads, squadMin, squadMax);
+      this.spawnFactionForces(this.pickBluforFaction(), usZones, [], usZoneSquads, squadMin, squadMax);
     } else if (usZoneSquads > 0) {
-      this.spawnFactionForces(Faction.US, usHQs, [], usZoneSquads, squadMin, squadMax);
+      this.spawnFactionForces(this.pickBluforFaction(), usHQs, [], usZoneSquads, squadMin, squadMax);
     }
     if (frontlineSquads > 0) {
-      this.spawnFactionForces(Faction.US, frontlineZones, [], frontlineSquads, squadMin, squadMax);
+      this.spawnFactionForces(this.pickBluforFaction(), frontlineZones, [], frontlineSquads, squadMin, squadMax);
     }
 
-    // Spawn OPFOR forces
+    // Spawn OPFOR forces (pick from factionMix, default NVA)
     const opforHQSquads = hqSquads;
     const opforZoneSquads = zoneSquads;
-    this.spawnFactionForces(Faction.NVA, opforHQs, opforZones, opforHQSquads, squadMin, squadMax);
+    this.spawnFactionForces(this.pickOpforFaction(), opforHQs, opforZones, opforHQSquads, squadMin, squadMax);
     if (opforZoneSquads > 0 && opforZones.length > 0) {
-      this.spawnFactionForces(Faction.NVA, opforZones, [], opforZoneSquads, squadMin, squadMax);
+      this.spawnFactionForces(this.pickOpforFaction(), opforZones, [], opforZoneSquads, squadMin, squadMax);
     } else if (opforZoneSquads > 0) {
-      this.spawnFactionForces(Faction.NVA, opforHQs, [], opforZoneSquads, squadMin, squadMax);
+      this.spawnFactionForces(this.pickOpforFaction(), opforHQs, [], opforZoneSquads, squadMin, squadMax);
     }
     if (frontlineSquads > 0) {
-      this.spawnFactionForces(Faction.NVA, frontlineZones, [], frontlineSquads, squadMin, squadMax);
+      this.spawnFactionForces(this.pickOpforFaction(), frontlineZones, [], frontlineSquads, squadMin, squadMax);
     }
 
     Logger.info('war-sim', `Spawned ${this.agents.size} agents in ${this.squads.size} squads`);
+  }
+
+  private pickBluforFaction(): Faction {
+    const factions = this.config?.factionMix?.[Alliance.BLUFOR];
+    if (!factions || factions.length === 0) return Faction.US;
+    return factions[Math.floor(Math.random() * factions.length)];
+  }
+
+  private pickOpforFaction(): Faction {
+    const factions = this.config?.factionMix?.[Alliance.OPFOR];
+    if (!factions || factions.length === 0) return Faction.NVA;
+    return factions[Math.floor(Math.random() * factions.length)];
   }
 
   private resetStrategicForces(): void {
