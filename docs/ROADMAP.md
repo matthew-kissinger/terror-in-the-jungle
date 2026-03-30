@@ -1,479 +1,89 @@
-# Terror in the Jungle - Roadmap
+# Roadmap
 
-Last updated: 2026-03-19
-Status: ALIGNED - Aspirational roadmap. Active execution tracked in `PLAN_STATE.md` and `NEXT_WORK.md`.
+Last updated: 2026-03-30
 
-> **Note:** This is an aspirational planning document. Phase dates and scope are not commitments. See `ARCHITECTURE_RECOVERY_PLAN.md` for active work status and `PLAN_STATE.md` for wave tracking.
+> Aspirational planning document. Active work tracked in [BACKLOG.md](BACKLOG.md).
 
 ## Vision
 
-This is a **war simulation engine** - not a single game. The engine powers game modes from squad-level FPS to theater-level combined arms RTS, all running in a browser.
+A **war simulation engine** - not a single game. Powers game modes from squad-level FPS to theater-level combined arms RTS, all in a browser.
 
-Core loop: **Play in first person AND command simultaneously.** The player is both a combatant and a commander. At squad scale, you're issuing move/hold/assault orders to your fire team. At battalion scale, you're directing troop movements, calling airstrikes, managing reinforcements via helicopter, and coordinating combined arms - all while still being able to pick up a rifle and fight.
+Core loop: **Play in first person AND command simultaneously.** The player holds a rifle and a radio. Snap between FPS combat and overhead tactical map in real-time - no time slowdown. All commanding happens under fire.
 
-Vietnam War is the first theater. The architecture should generalize to any war with different factions, terrain, vehicles, and doctrine.
+Vietnam War is the first theater. Architecture generalizes to any war with different factions, terrain, vehicles, and doctrine.
 
-**Three.js reference:** https://threejs.org/docs/llms-full.txt
-Current alignment: ship on `WebGLRenderer` now. `WebGPURenderer`/TSL stays deferred until terrain materials and post-processing are ported off `onBeforeCompile` and the current WebGL path stops being the most compatible option.
-
-## Current State Summary
-
-| Domain | State | Key Limitation |
-|--------|-------|----------------|
-| Vehicles | UH-1 Huey, UH-1C Gunship, AH-1 Cobra (player-pilotable) | Helicopter weapons/damage/HUD are live. Open Frontier and A Shau stage parked fixed-wing aircraft plus separate armored yards. Fixed-wing physics exist but are not yet wired to live vehicles; no drivable ground vehicles yet. |
-| Weapons | 7 weapon models across 6 types (M16A1, AK-47, Ithaca 37, M3, M1911, M60, M79) | GLB viewmodels, differentiated ballistics, player tracers, per-weapon audio. Field pickups and weapon expansion are later-phase. |
-| AI | 8-state FSM, 2 factions (US/OPFOR) | No vehicle usage, no turret manning, limited tactical intelligence |
-| Squad | Single coordinator + Z-key command overlay (desktop/touch) | Selected-squad detail is live; gamepad parity deferred; scale adapters deferred |
-| Terrain | Noise + DEM terrain runtime, CDLOD rewrite live | CDLOD morphing complete; auto-scaled LOD levels per world size; hydrology/gameplay integration still incomplete |
-| Vegetation | 7+ billboard types with biome-aware runtime wiring, Poisson cache, adaptive scheduling | Staged activation or distant representation change needed for traversal backlog |
-| Water | Global plane + shader rivers | No swimming, no boats, disabled in A Shau, shader is basic |
-| Assets | 75 GLBs in `public/models/`; catalog + notes in `deploy-3d-assets/README.md` (no duplicate GLBs in repo) | Vegetation billboard remakes pending |
-| HUD/UI | UI Engine is the active path. GameUI screen state machine (TitleScreen + ModeSelectScreen + DeployScreen) replaces old StartScreen/RespawnUI. SettingsModal absorbs controls reference + tutorial. IconRegistry, CrosshairSystem, HelicopterHUD, and mobile gestures are live. Opaque backgrounds replace `backdrop-filter: blur()` on all screen overlays. | Some legacy raw-DOM HUD/admin surfaces still remain and should migrate opportunistically |
-| Scale | 3000 agents / 21km map | combat120 tails still need work; terrain texture/material validation now covers every shipped mode |
-| Factions | US, ARVN, NVA, VC loadout contexts are live | Zone ownership generalized to BLUFOR/OPFOR alliance level; dynamic HUD faction labels from config |
-
-## Resolved Decisions
-
-1. **Loadout:** Default loadout presets per faction + fully customizable loadouts. Player can change loadout on respawn. Implies rearchitect of start/deploy screen and respawn flow.
-2. **Command mode:** Fully real-time. No time slowdown. Controls and HUD must be designed so commanding at scale is viable without pausing. This means the command UX must be extremely efficient - quick-access shortcuts, map-based point-and-click, minimal menu depth.
-3. **Water:** Part of larger plan. Needs proper implementation as terrain engine module. Sandbox test mode for isolated water/biome development before integration.
-4. **Survival:** Roguelite survival mode is a future game mode. Note it but don't architect for it now. Animals serve triple purpose: ambient decoration, environmental hazard, and food source (in survival modes later).
-5. **NPC rendering:** Sprites for now. Possible 3D NPC models later if performant, with billboard LOD fallback at distance. Don't over-invest in sprite infrastructure that blocks 3D transition.
-6. **Sandbox test mode:** Configurable engine module, not one monolith mode. Break into blocks: terrain sandbox, vehicle sandbox, asset preview, system toggle panel. Each block independently useful.
-7. **Historical accuracy vs gameplay:** Case-by-case. Ask before making a call on conflicts.
-8. **Campaign:** Engine module. Architect so linear missions, dynamic campaign, and sandbox operations can all be built as game modes. Not a near-term build.
-9. **Multiplayer:** Not building now. Architect so it's not blocked. Single-player with AI is the focus.
-10. **Respawn/deploy flow:** Full revamp. Map with spawn point selection + loadout customization + deploy button. Cross-platform (desktop, mobile, gamepad).
+Current renderer: `WebGLRenderer`. `WebGPURenderer`/TSL deferred until terrain materials and post-processing are ported.
 
 ## Architecture Principles
 
-1. **Engine-first:** Every system built as a reusable module, not a one-off feature. Terrain is a terrain engine. Vehicles are a vehicle system. Factions are data-driven configs.
-2. **Scale-agnostic:** Same systems power 8v8 and 3000v3000. Materialization tiers handle the scale transition.
-3. **Input-agnostic:** Single control schema drives keyboard, touch, and gamepad. No platform-specific input wiring.
-4. **Asset-driven:** Models, textures, and sprites loaded from files (GLB/WebP/PNG), not generated procedurally in code.
-5. **Faction-flexible:** Player can play any faction. Factions are configs (sprites, weapons, AI doctrine, voice lines), not hardcoded.
-6. **Sandbox-testable:** Every major system (terrain, water, vehicles, structures) has a sandbox test mode for isolated development and iteration.
+1. **Engine-first:** Every system is a reusable module, not a one-off feature.
+2. **Scale-agnostic:** Same systems power 8v8 and 3000v3000. Materialization tiers handle scale.
+3. **Input-agnostic:** Single control schema for keyboard, touch, and gamepad.
+4. **Asset-driven:** GLB/WebP/PNG from disk, not procedural code generation.
+5. **Faction-flexible:** Factions are data configs (sprites, weapons, AI doctrine), not hardcoded.
 
----
+## Phase Summary
 
-## Phase 0: Asset Manifest [DONE]
-**Deliverable:** `docs/ASSET_MANIFEST.md` - comprehensive generation queue for Pixel Forge agent.
-**Contents:** 80+ assets with prompts, tri budgets, mesh part naming, animations, scale specs.
-**Categories:** 6 aircraft, 5 ground vehicles, 2 watercraft, 8 weapons, 12 structures, 6 defense systems, 6 animals, 8 terrain textures, 13 vegetation billboards, 4 faction sprite sets, UI/HUD assets.
-**Priority sprints:** 4 sprints ordered by dependency (replace procedural -> expand visual -> combat systems -> extended content).
+| Phase | Status | Summary |
+|-------|--------|---------|
+| 0: Asset Manifest | DONE | 80+ asset specs for Pixel Forge generation. |
+| 1: Asset Generation | DONE | 75 GLBs generated. Vegetation remakes still pending. |
+| 2: Asset Integration | MOSTLY DONE | Weapons (7), helicopters (3), animals (6), structures integrated. Fixed-wing/ground vehicles static only. |
+| 3: Vehicle Controls | PARTIAL | Helicopter flight/weapons/damage/HUD live. Controls tuning, NPC transport, vehicle abstraction remain. |
+| 4: Squad Command | PARTIAL | Single coordinator + Z-key overlay live. Map-first command mode live. Gamepad parity, scale adapters deferred. |
+| 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. Water engine and hydrology not started. |
+| 6: Ground Vehicles | NOT STARTED | GLBs exist (jeep, APC, truck, tank). No driving runtime. |
+| 7: Combat Expansion | PARTIAL | Loadout system live (7 weapons, faction pools, presets). Stationary weapons, field pickup not started. |
+| 8: Fixed-Wing Air War | PARTIAL | Flight physics and NPC pilot AI exist. Not wired to live vehicle runtime. |
+| 9: Faction Expansion | PARTIAL | 4 factions in loadout context (US, ARVN, NVA, VC). AI doctrine per faction not started. |
+| 10: Scale Frontier | NOT STARTED | Gated on combat AI p99 closure. |
 
----
+## Phase Details (Future Work)
 
-## Phase 1: Asset Generation Sprint
-**Goal:** Generate HIGH priority assets via Pixel Forge.
-**Method:** Mount coding agent in Pixel Forge repo with ASSET_MANIFEST.md as context.
-**Deliverable:** GLB files in `public/models/`, sprites/textures in `public/assets/`.
+### Vehicles & Transport
+- Unified `IVehicle` interface for helicopters, ground vehicles, watercraft
+- Ground vehicle physics (terrain-following, speed by surface type)
+- M151 Jeep, M113 APC, M35 Truck as first drivable ground vehicles
+- NPC helicopter transport (takeoff, fly to LZ, deploy squad, RTB)
+- Watercraft (sampan, PBR) blocked on water engine
 
-### Sprint 1 Priority Order
-1. All 7 vegetation billboard remakes + bamboo grove
-2. Dense jungle floor + muddy trail textures
-3. UH-1 Huey Transport + UH-1C Gunship GLBs
-4. M16A1, AK-47, M60 weapon viewmodel GLBs
-5. Sandbag Wall, Bunker, Ammo Crate, Helipad GLBs
-6. M2 Browning .50 cal mounted weapon GLB
-7. NVA Regular infantry sprites (9 sprites, replace VC)
-
-### Workflow
-1. Agent reads ASSET_MANIFEST.md for prompts and specs
-2. Kiln API for 3D models (GLB) with named mesh parts
-3. Sprite Generator for 2D assets (vegetation, soldiers, textures)
-4. Use existing US soldier sprites as image input for faction variants
-5. Export to Terror in the Jungle public/ directory
-6. Iterate: review in-engine, regenerate if quality insufficient
-
----
-
-## Phase 1.5: Sandbox & Test Infrastructure
-**Goal:** Modular sandbox blocks for isolated testing of engine systems.
-**Dependencies:** Independent. Can start anytime. Each block is independently useful.
-
-### Architecture
-Not one monolith sandbox mode. Instead, composable blocks that can be combined:
-
-| Block | Purpose | URL Param |
-|-------|---------|-----------|
-| Terrain Sandbox | Test biome textures, vegetation placement, chunk rendering, noise params | `?sandbox=terrain` |
-| Vehicle Sandbox | Test vehicle physics, GLB loading, controls, damage | `?sandbox=vehicle` |
-| Asset Preview | Load and inspect any GLB/sprite, rotate, zoom, check mesh parts | `?sandbox=asset` |
-| Water Sandbox | Test water shader, swimming, buoyancy, river rendering | `?sandbox=water` |
-| Combat Sandbox | Spawn NPCs, test weapons, turrets, AI behavior | `?sandbox=combat` |
-| System Toggle | Debug panel to enable/disable any system at runtime | Always available via `?debug=1` |
-
-### Shared Infrastructure
-- `SandboxConfig` in `src/config/gameModes.ts` - configurable per block
-- Flat terrain default, free camera, no win/loss, no timers
-- Debug panel UI: spawn entity dropdown, teleport, toggle systems, perf overlay
-- Reuse existing `SandboxModeDetector` infrastructure (already exists in code)
-- Each block registers its own debug controls via a plugin interface
-
-### Implementation Order
-1. System toggle panel (debug overlay, useful immediately)
-2. Asset preview block (validates Pixel Forge output)
-3. Terrain sandbox (biome iteration)
-4. Vehicle sandbox (physics tuning)
-5. Water sandbox (shader development)
-6. Combat sandbox (AI iteration)
-
----
-
-## Phase 2: Asset Integration & Engine Wiring
-**Goal:** Replace all procedural geometry with GLB models. Build asset loading infrastructure.
-**Dependencies:** Phase 1 assets generated.
-
-### 2A. GLB Loading Infrastructure
-- GLTFLoader utility with caching and error handling
-- Asset registry: map model IDs to file paths
-- LOD strategy for GLB models (distance-based swap or billboard fallback)
-
-### 2B. Helicopter Model Swap
-- Replace HelicopterGeometry.ts with Huey.glb
-- Wire named mesh parts: mainRotor (spin), doorGunLeft/Right (aim), cockpitGlass (transparency)
-- Adjust collision bounds and interaction radius to match new geometry
-- Add gunship variant loading (UH-1C.glb with rocket pods + minigun parts)
-
-### 2C. Weapon Viewmodel Swap
-- ~~Replace ProgrammaticGunFactory with GLB loading~~ DONE (deleted; 7 GLBs wired via WeaponRigManager)
-- Wire animation clips from GLB (reload, fire recoil, ADS transition)
-- ~~Map muzzle flash spawn point to named `muzzle` mesh part~~ DONE (auto-discovered from GLB node names)
-- Weapon-specific animations: M60 belt feed, shotgun pump, pistol slide
-
-### 2D. Structure Integration
-- Replace procedural sandbag mesh with GLB
-- Place bunkers, ammo crates, guard towers at objective zones (zone config driven)
-- Ammo crate `lid` part animated on interaction (weapon swap at captured objectives)
-- Wire firebase structures to game mode configs
-
-### 2E. Vegetation Billboard Swap
-- Replace 7 billboard textures with new Pixel Forge sprites
-- Add new vegetation types (bamboo, banana, tall grass) to ChunkVegetationGenerator
-- Maintain performance: same InstancedMesh billboard rendering, new textures only
-
-### 2F. Terrain Texture Expansion
-- Multi-texture terrain material (per-chunk or per-vertex biome selection)
-- Initial: height/slope-based texture selection (jungle floor low, rocky high, laterite cleared)
-- Texture atlas or array texture for GPU-efficient multi-texture rendering
-
----
-
-## Phase 3: Helicopter & Vehicle Controls Overhaul
-**Goal:** Fix helicopter controls, add weapons, build unified vehicle control schema.
-**Dependencies:** Phase 2B (GLB loaded), Phase 2C (weapon models).
-
-### 3A. Helicopter Control Fix
-- **Collective:** Direct input (hold W = thrust, release = no thrust). Remove lerp-to-0.4 behavior.
-- **Altitude lock:** Dedicated key (Space or H) to hold current altitude. Visual indicator in HUD.
-- **Input smoothing:** Single-layer smoothing in HelicopterPhysics only, remove PlayerMovement lerp.
-- **Auto-hover:** Only engages when altitude lock active, not by default.
-- **Unified control schema for all platforms:**
-
-| Action | Desktop | Touch | Gamepad |
-|--------|---------|-------|---------|
-| Collective Up | W | Right stick up | Right trigger |
-| Collective Down | S | Right stick down | Left trigger |
-| Cyclic Pitch | Mouse Y / Arrow Up/Down | Cyclic pad | Left stick Y |
-| Cyclic Roll | Mouse X / Arrow Left/Right | Cyclic pad | Left stick X |
-| Yaw | A/D | Twist or buttons | Bumpers |
-| Altitude Lock | Space | Button | A button |
-| Fire Door Guns | Mouse Click | Fire button | Right trigger (when locked) |
-| Camera Mode | Right Ctrl | Swipe | Right stick click |
-| Enter/Exit | E | Interaction button | Y button |
-
-### 3B. Door Gun Weapons
-- Left/right M60 door guns fire independently or together
-- Weapon HUD shows ammo, overheat bar, traverse arc
-- Tracers + bullet impact effects
-- Damage to ground NPCs from door gun fire
-- AI door gunner behavior (NPC fires when enemies in arc)
-
-### 3C. NPC Helicopter Interaction
-- `IBoardable` interface: board(npc), disembark(npc), getPassengers(), getCapacity()
-- Player command: "Board helicopter" (nearby allied NPCs board)
-- Transport flight: player flies, NPCs are passengers (attached to helicopter position)
-- Deploy: hover + command to disembark (NPCs fast-rope or jump at low altitude)
-- AI pilot mode: order helicopter to fly to waypoint autonomously
-
-### 3D. Vehicle System Abstraction
-- `IVehicle` interface shared by helicopter, ground vehicles, boats
-- Common: enter/exit, damage/health, physics update, render update
-- Common controls abstraction: throttle, steering, brake, weapons
-- Vehicle manager: spawn, track, despawn vehicles per faction/mode
-
----
-
-## Phase 4: Squad Command & RTS Layer [PARTIALLY COMPLETE]
-**Goal:** Unified, intuitive command interface that scales from squad to army.
-**Dependencies:** Independent (can start parallel with Phase 3).
-**See:** `docs/archive/SQUAD_COMMAND_REARCHITECT.md` (archived)
-
-Current state:
-- single command coordinator is live
-- `QuickCommandStrip` is live
-- desktop/touch command mode is now map-first for ground placement orders
-- minimap/full-map guidance for current command position is live
-- remaining work is selected-squad detail, map-click squad selection, and gamepad parity
-
-### 4A. Input Unification
-- All squad input routed through single CommandInputManager
-- Remove: direct keyboard handling in PlayerSquadController
-- Remove: dead code squad wiring in TouchActionButtons/TouchControls
-- Desktop: Z opens command mode, mouse selects on map/radial, click confirms
-- Mobile: dedicated command button opens command mode, touch selects/confirms
-- Gamepad: D-pad for quick commands, R3 for command mode
-
-### 4B. Command Mode (Real-Time)
-- Toggle between FPS and command mode (not overlay - full mode switch)
-- **Fully real-time** - no time slowdown. Player is vulnerable while commanding.
-- Command mode: camera pulls to overhead/tactical view
-- Map becomes primary interaction surface
-- Click map to set waypoints, select units, assign objectives
-- UX must be extremely efficient: minimal menu depth, quick-access shortcuts, point-and-click on map
-- Player can snap back to FPS instantly (Escape or Z release)
-- Audio cues for incoming threats while in command view (gunfire near player, taking damage)
-- Desktop/touch overlay currently uses a local tactical map rather than a full detached command camera. That is the current stepping stone, not the final battalion-scale surface.
-
-### 4C. Command Scaling
-- **Squad scale (8-16):** Direct orders to individual squad (follow, hold, assault, defend, retreat)
-- **Platoon scale (30-60):** Orders to 2-4 squads, formation commands, support requests
-- **Company scale (100-200):** Macro objectives, air support calldown, reinforcement allocation
-- **Battalion+ scale (500+):** Strategic map, front line management, resource allocation, theater-level
-
-### 4D. Command HUD
-- Minimap with selectable unit icons
-- Full map as tactical command surface (overlay or separate view)
-- Selected unit info panel (squad composition, status, ammo, morale)
-- Command queue visualization (waypoint lines on map)
+### Command & RTS
+- Command scaling: squad (8-16) -> platoon (30-60) -> company (100-200) -> battalion (500+)
+- Full map as tactical command surface with waypoints and unit selection
 - Air support / artillery request interface
 
----
+### Terrain & Environment
+- Water engine: river system, swimming, depth-based rendering, watercraft physics
+- Road network generation (splines, intersections, pathfinding between zones)
+- Biome transitions (blending at boundaries)
 
-## Phase 5: Terrain Engine Module
-**Goal:** Architect terrain as a standalone engine module with biome support.
-**Dependencies:** Phase 2F (textures), Phase 2E (vegetation types).
+### Combat & Content
+- Stationary weapons (M2 .50 cal emplacements, NPC manning)
+- Faction AI doctrines (VC guerrilla, NVA conventional, US combined arms)
+- Day/night cycle, music/soundtrack
+- Survival/roguelite game mode
 
-### 5A. Biome System
-*(Partially complete: BiomeClassifier, per-biome terrain material, and biome-driven vegetation scattering are live via T-003/T-007)*
-- Biome enum: DENSE_JUNGLE, HIGHLAND, RICE_PADDY, RIVERBANK, FIREBASE_CLEAR, PLANTATION, BAMBOO_GROVE, VILLAGE
-- Classification rules: height + slope + moisture + distance-to-water + noise
-- Per-biome config: ground texture, vegetation set + density, prop set, audio ambiance
-- Smooth biome transitions (blending at boundaries, ~20m transition zones)
+### Scale & Performance
+- ECS evaluation for combat entities (if current approach stops scaling)
+- Additional DEM maps (Khe Sanh, Hue, Ia Drang, Mekong Delta)
+- Tile-based region loading for theater-scale maps
+- Multiplayer/networking (architect for it, not building now)
 
-### 5B. Terrain Generation Module
-- Abstract terrain generator interface (noise-based, DEM-based, hybrid)
-- Road/trail generation (A* between zones, cleared path with mud texture)
-- Firebase perimeter generation (cleared circle + structures from config)
-- Village generation (huts, paths, rice paddies from template)
-- Landing zone generation (cleared areas with helipad markers)
-
-### 5C. Improved Chunk System
-*(Superseded: chunk system replaced by CDLOD terrain rewrite, 2026-03-03)*
-- Better LOD transitions (geometry morphing, not popping)
-- Texture splatting per-vertex for biome blending
-- Chunk merging for distant terrain (reduce draw calls)
-- Async chunk priority: visible chunks first, then ring expansion
-
-### 5D. Water Engine
-- River system overhaul (proper Three.js Water2 or custom shader)
-- Depth-based rendering (shallow wading vs deep swimming)
-- Swimming mechanics (player movement in water)
-- Watercraft physics (buoyancy, current, steering)
-- Re-enable water for A Shau with stream/river focus
-
----
-
-## Phase 6: Ground Vehicles & Watercraft
-**Goal:** Drivable ground vehicles and boats.
-**Dependencies:** Phase 3D (vehicle abstraction), Phase 5D (water engine).
-
-### 6A. Ground Vehicle Physics
-- Wheel-based physics (simplified: no suspension sim, just terrain following)
-- Speed limits by terrain type (road fast, jungle slow, mud very slow)
-- Collision with structures and vegetation
-- Vehicle damage from weapons + terrain hazards
-
-### 6B. Ground Vehicles
-- M151 MUTT Jeep (fast, 4 passengers, mounted M60)
-- M113 APC (armored, 11 passengers, .50 cal turret)
-- M35 Deuce-and-a-Half (16 passengers, no weapons, supply truck)
-- NVA equivalents as needed (trucks, PT-76 later)
-
-### 6C. Watercraft
-- Sampan (quiet, 4 passengers, NPC transport)
-- PBR Mark II (fast, twin .50 cal, river patrol)
-- Water navigation: river-following pathfinding for AI
-
----
-
-## Phase 7: Combat & Loadout Expansion
-**Goal:** Loadout system, new weapons, turrets, animals.
-**Dependencies:** Phase 2C (weapon GLBs), Phase 3B (vehicle weapons).
-
-### 7A. Loadout System [FOUNDATION LIVE]
-- **Default presets** per faction (e.g., Rifleman = M16 + M1911 + frags, Support = M60 + M1911 + smoke)
-- **Custom loadouts:** player can build and save custom loadouts from faction weapon pool
-- **Changeable on respawn:** loadout selection screen appears on each respawn, not just match start
-- **Requires rearchitect:** Start/deploy screen flow, respawn flow, and loadout persistence (localStorage)
-- Equipment slot: grenade type, mortar, sandbags, claymore, medkit
-- Weapon swap at captured objectives: interact with ammo crate, choose replacement
-- Loadout screen shows weapon stats (damage, RPM, range, recoil)
-- Faction-specific weapon pools (US gets M16/M60, NVA gets AK-47/RPG-7)
-- Current implementation already has the shared deploy/respawn loadout loop, faction-aware pools, presets, and OPFOR AK first-person weapon switching. Field pickup, objective crate swapping, and deeper equipment expansion remain future work.
-
-### 7B. Stationary Weapons
-- M2 .50 cal emplacement at objectives (sandbag ring + tripod)
-- Player mount/dismount (E key / interaction button)
-- NPC manning: defenders automatically use turrets when enemies approach
-- Traverse arc limit (90-180 degrees), elevation limits
-- Turret HUD: arc indicator, ammo counter, overheat bar
-
-### 7C. New Weapon Types
-- M60 as deployable LMG (bipod deploy for accuracy bonus)
-- M79 grenade launcher (indirect fire, single shot, arc preview)
-- RPG-7 (anti-vehicle, high damage, backblast danger zone)
-- Claymore mines (directional, place and detonate or tripwire)
-
-### 7D. Animals
-- **Passive:** Water buffalo (blocking, flee on gunfire), bird flocks (scatter on explosions)
-- **Neutral:** Macaque monkeys (scatter, screech alerts NPCs of player position)
-- **Aggressive:** Tiger (rare, attacks lone soldiers), snake (hidden, proximity damage)
-- **Survival:** Water buffalo and wild boar huntable for food in survival game modes
-- **Implementation:** Simple state machine (idle/alert/flee/attack), billboard sprites for performance, GLB optional later
-- **Performance:** Max 20 active animals per chunk, despawn beyond 200m
-
----
-
-## Phase 8: Fixed-Wing & Advanced Air War
-**Goal:** Planes, close air support, gunship gameplay, anti-air defense.
-**Dependencies:** Phase 3D (vehicle system), Phase 6A (vehicle physics generalized).
-
-### 8A. Fixed-Wing Framework
-- Flight physics: speed-based lift, stall at low speed, no hover
-- AI flight patterns: patrol circuit, attack run (dive + strafe/bomb), loiter orbit
-- Runway/airstrip zones for takeoff/landing (or air-spawn for simplicity)
-
-### 8B. Close Air Support
-- A-1 Skyraider: slow, heavy ordnance, player-flyable (Vietnam workhorse)
-- F-4 Phantom: fast, bombs/napalm, AI-scripted strafing runs
-- AC-47 Spooky: player mans side guns while AI circles target zone
-- Effects: napalm (area fire, smoke, damage over time), bomb craters, strafing tracers
-
-### 8C. Anti-Air Defense
-- ZPU-4 quad 14.5mm AA (NPC manned, visual tracers, threat to helicopters)
-- 37mm AA autocannon (threat to fixed-wing)
-- SA-2 SAM sites (advanced, threat to high-altitude aircraft)
-- Aircraft damage: engines, control surfaces, crew hit
-- Bailout / crash landing mechanics
-
----
-
-## Phase 9: Faction & Game Mode Expansion
-**Goal:** Multiple playable factions, game-mode-driven faction composition.
-**Dependencies:** Phase 1 (faction sprites), Phase 7A (loadout).
-
-### 9A. Faction System
-- `FactionConfig`: sprites, weapon pool, vehicle pool, AI doctrine, voice lines, insignia
-- 4 factions: US Army, NVA (North Vietnamese Army), ARVN (South Vietnamese), Viet Cong
-- Player selects faction at match start (game mode permitting)
-- AI doctrine per faction: US (air superiority, firepower), NVA (tunnels, ambush, mass assault), ARVN (defensive, combined ops), VC (guerrilla, traps, hit-and-run)
-
-### 9B. Game Mode Scaling
-- **Skirmish (Squad):** 1 faction per side, 8-16 per team, single zone, 10 min
-- **Zone Control (Platoon):** 1 faction per side, 30-60 per team, 3-5 zones, 20 min
-- **Open Frontier (Company):** 1-2 factions per side, 60-120 per team, 6+ zones, 30 min
-- **A Shau Valley (Battalion):** 2 factions per side (US+ARVN vs NVA+VC), 1500+ per side, 18 zones, 60 min
-- **Theater (Division+):** Full Vietnam map, province control, campaign progression
-
-### 9C. Survival Mode (Roguelite)
-- Extended solo or small-team operation behind enemy lines
-- **Roguelite elements:** permadeath per run, meta-progression between runs, randomized objectives
-- Animals as food source (hunt to sustain)
-- Environmental hazards (snakes, weather, terrain)
-- Limited ammo and supplies (scavenge from crates and fallen enemies)
-- Extraction objective (reach LZ for helicopter pickup)
-- **Note:** This is a future game mode direction. Don't over-architect for it now. Animal systems should be designed to support food mechanics later without requiring rewrite.
-
----
-
-## Phase 10: Scale & Performance Frontier
-**Goal:** Push to full-Vietnam simulation scale.
-**Dependencies:** All prior phases provide the systems to scale.
-
-Execution gate:
-- Do not start frontier-tech adoption from this phase while `docs/PERF_FRONTIER.md` and `docs/ARCHITECTURE_RECOVERY_PLAN.md` still show unresolved CPU tail hotspots in `combat120`, terrain-heavy short captures, or `frontier30m`.
-- Current priority remains evidence-backed CPU/harness closure first, then larger renderer/architecture bets.
-
-### 10A. Performance Architecture
-- Evaluate ECS migration for combat entities only if object pooling and current JS-level hot-path cleanup stop scaling further
-- Spatial partitioning optimization for 3D queries only after the current measured spatial/terrain bottlenecks are re-baselined
-- Render budget enforcement: adaptive LOD, aggressive culling, draw call batching
-- Memory pooling for ALL transient objects (bullets, effects, debris)
-- Profile and optimize per-phase with perf harness
-
-### 10B. Historical Data Integration
-- Additional DEM regions: Khe Sanh, Hue, DMZ, Ia Drang Valley, Mekong Delta
-- Historical unit positions and operations data for campaign scenarios
-- Real river/road network data
-
-### 10C. Larger Map Infrastructure
-- Tile-based region loading (only active region + neighbors in memory)
-- Hierarchical terrain LOD (satellite texture at 10km+, chunks at 2km, full detail at 500m)
-- Strategic AI operates on abstract map (not per-agent pathfinding)
-- Multi-region campaign: player can redeploy between active theaters
-
----
-
-## Cross-Cutting Concerns
-
-### Performance Budget (All Phases)
-- Target: 60 FPS with 120+ materialized NPCs
-- Frame budget: <8ms average, <16ms P99
-- Memory: <512MB heap for standard modes
-- Load time: <5s to first meaningful frame
-- Every phase: run perf captures before/after, reject regressions
-
-### Testing (All Phases)
-- Unit tests for all new systems
-- Integration scenario tests in `src/integration/scenarios/` (real system wiring, minimal mocks)
-- Perf captures via `npm run perf:capture` after each phase
-- Perf baseline comparison via `npm run perf:compare` (auto pass/warn/fail)
-- Agent validation workflow: see `docs/AGENT_TESTING.md`
-- Mobile smoke tests for touch controls
-- A/B comparison for architectural changes
-
-### Compatibility
-- Desktop: Chrome, Firefox, Edge (keyboard + mouse)
-- Mobile: Chrome Android, Safari iOS (touch)
-- Gamepad: Xbox/PS controller support
-- WebGL2 is the active runtime today; WebGPU remains a later frontier option once current CPU hotspots and regression baselines are stable
-
-### Documentation Contract
-- Update this file after each phase completion
-- Update `ARCHITECTURE_RECOVERY_PLAN.md` for architecture decisions
-- Update `PROFILING_HARNESS.md` for capture flag changes
-- Update `ASSET_MANIFEST.md` when new asset needs are identified
-
----
-
-## Resolved Questions
+## Resolved Decisions
 
 | Question | Decision |
 |----------|----------|
-| Loadout philosophy | Default presets + fully customizable. Changeable on respawn. |
-| Command mode UX | Fully real-time. No time slowdown. UX must be efficient enough to command under fire. |
-| Water rendering | Full implementation as terrain engine module. Sandbox test mode first. |
-| Survival depth | Roguelite game mode, future direction. Animals designed to support food mechanics later. |
-| NPC rendering | Sprites for now. 3D later if performant, billboard LOD fallback. |
-| Asset style | GLB for all 3D objects. Sprites for NPCs. Pixel Forge generates everything. |
-| Historical accuracy vs gameplay | Case-by-case. Ask before making a call. |
-| Campaign structure | Engine module - architect so all three (linear, dynamic, sandbox) can be built as game modes when ready. Not a near-term build. |
-| Multiplayer | Architect for it (don't block it) but not building it now. Single-player with AI is the focus. |
-| Respawn flow UX | Full revamp: spawn point selection on map + loadout customization + deploy. Cross-platform compatible (desktop, mobile, gamepad). |
-| Sandbox test mode | Configurable engine module. Break down into smaller blocks: terrain sandbox, vehicle sandbox, asset preview, system toggle panel. Not just one monolith mode. |
+| Loadout | Default presets + fully customizable. Changeable on respawn. |
+| Command mode | Fully real-time. No time slowdown. |
+| Water | Terrain engine module. Sandbox test first. |
+| NPC rendering | Sprites now. 3D later if performant. |
+| Campaign | Engine module. Linear, dynamic, and sandbox modes possible. Not near-term. |
+| Multiplayer | Don't block it, but not building now. Single-player AI focus. |
+| Historical accuracy | Case-by-case. |
 
-## Open Questions
+## Performance Budget
 
-(None at this time. All major direction questions resolved. Specific implementation details will be decided per-phase.)
+- Target: 60 FPS with 120+ materialized NPCs
+- Frame budget: <8ms average, <16ms p99
+- Memory: <512MB heap for standard modes
+- Every phase: perf captures before/after, reject regressions

@@ -1,69 +1,72 @@
 # Terror in the Jungle
 
-Browser-based 3D FPS set in Vietnam. Large-scale AI combat, stable frame pacing, testable scenarios.
+A browser-based 3D first-person shooter set in the Vietnam War. Command squads, fly helicopters, and fight across procedural jungles and real-world terrain - all running at 60fps in your browser.
 
-**Play:** https://matthew-kissinger.github.io/terror-in-the-jungle/
+**[Play Now](https://terror-in-the-jungle.pages.dev)**
 
-## Prerequisites
+<p align="center">
+  <img src="phone-screen.png" alt="Terror in the Jungle - mobile gameplay" width="300">
+</p>
 
-- Node 22 (pinned in `.nvmrc`)
-- Modern browser with WebGL2
+## Features
+
+- **5 game modes** from 20-player skirmishes to 3,000-agent battalion warfare on a 21km historical map
+- **3 flyable helicopters** - UH-1 Huey, UH-1C Gunship, AH-1 Cobra with weapons, door gunners, and tactical insertion
+- **7 weapon types** - M16A1, AK-47, Ithaca 37, M3 Grease Gun, M1911, M60 LMG, M79 grenade launcher
+- **4 factions** - US Army, ARVN, NVA, Viet Cong with faction-specific loadouts
+- **Real terrain** - A Shau Valley built from USGS DEM elevation data
+- **Procedural worlds** - noise-driven terrain with biome-aware vegetation, firebases, and airfields
+- **AI combat** - 8-state FSM with squad tactics, suppression, flanking, and cover search
+- **Mobile + desktop** - touch controls with virtual joystick, or keyboard and mouse
+
+## Game Modes
+
+| Mode | Scale | Duration | Description |
+|------|------:|--------:|-------------|
+| Zone Control | 20 | 3 min | Capture and hold strategic zones. Control the majority to drain enemy tickets. |
+| Team Deathmatch | 30 | 5 min | First team to the kill target wins. Pure tactical combat. |
+| Open Frontier | 120 | 15 min | Large-scale warfare with helicopters, airfields, and armored staging areas. |
+| A Shau Valley | 3,000 | 60 min | Historical campaign on real DEM terrain with a war simulator and strategic AI. |
+| AI Sandbox | configurable | 60 min | Automated AI combat for testing and observation. |
 
 ## Quick Start
 
 ```bash
 npm install
-npm run dev
-npm run build
+npm run dev        # Development server
+npm run build      # Production build
+npm run validate   # Lint + tests + build + smoke test
 ```
 
-## Game Modes
-
-| Mode | World Size | Combatants | Match Length | Description |
-|------|---:|---:|---:|---|
-| Zone Control | 500m | 20 | 3 min | Combat over 3 strategic zones. Control the majority to drain enemy tickets. |
-| Team Deathmatch | 400m | 30 | 5 min | Pure tactical combat. First team to the kill target wins. |
-| Open Frontier | 3200m | 120 | 15 min | Large-scale warfare across 10 zones with helicopters, a rear-area airfield, and a staged armored yard. |
-| A Shau Valley | 21km | 60 materialized / 3000 strategic | 60 min | Historical campaign on real DEM terrain with war simulator, upgraded Ta Bat airfield, and a staged armored yard. |
-| AI Sandbox | 200m | 40 (configurable) | 60 min | Automated AI combat for performance testing. |
-
-Three flyable helicopters: UH-1 Huey (transport), UH-1C Gunship, AH-1 Cobra (attack). Open Frontier and A Shau also stage parked fixed-wing aircraft plus jeeps/APCs/tanks as static world content.
-
-## Development
-
-```bash
-npm run dev                # Vite dev server
-npm run build              # Type-check + production build
-npm run smoke:prod         # Built-app Playwright smoke against the deployed base path
-npm run test:run           # All tests
-npm run test:quick         # Unit tests only (dot reporter)
-npm run test:integration   # Integration scenario tests
-npm run validate           # Lint + tests + build + production smoke
-npm run validate:full      # validate + combat120 perf capture + baseline comparison
-npm run lint               # ESLint
-npm run lint:fix           # ESLint with auto-fix
-```
-
-`smoke:prod` serves `dist/` under `/terror-in-the-jungle`, loads the built app in Chromium, fails on page/runtime errors, and verifies the real menu -> deploy transition.
-
-## Profiling
-
-```bash
-npm run perf:capture                # Default headed capture
-npm run perf:capture:combat120      # 120 NPC combat stress test
-npm run perf:compare                # Compare latest capture against baselines
-npm run perf:update-baseline        # Update baseline from latest capture
-npm run perf:analyze:latest         # Analyze most recent capture artifacts
-```
-
-Artifacts are written to `artifacts/perf/<timestamp>/`.
+Requires Node 22 (pinned in `.nvmrc`) and a browser with WebGL2.
 
 ## Tech Stack
 
-Three.js r182, TypeScript 5.9, Vite 7.3, Vitest 4.0, Playwright 1.58.
+[Three.js](https://threejs.org/) 0.183 | TypeScript 5.9 | Vite 8 | Vitest 4 | Playwright 1.58 | [Recast Navigation](https://github.com/isaac-mason/recast-navigation-js) (WASM navmesh)
+
+44 game systems, 75 GLB models, 38 pixel-art UI icons, CDLOD terrain with real-time LOD.
+
+Deployed on [Cloudflare Pages](https://terror-in-the-jungle.pages.dev), CI-gated (lint + test + build + smoke).
 
 ## Documentation
 
-See [docs/README.md](docs/README.md) for the full docs index and block map.
+| Doc | Purpose |
+|-----|---------|
+| [Architecture](docs/ARCHITECTURE.md) | System overview, tick graph, coupling heatmap, key patterns |
+| [Roadmap](docs/ROADMAP.md) | Vision, phase plan, resolved decisions |
+| [Performance](docs/PERFORMANCE.md) | Profiling commands, scenarios, bottleneck status |
+| [Development](docs/DEVELOPMENT.md) | Testing, CI, deployment, pre-push checklist |
+| [Backlog](docs/BACKLOG.md) | Open work, known bugs, architecture debt |
+| [Asset Manifest](docs/ASSET_MANIFEST.md) | 75 GLBs, integration status, art direction |
 
-Before commit/push or deploy, use [docs/DEPLOYMENT_VALIDATION.md](docs/DEPLOYMENT_VALIDATION.md) for the current release-readiness checklist.
+## Contributing
+
+```bash
+npm run validate   # Must pass before PR
+```
+
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) for the full testing and deployment guide.
+
+## License
+
+MIT - see [LICENSE](LICENSE).
