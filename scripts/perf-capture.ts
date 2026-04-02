@@ -314,6 +314,20 @@ async function safeAwait<T>(label: string, promise: Promise<T>, timeoutMs: numbe
   }
 }
 
+async function foregroundCapturePage(page: Page): Promise<void> {
+  await safeAwait('page.bringToFront', page.bringToFront(), 3_000);
+  await safeAwait(
+    'page focus',
+    page.evaluate(() => {
+      window.focus();
+      if (document.body instanceof HTMLElement) {
+        document.body.focus({ preventScroll: true });
+      }
+    }),
+    3_000
+  );
+}
+
 function isPidAlive(pid: number): boolean {
   if (!Number.isFinite(pid) || pid <= 0) return false;
   try {
@@ -1857,8 +1871,10 @@ async function runCapture(): Promise<void> {
     stage = 'navigate-and-startup';
     logStep(`📍 Navigating to ${url}`);
     await withTimeout('page.goto', page.goto(url, { waitUntil: 'commit' }), navTimeoutMs);
+    await foregroundCapturePage(page);
     if (requestedMode !== 'ai_sandbox') {
       await startRequestedMode(page, requestedMode, startupTimeoutSeconds);
+      await foregroundCapturePage(page);
     }
     startupState = await waitForRendering(page, startupTimeoutSeconds, startupFrameThreshold);
     startupTimeline = await safeAwait(
@@ -1915,6 +1931,7 @@ async function runCapture(): Promise<void> {
         });
         activeScenarioStarted = activePlayerScenario;
       }
+      await foregroundCapturePage(page);
       await warmupRuntime(page, warmupSeconds);
       // Reset rolling metrics so sampling reflects steady-state window, not startup cost.
       await safeAwait(
@@ -1940,6 +1957,7 @@ async function runCapture(): Promise<void> {
           maxCompressedPerFaction
         });
       }
+      await foregroundCapturePage(page);
     }
 
     stage = 'sample-runtime';
