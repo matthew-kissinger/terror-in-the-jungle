@@ -1,6 +1,6 @@
 # Asset Manifest
 
-Last updated: 2026-03-30
+Last updated: 2026-04-01
 
 ## Generated Assets (75 GLBs)
 
@@ -9,7 +9,7 @@ Shipped path: `public/models/**` (Vite static assets). Catalog in `deploy-3d-ass
 | Category | Count | Examples |
 |----------|------:|---------|
 | Weapons | 9 | M16A1, AK-47, M60, RPG-7, M79, Ithaca 37, M1911, M2 Browning, M3 Grease Gun |
-| Aircraft | 6 | UH-1 Huey, UH-1C Gunship, AH-1 Cobra, F-4 Phantom, AC-47 Spooky, A-1 Skyraider |
+| Aircraft | 6 | UH-1 Huey (w/ M60 door guns), UH-1C Gunship, AH-1 Cobra, F-4 Phantom, AC-47 Spooky, A-1 Skyraider |
 | Ground vehicles | 5 | M151 Jeep, M113 APC, M35 Truck, M48 Patton, PT-76 |
 | Watercraft | 2 | Sampan, PBR |
 | Structures | 32 | Sandbag wall/bunker, guard tower, helipad, TOC bunker, tunnel entrance |
@@ -22,7 +22,7 @@ Shipped path: `public/models/**` (Vite static assets). Catalog in `deploy-3d-ass
 | Category | Status | Details |
 |----------|--------|---------|
 | Weapons | 7/9 integrated | M16A1, AK-47, Ithaca 37, M3, M1911, M60, M79 via WeaponRigManager |
-| Helicopters | 3/3 integrated | UH-1 Huey, UH-1C Gunship, AH-1 Cobra via ModelLoader |
+| Helicopters | 3/3 integrated | UH-1 Huey, UH-1C Gunship, AH-1 Cobra via ModelLoader. Rotor pivots rigged (Joint_MainRotor/Joint_TailRotor) for HelicopterAnimation. |
 | Animals | 6/6 integrated | All types via AnimalSystem |
 | Structures | Integrated | Procedural firebase/airfield generators, WorldFeatureSystem |
 | Fixed-wing | Static only | Staged at airfields in Open Frontier / A Shau, no live vehicle runtime |
