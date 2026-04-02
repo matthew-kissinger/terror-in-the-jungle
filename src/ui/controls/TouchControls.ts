@@ -255,8 +255,7 @@ export class TouchControls {
     // menu slot strips its fixed layer/z-index and lets the action stack
     // intercept taps on short landscape phones.
     // joystick + look stay as overlays
-    // contextual buttons (interaction, sandbag, mortar) keep their fixed positioning
-    // Rally button disabled on mobile (broken)
+    // contextual buttons (interaction, sandbag, mortar, rally) keep their fixed positioning
   }
 
   /**

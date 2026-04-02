@@ -59,7 +59,7 @@ export class RallyPointSystem implements GameSystem {
       }
 
       // Check regeneration
-      if (!rallyPoint.active && rallyPoint.lastDepletedTime) {
+      if (!rallyPoint.active && rallyPoint.lastDepletedTime !== undefined) {
         if (currentTime - rallyPoint.lastDepletedTime > rallyPoint.regenerationTime) {
           Logger.info('rally-point', ` Rally point for squad ${squadId} regenerated`);
           rallyPoint.active = true;

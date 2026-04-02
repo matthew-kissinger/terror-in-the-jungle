@@ -30,17 +30,20 @@ describe('RallyPointSystem', () => {
   let scene: THREE.Scene;
   let system: RallyPointSystem;
   let mockPerformanceNow: number;
+  let perfSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     scene = new THREE.Scene();
     mockPerformanceNow = 0;
-    
-    // Mock performance.now
-    global.performance = {
-      now: () => mockPerformanceNow,
-    } as any;
-    
+
+    // Mock performance.now using vi.spyOn for reliable interception
+    perfSpy = vi.spyOn(performance, 'now').mockImplementation(() => mockPerformanceNow);
+
     system = new RallyPointSystem(scene);
+  });
+
+  afterEach(() => {
+    perfSpy.mockRestore();
   });
 
   describe('Constructor and Initialization', () => {
@@ -334,9 +337,7 @@ describe('RallyPointSystem', () => {
   });
 
   describe('update - regeneration', () => {
-    // Note: Regeneration tests are skipped due to performance.now() mocking issues in test environment
-    // The regeneration logic works correctly in production but is difficult to test with current setup
-    it.skip('should regenerate rally point after 30 seconds of depletion', () => {
+    it('should regenerate rally point after 30 seconds of depletion', () => {
       const friendlyZone = createMockZone('zone-1', new THREE.Vector3(0, 0, 0), 30, Faction.US);
       const zoneManager = createMockZoneManager([friendlyZone]);
       system.setZoneManager(zoneManager);
@@ -381,7 +382,7 @@ describe('RallyPointSystem', () => {
       expect(status!.usesRemaining).toBe(0);
     });
 
-    it.skip('should reset uses to max after regeneration', () => {
+    it('should reset uses to max after regeneration', () => {
       const friendlyZone = createMockZone('zone-1', new THREE.Vector3(0, 0, 0), 30, Faction.US);
       const zoneManager = createMockZoneManager([friendlyZone]);
       system.setZoneManager(zoneManager);

@@ -149,10 +149,14 @@ export class HelicopterPhysics {
   private smoothControlInputs(deltaTime: number): void {
     const smoothRate = Math.min(this.cfg.inputSmoothRate * deltaTime, 1.0);
 
+    // Collective uses faster decay when releasing throttle (dropping toward idle)
+    // to eliminate the "sticky throttle" feel on key release
+    const collectiveDecaying = this.controls.collective < this.smoothedControls.collective;
+    const collectiveRate = collectiveDecaying ? Math.min(smoothRate * 2.5, 1.0) : smoothRate;
     this.smoothedControls.collective = THREE.MathUtils.lerp(
       this.smoothedControls.collective,
       this.controls.collective,
-      smoothRate
+      collectiveRate
     );
 
     this.smoothedControls.cyclicPitch = THREE.MathUtils.lerp(
