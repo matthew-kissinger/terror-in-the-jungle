@@ -1,45 +1,45 @@
 # Backlog
 
-Last updated: 2026-03-30
+Last updated: 2026-04-01
 
-## Active
+## P0 - Performance Blockers
 
 - [ ] Combat AI p99 ~35ms (target <16ms) - synchronous cover search in `AIStateEngage.initiateSquadSuppression()`
-- [ ] Terrain contract cleanup: remove stale chunk-era config names, debug labels
 - [ ] Reduce initial JS bundle (~710-734kB main runtime chunks)
-- [ ] Weapon sound variants (2-3 per weapon type) + impact/body/headshot sounds
 
-## Planned
+## P1 - Gameplay
 
-### Gameplay
 - [ ] Wire NPC pilot AI into SystemUpdater for live NPC flight
-- [ ] Wire FixedWingPhysics for player-pilotable fixed-wing aircraft
 - [ ] NPC helicopter transport missions (takeoff, fly to LZ, deploy, RTB)
-- [ ] Ground vehicles (M151 jeep first - GLB exists)
+- [ ] Ground vehicles (M151 jeep first - GLB exists, need driving runtime)
+- [ ] Wire FixedWingPhysics for player-pilotable fixed-wing aircraft
+- [ ] Weapon sound variants (2-3 per weapon type) + impact/body/headshot sounds
+- [ ] Stationary weapons (M2 .50 cal emplacements, NPC manning)
+- [ ] Faction AI doctrines (VC guerrilla vs NVA conventional vs US combined arms)
+
+## P2 - Content & Polish
+
+- [ ] Vegetation billboard remakes
+- [ ] Terrain texture improvements
 - [ ] Road network generation (splines, intersections, pathfinding)
 - [ ] Wire additional DEM maps as game modes (Ia Drang, Khe Sanh)
-- [ ] Hydrology system layer (T-008, blocked on river gameplay requirements)
+- [ ] Day/night cycle
+- [ ] Music/soundtrack
 
-### Architecture
+## P3 - Architecture
+
+- [ ] Terrain contract cleanup: remove stale chunk-era config names, debug labels
 - [ ] Decide: remaining connector bursts -> constructor/runtime dependency objects vs grouped setters
 - [ ] Split tracked tick groups into smaller declared groups where cadence can differ safely
 - [ ] Move more world/strategy/passive-UI work behind scheduler contracts
 - [ ] Continue identifying deploy-only UI/runtime that can defer without touching menu path
 
-### Content
-- [ ] Vegetation billboard remakes
-- [ ] Terrain textures
-- [ ] Helicopter GLB replacements (UH-1 Huey, UH-1C Gunship)
-- [ ] Faction AI doctrines (VC guerrilla vs NVA conventional vs US combined arms)
-- [ ] Music/soundtrack
-- [ ] Day/night cycle
-
 ## Far Horizon
 
+- Hydrology system / water engine (river system, swimming, depth rendering, watercraft physics)
 - Watercraft (PBR, sampan - GLBs exist, blocked on water engine)
 - Multiplayer/networking
 - Destructible structures
-- Swimming/river gameplay
 - Survival/roguelite mode
 - Campaign system
 - Theater-scale maps (tiled DEM)
@@ -57,5 +57,5 @@ Last updated: 2026-03-30
 1. SystemManager ceremony - adding a new system touches SystemInitializer + composers.
 2. PlayerController 47 setter methods (deferred init ceremony).
 3. Variable deltaTime physics (no fixed timestep for player/helicopter).
-4. Mixed UI paradigms (~57 files with raw createElement alongside UIComponent + CSS Modules).
+4. Mixed UI paradigms (~50 files with raw createElement alongside UIComponent + CSS Modules).
 5. Partial singleton reset coverage (blocks HMR and "return to menu").

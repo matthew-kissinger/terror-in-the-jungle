@@ -1,6 +1,6 @@
 # Project Notes
 
-Last updated: 2026-03-30
+Last updated: 2026-04-01
 
 ## Project
 
@@ -54,7 +54,8 @@ npm run perf:update-baseline  # update baseline from latest capture
 
 - combat120 at WARN: p99 ~30-35ms (target <16ms), top bottleneck is synchronous cover search in AIStateEngage
 - Deployed to Cloudflare Pages, CI-gated (lint + test + build + smoke)
-- 5 game modes live, 3 flyable helicopters, 7 weapon types, 4 factions
+- 5 game modes live, 3 flyable helicopters, 6 weapon slots (rifle/shotgun/smg/pistol/lmg/launcher), 4 factions
+- 75 GLB assets shipped, 6 aircraft rebuilt with rigged rotors via PixelForge Kiln
 - Mobile touch controls hardened (virtual joystick, vehicle action bar, fullscreen workarounds)
 - Async startup eliminates Open Frontier hang; map seed rotation (5 OF, 3 ZC, 3 TDM variants)
 - Terrain CDLOD rewrite live with auto-scaled LOD levels per world size

@@ -1,18 +1,29 @@
 # Development Guide
 
+Last updated: 2026-04-01
+
 ## Prerequisites
 
 - Node 22 (pinned in `.nvmrc`)
-- Modern browser with WebGL2
+- Modern browser with WebGL2 support
 
-## Quick Validation (< 30 seconds)
+## Quick Start
+
+```bash
+npm install
+npm run dev              # Vite dev server
+```
+
+## Validation
+
+### Quick (< 30 seconds)
 
 ```bash
 npm run test:quick       # All tests, dot reporter
 npm run lint             # ESLint on src/
 ```
 
-## Full Validation (~2-5 minutes)
+### Full (~2-5 minutes)
 
 ```bash
 npm run validate         # lint + test:run + build + smoke:prod
@@ -21,7 +32,7 @@ npm run deadcode         # knip dead code scan (advisory)
 
 `validate` runs ESLint, the full Vitest suite, TypeScript + Vite production build, then `scripts/prod-smoke.ts` against the built app.
 
-## Integration Tests
+### Integration Tests
 
 ```bash
 npm run test:integration   # src/integration/ tests only
@@ -30,7 +41,7 @@ npm run check:mobile-ui    # Built-app phone viewport flow gate
 
 `check:mobile-ui` drives the real title -> mode select -> deploy -> gameplay flow and fails when controls are offscreen on the phone viewport matrix.
 
-## Performance Validation
+### Performance Validation
 
 ```bash
 npm run perf:capture:combat120   # Primary regression capture
@@ -77,11 +88,54 @@ Current large chunks:
 ### Manual Smoke Checks
 
 After changes to `src/ui/controls/`, `src/ui/hud/`, or `src/systems/player/`:
-1. menu -> play -> deploy works
+1. Menu -> play -> deploy works
 2. Initial deploy enters live gameplay
 3. Deploy cancel returns to menu
 4. Respawn works
 5. No fatal console errors
+
+## Project Structure
+
+```
+src/
+  core/           GameEngine, bootstrap, SystemUpdater, GameEventBus
+  config/         Game mode configs, MapSeedRegistry, CombatantConfig
+  systems/
+    combat/       CombatantSystem, AI states, spatial grid, squads, LOD
+    terrain/      TerrainSystem, CDLOD, height queries, biome classifier
+    navigation/   NavmeshSystem, crowd, movement adapter
+    strategy/     WarSimulator, MaterializationPipeline (A Shau scale)
+    player/       PlayerController, FirstPersonWeapon, weapon subsystem
+    weapons/      GrenadeSystem, MortarSystem, SandbagSystem, AmmoSupply
+    helicopter/   HelicopterModel, HelicopterPhysics, HelicopterAnimation
+    vehicle/      VehicleManager, NPCVehicleController
+    world/        ZoneManager, TicketSystem, GameModeManager, WorldFeatures
+    airsupport/   AirSupportManager, AAEmplacement
+    assets/       AssetLoader, ModelLoader
+    audio/        AudioManager, FootstepAudio, WeaponSounds
+    effects/      TracerPool, MuzzleFlash, PostProcessing, CameraShake
+    environment/  WeatherSystem, WaterSystem, Skybox
+    input/        InputContextManager
+    debug/        PerformanceTelemetry, PerformanceBenchmark
+  ui/
+    hud/          HUDSystem, KillFeed, HitMarker, ScorePopup, HelicopterHUD
+    controls/     TouchControls, TouchLook, TouchADSButton, GamepadManager
+    screens/      TitleScreen, ModeSelectScreen, DeployScreen, GameUI
+    layout/       HUDLayout, VisibilityManager, GameplayPresentationController
+    loading/      LoadingScreen, SettingsModal
+    engine/       UIComponent base class
+    icons/        IconRegistry
+    minimap/      MinimapSystem, MinimapRenderer
+    compass/      CompassSystem
+  types/          SystemInterfaces, shared type definitions
+  utils/          ObjectPoolManager, Logger
+  integration/    Integration test scenarios
+  test-utils/     Test helpers and mocks
+scripts/          Perf capture, analysis, comparison, prebake
+public/
+  models/         75 GLB files (weapons, vehicles, structures, etc.)
+  assets/         Textures, sprites, audio, icons
+```
 
 ## Exit Codes
 

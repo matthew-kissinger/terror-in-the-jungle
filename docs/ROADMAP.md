@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-03-30
+Last updated: 2026-04-01
 
 > Aspirational planning document. Active work tracked in [BACKLOG.md](BACKLOG.md).
 
@@ -26,15 +26,15 @@ Current renderer: `WebGLRenderer`. `WebGPURenderer`/TSL deferred until terrain m
 
 | Phase | Status | Summary |
 |-------|--------|---------|
-| 0: Asset Manifest | DONE | 80+ asset specs for Pixel Forge generation. |
-| 1: Asset Generation | DONE | 75 GLBs generated. Vegetation remakes still pending. |
-| 2: Asset Integration | MOSTLY DONE | Weapons (7), helicopters (3), animals (6), structures integrated. Fixed-wing/ground vehicles static only. |
-| 3: Vehicle Controls | PARTIAL | Helicopter flight/weapons/damage/HUD live. Controls tuning, NPC transport, vehicle abstraction remain. |
+| 0: Asset Manifest | DONE | 75 asset specs generated via PixelForge Kiln. |
+| 1: Asset Generation | DONE | 75 GLBs shipped. Vegetation remakes pending. |
+| 2: Asset Integration | MOSTLY DONE | Weapons (7/9), helicopters (3/3), animals (6/6), structures integrated. Fixed-wing/ground vehicles static only. |
+| 3: Vehicle Controls | PARTIAL | 3 flyable helicopters with flight/weapons/damage/HUD. 6 aircraft GLBs rebuilt with rigged rotors. NPC transport, ground vehicles remain. |
 | 4: Squad Command | PARTIAL | Single coordinator + Z-key overlay live. Map-first command mode live. Gamepad parity, scale adapters deferred. |
 | 5: Terrain Engine | PARTIAL | CDLOD rewrite live. Biome classifier and vegetation scattering live. Water engine and hydrology not started. |
-| 6: Ground Vehicles | NOT STARTED | GLBs exist (jeep, APC, truck, tank). No driving runtime. |
-| 7: Combat Expansion | PARTIAL | Loadout system live (7 weapons, faction pools, presets). Stationary weapons, field pickup not started. |
-| 8: Fixed-Wing Air War | PARTIAL | Flight physics and NPC pilot AI exist. Not wired to live vehicle runtime. |
+| 6: Ground Vehicles | NOT STARTED | GLBs exist (jeep, APC, truck, tank, PT-76). No driving runtime. |
+| 7: Combat Expansion | PARTIAL | Loadout system live (6 weapon slots, faction pools, presets). Stationary weapons, field pickup not started. |
+| 8: Fixed-Wing Air War | PARTIAL | Flight physics and NPC pilot AI exist. Not wired to live vehicle runtime. 3 fixed-wing GLBs rebuilt. |
 | 9: Faction Expansion | PARTIAL | 4 factions in loadout context (US, ARVN, NVA, VC). AI doctrine per faction not started. |
 | 10: Scale Frontier | NOT STARTED | Gated on combat AI p99 closure. |
 
