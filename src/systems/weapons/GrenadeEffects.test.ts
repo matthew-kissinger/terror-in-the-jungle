@@ -307,7 +307,7 @@ describe('GrenadeEffects', () => {
         mockCombatantSystem,
         mockPlayerController
       );
-      expect(mockImpactEffectsPool.spawn).toHaveBeenCalledTimes(15);
+      expect(mockImpactEffectsPool.spawn).toHaveBeenCalledTimes(5);
       // Check that positions are offset from grenade position
       const calls = (mockImpactEffectsPool.spawn as vi.Mock).mock.calls;
       const grenadePosX = fragGrenade.position.x;
@@ -461,7 +461,7 @@ describe('GrenadeEffects', () => {
         mockCombatantSystem,
         mockPlayerController
       );
-      expect(mockImpactEffectsPool.spawn).toHaveBeenCalledTimes(30);
+      expect(mockImpactEffectsPool.spawn).toHaveBeenCalledTimes(8);
       // Check that positions are offset from grenade position
       const calls = (mockImpactEffectsPool.spawn as vi.Mock).mock.calls;
       const grenadePosY = smokeGrenade.position.y;

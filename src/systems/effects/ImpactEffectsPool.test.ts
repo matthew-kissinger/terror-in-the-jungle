@@ -275,9 +275,9 @@ describe('ImpactEffectsPool', () => {
   });
 
   it('pre-allocates effects and creates materials/textures', () => {
-    // Effects are no longer added to scene at creation time;
-    // they are added on spawn and removed on deactivation.
-    expect(scene.add).toHaveBeenCalledTimes(0);
+    // Effects are added to scene at pool creation (toggle visible, never add/remove)
+    // Pool size 2, each effect has particles + sparks + decal = 6 scene.add calls
+    expect(scene.add).toHaveBeenCalledTimes(6);
 
     const _THREE = require('three');
     expect(pointsMaterialCalls).toHaveLength(2);
@@ -372,12 +372,18 @@ describe('ImpactEffectsPool', () => {
     expect(particlePositions.getY(0)).not.toBeCloseTo(0);
     expect(sparkPositions.getY(0)).not.toBeCloseTo(0);
 
-    expect(effect.decal.material.opacity).toBeCloseTo(0.35, 5);
+    // Decal uses shared material - stays visible until 400ms cutoff
+    expect(effect.decal.visible).toBe(true);
 
     mockNow += 200; // total 350ms
     pool.update(0.2);
     expect(effect.particles.material.opacity).toBeCloseTo(0.6, 5);
     expect(effect.sparks.material.opacity).toBeCloseTo(0.75, 5);
+
+    // After 400ms, decal is hidden
+    mockNow += 100; // total 450ms
+    pool.update(0.1);
+    expect(effect.decal.visible).toBe(false);
   });
 
   it('removes expired effects using swap-and-pop compaction', () => {
@@ -441,8 +447,9 @@ describe('ImpactEffectsPool', () => {
     expect(effect.particles.geometry.disposed).toBe(true);
     expect(effect.sparks.geometry.disposed).toBe(true);
 
+    // Shared decal material disposed once (no longer cloned per effect)
     const disposedSpriteMaterials = spriteMaterialInstances.filter(m => m.disposed).length;
-    expect(disposedSpriteMaterials).toBe(3);
+    expect(disposedSpriteMaterials).toBe(1);
 
     const disposedPointsMaterials = pointsMaterialInstances.filter(m => m.disposed).length;
     expect(disposedPointsMaterials).toBe(2);

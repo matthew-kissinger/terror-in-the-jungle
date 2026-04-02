@@ -98,7 +98,17 @@ async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: TH
     Logger.info('engine-init', 'Combat AI disabled by sandbox config (combat=0)');
   }
 
-  requestBackgroundTask(() => engine.renderer.precompileShaders(), 1000);
+  // Pre-warm effect pool shaders before general precompile to avoid first-explosion stall
+  requestBackgroundTask(() => {
+    const webglRenderer = engine.renderer.renderer;
+    const camera = engine.renderer.camera;
+    const cs = engine.systemManager.combatantSystem;
+    if (cs) {
+      cs.explosionEffectsPool.prewarm(webglRenderer, camera);
+      cs.impactEffectsPool.prewarm(webglRenderer, camera);
+    }
+    engine.renderer.precompileShaders();
+  }, 1000);
   requestBackgroundTask(() => engine.systemManager.startDeferredInitialization(), 500);
   engine.startupFlow.enterLive();
   markPhase(`interactive-ready (${(performance.now() - startTime).toFixed(1)}ms)`);

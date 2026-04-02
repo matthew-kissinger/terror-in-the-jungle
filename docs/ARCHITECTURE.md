@@ -50,7 +50,7 @@ Runtime composers (extracted from SystemConnector):
 | Assets | `src/systems/assets/` | AssetLoader, ModelLoader | untracked |
 | Input | `src/systems/input/` | InputContextManager (singleton) | untracked |
 | Audio | `src/systems/audio/` | AudioManager, FootstepAudioSystem | untracked |
-| Effects | `src/systems/effects/` | TracerPool, PostProcessingManager, CameraShakeSystem | untracked |
+| Effects | `src/systems/effects/` | ExplosionEffectsPool, ImpactEffectsPool, SmokeCloudSystem, TracerPool, PostProcessingManager, CameraShakeSystem | untracked |
 | Environment | `src/systems/environment/` | WeatherSystem, WaterSystem, Skybox | untracked |
 | Debug | `src/systems/debug/` | PerformanceTelemetry (singleton) | untracked |
 | UI | `src/ui/` | HUDSystem, GameUI, TouchControls, MinimapSystem, FullMapSystem | 1.5ms |

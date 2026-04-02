@@ -57,11 +57,30 @@ export class ImpactEffectsPool {
       transparent: true
     });
 
-    // Pre-allocate pool
+    // Pre-allocate pool and add to scene once (toggle visible, never add/remove)
     for (let i = 0; i < maxEffects; i++) {
       const effect = this.createImpactEffect();
+      this.scene.add(effect.particles);
+      this.scene.add(effect.sparks);
+      this.scene.add(effect.decal);
       this.pool.push(effect);
     }
+  }
+
+  /**
+   * Force GPU shader compilation for all effect materials.
+   * Call once after construction to avoid first-hit stall.
+   */
+  prewarm(renderer: THREE.WebGLRenderer, camera: THREE.Camera): void {
+    const effect = this.pool[0];
+    if (!effect) return;
+    effect.particles.visible = true;
+    effect.sparks.visible = true;
+    effect.decal.visible = true;
+    renderer.compile(this.scene, camera);
+    effect.particles.visible = false;
+    effect.sparks.visible = false;
+    effect.decal.visible = false;
   }
 
   private createDecalTexture(): THREE.Texture {
@@ -115,8 +134,8 @@ export class ImpactEffectsPool {
     sparks.visible = false;
     sparks.matrixAutoUpdate = true;
 
-    // Create decal sprite
-    const decal = new THREE.Sprite(this.decalMaterial.clone());
+    // Create decal sprite (shared material - opacity controlled via group visibility)
+    const decal = new THREE.Sprite(this.decalMaterial);
     decal.scale.set(0.2, 0.2, 1);
     decal.visible = false;
     decal.matrixAutoUpdate = true;
@@ -145,8 +164,6 @@ export class ImpactEffectsPool {
     effect.decal.position.copy(position);
     effect.decal.position.addScaledVector(normal, 0.01); // Offset slightly
     effect.decal.visible = true;
-    effect.decal.material.opacity = 0.5;
-    this.scene.add(effect.decal);
 
     // Initialize particle positions and velocities
     const particlePositions = effect.particles.geometry.attributes.position as THREE.BufferAttribute;
@@ -189,10 +206,6 @@ export class ImpactEffectsPool {
 
     effect.particles.visible = true;
     effect.sparks.visible = true;
-    this.scene.add(effect.particles);
-    this.scene.add(effect.sparks);
-    (effect.particles.material as THREE.PointsMaterial).opacity = 0.8;
-    (effect.sparks.material as THREE.PointsMaterial).opacity = 1;
 
     // Set timing
     const now = performance.now();
@@ -211,13 +224,10 @@ export class ImpactEffectsPool {
       const remaining = effect.aliveUntil - now;
 
       if (remaining <= 0) {
-        // Hide, remove from scene, return to pool
+        // Hide (objects stay in scene permanently)
         effect.particles.visible = false;
         effect.sparks.visible = false;
         effect.decal.visible = false;
-        this.scene.remove(effect.particles);
-        this.scene.remove(effect.sparks);
-        this.scene.remove(effect.decal);
         const last = this.active[this.active.length - 1];
         this.active[i] = last;
         this.active.pop();
@@ -267,34 +277,24 @@ export class ImpactEffectsPool {
           (effect.sparks.material as THREE.PointsMaterial).opacity = 1 * (1 - fadeProgress);
         }
 
-        // Decal stays visible but fades slowly
-        if (elapsed > 100) {
-          effect.decal.material.opacity = 0.5 * (1 - elapsed / 500);
+        // Hide decal in last portion (shared material, can't fade individually)
+        if (elapsed > 400) {
+          effect.decal.visible = false;
         }
       }
     }
   }
 
   dispose(): void {
-    this.active.forEach(e => {
+    const disposeEffect = (e: ImpactEffect) => {
       this.scene.remove(e.particles);
       this.scene.remove(e.sparks);
       this.scene.remove(e.decal);
       e.particles.geometry.dispose();
       e.sparks.geometry.dispose();
-      // Dispose cloned decal material
-      e.decal.material.dispose();
-    });
-
-    this.pool.forEach(e => {
-      this.scene.remove(e.particles);
-      this.scene.remove(e.sparks);
-      this.scene.remove(e.decal);
-      e.particles.geometry.dispose();
-      e.sparks.geometry.dispose();
-      // Dispose cloned decal material
-      e.decal.material.dispose();
-    });
+    };
+    this.active.forEach(disposeEffect);
+    this.pool.forEach(disposeEffect);
 
     this.particleMaterial.dispose();
     this.sparkMaterial.dispose();

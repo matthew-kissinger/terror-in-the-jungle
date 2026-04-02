@@ -57,7 +57,9 @@ export class SmokeCloudSystem implements GameSystem {
     this.createOverlay();
 
     for (let i = 0; i < this.MAX_CLOUDS; i++) {
-      this.pool.push(this.createCloud());
+      const cloud = this.createCloud();
+      this.scene.add(cloud.group);
+      this.pool.push(cloud);
     }
 
     Logger.info('effects', `Smoke Cloud System initialized (pool: ${this.MAX_CLOUDS})`);
@@ -166,7 +168,6 @@ export class SmokeCloudSystem implements GameSystem {
     cloud.group.position.copy(position);
     cloud.group.position.y += 0.5;
     cloud.group.visible = true;
-    this.scene.add(cloud.group);
 
     const spriteCount = cloud.sprites.length;
     for (let i = 0; i < spriteCount; i++) {
@@ -289,7 +290,6 @@ export class SmokeCloudSystem implements GameSystem {
   private deactivateCloud(index: number): void {
     const cloud = this.clouds[index];
     cloud.group.visible = false;
-    this.scene.remove(cloud.group);
 
     const spriteCount = cloud.sprites.length;
     for (let i = 0; i < spriteCount; i++) {

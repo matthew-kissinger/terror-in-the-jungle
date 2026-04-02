@@ -63,7 +63,7 @@ export class GrenadeEffects {
 
     // Additional debris/impact effects for more detail
     if (impactEffectsPool) {
-      for (let i = 0; i < 15; i++) {
+      for (let i = 0; i < 5; i++) {
         _offset.set(
           (Math.random() - 0.5) * 3,
           Math.random() * 1.5,
@@ -106,9 +106,8 @@ export class GrenadeEffects {
     impactEffectsPool: ImpactEffectsPool | undefined
   ): void {
     // Smoke grenade - create smoke effect, no damage
-    // Spawn multiple smoke particles for a smoke cloud
     if (impactEffectsPool) {
-      for (let i = 0; i < 30; i++) {
+      for (let i = 0; i < 8; i++) {
         _offset.set(
           (Math.random() - 0.5) * 5,
           Math.random() * 3,

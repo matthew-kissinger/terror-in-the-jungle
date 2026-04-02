@@ -92,36 +92,21 @@ export class GrenadePhysics {
 
 export class GrenadeSpawner {
   private scene: THREE.Scene;
+  private sharedGeometry: THREE.SphereGeometry;
+  private materials: Record<string, THREE.MeshStandardMaterial>;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
+    this.sharedGeometry = new THREE.SphereGeometry(0.3, 8, 8);
+    this.materials = {
+      [GrenadeType.FRAG]: new THREE.MeshStandardMaterial({ color: 0x2a4a2a, metalness: 0.6, roughness: 0.4 }),
+      [GrenadeType.SMOKE]: new THREE.MeshStandardMaterial({ color: 0x808080, metalness: 0.6, roughness: 0.4 }),
+      [GrenadeType.FLASHBANG]: new THREE.MeshStandardMaterial({ color: 0xFFFFAA, metalness: 0.6, roughness: 0.4 }),
+    };
   }
 
   spawnGrenade(position: THREE.Vector3, velocity: THREE.Vector3, fuseTime: number, id: number, type: GrenadeType): Grenade {
-    const geometry = new THREE.SphereGeometry(0.3, 8, 8);
-
-    // Different colors for different grenade types
-    let color: number;
-    switch (type) {
-      case GrenadeType.SMOKE:
-        color = 0x808080; // Gray for smoke
-        break;
-      case GrenadeType.FLASHBANG:
-        color = 0xFFFFAA; // Yellow for flashbang
-        break;
-      case GrenadeType.FRAG:
-      default:
-        color = 0x2a4a2a; // Dark green for frag
-        break;
-    }
-
-    const material = new THREE.MeshStandardMaterial({
-      color,
-      metalness: 0.6,
-      roughness: 0.4
-    });
-
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = new THREE.Mesh(this.sharedGeometry, this.materials[type] ?? this.materials[GrenadeType.FRAG]);
     mesh.position.copy(position);
     mesh.castShadow = true;
     mesh.matrixAutoUpdate = true;
@@ -147,10 +132,12 @@ export class GrenadeSpawner {
   removeGrenade(grenade: Grenade): void {
     if (grenade.mesh) {
       this.scene.remove(grenade.mesh);
-      grenade.mesh.geometry.dispose();
-      if (grenade.mesh.material instanceof THREE.Material) {
-        grenade.mesh.material.dispose();
-      }
+      // Geometry and materials are shared, don't dispose per-grenade
     }
+  }
+
+  dispose(): void {
+    this.sharedGeometry.dispose();
+    Object.values(this.materials).forEach(m => m.dispose());
   }
 }

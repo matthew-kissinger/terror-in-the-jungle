@@ -83,6 +83,10 @@ Automated checks: frame progression, mean/tail frame timing, hitch ratios (>50ms
 2. **Open Frontier draw calls** - highest draw-call and triangle throughput of any scenario (~255 avg calls).
 3. **Heap churn in heavy combat** - `HeightQueryCache` string-key generation and eviction on terrain/movement paths.
 
+## Resolved Bottlenecks
+
+1. **Grenade/explosion first-use stall** (2026-04-01) - First grenade explosion caused a multi-frame freeze from synchronous GPU shader compilation + scene graph thrashing. Fixed by: keeping all pooled effect objects in the scene permanently (toggle `visible` instead of `scene.add/remove`), sharing grenade geometry/materials, reducing frag impact effects (15->5), and pre-warming effect shaders at startup via `renderer.compile()`.
+
 ## Workflow
 
 1. Capture: `npm run perf:capture:combat120`

@@ -36,11 +36,38 @@ export class ExplosionEffectsPool {
     this.flashTexture = createFlashTexture();
     this.debrisTexture = createDebrisTexture();
 
-    // Pre-allocate pool
+    // Pre-allocate pool and add to scene once (toggle visible, never add/remove)
     for (let i = 0; i < maxEffects; i++) {
       const effect = createExplosionEffect(this.scene, this.smokeTexture, this.flashTexture, this.debrisTexture);
+      this.scene.add(effect.flash);
+      this.scene.add(effect.flashSprite);
+      this.scene.add(effect.smokeParticles);
+      this.scene.add(effect.fireParticles);
+      this.scene.add(effect.debrisParticles);
+      this.scene.add(effect.shockwaveRing);
       this.pool.push(effect);
     }
+  }
+
+  /**
+   * Force GPU shader compilation for all effect materials.
+   * Call once after construction to avoid first-explosion stall.
+   */
+  prewarm(renderer: THREE.WebGLRenderer, camera: THREE.Camera): void {
+    const effect = this.pool[0];
+    if (!effect) return;
+    // Temporarily make visible so renderer.compile picks up their programs
+    effect.flashSprite.visible = true;
+    effect.smokeParticles.visible = true;
+    effect.fireParticles.visible = true;
+    effect.debrisParticles.visible = true;
+    effect.shockwaveRing.visible = true;
+    renderer.compile(this.scene, camera);
+    effect.flashSprite.visible = false;
+    effect.smokeParticles.visible = false;
+    effect.fireParticles.visible = false;
+    effect.debrisParticles.visible = false;
+    effect.shockwaveRing.visible = false;
   }
 
   spawn(position: THREE.Vector3): void {
@@ -53,22 +80,17 @@ export class ExplosionEffectsPool {
     effect.flash.position.copy(position);
     effect.flash.intensity = 8;
     effect.flash.visible = true;
-    this.scene.add(effect.flash);
 
     // Position flash sprite - larger
     effect.flashSprite.position.copy(position);
     effect.flashSprite.scale.set(15, 15, 1);
     effect.flashSprite.material.opacity = 1;
     effect.flashSprite.visible = true;
-    this.scene.add(effect.flashSprite);
 
     // Initialize particles
     initializeSmokeParticles(effect, position);
     initializeFireParticles(effect, position);
     initializeDebrisParticles(effect, position);
-    this.scene.add(effect.smokeParticles);
-    this.scene.add(effect.fireParticles);
-    this.scene.add(effect.debrisParticles);
 
     // Initialize shockwave ring
     effect.shockwaveRing.position.copy(position);
@@ -76,7 +98,6 @@ export class ExplosionEffectsPool {
     effect.shockwaveRing.scale.set(0.1, 0.1, 1);
     (effect.shockwaveRing.material as THREE.MeshBasicMaterial).opacity = 0.6;
     effect.shockwaveRing.visible = true;
-    this.scene.add(effect.shockwaveRing);
 
     // Set timing - explosion lasts 3 seconds (smoke lingers)
     effect.startTime = now;
@@ -94,19 +115,13 @@ export class ExplosionEffectsPool {
       const remaining = effect.aliveUntil - now;
 
       if (remaining <= 0) {
-        // Hide and remove from scene
+        // Hide (objects stay in scene permanently)
         effect.flash.visible = false;
         effect.flashSprite.visible = false;
         effect.smokeParticles.visible = false;
         effect.fireParticles.visible = false;
         effect.debrisParticles.visible = false;
         effect.shockwaveRing.visible = false;
-        this.scene.remove(effect.flash);
-        this.scene.remove(effect.flashSprite);
-        this.scene.remove(effect.smokeParticles);
-        this.scene.remove(effect.fireParticles);
-        this.scene.remove(effect.debrisParticles);
-        this.scene.remove(effect.shockwaveRing);
         const last = this.active[this.active.length - 1];
         this.active[i] = last;
         this.active.pop();
