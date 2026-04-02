@@ -59,6 +59,7 @@ export class TracerPool {
 
       group.visible = false;
       group.matrixAutoUpdate = true;
+      this.scene.add(group);
       this.pool.push({ group, coreLine, glowLine, aliveUntil: 0 });
     }
   }
@@ -79,7 +80,6 @@ export class TracerPool {
     (tracer.coreLine.material as THREE.LineBasicMaterial).opacity = 0.9;
     (tracer.glowLine.material as THREE.LineBasicMaterial).opacity = 0.5;
     tracer.group.visible = true;
-    this.scene.add(tracer.group);
     tracer.aliveUntil = performance.now() + Math.max(1, lifetimeMs);
     this.active.push(tracer);
   }
@@ -92,7 +92,6 @@ export class TracerPool {
 
       if (timeLeft <= 0) {
         tracer.group.visible = false;
-        this.scene.remove(tracer.group);
         const last = this.active[this.active.length - 1];
         this.active[i] = last;
         this.active.pop();
