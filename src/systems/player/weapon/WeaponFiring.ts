@@ -252,7 +252,7 @@ export class WeaponFiring {
     barrelOriginTarget: THREE.Vector3,
     aimPointTarget: THREE.Vector3,
   ): ShotCommand {
-    this.resolveTracerStart(barrelOriginTarget)
+    this.resolveTracerStart(barrelOriginTarget, command.isADS)
     this.resolveAimPoint(command, aimPointTarget)
 
     _barrelDirection.subVectors(aimPointTarget, barrelOriginTarget)
@@ -294,12 +294,18 @@ export class WeaponFiring {
     return target.copy(command.ray.origin).addScaledVector(command.ray.direction, 200)
   }
 
-  private resolveTracerStart(target: THREE.Vector3): THREE.Vector3 {
+  private resolveTracerStart(target: THREE.Vector3, isADS: boolean): THREE.Vector3 {
     this.camera.getWorldPosition(_cameraPos)
     this.camera.getWorldDirection(_forward)
+
+    if (isADS) {
+      // ADS: barrel is centered on screen, use camera origin with small forward offset
+      return target.copy(_cameraPos).addScaledVector(_forward, PLAYER_BARREL_WORLD_DISTANCE)
+    }
+
     this.camera.getWorldQuaternion(_cameraQuat)
 
-    // Camera-relative offset to approximate barrel position.
+    // Hip-fire: camera-relative offset to approximate barrel position.
     // Avoids NDC projection which can clamp to screen edges during recoil,
     // creating a visible second ray from the wrong origin.
     _cameraRight.set(1, 0, 0).applyQuaternion(_cameraQuat).normalize()
