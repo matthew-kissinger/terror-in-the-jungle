@@ -67,13 +67,14 @@ Optional deep artifacts: `cpu-profile.cpuprofile`, `heap-sampling.json`, `chrome
 
 - **Resolved on 2026-04-02:** the Playwright perf harness freeze at `frameCount=1` was caused by same-document View Transitions on the live-entry path. Menu-only transitions can still use `document.startViewTransition()`, but live-entry now bypasses it and perf/sandbox runs explicitly force `uiTransitions=0`.
 - Harness startup probes now capture `rafTicks`, page visibility, startup phase, and active view-transition state so browser scheduling failures are distinguishable from game-loop failures.
+- GitHub-hosted CI perf remains advisory. The harness is now trustworthy locally, but the hosted Linux/Xvfb environment still exhibits non-representative browser scheduling and GPU readback stalls during `combat120`, so authoritative perf gating stays with local/self-run `validate:full`.
 - Full scenario health should be re-baselined after this fix. The table below reflects the last accepted warm measurements before the harness freeze was corrected.
 
 ## Validation Gates
 
 Automated checks: frame progression, mean/tail frame timing, hitch ratios (>50ms, >100ms), over-budget ratio, combat shot/hit sanity, heap behavior (growth, peak, recovery), runtime UI contamination.
 
-`perf:compare` always prints PASS/WARN/FAIL rows. `FAIL` remains deploy-blocking; `WARN` is reported but non-blocking by default so recovered-but-not-yet-rebaselined scenarios still surface in CI logs instead of silently disabling deploy. Use `perf:compare:strict` or `--fail-on-warn` when you want warnings to fail locally.
+`perf:compare` always prints PASS/WARN/FAIL rows. `FAIL` remains locally blocking when you use `validate:full`, while hosted CI keeps the artifacts and reports the failure without blocking deploy. `WARN` is reported but non-blocking by default so recovered-but-not-yet-rebaselined scenarios still surface in logs. Use `perf:compare:strict` or `--fail-on-warn` when you want warnings to fail locally.
 
 `peak_max_frame_ms` classification: pass <120, warn 120-299, fail >=300.
 

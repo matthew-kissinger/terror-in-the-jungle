@@ -64,7 +64,8 @@ Required gates before deploy:
 3. `build` (includes `prebuild` which skips if pre-baked assets exist)
 4. `smoke`
 5. `mobile-ui`
-6. `perf`
+
+`perf` still runs on every push and uploads artifacts, but the hosted GitHub runner result is advisory again. The recovered harness is stable locally, while the hosted Linux/Xvfb environment still shows browser scheduling and GPU readback behavior that is not representative enough to block deploy. Use `npm run validate:full` on a real local/self-run environment for an authoritative perf gate.
 
 Live at: https://terror-in-the-jungle.pages.dev/
 
@@ -80,7 +81,7 @@ For performance-sensitive changes, also run:
 npm run validate:full    # adds combat120 capture + baseline comparison
 ```
 
-CI now treats the perf capture as a deploy gate again. If the harness cannot produce a `summary.json`, or if `perf:compare` reports an actual `FAIL`, the perf job fails rather than silently skipping comparison. Warning-level deviations are still logged and should drive follow-up perf work, but they no longer deadlock deploy while the accepted baseline set is being refreshed after the harness recovery.
+CI still captures perf artifacts on every push, but the hosted-run perf outcome is advisory. If the harness cannot produce a `summary.json`, or if `perf:compare` reports a `FAIL`, the workflow now keeps the artifacts and proceeds with deploy instead of blocking on a runner environment we have already validated as noisy. Treat `validate:full` as the authoritative pre-push perf gate.
 
 ### Build Output
 
