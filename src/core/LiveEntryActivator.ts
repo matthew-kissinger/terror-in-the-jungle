@@ -7,6 +7,7 @@ import type { GameEngine } from './GameEngine';
 import { markStartup } from './StartupTelemetry';
 import { isPerfDiagnosticsEnabled } from './PerfDiagnostics';
 import { resolveModeSpawnPosition } from './ModeSpawnPosition';
+import { resolveNearbySafeSpawnPosition, resolveOpenSpawnFacingYaw } from './SpawnFacing';
 
 export function startLiveGame(engine: GameEngine, initialSpawnPosition?: THREE.Vector3): void {
   if (engine.gameStarted) {
@@ -57,12 +58,20 @@ async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: TH
     const definition = engine.systemManager.gameModeManager.getCurrentDefinition();
     const loadoutContext = engine.systemManager.loadoutService.getContext();
     const terrainSystem = engine.systemManager.terrainSystem;
-    const pos = initialSpawnPosition?.clone() ?? resolveModeSpawnPosition(definition, loadoutContext.alliance);
+    const requestedPos = initialSpawnPosition?.clone() ?? resolveModeSpawnPosition(definition, loadoutContext.alliance);
+    const safeOriginPos = definition.policies.respawn.initialSpawnRule === 'origin'
+      ? resolveNearbySafeSpawnPosition(requestedPos, terrainSystem)
+      : requestedPos;
+    const pos = requestedPos.set(safeOriginPos.x, requestedPos.y, safeOriginPos.z);
     pos.y = terrainSystem.getEffectiveHeightAt(pos.x, pos.z) + 2;
     const reason = definition.policies.respawn.initialSpawnRule === 'origin'
       ? 'startup.spawn.sandbox'
       : 'startup.spawn.mode-hq';
     engine.systemManager.playerController.setPosition(pos, reason);
+    if (definition.policies.respawn.initialSpawnRule === 'origin') {
+      const yaw = resolveOpenSpawnFacingYaw(pos, terrainSystem, Math.PI);
+      engine.systemManager.playerController.setViewAngles(yaw, 0);
+    }
   } catch {
     // Keep startup resilient; spawn fallback already exists elsewhere.
   }

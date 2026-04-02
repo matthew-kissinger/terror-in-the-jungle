@@ -108,6 +108,22 @@ describe('PlayerCamera', () => {
     });
   });
 
+  describe('setInfantryViewAngles', () => {
+    it('updates the stored infantry yaw and pitch immediately', () => {
+      playerCamera.setInfantryViewAngles(0, 0.25);
+
+      expect(camera.rotation.y).toBe(0);
+      expect(camera.rotation.x).toBe(0.25);
+      expect(camera.position.equals(playerState.position)).toBe(true);
+    });
+
+    it('clamps pitch to the supported infantry range', () => {
+      playerCamera.setInfantryViewAngles(0, 10);
+
+      expect(camera.rotation.x).toBeCloseTo(Math.PI / 2 - 0.1, 5);
+    });
+  });
+
   describe('Helicopter mouse control', () => {
     it('should initialize with mouse control enabled', () => {
       expect(playerCamera.getHelicopterMouseControlEnabled()).toBe(true);

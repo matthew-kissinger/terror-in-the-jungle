@@ -580,6 +580,7 @@ export class PlayerController implements GameSystem {
   getCamera(): THREE.PerspectiveCamera { return this.camera; }
   isMoving(): boolean { return this.playerState.velocity.length() > 0.1; }
   teleport(position: THREE.Vector3): void { this.setPosition(position, 'teleport'); }
+  setViewAngles(yaw: number, pitch = 0): void { this.cameraController.setInfantryViewAngles(yaw, pitch); }
 
   equipWeapon(): void {
     if (this.firstPersonWeapon) {

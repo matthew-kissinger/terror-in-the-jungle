@@ -251,21 +251,33 @@ export class GameRenderer {
     const rendererAny = this.renderer as THREE.WebGLRenderer & {
       compileAsync?: (scene: THREE.Object3D, camera: THREE.Camera) => Promise<unknown>;
     };
+    const supportsParallelCompile = this.renderer.extensions.has('KHR_parallel_shader_compile');
+
+    if (!supportsParallelCompile) {
+      Logger.warn('Renderer', 'KHR_parallel_shader_compile unavailable; skipping async shader pre-compilation');
+      return;
+    }
 
     // Prefer async compile path to reduce main-thread stalls on startup.
     if (typeof rendererAny.compileAsync === 'function') {
-      void rendererAny.compileAsync(this.scene, this.camera)
-        .then(() => {
-          this.renderer.render(this.scene, this.camera);
-          const elapsed = performance.now() - startTime;
-          Logger.info('Renderer', `Shader pre-compilation complete async (${elapsed.toFixed(1)}ms)`);
-        })
-        .catch((error) => {
-          // Avoid sync fallback in runtime; it can cause multi-second stalls on some drivers/headless runs.
-          Logger.warn('Renderer', `Async shader pre-compilation failed; skipping fallback compile: ${error}`);
-          const elapsed = performance.now() - startTime;
-          Logger.info('Renderer', `Shader pre-compilation skipped fallback (${elapsed.toFixed(1)}ms)`);
-        });
+      try {
+        void rendererAny.compileAsync(this.scene, this.camera)
+          .then(() => {
+            this.renderer.render(this.scene, this.camera);
+            const elapsed = performance.now() - startTime;
+            Logger.info('Renderer', `Shader pre-compilation complete async (${elapsed.toFixed(1)}ms)`);
+          })
+          .catch((error) => {
+            // Avoid sync fallback in runtime; it can cause multi-second stalls on some drivers/headless runs.
+            Logger.warn('Renderer', `Async shader pre-compilation failed; skipping fallback compile: ${error}`);
+            const elapsed = performance.now() - startTime;
+            Logger.info('Renderer', `Shader pre-compilation skipped fallback (${elapsed.toFixed(1)}ms)`);
+          });
+      } catch (error) {
+        Logger.warn('Renderer', `Async shader pre-compilation threw synchronously; skipping fallback compile: ${error}`);
+        const elapsed = performance.now() - startTime;
+        Logger.info('Renderer', `Shader pre-compilation skipped fallback (${elapsed.toFixed(1)}ms)`);
+      }
       return;
     }
 

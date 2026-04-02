@@ -20,7 +20,7 @@ export class PlayerCamera {
 
   // Camera settings
   private pitch = 0;
-  private yaw = Math.PI; // Face toward negative X
+  private yaw = Math.PI; // Default forward view for first live-entry update.
   private maxPitch = Math.PI / 2 - 0.1;
 
   // Helicopter camera settings
@@ -176,6 +176,18 @@ export class PlayerCamera {
   restoreInfantryAngles(): void {
     this.yaw = this.savedInfantryYaw;
     this.pitch = this.savedInfantryPitch;
+  }
+
+  setInfantryViewAngles(yaw: number, pitch = 0): void {
+    this.yaw = yaw;
+    this.pitch = MathUtils.clamp(pitch, -this.maxPitch, this.maxPitch);
+    if (this.playerState.isInHelicopter) {
+      return;
+    }
+    this.camera.rotation.order = 'YXZ';
+    this.camera.rotation.y = this.yaw;
+    this.camera.rotation.x = this.pitch;
+    this.camera.position.copy(this.playerState.position);
   }
 
   // Apply recoil to camera

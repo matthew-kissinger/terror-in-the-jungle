@@ -112,6 +112,7 @@ export interface IPlayerController {
   getCamera(): THREE.PerspectiveCamera;
   isMoving(): boolean;
   teleport(position: THREE.Vector3): void;
+  setViewAngles(yaw: number, pitch?: number): void;
 
   // Weapon handling
   equipWeapon(): void;
