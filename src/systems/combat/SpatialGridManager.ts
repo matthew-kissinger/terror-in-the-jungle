@@ -90,10 +90,7 @@ export class SpatialGridManager {
    */
   reinitialize(worldSize: number): void {
     Logger.info('spatial-grid', `Reinitializing with new world size ${worldSize}`)
-    this.isInitialized = false
-    this.grid = null
-    this.telemetry.entityCount = 0
-    this.loggedUninitializedMethods.clear()
+    this.reset()
     this.initialize(worldSize)
   }
 

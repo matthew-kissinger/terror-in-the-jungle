@@ -67,5 +67,17 @@ export class InputContextManager {
   isDecoupled(): boolean {
     return this._decoupledInput;
   }
+
+  /** Reset to initial state (used on engine dispose / game mode change). */
+  reset(): void {
+    this.context = 'gameplay';
+    this._decoupledInput = false;
+    this.listeners.clear();
+  }
+
+  /** Reset the singleton instance (for test isolation). */
+  static resetInstance(): void {
+    InputContextManager.instance = null;
+  }
 }
 

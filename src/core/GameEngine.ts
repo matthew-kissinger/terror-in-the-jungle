@@ -20,6 +20,7 @@ import { GameEventBus } from './GameEventBus';
 import { objectPool } from '../utils/ObjectPoolManager';
 import { resetHeightQueryCache } from '../systems/terrain/HeightQueryCache';
 import { spatialGridManager } from '../systems/combat/SpatialGridManager';
+import { InputContextManager } from '../systems/input/InputContextManager';
 
 // Import split modules
 import * as Init from './GameEngineInit';
@@ -315,6 +316,7 @@ export class GameEngine {
     objectPool.reset();
     resetHeightQueryCache();
     spatialGridManager.reset();
+    InputContextManager.getInstance().reset();
     Logger.info('core', 'Engine disposed');
   }
 }
