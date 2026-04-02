@@ -86,6 +86,7 @@ Automated checks: frame progression, mean/tail frame timing, hitch ratios (>50ms
 ## Resolved Bottlenecks
 
 1. **Grenade/explosion first-use stall** (2026-04-01) - First grenade explosion caused a multi-frame freeze from synchronous GPU shader compilation + scene graph thrashing. Fixed by: keeping all pooled effect objects in the scene permanently (toggle `visible` instead of `scene.add/remove`), sharing grenade geometry/materials, reducing frag impact effects (15->5), and pre-warming effect shaders at startup via `renderer.compile()`.
+2. **Effect pool scene.add/remove thrashing** (2026-04-01) - TracerPool, ImpactEffectsPool, ExplosionEffectsPool, and SmokeCloudSystem all added/removed objects from the scene graph on every spawn/expire cycle. Fixed by adding all pooled objects at construction and toggling `visible`. Extracted `EffectPool<T>` base class to share the pool lifecycle pattern.
 
 ## Workflow
 

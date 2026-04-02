@@ -48,14 +48,13 @@ Last updated: 2026-04-01
 ## Known Bugs
 
 1. Combat AI p99 sits ~35ms in heavy scenarios, above the 16ms target.
-2. Main runtime bundle is ~710-734kB (startup stable but heavy).
-3. Helicopter collective throttle stickiness.
-4. Open Frontier/A Shau helicopters are cosmetic - no NPC pilots, no transport mechanic.
+2. Main runtime bundle is ~780kB (startup stable but heavy).
+3. Open Frontier/A Shau helicopters are cosmetic - no NPC pilots, no transport mechanic.
 
 ## Architecture Debt
 
 1. SystemManager ceremony - adding a new system touches SystemInitializer + composers.
-2. PlayerController 47 setter methods (deferred init ceremony).
-3. Variable deltaTime physics (no fixed timestep for player/helicopter).
+2. PlayerController 30 setter methods (deferred init ceremony; audit found only 6 redundant, all used in tests).
+3. Variable deltaTime physics (no fixed timestep for grenade/NPC/particle systems; player and helicopter use FixedStepRunner).
 4. Mixed UI paradigms (~50 files with raw createElement alongside UIComponent + CSS Modules).
-5. Partial singleton reset coverage (blocks HMR and "return to menu").
+5. Recast-navigation WASM shipped twice (main thread + worker; Vite worker boundary limitation, not fixable with config).

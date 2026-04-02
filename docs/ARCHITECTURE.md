@@ -178,14 +178,15 @@ Mutual dependencies: CombatantSystem <-> ZoneManager, PlayerController <-> First
 - **CSS Modules + UIComponent**: New UI uses signals-based UIComponent with CSS Modules.
 - **Scratch vectors**: Pre-allocated reusable vectors in hot-path classes.
 - **freezeTransform**: Static objects have `matrixAutoUpdate` disabled for scene graph perf.
+- **EffectPool\<T\>**: Abstract base class for pooled visual effects (TracerPool, ImpactEffectsPool, ExplosionEffectsPool). Objects stay in scene permanently, toggling `visible` instead of add/remove.
 
 ## Known Architecture Debt
 
 1. **SystemManager ceremony** - adding a new system touches SystemInitializer + one or more composers.
-2. **PlayerController 47 setters** - grouped `configureDependencies()` exists but compatibility setters remain.
-3. **Variable deltaTime physics** - no fixed timestep for player/helicopter (FixedStepRunner exists but not universal).
+2. **PlayerController 30 setters** - grouped `configureDependencies()` exists but compatibility setters remain (6 redundant but used in tests).
+3. **Variable deltaTime physics** - FixedStepRunner used for player/helicopter but not for grenade/NPC/particle systems.
 4. **Mixed UI paradigms** - UIComponent + CSS Modules is the active path, but ~50 files still use raw `document.createElement`.
-5. **Partial singleton reset** - major singletons reset on engine teardown, but no universal dispose contract.
+5. **Recast WASM duplication** - shipped twice (main thread + worker) due to Vite worker boundary limitation.
 
 ## Game Modes
 
