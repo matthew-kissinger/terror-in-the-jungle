@@ -6,12 +6,13 @@ import { existsSync, readFileSync, statSync } from 'fs';
 import { extname, join, normalize } from 'path';
 
 const HOST = '127.0.0.1';
-const PORT = Number(process.env.PROD_SMOKE_PORT ?? 4173);
+const DEFAULT_PORT = Number(process.env.PROD_SMOKE_PORT ?? 0);
 const BASE_PATH = '';
 const DIST_ROOT = join(process.cwd(), 'dist');
 const INDEX_PATH = join(DIST_ROOT, 'index.html');
 const START_TIMEOUT_MS = 90_000;
 const POST_PLAY_TIMEOUT_MS = 60_000;
+let activePort = DEFAULT_PORT;
 
 const MIME_TYPES: Record<string, string> = {
   '.br': 'application/octet-stream',
@@ -63,7 +64,7 @@ function resolveFilePath(pathname: string): string | null {
 }
 
 function serveFile(req: IncomingMessage, res: ServerResponse): void {
-  const requestUrl = new URL(req.url ?? '/', `http://${HOST}:${PORT}`);
+  const requestUrl = new URL(req.url ?? '/', `http://${HOST}:${activePort}`);
   const pathname = requestUrl.pathname;
   if (!pathname.startsWith(BASE_PATH)) {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -92,9 +93,18 @@ function serveFile(req: IncomingMessage, res: ServerResponse): void {
   res.end(body);
 }
 
+function resolveListeningPort(server: ReturnType<typeof createServer>): number {
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Failed to resolve prod smoke server port.');
+  }
+  return address.port;
+}
+
 async function runSmoke(): Promise<SmokeResult> {
   const server = createServer(serveFile);
-  await new Promise<void>((resolve) => server.listen(PORT, HOST, resolve));
+  await new Promise<void>((resolve) => server.listen(activePort, HOST, resolve));
+  activePort = resolveListeningPort(server);
 
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
@@ -117,7 +127,7 @@ async function runSmoke(): Promise<SmokeResult> {
       }
     });
 
-    await page.goto(`http://${HOST}:${PORT}${BASE_PATH}/`, { waitUntil: 'domcontentloaded', timeout: START_TIMEOUT_MS });
+    await page.goto(`http://${HOST}:${activePort}${BASE_PATH}/`, { waitUntil: 'domcontentloaded', timeout: START_TIMEOUT_MS });
 
     // Wait for START GAME button on TitleScreen (new flow)
     // Falls back to old data-ref="play" for backward compatibility

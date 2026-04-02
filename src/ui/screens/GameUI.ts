@@ -8,6 +8,7 @@
  */
 
 import { UIComponent } from '../engine/UIComponent';
+import { runUiTransition } from '../engine/UITransitions';
 import { GameLaunchSelection, GameMode } from '../../config/gameModeTypes';
 import { SettingsModal } from '../loading/SettingsModal';
 import { TitleScreen } from './TitleScreen';
@@ -19,9 +20,6 @@ import {
 import { GameEventBus } from '../../core/GameEventBus';
 
 type UIState = 'loading' | 'title' | 'mode_select' | 'preparing' | 'hidden';
-type ViewTransitionDocument = Document & {
-  startViewTransition?: (callback: () => void) => { finished: Promise<void> };
-};
 
 export class GameUI extends UIComponent {
   private titleScreen: TitleScreen;
@@ -47,8 +45,13 @@ export class GameUI extends UIComponent {
   }
 
   protected onMount(): void {
-    // Remove boot splash now that JS UI is ready
-    document.getElementById('boot-splash')?.remove();
+    // Fade out boot splash now that JS UI is ready
+    const splash = document.getElementById('boot-splash');
+    if (splash) {
+      splash.style.transition = 'opacity 0.3s ease-out';
+      splash.style.opacity = '0';
+      setTimeout(() => splash.remove(), 300);
+    }
 
     // Mount children to body (not to this.root)
     this.titleScreen.mount(document.body);
@@ -115,7 +118,7 @@ export class GameUI extends UIComponent {
   }
 
   hide(): void {
-    this.runViewTransition(() => {
+    runUiTransition('live-entry', () => {
       this.state = 'hidden';
       this.unsubModeProgress?.();
       this.unsubModeProgress = undefined;
@@ -162,7 +165,7 @@ export class GameUI extends UIComponent {
   // --- Private ---
 
   private showModeSelect(): void {
-    this.runViewTransition(() => {
+    runUiTransition('menu', () => {
       this.state = 'mode_select';
       this.titleScreen.hideScreen();
       this.modeSelectScreen.show();
@@ -170,7 +173,7 @@ export class GameUI extends UIComponent {
   }
 
   private showTitle(): void {
-    this.runViewTransition(() => {
+    runUiTransition('menu', () => {
       this.state = 'title';
       this.modeSelectScreen.hide();
       this.titleScreen.showScreen();
@@ -191,14 +194,5 @@ export class GameUI extends UIComponent {
     };
 
     this.onPlayCallback?.(selection);
-  }
-
-  private runViewTransition(update: () => void): void {
-    const doc = document as ViewTransitionDocument;
-    if (typeof doc.startViewTransition === 'function') {
-      doc.startViewTransition(() => update());
-      return;
-    }
-    update();
   }
 }

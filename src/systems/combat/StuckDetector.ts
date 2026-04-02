@@ -170,7 +170,6 @@ export class StuckDetector {
 
 export {
   STUCK_CHECK_INTERVAL_MS,
-  STUCK_MOVE_THRESHOLD_SQ,
   STUCK_PINNED_DWELL_MS,
   STUCK_TICK_THRESHOLD,
 };

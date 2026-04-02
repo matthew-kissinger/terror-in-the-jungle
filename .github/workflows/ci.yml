@@ -190,20 +190,12 @@ jobs:
         run: npm run build
 
       - name: Capture combat120 scenario
-        continue-on-error: true
         env:
           PERF_STARTUP_TIMEOUT: 90
         run: xvfb-run -a npm run perf:capture:combat120
 
       - name: Compare against baselines
-        if: always()
-        continue-on-error: true
-        run: |
-          if ls artifacts/perf/*/summary.json 1>/dev/null 2>&1; then
-            npm run perf:compare -- --scenario combat120
-          else
-            echo "No capture artifacts found, skipping comparison"
-          fi
+        run: npm run perf:compare -- --scenario combat120
 
       - name: Upload perf artifacts
         if: always()
@@ -215,7 +207,7 @@ jobs:
 
   deploy:
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-    needs: [lint, test, build, smoke, mobile-ui]
+    needs: [lint, test, build, smoke, mobile-ui, perf]
     runs-on: ubuntu-latest
     steps:
       - name: Download build artifact

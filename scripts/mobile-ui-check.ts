@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs
 import { extname, join, normalize } from 'path';
 
 const HOST = '127.0.0.1';
-const DEFAULT_PORT = 4175;
+const DEFAULT_PORT = Number(process.env.MOBILE_UI_PORT ?? 0);
 const DIST_ROOT = join(process.cwd(), 'dist');
 const INDEX_PATH = join(DIST_ROOT, 'index.html');
 const ARTIFACT_ROOT = join(process.cwd(), 'artifacts', 'mobile-ui');
@@ -175,6 +175,14 @@ function parseArgs(): { mode: string; port: number; headed: boolean; includeWebk
     headed: args.includes('--headed'),
     includeWebkit: args.includes('--include-webkit'),
   };
+}
+
+function resolveListeningPort(server: ReturnType<typeof createServer>): number {
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Failed to resolve mobile UI server port.');
+  }
+  return address.port;
 }
 
 function resolveFilePath(pathname: string): string | null {
@@ -630,6 +638,7 @@ async function main(): Promise<void> {
   const browsers: Partial<Record<BrowserKind, Browser>> = {};
   const server = createServer(serveDist);
   await new Promise<void>((resolve) => server.listen(options.port, HOST, resolve));
+  const port = resolveListeningPort(server);
 
   try {
     browsers.chromium = await chromium.launch({
@@ -652,7 +661,7 @@ async function main(): Promise<void> {
       if (!browser) {
         throw new Error(`Browser not available for ${device.browserKind}`);
       }
-      reports.push(await runDeviceCase(browser, device, artifactDir, options.mode, options.port));
+      reports.push(await runDeviceCase(browser, device, artifactDir, options.mode, port));
     }
 
     writeFileSync(join(artifactDir, 'report.json'), JSON.stringify(reports, null, 2));

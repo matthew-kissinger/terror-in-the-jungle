@@ -1,6 +1,6 @@
 # Performance & Profiling
 
-Last updated: 2026-04-01
+Last updated: 2026-04-02
 
 ## Commands
 
@@ -15,6 +15,7 @@ npm run perf:capture:ashau:short    # A Shau short
 npm run perf:capture:frontier30m    # 30-minute soak test
 npm run perf:quick                  # Quick smoke (not a baseline)
 npm run perf:compare                # Compare latest vs tracked baselines
+npm run perf:compare:strict         # Same compare, but fail on warnings too
 npm run perf:update-baseline        # Update baselines from latest capture
 npm run perf:analyze:latest         # Analyze most recent artifacts
 npm run perf:startup:openfrontier   # Production startup benchmark
@@ -24,12 +25,12 @@ npm run perf:startup:openfrontier   # Production startup benchmark
 
 | Scenario | Mode | Duration | NPCs | Purpose |
 |----------|------|----------|-----:|---------|
-| `combat120` | AI Sandbox | 120s | 120 | Combat stress, primary regression target |
-| `openfrontier:short` | Open Frontier | 60s | 120 | Terrain + draw call pressure |
-| `ashau:short` | A Shau Valley | 60s | 60 | Strategy stack + heap peaks |
+| `combat120` | AI Sandbox | 90s | 120 | Combat stress, primary regression target |
+| `openfrontier:short` | Open Frontier | 180s | 120 | Terrain + draw call pressure |
+| `ashau:short` | A Shau Valley | 180s | 60 | Strategy stack + heap peaks |
 | `frontier30m` | Open Frontier | 30min | 120 | Long-tail stability soak |
-| `zonecontrol` | Zone Control | 60s | 20 | Small-map gameplay |
-| `teamdeathmatch` | TDM | 60s | 30 | Kill-race scenario |
+| `zonecontrol` | Zone Control | 120s | 60 | Small-map gameplay |
+| `teamdeathmatch` | TDM | 120s | 80 | Kill-race scenario |
 
 Tracked baselines: `combat120`, `openfrontier:short`, `ashau:short`, `frontier30m`.
 
@@ -60,9 +61,19 @@ Each run writes to `artifacts/perf/<timestamp>/`:
 
 Optional deep artifacts: `cpu-profile.cpuprofile`, `heap-sampling.json`, `chrome-trace.json`.
 
+`summary.json`, `validation.json`, `console.json`, and `runtime-samples.json` are written on best effort failure paths as well, so a blocked run still leaves enough evidence to diagnose startup regressions.
+
+## Harness Status
+
+- **Resolved on 2026-04-02:** the Playwright perf harness freeze at `frameCount=1` was caused by same-document View Transitions on the live-entry path. Menu-only transitions can still use `document.startViewTransition()`, but live-entry now bypasses it and perf/sandbox runs explicitly force `uiTransitions=0`.
+- Harness startup probes now capture `rafTicks`, page visibility, startup phase, and active view-transition state so browser scheduling failures are distinguishable from game-loop failures.
+- Full scenario health should be re-baselined after this fix. The table below reflects the last accepted warm measurements before the harness freeze was corrected.
+
 ## Validation Gates
 
 Automated checks: frame progression, mean/tail frame timing, hitch ratios (>50ms, >100ms), over-budget ratio, combat shot/hit sanity, heap behavior (growth, peak, recovery), runtime UI contamination.
+
+`perf:compare` always prints PASS/WARN/FAIL rows. `FAIL` remains deploy-blocking; `WARN` is reported but non-blocking by default so recovered-but-not-yet-rebaselined scenarios still surface in CI logs instead of silently disabling deploy. Use `perf:compare:strict` or `--fail-on-warn` when you want warnings to fail locally.
 
 `peak_max_frame_ms` classification: pass <120, warn 120-299, fail >=300.
 
@@ -85,8 +96,9 @@ Automated checks: frame progression, mean/tail frame timing, hitch ratios (>50ms
 
 ## Resolved Bottlenecks
 
-1. **Grenade/explosion first-use stall** (2026-04-01) - First grenade explosion caused a multi-frame freeze from synchronous GPU shader compilation + scene graph thrashing. Fixed by: keeping all pooled effect objects in the scene permanently (toggle `visible` instead of `scene.add/remove`), sharing grenade geometry/materials, reducing frag impact effects (15->5), and pre-warming effect shaders at startup via `renderer.compile()`.
+1. **Perf harness startup freeze** (2026-04-02) - Playwright captures could reach `engine-init.startup-flow.interactive-ready` and then stop at `frameCount=1`. Root cause was `GameUI.hide()` using `document.startViewTransition()` during live-entry while the renderer was being revealed. Fixed by disabling view transitions on the live-entry path and for perf/sandbox automation.
 2. **Effect pool scene.add/remove thrashing** (2026-04-01) - TracerPool, ImpactEffectsPool, ExplosionEffectsPool, and SmokeCloudSystem all added/removed objects from the scene graph on every spawn/expire cycle. Fixed by adding all pooled objects at construction and toggling `visible`. Extracted `EffectPool<T>` base class to share the pool lifecycle pattern.
+3. **Grenade/explosion first-use stall, partial** (2026-04-02) - Scene graph thrashing was removed and startup warmup now uses a hidden live effect spawn instead of relying on `renderer.compile()` alone. Re-baseline cold-start captures are still required before treating this as fully closed.
 
 ## Workflow
 
@@ -102,6 +114,7 @@ Treat first capture after fresh boot as cold-start data. Use matched warm pairs 
 ## Diagnostics
 
 - Perf diagnostics gated behind `import.meta.env.DEV` + `?perf=1` URL param.
+- Perf harness runs also set `?uiTransitions=0` to avoid browser transition/screenshot interactions during live-entry.
 - `SystemUpdater` emits `performance.mark()`/`performance.measure()` during captures only.
 - Browser stall observers (`longtask`, `long-animation-frame`) are Chromium-only, harness-only.
 - `perf-startup-ui.ts` is the public-build startup benchmark (separate from runtime harness).

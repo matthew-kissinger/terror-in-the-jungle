@@ -329,6 +329,72 @@ describe('AICoverFinding', () => {
       expect(mockTerrainSystem.raycastTerrain).not.toHaveBeenCalled();
     });
 
+    it('uses the intended 8x8 vegetation sampling grid before terrain fallback', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      const threatPos = new THREE.Vector3(30, 0, 0);
+
+      mockHeightQueryCache.getHeightAt = vi.fn(() => 0.6);
+
+      const cover = coverFinding.findNearestCover(combatant, threatPos);
+
+      expect(cover).toBeNull();
+      // 8x8 centered samples with the circular radius mask produce 52 vegetation probes
+      // (52 * 5 height reads), plus 24 terrain fallback probes.
+      expect(mockHeightQueryCache.getHeightAt).toHaveBeenCalledTimes(284);
+    });
+
+    it('reuses cached cover results for nearby same-frame searches', () => {
+      const threatPos = new THREE.Vector3(30, 0, 0);
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      const nearbyCombatant = createMockCombatant('c2', Faction.US, new THREE.Vector3(1, 0, 1));
+
+      mockHeightQueryCache.getHeightAt = vi.fn((x: number) => {
+        if (x >= 9 && x <= 11) return 1.2;
+        return 0;
+      });
+
+      (mockTerrainSystem.raycastTerrain as any).mockImplementation((_origin: THREE.Vector3, _dir: THREE.Vector3, maxDistance: number) => ({
+        hit: true,
+        distance: maxDistance - 2,
+      }));
+
+      const firstCover = coverFinding.findNearestCover(combatant, threatPos);
+      const heightCallsAfterFirstSearch = (mockHeightQueryCache.getHeightAt as any).mock.calls.length;
+      const raycastsAfterFirstSearch = (mockTerrainSystem.raycastTerrain as any).mock.calls.length;
+
+      const secondCover = coverFinding.findNearestCover(nearbyCombatant, threatPos);
+
+      expect(firstCover).not.toBeNull();
+      expect(secondCover).not.toBeNull();
+      expect(secondCover?.distanceTo(firstCover!)).toBeLessThan(0.001);
+      expect(mockHeightQueryCache.getHeightAt).toHaveBeenCalledTimes(heightCallsAfterFirstSearch);
+      expect(mockTerrainSystem.raycastTerrain).toHaveBeenCalledTimes(raycastsAfterFirstSearch);
+    });
+
+    it('clears the frame-local cache on beginFrame', () => {
+      const threatPos = new THREE.Vector3(30, 0, 0);
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      const nearbyCombatant = createMockCombatant('c2', Faction.US, new THREE.Vector3(1, 0, 1));
+
+      mockHeightQueryCache.getHeightAt = vi.fn((x: number) => {
+        if (x >= 9 && x <= 11) return 1.2;
+        return 0;
+      });
+
+      (mockTerrainSystem.raycastTerrain as any).mockImplementation((_origin: THREE.Vector3, _dir: THREE.Vector3, maxDistance: number) => ({
+        hit: true,
+        distance: maxDistance - 2,
+      }));
+
+      coverFinding.findNearestCover(combatant, threatPos);
+      const heightCallsAfterFirstSearch = (mockHeightQueryCache.getHeightAt as any).mock.calls.length;
+
+      coverFinding.beginFrame();
+      coverFinding.findNearestCover(nearbyCombatant, threatPos);
+
+      expect((mockHeightQueryCache.getHeightAt as any).mock.calls.length).toBeGreaterThan(heightCallsAfterFirstSearch);
+    });
+
     it('prefers sandbag cover when it scores higher than terrain', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
       const threatPos = new THREE.Vector3(25, 0, 0);

@@ -28,6 +28,13 @@ const _sandbagSize = new THREE.Vector3();
 export class AICoverFinding {
   private terrainSystem?: ITerrainRuntime;
   private sandbagSystem?: SandbagSystem;
+  private readonly COVER_SEARCH_CACHE_GRID_METERS = 6;
+  private readonly MAX_COVER_SEARCH_CACHE_ENTRIES = 256;
+  private coverSearchCache: Map<string, THREE.Vector3 | null> = new Map();
+
+  beginFrame(): void {
+    this.coverSearchCache.clear();
+  }
 
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {
     this.terrainSystem = terrainSystem;
@@ -73,6 +80,12 @@ export class AICoverFinding {
     const MAX_SEARCH_RADIUS_SQ = MAX_SEARCH_RADIUS * MAX_SEARCH_RADIUS;
     const SEARCH_SAMPLES = 8;
     const SANDBAG_PREFERRED_DISTANCE = 15;
+    const cacheKey = this.getCoverSearchCacheKey(combatant.position, threatPosition);
+    const cachedCover = this.coverSearchCache.get(cacheKey);
+    if (cachedCover !== undefined) {
+      return cachedCover ? cachedCover.clone() : null;
+    }
+
     let bestCoverPos: THREE.Vector3 | null = null;
     let bestCoverScore = -Infinity;
 
@@ -174,6 +187,7 @@ export class AICoverFinding {
       }
     }
 
+    this.cacheCoverSearchResult(cacheKey, bestCoverPos);
     return bestCoverPos;
   }
 
@@ -210,8 +224,10 @@ export class AICoverFinding {
     const gridSize = 8;
     const step = (searchRadius * 2) / gridSize;
 
-    for (let x = -searchRadius; x <= searchRadius; x += step) {
-      for (let z = -searchRadius; z <= searchRadius; z += step) {
+    for (let gridX = 0; gridX < gridSize; gridX++) {
+      const x = -searchRadius + (gridX + 0.5) * step;
+      for (let gridZ = 0; gridZ < gridSize; gridZ++) {
+        const z = -searchRadius + (gridZ + 0.5) * step;
         const samplePos = _testPos;
         samplePos.set(
           position.x + x,
@@ -257,6 +273,22 @@ export class AICoverFinding {
     }
 
     return coverPositions;
+  }
+
+  private getCoverSearchCacheKey(position: THREE.Vector3, threatPosition: THREE.Vector3): string {
+    const grid = this.COVER_SEARCH_CACHE_GRID_METERS;
+    const px = Math.round(position.x / grid);
+    const pz = Math.round(position.z / grid);
+    const tx = Math.round(threatPosition.x / grid);
+    const tz = Math.round(threatPosition.z / grid);
+    return `${px},${pz}:${tx},${tz}`;
+  }
+
+  private cacheCoverSearchResult(cacheKey: string, coverPosition: THREE.Vector3 | null): void {
+    if (this.coverSearchCache.size >= this.MAX_COVER_SEARCH_CACHE_ENTRIES) {
+      this.coverSearchCache.clear();
+    }
+    this.coverSearchCache.set(cacheKey, coverPosition ? coverPosition.clone() : null);
   }
 
   private isPositionCover(

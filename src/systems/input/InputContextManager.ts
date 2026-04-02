@@ -6,7 +6,7 @@ type InputContextListener = (context: InputContext) => void;
  * Shared input context state used to prevent gameplay actions from firing
  * while UI-focused contexts (map/menu/modal) are active.
  */
-export interface InputContextOptions {
+interface InputContextOptions {
   /** When true, pointer is unlocked but movement keys remain active. */
   decoupleInput?: boolean;
 }
@@ -80,4 +80,3 @@ export class InputContextManager {
     InputContextManager.instance = null;
   }
 }
-

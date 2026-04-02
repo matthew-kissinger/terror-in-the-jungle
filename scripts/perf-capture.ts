@@ -244,6 +244,14 @@ type StartupDiagnostics = {
   hasPerfApi: boolean;
   bodyClassName: string;
   errorPanelVisible: boolean;
+  gameStarted: boolean;
+  startupPhase: string | null;
+  rafTicks: number;
+  hidden: boolean;
+  visibilityState: string;
+  activeViewTransition: boolean;
+  uiTransitionEnabled: boolean;
+  uiTransitionReason: string | null;
 };
 
 type ValidationCheckStatus = 'pass' | 'warn' | 'fail';
@@ -1142,6 +1150,12 @@ async function getStartupProbe(page: Page): Promise<{
   hasMetrics: boolean;
   readyState: string;
   uiErrorPanelVisible: boolean;
+  gameStarted: boolean;
+  startupPhase: string | null;
+  rafTicks: number;
+  hidden: boolean;
+  visibilityState: string;
+  activeViewTransition: boolean;
   startupElapsedMs?: number;
   startupLastMark?: string;
   startupLastMarkMs?: number;
@@ -1157,6 +1171,9 @@ async function getStartupProbe(page: Page): Promise<{
     const engine = (window as any).__engine;
     const startup = (window as any).__startupTelemetry?.getSnapshot?.();
     const combatProfile = (window as any).combatProfile?.();
+    const startupPhase = typeof engine?.startupFlow?.getState === 'function'
+      ? String(engine.startupFlow.getState().phase ?? '')
+      : null;
     let combatAiStateTop: string | undefined;
     let combatAiStateTopMs: number | undefined;
     const aiStateMs = combatProfile?.timing?.aiStateMs;
@@ -1173,6 +1190,23 @@ async function getStartupProbe(page: Page): Promise<{
       hasMetrics: Boolean(metrics),
       readyState: document.readyState,
       uiErrorPanelVisible: Boolean(document.querySelector('.error-panel')),
+      gameStarted: Boolean(engine?.gameStarted),
+      startupPhase,
+      rafTicks: Number((window as any).__perfHarnessRaf?.ticks ?? 0),
+      hidden: document.hidden,
+      visibilityState: document.visibilityState,
+      activeViewTransition: Boolean((document as Document & { activeViewTransition?: unknown }).activeViewTransition),
+      uiTransitionEnabled: Boolean(
+        (document as Document & {
+          uiTransitionState?: { enabled?: unknown };
+        }).uiTransitionState?.enabled
+      ),
+      uiTransitionReason: (() => {
+        const reason = (document as Document & {
+          uiTransitionState?: { reason?: unknown };
+        }).uiTransitionState?.reason;
+        return typeof reason === 'string' ? reason : null;
+      })(),
       startupElapsedMs: startup ? Number(startup.totalElapsedMs ?? 0) : undefined,
       startupLastMark: startup?.marks?.length ? String(startup.marks[startup.marks.length - 1].name ?? '') : undefined,
       startupLastMarkMs: startup?.marks?.length ? Number(startup.marks[startup.marks.length - 1].sinceStartMs ?? 0) : undefined,
@@ -1205,15 +1239,20 @@ async function waitForRendering(
   const probeIntervalSeconds = 3;
   const maxSamples = Math.max(1, Math.ceil(maxStartupSeconds / probeIntervalSeconds));
   let count = 0;
+  let rafTicks = 0;
   let firstEngineSeenSec: number | undefined;
   let firstMetricsSeenSec: number | undefined;
   let lastStartupMark: string | undefined;
   let lastStartupMarkMs: number | undefined;
+  let stalledGameplaySamples = 0;
   for (let i = 0; i < maxSamples; i++) {
     await sleep(probeIntervalSeconds * 1000);
     try {
       const probe = await getStartupProbe(page);
+      const frameDelta = probe.frameCount - count;
+      const rafDelta = probe.rafTicks - rafTicks;
       count = probe.frameCount;
+      rafTicks = probe.rafTicks;
       if (probe.hasEngine && firstEngineSeenSec === undefined) {
         firstEngineSeenSec = (i + 1) * probeIntervalSeconds;
       }
@@ -1228,7 +1267,31 @@ async function waitForRendering(
       const startupMsg = probe.startupLastMark
         ? ` startup(mark=${probe.startupLastMark}@${Number(probe.startupLastMarkMs ?? 0).toFixed(0)}ms total=${Number(probe.startupElapsedMs ?? 0).toFixed(0)}ms)`
         : '';
-      logStep(`Startup frame sample ${((i + 1) * probeIntervalSeconds)}s -> ${count} (ready=${probe.readyState} engine=${probe.hasEngine ? 1 : 0} metrics=${probe.hasMetrics ? 1 : 0} errPanel=${probe.uiErrorPanelVisible ? 1 : 0})${startupMsg}${combatMsg}`);
+      logStep(
+        `Startup frame sample ${((i + 1) * probeIntervalSeconds)}s -> ${count} `
+        + `(raf=${probe.rafTicks} ready=${probe.readyState} phase=${probe.startupPhase ?? 'unknown'} `
+        + `started=${probe.gameStarted ? 1 : 0} hidden=${probe.hidden ? 1 : 0} `
+        + `visibility=${probe.visibilityState} transition=${probe.activeViewTransition ? 1 : 0} `
+        + `uiTransitions=${probe.uiTransitionEnabled ? 1 : 0}:${probe.uiTransitionReason ?? 'none'} `
+        + `engine=${probe.hasEngine ? 1 : 0} metrics=${probe.hasMetrics ? 1 : 0} errPanel=${probe.uiErrorPanelVisible ? 1 : 0})`
+        + `${startupMsg}${combatMsg}`
+      );
+      if (probe.gameStarted && probe.frameCount > 0) {
+        stalledGameplaySamples = frameDelta <= 0 && rafDelta <= 0
+          ? stalledGameplaySamples + 1
+          : 0;
+        if (stalledGameplaySamples >= 2) {
+          return {
+            started: false,
+            lastFrameCount: probe.frameCount,
+            reason: `Gameplay startup stalled after activation (frameCount=${probe.frameCount}, rafTicks=${probe.rafTicks}, phase=${probe.startupPhase ?? 'unknown'}, hidden=${probe.hidden}, visibility=${probe.visibilityState}, activeViewTransition=${probe.activeViewTransition}, uiTransitionEnabled=${probe.uiTransitionEnabled}, uiTransitionReason=${probe.uiTransitionReason ?? 'none'})`,
+            firstEngineSeenSec,
+            firstMetricsSeenSec,
+            lastStartupMark,
+            lastStartupMarkMs
+          };
+        }
+      }
     } catch {
       // If early runtime globals are not available yet, keep probing until timeout.
       count = 0;
@@ -1556,20 +1619,21 @@ async function runCapture(): Promise<void> {
   const combatParam = enableCombat ? '1' : '0';
   const autostart = requestedMode === 'ai_sandbox' ? 'true' : 'false';
   const losPrefilterParam = losHeightPrefilter ? '1' : '0';
+  const uiTransitionsParam = '0';
   const diagnosticsQuery = 'perf=1';
   const query = sandboxMode
-    ? `?sandbox=true&${diagnosticsQuery}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}`
-    : `?${diagnosticsQuery}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}`;
+    ? `?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}`
+    : `?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}`;
   const url = `http://localhost:${port}/${query}`;
-  const preflightUrl = `http://localhost:${port}/?${diagnosticsQuery}`;
+  const preflightUrl = `http://localhost:${port}/?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}`;
   const primaryPath = new URL(url).pathname + new URL(url).search;
   const prewarmPaths = sandboxMode
     ? [
-        `/?${diagnosticsQuery}`,
-        `/?sandbox=true&${diagnosticsQuery}&autostart=false`,
+        `/?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}`,
+        `/?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&autostart=false`,
         primaryPath.replace(`duration=${durationSeconds}`, 'duration=0')
       ]
-    : [`/?${diagnosticsQuery}`, primaryPath];
+    : [`/?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}`, primaryPath];
   const runHardTimeoutMs = Math.max(
     MIN_RUN_HARD_TIMEOUT_MS,
     (startupTimeoutSeconds + warmupSeconds + durationSeconds + 90) * 1000
@@ -1597,12 +1661,87 @@ async function runCapture(): Promise<void> {
   let stage = 'init';
   let hardTimeout: NodeJS.Timeout | null = null;
   let startedDevServer = false;
+  let emergencyArtifactsWritten = false;
+  let signalHandlersInstalled = false;
+
+  const writeEmergencyArtifacts = (reason: string): void => {
+    if (emergencyArtifactsWritten) return;
+    emergencyArtifactsWritten = true;
+
+    try {
+      const emergencyValidation: ValidationReport = validation.checks.length > 0
+        ? validation
+        : {
+            overall: 'fail',
+            checks: [
+              {
+                id: 'capture_completed',
+                status: 'fail',
+                value: 0,
+                message: reason
+              }
+            ]
+          };
+      writeFileSync(join(artifactDir, 'console.json'), JSON.stringify(consoleEntries, null, 2), 'utf-8');
+      writeFileSync(join(artifactDir, 'runtime-samples.json'), JSON.stringify(runtimeSamples, null, 2), 'utf-8');
+      writeFileSync(join(artifactDir, 'validation.json'), JSON.stringify(emergencyValidation, null, 2), 'utf-8');
+      writeFileSync(join(artifactDir, 'summary.json'), JSON.stringify({
+        startedAt,
+        endedAt: nowIso(),
+        durationSeconds,
+        npcs: effectiveNpcs,
+        requestedNpcs: npcs,
+        url,
+        status: 'failed',
+        failureReason: reason,
+        finalFrameCount,
+        artifactDir,
+        validation: emergencyValidation,
+        lastStage: stage,
+        scenario: {
+          mode: startupState.started ? requestedMode : 'unknown',
+          requestedMode
+        }
+      }, null, 2), 'utf-8');
+    } catch {
+      // best effort
+    }
+  };
+
+  const emergencyShutdown = (reason: string): void => {
+    failureReason ??= reason;
+    writeEmergencyArtifacts(reason);
+    forceKillPlaywrightBrowsers(browserProfileDir);
+    if (server && startedDevServer && !reuseDevServer) {
+      try {
+        void killDevServer(server);
+      } catch {
+        // best effort
+      }
+    }
+    if (hardTimeout) {
+      clearTimeout(hardTimeout);
+      hardTimeout = null;
+    }
+    releaseRunLock();
+  };
+
+  const handleProcessSignal = (signal: NodeJS.Signals): void => {
+    const reason = `Capture interrupted by ${signal} at stage=${stage}`;
+    console.error(reason);
+    emergencyShutdown(reason);
+    process.exit(1);
+  };
 
   try {
     acquireRunLock();
+    process.once('SIGINT', handleProcessSignal);
+    process.once('SIGTERM', handleProcessSignal);
+    signalHandlersInstalled = true;
     hardTimeout = setTimeout(() => {
       const reason = `Hard timeout reached at stage=${stage}`;
       console.error(reason);
+      emergencyShutdown(reason);
       process.exit(1);
     }, runHardTimeoutMs);
 
@@ -1651,6 +1790,25 @@ async function runCapture(): Promise<void> {
     await withTimeout(
       'install browser perf observers',
       page.addInitScript({ path: join(process.cwd(), 'scripts', 'perf-browser-observers.js') }),
+      STEP_TIMEOUT_MS
+    );
+    await withTimeout(
+      'install rAF startup monitor',
+      page.addInitScript({
+        content: `
+          (() => {
+            const globalScope = window;
+            globalScope.__perfHarnessRaf = { ticks: 0 };
+            const tick = () => {
+              if (globalScope.__perfHarnessRaf) {
+                globalScope.__perfHarnessRaf.ticks += 1;
+              }
+              requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+          })();
+        `,
+      }),
       STEP_TIMEOUT_MS
     );
     page.on('console', msg => {
@@ -1719,7 +1877,26 @@ async function runCapture(): Promise<void> {
           hasEngine: Boolean((window as any).__engine),
           hasPerfApi: Boolean((window as any).perf?.report),
           bodyClassName: document.body?.className ?? '',
-          errorPanelVisible: Boolean(document.querySelector('.error-panel'))
+          errorPanelVisible: Boolean(document.querySelector('.error-panel')),
+          gameStarted: Boolean((window as any).__engine?.gameStarted),
+          startupPhase: typeof (window as any).__engine?.startupFlow?.getState === 'function'
+            ? String((window as any).__engine.startupFlow.getState().phase ?? '')
+            : null,
+          rafTicks: Number((window as any).__perfHarnessRaf?.ticks ?? 0),
+          hidden: document.hidden,
+          visibilityState: document.visibilityState,
+          activeViewTransition: Boolean((document as Document & { activeViewTransition?: unknown }).activeViewTransition),
+          uiTransitionEnabled: Boolean(
+            (document as Document & {
+              uiTransitionState?: { enabled?: unknown };
+            }).uiTransitionState?.enabled
+          ),
+          uiTransitionReason: (() => {
+            const reason = (document as Document & {
+              uiTransitionState?: { reason?: unknown };
+            }).uiTransitionState?.reason;
+            return typeof reason === 'string' ? reason : null;
+          })()
         })),
         3_000
       );
@@ -2312,6 +2489,10 @@ async function runCapture(): Promise<void> {
     forceKillPlaywrightBrowsers(browserProfileDir);
     if (hardTimeout) {
       clearTimeout(hardTimeout);
+    }
+    if (signalHandlersInstalled) {
+      process.off('SIGINT', handleProcessSignal);
+      process.off('SIGTERM', handleProcessSignal);
     }
     releaseRunLock();
   }

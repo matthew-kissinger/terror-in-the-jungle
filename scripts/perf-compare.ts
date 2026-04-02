@@ -7,8 +7,8 @@
  * baselines defined in perf-baselines.json.
  *
  * Exit codes:
- *   0 = all pass
- *   1 = any warn (no fail)
+ *   0 = all pass, or warn when warnings are allowed
+ *   1 = any warn when --fail-on-warn is set
  *   2 = any fail
  *
  * Usage:
@@ -16,6 +16,7 @@
  *   npx tsx scripts/perf-compare.ts --scenario combat120
  *   npx tsx scripts/perf-compare.ts --update-baseline combat120
  *   npx tsx scripts/perf-compare.ts --dir 2026-02-21T16-35-52-406Z
+ *   npx tsx scripts/perf-compare.ts --scenario combat120 --fail-on-warn
  */
 
 import { readdirSync, readFileSync, writeFileSync, existsSync } from 'fs';
@@ -112,12 +113,12 @@ const ARTIFACT_ROOT = join(process.cwd(), 'artifacts', 'perf');
 const BASELINE_PATH = join(process.cwd(), 'perf-baselines.json');
 const SCENARIO_ALIASES: Record<string, string> = {
   combat120: 'combat120',
-  openfrontier: 'openFrontier',
-  'openfrontier:short': 'openFrontier',
-  openfrontiershort: 'openFrontier',
-  ashau: 'ashau',
-  'ashau:short': 'ashau',
-  ashaushort: 'ashau',
+  openfrontier: 'openfrontier:short',
+  'openfrontier:short': 'openfrontier:short',
+  openfrontiershort: 'openfrontier:short',
+  ashau: 'ashau:short',
+  'ashau:short': 'ashau:short',
+  ashaushort: 'ashau:short',
   frontier30m: 'frontier30m',
 };
 
@@ -241,7 +242,7 @@ function detectScenario(metrics: ExtractedMetrics): string | null {
     && metrics.durationSeconds >= 150
     && metrics.durationSeconds < 600
   ) {
-    return 'openFrontier';
+    return 'openfrontier:short';
   }
   if (
     mode === 'a_shau_valley'
@@ -249,7 +250,7 @@ function detectScenario(metrics: ExtractedMetrics): string | null {
     && metrics.durationSeconds >= 150
     && metrics.durationSeconds < 600
   ) {
-    return 'ashau';
+    return 'ashau:short';
   }
   return null;
 }
@@ -392,9 +393,11 @@ function updateBaseline(
 // CLI
 // ---------------------------------------------------------------------------
 
-function parseArgs(): { scenario?: string; updateBaseline?: string; dir?: string } {
+function parseArgs(): { scenario?: string; updateBaseline?: string; dir?: string; failOnWarn: boolean } {
   const args = process.argv.slice(2);
-  const result: { scenario?: string; updateBaseline?: string; dir?: string } = {};
+  const result: { scenario?: string; updateBaseline?: string; dir?: string; failOnWarn: boolean } = {
+    failOnWarn: false,
+  };
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--scenario' && args[i + 1]) {
@@ -408,6 +411,8 @@ function parseArgs(): { scenario?: string; updateBaseline?: string; dir?: string
       }
     } else if (args[i] === '--dir' && args[i + 1]) {
       result.dir = args[++i];
+    } else if (args[i] === '--fail-on-warn') {
+      result.failOnWarn = true;
     }
   }
 
@@ -539,8 +544,14 @@ function main(): void {
     console.log('\nFAIL - one or more metrics exceeded fail threshold');
     process.exit(2);
   } else if (hasWarn) {
+    if (opts.failOnWarn) {
+      console.log('\nWARN - one or more metrics exceeded pass threshold but within warn limit');
+      console.log('Treating warnings as failures because --fail-on-warn was set.');
+      process.exit(1);
+    }
     console.log('\nWARN - one or more metrics exceeded pass threshold but within warn limit');
-    process.exit(1);
+    console.log('Warnings are non-blocking by default; rerun with --fail-on-warn to make them fatal.');
+    process.exit(0);
   } else {
     console.log('\nPASS - all metrics within acceptable range');
     process.exit(0);

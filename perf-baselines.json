@@ -46,7 +46,7 @@
         "p99FrameMs": 100
       }
     },
-    "openFrontier": {
+    "openfrontier:short": {
       "description": "120 NPCs, open_frontier, 180s short warm baseline",
       "thresholds": {
         "avgFrameMs": {
@@ -90,7 +90,7 @@
         "p99FrameMs": 25.2
       }
     },
-    "ashau": {
+    "ashau:short": {
       "description": "60 NPCs, a_shau_valley, 180s short warm baseline",
       "thresholds": {
         "avgFrameMs": {

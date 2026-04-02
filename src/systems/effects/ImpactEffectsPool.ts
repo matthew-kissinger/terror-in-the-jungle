@@ -114,21 +114,6 @@ export class ImpactEffectsPool extends EffectPool<ImpactEffect> {
     effect.sparks.geometry.dispose();
   }
 
-  /**
-   * Force GPU shader compilation for all effect materials.
-   */
-  prewarm(renderer: THREE.WebGLRenderer, camera: THREE.Camera): void {
-    const effect = this.pool[0];
-    if (!effect) return;
-    effect.particles.visible = true;
-    effect.sparks.visible = true;
-    effect.decal.visible = true;
-    renderer.compile(this.scene, camera);
-    effect.particles.visible = false;
-    effect.sparks.visible = false;
-    effect.decal.visible = false;
-  }
-
   private createDecalTexture(): THREE.Texture {
     const canvas = document.createElement('canvas');
     canvas.width = 64;

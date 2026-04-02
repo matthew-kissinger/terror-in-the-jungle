@@ -18,7 +18,7 @@ type WorkerMessage = GenerateMessage;
 
 let ready = false;
 
-init()
+const initPromise = init()
   .then(() => {
     ready = true;
     (self as unknown as Worker).postMessage({ type: 'ready' });
@@ -31,10 +31,16 @@ init()
     });
   });
 
-self.onmessage = function (event: MessageEvent<WorkerMessage>) {
+self.onmessage = async function (event: MessageEvent<WorkerMessage>) {
   const msg = event.data;
 
   if (msg.type === 'generate') {
+    try {
+      await initPromise;
+    } catch {
+      // The init failure path already posted an error to the main thread.
+    }
+
     if (!ready) {
       (self as unknown as Worker).postMessage({
         type: 'error',
@@ -44,23 +50,31 @@ self.onmessage = function (event: MessageEvent<WorkerMessage>) {
       return;
     }
 
-    const result = generateSoloNavMesh(msg.positions, msg.indices, msg.config);
+    try {
+      const result = generateSoloNavMesh(msg.positions, msg.indices, msg.config);
 
-    if (!result.success || !result.navMesh) {
+      if (!result.success || !result.navMesh) {
+        (self as unknown as Worker).postMessage({
+          type: 'error',
+          requestId: msg.requestId,
+          message: result.success ? 'No navMesh returned' : result.error,
+        });
+        return;
+      }
+
+      const navMeshData = exportNavMesh(result.navMesh);
+      result.navMesh.destroy();
+
+      (self as unknown as Worker).postMessage(
+        { type: 'result', requestId: msg.requestId, navMeshData },
+        [navMeshData.buffer],
+      );
+    } catch (error) {
       (self as unknown as Worker).postMessage({
         type: 'error',
         requestId: msg.requestId,
-        message: result.success ? 'No navMesh returned' : result.error,
+        message: error instanceof Error ? error.message : String(error),
       });
-      return;
     }
-
-    const navMeshData = exportNavMesh(result.navMesh);
-    result.navMesh.destroy();
-
-    (self as unknown as Worker).postMessage(
-      { type: 'result', requestId: msg.requestId, navMeshData },
-      [navMeshData.buffer],
-    );
   }
 };

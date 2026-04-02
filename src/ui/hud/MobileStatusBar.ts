@@ -12,6 +12,10 @@
 import { UIComponent } from '../engine/UIComponent';
 import styles from './MobileStatusBar.module.css';
 
+function sanitizeTimeRemaining(timeRemaining: number): number {
+  return Number.isFinite(timeRemaining) ? Math.max(0, timeRemaining) : 0;
+}
+
 export class MobileStatusBar extends UIComponent {
   private timeRemaining = this.signal(Infinity);
   private usTickets = this.signal(0);
@@ -33,9 +37,9 @@ export class MobileStatusBar extends UIComponent {
   protected onMount(): void {
     // Timer formatting + warning/critical states
     this.effect(() => {
-      const t = this.timeRemaining.value;
-      const m = Math.floor(Math.max(0, t) / 60);
-      const s = Math.floor(Math.max(0, t) % 60);
+      const t = sanitizeTimeRemaining(this.timeRemaining.value);
+      const m = Math.floor(t / 60);
+      const s = Math.floor(t % 60);
       const timerEl = this.$('[data-ref="timer"]');
       if (timerEl) {
         timerEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;

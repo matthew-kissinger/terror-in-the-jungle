@@ -83,22 +83,6 @@ export class ExplosionEffectsPool extends EffectPool<ExplosionEffect> {
    * Force GPU shader compilation for all effect materials.
    * Call once after construction to avoid first-explosion stall.
    */
-  prewarm(renderer: THREE.WebGLRenderer, camera: THREE.Camera): void {
-    const effect = this.pool[0];
-    if (!effect) return;
-    effect.flashSprite.visible = true;
-    effect.smokeParticles.visible = true;
-    effect.fireParticles.visible = true;
-    effect.debrisParticles.visible = true;
-    effect.shockwaveRing.visible = true;
-    renderer.compile(this.scene, camera);
-    effect.flashSprite.visible = false;
-    effect.smokeParticles.visible = false;
-    effect.fireParticles.visible = false;
-    effect.debrisParticles.visible = false;
-    effect.shockwaveRing.visible = false;
-  }
-
   spawn(position: THREE.Vector3): void {
     const effect = this.acquire();
     if (!effect) return;

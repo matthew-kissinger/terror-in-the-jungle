@@ -19,7 +19,7 @@ const PLAYER_PIN_RADIUS_SQ = 1.44;
 const PLAYER_PIN_RELEASE_RADIUS_SQ = 4.0;
 const PINNED_AREA_EVENT_MS = 1200;
 
-export class MovementStatsTracker {
+class MovementStatsTracker {
   private static instance: MovementStatsTracker | null = null;
 
   private summary: PlayerMovementSummary = this.createEmptySummary();

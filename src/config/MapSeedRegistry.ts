@@ -1,6 +1,6 @@
 import { GameMode } from './gameModeTypes';
 
-export interface MapSeedVariant {
+interface MapSeedVariant {
   seed: number;
   navmeshAsset: string;
   heightmapAsset: string;

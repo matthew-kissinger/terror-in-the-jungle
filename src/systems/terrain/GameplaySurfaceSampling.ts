@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export interface SupportNormalSampleOptions {
+interface SupportNormalSampleOptions {
   sampleDistance?: number;
   footprintRadius?: number;
   lookaheadDistance?: number;

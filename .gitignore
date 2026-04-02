@@ -46,6 +46,7 @@ run_*.sh
 test_build.sh
 test_telemetry.html
 prompts/
+progress.md
 
 # Python
 __pycache__/
@@ -68,6 +69,8 @@ artifacts/
 playtest-results/
 
 # Local scratch / locks (not source)
+output/
+tmp/
 tmp/*.lock
 
 # Vietnam terrain data (large binary files, downloaded via scripts)

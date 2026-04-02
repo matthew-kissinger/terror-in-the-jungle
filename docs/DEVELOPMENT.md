@@ -1,6 +1,6 @@
 # Development Guide
 
-Last updated: 2026-04-01
+Last updated: 2026-04-02
 
 ## Prerequisites
 
@@ -46,6 +46,7 @@ npm run check:mobile-ui    # Built-app phone viewport flow gate
 ```bash
 npm run perf:capture:combat120   # Primary regression capture
 npm run perf:compare             # Compare against baselines
+npm run perf:compare:strict      # Treat warnings as failures too
 npm run validate:full            # test + build + combat120 + compare
 ```
 
@@ -62,6 +63,8 @@ Required gates before deploy:
 2. `test`
 3. `build` (includes `prebuild` which skips if pre-baked assets exist)
 4. `smoke`
+5. `mobile-ui`
+6. `perf`
 
 Live at: https://terror-in-the-jungle.pages.dev/
 
@@ -76,6 +79,8 @@ For performance-sensitive changes, also run:
 ```bash
 npm run validate:full    # adds combat120 capture + baseline comparison
 ```
+
+CI now treats the perf capture as a deploy gate again. If the harness cannot produce a `summary.json`, or if `perf:compare` reports an actual `FAIL`, the perf job fails rather than silently skipping comparison. Warning-level deviations are still logged and should drive follow-up perf work, but they no longer deadlock deploy while the accepted baseline set is being refreshed after the harness recovery.
 
 ### Build Output
 
@@ -139,9 +144,9 @@ public/
 
 ## Exit Codes
 
-| Command | 0 | 1 |
-|---------|---|---|
-| `test:run` / `test:quick` | All pass | Failures |
-| `build` | Success | TS/build error |
-| `validate` | All pass | First failure |
-| `perf:compare` | All PASS | Any WARN or FAIL |
+| Command | 0 | 1 | 2 |
+|---------|---|---|---|
+| `test:run` / `test:quick` | All pass | Failures | - |
+| `build` | Success | TS/build error | - |
+| `validate` | All pass | First failure | - |
+| `perf:compare` | All PASS, or WARN unless `--fail-on-warn` is set | WARN with `--fail-on-warn` | Any FAIL |

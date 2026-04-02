@@ -10,6 +10,10 @@
 import { UIComponent } from '../engine/UIComponent';
 import styles from './MatchTimer.module.css';
 
+function sanitizeTimeRemaining(timeRemaining: number): number {
+  return Number.isFinite(timeRemaining) ? Math.max(0, timeRemaining) : 0;
+}
+
 export class MatchTimer extends UIComponent {
   // --- Reactive state ---
   private timeRemaining = this.signal(Infinity);
@@ -22,15 +26,15 @@ export class MatchTimer extends UIComponent {
   protected onMount(): void {
     // Effect: format and display time
     this.effect(() => {
-      const t = this.timeRemaining.value;
-      const minutes = Math.floor(Math.max(0, t) / 60);
-      const seconds = Math.floor(Math.max(0, t) % 60);
+      const t = sanitizeTimeRemaining(this.timeRemaining.value);
+      const minutes = Math.floor(t / 60);
+      const seconds = Math.floor(t % 60);
       this.text('[data-ref="display"]', `${minutes}:${seconds.toString().padStart(2, '0')}`);
     });
 
     // Effect: warning/critical classes
     this.effect(() => {
-      const t = this.timeRemaining.value;
+      const t = sanitizeTimeRemaining(this.timeRemaining.value);
       const isCritical = t <= 30;
       const isWarning = !isCritical && t <= 60;
 

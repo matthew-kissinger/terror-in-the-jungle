@@ -1,6 +1,6 @@
 import type { CDPSession } from 'playwright';
 
-export type TouchPoint = {
+type TouchPoint = {
   x: number;  // CSS viewport pixels
   y: number;
   id: number; // unique finger identifier

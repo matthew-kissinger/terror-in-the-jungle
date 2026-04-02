@@ -98,18 +98,21 @@ async function runLiveEntryStartup(engine: GameEngine, initialSpawnPosition?: TH
     Logger.info('engine-init', 'Combat AI disabled by sandbox config (combat=0)');
   }
 
-  // Pre-warm effect pool shaders before general precompile to avoid first-explosion stall
-  requestBackgroundTask(() => {
-    const webglRenderer = engine.renderer.renderer;
-    const camera = engine.renderer.camera;
-    const cs = engine.systemManager.combatantSystem;
-    if (cs) {
-      cs.explosionEffectsPool.prewarm(webglRenderer, camera);
-      cs.impactEffectsPool.prewarm(webglRenderer, camera);
+  // Warm GPU pipeline by spawning one explosion below ground.
+  // This forces shader compilation + texture/buffer uploads through the
+  // actual render pipeline, eliminating first-grenade stalls.
+  requestBackgroundTask(engine, () => {
+    try {
+      const cs = engine.systemManager.combatantSystem;
+      const warmupPos = new THREE.Vector3(0, -500, 0);
+      cs.explosionEffectsPool.spawn(warmupPos);
+      cs.impactEffectsPool.spawn(warmupPos, warmupPos);
+    } catch {
+      // Engine may already be disposing after a short-lived warmup run.
     }
-    engine.renderer.precompileShaders();
   }, 1000);
-  requestBackgroundTask(() => engine.systemManager.startDeferredInitialization(), 500);
+  requestBackgroundTask(engine, () => engine.renderer.precompileShaders(), 2000);
+  requestBackgroundTask(engine, () => engine.systemManager.startDeferredInitialization(), 500);
   engine.startupFlow.enterLive();
   markPhase(`interactive-ready (${(performance.now() - startTime).toFixed(1)}ms)`);
   markStartup('engine-init.startup-flow.interactive-ready');
@@ -119,12 +122,22 @@ function nextFrame(): Promise<void> {
   return new Promise(resolve => requestAnimationFrame(() => resolve()));
 }
 
-function requestBackgroundTask(task: () => void, timeoutMs: number): void {
+function requestBackgroundTask(engine: GameEngine, task: () => void, timeoutMs: number): void {
+  const runSafely = () => {
+    if (engine.isDisposed) {
+      return;
+    }
+    try {
+      task();
+    } catch {
+      // Background warmups are best-effort only and should never crash the page.
+    }
+  };
   const w = window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
   if (typeof w.requestIdleCallback === 'function') {
-    w.requestIdleCallback(() => task(), { timeout: timeoutMs });
+    w.requestIdleCallback(() => runSafely(), { timeout: timeoutMs });
   } else {
-    setTimeout(task, timeoutMs);
+    setTimeout(runSafely, timeoutMs);
   }
 }
 

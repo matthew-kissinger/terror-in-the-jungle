@@ -16,6 +16,14 @@ export default defineConfig({
       deleteOriginFile: false
     })
   ],
+  optimizeDeps: {
+    entries: ['index.html']
+  },
+  server: {
+    watch: {
+      ignored: ['**/artifacts/**']
+    }
+  },
   build: {
     outDir: 'dist',
     assetsDir: 'assets',

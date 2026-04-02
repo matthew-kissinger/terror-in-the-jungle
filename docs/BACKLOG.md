@@ -5,6 +5,7 @@ Last updated: 2026-04-01
 ## P0 - Performance Blockers
 
 - [ ] Combat AI p99 ~35ms (target <16ms) - synchronous cover search in `AIStateEngage.initiateSquadSuppression()`
+- [ ] Re-capture and refresh perf baselines after the 2026-04-02 harness recovery (`combat120`, `openfrontier:short`, `ashau:short`, `frontier30m`)
 - [ ] Reduce initial JS bundle (~710-734kB main runtime chunks)
 
 ## P1 - Gameplay
@@ -50,6 +51,7 @@ Last updated: 2026-04-01
 1. Combat AI p99 sits ~35ms in heavy scenarios, above the 16ms target.
 2. Main runtime bundle is ~780kB (startup stable but heavy).
 3. Open Frontier/A Shau helicopters are cosmetic - no NPC pilots, no transport mechanic.
+4. First grenade/explosion cold-start hitch needs fresh perf evidence after the hidden live-effect warmup change.
 
 ## Architecture Debt
 

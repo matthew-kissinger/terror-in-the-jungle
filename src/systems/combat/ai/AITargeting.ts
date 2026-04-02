@@ -29,6 +29,7 @@ export class AITargeting {
 
   beginFrame(): void {
     this.targetAcquisition.beginFrame();
+    this.coverFinding.beginFrame();
   }
 
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {

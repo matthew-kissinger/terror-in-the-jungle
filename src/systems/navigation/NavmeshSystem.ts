@@ -9,7 +9,7 @@ import type { Crowd, NavMesh, NavMeshQuery, TileCache, Obstacle } from '@recast-
 import type { MapFeatureDefinition } from '../../config/gameModeTypes';
 
 /** Result of a connectivity validation across multiple points. */
-export interface ConnectivityResult {
+interface ConnectivityResult {
   /** True if all points can reach each other via navmesh paths. */
   connected: boolean;
   /** Groups of point indices that can reach each other. Single group = fully connected. */
@@ -357,10 +357,16 @@ export class NavmeshSystem {
 
     // Try off-thread generation via worker
     if (this.workerReady && this.getPositionsAndIndicesFn && this.importNavMeshFn) {
-      const workerResult = await this.generateViaWorker(inputMeshes, recastConfig, cacheKey);
-      geometry.dispose();
-      for (const m of obstacleMeshes) m.geometry.dispose();
-      return workerResult;
+      try {
+        const workerResult = await this.generateViaWorker(inputMeshes, recastConfig, cacheKey);
+        geometry.dispose();
+        for (const m of obstacleMeshes) m.geometry.dispose();
+        return workerResult;
+      } catch (error) {
+        Logger.warn('Navigation', 'Worker navmesh generation failed, falling back to main thread:', error);
+        this.pendingGeneration = null;
+        this.workerReady = false;
+      }
     }
 
     // Fallback: main-thread generation

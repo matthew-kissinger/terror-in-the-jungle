@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type * as THREE from 'three';
 
 // Create mock functions for the overlay
 const mockCreateOverlay = vi.fn();
