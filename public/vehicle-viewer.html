@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vehicle Model Viewer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #1a1a2e; color: #e0e0e0; font-family: 'Consolas', 'Monaco', monospace; overflow: hidden; }
+
+  #viewport { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
+  /* HUD overlay */
+  #hud { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+  #hud > * { pointer-events: auto; }
+
+  /* Left sidebar - model selector */
+  #sidebar {
+    position: absolute; top: 0; left: 0; bottom: 0; width: 220px;
+    background: rgba(0,0,0,0.82); backdrop-filter: blur(10px);
+    border-right: 1px solid #333;
+    overflow-y: auto; padding: 0; z-index: 10;
+    display: flex; flex-direction: column;
+  }
+  #sidebar h1 {
+    font-size: 13px; font-weight: 600; color: #8f8;
+    padding: 12px 14px 8px; border-bottom: 1px solid #333;
+  }
+  .model-group {
+    padding: 8px 0 4px;
+  }
+  .model-group-label {
+    font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 1px;
+    padding: 0 14px 4px;
+  }
+  .model-btn {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 7px 14px;
+    background: none; border: none; color: #aaa;
+    font-family: inherit; font-size: 12px; cursor: pointer;
+    text-align: left; transition: all 0.12s;
+  }
+  .model-btn:hover { background: rgba(255,255,255,0.06); color: #fff; }
+  .model-btn.active { background: rgba(136,255,136,0.1); color: #8f8; border-left: 2px solid #8f8; }
+  .model-btn.active .model-status { color: #8f8; }
+  .model-btn .model-status {
+    font-size: 9px; color: #555; margin-left: auto; white-space: nowrap;
+  }
+  .model-btn .model-status.new { color: #fa0; }
+  .model-btn .model-status.done { color: #8f8; }
+
+  /* Right panel - scene hierarchy */
+  #hierarchy {
+    position: absolute; top: 0; right: 0; bottom: 0; width: 300px;
+    background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+    border-left: 1px solid #333;
+    overflow-y: auto; padding: 10px; font-size: 11px;
+    z-index: 5;
+  }
+  #hierarchy h2 { font-size: 12px; color: #8f8; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+  .node { padding: 2px 0; cursor: pointer; white-space: nowrap; }
+  .node:hover { color: #fff; background: rgba(255,255,255,0.05); }
+  .node.selected { color: #ff0; background: rgba(255,255,0,0.1); }
+  .node-joint { color: #f8a; }
+  .node-mesh { color: #8cf; }
+  .node-group { color: #aaa; }
+  .indent { display: inline-block; width: 14px; }
+  .node-icon { display: inline-block; width: 14px; font-size: 10px; }
+  .tri-count { color: #666; font-size: 10px; margin-left: 4px; }
+
+  /* Bottom stats bar */
+  #stats {
+    position: absolute; bottom: 0; left: 220px; right: 300px;
+    padding: 8px 16px;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+    border-top: 1px solid #333;
+    font-size: 11px; color: #aaa;
+    display: flex; gap: 16px; flex-wrap: wrap; z-index: 5;
+  }
+  #stats .stat-label { color: #666; }
+  #stats .stat-value { color: #ccc; }
+  #stats .stat-warn { color: #fa0; }
+  #stats .stat-ok { color: #8f8; }
+
+  /* Controls help */
+  #controls-help {
+    position: absolute; bottom: 36px; left: 236px;
+    font-size: 10px; color: #444; z-index: 5;
+  }
+
+  /* Nav buttons */
+  #nav-btns {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; z-index: 10;
+  }
+  .nav-btn {
+    padding: 6px 16px; border: 1px solid #444; border-radius: 4px;
+    background: rgba(0,0,0,0.7); color: #aaa; font-family: inherit; font-size: 12px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .nav-btn:hover { background: #2a2a4a; color: #fff; border-color: #8f8; }
+  .nav-btn:disabled { opacity: 0.3; cursor: default; }
+</style>
+</head>
+<body>
+
+<canvas id="viewport"></canvas>
+
+<div id="hud">
+  <!-- Left sidebar: model selector -->
+  <div id="sidebar">
+    <h1>Vehicle Models</h1>
+    <!-- populated by JS -->
+  </div>
+
+  <!-- Right panel: scene hierarchy -->
+  <div id="hierarchy">
+    <h2>Scene Hierarchy</h2>
+    <div id="tree">Select a model</div>
+  </div>
+
+  <!-- Bottom stats -->
+  <div id="stats">
+    <div><span class="stat-label">Tris: </span><span class="stat-value" id="stat-tris">-</span></div>
+    <div><span class="stat-label">Meshes: </span><span class="stat-value" id="stat-meshes">-</span></div>
+    <div><span class="stat-label">Joints: </span><span class="stat-value" id="stat-joints">-</span></div>
+    <div><span class="stat-label">File: </span><span class="stat-value" id="stat-size">-</span></div>
+    <div><span class="stat-label">Bounds: </span><span class="stat-value" id="stat-bounds">-</span></div>
+  </div>
+
+  <div id="controls-help">
+    LMB: Orbit &nbsp; RMB: Pan &nbsp; Scroll: Zoom &nbsp; Click node to highlight &nbsp; Arrow keys or buttons: Prev/Next
+  </div>
+
+  <div id="nav-btns">
+    <button class="nav-btn" id="btn-prev">Prev</button>
+    <button class="nav-btn" id="btn-next">Next</button>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.183.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// ═══════════════════════════════════════════════════════════════
+// Model registry - all vehicles with metadata
+// ═══════════════════════════════════════════════════════════════
+const MODELS = [
+  // Ground vehicles (rebuild targets)
+  { group: 'Ground Vehicles', id: 'm151-jeep',   name: 'M151 Jeep',     path: './models/vehicles/ground/m151-jeep.glb',     budget: 3000, status: 'new' },
+  { group: 'Ground Vehicles', id: 'm35-truck',   name: 'M35 Truck',     path: './models/vehicles/ground/m35-truck.glb',     budget: 4000, status: 'pending' },
+  { group: 'Ground Vehicles', id: 'm113-apc',    name: 'M113 APC',      path: './models/vehicles/ground/m113-apc.glb',      budget: 5000, status: 'pending' },
+  { group: 'Ground Vehicles', id: 'm48-patton',  name: 'M48 Patton',    path: './models/vehicles/ground/m48-patton.glb',    budget: 8000, status: 'pending' },
+  { group: 'Ground Vehicles', id: 'pt76',        name: 'PT-76',         path: './models/vehicles/ground/pt76.glb',          budget: 5000, status: 'pending' },
+
+  // Watercraft (rebuild targets)
+  { group: 'Watercraft',      id: 'sampan',      name: 'Sampan',        path: './models/vehicles/watercraft/sampan.glb',    budget: 2000, status: 'pending' },
+  { group: 'Watercraft',      id: 'pbr',         name: 'PBR Mk II',    path: './models/vehicles/watercraft/pbr.glb',       budget: 5000, status: 'pending' },
+
+  // Aircraft (already rebuilt - reference)
+  { group: 'Aircraft (done)', id: 'uh1-huey',    name: 'UH-1 Huey',    path: './models/vehicles/aircraft/uh1-huey.glb',    budget: 5000, status: 'done' },
+  { group: 'Aircraft (done)', id: 'uh1c-gunship',name: 'UH-1C Gunship', path: './models/vehicles/aircraft/uh1c-gunship.glb',budget: 5000, status: 'done' },
+  { group: 'Aircraft (done)', id: 'ah1-cobra',   name: 'AH-1 Cobra',   path: './models/vehicles/aircraft/ah1-cobra.glb',   budget: 5000, status: 'done' },
+  { group: 'Aircraft (done)', id: 'ac47-spooky', name: 'AC-47 Spooky', path: './models/vehicles/aircraft/ac47-spooky.glb', budget: 8000, status: 'done' },
+  { group: 'Aircraft (done)', id: 'f4-phantom',  name: 'F-4 Phantom',  path: './models/vehicles/aircraft/f4-phantom.glb',  budget: 5000, status: 'done' },
+  { group: 'Aircraft (done)', id: 'a1-skyraider',name: 'A-1 Skyraider', path: './models/vehicles/aircraft/a1-skyraider.glb',budget: 5000, status: 'done' },
+];
+
+// ═══════════════════════════════════════════════════════════════
+// Three.js setup
+// ═══════════════════════════════════════════════════════════════
+const canvas = document.getElementById('viewport');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x1a1a2e);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
+camera.position.set(8, 5, 8);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.target.set(0, 1, 0);
+
+// Lighting
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+dirLight.position.set(10, 15, 8);
+scene.add(dirLight);
+const fillLight = new THREE.DirectionalLight(0x8899cc, 0.4);
+fillLight.position.set(-6, 4, -8);
+scene.add(fillLight);
+
+// Ground grid
+scene.add(new THREE.GridHelper(20, 20, 0x444444, 0x2a2a2a));
+
+// Axes
+const axes = new THREE.AxesHelper(3);
+axes.position.set(-10, 0, -10);
+scene.add(axes);
+
+function makeLabel(text, pos, color) {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 32;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = color;
+  ctx.font = 'bold 24px monospace';
+  ctx.fillText(text, 4, 24);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false }));
+  sprite.position.copy(pos);
+  sprite.scale.set(1, 0.5, 1);
+  scene.add(sprite);
+}
+makeLabel('+X', new THREE.Vector3(-6.8, 0.3, -10), '#ff4444');
+makeLabel('+Y', new THREE.Vector3(-10, 3.3, -10), '#44ff44');
+makeLabel('+Z (forward)', new THREE.Vector3(-10, 0.3, -6.5), '#4488ff');
+
+// Forward arrow
+scene.add(new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0.05, 0), 4, 0x4488ff, 0.4, 0.25));
+
+// ═══════════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════════
+let currentModel = null;
+let currentIndex = -1;
+let highlightedMesh = null;
+const originalMaterials = new Map();
+const highlightMat = new THREE.MeshBasicMaterial({ color: 0xffff00, wireframe: true, depthTest: false });
+const loader = new GLTFLoader();
+
+// ═══════════════════════════════════════════════════════════════
+// Build sidebar
+// ═══════════════════════════════════════════════════════════════
+const sidebar = document.getElementById('sidebar');
+let lastGroup = '';
+
+MODELS.forEach((m, i) => {
+  if (m.group !== lastGroup) {
+    lastGroup = m.group;
+    const grp = document.createElement('div');
+    grp.className = 'model-group';
+    const label = document.createElement('div');
+    label.className = 'model-group-label';
+    label.textContent = m.group;
+    grp.appendChild(label);
+    sidebar.appendChild(grp);
+  }
+
+  const btn = document.createElement('button');
+  btn.className = 'model-btn';
+  btn.dataset.index = i;
+  btn.innerHTML = `<span>${m.name}</span><span class="model-status ${m.status}">${m.status}</span>`;
+  btn.addEventListener('click', () => selectModel(i));
+  sidebar.appendChild(btn);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Model loading
+// ═══════════════════════════════════════════════════════════════
+function selectModel(index) {
+  if (index < 0 || index >= MODELS.length) return;
+  currentIndex = index;
+  const m = MODELS[index];
+
+  // Update sidebar active state
+  document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.model-btn[data-index="${index}"]`)?.classList.add('active');
+
+  // Update nav buttons
+  document.getElementById('btn-prev').disabled = index === 0;
+  document.getElementById('btn-next').disabled = index === MODELS.length - 1;
+
+  // Load model
+  document.getElementById('stat-tris').textContent = 'loading...';
+  document.getElementById('tree').textContent = 'Loading...';
+
+  loader.load(m.path, (gltf) => {
+    if (currentModel) {
+      scene.remove(currentModel);
+      originalMaterials.clear();
+      highlightedMesh = null;
+    }
+
+    const model = gltf.scene;
+    currentModel = model;
+    scene.add(model);
+
+    // Compute bounds and frame camera
+    const box3 = new THREE.Box3().setFromObject(model);
+    const size = box3.getSize(new THREE.Vector3());
+    const center = box3.getCenter(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const dist = maxDim * 1.8;
+    camera.position.set(center.x + dist * 0.7, center.y + dist * 0.5, center.z + dist * 0.7);
+    controls.target.copy(center);
+    controls.update();
+
+    // Gather stats
+    let triCount = 0, meshCount = 0, jointCount = 0;
+    model.traverse((child) => {
+      if (child.isMesh) {
+        meshCount++;
+        const geo = child.geometry;
+        if (geo.index) triCount += geo.index.count / 3;
+        else if (geo.attributes.position) triCount += geo.attributes.position.count / 3;
+      }
+      if (child.name.startsWith('Joint_')) jointCount++;
+    });
+
+    const overBudget = triCount > m.budget;
+    document.getElementById('stat-tris').textContent = `${triCount.toLocaleString()} / ${m.budget.toLocaleString()}`;
+    document.getElementById('stat-tris').className = overBudget ? 'stat-value stat-warn' : 'stat-value stat-ok';
+    document.getElementById('stat-meshes').textContent = meshCount;
+    document.getElementById('stat-joints').textContent = jointCount;
+    document.getElementById('stat-bounds').textContent = `${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)} m`;
+
+    // Get file size via HEAD request
+    fetch(m.path, { method: 'HEAD' }).then(r => {
+      const bytes = r.headers.get('content-length');
+      document.getElementById('stat-size').textContent = bytes ? `${(bytes / 1024).toFixed(1)} KB` : '-';
+    }).catch(() => {});
+
+    // Build hierarchy tree
+    buildTree(model);
+
+  }, undefined, (err) => {
+    document.getElementById('tree').textContent = `Failed to load: ${err.message}`;
+    document.getElementById('stat-tris').textContent = 'error';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Hierarchy tree
+// ═══════════════════════════════════════════════════════════════
+function buildTree(model) {
+  const container = document.getElementById('tree');
+  container.innerHTML = '';
+
+  function addNode(obj, depth) {
+    const div = document.createElement('div');
+    div.className = 'node';
+
+    const name = obj.name || '(unnamed)';
+    let cls = 'node-group', icon = '>';
+    if (name.startsWith('Joint_')) { cls = 'node-joint'; icon = 'J'; }
+    else if (name.startsWith('Mesh_') || obj.isMesh) { cls = 'node-mesh'; icon = 'M'; }
+
+    for (let i = 0; i < depth; i++) {
+      const s = document.createElement('span');
+      s.className = 'indent';
+      s.textContent = depth === i + 1 ? '|-' : '| ';
+      div.appendChild(s);
+    }
+
+    const iconSpan = document.createElement('span');
+    iconSpan.className = `node-icon ${cls}`;
+    iconSpan.textContent = icon + ' ';
+    div.appendChild(iconSpan);
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = cls;
+    nameSpan.textContent = name;
+    div.appendChild(nameSpan);
+
+    if (obj.isMesh && obj.geometry) {
+      const geo = obj.geometry;
+      let tris = geo.index ? geo.index.count / 3 : (geo.attributes.position?.count / 3 || 0);
+      const s = document.createElement('span');
+      s.className = 'tri-count';
+      s.textContent = ` (${Math.round(tris)} tris)`;
+      div.appendChild(s);
+    }
+
+    div.addEventListener('click', () => {
+      document.querySelectorAll('.node.selected').forEach(n => n.classList.remove('selected'));
+      unhighlight();
+      div.classList.add('selected');
+      highlight(obj);
+    });
+
+    container.appendChild(div);
+    for (const child of obj.children) addNode(child, depth + 1);
+  }
+
+  addNode(model, 0);
+}
+
+function highlight(obj) {
+  unhighlight();
+  obj.traverse((c) => {
+    if (c.isMesh) {
+      originalMaterials.set(c, c.material);
+      c.material = highlightMat;
+    }
+  });
+  highlightedMesh = obj;
+}
+
+function unhighlight() {
+  if (!highlightedMesh) return;
+  highlightedMesh.traverse((c) => {
+    if (c.isMesh && originalMaterials.has(c)) c.material = originalMaterials.get(c);
+  });
+  originalMaterials.clear();
+  highlightedMesh = null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Navigation
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('btn-prev').addEventListener('click', () => selectModel(currentIndex - 1));
+document.getElementById('btn-next').addEventListener('click', () => selectModel(currentIndex + 1));
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); selectModel(currentIndex - 1); }
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); selectModel(currentIndex + 1); }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// Resize + animate
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+(function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+
+// Auto-select from URL param or default to first model
+const urlModel = new URLSearchParams(location.search).get('model');
+if (urlModel) {
+  const idx = MODELS.findIndex(m => m.id === urlModel);
+  selectModel(idx >= 0 ? idx : 0);
+} else {
+  selectModel(0);
+}
+</script>
+</body>
+</html>
