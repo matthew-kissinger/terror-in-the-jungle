@@ -564,6 +564,18 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.setFixedWingAutoLevel(active);
   }
 
+  showFixedWingMouseIndicator(): void {
+    this.elements.showFixedWingMouseIndicator();
+  }
+
+  hideFixedWingMouseIndicator(): void {
+    this.elements.hideFixedWingMouseIndicator();
+  }
+
+  updateFixedWingMouseMode(controlMode: boolean): void {
+    this.elements.updateFixedWingMouseMode(controlMode);
+  }
+
   // Squad deploy prompt methods (IHUDSystem)
   showSquadDeployPrompt(): void {
     this.showInteractionPrompt('Press G to deploy squad');

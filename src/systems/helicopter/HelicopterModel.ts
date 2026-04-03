@@ -16,6 +16,7 @@ import type { CombatantSystem } from '../combat/CombatantSystem';
 import type { GrenadeSystem } from '../weapons/GrenadeSystem';
 import type { VehicleManager } from '../vehicle/VehicleManager';
 import { HelicopterVehicleAdapter } from '../vehicle/HelicopterVehicleAdapter';
+import { shouldRenderAirVehicle } from '../vehicle/AirVehicleVisibility';
 import { Faction } from '../combat/types';
 import type { IHUDSystem, IPlayerController, ITerrainRuntime, IAudioManager } from '../../types/SystemInterfaces';
 import type { PlayerInput } from '../player/PlayerInput';
@@ -342,6 +343,9 @@ export class HelicopterModel implements GameSystem {
     this.updateHelicopterPhysics(deltaTime);
 
     this.helicopters.forEach((helicopter, id) => {
+      if (!helicopter.visible) {
+        return;
+      }
       const physics = this.helicopterPhysics.get(id);
       this.animation.updateRotors(helicopter, id, physics, deltaTime);
 
@@ -475,6 +479,9 @@ export class HelicopterModel implements GameSystem {
     const pilotedId = this.playerController?.isInHelicopter()
       ? this.playerController.getHelicopterId()
       : null;
+    const camera = this.playerController && typeof this.playerController.getCamera === 'function'
+      ? this.playerController.getCamera()
+      : null;
 
     for (const [id, helicopter] of this.helicopters) {
       if (this.healthSystem.isDestroyed(id)) continue;
@@ -522,6 +529,15 @@ export class HelicopterModel implements GameSystem {
       const finalQuaternion = this.animation.updateVisualTilt(helicopter, id, physics, deltaTime);
       helicopter.quaternion.copy(finalQuaternion);
 
+      helicopter.visible = shouldRenderAirVehicle({
+        camera,
+        scene: this.scene,
+        vehiclePosition: helicopter.position,
+        isAirborne: !state.isGrounded,
+        isPiloted,
+        currentlyVisible: helicopter.visible,
+      });
+
       if (isPiloted && this.playerController) {
         this.playerController.updatePlayerPosition(state.position);
 
@@ -540,8 +556,10 @@ export class HelicopterModel implements GameSystem {
         this.healthSystem.updateHUD(id);
       }
 
-      // Door gunner AI fires on all airborne helicopters (piloted or not)
-      this.doorGunner.update(deltaTime, id, state.position, helicopter.quaternion, state.isGrounded);
+      // Door gunner AI only matters when the helicopter is relevant to the player.
+      if (isPiloted || helicopter.visible) {
+        this.doorGunner.update(deltaTime, id, state.position, helicopter.quaternion, state.isGrounded);
+      }
     }
 
     // Tick weapon effects once per frame

@@ -1,8 +1,8 @@
 # Architecture
 
-Last verified: 2026-04-03
+Last verified: 2026-04-02
 
-Systems-based orchestration engine. 43 GameSystem classes, 14 tracked tick groups, 8 singletons.
+Systems-based orchestration engine. 44 GameSystem classes, 14 tracked tick groups, 8 singletons.
 
 ## Entry Points
 
@@ -115,7 +115,7 @@ Key behavior:
 - `WeaponAnimations` handles ADS transition, recoil spring, idle bob, and pump action.
 - `ShotCommand` pattern: all validation (canFire, ammo) happens before command creation. Executor trusts the command.
 
-## Helicopter System
+## Air Vehicle Systems
 
 Three flyable helicopters with GLB models containing rigged rotor pivots:
 
@@ -130,6 +130,12 @@ Rotor detection (`HelicopterGeometry.ts`): Traverses GLB scene graph, matches no
 Naming rule: Only pivot nodes (Joint_*) should match rotor patterns. Child mesh names use MR*/TR* prefixes to avoid double-animation.
 
 Tail rotor pre-rotation: `pivot.rotation.y = PI/2` baked into GLB so the Z-spin creates a sideways disc.
+
+Fixed-wing runtime (`src/systems/vehicle/`):
+- `FixedWingPhysics` now runs on a fixed timestep and uses an arcade flight model with takeoff rotation, climb trim, banked turning, stall state, and ground-roll behavior.
+- `FixedWingModel` only simulates the piloted aircraft plus airborne/unsettled aircraft. Parked aircraft stay collision-valid but skip unnecessary per-frame flight work.
+- `AirVehicleVisibility` gates helicopter and fixed-wing rendering against camera/fog distance so far vehicles stop contributing draw calls outside useful visibility.
+- `ModelDrawCallOptimizer` batches static aircraft sub-meshes by material at load time. Rotor/propeller meshes stay separate so animation still works.
 
 ## Coupling Heatmap
 
@@ -171,7 +177,7 @@ Mutual dependencies: CombatantSystem <-> ZoneManager, PlayerController <-> First
 
 ## Key Patterns
 
-- **GameSystem interface**: `init()`, `update(dt)`, `dispose()`. All 43 systems implement it.
+- **GameSystem interface**: `init()`, `update(dt)`, `dispose()`. All 44 systems implement it.
 - **Runtime composers**: Grouped dependency wiring replaces monolithic SystemConnector.
 - **SimulationScheduler**: Cadence-based update groups for non-critical systems.
 - **ObjectPool**: Pre-allocated Vector3/Quaternion/Matrix4 for GC avoidance in hot paths.
@@ -179,6 +185,7 @@ Mutual dependencies: CombatantSystem <-> ZoneManager, PlayerController <-> First
 - **Scratch vectors**: Pre-allocated reusable vectors in hot-path classes.
 - **freezeTransform**: Static objects have `matrixAutoUpdate` disabled for scene graph perf.
 - **EffectPool\<T\>**: Abstract base class for pooled visual effects (TracerPool, ImpactEffectsPool, ExplosionEffectsPool). Objects stay in scene permanently, toggling `visible` instead of add/remove.
+- **Asset-side batching**: Complex static GLB hierarchies can be merged by material at load time to reduce draw calls without changing authored assets.
 
 ## Known Architecture Debt
 

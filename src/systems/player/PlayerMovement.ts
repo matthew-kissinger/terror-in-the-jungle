@@ -482,7 +482,12 @@ export class PlayerMovement {
     }
   }
 
-  updateHelicopterControls(deltaTime: number, input: PlayerInput, hudSystem?: IHUDSystem): void {
+  updateHelicopterControls(
+    deltaTime: number,
+    input: PlayerInput,
+    hudSystem?: IHUDSystem,
+    mouseMovement?: { x: number; y: number },
+  ): void {
     // Raw target values - HelicopterPhysics.smoothControlInputs() handles all ramping.
     const touchControls = input.getTouchControls();
     const hasTouchHeliMode = touchControls?.isInHelicopterMode() ?? false;
@@ -531,6 +536,10 @@ export class PlayerMovement {
         : input.isKeyPressed('arrowdown') ? -1.0 : 0;
       this.helicopterControls.cyclicRoll = input.isKeyPressed('arrowright') ? 1.0
         : input.isKeyPressed('arrowleft') ? -1.0 : 0;
+    }
+
+    if (mouseMovement) {
+      this.addMouseControlToHelicopter(mouseMovement);
     }
 
     // Send controls to helicopter model
@@ -592,6 +601,7 @@ export class PlayerMovement {
     input: PlayerInput,
     fixedWingModel?: import('../vehicle/FixedWingModel').FixedWingModel,
     hudSystem?: IHUDSystem,
+    mouseMovement?: { x: number; y: number },
   ): void {
     const touchControls = input.getTouchControls();
     const hasTouchMode = touchControls?.isInHelicopterMode() ?? false;
@@ -667,6 +677,10 @@ export class PlayerMovement {
       this.fixedWingControls.roll = rollInput;
     }
 
+    if (mouseMovement) {
+      this.addMouseControlToFixedWing(mouseMovement);
+    }
+
     // Auto-level: gradually zero pitch/roll when active and no manual input
     if (this.fixedWingAutoLevel && this.fixedWingControls.pitch === 0 && this.fixedWingControls.roll === 0) {
       // Apply gentle correction inputs that FixedWingPhysics will smooth
@@ -699,10 +713,10 @@ export class PlayerMovement {
       if (fwModel && this.playerState.fixedWingId) {
         const fd = fwModel.getFlightData(this.playerState.fixedWingId);
         if (fd) {
-          (hudSystem as any).updateFixedWingFlightData?.(fd.airspeed, fd.heading, fd.verticalSpeed);
-          (hudSystem as any).updateFixedWingThrottle?.(this.fixedWingThrottle);
-          (hudSystem as any).setFixedWingStallWarning?.(fd.isStalled);
-          (hudSystem as any).setFixedWingAutoLevel?.(this.fixedWingAutoLevel);
+          hudSystem.updateFixedWingFlightData?.(fd.airspeed, fd.heading, fd.verticalSpeed);
+          hudSystem.updateFixedWingThrottle?.(this.fixedWingThrottle);
+          hudSystem.setFixedWingStallWarning?.(fd.isStalled);
+          hudSystem.setFixedWingAutoLevel?.(this.fixedWingAutoLevel);
         }
       }
     }

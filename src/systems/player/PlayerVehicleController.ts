@@ -59,16 +59,18 @@ export class PlayerVehicleController {
     input: PlayerInput,
     cameraController: PlayerCamera,
   ): void {
-    movement.updateHelicopterControls(deltaTime, input, this.deps.hudSystem);
-
+    let mouseMovement: { x: number; y: number } | undefined;
     const touchHeli = input.getTouchControls()?.isInHelicopterMode() ?? false;
     if (
       !touchHeli
       && cameraController.getHelicopterMouseControlEnabled()
       && input.getIsPointerLocked()
     ) {
-      const mouseMovement = input.getMouseMovement();
-      movement.addMouseControlToHelicopter(mouseMovement);
+      mouseMovement = input.getMouseMovement();
+    }
+
+    movement.updateHelicopterControls(deltaTime, input, this.deps.hudSystem, mouseMovement);
+    if (mouseMovement) {
       input.clearMouseMovement();
     }
   }
@@ -100,16 +102,24 @@ export class PlayerVehicleController {
     input: PlayerInput,
     cameraController: PlayerCamera,
   ): void {
-    movement.updateFixedWingControls(deltaTime, input, this.deps.fixedWingModel ?? undefined, this.deps.hudSystem);
-
+    let mouseMovement: { x: number; y: number } | undefined;
     const touchHeli = input.getTouchControls()?.isInHelicopterMode() ?? false;
     if (
       !touchHeli
       && cameraController.getHelicopterMouseControlEnabled()
       && input.getIsPointerLocked()
     ) {
-      const mouseMovement = input.getMouseMovement();
-      movement.addMouseControlToFixedWing(mouseMovement);
+      mouseMovement = input.getMouseMovement();
+    }
+
+    movement.updateFixedWingControls(
+      deltaTime,
+      input,
+      this.deps.fixedWingModel ?? undefined,
+      this.deps.hudSystem,
+      mouseMovement,
+    );
+    if (mouseMovement) {
       input.clearMouseMovement();
     }
   }
@@ -135,8 +145,8 @@ export class PlayerVehicleController {
     cameraController.saveInfantryAngles();
 
     this.deps.hudSystem?.showFixedWingInstruments?.();
-    this.deps.hudSystem?.showHelicopterMouseIndicator();
-    this.deps.hudSystem?.updateHelicopterMouseMode(cameraController.getHelicopterMouseControlEnabled());
+    this.deps.hudSystem?.showFixedWingMouseIndicator?.();
+    this.deps.hudSystem?.updateFixedWingMouseMode?.(cameraController.getHelicopterMouseControlEnabled());
     this.deps.hudSystem?.setVehicleContext?.(createFixedWingUIContext());
 
     // Set stall speed for HUD display
@@ -167,7 +177,7 @@ export class PlayerVehicleController {
     }
     cameraController?.restoreInfantryAngles();
     this.deps.hudSystem?.hideFixedWingInstruments?.();
-    this.deps.hudSystem?.hideHelicopterMouseIndicator();
+    this.deps.hudSystem?.hideFixedWingMouseIndicator?.();
     this.deps.hudSystem?.setVehicleContext?.(null);
 
     this.deps.fixedWingModel?.setPilotedAircraft(null);
@@ -181,6 +191,7 @@ export class PlayerVehicleController {
   handleToggleMouseControl(cameraController: PlayerCamera): boolean {
     const enabled = cameraController.toggleHelicopterMouseControl();
     this.deps.hudSystem?.updateHelicopterMouseMode(enabled);
+    this.deps.hudSystem?.updateFixedWingMouseMode?.(enabled);
     return enabled;
   }
 

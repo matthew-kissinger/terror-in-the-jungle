@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { modelLoader } from '../assets/ModelLoader';
+import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
 import { AircraftModels } from '../assets/modelPaths';
 import { Logger } from '../../utils/Logger';
 
@@ -50,6 +51,7 @@ export async function createHelicopterGeometry(
   helicopterGroup.add(scene);
 
   wireRotorGroups(scene, helicopterGroup);
+  optimizeAircraftScene(scene, aircraftKey);
 
   helicopterGroup.userData = {
     type: 'helicopter',
@@ -113,6 +115,29 @@ function wireRotorGroups(scene: THREE.Group, helicopterGroup: THREE.Group): void
     tailBlades.position.set(-6, 2.5, 0);
     helicopterGroup.add(tailBlades);
     Logger.debug('helicopter', 'Added synthetic tail rotor blades');
+  }
+}
+
+function optimizeAircraftScene(scene: THREE.Group, aircraftKey: string): void {
+  const result = optimizeStaticModelDrawCalls(scene, {
+    batchNamePrefix: `${aircraftKey.toLowerCase()}_static`,
+    excludeMesh: (mesh) => {
+      const name = mesh.name.toLowerCase();
+      return mesh.userData.type === 'mainBlades'
+        || mesh.userData.type === 'tailBlades'
+        || name.includes('mainblade')
+        || name.includes('mainrotor')
+        || name.includes('tailblade')
+        || name.includes('tailrotor')
+        || name.includes('rotorhub');
+    },
+  });
+
+  if (result.sourceMeshCount > 0) {
+    Logger.info(
+      'helicopter',
+      `Optimized ${aircraftKey} draw calls: ${result.sourceMeshCount} leaf meshes -> ${result.mergedMeshCount} batches`,
+    );
   }
 }
 

@@ -6,9 +6,11 @@ import { FixedWingPhysics } from './FixedWingPhysics';
 import { FixedWingAnimation } from './FixedWingAnimation';
 import { FixedWingInteraction } from './FixedWingInteraction';
 import { FixedWingVehicleAdapter } from './FixedWingVehicleAdapter';
+import { shouldRenderAirVehicle } from './AirVehicleVisibility';
 import { FIXED_WING_CONFIGS, getFixedWingDisplayInfo } from './FixedWingConfigs';
 import type { FixedWingDisplayInfo } from './FixedWingConfigs';
 import { ModelLoader } from '../assets/ModelLoader';
+import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
 import { Faction } from '../combat/types';
 import { Logger } from '../../utils/Logger';
 import { AircraftModels } from '../assets/modelPaths';
@@ -39,6 +41,7 @@ export interface FixedWingFlightData {
  * Parallel to HelicopterModel but simpler (no weapons, no door gunners).
  */
 export class FixedWingModel implements GameSystem {
+  private static readonly IDLE_SIMULATION_SPEED = 0.5;
   private scene: THREE.Scene;
   private modelLoader = new ModelLoader();
   private animation = new FixedWingAnimation();
@@ -49,6 +52,7 @@ export class FixedWingModel implements GameSystem {
   private physics = new Map<string, FixedWingPhysics>();
   private configKeys = new Map<string, string>();
   private displayNames = new Map<string, string>();
+  private collisionRegistered = new Set<string>();
   private pilotedAircraftId: string | null = null;
 
   // Dependencies
@@ -98,43 +102,83 @@ export class FixedWingModel implements GameSystem {
     // Update interaction prompts
     this.interaction.checkPlayerProximity();
 
-    // Only run physics for the piloted aircraft. Idle parked aircraft skip
-    // physics/animation entirely to avoid wasting frame budget.
-    if (this.pilotedAircraftId) {
-      const phys = this.physics.get(this.pilotedAircraftId);
-      const group = this.groups.get(this.pilotedAircraftId);
-      if (phys && group) {
-        phys.setControls(this.currentControls);
+    const camera = this.playerController && typeof this.playerController.getCamera === 'function'
+      ? this.playerController.getCamera()
+      : null;
 
+    for (const [aircraftId, phys] of this.physics) {
+      const group = this.groups.get(aircraftId);
+      if (!group) {
+        continue;
+      }
+
+      const isPiloted = aircraftId === this.pilotedAircraftId;
+      const shouldSimulate = isPiloted
+        || phys.getFlightState() !== 'grounded'
+        || phys.getAirspeed() > FixedWingModel.IDLE_SIMULATION_SPEED;
+
+      if (isPiloted) {
+        phys.setControls(this.currentControls);
+      } else if (shouldSimulate) {
+        phys.setControls({ throttle: 0, pitch: 0, roll: 0, yaw: 0 });
+      }
+
+      if (shouldSimulate) {
         const pos = phys.getPosition();
         const terrainHeight = this.terrainManager?.getEffectiveHeightAt(pos.x, pos.z) ?? 0;
         phys.update(deltaTime, terrainHeight);
 
-        // Sync outer group position; inner model has the visual rotation offset
         group.position.copy(phys.getPosition());
         group.quaternion.copy(phys.getQuaternion());
+      }
 
-        // Propeller animation
+      const shouldRender = shouldRenderAirVehicle({
+        camera,
+        scene: this.scene,
+        vehiclePosition: group.position,
+        isAirborne: phys.getFlightState() !== 'grounded',
+        isPiloted,
+        currentlyVisible: group.visible,
+      });
+      group.visible = shouldRender;
+
+      if (shouldRender) {
         const controls = phys.getControls();
-        this.animation.update(this.pilotedAircraftId, controls.throttle, deltaTime);
+        this.animation.update(aircraftId, controls.throttle, deltaTime);
+      }
 
-        // Sync player position to aircraft
-        if (this.playerController) {
-          this.playerController.updatePlayerPosition(phys.getPosition());
-        }
+      if (isPiloted && this.playerController) {
+        this.playerController.updatePlayerPosition(phys.getPosition());
       }
     }
   }
 
   dispose(): void {
     for (const [id, group] of this.groups) {
+      if (this.collisionRegistered.has(id)) {
+        this.terrainManager?.unregisterCollisionObject(id);
+      }
       this.scene.remove(group);
+      group.traverse((node) => {
+        if (!(node instanceof THREE.Mesh)) {
+          return;
+        }
+        if (node.userData.generatedMergedGeometry === true) {
+          node.geometry.dispose();
+          if (Array.isArray(node.material)) {
+            node.material.forEach((material) => material.dispose());
+          } else {
+            node.material.dispose();
+          }
+        }
+      });
       this.animation.dispose(id);
     }
     this.groups.clear();
     this.physics.clear();
     this.configKeys.clear();
     this.displayNames.clear();
+    this.collisionRegistered.clear();
   }
 
   // -- Aircraft creation --
@@ -169,6 +213,7 @@ export class FixedWingModel implements GameSystem {
       // GLB faces +Z but physics forward is -Z. Rotate inner model 180° on Y
       // so it visually aligns with the physics forward direction.
       innerModel.rotation.y = Math.PI;
+      this.optimizeLoadedAircraft(innerModel, configKey);
 
       // Outer group is driven by physics quaternion (position + attitude).
       // Inner model handles the visual-to-physics rotation offset.
@@ -187,6 +232,10 @@ export class FixedWingModel implements GameSystem {
       this.groups.set(id, group);
       this.configKeys.set(id, configKey);
       this.displayNames.set(id, display.displayName);
+      if (this.terrainManager) {
+        this.terrainManager.registerCollisionObject(id, group);
+        this.collisionRegistered.add(id);
+      }
 
       // Create physics instance (starts grounded)
       const phys = new FixedWingPhysics(worldPosition.clone(), config.physics);
@@ -216,6 +265,33 @@ export class FixedWingModel implements GameSystem {
     } catch (err) {
       Logger.warn('fixedwing', `Failed to load model ${modelPath}: ${err}`);
       return false;
+    }
+  }
+
+  private optimizeLoadedAircraft(innerModel: THREE.Group, configKey: string): void {
+    const display = getFixedWingDisplayInfo(configKey);
+    const propellerNames = new Set(
+      (display?.propellerNodes ?? []).map((name) => name.toLowerCase()),
+    );
+
+    const result = optimizeStaticModelDrawCalls(innerModel, {
+      batchNamePrefix: `${configKey.toLowerCase()}_static`,
+      excludeMesh: (mesh) => {
+        const meshName = mesh.name.toLowerCase();
+        for (const propName of propellerNames) {
+          if (meshName.includes(propName)) {
+            return true;
+          }
+        }
+        return meshName.includes('propeller') || meshName.includes('prop_');
+      },
+    });
+
+    if (result.sourceMeshCount > 0) {
+      Logger.info(
+        'fixedwing',
+        `Optimized ${configKey} draw calls: ${result.sourceMeshCount} leaf meshes -> ${result.mergedMeshCount} batches`,
+      );
     }
   }
 

@@ -30,18 +30,30 @@ describe('PlayerVehicleController', () => {
   it('applies addMouseControlToHelicopter when not in touch helicopter mode', () => {
     const vehicle = new PlayerVehicleController();
     const addMouse = vi.fn();
-    const movement = { updateHelicopterControls: vi.fn(), addMouseControlToHelicopter: addMouse } as unknown as PlayerMovement;
+    const updateHeli = vi.fn();
+    const clearMouseMovement = vi.fn();
+    const movement = {
+      updateHelicopterControls: updateHeli,
+      addMouseControlToHelicopter: addMouse,
+    } as unknown as PlayerMovement;
     const input = {
       getTouchControls: () => ({ isInHelicopterMode: () => false }),
       getIsPointerLocked: () => true,
       getMouseMovement: () => ({ x: 0.1, y: -0.2 }),
-      clearMouseMovement: vi.fn(),
+      clearMouseMovement,
     } as unknown as PlayerInput;
     const camera = { getHelicopterMouseControlEnabled: () => true } as unknown as PlayerCamera;
 
     vehicle.updateHelicopterMode(0.016, movement, input, camera);
 
-    expect(addMouse).toHaveBeenCalledWith({ x: 0.1, y: -0.2 });
+    expect(updateHeli).toHaveBeenCalledWith(
+      0.016,
+      input,
+      undefined,
+      { x: 0.1, y: -0.2 },
+    );
+    expect(addMouse).not.toHaveBeenCalled();
+    expect(clearMouseMovement).toHaveBeenCalled();
   });
 
   it('skips addMouseControlToHelicopter when helicopter mouse mode disabled', () => {

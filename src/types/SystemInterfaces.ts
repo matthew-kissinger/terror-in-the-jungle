@@ -80,6 +80,16 @@ export interface IHUDSystem {
   updateMortarState(pitch: number, yaw: number, power: number, isAiming: boolean): void;
   showSquadDeployPrompt(): void;
   hideSquadDeployPrompt(): void;
+  showFixedWingInstruments?(): void;
+  hideFixedWingInstruments?(): void;
+  updateFixedWingFlightData?(airspeed: number, heading: number, verticalSpeed: number): void;
+  updateFixedWingThrottle?(throttle: number): void;
+  setFixedWingStallWarning?(stalled: boolean): void;
+  setFixedWingStallSpeed?(speed: number): void;
+  setFixedWingAutoLevel?(active: boolean): void;
+  showFixedWingMouseIndicator?(): void;
+  hideFixedWingMouseIndicator?(): void;
+  updateFixedWingMouseMode?(controlMode: boolean): void;
 }
 
 /**

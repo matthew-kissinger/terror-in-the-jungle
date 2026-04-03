@@ -12,6 +12,7 @@ A browser-based 3D first-person shooter set in the Vietnam War. Command squads, 
 
 - **5 game modes** from 20-player skirmishes to 3,000-agent battalion warfare on a 21km historical map
 - **3 flyable helicopters** - UH-1 Huey, UH-1C Gunship, AH-1 Cobra with weapons, door gunners, and tactical insertion
+- **3 flyable fixed-wing aircraft** - A-1 Skyraider, AC-47 Spooky, and F-4 Phantom with airfield spawns and per-aircraft flight tuning
 - **7 weapon types** - M16A1, AK-47, Ithaca 37, M3 Grease Gun, M1911, M60 LMG, M79 grenade launcher
 - **4 factions** - US Army, ARVN, NVA, Viet Cong with faction-specific loadouts
 - **Real terrain** - A Shau Valley built from USGS DEM elevation data

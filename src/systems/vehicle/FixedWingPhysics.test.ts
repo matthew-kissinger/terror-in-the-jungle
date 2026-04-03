@@ -34,17 +34,20 @@ describe('FixedWingPhysics', () => {
   });
 
   describe('stall detection', () => {
-    it('detects stall when airspeed drops below stall speed', () => {
-      // Start very high so gravity doesn't bring us to ground before stalling
-      const fw = createPhysics(skyraiderCfg, 2000);
-      // Give it some initial speed, then cut throttle
-      fw.setControls({ throttle: 1.0 });
-      for (let i = 0; i < 120; i++) fw.update(1 / 60, 0);
-      // Now cut thrust and let it decelerate via drag
-      fw.setControls({ throttle: 0 });
-      for (let i = 0; i < 600; i++) fw.update(1 / 60, 0);
-      // Should eventually stall (airspeed below stall speed while still airborne)
-      expect(fw.getAltitude()).toBeGreaterThan(1.0); // still in the air
+    it('detects stall when the pilot over-rotates after takeoff', () => {
+      const fw = new FixedWingPhysics(new THREE.Vector3(0, 0, 0), skyraiderCfg);
+      for (let i = 0; i < 900; i++) {
+        fw.setControls({
+          throttle: 1.0,
+          pitch: i > 180 ? 0.7 : 0,
+          roll: 0,
+          yaw: 0,
+        });
+        fw.update(1 / 60, 0);
+      }
+
+      expect(fw.getAltitude()).toBeGreaterThan(1.0);
+      expect(fw.getAirspeed()).toBeLessThan(skyraiderCfg.stallSpeed);
       expect(fw.isStalled()).toBe(true);
     });
 
@@ -91,6 +94,22 @@ describe('FixedWingPhysics', () => {
       fw.setControls({ throttle: 0.2 });
       for (let i = 0; i < 60; i++) fw.update(1 / 60, 0);
       expect(fw.getAltitude()).toBeCloseTo(0.5, 0); // Just above ground clearance
+    });
+
+    it('takes off with a sensible rotation input', () => {
+      const fw = new FixedWingPhysics(new THREE.Vector3(0, 0, 0), skyraiderCfg);
+      for (let i = 0; i < 900; i++) {
+        fw.setControls({
+          throttle: 1.0,
+          pitch: i > 180 ? 0.25 : 0,
+          roll: 0,
+          yaw: 0,
+        });
+        fw.update(1 / 60, 0);
+      }
+
+      expect(fw.getAltitude()).toBeGreaterThan(1.0);
+      expect(fw.getFlightState()).not.toBe('grounded');
     });
   });
 
