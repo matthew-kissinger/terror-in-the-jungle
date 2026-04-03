@@ -364,7 +364,7 @@ export class TouchControls {
 
   private applyActorContext(actorMode: ActorMode, vehicleContext: VehicleUIContext | null): void {
     this.actorMode = actorMode;
-    this.inHelicopterMode = actorMode === 'helicopter';
+    this.inHelicopterMode = actorMode === 'helicopter' || actorMode === 'plane';
     const showInfantryControls = this.visible && actorMode === 'infantry';
     const showVehicleControls = this.visible && actorMode !== 'infantry';
 

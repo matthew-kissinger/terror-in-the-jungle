@@ -36,6 +36,8 @@ export interface PlayerState {
   isCrouching: boolean;
   isInHelicopter: boolean;
   helicopterId: string | null;
+  isInFixedWing: boolean;
+  fixedWingId: string | null;
 }
 
 export interface GameSystem {

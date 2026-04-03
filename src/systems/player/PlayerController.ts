@@ -18,6 +18,7 @@ import { InputContextManager } from '../input/InputContextManager';
 import { Logger } from '../../utils/Logger';
 import { resolveInitialSpawnPosition } from '../world/runtime/ModeSpawnResolver';
 import type { HelicopterModel } from '../helicopter/HelicopterModel';
+import type { FixedWingModel } from '../vehicle/FixedWingModel';
 import type { FirstPersonWeapon } from './FirstPersonWeapon';
 import type { HUDSystem } from '../../ui/hud/HUDSystem';
 import type { IGameRenderer, ITerrainRuntime } from '../../types/SystemInterfaces';
@@ -54,6 +55,7 @@ export class PlayerController implements GameSystem {
   private terrainSystem?: ITerrainRuntime;
   private gameModeManager?: GameModeManager;
   private helicopterModel?: HelicopterModel;
+  private fixedWingModel?: FixedWingModel;
   private firstPersonWeapon?: FirstPersonWeapon;
   private hudSystem?: HUDSystem;
   private ticketSystem?: TicketSystem;
@@ -108,7 +110,9 @@ export class PlayerController implements GameSystem {
       gravity: PLAYER_GRAVITY,
       isCrouching: false,
       isInHelicopter: false,
-      helicopterId: null
+      helicopterId: null,
+      isInFixedWing: false,
+      fixedWingId: null,
     };
 
     // Initialize modules
@@ -146,6 +150,8 @@ export class PlayerController implements GameSystem {
     if (this.cameraShakeSystem) this.cameraShakeSystem.update(deltaTime);
     if (this.playerState.isInHelicopter) {
       this.updateHelicopterMode(deltaTime);
+    } else if (this.playerState.isInFixedWing) {
+      this.updateFixedWingMode(deltaTime);
     } else {
       this.movement.updateMovement(deltaTime, this.input, this.camera);
     }
@@ -178,7 +184,13 @@ export class PlayerController implements GameSystem {
         if (this.commandInputManager?.handleSecondarySelect()) return;
         this.handleEnterExitHelicopter();
       },
-      onToggleAutoHover: () => this.movement.toggleAutoHover(),
+      onToggleAutoHover: () => {
+        if (this.playerState.isInFixedWing) {
+          this.movement.toggleAutoLevel();
+        } else {
+          this.movement.toggleAutoHover();
+        }
+      },
       onToggleAltitudeLock: () => this.movement.toggleAltitudeLock(),
       onToggleMouseControl: () => this.handleToggleMouseControl(),
       onSandbagRotateLeft: () => this.sandbagSystem?.rotatePlacementPreview(-Math.PI / 8),
@@ -351,6 +363,10 @@ export class PlayerController implements GameSystem {
       this.helicopterModel.exitHelicopter();
       return;
     }
+    if (this.playerState.isInFixedWing && this.fixedWingModel) {
+      this.fixedWingModel.exitAircraft();
+      return;
+    }
     if (this.gameStarted && this.settingsModal) {
       this.settingsModal.show();
       return;
@@ -418,6 +434,10 @@ export class PlayerController implements GameSystem {
 
   private updateHelicopterMode(deltaTime: number): void {
     this.vehicleController.updateHelicopterMode(deltaTime, this.movement, this.input, this.cameraController);
+  }
+
+  private updateFixedWingMode(deltaTime: number): void {
+    this.vehicleController.updateFixedWingMode(deltaTime, this.movement, this.input, this.cameraController);
   }
 
   private updateHUD(): void {
@@ -489,6 +509,7 @@ export class PlayerController implements GameSystem {
     return reason.startsWith('startup')
       || reason.startsWith('respawn')
       || reason.startsWith('helicopter')
+      || reason.startsWith('fixedwing')
       || reason.startsWith('harness')
       || reason === 'teleport';
   }
@@ -637,6 +658,34 @@ export class PlayerController implements GameSystem {
   isInHelicopter(): boolean { return this.playerState.isInHelicopter; }
   getHelicopterId(): string | null { return this.playerState.helicopterId; }
 
+  enterFixedWing(aircraftId: string, aircraftPosition: THREE.Vector3): void {
+    Logger.info('player', `ENTERING FIXED-WING: ${aircraftId}`);
+    this.vehicleController.enterFixedWing(
+      this.playerState,
+      aircraftPosition,
+      aircraftId,
+      (position, reason) => this.setPosition(position, reason),
+      this.input,
+      this.cameraController,
+    );
+    this.unequipWeapon();
+  }
+
+  exitFixedWing(exitPosition: THREE.Vector3): void {
+    Logger.info('player', `EXITING FIXED-WING: ${this.playerState.fixedWingId}`);
+    this.vehicleController.exitFixedWing(
+      this.playerState,
+      exitPosition,
+      (position, reason) => this.setPosition(position, reason),
+      this.input,
+      this.cameraController,
+    );
+    this.equipWeapon();
+  }
+
+  isInFixedWing(): boolean { return this.playerState.isInFixedWing; }
+  getFixedWingId(): string | null { return this.playerState.fixedWingId; }
+
   // ── Spectator camera API ──
 
   /**
@@ -736,8 +785,14 @@ export class PlayerController implements GameSystem {
       sandbagSystem: dependencies.sandbagSystem,
       ticketSystem: dependencies.ticketSystem,
     });
+    if (dependencies.fixedWingModel) {
+      this.fixedWingModel = dependencies.fixedWingModel;
+      this.movement.setFixedWingModel(dependencies.fixedWingModel);
+      this.cameraController.setFixedWingModel(dependencies.fixedWingModel);
+    }
     this.configureVehicleController({
       helicopterModel: dependencies.helicopterModel,
+      fixedWingModel: dependencies.fixedWingModel,
       hudSystem: dependencies.hudSystem,
       airSupportManager: dependencies.airSupportManager,
     });
@@ -840,6 +895,12 @@ export class PlayerController implements GameSystem {
   setFootstepAudioSystem(footstepAudioSystem: FootstepAudioSystem): void { this.footstepAudioSystem = footstepAudioSystem; this.movement.setFootstepAudioSystem(footstepAudioSystem); }
   setPlayerSquadId(squadId: string): void { this.playerSquadId = squadId; }
   setPlayerSquadController(playerSquadController: PlayerSquadController): void { this.playerSquadController = playerSquadController; }
+  setFixedWingModel(fixedWingModel: FixedWingModel): void {
+    this.fixedWingModel = fixedWingModel;
+    this.movement.setFixedWingModel(fixedWingModel);
+    this.cameraController.setFixedWingModel(fixedWingModel);
+    this.configureVehicleController({ fixedWingModel });
+  }
   setAirSupportManager(airSupportManager: AirSupportManager): void {
     this.airSupportManager = airSupportManager;
     this.configureVehicleController({ airSupportManager });

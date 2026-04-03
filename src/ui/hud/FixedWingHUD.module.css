@@ -1,0 +1,456 @@
+/**
+ * FixedWingHUD - Fixed-wing aircraft instruments overlay
+ *
+ * Design: Vertical stack of glass panels on the left edge (matches HelicopterHUD).
+ * Sections: elevation+airspeed, heading, VSI, throttle+auto-level, stall warning, mouse mode, damage bar.
+ */
+
+.container {
+  position: fixed;
+  left: max(4px, env(safe-area-inset-left, 0px));
+  bottom: max(60px, env(safe-area-inset-bottom, 0px));
+  display: none;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+  user-select: none;
+  z-index: var(--z-hud-overlay);
+  max-height: calc(100dvh - 120px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.touchMode {
+  gap: 4px;
+}
+
+.visible {
+  display: flex;
+}
+
+/* --- Shared panel base --- */
+.panel {
+  width: 60px;
+  background:
+    linear-gradient(180deg, rgba(120, 180, 255, 0.08), transparent 70%),
+    rgba(15, 21, 14, 0.92);
+  border: 1px solid var(--ops-line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--ops-shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2) var(--space-1-5);
+}
+
+.touchMode .panel {
+  width: 48px;
+  padding: 6px 6px;
+}
+
+/* --- Elevation + airspeed section --- */
+.elevationValue {
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  text-align: center;
+  background: rgba(120, 180, 255, 0.08);
+  padding: var(--space-1) var(--space-1-5);
+  border-radius: var(--radius-sm);
+  min-width: 40px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dataLabel {
+  font-size: var(--font-size-3xs);
+  font-weight: var(--weight-semibold);
+  color: var(--ops-data);
+  text-align: center;
+  margin-top: var(--space-1);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.touchMode .dataLabel {
+  display: none;
+}
+
+.airspeedValue {
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  text-align: center;
+  background: rgba(255, 255, 255, 0.08);
+  padding: var(--space-1) var(--space-1-5);
+  border-radius: var(--radius-sm);
+  min-width: 40px;
+  font-variant-numeric: tabular-nums;
+}
+
+.airspeedStall {
+  color: var(--danger);
+  background: rgba(201, 120, 74, 0.15);
+}
+
+.airspeedWarning {
+  color: var(--accent);
+}
+
+/* --- Heading section --- */
+.headingSection {
+  flex-direction: row;
+  gap: 4px;
+}
+
+.headingLabel {
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  min-width: 18px;
+  text-align: center;
+}
+
+.headingDegrees {
+  font-size: var(--font-size-3xs);
+  color: var(--ops-data);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- VSI section --- */
+.vsiSection {
+  flex-direction: row;
+  gap: 3px;
+}
+
+.vsiArrow {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  transition: border-color var(--duration-fast) var(--ease-out);
+}
+
+.vsiUp {
+  border-bottom: 6px solid var(--success);
+}
+
+.vsiDown {
+  border-top: 6px solid var(--danger);
+}
+
+.vsiNeutral {
+  border-bottom: 6px solid var(--text-muted);
+  opacity: 0.4;
+}
+
+.vsiValue {
+  font-size: var(--font-size-2xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  min-width: 24px;
+  text-align: center;
+}
+
+/* --- Throttle + auto-level section --- */
+.instrumentsSection {
+  gap: 6px;
+}
+
+.touchMode .instrumentsSection {
+  gap: 4px;
+}
+
+.instrumentColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.instrumentLabel {
+  font-size: 8px;
+  color: var(--ops-data);
+  text-align: center;
+  margin-bottom: 2px;
+  text-transform: uppercase;
+}
+
+.touchMode .instrumentLabel {
+  display: none;
+}
+
+.thrustBar {
+  width: 12px;
+  height: 30px;
+  border: 1px solid var(--ops-line);
+  position: relative;
+  border-radius: 2px;
+  background: rgba(7, 10, 8, 0.7);
+}
+
+.touchMode .thrustBar {
+  height: 24px;
+}
+
+.thrustFill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 0%;
+  border-radius: 1px;
+  transition: height 0.1s ease;
+}
+
+.thrustNormal {
+  background: linear-gradient(to top, var(--success), rgba(106, 184, 122, 0.85));
+}
+
+.thrustMedium {
+  background: linear-gradient(to top, var(--accent), rgba(212, 180, 68, 0.85));
+}
+
+.thrustHigh {
+  background: linear-gradient(to top, var(--danger), rgba(201, 120, 74, 0.85));
+}
+
+/* Status indicators (Auto-level) */
+.statusRow {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  justify-content: center;
+}
+
+.statusBox {
+  width: 24px;
+  height: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  background: rgba(100, 100, 100, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 7px;
+  font-weight: var(--weight-bold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  transition: background var(--duration-fast) var(--ease-out),
+              border-color var(--duration-fast) var(--ease-out),
+              color var(--duration-fast) var(--ease-out);
+}
+
+.statusBoxActive {
+  color: var(--text-primary);
+  background: rgba(92, 184, 92, 0.35);
+  border-color: var(--success);
+}
+
+/* --- Stall warning --- */
+.stallWarning {
+  display: none;
+  background: rgba(201, 60, 40, 0.25);
+  border-color: var(--danger);
+}
+
+.stallWarningVisible {
+  display: flex;
+}
+
+.stallText {
+  font-size: var(--font-size-xs);
+  font-weight: var(--weight-bold);
+  color: var(--danger);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  animation: stallBlink 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes stallBlink {
+  from { opacity: 0.4; }
+  to { opacity: 1.0; }
+}
+
+/* --- Mouse mode section --- */
+.mouseSection {
+  display: none;
+}
+
+.mouseSectionVisible {
+  display: flex;
+}
+
+.touchMode .mouseSection,
+.touchMode .mouseSectionVisible {
+  display: none !important;
+}
+
+.mouseIcon {
+  width: 20px;
+  height: 26px;
+  border: 2px solid var(--ops-data);
+  border-radius: 8px 8px 12px 12px;
+  position: relative;
+  margin-bottom: var(--space-1);
+  background: rgba(120, 180, 255, 0.05);
+  transition: border-color var(--duration-fast) var(--ease-out),
+              background var(--duration-fast) var(--ease-out);
+}
+
+.mouseIconFreeLook {
+  border-color: var(--ops-accent);
+  background: rgba(120, 180, 255, 0.12);
+}
+
+.mouseWheel {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 6px;
+  background: var(--ops-data);
+  border-radius: 1px;
+}
+
+.mouseStatus {
+  font-size: var(--font-size-3xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  text-align: center;
+  text-transform: uppercase;
+  line-height: 1.2;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.mouseStatusFreeLook {
+  color: var(--ops-accent);
+}
+
+.mouseLabel {
+  font-size: 8px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 2px;
+  text-transform: uppercase;
+}
+
+/* --- Damage section --- */
+.damageSection {
+  flex-direction: row;
+  gap: 4px;
+  width: 60px;
+}
+
+.damageBarOuter {
+  flex: 1;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.damageFill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.2s ease, background 0.3s ease;
+}
+
+.damageGreen { background: var(--success); }
+.damageAmber { background: var(--accent); }
+.damageRed { background: var(--danger); }
+
+.damageValue {
+  font-size: var(--font-size-3xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  min-width: 24px;
+  text-align: right;
+}
+
+/* --- Responsive: mobile touch landscape --- */
+@media (pointer: coarse) and (orientation: landscape) {
+  .container {
+    top: auto;
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: max(4px, env(safe-area-inset-bottom, 0px));
+    max-height: 52px;
+    overflow: hidden;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 3px;
+    max-width: 55%;
+  }
+
+  .container .panel {
+    width: auto;
+    min-width: unset;
+    max-height: 32px;
+    padding: 2px 6px;
+    overflow: hidden;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .container .panel > * {
+    flex-direction: row;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .container .elevationValue,
+  .container .airspeedValue {
+    font-size: 11px;
+    min-width: unset;
+    padding: 0;
+  }
+
+  .container .damageSection {
+    flex-direction: row;
+    align-items: center;
+    width: auto;
+    gap: 3px;
+  }
+
+  .container .statusBox {
+    display: none;
+  }
+}
+
+@media (pointer: coarse) and (orientation: portrait) {
+  .container {
+    bottom: auto;
+    right: auto;
+    top: 108px;
+    left: max(4px, env(safe-area-inset-left, 0px));
+    max-height: calc(65dvh - 116px);
+    overflow-y: auto;
+    gap: 3px;
+  }
+
+  .container .panel {
+    padding: 3px 5px;
+    width: 80px;
+  }
+
+  .container .elevationValue,
+  .container .airspeedValue {
+    font-size: 10px;
+    min-width: unset;
+    padding: 0;
+  }
+
+  .container .damageSection {
+    width: 80px;
+  }
+}

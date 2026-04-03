@@ -299,6 +299,7 @@ export class SystemManager {
   get compassSystem(): CompassSystem { return this.registry.require('compassSystem'); }
   get helipadSystem(): HelipadSystem { return this.registry.require('helipadSystem'); }
   get helicopterModel(): HelicopterModel { return this.registry.require('helicopterModel'); }
+  get fixedWingModel(): import('../systems/vehicle/FixedWingModel').FixedWingModel { return this.registry.require('fixedWingModel'); }
   get playerSquadController(): PlayerSquadController { return this.registry.require('playerSquadController'); }
   get commandInputManager(): CommandInputManager { return this.registry.require('commandInputManager'); }
   get inventoryManager(): InventoryManager { return this.registry.require('inventoryManager'); }

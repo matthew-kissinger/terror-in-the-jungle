@@ -12,6 +12,7 @@ import { generateAirfieldLayout } from './AirfieldLayoutGenerator';
 import { GameModeManager } from './GameModeManager';
 import { getWorldFeaturePrefab } from './WorldFeaturePrefabs';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
+import { FixedWingModel } from '../vehicle/FixedWingModel';
 
 const _rotatedOffset = new THREE.Vector3();
 const _upAxis = new THREE.Vector3(0, 1, 0);
@@ -56,6 +57,7 @@ export class WorldFeatureSystem implements GameSystem {
   private terrainManager?: ITerrainRuntime;
   private gameModeManager?: GameModeManager;
   private navmeshSystem?: NavmeshSystem;
+  private fixedWingModel?: FixedWingModel;
   private spawnedObjects: SpawnedFeatureObject[] = [];
   private buildInFlight = false;
   private builtModeId: string | null = null;
@@ -83,6 +85,10 @@ export class WorldFeatureSystem implements GameSystem {
 
   setNavmeshSystem(navmeshSystem: NavmeshSystem): void {
     this.navmeshSystem = navmeshSystem;
+  }
+
+  setFixedWingModel(fixedWingModel: FixedWingModel): void {
+    this.fixedWingModel = fixedWingModel;
   }
 
   update(_deltaTime: number): void {
@@ -141,6 +147,21 @@ export class WorldFeatureSystem implements GameSystem {
     const featureYaw = feature.placement?.yaw ?? 0;
     for (let i = 0; i < placements.length; i++) {
       const placement = placements[i];
+
+      // Route fixed-wing aircraft to FixedWingModel for interactive spawning
+      if (this.fixedWingModel && FixedWingModel.isFixedWingModelPath(placement.modelPath)) {
+        _rotatedOffset.copy(placement.offset).applyAxisAngle(_upAxis, featureYaw);
+        const worldPos = new THREE.Vector3(
+          feature.position.x + _rotatedOffset.x,
+          feature.position.y,
+          feature.position.z + _rotatedOffset.z,
+        );
+        const heading = featureYaw + (placement.yaw ?? 0);
+        const spotId = `${feature.id}_fw_${i}`;
+        this.fixedWingModel.createAircraftAtSpot(spotId, placement.modelPath, worldPos, heading);
+        continue;
+      }
+
       const object = await modelLoader.loadModel(placement.modelPath);
       prepareModelForPlacement(object, placement.modelPath);
 

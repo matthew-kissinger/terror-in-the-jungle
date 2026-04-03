@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-04-01
+Last verified: 2026-04-02
 
 Systems-based orchestration engine. 43 GameSystem classes, 14 tracked tick groups, 8 singletons.
 
@@ -44,7 +44,7 @@ Runtime composers (extracted from SystemConnector):
 | Strategy | `src/systems/strategy/` | WarSimulator, MaterializationPipeline, StrategicDirector | 2ms |
 | Player | `src/systems/player/` | PlayerController, PlayerMovement, FirstPersonWeapon | 1ms |
 | Weapons | `src/systems/weapons/` | GrenadeSystem, MortarSystem, SandbagSystem, AmmoSupplySystem | 1ms |
-| Vehicles | `src/systems/helicopter/`, `src/systems/vehicle/` | HelicopterModel, HelicopterPhysics, VehicleManager | 1ms |
+| Vehicles | `src/systems/helicopter/`, `src/systems/vehicle/` | HelicopterModel, HelicopterPhysics, FixedWingModel, FixedWingPhysics, VehicleManager | 1ms |
 | World | `src/systems/world/` | ZoneManager, TicketSystem, GameModeManager, WorldFeatureSystem | 1ms |
 | Air Support | `src/systems/airsupport/` | AirSupportManager, AAEmplacement | 1ms |
 | Assets | `src/systems/assets/` | AssetLoader, ModelLoader | untracked |
@@ -71,7 +71,7 @@ TRACKED (budgeted, EMA-monitored):
   Terrain     2.0ms  terrainSystem
   Navigation  2.0ms  navmeshSystem
   Billboards  2.0ms  globalBillboardSystem
-  Vehicles    1.0ms  helicopterModel + vehicleManager
+  Vehicles    1.0ms  helicopterModel + fixedWingModel + vehicleManager
   Player      1.0ms  playerController + firstPersonWeapon
   Weapons     1.0ms  grenade + mortar + sandbag + ammoSupply
   HUD         1.0ms  hudSystem

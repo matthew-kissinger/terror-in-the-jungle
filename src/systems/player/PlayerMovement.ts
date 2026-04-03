@@ -69,7 +69,13 @@ export class PlayerMovement {
   private sandbagSystem?: SandbagSystem;
   private footstepAudioSystem?: FootstepAudioSystem;
   private helicopterModel?: IHelicopterModel;
+  private fixedWingModel?: import('../vehicle/FixedWingModel').FixedWingModel;
   private worldHalfExtent = 0;
+
+  // Fixed-wing control state
+  private fixedWingThrottle = 0;
+  private fixedWingControls = { throttle: 0, pitch: 0, roll: 0, yaw: 0 };
+  private fixedWingAutoLevel = false;
   private helicopterControls: HelicopterControls = {
     collective: 0,
     cyclicPitch: 0,
@@ -108,6 +114,10 @@ export class PlayerMovement {
 
   setHelicopterModel(helicopterModel: IHelicopterModel): void {
     this.helicopterModel = helicopterModel;
+  }
+
+  setFixedWingModel(fixedWingModel: import('../vehicle/FixedWingModel').FixedWingModel): void {
+    this.fixedWingModel = fixedWingModel;
   }
 
   setCrouching(crouching: boolean): void {
@@ -461,7 +471,7 @@ export class PlayerMovement {
     }
 
     // Play footstep sounds when moving on ground
-    if (this.footstepAudioSystem && !this.playerState.isInHelicopter) {
+    if (this.footstepAudioSystem && !this.playerState.isInHelicopter && !this.playerState.isInFixedWing) {
       const isMoving = moveVector.length() > 0;
       this.footstepAudioSystem.playPlayerFootstep(
         this.playerState.position,
@@ -568,6 +578,160 @@ export class PlayerMovement {
       this.helicopterControls.cyclicPitch - mouseMovement.y * mouseSensitivity,
       -1.0, 1.0
     );
+  }
+
+  // ── Fixed-wing controls ──
+
+  private static readonly FW_THROTTLE_RAMP_RATE = 0.8; // units/sec
+  private static readonly FW_MOUSE_SENSITIVITY = 0.5;
+  private static readonly FW_TOUCH_DEADZONE = 0.1;
+  private static readonly FW_AUTO_LEVEL_RATE = 2.0; // rad/sec to zero out roll/pitch
+
+  updateFixedWingControls(
+    deltaTime: number,
+    input: PlayerInput,
+    fixedWingModel?: import('../vehicle/FixedWingModel').FixedWingModel,
+    hudSystem?: IHUDSystem,
+  ): void {
+    const touchControls = input.getTouchControls();
+    const hasTouchMode = touchControls?.isInHelicopterMode() ?? false;
+
+    // --- Throttle (persistent: W increases, S decreases, neither holds) ---
+    if (hasTouchMode) {
+      const touchMove = input.getTouchMovementVector();
+      const throttleRate = -touchMove.z; // up = positive = increase
+      if (Math.abs(throttleRate) > PlayerMovement.FW_TOUCH_DEADZONE) {
+        this.fixedWingThrottle = THREE.MathUtils.clamp(
+          this.fixedWingThrottle + throttleRate * deltaTime * PlayerMovement.FW_THROTTLE_RAMP_RATE,
+          0, 1,
+        );
+      }
+    } else if (input.isKeyPressed('keyw')) {
+      this.fixedWingThrottle = Math.min(this.fixedWingThrottle + deltaTime * PlayerMovement.FW_THROTTLE_RAMP_RATE, 1.0);
+    } else if (input.isKeyPressed('keys')) {
+      this.fixedWingThrottle = Math.max(this.fixedWingThrottle - deltaTime * PlayerMovement.FW_THROTTLE_RAMP_RATE, 0.0);
+    }
+    this.fixedWingControls.throttle = this.fixedWingThrottle;
+
+    // --- Yaw (rudder) ---
+    if (hasTouchMode) {
+      const touchMove = input.getTouchMovementVector();
+      this.fixedWingControls.yaw = Math.abs(touchMove.x) > PlayerMovement.FW_TOUCH_DEADZONE ? -touchMove.x : 0;
+    } else if (input.isKeyPressed('keya')) {
+      this.fixedWingControls.yaw = 1.0;
+    } else if (input.isKeyPressed('keyd')) {
+      this.fixedWingControls.yaw = -1.0;
+    } else {
+      this.fixedWingControls.yaw = 0;
+    }
+
+    // --- Pitch / Roll ---
+    // Gamepad: left stick -> pitch (Y) and roll (X) in flight-sim style
+    const gp = input.getGamepadManager?.();
+    const gpActive = gp?.isActive() ?? false;
+
+    const touchCyclic = input.getTouchCyclicInput();
+    const hasTouchCyclic = Math.abs(touchCyclic.pitch) > 0.05 || Math.abs(touchCyclic.roll) > 0.05;
+
+    if (gpActive && gp) {
+      const gpMove = gp.getMovementVector();
+      const gpPitch = -gpMove.z; // Stick forward (negative z) = nose down (negative pitch), invert
+      const gpRoll = gpMove.x;
+      if (Math.abs(gpPitch) > 0.05 || Math.abs(gpRoll) > 0.05) {
+        this.fixedWingControls.pitch = gpPitch;
+        this.fixedWingControls.roll = gpRoll;
+        this.fixedWingAutoLevel = false;
+      } else {
+        this.fixedWingControls.pitch = 0;
+        this.fixedWingControls.roll = 0;
+      }
+      // Gamepad triggers for throttle: RT = increase, LT = decrease
+      // Read trigger values as analog throttle adjustment
+      // (onFireStart/onFireStop callbacks don't fire when we consume here;
+      //  we rely on the raw axis values or the existing keyboard fallback)
+    } else if (hasTouchCyclic) {
+      this.fixedWingControls.pitch = touchCyclic.pitch;
+      this.fixedWingControls.roll = touchCyclic.roll;
+      this.fixedWingAutoLevel = false;
+    } else {
+      const pitchInput = input.isKeyPressed('arrowup') ? 1.0
+        : input.isKeyPressed('arrowdown') ? -1.0 : 0;
+      const rollInput = input.isKeyPressed('arrowright') ? 1.0
+        : input.isKeyPressed('arrowleft') ? -1.0 : 0;
+
+      if (pitchInput !== 0 || rollInput !== 0) {
+        this.fixedWingAutoLevel = false;
+      }
+
+      this.fixedWingControls.pitch = pitchInput;
+      this.fixedWingControls.roll = rollInput;
+    }
+
+    // Auto-level: gradually zero pitch/roll when active and no manual input
+    if (this.fixedWingAutoLevel && this.fixedWingControls.pitch === 0 && this.fixedWingControls.roll === 0) {
+      // Apply gentle correction inputs that FixedWingPhysics will smooth
+      const model = fixedWingModel ?? this.fixedWingModel;
+      if (model && this.playerState.fixedWingId) {
+        const fd = model.getFlightData(this.playerState.fixedWingId);
+        if (fd) {
+          // Correct roll toward 0
+          if (Math.abs(fd.roll) > 2) {
+            this.fixedWingControls.roll = -THREE.MathUtils.clamp(fd.roll / 45, -1, 1);
+          }
+          // Correct pitch toward slight nose-up (3 degrees)
+          if (Math.abs(fd.pitch - 3) > 2) {
+            this.fixedWingControls.pitch = THREE.MathUtils.clamp((3 - fd.pitch) / 30, -0.5, 0.5);
+          }
+        }
+      }
+    }
+
+    // Send controls to model
+    const model = fixedWingModel ?? this.fixedWingModel;
+    if (model) {
+      model.setFixedWingControls(this.fixedWingControls);
+    }
+
+    // Update fixed-wing HUD
+    if (hudSystem) {
+      hudSystem.updateElevation(this.playerState.position.y);
+      const fwModel = fixedWingModel ?? this.fixedWingModel;
+      if (fwModel && this.playerState.fixedWingId) {
+        const fd = fwModel.getFlightData(this.playerState.fixedWingId);
+        if (fd) {
+          (hudSystem as any).updateFixedWingFlightData?.(fd.airspeed, fd.heading, fd.verticalSpeed);
+          (hudSystem as any).updateFixedWingThrottle?.(this.fixedWingThrottle);
+          (hudSystem as any).setFixedWingStallWarning?.(fd.isStalled);
+          (hudSystem as any).setFixedWingAutoLevel?.(this.fixedWingAutoLevel);
+        }
+      }
+    }
+  }
+
+  toggleAutoLevel(): void {
+    this.fixedWingAutoLevel = !this.fixedWingAutoLevel;
+    Logger.info('player', `Auto-level ${this.fixedWingAutoLevel ? 'enabled' : 'disabled'}`);
+  }
+
+  addMouseControlToFixedWing(
+    mouseMovement: { x: number; y: number },
+    mouseSensitivity: number = PlayerMovement.FW_MOUSE_SENSITIVITY,
+  ): void {
+    this.fixedWingControls.roll = THREE.MathUtils.clamp(
+      this.fixedWingControls.roll + mouseMovement.x * mouseSensitivity,
+      -1.0, 1.0,
+    );
+    this.fixedWingControls.pitch = THREE.MathUtils.clamp(
+      this.fixedWingControls.pitch - mouseMovement.y * mouseSensitivity,
+      -1.0, 1.0,
+    );
+    this.fixedWingAutoLevel = false;
+  }
+
+  resetFixedWingControls(): void {
+    this.fixedWingThrottle = 0;
+    this.fixedWingControls = { throttle: 0, pitch: 0, roll: 0, yaw: 0 };
+    this.fixedWingAutoLevel = false;
   }
 
   /** Clamp position to world boundary and bounce velocity inward. */

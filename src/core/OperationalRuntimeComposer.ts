@@ -11,6 +11,7 @@ type OperationalRuntimeRefs = Pick<
   | 'gameModeManager'
   | 'globalBillboardSystem'
   | 'grenadeSystem'
+  | 'fixedWingModel'
   | 'helicopterModel'
   | 'helipadSystem'
   | 'hudSystem'
@@ -46,6 +47,7 @@ interface OperationalRuntimeGroups {
     OperationalRuntimeRefs,
     | 'audioManager'
     | 'combatantSystem'
+    | 'fixedWingModel'
     | 'fullMapSystem'
     | 'gameModeManager'
     | 'globalBillboardSystem'
@@ -98,6 +100,7 @@ export function createOperationalRuntimeGroups(
     vehicleRuntime: {
       audioManager: refs.audioManager,
       combatantSystem: refs.combatantSystem,
+      fixedWingModel: refs.fixedWingModel,
       fullMapSystem: refs.fullMapSystem,
       gameModeManager: refs.gameModeManager,
       globalBillboardSystem: refs.globalBillboardSystem,
@@ -206,6 +209,14 @@ function wireVehicleRuntime(
     runtime.worldFeatureSystem.setTerrainManager(runtime.terrainSystem);
     runtime.worldFeatureSystem.setGameModeManager(runtime.gameModeManager);
   }
+
+  // Wire FixedWingModel
+  runtime.fixedWingModel.setTerrainManager(runtime.terrainSystem);
+  runtime.fixedWingModel.setPlayerController(runtime.playerController);
+  runtime.fixedWingModel.setHUDSystem(runtime.hudSystem);
+  runtime.fixedWingModel.setVehicleManager(runtime.vehicleManager);
+  runtime.playerController.setFixedWingModel(runtime.fixedWingModel);
+  runtime.worldFeatureSystem.setFixedWingModel(runtime.fixedWingModel);
 
   runtime.npcVehicleController.setVehicleManager(runtime.vehicleManager);
   runtime.npcVehicleController.setCombatantProvider(() => runtime.combatantSystem.combatants);

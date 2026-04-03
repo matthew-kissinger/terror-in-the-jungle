@@ -15,6 +15,7 @@ import { GameStatusPanel } from './GameStatusPanel';
 import { KillCounter } from './KillCounter';
 import { AmmoDisplay } from './AmmoDisplay';
 import { HelicopterHUD } from './HelicopterHUD';
+import { FixedWingHUD } from './FixedWingHUD';
 import { InteractionPromptPanel } from './InteractionPromptPanel';
 import { GrenadeMeter } from './GrenadeMeter';
 import { MortarPanel } from './MortarPanel';
@@ -47,6 +48,7 @@ export class HUDElements {
 
   // UIComponent-based elements (Phase 4)
   public helicopterHUD: HelicopterHUD;
+  public fixedWingHUD: FixedWingHUD;
 
   // Feedback systems
   public killFeed: KillFeed;
@@ -79,6 +81,7 @@ export class HUDElements {
 
     // Initialize Phase 4 UIComponent modules
     this.helicopterHUD = new HelicopterHUD();
+    this.fixedWingHUD = new FixedWingHUD();
 
     // Initialize legacy modules (not yet migrated)
     this.objectiveDisplay = new ObjectiveDisplay();
@@ -125,6 +128,7 @@ export class HUDElements {
     this.ammoDisplay.mount(this.hudContainer);
     this.interactionPromptPanel.mount(this.hudContainer);
     this.helicopterHUD.mount(document.body);
+    this.fixedWingHUD.mount(document.body);
     this.grenadeMeter.mount(this.hudContainer);
     this.mortarPanel.mount(this.hudContainer);
     // Removed respawn button from HUD
@@ -253,6 +257,47 @@ export class HUDElements {
     this.helicopterHUD.setDamage(healthPercent);
   }
 
+  // Fixed-wing HUD methods
+  showFixedWingInstruments(): void {
+    this.fixedWingHUD.show();
+  }
+
+  hideFixedWingInstruments(): void {
+    this.fixedWingHUD.hide();
+  }
+
+  updateFixedWingFlightData(airspeed: number, heading: number, verticalSpeed: number): void {
+    this.fixedWingHUD.setFlightData(airspeed, heading, verticalSpeed);
+  }
+
+  updateFixedWingThrottle(throttle: number): void {
+    this.fixedWingHUD.setThrottle(throttle);
+  }
+
+  setFixedWingStallWarning(stalled: boolean): void {
+    this.fixedWingHUD.setStallWarning(stalled);
+  }
+
+  setFixedWingStallSpeed(speed: number): void {
+    this.fixedWingHUD.setStallSpeed(speed);
+  }
+
+  setFixedWingAutoLevel(active: boolean): void {
+    this.fixedWingHUD.setAutoLevel(active);
+  }
+
+  showFixedWingMouseIndicator(): void {
+    this.fixedWingHUD.showMouseIndicator();
+  }
+
+  hideFixedWingMouseIndicator(): void {
+    this.fixedWingHUD.hideMouseIndicator();
+  }
+
+  updateFixedWingMouseMode(controlMode: boolean): void {
+    this.fixedWingHUD.setMouseMode(controlMode);
+  }
+
   // Mortar indicator methods
   showMortarIndicator(): void {
     this.mortarPanel.show();
@@ -312,6 +357,9 @@ export class HUDElements {
     // `contain: layout style` which creates a new containing block,
     // breaking position:fixed and causing the panels to offset toward center.
     this.helicopterHUD.mount(document.body);
+
+    this.fixedWingHUD.unmount();
+    this.fixedWingHUD.mount(document.body);
 
     // Legacy HTMLDivElement elements
     layout.getSlot('objectives').appendChild(this.objectivesList);
@@ -439,5 +487,6 @@ export class HUDElements {
     this.grenadeMeter.dispose();
     this.mortarPanel.dispose();
     this.helicopterHUD.dispose();
+    this.fixedWingHUD.dispose();
   }
 }

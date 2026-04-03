@@ -1,4 +1,4 @@
-export type InputContext = 'gameplay' | 'helicopter' | 'map' | 'menu' | 'modal' | 'spectator';
+export type InputContext = 'gameplay' | 'helicopter' | 'fixed_wing' | 'map' | 'menu' | 'modal' | 'spectator';
 
 type InputContextListener = (context: InputContext) => void;
 
@@ -45,22 +45,22 @@ export class InputContextManager {
   }
 
   isGameplay(): boolean {
-    return this.context === 'gameplay' || this.context === 'helicopter';
+    return this.context === 'gameplay' || this.context === 'helicopter' || this.context === 'fixed_wing';
   }
 
-  /** True only in infantry gameplay - equipment keys (grenades/sandbags/mortar) are blocked in helicopter. */
+  /** True only in infantry gameplay - equipment keys (grenades/sandbags/mortar) are blocked in vehicles. */
   isInfantryGameplay(): boolean {
     return this.context === 'gameplay';
   }
 
-  /** Movement allowed in gameplay, helicopter, or when input is decoupled (e.g. scoreboard overlay). */
+  /** Movement allowed in gameplay, helicopter, fixed-wing, or when input is decoupled (e.g. scoreboard overlay). */
   isMovementAllowed(): boolean {
-    return this.context === 'gameplay' || this.context === 'helicopter' || this._decoupledInput;
+    return this.context === 'gameplay' || this.context === 'helicopter' || this.context === 'fixed_wing' || this._decoupledInput;
   }
 
-  /** Firing is allowed in gameplay and helicopter contexts. */
+  /** Firing is allowed in gameplay, helicopter, and fixed-wing contexts. */
   isFireAllowed(): boolean {
-    return this.context === 'gameplay' || this.context === 'helicopter';
+    return this.context === 'gameplay' || this.context === 'helicopter' || this.context === 'fixed_wing';
   }
 
   /** Whether input is currently in decoupled mode. */

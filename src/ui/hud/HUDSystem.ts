@@ -530,6 +530,40 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.setHelicopterDamage(healthPercent);
   }
 
+  // Fixed-wing instruments methods
+  showFixedWingInstruments(): void {
+    this.elements.showFixedWingInstruments();
+    this.hudLayout.setState({ actorMode: 'plane' });
+  }
+
+  hideFixedWingInstruments(): void {
+    this.elements.hideFixedWingInstruments();
+    this.hudLayout.setState({
+      actorMode: 'infantry',
+      vehicleContext: null,
+    });
+  }
+
+  updateFixedWingFlightData(airspeed: number, heading: number, verticalSpeed: number): void {
+    this.elements.updateFixedWingFlightData(airspeed, heading, verticalSpeed);
+  }
+
+  updateFixedWingThrottle(throttle: number): void {
+    this.elements.updateFixedWingThrottle(throttle);
+  }
+
+  setFixedWingStallWarning(stalled: boolean): void {
+    this.elements.setFixedWingStallWarning(stalled);
+  }
+
+  setFixedWingStallSpeed(speed: number): void {
+    this.elements.setFixedWingStallSpeed(speed);
+  }
+
+  setFixedWingAutoLevel(active: boolean): void {
+    this.elements.setFixedWingAutoLevel(active);
+  }
+
   // Squad deploy prompt methods (IHUDSystem)
   showSquadDeployPrompt(): void {
     this.showInteractionPrompt('Press G to deploy squad');

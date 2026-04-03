@@ -124,6 +124,12 @@ export interface IPlayerController {
   isInHelicopter(): boolean;
   getHelicopterId(): string | null;
 
+  // Fixed-wing lifecycle
+  enterFixedWing(aircraftId: string, aircraftPosition: THREE.Vector3): void;
+  exitFixedWing(exitPosition: THREE.Vector3): void;
+  isInFixedWing(): boolean;
+  getFixedWingId(): string | null;
+
   // Dependency setters
   setTerrainSystem(terrainSystem: ITerrainRuntime): void;
   setGameModeManager(gameModeManager: GameModeManager): void;

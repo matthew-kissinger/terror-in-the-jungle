@@ -44,6 +44,7 @@ import type { AirSupportManager } from '../systems/airsupport/AirSupportManager'
 import type { AAEmplacementSystem } from '../systems/airsupport/AAEmplacement';
 import type { VehicleManager } from '../systems/vehicle/VehicleManager';
 import type { NPCVehicleController } from '../systems/vehicle/NPCVehicleController';
+import type { FixedWingModel } from '../systems/vehicle/FixedWingModel';
 
 export interface SystemKeyToType {
   assetLoader: AssetLoader;
@@ -90,6 +91,7 @@ export interface SystemKeyToType {
   aaEmplacementSystem: AAEmplacementSystem;
   vehicleManager: VehicleManager;
   npcVehicleController: NPCVehicleController;
+  fixedWingModel: FixedWingModel;
 }
 
 type SystemKey = keyof SystemKeyToType;
@@ -176,4 +178,5 @@ const SYSTEM_KEYS: readonly SystemKey[] = [
   'aaEmplacementSystem',
   'vehicleManager',
   'npcVehicleController',
+  'fixedWingModel',
 ] as const;

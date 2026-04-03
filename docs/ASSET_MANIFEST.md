@@ -1,6 +1,6 @@
 # Asset Manifest
 
-Last updated: 2026-04-01
+Last updated: 2026-04-02
 
 ## 3D Models (75 GLBs)
 
@@ -25,7 +25,7 @@ All models: low-poly stylized (PS2-era fidelity), GLB (binary glTF 2.0), PBR mat
 |----------|--------|---------|
 | Weapons | 7/9 integrated | M16A1, AK-47, Ithaca 37, M3, M1911, M60, M79 via WeaponRigManager. RPG-7 and M2 Browning not wired. |
 | Helicopters | 3/3 integrated | UH-1 Huey, UH-1C Gunship, AH-1 Cobra via ModelLoader. Rotor pivots rigged (Joint_MainRotor/Joint_TailRotor). Tail rotor has baked `rotation.y = PI/2` for sideways spin. |
-| Fixed-wing | 3/3 static | F-4 Phantom, AC-47 Spooky, A-1 Skyraider staged at airfields. No live vehicle runtime. |
+| Fixed-wing | 3/3 integrated | F-4 Phantom, AC-47 Spooky, A-1 Skyraider flyable at airfields via FixedWingModel. Aerodynamic physics, propeller animation, per-aircraft HUD. |
 | Ground vehicles | 5/5 static | Staged in motor pools. No driving/interaction. |
 | Watercraft | Not wired | Blocked on water engine. |
 | Animals | 6/6 integrated | All types via AnimalSystem. |

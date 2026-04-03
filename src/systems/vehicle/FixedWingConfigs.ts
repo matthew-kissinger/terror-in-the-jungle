@@ -21,6 +21,31 @@ interface FixedWingConfig {
   role: 'transport' | 'fighter' | 'attack';
 }
 
+export interface FixedWingDisplayInfo {
+  displayName: string;
+  hasPropellers: boolean;
+  propellerNodes: string[];
+  autoLevelDefault: boolean;
+  cameraDistance: number;
+  cameraHeight: number;
+  fovWidenEnabled: boolean;
+  seats: number;
+}
+
+export const FIXED_WING_DISPLAY: Record<string, FixedWingDisplayInfo> = {
+  A1_SKYRAIDER: { displayName: 'A-1 Skyraider', hasPropellers: true, propellerNodes: ['propeller'], autoLevelDefault: true, cameraDistance: 30, cameraHeight: 8, fovWidenEnabled: false, seats: 1 },
+  AC47_SPOOKY: { displayName: 'AC-47 Spooky', hasPropellers: true, propellerNodes: ['propLeft', 'propRight'], autoLevelDefault: true, cameraDistance: 40, cameraHeight: 12, fovWidenEnabled: false, seats: 2 },
+  F4_PHANTOM: { displayName: 'F-4 Phantom', hasPropellers: false, propellerNodes: [], autoLevelDefault: false, cameraDistance: 35, cameraHeight: 8, fovWidenEnabled: true, seats: 1 },
+};
+
+export function getFixedWingConfig(key: string): FixedWingConfig | null {
+  return FIXED_WING_CONFIGS[key] ?? null;
+}
+
+export function getFixedWingDisplayInfo(key: string): FixedWingDisplayInfo | null {
+  return FIXED_WING_DISPLAY[key] ?? null;
+}
+
 export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
   // AC-47 Spooky: slow transport/gunship, high lift, low roll rate
   // Cl tuned so lift = weight at stall speed (game-balanced, not real-world)

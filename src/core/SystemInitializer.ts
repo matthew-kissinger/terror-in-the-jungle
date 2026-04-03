@@ -21,6 +21,7 @@ import { FullMapSystem } from '../ui/map/FullMapSystem';
 import { CompassSystem } from '../ui/compass/CompassSystem';
 import { HelipadSystem } from '../systems/helicopter/HelipadSystem';
 import { HelicopterModel } from '../systems/helicopter/HelicopterModel';
+import { FixedWingModel } from '../systems/vehicle/FixedWingModel';
 import { PlayerSquadController } from '../systems/combat/PlayerSquadController';
 import { CommandInputManager } from '../systems/combat/CommandInputManager';
 import { InventoryManager } from '../systems/player/InventoryManager';
@@ -144,6 +145,7 @@ export class SystemInitializer {
     refs.gameModeManager = new GameModeManager();
     refs.helipadSystem = new HelipadSystem(scene);
     refs.helicopterModel = new HelicopterModel(scene);
+    refs.fixedWingModel = new FixedWingModel(scene);
     refs.worldFeatureSystem = new WorldFeatureSystem(scene);
 
     refs.navmeshSystem = new NavmeshSystem();
@@ -203,6 +205,7 @@ export class SystemInitializer {
       refs.hudSystem,
       refs.helipadSystem,
       refs.helicopterModel,
+      refs.fixedWingModel,
       refs.worldFeatureSystem,
       refs.skybox,
       refs.gameModeManager,
@@ -230,7 +233,8 @@ export class SystemInitializer {
     // Defer non-critical systems so first interactive frame is not blocked.
     const deferredSystems = new Set<GameSystem>([
       refs.helipadSystem,
-      refs.helicopterModel
+      refs.helicopterModel,
+      refs.fixedWingModel,
     ]);
 
     const systems: GameSystem[] = allSystems.filter(system => !deferredSystems.has(system));

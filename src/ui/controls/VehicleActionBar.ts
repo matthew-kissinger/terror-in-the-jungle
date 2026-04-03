@@ -170,6 +170,8 @@ export class VehicleActionBar extends UIComponent {
     this.mapBtn.style.display = capabilities?.canOpenMap ? 'flex' : 'none';
     this.cmdBtn.style.display = capabilities?.canOpenCommand ? 'flex' : 'none';
     this.hoverBtn.style.display = capabilities?.canStabilize ? 'flex' : 'none';
+    // Relabel stabilizer button based on vehicle type
+    this.hoverBtn.textContent = context?.kind === 'plane' ? 'LEVEL' : 'STAB';
     // LOOK hidden on touch - free-look is handled by the cyclic joystick
     const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     this.lookBtn.style.display = (!isTouchDevice && capabilities?.canFreeLook) ? 'flex' : 'none';

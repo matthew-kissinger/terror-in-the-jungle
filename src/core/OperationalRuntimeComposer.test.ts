@@ -42,6 +42,12 @@ function createRefs() {
     gameModeManager: {
       setWarSimulator: vi.fn(),
     },
+    fixedWingModel: {
+      setTerrainManager: vi.fn(),
+      setPlayerController: vi.fn(),
+      setHUDSystem: vi.fn(),
+      setVehicleManager: vi.fn(),
+    },
     globalBillboardSystem: {},
     grenadeSystem: {},
     helicopterModel: {
@@ -78,6 +84,7 @@ function createRefs() {
     },
     playerController: {
       configureVehicleController: vi.fn(),
+      setFixedWingModel: vi.fn(),
     },
     radioTransmissionSystem: {
       setAudioListener: vi.fn(),
@@ -99,6 +106,7 @@ function createRefs() {
     worldFeatureSystem: {
       setGameModeManager: vi.fn(),
       setTerrainManager: vi.fn(),
+      setFixedWingModel: vi.fn(),
     },
     zoneManager: {},
   } as any;

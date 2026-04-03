@@ -1,5 +1,6 @@
 import type { GameModeManager } from '../world/GameModeManager';
 import type { HelicopterModel } from '../helicopter/HelicopterModel';
+import type { FixedWingModel } from '../vehicle/FixedWingModel';
 import type { FirstPersonWeapon } from './FirstPersonWeapon';
 import type { HUDSystem } from '../../ui/hud/HUDSystem';
 import type { IGameRenderer, ITerrainRuntime } from '../../types/SystemInterfaces';
@@ -29,6 +30,7 @@ export interface PlayerCombatControllerDependencies {
 
 export interface PlayerVehicleControllerDependencies {
   helicopterModel?: HelicopterModel;
+  fixedWingModel?: FixedWingModel;
   hudSystem?: HUDSystem;
   airSupportManager?: AirSupportManager;
 }
@@ -37,6 +39,7 @@ export interface PlayerControllerDependencies {
   terrainSystem: ITerrainRuntime;
   gameModeManager: GameModeManager;
   helicopterModel: HelicopterModel;
+  fixedWingModel?: FixedWingModel;
   firstPersonWeapon: FirstPersonWeapon;
   hudSystem: HUDSystem;
   ticketSystem: TicketSystem;
