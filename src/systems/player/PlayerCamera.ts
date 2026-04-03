@@ -238,7 +238,6 @@ export class PlayerCamera {
     if (display?.fovWidenEnabled) {
       const fd = this.fixedWingModel.getFlightData(aircraftId);
       if (fd) {
-        const physics = this.fixedWingModel.getPhysics(aircraftId);
         const maxSpeed = 200; // F-4 max speed
         const speedFraction = Math.min(fd.airspeed / maxSpeed, 1.0);
         const baseFOV = 75;
