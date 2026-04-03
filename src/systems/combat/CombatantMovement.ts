@@ -217,9 +217,18 @@ export class CombatantMovement {
     const progress = this.updateProgressTracking(combatant, steering.anchorDistanceBeforeSq, now);
 
     const stuckAction: StuckRecoveryAction = this.stuckDetector.checkAndRecover(combatant, now);
-    const backtrackActivated = stuckAction === 'backtrack' && this.activateBacktrack(combatant);
-    if (backtrackActivated) {
-      Logger.warn('combat', `NPC ${combatant.id} stalled on terrain, backtracking to last good progress point`);
+    let backtrackActivated = false;
+    if (stuckAction === 'backtrack') {
+      backtrackActivated = this.activateBacktrack(combatant);
+      if (backtrackActivated) {
+        Logger.warn('combat', `NPC ${combatant.id} stalled on terrain, backtracking to last good progress point`);
+      }
+    } else if (stuckAction === 'hold') {
+      combatant.movementBacktrackPoint = undefined;
+      combatant.destinationPoint = undefined;
+      combatant.movementIntent = 'hold';
+      combatant.velocity.set(0, 0, 0);
+      Logger.warn('combat', `NPC ${combatant.id} exceeded max recovery attempts, holding position`);
     }
 
     const telemetryIntent: CombatantMovementIntent = backtrackActivated

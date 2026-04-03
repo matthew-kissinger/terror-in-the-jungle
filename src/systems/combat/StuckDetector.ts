@@ -1,6 +1,6 @@
 import type { Combatant } from './types';
 
-export type StuckRecoveryAction = 'none' | 'backtrack';
+export type StuckRecoveryAction = 'none' | 'backtrack' | 'hold';
 
 // Stuck detection is a guardrail, not a primary navigation system.
 // Intervals must be long enough for contour logic to complete before triggering backtrack.
@@ -11,6 +11,8 @@ const STUCK_TICK_THRESHOLD = 2;
 const STUCK_PINNED_RADIUS_SQ = 2.25;
 const STUCK_PINNED_RELEASE_RADIUS_SQ = 6.25;
 const STUCK_PINNED_DWELL_MS = 1200;
+const MAX_CONSECUTIVE_BACKTRACKS = 4;
+const HOLD_COOLDOWN_MS = 15_000;
 
 interface StuckRecord {
   lastCheckX: number;
@@ -25,6 +27,7 @@ interface StuckRecord {
   localAreaOriginZ: number;
   localAreaDwellMs: number;
   localAreaMaxRadiusSq: number;
+  holdStartTime?: number;
 }
 
 /**
@@ -76,7 +79,14 @@ export class StuckDetector {
     if (anchorChanged) {
       record.stuckTicks = 0;
       record.recoveryCount = 0;
+      record.holdStartTime = undefined;
       this.resetLocalArea(record, combatant.position.x, combatant.position.z);
+    }
+
+    // Release hold state after cooldown expires
+    if (record.holdStartTime && (now - record.holdStartTime) > HOLD_COOLDOWN_MS) {
+      record.recoveryCount = 0;
+      record.holdStartTime = undefined;
     }
 
     const wantsMovement = combatant.velocity.lengthSq() > 0.01;
@@ -125,6 +135,10 @@ export class StuckDetector {
     ) {
       record.stuckTicks = 0;
       record.recoveryCount++;
+      if (record.recoveryCount > MAX_CONSECUTIVE_BACKTRACKS) {
+        record.holdStartTime = now;
+        return 'hold';
+      }
       return 'backtrack';
     }
 
@@ -172,4 +186,6 @@ export {
   STUCK_CHECK_INTERVAL_MS,
   STUCK_PINNED_DWELL_MS,
   STUCK_TICK_THRESHOLD,
+  MAX_CONSECUTIVE_BACKTRACKS,
+  HOLD_COOLDOWN_MS,
 };

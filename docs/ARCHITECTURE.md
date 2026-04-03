@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-04-02
+Last verified: 2026-04-03
 
 Systems-based orchestration engine. 43 GameSystem classes, 14 tracked tick groups, 8 singletons.
 

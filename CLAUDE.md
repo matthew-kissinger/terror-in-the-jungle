@@ -52,7 +52,7 @@ npm run perf:update-baseline  # update baseline from latest capture
 
 ## Current Focus
 
-- combat120 at WARN: p99 ~30-35ms (target <16ms), top bottleneck is synchronous cover search in AIStateEngage
+- combat120 at WARN: p95 ~32ms, p99 ~34ms; cover search budget-capped (6/frame), max spike 50ms (was 59ms), heap growth negative
 - Deployed to Cloudflare Pages, CI-gated (lint + test + build + smoke)
 - 5 game modes live, 3 flyable helicopters, 3 flyable fixed-wing aircraft, 6 weapon slots (rifle/shotgun/smg/pistol/lmg/launcher), 4 factions
 - 75 GLB assets shipped, 6 aircraft rebuilt with rigged rotors via PixelForge Kiln

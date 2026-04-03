@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Combatant } from '../types';
 import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
+import { tryConsumeCoverSearch } from './CoverSearchBudget';
 
 // Module-level scratch vectors for cover finding
 const _sandbagCenter = new THREE.Vector3();
@@ -21,6 +22,12 @@ const _coverToThreatCheck = new THREE.Vector3();
 const _coverToCombatant = new THREE.Vector3();
 const _ray = new THREE.Ray();
 const _sandbagSize = new THREE.Vector3();
+const _bestCover = new THREE.Vector3();
+
+// Pre-allocated vegetation candidate buffer (avoids per-search array + clone allocations)
+const MAX_VEG_CANDIDATES = 4;
+const _vegBuffer: THREE.Vector3[] = [];
+for (let i = 0; i < MAX_VEG_CANDIDATES; i++) _vegBuffer.push(new THREE.Vector3());
 
 /**
  * Handles cover finding and cover viability checks
@@ -86,7 +93,12 @@ export class AICoverFinding {
       return cachedCover ? cachedCover.clone() : null;
     }
 
-    let bestCoverPos: THREE.Vector3 | null = null;
+    // Gate expensive searches behind per-frame budget
+    if (!tryConsumeCoverSearch()) {
+      return null;
+    }
+
+    let bestCoverFound = false;
     let bestCoverScore = -Infinity;
 
     // Check sandbags first
@@ -123,17 +135,19 @@ export class AICoverFinding {
 
           if (score > bestCoverScore) {
             bestCoverScore = score;
-            bestCoverPos = _coverPos.clone();
+            _bestCover.copy(_coverPos);
+            bestCoverFound = true;
           }
         }
       }
     }
 
-    // Check vegetation cover
+    // Check vegetation cover (uses pre-allocated buffer)
     if (this.terrainSystem) {
-      const vegetationCover = this.findVegetationCover(combatant.position, threatPosition, MAX_SEARCH_RADIUS);
+      const vegCount = this.findVegetationCoverIntoBuffer(combatant.position, threatPosition, MAX_SEARCH_RADIUS);
 
-      for (const vegPos of vegetationCover) {
+      for (let vi = 0; vi < vegCount; vi++) {
+        const vegPos = _vegBuffer[vi];
         const distanceToCombatantSq = combatant.position.distanceToSquared(vegPos);
         const distanceToCombatant = Math.sqrt(distanceToCombatantSq);
         const distanceToThreatSq = vegPos.distanceToSquared(threatPosition);
@@ -152,7 +166,8 @@ export class AICoverFinding {
 
         if (score > bestCoverScore) {
           bestCoverScore = score;
-          bestCoverPos = vegPos.clone();
+          _bestCover.copy(vegPos);
+          bestCoverFound = true;
         }
       }
     }
@@ -180,15 +195,18 @@ export class AICoverFinding {
 
             if (score > bestCoverScore) {
               bestCoverScore = score;
-              bestCoverPos = _testPos.clone();
+              _bestCover.copy(_testPos);
+              bestCoverFound = true;
             }
           }
         }
       }
     }
 
-    this.cacheCoverSearchResult(cacheKey, bestCoverPos);
-    return bestCoverPos;
+    // Single clone at exit -- caller owns this copy
+    const result = bestCoverFound ? _bestCover.clone() : null;
+    this.cacheCoverSearchResult(cacheKey, result);
+    return result;
   }
 
   /**
@@ -208,19 +226,22 @@ export class AICoverFinding {
 
   // Private methods
 
-  private findVegetationCover(
+  /**
+   * Find vegetation cover candidates into the pre-allocated _vegBuffer.
+   * Returns the number of candidates found (0..MAX_VEG_CANDIDATES).
+   */
+  private findVegetationCoverIntoBuffer(
     position: THREE.Vector3,
     threatPosition: THREE.Vector3,
     searchRadius: number
-  ): THREE.Vector3[] {
-    if (!this.terrainSystem) return [];
+  ): number {
+    if (!this.terrainSystem) return 0;
 
-    const coverPositions: THREE.Vector3[] = [];
+    let count = 0;
     const VEGETATION_COVER_DISTANCE = 3;
     const MIN_COVER_HEIGHT = 1.5;
     const searchRadiusSq = searchRadius * searchRadius;
 
-    const MAX_CANDIDATES = 4;
     const gridSize = 8;
     const step = (searchRadius * 2) / gridSize;
 
@@ -265,14 +286,15 @@ export class AICoverFinding {
 
           const dotProduct = _coverToSample.dot(_coverToThreat);
           if (dotProduct > 0.5) {
-            coverPositions.push(coverPos.clone());
-            if (coverPositions.length >= MAX_CANDIDATES) return coverPositions;
+            _vegBuffer[count].copy(coverPos);
+            count++;
+            if (count >= MAX_VEG_CANDIDATES) return count;
           }
         }
       }
     }
 
-    return coverPositions;
+    return count;
   }
 
   private getCoverSearchCacheKey(position: THREE.Vector3, threatPosition: THREE.Vector3): string {
@@ -288,7 +310,8 @@ export class AICoverFinding {
     if (this.coverSearchCache.size >= this.MAX_COVER_SEARCH_CACHE_ENTRIES) {
       this.coverSearchCache.clear();
     }
-    this.coverSearchCache.set(cacheKey, coverPosition ? coverPosition.clone() : null);
+    // coverPosition is already a fresh clone (or null) from the caller -- cache takes ownership
+    this.coverSearchCache.set(cacheKey, coverPosition);
   }
 
   private isPositionCover(

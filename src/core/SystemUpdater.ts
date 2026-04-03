@@ -21,8 +21,8 @@ interface SystemTimingEntry {
 export class SystemUpdater {
   private systemTimings: Map<string, SystemTimingEntry> = new Map();
   private readonly EMA_ALPHA = 0.1;
-  private readonly BUDGET_WARN_THRESHOLD = 1.5; // Warn when EMA exceeds 150% of budget
-  private readonly BUDGET_WARN_COOLDOWN_MS = 10_000;
+  private readonly BUDGET_WARN_THRESHOLD = 1.2; // Warn when EMA exceeds 120% of budget
+  private readonly BUDGET_WARN_COOLDOWN_MS = 5_000;
   private budgetWarningLastMs: Map<string, number> = new Map();
   private readonly scheduler = new SimulationScheduler();
   private readonly perfUserTimingEnabled = import.meta.env.DEV && isPerfUserTimingEnabled();

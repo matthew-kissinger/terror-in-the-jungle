@@ -6,6 +6,8 @@ import {
   STUCK_CHECK_INTERVAL_MS,
   STUCK_PINNED_DWELL_MS,
   STUCK_TICK_THRESHOLD,
+  MAX_CONSECUTIVE_BACKTRACKS,
+  HOLD_COOLDOWN_MS,
 } from './StuckDetector';
 
 describe('StuckDetector', () => {
@@ -186,6 +188,94 @@ describe('StuckDetector', () => {
     detector.clear();
     expect(detector.getRecord('npc1')).toBeUndefined();
     expect(detector.getRecord('npc2')).toBeUndefined();
+  });
+
+  it('returns hold after exceeding MAX_CONSECUTIVE_BACKTRACKS', () => {
+    const c = createTestCombatant({
+      id: 'npc-hold',
+      position: new THREE.Vector3(10, 0, 10),
+      movementAnchor: new THREE.Vector3(50, 0, 50),
+      movementLastGoodPosition: new THREE.Vector3(6, 0, 6),
+    });
+    c.velocity.set(2, 0, 0);
+    detector.checkAndRecover(c, 0);
+
+    let t = 0;
+    let action: ReturnType<StuckDetector['checkAndRecover']> = 'none';
+
+    // Trigger MAX_CONSECUTIVE_BACKTRACKS backtracks
+    for (let cycle = 0; cycle < MAX_CONSECUTIVE_BACKTRACKS; cycle++) {
+      for (let tick = 0; tick < STUCK_TICK_THRESHOLD; tick++) {
+        t += STUCK_CHECK_INTERVAL_MS;
+        action = detector.checkAndRecover(c, t);
+      }
+      expect(action).toBe('backtrack');
+    }
+
+    // Next stall cycle should trigger 'hold'
+    for (let tick = 0; tick < STUCK_TICK_THRESHOLD; tick++) {
+      t += STUCK_CHECK_INTERVAL_MS;
+      action = detector.checkAndRecover(c, t);
+    }
+    expect(action).toBe('hold');
+    expect(detector.getRecord('npc-hold')!.holdStartTime).toBe(t);
+  });
+
+  it('resets hold state when anchor changes', () => {
+    const c = createTestCombatant({
+      id: 'npc-hold-reset',
+      position: new THREE.Vector3(10, 0, 10),
+      movementAnchor: new THREE.Vector3(50, 0, 50),
+      movementLastGoodPosition: new THREE.Vector3(6, 0, 6),
+    });
+    c.velocity.set(2, 0, 0);
+    detector.checkAndRecover(c, 0);
+
+    let t = 0;
+    // Drive to hold state
+    for (let cycle = 0; cycle <= MAX_CONSECUTIVE_BACKTRACKS; cycle++) {
+      for (let tick = 0; tick < STUCK_TICK_THRESHOLD; tick++) {
+        t += STUCK_CHECK_INTERVAL_MS;
+        detector.checkAndRecover(c, t);
+      }
+    }
+    expect(detector.getRecord('npc-hold-reset')!.holdStartTime).toBeDefined();
+
+    // Change anchor significantly (>2m)
+    c.movementAnchor = new THREE.Vector3(100, 0, 100);
+    t += STUCK_CHECK_INTERVAL_MS;
+    detector.checkAndRecover(c, t);
+
+    expect(detector.getRecord('npc-hold-reset')!.recoveryCount).toBe(0);
+    expect(detector.getRecord('npc-hold-reset')!.holdStartTime).toBeUndefined();
+  });
+
+  it('resets hold state after HOLD_COOLDOWN_MS expires', () => {
+    const c = createTestCombatant({
+      id: 'npc-hold-timeout',
+      position: new THREE.Vector3(10, 0, 10),
+      movementAnchor: new THREE.Vector3(50, 0, 50),
+      movementLastGoodPosition: new THREE.Vector3(6, 0, 6),
+    });
+    c.velocity.set(2, 0, 0);
+    detector.checkAndRecover(c, 0);
+
+    let t = 0;
+    // Drive to hold state
+    for (let cycle = 0; cycle <= MAX_CONSECUTIVE_BACKTRACKS; cycle++) {
+      for (let tick = 0; tick < STUCK_TICK_THRESHOLD; tick++) {
+        t += STUCK_CHECK_INTERVAL_MS;
+        detector.checkAndRecover(c, t);
+      }
+    }
+    expect(detector.getRecord('npc-hold-timeout')!.holdStartTime).toBeDefined();
+
+    // Advance past cooldown
+    t += HOLD_COOLDOWN_MS + 1;
+    detector.checkAndRecover(c, t);
+
+    expect(detector.getRecord('npc-hold-timeout')!.recoveryCount).toBe(0);
+    expect(detector.getRecord('npc-hold-timeout')!.holdStartTime).toBeUndefined();
   });
 
   it('tracks multiple combatants independently', () => {

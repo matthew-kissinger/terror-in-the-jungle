@@ -5,6 +5,7 @@ import { Combatant, CombatantState, Faction } from '../types';
 import { SandbagSystem } from '../../weapons/SandbagSystem';
 import type { ITerrainRuntime } from '../../../types/SystemInterfaces';
 import { mockTerrainRuntime, createTestCombatant } from '../../../test-utils';
+import { resetCoverSearchBudget } from './CoverSearchBudget';
 
 const mockTerrainSystem: ITerrainRuntime = mockTerrainRuntime({
   getHeightAt: vi.fn((x: number, z: number) => mockHeightQueryCache.getHeightAt(x, z)),
@@ -58,6 +59,7 @@ describe('AICoverFinding', () => {
     coverFinding.setSandbagSystem(mockSandbagSystem);
 
     vi.clearAllMocks();
+    resetCoverSearchBudget();
     mockHeightQueryCache.getHeightAt = vi.fn(() => 0);
     (mockTerrainSystem.raycastTerrain as any).mockImplementation(() => ({ hit: false, distance: undefined }));
     (mockSandbagSystem.getSandbagBounds as any).mockReturnValue([]);

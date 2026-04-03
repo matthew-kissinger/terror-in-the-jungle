@@ -14,6 +14,7 @@ import {
   resetCombatFireRaycastBudget,
   setMaxCombatFireRaycastsPerFrame
 } from './ai/CombatFireRaycastBudget';
+import { resetCoverSearchBudget } from './ai/CoverSearchBudget';
 import { Logger } from '../../utils/Logger';
 
 // Stagger periods: how many frames between full AI updates per LOD tier
@@ -100,6 +101,7 @@ export class CombatantLODManager {
   private readonly AI_LOG_THROTTLE_MS = 5000;
   private readonly AI_FRAME_BUDGET_MS = 6.0;
   private readonly AI_SEVERE_OVER_BUDGET_MULTIPLIER = 2.5;
+  private readonly AI_SOFT_BUDGET_RATIO = 0.75;
   private readonly CULLED_LOOP_BUDGET_MS = 1.5;
   private readonly CULLED_DISTANT_SIM_INTERVAL_MS = 45000;
   private maxHighFullUpdatesPerFrame = 20;
@@ -290,6 +292,7 @@ export class CombatantLODManager {
       const fireRaycastCap = Math.max(4, Math.min(24, Math.round(16 / Math.max(1, this.intervalScale))));
       setMaxCombatFireRaycastsPerFrame(fireRaycastCap);
       resetCombatFireRaycastBudget();
+      resetCoverSearchBudget();
 
       // Clear stale LOS cache entries
       this.combatantAI.clearLOSCache();
@@ -362,12 +365,14 @@ export class CombatantLODManager {
       combatant.lodLevel = 'high';
       this.lodHighCount++;
 
+      // Flat cascade: severe -> hard exceeded -> full update
+      if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
+        this.updateCombatantUltraLight(combatant, deltaTime);
+        this.staggeredSkipCount++;
+        return;
+      }
       if (!enableAI || this.isAIBudgetExceeded(aiFrameStart)) {
-        if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
-          this.updateCombatantUltraLight(combatant, deltaTime);
-        } else {
-          this.updateCombatantVisualOnly(combatant, deltaTime);
-        }
+        this.updateCombatantVisualOnly(combatant, deltaTime);
         this.staggeredSkipCount++;
         return;
       }
@@ -397,12 +402,15 @@ export class CombatantLODManager {
       const elapsedMs = now - (combatant.lastUpdateTime || 0);
 
       if (elapsedMs > dynamicIntervalMs) {
+        // Flat cascade for medium LOD
+        if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
+          this.updateCombatantUltraLight(combatant, deltaTime);
+          combatant.lastUpdateTime = now;
+          this.staggeredSkipCount++;
+          return;
+        }
         if (!enableAI || this.isAIBudgetExceeded(aiFrameStart)) {
-          if (enableAI && this.isAISeverelyOverBudget(aiFrameStart)) {
-            this.updateCombatantUltraLight(combatant, deltaTime);
-          } else {
-            this.updateCombatantBasic(combatant, deltaTime);
-          }
+          this.updateCombatantBasic(combatant, deltaTime);
           combatant.lastUpdateTime = now;
           this.staggeredSkipCount++;
           return;
@@ -565,6 +573,10 @@ export class CombatantLODManager {
       this.aiSevereOverBudgetEventsThisFrame++;
     }
     return severe;
+  }
+
+  private isAISoftBudgetExceeded(aiFrameStart: number): boolean {
+    return (performance.now() - aiFrameStart) > (this.aiBudgetMs * this.AI_SOFT_BUDGET_RATIO);
   }
 
   private updateCombatantFull(combatant: Combatant, deltaTime: number): void {

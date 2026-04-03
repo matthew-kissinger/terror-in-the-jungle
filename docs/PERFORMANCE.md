@@ -1,6 +1,6 @@
 # Performance & Profiling
 
-Last updated: 2026-04-02
+Last updated: 2026-04-03
 
 ## Commands
 
@@ -82,7 +82,7 @@ Automated checks: frame progression, mean/tail frame timing, hitch ratios (>50ms
 
 | Scenario | Status | Avg | p99 | Notes |
 |----------|--------|----:|----:|-------|
-| `combat120` | WARN | ~12-13ms | ~30-35ms | AI cover search is top remaining bottleneck |
+| `combat120` | WARN | ~14ms | ~33ms | Cover search budget-capped; max spike 50ms (was 59ms) |
 | `openfrontier:short` | WARN | ~6.5ms | ~25ms | Draw call pressure highest here |
 | `ashau:short` | WARN | ~9ms | ~26ms | WarSim dominates tick budget |
 | `frontier30m` | PASS* | ~6.5ms | ~29ms | Terrain-led tails solved; rare GC outliers |
@@ -91,13 +91,16 @@ Automated checks: frame progression, mean/tail frame timing, hitch ratios (>50ms
 
 ## Known Bottlenecks
 
-1. **Combat AI tails** - `AIStateEngage.initiateSquadSuppression()` synchronous cover search. Grid reduced to 8x8 with early-out but still the top combat tail.
+1. **Combat AI tails** - cover search is budget-capped to 6/frame via `CoverSearchBudget`, but p95/p99 still in WARN range due to per-search cost (sandbag iteration + vegetation grid + terrain probes).
 2. **Open Frontier draw calls** - highest draw-call and triangle throughput of any scenario (~255 avg calls).
-3. **Heap churn in heavy combat** - `HeightQueryCache` string-key generation and eviction on terrain/movement paths.
+3. **NPC terrain stalling** - movement solver still produces stalls on steep terrain; `StuckDetector` now caps at 4 backtrack attempts then holds position (15s cooldown).
 
 ## Resolved Bottlenecks
 
-1. **Perf harness startup freeze** (2026-04-02) - Playwright captures could reach `engine-init.startup-flow.interactive-ready` and then stop at `frameCount=1`. Root cause was `GameUI.hide()` using `document.startViewTransition()` during live-entry while the renderer was being revealed. Fixed by disabling view transitions on the live-entry path and for perf/sandbox automation.
+1. **Cover search frame spikes** (2026-04-03) - `findNearestCover()` had no per-frame limit, allowing 44+ searches/frame during heavy combat. Added `CoverSearchBudget` (6/frame cap, mirrors `RaycastBudget` pattern). Eliminated 5 of 6 `Vector3.clone()` sites in `AICoverFinding` using scratch vectors and pre-allocated vegetation buffer. Heap growth dropped from 15.4MB to net negative. Max frame spike cut from 59ms to 50ms.
+2. **Infinite NPC backtrack loops** (2026-04-03) - `StuckDetector` had no retry limit; 30+ NPCs would cycle backtrack-stall-backtrack forever, burning navmesh queries and terrain scoring every 1.2s. Added `MAX_CONSECUTIVE_BACKTRACKS = 4` with 'hold' action: NPC stops movement but continues combat. Resets after anchor change or 15s cooldown.
+3. **Binary AI degradation cliff** (2026-04-03) - `CombatantLODManager` budget cascade restructured from nested checks to flat severe -> exceeded -> stagger. `SystemUpdater` budget warning threshold tightened from 150% to 120% with 5s cooldown (was 10s).
+4. **Perf harness startup freeze** (2026-04-02) - Playwright captures could reach `engine-init.startup-flow.interactive-ready` and then stop at `frameCount=1`. Root cause was `GameUI.hide()` using `document.startViewTransition()` during live-entry while the renderer was being revealed. Fixed by disabling view transitions on the live-entry path and for perf/sandbox automation.
 2. **Effect pool scene.add/remove thrashing** (2026-04-01) - TracerPool, ImpactEffectsPool, ExplosionEffectsPool, and SmokeCloudSystem all added/removed objects from the scene graph on every spawn/expire cycle. Fixed by adding all pooled objects at construction and toggling `visible`. Extracted `EffectPool<T>` base class to share the pool lifecycle pattern.
 3. **Grenade/explosion first-use stall, partial** (2026-04-02) - Scene graph thrashing was removed and startup warmup now uses a hidden live effect spawn instead of relying on `renderer.compile()` alone. Re-baseline cold-start captures are still required before treating this as fully closed.
 
