@@ -47,9 +47,10 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
       { modelPath: GroundVehicleModels.M35_TRUCK, zone: 'runway_side', weight: 1, registerCollision: true },
     ],
     parkingSpots: [
-      { modelPath: AircraftModels.UH1_HUEY, offsetAlongRunway: 0.2, offsetLateral: 45 },
-      { modelPath: AircraftModels.A1_SKYRAIDER, offsetAlongRunway: 0.5, offsetLateral: 50 },
-      { modelPath: AircraftModels.F4_PHANTOM, offsetAlongRunway: 0.8, offsetLateral: 48 },
+      { modelPath: AircraftModels.UH1_HUEY, offsetAlongRunway: 0.15, offsetLateral: 45 },
+      { modelPath: AircraftModels.A1_SKYRAIDER, offsetAlongRunway: 0.4, offsetLateral: 50 },
+      { modelPath: AircraftModels.AC47_SPOOKY, offsetAlongRunway: 0.6, offsetLateral: 52 },
+      { modelPath: AircraftModels.F4_PHANTOM, offsetAlongRunway: 0.85, offsetLateral: 48 },
     ],
   },
 

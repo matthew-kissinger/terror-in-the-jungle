@@ -13,6 +13,8 @@ import { Faction } from '../combat/types';
 import { Logger } from '../../utils/Logger';
 import { AircraftModels } from '../assets/modelPaths';
 
+const _flightEuler = new THREE.Euler();
+
 /** Map from model path to config key */
 const MODEL_PATH_TO_CONFIG: Record<string, string> = {
   [AircraftModels.A1_SKYRAIDER]: 'A1_SKYRAIDER',
@@ -96,34 +98,30 @@ export class FixedWingModel implements GameSystem {
     // Update interaction prompts
     this.interaction.checkPlayerProximity();
 
-    // Update physics and animation for all aircraft
-    for (const [id, phys] of this.physics) {
-      const group = this.groups.get(id);
-      if (!group) continue;
-
-      // Apply player controls to piloted aircraft
-      if (id === this.pilotedAircraftId) {
+    // Only run physics for the piloted aircraft. Idle parked aircraft skip
+    // physics/animation entirely to avoid wasting frame budget.
+    if (this.pilotedAircraftId) {
+      const phys = this.physics.get(this.pilotedAircraftId);
+      const group = this.groups.get(this.pilotedAircraftId);
+      if (phys && group) {
         phys.setControls(this.currentControls);
-      }
 
-      // Get terrain height under aircraft
-      const pos = phys.getPosition();
-      const terrainHeight = this.terrainManager?.getEffectiveHeightAt(pos.x, pos.z) ?? 0;
+        const pos = phys.getPosition();
+        const terrainHeight = this.terrainManager?.getEffectiveHeightAt(pos.x, pos.z) ?? 0;
+        phys.update(deltaTime, terrainHeight);
 
-      // Step physics
-      phys.update(deltaTime, terrainHeight);
+        // Sync outer group position; inner model has the visual rotation offset
+        group.position.copy(phys.getPosition());
+        group.quaternion.copy(phys.getQuaternion());
 
-      // Sync mesh to physics
-      group.position.copy(phys.getPosition());
-      group.quaternion.copy(phys.getQuaternion());
+        // Propeller animation
+        const controls = phys.getControls();
+        this.animation.update(this.pilotedAircraftId, controls.throttle, deltaTime);
 
-      // Update propeller animation
-      const controls = phys.getControls();
-      this.animation.update(id, controls.throttle, deltaTime);
-
-      // Sync player position to aircraft when piloted
-      if (id === this.pilotedAircraftId && this.playerController) {
-        this.playerController.updatePlayerPosition(phys.getPosition());
+        // Sync player position to aircraft
+        if (this.playerController) {
+          this.playerController.updatePlayerPosition(phys.getPosition());
+        }
       }
     }
   }
@@ -167,15 +165,21 @@ export class FixedWingModel implements GameSystem {
     if (!display) return false;
 
     try {
-      const group = await this.modelLoader.loadModel(modelPath);
-      // Apply same rotation convention as helicopter: -90 deg Y so nose faces forward
-      group.rotation.y = heading - Math.PI / 2;
+      const innerModel = await this.modelLoader.loadModel(modelPath);
+      // GLB faces +Z but physics forward is -Z. Rotate inner model 180° on Y
+      // so it visually aligns with the physics forward direction.
+      innerModel.rotation.y = Math.PI;
+
+      // Outer group is driven by physics quaternion (position + attitude).
+      // Inner model handles the visual-to-physics rotation offset.
+      const group = new THREE.Group();
+      group.add(innerModel);
       group.position.copy(worldPosition);
 
       // Ensure Y is on terrain
       if (this.terrainManager) {
         const h = this.terrainManager.getEffectiveHeightAt(worldPosition.x, worldPosition.z);
-        group.position.y = h + 0.5; // Slightly above ground
+        group.position.y = h + 0.5;
         worldPosition.y = h + 0.5;
       }
 
@@ -186,9 +190,11 @@ export class FixedWingModel implements GameSystem {
 
       // Create physics instance (starts grounded)
       const phys = new FixedWingPhysics(worldPosition.clone(), config.physics);
-      // Set initial heading via quaternion
+      // Set initial heading
       const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), heading);
       phys.getQuaternion().copy(q);
+      // Sync group to initial physics state so parked aircraft face the right way
+      group.quaternion.copy(q);
 
       if (this.terrainManager) {
         phys.setWorldHalfExtent(this.terrainManager.getPlayableWorldSize() / 2);
@@ -196,8 +202,8 @@ export class FixedWingModel implements GameSystem {
 
       this.physics.set(id, phys);
 
-      // Wire animation
-      this.animation.initialize(id, configKey, group);
+      // Wire animation on the inner model (where propeller nodes live)
+      this.animation.initialize(id, configKey, innerModel);
 
       // Register with VehicleManager
       if (this.vehicleManager) {
@@ -245,8 +251,8 @@ export class FixedWingModel implements GameSystem {
     const configKey = this.configKeys.get(aircraftId);
     const config = configKey ? FIXED_WING_CONFIGS[configKey] : null;
 
-    // Extract pitch and roll from quaternion
-    const euler = new THREE.Euler().setFromQuaternion(phys.getQuaternion(), 'YXZ');
+    // Extract pitch and roll from quaternion (reuse scratch euler)
+    _flightEuler.setFromQuaternion(phys.getQuaternion(), 'YXZ');
 
     return {
       airspeed: phys.getAirspeed(),
@@ -256,8 +262,8 @@ export class FixedWingModel implements GameSystem {
       isStalled: phys.isStalled(),
       flightState: phys.getFlightState(),
       stallSpeed: config?.physics.stallSpeed ?? 40,
-      pitch: THREE.MathUtils.radToDeg(euler.x),
-      roll: THREE.MathUtils.radToDeg(euler.z),
+      pitch: THREE.MathUtils.radToDeg(_flightEuler.x),
+      roll: THREE.MathUtils.radToDeg(_flightEuler.z),
     };
   }
 
