@@ -132,6 +132,58 @@ describe('PlayerMovement', () => {
     });
   });
 
+  describe('fixed-wing controls', () => {
+    it('builds normalized fixed-wing commands from keyboard input', () => {
+      const setFixedWingCommand = vi.fn();
+      const fixedWingModel = { setFixedWingCommand } as any;
+      vi.mocked(mockInput.isKeyPressed).mockImplementation((key: string) => key === 'keyw' || key === 'arrowup');
+
+      playerMovement.initializeFixedWingControls(false);
+      playerMovement.updateFixedWingControls(0.5, mockInput, fixedWingModel);
+
+      const command = setFixedWingCommand.mock.calls[0][0];
+      expect(command).toEqual(expect.objectContaining({
+        pitchCommand: 1,
+        rollCommand: 0,
+        yawCommand: 0,
+        brake: 0,
+        stabilityAssist: false,
+      }));
+      expect(command.throttleTarget).toBeCloseTo(0.4, 5);
+    });
+
+    it('applies wheel brake when reducing throttle near idle', () => {
+      const setFixedWingCommand = vi.fn();
+      const fixedWingModel = { setFixedWingCommand } as any;
+      vi.mocked(mockInput.isKeyPressed).mockImplementation((key: string) => key === 'keys');
+
+      playerMovement.initializeFixedWingControls(false);
+      playerMovement.updateFixedWingControls(0.25, mockInput, fixedWingModel);
+
+      expect(setFixedWingCommand).toHaveBeenCalledWith(expect.objectContaining({
+        throttleTarget: 0,
+        brake: 1,
+      }));
+    });
+
+    it('resets the virtual stick and preserves configured stability assist defaults', () => {
+      const setFixedWingCommand = vi.fn();
+      const fixedWingModel = { setFixedWingCommand } as any;
+
+      playerMovement.initializeFixedWingControls(false);
+      playerMovement.addMouseControlToFixedWing({ x: 0.8, y: -0.6 }, 1);
+      playerMovement.initializeFixedWingControls(true);
+      playerMovement.updateFixedWingControls(0.016, mockInput, fixedWingModel);
+
+      expect(setFixedWingCommand).toHaveBeenCalledWith(expect.objectContaining({
+        throttleTarget: 0,
+        pitchCommand: 0,
+        rollCommand: 0,
+        stabilityAssist: true,
+      }));
+    });
+  });
+
   describe('handleJump', () => {
     it('should apply jump velocity when grounded', () => {
       playerState.isGrounded = true;

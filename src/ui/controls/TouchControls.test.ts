@@ -321,6 +321,21 @@ describe('TouchControls', () => {
     expect(vehicleActionBarInstances[0].hide).toHaveBeenCalled();
   });
 
+  it('flight-mode aliases route through the same vehicle layout', () => {
+    const controls = new TouchControls();
+    controls.show();
+
+    controls.enterFlightVehicleMode();
+
+    expect(controls.isInFlightMode()).toBe(true);
+    expect(vehicleActionBarInstances[0].show).toHaveBeenCalled();
+
+    controls.exitFlightVehicleMode();
+
+    expect(controls.isInFlightMode()).toBe(false);
+    expect(vehicleActionBarInstances[0].hide).toHaveBeenCalled();
+  });
+
   it('dispose() disposes vehicleActionBar', () => {
     const controls = new TouchControls();
 

@@ -49,6 +49,30 @@ export class PlayerVehicleController {
   private deps: PlayerVehicleControllerDependencies = {};
   private airSupportCycleIndex = 0;
 
+  private getTouchFlightMode(input: PlayerInput): boolean {
+    const touchControls = input.getTouchControls?.();
+    if (!touchControls) return false;
+    if (typeof touchControls.isInFlightMode === 'function') {
+      return touchControls.isInFlightMode();
+    }
+    return touchControls.isInHelicopterMode();
+  }
+
+  private getFlightMouseControlEnabled(cameraController: PlayerCamera): boolean {
+    if (typeof cameraController.getFlightMouseControlEnabled === 'function') {
+      return cameraController.getFlightMouseControlEnabled();
+    }
+    return cameraController.getHelicopterMouseControlEnabled();
+  }
+
+  private setFlightVehicleInputState(input: PlayerInput, mode: 'none' | 'helicopter' | 'plane'): void {
+    if (typeof input.setFlightVehicleMode === 'function') {
+      input.setFlightVehicleMode(mode);
+      return;
+    }
+    input.setInHelicopter(mode !== 'none');
+  }
+
   configure(deps: PlayerVehicleControllerDependencies): void {
     this.deps = { ...this.deps, ...deps };
   }
@@ -60,10 +84,10 @@ export class PlayerVehicleController {
     cameraController: PlayerCamera,
   ): void {
     let mouseMovement: { x: number; y: number } | undefined;
-    const touchHeli = input.getTouchControls()?.isInHelicopterMode() ?? false;
+    const touchHeli = this.getTouchFlightMode(input);
     if (
       !touchHeli
-      && cameraController.getHelicopterMouseControlEnabled()
+      && this.getFlightMouseControlEnabled(cameraController)
       && input.getIsPointerLocked()
     ) {
       mouseMovement = input.getMouseMovement();
@@ -103,10 +127,10 @@ export class PlayerVehicleController {
     cameraController: PlayerCamera,
   ): void {
     let mouseMovement: { x: number; y: number } | undefined;
-    const touchHeli = input.getTouchControls()?.isInHelicopterMode() ?? false;
+    const touchHeli = this.getTouchFlightMode(input);
     if (
       !touchHeli
-      && cameraController.getHelicopterMouseControlEnabled()
+      && this.getFlightMouseControlEnabled(cameraController)
       && input.getIsPointerLocked()
     ) {
       mouseMovement = input.getMouseMovement();
@@ -138,7 +162,7 @@ export class PlayerVehicleController {
     playerState.velocity.set(0, 0, 0);
     playerState.isRunning = false;
 
-    input.setInHelicopter(true); // Reuse existing flag for vehicle mode
+    this.setFlightVehicleInputState(input, 'plane');
     if ('setInputContext' in input) {
       (input as any).setInputContext('fixed_wing');
     }
@@ -146,7 +170,7 @@ export class PlayerVehicleController {
 
     this.deps.hudSystem?.showFixedWingInstruments?.();
     this.deps.hudSystem?.showFixedWingMouseIndicator?.();
-    this.deps.hudSystem?.updateFixedWingMouseMode?.(cameraController.getHelicopterMouseControlEnabled());
+    this.deps.hudSystem?.updateFixedWingMouseMode?.(this.getFlightMouseControlEnabled(cameraController));
     this.deps.hudSystem?.setVehicleContext?.(createFixedWingUIContext());
 
     // Set stall speed for HUD display
@@ -171,7 +195,7 @@ export class PlayerVehicleController {
     playerState.isInFixedWing = false;
     playerState.fixedWingId = null;
     setPosition(exitPosition, 'fixedwing.exit');
-    input.setInHelicopter(false);
+    this.setFlightVehicleInputState(input, 'none');
     if ('setInputContext' in input) {
       (input as any).setInputContext('gameplay');
     }
@@ -189,7 +213,7 @@ export class PlayerVehicleController {
   }
 
   handleToggleMouseControl(cameraController: PlayerCamera): boolean {
-    const enabled = cameraController.toggleHelicopterMouseControl();
+    const enabled = cameraController.toggleFlightMouseControl();
     this.deps.hudSystem?.updateHelicopterMouseMode(enabled);
     this.deps.hudSystem?.updateFixedWingMouseMode?.(enabled);
     return enabled;
@@ -231,7 +255,7 @@ export class PlayerVehicleController {
     playerState.velocity.set(0, 0, 0);
     playerState.isRunning = false;
 
-    input.setInHelicopter(true);
+    this.setFlightVehicleInputState(input, 'helicopter');
     // Set helicopter input context if InputManager is available (gates equipment keys)
     if ('setInputContext' in input) {
       (input as any).setInputContext('helicopter');
@@ -239,7 +263,7 @@ export class PlayerVehicleController {
     cameraController.saveInfantryAngles();
 
     this.deps.hudSystem?.showHelicopterMouseIndicator();
-    this.deps.hudSystem?.updateHelicopterMouseMode(cameraController.getHelicopterMouseControlEnabled());
+    this.deps.hudSystem?.updateHelicopterMouseMode(this.getFlightMouseControlEnabled(cameraController));
     this.deps.hudSystem?.showHelicopterInstruments();
 
     if (this.deps.helicopterModel) {
@@ -268,7 +292,7 @@ export class PlayerVehicleController {
     playerState.isInHelicopter = false;
     playerState.helicopterId = null;
     setPosition(exitPosition, 'helicopter.exit');
-    input.setInHelicopter(false);
+    this.setFlightVehicleInputState(input, 'none');
     if ('setInputContext' in input) {
       (input as any).setInputContext('gameplay');
     }

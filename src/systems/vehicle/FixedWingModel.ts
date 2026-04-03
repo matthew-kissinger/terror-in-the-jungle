@@ -3,6 +3,7 @@ import type { GameSystem } from '../../types';
 import type { ITerrainRuntime, IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
 import type { VehicleManager } from './VehicleManager';
 import { FixedWingPhysics } from './FixedWingPhysics';
+import type { FixedWingCommand, FixedWingTerrainSample } from './FixedWingPhysics';
 import { FixedWingAnimation } from './FixedWingAnimation';
 import { FixedWingInteraction } from './FixedWingInteraction';
 import { FixedWingVehicleAdapter } from './FixedWingVehicleAdapter';
@@ -15,7 +16,7 @@ import { Faction } from '../combat/types';
 import { Logger } from '../../utils/Logger';
 import { AircraftModels } from '../assets/modelPaths';
 
-const _flightEuler = new THREE.Euler();
+const _terrainSampleNormal = new THREE.Vector3(0, 1, 0);
 
 /** Map from model path to config key */
 const MODEL_PATH_TO_CONFIG: Record<string, string> = {
@@ -29,6 +30,13 @@ export interface FixedWingFlightData {
   heading: number;
   verticalSpeed: number;
   altitude: number;
+  altitudeAGL: number;
+  phase: 'parked' | 'ground_roll' | 'rotation' | 'airborne' | 'stall' | 'landing_rollout';
+  aoaDeg: number;
+  sideslipDeg: number;
+  throttle: number;
+  brake: number;
+  weightOnWheels: boolean;
   isStalled: boolean;
   flightState: 'grounded' | 'airborne' | 'stalled';
   stallSpeed: number;
@@ -62,8 +70,14 @@ export class FixedWingModel implements GameSystem {
   private vehicleManager?: VehicleManager;
 
   // Controls from player input
-  private currentControls: { throttle: number; pitch: number; roll: number; yaw: number } = {
-    throttle: 0, pitch: 0, roll: 0, yaw: 0,
+  private currentCommand: FixedWingCommand = {
+    throttleTarget: 0,
+    pitchCommand: 0,
+    rollCommand: 0,
+    yawCommand: 0,
+    brake: 0,
+    freeLook: false,
+    stabilityAssist: false,
   };
 
   constructor(scene: THREE.Scene) {
@@ -118,15 +132,21 @@ export class FixedWingModel implements GameSystem {
         || phys.getAirspeed() > FixedWingModel.IDLE_SIMULATION_SPEED;
 
       if (isPiloted) {
-        phys.setControls(this.currentControls);
+        phys.setCommand(this.currentCommand);
       } else if (shouldSimulate) {
-        phys.setControls({ throttle: 0, pitch: 0, roll: 0, yaw: 0 });
+        phys.setCommand({
+          throttleTarget: 0,
+          pitchCommand: 0,
+          rollCommand: 0,
+          yawCommand: 0,
+          brake: phys.getCommand().brake > 0 ? phys.getCommand().brake : 0,
+        });
       }
 
       if (shouldSimulate) {
         const pos = phys.getPosition();
-        const terrainHeight = this.terrainManager?.getEffectiveHeightAt(pos.x, pos.z) ?? 0;
-        phys.update(deltaTime, terrainHeight);
+        const terrainSample = this.getTerrainSample(pos.x, pos.z);
+        phys.update(deltaTime, terrainSample);
 
         group.position.copy(phys.getPosition());
         group.quaternion.copy(phys.getQuaternion());
@@ -143,8 +163,7 @@ export class FixedWingModel implements GameSystem {
       group.visible = shouldRender;
 
       if (shouldRender) {
-        const controls = phys.getControls();
-        this.animation.update(aircraftId, controls.throttle, deltaTime);
+        this.animation.update(aircraftId, phys.getFlightSnapshot().throttle, deltaTime);
       }
 
       if (isPiloted && this.playerController) {
@@ -303,19 +322,29 @@ export class FixedWingModel implements GameSystem {
 
   exitAircraft(): void {
     this.pilotedAircraftId = null;
-    this.currentControls = { throttle: 0, pitch: 0, roll: 0, yaw: 0 };
+    this.currentCommand = this.createIdleCommand();
     this.interaction.exitAircraft();
   }
 
   setPilotedAircraft(aircraftId: string | null): void {
     this.pilotedAircraftId = aircraftId;
-    if (!aircraftId) {
-      this.currentControls = { throttle: 0, pitch: 0, roll: 0, yaw: 0 };
-    }
+    this.currentCommand = this.createIdleCommand();
+  }
+
+  setFixedWingCommand(command: FixedWingCommand): void {
+    this.currentCommand = { ...command };
   }
 
   setFixedWingControls(controls: { throttle: number; pitch: number; roll: number; yaw: number }): void {
-    this.currentControls = controls;
+    this.currentCommand = {
+      throttleTarget: controls.throttle,
+      pitchCommand: controls.pitch,
+      rollCommand: controls.roll,
+      yawCommand: controls.yaw,
+      brake: 0,
+      freeLook: false,
+      stabilityAssist: false,
+    };
   }
 
   // -- Queries --
@@ -326,20 +355,25 @@ export class FixedWingModel implements GameSystem {
 
     const configKey = this.configKeys.get(aircraftId);
     const config = configKey ? FIXED_WING_CONFIGS[configKey] : null;
-
-    // Extract pitch and roll from quaternion (reuse scratch euler)
-    _flightEuler.setFromQuaternion(phys.getQuaternion(), 'YXZ');
+    const snapshot = phys.getFlightSnapshot();
 
     return {
-      airspeed: phys.getAirspeed(),
-      heading: phys.getHeading(),
-      verticalSpeed: phys.getVerticalSpeed(),
-      altitude: phys.getAltitude(),
-      isStalled: phys.isStalled(),
+      airspeed: snapshot.airspeed,
+      heading: snapshot.headingDeg,
+      verticalSpeed: snapshot.verticalSpeed,
+      altitude: snapshot.altitude,
+      altitudeAGL: snapshot.altitudeAGL,
+      phase: snapshot.phase,
+      aoaDeg: snapshot.aoaDeg,
+      sideslipDeg: snapshot.sideslipDeg,
+      throttle: snapshot.throttle,
+      brake: snapshot.brake,
+      weightOnWheels: snapshot.weightOnWheels,
+      isStalled: snapshot.isStalled,
       flightState: phys.getFlightState(),
       stallSpeed: config?.physics.stallSpeed ?? 40,
-      pitch: THREE.MathUtils.radToDeg(_flightEuler.x),
-      roll: THREE.MathUtils.radToDeg(_flightEuler.z),
+      pitch: snapshot.pitchDeg,
+      roll: snapshot.rollDeg,
     };
   }
 
@@ -377,5 +411,28 @@ export class FixedWingModel implements GameSystem {
   /** Check if a model path corresponds to a fixed-wing aircraft */
   static isFixedWingModelPath(modelPath: string): boolean {
     return modelPath in MODEL_PATH_TO_CONFIG;
+  }
+
+  private createIdleCommand(): FixedWingCommand {
+    return {
+      throttleTarget: 0,
+      pitchCommand: 0,
+      rollCommand: 0,
+      yawCommand: 0,
+      brake: 0,
+      freeLook: false,
+      stabilityAssist: false,
+    };
+  }
+
+  private getTerrainSample(x: number, z: number): FixedWingTerrainSample {
+    if (!this.terrainManager) {
+      return { height: 0 };
+    }
+
+    return {
+      height: this.terrainManager.getEffectiveHeightAt(x, z),
+      normal: this.terrainManager.getNormalAt(x, z, _terrainSampleNormal),
+    };
   }
 }

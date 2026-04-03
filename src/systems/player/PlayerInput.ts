@@ -5,6 +5,8 @@ import { shouldUseTouchControls, isTouchDevice } from '../../utils/DeviceDetecto
 import { TouchControls } from '../../ui/controls/TouchControls';
 import { GamepadManager } from '../../ui/controls/GamepadManager';
 
+export type FlightVehicleMode = 'none' | 'helicopter' | 'plane';
+
 export interface InputCallbacks {
   onJump?: () => void;
   onRunStart?: () => void;
@@ -55,7 +57,7 @@ export class PlayerInput {
   private boundOnWheel!: (event: WheelEvent) => void;
   private callbacks: InputCallbacks = {};
   private isControlsEnabled = true;
-  private isInHelicopter = false;
+  private flightVehicleMode: FlightVehicleMode = 'none';
   private currentWeaponMode: WeaponSlot = WeaponSlot.PRIMARY;
 
   /** Touch controls - only created on touch-capable devices */
@@ -216,7 +218,11 @@ export class PlayerInput {
   }
 
   setInHelicopter(inHelicopter: boolean): void {
-    this.isInHelicopter = inHelicopter;
+    this.flightVehicleMode = inHelicopter ? 'helicopter' : 'none';
+  }
+
+  setFlightVehicleMode(mode: FlightVehicleMode): void {
+    this.flightVehicleMode = mode;
   }
 
   setCurrentWeaponMode(mode: WeaponSlot): void {
@@ -328,6 +334,10 @@ export class PlayerInput {
     return this.touchControls.helicopterCyclic.getCyclicInput();
   }
 
+  getTouchFlightCyclicInput(): { pitch: number; roll: number } {
+    return this.getTouchCyclicInput();
+  }
+
   private setupEventListeners(): void {
     this.boundOnKeyDown = this.onKeyDown.bind(this);
     this.boundOnKeyUp = this.onKeyUp.bind(this);
@@ -395,7 +405,7 @@ export class PlayerInput {
     }
 
     if (event.code === 'Space') {
-      if (this.isInHelicopter) {
+      if (this.isInFlightVehicle()) {
         this.callbacks.onToggleAutoHover?.();
       } else {
         this.callbacks.onJump?.();
@@ -406,20 +416,21 @@ export class PlayerInput {
       this.callbacks.onEscape?.();
     }
 
-    // Handle helicopter entry/exit with E key
+    // Handle vehicle entry/exit with E key
     if (event.code === 'KeyE') {
       this.callbacks.onEnterExitHelicopter?.();
     }
 
-    // Helicopter-specific controls
-    if (this.isInHelicopter) {
-      // Engine boost already handled by Shift above
-
+    // Flight-vehicle controls
+    if (this.isInFlightVehicle()) {
       // Toggle mouse control mode with Right Ctrl
       if (event.code === 'ControlRight') {
         this.callbacks.onToggleMouseControl?.();
       }
+    }
 
+    // Helicopter-specific controls
+    if (this.isInHelicopterMode()) {
       // Squad deploy from helicopter with G key
       if (event.code === 'KeyG') {
         this.callbacks.onSquadDeploy?.();
@@ -438,8 +449,8 @@ export class PlayerInput {
       }
     }
 
-    // Sandbag rotation controls (when not in helicopter)
-    if (!this.isInHelicopter && this.currentWeaponMode === WeaponSlot.SANDBAG) {
+    // Sandbag rotation controls (when not in a flight vehicle)
+    if (!this.isInFlightVehicle() && this.currentWeaponMode === WeaponSlot.SANDBAG) {
       if (event.code === 'KeyR') {
         this.callbacks.onSandbagRotateLeft?.();
       } else if (event.code === 'KeyT') {
@@ -448,17 +459,17 @@ export class PlayerInput {
     }
 
     // Reload with R key (when not rotating sandbag)
-    if (!this.isInHelicopter && this.currentWeaponMode !== WeaponSlot.SANDBAG && event.code === 'KeyR') {
+    if (!this.isInFlightVehicle() && this.currentWeaponMode !== WeaponSlot.SANDBAG && event.code === 'KeyR') {
       this.callbacks.onReload?.();
     }
 
-    // Air support menu with T key (when not in helicopter and not in sandbag mode)
-    if (!this.isInHelicopter && this.currentWeaponMode !== WeaponSlot.SANDBAG && event.code === 'KeyT') {
+    // Air support menu with T key (when not in a flight vehicle and not in sandbag mode)
+    if (!this.isInFlightVehicle() && this.currentWeaponMode !== WeaponSlot.SANDBAG && event.code === 'KeyT') {
       this.callbacks.onAirSupportMenu?.();
     }
 
-    // Rally point placement with V key (when not in helicopter)
-    if (!this.isInHelicopter && event.code === 'KeyV') {
+    // Rally point placement with V key (when not in a flight vehicle)
+    if (!this.isInFlightVehicle() && event.code === 'KeyV') {
       this.callbacks.onRallyPointPlace?.();
     }
 
@@ -466,23 +477,23 @@ export class PlayerInput {
       this.callbacks.onMapToggle?.();
     }
 
-    // Mortar camera toggle with M key (when not in helicopter)
-    if (!this.isInHelicopter && event.code === 'KeyM' && !this.isTouchMode) {
+    // Mortar camera toggle with M key (when not in a flight vehicle)
+    if (!this.isInFlightVehicle() && event.code === 'KeyM' && !this.isTouchMode) {
       this.callbacks.onToggleMortarCamera?.();
     }
 
-    // Mortar deploy/undeploy with B key (when not in helicopter)
-    if (!this.isInHelicopter && event.code === 'KeyB') {
+    // Mortar deploy/undeploy with B key (when not in a flight vehicle)
+    if (!this.isInFlightVehicle() && event.code === 'KeyB') {
       this.callbacks.onDeployMortar?.();
     }
 
-    // Mortar fire with F key (when not in helicopter)
-    if (!this.isInHelicopter && event.code === 'KeyF') {
+    // Mortar fire with F key (when not in a flight vehicle)
+    if (!this.isInFlightVehicle() && event.code === 'KeyF') {
       this.callbacks.onMortarFire?.();
     }
 
-    // Mortar aiming with arrow keys (when not in helicopter)
-    if (!this.isInHelicopter) {
+    // Mortar aiming with arrow keys (when not in a flight vehicle)
+    if (!this.isInFlightVehicle()) {
       if (event.code === 'ArrowUp') {
         this.callbacks.onMortarAdjustPitch?.(1);
       } else if (event.code === 'ArrowDown') {
@@ -571,7 +582,7 @@ export class PlayerInput {
   }
 
   private onWheel(event: WheelEvent): void {
-    if (!this.isControlsEnabled || this.isInHelicopter) return;
+    if (!this.isControlsEnabled || this.isInFlightVehicle()) return;
 
     // Only handle wheel for mortar pitch adjustment if mortar is deployed
     // The callback will check if mortar is deployed before applying
@@ -594,12 +605,12 @@ export class PlayerInput {
       : 'Mouse - Look around (pointer lock disabled)';
     Logger.info('player', `
  CONTROLS:
-WASD - Move / Helicopter Controls (W/S = Collective, A/D = Yaw)
-Arrow Keys - Helicopter Cyclic (↑↓ = Pitch, ←→ = Roll)
+WASD - Move / Flight controls (helicopter: collective+yaw, plane: throttle+yaw)
+Arrow Keys - Flight pitch/roll
 Shift - Run / Engine Boost (in helicopter)
-Space - Jump / Toggle Auto-Hover (in helicopter)
-Right Ctrl - Toggle Mouse Control Mode (helicopter: control vs free look)
-E - Enter/Exit Helicopter
+Space - Jump / Toggle Flight Assist (in aircraft)
+Right Ctrl - Toggle Flight Mouse Control
+E - Enter/Exit Vehicle
 M - Toggle Mortar Camera View (when mortar deployed)
 1-6 - Switch Weapons
 R - Reload
@@ -612,6 +623,14 @@ TAB - Scoreboard
 ${pointerLockHint}
 Escape - Open settings (on foot) / Exit helicopter
     `);
+  }
+
+  private isInFlightVehicle(): boolean {
+    return this.flightVehicleMode !== 'none';
+  }
+
+  private isInHelicopterMode(): boolean {
+    return this.flightVehicleMode === 'helicopter';
   }
 
   // Unlock mouse cursor for respawn UI

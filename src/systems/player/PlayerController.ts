@@ -660,6 +660,8 @@ export class PlayerController implements GameSystem {
 
   enterFixedWing(aircraftId: string, aircraftPosition: THREE.Vector3): void {
     Logger.info('player', `ENTERING FIXED-WING: ${aircraftId}`);
+    const autoLevelDefault = this.fixedWingModel?.getDisplayInfo(aircraftId)?.autoLevelDefault ?? false;
+    this.movement.initializeFixedWingControls(autoLevelDefault);
     this.vehicleController.enterFixedWing(
       this.playerState,
       aircraftPosition,
@@ -673,6 +675,7 @@ export class PlayerController implements GameSystem {
 
   exitFixedWing(exitPosition: THREE.Vector3): void {
     Logger.info('player', `EXITING FIXED-WING: ${this.playerState.fixedWingId}`);
+    this.movement.resetFixedWingControls();
     this.vehicleController.exitFixedWing(
       this.playerState,
       exitPosition,

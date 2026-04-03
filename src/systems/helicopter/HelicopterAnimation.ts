@@ -6,6 +6,11 @@ const _finalQuaternion = new THREE.Quaternion();
 const _scratchEuler = new THREE.Euler(0, 0, 0, 'YXZ');
 const _scratchQuaternion = new THREE.Quaternion();
 
+interface RotorNodes {
+  main: THREE.Object3D[];
+  tail: THREE.Object3D[];
+}
+
 /**
  * Manages helicopter rotor animations and visual tilt effects.
  * Handles rotor speed interpolation and banking/tilting visual feedback.
@@ -14,6 +19,7 @@ export class HelicopterAnimation {
   // Rotor animation state
   private mainRotorSpeed: Map<string, number> = new Map();
   private tailRotorSpeed: Map<string, number> = new Map();
+  private rotorNodes: Map<string, RotorNodes> = new Map();
   private readonly rotorAcceleration = 5.0; // How fast rotors spin up/down
 
   // Visual tilt system for realistic helicopter banking
@@ -26,11 +32,14 @@ export class HelicopterAnimation {
   /**
    * Initialize animation state for a helicopter.
    */
-  initialize(helicopterId: string): void {
+  initialize(helicopterId: string, helicopter?: THREE.Group): void {
     this.mainRotorSpeed.set(helicopterId, 0);
     this.tailRotorSpeed.set(helicopterId, 0);
     this.visualTiltQuaternion.set(helicopterId, new THREE.Quaternion());
     this.targetTiltQuaternion.set(helicopterId, new THREE.Quaternion());
+    if (helicopter) {
+      this.rotorNodes.set(helicopterId, this.resolveRotorNodes(helicopter));
+    }
   }
 
   /**
@@ -42,6 +51,10 @@ export class HelicopterAnimation {
     physics: HelicopterPhysics | undefined,
     deltaTime: number
   ): void {
+    if (!this.mainRotorSpeed.has(helicopterId) || !this.tailRotorSpeed.has(helicopterId)) {
+      return;
+    }
+
     let targetMainSpeed = 0;
     let targetTailSpeed = 0;
 
@@ -71,15 +84,16 @@ export class HelicopterAnimation {
     this.mainRotorSpeed.set(helicopterId, newMainSpeed);
     this.tailRotorSpeed.set(helicopterId, newTailSpeed);
 
-    // Apply rotations to rotor groups (wrap to prevent float precision loss)
+    const nodes = this.rotorNodes.get(helicopterId) ?? this.resolveAndStoreRotorNodes(helicopterId, helicopter);
+
+    // Apply rotations to cached rotor groups (wrap to prevent float precision loss)
     const TAU = Math.PI * 2;
-    helicopter.traverse((child) => {
-      if (child.userData.type === 'mainBlades') {
-        child.rotation.y = (child.rotation.y + newMainSpeed * deltaTime) % TAU;
-      } else if (child.userData.type === 'tailBlades') {
-        child.rotation.z = (child.rotation.z + newTailSpeed * deltaTime) % TAU;
-      }
-    });
+    for (const mainRotor of nodes.main) {
+      mainRotor.rotation.y = (mainRotor.rotation.y + newMainSpeed * deltaTime) % TAU;
+    }
+    for (const tailRotor of nodes.tail) {
+      tailRotor.rotation.z = (tailRotor.rotation.z + newTailSpeed * deltaTime) % TAU;
+    }
   }
 
   /**
@@ -149,6 +163,7 @@ export class HelicopterAnimation {
   dispose(helicopterId: string): void {
     this.mainRotorSpeed.delete(helicopterId);
     this.tailRotorSpeed.delete(helicopterId);
+    this.rotorNodes.delete(helicopterId);
     this.visualTiltQuaternion.delete(helicopterId);
     this.targetTiltQuaternion.delete(helicopterId);
   }
@@ -159,7 +174,26 @@ export class HelicopterAnimation {
   disposeAll(): void {
     this.mainRotorSpeed.clear();
     this.tailRotorSpeed.clear();
+    this.rotorNodes.clear();
     this.visualTiltQuaternion.clear();
     this.targetTiltQuaternion.clear();
+  }
+
+  private resolveAndStoreRotorNodes(helicopterId: string, helicopter: THREE.Group): RotorNodes {
+    const nodes = this.resolveRotorNodes(helicopter);
+    this.rotorNodes.set(helicopterId, nodes);
+    return nodes;
+  }
+
+  private resolveRotorNodes(helicopter: THREE.Group): RotorNodes {
+    const nodes: RotorNodes = { main: [], tail: [] };
+    helicopter.traverse((child) => {
+      if (child.userData.type === 'mainBlades') {
+        nodes.main.push(child);
+      } else if (child.userData.type === 'tailBlades') {
+        nodes.tail.push(child);
+      }
+    });
+    return nodes;
   }
 }

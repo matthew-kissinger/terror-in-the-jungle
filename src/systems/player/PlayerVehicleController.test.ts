@@ -72,4 +72,46 @@ describe('PlayerVehicleController', () => {
 
     expect(addMouse).not.toHaveBeenCalled();
   });
+
+  it('uses generic flight touch mode for fixed-wing mouse suppression', () => {
+    const vehicle = new PlayerVehicleController();
+    const updateFixedWingControls = vi.fn();
+    const movement = { updateFixedWingControls } as unknown as PlayerMovement;
+    const input = {
+      getTouchControls: () => ({ isInFlightMode: () => true }),
+      getIsPointerLocked: () => true,
+      getMouseMovement: () => ({ x: 0.25, y: -0.4 }),
+      clearMouseMovement: vi.fn(),
+    } as unknown as PlayerInput;
+    const camera = { getFlightMouseControlEnabled: () => true } as unknown as PlayerCamera;
+
+    vehicle.updateFixedWingMode(0.016, movement, input, camera);
+
+    expect(updateFixedWingControls).toHaveBeenCalledWith(0.016, input, undefined, undefined, undefined);
+  });
+
+  it('passes mouse delta into fixed-wing mode when flight mouse control is enabled', () => {
+    const vehicle = new PlayerVehicleController();
+    const updateFixedWingControls = vi.fn();
+    const clearMouseMovement = vi.fn();
+    const movement = { updateFixedWingControls } as unknown as PlayerMovement;
+    const input = {
+      getTouchControls: () => null,
+      getIsPointerLocked: () => true,
+      getMouseMovement: () => ({ x: -0.15, y: 0.35 }),
+      clearMouseMovement,
+    } as unknown as PlayerInput;
+    const camera = { getFlightMouseControlEnabled: () => true } as unknown as PlayerCamera;
+
+    vehicle.updateFixedWingMode(0.016, movement, input, camera);
+
+    expect(updateFixedWingControls).toHaveBeenCalledWith(
+      0.016,
+      input,
+      undefined,
+      undefined,
+      { x: -0.15, y: 0.35 },
+    );
+    expect(clearMouseMovement).toHaveBeenCalled();
+  });
 });

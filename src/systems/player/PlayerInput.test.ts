@@ -245,6 +245,13 @@ describe('PlayerInput', () => {
       expect(callbacks.onJump).not.toHaveBeenCalled();
     });
 
+    it('should treat plane flight mode as vehicle input state', () => {
+      playerInput.setFlightVehicleMode('plane');
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' }));
+      expect(callbacks.onToggleAutoHover).toHaveBeenCalled();
+      expect(callbacks.onJump).not.toHaveBeenCalled();
+    });
+
     it('should trigger onRunStart/onRunStop when Shift is pressed/released', () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { code: 'ShiftLeft' }));
       expect(callbacks.onRunStart).toHaveBeenCalled();

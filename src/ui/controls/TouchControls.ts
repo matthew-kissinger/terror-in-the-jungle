@@ -273,7 +273,7 @@ export class TouchControls {
     return this.look.consumeDelta();
   }
 
-  private inHelicopterMode = false;
+  private inFlightVehicleMode = false;
 
   show(): void {
     if (this.visible) return;
@@ -322,6 +322,10 @@ export class TouchControls {
     this.applyActorContext('helicopter', this.vehicleContext);
   }
 
+  enterFlightVehicleMode(): void {
+    this.enterHelicopterMode();
+  }
+
   /**
    * Exit helicopter mode: restore infantry controls.
    */
@@ -329,9 +333,18 @@ export class TouchControls {
     this.applyActorContext('infantry', null);
   }
 
+  exitFlightVehicleMode(): void {
+    this.exitHelicopterMode();
+  }
+
   /** Whether currently in helicopter dual-joystick mode. */
   isInHelicopterMode(): boolean {
-    return this.inHelicopterMode;
+    return this.inFlightVehicleMode;
+  }
+
+  /** Whether touch controls are currently in any flight-vehicle mode. */
+  isInFlightMode(): boolean {
+    return this.inFlightVehicleMode;
   }
 
   /** Update the weapon cycler's active slot (synced from PlayerController). */
@@ -364,7 +377,7 @@ export class TouchControls {
 
   private applyActorContext(actorMode: ActorMode, vehicleContext: VehicleUIContext | null): void {
     this.actorMode = actorMode;
-    this.inHelicopterMode = actorMode === 'helicopter' || actorMode === 'plane';
+    this.inFlightVehicleMode = actorMode === 'helicopter' || actorMode === 'plane';
     const showInfantryControls = this.visible && actorMode === 'infantry';
     const showVehicleControls = this.visible && actorMode !== 'infantry';
 

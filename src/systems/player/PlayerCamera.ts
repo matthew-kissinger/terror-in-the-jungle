@@ -31,7 +31,7 @@ export class PlayerCamera {
   // Helicopter camera settings
   private helicopterCameraDistance = 25;
   private helicopterCameraHeight = 8;
-  private helicopterMouseControlEnabled = true;
+  private flightMouseControlEnabled = true;
 
   // Fixed-wing camera smoothing
   private baseFOV = 75;
@@ -57,18 +57,30 @@ export class PlayerCamera {
     this.fixedWingModel = fixedWingModel;
   }
 
+  setFlightMouseControlEnabled(enabled: boolean): void {
+    this.flightMouseControlEnabled = enabled;
+  }
+
+  getFlightMouseControlEnabled(): boolean {
+    return this.flightMouseControlEnabled;
+  }
+
+  toggleFlightMouseControl(): boolean {
+    this.flightMouseControlEnabled = !this.flightMouseControlEnabled;
+    Logger.info('player', ` Mouse flight ${this.flightMouseControlEnabled ? 'enabled (affects aircraft controls)' : 'disabled (free orbital look)'}`);
+    return this.flightMouseControlEnabled;
+  }
+
   setHelicopterMouseControlEnabled(enabled: boolean): void {
-    this.helicopterMouseControlEnabled = enabled;
+    this.setFlightMouseControlEnabled(enabled);
   }
 
   getHelicopterMouseControlEnabled(): boolean {
-    return this.helicopterMouseControlEnabled;
+    return this.getFlightMouseControlEnabled();
   }
 
   toggleHelicopterMouseControl(): boolean {
-    this.helicopterMouseControlEnabled = !this.helicopterMouseControlEnabled;
-    Logger.info('player', ` Mouse control ${this.helicopterMouseControlEnabled ? 'enabled (affects controls)' : 'disabled (free orbital look)'}`);
-    return this.helicopterMouseControlEnabled;
+    return this.toggleFlightMouseControl();
   }
 
   updateCamera(input: PlayerInput): void {
@@ -132,7 +144,7 @@ export class PlayerCamera {
     const distanceBack = this.helicopterCameraDistance;
     const heightAbove = this.helicopterCameraHeight;
 
-    if (!this.helicopterMouseControlEnabled && input.getIsPointerLocked()) {
+    if (!this.flightMouseControlEnabled && input.getIsPointerLocked()) {
       // Free orbital look mode - mouse controls camera orbital position around helicopter
       const mouseSensitivity = 0.01;
       const mouseMovement = input.getMouseMovement();
@@ -199,7 +211,7 @@ export class PlayerCamera {
     const distanceBack = display?.cameraDistance ?? 30;
     const heightAbove = display?.cameraHeight ?? 8;
 
-    if (!this.helicopterMouseControlEnabled && input.getIsPointerLocked()) {
+    if (!this.flightMouseControlEnabled && input.getIsPointerLocked()) {
       // Free orbital look mode
       const mouseSensitivity = 0.01;
       const mouseMovement = input.getMouseMovement();

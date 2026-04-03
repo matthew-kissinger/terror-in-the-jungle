@@ -13,6 +13,8 @@ interface AircraftInfo {
   faction: string;
 }
 
+type RotorAnimationType = 'mainBlades' | 'tailBlades';
+
 const AIRCRAFT_INFO: Record<string, AircraftInfo> = {
   UH1_HUEY:      { modelPath: AircraftModels.UH1_HUEY,      displayName: 'UH-1 Huey',      faction: 'US' },
   UH1C_GUNSHIP:  { modelPath: AircraftModels.UH1C_GUNSHIP,  displayName: 'UH-1C Gunship',  faction: 'US' },
@@ -72,33 +74,29 @@ function wireRotorGroups(scene: THREE.Group, helicopterGroup: THREE.Group): void
 
   scene.traverse((child) => {
     const name = child.name.toLowerCase();
+    const rotorType = getRotorAnimationType(name);
 
-    // Match grouped rotor parts (if model already has a spin group)
-    if (name.includes('mainrotor') || name.includes('main_rotor') || name.includes('mainblades') || name.includes('main_blades')) {
-      child.userData.type = 'mainBlades';
-    } else if (name.includes('tailrotor') || name.includes('tail_rotor') || name.includes('tailblades') || name.includes('tail_blades')) {
-      child.userData.type = 'tailBlades';
+    if (rotorType) {
+      child.userData.type = rotorType;
     }
 
-    // Match individual blade/rotor meshes
-    if (name.includes('mainblade') || name.includes('mainrotor')) {
+    if (isMainRotorPartName(name)) {
       mainBladeNodes.push(child);
-    } else if (name.includes('tailblade') || name.includes('tailrotor')) {
+    } else if (isTailRotorPartName(name)) {
       tailBladeNodes.push(child);
-    } else if (name.includes('rotorhub')) {
+    }
+
+    if (isRotorHubName(name)) {
       rotorHub = child;
     }
   });
 
-  // Group individual main blades under a single spin parent
-  const hasGroupedMain = !!helicopterGroup.getObjectByName('mainBlades') ||
-    Array.from(helicopterGroup.children).some(c => c.userData.type === 'mainBlades');
+  const hasGroupedMain = hasRotorAnimationRoot(scene, 'mainBlades');
   if (mainBladeNodes.length > 0 && !hasGroupedMain) {
     groupBladesUnderParent(scene, mainBladeNodes, 'mainBlades', rotorHub);
   }
 
-  // Group individual tail blades
-  const hasGroupedTail = Array.from(helicopterGroup.children).some(c => c.userData.type === 'tailBlades');
+  const hasGroupedTail = hasRotorAnimationRoot(scene, 'tailBlades');
   if (tailBladeNodes.length > 0 && !hasGroupedTail) {
     groupBladesUnderParent(scene, tailBladeNodes, 'tailBlades');
   }
@@ -121,16 +119,7 @@ function wireRotorGroups(scene: THREE.Group, helicopterGroup: THREE.Group): void
 function optimizeAircraftScene(scene: THREE.Group, aircraftKey: string): void {
   const result = optimizeStaticModelDrawCalls(scene, {
     batchNamePrefix: `${aircraftKey.toLowerCase()}_static`,
-    excludeMesh: (mesh) => {
-      const name = mesh.name.toLowerCase();
-      return mesh.userData.type === 'mainBlades'
-        || mesh.userData.type === 'tailBlades'
-        || name.includes('mainblade')
-        || name.includes('mainrotor')
-        || name.includes('tailblade')
-        || name.includes('tailrotor')
-        || name.includes('rotorhub');
-    },
+    excludeMesh: (mesh) => isHelicopterAnimatedRotorMesh(mesh),
   });
 
   if (result.sourceMeshCount > 0) {
@@ -164,7 +153,7 @@ function groupBladesUnderParent(
     blade.position.sub(pivot);
     group.add(blade);
   }
-  if (hub) {
+  if (hub && !bladeNodes.includes(hub)) {
     const worldPos = hub.getWorldPosition(new THREE.Vector3());
     scene.worldToLocal(worldPos);
     hub.removeFromParent();
@@ -173,6 +162,80 @@ function groupBladesUnderParent(
   }
   scene.add(group);
   Logger.debug('helicopter', `Grouped ${bladeNodes.length} ${groupName} meshes under spin parent`);
+}
+
+function getRotorAnimationType(name: string): RotorAnimationType | null {
+  if (
+    name.includes('mainrotor')
+    || name.includes('main_rotor')
+    || name.includes('mainblades')
+    || name.includes('main_blades')
+  ) {
+    return 'mainBlades';
+  }
+
+  if (
+    name.includes('tailrotor')
+    || name.includes('tail_rotor')
+    || name.includes('tailblades')
+    || name.includes('tail_blades')
+  ) {
+    return 'tailBlades';
+  }
+
+  return null;
+}
+
+function hasRotorAnimationRoot(scene: THREE.Object3D, rotorType: RotorAnimationType): boolean {
+  let found = false;
+  scene.traverse((child) => {
+    if (child.userData.type === rotorType) {
+      found = true;
+    }
+  });
+  return found;
+}
+
+function isMainRotorPartName(name: string): boolean {
+  return name.includes('mainblade')
+    || name.includes('mainrotor')
+    || name.includes('main_rotor')
+    || name.includes('mrblade')
+    || name.includes('mrhub')
+    || name.includes('mrtip')
+    || name.includes('rotormast');
+}
+
+function isTailRotorPartName(name: string): boolean {
+  return name.includes('tailblade')
+    || name.includes('tailrotor')
+    || name.includes('tail_rotor')
+    || name.includes('trblade')
+    || name.includes('trhub')
+    || name.includes('trtip');
+}
+
+function isRotorHubName(name: string): boolean {
+  return name.includes('rotorhub')
+    || name.includes('mrhub')
+    || name.includes('trhub');
+}
+
+export function isHelicopterAnimatedRotorMesh(mesh: THREE.Mesh): boolean {
+  const name = mesh.name.toLowerCase();
+  if (isMainRotorPartName(name) || isTailRotorPartName(name) || isRotorHubName(name)) {
+    return true;
+  }
+
+  let current: THREE.Object3D | null = mesh;
+  while (current) {
+    if (current.userData.type === 'mainBlades' || current.userData.type === 'tailBlades') {
+      return true;
+    }
+    current = current.parent;
+  }
+
+  return false;
 }
 
 // ─── Synthetic fallback rotors ────────────────────────────────────────────
