@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { HelicopterPlayerAdapter } from './HelicopterPlayerAdapter';
-import type { VehicleTransitionContext, VehicleUpdateContext } from './PlayerVehicleAdapter';
+import type { VehicleTransitionContext } from './PlayerVehicleAdapter';
 import type { PlayerState } from '../../types';
 
 vi.mock('../../utils/Logger', () => ({

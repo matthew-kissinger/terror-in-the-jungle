@@ -154,7 +154,6 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     hudSystem?: IHUDSystem,
     mouseMovement?: { x: number; y: number },
   ): void {
-    const touchControls = input.getTouchControls();
     const hasTouchMode = this.isTouchFlightMode(input);
     const gp = input.getGamepadManager?.();
     const gpActive = gp?.isActive() ?? false;

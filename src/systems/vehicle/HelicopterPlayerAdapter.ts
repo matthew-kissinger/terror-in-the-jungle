@@ -6,7 +6,6 @@ import type { PlayerCamera } from '../player/PlayerCamera';
 import type { PlayerVehicleAdapter, VehicleTransitionContext, VehicleUpdateContext } from './PlayerVehicleAdapter';
 import type { InputContext } from '../input/InputContextManager';
 import type { VehicleUIContext } from '../../ui/layout/types';
-import { shouldUseTouchControls } from '../../utils/DeviceDetector';
 
 // ── Helicopter control tuning ──
 const HELI_AUTOHOVER_TARGET = 0.4;
@@ -178,7 +177,6 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
     hudSystem?: IHUDSystem,
     mouseMovement?: { x: number; y: number },
   ): void {
-    const touchControls = input.getTouchControls();
     const hasTouchHeliMode = this.isTouchFlightMode(input);
 
     // --- Collective (vertical thrust) ---
