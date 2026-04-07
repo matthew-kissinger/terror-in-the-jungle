@@ -186,7 +186,9 @@ export class WorldFeatureSystem implements GameSystem {
             y: feature.position.y + _rotatedOffset.y,
             z: worldZ,
           }
-        : this.resolveTerrainPlacement(worldX, worldZ, object);
+        : placement.skipFlatSearch
+          ? { x: worldX, y: this.terrainManager.getHeightAt(worldX, worldZ), z: worldZ }
+          : this.resolveTerrainPlacement(worldX, worldZ, object);
 
       object.position.set(
         terrainPlacement.x,

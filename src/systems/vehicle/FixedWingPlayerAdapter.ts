@@ -89,6 +89,11 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
 
     // Tell FixedWingModel this aircraft is now piloted
     this.fixedWingModel.setPilotedAircraft(ctx.vehicleId);
+
+    // Re-acquire pointer lock for mouse flight controls
+    if (typeof ctx.input.relockPointer === 'function') {
+      ctx.input.relockPointer();
+    }
   }
 
   onExit(ctx: VehicleTransitionContext): void {
@@ -203,14 +208,18 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
         pitchCommand = gpPitch;
         rollCommand = gpRoll;
       }
-    } else if (hasTouchCyclic) {
-      pitchCommand = touchCyclic.pitch;
-      rollCommand = touchCyclic.roll;
-    } else {
-      pitchCommand = input.isKeyPressed('arrowup') ? 1.0
-        : input.isKeyPressed('arrowdown') ? -1.0 : 0;
-      rollCommand = input.isKeyPressed('arrowright') ? 1.0
-        : input.isKeyPressed('arrowleft') ? -1.0 : 0;
+    }
+
+    if (pitchCommand === 0 && rollCommand === 0) {
+      if (hasTouchCyclic) {
+        pitchCommand = touchCyclic.pitch;
+        rollCommand = touchCyclic.roll;
+      } else {
+        pitchCommand = input.isKeyPressed('arrowup') ? 1.0
+          : input.isKeyPressed('arrowdown') ? -1.0 : 0;
+        rollCommand = input.isKeyPressed('arrowright') ? 1.0
+          : input.isKeyPressed('arrowleft') ? -1.0 : 0;
+      }
     }
 
     if (mouseMovement) {

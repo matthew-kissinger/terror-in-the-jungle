@@ -84,6 +84,11 @@ export class HelicopterPlayerAdapter implements PlayerVehicleAdapter {
     hudSystem?.setVehicleContext?.(createHelicopterUIContext(role));
     hudSystem?.setHelicopterAircraftRole(role);
 
+    // Re-acquire pointer lock for mouse flight controls
+    if (typeof ctx.input.relockPointer === 'function') {
+      ctx.input.relockPointer();
+    }
+
     if (ctx.gameRenderer) {
       const crosshairMode = role === 'attack'
         ? 'helicopter_attack'

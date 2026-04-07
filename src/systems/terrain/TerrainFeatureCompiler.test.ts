@@ -147,7 +147,7 @@ describe('compileTerrainFeatures', () => {
       ],
     });
 
-    expect(compiled.stamps).toHaveLength(3);
+    expect(compiled.stamps).toHaveLength(5); // runway + taxiway + apron + 2 filler stamps
     expect(compiled.vegetationExclusionZones).toHaveLength(1);
     expect(compiled.surfacePatches).toHaveLength(3);
     expect(compiled.surfacePatches.some((patch) => patch.shape === 'rect' && patch.surface === 'runway')).toBe(true);

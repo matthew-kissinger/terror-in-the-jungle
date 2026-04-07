@@ -4,7 +4,7 @@ import type {
   MapFeatureDefinition,
   MapFeatureRectFootprint,
 } from '../../config/gameModeTypes';
-import { AIRFIELD_TEMPLATES } from '../world/AirfieldTemplates';
+import { AIRFIELD_TEMPLATES, type AirfieldSurfaceRect } from '../world/AirfieldTemplates';
 import { generateAirfieldLayout } from '../world/AirfieldLayoutGenerator';
 import { compileTerrainFlow } from './TerrainFlowCompiler';
 import type {
@@ -178,7 +178,7 @@ function compileGeneratedTerrainStamps(feature: MapFeatureDefinition): TerrainSt
   const heightOffset = feature.terrain?.heightOffset ?? 0;
   const authoredStrength = feature.terrain?.gradeStrength;
 
-  const stampedRects = [
+  const stampedRects: Array<{ kind: 'runway' | 'apron' | 'taxiway' | 'filler'; rect: AirfieldSurfaceRect }> = [
     ...template.taxiways.map((rect) => ({ kind: 'taxiway' as const, rect })),
     ...template.aprons.map((rect) => ({ kind: 'apron' as const, rect })),
     {
@@ -194,6 +194,50 @@ function compileGeneratedTerrainStamps(feature: MapFeatureDefinition): TerrainSt
       },
     },
   ];
+
+  // Add filler stamps to bridge gaps between runway and nearest side stamps.
+  // Without these, a 30m+ band between runway and taxiway/apron is unflattened.
+  const runwayCapsuleWidth = Math.min(template.runwayWidth, template.runwayLength);
+  const runwayInnerEdge = runwayCapsuleWidth * 0.5 + 3; // runway innerPadding
+
+  const sideRects = [...template.taxiways, ...template.aprons];
+  const positiveSide = sideRects.filter((r) => r.offsetLateral > 0);
+  const negativeSide = sideRects.filter((r) => r.offsetLateral < 0);
+
+  for (const side of [
+    { rects: positiveSide, sign: 1 },
+    { rects: negativeSide, sign: -1 },
+  ]) {
+    let farEdge: number;
+    if (side.rects.length > 0) {
+      farEdge = Math.min(
+        ...side.rects.map((r) => {
+          const capsW = Math.min(r.width, r.length);
+          return Math.abs(r.offsetLateral) - capsW * 0.5 - 1.5; // non-runway innerPadding
+        }),
+      );
+    } else {
+      // No taxiway/apron on this side; cover the runway_side building zone
+      farEdge = template.runwayWidth * 0.5 + 30;
+    }
+
+    const gapWidth = farEdge - runwayInnerEdge;
+    if (gapWidth <= 2) continue;
+
+    const gapCenter = (runwayInnerEdge + farEdge) * 0.5;
+    stampedRects.unshift({
+      kind: 'filler' as const,
+      rect: {
+        offsetAlongRunway: 0,
+        offsetLateral: gapCenter * side.sign,
+        length: template.runwayLength * 0.8,
+        width: gapWidth,
+        yaw: 0,
+        surface: 'packed_earth' as const,
+        blend: 3,
+      },
+    });
+  }
 
   return stampedRects.map(({ kind, rect }, index) => {
     const stampTuning = resolveAirfieldStampTuning(rect.surface, feature.terrain?.targetHeightMode);
@@ -211,6 +255,9 @@ function compileGeneratedTerrainStamps(feature: MapFeatureDefinition): TerrainSt
     const capsuleWidth = Math.min(rect.width, rect.length);
     const segmentHalfLength = Math.max(0, (capsuleLength - capsuleWidth) * 0.5);
 
+    // Fillers use 'center' target height mode to match runway elevation
+    const targetHeightMode = kind === 'filler' ? 'center' as const : stampTuning.targetHeightMode;
+
     return {
       kind: 'flatten_capsule',
       startX: center.x - directionX * segmentHalfLength,
@@ -222,7 +269,7 @@ function compileGeneratedTerrainStamps(feature: MapFeatureDefinition): TerrainSt
       gradeRadius: capsuleWidth * 0.5 + stampTuning.gradePadding,
       gradeStrength: authoredStrength ?? stampTuning.gradeStrength,
       samplingRadius: stampTuning.samplingRadius(capsuleWidth),
-      targetHeightMode: stampTuning.targetHeightMode,
+      targetHeightMode,
       heightOffset,
       priority: priority + resolveAirfieldStampPriorityOffset(kind) + index,
     };
@@ -409,13 +456,16 @@ function resolveAirfieldStampTuning(
   };
 }
 
-function resolveAirfieldStampPriorityOffset(kind: 'runway' | 'apron' | 'taxiway'): number {
+function resolveAirfieldStampPriorityOffset(kind: 'runway' | 'apron' | 'taxiway' | 'filler'): number {
   switch (kind) {
     case 'runway':
       return 20;
     case 'apron':
       return 10;
     case 'taxiway':
+      return 0;
+    case 'filler':
+      return -5;
     default:
       return 0;
   }

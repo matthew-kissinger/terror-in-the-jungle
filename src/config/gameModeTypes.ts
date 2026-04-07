@@ -95,6 +95,8 @@ export interface StaticModelPlacementConfig {
   yaw?: number;
   uniformScale?: number;
   terrainSnap?: boolean;
+  /** Snap to terrain height at exact position without searching for flatter ground nearby. */
+  skipFlatSearch?: boolean;
   heightOffset?: number;
   registerCollision?: boolean;
 }

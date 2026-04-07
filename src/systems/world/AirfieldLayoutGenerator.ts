@@ -136,6 +136,7 @@ export function generateAirfieldLayout(
       offset: localOff,
       yaw: spot.yaw ?? 0,
       registerCollision: true,
+      skipFlatSearch: true,
     });
     placed.push({ x: localOff.x, z: localOff.z, radius: clearanceRadius });
   }
@@ -186,6 +187,7 @@ export function generateAirfieldLayout(
       offset: localOff,
       yaw: (rng() - 0.5) * 0.3,
       registerCollision: entry.registerCollision,
+      skipFlatSearch: true,
     });
     placed.push({ x: localOff.x, z: localOff.z, radius: clearanceRadius });
   }
