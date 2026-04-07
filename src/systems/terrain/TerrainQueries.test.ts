@@ -91,6 +91,40 @@ describe('TerrainQueries', () => {
     expect(true).toBe(true);
   });
 
+  it('keeps static collision bounds cached after registration', () => {
+    const obj = new THREE.Mesh(
+      new THREE.BoxGeometry(4, 4, 4),
+      new THREE.MeshBasicMaterial(),
+    );
+    obj.position.set(0, 12, 0);
+    obj.updateMatrixWorld(true);
+
+    queries.registerCollisionObject('static_box', obj);
+    expect(queries.getEffectiveHeightAt(0, 0)).toBe(14);
+
+    obj.position.set(0, 20, 0);
+    obj.updateMatrixWorld(true);
+
+    expect(queries.getEffectiveHeightAt(0, 0)).toBe(14);
+  });
+
+  it('recomputes bounds for dynamic collision objects', () => {
+    const obj = new THREE.Mesh(
+      new THREE.BoxGeometry(4, 4, 4),
+      new THREE.MeshBasicMaterial(),
+    );
+    obj.position.set(0, 12, 0);
+    obj.updateMatrixWorld(true);
+
+    queries.registerCollisionObject('dynamic_box', obj, { dynamic: true });
+    expect(queries.getEffectiveHeightAt(0, 0)).toBe(14);
+
+    obj.position.set(0, 20, 0);
+    obj.updateMatrixWorld(true);
+
+    expect(queries.getEffectiveHeightAt(0, 0)).toBe(22);
+  });
+
   it('getLOSAccelerator returns the injected accelerator', () => {
     expect(queries.getLOSAccelerator()).toBe(mockLOS);
   });

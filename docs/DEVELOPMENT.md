@@ -1,6 +1,6 @@
 # Development Guide
 
-Last updated: 2026-04-02
+Last updated: 2026-04-07
 
 ## Prerequisites
 
@@ -45,12 +45,16 @@ npm run check:mobile-ui    # Built-app phone viewport flow gate
 
 ```bash
 npm run perf:capture:combat120   # Primary regression capture
+npm run perf:capture:openfrontier:short
 npm run perf:compare             # Compare against baselines
+npm run perf:compare -- --scenario openfrontier:short
 npm run perf:compare:strict      # Treat warnings as failures too
 npm run validate:full            # test + build + combat120 + compare
 ```
 
 See [PERFORMANCE.md](PERFORMANCE.md) for full profiling docs.
+
+For world-size, staged-prop, aircraft, vehicle, terrain-query, or hit-detection changes, `combat120` is not enough. Run `npm run perf:capture:openfrontier:short` and compare that scenario explicitly before you push.
 
 ## Deployment
 
@@ -81,6 +85,12 @@ For performance-sensitive changes, also run:
 npm run validate:full    # adds combat120 capture + baseline comparison
 ```
 
+For world/vehicle/aircraft/terrain work, also run:
+```bash
+npm run perf:capture:openfrontier:short
+npm run perf:compare -- --scenario openfrontier:short
+```
+
 CI still captures perf artifacts on every push, but the hosted-run perf outcome is advisory. If the harness cannot produce a `summary.json`, or if `perf:compare` reports a `FAIL`, the workflow now keeps the artifacts and proceeds with deploy instead of blocking on a runner environment we have already validated as noisy. Treat `validate:full` as the authoritative pre-push perf gate.
 
 ### Build Output
@@ -99,6 +109,11 @@ After changes to `src/ui/controls/`, `src/ui/hud/`, or `src/systems/player/`:
 3. Deploy cancel returns to menu
 4. Respawn works
 5. No fatal console errors
+
+After changes to `src/systems/world/`, `src/systems/terrain/`, `src/systems/vehicle/`, or `src/systems/combat/`, also confirm:
+1. Open Frontier capture records player shots and hits
+2. Nearby enemies are returned by combat spatial queries in the active mode bounds
+3. Entering a plane does not produce vertical self-launch on the first update ticks
 
 ## Project Structure
 

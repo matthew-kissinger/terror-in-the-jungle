@@ -17,6 +17,23 @@ interface MergeBucket {
   receiveShadow: boolean;
 }
 
+type MaterialRecord = Record<string, unknown>;
+
+const TEXTURE_KEYS = [
+  'map',
+  'alphaMap',
+  'aoMap',
+  'bumpMap',
+  'displacementMap',
+  'emissiveMap',
+  'envMap',
+  'lightMap',
+  'metalnessMap',
+  'normalMap',
+  'roughnessMap',
+  'specularMap',
+] as const;
+
 /**
  * Collapse static leaf meshes into one mesh per material to cut draw calls.
  * Animated/control meshes can be excluded via `excludeMesh`.
@@ -58,7 +75,7 @@ export function optimizeStaticModelDrawCalls(
     geometry.applyMatrix4(_localMatrix);
 
     const material = child.material;
-    const bucketKey = material.uuid;
+    const bucketKey = getMaterialMergeKey(material);
     const bucket = buckets.get(bucketKey);
     if (bucket) {
       bucket.geometries.push(geometry);
@@ -143,4 +160,52 @@ function pruneEmptyGroups(root: THREE.Object3D): void {
   for (const group of groupsToRemove) {
     group.removeFromParent();
   }
+}
+
+function getMaterialMergeKey(material: THREE.Material): string {
+  const materialRecord = material as unknown as MaterialRecord;
+  const commonKey = {
+    type: material.type,
+    transparent: material.transparent,
+    alphaTest: material.alphaTest,
+    side: material.side,
+    opacity: material.opacity,
+    depthWrite: material.depthWrite,
+    depthTest: material.depthTest,
+    blending: material.blending,
+    premultipliedAlpha: material.premultipliedAlpha,
+    vertexColors: material.vertexColors,
+    flatShading: 'flatShading' in material ? material.flatShading : false,
+    fog: 'fog' in material ? materialRecord.fog : false,
+    toneMapped: material.toneMapped,
+    wireframe: 'wireframe' in material ? material.wireframe : false,
+    visible: material.visible,
+  };
+
+  const standardKey = material instanceof THREE.MeshStandardMaterial
+    ? {
+        color: material.color.getHexString(),
+        emissive: material.emissive.getHexString(),
+        roughness: material.roughness,
+        metalness: material.metalness,
+        emissiveIntensity: material.emissiveIntensity,
+      }
+    : {
+        color: 'color' in material && material.color instanceof THREE.Color
+          ? material.color.getHexString()
+          : null,
+      };
+
+  const textureKey = Object.fromEntries(
+    TEXTURE_KEYS.map((key) => {
+      const value = materialRecord[key];
+      return [key, value instanceof THREE.Texture ? value.uuid : null];
+    }),
+  );
+
+  return JSON.stringify({
+    ...commonKey,
+    ...standardKey,
+    textures: textureKey,
+  });
 }

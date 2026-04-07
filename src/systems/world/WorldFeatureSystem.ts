@@ -7,6 +7,7 @@ import { freezeTransform } from '../../utils/SceneUtils';
 import { modelLoader } from '../assets/ModelLoader';
 import { getModelPlacementProfile } from '../assets/ModelPlacementProfiles';
 import { prepareModelForPlacement } from '../assets/ModelPlacementUtils';
+import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
 import { AIRFIELD_TEMPLATES } from './AirfieldTemplates';
 import { generateAirfieldLayout } from './AirfieldLayoutGenerator';
 import { GameModeManager } from './GameModeManager';
@@ -164,6 +165,7 @@ export class WorldFeatureSystem implements GameSystem {
 
       const object = await modelLoader.loadModel(placement.modelPath);
       prepareModelForPlacement(object, placement.modelPath);
+      this.optimizeStaticPlacementObject(object, placement.modelPath);
 
       const profile = getModelPlacementProfile(placement.modelPath);
 
@@ -211,6 +213,19 @@ export class WorldFeatureSystem implements GameSystem {
         object,
         collisionRegistered,
       });
+    }
+  }
+
+  private optimizeStaticPlacementObject(object: THREE.Object3D, modelPath: string): void {
+    const result = optimizeStaticModelDrawCalls(object, {
+      batchNamePrefix: modelPath.replace(/[/.]/g, '_'),
+    });
+
+    if (result.sourceMeshCount > 1 && result.mergedMeshCount > 0) {
+      Logger.info(
+        'world',
+        `Optimized static placement ${modelPath}: ${result.sourceMeshCount} leaf meshes -> ${result.mergedMeshCount} batches`,
+      );
     }
   }
 

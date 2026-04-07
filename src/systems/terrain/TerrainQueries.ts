@@ -5,6 +5,7 @@ import { getHeightQueryCache } from './HeightQueryCache';
 // Scratch vectors (zero allocation per call)
 const _queryPos = new THREE.Vector3();
 const _rayTarget = new THREE.Vector3();
+const _collisionBox = new THREE.Box3();
 
 /**
  * Terrain query facade. Replaces ChunkTerrainQueries.
@@ -13,7 +14,11 @@ const _rayTarget = new THREE.Vector3();
  */
 export class TerrainQueries {
   private losAccelerator: LOSAccelerator;
-  private collisionObjects: Map<string, THREE.Object3D> = new Map();
+  private collisionObjects: Map<string, {
+    object: THREE.Object3D;
+    bounds: THREE.Box3;
+    dynamic: boolean;
+  }> = new Map();
 
   constructor(losAccelerator: LOSAccelerator) {
     this.losAccelerator = losAccelerator;
@@ -32,9 +37,10 @@ export class TerrainQueries {
   getEffectiveHeightAt(x: number, z: number): number {
     let height = this.getHeightAt(x, z);
 
-    for (const [, obj] of this.collisionObjects) {
+    for (const [, entry] of this.collisionObjects) {
+      const obj = entry.object;
       if (!obj.visible) continue;
-      const box = new THREE.Box3().setFromObject(obj);
+      const box = this.getCollisionBounds(entry);
 
       if (x >= box.min.x && x <= box.max.x && z >= box.min.z && z <= box.max.z) {
         height = Math.max(height, box.max.y);
@@ -57,11 +63,11 @@ export class TerrainQueries {
    * Check collision with registered objects.
    */
   checkObjectCollision(position: THREE.Vector3, radius = 0.5): boolean {
-    for (const [, obj] of this.collisionObjects) {
+    for (const [, entry] of this.collisionObjects) {
+      const obj = entry.object;
       if (!obj.visible) continue;
-      const box = new THREE.Box3().setFromObject(obj);
-      box.expandByScalar(radius);
-      if (box.containsPoint(position)) return true;
+      _collisionBox.copy(this.getCollisionBounds(entry)).expandByScalar(radius);
+      if (_collisionBox.containsPoint(position)) return true;
     }
     return false;
   }
@@ -69,8 +75,25 @@ export class TerrainQueries {
   /**
    * Register a collision object for height/collision queries.
    */
-  registerCollisionObject(id: string, object: THREE.Object3D): void {
-    this.collisionObjects.set(id, object);
+  registerCollisionObject(
+    id: string,
+    object: THREE.Object3D,
+    options?: {
+      dynamic?: boolean;
+    },
+  ): void {
+    const entry = {
+      object,
+      bounds: new THREE.Box3(),
+      dynamic: options?.dynamic === true,
+    };
+
+    if (!entry.dynamic) {
+      object.updateMatrixWorld(true);
+      entry.bounds.setFromObject(object);
+    }
+
+    this.collisionObjects.set(id, entry);
   }
 
   /**
@@ -106,5 +129,17 @@ export class TerrainQueries {
 
   dispose(): void {
     this.collisionObjects.clear();
+  }
+
+  private getCollisionBounds(entry: {
+    object: THREE.Object3D;
+    bounds: THREE.Box3;
+    dynamic: boolean;
+  }): THREE.Box3 {
+    if (entry.dynamic) {
+      entry.object.updateMatrixWorld(true);
+      entry.bounds.setFromObject(entry.object);
+    }
+    return entry.bounds;
   }
 }

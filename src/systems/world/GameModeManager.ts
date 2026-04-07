@@ -241,6 +241,12 @@ export class GameModeManager implements GameSystem {
       this.zoneManager.setGameModeConfig(config);
     }
 
+    // Keep combat spatial bounds aligned with the active mode before any
+    // respawn/reseed work inserts units into the octree.
+    if (this.combatantSystem) {
+      this.combatantSystem.setSpatialBounds(config.worldSize);
+    }
+
     // Configure combatant system
     if (this.combatantSystem) {
       this.combatantSystem.setMaxCombatants(config.maxCombatants);

@@ -221,7 +221,13 @@ export interface ITerrainRuntime {
   getActiveTerrainTileCount(): number;
   setSurfaceWetness(wetness: number): void;
   updatePlayerPosition(position: THREE.Vector3): void;
-  registerCollisionObject(id: string, object: THREE.Object3D): void;
+  registerCollisionObject(
+    id: string,
+    object: THREE.Object3D,
+    options?: {
+      dynamic?: boolean;
+    },
+  ): void;
   unregisterCollisionObject(id: string): void;
   raycastTerrain(origin: THREE.Vector3, direction: THREE.Vector3, maxDistance: number): { hit: boolean; point?: THREE.Vector3; distance?: number };
 }

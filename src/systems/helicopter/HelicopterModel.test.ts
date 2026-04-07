@@ -262,7 +262,11 @@ describe('HelicopterModel', () => {
       model.createHelicopterWhenReady();
       await flushPromises();
 
-      expect(mockTerrainManager.registerCollisionObject).toHaveBeenCalledWith(HELI_ID, expect.any(THREE.Group));
+      expect(mockTerrainManager.registerCollisionObject).toHaveBeenCalledWith(
+        HELI_ID,
+        expect.any(THREE.Group),
+        { dynamic: true },
+      );
     });
   });
 

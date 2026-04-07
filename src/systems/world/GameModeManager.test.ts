@@ -53,6 +53,7 @@ describe('GameModeManager', () => {
     expect(mockFullMapSystem.setTerrainRuntime).toHaveBeenCalledWith(mockTerrainSystem);
 
     manager.setGameMode(GameMode.A_SHAU_VALLEY);
+    expect(mockCombatantSystem.setSpatialBounds).toHaveBeenLastCalledWith(22000);
     expect(mockMinimapSystem.setMapIntelPolicy).toHaveBeenLastCalledWith(
       expect.objectContaining({
         tacticalRangeOverride: 900,
@@ -67,6 +68,7 @@ describe('GameModeManager', () => {
     );
 
     manager.setGameMode(GameMode.ZONE_CONTROL);
+    expect(mockCombatantSystem.setSpatialBounds).toHaveBeenLastCalledWith(800);
     expect(mockMinimapSystem.setMapIntelPolicy).toHaveBeenLastCalledWith(
       expect.objectContaining({
         tacticalRangeOverride: null,
@@ -78,6 +80,60 @@ describe('GameModeManager', () => {
         showStrategicAgentsOnFullMap: false,
         strategicLayer: 'none',
       })
+    );
+  });
+
+  it('reapplies combat spatial bounds when switching into Open Frontier', () => {
+    const manager = new GameModeManager();
+    const mockZoneManager = {
+      setGameModeConfig: vi.fn(),
+      getAllZones: vi.fn(() => []),
+    } as any;
+    const mockCombatantSystem = {
+      setSpatialBounds: vi.fn(),
+      setMaxCombatants: vi.fn(),
+      setSquadSizes: vi.fn(),
+      setReinforcementInterval: vi.fn(),
+      setAutonomousSpawningEnabled: vi.fn(),
+      reseedForcesForMode: vi.fn(),
+      clearCombatantsForExternalPopulation: vi.fn(),
+      combatantAI: {
+        setEngagementRange: vi.fn(),
+      },
+    } as any;
+    const mockTicketSystem = {
+      setMaxTickets: vi.fn(),
+      setMatchDuration: vi.fn(),
+      setDeathPenalty: vi.fn(),
+      setTDMMode: vi.fn(),
+    } as any;
+    const mockTerrainSystem = {
+      setRenderDistance: vi.fn(),
+      getHeightAt: vi.fn(() => 0),
+    } as any;
+    const mockMinimapSystem = {
+      setMapIntelPolicy: vi.fn(),
+      setWorldScale: vi.fn(),
+    } as any;
+    const mockFullMapSystem = {
+      setMapIntelPolicy: vi.fn(),
+      setTerrainRuntime: vi.fn(),
+    } as any;
+
+    manager.connectSystems(
+      mockZoneManager,
+      mockCombatantSystem,
+      mockTicketSystem,
+      mockTerrainSystem,
+      mockMinimapSystem,
+      mockFullMapSystem
+    );
+
+    manager.setGameMode(GameMode.OPEN_FRONTIER);
+
+    expect(mockCombatantSystem.setSpatialBounds).toHaveBeenCalledWith(3200);
+    expect(mockCombatantSystem.setSpatialBounds.mock.invocationCallOrder[0]).toBeLessThan(
+      mockCombatantSystem.reseedForcesForMode.mock.invocationCallOrder[0]
     );
   });
 

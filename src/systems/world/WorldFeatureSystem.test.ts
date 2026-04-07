@@ -2,13 +2,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { GameMode } from '../../config/gameModeTypes';
 import { WorldFeatureSystem } from './WorldFeatureSystem';
+import { modelLoader } from '../assets/ModelLoader';
 
 vi.mock('../assets/ModelLoader', () => ({
   modelLoader: {
     loadModel: vi.fn(async () => {
       const THREE = await import('three');
       const group = new THREE.Group();
-      group.add(new THREE.Mesh(new THREE.BoxGeometry(2, 1, 2), new THREE.MeshBasicMaterial()));
+      const left = new THREE.Mesh(
+        new THREE.BoxGeometry(2, 1, 2),
+        new THREE.MeshStandardMaterial({ color: 0x4a5a2a, roughness: 0.8, metalness: 0.1 }),
+      );
+      left.position.x = -1.5;
+      const right = new THREE.Mesh(
+        new THREE.BoxGeometry(2, 1, 2),
+        new THREE.MeshStandardMaterial({ color: 0x4a5a2a, roughness: 0.8, metalness: 0.1 }),
+      );
+      right.position.x = 1.5;
+      group.add(left);
+      group.add(right);
       return group;
     }),
   },
@@ -133,5 +145,39 @@ describe('WorldFeatureSystem', () => {
     const placed = scene.children[0];
     expect(placed.position.x).toBeGreaterThan(10.5);
     expect(placed.position.y).toBeLessThan(8);
+  });
+
+  it('optimizes generic static placements before adding them to the scene', async () => {
+    currentConfig = {
+      id: GameMode.ZONE_CONTROL,
+      features: [
+        {
+          id: 'optimized_static_feature',
+          kind: 'village',
+          position: new THREE.Vector3(10, 0, 20),
+          staticPlacements: [
+            {
+              modelPath: 'mock_vehicle.glb',
+              offset: new THREE.Vector3(0, 0, 0),
+            },
+          ],
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+
+    expect(vi.mocked(modelLoader.loadModel)).toHaveBeenCalledWith('mock_vehicle.glb');
+
+    const placed = scene.children[0];
+    let meshCount = 0;
+    placed.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        meshCount++;
+      }
+    });
+
+    expect(meshCount).toBe(1);
   });
 });

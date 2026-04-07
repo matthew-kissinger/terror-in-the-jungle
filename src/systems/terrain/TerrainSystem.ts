@@ -287,8 +287,14 @@ export class TerrainSystem implements GameSystem {
 
   // ──── Collision objects ────
 
-  registerCollisionObject(id: string, object: THREE.Object3D): void {
-    this.terrainQueries.registerCollisionObject(id, object);
+  registerCollisionObject(
+    id: string,
+    object: THREE.Object3D,
+    options?: {
+      dynamic?: boolean;
+    },
+  ): void {
+    this.terrainQueries.registerCollisionObject(id, object, options);
   }
 
   unregisterCollisionObject(id: string): void {

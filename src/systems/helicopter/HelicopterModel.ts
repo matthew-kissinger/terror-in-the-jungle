@@ -281,7 +281,7 @@ export class HelicopterModel implements GameSystem {
     this.audio.initialize(helicopterId, helicopter);
 
     if (this.terrainManager) {
-      this.terrainManager.registerCollisionObject(helicopterId, helicopter);
+      this.terrainManager.registerCollisionObject(helicopterId, helicopter, { dynamic: true });
     }
 
     // Register with VehicleManager

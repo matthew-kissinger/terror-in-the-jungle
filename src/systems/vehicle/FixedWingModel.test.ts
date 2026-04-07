@@ -70,6 +70,28 @@ describe('FixedWingModel', () => {
       expect(model.hasAircraft()).toBe(true);
     });
 
+    it('uses raw terrain height rather than effective collision height for placement and sampling', async () => {
+      const terrain = createMockTerrain();
+      terrain.getHeightAt.mockReturnValue(8);
+      terrain.getEffectiveHeightAt.mockReturnValue(40);
+
+      model.setTerrainManager(terrain as any);
+
+      const pos = new THREE.Vector3(50, 0, -25);
+      await model.createAircraftAtSpot('fw_raw_height', AircraftModels.A1_SKYRAIDER, pos, 0);
+
+      expect(terrain.getHeightAt).toHaveBeenCalledWith(50, -25);
+      expect(terrain.registerCollisionObject).toHaveBeenCalledWith(
+        'fw_raw_height',
+        expect.any(THREE.Group),
+        { dynamic: true },
+      );
+
+      model.update(1 / 60);
+
+      expect(terrain.getEffectiveHeightAt).not.toHaveBeenCalledWith(50, -25);
+    });
+
     it('returns false for unknown model path', async () => {
       const pos = new THREE.Vector3(0, 0, 0);
       const result = await model.createAircraftAtSpot('test', 'unknown/model.glb', pos, 0);

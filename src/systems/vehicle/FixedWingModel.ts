@@ -242,7 +242,7 @@ export class FixedWingModel implements GameSystem {
 
       // Ensure Y is on terrain (use physics gearClearance instead of hardcoded offset)
       if (this.terrainManager) {
-        const h = this.terrainManager.getEffectiveHeightAt(worldPosition.x, worldPosition.z);
+        const h = this.terrainManager.getHeightAt(worldPosition.x, worldPosition.z);
         group.position.y = h + config.physics.gearClearance;
         worldPosition.y = h + config.physics.gearClearance;
       }
@@ -252,7 +252,7 @@ export class FixedWingModel implements GameSystem {
       this.configKeys.set(id, configKey);
       this.displayNames.set(id, display.displayName);
       if (this.terrainManager) {
-        this.terrainManager.registerCollisionObject(id, group);
+        this.terrainManager.registerCollisionObject(id, group, { dynamic: true });
         this.collisionRegistered.add(id);
       }
 
@@ -444,7 +444,7 @@ export class FixedWingModel implements GameSystem {
     }
 
     return {
-      height: this.terrainManager.getEffectiveHeightAt(x, z),
+      height: this.terrainManager.getHeightAt(x, z),
       normal: this.terrainManager.getNormalAt(x, z, _terrainSampleNormal),
     };
   }
