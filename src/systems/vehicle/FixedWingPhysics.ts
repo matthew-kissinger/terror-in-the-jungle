@@ -387,9 +387,16 @@ export class FixedWingPhysics {
     }
 
     const rotationReady = forwardSpeed >= this.cfg.vrSpeed * 0.9;
-    const targetPitch = rotationReady
-      ? Math.max(0, this.elevator) * THREE.MathUtils.degToRad(this.cfg.rotationPitchLimitDeg)
-      : 0;
+    let targetPitch: number;
+    if (this.elevator > 0 && rotationReady) {
+      targetPitch = this.elevator * THREE.MathUtils.degToRad(this.cfg.rotationPitchLimitDeg);
+    } else if (this.elevator > 0) {
+      // Below Vr: gradual visual feedback (capped at 4 deg) so the player sees input is working
+      const preRotationAuthority = THREE.MathUtils.smoothstep(forwardSpeed, this.cfg.vrSpeed * 0.3, this.cfg.vrSpeed * 0.9);
+      targetPitch = this.elevator * THREE.MathUtils.degToRad(4) * preRotationAuthority;
+    } else {
+      targetPitch = 0;
+    }
     this.groundPitch = THREE.MathUtils.lerp(
       this.groundPitch,
       Math.min(targetPitch, MAX_GROUND_ALIGN_PITCH),
