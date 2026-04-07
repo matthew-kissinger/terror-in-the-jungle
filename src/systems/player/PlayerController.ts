@@ -28,6 +28,10 @@ import type { AirSupportManager } from '../airsupport/AirSupportManager';
 import type { PlayerCombatControllerDependencies, PlayerControllerDependencies, PlayerVehicleControllerDependencies } from './PlayerControllerDependencies';
 import { PlayerCombatController } from './PlayerCombatController';
 import { PlayerVehicleController } from './PlayerVehicleController';
+import { VehicleStateManager } from '../vehicle/VehicleStateManager';
+import { HelicopterPlayerAdapter } from '../vehicle/HelicopterPlayerAdapter';
+import { FixedWingPlayerAdapter } from '../vehicle/FixedWingPlayerAdapter';
+import type { VehicleTransitionContext } from '../vehicle/PlayerVehicleAdapter';
 import type { FullMapSystem } from '../../ui/map/FullMapSystem';
 
 interface SettingsModalController {
@@ -93,6 +97,9 @@ export class PlayerController implements GameSystem {
   private cameraController: PlayerCamera;
   private combatController = new PlayerCombatController();
   private vehicleController = new PlayerVehicleController();
+  private vehicleStateManager = new VehicleStateManager();
+  private helicopterAdapter?: HelicopterPlayerAdapter;
+  private fixedWingAdapter?: FixedWingPlayerAdapter;
 
   constructor(camera: THREE.PerspectiveCamera) {
     this.camera = camera;
@@ -148,10 +155,13 @@ export class PlayerController implements GameSystem {
     }
 
     if (this.cameraShakeSystem) this.cameraShakeSystem.update(deltaTime);
-    if (this.playerState.isInHelicopter) {
-      this.updateHelicopterMode(deltaTime);
-    } else if (this.playerState.isInFixedWing) {
-      this.updateFixedWingMode(deltaTime);
+    if (this.vehicleStateManager.isInVehicle()) {
+      this.vehicleStateManager.update({
+        deltaTime,
+        input: this.input,
+        cameraController: this.cameraController,
+        hudSystem: this.hudSystem,
+      });
     } else {
       this.movement.updateMovement(deltaTime, this.input, this.camera);
     }
@@ -175,8 +185,18 @@ export class PlayerController implements GameSystem {
         if (this.commandInputManager?.handlePrimaryConfirm()) return;
         this.movement.handleJump();
       },
-      onRunStart: () => this.movement.setRunning(true),
-      onRunStop: () => this.movement.setRunning(false),
+      onRunStart: () => {
+        this.movement.setRunning(true);
+        if (this.helicopterAdapter && this.vehicleStateManager.getVehicleType() === 'helicopter') {
+          this.helicopterAdapter.setEngineBoost(true);
+        }
+      },
+      onRunStop: () => {
+        this.movement.setRunning(false);
+        if (this.helicopterAdapter && this.vehicleStateManager.getVehicleType() === 'helicopter') {
+          this.helicopterAdapter.setEngineBoost(false);
+        }
+      },
       onEscape: () => this.handleEscape(),
       onScoreboardToggle: (visible: boolean) => this.hudSystem?.toggleScoreboard(visible),
       onScoreboardTap: () => this.hudSystem?.toggleScoreboardVisibility(),
@@ -185,13 +205,17 @@ export class PlayerController implements GameSystem {
         this.handleEnterExitHelicopter();
       },
       onToggleAutoHover: () => {
-        if (this.playerState.isInFixedWing) {
-          this.movement.toggleAutoLevel();
-        } else {
-          this.movement.toggleAutoHover();
+        if (this.vehicleStateManager.getVehicleType() === 'fixed_wing') {
+          this.fixedWingAdapter?.toggleAutoLevel();
+        } else if (this.vehicleStateManager.getVehicleType() === 'helicopter') {
+          this.helicopterAdapter?.toggleAutoHover();
         }
       },
-      onToggleAltitudeLock: () => this.movement.toggleAltitudeLock(),
+      onToggleAltitudeLock: () => {
+        if (this.vehicleStateManager.getVehicleType() === 'helicopter') {
+          this.helicopterAdapter?.toggleAltitudeLock();
+        }
+      },
       onToggleMouseControl: () => this.handleToggleMouseControl(),
       onSandbagRotateLeft: () => this.sandbagSystem?.rotatePlacementPreview(-Math.PI / 8),
       onSandbagRotateRight: () => this.sandbagSystem?.rotatePlacementPreview(Math.PI / 8),
@@ -359,12 +383,12 @@ export class PlayerController implements GameSystem {
     if (this.fullMapSystem?.getIsVisible()) {
       return;
     }
-    if (this.playerState.isInHelicopter && this.helicopterModel) {
-      this.helicopterModel.exitHelicopter();
-      return;
-    }
-    if (this.playerState.isInFixedWing && this.fixedWingModel) {
-      this.fixedWingModel.exitAircraft();
+    if (this.vehicleStateManager.isInVehicle()) {
+      if (this.playerState.isInHelicopter && this.helicopterModel) {
+        this.helicopterModel.exitHelicopter();
+      } else if (this.playerState.isInFixedWing && this.fixedWingModel) {
+        this.fixedWingModel.exitAircraft();
+      }
       return;
     }
     if (this.gameStarted && this.settingsModal) {
@@ -430,14 +454,6 @@ export class PlayerController implements GameSystem {
 
   private handleMortarAdjustYaw(delta: number): void {
     this.combatController.adjustMortarYaw(delta);
-  }
-
-  private updateHelicopterMode(deltaTime: number): void {
-    this.vehicleController.updateHelicopterMode(deltaTime, this.movement, this.input, this.cameraController);
-  }
-
-  private updateFixedWingMode(deltaTime: number): void {
-    this.vehicleController.updateFixedWingMode(deltaTime, this.movement, this.input, this.cameraController);
   }
 
   private updateHUD(): void {
@@ -622,36 +638,16 @@ export class PlayerController implements GameSystem {
 
   enterHelicopter(helicopterId: string, helicopterPosition: THREE.Vector3): void {
     Logger.info('player', `  ENTERING HELICOPTER: ${helicopterId}`);
-    // Swap HUD context first so the vehicle UI is ready before the weapon disappears
-    this.vehicleController.enterHelicopter(
-      this.playerState,
-      helicopterPosition,
-      helicopterId,
-      (position, reason) => this.setPosition(position, reason),
-      this.input,
-      this.gameRenderer,
-      this.cameraController,
-    );
+    this.vehicleStateManager.enterVehicle('helicopter', helicopterId, this.buildTransitionContext(helicopterId, helicopterPosition));
     this.unequipWeapon();
-
-    Logger.info('player', ` Player entered helicopter at position (${helicopterPosition.x.toFixed(1)}, ${helicopterPosition.y.toFixed(1)}, ${helicopterPosition.z.toFixed(1)})`);
     Logger.info('player', `  CAMERA MODE: Switched to helicopter camera (flight sim style)`);
   }
 
   exitHelicopter(exitPosition: THREE.Vector3): void {
     const helicopterId = this.playerState.helicopterId;
     Logger.info('player', `  EXITING HELICOPTER: ${helicopterId}`);
-    this.vehicleController.exitHelicopter(
-      this.playerState,
-      exitPosition,
-      (position, reason) => this.setPosition(position, reason),
-      this.input,
-      this.gameRenderer,
-      this.cameraController,
-    );
+    this.vehicleStateManager.exitVehicle(this.buildTransitionContext(helicopterId ?? '', exitPosition));
     this.equipWeapon();
-
-    Logger.info('player', ` Player exited helicopter to position (${exitPosition.x.toFixed(1)}, ${exitPosition.y.toFixed(1)}, ${exitPosition.z.toFixed(1)})`);
     Logger.info('player', `  CAMERA MODE: Switched to first-person camera`);
   }
 
@@ -660,34 +656,31 @@ export class PlayerController implements GameSystem {
 
   enterFixedWing(aircraftId: string, aircraftPosition: THREE.Vector3): void {
     Logger.info('player', `ENTERING FIXED-WING: ${aircraftId}`);
-    const autoLevelDefault = this.fixedWingModel?.getDisplayInfo(aircraftId)?.autoLevelDefault ?? false;
-    this.movement.initializeFixedWingControls(autoLevelDefault);
-    this.vehicleController.enterFixedWing(
-      this.playerState,
-      aircraftPosition,
-      aircraftId,
-      (position, reason) => this.setPosition(position, reason),
-      this.input,
-      this.cameraController,
-    );
+    this.vehicleStateManager.enterVehicle('fixed_wing', aircraftId, this.buildTransitionContext(aircraftId, aircraftPosition));
     this.unequipWeapon();
   }
 
   exitFixedWing(exitPosition: THREE.Vector3): void {
     Logger.info('player', `EXITING FIXED-WING: ${this.playerState.fixedWingId}`);
-    this.movement.resetFixedWingControls();
-    this.vehicleController.exitFixedWing(
-      this.playerState,
-      exitPosition,
-      (position, reason) => this.setPosition(position, reason),
-      this.input,
-      this.cameraController,
-    );
+    this.vehicleStateManager.exitVehicle(this.buildTransitionContext(this.playerState.fixedWingId ?? '', exitPosition));
     this.equipWeapon();
   }
 
   isInFixedWing(): boolean { return this.playerState.isInFixedWing; }
   getFixedWingId(): string | null { return this.playerState.fixedWingId; }
+
+  private buildTransitionContext(vehicleId: string, position: THREE.Vector3): VehicleTransitionContext {
+    return {
+      playerState: this.playerState,
+      vehicleId,
+      position,
+      setPosition: (pos, reason) => this.setPosition(pos, reason),
+      input: this.input,
+      cameraController: this.cameraController,
+      gameRenderer: this.gameRenderer,
+      hudSystem: this.hudSystem,
+    };
+  }
 
   // ── Spectator camera API ──
 
@@ -737,7 +730,7 @@ export class PlayerController implements GameSystem {
     this.gameModeManager = dependencies.gameModeManager;
     this.ticketSystem = dependencies.ticketSystem;
     this.helicopterModel = dependencies.helicopterModel;
-    this.movement.setHelicopterModel(dependencies.helicopterModel);
+
     this.cameraController.setHelicopterModel(dependencies.helicopterModel);
     dependencies.helicopterModel.setPlayerInput(this.input);
     this.firstPersonWeapon = dependencies.firstPersonWeapon;
@@ -790,7 +783,7 @@ export class PlayerController implements GameSystem {
     });
     if (dependencies.fixedWingModel) {
       this.fixedWingModel = dependencies.fixedWingModel;
-      this.movement.setFixedWingModel(dependencies.fixedWingModel);
+
       this.cameraController.setFixedWingModel(dependencies.fixedWingModel);
     }
     this.configureVehicleController({
@@ -799,6 +792,13 @@ export class PlayerController implements GameSystem {
       hudSystem: dependencies.hudSystem,
       airSupportManager: dependencies.airSupportManager,
     });
+    // Register vehicle adapters with VehicleStateManager
+    this.helicopterAdapter = new HelicopterPlayerAdapter(dependencies.helicopterModel);
+    this.vehicleStateManager.registerAdapter(this.helicopterAdapter);
+    if (dependencies.fixedWingModel) {
+      this.fixedWingAdapter = new FixedWingPlayerAdapter(dependencies.fixedWingModel);
+      this.vehicleStateManager.registerAdapter(this.fixedWingAdapter);
+    }
 
     dependencies.hudSystem.setWeaponSelectCallback((slotIndex: number) => {
       this.inventoryManager?.setCurrentSlot(slotIndex as WeaponSlot);
@@ -839,11 +839,12 @@ export class PlayerController implements GameSystem {
   setTicketSystem(ticketSystem: TicketSystem): void { this.ticketSystem = ticketSystem; this.configureCombatController({ ticketSystem }); }
   setHelicopterModel(helicopterModel: HelicopterModel): void {
     this.helicopterModel = helicopterModel;
-    this.movement.setHelicopterModel(helicopterModel);
     this.cameraController.setHelicopterModel(helicopterModel);
     helicopterModel.setPlayerInput(this.input);
     this.configureCombatController({ helicopterModel });
     this.configureVehicleController({ helicopterModel });
+    this.helicopterAdapter = new HelicopterPlayerAdapter(helicopterModel);
+    this.vehicleStateManager.registerAdapter(this.helicopterAdapter);
   }
   setFirstPersonWeapon(firstPersonWeapon: FirstPersonWeapon): void {
     this.firstPersonWeapon = firstPersonWeapon;
@@ -900,9 +901,10 @@ export class PlayerController implements GameSystem {
   setPlayerSquadController(playerSquadController: PlayerSquadController): void { this.playerSquadController = playerSquadController; }
   setFixedWingModel(fixedWingModel: FixedWingModel): void {
     this.fixedWingModel = fixedWingModel;
-    this.movement.setFixedWingModel(fixedWingModel);
     this.cameraController.setFixedWingModel(fixedWingModel);
     this.configureVehicleController({ fixedWingModel });
+    this.fixedWingAdapter = new FixedWingPlayerAdapter(fixedWingModel);
+    this.vehicleStateManager.registerAdapter(this.fixedWingAdapter);
   }
   setAirSupportManager(airSupportManager: AirSupportManager): void {
     this.airSupportManager = airSupportManager;

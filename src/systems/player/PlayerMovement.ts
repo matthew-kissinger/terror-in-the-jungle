@@ -1,12 +1,9 @@
-import { Logger } from '../../utils/Logger';
 import * as THREE from 'three';
 import { PlayerState } from '../../types';
-import { HelicopterControls } from '../helicopter/HelicopterPhysics';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import { SandbagSystem } from '../weapons/SandbagSystem';
 import { FootstepAudioSystem } from '../audio/FootstepAudioSystem';
 import { PlayerInput } from './PlayerInput';
-import { IHUDSystem, IHelicopterModel } from '../../types/SystemInterfaces';
 import { getHeightQueryCache } from '../terrain/HeightQueryCache';
 import {
   canStepUp,
@@ -17,7 +14,6 @@ import {
 import { FixedStepRunner } from '../../utils/FixedStepRunner';
 import { performanceTelemetry } from '../debug/PerformanceTelemetry';
 import { movementStatsTracker } from './MovementStatsTracker';
-import type { FixedWingCommand } from '../vehicle/FixedWingPhysics';
 import {
   computeForwardGrade,
   computeSlopeValueFromNormal,
@@ -56,39 +52,14 @@ const PLAYER_STEEP_FLOW_MIN_SPEED = 1.4;
 const PLAYER_STEEP_FLOW_LERP = 0.58;
 const PLAYER_TERRAIN_LIP_RISE = 0.45;
 
-// ── Helicopter control targets ──
-// PlayerMovement emits raw target values; HelicopterPhysics.smoothControlInputs() handles ramping.
-const HELI_AUTOHOVER_TARGET = 0.4;
-const HELI_TOUCH_JOYSTICK_DEADZONE = 0.1;
-const HELI_TOUCH_CYCLIC_DEADZONE = 0.05;
-const HELI_MOUSE_SENSITIVITY_DEFAULT = 0.5;
-
 export class PlayerMovement {
   static readonly FIXED_STEP_SECONDS = 0.016;
   private playerState: PlayerState;
   private terrainSystem?: ITerrainRuntime;
   private sandbagSystem?: SandbagSystem;
   private footstepAudioSystem?: FootstepAudioSystem;
-  private helicopterModel?: IHelicopterModel;
-  private fixedWingModel?: import('../vehicle/FixedWingModel').FixedWingModel;
   private worldHalfExtent = 0;
-
-  // Fixed-wing command state
-  private fixedWingThrottle = 0;
-  private fixedWingMousePitch = 0;
-  private fixedWingMouseRoll = 0;
-  private fixedWingStabilityAssist = false;
-  private helicopterControls: HelicopterControls = {
-    collective: 0,
-    cyclicPitch: 0,
-    cyclicRoll: 0,
-    yaw: 0,
-    engineBoost: false,
-    autoHover: true
-  };
   private isRunning = false;
-  private altitudeLock = false;
-  private lockedCollective = HELI_AUTOHOVER_TARGET;
   private readonly movementStepper = new FixedStepRunner(PlayerMovement.FIXED_STEP_SECONDS, 1.0);
   private readonly supportNormal = new THREE.Vector3(0, 1, 0);
   private readonly sampledSupportNormal = new THREE.Vector3(0, 1, 0);
@@ -114,14 +85,6 @@ export class PlayerMovement {
     this.footstepAudioSystem = footstepAudioSystem;
   }
 
-  setHelicopterModel(helicopterModel: IHelicopterModel): void {
-    this.helicopterModel = helicopterModel;
-  }
-
-  setFixedWingModel(fixedWingModel: import('../vehicle/FixedWingModel').FixedWingModel): void {
-    this.fixedWingModel = fixedWingModel;
-  }
-
   setCrouching(crouching: boolean): void {
     this.playerState.isCrouching = crouching;
   }
@@ -133,11 +96,6 @@ export class PlayerMovement {
   setRunning(running: boolean): void {
     this.isRunning = running;
     this.playerState.isRunning = running;
-
-    // Also handle helicopter engine boost
-    if (this.playerState.isInHelicopter) {
-      this.helicopterControls.engineBoost = running;
-    }
   }
 
   handleJump(): void {
@@ -146,23 +104,6 @@ export class PlayerMovement {
       this.playerState.isJumping = true;
       this.playerState.isGrounded = false;
     }
-  }
-
-  toggleAutoHover(): void {
-    this.helicopterControls.autoHover = !this.helicopterControls.autoHover;
-    Logger.info('player', ` Auto-hover ${this.helicopterControls.autoHover ? 'enabled' : 'disabled'}`);
-  }
-
-  toggleAltitudeLock(): void {
-    this.altitudeLock = !this.altitudeLock;
-    if (this.altitudeLock) {
-      this.lockedCollective = this.helicopterControls.collective;
-    }
-    Logger.info('player', `Altitude lock ${this.altitudeLock ? 'ON' : 'OFF'} (collective ${this.lockedCollective.toFixed(2)})`);
-  }
-
-  getHelicopterControls(): HelicopterControls {
-    return { ...this.helicopterControls };
   }
 
   updateMovement(deltaTime: number, input: PlayerInput, camera: THREE.Camera): void {
@@ -482,300 +423,6 @@ export class PlayerMovement {
         isMoving && this.playerState.isGrounded
       );
     }
-  }
-
-  updateHelicopterControls(
-    deltaTime: number,
-    input: PlayerInput,
-    hudSystem?: IHUDSystem,
-    mouseMovement?: { x: number; y: number },
-  ): void {
-    // Raw target values - HelicopterPhysics.smoothControlInputs() handles all ramping.
-    const touchControls = input.getTouchControls();
-    const hasTouchHeliMode = this.isTouchFlightMode(touchControls);
-
-    // --- Collective (vertical thrust) ---
-    if (hasTouchHeliMode) {
-      const touchMove = input.getTouchMovementVector();
-      const collectiveInput = -touchMove.z; // Invert: joystick up = more thrust
-      if (Math.abs(collectiveInput) > HELI_TOUCH_JOYSTICK_DEADZONE) {
-        this.helicopterControls.collective = (collectiveInput + 1) / 2; // Map [-1,1] to [0,1]
-        this.altitudeLock = false; // Manual input disengages altitude lock
-      } else {
-        this.helicopterControls.collective = this.getIdleCollective();
-      }
-    } else if (input.isKeyPressed('keyw')) {
-      this.helicopterControls.collective = 1.0;
-      this.altitudeLock = false;
-    } else if (input.isKeyPressed('keys')) {
-      this.helicopterControls.collective = 0.0;
-      this.altitudeLock = false;
-    } else {
-      this.helicopterControls.collective = this.getIdleCollective();
-    }
-
-    // --- Yaw (tail rotor, turning) ---
-    if (hasTouchHeliMode) {
-      const touchMove = input.getTouchMovementVector();
-      this.helicopterControls.yaw = Math.abs(touchMove.x) > HELI_TOUCH_JOYSTICK_DEADZONE ? -touchMove.x : 0;
-    } else if (input.isKeyPressed('keya')) {
-      this.helicopterControls.yaw = 1.0;
-    } else if (input.isKeyPressed('keyd')) {
-      this.helicopterControls.yaw = -1.0;
-    } else {
-      this.helicopterControls.yaw = 0;
-    }
-
-    // --- Cyclic Pitch/Roll ---
-    const touchCyclic = this.getTouchFlightCyclicInput(input);
-    const hasTouchCyclic = Math.abs(touchCyclic.pitch) > HELI_TOUCH_CYCLIC_DEADZONE || Math.abs(touchCyclic.roll) > HELI_TOUCH_CYCLIC_DEADZONE;
-
-    if (hasTouchCyclic) {
-      this.helicopterControls.cyclicPitch = touchCyclic.pitch;
-      this.helicopterControls.cyclicRoll = touchCyclic.roll;
-    } else {
-      this.helicopterControls.cyclicPitch = input.isKeyPressed('arrowup') ? 1.0
-        : input.isKeyPressed('arrowdown') ? -1.0 : 0;
-      this.helicopterControls.cyclicRoll = input.isKeyPressed('arrowright') ? 1.0
-        : input.isKeyPressed('arrowleft') ? -1.0 : 0;
-    }
-
-    if (mouseMovement) {
-      this.addMouseControlToHelicopter(mouseMovement);
-    }
-
-    // Send controls to helicopter model
-    if (this.helicopterModel && this.playerState.helicopterId) {
-      this.helicopterModel.setHelicopterControls(this.playerState.helicopterId, this.helicopterControls);
-    }
-
-    // Update helicopter instruments HUD
-    if (hudSystem) {
-      let rpm = this.helicopterControls.collective * 0.8 + 0.2;
-      if (this.helicopterModel && this.playerState.helicopterId) {
-        const state = this.helicopterModel.getHelicopterState(this.playerState.helicopterId);
-        if (state) rpm = state.engineRPM;
-
-        const flightData = this.helicopterModel.getFlightData(this.playerState.helicopterId);
-        if (flightData) {
-          hudSystem.updateHelicopterFlightData(flightData.airspeed, flightData.heading, flightData.verticalSpeed);
-        }
-      }
-      hudSystem.updateHelicopterInstruments(
-        this.helicopterControls.collective,
-        rpm,
-        this.helicopterControls.autoHover,
-        this.helicopterControls.engineBoost
-      );
-    }
-  }
-
-  /** Collective target when no W/S key is pressed. */
-  private getIdleCollective(): number {
-    if (this.altitudeLock) return this.lockedCollective;
-    if (this.helicopterControls.autoHover) return HELI_AUTOHOVER_TARGET;
-    return 0;
-  }
-
-  addMouseControlToHelicopter(mouseMovement: { x: number; y: number }, mouseSensitivity: number = HELI_MOUSE_SENSITIVITY_DEFAULT): void {
-    // Mouse X controls roll (banking)
-    this.helicopterControls.cyclicRoll = THREE.MathUtils.clamp(
-      this.helicopterControls.cyclicRoll + mouseMovement.x * mouseSensitivity,
-      -1.0, 1.0
-    );
-
-    // Mouse Y controls pitch (forward/backward) - inverted for intuitive control
-    this.helicopterControls.cyclicPitch = THREE.MathUtils.clamp(
-      this.helicopterControls.cyclicPitch - mouseMovement.y * mouseSensitivity,
-      -1.0, 1.0
-    );
-  }
-
-  // ── Fixed-wing controls ──
-
-  private static readonly FW_THROTTLE_RAMP_RATE = 0.8; // units/sec
-  private static readonly FW_MOUSE_SENSITIVITY = 0.5;
-  private static readonly FW_TOUCH_DEADZONE = 0.1;
-  private static readonly FW_MOUSE_RECENTER_RATE = 1.8;
-  private static readonly FW_ASSIST_MOUSE_RECENTER_RATE = 3.2;
-
-  updateFixedWingControls(
-    deltaTime: number,
-    input: PlayerInput,
-    fixedWingModel?: import('../vehicle/FixedWingModel').FixedWingModel,
-    hudSystem?: IHUDSystem,
-    mouseMovement?: { x: number; y: number },
-  ): void {
-    const model = fixedWingModel ?? this.fixedWingModel;
-    const touchControls = input.getTouchControls();
-    const hasTouchMode = this.isTouchFlightMode(touchControls);
-    const gp = input.getGamepadManager?.();
-    const gpActive = gp?.isActive() ?? false;
-
-    // --- Throttle target (persistent: W increases, S decreases) ---
-    let brake = 0;
-    if (hasTouchMode) {
-      const touchMove = input.getTouchMovementVector();
-      const throttleRate = -touchMove.z; // up = positive = increase
-      if (Math.abs(throttleRate) > PlayerMovement.FW_TOUCH_DEADZONE) {
-        this.fixedWingThrottle = THREE.MathUtils.clamp(
-          this.fixedWingThrottle + throttleRate * deltaTime * PlayerMovement.FW_THROTTLE_RAMP_RATE,
-          0, 1,
-        );
-      }
-    } else if (input.isKeyPressed('keyw')) {
-      this.fixedWingThrottle = Math.min(this.fixedWingThrottle + deltaTime * PlayerMovement.FW_THROTTLE_RAMP_RATE, 1.0);
-    } else if (input.isKeyPressed('keys')) {
-      this.fixedWingThrottle = Math.max(this.fixedWingThrottle - deltaTime * PlayerMovement.FW_THROTTLE_RAMP_RATE, 0.0);
-      if (this.fixedWingThrottle <= 0.35) {
-        brake = 1.0;
-      }
-    }
-
-    // --- Yaw / steering ---
-    let yawCommand = 0;
-    if (hasTouchMode) {
-      const touchMove = input.getTouchMovementVector();
-      yawCommand = Math.abs(touchMove.x) > PlayerMovement.FW_TOUCH_DEADZONE ? -touchMove.x : 0;
-    } else if (input.isKeyPressed('keya')) {
-      yawCommand = 1.0;
-    } else if (input.isKeyPressed('keyd')) {
-      yawCommand = -1.0;
-    }
-
-    // --- Pitch / roll command adapter ---
-    const touchCyclic = this.getTouchFlightCyclicInput(input);
-    const hasTouchCyclic = Math.abs(touchCyclic.pitch) > 0.05 || Math.abs(touchCyclic.roll) > 0.05;
-    let pitchCommand = 0;
-    let rollCommand = 0;
-
-    if (gpActive && gp) {
-      const gpMove = gp.getMovementVector();
-      const gpPitch = -gpMove.z; // Stick forward (negative z) = nose down (negative pitch), invert
-      const gpRoll = gpMove.x;
-      if (Math.abs(gpPitch) > 0.05 || Math.abs(gpRoll) > 0.05) {
-        pitchCommand = gpPitch;
-        rollCommand = gpRoll;
-      }
-    } else if (hasTouchCyclic) {
-      pitchCommand = touchCyclic.pitch;
-      rollCommand = touchCyclic.roll;
-    } else {
-      pitchCommand = input.isKeyPressed('arrowup') ? 1.0
-        : input.isKeyPressed('arrowdown') ? -1.0 : 0;
-      rollCommand = input.isKeyPressed('arrowright') ? 1.0
-        : input.isKeyPressed('arrowleft') ? -1.0 : 0;
-    }
-
-    if (mouseMovement) {
-      this.addMouseControlToFixedWing(mouseMovement);
-    }
-
-    const recenterRate = this.fixedWingStabilityAssist
-      ? PlayerMovement.FW_ASSIST_MOUSE_RECENTER_RATE
-      : PlayerMovement.FW_MOUSE_RECENTER_RATE;
-    this.fixedWingMousePitch = THREE.MathUtils.lerp(
-      this.fixedWingMousePitch,
-      0,
-      Math.min(recenterRate * deltaTime, 1.0),
-    );
-    this.fixedWingMouseRoll = THREE.MathUtils.lerp(
-      this.fixedWingMouseRoll,
-      0,
-      Math.min(recenterRate * deltaTime, 1.0),
-    );
-
-    const command = this.composeFixedWingCommand(
-      pitchCommand,
-      rollCommand,
-      yawCommand,
-      brake,
-    );
-
-    if (model) {
-      model.setFixedWingCommand(command);
-    }
-
-    // Update fixed-wing HUD
-    if (hudSystem) {
-      hudSystem.updateElevation(this.playerState.position.y);
-      if (model && this.playerState.fixedWingId) {
-        const fd = model.getFlightData(this.playerState.fixedWingId);
-        if (fd) {
-          hudSystem.updateFixedWingFlightData?.(fd.airspeed, fd.heading, fd.verticalSpeed);
-          hudSystem.updateFixedWingThrottle?.(this.fixedWingThrottle);
-          hudSystem.setFixedWingStallWarning?.(fd.isStalled || fd.phase === 'rotation');
-          hudSystem.setFixedWingAutoLevel?.(this.fixedWingStabilityAssist);
-        }
-      }
-    }
-  }
-
-  toggleAutoLevel(): void {
-    this.fixedWingStabilityAssist = !this.fixedWingStabilityAssist;
-    Logger.info('player', `Flight assist ${this.fixedWingStabilityAssist ? 'enabled' : 'disabled'}`);
-  }
-
-  addMouseControlToFixedWing(
-    mouseMovement: { x: number; y: number },
-    mouseSensitivity: number = PlayerMovement.FW_MOUSE_SENSITIVITY,
-  ): void {
-    this.fixedWingMouseRoll = THREE.MathUtils.clamp(
-      this.fixedWingMouseRoll + mouseMovement.x * mouseSensitivity,
-      -1.0, 1.0,
-    );
-    this.fixedWingMousePitch = THREE.MathUtils.clamp(
-      this.fixedWingMousePitch - mouseMovement.y * mouseSensitivity,
-      -1.0, 1.0,
-    );
-  }
-
-  initializeFixedWingControls(stabilityAssist: boolean): void {
-    this.fixedWingThrottle = 0;
-    this.fixedWingMousePitch = 0;
-    this.fixedWingMouseRoll = 0;
-    this.fixedWingStabilityAssist = stabilityAssist;
-  }
-
-  resetFixedWingControls(): void {
-    this.initializeFixedWingControls(false);
-  }
-
-  private composeFixedWingCommand(
-    pitchCommand: number,
-    rollCommand: number,
-    yawCommand: number,
-    brake: number,
-  ): FixedWingCommand {
-    const composedPitch = THREE.MathUtils.clamp(pitchCommand + this.fixedWingMousePitch, -1, 1);
-    const composedRoll = THREE.MathUtils.clamp(rollCommand + this.fixedWingMouseRoll, -1, 1);
-
-    return {
-      throttleTarget: this.fixedWingThrottle,
-      pitchCommand: composedPitch,
-      rollCommand: composedRoll,
-      yawCommand,
-      brake,
-      freeLook: false,
-      stabilityAssist: this.fixedWingStabilityAssist,
-    };
-  }
-
-  private isTouchFlightMode(
-    touchControls: ReturnType<PlayerInput['getTouchControls']>,
-  ): boolean {
-    if (!touchControls) return false;
-    if (typeof touchControls.isInFlightMode === 'function') {
-      return touchControls.isInFlightMode();
-    }
-    return touchControls.isInHelicopterMode();
-  }
-
-  private getTouchFlightCyclicInput(input: PlayerInput): { pitch: number; roll: number } {
-    if (typeof input.getTouchFlightCyclicInput === 'function') {
-      return input.getTouchFlightCyclicInput();
-    }
-    return input.getTouchCyclicInput();
   }
 
   /** Clamp position to world boundary and bounce velocity inward. */

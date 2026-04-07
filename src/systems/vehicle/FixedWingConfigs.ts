@@ -159,7 +159,7 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
     physics: {
       mass: 18000,
       wingArea: 49.2,
-      maxThrust: 180000,
+      maxThrust: 155000,
       stallSpeed: 60,
       vrSpeed: 68,
       v2Speed: 82,

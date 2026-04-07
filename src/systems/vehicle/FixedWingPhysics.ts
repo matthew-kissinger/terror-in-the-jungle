@@ -133,6 +133,7 @@ export class FixedWingPhysics {
   private phase: FixedWingFlightPhase = 'parked';
   private weightOnWheels = true;
   private worldHalfExtent = 0;
+  private groundStabilizationTicks = 3;
   private snapshot: FixedWingFlightSnapshot;
 
   constructor(initialPosition: THREE.Vector3, config: FixedWingPhysicsConfig) {
@@ -270,6 +271,7 @@ export class FixedWingPhysics {
     this.groundHeight = position.y - this.cfg.gearClearance;
     this.groundPitch = 0;
     this.phase = 'parked';
+    this.groundStabilizationTicks = 3;
     this.weightOnWheels = true;
     this.throttle = 0;
     this.elevator = 0;
@@ -313,10 +315,19 @@ export class FixedWingPhysics {
     this.terrainNormal.copy(terrain.normal ?? _groundNormal.set(0, 1, 0)).normalize();
     this.updateEffectorState(dt);
 
-    const airborneBySeparation = this.position.y > (this.groundHeight + this.cfg.gearClearance + this.cfg.liftoffClearance + GROUND_TOUCHDOWN_BUFFER);
-    if (this.weightOnWheels && airborneBySeparation) {
+    const separation = this.position.y - (this.groundHeight + this.cfg.gearClearance);
+    const airborneBySeparation = separation > (this.cfg.liftoffClearance + GROUND_TOUCHDOWN_BUFFER);
+
+    // Ground stabilization: prevent false airborne transition from terrain height mismatch
+    // during the first few ticks after creation or resetToGround().
+    // Only applies when weight is on wheels and aircraft is near ground (< 2m separation).
+    if (this.groundStabilizationTicks > 0 && this.weightOnWheels && separation < 2.0) {
+      this.groundStabilizationTicks--;
+      this.position.y = this.groundHeight + this.cfg.gearClearance;
+    } else if (this.weightOnWheels && airborneBySeparation) {
       this.weightOnWheels = false;
       this.phase = 'airborne';
+      this.groundStabilizationTicks = 0;
     }
 
     if (this.weightOnWheels) {
@@ -470,7 +481,15 @@ export class FixedWingPhysics {
 
     this.applyAngularRates(dt);
 
-    _forceLocal.set(0, 0, -this.throttle * this.cfg.maxThrust);
+    // Scale thrust by airspeed to prevent rocket-launch behavior at zero speed.
+    // Floor of 0.3 allows stall recovery with partial power.
+    const thrustSpeedRatio = THREE.MathUtils.smoothstep(
+      aero.forwardSpeed,
+      this.cfg.stallSpeed * 0.15,
+      this.cfg.stallSpeed * 0.5,
+    );
+    const effectiveThrust = this.throttle * this.cfg.maxThrust * Math.max(thrustSpeedRatio, 0.3);
+    _forceLocal.set(0, 0, -effectiveThrust);
     if (aero.airspeed > MIN_SPEED) {
       _dragDirLocal.copy(_windLocal).multiplyScalar(aero.drag);
       _liftDirLocal.multiplyScalar(aero.lift);

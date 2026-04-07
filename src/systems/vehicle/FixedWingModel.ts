@@ -240,11 +240,11 @@ export class FixedWingModel implements GameSystem {
       group.add(innerModel);
       group.position.copy(worldPosition);
 
-      // Ensure Y is on terrain
+      // Ensure Y is on terrain (use physics gearClearance instead of hardcoded offset)
       if (this.terrainManager) {
         const h = this.terrainManager.getEffectiveHeightAt(worldPosition.x, worldPosition.z);
-        group.position.y = h + 0.5;
-        worldPosition.y = h + 0.5;
+        group.position.y = h + config.physics.gearClearance;
+        worldPosition.y = h + config.physics.gearClearance;
       }
 
       this.scene.add(group);
@@ -329,6 +329,19 @@ export class FixedWingModel implements GameSystem {
   setPilotedAircraft(aircraftId: string | null): void {
     this.pilotedAircraftId = aircraftId;
     this.currentCommand = this.createIdleCommand();
+
+    // Reset physics for parked aircraft to prevent stale micro-drift
+    if (aircraftId) {
+      const phys = this.physics.get(aircraftId);
+      if (phys && phys.getPhase() === 'parked') {
+        phys.resetToGround(phys.getPosition());
+        // Restore heading from the group quaternion
+        const group = this.groups.get(aircraftId);
+        if (group) {
+          phys.getQuaternion().copy(group.quaternion);
+        }
+      }
+    }
   }
 
   setFixedWingCommand(command: FixedWingCommand): void {

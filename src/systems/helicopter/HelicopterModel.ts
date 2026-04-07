@@ -347,7 +347,11 @@ export class HelicopterModel implements GameSystem {
         return;
       }
       const physics = this.helicopterPhysics.get(id);
-      this.animation.updateRotors(helicopter, id, physics, deltaTime);
+      // Skip rotor animation for idle grounded helicopters (engineRPM === 0)
+      const state = physics?.getState();
+      if (!state || !(state.isGrounded && state.engineRPM === 0)) {
+        this.animation.updateRotors(helicopter, id, physics, deltaTime);
+      }
 
       const isPlayerControlling = !!this.playerController &&
                                  this.playerController.isInHelicopter() &&
@@ -556,8 +560,8 @@ export class HelicopterModel implements GameSystem {
         this.healthSystem.updateHUD(id);
       }
 
-      // Door gunner AI only matters when the helicopter is relevant to the player.
-      if (isPiloted || helicopter.visible) {
+      // Door gunner AI only matters for the piloted helicopter
+      if (isPiloted) {
         this.doorGunner.update(deltaTime, id, state.position, helicopter.quaternion, state.isGrounded);
       }
     }

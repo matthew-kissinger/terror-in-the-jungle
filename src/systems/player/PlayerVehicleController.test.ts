@@ -1,117 +1,66 @@
 /**
  * @vitest-environment jsdom
+ *
+ * Vehicle control update tests moved to:
+ * - HelicopterPlayerAdapter.test.ts
+ * - FixedWingPlayerAdapter.test.ts
  */
 import { describe, expect, it, vi } from 'vitest';
 import { PlayerVehicleController } from './PlayerVehicleController';
-import type { PlayerMovement } from './PlayerMovement';
-import type { PlayerInput } from './PlayerInput';
-import type { PlayerCamera } from './PlayerCamera';
+import type { PlayerState } from '../../types';
+import * as THREE from 'three';
+
+function createPlayerState(overrides: Partial<PlayerState> = {}): PlayerState {
+  return {
+    position: new THREE.Vector3(),
+    velocity: new THREE.Vector3(),
+    speed: 10,
+    runSpeed: 20,
+    isRunning: false,
+    isGrounded: true,
+    isJumping: false,
+    jumpForce: 12,
+    gravity: -25,
+    isCrouching: false,
+    isInHelicopter: false,
+    helicopterId: null,
+    isInFixedWing: false,
+    fixedWingId: null,
+    ...overrides,
+  };
+}
 
 describe('PlayerVehicleController', () => {
-  it('skips addMouseControlToHelicopter when touch helicopter mode is active', () => {
+  it('handleEnterExitVehicle exits helicopter when in helicopter', () => {
     const vehicle = new PlayerVehicleController();
-    const addMouse = vi.fn();
-    const updateHeli = vi.fn();
-    const movement = { updateHelicopterControls: updateHeli, addMouseControlToHelicopter: addMouse } as unknown as PlayerMovement;
-    const input = {
-      getTouchControls: () => ({ isInHelicopterMode: () => true }),
-      getIsPointerLocked: () => true,
-      getMouseMovement: () => ({ x: 0.5, y: 0.25 }),
-      clearMouseMovement: vi.fn(),
-    } as unknown as PlayerInput;
-    const camera = { getHelicopterMouseControlEnabled: () => true } as unknown as PlayerCamera;
+    const exitHelicopter = vi.fn();
+    vehicle.configure({ helicopterModel: { exitHelicopter } as any });
 
-    vehicle.updateHelicopterMode(0.016, movement, input, camera);
+    const ps = createPlayerState({ isInHelicopter: true, helicopterId: 'heli_1' });
+    vehicle.handleEnterExitVehicle(ps);
 
-    expect(updateHeli).toHaveBeenCalled();
-    expect(addMouse).not.toHaveBeenCalled();
+    expect(exitHelicopter).toHaveBeenCalled();
   });
 
-  it('applies addMouseControlToHelicopter when not in touch helicopter mode', () => {
+  it('handleEnterExitVehicle exits fixed-wing when in fixed-wing', () => {
     const vehicle = new PlayerVehicleController();
-    const addMouse = vi.fn();
-    const updateHeli = vi.fn();
-    const clearMouseMovement = vi.fn();
-    const movement = {
-      updateHelicopterControls: updateHeli,
-      addMouseControlToHelicopter: addMouse,
-    } as unknown as PlayerMovement;
-    const input = {
-      getTouchControls: () => ({ isInHelicopterMode: () => false }),
-      getIsPointerLocked: () => true,
-      getMouseMovement: () => ({ x: 0.1, y: -0.2 }),
-      clearMouseMovement,
-    } as unknown as PlayerInput;
-    const camera = { getHelicopterMouseControlEnabled: () => true } as unknown as PlayerCamera;
+    const exitAircraft = vi.fn();
+    vehicle.configure({ fixedWingModel: { exitAircraft } as any });
 
-    vehicle.updateHelicopterMode(0.016, movement, input, camera);
+    const ps = createPlayerState({ isInFixedWing: true, fixedWingId: 'fw_1' });
+    vehicle.handleEnterExitVehicle(ps);
 
-    expect(updateHeli).toHaveBeenCalledWith(
-      0.016,
-      input,
-      undefined,
-      { x: 0.1, y: -0.2 },
-    );
-    expect(addMouse).not.toHaveBeenCalled();
-    expect(clearMouseMovement).toHaveBeenCalled();
+    expect(exitAircraft).toHaveBeenCalled();
   });
 
-  it('skips addMouseControlToHelicopter when helicopter mouse mode disabled', () => {
+  it('handleEnterExitVehicle tries fixed-wing first when on foot', () => {
     const vehicle = new PlayerVehicleController();
-    const addMouse = vi.fn();
-    const movement = { updateHelicopterControls: vi.fn(), addMouseControlToHelicopter: addMouse } as unknown as PlayerMovement;
-    const input = {
-      getTouchControls: () => null,
-      getIsPointerLocked: () => true,
-      getMouseMovement: () => ({ x: 1, y: 1 }),
-      clearMouseMovement: vi.fn(),
-    } as unknown as PlayerInput;
-    const camera = { getHelicopterMouseControlEnabled: () => false } as unknown as PlayerCamera;
+    const tryEnterAircraft = vi.fn(() => true);
+    vehicle.configure({ fixedWingModel: { tryEnterAircraft } as any });
 
-    vehicle.updateHelicopterMode(0.016, movement, input, camera);
+    const ps = createPlayerState();
+    vehicle.handleEnterExitVehicle(ps);
 
-    expect(addMouse).not.toHaveBeenCalled();
-  });
-
-  it('uses generic flight touch mode for fixed-wing mouse suppression', () => {
-    const vehicle = new PlayerVehicleController();
-    const updateFixedWingControls = vi.fn();
-    const movement = { updateFixedWingControls } as unknown as PlayerMovement;
-    const input = {
-      getTouchControls: () => ({ isInFlightMode: () => true }),
-      getIsPointerLocked: () => true,
-      getMouseMovement: () => ({ x: 0.25, y: -0.4 }),
-      clearMouseMovement: vi.fn(),
-    } as unknown as PlayerInput;
-    const camera = { getFlightMouseControlEnabled: () => true } as unknown as PlayerCamera;
-
-    vehicle.updateFixedWingMode(0.016, movement, input, camera);
-
-    expect(updateFixedWingControls).toHaveBeenCalledWith(0.016, input, undefined, undefined, undefined);
-  });
-
-  it('passes mouse delta into fixed-wing mode when flight mouse control is enabled', () => {
-    const vehicle = new PlayerVehicleController();
-    const updateFixedWingControls = vi.fn();
-    const clearMouseMovement = vi.fn();
-    const movement = { updateFixedWingControls } as unknown as PlayerMovement;
-    const input = {
-      getTouchControls: () => null,
-      getIsPointerLocked: () => true,
-      getMouseMovement: () => ({ x: -0.15, y: 0.35 }),
-      clearMouseMovement,
-    } as unknown as PlayerInput;
-    const camera = { getFlightMouseControlEnabled: () => true } as unknown as PlayerCamera;
-
-    vehicle.updateFixedWingMode(0.016, movement, input, camera);
-
-    expect(updateFixedWingControls).toHaveBeenCalledWith(
-      0.016,
-      input,
-      undefined,
-      undefined,
-      { x: -0.15, y: 0.35 },
-    );
-    expect(clearMouseMovement).toHaveBeenCalled();
+    expect(tryEnterAircraft).toHaveBeenCalled();
   });
 });
