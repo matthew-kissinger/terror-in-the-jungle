@@ -1,6 +1,6 @@
 # Project Notes
 
-Last updated: 2026-04-02
+Last updated: 2026-04-06
 
 ## Project
 
@@ -44,7 +44,7 @@ npm run perf:update-baseline  # update baseline from latest capture
 - Navigation: `src/systems/navigation/*` (navmesh, crowd, movement adapter)
 - Strategy (A Shau): `src/systems/strategy/*`
 - Terrain: `src/systems/terrain/*`
-- Vehicles: `src/systems/vehicle/*` (FixedWingModel, FixedWingPhysics, VehicleManager), `src/systems/helicopter/*`
+- Vehicles: `src/systems/vehicle/*` (VehicleStateManager, FixedWingPlayerAdapter, HelicopterPlayerAdapter, FixedWingModel, FixedWingPhysics, VehicleManager), `src/systems/helicopter/*`
 - World features: `src/systems/world/*` (WorldFeatureSystem, FirebaseLayoutGenerator, AirfieldLayoutGenerator)
 - Harness: `scripts/perf-capture.ts`, `scripts/perf-analyze-latest.ts`, `scripts/perf-compare.ts`
 - UI: `src/ui/hud/`, `src/ui/controls/`, `src/ui/icons/`, `src/ui/screens/`, `src/ui/loading/`, `src/ui/engine/`
@@ -56,6 +56,8 @@ npm run perf:update-baseline  # update baseline from latest capture
 - Deployed to Cloudflare Pages, CI-gated (lint + test + build + smoke)
 - 5 game modes live, 3 flyable helicopters, 3 flyable fixed-wing aircraft, 6 weapon slots (rifle/shotgun/smg/pistol/lmg/launcher), 4 factions
 - 75 GLB assets shipped, 6 aircraft rebuilt with rigged rotors via PixelForge Kiln
+- VehicleStateManager owns player vehicle lifecycle; adapter pattern for helicopter/fixed-wing
+- Fixed-wing physics: ground stabilization, thrust speed gate, F-4 TWR corrected
 - Mobile touch controls hardened (virtual joystick, vehicle action bar, fullscreen workarounds)
 - Async startup eliminates Open Frontier hang; map seed rotation (5 OF, 3 ZC, 3 TDM variants)
 - Terrain CDLOD rewrite live with auto-scaled LOD levels per world size

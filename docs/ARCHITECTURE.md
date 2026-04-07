@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-04-02
+Last verified: 2026-04-06
 
 Systems-based orchestration engine. 44 GameSystem classes, 14 tracked tick groups, 8 singletons.
 
@@ -44,7 +44,7 @@ Runtime composers (extracted from SystemConnector):
 | Strategy | `src/systems/strategy/` | WarSimulator, MaterializationPipeline, StrategicDirector | 2ms |
 | Player | `src/systems/player/` | PlayerController, PlayerMovement, FirstPersonWeapon | 1ms |
 | Weapons | `src/systems/weapons/` | GrenadeSystem, MortarSystem, SandbagSystem, AmmoSupplySystem | 1ms |
-| Vehicles | `src/systems/helicopter/`, `src/systems/vehicle/` | HelicopterModel, HelicopterPhysics, FixedWingModel, FixedWingPhysics, VehicleManager | 1ms |
+| Vehicles | `src/systems/helicopter/`, `src/systems/vehicle/` | VehicleStateManager, HelicopterPlayerAdapter, FixedWingPlayerAdapter, HelicopterModel, FixedWingModel, VehicleManager | 1ms |
 | World | `src/systems/world/` | ZoneManager, TicketSystem, GameModeManager, WorldFeatureSystem | 1ms |
 | Air Support | `src/systems/airsupport/` | AirSupportManager, AAEmplacement | 1ms |
 | Assets | `src/systems/assets/` | AssetLoader, ModelLoader | untracked |
@@ -132,10 +132,16 @@ Naming rule: Only pivot nodes (Joint_*) should match rotor patterns. Child mesh 
 Tail rotor pre-rotation: `pivot.rotation.y = PI/2` baked into GLB so the Z-spin creates a sideways disc.
 
 Fixed-wing runtime (`src/systems/vehicle/`):
-- `FixedWingPhysics` now runs on a fixed timestep and uses an arcade flight model with takeoff rotation, climb trim, banked turning, stall state, and ground-roll behavior.
-- `FixedWingModel` only simulates the piloted aircraft plus airborne/unsettled aircraft. Parked aircraft stay collision-valid but skip unnecessary per-frame flight work.
+- `FixedWingPhysics` runs on a fixed timestep with an arcade flight model. Ground stabilization ticks (3 frames) prevent false airborne transitions from terrain height mismatch. Thrust is gated by airspeed to prevent rocket-launch at zero speed.
+- `FixedWingModel` only simulates the piloted aircraft plus airborne/unsettled aircraft. Entering a parked aircraft calls `resetToGround()` to clear micro-drift.
 - `AirVehicleVisibility` gates helicopter and fixed-wing rendering against camera/fog distance so far vehicles stop contributing draw calls outside useful visibility.
 - `ModelDrawCallOptimizer` batches static aircraft sub-meshes by material at load time. Rotor/propeller meshes stay separate so animation still works.
+
+Vehicle state management (`src/systems/vehicle/`):
+- `VehicleStateManager` is the single source of truth for player vehicle state. Registered adapters handle enter/exit/update lifecycle with guaranteed cleanup.
+- `PlayerVehicleAdapter` interface: `onEnter()`, `onExit()`, `update()`, `resetControlState()`.
+- `HelicopterPlayerAdapter` owns helicopter control state (collective, cyclic, yaw, altitudeLock). `FixedWingPlayerAdapter` owns fixed-wing control state (throttle, mouse pitch/roll, stabilityAssist).
+- `PlayerState` flags (`isInHelicopter`, `isInFixedWing`) are derived cache synced via `syncPlayerState()`. Adding a new vehicle type requires one new adapter file.
 
 ## Coupling Heatmap
 
@@ -190,7 +196,7 @@ Mutual dependencies: CombatantSystem <-> ZoneManager, PlayerController <-> First
 ## Known Architecture Debt
 
 1. **SystemManager ceremony** - adding a new system touches SystemInitializer + one or more composers.
-2. **PlayerController 30 setters** - grouped `configureDependencies()` exists but compatibility setters remain (6 redundant but used in tests).
+2. **PlayerController setters** - grouped `configureDependencies()` exists but compatibility setters remain. Vehicle control state moved to adapters (2026-04-06) but model/camera setters still duplicated.
 3. **Variable deltaTime physics** - FixedStepRunner used for player/helicopter but not for grenade/NPC/particle systems.
 4. **Mixed UI paradigms** - UIComponent + CSS Modules is the active path, but ~50 files still use raw `document.createElement`.
 5. **Recast WASM duplication** - shipped twice (main thread + worker) due to Vite worker boundary limitation.

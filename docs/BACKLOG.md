@@ -1,6 +1,6 @@
 # Backlog
 
-Last updated: 2026-04-02
+Last updated: 2026-04-06
 
 ## P0 - Performance Blockers
 
@@ -14,7 +14,7 @@ Last updated: 2026-04-02
 - [ ] Wire NPC pilot AI into SystemUpdater for live NPC flight
 - [ ] NPC helicopter transport missions (takeoff, fly to LZ, deploy, RTB)
 - [ ] Ground vehicles (M151 jeep first - GLB exists, need driving runtime)
-- [ ] Fixed-wing gameplay pass: braking, runway HUD cues, and combat-role follow-on systems
+- [ ] Fixed-wing gameplay pass: takeoff/landing feel tuning, runway HUD cues, weapons integration
 - [ ] Weapon sound variants (2-3 per weapon type) + impact/body/headshot sounds
 - [ ] Stationary weapons (M2 .50 cal emplacements, NPC manning)
 - [ ] Faction AI doctrines (VC guerrilla vs NVA conventional vs US combined arms)
@@ -57,7 +57,14 @@ Last updated: 2026-04-02
 ## Architecture Debt
 
 1. SystemManager ceremony - adding a new system touches SystemInitializer + composers.
-2. PlayerController 30 setter methods (deferred init ceremony; audit found only 6 redundant, all used in tests).
-3. Variable deltaTime physics (no fixed timestep for grenade/NPC/particle systems; player and helicopter use FixedStepRunner).
+2. PlayerController setter methods (reduced after vehicle adapter refactor; model/camera setters still duplicated).
+3. Variable deltaTime physics (no fixed timestep for grenade/NPC/particle systems; player, helicopter, and fixed-wing use FixedStepRunner).
+
+## Recently Completed (2026-04-06)
+
+- [x] VehicleStateManager: single source of truth for player vehicle state with adapter pattern
+- [x] Fixed-wing physics: ground stabilization, thrust speed gate, F-4 TWR correction, resetToGround on enter
+- [x] Helicopter perf: door gunner restricted to piloted only, idle rotor animation skip
+- [x] Vehicle control state decoupled from PlayerMovement (~550 lines removed)
 4. Mixed UI paradigms (~50 files with raw createElement alongside UIComponent + CSS Modules).
 5. Recast-navigation WASM shipped twice (main thread + worker; Vite worker boundary limitation, not fixable with config).
