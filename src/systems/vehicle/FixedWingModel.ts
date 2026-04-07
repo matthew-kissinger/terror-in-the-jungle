@@ -8,22 +8,18 @@ import { FixedWingAnimation } from './FixedWingAnimation';
 import { FixedWingInteraction } from './FixedWingInteraction';
 import { FixedWingVehicleAdapter } from './FixedWingVehicleAdapter';
 import { shouldRenderAirVehicle } from './AirVehicleVisibility';
-import { FIXED_WING_CONFIGS, getFixedWingDisplayInfo } from './FixedWingConfigs';
+import {
+  FIXED_WING_CONFIGS,
+  getFixedWingConfigKeyForModelPath,
+  getFixedWingDisplayInfo,
+} from './FixedWingConfigs';
 import type { FixedWingDisplayInfo } from './FixedWingConfigs';
 import { ModelLoader } from '../assets/ModelLoader';
 import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
 import { Faction } from '../combat/types';
 import { Logger } from '../../utils/Logger';
-import { AircraftModels } from '../assets/modelPaths';
 
 const _terrainSampleNormal = new THREE.Vector3(0, 1, 0);
-
-/** Map from model path to config key */
-const MODEL_PATH_TO_CONFIG: Record<string, string> = {
-  [AircraftModels.A1_SKYRAIDER]: 'A1_SKYRAIDER',
-  [AircraftModels.F4_PHANTOM]: 'F4_PHANTOM',
-  [AircraftModels.AC47_SPOOKY]: 'AC47_SPOOKY',
-};
 
 export interface FixedWingFlightData {
   airspeed: number;
@@ -212,7 +208,7 @@ export class FixedWingModel implements GameSystem {
     worldPosition: THREE.Vector3,
     heading: number,
   ): Promise<boolean> {
-    const configKey = MODEL_PATH_TO_CONFIG[modelPath];
+    const configKey = getFixedWingConfigKeyForModelPath(modelPath);
     if (!configKey) {
       Logger.warn('fixedwing', `No config for model path: ${modelPath}`);
       return false;
@@ -423,7 +419,7 @@ export class FixedWingModel implements GameSystem {
 
   /** Check if a model path corresponds to a fixed-wing aircraft */
   static isFixedWingModelPath(modelPath: string): boolean {
-    return modelPath in MODEL_PATH_TO_CONFIG;
+    return getFixedWingConfigKeyForModelPath(modelPath) !== null;
   }
 
   private createIdleCommand(): FixedWingCommand {

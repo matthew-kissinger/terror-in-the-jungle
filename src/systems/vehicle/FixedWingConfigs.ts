@@ -6,6 +6,8 @@
  * a few overloaded lift/turn-rate constants.
  */
 
+import { AircraftModels } from '../assets/modelPaths';
+
 export interface FixedWingPhysicsConfig {
   mass: number; // kg
   wingArea: number; // m^2
@@ -50,9 +52,15 @@ export interface FixedWingPhysicsConfig {
   groundEffectStrength: number;
 }
 
-interface FixedWingConfig {
+export interface FixedWingOperationInfo {
+  minimumRunwayLength: number; // meters for current simplified takeoff/landing contract
+  preferredSpawnMode: 'parked' | 'orbit';
+}
+
+export interface FixedWingConfig {
   physics: FixedWingPhysicsConfig;
   role: 'transport' | 'fighter' | 'attack';
+  operation: FixedWingOperationInfo;
 }
 
 export interface FixedWingDisplayInfo {
@@ -107,6 +115,15 @@ export function getFixedWingDisplayInfo(key: string): FixedWingDisplayInfo | nul
   return FIXED_WING_DISPLAY[key] ?? null;
 }
 
+export function getFixedWingConfigKeyForModelPath(modelPath: string): string | null {
+  return FIXED_WING_MODEL_TO_KEY[modelPath] ?? null;
+}
+
+export function getFixedWingConfigForModelPath(modelPath: string): FixedWingConfig | null {
+  const key = getFixedWingConfigKeyForModelPath(modelPath);
+  return key ? FIXED_WING_CONFIGS[key] ?? null : null;
+}
+
 export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
   AC47_SPOOKY: {
     physics: {
@@ -153,6 +170,10 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       groundEffectStrength: 0.22,
     },
     role: 'transport',
+    operation: {
+      minimumRunwayLength: 340,
+      preferredSpawnMode: 'orbit',
+    },
   },
 
   F4_PHANTOM: {
@@ -200,6 +221,10 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       groundEffectStrength: 0.14,
     },
     role: 'fighter',
+    operation: {
+      minimumRunwayLength: 420,
+      preferredSpawnMode: 'parked',
+    },
   },
 
   A1_SKYRAIDER: {
@@ -247,5 +272,15 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       groundEffectStrength: 0.2,
     },
     role: 'attack',
+    operation: {
+      minimumRunwayLength: 280,
+      preferredSpawnMode: 'parked',
+    },
   },
+};
+
+const FIXED_WING_MODEL_TO_KEY: Record<string, string> = {
+  [AircraftModels.A1_SKYRAIDER]: 'A1_SKYRAIDER',
+  [AircraftModels.F4_PHANTOM]: 'F4_PHANTOM',
+  [AircraftModels.AC47_SPOOKY]: 'AC47_SPOOKY',
 };

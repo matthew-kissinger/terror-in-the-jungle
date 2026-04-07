@@ -134,6 +134,7 @@ Tail rotor pre-rotation: `pivot.rotation.y = PI/2` baked into GLB so the Z-spin 
 Fixed-wing runtime (`src/systems/vehicle/`):
 - `FixedWingPhysics` runs on a fixed timestep with an arcade flight model. Ground stabilization ticks (3 frames) prevent false airborne transitions from terrain height mismatch. Thrust is gated by airspeed to prevent rocket-launch at zero speed.
 - `FixedWingModel` only simulates the piloted aircraft plus airborne/unsettled aircraft. Entering a parked aircraft calls `resetToGround()` to clear micro-drift.
+- Template airfields now compile runway/apron/taxi geometry into directional terrain stamps and local-space parking stands. Rotated airfields therefore keep fixed-wing parking side-by-side instead of double-rotating spawn offsets.
 - `AirVehicleVisibility` gates helicopter and fixed-wing rendering against camera/fog distance so far vehicles stop contributing draw calls outside useful visibility.
 - `ModelDrawCallOptimizer` batches static aircraft sub-meshes by material at load time. Rotor/propeller meshes stay separate so animation still works.
 

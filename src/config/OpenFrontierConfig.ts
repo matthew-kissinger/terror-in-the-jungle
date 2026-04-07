@@ -167,19 +167,15 @@ export const OPEN_FRONTIER_CONFIG: GameModeConfig = {
       position: new THREE.Vector3(320, 0, -1230),
       placement: { yaw: Math.PI * 0.5 },
       templateId: 'us_airbase',
-      footprint: { shape: 'circle', radius: 135 },
+      footprint: { shape: 'circle', radius: 270 },
       terrain: {
         flatten: true,
-        flatRadius: 90,
-        blendRadius: 130,
-        gradeRadius: 185,
-        gradeStrength: 0.18,
-        samplingRadius: 70,
-        targetHeightMode: 'average',
+        gradeStrength: 0.22,
+        targetHeightMode: 'center',
       },
       vegetation: {
         clear: true,
-        exclusionRadius: 145,
+        exclusionRadius: 290,
       },
     },
     {

@@ -18,16 +18,36 @@ describe('AirfieldLayoutGenerator', () => {
       expect(runway!.length).toBe(template.runwayLength);
     });
 
-    it('generates taxiway surface patch', () => {
+    it('generates apron and taxiway surface patches', () => {
       const layout = generateAirfieldLayout(template, center, heading);
-      const taxiway = layout.surfacePatches.find(p => p.surface === 'packed_earth');
-      expect(taxiway).toBeDefined();
+      const packedEarthPatches = layout.surfacePatches.filter(p => p.surface === 'packed_earth');
+      expect(packedEarthPatches.length).toBe(template.aprons.length + template.taxiways.length);
     });
 
     it('includes aircraft parking spots', () => {
       const layout = generateAirfieldLayout(template, center, heading);
       const parkingPlacements = layout.placements.filter(p => p.id?.startsWith('parking'));
       expect(parkingPlacements.length).toBe(template.parkingSpots.length);
+    });
+
+    it('keeps aircraft parking offsets in feature-local space', () => {
+      const layoutA = generateAirfieldLayout(template, center, 0);
+      const layoutB = generateAirfieldLayout(template, center, Math.PI * 0.5);
+      const parkingA = layoutA.placements.filter(p => p.id?.startsWith('parking'));
+      const parkingB = layoutB.placements.filter(p => p.id?.startsWith('parking'));
+
+      expect(parkingA.map((p) => p.offset.toArray())).toEqual(parkingB.map((p) => p.offset.toArray()));
+    });
+
+    it('arranges fixed-wing parking spots side-by-side on the apron', () => {
+      const layout = generateAirfieldLayout(template, center, heading);
+      const parkingPlacements = layout.placements.filter(p => p.id?.startsWith('parking'));
+      const apronLateral = parkingPlacements.map((p) => p.offset.x);
+      const alongOffsets = parkingPlacements.map((p) => p.offset.z);
+
+      expect(new Set(apronLateral).size).toBe(1);
+      expect(Math.min(...alongOffsets)).toBeLessThan(0);
+      expect(Math.max(...alongOffsets)).toBeGreaterThan(0);
     });
 
     it('generates structures within count range', () => {
@@ -73,6 +93,12 @@ describe('AirfieldLayoutGenerator', () => {
       const fullParking = full.placements.filter(p => p.id?.startsWith('parking'));
       const stripParking = strip.placements.filter(p => p.id?.startsWith('parking'));
       expect(stripParking.length).toBeLessThan(fullParking.length);
+    });
+
+    it('includes a single apron service area and taxi connector', () => {
+      const strip = generateAirfieldLayout(AIRFIELD_TEMPLATES.forward_strip, center, heading);
+      expect(strip.surfacePatches.filter((p) => p.surface === 'packed_earth').length)
+        .toBe(AIRFIELD_TEMPLATES.forward_strip.aprons.length + AIRFIELD_TEMPLATES.forward_strip.taxiways.length);
     });
   });
 

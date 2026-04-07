@@ -105,7 +105,7 @@ describe('compileTerrainFeatures', () => {
     }
   });
 
-  it('emits generated runway and taxiway surface patches for authored airfields', () => {
+  it('emits directional terrain stamps and surface patches for authored airfields', () => {
     const compiled = compileTerrainFeatures({
       id: GameMode.A_SHAU_VALLEY,
       name: 'Airfield Mode',
@@ -133,27 +133,31 @@ describe('compileTerrainFeatures', () => {
           position: new THREE.Vector3(100, 0, 200),
           placement: { yaw: Math.PI * 0.35 },
           templateId: 'forward_strip',
-          footprint: { shape: 'circle', radius: 88 },
+          footprint: { shape: 'circle', radius: 180 },
           terrain: {
             flatten: true,
-            flatRadius: 58,
-            blendRadius: 86,
-            samplingRadius: 54,
-            targetHeightMode: 'average',
+            gradeStrength: 0.16,
+            targetHeightMode: 'center',
           },
           vegetation: {
             clear: true,
-            exclusionRadius: 92,
+            exclusionRadius: 190,
           },
         },
       ],
     });
 
-    expect(compiled.stamps).toHaveLength(1);
+    expect(compiled.stamps).toHaveLength(3);
     expect(compiled.vegetationExclusionZones).toHaveLength(1);
-    expect(compiled.surfacePatches).toHaveLength(2);
+    expect(compiled.surfacePatches).toHaveLength(3);
     expect(compiled.surfacePatches.some((patch) => patch.shape === 'rect' && patch.surface === 'runway')).toBe(true);
-    expect(compiled.surfacePatches.some((patch) => patch.shape === 'rect' && patch.surface === 'packed_earth')).toBe(true);
+    expect(compiled.surfacePatches.filter((patch) => patch.shape === 'rect' && patch.surface === 'packed_earth').length).toBe(2);
+    expect(compiled.stamps.every((stamp) => stamp.kind === 'flatten_capsule')).toBe(true);
+    const runwayStamp = compiled.stamps.find((stamp) =>
+      stamp.kind === 'flatten_capsule'
+      && Math.abs(stamp.startX - stamp.endX) > Math.abs(stamp.startZ - stamp.endZ),
+    );
+    expect(runwayStamp?.targetHeightMode).toBe('center');
   });
 
   it('compiles terrain-flow corridors and overlay paths for route-aware modes', () => {

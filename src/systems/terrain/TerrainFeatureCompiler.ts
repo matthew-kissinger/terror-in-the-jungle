@@ -11,6 +11,8 @@ import type {
   CompiledTerrainFeatureSet,
   TerrainExclusionZone,
   TerrainStampConfig,
+  TerrainStampTargetHeightMode,
+  TerrainSurfaceKind,
   TerrainSurfacePatch,
 } from './TerrainFeatureTypes';
 
@@ -51,9 +53,9 @@ export function compileTerrainFeatures(
 }
 
 function compileFeature(feature: MapFeatureDefinition, compiled: CompiledTerrainFeatureSet): void {
-  const stamp = compileTerrainStamp(feature);
-  if (stamp) {
-    compiled.stamps.push(stamp);
+  const stamps = compileTerrainStamps(feature);
+  if (stamps.length > 0) {
+    compiled.stamps.push(...stamps);
   }
 
   const surfacePatch = compileSurfacePatch(feature);
@@ -72,12 +74,17 @@ function compileFeature(feature: MapFeatureDefinition, compiled: CompiledTerrain
   }
 }
 
-function compileTerrainStamp(feature: MapFeatureDefinition): TerrainStampConfig | null {
+function compileTerrainStamps(feature: MapFeatureDefinition): TerrainStampConfig[] {
   const terrain = feature.terrain;
-  if (!terrain?.flatten) return null;
+  if (!terrain?.flatten) return [];
+
+  const generated = compileGeneratedTerrainStamps(feature);
+  if (generated.length > 0) {
+    return generated;
+  }
 
   const circle = resolveCircleFootprint(feature);
-  if (!circle) return null;
+  if (!circle) return [];
 
   const innerRadius = terrain.flatRadius ?? Math.min(circle.radius, defaultFlatRadiusForFeature(feature));
   const outerRadius = Math.max(innerRadius, terrain.blendRadius ?? Math.max(circle.radius, defaultBlendRadiusForFeature(feature)));
@@ -85,7 +92,7 @@ function compileTerrainStamp(feature: MapFeatureDefinition): TerrainStampConfig 
   const gradeStrength = resolveGradeStrength(feature, terrain.gradeStrength, gradeRadius, outerRadius);
   const samplingRadius = terrain.samplingRadius ?? innerRadius;
 
-  return {
+  return [{
     kind: 'flatten_circle',
     centerX: feature.position.x,
     centerZ: feature.position.z,
@@ -97,7 +104,7 @@ function compileTerrainStamp(feature: MapFeatureDefinition): TerrainStampConfig 
     targetHeightMode: terrain.targetHeightMode ?? 'max',
     heightOffset: terrain.heightOffset ?? 0,
     priority: terrain.priority ?? defaultPriorityForFeature(feature),
-  };
+  }];
 }
 
 function compileSurfacePatch(feature: MapFeatureDefinition): TerrainSurfacePatch | null {
@@ -155,6 +162,71 @@ function compileGeneratedSurfacePatches(feature: MapFeatureDefinition): TerrainS
     feature.placement?.yaw ?? 0,
     feature.seedHint ?? feature.id,
   ).surfacePatches;
+}
+
+function compileGeneratedTerrainStamps(feature: MapFeatureDefinition): TerrainStampConfig[] {
+  if (feature.kind !== 'airfield' || !feature.templateId) {
+    return [];
+  }
+
+  const template = AIRFIELD_TEMPLATES[feature.templateId];
+  if (!template) {
+    return [];
+  }
+
+  const priority = feature.terrain?.priority ?? defaultPriorityForFeature(feature);
+  const heightOffset = feature.terrain?.heightOffset ?? 0;
+  const authoredStrength = feature.terrain?.gradeStrength;
+
+  const stampedRects = [
+    ...template.taxiways.map((rect) => ({ kind: 'taxiway' as const, rect })),
+    ...template.aprons.map((rect) => ({ kind: 'apron' as const, rect })),
+    {
+      kind: 'runway' as const,
+      rect: {
+        offsetAlongRunway: 0,
+        offsetLateral: 0,
+        length: template.runwayLength,
+        width: template.runwayWidth,
+        yaw: 0,
+        surface: 'runway' as const,
+        blend: 3,
+      },
+    },
+  ];
+
+  return stampedRects.map(({ kind, rect }, index) => {
+    const stampTuning = resolveAirfieldStampTuning(rect.surface, feature.terrain?.targetHeightMode);
+    const yaw = (feature.placement?.yaw ?? 0) + (rect.yaw ?? 0);
+    const center = localAlongLateralToWorld(
+      feature.position.x,
+      feature.position.z,
+      feature.placement?.yaw ?? 0,
+      rect.offsetAlongRunway,
+      rect.offsetLateral,
+    );
+    const directionX = Math.sin(yaw);
+    const directionZ = Math.cos(yaw);
+    const capsuleLength = Math.max(rect.width, rect.length);
+    const capsuleWidth = Math.min(rect.width, rect.length);
+    const segmentHalfLength = Math.max(0, (capsuleLength - capsuleWidth) * 0.5);
+
+    return {
+      kind: 'flatten_capsule',
+      startX: center.x - directionX * segmentHalfLength,
+      startZ: center.z - directionZ * segmentHalfLength,
+      endX: center.x + directionX * segmentHalfLength,
+      endZ: center.z + directionZ * segmentHalfLength,
+      innerRadius: capsuleWidth * 0.5 + stampTuning.innerPadding,
+      outerRadius: capsuleWidth * 0.5 + stampTuning.outerPadding,
+      gradeRadius: capsuleWidth * 0.5 + stampTuning.gradePadding,
+      gradeStrength: authoredStrength ?? stampTuning.gradeStrength,
+      samplingRadius: stampTuning.samplingRadius(capsuleWidth),
+      targetHeightMode: stampTuning.targetHeightMode,
+      heightOffset,
+      priority: priority + resolveAirfieldStampPriorityOffset(kind) + index,
+    };
+  });
 }
 
 function compileVegetationExclusion(feature: MapFeatureDefinition): TerrainExclusionZone | null {
@@ -289,6 +361,63 @@ function defaultPriorityForFeature(feature: MapFeatureDefinition): number {
       return 120;
     default:
       return 100;
+  }
+}
+
+function localAlongLateralToWorld(
+  centerX: number,
+  centerZ: number,
+  heading: number,
+  along: number,
+  lateral: number,
+): { x: number; z: number } {
+  return {
+    x: centerX + along * Math.sin(heading) + lateral * Math.cos(heading),
+    z: centerZ + along * Math.cos(heading) - lateral * Math.sin(heading),
+  };
+}
+
+function resolveAirfieldStampTuning(
+  surface: TerrainSurfaceKind,
+  authoredMode: TerrainStampTargetHeightMode | undefined,
+): {
+  innerPadding: number;
+  outerPadding: number;
+  gradePadding: number;
+  gradeStrength: number;
+  targetHeightMode: TerrainStampTargetHeightMode;
+  samplingRadius: (width: number) => number;
+} {
+  if (surface === 'runway') {
+    return {
+      innerPadding: 3,
+      outerPadding: 8,
+      gradePadding: 22,
+      gradeStrength: 0.22,
+      targetHeightMode: authoredMode ?? 'center',
+      samplingRadius: (width) => Math.max(10, width * 0.8),
+    };
+  }
+
+  return {
+    innerPadding: 1.5,
+    outerPadding: 5,
+    gradePadding: 14,
+    gradeStrength: 0.16,
+    targetHeightMode: authoredMode ?? 'average',
+    samplingRadius: (width) => Math.max(8, width * 0.65),
+  };
+}
+
+function resolveAirfieldStampPriorityOffset(kind: 'runway' | 'apron' | 'taxiway'): number {
+  switch (kind) {
+    case 'runway':
+      return 20;
+    case 'apron':
+      return 10;
+    case 'taxiway':
+    default:
+      return 0;
   }
 }
 

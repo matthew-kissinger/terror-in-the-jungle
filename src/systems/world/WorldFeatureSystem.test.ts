@@ -91,6 +91,34 @@ describe('WorldFeatureSystem', () => {
     expect(scene.children.length).toBeGreaterThanOrEqual(6);
   });
 
+  it('spawns fixed-wing aircraft from local stand offsets without double-rotating them', async () => {
+    const fixedWingModel = {
+      createAircraftAtSpot: vi.fn(async () => true),
+    };
+    system.setFixedWingModel(fixedWingModel as any);
+    currentConfig = {
+      id: GameMode.OPEN_FRONTIER,
+      features: [
+        {
+          id: 'test_airfield_main',
+          kind: 'airfield',
+          position: new THREE.Vector3(120, 0, -80),
+          placement: { yaw: Math.PI * 0.5 },
+          templateId: 'us_airbase',
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+
+    const fixedWingCalls = fixedWingModel.createAircraftAtSpot.mock.calls;
+    expect(fixedWingCalls).toHaveLength(3);
+    const worldPositions = fixedWingCalls.map((call) => call[2] as THREE.Vector3);
+    expect(worldPositions.map((p) => Number(p.z.toFixed(2)))).toEqual([-176, -176, -176]);
+    expect(worldPositions.map((p) => Number(p.x.toFixed(2)))).toEqual([38, 120, 202]);
+  });
+
   it('clears previously spawned objects when switching to a mode without static features', async () => {
     system.update(0.016);
     await flushPromises();

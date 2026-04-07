@@ -14,7 +14,7 @@ Last updated: 2026-04-06
 - [ ] Wire NPC pilot AI into SystemUpdater for live NPC flight
 - [ ] NPC helicopter transport missions (takeoff, fly to LZ, deploy, RTB)
 - [ ] Ground vehicles (M151 jeep first - GLB exists, need driving runtime)
-- [ ] Fixed-wing gameplay pass: takeoff/landing feel tuning, runway HUD cues, weapons integration
+- [ ] Fixed-wing role split follow-up: A-1 rough-field tuning, AC-47 orbit workflow, F-4 assist/HUD/weapons
 - [ ] Weapon sound variants (2-3 per weapon type) + impact/body/headshot sounds
 - [ ] Stationary weapons (M2 .50 cal emplacements, NPC manning)
 - [ ] Faction AI doctrines (VC guerrilla vs NVA conventional vs US combined arms)

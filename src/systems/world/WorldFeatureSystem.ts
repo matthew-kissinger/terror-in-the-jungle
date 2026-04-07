@@ -8,7 +8,7 @@ import { modelLoader } from '../assets/ModelLoader';
 import { getModelPlacementProfile } from '../assets/ModelPlacementProfiles';
 import { prepareModelForPlacement } from '../assets/ModelPlacementUtils';
 import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
-import { AIRFIELD_TEMPLATES } from './AirfieldTemplates';
+import { AIRFIELD_TEMPLATES, getAirfieldTemplateCompatibilityIssues } from './AirfieldTemplates';
 import { generateAirfieldLayout } from './AirfieldLayoutGenerator';
 import { GameModeManager } from './GameModeManager';
 import { getWorldFeaturePrefab } from './WorldFeaturePrefabs';
@@ -250,6 +250,14 @@ export class WorldFeatureSystem implements GameSystem {
     if (!template) {
       Logger.warn('world', `Unknown airfield template "${feature.templateId}" on feature "${feature.id}"`);
       return [];
+    }
+
+    const compatibilityIssues = getAirfieldTemplateCompatibilityIssues(template);
+    if (compatibilityIssues.length > 0) {
+      const details = compatibilityIssues
+        .map((issue) => `${issue.modelPath} requires ${issue.minimumRunwayLength}m, template has ${issue.actualRunwayLength}m`)
+        .join('; ');
+      Logger.warn('world', `Airfield template "${template.id}" has runway compatibility issues: ${details}`);
     }
 
     return generateAirfieldLayout(

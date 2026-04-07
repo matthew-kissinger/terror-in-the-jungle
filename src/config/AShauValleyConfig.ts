@@ -268,19 +268,15 @@ export const A_SHAU_VALLEY_CONFIG: GameModeConfig = {
       position: geoToWorld(16.27, 107.16),
       placement: { yaw: Math.PI * 0.18 },
       templateId: 'forward_strip',
-      footprint: { shape: 'circle', radius: 88 },
+      footprint: { shape: 'circle', radius: 180 },
       terrain: {
         flatten: true,
-        flatRadius: 58,
-        blendRadius: 86,
-        gradeRadius: 126,
         gradeStrength: 0.16,
-        samplingRadius: 54,
-        targetHeightMode: 'average',
+        targetHeightMode: 'center',
       },
       vegetation: {
         clear: true,
-        exclusionRadius: 92,
+        exclusionRadius: 190,
       },
     },
     {

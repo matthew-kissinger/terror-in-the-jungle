@@ -1,9 +1,13 @@
 import * as THREE from 'three';
 import type { StaticModelPlacementConfig } from '../../config/gameModeTypes';
 import type { RectTerrainSurfacePatch } from '../terrain/TerrainFeatureTypes';
-import type { AirfieldTemplate, AirfieldStructureEntry } from './AirfieldTemplates';
+import type {
+  AirfieldTemplate,
+  AirfieldStructureEntry,
+  AirfieldSurfaceRect,
+} from './AirfieldTemplates';
 
-const MIN_SPACING = 6;
+const DEFAULT_CLEARANCE_RADIUS = 6;
 
 interface AirfieldLayout {
   placements: StaticModelPlacementConfig[];
@@ -42,12 +46,13 @@ function weightedSelect(entries: AirfieldStructureEntry[], rng: () => number): A
 function isSpacingValid(
   x: number,
   z: number,
-  minSpacing: number,
-  placed: Array<{ x: number; z: number }>,
+  radius: number,
+  placed: Array<{ x: number; z: number; radius: number }>,
 ): boolean {
   for (const p of placed) {
     const dx = x - p.x;
     const dz = z - p.z;
+    const minSpacing = radius + p.radius;
     if (dx * dx + dz * dz < minSpacing * minSpacing) return false;
   }
   return true;
@@ -68,6 +73,10 @@ export function generateAirfieldLayout(
   const cosH = Math.cos(heading);
   const sinH = Math.sin(heading);
 
+  function localOffset(along: number, lateral: number): THREE.Vector3 {
+    return new THREE.Vector3(lateral, 0, along);
+  }
+
   // Transform local offset (along runway / lateral) to world offset
   function toWorld(along: number, lateral: number): { x: number; z: number } {
     return {
@@ -76,52 +85,59 @@ export function generateAirfieldLayout(
     };
   }
 
+  function pushSurfaceRect(rect: AirfieldSurfaceRect): void {
+    const worldCenter = toWorld(rect.offsetAlongRunway, rect.offsetLateral);
+    surfacePatches.push({
+      shape: 'rect',
+      x: center.x + worldCenter.x,
+      z: center.z + worldCenter.z,
+      width: rect.width,
+      length: rect.length,
+      blend: rect.blend,
+      yaw: heading + (rect.yaw ?? 0),
+      surface: rect.surface,
+      priority: rect.surface === 'runway' ? 10 : 8,
+    });
+  }
+
   const surfacePatches: RectTerrainSurfacePatch[] = [];
   const placements: StaticModelPlacementConfig[] = [];
-  const placed: Array<{ x: number; z: number }> = [];
+  const placed: Array<{ x: number; z: number; radius: number }> = [];
 
   // 1. Runway surface patch
-  surfacePatches.push({
-    shape: 'rect',
-    x: center.x,
-    z: center.z,
+  pushSurfaceRect({
+    offsetAlongRunway: 0,
+    offsetLateral: 0,
     width: template.runwayWidth,
     length: template.runwayLength,
     blend: 3,
-    yaw: heading,
     surface: 'runway',
-    priority: 10,
   });
 
-  // 2. Taxiway surface patch (perpendicular connector from runway to dispersal)
-  const taxiwayCenter = toWorld(0, template.dispersalOffset * 0.5);
-  surfacePatches.push({
-    shape: 'rect',
-    x: center.x + taxiwayCenter.x,
-    z: center.z + taxiwayCenter.z,
-    width: template.taxiwayWidth,
-    length: template.dispersalOffset,
-    blend: 2,
-    yaw: heading + Math.PI / 2,
-    surface: 'packed_earth',
-    priority: 8,
-  });
+  // 2. Apron and taxiway surface patches
+  for (const apron of template.aprons) {
+    pushSurfaceRect(apron);
+  }
+  for (const taxiway of template.taxiways) {
+    pushSurfaceRect(taxiway);
+  }
 
   // 3. Aircraft parking spots
   for (let i = 0; i < template.parkingSpots.length; i++) {
     const spot = template.parkingSpots[i];
-    const along = (spot.offsetAlongRunway - 0.5) * template.runwayLength;
+    const along = spot.offsetAlongRunway;
     const lateral = spot.offsetLateral;
-    const worldOff = toWorld(along, lateral);
+    const localOff = localOffset(along, lateral);
+    const clearanceRadius = Math.max(DEFAULT_CLEARANCE_RADIUS, spot.clearanceRadius ?? DEFAULT_CLEARANCE_RADIUS);
 
     placements.push({
       id: `parking_${i}`,
       modelPath: spot.modelPath,
-      offset: new THREE.Vector3(worldOff.x, 0, worldOff.z),
-      yaw: heading,
+      offset: localOff,
+      yaw: spot.yaw ?? 0,
       registerCollision: true,
     });
-    placed.push(worldOff);
+    placed.push({ x: localOff.x, z: localOff.z, radius: clearanceRadius });
   }
 
   // 4. Fill structures from template pool
@@ -142,11 +158,11 @@ export function generateAirfieldLayout(
     switch (entry.zone) {
       case 'runway_side':
         along = (rng() - 0.5) * template.runwayLength * 0.8;
-        lateral = (template.runwayWidth * 0.5 + 5 + rng() * 15) * (rng() > 0.5 ? 1 : -1);
+        lateral = (template.runwayWidth * 0.5 + 8 + rng() * 20) * (rng() > 0.5 ? 1 : -1);
         break;
       case 'dispersal':
         along = (rng() - 0.5) * template.runwayLength * 0.6;
-        lateral = template.dispersalOffset + rng() * 15;
+        lateral = template.dispersalOffset + rng() * 18;
         break;
       case 'perimeter': {
         const perimDist = Math.max(template.runwayLength * 0.5, template.dispersalOffset + 20);
@@ -159,18 +175,19 @@ export function generateAirfieldLayout(
         continue;
     }
 
-    const worldOff = toWorld(along, lateral);
+    const localOff = localOffset(along, lateral);
+    const clearanceRadius = entry.registerCollision ? 9 : DEFAULT_CLEARANCE_RADIUS;
 
-    if (!isSpacingValid(worldOff.x, worldOff.z, MIN_SPACING, placed)) continue;
+    if (!isSpacingValid(localOff.x, localOff.z, clearanceRadius, placed)) continue;
 
     placements.push({
       id: `struct_${placements.length}`,
       modelPath: entry.modelPath,
-      offset: new THREE.Vector3(worldOff.x, 0, worldOff.z),
-      yaw: heading + (rng() - 0.5) * 0.3,
+      offset: localOff,
+      yaw: (rng() - 0.5) * 0.3,
       registerCollision: entry.registerCollision,
     });
-    placed.push(worldOff);
+    placed.push({ x: localOff.x, z: localOff.z, radius: clearanceRadius });
   }
 
   return { placements, surfacePatches };
