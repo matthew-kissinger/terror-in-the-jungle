@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-04-06
+Last verified: 2026-04-08
 
 Systems-based orchestration engine. 44 GameSystem classes, 14 tracked tick groups, 8 singletons.
 
@@ -133,7 +133,9 @@ Tail rotor pre-rotation: `pivot.rotation.y = PI/2` baked into GLB so the Z-spin 
 
 Fixed-wing runtime (`src/systems/vehicle/`):
 - `FixedWingPhysics` runs on a fixed timestep with an arcade flight model. Ground stabilization ticks (3 frames) prevent false airborne transitions from terrain height mismatch. Thrust is gated by airspeed to prevent rocket-launch at zero speed.
-- `FixedWingModel` only simulates the piloted aircraft plus airborne/unsettled aircraft. Entering a parked aircraft calls `resetToGround()` to clear micro-drift.
+- `FixedWingControlLaw` sits above physics and converts player pilot intent into bounded phase-aware commands (`taxi`, `takeoff_roll`, `rotation`, `initial_climb`, `flight`, `approach`, `landing_rollout`).
+- `FixedWingModel` only simulates the piloted aircraft plus airborne/unsettled aircraft. It also owns fixed-wing operation states (`parked`, `lineup`, `takeoff_roll`, `rotation`, `initial_climb`, `cruise`, `orbit_hold`, `approach`, `rollout`) and debug runway/approach reposition helpers used by browser probes.
+- `FixedWingPlayerAdapter` owns throttle/pitch/bank intent, direct-stick overlay, flight-assist/orbit-hold toggles, and seeds fixed-wing HUD state on entry.
 - Template airfields now compile runway/apron/taxi geometry into directional terrain stamps and local-space parking stands. Rotated airfields therefore keep fixed-wing parking side-by-side instead of double-rotating spawn offsets.
 - `AirVehicleVisibility` gates helicopter and fixed-wing rendering against camera/fog distance so far vehicles stop contributing draw calls outside useful visibility.
 - `ModelDrawCallOptimizer` batches static aircraft sub-meshes by material at load time. Rotor/propeller meshes stay separate so animation still works.
@@ -187,6 +189,7 @@ Mutual dependencies: CombatantSystem <-> ZoneManager, PlayerController <-> First
 - **GameSystem interface**: `init()`, `update(dt)`, `dispose()`. All 44 systems implement it.
 - **Runtime composers**: Grouped dependency wiring replaces monolithic SystemConnector.
 - **SimulationScheduler**: Cadence-based update groups for non-critical systems.
+- **Diagnostics hooks**: in dev/perf diagnostics mode, `bootstrap.ts` exposes `window.advanceTime(ms)` and `window.render_game_to_text()` so Playwright probes can step the live game deterministically and capture compact state.
 - **ObjectPool**: Pre-allocated Vector3/Quaternion/Matrix4 for GC avoidance in hot paths.
 - **CSS Modules + UIComponent**: New UI uses signals-based UIComponent with CSS Modules.
 - **Scratch vectors**: Pre-allocated reusable vectors in hot-path classes.

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { IGameRenderer } from '../types/SystemInterfaces';
 import type { SystemKeyToType } from './SystemRegistry';
+import { shouldUseTouchControls } from '../utils/DeviceDetector';
 
 type StartupPlayerRuntimeRefs = Pick<
   SystemKeyToType,
@@ -307,8 +308,7 @@ function wireHUDRuntime(runtime: StartupPlayerRuntimeGroups['hudRuntime']): void
   playerHealthSystem.mountUI(layout.getSlot('health'));
   // On touch, mount squad indicator under status-bar (timer/score) so it
   // flows tight beneath it. On desktop, it goes in the stats column.
-  const isTouchMount = typeof window !== 'undefined' &&
-    ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  const isTouchMount = typeof window !== 'undefined' && shouldUseTouchControls();
   playerSquadController.mountIndicatorTo(
     layout.getSlot(isTouchMount ? 'status-bar' : 'stats')
   );

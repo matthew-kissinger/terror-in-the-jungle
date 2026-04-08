@@ -30,6 +30,21 @@ describe('DeviceDetector', () => {
       value: 720,
       configurable: true,
     });
+
+    Object.defineProperty(window, 'matchMedia', {
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes('fine'),
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+      configurable: true,
+      writable: true,
+    });
   });
 
   it('isTouchDevice detects touch capability via ontouchstart', async () => {
@@ -68,10 +83,52 @@ describe('DeviceDetector', () => {
     expect(isTouchDevice()).toBe(true);
   });
 
-  it('shouldUseTouchControls returns true for touch devices', async () => {
+  it('shouldUseTouchControls returns true for mobile-sized touch devices', async () => {
     Object.defineProperty(navigator, 'maxTouchPoints', {
       value: 1,
       configurable: true,
+    });
+    Object.defineProperty(window, 'innerWidth', {
+      value: 390,
+      configurable: true,
+    });
+    Object.defineProperty(window, 'innerHeight', {
+      value: 844,
+      configurable: true,
+    });
+
+    const { shouldUseTouchControls } = await loadDeviceDetector();
+    expect(shouldUseTouchControls()).toBe(true);
+  });
+
+  it('shouldUseTouchControls returns false for hybrid desktop devices with a fine pointer', async () => {
+    Object.defineProperty(navigator, 'maxTouchPoints', {
+      value: 5,
+      configurable: true,
+    });
+
+    const { shouldUseTouchControls } = await loadDeviceDetector();
+    expect(shouldUseTouchControls()).toBe(false);
+  });
+
+  it('shouldUseTouchControls returns true for touch-only coarse-pointer devices', async () => {
+    Object.defineProperty(navigator, 'maxTouchPoints', {
+      value: 1,
+      configurable: true,
+    });
+    Object.defineProperty(window, 'matchMedia', {
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes('coarse'),
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+      configurable: true,
+      writable: true,
     });
 
     const { shouldUseTouchControls } = await loadDeviceDetector();

@@ -564,6 +564,18 @@ export class HUDSystem implements GameSystem, IHUDSystem {
     this.elements.setFixedWingAutoLevel(active);
   }
 
+  setFixedWingFlightAssist(active: boolean): void {
+    this.elements.setFixedWingFlightAssist(active);
+  }
+
+  setFixedWingPhase(phase: import('../../systems/vehicle/FixedWingControlLaw').FixedWingControlPhase): void {
+    this.elements.setFixedWingPhase(phase);
+  }
+
+  setFixedWingOperationState(state: import('../../systems/vehicle/FixedWingOperations').FixedWingOperationState): void {
+    this.elements.setFixedWingOperationState(state);
+  }
+
   showFixedWingMouseIndicator(): void {
     this.elements.showFixedWingMouseIndicator();
   }

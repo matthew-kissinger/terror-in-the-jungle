@@ -286,6 +286,18 @@ export class HUDElements {
     this.fixedWingHUD.setAutoLevel(active);
   }
 
+  setFixedWingFlightAssist(active: boolean): void {
+    this.fixedWingHUD.setFlightAssist(active);
+  }
+
+  setFixedWingPhase(phase: import('../../systems/vehicle/FixedWingControlLaw').FixedWingControlPhase): void {
+    this.fixedWingHUD.setPhase(phase);
+  }
+
+  setFixedWingOperationState(state: import('../../systems/vehicle/FixedWingOperations').FixedWingOperationState): void {
+    this.fixedWingHUD.setOperationState(state);
+  }
+
   showFixedWingMouseIndicator(): void {
     this.fixedWingHUD.showMouseIndicator();
   }

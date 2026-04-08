@@ -1,6 +1,6 @@
 # Development Guide
 
-Last updated: 2026-04-07
+Last updated: 2026-04-08
 
 ## Prerequisites
 
@@ -40,6 +40,14 @@ npm run check:mobile-ui    # Built-app phone viewport flow gate
 ```
 
 `check:mobile-ui` drives the real title -> mode select -> deploy -> gameplay flow and fails when controls are offscreen on the phone viewport matrix.
+
+### Runtime Probes
+
+```bash
+npx tsx scripts/fixed-wing-runtime-probe.ts --port 4173 --reuse-dev-server true
+```
+
+`fixed-wing-runtime-probe.ts` boots Open Frontier in Playwright, forces desktop input semantics, steps the live game deterministically through `window.advanceTime(ms)`, and validates runway takeoff/climb for the A-1, F-4, and AC-47. Artifacts land in `artifacts/fixed-wing-runtime-probe/`.
 
 ### Performance Validation
 
@@ -114,6 +122,7 @@ After changes to `src/systems/world/`, `src/systems/terrain/`, `src/systems/vehi
 1. Open Frontier capture records player shots and hits
 2. Nearby enemies are returned by combat spatial queries in the active mode bounds
 3. Entering a plane does not produce vertical self-launch on the first update ticks
+4. `scripts/fixed-wing-runtime-probe.ts` still produces successful A-1 / F-4 / AC-47 takeoff probes when the change touches fixed-wing, airfields, player input, or browser diagnostics hooks
 
 ## Project Structure
 

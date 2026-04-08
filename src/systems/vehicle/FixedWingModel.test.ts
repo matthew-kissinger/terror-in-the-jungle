@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { FixedWingModel } from './FixedWingModel';
 import { AircraftModels } from '../assets/modelPaths';
+import type { FixedWingSpawnMetadata } from './FixedWingOperations';
 
 // Mock ModelLoader
 vi.mock('../assets/ModelLoader', () => ({
@@ -39,6 +40,25 @@ function createMockTerrain() {
     registerCollisionObject: vi.fn(),
     unregisterCollisionObject: vi.fn(),
     raycastTerrain: vi.fn().mockReturnValue({ hit: false }),
+  };
+}
+
+function createSpawnMetadata(): FixedWingSpawnMetadata {
+  return {
+    standId: 'stand_a1',
+    taxiRoute: [
+      new THREE.Vector3(100, 0, -200),
+      new THREE.Vector3(60, 0, -200),
+      new THREE.Vector3(20, 0, -230),
+    ],
+    runwayStart: {
+      id: 'south_departure',
+      position: new THREE.Vector3(0, 0, -260),
+      heading: Math.PI,
+      holdShortPosition: new THREE.Vector3(20, 0, -230),
+      shortFinalDistance: 140,
+      shortFinalAltitude: 32,
+    },
   };
 }
 
@@ -117,6 +137,20 @@ describe('FixedWingModel', () => {
       expect(display!.hasPropellers).toBe(false);
       expect(display!.fovWidenEnabled).toBe(true);
     });
+
+    it('stores cloned fixed-wing spawn metadata for runway helpers', async () => {
+      const pos = new THREE.Vector3(100, 10, -200);
+      const metadata = createSpawnMetadata();
+      await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, pos, 0, metadata);
+
+      const stored = model.getSpawnMetadata('fw1');
+      expect(stored).not.toBeNull();
+      expect(stored).not.toBe(metadata);
+      expect(stored?.standId).toBe('stand_a1');
+      expect(stored?.taxiRoute).toHaveLength(3);
+      expect(stored?.runwayStart?.id).toBe('south_departure');
+      expect(stored?.runwayStart?.position).not.toBe(metadata.runwayStart?.position);
+    });
   });
 
   describe('controls', () => {
@@ -163,6 +197,58 @@ describe('FixedWingModel', () => {
     it('returns false for unknown aircraft ID', () => {
       const target = new THREE.Vector3();
       expect(model.getAircraftPositionTo('nonexistent', target)).toBe(false);
+    });
+
+    it('repositions an aircraft to its runway lineup point when spawn metadata exists', async () => {
+      const metadata = createSpawnMetadata();
+      await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, new THREE.Vector3(100, 10, -200), 0, metadata);
+
+      expect(model.positionAircraftAtRunwayStart('fw1')).toBe(true);
+
+      const target = new THREE.Vector3();
+      expect(model.getAircraftPositionTo('fw1', target)).toBe(true);
+      expect(target.x).toBeCloseTo(metadata.runwayStart!.position.x, 4);
+      expect(target.z).toBeCloseTo(metadata.runwayStart!.position.z, 4);
+      expect(target.y).toBeCloseTo(10.5, 4);
+      expect(model.getFlightData('fw1')?.operationState).toBe('lineup');
+    });
+
+    it('repositions an aircraft onto approach using runway metadata', async () => {
+      const metadata = createSpawnMetadata();
+      await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, new THREE.Vector3(100, 10, -200), 0, metadata);
+
+      expect(model.positionAircraftOnApproach('fw1')).toBe(true);
+
+      const flightData = model.getFlightData('fw1');
+      expect(flightData).not.toBeNull();
+      expect(flightData?.weightOnWheels).toBe(false);
+      expect(flightData?.controlPhase).toBe('approach');
+      expect(flightData?.operationState).toBe('approach');
+      expect(flightData?.verticalSpeed).toBeLessThan(-4);
+    });
+  });
+
+  describe('exit gating', () => {
+    it('refuses exit while the aircraft is airborne and shows a HUD message', async () => {
+      const metadata = createSpawnMetadata();
+      const hud = { showMessage: vi.fn() };
+      const playerController = {
+        isInHelicopter: () => false,
+        isInFixedWing: () => true,
+        getFixedWingId: () => 'fw1',
+        exitFixedWing: vi.fn(),
+      };
+      model.setHUDSystem(hud as any);
+      model.setPlayerController(playerController as any);
+
+      await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, new THREE.Vector3(100, 10, -200), 0, metadata);
+      model.setPilotedAircraft('fw1');
+      model.positionAircraftOnApproach('fw1');
+
+      model.exitAircraft();
+
+      expect(hud.showMessage).toHaveBeenCalledWith('Aircraft must be on the ground before exit.', 2000);
+      expect(playerController.exitFixedWing).not.toHaveBeenCalled();
     });
   });
 

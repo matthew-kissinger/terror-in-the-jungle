@@ -258,8 +258,13 @@ describe('InputManager', () => {
     });
 
     it('tracks pointerdown activity as touch mode', () => {
-      document.dispatchEvent(new PointerEvent('pointerdown'));
+      document.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch' }));
       expect(input.getLastInputMode()).toBe('touch');
+    });
+
+    it('ignores mouse pointerdown when tracking touch input mode', () => {
+      document.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'mouse' }));
+      expect(input.getLastInputMode()).toBe('keyboardMouse');
     });
 
     it('fires mode change listener when mode switches', () => {

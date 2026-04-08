@@ -79,7 +79,7 @@ describe('FixedWingPhysics', () => {
   });
 
   describe('stall behavior', () => {
-    it('enters a stall after sustained over-rotation', () => {
+    it('alpha protection prevents stall during aggressive rotation', () => {
       const fw = createRunwayPhysics();
       for (let i = 0; i < 960; i++) {
         fw.setCommand({
@@ -93,10 +93,42 @@ describe('FixedWingPhysics', () => {
       }
 
       const snapshot = fw.getFlightSnapshot();
-      expect(snapshot.altitudeAGL).toBeGreaterThan(0.2);
-      expect(snapshot.phase).toBe('stall');
-      expect(snapshot.isStalled).toBe(true);
-      expect(snapshot.aoaDeg).toBeGreaterThan(skyraiderCfg.alphaStallDeg);
+      expect(snapshot.altitudeAGL).toBeGreaterThan(1.0);
+      expect(snapshot.phase).not.toBe('stall');
+      expect(snapshot.isStalled).toBe(false);
+      expect(snapshot.aoaDeg).toBeLessThan(skyraiderCfg.alphaStallDeg);
+    });
+
+    it('takes off cleanly with full pitch input', () => {
+      const fw = createRunwayPhysics();
+      for (let i = 0; i < 900; i++) {
+        fw.setCommand({
+          throttleTarget: 1,
+          pitchCommand: i > 180 ? 1.0 : 0,
+          rollCommand: 0,
+          yawCommand: 0,
+          brake: 0,
+        });
+        fw.update(1 / 60, flatTerrain());
+      }
+
+      const snapshot = fw.getFlightSnapshot();
+      expect(snapshot.altitudeAGL).toBeGreaterThan(1.0);
+      expect(snapshot.weightOnWheels).toBe(false);
+      expect(snapshot.isStalled).toBe(false);
+    });
+
+    it('stalls from speed loss', () => {
+      const fw = createAirbornePhysics(skyraiderCfg, 2000, skyraiderCfg.stallSpeed);
+      let stalledAtAnyPoint = false;
+      for (let i = 0; i < 900; i++) {
+        fw.setCommand({ throttleTarget: 0, pitchCommand: 0.6, stabilityAssist: false });
+        fw.update(1 / 60, flatTerrain());
+        const s = fw.getFlightSnapshot();
+        if (s.isStalled) stalledAtAnyPoint = true;
+      }
+
+      expect(stalledAtAnyPoint).toBe(true);
     });
 
     it('reports descending vertical speed when an airborne aircraft has insufficient lift', () => {
@@ -179,6 +211,25 @@ describe('FixedWingPhysics', () => {
       expect(fw.getAirspeed()).toBe(0);
       expect(fw.getFlightState()).toBe('grounded');
       expect(fw.getFlightSnapshot().phase).toBe('parked');
+    });
+  });
+
+  describe('resetAirborne', () => {
+    it('repositions the aircraft into a clean airborne state', () => {
+      const fw = createRunwayPhysics();
+      const position = new THREE.Vector3(120, 85, -40);
+      const quaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI * 0.5);
+
+      fw.resetAirborne(position, quaternion, 72, -5, 10);
+
+      const snapshot = fw.getFlightSnapshot();
+      expect(fw.getPosition().x).toBeCloseTo(120, 4);
+      expect(fw.getPosition().y).toBeCloseTo(85, 4);
+      expect(fw.getFlightState()).toBe('airborne');
+      expect(snapshot.phase).toBe('airborne');
+      expect(snapshot.weightOnWheels).toBe(false);
+      expect(snapshot.airspeed).toBeGreaterThan(60);
+      expect(snapshot.verticalSpeed).toBeCloseTo(-5, 4);
     });
   });
 

@@ -14,6 +14,8 @@
 import { UIComponent } from '../engine/UIComponent';
 import { isTouchDevice } from '../../utils/DeviceDetector';
 import { iconHtml } from '../icons/IconRegistry';
+import type { FixedWingControlPhase } from '../../systems/vehicle/FixedWingControlLaw';
+import type { FixedWingOperationState } from '../../systems/vehicle/FixedWingOperations';
 import styles from './FixedWingHUD.module.css';
 
 const HEADING_LABELS: readonly string[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
@@ -21,6 +23,49 @@ const HEADING_LABELS: readonly string[] = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W',
 function headingToLabel(degrees: number): string {
   const index = Math.round(degrees / 45) % 8;
   return HEADING_LABELS[index];
+}
+
+function phaseCueLabel(
+  operationState: FixedWingOperationState,
+  phase: FixedWingControlPhase,
+): string | null {
+  switch (operationState) {
+    case 'taxi':
+      return 'TAXI';
+    case 'lineup':
+      return 'LINE UP';
+    case 'takeoff_roll':
+      return 'TAKEOFF';
+    case 'rotation':
+      return 'ROTATE';
+    case 'initial_climb':
+      return 'CLIMB';
+    case 'orbit_hold':
+      return 'ORBIT';
+    case 'approach':
+      return 'APPROACH';
+    case 'rollout':
+      return 'ROLLOUT';
+    case 'stopped':
+      return 'STOP';
+    case 'parked':
+    case 'cruise':
+    default:
+      break;
+  }
+
+  switch (phase) {
+    case 'takeoff_roll':
+      return 'TAKEOFF';
+    case 'rotation':
+      return 'ROTATE';
+    case 'initial_climb':
+      return 'CLIMB';
+    case 'approach':
+      return 'APPROACH';
+    default:
+      return null;
+  }
 }
 
 export class FixedWingHUD extends UIComponent {
@@ -42,6 +87,8 @@ export class FixedWingHUD extends UIComponent {
 
   // Stall
   private isStalled = this.signal(false);
+  private controlPhase = this.signal<FixedWingControlPhase>('taxi');
+  private operationState = this.signal<FixedWingOperationState>('parked');
 
   // Mouse mode
   private mouseVisible = this.signal(false);
@@ -83,7 +130,7 @@ export class FixedWingHUD extends UIComponent {
         </div>
       </div>
       <div data-ref="stallWarning" class="${styles.panel} ${styles.stallWarning}">
-        <div class="${styles.stallText}">STALL</div>
+        <div data-ref="stallText" class="${styles.stallText}">STALL</div>
       </div>
       <div data-ref="mouse" class="${styles.panel} ${styles.mouseSection}">
         <div data-ref="mouseIcon" class="${styles.mouseIcon}">
@@ -174,6 +221,7 @@ export class FixedWingHUD extends UIComponent {
     this.effect(() => {
       const el = this.$('[data-ref="autoLevelBox"]');
       if (!el) return;
+      el.textContent = this.operationState.value === 'orbit_hold' ? 'ORB' : 'LVL';
       if (this.autoLevel.value) {
         el.classList.add(styles.statusBoxActive);
       } else {
@@ -184,11 +232,25 @@ export class FixedWingHUD extends UIComponent {
     // Effect: stall warning
     this.effect(() => {
       const el = this.$('[data-ref="stallWarning"]');
+      const textEl = this.$('[data-ref="stallText"]');
       if (!el) return;
+      const cueLabel = phaseCueLabel(this.operationState.value, this.controlPhase.value);
       if (this.isStalled.value) {
         el.classList.add(styles.stallWarningVisible);
+        el.classList.remove(styles.phaseCueVisible);
+        textEl?.classList.add(styles.stallTextCritical);
+        textEl?.classList.remove(styles.stallTextCue);
+        if (textEl) textEl.textContent = 'STALL';
+      } else if (cueLabel) {
+        el.classList.add(styles.stallWarningVisible, styles.phaseCueVisible);
+        textEl?.classList.remove(styles.stallTextCritical);
+        textEl?.classList.add(styles.stallTextCue);
+        if (textEl) textEl.textContent = cueLabel;
       } else {
+        el.classList.remove(styles.phaseCueVisible);
         el.classList.remove(styles.stallWarningVisible);
+        textEl?.classList.remove(styles.stallTextCritical, styles.stallTextCue);
+        if (textEl) textEl.textContent = 'STALL';
       }
     });
 
@@ -254,9 +316,12 @@ export class FixedWingHUD extends UIComponent {
 
   setStallSpeed(speed: number): void { this.stallSpeed.value = speed; }
   setStallWarning(stalled: boolean): void { this.isStalled.value = stalled; }
+  setPhase(phase: FixedWingControlPhase): void { this.controlPhase.value = phase; }
+  setOperationState(state: FixedWingOperationState): void { this.operationState.value = state; }
 
   setThrottle(throttle: number): void { this.throttle.value = throttle; }
   setAutoLevel(active: boolean): void { this.autoLevel.value = active; }
+  setFlightAssist(active: boolean): void { this.setAutoLevel(active); }
 
   showMouseIndicator(): void { this.mouseVisible.value = true; }
   hideMouseIndicator(): void { this.mouseVisible.value = false; }

@@ -43,13 +43,15 @@ interface TouchControlCallbacks {
   onWeaponSelect: (slotIndex: number) => void;
   onADSToggle: (active: boolean) => void;
   onScoreboardTap?: () => void;
-  onEnterExitHelicopter: () => void;
+  onEnterExitVehicle?: () => void;
+  onEnterExitHelicopter?: () => void;
   onSandbagRotateLeft: () => void;
   onSandbagRotateRight: () => void;
   onRallyPointPlace: () => void;
   onSquadCommand?: () => void;
   onMapToggle?: () => void;
   onMenuOpen?: () => void;
+  onToggleFlightAssist?: () => void;
   onToggleAutoHover?: () => void;
   onVehicleFireStart?: () => void;
   onVehicleFireStop?: () => void;
@@ -159,7 +161,7 @@ export class TouchControls {
       this.look.setADS(active);
       callbacks.onADSToggle(active);
     });
-    this.interactionButton.setCallback(callbacks.onEnterExitHelicopter);
+    this.interactionButton.setCallback(callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter ?? (() => {}));
     this.sandbagButtons.setCallbacks(callbacks.onSandbagRotateLeft, callbacks.onSandbagRotateRight);
     this.rallyPointButton.setCallback(callbacks.onRallyPointPlace);
     this.rallyPointButton.setSquadCommandCallback(() => callbacks.onSquadCommand?.());
@@ -167,10 +169,10 @@ export class TouchControls {
 
     // Wire vehicle action bar
     this.vehicleActionBar.setCallbacks({
-      onExitVehicle: () => callbacks.onEnterExitHelicopter(),
+      onExitVehicle: () => (callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter ?? (() => {}))(),
       onVehicleFireStart: () => callbacks.onVehicleFireStart?.(),
       onVehicleFireStop: () => callbacks.onVehicleFireStop?.(),
-      onToggleAutoHover: () => callbacks.onToggleAutoHover?.(),
+      onToggleFlightAssist: () => (callbacks.onToggleFlightAssist ?? callbacks.onToggleAutoHover)?.(),
       onLookDown: () => this.look.show(),
       onLookUp: () => {
         if (this.actorMode !== 'infantry') this.look.hide();

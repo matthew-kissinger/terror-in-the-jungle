@@ -200,13 +200,24 @@ export class PlayerController implements GameSystem {
       onEscape: () => this.handleEscape(),
       onScoreboardToggle: (visible: boolean) => this.hudSystem?.toggleScoreboard(visible),
       onScoreboardTap: () => this.hudSystem?.toggleScoreboardVisibility(),
+      onEnterExitVehicle: () => {
+        if (this.commandInputManager?.handleSecondarySelect()) return;
+        this.handleEnterExitHelicopter();
+      },
       onEnterExitHelicopter: () => {
         if (this.commandInputManager?.handleSecondarySelect()) return;
         this.handleEnterExitHelicopter();
       },
+      onToggleFlightAssist: () => {
+        if (this.vehicleStateManager.getVehicleType() === 'fixed_wing') {
+          this.fixedWingAdapter?.toggleFlightAssist();
+        } else if (this.vehicleStateManager.getVehicleType() === 'helicopter') {
+          this.helicopterAdapter?.toggleAutoHover();
+        }
+      },
       onToggleAutoHover: () => {
         if (this.vehicleStateManager.getVehicleType() === 'fixed_wing') {
-          this.fixedWingAdapter?.toggleAutoLevel();
+          this.fixedWingAdapter?.toggleFlightAssist();
         } else if (this.vehicleStateManager.getVehicleType() === 'helicopter') {
           this.helicopterAdapter?.toggleAutoHover();
         }

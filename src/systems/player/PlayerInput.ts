@@ -14,7 +14,9 @@ export interface InputCallbacks {
   onEscape?: () => void;
   onScoreboardToggle?: (visible: boolean) => void;
   onScoreboardTap?: () => void;
+  onEnterExitVehicle?: () => void;
   onEnterExitHelicopter?: () => void;
+  onToggleFlightAssist?: () => void;
   onToggleAutoHover?: () => void;
   onToggleAltitudeLock?: () => void;
   onToggleMouseControl?: () => void;
@@ -128,14 +130,14 @@ export class PlayerInput {
           }
         },
         onScoreboardTap: () => callbacks.onScoreboardTap?.(),
-        onEnterExitHelicopter: () => callbacks.onEnterExitHelicopter?.(),
+        onEnterExitVehicle: () => (callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter)?.(),
         onSandbagRotateLeft: () => callbacks.onSandbagRotateLeft?.(),
         onSandbagRotateRight: () => callbacks.onSandbagRotateRight?.(),
         onRallyPointPlace: () => callbacks.onRallyPointPlace?.(),
         onMapToggle: () => callbacks.onMapToggle?.(),
         onSquadCommand: () => callbacks.onSquadCommand?.(),
         onMenuOpen: () => callbacks.onMenuOpen?.(),
-        onToggleAutoHover: () => callbacks.onToggleAutoHover?.(),
+        onToggleFlightAssist: () => (callbacks.onToggleFlightAssist ?? callbacks.onToggleAutoHover)?.(),
         onVehicleFireStart: () => callbacks.onMouseDown?.(0),
         onVehicleFireStop: () => callbacks.onMouseUp?.(0),
         onHelicopterWeaponSwitch: (index: number) => callbacks.onHelicopterWeaponSwitch?.(index),
@@ -147,7 +149,7 @@ export class PlayerInput {
       this.gamepadManager.setCallbacks({
         onJump: () => callbacks.onJump?.(),
         onReload: () => callbacks.onReload?.(),
-        onInteract: () => callbacks.onEnterExitHelicopter?.(),
+        onInteract: () => (callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter)?.(),
         onWeaponSwitch: () => {
           // Cycle through weapons: primary -> secondary -> throwable
           const next = ((this.currentWeaponMode + 1) % 3) as WeaponSlot;
@@ -406,7 +408,7 @@ export class PlayerInput {
 
     if (event.code === 'Space') {
       if (this.isInFlightVehicle()) {
-        this.callbacks.onToggleAutoHover?.();
+        (this.callbacks.onToggleFlightAssist ?? this.callbacks.onToggleAutoHover)?.();
       } else {
         this.callbacks.onJump?.();
       }
@@ -418,7 +420,7 @@ export class PlayerInput {
 
     // Handle vehicle entry/exit with E key
     if (event.code === 'KeyE') {
-      this.callbacks.onEnterExitHelicopter?.();
+      (this.callbacks.onEnterExitVehicle ?? this.callbacks.onEnterExitHelicopter)?.();
     }
 
     // Flight-vehicle controls
@@ -605,11 +607,13 @@ export class PlayerInput {
       : 'Mouse - Look around (pointer lock disabled)';
     Logger.info('player', `
  CONTROLS:
-WASD - Move / Flight controls (helicopter: collective+yaw, plane: throttle+yaw)
-Arrow Keys - Flight pitch/roll
+WASD - Move on foot / vehicle-specific flight controls
 Shift - Run / Engine Boost (in helicopter)
-Space - Jump / Toggle Flight Assist (in aircraft)
+Space - Jump / Flight Assist / AC-47 Orbit Hold
 Right Ctrl - Toggle Flight Mouse Control
+W/S - Plane throttle while boarded
+A/D - Plane runway steering / rudder
+Arrow Keys - Plane pitch and bank intent
 E - Enter/Exit Vehicle
 M - Toggle Mortar Camera View (when mortar deployed)
 1-6 - Switch Weapons

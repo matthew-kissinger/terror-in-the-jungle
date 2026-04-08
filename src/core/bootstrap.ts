@@ -92,6 +92,13 @@ export async function bootstrapGame(): Promise<void> {
       (window as any).__ashauDiagnostics = () => buildAShauDiagnostics(engine);
     }
 
+    if (import.meta.env.DEV && (isPerfDiagnosticsEnabled() || isDiagEnabled())) {
+      (window as any).advanceTime = async (ms: number) => {
+        engine.advanceTime(ms);
+      };
+      (window as any).render_game_to_text = () => buildRenderGameToText(engine);
+    }
+
     if (isDiagEnabled()) {
       (window as any).__rendererInfo = () => {
         const info = engine.renderer?.renderer?.info;
@@ -132,6 +139,74 @@ export async function bootstrapGame(): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
     showFatalError(message);
   }
+}
+
+function roundForRender(value: number | null | undefined): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+  return Number(value.toFixed(1));
+}
+
+function buildRenderGameToText(engine: GameEngine): string {
+  const systems = engine.systemManager;
+  const playerController = systems.playerController;
+  const fixedWingModel = systems.fixedWingModel;
+  const inputManager = (playerController as any).input;
+  const playerPosition = playerController.getPosition?.();
+  const activeFixedWingId = playerController.getFixedWingId?.() ?? null;
+  const activeFixedWing = activeFixedWingId
+    ? fixedWingModel.getFlightData(activeFixedWingId)
+    : null;
+
+  const payload = {
+    mode: systems.gameModeManager.getCurrentMode(),
+    gameStarted: engine.gameStarted,
+    coordSystem: 'x=east/west, z=north/south, y=up',
+    input: {
+      touchMode: inputManager?.getIsTouchMode?.() ?? null,
+      inputMode: inputManager?.getLastInputMode?.() ?? null,
+    },
+    player: {
+      x: roundForRender(playerPosition?.x),
+      y: roundForRender(playerPosition?.y),
+      z: roundForRender(playerPosition?.z),
+      inHelicopter: playerController.isInHelicopter?.() ?? false,
+      inFixedWing: playerController.isInFixedWing?.() ?? false,
+      fixedWingId: activeFixedWingId,
+    },
+    activeFixedWing: activeFixedWing
+      ? {
+          configKey: activeFixedWing.configKey,
+          airspeed: roundForRender(activeFixedWing.airspeed),
+          altitudeAGL: roundForRender(activeFixedWing.altitudeAGL),
+          verticalSpeed: roundForRender(activeFixedWing.verticalSpeed),
+          heading: roundForRender(activeFixedWing.heading),
+          phase: activeFixedWing.phase,
+          controlPhase: activeFixedWing.controlPhase,
+          operationState: activeFixedWing.operationState,
+          throttle: roundForRender(activeFixedWing.throttle),
+          stalled: activeFixedWing.isStalled,
+        }
+      : null,
+    fixedWing: fixedWingModel.getAircraftIds().map((id) => {
+      const fd = fixedWingModel.getFlightData(id);
+      return {
+        id,
+        configKey: fixedWingModel.getConfigKey(id),
+        airspeed: roundForRender(fd?.airspeed ?? null),
+        altitudeAGL: roundForRender(fd?.altitudeAGL ?? null),
+        heading: roundForRender(fd?.heading ?? null),
+        phase: fd?.phase ?? null,
+        operationState: fd?.operationState ?? null,
+      };
+    }),
+    hud: {
+      interaction: document.getElementById('game-hud-root')?.dataset.interaction ?? null,
+    },
+  };
+
+  return JSON.stringify(payload);
 }
 
 function buildAShauDiagnostics(engine: GameEngine) {

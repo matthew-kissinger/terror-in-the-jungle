@@ -147,11 +147,11 @@ describe('compileTerrainFeatures', () => {
       ],
     });
 
-    expect(compiled.stamps).toHaveLength(5); // runway + taxiway + apron + 2 filler stamps
+    expect(compiled.stamps).toHaveLength(6); // runway + apron + 3 taxiway rects + 1 filler stamp
     expect(compiled.vegetationExclusionZones).toHaveLength(1);
-    expect(compiled.surfacePatches).toHaveLength(3);
+    expect(compiled.surfacePatches).toHaveLength(5);
     expect(compiled.surfacePatches.some((patch) => patch.shape === 'rect' && patch.surface === 'runway')).toBe(true);
-    expect(compiled.surfacePatches.filter((patch) => patch.shape === 'rect' && patch.surface === 'packed_earth').length).toBe(2);
+    expect(compiled.surfacePatches.filter((patch) => patch.shape === 'rect' && patch.surface === 'packed_earth').length).toBe(4);
     expect(compiled.stamps.every((stamp) => stamp.kind === 'flatten_capsule')).toBe(true);
     const runwayStamp = compiled.stamps.find((stamp) =>
       stamp.kind === 'flatten_capsule'

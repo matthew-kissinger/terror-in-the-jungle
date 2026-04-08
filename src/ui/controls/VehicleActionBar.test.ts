@@ -3,6 +3,11 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VehicleActionBar } from './VehicleActionBar';
+import { shouldUseTouchControls } from '../../utils/DeviceDetector';
+
+vi.mock('../../utils/DeviceDetector', () => ({
+  shouldUseTouchControls: vi.fn(() => true),
+}));
 
 function pointerEvent(type: string, opts: Partial<PointerEventInit> = {}): PointerEvent {
   return new PointerEvent(type, {
@@ -20,6 +25,7 @@ describe('VehicleActionBar', () => {
 
   beforeEach(() => {
     document.body.innerHTML = '';
+    vi.mocked(shouldUseTouchControls).mockReturnValue(true);
     bar = new VehicleActionBar();
     bar.mount(document.body);
   });
@@ -138,8 +144,70 @@ describe('VehicleActionBar', () => {
     expect((document.querySelector('[aria-label="MAP"]') as HTMLDivElement).style.display).toBe('flex');
     expect((document.querySelector('[aria-label="CMD"]') as HTMLDivElement).style.display).toBe('flex');
     expect((document.querySelector('[aria-label="STAB"]') as HTMLDivElement).style.display).toBe('flex');
-    // LOOK is hidden on touch devices (jsdom has ontouchstart), free-look handled by cyclic joystick
+    expect((document.querySelector('[aria-label="STAB"]') as HTMLDivElement).textContent).toBe('STAB');
+    // LOOK is hidden when touch controls are active; free-look is handled by the cyclic joystick
     expect((document.querySelector('[aria-label="LOOK"]') as HTMLDivElement).style.display).toBe('none');
+  });
+
+  it('shows LOOK when touch controls are not active', async () => {
+    vi.mocked(shouldUseTouchControls).mockReturnValue(false);
+
+    bar.setVehicleContext({
+      kind: 'plane',
+      role: 'attack',
+      hudVariant: 'flight',
+      weaponCount: 0,
+      capabilities: {
+        canExit: true,
+        canFirePrimary: false,
+        canCycleWeapons: false,
+        canFreeLook: true,
+        canStabilize: true,
+        canDeploySquad: false,
+        canOpenMap: true,
+        canOpenCommand: true,
+      },
+    });
+
+    expect((document.querySelector('[aria-label="LOOK"]') as HTMLDivElement).style.display).toBe('flex');
+  });
+
+  it('relabels the stabilizer button for plane and gunship contexts', () => {
+    bar.setVehicleContext({
+      kind: 'plane',
+      role: 'attack',
+      hudVariant: 'flight',
+      weaponCount: 0,
+      capabilities: {
+        canExit: true,
+        canFirePrimary: false,
+        canCycleWeapons: false,
+        canFreeLook: true,
+        canStabilize: true,
+        canDeploySquad: false,
+        canOpenMap: true,
+        canOpenCommand: true,
+      },
+    });
+    expect((document.querySelector('[aria-label="LEVEL"]') as HTMLDivElement).textContent).toBe('LEVEL');
+
+    bar.setVehicleContext({
+      kind: 'plane',
+      role: 'gunship',
+      hudVariant: 'flight',
+      weaponCount: 0,
+      capabilities: {
+        canExit: true,
+        canFirePrimary: false,
+        canCycleWeapons: false,
+        canFreeLook: true,
+        canStabilize: true,
+        canDeploySquad: false,
+        canOpenMap: true,
+        canOpenCommand: true,
+      },
+    });
+    expect((document.querySelector('[aria-label="ORBIT"]') as HTMLDivElement).textContent).toBe('ORBIT');
   });
 
   it('cycles weapons using the configured vehicle weapon count', () => {

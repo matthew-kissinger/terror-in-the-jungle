@@ -20,7 +20,10 @@ export class InputManager extends PlayerInput {
   private readonly onMouseActivity = (_event: MouseEvent): void => {
     this.setLastMode('keyboardMouse');
   };
-  private readonly onTouchActivity = (_event: TouchEvent | PointerEvent): void => {
+  private readonly onTouchActivity = (event: TouchEvent | PointerEvent): void => {
+    if ('pointerType' in event && event.pointerType !== 'touch') {
+      return;
+    }
     this.setLastMode('touch');
   };
 
@@ -91,7 +94,9 @@ export class InputManager extends PlayerInput {
       onRunStop: () => this.runRelease(callbacks.onRunStop),
       onScoreboardToggle: (visible) => this.runGameplay(() => callbacks.onScoreboardToggle?.(visible)),
       onScoreboardTap: () => this.runGameplay(callbacks.onScoreboardTap),
+      onEnterExitVehicle: () => this.runGameplay(callbacks.onEnterExitVehicle ?? callbacks.onEnterExitHelicopter),
       onEnterExitHelicopter: () => this.runGameplay(callbacks.onEnterExitHelicopter),
+      onToggleFlightAssist: () => this.runGameplay(callbacks.onToggleFlightAssist ?? callbacks.onToggleAutoHover),
       onToggleAutoHover: () => this.runGameplay(callbacks.onToggleAutoHover),
       onToggleAltitudeLock: () => this.runGameplay(callbacks.onToggleAltitudeLock),
       onToggleMouseControl: () => this.runGameplay(callbacks.onToggleMouseControl),

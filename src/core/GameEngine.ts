@@ -286,9 +286,66 @@ export class GameEngine {
     Loop.start(this);
   }
 
+  /**
+   * Diagnostics-only deterministic stepping hook for browser automation.
+   * Advances simulation at 60 Hz and renders the latest frame once at the end.
+   */
+  public advanceTime(ms: number): void {
+    if (!this.isInitialized || !this.gameStarted || this.isDisposed || this.contextLost) {
+      return;
+    }
+
+    const fixedDelta = 1 / 60;
+    const steps = Math.max(1, Math.round(ms / (fixedDelta * 1000)));
+    for (let i = 0; i < steps; i++) {
+      this.lastFrameDelta = fixedDelta;
+      this.systemManager.updateSystems(fixedDelta, this.gameStarted);
+      this.systemManager.skybox.updatePosition(this.renderer.camera.position);
+    }
+
+    this.renderDiagnosticsFrame();
+  }
+
   /** True while WebGL context is lost (checked by game loop to skip rendering) */
   public get contextLost(): boolean {
     return this.contextRecovery.contextLost;
+  }
+
+  private renderDiagnosticsFrame(): void {
+    const mortarSystem = this.systemManager.mortarSystem;
+    const usingMortarCamera = mortarSystem?.isUsingMortarCamera() ?? false;
+    const mortarCamera = mortarSystem?.getMortarCamera();
+    const pp = this.renderer.postProcessing;
+    const renderer = this.renderer.renderer;
+
+    if (pp && !usingMortarCamera) {
+      pp.beginFrame();
+    }
+
+    if (usingMortarCamera && mortarCamera) {
+      renderer.render(this.renderer.scene, mortarCamera);
+    } else {
+      renderer.render(this.renderer.scene, this.renderer.camera);
+    }
+
+    if (!usingMortarCamera) {
+      this.systemManager.firstPersonWeapon?.renderWeapon(renderer);
+
+      const currentAutoClear = renderer.autoClear;
+      renderer.autoClear = false;
+
+      if (this.systemManager.grenadeSystem && this.systemManager.inventoryManager) {
+        const grenadeScene = this.systemManager.grenadeSystem.getGrenadeOverlayScene();
+        const grenadeCamera = this.systemManager.grenadeSystem.getGrenadeOverlayCamera();
+        if (grenadeScene && grenadeCamera) {
+          renderer.clearDepth();
+          renderer.render(grenadeScene, grenadeCamera);
+        }
+      }
+
+      renderer.autoClear = currentAutoClear;
+      pp?.endFrame();
+    }
   }
 
   public dispose(): void {

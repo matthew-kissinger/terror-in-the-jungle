@@ -50,6 +50,20 @@ describe('AirfieldLayoutGenerator', () => {
       expect(Math.max(...alongOffsets)).toBeGreaterThan(0);
     });
 
+    it('attaches stand, taxi-route, and runway-start metadata to fixed-wing parking spots', () => {
+      const layout = generateAirfieldLayout(template, center, heading);
+      const fixedWingParking = layout.placements.filter((p) => p.fixedWingSpawn);
+
+      expect(fixedWingParking).toHaveLength(3);
+      expect(fixedWingParking[0].fixedWingSpawn).toEqual(expect.objectContaining({
+        standId: 'stand_a1',
+        taxiRoute: expect.any(Array),
+        runwayStart: expect.objectContaining({ id: 'south_departure' }),
+      }));
+      expect(fixedWingParking[1].fixedWingSpawn?.standId).toBe('stand_ac47');
+      expect(fixedWingParking[2].fixedWingSpawn?.runwayStart?.id).toBe('north_departure');
+    });
+
     it('generates structures within count range', () => {
       const layout = generateAirfieldLayout(template, center, heading);
       const structures = layout.placements.filter(p => p.id?.startsWith('struct'));
@@ -99,6 +113,18 @@ describe('AirfieldLayoutGenerator', () => {
       const strip = generateAirfieldLayout(AIRFIELD_TEMPLATES.forward_strip, center, heading);
       expect(strip.surfacePatches.filter((p) => p.surface === 'packed_earth').length)
         .toBe(AIRFIELD_TEMPLATES.forward_strip.aprons.length + AIRFIELD_TEMPLATES.forward_strip.taxiways.length);
+    });
+
+    it('only adds fixed-wing spawn metadata to fixed-wing parking placements', () => {
+      const strip = generateAirfieldLayout(AIRFIELD_TEMPLATES.forward_strip, center, heading);
+      const helicopterSpot = strip.placements.find((p) => p.modelPath.includes('uh1'));
+      const fixedWingSpot = strip.placements.find((p) => p.fixedWingSpawn);
+
+      expect(helicopterSpot?.fixedWingSpawn).toBeUndefined();
+      expect(fixedWingSpot?.fixedWingSpawn).toEqual(expect.objectContaining({
+        standId: 'strip_a1',
+        runwayStart: expect.objectContaining({ id: 'strip_south_departure' }),
+      }));
     });
   });
 

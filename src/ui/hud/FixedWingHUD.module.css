@@ -260,6 +260,11 @@
   display: flex;
 }
 
+.phaseCueVisible {
+  background: rgba(212, 180, 68, 0.18);
+  border-color: var(--accent);
+}
+
 .stallText {
   font-size: var(--font-size-xs);
   font-weight: var(--weight-bold);
@@ -268,6 +273,16 @@
   text-transform: uppercase;
   letter-spacing: 1px;
   animation: stallBlink 0.5s ease-in-out infinite alternate;
+}
+
+.stallTextCritical {
+  color: var(--danger);
+}
+
+.stallTextCue {
+  color: var(--accent);
+  letter-spacing: 0.6px;
+  animation: none;
 }
 
 @keyframes stallBlink {

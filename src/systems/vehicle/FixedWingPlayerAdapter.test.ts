@@ -8,15 +8,23 @@ vi.mock('../../utils/Logger', () => ({
   Logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },
 }));
 
-function createMockFixedWingModel() {
+function createMockFixedWingModel(options?: {
+  configKey?: string;
+  displayName?: string;
+  flightData?: Record<string, unknown>;
+}) {
+  const configKey = options?.configKey ?? 'A1_SKYRAIDER';
   return {
-    getDisplayInfo: vi.fn(() => ({ autoLevelDefault: true, displayName: 'A-1 Skyraider' })),
+    getDisplayInfo: vi.fn(() => ({ autoLevelDefault: true, displayName: options?.displayName ?? 'A-1 Skyraider' })),
+    getConfigKey: vi.fn(() => configKey),
     getFlightData: vi.fn(() => ({
       airspeed: 60,
       heading: 180,
       verticalSpeed: 5,
       altitude: 200,
       altitudeAGL: 150,
+      controlPhase: 'flight' as const,
+      operationState: 'cruise' as const,
       phase: 'airborne' as const,
       aoaDeg: 4,
       sideslipDeg: 0,
@@ -28,8 +36,16 @@ function createMockFixedWingModel() {
       stallSpeed: 40,
       pitch: 5,
       roll: 0,
+      orbitHoldEnabled: false,
+      configKey,
+      ...options?.flightData,
     })),
+    getAircraftPositionTo: vi.fn((_aircraftId: string, target: THREE.Vector3) => {
+      target.set(500, 140, 600);
+      return true;
+    }),
     setPilotedAircraft: vi.fn(),
+    setFixedWingPilotIntent: vi.fn(),
     setFixedWingCommand: vi.fn(),
     exitAircraft: vi.fn(),
     tryEnterAircraft: vi.fn(),
@@ -67,8 +83,12 @@ function createMockHudSystem() {
     updateFixedWingFlightData: vi.fn(),
     updateFixedWingThrottle: vi.fn(),
     setFixedWingStallWarning: vi.fn(),
+    setFixedWingPhase: vi.fn(),
+    setFixedWingOperationState: vi.fn(),
+    setFixedWingFlightAssist: vi.fn(),
     setFixedWingAutoLevel: vi.fn(),
     updateElevation: vi.fn(),
+    showMessage: vi.fn(),
   };
 }
 
@@ -172,6 +192,7 @@ describe('FixedWingPlayerAdapter', () => {
       expect(hud.showFixedWingInstruments).toHaveBeenCalled();
       expect(hud.showFixedWingMouseIndicator).toHaveBeenCalled();
       expect(hud.setVehicleContext).toHaveBeenCalled();
+      expect(hud.setFixedWingOperationState).toHaveBeenCalledWith('cruise');
     });
   });
 
@@ -251,11 +272,11 @@ describe('FixedWingPlayerAdapter', () => {
       };
       adapter.update(updateCtx);
 
-      expect(fwModel.setFixedWingCommand).toHaveBeenCalled();
-      const cmd = fwModel.setFixedWingCommand.mock.calls[0][0];
-      expect(cmd.throttleTarget).toBe(0); // no W key pressed
-      expect(cmd.pitchCommand).toBe(0);
-      expect(cmd.rollCommand).toBe(0);
+      expect(fwModel.setFixedWingPilotIntent).toHaveBeenCalled();
+      const intent = fwModel.setFixedWingPilotIntent.mock.calls[0][0];
+      expect(intent.throttleTarget).toBe(0); // no W key pressed
+      expect(intent.pitchIntent).toBe(0);
+      expect(intent.bankIntent).toBe(0);
     });
 
     it('does not send command when not active', () => {
@@ -266,7 +287,39 @@ describe('FixedWingPlayerAdapter', () => {
       };
       adapter.update(updateCtx);
 
-      expect(fwModel.setFixedWingCommand).not.toHaveBeenCalled();
+      expect(fwModel.setFixedWingPilotIntent).not.toHaveBeenCalled();
+    });
+
+    it('toggles orbit hold for gunship aircraft when airborne', () => {
+      fwModel = createMockFixedWingModel({
+        configKey: 'AC47_SPOOKY',
+        displayName: 'AC-47 Spooky',
+        flightData: {
+          altitudeAGL: 160,
+          weightOnWheels: false,
+          operationState: 'cruise',
+        },
+      });
+      adapter = new FixedWingPlayerAdapter(fwModel as any);
+
+      const ps = createPlayerState();
+      const ctx = createTransitionContext(ps, 'ac47_1');
+      adapter.onEnter(ctx);
+      adapter.toggleFlightAssist();
+
+      const updateCtx: VehicleUpdateContext = {
+        deltaTime: 0.016,
+        input: ctx.input,
+        cameraController: ctx.cameraController,
+        hudSystem: ctx.hudSystem,
+      };
+      adapter.update(updateCtx);
+
+      expect(fwModel.setFixedWingPilotIntent).toHaveBeenCalled();
+      const intent = fwModel.setFixedWingPilotIntent.mock.calls.at(-1)?.[0];
+      expect(intent.orbitHoldEnabled).toBe(true);
+      expect(intent.assistEnabled).toBe(true);
+      expect(Math.hypot(intent.orbitCenterX, intent.orbitCenterZ)).toBeGreaterThan(0);
     });
   });
 });

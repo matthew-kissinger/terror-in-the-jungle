@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import type { FixedWingModel } from './FixedWingModel';
-import type { FixedWingCommand } from './FixedWingPhysics';
+import { createIdleFixedWingPilotIntent } from './FixedWingControlLaw';
+import type { FixedWingPilotIntent, FixedWingPilotMode } from './FixedWingControlLaw';
+import { FIXED_WING_CONFIGS } from './FixedWingConfigs';
+import { buildOrbitAnchorFromHeading } from './FixedWingOperations';
 import type { IHUDSystem } from '../../types/SystemInterfaces';
 import type { PlayerInput } from '../player/PlayerInput';
 import type { PlayerCamera } from '../player/PlayerCamera';
@@ -15,10 +18,10 @@ const FW_TOUCH_DEADZONE = 0.1;
 const FW_MOUSE_RECENTER_RATE = 1.8;
 const FW_ASSIST_MOUSE_RECENTER_RATE = 3.2;
 
-function createFixedWingUIContext(): VehicleUIContext {
+function createFixedWingUIContext(role: string): VehicleUIContext {
   return {
     kind: 'plane',
-    role: 'pilot',
+    role,
     hudVariant: 'flight',
     weaponCount: 0,
     capabilities: {
@@ -48,9 +51,15 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
   private fixedWingMousePitch = 0;
   private fixedWingMouseRoll = 0;
   private fixedWingStabilityAssist = false;
+  private fixedWingOrbitHold = false;
+  private fixedWingOrbitCenterX = 0;
+  private fixedWingOrbitCenterZ = 0;
+  private fixedWingPilotMode: FixedWingPilotMode = 'assisted';
+  private lastMouseControlEnabled = false;
 
   private fixedWingModel: FixedWingModel;
   private activeAircraftId: string | null = null;
+  private activeConfigKey: string | null = null;
 
   constructor(fixedWingModel: FixedWingModel) {
     this.fixedWingModel = fixedWingModel;
@@ -58,11 +67,18 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
 
   onEnter(ctx: VehicleTransitionContext): void {
     // Initialize controls from aircraft config
+    this.activeConfigKey = this.fixedWingModel.getConfigKey(ctx.vehicleId);
+    const config = this.activeConfigKey ? FIXED_WING_CONFIGS[this.activeConfigKey] : null;
     const autoLevelDefault = this.fixedWingModel.getDisplayInfo(ctx.vehicleId)?.autoLevelDefault ?? false;
     this.fixedWingThrottle = 0;
     this.fixedWingMousePitch = 0;
     this.fixedWingMouseRoll = 0;
     this.fixedWingStabilityAssist = autoLevelDefault;
+    this.fixedWingOrbitHold = false;
+    this.fixedWingOrbitCenterX = 0;
+    this.fixedWingOrbitCenterZ = 0;
+    this.fixedWingPilotMode = 'assisted';
+    this.lastMouseControlEnabled = this.getFlightMouseControlEnabled(ctx.cameraController);
     this.activeAircraftId = ctx.vehicleId;
 
     ctx.playerState.velocity.set(0, 0, 0);
@@ -79,12 +95,22 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     hudSystem?.showFixedWingInstruments?.();
     hudSystem?.showFixedWingMouseIndicator?.();
     hudSystem?.updateFixedWingMouseMode?.(this.getFlightMouseControlEnabled(ctx.cameraController));
-    hudSystem?.setVehicleContext?.(createFixedWingUIContext());
+    hudSystem?.setVehicleContext?.(createFixedWingUIContext(config?.role ?? 'pilot'));
 
     // Set stall speed for HUD display
     const fd = this.fixedWingModel.getFlightData(ctx.vehicleId);
     if (fd) {
       hudSystem?.setFixedWingStallSpeed?.(fd.stallSpeed);
+      hudSystem?.updateFixedWingFlightData?.(fd.airspeed, fd.heading, fd.verticalSpeed);
+      hudSystem?.updateFixedWingThrottle?.(fd.throttle);
+      hudSystem?.setFixedWingStallWarning?.(fd.isStalled);
+      hudSystem?.setFixedWingPhase?.(fd.controlPhase);
+      hudSystem?.setFixedWingOperationState?.(fd.operationState);
+      const assistIndicator = config?.operation.playerFlow === 'gunship_orbit'
+        ? fd.orbitHoldEnabled
+        : this.fixedWingStabilityAssist;
+      hudSystem?.setFixedWingFlightAssist?.(assistIndicator);
+      hudSystem?.setFixedWingAutoLevel?.(assistIndicator);
     }
 
     // Tell FixedWingModel this aircraft is now piloted
@@ -111,6 +137,7 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
 
     this.fixedWingModel.setPilotedAircraft(null);
     this.activeAircraftId = null;
+    this.activeConfigKey = null;
     this.resetControlState();
   }
 
@@ -119,15 +146,22 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
 
     let mouseMovement: { x: number; y: number } | undefined;
     const touchFlight = this.isTouchFlightMode(ctx.input);
+    const mouseControlEnabled = this.getFlightMouseControlEnabled(ctx.cameraController);
     if (
       !touchFlight
-      && this.getFlightMouseControlEnabled(ctx.cameraController)
+      && mouseControlEnabled
       && ctx.input.getIsPointerLocked()
     ) {
       mouseMovement = ctx.input.getMouseMovement();
     }
 
-    this.updateFixedWingControls(ctx.deltaTime, ctx.input, ctx.hudSystem as IHUDSystem | undefined, mouseMovement);
+    this.updateFixedWingControls(
+      ctx.deltaTime,
+      ctx.input,
+      ctx.hudSystem as IHUDSystem | undefined,
+      mouseMovement,
+      mouseControlEnabled,
+    );
 
     if (mouseMovement) {
       ctx.input.clearMouseMovement();
@@ -139,16 +173,33 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     this.fixedWingMousePitch = 0;
     this.fixedWingMouseRoll = 0;
     this.fixedWingStabilityAssist = false;
+    this.fixedWingOrbitHold = false;
+    this.fixedWingOrbitCenterX = 0;
+    this.fixedWingOrbitCenterZ = 0;
+    this.fixedWingPilotMode = 'assisted';
+    this.lastMouseControlEnabled = false;
   }
 
   // ── Public accessors ──
 
-  toggleAutoLevel(): void {
+  toggleFlightAssist(): void {
+    if (this.isGunshipActive()) {
+      this.toggleOrbitHold();
+      return;
+    }
     this.fixedWingStabilityAssist = !this.fixedWingStabilityAssist;
   }
 
-  isAutoLevelEnabled(): boolean {
+  toggleAutoLevel(): void {
+    this.toggleFlightAssist();
+  }
+
+  isFlightAssistEnabled(): boolean {
     return this.fixedWingStabilityAssist;
+  }
+
+  isAutoLevelEnabled(): boolean {
+    return this.isFlightAssistEnabled();
   }
 
   // ── Private control update ──
@@ -158,25 +209,49 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     input: PlayerInput,
     hudSystem?: IHUDSystem,
     mouseMovement?: { x: number; y: number },
+    mouseControlEnabled: boolean = false,
   ): void {
     const hasTouchMode = this.isTouchFlightMode(input);
     const gp = input.getGamepadManager?.();
     const gpActive = gp?.isActive() ?? false;
 
+    if (mouseControlEnabled !== this.lastMouseControlEnabled) {
+      this.fixedWingMousePitch = 0;
+      this.fixedWingMouseRoll = 0;
+      this.lastMouseControlEnabled = mouseControlEnabled;
+    }
+    this.fixedWingPilotMode = mouseControlEnabled ? 'direct_stick' : 'assisted';
+
+    const activeFlightData = this.activeAircraftId
+      ? this.fixedWingModel.getFlightData(this.activeAircraftId)
+      : null;
+    const activeConfig = this.activeConfigKey ? FIXED_WING_CONFIGS[this.activeConfigKey] : null;
+    if (
+      this.fixedWingOrbitHold
+      && (!activeConfig || !activeFlightData || activeFlightData.weightOnWheels
+        || activeFlightData.altitudeAGL < (activeConfig.operation.orbitMinAltitude ?? 80))
+    ) {
+      this.fixedWingOrbitHold = false;
+    }
+
     // --- Throttle target (persistent: W increases, S decreases) ---
     let brake = 0;
+    let throttleStep = 0;
     if (hasTouchMode) {
       const touchMove = input.getTouchMovementVector();
       const throttleRate = -touchMove.z;
       if (Math.abs(throttleRate) > FW_TOUCH_DEADZONE) {
+        throttleStep = throttleRate;
         this.fixedWingThrottle = THREE.MathUtils.clamp(
           this.fixedWingThrottle + throttleRate * deltaTime * FW_THROTTLE_RAMP_RATE,
           0, 1,
         );
       }
     } else if (input.isKeyPressed('keyw')) {
+      throttleStep = 1;
       this.fixedWingThrottle = Math.min(this.fixedWingThrottle + deltaTime * FW_THROTTLE_RAMP_RATE, 1.0);
     } else if (input.isKeyPressed('keys')) {
+      throttleStep = -1;
       this.fixedWingThrottle = Math.max(this.fixedWingThrottle - deltaTime * FW_THROTTLE_RAMP_RATE, 0.0);
       if (this.fixedWingThrottle <= 0.35) {
         brake = 1.0;
@@ -184,45 +259,45 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     }
 
     // --- Yaw / steering ---
-    let yawCommand = 0;
+    let yawIntent = 0;
     if (hasTouchMode) {
       const touchMove = input.getTouchMovementVector();
-      yawCommand = Math.abs(touchMove.x) > FW_TOUCH_DEADZONE ? -touchMove.x : 0;
+      yawIntent = Math.abs(touchMove.x) > FW_TOUCH_DEADZONE ? -touchMove.x : 0;
     } else if (input.isKeyPressed('keya')) {
-      yawCommand = 1.0;
+      yawIntent = 1.0;
     } else if (input.isKeyPressed('keyd')) {
-      yawCommand = -1.0;
+      yawIntent = -1.0;
     }
 
-    // --- Pitch / roll command adapter ---
+    // --- Pitch / bank intent adapter ---
     const touchCyclic = this.getTouchFlightCyclicInput(input);
     const hasTouchCyclic = Math.abs(touchCyclic.pitch) > 0.05 || Math.abs(touchCyclic.roll) > 0.05;
-    let pitchCommand = 0;
-    let rollCommand = 0;
+    let pitchIntent = 0;
+    let bankIntent = 0;
 
     if (gpActive && gp) {
       const gpMove = gp.getMovementVector();
       const gpPitch = -gpMove.z;
       const gpRoll = gpMove.x;
       if (Math.abs(gpPitch) > 0.05 || Math.abs(gpRoll) > 0.05) {
-        pitchCommand = gpPitch;
-        rollCommand = gpRoll;
+        pitchIntent = gpPitch;
+        bankIntent = gpRoll;
       }
     }
 
-    if (pitchCommand === 0 && rollCommand === 0) {
+    if (pitchIntent === 0 && bankIntent === 0) {
       if (hasTouchCyclic) {
-        pitchCommand = touchCyclic.pitch;
-        rollCommand = touchCyclic.roll;
+        pitchIntent = touchCyclic.pitch;
+        bankIntent = touchCyclic.roll;
       } else {
-        pitchCommand = input.isKeyPressed('arrowup') ? 1.0
+        pitchIntent = input.isKeyPressed('arrowup') ? 1.0
           : input.isKeyPressed('arrowdown') ? -1.0 : 0;
-        rollCommand = input.isKeyPressed('arrowright') ? 1.0
+        bankIntent = input.isKeyPressed('arrowright') ? 1.0
           : input.isKeyPressed('arrowleft') ? -1.0 : 0;
       }
     }
 
-    if (mouseMovement) {
+    if (mouseMovement && mouseControlEnabled) {
       this.addMouseControl(mouseMovement);
     }
 
@@ -240,8 +315,15 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
       Math.min(recenterRate * deltaTime, 1.0),
     );
 
-    const command = this.composeCommand(pitchCommand, rollCommand, yawCommand, brake);
-    this.fixedWingModel.setFixedWingCommand(command);
+    const intent = this.composePilotIntent(
+      throttleStep,
+      pitchIntent,
+      bankIntent,
+      yawIntent,
+      brake,
+      activeConfig,
+    );
+    this.fixedWingModel.setFixedWingPilotIntent(intent);
 
     // Update fixed-wing HUD
     if (hudSystem && this.activeAircraftId) {
@@ -250,8 +332,12 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
       if (fd) {
         hudSystem.updateFixedWingFlightData?.(fd.airspeed, fd.heading, fd.verticalSpeed);
         hudSystem.updateFixedWingThrottle?.(this.fixedWingThrottle);
-        hudSystem.setFixedWingStallWarning?.(fd.isStalled || fd.phase === 'rotation');
-        hudSystem.setFixedWingAutoLevel?.(this.fixedWingStabilityAssist);
+        hudSystem.setFixedWingStallWarning?.(fd.isStalled);
+        hudSystem.setFixedWingPhase?.(fd.controlPhase);
+        hudSystem.setFixedWingOperationState?.(fd.operationState);
+        const assistIndicator = this.isGunshipActive() ? this.fixedWingOrbitHold : this.fixedWingStabilityAssist;
+        hudSystem.setFixedWingFlightAssist?.(assistIndicator);
+        hudSystem.setFixedWingAutoLevel?.(assistIndicator);
       }
     }
   }
@@ -267,24 +353,70 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
     );
   }
 
-  private composeCommand(
-    pitchCommand: number,
-    rollCommand: number,
-    yawCommand: number,
+  private composePilotIntent(
+    throttleStep: number,
+    pitchIntent: number,
+    bankIntent: number,
+    yawIntent: number,
     brake: number,
-  ): FixedWingCommand {
-    const composedPitch = THREE.MathUtils.clamp(pitchCommand + this.fixedWingMousePitch, -1, 1);
-    const composedRoll = THREE.MathUtils.clamp(rollCommand + this.fixedWingMouseRoll, -1, 1);
+    activeConfig: (typeof FIXED_WING_CONFIGS)[keyof typeof FIXED_WING_CONFIGS] | null,
+  ): FixedWingPilotIntent {
+    const intent = createIdleFixedWingPilotIntent();
+    intent.throttleStep = THREE.MathUtils.clamp(throttleStep, -1, 1);
+    intent.throttleTarget = this.fixedWingThrottle;
+    intent.pitchIntent = THREE.MathUtils.clamp(pitchIntent, -1, 1);
+    intent.bankIntent = THREE.MathUtils.clamp(bankIntent, -1, 1);
+    intent.yawIntent = THREE.MathUtils.clamp(yawIntent, -1, 1);
+    intent.brake = brake;
+    intent.pilotMode = this.fixedWingPilotMode;
+    intent.assistEnabled = this.fixedWingStabilityAssist;
+    intent.orbitHoldEnabled = this.fixedWingOrbitHold;
+    intent.orbitCenterX = this.fixedWingOrbitCenterX;
+    intent.orbitCenterZ = this.fixedWingOrbitCenterZ;
+    intent.orbitRadius = activeConfig?.operation.orbitRadius ?? 0;
+    intent.orbitBankDeg = activeConfig?.operation.orbitBankDeg ?? 0;
+    intent.orbitTurnDirection = activeConfig?.operation.orbitTurnDirection ?? -1;
+    intent.directPitchInput = this.fixedWingPilotMode === 'direct_stick' ? this.fixedWingMousePitch : 0;
+    intent.directRollInput = this.fixedWingPilotMode === 'direct_stick' ? this.fixedWingMouseRoll : 0;
+    intent.directYawInput = 0;
+    return intent;
+  }
 
-    return {
-      throttleTarget: this.fixedWingThrottle,
-      pitchCommand: composedPitch,
-      rollCommand: composedRoll,
-      yawCommand,
-      brake,
-      freeLook: false,
-      stabilityAssist: this.fixedWingStabilityAssist,
-    };
+  private toggleOrbitHold(): void {
+    if (!this.activeAircraftId || !this.activeConfigKey) {
+      return;
+    }
+    const config = FIXED_WING_CONFIGS[this.activeConfigKey];
+    const flightData = this.fixedWingModel.getFlightData(this.activeAircraftId);
+    if (!config || !flightData || flightData.weightOnWheels) {
+      this.fixedWingOrbitHold = false;
+      return;
+    }
+    const minAltitude = config.operation.orbitMinAltitude ?? 80;
+    if (!this.fixedWingOrbitHold && flightData.altitudeAGL < minAltitude) {
+      return;
+    }
+
+    this.fixedWingOrbitHold = !this.fixedWingOrbitHold;
+    if (!this.fixedWingOrbitHold) {
+      return;
+    }
+
+    const position = new THREE.Vector3();
+    if (!this.fixedWingModel.getAircraftPositionTo(this.activeAircraftId, position)) {
+      this.fixedWingOrbitHold = false;
+      return;
+    }
+
+    const anchor = buildOrbitAnchorFromHeading(
+      position,
+      THREE.MathUtils.degToRad(flightData.heading),
+      config.operation.orbitRadius ?? 160,
+      config.operation.orbitTurnDirection ?? -1,
+    );
+    this.fixedWingOrbitCenterX = anchor.centerX;
+    this.fixedWingOrbitCenterZ = anchor.centerZ;
+    this.fixedWingStabilityAssist = true;
   }
 
   // ── Input helpers ──
@@ -318,5 +450,12 @@ export class FixedWingPlayerAdapter implements PlayerVehicleAdapter {
       return input.getTouchFlightCyclicInput();
     }
     return input.getTouchCyclicInput();
+  }
+
+  private isGunshipActive(): boolean {
+    if (!this.activeConfigKey) {
+      return false;
+    }
+    return FIXED_WING_CONFIGS[this.activeConfigKey]?.operation.playerFlow === 'gunship_orbit';
   }
 }

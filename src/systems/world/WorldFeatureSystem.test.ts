@@ -117,6 +117,15 @@ describe('WorldFeatureSystem', () => {
     const worldPositions = fixedWingCalls.map((call) => call[2] as THREE.Vector3);
     expect(worldPositions.map((p) => Number(p.z.toFixed(2)))).toEqual([-176, -176, -176]);
     expect(worldPositions.map((p) => Number(p.x.toFixed(2)))).toEqual([38, 120, 202]);
+    expect(fixedWingCalls[0][4]).toEqual(expect.objectContaining({
+      standId: 'stand_a1',
+      taxiRoute: expect.any(Array),
+      runwayStart: expect.objectContaining({ id: 'south_departure' }),
+    }));
+    expect(fixedWingCalls[2][4]).toEqual(expect.objectContaining({
+      standId: 'stand_f4',
+      runwayStart: expect.objectContaining({ id: 'north_departure' }),
+    }));
   });
 
   it('clears previously spawned objects when switching to a mode without static features', async () => {

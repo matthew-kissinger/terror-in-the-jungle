@@ -1,8 +1,11 @@
 import * as THREE from 'three';
 import type { StaticModelPlacementConfig } from '../../config/gameModeTypes';
+import { getFixedWingConfigForModelPath } from '../vehicle/FixedWingConfigs';
 import type { RectTerrainSurfacePatch } from '../terrain/TerrainFeatureTypes';
 import type {
   AirfieldTemplate,
+  AirfieldTaxiRoute,
+  AirfieldRunwayStart,
   AirfieldStructureEntry,
   AirfieldSurfaceRect,
 } from './AirfieldTemplates';
@@ -56,6 +59,16 @@ function isSpacingValid(
     if (dx * dx + dz * dz < minSpacing * minSpacing) return false;
   }
   return true;
+}
+
+function resolveTaxiRoute(template: AirfieldTemplate, routeId?: string): AirfieldTaxiRoute | undefined {
+  if (!routeId) return undefined;
+  return template.taxiRoutes.find((route) => route.id === routeId);
+}
+
+function resolveRunwayStart(template: AirfieldTemplate, startId?: string): AirfieldRunwayStart | undefined {
+  if (!startId) return undefined;
+  return template.runwayStarts.find((start) => start.id === startId);
 }
 
 export function generateAirfieldLayout(
@@ -130,6 +143,26 @@ export function generateAirfieldLayout(
     const localOff = localOffset(along, lateral);
     const clearanceRadius = Math.max(DEFAULT_CLEARANCE_RADIUS, spot.clearanceRadius ?? DEFAULT_CLEARANCE_RADIUS);
 
+    const taxiRoute = resolveTaxiRoute(template, spot.taxiRouteId);
+    const runwayStart = resolveRunwayStart(template, spot.runwayStartId);
+    const fixedWingSpawn = getFixedWingConfigForModelPath(spot.modelPath)
+      ? {
+          standId: spot.standId ?? `stand_${i}`,
+          taxiRoute: taxiRoute?.points.map((point) => localOffset(point.offsetAlongRunway, point.offsetLateral)),
+          runwayStart: runwayStart
+            ? {
+                id: runwayStart.id,
+                position: localOffset(runwayStart.offsetAlongRunway, runwayStart.offsetLateral),
+                heading: runwayStart.heading,
+                holdShortPosition: runwayStart.holdShortAlongRunway !== undefined && runwayStart.holdShortLateral !== undefined
+                  ? localOffset(runwayStart.holdShortAlongRunway, runwayStart.holdShortLateral)
+                  : undefined,
+                shortFinalDistance: runwayStart.shortFinalDistance,
+                shortFinalAltitude: runwayStart.shortFinalAltitude,
+              }
+            : undefined,
+        }
+      : undefined;
     placements.push({
       id: `parking_${i}`,
       modelPath: spot.modelPath,
@@ -137,6 +170,7 @@ export function generateAirfieldLayout(
       yaw: spot.yaw ?? 0,
       registerCollision: true,
       skipFlatSearch: true,
+      fixedWingSpawn,
     });
     placed.push({ x: localOff.x, z: localOff.z, radius: clearanceRadius });
   }

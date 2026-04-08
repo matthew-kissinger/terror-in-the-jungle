@@ -55,11 +55,23 @@ export interface FixedWingPhysicsConfig {
 export interface FixedWingOperationInfo {
   minimumRunwayLength: number; // meters for current simplified takeoff/landing contract
   preferredSpawnMode: 'parked' | 'orbit';
+  playerFlow: 'runway' | 'gunship_orbit';
+  taxiSpeedMax: number;
+  stoppedSpeedMax: number;
+  exitSpeedMax: number;
+  approachSpeed: number;
+  orbitRadius?: number;
+  orbitBankDeg?: number;
+  orbitTurnDirection?: -1 | 1;
+  orbitMinAltitude?: number;
 }
+
+export type FixedWingPilotProfile = 'trainer' | 'fast_jet' | 'gunship';
 
 export interface FixedWingConfig {
   physics: FixedWingPhysicsConfig;
-  role: 'transport' | 'fighter' | 'attack';
+  role: 'transport' | 'fighter' | 'attack' | 'gunship';
+  pilotProfile: FixedWingPilotProfile;
   operation: FixedWingOperationInfo;
 }
 
@@ -99,7 +111,7 @@ export const FIXED_WING_DISPLAY: Record<string, FixedWingDisplayInfo> = {
     displayName: 'F-4 Phantom',
     hasPropellers: false,
     propellerNodes: [],
-    autoLevelDefault: false,
+    autoLevelDefault: true,
     cameraDistance: 35,
     cameraHeight: 8,
     fovWidenEnabled: true,
@@ -169,10 +181,20 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       rotationPitchLimitDeg: 11,
       groundEffectStrength: 0.22,
     },
-    role: 'transport',
+    role: 'gunship',
+    pilotProfile: 'gunship',
     operation: {
       minimumRunwayLength: 340,
-      preferredSpawnMode: 'orbit',
+      preferredSpawnMode: 'parked',
+      playerFlow: 'gunship_orbit',
+      taxiSpeedMax: 7,
+      stoppedSpeedMax: 1.4,
+      exitSpeedMax: 2.8,
+      approachSpeed: 48,
+      orbitRadius: 650,
+      orbitBankDeg: 24,
+      orbitTurnDirection: -1,
+      orbitMinAltitude: 90,
     },
   },
 
@@ -221,9 +243,15 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       groundEffectStrength: 0.14,
     },
     role: 'fighter',
+    pilotProfile: 'fast_jet',
     operation: {
       minimumRunwayLength: 420,
       preferredSpawnMode: 'parked',
+      playerFlow: 'runway',
+      taxiSpeedMax: 10,
+      stoppedSpeedMax: 2.2,
+      exitSpeedMax: 4.5,
+      approachSpeed: 90,
     },
   },
 
@@ -272,9 +300,15 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       groundEffectStrength: 0.2,
     },
     role: 'attack',
+    pilotProfile: 'trainer',
     operation: {
       minimumRunwayLength: 280,
       preferredSpawnMode: 'parked',
+      playerFlow: 'runway',
+      taxiSpeedMax: 8,
+      stoppedSpeedMax: 1.8,
+      exitSpeedMax: 3.4,
+      approachSpeed: 55,
     },
   },
 };
@@ -284,3 +318,20 @@ const FIXED_WING_MODEL_TO_KEY: Record<string, string> = {
   [AircraftModels.F4_PHANTOM]: 'F4_PHANTOM',
   [AircraftModels.AC47_SPOOKY]: 'AC47_SPOOKY',
 };
+
+export function isFixedWingRunwayEnterable(key: string): boolean {
+  return Boolean(FIXED_WING_CONFIGS[key]);
+}
+
+export function getFixedWingInteractionPriority(key: string): number {
+  const profile = FIXED_WING_CONFIGS[key]?.pilotProfile ?? 'trainer';
+  switch (profile) {
+    case 'trainer':
+      return 0;
+    case 'fast_jet':
+      return 1;
+    case 'gunship':
+    default:
+      return 2;
+  }
+}

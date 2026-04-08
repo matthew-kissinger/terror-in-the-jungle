@@ -14,6 +14,7 @@ import { GameModeManager } from './GameModeManager';
 import { getWorldFeaturePrefab } from './WorldFeaturePrefabs';
 import type { NavmeshSystem } from '../navigation/NavmeshSystem';
 import { FixedWingModel } from '../vehicle/FixedWingModel';
+import type { FixedWingSpawnMetadata } from '../vehicle/FixedWingOperations';
 
 const _rotatedOffset = new THREE.Vector3();
 const _upAxis = new THREE.Vector3(0, 1, 0);
@@ -159,7 +160,13 @@ export class WorldFeatureSystem implements GameSystem {
         );
         const heading = featureYaw + (placement.yaw ?? 0);
         const spotId = `${feature.id}_fw_${i}`;
-        this.fixedWingModel.createAircraftAtSpot(spotId, placement.modelPath, worldPos, heading);
+        this.fixedWingModel.createAircraftAtSpot(
+          spotId,
+          placement.modelPath,
+          worldPos,
+          heading,
+          this.buildFixedWingSpawnMetadata(feature.position, featureYaw, placement),
+        );
         continue;
       }
 
@@ -293,6 +300,43 @@ export class WorldFeatureSystem implements GameSystem {
     }
     this.spawnedObjects = [];
     this.builtModeId = null;
+  }
+
+  private buildFixedWingSpawnMetadata(
+    featurePosition: THREE.Vector3,
+    featureYaw: number,
+    placement: StaticModelPlacementConfig,
+  ): FixedWingSpawnMetadata | undefined {
+    const metadata = placement.fixedWingSpawn;
+    if (!metadata) {
+      return undefined;
+    }
+
+    const rotateLocalPoint = (point: THREE.Vector3): THREE.Vector3 => {
+      _rotatedOffset.copy(point).applyAxisAngle(_upAxis, featureYaw);
+      return new THREE.Vector3(
+        featurePosition.x + _rotatedOffset.x,
+        featurePosition.y + point.y,
+        featurePosition.z + _rotatedOffset.z,
+      );
+    };
+
+    return {
+      standId: metadata.standId,
+      taxiRoute: (metadata.taxiRoute ?? []).map((point) => rotateLocalPoint(point)),
+      runwayStart: metadata.runwayStart
+        ? {
+            id: metadata.runwayStart.id,
+            position: rotateLocalPoint(metadata.runwayStart.position),
+            heading: featureYaw + metadata.runwayStart.heading,
+            holdShortPosition: metadata.runwayStart.holdShortPosition
+              ? rotateLocalPoint(metadata.runwayStart.holdShortPosition)
+              : undefined,
+            shortFinalDistance: metadata.runwayStart.shortFinalDistance ?? 160,
+            shortFinalAltitude: metadata.runwayStart.shortFinalAltitude ?? 40,
+          }
+        : undefined,
+    };
   }
 
   private resolveTerrainPlacement(

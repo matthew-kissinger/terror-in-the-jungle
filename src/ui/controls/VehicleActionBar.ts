@@ -14,11 +14,13 @@
 import { UIComponent } from '../engine/UIComponent';
 import styles from './TouchControls.module.css';
 import type { VehicleUIContext } from '../layout/types';
+import { shouldUseTouchControls } from '../../utils/DeviceDetector';
 
 interface VehicleActionCallbacks {
   onExitVehicle?: () => void;
   onVehicleFireStart?: () => void;
   onVehicleFireStop?: () => void;
+  onToggleFlightAssist?: () => void;
   onToggleAutoHover?: () => void;
   onLookDown?: () => void;
   onLookUp?: () => void;
@@ -127,7 +129,7 @@ export class VehicleActionBar extends UIComponent {
     this.listen(this.hoverBtn, 'pointerdown', (e: PointerEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      this.callbacks.onToggleAutoHover?.();
+      (this.callbacks.onToggleFlightAssist ?? this.callbacks.onToggleAutoHover)?.();
     }, { passive: false });
 
     this.listen(this.lookBtn, 'pointerdown', (e: PointerEvent) => {
@@ -170,11 +172,9 @@ export class VehicleActionBar extends UIComponent {
     this.mapBtn.style.display = capabilities?.canOpenMap ? 'flex' : 'none';
     this.cmdBtn.style.display = capabilities?.canOpenCommand ? 'flex' : 'none';
     this.hoverBtn.style.display = capabilities?.canStabilize ? 'flex' : 'none';
-    // Relabel stabilizer button based on vehicle type
-    this.hoverBtn.textContent = context?.kind === 'plane' ? 'LEVEL' : 'STAB';
+    this.applyStabilizerLabel(context);
     // LOOK hidden on touch - free-look is handled by the cyclic joystick
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    this.lookBtn.style.display = (!isTouchDevice && capabilities?.canFreeLook) ? 'flex' : 'none';
+    this.lookBtn.style.display = (!shouldUseTouchControls() && capabilities?.canFreeLook) ? 'flex' : 'none';
   }
 
   show(): void {
@@ -207,13 +207,21 @@ export class VehicleActionBar extends UIComponent {
     }
   }
 
-  setAutoHoverActive(active: boolean): void {
+  setFlightAssistActive(active: boolean): void {
     this.autoHoverActive = active;
     this.hoverBtn.classList.toggle(styles.vehicleBtnActive, active);
   }
 
-  isAutoHoverActive(): boolean {
+  isFlightAssistActive(): boolean {
     return this.autoHoverActive;
+  }
+
+  setAutoHoverActive(active: boolean): void {
+    this.setFlightAssistActive(active);
+  }
+
+  isAutoHoverActive(): boolean {
+    return this.isFlightAssistActive();
   }
 
   private createButton(label: string, className: string): HTMLDivElement {
@@ -225,5 +233,13 @@ export class VehicleActionBar extends UIComponent {
     btn.style.pointerEvents = 'auto';
     btn.style.userSelect = 'none';
     return btn;
+  }
+
+  private applyStabilizerLabel(context: VehicleUIContext | null): void {
+    const label = context?.kind === 'plane'
+      ? context.role === 'gunship' ? 'ORBIT' : 'LEVEL'
+      : 'STAB';
+    this.hoverBtn.textContent = label;
+    this.hoverBtn.setAttribute('aria-label', label);
   }
 }

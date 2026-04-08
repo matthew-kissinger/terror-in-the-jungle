@@ -99,6 +99,18 @@ export interface StaticModelPlacementConfig {
   skipFlatSearch?: boolean;
   heightOffset?: number;
   registerCollision?: boolean;
+  fixedWingSpawn?: {
+    standId: string;
+    taxiRoute?: THREE.Vector3[];
+    runwayStart?: {
+      id: string;
+      position: THREE.Vector3;
+      heading: number;
+      holdShortPosition?: THREE.Vector3;
+      shortFinalDistance?: number;
+      shortFinalAltitude?: number;
+    };
+  };
 }
 
 export interface MapFeatureCircleFootprint {

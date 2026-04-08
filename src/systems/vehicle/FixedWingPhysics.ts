@@ -81,6 +81,8 @@ export interface FixedWingFlightSnapshot {
   headingDeg: number;
   pitchDeg: number;
   rollDeg: number;
+  pitchRateDeg: number;
+  rollRateDeg: number;
   throttle: number;
   brake: number;
   weightOnWheels: boolean;
@@ -303,6 +305,32 @@ export class FixedWingPhysics {
     });
   }
 
+  resetAirborne(
+    position: THREE.Vector3,
+    quaternion: THREE.Quaternion,
+    forwardSpeed: number,
+    verticalSpeed: number = 0,
+    groundHeight?: number,
+  ): void {
+    this.position.copy(position);
+    this.quaternion.copy(quaternion).normalize();
+    _forward.set(0, 0, -1).applyQuaternion(this.quaternion).normalize();
+    this.velocity.copy(_forward).multiplyScalar(forwardSpeed);
+    this.velocity.y = verticalSpeed;
+    this.terrainNormal.set(0, 1, 0);
+    if (groundHeight !== undefined) {
+      this.groundHeight = groundHeight;
+    }
+    this.groundPitch = 0;
+    this.phase = 'airborne';
+    this.groundStabilizationTicks = 0;
+    this.weightOnWheels = false;
+    this.pitchRate = 0;
+    this.rollRate = 0;
+    this.yawRate = 0;
+    this.snapshot = this.buildSnapshot(this.computeAerodynamics());
+  }
+
   private resolveTerrainSample(terrain: number | FixedWingTerrainSample): FixedWingTerrainSample {
     if (typeof terrain === 'number') {
       return { height: terrain };
@@ -325,9 +353,20 @@ export class FixedWingPhysics {
       this.groundStabilizationTicks--;
       this.position.y = this.groundHeight + this.cfg.gearClearance;
     } else if (this.weightOnWheels && airborneBySeparation) {
-      this.weightOnWheels = false;
-      this.phase = 'airborne';
-      this.groundStabilizationTicks = 0;
+      const speed = this.velocity.length();
+      if (speed < this.cfg.stallSpeed && separation < 3) {
+        // Too slow to sustain flight and still near ground - snap back
+        this.position.y = this.groundHeight + this.cfg.gearClearance;
+      } else {
+        this.weightOnWheels = false;
+        this.phase = 'airborne';
+        this.groundStabilizationTicks = 0;
+        // Match normal liftoff velocity boost
+        this.velocity.addScaledVector(
+          _up.set(0, 1, 0).applyQuaternion(this.quaternion),
+          Math.max(1.5, speed * 0.04),
+        );
+      }
     }
 
     if (this.weightOnWheels) {
@@ -456,7 +495,15 @@ export class FixedWingPhysics {
 
     const stallPitchDrop = aero.stalled ? -(0.9 + aero.stallSeverity * 1.3) : 0;
 
-    const pitchAccel = this.elevator * this.cfg.elevatorPower * authority
+    // Alpha protection: attenuate nose-up elevator as AoA approaches stall.
+    // Modeled after fly-by-wire alpha limiters (F-16 FLCS, A320 alpha floor).
+    const absAlphaDeg = Math.abs(THREE.MathUtils.radToDeg(aero.alphaRad));
+    const protectionOnsetDeg = this.cfg.alphaStallDeg - 5;
+    const protectionFullDeg = this.cfg.alphaStallDeg - 1;
+    const alphaFactor = 1 - THREE.MathUtils.smoothstep(absAlphaDeg, protectionOnsetDeg, protectionFullDeg);
+    const protectedElevator = this.elevator > 0 ? this.elevator * alphaFactor : this.elevator;
+
+    const pitchAccel = protectedElevator * this.cfg.elevatorPower * authority
       + basePitchAssist
       + assistPitch
       + stallPitchDrop
@@ -643,6 +690,8 @@ export class FixedWingPhysics {
       headingDeg,
       pitchDeg: THREE.MathUtils.radToDeg(_euler.x),
       rollDeg: THREE.MathUtils.radToDeg(_euler.z),
+      pitchRateDeg: THREE.MathUtils.radToDeg(this.pitchRate),
+      rollRateDeg: THREE.MathUtils.radToDeg(this.rollRate),
       throttle: this.throttle,
       brake: this.brake,
       weightOnWheels: this.weightOnWheels,

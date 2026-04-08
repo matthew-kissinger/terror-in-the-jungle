@@ -37,6 +37,7 @@ npm install
 npm run dev        # Development server
 npm run build      # Production build
 npm run validate   # Lint + tests + build + smoke test
+npx tsx scripts/fixed-wing-runtime-probe.ts --port 4173 --reuse-dev-server true
 ```
 
 Requires Node 22 (pinned in `.nvmrc`) and a browser with WebGL2.

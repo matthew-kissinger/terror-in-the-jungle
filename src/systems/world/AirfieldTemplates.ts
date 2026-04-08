@@ -12,11 +12,14 @@ export interface AirfieldStructureEntry {
 }
 
 export interface AirfieldParkingSpot {
+  standId?: string;
   modelPath: string;
   offsetAlongRunway: number;   // meters along runway centerline from airfield origin
   offsetLateral: number;       // meters perpendicular to runway centerline
   yaw?: number;                // radians relative to runway heading
   clearanceRadius?: number;    // spacing radius used during procedural structure placement
+  taxiRouteId?: string;
+  runwayStartId?: string;
 }
 
 export interface AirfieldSurfaceRect {
@@ -29,6 +32,25 @@ export interface AirfieldSurfaceRect {
   surface: TerrainSurfaceKind;
 }
 
+export interface AirfieldTaxiRoute {
+  id: string;
+  points: Array<{
+    offsetAlongRunway: number;
+    offsetLateral: number;
+  }>;
+}
+
+export interface AirfieldRunwayStart {
+  id: string;
+  offsetAlongRunway: number;
+  offsetLateral: number;
+  heading: number;
+  holdShortAlongRunway?: number;
+  holdShortLateral?: number;
+  shortFinalDistance?: number;
+  shortFinalAltitude?: number;
+}
+
 export interface AirfieldTemplate {
   id: string;
   runwayLength: number;        // meters
@@ -38,6 +60,8 @@ export interface AirfieldTemplate {
   pool: AirfieldStructureEntry[];
   aprons: AirfieldSurfaceRect[];
   taxiways: AirfieldSurfaceRect[];
+  taxiRoutes: AirfieldTaxiRoute[];
+  runwayStarts: AirfieldRunwayStart[];
   parkingSpots: AirfieldParkingSpot[];
 }
 
@@ -79,50 +103,139 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
     taxiways: [
       {
         offsetAlongRunway: 0,
-        offsetLateral: 55,
-        length: 82,
+        offsetLateral: 58,
+        length: 430,
+        width: 12,
+        blend: 3,
+        surface: 'packed_earth',
+      },
+      {
+        offsetAlongRunway: -82,
+        offsetLateral: 77,
+        length: 38,
         width: 12,
         blend: 3,
         yaw: Math.PI / 2,
         surface: 'packed_earth',
       },
       {
-        offsetAlongRunway: -140,
-        offsetLateral: 55,
-        length: 82,
+        offsetAlongRunway: 0,
+        offsetLateral: 77,
+        length: 38,
+        width: 12,
+        blend: 3,
+        yaw: Math.PI / 2,
+        surface: 'packed_earth',
+      },
+      {
+        offsetAlongRunway: 82,
+        offsetLateral: 77,
+        length: 38,
+        width: 12,
+        blend: 3,
+        yaw: Math.PI / 2,
+        surface: 'packed_earth',
+      },
+      {
+        offsetAlongRunway: -194,
+        offsetLateral: 29,
+        length: 58,
         width: 10,
         blend: 3,
         yaw: Math.PI / 2,
         surface: 'packed_earth',
       },
       {
-        offsetAlongRunway: 140,
-        offsetLateral: 55,
-        length: 82,
+        offsetAlongRunway: 194,
+        offsetLateral: 29,
+        length: 58,
         width: 10,
         blend: 3,
         yaw: Math.PI / 2,
         surface: 'packed_earth',
       },
     ],
+    taxiRoutes: [
+      {
+        id: 'a1_south_route',
+        points: [
+          { offsetAlongRunway: -82, offsetLateral: 96 },
+          { offsetAlongRunway: -82, offsetLateral: 58 },
+          { offsetAlongRunway: -194, offsetLateral: 58 },
+          { offsetAlongRunway: -194, offsetLateral: 0 },
+        ],
+      },
+      {
+        id: 'ac47_south_route',
+        points: [
+          { offsetAlongRunway: 0, offsetLateral: 96 },
+          { offsetAlongRunway: 0, offsetLateral: 58 },
+          { offsetAlongRunway: -194, offsetLateral: 58 },
+          { offsetAlongRunway: -194, offsetLateral: 0 },
+        ],
+      },
+      {
+        id: 'f4_north_route',
+        points: [
+          { offsetAlongRunway: 82, offsetLateral: 96 },
+          { offsetAlongRunway: 82, offsetLateral: 58 },
+          { offsetAlongRunway: 194, offsetLateral: 58 },
+          { offsetAlongRunway: 194, offsetLateral: 0 },
+        ],
+      },
+    ],
+    runwayStarts: [
+      {
+        id: 'south_departure',
+        offsetAlongRunway: -218,
+        offsetLateral: 0,
+        heading: Math.PI,
+        holdShortAlongRunway: -194,
+        holdShortLateral: 58,
+        shortFinalDistance: 170,
+        shortFinalAltitude: 42,
+      },
+      {
+        id: 'north_departure',
+        offsetAlongRunway: 218,
+        offsetLateral: 0,
+        heading: 0,
+        holdShortAlongRunway: 194,
+        holdShortLateral: 58,
+        shortFinalDistance: 190,
+        shortFinalAltitude: 48,
+      },
+    ],
     parkingSpots: [
       {
+        standId: 'stand_a1',
         modelPath: AircraftModels.A1_SKYRAIDER,
         offsetAlongRunway: -82,
         offsetLateral: 96,
+        yaw: 0,
         clearanceRadius: 22,
+        taxiRouteId: 'a1_south_route',
+        runwayStartId: 'south_departure',
       },
       {
+        standId: 'stand_ac47',
         modelPath: AircraftModels.AC47_SPOOKY,
         offsetAlongRunway: 0,
         offsetLateral: 96,
+        yaw: 0,
         clearanceRadius: 30,
+        taxiRouteId: 'ac47_south_route',
+        runwayStartId: 'south_departure',
       },
       {
+        standId: 'stand_f4',
         modelPath: AircraftModels.F4_PHANTOM,
         offsetAlongRunway: 82,
         offsetLateral: 96,
+        yaw: Math.PI,
         clearanceRadius: 24,
+        taxiRouteId: 'f4_north_route',
+        runwayStartId: 'north_departure',
       },
     ],
   },
@@ -153,12 +266,52 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
     taxiways: [
       {
         offsetAlongRunway: 0,
-        offsetLateral: 25,
+        offsetLateral: 24,
+        length: 200,
+        width: 8,
+        blend: 2,
+        surface: 'packed_earth',
+      },
+      {
+        offsetAlongRunway: 0,
+        offsetLateral: 33,
         length: 32,
         width: 7,
         blend: 2,
         yaw: Math.PI / 2,
         surface: 'packed_earth',
+      },
+      {
+        offsetAlongRunway: -128,
+        offsetLateral: 12,
+        length: 28,
+        width: 7,
+        blend: 2,
+        yaw: Math.PI / 2,
+        surface: 'packed_earth',
+      },
+    ],
+    taxiRoutes: [
+      {
+        id: 'strip_a1_route',
+        points: [
+          { offsetAlongRunway: 24, offsetLateral: 42 },
+          { offsetAlongRunway: 24, offsetLateral: 24 },
+          { offsetAlongRunway: -128, offsetLateral: 24 },
+          { offsetAlongRunway: -128, offsetLateral: 0 },
+        ],
+      },
+    ],
+    runwayStarts: [
+      {
+        id: 'strip_south_departure',
+        offsetAlongRunway: -146,
+        offsetLateral: 0,
+        heading: Math.PI,
+        holdShortAlongRunway: -128,
+        holdShortLateral: 24,
+        shortFinalDistance: 120,
+        shortFinalAltitude: 34,
       },
     ],
     parkingSpots: [
@@ -169,10 +322,14 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
         clearanceRadius: 14,
       },
       {
+        standId: 'strip_a1',
         modelPath: AircraftModels.A1_SKYRAIDER,
         offsetAlongRunway: 24,
         offsetLateral: 42,
+        yaw: 0,
         clearanceRadius: 20,
+        taxiRouteId: 'strip_a1_route',
+        runwayStartId: 'strip_south_departure',
       },
     ],
   },

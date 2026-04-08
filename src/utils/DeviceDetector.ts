@@ -8,6 +8,21 @@ let _isTouchDevice: boolean | null = null;
 let _gpuTier: GPUTier | null = null;
 let _isMobileGPU: boolean | null = null;
 
+function mediaQueryMatches(query: string): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false;
+  }
+  return window.matchMedia(query).matches;
+}
+
+function hasCoarsePointer(): boolean {
+  return mediaQueryMatches('(any-pointer: coarse)') || mediaQueryMatches('(pointer: coarse)');
+}
+
+function hasFinePointer(): boolean {
+  return mediaQueryMatches('(any-pointer: fine)') || mediaQueryMatches('(pointer: fine)');
+}
+
 /**
  * Detect whether the current device supports touch input.
  * Result is cached after the first call.
@@ -29,14 +44,17 @@ export function isMobileViewport(): boolean {
 
 /**
  * Returns true when touch controls should be active.
- * Currently: any hardware touch surface (`maxTouchPoints` / `ontouchstart`).
- *
- * Tradeoff: touch-capable laptops/desktops get mobile overlay controls and
- * touch-oriented input semantics (e.g. synthetic pointer lock for look).
- * A future setting or primary-pointer heuristic could narrow this (see plan: hybrid devices).
+ * Hybrid desktop/touch devices should stay on desktop controls unless the
+ * viewport is mobile-sized or there is no fine pointer available.
  */
 export function shouldUseTouchControls(): boolean {
-  return isTouchDevice();
+  if (!isTouchDevice()) {
+    return false;
+  }
+  if (isMobileViewport()) {
+    return true;
+  }
+  return hasCoarsePointer() && !hasFinePointer();
 }
 
 /**

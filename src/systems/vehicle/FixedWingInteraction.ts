@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
 import type { IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
+import { getFixedWingInteractionPriority, isFixedWingRunwayEnterable } from './FixedWingConfigs';
 import { shouldUseTouchControls } from '../../utils/DeviceDetector';
 import { Logger } from '../../utils/Logger';
 
@@ -13,6 +14,7 @@ const INTERACTION_RADIUS = 8; // Slightly larger than helicopter (5m) since plan
  */
 export class FixedWingInteraction {
   private aircraft: Map<string, THREE.Group>;
+  private configKeys: Map<string, string>;
   private playerController?: IPlayerController;
   private hudSystem?: IHUDSystem;
   private terrainManager?: ITerrainRuntime;
@@ -21,9 +23,14 @@ export class FixedWingInteraction {
   private suppressInteractionUntilMs = 0;
   private displayNames: Map<string, string>;
 
-  constructor(aircraft: Map<string, THREE.Group>, displayNames: Map<string, string>) {
+  constructor(
+    aircraft: Map<string, THREE.Group>,
+    displayNames: Map<string, string>,
+    configKeys: Map<string, string>,
+  ) {
     this.aircraft = aircraft;
     this.displayNames = displayNames;
+    this.configKeys = configKeys;
   }
 
   setPlayerController(playerController: IPlayerController): void {
@@ -38,17 +45,28 @@ export class FixedWingInteraction {
     this.terrainManager = terrainManager;
   }
 
-  private findNearestAircraft(playerPosition: THREE.Vector3): { id: string; group: THREE.Group; distance: number } | null {
-    let nearest: { id: string; group: THREE.Group; distance: number } | null = null;
+  private findBestNearbyAircraft(
+    playerPosition: THREE.Vector3,
+    maxDistance: number,
+  ): { id: string; group: THREE.Group; distance: number; priority: number } | null {
+    let best: { id: string; group: THREE.Group; distance: number; priority: number } | null = null;
     for (const [id, group] of this.aircraft) {
+      const configKey = this.configKeys.get(id);
+      if (configKey && !isFixedWingRunwayEnterable(configKey)) {
+        continue;
+      }
       const dx = playerPosition.x - group.position.x;
       const dz = playerPosition.z - group.position.z;
       const dist = Math.sqrt(dx * dx + dz * dz);
-      if (!nearest || dist < nearest.distance) {
-        nearest = { id, group, distance: dist };
+      if (dist > maxDistance) {
+        continue;
+      }
+      const priority = configKey ? getFixedWingInteractionPriority(configKey) : Number.MAX_SAFE_INTEGER;
+      if (!best || priority < best.priority || (priority === best.priority && dist < best.distance)) {
+        best = { id, group, distance: dist, priority };
       }
     }
-    return nearest;
+    return best;
   }
 
   checkPlayerProximity(): void {
@@ -68,16 +86,15 @@ export class FixedWingInteraction {
     const playerPosition = this.playerController.getPosition();
     if (!playerPosition) return;
 
-    const nearest = this.findNearestAircraft(playerPosition);
-    if (!nearest) return;
+    const nearest = this.findBestNearbyAircraft(playerPosition, INTERACTION_RADIUS);
+    const isNearNow = nearest !== null;
+    const nextAircraftId = nearest?.id ?? null;
 
-    const isNearNow = nearest.distance <= INTERACTION_RADIUS;
-
-    if (isNearNow !== this.isPlayerNearAircraft) {
+    if (isNearNow !== this.isPlayerNearAircraft || nextAircraftId !== this.nearestAircraftId) {
       this.isPlayerNearAircraft = isNearNow;
+      this.nearestAircraftId = nextAircraftId;
 
-      if (this.isPlayerNearAircraft) {
-        this.nearestAircraftId = nearest.id;
+      if (this.isPlayerNearAircraft && nearest) {
         const name = this.displayNames.get(nearest.id) ?? 'aircraft';
         Logger.debug('fixedwing', `Player near ${nearest.id} (${nearest.distance.toFixed(1)}m)`);
 
@@ -90,7 +107,6 @@ export class FixedWingInteraction {
           targetId: nearest.id,
         });
       } else {
-        this.nearestAircraftId = null;
         this.hudSystem.setInteractionContext?.(null);
       }
     }
@@ -104,8 +120,8 @@ export class FixedWingInteraction {
     const playerPosition = this.playerController.getPosition();
     if (!playerPosition) return false;
 
-    const nearest = this.findNearestAircraft(playerPosition);
-    if (!nearest || nearest.distance > INTERACTION_RADIUS) return false;
+    const nearest = this.findBestNearbyAircraft(playerPosition, INTERACTION_RADIUS);
+    if (!nearest) return false;
 
     Logger.debug('fixedwing', `PLAYER ENTERING ${nearest.id}`);
     this.playerController.enterFixedWing(nearest.id, nearest.group.position.clone());

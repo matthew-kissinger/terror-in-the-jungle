@@ -1,6 +1,6 @@
 # Backlog
 
-Last updated: 2026-04-06
+Last updated: 2026-04-08
 
 ## P0 - Performance Blockers
 
@@ -51,7 +51,7 @@ Last updated: 2026-04-06
 
 1. Combat AI p99 sits ~35ms in heavy scenarios, above the 16ms target.
 2. Main runtime bundle is ~780kB (startup stable but heavy).
-3. Open Frontier/A Shau air vehicles are player-usable, but still lack NPC pilots, transport missions, and broader battlefield integration.
+3. Open Frontier fixed-wing runtime is player-usable and now has deterministic takeoff probes, but still lacks NPC pilots, orbit/combat mission integration, and landing/orbit acceptance coverage beyond the current probe.
 4. First grenade/explosion cold-start hitch needs fresh perf evidence after the hidden live-effect warmup change.
 
 ## Architecture Debt
