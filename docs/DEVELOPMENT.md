@@ -81,6 +81,18 @@ Required gates before deploy:
 
 Live at: https://terror-in-the-jungle.pages.dev/
 
+See [DEPLOY_WORKFLOW.md](DEPLOY_WORKFLOW.md) for the full build-to-prod path, Cloudflare Pages cache-control strategy, service-worker behavior, and prod header spot-check recipes.
+
+### Local prod-like preview
+
+```bash
+npm run build
+npm run preview          # Vite preview server over dist/
+npm run smoke:prod       # headless Playwright smoke over dist/ (what CI runs)
+```
+
+Neither Tier exercises `_headers` (that's a Cloudflare Pages layer), but both confirm the bundled app boots and assets resolve. See DEPLOY_WORKFLOW.md section 5.
+
 ### Pre-Push Checklist
 
 ```bash
