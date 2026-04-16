@@ -989,6 +989,12 @@ async function startDevServer(port: number): Promise<ChildProcess> {
     shell: true
   });
 
+  if (server.pid) {
+    logStep(`  dev-server spawned pid=${server.pid}`);
+  } else {
+    logStep('  dev-server spawn did not report a pid');
+  }
+
   return new Promise((resolve, reject) => {
     let output = '';
     let resolved = false;
@@ -1002,7 +1008,7 @@ async function startDevServer(port: number): Promise<ChildProcess> {
       if (!resolved && (output.includes('Local:') || output.includes('localhost'))) {
         resolved = true;
         clearTimeout(timeout);
-        logStep('✅ Dev server ready');
+        logStep(`✅ Dev server ready (pid=${server.pid ?? 'unknown'})`);
         resolve(server);
       }
     });
@@ -1034,46 +1040,92 @@ async function isPortOpen(port: number, host = '127.0.0.1'): Promise<boolean> {
 }
 
 function cleanupPortListeners(port: number): void {
-  if (process.platform !== 'win32') return;
+  if (process.platform === 'win32') {
+    try {
+      const output = execSync(`netstat -ano -p tcp | findstr :${port}`, { encoding: 'utf-8' });
+      const pids = output
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map(line => line.split(/\s+/))
+        .filter(parts => parts.length >= 5 && parts[3] === 'LISTENING')
+        .map(parts => Number(parts[4]))
+        .filter(pid => Number.isFinite(pid) && pid > 0);
 
+      for (const pid of new Set(pids)) {
+        spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { shell: true, stdio: 'ignore' });
+        logStep(`🧹 Cleared stale listener on :${port} (pid=${pid})`);
+      }
+    } catch {
+      // best effort; no active listener is expected on most runs
+    }
+    return;
+  }
+
+  // Unix: try lsof first, fall back to fuser. Either is best-effort.
   try {
-    const output = execSync(`netstat -ano -p tcp | findstr :${port}`, { encoding: 'utf-8' });
+    const output = execSync(`lsof -ti tcp:${port} -sTCP:LISTEN`, { encoding: 'utf-8' });
     const pids = output
       .split(/\r?\n/)
       .map(line => line.trim())
       .filter(Boolean)
-      .map(line => line.split(/\s+/))
-      .filter(parts => parts.length >= 5 && parts[3] === 'LISTENING')
-      .map(parts => Number(parts[4]))
+      .map(pid => Number(pid))
       .filter(pid => Number.isFinite(pid) && pid > 0);
-
     for (const pid of new Set(pids)) {
-      spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { shell: true, stdio: 'ignore' });
-      logStep(`🧹 Cleared stale listener on :${port} (pid=${pid})`);
+      try {
+        process.kill(pid, 'SIGKILL');
+        logStep(`🧹 Cleared stale listener on :${port} (pid=${pid})`);
+      } catch {
+        // already gone
+      }
     }
   } catch {
-    // best effort; no active listener is expected on most runs
+    try {
+      execSync(`fuser -k ${port}/tcp`, { encoding: 'utf-8', stdio: 'ignore' });
+      logStep(`🧹 fuser -k ${port}/tcp`);
+    } catch {
+      // best effort
+    }
   }
 }
 
 async function killDevServer(server: ChildProcess): Promise<void> {
-  logStep('🛑 Stopping dev server');
-  if (!server.pid) return;
+  const pid = server.pid;
+  logStep(`🛑 Stopping dev server (pid=${pid ?? 'unknown'})`);
+  if (!pid) return;
 
+  let exited = false;
   await new Promise<void>((resolve) => {
-    server.on('exit', () => resolve());
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    server.once('exit', () => { exited = true; settle(); });
     if (process.platform === 'win32') {
-      spawn('taskkill', ['/PID', String(server.pid), '/T', '/F'], { shell: true, stdio: 'ignore' });
+      // /T kills the whole tree; /F forces termination. Spawn taskkill and wait for it to return.
+      const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { shell: true, stdio: 'ignore' });
+      killer.once('close', () => {
+        // taskkill returned; give the child exit event a short grace window.
+        setTimeout(settle, 500);
+      });
+      killer.once('error', () => settle());
     } else {
       try {
-        process.kill(-server.pid, 'SIGTERM');
+        process.kill(-pid, 'SIGTERM');
       } catch {
         server.kill('SIGTERM');
       }
+      // Escalate to SIGKILL if still alive after 3s.
+      setTimeout(() => {
+        if (exited) return;
+        try { process.kill(-pid, 'SIGKILL'); } catch { try { server.kill('SIGKILL'); } catch { /* noop */ } }
+      }, 3000);
     }
-    setTimeout(resolve, 5000);
+    setTimeout(settle, 5000);
   });
-  logStep('✅ Dev server stopped');
+  logStep(`✅ Dev server stopped (pid=${pid}, exited=${exited})`);
 }
 
 async function prewarmDevServer(port: number, paths: string[]): Promise<{ totalMs: number; allOk: boolean }> {
@@ -1611,7 +1663,9 @@ async function runCapture(): Promise<void> {
   const frontlineTriggerDistance = parseNumberFlag('frontline-trigger-distance', DEFAULT_FRONTLINE_TRIGGER_DISTANCE);
   const maxCompressedPerFaction = parseNumberFlag('frontline-compressed-per-faction', DEFAULT_MAX_COMPRESSED_PER_FACTION);
   const logLevel = String(process.env.PERF_LOG_LEVEL ?? process.argv.find(a => a.startsWith('--log-level='))?.split('=')[1] ?? 'warn');
-  const reuseDevServer = parseBooleanFlag('reuse-dev-server', true);
+  // Default OFF: fresh spawn + explicit teardown per run. Opt in with --reuse-dev-server
+  // or PERF_REUSE_DEV_SERVER=1 when iterating locally and the dev server is known-clean.
+  const reuseDevServer = parseBooleanFlag('reuse-dev-server', false);
   const effectiveNpcs = enableCombat ? npcs : 0;
   const artifactDir = makeArtifactDir();
   const browserProfileDir = join(artifactDir, 'browser-profile');
