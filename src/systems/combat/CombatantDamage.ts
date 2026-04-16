@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Combatant, CombatantState, Squad, isBlufor } from './types';
+import { Combatant, CombatantState, Squad, isBlufor, isPlayerTarget } from './types';
 import { PlayerHealthSystem } from '../player/PlayerHealthSystem';
 import { TicketSystem } from '../world/TicketSystem';
 import { AudioManager } from '../audio/AudioManager';
@@ -83,6 +83,17 @@ export class CombatantDamage {
     target.lastHitTime = Date.now();
     target.suppressionLevel = Math.min(1.0, target.suppressionLevel + 0.3);
 
+    // Record the attacker position as a threat bearing so AI state handlers
+    // (patrol/defend/engage) have a direction to orient toward on the next
+    // tick, even when the attacker isn't currently visible.
+    if (attacker) {
+      if (target.lastKnownTargetPos) {
+        target.lastKnownTargetPos.copy(attacker.position);
+      } else {
+        target.lastKnownTargetPos = attacker.position.clone();
+      }
+    }
+
     // Trigger damage flash effect in shader
     if (this.combatantRenderer) {
       this.combatantRenderer.setDamageFlash(target.id, 1.0);
@@ -114,8 +125,12 @@ export class CombatantDamage {
     // Increment death count for target
     target.deaths++;
 
-    // Increment kill count for attacker (if exists and is not player proxy)
-    if (attacker) {
+    const attackerIsPlayerProxy = isPlayerTarget(attacker);
+
+    // Increment kill count for attacker (if exists and is not player proxy).
+    // Player kills are tracked separately via HUDSystem.addKill in
+    // CombatantCombat.handlePlayerShot, so we skip the proxy here.
+    if (attacker && !attackerIsPlayerProxy) {
       attacker.kills++;
     }
 
@@ -186,8 +201,10 @@ export class CombatantDamage {
       this.ticketSystem.onCombatantDeath(target.faction);
     }
 
-    // Add to kill feed (AI-on-AI kills)
-    if (this.hudSystem && attacker) {
+    // Add to kill feed (AI-on-AI kills). Player-proxy kills are routed
+    // through CombatantCombat.handlePlayerShot via addKillToFeed('PLAYER',...)
+    // so we skip this path to avoid duplicate feed entries.
+    if (this.hudSystem && attacker && !attackerIsPlayerProxy) {
       const killerName = `${attacker.faction}-${attacker.id.slice(-4)}`;
       const victimName = `${target.faction}-${target.id.slice(-4)}`;
       this.hudSystem.addKillToFeed(
@@ -200,16 +217,20 @@ export class CombatantDamage {
       );
     }
 
-    // Emit typed event for subscribers (additive - existing direct calls remain)
-    GameEventBus.emit('npc_killed', {
-      killerId: attacker?.id ?? 'unknown',
-      victimId: target.id,
-      killerFaction: attacker?.faction ?? target.faction,
-      victimFaction: target.faction,
-      isHeadshot,
-      weaponType: attacker ? 'rifle' : undefined,
-      position: target.position,
-    });
+    // Emit typed event for subscribers. Player kills emit 'player_kill'
+    // from CombatantCombat.handlePlayerShot; skip 'npc_killed' for the proxy
+    // to avoid double-counting.
+    if (!attackerIsPlayerProxy) {
+      GameEventBus.emit('npc_killed', {
+        killerId: attacker?.id ?? 'unknown',
+        victimId: target.id,
+        killerFaction: attacker?.faction ?? target.faction,
+        victimFaction: target.faction,
+        isHeadshot,
+        weaponType: attacker ? 'rifle' : undefined,
+        position: target.position,
+      });
+    }
 
     // Update squad
     if (target.squadId && squads) {

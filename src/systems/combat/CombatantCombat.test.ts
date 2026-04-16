@@ -593,6 +593,90 @@ describe('CombatantCombat', () => {
       expect(result.point.x).toBeLessThan(214);
       expect(target.health).toBe(100);
     });
+
+    // ── NPC combat response (B1): player shots must give the target a
+    //    threat signal (hit flag + attacker bearing) so AI can react.
+    it('should flag lastHitTime and raise suppressionLevel on the shot target', () => {
+      const target = createMockCombatant('target-1', Faction.NVA, 100, CombatantState.PATROLLING);
+      const allCombatants = new Map<string, Combatant>();
+      allCombatants.set('target-1', target);
+      const ray = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0));
+
+      vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue({
+        combatant: target,
+        point: new THREE.Vector3(10, 0, 0),
+        distance: 10,
+        headshot: false,
+      });
+
+      expect(target.lastHitTime).toBe(0);
+      const startingSuppression = target.suppressionLevel;
+
+      combatantCombat.handlePlayerShot(ray, () => 30, allCombatants);
+
+      // The NPC now has a fresh "I was shot" marker and elevated suppression.
+      expect(target.lastHitTime).toBeGreaterThan(0);
+      expect(target.suppressionLevel).toBeGreaterThan(startingSuppression);
+    });
+
+    it('should record the player position as a threat bearing on the target', () => {
+      const target = createMockCombatant('target-1', Faction.NVA, 100, CombatantState.PATROLLING);
+      const allCombatants = new Map<string, Combatant>();
+      allCombatants.set('target-1', target);
+      const ray = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0));
+
+      // Seed the player position so we can assert the proxy captured it.
+      const playerPos = new THREE.Vector3(-7, 0, 12);
+      combatantCombat.updateCombat(
+        createMockCombatant('ticker', Faction.US),
+        0.016,
+        playerPos,
+        new Map(),
+        new Map()
+      );
+
+      vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue({
+        combatant: target,
+        point: new THREE.Vector3(10, 0, 0),
+        distance: 10,
+        headshot: false,
+      });
+
+      expect(target.lastKnownTargetPos).toBeUndefined();
+
+      combatantCombat.handlePlayerShot(ray, () => 20, allCombatants);
+
+      // The damage path should have stamped a threat bearing matching where
+      // the player stood, giving AI state handlers a direction to orient to.
+      expect(target.lastKnownTargetPos).toBeInstanceOf(THREE.Vector3);
+      expect(target.lastKnownTargetPos!.x).toBeCloseTo(playerPos.x);
+      expect(target.lastKnownTargetPos!.y).toBeCloseTo(playerPos.y);
+      expect(target.lastKnownTargetPos!.z).toBeCloseTo(playerPos.z);
+    });
+
+    it('should not duplicate the kill feed entry when the player scores a lethal hit', () => {
+      const target = createMockCombatant('target-1', Faction.NVA, 10);
+      const allCombatants = new Map<string, Combatant>();
+      allCombatants.set('target-1', target);
+      const ray = new THREE.Ray(new THREE.Vector3(0, 0, 0), new THREE.Vector3(1, 0, 0));
+
+      vi.spyOn(combatantCombat.hitDetection, 'raycastCombatants').mockReturnValue({
+        combatant: target,
+        point: new THREE.Vector3(10, 0, 0),
+        distance: 10,
+        headshot: false,
+      });
+
+      const result = combatantCombat.handlePlayerShot(ray, () => 100, allCombatants, 'rifle');
+
+      expect(result.killed).toBe(true);
+      // The player-kill feed entry is emitted exactly once, by the player
+      // shot path (killer 'PLAYER'). The AI-on-AI feed path inside
+      // CombatantDamage must not also fire for the proxy attacker.
+      const calls = (mockHUDSystem.addKillToFeed as any).mock.calls;
+      expect(calls.length).toBe(1);
+      expect(calls[0][0]).toBe('PLAYER');
+    });
   });
 
   describe('checkPlayerHit', () => {
