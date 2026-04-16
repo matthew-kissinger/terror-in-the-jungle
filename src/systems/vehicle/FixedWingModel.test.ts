@@ -125,7 +125,7 @@ describe('FixedWingModel', () => {
       expect(fd).not.toBeNull();
       expect(fd!.airspeed).toBe(0);
       expect(fd!.flightState).toBe('grounded');
-      expect(fd!.stallSpeed).toBe(40);
+      expect(fd!.stallSpeed).toBe(38);
     });
 
     it('provides display info for created aircraft', async () => {

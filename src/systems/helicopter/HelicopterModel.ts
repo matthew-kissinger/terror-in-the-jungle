@@ -62,6 +62,11 @@ export class HelicopterModel implements GameSystem {
   private deployPromptAccumulator = 0;
   private readonly DEPLOY_PROMPT_INTERVAL = 0.5; // check every 500ms
   private isDeployPromptVisible = false;
+  private readonly deploySnapshot = {
+    position: new THREE.Vector3(),
+    velocity: new THREE.Vector3(),
+    groundHeight: 0,
+  };
 
   // Callback for squad deploy events
   private onSquadDeployCallback?: (helicopterId: string, positions: THREE.Vector3[]) => void;
@@ -410,13 +415,11 @@ export class HelicopterModel implements GameSystem {
     if (!physics) return;
 
     const state = physics.getState();
-    const snapshot = {
-      position: state.position.clone(),
-      velocity: state.velocity.clone(),
-      groundHeight: state.groundHeight,
-    };
+    this.deploySnapshot.position.copy(state.position);
+    this.deploySnapshot.velocity.copy(state.velocity);
+    this.deploySnapshot.groundHeight = state.groundHeight;
 
-    const check = this.squadDeploy.canDeploy(helicopterId, snapshot);
+    const check = this.squadDeploy.canDeploy(helicopterId, this.deploySnapshot);
     if (check.canDeploy && !this.isDeployPromptVisible) {
       this.isDeployPromptVisible = true;
       this.hudSystem.showSquadDeployPrompt();

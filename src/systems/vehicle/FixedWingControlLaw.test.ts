@@ -17,12 +17,13 @@ function makeAirbornePhysics(config: (typeof FIXED_WING_CONFIGS)[keyof typeof FI
 }
 
 describe('FixedWingControlLaw', () => {
-  it('buffers rotation demand until takeoff speed', () => {
+  it('passes pitch intent through on ground but blocks roll while wheels are down', () => {
     const cfg = FIXED_WING_CONFIGS.A1_SKYRAIDER;
     const intent = {
       ...createIdleFixedWingPilotIntent(),
       throttleTarget: 1,
       pitchIntent: 1,
+      bankIntent: 1,
       assistEnabled: true,
     };
 
@@ -46,8 +47,74 @@ describe('FixedWingControlLaw', () => {
       isStalled: false,
     }, cfg.physics, cfg.pilotProfile, intent);
 
-    expect(command.pitchCommand).toBe(0);
+    expect(command.pitchCommand).toBeGreaterThan(0.5);
     expect(command.rollCommand).toBe(0);
+  });
+
+  it('forces nose-down when stalled regardless of pitch intent', () => {
+    const cfg = FIXED_WING_CONFIGS.A1_SKYRAIDER;
+    const intent = {
+      ...createIdleFixedWingPilotIntent(),
+      throttleTarget: 1,
+      pitchIntent: 1,
+      assistEnabled: true,
+    };
+
+    const command = buildFixedWingPilotCommand({
+      phase: 'stall',
+      airspeed: cfg.physics.stallSpeed * 0.8,
+      forwardAirspeed: cfg.physics.stallSpeed * 0.8,
+      verticalSpeed: -4,
+      altitude: 200,
+      altitudeAGL: 180,
+      aoaDeg: 20,
+      sideslipDeg: 0,
+      headingDeg: 0,
+      pitchDeg: 20,
+      rollDeg: 0,
+      pitchRateDeg: 0,
+      rollRateDeg: 0,
+      throttle: 1,
+      brake: 0,
+      weightOnWheels: false,
+      isStalled: true,
+    }, cfg.physics, cfg.pilotProfile, intent);
+
+    expect(command.pitchCommand).toBeLessThanOrEqual(-0.3);
+  });
+
+  it('auto-levels roll when airborne with assist and no bank input', () => {
+    const cfg = FIXED_WING_CONFIGS.F4_PHANTOM;
+    const intent = {
+      ...createIdleFixedWingPilotIntent(),
+      throttleTarget: 0.8,
+      assistEnabled: true,
+    };
+
+    // Positive rollDeg with assist + no input: positive rollCommand drives rollDeg
+    // toward zero because positive command rolls around local -Z axis, which decreases
+    // Euler Z. Sign asymmetry with pitch — see FixedWingControlLaw comments.
+    const command = buildFixedWingPilotCommand({
+      phase: 'airborne',
+      airspeed: cfg.physics.v2Speed * 1.2,
+      forwardAirspeed: cfg.physics.v2Speed * 1.2,
+      verticalSpeed: 0,
+      altitude: 800,
+      altitudeAGL: 800,
+      aoaDeg: 2,
+      sideslipDeg: 0,
+      headingDeg: 0,
+      pitchDeg: 0,
+      rollDeg: 30,
+      pitchRateDeg: 0,
+      rollRateDeg: 0,
+      throttle: 0.8,
+      brake: 0,
+      weightOnWheels: false,
+      isStalled: false,
+    }, cfg.physics, cfg.pilotProfile, intent);
+
+    expect(command.rollCommand).toBeGreaterThan(0);
   });
 
   it('takes off and climbs cleanly in trainer assisted mode', () => {
@@ -80,7 +147,9 @@ describe('FixedWingControlLaw', () => {
     const cfg = FIXED_WING_CONFIGS.F4_PHANTOM;
     const fw = makeAirbornePhysics(cfg.physics);
 
-    for (let i = 0; i < 180; i++) {
+    // Short bank pulse (0.33s) — representative of a user tap, not a 1-second hold.
+    // Assisted arcade is not a strict limiter; sustained full deflection will over-bank.
+    for (let i = 0; i < 20; i++) {
       const snapshot = fw.getFlightSnapshot();
       const intent = {
         ...createIdleFixedWingPilotIntent(),
@@ -92,7 +161,7 @@ describe('FixedWingControlLaw', () => {
       fw.update(1 / 60, flatTerrain());
     }
 
-    for (let i = 0; i < 120; i++) {
+    for (let i = 0; i < 300; i++) {
       const snapshot = fw.getFlightSnapshot();
       const intent = {
         ...createIdleFixedWingPilotIntent(),

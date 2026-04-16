@@ -1,6 +1,6 @@
 # Project Notes
 
-Last updated: 2026-04-06
+Last updated: 2026-04-16
 
 ## Project
 
@@ -69,3 +69,10 @@ npm run perf:update-baseline  # update baseline from latest capture
 - Update `docs/PERFORMANCE.md` when capture flags/semantics change.
 - Update `docs/ASSET_MANIFEST.md` when new asset needs are identified.
 - Keep docs concise; remove stale status logs.
+- When a "recovery plan" or "stabilization plan" doc is resolved, move it to `docs/archive/`. Don't let reference-only docs sit alongside active ones.
+
+## Game Feel Requires Human Playtest
+
+Tests, lint, build, and the fixed-wing runtime probe catch correctness regressions. They do not catch feel regressions. An aircraft that passes every test can still be miserable to fly. A combat pacing change that leaves AI reaction times "technically correct" can still feel lifeless.
+
+Any change to flight, driving, combat rhythm, or UI responsiveness must be validated by a human running `docs/PLAYTEST_CHECKLIST.md`. Passing automated checks is necessary, not sufficient. If you can't get a human through the checklist, say so explicitly in the PR description rather than claiming the change is done.

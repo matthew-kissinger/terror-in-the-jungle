@@ -33,7 +33,10 @@ import { optimizeStaticModelDrawCalls } from '../assets/ModelDrawCallOptimizer';
 import { Faction } from '../combat/types';
 import { Logger } from '../../utils/Logger';
 
-const _terrainSampleNormal = new THREE.Vector3(0, 1, 0);
+interface CachedTerrainSample {
+  sample: FixedWingTerrainSample;
+  lastSampleMs: number;
+}
 
 export interface FixedWingFlightData {
   airspeed: number;
@@ -64,6 +67,7 @@ export interface FixedWingFlightData {
  */
 export class FixedWingModel implements GameSystem {
   private static readonly IDLE_SIMULATION_SPEED = 0.5;
+  private static readonly AI_TERRAIN_SAMPLE_INTERVAL_MS = 100;
   private scene: THREE.Scene;
   private modelLoader = new ModelLoader();
   private animation = new FixedWingAnimation();
@@ -77,6 +81,7 @@ export class FixedWingModel implements GameSystem {
   private collisionRegistered = new Set<string>();
   private spawnMetadata = new Map<string, FixedWingSpawnMetadata>();
   private lineupAircraft = new Set<string>();
+  private terrainSampleCache = new Map<string, CachedTerrainSample>();
   private pilotedAircraftId: string | null = null;
 
   // Dependencies
@@ -175,7 +180,7 @@ export class FixedWingModel implements GameSystem {
 
       if (shouldSimulate) {
         const pos = phys.getPosition();
-        const terrainSample = this.getTerrainSample(pos.x, pos.z);
+        const terrainSample = this.getTerrainSampleCached(aircraftId, pos.x, pos.z, isPiloted);
         phys.update(deltaTime, terrainSample);
 
         const configKey = this.configKeys.get(aircraftId);
@@ -236,6 +241,7 @@ export class FixedWingModel implements GameSystem {
     this.collisionRegistered.clear();
     this.spawnMetadata.clear();
     this.lineupAircraft.clear();
+    this.terrainSampleCache.clear();
   }
 
   // -- Aircraft creation --
@@ -623,15 +629,38 @@ export class FixedWingModel implements GameSystem {
     };
   }
 
-  private getTerrainSample(x: number, z: number): FixedWingTerrainSample {
+  private getTerrainSampleCached(
+    aircraftId: string,
+    x: number,
+    z: number,
+    isPiloted: boolean,
+  ): FixedWingTerrainSample {
     if (!this.terrainManager) {
       return { height: 0 };
     }
 
-    return {
-      height: this.terrainManager.getHeightAt(x, z),
-      normal: this.terrainManager.getNormalAt(x, z, _terrainSampleNormal),
-    };
+    let cached = this.terrainSampleCache.get(aircraftId);
+    if (!cached) {
+      cached = {
+        sample: { height: 0, normal: new THREE.Vector3(0, 1, 0) },
+        lastSampleMs: Number.NEGATIVE_INFINITY,
+      };
+      this.terrainSampleCache.set(aircraftId, cached);
+    }
+
+    const nowMs = performance.now();
+    const needsRefresh = isPiloted
+      || nowMs - cached.lastSampleMs >= FixedWingModel.AI_TERRAIN_SAMPLE_INTERVAL_MS;
+
+    if (needsRefresh) {
+      cached.sample.height = this.terrainManager.getHeightAt(x, z);
+      const normal = cached.sample.normal ?? new THREE.Vector3(0, 1, 0);
+      this.terrainManager.getNormalAt(x, z, normal);
+      cached.sample.normal = normal;
+      cached.lastSampleMs = nowMs;
+    }
+
+    return cached.sample;
   }
 
   private isOrbitHoldActive(aircraftId: string): boolean {

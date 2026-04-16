@@ -18,6 +18,7 @@ type ScenarioResult = {
   touchMode: boolean | null;
   inputMode: string | null;
   finalState: unknown;
+  liftoffAtMs: number | null;
   samples: unknown[];
   renderState: string | null;
   success: boolean;
@@ -196,6 +197,7 @@ async function runScenario(page: Page, configKey: string): Promise<Omit<Scenario
       const samples = [];
 
       let rotateHeld = false;
+      let liftoffAtMs = null;
       dispatchKey('keydown', 'KeyW', 'w');
 
       for (let chunk = 0; chunk < totalChunks; chunk++) {
@@ -208,6 +210,9 @@ async function runScenario(page: Page, configKey: string): Promise<Omit<Scenario
         if (rotateHeld && fd.altitudeAGL >= releaseAltitude) {
           dispatchKey('keyup', 'ArrowUp', 'ArrowUp');
           rotateHeld = false;
+        }
+        if (liftoffAtMs === null && !fd.weightOnWheels) {
+          liftoffAtMs = (chunk + 1) * chunkMs;
         }
         samples.push({
           simTimeMs: (chunk + 1) * chunkMs,
@@ -237,6 +242,7 @@ async function runScenario(page: Page, configKey: string): Promise<Omit<Scenario
         touchMode: input?.getIsTouchMode?.() ?? null,
         inputMode: input?.getLastInputMode?.() ?? null,
         finalState: model.getFlightData(id),
+        liftoffAtMs,
         samples,
         renderState: typeof window.render_game_to_text === 'function'
           ? window.render_game_to_text()
@@ -244,6 +250,50 @@ async function runScenario(page: Page, configKey: string): Promise<Omit<Scenario
       };
     })()
   `);
+}
+
+function printSummaryTable(results: ScenarioResult[]): void {
+  const rows = results.map((r) => {
+    const finalState = r.finalState as {
+      altitudeAGL?: number;
+      airspeed?: number;
+      phase?: string;
+      isStalled?: boolean;
+    } | null;
+    return {
+      aircraft: r.configKey,
+      success: r.success ? 'yes' : 'no',
+      liftoffSec: r.liftoffAtMs !== null && r.liftoffAtMs !== undefined
+        ? (r.liftoffAtMs / 1000).toFixed(2)
+        : '—',
+      finalAltM: finalState?.altitudeAGL !== undefined
+        ? finalState.altitudeAGL.toFixed(1)
+        : '—',
+      finalSpeedMs: finalState?.airspeed !== undefined
+        ? finalState.airspeed.toFixed(1)
+        : '—',
+      phase: finalState?.phase ?? '—',
+      stalled: finalState?.isStalled === true ? 'yes' : 'no',
+    };
+  });
+
+  const headers: Array<keyof typeof rows[number]> = [
+    'aircraft', 'success', 'liftoffSec', 'finalAltM', 'finalSpeedMs', 'phase', 'stalled',
+  ];
+  const widths = headers.map((h) => Math.max(
+    String(h).length,
+    ...rows.map((r) => String(r[h]).length),
+  ));
+
+  const fmt = (cells: string[]) => cells.map((c, i) => c.padEnd(widths[i])).join('  ');
+  console.log('');
+  console.log('Fixed-wing runtime probe summary:');
+  console.log(fmt(headers.map(String)));
+  console.log(fmt(widths.map((w) => '-'.repeat(w))));
+  for (const row of rows) {
+    console.log(fmt(headers.map((h) => String(row[h]))));
+  }
+  console.log('');
 }
 
 async function main(): Promise<void> {
@@ -306,7 +356,7 @@ async function main(): Promise<void> {
       results,
     };
     writeFileSync(join(artifactDir, 'summary.json'), JSON.stringify(summary, null, 2), 'utf-8');
-    console.log(JSON.stringify(summary, null, 2));
+    printSummaryTable(results);
     await browser.close();
   } finally {
     if (server && startedServer) {

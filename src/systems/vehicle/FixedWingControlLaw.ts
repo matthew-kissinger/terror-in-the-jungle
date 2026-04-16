@@ -38,87 +38,51 @@ interface FixedWingPilotCommandContext {
   positionZ: number;
 }
 
-interface PilotAssistEnvelope {
-  maxBankDeg: number;
-  maxPitchDeg: number;
-  rotationPitchDeg: number;
-  climbTrimPitchDeg: number;
-  climbPitchAuthorityDeg: number;
-  approachPitchBiasDeg: number;
-  pitchErrorForFullCommandDeg: number;
-  bankErrorForFullCommandDeg: number;
-  directPitchScale: number;
-  directRollScale: number;
-  directYawScale: number;
+interface PilotTuning {
+  pitchScale: number;
+  rollScale: number;
+  yawScale: number;
   coordinatedYawScale: number;
-  pitchCommandGain: number;
-  rollCommandGain: number;
-  initialClimbPitchFloor: number;
-  pitchRateDampingDegPerSec: number;
-  rollRateDampingDegPerSec: number;
+  autoLevelStrength: number;
+  gravityCompStrength: number;
+  maxAssistBankDeg: number;
+  maxAssistPitchDeg: number;
 }
 
 const CONTROL_PHASE_APPROACH_ALTITUDE = 120;
 const CONTROL_PHASE_INITIAL_CLIMB_ALTITUDE = 50;
 const CONTROL_PHASE_TAXI_SPEED = 6;
 
-const PROFILE_ENVELOPES: Record<FixedWingPilotProfile, PilotAssistEnvelope> = {
+const PILOT_TUNING: Record<FixedWingPilotProfile, PilotTuning> = {
   trainer: {
-    maxBankDeg: 25,
-    maxPitchDeg: 10,
-    rotationPitchDeg: 8,
-    climbTrimPitchDeg: 6.5,
-    climbPitchAuthorityDeg: 1.2,
-    approachPitchBiasDeg: -2,
-    pitchErrorForFullCommandDeg: 7,
-    bankErrorForFullCommandDeg: 16,
-    directPitchScale: 0.35,
-    directRollScale: 0.4,
-    directYawScale: 0.2,
-    coordinatedYawScale: 0.18,
-    pitchCommandGain: 1.0,
-    rollCommandGain: 0.7,
-    initialClimbPitchFloor: 0.18,
-    pitchRateDampingDegPerSec: 36,
-    rollRateDampingDegPerSec: 65,
+    pitchScale: 0.85,
+    rollScale: 0.75,
+    yawScale: 0.45,
+    coordinatedYawScale: 0.15,
+    autoLevelStrength: 0.8,
+    gravityCompStrength: 0.2,
+    maxAssistBankDeg: 45,
+    maxAssistPitchDeg: 25,
   },
   fast_jet: {
-    maxBankDeg: 18,
-    maxPitchDeg: 6,
-    rotationPitchDeg: 6,
-    climbTrimPitchDeg: 4.5,
-    climbPitchAuthorityDeg: 0.8,
-    approachPitchBiasDeg: -1.5,
-    pitchErrorForFullCommandDeg: 6,
-    bankErrorForFullCommandDeg: 18,
-    directPitchScale: 0.5,
-    directRollScale: 0.6,
-    directYawScale: 0.22,
-    coordinatedYawScale: 0.14,
-    pitchCommandGain: 0.55,
-    rollCommandGain: 0.08,
-    initialClimbPitchFloor: 0.18,
-    pitchRateDampingDegPerSec: 42,
-    rollRateDampingDegPerSec: 85,
+    pitchScale: 0.9,
+    rollScale: 0.9,
+    yawScale: 0.35,
+    coordinatedYawScale: 0.12,
+    autoLevelStrength: 0.7,
+    gravityCompStrength: 0.15,
+    maxAssistBankDeg: 55,
+    maxAssistPitchDeg: 28,
   },
   gunship: {
-    maxBankDeg: 28,
-    maxPitchDeg: 8,
-    rotationPitchDeg: 6,
-    climbTrimPitchDeg: 5,
-    climbPitchAuthorityDeg: 3,
-    approachPitchBiasDeg: -2,
-    pitchErrorForFullCommandDeg: 7,
-    bankErrorForFullCommandDeg: 18,
-    directPitchScale: 0.3,
-    directRollScale: 0.35,
-    directYawScale: 0.2,
-    coordinatedYawScale: 0.12,
-    pitchCommandGain: 0.95,
-    rollCommandGain: 0.55,
-    initialClimbPitchFloor: 0.2,
-    pitchRateDampingDegPerSec: 38,
-    rollRateDampingDegPerSec: 70,
+    pitchScale: 0.7,
+    rollScale: 0.55,
+    yawScale: 0.4,
+    coordinatedYawScale: 0.18,
+    autoLevelStrength: 0.9,
+    gravityCompStrength: 0.25,
+    maxAssistBankDeg: 35,
+    maxAssistPitchDeg: 20,
   },
 };
 
@@ -180,6 +144,18 @@ export function deriveFixedWingControlPhase(
   return 'flight';
 }
 
+/**
+ * Arcade-feel fixed-wing pilot command builder.
+ *
+ * Stick input maps directly to pitch/roll/yaw command scaled by per-profile authority.
+ * When airborne with assist on, auto-level gently rolls toward zero, gravity
+ * compensation nudges nose up if altitude is bleeding off, and turn coordination
+ * adds yaw proportional to bank. Orbit hold keeps the command builder usable by
+ * AC-47 gunship mode without routing players through it.
+ *
+ * Stall protection forces nose-down and level; the physics layer owns alpha
+ * protection, ground stabilization, and liftoff gating.
+ */
 export function buildFixedWingPilotCommand(
   snapshot: FixedWingFlightSnapshot,
   cfg: FixedWingPhysicsConfig,
@@ -187,21 +163,23 @@ export function buildFixedWingPilotCommand(
   intent: FixedWingPilotIntent,
   context?: FixedWingPilotCommandContext,
 ): FixedWingCommand {
-  const phase = deriveFixedWingControlPhase(snapshot, cfg);
-  const envelope = PROFILE_ENVELOPES[pilotProfile];
-  const pitchIntent = THREE.MathUtils.clamp(intent.pitchIntent, -1, 1);
-  const bankIntent = THREE.MathUtils.clamp(intent.bankIntent, -1, 1);
-  const yawIntent = THREE.MathUtils.clamp(intent.yawIntent, -1, 1);
+  const tuning = PILOT_TUNING[pilotProfile];
+  const pitchInput = THREE.MathUtils.clamp(intent.pitchIntent, -1, 1);
+  const rollInput = THREE.MathUtils.clamp(intent.bankIntent, -1, 1);
+  const yawInput = THREE.MathUtils.clamp(intent.yawIntent, -1, 1);
 
-  let targetPitchDeg = 0;
-  let targetBankDeg = 0;
-  let yawCommand = 0;
-  const orbitHoldActive = intent.orbitHoldEnabled
+  const orbitActive = Boolean(
+    intent.orbitHoldEnabled
     && !snapshot.weightOnWheels
     && context
-    && intent.orbitRadius > 1;
+    && intent.orbitRadius > 1,
+  );
 
-  if (orbitHoldActive) {
+  let pitchCommand = 0;
+  let rollCommand = 0;
+  let yawCommand = 0;
+
+  if (orbitActive && context) {
     const deltaX = context.positionX - intent.orbitCenterX;
     const deltaZ = context.positionZ - intent.orbitCenterZ;
     const currentRadius = Math.max(Math.hypot(deltaX, deltaZ), 1);
@@ -212,104 +190,85 @@ export function buildFixedWingPilotCommand(
     );
     const nominalBankDeg = Math.max(intent.orbitBankDeg, requiredBankDeg);
     const bankCorrectionDeg = THREE.MathUtils.clamp(radiusError * 30, -8, 8);
-    targetBankDeg = nominalBankDeg * intent.orbitTurnDirection + bankCorrectionDeg * intent.orbitTurnDirection;
-    targetBankDeg = THREE.MathUtils.clamp(targetBankDeg, -envelope.maxBankDeg, envelope.maxBankDeg);
-    targetPitchDeg = THREE.MathUtils.clamp(
-      envelope.climbTrimPitchDeg * 0.45 + THREE.MathUtils.clamp((1.5 - snapshot.verticalSpeed) * 0.6, -2, 2),
-      -4,
-      envelope.maxPitchDeg * 0.7,
+    const targetBankDeg = THREE.MathUtils.clamp(
+      (nominalBankDeg + bankCorrectionDeg) * intent.orbitTurnDirection,
+      -30,
+      30,
     );
-    yawCommand = intent.orbitTurnDirection * 0.22;
+
+    rollCommand = THREE.MathUtils.clamp((snapshot.rollDeg - targetBankDeg) / 12, -1, 1) * 0.8;
+    rollCommand -= snapshot.rollRateDeg / 85;
+
+    const climbBias = THREE.MathUtils.clamp((1.5 - snapshot.verticalSpeed) * 0.1, -0.15, 0.3);
+    pitchCommand = climbBias - snapshot.pitchRateDeg / 60;
+
+    yawCommand = intent.orbitTurnDirection * 0.2;
   } else {
-    switch (phase) {
-    case 'taxi':
-      yawCommand = yawIntent;
-      break;
-    case 'takeoff_roll':
-      yawCommand = yawIntent;
-      break;
-    case 'rotation':
-      targetPitchDeg = pitchIntent > 0.08
-        ? envelope.rotationPitchDeg * Math.max(pitchIntent, 0.5)
-        : envelope.climbTrimPitchDeg;
-      yawCommand = yawIntent * 0.7;
-      break;
-    case 'initial_climb':
-      targetPitchDeg = envelope.climbTrimPitchDeg + pitchIntent * envelope.climbPitchAuthorityDeg;
-      targetPitchDeg += THREE.MathUtils.clamp((6 - snapshot.verticalSpeed) * 0.3, 0, 2.5);
-      targetBankDeg = bankIntent * Math.min(envelope.maxBankDeg, 20);
-      yawCommand = yawIntent * 0.4;
-      break;
-    case 'approach':
-      targetPitchDeg = envelope.approachPitchBiasDeg + pitchIntent * (envelope.maxPitchDeg * 0.45);
-      targetBankDeg = bankIntent * Math.min(envelope.maxBankDeg, 18);
-      yawCommand = yawIntent * 0.55;
-      break;
-    case 'landing_rollout':
-      yawCommand = yawIntent;
-      break;
-    case 'flight':
-    default:
-      targetPitchDeg = pitchIntent * (intent.assistEnabled ? envelope.maxPitchDeg * 0.6 : envelope.maxPitchDeg);
-      targetBankDeg = bankIntent * envelope.maxBankDeg;
-      yawCommand = yawIntent * 0.55;
-      break;
+    const mergedPitchInput = intent.pilotMode === 'direct_stick'
+      ? THREE.MathUtils.clamp(pitchInput + intent.directPitchInput * 0.7, -1, 1)
+      : pitchInput;
+    const mergedRollInput = intent.pilotMode === 'direct_stick'
+      ? THREE.MathUtils.clamp(rollInput + intent.directRollInput * 0.7, -1, 1)
+      : rollInput;
+    const mergedYawInput = intent.pilotMode === 'direct_stick'
+      ? THREE.MathUtils.clamp(yawInput + intent.directYawInput * 0.7, -1, 1)
+      : yawInput;
+
+    yawCommand = mergedYawInput * tuning.yawScale;
+
+    const rollIntentActive = Math.abs(mergedRollInput) >= 0.05;
+    const pitchIntentActive = Math.abs(mergedPitchInput) >= 0.05;
+
+    // Sign note: positive rollCommand drives rollDeg negative (Euler Z extraction
+    // from local-axis roll). Bank target uses `(current - target)` for convergent
+    // negative feedback. Pitch sign is opposite: positive pitchCommand raises pitchDeg.
+    // Rate terms (rollRateDeg, pitchRateDeg) provide damping that cancels banking
+    // momentum before the aircraft wraps through inverted.
+    if (!snapshot.weightOnWheels && intent.assistEnabled) {
+      // rollRateDeg has opposite sign to d(rollDeg)/dt because positive rollRate rotates
+      // around local -Z axis which maps to negative Euler Z accumulation. Rate-damping
+      // term subtracts rollRateDeg so D acts in the conventional PD sense.
+      if (rollIntentActive) {
+        const targetBankDeg = mergedRollInput * tuning.maxAssistBankDeg;
+        const errorTerm = (snapshot.rollDeg - targetBankDeg) / 25;
+        const rateTerm = -snapshot.rollRateDeg / 120;
+        rollCommand = THREE.MathUtils.clamp(errorTerm + rateTerm, -1, 1) * tuning.rollScale;
+      } else {
+        const combined = (snapshot.rollDeg - snapshot.rollRateDeg * 0.25) / 50;
+        rollCommand = THREE.MathUtils.clamp(combined, -0.4, 0.4) * tuning.autoLevelStrength;
+      }
+
+      if (pitchIntentActive) {
+        const targetPitchDeg = mergedPitchInput * tuning.maxAssistPitchDeg;
+        const errorTerm = (targetPitchDeg - snapshot.pitchDeg) / 14;
+        const rateTerm = -snapshot.pitchRateDeg / 140;
+        pitchCommand = THREE.MathUtils.clamp(errorTerm + rateTerm, -1, 1) * tuning.pitchScale;
+      } else if (
+        intent.throttleTarget > 0.2
+        && snapshot.airspeed >= cfg.stallSpeed * 0.9
+      ) {
+        const altitudeLossRate = Math.max(0, -snapshot.verticalSpeed);
+        pitchCommand = THREE.MathUtils.smoothstep(altitudeLossRate, 0, 6) * tuning.gravityCompStrength;
+      }
+
+      yawCommand -= THREE.MathUtils.clamp(snapshot.rollDeg / 40, -1, 1) * tuning.coordinatedYawScale;
+    } else {
+      pitchCommand = mergedPitchInput * tuning.pitchScale;
+      // Positive stick must bank the aircraft in the same direction as the old
+      // codebase's convention; sign of command is opposite to sign of resulting
+      // rollDeg, so flip the input.
+      rollCommand = -mergedRollInput * tuning.rollScale;
     }
   }
 
   if (snapshot.isStalled) {
-    targetPitchDeg = Math.min(targetPitchDeg, -4);
-    targetBankDeg = THREE.MathUtils.clamp(targetBankDeg, -10, 10);
+    pitchCommand = Math.min(pitchCommand, -0.3);
+    rollCommand *= 0.4;
     yawCommand = 0;
-  }
-
-  if (!snapshot.weightOnWheels && intent.assistEnabled && !orbitHoldActive) {
-    yawCommand += THREE.MathUtils.clamp(targetBankDeg / Math.max(envelope.maxBankDeg, 1), -1, 1) * envelope.coordinatedYawScale;
-  }
-
-  let pitchCommand = THREE.MathUtils.clamp(
-    (targetPitchDeg - snapshot.pitchDeg) / envelope.pitchErrorForFullCommandDeg,
-    -1,
-    1,
-  ) * envelope.pitchCommandGain;
-  let rollCommand = THREE.MathUtils.clamp(
-    (snapshot.rollDeg - targetBankDeg) / envelope.bankErrorForFullCommandDeg,
-    -1,
-    1,
-  ) * envelope.rollCommandGain;
-
-  pitchCommand -= snapshot.pitchRateDeg / envelope.pitchRateDampingDegPerSec;
-  rollCommand -= snapshot.rollRateDeg / envelope.rollRateDampingDegPerSec;
-
-  if (intent.pilotMode === 'direct_stick') {
-    pitchCommand += THREE.MathUtils.clamp(intent.directPitchInput, -1, 1) * envelope.directPitchScale;
-    rollCommand += THREE.MathUtils.clamp(intent.directRollInput, -1, 1) * envelope.directRollScale;
-    yawCommand += THREE.MathUtils.clamp(intent.directYawInput, -1, 1) * envelope.directYawScale;
   }
 
   if (snapshot.weightOnWheels) {
     rollCommand = 0;
-  }
-
-  if (phase === 'rotation' && pitchIntent > 0.08) {
-    pitchCommand = Math.max(pitchCommand, 0.85);
-  }
-
-  if (phase === 'initial_climb' && pitchIntent > 0.08) {
-    pitchCommand = Math.max(pitchCommand, envelope.initialClimbPitchFloor);
-  }
-
-  if (phase === 'initial_climb' && snapshot.altitudeAGL < 8 && snapshot.verticalSpeed < 2) {
-    pitchCommand = Math.max(pitchCommand, 0.4);
-  }
-
-  if (phase === 'initial_climb' && snapshot.altitudeAGL < 6 && snapshot.airspeed < cfg.v2Speed) {
-    pitchCommand = Math.max(pitchCommand, 0.72);
-  }
-
-  if (!snapshot.weightOnWheels && intent.assistEnabled && Math.abs(bankIntent) < 0.05 && !orbitHoldActive) {
-    const levelRollCommand = THREE.MathUtils.clamp(snapshot.rollDeg / 18, -1, 1) * 0.65;
-    rollCommand += levelRollCommand;
   }
 
   return {
