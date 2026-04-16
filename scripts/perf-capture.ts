@@ -1,10 +1,18 @@
 #!/usr/bin/env tsx
 
 import { chromium, type BrowserContext, type CDPSession, type Page } from 'playwright';
-import { execSync, spawn, type ChildProcess } from 'child_process';
+import { spawn } from 'child_process';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { Socket } from 'net';
+import {
+  cleanupPortListeners,
+  isPortOpen,
+  parseServerModeArg,
+  startServer,
+  stopServer,
+  type ServerHandle,
+  type ServerMode,
+} from './preview-server';
 import {
   renderMovementArtifactViewerHtml,
   type MovementArtifactReportForViewer,
@@ -981,153 +989,6 @@ async function forceGCAndMeasureHeap(
   return memory;
 }
 
-async function startDevServer(port: number): Promise<ChildProcess> {
-  logStep(`🚀 Starting dev server on port ${port}`);
-  const server = spawn('npm', ['run', 'dev', '--', '--port', String(port), '--host'], {
-    cwd: process.cwd(),
-    stdio: 'pipe',
-    shell: true
-  });
-
-  if (server.pid) {
-    logStep(`  dev-server spawned pid=${server.pid}`);
-  } else {
-    logStep('  dev-server spawn did not report a pid');
-  }
-
-  return new Promise((resolve, reject) => {
-    let output = '';
-    let resolved = false;
-    const timeout = setTimeout(() => {
-      server.kill();
-      reject(new Error('Dev server startup timeout'));
-    }, STEP_TIMEOUT_MS);
-
-    server.stdout?.on('data', (data) => {
-      output += data.toString();
-      if (!resolved && (output.includes('Local:') || output.includes('localhost'))) {
-        resolved = true;
-        clearTimeout(timeout);
-        logStep(`✅ Dev server ready (pid=${server.pid ?? 'unknown'})`);
-        resolve(server);
-      }
-    });
-
-    server.stderr?.on('data', (data) => {
-      console.error('[dev-server]', data.toString().trim());
-    });
-
-    server.on('error', (err) => {
-      clearTimeout(timeout);
-      reject(err);
-    });
-  });
-}
-
-async function isPortOpen(port: number, host = '127.0.0.1'): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new Socket();
-    const onDone = (open: boolean) => {
-      try { socket.destroy(); } catch { /* noop */ }
-      resolve(open);
-    };
-    socket.setTimeout(800);
-    socket.once('connect', () => onDone(true));
-    socket.once('error', () => onDone(false));
-    socket.once('timeout', () => onDone(false));
-    socket.connect(port, host);
-  });
-}
-
-function cleanupPortListeners(port: number): void {
-  if (process.platform === 'win32') {
-    try {
-      const output = execSync(`netstat -ano -p tcp | findstr :${port}`, { encoding: 'utf-8' });
-      const pids = output
-        .split(/\r?\n/)
-        .map(line => line.trim())
-        .filter(Boolean)
-        .map(line => line.split(/\s+/))
-        .filter(parts => parts.length >= 5 && parts[3] === 'LISTENING')
-        .map(parts => Number(parts[4]))
-        .filter(pid => Number.isFinite(pid) && pid > 0);
-
-      for (const pid of new Set(pids)) {
-        spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { shell: true, stdio: 'ignore' });
-        logStep(`🧹 Cleared stale listener on :${port} (pid=${pid})`);
-      }
-    } catch {
-      // best effort; no active listener is expected on most runs
-    }
-    return;
-  }
-
-  // Unix: try lsof first, fall back to fuser. Either is best-effort.
-  try {
-    const output = execSync(`lsof -ti tcp:${port} -sTCP:LISTEN`, { encoding: 'utf-8' });
-    const pids = output
-      .split(/\r?\n/)
-      .map(line => line.trim())
-      .filter(Boolean)
-      .map(pid => Number(pid))
-      .filter(pid => Number.isFinite(pid) && pid > 0);
-    for (const pid of new Set(pids)) {
-      try {
-        process.kill(pid, 'SIGKILL');
-        logStep(`🧹 Cleared stale listener on :${port} (pid=${pid})`);
-      } catch {
-        // already gone
-      }
-    }
-  } catch {
-    try {
-      execSync(`fuser -k ${port}/tcp`, { encoding: 'utf-8', stdio: 'ignore' });
-      logStep(`🧹 fuser -k ${port}/tcp`);
-    } catch {
-      // best effort
-    }
-  }
-}
-
-async function killDevServer(server: ChildProcess): Promise<void> {
-  const pid = server.pid;
-  logStep(`🛑 Stopping dev server (pid=${pid ?? 'unknown'})`);
-  if (!pid) return;
-
-  let exited = false;
-  await new Promise<void>((resolve) => {
-    let settled = false;
-    const settle = () => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    };
-    server.once('exit', () => { exited = true; settle(); });
-    if (process.platform === 'win32') {
-      // /T kills the whole tree; /F forces termination. Spawn taskkill and wait for it to return.
-      const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { shell: true, stdio: 'ignore' });
-      killer.once('close', () => {
-        // taskkill returned; give the child exit event a short grace window.
-        setTimeout(settle, 500);
-      });
-      killer.once('error', () => settle());
-    } else {
-      try {
-        process.kill(-pid, 'SIGTERM');
-      } catch {
-        server.kill('SIGTERM');
-      }
-      // Escalate to SIGKILL if still alive after 3s.
-      setTimeout(() => {
-        if (exited) return;
-        try { process.kill(-pid, 'SIGKILL'); } catch { try { server.kill('SIGKILL'); } catch { /* noop */ } }
-      }, 3000);
-    }
-    setTimeout(settle, 5000);
-  });
-  logStep(`✅ Dev server stopped (pid=${pid}, exited=${exited})`);
-}
-
 async function prewarmDevServer(port: number, paths: string[]): Promise<{ totalMs: number; allOk: boolean }> {
   const start = Date.now();
   let allOk = true;
@@ -1663,16 +1524,23 @@ async function runCapture(): Promise<void> {
   const frontlineTriggerDistance = parseNumberFlag('frontline-trigger-distance', DEFAULT_FRONTLINE_TRIGGER_DISTANCE);
   const maxCompressedPerFaction = parseNumberFlag('frontline-compressed-per-faction', DEFAULT_MAX_COMPRESSED_PER_FACTION);
   const logLevel = String(process.env.PERF_LOG_LEVEL ?? process.argv.find(a => a.startsWith('--log-level='))?.split('=')[1] ?? 'warn');
-  // Default OFF: fresh spawn + explicit teardown per run. Opt in with --reuse-dev-server
-  // or PERF_REUSE_DEV_SERVER=1 when iterating locally and the dev server is known-clean.
-  const reuseDevServer = parseBooleanFlag('reuse-dev-server', false);
+  // Default OFF: fresh spawn + explicit teardown per run. Opt in with --reuse-server
+  // (or --reuse-dev-server for back-compat) when iterating locally.
+  const reuseServer = parseBooleanFlag('reuse-server', parseBooleanFlag('reuse-dev-server', false));
+  // Default 'perf': preview the purpose-built perf-harness bundle (prod-shape,
+  // minified, tree-shaken, but with diagnostic hooks compiled in via
+  // VITE_PERF_HARNESS=1). See docs/PERFORMANCE.md "Build targets" and
+  // scripts/preview-server.ts for the full story. 'dev' is retained for
+  // debugging against source maps. 'retail' previews the ship bundle (no
+  // harness surface — will fail to drive, but useful for bundle inspection).
+  const serverMode: ServerMode = parseServerModeArg(process.argv, 'perf');
   const effectiveNpcs = enableCombat ? npcs : 0;
   const artifactDir = makeArtifactDir();
   const browserProfileDir = join(artifactDir, 'browser-profile');
   mkdirSync(browserProfileDir, { recursive: true });
-  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} prewarm=${prewarm} runtimePreflight=${runtimePreflight} reuseDevServer=${reuseDevServer}`);
+  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} prewarm=${prewarm} runtimePreflight=${runtimePreflight} reuseServer=${reuseServer} serverMode=${serverMode}`);
 
-  let server: ChildProcess | null = null;
+  let server: ServerHandle | null = null;
   let context: BrowserContext | null = null;
   let page: Page | null = null;
   let cdp: CDPSession | null = null;
@@ -1728,7 +1596,7 @@ async function runCapture(): Promise<void> {
   let playwrightTracingStarted = false;
   let stage = 'init';
   let hardTimeout: NodeJS.Timeout | null = null;
-  let startedDevServer = false;
+  let startedServer = false;
   let emergencyArtifactsWritten = false;
   let signalHandlersInstalled = false;
 
@@ -1780,9 +1648,9 @@ async function runCapture(): Promise<void> {
     failureReason ??= reason;
     writeEmergencyArtifacts(reason);
     forceKillPlaywrightBrowsers(browserProfileDir);
-    if (server && startedDevServer && !reuseDevServer) {
+    if (server && startedServer && !reuseServer) {
       try {
-        void killDevServer(server);
+        void stopServer(server);
       } catch {
         // best effort
       }
@@ -1813,19 +1681,27 @@ async function runCapture(): Promise<void> {
       process.exit(1);
     }, runHardTimeoutMs);
 
-    stage = 'start-dev-server';
-    if (reuseDevServer && await isPortOpen(port)) {
-      logStep(`♻ Reusing existing dev server on port ${port}`);
+    stage = 'start-server';
+    if (reuseServer && await isPortOpen(port)) {
+      logStep(`♻ Reusing existing server on port ${port} (mode=${serverMode})`);
     } else {
-      cleanupPortListeners(port);
-      server = await startDevServer(port);
-      startedDevServer = true;
+      cleanupPortListeners(port, logStep);
+      server = await startServer({
+        mode: serverMode,
+        port,
+        host: '127.0.0.1',
+        startupTimeoutMs: STEP_TIMEOUT_MS,
+        stdio: 'pipe',
+        log: logStep,
+        onStderr: (chunk) => console.error(`[${serverMode}-server]`, chunk.trim()),
+      });
+      startedServer = true;
       await sleep(2000);
     }
     if (prewarm) {
-      stage = 'prewarm-dev-server';
+      stage = 'prewarm-server';
       prewarmResult = await prewarmDevServer(port, prewarmPaths);
-      logStep(`🔥 Dev-server prewarm completed in ${prewarmResult.totalMs}ms (allOk=${prewarmResult.allOk})`);
+      logStep(`🔥 Server prewarm completed in ${prewarmResult.totalMs}ms (allOk=${prewarmResult.allOk})`);
     }
 
     stage = 'launch-browser';
@@ -2553,10 +2429,10 @@ async function runCapture(): Promise<void> {
       await safeAwait('context.close', context.close(), 10_000);
     }
     stage = 'cleanup-server';
-    if (server && startedDevServer && !reuseDevServer) {
-      await safeAwait('killDevServer', killDevServer(server), 12_000);
-    } else if (server && startedDevServer && reuseDevServer) {
-      logStep('♻ Leaving dev server running for reuse');
+    if (server && startedServer && !reuseServer) {
+      await safeAwait('stopServer', stopServer(server), 12_000);
+    } else if (server && startedServer && reuseServer) {
+      logStep(`♻ Leaving ${serverMode} server running for reuse`);
     }
     forceKillPlaywrightBrowsers(browserProfileDir);
     if (hardTimeout) {
