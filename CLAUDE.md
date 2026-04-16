@@ -71,6 +71,23 @@ npm run perf:update-baseline  # update baseline from latest capture
 - Keep docs concise; remove stale status logs.
 - When a "recovery plan" or "stabilization plan" doc is resolved, move it to `docs/archive/`. Don't let reference-only docs sit alongside active ones.
 
+## Agent Operating Guide
+
+If you are an agent working in this repo, read these before editing:
+
+- `docs/TESTING.md` — the four-layer test contract. Write behavior tests, not implementation-mirror tests. Delete tests that block refactors by asserting tuning constants or phase-state names.
+- `docs/INTERFACE_FENCE.md` — `src/types/SystemInterfaces.ts` interfaces are fenced. Any change there requires `[interface-change]` in PR title and human approval. Try to solve the problem without a fence change first.
+- `docs/PLAYTEST_CHECKLIST.md` — game feel still requires a human. Don't claim a flight/combat/UI change is done without a playtest note.
+- `docs/AGENT_ORCHESTRATION.md` — the master DAG for coordinated multi-agent work. Individual task briefs live in `docs/tasks/*.md`.
+
+Hard rules:
+
+1. Don't modify fenced interfaces without explicit approval.
+2. Don't rewrite code that isn't in your task's scope list. Comments and formatting outside scope are off-limits.
+3. Don't write implementation-mirror tests.
+4. Don't push directly to master unless you own the merge step — agents working tasks push to their own branches and orchestrator merges.
+5. Verify locally before pushing: `npm run lint`, `npm run test:run`, `npm run build`.
+
 ## Game Feel Requires Human Playtest
 
 Tests, lint, build, and the fixed-wing runtime probe catch correctness regressions. They do not catch feel regressions. An aircraft that passes every test can still be miserable to fly. A combat pacing change that leaves AI reaction times "technically correct" can still feel lifeless.

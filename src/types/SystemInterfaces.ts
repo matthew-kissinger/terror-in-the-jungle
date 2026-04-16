@@ -1,5 +1,13 @@
 /**
- * System Interface Definitions
+ * System Interface Definitions — FENCED CONTRACTS
+ *
+ * Every exported interface in this file is a contract between subsystems.
+ * Internals may churn freely; these interfaces may not change without a
+ * `[interface-change]` PR and explicit human approval.
+ *
+ * See `docs/INTERFACE_FENCE.md` for rules, procedure, and rationale.
+ *
+ * Last fence review: 2026-04-16 (F1+F2 foundation pass).
  * Only interfaces actively imported by other modules belong here.
  */
 
