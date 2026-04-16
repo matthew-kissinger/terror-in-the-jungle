@@ -8,6 +8,14 @@ This file defines the rules for changing contract interfaces. **Interfaces insid
 
 Multiple agents have iterated on this codebase. Each agent, acting alone, writes code that looks tidy to that agent — but the composition drifts. The single biggest defense against drift is a small, frozen set of interfaces that systems agree to. Internals can churn freely; the fence cannot.
 
+## What this fence is NOT
+
+The fence is about preventing **accidental drift**. It is not about cementing today's interface shape as correct.
+
+When Phase E rearchitecting decisions land (ECS, rendering paradigm, agent-action API, etc.), these interfaces *will* change deliberately. The fence makes sure those changes happen in a `[interface-change]` PR with human review, not as an incidental side-effect of a cleanup task. See `docs/REARCHITECTURE.md` for the open paradigm questions that will eventually reshape these interfaces.
+
+In other words: the fence preserves the option to rearchitect cleanly. It does not foreclose it.
+
 ## What is fenced
 
 Every exported interface in `src/types/SystemInterfaces.ts`, specifically:

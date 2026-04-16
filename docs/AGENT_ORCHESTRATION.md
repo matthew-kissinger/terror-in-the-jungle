@@ -14,7 +14,9 @@ Correct accumulated drift without re-architecting the whole system. The delivera
 4. **Batch C (infrastructure, 4 tasks):** build-mode perf capture, recast-wasm dedup, deploy workflow doc, dev-mode stability.
 5. **Batch D (combat carve-out, 2 tasks):** first-class combat subsystem + Open Frontier pacing. **Runs after A+B+C fully merged.**
 
-Batch E (bitECS, WebGPU) is **out of scope** for tonight. It requires human decision.
+Batch E runs **in parallel with A/B/C** as an R&D track. E agents produce decision memos with prototype data, not merged behavior changes. See `docs/REARCHITECTURE.md` for the five open paradigm questions and `docs/tasks/E*.md` for the individual spike briefs.
+
+Batch F (actual rearchitecting) is **out of scope for this run**. It gets planned from the E memos in a separate, deliberate pass.
 
 ## DAG
 
@@ -23,20 +25,25 @@ Batch E (bitECS, WebGPU) is **out of scope** for tonight. It requires human deci
                                   │
     ┌─────────────────────────────┼─────────────────────────────┐
     │                             │                             │
- Batch A (parallel)          Batch B (parallel)            Batch C (parallel)
-  A1 vehicle tests            B1 NPC combat response        C1 build-mode perf
-  A2 combat tests             B2 active driver fix          C2 recast wasm dedup
-  A3 navigation tests         B3 NPC terrain stall          C3 deploy workflow doc
-  A4 terrain tests                                          C4 dev-mode stability
-  A5 ui tests
+ Batch A (parallel)          Batch B (parallel)            Batch C (parallel)         Batch E (parallel R&D,
+  A1 vehicle tests            B1 NPC combat response        C1 build-mode perf          decision memos only)
+  A2 combat tests             B2 active driver fix          C2 recast wasm dedup       E1 ECS spike
+  A3 navigation tests         B3 NPC terrain stall          C3 deploy workflow doc     E2 rendering-at-scale
+  A4 terrain tests                                          C4 dev-mode stability     E3 combat AI paradigm
+  A5 ui tests                                                                          E4 agent-as-player API
+                                                                                       E5 deterministic sim
+                                                                                       E6 vehicle physics rebuild
                                   │
-                     (all A + B + C merged)
+                     (all A + B + C merged; E memos delivered)
                                   │
                            Batch D (serial)
                            D1 combat carve-out
                            D2 OF combat pacing
                                   │
                               (stop for tonight)
+                                  │
+                        Batch F (separate later run,
+                        planned from E memos)
 ```
 
 ## Dependency rules
