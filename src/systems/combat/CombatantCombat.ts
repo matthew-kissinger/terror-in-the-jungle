@@ -63,6 +63,46 @@ export class CombatantCombat {
   private readonly _targetFirePos = new THREE.Vector3();
   private readonly _fireDirection = new THREE.Vector3();
 
+  // Player-as-attacker proxy. Mirrors the `_playerTarget` pattern in
+  // AITargetAcquisition: the player is not a Combatant, but downstream damage
+  // code (death direction, assist tracking, kill-feed attribution) needs a
+  // stable reference with id/faction/position. Mutations back to this proxy
+  // (e.g. attacker.kills++) are guarded via isPlayerTarget() in CombatantDamage.
+  private readonly _playerAttackerProxy: Combatant = {
+    id: 'PLAYER',
+    kind: 'player',
+    faction: Faction.US,
+    position: new THREE.Vector3(),
+    velocity: new THREE.Vector3(),
+    rotation: 0,
+    visualRotation: 0,
+    rotationVelocity: 0,
+    scale: new THREE.Vector3(1, 1, 1),
+    health: 100,
+    maxHealth: 100,
+    state: CombatantState.ENGAGING,
+    weaponSpec: {} as any,
+    gunCore: {} as any,
+    skillProfile: {} as any,
+    lastShotTime: 0,
+    currentBurst: 0,
+    burstCooldown: 0,
+    reactionTimer: 0,
+    suppressionLevel: 0,
+    alertTimer: 0,
+    isFullAuto: false,
+    panicLevel: 0,
+    lastHitTime: 0,
+    consecutiveMisses: 0,
+    wanderAngle: 0,
+    timeToDirectionChange: 0,
+    lastUpdateTime: 0,
+    updatePriority: 0,
+    lodLevel: 'high',
+    kills: 0,
+    deaths: 0,
+  } as Combatant;
+
   constructor(
     scene: THREE.Scene,
     tracerPool: TracerPool,
@@ -307,7 +347,10 @@ export class CombatantCombat {
     if (hit) {
       const damage = damageCalculator(hit.distance, hit.headshot);
       const targetHealth = hit.combatant.health;
-      this.damage.applyDamage(hit.combatant, damage, undefined, undefined, hit.headshot);
+      // Keep proxy position current so deathDirection / AI threat bearing are
+      // oriented from where the player actually stood when the shot resolved.
+      this._playerAttackerProxy.position.copy(this.playerPosition);
+      this.damage.applyDamage(hit.combatant, damage, this._playerAttackerProxy, undefined, hit.headshot);
 
       const killed = targetHealth > 0 && hit.combatant.health <= 0;
 
