@@ -4,6 +4,35 @@ Last updated: 2026-04-16
 
 This file is the master plan for an orchestrator agent draining the drift-correction backlog in a single focused pass. Read this first. Then read the task files under `docs/tasks/` as you dispatch them.
 
+## Kickoff (read this first if you are the orchestrator)
+
+You are the orchestrator. You will spawn implementation subagents in parallel, wait for them, run CI, merge, and advance the DAG. You do not write code yourself — executors do.
+
+1. Confirm your effort level is `xhigh` (`/effort xhigh` if not).
+2. Confirm you are on `master` at the latest origin tip (`git fetch origin && git status`).
+3. Use `TaskCreate` to create one task per brief in `docs/tasks/`. Keep a live status table.
+4. Read this whole file (Mission, DAG, Dependency rules, Dispatch protocol, Merge protocol, Failure handling, Ground rules).
+5. Dispatch **Round 1** per the round schedule below. Cap: **5 concurrent executors max per round.**
+6. Poll CI with `Monitor` or `gh pr view --json statusCheckRollup`. Do not sleep-poll.
+7. Merge playtest-optional AND playtest-required tasks on CI green (no parking — user chose parallel-merge-revert-if-needed policy).
+8. After every system-touching merge, schedule a post-round perf capture (batched, not per-task).
+9. Interrupt and surface to the user on: fence-change proposal, 2+ task failures in a batch, CI total regression.
+10. At end, print the end-of-run summary (see `## End-of-run checklist`).
+
+**Execution model:** all subagents run Opus 4.7 at effort `xhigh`. Executors use `subagent_type: "executor"` with the task file contents as their brief. Use `isolation: "worktree"` so each gets its own branch + directory.
+
+**Concurrency cap:** 5 parallel executors max. This is a workstation thermal + context-budget limit, not a Claude Code limit.
+
+## Round schedule
+
+Do not dispatch all 17 parallel-eligible tasks at once.
+
+- **Round 1 (5 parallel):** B1, C1, C2, C3, C4 — B1 first because A2 is gated on it.
+- **Round 2 (5 parallel, starts immediately after Round 1 dispatch returns, overlaps with Round 1 merges):** A1, A3, A4, A5, B2.
+- **Round 3 (2–3 parallel):** B3, A2 (only after B1 merges), any retries from Round 1–2.
+- **E-track (background, staggered):** Dispatch E1, E2, E3 in Round 1+; E4, E5, E6 after Round 2 dispatch returns. E tasks write to `spike/*` branches and produce memos at `docs/rearch/E*-*.md` — they do not merge to master and never conflict with A/B/C.
+- **Round 4 (serial, after all A+B+C merged):** D1 then D2. D1 likely surfaces a fence change — stop and surface to user before proceeding.
+
 ## Mission
 
 Correct accumulated drift without re-architecting the whole system. The deliverables for this pass are:
@@ -74,17 +103,15 @@ The orchestrator, for each task in parallel-eligible batches:
 - **Never:** force-push to master. Never squash a merge without explicit instruction.
 - After every merge: re-run `npm run perf:capture:combat120` if the PR touched any system in `src/systems/`. Budget is 7 min; this is the cost of parallelism.
 
-## Playtest queue
+## Playtest policy (current run)
 
-Some tasks require human playtest before merge (flagged in the task file under `**Playtest required:** yes`). The orchestrator:
+**Merge-first, revert-if-needed.** For this run, playtest-required PRs are merged on CI green along with everything else. The user accepts revert risk in exchange for DAG throughput. The orchestrator still:
 
-- Does **not** merge playtest-required PRs. Instead, collects them in a pending list.
-- Hands the pending list to the human at the end of the run or on request.
-- Merges playtest-optional PRs immediately on CI green.
+- Flags PRs that were playtest-required in the end-of-run summary, under a `Playtest recommended` section.
+- Recommends a playtest pass against combat120 + Open Frontier after the run completes.
+- Does **not** auto-revert. Revert decisions are human.
 
-Tasks that are playtest-optional: docs changes, infrastructure (C-series), test triage (A-series), isolated bug fixes that don't change user-visible behavior.
-
-Tasks that are playtest-required: anything in the flight path, combat AI behavior, vehicle/helicopter feel, UI responsiveness. (B1 is playtest-required. D1 and D2 are playtest-required.)
+Tasks currently flagged playtest-required in their briefs: **B1, D1, D2**. Treat these as "merge + flag for follow-up playtest," not "block on playtest."
 
 ## Failure handling
 
@@ -134,16 +161,44 @@ Blocked:
 
 Before finishing:
 
-- [ ] All playtest-optional tasks merged to master.
-- [ ] Playtest-pending list handed to human.
-- [ ] Blocked list handed to human with agent failure reports.
-- [ ] `npm run perf:capture:combat120` run against final master, numbers recorded.
-- [ ] Summary printed.
+- [ ] All merged tasks listed with PR URLs.
+- [ ] `Playtest recommended` section lists B1 + any D-batch PRs that landed, with a one-line "what to try" per PR.
+- [ ] Blocked list handed to human with agent failure reports (what was attempted, what broke, suggested next step).
+- [ ] E-track memos delivered under `docs/rearch/E*-*.md`, summarized in the final report.
+- [ ] `npm run perf:capture:combat120` run against final master, delta vs pre-run baseline recorded.
+- [ ] Summary printed in this shape:
+
+```
+Run complete.
+
+Merged (N): <list of PR URLs, one per line>
+Blocked (N): <task-id — reason>
+Playtest recommended: B1, (D1, D2 if landed)
+E-track memos: E1, E2, E3, E4, E5, E6 → docs/rearch/
+
+Perf vs pre-run master:
+  combat120 p95: X ms (Δ +/- Y%)
+  combat120 p99: X ms (Δ +/- Y%)
+
+Next session: review E memos, plan Batch F.
+```
+
+## Agents you will spawn
+
+All defined under `.claude/agents/`:
+
+- **`executor`** (`.claude/agents/executor.md`) — the implementation agent. Spawn N per round with `subagent_type: "executor"`, `isolation: "worktree"`, and the task file contents in the prompt.
+- **`combat-reviewer`** (`.claude/agents/combat-reviewer.md`) — post-implementation review for tasks touching `src/systems/combat/**`. Spawn after the executor reports done, before merge.
+- **`terrain-nav-reviewer`** (`.claude/agents/terrain-nav-reviewer.md`) — same pattern for `src/systems/terrain/**` + `src/systems/navigation/**`.
+- **`perf-analyst`** (`.claude/agents/perf-analyst.md`) — post-round perf capture analysis.
+
+All four agents are pinned to Opus 4.7 at effort `xhigh` via frontmatter.
 
 ## References
 
 - Task files: `docs/tasks/*.md`
 - Test contract: `docs/TESTING.md`
 - Fence rules: `docs/INTERFACE_FENCE.md`
-- Playtest: `docs/PLAYTEST_CHECKLIST.md`
+- Playtest checklist (for recommended follow-up): `docs/PLAYTEST_CHECKLIST.md`
 - Current backlog (deferred items): `docs/BACKLOG.md`
+- Rearchitecture questions (Batch E inputs): `docs/REARCHITECTURE.md`

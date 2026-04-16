@@ -73,6 +73,13 @@ output/
 tmp/
 tmp/*.lock
 
+# Claude Code / agent harness
+# Committed: .claude/agents/, .claude/commands/, .claude/skills/, .claude/launch.json (shared debug config)
+# Ignored: local state + worktrees
+.claude/settings.local.json
+.claude/worktrees/
+.claude/scheduled_tasks.lock
+
 # Vietnam terrain data (large binary files, downloaded via scripts)
 data/vietnam/terrain-tiles/
 data/vietnam/big-map/z13/
