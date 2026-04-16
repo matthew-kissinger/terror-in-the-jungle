@@ -3,8 +3,15 @@
 import { chromium, type BrowserContext, type Page } from 'playwright';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { execSync, spawn, type ChildProcess } from 'child_process';
-import { Socket } from 'net';
+import {
+  cleanupPortListeners,
+  isPortOpen,
+  parseServerModeArg,
+  startServer,
+  stopServer,
+  type ServerHandle,
+  type ServerMode,
+} from './preview-server';
 
 const HOST = '127.0.0.1';
 const DEFAULT_PORT = 4173;
@@ -59,141 +66,6 @@ function ensureDir(dir: string): void {
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true });
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function isPortOpen(host: string, port: number): Promise<boolean> {
-  return new Promise((resolve) => {
-    const socket = new Socket();
-    socket.setTimeout(800);
-    socket.once('connect', () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once('timeout', () => resolve(false));
-    socket.once('error', () => resolve(false));
-    socket.connect(port, host);
-  });
-}
-
-async function waitForPort(host: string, port: number, timeoutMs: number): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await isPortOpen(host, port)) {
-      return;
-    }
-    await sleep(250);
-  }
-  throw new Error(`Timed out waiting for ${host}:${port}`);
-}
-
-function cleanupPortListeners(port: number): void {
-  if (process.platform === 'win32') {
-    try {
-      const output = execSync(`netstat -ano -p tcp | findstr :${port}`, { encoding: 'utf-8' });
-      const pids = output
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => line.split(/\s+/))
-        .filter((parts) => parts.length >= 5 && parts[3] === 'LISTENING')
-        .map((parts) => Number(parts[4]))
-        .filter((pid) => Number.isFinite(pid) && pid > 0);
-      for (const pid of new Set(pids)) {
-        spawn('taskkill', ['/PID', String(pid), '/T', '/F'], { shell: false, stdio: 'ignore' });
-        console.log(`[probe] cleared stale listener on :${port} (pid=${pid})`);
-      }
-    } catch {
-      // best effort
-    }
-    return;
-  }
-
-  try {
-    const output = execSync(`lsof -ti tcp:${port} -sTCP:LISTEN`, { encoding: 'utf-8' });
-    const pids = output
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((pid) => Number(pid))
-      .filter((pid) => Number.isFinite(pid) && pid > 0);
-    for (const pid of new Set(pids)) {
-      try {
-        process.kill(pid, 'SIGKILL');
-        console.log(`[probe] cleared stale listener on :${port} (pid=${pid})`);
-      } catch {
-        // already gone
-      }
-    }
-  } catch {
-    try {
-      execSync(`fuser -k ${port}/tcp`, { encoding: 'utf-8', stdio: 'ignore' });
-    } catch {
-      // best effort
-    }
-  }
-}
-
-function startDevServer(host: string, port: number): ChildProcess {
-  let proc: ChildProcess;
-  if (process.platform === 'win32') {
-    proc = spawn('cmd.exe', ['/d', '/s', '/c', `npm run dev -- --host ${host} --port ${port}`], {
-      cwd: process.cwd(),
-      stdio: 'ignore',
-      shell: false,
-    });
-  } else {
-    proc = spawn('npm', ['run', 'dev', '--', '--host', host, '--port', String(port)], {
-      cwd: process.cwd(),
-      stdio: 'ignore',
-      shell: false,
-    });
-  }
-  console.log(`[probe] dev-server spawned pid=${proc.pid ?? 'unknown'} on ${host}:${port}`);
-  return proc;
-}
-
-async function stopDevServer(proc: ChildProcess): Promise<void> {
-  const pid = proc.pid;
-  if (proc.killed || !pid) {
-    console.log(`[probe] dev-server already exited (pid=${pid ?? 'unknown'})`);
-    return;
-  }
-  console.log(`[probe] stopping dev-server pid=${pid}`);
-  if (process.platform === 'win32') {
-    await new Promise<void>((resolve) => {
-      const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], {
-        stdio: 'ignore',
-        shell: false,
-      });
-      killer.on('close', () => resolve());
-      killer.on('error', () => resolve());
-    });
-    // Brief grace window for the child exit event.
-    await sleep(500);
-    console.log(`[probe] dev-server stopped pid=${pid} (killed=${proc.killed})`);
-    return;
-  }
-  let exited = false;
-  proc.once('exit', () => { exited = true; });
-  try {
-    process.kill(-pid, 'SIGTERM');
-  } catch {
-    proc.kill('SIGTERM');
-  }
-  await sleep(1000);
-  if (!exited) {
-    try {
-      process.kill(-pid, 'SIGKILL');
-    } catch {
-      try { proc.kill('SIGKILL'); } catch { /* noop */ }
-    }
-    await sleep(500);
-  }
-  console.log(`[probe] dev-server stopped pid=${pid} (exited=${exited})`);
 }
 
 async function createContext(browser: Awaited<ReturnType<typeof chromium.launch>>): Promise<BrowserContext> {
@@ -370,22 +242,29 @@ function printSummaryTable(results: ScenarioResult[]): void {
 async function main(): Promise<void> {
   const port = parseNumberArg('port', DEFAULT_PORT);
   const headed = parseBooleanArg('headed', false);
-  // Default OFF: fresh spawn + explicit teardown per run. Pass --reuse-dev-server=1
-  // when iterating locally and a clean dev server is already running.
-  const reuseDevServer = parseBooleanArg('reuse-dev-server', false);
+  // Default OFF: fresh spawn + explicit teardown per run.
+  const reuseServer = parseBooleanArg('reuse-server', parseBooleanArg('reuse-dev-server', false));
+  // Default 'perf': preview the perf-harness bundle (prod-shape with
+  // diagnostic hooks compiled in via VITE_PERF_HARNESS=1). See
+  // scripts/preview-server.ts and docs/PERFORMANCE.md for the full story.
+  const serverMode: ServerMode = parseServerModeArg(process.argv, 'perf');
   const artifactDir = join(process.cwd(), 'artifacts', 'fixed-wing-runtime-probe');
   ensureDir(artifactDir);
 
-  let server: ChildProcess | null = null;
-  let startedServer = false;
+  let server: ServerHandle | null = null;
   try {
-    if (reuseDevServer && (await isPortOpen(HOST, port))) {
-      console.log(`[probe] reusing existing dev server on :${port}`);
+    if (reuseServer && (await isPortOpen(port, HOST))) {
+      console.log(`[probe] reusing existing ${serverMode} server on :${port}`);
     } else {
-      cleanupPortListeners(port);
-      server = startDevServer(HOST, port);
-      startedServer = true;
-      await waitForPort(HOST, port, STARTUP_TIMEOUT_MS);
+      cleanupPortListeners(port, (msg) => console.log(`[probe] ${msg}`));
+      server = await startServer({
+        mode: serverMode,
+        host: HOST,
+        port,
+        startupTimeoutMs: STARTUP_TIMEOUT_MS,
+        stdio: 'ignore',
+        log: (msg) => console.log(`[probe] ${msg}`),
+      });
     }
 
     const browser = await chromium.launch({
@@ -435,8 +314,8 @@ async function main(): Promise<void> {
     printSummaryTable(results);
     await browser.close();
   } finally {
-    if (server && startedServer) {
-      await stopDevServer(server);
+    if (server) {
+      await stopServer(server);
     }
   }
 }
