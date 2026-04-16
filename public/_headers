@@ -8,10 +8,18 @@
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
+# /data/* rules are split into specific subpaths so that Cloudflare Pages does
+# not merge multiple matching Cache-Control values into one concatenated header
+# (observed in prod before 2026-04-16: "max-age=31536000, immutable, max-age=86400").
+# See docs/DEPLOY_WORKFLOW.md section 2 for context.
+
 /data/navmesh/*
   Cache-Control: public, max-age=31536000, immutable
 
-/data/*
+/data/heightmaps/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/data/vietnam/*
   Cache-Control: public, max-age=86400
 
 /
