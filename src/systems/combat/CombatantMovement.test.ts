@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { CombatantMovement } from './CombatantMovement';
 import { CombatantState } from './types';
 import { createTestCombatant, mockTerrainRuntime } from '../../test-utils';
+import { NPC_MAX_SPEED } from '../../config/CombatantConfig';
 
 function mockNavmeshAdapter(agentIds: Set<string> = new Set()) {
   return {
@@ -141,6 +142,33 @@ describe('CombatantMovement', () => {
 
     expect(c.velocity.lengthSq()).toBe(0);
     expect(c.rotation).toBeCloseTo(0);
+  });
+
+  it('bounds per-tick position delta even under a hitching deltaTime', () => {
+    // Frame hitches (GC pause, long frame) can deliver oversized dt to the movement
+    // integrator. The position step must stay bounded so NPCs cannot teleport.
+    const c = createTestCombatant({
+      id: 'npc-hitch',
+      state: CombatantState.ADVANCING,
+      position: new THREE.Vector3(0, 0, 0),
+      destinationPoint: new THREE.Vector3(100, 0, 0),
+      lodLevel: 'high',
+    });
+
+    const startX = c.position.x;
+    const startZ = c.position.z;
+
+    // 2 seconds of dt in a single tick — represents a severe hitch.
+    movement.updateMovement(c, 2.0, new Map(), new Map(), {
+      disableSpacing: true,
+      disableTerrainSample: true,
+    });
+
+    const horizontalDelta = Math.hypot(c.position.x - startX, c.position.z - startZ);
+    // Upper bound: NPC_MAX_SPEED * MAX_DELTA_TIME (0.1s clamp) = 0.8m, with a small
+    // tolerance for downstream steering adjustments. Definitively far below the ~16m
+    // that an unclamped 2.0s dt * 8 m/s would produce.
+    expect(horizontalDelta).toBeLessThan(NPC_MAX_SPEED * 0.1 + 0.5);
   });
 
   describe('stuck detector integration', () => {

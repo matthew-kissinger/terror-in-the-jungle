@@ -5,9 +5,10 @@ import { handlePlayerCommand, handleRejoiningMovement } from './CombatantMovemen
 import { NPC_MAX_SPEED } from '../../config/CombatantConfig';
 
 // ── Movement speeds (m/s) ──
-// With navmesh path-following, NPCs no longer waste time stuck on terrain.
-// Speeds reflect intended tactical pace, not compensation for stuck time.
-const TRAVERSAL_RUN_SPEED = Math.max(NPC_MAX_SPEED + 2, 10);
+// NPC_MAX_SPEED is the true locomotion ceiling. Never add to or floor-override it —
+// that produces superhuman "hypersprint" bursts. Stall recovery is handled by
+// StuckDetector + navmesh backtrack, not by boosting traversal speed.
+const TRAVERSAL_RUN_SPEED = NPC_MAX_SPEED;
 const SQUAD_FOLLOW_SPEED = 7;
 const PATROL_SPEED = 7.5;
 const PATROL_CLOSE_SPEED = 5;
@@ -18,7 +19,7 @@ const ADVANCING_TRAVERSE_SPEED = 8;
 const ADVANCING_CLOSE_SPEED = 5.5;
 const COMBAT_RETREAT_SPEED = 3.5;
 const COMBAT_STRAFE_SPEED = 3;
-const COVER_SEEKING_SPEED = Math.max(NPC_MAX_SPEED + 1.0, 9.0);
+const COVER_SEEKING_SPEED = NPC_MAX_SPEED;
 const DEFEND_SPEED = 6;
 const SUPPRESS_HOLD_SPEED = 0;
 

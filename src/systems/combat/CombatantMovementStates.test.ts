@@ -4,6 +4,7 @@ import { updatePatrolMovement, updateCombatMovement, updateCoverSeekingMovement,
 import { Combatant, Faction, Squad, SquadCommand } from './types';
 import { ZoneState } from '../world/ZoneManager';
 import { handlePlayerCommand, handleRejoiningMovement } from './CombatantMovementCommands';
+import { NPC_MAX_SPEED } from '../../config/CombatantConfig';
 
 // Mock Three.js Vector3
 vi.mock('three', () => ({
@@ -217,7 +218,11 @@ describe('CombatantMovementStates', () => {
         zoneManager: zoneManager as any,
         getEnemyBasePosition: () => new THREE.Vector3(100, 0, 0)
       });
-      expect(farLeader.velocity.length()).toBeCloseTo(10, 5); // PATROL_LONG_DISTANCE_SPEED
+      // Long-distance patrol runs at least as fast as closer-range patrol speeds,
+      // but must never exceed NPC_MAX_SPEED (hypersprint guard).
+      expect(farLeader.velocity.length()).toBeGreaterThanOrEqual(nearLeader.velocity.length());
+      expect(farLeader.velocity.length()).toBeGreaterThanOrEqual(midLeader.velocity.length());
+      expect(farLeader.velocity.length()).toBeLessThanOrEqual(NPC_MAX_SPEED + 1e-5);
     });
 
     it('falls back to advancing toward enemy base when no zones are available', () => {
@@ -364,10 +369,12 @@ describe('CombatantMovementStates', () => {
       expect(combatant.velocity.length()).toBe(0);
     });
 
-    it('moves toward destination at COVER_SEEKING_SPEED when not arrived', () => {
+    it('moves toward destination at up to NPC_MAX_SPEED when not arrived', () => {
       const combatant = createCombatant({ destinationPoint: new THREE.Vector3(20, 0, 0) });
       updateCoverSeekingMovement(combatant);
-      expect(combatant.velocity.x).toBeCloseTo(9, 5); // COVER_SEEKING_SPEED
+      // Cover-seeking must not exceed the NPC locomotion ceiling (hypersprint guard).
+      expect(combatant.velocity.x).toBeGreaterThan(0);
+      expect(combatant.velocity.x).toBeLessThanOrEqual(NPC_MAX_SPEED + 1e-5);
       expect(combatant.velocity.z).toBeCloseTo(0, 5);
     });
   });

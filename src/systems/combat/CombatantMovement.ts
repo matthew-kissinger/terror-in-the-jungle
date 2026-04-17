@@ -205,8 +205,15 @@ export class CombatantMovement {
 
     const steering = this.applyTerrainAwareVelocity(combatant, now);
 
+    // Clamp dt before position integration. Frame hitches (GC, heavy frames) produce
+    // oversized dt that, combined with velocity, yield inhuman position jumps.
+    // Mirrors updateRotation's safeDeltaTime below.
+    const safeDeltaTime = Number.isFinite(deltaTime)
+      ? Math.max(0, Math.min(deltaTime, MAX_DELTA_TIME))
+      : DEFAULT_DELTA_TIME;
+
     // Apply velocity normally - LOD scaling handled in CombatantSystem
-    combatant.position.addScaledVector(combatant.velocity, deltaTime);
+    combatant.position.addScaledVector(combatant.velocity, safeDeltaTime);
 
     // Keep on terrain with sampled/cached updates to avoid per-frame height churn at scale.
     if (!options?.disableTerrainSample) {
