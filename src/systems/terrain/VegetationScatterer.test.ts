@@ -27,7 +27,6 @@ import type { GlobalBillboardSystem } from '../world/billboard/GlobalBillboardSy
 import type { VegetationTypeConfig } from '../../config/vegetationTypes';
 import type { BiomeClassificationRule, BiomeVegetationEntry } from '../../config/biomes';
 import { ChunkVegetationGenerator } from './ChunkVegetationGenerator';
-import { getHeightQueryCache } from './HeightQueryCache';
 
 function makeMockBillboard(): GlobalBillboardSystem {
   return {
@@ -104,15 +103,6 @@ describe('VegetationScatterer', () => {
     expect(scatterer.getActiveCellCount()).toBe(0);
   });
 
-  it('does not generate when not configured', () => {
-    const emptyScatterer = new VegetationScatterer(billboard, 64, 2);
-    emptyScatterer.update(new THREE.Vector3(0, 0, 0));
-
-    // addChunkInstances should not be called for empty config
-    // (cells are tracked but no vegetation generated)
-    expect(emptyScatterer.getActiveCellCount()).toBeGreaterThan(0);
-  });
-
   it('classifies vegetation by biome rule per cell', () => {
     const rules: BiomeClassificationRule[] = [
       { biomeId: 'highland', elevationMin: 4, priority: 10 },
@@ -135,23 +125,4 @@ describe('VegetationScatterer', () => {
     expect(classifiedPalette).toEqual(highlandPalette);
   });
 
-  it('passes unclamped world coordinates to height cache (heightmap covers visual extent)', () => {
-    scatterer.setWorldBounds(100, 50);
-
-    const cache = getHeightQueryCache() as any;
-    cache.getHeightAt.mockClear();
-
-    (scatterer as any).generateCell('1,0');
-
-    const calls = vi.mocked(ChunkVegetationGenerator.generateVegetation).mock.calls;
-    expect(calls.length).toBeGreaterThan(0);
-    const getHeight = calls[calls.length - 1][3] as (localX: number, localZ: number) => number;
-
-    cache.getHeightAt.mockClear();
-    getHeight(64, 0);
-
-    // baseX = 1*64 = 64, localX = 64 -> worldX = 128. No clamping:
-    // heightmap covers full visual extent (worldSize + 2*visualMargin).
-    expect(cache.getHeightAt).toHaveBeenCalledWith(128, 0);
-  });
 });

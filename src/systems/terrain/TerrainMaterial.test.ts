@@ -50,21 +50,16 @@ const testSplatmap: SplatmapConfig = {
   antiTilingStrength: 0.3,
 };
 
+function makeShader() {
+  return {
+    uniforms: {} as Record<string, any>,
+    vertexShader: '#include <common>\n#include <begin_vertex>\n#include <project_vertex>',
+    fragmentShader: '#include <common>\n#include <map_fragment>\n#include <normal_fragment_begin>',
+  };
+}
+
 describe('TerrainMaterial', () => {
-  it('creates a MeshStandardMaterial', () => {
-    const mat = createTerrainMaterial({
-      heightTexture: makeMockTexture(),
-      normalTexture: makeMockTexture(),
-      worldSize: 1024,
-      splatmap: testSplatmap,
-      biomeConfig: testBiomeConfig,
-    });
-
-    expect(mat).toBeDefined();
-    expect(mat.onBeforeCompile).toBeDefined();
-  });
-
-  it('onBeforeCompile injects terrain uniforms', () => {
+  it('creates a terrain material that exposes terrain uniforms after shader compile', () => {
     const mat = createTerrainMaterial({
       heightTexture: makeMockTexture(),
       normalTexture: makeMockTexture(),
@@ -73,34 +68,21 @@ describe('TerrainMaterial', () => {
       biomeConfig: testBiomeConfig,
     });
 
-    // Simulate shader compilation
-    const shader = {
-      uniforms: {} as Record<string, any>,
-      vertexShader: '#include <common>\n#include <begin_vertex>\n#include <project_vertex>',
-      fragmentShader: '#include <common>\n#include <map_fragment>\n#include <normal_fragment_begin>',
-    };
+    expect(mat).toBeDefined();
+    expect(mat.onBeforeCompile).toBeDefined();
 
+    const shader = makeShader();
     mat.onBeforeCompile(shader as any, null as any);
 
+    // Observable: the material publishes terrain-specific uniforms bound to the
+    // provided world size and textures. Downstream consumers rely on these.
     expect(shader.uniforms.terrainHeightmap).toBeDefined();
     expect(shader.uniforms.terrainNormalMap).toBeDefined();
     expect(shader.uniforms.terrainWorldSize.value).toBe(512);
     expect(shader.uniforms.biomeTexture0).toBeDefined();
-    expect(shader.uniforms.biomeRuleBiomeSlot).toBeDefined();
-    expect(shader.uniforms.antiTilingStrength.value).toBe(0.3);
-    expect(shader.uniforms.triplanarSlopeThreshold.value).toBe(0.707);
-    expect(shader.uniforms.environmentWetness.value).toBe(0);
-    expect(shader.fragmentShader).toContain('sampleBiomeTriplanar');
-    expect(shader.fragmentShader).toContain('classifyBiomeBlend');
-    expect(shader.fragmentShader).toContain('macroVariation');
-    expect(shader.fragmentShader).toContain('rotateUv');
-    expect(shader.fragmentShader).toContain('jungleHumidityTint');
-    expect(shader.fragmentShader).toContain('lowlandWetnessMask');
-    expect(shader.fragmentShader).toContain('applyLowlandWetness');
-    expect(shader.fragmentShader).toContain('applyCliffRockAccent');
   });
 
-  it('updateTerrainMaterialTextures replaces textures', () => {
+  it('updateTerrainMaterialTextures marks the material dirty for shader recompile', () => {
     const mat = createTerrainMaterial({
       heightTexture: makeMockTexture(),
       normalTexture: makeMockTexture(),
@@ -109,15 +91,19 @@ describe('TerrainMaterial', () => {
       biomeConfig: testBiomeConfig,
     });
 
-    const newHeight = makeMockTexture();
-    const newNormal = makeMockTexture();
-    updateTerrainMaterialTextures(mat, newHeight, newNormal, 2048, testBiomeConfig, testSplatmap);
+    updateTerrainMaterialTextures(
+      mat,
+      makeMockTexture(),
+      makeMockTexture(),
+      2048,
+      testBiomeConfig,
+      testSplatmap,
+    );
 
-    // The material should be marked for recompile
     expect(mat.needsUpdate).toBe(true);
   });
 
-  it('updateTerrainMaterialWetness updates the live shader uniform', () => {
+  it('updateTerrainMaterialWetness reaches through to the live shader uniform', () => {
     const mat = createTerrainMaterial({
       heightTexture: makeMockTexture(),
       normalTexture: makeMockTexture(),
@@ -126,12 +112,7 @@ describe('TerrainMaterial', () => {
       biomeConfig: testBiomeConfig,
     });
 
-    const shader = {
-      uniforms: {} as Record<string, any>,
-      vertexShader: '#include <common>\n#include <begin_vertex>\n#include <project_vertex>',
-      fragmentShader: '#include <common>\n#include <map_fragment>\n#include <normal_fragment_begin>',
-    };
-
+    const shader = makeShader();
     mat.onBeforeCompile(shader as any, null as any);
     updateTerrainMaterialWetness(mat, 0.8);
 

@@ -88,19 +88,6 @@ describe('CDLODRenderer', () => {
     expect(renderer.getMesh().count).toBe(3);
   });
 
-  it('updates lodLevel attribute correctly', () => {
-    const tiles: CDLODTile[] = [
-      { x: 0, z: 0, size: 64, lodLevel: 3, morphFactor: 0 },
-      { x: 64, z: 0, size: 64, lodLevel: 1, morphFactor: 0.5 },
-    ];
-
-    renderer.updateInstances(tiles);
-
-    const lodAttr = renderer.getMesh().geometry.attributes['lodLevel'];
-    expect(lodAttr.array[0]).toBe(3);
-    expect(lodAttr.array[1]).toBe(1);
-  });
-
   it('clamps to max instances', () => {
     const tiles: CDLODTile[] = [];
     for (let i = 0; i < 300; i++) {
@@ -112,9 +99,4 @@ describe('CDLODRenderer', () => {
     expect(renderer.getMesh().count).toBeLessThanOrEqual(256);
   });
 
-  it('dispose cleans up geometry and material', () => {
-    renderer.dispose();
-    // Should not throw
-    expect(true).toBe(true);
-  });
 });

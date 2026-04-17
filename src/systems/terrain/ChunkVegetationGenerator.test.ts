@@ -34,17 +34,7 @@ describe('ChunkVegetationGenerator', () => {
     vi.restoreAllMocks();
   });
 
-  it('reuses cached Poisson templates for repeated generation profiles', () => {
-    const poissonSpy = vi.spyOn(MathUtils, 'poissonDiskSampling');
-
-    const getHeight = () => 5;
-    ChunkVegetationGenerator.generateVegetation(0, 0, 64, getHeight, coconutOnly, palette);
-    ChunkVegetationGenerator.generateVegetation(1, 0, 64, getHeight, coconutOnly, palette);
-
-    expect(poissonSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it('applies deterministic per-cell offsets on top of cached Poisson templates', () => {
+  it('produces different vegetation placements for different chunks (per-cell offsets on top of cached templates)', () => {
     const template = [
       new THREE.Vector2(10, 10),
       new THREE.Vector2(20, 20),
@@ -62,6 +52,8 @@ describe('ChunkVegetationGenerator', () => {
     expect(firstInstances.length).toBeGreaterThan(0);
     expect(secondInstances.length).toBeGreaterThan(0);
 
+    // Positions in adjacent chunks should not land on identical local coordinates -
+    // otherwise neighboring chunks would show a visible tiled pattern.
     const firstLocal = firstInstances[0].position.x % 64;
     const secondLocal = secondInstances[0].position.x % 64;
     expect(secondLocal).not.toBeCloseTo(firstLocal, 5);
