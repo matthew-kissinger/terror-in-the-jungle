@@ -210,8 +210,9 @@ export class PerformanceTelemetry {
   private enabled = this.resolveInitialEnabledState()
 
   private constructor() {
-    // Expose to window only for harness/dev diagnostics.
-    if (import.meta.env.DEV && typeof window !== 'undefined' && isPerfDiagnosticsEnabled()) {
+    // Expose to window only for harness/dev diagnostics. Gate matches
+    // src/core/PerfDiagnostics.ts: DEV or VITE_PERF_HARNESS build.
+    if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && typeof window !== 'undefined' && isPerfDiagnosticsEnabled()) {
       (window as any).perf = {
         report: () => this.getReport(),
         getMovement: () => this.getMovementTelemetry(),
@@ -951,7 +952,7 @@ export class PerformanceTelemetry {
   }
 
   private resolveInitialEnabledState(): boolean {
-    if (!import.meta.env.DEV) {
+    if (!import.meta.env.DEV && import.meta.env.VITE_PERF_HARNESS !== '1') {
       return false
     }
     return isPerfDiagnosticsEnabled()

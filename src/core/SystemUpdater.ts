@@ -25,7 +25,8 @@ export class SystemUpdater {
   private readonly BUDGET_WARN_COOLDOWN_MS = 5_000;
   private budgetWarningLastMs: Map<string, number> = new Map();
   private readonly scheduler = new SimulationScheduler();
-  private readonly perfUserTimingEnabled = import.meta.env.DEV && isPerfUserTimingEnabled();
+  private readonly perfUserTimingEnabled =
+    (import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfUserTimingEnabled();
 
   updateSystems(
     refs: SystemKeyToType,
@@ -263,7 +264,7 @@ export class SystemUpdater {
   }
 
   private withUserTiming(name: string, fn: () => void): void {
-    if (!import.meta.env.DEV || !this.perfUserTimingEnabled) {
+    if (!this.perfUserTimingEnabled) {
       fn();
       return;
     }

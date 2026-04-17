@@ -34,7 +34,7 @@ export function startLiveGame(engine: GameEngine, initialSpawnPosition?: THREE.V
   performanceTelemetry.setEnabled(
     engine.performanceOverlay.isVisible()
     || engine.sandboxEnabled
-    || (import.meta.env.DEV && isPerfDiagnosticsEnabled())
+    || ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfDiagnosticsEnabled())
   );
 }
 

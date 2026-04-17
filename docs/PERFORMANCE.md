@@ -1,10 +1,48 @@
 # Performance & Profiling
 
-Last updated: 2026-04-07
+Last updated: 2026-04-16
+
+## Build targets
+
+Three Vite build targets exist, differing only in whether the perf-harness
+diagnostic hooks are compiled in:
+
+| Target | Command | Output | Harness surface | Use |
+|--------|---------|--------|-----------------|-----|
+| dev    | `npm run dev`        | — (HMR server) | yes   | Local development and live iteration |
+| retail | `npm run build`      | `dist/`        | no    | What ships to Cloudflare Pages |
+| perf   | `npm run build:perf` | `dist-perf/`   | yes   | Prod-shape bundle measured by perf captures |
+
+The `perf` target is the retail build plus the diagnostic hooks the harness
+drives (`window.__engine`, `window.__metrics`, `window.advanceTime`,
+`window.combatProfile`, `window.perf`, etc.). `VITE_PERF_HARNESS=1` is set at
+build time; Vite constant-folds `import.meta.env.VITE_PERF_HARNESS === '1'`,
+so retail builds dead-code-eliminate the hook branches.
+
+Why measure the `perf` build instead of `dev`:
+
+- Fidelity. Minification, tree-shaking, and chunk splitting change both code
+  shape and frame cost. Numbers from a dev bundle overstate production work
+  per frame.
+- Stability. Vite's dev HMR websocket has been observed to rot under repeated
+  headless captures ("send was called before connect"). The preview-served
+  bundle is stateless.
+
+Why not measure the `retail` bundle directly: the harness driver needs the
+diagnostic globals to coordinate warmup, read frame metrics, and inspect
+combat state. The `perf` bundle keeps everything else identical.
+
+`perf:capture` and `fixed-wing-runtime-probe` default to the `perf` target.
+Use `--server-mode dev` to debug against source maps; use
+`--server-mode retail` if you want to preview the ship bundle (the capture
+driver will time out waiting for `__engine`, which is the point — it proves
+retail has zero harness surface).
 
 ## Commands
 
 ```bash
+npm run build:perf                  # Build the perf-harness bundle to dist-perf/
+npm run preview:perf                # Preview dist-perf/ (harness-ready preview)
 npm run perf:capture                # Default headed capture
 npm run perf:capture:headless       # Headless capture
 npm run perf:capture:combat120      # 120 NPC combat stress test
