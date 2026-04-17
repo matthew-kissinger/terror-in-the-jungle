@@ -4,6 +4,7 @@ import { ISpatialQuery } from '../SpatialOctree'
 import { AICoverSystem } from './AICoverSystem'
 import { AIFlankingSystem } from './AIFlankingSystem'
 import { Logger } from '../../../utils/Logger'
+import { getFactionCombatTuning } from '../../../config/FactionCombatTuning'
 
 const _toTarget = new THREE.Vector3()
 const _flankingPos = new THREE.Vector3()
@@ -15,7 +16,6 @@ const CLOSE_RANGE_BURST = 8
 const CLOSE_RANGE_PAUSE_MS = 200
 const PANIC_HIT_WINDOW = 2.0 // seconds since last hit
 const PANIC_INCREMENT = 0.3
-const PANIC_THRESHOLD = 0.5
 const PANIC_BURST = 10
 const PANIC_PAUSE_MS = 150
 const PANIC_DECAY_RATE = 0.2
@@ -159,7 +159,7 @@ export class AIStateEngage {
       const timeSinceHit = (Date.now() - combatant.lastHitTime) / 1000
       if (timeSinceHit < PANIC_HIT_WINDOW) {
         combatant.panicLevel = Math.min(1.0, combatant.panicLevel + PANIC_INCREMENT)
-        if (combatant.panicLevel > PANIC_THRESHOLD) {
+        if (combatant.panicLevel > getFactionCombatTuning(combatant.faction).panicThreshold) {
           combatant.isFullAuto = true
           combatant.skillProfile.burstLength = PANIC_BURST
           combatant.skillProfile.burstPauseMs = PANIC_PAUSE_MS
