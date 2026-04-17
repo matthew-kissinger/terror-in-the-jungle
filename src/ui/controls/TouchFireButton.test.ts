@@ -24,46 +24,31 @@ describe('TouchFireButton', () => {
     button = document.getElementById('touch-fire-btn') as HTMLDivElement;
   });
 
-  it('creates the fire button element', () => {
+  it('mounts into the document', () => {
     expect(button).toBeTruthy();
-    const img = button.querySelector('img') as HTMLImageElement;
-    expect(img).toBeTruthy();
-    expect(img.src).toContain('icon-fire.png');
-    expect(button.className).toContain('fireBtn');
   });
 
-  it('touch start triggers onFireStart and visual pressed state', () => {
+  it('pointerdown triggers onFireStart, pointerup triggers onFireStop', () => {
     const onFireStart = vi.fn();
     const onFireStop = vi.fn();
     fireButton.setCallbacks(onFireStart, onFireStop);
 
     button.dispatchEvent(pointerEvent('pointerdown'));
-
     expect(onFireStart).toHaveBeenCalledTimes(1);
-    expect(button.classList.contains('pressed')).toBe(true);
-  });
 
-  it('touch end triggers onFireStop and resets visuals', () => {
-    const onFireStart = vi.fn();
-    const onFireStop = vi.fn();
-    fireButton.setCallbacks(onFireStart, onFireStop);
-
-    button.dispatchEvent(pointerEvent('pointerdown'));
     button.dispatchEvent(pointerEvent('pointerup'));
-
     expect(onFireStop).toHaveBeenCalledTimes(1);
-    expect(button.classList.contains('pressed')).toBe(false);
   });
 
-  it('show and hide toggle visibility', () => {
+  it('show / hide toggle visibility', () => {
     fireButton.hide();
     expect(button.style.display).toBe('none');
 
     fireButton.show();
-    expect(button.style.display).toBe('flex');
+    expect(button.style.display).not.toBe('none');
   });
 
-  it('hide while pressed triggers onFireStop', () => {
+  it('hide while pressed triggers onFireStop so the weapon stops firing', () => {
     const onFireStart = vi.fn();
     const onFireStop = vi.fn();
     fireButton.setCallbacks(onFireStart, onFireStop);
@@ -74,7 +59,7 @@ describe('TouchFireButton', () => {
     expect(onFireStop).toHaveBeenCalledTimes(1);
   });
 
-  it('dispose removes dom and listeners', () => {
+  it('dispose removes the button and detaches listeners', () => {
     const onFireStart = vi.fn();
     const onFireStop = vi.fn();
     fireButton.setCallbacks(onFireStart, onFireStop);

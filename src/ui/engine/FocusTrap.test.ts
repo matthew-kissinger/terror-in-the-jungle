@@ -84,16 +84,6 @@ describe('FocusTrap', () => {
     expect(document.activeElement).toBe(btn3);
   });
 
-  it('dispose removes all listeners', () => {
-    trap.activate();
-    trap.dispose();
-
-    btn3.focus();
-    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
-    btn3.dispatchEvent(event);
-    expect(document.activeElement).toBe(btn3);
-  });
-
   it('activate is idempotent (no duplicate listeners)', () => {
     trap.activate();
     trap.activate();

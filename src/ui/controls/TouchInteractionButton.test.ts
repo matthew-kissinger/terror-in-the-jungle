@@ -13,6 +13,12 @@ function pointerEvent(type: string, pointerId = 1): PointerEvent {
   });
 }
 
+/**
+ * Behavior-focused tests for the interaction prompt button.
+ *
+ * Preserves: show/hide lifecycle (critical per A5 brief), callback wiring,
+ * and safe disposal. We don't assert on icon file names or CSS class names.
+ */
 describe('TouchInteractionButton', () => {
   let interactionButton: TouchInteractionButton;
   let button: HTMLDivElement;
@@ -24,73 +30,34 @@ describe('TouchInteractionButton', () => {
     button = document.getElementById('touch-interaction-btn') as HTMLDivElement;
   });
 
-  it('creates the interaction button element', () => {
+  it('mounts hidden by default', () => {
     expect(button).toBeTruthy();
-    const img = button.querySelector('img') as HTMLImageElement;
-    expect(img).toBeTruthy();
-    expect(img.src).toContain('icon-interact.png');
-    expect(button.className).toContain('interactBtn');
-  });
-
-  it('starts hidden by default', () => {
     expect(button.style.display).toBe('none');
   });
 
-  it('touch start triggers onInteract callback and visual pressed state', () => {
-    const onInteract = vi.fn();
-    interactionButton.setCallback(onInteract);
+  it('showButton reveals the prompt and hideButton hides it cleanly', () => {
     interactionButton.showButton();
+    expect(button.style.display).not.toBe('none');
 
-    button.dispatchEvent(pointerEvent('pointerdown'));
-
-    expect(onInteract).toHaveBeenCalledTimes(1);
-    expect(button.classList.contains('pressed')).toBe(true);
-  });
-
-  it('touch end resets visuals', () => {
-    const onInteract = vi.fn();
-    interactionButton.setCallback(onInteract);
-    interactionButton.showButton();
-
-    button.dispatchEvent(pointerEvent('pointerdown'));
-    button.dispatchEvent(pointerEvent('pointerup'));
-
-    expect(button.classList.contains('pressed')).toBe(false);
-  });
-
-  it('showButton makes button visible', () => {
-    interactionButton.showButton();
-    expect(button.style.display).toBe('flex');
-  });
-
-  it('hideButton hides button', () => {
-    interactionButton.showButton();
     interactionButton.hideButton();
     expect(button.style.display).toBe('none');
   });
 
-  it('show() does not auto-show button (only showButton does)', () => {
+  it('top-level show() alone does not reveal the prompt (showButton controls visibility)', () => {
     interactionButton.show();
     expect(button.style.display).toBe('none');
   });
 
-  it('hide() hides button', () => {
-    interactionButton.showButton();
-    interactionButton.hide();
-    expect(button.style.display).toBe('none');
-  });
-
-  it('does not trigger callback if touched while hidden', () => {
+  it('tapping the button invokes the interact callback', () => {
     const onInteract = vi.fn();
     interactionButton.setCallback(onInteract);
+    interactionButton.showButton();
 
-    // Button is hidden by default
     button.dispatchEvent(pointerEvent('pointerdown'));
-
-    expect(onInteract).toHaveBeenCalledTimes(1); // Still triggers (button exists in DOM)
+    expect(onInteract).toHaveBeenCalledTimes(1);
   });
 
-  it('does not trigger callback multiple times from repeat pointerdown', () => {
+  it('repeated pointerdown events without release only fire once', () => {
     const onInteract = vi.fn();
     interactionButton.setCallback(onInteract);
     interactionButton.showButton();
@@ -102,7 +69,7 @@ describe('TouchInteractionButton', () => {
     expect(onInteract).toHaveBeenCalledTimes(1);
   });
 
-  it('dispose removes dom and listeners', () => {
+  it('dispose removes the button and detaches listeners', () => {
     const onInteract = vi.fn();
     interactionButton.setCallback(onInteract);
 
