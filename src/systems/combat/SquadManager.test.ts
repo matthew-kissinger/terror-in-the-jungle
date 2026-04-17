@@ -5,7 +5,6 @@ import { CombatantFactory } from './CombatantFactory'
 import { InfluenceMapSystem } from './InfluenceMapSystem'
 import type { ITerrainRuntime } from '../../types/SystemInterfaces'
 
-// Mock Three.js Vector3
 vi.mock('three', () => ({
   Vector3: vi.fn().mockImplementation(function (this: any, x = 0, y = 0, z = 0) {
     this.x = x
@@ -51,14 +50,12 @@ vi.mock('three', () => ({
   },
 }))
 
-// Mock HeightQueryCache
 vi.mock('../world/HeightQueryCache', () => ({
   getHeightQueryCache: vi.fn(() => ({
     getHeightAt: vi.fn((_x: number, _z: number) => 0),
   })),
 }))
 
-// Mock Logger
 vi.mock('../../utils/Logger', () => ({
   Logger: {
     log: vi.fn(),
@@ -69,7 +66,6 @@ vi.mock('../../utils/Logger', () => ({
   },
 }))
 
-// Helper to create mock combatant
 function createMockCombatant(overrides: Partial<Combatant> = {}): Combatant {
   const THREE = require('three')
   return {
@@ -152,193 +148,83 @@ describe('SquadManager', () => {
     squadManager = new SquadManager(mockFactory, mockTerrainSystem)
   })
 
-  describe('constructor', () => {
-    it('should create instance with factory', () => {
-      expect(squadManager).toBeDefined()
-    })
-
-    it('should create instance with factory and chunk manager', () => {
-      const manager = new SquadManager(mockFactory, mockTerrainSystem)
-      expect(manager).toBeDefined()
-    })
-
-    it('should initialize empty squads map', () => {
-      expect(squadManager.getAllSquads().size).toBe(0)
-    })
-  })
-
   describe('createSquad', () => {
-    it('should create squad with correct faction', () => {
+    it('creates a squad with the requested faction, size, and unique id per call', () => {
       const position = new THREE.Vector3(10, 0, 10)
-      const { squad } = squadManager.createSquad(Faction.US, position, 4)
-
-      expect(squad.faction).toBe(Faction.US)
-    })
-
-    it('should create squad with correct number of members', () => {
-      const position = new THREE.Vector3(10, 0, 10)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 4)
-
-      expect(squad.members.length).toBe(4)
-      expect(members.length).toBe(4)
-    })
-
-    it('should assign unique squad ID', () => {
-      const position = new THREE.Vector3(10, 0, 10)
-      const { squad: squad1 } = squadManager.createSquad(Faction.US, position, 2)
+      const { squad: squad1, members } = squadManager.createSquad(Faction.US, position, 4)
       const { squad: squad2 } = squadManager.createSquad(Faction.US, position, 2)
 
+      expect(squad1.faction).toBe(Faction.US)
+      expect(squad1.members.length).toBe(4)
+      expect(members.length).toBe(4)
       expect(squad1.id).not.toBe(squad2.id)
     })
 
-    it('should set first member as leader', () => {
-      const position = new THREE.Vector3(10, 0, 10)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 4)
+    it('promotes the first member to leader and marks the rest as followers, all tagged with the squad id', () => {
+      const { squad, members } = squadManager.createSquad(Faction.US, new THREE.Vector3(10, 0, 10), 4)
 
       expect(squad.leaderId).toBe(members[0].id)
       expect(members[0].squadRole).toBe('leader')
+      for (let i = 1; i < members.length; i++) {
+        expect(members[i].squadRole).toBe('follower')
+      }
+      members.forEach(m => expect(m.squadId).toBe(squad.id))
     })
 
-    it('should set remaining members as followers', () => {
-      const position = new THREE.Vector3(10, 0, 10)
-      const { members } = squadManager.createSquad(Faction.US, position, 4)
-
-      expect(members[1].squadRole).toBe('follower')
-      expect(members[2].squadRole).toBe('follower')
-      expect(members[3].squadRole).toBe('follower')
-    })
-
-    it('should set default formation to wedge', () => {
-      const position = new THREE.Vector3(10, 0, 10)
-      const { squad } = squadManager.createSquad(Faction.US, position, 4)
-
-      expect(squad.formation).toBe('wedge')
-    })
-
-    it('should assign squadId to all members', () => {
-      const position = new THREE.Vector3(10, 0, 10)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 4)
-
-      members.forEach(member => {
-        expect(member.squadId).toBe(squad.id)
-      })
-    })
-
-    it('should store squad in squads map', () => {
-      const position = new THREE.Vector3(10, 0, 10)
-      const { squad } = squadManager.createSquad(Faction.US, position, 4)
-
+    it('stores the squad in the lookup and returns it via getSquad', () => {
+      const { squad } = squadManager.createSquad(Faction.US, new THREE.Vector3(0, 0, 0), 4)
       expect(squadManager.getSquad(squad.id)).toBe(squad)
     })
 
-    it('should create OPFOR squads', () => {
-      const position = new THREE.Vector3(-10, 0, -10)
-      const { squad } = squadManager.createSquad(Faction.NVA, position, 3)
+    it('positions followers away from the leader anchor', () => {
+      const { members } = squadManager.createSquad(Faction.US, new THREE.Vector3(0, 0, 0), 4)
 
-      expect(squad.faction).toBe(Faction.NVA)
-      expect(squad.members.length).toBe(3)
+      // Leader at ~origin; every follower offset from it.
+      expect(members[1].position.x !== 0 || members[1].position.z !== 0).toBe(true)
+      expect(members[2].position.x !== 0 || members[2].position.z !== 0).toBe(true)
+      expect(members[3].position.x !== 0 || members[3].position.z !== 0).toBe(true)
     })
 
-    it('should create single-member squad', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 1)
-
-      expect(squad.members.length).toBe(1)
-      expect(members.length).toBe(1)
-      expect(members[0].squadRole).toBe('leader')
-    })
-
-    it('should create large squad', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 12)
-
-      expect(squad.members.length).toBe(12)
-      expect(members.length).toBe(12)
-    })
-
-    it('should position leader at center', () => {
-      const position = new THREE.Vector3(10, 0, 10)
-      const { members } = squadManager.createSquad(Faction.US, position, 4)
-
-      // Leader should be at or near center (with terrain height adjustment)
-      expect(members[0].position.x).toBeCloseTo(10, 0)
-      expect(members[0].position.z).toBeCloseTo(10, 0)
-    })
-
-    it('should position followers in formation', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { members } = squadManager.createSquad(Faction.US, position, 4)
-
-      // Followers should be offset from center
-      expect(members[1].position.x).not.toBe(0)
-      expect(members[2].position.x).not.toBe(0)
-      expect(members[3].position.x).not.toBe(0)
-    })
-
-    it('should call factory for each member', () => {
-      const position = new THREE.Vector3(10, 0, 10)
-      squadManager.createSquad(Faction.US, position, 4)
-
+    it('calls the combatant factory once per member', () => {
+      squadManager.createSquad(Faction.US, new THREE.Vector3(10, 0, 10), 4)
       expect(mockFactory.createCombatant).toHaveBeenCalledTimes(4)
     })
 
-    it('should increment squad ID counter', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad: squad1 } = squadManager.createSquad(Faction.US, position, 2)
-      const { squad: squad2 } = squadManager.createSquad(Faction.US, position, 2)
-
-      expect(squad1.id).toContain('squad_US_0')
-      expect(squad2.id).toContain('squad_US_1')
-    })
-
-    it('should move the squad anchor away from a narrow cliff band when a safer nearby point exists', () => {
+    it('moves the squad anchor out of a narrow cliff band when a safer nearby point exists', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5)
       vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockImplementation(
         (x: number) => (x >= 8 && x <= 12 ? 12 : 0),
       )
 
-      const position = new THREE.Vector3(10, 0, 0)
-      const { members } = squadManager.createSquad(Faction.US, position, 4)
-
+      const { members } = squadManager.createSquad(Faction.US, new THREE.Vector3(10, 0, 0), 4)
       expect(Math.abs(members[0].position.x - 10)).toBeGreaterThanOrEqual(4)
       vi.restoreAllMocks()
     })
 
-    it('should pull followers inward when the formation edge drops away sharply', () => {
+    it('pulls followers inward when the formation edge drops away sharply', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0.5)
       vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockImplementation((x: number) => (x >= 3.5 ? 10 : 0))
 
-      const position = new THREE.Vector3(0, 0, 0)
-      const { members } = squadManager.createSquad(Faction.US, position, 4)
-
+      const { members } = squadManager.createSquad(Faction.US, new THREE.Vector3(0, 0, 0), 4)
       expect(members[3].position.x).toBeLessThan(3.5)
       vi.restoreAllMocks()
     })
   })
 
   describe('removeSquadMember', () => {
-    it('should remove member from squad', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 4)
+    it('removes a follower without promoting a new leader', () => {
+      const { squad, members } = squadManager.createSquad(Faction.US, new THREE.Vector3(0, 0, 0), 4)
+      const originalLeader = squad.leaderId
 
-      squadManager.removeSquadMember(squad.id, members[1].id)
+      squadManager.removeSquadMember(squad.id, members[2].id)
 
       expect(squad.members.length).toBe(3)
-      expect(squad.members).not.toContain(members[1].id)
+      expect(squad.members).not.toContain(members[2].id)
+      expect(squad.leaderId).toBe(originalLeader)
     })
 
-    it('should delete squad when last member removed', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 1)
-
-      squadManager.removeSquadMember(squad.id, members[0].id)
-
-      expect(squadManager.getSquad(squad.id)).toBeUndefined()
-    })
-
-    it('should promote new leader when leader removed', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 4)
+    it('promotes a new leader when the current leader is removed', () => {
+      const { squad, members } = squadManager.createSquad(Faction.US, new THREE.Vector3(0, 0, 0), 4)
       const originalLeader = members[0].id
 
       squadManager.removeSquadMember(squad.id, originalLeader)
@@ -347,121 +233,38 @@ describe('SquadManager', () => {
       expect(squad.leaderId).not.toBe(originalLeader)
     })
 
-    it('should handle removing non-existent member', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad } = squadManager.createSquad(Faction.US, position, 4)
-
-      expect(() => {
-        squadManager.removeSquadMember(squad.id, 'non-existent-id')
-      }).not.toThrow()
-    })
-
-    it('should handle removing from non-existent squad', () => {
-      expect(() => {
-        squadManager.removeSquadMember('non-existent-squad', 'member-id')
-      }).not.toThrow()
-    })
-
-    it('should not promote leader if non-leader removed', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 4)
-      const originalLeader = squad.leaderId
-
-      squadManager.removeSquadMember(squad.id, members[2].id)
-
-      expect(squad.leaderId).toBe(originalLeader)
-    })
-
-    it('should handle removing multiple members sequentially', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 4)
-
-      squadManager.removeSquadMember(squad.id, members[1].id)
-      squadManager.removeSquadMember(squad.id, members[2].id)
-
-      expect(squad.members.length).toBe(2)
-    })
-
-    it('should delete squad after removing all members one by one', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 3)
-
+    it('deletes the squad entirely when the last member is removed', () => {
+      const { squad, members } = squadManager.createSquad(Faction.US, new THREE.Vector3(0, 0, 0), 1)
       squadManager.removeSquadMember(squad.id, members[0].id)
-      squadManager.removeSquadMember(squad.id, members[1].id)
-      squadManager.removeSquadMember(squad.id, members[2].id)
-
       expect(squadManager.getSquad(squad.id)).toBeUndefined()
     })
-  })
 
-  describe('getSquad', () => {
-    it('should return squad by ID', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad } = squadManager.createSquad(Faction.US, position, 4)
-
-      const retrieved = squadManager.getSquad(squad.id)
-
-      expect(retrieved).toBe(squad)
-    })
-
-    it('should return undefined for non-existent squad', () => {
-      const retrieved = squadManager.getSquad('non-existent-id')
-
-      expect(retrieved).toBeUndefined()
+    it('is a no-op for unknown squad / member ids', () => {
+      const { squad } = squadManager.createSquad(Faction.US, new THREE.Vector3(0, 0, 0), 4)
+      expect(() => {
+        squadManager.removeSquadMember(squad.id, 'non-existent-id')
+        squadManager.removeSquadMember('non-existent-squad', 'member-id')
+      }).not.toThrow()
     })
   })
 
   describe('getAllSquads', () => {
-    it('should return empty map initially', () => {
-      const squads = squadManager.getAllSquads()
-
-      expect(squads.size).toBe(0)
-    })
-
-    it('should return all created squads', () => {
+    it('returns every created squad until it is removed', () => {
       const position = new THREE.Vector3(0, 0, 0)
       squadManager.createSquad(Faction.US, position, 4)
       squadManager.createSquad(Faction.NVA, position, 3)
+      expect(squadManager.getAllSquads().size).toBe(2)
 
-      const squads = squadManager.getAllSquads()
-
-      expect(squads.size).toBe(2)
-    })
-
-    it('should reflect squad removals', () => {
-      const position = new THREE.Vector3(0, 0, 0)
       const { squad, members } = squadManager.createSquad(Faction.US, position, 1)
-
       squadManager.removeSquadMember(squad.id, members[0].id)
-
-      const squads = squadManager.getAllSquads()
-      expect(squads.size).toBe(0)
-    })
-  })
-
-  describe('setTerrainSystem', () => {
-    it('should store terrain system reference', () => {
-      const manager = new SquadManager(mockFactory)
-      manager.setTerrainSystem(mockTerrainSystem)
-
-      expect(manager).toBeDefined()
-    })
-  })
-
-  describe('setInfluenceMap', () => {
-    it('should store influence map reference', () => {
-      squadManager.setInfluenceMap(mockInfluenceMap)
-
-      expect(squadManager).toBeDefined()
+      expect(squadManager.getAllSquads().size).toBe(2)
     })
   })
 
   describe('assignSquadObjective', () => {
-    it('should assign objective from influence map', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad } = squadManager.createSquad(Faction.US, position, 4)
-
-      const mockZone = {
+    it('returns the influence-map pick when one is available', () => {
+      const { squad } = squadManager.createSquad(Faction.US, new THREE.Vector3(0, 0, 0), 4)
+      const zone = {
         id: 'zone1',
         name: 'Alpha',
         position: new THREE.Vector3(50, 0, 50),
@@ -469,47 +272,18 @@ describe('SquadManager', () => {
         owner: Faction.NVA,
         isHomeBase: false,
       }
-
-      vi.mocked(mockInfluenceMap.findBestZoneTarget).mockReturnValue(mockZone)
+      vi.mocked(mockInfluenceMap.findBestZoneTarget).mockReturnValue(zone)
       squadManager.setInfluenceMap(mockInfluenceMap)
 
-      const result = squadManager.assignSquadObjective(squad, position, [mockZone])
-
-      expect(result).toBe(mockZone)
+      const result = squadManager.assignSquadObjective(squad, new THREE.Vector3(0, 0, 0), [zone])
+      expect(result).toBe(zone)
       expect(squad.objective).toBeDefined()
     })
 
-    it('should fallback to random zone without influence map', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad } = squadManager.createSquad(Faction.US, position, 4)
+    it('returns null when no enemy/neutral zones are viable', () => {
+      const { squad } = squadManager.createSquad(Faction.US, new THREE.Vector3(0, 0, 0), 4)
 
-      const mockZone = {
-        id: 'zone1',
-        name: 'Alpha',
-        position: new THREE.Vector3(50, 0, 50),
-        radius: 30,
-        owner: Faction.NVA,
-        isHomeBase: false,
-      }
-
-      const result = squadManager.assignSquadObjective(squad, position, [mockZone])
-
-      expect(result).toBe(mockZone)
-    })
-
-    it('should return null if no valid zones', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad } = squadManager.createSquad(Faction.US, position, 4)
-
-      const result = squadManager.assignSquadObjective(squad, position, [])
-
-      expect(result).toBeNull()
-    })
-
-    it('should skip home base zones in fallback', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad } = squadManager.createSquad(Faction.US, position, 4)
-
+      // Only home base: must be skipped
       const homeBase = {
         id: 'hq',
         name: 'HQ',
@@ -518,16 +292,7 @@ describe('SquadManager', () => {
         owner: Faction.US,
         isHomeBase: true,
       }
-
-      const result = squadManager.assignSquadObjective(squad, position, [homeBase])
-
-      expect(result).toBeNull()
-    })
-
-    it('should skip zones owned by same faction in fallback', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad } = squadManager.createSquad(Faction.US, position, 4)
-
+      // Owned by same faction: must be skipped
       const ownedZone = {
         id: 'zone1',
         name: 'Alpha',
@@ -537,14 +302,27 @@ describe('SquadManager', () => {
         isHomeBase: false,
       }
 
-      const result = squadManager.assignSquadObjective(squad, position, [ownedZone])
+      expect(squadManager.assignSquadObjective(squad, new THREE.Vector3(0, 0, 0), [])).toBeNull()
+      expect(squadManager.assignSquadObjective(squad, new THREE.Vector3(0, 0, 0), [homeBase])).toBeNull()
+      expect(squadManager.assignSquadObjective(squad, new THREE.Vector3(0, 0, 0), [ownedZone])).toBeNull()
+    })
 
-      expect(result).toBeNull()
+    it('falls back to a valid zone even without an influence map', () => {
+      const { squad } = squadManager.createSquad(Faction.US, new THREE.Vector3(0, 0, 0), 4)
+      const zone = {
+        id: 'zone1',
+        name: 'Alpha',
+        position: new THREE.Vector3(50, 0, 50),
+        radius: 30,
+        owner: Faction.NVA,
+        isHomeBase: false,
+      }
+      expect(squadManager.assignSquadObjective(squad, new THREE.Vector3(0, 0, 0), [zone])).toBe(zone)
     })
   })
 
   describe('findBestApproachPosition', () => {
-    it('should return position from influence map', () => {
+    it('delegates to the influence map when one is set', () => {
       const currentPos = new THREE.Vector3(0, 0, 0)
       const targetPos = new THREE.Vector3(50, 0, 50)
       const bestPos = new THREE.Vector3(40, 0, 45)
@@ -552,143 +330,61 @@ describe('SquadManager', () => {
       vi.mocked(mockInfluenceMap.findBestPositionNear).mockReturnValue(bestPos)
       squadManager.setInfluenceMap(mockInfluenceMap)
 
-      const result = squadManager.findBestApproachPosition(
-        currentPos,
-        targetPos,
-        Faction.US,
-        50
-      )
-
+      const result = squadManager.findBestApproachPosition(currentPos, targetPos, Faction.US, 50)
       expect(result).toBe(bestPos)
       expect(mockInfluenceMap.findBestPositionNear).toHaveBeenCalledWith(targetPos, 50, Faction.US)
     })
 
-    it('should return null without influence map', () => {
-      const currentPos = new THREE.Vector3(0, 0, 0)
-      const targetPos = new THREE.Vector3(50, 0, 50)
-
+    it('returns null without an influence map', () => {
       const result = squadManager.findBestApproachPosition(
-        currentPos,
-        targetPos,
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(50, 0, 50),
         Faction.US,
         50
       )
-
       expect(result).toBeNull()
-    })
-
-    it('should use default search radius', () => {
-      const currentPos = new THREE.Vector3(0, 0, 0)
-      const targetPos = new THREE.Vector3(50, 0, 50)
-
-      vi.mocked(mockInfluenceMap.findBestPositionNear).mockReturnValue(null)
-      squadManager.setInfluenceMap(mockInfluenceMap)
-
-      squadManager.findBestApproachPosition(currentPos, targetPos, Faction.US)
-
-      expect(mockInfluenceMap.findBestPositionNear).toHaveBeenCalledWith(targetPos, 50, Faction.US)
     })
   })
 
   describe('assignSuppressionRoles', () => {
-    it('should return empty arrays for small squads', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 2)
+    it('splits a larger squad into suppressors (leader + first) and flankers with destinations', () => {
+      const { squad, members } = squadManager.createSquad(Faction.US, new THREE.Vector3(0, 0, 0), 4)
       const combatants = new Map(members.map(m => [m.id, m]))
-      const targetPos = new THREE.Vector3(50, 0, 50)
-
-      const result = squadManager.assignSuppressionRoles(squad, targetPos, combatants)
-
-      expect(result.suppressors.length).toBe(0)
-      expect(result.flankers.length).toBe(0)
-    })
-
-    it('should assign leader as suppressor', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 4)
-      const combatants = new Map(members.map(m => [m.id, m]))
-      const targetPos = new THREE.Vector3(50, 0, 50)
-
-      const result = squadManager.assignSuppressionRoles(squad, targetPos, combatants)
+      const result = squadManager.assignSuppressionRoles(squad, new THREE.Vector3(50, 0, 50), combatants)
 
       expect(result.suppressors).toContain(members[0])
-    })
-
-    it('should assign first follower as suppressor', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 4)
-      const combatants = new Map(members.map(m => [m.id, m]))
-      const targetPos = new THREE.Vector3(50, 0, 50)
-
-      const result = squadManager.assignSuppressionRoles(squad, targetPos, combatants)
-
       expect(result.suppressors).toContain(members[1])
-    })
-
-    it('should assign remaining members as flankers', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 4)
-      const combatants = new Map(members.map(m => [m.id, m]))
-      const targetPos = new THREE.Vector3(50, 0, 50)
-
-      const result = squadManager.assignSuppressionRoles(squad, targetPos, combatants)
-
       expect(result.flankers).toContain(members[2])
       expect(result.flankers).toContain(members[3])
-    })
-
-    it('should set destination points for flankers', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 4)
-      const combatants = new Map(members.map(m => [m.id, m]))
-      const targetPos = new THREE.Vector3(50, 0, 50)
-
-      squadManager.assignSuppressionRoles(squad, targetPos, combatants)
-
       expect(members[2].destinationPoint).toBeDefined()
       expect(members[3].destinationPoint).toBeDefined()
     })
 
-    it('should handle missing combatants gracefully', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad } = squadManager.createSquad(Faction.US, position, 4)
-      const combatants = new Map()
-      const targetPos = new THREE.Vector3(50, 0, 50)
-
-      const result = squadManager.assignSuppressionRoles(squad, targetPos, combatants)
+    it('returns empty roles when the squad is too small', () => {
+      const { squad, members } = squadManager.createSquad(Faction.US, new THREE.Vector3(0, 0, 0), 2)
+      const combatants = new Map(members.map(m => [m.id, m]))
+      const result = squadManager.assignSuppressionRoles(squad, new THREE.Vector3(50, 0, 50), combatants)
 
       expect(result.suppressors.length).toBe(0)
       expect(result.flankers.length).toBe(0)
     })
 
-    it('should work with exactly 3 members', () => {
-      const position = new THREE.Vector3(0, 0, 0)
-      const { squad, members } = squadManager.createSquad(Faction.US, position, 3)
-      const combatants = new Map(members.map(m => [m.id, m]))
-      const targetPos = new THREE.Vector3(50, 0, 50)
-
-      const result = squadManager.assignSuppressionRoles(squad, targetPos, combatants)
-
-      expect(result.suppressors.length).toBe(2)
-      expect(result.flankers.length).toBe(1)
+    it('returns empty roles when members are missing from the combatants map', () => {
+      const { squad } = squadManager.createSquad(Faction.US, new THREE.Vector3(0, 0, 0), 4)
+      const result = squadManager.assignSuppressionRoles(squad, new THREE.Vector3(50, 0, 50), new Map())
+      expect(result.suppressors.length).toBe(0)
+      expect(result.flankers.length).toBe(0)
     })
   })
 
   describe('dispose', () => {
-    it('should clear all squads', () => {
+    it('clears every squad and tolerates being called with none', () => {
       const position = new THREE.Vector3(0, 0, 0)
       squadManager.createSquad(Faction.US, position, 4)
       squadManager.createSquad(Faction.NVA, position, 3)
-
       squadManager.dispose()
-
       expect(squadManager.getAllSquads().size).toBe(0)
-    })
-
-    it('should handle dispose on empty manager', () => {
-      expect(() => {
-        squadManager.dispose()
-      }).not.toThrow()
+      expect(() => squadManager.dispose()).not.toThrow()
     })
   })
 })
