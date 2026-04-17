@@ -278,6 +278,123 @@ describe('StuckDetector', () => {
     expect(detector.getRecord('npc-hold-timeout')!.holdStartTime).toBeUndefined();
   });
 
+  describe('goal-anchor-aware escalation', () => {
+    /**
+     * Simulate the real in-game backtrack cycle: NPC stalls, backtrack flips
+     * the movement anchor to a nearby recovery point; NPC reaches it; movement
+     * anchor flips back to the original goal; NPC re-stalls on the same slope.
+     *
+     * Without goal-aware tracking, the old detector reset recoveryCount every
+     * time the movement anchor flipped back to the goal, so MAX_CONSECUTIVE_
+     * BACKTRACKS never fired. With the goal anchor threaded through, the
+     * detector should hit 'hold' after the cap.
+     */
+    it('escalates to hold across repeated backtrack<->goal flips on an unreachable goal', () => {
+      const goal = new THREE.Vector3(50, 0, 50);
+      const backtrackPoint = new THREE.Vector3(12, 0, 12);
+      const c = createTestCombatant({
+        id: 'npc-flipping',
+        position: new THREE.Vector3(10, 0, 10),
+        movementAnchor: goal.clone(),
+        movementLastGoodPosition: new THREE.Vector3(8, 0, 8),
+      });
+      c.velocity.set(2, 0, 0);
+
+      detector.checkAndRecover(c, 0, goal);
+
+      let t = 0;
+      let lastAction: ReturnType<StuckDetector['checkAndRecover']> = 'none';
+
+      // Simulate many stall cycles. Each cycle: two stuck ticks against the
+      // goal, then the movement anchor flips to the backtrack point as the
+      // movement solver activates backtrack. The NPC makes no real progress
+      // toward the goal overall.
+      for (let cycle = 0; cycle < MAX_CONSECUTIVE_BACKTRACKS + 2; cycle++) {
+        // Stall toward goal.
+        c.movementAnchor = goal.clone();
+        for (let tick = 0; tick < STUCK_TICK_THRESHOLD; tick++) {
+          t += STUCK_CHECK_INTERVAL_MS;
+          lastAction = detector.checkAndRecover(c, t, goal);
+          if (lastAction === 'hold') break;
+        }
+        if (lastAction === 'hold') break;
+
+        // Movement anchor flips to the backtrack point (simulates
+        // activateBacktrack). The goal is unchanged.
+        c.movementAnchor = backtrackPoint.clone();
+        t += STUCK_CHECK_INTERVAL_MS;
+        detector.checkAndRecover(c, t, goal);
+      }
+
+      expect(lastAction).toBe('hold');
+    });
+
+    /**
+     * Real progress toward the goal — not just anchor flipping — should
+     * reset the escalation counter.
+     */
+    it('resets recoveryCount when the NPC makes real progress toward the goal', () => {
+      const goal = new THREE.Vector3(0, 0, 100);
+      const c = createTestCombatant({
+        id: 'npc-progressing',
+        position: new THREE.Vector3(0, 0, 10),
+        movementAnchor: goal.clone(),
+        movementLastGoodPosition: new THREE.Vector3(0, 0, 8),
+      });
+      c.velocity.set(0, 0, 2);
+
+      detector.checkAndRecover(c, 0, goal);
+
+      // Drive two stuck ticks -> one backtrack trigger.
+      let t = 0;
+      for (let tick = 0; tick < STUCK_TICK_THRESHOLD; tick++) {
+        t += STUCK_CHECK_INTERVAL_MS;
+        detector.checkAndRecover(c, t, goal);
+      }
+      expect(detector.getRecord('npc-progressing')!.recoveryCount).toBe(1);
+
+      // NPC now makes meaningful progress toward goal (moves ~20m closer).
+      c.position.set(0, 0, 30);
+      c.velocity.set(0, 0, 2);
+      t += STUCK_CHECK_INTERVAL_MS;
+      detector.checkAndRecover(c, t, goal);
+
+      expect(detector.getRecord('npc-progressing')!.recoveryCount).toBe(0);
+    });
+
+    /**
+     * If the AI assigns a completely new goal, the escalation counter must
+     * reset. This mirrors the case where a squad leader re-routes the NPC
+     * after a defend/engage transition.
+     */
+    it('resets recoveryCount when the goal anchor changes meaningfully', () => {
+      const goalA = new THREE.Vector3(50, 0, 50);
+      const goalB = new THREE.Vector3(-50, 0, -50);
+      const c = createTestCombatant({
+        id: 'npc-goal-change',
+        position: new THREE.Vector3(10, 0, 10),
+        movementAnchor: goalA.clone(),
+        movementLastGoodPosition: new THREE.Vector3(8, 0, 8),
+      });
+      c.velocity.set(2, 0, 0);
+
+      detector.checkAndRecover(c, 0, goalA);
+
+      let t = 0;
+      for (let tick = 0; tick < STUCK_TICK_THRESHOLD; tick++) {
+        t += STUCK_CHECK_INTERVAL_MS;
+        detector.checkAndRecover(c, t, goalA);
+      }
+      expect(detector.getRecord('npc-goal-change')!.recoveryCount).toBe(1);
+
+      // New goal assigned by AI.
+      t += STUCK_CHECK_INTERVAL_MS;
+      detector.checkAndRecover(c, t, goalB);
+
+      expect(detector.getRecord('npc-goal-change')!.recoveryCount).toBe(0);
+    });
+  });
+
   it('tracks multiple combatants independently', () => {
     const c1 = createTestCombatant({
       id: 'npc1',

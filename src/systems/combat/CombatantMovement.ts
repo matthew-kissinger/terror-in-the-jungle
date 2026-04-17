@@ -216,7 +216,17 @@ export class CombatantMovement {
 
     const progress = this.updateProgressTracking(combatant, steering.anchorDistanceBeforeSq, now);
 
-    const stuckAction: StuckRecoveryAction = this.stuckDetector.checkAndRecover(combatant, now);
+    // Pass the *goal* anchor (destination/cover/target) separately so the
+    // stuck detector's escalation counter does not reset every time the
+    // transient movement anchor flips between a backtrack point and the goal.
+    // This is what allows repeated-stall escalation (-> 'hold') to actually
+    // fire when an NPC is stuck against an unreachable objective.
+    const goalAnchorForStuck = this.resolvePrimaryGoalAnchor(combatant);
+    const stuckAction: StuckRecoveryAction = this.stuckDetector.checkAndRecover(
+      combatant,
+      now,
+      goalAnchorForStuck,
+    );
     let backtrackActivated = false;
     if (stuckAction === 'backtrack') {
       backtrackActivated = this.activateBacktrack(combatant);
