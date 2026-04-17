@@ -111,6 +111,10 @@
       lastMovementDecisionAt: 0,
       movementLockUntil: 0,
       movementState: 'advance',
+      previousMovementState: null,
+      movementStateSince: 0,
+      lastReversalAt: 0,
+      movementTransitions: 0,
       firingUntil: 0,
       lastRepositionAt: 0,
       lastFireProbe: null,
@@ -188,13 +192,51 @@
       }
     }
 
-    function setMovementState(nextState) {
+    // Pairs that count as direction reversals for the anti-flap debounce.
+    const REVERSAL_PAIRS = {
+      advance: 'retreat',
+      retreat: 'advance',
+      sprint: 'retreat',
+      strafe: 'retreat'
+    };
+    const REVERSAL_COOLDOWN_MS = 900;
+
+    function isReversal(fromState, toState) {
+      return REVERSAL_PAIRS[fromState] === toState;
+    }
+
+    function setMovementState(nextState, options) {
       const now = Date.now();
-      if (state.movementState === nextState && now < state.movementLockUntil) {
+      const force = !!(options && options.force);
+
+      // No-op when already in the target state (but keep pattern fresh without
+      // resetting the dwell timer — important so repeated same-state requests
+      // don't extend the lock indefinitely).
+      if (state.movementState === nextState) {
         return;
       }
+
+      // Enforce minimum dwell in the current state unless the caller forces it
+      // (firing locks, capture-point holds, stuck recovery).
+      if (!force && now < state.movementLockUntil) {
+        return;
+      }
+
+      // Anti-flap: suppress rapid direction reversals (e.g. advance <-> retreat
+      // bouncing) within a short window, unless forced.
+      if (!force && isReversal(state.movementState, nextState) && (now - state.lastReversalAt) < REVERSAL_COOLDOWN_MS) {
+        return;
+      }
+
+      if (isReversal(state.movementState, nextState)) {
+        state.lastReversalAt = now;
+      }
+
+      state.previousMovementState = state.movementState;
       state.movementState = nextState;
+      state.movementStateSince = now;
       state.movementLockUntil = now + modeProfile.transitionHoldMs + Math.floor(Math.random() * 360);
+      state.movementTransitions++;
 
       if (nextState === 'sprint') {
         setMovementPattern(['KeyW', 'ShiftLeft']);
@@ -1317,7 +1359,7 @@
         if (state.stuckMs > 3000 && !state.stuckRecoveryMode) {
           state.stuckRecoveryMode = true;
           state.stuckRecoveryUntil = Date.now() + 2000;
-          setMovementState('retreat');
+          setMovementState('retreat', { force: true });
         }
         if (state.stuckRecoveryMode && Date.now() < state.stuckRecoveryUntil) {
           // Alternate strafes during recovery
@@ -1365,12 +1407,12 @@
           && (!nearestOpfor || nearestDist > 140)
         );
         if (captureFocus && captureFocus.hold && captureFocus.inside && shouldStayOnCapturePoint) {
-          setMovementState('hold');
+          setMovementState('hold', { force: true });
           return;
         }
 
         if (now < state.firingUntil && state.targetVisible) {
-          setMovementState('hold');
+          setMovementState('hold', { force: true });
           return;
         }
         if (now - state.lastMovementDecisionAt >= modeProfile.decisionIntervalMs) {
@@ -1390,7 +1432,7 @@
               return;
             }
             // All directions blocked - retreat
-            setMovementState('retreat');
+            setMovementState('retreat', { force: true });
             return;
           }
 
@@ -1437,7 +1479,8 @@
         frontlineCompressed: state.frontlineCompressed,
         frontlineDistance: state.frontlineDistance,
         frontlineMoveCount: state.frontlineMoveCount,
-        capturedZoneCount: state.capturedZoneCount
+        capturedZoneCount: state.capturedZoneCount,
+        movementTransitions: state.movementTransitions
       };
     }
 
@@ -1453,6 +1496,9 @@
       return {
         mode: opts.mode,
         movementState: state.movementState,
+        previousMovementState: state.previousMovementState,
+        movementStateSince: state.movementStateSince,
+        movementTransitions: state.movementTransitions,
         targetVisible: state.targetVisible,
         lastRepositionAt: state.lastRepositionAt,
         lastShotAt: state.lastShotAt,
@@ -1582,7 +1628,7 @@
         && dist <= 90;
       if (!shotAnalysis.landable) {
         if (allowSpeculativeFire) {
-          setMovementState('hold');
+          setMovementState('hold', { force: true });
         } else {
         updateFireProbe({
           reason: 'shot_blocked',
@@ -1635,7 +1681,7 @@
       }
 
       if (dist < 110) {
-        setMovementState('hold');
+        setMovementState('hold', { force: true });
       }
 
       mouseDown();
