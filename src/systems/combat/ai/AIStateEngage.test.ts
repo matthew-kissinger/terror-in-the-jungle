@@ -210,6 +210,32 @@ describe('AIStateEngage', () => {
       expect(combatant.panicLevel).toBeLessThan(panicHigh);
     });
 
+    it('VC combatants enter panic full-auto at a lower panic level than NVA', () => {
+      // Same stimulus (recent hit + medium-range target) to a VC and an NVA combatant.
+      // VC doctrine panics sooner; NVA is committed and holds controlled fire.
+      const vcPos = new THREE.Vector3(0, 0, 0);
+      const nvaPos = new THREE.Vector3(0, 0, 0);
+      const vc = createMockCombatant('vc1', Faction.VC, vcPos);
+      const nva = createMockCombatant('nva1', Faction.NVA, nvaPos);
+      const vcTarget = createMockTarget('tv', Faction.US, new THREE.Vector3(30, 0, 0));
+      const nvaTarget = createMockTarget('tn', Faction.US, new THREE.Vector3(30, 0, 0));
+      vc.target = vcTarget;
+      nva.target = nvaTarget;
+
+      // Recently hit — inside PANIC_HIT_WINDOW so panicLevel increments on this tick.
+      vc.lastHitTime = Date.now() - 500;
+      nva.lastHitTime = Date.now() - 500;
+      vc.panicLevel = 0.4;
+      nva.panicLevel = 0.4;
+
+      invokeHandleEngaging(vc);
+      invokeHandleEngaging(nva);
+
+      // After increment (~0.7), VC is above its doctrine threshold, NVA is not.
+      expect(vc.isFullAuto).toBe(true);
+      expect(nva.isFullAuto).toBe(false);
+    });
+
     it('goes full-auto when nearby enemies cross the threshold', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
       const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
