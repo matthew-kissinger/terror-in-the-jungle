@@ -21,8 +21,8 @@
 }
 
 .card {
-  background: rgba(15, 25, 35, 0.95);
-  border: 1px solid rgba(90, 143, 181, 0.4);
+  background: rgba(13, 19, 14, 0.95);
+  border: 1px solid rgba(200, 170, 80, 0.4);
   border-radius: var(--radius-xl);
   padding: var(--space-8) var(--space-10, 3rem);
   max-width: 620px;
@@ -81,7 +81,7 @@
   padding: var(--space-4);
   background: rgba(0, 0, 0, 0.3);
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(90, 143, 181, 0.15);
+  border: 1px solid rgba(200, 170, 80, 0.18);
 }
 
 .intelItem {
@@ -102,7 +102,7 @@
 }
 
 .beginButton {
-  background: rgba(90, 143, 181, 0.4);
+  background: rgba(217, 119, 6, 0.3);
   border: 1px solid var(--screen-accent);
   color: var(--text-primary);
   padding: var(--space-4) var(--space-10, 3rem);
@@ -120,9 +120,9 @@
 }
 
 .beginButton:hover {
-  background: rgba(90, 143, 181, 0.6);
+  background: rgba(217, 119, 6, 0.45);
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(127, 180, 217, 0.25);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.25);
 }
 
 .beginButton:active {
