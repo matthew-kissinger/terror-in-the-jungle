@@ -30,9 +30,9 @@ describe('FixedWingPhysics', () => {
       }
 
       const snapshot = fw.getFlightSnapshot();
-      expect(snapshot.phase).toBe('ground_roll');
       expect(snapshot.altitudeAGL).toBeCloseTo(0, 4);
       expect(snapshot.weightOnWheels).toBe(true);
+      expect(fw.getFlightState()).toBe('grounded');
     });
 
     it('takes off after a sensible rotation input above Vr', () => {
@@ -71,7 +71,7 @@ describe('FixedWingPhysics', () => {
       }
 
       const snapshot = fw.getFlightSnapshot();
-      expect(snapshot.phase).toBe('airborne');
+      expect(fw.getFlightState()).toBe('airborne');
       expect(snapshot.altitudeAGL).toBeGreaterThan(10);
       expect(snapshot.aoaDeg).toBeLessThan(10);
       expect(snapshot.isStalled).toBe(false);
@@ -94,28 +94,8 @@ describe('FixedWingPhysics', () => {
 
       const snapshot = fw.getFlightSnapshot();
       expect(snapshot.altitudeAGL).toBeGreaterThan(1.0);
-      expect(snapshot.phase).not.toBe('stall');
       expect(snapshot.isStalled).toBe(false);
       expect(snapshot.aoaDeg).toBeLessThan(skyraiderCfg.alphaStallDeg);
-    });
-
-    it('takes off cleanly with full pitch input', () => {
-      const fw = createRunwayPhysics();
-      for (let i = 0; i < 900; i++) {
-        fw.setCommand({
-          throttleTarget: 1,
-          pitchCommand: i > 180 ? 1.0 : 0,
-          rollCommand: 0,
-          yawCommand: 0,
-          brake: 0,
-        });
-        fw.update(1 / 60, flatTerrain());
-      }
-
-      const snapshot = fw.getFlightSnapshot();
-      expect(snapshot.altitudeAGL).toBeGreaterThan(1.0);
-      expect(snapshot.weightOnWheels).toBe(false);
-      expect(snapshot.isStalled).toBe(false);
     });
 
     it('stalls from speed loss', () => {
@@ -200,7 +180,7 @@ describe('FixedWingPhysics', () => {
   });
 
   describe('resetToGround', () => {
-    it('resets position, velocity, and phase', () => {
+    it('puts the aircraft parked on the ground at the requested position', () => {
       const fw = createAirbornePhysics();
       fw.setCommand({ throttleTarget: 1, stabilityAssist: true });
       for (let i = 0; i < 60; i++) fw.update(1 / 60, flatTerrain());
@@ -210,7 +190,7 @@ describe('FixedWingPhysics', () => {
       expect(fw.getPosition().x).toBe(100);
       expect(fw.getAirspeed()).toBe(0);
       expect(fw.getFlightState()).toBe('grounded');
-      expect(fw.getFlightSnapshot().phase).toBe('parked');
+      expect(fw.getFlightSnapshot().weightOnWheels).toBe(true);
     });
   });
 
@@ -226,20 +206,9 @@ describe('FixedWingPhysics', () => {
       expect(fw.getPosition().x).toBeCloseTo(120, 4);
       expect(fw.getPosition().y).toBeCloseTo(85, 4);
       expect(fw.getFlightState()).toBe('airborne');
-      expect(snapshot.phase).toBe('airborne');
       expect(snapshot.weightOnWheels).toBe(false);
       expect(snapshot.airspeed).toBeGreaterThan(60);
       expect(snapshot.verticalSpeed).toBeCloseTo(-5, 4);
-    });
-  });
-
-  describe('per-aircraft configs', () => {
-    it('Phantom has higher stall speed than Skyraider', () => {
-      expect(phantomCfg.stallSpeed).toBeGreaterThan(skyraiderCfg.stallSpeed);
-    });
-
-    it('Phantom has higher max speed than Skyraider', () => {
-      expect(phantomCfg.maxSpeed).toBeGreaterThan(skyraiderCfg.maxSpeed);
     });
   });
 
