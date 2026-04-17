@@ -1,24 +1,24 @@
 /**
  * Shared helper for spawning a Vite server to back the perf/probe harnesses.
  *
- * Two modes are supported:
- *   - 'preview': Runs `vite preview` against `dist/`. Optionally builds first if
- *     `dist/index.html` is missing. This is the representative target —
- *     minified, chunked, tree-shaken code, i.e. what ships to users.
+ * Three modes are supported (see docs/PERFORMANCE.md "Build targets"):
+ *   - 'perf'   (default): Runs `vite preview --outDir dist-perf` against the
+ *     perf-harness bundle built via `npm run build:perf`
+ *     (VITE_PERF_HARNESS=1). Prod-shape — minified, chunked, tree-shaken —
+ *     but includes the diagnostic window globals the harness drives
+ *     (`__engine`, `advanceTime`, `__metrics`, etc.). This is the
+ *     representative target for perf measurement.
+ *   - 'retail': Runs `vite preview` against `dist/`, i.e. the retail build
+ *     shipping to Cloudflare Pages. No harness surface — useful for bundle
+ *     inspection, but the capture driver will time out waiting for
+ *     `window.__engine`.
  *   - 'dev': Runs `vite` (dev mode) with HMR. Useful for debugging against
- *     source maps but NOT representative of production, and the dev server's
- *     HMR websocket is known to rot under repeated headless captures ("send
- *     was called before connect").
+ *     source maps but NOT representative of production. The dev HMR
+ *     websocket is also known to rot under repeated headless captures
+ *     ("send was called before connect").
  *
- * **Current default (2026-04-16):** callers still default to 'dev' because the
- * perf capture driver and the fixed-wing runtime probe rely on
- * `window.__engine` and `window.advanceTime`, both of which are gated by
- * `import.meta.env.DEV` in `src/core/bootstrap.ts`. In a production build
- * those hooks are dead-code-eliminated, so the harness times out waiting for
- * `__engine`. The long-term goal (task C1) is to flip the default to
- * 'preview' once that gate is relaxed to honour `?perf=1` in prod builds.
- * Until then, `--server-mode preview` is available for callers who have
- * unlocked the diagnostics through other means.
+ * `'preview'` is accepted as an alias for `'retail'` for back-compat with the
+ * original C1 scope.
  */
 
 import { execSync, spawn, type ChildProcess } from 'child_process';
@@ -26,7 +26,7 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { Socket } from 'net';
 
-export type ServerMode = 'preview' | 'dev';
+export type ServerMode = 'perf' | 'retail' | 'dev';
 
 export interface ServerHandle {
   proc: ChildProcess;
@@ -45,9 +45,10 @@ export interface StartServerOptions {
    */
   startupTimeoutMs?: number;
   /**
-   * Only meaningful in preview mode. If true (default), a missing `dist/` will
-   * trigger `npm run build` before launching preview. If false, a missing
-   * `dist/` will throw.
+   * Only meaningful in preview modes ('perf' / 'retail'). If true (default),
+   * a missing build output directory will trigger the matching build
+   * (`npm run build:perf` or `npm run build`) before launching preview. If
+   * false, a missing output dir will throw.
    */
   buildIfMissing?: boolean;
   /**
@@ -68,7 +69,8 @@ export interface StartServerOptions {
 
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_STARTUP_TIMEOUT_MS = 120_000;
-const DIST_INDEX = join(process.cwd(), 'dist', 'index.html');
+const RETAIL_DIST_INDEX = join(process.cwd(), 'dist', 'index.html');
+const PERF_DIST_INDEX = join(process.cwd(), 'dist-perf', 'index.html');
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -103,26 +105,35 @@ export async function waitForPort(
 }
 
 /**
- * Parse a `--mode=<value>` / `--mode <value>` arg out of argv and map it to a
- * ServerMode. Defaults to 'preview'. Any value other than 'dev' resolves to
- * 'preview' so typos fall back to the safe production-like path.
+ * Parse a `--server-mode=<value>` / `--server-mode <value>` arg out of argv
+ * and map it to a ServerMode. Any unrecognised value falls back to the
+ * provided fallback (default 'perf') so typos resolve to the safe
+ * harness-capable path. `'preview'` is accepted as an alias for `'retail'`.
  */
-export function parseServerModeArg(argv: string[], fallback: ServerMode = 'preview'): ServerMode {
+export function parseServerModeArg(argv: string[], fallback: ServerMode = 'perf'): ServerMode {
+  const normalise = (raw: string | undefined): ServerMode | null => {
+    if (!raw) return null;
+    if (raw === 'dev') return 'dev';
+    if (raw === 'retail' || raw === 'preview') return 'retail';
+    if (raw === 'perf') return 'perf';
+    return null;
+  };
+
   const eqArg = argv.find((arg) => arg.startsWith('--mode=') || arg.startsWith('--server-mode='));
   if (eqArg) {
-    const value = eqArg.split('=')[1];
-    return value === 'dev' ? 'dev' : 'preview';
+    return normalise(eqArg.split('=')[1]) ?? fallback;
   }
   const flagIndex = argv.findIndex((arg) => arg === '--server-mode');
   if (flagIndex >= 0 && flagIndex + 1 < argv.length) {
-    return argv[flagIndex + 1] === 'dev' ? 'dev' : 'preview';
+    return normalise(argv[flagIndex + 1]) ?? fallback;
   }
   return fallback;
 }
 
-function runBuildSync(log: (msg: string) => void): void {
-  log('Building production bundle (npm run build) before preview...');
-  execSync('npm run build', { stdio: 'inherit', cwd: process.cwd() });
+function runBuildSync(mode: 'retail' | 'perf', log: (msg: string) => void): void {
+  const script = mode === 'perf' ? 'build:perf' : 'build';
+  log(`Building ${mode} bundle (npm run ${script}) before preview...`);
+  execSync(`npm run ${script}`, { stdio: 'inherit', cwd: process.cwd() });
 }
 
 function spawnServerProcess(
@@ -131,8 +142,8 @@ function spawnServerProcess(
   port: number,
   stdio: 'pipe' | 'ignore'
 ): ChildProcess {
-  const command = mode === 'preview' ? 'preview' : 'dev';
-  const args = ['run', command, '--', '--host', host, '--port', String(port), '--strictPort'];
+  const npmScript = mode === 'perf' ? 'preview:perf' : mode === 'retail' ? 'preview' : 'dev';
+  const args = ['run', npmScript, '--', '--host', host, '--port', String(port), '--strictPort'];
   if (process.platform === 'win32') {
     // On Windows, spawn through cmd.exe so the npm shim resolves correctly without
     // leaving shell:true-style quoting surprises.
@@ -156,21 +167,24 @@ function spawnServerProcess(
  * block to avoid leaked subprocesses.
  */
 export async function startServer(opts: StartServerOptions): Promise<ServerHandle> {
-  const mode: ServerMode = opts.mode ?? 'preview';
+  const mode: ServerMode = opts.mode ?? 'perf';
   const host = opts.host ?? DEFAULT_HOST;
   const timeout = opts.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS;
   const buildIfMissing = opts.buildIfMissing ?? true;
   const log = opts.log ?? ((msg) => console.log(msg));
   const stdio: 'pipe' | 'ignore' = opts.stdio ?? 'pipe';
 
-  if (mode === 'preview') {
-    if (!existsSync(DIST_INDEX)) {
+  if (mode === 'perf' || mode === 'retail') {
+    const indexPath = mode === 'perf' ? PERF_DIST_INDEX : RETAIL_DIST_INDEX;
+    const outDirLabel = mode === 'perf' ? 'dist-perf' : 'dist';
+    const buildScript = mode === 'perf' ? 'npm run build:perf' : 'npm run build';
+    if (!existsSync(indexPath)) {
       if (!buildIfMissing) {
-        throw new Error(`dist/index.html not found. Run \`npm run build\` before starting preview.`);
+        throw new Error(`${outDirLabel}/index.html not found. Run \`${buildScript}\` before starting preview.`);
       }
-      runBuildSync(log);
-      if (!existsSync(DIST_INDEX)) {
-        throw new Error('Build completed but dist/index.html is still missing.');
+      runBuildSync(mode, log);
+      if (!existsSync(indexPath)) {
+        throw new Error(`Build completed but ${outDirLabel}/index.html is still missing.`);
       }
     }
   }

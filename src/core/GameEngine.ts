@@ -73,7 +73,9 @@ export class GameEngine {
     this.performanceOverlay = new PerformanceOverlay();
     this.timeIndicator = new TimeIndicator();
     this.logOverlay = new LogOverlay();
-    if (import.meta.env.DEV && isPerfDiagnosticsEnabled()) {
+    // Perf-harness gate (see src/core/PerfDiagnostics.ts and
+    // docs/PERFORMANCE.md "Build targets"): DEV or VITE_PERF_HARNESS build.
+    if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfDiagnosticsEnabled()) {
       this.runtimeMetrics = new RuntimeMetrics();
     }
 
@@ -168,7 +170,7 @@ export class GameEngine {
         performanceTelemetry.setEnabled(
           this.performanceOverlay.isVisible()
           || this.sandboxEnabled
-          || (import.meta.env.DEV && isPerfDiagnosticsEnabled())
+          || ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfDiagnosticsEnabled())
         );
         break;
       }

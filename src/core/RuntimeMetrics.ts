@@ -38,7 +38,8 @@ export class RuntimeMetrics {
 
   constructor() {
     if (typeof window !== 'undefined' && (
-      (import.meta.env.DEV && isPerfDiagnosticsEnabled()) || isDiagEnabled()
+      ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfDiagnosticsEnabled())
+      || isDiagEnabled()
     )) {
       // Use arrow functions to capture 'this' lexically instead of aliasing
       const getFrameCount = () => this.frameCount;

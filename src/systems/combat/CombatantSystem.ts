@@ -182,13 +182,14 @@ export class CombatantSystem implements GameSystem {
     // Update AI with all squads
     this.combatantAI.setSquads(this.squadManager.getAllSquads());
 
-    // Expose profiling only for harness/dev diagnostics.
-    if (import.meta.env.DEV && typeof window !== 'undefined' && isPerfDiagnosticsEnabled()) {
+    // Expose profiling only for harness/dev diagnostics. Gate matches
+    // src/core/PerfDiagnostics.ts: DEV or VITE_PERF_HARNESS build.
+    if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && typeof window !== 'undefined' && isPerfDiagnosticsEnabled()) {
       (window as any).combatProfile = () => this.getCombatProfile();
     }
 
     Logger.info('Combat', 'Combatant System initialized');
-    if (import.meta.env.DEV && isPerfDiagnosticsEnabled()) {
+    if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfDiagnosticsEnabled()) {
       Logger.info('Combat', 'Use window.combatProfile() in console to see combat performance breakdown');
     }
   }

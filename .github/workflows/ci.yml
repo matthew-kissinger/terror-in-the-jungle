@@ -186,8 +186,8 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      - name: Build
-        run: npm run build
+      - name: Build perf-harness bundle
+        run: npm run build:perf
 
       - name: Capture combat120 scenario
         env:

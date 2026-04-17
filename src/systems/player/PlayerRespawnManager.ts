@@ -643,7 +643,7 @@ export class PlayerRespawnManager implements GameSystem {
 
   private shouldAutoConfirmInitialDeploy(): boolean {
     const deployState = this.deployFlow.getState();
-    return import.meta.env.DEV
+    return (import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1')
       && isPerfDiagnosticsEnabled()
       && deployState.hasPendingInitialDeploy
       && !!this.selectedSpawnPoint;

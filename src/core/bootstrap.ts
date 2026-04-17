@@ -78,7 +78,11 @@ export async function bootstrapGame(): Promise<void> {
       'icon-minigun', 'icon-rocket-pod', 'icon-door-gun',
     ]);
 
-    if (import.meta.env.DEV && isPerfDiagnosticsEnabled()) {
+    // Perf-harness gate: true in `vite dev` AND in the perf-harness build
+    // (VITE_PERF_HARNESS=1, see docs/PERFORMANCE.md "Build targets"). Retail
+    // builds evaluate both constants to false at compile time, so Vite DCE
+    // eliminates these diagnostic exposures from the shipping bundle.
+    if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfDiagnosticsEnabled()) {
       // Expose engine root for perf harness scenario control.
       (window as any).__engine = engine;
       // Expose renderer for performance measurement scripts.
@@ -92,7 +96,7 @@ export async function bootstrapGame(): Promise<void> {
       (window as any).__ashauDiagnostics = () => buildAShauDiagnostics(engine);
     }
 
-    if (import.meta.env.DEV && (isPerfDiagnosticsEnabled() || isDiagEnabled())) {
+    if ((import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && (isPerfDiagnosticsEnabled() || isDiagEnabled())) {
       (window as any).advanceTime = async (ms: number) => {
         engine.advanceTime(ms);
       };
