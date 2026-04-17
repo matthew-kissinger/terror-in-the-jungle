@@ -69,7 +69,10 @@
     "profile:modes": "npx tsx scripts/mode-load-profiler.ts",
     "playtest:mobile": "npx tsx scripts/mobile-playtest.ts",
     "playtest:mobile:quick": "npx tsx scripts/mobile-playtest.ts --landscape-only",
-    "playtest:mobile:flow": "npx tsx scripts/mobile-playtest.ts --flow-only"
+    "playtest:mobile:flow": "npx tsx scripts/mobile-playtest.ts --flow-only",
+    "bench:e2": "npx vite --config scripts/e2-rendering-bench/vite.config.ts",
+    "bench:e2:capture": "npx tsx scripts/e2-rendering-bench/capture.ts",
+    "bench:e2:capture:headed": "npx tsx scripts/e2-rendering-bench/capture.ts --headed"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",

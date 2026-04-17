@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>E2 rendering bench</title>
+    <style>
+      html, body { margin: 0; padding: 0; background: #0b0b10; color: #dfe4ee; font: 13px/1.4 ui-monospace, Consolas, monospace; }
+      #hud { position: fixed; top: 8px; left: 8px; background: rgba(0,0,0,0.55); padding: 8px 12px; border-radius: 4px; white-space: pre; }
+      #results { position: fixed; top: 8px; right: 8px; background: rgba(0,0,0,0.55); padding: 8px 12px; border-radius: 4px; white-space: pre; max-width: 44ch; }
+      #controls { position: fixed; bottom: 8px; left: 8px; background: rgba(0,0,0,0.55); padding: 8px 12px; border-radius: 4px; }
+      button { background: #1f2533; color: #dfe4ee; border: 1px solid #3a475f; padding: 4px 10px; margin: 2px 2px 2px 0; cursor: pointer; }
+      button:hover { background: #2a3346; }
+      canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="hud">loading...</div>
+    <div id="results">no measurements yet</div>
+    <div id="controls">
+      <div>scene:
+        <button data-scene="A">A object3d</button>
+        <button data-scene="B">B keyed instanced</button>
+        <button data-scene="C">C single instanced</button>
+      </div>
+      <div>N:
+        <button data-n="500">500</button>
+        <button data-n="1000">1000</button>
+        <button data-n="2000">2000</button>
+        <button data-n="3000">3000</button>
+      </div>
+      <div>
+        <button id="run-sweep">run full sweep</button>
+        <button id="copy-csv">copy CSV</button>
+      </div>
+    </div>
+    <script type="module" src="./bench.ts"></script>
+  </body>
+</html>
