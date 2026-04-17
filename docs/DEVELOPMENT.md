@@ -1,6 +1,6 @@
 # Development Guide
 
-Last updated: 2026-04-08
+Last updated: 2026-04-17
 
 ## Prerequisites
 
@@ -44,14 +44,19 @@ npm run check:mobile-ui    # Built-app phone viewport flow gate
 ### Runtime Probes
 
 ```bash
-npx tsx scripts/fixed-wing-runtime-probe.ts --port 4173 --reuse-dev-server true
+npx tsx scripts/fixed-wing-runtime-probe.ts                       # default: preview mode (builds perf target, serves via vite preview)
+npx tsx scripts/fixed-wing-runtime-probe.ts --server-mode dev     # debug against dev server with source maps
 ```
 
 `fixed-wing-runtime-probe.ts` boots Open Frontier in Playwright, forces desktop input semantics, steps the live game deterministically through `window.advanceTime(ms)`, and validates runway takeoff/climb for the A-1, F-4, and AC-47. Artifacts land in `artifacts/fixed-wing-runtime-probe/`.
 
+Post-C1 (2026-04-17), the probe defaults to the `perf` build target served via `vite preview` rather than sharing a dev server. See PERFORMANCE.md "Build targets" for the why.
+
 ### Performance Validation
 
 ```bash
+npm run build:perf               # Build perf-harness bundle (dist-perf/)
+npm run preview:perf             # Preview dist-perf/ (harness-ready)
 npm run perf:capture:combat120   # Primary regression capture
 npm run perf:capture:openfrontier:short
 npm run perf:compare             # Compare against baselines
@@ -118,7 +123,7 @@ CI still captures perf artifacts on every push, but the hosted-run perf outcome 
 Current large chunks:
 - `three`: ~691kB
 - `index`: ~758kB
-- `recast-navigation.wasm-compat`: ~710kB
+- `recast-navigation.wasm-compat`: ~340kB WASM binary + ~275kB JS loader per entry (shipped WASM roughly halved after C2 dedupe; previously shipped twice across main + worker)
 - `ui`: ~425kB
 
 ### Manual Smoke Checks
