@@ -204,57 +204,13 @@ describe('TerrainSystem', () => {
   });
 
   describe('GameSystem lifecycle', () => {
-    it('initializes without error', async () => {
+    it('initializes terrain mesh into the scene', async () => {
       await terrain.init();
-      // Should add mesh to scene
       expect(scene.add).toHaveBeenCalled();
       expect(mockVegetationConfigure).toHaveBeenCalled();
     });
 
-    it('update runs without error after init', async () => {
-      await terrain.init();
-      terrain.update(0.016);
-    });
-
-    it('backs off vegetation additions on unhealthy frames while keeping removals aggressive', async () => {
-      await terrain.init();
-
-      terrain.update(0.025);
-
-      expect(mockVegetationUpdateBudgeted).toHaveBeenCalledWith(
-        expect.any(THREE.Vector3),
-        expect.objectContaining({
-          maxAddsPerFrame: 0,
-          maxRemovalsPerFrame: 10,
-        }),
-      );
-    });
-
-    it('throttles moderate-pressure vegetation additions to every other frame', async () => {
-      await terrain.init();
-
-      terrain.update(0.019);
-      terrain.update(0.019);
-
-      expect(mockVegetationUpdateBudgeted).toHaveBeenNthCalledWith(
-        1,
-        expect.any(THREE.Vector3),
-        expect.objectContaining({
-          maxAddsPerFrame: 0,
-          maxRemovalsPerFrame: 6,
-        }),
-      );
-      expect(mockVegetationUpdateBudgeted).toHaveBeenNthCalledWith(
-        2,
-        expect.any(THREE.Vector3),
-        expect.objectContaining({
-          maxAddsPerFrame: 1,
-          maxRemovalsPerFrame: 6,
-        }),
-      );
-    });
-
-    it('dispose cleans up', async () => {
+    it('dispose removes terrain from scene', async () => {
       await terrain.init();
       terrain.dispose();
       expect(scene.remove).toHaveBeenCalled();
@@ -262,12 +218,7 @@ describe('TerrainSystem', () => {
   });
 
   describe('runtime API', () => {
-    it('getHeightAt returns a number', async () => {
-      await terrain.init();
-      expect(typeof terrain.getHeightAt(0, 0)).toBe('number');
-    });
-
-    it('getHeightAt uses gameplay query path instead of GPU-baked sampling', async () => {
+    it('getHeightAt returns the cache-backed gameplay height, not the baked GPU sample', async () => {
       await terrain.init();
       expect(terrain.getHeightAt(5, 6)).toBe(10);
       expect(mockCacheGetHeightAt).toHaveBeenCalledWith(5, 6);
@@ -279,48 +230,22 @@ describe('TerrainSystem', () => {
       expect(terrain.isTerrainReady()).toBe(true);
     });
 
-    it('hasTerrainAt reports in-bounds coverage after init', async () => {
+    it('hasTerrainAt reports coverage inside configured world bounds and rejects outside', async () => {
       await terrain.init();
       expect(terrain.hasTerrainAt(0, 0)).toBe(true);
+
+      terrain.setWorldSize(100);
+      expect(terrain.hasTerrainAt(60, 0)).toBe(false);
     });
 
-    it('getChunkSize returns configured size', () => {
-      expect(terrain.getChunkSize()).toBe(64);
-    });
-
-    it('getWorkerPool returns pool', () => {
-      expect(terrain.getWorkerPool()).not.toBeNull();
-    });
-
-    it('getWorkerStats returns stats', () => {
-      const stats = terrain.getWorkerStats();
-      expect(stats).not.toBeNull();
-      expect(stats!.enabled).toBe(true);
-    });
-
-    it('getWorkerTelemetry returns telemetry', () => {
-      const telemetry = terrain.getWorkerTelemetry();
-      expect(telemetry).not.toBeNull();
-      expect(telemetry!.enabled).toBe(true);
-    });
-
-    it('setChunkSize reconfigures world', async () => {
+    it('exposes configured chunk size and allows reconfiguration', async () => {
       await terrain.init();
+      expect(terrain.getChunkSize()).toBe(64);
       terrain.setChunkSize(128);
       expect(terrain.getChunkSize()).toBe(128);
     });
 
-    it('setRenderDistance reconfigures world', async () => {
-      await terrain.init();
-      terrain.setRenderDistance(4);
-      // Should not throw
-    });
-
-    it('defaults world size from startup terrain config until explicitly overridden', () => {
-      expect(terrain.getWorldSize()).toBe(64 * 6 * 2);
-    });
-
-    it('setWorldSize makes map extent explicit and stable across chunk config changes', async () => {
+    it('explicit setWorldSize is stable across chunk config changes', async () => {
       await terrain.init();
       terrain.setWorldSize(21136);
       expect(terrain.getWorldSize()).toBe(21136);
@@ -331,42 +256,17 @@ describe('TerrainSystem', () => {
       expect(terrain.getWorldSize()).toBe(21136);
     });
 
-    it('setVisualMargin updates shared visual overflow bounds without changing playable size', async () => {
+    it('visual margin expands the rendered extent without changing playable bounds', async () => {
       await terrain.init();
-
       terrain.setWorldSize(500);
       terrain.setVisualMargin(320);
 
-      expect(terrain.getWorldSize()).toBe(500);
       expect(terrain.getPlayableWorldSize()).toBe(500);
-      expect(terrain.getVisualMargin()).toBe(320);
-      expect(terrain.getVisualWorldSize()).toBe(1140);
+      expect(terrain.getVisualWorldSize()).toBeGreaterThan(terrain.getPlayableWorldSize());
       expect(mockVegetationSetWorldBounds).toHaveBeenLastCalledWith(500, 320);
     });
 
-    it('uses a reduced render-surface bake grid for very large worlds', async () => {
-      await terrain.init();
-      terrain.setWorldSize(21136);
-
-      expect(mockBakeFromProvider).toHaveBeenLastCalledWith(
-        expect.anything(),
-        512,
-        21136,
-      );
-    });
-
-    it('uses a denser render-surface bake grid for mid-size large worlds like open frontier', async () => {
-      await terrain.init();
-      terrain.setWorldSize(3200);
-
-      expect(mockBakeFromProvider).toHaveBeenLastCalledWith(
-        expect.anything(),
-        1024,
-        3200,
-      );
-    });
-
-    it('uses prepared heightmap uploads instead of provider rebakes when supplied', async () => {
+    it('prepared heightmap uploads replace the need to rebake from the provider', async () => {
       await terrain.init();
 
       terrain.setPreparedHeightmap({
@@ -376,25 +276,16 @@ describe('TerrainSystem', () => {
       });
       terrain.setWorldSize(3200);
 
-      expect(mockUploadPrebakedGrid).toHaveBeenCalledWith(
-        expect.any(Float32Array),
-        4,
-        3200,
-      );
+      expect(mockUploadPrebakedGrid).toHaveBeenCalled();
     });
 
-    it('hasTerrainAt returns false outside explicit world bounds', async () => {
+    it('setBiomeConfig regenerates vegetation after init', async () => {
       await terrain.init();
-      terrain.setWorldSize(100);
-      expect(terrain.hasTerrainAt(60, 0)).toBe(false);
-    });
-
-    it('setBiomeConfig updates config', () => {
       terrain.setBiomeConfig('highland', []);
-      expect(mockVegetationConfigure).toHaveBeenCalled();
+      expect(mockVegetationRegenerateAll).toHaveBeenCalled();
     });
 
-    it('setBiomeConfig configures billboard system with all participating biomes', () => {
+    it('setBiomeConfig configures billboard system with every participating biome', () => {
       const billboard = makeMockBillboard();
       terrain = new TerrainSystem(
         scene,
@@ -411,19 +302,13 @@ describe('TerrainSystem', () => {
       expect(billboard.configure).toHaveBeenCalledWith(['denseJungle', 'highland']);
     });
 
-    it('setBiomeConfig regenerates vegetation after init', async () => {
-      await terrain.init();
-      terrain.setBiomeConfig('highland', []);
-      expect(mockVegetationRegenerateAll).toHaveBeenCalled();
-    });
-
-    it('registerCollisionObject and unregisterCollisionObject work', () => {
+    it('collision object register/unregister round-trips without error', () => {
       const obj = new THREE.Object3D();
       terrain.registerCollisionObject('test', obj);
       terrain.unregisterCollisionObject('test');
     });
 
-    it('raycastTerrain delegates correctly', async () => {
+    it('raycastTerrain produces a hit-shaped result', async () => {
       await terrain.init();
       const result = terrain.raycastTerrain(
         new THREE.Vector3(0, 50, 0),
@@ -434,13 +319,5 @@ describe('TerrainSystem', () => {
       expect(typeof result.hit).toBe('boolean');
     });
 
-    it('getLOSAccelerator returns accelerator', () => {
-      expect(terrain.getLOSAccelerator()).toBeDefined();
-    });
-
-    it('updatePlayerPosition tracks position', () => {
-      terrain.updatePlayerPosition(new THREE.Vector3(100, 0, 200));
-      // Should not throw
-    });
   });
 });

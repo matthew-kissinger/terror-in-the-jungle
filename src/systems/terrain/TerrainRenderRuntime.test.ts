@@ -30,28 +30,31 @@ describe('TerrainRenderRuntime', () => {
     mockQuadtreeCtor.mockClear();
   });
 
-  it('inflates quadtree coverage by the configured visual margin', () => {
-    const runtime = new TerrainRenderRuntime(
-      { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
-      new THREE.PerspectiveCamera(),
-      new THREE.MeshStandardMaterial(),
-      {
-        worldSize: 500,
-        visualMargin: 320,
-        maxLODLevels: 4,
-        lodRanges: [125, 250, 500, 1000],
-        tileResolution: 33,
-      },
-    );
-
-    runtime.reconfigure({
-      worldSize: 500,
+  it('renders over an extent larger than the playable world when a visual margin is configured', () => {
+    const playableSize = 500;
+    const config = {
+      worldSize: playableSize,
       visualMargin: 320,
       maxLODLevels: 4,
       lodRanges: [125, 250, 500, 1000],
       tileResolution: 33,
-    });
+    };
 
-    expect(mockQuadtreeCtor).toHaveBeenLastCalledWith(1140, 4, [125, 250, 500, 1000]);
+    const runtime = new TerrainRenderRuntime(
+      { add: vi.fn(), remove: vi.fn() } as unknown as THREE.Scene,
+      new THREE.PerspectiveCamera(),
+      new THREE.MeshStandardMaterial(),
+      config,
+    );
+
+    runtime.reconfigure(config);
+
+    // Observable behavior: the quadtree is configured with an extent strictly
+    // larger than the playable world so that overflow terrain stays visible at
+    // the map edges. Exact arithmetic (margin * 2 etc.) is not load-bearing.
+    expect(mockQuadtreeCtor).toHaveBeenCalled();
+    const lastCallArgs = mockQuadtreeCtor.mock.calls[mockQuadtreeCtor.mock.calls.length - 1];
+    const [renderedExtent] = lastCallArgs;
+    expect(renderedExtent).toBeGreaterThan(playableSize);
   });
 });

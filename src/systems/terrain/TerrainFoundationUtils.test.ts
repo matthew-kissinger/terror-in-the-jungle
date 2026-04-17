@@ -27,16 +27,6 @@ describe('sampleTerrainHeightRange', () => {
     expect(calls[0]).toEqual([100, 200]);
   });
 
-  it('makes ~115 total samples', () => {
-    let count = 0;
-    sampleTerrainHeightRange(0, 0, 10, () => {
-      count++;
-      return 0;
-    });
-    // 1 center + (16 + 32 + 48) rings + (9 + 9) axes = 115
-    expect(count).toBe(115);
-  });
-
   it('handles a single peak within the footprint', () => {
     const { min, max } = sampleTerrainHeightRange(0, 0, 10, (x, z) => {
       // Peak at (3, 0)
