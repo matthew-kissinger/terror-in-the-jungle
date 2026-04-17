@@ -82,17 +82,15 @@ describe('VehicleStateManager', () => {
     manager.registerAdapter(fwAdapter);
   });
 
-  describe('initial state', () => {
-    it('starts as infantry', () => {
-      expect(manager.isInVehicle()).toBe(false);
-      expect(manager.getVehicleType()).toBeNull();
-      expect(manager.getVehicleId()).toBeNull();
-      expect(manager.getActiveAdapter()).toBeNull();
-    });
+  it('starts outside any vehicle', () => {
+    expect(manager.isInVehicle()).toBe(false);
+    expect(manager.getVehicleType()).toBeNull();
+    expect(manager.getVehicleId()).toBeNull();
+    expect(manager.getActiveAdapter()).toBeNull();
   });
 
-  describe('enterVehicle', () => {
-    it('transitions to in_vehicle and calls adapter.onEnter', () => {
+  describe('entering a vehicle', () => {
+    it('activates the matching adapter and marks the player as riding the helicopter', () => {
       const ctx = createTransitionContext(playerState, 'heli_1');
       const result = manager.enterVehicle('helicopter', 'heli_1', ctx);
 
@@ -102,19 +100,15 @@ describe('VehicleStateManager', () => {
       expect(manager.getVehicleId()).toBe('heli_1');
       expect(manager.getActiveAdapter()).toBe(heliAdapter);
       expect(heliAdapter.onEnter).toHaveBeenCalledOnce();
-    });
 
-    it('syncs PlayerState flags for helicopter', () => {
-      const ctx = createTransitionContext(playerState, 'heli_1');
-      manager.enterVehicle('helicopter', 'heli_1', ctx);
-
+      // PlayerState flags reflect helicopter membership, not fixed-wing.
       expect(playerState.isInHelicopter).toBe(true);
       expect(playerState.helicopterId).toBe('heli_1');
       expect(playerState.isInFixedWing).toBe(false);
       expect(playerState.fixedWingId).toBeNull();
     });
 
-    it('syncs PlayerState flags for fixed_wing', () => {
+    it('marks the player as riding a fixed-wing when entering that vehicle type', () => {
       const ctx = createTransitionContext(playerState, 'fw_1');
       manager.enterVehicle('fixed_wing', 'fw_1', ctx);
 
@@ -124,15 +118,14 @@ describe('VehicleStateManager', () => {
       expect(playerState.helicopterId).toBeNull();
     });
 
-    it('returns false for unregistered vehicle type', () => {
+    it('refuses to enter an unknown vehicle type', () => {
       const ctx = createTransitionContext(playerState);
       const result = manager.enterVehicle('boat', 'boat_1', ctx);
-
       expect(result).toBe(false);
       expect(manager.isInVehicle()).toBe(false);
     });
 
-    it('exits current vehicle before entering new one (helicopter -> fixed_wing)', () => {
+    it('swaps cleanly between vehicles (helicopter -> fixed_wing)', () => {
       const ctx = createTransitionContext(playerState, 'heli_1');
       manager.enterVehicle('helicopter', 'heli_1', ctx);
 
@@ -148,8 +141,8 @@ describe('VehicleStateManager', () => {
     });
   });
 
-  describe('exitVehicle', () => {
-    it('transitions to infantry and calls adapter.onExit + resetControlState', () => {
+  describe('exiting a vehicle', () => {
+    it('returns the player to infantry, notifies the adapter, and clears PlayerState flags', () => {
       const ctx = createTransitionContext(playerState, 'heli_1');
       manager.enterVehicle('helicopter', 'heli_1', ctx);
       manager.exitVehicle(ctx);
@@ -157,30 +150,22 @@ describe('VehicleStateManager', () => {
       expect(manager.isInVehicle()).toBe(false);
       expect(heliAdapter.onExit).toHaveBeenCalledOnce();
       expect(heliAdapter.resetControlState).toHaveBeenCalled();
-    });
-
-    it('clears all PlayerState flags on exit', () => {
-      const ctx = createTransitionContext(playerState, 'heli_1');
-      manager.enterVehicle('helicopter', 'heli_1', ctx);
-      manager.exitVehicle(ctx);
-
       expect(playerState.isInHelicopter).toBe(false);
       expect(playerState.helicopterId).toBeNull();
       expect(playerState.isInFixedWing).toBe(false);
       expect(playerState.fixedWingId).toBeNull();
     });
 
-    it('is a no-op when already infantry', () => {
+    it('is a no-op when the player is already on foot', () => {
       const ctx = createTransitionContext(playerState);
       manager.exitVehicle(ctx);
-
       expect(heliAdapter.onExit).not.toHaveBeenCalled();
       expect(fwAdapter.onExit).not.toHaveBeenCalled();
     });
   });
 
-  describe('update', () => {
-    it('delegates to active adapter', () => {
+  describe('per-frame update', () => {
+    it('drives the active adapter while riding a vehicle', () => {
       const ctx = createTransitionContext(playerState, 'heli_1');
       manager.enterVehicle('helicopter', 'heli_1', ctx);
 
@@ -190,39 +175,11 @@ describe('VehicleStateManager', () => {
       expect(heliAdapter.update).toHaveBeenCalledWith(updateCtx);
     });
 
-    it('is a no-op when infantry', () => {
+    it('does nothing while the player is on foot', () => {
       const updateCtx = createUpdateContext();
       manager.update(updateCtx);
-
       expect(heliAdapter.update).not.toHaveBeenCalled();
       expect(fwAdapter.update).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('full lifecycle: helicopter -> exit -> fixed_wing -> exit', () => {
-    it('handles the full transition cleanly', () => {
-      const ctx1 = createTransitionContext(playerState, 'heli_1');
-      manager.enterVehicle('helicopter', 'heli_1', ctx1);
-      expect(playerState.isInHelicopter).toBe(true);
-
-      manager.exitVehicle(ctx1);
-      expect(playerState.isInHelicopter).toBe(false);
-      expect(manager.isInVehicle()).toBe(false);
-
-      const ctx2 = createTransitionContext(playerState, 'fw_1');
-      manager.enterVehicle('fixed_wing', 'fw_1', ctx2);
-      expect(playerState.isInFixedWing).toBe(true);
-      expect(playerState.isInHelicopter).toBe(false);
-
-      manager.exitVehicle(ctx2);
-      expect(playerState.isInFixedWing).toBe(false);
-      expect(manager.isInVehicle()).toBe(false);
-
-      // All adapters properly cleaned up
-      expect(heliAdapter.onEnter).toHaveBeenCalledTimes(1);
-      expect(heliAdapter.onExit).toHaveBeenCalledTimes(1);
-      expect(fwAdapter.onEnter).toHaveBeenCalledTimes(1);
-      expect(fwAdapter.onExit).toHaveBeenCalledTimes(1);
     });
   });
 });

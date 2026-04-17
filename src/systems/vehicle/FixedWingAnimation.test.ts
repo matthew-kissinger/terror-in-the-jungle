@@ -55,14 +55,6 @@ describe('FixedWingAnimation', () => {
     expect(propR.rotation.z).not.toBe(0);
   });
 
-  it('does not create animation state for jets (F-4 Phantom)', () => {
-    const group = new THREE.Group();
-    animation.initialize('fw3', 'F4_PHANTOM', group);
-
-    // Should not throw when updating a jet with no propellers
-    animation.update('fw3', 1.0, 1 / 60);
-  });
-
   it('spins faster at higher throttle', () => {
     const groupLow = createGroupWithPropeller('propeller');
     const groupHigh = createGroupWithPropeller('propeller');

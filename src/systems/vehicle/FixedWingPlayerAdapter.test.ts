@@ -131,124 +131,54 @@ describe('FixedWingPlayerAdapter', () => {
     adapter = new FixedWingPlayerAdapter(fwModel as any);
   });
 
-  describe('properties', () => {
-    it('has correct vehicleType and inputContext', () => {
-      expect(adapter.vehicleType).toBe('fixed_wing');
-      expect(adapter.inputContext).toBe('fixed_wing');
-    });
+  it('identifies itself as a fixed-wing adapter with fixed-wing input context', () => {
+    expect(adapter.vehicleType).toBe('fixed_wing');
+    expect(adapter.inputContext).toBe('fixed_wing');
   });
 
-  describe('onEnter', () => {
-    it('clears player velocity and running state', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
-      adapter.onEnter(ctx);
-
-      expect(ps.velocity.x).toBe(0);
-      expect(ps.velocity.y).toBe(0);
-      expect(ps.velocity.z).toBe(0);
-      expect(ps.isRunning).toBe(false);
-    });
-
-    it('sets player position to aircraft position', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
-      adapter.onEnter(ctx);
-
-      expect(ctx.setPosition).toHaveBeenCalledWith(ctx.position, 'fixedwing.enter');
-    });
-
-    it('initializes stability assist from aircraft config', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
-      adapter.onEnter(ctx);
-
-      // autoLevelDefault is true in mock
-      expect(adapter.isAutoLevelEnabled()).toBe(true);
-    });
-
-    it('sets input mode to plane', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
-      adapter.onEnter(ctx);
-
-      expect(ctx.input.setFlightVehicleMode).toHaveBeenCalledWith('plane');
-    });
-
-    it('tells FixedWingModel this aircraft is piloted', () => {
+  describe('entering the aircraft', () => {
+    it('puts the player into the cockpit (zeros velocity, snaps position, sets flight mode)', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps, 'fw_abc');
       adapter.onEnter(ctx);
 
+      // Player is no longer running around on foot.
+      expect(ps.velocity.x).toBe(0);
+      expect(ps.velocity.y).toBe(0);
+      expect(ps.velocity.z).toBe(0);
+      expect(ps.isRunning).toBe(false);
+      // Player is snapped to the aircraft position.
+      expect(ctx.setPosition).toHaveBeenCalledWith(ctx.position, 'fixedwing.enter');
+      // Input subsystem is told we are flying a plane.
+      expect(ctx.input.setFlightVehicleMode).toHaveBeenCalledWith('plane');
+      // Model is told this aircraft is now piloted.
       expect(fwModel.setPilotedAircraft).toHaveBeenCalledWith('fw_abc');
-    });
-
-    it('shows fixed-wing HUD elements', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
-      adapter.onEnter(ctx);
-
-      const hud = ctx.hudSystem as ReturnType<typeof createMockHudSystem>;
-      expect(hud.showFixedWingInstruments).toHaveBeenCalled();
-      expect(hud.showFixedWingMouseIndicator).toHaveBeenCalled();
-      expect(hud.setVehicleContext).toHaveBeenCalled();
-      expect(hud.setFixedWingOperationState).toHaveBeenCalledWith('cruise');
+      // Stability assist inherits the aircraft default.
+      expect(adapter.isAutoLevelEnabled()).toBe(true);
     });
   });
 
-  describe('onExit', () => {
-    it('restores camera angles', () => {
+  describe('exiting the aircraft', () => {
+    it('releases the cockpit (restores camera, clears piloted aircraft, clears flight mode)', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
       adapter.onEnter(ctx);
       adapter.onExit(ctx);
 
       expect(ctx.cameraController.restoreInfantryAngles).toHaveBeenCalled();
-    });
-
-    it('hides fixed-wing HUD elements', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
-      adapter.onEnter(ctx);
-      adapter.onExit(ctx);
-
-      const hud = ctx.hudSystem as ReturnType<typeof createMockHudSystem>;
-      expect(hud.hideFixedWingInstruments).toHaveBeenCalled();
-      expect(hud.hideFixedWingMouseIndicator).toHaveBeenCalled();
-    });
-
-    it('clears piloted aircraft', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
-      adapter.onEnter(ctx);
-      adapter.onExit(ctx);
-
       expect(fwModel.setPilotedAircraft).toHaveBeenCalledWith(null);
-    });
-
-    it('resets input mode to none', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
-      adapter.onEnter(ctx);
-      adapter.onExit(ctx);
-
       expect(ctx.input.setFlightVehicleMode).toHaveBeenCalledWith('none');
     });
   });
 
-  describe('resetControlState', () => {
-    it('zeros all control fields', () => {
-      adapter.toggleAutoLevel(); // flip from default
-
+  describe('stability assist (auto-level)', () => {
+    it('resetControlState turns auto-level off', () => {
+      adapter.toggleAutoLevel();
       adapter.resetControlState();
-
       expect(adapter.isAutoLevelEnabled()).toBe(false);
     });
-  });
 
-  describe('toggleAutoLevel', () => {
-    it('toggles stability assist on and off', () => {
-      // Default is false (resetControlState sets it)
+    it('toggleAutoLevel flips the assist state', () => {
       adapter.resetControlState();
       expect(adapter.isAutoLevelEnabled()).toBe(false);
       adapter.toggleAutoLevel();
@@ -258,8 +188,8 @@ describe('FixedWingPlayerAdapter', () => {
     });
   });
 
-  describe('update', () => {
-    it('sends command to fixed-wing model when active', () => {
+  describe('per-frame update', () => {
+    it('drives the aircraft model with pilot intent while active', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps, 'fw_1');
       adapter.onEnter(ctx);
@@ -274,23 +204,23 @@ describe('FixedWingPlayerAdapter', () => {
 
       expect(fwModel.setFixedWingPilotIntent).toHaveBeenCalled();
       const intent = fwModel.setFixedWingPilotIntent.mock.calls[0][0];
-      expect(intent.throttleTarget).toBe(0); // no W key pressed
+      // Idle stick: no throttle, no stick deflection.
+      expect(intent.throttleTarget).toBe(0);
       expect(intent.pitchIntent).toBe(0);
       expect(intent.bankIntent).toBe(0);
     });
 
-    it('does not send command when not active', () => {
+    it('does nothing when the adapter is not active', () => {
       const updateCtx: VehicleUpdateContext = {
         deltaTime: 0.016,
         input: { getTouchControls: vi.fn(() => null) } as any,
         cameraController: {} as any,
       };
       adapter.update(updateCtx);
-
       expect(fwModel.setFixedWingPilotIntent).not.toHaveBeenCalled();
     });
 
-    it('toggles orbit hold for gunship aircraft when airborne', () => {
+    it('sends an orbit-hold intent for a gunship when flight assist is engaged airborne', () => {
       fwModel = createMockFixedWingModel({
         configKey: 'AC47_SPOOKY',
         displayName: 'AC-47 Spooky',

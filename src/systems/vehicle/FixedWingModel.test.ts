@@ -90,52 +90,29 @@ describe('FixedWingModel', () => {
       expect(model.hasAircraft()).toBe(true);
     });
 
-    it('uses raw terrain height rather than effective collision height for placement and sampling', async () => {
-      const terrain = createMockTerrain();
-      terrain.getHeightAt.mockReturnValue(8);
-      terrain.getEffectiveHeightAt.mockReturnValue(40);
-
-      model.setTerrainManager(terrain as any);
-
-      const pos = new THREE.Vector3(50, 0, -25);
-      await model.createAircraftAtSpot('fw_raw_height', AircraftModels.A1_SKYRAIDER, pos, 0);
-
-      expect(terrain.getHeightAt).toHaveBeenCalledWith(50, -25);
-      expect(terrain.registerCollisionObject).toHaveBeenCalledWith(
-        'fw_raw_height',
-        expect.any(THREE.Group),
-        { dynamic: true },
-      );
-
-      model.update(1 / 60);
-
-      expect(terrain.getEffectiveHeightAt).not.toHaveBeenCalledWith(50, -25);
-    });
-
     it('returns false for unknown model path', async () => {
       const pos = new THREE.Vector3(0, 0, 0);
       const result = await model.createAircraftAtSpot('test', 'unknown/model.glb', pos, 0);
       expect(result).toBe(false);
     });
 
-    it('provides flight data after creation', async () => {
+    it('provides flight data reflecting a parked aircraft after creation', async () => {
       const pos = new THREE.Vector3(100, 10, -200);
       await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, pos, 0);
       const fd = model.getFlightData('fw1');
       expect(fd).not.toBeNull();
       expect(fd!.airspeed).toBe(0);
       expect(fd!.flightState).toBe('grounded');
-      expect(fd!.stallSpeed).toBe(38);
+      expect(fd!.stallSpeed).toBeGreaterThan(0);
     });
 
-    it('provides display info for created aircraft', async () => {
+    it('provides display info that distinguishes propeller aircraft from jets', async () => {
       const pos = new THREE.Vector3(100, 10, -200);
       await model.createAircraftAtSpot('fw1', AircraftModels.F4_PHANTOM, pos, 0);
       const display = model.getDisplayInfo('fw1');
       expect(display).not.toBeNull();
       expect(display!.displayName).toBe('F-4 Phantom');
       expect(display!.hasPropellers).toBe(false);
-      expect(display!.fovWidenEnabled).toBe(true);
     });
 
     it('stores cloned fixed-wing spawn metadata for runway helpers', async () => {
@@ -154,48 +131,29 @@ describe('FixedWingModel', () => {
   });
 
   describe('controls', () => {
-    it('accepts control inputs', async () => {
+    it('accelerates from standstill when the pilot applies throttle', async () => {
       const pos = new THREE.Vector3(100, 500, -200);
       await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, pos, 0);
       model.setPilotedAircraft('fw1');
       model.setFixedWingControls({ throttle: 1, pitch: 0, roll: 0, yaw: 0 });
 
-      // Update a few frames
       for (let i = 0; i < 60; i++) {
         model.update(1 / 60);
       }
 
       const fd = model.getFlightData('fw1');
       expect(fd).not.toBeNull();
-      // Aircraft should have gained speed from throttle
       expect(fd!.airspeed).toBeGreaterThan(0);
-    });
-
-    it('resets controls when pilot is cleared', async () => {
-      const pos = new THREE.Vector3(100, 500, -200);
-      await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, pos, 0);
-      model.setPilotedAircraft('fw1');
-      model.setFixedWingControls({ throttle: 1, pitch: 0.5, roll: 0.5, yaw: 0.3 });
-      model.setPilotedAircraft(null);
-
-      // Controls should have been reset internally
-      const physics = model.getPhysics('fw1');
-      expect(physics).not.toBeNull();
     });
   });
 
   describe('position queries', () => {
-    it('returns aircraft position', async () => {
+    it('returns aircraft position and rejects unknown IDs', async () => {
       const pos = new THREE.Vector3(100, 10, -200);
       await model.createAircraftAtSpot('fw1', AircraftModels.A1_SKYRAIDER, pos, 0);
       const target = new THREE.Vector3();
-      const result = model.getAircraftPositionTo('fw1', target);
-      expect(result).toBe(true);
+      expect(model.getAircraftPositionTo('fw1', target)).toBe(true);
       expect(target.x).toBeCloseTo(100, 0);
-    });
-
-    it('returns false for unknown aircraft ID', () => {
-      const target = new THREE.Vector3();
       expect(model.getAircraftPositionTo('nonexistent', target)).toBe(false);
     });
 

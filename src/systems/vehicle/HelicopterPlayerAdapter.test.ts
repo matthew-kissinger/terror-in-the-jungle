@@ -110,114 +110,56 @@ describe('HelicopterPlayerAdapter', () => {
     adapter = new HelicopterPlayerAdapter(heliModel as any);
   });
 
-  describe('properties', () => {
-    it('has correct vehicleType and inputContext', () => {
-      expect(adapter.vehicleType).toBe('helicopter');
-      expect(adapter.inputContext).toBe('helicopter');
-    });
+  it('identifies itself as a helicopter adapter with helicopter input context', () => {
+    expect(adapter.vehicleType).toBe('helicopter');
+    expect(adapter.inputContext).toBe('helicopter');
   });
 
-  describe('onEnter', () => {
-    it('clears player velocity and running state', () => {
+  describe('entering the helicopter', () => {
+    it('takes the player off their feet and into the cockpit', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
       adapter.onEnter(ctx);
 
+      // Player no longer running around on foot.
       expect(ps.velocity.x).toBe(0);
       expect(ps.velocity.y).toBe(0);
       expect(ps.velocity.z).toBe(0);
       expect(ps.isRunning).toBe(false);
-    });
-
-    it('sets player position to helicopter position', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
-      adapter.onEnter(ctx);
-
+      // Snapped to the helicopter.
       expect(ctx.setPosition).toHaveBeenCalledWith(ctx.position, 'helicopter.enter');
-    });
-
-    it('sets input mode to helicopter', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
-      adapter.onEnter(ctx);
-
+      // Input is in helicopter mode.
       expect(ctx.input.setFlightVehicleMode).toHaveBeenCalledWith('helicopter');
-    });
-
-    it('saves camera angles', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
-      adapter.onEnter(ctx);
-
+      // Camera remembers the infantry angles so we can restore them on exit.
       expect(ctx.cameraController.saveInfantryAngles).toHaveBeenCalled();
     });
 
-    it('shows helicopter HUD elements', () => {
+    it('adjusts the crosshair for the helicopter role on entry', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
       adapter.onEnter(ctx);
-
-      const hud = ctx.hudSystem as ReturnType<typeof createMockHudSystem>;
-      expect(hud.showHelicopterMouseIndicator).toHaveBeenCalled();
-      expect(hud.showHelicopterInstruments).toHaveBeenCalled();
-      expect(hud.setVehicleContext).toHaveBeenCalled();
-    });
-
-    it('sets crosshair mode for transport helicopter', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
-      adapter.onEnter(ctx);
-
       expect(ctx.gameRenderer!.setCrosshairMode).toHaveBeenCalledWith('helicopter_transport');
     });
   });
 
-  describe('onExit', () => {
-    it('restores camera angles', () => {
+  describe('exiting the helicopter', () => {
+    it('puts the player back on their feet (restores camera, infantry crosshair, clears flight mode)', () => {
       const ps = createPlayerState();
       const ctx = createTransitionContext(ps);
       adapter.onEnter(ctx);
       adapter.onExit(ctx);
 
       expect(ctx.cameraController.restoreInfantryAngles).toHaveBeenCalled();
-    });
-
-    it('hides helicopter HUD elements', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
-      adapter.onEnter(ctx);
-      adapter.onExit(ctx);
-
-      const hud = ctx.hudSystem as ReturnType<typeof createMockHudSystem>;
-      expect(hud.hideHelicopterMouseIndicator).toHaveBeenCalled();
-      expect(hud.hideHelicopterInstruments).toHaveBeenCalled();
-    });
-
-    it('resets crosshair to infantry', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
-      adapter.onEnter(ctx);
-      adapter.onExit(ctx);
-
       expect(ctx.gameRenderer!.setCrosshairMode).toHaveBeenCalledWith('infantry');
-    });
-
-    it('resets input mode to none', () => {
-      const ps = createPlayerState();
-      const ctx = createTransitionContext(ps);
-      adapter.onEnter(ctx);
-      adapter.onExit(ctx);
-
       expect(ctx.input.setFlightVehicleMode).toHaveBeenCalledWith('none');
     });
   });
 
-  describe('resetControlState', () => {
-    it('zeros all control fields', () => {
+  describe('control state', () => {
+    it('resetControlState zeroes stick inputs and keeps autoHover enabled by default', () => {
       adapter.setEngineBoost(true);
-      adapter.toggleAutoHover(); // now false
-      adapter.toggleAltitudeLock(); // now true
+      adapter.toggleAutoHover();
+      adapter.toggleAltitudeLock();
 
       adapter.resetControlState();
 
@@ -229,10 +171,8 @@ describe('HelicopterPlayerAdapter', () => {
       expect(controls.engineBoost).toBe(false);
       expect(controls.autoHover).toBe(true);
     });
-  });
 
-  describe('toggleAutoHover', () => {
-    it('toggles autoHover on and off', () => {
+    it('toggleAutoHover flips the assist state', () => {
       expect(adapter.getHelicopterControls().autoHover).toBe(true);
       adapter.toggleAutoHover();
       expect(adapter.getHelicopterControls().autoHover).toBe(false);

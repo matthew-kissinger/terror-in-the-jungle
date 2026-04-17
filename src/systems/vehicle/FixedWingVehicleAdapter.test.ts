@@ -26,29 +26,27 @@ describe('FixedWingVehicleAdapter', () => {
     adapter = new FixedWingVehicleAdapter('fw1', 'A1_SKYRAIDER', Faction.US, createMockModel());
   });
 
-  it('has correct category', () => {
+  it('exposes a single pilot seat in the fixed_wing category', () => {
     expect(adapter.category).toBe('fixed_wing');
-  });
-
-  it('has a pilot seat', () => {
     const seats = adapter.getSeats();
     expect(seats.length).toBe(1);
     expect(seats[0].role).toBe('pilot');
   });
 
-  it('allows entering the pilot seat', () => {
+  it('boards one occupant and reports the seat as full', () => {
+    expect(adapter.hasFreeSeats()).toBe(true);
+    expect(adapter.hasFreeSeats('pilot')).toBe(true);
+
     const seatIndex = adapter.enterVehicle('player', 'pilot');
     expect(seatIndex).toBe(0);
     expect(adapter.getPilotId()).toBe('player');
+    expect(adapter.hasFreeSeats()).toBe(false);
+
+    // Second occupant is refused.
+    expect(adapter.enterVehicle('npc1')).toBeNull();
   });
 
-  it('returns null when all seats are occupied', () => {
-    adapter.enterVehicle('player');
-    const result = adapter.enterVehicle('npc1');
-    expect(result).toBeNull();
-  });
-
-  it('exits and returns a world position', () => {
+  it('exits the pilot and returns a valid world position', () => {
     adapter.enterVehicle('player');
     const exitPos = adapter.exitVehicle('player');
     expect(exitPos).not.toBeNull();
@@ -56,19 +54,9 @@ describe('FixedWingVehicleAdapter', () => {
     expect(adapter.getPilotId()).toBeNull();
   });
 
-  it('reports free seats correctly', () => {
-    expect(adapter.hasFreeSeats()).toBe(true);
-    expect(adapter.hasFreeSeats('pilot')).toBe(true);
-    adapter.enterVehicle('player');
-    expect(adapter.hasFreeSeats()).toBe(false);
-  });
-
-  it('returns position from model', () => {
+  it('exposes position and velocity for the aircraft', () => {
     const pos = adapter.getPosition();
     expect(pos.x).toBe(100);
-  });
-
-  it('returns velocity from physics', () => {
     const vel = adapter.getVelocity();
     expect(vel.x).toBe(30);
   });
