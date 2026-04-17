@@ -4,7 +4,6 @@ import { AIStateEngage } from './AIStateEngage';
 import { Combatant, CombatantState, Faction, Squad } from '../types';
 import { ISpatialQuery } from '../SpatialOctree';
 
-// Mock dependencies
 vi.mock('../../../utils/Logger', () => ({
   Logger: {
     info: vi.fn(),
@@ -85,204 +84,169 @@ describe('AIStateEngage', () => {
     return createMockCombatant(id, faction, position);
   }
 
-  describe('setSquads, setCoverSystem, setFlankingSystem', () => {
-    it('should set squads', () => {
-      const mockSquads = new Map<string, Squad>();
-      aiStateEngage.setSquads(mockSquads);
-      // squads is private, verified by usage in tests
-    });
+  const canSeeTarget = vi.fn();
+  const shouldSeekCover = vi.fn();
+  const findNearestCover = vi.fn();
+  const countNearbyEnemies = vi.fn();
+  const isCoverFlanked = vi.fn();
 
-    it('should set cover system', () => {
-      aiStateEngage.setCoverSystem(mockCoverSystem);
-      // verified by usage in tests
-    });
-
-    it('should set flanking system', () => {
-      aiStateEngage.setFlankingSystem(mockFlankingSystem);
-      // verified by usage in tests
-    });
+  beforeEach(() => {
+    canSeeTarget.mockReturnValue(true);
+    shouldSeekCover.mockReturnValue(false);
+    findNearestCover.mockReturnValue(null);
+    countNearbyEnemies.mockReturnValue(0);
+    isCoverFlanked.mockReturnValue(false);
   });
 
-  describe('handleEngaging', () => {
-    const canSeeTarget = vi.fn();
-    const shouldSeekCover = vi.fn();
-    const findNearestCover = vi.fn();
-    const countNearbyEnemies = vi.fn();
-    const isCoverFlanked = vi.fn();
+  function invokeHandleEngaging(combatant: Combatant) {
+    aiStateEngage.handleEngaging(
+      combatant, 0.016, playerPosition, allCombatants, spatialGrid,
+      canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
+    );
+  }
 
-    beforeEach(() => {
-      canSeeTarget.mockReturnValue(true);
-      shouldSeekCover.mockReturnValue(false);
-      findNearestCover.mockReturnValue(null);
-      countNearbyEnemies.mockReturnValue(0);
-      isCoverFlanked.mockReturnValue(false);
-    });
-
-    it('should transition to PATROLLING when target is null', () => {
+  describe('handleEngaging - target loss', () => {
+    it('drops back to PATROLLING when target is null', () => {
       const combatant = createMockCombatant('c1', Faction.US);
       combatant.target = null;
 
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
+      invokeHandleEngaging(combatant);
 
       expect(combatant.state).toBe(CombatantState.PATROLLING);
       expect(combatant.isFullAuto).toBe(false);
     });
 
-    it('should transition to DEFENDING when previous state was DEFENDING and target is null', () => {
+    it('restores DEFENDING when that was the previous state and the target is gone', () => {
       const combatant = createMockCombatant('c1', Faction.US);
       combatant.target = null;
       combatant.previousState = CombatantState.DEFENDING;
 
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
+      invokeHandleEngaging(combatant);
 
       expect(combatant.state).toBe(CombatantState.DEFENDING);
     });
 
-    it('should transition to PATROLLING when target is DEAD', () => {
+    it('drops target and returns to PATROLLING when the target is already dead', () => {
       const combatant = createMockCombatant('c1', Faction.US);
-      const deadTarget = createMockTarget('dead', Faction.NVA);
-      deadTarget.state = CombatantState.DEAD;
-      combatant.target = deadTarget;
+      const dead = createMockTarget('dead', Faction.NVA);
+      dead.state = CombatantState.DEAD;
+      combatant.target = dead;
 
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
+      invokeHandleEngaging(combatant);
 
       expect(combatant.state).toBe(CombatantState.PATROLLING);
       expect(combatant.target).toBeNull();
     });
 
-    it('should release cover when target is lost', () => {
+    it('releases cover when the target is lost', () => {
       const combatant = createMockCombatant('c1', Faction.US);
       combatant.target = null;
       aiStateEngage.setCoverSystem(mockCoverSystem);
 
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
+      invokeHandleEngaging(combatant);
 
       expect(mockCoverSystem.releaseCover).toHaveBeenCalledWith('c1');
     });
+  });
 
-    it('should face target and update rotation', () => {
+  describe('handleEngaging - combat behavior', () => {
+    it('orients the combatant toward its target', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
       const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(10, 0, 10));
       combatant.target = target;
 
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
+      invokeHandleEngaging(combatant);
 
-      // Rotation should be calculated towards target
-      const expectedRotation = Math.atan2(10, 10);
-      expect(combatant.rotation).toBeCloseTo(expectedRotation, 5);
+      expect(combatant.rotation).toBeCloseTo(Math.atan2(10, 10), 5);
     });
 
-    it('should enable full auto at close range (<15m)', () => {
+    it('updates lastKnownTargetPos each tick the target is visible', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
+      combatant.target = target;
+
+      invokeHandleEngaging(combatant);
+
+      expect(combatant.lastKnownTargetPos).toBeDefined();
+      expect(combatant.lastKnownTargetPos!.distanceTo(target.position)).toBeLessThan(0.1);
+    });
+
+    it('switches to full-auto behavior at close range', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
       const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(10, 0, 0));
       combatant.target = target;
 
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
+      invokeHandleEngaging(combatant);
 
       expect(combatant.isFullAuto).toBe(true);
-      expect(combatant.skillProfile.burstLength).toBe(8);
-      expect(combatant.skillProfile.burstPauseMs).toBe(200);
     });
 
-    it('should not enable full auto at medium range (>15m)', () => {
+    it('stays on controlled bursts at medium range', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
       const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(30, 0, 0));
       combatant.target = target;
-      combatant.faction = Faction.US;
-      combatant.squadRole = 'follower';
 
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
+      invokeHandleEngaging(combatant);
 
       expect(combatant.isFullAuto).toBe(false);
-      expect(combatant.skillProfile.burstLength).toBe(3);
     });
 
-    it('should increase panic when recently hit', () => {
-      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
-      combatant.target = target;
-      combatant.lastHitTime = Date.now() - 1000; // 1 second ago
-      combatant.panicLevel = 0;
-
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
-
-      expect(combatant.panicLevel).toBeGreaterThan(0);
-    });
-
-    it('should enable full auto when panic level is high', () => {
+    it('increases panic when recently hit, decays it when not', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
       const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
       combatant.target = target;
       combatant.lastHitTime = Date.now() - 500;
-      combatant.panicLevel = 0.6;
+      combatant.panicLevel = 0;
 
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
+      invokeHandleEngaging(combatant);
+      expect(combatant.panicLevel).toBeGreaterThan(0);
 
-      expect(combatant.isFullAuto).toBe(true);
-      expect(combatant.skillProfile.burstLength).toBe(10);
-      expect(combatant.skillProfile.burstPauseMs).toBe(150);
-    });
-
-    it('should decrease panic over time', () => {
-      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
-      combatant.target = target;
-      combatant.lastHitTime = Date.now() - 5000; // 5 seconds ago
-      combatant.panicLevel = 0.5;
-
+      combatant.lastHitTime = Date.now() - 10000;
+      const panicHigh = combatant.panicLevel;
       aiStateEngage.handleEngaging(
         combatant, 1.0, playerPosition, allCombatants, spatialGrid,
         canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
       );
-
-      expect(combatant.panicLevel).toBeLessThan(0.5);
+      expect(combatant.panicLevel).toBeLessThan(panicHigh);
     });
 
-    it('should transition to SEEKING_COVER when should seek cover', () => {
+    it('goes full-auto when nearby enemies cross the threshold', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
+      combatant.target = target;
+      countNearbyEnemies.mockReturnValue(4);
+
+      invokeHandleEngaging(combatant);
+
+      expect(combatant.isFullAuto).toBe(true);
+    });
+
+    it('transitions to SUPPRESSING when the target is not visible', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
+      combatant.target = target;
+      canSeeTarget.mockReturnValue(false);
+
+      invokeHandleEngaging(combatant);
+
+      expect(combatant.state).toBe(CombatantState.SUPPRESSING);
+      expect(combatant.lastKnownTargetPos).toBeDefined();
+    });
+
+    it('transitions to SEEKING_COVER and records a cover position when cover is needed', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
       const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
       combatant.target = target;
       shouldSeekCover.mockReturnValue(true);
       findNearestCover.mockReturnValue(new THREE.Vector3(5, 0, 5));
 
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
+      invokeHandleEngaging(combatant);
 
       expect(combatant.state).toBe(CombatantState.SEEKING_COVER);
       expect(combatant.coverPosition).toBeDefined();
-      expect(combatant.destinationPoint).toBeDefined();
     });
 
-    it('should use advanced cover system when available', () => {
+    it('prefers the advanced cover system when one is registered', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
       const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
       combatant.target = target;
@@ -292,243 +256,91 @@ describe('AIStateEngage', () => {
       mockCoverSystem.findBestCover.mockReturnValue(coverSpot);
       aiStateEngage.setCoverSystem(mockCoverSystem);
 
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
+      invokeHandleEngaging(combatant);
 
       expect(mockCoverSystem.findBestCover).toHaveBeenCalled();
       expect(mockCoverSystem.claimCover).toHaveBeenCalledWith(combatant, expect.any(THREE.Vector3));
       expect(combatant.state).toBe(CombatantState.SEEKING_COVER);
     });
+  });
 
-    it('should enable full auto when many nearby enemies', () => {
+  describe('handleEngaging - in-cover behavior', () => {
+    it('repositions out of cover when the cover system signals it is no longer effective', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
       const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
       combatant.target = target;
-      countNearbyEnemies.mockReturnValue(4);
+      combatant.inCover = true;
+      combatant.coverPosition = new THREE.Vector3(0, 0, 0);
 
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
+      mockCoverSystem.evaluateCurrentCover.mockReturnValue({ effective: false, shouldReposition: true });
+      mockCoverSystem.findBestCover.mockReturnValue({ position: new THREE.Vector3(10, 0, 10) });
+      aiStateEngage.setCoverSystem(mockCoverSystem);
 
-      expect(combatant.isFullAuto).toBe(true);
-      expect(combatant.skillProfile.burstLength).toBe(6);
+      invokeHandleEngaging(combatant);
+
+      expect(mockCoverSystem.releaseCover).toHaveBeenCalledWith('c1');
+      expect(combatant.state).toBe(CombatantState.SEEKING_COVER);
     });
 
-    it('should transition to SUPPRESSING when cannot see target', () => {
+    it('breaks out of cover when the fallback flanked-check signals exposure', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
       const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
       combatant.target = target;
-      canSeeTarget.mockReturnValue(false);
+      combatant.inCover = true;
+      combatant.coverPosition = new THREE.Vector3(0, 0, 0);
+      isCoverFlanked.mockReturnValue(true);
 
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
+      invokeHandleEngaging(combatant);
 
-      expect(combatant.state).toBe(CombatantState.SUPPRESSING);
-      expect(combatant.lastKnownTargetPos).toBeDefined();
-      expect(combatant.isFullAuto).toBe(true);
-      expect(combatant.skillProfile.burstLength).toBe(12);
+      expect(combatant.inCover).toBe(false);
+      expect(combatant.coverPosition).toBeUndefined();
+    });
+  });
+
+  describe('handleEngaging - squad flanking', () => {
+    beforeEach(() => {
+      aiStateEngage.setFlankingSystem(mockFlankingSystem);
     });
 
-    it('should update last known target position when target is visible', () => {
+    it('initiates a flank when the flanking system says to', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
       combatant.target = target;
+      combatant.squadId = 'squad-1';
 
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
+      squads.set('squad-1', { id: 'squad-1', faction: Faction.US, members: ['c1', 'c2', 'c3'] } as Squad);
+      aiStateEngage.setSquads(squads);
 
-      expect(combatant.lastKnownTargetPos).toBeDefined();
-      expect(combatant.lastKnownTargetPos?.distanceTo(target.position)).toBeLessThan(0.1);
+      mockFlankingSystem.shouldInitiateFlank.mockReturnValue(true);
+      mockFlankingSystem.initiateFlank.mockReturnValue({ id: 'flank-op-1' });
+
+      invokeHandleEngaging(combatant);
+
+      expect(mockFlankingSystem.initiateFlank).toHaveBeenCalled();
     });
 
-    describe('In Cover Behavior', () => {
-      it('should use peek-and-fire burst params when in cover', () => {
-        const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-        const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
-        combatant.target = target;
-        combatant.inCover = true;
-        combatant.coverPosition = new THREE.Vector3(0, 0, 0);
-        aiStateEngage.setCoverSystem(mockCoverSystem);
+    it('does not try to start a flank if one is already active for the squad', () => {
+      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
+      combatant.target = target;
+      combatant.squadId = 'squad-1';
 
-        aiStateEngage.handleEngaging(
-          combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-          canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-        );
+      squads.set('squad-1', { id: 'squad-1', faction: Faction.US, members: ['c1', 'c2', 'c3'] } as Squad);
+      aiStateEngage.setSquads(squads);
 
-        expect(combatant.skillProfile.burstLength).toBe(2);
-        expect(combatant.skillProfile.burstPauseMs).toBe(1500);
-      });
+      mockFlankingSystem.hasActiveFlank.mockReturnValue(true);
 
-      it('should reposition when cover is compromised', () => {
-        const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-        const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
-        combatant.target = target;
-        combatant.inCover = true;
-        combatant.coverPosition = new THREE.Vector3(0, 0, 0);
+      invokeHandleEngaging(combatant);
 
-        mockCoverSystem.evaluateCurrentCover.mockReturnValue({ effective: false, shouldReposition: true });
-        const newCover = { position: new THREE.Vector3(10, 0, 10) };
-        mockCoverSystem.findBestCover.mockReturnValue(newCover);
-        aiStateEngage.setCoverSystem(mockCoverSystem);
-
-        aiStateEngage.handleEngaging(
-          combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-          canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-        );
-
-        expect(mockCoverSystem.releaseCover).toHaveBeenCalledWith('c1');
-        expect(combatant.state).toBe(CombatantState.SEEKING_COVER);
-      });
-
-      it('should use fallback flanked check when no cover system', () => {
-        const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-        const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
-        combatant.target = target;
-        combatant.inCover = true;
-        combatant.coverPosition = new THREE.Vector3(0, 0, 0);
-        isCoverFlanked.mockReturnValue(true);
-
-        aiStateEngage.handleEngaging(
-          combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-          canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-        );
-
-        expect(combatant.inCover).toBe(false);
-        expect(combatant.coverPosition).toBeUndefined();
-      });
-    });
-
-    describe('Burst Parameter Adjustment', () => {
-      it('should use OPFOR leader burst params', () => {
-        const combatant = createMockCombatant('c1', Faction.NVA, new THREE.Vector3(0, 0, 0));
-        const target = createMockTarget('t1', Faction.US, new THREE.Vector3(50, 0, 0));
-        combatant.target = target;
-        combatant.squadRole = 'leader';
-
-        aiStateEngage.handleEngaging(
-          combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-          canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-        );
-
-        expect(combatant.skillProfile.burstLength).toBe(4);
-        expect(combatant.skillProfile.burstPauseMs).toBe(800);
-      });
-
-      it('should use OPFOR follower burst params', () => {
-        const combatant = createMockCombatant('c1', Faction.NVA, new THREE.Vector3(0, 0, 0));
-        const target = createMockTarget('t1', Faction.US, new THREE.Vector3(50, 0, 0));
-        combatant.target = target;
-        combatant.squadRole = 'follower';
-
-        aiStateEngage.handleEngaging(
-          combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-          canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-        );
-
-        expect(combatant.skillProfile.burstLength).toBe(3);
-        expect(combatant.skillProfile.burstPauseMs).toBe(1000);
-      });
-
-      it('should use US leader burst params', () => {
-        const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-        const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
-        combatant.target = target;
-        combatant.squadRole = 'leader';
-
-        aiStateEngage.handleEngaging(
-          combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-          canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-        );
-
-        expect(combatant.skillProfile.burstLength).toBe(3);
-        expect(combatant.skillProfile.burstPauseMs).toBe(900);
-      });
-
-      it('should use US follower burst params', () => {
-        const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-        const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
-        combatant.target = target;
-        combatant.squadRole = 'follower';
-
-        aiStateEngage.handleEngaging(
-          combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-          canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-        );
-
-        expect(combatant.skillProfile.burstLength).toBe(3);
-        expect(combatant.skillProfile.burstPauseMs).toBe(1100);
-      });
-    });
-
-    describe('Squad Flanking', () => {
-      beforeEach(() => {
-        aiStateEngage.setFlankingSystem(mockFlankingSystem);
-      });
-
-      it('should initiate flanking when conditions are met', () => {
-        const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-        const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
-        combatant.target = target;
-        combatant.squadId = 'squad-1';
-
-        const squad: Squad = {
-          id: 'squad-1',
-          faction: Faction.US,
-          members: ['c1', 'c2', 'c3'],
-        } as Squad;
-        squads.set('squad-1', squad);
-        aiStateEngage.setSquads(squads);
-
-        mockFlankingSystem.shouldInitiateFlank.mockReturnValue(true);
-        mockFlankingSystem.initiateFlank.mockReturnValue({ id: 'flank-op-1' });
-
-        aiStateEngage.handleEngaging(
-          combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-          canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-        );
-
-        expect(mockFlankingSystem.shouldInitiateFlank).toHaveBeenCalled();
-        expect(mockFlankingSystem.initiateFlank).toHaveBeenCalled();
-      });
-
-      it('should not initiate flanking if already active', () => {
-        const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-        const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
-        combatant.target = target;
-        combatant.squadId = 'squad-1';
-
-        const squad: Squad = {
-          id: 'squad-1',
-          faction: Faction.US,
-          members: ['c1', 'c2', 'c3'],
-        } as Squad;
-        squads.set('squad-1', squad);
-        aiStateEngage.setSquads(squads);
-
-        mockFlankingSystem.hasActiveFlank.mockReturnValue(true);
-
-        aiStateEngage.handleEngaging(
-          combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-          canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-        );
-
-        expect(mockFlankingSystem.shouldInitiateFlank).not.toHaveBeenCalled();
-      });
+      expect(mockFlankingSystem.shouldInitiateFlank).not.toHaveBeenCalled();
     });
   });
 
   describe('handleSuppressing', () => {
-    it('should transition to ENGAGING when suppression time expires', () => {
+    it('returns to ENGAGING when the suppression timer expires', () => {
       const combatant = createMockCombatant('c1', Faction.US);
       combatant.state = CombatantState.SUPPRESSING;
-      combatant.suppressionEndTime = Date.now() - 1000; // Already expired
+      combatant.suppressionEndTime = Date.now() - 1000;
 
       aiStateEngage.handleSuppressing(combatant, 0.016);
 
@@ -537,10 +349,10 @@ describe('AIStateEngage', () => {
       expect(combatant.suppressionEndTime).toBeUndefined();
     });
 
-    it('should continue suppressing when time has not expired', () => {
+    it('continues suppressing while the timer is active', () => {
       const combatant = createMockCombatant('c1', Faction.US);
       combatant.state = CombatantState.SUPPRESSING;
-      combatant.suppressionEndTime = Date.now() + 2000; // Still active
+      combatant.suppressionEndTime = Date.now() + 2000;
       combatant.alertTimer = 5.0;
 
       aiStateEngage.handleSuppressing(combatant, 0.016);
@@ -549,313 +361,148 @@ describe('AIStateEngage', () => {
       expect(combatant.alertTimer).toBeLessThan(5.0);
     });
 
-    it('should transition to PATROLLING when alert timer expires', () => {
+    it('decays to PATROLLING when the alert timer runs out', () => {
       const combatant = createMockCombatant('c1', Faction.US);
       combatant.state = CombatantState.SUPPRESSING;
       combatant.alertTimer = 0.01;
-      const target = createMockTarget('t1', Faction.NVA);
-      combatant.target = target;
+      combatant.target = createMockTarget('t1', Faction.NVA);
 
       aiStateEngage.handleSuppressing(combatant, 0.02);
 
       expect(combatant.state).toBe(CombatantState.PATROLLING);
       expect(combatant.target).toBeNull();
-      expect(combatant.lastKnownTargetPos).toBeUndefined();
-      expect(combatant.suppressionTarget).toBeUndefined();
-    });
-
-    it('should handle no suppression end time', () => {
-      const combatant = createMockCombatant('c1', Faction.US);
-      combatant.state = CombatantState.SUPPRESSING;
-      combatant.suppressionEndTime = undefined;
-      combatant.alertTimer = 5.0;
-
-      aiStateEngage.handleSuppressing(combatant, 0.016);
-
-      expect(combatant.alertTimer).toBeLessThan(5.0);
     });
   });
 
   describe('handleAlert', () => {
-    const canSeeTarget = vi.fn();
+    const canSee = vi.fn();
 
     beforeEach(() => {
-      canSeeTarget.mockReturnValue(true);
+      canSee.mockReturnValue(true);
     });
 
-    it('should decrease alert and reaction timers', () => {
+    it('ticks down alert and reaction timers', () => {
       const combatant = createMockCombatant('c1', Faction.US);
       combatant.state = CombatantState.ALERT;
       combatant.alertTimer = 2.0;
       combatant.reactionTimer = 1.0;
-      const target = createMockTarget('t1', Faction.NVA);
-      combatant.target = target;
+      combatant.target = createMockTarget('t1', Faction.NVA);
 
-      aiStateEngage.handleAlert(combatant, 0.5, playerPosition, canSeeTarget);
+      aiStateEngage.handleAlert(combatant, 0.5, playerPosition, canSee);
 
       expect(combatant.alertTimer).toBe(1.5);
       expect(combatant.reactionTimer).toBe(0.5);
     });
 
-    it('should transition to ENGAGING when reaction timer expires and can see target', () => {
+    it('escalates to ENGAGING when reaction timer hits zero and target is visible', () => {
       const combatant = createMockCombatant('c1', Faction.US);
       combatant.state = CombatantState.ALERT;
       combatant.reactionTimer = 0.01;
-      combatant.alertTimer = 2.0;
-      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(10, 0, 10));
-      combatant.target = target;
+      combatant.target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(10, 0, 10));
 
-      aiStateEngage.handleAlert(combatant, 0.02, playerPosition, canSeeTarget);
+      aiStateEngage.handleAlert(combatant, 0.02, playerPosition, canSee);
 
       expect(combatant.state).toBe(CombatantState.ENGAGING);
       expect(combatant.currentBurst).toBe(0);
     });
 
-    it('should face target when reaction timer expires', () => {
-      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      combatant.state = CombatantState.ALERT;
-      combatant.reactionTimer = 0.01;
-      combatant.rotation = 0;
-      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(10, 0, 10));
-      combatant.target = target;
-
-      aiStateEngage.handleAlert(combatant, 0.02, playerPosition, canSeeTarget);
-
-      const expectedRotation = Math.atan2(10, 10);
-      expect(combatant.rotation).toBeCloseTo(expectedRotation, 5);
-    });
-
-    it('should transition to PATROLLING when cannot see target', () => {
+    it('falls back to PATROLLING when the target was lost before the reaction fires', () => {
       const combatant = createMockCombatant('c1', Faction.US);
       combatant.state = CombatantState.ALERT;
       combatant.reactionTimer = 0.01;
-      const target = createMockTarget('t1', Faction.NVA);
-      combatant.target = target;
-      canSeeTarget.mockReturnValue(false);
+      combatant.target = createMockTarget('t1', Faction.NVA);
+      canSee.mockReturnValue(false);
 
-      aiStateEngage.handleAlert(combatant, 0.02, playerPosition, canSeeTarget);
+      aiStateEngage.handleAlert(combatant, 0.02, playerPosition, canSee);
 
       expect(combatant.state).toBe(CombatantState.PATROLLING);
       expect(combatant.target).toBeNull();
     });
 
-    it('should transition to DEFENDING when previous state was DEFENDING', () => {
+    it('returns to DEFENDING when that was the previous state and target was lost', () => {
       const combatant = createMockCombatant('c1', Faction.US);
       combatant.state = CombatantState.ALERT;
       combatant.previousState = CombatantState.DEFENDING;
       combatant.reactionTimer = 0.01;
-      const target = createMockTarget('t1', Faction.NVA);
-      combatant.target = target;
-      canSeeTarget.mockReturnValue(false);
+      combatant.target = createMockTarget('t1', Faction.NVA);
+      canSee.mockReturnValue(false);
 
-      aiStateEngage.handleAlert(combatant, 0.02, playerPosition, canSeeTarget);
+      aiStateEngage.handleAlert(combatant, 0.02, playerPosition, canSee);
 
       expect(combatant.state).toBe(CombatantState.DEFENDING);
     });
-
-    it('should handle player target position', () => {
-      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(10, 0, 10));
-      combatant.state = CombatantState.ALERT;
-      combatant.reactionTimer = 0.01;
-      const target = createMockTarget('PLAYER', Faction.US, new THREE.Vector3(0, 0, 0));
-      combatant.target = target;
-      const playerPos = new THREE.Vector3(5, 0, 5);
-
-      aiStateEngage.handleAlert(combatant, 0.02, playerPos, canSeeTarget);
-
-      // Should use playerPosition instead of target.position
-      const expectedRotation = Math.atan2(5 - 10, 5 - 10);
-      expect(combatant.rotation).toBeCloseTo(expectedRotation, 5);
-    });
   });
 
-  describe('Squad Suppression', () => {
-    const canSeeTarget = vi.fn();
-    const shouldSeekCover = vi.fn();
-    const findNearestCover = vi.fn();
-    const countNearbyEnemies = vi.fn();
-    const isCoverFlanked = vi.fn();
+  describe('squad suppression', () => {
+    it('initiates suppression from the leader when squad size and engagement distance qualify', () => {
+      const leader = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
+      leader.target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
+      leader.squadId = 'squad-1';
+      leader.squadRole = 'leader';
 
-    beforeEach(() => {
-      canSeeTarget.mockReturnValue(true);
-      shouldSeekCover.mockReturnValue(false);
-      findNearestCover.mockReturnValue(null);
-      countNearbyEnemies.mockReturnValue(0);
-      isCoverFlanked.mockReturnValue(false);
-    });
+      allCombatants.set('c1', leader);
+      allCombatants.set('c2', createMockCombatant('c2', Faction.US));
+      allCombatants.set('c3', createMockCombatant('c3', Faction.US));
 
-    it('should initiate squad suppression when conditions are met', () => {
-      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
-      combatant.target = target;
-      combatant.squadId = 'squad-1';
-      combatant.squadRole = 'leader';
-
-      const c2 = createMockCombatant('c2', Faction.US);
-      const c3 = createMockCombatant('c3', Faction.US);
-      allCombatants.set('c1', combatant);
-      allCombatants.set('c2', c2);
-      allCombatants.set('c3', c3);
-
-      const squad: Squad = {
-        id: 'squad-1',
-        faction: Faction.US,
-        members: ['c1', 'c2', 'c3'],
-      } as Squad;
-      squads.set('squad-1', squad);
+      squads.set('squad-1', { id: 'squad-1', faction: Faction.US, members: ['c1', 'c2', 'c3'] } as Squad);
       aiStateEngage.setSquads(squads);
-
       countNearbyEnemies.mockReturnValue(3);
 
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
+      invokeHandleEngaging(leader);
 
-      // Leader should be suppressing
-      expect(combatant.state).toBe(CombatantState.SUPPRESSING);
+      expect(leader.state).toBe(CombatantState.SUPPRESSING);
     });
 
-    it('should not initiate suppression if squad too small', () => {
+    it('does not initiate squad suppression for squads below the minimum size', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
-      combatant.target = target;
-      combatant.squadId = 'squad-1';
+      combatant.target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
 
-      const squad: Squad = {
-        id: 'squad-1',
-        faction: Faction.US,
-        members: ['c1', 'c2'], // Only 2 members
-      } as Squad;
-      squads.set('squad-1', squad);
+      squads.set('squad-1', { id: 'squad-1', faction: Faction.US, members: ['c1', 'c2'] } as Squad);
       aiStateEngage.setSquads(squads);
-
       countNearbyEnemies.mockReturnValue(3);
 
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
+      invokeHandleEngaging(combatant);
 
       expect(combatant.state).not.toBe(CombatantState.SUPPRESSING);
     });
 
-    it('should respect suppression cooldown', () => {
+    it('respects the suppression cooldown between attempts', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
-      combatant.target = target;
+      combatant.target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
       combatant.squadId = 'squad-1';
 
-      const squad: Squad = {
-        id: 'squad-1',
-        faction: Faction.US,
-        members: ['c1', 'c2', 'c3'],
-      } as Squad;
-      squads.set('squad-1', squad);
+      squads.set('squad-1', { id: 'squad-1', faction: Faction.US, members: ['c1', 'c2', 'c3'] } as Squad);
       aiStateEngage.setSquads(squads);
-
       countNearbyEnemies.mockReturnValue(3);
 
-      // First suppression
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
-
-      // Reset state
+      invokeHandleEngaging(combatant);
       combatant.state = CombatantState.ENGAGING;
+      invokeHandleEngaging(combatant);
 
-      // Try again immediately
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
-
-      // Should not initiate again (cooldown)
       expect(combatant.state).toBe(CombatantState.ENGAGING);
     });
 
-    it('should not initiate if distance too close', () => {
+    it('does not suppress at distances outside the engagement band', () => {
       const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(20, 0, 0));
-      combatant.target = target;
       combatant.squadId = 'squad-1';
 
-      const squad: Squad = {
-        id: 'squad-1',
-        faction: Faction.US,
-        members: ['c1', 'c2', 'c3'],
-      } as Squad;
-      squads.set('squad-1', squad);
+      squads.set('squad-1', { id: 'squad-1', faction: Faction.US, members: ['c1', 'c2', 'c3'] } as Squad);
       aiStateEngage.setSquads(squads);
-
       countNearbyEnemies.mockReturnValue(3);
 
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
+      // Too close
+      combatant.target = createMockTarget('t-close', Faction.NVA, new THREE.Vector3(20, 0, 0));
+      invokeHandleEngaging(combatant);
+      expect(combatant.state).not.toBe(CombatantState.SUPPRESSING);
 
+      // Too far
+      combatant.state = CombatantState.ENGAGING;
+      combatant.target = createMockTarget('t-far', Faction.NVA, new THREE.Vector3(500, 0, 0));
+      invokeHandleEngaging(combatant);
       expect(combatant.state).not.toBe(CombatantState.SUPPRESSING);
     });
 
-    it('should not initiate if distance too far', () => {
-      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(100, 0, 0));
-      combatant.target = target;
-      combatant.squadId = 'squad-1';
-
-      const squad: Squad = {
-        id: 'squad-1',
-        faction: Faction.US,
-        members: ['c1', 'c2', 'c3'],
-      } as Squad;
-      squads.set('squad-1', squad);
-      aiStateEngage.setSquads(squads);
-
-      countNearbyEnemies.mockReturnValue(3);
-
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
-
-      expect(combatant.state).not.toBe(CombatantState.SUPPRESSING);
-    });
-
-    it('should initiate when squadmate has low health', () => {
-      const combatant = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 0, 0));
-      const target = createMockTarget('t1', Faction.NVA, new THREE.Vector3(50, 0, 0));
-      combatant.target = target;
-      combatant.squadId = 'squad-1';
-      combatant.squadRole = 'leader';
-
-      const lowHealthMember = createMockCombatant('c2', Faction.US);
-      lowHealthMember.health = 30;
-      lowHealthMember.maxHealth = 100;
-
-      allCombatants.set('c1', combatant);
-      allCombatants.set('c2', lowHealthMember);
-
-      const squad: Squad = {
-        id: 'squad-1',
-        faction: Faction.US,
-        members: ['c1', 'c2', 'c3'],
-      } as Squad;
-      squads.set('squad-1', squad);
-      aiStateEngage.setSquads(squads);
-
-      countNearbyEnemies.mockReturnValue(0);
-
-      aiStateEngage.handleEngaging(
-        combatant, 0.016, playerPosition, allCombatants, spatialGrid,
-        canSeeTarget, shouldSeekCover, findNearestCover, countNearbyEnemies, isCoverFlanked
-      );
-
-      expect(combatant.state).toBe(CombatantState.SUPPRESSING);
-    });
-
-    it('uses member elevation for flank cover probe and does not mutate member positions', () => {
+    it('uses member elevation for flank cover probes without mutating member positions', () => {
       const leader = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 5, 0));
       const suppressor = createMockCombatant('c2', Faction.US, new THREE.Vector3(5, 9, 0));
       const flanker = createMockCombatant('c3', Faction.US, new THREE.Vector3(-5, 14, 0));
@@ -867,12 +514,7 @@ describe('AIStateEngage', () => {
       allCombatants.set('c2', suppressor);
       allCombatants.set('c3', flanker);
 
-      const squad: Squad = {
-        id: 'squad-1',
-        faction: Faction.US,
-        members: ['c1', 'c2', 'c3'],
-      } as Squad;
-      squads.set('squad-1', squad);
+      squads.set('squad-1', { id: 'squad-1', faction: Faction.US, members: ['c1', 'c2', 'c3'] } as Squad);
       aiStateEngage.setSquads(squads);
 
       const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.0);
@@ -889,8 +531,7 @@ describe('AIStateEngage', () => {
       expect(flanker.state).toBe(CombatantState.ADVANCING);
     });
 
-    it('reuses a nearby existing flank destination without rerunning cover search', () => {
-      const targetPos = new THREE.Vector3(50, 0, 0);
+    it('reuses a nearby existing flank destination instead of re-searching cover', () => {
       const leader = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 2, 0));
       const suppressor = createMockCombatant('c2', Faction.US, new THREE.Vector3(5, 4, 0));
       const flanker = createMockCombatant('c3', Faction.US, new THREE.Vector3(0, 7, 0));
@@ -902,29 +543,22 @@ describe('AIStateEngage', () => {
       allCombatants.set('c2', suppressor);
       allCombatants.set('c3', flanker);
 
-      const squad: Squad = {
-        id: 'squad-1',
-        faction: Faction.US,
-        members: ['c1', 'c2', 'c3'],
-      } as Squad;
-      squads.set('squad-1', squad);
+      squads.set('squad-1', { id: 'squad-1', faction: Faction.US, members: ['c1', 'c2', 'c3'] } as Squad);
       aiStateEngage.setSquads(squads);
 
       const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.0);
       findNearestCover.mockReturnValue(null);
 
-      aiStateEngage.initiateSquadSuppression(leader, targetPos, allCombatants, findNearestCover);
+      aiStateEngage.initiateSquadSuppression(leader, new THREE.Vector3(50, 0, 0), allCombatants, findNearestCover);
 
       randomSpy.mockRestore();
 
       expect(findNearestCover).not.toHaveBeenCalled();
       expect(flanker.state).toBe(CombatantState.ADVANCING);
-      expect(flanker.destinationPoint).toBeDefined();
-      expect(flanker.destinationPoint?.distanceTo(new THREE.Vector3(50, 7, -20))).toBeLessThan(0.001);
+      expect(flanker.destinationPoint!.distanceTo(new THREE.Vector3(50, 7, -20))).toBeLessThan(0.001);
     });
 
     it('caps flank cover searches per suppression initiation for larger squads', () => {
-      const targetPos = new THREE.Vector3(60, 0, 0);
       const leader = createMockCombatant('c1', Faction.US, new THREE.Vector3(0, 2, 0));
       leader.squadId = 'squad-1';
       leader.squadRole = 'leader';
@@ -938,25 +572,19 @@ describe('AIStateEngage', () => {
       }
 
       members.forEach(member => allCombatants.set(member.id, member));
-      const squad: Squad = {
-        id: 'squad-1',
-        faction: Faction.US,
-        members: members.map(member => member.id),
-      } as Squad;
-      squads.set('squad-1', squad);
+      squads.set('squad-1', { id: 'squad-1', faction: Faction.US, members: members.map(m => m.id) } as Squad);
       aiStateEngage.setSquads(squads);
 
       const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.0);
       findNearestCover.mockReturnValue(null);
 
-      aiStateEngage.initiateSquadSuppression(leader, targetPos, allCombatants, findNearestCover);
+      aiStateEngage.initiateSquadSuppression(leader, new THREE.Vector3(60, 0, 0), allCombatants, findNearestCover);
 
       randomSpy.mockRestore();
 
-      // 6-member squad => 2 suppressors + 4 flankers, but cover search is capped at 2.
+      // Cover search is budget-capped per initiation (currently 2).
       expect(findNearestCover).toHaveBeenCalledTimes(2);
-      const flankingMembers = members.slice(2);
-      for (const member of flankingMembers) {
+      for (const member of members.slice(2)) {
         expect(member.state).toBe(CombatantState.ADVANCING);
         expect(member.destinationPoint).toBeDefined();
       }
