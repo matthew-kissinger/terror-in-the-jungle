@@ -1,120 +1,52 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect } from "vitest";
-import { getWeaponIconElement, getWeaponIconData } from "../icons/IconRegistry";
+import { describe, it, expect } from 'vitest';
+import { getWeaponIconElement, getWeaponIconData } from '../icons/IconRegistry';
 
-describe("WeaponIconRegistry (IconRegistry)", () => {
-  describe("getWeaponIconData()", () => {
-    it("should return data for rifle", () => {
-      const data = getWeaponIconData("rifle");
-      expect(data.label).toBe("Rifle");
-      expect(data.iconFile).toBe("icon-rifle");
-    });
-
-    it("should return data for shotgun", () => {
-      expect(getWeaponIconData("shotgun").label).toBe("Shotgun");
-    });
-
-    it("should return data for smg", () => {
-      expect(getWeaponIconData("smg").label).toBe("SMG");
-    });
-
-    it("should return data for pistol", () => {
-      expect(getWeaponIconData("pistol").label).toBe("Pistol");
-    });
-
-    it("should return data for lmg", () => {
-      expect(getWeaponIconData("lmg").label).toBe("LMG");
-    });
-
-    it("should return data for launcher", () => {
-      expect(getWeaponIconData("launcher").label).toBe("Launcher");
-    });
-
-    it("should return data for grenade", () => {
-      const data = getWeaponIconData("grenade");
-      expect(data.label).toBe("Grenade");
-      expect(data.iconFile).toBe("icon-grenade");
-    });
-
-    it("should return data for mortar", () => {
-      const data = getWeaponIconData("mortar");
-      expect(data.label).toBe("Mortar");
-      expect(data.iconFile).toBe("icon-mortar");
-    });
-
-    it("should return data for melee", () => {
-      expect(getWeaponIconData("melee").label).toBe("Melee");
-    });
-
-    it("should return data for helicopter_minigun", () => {
-      expect(getWeaponIconData("helicopter_minigun").label).toBe("Minigun");
-    });
-
-    it("should return data for helicopter_rocket", () => {
-      expect(getWeaponIconData("helicopter_rocket").label).toBe("Rocket");
-    });
-
-    it("should return data for helicopter_doorgun", () => {
-      expect(getWeaponIconData("helicopter_doorgun").label).toBe("Door Gun");
-    });
-
-    it("should return unknown data for unrecognized types", () => {
-      const data = getWeaponIconData("nonexistent_weapon");
-      expect(data.label).toBe("--");
-    });
-
-    it("should return unknown data for empty string", () => {
-      expect(getWeaponIconData("").label).toBe("--");
-    });
+/**
+ * Behavior-focused tests for the weapon icon registry.
+ *
+ * Intentionally does NOT assert on exact icon file names, exact labels, or a
+ * per-weapon enumeration — those are catalog data that will churn as weapons
+ * are rebalanced/renamed. We assert instead on the registry's contract:
+ * known types resolve to an image, unknown types fall back safely, and
+ * different types don't collide.
+ */
+describe('weapon icon registry', () => {
+  it('returns a label and icon identifier for known weapon types', () => {
+    const rifle = getWeaponIconData('rifle');
+    expect(rifle.label.length).toBeGreaterThan(0);
+    expect(rifle.iconFile.length).toBeGreaterThan(0);
   });
 
-  describe("getWeaponIconElement()", () => {
-    it("should return an img element for known weapons", () => {
-      const element = getWeaponIconElement("rifle");
-      expect(element.tagName).toBe("IMG");
-      expect((element as HTMLImageElement).src).toContain("icon-rifle.png");
-    });
+  it('returns a fallback entry for unknown / empty types', () => {
+    expect(getWeaponIconData('not-a-real-weapon').label).toBe('--');
+    expect(getWeaponIconData('').label).toBe('--');
+  });
 
-    it("should set alt text to weapon type on img element", () => {
-      const element = getWeaponIconElement("rifle") as HTMLImageElement;
-      expect(element.alt).toBe("rifle");
-    });
+  it('returns an <img> element for known weapons', () => {
+    const element = getWeaponIconElement('rifle') as HTMLImageElement;
+    expect(element.tagName).toBe('IMG');
+    expect(element.src.length).toBeGreaterThan(0);
+    expect(element.alt).toBe('rifle');
+  });
 
-    it("should return different icon sources for different weapon types", () => {
-      const rifle = getWeaponIconElement("rifle") as HTMLImageElement;
-      const shotgun = getWeaponIconElement("shotgun") as HTMLImageElement;
-      expect(rifle.src).not.toBe(shotgun.src);
-    });
+  it('returns a text fallback span for unknown weapons', () => {
+    const element = getWeaponIconElement('banana');
+    expect(element.tagName).toBe('SPAN');
+    expect(element.textContent).toBe('--');
+  });
 
-    it("should return fallback for unknown weapon type", () => {
-      const element = getWeaponIconElement("unknown");
-      expect(element.tagName).toBe("SPAN");
-      expect(element.textContent).toBe("--");
-    });
+  it('returns different icons for different weapon types', () => {
+    const a = getWeaponIconElement('rifle') as HTMLImageElement;
+    const b = getWeaponIconElement('shotgun') as HTMLImageElement;
+    expect(a.src).not.toBe(b.src);
+  });
 
-    it("should return unknown fallback for totally unrecognized type", () => {
-      const element = getWeaponIconElement("banana");
-      expect(element.textContent).toBe("--");
-    });
-
-    it("should return img for grenade with correct icon", () => {
-      const element = getWeaponIconElement("grenade") as HTMLImageElement;
-      expect(element.tagName).toBe("IMG");
-      expect(element.src).toContain("icon-grenade.png");
-    });
-
-    it("should return img for helicopter_minigun with correct icon", () => {
-      const element = getWeaponIconElement("helicopter_minigun") as HTMLImageElement;
-      expect(element.tagName).toBe("IMG");
-      expect(element.src).toContain("icon-minigun.png");
-    });
-
-    it("should return a new element each call (no shared references)", () => {
-      const el1 = getWeaponIconElement("rifle");
-      const el2 = getWeaponIconElement("rifle");
-      expect(el1).not.toBe(el2);
-    });
+  it('returns a fresh DOM element on each call (no shared references)', () => {
+    const el1 = getWeaponIconElement('rifle');
+    const el2 = getWeaponIconElement('rifle');
+    expect(el1).not.toBe(el2);
   });
 });

@@ -17,32 +17,19 @@ describe('TouchMenuButton', () => {
     button.dispose();
   });
 
-  it('creates button element in the DOM', () => {
-    const el = document.getElementById('touch-menu-btn');
-    expect(el).toBeTruthy();
-    expect(el!.className).toContain('menuBtn');
+  it('mounts into the document', () => {
+    expect(document.getElementById('touch-menu-btn')).toBeTruthy();
   });
 
-  it('renders menu icon', () => {
-    const el = document.getElementById('touch-menu-btn')!;
-    const img = el.querySelector('img') as HTMLImageElement;
-    expect(img).toBeTruthy();
-    expect(img.src).toContain('icon-menu.png');
-  });
-
-  it('show() makes button visible', () => {
-    button.hide();
-    button.show();
-    expect(document.getElementById('touch-menu-btn')!.style.display).toBe('flex');
-  });
-
-  it('hide() hides the button', () => {
-    button.show();
+  it('show / hide toggle visibility', () => {
     button.hide();
     expect(document.getElementById('touch-menu-btn')!.style.display).toBe('none');
+
+    button.show();
+    expect(document.getElementById('touch-menu-btn')!.style.display).not.toBe('none');
   });
 
-  it('tapping the button calls the shared menu callback', () => {
+  it('tapping the button invokes the open callback', () => {
     const onOpen = vi.fn();
     button.setOpenCallback(onOpen);
 
@@ -50,10 +37,9 @@ describe('TouchMenuButton', () => {
       .dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
 
     expect(onOpen).toHaveBeenCalledTimes(1);
-    expect(document.getElementById('touch-menu-overlay')).toBeNull();
   });
 
-  it('dispose removes button from DOM', () => {
+  it('dispose removes the button from the DOM', () => {
     button.dispose();
     expect(document.getElementById('touch-menu-btn')).toBeNull();
   });

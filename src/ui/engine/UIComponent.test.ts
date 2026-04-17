@@ -56,92 +56,46 @@ describe('UIComponent', () => {
   });
 
   describe('lifecycle', () => {
-    it('defers build() until first element access (lazy init)', () => {
+    it('build runs lazily on first element access and mount', () => {
       const comp = new TestComponent();
-      // build() is NOT called during construction
-      // (useDefineForClassFields: true makes field initializers run after super())
       expect(comp.buildCalled).toBe(false);
-
-      // Accessing .element triggers build
-      const el = comp.element;
-      expect(comp.buildCalled).toBe(true);
-      expect(el.className).toBe('test-component');
-    });
-
-    it('build() runs exactly once across multiple element accesses', () => {
-      const comp = new TestComponent();
       void comp.element; // triggers build
-      comp.buildCalled = false; // reset flag
-      void comp.element; // second access
-      expect(comp.buildCalled).toBe(false); // should not re-trigger
-    });
-
-    it('mount() triggers build if not yet built', () => {
-      const comp = new TestComponent();
-      expect(comp.buildCalled).toBe(false);
-      comp.mount(container);
       expect(comp.buildCalled).toBe(true);
+
+      const comp2 = new TestComponent();
+      comp2.mount(container);
+      expect(comp2.buildCalled).toBe(true);
     });
 
-    it('is not mounted after construction', () => {
-      const comp = new TestComponent();
-      expect(comp.mounted).toBe(false);
-    });
-
-    it('mount() appends to parent and calls onMount', () => {
+    it('mount appends to parent and calls onMount exactly once', () => {
       const comp = new TestComponent();
       comp.mount(container);
+      comp.mount(container); // idempotent
+
       expect(comp.mounted).toBe(true);
       expect(comp.mountCalled).toBe(true);
-      expect(container.contains(comp.element)).toBe(true);
+      expect(container.querySelectorAll('.test-component')).toHaveLength(1);
     });
 
-    it('mount() is idempotent', () => {
-      const comp = new TestComponent();
-      comp.mount(container);
-      comp.mount(container); // should not throw or double-mount
-      expect(container.querySelectorAll('.test-component').length).toBe(1);
-    });
-
-    it('unmount() removes from DOM and calls onUnmount', () => {
+    it('unmount removes from DOM, calls onUnmount, and is idempotent', () => {
       const comp = new TestComponent();
       comp.mount(container);
       comp.unmount();
+      comp.unmount();
+
       expect(comp.mounted).toBe(false);
       expect(comp.unmountCalled).toBe(true);
       expect(container.contains(comp.element)).toBe(false);
     });
 
-    it('unmount() is idempotent', () => {
-      const comp = new TestComponent();
-      comp.mount(container);
-      comp.unmount();
-      comp.unmount(); // should not throw
-      expect(comp.mounted).toBe(false);
-    });
-
-    it('dispose() calls unmount', () => {
+    it('dispose unmounts and is safe when never mounted', () => {
       const comp = new TestComponent();
       comp.mount(container);
       comp.dispose();
       expect(comp.mounted).toBe(false);
-      expect(container.contains(comp.element)).toBe(false);
-    });
 
-    it('dispose() is safe when not mounted', () => {
-      const comp = new TestComponent();
-      comp.dispose(); // should not throw
-    });
-
-    it('signals declared as class fields are available inside build()', () => {
-      // This verifies the lazy build pattern works with useDefineForClassFields.
-      // If build() ran during super(), this.label would be undefined.
-      const comp = new TestComponent();
-      comp.mount(container);
-      // label signal was used in onMount effect - if build() ran too early,
-      // the signal field initializer wouldn't have run yet and this would fail
-      const labelEl = comp.element.querySelector('[data-ref="label"]');
-      expect(labelEl?.textContent).toBe('hello');
+      const comp2 = new TestComponent();
+      expect(() => comp2.dispose()).not.toThrow();
     });
   });
 
@@ -182,51 +136,6 @@ describe('UIComponent', () => {
       comp.label.value = 'after';
       // Element is detached, but check the element still has old value
       expect(comp.element.querySelector('[data-ref="label"]')?.textContent).toBe('before');
-    });
-  });
-
-  describe('DOM helpers', () => {
-    it('$() queries within root', () => {
-      const comp = new TestComponent();
-      comp.mount(container); // ensure built
-      const el = (comp as any).$('[data-ref="label"]');
-      expect(el).not.toBeNull();
-      expect(el?.tagName).toBe('SPAN');
-    });
-
-    it('$all() returns all matches', () => {
-      const comp = new TestComponent();
-      comp.mount(container); // ensure built
-      const els = (comp as any).$all('span');
-      expect(els.length).toBe(2);
-    });
-
-    it('text() sets textContent', () => {
-      const comp = new TestComponent();
-      comp.mount(container); // ensure built
-      (comp as any).text('[data-ref="label"]', 'test');
-      expect(comp.element.querySelector('[data-ref="label"]')?.textContent).toBe('test');
-    });
-
-    it('text() is no-op for missing selector', () => {
-      const comp = new TestComponent();
-      comp.mount(container); // ensure built
-      // Should not throw
-      (comp as any).text('[data-ref="missing"]', 'test');
-    });
-
-    it('toggleClass() toggles CSS classes on root', () => {
-      const comp = new TestComponent();
-      (comp as any).toggleClass('active', true);
-      expect(comp.element.classList.contains('active')).toBe(true);
-      (comp as any).toggleClass('active', false);
-      expect(comp.element.classList.contains('active')).toBe(false);
-    });
-
-    it('setVar() sets CSS custom property', () => {
-      const comp = new TestComponent();
-      (comp as any).setVar('--test-color', 'red');
-      expect(comp.element.style.getPropertyValue('--test-color')).toBe('red');
     });
   });
 

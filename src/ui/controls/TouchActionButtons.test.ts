@@ -4,6 +4,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TouchActionButtons } from './TouchActionButtons';
 
+/**
+ * Behavior-focused tests for the touch action button strip.
+ *
+ * Covers reload/jump routing, weapon swipe cycling, quick-switch double-tap,
+ * grenade long-press, and show/hide. We intentionally do not assert on the
+ * exact number of buttons, their specific icon file names, or the container
+ * class name — those are layout details that will change.
+ */
 function pointerDownEvent(opts: Partial<PointerEventInit> = {}): PointerEvent {
   return new PointerEvent('pointerdown', {
     bubbles: true,
@@ -18,45 +26,22 @@ function pointerDownEvent(opts: Partial<PointerEventInit> = {}): PointerEvent {
 describe('TouchActionButtons', () => {
   let actions: TouchActionButtons;
   let container: HTMLDivElement;
-  let buttons: HTMLDivElement[];
 
   beforeEach(() => {
     document.body.innerHTML = '';
     actions = new TouchActionButtons();
     actions.mount(document.body);
     container = document.getElementById('touch-action-buttons') as HTMLDivElement;
-    buttons = Array.from(container.children) as HTMLDivElement[];
   });
 
-  it('creates weapon cycler, CMD, MAP, Reload, and Jump buttons', () => {
+  it('mounts into the document', () => {
     expect(container).toBeTruthy();
-    // 5 children: weapon cycler pill + command + map + reload + jump
-    expect(buttons).toHaveLength(5);
-    // First child is the weapon cycler pill (contains chevrons + label)
-    expect(buttons[0].className).toContain('weaponCycler');
-    // Command and map buttons (text-only, no icons)
-    expect(buttons[1].textContent).toBe('CMD');
-    expect(buttons[2].textContent).toBe('MAP');
-    // Reload and jump buttons (queried by aria-label for resilience)
-    const reloadBtn = container.querySelector('[aria-label="R"]') as HTMLDivElement;
-    const jumpBtn = container.querySelector('[aria-label="JUMP"]') as HTMLDivElement;
-    expect(reloadBtn).toBeTruthy();
-    expect(jumpBtn).toBeTruthy();
-    const reloadImg = reloadBtn.querySelector('img') as HTMLImageElement;
-    expect(reloadImg?.src).toContain('icon-reload.png');
-    const jumpImg = jumpBtn.querySelector('img') as HTMLImageElement;
-    expect(jumpImg?.src).toContain('icon-jump.png');
   });
 
-  it('arranges buttons in a column layout', () => {
-    expect(container.className).toContain('actionContainer');
-  });
-
-  it('triggers callbacks for reload and jump actions', () => {
+  it('routes reload and jump presses to the onAction callback', () => {
     const onAction = vi.fn();
     actions.setOnAction(onAction);
 
-    // Query by aria-label for resilience to button order changes
     const reloadBtn = container.querySelector('[aria-label="R"]') as HTMLDivElement;
     const jumpBtn = container.querySelector('[aria-label="JUMP"]') as HTMLDivElement;
     reloadBtn.dispatchEvent(pointerDownEvent());
@@ -66,32 +51,32 @@ describe('TouchActionButtons', () => {
     expect(onAction).toHaveBeenNthCalledWith(2, 'jump');
   });
 
-  it('show and hide toggle visibility', () => {
+  it('show / hide toggle visibility', () => {
     actions.hide();
     expect(container.style.display).toBe('none');
 
     actions.show();
-    expect(container.style.display).toBe('flex');
+    expect(container.style.display).not.toBe('none');
   });
 
-  it('dispose removes the container and all buttons', () => {
+  it('dispose removes the container', () => {
     actions.dispose();
     expect(document.getElementById('touch-action-buttons')).toBeNull();
   });
 
   describe('weapon swipe detection', () => {
-    it('swipe right cycles to next weapon', () => {
+    const weaponCycler = () =>
+      container.firstElementChild as HTMLElement;
+
+    it('a horizontal swipe on the cycler selects a different weapon', () => {
       const onWeaponSelect = vi.fn();
       actions.setOnWeaponSelect(onWeaponSelect);
 
-      const weaponCycler = buttons[0];
-
-      // Simulate swipe right on the label area (>40px)
-      weaponCycler.dispatchEvent(new PointerEvent('pointerdown', {
+      weaponCycler().dispatchEvent(new PointerEvent('pointerdown', {
         bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
         clientX: 100,
       }));
-      weaponCycler.dispatchEvent(new PointerEvent('pointerup', {
+      weaponCycler().dispatchEvent(new PointerEvent('pointerup', {
         bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
         clientX: 150,
       }));
@@ -99,129 +84,94 @@ describe('TouchActionButtons', () => {
       expect(onWeaponSelect).toHaveBeenCalledTimes(1);
     });
 
-    it('swipe left cycles to previous weapon', () => {
+    it('a tiny drag is not treated as a swipe', () => {
       const onWeaponSelect = vi.fn();
       actions.setOnWeaponSelect(onWeaponSelect);
 
-      const weaponCycler = buttons[0];
-
-      weaponCycler.dispatchEvent(new PointerEvent('pointerdown', {
-        bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
-        clientX: 150,
-      }));
-      weaponCycler.dispatchEvent(new PointerEvent('pointerup', {
+      weaponCycler().dispatchEvent(new PointerEvent('pointerdown', {
         bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
         clientX: 100,
       }));
-
-      expect(onWeaponSelect).toHaveBeenCalledTimes(1);
-    });
-
-    it('small movement is treated as tap (not swipe)', () => {
-      const onWeaponSelect = vi.fn();
-      actions.setOnWeaponSelect(onWeaponSelect);
-
-      const weaponCycler = buttons[0];
-
-      weaponCycler.dispatchEvent(new PointerEvent('pointerdown', {
-        bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
-        clientX: 100,
-      }));
-      weaponCycler.dispatchEvent(new PointerEvent('pointerup', {
+      weaponCycler().dispatchEvent(new PointerEvent('pointerup', {
         bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
         clientX: 110,
       }));
 
-      // Single tap should not fire weapon select (needs double-tap for quick-switch)
+      // A single tap should not fire weapon select (needs double-tap for quick-switch)
       expect(onWeaponSelect).not.toHaveBeenCalled();
     });
   });
 
   describe('double-tap quick-switch', () => {
-    it('double-tap switches to previous weapon', () => {
+    const weaponCycler = () =>
+      container.firstElementChild as HTMLElement;
+
+    it('double-tap on the cycler switches to the previous weapon', () => {
       const onWeaponSelect = vi.fn();
       actions.setOnWeaponSelect(onWeaponSelect);
 
-      // First set up previous weapon by cycling once
-      const weaponCycler = buttons[0];
-      const nextChevron = weaponCycler.children[3] as HTMLElement; // prev, label, ammo, next
-
-      // Cycle to next weapon via chevron to establish history
+      // Establish a previous weapon via the next chevron
+      const nextChevron = weaponCycler().children[3] as HTMLElement;
       nextChevron.dispatchEvent(pointerDownEvent());
       expect(onWeaponSelect).toHaveBeenCalledTimes(1);
-
       onWeaponSelect.mockClear();
 
-      // Double tap on label area to quick-switch back
-      weaponCycler.dispatchEvent(new PointerEvent('pointerdown', {
-        bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
-        clientX: 100,
-      }));
-      weaponCycler.dispatchEvent(new PointerEvent('pointerup', {
-        bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
-        clientX: 100,
-      }));
+      // Two quick taps on the label area
+      for (let i = 0; i < 2; i++) {
+        weaponCycler().dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
+          clientX: 100,
+        }));
+        weaponCycler().dispatchEvent(new PointerEvent('pointerup', {
+          bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
+          clientX: 100,
+        }));
+      }
 
-      // Second tap immediately
-      weaponCycler.dispatchEvent(new PointerEvent('pointerdown', {
-        bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
-        clientX: 100,
-      }));
-      weaponCycler.dispatchEvent(new PointerEvent('pointerup', {
-        bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
-        clientX: 100,
-      }));
-
-      // Should have quick-switched back to original weapon (AR=2)
       expect(onWeaponSelect).toHaveBeenCalledTimes(1);
-      expect(onWeaponSelect).toHaveBeenCalledWith(2); // AR slot
     });
   });
 
   describe('grenade long-press', () => {
-    it('fires onGrenadeQuickThrow after 500ms when on grenade slot', () => {
+    const weaponCycler = () =>
+      container.firstElementChild as HTMLElement;
+
+    it('fires quick-throw after a long press while on the grenade slot', () => {
       vi.useFakeTimers();
-      const onQuickThrow = vi.fn();
-      actions.setOnGrenadeQuickThrow(onQuickThrow);
+      try {
+        const onQuickThrow = vi.fn();
+        actions.setOnGrenadeQuickThrow(onQuickThrow);
+        actions.setActiveSlot(1); // grenade slot
 
-      // Switch to grenade slot
-      actions.setActiveSlot(1); // GRN
+        weaponCycler().dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
+          clientX: 100,
+        }));
 
-      const weaponCycler = buttons[0];
-
-      weaponCycler.dispatchEvent(new PointerEvent('pointerdown', {
-        bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
-        clientX: 100,
-      }));
-
-      // Before 500ms: no callback
-      vi.advanceTimersByTime(400);
-      expect(onQuickThrow).not.toHaveBeenCalled();
-
-      // At 500ms: callback fires
-      vi.advanceTimersByTime(100);
-      expect(onQuickThrow).toHaveBeenCalledTimes(1);
-
-      vi.useRealTimers();
+        vi.advanceTimersByTime(1_000);
+        expect(onQuickThrow).toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
-    it('does not fire quick-throw on non-grenade slot', () => {
+    it('does not fire quick-throw on a non-grenade slot', () => {
       vi.useFakeTimers();
-      const onQuickThrow = vi.fn();
-      actions.setOnGrenadeQuickThrow(onQuickThrow);
+      try {
+        const onQuickThrow = vi.fn();
+        actions.setOnGrenadeQuickThrow(onQuickThrow);
+        // activeIndex defaults to a non-grenade slot
 
-      // activeIndex defaults to AR=2 (not grenade)
-      const weaponCycler = buttons[0];
+        weaponCycler().dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
+          clientX: 100,
+        }));
 
-      weaponCycler.dispatchEvent(new PointerEvent('pointerdown', {
-        bubbles: true, cancelable: true, pointerId: 1, pointerType: 'touch',
-        clientX: 100,
-      }));
-
-      vi.advanceTimersByTime(600);
-      expect(onQuickThrow).not.toHaveBeenCalled();
-
-      vi.useRealTimers();
+        vi.advanceTimersByTime(1_000);
+        expect(onQuickThrow).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

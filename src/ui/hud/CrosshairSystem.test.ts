@@ -50,20 +50,16 @@ describe('CrosshairSystem', () => {
       expect(pipper.style.display).toBe('');
     });
 
-    it('should hide both for helicopter_transport', () => {
+    it('should hide both reticles for helicopter modes that have no pilot crosshair', () => {
       crosshair.setMode('helicopter_transport');
-
-      const infantry = crosshair.element.querySelector('[data-ref="infantry"]') as HTMLElement;
-      const pipper = crosshair.element.querySelector('[data-ref="pipper"]') as HTMLElement;
+      let infantry = crosshair.element.querySelector('[data-ref="infantry"]') as HTMLElement;
+      let pipper = crosshair.element.querySelector('[data-ref="pipper"]') as HTMLElement;
       expect(infantry.style.display).toBe('none');
       expect(pipper.style.display).toBe('none');
-    });
 
-    it('should hide both for helicopter_gunship', () => {
       crosshair.setMode('helicopter_gunship');
-
-      const infantry = crosshair.element.querySelector('[data-ref="infantry"]') as HTMLElement;
-      const pipper = crosshair.element.querySelector('[data-ref="pipper"]') as HTMLElement;
+      infantry = crosshair.element.querySelector('[data-ref="infantry"]') as HTMLElement;
+      pipper = crosshair.element.querySelector('[data-ref="pipper"]') as HTMLElement;
       expect(infantry.style.display).toBe('none');
       expect(pipper.style.display).toBe('none');
     });
@@ -78,20 +74,15 @@ describe('CrosshairSystem', () => {
   });
 
   describe('visibility', () => {
-    it('should hide crosshair', () => {
+    it('hideCrosshair and showCrosshair toggle the hidden state', () => {
       crosshair.hideCrosshair();
       expect(crosshair.element.classList.contains('hidden')).toBe(true);
-    });
 
-    it('should show crosshair again', () => {
+      crosshair.showCrosshair();
+      expect(crosshair.element.classList.contains('hidden')).toBe(false);
+
       crosshair.hideCrosshair();
       crosshair.showCrosshairAgain();
-      expect(crosshair.element.classList.contains('hidden')).toBe(false);
-    });
-
-    it('should show crosshair', () => {
-      crosshair.hideCrosshair();
-      crosshair.showCrosshair();
       expect(crosshair.element.classList.contains('hidden')).toBe(false);
     });
   });

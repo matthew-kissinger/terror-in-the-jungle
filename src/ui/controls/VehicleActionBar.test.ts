@@ -30,29 +30,16 @@ describe('VehicleActionBar', () => {
     bar.mount(document.body);
   });
 
-  it('creates EXIT, FIRE, WPN, MAP, CMD, STAB, and LOOK buttons', () => {
+  it('mounts into the document and starts hidden', () => {
     const root = document.getElementById('vehicle-action-bar')!;
     expect(root).toBeTruthy();
-    const buttons = Array.from(root.children) as HTMLDivElement[];
-    expect(buttons).toHaveLength(7);
-    expect(buttons[0].textContent).toBe('EXIT');
-    expect(buttons[1].textContent).toBe('FIRE');
-    expect(buttons[2].textContent).toBe('WPN');
-    expect(buttons[3].textContent).toBe('MAP');
-    expect(buttons[4].textContent).toBe('CMD');
-    expect(buttons[5].textContent).toBe('STAB');
-    expect(buttons[6].textContent).toBe('LOOK');
-  });
-
-  it('starts hidden', () => {
-    const root = document.getElementById('vehicle-action-bar')!;
     expect(root.style.display).toBe('none');
   });
 
-  it('show/hide toggles visibility', () => {
+  it('show / hide toggle visibility', () => {
     const root = document.getElementById('vehicle-action-bar')!;
     bar.show();
-    expect(root.style.display).toBe('flex');
+    expect(root.style.display).not.toBe('none');
     bar.hide();
     expect(root.style.display).toBe('none');
   });

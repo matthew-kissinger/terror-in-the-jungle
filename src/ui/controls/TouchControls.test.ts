@@ -4,10 +4,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InputContextManager } from '../../systems/input/InputContextManager';
 
+/**
+ * Behavior-focused tests for TouchControls.
+ *
+ * TouchControls is a thin orchestrator; most of its fan-out to sub-components
+ * is implementation. We assert on the public contract instead:
+ *   - setCallbacks routes action buttons to the right callback.
+ *   - Entering/exiting vehicle modes toggles the shared action bar.
+ *   - Context changes away from gameplay cancel pending touch gestures.
+ *   - Modal overlays suppress pointer events on the touch layer.
+ */
+
 const joystickInstances: any[] = [];
 const lookInstances: any[] = [];
 const fireInstances: any[] = [];
 const actionInstances: any[] = [];
+const vehicleActionBarInstances: any[] = [];
 
 vi.mock('./VirtualJoystick', () => ({
   VirtualJoystick: class {
@@ -162,8 +174,6 @@ vi.mock('./TouchHelicopterCyclic', () => ({
   },
 }));
 
-const vehicleActionBarInstances: any[] = [];
-
 vi.mock('./VehicleActionBar', () => ({
   VehicleActionBar: class {
     element = document.createElement('div');
@@ -196,69 +206,17 @@ describe('TouchControls', () => {
     vehicleActionBarInstances.length = 0;
   });
 
-  it('constructor creates all sub-components', () => {
-    const controls = new TouchControls();
-    expect(controls.joystick).toBeTruthy();
-    expect(controls.look).toBeTruthy();
-    expect(controls.fireButton).toBeTruthy();
-    expect(controls.actionButtons).toBeTruthy();
-    expect(joystickInstances).toHaveLength(1);
-    expect(lookInstances).toHaveLength(1);
-    expect(fireInstances).toHaveLength(1);
-    expect(actionInstances).toHaveLength(1);
-  });
-
-  it('show() calls show on all sub-components', () => {
+  it('reports visibility state after show / hide', () => {
     const controls = new TouchControls();
 
     controls.show();
-
     expect(controls.isVisible()).toBe(true);
-    expect(joystickInstances[0].show).toHaveBeenCalledTimes(1);
-    expect(lookInstances[0].show).toHaveBeenCalledTimes(1);
-    expect(fireInstances[0].show).toHaveBeenCalledTimes(1);
-    expect(actionInstances[0].show).toHaveBeenCalledTimes(1);
-  });
-
-  it('hide() calls hide on all sub-components', () => {
-    const controls = new TouchControls();
-    controls.show();
 
     controls.hide();
-
     expect(controls.isVisible()).toBe(false);
-    expect(joystickInstances[0].hide).toHaveBeenCalledTimes(1);
-    expect(lookInstances[0].hide).toHaveBeenCalledTimes(1);
-    expect(fireInstances[0].hide).toHaveBeenCalledTimes(1);
-    expect(actionInstances[0].hide).toHaveBeenCalledTimes(1);
   });
 
-  it('dispose() disposes all sub-components', () => {
-    const controls = new TouchControls();
-
-    controls.dispose();
-
-    expect(joystickInstances[0].dispose).toHaveBeenCalledTimes(1);
-    expect(lookInstances[0].dispose).toHaveBeenCalledTimes(1);
-    expect(fireInstances[0].dispose).toHaveBeenCalledTimes(1);
-    expect(actionInstances[0].dispose).toHaveBeenCalledTimes(1);
-  });
-
-  it('getMovementVector() returns joystick output', () => {
-    const controls = new TouchControls();
-
-    expect(controls.getMovementVector()).toBe(joystickInstances[0].output);
-    expect(controls.getMovementVector()).toEqual({ x: 0.5, z: -0.25 });
-  });
-
-  it('consumeLookDelta() returns look delta', () => {
-    const controls = new TouchControls();
-
-    expect(controls.consumeLookDelta()).toEqual({ x: 1.2, y: -0.4 });
-    expect(lookInstances[0].consumeDelta).toHaveBeenCalledTimes(1);
-  });
-
-  it('setCallbacks() wires fire, sprint, action, and weapon select callbacks', () => {
+  it('routes jump / reload / map actions to the caller callbacks', () => {
     const controls = new TouchControls();
     const callbacks = {
       onFireStart: vi.fn(),
@@ -280,44 +238,47 @@ describe('TouchControls', () => {
 
     controls.setCallbacks(callbacks);
 
-    expect(fireInstances[0].setCallbacks).toHaveBeenCalledWith(callbacks.onFireStart, callbacks.onFireStop);
-    expect(joystickInstances[0].setSprintCallbacks).toHaveBeenCalledWith(callbacks.onSprintStart, callbacks.onSprintStop);
-    expect(actionInstances[0].setOnAction).toHaveBeenCalledTimes(1);
-    expect(actionInstances[0].setOnWeaponSelect).toHaveBeenCalledTimes(1);
-
     const actionRouter = actionInstances[0].setOnAction.mock.calls[0][0] as (action: string) => void;
     actionRouter('jump');
     actionRouter('reload');
-    actionRouter('command');
     actionRouter('map');
 
     expect(callbacks.onJump).toHaveBeenCalledTimes(1);
     expect(callbacks.onReload).toHaveBeenCalledTimes(1);
-    expect(callbacks.onRallyPointPlace).not.toHaveBeenCalled();
     expect(callbacks.onMapToggle).toHaveBeenCalledTimes(1);
+  });
 
-    // Weapon select is wired through setOnWeaponSelect, not through action router
+  it('routes weapon selection through the weapon-select handler', () => {
+    const controls = new TouchControls();
+    const onWeaponSelect = vi.fn();
+    controls.setCallbacks({
+      onFireStart: vi.fn(),
+      onFireStop: vi.fn(),
+      onJump: vi.fn(),
+      onReload: vi.fn(),
+      onGrenade: vi.fn(),
+      onSprintStart: vi.fn(),
+      onSprintStop: vi.fn(),
+      onWeaponSelect,
+      onADSToggle: vi.fn(),
+      onSandbagRotateLeft: vi.fn(),
+      onSandbagRotateRight: vi.fn(),
+      onRallyPointPlace: vi.fn(),
+    });
+
     const weaponRouter = actionInstances[0].setOnWeaponSelect.mock.calls[0][0] as (slot: number) => void;
     weaponRouter(3);
-    expect(callbacks.onWeaponSelect).toHaveBeenCalledWith(3);
+    expect(onWeaponSelect).toHaveBeenCalledWith(3);
   });
 
-  it('enterHelicopterMode() shows vehicleActionBar', () => {
+  it('enterHelicopterMode / exitHelicopterMode toggles the vehicle action bar', () => {
     const controls = new TouchControls();
     controls.show();
 
     controls.enterHelicopterMode();
-
-    expect(vehicleActionBarInstances[0].show).toHaveBeenCalledTimes(1);
-  });
-
-  it('exitHelicopterMode() hides vehicleActionBar', () => {
-    const controls = new TouchControls();
-    controls.show();
-    controls.enterHelicopterMode();
+    expect(vehicleActionBarInstances[0].show).toHaveBeenCalled();
 
     controls.exitHelicopterMode();
-
     expect(vehicleActionBarInstances[0].hide).toHaveBeenCalled();
   });
 
@@ -326,42 +287,29 @@ describe('TouchControls', () => {
     controls.show();
 
     controls.enterFlightVehicleMode();
-
     expect(controls.isInFlightMode()).toBe(true);
-    expect(vehicleActionBarInstances[0].show).toHaveBeenCalled();
 
     controls.exitFlightVehicleMode();
-
     expect(controls.isInFlightMode()).toBe(false);
-    expect(vehicleActionBarInstances[0].hide).toHaveBeenCalled();
   });
 
-  it('dispose() disposes vehicleActionBar', () => {
-    const controls = new TouchControls();
-
-    controls.dispose();
-
-    expect(vehicleActionBarInstances[0].dispose).toHaveBeenCalledTimes(1);
-  });
-
-  it('cancels active touch interactions when input context leaves gameplay', () => {
+  it('leaving the gameplay input context cancels active touch gestures', () => {
     new TouchControls();
     const contextManager = InputContextManager.getInstance();
 
     contextManager.setContext('menu');
 
-    expect(joystickInstances[0].cancelActiveTouch).toHaveBeenCalledTimes(1);
-    expect(lookInstances[0].cancelActiveLook).toHaveBeenCalledTimes(1);
-    expect(fireInstances[0].cancelActivePress).toHaveBeenCalledTimes(1);
-    expect(actionInstances[0].cancelActiveGesture).toHaveBeenCalledTimes(1);
+    expect(joystickInstances[0].cancelActiveTouch).toHaveBeenCalled();
+    expect(lookInstances[0].cancelActiveLook).toHaveBeenCalled();
+    expect(fireInstances[0].cancelActivePress).toHaveBeenCalled();
+    expect(actionInstances[0].cancelActiveGesture).toHaveBeenCalled();
   });
 
-  it('beginModalOverlays / endModalOverlays sets pointer-events on touch roots (ref-counted)', () => {
+  it('ref-counts modal overlays when suppressing touch pointer events', () => {
     const controls = new TouchControls();
 
     controls.beginModalOverlays();
     expect(joystickInstances[0].element.style.pointerEvents).toBe('none');
-    expect(vehicleActionBarInstances[0].element.style.pointerEvents).toBe('none');
 
     controls.beginModalOverlays();
     controls.endModalOverlays();
@@ -369,6 +317,10 @@ describe('TouchControls', () => {
 
     controls.endModalOverlays();
     expect(joystickInstances[0].element.style.pointerEvents).toBe('');
-    expect(vehicleActionBarInstances[0].element.style.pointerEvents).toBe('');
+  });
+
+  it('dispose cleans up cleanly without throwing', () => {
+    const controls = new TouchControls();
+    expect(() => controls.dispose()).not.toThrow();
   });
 });

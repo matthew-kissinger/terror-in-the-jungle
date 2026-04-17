@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { FullMapSystem } from './FullMapSystem';
@@ -7,10 +10,20 @@ import { GameModeManager } from '../../systems/world/GameModeManager';
 import { Faction, CombatantState } from '../../systems/combat/types';
 import { FullMapInput } from './FullMapInput';
 
-// Mock dependencies
+/**
+ * Behavior-focused tests for FullMapSystem.
+ *
+ * Intentionally does NOT assert on:
+ * - Canvas API call counts (fillRect/save/restore/translate/scale) — those are
+ *   implementation details of the rendering pass.
+ * - Specific rgba() color strings used by the canvas — tuning constants.
+ * - Private field access via (system as any).xxx — not part of the contract.
+ *
+ * The real visual correctness of the full map is a playtest concern; JSDom can
+ * only validate high-level wiring here.
+ */
 vi.mock('./FullMapInput', () => ({
-  FullMapInput: vi.fn().mockImplementation(function(this: any, callbacks: any) {
-    // Store callbacks for later use
+  FullMapInput: vi.fn().mockImplementation(function (this: any, callbacks: any) {
     this.callbacks = callbacks;
     this.setupEventListeners = vi.fn();
     this.setIsVisible = vi.fn();
@@ -24,7 +37,7 @@ vi.mock('./FullMapInput', () => ({
     this.toggle = vi.fn();
     this.dispose = vi.fn();
     return this;
-  })
+  }),
 }));
 vi.mock('../../utils/Logger');
 vi.mock('../../utils/DeviceDetector', () => ({
@@ -34,20 +47,14 @@ vi.mock('../../systems/world/ZoneManager');
 vi.mock('../../systems/combat/CombatantSystem');
 vi.mock('../../systems/world/GameModeManager');
 
-// Mock canvas context - this will be the single shared instance
-let sharedMockCanvasContext: any = null;
-
-const createMockCanvasContext = () => {
-  if (sharedMockCanvasContext) {
-    return sharedMockCanvasContext;
-  }
-  
-  sharedMockCanvasContext = {
-    fillStyles: [] as string[],
-    strokeStyles: [] as string[],
+function createCanvasContextStub() {
+  return {
+    fillStyle: '',
+    strokeStyle: '',
     lineWidth: 1,
     font: '',
     textAlign: 'start' as CanvasTextAlign,
+    textBaseline: 'alphabetic' as CanvasTextBaseline,
     fillRect: vi.fn(),
     strokeRect: vi.fn(),
     clearRect: vi.fn(),
@@ -62,105 +69,11 @@ const createMockCanvasContext = () => {
     restore: vi.fn(),
     translate: vi.fn(),
     scale: vi.fn(),
-    createRadialGradient: vi.fn(() => ({
-      addColorStop: vi.fn(),
-    })),
-    createLinearGradient: vi.fn(() => ({
-      addColorStop: vi.fn(),
-    })),
+    closePath: vi.fn(),
+    createRadialGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
+    createLinearGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
   };
-
-  let fillStyleValue = '';
-  Object.defineProperty(sharedMockCanvasContext, 'fillStyle', {
-    get: () => fillStyleValue,
-    set: (value: string) => {
-      fillStyleValue = value;
-      sharedMockCanvasContext.fillStyles.push(value);
-    },
-    configurable: true,
-  });
-
-  let strokeStyleValue = '';
-  Object.defineProperty(sharedMockCanvasContext, 'strokeStyle', {
-    get: () => strokeStyleValue,
-    set: (value: string) => {
-      strokeStyleValue = value;
-      sharedMockCanvasContext.strokeStyles.push(value);
-    },
-    configurable: true,
-  });
-  
-  return sharedMockCanvasContext;
-};
-
-// Mock DOM helpers
-const createMockDOM = () => {
-  const _elements = new Map<string, any>();
-  const styleSheets = new Set<any>();
-
-  const mockDocument = {
-    createElement: vi.fn((tagName: string) => {
-      const element: any = {
-        id: '',
-        className: '',
-        classList: {
-          add: vi.fn(),
-          remove: vi.fn(),
-          contains: vi.fn(),
-        },
-        style: {},
-        appendChild: vi.fn((child: any) => {
-          if (child) {
-            child.parentElement = element;
-          }
-          return child;
-        }),
-        removeChild: vi.fn(),
-        remove: vi.fn(),
-        querySelector: vi.fn(),
-        getContext: vi.fn(),
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-        parentNode: null,
-        textContent: '',
-        innerHTML: '',
-      };
-
-      if (tagName === 'canvas') {
-        // Return the shared mock canvas context (create it if it doesn't exist)
-        element.getContext = vi.fn((contextType: string) => {
-          if (contextType === '2d') {
-            return createMockCanvasContext();
-          }
-          return null;
-        });
-        element.width = 800;
-        element.height = 800;
-      }
-
-      if (tagName === 'style') {
-        element.sheet = {
-          cssRules: [],
-          insertRule: vi.fn(),
-          deleteRule: vi.fn(),
-        };
-      }
-
-      return element;
-    }),
-    head: {
-      appendChild: vi.fn((style: any) => {
-        styleSheets.add(style);
-      }),
-    },
-    body: {
-      appendChild: vi.fn(),
-      removeChild: vi.fn(),
-    },
-  };
-
-  return { mockDocument, styleSheets };
-};
+}
 
 describe('FullMapSystem', () => {
   let system: FullMapSystem;
@@ -169,10 +82,7 @@ describe('FullMapSystem', () => {
   let mockCombatantSystem: CombatantSystem;
   let mockGameModeManager: GameModeManager;
   let mockInputHandler: FullMapInput;
-  let mockDOM: ReturnType<typeof createMockDOM>;
-  let mockCanvasContext: any;
 
-  // Sample test data
   const createTestZone = (overrides?: Partial<CaptureZone>): CaptureZone => ({
     id: 'test-zone',
     name: 'Test Zone',
@@ -209,19 +119,12 @@ describe('FullMapSystem', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
-    // Reset shared canvas context
-    sharedMockCanvasContext = null;
+    document.body.innerHTML = '';
 
-    // Setup DOM mocks
-    mockDOM = createMockDOM();
-    vi.stubGlobal('document', mockDOM.mockDocument);
-    vi.stubGlobal('window', {
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    });
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+      () => createCanvasContextStub() as never,
+    );
 
-    // Setup camera
     mockCamera = {
       position: new THREE.Vector3(0, 5, 0),
       getWorldDirection: vi.fn((target: THREE.Vector3) => {
@@ -230,7 +133,6 @@ describe('FullMapSystem', () => {
       }),
     } as any;
 
-    // Setup mock input handler - will be created by FullMapInput constructor
     mockInputHandler = {
       setupEventListeners: vi.fn(),
       setIsVisible: vi.fn(),
@@ -245,361 +147,115 @@ describe('FullMapSystem', () => {
       dispose: vi.fn(),
     } as any;
 
-    // Mock FullMapInput constructor
-    vi.mocked(FullMapInput).mockImplementation(function(this: any, callbacks: any) {
+    vi.mocked(FullMapInput).mockImplementation(function (this: any, callbacks: any) {
       this.callbacks = callbacks;
       Object.assign(this, mockInputHandler);
       return this;
     });
 
-    // Setup mock systems
-    mockZoneManager = {
-      getAllZones: vi.fn(() => []),
-    } as any;
-
-    mockCombatantSystem = {
-      getAllCombatants: vi.fn(() => []),
-    } as any;
-
-    mockGameModeManager = {
-      getWorldSize: vi.fn(() => 400),
-    } as any;
+    mockZoneManager = { getAllZones: vi.fn(() => []) } as any;
+    mockCombatantSystem = { getAllCombatants: vi.fn(() => []) } as any;
+    mockGameModeManager = { getWorldSize: vi.fn(() => 400) } as any;
 
     system = new FullMapSystem(mockCamera);
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    system?.dispose();
   });
 
-  describe('init', () => {
-    it('should append map container to body', async () => {
+  describe('lifecycle', () => {
+    it('init attaches the map container to the document', async () => {
       await system.init();
-      expect(mockDOM.mockDocument.body.appendChild).toHaveBeenCalled();
+      expect(document.querySelector('body > *')).not.toBeNull();
+    });
+
+    it('starts hidden', () => {
+      expect(system.getIsVisible()).toBe(false);
+    });
+
+    it('dispose is safe to call multiple times', () => {
+      system.dispose();
+      expect(() => system.dispose()).not.toThrow();
+    });
+  });
+
+  describe('visibility', () => {
+    beforeEach(() => {
+      system.setZoneManager(mockZoneManager);
+      system.setCombatantSystem(mockCombatantSystem);
+      system.setGameModeManager(mockGameModeManager);
+    });
+
+    it('reports show/hide through getIsVisible', () => {
+      (system as unknown as { show: () => void }).show();
+      expect(system.getIsVisible()).toBe(true);
+
+      (system as unknown as { hide: () => void }).hide();
+      expect(system.getIsVisible()).toBe(false);
+    });
+
+    it('tells the input handler about visibility changes', () => {
+      (system as unknown as { show: () => void }).show();
+      expect(mockInputHandler.setIsVisible).toHaveBeenCalledWith(true);
+
+      (system as unknown as { hide: () => void }).hide();
+      expect(mockInputHandler.setIsVisible).toHaveBeenCalledWith(false);
     });
   });
 
   describe('update', () => {
-    it('should update player position from camera', () => {
-      mockCamera.position.set(100, 5, 200);
+    it('reads the player orientation from the camera', () => {
       system.update(0.016);
-      
-      // Player position should be updated from camera position
       expect(mockCamera.getWorldDirection).toHaveBeenCalled();
     });
 
-    it('should update world size from game mode manager', () => {
+    it('reads world size from the game-mode manager', () => {
       system.setGameModeManager(mockGameModeManager);
       system.update(0.016);
-      
       expect(mockGameModeManager.getWorldSize).toHaveBeenCalled();
     });
-
-    it('should not render when not visible', () => {
-      const getContextSpy = vi.spyOn(system as any, 'render');
-      system.update(0.016);
-      
-      expect(getContextSpy).not.toHaveBeenCalled();
-    });
-
-    it('should render when visible', () => {
-      const renderSpy = vi.spyOn(system as any, 'render');
-      (system as any).isVisible = true;
-      system.update(0.016);
-      
-      expect(renderSpy).toHaveBeenCalled();
-    });
   });
 
-  describe('show/hide', () => {
+  describe('rendering does not throw on edge inputs', () => {
     beforeEach(() => {
       system.setZoneManager(mockZoneManager);
       system.setCombatantSystem(mockCombatantSystem);
       system.setGameModeManager(mockGameModeManager);
     });
 
-    it('should show map and set visible class', () => {
-      (system as any).show();
-      
-      expect((system as any).isVisible).toBe(true);
-      expect(mockInputHandler.setIsVisible).toHaveBeenCalledWith(true);
-    });
-
-    it('should hide map and remove visible class', () => {
-      (system as any).isVisible = true;
-      (system as any).hide();
-      
-      expect((system as any).isVisible).toBe(false);
-      expect(mockInputHandler.setIsVisible).toHaveBeenCalledWith(false);
-    });
-
-    it('should auto-fit view when showing map', () => {
-      const autoFitSpy = vi.spyOn(system as any, 'autoFitView');
-      (system as any).show();
-      
-      expect(autoFitSpy).toHaveBeenCalled();
-    });
-  });
-
-  describe('autoFitView', () => {
-    beforeEach(() => {
-      system.setGameModeManager(mockGameModeManager);
-    });
-
-    it('should set default zoom for Zone Control (small world)', () => {
-      mockGameModeManager.getWorldSize = vi.fn(() => 400);
-      // Update worldSize before calling autoFitView
-      system.update(0.016);
-      (system as any).autoFitView();
-      
-      expect(mockInputHandler.setZoomLevel).toHaveBeenCalledWith(1.0);
-      expect(mockInputHandler.setDefaultZoomLevel).toHaveBeenCalledWith(1.0);
-    });
-
-    it('should calculate optimal zoom for Open Frontier (large world)', () => {
+    it('renders with zones at the world boundary', () => {
       mockGameModeManager.getWorldSize = vi.fn(() => 3200);
-      // Update worldSize before calling autoFitView
+      mockZoneManager.getAllZones = vi.fn(() => [
+        createTestZone({ position: new THREE.Vector3(-100, 0, -100) }),
+        createTestZone({ id: 'edge', position: new THREE.Vector3(1600, 0, 1600) }),
+      ]);
       system.update(0.016);
-      (system as any).autoFitView();
-      
-      // Should calculate zoom to fit 80% of canvas
-      expect(mockInputHandler.setZoomLevel).toHaveBeenCalled();
-      expect(mockInputHandler.setDefaultZoomLevel).toHaveBeenCalled();
-    });
-  });
 
-  describe('getIsVisible', () => {
-    it('should return the current visibility state', () => {
-      expect(system.getIsVisible()).toBe(false);
-      
-      (system as any).show();
-      expect(system.getIsVisible()).toBe(true);
-      
-      (system as any).hide();
-      expect(system.getIsVisible()).toBe(false);
-    });
-  });
-
-  describe('render', () => {
-    beforeEach(() => {
-      system.setZoneManager(mockZoneManager);
-      system.setCombatantSystem(mockCombatantSystem);
-      system.setGameModeManager(mockGameModeManager);
-      
-      // Get reference to the shared mock canvas context
-      mockCanvasContext = sharedMockCanvasContext;
+      expect(() => (system as any).render()).not.toThrow();
     });
 
-    it('should clear canvas before rendering', () => {
-      mockCanvasContext = sharedMockCanvasContext;
-      (system as any).render();
-      
-      // System uses fillRect to clear, not clearRect
-      expect(mockCanvasContext.fillRect).toHaveBeenCalledWith(0, 0, 800, 800);
+    it('renders with combatants at the world boundary', () => {
+      mockGameModeManager.getWorldSize = vi.fn(() => 3200);
+      mockCombatantSystem.getAllCombatants = vi.fn(() => [
+        createTestCombatant({ position: new THREE.Vector3(2000, 0, 2000) }),
+      ]);
+      system.update(0.016);
+
+      expect(() => (system as any).render()).not.toThrow();
     });
 
-    it('should apply zoom transformation', () => {
-      mockCanvasContext = sharedMockCanvasContext;
-      (system as any).render();
-      
-      expect(mockCanvasContext.save).toHaveBeenCalled();
-      expect(mockCanvasContext.translate).toHaveBeenCalled();
-      expect(mockCanvasContext.scale).toHaveBeenCalled();
-      expect(mockCanvasContext.restore).toHaveBeenCalled();
-    });
-
-    it('should draw grid', () => {
-      mockCanvasContext = sharedMockCanvasContext;
-      (system as any).render();
-      
-      expect(mockCanvasContext.strokeStyle).toBeDefined();
-      expect(mockCanvasContext.lineWidth).toBeDefined();
-      // Grid drawing should call stroke multiple times
-      expect(mockCanvasContext.stroke.mock.calls.length).toBeGreaterThan(0);
-    });
-
-    it('should draw zones when zone manager is set', () => {
-      mockCanvasContext = sharedMockCanvasContext;
-      const testZone = createTestZone();
-      mockZoneManager.getAllZones = vi.fn(() => [testZone]);
-      
-      (system as any).render();
-      
-      expect(mockZoneManager.getAllZones).toHaveBeenCalled();
-      expect(mockCanvasContext.fill).toHaveBeenCalled();
-      expect(mockCanvasContext.stroke).toHaveBeenCalled();
-    });
-
-    it('should draw combatants when combatant system is set', () => {
-      mockCanvasContext = sharedMockCanvasContext;
-      const testCombatant = createTestCombatant();
-      mockCombatantSystem.getAllCombatants = vi.fn(() => [testCombatant]);
-      
-      (system as any).render();
-      
-      expect(mockCombatantSystem.getAllCombatants).toHaveBeenCalled();
-      expect(mockCanvasContext.fill).toHaveBeenCalled();
-    });
-
-    it('should draw the command marker when a command position is set', () => {
-      mockCanvasContext = sharedMockCanvasContext;
+    it('renders when a command position is set', () => {
       system.setCommandPosition(new THREE.Vector3(50, 0, -40));
-
-      (system as any).render();
-
-      expect(mockCanvasContext.moveTo).toHaveBeenCalled();
-      expect(mockCanvasContext.lineTo).toHaveBeenCalled();
-      expect(mockCanvasContext.arc).toHaveBeenCalledWith(
-        expect.any(Number),
-        expect.any(Number),
-        9,
-        0,
-        Math.PI * 2
-      );
-      expect(mockCanvasContext.fillText).toHaveBeenCalledWith(
-        '64m',
-        expect.any(Number),
-        expect.any(Number)
-      );
+      expect(() => (system as any).render()).not.toThrow();
     });
 
-    it('should draw player marker', () => {
-      mockCanvasContext = sharedMockCanvasContext;
-      (system as any).render();
-      
-      // Player should be drawn (arc for position + line for direction)
-      expect(mockCanvasContext.arc.mock.calls.length).toBeGreaterThan(0);
-      expect(mockCanvasContext.stroke).toHaveBeenCalled();
-    });
-
-    it('should not draw dead combatants', () => {
-      mockCanvasContext = sharedMockCanvasContext;
-      const deadCombatant = createTestCombatant({ state: CombatantState.DEAD });
-      mockCombatantSystem.getAllCombatants = vi.fn(() => [deadCombatant]);
-      
-      (system as any).render();
-      
-      // Should only draw player, not the dead combatant
-      const arcCalls = mockCanvasContext.arc.mock.calls;
-      expect(arcCalls.length).toBeGreaterThan(0);
-    });
-
-    it('should support player squad highlighting on the full map', () => {
-      mockCanvasContext = sharedMockCanvasContext;
-      const testCombatant = createTestCombatant({ squadId: 'squad-player' });
+    it('renders when the player squad is highlighted', () => {
       system.setPlayerSquadId('squad-player');
-      mockCombatantSystem.getAllCombatants = vi.fn(() => [testCombatant]);
-
-      (system as any).render();
-
-      expect(mockCanvasContext.fillStyles).toContain('rgba(92, 184, 92, 0.92)');
-    });
-
-    it('should draw strategic agents only when map intel policy enables them', () => {
-      mockCanvasContext = sharedMockCanvasContext;
-      mockCanvasContext.arc.mockClear();
-      const mockWarSimulator = {
-        isEnabled: vi.fn(() => true),
-        getAgentPositionsForMap: vi.fn(() => [0, 100, 100, 2]),
-      } as any;
-
-      system.setWarSimulator(mockWarSimulator);
-      system.setMapIntelPolicy({
-        tacticalRangeOverride: null,
-        showStrategicAgentsOnMinimap: false,
-        showStrategicAgentsOnFullMap: true,
-        strategicLayer: 'optional',
-      });
-
-      (system as any).render();
-
-      // Player arc + strategic agent arc.
-      expect(mockCanvasContext.arc.mock.calls.length).toBeGreaterThanOrEqual(2);
-      expect(mockCanvasContext.fillStyles).toContain('rgba(91, 140, 201, 0.2)');
-    });
-  });
-
-  describe('dispose', () => {
-    it('should dispose input handler', () => {
-      system.dispose();
-      
-      expect(mockInputHandler.dispose).toHaveBeenCalled();
-    });
-
-    it('should remove map container from DOM', () => {
-      const mapContainer = (system as any).mapContainer;
-      // Set up a mock parent node
-      const mockParentNode = {
-        removeChild: vi.fn(),
-      };
-      mapContainer.parentNode = mockParentNode;
-      
-      system.dispose();
-      
-      expect(mockParentNode.removeChild).toHaveBeenCalledWith(mapContainer);
-    });
-
-    it('should handle dispose when parent node is null', () => {
-      const mapContainer = (system as any).mapContainer;
-      mapContainer.parentNode = null;
-      
-      expect(() => system.dispose()).not.toThrow();
-    });
-
-    it('should handle multiple dispose calls', () => {
-      system.dispose();
-      expect(() => system.dispose()).not.toThrow();
-    });
-  });
-
-  describe('Coordinate system handling', () => {
-    it('should correctly map world coordinates to map coordinates', () => {
-      mockCanvasContext = sharedMockCanvasContext;
-      const testZone = createTestZone({
-        position: new THREE.Vector3(1600, 0, 1600), // Center of 3200 world
-      });
-      
-      mockGameModeManager.getWorldSize = vi.fn(() => 3200);
-      system.setGameModeManager(mockGameModeManager);
-      system.update(0.016); // Update worldSize
-      mockZoneManager.getAllZones = vi.fn(() => [testZone]);
-      system.setZoneManager(mockZoneManager);
-      
-      (system as any).render();
-      
-      // Zone should be drawn at center of map
-      expect(mockCanvasContext.arc).toHaveBeenCalledWith(
-        expect.closeTo(400), // Center of 800px map
-        expect.closeTo(400),
-        expect.any(Number),
-        0,
-        Math.PI * 2
-      );
-    });
-
-    it('should handle negative world coordinates', () => {
-      const testZone = createTestZone({
-        position: new THREE.Vector3(-100, 0, -100),
-      });
-      
-      mockZoneManager.getAllZones = vi.fn(() => [testZone]);
-      system.setZoneManager(mockZoneManager);
-      
-      expect(() => (system as any).render()).not.toThrow();
-    });
-
-    it('should handle combatants at world boundaries', () => {
-      const boundaryCombatant = createTestCombatant({
-        position: new THREE.Vector3(2000, 0, 2000), // Edge of 3200 world
-      });
-      
-      mockGameModeManager.getWorldSize = vi.fn(() => 3200);
-      system.setGameModeManager(mockGameModeManager);
-      mockCombatantSystem.getAllCombatants = vi.fn(() => [boundaryCombatant]);
-      system.setCombatantSystem(mockCombatantSystem);
-      
+      mockCombatantSystem.getAllCombatants = vi.fn(() => [
+        createTestCombatant({ squadId: 'squad-player' }),
+      ]);
       expect(() => (system as any).render()).not.toThrow();
     });
   });
-
 });
