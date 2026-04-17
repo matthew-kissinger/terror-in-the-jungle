@@ -1,6 +1,6 @@
 # Architecture
 
-Last verified: 2026-04-08
+Last verified: 2026-04-17
 
 Systems-based orchestration engine. 44 GameSystem classes, 14 tracked tick groups, 8 singletons.
 
@@ -54,7 +54,9 @@ Runtime composers (extracted from SystemConnector):
 | Environment | `src/systems/environment/` | WeatherSystem, WaterSystem, Skybox | untracked |
 | Debug | `src/systems/debug/` | PerformanceTelemetry (singleton) | untracked |
 | UI | `src/ui/` | HUDSystem, GameUI, TouchControls, MinimapSystem, FullMapSystem | 1.5ms |
-| Config | `src/config/` | gameModeTypes, *Config, MapSeedRegistry, CombatantConfig | - |
+| Config | `src/config/` | gameModeTypes, *Config, MapSeedRegistry, CombatantConfig, FactionCombatTuning | - |
+
+See [docs/COMBAT.md](COMBAT.md) for the authoritative combat subsystem architecture (carved out in D1, 2026-04-17). Per-faction combat tuning lives in `src/config/FactionCombatTuning.ts` and is consumed through the `FACTION_COMBAT_TUNING[faction]` lookup pattern (D2, 2026-04-17).
 
 ## Tick Graph
 
@@ -189,7 +191,7 @@ Mutual dependencies: CombatantSystem <-> ZoneManager, PlayerController <-> First
 - **GameSystem interface**: `init()`, `update(dt)`, `dispose()`. All 44 systems implement it.
 - **Runtime composers**: Grouped dependency wiring replaces monolithic SystemConnector.
 - **SimulationScheduler**: Cadence-based update groups for non-critical systems.
-- **Diagnostics hooks**: in dev/perf diagnostics mode, `bootstrap.ts` exposes `window.advanceTime(ms)` and `window.render_game_to_text()` so Playwright probes can step the live game deterministically and capture compact state.
+- **Diagnostics hooks**: in dev or perf-harness mode, `bootstrap.ts` exposes `window.advanceTime(ms)` and `window.render_game_to_text()` so Playwright probes can step the live game deterministically and capture compact state. Gated by `import.meta.env.DEV` + `?perf=1` at runtime OR by `import.meta.env.VITE_PERF_HARNESS === '1'` at build time (see `npm run build:perf`). Retail `npm run build` ships ZERO harness surface - hook branches are dead-code-eliminated by the build-time constant-fold.
 - **ObjectPool**: Pre-allocated Vector3/Quaternion/Matrix4 for GC avoidance in hot paths.
 - **CSS Modules + UIComponent**: New UI uses signals-based UIComponent with CSS Modules.
 - **Scratch vectors**: Pre-allocated reusable vectors in hot-path classes.
@@ -203,7 +205,6 @@ Mutual dependencies: CombatantSystem <-> ZoneManager, PlayerController <-> First
 2. **PlayerController setters** - grouped `configureDependencies()` exists but compatibility setters remain. Vehicle control state moved to adapters (2026-04-06) but model/camera setters still duplicated.
 3. **Variable deltaTime physics** - FixedStepRunner used for player/helicopter but not for grenade/NPC/particle systems.
 4. **Mixed UI paradigms** - UIComponent + CSS Modules is the active path, but ~50 files still use raw `document.createElement`.
-5. **Recast WASM duplication** - shipped twice (main thread + worker) due to Vite worker boundary limitation.
 
 ## Game Modes
 

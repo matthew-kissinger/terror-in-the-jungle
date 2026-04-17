@@ -1,95 +1,25 @@
-# Project Notes
+# Project Notes (Claude Code)
 
-Last updated: 2026-04-16
+Last updated: 2026-04-17
 
-## Project
+Terror in the Jungle is a browser-based 3D combat game (Three.js 0.183, TypeScript 5.9, Vite 8). Up to 3,000 AI combatants, stable frame-time tails, real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages.
 
-Terror in the Jungle is a browser-based 3D combat game focused on:
-- large-scale AI combat (up to 3,000 agents)
-- stable frame-time tails under load
-- realistic/testable large-map scenarios (A Shau Valley 21km DEM)
+## Read First
 
-Tech: Three.js 0.183, TypeScript 5.9, Vite 8, Vitest 4, Node 22.
+See [AGENTS.md](AGENTS.md) for the authoritative, agent-agnostic operating guide: commands, conventions, documentation map, hard rules, game-feel playtest rule, and known gotchas. That file applies to every agent (Claude Code, Codex, Cursor, Gemini) and humans alike.
 
-## Daily Commands
+## Claude Code specifics
 
-```bash
-npm run dev
-npm run build
-npm run test:run
-npm run test:quick           # all tests with dot reporter (fast output)
-npm run test:integration     # integration scenario tests only
-npm run validate             # lint + test:run + build + smoke:prod
-npm run validate:full        # test:run + build + combat120 capture + perf:compare
-```
+On top of what's in `AGENTS.md`, this repo ships Claude-Code-specific harness pieces:
 
-## Perf Commands
+- **Slash commands** in `.claude/commands/`: `/validate`, `/perf-capture`, `/playtest`, `/orchestrate`.
+- **Subagent types** in `.claude/agents/`: `executor`, `combat-reviewer`, `terrain-nav-reviewer`, `perf-analyst`, plus an `orchestrator` role kicked off via the `/orchestrate` slash command against `docs/AGENT_ORCHESTRATION.md`.
+- **Orchestration runbook entry point**: [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md). Individual task briefs live in `docs/tasks/*.md`.
+- **Statusline** at `~/.claude/statusline.ps1` (user-level global).
+- **Global StopFailure hook** plays `mission-failed.mp3` on tool failure (user-level global, set up in `~/.claude/settings.json`).
 
-```bash
-npm run perf:capture:combat120
-npm run perf:capture:openfrontier:short
-npm run perf:capture:ashau:short
-npm run perf:capture:frontier30m
-npm run perf:quick            # quick smoke capture only (not a committed baseline)
-npm run perf:compare          # compare latest capture against baselines
-npm run perf:update-baseline  # update baseline from latest capture
-```
+## Current focus
 
-## Runtime Landmarks
+combat120 is PASS-leaning WARN after the 2026-04-17 drift-correction run: avg ~15ms (-10.7% vs pre-run), p99 ~34ms, max ~47ms, 0% hitch, 8.8MB heap growth. 5 game modes live, per-faction combat doctrine starter landed (D2 via `FactionCombatTuning`), and the NPC hypersprint bug has been root-caused in `CombatantLODManager` but shelved for Phase F render-side position interpolation work.
 
-- Entry: `src/main.ts`, `src/core/bootstrap.ts`
-- Engine: `src/core/GameEngine.ts`, `src/core/GameEngineInit.ts`, `src/core/SystemUpdater.ts`, `src/core/GameEventBus.ts`
-- Modes: `src/config/gameModeTypes.ts`, `src/config/*Config.ts`, `src/config/MapSeedRegistry.ts`
-- Combat: `src/systems/combat/*`
-- Navigation: `src/systems/navigation/*` (navmesh, crowd, movement adapter)
-- Strategy (A Shau): `src/systems/strategy/*`
-- Terrain: `src/systems/terrain/*`
-- Vehicles: `src/systems/vehicle/*` (VehicleStateManager, FixedWingPlayerAdapter, HelicopterPlayerAdapter, FixedWingModel, FixedWingPhysics, VehicleManager), `src/systems/helicopter/*`
-- World features: `src/systems/world/*` (WorldFeatureSystem, FirebaseLayoutGenerator, AirfieldLayoutGenerator)
-- Harness: `scripts/perf-capture.ts`, `scripts/perf-analyze-latest.ts`, `scripts/perf-compare.ts`
-- UI: `src/ui/hud/`, `src/ui/controls/`, `src/ui/icons/`, `src/ui/screens/`, `src/ui/loading/`, `src/ui/engine/`
-- Tests: `src/integration/`, `src/test-utils/`
-
-## Current Focus
-
-- combat120 at WARN: p95 ~32ms, p99 ~34ms; cover search budget-capped (6/frame), max spike 50ms (was 59ms), heap growth negative
-- Deployed to Cloudflare Pages, CI-gated (lint + test + build + smoke)
-- 5 game modes live, 3 flyable helicopters, 3 flyable fixed-wing aircraft, 6 weapon slots (rifle/shotgun/smg/pistol/lmg/launcher), 4 factions
-- 75 GLB assets shipped, 6 aircraft rebuilt with rigged rotors via PixelForge Kiln
-- VehicleStateManager owns player vehicle lifecycle; adapter pattern for helicopter/fixed-wing
-- Fixed-wing physics: ground stabilization, thrust speed gate, F-4 TWR corrected
-- Mobile touch controls hardened (virtual joystick, vehicle action bar, fullscreen workarounds)
-- Async startup eliminates Open Frontier hang; map seed rotation (5 OF, 3 ZC, 3 TDM variants)
-- Terrain CDLOD rewrite live with auto-scaled LOD levels per world size
-- See `docs/BACKLOG.md` for open work items
-
-## Documentation Contract
-
-- Update `docs/ARCHITECTURE.md` after architecture decisions.
-- Update `docs/PERFORMANCE.md` when capture flags/semantics change.
-- Update `docs/ASSET_MANIFEST.md` when new asset needs are identified.
-- Keep docs concise; remove stale status logs.
-- When a "recovery plan" or "stabilization plan" doc is resolved, move it to `docs/archive/`. Don't let reference-only docs sit alongside active ones.
-
-## Agent Operating Guide
-
-If you are an agent working in this repo, read these before editing:
-
-- `docs/TESTING.md` — the four-layer test contract. Write behavior tests, not implementation-mirror tests. Delete tests that block refactors by asserting tuning constants or phase-state names.
-- `docs/INTERFACE_FENCE.md` — `src/types/SystemInterfaces.ts` interfaces are fenced. Any change there requires `[interface-change]` in PR title and human approval. Try to solve the problem without a fence change first.
-- `docs/PLAYTEST_CHECKLIST.md` — game feel still requires a human. Don't claim a flight/combat/UI change is done without a playtest note.
-- `docs/AGENT_ORCHESTRATION.md` — the master DAG for coordinated multi-agent work. Individual task briefs live in `docs/tasks/*.md`.
-
-Hard rules:
-
-1. Don't modify fenced interfaces without explicit approval.
-2. Don't rewrite code that isn't in your task's scope list. Comments and formatting outside scope are off-limits.
-3. Don't write implementation-mirror tests.
-4. Don't push directly to master unless you own the merge step — agents working tasks push to their own branches and orchestrator merges.
-5. Verify locally before pushing: `npm run lint`, `npm run test:run`, `npm run build`.
-
-## Game Feel Requires Human Playtest
-
-Tests, lint, build, and the fixed-wing runtime probe catch correctness regressions. They do not catch feel regressions. An aircraft that passes every test can still be miserable to fly. A combat pacing change that leaves AI reaction times "technically correct" can still feel lifeless.
-
-Any change to flight, driving, combat rhythm, or UI responsiveness must be validated by a human running `docs/PLAYTEST_CHECKLIST.md`. Passing automated checks is necessary, not sufficient. If you can't get a human through the checklist, say so explicitly in the PR description rather than claiming the change is done.
+See [docs/BACKLOG.md](docs/BACKLOG.md) for open items and recently completed work.

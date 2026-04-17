@@ -1,6 +1,6 @@
 # Performance & Profiling
 
-Last updated: 2026-04-16
+Last updated: 2026-04-17
 
 ## Build targets
 
@@ -120,18 +120,20 @@ Automated checks: frame progression, mean/tail frame timing, hitch ratios (>50ms
 
 | Scenario | Status | Avg | p99 | Notes |
 |----------|--------|----:|----:|-------|
-| `combat120` | WARN | ~16ms | ~35ms | Clean 2026-04-07 capture passed all fail gates; remaining warnings are p99 tail + heap peak |
+| `combat120` | WARN | ~15ms | ~34ms | Post drift-correction run 2026-04-17: avg dropped -10.7% vs pre-run; p99 tail + heap peak (8.8MB) are the remaining warnings. Max spike ~47ms, hitch 0%. |
 | `openfrontier:short` | WARN | ~9.9ms | ~29.6ms | Renderer/hit-reg regressions recovered; remaining tail-latency + heap-peak warning |
 | `ashau:short` | WARN | ~9ms | ~26ms | WarSim dominates tick budget |
 | `frontier30m` | PASS* | ~6.5ms | ~29ms | Terrain-led tails solved; rare GC outliers |
 
 *frontier30m p99 includes rare GC/OS outliers, not game code.
 
+Pre drift-correction baseline for `combat120` (2026-04-16T23:06): avg 17.08ms, p99 34.40ms, max 47.30ms.
+
 ## Known Bottlenecks
 
 1. **Combat AI tails** - cover search is budget-capped to 6/frame via `CoverSearchBudget`, but p95/p99 still in WARN range due to per-search cost (sandbag iteration + vegetation grid + terrain probes).
 2. **Open Frontier renderer tails** - the latest short capture (`artifacts/perf/2026-04-07T04-01-01-963Z`) passes mean/p95/hitch gates, but `p99FrameMs` still warns at `29.60ms` and heap peak-growth still warns at `35.13MB`. The mode is stable again, but not yet back to the March 4 renderer baseline.
-3. **NPC terrain stalling** - movement solver still produces stalls on steep terrain; `StuckDetector` now caps at 4 backtrack attempts then holds position (15s cooldown).
+3. **NPC terrain stalling** - movement solver still produces stalls on steep terrain. `StuckDetector` escalation was made reachable in B3 (2026-04-17) by tracking the goal anchor independently of the backtrack anchor, so the 4-attempt abandon / hold path now actually fires instead of being reset on every anchor flip.
 
 ## Resolved Bottlenecks
 
@@ -148,6 +150,9 @@ Automated checks: frame progression, mean/tail frame timing, hitch ratios (>50ms
 11. **Helicopter idle per-frame cost** (2026-04-06) - Door gunner AI ran targeting/firing for every visible helicopter, not just the piloted one. Restricted to piloted only. Rotor animation skipped for grounded helicopters with `engineRPM === 0`.
 12. **Fixed-wing ground-to-air pop** (2026-04-06) - Parked aircraft could instantly transition to airborne on first simulation tick due to terrain height mismatch. Added 3-tick ground stabilization clamp. F-4 Phantom TWR corrected (180kN -> 155kN). Thrust gated by airspeed smoothstep. Physics reset on player entry.
 13. **Fixed-wing self-lift on entry** (2026-04-07) - plane placement/update sampled `getEffectiveHeightAt()` and could treat the aircraft's own collision bounds as terrain support. Fixed-wing placement and terrain sampling now use raw terrain height, while aircraft collision registration remains available to other systems through the dynamic collision path.
+14. **NPC combat response gap** (B1, 2026-04-17) - `CombatantCombat.ts:310` player-shot path was passing `attacker=undefined` into `CombatantDamage`, so NPC AI suppression / panic / threat-bearing signals never fired on player hits. Fixed by wiring a `_playerAttackerProxy` through the damage path, mirroring the existing `_playerTarget` pattern in `AITargetAcquisition`.
+15. **NPC terrain-stall escalation unreachable** (B3, 2026-04-17) - `StuckDetector` had a 4-attempt abandon path, but `recoveryCount` was reset every time the movement anchor flipped between the backtrack anchor and the goal anchor, so escalation never triggered. Introduced explicit goal-anchor tracking so the counter escalates independently of anchor flips.
+16. **Perf captures ran against dev-mode** (C1, 2026-04-17) - captures were running against Vite dev-server (HMR, unminified), so numbers overstated real work per frame and the dev HMR websocket intermittently rotted (`send was called before connect`) mid-run. New `npm run build:perf` target produces a prod-shape bundle to `dist-perf/` with `VITE_PERF_HARNESS=1` set at build time; `perf:capture` and `fixed-wing-runtime-probe` default to previewing that bundle. Retail `npm run build` ships zero harness surface because Vite constant-folds `import.meta.env.VITE_PERF_HARNESS === '1'` and DCE's the hook branches.
 
 ## Workflow
 
@@ -164,7 +169,7 @@ For world-feature, asset, aircraft, or collision-query changes, pair `npm run pe
 
 ## Diagnostics
 
-- Perf diagnostics gated behind `import.meta.env.DEV` + `?perf=1` URL param.
+- Perf diagnostics gated behind `import.meta.env.DEV` + `?perf=1` URL param at runtime, OR `import.meta.env.VITE_PERF_HARNESS === '1'` at build time (see `npm run build:perf`). Retail `npm run build` ships ZERO harness surface - the hook branches are dead-code-eliminated.
 - Perf harness runs also set `?uiTransitions=0` to avoid browser transition/screenshot interactions during live-entry.
 - `SystemUpdater` emits `performance.mark()`/`performance.measure()` during captures only.
 - Browser stall observers (`longtask`, `long-animation-frame`) are Chromium-only, harness-only.
