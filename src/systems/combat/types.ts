@@ -104,6 +104,13 @@ export interface Combatant extends ITargetable {
   id: string;
   faction: Faction;
   position: THREE.Vector3;
+  /**
+   * Rendered (on-screen) position. Owned by CombatantRenderInterpolator.
+   * Lags `position` when logical dt amortization produces large jumps, so
+   * low-LOD crowds do not visually teleport. Renderers should consume this
+   * when writing instance matrices; fall back to `position` if unset.
+   */
+  renderedPosition?: THREE.Vector3;
   velocity: THREE.Vector3;
   rotation: number;
   visualRotation: number;

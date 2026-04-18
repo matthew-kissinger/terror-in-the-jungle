@@ -4,6 +4,7 @@ import { CombatantAI } from './CombatantAI';
 import { CombatantCombat } from './CombatantCombat';
 import { CombatantMovement } from './CombatantMovement';
 import { CombatantRenderer } from './CombatantRenderer';
+import { CombatantRenderInterpolator } from './CombatantRenderInterpolator';
 import { SquadManager } from './SquadManager';
 import { spatialGridManager } from './SpatialGridManager';
 import { ZoneManager } from '../world/ZoneManager';
@@ -118,6 +119,7 @@ export class CombatantLODManager {
   private combatantMovement: CombatantMovement;
   private combatantRenderer: CombatantRenderer;
   private squadManager: SquadManager;
+  private renderInterpolator: CombatantRenderInterpolator = new CombatantRenderInterpolator();
   constructor(
     combatants: Map<string, Combatant>,
     playerPosition: THREE.Vector3,
@@ -271,6 +273,17 @@ export class CombatantLODManager {
    * Update all combatants with LOD-based scheduling
    */
   updateCombatants(deltaTime: number, options?: { enableAI?: boolean }): void {
+    try {
+      this.runLODUpdate(deltaTime, options);
+    } finally {
+      // Always tick the render-side interpolator so dt-amortized logical
+      // position jumps do not produce visible teleports. Wrapped in finally
+      // because the culled-loop path has early returns deeper in the pipeline.
+      this.renderInterpolator.update(this.combatants, deltaTime);
+    }
+  }
+
+  private runLODUpdate(deltaTime: number, options?: { enableAI?: boolean }): void {
     const enableAI = options?.enableAI ?? true;
     const lodPipelineStart = performance.now();
     let deathMs = 0;
@@ -746,6 +759,15 @@ export class CombatantLODManager {
 
   getSpatiallyUpdatedIds(): ReadonlySet<string> {
     return this.spatiallyUpdatedIds;
+  }
+
+  /**
+   * Exposes the render-side position interpolator so callers can snap rendered
+   * positions after teleport-like events (mode switch, respawn, dismount) and
+   * so tests can verify interpolation behavior.
+   */
+  getRenderInterpolator(): CombatantRenderInterpolator {
+    return this.renderInterpolator;
   }
 
   private recordSpatialUpdate(combatant: Combatant): void {
