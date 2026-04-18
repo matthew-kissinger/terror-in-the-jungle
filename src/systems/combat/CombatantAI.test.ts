@@ -63,6 +63,8 @@ vi.mock('./ai/AIStateEngage', () => ({
     setCoverSystem = vi.fn()
     setFlankingSystem = vi.fn()
     setSquads = vi.fn()
+    setUtilityScorer = vi.fn()
+    setCoverBearingProbe = vi.fn()
   },
 }))
 

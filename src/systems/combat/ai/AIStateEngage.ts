@@ -5,6 +5,7 @@ import { AICoverSystem } from './AICoverSystem'
 import { AIFlankingSystem } from './AIFlankingSystem'
 import { Logger } from '../../../utils/Logger'
 import { getFactionCombatTuning } from '../../../config/FactionCombatTuning'
+import { UtilityScorer, UtilityContext } from './utility'
 
 const _toTarget = new THREE.Vector3()
 const _flankingPos = new THREE.Vector3()
@@ -58,6 +59,11 @@ export class AIStateEngage {
   private squadSuppressionCooldown: Map<string, number> = new Map()
   private coverSystem?: AICoverSystem
   private flankingSystem?: AIFlankingSystem
+  private utilityScorer?: UtilityScorer
+  // Caller-supplied: does terrain afford cover in `bearingRad` (radians)
+  // within `radius` of `origin`? Left undefined when no terrain query is
+  // wired — utility actions that depend on it will simply score 0.
+  private hasCoverInBearing?: (origin: THREE.Vector3, bearingRad: number, radius: number) => boolean
 
   setSquads(squads: Map<string, Squad>): void {
     this.squads = squads
@@ -69,6 +75,26 @@ export class AIStateEngage {
 
   setFlankingSystem(flankingSystem: AIFlankingSystem): void {
     this.flankingSystem = flankingSystem
+  }
+
+  /**
+   * Opt-in utility-AI scorer. When set, factions with useUtilityAI=true get
+   * a pre-pass each tick that may route them into SEEKING_COVER (fire-and-fade)
+   * before the default engage ladder runs. Leaving this unset makes the
+   * behavior a pure no-op for all factions.
+   */
+  setUtilityScorer(scorer: UtilityScorer): void {
+    this.utilityScorer = scorer
+  }
+
+  /**
+   * Opt-in terrain predicate for utility actions that need directional
+   * cover queries. When unset, fire-and-fade cannot score > 0.
+   */
+  setCoverBearingProbe(
+    probe: (origin: THREE.Vector3, bearingRad: number, radius: number) => boolean
+  ): void {
+    this.hasCoverInBearing = probe
   }
 
   handleEngaging(
@@ -166,6 +192,24 @@ export class AIStateEngage {
         }
       } else {
         combatant.panicLevel = Math.max(0, combatant.panicLevel - deltaTime * PANIC_DECAY_RATE)
+      }
+
+      // Opt-in utility-AI pre-pass (C1). Only factions with useUtilityAI=true
+      // consult the scorer. A winning fire-and-fade intent routes the unit
+      // into SEEKING_COVER toward cover available in the away-from-threat
+      // bearing. All other outcomes (scorer returns null, or an intent we
+      // don't act on here) fall through to the default engage ladder.
+      if (this.utilityScorer && getFactionCombatTuning(combatant.faction).useUtilityAI) {
+        const ctx = this.buildUtilityContext(combatant, targetPos)
+        const pick = this.utilityScorer.pick(ctx)
+        if (pick.intent && pick.intent.kind === 'seekCoverInBearing') {
+          combatant.state = CombatantState.SEEKING_COVER
+          combatant.coverPosition = pick.intent.coverPosition
+          combatant.destinationPoint = pick.intent.coverPosition
+          combatant.lastCoverSeekTime = Date.now()
+          combatant.inCover = false
+          return
+        }
       }
 
       // Check if should seek cover - use improved cover system if available
@@ -297,6 +341,25 @@ export class AIStateEngage {
         combatant.target = null
         combatant.previousState = undefined
       }
+    }
+  }
+
+  private buildUtilityContext(combatant: Combatant, targetPos: THREE.Vector3): UtilityContext {
+    const squad = combatant.squadId ? this.squads.get(combatant.squadId) : undefined
+    const probe = this.hasCoverInBearing
+    return {
+      self: combatant,
+      threatPosition: targetPos,
+      squad,
+      // C1 proxy: own panicLevel stands in for squad-wide pressure. A real
+      // cross-NPC aggregate (average panic, low-health-member count) is a
+      // CombatantAI-tier responsibility and is queued for the follow-up.
+      // Using per-unit panic keeps the fire-and-fade gate active for the
+      // VC canary without requiring a new tick pass.
+      squadSuppression: combatant.panicLevel,
+      hasCoverInBearing: probe
+        ? (bearingRad, radius) => probe(combatant.position, bearingRad, radius)
+        : undefined,
     }
   }
 
