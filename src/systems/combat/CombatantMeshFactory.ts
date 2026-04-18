@@ -38,6 +38,47 @@ const FACTION_SPRITE_CONFIGS: FactionSpriteConfig[] = [
 const SQUAD_OUTLINE_COLOR = new THREE.Color(0.0, 1.0, 0.3);
 const SQUAD_MARKER_COLOR = new THREE.Color(0.0, 1.0, 0.3);
 
+// Per-bucket instance capacity. The E2 rendering spike (docs/rearch/E2-rendering-evaluation.md
+// on spike/E2-rendering-at-scale) recommended raising this "before combat testing moves past
+// 500 concurrent NPCs per bucket" and measured the keyed-instanced path at ~2ms/frame CPU cost
+// at 3000 total instances. 512 leaves headroom above the 500 threshold while keeping the
+// per-mesh instanceMatrix buffer small (~32 KB per mesh, ~3.5 MB total across all buckets).
+export const DEFAULT_MESH_BUCKET_CAPACITY = 512;
+
+// Mounted sprites (NPCs seated in vehicles) peak much lower since vehicle crew counts are
+// bounded by vehicle capacity. Raise from the prior 32 to 128 to preserve a 4x safety margin.
+export const MOUNTED_MESH_BUCKET_CAPACITY = 128;
+
+const OVERFLOW_LOG_INTERVAL_MS = 1000;
+const bucketOverflowLastLog = new Map<string, number>();
+const bucketOverflowPending = new Map<string, number>();
+
+/**
+ * Surface a bucket-capacity overflow as a rate-limited warning. Call once per dropped instance;
+ * this helper coalesces into a single log line per bucket per second so hot paths do not spam.
+ * Visible for tests.
+ */
+export function reportBucketOverflow(bucketKey: string, now: number = performance.now()): void {
+  const pending = (bucketOverflowPending.get(bucketKey) ?? 0) + 1;
+  bucketOverflowPending.set(bucketKey, pending);
+
+  const lastLog = bucketOverflowLastLog.get(bucketKey);
+  if (lastLog !== undefined && now - lastLog < OVERFLOW_LOG_INTERVAL_MS) return;
+
+  bucketOverflowLastLog.set(bucketKey, now);
+  bucketOverflowPending.set(bucketKey, 0);
+  Logger.warn(
+    'combat-renderer',
+    `Combatant mesh bucket "${bucketKey}" overflowed capacity; dropped ${pending} instance(s) in the last ${(OVERFLOW_LOG_INTERVAL_MS / 1000).toFixed(1)}s`
+  );
+}
+
+/** Test-only: clear overflow throttling state so each test starts from a clean slate. */
+export function resetBucketOverflowState(): void {
+  bucketOverflowLastLog.clear();
+  bucketOverflowPending.clear();
+}
+
 export class CombatantMeshFactory {
   private scene: THREE.Scene;
   private assetLoader: AssetLoader;
@@ -77,7 +118,7 @@ export class CombatantMeshFactory {
       key: string,
       outlineColor: THREE.Color,
       markerColor: THREE.Color,
-      maxInstances = 120
+      maxInstances = DEFAULT_MESH_BUCKET_CAPACITY
     ) => {
       const spriteMaterial = new THREE.MeshBasicMaterial({
         map: texture, transparent: true, alphaTest: 0.5,
@@ -140,7 +181,7 @@ export class CombatantMeshFactory {
       if (mounted) {
         for (const dir of DIRECTIONS) {
           soldierTextures.set(`${cfg.factionKey}_mounted_${dir}`, mounted);
-          createMeshSet(mounted, `${cfg.factionKey}_mounted_${dir}`, cfg.outlineColor, cfg.markerColor, 32);
+          createMeshSet(mounted, `${cfg.factionKey}_mounted_${dir}`, cfg.outlineColor, cfg.markerColor, MOUNTED_MESH_BUCKET_CAPACITY);
         }
       }
     }
@@ -155,7 +196,7 @@ export class CombatantMeshFactory {
     }
     if (playerTextures.mounted) {
       for (const dir of DIRECTIONS) {
-        createMeshSet(playerTextures.mounted, `SQUAD_mounted_${dir}`, SQUAD_OUTLINE_COLOR, SQUAD_MARKER_COLOR, 32);
+        createMeshSet(playerTextures.mounted, `SQUAD_mounted_${dir}`, SQUAD_OUTLINE_COLOR, SQUAD_MARKER_COLOR, MOUNTED_MESH_BUCKET_CAPACITY);
       }
     }
 
