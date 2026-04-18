@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { FixedWingControlPhase } from './FixedWingControlLaw';
 import type { FixedWingConfig } from './FixedWingConfigs';
-import type { FixedWingFlightSnapshot } from './FixedWingPhysics';
+import type { FixedWingFlightSnapshot } from './FixedWingTypes';
 
 export type FixedWingOperationState =
   | 'parked'

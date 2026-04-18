@@ -233,7 +233,7 @@ export class PlayerCamera {
       this.camera.lookAt(_lookTarget);
     } else {
       // Following mode - camera behind aircraft with lerp smoothing
-      // FixedWingPhysics forward is (0,0,-1), match it for camera positioning
+      // Airframe forward is (0,0,-1), match it for camera positioning
       _fwForward.set(0, 0, -1).applyQuaternion(_fwQuaternion);
       _cameraPosition.copy(_fwPosition);
       _cameraPosition.addScaledVector(_fwForward, -distanceBack);

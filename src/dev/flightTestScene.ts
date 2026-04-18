@@ -1,7 +1,7 @@
 /**
  * Isolated fixed-wing test scene.
  *
- * Deliberately minimal: flat ground plane at y=0, single Skyraider (physics +
+ * Deliberately minimal: flat ground plane at y=0, single Skyraider (Airframe +
  * placeholder mesh), chase-cam, keyboard input, on-screen debug overlay. No AI,
  * combat, LOD, objectives, terrain streaming, HUD, or mode selection. The scene
  * lets a human feel the controls and an agent see the full input → physics →
@@ -11,9 +11,11 @@
  */
 
 import * as THREE from 'three';
-import { FixedWingPhysics } from '../systems/vehicle/FixedWingPhysics';
-import type { FixedWingTerrainSample } from '../systems/vehicle/FixedWingPhysics';
+import { Airframe } from '../systems/vehicle/airframe/Airframe';
+import { createFlatTerrainProbe } from '../systems/vehicle/airframe/terrainProbe';
+import type { AirframeIntent } from '../systems/vehicle/airframe/types';
 import { FIXED_WING_CONFIGS } from '../systems/vehicle/FixedWingConfigs';
+import { airframeConfigFromLegacy, airframeStateToFixedWingSnapshot } from '../systems/vehicle/FixedWingTypes';
 
 interface InputState {
   throttleUp: boolean;
@@ -38,18 +40,14 @@ const RESET_DEBOUNCE_MS = 300;
 
 const CONFIG_KEY = 'A1_SKYRAIDER';
 
-const FLAT_TERRAIN_SAMPLE: FixedWingTerrainSample = {
-  height: 0,
-  normal: new THREE.Vector3(0, 1, 0),
-};
-
 export class FlightTestScene {
   private readonly container: HTMLElement;
   private readonly scene = new THREE.Scene();
   private readonly camera: THREE.PerspectiveCamera;
   private readonly renderer: THREE.WebGLRenderer;
   private readonly aircraftGroup = new THREE.Group();
-  private readonly physics: FixedWingPhysics;
+  private readonly airframe: Airframe;
+  private readonly terrainProbe = createFlatTerrainProbe(0);
 
   private readonly input: InputState = {
     throttleUp: false,
@@ -89,7 +87,7 @@ export class FlightTestScene {
       throw new Error(`Flight test scene: missing config for ${CONFIG_KEY}`);
     }
 
-    this.physics = new FixedWingPhysics(SPAWN_POSITION.clone(), config.physics);
+    this.airframe = new Airframe(SPAWN_POSITION.clone(), airframeConfigFromLegacy(config.physics));
 
     // Renderer
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -224,29 +222,31 @@ export class FlightTestScene {
     this.rollCommand = lerp(this.rollCommand, targetRoll, k);
     this.yawCommand = lerp(this.yawCommand, targetYaw, k);
 
-    // Drive physics — input-before-vehicle (matches SystemUpdater: Vehicles,
-    // then Player). In isolation we set the command first then step physics.
-    this.physics.setCommand({
-      throttleTarget: this.throttleTarget,
-      pitchCommand: this.pitchCommand,
-      rollCommand: this.rollCommand,
-      yawCommand: this.yawCommand,
+    // Drive physics — input-before-vehicle. Build intent from the smoothed
+    // commanded values; the airframe config is feel-neutralized so these
+    // values flow straight through to surface deflection in the raw tier.
+    const intent: AirframeIntent = {
+      pitch: this.pitchCommand,
+      roll: this.rollCommand,
+      yaw: this.yawCommand,
+      throttle: this.throttleTarget,
       brake: this.input.brake ? 1 : 0,
-    });
-    this.physics.update(dt, FLAT_TERRAIN_SAMPLE);
+      tier: 'raw',
+    };
+    this.airframe.step(intent, this.terrainProbe, dt);
 
-    // Sync rendered transform from physics
-    this.aircraftGroup.position.copy(this.physics.getPosition());
-    this.aircraftGroup.quaternion.copy(this.physics.getQuaternion());
+    // Sync rendered transform from airframe
+    this.aircraftGroup.position.copy(this.airframe.getPosition());
+    this.aircraftGroup.quaternion.copy(this.airframe.getQuaternion());
 
     // Chase-cam follow (mirrors PlayerCamera.updateFixedWingCamera following
     // branch, simplified — no mouse orbit in the test scene).
-    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.physics.getQuaternion());
-    const camPos = this.physics.getPosition().clone()
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.airframe.getQuaternion());
+    const camPos = this.airframe.getPosition().clone()
       .addScaledVector(forward, -CAMERA_DISTANCE);
     camPos.y += CAMERA_HEIGHT;
     this.camera.position.lerp(camPos, 0.08);
-    const lookAt = this.physics.getPosition().clone();
+    const lookAt = this.airframe.getPosition().clone();
     lookAt.y += 2;
     this.camera.lookAt(lookAt);
 
@@ -281,13 +281,13 @@ export class FlightTestScene {
   }
 
   private resetAircraft(): void {
-    this.physics.resetToGround(SPAWN_POSITION.clone());
+    this.airframe.resetToGround(SPAWN_POSITION.clone());
     this.throttleTarget = 0;
     this.pitchCommand = 0;
     this.rollCommand = 0;
     this.yawCommand = 0;
-    this.aircraftGroup.position.copy(this.physics.getPosition());
-    this.aircraftGroup.quaternion.copy(this.physics.getQuaternion());
+    this.aircraftGroup.position.copy(this.airframe.getPosition());
+    this.aircraftGroup.quaternion.copy(this.airframe.getQuaternion());
   }
 
   // ── UI ──
@@ -322,7 +322,7 @@ export class FlightTestScene {
   }
 
   private updateOverlay(): void {
-    const s = this.physics.getFlightSnapshot();
+    const s = airframeStateToFixedWingSnapshot(this.airframe.getState());
     const lines = [
       'FLIGHT TEST MODE',
       '',
