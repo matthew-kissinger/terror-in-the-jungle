@@ -87,6 +87,11 @@ export async function bootstrapGame(): Promise<void> {
       (window as any).__engine = engine;
       // Expose renderer for performance measurement scripts.
       (window as any).__renderer = engine.renderer;
+      // Expose the typed agent/player API so the perf harness driver can
+      // construct an AgentController without synthesizing keyboard events.
+      // See `src/systems/agent/` and `scripts/perf-active-driver.js`.
+      const { createAgentControllerFromEngine } = await import('../systems/agent/createAgentControllerFromEngine');
+      (window as any).__agent = { createFromEngine: () => createAgentControllerFromEngine(engine) };
       // A Shau runtime diagnostics helper for harness/dev validation.
       ashauSessionTelemetry.sessionStartEpochMs = Date.now();
       ashauSessionTelemetry.firstTacticalContactMs = null;

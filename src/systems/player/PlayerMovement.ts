@@ -64,9 +64,23 @@ export class PlayerMovement {
   private readonly supportNormal = new THREE.Vector3(0, 1, 0);
   private readonly sampledSupportNormal = new THREE.Vector3(0, 1, 0);
   private lastGroundWalkable = true;
+  /**
+   * Agent-driven movement intent in camera-relative coordinates (forward, strafe).
+   * When active, overrides keyboard/touch input in the movement loop. See
+   * `AgentController` in `src/systems/agent/`.
+   */
+  private agentMovementIntent: { forward: number; strafe: number } | null = null;
 
   constructor(playerState: PlayerState) {
     this.playerState = playerState;
+  }
+
+  /**
+   * Set the camera-relative movement intent driven by an external agent.
+   * `null` to clear and hand control back to keyboard/touch input.
+   */
+  setAgentMovementIntent(intent: { forward: number; strafe: number } | null): void {
+    this.agentMovementIntent = intent;
   }
 
   setTerrainSystem(terrainSystem: ITerrainRuntime): void {
@@ -125,26 +139,35 @@ export class PlayerMovement {
       baseSpeed *= CROUCH_SPEED_MULTIPLIER;
     }
 
-    // Calculate movement direction based on camera orientation
-    // Check touch joystick first, then fall back to keyboard
-    const touchMove = input.getTouchMovementVector();
-    if (Math.abs(touchMove.x) > 0.1 || Math.abs(touchMove.z) > 0.1) {
-      // Use touch joystick values directly
-      moveVector.x = touchMove.x;
-      moveVector.z = touchMove.z;
+    // Calculate movement direction based on camera orientation.
+    // Priority: agent-driven intent (if set) > touch joystick > keyboard.
+    const agentIntent = this.agentMovementIntent;
+    if (agentIntent && (Math.abs(agentIntent.forward) > 0.01 || Math.abs(agentIntent.strafe) > 0.01)) {
+      // Agent intent is in camera-relative axes already: forward along camera,
+      // strafe along camera right. Match the touch-joystick convention where
+      // -z is forward, +x is strafe right.
+      moveVector.x = agentIntent.strafe;
+      moveVector.z = -agentIntent.forward;
     } else {
-      // Keyboard input
-      if (input.isKeyPressed('keyw')) {
-        moveVector.z -= 1;
-      }
-      if (input.isKeyPressed('keys')) {
-        moveVector.z += 1;
-      }
-      if (input.isKeyPressed('keya')) {
-        moveVector.x -= 1;
-      }
-      if (input.isKeyPressed('keyd')) {
-        moveVector.x += 1;
+      const touchMove = input.getTouchMovementVector();
+      if (Math.abs(touchMove.x) > 0.1 || Math.abs(touchMove.z) > 0.1) {
+        // Use touch joystick values directly
+        moveVector.x = touchMove.x;
+        moveVector.z = touchMove.z;
+      } else {
+        // Keyboard input
+        if (input.isKeyPressed('keyw')) {
+          moveVector.z -= 1;
+        }
+        if (input.isKeyPressed('keys')) {
+          moveVector.z += 1;
+        }
+        if (input.isKeyPressed('keya')) {
+          moveVector.x -= 1;
+        }
+        if (input.isKeyPressed('keyd')) {
+          moveVector.x += 1;
+        }
       }
     }
 
