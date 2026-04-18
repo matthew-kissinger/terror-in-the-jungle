@@ -6,6 +6,7 @@ import { AIFlankingSystem } from './AIFlankingSystem'
 import { Logger } from '../../../utils/Logger'
 import { getFactionCombatTuning } from '../../../config/FactionCombatTuning'
 import { UtilityScorer, UtilityContext } from './utility'
+import { SeededRandom } from '../../../core/SeededRandom'
 
 const _toTarget = new THREE.Vector3()
 const _flankingPos = new THREE.Vector3()
@@ -428,7 +429,7 @@ export class AIStateEngage {
         } else {
           member.suppressionTarget = targetPos.clone()
         }
-        member.suppressionEndTime = now + SUPPRESSION_BASE_DURATION_MS + Math.random() * SUPPRESSION_JITTER_MS
+        member.suppressionEndTime = now + SUPPRESSION_BASE_DURATION_MS + SeededRandom.random() * SUPPRESSION_JITTER_MS
         if (member.lastKnownTargetPos) {
           member.lastKnownTargetPos.copy(targetPos)
         } else {

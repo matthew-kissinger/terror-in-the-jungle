@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Combatant, CombatantState, AISkillProfile, Faction, isOpfor } from './types';
 import { WeaponSpec, GunplayCore } from '../weapons/GunplayCore';
 import { NPC_HEALTH, OPFOR_OBJECTIVE_FOCUS_CHANCE } from '../../config/CombatantConfig';
+import { SeededRandom } from '../../core/SeededRandom';
 
 // ── Skill profile randomization ──
 const REACTION_DELAY_JITTER = 100; // +/- ms
@@ -19,7 +20,7 @@ export class CombatantFactory {
     const weaponSpec = this.createWeaponSpec(faction);
     const gunCore = new GunplayCore(weaponSpec);
     const skillProfile = this.createSkillProfile(faction, squadData?.squadRole || 'follower');
-    const initialRotation = Math.random() * Math.PI * 2;
+    const initialRotation = SeededRandom.random() * Math.PI * 2;
 
     const combatant: Combatant = {
       id,
@@ -52,14 +53,14 @@ export class CombatantFactory {
       lastHitTime: 0,
       consecutiveMisses: 0,
 
-      wanderAngle: Math.random() * Math.PI * 2,
-      timeToDirectionChange: Math.random() * 3,
+      wanderAngle: SeededRandom.random() * Math.PI * 2,
+      timeToDirectionChange: SeededRandom.random() * 3,
 
       lastUpdateTime: 0,
       updatePriority: 0,
       lodLevel: 'high',
 
-      isObjectiveFocused: isOpfor(faction) && Math.random() < OPFOR_OBJECTIVE_FOCUS_CHANCE,
+      isObjectiveFocused: isOpfor(faction) && SeededRandom.random() < OPFOR_OBJECTIVE_FOCUS_CHANCE,
 
       kills: 0,
       deaths: 0,
@@ -157,8 +158,8 @@ export class CombatantFactory {
     };
 
     const baseProfile = { ...profiles[faction] };
-    baseProfile.reactionDelayMs += (Math.random() - 0.5) * REACTION_DELAY_JITTER;
-    baseProfile.aimJitterAmplitude += (Math.random() - 0.5) * AIM_JITTER_AMPLITUDE_JITTER;
+    baseProfile.reactionDelayMs += (SeededRandom.random() - 0.5) * REACTION_DELAY_JITTER;
+    baseProfile.aimJitterAmplitude += (SeededRandom.random() - 0.5) * AIM_JITTER_AMPLITUDE_JITTER;
     return baseProfile;
   }
 }

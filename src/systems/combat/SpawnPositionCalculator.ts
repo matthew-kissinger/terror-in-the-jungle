@@ -4,6 +4,7 @@ import { ZoneManager, ZoneState, CaptureZone } from '../world/ZoneManager';
 import { GameModeConfig } from '../../config/gameModeTypes';
 import { Logger } from '../../utils/Logger';
 import type { ITerrainRuntime } from '../../types/SystemInterfaces';
+import { SeededRandom } from '../../core/SeededRandom';
 
 // Module-level scratch vectors to avoid per-call allocations
 const _spawnPos = new THREE.Vector3();
@@ -79,7 +80,7 @@ export class SpawnPositionCalculator {
       }
 
       if (ownedBases.length > 0) {
-        const baseZone = ownedBases[Math.floor(Math.random() * ownedBases.length)];
+        const baseZone = ownedBases[Math.floor(SeededRandom.random() * ownedBases.length)];
         const anchor = baseZone.position;
         this.findSafeSpawnPositionNearAnchor(anchor, 20, 50, terrainSystem, _spawnPos);
         Logger.info('combat', ` Using base ${baseZone.id} for squad respawn at (${_spawnPos.x.toFixed(1)}, ${_spawnPos.z.toFixed(1)})`);
@@ -158,8 +159,8 @@ export class SpawnPositionCalculator {
   ): THREE.Vector3 {
     const result = target || _spawnPos;
     const resolvedMaxRadius = Math.max(minRadius, maxRadius);
-    const fallbackRadius = minRadius + Math.random() * (resolvedMaxRadius - minRadius);
-    const fallbackAngle = Math.random() * Math.PI * 2;
+    const fallbackRadius = minRadius + SeededRandom.random() * (resolvedMaxRadius - minRadius);
+    const fallbackAngle = SeededRandom.random() * Math.PI * 2;
     let fallbackY = 0;
 
     if (!terrainSystem || !this.canUseTerrainAt(terrainSystem, anchor.x, anchor.z)) {
@@ -197,8 +198,8 @@ export class SpawnPositionCalculator {
         radius = 0;
         angle = 0;
       } else {
-        radius = minRadius + Math.random() * (resolvedMaxRadius - minRadius);
-        angle = Math.random() * Math.PI * 2;
+        radius = minRadius + SeededRandom.random() * (resolvedMaxRadius - minRadius);
+        angle = SeededRandom.random() * Math.PI * 2;
       }
 
       const candidateX = anchor.x + Math.cos(angle) * radius;
@@ -311,7 +312,7 @@ export class SpawnPositionCalculator {
    * Get a random squad size within range
    */
   static randomSquadSize(min: number, max: number): number {
-    return Math.floor(min + Math.random() * (max - min + 1));
+    return Math.floor(min + SeededRandom.random() * (max - min + 1));
   }
 
   /**
@@ -325,8 +326,8 @@ export class SpawnPositionCalculator {
    * Get a random offset for spawning
    */
   static randomSpawnOffset(minRadius: number, maxRadius: number, target?: THREE.Vector3): THREE.Vector3 {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = minRadius + Math.random() * (maxRadius - minRadius);
+    const angle = SeededRandom.random() * Math.PI * 2;
+    const radius = minRadius + SeededRandom.random() * (maxRadius - minRadius);
     const result = target || _offsetVec;
     return result.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
   }
