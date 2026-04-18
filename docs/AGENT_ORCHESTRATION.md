@@ -70,50 +70,78 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: (no active cycle)
-
-When a cycle is dispatched, replace this stub with the shape below. Until
-then, there is no live cycle; `/orchestrate` has nothing to run.
-
-```
-## Current cycle: <human-readable title>
+## Current cycle: harness + flight cleanup + combat expansion
 
 ### Cycle ID
 
-cycle-YYYY-MM-DD-<slug>
+`cycle-2026-04-19-harness-flight-combat`
 
 ### Why this cycle exists
 
-<one paragraph of motivation — what it unblocks, why now>
+Three independent strands converged on the same cycle:
+
+1. **Harness debt.** The 2026-04-18 cycle closed with the perf-active-driver reverted — A4's AgentController primitive shipped, but the rewrite of the driver introduced a direction-inversion bug and was reverted. Captures work today, but the imperative 1755-LOC driver is the bottleneck on every future perf-sensitive task. `perf-harness-architecture` replaces it with declarative scenario/policy/validator architecture on top of the preserved primitive.
+2. **Flight debt.** B1 shipped the unified `Airframe` module but kept `FixedWingPhysics.ts` as a 422-LOC compat shim. `b1-flight-cutover` deletes it and fans the 5 remaining callers through to direct `Airframe` usage. `npc-fixed-wing-pilot-ai` is the first live NPC consumer of the post-cutover API — concrete validation that the primitive is good.
+3. **Combat growth.** C1 shipped a VC-only utility canary; `utility-ai-doctrine-expansion` flips all four factions to utility-AI with response curves and new action families, closes the `RETREATING` orphan state, and makes faction differentiation observable. `heap-regression-investigation` and `perf-baseline-refresh` keep the perf signal trustworthy across the expansion.
 
 ### Tasks in this cycle
 
-<slug-named briefs under `docs/tasks/`, each with a one-line summary>
+All briefs under `docs/tasks/` with matching slug names.
+
+- **`perf-harness-architecture`** — replace the imperative perf-active-driver with declarative `src/dev/harness/` (runner, policies, scenarios, validators). Consumes the A4 AgentController + C2 SeededRandom / ReplayRecorder primitives already on master.
+- **`b1-flight-cutover`** — delete `FixedWingPhysics.ts` shim; wire 5 callers (FixedWingModel, NPCFlightController, flightTestScene, integration tests) directly to `Airframe`. `FixedWingControlLaw.ts` and `FixedWingConfigs.ts` are NOT shims and stay.
+- **`utility-ai-doctrine-expansion`** — expand `FactionCombatTuning` with response curves, action-weight multipliers, and morale decay. Flip all 4 factions to utility-AI. Add 2 new scored actions (`repositionAction` + one of `suppress` / `hold`). Close `RETREATING` orphan state with a minimal `AIStateRetreat`.
+- **`heap-regression-investigation`** — bisect the +296% combat120 heap growth from the 2026-04-18 cycle. Likely suspects: `ReplayRecorder` buffering without session gate; per-tick utility-context allocation. Fix + rearch memo.
+- **`npc-fixed-wing-pilot-ai`** — author `NPCFixedWingPilot` (state machine + PD control loops) that emits `FixedWingPilotIntent` against the post-cutover `Airframe`. One NPC aircraft spawns in at least one game mode with a mission (takeoff → waypoint → RTB → landing).
+- **`perf-baseline-refresh`** — recapture `combat120`, `openfrontier:short`, `ashau:short`, `frontier30m` on the new harness after the heap fix. Rewrite `perf-baselines.json` with realistic thresholds; stale p99=100ms → measured ~30ms.
 
 ### Round schedule
 
-<rounds with parallelism counts; which tasks go in each>
+- **Round 1 (3 parallel):** `perf-harness-architecture`, `b1-flight-cutover`, `utility-ai-doctrine-expansion`. All three are independent of each other. Harness is the largest; cutover is mechanical-but-risky; doctrine expansion is scoped.
+- **Round 2 (2 parallel):** `heap-regression-investigation`, `npc-fixed-wing-pilot-ai`. Heap investigation wants the new harness for clean repro. NPC pilot wants the post-cutover `Airframe` surface.
+- **Round 3 (1):** `perf-baseline-refresh`. Rebaseline on the new harness with the heap fix in place. This is the cycle closer.
 
 ### Concurrency cap
 
-<default 5, override if needed>
+3 parallel executors (override of the default 5). Rationale: harness rebuild and flight cutover are both large-ish; keeping the round narrow reduces merge-queue thrash and makes CI red easier to triage.
 
 ### Dependencies
 
-<addBlockedBy map by slug>
+`addBlockedBy` by slug:
+
+- `perf-harness-architecture` — no blockers.
+- `b1-flight-cutover` — no blockers.
+- `utility-ai-doctrine-expansion` — no blockers.
+- `heap-regression-investigation` — blocked by `perf-harness-architecture` (clean repro surface).
+- `npc-fixed-wing-pilot-ai` — blocked by `b1-flight-cutover` (consumes direct Airframe API).
+- `perf-baseline-refresh` — blocked by `perf-harness-architecture` AND `heap-regression-investigation`.
 
 ### Playtest policy
 
-<per-task yes/no, with rationale where non-obvious>
+- `perf-harness-architecture` — yes (harness IS a playtest surface; sign-flip detection test demonstrates it).
+- `b1-flight-cutover` — yes (flight feel must be identical pre/post).
+- `utility-ai-doctrine-expansion` — yes (faction differentiation observable or the task is a dud).
+- `heap-regression-investigation` — no (infra / debugging).
+- `npc-fixed-wing-pilot-ai` — yes (observable: NPC aircraft takes off, flies, lands).
+- `perf-baseline-refresh` — no (measurement).
+
+Playtest-required PRs still merge on CI green per cycle-lifecycle policy. Flag them under "Playtest recommended" in end-of-run summary; human runs the checklist after the cycle lands.
 
 ### Perf policy
 
-<per-round diff rules; extra scenarios to capture>
+- After Round 1: full perf diff (`combat120`). The harness-rebuild changes the capture pipeline, so absolute numbers may shift; p99 > 5% worse than pre-rebuild → stop and surface.
+- After Round 2: `combat120` diff again. Expect heap growth to drop (`heap-regression-investigation`) — if it doesn't, the fix didn't land.
+- End-of-cycle: `perf-baseline-refresh` IS the perf action. It writes the new baselines as its PR content.
+- Do not run `perf:update-baseline` in Round 1 or Round 2. Only Round 3 updates baselines.
 
 ### Failure handling
 
-<stop conditions for this cycle>
-```
+- Any fence-change proposal → stop that task, surface to human.
+- Any CI red the executor can't resolve in-scope → stop that task, do not auto-retry, move to next round.
+- If Round 1 returns ≥ 2 tasks blocked or failed → stop the cycle. The round's premise is wrong.
+- If `heap-regression-investigation` dead-ends (no commit clearly flagged) → mark blocked, proceed to Round 3 with the stale-but-unchanged baseline flag recorded in the end-of-run summary.
+- If `npc-fixed-wing-pilot-ai` playtest shows the NPC aircraft augers in consistently → mark blocked, do not merge on CI green alone. This is a case where merged-but-broken is worse than unmerged.
+- Playtest-recommended tasks: merge on CI green; human playtest is post-merge checklist, not a merge gate.
 
 ## Dispatch protocol
 

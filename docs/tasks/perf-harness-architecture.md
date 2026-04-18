@@ -1,8 +1,9 @@
-# Task D1: Perf-harness architecture — scenarios, policies, validators
+# perf-harness-architecture: scenarios, policies, validators
 
-**Phase:** D (next cycle — follows A/B/C rebuild foundation)
-**Depends on:** A4 merged (AgentController primitive), C2 merged (SeededRandom + ReplayRecorder)
-**Blocks:** reliable perf captures; repeatable agent-driven playtests; eventual NPC pilot integration
+**Slug:** `perf-harness-architecture`
+**Cycle:** `cycle-2026-04-19-harness-flight-combat`
+**Depends on:** nothing in this cycle (AgentController primitive + SeededRandom/ReplayRecorder already on master)
+**Blocks (in this cycle):** `heap-regression-investigation` (wants clean repro via the new harness), `perf-baseline-refresh` (must use the new harness), `npc-fixed-wing-pilot-ai` (future harness scenarios will drive NPC pilots)
 **Playtest required:** yes (the harness *is* a playtest surface)
 **Estimated risk:** medium — new module; replaces an imperative 1755-LOC driver with a declarative scenario system
 **Files touched:** new `src/dev/harness/` module (runner, policies, scenarios, validators), rewritten `scripts/perf-active-driver.js` as thin scenario launcher, gate on `window.__agent` exposure in `src/core/bootstrap.ts`, tests.
@@ -19,13 +20,22 @@ A revert of `scripts/perf-active-driver.js` restored working captures. This task
 
 ## Required reading first
 
-- `docs/tasks/archive/A4-agent-player-api.md` — AgentController primitive design (shipped as `src/systems/agent/`).
-- C2's `src/core/SeededRandom.ts`, `ReplayRecorder.ts`, `ReplayPlayer.ts` — deterministic input replay, used here for reproducible captures.
+- `docs/tasks/archive/cycle-2026-04-18-rebuild-foundation/agent-player-api.md` — AgentController primitive design (shipped as `src/systems/agent/`).
+- `src/core/SeededRandom.ts`, `ReplayRecorder.ts`, `ReplayPlayer.ts` — deterministic input replay, used here for reproducible captures.
 - `docs/TESTING.md` — behavior contracts.
 - `docs/INTERFACE_FENCE.md`.
-- **`examples/prose/` (if present)** — clone `prose.md` repo and peer prose-format orchestration repos into `examples/` (gitignored) **before** starting. Reference their scenario/policy/pipeline conventions when shaping this architecture. Goal: learn from how they structure declarative runtime configs + pluggable policies without reinventing.
+- **`examples/prose-main/` (after clone)** — `git clone https://github.com/openprose/prose examples/prose-main` (add `examples/` to `.gitignore` if not already). prose.md V2 uses declarative `.md` programs with YAML frontmatter and requires/ensures contracts; read `skills/open-prose/prose.md` for the VM spec. Reference pattern: declarative step contracts that the runtime auto-wires.
 - `scripts/perf-capture.ts` — how captures wrap the driver today; know this before redesigning.
 - `scripts/perf-active-driver.js` — current (reverted) driver. Understand what it actually does before replacing it.
+
+### External patterns worth borrowing (read enough to recognize the shape)
+
+- **Playwright `{ option: true }` fixture tuple** — type-safe DI for scenario fixtures: https://playwright.dev/docs/test-fixtures
+- **XState v5 `setup({ types, actors, actions, guards })`** — typed registries for pluggable policies. Direct analogue for a policy-id → constructor registry: https://stately.ai/docs/setup
+- **Zod schema as single source of truth** — parse `ScenarioConfig` at load; `z.infer` → TS types. Use `.refine()` for cross-field validation (spawn count vs map capacity): https://zod.dev
+- **Vitest `test.each` with `$property` interpolation** — scenarios as rows; clean for matrix runs: https://vitest.dev/api/test
+
+Avoid: deep class hierarchies per scenario type; runtime-only config validation; imperative setup/act/assert hidden inside scenario files.
 
 ## Architecture (the target state)
 
@@ -136,9 +146,9 @@ export const combat120: ScenarioConfig = {
 
 ## Prose.md / examples research reference
 
-Unrelated to D1's immediate scope but worth capturing once the executor is already reading prose projects: write findings to `docs/rearch/D1-prose-research.md` covering:
-- How they structure declarative scenarios.
+Secondary — worth capturing once the executor is already reading prose projects: write findings to `docs/rearch/prose-research.md` covering:
+- How they structure declarative scenarios (frontmatter + contracts).
 - Their policy/plugin registration patterns.
 - Whether their orchestration patterns apply to future multi-agent cycles in this repo.
 
-Non-binding reference note — the executor can skip if the prose repos don't load cleanly or the patterns don't generalize.
+Non-binding reference note — the executor can skip if the prose repo doesn't clone cleanly or the patterns don't generalize.
