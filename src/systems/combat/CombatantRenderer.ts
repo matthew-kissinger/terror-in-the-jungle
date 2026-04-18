@@ -199,8 +199,13 @@ export class CombatantRenderer {
         }
       }
 
-      // Position with Y bob for walking NPCs
-      this.scratchPosition.copy(combatant.position);
+      // Position with Y bob for walking NPCs.
+      // Prefer interpolated rendered position when available so dt-amortized
+      // logical jumps (low-LOD crowds) do not visually teleport. Falls back
+      // to logical position for any combatant not yet touched by the
+      // CombatantRenderInterpolator (e.g. freshly spawned this frame).
+      const sourcePosition = combatant.renderedPosition ?? combatant.position;
+      this.scratchPosition.copy(sourcePosition);
       let finalPosition = this.scratchPosition;
       let finalScaleX = scaleX;
       let finalScaleY = combatant.scale.y;
@@ -408,11 +413,13 @@ export class CombatantRenderer {
         this.scratchOutlineMatrix.multiply(this.scratchScaleMatrix);
         outlineMesh.setMatrixAt(index, this.scratchOutlineMatrix);
       }
-      // No ground marker for mounted NPCs (they're airborne in vehicles)
+      // No ground marker for mounted NPCs (they're airborne in vehicles).
+      // Use the same interpolated source as the billboard so marker and sprite
+      // stay co-located when dt amortization smooths the visible position.
       const markerMesh = this.factionGroundMarkers.get(key);
       if (markerMesh && stateKey !== 'mounted') {
         this.scratchMarkerMatrix.makeRotationX(-Math.PI / 2);
-        this.scratchMarkerMatrix.setPosition(combatant.position.x, 0.1, combatant.position.z);
+        this.scratchMarkerMatrix.setPosition(sourcePosition.x, 0.1, sourcePosition.z);
         markerMesh.setMatrixAt(index, this.scratchMarkerMatrix);
       }
 

@@ -591,6 +591,47 @@ describe('CombatantLODManager', () => {
     });
   });
 
+  describe('Render-side position interpolation', () => {
+    it('caps visible per-frame movement across 120 combatants when logical positions jump', () => {
+      // Scripted scenario: spawn 120 combatants across LOD bands, prime one
+      // frame so renderedPosition initializes, then force large logical jumps
+      // (simulating dt-amortized sim updates). On every subsequent frame the
+      // rendered movement per combatant must not exceed the visible cap.
+      manager.setGameModeManager(createMockGameModeManager(2000));
+      manager.setZoneManager(createMockZoneManager());
+
+      for (let i = 0; i < 120; i++) {
+        const angle = (i / 120) * Math.PI * 2;
+        const radius = 300 + (i % 7) * 80; // spread across low/culled bands
+        combatants.set(`c${i}`, createMockCombatant(
+          `c${i}`,
+          new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius)
+        ));
+      }
+
+      const dt = 1 / 60;
+      manager.updateCombatants(dt); // priming frame
+
+      const maxStepPerFrame = manager.getRenderInterpolator().getMaxSpeedMps() * dt + 1e-6;
+      const previous = new Map<string, THREE.Vector3>();
+      combatants.forEach(c => {
+        expect(c.renderedPosition).toBeDefined();
+        previous.set(c.id, c.renderedPosition!.clone());
+      });
+
+      combatants.forEach(c => { c.position.x += 50; c.position.z -= 30; });
+
+      for (let frame = 0; frame < 30; frame++) {
+        manager.updateCombatants(dt);
+        combatants.forEach(c => {
+          const step = c.renderedPosition!.distanceTo(previous.get(c.id)!);
+          expect(step).toBeLessThanOrEqual(maxStepPerFrame);
+          previous.set(c.id, c.renderedPosition!.clone());
+        });
+      }
+    });
+  });
+
   describe('Integration - distance bucketing with different world sizes', () => {
     it('should use larger thresholds for large worlds', () => {
       const smallWorldManager = createMockGameModeManager(400);
