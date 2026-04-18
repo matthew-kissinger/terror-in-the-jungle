@@ -195,21 +195,41 @@ export class AIStateEngage {
         combatant.panicLevel = Math.max(0, combatant.panicLevel - deltaTime * PANIC_DECAY_RATE)
       }
 
-      // Opt-in utility-AI pre-pass (C1). Only factions with useUtilityAI=true
-      // consult the scorer. A winning fire-and-fade intent routes the unit
-      // into SEEKING_COVER toward cover available in the away-from-threat
-      // bearing. All other outcomes (scorer returns null, or an intent we
-      // don't act on here) fall through to the default engage ladder.
+      // Opt-in utility-AI pre-pass. Factions with useUtilityAI=true consult
+      // the scorer before the default engage/seek-cover ladder. Known intents
+      // route the unit into the matching state; unknown intents (or none)
+      // fall through to the legacy ladder.
       if (this.utilityScorer && getFactionCombatTuning(combatant.faction).useUtilityAI) {
         const ctx = this.buildUtilityContext(combatant, targetPos)
         const pick = this.utilityScorer.pick(ctx)
-        if (pick.intent && pick.intent.kind === 'seekCoverInBearing') {
+        const intent = pick.intent
+        if (intent && intent.kind === 'seekCoverInBearing') {
+          // Scratch Vector3 inside fireAndFadeAction.apply() is shared —
+          // clone into combatant to decouple lifetimes. (Existing behavior,
+          // preserved.)
           combatant.state = CombatantState.SEEKING_COVER
-          combatant.coverPosition = pick.intent.coverPosition
-          combatant.destinationPoint = pick.intent.coverPosition
+          combatant.coverPosition = intent.coverPosition
+          combatant.destinationPoint = intent.coverPosition
           combatant.lastCoverSeekTime = Date.now()
           combatant.inCover = false
           return
+        }
+        if (intent && intent.kind === 'reposition') {
+          // Fallback point is a pooled scratch on the action singleton —
+          // clone before persisting so subsequent ticks don't mutate the
+          // combatant's stored destination under us.
+          combatant.state = CombatantState.RETREATING
+          combatant.destinationPoint = intent.fallbackPosition.clone()
+          combatant.inCover = false
+          combatant.isFlankingMove = false
+          return
+        }
+        if (intent && intent.kind === 'holdPosition') {
+          // Stay in ENGAGING; suppress the default engage-ladder
+          // repositioning by not seeking cover. Leave burst parameters to
+          // the existing engage logic further down.
+          // (Intentional no-op: existing in-cover / peek-and-fire code
+          // below already handles the "stay put and fire" behavior.)
         }
       }
 

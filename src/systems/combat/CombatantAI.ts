@@ -10,6 +10,7 @@ import { AIStatePatrol } from './ai/AIStatePatrol'
 import { AIStateEngage } from './ai/AIStateEngage'
 import { AIStateMovement } from './ai/AIStateMovement'
 import { AIStateDefend } from './ai/AIStateDefend'
+import { AIStateRetreat } from './ai/AIStateRetreat'
 import { AITargeting } from './ai/AITargeting'
 import { AICoverSystem } from './ai/AICoverSystem'
 import { AIFlankingSystem } from './ai/AIFlankingSystem'
@@ -25,6 +26,7 @@ export class CombatantAI {
   private engageHandler: AIStateEngage
   private movementHandler: AIStateMovement
   private defendHandler: AIStateDefend
+  private retreatHandler: AIStateRetreat
   private targeting: AITargeting
 
   // Tactical systems
@@ -41,7 +43,8 @@ export class CombatantAI {
     suppressing: 0,
     advancing: 0,
     seeking_cover: 0,
-    defending: 0
+    defending: 0,
+    retreating: 0
   }
 
   // Proxy combatant reused by the utility-AI cover-bearing probe. Mutated in
@@ -53,6 +56,7 @@ export class CombatantAI {
     this.engageHandler = new AIStateEngage()
     this.movementHandler = new AIStateMovement()
     this.defendHandler = new AIStateDefend()
+    this.retreatHandler = new AIStateRetreat()
     this.targeting = new AITargeting()
     this.coverSystem = new AICoverSystem()
     this.flankingSystem = new AIFlankingSystem()
@@ -227,6 +231,18 @@ export class CombatantAI {
           this.getClusterDensity.bind(this)
         )
         break
+
+      case CombatantState.RETREATING: {
+        // Threat anchor: prefer current target, fall back to the last-known
+        // target position so the bearing-flip guard still fires if the
+        // target was lost mid-retreat. If neither is known, fall back to
+        // the player position (worst case, produces a stable bearing).
+        const threatPos = combatant.target
+          ? (combatant.target.id === 'PLAYER' ? playerPosition : combatant.target.position)
+          : (combatant.lastKnownTargetPos ?? playerPosition)
+        this.retreatHandler.handleRetreating(combatant, deltaTime, threatPos)
+        break
+      }
     }
     const stateDuration = performance.now() - stateStart
     const key = this.getStateTimingKey(stateAtStart)
@@ -254,6 +270,7 @@ export class CombatantAI {
       case CombatantState.ADVANCING: return 'advancing'
       case CombatantState.SEEKING_COVER: return 'seeking_cover'
       case CombatantState.DEFENDING: return 'defending'
+      case CombatantState.RETREATING: return 'retreating'
       default: return 'patrolling'
     }
   }

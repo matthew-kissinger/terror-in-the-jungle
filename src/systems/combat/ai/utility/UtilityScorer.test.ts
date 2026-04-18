@@ -6,6 +6,8 @@ import {
   UtilityScorer,
   DEFAULT_UTILITY_ACTIONS,
   fireAndFadeAction,
+  repositionAction,
+  holdAction,
 } from './index'
 
 vi.mock('../../../../utils/Logger', () => ({
@@ -134,9 +136,16 @@ describe('UtilityScorer: integration with AIStateEngage', () => {
     runTick(engageOn, vcOn)
     runTick(engageOff, vcOff)
 
-    // Behavior assertion: utility-on VC has left ENGAGING for cover.
-    // Utility-off VC still in ENGAGING (panic drives full-auto, nothing more).
-    expect(vcOn.state).toBe(CombatantState.SEEKING_COVER)
+    // Behavior assertion: utility-on VC has left ENGAGING (either to cover
+    // or to a reposition / retreat state); utility-off VC is still in
+    // ENGAGING (panic drives full-auto, nothing more). The specific
+    // break-contact destination is tuning (fade to cover vs fall back) and
+    // may flip with doctrine changes — only the state-transition invariant
+    // is asserted.
+    expect([
+      CombatantState.SEEKING_COVER,
+      CombatantState.RETREATING,
+    ]).toContain(vcOn.state)
     expect(vcOff.state).toBe(CombatantState.ENGAGING)
   })
 
@@ -162,9 +171,11 @@ describe('UtilityScorer: integration with AIStateEngage', () => {
     expect(vc.state).toBe(CombatantState.ENGAGING)
   })
 
-  it('NVA is unaffected by the utility layer even when it is registered (useUtilityAI=false)', () => {
-    // NVA opts out of the utility layer in FactionCombatTuning. Registering
-    // the scorer must not change NVA behavior — the flag is the gate.
+  it('NVA does not fade at moderate pressure even with utility-AI on — commits harder than VC', () => {
+    // After the doctrine-expansion pass, NVA opts in to utility-AI like every
+    // faction, but its action-weight table damps fade/reposition and
+    // amplifies hold/suppress. At moderate squad-suppression with cover
+    // available, NVA stays in ENGAGING where VC would fade.
 
     engage.setUtilityScorer(new UtilityScorer(DEFAULT_UTILITY_ACTIONS))
     engage.setCoverBearingProbe(() => true)
@@ -173,11 +184,16 @@ describe('UtilityScorer: integration with AIStateEngage', () => {
     const target = createCombatant('target', Faction.US, new THREE.Vector3(-10, 0, 0))
     nva.target = target
     nva.lastHitTime = Date.now() - 500
-    nva.panicLevel = 0.5 // above VC threshold, below NVA threshold (0.7)
+    // Start at 0.3 — the handler bumps by PANIC_INCREMENT (0.3) on this
+    // tick, bringing NVA to ~0.6. That is above VC's 0.35 threshold but
+    // still below NVA's 0.7 threshold. Reposition's hard gate (panic <
+    // faction threshold) keeps NVA engaged.
+    nva.panicLevel = 0.3
 
     tick(nva)
 
-    // NVA does not break contact; its doctrine commits at this pressure level.
+    // NVA does not break contact at this pressure — fire-and-fade's weight
+    // is dampened below the threshold of winning.
     expect(nva.state).toBe(CombatantState.ENGAGING)
   })
 })
@@ -225,5 +241,194 @@ describe('UtilityScorer: unit scoring', () => {
     // The hard gate is the entire point of this action — without cover,
     // it must lose regardless of how much pressure is present.
     expect(pick.action).toBeNull()
+  })
+})
+
+describe('repositionAction', () => {
+  // Behavior: a reposition intent must transition the unit into RETREATING
+  // with a fallback point behind the threat bearing. Closes the orphan
+  // RETREATING state noted in docs/COMBAT.md.
+
+  it('scores zero without a cover probe (no open-ground retreats)', () => {
+    const self = createCombatant('c', Faction.VC, new THREE.Vector3(10, 0, 0))
+    self.panicLevel = 0.9
+    const score = repositionAction.score({
+      self,
+      threatPosition: new THREE.Vector3(-10, 0, 0),
+      squadSuppression: 0.9,
+    })
+    expect(score).toBe(0)
+  })
+
+  it('scores above zero when pressure is high and cover exists behind the threat bearing', () => {
+    const self = createCombatant('c', Faction.VC, new THREE.Vector3(10, 0, 0))
+    self.panicLevel = 0.9
+    const score = repositionAction.score({
+      self,
+      threatPosition: new THREE.Vector3(-10, 0, 0),
+      squadSuppression: 0.9,
+      hasCoverInBearing: () => true,
+    })
+    expect(score).toBeGreaterThan(0)
+  })
+
+  it('apply returns a fallback point on the away-from-threat side of the unit', () => {
+    const self = createCombatant('c', Faction.VC, new THREE.Vector3(10, 0, 0))
+    self.panicLevel = 0.9
+    const intent = repositionAction.apply({
+      self,
+      threatPosition: new THREE.Vector3(-10, 0, 0),
+      squadSuppression: 0.9,
+      hasCoverInBearing: () => true,
+    })
+    expect(intent?.kind).toBe('reposition')
+    if (intent?.kind !== 'reposition') throw new Error('wrong intent kind')
+    // Threat is at -10, self at +10: fallback x should be greater than self.x.
+    expect(intent.fallbackPosition.x).toBeGreaterThan(self.position.x)
+  })
+
+  it('does not allocate a fresh Vector3 on each apply() call', () => {
+    // Pooling invariant from the task brief: action apply() must not
+    // allocate a new THREE.Vector3 per tick. Same action reused across
+    // calls returns the same scratch (callers must clone to persist).
+    const self = createCombatant('c', Faction.VC, new THREE.Vector3(10, 0, 0))
+    const ctx = {
+      self,
+      threatPosition: new THREE.Vector3(-10, 0, 0),
+      squadSuppression: 0.9,
+      hasCoverInBearing: () => true,
+    }
+    const a = repositionAction.apply(ctx)
+    const b = repositionAction.apply(ctx)
+    if (a?.kind !== 'reposition' || b?.kind !== 'reposition') {
+      throw new Error('expected reposition intents')
+    }
+    // Same pooled scratch object — reference equality.
+    expect(a.fallbackPosition).toBe(b.fallbackPosition)
+  })
+})
+
+describe('holdAction', () => {
+  // Behavior: hold wins when the unit is in good cover near its objective
+  // and squad cohesion is solid. Collapses to zero under heavy suppression.
+
+  it('scores zero with no cover / cohesion / objective data', () => {
+    const self = createCombatant('c', Faction.NVA, new THREE.Vector3())
+    const score = holdAction.score({
+      self,
+      threatPosition: new THREE.Vector3(10, 0, 0),
+    })
+    expect(score).toBe(0)
+  })
+
+  it('scores above zero when cover and cohesion are strong', () => {
+    const self = createCombatant('c', Faction.NVA, new THREE.Vector3())
+    const score = holdAction.score({
+      self,
+      threatPosition: new THREE.Vector3(10, 0, 0),
+      coverQualityHere: 0.9,
+      squadCohesion: 0.9,
+      objectiveProximity: 0.8,
+    })
+    expect(score).toBeGreaterThan(0)
+  })
+
+  it('collapses to zero under near-max squad suppression (hold is untenable)', () => {
+    const self = createCombatant('c', Faction.NVA, new THREE.Vector3())
+    const score = holdAction.score({
+      self,
+      threatPosition: new THREE.Vector3(10, 0, 0),
+      coverQualityHere: 1,
+      squadCohesion: 1,
+      objectiveProximity: 1,
+      squadSuppression: 0.95,
+    })
+    expect(score).toBe(0)
+  })
+})
+
+describe('faction action-weight differentiation', () => {
+  // Two combatants, identical observation state, different factions. The
+  // scorer's faction-weight multipliers must route them to different winning
+  // actions. If all factions feel the same the whole task is pointless (hard
+  // stop in the brief).
+
+  const buildCtx = (combatant: Combatant) => ({
+    self: combatant,
+    threatPosition: new THREE.Vector3(-10, 0, 0),
+    squadSuppression: 0.8,
+    hasCoverInBearing: () => true,
+    coverQualityHere: 0.8,
+    squadCohesion: 0.9,
+    objectiveProximity: 0.7,
+  })
+
+  it('VC picks fade/reposition over hold under pressure with cover behind', () => {
+    const scorer = new UtilityScorer(DEFAULT_UTILITY_ACTIONS)
+    const vc = createCombatant('vc', Faction.VC, new THREE.Vector3(10, 0, 0))
+    vc.panicLevel = 0.8
+    const pick = scorer.pick(buildCtx(vc))
+    expect(pick.action).not.toBeNull()
+    expect(['fire_and_fade', 'reposition']).toContain(pick.action?.id)
+  })
+
+  it('NVA picks hold over fade given the same observation state', () => {
+    const scorer = new UtilityScorer(DEFAULT_UTILITY_ACTIONS)
+    const nva = createCombatant('nva', Faction.NVA, new THREE.Vector3(10, 0, 0))
+    nva.panicLevel = 0.8
+    const pick = scorer.pick(buildCtx(nva))
+    expect(pick.action).not.toBeNull()
+    // NVA doctrine: dug in around objective, do not fade. hold weight is
+    // high and fade weight is dampened.
+    expect(pick.action?.id).toBe('hold')
+  })
+
+  it('VC and NVA diverge on identical observation state', () => {
+    const scorer = new UtilityScorer(DEFAULT_UTILITY_ACTIONS)
+    const vc = createCombatant('vc', Faction.VC, new THREE.Vector3(10, 0, 0))
+    const nva = createCombatant('nva', Faction.NVA, new THREE.Vector3(10, 0, 0))
+    vc.panicLevel = 0.8
+    nva.panicLevel = 0.8
+    const pickVC = scorer.pick(buildCtx(vc))
+    const pickNVA = scorer.pick(buildCtx(nva))
+    // Doctrine differentiation: the winners must not be the same action ID.
+    // If this ever fires, the faction weights are too timid.
+    expect(pickVC.action?.id).not.toBe(pickNVA.action?.id)
+  })
+})
+
+describe('AIStateEngage routing new utility intents', () => {
+  it('routes a winning reposition intent into RETREATING with a cloned destination', () => {
+    // Behavior: when the scorer picks reposition, the engage handler must
+    // set state=RETREATING, stash destinationPoint as a cloned Vector3
+    // (not the pooled scratch), and exit the handler.
+    const engage = new AIStateEngage()
+    engage.setUtilityScorer(new UtilityScorer([repositionAction]))
+    engage.setCoverBearingProbe(() => true)
+
+    const vc = createCombatant('vc', Faction.VC, new THREE.Vector3(10, 0, 0))
+    const target = createCombatant('target', Faction.US, new THREE.Vector3(-10, 0, 0))
+    vc.target = target
+    vc.panicLevel = 0.9
+    vc.lastHitTime = Date.now() - 500
+
+    engage.handleEngaging(
+      vc, 0.016, new THREE.Vector3(), new Map(), undefined,
+      () => true, () => false, () => null, () => 0, () => false
+    )
+
+    expect(vc.state).toBe(CombatantState.RETREATING)
+    expect(vc.destinationPoint).toBeDefined()
+
+    // Clone invariant: mutating the scratch on the next apply() must not
+    // affect the stored destinationPoint.
+    const saved = vc.destinationPoint!.clone()
+    repositionAction.apply({
+      self: vc,
+      threatPosition: new THREE.Vector3(100, 0, 100),
+      squadSuppression: 0.9,
+      hasCoverInBearing: () => true,
+    })
+    expect(vc.destinationPoint!.distanceTo(saved)).toBe(0)
   })
 })

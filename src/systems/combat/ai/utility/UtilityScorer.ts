@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { Combatant, Squad } from '../../types'
+import { FactionActionWeights, getFactionCombatTuning } from '../../../../config/FactionCombatTuning'
 
 /**
  * Minimal utility-AI scoring layer (C1 prototype).
@@ -48,6 +49,25 @@ export interface UtilityContext {
   readonly hasCoverInBearing?: (bearingRad: number, radius: number) => boolean
   /** True if a callable support asset (gunship, etc.) is available now. */
   readonly supportAvailable?: boolean
+  /**
+   * Ammo reserve ratio in [0,1] (rounds remaining / max). Feeds the
+   * faction-specific ammoAnxietyCurve in retreat-style scoring. When
+   * undefined the curve is not consulted (actions should treat it as
+   * "no data" and fall back to other considerations).
+   */
+  readonly ammoReserve?: number
+  /**
+   * Squad cohesion proxy in [0,1]. 1 = squad is intact around this unit,
+   * 0 = unit is isolated. Used by regroup/hold-style actions.
+   */
+  readonly squadCohesion?: number
+  /**
+   * Cover-quality proxy in [0,1] for the unit's current position. Used by
+   * hold-style actions. 0 = open ground, 1 = hardened.
+   */
+  readonly coverQualityHere?: number
+  /** Proximity proxy in [0,1] to the squad's objective. 1 = on it. */
+  readonly objectiveProximity?: number
 }
 
 /**
@@ -73,6 +93,23 @@ export type UtilityIntent =
       /** Emit a support request. Caller owns the outbound channel. */
       readonly kind: 'requestSupport'
     }
+  | {
+      /**
+       * Fall back to the supplied position (behind threat bearing). Caller
+       * transitions the unit to RETREATING and uses fallbackPosition as the
+       * destination. Closes the previously-orphan RETREATING state.
+       */
+      readonly kind: 'reposition'
+      readonly fallbackPosition: THREE.Vector3
+      readonly bearingRad: number
+    }
+  | {
+      /**
+       * Stay put at current cover, suppress if LOS. Caller enters/stays in
+       * the ENGAGING state with inCover=true semantics; no movement target.
+       */
+      readonly kind: 'holdPosition'
+    }
 
 /**
  * A doctrine action the scorer can pick. score() returns a non-negative
@@ -82,6 +119,14 @@ export type UtilityIntent =
  */
 export interface UtilityAction {
   readonly id: string
+  /**
+   * Optional faction-action-weight key. When set, the scorer multiplies the
+   * action's raw score by `factionTuning.actionWeights[weightKey]` before
+   * ranking. Legacy actions without a weightKey run at weight 1.0 for all
+   * factions — keeps the scaffolded scoreboard (fire_and_fade canary etc.)
+   * behaving the same across the upgrade.
+   */
+  readonly weightKey?: keyof FactionActionWeights
   score(ctx: UtilityContext): number
   apply(ctx: UtilityContext): UtilityIntent | null
 }
@@ -114,10 +159,18 @@ export class UtilityScorer {
    * machine's default behavior."
    */
   pick(ctx: UtilityContext): UtilityPick {
+    const weights = getFactionCombatTuning(ctx.self.faction).actionWeights
     let bestAction: UtilityAction | null = null
     let bestScore = 0
     for (const action of this.actions) {
-      const s = action.score(ctx)
+      const raw = action.score(ctx)
+      if (raw <= 0) continue
+      const mult = action.weightKey ? weights[action.weightKey] : 1
+      // Zero/negative weight fully disables the action for this faction —
+      // the doctrine table can "turn off" an action without a code branch.
+      if (mult <= 0) continue
+      const s = raw * mult
+      if (!Number.isFinite(s)) continue
       if (s > bestScore) {
         bestScore = s
         bestAction = action
