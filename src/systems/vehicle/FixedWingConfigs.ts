@@ -259,23 +259,36 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
     physics: {
       mass: 8200,
       wingArea: 37.2,
-      maxThrust: 50000,
-      stallSpeed: 38,
-      vrSpeed: 42,
-      v2Speed: 50,
+      // Arcade-feel tuning from B1 rebuild. Original certified-procedure
+      // numbers (50 kN thrust, 1.6/s throttle ramp, Vr=42) meant a 10+ s
+      // ground roll; the rebuild targets ~6 s to clear the runway and a
+      // climb-out that clears 20 m inside 8 s at full power.
+      maxThrust: 95000,
+      stallSpeed: 34,
+      vrSpeed: 38,
+      v2Speed: 46,
       maxSpeed: 120,
-      throttleResponse: 1.6,
-      controlResponse: 4.4,
-      cl0: 0.28,
-      clAlpha: 4.4,
-      clMax: 1.6,
-      alphaStallDeg: 15,
+      throttleResponse: 4.0,
+      controlResponse: 5.0,
+      // Arcade-lift wing: cl0 sized so a Skyraider at 50 m/s generates ~1g
+      // of lift with wings level (no alpha needed). The rebuild prioritizes
+      // "plane holds altitude when you let go of the stick" over historical
+      // accuracy. Level-flight cl at cruise = weight / (q * wingArea)
+      // ≈ 80 kN / (1531 * 37.2) ≈ 1.41. cl0 is set slightly above to give
+      // a small climb margin at trim alpha.
+      cl0: 1.55,
+      clAlpha: 5.5,
+      clMax: 2.6,
+      alphaStallDeg: 16,
       alphaMaxDeg: 26,
       trimAlphaDeg: 4.0,
       cd0: 0.032,
-      inducedDragK: 0.06,
+      // Induced drag K bumped so cruise speed naturally levels off near
+      // 55-65 m/s at mid-throttle. Prevents runaway acceleration that
+      // would otherwise push lift way past 1g at a locked altitude.
+      inducedDragK: 0.22,
       sideForceCoefficient: 1.2,
-      elevatorPower: 2.3,
+      elevatorPower: 1.5,
       aileronPower: 3.2,
       rudderPower: 1.0,
       pitchStability: 2.2,
@@ -287,7 +300,7 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       stabilityAssistPitch: 1.2,
       stabilityAssistRoll: 2.3,
       stabilityAssistYaw: 1.5,
-      maxPitchRate: 1.15,
+      maxPitchRate: 0.5,
       maxRollRate: 1.7,
       maxYawRate: 0.8,
       groundSteering: 0.6,
@@ -296,8 +309,8 @@ export const FIXED_WING_CONFIGS: Record<string, FixedWingConfig> = {
       brakeDeceleration: 14,
       gearClearance: 0.5,
       liftoffClearance: 0.2,
-      rotationPitchLimitDeg: 12,
-      groundEffectStrength: 0.2,
+      rotationPitchLimitDeg: 14,
+      groundEffectStrength: 0.35,
     },
     role: 'attack',
     pilotProfile: 'trainer',
