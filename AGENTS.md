@@ -57,7 +57,7 @@ npm run perf:update-baseline        # Overwrite baselines from latest
 4. npm run test:quick
 5. npm run lint
 6. git commit, push to task branch
-7. Open PR titled "<type>(<scope>): <summary> (<TASK-ID>)"
+7. Open PR titled "<type>(<scope>): <summary> (<slug>)"
 ```
 
 For perf-sensitive work, add `npm run validate:full` before push.

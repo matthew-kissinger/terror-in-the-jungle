@@ -1,6 +1,17 @@
 # Backlog
 
-Last updated: 2026-04-17
+Last updated: 2026-04-18
+
+## Cycle conventions (2026-04-18)
+
+Phase-letter task IDs (A/B/C/D/E/F) are retired. Every cycle starts from
+the "Current cycle" stub in
+[AGENT_ORCHESTRATION.md](AGENT_ORCHESTRATION.md), uses descriptive slugs
+for task IDs (`plane-test-harness`, not `A1`), and identifies itself with
+a dated slug: `cycle-YYYY-MM-DD-<slug>`. Closed-cycle briefs live under
+`docs/tasks/archive/<cycle-id>/`. See the "Cycle lifecycle" section of
+the runbook for the end-of-cycle ritual.
+
 
 ## P0 - Performance Blockers
 
@@ -45,6 +56,10 @@ Last updated: 2026-04-17
 - Theater-scale maps (tiled DEM)
 - ECS evaluation for combat entities (see `docs/rearch/E1-ecs-evaluation.md` on `spike/E1-ecs` - deferred)
 
+## Research references (external repos worth cloning into `examples/` for pattern study)
+
+- **prose.md + peer prose-format repos** — clone into `examples/prose-main/` (gitignored) for reference on how they structure declarative runtime configs, policy/plugin registration, and orchestration/execution patterns. Findings inform the queued `perf-harness-architecture` brief and future multi-agent cycles. Write notes to `docs/rearch/prose-research.md` if patterns generalize.
+
 ## Known Issues (flagged, deferred)
 
 1. **NPC hypersprint.** Mechanism identified in `CombatantLODManager` per-update dt amortization (lines ~425, ~454-456, ~652): logical positions tick at full dt but rendered positions don't interpolate, so low-LOD crowds visually teleport. Proper fix is render-side position interpolation (logical vs rendered position split). Shelved for Phase F; F1's attempted dt clamp was closed because it would have broken LOD amortization and the speed-ceiling bypasses it targeted were already fixed on master.
@@ -78,6 +93,70 @@ E-track spike memos were kept on `spike/E*` branches and never merged. Pull each
 - **Vehicle physics rebuild.** Airframe spike and cross-vehicle state bleed confirmed. Memo: `docs/rearch/E6-vehicle-physics-evaluation.md` on `spike/E6-vehicle-physics-rebuild`. Status: prototype-more.
 - **Rendering at scale.** E2 deferred overall but flagged the `maxInstances = 120` silent-drop listed under Known Issues. Memo: `docs/rearch/E2-rendering-evaluation.md` on `spike/E2-rendering-at-scale`.
 - **ECS evaluation.** Deferred - bitECS came in ~0.97x at N=3000; V8 already inlines Vector3 shapes well enough. Memo: `docs/rearch/E1-ecs-evaluation.md` (also on master) and `spike/E1-ecs`.
+
+## Recently Completed (cycle-2026-04-18-rebuild-foundation)
+
+Nine commits on master between `9a0a53e` and `127f0a2`, seven merged PRs
+plus an A2 root-cause followup and an A4 perf-driver revert. Briefs are
+archived under `docs/tasks/archive/cycle-2026-04-18-rebuild-foundation/`
+with letter prefixes dropped (slug convention).
+
+- **plane-test-harness** (`5571be1`) — isolated `?mode=flight-test` scene
+  plus L3 integration harness at
+  `src/systems/vehicle/__tests__/fixedWing.integration.test.ts`. Single
+  source of truth for fixed-wing flight validation going forward.
+- **render-position-interpolation** (`a6a78b1`) — new
+  `CombatantRenderInterpolator` splits logical vs rendered position for
+  LOD'd combatants. Fixes NPC hypersprint teleport under LOD dt
+  amortization without changing sim behavior.
+- **render-interpolation-followup** (`9a0a53e`) — root-cause fix in
+  `CombatantLODManager` culled-loop: `return` → `continue` so a
+  mid-bucket early-out no longer drops every combatant behind it.
+  Removed the defensive try/finally scaffolding that was masking the
+  symptom.
+- **rendering-at-scale** (`797b610`) — raised `CombatantMeshFactory`
+  instance cap and surfaced overflow instead of silently dropping past
+  120. Addresses the silent-drop listed under Known Issues.
+- **agent-player-api** (`86517d9` + revert `82159c8`) — typed
+  `AgentController` / `AgentAction` / `AgentObservation` primitive
+  landed under `src/systems/agent/`. Accompanying rewrite of
+  `scripts/perf-active-driver.js` introduced a direction-inversion
+  regression in combat120 perf captures and was reverted to the
+  pre-cycle 1755-LOC driver. The primitive itself stays and will be
+  consumed by the next cycle's harness rebuild.
+- **vehicle-physics-rebuild** (`3268908`) — unified `Airframe` module
+  with swept collision and explicit raw/assist control laws, backing the
+  A1 integration tests. `FixedWingPhysics` / `FixedWingControlLaw` /
+  `FixedWingConfigs` kept as thin compat shims to avoid an 18+ caller
+  cascade; full cutover queued as a follow-up. `FixedWingPlayerAdapter`
+  not rewritten in this cycle.
+- **utility-ai-combat-layer** (`af62b37`) — opt-in `UtilityScorer`
+  pre-pass in `AIStateEngage.handleEngaging`, gated on
+  `FACTION_COMBAT_TUNING[faction].useUtilityAI`. VC faction canary
+  enabled; NVA / US / ARVN still run the existing state machine
+  unchanged.
+- **deterministic-sim-seeded-replay** (`127f0a2`) — `SeededRandom`
+  (xoroshiro128++) plus `ReplayRecorder` / `ReplayPlayer`. A 30s replay
+  converges byte-identical on tick-space input; open non-determinism
+  sources catalogued in `docs/rearch/C2-determinism-open-sources.md`.
+  Falls back to `Math.random()` when no replay session is active, so
+  existing code paths are untouched.
+
+### Follow-ups carried forward
+
+- **Heap growth regression** on combat120 (~+296% vs baseline during the
+  cycle) — investigate whether a specific round introduced it.
+- **`perf-baselines.json` is stale.** p99=100ms in-file; reality is
+  closer to 30ms. Refresh after the next cycle's harness rebuild so
+  baselines reflect the new measurement methodology.
+- **B1 full cutover.** Delete `FixedWingPhysics` /
+  `FixedWingControlLaw` / `FixedWingConfigs`, rewrite
+  `FixedWingPlayerAdapter`, fan out through the 18+ callers.
+- **perf-harness-architecture** — brief already written at
+  `docs/tasks/perf-harness-architecture.md`, staged for the next cycle.
+  Replaces the keystroke-emulation active-driver with declarative
+  scenario / policy / validator architecture on top of the
+  `AgentController` primitive.
 
 ## Recently Completed (2026-04-17 drift-correction run)
 

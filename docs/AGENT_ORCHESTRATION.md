@@ -1,184 +1,232 @@
-# Agent Orchestration DAG
+# Agent Orchestration — Runbook
 
 Last updated: 2026-04-18
 
-This file is the master plan for the current orchestrator run. Read this first. Then read the task files under `docs/tasks/` as you dispatch them.
+This file is the master runbook for multi-agent cycles in this repo. It has
+three parts:
 
-## Current cycle: Plane debugging enablement
+1. **Operating model + dispatch / merge patterns.** Durable across cycles.
+2. **Cycle lifecycle.** Conventions for task IDs, cycle IDs, and the
+   end-of-cycle ritual. Durable across cycles.
+3. **Current cycle.** Reset every cycle. Past cycles live in
+   `docs/BACKLOG.md` "Recently Completed" and their briefs under
+   `docs/tasks/archive/<cycle-id>/`.
 
-**Why this cycle exists:** the fixed-wing plane has been broken for months. Every surgical fix attempt has failed because the engine has too much concurrent noise (3000 AI, streaming terrain, LOD, HUD, squad logic) to debug flight behavior in. The plane's unit tests pass while the feature is broken. The prior drift-correction run (2026-04-17) completed and left the repo in PASS-leaning WARN shape — combat is healthy, the plane is not.
+If you are the orchestrator, read this file top to bottom. If you are an
+executor, read only the task brief the orchestrator hands you plus the required
+reading inside it.
 
-This cycle does ONE thing: land the isolated test harness (F1) so that (a) a human can feel the controls without engine noise, and (b) future rebuild work has a real feedback loop. The rebuild itself is NOT in this cycle — it's the next cycle, planned from what F1 reveals.
+## Operating model
 
-Small cycle, one task, deliberately. No more whack-a-mole.
+- **The main Claude Code session plays the orchestrator role.** Subagents
+  cannot reliably spawn further subagents in this harness (they do not receive
+  an `Agent` tool regardless of what frontmatter claims). The 2026-04-17
+  drift-correction run worked because the main session WAS the orchestrator.
+  Do not try to spawn an "orchestrator" subagent — the run will deadlock at
+  dispatch.
+- **Executors are subagents.** Each is spawned with
+  `subagent_type="executor"`, `isolation="worktree"`, and the full task-brief
+  contents as the prompt.
+- **Reviewers are subagents.** `combat-reviewer` on PRs touching
+  `src/systems/combat/**`, `terrain-nav-reviewer` on PRs touching terrain or
+  nav paths.
+- **Perf analyst is a subagent.** Run after each round to diff perf vs
+  baseline.
+- **Concurrency cap:** default 5 parallel executors. The current cycle can
+  override.
 
-## Kickoff (read this first if you are the orchestrator)
+## Cycle lifecycle
 
-You are the orchestrator. You will spawn one implementation subagent, wait for it, run CI, merge on green, then stop and surface the result to the user.
+The project runs multi-task cycles through this runbook. The cycle-specific
+section (below) is reset at the start of every cycle; the rest of this file
+is durable across cycles.
 
-1. Confirm your effort level is `xhigh` (`/effort xhigh` if not).
-2. Confirm you are on `master` at the latest origin tip (`git fetch origin && git status`).
-3. Use `TaskCreate` to create one task for F1. Keep a live status.
-4. Read this whole file (Mission, DAG, Dispatch protocol, Merge protocol, Failure handling, Ground rules).
-5. Dispatch **Round 1** (F1 only — see round schedule).
-6. Poll CI with `Monitor` or `gh pr view --json statusCheckRollup`. Do not sleep-poll.
-7. Merge on CI green. F1 is dev-mode-only and risk-low, so no playtest gate.
-8. Run a post-merge perf capture (`npm run perf:capture:combat120`) to confirm no regression.
-9. Interrupt and surface to the user on: fence-change proposal, CI red, perf regression >5%.
-10. At end, print the end-of-run summary (see `## End-of-run checklist`) AND a clear recommendation to the human about whether to dispatch Round 2 (E6 prototype refresh) in a follow-up cycle.
+**Task IDs are descriptive slugs, not phase letters.** Use
+`plane-test-harness`, not `A1`. Phase letters were retired on 2026-04-18
+after two consecutive cycles claimed fresh A/B/C prefixes and queued a
+`D1` for the next one — linear, and the alphabet doesn't scale. A cycle
+can have as many tasks as its DAG requires without running out of letters.
 
-**Execution model:** all subagents run Opus 4.7 at effort `xhigh`. Executors use `subagent_type: "executor"` with the task file contents as their brief. Use `isolation: "worktree"` so each gets its own branch + directory.
+**Cycle IDs are dated slugs.** Format: `cycle-YYYY-MM-DD-<slug>`, e.g.
+`cycle-2026-04-18-rebuild-foundation`. The cycle ID is the archive
+subfolder name and the section header in `docs/BACKLOG.md` when the cycle
+closes.
 
-**Concurrency cap:** 1 executor this cycle. F1 is the only task. The 5-parallel cap from prior cycles does not apply.
+**Branches follow the slug.** `task/<slug>`, no letter prefix. Commit
+first-line format: `<type>(<scope>): <summary> (<slug>)`.
 
-## Round schedule
+**Dependencies** are declared via `addBlockedBy` on task slugs inside the
+current cycle's DAG (see the "Dependencies" subsection of "Current cycle").
 
-- **Round 1 (1 executor):** F1 — plane test mode + L3 integration test harness.
-- **Post-merge:** perf capture + summary.
-- **Round 2 (NOT in this cycle):** E6 prototype refresh using the new harness. Surface recommendation to human at end of Round 1; wait for human OK before Round 2 gets scoped as its own cycle.
+**End-of-cycle ritual** (run as the last orchestrator action, or as a
+standalone bookkeeping pass):
 
-## Mission
+1. Move each merged brief from `docs/tasks/<slug>.md` →
+   `docs/tasks/archive/<cycle-id>/<slug>.md`.
+2. Append a `## Recently Completed (<cycle-id>)` section to
+   `docs/BACKLOG.md` with PR list, one-line summaries, and follow-ups.
+3. Reset the "Current cycle" section below to the empty stub.
+4. Commit with message `docs: close <cycle-id>`.
 
-Land `docs/tasks/F1-plane-test-mode.md`:
+The stub template under "Current cycle" is what the next cycle fills in.
 
-- A URL-param-reachable dev scene (`?mode=flight-test`) with flat terrain, one plane, debug overlay, no engine noise.
-- An L3 Vitest integration test driving the real input → physics → render path with 5 scenarios.
-- Tests 1 (flat-ground takeoff) and 5 (cliff) are expected to FAIL against current code — this documents the regression and gives future rebuild work a target.
+## Current cycle: (no active cycle)
 
-Non-goals for this cycle:
-
-- Do not fix the plane. F1 is the harness, not the fix.
-- Do not rewrite `FixedWingPhysics.ts`, `FixedWingControlLaw.ts`, `FixedWingPlayerAdapter.ts`, or `FixedWingConfigs.ts`.
-- Do not change `SystemUpdater` order (even though audit found it wrong — that's E6).
-- Do not touch fenced interfaces in `src/types/SystemInterfaces.ts`.
-
-## DAG
+When a cycle is dispatched, replace this stub with the shape below. Until
+then, there is no live cycle; `/orchestrate` has nothing to run.
 
 ```
-                    master (post drift-correction, 2026-04-17)
-                                    │
-                                 Round 1
-                                F1 harness
-                                (1 executor)
-                                    │
-                              CI green → merge
-                                    │
-                            post-merge perf capture
-                                    │
-                            end-of-run summary +
-                         Round 2 recommendation to human
-                                    │
-                              (cycle stops)
-                                    │
-                     Round 2 (next cycle, if human OKs)
-                      E6 prototype refresh in harness
+## Current cycle: <human-readable title>
+
+### Cycle ID
+
+cycle-YYYY-MM-DD-<slug>
+
+### Why this cycle exists
+
+<one paragraph of motivation — what it unblocks, why now>
+
+### Tasks in this cycle
+
+<slug-named briefs under `docs/tasks/`, each with a one-line summary>
+
+### Round schedule
+
+<rounds with parallelism counts; which tasks go in each>
+
+### Concurrency cap
+
+<default 5, override if needed>
+
+### Dependencies
+
+<addBlockedBy map by slug>
+
+### Playtest policy
+
+<per-task yes/no, with rationale where non-obvious>
+
+### Perf policy
+
+<per-round diff rules; extra scenarios to capture>
+
+### Failure handling
+
+<stop conditions for this cycle>
 ```
-
-## Dependency rules
-
-- F1 depends on nothing. It's pure new surface.
-- F1 must NOT depend on or modify existing flight code beyond a minimal entry hook in `src/bootstrap.ts`.
 
 ## Dispatch protocol
 
-The orchestrator, for F1:
+For each round, in a single orchestrator turn:
 
-1. Read `docs/tasks/F1-plane-test-mode.md`. It contains scope, required reading, scene requirements, test requirements, exit criteria.
-2. Also give the executor pointers to the reference clones at `examples/flight-references/` — see `examples/flight-references/README.md` for which files matter. These are gitignored study material, not code to copy.
-3. Create a fresh worktree via `isolation: "worktree"`.
-4. Spawn the executor with the task file contents + reference-clones pointer as the brief.
-5. When the agent reports done + PR branch pushed, orchestrator:
-   - Runs CI check.
-   - If CI green, merges to master via fast-forward.
-   - If CI red, reports the failing job to the user and stops.
+1. Select the next batch per the round schedule (≤ concurrency cap).
+2. Send one message with N parallel `Agent` calls:
+   ```
+   Agent(
+     subagent_type="executor",
+     isolation="worktree",
+     description="<slug>",
+     prompt="<full task-brief contents + slug + ground rules>"
+   )
+   ```
+3. Mark each task `in_progress` with `TaskUpdate`.
+4. When an executor returns:
+   - Read the structured report.
+   - If `fence_change: yes` → stop; surface to human.
+   - If PR URL present but CI state unknown → poll
+     `gh pr view <url> --json statusCheckRollup,mergeable` or stream via
+     `Monitor` on `gh pr checks <url> --watch`.
+5. On CI green:
+   - Spawn `combat-reviewer` if the diff touches `src/systems/combat/**`.
+   - Spawn `terrain-nav-reviewer` if the diff touches terrain/nav.
+   - Merge via `gh pr merge <url> --rebase` (fast-forward preferred; fall
+     back to `--merge` only if branch protection blocks rebase).
+   - `TaskUpdate` to `completed` with the PR URL.
+   - Advance any dependent tasks that just unblocked.
+6. On CI red: `TaskUpdate` to `blocked`; do not retry.
 
 ## Merge protocol
 
-- **Preferred:** fast-forward push to master.
-- **Fallback:** rebase onto master, re-run CI, then fast-forward.
+- **Preferred:** rebase-merge via `gh pr merge --rebase`.
+- **Fallback:** `--merge` if branch protection requires it.
 - **Never:** force-push to master. Never squash without explicit instruction.
-- **Post-merge perf capture:** `npm run perf:capture:combat120`. F1 is dev-mode-only and shouldn't move combat perf — if it does by >5%, flag it, don't revert unilaterally.
+- **Branch cleanup:** `gh pr merge --rebase` auto-deletes the branch if
+  configured; otherwise leave the branch, it's cheap.
 
-## Playtest policy (this cycle)
+## Reviewer invocation rules
 
-F1 is itself a playtest harness, not a feature merge. No playtest gate. The orchestrator's end-of-run summary should include a one-line "human should now try" entry pointing at `?mode=flight-test` and the failing integration tests.
-
-## Failure handling
-
-If the F1 executor reports failure, the orchestrator:
-
-1. Reads the failure report (what was attempted, what broke).
-2. Does **not** automatically retry.
-3. Surfaces the full failure report to the human. F1 is the only task in the cycle; there's nothing to fall back to.
-
-If a **fence change** is proposed (any change to `src/types/SystemInterfaces.ts`), orchestrator stops immediately and surfaces to the human. F1 should not need fence changes — if the executor thinks it does, the scope is wrong.
+- Combat PRs: touch any file under `src/systems/combat/**` or any test under
+  `src/integration/**combat*` → `combat-reviewer`.
+- Terrain / nav PRs: touch any file under `src/systems/terrain/**` or
+  `src/systems/navigation/**` → `terrain-nav-reviewer`.
+- The reviewer reads the diff, reports findings to the orchestrator, and does
+  not block merge unless it flags a fence change or scope violation.
 
 ## Ground rules for dispatched agents
 
-Every task brief starts with these ground rules as context:
+Every task brief ends up in an executor prompt along with these:
 
-1. **Read `docs/TESTING.md` before writing or modifying tests.** F1's integration test must be a real L3 test, not an L2 mock or L4 full-engine scenario.
-2. **Read `docs/INTERFACE_FENCE.md` before touching `src/types/SystemInterfaces.ts`.** F1 should not require fence changes.
-3. **Read `examples/flight-references/README.md` for loop-ordering and terrain-sampling patterns before writing the harness.**
-4. **Small diffs over big ones.** F1 should be <500 lines of new code + test. If it's growing past that, stop and reassess.
-5. **Don't rewrite code that isn't in scope.** F1 touches new files + a tiny bootstrap hook. Do not touch `FixedWingPhysics.ts`, `FixedWingControlLaw.ts`, `FixedWingPlayerAdapter.ts`, `FixedWingConfigs.ts`, or `SystemUpdater.ts`.
-6. **Verify locally before pushing:** `npm run lint`, `npm run test:run`, `npm run build`.
-7. **Write behavior tests, not implementation tests.** See `docs/TESTING.md`.
-8. **Report concisely:** what you changed, why, what you ran for verification, and — importantly — which of the 5 integration test scenarios pass vs fail on current code. The failing ones are the point.
+1. Read `docs/TESTING.md` before writing tests. Behavior tests only.
+2. Read `docs/INTERFACE_FENCE.md` before touching
+   `src/types/SystemInterfaces.ts`. Any proposed fence change → stop and
+   surface.
+3. Small diffs. If you pass ~500 lines net and you are not deleting retired
+   code (B1 is the one task that can go larger), stop and reassess.
+4. Do not modify files outside the task's `Files touched` scope.
+5. Verify locally before pushing: `npm run lint`, `npm run test:run`,
+   `npm run build`.
+6. Branch: `task/<slug>`. Commit first line:
+   `<type>(<scope>): <summary> (<slug>)`.
+7. Never push to master directly.
+8. Report back in the structured format from `.claude/agents/executor.md`.
 
-## Progress tracking
+## End-of-run summary format
 
-Orchestrator maintains a live status table. Status values: `pending`, `in-progress`, `awaiting-ci`, `awaiting-merge`, `merged`, `blocked`.
-
-At end of run:
+Print this verbatim at cycle end, substituting the current cycle's values:
 
 ```
-Round 1: 1/1 merged (F1) | blocked | failed
+Cycle: <cycle-id>
+Dates: <start> → <end>
 
-Integration test baseline on current code:
-- Test 1 (flat takeoff): PASS/FAIL
-- Test 2 (level cruise): PASS/FAIL
-- Test 3 (dive): PASS/FAIL
-- Test 4 (pitch-up): PASS/FAIL
-- Test 5 (cliff): PASS/FAIL
+Round 1: X/N merged | blocked | failed
+Round 2: X/M merged
+...
 
-Perf delta (combat120):
-  p95: X ms (Δ +/- Y%)
-  p99: X ms (Δ +/- Y%)
+PR URLs:
+  <slug>: <url>
+  <slug>: <url>
+  ...
 
-Recommendation for next cycle:
-- Dispatch Round 2 (E6 prototype refresh using the F1 harness)? YES/NO + one-line reason.
+Cycle-specific acceptance results (if any — e.g. integration-test before/after):
+  <test name>: <before> → <after>
+
+Perf deltas:
+  combat120:
+    p95: <ms> (Δ ±<%>)
+    p99: <ms> (Δ ±<%>)
+  <other-scenario>:
+    p95: <ms> (Δ ±<%>)
+    p99: <ms> (Δ ±<%>)
+
+Playtest recommended: <slug>, <slug>, ...
+
+Blocked / failed tasks:
+  <slug>: <one-line cause>
+
+Next cycle recommendation:
+  <one-line>
 ```
-
-## End-of-run checklist
-
-Before finishing:
-
-- [ ] F1 merged with PR URL captured.
-- [ ] 5 integration test scenarios each recorded as PASS or FAIL against current master code.
-- [ ] `?mode=flight-test` verified reachable in a local build (executor should confirm, not orchestrator).
-- [ ] `npm run perf:capture:combat120` run, delta recorded.
-- [ ] `examples/flight-references/` still gitignored (sanity check — no accidental commit of reference clones).
-- [ ] Round 2 recommendation written to the user: should they start the E6 prototype refresh cycle next, or playtest F1 first and come back?
-- [ ] Summary printed in the shape above.
-
-## Agents you will spawn
-
-All defined under `.claude/agents/`:
-
-- **`executor`** (`.claude/agents/executor.md`) — the implementation agent. One spawn this cycle for F1.
-- **`perf-analyst`** (`.claude/agents/perf-analyst.md`) — post-merge perf capture analysis. Cheap; always run.
-- **(Not needed this cycle):** `combat-reviewer`, `terrain-nav-reviewer` — F1 doesn't touch combat or terrain/nav code paths.
-
-All agents are pinned to Opus 4.7 at effort `xhigh` via frontmatter.
 
 ## References
 
-- Task brief (this cycle): `docs/tasks/F1-plane-test-mode.md`
-- Downstream rebuild task (next cycle candidate): `docs/tasks/E6-vehicle-physics-rebuild.md`
-- Reference clones: `examples/flight-references/` (gitignored; see its `README.md`)
+- Executor role spec: `.claude/agents/executor.md`
+- Orchestrator playbook: `.claude/agents/orchestrator.md`
+- Interface fence rules: `docs/INTERFACE_FENCE.md`
 - Test contract: `docs/TESTING.md`
-- Fence rules: `docs/INTERFACE_FENCE.md`
-- Playtest checklist (for eventual full rebuild validation, not this cycle): `docs/PLAYTEST_CHECKLIST.md`
+- Playtest checklist: `docs/PLAYTEST_CHECKLIST.md`
 - Current backlog: `docs/BACKLOG.md`
-- Rearchitecture spike memos (prior cycle): on `spike/E*-*` branches, not in master
+- Past-cycle briefs: `docs/tasks/archive/<cycle-id>/`
+- E-track spike memos (still referenced by Phase F candidates in the
+  backlog): `origin/spike/E2-rendering-at-scale`,
+  `spike/E3-combat-ai-paradigm`, `spike/E4-agent-player-api`,
+  `spike/E5-deterministic-sim`, `spike/E6-vehicle-physics-rebuild`

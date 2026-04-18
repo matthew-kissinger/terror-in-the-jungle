@@ -1,8 +1,8 @@
-# Task F1: Isolated plane test mode + integration test harness
+# Task A1: Isolated plane test mode + integration test harness
 
-**Phase:** F (prereq for the E6 rebuild landing in prod)
+**Phase:** A (foundation)
 **Depends on:** nothing
-**Blocks:** E6 prototype validation, any future fixed-wing behavior work
+**Blocks:** B1 (vehicle physics rebuild validates inside this harness)
 **Playtest required:** yes (the deliverable IS a playtest harness)
 **Estimated risk:** low (new surface, doesn't touch existing flight code)
 **Files touched:** new `src/dev/flightTestMode.ts`, new `src/dev/flightTestScene.ts`, new `src/systems/vehicle/__tests__/fixedWing.integration.test.ts`, tiny change to `src/bootstrap.ts` or entry to register the dev hotkey/URL param
@@ -38,7 +38,7 @@ CI) to catch regressions before landing.
 
 ## Required reading first
 
-- `docs/tasks/E6-vehicle-physics-rebuild.md` — the rebuild this harness validates.
+- `docs/tasks/B1-vehicle-physics-rebuild.md` — the rebuild this harness validates.
 - `docs/TESTING.md` — four-layer contract. This task produces an L3 integration test,
   not an L2 or L4.
 - `docs/INTERFACE_FENCE.md` — the test scene must NOT modify fenced interfaces.
@@ -132,9 +132,9 @@ E6 or later.
   debug overlay shows during manual takeoff.
 - `npm run lint` and `npm run build` green.
 
-## Why this before E6
+## Why this before B1
 
-E6 says "Run an isolated scenario: spawn at altitude, apply stick, observe." It
-doesn't specify *where*. Without this harness, E6's prototype validates in a vacuum
-and we're back to whack-a-mole. Land this first. Then E6's prototype runs inside
-this harness. Then the rebuild lands with confidence.
+B1 (vehicle physics rebuild) says "run an isolated scenario: spawn at altitude,
+apply stick, observe." It doesn't specify *where*. Without this harness, the
+rebuild validates in a vacuum and we're back to whack-a-mole. Land A1 first. Then
+B1 runs inside this harness. Then the rebuild lands with confidence.

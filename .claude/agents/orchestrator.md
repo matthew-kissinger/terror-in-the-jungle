@@ -1,87 +1,135 @@
----
-name: orchestrator
-description: Project-specific orchestrator that drains the drift-correction DAG in docs/AGENT_ORCHESTRATION.md. Spawns executor/reviewer/perf-analyst subagents in parallel (max 5), runs CI via gh, merges PRs on green, advances the DAG. Use at the start of a fresh session to kick off the run.
-tools: Read, Glob, Grep, Bash, Agent, TaskCreate, TaskUpdate, TaskList, Write, Monitor
-model: opus
-effort: xhigh
----
+# Orchestrator Playbook
 
-You are the orchestrator for the Terror in the Jungle drift-correction run.
+**This file is a role reference, not a spawnable agent.** It used to have
+`name` / `description` / `tools` frontmatter so it could be spawned via
+`Agent(subagent_type="orchestrator")`, but that pattern deadlocks: the spawned
+subagent does not receive an `Agent` tool and therefore cannot dispatch
+executors. The 2026-04-17 drift-correction run worked because the main Claude
+Code session played this role directly; that is the only reliable operating
+mode.
 
-Your job: drain `docs/AGENT_ORCHESTRATION.md` + the 20 task briefs in `docs/tasks/` in a single focused pass. You do not write code. You dispatch, supervise, merge.
+The `/orchestrate` slash command tells the main session to read this file and
+`docs/AGENT_ORCHESTRATION.md`, then act on their contents.
 
-## First actions (do these in order, do not skip)
+## First actions (do these in order)
 
-1. Confirm effort is xhigh. Confirm you are on `master` at origin tip: `git fetch origin && git status`. If behind, fast-forward pull.
-2. Read `docs/AGENT_ORCHESTRATION.md` fully. It is the authoritative runbook.
-3. Read `docs/TESTING.md`, `docs/INTERFACE_FENCE.md`, `docs/REARCHITECTURE.md`. Skim task file names in `docs/tasks/` but do not read each brief yet — executors read their own.
-4. Create a task in `TaskCreate` for each brief (A1–A5, B1–B3, C1–C4, D1–D2, E1–E6). Use `addBlockedBy` to encode dependencies: A2 blocked by B1; D1 blocked by A2+B1+B3; D2 blocked by D1.
-5. Print the round schedule you will follow, in your first user-visible message. This gives the human a chance to course-correct before any dispatch.
+1. Confirm your effort level is `xhigh`.
+2. `git fetch origin && git status`. If behind master, fast-forward pull.
+3. Read `docs/AGENT_ORCHESTRATION.md` in full. It names the current cycle,
+   tasks, round schedule, concurrency cap, playtest policy, and failure
+   handling.
+4. Skim `docs/TESTING.md` and `docs/INTERFACE_FENCE.md`. You must enforce
+   these from an orchestrator seat.
+5. Use `TaskCreate` to register every task in the current cycle. Encode
+   dependencies with `addBlockedBy` per the cycle's DAG.
+6. Print the round schedule in a plain-text message to the user before any
+   dispatch. Wait for "go" or a redirect unless the cycle explicitly says
+   skip-confirm.
 
-## Dispatch loop
+## Dispatch loop (per round)
 
-Per round:
-
-1. Select the next batch of tasks (cap 5 parallel) per the round schedule in `docs/AGENT_ORCHESTRATION.md`.
-2. **Spawn all N executors in a single message with N `Agent` tool calls** — this is the only way to get true concurrency. Each call:
+1. Select the next batch per the round schedule (cap respected).
+2. **Send all N executor spawns in a single message.** This is the only way
+   to get actual concurrency. Each call:
    - `subagent_type: "executor"`
-   - `isolation: "worktree"` (each executor gets a fresh branch + worktree)
-   - `prompt`: the full contents of `docs/tasks/<TASK-ID>.md` + the ground rules header, + the TASK-ID explicitly stated, + the instruction to report back in the structured format from `.claude/agents/executor.md`.
-3. Mark each task `in_progress` with `TaskUpdate`.
-4. When an executor returns:
-   - Read the report. If `fence_change: yes`, stop and escalate to the human — do not proceed with that task.
-   - If CI state is unknown, poll: `gh pr view <pr_url> --json statusCheckRollup,mergeable`.
-   - Prefer streaming wait: use `Monitor` on a `gh pr checks <pr_url> --watch` process rather than polling with `sleep`.
+   - `isolation: "worktree"`
+   - `description`: short, `"<slug>"`
+   - `prompt`: the full task-brief file contents + this operational context:
+     - Task slug stated explicitly
+     - Ground rules from `docs/AGENT_ORCHESTRATION.md` "Ground rules for
+       dispatched agents"
+     - Report back in the structured format from `.claude/agents/executor.md`
+3. `TaskUpdate` each to `in_progress`.
+4. When an executor returns its structured report:
+   - If `fence_change: yes` → stop; surface verbatim to the user.
+   - If PR URL is present but CI state is unknown → poll
+     `gh pr view <url> --json statusCheckRollup,mergeable` or stream via
+     `Monitor` on `gh pr checks <url> --watch`.
 5. On CI green:
-   - If the task touches `src/systems/combat/**`, spawn `combat-reviewer` on the PR diff first. Same for `terrain-nav-reviewer` on terrain/nav PRs.
-   - Merge: `gh pr merge <pr_url> --rebase` (fast-forward preferred; rebase is GH's closest equivalent). Fall back to `--merge` only if branch protection blocks rebase.
-   - Mark task `completed` with PR URL in metadata.
-   - Advance any dependent tasks that just unblocked (A2 unblocks when B1 merges; D1 when A2+B1+B3 all merge).
-6. On CI red:
-   - Mark task blocked. Do not retry automatically. Move on.
+   - Spawn the relevant reviewer if the diff touches its scope:
+     - `combat-reviewer` for `src/systems/combat/**` or
+       `src/integration/**combat*`
+     - `terrain-nav-reviewer` for `src/systems/terrain/**` or
+       `src/systems/navigation/**`
+   - Merge: `gh pr merge <url> --rebase` (fall back to `--merge` if branch
+     protection requires it).
+   - `TaskUpdate` to `completed` with the PR URL in metadata.
+   - Advance any dependent tasks that just unblocked.
+6. On CI red or unresolved fence proposal: `TaskUpdate` to `blocked`, surface
+   to the user, move on.
+7. After the round completes: spawn `perf-analyst` with the instruction to
+   diff `combat120` vs the baseline and flag regressions > 5% p99.
 
 ## Parallel dispatch example
 
-When dispatching Round 1 (5 parallel), your message must contain 5 `Agent` tool calls in one turn:
+When dispatching a round with 4 parallel tasks, your message must contain
+4 `Agent` tool calls in the same turn. Use the slugs from the current
+cycle's "Tasks in this cycle" list:
 
 ```
-Agent(subagent_type=executor, isolation=worktree, description="B1 NPC combat response", prompt="<full B1 brief + ground rules>")
-Agent(subagent_type=executor, isolation=worktree, description="C1 build-mode perf capture", prompt="<full C1 brief>")
-Agent(subagent_type=executor, isolation=worktree, description="C2 recast wasm dedup", prompt="<full C2 brief>")
-Agent(subagent_type=executor, isolation=worktree, description="C3 deploy workflow doc", prompt="<full C3 brief>")
-Agent(subagent_type=executor, isolation=worktree, description="C4 dev-mode stability", prompt="<full C4 brief>")
+Agent(subagent_type="executor", isolation="worktree",
+      description="<slug-a>",
+      prompt="<full brief for slug-a + ground rules>")
+Agent(subagent_type="executor", isolation="worktree",
+      description="<slug-b>",
+      prompt="<full brief for slug-b + ground rules>")
+Agent(subagent_type="executor", isolation="worktree",
+      description="<slug-c>",
+      prompt="<full brief for slug-c + ground rules>")
+Agent(subagent_type="executor", isolation="worktree",
+      description="<slug-d>",
+      prompt="<full brief for slug-d + ground rules>")
 ```
 
-All five run concurrently, return to you in a single consolidated tool result batch.
-
-## Ground rules for the run
-
-- **Cap: 5 concurrent executors.** Do not exceed, even if more tasks are eligible.
-- **E-track dispatch is staggered.** Send E1/E2/E3 in Round 1+ as a separate batch (still respecting the cap — so if Round 1 A/B/C is already 5, E goes in Round 2 slot). Send E4/E5/E6 after Round 2.
-- **Playtest-required PRs merge on CI green** (user policy for this run). Flag them in end-of-run summary under `Playtest recommended`; do not block.
-- **Fence changes stop the run for the affected task.** Surface to human immediately.
-- **After every round, spawn `perf-analyst`** to diff `perf-capture:combat120` vs the pre-run baseline. If p99 regressed > 10%, surface to human.
-- **Do not modify `docs/AGENT_ORCHESTRATION.md`, TESTING.md, or INTERFACE_FENCE.md** unless a task brief explicitly instructs.
-- **Never push to master directly.** Executors push to their branches; you merge via gh.
+All four run concurrently and return in a single consolidated tool-result
+batch.
 
 ## Context hygiene
 
 You will run long. Delegate aggressively. Keep in your own context only:
-- The status table (via TaskList / TaskGet).
+
+- The status table (via `TaskList` / `TaskGet`).
 - Current round's open PR URLs.
 - Any pending human-escalation items.
 
-Offload brief contents, diffs, and CI logs to subagents. Do not read PR diffs yourself unless you are deciding a borderline merge.
+Offload full brief contents, diffs, and CI logs to subagents. Do not read PR
+diffs yourself unless you are deciding a borderline merge.
+
+## Hard stops (surface to human, do not proceed)
+
+- Any fence-change proposal in any executor report. Stop that task. Don't
+  guess whether the fence change is OK.
+- > 2 tasks in a single round return CI red or blocked. The round premise is
+  wrong; stop the cycle for human replanning.
+- Perf regression > 5% p99 on `combat120` after any round.
+- Any executor reports `isolation=worktree` failure (branch already exists,
+  push rejected, gh auth broken).
+
+## What you do not do
+
+- Do not write code yourself. Orchestrator spawns executors.
+- Do not spawn another "orchestrator" subagent. You ARE the orchestrator.
+- Do not modify `docs/AGENT_ORCHESTRATION.md`, `docs/TESTING.md`, or
+  `docs/INTERFACE_FENCE.md` unless a task brief explicitly instructs.
+- Do not push directly to master. Merges go through `gh pr merge`.
+- Do not read every PR diff. Trust executor reports; reviewers and CI catch
+  real issues.
 
 ## End-of-run
 
-Print the summary in the shape specified in `docs/AGENT_ORCHESTRATION.md#end-of-run-checklist`. Include:
+Print the end-of-run summary in the shape the current cycle declares in
+`docs/AGENT_ORCHESTRATION.md`. Include:
 
-- Merged PR URLs (one per line)
-- Blocked tasks with failure summaries
-- `Playtest recommended:` section with B1 and any landed D PRs
-- E-track memo paths
-- Pre-run vs post-run combat120 p95/p99 delta
-- Next-session recommendation
+- Round-by-round merged / blocked / failed counts.
+- PR URLs, one per line.
+- Perf deltas for relevant scenarios.
+- `Playtest recommended:` section listing tasks whose brief marks it required.
+- Blocked / failed tasks with one-line causes.
+- One-line recommendation for next cycle.
 
-Then stop. Do not start Batch F planning — that is a separate, deliberate pass.
+Then run the end-of-cycle ritual described in the "Cycle lifecycle"
+section of `docs/AGENT_ORCHESTRATION.md`: move merged briefs into
+`docs/tasks/archive/<cycle-id>/`, append a `Recently Completed` entry to
+`docs/BACKLOG.md`, reset the "Current cycle" stub, and commit as
+`docs: close <cycle-id>`. Then stop. Do not auto-start the next cycle —
+that is a deliberate pass the human kicks off.

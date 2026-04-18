@@ -17,8 +17,8 @@ You were spawned by the orchestrator with a single task brief. Deliver a small, 
 3. **Small diffs over big ones.** If your diff grows past ~400 lines, stop and reassess — you are probably drifting scope.
 4. **Do not rewrite code outside your task's listed `Files touched` scope.** Comments and formatting outside scope are off-limits unless required by the change.
 5. **Verify locally before pushing:** `npm run lint`, `npm run test:run`, `npm run build` all green.
-6. **One branch per task.** Branch name: `task/<TASK-ID>-<kebab-slug>` (e.g. `task/B1-npc-combat-response`).
-7. **Commit discipline.** One logical commit preferred. Multiple commits OK if they tell a clean story. Commit message first line: `<type>(<scope>): <summary> (<TASK-ID>)` — e.g. `fix(combat): pass player proxy as attacker (B1)`.
+6. **One branch per task.** Branch name: `task/<slug>` (e.g. `task/utility-ai-combat-layer`).
+7. **Commit discipline.** One logical commit preferred. Multiple commits OK if they tell a clean story. Commit message first line: `<type>(<scope>): <summary> (<slug>)` — e.g. `feat(combat): utility-AI scoring layer, VC faction canary (utility-ai-combat-layer)`.
 8. **Never push to master.** Push to your task branch and open a PR.
 
 ## Workflow
