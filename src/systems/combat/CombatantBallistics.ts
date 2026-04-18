@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Combatant, isPlayerTarget } from './types';
+import { SeededRandom } from '../../core/SeededRandom';
 
 /**
  * Handles ballistics calculations for AI combatants.
@@ -62,8 +63,8 @@ export class CombatantBallistics {
     this.scratchRight.crossVectors(this.scratchToTarget, this.scratchUp).normalize();
     this.scratchRealUp.crossVectors(this.scratchRight, this.scratchToTarget).normalize();
 
-    const jitterX = (Math.random() - 0.5) * jitterRad;
-    const jitterY = (Math.random() - 0.5) * jitterRad;
+    const jitterX = (SeededRandom.random() - 0.5) * jitterRad;
+    const jitterY = (SeededRandom.random() - 0.5) * jitterRad;
 
     this.scratchFinalDir.copy(this.scratchToTarget)
       .addScaledVector(this.scratchRight, Math.sin(jitterX))
@@ -97,8 +98,8 @@ export class CombatantBallistics {
     this.scratchToTarget.subVectors(target, combatant.position).normalize();
 
     const spreadRad = THREE.MathUtils.degToRad(spread);
-    const theta = Math.random() * Math.PI * 2;
-    const r = Math.random() * spreadRad;
+    const theta = SeededRandom.random() * Math.PI * 2;
+    const r = SeededRandom.random() * spreadRad;
 
     this.scratchUp.set(0, 1, 0);
     this.scratchRight.crossVectors(this.scratchToTarget, this.scratchUp).normalize();

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Combatant, CombatantState, Faction, ITargetable, isAlly } from '../types';
 import { ISpatialQuery } from '../SpatialOctree';
 import { clusterManager } from '../ClusterManager';
+import { SeededRandom } from '../../../core/SeededRandom';
 
 // Module-level scratch vectors
 const _playerTarget: ITargetable = {
@@ -194,7 +195,7 @@ export class AITargetAcquisition {
       engageProbability = 0.2;
     }
 
-    return Math.random() < engageProbability;
+    return SeededRandom.random() < engageProbability;
   }
 
   /**

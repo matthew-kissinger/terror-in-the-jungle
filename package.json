@@ -54,6 +54,7 @@
     "test:run": "vitest run",
     "test:integration": "vitest run src/integration/",
     "test:frontier": "vitest run src/systems/terrain/TerrainRenderRuntime.test.ts src/systems/terrain/TerrainSystem.test.ts src/systems/player/PlayerMovement.test.ts src/systems/helicopter/HelipadSystem.test.ts src/systems/helicopter/HelicopterModel.test.ts src/integration/scenarios/combat-flow.test.ts src/integration/scenarios/zone-capture.test.ts",
+    "test:determinism": "vitest run src/core/SeededRandom.test.ts src/core/ReplayRecorder.test.ts src/core/ReplayPlayer.test.ts",
     "test:quick": "vitest run --reporter=dot",
     "deadcode": "knip",
     "perf:quick": "npx tsx scripts/perf-capture.ts --headed --duration 30 --warmup 8 --npcs 60",
