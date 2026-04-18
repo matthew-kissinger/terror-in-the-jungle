@@ -1,39 +1,57 @@
 # Deploy Workflow
 
-Last updated: 2026-04-16
+Last updated: 2026-04-18
 
 Production: https://terror-in-the-jungle.pages.dev/
 
-This document captures how `master` becomes a live deploy, how caching is layered across Cloudflare Pages + the service worker + the browser, and how to verify prod headers when something looks stale.
+This document captures how a commit becomes a live deploy, how caching is layered across Cloudflare Pages + the service worker + the browser, and how to verify prod headers when something looks stale.
 
 ## 1. Build to deploy path
 
-All deploys go through GitHub Actions. There is no manual `wrangler deploy`.
+Deploy is **manual**. `master` no longer auto-deploys. CI gates still run on every push, but the actual Cloudflare Pages upload only happens when you trigger it.
 
 ```
 push to master
-  -> .github/workflows/ci.yml
+  -> .github/workflows/ci.yml         (gates only, no deploy)
        lint  ---\
        test  ----+-- (parallel)
-       build ---/    uploads dist artifact
+       build ---/
        smoke  ---\
        mobile-ui -+-- (needs: lint, test)
        perf   (advisory, never blocks)
 
-     deploy (needs: lint, test, build, smoke, mobile-ui, perf)
-       - downloads dist artifact from build job
+manual trigger (you decide when)
+  -> .github/workflows/deploy.yml     (workflow_dispatch)
+       - checkout ref (default: master)
+       - npm ci
+       - npm run build
        - cloudflare/wrangler-action@v3
        - command: pages deploy dist --project-name terror-in-the-jungle
 ```
 
+### How to trigger a deploy
+
+Any of:
+
+- `npm run deploy:prod` — shortcut for `gh workflow run deploy.yml`. Runs against master's tip.
+- `gh workflow run deploy.yml -r <branch-or-tag>` — deploy a specific ref.
+- GitHub web UI: Actions tab -> "Deploy" workflow -> "Run workflow" button.
+
+Typical flow: push to master, wait for CI green, then run `npm run deploy:prod` when you actually want the build live. This lets you batch multiple merges into one deploy.
+
 Key facts:
 
-- The deploy job runs `cloudflare/wrangler-action@v3`, **not** Cloudflare Pages' Git integration. Cloudflare sees only the pre-built `dist/` directory.
-- Because we upload a built artifact, the Pages project has no build step configured on Cloudflare's side. The build is fully reproducible from `package-lock.json` + `npm ci` inside the GitHub runner.
-- `perf` runs on every push, uploads artifacts, and is intentionally advisory — see `docs/DEVELOPMENT.md` for why (Xvfb/GPU noise on hosted runners).
-- The deploy job is gated by `if: github.ref == 'refs/heads/master' && github.event_name == 'push'`. PRs do not auto-deploy. Preview deploys are not currently configured; see "Open items" below.
+- The deploy workflow runs `cloudflare/wrangler-action@v3`, **not** Cloudflare Pages' Git integration. Cloudflare sees only the pre-built `dist/` directory.
+- The Pages project has no build step configured on Cloudflare's side. The build is fully reproducible from `package-lock.json` + `npm ci` inside the GitHub runner.
+- The deploy workflow does a fresh checkout + `npm ci` + `npm run build` every run. It does not rely on a CI artifact; that decoupling is why CI and deploy can live in separate workflows.
+- CI `perf` runs on every push, uploads artifacts, and is intentionally advisory — see `docs/DEVELOPMENT.md` for why (Xvfb/GPU noise on hosted runners).
+- PRs do not auto-deploy. Preview deploys are not currently configured; see "Open items" below.
 
 Secrets used: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (repo secrets).
+
+### Why manual
+
+Previously every master push deployed. That meant every docs-only or scoping-only merge redeployed prod. Moving deploy to manual keeps CI as the quality gate but lets you decide when users see a change. Tradeoff: you now have to remember to deploy after landing a feature. The intent is "batch shippable merges, then deploy once."
 
 ## 2. Cache-control strategy
 

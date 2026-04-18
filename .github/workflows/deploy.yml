@@ -1,0 +1,46 @@
+name: Deploy
+
+# Manual-only. Trigger via GitHub UI ("Run workflow" on the Actions tab)
+# or from a terminal: `gh workflow run deploy.yml` (or `npm run deploy:prod`).
+# Deploys whatever ref is selected (default: master tip).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name terror-in-the-jungle
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          packageManager: npm

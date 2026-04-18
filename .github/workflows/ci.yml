@@ -30,7 +30,6 @@ on:
 
 permissions:
   contents: read
-  deployments: write
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -96,13 +95,6 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - name: Upload build artifact for deploy
-        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-        uses: actions/upload-artifact@v5
-        with:
-          name: dist
-          path: './dist'
 
   smoke:
     runs-on: ubuntu-latest
@@ -206,24 +198,3 @@ jobs:
           name: perf-capture-artifacts
           path: artifacts/perf/**
           retention-days: 7
-
-  deploy:
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-    needs: [lint, test, build, smoke, mobile-ui, perf]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download build artifact
-        uses: actions/download-artifact@v5
-        with:
-          name: dist
-          path: dist
-
-      - name: Deploy to Cloudflare Pages
-        id: deploy
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name terror-in-the-jungle
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-          packageManager: npm

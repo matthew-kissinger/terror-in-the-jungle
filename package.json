@@ -24,6 +24,7 @@
     "preview": "vite preview",
     "preview:perf": "vite preview --outDir dist-perf",
     "smoke:prod": "npx tsx scripts/prod-smoke.ts",
+    "deploy:prod": "gh workflow run deploy.yml",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "perf:baseline": "npx tsx scripts/perf-baseline.ts",
