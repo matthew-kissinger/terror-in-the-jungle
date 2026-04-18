@@ -7,13 +7,12 @@
  * rather than internal phase names or tuning values. Per docs/TESTING.md:
  * behavior tests, not implementation mirrors.
  *
- * Tests 1 (takeoff) and 5 (cliff) are the brief's named regression targets.
- * Test 2 (level cruise) turned out to be a second observable regression on the
- * current flight code — the plane noses down in cruise and descends ~50m over
- * 5s — so it is also declared as a regression target here. All three are
- * declared with `it.fails()` so the suite stays green while still encoding the
- * expected post-rebuild behavior. When B1 (vehicle physics rebuild) lands,
- * those tests should start passing and `it.fails()` can be swapped to `it()`.
+ * Tests 1 (takeoff) and 5 (cliff) were the brief's named regression targets;
+ * test 2 (level cruise) was a second observable regression surfaced while
+ * writing these tests. All three were previously declared with `it.fails()`.
+ * As of the B1 vehicle physics rebuild the backing sim (now the unified
+ * Airframe primitive via FixedWingPhysics) passes all five scenarios, so
+ * they are declared as plain `it()` assertions here.
  *
  * See docs/tasks/A1-plane-test-mode.md.
  */
@@ -33,10 +32,10 @@ function flatTerrainAt(height: number): FixedWingTerrainSample {
 
 describe('FixedWing L3 integration — behavior contracts', () => {
   // ─────────────────────────────────────────────────────────────────────
-  // Test 1 — regression target: expected to FAIL against current physics
-  // until the vehicle physics rebuild (B1) lands.
+  // Test 1 — former regression target; now passes against the rebuilt
+  // Airframe sim.
   // ─────────────────────────────────────────────────────────────────────
-  it.fails('takes off from a flat runway in 8 seconds at full throttle + elevator', () => {
+  it('takes off from a flat runway in 8 seconds at full throttle + elevator', () => {
     const phys = new FixedWingPhysics(new THREE.Vector3(0, 1.5, 0), SKYRAIDER);
 
     for (let i = 0; i < Math.round(8 / FIXED_DT); i++) {
@@ -55,10 +54,11 @@ describe('FixedWing L3 integration — behavior contracts', () => {
     expect(snap.forwardAirspeed).toBeGreaterThan(SKYRAIDER.vrSpeed);
   });
 
-  // Second regression target surfaced while writing these tests: with neutral
-  // stick at 50 m/s, stability assist on, the plane noses down and descends
-  // roughly 50 m over 5 s. Expected pass once cruise trim is correct.
-  it.fails('holds altitude in level cruise with neutral stick', () => {
+  // Former regression: neutral stick at 50 m/s with stability assist used to
+  // descend roughly 50 m over 5 s because of an unbalanced pitch trim. The
+  // rebuilt sim's assist tier autolevels toward trim alpha and holds
+  // altitude.
+  it('holds altitude in level cruise with neutral stick', () => {
     const phys = new FixedWingPhysics(new THREE.Vector3(0, 200, 0), SKYRAIDER);
     // Place airborne at 200m with 50 m/s cruise (> v2, < max).
     const quat = new THREE.Quaternion(); // identity: forward = -Z
@@ -135,13 +135,13 @@ describe('FixedWing L3 integration — behavior contracts', () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────
-  // Test 5 — regression target: expected to FAIL. A low-speed aircraft
-  // cleared just past a cliff edge at ~50 m AGL with full throttle and
-  // neutral stick should lose less than 30 m of altitude in 4 s, matching
-  // the post-rebuild expectation that alpha-protection + ground-effect
-  // transition behave smoothly across terrain discontinuities.
+  // Test 5 — former regression: a low-speed aircraft cleared just past a
+  // cliff edge at ~50 m AGL with full throttle and neutral stick should
+  // lose less than 30 m of altitude in 4 s. After the rebuild the assist
+  // tier's autolevel-toward-trim elevator plus restored ground-effect lift
+  // keeps the aircraft within the budget.
   // ─────────────────────────────────────────────────────────────────────
-  it.fails('loses < 30 m of altitude over a cliff at marginal airspeed', () => {
+  it('loses < 30 m of altitude over a cliff at marginal airspeed', () => {
     // forward=+X: rotate identity 90deg CCW about Y so -Z becomes +X.
     const facingPlusX = new THREE.Quaternion().setFromAxisAngle(
       new THREE.Vector3(0, 1, 0),
