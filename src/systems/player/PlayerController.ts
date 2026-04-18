@@ -615,6 +615,32 @@ export class PlayerController implements GameSystem {
   }
 
   applyRecoil(pitchDeltaRad: number, yawDeltaRad: number): void { this.cameraController.applyRecoil(pitchDeltaRad, yawDeltaRad); }
+
+  /**
+   * Agent-facing public surface. Used by the typed action/observation adapter
+   * in `src/systems/agent/` to drive the player without keystroke emulation.
+   * These forward directly into the same internals human input uses.
+   */
+  getYaw(): number { return Number(this.camera.rotation.y) || 0; }
+  getPitch(): number { return Number(this.camera.rotation.x) || 0; }
+  /**
+   * Set the camera-relative movement intent (forward/strafe in [-1, 1], sprint
+   * boolean). `null`-ing the intent (all zeros) returns movement control to
+   * keyboard/touch. PlayerMovement consumes the intent inside its fixed-step
+   * loop, so the caller can re-issue every tick without fighting debounce.
+   */
+  applyMovementIntent(intent: { forward: number; strafe: number; sprint: boolean }): void {
+    const hasIntent = Math.abs(intent.forward) > 0.01 || Math.abs(intent.strafe) > 0.01;
+    this.movement.setAgentMovementIntent(hasIntent ? { forward: intent.forward, strafe: intent.strafe } : null);
+    this.movement.setRunning(!!intent.sprint);
+    this.playerState.isRunning = !!intent.sprint;
+  }
+  /** Start firing via the unified action path. Idempotent. */
+  fireStart(): void { this.actionFireStart(); }
+  /** Stop firing via the unified action path. Idempotent. */
+  fireStop(): void { this.actionFireStop(); }
+  /** Trigger a reload via the unified action path. */
+  reloadWeapon(): void { this.actionReload(); }
   applyScreenShake(intensity: number, duration: number = 0.2): void { if (this.cameraShakeSystem) this.cameraShakeSystem.shake(intensity, duration); }
   applyDamageShake(damageAmount: number): void { if (this.cameraShakeSystem) this.cameraShakeSystem.shakeFromDamage(damageAmount); }
   applyExplosionShake(explosionPos: THREE.Vector3, maxRadius: number): void { if (this.cameraShakeSystem) this.cameraShakeSystem.shakeFromExplosion(explosionPos, this.playerState.position, maxRadius); }
