@@ -12,5 +12,7 @@ export {
   fireAndFadeAction,
   coordinateSuppressionAction,
   requestSupportAction,
+  repositionAction,
+  holdAction,
   DEFAULT_UTILITY_ACTIONS,
 } from './actions'
