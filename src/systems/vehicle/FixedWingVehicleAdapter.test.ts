@@ -13,8 +13,9 @@ function createMockModel() {
       target.identity();
       return true;
     }),
-    getPhysics: vi.fn().mockReturnValue({
-      getVelocity: () => new THREE.Vector3(30, 0, 0),
+    getAircraftVelocityTo: vi.fn((id: string, target: THREE.Vector3) => {
+      target.set(30, 0, 0);
+      return true;
     }),
   } as any;
 }

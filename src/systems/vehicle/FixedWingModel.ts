@@ -2,8 +2,20 @@ import * as THREE from 'three';
 import type { GameSystem } from '../../types';
 import type { ITerrainRuntime, IHUDSystem, IPlayerController } from '../../types/SystemInterfaces';
 import type { VehicleManager } from './VehicleManager';
-import { FixedWingPhysics } from './FixedWingPhysics';
-import type { FixedWingCommand, FixedWingTerrainSample } from './FixedWingPhysics';
+import { Airframe } from './airframe/Airframe';
+import type { AirframeIntent, AirframeTerrainProbe } from './airframe/types';
+import {
+  airframeConfigFromLegacy,
+  airframeStateToFixedWingSnapshot,
+  fixedWingFlightStateFromSnapshot,
+} from './FixedWingTypes';
+import type {
+  FixedWingCommand,
+  FixedWingFlightPhase,
+  FixedWingFlightSnapshot,
+  FixedWingFlightState,
+  FixedWingTerrainSample,
+} from './FixedWingTypes';
 import { FixedWingAnimation } from './FixedWingAnimation';
 import { FixedWingInteraction } from './FixedWingInteraction';
 import { FixedWingVehicleAdapter } from './FixedWingVehicleAdapter';
@@ -38,6 +50,16 @@ interface CachedTerrainSample {
   lastSampleMs: number;
 }
 
+interface AircraftRuntime {
+  airframe: Airframe;
+  /**
+   * Pending command fed to the Airframe each update. Latest gameplay-side
+   * command, translated to an `AirframeIntent` at step time.
+   */
+  command: FixedWingCommand;
+  worldHalfExtent: number;
+}
+
 export interface FixedWingFlightData {
   airspeed: number;
   heading: number;
@@ -46,19 +68,98 @@ export interface FixedWingFlightData {
   altitudeAGL: number;
   controlPhase: FixedWingControlPhase;
   operationState: FixedWingOperationState;
-  phase: 'parked' | 'ground_roll' | 'rotation' | 'airborne' | 'stall' | 'landing_rollout';
+  phase: FixedWingFlightPhase;
   aoaDeg: number;
   sideslipDeg: number;
   throttle: number;
   brake: number;
   weightOnWheels: boolean;
   isStalled: boolean;
-  flightState: 'grounded' | 'airborne' | 'stalled';
+  flightState: FixedWingFlightState;
   stallSpeed: number;
   pitch: number;
   roll: number;
   orbitHoldEnabled: boolean;
   configKey: string | null;
+}
+
+function createIdleCommand(): FixedWingCommand {
+  return {
+    throttleTarget: 0,
+    pitchCommand: 0,
+    rollCommand: 0,
+    yawCommand: 0,
+    brake: 0,
+    freeLook: false,
+    stabilityAssist: false,
+  };
+}
+
+/**
+ * Translate a gameplay-side `FixedWingCommand` into an `AirframeIntent`. The
+ * legacy shim used to do this internally. Two things to preserve:
+ *
+ * 1. `stabilityAssist` maps directly to `tier: 'assist' | 'raw'`. The Airframe
+ *    command builder branches on tier, and the scales in the `feel` config
+ *    are deliberately neutralized (see `airframeConfigFromLegacy`) so the
+ *    legacy command values flow through unchanged.
+ * 2. `brake` is only meaningful while weight-on-wheels; the Airframe command
+ *    builder clamps it at ground-tier, so no extra gating is needed here.
+ */
+function commandToAirframeIntent(cmd: FixedWingCommand): AirframeIntent {
+  return {
+    pitch: cmd.pitchCommand,
+    roll: cmd.rollCommand,
+    yaw: cmd.yawCommand,
+    throttle: cmd.throttleTarget,
+    brake: cmd.brake,
+    tier: cmd.stabilityAssist ? 'assist' : 'raw',
+  };
+}
+
+function makeStaticTerrainProbe(sample: FixedWingTerrainSample): AirframeTerrainProbe {
+  const normal = sample.normal ?? new THREE.Vector3(0, 1, 0);
+  const height = sample.height;
+  return {
+    sample() {
+      return { height, normal };
+    },
+    sweep(from: THREE.Vector3, to: THREE.Vector3) {
+      if (from.y >= height && to.y < height) {
+        const t = (from.y - height) / Math.max(from.y - to.y, 0.0001);
+        const point = new THREE.Vector3().lerpVectors(from, to, t);
+        point.y = height;
+        return { hit: true, point, normal };
+      }
+      return null;
+    },
+  };
+}
+
+function sanitizeCommand(command: Partial<FixedWingCommand>, base: FixedWingCommand): FixedWingCommand {
+  const next: FixedWingCommand = { ...base };
+  if (command.throttleTarget !== undefined) {
+    next.throttleTarget = THREE.MathUtils.clamp(command.throttleTarget, 0, 1);
+  }
+  if (command.pitchCommand !== undefined) {
+    next.pitchCommand = THREE.MathUtils.clamp(command.pitchCommand, -1, 1);
+  }
+  if (command.rollCommand !== undefined) {
+    next.rollCommand = THREE.MathUtils.clamp(command.rollCommand, -1, 1);
+  }
+  if (command.yawCommand !== undefined) {
+    next.yawCommand = THREE.MathUtils.clamp(command.yawCommand, -1, 1);
+  }
+  if (command.brake !== undefined) {
+    next.brake = THREE.MathUtils.clamp(command.brake, 0, 1);
+  }
+  if (command.freeLook !== undefined) {
+    next.freeLook = command.freeLook;
+  }
+  if (command.stabilityAssist !== undefined) {
+    next.stabilityAssist = command.stabilityAssist;
+  }
+  return next;
 }
 
 /**
@@ -75,7 +176,7 @@ export class FixedWingModel implements GameSystem {
 
   // Per-aircraft state
   private groups = new Map<string, THREE.Group>();
-  private physics = new Map<string, FixedWingPhysics>();
+  private runtimes = new Map<string, AircraftRuntime>();
   private configKeys = new Map<string, string>();
   private displayNames = new Map<string, string>();
   private collisionRegistered = new Set<string>();
@@ -92,15 +193,7 @@ export class FixedWingModel implements GameSystem {
 
   // Controls from player input
   private currentPilotIntent: FixedWingPilotIntent = createIdleFixedWingPilotIntent();
-  private currentCommand: FixedWingCommand = {
-    throttleTarget: 0,
-    pitchCommand: 0,
-    rollCommand: 0,
-    yawCommand: 0,
-    brake: 0,
-    freeLook: false,
-    stabilityAssist: false,
-  };
+  private currentCommand: FixedWingCommand = createIdleCommand();
   private pilotIntentActive = false;
 
   constructor(scene: THREE.Scene) {
@@ -143,72 +236,85 @@ export class FixedWingModel implements GameSystem {
       ? this.playerController.getCamera()
       : null;
 
-    for (const [aircraftId, phys] of this.physics) {
+    for (const [aircraftId, runtime] of this.runtimes) {
       const group = this.groups.get(aircraftId);
       if (!group) {
         continue;
       }
 
       const isPiloted = aircraftId === this.pilotedAircraftId;
+      const snapshot = this.buildSnapshot(runtime);
+      const flightState = fixedWingFlightStateFromSnapshot(snapshot);
       const shouldSimulate = isPiloted
-        || phys.getFlightState() !== 'grounded'
-        || phys.getAirspeed() > FixedWingModel.IDLE_SIMULATION_SPEED;
+        || flightState !== 'grounded'
+        || snapshot.airspeed > FixedWingModel.IDLE_SIMULATION_SPEED;
 
       if (isPiloted) {
         const configKey = this.configKeys.get(aircraftId);
         const config = configKey ? FIXED_WING_CONFIGS[configKey] : null;
         if (config && this.pilotIntentActive) {
-          phys.setCommand(buildFixedWingPilotCommand(
-            phys.getFlightSnapshot(),
-            config.physics,
-            config.pilotProfile,
-            this.currentPilotIntent,
-            { positionX: phys.getPosition().x, positionZ: phys.getPosition().z },
-          ));
+          const position = runtime.airframe.getPosition();
+          runtime.command = sanitizeCommand(
+            buildFixedWingPilotCommand(
+              snapshot,
+              config.physics,
+              config.pilotProfile,
+              this.currentPilotIntent,
+              { positionX: position.x, positionZ: position.z },
+            ),
+            runtime.command,
+          );
         } else {
-          phys.setCommand(this.currentCommand);
+          runtime.command = sanitizeCommand(this.currentCommand, runtime.command);
         }
       } else if (shouldSimulate) {
-        phys.setCommand({
+        runtime.command = sanitizeCommand({
           throttleTarget: 0,
           pitchCommand: 0,
           rollCommand: 0,
           yawCommand: 0,
-          brake: phys.getCommand().brake > 0 ? phys.getCommand().brake : 0,
-        });
+          brake: runtime.command.brake > 0 ? runtime.command.brake : 0,
+        }, runtime.command);
       }
 
       if (shouldSimulate) {
-        const pos = phys.getPosition();
+        const pos = runtime.airframe.getPosition();
         const terrainSample = this.getTerrainSampleCached(aircraftId, pos.x, pos.z, isPiloted);
-        phys.update(deltaTime, terrainSample);
+        runtime.airframe.step(
+          commandToAirframeIntent(runtime.command),
+          makeStaticTerrainProbe(terrainSample),
+          deltaTime,
+        );
 
+        const postSnapshot = this.buildSnapshot(runtime);
         const configKey = this.configKeys.get(aircraftId);
         const config = configKey ? FIXED_WING_CONFIGS[configKey] : null;
-        if (config && (phys.getFlightSnapshot().airspeed > config.operation.taxiSpeedMax || !phys.getFlightSnapshot().weightOnWheels)) {
+        if (config && (postSnapshot.airspeed > config.operation.taxiSpeedMax || !postSnapshot.weightOnWheels)) {
           this.lineupAircraft.delete(aircraftId);
         }
 
-        group.position.copy(phys.getPosition());
-        group.quaternion.copy(phys.getQuaternion());
+        group.position.copy(runtime.airframe.getPosition());
+        group.quaternion.copy(runtime.airframe.getQuaternion());
       }
 
+      const currentSnapshot = shouldSimulate ? this.buildSnapshot(runtime) : snapshot;
+      const currentFlightState = fixedWingFlightStateFromSnapshot(currentSnapshot);
       const shouldRender = shouldRenderAirVehicle({
         camera,
         scene: this.scene,
         vehiclePosition: group.position,
-        isAirborne: phys.getFlightState() !== 'grounded',
+        isAirborne: currentFlightState !== 'grounded',
         isPiloted,
         currentlyVisible: group.visible,
       });
       group.visible = shouldRender;
 
       if (shouldRender) {
-        this.animation.update(aircraftId, phys.getFlightSnapshot().throttle, deltaTime);
+        this.animation.update(aircraftId, currentSnapshot.throttle, deltaTime);
       }
 
       if (isPiloted && this.playerController) {
-        this.playerController.updatePlayerPosition(phys.getPosition());
+        this.playerController.updatePlayerPosition(runtime.airframe.getPosition());
       }
     }
   }
@@ -235,7 +341,7 @@ export class FixedWingModel implements GameSystem {
       this.animation.dispose(id);
     }
     this.groups.clear();
-    this.physics.clear();
+    this.runtimes.clear();
     this.configKeys.clear();
     this.displayNames.clear();
     this.collisionRegistered.clear();
@@ -317,19 +423,25 @@ export class FixedWingModel implements GameSystem {
         this.collisionRegistered.add(id);
       }
 
-      // Create physics instance (starts grounded)
-      const phys = new FixedWingPhysics(worldPosition.clone(), config.physics);
-      // Set initial heading
+      // Build the airframe instance (starts parked on the ground).
+      const airframe = new Airframe(worldPosition.clone(), airframeConfigFromLegacy(config.physics));
+      // Set initial heading on the airframe quaternion.
       const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), heading);
-      phys.getQuaternion().copy(q);
-      // Sync group to initial physics state so parked aircraft face the right way
+      airframe.getQuaternion().copy(q);
+      // Sync group to initial physics state so parked aircraft face the right way.
       group.quaternion.copy(q);
 
+      let worldHalfExtent = 0;
       if (this.terrainManager) {
-        phys.setWorldHalfExtent(this.terrainManager.getPlayableWorldSize() / 2);
+        worldHalfExtent = this.terrainManager.getPlayableWorldSize() / 2;
+        airframe.setWorldHalfExtent(worldHalfExtent);
       }
 
-      this.physics.set(id, phys);
+      this.runtimes.set(id, {
+        airframe,
+        command: createIdleCommand(),
+        worldHalfExtent,
+      });
 
       // Wire animation on the inner model (where propeller nodes live)
       this.animation.initialize(id, configKey, innerModel);
@@ -399,7 +511,7 @@ export class FixedWingModel implements GameSystem {
       }
     }
     this.pilotedAircraftId = null;
-    this.currentCommand = this.createIdleCommand();
+    this.currentCommand = createIdleCommand();
     this.currentPilotIntent = createIdleFixedWingPilotIntent();
     this.pilotIntentActive = false;
     this.interaction.exitAircraft();
@@ -407,19 +519,26 @@ export class FixedWingModel implements GameSystem {
 
   setPilotedAircraft(aircraftId: string | null): void {
     this.pilotedAircraftId = aircraftId;
-    this.currentCommand = this.createIdleCommand();
+    this.currentCommand = createIdleCommand();
     this.currentPilotIntent = createIdleFixedWingPilotIntent();
     this.pilotIntentActive = false;
 
     // Reset physics for parked aircraft to prevent stale micro-drift
     if (aircraftId) {
-      const phys = this.physics.get(aircraftId);
-      if (phys && phys.getPhase() === 'parked') {
-        phys.resetToGround(phys.getPosition());
-        // Restore heading from the group quaternion
-        const group = this.groups.get(aircraftId);
-        if (group) {
-          phys.getQuaternion().copy(group.quaternion);
+      const runtime = this.runtimes.get(aircraftId);
+      if (runtime) {
+        const snapshot = this.buildSnapshot(runtime);
+        if (snapshot.phase === 'parked') {
+          runtime.airframe.resetToGround(runtime.airframe.getPosition());
+          runtime.command = createIdleCommand();
+          if (runtime.worldHalfExtent > 0) {
+            runtime.airframe.setWorldHalfExtent(runtime.worldHalfExtent);
+          }
+          // Restore heading from the group quaternion
+          const group = this.groups.get(aircraftId);
+          if (group) {
+            runtime.airframe.getQuaternion().copy(group.quaternion);
+          }
         }
       }
     }
@@ -451,12 +570,12 @@ export class FixedWingModel implements GameSystem {
   // -- Queries --
 
   getFlightData(aircraftId: string): FixedWingFlightData | null {
-    const phys = this.physics.get(aircraftId);
-    if (!phys) return null;
+    const runtime = this.runtimes.get(aircraftId);
+    if (!runtime) return null;
 
     const configKey = this.configKeys.get(aircraftId);
     const config = configKey ? FIXED_WING_CONFIGS[configKey] : null;
-    const snapshot = phys.getFlightSnapshot();
+    const snapshot = this.buildSnapshot(runtime);
 
     const controlPhase = config ? deriveFixedWingControlPhase(snapshot, config.physics) : 'flight';
     const orbitHoldEnabled = this.isOrbitHoldActive(aircraftId);
@@ -480,7 +599,7 @@ export class FixedWingModel implements GameSystem {
       brake: snapshot.brake,
       weightOnWheels: snapshot.weightOnWheels,
       isStalled: snapshot.isStalled,
-      flightState: phys.getFlightState(),
+      flightState: fixedWingFlightStateFromSnapshot(snapshot),
       stallSpeed: config?.physics.stallSpeed ?? 40,
       pitch: snapshot.pitchDeg,
       roll: snapshot.rollDeg,
@@ -494,10 +613,6 @@ export class FixedWingModel implements GameSystem {
     return configKey ? getFixedWingDisplayInfo(configKey) : null;
   }
 
-  getPhysics(aircraftId: string): FixedWingPhysics | null {
-    return this.physics.get(aircraftId) ?? null;
-  }
-
   getAircraftPositionTo(id: string, target: THREE.Vector3): boolean {
     const group = this.groups.get(id);
     if (!group) return false;
@@ -506,9 +621,16 @@ export class FixedWingModel implements GameSystem {
   }
 
   getAircraftQuaternionTo(id: string, target: THREE.Quaternion): boolean {
-    const phys = this.physics.get(id);
-    if (!phys) return false;
-    target.copy(phys.getQuaternion());
+    const runtime = this.runtimes.get(id);
+    if (!runtime) return false;
+    target.copy(runtime.airframe.getQuaternion());
+    return true;
+  }
+
+  getAircraftVelocityTo(id: string, target: THREE.Vector3): boolean {
+    const runtime = this.runtimes.get(id);
+    if (!runtime) return false;
+    target.copy(runtime.airframe.getVelocity());
     return true;
   }
 
@@ -527,11 +649,11 @@ export class FixedWingModel implements GameSystem {
   positionAircraftAtRunwayStart(aircraftId: string): boolean {
     const metadata = this.spawnMetadata.get(aircraftId);
     const runwayStart = metadata?.runwayStart;
-    const phys = this.physics.get(aircraftId);
+    const runtime = this.runtimes.get(aircraftId);
     const group = this.groups.get(aircraftId);
     const configKey = this.configKeys.get(aircraftId);
     const config = configKey ? FIXED_WING_CONFIGS[configKey] : null;
-    if (!runwayStart || !phys || !group || !config) {
+    if (!runwayStart || !runtime || !group || !config) {
       return false;
     }
     this.resetPilotedCommandState(aircraftId);
@@ -541,10 +663,14 @@ export class FixedWingModel implements GameSystem {
       position.y = this.terrainManager.getHeightAt(position.x, position.z) + config.physics.gearClearance;
     }
 
-    phys.resetToGround(position);
-    phys.getQuaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), runwayStart.heading);
-    group.position.copy(phys.getPosition());
-    group.quaternion.copy(phys.getQuaternion());
+    runtime.airframe.resetToGround(position);
+    runtime.command = createIdleCommand();
+    if (runtime.worldHalfExtent > 0) {
+      runtime.airframe.setWorldHalfExtent(runtime.worldHalfExtent);
+    }
+    runtime.airframe.getQuaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), runwayStart.heading);
+    group.position.copy(runtime.airframe.getPosition());
+    group.quaternion.copy(runtime.airframe.getQuaternion());
     this.lineupAircraft.add(aircraftId);
     return true;
   }
@@ -552,11 +678,11 @@ export class FixedWingModel implements GameSystem {
   positionAircraftOnApproach(aircraftId: string): boolean {
     const metadata = this.spawnMetadata.get(aircraftId);
     const runwayStart = metadata?.runwayStart;
-    const phys = this.physics.get(aircraftId);
+    const runtime = this.runtimes.get(aircraftId);
     const group = this.groups.get(aircraftId);
     const configKey = this.configKeys.get(aircraftId);
     const config = configKey ? FIXED_WING_CONFIGS[configKey] : null;
-    if (!runwayStart || !phys || !group || !config) {
+    if (!runwayStart || !runtime || !group || !config) {
       return false;
     }
     this.resetPilotedCommandState(aircraftId);
@@ -572,15 +698,18 @@ export class FixedWingModel implements GameSystem {
       position.y += runwayStart.shortFinalAltitude ?? 40;
     }
 
-    phys.resetAirborne(
+    runtime.airframe.resetAirborne(
       position,
       quaternion,
       Math.max(config.operation.approachSpeed, config.physics.v2Speed * 0.9),
       -5,
       groundHeight,
     );
-    group.position.copy(phys.getPosition());
-    group.quaternion.copy(phys.getQuaternion());
+    if (runtime.worldHalfExtent > 0) {
+      runtime.airframe.setWorldHalfExtent(runtime.worldHalfExtent);
+    }
+    group.position.copy(runtime.airframe.getPosition());
+    group.quaternion.copy(runtime.airframe.getQuaternion());
     this.lineupAircraft.delete(aircraftId);
     return true;
   }
@@ -617,16 +746,8 @@ export class FixedWingModel implements GameSystem {
     return getFixedWingConfigKeyForModelPath(modelPath) !== null;
   }
 
-  private createIdleCommand(): FixedWingCommand {
-    return {
-      throttleTarget: 0,
-      pitchCommand: 0,
-      rollCommand: 0,
-      yawCommand: 0,
-      brake: 0,
-      freeLook: false,
-      stabilityAssist: false,
-    };
+  private buildSnapshot(runtime: AircraftRuntime): FixedWingFlightSnapshot {
+    return airframeStateToFixedWingSnapshot(runtime.airframe.getState());
   }
 
   private getTerrainSampleCached(
@@ -671,7 +792,7 @@ export class FixedWingModel implements GameSystem {
     if (this.pilotedAircraftId !== aircraftId) {
       return;
     }
-    this.currentCommand = this.createIdleCommand();
+    this.currentCommand = createIdleCommand();
     this.currentPilotIntent = createIdleFixedWingPilotIntent();
     this.pilotIntentActive = false;
   }

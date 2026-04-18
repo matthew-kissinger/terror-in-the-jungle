@@ -109,10 +109,7 @@ export class FixedWingVehicleAdapter implements IVehicle {
   }
 
   getVelocity(): THREE.Vector3 {
-    const physics = this.fixedWingModel.getPhysics(this.vehicleId);
-    if (physics) {
-      this._vel.copy(physics.getVelocity());
-    } else {
+    if (!this.fixedWingModel.getAircraftVelocityTo(this.vehicleId, this._vel)) {
       this._vel.set(0, 0, 0);
     }
     return this._vel;

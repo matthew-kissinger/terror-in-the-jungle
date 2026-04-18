@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { FixedWingPhysicsConfig, FixedWingPilotProfile } from './FixedWingConfigs';
-import type { FixedWingCommand, FixedWingFlightSnapshot } from './FixedWingPhysics';
+import type { FixedWingCommand, FixedWingFlightSnapshot } from './FixedWingTypes';
 
 export type FixedWingPilotMode = 'assisted' | 'direct_stick';
 

@@ -354,7 +354,7 @@ export class AirSupportManager implements GameSystem {
   }
 
   /**
-   * Get the FixedWingPhysicsConfig for a mission type, if physics-driven flight is available.
+   * Get the FixedWing physics config for a mission type, if physics-driven flight is available.
    * Currently enabled for spooky (AC-47) only; other missions use legacy direct positioning.
    */
   private getPhysicsConfig(type: AirSupportType) {
