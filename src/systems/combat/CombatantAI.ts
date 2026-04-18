@@ -13,6 +13,7 @@ import { AIStateDefend } from './ai/AIStateDefend'
 import { AITargeting } from './ai/AITargeting'
 import { AICoverSystem } from './ai/AICoverSystem'
 import { AIFlankingSystem } from './ai/AIFlankingSystem'
+import { UtilityScorer, DEFAULT_UTILITY_ACTIONS } from './ai/utility'
 /**
  * Thin orchestrator for AI state machine - delegates to focused state handler modules
  */
@@ -43,6 +44,10 @@ export class CombatantAI {
     defending: 0
   }
 
+  // Proxy combatant reused by the utility-AI cover-bearing probe. Mutated in
+  // place so the probe allocates nothing on the hot path.
+  private _coverProbe: { position: THREE.Vector3 } = { position: new THREE.Vector3() }
+
   constructor() {
     this.patrolHandler = new AIStatePatrol()
     this.engageHandler = new AIStateEngage()
@@ -55,6 +60,29 @@ export class CombatantAI {
     // Wire tactical systems to engage handler
     this.engageHandler.setCoverSystem(this.coverSystem)
     this.engageHandler.setFlankingSystem(this.flankingSystem)
+
+    // Wire C1 utility-AI prototype. Factions opt in via
+    // FACTION_COMBAT_TUNING[faction].useUtilityAI — currently only VC.
+    // Leaving the probe unwired keeps fire-and-fade disabled for all
+    // factions regardless of the flag (graceful no-op).
+    this.engageHandler.setUtilityScorer(new UtilityScorer(DEFAULT_UTILITY_ACTIONS))
+    this.engageHandler.setCoverBearingProbe((origin, bearingRad, radius) => {
+      // Cheap directional cover check: ask AICoverSystem for the best cover
+      // near a probe-tip in the away-from-threat bearing, capped to `radius`.
+      // Returns true when a usable spot exists within that search radius.
+      this._coverProbe.position.set(
+        origin.x + Math.cos(bearingRad) * radius,
+        origin.y,
+        origin.z + Math.sin(bearingRad) * radius
+      )
+      const spot = this.coverSystem.findBestCover(
+        this._coverProbe as Combatant,
+        origin,
+        new Map(),
+        radius
+      )
+      return spot != null
+    })
   }
 
   setSquads(squads: Map<string, Squad>): void {
