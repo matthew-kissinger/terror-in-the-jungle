@@ -270,20 +270,11 @@ export class CombatantLODManager {
   }
 
   /**
-   * Update all combatants with LOD-based scheduling
+   * Update all combatants with LOD-based scheduling, then tick the
+   * render-side interpolator so dt-amortized logical position jumps are
+   * smoothed into visible motion.
    */
   updateCombatants(deltaTime: number, options?: { enableAI?: boolean }): void {
-    try {
-      this.runLODUpdate(deltaTime, options);
-    } finally {
-      // Always tick the render-side interpolator so dt-amortized logical
-      // position jumps do not produce visible teleports. Wrapped in finally
-      // because the culled-loop path has early returns deeper in the pipeline.
-      this.renderInterpolator.update(this.combatants, deltaTime);
-    }
-  }
-
-  private runLODUpdate(deltaTime: number, options?: { enableAI?: boolean }): void {
     const enableAI = options?.enableAI ?? true;
     const lodPipelineStart = performance.now();
     let deathMs = 0;
@@ -515,7 +506,7 @@ export class CombatantLODManager {
       } else {
         if (isLargeWorldMode && this.frameCounter % STAGGER_CULLED_NEAR !== index % STAGGER_CULLED_NEAR) {
           this.staggeredSkipCount++;
-          return;
+          continue;
         }
         const dynamicIntervalMs = this.computeDynamicIntervalMsFromDistanceSq(distanceSq) * this.intervalScale;
         if (elapsedMs > dynamicIntervalMs) {
@@ -523,7 +514,7 @@ export class CombatantLODManager {
             this.updateCombatantUltraLight(combatant, deltaTime);
             combatant.lastUpdateTime = now;
             this.staggeredSkipCount++;
-            return;
+            continue;
           }
           const maxEff = Math.min(3.0, dynamicIntervalMs / 1000 * 3);
           const effectiveDelta = combatant.lastUpdateTime ? Math.min(elapsedMs / 1000, maxEff) : deltaTime;
@@ -563,6 +554,8 @@ export class CombatantLODManager {
         `[LOD spike] total=${lodPipelineMs.toFixed(1)}ms death=${deathMs.toFixed(1)} classify=${classifyMs.toFixed(1)} high=${highLoopMs.toFixed(1)} medium=${mediumLoopMs.toFixed(1)} low=${lowLoopMs.toFixed(1)} culled=${culledLoopMs.toFixed(1)} culledDeferred=${culledDeferred} counts(h/m/l/c)=${this.highBucket.length}/${this.mediumBucket.length}/${this.lowBucket.length}/${this.culledBucket.length}`
       );
     }
+
+    this.renderInterpolator.update(this.combatants, deltaTime);
   }
 
   private isAIBudgetExceeded(aiFrameStart: number): boolean {

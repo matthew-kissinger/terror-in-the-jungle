@@ -33,10 +33,10 @@ function isPassThroughState(combatant: Combatant): boolean {
  * produce multi-meter logical position jumps for low-LOD combatants. Rendered
  * verbatim, that looks like the crowd is teleporting ("hypersprint").
  *
- * This class keeps a separate rendered Vector3 per combatant (stored on
- * `combatant.renderedPosition` for zero-lookup access) and moves it toward
- * the latest logical position each real frame, capped at a visible speed.
- * The sim is unchanged. Mounted and dying combatants pass through unclamped.
+ * Per-combatant rendered Vector3 lives on `combatant.renderedPosition` for
+ * zero-lookup access. Each real frame it moves toward the latest logical
+ * position, capped at a visible speed. The sim is unchanged. Mounted and
+ * dying combatants pass through unclamped.
  */
 export class CombatantRenderInterpolator {
   private readonly scratchDelta = new THREE.Vector3();
