@@ -65,6 +65,7 @@ vi.mock('./CombatantMeshFactory', () => ({
   },
   disposeCombatantMeshes: vi.fn(),
   updateCombatantTexture: vi.fn(),
+  reportBucketOverflow: vi.fn(),
 }));
 
 vi.mock('./CombatantShaders', () => ({

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Combatant, CombatantState, isBlufor } from './types';
 import { AssetLoader } from '../assets/AssetLoader';
-import { CombatantMeshFactory, disposeCombatantMeshes, updateCombatantTexture, type ViewDirection, type WalkFrameMap } from './CombatantMeshFactory';
+import { CombatantMeshFactory, disposeCombatantMeshes, reportBucketOverflow, updateCombatantTexture, type ViewDirection, type WalkFrameMap } from './CombatantMeshFactory';
 import { CombatantShaderSettingsManager, setDamageFlash, updateShaderUniforms, type NPCShaderSettings, type ShaderPreset, type ShaderUniformSettings } from './CombatantShaders';
 import { Logger } from '../../utils/Logger';
 
@@ -182,7 +182,11 @@ export class CombatantRenderer {
       if (!mesh) return;
       const capacity = (mesh.instanceMatrix as any).count ?? mesh.count;
       const index = this.renderWriteCounts.get(key) ?? 0;
-      if (index >= capacity) return;
+      if (index >= capacity) {
+        // Surface the overflow instead of silently dropping. Rate-limited per-bucket-per-second.
+        reportBucketOverflow(key);
+        return;
+      }
 
       // Billboard rotation: face camera
       matrix.makeRotationY(cameraAngle);
