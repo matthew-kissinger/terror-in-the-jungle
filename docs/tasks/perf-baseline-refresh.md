@@ -1,7 +1,7 @@
 # perf-baseline-refresh: rebaseline all four scenarios on the new harness
 
 **Slug:** `perf-baseline-refresh`
-**Cycle:** `cycle-2026-04-19-harness-flight-combat`
+**Cycle:** `cycle-2026-04-18-harness-flight-combat`
 **Depends on:** `perf-harness-architecture` (must capture on the new runner so baselines reflect the declarative scenario path, not the reverted imperative driver), `heap-regression-investigation` (fix must land first or we bake the leak into fresh baselines)
 **Blocks (in this cycle):** nothing — this is the cycle closer
 **Playtest required:** no (pure measurement)
@@ -49,8 +49,8 @@ This task captures fresh baselines across all four scenarios using the new harne
    - Do not pick values tighter than the measured range — flakes will poison CI.
 6. Run `npm run perf:update-baseline` to write the new thresholds. If the script supports per-scenario updates, do them one at a time so each PR section is easy to review.
 7. Update `lastUpdated` in `perf-baselines.json` to today (the script should do this; verify).
-8. Capture the four `artifacts/perf/<timestamp>/` directories and either (a) commit them to the repo under `docs/perf/baselines-cycle-2026-04-19/` or (b) reference them by SHA in the rearch memo — check prior convention by listing what's in `artifacts/` or `docs/perf/` on master. Default to option (b) unless the repo has historically committed artifacts.
-9. Write `docs/rearch/perf-baselines-refresh-2026-04-19.md` documenting:
+8. Capture the four `artifacts/perf/<timestamp>/` directories and either (a) commit them to the repo under `docs/perf/baselines-cycle-2026-04-18/` or (b) reference them by SHA in the rearch memo — check prior convention by listing what's in `artifacts/` or `docs/perf/` on master. Default to option (b) unless the repo has historically committed artifacts.
+9. Write `docs/rearch/perf-baselines-refresh-2026-04-18.md` documenting:
    - The 4 measured values per scenario (p50 / p95 / p99 / max / heap growth).
    - The chosen thresholds and the headroom multipliers.
    - Machine context (CPU model, browser version, Three.js version).
@@ -62,7 +62,7 @@ This task captures fresh baselines across all four scenarios using the new harne
 
 - `perf-baselines.json` `lastUpdated` is today's date and all 4 scenarios have refreshed thresholds.
 - Second back-to-back combat120 capture passes `npm run perf:compare` cleanly.
-- `docs/rearch/perf-baselines-refresh-2026-04-19.md` exists with measured values, chosen thresholds, and machine context.
+- `docs/rearch/perf-baselines-refresh-2026-04-18.md` exists with measured values, chosen thresholds, and machine context.
 - `npm run lint`, `npm run test:run`, `npm run build` green.
 
 ## Non-goals

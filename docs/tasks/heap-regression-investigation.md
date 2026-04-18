@@ -1,7 +1,7 @@
 # heap-regression-investigation: bisect the +296% combat120 heap growth
 
 **Slug:** `heap-regression-investigation`
-**Cycle:** `cycle-2026-04-19-harness-flight-combat`
+**Cycle:** `cycle-2026-04-18-harness-flight-combat`
 **Depends on:** `perf-harness-architecture` (need a clean repro under the new declarative harness; the old imperative driver is being replaced in the same cycle, so writing a bisection harness against it would be throwaway work)
 **Blocks (in this cycle):** `perf-baseline-refresh` (don't bake the regression into fresh baselines)
 **Playtest required:** no (infra / debugging)

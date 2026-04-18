@@ -1,7 +1,7 @@
 # utility-ai-doctrine-expansion: per-faction response curves and scored actions
 
 **Slug:** `utility-ai-doctrine-expansion`
-**Cycle:** `cycle-2026-04-19-harness-flight-combat`
+**Cycle:** `cycle-2026-04-18-harness-flight-combat`
 **Depends on:** nothing in this cycle (C1 utility-AI starter already on master)
 **Blocks (in this cycle):** nothing
 **Playtest required:** yes (observable: each faction feels different under fire — VC fade fast, NVA hold longer, US advance more aggressively, ARVN cohere or break)

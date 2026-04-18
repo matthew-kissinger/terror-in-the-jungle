@@ -1,7 +1,7 @@
 # npc-fixed-wing-pilot-ai: wire NPC fixed-wing pilots into live flight
 
 **Slug:** `npc-fixed-wing-pilot-ai`
-**Cycle:** `cycle-2026-04-19-harness-flight-combat`
+**Cycle:** `cycle-2026-04-18-harness-flight-combat`
 **Depends on:** `b1-flight-cutover` (consume `Airframe` directly; no point wiring against the shim hours before it's deleted)
 **Blocks (in this cycle):** nothing
 **Playtest required:** yes (observable: A1 Skyraider NPC takes off, flies to a waypoint over enemy territory, returns, lands without crashing)

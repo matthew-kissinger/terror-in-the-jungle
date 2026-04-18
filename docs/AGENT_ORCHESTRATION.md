@@ -74,7 +74,7 @@ The stub template under "Current cycle" is what the next cycle fills in.
 
 ### Cycle ID
 
-`cycle-2026-04-19-harness-flight-combat`
+`cycle-2026-04-18-harness-flight-combat`
 
 ### Why this cycle exists
 

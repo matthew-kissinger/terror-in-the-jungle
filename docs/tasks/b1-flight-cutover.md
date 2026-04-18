@@ -1,7 +1,7 @@
 # b1-flight-cutover: delete the FixedWingPhysics shim
 
 **Slug:** `b1-flight-cutover`
-**Cycle:** `cycle-2026-04-19-harness-flight-combat`
+**Cycle:** `cycle-2026-04-18-harness-flight-combat`
 **Depends on:** nothing in this cycle (B1 airframe already on master since `3268908`)
 **Blocks (in this cycle):** `npc-fixed-wing-pilot-ai` (consumes the direct Airframe API)
 **Playtest required:** yes (player flight feel is the observable)

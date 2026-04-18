@@ -1,7 +1,7 @@
 # perf-harness-architecture: scenarios, policies, validators
 
 **Slug:** `perf-harness-architecture`
-**Cycle:** `cycle-2026-04-19-harness-flight-combat`
+**Cycle:** `cycle-2026-04-18-harness-flight-combat`
 **Depends on:** nothing in this cycle (AgentController primitive + SeededRandom/ReplayRecorder already on master)
 **Blocks (in this cycle):** `heap-regression-investigation` (wants clean repro via the new harness), `perf-baseline-refresh` (must use the new harness), `npc-fixed-wing-pilot-ai` (future harness scenarios will drive NPC pilots)
 **Playtest required:** yes (the harness *is* a playtest surface)
