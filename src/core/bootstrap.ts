@@ -6,6 +6,7 @@ import { isBlufor, isOpfor } from '../systems/combat/types';
 import { isPerfDiagnosticsEnabled, isDiagEnabled } from './PerfDiagnostics';
 import { Logger } from '../utils/Logger';
 import { preloadIcons } from '../ui/icons/IconRegistry';
+import { isFlightTestMode } from '../dev/flightTestMode';
 
 const ashauSessionTelemetry = {
   sessionStartEpochMs: Date.now(),
@@ -60,6 +61,22 @@ export async function bootstrapGame(): Promise<void> {
   markStartup('bootstrap.begin');
   // Inject shared design system CSS before any UI is created
   injectSharedStyles();
+
+  // Dev flight-test mode short-circuits the normal engine boot. Activated by
+  // `?mode=flight-test`. See docs/tasks/A1-plane-test-mode.md.
+  if (isFlightTestMode()) {
+    try {
+      const { FlightTestScene } = await import('../dev/flightTestScene');
+      const scene = new FlightTestScene(document.body);
+      scene.start();
+      window.addEventListener('beforeunload', () => scene.dispose());
+    } catch (error) {
+      Logger.error('bootstrap', 'Flight-test mode failed to initialize', error);
+      const message = error instanceof Error ? error.message : String(error);
+      showFatalError(message);
+    }
+    return;
+  }
 
   const engine = new GameEngine();
   markStartup('bootstrap.engine-constructed');
