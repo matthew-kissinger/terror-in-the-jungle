@@ -26,6 +26,8 @@ import {
   deriveFixedWingControlPhase,
 } from './FixedWingControlLaw';
 import type { FixedWingControlPhase, FixedWingPilotIntent } from './FixedWingControlLaw';
+import { NPCFixedWingPilot } from './NPCFixedWingPilot';
+import type { Mission as NPCPilotMission, TerrainProbe as NPCTerrainProbe } from './NPCFixedWingPilot';
 import {
   deriveFixedWingOperationState,
   getFixedWingExitStatus,
@@ -184,6 +186,8 @@ export class FixedWingModel implements GameSystem {
   private lineupAircraft = new Set<string>();
   private terrainSampleCache = new Map<string, CachedTerrainSample>();
   private pilotedAircraftId: string | null = null;
+  /** NPC pilots attached to aircraft in our catalog. See `attachNPCPilot()`. */
+  private npcPilots = new Map<string, NPCFixedWingPilot>();
 
   // Dependencies
   private terrainManager?: ITerrainRuntime;
@@ -243,9 +247,11 @@ export class FixedWingModel implements GameSystem {
       }
 
       const isPiloted = aircraftId === this.pilotedAircraftId;
+      const npcPilot = !isPiloted ? this.npcPilots.get(aircraftId) : undefined;
       const snapshot = this.buildSnapshot(runtime);
       const flightState = fixedWingFlightStateFromSnapshot(snapshot);
       const shouldSimulate = isPiloted
+        || npcPilot !== undefined
         || flightState !== 'grounded'
         || snapshot.airspeed > FixedWingModel.IDLE_SIMULATION_SPEED;
 
@@ -266,6 +272,32 @@ export class FixedWingModel implements GameSystem {
           );
         } else {
           runtime.command = sanitizeCommand(this.currentCommand, runtime.command);
+        }
+      } else if (npcPilot) {
+        const configKey = this.configKeys.get(aircraftId);
+        const config = configKey ? FIXED_WING_CONFIGS[configKey] : null;
+        const airframeState = runtime.airframe.getState();
+        const pilotIntent = npcPilot.update(deltaTime, airframeState);
+        if (pilotIntent && config) {
+          const position = runtime.airframe.getPosition();
+          runtime.command = sanitizeCommand(
+            buildFixedWingPilotCommand(
+              snapshot,
+              config.physics,
+              config.pilotProfile,
+              pilotIntent,
+              { positionX: position.x, positionZ: position.z },
+            ),
+            runtime.command,
+          );
+        } else {
+          runtime.command = sanitizeCommand({
+            throttleTarget: 0,
+            pitchCommand: 0,
+            rollCommand: 0,
+            yawCommand: 0,
+            brake: 1,
+          }, runtime.command);
         }
       } else if (shouldSimulate) {
         runtime.command = sanitizeCommand({
@@ -348,6 +380,8 @@ export class FixedWingModel implements GameSystem {
     this.spawnMetadata.clear();
     this.lineupAircraft.clear();
     this.terrainSampleCache.clear();
+    for (const pilot of this.npcPilots.values()) pilot.clearMission();
+    this.npcPilots.clear();
   }
 
   // -- Aircraft creation --
@@ -565,6 +599,39 @@ export class FixedWingModel implements GameSystem {
   setFixedWingPilotIntent(intent: FixedWingPilotIntent): void {
     this.currentPilotIntent = { ...intent };
     this.pilotIntentActive = true;
+  }
+
+  // -- NPC pilot hooks --
+
+  /**
+   * Attach an NPC pilot to an aircraft in this catalog. The pilot owns the
+   * aircraft's runtime command whenever the aircraft is not player-piloted.
+   * Returns false if the aircraftId is unknown.
+   */
+  attachNPCPilot(aircraftId: string, mission: NPCPilotMission): boolean {
+    if (!this.runtimes.has(aircraftId)) {
+      return false;
+    }
+    const terrainProbe: NPCTerrainProbe | null = this.terrainManager
+      ? { getHeightAt: (x: number, z: number) => this.terrainManager!.getHeightAt(x, z) }
+      : null;
+    const existing = this.npcPilots.get(aircraftId);
+    const pilot = existing ?? new NPCFixedWingPilot(undefined, terrainProbe);
+    pilot.setMission(mission);
+    this.npcPilots.set(aircraftId, pilot);
+    Logger.info('fixedwing', `NPC pilot attached to ${aircraftId} (mission.kind=${mission.kind})`);
+    return true;
+  }
+
+  detachNPCPilot(aircraftId: string): void {
+    const pilot = this.npcPilots.get(aircraftId);
+    if (!pilot) return;
+    pilot.clearMission();
+    this.npcPilots.delete(aircraftId);
+  }
+
+  getNPCPilot(aircraftId: string): NPCFixedWingPilot | null {
+    return this.npcPilots.get(aircraftId) ?? null;
   }
 
   // -- Queries --

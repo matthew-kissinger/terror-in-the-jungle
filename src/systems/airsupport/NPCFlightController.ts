@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { NPCPilotAI, type PilotMission } from '../vehicle/NPCPilotAI';
+import { NPCFixedWingPilot } from '../vehicle/NPCFixedWingPilot';
+import type { Mission } from '../vehicle/NPCFixedWingPilot';
 import { Airframe } from '../vehicle/airframe/Airframe';
 import type { AirframeIntent, AirframeTerrainProbe } from '../vehicle/airframe/types';
 import type { FixedWingPhysicsConfig } from '../vehicle/FixedWingConfigs';
@@ -7,29 +8,31 @@ import { airframeConfigFromLegacy } from '../vehicle/FixedWingTypes';
 import { Logger } from '../../utils/Logger';
 
 /**
- * Bridges NPCPilotAI (mission FSM) with the unified Airframe sim for
- * physics-driven air support missions.
+ * Air-support variant of the NPC pilot bridge. Owns a single transient
+ * aircraft and runs a fixed-wing `NPCFixedWingPilot` against a caller-
+ * supplied mission. Used by `AirSupportManager` for one-off gunship / attack
+ * / recon sorties. Persistent world-owned aircraft use
+ * `FixedWingModel.attachNPCPilot()` instead.
  *
- * Each frame:
- *   1. NPCPilotAI.update() produces PilotControls (collective, cyclicPitch, yaw)
- *   2. Controls are mapped to an AirframeIntent (throttle, pitch, roll, yaw)
- *   3. Airframe.step() integrates forces and position using a flat-slab probe
- *      built from the supplied terrain height
- *   4. Aircraft mesh is synced to airframe state
- *
- * Minimum throttle clamp: NPC missions expect the aircraft to stay airborne
- * for the whole arrival / orbit phase. The pilot-AI collective is clamped to
- * a floor (0.3) so the sim never drops the throttle to zero and stalls into
- * the ground mid-mission.
+ * The public `PilotMission` shape is kept stable for callers; we translate
+ * it into the fixed-wing `Mission` internally.
  */
+
+export interface PilotMission {
+  waypoints: THREE.Vector3[];
+  cruiseAltitude: number;
+  cruiseSpeed: number;
+  orbitPoint?: THREE.Vector3;
+  orbitRadius?: number;
+  homePosition: THREE.Vector3;
+  attackTarget?: THREE.Vector3;
+}
+
 export class NPCFlightController {
-  private readonly pilotAI: NPCPilotAI;
+  private readonly pilot: NPCFixedWingPilot;
   private readonly airframe: Airframe;
   private readonly aircraft: THREE.Group;
-  /**
-   * Last intent fed to the airframe. Persisted across frames so setMission()
-   * can prime throttle before the first pilot-AI update runs.
-   */
+  /** Persisted across frames so setMission() can prime throttle pre-first-tick. */
   private intent: AirframeIntent = {
     pitch: 0,
     roll: 0,
@@ -38,6 +41,8 @@ export class NPCFlightController {
     brake: 0,
     tier: 'raw',
   };
+  /** True once a mission has been set; until then the airframe drifts. */
+  private missionActive = false;
 
   constructor(
     aircraft: THREE.Group,
@@ -45,14 +50,21 @@ export class NPCFlightController {
     physicsConfig: FixedWingPhysicsConfig,
   ) {
     this.aircraft = aircraft;
-    this.pilotAI = new NPCPilotAI();
+    this.pilot = new NPCFixedWingPilot();
     this.airframe = new Airframe(startPosition, airframeConfigFromLegacy(physicsConfig));
+    // AirSupportManager spawns the aircraft airborne; mark WoW false so
+    // the airframe integrates airborne physics straight away.
+    const forwardSpeed = 60; // plausible cruise; pilot's PD reels it in.
+    this.airframe.resetAirborne(startPosition, this.airframe.getQuaternion(), forwardSpeed);
   }
 
-  setMission(mission: PilotMission): void {
-    this.pilotAI.setMission(mission);
-    // Start with throttle up so the aircraft is already airborne
+  setMission(legacy: PilotMission): void {
+    const mission = legacyToFixedWingMission(legacy);
+    this.pilot.setMission(mission);
+    // Pilot starts cold by design; air-support callers expect the aircraft to
+    // already be flying, so skip straight to cruise and prime throttle.
     this.intent.throttle = 0.9;
+    this.missionActive = true;
   }
 
   setWorldHalfExtent(halfExtent: number): void {
@@ -60,7 +72,7 @@ export class NPCFlightController {
   }
 
   getState(): string {
-    return this.pilotAI.getState();
+    return this.pilot.getState();
   }
 
   getPosition(): THREE.Vector3 {
@@ -75,55 +87,94 @@ export class NPCFlightController {
     return this.airframe.getVelocity();
   }
 
-  /**
-   * Update the pilot AI and airframe, then sync the aircraft mesh.
-   */
   update(dt: number, terrainHeight: number): void {
-    const pos = this.airframe.getPosition();
-    const vel = this.airframe.getVelocity();
-    const quat = this.airframe.getQuaternion();
+    // Run the pilot state machine against the latest airframe observation.
+    const snapshot = this.airframe.getState();
+    const intent = this.missionActive ? this.pilot.update(dt, snapshot) : null;
 
-    // Run pilot AI to get desired controls
-    const pilotControls = this.pilotAI.update(dt, pos, vel, quat, terrainHeight);
+    if (intent) {
+      // Map FixedWingPilotIntent (pitch/bank/yaw) onto AirframeIntent.
+      this.intent.pitch = intent.pitchIntent;
+      this.intent.roll = intent.bankIntent;
+      this.intent.yaw = intent.yawIntent;
+      this.intent.throttle = intent.throttleTarget;
+      this.intent.brake = intent.brake;
+      this.intent.tier = intent.assistEnabled ? 'assist' : 'raw';
+    }
 
-    // Map helicopter-style PilotControls to fixed-wing airframe intent.
-    //   collective  -> throttle  (both 0..1 range for power)
-    //   cyclicPitch -> pitch     (sign inverted: positive cyclicPitch = nose
-    //                             down in heli, we want pitch-up in plane)
-    //   cyclicRoll  -> roll      (direct)
-    //   yaw         -> yaw       (heading correction)
-    this.intent.throttle = Math.max(pilotControls.collective ?? 0.5, 0.3);
-    this.intent.pitch = -(pilotControls.cyclicPitch ?? 0);
-    this.intent.roll = pilotControls.cyclicRoll ?? 0;
-    this.intent.yaw = pilotControls.yaw ?? 0;
-    this.intent.brake = 0;
-    this.intent.tier = 'raw';
-
-    // Step the airframe with a flat-slab probe at the caller-supplied ground
-    // height. Same terrain contract the old fixed-wing shim exposed: one
-    // constant height fed for both sample and sweep.
     this.airframe.step(this.intent, makeStaticTerrainProbe(terrainHeight), dt);
 
-    // Sync aircraft mesh to airframe state
     this.aircraft.position.copy(this.airframe.getPosition());
     this.aircraft.quaternion.copy(this.airframe.getQuaternion());
   }
 
   /**
-   * Check if the pilot AI has completed its mission (returned to idle).
+   * Check if the pilot has landed / terminated its mission.
+   * The pilot uses 'COLD' for both parked-never-started and
+   * parked-after-landing; for the air-support case, a mission is complete
+   * only if the pilot has transitioned to LANDING/DEAD or has passed through
+   * at least one non-COLD state and returned to COLD (i.e. actually landed).
    */
   isMissionComplete(): boolean {
-    return this.pilotAI.getState() === 'idle';
+    if (!this.missionActive) return true;
+    const state = this.pilot.getState();
+    if (state === 'DEAD') return true;
+    // Only treat COLD as complete if the pilot has logged any transitions
+    // since setMission (a completed sortie logs COLD→TAXI→... →LANDING→COLD).
+    const log = this.pilot.getTransitionLog();
+    if (state === 'COLD' && log.length > 1) return true;
+    return false;
   }
 
   dispose(): void {
-    this.pilotAI.clearMission();
+    this.pilot.clearMission();
+    this.missionActive = false;
   }
 }
 
 /**
- * Build a PilotMission from air support parameters.
+ * Map a helicopter-style `PilotMission` to the fixed-wing pilot's `Mission`.
+ * Waypoints become fly-by; orbitPoint → orbit target; attackTarget → attack
+ * target; homePosition → home runway start.
  */
+function legacyToFixedWingMission(legacy: PilotMission): Mission {
+  const waypoints = legacy.waypoints.map((wp) => ({
+    position: wp.clone(),
+    altitudeAGLm: legacy.cruiseAltitude,
+    airspeedMs: legacy.cruiseSpeed,
+    arrivalKind: 'flyby' as const,
+  }));
+
+  let kind: Mission['kind'] = 'ferry';
+  let targetPos: THREE.Vector3 | null = null;
+  let minAttackAlt = 80;
+
+  if (legacy.orbitPoint) {
+    kind = 'orbit';
+    targetPos = legacy.orbitPoint.clone();
+    minAttackAlt = 120;
+  } else if (legacy.attackTarget) {
+    kind = 'attack';
+    targetPos = legacy.attackTarget.clone();
+    minAttackAlt = 80;
+  }
+
+  return {
+    kind,
+    waypoints,
+    target: targetPos
+      ? { position: targetPos, minAttackAltM: minAttackAlt }
+      : undefined,
+    bingo: { fuelFraction: 0.1, ammoFraction: 0.05 },
+    homeAirfield: {
+      runwayStart: legacy.homePosition.clone(),
+      runwayHeading: 0,
+    },
+    orbitRadiusM: legacy.orbitRadius,
+  };
+}
+
+/** Build a `PilotMission` from air support parameters. */
 export function buildAirSupportMission(
   targetPosition: THREE.Vector3,
   approachDirection: THREE.Vector3,

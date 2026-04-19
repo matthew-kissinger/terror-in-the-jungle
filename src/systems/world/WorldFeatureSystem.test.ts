@@ -94,6 +94,7 @@ describe('WorldFeatureSystem', () => {
   it('spawns fixed-wing aircraft from local stand offsets without double-rotating them', async () => {
     const fixedWingModel = {
       createAircraftAtSpot: vi.fn(async () => true),
+      attachNPCPilot: vi.fn(() => true),
     };
     system.setFixedWingModel(fixedWingModel as any);
     currentConfig = {

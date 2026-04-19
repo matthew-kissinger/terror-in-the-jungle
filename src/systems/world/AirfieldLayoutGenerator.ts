@@ -163,6 +163,17 @@ export function generateAirfieldLayout(
             : undefined,
         }
       : undefined;
+    const npcAutoFlight = spot.npcAutoFlight
+      ? {
+          kind: spot.npcAutoFlight.kind,
+          waypointOffset: localOffset(
+            spot.npcAutoFlight.waypointOffsetAlongRunway,
+            spot.npcAutoFlight.waypointOffsetLateral,
+          ),
+          altitudeAGLm: spot.npcAutoFlight.altitudeAGLm,
+          airspeedMs: spot.npcAutoFlight.airspeedMs,
+        }
+      : undefined;
     placements.push({
       id: `parking_${i}`,
       modelPath: spot.modelPath,
@@ -171,6 +182,7 @@ export function generateAirfieldLayout(
       registerCollision: true,
       skipFlatSearch: true,
       fixedWingSpawn,
+      npcAutoFlight,
     });
     placed.push({ x: localOff.x, z: localOff.z, radius: clearanceRadius });
   }
