@@ -93,14 +93,17 @@ All briefs under `docs/tasks/` with matching slug names.
 - **`utility-ai-doctrine-expansion`** — *(merged in Round 1, PR #87.)* Expanded `FactionCombatTuning` with response curves, action-weight multipliers, morale decay. Flipped all 4 factions to utility-AI. Added `repositionAction` + `holdAction`. Closed `RETREATING` orphan state with minimal `AIStateRetreat`.
 - **`heap-regression-investigation`** — bisect the +296% combat120 heap growth from the 2026-04-18 cycle. Likely suspects: `ReplayRecorder` buffering without session gate; per-tick utility-context allocation. Fix + rearch memo. Uses the redesigned harness for clean repro.
 - **`npc-fixed-wing-pilot-ai`** — author `NPCFixedWingPilot` (state machine + PD control loops) that emits `FixedWingPilotIntent` against the post-cutover `Airframe`. One NPC aircraft spawns in at least one game mode with a mission (takeoff → waypoint → RTB → landing).
-- **`perf-baseline-refresh`** — recapture `combat120`, `openfrontier:short`, `ashau:short`, `frontier30m` on the redesigned harness after the heap fix. Rewrite `perf-baselines.json` with realistic thresholds; stale p99=100ms → measured ~30ms.
+- **`perf-baseline-refresh`** — recapture `combat120`, `openfrontier:short`, `ashau:short`, `frontier30m` on the redesigned harness after the heap fix. Rewrite `perf-baselines.json` with realistic thresholds; stale p99=100ms → measured ~30ms. *(Round 3 attempt 2026-04-19 stopped at hard stop #1 on openfrontier — `waypointsFollowed=0 / waypointReplanFailures=202`, p99 = 63ms > 60ms validator floor. Root cause: `NavmeshSystem.queryPath` returns null on every driver re-plan on open_frontier. Spawned Round 4 `perf-openfrontier-navmesh-fix`.)*
+- **`perf-openfrontier-navmesh-fix`** — diagnose why `queryPath` always returns null on open_frontier (likely seed-outside-prebake-list OR navmesh-not-ready-at-first-query OR off-mesh-spawn). Land smallest fix that makes openfrontier:short produce `waypointsFollowedCount > 50`. Unblocks Round 3 retry.
 
 ### Round schedule
 
 - **Round 1 (3 parallel) — LANDED.** `perf-harness-architecture` ✗ reverted (PR #88 → PR #89), `b1-flight-cutover` ✓ merged (PR #86), `utility-ai-doctrine-expansion` ✓ merged (PR #87).
 - **Round 1b (1, solo) — ACTIVE.** `perf-harness-redesign`. Blocks Round 2's `heap-regression-investigation` and Round 3's `perf-baseline-refresh`. Solo so its playtest (the task's key acceptance signal) gets full attention.
 - **Round 2 (2 parallel):** `heap-regression-investigation`, `npc-fixed-wing-pilot-ai`. Heap investigation uses the redesigned harness for clean repro. NPC pilot wants the post-cutover `Airframe` surface (already on master).
-- **Round 3 (1):** `perf-baseline-refresh`. Rebaseline on the redesigned harness with the heap fix in place. Cycle closer.
+- **Round 3 (1) — ATTEMPTED, STOPPED.** `perf-baseline-refresh`. Rebaseline on the redesigned harness with the heap fix in place. Hit hard stop on openfrontier:short validator fail (p99 63ms > 60ms floor). Will retry after Round 4.
+- **Round 4 (1, solo) — ACTIVE.** `perf-openfrontier-navmesh-fix`. Fix driver queryPath failures on open_frontier. Unblocks Round 3 retry.
+- **Round 5 (1):** `perf-baseline-refresh` retry. Cycle closer.
 
 ### Concurrency cap
 
@@ -115,7 +118,8 @@ All briefs under `docs/tasks/` with matching slug names.
 - `utility-ai-doctrine-expansion` — no blockers. *(merged.)*
 - `heap-regression-investigation` — blocked by `perf-harness-redesign` (clean combat-exercising repro surface).
 - `npc-fixed-wing-pilot-ai` — blocked by `b1-flight-cutover` (consumes direct Airframe API). *(unblocked; ready for Round 2.)*
-- `perf-baseline-refresh` — blocked by `perf-harness-redesign` AND `heap-regression-investigation`.
+- `perf-baseline-refresh` — blocked by `perf-harness-redesign` AND `heap-regression-investigation` AND `perf-openfrontier-navmesh-fix` *(new, after Round 3 hard-stopped)*.
+- `perf-openfrontier-navmesh-fix` — no blockers (surfaces on current master).
 
 ### Playtest policy
 
