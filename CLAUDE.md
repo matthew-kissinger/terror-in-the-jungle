@@ -1,6 +1,6 @@
 # Project Notes (Claude Code)
 
-Last updated: 2026-04-17
+Last updated: 2026-04-19
 
 Terror in the Jungle is a browser-based 3D combat game (Three.js 0.183, TypeScript 5.9, Vite 8). Up to 3,000 AI combatants, stable frame-time tails, real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages.
 
@@ -21,6 +21,8 @@ On top of what's in `AGENTS.md`, this repo ships Claude-Code-specific harness pi
 
 ## Current focus
 
-combat120 is PASS-leaning WARN after the 2026-04-17 drift-correction run: avg ~15ms (-10.7% vs pre-run), p99 ~34ms, max ~47ms, 0% hitch, 8.8MB heap growth. 5 game modes live, per-faction combat doctrine starter landed (D2 via `FactionCombatTuning`), and the NPC hypersprint bug has been root-caused in `CombatantLODManager` but shelved for Phase F render-side position interpolation work.
+`cycle-2026-04-18-harness-flight-combat` closed on 2026-04-19 (seven merged PRs: `b1-flight-cutover`, `utility-ai-doctrine-expansion`, `perf-harness-redesign`, `heap-regression-investigation`, `npc-fixed-wing-pilot-ai`, `perf-harness-verticality-and-sizing`, `perf-harness-player-bot-aim-fix`). Per-faction combat doctrine (`FactionCombatTuning`) and the post-cutover `Airframe` surface are the shipped foundations; the aim-fixed player-bot is the active perf-harness driver. The NPC hypersprint bug is root-caused in `CombatantLODManager` but shelved for a future render-side position-interpolation task.
+
+Phase-letter task IDs (A/B/C/D/E/F) were retired 2026-04-18. New cycles use descriptive slugs under `task/<slug>` with `cycle-YYYY-MM-DD-<slug>` cycle IDs.
 
 See [docs/BACKLOG.md](docs/BACKLOG.md) for open items and recently completed work.
