@@ -193,6 +193,20 @@ type RuntimeSample = {
     healthTopUpCount: number;
     lastShotAt: number;
     lastFireProbe?: Record<string, unknown> | null;
+    // perf-harness-redesign surfaces. All optional: older capture artifacts
+    // replayed through this script must still parse.
+    terrainProfile?: string;
+    maxGradient?: number;
+    stuckTimeoutSec?: number;
+    losRejectedShots?: number;
+    stuckTeleportCount?: number;
+    maxStuckSeconds?: number;
+    gradientProbeDeflections?: number;
+    waypointsFollowedCount?: number;
+    waypointReplanFailures?: number;
+    waypointCount?: number;
+    waypointIdx?: number;
+    movementTransitions?: number;
   };
 };
 
@@ -667,11 +681,85 @@ async function captureMovementViewerPayload(page: Page): Promise<MovementViewerP
   };
 }
 
+type HarnessModeThresholds = {
+  minShotsFired: number;
+  minHitsRecorded: number;
+  maxStuckSeconds: number;
+  minMovementTransitions: number;
+};
+
+/**
+ * Per-mode validator thresholds for the harness-driven play loop.
+ * Starter values chosen to be achievable by the fixed driver with headroom
+ * (per perf-harness-redesign brief). Tune after smoke captures; record the
+ * chosen values in PR description.
+ */
+const HARNESS_MODE_THRESHOLDS: Record<string, HarnessModeThresholds> = {
+  ai_sandbox: {
+    minShotsFired: 50,
+    minHitsRecorded: 5,
+    maxStuckSeconds: 5,
+    minMovementTransitions: 3
+  },
+  open_frontier: {
+    minShotsFired: 30,
+    minHitsRecorded: 2,
+    maxStuckSeconds: 8,
+    minMovementTransitions: 3
+  },
+  a_shau_valley: {
+    minShotsFired: 30,
+    minHitsRecorded: 2,
+    maxStuckSeconds: 8,
+    minMovementTransitions: 3
+  },
+  // zone_control and team_deathmatch exercise capture-point behaviour (player
+  // often inside an LOS-limited objective or moving between zones), so shot
+  // counts are structurally lower than ai_sandbox's pure engagement. Floors
+  // here match observed behaviour at the scenario's stock duration; see the
+  // perf-harness-redesign PR description for measurements.
+  zone_control: {
+    minShotsFired: 15,
+    minHitsRecorded: 1,
+    maxStuckSeconds: 8,
+    minMovementTransitions: 3
+  },
+  team_deathmatch: {
+    minShotsFired: 15,
+    minHitsRecorded: 1,
+    maxStuckSeconds: 8,
+    minMovementTransitions: 3
+  }
+};
+
+/**
+ * Long captures (e.g. frontier30m = 1800s) need higher floor expectations.
+ * Scale up shots/hits/transitions while holding per-event ceilings fixed.
+ */
+function scaleModeThresholdsForDuration(
+  base: HarnessModeThresholds,
+  durationSeconds: number
+): HarnessModeThresholds {
+  // Scale off a 90s reference (combat120 cadence). Clamp so short runs don't
+  // drop the floor below the base value.
+  const scale = Math.max(1, durationSeconds / 90);
+  return {
+    minShotsFired: Math.round(base.minShotsFired * scale),
+    minHitsRecorded: Math.round(base.minHitsRecorded * scale),
+    maxStuckSeconds: base.maxStuckSeconds,
+    minMovementTransitions: Math.round(base.minMovementTransitions * scale)
+  };
+}
+
 function validateRun(
   runtimeSamples: RuntimeSample[],
   consoleEntries: ConsoleEntry[],
   durationSeconds: number,
-  options?: { hitValidation?: 'strict' | 'relaxed' | 'critical' | 'off'; sampleIntervalMs?: number }
+  options?: {
+    hitValidation?: 'strict' | 'relaxed' | 'critical' | 'off';
+    sampleIntervalMs?: number;
+    modeThresholds?: HarnessModeThresholds | null;
+  }
 ): ValidationReport {
   const checks: ValidationCheck[] = [];
   const sampleCount = runtimeSamples.length;
@@ -935,6 +1023,74 @@ function validateRun(
         status: 'warn',
         value: texGrowth,
         message: `Monotonic texture growth: ${texValues[0]} -> ${texValues[texValues.length - 1]} (+${texGrowth})`
+      });
+    }
+  }
+
+  // Per-mode harness validators (perf-harness-redesign). These are fail-loud:
+  // if the driver fails to produce shots/hits or gets stuck beyond the scenario
+  // tolerance, validation.overall flips to fail and the capture script exits
+  // non-zero. This is the gate that should have caught PR #88's regression.
+  const modeThresholds = options?.modeThresholds ?? null;
+  if (modeThresholds) {
+    const shotSamples = runtimeSamples.filter(s => typeof s.shotsThisSession === 'number');
+    const finalShots = shotSamples.length > 0
+      ? Number(shotSamples[shotSamples.length - 1].shotsThisSession ?? 0)
+      : 0;
+    const finalHits = shotSamples.length > 0
+      ? Number(shotSamples[shotSamples.length - 1].hitsThisSession ?? 0)
+      : 0;
+    const maxStuckSeconds = runtimeSamples.reduce((max, s) => {
+      const v = Number(s.harnessDriver?.maxStuckSeconds ?? 0);
+      return v > max ? v : max;
+    }, 0);
+    const finalTransitions = runtimeSamples.reduce((max, s) => {
+      const v = Number(s.harnessDriver?.movementTransitions ?? 0);
+      return v > max ? v : max;
+    }, 0);
+
+    checks.push({
+      id: 'harness_min_shots_fired',
+      status: finalShots >= modeThresholds.minShotsFired
+        ? 'pass'
+        : finalShots >= Math.floor(modeThresholds.minShotsFired * 0.5)
+          ? 'warn'
+          : 'fail',
+      value: finalShots,
+      message: `Harness player shots=${finalShots} (min=${modeThresholds.minShotsFired})`
+    });
+    checks.push({
+      id: 'harness_min_hits_recorded',
+      status: finalHits >= modeThresholds.minHitsRecorded
+        ? 'pass'
+        : finalHits >= Math.floor(modeThresholds.minHitsRecorded * 0.5)
+          ? 'warn'
+          : 'fail',
+      value: finalHits,
+      message: `Harness player hits=${finalHits} (min=${modeThresholds.minHitsRecorded})`
+    });
+    checks.push({
+      id: 'harness_max_stuck_seconds',
+      status: maxStuckSeconds <= modeThresholds.maxStuckSeconds
+        ? 'pass'
+        : maxStuckSeconds <= modeThresholds.maxStuckSeconds * 1.5
+          ? 'warn'
+          : 'fail',
+      value: maxStuckSeconds,
+      message: `Max harness stuck duration ${maxStuckSeconds.toFixed(1)}s (max=${modeThresholds.maxStuckSeconds}s)`
+    });
+    // Movement transitions are mainly a liveness signal — a declarative driver
+    // that never pressed WASD produced 0 here in PR #88.
+    if (finalTransitions > 0) {
+      checks.push({
+        id: 'harness_min_movement_transitions',
+        status: finalTransitions >= modeThresholds.minMovementTransitions
+          ? 'pass'
+          : finalTransitions >= Math.floor(modeThresholds.minMovementTransitions * 0.5)
+            ? 'warn'
+            : 'fail',
+        value: finalTransitions,
+        message: `Harness movement transitions=${finalTransitions} (min=${modeThresholds.minMovementTransitions})`
       });
     }
   }
@@ -1409,7 +1565,7 @@ async function setupActiveScenarioDriver(page: Page, options: ActiveScenarioOpti
   if (!driverInstalled) {
     await withTimeout(
       'inject active scenario driver',
-      page.addScriptTag({ path: join(process.cwd(), 'scripts', 'perf-active-driver.js') }),
+      page.addScriptTag({ path: join(process.cwd(), 'scripts', 'perf-active-driver.cjs') }),
       SCENARIO_SETUP_TIMEOUT_MS
     );
   }
@@ -1434,7 +1590,7 @@ async function stopActiveScenarioDriver(page: Page): Promise<void> {
 
   if (result) {
     logStep(
-      `🎮 Active driver stopped (respawns=${result.respawnCount}, ammoRefills=${result.ammoRefillCount ?? 0}, healthTopUps=${result.healthTopUpCount ?? 0}, frontlineCompressed=${result.frontlineCompressed}, frontlineDistance=${Number(result.frontlineDistance ?? 0).toFixed(1)}, moved=${result.frontlineMoveCount ?? 0}, capturedZones=${result.capturedZoneCount ?? 0}, movementTransitions=${Number(result.movementTransitions ?? 0)})`
+      `🎮 Active driver stopped (respawns=${result.respawnCount}, ammoRefills=${result.ammoRefillCount ?? 0}, healthTopUps=${result.healthTopUpCount ?? 0}, frontlineCompressed=${result.frontlineCompressed}, frontlineDistance=${Number(result.frontlineDistance ?? 0).toFixed(1)}, moved=${result.frontlineMoveCount ?? 0}, capturedZones=${result.capturedZoneCount ?? 0}, movementTransitions=${Number(result.movementTransitions ?? 0)}, losRejectedShots=${Number(result.losRejectedShots ?? 0)}, stuckTeleports=${Number(result.stuckTeleportCount ?? 0)}, maxStuckSec=${Number(result.maxStuckSeconds ?? 0).toFixed(1)}, gradientDeflections=${Number(result.gradientProbeDeflections ?? 0)}, waypointsFollowed=${Number(result.waypointsFollowedCount ?? 0)}, waypointReplanFailures=${Number(result.waypointReplanFailures ?? 0)})`
     );
   }
 }
@@ -1523,6 +1679,12 @@ async function runCapture(): Promise<void> {
   );
   const frontlineTriggerDistance = parseNumberFlag('frontline-trigger-distance', DEFAULT_FRONTLINE_TRIGGER_DISTANCE);
   const maxCompressedPerFaction = parseNumberFlag('frontline-compressed-per-faction', DEFAULT_MAX_COMPRESSED_PER_FACTION);
+  // Optional map-terrain seed pin (perf-harness-redesign). When present, the URL
+  // query gains &seed=<n>; sandbox mode reads it and overrides the random
+  // AI_SANDBOX terrain seed so combat120 captures are reproducible and we can
+  // curate a fair engagement landscape (not a pathological steep hill).
+  const seedArg = parseNumberFlag('seed', Number.NaN);
+  const seedPin = Number.isFinite(seedArg) && seedArg >= 0 ? Math.floor(seedArg) : null;
   const logLevel = String(process.env.PERF_LOG_LEVEL ?? process.argv.find(a => a.startsWith('--log-level='))?.split('=')[1] ?? 'warn');
   // Default OFF: fresh spawn + explicit teardown per run. Opt in with --reuse-server
   // (or --reuse-dev-server for back-compat) when iterating locally.
@@ -1538,7 +1700,7 @@ async function runCapture(): Promise<void> {
   const artifactDir = makeArtifactDir();
   const browserProfileDir = join(artifactDir, 'browser-profile');
   mkdirSync(browserProfileDir, { recursive: true });
-  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} prewarm=${prewarm} runtimePreflight=${runtimePreflight} reuseServer=${reuseServer} serverMode=${serverMode}`);
+  logStep(`Config duration=${durationSeconds}s warmup=${warmupSeconds}s npcs=${effectiveNpcs} (requested=${npcs}) mode=${requestedMode} sandbox=${sandboxMode} seedPin=${seedPin ?? 'none'} startupTimeout=${startupTimeoutSeconds}s startupFrameThreshold=${startupFrameThreshold} runtimePreflightTimeout=${runtimePreflightTimeoutSeconds}s port=${port} headed=${headed} devtools=${devtools} playwrightTrace=${playwrightTrace} deepCdp=${deepCdp} combat=${enableCombat} activePlayer=${activePlayerScenario} compressFrontline=${compressFrontline} allowWarpRecovery=${allowWarpRecovery} activeTopUpHealth=${activeTopUpHealth} activeAutoRespawn=${activeAutoRespawn} movementDecisionIntervalMs=${movementDecisionIntervalMs} losHeightPrefilter=${losHeightPrefilter} sampleIntervalMs=${sampleIntervalMs} detailEverySamples=${detailEverySamples} prewarm=${prewarm} runtimePreflight=${runtimePreflight} reuseServer=${reuseServer} serverMode=${serverMode}`);
 
   let server: ServerHandle | null = null;
   let context: BrowserContext | null = null;
@@ -1557,9 +1719,10 @@ async function runCapture(): Promise<void> {
   const losPrefilterParam = losHeightPrefilter ? '1' : '0';
   const uiTransitionsParam = '0';
   const diagnosticsQuery = 'perf=1';
+  const seedQuery = seedPin !== null ? `&seed=${seedPin}` : '';
   const query = sandboxMode
-    ? `?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}`
-    : `?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}`;
+    ? `?sandbox=true&${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&npcs=${effectiveNpcs}&autostart=${autostart}&duration=${durationSeconds}&combat=${combatParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${seedQuery}`
+    : `?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}&logLevel=${encodeURIComponent(logLevel)}&losHeightPrefilter=${losPrefilterParam}${seedQuery}`;
   const url = `http://localhost:${port}/${query}`;
   const preflightUrl = `http://localhost:${port}/?${diagnosticsQuery}&uiTransitions=${uiTransitionsParam}`;
   const primaryPath = new URL(url).pathname + new URL(url).search;
@@ -2156,7 +2319,25 @@ async function runCapture(): Promise<void> {
               lastShotAt: Number(harnessDriver.lastShotAt ?? 0),
               lastFireProbe: harnessDriver.lastFireProbe && typeof harnessDriver.lastFireProbe === 'object'
                 ? harnessDriver.lastFireProbe
-                : null
+                : null,
+              terrainProfile: typeof harnessDriver.terrainProfile === 'string'
+                ? harnessDriver.terrainProfile
+                : undefined,
+              maxGradient: Number.isFinite(Number(harnessDriver.maxGradient))
+                ? Number(harnessDriver.maxGradient)
+                : undefined,
+              stuckTimeoutSec: Number.isFinite(Number(harnessDriver.stuckTimeoutSec))
+                ? Number(harnessDriver.stuckTimeoutSec)
+                : undefined,
+              losRejectedShots: Number(harnessDriver.losRejectedShots ?? 0),
+              stuckTeleportCount: Number(harnessDriver.stuckTeleportCount ?? 0),
+              maxStuckSeconds: Number(harnessDriver.maxStuckSeconds ?? 0),
+              gradientProbeDeflections: Number(harnessDriver.gradientProbeDeflections ?? 0),
+              waypointsFollowedCount: Number(harnessDriver.waypointsFollowedCount ?? 0),
+              waypointReplanFailures: Number(harnessDriver.waypointReplanFailures ?? 0),
+              waypointCount: Number(harnessDriver.waypointCount ?? 0),
+              waypointIdx: Number(harnessDriver.waypointIdx ?? 0),
+              movementTransitions: Number(harnessDriver.movementTransitions ?? 0)
             } : undefined,
             systemTop: Array.isArray(report?.systemBreakdown)
               ? report.systemBreakdown.slice(0, 3).map((s: any) => ({
@@ -2249,9 +2430,16 @@ async function runCapture(): Promise<void> {
       enableCombat && activePlayerScenario
         ? (requestedMode === 'open_frontier' ? 'critical' : requestedMode === 'a_shau_valley' ? 'relaxed' : 'strict')
         : 'off';
+    const baseModeThresholds = enableCombat && activePlayerScenario
+      ? HARNESS_MODE_THRESHOLDS[requestedMode] ?? null
+      : null;
+    const modeThresholds = baseModeThresholds
+      ? scaleModeThresholdsForDuration(baseModeThresholds, durationSeconds)
+      : null;
     validation = validateRun(runtimeSamples, consoleEntries, durationSeconds, {
       hitValidation: hitValidationMode,
-      sampleIntervalMs
+      sampleIntervalMs,
+      modeThresholds
     });
     if (!startupState.started) {
       validation.checks.push({
