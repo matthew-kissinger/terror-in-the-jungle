@@ -3,6 +3,7 @@ import { BuildingModels, PropModels, StructureModels } from './modelPaths';
 export type ModelGroundingMode = 'bounds_center_bottom';
 export type ModelCollisionMode = 'none' | 'bounds';
 export type ModelNormalizeBy = 'height' | 'width' | 'depth' | 'none';
+export type ModelDrawCallOptimizationStrategy = 'merge' | 'batch';
 
 export interface ExpectedModelDimensions {
   width: number;
@@ -19,12 +20,14 @@ export interface ModelPlacementProfile {
   minSpacing?: number;
   coverOffset?: number;
   displayScale?: number;
+  drawCallOptimization?: ModelDrawCallOptimizationStrategy;
 }
 
 const DEFAULT_MODEL_PLACEMENT_PROFILE: ModelPlacementProfile = {
   groundingMode: 'bounds_center_bottom',
   normalizeBy: 'none',
   collisionMode: 'none',
+  drawCallOptimization: 'merge',
 };
 
 const PROFILE_OVERRIDES: Record<string, ModelPlacementProfile> = {
@@ -55,27 +58,32 @@ const PROFILE_OVERRIDES: Record<string, ModelPlacementProfile> = {
     groundingMode: 'bounds_center_bottom',
     normalizeBy: 'none',
     collisionMode: 'none',
+    drawCallOptimization: 'batch',
   },
   [StructureModels.GUARD_TOWER]: {
     groundingMode: 'bounds_center_bottom',
     normalizeBy: 'none',
     collisionMode: 'none',
+    drawCallOptimization: 'batch',
   },
   [StructureModels.COMMS_TOWER]: {
     groundingMode: 'bounds_center_bottom',
     normalizeBy: 'none',
     collisionMode: 'none',
+    drawCallOptimization: 'batch',
   },
   [StructureModels.WATER_TOWER]: {
     groundingMode: 'bounds_center_bottom',
     normalizeBy: 'none',
     collisionMode: 'none',
+    drawCallOptimization: 'batch',
   },
   [StructureModels.SANDBAG_BUNKER]: {
     groundingMode: 'bounds_center_bottom',
     normalizeBy: 'none',
     collisionMode: 'none',
     coverHeight: 1.5,
+    drawCallOptimization: 'batch',
   },
   [StructureModels.FOXHOLE]: {
     groundingMode: 'bounds_center_bottom',
@@ -86,21 +94,25 @@ const PROFILE_OVERRIDES: Record<string, ModelPlacementProfile> = {
     groundingMode: 'bounds_center_bottom',
     normalizeBy: 'none',
     collisionMode: 'none',
+    drawCallOptimization: 'batch',
   },
   [StructureModels.VILLAGE_HUT]: {
     groundingMode: 'bounds_center_bottom',
     normalizeBy: 'none',
     collisionMode: 'none',
+    drawCallOptimization: 'batch',
   },
   [BuildingModels.FARMHOUSE]: {
     groundingMode: 'bounds_center_bottom',
     normalizeBy: 'none',
     collisionMode: 'none',
+    drawCallOptimization: 'batch',
   },
   [BuildingModels.WAREHOUSE]: {
     groundingMode: 'bounds_center_bottom',
     normalizeBy: 'none',
     collisionMode: 'none',
+    drawCallOptimization: 'batch',
   },
   [StructureModels.FUEL_DRUM]: {
     groundingMode: 'bounds_center_bottom',

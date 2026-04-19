@@ -47,4 +47,17 @@ describe('optimizeStaticModelDrawCalls', () => {
     expect(result.mergedMeshCount).toBe(2);
     expect(countMeshes(root)).toBe(2);
   });
+
+  it('can preserve per-object batch instances instead of merging geometry', () => {
+    const root = new THREE.Group();
+    root.add(makeMesh(0x4a5a2a, -2));
+    root.add(makeMesh(0x4a5a2a, 2));
+
+    const result = optimizeStaticModelDrawCalls(root, { strategy: 'batch' });
+
+    expect(result.sourceMeshCount).toBe(2);
+    expect(result.mergedMeshCount).toBe(1);
+    expect(countMeshes(root)).toBe(1);
+    expect((root.children[0] as THREE.BatchedMesh).isBatchedMesh).toBe(true);
+  });
 });

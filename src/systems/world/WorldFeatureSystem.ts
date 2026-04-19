@@ -230,14 +230,16 @@ export class WorldFeatureSystem implements GameSystem {
   }
 
   private optimizeStaticPlacementObject(object: THREE.Object3D, modelPath: string): void {
+    const profile = getModelPlacementProfile(modelPath);
     const result = optimizeStaticModelDrawCalls(object, {
       batchNamePrefix: modelPath.replace(/[/.]/g, '_'),
+      strategy: profile.drawCallOptimization,
     });
 
     if (result.sourceMeshCount > 1 && result.mergedMeshCount > 0) {
       Logger.info(
         'world',
-        `Optimized static placement ${modelPath}: ${result.sourceMeshCount} leaf meshes -> ${result.mergedMeshCount} batches`,
+        `Optimized static placement ${modelPath}: ${result.sourceMeshCount} leaf meshes -> ${result.mergedMeshCount} ${profile.drawCallOptimization} batch(es)`,
       );
     }
   }

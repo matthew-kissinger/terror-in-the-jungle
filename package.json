@@ -77,7 +77,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
-    "@types/three": "^0.183.0",
+    "@types/three": "^0.184.0",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
     "@typescript-eslint/parser": "^8.58.0",
     "cross-env": "^7.0.3",
@@ -105,7 +105,7 @@
     "@recast-navigation/core": "^0.43.0",
     "@recast-navigation/generators": "^0.43.0",
     "@recast-navigation/three": "^0.43.0",
-    "three": "^0.183.0",
+    "three": "^0.184.0",
     "three-mesh-bvh": "^0.9.9"
   }
 }

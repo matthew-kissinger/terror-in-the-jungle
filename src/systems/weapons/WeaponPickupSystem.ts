@@ -89,6 +89,7 @@ export class WeaponPickupSystem implements GameSystem {
         side: THREE.DoubleSide,
         transparent: true,
         opacity: 0.8,
+        forceSinglePass: true,
         depthWrite: false
       });
       this.materials.set(type as WeaponType, material);

@@ -101,6 +101,7 @@ export function createExplosionEffect(
     transparent: true,
     opacity: 0.6,
     side: THREE.DoubleSide,
+    forceSinglePass: true,
     blending: THREE.AdditiveBlending,
     depthWrite: false
   });

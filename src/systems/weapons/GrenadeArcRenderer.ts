@@ -223,6 +223,7 @@ export class GrenadeArcRenderer {
       transparent: true,
       opacity: 0.7, // More opaque
       side: THREE.DoubleSide,
+      forceSinglePass: true,
       depthTest: false
     });
 

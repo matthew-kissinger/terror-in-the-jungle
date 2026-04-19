@@ -133,7 +133,7 @@ export class CombatantMeshFactory {
     ) => {
       const spriteMaterial = new THREE.MeshBasicMaterial({
         map: texture, transparent: true, alphaTest: 0.5,
-        side: THREE.DoubleSide, depthWrite: true
+        side: THREE.DoubleSide, forceSinglePass: true, depthWrite: true
       });
       const mesh = new THREE.InstancedMesh(soldierGeometry, spriteMaterial, maxInstances);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -159,7 +159,7 @@ export class CombatantMeshFactory {
 
       const markerMaterial = new THREE.MeshBasicMaterial({
         color: markerColor, transparent: true, opacity: 0.6,
-        side: THREE.DoubleSide, depthWrite: false
+        side: THREE.DoubleSide, forceSinglePass: true, depthWrite: false
       });
       const markerMesh = new THREE.InstancedMesh(markerGeometry, markerMaterial, maxInstances);
       markerMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

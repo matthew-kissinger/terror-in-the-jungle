@@ -39,6 +39,7 @@ export class PixelPerfectUtils {
       transparent,
       alphaTest: transparent ? 0.5 : 0,  // Higher alpha test to remove outlines
       side: THREE.DoubleSide,
+      forceSinglePass: transparent,
       depthWrite: true  // Ensure proper depth sorting
     });
   }

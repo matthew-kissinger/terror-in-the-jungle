@@ -41,6 +41,7 @@ export class MortarVisuals {
       transparent: true,
       opacity: 0.9,
       side: THREE.DoubleSide,
+      forceSinglePass: true,
       depthTest: false
     });
 
@@ -61,6 +62,7 @@ export class MortarVisuals {
       transparent: true,
       opacity: 0.4,
       side: THREE.DoubleSide,
+      forceSinglePass: true,
       depthTest: false
     });
 

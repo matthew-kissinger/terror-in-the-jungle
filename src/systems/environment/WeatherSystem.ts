@@ -126,6 +126,7 @@ export class WeatherSystem implements GameSystem {
       transparent: true,
       opacity: 0.6,
       side: THREE.DoubleSide,
+      forceSinglePass: true,
       depthWrite: false
     });
 

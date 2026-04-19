@@ -70,7 +70,8 @@ export class ZoneRenderer {
       color: 0x0066cc,
       transparent: true,
       opacity: 0.9,
-      side: THREE.DoubleSide
+      side: THREE.DoubleSide,
+      forceSinglePass: true
     });
     zone.usFlagMesh = new THREE.Mesh(flagGeometry, usFlagMaterial);
     zone.usFlagMesh.position.copy(zone.position);
@@ -85,7 +86,8 @@ export class ZoneRenderer {
       color: 0xcc0000,
       transparent: true,
       opacity: 0.9,
-      side: THREE.DoubleSide
+      side: THREE.DoubleSide,
+      forceSinglePass: true
     });
     zone.opforFlagMesh = new THREE.Mesh(flagGeometry, opforFlagMaterial);
     zone.opforFlagMesh.position.copy(zone.position);
@@ -115,7 +117,8 @@ export class ZoneRenderer {
       color: 0xffffff,
       transparent: true,
       opacity: 0.6,
-      side: THREE.DoubleSide
+      side: THREE.DoubleSide,
+      forceSinglePass: true
     });
     zone.progressRing = new THREE.Mesh(progressGeometry, progressMaterial);
     zone.progressRing.rotation.x = -Math.PI / 2;

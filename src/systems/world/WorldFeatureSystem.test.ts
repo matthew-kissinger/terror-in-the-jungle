@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { GameMode } from '../../config/gameModeTypes';
 import { WorldFeatureSystem } from './WorldFeatureSystem';
 import { modelLoader } from '../assets/ModelLoader';
+import { BuildingModels } from '../assets/modelPaths';
 
 vi.mock('../assets/ModelLoader', () => ({
   modelLoader: {
@@ -217,5 +218,37 @@ describe('WorldFeatureSystem', () => {
     });
 
     expect(meshCount).toBe(1);
+  });
+
+  it('uses BatchedMesh for placement profiles that opt into batched world props', async () => {
+    currentConfig = {
+      id: GameMode.ZONE_CONTROL,
+      features: [
+        {
+          id: 'batched_static_feature',
+          kind: 'village',
+          position: new THREE.Vector3(10, 0, 20),
+          staticPlacements: [
+            {
+              modelPath: BuildingModels.WAREHOUSE,
+              offset: new THREE.Vector3(0, 0, 0),
+            },
+          ],
+        },
+      ],
+    };
+
+    system.update(0.016);
+    await flushPromises();
+
+    const placed = scene.children[0];
+    let batchedMeshCount = 0;
+    placed.traverse((child) => {
+      if ((child as THREE.BatchedMesh).isBatchedMesh) {
+        batchedMeshCount++;
+      }
+    });
+
+    expect(batchedMeshCount).toBe(1);
   });
 });
