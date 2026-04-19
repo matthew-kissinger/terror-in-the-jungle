@@ -1,12 +1,12 @@
-# perf-harness-redesign: per-mode drivers, LOS-aware fire, fail-loud validators
+# perf-harness-redesign: terrain-aware pathing, LOS-gated fire, fail-loud validators
 
 **Slug:** `perf-harness-redesign`
 **Cycle:** `cycle-2026-04-18-harness-flight-combat`
-**Depends on:** nothing in this cycle (AgentController primitive + SeededRandom/ReplayRecorder already on master but are NOT in scope for this task — see "Non-goals")
+**Depends on:** nothing in this cycle (AgentController, SeededRandom, ReplayRecorder stay on master but are NOT consumed by this task — see "Non-goals")
 **Blocks (in this cycle):** `heap-regression-investigation` (wants a capture surface that actually exercises combat), `perf-baseline-refresh` (rebaseline must use the fixed harness)
-**Playtest required:** yes (harness IS a playtest surface; fire-path behavior must be observable live)
-**Estimated risk:** low-to-medium — narrow, surgical improvements on the known-working pre-A4 imperative driver
-**Files touched:** `scripts/perf-active-driver.js` (surgical edits, stay within ~1900 LOC total), `scripts/perf-capture.ts` (validator contract), new `scripts/perf-harness/validators.js` (or inline — executor's call), `src/core/bootstrap.ts` (only if agent-exposure gate needs a tweak). No `src/dev/harness/**` this time.
+**Playtest required:** yes — **merge-gated on playtest**, not the usual post-merge checklist. The reverted PR #88 would have been caught if this gate had been in place.
+**Estimated risk:** medium — the terrain-navigation work is a new layer; the surrounding changes are surgical
+**Files touched:** `scripts/perf-active-driver.js` (primary edits), `scripts/perf-capture.ts` (validator wiring, optional seed query param plumbing), possibly `src/config/MapSeedRegistry.ts` (adding an AI_SANDBOX harness-test variant) or a URL-param seed override, new tests under `scripts/perf-harness/` or inline.
 
 ## Why this task exists
 
@@ -17,124 +17,195 @@ The declarative `src/dev/harness/` approach from PR #88 (`perf-harness-architect
 3. The player fired through terrain at enemies with no LOS gating.
 4. combat120 capture produced `shots_fired=0`, `hits=0` over a full 90s with 120 NPCs. The new harness's own validators correctly marked the run FAIL, which is how the break surfaced.
 
-The older imperative `scripts/perf-active-driver.js` (1755 LOC, restored on master by PR #89) was action-oriented and produced meaningful combat activity. Its shape is worth preserving. It has the two key properties the declarative attempt lost: **per-mode tuning tables** (distances, juke style, decision cadence) and **direct method invocation** into `playerController` (not a DOM-event pipeline that can be silently disconnected).
+Post-revert observation from the user: combat120 runs on procedural `ai_sandbox` terrain that is **frequently a steep hill**. The restored imperative driver issues raw WASD keys based on direction-to-target. On flat ground that works. On a steep slope it fails three ways:
 
-This task upgrades the restored imperative driver with the one good idea from the reverted declarative harness (fail-loud validators) and the one new improvement the playtest exposed (LOS-aware fire gating). It does NOT introduce a new module, new DSL, or new policy/scenario/validator abstraction layer.
+1. `W` toward the hill face doesn't climb (player physics blocks ascent or forces a sideways slide).
+2. The A/D "juke" logic picks perpendicular strafes that oscillate along the contour line — left/right, left/right — because both strafes point toward similar-gradient terrain.
+3. There's no awareness that going *around* the hill would reach the engagement faster than trying to go *through* it.
+
+This task fixes both the reverted declarative attempt's shortfalls AND the terrain-navigation weakness in the restored imperative driver. It keeps the driver imperative (the shape the user confirmed "worked better") and adds four principled layers for terrain-aware movement, plus LOS-gated fire, fail-loud validators, and a deterministic-seed pin for combat120.
 
 ## Required reading first
 
-- `scripts/perf-active-driver.js` — the 1755-LOC base. Read `createDriver()`, `modeProfiles`, `mouseDown`/`mouseUp`, `syncCameraAim`, `findNearestOpfor`, `getPlayerShotRay`, and the main movement+fire loop (~line 1190 onward). This is the file you're editing.
-- `scripts/perf-capture.ts` — `validation` handling, `summary.json`/`validation.json` writes, acceptance gates (around line 1520–1700). Understand how `status: 'failed'` flows through to exit code.
-- `src/systems/player/PlayerController.ts` (or wherever `actionFireStart`/`actionFireStop` live) — the exposed fire surface the driver invokes. Confirm the method names haven't drifted.
-- `src/systems/combat/` — the path a fire-intent takes from the player controller through weapon → shot → damage. Specifically check: does a shot fired by `actionFireStart()` go through the same LOS-aware resolution as a real mouse-driven shot? If so, the "shooting through terrain" issue is the aim path, not the resolve path.
+- `scripts/perf-active-driver.js` — the 1755-LOC base on master. Read `createDriver()`, `modeProfiles`, `mouseDown`/`mouseUp`, `syncCameraAim`, `findNearestOpfor`, `getPlayerShotRay`, `setHarnessPlayerPosition`, and the movement+fire loop starting ~line 1190.
+- `scripts/perf-capture.ts` — `validation` handling, `summary.json` / `validation.json` writes, `--mode` / `--npcs` / query-string construction (~line 1555: `const query = sandboxMode ? ... : ...`). Understand how `status: 'failed'` flows to exit code.
+- `src/systems/navigation/NavmeshSystem.ts` — exposes `queryPath(start: THREE.Vector3, end: THREE.Vector3): THREE.Vector3[] | null`. This is the macro-routing surface.
+- `src/systems/player/PlayerController.ts` (or wherever `actionFireStart` / `actionFireStop` live) — confirm method names haven't drifted.
+- `src/systems/combat/` — path a fire intent takes from controller through weapon → shot → damage. If `actionFireStart()` resolves shots through the same LOS-aware path as real mouse fire, the "shooting through terrain" issue is the aim path, not the resolve path. The harness LOS gate addresses the aim path.
+- `src/config/MapSeedRegistry.ts` — AI_SANDBOX is NOT in the registry (intentionally random; see line 45 comment). For deterministic combat120 terrain, either pass a seed via URL query param or add an AI_SANDBOX entry.
 - `docs/TESTING.md` — behavior tests only.
 - `docs/INTERFACE_FENCE.md` — no fence changes expected.
 
 ### What to look at but NOT build on
 
-- `src/systems/agent/` — the AgentController primitive (shipped in cycle-2026-04-18-rebuild-foundation). Stays. This task does NOT consume it. The reverted harness tried to; it didn't work for reasons tied to the policy abstraction, not the primitive itself.
-- `src/core/SeededRandom.ts` / `ReplayRecorder.ts` / `ReplayPlayer.ts` — stay. Not consumed by this task. (Future harness redesigns may consume them; this task is about unblocking the cycle.)
+- `src/systems/agent/` — AgentController primitive stays on master. This task does NOT consume it.
+- `src/core/SeededRandom.ts` / `ReplayRecorder.ts` / `ReplayPlayer.ts` — stay. Not consumed by this task.
 
-## Target state
+## Target state — four-layer terrain-aware movement
 
-### 1. Per-mode drivers confirmed action-oriented
+The current driver has one movement layer: "WASD toward target direction." This task stacks four layers on top of the existing driver, in priority order. Each layer cascades: if a higher layer can't make progress, the next layer down takes over.
 
-The restored driver already has a `modeProfiles` table covering `ai_sandbox`, `open_frontier`, `a_shau_valley`, `zone_control`, `team_deathmatch`. Verify each mode's profile produces observable combat activity by running a short smoke capture in each and recording `shots_fired` / `hits` / `movementTransitions` in a scratch table:
+### Layer 1 — Macro routing via navmesh waypoints
 
-```
-mode                 shots_fired  hits  transitions  notes
-ai_sandbox (120)        > 50      > 5    > 3
-open_frontier:short     > 30      > 2    > 3
-a_shau_valley:short     > 30      > 2    > 3
-zone_control (60)       > 20      > 1    > 2
-team_deathmatch (80)    > 30      > 2    > 2
-```
+At scenario start and every 5s thereafter (or when stuck), compute a path from current position to the engagement center via `NavmeshSystem.queryPath(playerPos, engagementCenter)`. If a path is returned, store the waypoint list. The driver's movement loop follows waypoints: aim keys toward the *next waypoint*, not directly at the final target. Advance to the next waypoint when within 4m of the current one.
 
-If any mode produces < half these numbers, tune that mode's profile — usually `approachDistance` too aggressive (player stops moving before in range) or `maxFireDistance` too tight (fire rejected on long-range engagements). Do not retune all five unless needed; flag the observed mis-tune in PR description.
+If `queryPath` returns null (e.g. player off-navmesh after a respawn-teleport), fall back to Layer 2 until the next re-plan.
 
-### 2. LOS-aware fire gate
+**Key pragmatic choice:** the navmesh is built for NPCs, not the player. NPC agent radius and physics may differ slightly from the player's. Use the waypoint list as a *guide* for direction — not as a rigid rails-movement constraint. Layer 2 does the actual per-tick heading choice within the waypoint leg.
 
-The driver currently aims via `camera.lookAt(target)` which ignores terrain between camera and target. Add a terrain-occlusion probe before pulling the trigger:
+### Layer 2 — Micro steering via terrain-gradient probe
+
+On each decision tick (~450ms), given current heading toward next waypoint (or target if Layer 1 has no path), sample terrain height at `lookAhead = 8m` in 5 candidate directions:
+- `ahead` (direction to waypoint)
+- `ahead ± 45°`
+- `ahead ± 90°`
+
+For each candidate, compute gradient as `(heightAt(probePoint) - currentHeight) / lookAhead`. Pick the candidate that:
+1. Advances toward the waypoint (positive dot-product with waypoint bearing), AND
+2. Has `|gradient| < maxGradient` (see Layer 4 per-mode tuning; default ≈ 0.45 ≈ 24°).
+
+If all 5 candidates exceed `maxGradient`, flag stuck (→ Layer 3). If multiple candidates pass, prefer the one with smallest `|gradient|` (stay on gentle terrain).
+
+Translate chosen heading to WASD: the existing driver has the mapping (`KeyW` forward, `KeyA`/`KeyD` strafe, yaw via `syncCameraAim`). Re-use it.
+
+### Layer 3 — Stuck detection → teleport recovery
+
+Track horizontal player position over a rolling 5s window. If horizontal displacement < 2m and the driver has issued movement commands consistently over that window, mark stuck. Options in order:
+1. Re-plan (call Layer 1's `queryPath` again; maybe the previous plan was stale).
+2. If re-plan fails or produces the same impassable first waypoint, teleport to the next waypoint via `setHarnessPlayerPosition(systems, nextWaypoint, 'harness.recovery.stuck')`.
+3. If no waypoints, teleport to engagement center (existing behavior for `harness.recovery.frontline_start`).
+
+Teleport is the last resort but the existing driver already uses it for frontline recovery; the new code just adds "stuck on steep terrain" as another trigger.
+
+### Layer 4 — Scenario-level terrain contract
+
+Extend the existing `modeProfiles` object with a `terrainProfile` field:
 
 ```js
-function hasLineOfSightToTarget(systems, playerPos, target, camera) {
-  // Cast a ray from camera/eye position toward target position.
-  // Use terrainSystem.raycast or existing getPlayerShotRay to check
-  // whether terrain blocks the line before the target.
-  // Returns true iff shot can reach target without intersecting terrain.
+modeProfiles = {
+  ai_sandbox: {
+    // ... existing fields ...
+    terrainProfile: 'mountainous',
+    maxGradient: 0.55,           // 28° — steeper allowed since the map is hilly
+    stuckTimeoutSec: 4,          // shorter — teleport sooner on steep terrain
+    waypointReplanIntervalMs: 3500,
+    combatSeedPin: 'AI_SANDBOX_COMBAT120_v1',  // see seed-pinning note below
+  },
+  open_frontier: { ..., terrainProfile: 'rolling', maxGradient: 0.45, stuckTimeoutSec: 6, waypointReplanIntervalMs: 5000 },
+  a_shau_valley: { ..., terrainProfile: 'mountainous', maxGradient: 0.60, stuckTimeoutSec: 5, waypointReplanIntervalMs: 4000 },
+  zone_control: { ..., terrainProfile: 'rolling', maxGradient: 0.45, stuckTimeoutSec: 6 },
+  team_deathmatch: { ..., terrainProfile: 'flat', maxGradient: 0.35, stuckTimeoutSec: 8 },
+};
+```
+
+`stuckTimeoutSec` and `maxGradient` values above are starter proposals; tune after smoke captures.
+
+### Seed pinning for combat120 (scenario-side, not driver-side)
+
+The AI_SANDBOX map is random per seed; procedural hilly layouts are common. To make combat120 capture reproducible AND avoid pathological terrain, pin the seed in the `perf:capture:combat120` script. Two shapes — executor's call:
+
+**Option A — URL query param.** Add `&seed=12345` to the combat120 URL in `scripts/perf-capture.ts`. Verify the game reads `?seed=` and respects it for AI_SANDBOX layout. Simpler; no registry change.
+
+**Option B — MapSeedRegistry entry.** Add an `AI_SANDBOX` variant block to `src/config/MapSeedRegistry.ts` with one pre-baked seed selected for flatter engagement terrain. Requires running `scripts/prebake-navmesh.ts` for that seed. More invasive.
+
+Prefer Option A unless the game's AI_SANDBOX path ignores `?seed=`. Pick the concrete seed number after a few smoke captures — choose one that shows `shots_fired > 50` with the least post-fix tuning. Record the seed choice in PR description.
+
+### LOS-aware fire gate (on top of the 4 layers)
+
+Before calling `actionFireStart`, probe the shot ray for terrain occlusion:
+
+```js
+function hasLineOfSightToTarget(systems, cameraPos, targetPos) {
+  // Use existing getPlayerShotRay or a fresh terrain raycast.
+  // Return true iff the ray from cameraPos to targetPos does not
+  // intersect terrain before reaching targetPos.
 }
 ```
 
-- If `hasLineOfSightToTarget` returns false, do NOT call `actionFireStart`. Optionally: trigger a reposition (e.g. side-strafe a short distance) to seek a clear LOS.
-- If true, proceed with fire as today.
-- `getPlayerShotRay(systems, camera)` already exists in the driver — reuse, extend, or replace. Read it first.
+If LOS blocked, do NOT call `actionFireStart`. Increment a `los_rejected_shots` counter. The movement layers above will likely have already repositioned the player to find LOS; if not, the stuck-teleport will.
 
-Behavior contract: when LOS is blocked, `shots_fired` should remain 0 for that frame but `movementTransitions` should increment (the driver repositions). If the harness is surrounded by terrain-blocked enemies, it's acceptable to have sub-threshold `shots_fired` for a specific capture, and the validator threshold for that mode can be tuned. But in the default scenarios, the player spawn points put hostiles in open terrain — if you see harness captures where the player is permanently blocked, the spawn logic is wrong, not the LOS gate.
+### Fail-loud validators
 
-### 3. Fail-loud validators
+Keep the restored driver's `validation.json` output. Treat `validation.overall = 'fail'` as capture failure in `perf-capture.ts`. Confirm non-zero exit on fail.
 
-Preserve this idea from the reverted harness. Treat `validation.overall = 'fail'` as capture failure in `perf-capture.ts`. The restored `validation` infrastructure already exists in the capture script — confirm it still writes `validation.json` and that failing validators cause non-zero exit. If not, wire it.
+Per-mode validator thresholds (starter values; tune after smoke captures):
 
-Minimum validator set per scenario:
-
-| Validator | Threshold (combat120) | Threshold (open_frontier:short) | Threshold (a_shau_valley:short) | Threshold (frontier30m) |
-|-----------|----------------------|--------------------------------|-------------------------------|------------------------|
+| Validator | combat120 | open_frontier:short | a_shau_valley:short | frontier30m |
+|-----------|-----------|---------------------|---------------------|-------------|
 | `min_shots_fired` | 50 | 30 | 30 | 200 |
 | `min_hits_recorded` | 5 | 2 | 2 | 20 |
 | `max_stuck_seconds` | 5 | 8 | 8 | 15 |
 | `min_movement_transitions` | 3 | 3 | 3 | 10 |
 
-Start with these; executor can tune after smoke captures. If a measured value is < 60% of the threshold, the threshold is too tight — bump down to the smallest value that the measured capture passes comfortably. Document chosen values in PR description.
+Thresholds should be achievable by the fixed driver with ~30% headroom. Document chosen values in PR description.
 
-### 4. A4-class regression protection
+### A4-class regression guard
 
-Add a behavior test at `scripts/perf-harness/perf-active-driver.test.js` (or equivalent — executor's call on path) that exercises the driver's fire decision logic with a deliberately sign-flipped target-delta: the driver should aim AWAY from target, `actionFireStart` should NOT be invoked (LOS gate rejects), and the validator check on `shots_fired` would fail the capture if run live. Keep this test fast (no live browser — mock `systems.playerController`, etc.).
-
-This is smaller than the reverted harness's sign-flip test but serves the same purpose: the A4 class of regression (invisible wrong-direction behavior) cannot reoccur silently.
+Behavior test at `scripts/perf-harness/perf-active-driver.test.js` (executor's call on exact path): with a mocked `systems.playerController`, exercise the fire decision with a sign-flipped target-delta. Expect: `actionFireStart` is NOT invoked; `los_rejected_shots` or a similar counter rises. This is the guard against the A4 class of silent-wrong-direction regression.
 
 ## Steps
 
-1. Read `scripts/perf-active-driver.js` in full. Build a short scratchpad of what each section does. Identify the 4–6 edit points required for this task.
-2. Verify the restored driver works end-to-end: `npm run build:perf` then `npm run perf:capture:combat120`. Expect a green `validation.overall = 'pass'` with `shots_fired > 50`. If it doesn't pass on the restored driver, the revert is incomplete — STOP and escalate.
-3. Run smoke captures in all 5 mode profiles (short durations OK, e.g. 30–45 sec). Record `shots_fired`, `hits`, `movementTransitions` per mode in the PR description table.
-4. Add the LOS-aware fire gate (`hasLineOfSightToTarget`). Add a behavior test covering: (a) clear LOS → fire allowed, (b) terrain-blocked LOS → fire rejected.
-5. Re-run all 5 smoke captures. Compare against the pre-LOS-gate values from step 3. Expected: small drop in `shots_fired` (< 20%), small rise in `movementTransitions` (< 30%). If either exceeds those bounds, the LOS gate is too strict — tune.
-6. Wire fail-loud validation: confirm `validation.overall = 'fail'` makes `perf-capture.ts` exit non-zero. Add per-mode minimum validator thresholds from the table above.
-7. Add the A4-regression behavior test (sign-flipped delta → no fire).
-8. `npm run lint`, `npm run test:run`, `npm run build`, `npm run build:perf` green.
-9. **Playtest**: run `npm run perf:capture:combat120 --headed` and watch. The player should move toward enemies, engage at appropriate range, fire, take cover. No looking-at-ground, no bouncing, no shooting-through-terrain. Document one observation per mode in PR description.
+1. Read all "Required reading first" files. Build a scratchpad of the 4-6 edit points in `perf-active-driver.js` required for this task.
+2. **Baseline gate (hard).** On current master (c480609), run `npm run build:perf` + `npm run perf:capture:combat120`. Expect `validation.overall = 'pass'` with `shots_fired > 50`. If it doesn't pass, the revert is broken — STOP and escalate. The baseline capture is proof the imperative driver at least produces shots on its current AI_SANDBOX seed.
+3. Smoke captures in all 5 modes (30–45s each). Record `shots_fired`, `hits`, `movementTransitions`, `max_stuck_seconds` per mode. Identify the worst performer; that's where Layer 1+2 will show the most improvement.
+4. Implement Layer 4 (scenario terrain contract). Extend `modeProfiles` with `terrainProfile`, `maxGradient`, `stuckTimeoutSec`, `waypointReplanIntervalMs`, `combatSeedPin` (where applicable).
+5. Implement Layer 3 (stuck detection → teleport). Extend the existing rolling-position tracker. Add "stuck-on-steep-terrain" as a new `setHarnessPlayerPosition` trigger reason.
+6. Implement Layer 2 (terrain-gradient probe). Add `chooseHeadingByGradient(systems, from, towardBearing, maxGrad)` function. Wire it between the existing direction-to-target computation and the WASD key press logic.
+7. Implement Layer 1 (navmesh waypoints). Add `planWaypoints(systems, playerPos, target)` wrapping `NavmeshSystem.queryPath`. Store waypoint list on driver state. Movement loop now aims toward `currentWaypoint` instead of `finalTarget`.
+8. Implement seed pinning (Option A preferred). Pass `&seed=<chosen>` in `scripts/perf-capture.ts` for combat120. Pick the seed after smoke-capturing 3–5 candidates on the updated driver; choose the one where the fixed driver achieves highest `shots_fired` with least tuning.
+9. Implement LOS-aware fire gate. Add `hasLineOfSightToTarget`. Call it before `actionFireStart`.
+10. Wire fail-loud validators in `perf-capture.ts`. Confirm `validation.overall = 'fail'` produces non-zero exit.
+11. Add the A4-class regression test.
+12. Run full smoke-capture sweep (all 5 modes, plus combat120 on the pinned seed). Tune thresholds to measured × 0.7 for pass, measured × 0.5 for warn.
+13. `npm run lint`, `npm run test:run`, `npm run build`, `npm run build:perf` green.
+14. **Live playtest (`npm run perf:capture:combat120 --headed`).** You cannot eyeball the browser window, but you CAN record in your PR report:
+    - Did `shots_fired > 50`? Exact value.
+    - Did `hits_recorded > 5`? Exact value.
+    - Did `max_stuck_seconds` stay under threshold? Exact value.
+    - Did any `los_rejected_shots` counter rise (proves the LOS gate engages)?
+    - Did any `harness.recovery.stuck` reasons appear in the console log? (One or two is fine; many means the terrain layers aren't keeping up — tune.)
+    The orchestrator will escalate the actual eyeball playtest to the human before merge.
 
 ## Exit criteria
 
-- `scripts/perf-active-driver.js` retains its per-mode profile structure; total LOC is within ~±150 of the pre-revert 1755 (scope creep guard).
-- `npm run perf:capture:combat120` produces `validation.overall = 'pass'` with `shots_fired > 50`, `hits > 5`.
-- Smoke captures in all 5 modes produce `validation.overall = 'pass'`.
+- `scripts/perf-active-driver.js` stays imperative; no new module created under `src/dev/harness/`.
+- Total LOC net change within ~+700 (the 4-layer terrain work is the bulk; original brief's ~500 budget is raised to reflect scope).
+- `npm run perf:capture:combat120` (on pinned seed) produces `validation.overall = 'pass'` with `shots_fired > 50`, `hits > 5`, `max_stuck_seconds < 5`.
+- Smoke captures in all 5 modes pass their per-mode thresholds.
 - LOS-aware fire gate rejects shots through terrain. Behavior test proves this.
 - A4-class regression test proves sign-flipped aim does not fire.
-- Live playtest on combat120: player visibly engages, no looking-at-ground, no shooting-through-terrain.
+- Live capture evidence in PR description: shots, hits, stuck-seconds, LOS-rejected count, teleport-recovery reasons.
 - `npm run lint`, `npm run test:run`, `npm run build`, `npm run build:perf` green.
 
 ## Non-goals
 
-- No rewrite of the imperative driver into a declarative DSL. If the executor reads the 1755 LOC and thinks "I can do this in 400 lines," that's the exact failure mode that produced PR #88. Stop.
-- No consumption of AgentController / SeededRandom / ReplayRecorder. These stay on master as primitives; a future cycle can layer them in after this harness is proven stable.
-- No new scenario types. The 5 existing mode profiles are the surface.
-- No deterministic-replay feature. Capture → analyze is the flow. Replay comes later.
-- No `src/dev/harness/` module. This task edits script files under `scripts/` and makes surgical changes to `src/core/bootstrap.ts` only if the existing `window.__engine` exposure gate needs a tweak.
-- No new `window.__*` globals. The restored driver uses `window.__engine`; stay with it.
-- No attempt to also fix the shooting-through-terrain bug if it exists in the underlying shot-resolve path. This task only adds an aim-path LOS gate in the harness driver. A separate task can investigate whether real player-driven shots also penetrate terrain — that's a combat-system bug, not a harness bug.
+- No rewrite of the imperative driver into a declarative DSL. This is the non-negotiable scope fence.
+- No consumption of AgentController / SeededRandom / ReplayRecorder.
+- No new `src/dev/harness/` module.
+- No deterministic-replay feature. Capture → analyze is the flow; replay comes later.
+- No new `window.__*` globals. Stay on `window.__engine`.
+- No fix for underlying combat shot-resolution (if real mouse fire also penetrates terrain, that's a separate task — the harness LOS gate is aim-path only).
+- No new mode profiles. The 5 existing modes are the surface.
+- No changes to NPC combat AI, weapons, terrain system, or navmesh system. `NavmeshSystem.queryPath` is consumed as-is.
+- No new npc / player input primitives.
 
 ## Hard stops
 
-- Restored driver fails validation on step 2 (shots_fired=0 on combat120 even without new gate) — STOP. Revert didn't restore the pre-rebuild behavior cleanly; escalate before layering changes on a broken base.
-- LOS gate kills shots_fired across all modes (more than ~20% drop) — STOP. Either the gate is too strict, or most scenario spawn points are terrain-blocked (spawn bug, not harness bug).
-- Live playtest still shows player looking at ground or bouncing back and forth after your edits — STOP. The mode profile tuning is wrong; don't ship a cosmetic fix.
-- Any fence change to `src/types/SystemInterfaces.ts` — STOP.
-- Diff exceeds ~500 LOC net — STOP, propose tighter brief. This is a surgical improvement, not a rewrite.
-- Executor proposes building a new scenario/policy/validator module under `src/dev/harness/` — STOP. That path was tried and reverted.
+- Restored driver fails Step 2's baseline gate (`shots_fired=0` even before your changes) → STOP. The revert is incomplete.
+- LOS gate drops `shots_fired` by > 20% across all modes → STOP. Either the gate is too strict, or spawn points are terrain-blocked (spawn bug, not harness bug).
+- Navmesh `queryPath` returns null consistently (player-spawn is outside navmesh coverage) → STOP and flag. Either the navmesh is wrong or the spawn is; not the harness's problem to fix.
+- Layer 2 gradient probe causes `max_stuck_seconds > mode.stuckTimeoutSec * 2` across multiple modes → STOP. The probe is bad; tune `maxGradient` or the lookahead distance; if still broken, the underlying logic is wrong.
+- Playtest capture evidence shows `shots_fired < 30` on combat120 after all tuning → STOP. The redesign didn't deliver; surface to orchestrator for replanning.
+- Diff exceeds ~700 LOC net → STOP. This is large for a single-task PR but bounded by the terrain-work scope; going past means scope drift.
+- Executor proposes building a new scenario/policy/validator module under `src/dev/harness/` → STOP. That path is walked.
+- Any fence change to `src/types/SystemInterfaces.ts` → STOP.
 
 ## Rationale (why this shape, not another)
 
-The reverted PR #88 was well-written on paper: declarative scenarios, typed configs, policy registry, fail-loud validators. But it failed because the abstraction layer between "policy emits intent" and "player weapon fires" was too thin, and the tests only exercised internal runner contracts — not the live integration with the real player controller. Policies passed unit tests; the gun still didn't go off.
+Three alternatives were considered and rejected:
 
-The imperative driver's direct method invocation (`playerController.actionFireStart()`) is ugly but robust: if the method disappears, the driver fails loudly on the very first tick. That's the property we want to preserve. Once the harness is stable on this base, a future cycle can re-introduce abstractions — this time with live integration tests that would have caught the shots=0 case before merge.
+- **Full declarative rewrite (PR #88's approach).** Rejected by user after live playtest showed the policy abstraction lost the action-oriented driver behavior. The imperative driver is brittle but its directness is robust: if `actionFireStart` disappears, the driver breaks on the first tick.
+- **Pre-baked harness-only test arena.** Add a flat `ai_sandbox_harness` map variant to MapSeedRegistry. Rejected as the sole strategy because the harness should be able to exercise arbitrary maps eventually; building in seed pinning as a *convenience* (not a *necessity*) via Option A URL param is the right shape. A future cycle can add formal seed registry entries.
+- **Navmesh-only movement (skip the gradient probe).** Would work if the navmesh perfectly matched player traversability. It doesn't — agent radius differs, and the navmesh is bake-once while the player has different physics. The gradient probe is the safety net that makes the navmesh guidance robust.
+
+The 4-layer shape is deliberately pragmatic: navmesh for the macro question ("where do I roughly go?"), gradient probe for the micro question ("what direction is least-steep toward there?"), teleport for the emergency escape, and terrain profile as the mode-specific tuning knob. Each layer has a clear fallback when the layer above fails.
