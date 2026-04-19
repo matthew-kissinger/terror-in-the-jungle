@@ -94,7 +94,8 @@ All briefs under `docs/tasks/` with matching slug names.
 - **`heap-regression-investigation`** — bisect the +296% combat120 heap growth from the 2026-04-18 cycle. Likely suspects: `ReplayRecorder` buffering without session gate; per-tick utility-context allocation. Fix + rearch memo. Uses the redesigned harness for clean repro.
 - **`npc-fixed-wing-pilot-ai`** — author `NPCFixedWingPilot` (state machine + PD control loops) that emits `FixedWingPilotIntent` against the post-cutover `Airframe`. One NPC aircraft spawns in at least one game mode with a mission (takeoff → waypoint → RTB → landing).
 - **`perf-baseline-refresh`** — recapture `combat120`, `openfrontier:short`, `ashau:short`, `frontier30m` on the redesigned harness after the heap fix. Rewrite `perf-baselines.json` with realistic thresholds; stale p99=100ms → measured ~30ms. *(Round 3 attempt 2026-04-19 stopped at hard stop #1 on openfrontier — `waypointsFollowed=0 / waypointReplanFailures=202`, p99 = 63ms > 60ms validator floor. Root cause: `NavmeshSystem.queryPath` returns null on every driver re-plan on open_frontier. Spawned Round 4 `perf-openfrontier-navmesh-fix`.)*
-- **`perf-openfrontier-navmesh-fix`** — diagnose why `queryPath` always returns null on open_frontier (likely seed-outside-prebake-list OR navmesh-not-ready-at-first-query OR off-mesh-spawn). Land smallest fix that makes openfrontier:short produce `waypointsFollowedCount > 50`. Unblocks Round 3 retry.
+- **`perf-openfrontier-navmesh-fix`** — ABANDONED pre-merge (2026-04-19). Dispatched as Round 4, killed mid-investigation after live playtest revealed the deeper issue: even with a working navmesh query the driver doesn't simulate gameplay (no states, no objectives, shoots through terrain because it reinvents LOS). Brief retained in git for context.
+- **`perf-harness-player-bot`** — replaces Round 4. Build `PlayerBotStateMachine` + `PlayerBotIntent` + controller shim, mirroring the `NPCFixedWingPilot` architecture. Consume NPC primitives (`AILineOfSight.canSeeTarget`, `AITargeting.findNearestEnemy`, `NavmeshSystem.queryPath` + `findNearestPoint`) instead of reinventing them. Kills shoot-through-terrain and slope-bobble by construction. Solves the openfrontier null-path issue as a side effect (navmesh snap before query). Up to 1500 LOC net; playtest-gated.
 
 ### Round schedule
 
@@ -102,7 +103,8 @@ All briefs under `docs/tasks/` with matching slug names.
 - **Round 1b (1, solo) — ACTIVE.** `perf-harness-redesign`. Blocks Round 2's `heap-regression-investigation` and Round 3's `perf-baseline-refresh`. Solo so its playtest (the task's key acceptance signal) gets full attention.
 - **Round 2 (2 parallel):** `heap-regression-investigation`, `npc-fixed-wing-pilot-ai`. Heap investigation uses the redesigned harness for clean repro. NPC pilot wants the post-cutover `Airframe` surface (already on master).
 - **Round 3 (1) — ATTEMPTED, STOPPED.** `perf-baseline-refresh`. Rebaseline on the redesigned harness with the heap fix in place. Hit hard stop on openfrontier:short validator fail (p99 63ms > 60ms floor). Will retry after Round 4.
-- **Round 4 (1, solo) — ACTIVE.** `perf-openfrontier-navmesh-fix`. Fix driver queryPath failures on open_frontier. Unblocks Round 3 retry.
+- **Round 4 — ABANDONED.** `perf-openfrontier-navmesh-fix` dispatched, killed mid-investigation after live playtest revealed the killbot driver's shallow behavior was a deeper issue than navmesh alone.
+- **Round 4 (replacement, 1 solo) — ACTIVE.** `perf-harness-player-bot`. Rebuild the driver as a state-machine bot consuming NPC primitives. Unblocks Round 5 retry.
 - **Round 5 (1):** `perf-baseline-refresh` retry. Cycle closer.
 
 ### Concurrency cap
@@ -118,8 +120,9 @@ All briefs under `docs/tasks/` with matching slug names.
 - `utility-ai-doctrine-expansion` — no blockers. *(merged.)*
 - `heap-regression-investigation` — blocked by `perf-harness-redesign` (clean combat-exercising repro surface).
 - `npc-fixed-wing-pilot-ai` — blocked by `b1-flight-cutover` (consumes direct Airframe API). *(unblocked; ready for Round 2.)*
-- `perf-baseline-refresh` — blocked by `perf-harness-redesign` AND `heap-regression-investigation` AND `perf-openfrontier-navmesh-fix` *(new, after Round 3 hard-stopped)*.
-- `perf-openfrontier-navmesh-fix` — no blockers (surfaces on current master).
+- `perf-baseline-refresh` — blocked by `perf-harness-redesign` AND `heap-regression-investigation` AND `perf-harness-player-bot` *(Round 4 replacement; killbot-architectural pivot)*.
+- `perf-openfrontier-navmesh-fix` — ABANDONED. Superseded by `perf-harness-player-bot`.
+- `perf-harness-player-bot` — no blockers (builds on all merged Round 1-3 harness work).
 
 ### Playtest policy
 
