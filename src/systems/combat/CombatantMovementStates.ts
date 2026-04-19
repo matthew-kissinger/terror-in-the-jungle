@@ -7,19 +7,27 @@ import { NPC_MAX_SPEED } from '../../config/CombatantConfig';
 // ── Movement speeds (m/s) ──
 // With navmesh path-following, NPCs no longer waste time stuck on terrain.
 // Speeds reflect intended tactical pace, not compensation for stuck time.
+//
+// INVARIANT: tactical movement speeds (the ones the player typically encounters
+// in engagement range — advancing, patrol-close, defend) MUST stay at or below
+// PLAYER_WALK_SPEED - 2 = 8 m/s (see src/systems/player/PlayerController.ts:50).
+// Rationale: the player has no separate sprint; PLAYER_WALK_SPEED = 10 m/s is
+// the whole budget. If NPCs repositon at ≥ player speed, the player can never
+// close an engagement and the whole combat loop stalls. See the playtest
+// observation in docs/tasks/perf-harness-verticality-and-sizing.md.
 const TRAVERSAL_RUN_SPEED = Math.max(NPC_MAX_SPEED + 2, 10);
 const SQUAD_FOLLOW_SPEED = 7;
 const PATROL_SPEED = 7.5;
-const PATROL_CLOSE_SPEED = 5;
+export const PATROL_CLOSE_SPEED = 4;
 const PATROL_LONG_DISTANCE_SPEED = TRAVERSAL_RUN_SPEED;
 const FALLBACK_ADVANCE_SPEED = 7.5;
 const COMBAT_APPROACH_SPEED = 5.5;
-const ADVANCING_TRAVERSE_SPEED = 8;
+export const ADVANCING_TRAVERSE_SPEED = 7;
 const ADVANCING_CLOSE_SPEED = 5.5;
 const COMBAT_RETREAT_SPEED = 3.5;
 const COMBAT_STRAFE_SPEED = 3;
 const COVER_SEEKING_SPEED = Math.max(NPC_MAX_SPEED + 1.0, 9.0);
-const DEFEND_SPEED = 6;
+export const DEFEND_SPEED = 5;
 const SUPPRESS_HOLD_SPEED = 0;
 
 // ── Distances (meters) ──

@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as THREE from 'three';
-import { updatePatrolMovement, updateCombatMovement, updateCoverSeekingMovement, updateDefendingMovement } from './CombatantMovementStates';
+import {
+  updatePatrolMovement,
+  updateCombatMovement,
+  updateCoverSeekingMovement,
+  updateDefendingMovement,
+  ADVANCING_TRAVERSE_SPEED,
+  DEFEND_SPEED,
+  PATROL_CLOSE_SPEED
+} from './CombatantMovementStates';
 import { Combatant, Faction, Squad, SquadCommand } from './types';
 import { ZoneState } from '../world/ZoneManager';
 import { handlePlayerCommand, handleRejoiningMovement } from './CombatantMovementCommands';
@@ -193,7 +201,7 @@ describe('CombatantMovementStates', () => {
         zoneManager: zoneManager as any,
         getEnemyBasePosition: () => new THREE.Vector3(100, 0, 0)
       });
-      expect(nearLeader.velocity.length()).toBeCloseTo(5, 5); // PATROL_CLOSE_SPEED
+      expect(nearLeader.velocity.length()).toBeCloseTo(PATROL_CLOSE_SPEED, 5);
 
       const midLeader = createCombatant({
         id: 'mid',
@@ -388,8 +396,33 @@ describe('CombatantMovementStates', () => {
     it('moves toward destination at DEFEND_SPEED when not arrived', () => {
       const combatant = createCombatant({ destinationPoint: new THREE.Vector3(20, 0, 0) });
       updateDefendingMovement(combatant);
-      expect(combatant.velocity.x).toBeCloseTo(6, 5); // DEFEND_SPEED
+      expect(combatant.velocity.x).toBeCloseTo(DEFEND_SPEED, 5);
       expect(combatant.velocity.z).toBeCloseTo(0, 5);
+    });
+  });
+
+  // Behavior invariant: the player's only movement budget is PLAYER_WALK_SPEED = 10
+  // (src/systems/player/PlayerController.ts). If NPCs move at or above that speed
+  // in the engagement envelope, the player cannot close gaps and combat stalls.
+  // Keep a ≥ 2 m/s margin on tactical speeds so the player can always catch up.
+  //
+  // These tests do NOT pin exact tuning numbers — they pin the BEHAVIOR the player
+  // experiences (NPCs slower than player). Lowering a constant further is fine;
+  // raising one past the margin will break the combat loop.
+  describe('NPC speed cap invariant', () => {
+    const PLAYER_WALK_SPEED = 10;
+    const CLOSE_MARGIN = 2;
+
+    it('advancing traverse speed leaves the player enough margin to close', () => {
+      expect(ADVANCING_TRAVERSE_SPEED).toBeLessThanOrEqual(PLAYER_WALK_SPEED - CLOSE_MARGIN);
+    });
+
+    it('defend speed leaves the player enough margin to close', () => {
+      expect(DEFEND_SPEED).toBeLessThanOrEqual(PLAYER_WALK_SPEED - CLOSE_MARGIN);
+    });
+
+    it('patrol close-range speed leaves the player enough margin to close', () => {
+      expect(PATROL_CLOSE_SPEED).toBeLessThanOrEqual(PLAYER_WALK_SPEED - CLOSE_MARGIN);
     });
   });
 });

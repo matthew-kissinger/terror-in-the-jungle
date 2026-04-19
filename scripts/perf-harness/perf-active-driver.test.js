@@ -28,7 +28,14 @@ const {
   evaluateFireGate,
   PLAYER_EYE_HEIGHT,
   TARGET_CHEST_HEIGHT,
-  DEFAULT_BULLET_SPEED
+  DEFAULT_BULLET_SPEED,
+  PLAYER_CLIMB_SLOPE_DOT,
+  PLAYER_MAX_CLIMB_ANGLE_RAD,
+  PLAYER_MAX_CLIMB_GRADIENT,
+  PATH_TRUST_TTL_MS,
+  AIM_PITCH_LIMIT_RAD,
+  isPathTrusted,
+  clampAimYByPitch
 } = driver;
 
 describe('perf-active-driver fire decision (A4 regression)', () => {
@@ -388,5 +395,144 @@ describe('perf-active-driver eye-height camera fix', () => {
     // shape — keep the assertion so anyone reverting the eye-height fix will
     // fail this test.
     expect(solution.pitch).toBeGreaterThan(0);
+  });
+});
+
+// perf-harness-verticality-and-sizing: behavior guards for the verticality pass.
+describe('perf-active-driver slope contract (physics-hooked climb gradient)', () => {
+  // Player physics `slopeDot = 0.7` and the navmesh `WALKABLE_SLOPE_ANGLE = 45°`
+  // are the two surfaces the live game walks on. The driver MUST consume the
+  // derived climb angle so its gradient probe cannot reject a slope the player
+  // could legitimately walk. This set of tests asserts the derivation is
+  // consistent, not the specific numeric value (non-implementation-mirror).
+
+  it('derives the climb gradient from the slope-dot contract', () => {
+    expect(PLAYER_MAX_CLIMB_ANGLE_RAD).toBeCloseTo(Math.acos(PLAYER_CLIMB_SLOPE_DOT), 10);
+    expect(PLAYER_MAX_CLIMB_GRADIENT).toBeCloseTo(Math.tan(PLAYER_MAX_CLIMB_ANGLE_RAD), 10);
+  });
+
+  it('admits slopes within the climb envelope when probing', () => {
+    // Uniform ~40° slope everywhere (below the ~45° climb limit). With a flat
+    // playing field tilted at 40°, every candidate direction has the same
+    // gradient magnitude, but none exceeds the physics climb cap — so the
+    // probe must accept the direct bearing rather than returning null.
+    // Deflecting-or-rejecting here is the bug shape that stalled the player
+    // on any non-flat ridge when per-mode maxGradient diverged from physics.
+    const gentleAngle = (40 * Math.PI) / 180;
+    const gentle = Math.tan(gentleAngle);
+    const sampleHeight = (x, z) => z * gentle; // tilt the whole world +z-up
+    const choice = chooseHeadingByGradient({
+      sampleHeight,
+      from: { x: 0, z: 0 },
+      bearingRad: Math.PI, // forward = +z (uphill)
+      maxGradient: PLAYER_MAX_CLIMB_GRADIENT,
+      lookAhead: 8
+    });
+    expect(choice).not.toBeNull();
+    // Every candidate that still advances toward the bearing passes the cap,
+    // so Math.abs(gradient) is below the climb envelope.
+    expect(Math.abs(choice.gradient)).toBeLessThan(PLAYER_MAX_CLIMB_GRADIENT);
+  });
+
+  it('rejects slopes beyond the climb envelope', () => {
+    // 60° ramp — well past ~45°. Probe must refuse the direct bearing.
+    const steep = Math.tan((60 * Math.PI) / 180); // ~1.73 gradient
+    const sampleHeight = (x, z) => 2 * steep * Math.hypot(x, z); // steep in every direction
+    const choice = chooseHeadingByGradient({
+      sampleHeight,
+      from: { x: 0, z: 0 },
+      bearingRad: 0,
+      maxGradient: PLAYER_MAX_CLIMB_GRADIENT,
+      lookAhead: 8
+    });
+    expect(choice).toBeNull();
+  });
+});
+
+describe('perf-active-driver path-trust invariant', () => {
+  // Brief: when navmesh returns a valid path, the driver must follow the
+  // pure-pursuit lookahead and NOT consult the per-tick gradient probe. The
+  // probe is a Reynolds 1999 local obstacle-avoidance behavior and must not
+  // override the macro path (NSRL invariant, arxiv:2410.04936).
+
+  it('trusts a fresh, multi-waypoint path', () => {
+    const path = [
+      { x: 0, y: 0, z: 0 },
+      { x: 10, y: 0, z: 0 }
+    ];
+    expect(isPathTrusted({ path, waypointIdx: 0, pathAgeMs: 500 })).toBe(true);
+  });
+
+  it('does not trust a single-waypoint path', () => {
+    const path = [{ x: 0, y: 0, z: 0 }];
+    expect(isPathTrusted({ path, waypointIdx: 0, pathAgeMs: 0 })).toBe(false);
+  });
+
+  it('does not trust a null / missing path', () => {
+    expect(isPathTrusted({ path: null, waypointIdx: 0, pathAgeMs: 0 })).toBe(false);
+    expect(isPathTrusted({ waypointIdx: 0, pathAgeMs: 0 })).toBe(false);
+  });
+
+  it('does not trust a stale path (past PATH_TRUST_TTL_MS)', () => {
+    const path = [
+      { x: 0, y: 0, z: 0 },
+      { x: 10, y: 0, z: 0 }
+    ];
+    expect(isPathTrusted({ path, waypointIdx: 0, pathAgeMs: PATH_TRUST_TTL_MS + 1 })).toBe(false);
+  });
+
+  it('does not trust a path once we walked past the last waypoint', () => {
+    const path = [
+      { x: 0, y: 0, z: 0 },
+      { x: 10, y: 0, z: 0 }
+    ];
+    expect(isPathTrusted({ path, waypointIdx: 2, pathAgeMs: 100 })).toBe(false);
+  });
+
+  it('TTL is positive and covers typical planning cadence', () => {
+    // Non-implementation-mirror: don't pin the exact 5000ms, but reject anything
+    // below the realistic cadence window (navmesh replans are 3.5-6s per mode).
+    expect(PATH_TRUST_TTL_MS).toBeGreaterThanOrEqual(3000);
+  });
+});
+
+describe('perf-active-driver aim pitch range', () => {
+  // Brief: vertical targets on steep terrain were going un-engaged because the
+  // aim-Y clamp was too tight. ±80° must be accessible; the fire-gate pitch
+  // safety ("-25° at > 10m") is the only ground-fire safety rail.
+
+  it('accepts a +30° elevated target at 50m without clamping pitch', () => {
+    const playerY = 0;
+    const horizontalDist = 50;
+    // +30° → desiredY = 50 * tan(30°) ≈ 28.87m above playerY.
+    const desiredY = horizontalDist * Math.tan((30 * Math.PI) / 180);
+    const clamped = clampAimYByPitch(playerY, desiredY, horizontalDist);
+    expect(clamped).toBeCloseTo(desiredY, 5);
+    const pitch = Math.atan2(clamped - playerY, horizontalDist);
+    expect(pitch).toBeCloseTo((30 * Math.PI) / 180, 3);
+  });
+
+  it('accepts a -45° depressed target at 20m without clamping pitch', () => {
+    const playerY = 10;
+    const horizontalDist = 20;
+    const desiredY = playerY - horizontalDist * Math.tan((45 * Math.PI) / 180);
+    const clamped = clampAimYByPitch(playerY, desiredY, horizontalDist);
+    expect(clamped).toBeCloseTo(desiredY, 5);
+  });
+
+  it('caps pitch at the ±80° gimbal margin', () => {
+    const playerY = 0;
+    const horizontalDist = 10;
+    // Aim nearly straight up (85° → tan(85°) ≈ 11.43 m/m).
+    const desiredY = 200; // way above the 80° envelope
+    const clamped = clampAimYByPitch(playerY, desiredY, horizontalDist);
+    const pitch = Math.atan2(clamped - playerY, horizontalDist);
+    // Cap is 80° ± floating-point rounding.
+    expect(pitch).toBeLessThanOrEqual(AIM_PITCH_LIMIT_RAD + 1e-9);
+    expect(pitch).toBeGreaterThan((75 * Math.PI) / 180);
+  });
+
+  it('returns desired Y unchanged at extremely close range (<= 1cm)', () => {
+    expect(clampAimYByPitch(2, 5, 0.005)).toBe(5);
   });
 });

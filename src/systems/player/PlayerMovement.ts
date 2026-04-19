@@ -37,8 +37,13 @@ const _contourB = new THREE.Vector3();
 // ── Player movement tuning ──
 const MOVEMENT_ACCELERATION = 5;
 const FRICTION_RATE = 8;
-const PLAYER_EYE_HEIGHT = 2;
-const PLAYER_CROUCH_EYE_HEIGHT = 1.2;
+// Player eye height. Raised from 2 → 2.2 so a typical soldier (NVA/VC/US) on
+// flat ground does not feel undersized next to the NPC sprite silhouette.
+// The perf-active harness driver keeps its own PLAYER_EYE_HEIGHT mirror in
+// scripts/perf-active-driver.cjs — update both when touching this number.
+// Crouch scales proportionally (1.2 → 1.32, same 0.6 ratio to standing).
+export const PLAYER_EYE_HEIGHT = 2.2;
+export const PLAYER_CROUCH_EYE_HEIGHT = 1.32;
 const CROUCH_SPEED_MULTIPLIER = 0.5;
 const PLAYER_COLLISION_RADIUS = 0.5;
 const LANDING_SOUND_THRESHOLD = -5;

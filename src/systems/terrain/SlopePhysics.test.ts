@@ -5,6 +5,8 @@ import {
   canStepUp,
   computeSlopeSlideVelocity,
   MAX_STEP_HEIGHT,
+  PLAYER_CLIMB_SLOPE_DOT,
+  PLAYER_MAX_CLIMB_ANGLE_RAD,
 } from './SlopePhysics';
 
 describe('computeSlopeSpeedMultiplier', () => {
@@ -68,5 +70,26 @@ describe('computeSlopeSlideVelocity', () => {
     const v = computeSlopeSlideVelocity(1, 1, 8);
     const len = Math.sqrt(v.x * v.x + v.z * v.z);
     expect(len).toBeCloseTo(8);
+  });
+});
+
+/**
+ * Behavior: the player-climb constants the perf harness consumes must stay
+ * derivable from each other. The navmesh bakes at the same angle (see
+ * NavmeshSystem.WALKABLE_SLOPE_ANGLE) and the harness driver imports
+ * PLAYER_MAX_CLIMB_ANGLE_RAD as its single source of truth. If these two drift
+ * apart the driver will reject slopes the player physics allows, stalling the
+ * harness on steep terrain (docs/tasks/perf-harness-verticality-and-sizing.md).
+ */
+describe('player climb constants', () => {
+  it('PLAYER_MAX_CLIMB_ANGLE_RAD matches acos(PLAYER_CLIMB_SLOPE_DOT)', () => {
+    expect(PLAYER_MAX_CLIMB_ANGLE_RAD).toBeCloseTo(Math.acos(PLAYER_CLIMB_SLOPE_DOT), 10);
+  });
+
+  it('the climb envelope comfortably covers the navmesh bake angle (~45°)', () => {
+    const navmeshBakeAngleRad = (45 * Math.PI) / 180;
+    // Physics must not be stricter than the navmesh, else paths produce
+    // unwalkable sections.
+    expect(PLAYER_MAX_CLIMB_ANGLE_RAD).toBeGreaterThanOrEqual(navmeshBakeAngleRad - 1e-3);
   });
 });
