@@ -4,18 +4,33 @@
  * reload. The bot never touches the engine directly; the controller is
  * the one and only translation boundary.
  *
+ * Aim path: intent carries a world-space `aimTarget` point. The
+ * controller uses `camera.lookAt()` (the same primitive every other
+ * camera consumer in the repo uses — PlayerCamera, DeathCamSystem,
+ * MortarCamera, SpectatorCamera, and the old killbot driver) to compute
+ * the target yaw/pitch. That keeps the rotation convention inside
+ * Three.js, where it belongs, and prevents the sign-error regression
+ * PR #95 shipped.
+ *
+ * Fire path: an aim-dot gate (cosine cone) runs before `fireStart()`.
+ * It is the one-line defense against future rotation-convention
+ * regressions — if the camera is NOT pointing at the aim target, we
+ * suppress the trigger rather than sending 243 shots into empty air.
+ *
  * Keeping this as a separate class (rather than folding it into the bot)
  * mirrors the NPCFixedWingPilot / FixedWing controller separation: the
  * bot is a pure function of its observations; the controller is the
  * thin engine adapter.
  */
 
+import * as THREE from 'three';
 import type { PlayerBotIntent } from './types';
 
 /**
  * Minimal interface the controller needs from the live PlayerController.
  * Kept narrow on purpose — do not couple this to the full PlayerController
- * shape. PlayerController already exposes these methods on master.
+ * shape. `getCamera` is already exposed on `IPlayerController` (not a fence
+ * change; see docs/INTERFACE_FENCE.md).
  */
 export interface PlayerBotControllerTarget {
   applyMovementIntent(intent: { forward: number; strafe: number; sprint: boolean }): void;
@@ -23,6 +38,9 @@ export interface PlayerBotControllerTarget {
   fireStart(): void;
   fireStop(): void;
   reloadWeapon(): void;
+  /** Optional — the camera the controller should point via lookAt.
+   *  When absent (older tests), aim path is a no-op (angles held). */
+  getCamera?(): THREE.PerspectiveCamera;
   /** Optional — if present, controller routes crouch through player state. */
   readonly playerController?: unknown;
 }
@@ -39,10 +57,14 @@ export interface PlayerBotControllerApplyResult {
   readonly sprint: boolean;
   readonly yaw: number;
   readonly pitch: number;
+  /** aim-dot (−1..1) at the end of apply. Undefined when no aim was committed. */
+  readonly aimDot?: number;
 }
 
 /** Absolute pitch clamp — ±80° matches the live camera gimbal budget. */
 const PITCH_LIMIT_RAD = (80 * Math.PI) / 180;
+/** Aim-dot threshold for the fire gate (cos ≈ 0.8 ≈ 37° cone). */
+const FIRE_AIM_DOT_THRESHOLD = 0.8;
 
 function clampPitch(pitch: number): number {
   if (!Number.isFinite(pitch)) return 0;
@@ -60,10 +82,20 @@ function wrapYaw(yaw: number): number {
 
 /** Lerp two angles (radians) along the shortest arc. `t` in [0,1]. */
 export function lerpAngle(from: number, to: number, t: number): number {
-  let delta = wrapYaw(to - from);
+  const delta = wrapYaw(to - from);
   const clamped = Math.max(0, Math.min(1, t));
   return wrapYaw(from + delta * clamped);
 }
+
+function lerp(from: number, to: number, t: number): number {
+  const c = Math.max(0, Math.min(1, t));
+  return from + (to - from) * c;
+}
+
+// Scratch vectors — reused to avoid per-tick allocations.
+const _tmpEye = new THREE.Vector3();
+const _tmpForward = new THREE.Vector3();
+const _tmpToTarget = new THREE.Vector3();
 
 export class PlayerBotController {
   private firingHeld = false;
@@ -91,17 +123,49 @@ export class PlayerBotController {
     const sprint = !!intent.sprint && forward > 0.1; // sprint only when moving forward
     this.target.applyMovementIntent({ forward, strafe, sprint });
 
-    // Aim — lerp toward the intent's target yaw/pitch. When aimLerpRate is
-    // 1 (default for the harness) this is an effective snap, matching the
-    // aggressive-mode behavior of the old killbot driver.
-    const yawNext = lerpAngle(this.lastYaw, intent.aimYaw, intent.aimLerpRate);
-    const pitchRaw = this.lastPitch + (clampPitch(intent.aimPitch) - this.lastPitch) * clamp01(intent.aimLerpRate);
-    const pitchNext = clampPitch(pitchRaw);
-    this.target.setViewAngles(yawNext, pitchNext);
-    this.lastYaw = yawNext;
-    this.lastPitch = pitchNext;
+    // Aim — use camera.lookAt() to convert the intent's world-space point
+    // into (yaw, pitch) in the Three.js convention, then lerp from our
+    // last-committed angles toward that target. At aimLerpRate=1 this is
+    // an effective snap-to-target (matching the harness default); at
+    // lower rates it's a slew.
+    let yawNext = this.lastYaw;
+    let pitchNext = this.lastPitch;
+    let aimDot: number | undefined;
 
-    // Fire — debounce. reload trumps fire (mirrors the live player's input).
+    const camera = typeof this.target.getCamera === 'function' ? this.target.getCamera() : undefined;
+    if (intent.aimTarget && camera) {
+      // Stash the real rotation so lookAt's temporary write can be overwritten
+      // by our lerped value via setViewAngles. This keeps the camera frame
+      // coherent with PlayerCamera.setInfantryViewAngles.
+      const prevOrder = camera.rotation.order;
+      camera.rotation.order = 'YXZ';
+      const savedY = camera.rotation.y;
+      const savedX = camera.rotation.x;
+
+      // Compute target yaw/pitch.
+      camera.lookAt(intent.aimTarget.x, intent.aimTarget.y, intent.aimTarget.z);
+      const targetYaw = wrapYaw(camera.rotation.y);
+      const targetPitch = clampPitch(camera.rotation.x);
+
+      // Restore and apply the lerped value via the engine surface.
+      camera.rotation.y = savedY;
+      camera.rotation.x = savedX;
+      camera.rotation.order = prevOrder;
+
+      yawNext = lerpAngle(this.lastYaw, targetYaw, intent.aimLerpRate);
+      pitchNext = clampPitch(lerp(this.lastPitch, targetPitch, intent.aimLerpRate));
+      this.target.setViewAngles(yawNext, pitchNext);
+      this.lastYaw = yawNext;
+      this.lastPitch = pitchNext;
+
+      // After setViewAngles has applied the lerped angles, the camera
+      // actually points at (yawNext, pitchNext). Re-read world direction
+      // and compare to the eye→target vector for the aim-dot gate.
+      aimDot = computeAimDot(camera, intent.aimTarget);
+    }
+    // else: aimTarget === null → hold current angles; no call to setViewAngles.
+
+    // Fire path. Reload trumps fire (mirrors the live player's input).
     let fired = false;
     let reloaded = false;
     if (intent.reload) {
@@ -112,11 +176,25 @@ export class PlayerBotController {
       this.target.reloadWeapon();
       reloaded = true;
     } else if (intent.firePrimary) {
-      if (!this.firingHeld) {
-        this.target.fireStart();
-        this.firingHeld = true;
+      // Aim-dot gate — last-line defense. If we have an aim target + camera
+      // but the camera is NOT pointing at it, SUPPRESS fire. This is the
+      // one-line regression net that catches yaw-convention drift.
+      const passesAimGate =
+        intent.aimTarget && camera
+          ? (typeof aimDot === 'number' && aimDot >= FIRE_AIM_DOT_THRESHOLD)
+          : true; // no camera / no aim target → defer to bot's decision
+
+      if (passesAimGate) {
+        if (!this.firingHeld) {
+          this.target.fireStart();
+          this.firingHeld = true;
+        }
+        fired = true;
+      } else if (this.firingHeld) {
+        // We were firing, but we've drifted off-target — stop the stream.
+        this.target.fireStop();
+        this.firingHeld = false;
       }
-      fired = true;
     } else if (this.firingHeld) {
       this.target.fireStop();
       this.firingHeld = false;
@@ -130,6 +208,7 @@ export class PlayerBotController {
       sprint,
       yaw: yawNext,
       pitch: pitchNext,
+      aimDot,
     };
   }
 
@@ -145,12 +224,18 @@ export class PlayerBotController {
   }
 }
 
+/** Cosine of the angle between camera forward and (eye→target). */
+function computeAimDot(camera: THREE.PerspectiveCamera, aimTarget: { x: number; y: number; z: number }): number {
+  camera.getWorldPosition(_tmpEye);
+  camera.getWorldDirection(_tmpForward);
+  _tmpToTarget.set(aimTarget.x - _tmpEye.x, aimTarget.y - _tmpEye.y, aimTarget.z - _tmpEye.z);
+  const len = _tmpToTarget.length();
+  if (!Number.isFinite(len) || len < 1e-6) return 1; // degenerate: treat as on-target
+  _tmpToTarget.multiplyScalar(1 / len);
+  return _tmpForward.dot(_tmpToTarget);
+}
+
 function clampAxis(x: number): number {
   if (!Number.isFinite(x)) return 0;
   return Math.max(-1, Math.min(1, x));
-}
-
-function clamp01(x: number): number {
-  if (!Number.isFinite(x)) return 0;
-  return Math.max(0, Math.min(1, x));
 }

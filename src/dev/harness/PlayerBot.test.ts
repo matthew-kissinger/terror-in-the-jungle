@@ -8,7 +8,6 @@ import { describe, expect, it } from 'vitest';
 import {
   BotTarget,
   BotVec3,
-  DEFAULT_PLAYER_BOT_CONFIG,
   PlayerBot,
   PlayerBotObservation,
 } from './PlayerBot';
@@ -142,14 +141,14 @@ describe('PlayerBot — ENGAGE', () => {
     expect(intent.reload).toBe(true);
   });
 
-  it('aims at the target (not forward) while in ENGAGE', () => {
+  it('writes aimTarget toward the target in ENGAGE (not null, not objective)', () => {
     const bot = new PlayerBot();
-    const target = makeTarget({ position: { x: 50, y: 0, z: 0 } }); // 90° to the right
-    bot.update(250, makeObservation({ findNearestEnemy: () => target, yaw: 0 }));
-    bot.update(250, makeObservation({ findNearestEnemy: () => target, yaw: 0 }));
-    const intent = bot.update(250, makeObservation({ findNearestEnemy: () => target, yaw: 0 }));
-    // Aim should be positive yaw (toward +x in the driver's atan2(dx, -dz) convention).
-    expect(intent.aimYaw).toBeGreaterThan(0);
+    const target = makeTarget({ position: { x: 50, y: 0, z: 0 } });
+    bot.update(250, makeObservation({ findNearestEnemy: () => target }));
+    bot.update(250, makeObservation({ findNearestEnemy: () => target }));
+    const intent = bot.update(250, makeObservation({ findNearestEnemy: () => target }));
+    expect(intent.aimTarget).not.toBeNull();
+    expect(intent.aimTarget!.x).toBeCloseTo(50, 5);
   });
 
   it('hands off to ADVANCE when target becomes occluded mid-engagement', () => {
@@ -165,28 +164,17 @@ describe('PlayerBot — ENGAGE', () => {
     expect(bot.getState()).toBe('ADVANCE');
   });
 
-  it('transitions to SEEK_COVER when health drops below the cover threshold', () => {
+  it('stays in ENGAGE when health is low but non-zero (no RETREAT)', () => {
+    // The harness bot is a push-through perf surrogate, not a soldier.
     const bot = new PlayerBot();
     const target = makeTarget();
     bot.update(250, makeObservation({ findNearestEnemy: () => target }));
     bot.update(250, makeObservation({ findNearestEnemy: () => target })); // ENGAGE
     bot.update(250, makeObservation({
       findNearestEnemy: () => target,
-      health: 40, // below default 50% threshold
+      health: 10,
     }));
-    expect(bot.getState()).toBe('SEEK_COVER');
-  });
-
-  it('transitions to RETREAT when health is critical', () => {
-    const bot = new PlayerBot();
-    const target = makeTarget();
-    bot.update(250, makeObservation({ findNearestEnemy: () => target }));
-    bot.update(250, makeObservation({ findNearestEnemy: () => target })); // ENGAGE
-    bot.update(250, makeObservation({
-      findNearestEnemy: () => target,
-      health: 10, // below retreatHealthFraction 0.2 default
-    }));
-    expect(bot.getState()).toBe('RETREAT');
+    expect(bot.getState()).toBe('ENGAGE');
   });
 });
 
@@ -228,7 +216,7 @@ describe('PlayerBot — ADVANCE', () => {
   });
 });
 
-describe('PlayerBot — RETREAT and RESPAWN_WAIT', () => {
+describe('PlayerBot — RESPAWN_WAIT', () => {
   it('forces RESPAWN_WAIT when health hits zero regardless of current state', () => {
     const bot = new PlayerBot();
     const target = makeTarget();
@@ -254,22 +242,6 @@ describe('PlayerBot — RETREAT and RESPAWN_WAIT', () => {
     expect(intent.moveForward).toBe(0);
     expect(intent.moveStrafe).toBe(0);
   });
-
-  it('returns to PATROL after retreatQuietMs with no new damage', () => {
-    const bot = new PlayerBot({
-      ...DEFAULT_PLAYER_BOT_CONFIG,
-      retreatQuietMs: 1000,
-    });
-    const target = makeTarget();
-    // PATROL → ALERT → ENGAGE → RETREAT (via low health).
-    bot.update(250, makeObservation({ findNearestEnemy: () => target }));
-    bot.update(250, makeObservation({ findNearestEnemy: () => target }));
-    bot.update(250, makeObservation({ findNearestEnemy: () => target, health: 10 }));
-    expect(bot.getState()).toBe('RETREAT');
-    // Later: no damage for longer than retreatQuietMs.
-    bot.update(250, makeObservation({ now: 5000, lastDamageMs: 0, health: 10 }));
-    expect(bot.getState()).toBe('PATROL');
-  });
 });
 
 describe('PlayerBot — transition log and histogram', () => {
@@ -293,7 +265,8 @@ describe('PlayerBot — transition log and histogram', () => {
 });
 
 describe('PlayerBot — intent shape invariants', () => {
-  it('moveForward and moveStrafe stay within [-1, 1]', () => {
+  it('moveForward stays within [0, 1] and moveStrafe within [-1, 1]', () => {
+    // moveForward is non-negative by contract (bot never back-pedals).
     const bot = new PlayerBot();
     const target = makeTarget();
     const obs = makeObservation({ findNearestEnemy: () => target });
@@ -305,20 +278,23 @@ describe('PlayerBot — intent shape invariants', () => {
       bot.update(250, obs),
     ];
     for (const intent of intents) {
-      expect(intent.moveForward).toBeGreaterThanOrEqual(-1);
+      expect(intent.moveForward).toBeGreaterThanOrEqual(0);
       expect(intent.moveForward).toBeLessThanOrEqual(1);
       expect(intent.moveStrafe).toBeGreaterThanOrEqual(-1);
       expect(intent.moveStrafe).toBeLessThanOrEqual(1);
     }
   });
 
-  it('aimYaw and aimPitch are finite numbers every tick', () => {
+  it('aimTarget is either null or contains finite numbers', () => {
     const bot = new PlayerBot();
     const target = makeTarget();
     for (let i = 0; i < 10; i++) {
       const intent = bot.update(250, makeObservation({ findNearestEnemy: () => target }));
-      expect(Number.isFinite(intent.aimYaw)).toBe(true);
-      expect(Number.isFinite(intent.aimPitch)).toBe(true);
+      if (intent.aimTarget) {
+        expect(Number.isFinite(intent.aimTarget.x)).toBe(true);
+        expect(Number.isFinite(intent.aimTarget.y)).toBe(true);
+        expect(Number.isFinite(intent.aimTarget.z)).toBe(true);
+      }
     }
   });
 });

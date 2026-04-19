@@ -8,10 +8,7 @@ import { describe, expect, it } from 'vitest';
 import {
   engageStrafeIntent,
   horizontalDistance,
-  pitchToward,
-  retreatYaw,
   stepState,
-  yawToward,
 } from './states';
 import {
   BotTarget,
@@ -72,6 +69,14 @@ describe('states — PATROL', () => {
   it('emits no fire intent', () => {
     const step = stepState('PATROL', makeCtx());
     expect(step.intent.firePrimary).toBe(false);
+  });
+
+  it('writes an aimTarget toward the objective when moving', () => {
+    const step = stepState('PATROL', makeCtx({
+      getObjective: () => ({ position: { x: 0, y: 0, z: -100 }, priority: 1 }),
+    }));
+    expect(step.intent.aimTarget).not.toBeNull();
+    expect(step.intent.moveForward).toBeGreaterThan(0);
   });
 });
 
@@ -143,38 +148,38 @@ describe('states — ENGAGE', () => {
     expect(step.nextState).toBe('ADVANCE');
   });
 
-  it('transitions to SEEK_COVER when health drops below the cover threshold', () => {
+  it('does not transition out of ENGAGE on low health', () => {
+    // Regression: the perf-harness player-bot is a push-through surrogate;
+    // it must NOT flee on damage. SEEK_COVER and RETREAT have been deleted.
     const target = makeTarget();
     const step = stepState('ENGAGE', makeCtx({
       currentTarget: target,
-      health: 30, // 30% < 50% default threshold
+      health: 5,
     }));
-    expect(step.nextState).toBe('SEEK_COVER');
+    // Low health → absorbing RESPAWN_WAIT only at health<=0, otherwise
+    // the bot stays in ENGAGE and keeps fighting.
+    expect(step.nextState).toBeNull();
+    expect(step.intent.firePrimary).toBe(true);
   });
 
-  it('transitions to RETREAT when health is critical', () => {
-    const target = makeTarget();
-    const step = stepState('ENGAGE', makeCtx({
-      currentTarget: target,
-      health: 10,
-    }));
-    expect(step.nextState).toBe('RETREAT');
+  it('does NOT emit backward movement even when target is close', () => {
+    // Regression: PR #95 set moveForward = -1 when inside retreatDistance.
+    // Players push through close contact; they don't back-pedal into the
+    // enemy's line of fire.
+    for (let dist = 1; dist <= 100; dist += 5) {
+      const target = makeTarget({ position: { x: 0, y: 0, z: -dist } });
+      const step = stepState('ENGAGE', makeCtx({ currentTarget: target }));
+      expect(step.intent.moveForward).toBeGreaterThanOrEqual(0);
+    }
   });
 
-  it('backs off when target is uncomfortably close', () => {
-    const target = makeTarget({ position: { x: 0, y: 0, z: -5 } });
-    const step = stepState('ENGAGE', makeCtx({
-      currentTarget: target,
-    }));
-    expect(step.intent.moveForward).toBeLessThan(0);
-  });
-
-  it('aims the camera at the target', () => {
-    const target = makeTarget({ position: { x: 30, y: 0, z: 0 } }); // +x
-    const step = stepState('ENGAGE', makeCtx({
-      currentTarget: target,
-    }));
-    expect(step.intent.aimYaw).toBeGreaterThan(0);
+  it('writes an aimTarget at the target chest/LOS height', () => {
+    const target = makeTarget({ position: { x: 30, y: 0, z: 0 } });
+    const step = stepState('ENGAGE', makeCtx({ currentTarget: target }));
+    expect(step.intent.aimTarget).not.toBeNull();
+    expect(step.intent.aimTarget!.x).toBeCloseTo(30, 5);
+    // LOS-height offset (1.7m per TARGET_LOS_HEIGHT) applied above ground.
+    expect(step.intent.aimTarget!.y).toBeGreaterThan(target.position.y);
   });
 });
 
@@ -215,54 +220,6 @@ describe('states — ADVANCE', () => {
   });
 });
 
-describe('states — SEEK_COVER', () => {
-  it('crouches while in cover', () => {
-    const step = stepState('SEEK_COVER', makeCtx({
-      currentTarget: makeTarget(),
-    }));
-    expect(step.intent.crouch).toBe(true);
-  });
-
-  it('transitions to RETREAT when health is critical', () => {
-    const step = stepState('SEEK_COVER', makeCtx({
-      currentTarget: makeTarget(),
-      health: 10,
-    }));
-    expect(step.nextState).toBe('RETREAT');
-  });
-
-  it('returns to PATROL when the target is stale or missing', () => {
-    const step = stepState('SEEK_COVER', makeCtx({
-      currentTarget: null,
-    }));
-    expect(step.nextState).toBe('PATROL');
-  });
-});
-
-describe('states — RETREAT', () => {
-  it('sprints away from the target', () => {
-    const target = makeTarget({ position: { x: 0, y: 0, z: -30 } });
-    const step = stepState('RETREAT', makeCtx({
-      currentTarget: target,
-      lastDamageMs: 1000,
-      now: 1100,
-    }));
-    expect(step.intent.sprint).toBe(true);
-    expect(step.intent.moveForward).toBeGreaterThan(0);
-  });
-
-  it('returns to PATROL after retreatQuietMs with no damage', () => {
-    const target = makeTarget();
-    const step = stepState('RETREAT', makeCtx({
-      currentTarget: target,
-      lastDamageMs: 0,
-      now: 10000,
-      config: { ...DEFAULT_PLAYER_BOT_CONFIG, retreatQuietMs: 1000 },
-    }));
-    expect(step.nextState).toBe('PATROL');
-  });
-});
-
 describe('states — RESPAWN_WAIT', () => {
   it('emits no movement or fire intent', () => {
     const step = stepState('RESPAWN_WAIT', makeCtx({ health: 0 }));
@@ -278,21 +235,6 @@ describe('states — RESPAWN_WAIT', () => {
 });
 
 describe('pure helpers', () => {
-  it('yawToward is zero for straight-ahead (-z) target', () => {
-    const yaw = yawToward({ x: 0, y: 0, z: 0 }, { x: 0, y: 0, z: -10 });
-    expect(yaw).toBeCloseTo(0, 5);
-  });
-
-  it('yawToward is +π/2 for +x target', () => {
-    const yaw = yawToward({ x: 0, y: 0, z: 0 }, { x: 10, y: 0, z: 0 });
-    expect(yaw).toBeCloseTo(Math.PI / 2, 5);
-  });
-
-  it('pitchToward is negative when target is below eye', () => {
-    const pitch = pitchToward({ x: 0, y: 2, z: 0 }, { x: 0, y: 0, z: -10 });
-    expect(pitch).toBeLessThan(0);
-  });
-
   it('horizontalDistance ignores y', () => {
     const d = horizontalDistance({ x: 0, y: 0, z: 0 }, { x: 3, y: 100, z: 4 });
     expect(d).toBeCloseTo(5, 5);
@@ -308,20 +250,10 @@ describe('pure helpers', () => {
   it('engageStrafeIntent is zero when amplitude is zero', () => {
     expect(engageStrafeIntent(500, 800, 0)).toBe(0);
   });
-
-  it('retreatYaw flips 180° from yawToward enemy', () => {
-    const from = { x: 0, y: 0, z: 0 };
-    const enemy = { x: 0, y: 0, z: -10 };
-    // yawToward(from, enemy) = 0; yawToward(enemy, from) = π.
-    // retreatYaw uses yawToward(enemy_to_from) + offset.
-    const yaw = retreatYaw(from, enemy, 0);
-    // Expect retreat bearing ≠ attack bearing.
-    expect(Math.abs(yaw - yawToward(from, enemy))).toBeGreaterThan(0.1);
-  });
 });
 
 describe('stepState — absorbing RESPAWN_WAIT guard', () => {
-  const states: PlayerBotState[] = ['PATROL', 'ALERT', 'ENGAGE', 'ADVANCE', 'SEEK_COVER', 'RETREAT'];
+  const states: PlayerBotState[] = ['PATROL', 'ALERT', 'ENGAGE', 'ADVANCE'];
   for (const s of states) {
     it(`forces RESPAWN_WAIT from ${s} when health is zero`, () => {
       const step = stepState(s, makeCtx({ health: 0 }));

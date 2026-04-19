@@ -646,12 +646,32 @@ describe('PlayerBot driver mirror — ENGAGE', () => {
     expect(step.intent.firePrimary).toBe(false);
   });
 
-  it('transitions to SEEK_COVER when health drops below the cover threshold', () => {
+  it('stays in ENGAGE and fires at low health (no SEEK_COVER/RETREAT)', () => {
+    // Harness bot is a push-through perf surrogate, not a soldier.
     const step = stepBotState('ENGAGE', makeBotCtx({
       currentTarget: makeBotTarget(),
-      health: 30,
+      health: 5,
     }));
-    expect(step.nextState).toBe('SEEK_COVER');
+    expect(step.nextState).toBeNull();
+    expect(step.intent.firePrimary).toBe(true);
+  });
+
+  it('does NOT emit backward movement in ENGAGE even when close (REGRESSION 3)', () => {
+    // Regression: PR #95 set moveForward = -1 when inside retreatDistance.
+    for (let dist = 1; dist <= 100; dist += 5) {
+      const step = stepBotState('ENGAGE', makeBotCtx({
+        currentTarget: makeBotTarget({ position: { x: 0, y: 0, z: -dist } }),
+      }));
+      expect(step.intent.moveForward).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('writes an aimTarget (world-space point) — not angles', () => {
+    const step = stepBotState('ENGAGE', makeBotCtx({
+      currentTarget: makeBotTarget({ position: { x: 30, y: 0, z: 0 } }),
+    }));
+    expect(step.intent.aimTarget).not.toBeNull();
+    expect(step.intent.aimTarget.x).toBeCloseTo(30, 5);
   });
 });
 
@@ -683,7 +703,7 @@ describe('PlayerBot driver mirror — ADVANCE', () => {
 });
 
 describe('PlayerBot driver mirror — RESPAWN_WAIT absorbs zero-health', () => {
-  const states = ['PATROL', 'ALERT', 'ENGAGE', 'ADVANCE', 'SEEK_COVER', 'RETREAT'];
+  const states = ['PATROL', 'ALERT', 'ENGAGE', 'ADVANCE'];
   for (const s of states) {
     it(`forces RESPAWN_WAIT from ${s} when health reaches zero`, () => {
       const step = stepBotState(s, makeBotCtx({ health: 0 }));
@@ -718,12 +738,17 @@ describe('PlayerBot driver mirror — mode profiles', () => {
     expect(config.maxFireDistance).toBe(profile.maxFireDistance);
   });
 
-  it('botConfigForProfile defines default cover/retreat thresholds', () => {
+  it('botConfigForProfile defines a non-negative pushInDistance', () => {
     const config = botConfigForProfile(profileForMode('ai_sandbox'));
-    expect(config.coverHealthFraction).toBeGreaterThan(0);
-    expect(config.coverHealthFraction).toBeLessThan(1);
-    expect(config.retreatHealthFraction).toBeGreaterThan(0);
-    expect(config.retreatHealthFraction).toBeLessThan(config.coverHealthFraction);
+    expect(config.pushInDistance).toBeGreaterThanOrEqual(0);
+  });
+
+  it('botConfigForProfile no longer carries cover / retreat thresholds', () => {
+    // Cover-seeking and retreating are gone from the harness bot.
+    const config = botConfigForProfile(profileForMode('ai_sandbox'));
+    expect(config.coverHealthFraction).toBeUndefined();
+    expect(config.retreatHealthFraction).toBeUndefined();
+    expect(config.coverSuppressionScore).toBeUndefined();
   });
 });
 
@@ -735,6 +760,11 @@ describe('PlayerBot driver mirror — idle intent shape', () => {
     expect(intent.sprint).toBe(false);
     expect(intent.firePrimary).toBe(false);
     expect(intent.reload).toBe(false);
+  });
+
+  it('has a null aimTarget by default (hold angles)', () => {
+    const intent = createIdleBotIntent();
+    expect(intent.aimTarget).toBeNull();
   });
 
   it('has an aimLerpRate of 1 (snap) by default', () => {

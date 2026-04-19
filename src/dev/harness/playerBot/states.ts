@@ -6,6 +6,11 @@
  * current-tick `PlayerBotIntent` plus the next state. No shared mutable
  * state lives here; `PlayerBot` owns the state/timeInState bookkeeping.
  *
+ * States emit AIM AS A WORLD-SPACE POINT (`intent.aimTarget`). Camera
+ * rotation conversion is done by the controller via `camera.lookAt()` —
+ * the bot never hand-rolls yaw/pitch math and so cannot regress the
+ * Three.js rotation convention.
+ *
  * Mirrors the architectural pattern of
  * `src/systems/vehicle/npcPilot/states.ts` so the ground-combat bot is
  * replay-friendly and testable the same way the fixed-wing pilot is.
@@ -29,41 +34,18 @@ export function horizontalDistance(a: BotVec3, b: BotVec3): number {
 }
 
 /**
- * Yaw angle pointing from `from` toward `to` (world-space, radians).
- * Convention matches the live camera: forward = (sin(yaw), 0, -cos(yaw)).
+ * Chest/LOS offset applied to a target's ground position. 1.7m aligns with
+ * the engine NPC-to-NPC LOS height used by AILineOfSight — aiming at 1.2m
+ * clipped low-torso shots into the ground on uneven terrain.
  */
-export function yawToward(from: BotVec3, to: BotVec3): number {
-  const dx = to.x - from.x;
-  const dz = to.z - from.z;
-  return Math.atan2(dx, -dz);
-}
-
-/**
- * Pitch angle from eye `from` toward 3D point `to` (radians, signed).
- * Negative = looking down (target below eye).
- */
-export function pitchToward(from: BotVec3, to: BotVec3): number {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const dz = to.z - from.z;
-  const horizontal = Math.hypot(dx, dz) || 1e-6;
-  return Math.atan2(dy, horizontal);
-}
-
-/** Chest-height offset applied to target ground position for aim. */
-const TARGET_CHEST_HEIGHT = 1.2;
+const TARGET_LOS_HEIGHT = 1.7;
 
 function aimPointForTarget(target: BotTarget): BotVec3 {
   return {
     x: target.position.x,
-    y: target.position.y + TARGET_CHEST_HEIGHT,
+    y: target.position.y + TARGET_LOS_HEIGHT,
     z: target.position.z,
   };
-}
-
-function fractionalHealth(ctx: PlayerBotStateContext): number {
-  if (ctx.maxHealth <= 0) return 0;
-  return ctx.health / ctx.maxHealth;
 }
 
 /** True when target exists AND is within maxFireDistance AND visible. */
@@ -85,18 +67,7 @@ export function engageStrafeIntent(
   amplitude: number,
 ): number {
   if (periodMs <= 0 || amplitude <= 0) return 0;
-  // Sine wave so the strafe oscillates smoothly through zero. The sign
-  // flips mid-period, producing the ±amplitude "dodge" the brief calls for.
   return Math.sin((2 * Math.PI * timeInStateMs) / periodMs) * amplitude;
-}
-
-/**
- * Yaw pointing AWAY from an enemy — used by RETREAT. Bearing is enemy→bot
- * ±135° so the bot doesn't just run in a straight line from the enemy.
- */
-export function retreatYaw(from: BotVec3, enemyPos: BotVec3, offsetRad: number): number {
-  const awayYaw = yawToward(enemyPos, from); // from-enemy direction
-  return awayYaw + offsetRad;
 }
 
 // ── State handlers ──────────────────────────────────────────────────────────
@@ -104,23 +75,22 @@ export function retreatYaw(from: BotVec3, enemyPos: BotVec3, offsetRad: number):
 function updatePatrol(ctx: PlayerBotStateContext): PlayerBotStateStep {
   const intent = createIdlePlayerBotIntent();
   intent.aimLerpRate = ctx.config.aimLerpRate;
-  intent.aimYaw = ctx.yaw;
-  intent.aimPitch = ctx.pitch;
 
   const enemy = ctx.findNearestEnemy();
   if (enemy) {
     // Hand off target selection to ALERT (which decides ENGAGE vs ADVANCE).
+    intent.aimTarget = aimPointForTarget(enemy);
     return { intent, nextState: 'ALERT', resetTimeInState: true };
   }
 
   const objective = ctx.getObjective();
-  const roamAnchor: BotVec3 | null = objective ? objective.position : null;
-  if (roamAnchor) {
-    intent.aimYaw = yawToward(ctx.eyePos, roamAnchor);
+  if (objective) {
+    intent.aimTarget = { x: objective.position.x, y: objective.position.y + TARGET_LOS_HEIGHT, z: objective.position.z };
     intent.moveForward = 1;
-    const dist = horizontalDistance(ctx.eyePos, roamAnchor);
+    const dist = horizontalDistance(ctx.eyePos, objective.position);
     intent.sprint = dist > ctx.config.sprintDistance;
   }
+  // else: no objective known. Hold current angles (aimTarget stays null).
 
   return { intent, nextState: null, resetTimeInState: false };
 }
@@ -135,14 +105,10 @@ function updateAlert(ctx: PlayerBotStateContext): PlayerBotStateStep {
   //   - target vanished → PATROL
   const target = ctx.currentTarget ?? ctx.findNearestEnemy();
   if (!target) {
-    intent.aimYaw = ctx.yaw;
-    intent.aimPitch = ctx.pitch;
     return { intent, nextState: 'PATROL', resetTimeInState: true };
   }
 
-  const aimPt = aimPointForTarget(target);
-  intent.aimYaw = yawToward(ctx.eyePos, aimPt);
-  intent.aimPitch = pitchToward(ctx.eyePos, aimPt);
+  intent.aimTarget = aimPointForTarget(target);
   intent.moveForward = 1;
 
   if (isEngagable(ctx, target)) {
@@ -157,24 +123,13 @@ function updateEngage(ctx: PlayerBotStateContext): PlayerBotStateStep {
 
   const target = ctx.currentTarget;
   if (!target) {
-    intent.aimYaw = ctx.yaw;
-    intent.aimPitch = ctx.pitch;
     return { intent, nextState: 'PATROL', resetTimeInState: true };
   }
 
-  // Health / suppression bail-outs first.
-  const healthFrac = fractionalHealth(ctx);
-  if (healthFrac < ctx.config.retreatHealthFraction) {
-    return { intent: aimOnlyIntent(ctx, target), nextState: 'RETREAT', resetTimeInState: true };
-  }
-  if (healthFrac < ctx.config.coverHealthFraction
-      || ctx.suppressionScore >= ctx.config.coverSuppressionScore) {
-    return { intent: aimOnlyIntent(ctx, target), nextState: 'SEEK_COVER', resetTimeInState: true };
-  }
-
-  const aimPt = aimPointForTarget(target);
-  intent.aimYaw = yawToward(ctx.eyePos, aimPt);
-  intent.aimPitch = pitchToward(ctx.eyePos, aimPt);
+  // Aim at the target (chest/LOS height). No health / suppression bail-outs —
+  // this is a perf-harness player surrogate, not a soldier. Players push in
+  // for kills; they do not flee on damage.
+  intent.aimTarget = aimPointForTarget(target);
 
   const visible = ctx.canSeeTarget(target.position);
   const dist = horizontalDistance(ctx.eyePos, target.position);
@@ -197,10 +152,9 @@ function updateEngage(ctx: PlayerBotStateContext): PlayerBotStateStep {
     ctx.config.engageStrafeAmplitude,
   );
 
-  // Back off a bit if too close.
-  if (dist < ctx.config.retreatDistance) {
-    intent.moveForward = -1;
-  }
+  // Push in until close. NEVER negative — players don't back-pedal in a
+  // fight, and back-pedalling broke hits=0 in Round 5/6.
+  intent.moveForward = dist > ctx.config.pushInDistance ? 1 : 0;
 
   return { intent, nextState: null, resetTimeInState: false };
 }
@@ -211,21 +165,16 @@ function updateAdvance(ctx: PlayerBotStateContext): PlayerBotStateStep {
 
   const target = ctx.currentTarget ?? ctx.findNearestEnemy();
   if (!target) {
-    intent.aimYaw = ctx.yaw;
-    intent.aimPitch = ctx.pitch;
     return { intent, nextState: 'PATROL', resetTimeInState: true };
   }
 
+  // Keep eyes on the target even while advancing.
+  intent.aimTarget = aimPointForTarget(target);
+
   // Re-check LOS: if we can now see the target, hand off to ENGAGE.
   if (isEngagable(ctx, target)) {
-    intent.aimYaw = yawToward(ctx.eyePos, aimPointForTarget(target));
-    intent.aimPitch = pitchToward(ctx.eyePos, aimPointForTarget(target));
     return { intent, nextState: 'ENGAGE', resetTimeInState: true };
   }
-
-  // Aim at the target even while advancing — bot "keeps eyes on".
-  intent.aimYaw = yawToward(ctx.eyePos, aimPointForTarget(target));
-  intent.aimPitch = pitchToward(ctx.eyePos, aimPointForTarget(target));
 
   // Movement toward the target. The DRIVER is expected to convert this
   // intent into navmesh-path pure-pursuit (that's where `queryPath` and
@@ -238,92 +187,18 @@ function updateAdvance(ctx: PlayerBotStateContext): PlayerBotStateStep {
   return { intent, nextState: null, resetTimeInState: false };
 }
 
-function updateSeekCover(ctx: PlayerBotStateContext): PlayerBotStateStep {
-  const intent = createIdlePlayerBotIntent();
-  intent.aimLerpRate = ctx.config.aimLerpRate;
-  intent.crouch = true;
-
-  const target = ctx.currentTarget;
-  if (target) {
-    const aimPt = aimPointForTarget(target);
-    intent.aimYaw = yawToward(ctx.eyePos, aimPt);
-    intent.aimPitch = pitchToward(ctx.eyePos, aimPt);
-  } else {
-    intent.aimYaw = ctx.yaw;
-    intent.aimPitch = ctx.pitch;
-  }
-
-  // Health recovery check — pop back out once safe, or bail to RETREAT if
-  // the cover search failed and we are still low.
-  const healthFrac = fractionalHealth(ctx);
-  if (healthFrac < ctx.config.retreatHealthFraction) {
-    return { intent, nextState: 'RETREAT', resetTimeInState: true };
-  }
-
-  // If contact has been quiet long enough, return to PATROL — cover worked.
-  if (!target || (ctx.now - target.lastKnownMs) > 3000) {
-    return { intent, nextState: 'PATROL', resetTimeInState: true };
-  }
-
-  // Crouch-retreat away from the target. Small lateral strafe to suggest
-  // moving to a cover corner.
-  intent.moveForward = -1;
-  intent.moveStrafe = engageStrafeIntent(
-    ctx.timeInStateMs,
-    ctx.config.engageStrafePeriodMs,
-    ctx.config.engageStrafeAmplitude,
-  );
-
-  // 2s fallthrough to RETREAT if no improvement.
-  if (ctx.timeInStateMs > 2000 && ctx.suppressionScore >= ctx.config.coverSuppressionScore) {
-    return { intent, nextState: 'RETREAT', resetTimeInState: true };
-  }
-  return { intent, nextState: null, resetTimeInState: false };
-}
-
-function updateRetreat(ctx: PlayerBotStateContext): PlayerBotStateStep {
-  const intent = createIdlePlayerBotIntent();
-  intent.aimLerpRate = ctx.config.aimLerpRate;
-  intent.sprint = true;
-
-  const target = ctx.currentTarget;
-  if (target) {
-    const retreatBearing = retreatYaw(ctx.eyePos, target.position, 0);
-    intent.aimYaw = retreatBearing;
-    intent.aimPitch = 0;
-  } else {
-    intent.aimYaw = ctx.yaw;
-    intent.aimPitch = ctx.pitch;
-  }
-  intent.moveForward = 1;
-
-  // 5s (config.retreatQuietMs) of no damage → PATROL.
-  if ((ctx.now - ctx.lastDamageMs) > ctx.config.retreatQuietMs) {
-    return { intent, nextState: 'PATROL', resetTimeInState: true };
-  }
-  return { intent, nextState: null, resetTimeInState: false };
-}
-
 function updateRespawnWait(ctx: PlayerBotStateContext): PlayerBotStateStep {
   const intent = createIdlePlayerBotIntent();
   intent.aimLerpRate = 1;
-  intent.aimYaw = ctx.yaw;
-  intent.aimPitch = ctx.pitch;
   if (ctx.health > 0) {
     return { intent, nextState: 'PATROL', resetTimeInState: true };
   }
   return { intent, nextState: null, resetTimeInState: false };
 }
 
-/** Helper: aim-at-target-only intent. Used for transition ticks. */
-function aimOnlyIntent(ctx: PlayerBotStateContext, target: BotTarget): PlayerBotIntent {
-  const intent = createIdlePlayerBotIntent();
-  intent.aimLerpRate = ctx.config.aimLerpRate;
-  const aimPt = aimPointForTarget(target);
-  intent.aimYaw = yawToward(ctx.eyePos, aimPt);
-  intent.aimPitch = pitchToward(ctx.eyePos, aimPt);
-  return intent;
-}
+// PlayerBotIntent is re-exported via types.ts consumers; reference is here
+// to keep the import used without introducing dead re-exports.
+export type { PlayerBotIntent };
 
 /**
  * Dispatch a state tick. If health <= 0, the absorbing RESPAWN_WAIT state is
@@ -339,8 +214,6 @@ export function stepState(state: PlayerBotState, ctx: PlayerBotStateContext): Pl
     case 'ALERT': return updateAlert(ctx);
     case 'ENGAGE': return updateEngage(ctx);
     case 'ADVANCE': return updateAdvance(ctx);
-    case 'SEEK_COVER': return updateSeekCover(ctx);
-    case 'RETREAT': return updateRetreat(ctx);
     case 'RESPAWN_WAIT': return updateRespawnWait(ctx);
   }
 }

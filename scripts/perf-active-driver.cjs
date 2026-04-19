@@ -110,6 +110,10 @@
   // imports them as-is.
   const PLAYER_EYE_HEIGHT = 2.2;
   const TARGET_CHEST_HEIGHT = 1.2;
+  // LOS-height: bot aims at 1.7m above target ground (matches engine NPC-to-NPC
+  // LOS). 1.2m aimed at the low-torso hitbox which was clipping into terrain
+  // on uneven ground.
+  const TARGET_LOS_HEIGHT = 1.7;
   const DEFAULT_BULLET_SPEED = 400;
 
   // Player's maximum walkable slope, derived from SlopePhysics.PLAYER_CLIMB_SLOPE_DOT.
@@ -255,8 +259,8 @@
       sprint: false,
       crouch: false,
       jump: false,
-      aimYaw: 0,
-      aimPitch: 0,
+      // World-space aim target. null = hold current view angles.
+      aimTarget: null,
       aimLerpRate: 1,
       firePrimary: false,
       reload: false,
@@ -269,24 +273,10 @@
     return Math.hypot(dx, dz);
   }
 
-  function botYawToward(from, to) {
-    const dx = Number(to.x || 0) - Number(from.x || 0);
-    const dz = Number(to.z || 0) - Number(from.z || 0);
-    return Math.atan2(dx, -dz);
-  }
-
-  function botPitchToward(from, to) {
-    const dx = Number(to.x || 0) - Number(from.x || 0);
-    const dy = Number(to.y || 0) - Number(from.y || 0);
-    const dz = Number(to.z || 0) - Number(from.z || 0);
-    const horizontal = Math.hypot(dx, dz) || 1e-6;
-    return Math.atan2(dy, horizontal);
-  }
-
   function botAimPoint(target) {
     return {
       x: Number(target.position.x || 0),
-      y: Number(target.position.y || 0) + TARGET_CHEST_HEIGHT,
+      y: Number(target.position.y || 0) + TARGET_LOS_HEIGHT,
       z: Number(target.position.z || 0),
     };
   }
@@ -303,30 +293,23 @@
     return Math.sin((2 * Math.PI * timeInStateMs) / periodMs) * amplitude;
   }
 
-  function botAimOnly(ctx, target) {
-    const intent = createIdleBotIntent();
-    intent.aimLerpRate = ctx.config.aimLerpRate;
-    const aimPt = botAimPoint(target);
-    intent.aimYaw = botYawToward(ctx.eyePos, aimPt);
-    intent.aimPitch = botPitchToward(ctx.eyePos, aimPt);
-    return intent;
-  }
-
   function updatePatrolBot(ctx) {
     const intent = createIdleBotIntent();
     intent.aimLerpRate = ctx.config.aimLerpRate;
-    intent.aimYaw = ctx.yaw;
-    intent.aimPitch = ctx.pitch;
     const enemy = ctx.findNearestEnemy();
     if (enemy) {
+      intent.aimTarget = botAimPoint(enemy);
       return { intent, nextState: 'ALERT', resetTimeInState: true };
     }
     const objective = ctx.getObjective();
-    const roamAnchor = objective ? objective.position : null;
-    if (roamAnchor) {
-      intent.aimYaw = botYawToward(ctx.eyePos, roamAnchor);
+    if (objective && objective.position) {
+      intent.aimTarget = {
+        x: Number(objective.position.x || 0),
+        y: Number(objective.position.y || 0) + TARGET_LOS_HEIGHT,
+        z: Number(objective.position.z || 0),
+      };
       intent.moveForward = 1;
-      intent.sprint = botHorizontalDistance(ctx.eyePos, roamAnchor) > ctx.config.sprintDistance;
+      intent.sprint = botHorizontalDistance(ctx.eyePos, objective.position) > ctx.config.sprintDistance;
     }
     return { intent, nextState: null, resetTimeInState: false };
   }
@@ -336,13 +319,9 @@
     intent.aimLerpRate = ctx.config.aimLerpRate;
     const target = ctx.currentTarget || ctx.findNearestEnemy();
     if (!target) {
-      intent.aimYaw = ctx.yaw;
-      intent.aimPitch = ctx.pitch;
       return { intent, nextState: 'PATROL', resetTimeInState: true };
     }
-    const aimPt = botAimPoint(target);
-    intent.aimYaw = botYawToward(ctx.eyePos, aimPt);
-    intent.aimPitch = botPitchToward(ctx.eyePos, aimPt);
+    intent.aimTarget = botAimPoint(target);
     intent.moveForward = 1;
     if (isEngagable(ctx, target)) {
       return { intent, nextState: 'ENGAGE', resetTimeInState: true };
@@ -355,20 +334,10 @@
     intent.aimLerpRate = ctx.config.aimLerpRate;
     const target = ctx.currentTarget;
     if (!target) {
-      intent.aimYaw = ctx.yaw;
-      intent.aimPitch = ctx.pitch;
       return { intent, nextState: 'PATROL', resetTimeInState: true };
     }
-    const healthFrac = ctx.maxHealth > 0 ? ctx.health / ctx.maxHealth : 0;
-    if (healthFrac < ctx.config.retreatHealthFraction) {
-      return { intent: botAimOnly(ctx, target), nextState: 'RETREAT', resetTimeInState: true };
-    }
-    if (healthFrac < ctx.config.coverHealthFraction || ctx.suppressionScore >= ctx.config.coverSuppressionScore) {
-      return { intent: botAimOnly(ctx, target), nextState: 'SEEK_COVER', resetTimeInState: true };
-    }
-    const aimPt = botAimPoint(target);
-    intent.aimYaw = botYawToward(ctx.eyePos, aimPt);
-    intent.aimPitch = botPitchToward(ctx.eyePos, aimPt);
+    // No health / suppression bail-out. Harness bot pushes through.
+    intent.aimTarget = botAimPoint(target);
     const visible = !!ctx.canSeeTarget(target.position);
     const dist = botHorizontalDistance(ctx.eyePos, target.position);
     if (!visible || dist > ctx.config.maxFireDistance) {
@@ -380,9 +349,8 @@
       intent.firePrimary = true;
     }
     intent.moveStrafe = engageStrafeIntent(ctx.timeInStateMs, ctx.config.engageStrafePeriodMs, ctx.config.engageStrafeAmplitude);
-    if (dist < ctx.config.retreatDistance) {
-      intent.moveForward = -1;
-    }
+    // Push in until close. NEVER negative — no back-pedalling.
+    intent.moveForward = dist > ctx.config.pushInDistance ? 1 : 0;
     return { intent, nextState: null, resetTimeInState: false };
   }
 
@@ -391,78 +359,21 @@
     intent.aimLerpRate = ctx.config.aimLerpRate;
     const target = ctx.currentTarget || ctx.findNearestEnemy();
     if (!target) {
-      intent.aimYaw = ctx.yaw;
-      intent.aimPitch = ctx.pitch;
       return { intent, nextState: 'PATROL', resetTimeInState: true };
     }
+    intent.aimTarget = botAimPoint(target);
     if (isEngagable(ctx, target)) {
-      const aimPt = botAimPoint(target);
-      intent.aimYaw = botYawToward(ctx.eyePos, aimPt);
-      intent.aimPitch = botPitchToward(ctx.eyePos, aimPt);
       return { intent, nextState: 'ENGAGE', resetTimeInState: true };
     }
-    const aimPt = botAimPoint(target);
-    intent.aimYaw = botYawToward(ctx.eyePos, aimPt);
-    intent.aimPitch = botPitchToward(ctx.eyePos, aimPt);
     intent.moveForward = 1;
     const dist = botHorizontalDistance(ctx.eyePos, target.position);
     intent.sprint = dist > ctx.config.sprintDistance;
     return { intent, nextState: null, resetTimeInState: false };
   }
 
-  function updateSeekCoverBot(ctx) {
-    const intent = createIdleBotIntent();
-    intent.aimLerpRate = ctx.config.aimLerpRate;
-    intent.crouch = true;
-    const target = ctx.currentTarget;
-    if (target) {
-      const aimPt = botAimPoint(target);
-      intent.aimYaw = botYawToward(ctx.eyePos, aimPt);
-      intent.aimPitch = botPitchToward(ctx.eyePos, aimPt);
-    } else {
-      intent.aimYaw = ctx.yaw;
-      intent.aimPitch = ctx.pitch;
-    }
-    const healthFrac = ctx.maxHealth > 0 ? ctx.health / ctx.maxHealth : 0;
-    if (healthFrac < ctx.config.retreatHealthFraction) {
-      return { intent, nextState: 'RETREAT', resetTimeInState: true };
-    }
-    if (!target || (ctx.now - target.lastKnownMs) > 3000) {
-      return { intent, nextState: 'PATROL', resetTimeInState: true };
-    }
-    intent.moveForward = -1;
-    intent.moveStrafe = engageStrafeIntent(ctx.timeInStateMs, ctx.config.engageStrafePeriodMs, ctx.config.engageStrafeAmplitude);
-    if (ctx.timeInStateMs > 2000 && ctx.suppressionScore >= ctx.config.coverSuppressionScore) {
-      return { intent, nextState: 'RETREAT', resetTimeInState: true };
-    }
-    return { intent, nextState: null, resetTimeInState: false };
-  }
-
-  function updateRetreatBot(ctx) {
-    const intent = createIdleBotIntent();
-    intent.aimLerpRate = ctx.config.aimLerpRate;
-    intent.sprint = true;
-    const target = ctx.currentTarget;
-    if (target) {
-      const retreatBearing = botYawToward(target.position, ctx.eyePos);
-      intent.aimYaw = retreatBearing;
-      intent.aimPitch = 0;
-    } else {
-      intent.aimYaw = ctx.yaw;
-      intent.aimPitch = ctx.pitch;
-    }
-    intent.moveForward = 1;
-    if ((ctx.now - ctx.lastDamageMs) > ctx.config.retreatQuietMs) {
-      return { intent, nextState: 'PATROL', resetTimeInState: true };
-    }
-    return { intent, nextState: null, resetTimeInState: false };
-  }
-
   function updateRespawnWaitBot(ctx) {
     const intent = createIdleBotIntent();
     intent.aimLerpRate = 1;
-    intent.aimYaw = ctx.yaw;
-    intent.aimPitch = ctx.pitch;
     if (ctx.health > 0) {
       return { intent, nextState: 'PATROL', resetTimeInState: true };
     }
@@ -478,8 +389,6 @@
       case 'ALERT': return updateAlertBot(ctx);
       case 'ENGAGE': return updateEngageBot(ctx);
       case 'ADVANCE': return updateAdvanceBot(ctx);
-      case 'SEEK_COVER': return updateSeekCoverBot(ctx);
-      case 'RETREAT': return updateRetreatBot(ctx);
       case 'RESPAWN_WAIT': return updateRespawnWaitBot(ctx);
       default: return updatePatrolBot(ctx);
     }
@@ -548,11 +457,9 @@
       maxFireDistance: profile.maxFireDistance,
       sprintDistance: profile.sprintDistance,
       approachDistance: profile.approachDistance,
-      retreatDistance: profile.retreatDistance,
-      coverHealthFraction: 0.5,
-      retreatHealthFraction: 0.2,
-      coverSuppressionScore: 0.7,
-      retreatQuietMs: 5000,
+      // Stop pushing closer inside ~8m. NEVER negative — the bot does not
+      // back-pedal into its target.
+      pushInDistance: 8,
       aimLerpRate: 1,
       engageStrafeAmplitude: profile.aggressiveMode ? 0.3 : 0.2,
       engageStrafePeriodMs: 750,
@@ -611,6 +518,7 @@
       shotsFired: 0,
       reloadsIssued: 0,
       losRejectedShots: 0,
+      aimDotGateRejectedShots: 0,
       stuckTeleportCount: 0,
       maxStuckMs: 0,
       stuckMs: 0,
@@ -618,8 +526,7 @@
       transitions: 0,
       lastStateChangeAt: 0,
       stateHistogram: {
-        PATROL: 0, ALERT: 0, ENGAGE: 0, ADVANCE: 0,
-        SEEK_COVER: 0, RETREAT: 0, RESPAWN_WAIT: 0,
+        PATROL: 0, ALERT: 0, ENGAGE: 0, ADVANCE: 0, RESPAWN_WAIT: 0,
       },
       lastFireProbe: null,
       frontlineInserted: false,
@@ -1079,10 +986,13 @@
       }
     }
 
-    function overlayPathYaw(playerPos) {
+    function overlayPathPoint(playerPos) {
       // Pure-pursuit lookahead along the current waypoints — when fresh and
-      // valid, overrides the bot's "straight-line to target" yaw so the player
-      // follows the navmesh route rather than wandering into a hill.
+      // valid, supplies a MOVEMENT anchor the driver can steer toward on the
+      // navmesh. Aim (at the enemy) and movement (along the path) may diverge
+      // when a corner blocks line of sight; that's fine and matches how a
+      // human player moves. Returns the lookahead point as a world-space
+      // 3D position, or null if there is no trusted path.
       const ageMs = Date.now() - state.lastWaypointReplanAt;
       if (!isPathTrusted({ path: state.waypoints, waypointIdx: state.waypointIdx, pathAgeMs: ageMs })) {
         return null;
@@ -1090,7 +1000,7 @@
       const pt = pointAlongPath(state.waypoints, state.waypointIdx, { x: playerPos.x, z: playerPos.z }, computeAdaptiveLookahead(0));
       if (!pt) return null;
       state.waypointsFollowed++;
-      return botYawToward(playerPos, pt);
+      return pt;
     }
 
     // ── Telemetry ──
@@ -1207,20 +1117,22 @@
 
       // ── Path overlay — when ADVANCE or PATROL, try to follow a navmesh waypoint
       // so the bot doesn't walk through hills. Active only if the current state
-      // wants forward motion and we have a usable anchor.
-      let overlayYaw = null;
+      // wants forward motion and we have a usable anchor. `overlayPathPoint` is
+      // a 3D point the driver steers MOVEMENT toward; AIM still points at the
+      // bot's chosen aim target (usually the enemy).
+      let overlayPoint = null;
       const wantsMove = step.intent.moveForward > 0.1;
       if (wantsMove && (state.botState === 'ADVANCE' || state.botState === 'PATROL' || state.botState === 'ALERT')) {
         const anchor = state.currentTarget ? state.currentTarget.position
           : (objectiveClosure() ? objectiveClosure().position : null);
         if (anchor) {
           updateWaypoints(systems, playerPos, anchor);
-          overlayYaw = overlayPathYaw(playerPos);
+          overlayPoint = overlayPathPoint(playerPos);
         }
       }
 
       // Apply the intent via the PlayerController surface. Intent → controls.
-      applyIntent(systems, step.intent, angles, overlayYaw);
+      applyIntent(systems, step.intent, angles, overlayPoint, playerPos);
 
       // Telemetry hooks for capture-side validators.
       if (step.intent.firePrimary) state.shotsFired++;
@@ -1254,7 +1166,7 @@
       return fresh || current;
     }
 
-    function applyIntent(systems, intent, currentAngles, overlayYaw) {
+    function applyIntent(systems, intent, currentAngles, overlayPoint, playerPos) {
       const pc = systems && systems.playerController;
       if (!pc) return;
 
@@ -1266,24 +1178,88 @@
         pc.applyMovementIntent({ forward, strafe, sprint });
       }
 
-      // Aim. Use overlay yaw when active (navmesh path trumps straight-line yaw
-      // so the bot follows the path instead of walking into terrain), but keep
-      // the intent's pitch so the bot still aims up/down at the target.
-      const targetYaw = overlayYaw != null ? overlayYaw : intent.aimYaw;
+      // ── Aim path: camera.lookAt() is the ONLY place the rotation
+      // convention lives. The bot writes a world-space aim target; the
+      // driver asks Three.js to compute the corresponding (yaw, pitch)
+      // and then applies a lerped value via setViewAngles. This is the
+      // same pattern as the old killbot (commit 37da280) and every other
+      // camera consumer in the repo (PlayerCamera, DeathCamSystem,
+      // MortarCamera, SpectatorCamera, flightTestScene).
+      const camera = getCamera(systems);
       if (!state.viewSeeded) {
         state.lastYaw = currentAngles.yaw;
         state.lastPitch = currentAngles.pitch;
         state.viewSeeded = true;
       }
-      const yawNext = lerpAngle(state.lastYaw, targetYaw, intent.aimLerpRate);
-      const pitchNext = clampPitch(intent.aimPitch);
-      if (typeof pc.setViewAngles === 'function') {
-        pc.setViewAngles(yawNext, pitchNext);
-      }
-      state.lastYaw = yawNext;
-      state.lastPitch = pitchNext;
 
-      // Fire / reload.
+      let yawNext = state.lastYaw;
+      let pitchNext = state.lastPitch;
+      let aimDot = null; // aim-dot against intent.aimTarget, for the fire gate
+      if (intent.aimTarget && camera) {
+        const prevOrder = camera.rotation.order;
+        camera.rotation.order = 'YXZ';
+        const savedY = camera.rotation.y;
+        const savedX = camera.rotation.x;
+        camera.lookAt(
+          Number(intent.aimTarget.x || 0),
+          Number(intent.aimTarget.y || 0),
+          Number(intent.aimTarget.z || 0),
+        );
+        const targetYaw = Number(camera.rotation.y || 0);
+        const targetPitch = Number(camera.rotation.x || 0);
+        camera.rotation.y = savedY;
+        camera.rotation.x = savedX;
+        camera.rotation.order = prevOrder;
+
+        yawNext = lerpAngle(state.lastYaw, targetYaw, intent.aimLerpRate);
+        pitchNext = clampPitch(state.lastPitch + (clampPitch(targetPitch) - state.lastPitch) * clamp01(intent.aimLerpRate));
+        if (typeof pc.setViewAngles === 'function') {
+          pc.setViewAngles(yawNext, pitchNext);
+        }
+        state.lastYaw = yawNext;
+        state.lastPitch = pitchNext;
+
+        // After setViewAngles, the camera points at (yawNext, pitchNext).
+        // Compute cosine of (camera forward) vs (eye→aimTarget) for the
+        // fire gate. readCameraWorld extracts forward + position from the
+        // camera's matrixWorld without a THREE.Vector3 dependency.
+        if (readCameraWorld(camera, _tmpEye, _tmpForward)) {
+          const tx = Number(intent.aimTarget.x || 0) - _tmpEye.x;
+          const ty = Number(intent.aimTarget.y || 0) - _tmpEye.y;
+          const tz = Number(intent.aimTarget.z || 0) - _tmpEye.z;
+          const tLen = Math.hypot(tx, ty, tz);
+          if (tLen > 1e-6) {
+            aimDot = (_tmpForward.x * tx + _tmpForward.y * ty + _tmpForward.z * tz) / tLen;
+          }
+        }
+      } else if (overlayPoint && camera && playerPos) {
+        // No aim target (e.g. PATROL with no objective) — still slew toward
+        // the movement overlay so the camera roughly faces travel direction.
+        const prevOrder = camera.rotation.order;
+        camera.rotation.order = 'YXZ';
+        const savedY = camera.rotation.y;
+        const savedX = camera.rotation.x;
+        camera.lookAt(Number(overlayPoint.x || 0), Number((overlayPoint.y || playerPos.y) + PLAYER_EYE_HEIGHT), Number(overlayPoint.z || 0));
+        const targetYaw = Number(camera.rotation.y || 0);
+        camera.rotation.y = savedY;
+        camera.rotation.x = savedX;
+        camera.rotation.order = prevOrder;
+        yawNext = lerpAngle(state.lastYaw, targetYaw, intent.aimLerpRate);
+        pitchNext = state.lastPitch;
+        if (typeof pc.setViewAngles === 'function') {
+          pc.setViewAngles(yawNext, pitchNext);
+        }
+        state.lastYaw = yawNext;
+        state.lastPitch = pitchNext;
+      }
+
+      // ── Fire gate: require aim-dot ≥ 0.8 (cos ≈ 37° cone) before firing.
+      // This catches any future yaw-convention drift: if the camera isn't
+      // pointing at the aim target, SUPPRESS the trigger rather than spray
+      // into empty air. The gate is the same primitive as
+      // `evaluateFireDecision(aimDotThreshold=0.8)` exported at the top of
+      // this file; we call that export directly so the gate behavior is
+      // one surface, not two.
       if (intent.reload) {
         if (state.firingHeld) {
           if (typeof pc.fireStop === 'function') pc.fireStop();
@@ -1291,12 +1267,34 @@
         }
         if (typeof pc.reloadWeapon === 'function') pc.reloadWeapon();
       } else if (intent.firePrimary) {
-        // LOS gate — one final engine check. The bot's LOS already passed,
-        // but we guard against one-tick races where the target moved.
-        if (!state.firingHeld) {
-          if (typeof pc.fireStart === 'function') pc.fireStart();
-          state.firingHeld = true;
-          state.lastShotAt = Date.now();
+        let passesAimGate = true;
+        if (intent.aimTarget && camera && aimDot !== null && readCameraWorld(camera, _tmpEye, _tmpForward)) {
+          // Route through evaluateFireDecision to reuse the export (not dead code).
+          const toTarget = {
+            x: Number(intent.aimTarget.x || 0) - _tmpEye.x,
+            y: Number(intent.aimTarget.y || 0) - _tmpEye.y,
+            z: Number(intent.aimTarget.z || 0) - _tmpEye.z,
+          };
+          const dist = Math.hypot(toTarget.x, toTarget.y, toTarget.z);
+          const decision = evaluateFireDecision({
+            cameraForward: { x: _tmpForward.x, y: _tmpForward.y, z: _tmpForward.z },
+            toTarget: toTarget,
+            aimDotThreshold: 0.8,
+            verticalThreshold: 0.45,
+            closeRange: dist < 10,
+          });
+          passesAimGate = !!decision.shouldFire;
+          if (!passesAimGate) state.aimDotGateRejectedShots++;
+        }
+        if (passesAimGate) {
+          if (!state.firingHeld) {
+            if (typeof pc.fireStart === 'function') pc.fireStart();
+            state.firingHeld = true;
+            state.lastShotAt = Date.now();
+          }
+        } else if (state.firingHeld) {
+          if (typeof pc.fireStop === 'function') pc.fireStop();
+          state.firingHeld = false;
         }
       } else if (state.firingHeld) {
         if (typeof pc.fireStop === 'function') pc.fireStop();
@@ -1314,6 +1312,11 @@
       return Math.max(-AIM_PITCH_LIMIT_RAD, Math.min(AIM_PITCH_LIMIT_RAD, p));
     }
 
+    function clamp01(x) {
+      if (!Number.isFinite(x)) return 0;
+      return Math.max(0, Math.min(1, x));
+    }
+
     function lerpAngle(from, to, t) {
       let delta = to - from;
       while (delta > Math.PI) delta -= Math.PI * 2;
@@ -1324,6 +1327,35 @@
       while (out < -Math.PI) out += Math.PI * 2;
       return out;
     }
+
+    // ── Camera-world extraction (no THREE.Vector3 dependency).
+    // applyIntent needs (camera position, forward direction) to compute the
+    // aim-dot gate. We pull both directly from `camera.matrixWorld`, which
+    // is a 16-element Float32Array/number[] in column-major order:
+    //   elements[0..3]   = right  (x-axis column)
+    //   elements[4..7]   = up     (y-axis column)
+    //   elements[8..11]  = -forward (−z-axis column — THREE stores camera's
+    //                                +z as "back"; −z is its forward)
+    //   elements[12..15] = translation (world position)
+    // This matches `camera.getWorldDirection()` / `getWorldPosition()` without
+    // needing a THREE.Vector3 scratch, which the perf harness bundle does
+    // not expose globally.
+    function readCameraWorld(camera, outEye, outForward) {
+      if (!camera || typeof camera.updateMatrixWorld !== 'function') return false;
+      camera.updateMatrixWorld(true);
+      const e = camera.matrixWorld && camera.matrixWorld.elements;
+      if (!e) return false;
+      outEye.x = Number(e[12]); outEye.y = Number(e[13]); outEye.z = Number(e[14]);
+      // Forward = negative third column (camera looks down its -Z).
+      let fx = -Number(e[8]), fy = -Number(e[9]), fz = -Number(e[10]);
+      const len = Math.hypot(fx, fy, fz);
+      if (len > 1e-6) { fx /= len; fy /= len; fz /= len; }
+      outForward.x = fx; outForward.y = fy; outForward.z = fz;
+      return true;
+    }
+
+    const _tmpEye = { x: 0, y: 0, z: 0 };
+    const _tmpForward = { x: 0, y: 0, z: 0 };
 
     // ── Public surface ──
 
@@ -1346,6 +1378,7 @@
         capturedZoneCount: 0,
         movementTransitions: state.transitions,
         losRejectedShots: state.losRejectedShots,
+        aimDotGateRejectedShots: state.aimDotGateRejectedShots,
         stuckTeleportCount: state.stuckTeleportCount,
         maxStuckSeconds: Math.max(0, Math.round(state.maxStuckMs / 100) / 10),
         gradientProbeDeflections: 0,
@@ -1389,7 +1422,7 @@
     return {
       stop: stop,
       getDebugSnapshot: getDebugSnapshot,
-      movementPatternCount: 5, // PATROL/ALERT/ENGAGE/ADVANCE/SEEK_COVER — informative only
+      movementPatternCount: 5, // PATROL/ALERT/ENGAGE/ADVANCE/RESPAWN_WAIT — informative only
       compressFrontline: enableFrontlineCompression,
       mode: opts.mode,
       allowWarpRecovery: opts.allowWarpRecovery,
@@ -1442,6 +1475,7 @@
       angularDistance: angularDistance,
       PLAYER_EYE_HEIGHT: PLAYER_EYE_HEIGHT,
       TARGET_CHEST_HEIGHT: TARGET_CHEST_HEIGHT,
+      TARGET_LOS_HEIGHT: TARGET_LOS_HEIGHT,
       DEFAULT_BULLET_SPEED: DEFAULT_BULLET_SPEED,
       PLAYER_CLIMB_SLOPE_DOT: PLAYER_CLIMB_SLOPE_DOT,
       PLAYER_MAX_CLIMB_ANGLE_RAD: PLAYER_MAX_CLIMB_ANGLE_RAD,

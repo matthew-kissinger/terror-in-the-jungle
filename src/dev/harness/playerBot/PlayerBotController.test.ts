@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
+import * as THREE from 'three';
 import {
   PlayerBotController,
   PlayerBotControllerTarget,
@@ -12,24 +13,48 @@ import {
 } from './PlayerBotController';
 import { createIdlePlayerBotIntent } from './types';
 
-function makeTarget(): PlayerBotControllerTarget & {
+interface RecordingTarget extends PlayerBotControllerTarget {
   movementCalls: Array<{ forward: number; strafe: number; sprint: boolean }>;
   viewCalls: Array<{ yaw: number; pitch: number }>;
   fireCalls: string[];
-} {
+  camera: THREE.PerspectiveCamera;
+}
+
+function makeCamera(): THREE.PerspectiveCamera {
+  const cam = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
+  cam.rotation.order = 'YXZ';
+  cam.position.set(0, 0, 0);
+  cam.updateMatrixWorld(true);
+  return cam;
+}
+
+function makeTarget(opts: { withCamera?: boolean } = {}): RecordingTarget {
   const movementCalls: Array<{ forward: number; strafe: number; sprint: boolean }> = [];
   const viewCalls: Array<{ yaw: number; pitch: number }> = [];
   const fireCalls: string[] = [];
-  return {
+  const camera = makeCamera();
+  const includeCamera = opts.withCamera !== false;
+  const t: RecordingTarget = {
     movementCalls,
     viewCalls,
     fireCalls,
+    camera,
     applyMovementIntent(intent) { movementCalls.push({ ...intent }); },
-    setViewAngles(yaw, pitch) { viewCalls.push({ yaw, pitch }); },
+    setViewAngles(yaw, pitch) {
+      viewCalls.push({ yaw, pitch });
+      // Mirror PlayerCamera.setInfantryViewAngles so the aim-dot gate
+      // reads a world-direction consistent with the engine.
+      camera.rotation.order = 'YXZ';
+      camera.rotation.y = yaw;
+      camera.rotation.x = pitch;
+      camera.updateMatrixWorld(true);
+    },
     fireStart() { fireCalls.push('start'); },
     fireStop() { fireCalls.push('stop'); },
     reloadWeapon() { fireCalls.push('reload'); },
   };
+  if (includeCamera) t.getCamera = () => camera;
+  return t;
 }
 
 describe('PlayerBotController — movement translation', () => {
@@ -76,46 +101,139 @@ describe('PlayerBotController — movement translation', () => {
     intent.moveStrafe = Number.POSITIVE_INFINITY;
     controller.apply(intent);
     expect(target.movementCalls[0].forward).toBe(0);
-    // infinity clamps to 1 after finite check; either way, it should be bounded.
     expect(target.movementCalls[0].strafe).toBeLessThanOrEqual(1);
     expect(target.movementCalls[0].strafe).toBeGreaterThanOrEqual(-1);
   });
 });
 
-describe('PlayerBotController — aim translation', () => {
-  it('snaps view angles at aimLerpRate=1', () => {
+// ── Regression tests (from the task brief).
+
+describe('PlayerBotController — yaw convention (REGRESSION 1)', () => {
+  // Guards against PR #95's sign-error regression. The controller must
+  // produce a camera world-forward that points AT the aim target, for all
+  // cardinal directions plus one off-axis case.
+
+  function runCardinal(dx: number, dz: number): THREE.Vector3 {
     const target = makeTarget();
     const controller = new PlayerBotController(target);
     const intent = createIdlePlayerBotIntent();
-    intent.aimYaw = 1.0;
-    intent.aimPitch = 0.5;
+    intent.aimTarget = { x: dx, y: 0, z: dz };
     intent.aimLerpRate = 1;
     controller.apply(intent);
-    expect(target.viewCalls[0].yaw).toBeCloseTo(1.0, 5);
-    expect(target.viewCalls[0].pitch).toBeCloseTo(0.5, 5);
+    return target.camera.getWorldDirection(new THREE.Vector3());
+  }
+
+  it('camera points +X when aimTarget is at +X', () => {
+    const fwd = runCardinal(10, 0);
+    expect(fwd.x).toBeCloseTo(1, 2);
+    expect(fwd.z).toBeCloseTo(0, 2);
   });
 
-  it('clamps pitch to the ±80° gimbal margin', () => {
+  it('camera points -X when aimTarget is at -X', () => {
+    const fwd = runCardinal(-10, 0);
+    expect(fwd.x).toBeCloseTo(-1, 2);
+    expect(fwd.z).toBeCloseTo(0, 2);
+  });
+
+  it('camera points +Z when aimTarget is at +Z', () => {
+    const fwd = runCardinal(0, 10);
+    expect(fwd.x).toBeCloseTo(0, 2);
+    expect(fwd.z).toBeCloseTo(1, 2);
+  });
+
+  it('camera points -Z when aimTarget is at -Z', () => {
+    const fwd = runCardinal(0, -10);
+    expect(fwd.x).toBeCloseTo(0, 2);
+    expect(fwd.z).toBeCloseTo(-1, 2);
+  });
+
+  it('camera points diagonally when aimTarget is diagonal', () => {
+    const fwd = runCardinal(10, 10);
+    // Target is at (+10, 0, +10) → unit direction (0.707, 0, 0.707).
+    expect(fwd.x).toBeCloseTo(Math.SQRT1_2, 2);
+    expect(fwd.z).toBeCloseTo(Math.SQRT1_2, 2);
+  });
+});
+
+describe('PlayerBotController — aim-dot gate (REGRESSION 2)', () => {
+  it('suppresses fire when camera has not yet slewed to aim target', () => {
+    const target = makeTarget();
+    const controller = new PlayerBotController(target);
+    // Start the camera pointing at -Z; put the aim target at +X.
+    controller.seedViewAngles(0, 0);
+    target.camera.rotation.order = 'YXZ';
+    target.camera.rotation.y = 0;
+    target.camera.rotation.x = 0;
+    target.camera.updateMatrixWorld(true);
+    const intent = createIdlePlayerBotIntent();
+    intent.aimTarget = { x: 10, y: 0, z: 0 };
+    intent.firePrimary = true;
+    // Very slow slew — after one tick the camera has barely moved, aimDot < 0.8.
+    intent.aimLerpRate = 0.05;
+    const result = controller.apply(intent);
+    expect(result.fired).toBe(false);
+    expect(target.fireCalls).not.toContain('start');
+    expect(result.aimDot).toBeLessThan(0.8);
+  });
+
+  it('allows fire when camera is pointing at the aim target (snap)', () => {
     const target = makeTarget();
     const controller = new PlayerBotController(target);
     const intent = createIdlePlayerBotIntent();
-    intent.aimPitch = Math.PI; // way past 80°
+    intent.aimTarget = { x: 10, y: 0, z: 0 };
+    intent.firePrimary = true;
+    intent.aimLerpRate = 1;
+    const result = controller.apply(intent);
+    expect(result.fired).toBe(true);
+    expect(target.fireCalls).toContain('start');
+  });
+});
+
+describe('PlayerBotController — aim translation', () => {
+  it('lookAt-based aim writes view angles via setViewAngles', () => {
+    const target = makeTarget();
+    const controller = new PlayerBotController(target);
+    const intent = createIdlePlayerBotIntent();
+    intent.aimTarget = { x: 10, y: 0, z: 0 };
+    intent.aimLerpRate = 1;
+    controller.apply(intent);
+    expect(target.viewCalls.length).toBe(1);
+    expect(Number.isFinite(target.viewCalls[0].yaw)).toBe(true);
+    expect(Number.isFinite(target.viewCalls[0].pitch)).toBe(true);
+  });
+
+  it('holds view angles when aimTarget is null (no setViewAngles call)', () => {
+    const target = makeTarget();
+    const controller = new PlayerBotController(target);
+    const intent = createIdlePlayerBotIntent();
+    intent.aimTarget = null;
+    controller.apply(intent);
+    expect(target.viewCalls.length).toBe(0);
+  });
+
+  it('clamps pitch to the ±80° gimbal margin when target is nearly overhead', () => {
+    const target = makeTarget();
+    const controller = new PlayerBotController(target);
+    const intent = createIdlePlayerBotIntent();
+    // Target directly above eye — lookAt pitch would be ~+90°, we clamp to 80°.
+    intent.aimTarget = { x: 0, y: 100, z: 0.001 };
     intent.aimLerpRate = 1;
     controller.apply(intent);
     const maxPitch = (80 * Math.PI) / 180;
-    expect(target.viewCalls[0].pitch).toBeLessThanOrEqual(maxPitch + 1e-6);
+    expect(Math.abs(target.viewCalls[0].pitch)).toBeLessThanOrEqual(maxPitch + 1e-6);
   });
 
-  it('slews toward the target yaw at lower lerp rates', () => {
+  it('slews partway toward target yaw at lower lerp rates', () => {
     const target = makeTarget();
     const controller = new PlayerBotController(target);
     controller.seedViewAngles(0, 0);
     const intent = createIdlePlayerBotIntent();
-    intent.aimYaw = 1.0;
+    intent.aimTarget = { x: 10, y: 0, z: 0 };
     intent.aimLerpRate = 0.5;
     controller.apply(intent);
-    // With rate 0.5 we should be halfway there, not snapped.
-    expect(target.viewCalls[0].yaw).toBeCloseTo(0.5, 2);
+    // First tick: halfway between 0 and target yaw. Target yaw for +X is finite
+    // and non-zero; we just assert movement toward the target (behavior, not value).
+    expect(target.viewCalls[0].yaw).not.toBe(0);
   });
 });
 
@@ -124,6 +242,8 @@ describe('PlayerBotController — fire and reload', () => {
     const target = makeTarget();
     const controller = new PlayerBotController(target);
     const intent = createIdlePlayerBotIntent();
+    intent.aimTarget = { x: 10, y: 0, z: 0 };
+    intent.aimLerpRate = 1;
     intent.firePrimary = true;
     controller.apply(intent);
     controller.apply(intent);
@@ -136,6 +256,8 @@ describe('PlayerBotController — fire and reload', () => {
     const target = makeTarget();
     const controller = new PlayerBotController(target);
     const intent = createIdlePlayerBotIntent();
+    intent.aimTarget = { x: 10, y: 0, z: 0 };
+    intent.aimLerpRate = 1;
     intent.firePrimary = true;
     controller.apply(intent);
     intent.firePrimary = false;
@@ -147,13 +269,14 @@ describe('PlayerBotController — fire and reload', () => {
     const target = makeTarget();
     const controller = new PlayerBotController(target);
     const fire = createIdlePlayerBotIntent();
+    fire.aimTarget = { x: 10, y: 0, z: 0 };
+    fire.aimLerpRate = 1;
     fire.firePrimary = true;
     controller.apply(fire);
     const reload = createIdlePlayerBotIntent();
     reload.reload = true;
     controller.apply(reload);
     expect(target.fireCalls).toContain('reload');
-    // After reload, firing should have been stopped.
     expect(target.fireCalls).toContain('stop');
   });
 
@@ -161,6 +284,8 @@ describe('PlayerBotController — fire and reload', () => {
     const target = makeTarget();
     const controller = new PlayerBotController(target);
     const intent = createIdlePlayerBotIntent();
+    intent.aimTarget = { x: 10, y: 0, z: 0 };
+    intent.aimLerpRate = 1;
     intent.firePrimary = true;
     controller.apply(intent);
     expect(controller.isFiringHeld()).toBe(true);
@@ -180,11 +305,9 @@ describe('lerpAngle', () => {
   });
 
   it('takes the shortest arc across the π/−π boundary', () => {
-    // From just below -π to just above +π, shortest arc is ~0.2 rad, not 2π-0.2.
     const from = -Math.PI + 0.1;
     const to = Math.PI - 0.1;
     const mid = lerpAngle(from, to, 0.5);
-    // Midpoint should be near ±π, not near 0.
     expect(Math.abs(Math.abs(mid) - Math.PI)).toBeLessThan(0.1);
   });
 
@@ -201,14 +324,13 @@ describe('PlayerBotController — integration-lite', () => {
     const intent = createIdlePlayerBotIntent();
     intent.moveForward = 1;
     intent.firePrimary = true;
-    intent.aimYaw = 0.25;
-    intent.aimPitch = 0.15;
+    intent.aimTarget = { x: 10, y: 0, z: 0 };
     intent.aimLerpRate = 1;
     const result = controller.apply(intent);
     expect(result.fired).toBe(true);
     expect(result.forward).toBe(1);
-    expect(result.yaw).toBeCloseTo(0.25, 5);
-    expect(result.pitch).toBeCloseTo(0.15, 5);
+    expect(Number.isFinite(result.yaw)).toBe(true);
+    expect(Number.isFinite(result.pitch)).toBe(true);
   });
 
   it('multiple applies do not leak unrelated fire calls', () => {
@@ -238,8 +360,6 @@ describe('PlayerBotController — integration-lite', () => {
       reloadWeapon: vi.fn(),
     };
     const controller = new PlayerBotController(faulty);
-    // Controller does not wrap applyMovementIntent — a real test should use reset,
-    // which DOES swallow errors. Assert reset is safe.
     expect(() => controller.reset()).not.toThrow();
   });
 });

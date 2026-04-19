@@ -15,10 +15,8 @@
 export type PlayerBotState =
   | 'PATROL'        // no target; move toward objective
   | 'ALERT'         // heard/spotted something; orient + advance cautiously
-  | 'ENGAGE'        // target visible + in-range; fire + strafe
+  | 'ENGAGE'        // target visible + in-range; push + fire
   | 'ADVANCE'       // target known, not visible or out-of-range; close the gap on navmesh
-  | 'SEEK_COVER'    // under fire, health low or suppression high
-  | 'RETREAT'       // health critical, break contact
   | 'RESPAWN_WAIT'; // dead, wait for respawn
 
 /** 3D world position (plain object — bot is engine-agnostic). */
@@ -40,21 +38,25 @@ export interface BotTarget {
  * Intent the bot emits each tick. The controller translates this into the
  * existing PlayerController surface (movement intent, view angles, fire).
  * No behavior lives on this object — it is a plain value.
+ *
+ * Aim is expressed as a WORLD-SPACE POINT, not angles. States know where
+ * to look; they do not know the camera's rotation convention. The
+ * controller uses Three.js `camera.lookAt()` to convert the point into
+ * view angles — that is the only place the rotation convention lives.
  */
 export interface PlayerBotIntent {
   // Movement — normalized axis values; controller translates to WASD keys.
-  moveForward: number;   // -1 (back) .. 0 .. 1 (forward)
+  moveForward: number;   // 0 .. 1 (bot never moves backward — players push)
   moveStrafe: number;    // -1 (left) .. 0 .. 1 (right)
   sprint: boolean;
   crouch: boolean;
   jump: boolean;         // rare; small ledges only
 
-  // Aim — absolute world-space yaw/pitch targets. Controller slews camera.
-  aimYaw: number;        // radians
-  aimPitch: number;      // radians
+  // Aim — world-space 3D target. `null` = hold current view angles (no slew).
+  aimTarget: BotVec3 | null;
   aimLerpRate: number;   // 0..1; 1 = snap
 
-  // Fire — bot writes intent; controller debounces.
+  // Fire — bot writes intent; controller debounces and aim-dot-gates.
   firePrimary: boolean;
   reload: boolean;
 }
@@ -70,7 +72,7 @@ export interface PlayerBotStateContext {
   readonly pitch: number;
   readonly health: number;              // 0..100
   readonly maxHealth: number;
-  readonly suppressionScore: number;    // 0..1
+  readonly suppressionScore: number;    // 0..1 (retained for telemetry; not consumed)
   readonly lastDamageMs: number;
   readonly magazine: { current: number; max: number };
   /** The best-known target, if any. State machine owns the transition. */
@@ -108,16 +110,8 @@ export interface PlayerBotConfig {
   readonly sprintDistance: number;
   /** Distance (m) threshold for normal advance. */
   readonly approachDistance: number;
-  /** Distance (m) at which ENGAGE backs off. */
-  readonly retreatDistance: number;
-  /** Health fraction below which ENGAGE transitions to SEEK_COVER. */
-  readonly coverHealthFraction: number;
-  /** Health fraction below which any state transitions to RETREAT. */
-  readonly retreatHealthFraction: number;
-  /** Suppression score above which ENGAGE breaks off. */
-  readonly coverSuppressionScore: number;
-  /** Milliseconds of contact quiet before RETREAT returns to PATROL. */
-  readonly retreatQuietMs: number;
+  /** Distance (m) below which ENGAGE stops pushing forward (0 — never −1). */
+  readonly pushInDistance: number;
   /** Aim slew rate per tick (0..1). 1 = instant snap. */
   readonly aimLerpRate: number;
   /** Strafe amplitude in ENGAGE (0..1). 0 disables player-dodge. */
@@ -134,11 +128,7 @@ export const DEFAULT_PLAYER_BOT_CONFIG: PlayerBotConfig = {
   maxFireDistance: 165,
   sprintDistance: 200,
   approachDistance: 120,
-  retreatDistance: 18,
-  coverHealthFraction: 0.5,
-  retreatHealthFraction: 0.2,
-  coverSuppressionScore: 0.7,
-  retreatQuietMs: 5000,
+  pushInDistance: 8,
   aimLerpRate: 1,
   engageStrafeAmplitude: 0.3,
   engageStrafePeriodMs: 750,
@@ -154,8 +144,7 @@ export function createIdlePlayerBotIntent(): PlayerBotIntent {
     sprint: false,
     crouch: false,
     jump: false,
-    aimYaw: 0,
-    aimPitch: 0,
+    aimTarget: null,
     aimLerpRate: 1,
     firePrimary: false,
     reload: false,
