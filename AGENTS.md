@@ -1,12 +1,12 @@
 # Agent Instructions
 
-Last updated: 2026-04-17
+Last updated: 2026-04-19
 
 This is the authoritative, agent-agnostic operating guide for this repo. Every agent (Claude Code, Codex, Cursor, Gemini, humans) should read this file first. `CLAUDE.md` is a thin wrapper that adds Claude-Code-specific context on top of what's here.
 
 ## Project
 
-Terror in the Jungle - a browser-based 3D combat game set in the Vietnam War. Three.js 0.183, TypeScript 5.9, Vite 8, Vitest 4, Node 22.
+Terror in the Jungle - a browser-based 3D combat game set in the Vietnam War. Three.js 0.184, TypeScript 6.0, Vite 8, Vitest 4, Node 22.
 
 Vision: up to 3,000 AI combatants in a single match, stable frame-time tails under load, real-terrain scenarios (A Shau Valley 21km DEM). Ships to Cloudflare Pages at https://terror-in-the-jungle.pages.dev/.
 

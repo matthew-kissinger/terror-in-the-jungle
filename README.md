@@ -46,7 +46,7 @@ Requires Node 22 (pinned in `.nvmrc`) and a browser with WebGL2.
 
 ## Tech Stack
 
-[Three.js](https://threejs.org/) 0.183 | TypeScript 5.9 | Vite 8 | Vitest 4 | Playwright 1.58 | [Recast Navigation](https://github.com/isaac-mason/recast-navigation-js) (WASM navmesh)
+[Three.js](https://threejs.org/) 0.184 | TypeScript 6.0 | Vite 8 | Vitest 4 | Playwright 1.58 | [Recast Navigation](https://github.com/isaac-mason/recast-navigation-js) (WASM navmesh)
 
 44 game systems, 75 GLB models, 38 pixel-art UI icons, CDLOD terrain with real-time LOD.
 

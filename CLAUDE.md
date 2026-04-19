@@ -2,7 +2,7 @@
 
 Last updated: 2026-04-19
 
-Terror in the Jungle is a browser-based 3D combat game (Three.js 0.183, TypeScript 5.9, Vite 8). Up to 3,000 AI combatants, stable frame-time tails, real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages.
+Terror in the Jungle is a browser-based 3D combat game (Three.js 0.184, TypeScript 6.0, Vite 8). Up to 3,000 AI combatants, stable frame-time tails, real-terrain scenarios (A Shau Valley 21km DEM). Deployed on Cloudflare Pages.
 
 ## Read First
 
