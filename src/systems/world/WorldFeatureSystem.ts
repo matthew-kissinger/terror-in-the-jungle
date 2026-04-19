@@ -160,13 +160,17 @@ export class WorldFeatureSystem implements GameSystem {
         );
         const heading = featureYaw + (placement.yaw ?? 0);
         const spotId = `${feature.id}_fw_${i}`;
-        this.fixedWingModel.createAircraftAtSpot(
+        const metadata = this.buildFixedWingSpawnMetadata(feature.position, featureYaw, placement);
+        const spawned = await this.fixedWingModel.createAircraftAtSpot(
           spotId,
           placement.modelPath,
           worldPos,
           heading,
-          this.buildFixedWingSpawnMetadata(feature.position, featureYaw, placement),
+          metadata,
         );
+        if (spawned && placement.npcAutoFlight) {
+          this.attachNPCFlight(spotId, worldPos, featureYaw, placement, metadata);
+        }
         continue;
       }
 
@@ -300,6 +304,63 @@ export class WorldFeatureSystem implements GameSystem {
     }
     this.spawnedObjects = [];
     this.builtModeId = null;
+  }
+
+  /**
+   * Translate a placement's `npcAutoFlight` hint into a concrete NPC pilot
+   * mission and attach it to the just-spawned aircraft. Waypoint offset is
+   * rotated from airfield-local to world space; home runway comes from the
+   * placement's `fixedWingSpawn.runwayStart`.
+   */
+  private attachNPCFlight(
+    aircraftId: string,
+    spawnWorldPos: THREE.Vector3,
+    featureYaw: number,
+    placement: StaticModelPlacementConfig,
+    metadata: FixedWingSpawnMetadata | undefined,
+  ): void {
+    if (!this.fixedWingModel || !placement.npcAutoFlight) {
+      return;
+    }
+    const autoFlight = placement.npcAutoFlight;
+    _rotatedOffset.copy(autoFlight.waypointOffset).applyAxisAngle(_upAxis, featureYaw);
+    const waypointWorld = new THREE.Vector3(
+      spawnWorldPos.x + _rotatedOffset.x,
+      spawnWorldPos.y,
+      spawnWorldPos.z + _rotatedOffset.z,
+    );
+
+    const runwayStart = metadata?.runwayStart;
+    const home = runwayStart
+      ? {
+          runwayStart: runwayStart.position.clone(),
+          runwayHeading: runwayStart.heading,
+        }
+      : {
+          runwayStart: spawnWorldPos.clone(),
+          runwayHeading: featureYaw + (placement.yaw ?? 0),
+        };
+
+    const mission = {
+      kind: autoFlight.kind,
+      waypoints: [
+        {
+          position: waypointWorld,
+          altitudeAGLm: autoFlight.altitudeAGLm,
+          airspeedMs: autoFlight.airspeedMs,
+          arrivalKind: 'flyby' as const,
+        },
+      ],
+      bingo: { fuelFraction: 0.1, ammoFraction: 0.05 },
+      homeAirfield: home,
+    };
+
+    const attached = this.fixedWingModel.attachNPCPilot(aircraftId, mission);
+    if (!attached) {
+      Logger.warn('world', `Failed to attach NPC pilot to ${aircraftId}`);
+    } else {
+      Logger.info('world', `Attached NPC pilot to ${aircraftId} for ${autoFlight.kind} sortie`);
+    }
   }
 
   private buildFixedWingSpawnMetadata(

@@ -18,18 +18,18 @@ describe('NPCFlightController', () => {
     fc = new NPCFlightController(aircraft, startPos, spookyConfig);
   });
 
-  it('starts in idle state', () => {
-    expect(fc.getState()).toBe('idle');
+  it('starts with no mission running', () => {
+    expect(fc.isMissionComplete()).toBe(true);
   });
 
-  it('transitions to takeoff when mission set', () => {
+  it('has an active mission after setMission', () => {
     const mission = buildAirSupportMission(
       new THREE.Vector3(0, 0, 0),
       new THREE.Vector3(0, 0, 1),
       300, 40, 'orbit',
     );
     fc.setMission(mission);
-    expect(fc.getState()).toBe('takeoff');
+    expect(fc.isMissionComplete()).toBe(false);
   });
 
   it('update moves the aircraft via physics', () => {
@@ -68,7 +68,7 @@ describe('NPCFlightController', () => {
     expect(aircraft.position.z).toBeCloseTo(physPos.z, 2);
   });
 
-  it('isMissionComplete returns true when idle', () => {
+  it('isMissionComplete flips from true (no mission) to false (mission running)', () => {
     expect(fc.isMissionComplete()).toBe(true);
 
     const mission = buildAirSupportMission(
@@ -80,15 +80,16 @@ describe('NPCFlightController', () => {
     expect(fc.isMissionComplete()).toBe(false);
   });
 
-  it('dispose clears mission', () => {
+  it('dispose stops any active mission', () => {
     const mission = buildAirSupportMission(
       new THREE.Vector3(0, 0, 0),
       new THREE.Vector3(0, 0, 1),
       300, 40, 'orbit',
     );
     fc.setMission(mission);
+    expect(fc.isMissionComplete()).toBe(false);
     fc.dispose();
-    expect(fc.getState()).toBe('idle');
+    expect(fc.isMissionComplete()).toBe(true);
   });
 });
 

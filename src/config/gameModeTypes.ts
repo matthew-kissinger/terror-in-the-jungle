@@ -111,6 +111,19 @@ export interface StaticModelPlacementConfig {
       shortFinalAltitude?: number;
     };
   };
+  /**
+   * Opt-in NPC auto-flight flag. When present, `WorldFeatureSystem` wires the
+   * spawned fixed-wing aircraft up to an NPC pilot via
+   * `FixedWingModel.attachNPCPilot()`. `waypointOffset` is airfield-local;
+   * the WorldFeatureSystem rotates it by the feature's yaw and translates
+   * by the aircraft's spawn position to build a world-space waypoint.
+   */
+  npcAutoFlight?: {
+    kind: 'ferry' | 'orbit' | 'patrol';
+    waypointOffset: THREE.Vector3;
+    altitudeAGLm: number;
+    airspeedMs: number;
+  };
 }
 
 export interface MapFeatureCircleFootprint {

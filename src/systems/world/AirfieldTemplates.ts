@@ -20,6 +20,19 @@ export interface AirfieldParkingSpot {
   clearanceRadius?: number;    // spacing radius used during procedural structure placement
   taxiRouteId?: string;
   runwayStartId?: string;
+  /**
+   * Opt-in: when present, the spawned aircraft gets an NPC fixed-wing pilot
+   * that flies a single sortie (takeoff → waypoint → RTB → landing).
+   * Offsets are local to the runway (along, lateral); WorldFeatureSystem
+   * rotates them into world space using the feature yaw.
+   */
+  npcAutoFlight?: {
+    kind: 'ferry' | 'orbit' | 'patrol';
+    waypointOffsetAlongRunway: number;
+    waypointOffsetLateral: number;
+    altitudeAGLm: number;
+    airspeedMs: number;
+  };
 }
 
 export interface AirfieldSurfaceRect {
@@ -216,6 +229,16 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
         clearanceRadius: 22,
         taxiRouteId: 'a1_south_route',
         runwayStartId: 'south_departure',
+        // Demo NPC sortie: A-1 takes off, flies south ~1.5 km down the field
+        // axis to a fly-by waypoint, returns, lands. Playtest evidence for
+        // `npc-fixed-wing-pilot-ai`.
+        npcAutoFlight: {
+          kind: 'ferry',
+          waypointOffsetAlongRunway: -1500,
+          waypointOffsetLateral: 0,
+          altitudeAGLm: 220,
+          airspeedMs: 65,
+        },
       },
       {
         standId: 'stand_ac47',
