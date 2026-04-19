@@ -48,4 +48,29 @@ describe('ReplayRecorder', () => {
     const blob = rec.build();
     expect(blob.metadata).toEqual({ engineBuild: 'test', agent: 'scripted' });
   });
+
+  it('stops buffering inputs after endSession() and resumes after startSession()', () => {
+    // Guards against the "recorder left wired into a long-lived tick loop
+    // accumulates forever" heap-regression shape. Behavior assertion:
+    // inputs only grow while a session is active.
+    const rec = new ReplayRecorder<SimpleInput>({ seed: 1, scenario: 's' });
+    rec.recordInput(0, { fire: false });
+    rec.endSession();
+    rec.recordInput(1, { fire: true });
+    rec.recordInput(2, { fire: true });
+    expect(rec.getInputCount()).toBe(1);
+    rec.startSession();
+    rec.recordInput(3, { fire: false });
+    expect(rec.getInputCount()).toBe(2);
+  });
+
+  it('recordInput is a silent no-op while the session is inactive', () => {
+    // No throw, no crash, no buffer growth. Callers outside a session get
+    // pass-through behavior without needing a session-aware wrapper.
+    const rec = new ReplayRecorder<SimpleInput>({ seed: 1, scenario: 's' });
+    rec.endSession();
+    expect(() => rec.recordInput(99, { fire: true })).not.toThrow();
+    expect(rec.getInputCount()).toBe(0);
+    expect(rec.isSessionActive()).toBe(false);
+  });
 });

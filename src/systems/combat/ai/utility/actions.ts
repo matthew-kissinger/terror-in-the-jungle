@@ -27,6 +27,10 @@ const FIRE_AND_FADE_COVER_PROBE_RADIUS = 12
 const FIRE_AND_FADE_HEALTH_PIVOT = 0.55
 const FIRE_AND_FADE_WEIGHT_SUPPRESSION = 0.8
 const FIRE_AND_FADE_WEIGHT_HEALTH = 0.35
+// Reused per-action scratch so apply() does not allocate per tick. The scorer
+// invokes this action as a singleton; callers that need to persist the cover
+// point past a tick must clone (AIStateEngage.handleEngaging does).
+const _fireAndFadeScratch = new THREE.Vector3()
 
 function suppressionDrive(ctx: UtilityContext): number {
   const threshold = getFactionCombatTuning(ctx.self.faction).panicThreshold
@@ -66,15 +70,19 @@ export const fireAndFadeAction: UtilityAction = {
     const { bearing } = coverGate(ctx)
     // Cover position = probe tip in the away-from-threat bearing. Caller
     // treats this as a SEEKING_COVER destination; the more precise spot
-    // selection stays with AICoverSystem when available.
-    const coverPosition = new THREE.Vector3(
+    // selection stays with AICoverSystem when available. Written into a
+    // module-level scratch so this apply() does not allocate per tick —
+    // callers that need to persist the cover point must clone (matches the
+    // established pattern in repositionAction). AIStateEngage.handleEngaging
+    // already clones before storing on the combatant.
+    _fireAndFadeScratch.set(
       ctx.self.position.x + Math.cos(bearing) * FIRE_AND_FADE_COVER_PROBE_RADIUS,
       ctx.self.position.y,
       ctx.self.position.z + Math.sin(bearing) * FIRE_AND_FADE_COVER_PROBE_RADIUS
     )
     return {
       kind: 'seekCoverInBearing',
-      coverPosition,
+      coverPosition: _fireAndFadeScratch,
       bearingRad: bearing,
     }
   },
