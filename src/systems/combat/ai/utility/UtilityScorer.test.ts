@@ -242,6 +242,29 @@ describe('UtilityScorer: unit scoring', () => {
     // it must lose regardless of how much pressure is present.
     expect(pick.action).toBeNull()
   })
+
+  it('fireAndFadeAction.apply does not allocate a fresh Vector3 on each call', () => {
+    // Pooling invariant: the action is a singleton in the default action set
+    // and is consulted per combatant per tick when utility AI is on. If
+    // apply() allocates a new Vector3 it produces ~120 * 60 short-lived
+    // objects per second which stresses the nursery. Callers clone before
+    // persisting (AIStateEngage.handleEngaging).
+    const self = createCombatant('c', Faction.VC, new THREE.Vector3(10, 0, 0))
+    self.panicLevel = 1.0
+    const ctx = {
+      self,
+      threatPosition: new THREE.Vector3(-10, 0, 0),
+      squadSuppression: 1.0,
+      hasCoverInBearing: () => true,
+    }
+    const a = fireAndFadeAction.apply(ctx)
+    const b = fireAndFadeAction.apply(ctx)
+    if (a?.kind !== 'seekCoverInBearing' || b?.kind !== 'seekCoverInBearing') {
+      throw new Error('expected seekCoverInBearing intents')
+    }
+    // Same pooled scratch object — reference equality.
+    expect(a.coverPosition).toBe(b.coverPosition)
+  })
 })
 
 describe('repositionAction', () => {
@@ -394,6 +417,47 @@ describe('faction action-weight differentiation', () => {
     // Doctrine differentiation: the winners must not be the same action ID.
     // If this ever fires, the faction weights are too timid.
     expect(pickVC.action?.id).not.toBe(pickNVA.action?.id)
+  })
+})
+
+describe('AIStateEngage seekCoverInBearing routing', () => {
+  it('clones the pooled scratch so the stored destination survives a subsequent pick', () => {
+    // Regression shape: fireAndFadeAction.apply() returns a shared scratch
+    // Vector3. AIStateEngage must copy (not assign) that scratch onto the
+    // combatant, otherwise a later pick (same or another combatant) mutates
+    // the stored destination out from under the movement system.
+    const engage = new AIStateEngage()
+    engage.setUtilityScorer(new UtilityScorer([fireAndFadeAction]))
+    engage.setCoverBearingProbe(() => true)
+
+    const vc = createCombatant('vc', Faction.VC, new THREE.Vector3(10, 0, 0))
+    const target = createCombatant('target', Faction.US, new THREE.Vector3(-10, 0, 0))
+    vc.target = target
+    vc.panicLevel = 0.9
+    vc.lastHitTime = Date.now() - 500
+
+    engage.handleEngaging(
+      vc, 0.016, new THREE.Vector3(), new Map(), undefined,
+      () => true, () => false, () => null, () => 0, () => false
+    )
+
+    expect(vc.state).toBe(CombatantState.SEEKING_COVER)
+    expect(vc.destinationPoint).toBeDefined()
+    const savedDestination = vc.destinationPoint!.clone()
+    const savedCover = vc.coverPosition!.clone()
+
+    // Mutate the scratch via another apply() on a different combatant.
+    const other = createCombatant('other', Faction.VC, new THREE.Vector3(500, 0, 500))
+    fireAndFadeAction.apply({
+      self: other,
+      threatPosition: new THREE.Vector3(-500, 0, -500),
+      squadSuppression: 0.9,
+      hasCoverInBearing: () => true,
+    })
+
+    // The first combatant's stored destination / cover must not have shifted.
+    expect(vc.destinationPoint!.distanceTo(savedDestination)).toBe(0)
+    expect(vc.coverPosition!.distanceTo(savedCover)).toBe(0)
   })
 })
 

@@ -62,6 +62,12 @@ export class ReplayRecorder<I = unknown> {
   private readonly scenario: string;
   private readonly tickRateHz: number;
   private readonly metadata?: Record<string, unknown>;
+  // Session gate. `recordInput()` is a no-op outside of an active session so
+  // the input buffer cannot grow unboundedly if a recorder is accidentally
+  // left wired into a long-lived tick loop (e.g. perf capture). Starts true
+  // on construction so existing tests that push inputs immediately after
+  // `new ReplayRecorder()` without an explicit startSession() keep working.
+  private sessionActive = true;
 
   constructor(opts: ReplayRecorderOptions) {
     this.seed = opts.seed;
@@ -78,8 +84,33 @@ export class ReplayRecorder<I = unknown> {
     return this.tickRateHz;
   }
 
-  /** Push one input frame for the given tick index. */
+  /**
+   * Mark the recorder as actively capturing. `recordInput()` only buffers
+   * frames while a session is active; pair with `endSession()` to stop the
+   * recorder from buffering further frames (e.g. after `build()` has been
+   * called but the tick loop is still calling `recordInput`).
+   */
+  startSession(): void {
+    this.sessionActive = true;
+  }
+
+  /**
+   * Stop buffering input frames. Subsequent `recordInput()` calls are silent
+   * no-ops until `startSession()` is called again. Does not clear the
+   * already-buffered frames — `build()` still produces a complete blob.
+   */
+  endSession(): void {
+    this.sessionActive = false;
+  }
+
+  /** True while the recorder is actively buffering `recordInput()` frames. */
+  isSessionActive(): boolean {
+    return this.sessionActive;
+  }
+
+  /** Push one input frame for the given tick index. No-op outside a session. */
   recordInput(tick: number, input: I): void {
+    if (!this.sessionActive) return;
     this.inputs.push({ tick, input });
   }
 

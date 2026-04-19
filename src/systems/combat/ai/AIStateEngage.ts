@@ -65,6 +65,40 @@ export class AIStateEngage {
   // within `radius` of `origin`? Left undefined when no terrain query is
   // wired — utility actions that depend on it will simply score 0.
   private hasCoverInBearing?: (origin: THREE.Vector3, bearingRad: number, radius: number) => boolean
+  // Scratch UtilityContext reused across every handleEngaging() call. The
+  // scorer reads fields synchronously and does not retain references, so a
+  // single instance is safe. Writable fields are reassigned per tick below;
+  // unused optional fields are reset to undefined so stale values from a
+  // previous combatant cannot leak.
+  private readonly scratchContext: {
+    self: Combatant | null
+    threatPosition: THREE.Vector3
+    squad: Squad | undefined
+    squadSuppression: number | undefined
+    hasCoverInBearing: ((bearingRad: number, radius: number) => boolean) | undefined
+    supportAvailable: boolean | undefined
+    ammoReserve: number | undefined
+    squadCohesion: number | undefined
+    coverQualityHere: number | undefined
+    objectiveProximity: number | undefined
+  } = {
+    self: null,
+    threatPosition: new THREE.Vector3(),
+    squad: undefined,
+    squadSuppression: undefined,
+    hasCoverInBearing: undefined,
+    supportAvailable: undefined,
+    ammoReserve: undefined,
+    squadCohesion: undefined,
+    coverQualityHere: undefined,
+    objectiveProximity: undefined,
+  }
+  // The combatant whose position the cached scratchCoverProbe is currently
+  // bound to. When it changes, we rebuild the closure; otherwise the closure
+  // is reused across ticks so utility actions don't allocate when they
+  // consult ctx.hasCoverInBearing.
+  private scratchProbeBoundTo: Combatant | null = null
+  private scratchCoverProbe: ((bearingRad: number, radius: number) => boolean) | undefined
 
   setSquads(squads: Map<string, Squad>): void {
     this.squads = squads
@@ -204,12 +238,22 @@ export class AIStateEngage {
         const pick = this.utilityScorer.pick(ctx)
         const intent = pick.intent
         if (intent && intent.kind === 'seekCoverInBearing') {
-          // Scratch Vector3 inside fireAndFadeAction.apply() is shared —
-          // clone into combatant to decouple lifetimes. (Existing behavior,
-          // preserved.)
+          // Scratch Vector3 inside fireAndFadeAction.apply() is shared across
+          // invocations — clone into combatant so subsequent picks can't
+          // mutate the stored destination out from under us. Reuse the
+          // combatant's existing Vector3 fields when present to avoid
+          // per-tick allocations on re-entry.
           combatant.state = CombatantState.SEEKING_COVER
-          combatant.coverPosition = intent.coverPosition
-          combatant.destinationPoint = intent.coverPosition
+          if (combatant.coverPosition) {
+            combatant.coverPosition.copy(intent.coverPosition)
+          } else {
+            combatant.coverPosition = intent.coverPosition.clone()
+          }
+          if (combatant.destinationPoint) {
+            combatant.destinationPoint.copy(intent.coverPosition)
+          } else {
+            combatant.destinationPoint = intent.coverPosition.clone()
+          }
           combatant.lastCoverSeekTime = Date.now()
           combatant.inCover = false
           return
@@ -368,20 +412,41 @@ export class AIStateEngage {
   private buildUtilityContext(combatant: Combatant, targetPos: THREE.Vector3): UtilityContext {
     const squad = combatant.squadId ? this.squads.get(combatant.squadId) : undefined
     const probe = this.hasCoverInBearing
-    return {
-      self: combatant,
-      threatPosition: targetPos,
-      squad,
-      // C1 proxy: own panicLevel stands in for squad-wide pressure. A real
-      // cross-NPC aggregate (average panic, low-health-member count) is a
-      // CombatantAI-tier responsibility and is queued for the follow-up.
-      // Using per-unit panic keeps the fire-and-fade gate active for the
-      // VC canary without requiring a new tick pass.
-      squadSuppression: combatant.panicLevel,
-      hasCoverInBearing: probe
-        ? (bearingRad, radius) => probe(combatant.position, bearingRad, radius)
-        : undefined,
+    // Rebind the scratch cover-probe closure only when the combatant changes
+    // (or when the probe is newly-wired / removed). The scorer is called
+    // synchronously per tick; a single cached closure per AIStateEngage
+    // instance is safe, and avoids allocating a fresh lambda every tick for
+    // every combatant when utility AI is on for all factions.
+    if (!probe) {
+      this.scratchCoverProbe = undefined
+      this.scratchProbeBoundTo = null
+    } else if (this.scratchProbeBoundTo !== combatant || !this.scratchCoverProbe) {
+      const currentCombatant = combatant
+      this.scratchCoverProbe = (bearingRad: number, radius: number): boolean =>
+        probe(currentCombatant.position, bearingRad, radius)
+      this.scratchProbeBoundTo = combatant
     }
+
+    const ctx = this.scratchContext
+    ctx.self = combatant
+    ctx.threatPosition = targetPos
+    ctx.squad = squad
+    // C1 proxy: own panicLevel stands in for squad-wide pressure. A real
+    // cross-NPC aggregate (average panic, low-health-member count) is a
+    // CombatantAI-tier responsibility and is queued for the follow-up.
+    // Using per-unit panic keeps the fire-and-fade gate active for the
+    // VC canary without requiring a new tick pass.
+    ctx.squadSuppression = combatant.panicLevel
+    ctx.hasCoverInBearing = this.scratchCoverProbe
+    // Reset optional fields so a stale value from a prior combatant can't
+    // leak into this tick's scoring. Keeping them explicitly-undefined also
+    // documents what the context offers to actions.
+    ctx.supportAvailable = undefined
+    ctx.ammoReserve = undefined
+    ctx.squadCohesion = undefined
+    ctx.coverQualityHere = undefined
+    ctx.objectiveProximity = undefined
+    return ctx as UtilityContext
   }
 
   private shouldInitiateSquadSuppression(
