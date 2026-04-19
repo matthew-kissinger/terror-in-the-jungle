@@ -67,8 +67,6 @@ export class PlayerBot {
     ALERT: 0,
     ENGAGE: 0,
     ADVANCE: 0,
-    SEEK_COVER: 0,
-    RETREAT: 0,
     RESPAWN_WAIT: 0,
   };
 
