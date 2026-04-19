@@ -104,20 +104,11 @@ export async function bootstrapGame(): Promise<void> {
       (window as any).__engine = engine;
       // Expose renderer for performance measurement scripts.
       (window as any).__renderer = engine.renderer;
-      // Agent/player API + declarative perf harness. Both live behind the
-      // same gate above; retail bundles DCE the dynamic imports entirely
-      // because `VITE_PERF_HARNESS` and `DEV` are compile-time constants.
-      // See `src/systems/agent/`, `src/dev/harness/`, and
-      // docs/tasks/perf-harness-architecture.md.
+      // Expose the typed agent/player API so the perf harness driver can
+      // construct an AgentController without synthesizing keyboard events.
+      // See `src/systems/agent/` and `scripts/perf-active-driver.js`.
       const { createAgentControllerFromEngine } = await import('../systems/agent/createAgentControllerFromEngine');
-      const harness = await import('../dev/harness');
       (window as any).__agent = { createFromEngine: () => createAgentControllerFromEngine(engine) };
-      (window as any).__harness = {
-        runScenario: harness.runScenario,
-        findScenario: harness.findScenario,
-        listScenarioIds: harness.listScenarioIds,
-        createAgentFromEngine: () => createAgentControllerFromEngine(engine),
-      };
       // A Shau runtime diagnostics helper for harness/dev validation.
       ashauSessionTelemetry.sessionStartEpochMs = Date.now();
       ashauSessionTelemetry.firstTacticalContactMs = null;
