@@ -1,6 +1,42 @@
 # Backlog
 
-Last updated: 2026-04-18
+Last updated: 2026-04-19
+
+## Recently Completed (cycle-2026-04-18-harness-flight-combat, 2026-04-18 → 2026-04-19)
+
+Seven merged PRs, two rounds abandoned pre-merge, one round replaced mid-cycle. Briefs archived under `docs/tasks/archive/cycle-2026-04-18-harness-flight-combat/`.
+
+- **PR #86 `b1-flight-cutover`** — deleted the `FixedWingPhysics` shim; 5 callers now consume `Airframe` directly.
+- **PR #87 `utility-ai-doctrine-expansion`** — per-faction response curves + reposition/hold actions; closed the RETREATING orphan state.
+- **PR #88 `perf-harness-architecture`** — declarative scenario runner. **Reverted by PR #89** after live playtest showed the policy didn't drive the player toward enemies.
+- **PR #90 `perf-harness-redesign`** — 4-layer imperative terrain-aware driver with LOS gate and per-mode validators. Replaced the reverted declarative runner.
+- **PR #91 `heap-regression-investigation`** — pooled utility-AI per-tick allocations; killed the +296% combat120 heap growth from the prior cycle.
+- **PR #92 `npc-fixed-wing-pilot-ai`** — NPC fixed-wing pilot state machine + airfield integration. First live consumer of the post-cutover `Airframe` surface.
+- **PR #93 `perf-harness-killbot`** — rule-only NSRL-style killbot driver with navmesh + pure-pursuit. Superseded later in the cycle by the state-machine bot.
+- **PR #94 `perf-harness-verticality-and-sizing`** — NPC speed cap, player eye-height raise (2→2.2), NPC billboard shrink (5×7→3.2×4.5), exported `PLAYER_MAX_CLIMB_ANGLE_RAD`, path-trust invariant.
+- **PR #95 `perf-harness-player-bot`** — state-machine bot (PlayerBotIntent + controller) mirroring NPCFixedWingPilot. **Shipped a behavior regression** (retreats on damage, hits=0 in live playtest) fixed by PR #96.
+- **PR #96 `perf-harness-player-bot-aim-fix`** — root-caused the PR #95 regression to a yaw-convention bug (`atan2(dx, -dz)` in a Three.js world where `forward = (-sin(yaw), 0, -cos(yaw))`). Switched aim path to `camera.lookAt()` matching the rest of the codebase. Wired the dormant `evaluateFireDecision` aim-dot gate. Stripped SEEK_COVER + RETREAT. Combat120 smoke: `shots=420, hits=221, 52.6% hit rate`. User confirmed live playtest: bot reached victory.
+
+### Abandoned rounds
+
+- `perf-openfrontier-navmesh-fix` (narrow navmesh-null bug investigation) — killed mid-run after deeper architectural gap surfaced.
+- `perf-harness-player-bot-aggressive` (defensive-state strip) — killed mid-run after executor's own smoke revealed the deeper aim convention bug.
+- `perf-baseline-refresh` Round 3, 5, 8 attempts — Round 3 stopped on openfrontier validator fail (killbot artifact), Round 5 stopped because the bot was retreating, Round 8 died on a transient 500 API error before producing captures. Baseline refresh carries into next cycle.
+
+### Follow-ups filed (new briefs under `docs/tasks/`)
+
+- `perf-baseline-refresh` (P0) — carried forward.
+- `harness-lifecycle-halt-on-match-end` (P1) — harness kept running past in-game victory screen during PR #96 playtest.
+- `bot-pathing-pit-and-steep-uphill` (P1) — bot over-paths on steep direct-uphill-to-objective, and gets trapped in pit geometry.
+- `harness-stats-accuracy-damage-wiring` (P2) — accuracy / damage-dealt / damage-taken / kills not surfaced in `summary.json`; state histogram disconnect between `harnessDriver.getDebugSnapshot().botState` and `perf-capture.ts`'s `movementState` read.
+
+### Lessons (codified)
+
+- `memory/feedback_harness_reuses_npc_primitives.md` — reference NPC primitives (LOS, targeting, navmesh), but do NOT inherit NPC cautiousness (SEEK_COVER, RETREAT). Harness bot plays like a focused human, not a cautious AI soldier.
+- Hand-rolled yaw math for camera-pointing is fragile; match the codebase's existing `camera.lookAt()` pattern (used by `PlayerCamera`, `DeathCamSystem`, `MortarCamera`, `SpectatorCamera`, `flightTestScene`, old killbot).
+- Wire `evaluateFireDecision`-style aim-dot gates into fire paths; they catch entire classes of future convention regressions automatically.
+
+## Cycle conventions (2026-04-18)
 
 ## Cycle conventions (2026-04-18)
 
@@ -15,7 +51,13 @@ the runbook for the end-of-cycle ritual.
 
 ## P0 - Performance Blockers
 
+- [ ] `perf-baseline-refresh` — rebaseline all 4 scenarios against the aim-fixed player bot (PR #96). Carried from `cycle-2026-04-18-harness-flight-combat` after three failed attempts. Stale since 2026-03-06. Brief: `docs/tasks/perf-baseline-refresh.md`.
 - [ ] Reduce initial JS bundle (~710-734kB main runtime chunks). Recast WASM dedupe (C2) trimmed shipped WASM ~half; remaining wins are in `three` and `index` chunks.
+
+## P1 - Perf harness
+
+- [ ] `harness-lifecycle-halt-on-match-end` — stop perf capture when match ends (bot kept running past victory screen in PR #96 playtest). Blocks reliable `frontier30m`. Brief: `docs/tasks/harness-lifecycle-halt-on-match-end.md`.
+- [ ] `bot-pathing-pit-and-steep-uphill` — bot over-paths on direct-uphill-to-objective and gets stuck in pit geometry. Brief: `docs/tasks/bot-pathing-pit-and-steep-uphill.md`.
 
 ## P1 - Gameplay
 
@@ -26,6 +68,10 @@ the runbook for the end-of-cycle ritual.
 - [ ] Weapon sound variants (2-3 per weapon type) + impact/body/headshot sounds
 - [ ] Stationary weapons (M2 .50 cal emplacements, NPC manning)
 - [ ] Faction AI doctrines - D2 landed the first observable differentiation (VC panics sooner than NVA); keep expanding the `FACTION_COMBAT_TUNING` lookup with stance/engagement/retreat parameters.
+
+## P2 - Observability
+
+- [ ] `harness-stats-accuracy-damage-wiring` — accuracy, damage-dealt, damage-taken, kills not surfaced in `summary.json`; state histogram disconnect between bot snapshot and capture reader. Brief: `docs/tasks/harness-stats-accuracy-damage-wiring.md`.
 
 ## P2 - Content & Polish
 
