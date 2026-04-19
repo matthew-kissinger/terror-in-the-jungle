@@ -11,21 +11,27 @@ Last updated: 2026-04-17
 
 ```bash
 npm install
+npm run doctor           # Verify Node, dependencies, and Playwright browser setup
 npm run dev              # Vite dev server
 ```
+
+Keep temporary agent worktrees and caches outside this repo root when possible. Nested clones under the main tree add avoidable indexing and search overhead for humans and agents.
 
 ## Validation
 
 ### Quick (< 30 seconds)
 
 ```bash
+npm run typecheck        # Source TypeScript check
 npm run test:quick       # All tests, dot reporter
 npm run lint             # ESLint on src/
+npm run validate:fast    # typecheck + lint + test:quick
 ```
 
 ### Full (~2-5 minutes)
 
 ```bash
+npm run validate:fast    # fast local gate
 npm run validate         # lint + test:run + build + smoke:prod
 npm run deadcode         # knip dead code scan (advisory)
 ```
@@ -101,6 +107,7 @@ Neither Tier exercises `_headers` (that's a Cloudflare Pages layer), but both co
 ### Pre-Push Checklist
 
 ```bash
+npm run validate:fast    # typecheck + lint + test:quick
 npm run validate         # lint + test + build + smoke
 npm run deadcode         # should stay green
 ```

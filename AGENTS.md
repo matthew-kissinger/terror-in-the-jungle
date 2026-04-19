@@ -14,6 +14,7 @@ Vision: up to 3,000 AI combatants in a single match, stable frame-time tails und
 
 ```bash
 # Dev loop
+npm run doctor                   # Verify Node, dependencies, and Playwright browsers
 npm run dev                      # Vite dev server (HMR, unminified)
 npm run build                    # Retail production build (dist/) - no harness
 npm run build:perf               # Perf-harness build (dist-perf/) - VITE_PERF_HARNESS=1
@@ -21,6 +22,7 @@ npm run preview                  # Preview dist/ via vite preview
 npm run preview:perf             # Preview dist-perf/ via vite preview
 
 # Tests and lint
+npm run typecheck                # Source TypeScript check
 npm run test:run                 # All Vitest tests
 npm run test:quick               # All tests, dot reporter (fast output)
 npm run test:integration         # Integration scenario tests only
@@ -28,6 +30,7 @@ npm run lint                     # ESLint on src/
 npm run deadcode                 # knip dead-code scan (advisory)
 
 # Gated checks
+npm run validate:fast            # typecheck + lint + test:quick
 npm run validate                 # lint + test:run + build + smoke:prod
 npm run validate:full            # test:run + build + combat120 capture + perf:compare
 npm run check:mobile-ui          # Built-app phone viewport flow gate
@@ -52,10 +55,10 @@ npm run perf:update-baseline        # Overwrite baselines from latest
 
 ```
 1. Branch: task/<id>-<kebab-slug> (e.g. task/B3-npc-terrain-stall)
-2. npm run dev (or npm run build:perf && npm run preview:perf for prod-shape)
-3. Make change
-4. npm run test:quick
-5. npm run lint
+2. npm run doctor
+3. npm run dev (or npm run build:perf && npm run preview:perf for prod-shape)
+4. Make change
+5. npm run validate:fast
 6. git commit, push to task branch
 7. Open PR titled "<type>(<scope>): <summary> (<slug>)"
 ```
@@ -149,3 +152,4 @@ Any change to flight, driving, combat rhythm, or UI responsiveness must be valid
 - **Executor discipline.** If you are a dispatched executor, read `Assess before you execute` in `.claude/agents/executor.md` before editing. Trace end-to-end, confirm the bug reproduces or the code referenced still exists, and check the tests that target the area.
 - **Perf captures default to preview mode** (post-C1). To debug against source maps, pass `--server-mode dev` to `scripts/perf-capture.ts` or `scripts/fixed-wing-runtime-probe.ts`.
 - **Worktrees do not inherit `node_modules`.** `test -d node_modules || npm ci --prefer-offline` before local verification.
+- **Keep ephemeral agent worktrees outside the repo root when possible.** Nested clones and caches slow IDE indexing, ripgrep, and agent tree walks even when ignore rules are present.

@@ -34,7 +34,9 @@ A browser-based 3D first-person shooter set in the Vietnam War. Command squads, 
 
 ```bash
 npm install
+npm run doctor     # Verify Node, dependencies, and Playwright browser setup
 npm run dev        # Development server
+npm run validate:fast
 npm run build      # Production build
 npm run validate   # Lint + tests + build + smoke test
 npx tsx scripts/fixed-wing-runtime-probe.ts --port 4173
@@ -64,6 +66,7 @@ Deployed on [Cloudflare Pages](https://terror-in-the-jungle.pages.dev), CI-gated
 ## Contributing
 
 ```bash
+npm run validate:fast
 npm run validate   # Must pass before PR
 ```
 

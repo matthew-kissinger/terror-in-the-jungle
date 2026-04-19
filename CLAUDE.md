@@ -15,6 +15,7 @@ On top of what's in `AGENTS.md`, this repo ships Claude-Code-specific harness pi
 - **Slash commands** in `.claude/commands/`: `/validate`, `/perf-capture`, `/playtest`, `/orchestrate`.
 - **Subagent types** in `.claude/agents/`: `executor`, `combat-reviewer`, `terrain-nav-reviewer`, `perf-analyst`, plus an `orchestrator` role kicked off via the `/orchestrate` slash command against `docs/AGENT_ORCHESTRATION.md`.
 - **Orchestration runbook entry point**: [docs/AGENT_ORCHESTRATION.md](docs/AGENT_ORCHESTRATION.md). Individual task briefs live in `docs/tasks/*.md`.
+- **Local Claude settings** live in `.claude/settings.local.json`, which is intentionally untracked and may differ per machine.
 - **Statusline** at `~/.claude/statusline.ps1` (user-level global).
 - **Global StopFailure hook** plays `mission-failed.mp3` on tool failure (user-level global, set up in `~/.claude/settings.json`).
 
