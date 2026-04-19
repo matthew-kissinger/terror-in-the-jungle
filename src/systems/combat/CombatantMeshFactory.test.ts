@@ -3,9 +3,12 @@ import * as THREE from 'three';
 import {
   DEFAULT_MESH_BUCKET_CAPACITY,
   MOUNTED_MESH_BUCKET_CAPACITY,
+  NPC_SPRITE_HEIGHT,
+  NPC_SPRITE_WIDTH,
   reportBucketOverflow,
   resetBucketOverflowState,
 } from './CombatantMeshFactory';
+import { PLAYER_EYE_HEIGHT } from '../player/PlayerMovement';
 import { Logger } from '../../utils/Logger';
 
 /**
@@ -135,5 +138,39 @@ describe('CombatantMeshFactory instanced write contract at raised cap', () => {
 
     geometry.dispose();
     material.dispose();
+  });
+});
+
+/**
+ * Behavior: the NPC billboard silhouette must not dwarf the player. The player
+ * eye height is the closest on-screen anchor for relative scale; if the sprite
+ * height is more than ~2.5x eye height the player feels undersized (playtest
+ * observation in docs/tasks/perf-harness-verticality-and-sizing.md).
+ *
+ * These tests do not pin exact sprite/eye dimensions — tuning is allowed — but
+ * pin the RATIO that determines the "player feels appropriately sized" gameplay
+ * contract. Any future change that pushes the ratio back past 2.5 must update
+ * these thresholds deliberately.
+ */
+describe('CombatantMeshFactory sizing contract (player vs. NPC)', () => {
+  it('sprite silhouette is not taller than the regression ceiling relative to the player eye', () => {
+    // Ratio floor comes from live playtest: 3.5:1 (5m eye-height? no — 7m sprite
+    // over 2m eye = 3.5) feels giant. Keep strictly below 2.5.
+    const ratio = NPC_SPRITE_HEIGHT / PLAYER_EYE_HEIGHT;
+    expect(ratio).toBeLessThan(2.5);
+  });
+
+  it('sprite dimensions are positive and plausible', () => {
+    // Guard against zeroed or inverted geometry: a 0-height plane is invisible.
+    expect(NPC_SPRITE_WIDTH).toBeGreaterThan(0);
+    expect(NPC_SPRITE_HEIGHT).toBeGreaterThan(0);
+    // Height-wider-than-wide (portrait) — a landscape billboard would be a bug.
+    expect(NPC_SPRITE_HEIGHT).toBeGreaterThan(NPC_SPRITE_WIDTH);
+  });
+
+  it('player eye height does not drop below the floor that keeps NPCs from feeling huge', () => {
+    // 2.2m is the playtest-validated tall-adult eye. Dropping below 2m re-enters
+    // the "player feels small" regression; keep a floor at 2m.
+    expect(PLAYER_EYE_HEIGHT).toBeGreaterThanOrEqual(2);
   });
 });

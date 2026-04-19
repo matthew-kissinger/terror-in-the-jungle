@@ -8,6 +8,26 @@
 /** Slope value (1 - normal.y) above which movement is fully blocked (~60 deg). */
 export const MAX_WALKABLE_SLOPE = 0.5;
 
+/**
+ * Dot product of support-normal with world-up at which the player transitions
+ * from "no penalty" (gentle slope) into the crawl zone. Used by the perf harness
+ * driver as the single source of truth for climbable terrain so its gradient
+ * probe cannot diverge from the physics the live game applies.
+ *
+ * Matches the `slopeDot >= 0.7` branch in computeSlopeSpeedMultiplier; the
+ * corresponding angle is Math.acos(0.7) ≈ 45.57°, and the navmesh bakes its
+ * WALKABLE_SLOPE_ANGLE at the same ~45° so a valid navmesh path is guaranteed
+ * climbable by player physics.
+ */
+export const PLAYER_CLIMB_SLOPE_DOT = 0.7;
+
+/**
+ * The maximum slope angle (radians) at which the player retains full movement
+ * speed. Derived from PLAYER_CLIMB_SLOPE_DOT so changing the physics threshold
+ * updates the harness in lockstep.
+ */
+export const PLAYER_MAX_CLIMB_ANGLE_RAD = Math.acos(PLAYER_CLIMB_SLOPE_DOT);
+
 /** Maximum vertical step the player can climb in one frame (meters). */
 export const MAX_STEP_HEIGHT = 0.5;
 

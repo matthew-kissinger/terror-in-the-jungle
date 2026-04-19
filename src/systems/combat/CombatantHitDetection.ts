@@ -41,8 +41,10 @@ export class CombatantHitDetection {
   private static loggedUninitializedGrid = false
 
   // Cached hit zones to avoid per-call allocations.
-  // Billboard sprites are PlaneGeometry(5, 7) centered at combatant.position
-  // (ground level). The visible character figure occupies roughly y=0 to y=+3.5.
+  // Billboard sprites are PlaneGeometry(NPC_SPRITE_WIDTH, NPC_SPRITE_HEIGHT),
+  // centered at combatant.position (ground level). Zone offsets are independent
+  // of the sprite dimensions — resizing the billboard does not move the hit
+  // zones — but the visible figure occupies roughly the upper half of the plane.
   // Spheres are widened to better match the billboard visual width (~2.5m body).
   // Legs raised from below-ground to y=0+ so shots at visible feet register.
   private readonly hitZonesEngaging: HitZone[] = [

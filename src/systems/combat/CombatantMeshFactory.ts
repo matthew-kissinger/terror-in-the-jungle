@@ -38,6 +38,17 @@ const FACTION_SPRITE_CONFIGS: FactionSpriteConfig[] = [
 const SQUAD_OUTLINE_COLOR = new THREE.Color(0.0, 1.0, 0.3);
 const SQUAD_MARKER_COLOR = new THREE.Color(0.0, 1.0, 0.3);
 
+// NPC billboard dimensions in world units (width x height). The sprite's visible
+// silhouette occupies roughly the upper half of the plane, so the apparent
+// figure height is ~0.55 * SPRITE_HEIGHT. At 4.5m sprite height that maps to a
+// ~2.5m apparent figure — slightly larger than a real soldier for readability
+// at range, without dwarfing the ~2.2m player eye. Previously 5x7, which made
+// the player feel undersized (3.5:1 NPC-apparent-to-player-eye ratio). Hit
+// detection uses CombatantHitDetection's zone offsets, not the sprite size,
+// so shrinking the plane does not affect gameplay hit registration.
+export const NPC_SPRITE_WIDTH = 3.2;
+export const NPC_SPRITE_HEIGHT = 4.5;
+
 // Per-bucket instance capacity. The E2 rendering spike (docs/rearch/E2-rendering-evaluation.md
 // on spike/E2-rendering-at-scale) recommended raising this "before combat testing moves past
 // 500 concurrent NPCs per bucket" and measured the keyed-instanced path at ~2ms/frame CPU cost
@@ -110,7 +121,7 @@ export class CombatantMeshFactory {
     const soldierTextures = new Map<string, THREE.Texture>();
     const factionMaterials = new Map<string, THREE.ShaderMaterial>();
     const walkFrameTextures: WalkFrameMap = new Map();
-    const soldierGeometry = new THREE.PlaneGeometry(5, 7);
+    const soldierGeometry = new THREE.PlaneGeometry(NPC_SPRITE_WIDTH, NPC_SPRITE_HEIGHT);
     const markerGeometry = new THREE.RingGeometry(1.5, 2.5, 16);
 
     const createMeshSet = (

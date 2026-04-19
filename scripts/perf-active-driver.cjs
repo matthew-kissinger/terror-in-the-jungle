@@ -103,12 +103,61 @@
   }
 
   // ── Killbot primitives (perf-harness-killbot) ──
-  // PLAYER_EYE_HEIGHT mirrors src/systems/player/PlayerMovement.ts (=2). Driver
-  // was sampling camera at the player's feet, so fire/aim math tilted downward
-  // and bullets hit the ground mid-range.
-  const PLAYER_EYE_HEIGHT = 2;
+  // PLAYER_EYE_HEIGHT mirrors src/systems/player/PlayerMovement.ts (=2.2).
+  // Driver was sampling camera at the player's feet, so fire/aim math tilted
+  // downward and bullets hit the ground mid-range. Raised to 2.2 (tall adult
+  // military eye) in perf-harness-verticality-and-sizing.
+  const PLAYER_EYE_HEIGHT = 2.2;
   const TARGET_CHEST_HEIGHT = 1.2;
   const DEFAULT_BULLET_SPEED = 400; // m/s (aim lead approximation)
+
+  // Player's maximum walkable slope, derived from the slope-dot threshold the
+  // live physics uses (SlopePhysics.PLAYER_CLIMB_SLOPE_DOT = 0.7). The navmesh
+  // bakes WALKABLE_SLOPE_ANGLE at the matching ~45° so a valid navmesh path is
+  // guaranteed climbable. The driver consumes this as the single source of
+  // truth for slope probing instead of per-mode ad-hoc maxGradient numbers.
+  // Mirror of src/systems/terrain/SlopePhysics.ts — update both together.
+  const PLAYER_CLIMB_SLOPE_DOT = 0.7;
+  const PLAYER_MAX_CLIMB_ANGLE_RAD = Math.acos(PLAYER_CLIMB_SLOPE_DOT);
+  // gradient = tan(angle). Converts the angle-based contract above into the
+  // rise/run threshold chooseHeadingByGradient expects.
+  const PLAYER_MAX_CLIMB_GRADIENT = Math.tan(PLAYER_MAX_CLIMB_ANGLE_RAD);
+
+  // Path-trust invariant (perf-harness-verticality-and-sizing). When a navmesh
+  // path is fresh (within TTL) and has at least two waypoints, the driver must
+  // follow the pure-pursuit lookahead on that path unconditionally; the Layer 2
+  // gradient probe is a FALLBACK for the no-path/stale-path case only. Mirrors
+  // the NSRL rule-core invariant (arxiv:2410.04936) that navmesh supplies valid
+  // traversal paths before any per-tick steering heuristic runs.
+  const PATH_TRUST_TTL_MS = 5000;
+
+  // Pure helper — decides whether the driver should trust a planned navmesh
+  // path or fall back to the per-tick gradient probe. Extracted so Node-side
+  // tests can exercise the exact same predicate the browser driver uses.
+  function isPathTrusted(opts) {
+    const path = opts && opts.path;
+    const index = Number(opts && opts.waypointIdx);
+    const ageMs = Number(opts && opts.pathAgeMs);
+    if (!Array.isArray(path) || path.length < 2) return false;
+    if (!Number.isFinite(index) || index < 0 || index >= path.length) return false;
+    if (!Number.isFinite(ageMs) || ageMs < 0) return false;
+    return ageMs < PATH_TRUST_TTL_MS;
+  }
+
+  // Pure helper — aim-Y clamp aligned to the ±80° pitch budget (leaves 10°
+  // gimbal-lock safety to PlayerCamera.maxPitch = π/2 - 0.1). The downstream
+  // fire gate (evaluateFireGate) is the ground-fire safety ("-25° at > 10m");
+  // this clamp only keeps aim within the physical pitch envelope.
+  const AIM_PITCH_LIMIT_RAD = (80 * Math.PI) / 180;
+  function clampAimYByPitch(playerY, desiredY, horizontalDist) {
+    const py = Number(playerY || 0);
+    const dy = Number(desiredY);
+    if (!Number.isFinite(dy)) return py;
+    const hz = Number(horizontalDist || 0);
+    if (!Number.isFinite(hz) || hz <= 0.01) return dy;
+    const vLimit = hz * Math.tan(AIM_PITCH_LIMIT_RAD);
+    return Math.max(py - vLimit, Math.min(py + vLimit, dy));
+  }
 
   // Utility score for target selection (Dave Mark IAUS). Higher = more desirable.
   // Visibility keeps blocked targets as candidates (score reduced but non-zero)
@@ -259,6 +308,11 @@
       opts.mode === 'team_deathmatch'
     );
     // Layer 4 — scenario terrain contract per mode (tunes Layer 1-3 stack).
+    // `maxGradient` is intentionally omitted here: the fallback gradient probe
+    // consumes PLAYER_MAX_CLIMB_GRADIENT (derived from the player physics
+    // slope-dot contract) as its single source of truth. Per-mode overrides
+    // previously diverged from the physics (0.35-0.60) and produced false
+    // positives where the driver refused a slope the live player could walk.
     const modeProfiles = {
       ai_sandbox: {
         sprintDistance: 200,
@@ -271,7 +325,6 @@
         preferredJuke: 'push',
         objectiveBias: 'frontline',
         terrainProfile: 'mountainous',
-        maxGradient: 0.55,
         stuckTimeoutSec: 4,
         waypointReplanIntervalMs: 3500
       },
@@ -286,7 +339,6 @@
         preferredJuke: 'strafe',
         objectiveBias: 'zone',
         terrainProfile: 'rolling',
-        maxGradient: 0.45,
         stuckTimeoutSec: 6,
         waypointReplanIntervalMs: 5000,
         aggressiveMode: true
@@ -302,7 +354,6 @@
         preferredJuke: 'push',
         objectiveBias: 'enemy_mass',
         terrainProfile: 'mountainous',
-        maxGradient: 0.60,
         stuckTimeoutSec: 5,
         waypointReplanIntervalMs: 4000,
         aggressiveMode: true
@@ -318,7 +369,6 @@
         preferredJuke: 'push',
         objectiveBias: 'zone',
         terrainProfile: 'rolling',
-        maxGradient: 0.45,
         stuckTimeoutSec: 6,
         waypointReplanIntervalMs: 5000
       },
@@ -333,7 +383,6 @@
         preferredJuke: 'push',
         objectiveBias: 'enemy_mass',
         terrainProfile: 'flat',
-        maxGradient: 0.35,
         stuckTimeoutSec: 8,
         waypointReplanIntervalMs: 6000
       }
@@ -415,7 +464,6 @@
     };
     const MAX_YAW_STEP = 0.09;
     const MAX_PITCH_STEP = 0.06;
-    const MAX_AIM_VERTICAL_DELTA = 4.5;
     const HEALTH_TOP_UP_COOLDOWN_MS = 12000;
     const HEALTH_TOP_UP_CRITICAL_RATIO = 0.14;
     const HEALTH_TOP_UP_CRITICAL_HP_ABS = 20;
@@ -1022,17 +1070,10 @@
       return { x: fx / len, y: fy / len, z: fz / len };
     }
 
+    // Driver-local alias for the pure pitch-limit clamp. Kept as a function so
+    // existing callers don't need to thread the top-level helper through.
     function clampAimY(playerY, desiredY, horizontalDist) {
-      const py = Number(playerY || 0);
-      const dy = Number(desiredY || py);
-      if (opts.mode === 'open_frontier' || opts.mode === 'a_shau_valley') {
-        return dy;
-      }
-      const dynamicLimit = Math.max(
-        MAX_AIM_VERTICAL_DELTA,
-        Number(horizontalDist || 0) * (opts.mode === 'open_frontier' ? 0.18 : opts.mode === 'a_shau_valley' ? 0.2 : 0.08)
-      );
-      return Math.max(py - dynamicLimit, Math.min(py + dynamicLimit, dy));
+      return clampAimYByPitch(playerY, desiredY, horizontalDist);
     }
 
     function isTerrainReadyAt(systems, x, z) {
@@ -1959,14 +2000,30 @@
         if (now - state.lastMovementDecisionAt >= modeProfile.decisionIntervalMs) {
           state.lastMovementDecisionAt = now;
 
-          // Layer 2 — gradient probe. Deflected headings translate to WASD keys
-          // RELATIVE to the camera forward so the camera stays aimed at the target
-          // (fire loop can still land shots) while the player strafes around.
+          // Path-trust invariant — when a navmesh path is fresh (< PATH_TRUST_TTL_MS)
+          // and has at least two waypoints, the steering target already reflects
+          // the pure-pursuit lookahead along a navmesh-validated route. Skip the
+          // gradient probe in that case: the probe is a local obstacle avoidance
+          // behavior (Reynolds 1999) and must never override the macro path
+          // (NSRL rule-core invariant, arxiv:2410.04936).
           const cameraController = systems.playerController ? systems.playerController.cameraController : null;
           const cameraYaw = cameraController
             ? Number(cameraController.yaw || 0)
             : Number(camera.rotation.y || 0);
-          const heading = chooseTerrainHeading(systems, playerPos, steeringTarget, modeProfile.maxGradient);
+          const pathAgeMs = now - Number(state.lastWaypointReplanAt || 0);
+          const pathTrusted =
+            !!state.waypoints
+            && state.waypoints.length >= 2
+            && state.waypointIdx < state.waypoints.length
+            && pathAgeMs < PATH_TRUST_TTL_MS;
+
+          // Layer 2 — gradient probe (fallback). Deflected headings translate
+          // to WASD keys RELATIVE to the camera forward so the camera stays
+          // aimed at the target (fire loop can still land shots) while the
+          // player strafes around.
+          const heading = pathTrusted
+            ? null
+            : chooseTerrainHeading(systems, playerPos, steeringTarget, PLAYER_MAX_CLIMB_GRADIENT);
           if (heading && heading.deflected) {
             state.gradientProbeDeflections++;
             // Bucket |rel angle| into 5 WASD patterns (W/W+strafe/strafe/S+strafe/S).
@@ -1988,10 +2045,11 @@
             setMovementPattern(pattern);
             state.movementTransitions++;
             return;
-          } else if (!heading) {
-            // No candidate passes the gradient gate. Last-resort 8-way slope probe
-            // (the existing behaviour) picks ANY direction under the hard slope cap;
-            // if that fails, retreat and let Layer 3 teleport.
+          } else if (!heading && !pathTrusted) {
+            // No candidate passes the gradient gate AND we have no trusted path
+            // to fall back on. Last-resort 8-way slope probe (the existing
+            // behaviour) picks ANY direction under the hard slope cap; if that
+            // fails, retreat and let Layer 3 teleport.
             const currentYawDeg = cameraYaw * 180 / Math.PI;
             const forwardSlope = probeTerrainSlope(systems, playerPos, currentYawDeg, 8);
             if (forwardSlope > 35) {
@@ -2082,7 +2140,9 @@
       return {
         mode: opts.mode,
         terrainProfile: String(modeProfile.terrainProfile || ''),
-        maxGradient: Number(modeProfile.maxGradient || 0),
+        maxGradient: PLAYER_MAX_CLIMB_GRADIENT,
+        maxClimbAngleRad: PLAYER_MAX_CLIMB_ANGLE_RAD,
+        pathTrustTtlMs: PATH_TRUST_TTL_MS,
         stuckTimeoutSec: Number(modeProfile.stuckTimeoutSec || 0),
         losRejectedShots: state.losRejectedShots,
         stuckTeleportCount: state.stuckTeleportCount,
@@ -2410,7 +2470,15 @@
       angularDistance: angularDistance,
       PLAYER_EYE_HEIGHT: PLAYER_EYE_HEIGHT,
       TARGET_CHEST_HEIGHT: TARGET_CHEST_HEIGHT,
-      DEFAULT_BULLET_SPEED: DEFAULT_BULLET_SPEED
+      DEFAULT_BULLET_SPEED: DEFAULT_BULLET_SPEED,
+      // perf-harness-verticality-and-sizing exports.
+      PLAYER_CLIMB_SLOPE_DOT: PLAYER_CLIMB_SLOPE_DOT,
+      PLAYER_MAX_CLIMB_ANGLE_RAD: PLAYER_MAX_CLIMB_ANGLE_RAD,
+      PLAYER_MAX_CLIMB_GRADIENT: PLAYER_MAX_CLIMB_GRADIENT,
+      PATH_TRUST_TTL_MS: PATH_TRUST_TTL_MS,
+      AIM_PITCH_LIMIT_RAD: AIM_PITCH_LIMIT_RAD,
+      isPathTrusted: isPathTrusted,
+      clampAimYByPitch: clampAimYByPitch
     };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);

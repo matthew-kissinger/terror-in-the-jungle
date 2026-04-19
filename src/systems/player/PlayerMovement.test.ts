@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { PlayerMovement } from './PlayerMovement';
+import { PlayerMovement, PLAYER_EYE_HEIGHT } from './PlayerMovement';
 import { PlayerState } from '../../types';
 import * as THREE from 'three';
 import { PlayerInput } from './PlayerInput';
@@ -255,7 +255,8 @@ describe('PlayerMovement', () => {
 
       playerMovement.updateMovement(0.5, mockInput, mockCamera); // Large deltaTime to ensure landing
 
-      expect(playerState.position.y).toBe(2); // Ground height (0) + 2
+      // Grounded Y = terrain height (0) + PLAYER_EYE_HEIGHT.
+      expect(playerState.position.y).toBe(PLAYER_EYE_HEIGHT);
       expect(playerState.velocity.y).toBe(0);
       expect(playerState.isGrounded).toBe(true);
       expect(playerState.isJumping).toBe(false);
@@ -284,8 +285,8 @@ describe('PlayerMovement', () => {
 
       movementWithoutChunk.updateMovement(0.016, mockInput, mockCamera);
 
-      // Should clamp to default ground height (2)
-      expect(playerState.position.y).toBe(2);
+      // Flat-world fallback clamps to PLAYER_EYE_HEIGHT.
+      expect(playerState.position.y).toBe(PLAYER_EYE_HEIGHT);
     });
 
     it('should allow climbing a walkable uphill slope without false step blocking', () => {
@@ -527,6 +528,10 @@ describe('PlayerMovement', () => {
     });
 
     it('should preserve Y velocity during horizontal movement', () => {
+      // Start airborne (well above ground-plus-eye-height) so we can observe
+      // the mid-air Y velocity without landing in the same tick.
+      playerState.position.y = 10;
+      playerState.isGrounded = false;
       playerState.velocity.y = 5; // Upward velocity
       vi.mocked(mockInput.isKeyPressed).mockImplementation((key: string) => key === 'keyw');
 
