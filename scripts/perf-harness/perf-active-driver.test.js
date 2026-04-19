@@ -35,8 +35,47 @@ const {
   PATH_TRUST_TTL_MS,
   AIM_PITCH_LIMIT_RAD,
   isPathTrusted,
-  clampAimYByPitch
+  clampAimYByPitch,
+  // perf-harness-player-bot exports — JS mirror of src/dev/harness/playerBot/*.ts.
+  stepBotState,
+  createIdleBotIntent,
+  profileForMode,
+  botConfigForProfile,
 } = driver;
+
+function makeBotCtx(overrides = {}) {
+  const config = overrides.config || botConfigForProfile(profileForMode('ai_sandbox'));
+  return Object.assign({
+    now: 1000,
+    state: 'PATROL',
+    timeInStateMs: 0,
+    eyePos: { x: 0, y: 2, z: 0 },
+    velocity: { x: 0, y: 0, z: 0 },
+    yaw: 0,
+    pitch: 0,
+    health: 100,
+    maxHealth: 100,
+    suppressionScore: 0,
+    lastDamageMs: 0,
+    magazine: { current: 30, max: 30 },
+    currentTarget: null,
+    findNearestEnemy: () => null,
+    canSeeTarget: () => true,
+    queryPath: () => null,
+    findNearestNavmeshPoint: () => null,
+    getObjective: () => null,
+    sampleHeight: () => 0,
+    config: config,
+  }, overrides);
+}
+
+function makeBotTarget(overrides = {}) {
+  return Object.assign({
+    id: 'enemy_1',
+    position: { x: 0, y: 0, z: -30 },
+    lastKnownMs: 0,
+  }, overrides);
+}
 
 describe('perf-active-driver fire decision (A4 regression)', () => {
   it('allows fire when camera forward aligns with the unit direction to target', () => {
@@ -534,5 +573,172 @@ describe('perf-active-driver aim pitch range', () => {
 
   it('returns desired Y unchanged at extremely close range (<= 1cm)', () => {
     expect(clampAimYByPitch(2, 5, 0.005)).toBe(5);
+  });
+});
+
+// ── perf-harness-player-bot: state-machine behavior tests. ──────────────────
+// These exercise the driver's JS-mirror of the TypeScript state machine
+// in src/dev/harness/playerBot/. The TypeScript tests (src/dev/harness/*.test.ts)
+// are the source-of-truth contract; these Node tests prove the driver stays in
+// sync so the browser harness does what the unit tests say it should.
+
+describe('PlayerBot driver mirror — PATROL and ALERT', () => {
+  it('starts in PATROL when no enemy is visible', () => {
+    const step = stepBotState('PATROL', makeBotCtx());
+    expect(step.nextState).toBeNull();
+    expect(step.intent.firePrimary).toBe(false);
+  });
+
+  it('transitions PATROL → ALERT on first enemy sighting', () => {
+    const step = stepBotState('PATROL', makeBotCtx({
+      findNearestEnemy: () => makeBotTarget(),
+    }));
+    expect(step.nextState).toBe('ALERT');
+  });
+
+  it('ALERT hands off to ENGAGE when target is near and visible', () => {
+    const target = makeBotTarget({ position: { x: 0, y: 0, z: -30 } });
+    const step = stepBotState('ALERT', makeBotCtx({
+      currentTarget: target,
+      canSeeTarget: () => true,
+    }));
+    expect(step.nextState).toBe('ENGAGE');
+  });
+
+  it('ALERT hands off to ADVANCE when target is occluded', () => {
+    const target = makeBotTarget({ position: { x: 0, y: 0, z: -30 } });
+    const step = stepBotState('ALERT', makeBotCtx({
+      currentTarget: target,
+      canSeeTarget: () => false,
+    }));
+    expect(step.nextState).toBe('ADVANCE');
+  });
+});
+
+describe('PlayerBot driver mirror — ENGAGE', () => {
+  it('emits fire intent with a loaded magazine and visible target', () => {
+    const step = stepBotState('ENGAGE', makeBotCtx({
+      currentTarget: makeBotTarget({ position: { x: 0, y: 0, z: -30 } }),
+      canSeeTarget: () => true,
+    }));
+    expect(step.intent.firePrimary).toBe(true);
+    expect(step.intent.reload).toBe(false);
+  });
+
+  it('emits reload intent when magazine is empty', () => {
+    const step = stepBotState('ENGAGE', makeBotCtx({
+      currentTarget: makeBotTarget(),
+      magazine: { current: 0, max: 30 },
+    }));
+    expect(step.intent.firePrimary).toBe(false);
+    expect(step.intent.reload).toBe(true);
+  });
+
+  it('transitions to ADVANCE when LOS is lost mid-engagement (core bug fix)', () => {
+    // Live playtest showed the old driver shooting through terrain. With the
+    // bot consuming canSeeTarget (engine terrain raycast) directly, the
+    // moment LOS breaks the state machine yields ADVANCE, not ENGAGE.
+    const step = stepBotState('ENGAGE', makeBotCtx({
+      currentTarget: makeBotTarget(),
+      canSeeTarget: () => false,
+    }));
+    expect(step.nextState).toBe('ADVANCE');
+    expect(step.intent.firePrimary).toBe(false);
+  });
+
+  it('transitions to SEEK_COVER when health drops below the cover threshold', () => {
+    const step = stepBotState('ENGAGE', makeBotCtx({
+      currentTarget: makeBotTarget(),
+      health: 30,
+    }));
+    expect(step.nextState).toBe('SEEK_COVER');
+  });
+});
+
+describe('PlayerBot driver mirror — ADVANCE', () => {
+  it('returns to ENGAGE once LOS is restored', () => {
+    const step = stepBotState('ADVANCE', makeBotCtx({
+      currentTarget: makeBotTarget({ position: { x: 0, y: 0, z: -30 } }),
+      canSeeTarget: () => true,
+    }));
+    expect(step.nextState).toBe('ENGAGE');
+  });
+
+  it('keeps moving forward when target remains occluded', () => {
+    const step = stepBotState('ADVANCE', makeBotCtx({
+      currentTarget: makeBotTarget({ position: { x: 0, y: 0, z: -30 } }),
+      canSeeTarget: () => false,
+    }));
+    expect(step.intent.moveForward).toBeGreaterThan(0);
+    expect(step.intent.firePrimary).toBe(false);
+  });
+
+  it('falls back to PATROL when target is gone', () => {
+    const step = stepBotState('ADVANCE', makeBotCtx({
+      currentTarget: null,
+      findNearestEnemy: () => null,
+    }));
+    expect(step.nextState).toBe('PATROL');
+  });
+});
+
+describe('PlayerBot driver mirror — RESPAWN_WAIT absorbs zero-health', () => {
+  const states = ['PATROL', 'ALERT', 'ENGAGE', 'ADVANCE', 'SEEK_COVER', 'RETREAT'];
+  for (const s of states) {
+    it(`forces RESPAWN_WAIT from ${s} when health reaches zero`, () => {
+      const step = stepBotState(s, makeBotCtx({ health: 0 }));
+      expect(step.nextState).toBe('RESPAWN_WAIT');
+    });
+  }
+
+  it('leaves RESPAWN_WAIT once health is restored', () => {
+    const step = stepBotState('RESPAWN_WAIT', makeBotCtx({ health: 100 }));
+    expect(step.nextState).toBe('PATROL');
+  });
+});
+
+describe('PlayerBot driver mirror — mode profiles', () => {
+  it('open_frontier enables aggressiveMode', () => {
+    expect(profileForMode('open_frontier').aggressiveMode).toBe(true);
+  });
+
+  it('combat120 (ai_sandbox) runs the standard profile', () => {
+    expect(profileForMode('ai_sandbox').aggressiveMode).toBe(false);
+  });
+
+  it('perception range is larger in open_frontier than team_deathmatch', () => {
+    const of = profileForMode('open_frontier');
+    const tdm = profileForMode('team_deathmatch');
+    expect(of.perceptionRange).toBeGreaterThan(tdm.perceptionRange);
+  });
+
+  it('botConfigForProfile carries over maxFireDistance from profile', () => {
+    const profile = profileForMode('open_frontier');
+    const config = botConfigForProfile(profile);
+    expect(config.maxFireDistance).toBe(profile.maxFireDistance);
+  });
+
+  it('botConfigForProfile defines default cover/retreat thresholds', () => {
+    const config = botConfigForProfile(profileForMode('ai_sandbox'));
+    expect(config.coverHealthFraction).toBeGreaterThan(0);
+    expect(config.coverHealthFraction).toBeLessThan(1);
+    expect(config.retreatHealthFraction).toBeGreaterThan(0);
+    expect(config.retreatHealthFraction).toBeLessThan(config.coverHealthFraction);
+  });
+});
+
+describe('PlayerBot driver mirror — idle intent shape', () => {
+  it('is all-zero by default', () => {
+    const intent = createIdleBotIntent();
+    expect(intent.moveForward).toBe(0);
+    expect(intent.moveStrafe).toBe(0);
+    expect(intent.sprint).toBe(false);
+    expect(intent.firePrimary).toBe(false);
+    expect(intent.reload).toBe(false);
+  });
+
+  it('has an aimLerpRate of 1 (snap) by default', () => {
+    const intent = createIdleBotIntent();
+    expect(intent.aimLerpRate).toBe(1);
   });
 });

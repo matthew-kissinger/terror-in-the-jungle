@@ -1,21 +1,30 @@
+/**
+ * Performance harness driver.
+ *
+ * This script is injected into the running page by the perf-capture harness.
+ * It instantiates a `PlayerBot` (ground-combat state-machine bot) on each
+ * active scenario and ticks it against the engine's own combat/navigation
+ * primitives — terrain raycast for LOS, navmesh for movement, the live
+ * combatant list for target search. The bot never reinvents those
+ * primitives; it consumes them.
+ *
+ * The bot and its controller live in `src/dev/harness/playerBot/*.ts` as the
+ * source-of-truth implementation (with Vitest coverage). This driver is a
+ * pure-JS mirror of that state machine, because Vite's injected script tag
+ * cannot import TypeScript modules. When changing bot behavior, change the
+ * TypeScript source AND this file together (same discipline
+ * `chooseHeadingByGradient`, `pointAlongPath`, etc. have followed since
+ * perf-harness-redesign).
+ */
+
 (function (root) {
   const globalWindow = typeof window !== 'undefined' ? window : null;
 
-  function keyToLabel(code) {
-    if (code.startsWith('Key')) return code.slice(3).toLowerCase();
-    if (code.startsWith('Digit')) return code.slice(5);
-    return code.toLowerCase();
-  }
+  // ── Pure helpers kept for Node-side regression tests (scripts/perf-harness).
+  // These are the same primitives that perf-harness-redesign, perf-harness-killbot
+  // and perf-harness-verticality-and-sizing exercised; do not remove without
+  // updating scripts/perf-harness/perf-active-driver.test.js in lockstep.
 
-  // Alliance helpers: factions are US/ARVN (BLUFOR) and NVA/VC (OPFOR)
-  const OPFOR_FACTIONS = new Set(['NVA', 'VC']);
-  const BLUFOR_FACTIONS = new Set(['US', 'ARVN']);
-  function isOpforFaction(faction) { return OPFOR_FACTIONS.has(faction); }
-  function isBluforFaction(faction) { return BLUFOR_FACTIONS.has(faction); }
-
-  // Pure fire decision — shared with scripts/perf-harness/perf-active-driver.test.js.
-  // Sign-flipped target-delta (A4-class regression) produces aimDot near -1 and is
-  // rejected by the aim_dot_too_low branch.
   function evaluateFireDecision(opts) {
     const forward = opts && opts.cameraForward;
     const toTarget = opts && opts.toTarget;
@@ -57,9 +66,6 @@
     return { shouldFire: true, reason: 'ok', aimDot: aimDot, verticalComponent: verticalComponent };
   }
 
-  // Layer 2 helper — 5-candidate gradient probe. Returns null if every candidate
-  // (ahead, ±45, ±90 off bearingRad) exceeds maxGradient; otherwise the candidate
-  // with smallest |gradient| among those that still advance toward the target.
   function chooseHeadingByGradient(opts) {
     const sampleHeight = opts && opts.sampleHeight;
     const from = opts && opts.from;
@@ -74,19 +80,16 @@
     const hHere = Number(sampleHeight(Number(from.x), Number(from.z)));
     if (!Number.isFinite(hHere)) return null;
     const offsets = [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2];
-    // Rotate so bearingRad is "ahead". Use standard x=sin(yaw), z=-cos(yaw) convention;
-    // the driver uses the same mapping in syncCameraAim.
     let best = null;
     let bestAbsGrad = Number.POSITIVE_INFINITY;
     for (let i = 0; i < offsets.length; i++) {
       const yaw = bearingRad + offsets[i];
       const dx = Math.sin(yaw);
       const dz = -Math.cos(yaw);
-      // Dot-product of candidate direction with original bearing direction.
       const bdx = Math.sin(bearingRad);
       const bdz = -Math.cos(bearingRad);
       const dot = dx * bdx + dz * bdz;
-      if (dot <= 0) continue; // candidate heads sideways/backwards; skip.
+      if (dot <= 0) continue;
       const probeX = Number(from.x) + dx * la;
       const probeZ = Number(from.z) + dz * la;
       const hThere = Number(sampleHeight(probeX, probeZ));
@@ -102,38 +105,21 @@
     return best;
   }
 
-  // ── Killbot primitives (perf-harness-killbot) ──
-  // PLAYER_EYE_HEIGHT mirrors src/systems/player/PlayerMovement.ts (=2.2).
-  // Driver was sampling camera at the player's feet, so fire/aim math tilted
-  // downward and bullets hit the ground mid-range. Raised to 2.2 (tall adult
-  // military eye) in perf-harness-verticality-and-sizing.
+  // Player eye-height and target chest-height — mirrors src/systems/player/PlayerMovement.ts
+  // (PLAYER_EYE_HEIGHT = 2.2). Keep these constants in sync; the Node test
+  // imports them as-is.
   const PLAYER_EYE_HEIGHT = 2.2;
   const TARGET_CHEST_HEIGHT = 1.2;
-  const DEFAULT_BULLET_SPEED = 400; // m/s (aim lead approximation)
+  const DEFAULT_BULLET_SPEED = 400;
 
-  // Player's maximum walkable slope, derived from the slope-dot threshold the
-  // live physics uses (SlopePhysics.PLAYER_CLIMB_SLOPE_DOT = 0.7). The navmesh
-  // bakes WALKABLE_SLOPE_ANGLE at the matching ~45° so a valid navmesh path is
-  // guaranteed climbable. The driver consumes this as the single source of
-  // truth for slope probing instead of per-mode ad-hoc maxGradient numbers.
-  // Mirror of src/systems/terrain/SlopePhysics.ts — update both together.
+  // Player's maximum walkable slope, derived from SlopePhysics.PLAYER_CLIMB_SLOPE_DOT.
   const PLAYER_CLIMB_SLOPE_DOT = 0.7;
   const PLAYER_MAX_CLIMB_ANGLE_RAD = Math.acos(PLAYER_CLIMB_SLOPE_DOT);
-  // gradient = tan(angle). Converts the angle-based contract above into the
-  // rise/run threshold chooseHeadingByGradient expects.
   const PLAYER_MAX_CLIMB_GRADIENT = Math.tan(PLAYER_MAX_CLIMB_ANGLE_RAD);
 
-  // Path-trust invariant (perf-harness-verticality-and-sizing). When a navmesh
-  // path is fresh (within TTL) and has at least two waypoints, the driver must
-  // follow the pure-pursuit lookahead on that path unconditionally; the Layer 2
-  // gradient probe is a FALLBACK for the no-path/stale-path case only. Mirrors
-  // the NSRL rule-core invariant (arxiv:2410.04936) that navmesh supplies valid
-  // traversal paths before any per-tick steering heuristic runs.
+  // Path-trust invariant (perf-harness-verticality-and-sizing).
   const PATH_TRUST_TTL_MS = 5000;
 
-  // Pure helper — decides whether the driver should trust a planned navmesh
-  // path or fall back to the per-tick gradient probe. Extracted so Node-side
-  // tests can exercise the exact same predicate the browser driver uses.
   function isPathTrusted(opts) {
     const path = opts && opts.path;
     const index = Number(opts && opts.waypointIdx);
@@ -144,10 +130,6 @@
     return ageMs < PATH_TRUST_TTL_MS;
   }
 
-  // Pure helper — aim-Y clamp aligned to the ±80° pitch budget (leaves 10°
-  // gimbal-lock safety to PlayerCamera.maxPitch = π/2 - 0.1). The downstream
-  // fire gate (evaluateFireGate) is the ground-fire safety ("-25° at > 10m");
-  // this clamp only keeps aim within the physical pitch envelope.
   const AIM_PITCH_LIMIT_RAD = (80 * Math.PI) / 180;
   function clampAimYByPitch(playerY, desiredY, horizontalDist) {
     const py = Number(playerY || 0);
@@ -159,9 +141,6 @@
     return Math.max(py - vLimit, Math.min(py + vLimit, dy));
   }
 
-  // Utility score for target selection (Dave Mark IAUS). Higher = more desirable.
-  // Visibility keeps blocked targets as candidates (score reduced but non-zero)
-  // so the driver can commit while re-acquiring LOS.
   function computeUtilityScore(opts) {
     const distance = Number(opts && opts.distance);
     const hasLOS = !!(opts && opts.hasLOS);
@@ -172,9 +151,6 @@
     return visibility * (1 / (distance + 1)) * threat;
   }
 
-  // Hysteresis rule — current lock is preserved unless a new candidate beats
-  // it by `ratio` (default 1.3 == 30% margin). Returns `true` when the caller
-  // should switch locks.
   function shouldSwitchTarget(currentScore, candidateScore, ratio) {
     const r = Number.isFinite(ratio) && ratio > 1 ? ratio : 1.3;
     const cur = Number.isFinite(currentScore) ? currentScore : 0;
@@ -183,9 +159,6 @@
     return cand > cur * r;
   }
 
-  // Aim solution with velocity lead. Uses the REAL eye (player + eye height),
-  // not the feet. Returns yaw/pitch in the driver convention (yaw 0 = -Z, right
-  // positive) and the aimPoint for downstream LOS gating.
   function computeAimSolution(opts) {
     const eyeX = Number(opts && opts.eyeX);
     const eyeY = Number(opts && opts.eyeY);
@@ -196,10 +169,7 @@
     const vx = Number(opts && opts.targetVx) || 0;
     const vy = Number(opts && opts.targetVy) || 0;
     const vz = Number(opts && opts.targetVz) || 0;
-    const bulletSpeed = Number(opts && opts.bulletSpeed) > 0
-      ? Number(opts.bulletSpeed)
-      : DEFAULT_BULLET_SPEED;
-
+    const bulletSpeed = Number(opts && opts.bulletSpeed) > 0 ? Number(opts.bulletSpeed) : DEFAULT_BULLET_SPEED;
     const horizontalDist = Math.hypot(targetX - eyeX, targetZ - eyeZ);
     const tFlight = horizontalDist / bulletSpeed;
     const aimX = targetX + vx * tFlight;
@@ -208,26 +178,14 @@
     const horizontalAim = Math.hypot(aimX - eyeX, aimZ - eyeZ) || 1e-6;
     const yaw = Math.atan2(aimX - eyeX, -(aimZ - eyeZ));
     const pitch = Math.atan2(aimY - eyeY, horizontalAim);
-    return {
-      yaw: yaw,
-      pitch: pitch,
-      aimPoint: { x: aimX, y: aimY, z: aimZ },
-      horizontalDist: horizontalDist
-    };
+    return { yaw: yaw, pitch: pitch, aimPoint: { x: aimX, y: aimY, z: aimZ }, horizontalDist: horizontalDist };
   }
 
-  // Adaptive pure-pursuit lookahead — scales with speed, clamped to [5, 20]m.
-  // Shape from Coulter 1992 + arxiv:2111.08873 (adaptive lookahead racing) +
-  // arxiv:2305.20026 (regulated pure pursuit). Stable fixed-speed lookahead
-  // oscillates on tight paths; adaptive variants don't.
   function computeAdaptiveLookahead(speed) {
     const s = Number.isFinite(speed) && speed >= 0 ? Number(speed) : 0;
     return Math.max(5, Math.min(20, 8 + 0.05 * s));
   }
 
-  // Walk forward along `path` from the current closest waypoint and return the
-  // point at `lookaheadDist` metres further. Used to smooth WASD heading so the
-  // driver commits to the geometry rather than per-tick steering noise.
   function pointAlongPath(path, fromIdx, fromPos, lookaheadDist) {
     if (!Array.isArray(path) || path.length === 0) return null;
     const idx = Math.max(0, Math.min(path.length - 1, Number(fromIdx) || 0));
@@ -243,11 +201,7 @@
       const seg = Math.hypot(wx - ax, wz - az);
       if (seg >= remaining) {
         const t = seg > 0 ? remaining / seg : 0;
-        return {
-          x: ax + (wx - ax) * t,
-          y: Number(wp.y || 0),
-          z: az + (wz - az) * t
-        };
+        return { x: ax + (wx - ax) * t, y: Number(wp.y || 0), z: az + (wz - az) * t };
       }
       remaining -= seg;
       ax = wx;
@@ -257,10 +211,6 @@
     return last ? { x: Number(last.x || 0), y: Number(last.y || 0), z: Number(last.z || 0) } : null;
   }
 
-  // Fire gate — composite rule: must pass aim error, LOS, pitch safety, and
-  // ammo readiness. pitch safety keeps the driver from firing straight into
-  // the ground at mid-to-long range (the brief's "-25 deg OR dist<10m" rule).
-  // Returns `{ fire, reason }`; rejected ticks do NOT invoke actionFireStart.
   function evaluateFireGate(opts) {
     const aimErrorRad = Number(opts && opts.aimErrorRad);
     const maxAimErrorRad = Number(opts && opts.maxAimErrorRad);
@@ -268,14 +218,10 @@
     const pitchRad = Number(opts && opts.pitchRad);
     const distance = Number(opts && opts.distance);
     const ammoReady = !!(opts && opts.ammoReady);
-    const errLimit = Number.isFinite(maxAimErrorRad) && maxAimErrorRad > 0
-      ? maxAimErrorRad
-      : (3 * Math.PI) / 180;
+    const errLimit = Number.isFinite(maxAimErrorRad) && maxAimErrorRad > 0 ? maxAimErrorRad : (3 * Math.PI) / 180;
     if (!ammoReady) return { fire: false, reason: 'ammo_not_ready' };
     if (!Number.isFinite(aimErrorRad) || aimErrorRad > errLimit) return { fire: false, reason: 'aim_error_too_high' };
     if (!losClear) return { fire: false, reason: 'los_blocked' };
-    // Pitch safety: don't fire sharply downward at range. Near-range targets
-    // (knife fight) can legitimately aim down.
     const MIN_SAFE_PITCH = -25 * Math.PI / 180;
     if (Number.isFinite(pitchRad) && pitchRad < MIN_SAFE_PITCH && (!Number.isFinite(distance) || distance > 10)) {
       return { fire: false, reason: 'fire_pitch_unsafe' };
@@ -291,393 +237,404 @@
     return Math.hypot(dy, dp);
   }
 
-  function createDriver(options) {
-    const opts = {
-      compressFrontline: !!options.compressFrontline,
-      frontlineTriggerDistance: Number(options.frontlineTriggerDistance || 500),
-      maxCompressedPerFaction: Number(options.maxCompressedPerFaction || 28),
-      mode: String(options.mode || 'ai_sandbox').toLowerCase(),
-      allowWarpRecovery: options.allowWarpRecovery === true,
-      topUpHealth: options.topUpHealth !== false,
-      autoRespawn: options.autoRespawn !== false,
-      movementDecisionIntervalMs: Number(options.movementDecisionIntervalMs || 450)
+  // ── PlayerBot state machine (JS mirror of src/dev/harness/playerBot/states.ts). ──
+  //
+  // `stepBotState(state, ctx)` is pure: returns { intent, nextState, resetTimeInState }.
+  // The TypeScript version is unit-tested under src/dev/harness/*.test.ts;
+  // changes here MUST be ported to the TS source in the same PR.
+
+  const OPFOR_FACTIONS = new Set(['NVA', 'VC']);
+  const BLUFOR_FACTIONS = new Set(['US', 'ARVN']);
+  function isOpforFaction(faction) { return OPFOR_FACTIONS.has(faction); }
+  function isBluforFaction(faction) { return BLUFOR_FACTIONS.has(faction); }
+
+  function createIdleBotIntent() {
+    return {
+      moveForward: 0,
+      moveStrafe: 0,
+      sprint: false,
+      crouch: false,
+      jump: false,
+      aimYaw: 0,
+      aimPitch: 0,
+      aimLerpRate: 1,
+      firePrimary: false,
+      reload: false,
     };
-    const enableFrontlineCompression = opts.compressFrontline && (
-      opts.mode === 'ai_sandbox' ||
-      opts.mode === 'zone_control' ||
-      opts.mode === 'team_deathmatch'
-    );
-    // Layer 4 — scenario terrain contract per mode (tunes Layer 1-3 stack).
-    // `maxGradient` is intentionally omitted here: the fallback gradient probe
-    // consumes PLAYER_MAX_CLIMB_GRADIENT (derived from the player physics
-    // slope-dot contract) as its single source of truth. Per-mode overrides
-    // previously diverged from the physics (0.35-0.60) and produced false
-    // positives where the driver refused a slope the live player could walk.
-    const modeProfiles = {
+  }
+
+  function botHorizontalDistance(a, b) {
+    const dx = Number(a.x || 0) - Number(b.x || 0);
+    const dz = Number(a.z || 0) - Number(b.z || 0);
+    return Math.hypot(dx, dz);
+  }
+
+  function botYawToward(from, to) {
+    const dx = Number(to.x || 0) - Number(from.x || 0);
+    const dz = Number(to.z || 0) - Number(from.z || 0);
+    return Math.atan2(dx, -dz);
+  }
+
+  function botPitchToward(from, to) {
+    const dx = Number(to.x || 0) - Number(from.x || 0);
+    const dy = Number(to.y || 0) - Number(from.y || 0);
+    const dz = Number(to.z || 0) - Number(from.z || 0);
+    const horizontal = Math.hypot(dx, dz) || 1e-6;
+    return Math.atan2(dy, horizontal);
+  }
+
+  function botAimPoint(target) {
+    return {
+      x: Number(target.position.x || 0),
+      y: Number(target.position.y || 0) + TARGET_CHEST_HEIGHT,
+      z: Number(target.position.z || 0),
+    };
+  }
+
+  function isEngagable(ctx, target) {
+    if (!target) return false;
+    const dist = botHorizontalDistance(ctx.eyePos, target.position);
+    if (dist > ctx.config.maxFireDistance) return false;
+    return !!ctx.canSeeTarget(target.position);
+  }
+
+  function engageStrafeIntent(timeInStateMs, periodMs, amplitude) {
+    if (periodMs <= 0 || amplitude <= 0) return 0;
+    return Math.sin((2 * Math.PI * timeInStateMs) / periodMs) * amplitude;
+  }
+
+  function botAimOnly(ctx, target) {
+    const intent = createIdleBotIntent();
+    intent.aimLerpRate = ctx.config.aimLerpRate;
+    const aimPt = botAimPoint(target);
+    intent.aimYaw = botYawToward(ctx.eyePos, aimPt);
+    intent.aimPitch = botPitchToward(ctx.eyePos, aimPt);
+    return intent;
+  }
+
+  function updatePatrolBot(ctx) {
+    const intent = createIdleBotIntent();
+    intent.aimLerpRate = ctx.config.aimLerpRate;
+    intent.aimYaw = ctx.yaw;
+    intent.aimPitch = ctx.pitch;
+    const enemy = ctx.findNearestEnemy();
+    if (enemy) {
+      return { intent, nextState: 'ALERT', resetTimeInState: true };
+    }
+    const objective = ctx.getObjective();
+    const roamAnchor = objective ? objective.position : null;
+    if (roamAnchor) {
+      intent.aimYaw = botYawToward(ctx.eyePos, roamAnchor);
+      intent.moveForward = 1;
+      intent.sprint = botHorizontalDistance(ctx.eyePos, roamAnchor) > ctx.config.sprintDistance;
+    }
+    return { intent, nextState: null, resetTimeInState: false };
+  }
+
+  function updateAlertBot(ctx) {
+    const intent = createIdleBotIntent();
+    intent.aimLerpRate = ctx.config.aimLerpRate;
+    const target = ctx.currentTarget || ctx.findNearestEnemy();
+    if (!target) {
+      intent.aimYaw = ctx.yaw;
+      intent.aimPitch = ctx.pitch;
+      return { intent, nextState: 'PATROL', resetTimeInState: true };
+    }
+    const aimPt = botAimPoint(target);
+    intent.aimYaw = botYawToward(ctx.eyePos, aimPt);
+    intent.aimPitch = botPitchToward(ctx.eyePos, aimPt);
+    intent.moveForward = 1;
+    if (isEngagable(ctx, target)) {
+      return { intent, nextState: 'ENGAGE', resetTimeInState: true };
+    }
+    return { intent, nextState: 'ADVANCE', resetTimeInState: true };
+  }
+
+  function updateEngageBot(ctx) {
+    const intent = createIdleBotIntent();
+    intent.aimLerpRate = ctx.config.aimLerpRate;
+    const target = ctx.currentTarget;
+    if (!target) {
+      intent.aimYaw = ctx.yaw;
+      intent.aimPitch = ctx.pitch;
+      return { intent, nextState: 'PATROL', resetTimeInState: true };
+    }
+    const healthFrac = ctx.maxHealth > 0 ? ctx.health / ctx.maxHealth : 0;
+    if (healthFrac < ctx.config.retreatHealthFraction) {
+      return { intent: botAimOnly(ctx, target), nextState: 'RETREAT', resetTimeInState: true };
+    }
+    if (healthFrac < ctx.config.coverHealthFraction || ctx.suppressionScore >= ctx.config.coverSuppressionScore) {
+      return { intent: botAimOnly(ctx, target), nextState: 'SEEK_COVER', resetTimeInState: true };
+    }
+    const aimPt = botAimPoint(target);
+    intent.aimYaw = botYawToward(ctx.eyePos, aimPt);
+    intent.aimPitch = botPitchToward(ctx.eyePos, aimPt);
+    const visible = !!ctx.canSeeTarget(target.position);
+    const dist = botHorizontalDistance(ctx.eyePos, target.position);
+    if (!visible || dist > ctx.config.maxFireDistance) {
+      return { intent, nextState: 'ADVANCE', resetTimeInState: true };
+    }
+    if (ctx.magazine.current <= 0) {
+      intent.reload = true;
+    } else {
+      intent.firePrimary = true;
+    }
+    intent.moveStrafe = engageStrafeIntent(ctx.timeInStateMs, ctx.config.engageStrafePeriodMs, ctx.config.engageStrafeAmplitude);
+    if (dist < ctx.config.retreatDistance) {
+      intent.moveForward = -1;
+    }
+    return { intent, nextState: null, resetTimeInState: false };
+  }
+
+  function updateAdvanceBot(ctx) {
+    const intent = createIdleBotIntent();
+    intent.aimLerpRate = ctx.config.aimLerpRate;
+    const target = ctx.currentTarget || ctx.findNearestEnemy();
+    if (!target) {
+      intent.aimYaw = ctx.yaw;
+      intent.aimPitch = ctx.pitch;
+      return { intent, nextState: 'PATROL', resetTimeInState: true };
+    }
+    if (isEngagable(ctx, target)) {
+      const aimPt = botAimPoint(target);
+      intent.aimYaw = botYawToward(ctx.eyePos, aimPt);
+      intent.aimPitch = botPitchToward(ctx.eyePos, aimPt);
+      return { intent, nextState: 'ENGAGE', resetTimeInState: true };
+    }
+    const aimPt = botAimPoint(target);
+    intent.aimYaw = botYawToward(ctx.eyePos, aimPt);
+    intent.aimPitch = botPitchToward(ctx.eyePos, aimPt);
+    intent.moveForward = 1;
+    const dist = botHorizontalDistance(ctx.eyePos, target.position);
+    intent.sprint = dist > ctx.config.sprintDistance;
+    return { intent, nextState: null, resetTimeInState: false };
+  }
+
+  function updateSeekCoverBot(ctx) {
+    const intent = createIdleBotIntent();
+    intent.aimLerpRate = ctx.config.aimLerpRate;
+    intent.crouch = true;
+    const target = ctx.currentTarget;
+    if (target) {
+      const aimPt = botAimPoint(target);
+      intent.aimYaw = botYawToward(ctx.eyePos, aimPt);
+      intent.aimPitch = botPitchToward(ctx.eyePos, aimPt);
+    } else {
+      intent.aimYaw = ctx.yaw;
+      intent.aimPitch = ctx.pitch;
+    }
+    const healthFrac = ctx.maxHealth > 0 ? ctx.health / ctx.maxHealth : 0;
+    if (healthFrac < ctx.config.retreatHealthFraction) {
+      return { intent, nextState: 'RETREAT', resetTimeInState: true };
+    }
+    if (!target || (ctx.now - target.lastKnownMs) > 3000) {
+      return { intent, nextState: 'PATROL', resetTimeInState: true };
+    }
+    intent.moveForward = -1;
+    intent.moveStrafe = engageStrafeIntent(ctx.timeInStateMs, ctx.config.engageStrafePeriodMs, ctx.config.engageStrafeAmplitude);
+    if (ctx.timeInStateMs > 2000 && ctx.suppressionScore >= ctx.config.coverSuppressionScore) {
+      return { intent, nextState: 'RETREAT', resetTimeInState: true };
+    }
+    return { intent, nextState: null, resetTimeInState: false };
+  }
+
+  function updateRetreatBot(ctx) {
+    const intent = createIdleBotIntent();
+    intent.aimLerpRate = ctx.config.aimLerpRate;
+    intent.sprint = true;
+    const target = ctx.currentTarget;
+    if (target) {
+      const retreatBearing = botYawToward(target.position, ctx.eyePos);
+      intent.aimYaw = retreatBearing;
+      intent.aimPitch = 0;
+    } else {
+      intent.aimYaw = ctx.yaw;
+      intent.aimPitch = ctx.pitch;
+    }
+    intent.moveForward = 1;
+    if ((ctx.now - ctx.lastDamageMs) > ctx.config.retreatQuietMs) {
+      return { intent, nextState: 'PATROL', resetTimeInState: true };
+    }
+    return { intent, nextState: null, resetTimeInState: false };
+  }
+
+  function updateRespawnWaitBot(ctx) {
+    const intent = createIdleBotIntent();
+    intent.aimLerpRate = 1;
+    intent.aimYaw = ctx.yaw;
+    intent.aimPitch = ctx.pitch;
+    if (ctx.health > 0) {
+      return { intent, nextState: 'PATROL', resetTimeInState: true };
+    }
+    return { intent, nextState: null, resetTimeInState: false };
+  }
+
+  function stepBotState(state, ctx) {
+    if (ctx.health <= 0 && state !== 'RESPAWN_WAIT') {
+      return { intent: createIdleBotIntent(), nextState: 'RESPAWN_WAIT', resetTimeInState: true };
+    }
+    switch (state) {
+      case 'PATROL': return updatePatrolBot(ctx);
+      case 'ALERT': return updateAlertBot(ctx);
+      case 'ENGAGE': return updateEngageBot(ctx);
+      case 'ADVANCE': return updateAdvanceBot(ctx);
+      case 'SEEK_COVER': return updateSeekCoverBot(ctx);
+      case 'RETREAT': return updateRetreatBot(ctx);
+      case 'RESPAWN_WAIT': return updateRespawnWaitBot(ctx);
+      default: return updatePatrolBot(ctx);
+    }
+  }
+
+  // ── Mode profiles ──────────────────────────────────────────────────────────
+
+  function profileForMode(mode) {
+    const base = {
       ai_sandbox: {
+        maxFireDistance: 165,
         sprintDistance: 200,
         approachDistance: 120,
         retreatDistance: 18,
-        maxFireDistance: 165,
-        holdChanceWhenVisible: 0.06,
-        transitionHoldMs: 900,
-        decisionIntervalMs: Math.max(420, opts.movementDecisionIntervalMs),
-        preferredJuke: 'push',
-        objectiveBias: 'frontline',
-        terrainProfile: 'mountainous',
-        stuckTimeoutSec: 4,
-        waypointReplanIntervalMs: 3500
+        perceptionRange: 220,
+        aggressiveMode: false,
+        waypointReplanIntervalMs: 3500,
+        decisionIntervalMs: 250,
       },
       open_frontier: {
+        maxFireDistance: 245,
         sprintDistance: 360,
         approachDistance: 185,
         retreatDistance: 16,
-        maxFireDistance: 245,
-        holdChanceWhenVisible: 0.02,
-        transitionHoldMs: 900,
-        decisionIntervalMs: Math.max(200, opts.movementDecisionIntervalMs),
-        preferredJuke: 'strafe',
-        objectiveBias: 'zone',
-        terrainProfile: 'rolling',
-        stuckTimeoutSec: 6,
+        perceptionRange: 900,
+        aggressiveMode: true,
         waypointReplanIntervalMs: 5000,
-        aggressiveMode: true
+        decisionIntervalMs: 250,
       },
       a_shau_valley: {
+        maxFireDistance: 235,
         sprintDistance: 320,
         approachDistance: 150,
         retreatDistance: 18,
-        maxFireDistance: 235,
-        holdChanceWhenVisible: 0.01,
-        transitionHoldMs: 850,
-        decisionIntervalMs: Math.max(200, opts.movementDecisionIntervalMs),
-        preferredJuke: 'push',
-        objectiveBias: 'enemy_mass',
-        terrainProfile: 'mountainous',
-        stuckTimeoutSec: 5,
+        perceptionRange: 1100,
+        aggressiveMode: true,
         waypointReplanIntervalMs: 4000,
-        aggressiveMode: true
+        decisionIntervalMs: 250,
       },
       zone_control: {
+        maxFireDistance: 150,
         sprintDistance: 220,
         approachDistance: 110,
         retreatDistance: 16,
-        maxFireDistance: 150,
-        holdChanceWhenVisible: 0.05,
-        transitionHoldMs: 950,
-        decisionIntervalMs: Math.max(480, opts.movementDecisionIntervalMs),
-        preferredJuke: 'push',
-        objectiveBias: 'zone',
-        terrainProfile: 'rolling',
-        stuckTimeoutSec: 6,
-        waypointReplanIntervalMs: 5000
+        perceptionRange: 220,
+        aggressiveMode: false,
+        waypointReplanIntervalMs: 5000,
+        decisionIntervalMs: 250,
       },
       team_deathmatch: {
+        maxFireDistance: 140,
         sprintDistance: 175,
         approachDistance: 90,
         retreatDistance: 12,
-        maxFireDistance: 140,
-        holdChanceWhenVisible: 0.08,
-        transitionHoldMs: 700,
-        decisionIntervalMs: Math.max(360, opts.movementDecisionIntervalMs),
-        preferredJuke: 'push',
-        objectiveBias: 'enemy_mass',
-        terrainProfile: 'flat',
-        stuckTimeoutSec: 8,
-        waypointReplanIntervalMs: 6000
-      }
+        perceptionRange: 260,
+        aggressiveMode: false,
+        waypointReplanIntervalMs: 6000,
+        decisionIntervalMs: 250,
+      },
     };
-    const modeProfile = modeProfiles[opts.mode] || modeProfiles.ai_sandbox;
-    const perceptionRange = opts.mode === 'a_shau_valley'
-      ? 1100
-      : opts.mode === 'open_frontier'
-        ? 900
-        : opts.mode === 'team_deathmatch'
-          ? 260
-          : 220;
+    return base[mode] || base.ai_sandbox;
+  }
+
+  function botConfigForProfile(profile) {
+    return {
+      maxFireDistance: profile.maxFireDistance,
+      sprintDistance: profile.sprintDistance,
+      approachDistance: profile.approachDistance,
+      retreatDistance: profile.retreatDistance,
+      coverHealthFraction: 0.5,
+      retreatHealthFraction: 0.2,
+      coverSuppressionScore: 0.7,
+      retreatQuietMs: 5000,
+      aimLerpRate: 1,
+      engageStrafeAmplitude: profile.aggressiveMode ? 0.3 : 0.2,
+      engageStrafePeriodMs: 750,
+      perceptionRange: profile.perceptionRange,
+      tickMs: 250,
+    };
+  }
+
+  // ── Driver implementation ──────────────────────────────────────────────────
+
+  function createDriver(options) {
+    const opts = {
+      mode: String(options.mode || 'ai_sandbox').toLowerCase(),
+      compressFrontline: !!options.compressFrontline,
+      frontlineTriggerDistance: Number(options.frontlineTriggerDistance || 500),
+      maxCompressedPerFaction: Number(options.maxCompressedPerFaction || 28),
+      allowWarpRecovery: options.allowWarpRecovery === true,
+      topUpHealth: options.topUpHealth !== false,
+      autoRespawn: options.autoRespawn !== false,
+    };
+    const profile = profileForMode(opts.mode);
+    const botConfig = botConfigForProfile(profile);
+    const enableFrontlineCompression = opts.compressFrontline && (
+      opts.mode === 'ai_sandbox' || opts.mode === 'zone_control' || opts.mode === 'team_deathmatch'
+    );
 
     const state = {
-      fireTimer: null,
       heartbeatTimer: null,
-      pressedKeys: new Set(),
+      // Bot bookkeeping.
+      botState: 'PATROL',
+      timeInStateMs: 0,
+      currentTarget: null,
+      lastTickMs: 0,
+      lastDamageMs: 0,
+      lastHealth: 100,
+      lastObjectiveZoneId: null,
+      // Movement / controller state.
       firingHeld: false,
+      lastYaw: 0,
+      lastPitch: 0,
+      viewSeeded: false,
+      // Path bookkeeping — used when the bot's ADVANCE state wants a planned route.
+      waypoints: null,
+      waypointIdx: 0,
+      lastWaypointReplanAt: 0,
+      waypointsFollowed: 0,
+      waypointReplanFailures: 0,
+      // Telemetry.
       respawnCount: 0,
       ammoRefillCount: 0,
       healthTopUpCount: 0,
-      enemySpawn: null,
       frontlineCompressed: false,
       frontlineDistance: 0,
       frontlineMoveCount: 0,
-      targetVisible: false,
-      lastMovementDecisionAt: 0,
-      movementLockUntil: 0,
-      movementState: 'advance',
-      previousMovementState: null,
-      movementStateSince: 0,
-      lastReversalAt: 0,
-      movementTransitions: 0,
-      firingUntil: 0,
-      lastRepositionAt: 0,
-      lastFireProbe: null,
-      lastStablePos: null,
-      stuckMs: 0,
-      objectiveZoneId: null,
-      objectiveSwitchAt: 0,
-      captureZoneId: null,
-      captureHoldUntil: 0,
-      capturedZoneCount: 0,
       lastShotAt: Date.now(),
-      hasFired: false,
-      lastAmmoRefillAt: 0,
-      lastHealthTopUpAt: 0,
-      deathHandled: false,
-      respawnRetryAt: 0,
+      shotsFired: 0,
+      reloadsIssued: 0,
+      losRejectedShots: 0,
+      stuckTeleportCount: 0,
+      maxStuckMs: 0,
+      stuckMs: 0,
+      lastStablePos: null,
+      transitions: 0,
+      lastStateChangeAt: 0,
+      stateHistogram: {
+        PATROL: 0, ALERT: 0, ENGAGE: 0, ADVANCE: 0,
+        SEEK_COVER: 0, RETREAT: 0, RESPAWN_WAIT: 0,
+      },
+      lastFireProbe: null,
       frontlineInserted: false,
       setupFastForwarded: false,
-      forcedContactInsertCount: 0,
-      stuckRecoveryMode: false,
-      stuckRecoveryUntil: 0,
-      // perf-harness-redesign state (Layers 1-3 + LOS counter).
-      waypoints: null,
-      waypointIdx: 0,
-      waypointTarget: null,
-      lastWaypointReplanAt: 0,
-      waypointReplanFailures: 0,
-      waypointsFollowedCount: 0,
-      maxStuckMs: 0,
-      stuckTeleportCount: 0,
-      losRejectedShots: 0,
-      gradientProbeDeflections: 0,
-      // perf-harness-killbot: rule-only NSRL target lock. Only consulted on
-      // aggressiveMode profiles (open_frontier + a_shau_valley). combat120
-      // keeps the nearest-each-tick behavior from perf-harness-redesign.
-      targetLock: {
-        combatantId: null,
-        lockedAtMs: 0,
-        lastScore: 0,
-        lastSeenMs: 0
-      },
-      firePitchRejections: 0,
-      firePitchSafetyGates: 0,
-      lockSwitches: 0,
-      combatState: 'SCAN'
+      enemySpawn: null,
     };
-    const MAX_YAW_STEP = 0.09;
-    const MAX_PITCH_STEP = 0.06;
-    const HEALTH_TOP_UP_COOLDOWN_MS = 12000;
-    const HEALTH_TOP_UP_CRITICAL_RATIO = 0.14;
-    const HEALTH_TOP_UP_CRITICAL_HP_ABS = 20;
-    const HEALTH_TOP_UP_TARGET_RATIO = 0.55;
-    const HEALTH_TOP_UP_BURST_HP = 55;
-    const RESPAWN_RETRY_COOLDOWN_MS = 450;
-    const AMMO_REFILL_COOLDOWN_MS = 5000;
-    const AMMO_RESERVE_FLOOR = 24;
-    const AMMO_CRITICAL_RESERVE = 4;
-    const FORCE_CONTACT_REINSERT_MS = opts.mode === 'open_frontier'
-      ? 10000
-      : opts.mode === 'a_shau_valley'
-        ? 12000
-        : 22000;
-    const FORCE_CONTACT_REINSERT_COOLDOWN_MS = opts.mode === 'open_frontier'
-      ? 15000
-      : opts.mode === 'a_shau_valley'
-        ? 18000
-        : 32000;
-    let lastForcedContactInsertAt = 0;
-
-    function dispatchKey(type, code) {
-      document.dispatchEvent(new KeyboardEvent(type, {
-        bubbles: true,
-        cancelable: true,
-        code: code,
-        key: keyToLabel(code)
-      }));
-    }
-
-    function pressKey(code) {
-      if (state.pressedKeys.has(code)) return;
-      state.pressedKeys.add(code);
-      dispatchKey('keydown', code);
-    }
-
-    function releaseKey(code) {
-      if (!state.pressedKeys.has(code)) return;
-      state.pressedKeys.delete(code);
-      dispatchKey('keyup', code);
-    }
-
-    function setMovementPattern(pattern) {
-      const keys = Array.from(state.pressedKeys);
-      for (let i = 0; i < keys.length; i++) {
-        if (!pattern.includes(keys[i])) releaseKey(keys[i]);
-      }
-      for (let i = 0; i < pattern.length; i++) {
-        pressKey(pattern[i]);
-      }
-    }
-
-    // Pairs that count as direction reversals for the anti-flap debounce.
-    const REVERSAL_PAIRS = {
-      advance: 'retreat',
-      retreat: 'advance',
-      sprint: 'retreat',
-      strafe: 'retreat'
-    };
-    const REVERSAL_COOLDOWN_MS = 900;
-
-    function isReversal(fromState, toState) {
-      return REVERSAL_PAIRS[fromState] === toState;
-    }
-
-    function setMovementState(nextState, options) {
-      const now = Date.now();
-      const force = !!(options && options.force);
-
-      // No-op when already in the target state (but keep pattern fresh without
-      // resetting the dwell timer — important so repeated same-state requests
-      // don't extend the lock indefinitely).
-      if (state.movementState === nextState) {
-        return;
-      }
-
-      // Enforce minimum dwell in the current state unless the caller forces it
-      // (firing locks, capture-point holds, stuck recovery).
-      if (!force && now < state.movementLockUntil) {
-        return;
-      }
-
-      // Anti-flap: suppress rapid direction reversals (e.g. advance <-> retreat
-      // bouncing) within a short window, unless forced.
-      if (!force && isReversal(state.movementState, nextState) && (now - state.lastReversalAt) < REVERSAL_COOLDOWN_MS) {
-        return;
-      }
-
-      if (isReversal(state.movementState, nextState)) {
-        state.lastReversalAt = now;
-      }
-
-      state.previousMovementState = state.movementState;
-      state.movementState = nextState;
-      state.movementStateSince = now;
-      state.movementLockUntil = now + modeProfile.transitionHoldMs + Math.floor(Math.random() * 360);
-      state.movementTransitions++;
-
-      if (nextState === 'sprint') {
-        setMovementPattern(['KeyW', 'ShiftLeft']);
-      } else if (nextState === 'advance') {
-        setMovementPattern(Math.random() < 0.5 ? ['KeyW', 'KeyA'] : ['KeyW', 'KeyD']);
-      } else if (nextState === 'retreat') {
-        setMovementPattern(Math.random() < 0.5 ? ['KeyS', 'KeyA'] : ['KeyS', 'KeyD']);
-      } else if (nextState === 'hold') {
-        setMovementPattern([]);
-      } else if (nextState === 'strafe') {
-        setMovementPattern(Math.random() < 0.5 ? ['KeyW', 'KeyA'] : ['KeyW', 'KeyD']);
-      }
-    }
-
-    function releaseAllKeys() {
-      const keys = Array.from(state.pressedKeys);
-      for (let i = 0; i < keys.length; i++) {
-        releaseKey(keys[i]);
-      }
-    }
-
-    function dispatchMouse(type, button, buttons) {
-      const init = {
-        bubbles: true,
-        cancelable: true,
-        button: button,
-        buttons: buttons,
-        clientX: globalWindow.innerWidth / 2,
-        clientY: globalWindow.innerHeight / 2
-      };
-      document.dispatchEvent(new MouseEvent(type, init));
-      globalWindow.dispatchEvent(new MouseEvent(type, init));
-    }
-
-    function invokePlayerAction(actionName) {
-      const systems = getSystems();
-      const playerController = systems && systems.playerController;
-      const action = playerController && playerController[actionName];
-      if (typeof action !== 'function') return false;
-      action.call(playerController);
-      return true;
-    }
-
-    function syncCameraAim(camera, cameraController, yaw, pitch) {
-      camera.rotation.order = 'YXZ';
-      camera.rotation.y = yaw;
-      camera.rotation.x = pitch;
-      if (cameraController) {
-        cameraController.yaw = yaw;
-        cameraController.pitch = pitch;
-      }
-      if (typeof camera.updateMatrixWorld === 'function') {
-        camera.updateMatrixWorld(true);
-      }
-    }
-
-    function syncCameraPosition(camera, cameraController, position) {
-      if (!camera || !position) return;
-      // Place the camera at the player's EYE (foot + PLAYER_EYE_HEIGHT), not
-      // the feet. The live game renders from the eye; the harness previously
-      // sampled from the feet, which tilted fire/aim math downward (bullets
-      // hit the ground between the player and the enemy).
-      const eyeX = Number(position.x || 0);
-      const eyeY = Number(position.y || 0) + PLAYER_EYE_HEIGHT;
-      const eyeZ = Number(position.z || 0);
-      if (camera.position && typeof camera.position.set === 'function') {
-        camera.position.set(eyeX, eyeY, eyeZ);
-      } else if (camera.position) {
-        camera.position.x = eyeX;
-        camera.position.y = eyeY;
-        camera.position.z = eyeZ;
-      }
-      if (cameraController && typeof cameraController.resetCameraPosition === 'function') {
-        // The controller's resetCameraPosition consumes feet position; let it
-        // own its own eye math so we don't fight it.
-        cameraController.resetCameraPosition(position);
-      }
-      if (typeof camera.updateMatrixWorld === 'function') {
-        camera.updateMatrixWorld(true);
-      }
-    }
-
-    function setHarnessPlayerPosition(systems, position, reason) {
-      const playerController = systems && systems.playerController;
-      if (!playerController || typeof playerController.setPosition !== 'function') return false;
-      playerController.setPosition(position, reason);
-      const refreshedPos = playerController.getPosition ? playerController.getPosition() : position;
-      const camera = playerController.getCamera ? playerController.getCamera() : null;
-      syncCameraPosition(camera, playerController.cameraController, refreshedPos);
-      state.lastRepositionAt = Date.now();
-      return true;
-    }
-
-    function mouseDown() {
-      if (state.firingHeld) return;
-      state.firingHeld = true;
-      if (!invokePlayerAction('actionFireStart')) {
-        dispatchMouse('mousedown', 0, 1);
-      }
-    }
-
-    function mouseUp() {
-      if (!state.firingHeld) return;
-      state.firingHeld = false;
-      if (!invokePlayerAction('actionFireStop')) {
-        dispatchMouse('mouseup', 0, 0);
-      }
-    }
 
     function getSystems() {
-      return globalWindow.__engine && globalWindow.__engine.systemManager;
+      return globalWindow && globalWindow.__engine && globalWindow.__engine.systemManager;
     }
 
     function disablePointerLockForHarness(systems) {
-      const playerController = systems && systems.playerController;
-      if (playerController && typeof playerController.setPointerLockEnabled === 'function') {
-        playerController.setPointerLockEnabled(false);
+      const pc = systems && systems.playerController;
+      if (pc && typeof pc.setPointerLockEnabled === 'function') {
+        pc.setPointerLockEnabled(false);
       }
     }
 
@@ -688,441 +645,160 @@
         return;
       }
       const phase = ticketSystem.getGameState().phase;
-      if (phase !== 'SETUP') {
-        state.setupFastForwarded = true;
-        return;
-      }
+      if (phase !== 'SETUP') { state.setupFastForwarded = true; return; }
       const setupDuration = typeof ticketSystem.getSetupDuration === 'function'
-        ? Number(ticketSystem.getSetupDuration())
-        : 10;
+        ? Number(ticketSystem.getSetupDuration()) : 10;
       ticketSystem.update(Math.max(0.25, setupDuration + 0.1));
       state.setupFastForwarded = true;
     }
 
-    function getPlayerShotRay(systems, camera) {
-      const firstPersonWeapon = systems && systems.firstPersonWeapon;
-      const rigManager = firstPersonWeapon && firstPersonWeapon.rigManager;
-      const gunCore = rigManager && rigManager.getCurrentCore ? rigManager.getCurrentCore() : null;
-      if (!gunCore || typeof gunCore.computeShotRay !== 'function' || typeof gunCore.getSpreadDeg !== 'function') {
-        return null;
-      }
-      return gunCore.computeShotRay(camera, gunCore.getSpreadDeg());
-    }
-
-    function analyzePlayerShot(systems, ray) {
-      const combatantSystem = systems && systems.combatantSystem;
-      const combatantCombat = combatantSystem && combatantSystem.combatantCombat;
-      const hitDetection = combatantCombat && combatantCombat.hitDetection;
-      if (!combatantSystem || !combatantCombat || !hitDetection || !ray) {
-        return {
-          landable: false,
-          reason: 'missing_dependencies',
-          hit: null,
-          terrainHit: null
-        };
-      }
-
-      const sandbagSystem = combatantCombat.sandbagSystem;
-      if (sandbagSystem && typeof sandbagSystem.checkRayIntersection === 'function' && sandbagSystem.checkRayIntersection(ray)) {
-        return {
-          landable: false,
-          reason: 'sandbag_block',
-          hit: null,
-          terrainHit: null
-        };
-      }
-
-      const hit = hitDetection.raycastCombatants(ray, 'US', combatantSystem.combatants);
-      if (!hit) {
-        return {
-          landable: false,
-          reason: 'no_combatant_hit',
-          hit: null,
-          terrainHit: null
-        };
-      }
-
-      const terrainSystem = combatantCombat.terrainSystem;
-      if (terrainSystem && typeof terrainSystem.raycastTerrain === 'function') {
-        const terrainHit = terrainSystem.raycastTerrain(ray.origin, ray.direction, hit.distance);
-        if (terrainHit && terrainHit.hit && Number.isFinite(terrainHit.distance) && terrainHit.distance < hit.distance - 0.5) {
-          return {
-            landable: false,
-            reason: 'terrain_block',
-            hit: hit,
-            terrainHit: terrainHit
-          };
-        }
-      }
-
-      if (typeof combatantCombat.isBlockedByHeightProfile === 'function' && combatantCombat.isBlockedByHeightProfile(ray, hit.distance)) {
-        return {
-          landable: false,
-          reason: 'height_profile_block',
-          hit: hit,
-          terrainHit: null
-        };
-      }
-
-      return {
-        landable: true,
-        reason: 'clear',
-        hit: hit,
-        terrainHit: null
-      };
-    }
-
-    function canLandPlayerShot(systems, ray) {
-      return analyzePlayerShot(systems, ray).landable;
-    }
-
     function getEnemySpawn(systems) {
       if (state.enemySpawn) return state.enemySpawn;
-
       const config = systems && systems.gameModeManager && systems.gameModeManager.getCurrentConfig
-        ? systems.gameModeManager.getCurrentConfig()
-        : null;
+        ? systems.gameModeManager.getCurrentConfig() : null;
       const zones = config && Array.isArray(config.zones) ? config.zones : null;
       if (zones) {
         for (let i = 0; i < zones.length; i++) {
-          const zone = zones[i];
-          if (zone && zone.isHomeBase && isOpforFaction(zone.owner) && zone.position) {
-            state.enemySpawn = {
-              x: Number(zone.position.x),
-              y: Number(zone.position.y),
-              z: Number(zone.position.z)
-            };
+          const z = zones[i];
+          if (z && z.isHomeBase && isOpforFaction(z.owner) && z.position) {
+            state.enemySpawn = { x: Number(z.position.x), y: Number(z.position.y), z: Number(z.position.z) };
             return state.enemySpawn;
           }
-        }
-      }
-
-      const combatants = systems && systems.combatantSystem && systems.combatantSystem.getAllCombatants
-        ? systems.combatantSystem.getAllCombatants()
-        : null;
-      if (!Array.isArray(combatants)) return null;
-
-      let count = 0;
-      let sumX = 0;
-      let sumY = 0;
-      let sumZ = 0;
-      for (let i = 0; i < combatants.length; i++) {
-        const combatant = combatants[i];
-        if (!combatant || combatant.id === 'player_proxy') continue;
-        if (!isOpforFaction(combatant.faction)) continue;
-        if (combatant.health <= 0 || combatant.state === 'dead') continue;
-        sumX += Number(combatant.position.x);
-        sumY += Number(combatant.position.y);
-        sumZ += Number(combatant.position.z);
-        count++;
-      }
-      if (count > 0) {
-        state.enemySpawn = { x: sumX / count, y: sumY / count, z: sumZ / count };
-      }
-      return state.enemySpawn;
-    }
-
-    function getUSSpawn(systems) {
-      const config = systems && systems.gameModeManager && systems.gameModeManager.getCurrentConfig
-        ? systems.gameModeManager.getCurrentConfig()
-        : null;
-      const zones = config && Array.isArray(config.zones) ? config.zones : null;
-      if (!zones) return null;
-      for (let i = 0; i < zones.length; i++) {
-        const zone = zones[i];
-        if (zone && zone.isHomeBase && isBluforFaction(zone.owner) && zone.position) {
-          return {
-            x: Number(zone.position.x),
-            y: Number(zone.position.y),
-            z: Number(zone.position.z)
-          };
         }
       }
       return null;
     }
 
-    function getPressureSpawnPoint(systems) {
-      const aShauSuggestion = systems
-        && systems.playerRespawnManager
-        && typeof systems.playerRespawnManager.getAShauPressureInsertionSuggestion === 'function'
-        ? (
-            systems.playerRespawnManager.getAShauPressureInsertionSuggestion({ minOpfor250: 1 })
-            || systems.playerRespawnManager.getAShauPressureInsertionSuggestion({ minOpfor250: 0 })
-          )
-        : null;
-      if (aShauSuggestion) {
-        return {
-          x: Number(aShauSuggestion.x),
-          y: Number(aShauSuggestion.y || 0),
-          z: Number(aShauSuggestion.z)
-        };
-      }
-
-      if (opts.mode === 'open_frontier') {
-        const liveFront = getLeadChargePoint(systems) || getEnemyMassPoint(systems) || getEngagementCenter(systems);
-        if (liveFront) {
-          return {
-            x: Number(liveFront.x) + (Math.random() - 0.5) * 28,
-            y: Number(liveFront.y || 0),
-            z: Number(liveFront.z) + (Math.random() - 0.5) * 28
-          };
+    function getEngagementCenter(systems) {
+      const cs = systems && systems.combatantSystem;
+      const combatants = cs && cs.getAllCombatants ? cs.getAllCombatants() : null;
+      if (!Array.isArray(combatants) || combatants.length === 0) return getEnemySpawn(systems);
+      let usC = 0, opC = 0, usX = 0, usY = 0, usZ = 0, opX = 0, opY = 0, opZ = 0;
+      for (let i = 0; i < combatants.length; i++) {
+        const c = combatants[i];
+        if (!c || c.id === 'player_proxy' || c.health <= 0 || c.state === 'dead') continue;
+        if (isBluforFaction(c.faction)) {
+          usX += Number(c.position.x); usY += Number(c.position.y); usZ += Number(c.position.z); usC++;
+        } else if (isOpforFaction(c.faction)) {
+          opX += Number(c.position.x); opY += Number(c.position.y); opZ += Number(c.position.z); opC++;
         }
       }
+      if (usC > 0 && opC > 0) {
+        return {
+          x: (usX / usC + opX / opC) * 0.5,
+          y: (usY / usC + opY / opC) * 0.5,
+          z: (usZ / usC + opZ / opC) * 0.5,
+        };
+      }
+      return getEnemySpawn(systems);
+    }
 
-      const usSpawn = getUSSpawn(systems);
-      const enemySpawn = getEnemySpawn(systems);
-      if (!usSpawn || !enemySpawn) return enemySpawn || usSpawn || null;
-
-      const midX = (usSpawn.x + enemySpawn.x) * 0.5;
-      const midZ = (usSpawn.z + enemySpawn.z) * 0.5;
-      const laneX = enemySpawn.x - usSpawn.x;
-      const laneZ = enemySpawn.z - usSpawn.z;
-      const laneLen = Math.hypot(laneX, laneZ) || 1;
-      const dirX = laneX / laneLen;
-      const dirZ = laneZ / laneLen;
-      const lateralX = -dirZ;
-      const lateralZ = dirX;
-
-      // Keep respawn/insert near the middle lane with a slight own-side bias.
-      const ownSideBias = 8;
-      const along = ownSideBias + (Math.random() - 0.5) * 40;
-      const lateral = (Math.random() - 0.5) * 44;
+    function getObjectiveZoneTarget(systems, playerPos) {
+      const zoneManager = systems && systems.zoneManager;
+      const zones = zoneManager && zoneManager.getAllZones ? zoneManager.getAllZones() : null;
+      if (!Array.isArray(zones) || zones.length === 0) return null;
+      let bestZone = null;
+      let bestScore = Number.POSITIVE_INFINITY;
+      for (let i = 0; i < zones.length; i++) {
+        const z = zones[i];
+        if (!z || z.isHomeBase) continue;
+        const isContested = z.state === 'contested';
+        const isOwned = isBluforFaction(z.owner);
+        const priority = isContested ? 0 : (isOwned ? 3 : 1);
+        const dx = Number(z.position.x) - Number(playerPos.x);
+        const dz = Number(z.position.z) - Number(playerPos.z);
+        const distSq = dx * dx + dz * dz;
+        const score = priority * 500000 + distSq;
+        if (score < bestScore) { bestScore = score; bestZone = z; }
+      }
+      if (!bestZone || !bestZone.position) return null;
+      state.lastObjectiveZoneId = String(bestZone.id || '');
       return {
-        x: midX + dirX * along + lateralX * lateral,
-        y: (usSpawn.y + enemySpawn.y) * 0.5,
-        z: midZ + dirZ * along + lateralZ * lateral
+        position: {
+          x: Number(bestZone.position.x),
+          y: Number(bestZone.position.y || 0),
+          z: Number(bestZone.position.z),
+        },
+        priority: bestZone.state === 'contested' ? 2 : (isBluforFaction(bestZone.owner) ? 0 : 1),
       };
     }
 
-    // Aggressive-mode target lock (open_frontier + a_shau_valley). Keeps a
-    // single committed combatant until it dies, leaves perception range, or
-    // a new candidate beats the current utility score by 30% (Dave Mark IAUS
-    // hysteresis). Returns the locked combatant (or null).
-    function selectLockedTarget(systems, playerPos) {
-      const combatants = systems && systems.combatantSystem && systems.combatantSystem.getAllCombatants
-        ? systems.combatantSystem.getAllCombatants()
-        : null;
-      if (!Array.isArray(combatants) || combatants.length === 0) {
-        state.targetLock.combatantId = null;
-        state.targetLock.lastScore = 0;
-        return null;
-      }
-      const perceptionSq = perceptionRange * perceptionRange;
-      const eye = { x: playerPos.x, y: Number(playerPos.y || 0) + PLAYER_EYE_HEIGHT, z: playerPos.z };
+    // ── Primitives wired to the engine ──
 
-      // Score every live opfor within perception, tracking best and current.
+    // `findNearestEnemy` — delegated to the live combatant system.
+    // Applies perception-range cull + live-only filter. Returns the
+    // engine-agnostic `BotTarget` shape the state machine expects.
+    function findNearestEnemy(systems, playerPos) {
+      const cs = systems && systems.combatantSystem;
+      const combatants = cs && cs.getAllCombatants ? cs.getAllCombatants() : null;
+      if (!Array.isArray(combatants) || combatants.length === 0) return null;
+      const pr = botConfig.perceptionRange;
+      const prSq = pr * pr;
       let best = null;
-      let bestScore = 0;
-      let current = null;
-      let currentScore = 0;
+      let bestDistSq = Number.POSITIVE_INFINITY;
       for (let i = 0; i < combatants.length; i++) {
         const c = combatants[i];
         if (!c || c.id === 'player_proxy') continue;
         if (!isOpforFaction(c.faction)) continue;
         if (c.health <= 0 || c.state === 'dead') continue;
-        const dx = Number(c.position.x) - playerPos.x;
-        const dz = Number(c.position.z) - playerPos.z;
+        const dx = Number(c.position.x) - Number(playerPos.x);
+        const dz = Number(c.position.z) - Number(playerPos.z);
         const distSq = dx * dx + dz * dz;
-        if (distSq > perceptionSq) continue;
-        const dist = Math.sqrt(distSq);
-        const targetPos = {
-          x: Number(c.position.x),
-          y: Number(c.position.y || 0) + TARGET_CHEST_HEIGHT,
-          z: Number(c.position.z)
-        };
-        const blockedRay = hasTerrainOcclusion(systems, eye, targetPos);
-        const blockedHeight = hasHeightProfileOcclusion(systems, eye, targetPos);
-        const hasLOS = !(blockedRay || blockedHeight);
-        const score = computeUtilityScore({ distance: dist, hasLOS: hasLOS, isEngagingUs: false });
-        if (score > bestScore) {
-          bestScore = score;
-          best = c;
-        }
-        if (state.targetLock.combatantId && c.id === state.targetLock.combatantId) {
-          current = c;
-          currentScore = score;
-        }
+        if (distSq > prSq) continue;
+        if (distSq < bestDistSq) { bestDistSq = distSq; best = c; }
       }
-
-      if (current) {
-        // Keep the lock unless a new candidate clearly beats it.
-        if (best && best.id !== current.id && shouldSwitchTarget(currentScore, bestScore, 1.3)) {
-          state.targetLock.combatantId = best.id;
-          state.targetLock.lockedAtMs = Date.now();
-          state.targetLock.lastScore = bestScore;
-          state.targetLock.lastSeenMs = Date.now();
-          state.lockSwitches++;
-          return best;
-        }
-        state.targetLock.lastScore = currentScore;
-        state.targetLock.lastSeenMs = Date.now();
-        return current;
-      }
-
-      if (best) {
-        state.targetLock.combatantId = best.id;
-        state.targetLock.lockedAtMs = Date.now();
-        state.targetLock.lastScore = bestScore;
-        state.targetLock.lastSeenMs = Date.now();
-        return best;
-      }
-
-      state.targetLock.combatantId = null;
-      state.targetLock.lastScore = 0;
-      return null;
-    }
-
-    function findNearestOpfor(systems, maxDistanceSq) {
-      const combatants = systems && systems.combatantSystem && systems.combatantSystem.getAllCombatants
-        ? systems.combatantSystem.getAllCombatants()
-        : null;
-      if (!Array.isArray(combatants) || combatants.length === 0) return null;
-      const playerPos = systems.playerController && systems.playerController.getPosition
-        ? systems.playerController.getPosition()
-        : null;
-      if (!playerPos) return null;
-
-      let nearest = null;
-      let nearestDistSq = Number.POSITIVE_INFINITY;
-      for (let i = 0; i < combatants.length; i++) {
-        const combatant = combatants[i];
-        if (!combatant || combatant.id === 'player_proxy') continue;
-        if (!isOpforFaction(combatant.faction)) continue;
-        if (combatant.health <= 0 || combatant.state === 'dead') continue;
-        const dx = combatant.position.x - playerPos.x;
-        const dz = combatant.position.z - playerPos.z;
-        const distSq = dx * dx + dz * dz;
-        if (distSq < nearestDistSq && distSq <= maxDistanceSq) {
-          nearestDistSq = distSq;
-          nearest = combatant;
-        }
-      }
-      return nearest;
-    }
-
-    function predictTargetPoint(targetCombatant, playerPos) {
-      if (!targetCombatant || !targetCombatant.position) return null;
-      const targetPos = targetCombatant.position;
-      const vel = targetCombatant.velocity;
-      const vx = vel && Number.isFinite(Number(vel.x)) ? Number(vel.x) : 0;
-      const vz = vel && Number.isFinite(Number(vel.z)) ? Number(vel.z) : 0;
-      const dx = Number(targetPos.x) - Number(playerPos.x);
-      const dz = Number(targetPos.z) - Number(playerPos.z);
-      const dist = Math.hypot(dx, dz);
-      const leadTime = Math.min(0.35, Math.max(0.08, dist / 280));
+      if (!best) return null;
       return {
-        x: Number(targetPos.x) + vx * leadTime,
-        y: Number(targetPos.y || 0),
-        z: Number(targetPos.z) + vz * leadTime
+        id: String(best.id || ''),
+        position: {
+          x: Number(best.position.x),
+          y: Number(best.position.y || 0),
+          z: Number(best.position.z || 0),
+        },
+        lastKnownMs: Date.now(),
       };
     }
 
-    function hasTerrainOcclusion(systems, fromPos, toPos) {
+    // `canSeeTarget` — consumes `terrainSystem.raycastTerrain` (the same primitive
+    // AILineOfSight uses internally), so the bot cannot acquire a target through
+    // a hill. Eye-to-chest segment; hit distance < segment length → occluded.
+    function canSeeTarget(systems, playerPos, targetPos) {
       const terrain = systems && systems.terrainSystem;
-      if (!terrain || !terrain.raycastTerrain || !fromPos || !toPos) return false;
-
-      const dx = toPos.x - fromPos.x;
-      const dy = (toPos.y || 0) - (fromPos.y || 0);
-      const dz = toPos.z - fromPos.z;
+      if (!terrain || typeof terrain.raycastTerrain !== 'function') return true;
+      const from = {
+        x: Number(playerPos.x),
+        y: Number(playerPos.y || 0) + PLAYER_EYE_HEIGHT,
+        z: Number(playerPos.z),
+      };
+      const to = {
+        x: Number(targetPos.x),
+        y: Number(targetPos.y || 0) + TARGET_CHEST_HEIGHT,
+        z: Number(targetPos.z),
+      };
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const dz = to.z - from.z;
       const distance = Math.hypot(dx, dy, dz);
-      if (!Number.isFinite(distance) || distance < 0.001) return false;
-
+      if (!Number.isFinite(distance) || distance < 0.001) return true;
       const dir = { x: dx / distance, y: dy / distance, z: dz / distance };
-      const hit = terrain.raycastTerrain(fromPos, dir, distance);
-      return !!(hit && hit.hit && Number.isFinite(hit.distance) && hit.distance < distance - 0.75);
+      const hit = terrain.raycastTerrain(from, dir, distance);
+      return !(hit && hit.hit && Number.isFinite(hit.distance) && hit.distance < distance - 0.75);
     }
 
-    function hasHeightProfileOcclusion(systems, fromPos, toPos) {
-      const terrain = systems && systems.terrainSystem;
-      if (!terrain || !terrain.getHeightAt || !fromPos || !toPos) return false;
-
-      const dx = toPos.x - fromPos.x;
-      const dz = toPos.z - fromPos.z;
-      const horizontalDist = Math.hypot(dx, dz);
-      if (!Number.isFinite(horizontalDist) || horizontalDist < 8) return false;
-
-      const samples = Math.min(7, Math.max(3, Math.floor(horizontalDist / 18)));
-      let blockingSamples = 0;
-      for (let i = 1; i < samples; i++) {
-        const t = i / samples;
-        const sx = fromPos.x + dx * t;
-        const sz = fromPos.z + dz * t;
-        const lineY = fromPos.y + ((toPos.y || 0) - (fromPos.y || 0)) * t;
-        const terrainY = Number(terrain.getHeightAt(sx, sz));
-        if (!Number.isFinite(terrainY)) continue;
-        if (terrainY > lineY + 1.3) {
-          blockingSamples++;
-          if (blockingSamples >= 2) return true;
-        }
-      }
-      return false;
-    }
-
-    function getCameraForward(camera) {
-      const elements = camera && camera.matrixWorld && camera.matrixWorld.elements;
-      if (!elements || elements.length < 16) {
-        return { x: 0, y: 0, z: -1 };
-      }
-      const fx = -elements[8];
-      const fy = -elements[9];
-      const fz = -elements[10];
-      const len = Math.hypot(fx, fy, fz) || 1;
-      return { x: fx / len, y: fy / len, z: fz / len };
-    }
-
-    // Driver-local alias for the pure pitch-limit clamp. Kept as a function so
-    // existing callers don't need to thread the top-level helper through.
-    function clampAimY(playerY, desiredY, horizontalDist) {
-      return clampAimYByPitch(playerY, desiredY, horizontalDist);
-    }
-
-    function isTerrainReadyAt(systems, x, z) {
-      const terrain = systems && systems.terrainSystem;
-      if (!terrain) return false;
-      if (terrain.isTerrainReady && !terrain.isTerrainReady()) return false;
-      if (terrain.hasTerrainAt) return terrain.hasTerrainAt(Number(x), Number(z));
-      return true;
-    }
-
-    /** Probe terrain slope at a given angle/distance from position. Returns slope in degrees. */
-    function probeTerrainSlope(systems, pos, angleDeg, distance) {
-      var terrain = systems && systems.terrainSystem;
-      if (!terrain || !terrain.getHeightAt) return 0;
-      var rad = angleDeg * Math.PI / 180;
-      var probeX = Number(pos.x) + Math.sin(rad) * distance;
-      var probeZ = Number(pos.z) + Math.cos(rad) * distance;
-      var hHere = Number(terrain.getHeightAt(Number(pos.x), Number(pos.z)));
-      var hThere = Number(terrain.getHeightAt(probeX, probeZ));
-      if (!Number.isFinite(hHere) || !Number.isFinite(hThere)) return 0;
-      var rise = hThere - hHere;
-      return Math.abs(Math.atan2(rise, distance)) * 180 / Math.PI;
-    }
-
-    /** Find a clear movement yaw (degrees) that avoids steep slopes. Returns null if all blocked. */
-    function findClearDirection(systems, pos, preferredYawDeg) {
-      var SLOPE_LIMIT = 35;
-      var PROBE_DIST = 8;
-      // Try preferred direction first, then 90deg offsets, then 180
-      var offsets = [0, 90, -90, 45, -45, 135, -135, 180];
-      for (var i = 0; i < offsets.length; i++) {
-        var testYaw = preferredYawDeg + offsets[i];
-        var slope = probeTerrainSlope(systems, pos, testYaw, PROBE_DIST);
-        if (slope < SLOPE_LIMIT) return testYaw;
-      }
-      return null;
-    }
-
-    // Layer 1 — navmesh path query wrapper. Tolerant of null (navmesh warming up,
-    // anchor off-mesh); callers cascade to Layer 2 direct steering. Waypoints are
-    // cloned to plain objects so state mutation can't disturb the query cache.
-    function planWaypoints(systems, playerPos, anchor) {
-      if (!playerPos || !anchor) return null;
-      const navmeshSystem = systems && systems.navmeshSystem;
-      if (!navmeshSystem || typeof navmeshSystem.queryPath !== 'function') return null;
+    // `queryPath` — wraps `navmeshSystem.queryPath`. The bot passes plain-object
+    // positions, we hand back plain-object waypoints. Null on any failure (off
+    // navmesh, no path).
+    function queryPath(systems, fromPos, toPos) {
+      const nav = systems && systems.navmeshSystem;
+      if (!nav || typeof nav.queryPath !== 'function') return null;
       try {
-        const startVec = { x: Number(playerPos.x || 0), y: Number(playerPos.y || 0), z: Number(playerPos.z || 0) };
-        const endVec = { x: Number(anchor.x || 0), y: Number(anchor.y || 0), z: Number(anchor.z || 0) };
-        const path = navmeshSystem.queryPath(startVec, endVec);
+        // Snap both endpoints onto the mesh before querying. This is the
+        // Round 3 fix: on open_frontier the player regularly stands just
+        // off-mesh and queryPath returns null. findNearestPoint (radius 5m)
+        // recovers the 99% case the way live NPCs already do.
+        const start = snapOntoNavmesh(systems, fromPos);
+        const end = snapOntoNavmesh(systems, toPos);
+        const path = nav.queryPath(start, end);
         if (!path || path.length === 0) return null;
         const out = [];
         for (let i = 0; i < path.length; i++) {
@@ -1136,409 +812,125 @@
       }
     }
 
-    // Layer 2 wrapper — converts the driver's (dx, dz) target delta into the yaw
-    // convention chooseHeadingByGradient expects (forward = (sin(yaw), 0, -cos(yaw))).
-    function chooseTerrainHeading(systems, from, target, maxGradient) {
+    function snapOntoNavmesh(systems, pos) {
+      const nav = systems && systems.navmeshSystem;
+      if (!nav || typeof nav.findNearestPoint !== 'function') return pos;
+      try {
+        const snapped = nav.findNearestPoint(pos, 5);
+        if (snapped && Number.isFinite(snapped.x) && Number.isFinite(snapped.z)) {
+          return { x: Number(snapped.x), y: Number(snapped.y || pos.y || 0), z: Number(snapped.z) };
+        }
+      } catch (_err) { /* ignore */ }
+      return pos;
+    }
+
+    function findNearestNavmeshPoint(systems, pos) {
+      const nav = systems && systems.navmeshSystem;
+      if (!nav || typeof nav.findNearestPoint !== 'function') return null;
+      try {
+        const p = nav.findNearestPoint(pos, 5);
+        if (!p || !Number.isFinite(p.x)) return null;
+        return { x: Number(p.x), y: Number(p.y || 0), z: Number(p.z) };
+      } catch (_err) {
+        return null;
+      }
+    }
+
+    function sampleHeight(systems, x, z) {
       const terrain = systems && systems.terrainSystem;
-      if (!terrain || typeof terrain.getHeightAt !== 'function' || !from || !target) return null;
-      const dx = Number(target.x || 0) - Number(from.x || 0);
-      const dz = Number(target.z || 0) - Number(from.z || 0);
-      if (!Number.isFinite(dx + dz) || Math.hypot(dx, dz) < 0.01) return null;
-      const bearingRad = Math.atan2(dx, -dz);
-      const choice = chooseHeadingByGradient({
-        sampleHeight: function (x, z) { return terrain.getHeightAt(x, z); },
-        from: from,
-        bearingRad: bearingRad,
-        maxGradient: Number.isFinite(maxGradient) ? maxGradient : 0.45,
-        lookAhead: 8
-      });
-      if (!choice) return null;
-      return { yaw: choice.yaw, gradient: choice.gradient, deflected: Math.abs(choice.offsetRad) > 1e-4 };
+      if (!terrain || typeof terrain.getHeightAt !== 'function') return 0;
+      const h = terrain.getHeightAt(Number(x), Number(z));
+      return Number.isFinite(h) ? Number(h) : 0;
     }
 
-    function groundPlayerIfNeeded(systems, playerPos) {
-      if (!systems || !systems.playerController || !systems.playerController.setPosition || !playerPos) return;
-      if (systems.playerController.isInHelicopter && systems.playerController.isInHelicopter()) return;
-      const terrain = systems.terrainSystem;
-      if (!terrain || !terrain.getHeightAt) return;
-      if (!isTerrainReadyAt(systems, playerPos.x, playerPos.z)) return;
-      const ground = Number(terrain.getHeightAt(Number(playerPos.x), Number(playerPos.z)));
-      if (!Number.isFinite(ground)) return;
-      const targetY = ground + 2;
-      const currentY = Number(playerPos.y || 0);
-      // Snap only when clearly off-ground to prevent jitter.
-      if (Math.abs(currentY - targetY) < 3.5) return;
-      const corrected = playerPos.clone ? playerPos.clone() : { x: Number(playerPos.x), y: currentY, z: Number(playerPos.z) };
-      corrected.y = targetY;
-      setHarnessPlayerPosition(systems, corrected, 'harness.ground_lock');
-    }
-
-    function getEngagementCenter(systems) {
-      const combatants = systems && systems.combatantSystem && systems.combatantSystem.getAllCombatants
-        ? systems.combatantSystem.getAllCombatants()
-        : null;
-      if (!Array.isArray(combatants) || combatants.length === 0) {
-        return getEnemySpawn(systems);
-      }
-
-      let usCount = 0;
-      let usX = 0;
-      let usY = 0;
-      let usZ = 0;
-      let opforCount = 0;
-      let opforX = 0;
-      let opforY = 0;
-      let opforZ = 0;
-
-      for (let i = 0; i < combatants.length; i++) {
-        const combatant = combatants[i];
-        if (!combatant || combatant.id === 'player_proxy') continue;
-        if (combatant.health <= 0 || combatant.state === 'dead') continue;
-        if (isBluforFaction(combatant.faction)) {
-          usX += Number(combatant.position.x);
-          usY += Number(combatant.position.y);
-          usZ += Number(combatant.position.z);
-          usCount++;
-        } else if (isOpforFaction(combatant.faction)) {
-          opforX += Number(combatant.position.x);
-          opforY += Number(combatant.position.y);
-          opforZ += Number(combatant.position.z);
-          opforCount++;
-        }
-      }
-
-      if (usCount > 0 && opforCount > 0) {
-        return {
-          x: (usX / usCount + opforX / opforCount) * 0.5,
-          y: (usY / usCount + opforY / opforCount) * 0.5,
-          z: (usZ / usCount + opforZ / opforCount) * 0.5
-        };
-      }
-      return getEnemySpawn(systems);
-    }
-
-    function getLeadChargePoint(systems) {
-      const combatants = systems && systems.combatantSystem && systems.combatantSystem.getAllCombatants
-        ? systems.combatantSystem.getAllCombatants()
-        : null;
-      if (!Array.isArray(combatants) || combatants.length === 0) {
-        return getEngagementCenter(systems) || getEnemySpawn(systems);
-      }
-
-      let usCount = 0;
-      let usX = 0;
-      let usY = 0;
-      let usZ = 0;
-      let opforCount = 0;
-      let opforX = 0;
-      let opforY = 0;
-      let opforZ = 0;
-
-      for (let i = 0; i < combatants.length; i++) {
-        const combatant = combatants[i];
-        if (!combatant || combatant.id === 'player_proxy') continue;
-        if (combatant.health <= 0 || combatant.state === 'dead') continue;
-        if (isBluforFaction(combatant.faction)) {
-          usX += Number(combatant.position.x);
-          usY += Number(combatant.position.y);
-          usZ += Number(combatant.position.z);
-          usCount++;
-        } else if (isOpforFaction(combatant.faction)) {
-          opforX += Number(combatant.position.x);
-          opforY += Number(combatant.position.y);
-          opforZ += Number(combatant.position.z);
-          opforCount++;
-        }
-      }
-
-      if (usCount < 1 || opforCount < 1) {
-        return getEngagementCenter(systems) || getEnemySpawn(systems);
-      }
-
-      const usCenter = { x: usX / usCount, y: usY / usCount, z: usZ / usCount };
-      const opforCenter = { x: opforX / opforCount, y: opforY / opforCount, z: opforZ / opforCount };
-      const laneX = opforCenter.x - usCenter.x;
-      const laneZ = opforCenter.z - usCenter.z;
-      const laneLen = Math.hypot(laneX, laneZ) || 1;
-      const dirX = laneX / laneLen;
-      const dirZ = laneZ / laneLen;
-
-      // Push player ahead of friendly centroid toward contact, not behind the line.
-      const pushDist = Math.min(110, Math.max(55, laneLen * 0.32));
-      const lateralX = -dirZ;
-      const lateralZ = dirX;
-      const lateral = (Math.random() - 0.5) * 20;
-
-      return {
-        x: usCenter.x + dirX * pushDist + lateralX * lateral,
-        y: (usCenter.y + opforCenter.y) * 0.5,
-        z: usCenter.z + dirZ * pushDist + lateralZ * lateral
-      };
-    }
-
-    function getObjectiveZoneTarget(systems, playerPos) {
-      const zoneManager = systems && systems.zoneManager;
-      const zones = zoneManager && zoneManager.getAllZones ? zoneManager.getAllZones() : null;
-      if (!Array.isArray(zones) || zones.length === 0) {
-        return null;
-      }
-
-      let bestZone = null;
-      let bestScore = Number.POSITIVE_INFINITY;
-      const now = Date.now();
-      const stickyZoneId = now < state.objectiveSwitchAt ? state.objectiveZoneId : null;
-      for (let i = 0; i < zones.length; i++) {
-        const zone = zones[i];
-        if (!zone || zone.isHomeBase) continue;
-        const isContested = zone.state === 'contested';
-        const isOwnedByUs = isBluforFaction(zone.owner);
-        const isSticky = stickyZoneId && zone.id === stickyZoneId;
-        const priority = isContested ? 0 : isOwnedByUs ? 3 : 1;
-        const dx = Number(zone.position.x) - Number(playerPos.x);
-        const dz = Number(zone.position.z) - Number(playerPos.z);
-        const distSq = dx * dx + dz * dz;
-        const score = priority * 500000 + distSq + (isSticky ? -160000 : 0);
-        if (score < bestScore) {
-          bestScore = score;
-          bestZone = zone;
-        }
-      }
-
-      if (bestZone && bestZone.position) {
-        state.objectiveZoneId = String(bestZone.id || '');
-        state.objectiveSwitchAt = now + 5500 + Math.floor(Math.random() * 2200);
-        return {
-          x: Number(bestZone.position.x),
-          y: Number(bestZone.position.y || 0),
-          z: Number(bestZone.position.z)
-        };
-      }
+    function getObjective(systems, playerPos) {
+      const zoneTarget = getObjectiveZoneTarget(systems, playerPos);
+      if (zoneTarget) return zoneTarget;
+      const center = getEngagementCenter(systems);
+      if (center) return { position: center, priority: 1 };
       return null;
     }
 
-    function findZoneById(zones, id) {
-      if (!Array.isArray(zones) || !id) return null;
-      for (let i = 0; i < zones.length; i++) {
-        if (zones[i] && String(zones[i].id) === String(id)) return zones[i];
-      }
-      return null;
+    function getPlayerPos(systems) {
+      if (!systems || !systems.playerController || !systems.playerController.getPosition) return null;
+      const pos = systems.playerController.getPosition();
+      if (!pos) return null;
+      return { x: Number(pos.x), y: Number(pos.y || 0), z: Number(pos.z) };
     }
 
-    function getCaptureFocus(systems, playerPos) {
-      const zoneManager = systems && systems.zoneManager;
-      const zones = zoneManager && zoneManager.getAllZones ? zoneManager.getAllZones() : null;
-      if (!Array.isArray(zones) || zones.length === 0) {
-        state.captureZoneId = null;
-        state.captureHoldUntil = 0;
-        return null;
+    function getPlayerVelocity(systems) {
+      if (!systems || !systems.playerController || !systems.playerController.getVelocity) {
+        return { x: 0, y: 0, z: 0 };
       }
+      const v = systems.playerController.getVelocity();
+      return { x: Number(v.x || 0), y: Number(v.y || 0), z: Number(v.z || 0) };
+    }
 
-      const now = Date.now();
-      const activeZone = findZoneById(zones, state.captureZoneId);
-      if (activeZone) {
-        const dx = Number(activeZone.position.x) - Number(playerPos.x);
-        const dz = Number(activeZone.position.z) - Number(playerPos.z);
-        const dist = Math.hypot(dx, dz);
-        const inside = dist <= Math.max(7, Number(activeZone.radius) * 0.72);
-
-        if (isBluforFaction(activeZone.owner) && !activeZone.isHomeBase) {
-          state.capturedZoneCount += 1;
-          state.captureZoneId = null;
-          state.captureHoldUntil = 0;
-          return null;
-        }
-
-        if (inside && now > state.captureHoldUntil) {
-          // Capture in Open Frontier can take a long time with a single actor.
-          state.captureHoldUntil = now + 90000 + Math.floor(Math.random() * 20000);
-        }
-
-        if (dist > Math.max(16, Number(activeZone.radius) * 1.5) && now > state.captureHoldUntil) {
-          state.captureZoneId = null;
-          state.captureHoldUntil = 0;
-          return null;
-        }
-
-        return {
-          zone: activeZone,
-          target: {
-            x: Number(activeZone.position.x),
-            y: Number(activeZone.position.y || 0),
-            z: Number(activeZone.position.z)
-          },
-          inside: inside,
-          hold: now < state.captureHoldUntil
-        };
+    function getPlayerHealth(systems) {
+      const health = systems && systems.playerHealthSystem;
+      if (!health || typeof health.getHealth !== 'function' || typeof health.getMaxHealth !== 'function') {
+        return { cur: 100, max: 100, dead: false };
       }
-
-      let bestZone = null;
-      let bestDist = Number.POSITIVE_INFINITY;
-      for (let i = 0; i < zones.length; i++) {
-        const zone = zones[i];
-        if (!zone || zone.isHomeBase) continue;
-        if (isBluforFaction(zone.owner) && zone.state !== 'contested') continue;
-        const dx = Number(zone.position.x) - Number(playerPos.x);
-        const dz = Number(zone.position.z) - Number(playerPos.z);
-        const dist = Math.hypot(dx, dz);
-        const prefer = zone.state === 'contested' ? -20 : 0;
-        const score = dist + prefer;
-        if (score < bestDist) {
-          bestDist = score;
-          bestZone = zone;
-        }
-      }
-
-      if (!bestZone) return null;
-      const distToBest = Math.hypot(Number(bestZone.position.x) - Number(playerPos.x), Number(bestZone.position.z) - Number(playerPos.z));
-      state.captureZoneId = String(bestZone.id || '');
-      state.captureHoldUntil = now + 110000 + Math.floor(Math.random() * 25000);
       return {
-        zone: bestZone,
-        target: {
-          x: Number(bestZone.position.x),
-          y: Number(bestZone.position.y || 0),
-          z: Number(bestZone.position.z)
-        },
-        inside: distToBest <= Math.max(7, Number(bestZone.radius) * 0.72),
-        hold: distToBest <= Math.max(7, Number(bestZone.radius) * 0.72)
+        cur: Number(health.getHealth()),
+        max: Number(health.getMaxHealth()),
+        dead: !!(typeof health.isDead === 'function' && health.isDead()),
       };
     }
 
-    function getEnemyMassPoint(systems) {
-      const combatants = systems && systems.combatantSystem && systems.combatantSystem.getAllCombatants
-        ? systems.combatantSystem.getAllCombatants()
+    function getMagazine(systems) {
+      const weapon = systems && systems.firstPersonWeapon;
+      if (!weapon || typeof weapon.getAmmoState !== 'function') {
+        return { current: 30, max: 30 };
+      }
+      const s = weapon.getAmmoState();
+      return {
+        current: Number(s && s.currentMagazine) || 0,
+        max: Number(s && s.magazineSize) || 30,
+      };
+    }
+
+    function getCamera(systems) {
+      return systems && systems.playerController && systems.playerController.getCamera
+        ? systems.playerController.getCamera()
         : null;
-      if (!Array.isArray(combatants) || combatants.length === 0) return null;
-
-      let count = 0;
-      let sumX = 0;
-      let sumY = 0;
-      let sumZ = 0;
-      for (let i = 0; i < combatants.length; i++) {
-        const combatant = combatants[i];
-        if (!combatant || combatant.id === 'player_proxy') continue;
-        if (!isOpforFaction(combatant.faction)) continue;
-        if (combatant.health <= 0 || combatant.state === 'dead') continue;
-        sumX += Number(combatant.position.x);
-        sumY += Number(combatant.position.y || 0);
-        sumZ += Number(combatant.position.z);
-        count++;
-      }
-      if (count < 1) return null;
-      return { x: sumX / count, y: sumY / count, z: sumZ / count };
     }
 
-    function getModeObjective(systems, playerPos) {
-      if (opts.mode === 'open_frontier' && !state.hasFired) {
-        return (
-          getEnemyMassPoint(systems) ||
-          getLeadChargePoint(systems) ||
-          getObjectiveZoneTarget(systems, playerPos) ||
-          getEngagementCenter(systems) ||
-          getEnemySpawn(systems)
-        );
+    function getCameraAngles(systems) {
+      const pc = systems && systems.playerController;
+      const cc = pc && pc.cameraController;
+      if (cc) {
+        return { yaw: Number(cc.yaw || 0), pitch: Number(cc.pitch || 0) };
       }
-      if (modeProfile.objectiveBias === 'zone') {
-        return (
-          getObjectiveZoneTarget(systems, playerPos) ||
-          getLeadChargePoint(systems) ||
-          getEngagementCenter(systems) ||
-          getEnemySpawn(systems)
-        );
-      }
-      if (modeProfile.objectiveBias === 'enemy_mass') {
-        return (
-          getEnemyMassPoint(systems) ||
-          getLeadChargePoint(systems) ||
-          getEngagementCenter(systems) ||
-          getEnemySpawn(systems)
-        );
-      }
-      return getLeadChargePoint(systems) || getEngagementCenter(systems) || getEnemySpawn(systems);
+      const camera = getCamera(systems);
+      return {
+        yaw: Number((camera && camera.rotation && camera.rotation.y) || 0),
+        pitch: Number((camera && camera.rotation && camera.rotation.x) || 0),
+      };
     }
 
-    function compressFrontline(systems) {
-      if (!enableFrontlineCompression || state.frontlineCompressed) return;
-      const combatants = systems && systems.combatantSystem && systems.combatantSystem.getAllCombatants
-        ? systems.combatantSystem.getAllCombatants()
-        : null;
-      if (!Array.isArray(combatants) || combatants.length === 0) return;
+    // ── Respawn / health / ammo sustainment ──
 
-      const alive = combatants.filter((combatant) =>
-        combatant &&
-        combatant.id !== 'player_proxy' &&
-        combatant.health > 0 &&
-        combatant.state !== 'dead'
-      );
-      const us = alive.filter((combatant) => isBluforFaction(combatant.faction));
-      const opfor = alive.filter((combatant) => isOpforFaction(combatant.faction));
-      if (us.length === 0 || opfor.length === 0) return;
+    const HEALTH_TOP_UP_COOLDOWN_MS = 12000;
+    const HEALTH_TOP_UP_CRITICAL_RATIO = 0.14;
+    const HEALTH_TOP_UP_CRITICAL_HP_ABS = 20;
+    const HEALTH_TOP_UP_TARGET_RATIO = 0.55;
+    const HEALTH_TOP_UP_BURST_HP = 55;
+    const RESPAWN_RETRY_COOLDOWN_MS = 450;
+    const AMMO_REFILL_COOLDOWN_MS = 5000;
+    const AMMO_RESERVE_FLOOR = 24;
+    const AMMO_CRITICAL_RESERVE = 4;
 
-      function centroid(items) {
-        let sumX = 0;
-        let sumZ = 0;
-        for (let i = 0; i < items.length; i++) {
-          sumX += Number(items[i].position.x);
-          sumZ += Number(items[i].position.z);
-        }
-        return { x: sumX / items.length, z: sumZ / items.length };
-      }
-
-      const usCenter = centroid(us);
-      const opforCenter = centroid(opfor);
-      const dx = opforCenter.x - usCenter.x;
-      const dz = opforCenter.z - usCenter.z;
-      const distance = Math.hypot(dx, dz);
-      state.frontlineDistance = distance;
-      if (!Number.isFinite(distance) || distance < opts.frontlineTriggerDistance) {
-        state.frontlineCompressed = true;
-        return;
-      }
-
-      const safeDx = distance > 0.001 ? dx / distance : 1;
-      const safeDz = distance > 0.001 ? dz / distance : 0;
-      const midpointX = (usCenter.x + opforCenter.x) * 0.5;
-      const midpointZ = (usCenter.z + opforCenter.z) * 0.5;
-      const lateralX = -safeDz;
-      const lateralZ = safeDx;
-
-      function moveGroup(group, side) {
-        let moved = 0;
-        const cap = Math.min(group.length, Math.max(0, opts.maxCompressedPerFaction));
-        for (let i = 0; i < cap; i++) {
-          const combatant = group[i];
-          const laneOffset = (Math.random() - 0.5) * 130;
-          const forwardOffset = side * (35 + Math.random() * 25);
-          const nextX = midpointX + safeDx * forwardOffset + lateralX * laneOffset;
-          const nextZ = midpointZ + safeDz * forwardOffset + lateralZ * laneOffset;
-          const height = systems.terrainSystem && systems.terrainSystem.getHeightAt
-            ? systems.terrainSystem.getHeightAt(nextX, nextZ)
-            : undefined;
-          combatant.position.x = nextX;
-          combatant.position.z = nextZ;
-          if (Number.isFinite(height)) {
-            combatant.position.y = Number(height) + 2;
-          }
-          if (combatant.velocity && combatant.velocity.set) {
-            combatant.velocity.set(0, 0, 0);
-          }
-          moved++;
-        }
-        return moved;
-      }
-
-      const usMoved = moveGroup(us, -1);
-      const opforMoved = moveGroup(opfor, 1);
-      state.frontlineMoveCount = usMoved + opforMoved;
-      state.frontlineCompressed = true;
-    }
+    let lastHealthTopUpAt = 0;
+    let lastAmmoRefillAt = 0;
+    let respawnRetryAt = 0;
+    let deathHandled = false;
 
     function topUpPlayerHealth(health) {
-      if (!opts.topUpHealth || !health || !health.getHealth || !health.getMaxHealth || !health.isDead || health.isDead()) {
-        return;
-      }
+      if (!opts.topUpHealth || !health) return;
+      if (!health.getHealth || !health.getMaxHealth || !health.isDead || health.isDead()) return;
       const now = Date.now();
-      if (now - state.lastHealthTopUpAt < HEALTH_TOP_UP_COOLDOWN_MS) return;
+      if (now - lastHealthTopUpAt < HEALTH_TOP_UP_COOLDOWN_MS) return;
       const hp = Number(health.getHealth());
       const maxHp = Number(health.getMaxHealth());
       if (!Number.isFinite(hp) || !Number.isFinite(maxHp) || maxHp <= 0) return;
@@ -1547,7 +939,7 @@
       if (!health.playerState) return;
       const targetHp = Math.min(maxHp, Math.max(maxHp * HEALTH_TOP_UP_TARGET_RATIO, hp + HEALTH_TOP_UP_BURST_HP));
       health.playerState.health = targetHp;
-      state.lastHealthTopUpAt = now;
+      lastHealthTopUpAt = now;
       state.healthTopUpCount++;
     }
 
@@ -1555,7 +947,7 @@
       const weapon = systems && systems.firstPersonWeapon;
       if (!weapon || typeof weapon.getAmmoState !== 'function') return false;
       const now = Date.now();
-      if (!forceRefill && now - state.lastAmmoRefillAt < AMMO_REFILL_COOLDOWN_MS) return false;
+      if (!forceRefill && now - lastAmmoRefillAt < AMMO_REFILL_COOLDOWN_MS) return false;
       const ammoState = weapon.getAmmoState();
       const magazine = Number(ammoState && ammoState.currentMagazine);
       const reserve = Number(ammoState && ammoState.reserveAmmo);
@@ -1565,546 +957,385 @@
       if (systems.inventoryManager && typeof systems.inventoryManager.reset === 'function') {
         systems.inventoryManager.reset();
       }
-      if (typeof weapon.enable === 'function') {
-        weapon.enable();
-      }
-      state.lastAmmoRefillAt = now;
+      if (typeof weapon.enable === 'function') weapon.enable();
+      lastAmmoRefillAt = now;
       state.ammoRefillCount++;
       return true;
     }
 
-    function keepPlayerInAction() {
+    function handleDeath(systems) {
+      const now = Date.now();
+      if (deathHandled && now < respawnRetryAt) return true;
+      deathHandled = true;
+      respawnRetryAt = now + RESPAWN_RETRY_COOLDOWN_MS;
+      releaseAllControls(systems);
+      if (systems.playerRespawnManager && systems.playerRespawnManager.cancelPendingRespawn) {
+        systems.playerRespawnManager.cancelPendingRespawn();
+      }
+      if (systems.playerRespawnManager && systems.playerRespawnManager.respawnAtBase) {
+        systems.playerRespawnManager.respawnAtBase();
+        state.respawnCount++;
+        lastHealthTopUpAt = now;
+        sustainAmmo(systems, true);
+      }
+      return true;
+    }
+
+    function releaseAllControls(systems) {
+      const pc = systems && systems.playerController;
+      if (!pc) return;
+      try { pc.applyMovementIntent({ forward: 0, strafe: 0, sprint: false }); } catch { /* ignore */ }
+      if (state.firingHeld) {
+        try { pc.fireStop(); } catch { /* ignore */ }
+        state.firingHeld = false;
+      }
+    }
+
+    // ── Frontline compression (tuning helper for AI sandbox modes) ──
+
+    function compressFrontline(systems) {
+      if (!enableFrontlineCompression || state.frontlineCompressed) return;
+      const cs = systems && systems.combatantSystem;
+      const combatants = cs && cs.getAllCombatants ? cs.getAllCombatants() : null;
+      if (!Array.isArray(combatants) || combatants.length === 0) return;
+      const alive = combatants.filter((c) => c && c.id !== 'player_proxy' && c.health > 0 && c.state !== 'dead');
+      const us = alive.filter((c) => isBluforFaction(c.faction));
+      const opfor = alive.filter((c) => isOpforFaction(c.faction));
+      if (us.length === 0 || opfor.length === 0) return;
+      function centroid(items) {
+        let sx = 0, sz = 0;
+        for (let i = 0; i < items.length; i++) { sx += Number(items[i].position.x); sz += Number(items[i].position.z); }
+        return { x: sx / items.length, z: sz / items.length };
+      }
+      const uc = centroid(us);
+      const oc = centroid(opfor);
+      const dx = oc.x - uc.x;
+      const dz = oc.z - uc.z;
+      const distance = Math.hypot(dx, dz);
+      state.frontlineDistance = distance;
+      if (!Number.isFinite(distance) || distance < opts.frontlineTriggerDistance) {
+        state.frontlineCompressed = true;
+        return;
+      }
+      const safeDx = distance > 0.001 ? dx / distance : 1;
+      const safeDz = distance > 0.001 ? dz / distance : 0;
+      const midX = (uc.x + oc.x) * 0.5;
+      const midZ = (uc.z + oc.z) * 0.5;
+      const latX = -safeDz;
+      const latZ = safeDx;
+      function moveGroup(group, side) {
+        let moved = 0;
+        const cap = Math.min(group.length, Math.max(0, opts.maxCompressedPerFaction));
+        for (let i = 0; i < cap; i++) {
+          const c = group[i];
+          const lane = (Math.random() - 0.5) * 130;
+          const forward = side * (35 + Math.random() * 25);
+          const nx = midX + safeDx * forward + latX * lane;
+          const nz = midZ + safeDz * forward + latZ * lane;
+          const h = systems.terrainSystem && systems.terrainSystem.getHeightAt
+            ? systems.terrainSystem.getHeightAt(nx, nz) : undefined;
+          c.position.x = nx;
+          c.position.z = nz;
+          if (Number.isFinite(h)) c.position.y = Number(h) + 2;
+          if (c.velocity && c.velocity.set) c.velocity.set(0, 0, 0);
+          moved++;
+        }
+        return moved;
+      }
+      const um = moveGroup(us, -1);
+      const om = moveGroup(opfor, 1);
+      state.frontlineMoveCount = um + om;
+      state.frontlineCompressed = true;
+    }
+
+    // ── Path follow (ADVANCE / PATROL use the bot's moveForward + yaw; we
+    // layer a navmesh waypoint so the camera yaw lock still respects terrain.) ──
+
+    function updateWaypoints(systems, playerPos, target) {
+      if (!target) { state.waypoints = null; state.waypointIdx = 0; return; }
+      const now = Date.now();
+      const sinceReplan = now - state.lastWaypointReplanAt;
+      const pathExhausted = !state.waypoints || state.waypoints.length === 0 || state.waypointIdx >= state.waypoints.length;
+      const needsReplan = sinceReplan > profile.waypointReplanIntervalMs || (pathExhausted && sinceReplan > 750);
+      if (needsReplan) {
+        const path = queryPath(systems, playerPos, target);
+        state.lastWaypointReplanAt = now;
+        if (path && path.length > 0) {
+          state.waypoints = path;
+          state.waypointIdx = 0;
+        } else {
+          state.waypointReplanFailures++;
+          state.waypoints = null;
+        }
+      }
+      if (state.waypoints && state.waypoints.length > 0) {
+        while (state.waypointIdx < state.waypoints.length) {
+          const wp = state.waypoints[state.waypointIdx];
+          const d = Math.hypot(Number(wp.x) - playerPos.x, Number(wp.z) - playerPos.z);
+          if (d > 4) break;
+          state.waypointIdx++;
+        }
+        if (state.waypointIdx >= state.waypoints.length) state.lastWaypointReplanAt = 0;
+      }
+    }
+
+    function overlayPathYaw(playerPos) {
+      // Pure-pursuit lookahead along the current waypoints — when fresh and
+      // valid, overrides the bot's "straight-line to target" yaw so the player
+      // follows the navmesh route rather than wandering into a hill.
+      const ageMs = Date.now() - state.lastWaypointReplanAt;
+      if (!isPathTrusted({ path: state.waypoints, waypointIdx: state.waypointIdx, pathAgeMs: ageMs })) {
+        return null;
+      }
+      const pt = pointAlongPath(state.waypoints, state.waypointIdx, { x: playerPos.x, z: playerPos.z }, computeAdaptiveLookahead(0));
+      if (!pt) return null;
+      state.waypointsFollowed++;
+      return botYawToward(playerPos, pt);
+    }
+
+    // ── Telemetry ──
+
+    function pushHistogram(currentState, dtMs) {
+      if (!state.stateHistogram[currentState]) state.stateHistogram[currentState] = 0;
+      state.stateHistogram[currentState] += Math.max(0, dtMs);
+    }
+
+    function transitionBot(nextState) {
+      if (nextState === state.botState) return;
+      state.transitions++;
+      state.lastStateChangeAt = Date.now();
+      state.botState = nextState;
+      state.timeInStateMs = 0;
+    }
+
+    // ── Per-tick update ──
+
+    function tick() {
       const systems = getSystems();
       if (!systems) return;
       disablePointerLockForHarness(systems);
       fastForwardSetupPhaseIfNeeded(systems);
 
-      const health = systems.playerHealthSystem;
-      const isDead = Boolean(health && health.isDead && health.isDead());
-      if (!isDead) {
-        state.deathHandled = false;
-      }
-      topUpPlayerHealth(health);
+      const health = getPlayerHealth(systems);
+      // Detect damage taken.
+      if (health.cur < state.lastHealth) state.lastDamageMs = Date.now();
+      state.lastHealth = health.cur;
 
-      if (opts.autoRespawn && isDead) {
-        const now = Date.now();
-        if (state.deathHandled && now < state.respawnRetryAt) {
-          return;
-        }
-        state.deathHandled = true;
-        state.respawnRetryAt = now + RESPAWN_RETRY_COOLDOWN_MS;
-        releaseAllKeys();
-        mouseUp();
-        let respawned = false;
-        if (systems.playerRespawnManager && systems.playerRespawnManager.cancelPendingRespawn) {
-          systems.playerRespawnManager.cancelPendingRespawn();
-        }
-        if (systems.playerRespawnManager && systems.playerRespawnManager.respawnAtBase) {
-          systems.playerRespawnManager.respawnAtBase();
-          respawned = true;
-        }
-        if (opts.allowWarpRecovery) {
-          const pressureSpawn = getPressureSpawnPoint(systems);
-          if (pressureSpawn && systems.playerController && systems.playerController.setPosition) {
-            if (isTerrainReadyAt(systems, pressureSpawn.x, pressureSpawn.z)) {
-              const currentPos = systems.playerController.getPosition ? systems.playerController.getPosition() : null;
-              const nextPos = currentPos && currentPos.clone ? currentPos.clone() : { x: 0, y: pressureSpawn.y, z: 0 };
-              nextPos.x = pressureSpawn.x;
-              nextPos.z = pressureSpawn.z;
-              nextPos.y = pressureSpawn.y;
-              const height = systems.terrainSystem && systems.terrainSystem.getHeightAt
-                ? systems.terrainSystem.getHeightAt(nextPos.x, nextPos.z)
-                : undefined;
-              if (Number.isFinite(height)) nextPos.y = Number(height) + 2;
-              setHarnessPlayerPosition(systems, nextPos, 'harness.recovery.respawn');
-            }
-          }
-        }
-        if (respawned) {
-          state.respawnCount++;
-          state.lastHealthTopUpAt = now;
-          sustainAmmo(systems, true);
-        }
+      // Ammo sustainment + health top-up.
+      const hs = systems.playerHealthSystem;
+      topUpPlayerHealth(hs);
+      sustainAmmo(systems, false);
+
+      if (health.dead) {
+        if (opts.autoRespawn) handleDeath(systems);
         return;
       }
+      deathHandled = false;
 
-      if (isDead) {
-        return;
-      }
-
-      if (systems.playerController && systems.playerController.isInHelicopter && systems.playerController.isInHelicopter()) {
-        const position = systems.playerController.getPosition ? systems.playerController.getPosition() : null;
-        if (position && position.clone) {
-          const exitPos = position.clone();
-          const height = systems.terrainSystem && systems.terrainSystem.getHeightAt
-            ? systems.terrainSystem.getHeightAt(exitPos.x, exitPos.z)
-            : undefined;
-          exitPos.y = Number.isFinite(height) ? Number(height) + 2 : exitPos.y;
-          if (systems.playerController.exitHelicopter) {
-            systems.playerController.exitHelicopter(exitPos);
-          }
+      const pc = systems.playerController;
+      if (pc && typeof pc.isInHelicopter === 'function' && pc.isInHelicopter()) {
+        const pos = pc.getPosition ? pc.getPosition() : null;
+        if (pos && pos.clone) {
+          const exit = pos.clone();
+          const h = systems.terrainSystem && systems.terrainSystem.getHeightAt
+            ? systems.terrainSystem.getHeightAt(exit.x, exit.z) : undefined;
+          exit.y = Number.isFinite(h) ? Number(h) + 2 : exit.y;
+          if (pc.exitHelicopter) pc.exitHelicopter(exit);
         }
       }
 
       compressFrontline(systems);
 
-      const playerPos = systems.playerController && systems.playerController.getPosition
-        ? systems.playerController.getPosition()
-        : null;
-      const camera = systems.playerController && systems.playerController.getCamera
-        ? systems.playerController.getCamera()
-        : null;
-      if (!playerPos || !camera) return;
-      sustainAmmo(systems, false);
-      syncCameraPosition(camera, systems.playerController.cameraController, playerPos);
-      groundPlayerIfNeeded(systems, playerPos);
+      const playerPos = getPlayerPos(systems);
+      if (!playerPos) return;
+      const velocity = getPlayerVelocity(systems);
+      const angles = getCameraAngles(systems);
+      const magazine = getMagazine(systems);
 
-      const enemySpawn = getEnemySpawn(systems);
-      const pressureSpawn = getPressureSpawnPoint(systems);
-      if (!state.frontlineInserted && pressureSpawn && (opts.mode === 'open_frontier' || opts.mode === 'a_shau_valley')) {
-        const nextPos = playerPos.clone ? playerPos.clone() : { x: Number(playerPos.x), y: Number(playerPos.y || 0), z: Number(playerPos.z) };
-        nextPos.x = pressureSpawn.x;
-        nextPos.z = pressureSpawn.z;
-        const height = systems.terrainSystem && systems.terrainSystem.getHeightAt
-          ? systems.terrainSystem.getHeightAt(nextPos.x, nextPos.z)
-          : undefined;
-        if (Number.isFinite(height)) nextPos.y = Number(height) + 2;
-        if (setHarnessPlayerPosition(systems, nextPos, 'harness.recovery.frontline_start')) {
-          state.frontlineInserted = true;
+      // dt for histogram + state timer.
+      const now = Date.now();
+      const dtMs = state.lastTickMs > 0 ? Math.max(0, now - state.lastTickMs) : 0;
+      state.lastTickMs = now;
+      state.timeInStateMs += dtMs;
+      pushHistogram(state.botState, dtMs);
+
+      // Build the bot context. Primitives are closures capturing `systems` so
+      // the state machine sees a stable, engine-agnostic surface.
+      const findEnemyClosure = () => findNearestEnemy(systems, playerPos);
+      const losClosure = (pos) => canSeeTarget(systems, playerPos, pos);
+      const pathClosure = (from, to) => queryPath(systems, from, to);
+      const snapClosure = (p) => findNearestNavmeshPoint(systems, p);
+      const sampleClosure = (x, z) => sampleHeight(systems, x, z);
+      const objectiveClosure = () => getObjective(systems, playerPos);
+
+      // Update the locked target using object-permanence logic (4s stale window).
+      state.currentTarget = updateLockedTarget(state.currentTarget, findEnemyClosure(), now);
+
+      const ctx = {
+        now,
+        state: state.botState,
+        timeInStateMs: state.timeInStateMs,
+        eyePos: {
+          x: playerPos.x,
+          y: playerPos.y + PLAYER_EYE_HEIGHT,
+          z: playerPos.z,
+        },
+        velocity: velocity,
+        yaw: angles.yaw,
+        pitch: angles.pitch,
+        health: health.cur,
+        maxHealth: health.max,
+        suppressionScore: 0, // not surfaced from the engine today; bot treats as 0
+        lastDamageMs: state.lastDamageMs,
+        magazine: magazine,
+        currentTarget: state.currentTarget,
+        findNearestEnemy: findEnemyClosure,
+        canSeeTarget: losClosure,
+        queryPath: pathClosure,
+        findNearestNavmeshPoint: snapClosure,
+        getObjective: objectiveClosure,
+        sampleHeight: sampleClosure,
+        config: botConfig,
+      };
+
+      const step = stepBotState(state.botState, ctx);
+      if (step.nextState && step.nextState !== state.botState) {
+        transitionBot(step.nextState);
+      } else if (step.resetTimeInState) {
+        state.timeInStateMs = 0;
+      }
+
+      // ── Path overlay — when ADVANCE or PATROL, try to follow a navmesh waypoint
+      // so the bot doesn't walk through hills. Active only if the current state
+      // wants forward motion and we have a usable anchor.
+      let overlayYaw = null;
+      const wantsMove = step.intent.moveForward > 0.1;
+      if (wantsMove && (state.botState === 'ADVANCE' || state.botState === 'PATROL' || state.botState === 'ALERT')) {
+        const anchor = state.currentTarget ? state.currentTarget.position
+          : (objectiveClosure() ? objectiveClosure().position : null);
+        if (anchor) {
+          updateWaypoints(systems, playerPos, anchor);
+          overlayYaw = overlayPathYaw(playerPos);
+        }
+      }
+
+      // Apply the intent via the PlayerController surface. Intent → controls.
+      applyIntent(systems, step.intent, angles, overlayYaw);
+
+      // Telemetry hooks for capture-side validators.
+      if (step.intent.firePrimary) state.shotsFired++;
+      if (step.intent.reload) state.reloadsIssued++;
+
+      // Stuck detection — track horizontal displacement. The old driver had a
+      // fancy teleport-recovery loop; with the bot consuming navmesh paths,
+      // stuck-ness usually means "terrain not loaded yet", so we only record
+      // the maximum for telemetry and let the autorespawn handle extreme cases.
+      if (!state.lastStablePos) {
+        state.lastStablePos = { x: playerPos.x, z: playerPos.z };
+        state.stuckMs = 0;
+      } else {
+        const moved = Math.hypot(playerPos.x - state.lastStablePos.x, playerPos.z - state.lastStablePos.z);
+        if (moved < 0.4) {
+          state.stuckMs += dtMs;
+        } else {
           state.stuckMs = 0;
-          return;
+          state.lastStablePos.x = playerPos.x;
+          state.lastStablePos.z = playerPos.z;
         }
       }
-      const engagementCenter = getEngagementCenter(systems) || enemySpawn;
-      if (pressureSpawn) {
-        const distToPressure = Math.hypot(pressureSpawn.x - playerPos.x, pressureSpawn.z - playerPos.z);
-        if (distToPressure > 260 && opts.allowWarpRecovery) {
-          if (!isTerrainReadyAt(systems, pressureSpawn.x, pressureSpawn.z)) {
-            // Skip pressure warp until terrain around target is resident.
-            // Keeps harness movement from dropping player through not-yet-loaded ground.
-            return;
-          }
-          const insertPos = playerPos.clone();
-          insertPos.x = pressureSpawn.x;
-          insertPos.z = pressureSpawn.z;
-          const h = systems.terrainSystem && systems.terrainSystem.getHeightAt
-            ? systems.terrainSystem.getHeightAt(insertPos.x, insertPos.z)
-            : undefined;
-          if (Number.isFinite(h)) insertPos.y = Number(h) + 2;
-          if (setHarnessPlayerPosition(systems, insertPos, 'harness.recovery.pressure')) {
-            return;
-          }
-        }
-      }
-      // Target selection — aggressive mode runs utility-AI target lock with 30%
-      // hysteresis. ai_sandbox/zone_control/team_deathmatch keep the existing
-      // nearest-each-tick selector that combat120 depends on.
-      const nearestOpfor = modeProfile.aggressiveMode
-        ? selectLockedTarget(systems, playerPos)
-        : findNearestOpfor(systems, perceptionRange * perceptionRange);
-      const nearestDist = nearestOpfor
-        ? Math.hypot(nearestOpfor.position.x - playerPos.x, nearestOpfor.position.z - playerPos.z)
-        : Number.POSITIVE_INFINITY;
-      const predictedTarget = nearestOpfor ? predictTargetPoint(nearestOpfor, playerPos) : null;
-      const target = predictedTarget || nearestOpfor?.position || getModeObjective(systems, playerPos) || engagementCenter;
-      state.targetVisible = false;
+      if (state.stuckMs > state.maxStuckMs) state.maxStuckMs = state.stuckMs;
+    }
 
-      if (target) {
-        const cameraController = systems.playerController ? systems.playerController.cameraController : null;
+    function updateLockedTarget(current, fresh, now) {
+      const staleMs = 4000;
+      if (!current) return fresh;
+      if (fresh && fresh.id === current.id) return fresh;
+      if ((now - current.lastKnownMs) > staleMs) return fresh;
+      return fresh || current;
+    }
 
-        if (modeProfile.aggressiveMode) {
-          // Snap-aim path. The NSRL paper (arxiv:2410.04936) kept shooting
-          // rule-based "to ensure controllability"; step-clamping here produced
-          // 0 shots on open_frontier because the 14-tick rotation to turn 90
-          // deg always lost to the ~200ms decision cadence. This is measurement
-          // infrastructure — it aims optimally.
-          const vel = nearestOpfor && nearestOpfor.velocity;
-          const vx = vel && Number.isFinite(Number(vel.x)) ? Number(vel.x) : 0;
-          const vz = vel && Number.isFinite(Number(vel.z)) ? Number(vel.z) : 0;
-          const targetX = Number(target.x || 0);
-          const targetZ = Number(target.z || 0);
-          const targetYCenter = Number(target.y || 0) + TARGET_CHEST_HEIGHT;
-          const horizontalDist = Math.hypot(targetX - playerPos.x, targetZ - playerPos.z);
-          const tFlight = horizontalDist / DEFAULT_BULLET_SPEED;
-          const aimX = targetX + vx * tFlight;
-          const aimZ = targetZ + vz * tFlight;
-          // Use Three.js lookAt for the yaw/pitch conversion (keeps the
-          // rotation convention consistent with the fire-loop aim), but SNAP
-          // the result — no step clamp.
-          camera.lookAt(aimX, targetYCenter, aimZ);
-          syncCameraAim(camera, cameraController, Number(camera.rotation.y || 0), Number(camera.rotation.x || 0));
-        } else {
-          const prevYaw = cameraController ? Number(cameraController.yaw || 0) : Number(camera.rotation.y || 0);
-          const prevPitch = cameraController ? Number(cameraController.pitch || 0) : Number(camera.rotation.x || 0);
+    function applyIntent(systems, intent, currentAngles, overlayYaw) {
+      const pc = systems && systems.playerController;
+      if (!pc) return;
 
-          const targetHorizontalDist = Math.hypot(
-            Number((target.x || 0) - playerPos.x),
-            Number((target.z || 0) - playerPos.z)
-          );
-          const aimY = clampAimY(playerPos.y, (target.y || 0) + 1.2, targetHorizontalDist);
-          camera.lookAt(target.x, aimY, target.z);
-          const desiredYaw = Number(camera.rotation.y || 0);
-          const desiredPitch = Number(camera.rotation.x || 0);
-          let yawDelta = desiredYaw - prevYaw;
-          while (yawDelta > Math.PI) yawDelta -= Math.PI * 2;
-          while (yawDelta < -Math.PI) yawDelta += Math.PI * 2;
-          const pitchDelta = desiredPitch - prevPitch;
-
-          const distToTarget = Math.hypot(
-            Number((target.x || 0) - playerPos.x),
-            Number((target.z || 0) - playerPos.z)
-          );
-          const dynamicYawStep = Math.min(0.14, MAX_YAW_STEP + (distToTarget < 85 ? 0.03 : 0));
-          const dynamicPitchStep = Math.min(0.1, MAX_PITCH_STEP + (distToTarget < 85 ? 0.02 : 0));
-          const nextYaw = prevYaw + Math.max(-dynamicYawStep, Math.min(dynamicYawStep, yawDelta));
-          const nextPitch = prevPitch + Math.max(-dynamicPitchStep, Math.min(dynamicPitchStep, pitchDelta));
-
-          syncCameraAim(camera, cameraController, nextYaw, nextPitch);
-        }
-
-        if (nearestOpfor) {
-          const probeShotRay = getPlayerShotRay(systems, camera);
-          state.targetVisible = canLandPlayerShot(systems, probeShotRay);
-        }
+      // Movement intent.
+      const forward = clampAxis(intent.moveForward);
+      const strafe = clampAxis(intent.moveStrafe);
+      const sprint = !!intent.sprint && forward > 0.1;
+      if (typeof pc.applyMovementIntent === 'function') {
+        pc.applyMovementIntent({ forward, strafe, sprint });
       }
 
-      // Combat FSM — observable state for logs/tests. No RETREAT / COVER:
-      // the killbot is fearless per brief directive.
-      if (modeProfile.aggressiveMode) {
-        if (!nearestOpfor) {
-          state.combatState = 'SCAN';
-        } else if (!state.targetLock.combatantId || state.targetLock.combatantId !== nearestOpfor.id) {
-          state.combatState = 'LOCK';
-        } else if (state.targetVisible) {
-          state.combatState = 'ENGAGE';
-        } else {
-          state.combatState = 'APPROACH';
-        }
+      // Aim. Use overlay yaw when active (navmesh path trumps straight-line yaw
+      // so the bot follows the path instead of walking into terrain), but keep
+      // the intent's pitch so the bot still aims up/down at the target.
+      const targetYaw = overlayYaw != null ? overlayYaw : intent.aimYaw;
+      if (!state.viewSeeded) {
+        state.lastYaw = currentAngles.yaw;
+        state.lastPitch = currentAngles.pitch;
+        state.viewSeeded = true;
       }
-
-      const captureFocus = getCaptureFocus(systems, playerPos);
-      const shouldBiasCombat = opts.mode === 'open_frontier'
-        && (state.capturedZoneCount > 0 || (Date.now() - state.lastShotAt) > 25000);
-      const combatTarget = getEnemyMassPoint(systems) || getLeadChargePoint(systems) || engagementCenter;
-      const objectiveTarget = shouldBiasCombat
-        ? (combatTarget || captureFocus?.target || getModeObjective(systems, playerPos) || engagementCenter)
-        : (captureFocus?.target || getModeObjective(systems, playerPos) || engagementCenter);
-      const nearestPredicted = nearestOpfor ? predictTargetPoint(nearestOpfor, playerPos) : null;
-      const predictedLockDistance = Math.max(95, Number(modeProfile.maxFireDistance || 0));
-      const movementTarget = (nearestPredicted && nearestDist < predictedLockDistance) ? nearestPredicted : objectiveTarget;
-
-      const nowMs = Date.now();
-      const noContactTooLong = (nowMs - state.lastShotAt) > FORCE_CONTACT_REINSERT_MS;
-      const farFromFight = !nearestOpfor
-        || nearestDist > Math.max(200, Number(modeProfile.maxFireDistance || 0) + 10)
-        || !state.targetVisible;
-      const maxForcedContactInserts = opts.mode === 'open_frontier' ? 1 : 2;
-      if (
-        farFromFight
-        && noContactTooLong
-        && state.forcedContactInsertCount < maxForcedContactInserts
-        && (nowMs - lastForcedContactInsertAt) > FORCE_CONTACT_REINSERT_COOLDOWN_MS
-      ) {
-        const insertAnchor = getEnemyMassPoint(systems) || getLeadChargePoint(systems) || engagementCenter || movementTarget;
-        if (insertAnchor && systems.playerController && systems.playerController.setPosition) {
-          const nextPos = playerPos.clone ? playerPos.clone() : { x: Number(playerPos.x), y: Number(playerPos.y || 0), z: Number(playerPos.z) };
-          const lateral = (Math.random() - 0.5) * 70;
-          const forward = 35 + Math.random() * 35;
-          nextPos.x = Number(insertAnchor.x) + forward;
-          nextPos.z = Number(insertAnchor.z) + lateral;
-          if (!isTerrainReadyAt(systems, nextPos.x, nextPos.z)) {
-            return;
-          }
-          const h = systems.terrainSystem && systems.terrainSystem.getHeightAt
-            ? systems.terrainSystem.getHeightAt(nextPos.x, nextPos.z)
-            : undefined;
-          if (Number.isFinite(h)) nextPos.y = Number(h) + 2;
-          if (setHarnessPlayerPosition(systems, nextPos, 'harness.recovery.contact_insert')) {
-            lastForcedContactInsertAt = nowMs;
-            state.forcedContactInsertCount++;
-            state.stuckMs = 0;
-            return;
-          }
-        }
+      const yawNext = lerpAngle(state.lastYaw, targetYaw, intent.aimLerpRate);
+      const pitchNext = clampPitch(intent.aimPitch);
+      if (typeof pc.setViewAngles === 'function') {
+        pc.setViewAngles(yawNext, pitchNext);
       }
+      state.lastYaw = yawNext;
+      state.lastPitch = pitchNext;
 
-      if (movementTarget) {
-        // Layer 1 — navmesh waypoint routing. Throttle covers both success and
-        // failure paths (failed queryPath still updates lastWaypointReplanAt so the
-        // 250ms heartbeat doesn't hammer the query). Path-exhausted case retries
-        // sooner (750ms) so waypoint advancement stays snappy.
-        const waypointAnchor = engagementCenter || objectiveTarget || movementTarget;
-        const replanIntervalMs = Number(modeProfile.waypointReplanIntervalMs || 5000);
-        const sinceReplanMs = Date.now() - state.lastWaypointReplanAt;
-        const pathExhausted =
-          !state.waypoints
-          || state.waypoints.length === 0
-          || state.waypointIdx >= state.waypoints.length;
-        const needsReplan =
-          sinceReplanMs > replanIntervalMs
-          || (pathExhausted && sinceReplanMs > 750);
-        if (waypointAnchor && needsReplan) {
-          const path = planWaypoints(systems, playerPos, waypointAnchor);
-          state.lastWaypointReplanAt = Date.now();
-          if (path && path.length > 0) {
-            state.waypoints = path;
-            state.waypointIdx = 0;
-            state.waypointTarget = {
-              x: Number(waypointAnchor.x || 0),
-              y: Number(waypointAnchor.y || 0),
-              z: Number(waypointAnchor.z || 0)
-            };
-          } else {
-            state.waypointReplanFailures++;
-            // Cascade to Layer 2 / direct target steering until the next replan window.
-            state.waypoints = null;
-          }
+      // Fire / reload.
+      if (intent.reload) {
+        if (state.firingHeld) {
+          if (typeof pc.fireStop === 'function') pc.fireStop();
+          state.firingHeld = false;
         }
-
-        // Advance waypoint index when within 4m; force a replan once path is done.
-        if (state.waypoints && state.waypoints.length > 0) {
-          while (state.waypointIdx < state.waypoints.length) {
-            const wp = state.waypoints[state.waypointIdx];
-            const wpDx = Number(wp.x || 0) - Number(playerPos.x || 0);
-            const wpDz = Number(wp.z || 0) - Number(playerPos.z || 0);
-            if (Math.hypot(wpDx, wpDz) > 4) break;
-            state.waypointIdx++;
-          }
-          if (state.waypointIdx >= state.waypoints.length) state.lastWaypointReplanAt = 0;
+        if (typeof pc.reloadWeapon === 'function') pc.reloadWeapon();
+      } else if (intent.firePrimary) {
+        // LOS gate — one final engine check. The bot's LOS already passed,
+        // but we guard against one-tick races where the target moved.
+        if (!state.firingHeld) {
+          if (typeof pc.fireStart === 'function') pc.fireStart();
+          state.firingHeld = true;
+          state.lastShotAt = Date.now();
         }
-
-        // Steering target. Aggressive modes use regulated pure-pursuit — pick a
-        // lookahead point along the planned path at adaptive distance (5-20m,
-        // shape per arxiv:2111.08873). Other modes keep the next-waypoint
-        // steering that combat120 relies on.
-        let steeringTarget = movementTarget;
-        if (state.waypoints && state.waypoints.length > 0 && state.waypointIdx < state.waypoints.length) {
-          if (modeProfile.aggressiveMode) {
-            const vel = systems.playerController && systems.playerController.getVelocity
-              ? systems.playerController.getVelocity()
-              : null;
-            const playerSpeed = vel ? Math.hypot(Number(vel.x || 0), Number(vel.z || 0)) : 0;
-            const lookaheadDist = computeAdaptiveLookahead(playerSpeed);
-            const lookaheadPt = pointAlongPath(state.waypoints, state.waypointIdx, { x: playerPos.x, z: playerPos.z }, lookaheadDist);
-            if (lookaheadPt) {
-              steeringTarget = lookaheadPt;
-            } else {
-              steeringTarget = state.waypoints[state.waypointIdx];
-            }
-          } else {
-            steeringTarget = state.waypoints[state.waypointIdx];
-          }
-          state.waypointsFollowedCount++;
-        }
-
-        const dx = steeringTarget.x - playerPos.x;
-        const dz = steeringTarget.z - playerPos.z;
-        const dist = Math.hypot(dx, dz);
-        // Distance to the final movement target (not waypoint) for the downstream
-        // movement-state policy; keeps sprint/advance distance semantics intact.
-        const finalDx = movementTarget.x - playerPos.x;
-        const finalDz = movementTarget.z - playerPos.z;
-        const finalDist = Math.hypot(finalDx, finalDz);
-        if (!state.lastStablePos) {
-          state.lastStablePos = { x: Number(playerPos.x), z: Number(playerPos.z) };
-          state.stuckMs = 0;
-        } else {
-          const moved = Math.hypot(Number(playerPos.x) - state.lastStablePos.x, Number(playerPos.z) - state.lastStablePos.z);
-          if (moved < 0.4) {
-            state.stuckMs += 250;
-          } else {
-            state.stuckMs = 0;
-            state.lastStablePos.x = Number(playerPos.x);
-            state.lastStablePos.z = Number(playerPos.z);
-          }
-        }
-        if (state.stuckMs > state.maxStuckMs) state.maxStuckMs = state.stuckMs;
-
-        // Layer 3 — stuck detection. 3s triggers retreat-strafe; mode-specific
-        // stuckTimeoutSec escalates to teleport (reason: harness.recovery.stuck).
-        const stuckTimeoutMs = Math.max(1000, Number(modeProfile.stuckTimeoutSec || 5) * 1000);
-        if (state.stuckMs > 3000 && !state.stuckRecoveryMode) {
-          state.stuckRecoveryMode = true;
-          state.stuckRecoveryUntil = Date.now() + 2000;
-          setMovementState('retreat', { force: true });
-        }
-        if (state.stuckRecoveryMode && Date.now() < state.stuckRecoveryUntil) {
-          // Alternate strafes during recovery
-          if (Math.random() < 0.3) {
-            setMovementPattern(Math.random() < 0.5 ? ['KeyS', 'KeyA'] : ['KeyS', 'KeyD']);
-          }
-          return;
-        }
-        if (state.stuckRecoveryMode && Date.now() >= state.stuckRecoveryUntil) {
-          state.stuckRecoveryMode = false;
-        }
-
-        if (state.stuckMs > stuckTimeoutMs) {
-          // Prefer hop to next waypoint (keeps planned route); else teleport near
-          // the engagement anchor.
-          let teleportTarget = null;
-          if (
-            state.waypoints
-            && state.waypoints.length > 0
-            && state.waypointIdx + 1 < state.waypoints.length
-          ) {
-            teleportTarget = state.waypoints[state.waypointIdx + 1];
-          }
-          if (!teleportTarget) {
-            const anchor = engagementCenter || movementTarget;
-            if (anchor) {
-              const offsetAngle = Math.random() * Math.PI * 2;
-              const offsetRadius = 80 + Math.random() * 45;
-              teleportTarget = {
-                x: anchor.x + Math.cos(offsetAngle) * offsetRadius,
-                y: anchor.y || 0,
-                z: anchor.z + Math.sin(offsetAngle) * offsetRadius
-              };
-            }
-          }
-          if (teleportTarget) {
-            if (!isTerrainReadyAt(systems, teleportTarget.x, teleportTarget.z)) return;
-            const nextPos = playerPos.clone();
-            nextPos.x = Number(teleportTarget.x);
-            nextPos.z = Number(teleportTarget.z);
-            const height = systems.terrainSystem && systems.terrainSystem.getHeightAt
-              ? systems.terrainSystem.getHeightAt(nextPos.x, nextPos.z)
-              : undefined;
-            if (Number.isFinite(height)) nextPos.y = Number(height) + 2;
-            if (setHarnessPlayerPosition(systems, nextPos, 'harness.recovery.stuck')) {
-              state.stuckMs = 0;
-              state.stuckRecoveryMode = false;
-              state.stuckTeleportCount++;
-              state.waypoints = null;
-              state.lastWaypointReplanAt = 0;
-              return;
-            }
-          }
-        }
-
-        const now = Date.now();
-        const shouldStayOnCapturePoint = !(
-          opts.mode === 'open_frontier'
-          && !state.hasFired
-          && (!nearestOpfor || nearestDist > 140)
-        );
-        if (captureFocus && captureFocus.hold && captureFocus.inside && shouldStayOnCapturePoint) {
-          setMovementState('hold', { force: true });
-          return;
-        }
-
-        if (now < state.firingUntil && state.targetVisible) {
-          setMovementState('hold', { force: true });
-          return;
-        }
-        if (now - state.lastMovementDecisionAt >= modeProfile.decisionIntervalMs) {
-          state.lastMovementDecisionAt = now;
-
-          // Path-trust invariant — when a navmesh path is fresh (< PATH_TRUST_TTL_MS)
-          // and has at least two waypoints, the steering target already reflects
-          // the pure-pursuit lookahead along a navmesh-validated route. Skip the
-          // gradient probe in that case: the probe is a local obstacle avoidance
-          // behavior (Reynolds 1999) and must never override the macro path
-          // (NSRL rule-core invariant, arxiv:2410.04936).
-          const cameraController = systems.playerController ? systems.playerController.cameraController : null;
-          const cameraYaw = cameraController
-            ? Number(cameraController.yaw || 0)
-            : Number(camera.rotation.y || 0);
-          const pathAgeMs = now - Number(state.lastWaypointReplanAt || 0);
-          const pathTrusted =
-            !!state.waypoints
-            && state.waypoints.length >= 2
-            && state.waypointIdx < state.waypoints.length
-            && pathAgeMs < PATH_TRUST_TTL_MS;
-
-          // Layer 2 — gradient probe (fallback). Deflected headings translate
-          // to WASD keys RELATIVE to the camera forward so the camera stays
-          // aimed at the target (fire loop can still land shots) while the
-          // player strafes around.
-          const heading = pathTrusted
-            ? null
-            : chooseTerrainHeading(systems, playerPos, steeringTarget, PLAYER_MAX_CLIMB_GRADIENT);
-          if (heading && heading.deflected) {
-            state.gradientProbeDeflections++;
-            // Bucket |rel angle| into 5 WASD patterns (W/W+strafe/strafe/S+strafe/S).
-            let rel = heading.yaw - cameraYaw;
-            while (rel > Math.PI) rel -= Math.PI * 2;
-            while (rel < -Math.PI) rel += Math.PI * 2;
-            const absRel = Math.abs(rel);
-            const side = rel >= 0 ? 'KeyD' : 'KeyA';
-            const DEG_30 = Math.PI / 6;
-            const DEG_60 = Math.PI / 3;
-            const DEG_120 = 2 * Math.PI / 3;
-            const DEG_150 = 5 * Math.PI / 6;
-            let pattern;
-            if (absRel < DEG_30) pattern = ['KeyW'];
-            else if (absRel < DEG_60) pattern = ['KeyW', side];
-            else if (absRel < DEG_120) pattern = [side];
-            else if (absRel < DEG_150) pattern = ['KeyS', side];
-            else pattern = ['KeyS'];
-            setMovementPattern(pattern);
-            state.movementTransitions++;
-            return;
-          } else if (!heading && !pathTrusted) {
-            // No candidate passes the gradient gate AND we have no trusted path
-            // to fall back on. Last-resort 8-way slope probe (the existing
-            // behaviour) picks ANY direction under the hard slope cap; if that
-            // fails, retreat and let Layer 3 teleport.
-            const currentYawDeg = cameraYaw * 180 / Math.PI;
-            const forwardSlope = probeTerrainSlope(systems, playerPos, currentYawDeg, 8);
-            if (forwardSlope > 35) {
-              const clearDir = findClearDirection(systems, playerPos, currentYawDeg);
-              if (clearDir !== null && clearDir !== currentYawDeg) {
-                // Hard-stuck fallback: rotate camera. Not the normal Layer 2 path.
-                const clearRad = clearDir * Math.PI / 180;
-                syncCameraAim(camera, cameraController, clearRad, Number(cameraController ? cameraController.pitch || 0 : camera.rotation.x || 0));
-                setMovementState('advance');
-                return;
-              }
-              setMovementState('retreat', { force: true });
-              return;
-            }
-          }
-
-          const noNearbyEnemy = !nearestOpfor || nearestDist > (opts.mode === 'open_frontier' ? 140 : 95);
-          if (captureFocus && !captureFocus.inside && noNearbyEnemy) {
-            setMovementState('sprint');
-            return;
-          }
-          if (captureFocus && !captureFocus.inside) {
-            setMovementState(finalDist > modeProfile.sprintDistance ? 'sprint' : 'advance');
-            return;
-          }
-          if (!state.targetVisible && finalDist > 60) {
-            setMovementState(finalDist > modeProfile.sprintDistance ? 'sprint' : 'advance');
-            return;
-          }
-          // Coherent movement policy: fewer abrupt transitions, mode-aware ranges.
-          if (finalDist > modeProfile.sprintDistance) {
-            setMovementState('sprint');
-          } else if (finalDist > modeProfile.approachDistance) {
-            setMovementState('advance');
-          } else if (finalDist < modeProfile.retreatDistance && state.targetVisible) {
-            setMovementState('retreat');
-          } else if (state.targetVisible && finalDist < 70 && Math.random() < modeProfile.holdChanceWhenVisible) {
-            setMovementState('hold');
-          } else if (modeProfile.preferredJuke === 'push' && Math.random() < 0.3) {
-            setMovementState('advance');
-          } else {
-            setMovementState('strafe');
-          }
-        }
-        // Silence unused-var linter: `dist` is kept for telemetry/debug but the
-        // primary distance used downstream is finalDist.
-        void dist;
+      } else if (state.firingHeld) {
+        if (typeof pc.fireStop === 'function') pc.fireStop();
+        state.firingHeld = false;
       }
     }
 
+    function clampAxis(x) {
+      if (!Number.isFinite(x)) return 0;
+      return Math.max(-1, Math.min(1, x));
+    }
+
+    function clampPitch(p) {
+      if (!Number.isFinite(p)) return 0;
+      return Math.max(-AIM_PITCH_LIMIT_RAD, Math.min(AIM_PITCH_LIMIT_RAD, p));
+    }
+
+    function lerpAngle(from, to, t) {
+      let delta = to - from;
+      while (delta > Math.PI) delta -= Math.PI * 2;
+      while (delta < -Math.PI) delta += Math.PI * 2;
+      const c = Math.max(0, Math.min(1, t));
+      let out = from + delta * c;
+      while (out > Math.PI) out -= Math.PI * 2;
+      while (out < -Math.PI) out += Math.PI * 2;
+      return out;
+    }
+
+    // ── Public surface ──
+
+    function start() {
+      state.heartbeatTimer = setInterval(tick, profile.decisionIntervalMs);
+      tick();
+    }
+
     function stop() {
-      releaseAllKeys();
-      mouseUp();
-      if (state.fireTimer) clearInterval(state.fireTimer);
-      if (state.heartbeatTimer) clearInterval(state.heartbeatTimer);
+      if (state.heartbeatTimer) { clearInterval(state.heartbeatTimer); state.heartbeatTimer = null; }
+      const systems = getSystems();
+      releaseAllControls(systems);
       return {
         respawnCount: state.respawnCount,
         ammoRefillCount: state.ammoRefillCount,
@@ -2112,311 +1343,58 @@
         frontlineCompressed: state.frontlineCompressed,
         frontlineDistance: state.frontlineDistance,
         frontlineMoveCount: state.frontlineMoveCount,
-        capturedZoneCount: state.capturedZoneCount,
-        movementTransitions: state.movementTransitions,
-        // perf-harness-redesign surfaces — read by capture-side per-mode validators.
+        capturedZoneCount: 0,
+        movementTransitions: state.transitions,
         losRejectedShots: state.losRejectedShots,
         stuckTeleportCount: state.stuckTeleportCount,
         maxStuckSeconds: Math.max(0, Math.round(state.maxStuckMs / 100) / 10),
-        gradientProbeDeflections: state.gradientProbeDeflections,
-        waypointsFollowedCount: state.waypointsFollowedCount,
+        gradientProbeDeflections: 0,
+        waypointsFollowedCount: state.waypointsFollowed,
         waypointReplanFailures: state.waypointReplanFailures,
-        // perf-harness-killbot surfaces — aggressive-mode lock + pitch-gate telemetry.
-        lockSwitches: state.lockSwitches,
-        firePitchSafetyGates: state.firePitchSafetyGates,
-        combatState: state.combatState
+        lockSwitches: 0,
+        firePitchSafetyGates: 0,
+        combatState: state.botState,
+        shotsFired: state.shotsFired,
+        reloadsIssued: state.reloadsIssued,
+        stateHistogramMs: Object.assign({}, state.stateHistogram),
       };
-    }
-
-    function updateFireProbe(data) {
-      state.lastFireProbe = Object.assign({
-        at: Date.now(),
-        reason: 'unknown',
-        shotsFired: false
-      }, data || {});
     }
 
     function getDebugSnapshot() {
       return {
         mode: opts.mode,
-        terrainProfile: String(modeProfile.terrainProfile || ''),
-        maxGradient: PLAYER_MAX_CLIMB_GRADIENT,
-        maxClimbAngleRad: PLAYER_MAX_CLIMB_ANGLE_RAD,
-        pathTrustTtlMs: PATH_TRUST_TTL_MS,
-        stuckTimeoutSec: Number(modeProfile.stuckTimeoutSec || 0),
-        losRejectedShots: state.losRejectedShots,
-        stuckTeleportCount: state.stuckTeleportCount,
-        maxStuckSeconds: Math.max(0, Math.round(state.maxStuckMs / 100) / 10),
-        gradientProbeDeflections: state.gradientProbeDeflections,
-        waypointsFollowedCount: state.waypointsFollowedCount,
+        botState: state.botState,
+        timeInStateMs: state.timeInStateMs,
+        currentTarget: state.currentTarget ? String(state.currentTarget.id) : null,
+        shotsFired: state.shotsFired,
+        reloadsIssued: state.reloadsIssued,
+        waypointsFollowedCount: state.waypointsFollowed,
         waypointReplanFailures: state.waypointReplanFailures,
         waypointCount: state.waypoints ? state.waypoints.length : 0,
         waypointIdx: state.waypointIdx,
-        movementState: state.movementState,
-        previousMovementState: state.previousMovementState,
-        movementStateSince: state.movementStateSince,
-        movementTransitions: state.movementTransitions,
-        targetVisible: state.targetVisible,
-        lastRepositionAt: state.lastRepositionAt,
+        movementTransitions: state.transitions,
+        lastStateChangeAt: state.lastStateChangeAt,
         lastShotAt: state.lastShotAt,
         respawnCount: state.respawnCount,
         ammoRefillCount: state.ammoRefillCount,
         healthTopUpCount: state.healthTopUpCount,
-        lastFireProbe: state.lastFireProbe
+        maxStuckSeconds: Math.max(0, Math.round(state.maxStuckMs / 100) / 10),
+        stateHistogramMs: Object.assign({}, state.stateHistogram),
+        pathTrustTtlMs: PATH_TRUST_TTL_MS,
+        maxGradient: PLAYER_MAX_CLIMB_GRADIENT,
       };
     }
 
-    setMovementState('sprint');
-
-    state.fireTimer = setInterval(function () {
-      const systems = getSystems();
-      const health = systems && systems.playerHealthSystem;
-      if (health && health.isDead && health.isDead()) return;
-      const playerPos = systems && systems.playerController && systems.playerController.getPosition
-        ? systems.playerController.getPosition()
-        : null;
-      const camera = systems && systems.playerController && systems.playerController.getCamera
-        ? systems.playerController.getCamera()
-        : null;
-      // Aggressive modes resolve the fire target through the same utility lock
-      // as the aim loop, so fire and aim stay on the same combatant. Other
-      // modes keep nearest-each-tick (combat120 depends on this behavior).
-      const nearestOpfor = playerPos && modeProfile.aggressiveMode
-        ? selectLockedTarget(systems, playerPos)
-        : findNearestOpfor(systems, perceptionRange * perceptionRange);
-      if (!playerPos || !camera || !nearestOpfor) {
-        updateFireProbe({
-          reason: !playerPos || !camera ? 'missing_player_or_camera' : 'missing_target',
-          hasPlayer: !!playerPos,
-          hasCamera: !!camera,
-          hasTarget: !!nearestOpfor
-        });
-        return;
-      }
-      const sinceRepositionMs = Date.now() - state.lastRepositionAt;
-      if (sinceRepositionMs < 450) {
-        updateFireProbe({
-          reason: 'reposition_cooldown',
-          sinceRepositionMs: sinceRepositionMs,
-          targetDistance: Math.hypot(
-            nearestOpfor.position.x - playerPos.x,
-            nearestOpfor.position.z - playerPos.z
-          )
-        });
-        return;
-      }
-      syncCameraPosition(camera, systems.playerController.cameraController, playerPos);
-
-      const dx = nearestOpfor.position.x - playerPos.x;
-      const dy = (nearestOpfor.position.y || 0) + TARGET_CHEST_HEIGHT - ((playerPos.y || 0) + PLAYER_EYE_HEIGHT);
-      const dz = nearestOpfor.position.z - playerPos.z;
-      const dist = Math.hypot(dx, dy, dz);
-      if (!Number.isFinite(dist) || dist < 0.001) {
-        updateFireProbe({ reason: 'invalid_target_distance', targetDistance: dist });
-        return;
-      }
-      if (dist > Number(modeProfile.maxFireDistance || 0)) {
-        updateFireProbe({
-          reason: 'target_out_of_range',
-          targetDistance: dist,
-          maxFireDistance: Number(modeProfile.maxFireDistance || 0)
-        });
-        return;
-      }
-      // Aggressive modes remove the 120m effective-range cap — per brief:
-      // "A long-range shot that misses is still a 'shot fired' — the validator
-      // cares about signal; the LOS + pitch safety gates prevent the bugs."
-      if (!modeProfile.aggressiveMode && opts.mode === 'open_frontier' && dist > 120) {
-        updateFireProbe({
-          reason: 'target_out_of_effective_range',
-          targetDistance: dist,
-          maxEffectiveFireDistance: 120
-        });
-        return;
-      }
-      const closeRange = dist < (opts.mode === 'open_frontier' ? 95 : 65);
-      const eye = {
-        x: playerPos.x,
-        y: Number(playerPos.y || 0) + PLAYER_EYE_HEIGHT,
-        z: playerPos.z
-      };
-      const targetEye = {
-        x: nearestOpfor.position.x,
-        y: Number(nearestOpfor.position.y || 0) + 1.2,
-        z: nearestOpfor.position.z
-      };
-      // LOS-aware fire gate (aim-path). Probe the eye-to-target ray for terrain
-      // occlusion BEFORE invoking actionFireStart. Counter rises on every rejection
-      // so captures can prove the gate engaged during the run.
-      const blockedRay = hasTerrainOcclusion(systems, eye, targetEye);
-      const blockedHeight = hasHeightProfileOcclusion(systems, eye, targetEye);
-      const visibleNow = !(blockedRay || blockedHeight);
-      state.targetVisible = visibleNow;
-      if (!visibleNow) {
-        state.losRejectedShots++;
-        updateFireProbe({
-          reason: 'target_occluded',
-          targetDistance: dist,
-          blockedRay: blockedRay,
-          blockedHeight: blockedHeight
-        });
-        return;
-      }
-      const tx = dx / dist;
-      const ty = dy / dist;
-      const tz = dz / dist;
-
-      // Pre-shot assist: tighten aim toward center mass just before burst.
-      const cameraController = systems.playerController ? systems.playerController.cameraController : null;
-      const clampedAimY = clampAimY(playerPos.y, (nearestOpfor.position.y || 0) + 1.25, Math.hypot(dx, dz));
-      camera.rotation.order = 'YXZ';
-      camera.lookAt(nearestOpfor.position.x, clampedAimY, nearestOpfor.position.z);
-      syncCameraAim(
-        camera,
-        cameraController,
-        Number(camera.rotation.y || 0),
-        Number(camera.rotation.x || 0)
-      );
-
-      const shotRay = getPlayerShotRay(systems, camera);
-      const shotAnalysis = analyzePlayerShot(systems, shotRay);
-      const cameraDelta = Math.hypot(
-        Number(camera.position.x || 0) - Number(playerPos.x || 0),
-        Number(camera.position.y || 0) - Number(playerPos.y || 0),
-        Number(camera.position.z || 0) - Number(playerPos.z || 0)
-      );
-      const rayOriginDelta = shotRay ? Math.hypot(
-        Number(shotRay.origin.x || 0) - Number(playerPos.x || 0),
-        Number(shotRay.origin.y || 0) - Number(playerPos.y || 0),
-        Number(shotRay.origin.z || 0) - Number(playerPos.z || 0)
-      ) : Number.NaN;
-      const allowSpeculativeFire =
-        opts.mode === 'open_frontier'
-        && visibleNow
-        && shotAnalysis.reason === 'no_combatant_hit'
-        && dist <= 90;
-      if (!shotAnalysis.landable) {
-        if (allowSpeculativeFire) {
-          setMovementState('hold', { force: true });
-        } else {
-        if (shotAnalysis.reason === 'terrain_block' || shotAnalysis.reason === 'height_profile_block') {
-          state.losRejectedShots++;
-        }
-        updateFireProbe({
-          reason: 'shot_blocked',
-          shotBlockReason: shotAnalysis.reason,
-          targetDistance: dist,
-          cameraDelta: cameraDelta,
-          rayOriginDelta: rayOriginDelta,
-          shotOrigin: shotRay ? {
-            x: Number(shotRay.origin.x || 0),
-            y: Number(shotRay.origin.y || 0),
-            z: Number(shotRay.origin.z || 0)
-          } : null,
-          targetId: String(nearestOpfor.id || ''),
-          hit: shotAnalysis.hit ? {
-            combatantId: String(shotAnalysis.hit.combatant && shotAnalysis.hit.combatant.id || ''),
-            distance: Number(shotAnalysis.hit.distance || 0)
-          } : null,
-          terrainHit: shotAnalysis.terrainHit ? {
-            distance: Number(shotAnalysis.terrainHit.distance || 0),
-            hit: !!shotAnalysis.terrainHit.hit
-          } : null
-        });
-        return;
-        }
-      }
-
-      const forward = shotRay ? shotRay.direction : getCameraForward(camera);
-      // Route aim-dot + vertical-angle decision through the pure helper so the
-      // A4-class regression test (scripts/perf-harness/perf-active-driver.test.js)
-      // exercises the same logic the browser does.
-      const fireDecision = evaluateFireDecision({
-        cameraForward: { x: forward.x, y: forward.y, z: forward.z },
-        toTarget: { x: tx, y: ty, z: tz },
-        aimDotThreshold: 0.8,
-        verticalThreshold: 0.45,
-        closeRange: closeRange
-      });
-      const aimDot = fireDecision.aimDot;
-      const verticalComponent = fireDecision.verticalComponent;
-      if (!fireDecision.shouldFire) {
-        updateFireProbe({
-          reason: fireDecision.reason,
-          targetDistance: dist,
-          aimDot: aimDot,
-          verticalComponent: verticalComponent,
-          closeRange: closeRange,
-          cameraDelta: cameraDelta,
-          rayOriginDelta: rayOriginDelta,
-          targetId: String(nearestOpfor.id || '')
-        });
-        return;
-      }
-
-      // Pitch safety gate — never fire sharply downward at range. The driver
-      // previously fired into the ground on open_frontier because the camera
-      // was sampled at the feet (pitch tilted downward). The eye-height fix
-      // addresses the root cause; this is the belt-and-braces guard.
-      const aimPitchRad = Number(camera.rotation.x || 0);
-      const fireGate = evaluateFireGate({
-        aimErrorRad: 0, // already filtered by evaluateFireDecision above
-        maxAimErrorRad: Math.PI, // disable — composite gates already ran
-        losClear: true, // LOS already checked above
-        pitchRad: aimPitchRad,
-        distance: dist,
-        ammoReady: true // ammo sustained by sustainAmmo()
-      });
-      if (!fireGate.fire) {
-        state.firePitchRejections++;
-        if (fireGate.reason === 'fire_pitch_unsafe') state.firePitchSafetyGates++;
-        updateFireProbe({
-          reason: fireGate.reason,
-          targetDistance: dist,
-          pitchRad: aimPitchRad,
-          targetId: String(nearestOpfor.id || '')
-        });
-        return;
-      }
-
-      if (dist < 110) {
-        setMovementState('hold', { force: true });
-      }
-
-      mouseDown();
-      state.lastShotAt = Date.now();
-      state.hasFired = true;
-      updateFireProbe({
-        reason: allowSpeculativeFire ? 'speculative_fire' : 'firing',
-        shotsFired: true,
-        targetDistance: dist,
-        aimDot: aimDot,
-        cameraDelta: cameraDelta,
-        rayOriginDelta: rayOriginDelta,
-        targetId: String(nearestOpfor.id || '')
-      });
-      const holdMs = 260 + Math.floor(Math.random() * 220);
-      state.firingUntil = Date.now() + holdMs + 120;
-      setTimeout(function () {
-        mouseUp();
-      }, holdMs);
-    }, 700);
-
-    state.heartbeatTimer = setInterval(function () {
-      keepPlayerInAction();
-    }, 250);
-
-    keepPlayerInAction();
-
+    start();
     return {
       stop: stop,
       getDebugSnapshot: getDebugSnapshot,
-      movementPatternCount: 3,
+      movementPatternCount: 5, // PATROL/ALERT/ENGAGE/ADVANCE/SEEK_COVER — informative only
       compressFrontline: enableFrontlineCompression,
       mode: opts.mode,
       allowWarpRecovery: opts.allowWarpRecovery,
       topUpHealth: opts.topUpHealth,
-      autoRespawn: opts.autoRespawn
+      autoRespawn: opts.autoRespawn,
     };
   }
 
@@ -2434,33 +1412,27 @@
           mode: String(driver.mode || ''),
           allowWarpRecovery: !!driver.allowWarpRecovery,
           topUpHealth: driver.topUpHealth !== false,
-          autoRespawn: driver.autoRespawn !== false
+          autoRespawn: driver.autoRespawn !== false,
         };
       },
       stop: function () {
-        if (!globalWindow.__perfHarnessDriverState || !globalWindow.__perfHarnessDriverState.stop) {
-          return null;
-        }
+        if (!globalWindow.__perfHarnessDriverState || !globalWindow.__perfHarnessDriverState.stop) return null;
         const stats = globalWindow.__perfHarnessDriverState.stop();
         globalWindow.__perfHarnessDriverState = null;
         return stats;
       },
       getDebugSnapshot: function () {
-        if (!globalWindow.__perfHarnessDriverState || !globalWindow.__perfHarnessDriverState.getDebugSnapshot) {
-          return null;
-        }
+        if (!globalWindow.__perfHarnessDriverState || !globalWindow.__perfHarnessDriverState.getDebugSnapshot) return null;
         return globalWindow.__perfHarnessDriverState.getDebugSnapshot();
-      }
+      },
     };
   }
 
-  // Expose pure helpers for Node-side regression tests (scripts/perf-harness/*).
-  // Browser scripts ignore the module.exports branch.
+  // Expose pure helpers for Node-side regression tests.
   if (typeof module !== 'undefined' && module && module.exports) {
     module.exports = {
       evaluateFireDecision: evaluateFireDecision,
       chooseHeadingByGradient: chooseHeadingByGradient,
-      // perf-harness-killbot exports.
       computeUtilityScore: computeUtilityScore,
       shouldSwitchTarget: shouldSwitchTarget,
       computeAimSolution: computeAimSolution,
@@ -2471,14 +1443,19 @@
       PLAYER_EYE_HEIGHT: PLAYER_EYE_HEIGHT,
       TARGET_CHEST_HEIGHT: TARGET_CHEST_HEIGHT,
       DEFAULT_BULLET_SPEED: DEFAULT_BULLET_SPEED,
-      // perf-harness-verticality-and-sizing exports.
       PLAYER_CLIMB_SLOPE_DOT: PLAYER_CLIMB_SLOPE_DOT,
       PLAYER_MAX_CLIMB_ANGLE_RAD: PLAYER_MAX_CLIMB_ANGLE_RAD,
       PLAYER_MAX_CLIMB_GRADIENT: PLAYER_MAX_CLIMB_GRADIENT,
       PATH_TRUST_TTL_MS: PATH_TRUST_TTL_MS,
       AIM_PITCH_LIMIT_RAD: AIM_PITCH_LIMIT_RAD,
       isPathTrusted: isPathTrusted,
-      clampAimYByPitch: clampAimYByPitch
+      clampAimYByPitch: clampAimYByPitch,
+      // Bot primitives.
+      stepBotState: stepBotState,
+      createIdleBotIntent: createIdleBotIntent,
+      engageStrafeIntent: engageStrafeIntent,
+      profileForMode: profileForMode,
+      botConfigForProfile: botConfigForProfile,
     };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
