@@ -95,7 +95,8 @@ All briefs under `docs/tasks/` with matching slug names.
 - **`npc-fixed-wing-pilot-ai`** — author `NPCFixedWingPilot` (state machine + PD control loops) that emits `FixedWingPilotIntent` against the post-cutover `Airframe`. One NPC aircraft spawns in at least one game mode with a mission (takeoff → waypoint → RTB → landing).
 - **`perf-baseline-refresh`** — recapture `combat120`, `openfrontier:short`, `ashau:short`, `frontier30m` on the redesigned harness after the heap fix. Rewrite `perf-baselines.json` with realistic thresholds; stale p99=100ms → measured ~30ms. *(Round 3 attempt 2026-04-19 stopped at hard stop #1 on openfrontier — `waypointsFollowed=0 / waypointReplanFailures=202`, p99 = 63ms > 60ms validator floor. Root cause: `NavmeshSystem.queryPath` returns null on every driver re-plan on open_frontier. Spawned Round 4 `perf-openfrontier-navmesh-fix`.)*
 - **`perf-openfrontier-navmesh-fix`** — ABANDONED pre-merge (2026-04-19). Dispatched as Round 4, killed mid-investigation after live playtest revealed the deeper issue: even with a working navmesh query the driver doesn't simulate gameplay (no states, no objectives, shoots through terrain because it reinvents LOS). Brief retained in git for context.
-- **`perf-harness-player-bot`** — replaces Round 4. Build `PlayerBotStateMachine` + `PlayerBotIntent` + controller shim, mirroring the `NPCFixedWingPilot` architecture. Consume NPC primitives (`AILineOfSight.canSeeTarget`, `AITargeting.findNearestEnemy`, `NavmeshSystem.queryPath` + `findNearestPoint`) instead of reinventing them. Kills shoot-through-terrain and slope-bobble by construction. Solves the openfrontier null-path issue as a side effect (navmesh snap before query). Up to 1500 LOC net; playtest-gated.
+- **`perf-harness-player-bot`** — *(merged in Round 4, PR #95.)* Built `PlayerBotStateMachine` + `PlayerBotIntent` + controller shim mirroring `NPCFixedWingPilot`. Consumes `terrainSystem.raycastTerrain`, `NavmeshSystem.queryPath` + `findNearestPoint`. 7 states: PATROL/ALERT/ENGAGE/ADVANCE/SEEK_COVER/RETREAT/RESPAWN_WAIT. Live playtest post-merge revealed the state machine inherited NPC *cautiousness* (retreat-on-damage, back-off-when-close) and the bot never actually fired in engagements — conflating "reference NPC primitives" with "adopt NPC behavior." Followed up by `perf-harness-player-bot-aggressive`.
+- **`perf-harness-player-bot-aggressive`** — Round 6 follow-up. Strip SEEK_COVER + RETREAT states entirely. Rewrite ENGAGE to push forward, fire continuously, never back off on damage. Fix LOS height (1.2 → 1.7 eye-to-eye) so terrain raycasts don't false-negative on bumps. 300 LOC budget; mostly deletions.
 
 ### Round schedule
 
@@ -104,8 +105,10 @@ All briefs under `docs/tasks/` with matching slug names.
 - **Round 2 (2 parallel):** `heap-regression-investigation`, `npc-fixed-wing-pilot-ai`. Heap investigation uses the redesigned harness for clean repro. NPC pilot wants the post-cutover `Airframe` surface (already on master).
 - **Round 3 (1) — ATTEMPTED, STOPPED.** `perf-baseline-refresh`. Rebaseline on the redesigned harness with the heap fix in place. Hit hard stop on openfrontier:short validator fail (p99 63ms > 60ms floor). Will retry after Round 4.
 - **Round 4 — ABANDONED.** `perf-openfrontier-navmesh-fix` dispatched, killed mid-investigation after live playtest revealed the killbot driver's shallow behavior was a deeper issue than navmesh alone.
-- **Round 4 (replacement, 1 solo) — ACTIVE.** `perf-harness-player-bot`. Rebuild the driver as a state-machine bot consuming NPC primitives. Unblocks Round 5 retry.
-- **Round 5 (1):** `perf-baseline-refresh` retry. Cycle closer.
+- **Round 4 (replacement, 1 solo) — LANDED.** `perf-harness-player-bot` (PR #95). State-machine bot consuming NPC primitives. Merged, but post-merge playtest exposed a behavioral regression (bot retreats, never fires) that required Round 6.
+- **Round 5 — ABANDONED.** `perf-baseline-refresh` retry dispatched but killed ~immediately; captures off a retreating bot would be worse than useless.
+- **Round 6 (1, solo) — ACTIVE.** `perf-harness-player-bot-aggressive`. Strip defensive states; fix ENGAGE to push + fire; fix LOS height. Playtest-gated.
+- **Round 7 (1):** `perf-baseline-refresh` second retry. Cycle closer.
 
 ### Concurrency cap
 
