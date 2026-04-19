@@ -102,6 +102,146 @@
     return best;
   }
 
+  // ── Killbot primitives (perf-harness-killbot) ──
+  // PLAYER_EYE_HEIGHT mirrors src/systems/player/PlayerMovement.ts (=2). Driver
+  // was sampling camera at the player's feet, so fire/aim math tilted downward
+  // and bullets hit the ground mid-range.
+  const PLAYER_EYE_HEIGHT = 2;
+  const TARGET_CHEST_HEIGHT = 1.2;
+  const DEFAULT_BULLET_SPEED = 400; // m/s (aim lead approximation)
+
+  // Utility score for target selection (Dave Mark IAUS). Higher = more desirable.
+  // Visibility keeps blocked targets as candidates (score reduced but non-zero)
+  // so the driver can commit while re-acquiring LOS.
+  function computeUtilityScore(opts) {
+    const distance = Number(opts && opts.distance);
+    const hasLOS = !!(opts && opts.hasLOS);
+    const isEngagingUs = !!(opts && opts.isEngagingUs);
+    if (!Number.isFinite(distance) || distance < 0) return 0;
+    const visibility = hasLOS ? 1 : 0.3;
+    const threat = isEngagingUs ? 2 : 1;
+    return visibility * (1 / (distance + 1)) * threat;
+  }
+
+  // Hysteresis rule — current lock is preserved unless a new candidate beats
+  // it by `ratio` (default 1.3 == 30% margin). Returns `true` when the caller
+  // should switch locks.
+  function shouldSwitchTarget(currentScore, candidateScore, ratio) {
+    const r = Number.isFinite(ratio) && ratio > 1 ? ratio : 1.3;
+    const cur = Number.isFinite(currentScore) ? currentScore : 0;
+    const cand = Number.isFinite(candidateScore) ? candidateScore : 0;
+    if (cur <= 0) return cand > 0;
+    return cand > cur * r;
+  }
+
+  // Aim solution with velocity lead. Uses the REAL eye (player + eye height),
+  // not the feet. Returns yaw/pitch in the driver convention (yaw 0 = -Z, right
+  // positive) and the aimPoint for downstream LOS gating.
+  function computeAimSolution(opts) {
+    const eyeX = Number(opts && opts.eyeX);
+    const eyeY = Number(opts && opts.eyeY);
+    const eyeZ = Number(opts && opts.eyeZ);
+    const targetX = Number(opts && opts.targetX);
+    const targetY = Number(opts && opts.targetY);
+    const targetZ = Number(opts && opts.targetZ);
+    const vx = Number(opts && opts.targetVx) || 0;
+    const vy = Number(opts && opts.targetVy) || 0;
+    const vz = Number(opts && opts.targetVz) || 0;
+    const bulletSpeed = Number(opts && opts.bulletSpeed) > 0
+      ? Number(opts.bulletSpeed)
+      : DEFAULT_BULLET_SPEED;
+
+    const horizontalDist = Math.hypot(targetX - eyeX, targetZ - eyeZ);
+    const tFlight = horizontalDist / bulletSpeed;
+    const aimX = targetX + vx * tFlight;
+    const aimY = targetY + vy * tFlight;
+    const aimZ = targetZ + vz * tFlight;
+    const horizontalAim = Math.hypot(aimX - eyeX, aimZ - eyeZ) || 1e-6;
+    const yaw = Math.atan2(aimX - eyeX, -(aimZ - eyeZ));
+    const pitch = Math.atan2(aimY - eyeY, horizontalAim);
+    return {
+      yaw: yaw,
+      pitch: pitch,
+      aimPoint: { x: aimX, y: aimY, z: aimZ },
+      horizontalDist: horizontalDist
+    };
+  }
+
+  // Adaptive pure-pursuit lookahead — scales with speed, clamped to [5, 20]m.
+  // Shape from Coulter 1992 + arxiv:2111.08873 (adaptive lookahead racing) +
+  // arxiv:2305.20026 (regulated pure pursuit). Stable fixed-speed lookahead
+  // oscillates on tight paths; adaptive variants don't.
+  function computeAdaptiveLookahead(speed) {
+    const s = Number.isFinite(speed) && speed >= 0 ? Number(speed) : 0;
+    return Math.max(5, Math.min(20, 8 + 0.05 * s));
+  }
+
+  // Walk forward along `path` from the current closest waypoint and return the
+  // point at `lookaheadDist` metres further. Used to smooth WASD heading so the
+  // driver commits to the geometry rather than per-tick steering noise.
+  function pointAlongPath(path, fromIdx, fromPos, lookaheadDist) {
+    if (!Array.isArray(path) || path.length === 0) return null;
+    const idx = Math.max(0, Math.min(path.length - 1, Number(fromIdx) || 0));
+    const pos = fromPos || path[idx];
+    let remaining = Number.isFinite(lookaheadDist) && lookaheadDist > 0 ? Number(lookaheadDist) : 8;
+    let ax = Number(pos && pos.x || 0);
+    let az = Number(pos && pos.z || 0);
+    for (let i = idx; i < path.length; i++) {
+      const wp = path[i];
+      if (!wp) continue;
+      const wx = Number(wp.x || 0);
+      const wz = Number(wp.z || 0);
+      const seg = Math.hypot(wx - ax, wz - az);
+      if (seg >= remaining) {
+        const t = seg > 0 ? remaining / seg : 0;
+        return {
+          x: ax + (wx - ax) * t,
+          y: Number(wp.y || 0),
+          z: az + (wz - az) * t
+        };
+      }
+      remaining -= seg;
+      ax = wx;
+      az = wz;
+    }
+    const last = path[path.length - 1];
+    return last ? { x: Number(last.x || 0), y: Number(last.y || 0), z: Number(last.z || 0) } : null;
+  }
+
+  // Fire gate — composite rule: must pass aim error, LOS, pitch safety, and
+  // ammo readiness. pitch safety keeps the driver from firing straight into
+  // the ground at mid-to-long range (the brief's "-25 deg OR dist<10m" rule).
+  // Returns `{ fire, reason }`; rejected ticks do NOT invoke actionFireStart.
+  function evaluateFireGate(opts) {
+    const aimErrorRad = Number(opts && opts.aimErrorRad);
+    const maxAimErrorRad = Number(opts && opts.maxAimErrorRad);
+    const losClear = !!(opts && opts.losClear);
+    const pitchRad = Number(opts && opts.pitchRad);
+    const distance = Number(opts && opts.distance);
+    const ammoReady = !!(opts && opts.ammoReady);
+    const errLimit = Number.isFinite(maxAimErrorRad) && maxAimErrorRad > 0
+      ? maxAimErrorRad
+      : (3 * Math.PI) / 180;
+    if (!ammoReady) return { fire: false, reason: 'ammo_not_ready' };
+    if (!Number.isFinite(aimErrorRad) || aimErrorRad > errLimit) return { fire: false, reason: 'aim_error_too_high' };
+    if (!losClear) return { fire: false, reason: 'los_blocked' };
+    // Pitch safety: don't fire sharply downward at range. Near-range targets
+    // (knife fight) can legitimately aim down.
+    const MIN_SAFE_PITCH = -25 * Math.PI / 180;
+    if (Number.isFinite(pitchRad) && pitchRad < MIN_SAFE_PITCH && (!Number.isFinite(distance) || distance > 10)) {
+      return { fire: false, reason: 'fire_pitch_unsafe' };
+    }
+    return { fire: true, reason: 'ok' };
+  }
+
+  function angularDistance(yaw1, pitch1, yaw2, pitch2) {
+    let dy = Number(yaw2) - Number(yaw1);
+    while (dy > Math.PI) dy -= Math.PI * 2;
+    while (dy < -Math.PI) dy += Math.PI * 2;
+    const dp = Number(pitch2) - Number(pitch1);
+    return Math.hypot(dy, dp);
+  }
+
   function createDriver(options) {
     const opts = {
       compressFrontline: !!options.compressFrontline,
@@ -142,13 +282,14 @@
         maxFireDistance: 245,
         holdChanceWhenVisible: 0.02,
         transitionHoldMs: 900,
-        decisionIntervalMs: Math.max(380, opts.movementDecisionIntervalMs),
+        decisionIntervalMs: Math.max(200, opts.movementDecisionIntervalMs),
         preferredJuke: 'strafe',
         objectiveBias: 'zone',
         terrainProfile: 'rolling',
         maxGradient: 0.45,
         stuckTimeoutSec: 6,
-        waypointReplanIntervalMs: 5000
+        waypointReplanIntervalMs: 5000,
+        aggressiveMode: true
       },
       a_shau_valley: {
         sprintDistance: 320,
@@ -157,13 +298,14 @@
         maxFireDistance: 235,
         holdChanceWhenVisible: 0.01,
         transitionHoldMs: 850,
-        decisionIntervalMs: Math.max(360, opts.movementDecisionIntervalMs),
+        decisionIntervalMs: Math.max(200, opts.movementDecisionIntervalMs),
         preferredJuke: 'push',
         objectiveBias: 'enemy_mass',
         terrainProfile: 'mountainous',
         maxGradient: 0.60,
         stuckTimeoutSec: 5,
-        waypointReplanIntervalMs: 4000
+        waypointReplanIntervalMs: 4000,
+        aggressiveMode: true
       },
       zone_control: {
         sprintDistance: 220,
@@ -256,7 +398,20 @@
       maxStuckMs: 0,
       stuckTeleportCount: 0,
       losRejectedShots: 0,
-      gradientProbeDeflections: 0
+      gradientProbeDeflections: 0,
+      // perf-harness-killbot: rule-only NSRL target lock. Only consulted on
+      // aggressiveMode profiles (open_frontier + a_shau_valley). combat120
+      // keeps the nearest-each-tick behavior from perf-harness-redesign.
+      targetLock: {
+        combatantId: null,
+        lockedAtMs: 0,
+        lastScore: 0,
+        lastSeenMs: 0
+      },
+      firePitchRejections: 0,
+      firePitchSafetyGates: 0,
+      lockSwitches: 0,
+      combatState: 'SCAN'
     };
     const MAX_YAW_STEP = 0.09;
     const MAX_PITCH_STEP = 0.06;
@@ -416,14 +571,23 @@
 
     function syncCameraPosition(camera, cameraController, position) {
       if (!camera || !position) return;
-      if (camera.position && typeof camera.position.copy === 'function') {
-        camera.position.copy(position);
-      } else {
-        camera.position.x = Number(position.x || 0);
-        camera.position.y = Number(position.y || 0);
-        camera.position.z = Number(position.z || 0);
+      // Place the camera at the player's EYE (foot + PLAYER_EYE_HEIGHT), not
+      // the feet. The live game renders from the eye; the harness previously
+      // sampled from the feet, which tilted fire/aim math downward (bullets
+      // hit the ground between the player and the enemy).
+      const eyeX = Number(position.x || 0);
+      const eyeY = Number(position.y || 0) + PLAYER_EYE_HEIGHT;
+      const eyeZ = Number(position.z || 0);
+      if (camera.position && typeof camera.position.set === 'function') {
+        camera.position.set(eyeX, eyeY, eyeZ);
+      } else if (camera.position) {
+        camera.position.x = eyeX;
+        camera.position.y = eyeY;
+        camera.position.z = eyeZ;
       }
       if (cameraController && typeof cameraController.resetCameraPosition === 'function') {
+        // The controller's resetCameraPosition consumes feet position; let it
+        // own its own eye math so we don't fight it.
         cameraController.resetCameraPosition(position);
       }
       if (typeof camera.updateMatrixWorld === 'function') {
@@ -680,6 +844,84 @@
         y: (usSpawn.y + enemySpawn.y) * 0.5,
         z: midZ + dirZ * along + lateralZ * lateral
       };
+    }
+
+    // Aggressive-mode target lock (open_frontier + a_shau_valley). Keeps a
+    // single committed combatant until it dies, leaves perception range, or
+    // a new candidate beats the current utility score by 30% (Dave Mark IAUS
+    // hysteresis). Returns the locked combatant (or null).
+    function selectLockedTarget(systems, playerPos) {
+      const combatants = systems && systems.combatantSystem && systems.combatantSystem.getAllCombatants
+        ? systems.combatantSystem.getAllCombatants()
+        : null;
+      if (!Array.isArray(combatants) || combatants.length === 0) {
+        state.targetLock.combatantId = null;
+        state.targetLock.lastScore = 0;
+        return null;
+      }
+      const perceptionSq = perceptionRange * perceptionRange;
+      const eye = { x: playerPos.x, y: Number(playerPos.y || 0) + PLAYER_EYE_HEIGHT, z: playerPos.z };
+
+      // Score every live opfor within perception, tracking best and current.
+      let best = null;
+      let bestScore = 0;
+      let current = null;
+      let currentScore = 0;
+      for (let i = 0; i < combatants.length; i++) {
+        const c = combatants[i];
+        if (!c || c.id === 'player_proxy') continue;
+        if (!isOpforFaction(c.faction)) continue;
+        if (c.health <= 0 || c.state === 'dead') continue;
+        const dx = Number(c.position.x) - playerPos.x;
+        const dz = Number(c.position.z) - playerPos.z;
+        const distSq = dx * dx + dz * dz;
+        if (distSq > perceptionSq) continue;
+        const dist = Math.sqrt(distSq);
+        const targetPos = {
+          x: Number(c.position.x),
+          y: Number(c.position.y || 0) + TARGET_CHEST_HEIGHT,
+          z: Number(c.position.z)
+        };
+        const blockedRay = hasTerrainOcclusion(systems, eye, targetPos);
+        const blockedHeight = hasHeightProfileOcclusion(systems, eye, targetPos);
+        const hasLOS = !(blockedRay || blockedHeight);
+        const score = computeUtilityScore({ distance: dist, hasLOS: hasLOS, isEngagingUs: false });
+        if (score > bestScore) {
+          bestScore = score;
+          best = c;
+        }
+        if (state.targetLock.combatantId && c.id === state.targetLock.combatantId) {
+          current = c;
+          currentScore = score;
+        }
+      }
+
+      if (current) {
+        // Keep the lock unless a new candidate clearly beats it.
+        if (best && best.id !== current.id && shouldSwitchTarget(currentScore, bestScore, 1.3)) {
+          state.targetLock.combatantId = best.id;
+          state.targetLock.lockedAtMs = Date.now();
+          state.targetLock.lastScore = bestScore;
+          state.targetLock.lastSeenMs = Date.now();
+          state.lockSwitches++;
+          return best;
+        }
+        state.targetLock.lastScore = currentScore;
+        state.targetLock.lastSeenMs = Date.now();
+        return current;
+      }
+
+      if (best) {
+        state.targetLock.combatantId = best.id;
+        state.targetLock.lockedAtMs = Date.now();
+        state.targetLock.lastScore = bestScore;
+        state.targetLock.lastSeenMs = Date.now();
+        return best;
+      }
+
+      state.targetLock.combatantId = null;
+      state.targetLock.lastScore = 0;
+      return null;
     }
 
     function findNearestOpfor(systems, maxDistanceSq) {
@@ -1413,7 +1655,12 @@
           }
         }
       }
-      const nearestOpfor = findNearestOpfor(systems, perceptionRange * perceptionRange);
+      // Target selection — aggressive mode runs utility-AI target lock with 30%
+      // hysteresis. ai_sandbox/zone_control/team_deathmatch keep the existing
+      // nearest-each-tick selector that combat120 depends on.
+      const nearestOpfor = modeProfile.aggressiveMode
+        ? selectLockedTarget(systems, playerPos)
+        : findNearestOpfor(systems, perceptionRange * perceptionRange);
       const nearestDist = nearestOpfor
         ? Math.hypot(nearestOpfor.position.x - playerPos.x, nearestOpfor.position.z - playerPos.z)
         : Number.POSITIVE_INFINITY;
@@ -1423,36 +1670,74 @@
 
       if (target) {
         const cameraController = systems.playerController ? systems.playerController.cameraController : null;
-        const prevYaw = cameraController ? Number(cameraController.yaw || 0) : Number(camera.rotation.y || 0);
-        const prevPitch = cameraController ? Number(cameraController.pitch || 0) : Number(camera.rotation.x || 0);
 
-        const targetHorizontalDist = Math.hypot(
-          Number((target.x || 0) - playerPos.x),
-          Number((target.z || 0) - playerPos.z)
-        );
-        const aimY = clampAimY(playerPos.y, (target.y || 0) + 1.2, targetHorizontalDist);
-        camera.lookAt(target.x, aimY, target.z);
-        const desiredYaw = Number(camera.rotation.y || 0);
-        const desiredPitch = Number(camera.rotation.x || 0);
-        let yawDelta = desiredYaw - prevYaw;
-        while (yawDelta > Math.PI) yawDelta -= Math.PI * 2;
-        while (yawDelta < -Math.PI) yawDelta += Math.PI * 2;
-        const pitchDelta = desiredPitch - prevPitch;
+        if (modeProfile.aggressiveMode) {
+          // Snap-aim path. The NSRL paper (arxiv:2410.04936) kept shooting
+          // rule-based "to ensure controllability"; step-clamping here produced
+          // 0 shots on open_frontier because the 14-tick rotation to turn 90
+          // deg always lost to the ~200ms decision cadence. This is measurement
+          // infrastructure — it aims optimally.
+          const vel = nearestOpfor && nearestOpfor.velocity;
+          const vx = vel && Number.isFinite(Number(vel.x)) ? Number(vel.x) : 0;
+          const vz = vel && Number.isFinite(Number(vel.z)) ? Number(vel.z) : 0;
+          const targetX = Number(target.x || 0);
+          const targetZ = Number(target.z || 0);
+          const targetYCenter = Number(target.y || 0) + TARGET_CHEST_HEIGHT;
+          const horizontalDist = Math.hypot(targetX - playerPos.x, targetZ - playerPos.z);
+          const tFlight = horizontalDist / DEFAULT_BULLET_SPEED;
+          const aimX = targetX + vx * tFlight;
+          const aimZ = targetZ + vz * tFlight;
+          // Use Three.js lookAt for the yaw/pitch conversion (keeps the
+          // rotation convention consistent with the fire-loop aim), but SNAP
+          // the result — no step clamp.
+          camera.lookAt(aimX, targetYCenter, aimZ);
+          syncCameraAim(camera, cameraController, Number(camera.rotation.y || 0), Number(camera.rotation.x || 0));
+        } else {
+          const prevYaw = cameraController ? Number(cameraController.yaw || 0) : Number(camera.rotation.y || 0);
+          const prevPitch = cameraController ? Number(cameraController.pitch || 0) : Number(camera.rotation.x || 0);
 
-        const distToTarget = Math.hypot(
-          Number((target.x || 0) - playerPos.x),
-          Number((target.z || 0) - playerPos.z)
-        );
-        const dynamicYawStep = Math.min(0.14, MAX_YAW_STEP + (distToTarget < 85 ? 0.03 : 0));
-        const dynamicPitchStep = Math.min(0.1, MAX_PITCH_STEP + (distToTarget < 85 ? 0.02 : 0));
-        const nextYaw = prevYaw + Math.max(-dynamicYawStep, Math.min(dynamicYawStep, yawDelta));
-        const nextPitch = prevPitch + Math.max(-dynamicPitchStep, Math.min(dynamicPitchStep, pitchDelta));
+          const targetHorizontalDist = Math.hypot(
+            Number((target.x || 0) - playerPos.x),
+            Number((target.z || 0) - playerPos.z)
+          );
+          const aimY = clampAimY(playerPos.y, (target.y || 0) + 1.2, targetHorizontalDist);
+          camera.lookAt(target.x, aimY, target.z);
+          const desiredYaw = Number(camera.rotation.y || 0);
+          const desiredPitch = Number(camera.rotation.x || 0);
+          let yawDelta = desiredYaw - prevYaw;
+          while (yawDelta > Math.PI) yawDelta -= Math.PI * 2;
+          while (yawDelta < -Math.PI) yawDelta += Math.PI * 2;
+          const pitchDelta = desiredPitch - prevPitch;
 
-        syncCameraAim(camera, cameraController, nextYaw, nextPitch);
+          const distToTarget = Math.hypot(
+            Number((target.x || 0) - playerPos.x),
+            Number((target.z || 0) - playerPos.z)
+          );
+          const dynamicYawStep = Math.min(0.14, MAX_YAW_STEP + (distToTarget < 85 ? 0.03 : 0));
+          const dynamicPitchStep = Math.min(0.1, MAX_PITCH_STEP + (distToTarget < 85 ? 0.02 : 0));
+          const nextYaw = prevYaw + Math.max(-dynamicYawStep, Math.min(dynamicYawStep, yawDelta));
+          const nextPitch = prevPitch + Math.max(-dynamicPitchStep, Math.min(dynamicPitchStep, pitchDelta));
+
+          syncCameraAim(camera, cameraController, nextYaw, nextPitch);
+        }
 
         if (nearestOpfor) {
           const probeShotRay = getPlayerShotRay(systems, camera);
           state.targetVisible = canLandPlayerShot(systems, probeShotRay);
+        }
+      }
+
+      // Combat FSM — observable state for logs/tests. No RETREAT / COVER:
+      // the killbot is fearless per brief directive.
+      if (modeProfile.aggressiveMode) {
+        if (!nearestOpfor) {
+          state.combatState = 'SCAN';
+        } else if (!state.targetLock.combatantId || state.targetLock.combatantId !== nearestOpfor.id) {
+          state.combatState = 'LOCK';
+        } else if (state.targetVisible) {
+          state.combatState = 'ENGAGE';
+        } else {
+          state.combatState = 'APPROACH';
         }
       }
 
@@ -1547,10 +1832,27 @@
           if (state.waypointIdx >= state.waypoints.length) state.lastWaypointReplanAt = 0;
         }
 
-        // Steering target is the next waypoint if Layer 1 gave us one, else direct.
+        // Steering target. Aggressive modes use regulated pure-pursuit — pick a
+        // lookahead point along the planned path at adaptive distance (5-20m,
+        // shape per arxiv:2111.08873). Other modes keep the next-waypoint
+        // steering that combat120 relies on.
         let steeringTarget = movementTarget;
         if (state.waypoints && state.waypoints.length > 0 && state.waypointIdx < state.waypoints.length) {
-          steeringTarget = state.waypoints[state.waypointIdx];
+          if (modeProfile.aggressiveMode) {
+            const vel = systems.playerController && systems.playerController.getVelocity
+              ? systems.playerController.getVelocity()
+              : null;
+            const playerSpeed = vel ? Math.hypot(Number(vel.x || 0), Number(vel.z || 0)) : 0;
+            const lookaheadDist = computeAdaptiveLookahead(playerSpeed);
+            const lookaheadPt = pointAlongPath(state.waypoints, state.waypointIdx, { x: playerPos.x, z: playerPos.z }, lookaheadDist);
+            if (lookaheadPt) {
+              steeringTarget = lookaheadPt;
+            } else {
+              steeringTarget = state.waypoints[state.waypointIdx];
+            }
+          } else {
+            steeringTarget = state.waypoints[state.waypointIdx];
+          }
           state.waypointsFollowedCount++;
         }
 
@@ -1760,7 +2062,11 @@
         maxStuckSeconds: Math.max(0, Math.round(state.maxStuckMs / 100) / 10),
         gradientProbeDeflections: state.gradientProbeDeflections,
         waypointsFollowedCount: state.waypointsFollowedCount,
-        waypointReplanFailures: state.waypointReplanFailures
+        waypointReplanFailures: state.waypointReplanFailures,
+        // perf-harness-killbot surfaces — aggressive-mode lock + pitch-gate telemetry.
+        lockSwitches: state.lockSwitches,
+        firePitchSafetyGates: state.firePitchSafetyGates,
+        combatState: state.combatState
       };
     }
 
@@ -1812,7 +2118,12 @@
       const camera = systems && systems.playerController && systems.playerController.getCamera
         ? systems.playerController.getCamera()
         : null;
-      const nearestOpfor = findNearestOpfor(systems, perceptionRange * perceptionRange);
+      // Aggressive modes resolve the fire target through the same utility lock
+      // as the aim loop, so fire and aim stay on the same combatant. Other
+      // modes keep nearest-each-tick (combat120 depends on this behavior).
+      const nearestOpfor = playerPos && modeProfile.aggressiveMode
+        ? selectLockedTarget(systems, playerPos)
+        : findNearestOpfor(systems, perceptionRange * perceptionRange);
       if (!playerPos || !camera || !nearestOpfor) {
         updateFireProbe({
           reason: !playerPos || !camera ? 'missing_player_or_camera' : 'missing_target',
@@ -1837,7 +2148,7 @@
       syncCameraPosition(camera, systems.playerController.cameraController, playerPos);
 
       const dx = nearestOpfor.position.x - playerPos.x;
-      const dy = (nearestOpfor.position.y || 0) + 1.2 - ((playerPos.y || 0) + 1.6);
+      const dy = (nearestOpfor.position.y || 0) + TARGET_CHEST_HEIGHT - ((playerPos.y || 0) + PLAYER_EYE_HEIGHT);
       const dz = nearestOpfor.position.z - playerPos.z;
       const dist = Math.hypot(dx, dy, dz);
       if (!Number.isFinite(dist) || dist < 0.001) {
@@ -1852,7 +2163,10 @@
         });
         return;
       }
-      if (opts.mode === 'open_frontier' && dist > 120) {
+      // Aggressive modes remove the 120m effective-range cap — per brief:
+      // "A long-range shot that misses is still a 'shot fired' — the validator
+      // cares about signal; the LOS + pitch safety gates prevent the bugs."
+      if (!modeProfile.aggressiveMode && opts.mode === 'open_frontier' && dist > 120) {
         updateFireProbe({
           reason: 'target_out_of_effective_range',
           targetDistance: dist,
@@ -1863,7 +2177,7 @@
       const closeRange = dist < (opts.mode === 'open_frontier' ? 95 : 65);
       const eye = {
         x: playerPos.x,
-        y: Number(playerPos.y || 0) + 1.6,
+        y: Number(playerPos.y || 0) + PLAYER_EYE_HEIGHT,
         z: playerPos.z
       };
       const targetEye = {
@@ -1980,6 +2294,31 @@
         return;
       }
 
+      // Pitch safety gate — never fire sharply downward at range. The driver
+      // previously fired into the ground on open_frontier because the camera
+      // was sampled at the feet (pitch tilted downward). The eye-height fix
+      // addresses the root cause; this is the belt-and-braces guard.
+      const aimPitchRad = Number(camera.rotation.x || 0);
+      const fireGate = evaluateFireGate({
+        aimErrorRad: 0, // already filtered by evaluateFireDecision above
+        maxAimErrorRad: Math.PI, // disable — composite gates already ran
+        losClear: true, // LOS already checked above
+        pitchRad: aimPitchRad,
+        distance: dist,
+        ammoReady: true // ammo sustained by sustainAmmo()
+      });
+      if (!fireGate.fire) {
+        state.firePitchRejections++;
+        if (fireGate.reason === 'fire_pitch_unsafe') state.firePitchSafetyGates++;
+        updateFireProbe({
+          reason: fireGate.reason,
+          targetDistance: dist,
+          pitchRad: aimPitchRad,
+          targetId: String(nearestOpfor.id || '')
+        });
+        return;
+      }
+
       if (dist < 110) {
         setMovementState('hold', { force: true });
       }
@@ -2060,7 +2399,18 @@
   if (typeof module !== 'undefined' && module && module.exports) {
     module.exports = {
       evaluateFireDecision: evaluateFireDecision,
-      chooseHeadingByGradient: chooseHeadingByGradient
+      chooseHeadingByGradient: chooseHeadingByGradient,
+      // perf-harness-killbot exports.
+      computeUtilityScore: computeUtilityScore,
+      shouldSwitchTarget: shouldSwitchTarget,
+      computeAimSolution: computeAimSolution,
+      computeAdaptiveLookahead: computeAdaptiveLookahead,
+      pointAlongPath: pointAlongPath,
+      evaluateFireGate: evaluateFireGate,
+      angularDistance: angularDistance,
+      PLAYER_EYE_HEIGHT: PLAYER_EYE_HEIGHT,
+      TARGET_CHEST_HEIGHT: TARGET_CHEST_HEIGHT,
+      DEFAULT_BULLET_SPEED: DEFAULT_BULLET_SPEED
     };
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
