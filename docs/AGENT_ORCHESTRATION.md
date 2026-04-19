@@ -70,43 +70,76 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: *(empty — fill in at start of next cycle)*
+## Current cycle: `cycle-2026-04-20-atmosphere-foundation` *(draft — confirm at kickoff)*
 
 ### Cycle ID
 
-`cycle-YYYY-MM-DD-<slug>`
+`cycle-2026-04-20-atmosphere-foundation`
 
 ### Why this cycle exists
 
-*(one paragraph)*
+The sky / sun / fog / ambient stack is a grab-bag of frozen lights, a static equirect skybox, and scalar-multiplier weather. It cannot support the fixed-wing aircraft shipped in B1 (they climb into the 500-unit dome), jungle-mood work (dawn patrols, golden-hour objectives), or the P2-roadmap "day/night cycle". This cycle establishes an `ISkyRuntime` fence + `AtmosphereSystem` with a Hosek-Wilkie sky backend, sky-tinted fog, sun/hemisphere lights driven from the atmosphere model, and a Bayer dither that kills gradient banding in the 24-level post-process. Design: `docs/ATMOSPHERE.md`. Parallel P0/P1 carries from the prior cycle run alongside.
 
 ### Tasks in this cycle
 
-- **`<slug>`** — *(one sentence summary; brief at `docs/tasks/<slug>.md`)*
+Atmosphere v1 foundation (Combo G architecture, Combo A first backend):
+
+- **`atmosphere-interface-fence`** — add `ISkyRuntime` + `ICloudRuntime` to `SystemInterfaces.ts`; stand up empty `AtmosphereSystem` shell with `NullSkyBackend`. Brief: `docs/tasks/atmosphere-interface-fence.md`.
+- **`atmosphere-hosek-wilkie-sky`** — first sky backend: analytic dome + CPU-side LUT + per-scenario TOD preset table. Brief: `docs/tasks/atmosphere-hosek-wilkie-sky.md`.
+- **`atmosphere-fog-tinted-by-sky`** — fog color sampled from sky zenith/horizon each frame; horizon seam disappears. Brief: `docs/tasks/atmosphere-fog-tinted-by-sky.md`.
+- **`atmosphere-sun-hemisphere-coupling`** — unfreeze moonLight; drive sun direction + color + hemisphere from atmosphere; rewire WaterSystem sun vector. Brief: `docs/tasks/atmosphere-sun-hemisphere-coupling.md`.
+- **`post-bayer-dither`** — 4×4 Bayer dither before the 24-level quantize in `PostProcessingManager.ts`. Independent of atmosphere stack. Brief: `docs/tasks/post-bayer-dither.md`.
+
+Parallel carries from prior cycle:
+
+- **`perf-baseline-refresh`** (P0) — rebaseline all 4 scenarios against the aim-fixed player bot. Brief: `docs/tasks/perf-baseline-refresh.md`.
+- **`harness-lifecycle-halt-on-match-end`** (P1) — halt perf harness at match end. Brief: `docs/tasks/harness-lifecycle-halt-on-match-end.md`.
+- **`bot-pathing-pit-and-steep-uphill`** (P1) — fix over-path on uphill + pit entrapment. Brief: `docs/tasks/bot-pathing-pit-and-steep-uphill.md`.
+- **`harness-stats-accuracy-damage-wiring`** (P2) — wire accuracy + damage into `summary.json`; fix bot-state histogram read. Brief: `docs/tasks/harness-stats-accuracy-damage-wiring.md`.
 
 ### Round schedule
 
-- **Round 1 (N parallel):** ...
+- **Round 1 (5 parallel):** `atmosphere-interface-fence`, `post-bayer-dither`, `harness-lifecycle-halt-on-match-end`, `bot-pathing-pit-and-steep-uphill`, `harness-stats-accuracy-damage-wiring`. These are independent of each other.
+- **Round 2 (1):** `atmosphere-hosek-wilkie-sky` (after Round 1's `atmosphere-interface-fence` merges).
+- **Round 3 (2 parallel):** `atmosphere-fog-tinted-by-sky`, `atmosphere-sun-hemisphere-coupling` (both consume the Hosek-Wilkie backend).
+- **Round 4 (1):** `perf-baseline-refresh` (after harness P1/P2 land — baselines should reflect the improved pathing + stats surfacing).
 
 ### Concurrency cap
 
-*(number + rationale if overriding default 5)*
+Default 5. No override.
 
 ### Dependencies
 
-*(addBlockedBy by slug)*
+```
+atmosphere-interface-fence       (blocks: hosek-wilkie, fog-tinted, sun-hemisphere)
+atmosphere-hosek-wilkie-sky      (blocked by: interface-fence; blocks: fog-tinted, sun-hemisphere)
+atmosphere-fog-tinted-by-sky     (blocked by: hosek-wilkie)
+atmosphere-sun-hemisphere-coupling (blocked by: hosek-wilkie)
+post-bayer-dither                (independent)
+perf-baseline-refresh            (softly blocked by harness P1/P2 — see brief)
+harness-lifecycle-halt-on-match-end (independent)
+bot-pathing-pit-and-steep-uphill (independent)
+harness-stats-accuracy-damage-wiring (independent)
+```
 
 ### Playtest policy
 
-*(per-task flag)*
+- `atmosphere-hosek-wilkie-sky`, `atmosphere-fog-tinted-by-sky`, `atmosphere-sun-hemisphere-coupling`, `post-bayer-dither`: **required** — visual observables.
+- `atmosphere-interface-fence`: not required — shell only, no visible change.
+- Harness + perf tasks: per existing briefs.
 
 ### Perf policy
 
-*(what runs when)*
+- `combat120` smoke on every atmosphere PR before merge; must stay within current WARN bound.
+- Full `npm run validate:full` (combat120 capture + perf:compare) on the final integration PR before `perf-baseline-refresh` dispatches.
+- Bayer dither PR: no perf expectation change (3–5 shader ops within noise).
 
 ### Failure handling
 
-*(escalation rules)*
+- Fence-change escalation: if `atmosphere-interface-fence` becomes an EXISTING-interface modification, STOP and open for human approval per `docs/INTERFACE_FENCE.md`.
+- Sky backend perf overrun (`World` group > 1.0ms): fall back to Three's Preetham `Sky` example as a temporary backend; do not break the budget.
+- Shadow popping on sun-direction animation: fall back to static frustum follow for v1; ship sun animation without shadow-follow.
+- If `atmosphere-fog-tinted-by-sky` requires changing `IGameRenderer.fog` from `THREE.FogExp2` to a subclass, STOP — that's `[interface-change]`.
 
 ## Dispatch protocol
 

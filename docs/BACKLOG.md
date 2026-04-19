@@ -1,6 +1,6 @@
 # Backlog
 
-Last updated: 2026-04-19
+Last updated: 2026-04-19 (atmosphere-foundation cycle drafted)
 
 ## Recently Completed (cycle-2026-04-18-harness-flight-combat, 2026-04-18 → 2026-04-19)
 
@@ -79,7 +79,7 @@ the runbook for the end-of-cycle ritual.
 - [ ] Terrain texture improvements
 - [ ] Road network generation (splines, intersections, pathfinding)
 - [ ] Wire additional DEM maps as game modes (Ia Drang, Khe Sanh)
-- [ ] Day/night cycle
+- [ ] Day/night cycle — v1 foundation queued for `cycle-2026-04-20-atmosphere-foundation` (per-scenario static TOD presets; live cycling deferred). Design: `docs/ATMOSPHERE.md`.
 - [ ] Music/soundtrack
 - [ ] Re-capture `openfrontier:short` after the 2026-04-02 air-vehicle batching + visibility pass and decide whether aircraft/helicopter far-LOD meshes are still needed
 
