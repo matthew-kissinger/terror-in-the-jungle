@@ -3,6 +3,13 @@ export interface SandboxConfig {
   duration: number;
   autoStart: boolean;
   enableCombat: boolean;
+  /**
+   * Deterministic terrain seed for AI_SANDBOX. When present, overrides the
+   * default `terrainSeed: 'random'` so harness captures reproduce on the same
+   * procedural map. Set via `?seed=<n>` URL param. Falls back to random when
+   * absent.
+   */
+  terrainSeedOverride?: number;
 }
 
 const DEFAULT_SANDBOX_CONFIG: SandboxConfig = {
@@ -37,6 +44,13 @@ export const isSandboxMode = (): boolean => {
   return parseBoolean(params.get('sandbox'), false);
 };
 
+const parseOptionalSeed = (raw: string | null): number | undefined => {
+  if (raw === null || raw === '') return undefined;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return undefined;
+  return parsed;
+};
+
 export const getSandboxConfig = (): SandboxConfig => {
   const params = getSearchParams();
   if (!params) {
@@ -48,11 +62,13 @@ export const getSandboxConfig = (): SandboxConfig => {
   const npcCount = parseNumber(params.get('npcs'), DEFAULT_SANDBOX_CONFIG.npcCount, npcMin, 400);
   const duration = parseNumber(params.get('duration'), DEFAULT_SANDBOX_CONFIG.duration, 0, 86400);
   const autoStart = parseBoolean(params.get('autostart'), isSandboxMode() ? true : false);
+  const terrainSeedOverride = parseOptionalSeed(params.get('seed'));
 
   return {
     npcCount,
     duration,
     autoStart,
-    enableCombat
+    enableCombat,
+    terrainSeedOverride
   };
 };

@@ -22,10 +22,17 @@ export function getGameModeConfig(mode: GameMode): GameModeConfig {
     case GameMode.AI_SANDBOX: {
       if (isSandboxMode()) {
         const sandboxConfig = getSandboxConfig();
-        return {
+        const base: GameModeConfig = {
           ...AI_SANDBOX_CONFIG,
           maxCombatants: sandboxConfig.npcCount
         };
+        // Honor ?seed=<n> URL param so harness captures reproduce on the same
+        // procedural AI_SANDBOX terrain. Without the override the mode keeps its
+        // default random seed.
+        if (typeof sandboxConfig.terrainSeedOverride === 'number') {
+          base.terrainSeed = sandboxConfig.terrainSeedOverride;
+        }
+        return base;
       }
       return AI_SANDBOX_CONFIG;
     }

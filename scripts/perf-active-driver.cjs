@@ -1,5 +1,5 @@
-(function () {
-  const globalWindow = window;
+(function (root) {
+  const globalWindow = typeof window !== 'undefined' ? window : null;
 
   function keyToLabel(code) {
     if (code.startsWith('Key')) return code.slice(3).toLowerCase();
@@ -12,6 +12,95 @@
   const BLUFOR_FACTIONS = new Set(['US', 'ARVN']);
   function isOpforFaction(faction) { return OPFOR_FACTIONS.has(faction); }
   function isBluforFaction(faction) { return BLUFOR_FACTIONS.has(faction); }
+
+  // Pure fire decision — shared with scripts/perf-harness/perf-active-driver.test.js.
+  // Sign-flipped target-delta (A4-class regression) produces aimDot near -1 and is
+  // rejected by the aim_dot_too_low branch.
+  function evaluateFireDecision(opts) {
+    const forward = opts && opts.cameraForward;
+    const toTarget = opts && opts.toTarget;
+    const aimDotThreshold = Number(opts && opts.aimDotThreshold);
+    const verticalThreshold = Number(opts && opts.verticalThreshold);
+    const closeRange = !!(opts && opts.closeRange);
+
+    if (!forward || !toTarget) {
+      return { shouldFire: false, reason: 'missing_vectors', aimDot: 0, verticalComponent: 0 };
+    }
+    const fx = Number(forward.x || 0);
+    const fy = Number(forward.y || 0);
+    const fz = Number(forward.z || 0);
+    const tx = Number(toTarget.x || 0);
+    const ty = Number(toTarget.y || 0);
+    const tz = Number(toTarget.z || 0);
+    const fLen = Math.hypot(fx, fy, fz);
+    const tLen = Math.hypot(tx, ty, tz);
+    if (!Number.isFinite(fLen) || !Number.isFinite(tLen) || fLen < 1e-6 || tLen < 1e-6) {
+      return { shouldFire: false, reason: 'degenerate_vectors', aimDot: 0, verticalComponent: 0 };
+    }
+    const fnx = fx / fLen;
+    const fny = fy / fLen;
+    const fnz = fz / fLen;
+    const tnx = tx / tLen;
+    const tny = ty / tLen;
+    const tnz = tz / tLen;
+    const aimDot = fnx * tnx + fny * tny + fnz * tnz;
+    const verticalComponent = Math.abs(tny);
+    const dotThreshold = Number.isFinite(aimDotThreshold) ? aimDotThreshold : 0.8;
+    const vThreshold = Number.isFinite(verticalThreshold) ? verticalThreshold : 0.45;
+
+    if (aimDot < dotThreshold) {
+      return { shouldFire: false, reason: 'aim_dot_too_low', aimDot: aimDot, verticalComponent: verticalComponent };
+    }
+    if (verticalComponent > vThreshold && !closeRange) {
+      return { shouldFire: false, reason: 'vertical_angle_rejected', aimDot: aimDot, verticalComponent: verticalComponent };
+    }
+    return { shouldFire: true, reason: 'ok', aimDot: aimDot, verticalComponent: verticalComponent };
+  }
+
+  // Layer 2 helper — 5-candidate gradient probe. Returns null if every candidate
+  // (ahead, ±45, ±90 off bearingRad) exceeds maxGradient; otherwise the candidate
+  // with smallest |gradient| among those that still advance toward the target.
+  function chooseHeadingByGradient(opts) {
+    const sampleHeight = opts && opts.sampleHeight;
+    const from = opts && opts.from;
+    const bearingRad = Number(opts && opts.bearingRad);
+    const maxGradient = Number(opts && opts.maxGradient);
+    const lookAhead = Number(opts && opts.lookAhead);
+    if (typeof sampleHeight !== 'function' || !from || !Number.isFinite(bearingRad)) {
+      return null;
+    }
+    const grad = Number.isFinite(maxGradient) && maxGradient > 0 ? maxGradient : 0.45;
+    const la = Number.isFinite(lookAhead) && lookAhead > 0 ? lookAhead : 8;
+    const hHere = Number(sampleHeight(Number(from.x), Number(from.z)));
+    if (!Number.isFinite(hHere)) return null;
+    const offsets = [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2];
+    // Rotate so bearingRad is "ahead". Use standard x=sin(yaw), z=-cos(yaw) convention;
+    // the driver uses the same mapping in syncCameraAim.
+    let best = null;
+    let bestAbsGrad = Number.POSITIVE_INFINITY;
+    for (let i = 0; i < offsets.length; i++) {
+      const yaw = bearingRad + offsets[i];
+      const dx = Math.sin(yaw);
+      const dz = -Math.cos(yaw);
+      // Dot-product of candidate direction with original bearing direction.
+      const bdx = Math.sin(bearingRad);
+      const bdz = -Math.cos(bearingRad);
+      const dot = dx * bdx + dz * bdz;
+      if (dot <= 0) continue; // candidate heads sideways/backwards; skip.
+      const probeX = Number(from.x) + dx * la;
+      const probeZ = Number(from.z) + dz * la;
+      const hThere = Number(sampleHeight(probeX, probeZ));
+      if (!Number.isFinite(hThere)) continue;
+      const gradient = (hThere - hHere) / la;
+      const absGradient = Math.abs(gradient);
+      if (absGradient > grad) continue;
+      if (absGradient < bestAbsGrad) {
+        bestAbsGrad = absGradient;
+        best = { yaw: yaw, gradient: gradient, offsetRad: offsets[i] };
+      }
+    }
+    return best;
+  }
 
   function createDriver(options) {
     const opts = {
@@ -29,6 +118,7 @@
       opts.mode === 'zone_control' ||
       opts.mode === 'team_deathmatch'
     );
+    // Layer 4 — scenario terrain contract per mode (tunes Layer 1-3 stack).
     const modeProfiles = {
       ai_sandbox: {
         sprintDistance: 200,
@@ -39,7 +129,11 @@
         transitionHoldMs: 900,
         decisionIntervalMs: Math.max(420, opts.movementDecisionIntervalMs),
         preferredJuke: 'push',
-        objectiveBias: 'frontline'
+        objectiveBias: 'frontline',
+        terrainProfile: 'mountainous',
+        maxGradient: 0.55,
+        stuckTimeoutSec: 4,
+        waypointReplanIntervalMs: 3500
       },
       open_frontier: {
         sprintDistance: 360,
@@ -50,7 +144,11 @@
         transitionHoldMs: 900,
         decisionIntervalMs: Math.max(380, opts.movementDecisionIntervalMs),
         preferredJuke: 'strafe',
-        objectiveBias: 'zone'
+        objectiveBias: 'zone',
+        terrainProfile: 'rolling',
+        maxGradient: 0.45,
+        stuckTimeoutSec: 6,
+        waypointReplanIntervalMs: 5000
       },
       a_shau_valley: {
         sprintDistance: 320,
@@ -61,7 +159,11 @@
         transitionHoldMs: 850,
         decisionIntervalMs: Math.max(360, opts.movementDecisionIntervalMs),
         preferredJuke: 'push',
-        objectiveBias: 'enemy_mass'
+        objectiveBias: 'enemy_mass',
+        terrainProfile: 'mountainous',
+        maxGradient: 0.60,
+        stuckTimeoutSec: 5,
+        waypointReplanIntervalMs: 4000
       },
       zone_control: {
         sprintDistance: 220,
@@ -72,7 +174,11 @@
         transitionHoldMs: 950,
         decisionIntervalMs: Math.max(480, opts.movementDecisionIntervalMs),
         preferredJuke: 'push',
-        objectiveBias: 'zone'
+        objectiveBias: 'zone',
+        terrainProfile: 'rolling',
+        maxGradient: 0.45,
+        stuckTimeoutSec: 6,
+        waypointReplanIntervalMs: 5000
       },
       team_deathmatch: {
         sprintDistance: 175,
@@ -83,7 +189,11 @@
         transitionHoldMs: 700,
         decisionIntervalMs: Math.max(360, opts.movementDecisionIntervalMs),
         preferredJuke: 'push',
-        objectiveBias: 'enemy_mass'
+        objectiveBias: 'enemy_mass',
+        terrainProfile: 'flat',
+        maxGradient: 0.35,
+        stuckTimeoutSec: 8,
+        waypointReplanIntervalMs: 6000
       }
     };
     const modeProfile = modeProfiles[opts.mode] || modeProfiles.ai_sandbox;
@@ -135,7 +245,18 @@
       setupFastForwarded: false,
       forcedContactInsertCount: 0,
       stuckRecoveryMode: false,
-      stuckRecoveryUntil: 0
+      stuckRecoveryUntil: 0,
+      // perf-harness-redesign state (Layers 1-3 + LOS counter).
+      waypoints: null,
+      waypointIdx: 0,
+      waypointTarget: null,
+      lastWaypointReplanAt: 0,
+      waypointReplanFailures: 0,
+      waypointsFollowedCount: 0,
+      maxStuckMs: 0,
+      stuckTeleportCount: 0,
+      losRejectedShots: 0,
+      gradientProbeDeflections: 0
     };
     const MAX_YAW_STEP = 0.09;
     const MAX_PITCH_STEP = 0.06;
@@ -706,6 +827,50 @@
         if (slope < SLOPE_LIMIT) return testYaw;
       }
       return null;
+    }
+
+    // Layer 1 — navmesh path query wrapper. Tolerant of null (navmesh warming up,
+    // anchor off-mesh); callers cascade to Layer 2 direct steering. Waypoints are
+    // cloned to plain objects so state mutation can't disturb the query cache.
+    function planWaypoints(systems, playerPos, anchor) {
+      if (!playerPos || !anchor) return null;
+      const navmeshSystem = systems && systems.navmeshSystem;
+      if (!navmeshSystem || typeof navmeshSystem.queryPath !== 'function') return null;
+      try {
+        const startVec = { x: Number(playerPos.x || 0), y: Number(playerPos.y || 0), z: Number(playerPos.z || 0) };
+        const endVec = { x: Number(anchor.x || 0), y: Number(anchor.y || 0), z: Number(anchor.z || 0) };
+        const path = navmeshSystem.queryPath(startVec, endVec);
+        if (!path || path.length === 0) return null;
+        const out = [];
+        for (let i = 0; i < path.length; i++) {
+          const p = path[i];
+          if (!p) continue;
+          out.push({ x: Number(p.x || 0), y: Number(p.y || 0), z: Number(p.z || 0) });
+        }
+        return out.length > 0 ? out : null;
+      } catch (_err) {
+        return null;
+      }
+    }
+
+    // Layer 2 wrapper — converts the driver's (dx, dz) target delta into the yaw
+    // convention chooseHeadingByGradient expects (forward = (sin(yaw), 0, -cos(yaw))).
+    function chooseTerrainHeading(systems, from, target, maxGradient) {
+      const terrain = systems && systems.terrainSystem;
+      if (!terrain || typeof terrain.getHeightAt !== 'function' || !from || !target) return null;
+      const dx = Number(target.x || 0) - Number(from.x || 0);
+      const dz = Number(target.z || 0) - Number(from.z || 0);
+      if (!Number.isFinite(dx + dz) || Math.hypot(dx, dz) < 0.01) return null;
+      const bearingRad = Math.atan2(dx, -dz);
+      const choice = chooseHeadingByGradient({
+        sampleHeight: function (x, z) { return terrain.getHeightAt(x, z); },
+        from: from,
+        bearingRad: bearingRad,
+        maxGradient: Number.isFinite(maxGradient) ? maxGradient : 0.45,
+        lookAhead: 8
+      });
+      if (!choice) return null;
+      return { yaw: choice.yaw, gradient: choice.gradient, deflected: Math.abs(choice.offsetRad) > 1e-4 };
     }
 
     function groundPlayerIfNeeded(systems, playerPos) {
@@ -1338,9 +1503,65 @@
       }
 
       if (movementTarget) {
-        const dx = movementTarget.x - playerPos.x;
-        const dz = movementTarget.z - playerPos.z;
+        // Layer 1 — navmesh waypoint routing. Throttle covers both success and
+        // failure paths (failed queryPath still updates lastWaypointReplanAt so the
+        // 250ms heartbeat doesn't hammer the query). Path-exhausted case retries
+        // sooner (750ms) so waypoint advancement stays snappy.
+        const waypointAnchor = engagementCenter || objectiveTarget || movementTarget;
+        const replanIntervalMs = Number(modeProfile.waypointReplanIntervalMs || 5000);
+        const sinceReplanMs = Date.now() - state.lastWaypointReplanAt;
+        const pathExhausted =
+          !state.waypoints
+          || state.waypoints.length === 0
+          || state.waypointIdx >= state.waypoints.length;
+        const needsReplan =
+          sinceReplanMs > replanIntervalMs
+          || (pathExhausted && sinceReplanMs > 750);
+        if (waypointAnchor && needsReplan) {
+          const path = planWaypoints(systems, playerPos, waypointAnchor);
+          state.lastWaypointReplanAt = Date.now();
+          if (path && path.length > 0) {
+            state.waypoints = path;
+            state.waypointIdx = 0;
+            state.waypointTarget = {
+              x: Number(waypointAnchor.x || 0),
+              y: Number(waypointAnchor.y || 0),
+              z: Number(waypointAnchor.z || 0)
+            };
+          } else {
+            state.waypointReplanFailures++;
+            // Cascade to Layer 2 / direct target steering until the next replan window.
+            state.waypoints = null;
+          }
+        }
+
+        // Advance waypoint index when within 4m; force a replan once path is done.
+        if (state.waypoints && state.waypoints.length > 0) {
+          while (state.waypointIdx < state.waypoints.length) {
+            const wp = state.waypoints[state.waypointIdx];
+            const wpDx = Number(wp.x || 0) - Number(playerPos.x || 0);
+            const wpDz = Number(wp.z || 0) - Number(playerPos.z || 0);
+            if (Math.hypot(wpDx, wpDz) > 4) break;
+            state.waypointIdx++;
+          }
+          if (state.waypointIdx >= state.waypoints.length) state.lastWaypointReplanAt = 0;
+        }
+
+        // Steering target is the next waypoint if Layer 1 gave us one, else direct.
+        let steeringTarget = movementTarget;
+        if (state.waypoints && state.waypoints.length > 0 && state.waypointIdx < state.waypoints.length) {
+          steeringTarget = state.waypoints[state.waypointIdx];
+          state.waypointsFollowedCount++;
+        }
+
+        const dx = steeringTarget.x - playerPos.x;
+        const dz = steeringTarget.z - playerPos.z;
         const dist = Math.hypot(dx, dz);
+        // Distance to the final movement target (not waypoint) for the downstream
+        // movement-state policy; keeps sprint/advance distance semantics intact.
+        const finalDx = movementTarget.x - playerPos.x;
+        const finalDz = movementTarget.z - playerPos.z;
+        const finalDist = Math.hypot(finalDx, finalDz);
         if (!state.lastStablePos) {
           state.lastStablePos = { x: Number(playerPos.x), z: Number(playerPos.z) };
           state.stuckMs = 0;
@@ -1354,8 +1575,11 @@
             state.lastStablePos.z = Number(playerPos.z);
           }
         }
+        if (state.stuckMs > state.maxStuckMs) state.maxStuckMs = state.stuckMs;
 
-        // Stuck recovery: 3s threshold triggers retreat, 8s escalates to teleport
+        // Layer 3 — stuck detection. 3s triggers retreat-strafe; mode-specific
+        // stuckTimeoutSec escalates to teleport (reason: harness.recovery.stuck).
+        const stuckTimeoutMs = Math.max(1000, Number(modeProfile.stuckTimeoutSec || 5) * 1000);
         if (state.stuckMs > 3000 && !state.stuckRecoveryMode) {
           state.stuckRecoveryMode = true;
           state.stuckRecoveryUntil = Date.now() + 2000;
@@ -1372,29 +1596,44 @@
           state.stuckRecoveryMode = false;
         }
 
-        if (state.stuckMs > 8000) {
-          // Escalate: teleport to engagement area
-          const anchor = engagementCenter || movementTarget;
-          if (anchor) {
-            const offsetAngle = Math.random() * Math.PI * 2;
-            const offsetRadius = 80 + Math.random() * 45;
-            const nextX = anchor.x + Math.cos(offsetAngle) * offsetRadius;
-            const nextZ = anchor.z + Math.sin(offsetAngle) * offsetRadius;
-            if (!isTerrainReadyAt(systems, nextX, nextZ)) {
-              return;
+        if (state.stuckMs > stuckTimeoutMs) {
+          // Prefer hop to next waypoint (keeps planned route); else teleport near
+          // the engagement anchor.
+          let teleportTarget = null;
+          if (
+            state.waypoints
+            && state.waypoints.length > 0
+            && state.waypointIdx + 1 < state.waypoints.length
+          ) {
+            teleportTarget = state.waypoints[state.waypointIdx + 1];
+          }
+          if (!teleportTarget) {
+            const anchor = engagementCenter || movementTarget;
+            if (anchor) {
+              const offsetAngle = Math.random() * Math.PI * 2;
+              const offsetRadius = 80 + Math.random() * 45;
+              teleportTarget = {
+                x: anchor.x + Math.cos(offsetAngle) * offsetRadius,
+                y: anchor.y || 0,
+                z: anchor.z + Math.sin(offsetAngle) * offsetRadius
+              };
             }
+          }
+          if (teleportTarget) {
+            if (!isTerrainReadyAt(systems, teleportTarget.x, teleportTarget.z)) return;
             const nextPos = playerPos.clone();
-            nextPos.x = nextX;
-            nextPos.z = nextZ;
+            nextPos.x = Number(teleportTarget.x);
+            nextPos.z = Number(teleportTarget.z);
             const height = systems.terrainSystem && systems.terrainSystem.getHeightAt
-              ? systems.terrainSystem.getHeightAt(nextX, nextZ)
+              ? systems.terrainSystem.getHeightAt(nextPos.x, nextPos.z)
               : undefined;
-            if (Number.isFinite(height)) {
-              nextPos.y = Number(height) + 2;
-            }
+            if (Number.isFinite(height)) nextPos.y = Number(height) + 2;
             if (setHarnessPlayerPosition(systems, nextPos, 'harness.recovery.stuck')) {
               state.stuckMs = 0;
               state.stuckRecoveryMode = false;
+              state.stuckTeleportCount++;
+              state.waypoints = null;
+              state.lastWaypointReplanAt = 0;
               return;
             }
           }
@@ -1418,22 +1657,53 @@
         if (now - state.lastMovementDecisionAt >= modeProfile.decisionIntervalMs) {
           state.lastMovementDecisionAt = now;
 
-          // Slope probe: check if current movement direction leads into steep terrain
-          var cameraController = systems.playerController ? systems.playerController.cameraController : null;
-          var currentYawDeg = cameraController ? (Number(cameraController.yaw || 0) * 180 / Math.PI) : 0;
-          var forwardSlope = probeTerrainSlope(systems, playerPos, currentYawDeg, 8);
-          if (forwardSlope > 35) {
-            var clearDir = findClearDirection(systems, playerPos, currentYawDeg);
-            if (clearDir !== null && clearDir !== currentYawDeg) {
-              // Rotate camera toward clear direction and advance
-              var clearRad = clearDir * Math.PI / 180;
-              syncCameraAim(camera, cameraController, clearRad, Number(cameraController ? cameraController.pitch || 0 : camera.rotation.x || 0));
-              setMovementState('advance');
+          // Layer 2 — gradient probe. Deflected headings translate to WASD keys
+          // RELATIVE to the camera forward so the camera stays aimed at the target
+          // (fire loop can still land shots) while the player strafes around.
+          const cameraController = systems.playerController ? systems.playerController.cameraController : null;
+          const cameraYaw = cameraController
+            ? Number(cameraController.yaw || 0)
+            : Number(camera.rotation.y || 0);
+          const heading = chooseTerrainHeading(systems, playerPos, steeringTarget, modeProfile.maxGradient);
+          if (heading && heading.deflected) {
+            state.gradientProbeDeflections++;
+            // Bucket |rel angle| into 5 WASD patterns (W/W+strafe/strafe/S+strafe/S).
+            let rel = heading.yaw - cameraYaw;
+            while (rel > Math.PI) rel -= Math.PI * 2;
+            while (rel < -Math.PI) rel += Math.PI * 2;
+            const absRel = Math.abs(rel);
+            const side = rel >= 0 ? 'KeyD' : 'KeyA';
+            const DEG_30 = Math.PI / 6;
+            const DEG_60 = Math.PI / 3;
+            const DEG_120 = 2 * Math.PI / 3;
+            const DEG_150 = 5 * Math.PI / 6;
+            let pattern;
+            if (absRel < DEG_30) pattern = ['KeyW'];
+            else if (absRel < DEG_60) pattern = ['KeyW', side];
+            else if (absRel < DEG_120) pattern = [side];
+            else if (absRel < DEG_150) pattern = ['KeyS', side];
+            else pattern = ['KeyS'];
+            setMovementPattern(pattern);
+            state.movementTransitions++;
+            return;
+          } else if (!heading) {
+            // No candidate passes the gradient gate. Last-resort 8-way slope probe
+            // (the existing behaviour) picks ANY direction under the hard slope cap;
+            // if that fails, retreat and let Layer 3 teleport.
+            const currentYawDeg = cameraYaw * 180 / Math.PI;
+            const forwardSlope = probeTerrainSlope(systems, playerPos, currentYawDeg, 8);
+            if (forwardSlope > 35) {
+              const clearDir = findClearDirection(systems, playerPos, currentYawDeg);
+              if (clearDir !== null && clearDir !== currentYawDeg) {
+                // Hard-stuck fallback: rotate camera. Not the normal Layer 2 path.
+                const clearRad = clearDir * Math.PI / 180;
+                syncCameraAim(camera, cameraController, clearRad, Number(cameraController ? cameraController.pitch || 0 : camera.rotation.x || 0));
+                setMovementState('advance');
+                return;
+              }
+              setMovementState('retreat', { force: true });
               return;
             }
-            // All directions blocked - retreat
-            setMovementState('retreat', { force: true });
-            return;
           }
 
           const noNearbyEnemy = !nearestOpfor || nearestDist > (opts.mode === 'open_frontier' ? 140 : 95);
@@ -1442,21 +1712,21 @@
             return;
           }
           if (captureFocus && !captureFocus.inside) {
-            setMovementState(dist > modeProfile.sprintDistance ? 'sprint' : 'advance');
+            setMovementState(finalDist > modeProfile.sprintDistance ? 'sprint' : 'advance');
             return;
           }
-          if (!state.targetVisible && dist > 60) {
-            setMovementState(dist > modeProfile.sprintDistance ? 'sprint' : 'advance');
+          if (!state.targetVisible && finalDist > 60) {
+            setMovementState(finalDist > modeProfile.sprintDistance ? 'sprint' : 'advance');
             return;
           }
           // Coherent movement policy: fewer abrupt transitions, mode-aware ranges.
-          if (dist > modeProfile.sprintDistance) {
+          if (finalDist > modeProfile.sprintDistance) {
             setMovementState('sprint');
-          } else if (dist > modeProfile.approachDistance) {
+          } else if (finalDist > modeProfile.approachDistance) {
             setMovementState('advance');
-          } else if (dist < modeProfile.retreatDistance && state.targetVisible) {
+          } else if (finalDist < modeProfile.retreatDistance && state.targetVisible) {
             setMovementState('retreat');
-          } else if (state.targetVisible && dist < 70 && Math.random() < modeProfile.holdChanceWhenVisible) {
+          } else if (state.targetVisible && finalDist < 70 && Math.random() < modeProfile.holdChanceWhenVisible) {
             setMovementState('hold');
           } else if (modeProfile.preferredJuke === 'push' && Math.random() < 0.3) {
             setMovementState('advance');
@@ -1464,6 +1734,9 @@
             setMovementState('strafe');
           }
         }
+        // Silence unused-var linter: `dist` is kept for telemetry/debug but the
+        // primary distance used downstream is finalDist.
+        void dist;
       }
     }
 
@@ -1480,7 +1753,14 @@
         frontlineDistance: state.frontlineDistance,
         frontlineMoveCount: state.frontlineMoveCount,
         capturedZoneCount: state.capturedZoneCount,
-        movementTransitions: state.movementTransitions
+        movementTransitions: state.movementTransitions,
+        // perf-harness-redesign surfaces — read by capture-side per-mode validators.
+        losRejectedShots: state.losRejectedShots,
+        stuckTeleportCount: state.stuckTeleportCount,
+        maxStuckSeconds: Math.max(0, Math.round(state.maxStuckMs / 100) / 10),
+        gradientProbeDeflections: state.gradientProbeDeflections,
+        waypointsFollowedCount: state.waypointsFollowedCount,
+        waypointReplanFailures: state.waypointReplanFailures
       };
     }
 
@@ -1495,6 +1775,17 @@
     function getDebugSnapshot() {
       return {
         mode: opts.mode,
+        terrainProfile: String(modeProfile.terrainProfile || ''),
+        maxGradient: Number(modeProfile.maxGradient || 0),
+        stuckTimeoutSec: Number(modeProfile.stuckTimeoutSec || 0),
+        losRejectedShots: state.losRejectedShots,
+        stuckTeleportCount: state.stuckTeleportCount,
+        maxStuckSeconds: Math.max(0, Math.round(state.maxStuckMs / 100) / 10),
+        gradientProbeDeflections: state.gradientProbeDeflections,
+        waypointsFollowedCount: state.waypointsFollowedCount,
+        waypointReplanFailures: state.waypointReplanFailures,
+        waypointCount: state.waypoints ? state.waypoints.length : 0,
+        waypointIdx: state.waypointIdx,
         movementState: state.movementState,
         previousMovementState: state.previousMovementState,
         movementStateSince: state.movementStateSince,
@@ -1580,11 +1871,15 @@
         y: Number(nearestOpfor.position.y || 0) + 1.2,
         z: nearestOpfor.position.z
       };
+      // LOS-aware fire gate (aim-path). Probe the eye-to-target ray for terrain
+      // occlusion BEFORE invoking actionFireStart. Counter rises on every rejection
+      // so captures can prove the gate engaged during the run.
       const blockedRay = hasTerrainOcclusion(systems, eye, targetEye);
       const blockedHeight = hasHeightProfileOcclusion(systems, eye, targetEye);
       const visibleNow = !(blockedRay || blockedHeight);
       state.targetVisible = visibleNow;
       if (!visibleNow) {
+        state.losRejectedShots++;
         updateFireProbe({
           reason: 'target_occluded',
           targetDistance: dist,
@@ -1630,6 +1925,9 @@
         if (allowSpeculativeFire) {
           setMovementState('hold', { force: true });
         } else {
+        if (shotAnalysis.reason === 'terrain_block' || shotAnalysis.reason === 'height_profile_block') {
+          state.losRejectedShots++;
+        }
         updateFireProbe({
           reason: 'shot_blocked',
           shotBlockReason: shotAnalysis.reason,
@@ -1656,25 +1954,27 @@
       }
 
       const forward = shotRay ? shotRay.direction : getCameraForward(camera);
-      const aimDot = forward.x * tx + forward.y * ty + forward.z * tz;
-      const verticalComponent = Math.abs(ty);
-      if (aimDot < 0.8) {
+      // Route aim-dot + vertical-angle decision through the pure helper so the
+      // A4-class regression test (scripts/perf-harness/perf-active-driver.test.js)
+      // exercises the same logic the browser does.
+      const fireDecision = evaluateFireDecision({
+        cameraForward: { x: forward.x, y: forward.y, z: forward.z },
+        toTarget: { x: tx, y: ty, z: tz },
+        aimDotThreshold: 0.8,
+        verticalThreshold: 0.45,
+        closeRange: closeRange
+      });
+      const aimDot = fireDecision.aimDot;
+      const verticalComponent = fireDecision.verticalComponent;
+      if (!fireDecision.shouldFire) {
         updateFireProbe({
-          reason: 'aim_dot_too_low',
+          reason: fireDecision.reason,
           targetDistance: dist,
           aimDot: aimDot,
-          cameraDelta: cameraDelta,
-          rayOriginDelta: rayOriginDelta,
-          targetId: String(nearestOpfor.id || '')
-        });
-        return;
-      }
-      if (verticalComponent > 0.45 && !closeRange) {
-        updateFireProbe({
-          reason: 'vertical_angle_rejected',
-          targetDistance: dist,
           verticalComponent: verticalComponent,
           closeRange: closeRange,
+          cameraDelta: cameraDelta,
+          rayOriginDelta: rayOriginDelta,
           targetId: String(nearestOpfor.id || '')
         });
         return;
@@ -1721,35 +2021,46 @@
     };
   }
 
-  globalWindow.__perfHarnessDriver = {
-    start: function (options) {
-      if (globalWindow.__perfHarnessDriverState && globalWindow.__perfHarnessDriverState.stop) {
-        globalWindow.__perfHarnessDriverState.stop();
+  if (globalWindow) {
+    globalWindow.__perfHarnessDriver = {
+      start: function (options) {
+        if (globalWindow.__perfHarnessDriverState && globalWindow.__perfHarnessDriverState.stop) {
+          globalWindow.__perfHarnessDriverState.stop();
+        }
+        const driver = createDriver(options || {});
+        globalWindow.__perfHarnessDriverState = driver;
+        return {
+          movementPatternCount: driver.movementPatternCount || 0,
+          compressFrontline: !!driver.compressFrontline,
+          mode: String(driver.mode || ''),
+          allowWarpRecovery: !!driver.allowWarpRecovery,
+          topUpHealth: driver.topUpHealth !== false,
+          autoRespawn: driver.autoRespawn !== false
+        };
+      },
+      stop: function () {
+        if (!globalWindow.__perfHarnessDriverState || !globalWindow.__perfHarnessDriverState.stop) {
+          return null;
+        }
+        const stats = globalWindow.__perfHarnessDriverState.stop();
+        globalWindow.__perfHarnessDriverState = null;
+        return stats;
+      },
+      getDebugSnapshot: function () {
+        if (!globalWindow.__perfHarnessDriverState || !globalWindow.__perfHarnessDriverState.getDebugSnapshot) {
+          return null;
+        }
+        return globalWindow.__perfHarnessDriverState.getDebugSnapshot();
       }
-      const driver = createDriver(options || {});
-      globalWindow.__perfHarnessDriverState = driver;
-      return {
-        movementPatternCount: driver.movementPatternCount || 0,
-        compressFrontline: !!driver.compressFrontline,
-        mode: String(driver.mode || ''),
-        allowWarpRecovery: !!driver.allowWarpRecovery,
-        topUpHealth: driver.topUpHealth !== false,
-        autoRespawn: driver.autoRespawn !== false
-      };
-    },
-    stop: function () {
-      if (!globalWindow.__perfHarnessDriverState || !globalWindow.__perfHarnessDriverState.stop) {
-        return null;
-      }
-      const stats = globalWindow.__perfHarnessDriverState.stop();
-      globalWindow.__perfHarnessDriverState = null;
-      return stats;
-    },
-    getDebugSnapshot: function () {
-      if (!globalWindow.__perfHarnessDriverState || !globalWindow.__perfHarnessDriverState.getDebugSnapshot) {
-        return null;
-      }
-      return globalWindow.__perfHarnessDriverState.getDebugSnapshot();
-    }
-  };
-})();
+    };
+  }
+
+  // Expose pure helpers for Node-side regression tests (scripts/perf-harness/*).
+  // Browser scripts ignore the module.exports branch.
+  if (typeof module !== 'undefined' && module && module.exports) {
+    module.exports = {
+      evaluateFireDecision: evaluateFireDecision,
+      chooseHeadingByGradient: chooseHeadingByGradient
+    };
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this);
