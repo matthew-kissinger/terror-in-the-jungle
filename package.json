@@ -76,7 +76,7 @@
     "playtest:mobile:flow": "npx tsx scripts/mobile-playtest.ts --flow-only"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
+    "@types/node": "^25.5.2",
     "@types/three": "^0.183.0",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
     "@typescript-eslint/parser": "^8.58.0",
