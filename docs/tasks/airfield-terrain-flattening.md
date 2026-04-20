@@ -65,7 +65,7 @@ Commit PNGs to `docs/cycles/cycle-2026-04-21-atmosphere-polish-and-fixes/screens
 ## Non-goals
 
 - Do not redesign the airfield template schema.
-- Do not change aircraft ground-physics tuning (separate `aircraft-ground-physics-tuning` task).
+- Do not change aircraft ground-physics or takeoff bounce — that's `aircraft-takeoff-bounce-fix` (recon confirmed the bouncing is in `Airframe.ts:522-540` ground-clamp logic, NOT the runway. Even on a perfectly flat runway the porpoise loop would fire.)
 - Do not change runway dimensions globally — fix the placement / flattening only.
 
 ## Hard stops

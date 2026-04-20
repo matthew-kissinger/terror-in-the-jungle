@@ -1,69 +1,72 @@
-# aircraft-a1-spawn-regression: A-1 Skyraider missing from main airbase runway
+# aircraft-a1-spawn-regression: keep an A-1 Skyraider parked at main_airbase for the player
 
-**Slug:** `aircraft-a1-spawn-regression`
+**Slug:** `aircraft-a1-spawn-regression` *(file kept; the original "missing aircraft regression" hypothesis was wrong — see "Recon-corrected diagnosis" below)*
 **Cycle:** `cycle-2026-04-21-atmosphere-polish-and-fixes`
-**Priority:** P1 — narrow scope, surgical fix; orthogonal to ground physics.
-**Playtest required:** YES (boolean: is the A-1 visible).
+**Priority:** P1 — narrow scope; orthogonal to ground physics.
+**Playtest required:** YES (boolean: is the A-1 parked when the player walks up).
 **Estimated risk:** low.
 **Budget:** ≤ 100 LOC.
 **Files touched:**
 
-- Investigate: `src/systems/world/AirfieldTemplates.ts:222-242` (A-1 entry), the spawner that walks `parkingSpots` (find via `Grep "parkingSpot" src/`), `src/systems/world/AirfieldLayoutGenerator.ts`.
-- Modify: whichever step in the spawn pipeline silently skips the A-1.
+- Modify: `src/systems/world/AirfieldTemplates.ts:222-242` (A-1 parking spot — remove `npcAutoFlight` field OR add a second parked-and-claimable A-1 spot).
 
-## Symptoms (orchestrator playtest 2026-04-20)
+## Recon-corrected diagnosis (2026-04-20)
 
-User: "I do not see the one with the single propeller now on the runway just the spooky and the jet."
+User playtest 2026-04-20 (post-recon): "oh it seems there was a plane that actually takes off at the start maybe that is where it went. and now i can actually fly i stand corrected. the plane that takes off at the start is not me flying it i just saw it take off in the sky."
 
-The A-1 (single-prop Skyraider) is defined at `AirfieldTemplates.ts:222-242` with `npcAutoFlight: { kind: 'ferry', ... }`. The AC-47 (two-prop gunship) and F-4 (jet) are also defined and visible. So the data is there; the bug is in the spawn pipeline gating the A-1 specifically out.
+The A-1 is **NOT missing**. It spawns correctly. `AirfieldTemplates.ts:222-242` defines it with `npcAutoFlight: { kind: 'ferry', waypoint: -1500m, altitude: 220m, airspeed: 65 m/s }`. The NPC pilot state machine (`NPCFixedWingPilot.ts:84-121`) walks COLD → STARTUP → TAKEOFF → CLIMB → NAVIGATE → RTB → LANDING and ferries the A-1 off the airfield within the first few seconds of world boot. By the time the player reaches the airfield, the A-1 is already a speck in the sky.
 
-This is ORTHOGONAL to `aircraft-ground-physics-tuning`. The A-1 spawn problem can be fixed independently — once it spawns, it will or won't take off based on physics tuning, but at least it'll be visible.
+So the original brief's spawn-pipeline hypothesis tree (asset load failure / pilot-init early return / clearance-radius collision / recent plumbing change) is **all moot**. The data flow is working as designed.
+
+The actual user need: the A-1 should be **available to the player at the airfield** so they can fly it themselves.
+
+## Fix options (pick one)
+
+**Option A — disable A-1 ferry mission (simplest).** Remove the `npcAutoFlight` field from `AirfieldTemplates.ts:222-242`. A-1 spawns parked, doesn't auto-launch, player can walk up and claim it. Loses the visual "plane departing at world start" gameplay, but that wasn't anyone's design intent — it was an integration test of the NPC pilot.
+
+**Option B — add a second parked A-1 spot.** Keep the existing ferry-A-1 (it demonstrates NPC pilot AI is alive). Add a second parking spot for a stationary A-1 that players can claim. Requires adding a parking-spot entry + an extra slot in the airfield layout. More invasive, larger diff.
+
+**Recommend Option A for v1.** The ferry-takeoff visual is nice-to-have; player access to the A-1 is what the user asked for. Option B can be a follow-up if the missing visual matters.
 
 ## Required reading first
 
-- `src/systems/world/AirfieldTemplates.ts` (parking spot for A-1 at lines 222-242).
-- `src/systems/world/AirfieldLayoutGenerator.ts` — placer.
-- The aircraft spawner — search via `Grep "parkingSpot" src/`, `Grep "AircraftModels" src/`.
-- `src/systems/vehicle/NPCFixedWingPilot.ts` and `npcPilot/states.ts` — does the spawn require valid pilot state? Could be that pilot init fails for the A-1's auto-flight config, leaving the A-1 unspawned.
-- Console log in `npm run dev` when generating main_airbase — look for messages mentioning "A1" / "Skyraider" / "stand_a1".
+- `src/systems/world/AirfieldTemplates.ts:222-263` — main_airbase parkingSpots block. Note the AC-47 and F-4 don't have `npcAutoFlight` — they spawn parked. A-1 is the outlier.
+- `src/systems/world/AirfieldLayoutGenerator.ts:166-176` — how `npcAutoFlight` flows from template to placement.
+- `src/systems/world/WorldFeatureSystem.ts:171-173` and `:311-350` — where `attachNPCFlight()` is called.
+- `src/systems/vehicle/NPCFixedWingPilot.ts:84-121` — pilot state machine for context.
+- Existing test (if any): `AirfieldTemplates.test.ts` or `AirfieldLayoutGenerator.test.ts`.
 
-## Hypothesis (cheapest first)
+## Steps (Option A path)
 
-1. Asset load fails silently for `AircraftModels.A1_SKYRAIDER`. Check console for asset errors.
-2. The spawner has an early-return when `npcAutoFlight` is present and pilot can't be created — and the A-1 is the ONLY parking spot with `npcAutoFlight` in the main airfield, so it's the only one that hits the failing branch.
-3. The runway start `south_departure` referenced by both A-1 (`taxiRouteId: 'a1_south_route'`) and AC-47 (`taxiRouteId: 'ac47_south_route'`) has a clearance conflict — placer keeps AC-47 (placed first) and rejects A-1 (placed second). Look at `clearanceRadius` (A-1: 22, AC-47: 30); their `offsetLateral` is the same (96), `offsetAlongRunway` differs (-82 vs 0). Distance ≈ 82m, larger than the sum of clearance radii (52m), should not conflict. But verify the actual conflict-detection math.
-4. Some recent cycle's plumbing change touched the spawn pipeline. Check `git log --oneline src/systems/world/` for the last 5-10 commits.
-
-## Steps
-
-1. `npm run dev`, generate main_airbase, observe runway. Confirm A-1 absent.
-2. Open browser console; look for errors mentioning A-1 / Skyraider / stand_a1 / asset load failures.
-3. Add a Logger trace in the spawner at every early-return that mentions which parking spot was skipped + why.
-4. Identify the failing branch.
-5. Fix: asset registration if model load fails; pilot-init handling if auto-flight init fails; clearance math if false-positive conflict.
+1. Read `AirfieldTemplates.ts:222-242`.
+2. Delete the `npcAutoFlight: { kind: 'ferry', ... }` field from the A-1 parking spot entry.
+3. Boot `npm run dev`, generate main_airbase. Confirm A-1 visible parked at its spot, AC-47 + F-4 still visible (no regression).
+4. Confirm no console errors.
+5. Add a regression test (extend `AirfieldTemplates.test.ts` if it exists, otherwise create a small one) that asserts main_airbase has exactly one A-1, AC-47, and F-4 parking spot AND none of them have `npcAutoFlight` set (so no auto-departure on boot).
 
 ## Screenshot evidence (required for merge)
 
-Commit PNGs to `docs/cycles/cycle-2026-04-21-atmosphere-polish-and-fixes/screenshots/aircraft-a1-spawn-regression/`:
+Commit PNG to `docs/cycles/cycle-2026-04-21-atmosphere-polish-and-fixes/screenshots/aircraft-a1-spawn-regression/`:
 
-- `main-airbase-with-a1.png` — A-1, AC-47, and F-4 all visible at main_airbase.
+- `main-airbase-with-a1-parked.png` — A-1, AC-47, and F-4 all visible parked at main_airbase, captured ~10 seconds after world boot (long enough that any auto-launch would have triggered).
 
 ## Exit criteria
 
-- A-1 Skyraider visible at main_airbase parking on every world-gen seed.
-- AC-47 and F-4 still visible (no regression on the other two).
-- No console errors about A-1 asset / spawn failure.
+- A-1 Skyraider visible parked at main_airbase 10+ seconds after world boot on every world-gen seed.
+- AC-47 and F-4 still visible parked (no regression on the other two).
+- Player can claim and fly the A-1 (manual smoke).
+- Regression test pinning "main_airbase has parked A-1, AC-47, F-4 with no `npcAutoFlight`."
 - `npm run lint`, `npm run test:run`, `npm run build` green.
-- Add a regression test (if there's an existing `AirfieldTemplates.test.ts` or `AirfieldLayoutGenerator.test.ts`, extend it to assert all three template parking spots get spawned).
 
 ## Non-goals
 
-- Do not address whether the A-1 takes off (separate `aircraft-ground-physics-tuning` task).
-- Do not change A-1 template config (yaw, taxi route, etc.).
+- Do not redesign the NPC pilot state machine or ferry mission concept (it can come back as a sortie spawned from a different airfield/template later).
+- Do not change A-1 template config beyond removing `npcAutoFlight`.
+- Do not address whether the A-1 takes off cleanly — that's `aircraft-takeoff-bounce-fix` (`aircraft-ground-physics-tuning`).
 - Do not redesign the spawn pipeline.
 
 ## Hard stops
 
 - Fence change → STOP.
-- Fix requires changing aircraft model assets → STOP, file separate task.
-- A-1 still missing after the trace identifies a fix → STOP, may indicate a deeper init-order issue with the new atmosphere wiring; surface for re-scoping.
+- Removing `npcAutoFlight` breaks `attachNPCFlight()` callers (e.g. unconditional access to a now-undefined field) → fix the access pattern, do not restore the field.
+- A-1 still missing after the field is removed → STOP, escalate (would indicate a deeper init-order issue).

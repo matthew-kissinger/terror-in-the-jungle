@@ -47,7 +47,7 @@ The repo already has `npm run assets:fix-alpha` — investigate what it does and
 
 1. Reproduce: `npm run dev`, observe a vegetation cluster near the player at noon. Confirm white/blue outlines on edges.
 2. Read each of the files in "Required reading first." Identify the exact material setup vegetation uses.
-3. Test option 1 (alpha bleed via existing asset pipeline) on a single vegetation sprite. If it fixes the issue, run it across all vegetation textures.
+3. Confirm whether `npm run assets:fix-alpha` exists in `package.json` and what it actually does (read the script source). If it's an alpha-bleed pipeline, run it on a single vegetation sprite first to validate before bulk-applying.
 4. If asset pipeline doesn't help, try the shader-side options.
 5. Verify the fix doesn't break other vegetation rendering (LOD transitions, distant haze).
 

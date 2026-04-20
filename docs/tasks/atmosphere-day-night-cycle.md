@@ -75,3 +75,7 @@ Commit PNGs to `docs/cycles/cycle-2026-04-21-atmosphere-polish-and-fixes/screens
 - LUT rebake cost blows the World group budget → STOP, raise the threshold or amortize across frames.
 - Sun-below-horizon produces NaN / black sky → STOP, tighten the clamp.
 - Pair with `post-tone-mapping-aces`: without tone-mapping, dawn/dusk warmth still won't read. If tone-mapping isn't merged yet, you can land but the visual demonstration will be muted.
+
+## Coordination with cloud-runtime-implementation
+
+`cloud-runtime-implementation` (Round 3) needs to read `AtmosphereSystem.getSunDirection()` live each frame so cloud color tracks the moving sun. **Do not change the signature of `getSunDirection()` or `getSunColor()`** — the cloud task assumes those return values evolve as time advances. Keep the public surface stable; mutate only the internal source of truth that backs them.

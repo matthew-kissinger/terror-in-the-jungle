@@ -73,6 +73,10 @@ Commit PNGs to `docs/cycles/cycle-2026-04-21-atmosphere-polish-and-fixes/screens
 - Do not touch `renderer.toneMapping` on the WebGLRenderer instance — the post-process pipeline owns the final color step.
 - Do not address the "fog too white at distance" symptom directly here — that's `fog-density-rebalance`.
 
+## Sequencing note
+
+Lands in Round 1 specifically because `fog-density-rebalance` and `vegetation-fog-and-lighting-parity` (both Round 2) need this in place before their visual validation reads correctly — once the warm hues no longer clip to white, the actual fog density and vegetation lighting issues become visible.
+
 ## Hard stops
 
 - Fence change → STOP.

@@ -106,8 +106,9 @@ Aircraft / airfield foundation (multi-system fix):
 
 - **`airfield-terrain-flattening`** (P0) — flatten airfield footprint properly; reject cliff-edge candidate sites. Brief: `docs/tasks/airfield-terrain-flattening.md`.
 - **`airfield-aircraft-orientation`** (P1) — parking yaws must align with taxi-route entry. Brief: `docs/tasks/airfield-aircraft-orientation.md`.
-- **`aircraft-ground-physics-tuning`** (P0) — flat-runway takeoff must work without hill-launch. Brief: `docs/tasks/aircraft-ground-physics-tuning.md`.
-- **`aircraft-a1-spawn-regression`** (P1) — A-1 Skyraider missing from main_airbase. Brief: `docs/tasks/aircraft-a1-spawn-regression.md`.
+- **`aircraft-ground-physics-tuning`** (P0) — fix takeoff porpoising / bouncing on ground-clamp oscillation in `Airframe.ts:522-540` post-liftoff fallback. Brief: `docs/tasks/aircraft-ground-physics-tuning.md`. *(Repurposed 2026-04-20 after recon — original "throttle/lift/friction tuning" hypothesis was wrong; root cause is airborne ground-clamp.)*
+- **`aircraft-a1-spawn-regression`** (P1) — keep A-1 Skyraider parked at main_airbase by removing its NPC ferry mission. Brief: `docs/tasks/aircraft-a1-spawn-regression.md`. *(Repurposed 2026-04-20 — A-1 isn't missing; it auto-ferries off at boot.)*
+- **`aircraft-simulation-culling`** (P2) — skip `airframe.step()` for unpiloted, off-screen aircraft beyond render-cull distance; no LOD mesh. Brief: `docs/tasks/aircraft-simulation-culling.md`.
 
 Content + harness fixes:
 
@@ -121,24 +122,25 @@ Carry-forward:
 
 ### Round schedule
 
-14 tasks across 5 rounds, 5-parallel cap.
+15 tasks across 5 rounds, 5-parallel cap.
 
 - **Round 1 (5 parallel — independent):**
   - `post-tone-mapping-aces`
   - `vegetation-alpha-edge-fix`
   - `skybox-cutover-no-fallbacks`
   - `ashau-dem-streaming-fix`
-  - `aircraft-a1-spawn-regression`
+  - `aircraft-a1-spawn-regression` *(repurposed; small config-only diff)*
 - **Round 2 (5 parallel — fan out from Round 1):**
   - `fog-density-rebalance` (after `post-tone-mapping-aces`)
   - `vegetation-fog-and-lighting-parity` (after `post-tone-mapping-aces`)
   - `airfield-terrain-flattening`
   - `npc-and-player-leap-fix`
   - `atmosphere-day-night-cycle`
-- **Round 3 (3 parallel):**
+- **Round 3 (4 parallel):**
   - `airfield-aircraft-orientation` (after `airfield-terrain-flattening`)
   - `harness-ashau-objective-cycling-fix` (after `ashau-dem-streaming-fix`)
-  - `cloud-runtime-implementation` (after `post-tone-mapping-aces` + `fog-density-rebalance` for color realism)
+  - `cloud-runtime-implementation` (after `post-tone-mapping-aces` + `fog-density-rebalance` + `atmosphere-day-night-cycle` — needs live sun direction)
+  - `aircraft-simulation-culling` *(independent; new task added 2026-04-20)*
 - **Round 4 (1):**
   - `aircraft-ground-physics-tuning` (after `airfield-terrain-flattening` so testable on a real flat runway)
 - **Round 5 (1):**
@@ -155,13 +157,14 @@ post-tone-mapping-aces                (blocks: fog-density-rebalance, vegetation
 fog-density-rebalance                 (blocked by: post-tone-mapping-aces; blocks: cloud-runtime-implementation)
 vegetation-alpha-edge-fix             (independent)
 vegetation-fog-and-lighting-parity    (blocked by: post-tone-mapping-aces)
-atmosphere-day-night-cycle            (independent — touches AtmosphereSystem; coordinate with cloud-runtime-implementation if both land same round, but no hard dep)
+atmosphere-day-night-cycle            (blocks: cloud-runtime-implementation — must merge first so cloud reads live sun direction)
 skybox-cutover-no-fallbacks           (independent)
-cloud-runtime-implementation          (blocked by: post-tone-mapping-aces, fog-density-rebalance)
+cloud-runtime-implementation          (blocked by: post-tone-mapping-aces, fog-density-rebalance, atmosphere-day-night-cycle)
 airfield-terrain-flattening           (blocks: airfield-aircraft-orientation, aircraft-ground-physics-tuning)
 airfield-aircraft-orientation         (blocked by: airfield-terrain-flattening)
-aircraft-ground-physics-tuning        (blocked by: airfield-terrain-flattening)
-aircraft-a1-spawn-regression          (independent)
+aircraft-ground-physics-tuning        (blocked by: airfield-terrain-flattening) [repurposed: takeoff bounce fix]
+aircraft-a1-spawn-regression          (independent) [repurposed: keep A-1 parked]
+aircraft-simulation-culling           (independent) [NEW 2026-04-20]
 ashau-dem-streaming-fix               (blocks: harness-ashau-objective-cycling-fix)
 harness-ashau-objective-cycling-fix   (blocked by: ashau-dem-streaming-fix; blocks: perf-baseline-refresh)
 npc-and-player-leap-fix               (blocks: perf-baseline-refresh)
