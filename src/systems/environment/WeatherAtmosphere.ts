@@ -40,6 +40,13 @@ export interface AtmosphereBaseValues {
 export interface FogTintIntentReceiver {
   setFogDarkenFactor(factor: number): void;
   setFogUnderwaterOverride(active: boolean): void;
+  /**
+   * Weather-driven cloud coverage intent. Mirrors fog darken: STORM /
+   * HEAVY_RAIN raise coverage toward overcast, CLEAR releases back to the
+   * scenario preset baseline. Optional so older callers / test stubs that
+   * only satisfy the fog surface keep compiling.
+   */
+  setCloudCoverageIntent?(active: boolean, target: number): void;
 }
 
 // Per-weather-state fog darkening. Forwarded to AtmosphereSystem via the
@@ -50,6 +57,14 @@ const FOG_DARKEN_LIGHT_RAIN = 0.88;
 const FOG_DARKEN_HEAVY_RAIN = 0.7;
 const FOG_DARKEN_STORM = 0.45;
 
+// Per-weather-state cloud coverage targets. STORM fills the sky; CLEAR
+// releases to the scenario preset default. Mirror of fog darken so the
+// two skies-vs-storm signals evolve together.
+const CLOUD_COVERAGE_CLEAR = 0.0;
+const CLOUD_COVERAGE_LIGHT_RAIN = 0.6;
+const CLOUD_COVERAGE_HEAVY_RAIN = 0.85;
+const CLOUD_COVERAGE_STORM = 1.0;
+
 function fogDarkenForState(state: WeatherState): number {
   switch (state) {
     case WeatherState.LIGHT_RAIN: return FOG_DARKEN_LIGHT_RAIN;
@@ -57,6 +72,16 @@ function fogDarkenForState(state: WeatherState): number {
     case WeatherState.STORM: return FOG_DARKEN_STORM;
     case WeatherState.CLEAR:
     default: return FOG_DARKEN_CLEAR;
+  }
+}
+
+function cloudCoverageForState(state: WeatherState): number {
+  switch (state) {
+    case WeatherState.LIGHT_RAIN: return CLOUD_COVERAGE_LIGHT_RAIN;
+    case WeatherState.HEAVY_RAIN: return CLOUD_COVERAGE_HEAVY_RAIN;
+    case WeatherState.STORM: return CLOUD_COVERAGE_STORM;
+    case WeatherState.CLEAR:
+    default: return CLOUD_COVERAGE_CLEAR;
   }
 }
 
@@ -82,6 +107,9 @@ export function updateAtmosphere(
     // the legacy direct write so behavior stays unchanged.
     if (fogIntent) {
       fogIntent.setFogUnderwaterOverride(true);
+      // Clouds aren't visible under the water surface, so release the
+      // weather coverage override while submerged.
+      fogIntent.setCloudCoverageIntent?.(false, 0);
     } else if (renderer.fog) {
       renderer.fog.color.setHex(0x003344);
     }
@@ -113,9 +141,18 @@ export function updateAtmosphere(
   // tint still reads as "same horizon, dimmer" rather than losing the
   // sun-color signature.
   const fogDarken = fogDarkenForState(currentState) * (1 - t) + fogDarkenForState(targetState) * t;
+  const cloudCoverage =
+    cloudCoverageForState(currentState) * (1 - t) + cloudCoverageForState(targetState) * t;
   if (fogIntent) {
     fogIntent.setFogUnderwaterOverride(false);
     fogIntent.setFogDarkenFactor(fogDarken);
+    // A non-CLEAR state (now or the target) means weather is actively
+    // tinting the sky; keep the intent active until we're fully back in
+    // CLEAR. Releasing early would snap coverage to the preset baseline
+    // mid-transition.
+    const active =
+      currentState !== WeatherState.CLEAR || targetState !== WeatherState.CLEAR;
+    fogIntent.setCloudCoverageIntent?.(active, cloudCoverage);
   }
 
   if (!isFlashing) {

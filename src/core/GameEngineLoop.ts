@@ -71,8 +71,16 @@ export function animate(engine: GameEngine, timestamp?: number): void {
 
     // Keep the analytic `AtmosphereSystem` dome glued to the camera so it
     // never z-fights terrain or clips when pilots climb past the dome
-    // radius.
-    engine.systemManager.atmosphereSystem.syncDomePosition(engine.renderer.camera.position);
+    // radius. Also tell the atmosphere the local ground height so the
+    // cloud layer sits at (terrainY + baseAltitude) rather than world Y=0.
+    const cameraPos = engine.renderer.camera.position;
+    engine.systemManager.atmosphereSystem.syncDomePosition(cameraPos);
+    const terrainSystem = engine.systemManager.terrainSystem;
+    if (terrainSystem && typeof terrainSystem.getHeightAt === 'function') {
+      engine.systemManager.atmosphereSystem.setTerrainYAtCamera(
+        terrainSystem.getHeightAt(cameraPos.x, cameraPos.z)
+      );
+    }
 
     // Check if mortar is deployed and using mortar camera view
     const mortarSystem = engine.systemManager.mortarSystem;

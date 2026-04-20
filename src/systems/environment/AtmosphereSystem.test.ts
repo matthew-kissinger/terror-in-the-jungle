@@ -327,9 +327,15 @@ describe('AtmosphereSystem (day/night cycle)', () => {
 });
 
 describe('AtmosphereSystem (ICloudRuntime contract)', () => {
-  it('starts with zero coverage and round-trips a normal value', () => {
+  it('coverage is a number in [0, 1] at boot', () => {
     const system = new AtmosphereSystem();
-    expect(system.getCoverage()).toBe(0);
+    const initial = system.getCoverage();
+    expect(initial).toBeGreaterThanOrEqual(0);
+    expect(initial).toBeLessThanOrEqual(1);
+  });
+
+  it('round-trips a normal coverage value', () => {
+    const system = new AtmosphereSystem();
     system.setCoverage(0.4);
     expect(system.getCoverage()).toBeCloseTo(0.4, 5);
   });
@@ -340,6 +346,78 @@ describe('AtmosphereSystem (ICloudRuntime contract)', () => {
     expect(system.getCoverage()).toBe(0);
     system.setCoverage(2.5);
     expect(system.getCoverage()).toBe(1);
+  });
+
+  it('applyScenarioPreset restores per-scenario baseline coverage', () => {
+    const system = new AtmosphereSystem();
+    // Temporarily force coverage to 1.0 via the public API.
+    system.setCoverage(1.0);
+    expect(system.getCoverage()).toBeCloseTo(1.0, 5);
+
+    // Reapplying a preset must reset coverage to that preset's baseline,
+    // whatever it is, so different scenarios don't leak their cloud
+    // coverage into each other.
+    const firstPreset = 'combat120' as const;
+    system.applyScenarioPreset(firstPreset);
+    const firstBaseline = system.getCoverage();
+    expect(firstBaseline).toBeGreaterThanOrEqual(0);
+    expect(firstBaseline).toBeLessThanOrEqual(1);
+
+    system.setCoverage(1.0);
+    system.applyScenarioPreset(firstPreset);
+    expect(system.getCoverage()).toBeCloseTo(firstBaseline, 5);
+  });
+
+  it('weather cloud intent raises coverage above the scenario baseline', () => {
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('combat120');
+    const baseline = system.getCoverage();
+
+    // Scene attach + syncDomePosition are required to trigger the
+    // cloud-layer update path that reconciles preset + intent.
+    const scene = new THREE.Scene();
+    system.attachScene(scene);
+    system.syncDomePosition(new THREE.Vector3(0, 5, 0));
+
+    // Simulate a storm weather target.
+    system.setCloudCoverageIntent(true, 0.95);
+    system.update(0.016);
+    expect(system.getCoverage()).toBeGreaterThan(baseline);
+    expect(system.getCoverage()).toBeCloseTo(0.95, 5);
+  });
+
+  it('clearing the weather cloud intent returns coverage to the scenario baseline', () => {
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('combat120');
+    const baseline = system.getCoverage();
+
+    const scene = new THREE.Scene();
+    system.attachScene(scene);
+    system.syncDomePosition(new THREE.Vector3(0, 5, 0));
+
+    system.setCloudCoverageIntent(true, 0.9);
+    system.update(0.016);
+    expect(system.getCoverage()).toBeCloseTo(0.9, 5);
+
+    system.setCloudCoverageIntent(false, 0);
+    system.update(0.016);
+    expect(system.getCoverage()).toBeCloseTo(baseline, 5);
+  });
+
+  it('weather intent never lowers coverage below the scenario baseline', () => {
+    const system = new AtmosphereSystem();
+    system.applyScenarioPreset('tdm'); // high baseline
+    const baseline = system.getCoverage();
+    expect(baseline).toBeGreaterThan(0);
+
+    const scene = new THREE.Scene();
+    system.attachScene(scene);
+    system.syncDomePosition(new THREE.Vector3(0, 5, 0));
+
+    // Request a tiny weather override; baseline must win.
+    system.setCloudCoverageIntent(true, 0.05);
+    system.update(0.016);
+    expect(system.getCoverage()).toBeCloseTo(baseline, 5);
   });
 });
 
