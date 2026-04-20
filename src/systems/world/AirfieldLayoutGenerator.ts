@@ -71,6 +71,54 @@ function resolveRunwayStart(template: AirfieldTemplate, startId?: string): Airfi
   return template.runwayStarts.find((start) => start.id === startId);
 }
 
+/**
+ * Compute the local-frame yaw (around Y) needed to face a parked aircraft
+ * toward the first taxiway waypoint it will actually move to.
+ *
+ * Taxi routes in this codebase are written as `points[0]` = the stand itself,
+ * followed by the taxiway entry and onward. The aircraft should face the
+ * first point that is distinct from its parking offset; we skip any leading
+ * points that coincide (within `COINCIDENT_EPS_M`) with the stand.
+ *
+ * Coordinate convention: `localOffset(along, lateral) → Vector3(lateral, 0, along)`
+ * places `lateral` on local X and `along` on local Z. A rotation-Y of `θ` maps
+ * physics-forward (local `-Z`) to `(-sin θ, 0, -cos θ)`. To face a world
+ * direction `(dX, 0, dZ)` we need `θ = atan2(-dX, -dZ)`.
+ *
+ * Returns `undefined` when no valid direction can be derived (missing route,
+ * only-coincident points, or a degenerate segment); callers fall back to the
+ * template's static `yaw` override or `0`.
+ */
+const COINCIDENT_EPS_M = 0.5;
+
+function computeParkingYaw(
+  spot: { offsetAlongRunway: number; offsetLateral: number },
+  route: AirfieldTaxiRoute | undefined,
+): number | undefined {
+  const points = route?.points;
+  if (!points || points.length === 0) return undefined;
+
+  let target: { offsetAlongRunway: number; offsetLateral: number } | undefined;
+  for (const point of points) {
+    const dAlong = point.offsetAlongRunway - spot.offsetAlongRunway;
+    const dLateral = point.offsetLateral - spot.offsetLateral;
+    if (Math.abs(dAlong) > COINCIDENT_EPS_M || Math.abs(dLateral) > COINCIDENT_EPS_M) {
+      target = point;
+      break;
+    }
+  }
+  if (!target) return undefined;
+
+  const dAlong = target.offsetAlongRunway - spot.offsetAlongRunway;
+  const dLateral = target.offsetLateral - spot.offsetLateral;
+  // In local frame: X = lateral, Z = along. Forward direction we want is
+  // (dLateral, 0, dAlong). Solve for θ such that (-sin θ, 0, -cos θ) aligns
+  // with that direction.
+  const yaw = Math.atan2(-dLateral, -dAlong);
+  if (!Number.isFinite(yaw)) return undefined;
+  return yaw;
+}
+
 export function generateAirfieldLayout(
   template: AirfieldTemplate,
   center: THREE.Vector3,
@@ -174,11 +222,17 @@ export function generateAirfieldLayout(
           airspeedMs: spot.npcAutoFlight.airspeedMs,
         }
       : undefined;
+    // Parked aircraft should face the first point of their taxi route so the
+    // NPC pilot (or player) rolls straight onto the taxiway without a U-turn.
+    // A per-spot `spot.yaw` override wins if the template author set one; then
+    // the computed taxi-entry yaw; finally zero. See `computeParkingYaw`.
+    const computedYaw = computeParkingYaw(spot, taxiRoute);
+    const parkingYaw = spot.yaw ?? computedYaw ?? 0;
     placements.push({
       id: `parking_${i}`,
       modelPath: spot.modelPath,
       offset: localOff,
-      yaw: spot.yaw ?? 0,
+      yaw: parkingYaw,
       registerCollision: true,
       skipFlatSearch: true,
       fixedWingSpawn,

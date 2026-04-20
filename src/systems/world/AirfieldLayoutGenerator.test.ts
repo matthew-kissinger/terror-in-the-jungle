@@ -50,6 +50,33 @@ describe('AirfieldLayoutGenerator', () => {
       expect(Math.max(...alongOffsets)).toBeGreaterThan(0);
     });
 
+    it('orients each parked aircraft toward the first non-coincident taxi-route waypoint', () => {
+      const layout = generateAirfieldLayout(template, center, heading);
+      const fixedWingParking = layout.placements.filter((p) => p.fixedWingSpawn);
+      expect(fixedWingParking.length).toBeGreaterThan(0);
+
+      for (const placement of fixedWingParking) {
+        const route = placement.fixedWingSpawn!.taxiRoute!;
+        const entry = route.find((point) => point.distanceTo(placement.offset) > 0.5);
+        expect(entry, `route must have a non-coincident waypoint for ${placement.id}`).toBeDefined();
+
+        // Physics forward is local -Z, rotated by yaw around Y. Apply same
+        // transform as the runtime to derive the facing vector.
+        const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(
+          new THREE.Vector3(0, 1, 0),
+          placement.yaw ?? 0,
+        );
+        const desired = new THREE.Vector3(
+          entry!.x - placement.offset.x,
+          0,
+          entry!.z - placement.offset.z,
+        ).normalize();
+
+        // Dot product of unit vectors ≈ 1 when they align.
+        expect(forward.dot(desired)).toBeGreaterThan(0.999);
+      }
+    });
+
     it('attaches stand, taxi-route, and runway-start metadata to fixed-wing parking spots', () => {
       const layout = generateAirfieldLayout(template, center, heading);
       const fixedWingParking = layout.placements.filter((p) => p.fixedWingSpawn);
@@ -113,6 +140,28 @@ describe('AirfieldLayoutGenerator', () => {
       const strip = generateAirfieldLayout(AIRFIELD_TEMPLATES.forward_strip, center, heading);
       expect(strip.surfacePatches.filter((p) => p.surface === 'packed_earth').length)
         .toBe(AIRFIELD_TEMPLATES.forward_strip.aprons.length + AIRFIELD_TEMPLATES.forward_strip.taxiways.length);
+    });
+
+    it('orients the forward-strip A-1 toward its taxi-route entry', () => {
+      const strip = generateAirfieldLayout(AIRFIELD_TEMPLATES.forward_strip, center, heading);
+      const fixedWingSpot = strip.placements.find((p) => p.fixedWingSpawn);
+      expect(fixedWingSpot).toBeDefined();
+      const entry = fixedWingSpot!.fixedWingSpawn!.taxiRoute!.find(
+        (point) => point.distanceTo(fixedWingSpot!.offset) > 0.5,
+      );
+      expect(entry).toBeDefined();
+
+      const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(
+        new THREE.Vector3(0, 1, 0),
+        fixedWingSpot!.yaw ?? 0,
+      );
+      const desired = new THREE.Vector3(
+        entry!.x - fixedWingSpot!.offset.x,
+        0,
+        entry!.z - fixedWingSpot!.offset.z,
+      ).normalize();
+
+      expect(forward.dot(desired)).toBeGreaterThan(0.999);
     });
 
     it('only adds fixed-wing spawn metadata to fixed-wing parking placements', () => {

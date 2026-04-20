@@ -16,7 +16,14 @@ export interface AirfieldParkingSpot {
   modelPath: string;
   offsetAlongRunway: number;   // meters along runway centerline from airfield origin
   offsetLateral: number;       // meters perpendicular to runway centerline
-  yaw?: number;                // radians relative to runway heading
+  /**
+   * Optional yaw override (radians relative to runway heading). When omitted,
+   * the layout generator points the aircraft toward the first point of its
+   * assigned `taxiRouteId` so the plane taxis out without a reverse maneuver.
+   * Only set explicitly when a stand has no taxi route (e.g. the UH-1 helipad)
+   * or when a template needs a non-default parking orientation.
+   */
+  yaw?: number;
   clearanceRadius?: number;    // spacing radius used during procedural structure placement
   taxiRouteId?: string;
   runwayStartId?: string;
@@ -225,7 +232,8 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
         modelPath: AircraftModels.A1_SKYRAIDER,
         offsetAlongRunway: -82,
         offsetLateral: 96,
-        yaw: 0,
+        // Yaw is computed at spawn time from the first taxi-route point.
+        // See `computeParkingYaw` in AirfieldLayoutGenerator.
         clearanceRadius: 22,
         taxiRouteId: 'a1_south_route',
         runwayStartId: 'south_departure',
@@ -243,7 +251,6 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
         modelPath: AircraftModels.AC47_SPOOKY,
         offsetAlongRunway: 0,
         offsetLateral: 96,
-        yaw: 0,
         clearanceRadius: 30,
         taxiRouteId: 'ac47_south_route',
         runwayStartId: 'south_departure',
@@ -253,7 +260,6 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
         modelPath: AircraftModels.F4_PHANTOM,
         offsetAlongRunway: 82,
         offsetLateral: 96,
-        yaw: Math.PI,
         clearanceRadius: 24,
         taxiRouteId: 'f4_north_route',
         runwayStartId: 'north_departure',
@@ -347,7 +353,6 @@ export const AIRFIELD_TEMPLATES: Record<string, AirfieldTemplate> = {
         modelPath: AircraftModels.A1_SKYRAIDER,
         offsetAlongRunway: 24,
         offsetLateral: 42,
-        yaw: 0,
         clearanceRadius: 20,
         taxiRouteId: 'strip_a1_route',
         runwayStartId: 'strip_south_departure',
