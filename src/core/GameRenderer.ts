@@ -129,19 +129,27 @@ export class GameRenderer {
     this.moonLight.shadow.radius = gpuTier === 'high' ? 4 : 2;
     this.moonLight.shadow.blurSamples = gpuTier === 'high' ? 25 : 10;
 
+    // The directional light's target drives shadow-camera orientation.
+    // Three.js only renders the target into the scene graph when it is
+    // added explicitly; without this, shadow updates against the target
+    // position are silently ignored.
+    this.moonLight.target.position.set(0, 0, 0);
+    this.scene.add(this.moonLight.target);
     this.scene.add(this.moonLight);
-    freezeTransform(this.moonLight);
+    // NOTE: moonLight is intentionally NOT freezeTransform'd. AtmosphereSystem
+    // drives its position + color + shadow-follow origin each frame.
 
     // Hemisphere light for atmosphere
     // Sky: filtered light from above
     // Ground: dark ground bounce light
     this.hemisphereLight = new THREE.HemisphereLight(
-      0x87ceeb, // Sky blue
-      0x4a6b3a, // Green ground bounce
+      0x87ceeb, // Sky blue — overwritten per-frame from AtmosphereSystem zenith
+      0x4a6b3a, // Green ground bounce — overwritten per-frame from AtmosphereSystem horizon
       0.8
     );
     this.scene.add(this.hemisphereLight);
-    freezeTransform(this.hemisphereLight);
+    // NOTE: hemisphereLight is intentionally NOT freezeTransform'd so its
+    // color + groundColor can be updated from the atmosphere model per frame.
 
     Logger.info('Renderer', 'Atmosphere initialized');
   }

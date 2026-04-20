@@ -20,6 +20,10 @@ function createRefs() {
       setInventoryManager: vi.fn(),
       setZoneManager: vi.fn(),
     },
+    atmosphereSystem: {
+      setRenderer: vi.fn(),
+      setShadowFollowTarget: vi.fn(),
+    },
     audioManager: {},
     combatantSystem: {
       combatantAI: {
@@ -110,8 +114,10 @@ function createRefs() {
     weatherSystem: {
       setAudioManager: vi.fn(),
       setRenderer: vi.fn(),
+      setFogTintIntentReceiver: vi.fn(),
     },
     waterSystem: {
+      setAtmosphereSystem: vi.fn(),
       setWeatherSystem: vi.fn(),
     },
     zoneManager: {
@@ -225,5 +231,16 @@ describe('GameplayRuntimeComposer', () => {
     expect(refs.weatherSystem.setAudioManager).toHaveBeenCalledWith(refs.audioManager);
     expect(refs.weatherSystem.setRenderer).toHaveBeenCalledWith(renderer);
     expect(refs.waterSystem.setWeatherSystem).toHaveBeenCalledWith(refs.weatherSystem);
+  });
+
+  it('binds the atmosphere system to renderer, camera, and water reflection sun', () => {
+    const { refs, renderer } = createRefs();
+    const camera = new THREE.PerspectiveCamera();
+
+    wireGameplayRuntime(createGameplayRuntimeGroups(refs), { camera, renderer });
+
+    expect(refs.atmosphereSystem.setRenderer).toHaveBeenCalledWith(renderer);
+    expect(refs.atmosphereSystem.setShadowFollowTarget).toHaveBeenCalledWith(camera);
+    expect(refs.waterSystem.setAtmosphereSystem).toHaveBeenCalledWith(refs.atmosphereSystem);
   });
 });

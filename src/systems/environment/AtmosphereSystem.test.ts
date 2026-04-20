@@ -2,6 +2,18 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { AtmosphereSystem } from './AtmosphereSystem';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
+import type { IGameRenderer } from '../../types/SystemInterfaces';
+
+function makeRendererStub(): IGameRenderer {
+  const moonLight = new THREE.DirectionalLight(0xffffff, 1.0);
+  const hemisphereLight = new THREE.HemisphereLight(0x000000, 0x000000, 0.5);
+  // Three.js initializes DirectionalLight.target to a fresh Object3D with
+  // matrixAutoUpdate=true, matching the live scene setup.
+  return {
+    moonLight,
+    hemisphereLight,
+  } as unknown as IGameRenderer;
+}
 
 /**
  * Behavior contract for `AtmosphereSystem` as exposed via `ISkyRuntime` /
@@ -92,6 +104,118 @@ describe('AtmosphereSystem (ISkyRuntime contract)', () => {
 
     expect(observedDt).toBeCloseTo(0.016, 5);
     expect(observed.length()).toBeCloseTo(1, 5);
+  });
+});
+
+describe('AtmosphereSystem (renderer coupling)', () => {
+  it('drives the moonLight color from the backend sun color when bound to a renderer', () => {
+    const system = new AtmosphereSystem();
+    const backend: ISkyBackend = {
+      update: () => {},
+      sample: (_dir, out) => out,
+      getSun: (out) => out.setHex(0xff8844),
+      getZenith: (out) => out.setHex(0x335588),
+      getHorizon: (out) => out.setHex(0x889966),
+    };
+    system.setBackend(backend);
+    const renderer = makeRendererStub();
+
+    system.setRenderer(renderer);
+
+    expect(renderer.moonLight!.color.getHex()).toBe(0xff8844);
+  });
+
+  it('positions the moonLight above the origin in the sun direction', () => {
+    const system = new AtmosphereSystem();
+    const renderer = makeRendererStub();
+    system.setRenderer(renderer);
+
+    // Default sun direction is normalize(0, 80, -50); light should sit well
+    // above the origin on the same azimuth ray.
+    expect(renderer.moonLight!.position.y).toBeGreaterThan(0);
+    expect(renderer.moonLight!.position.lengthSq()).toBeGreaterThan(0);
+  });
+
+  it('recenters the moonLight shadow follow target on the bound follow object', () => {
+    const system = new AtmosphereSystem();
+    const renderer = makeRendererStub();
+    system.setRenderer(renderer);
+
+    const follow = new THREE.Object3D();
+    follow.position.set(120, 5, -40);
+    system.setShadowFollowTarget(follow);
+    // Trigger re-apply via update().
+    system.update(0.016);
+
+    const target = renderer.moonLight!.target.position;
+    expect(target.x).toBeCloseTo(120, 3);
+    expect(target.z).toBeCloseTo(-40, 3);
+  });
+
+  it('drives hemisphere sky color from the backend zenith sample', () => {
+    const system = new AtmosphereSystem();
+    const renderer = makeRendererStub();
+
+    system.setRenderer(renderer);
+
+    // Default backend zenith is 0x87ceeb.
+    expect(renderer.hemisphereLight!.color.getHex()).toBe(0x87ceeb);
+  });
+
+  it('drives hemisphere ground color darker than the backend horizon sample', () => {
+    const system = new AtmosphereSystem();
+    const renderer = makeRendererStub();
+
+    system.setRenderer(renderer);
+
+    const horizon = new THREE.Color();
+    system.getHorizonColor(horizon);
+    const ground = renderer.hemisphereLight!.groundColor;
+
+    // Darkened approximation of the horizon: components must be smaller in
+    // magnitude than the horizon color, and non-zero for a non-black
+    // horizon. This is a behavior assertion (ground is tinted toward but
+    // dimmer than horizon) rather than a specific darken constant.
+    expect(ground.r).toBeLessThan(horizon.r);
+    expect(ground.g).toBeLessThan(horizon.g);
+    expect(ground.b).toBeLessThan(horizon.b);
+    expect(ground.getHex()).not.toBe(0);
+  });
+
+  it('reapplies atmosphere state to the renderer on update()', () => {
+    const system = new AtmosphereSystem();
+    const renderer = makeRendererStub();
+    system.setRenderer(renderer);
+
+    // Swap to a backend with distinctly different colors; the swap alone
+    // does not push to the renderer — update() must.
+    const backend: ISkyBackend = {
+      update: () => {},
+      sample: (_dir, out) => out,
+      getSun: (out) => out.setHex(0xaabbcc),
+      getZenith: (out) => out.setHex(0x112233),
+      getHorizon: (out) => out.setHex(0x445566),
+    };
+    system.setBackend(backend);
+    expect(renderer.moonLight!.color.getHex()).not.toBe(0xaabbcc);
+
+    system.update(0.016);
+    expect(renderer.moonLight!.color.getHex()).toBe(0xaabbcc);
+    expect(renderer.hemisphereLight!.color.getHex()).toBe(0x112233);
+  });
+
+  it('leaves moonLight intensity untouched (weather owns intensity)', () => {
+    const system = new AtmosphereSystem();
+    const renderer = makeRendererStub();
+    renderer.moonLight!.intensity = 1.7;
+
+    system.setRenderer(renderer);
+    system.update(0.016);
+
+    // AtmosphereSystem drives position/color; weather drives intensity.
+    // Verifying that intensity survives the atmosphere pass is the contract
+    // that keeps the weather-multiplier ordering valid.
+    expect(renderer.moonLight!.intensity).toBe(1.7);
   });
 });
 

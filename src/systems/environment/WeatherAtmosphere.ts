@@ -18,20 +18,33 @@ export interface AtmosphereBaseValues {
 }
 
 /**
- * Minimal structural surface for the atmosphere system's fog-tint plumbing.
- * Lets the weather code forward "storm darkens fog" / "underwater override"
- * intent without directly writing `scene.fog.color` — the atmosphere
- * system is the single authority that reconciles sky-driven tint, weather
- * darken, and underwater override each frame.
+ * Apply weather modulation to renderer lights/fog.
+ *
+ * Ordering (post-cycle-2026-04-20):
+ *   atmosphere model → sun direction + sun color + hemisphere sky/ground
+ *     colors are owned by AtmosphereSystem (applied each frame before this
+ *     function runs); fog color is also sky-driven via `FogTintIntentReceiver`.
+ *   weather multiplier (THIS FUNCTION) → scales light *intensities* and fog
+ *     density; forwards a fog-darken multiplier to AtmosphereSystem; does
+ *     NOT overwrite light colors.
+ *   lightning flash → briefly boosts intensities and tints fog (handled in
+ *     WeatherLightning.ts).
+ *   underwater override → hard clamp; forwarded to AtmosphereSystem so it
+ *     pins fog to teal regardless of sky.
+ *
+ * Preserving color mutations only on the underwater path keeps the
+ * atmosphere-driven sun/hemisphere palette visible during clear/rain/storm
+ * weather while still letting lightning and submersion do their visible
+ * overrides.
  */
 export interface FogTintIntentReceiver {
   setFogDarkenFactor(factor: number): void;
   setFogUnderwaterOverride(active: boolean): void;
 }
 
-// Per-weather-state fog darkening. Mirrors the constants in
-// `AtmosphereSystem.WEATHER_FOG_DARKEN` so the weather code stays a pure
-// "intent forwarder" without importing the concrete system.
+// Per-weather-state fog darkening. Forwarded to AtmosphereSystem via the
+// FogTintIntentReceiver so the weather code stays a pure "intent forwarder"
+// without importing the concrete system.
 const FOG_DARKEN_CLEAR = 1.0;
 const FOG_DARKEN_LIGHT_RAIN = 0.88;
 const FOG_DARKEN_HEAVY_RAIN = 0.7;
@@ -109,17 +122,29 @@ export function updateAtmosphere(
     if (renderer.fog) {
       renderer.fog.density = fogDensity;
       // Legacy fallback: when no atmosphere intent receiver is wired,
-      // stamp the baseline fog color so pre-atmosphere behavior is
-      // preserved byte-for-byte in isolated unit tests.
+      // stamp the baseline fog color so pre-atmosphere behavior (and
+      // lightning-flash unwind) is preserved byte-for-byte in isolated
+      // unit tests.
       if (!fogIntent) {
         renderer.fog.color.setHex(baseValues.fogColor);
       }
     }
     if (renderer.ambientLight) {
       renderer.ambientLight.intensity = ambientInt;
+      // AmbientLight is explicitly excluded from this task's scope
+      // (see `docs/tasks/atmosphere-sun-hemisphere-coupling.md` non-goals).
+      // Keep the legacy color so the flat-fill ambient reads the same.
       renderer.ambientLight.color.setHex(baseValues.ambientColor);
     }
+    // moonLight.intensity is weather-multiplied here; moonLight.color +
+    // moonLight.position are driven by `AtmosphereSystem.applyToRenderer`
+    // AFTER this function runs each frame (see SystemUpdater World group:
+    // weatherSystem.update → atmosphereSystem.update). The atmosphere
+    // colors are therefore final even when weather recomputes intensity.
     if (renderer.moonLight) renderer.moonLight.intensity = moonInt;
+    // hemisphereLight.intensity is weather-multiplied here; hemisphere
+    // sky + ground colors are driven by `AtmosphereSystem.applyToRenderer`
+    // after this function runs.
     if (renderer.hemisphereLight) renderer.hemisphereLight.intensity = hemisphereInt;
   }
 }

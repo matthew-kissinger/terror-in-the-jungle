@@ -181,7 +181,7 @@ export function wireGameplayRuntime(
   wireWorldRuntime(groups.worldRuntime, options.camera);
   wireWeaponRuntime(groups.weaponRuntime);
   wireGameModeRuntime(groups.gameModeRuntime);
-  wireEnvironmentRuntime(groups.environmentRuntime, options.renderer);
+  wireEnvironmentRuntime(groups.environmentRuntime, options.renderer, options.camera);
 }
 
 function wireCombatRuntime(
@@ -319,7 +319,8 @@ function wireGameModeRuntime(runtime: GameplayRuntimeGroups['gameModeRuntime']):
 
 function wireEnvironmentRuntime(
   runtime: GameplayRuntimeGroups['environmentRuntime'],
-  renderer?: IGameRenderer
+  renderer?: IGameRenderer,
+  camera?: THREE.PerspectiveCamera
 ): void {
   if (runtime.weatherSystem) {
     runtime.weatherSystem.setAudioManager(runtime.audioManager);
@@ -335,7 +336,22 @@ function wireEnvironmentRuntime(
     }
   }
 
+  if (runtime.atmosphereSystem) {
+    if (renderer) {
+      // AtmosphereSystem now owns the directional sun light + hemisphere
+      // palette. Bind AFTER setupLighting() has run so the initial apply
+      // pushes atmosphere-driven values onto the lights immediately.
+      runtime.atmosphereSystem.setRenderer(renderer);
+    }
+    if (camera) {
+      runtime.atmosphereSystem.setShadowFollowTarget(camera);
+    }
+  }
+
   if (runtime.waterSystem) {
     runtime.waterSystem.setWeatherSystem(runtime.weatherSystem);
+    if (runtime.atmosphereSystem) {
+      runtime.waterSystem.setAtmosphereSystem(runtime.atmosphereSystem);
+    }
   }
 }
