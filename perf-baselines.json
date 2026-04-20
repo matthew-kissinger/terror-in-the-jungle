@@ -1,181 +1,201 @@
 {
   "version": 1,
-  "lastUpdated": "2026-03-06",
+  "lastUpdated": "2026-04-20",
   "scenarios": {
     "combat120": {
       "description": "120 NPCs, ai_sandbox, 90s warm baseline",
       "thresholds": {
         "avgFrameMs": {
-          "pass": 16,
-          "warn": 25
+          "pass": 15.08,
+          "warn": 17.05
         },
         "p95FrameMs": {
-          "pass": 20,
-          "warn": 35
+          "pass": 37.14,
+          "warn": 41.99
         },
         "p99FrameMs": {
-          "pass": 30,
-          "warn": 50
+          "pass": 38.41,
+          "warn": 43.42
         },
         "maxFrameMs": {
-          "pass": 120,
-          "warn": 300
+          "pass": 51.98,
+          "warn": 58.76
         },
         "hitch50Pct": {
-          "pass": 0.5,
-          "warn": 2
+          "pass": 0.2,
+          "warn": 0.5
         },
         "hitch100Pct": {
-          "pass": 0.1,
+          "pass": 0.2,
           "warn": 0.5
         },
         "overBudgetPct": {
-          "pass": 20,
-          "warn": 60
+          "pass": 2,
+          "warn": 5
         },
         "heapGrowthMb": {
-          "pass": 20,
-          "warn": 80
+          "pass": 22.88,
+          "warn": 42.88
         }
       },
       "lastMeasured": {
-        "date": "2026-03-04",
-        "artifactDir": "2026-03-04T07-50-37-054Z",
-        "avgFrameMs": 15.1,
-        "p95FrameMs": 23.2,
-        "p99FrameMs": 100
+        "date": "2026-04-20",
+        "artifactDir": "2026-04-20T06-15-39-927Z",
+        "avgFrameMs": 13.12,
+        "p95FrameMs": 32.3,
+        "p99FrameMs": 33.4,
+        "maxFrameMs": 45.2,
+        "hitch50Pct": 0,
+        "hitch100Pct": 0,
+        "overBudgetPct": 0.06,
+        "heapGrowthMb": 12.88
       }
     },
     "openfrontier:short": {
       "description": "120 NPCs, open_frontier, 180s short warm baseline",
       "thresholds": {
         "avgFrameMs": {
-          "pass": 14,
-          "warn": 25
+          "pass": 8.63,
+          "warn": 9.75
         },
         "p95FrameMs": {
-          "pass": 18,
-          "warn": 35
+          "pass": 35.88,
+          "warn": 40.56
         },
         "p99FrameMs": {
-          "pass": 25,
-          "warn": 45
+          "pass": 37.6,
+          "warn": 42.51
         },
         "maxFrameMs": {
-          "pass": 120,
-          "warn": 300
+          "pass": 111.32,
+          "warn": 125.84
         },
         "hitch50Pct": {
-          "pass": 0.5,
-          "warn": 2
+          "pass": 0.2,
+          "warn": 0.5
         },
         "hitch100Pct": {
-          "pass": 0.1,
+          "pass": 0.2,
           "warn": 0.5
         },
         "overBudgetPct": {
-          "pass": 15,
-          "warn": 50
+          "pass": 2,
+          "warn": 5
         },
         "heapGrowthMb": {
-          "pass": 30,
-          "warn": 80
+          "pass": 10,
+          "warn": 30
         }
       },
       "lastMeasured": {
-        "date": "2026-03-04",
-        "artifactDir": "2026-03-04T07-52-39-767Z",
-        "avgFrameMs": 6.57,
-        "p95FrameMs": 13.8,
-        "p99FrameMs": 25.2
+        "date": "2026-04-20",
+        "artifactDir": "2026-04-20T06-18-05-147Z",
+        "avgFrameMs": 7.5,
+        "p95FrameMs": 31.2,
+        "p99FrameMs": 32.7,
+        "maxFrameMs": 96.8,
+        "hitch50Pct": 0.004,
+        "hitch100Pct": 0,
+        "overBudgetPct": 0.01,
+        "heapGrowthMb": -55.42
       }
     },
     "ashau:short": {
       "description": "60 NPCs, a_shau_valley, 180s short warm baseline",
       "thresholds": {
         "avgFrameMs": {
-          "pass": 14,
-          "warn": 25
+          "pass": 6.66,
+          "warn": 7.53
         },
         "p95FrameMs": {
-          "pass": 18,
-          "warn": 35
+          "pass": 12.54,
+          "warn": 14.17
         },
         "p99FrameMs": {
-          "pass": 25,
-          "warn": 45
+          "pass": 17.94,
+          "warn": 20.28
         },
         "maxFrameMs": {
-          "pass": 120,
-          "warn": 300
+          "pass": 34.62,
+          "warn": 39.13
         },
         "hitch50Pct": {
-          "pass": 0.5,
-          "warn": 2
+          "pass": 0.2,
+          "warn": 0.5
         },
         "hitch100Pct": {
-          "pass": 0.1,
+          "pass": 0.2,
           "warn": 0.5
         },
         "overBudgetPct": {
-          "pass": 15,
-          "warn": 50
+          "pass": 2,
+          "warn": 5
         },
         "heapGrowthMb": {
-          "pass": 25,
-          "warn": 60
+          "pass": 10,
+          "warn": 30
         }
       },
       "lastMeasured": {
-        "date": "2026-03-04",
-        "artifactDir": "2026-03-04T07-46-50-552Z",
-        "avgFrameMs": 8.93,
-        "p95FrameMs": 17.7,
-        "p99FrameMs": 25.8
+        "date": "2026-04-20",
+        "artifactDir": "2026-04-20T06-21-56-636Z",
+        "avgFrameMs": 5.79,
+        "p95FrameMs": 10.9,
+        "p99FrameMs": 15.6,
+        "maxFrameMs": 30.1,
+        "hitch50Pct": 0,
+        "hitch100Pct": 0,
+        "overBudgetPct": 0,
+        "heapGrowthMb": -0.07
       }
     },
     "frontier30m": {
       "description": "120 NPCs, open_frontier, 1800s soak warm baseline",
       "thresholds": {
         "avgFrameMs": {
-          "pass": 14,
-          "warn": 25
+          "pass": 10.15,
+          "warn": 11.47
         },
         "p95FrameMs": {
-          "pass": 18,
-          "warn": 35
+          "pass": 37.95,
+          "warn": 42.9
         },
         "p99FrameMs": {
-          "pass": 35,
-          "warn": 60
+          "pass": 38.76,
+          "warn": 43.81
         },
         "maxFrameMs": {
-          "pass": 180,
-          "warn": 500
+          "pass": 114.31,
+          "warn": 129.22
         },
         "hitch50Pct": {
-          "pass": 0.75,
-          "warn": 2.5
+          "pass": 0.2,
+          "warn": 0.5
         },
         "hitch100Pct": {
-          "pass": 0.15,
-          "warn": 0.75
+          "pass": 0.2,
+          "warn": 0.5
         },
         "overBudgetPct": {
-          "pass": 15,
-          "warn": 50
+          "pass": 2,
+          "warn": 5
         },
         "heapGrowthMb": {
-          "pass": 35,
-          "warn": 100
+          "pass": 10,
+          "warn": 30
         }
       },
       "lastMeasured": {
-        "date": "2026-03-04",
-        "artifactDir": "2026-03-04T07-57-32-230Z",
-        "avgFrameMs": 7.13,
-        "p95FrameMs": 12.5,
-        "p99FrameMs": 85.9
+        "date": "2026-04-20",
+        "artifactDir": "2026-04-20T06-25-47-223Z",
+        "avgFrameMs": 8.82,
+        "p95FrameMs": 33,
+        "p99FrameMs": 33.7,
+        "maxFrameMs": 99.4,
+        "hitch50Pct": 0.001,
+        "hitch100Pct": 0,
+        "overBudgetPct": 0,
+        "heapGrowthMb": -5.99
       }
     }
   }
