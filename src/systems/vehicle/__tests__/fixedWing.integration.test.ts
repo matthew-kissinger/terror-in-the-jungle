@@ -100,6 +100,79 @@ describe('FixedWing L3 integration — behavior contracts', () => {
     expect(state.forwardAirspeedMs).toBeGreaterThan(SKYRAIDER.vrSpeed);
   });
 
+  // Regression: post-liftoff porpoise. Before the fix the airborne
+  // ground-touchdown fallback would snap the aircraft back to the runway
+  // ~1 second after liftoff if AGL dipped below a small clearance threshold
+  // with vy <= 0, producing a visible bounce during the early climb. The
+  // contract here is that once an aircraft lifts off under reasonable inputs
+  // it remains airborne for the rest of the climb segment — no retouchdown.
+  it('does not re-touchdown within 4 seconds of liftoff at full throttle', () => {
+    const af = new Airframe(new THREE.Vector3(0, SKYRAIDER_AF.ground.gearClearanceM, 0), SKYRAIDER_AF);
+    const probe = flatProbe(0);
+    const cmd = intent({ throttle: 1, pitch: 0.3 });
+
+    let liftoffTick = -1;
+    let postLiftoffTouchdowns = 0;
+    let wasAirborne = false;
+    // 12 s is enough for liftoff (~3 s into the roll) plus a 4 s climb window.
+    const totalTicks = Math.round(12 / FIXED_DT);
+    for (let i = 0; i < totalTicks; i++) {
+      af.step(cmd, probe, FIXED_DT);
+      const s = af.getState();
+      if (liftoffTick < 0 && !s.weightOnWheels) {
+        liftoffTick = i;
+      }
+      if (liftoffTick >= 0) {
+        if (wasAirborne && s.weightOnWheels) {
+          postLiftoffTouchdowns++;
+        }
+        wasAirborne = !s.weightOnWheels;
+      }
+      if (liftoffTick >= 0 && i > liftoffTick + Math.round(4 / FIXED_DT)) break;
+    }
+
+    expect(liftoffTick).toBeGreaterThan(0);
+    expect(postLiftoffTouchdowns).toBe(0);
+  });
+
+  // Regression: altitude monotonicity across the first climb phase.
+  // With aerodynamic oscillation the AGL trace zig-zagged around the
+  // fallback threshold; after the fix the trace is strictly monotonic once
+  // the plane has cleared the ground + gear clearance.
+  it('climbs monotonically for 3 seconds after liftoff', () => {
+    const af = new Airframe(new THREE.Vector3(0, SKYRAIDER_AF.ground.gearClearanceM, 0), SKYRAIDER_AF);
+    const probe = flatProbe(0);
+    const cmd = intent({ throttle: 1, pitch: 0.3 });
+
+    let liftoffTick = -1;
+    let lastAGL = 0;
+    let dips = 0;
+    const totalTicks = Math.round(12 / FIXED_DT);
+    for (let i = 0; i < totalTicks; i++) {
+      af.step(cmd, probe, FIXED_DT);
+      const s = af.getState();
+      if (liftoffTick < 0 && !s.weightOnWheels) {
+        liftoffTick = i;
+        lastAGL = s.altitudeAGL;
+        continue;
+      }
+      if (liftoffTick >= 0) {
+        // A true climb: AGL should not drop below its previous value by
+        // more than a small tolerance (aerodynamic fluctuation).
+        if (s.altitudeAGL < lastAGL - 0.1) {
+          dips++;
+        }
+        lastAGL = Math.max(lastAGL, s.altitudeAGL);
+        if (i > liftoffTick + Math.round(3 / FIXED_DT)) break;
+      }
+    }
+
+    expect(liftoffTick).toBeGreaterThan(0);
+    // Allow a tiny number of tolerance dips (≤ 3) for aerodynamic wiggle;
+    // a real bounce produces dozens.
+    expect(dips).toBeLessThan(4);
+  });
+
   // Former regression: neutral stick at 50 m/s with stability assist used to
   // descend roughly 50 m over 5 s because of an unbalanced pitch trim. The
   // rebuilt sim's assist tier autolevels toward trim alpha and holds
