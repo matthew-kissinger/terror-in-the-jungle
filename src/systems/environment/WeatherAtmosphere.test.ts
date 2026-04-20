@@ -26,10 +26,12 @@ function makeRendererStub(): IGameRenderer {
 function makeFogIntentStub(): FogTintIntentReceiver & {
   setFogDarkenFactor: ReturnType<typeof vi.fn>;
   setFogUnderwaterOverride: ReturnType<typeof vi.fn>;
+  setCloudCoverageIntent: ReturnType<typeof vi.fn>;
 } {
   return {
     setFogDarkenFactor: vi.fn(),
     setFogUnderwaterOverride: vi.fn(),
+    setCloudCoverageIntent: vi.fn(),
   };
 }
 
@@ -118,5 +120,52 @@ describe('WeatherAtmosphere fog-tint forwarding', () => {
     // Clear path with no intent receiver: fog stamped with baseline.
     updateAtmosphere(renderer, false, WeatherState.CLEAR, WeatherState.CLEAR, 1, baseValues, false);
     expect(renderer.fog!.color.getHex()).toBe(0x5a7a6a);
+  });
+});
+
+describe('WeatherAtmosphere cloud-coverage forwarding', () => {
+  it('releases the cloud intent during clear weather', () => {
+    const renderer = makeRendererStub();
+    const intent = makeFogIntentStub();
+
+    updateAtmosphere(renderer, false, WeatherState.CLEAR, WeatherState.CLEAR, 1, baseValues, false, intent);
+
+    const last = intent.setCloudCoverageIntent.mock.calls.at(-1);
+    expect(last?.[0]).toBe(false);
+  });
+
+  it('activates the cloud intent during storms', () => {
+    const renderer = makeRendererStub();
+    const intent = makeFogIntentStub();
+
+    updateAtmosphere(renderer, false, WeatherState.STORM, WeatherState.STORM, 1, baseValues, false, intent);
+
+    const last = intent.setCloudCoverageIntent.mock.calls.at(-1);
+    expect(last?.[0]).toBe(true);
+    // Target coverage must be a positive value in [0, 1].
+    expect(last?.[1]).toBeGreaterThan(0);
+    expect(last?.[1]).toBeLessThanOrEqual(1);
+  });
+
+  it('storm cloud coverage target is higher than heavy-rain (weather intensity order)', () => {
+    const storm = makeFogIntentStub();
+    const heavy = makeFogIntentStub();
+
+    updateAtmosphere(makeRendererStub(), false, WeatherState.STORM, WeatherState.STORM, 1, baseValues, false, storm);
+    updateAtmosphere(makeRendererStub(), false, WeatherState.HEAVY_RAIN, WeatherState.HEAVY_RAIN, 1, baseValues, false, heavy);
+
+    const stormTarget = storm.setCloudCoverageIntent.mock.calls.at(-1)?.[1] as number;
+    const heavyTarget = heavy.setCloudCoverageIntent.mock.calls.at(-1)?.[1] as number;
+    expect(stormTarget).toBeGreaterThan(heavyTarget);
+  });
+
+  it('releases the cloud intent while the camera is submerged', () => {
+    const renderer = makeRendererStub();
+    const intent = makeFogIntentStub();
+
+    updateAtmosphere(renderer, true, WeatherState.STORM, WeatherState.STORM, 1, baseValues, false, intent);
+
+    const last = intent.setCloudCoverageIntent.mock.calls.at(-1);
+    expect(last?.[0]).toBe(false);
   });
 });

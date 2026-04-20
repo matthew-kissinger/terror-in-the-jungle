@@ -3,6 +3,7 @@ import { GameSystem } from '../../types';
 import type { ICloudRuntime, IGameRenderer, ISkyRuntime } from '../../types/SystemInterfaces';
 import type { ISkyBackend } from './atmosphere/ISkyBackend';
 import { HosekWilkieSkyBackend } from './atmosphere/HosekWilkieSkyBackend';
+import { CloudLayer } from './atmosphere/CloudLayer';
 import {
   SCENARIO_ATMOSPHERE_PRESETS,
   computeSunDirectionAtTime,
@@ -71,9 +72,16 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private hosekBackend: HosekWilkieSkyBackend;
   private scene?: THREE.Scene;
   private domeMesh: THREE.Mesh;
+  private cloudLayer: CloudLayer;
+  private cloudMesh: THREE.Mesh;
   private currentScenario?: ScenarioAtmosphereKey;
   private readonly sunDirection = new THREE.Vector3(0, 80, -50).normalize();
-  private cloudCoverage = 0;
+  /** Per-scenario cloud coverage baseline (preset-driven). Weather multiplies on top. */
+  private presetCloudCoverage = 0;
+  /** Weather-driven cloud coverage target (0..1). Blended into coverage each frame. */
+  private weatherCloudCoverage = 0;
+  /** True while a weather-override coverage target is active (STORM/RAIN). */
+  private weatherCloudActive = false;
 
   // Animated sun direction is driven by `simulationTimeSeconds` via the
   // active preset's optional `todCycle`. Presets without a `todCycle` hold
@@ -102,11 +110,17 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
   private readonly scratchZenith = new THREE.Color();
   private readonly scratchHorizon = new THREE.Color();
   private readonly scratchSunPosition = new THREE.Vector3();
+  private readonly scratchCloudSunColor = new THREE.Color();
+  private readonly cameraPosition = new THREE.Vector3();
+  /** Local terrain Y at the camera; 0 if no follow target. */
+  private terrainYAtCamera = 0;
 
   constructor() {
     this.hosekBackend = new HosekWilkieSkyBackend();
     this.backend = this.hosekBackend;
     this.domeMesh = this.hosekBackend.getMesh();
+    this.cloudLayer = new CloudLayer();
+    this.cloudMesh = this.cloudLayer.getMesh();
     // Apply bootstrap preset synchronously so the first render sees a real
     // sky — no NullSkyBackend flat-color frame, no legacy PNG fallback.
     this.applyScenarioPreset(AtmosphereSystem.BOOTSTRAP_PRESET);
@@ -130,12 +144,17 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     this.backend.update(deltaTime, this.sunDirection);
     this.applyToRenderer();
     this.applyFogColor();
+    this.updateCloudLayer();
   }
 
   dispose(): void {
     if (this.scene && this.domeMesh) {
       this.scene.remove(this.domeMesh);
     }
+    if (this.scene && this.cloudMesh) {
+      this.scene.remove(this.cloudMesh);
+    }
+    this.cloudLayer.dispose();
     this.hosekBackend.dispose();
     this.renderer = undefined;
     this.followTarget = undefined;
@@ -149,9 +168,11 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     if (this.scene === scene) return;
     if (this.scene) {
       this.scene.remove(this.domeMesh);
+      this.scene.remove(this.cloudMesh);
     }
     this.scene = scene;
     this.scene.add(this.domeMesh);
+    this.scene.add(this.cloudMesh);
   }
 
   /**
@@ -181,6 +202,15 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     if (this.renderer?.fog) {
       this.renderer.fog.density = preset.fogDensity;
     }
+
+    // Apply per-scenario cloud coverage default. Scenarios without an
+    // explicit `cloudCoverageDefault` fall through to 0 (clear sky), which
+    // preserves the pre-cloud-runtime baseline for perf-sensitive scenes.
+    this.presetCloudCoverage = preset.cloudCoverageDefault ?? 0;
+    this.weatherCloudActive = false;
+    this.weatherCloudCoverage = 0;
+    this.cloudLayer.setCoverage(this.presetCloudCoverage);
+
     Logger.info('atmosphere', `Applied scenario preset '${key}' (${preset.label})`);
 
     // Force LUT bake immediately so subsequent samples are consistent.
@@ -227,6 +257,18 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
    */
   syncDomePosition(cameraPosition: THREE.Vector3): void {
     this.domeMesh.position.copy(cameraPosition);
+    this.cameraPosition.copy(cameraPosition);
+  }
+
+  /**
+   * Optional local-terrain Y at the camera. When provided, the cloud
+   * plane sits at `terrainY + baseAltitude` so the flight-envelope clearance
+   * is measured above ground, not world origin. Defaults to 0 when unset.
+   */
+  setTerrainYAtCamera(y: number): void {
+    if (Number.isFinite(y)) {
+      this.terrainYAtCamera = y;
+    }
   }
 
   /** Swap backends at runtime (used by future TOD presets and tests). */
@@ -381,13 +423,58 @@ export class AtmosphereSystem implements GameSystem, ISkyRuntime, ICloudRuntime 
     return this.backend.getHorizon(out);
   }
 
+  /**
+   * Weather-state cloud coverage intent. Mirrors the `FogTintIntentReceiver`
+   * pattern: `WeatherAtmosphere` computes a transitionProgress-blended
+   * target and forwards it here each frame. `active === false` releases
+   * the override and the layer returns to the per-scenario preset default.
+   */
+  setCloudCoverageIntent(active: boolean, target: number): void {
+    this.weatherCloudActive = active;
+    this.weatherCloudCoverage = Math.max(0, Math.min(1, target));
+  }
+
+  /**
+   * Per-frame cloud-layer update. Pushes the authoritative sun direction
+   * and sun color into the cloud shader and repositions the plane above
+   * the camera at the configured base altitude. No-ops gracefully when
+   * no scene has been attached (menu/test phase).
+   */
+  private updateCloudLayer(): void {
+    if (!this.scene) return;
+
+    // Reconcile preset default with weather override. The weather path
+    // only raises coverage (storm overcasts the sky even at a "clear"
+    // preset); it should never hide a heavily-clouded preset below its
+    // baseline.
+    const effective = this.weatherCloudActive
+      ? Math.max(this.presetCloudCoverage, this.weatherCloudCoverage)
+      : this.presetCloudCoverage;
+    this.cloudLayer.setCoverage(effective);
+
+    this.backend.getSun(this.scratchCloudSunColor);
+    this.cloudLayer.update(
+      this.cameraPosition,
+      this.terrainYAtCamera,
+      this.sunDirection,
+      this.scratchCloudSunColor
+    );
+  }
+
   // --- ICloudRuntime ---
 
   getCoverage(): number {
-    return this.cloudCoverage;
+    return this.cloudLayer.getCoverage();
   }
 
   setCoverage(v: number): void {
-    this.cloudCoverage = Math.max(0, Math.min(1, v));
+    const clamped = Math.max(0, Math.min(1, v));
+    // Direct `setCoverage` calls overwrite both the preset baseline and
+    // any active weather override — callers bypassing the intent API are
+    // typically tests or debug UI that want to see a specific coverage.
+    this.presetCloudCoverage = clamped;
+    this.weatherCloudActive = false;
+    this.weatherCloudCoverage = 0;
+    this.cloudLayer.setCoverage(clamped);
   }
 }

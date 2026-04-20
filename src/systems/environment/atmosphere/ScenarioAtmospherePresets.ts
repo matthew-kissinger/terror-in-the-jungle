@@ -79,6 +79,15 @@ export interface AtmospherePreset {
    * animates the sun across simulated time. See `AtmosphereTodCycle`.
    */
   todCycle?: AtmosphereTodCycle;
+  /**
+   * Baseline cloud coverage for this scenario in [0, 1]. Omitted means
+   * "no clouds at boot" — `AtmosphereSystem` treats it as 0 and the
+   * cloud layer stays hidden. Weather state (STORM, HEAVY_RAIN, ...)
+   * layers a higher coverage target on top of this baseline via
+   * `setCloudCoverageIntent`; the effective coverage is `max(preset,
+   * weather)` so a heavily-clouded preset never unfills under weather.
+   */
+  cloudCoverageDefault?: number;
 }
 
 /** Clamp lower bound for sun elevation (radians). Matches ~-10deg by default. */
@@ -167,6 +176,7 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     // Start at dawn (6am); 10-minute real-time cycle so playtests see the
     // sun sweep across the sky without waiting forever.
     todCycle: { dayLengthSeconds: 600, startHour: 6 },
+    cloudCoverageDefault: 0.4, // damp jungle valley, overcast morning
   },
   // Noon: sun near zenith, neutral turbidity, deep saturated zenith blue.
   openfrontier: {
@@ -179,6 +189,7 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     exposure: 0.22,
     fogDensity: 0.0022,
     todCycle: { dayLengthSeconds: 600, startHour: 12 },
+    cloudCoverageDefault: 0.1, // clear desert sky, only the occasional wisp
   },
   // Dusk: sun very low in the west, heavy haze, strong orange extinction.
   // Highest fog density — dusk reads as "can see nearby, distance fades"
@@ -193,6 +204,7 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     exposure: 0.16,
     fogDensity: 0.0028,
     todCycle: { dayLengthSeconds: 600, startHour: 18 },
+    cloudCoverageDefault: 0.6, // overcast dusk, broken layers
   },
   // Golden hour: oblique warm light, moderate turbidity.
   zc: {
@@ -205,6 +217,7 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     exposure: 0.18,
     fogDensity: 0.0024,
     todCycle: { dayLengthSeconds: 600, startHour: 16 },
+    cloudCoverageDefault: 0.3, // broken golden-hour clouds
   },
   // AI sandbox (perf harness): noon, perf-neutral; matches the legacy
   // combat120 framing so the baseline PNG diff stays meaningful.
@@ -217,6 +230,7 @@ export const SCENARIO_ATMOSPHERE_PRESETS: Record<ScenarioAtmosphereKey, Atmosphe
     groundAlbedo: new THREE.Color(0x3b4c2e),
     exposure: 0.22,
     fogDensity: 0.0022,
+    cloudCoverageDefault: 0.2, // light scattered — perf-lean baseline
   },
 };
 

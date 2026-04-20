@@ -302,7 +302,14 @@ export class GameEngine {
     for (let i = 0; i < steps; i++) {
       this.lastFrameDelta = fixedDelta;
       this.systemManager.updateSystems(fixedDelta, this.gameStarted);
-      this.systemManager.atmosphereSystem.syncDomePosition(this.renderer.camera.position);
+      const camPos = this.renderer.camera.position;
+      this.systemManager.atmosphereSystem.syncDomePosition(camPos);
+      const terrainSystem = this.systemManager.terrainSystem;
+      if (terrainSystem && typeof terrainSystem.getHeightAt === 'function') {
+        this.systemManager.atmosphereSystem.setTerrainYAtCamera(
+          terrainSystem.getHeightAt(camPos.x, camPos.z)
+        );
+      }
     }
 
     this.renderDiagnosticsFrame();
