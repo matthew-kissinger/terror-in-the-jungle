@@ -183,4 +183,100 @@ describe('CombatantRenderInterpolator', () => {
 
     expect(c.renderedPosition!.x).toBeCloseTo(0);
   });
+
+  // ── Vertical-clamp regression (npc-and-player-leap-fix) ──
+  //
+  // A distant-culled NPC's logical Y is held at DISTANT_CULLED_DEFAULT_Y = 3
+  // while far from the camera. On LOD promotion the next movement tick
+  // resamples real terrain height — which on A Shau DEM can be +50m or
+  // more. Before the vertical clamp the interpolator resolved that gap at
+  // the full 18 m/s horizontal cap, which rendered as a visible "leap into
+  // the air" over several seconds. The two-tier vertical cap eases large
+  // gaps in slowly while leaving small, legitimate terrain-follow deltas
+  // at the locomotion rate.
+
+  it('does not leap vertically on a multi-meter Y snap', () => {
+    const interp = new CombatantRenderInterpolator({
+      maxSpeedMps: 18,
+      maxVerticalFarMps: 2,
+      maxVerticalNearMps: 8,
+    });
+    const c = makeCombatant('a', new THREE.Vector3(0, 3, 0));
+    const combatants = new Map([[c.id, c]]);
+    interp.update(combatants, 1 / 60);
+
+    // Simulate LOD promotion: logical Y corrected from 3 → 53.
+    c.position.set(0, 53, 0);
+    const dt = 1 / 60;
+
+    for (let i = 0; i < 30; i++) {
+      const previousY = c.renderedPosition!.y;
+      interp.update(combatants, dt);
+      const ySteppedThisFrame = c.renderedPosition!.y - previousY;
+      // While the gap is still large, every frame must stay within the
+      // far-tier cap. No single frame is allowed to "leap."
+      expect(Math.abs(ySteppedThisFrame)).toBeLessThanOrEqual(8 * dt + 1e-6);
+    }
+  });
+
+  it('closes a vertical gap eventually when given enough frames', () => {
+    const interp = new CombatantRenderInterpolator({
+      maxSpeedMps: 18,
+      maxVerticalFarMps: 2,
+      maxVerticalNearMps: 8,
+    });
+    const c = makeCombatant('a', new THREE.Vector3(0, 0, 0));
+    const combatants = new Map([[c.id, c]]);
+    interp.update(combatants, 1 / 60);
+
+    c.position.set(0, 5, 0);
+    for (let i = 0; i < 600; i++) interp.update(combatants, 1 / 60);
+
+    expect(Math.abs(c.renderedPosition!.y - 5)).toBeLessThan(0.05);
+  });
+
+  it('does not let horizontal travel spend itself on Y during a simultaneous jump', () => {
+    // On a combined XZ+Y snap, Y and XZ resolve independently so the
+    // horizontal motion stays at its own cap and the vertical stays at
+    // its own (much tighter) cap. This matters for an NPC coming out of
+    // distant-culled simulation: horizontal catch-up should still close
+    // normally, vertical should not launch.
+    const interp = new CombatantRenderInterpolator({
+      maxSpeedMps: 18,
+      maxVerticalFarMps: 2,
+      maxVerticalNearMps: 8,
+    });
+    const c = makeCombatant('a', new THREE.Vector3(0, 0, 0));
+    const combatants = new Map([[c.id, c]]);
+    interp.update(combatants, 1 / 60);
+
+    c.position.set(20, 50, 0); // 20m horizontal jump + 50m vertical snap
+    const dt = 1 / 60;
+    interp.update(combatants, dt);
+
+    const xzStep = Math.hypot(c.renderedPosition!.x, c.renderedPosition!.z);
+    expect(xzStep).toBeCloseTo(18 * dt, 4); // horizontal at full cap
+    expect(Math.abs(c.renderedPosition!.y)).toBeLessThanOrEqual(2 * dt + 1e-6);
+  });
+
+  it('tracks small grounded Y adjustments at the locomotion rate', () => {
+    // A combatant sprinting down a slope produces per-frame Y deltas of a
+    // few centimetres; these must track tightly so the sprite stays glued
+    // to terrain. Simulate a 1 cm/tick descent and confirm rendered Y
+    // stays within the snap radius of logical Y.
+    const interp = new CombatantRenderInterpolator({
+      maxSpeedMps: 18,
+      maxVerticalFarMps: 2,
+      maxVerticalNearMps: 8,
+    });
+    const c = makeCombatant('a', new THREE.Vector3(0, 0, 0));
+    const combatants = new Map([[c.id, c]]);
+    interp.update(combatants, 1 / 60);
+
+    for (let i = 0; i < 30; i++) {
+      c.position.y -= 0.01;
+      interp.update(combatants, 1 / 60);
+      expect(Math.abs(c.renderedPosition!.y - c.position.y)).toBeLessThan(0.02);
+    }
+  });
 });

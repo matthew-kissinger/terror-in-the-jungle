@@ -322,6 +322,43 @@ describe('PlayerMovement', () => {
 
       expect(playerState.velocity.x).toBeGreaterThan(flatEquivalentSpeed);
     });
+
+    // ── Player leap regression (npc-and-player-leap-fix) ──
+    //
+    // A grounded player walking toward a vertical seam in the effective-
+    // ground height (an overhanging collision box, a cliff, or a steep
+    // terrain lip that the support-normal sampler then contour-flows into
+    // higher ground) used to ground-clamp to the new height in one frame,
+    // launching the camera skyward by tens of metres. The walking rise
+    // clamp keeps the player planted while preserving real step-up motion.
+
+    it('does not launch the camera when effective ground rises abruptly under walking motion', () => {
+      // Current XZ has flat terrain; the target XZ (x > 0.05) resolves to
+      // a 30m-tall effective ground — simulating a collision-bbox or cliff
+      // seam the player walks into. Before the clamp this produced a
+      // 30m one-frame Y jump.
+      vi.mocked(mockInput.isKeyPressed).mockImplementation((key: string) => key === 'keyd');
+      vi.mocked(mockTerrainSystem.getHeightAt).mockImplementation((x: number) => (x > 0.05 ? 30 : 0));
+      vi.mocked(mockTerrainSystem.getEffectiveHeightAt).mockImplementation((x: number) => (x > 0.05 ? 30 : 0));
+
+      const initialY = playerState.position.y;
+      playerMovement.updateMovement(0.016, mockInput, mockCamera);
+
+      // Rise per fixed step is bounded; one 16ms tick must not launch the
+      // camera by more than a metre even if the resolved ground demanded
+      // +30m. The exact bound mirrors PLAYER_MAX_GROUND_RISE_PER_STEP.
+      const riseThisFrame = playerState.position.y - initialY;
+      expect(riseThisFrame).toBeLessThanOrEqual(0.55); // 0.5 + float slack
+    });
+
+    it('still snaps to ground on respawn / first-frame spawn correction', () => {
+      // wasGrounded=true, but the player is not walking (no key pressed,
+      // horizontal motion below epsilon) — spawn/respawn corrections must
+      // still snap cleanly to PLAYER_EYE_HEIGHT without being clamped.
+      playerState.position.y = 0;
+      playerMovement.updateMovement(0.016, mockInput, mockCamera);
+      expect(playerState.position.y).toBe(PLAYER_EYE_HEIGHT);
+    });
   });
 
   describe('updateMovement - collision detection', () => {
