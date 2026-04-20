@@ -187,6 +187,11 @@ type RuntimeSample = {
   systemTop: Array<{ name: string; emaMs: number; peakMs: number }>;
   harnessDriver?: {
     mode: string;
+    // `botState` is the canonical bot state-machine label
+    // (PATROL/ALERT/ENGAGE/ADVANCE/RESPAWN_WAIT). `movementState` is
+    // kept as an alias for backward compatibility with older capture
+    // artifacts; readers should prefer `botState`.
+    botState: string;
     movementState: string;
     targetVisible: boolean;
     respawnCount: number;
@@ -213,7 +218,41 @@ type RuntimeSample = {
     // match is still active. Drives early capture finalization.
     matchEndedAtMs?: number | null;
     matchOutcome?: 'victory' | 'defeat' | 'draw' | null;
+    // harness-stats-accuracy-damage-wiring: combat rollups from
+    // PlayerStatsTracker.
+    damageDealt?: number;
+    damageTaken?: number;
+    kills?: number;
+    accuracy?: number;
+    engineShotsFired?: number;
+    engineShotsHit?: number;
+    stateHistogramMs?: Record<string, number>;
   };
+};
+
+type HarnessDriverFinal = {
+  respawnCount: number;
+  ammoRefillCount: number;
+  healthTopUpCount: number;
+  movementTransitions: number;
+  losRejectedShots: number;
+  aimDotGateRejectedShots: number;
+  waypointsFollowedCount: number;
+  waypointReplanFailures: number;
+  shotsFired: number;
+  reloadsIssued: number;
+  // Final values surfaced by the active driver's stop() call. These
+  // are the canonical end-of-run combat numbers; the runtime-samples
+  // stream contains per-sample readings of the same counters but they
+  // may flicker as PlayerStatsTracker is reset on respawn.
+  damageDealt: number;
+  damageTaken: number;
+  kills: number;
+  accuracy: number;
+  engineShotsFired: number;
+  engineShotsHit: number;
+  botState: string;
+  stateHistogramMs: Record<string, number>;
 };
 
 type CaptureSummary = {
@@ -264,6 +303,11 @@ type CaptureSummary = {
   // report in-match vs post-match coverage.
   matchEndedAtMs?: number | null;
   matchOutcome?: 'victory' | 'defeat' | 'draw' | null;
+  // harness-stats-accuracy-damage-wiring: end-of-run combat rollups
+  // (kills, damage dealt/taken, accuracy, state histogram) lifted from
+  // the active driver's stop() call. Optional: only present when the
+  // active player scenario was enabled and the stop call returned data.
+  harnessDriverFinal?: HarnessDriverFinal;
 };
 
 type MovementViewerPayload = {
@@ -1604,18 +1648,43 @@ async function setupActiveScenarioDriver(page: Page, options: ActiveScenarioOpti
   );
 }
 
-async function stopActiveScenarioDriver(page: Page): Promise<void> {
+async function stopActiveScenarioDriver(page: Page): Promise<HarnessDriverFinal | null> {
   const result = await safeAwait(
     'stop active scenario driver',
     page.evaluate(() => (window as any).__perfHarnessDriver?.stop?.() ?? null),
     SCENARIO_SETUP_TIMEOUT_MS
   );
 
-  if (result) {
-    logStep(
-      `🎮 Active driver stopped (respawns=${result.respawnCount}, ammoRefills=${result.ammoRefillCount ?? 0}, healthTopUps=${result.healthTopUpCount ?? 0}, frontlineCompressed=${result.frontlineCompressed}, frontlineDistance=${Number(result.frontlineDistance ?? 0).toFixed(1)}, moved=${result.frontlineMoveCount ?? 0}, capturedZones=${result.capturedZoneCount ?? 0}, movementTransitions=${Number(result.movementTransitions ?? 0)}, losRejectedShots=${Number(result.losRejectedShots ?? 0)}, stuckTeleports=${Number(result.stuckTeleportCount ?? 0)}, maxStuckSec=${Number(result.maxStuckSeconds ?? 0).toFixed(1)}, gradientDeflections=${Number(result.gradientProbeDeflections ?? 0)}, waypointsFollowed=${Number(result.waypointsFollowedCount ?? 0)}, waypointReplanFailures=${Number(result.waypointReplanFailures ?? 0)})`
-    );
-  }
+  if (!result) return null;
+
+  logStep(
+    `🎮 Active driver stopped (respawns=${result.respawnCount}, ammoRefills=${result.ammoRefillCount ?? 0}, healthTopUps=${result.healthTopUpCount ?? 0}, frontlineCompressed=${result.frontlineCompressed}, frontlineDistance=${Number(result.frontlineDistance ?? 0).toFixed(1)}, moved=${result.frontlineMoveCount ?? 0}, capturedZones=${result.capturedZoneCount ?? 0}, movementTransitions=${Number(result.movementTransitions ?? 0)}, losRejectedShots=${Number(result.losRejectedShots ?? 0)}, stuckTeleports=${Number(result.stuckTeleportCount ?? 0)}, maxStuckSec=${Number(result.maxStuckSeconds ?? 0).toFixed(1)}, gradientDeflections=${Number(result.gradientProbeDeflections ?? 0)}, waypointsFollowed=${Number(result.waypointsFollowedCount ?? 0)}, waypointReplanFailures=${Number(result.waypointReplanFailures ?? 0)}, kills=${Number(result.kills ?? 0)}, damageDealt=${Number(result.damageDealt ?? 0).toFixed(1)}, damageTaken=${Number(result.damageTaken ?? 0).toFixed(1)}, accuracy=${(Number(result.accuracy ?? 0) * 100).toFixed(1)}%)`
+  );
+
+  return {
+    respawnCount: Number(result.respawnCount ?? 0),
+    ammoRefillCount: Number(result.ammoRefillCount ?? 0),
+    healthTopUpCount: Number(result.healthTopUpCount ?? 0),
+    movementTransitions: Number(result.movementTransitions ?? 0),
+    losRejectedShots: Number(result.losRejectedShots ?? 0),
+    aimDotGateRejectedShots: Number(result.aimDotGateRejectedShots ?? 0),
+    waypointsFollowedCount: Number(result.waypointsFollowedCount ?? 0),
+    waypointReplanFailures: Number(result.waypointReplanFailures ?? 0),
+    shotsFired: Number(result.shotsFired ?? 0),
+    reloadsIssued: Number(result.reloadsIssued ?? 0),
+    damageDealt: Number(result.damageDealt ?? 0),
+    damageTaken: Number(result.damageTaken ?? 0),
+    kills: Number(result.kills ?? 0),
+    accuracy: Number(result.accuracy ?? 0),
+    engineShotsFired: Number(result.engineShotsFired ?? 0),
+    engineShotsHit: Number(result.engineShotsHit ?? 0),
+    botState: String(result.botState ?? result.combatState ?? ''),
+    stateHistogramMs: result.stateHistogramMs && typeof result.stateHistogramMs === 'object'
+      ? Object.fromEntries(
+          Object.entries(result.stateHistogramMs).map(([k, v]) => [String(k), Number(v ?? 0)])
+        )
+      : {},
+  };
 }
 
 async function startChromeTracing(cdp: CDPSession): Promise<void> {
@@ -1782,6 +1851,7 @@ async function runCapture(): Promise<void> {
   let matchEndedAtRelMs: number | null = null;
   let matchOutcome: 'victory' | 'defeat' | 'draw' | null = null;
   let activeScenarioStarted = false;
+  let harnessDriverFinal: HarnessDriverFinal | null = null;
   let cdpStarted = false;
   let playwrightTracingStarted = false;
   let stage = 'init';
@@ -2338,7 +2408,11 @@ async function runCapture(): Promise<void> {
               : undefined,
             harnessDriver: harnessDriver ? {
               mode: String(harnessDriver.mode ?? ''),
-              movementState: String(harnessDriver.movementState ?? ''),
+              // Driver exposes the canonical bot state machine label
+              // under `botState`; older artifacts may have only had
+              // `movementState`. Read both and prefer `botState`.
+              botState: String(harnessDriver.botState ?? harnessDriver.movementState ?? ''),
+              movementState: String(harnessDriver.botState ?? harnessDriver.movementState ?? ''),
               targetVisible: Boolean(harnessDriver.targetVisible),
               respawnCount: Number(harnessDriver.respawnCount ?? 0),
               ammoRefillCount: Number(harnessDriver.ammoRefillCount ?? 0),
@@ -2370,7 +2444,21 @@ async function runCapture(): Promise<void> {
                 : null,
               matchOutcome: typeof harnessDriver.matchOutcome === 'string'
                 ? (harnessDriver.matchOutcome as 'victory' | 'defeat' | 'draw')
-                : null
+                : null,
+              damageDealt: Number(harnessDriver.damageDealt ?? 0),
+              damageTaken: Number(harnessDriver.damageTaken ?? 0),
+              kills: Number(harnessDriver.kills ?? 0),
+              accuracy: Number(harnessDriver.accuracy ?? 0),
+              engineShotsFired: Number(harnessDriver.engineShotsFired ?? 0),
+              engineShotsHit: Number(harnessDriver.engineShotsHit ?? 0),
+              stateHistogramMs: harnessDriver.stateHistogramMs && typeof harnessDriver.stateHistogramMs === 'object'
+                ? Object.fromEntries(
+                    Object.entries(harnessDriver.stateHistogramMs).map(([k, v]: [string, any]) => [
+                      String(k),
+                      Number(v ?? 0)
+                    ])
+                  )
+                : {}
             } : undefined,
             systemTop: Array.isArray(report?.systemBreakdown)
               ? report.systemBreakdown.slice(0, 3).map((s: any) => ({
@@ -2408,7 +2496,11 @@ async function runCapture(): Promise<void> {
         const driverReason = typeof sample.harnessDriver?.lastFireProbe?.reason === 'string'
           ? String(sample.harnessDriver?.lastFireProbe?.reason)
           : '';
-        const driverMovement = sample.harnessDriver?.movementState ? String(sample.harnessDriver.movementState) : '';
+        const driverMovement = sample.harnessDriver?.botState
+          ? String(sample.harnessDriver.botState)
+          : sample.harnessDriver?.movementState
+            ? String(sample.harnessDriver.movementState)
+            : '';
         const driverSuffix = driverReason || driverMovement
           ? ` driver=${driverMovement || 'unknown'} probe=${driverReason || 'unknown'}`
           : '';
@@ -2447,6 +2539,15 @@ async function runCapture(): Promise<void> {
       } catch {
         logStep('⚠ Forced GC final measurement failed');
       }
+    }
+
+    // Stop the active scenario driver here (before CDP teardown) so we
+    // can capture its final combat stats — kills, damage dealt/taken,
+    // accuracy, state histogram — into summary.json. The cleanup-context
+    // stage in finally{} also tries to stop, but by then
+    // `__perfHarnessDriverState` is null and that call is a no-op.
+    if (page && activeScenarioStarted && !harnessDriverFinal) {
+      harnessDriverFinal = await stopActiveScenarioDriver(page);
     }
 
     stage = 'stop-cdp';
@@ -2650,7 +2751,8 @@ async function runCapture(): Promise<void> {
           runtimePreflightOk: runtimePreflightResult.ok
         },
         matchEndedAtMs: matchEndedAtRelMs,
-        matchOutcome: matchOutcome
+        matchOutcome: matchOutcome,
+        harnessDriverFinal: harnessDriverFinal ?? undefined
       };
       writeFileSync(join(artifactDir, 'summary.json'), JSON.stringify(summary, null, 2), 'utf-8');
       console.log(`\nArtifacts: ${artifactDir}`);
@@ -2658,8 +2760,12 @@ async function runCapture(): Promise<void> {
       // best effort only
     }
     stage = 'cleanup-context';
-    if (page && activeScenarioStarted) {
-      await stopActiveScenarioDriver(page);
+    // The early stop above (before stop-cdp) usually catches the
+    // driver. If we got here without one (e.g. an early throw before
+    // the early-stop point), make sure the in-page driver is torn down
+    // so the next run doesn't inherit it.
+    if (page && activeScenarioStarted && !harnessDriverFinal) {
+      harnessDriverFinal = await stopActiveScenarioDriver(page);
     }
     if (context) {
       await safeAwait('context.close', context.close(), 10_000);
