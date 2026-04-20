@@ -980,6 +980,24 @@ describe('PlayerBot driver mirror — match-end detection', () => {
     expect(detectMatchEnded(null)).toBe(false);
     expect(detectMatchEnded(undefined)).toBe(false);
   });
+
+  // harness-match-end-skip-ai-sandbox: TicketSystem reports phase='ENDED'
+  // from the first tick in ai_sandbox (no tickets, no objective). The driver
+  // must skip the latch in that mode; win-condition modes still exit.
+  it('does NOT latch match-end on ai_sandbox regardless of phase/gameActive', () => {
+    expect(detectMatchEnded({ phase: 'ENDED', gameActive: false }, 'ai_sandbox')).toBe(false);
+    expect(detectMatchEnded({ phase: 'COMBAT', gameActive: false }, 'ai_sandbox')).toBe(false);
+    // Case-insensitive: driver lowercases opts.mode, belt-and-braces for callers.
+    expect(detectMatchEnded({ phase: 'ENDED', gameActive: false }, 'AI_SANDBOX')).toBe(false);
+    // Outcome helper must follow suit so the capture never surfaces an outcome.
+    expect(detectMatchOutcome({ phase: 'ENDED', gameActive: false, winner: 'US' }, 'ai_sandbox')).toBeNull();
+  });
+
+  it('still latches match-end for win-condition modes at the right phase', () => {
+    expect(detectMatchEnded({ phase: 'ENDED', gameActive: false, winner: 'US' }, 'open_frontier')).toBe(true);
+    expect(detectMatchEnded({ phase: 'COMBAT', gameActive: false }, 'team_deathmatch')).toBe(true);
+    expect(detectMatchEnded({ phase: 'SETUP', gameActive: true }, 'zone_control')).toBe(false);
+  });
 });
 
 describe('PlayerBot driver mirror — match outcome mapping', () => {
