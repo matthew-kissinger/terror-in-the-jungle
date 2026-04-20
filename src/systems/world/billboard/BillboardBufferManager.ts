@@ -11,6 +11,18 @@ export interface GPUVegetationConfig {
   maxDistance: number;
 }
 
+/**
+ * Per-frame lighting snapshot forwarded from AtmosphereSystem so billboard
+ * vegetation shades with the same sun + hemisphere colors terrain picks up
+ * through MeshStandardMaterial. Kept deliberately small — this is a cheap
+ * hemispheric approximation, not a full PBR port.
+ */
+export interface BillboardLighting {
+  sunColor: THREE.Color;
+  skyColor: THREE.Color;
+  groundColor: THREE.Color;
+}
+
 export class GPUBillboardVegetation {
   private geometry: THREE.InstancedBufferGeometry;
   private material: THREE.RawShaderMaterial;
@@ -88,6 +100,13 @@ export class GPUBillboardVegetation {
         fogHeightFalloff: { value: 0.03 },   // How quickly fog thins with altitude (lower = thicker at height)
         fogStartDistance: { value: 100.0 },  // Fog doesn't appear until this distance
         fogEnabled: { value: false },
+        // Atmosphere lighting uniforms (cycle-2026-04-21 parity pass). Start
+        // neutral so materials rendered before AtmosphereSystem is wired
+        // (tests, early boot, legacy callers) still see reasonable color.
+        sunColor: { value: new THREE.Color(1, 1, 1) },
+        skyColor: { value: new THREE.Color(0.7, 0.8, 1.0) },
+        groundColor: { value: new THREE.Color(0.3, 0.3, 0.25) },
+        lightingEnabled: { value: false },
       },
       vertexShader: BILLBOARD_VERTEX_SHADER,
       fragmentShader: BILLBOARD_FRAGMENT_SHADER,
@@ -240,7 +259,12 @@ export class GPUBillboardVegetation {
   }
 
   // Update uniforms (called every frame)
-  update(camera: THREE.Camera, time: number, fog?: THREE.FogExp2 | null): void {
+  update(
+    camera: THREE.Camera,
+    time: number,
+    fog?: THREE.FogExp2 | null,
+    lighting?: BillboardLighting | null,
+  ): void {
     // Apply batched buffer updates
     if (this.pendingPositionUpdate) {
       this.positionAttribute.needsUpdate = true;
@@ -268,6 +292,18 @@ export class GPUBillboardVegetation {
       // Height fog uses its own density/falloff, not the scene's FogExp2 density
     } else {
       this.material.uniforms.fogEnabled.value = false;
+    }
+
+    // Atmosphere lighting — forward the same sun/hemisphere colors terrain's
+    // MeshStandardMaterial samples via renderer.moonLight + hemisphereLight,
+    // so vegetation and terrain darken / warm together across TOD and storms.
+    if (lighting) {
+      this.material.uniforms.sunColor.value.copy(lighting.sunColor);
+      this.material.uniforms.skyColor.value.copy(lighting.skyColor);
+      this.material.uniforms.groundColor.value.copy(lighting.groundColor);
+      this.material.uniforms.lightingEnabled.value = true;
+    } else {
+      this.material.uniforms.lightingEnabled.value = false;
     }
   }
 

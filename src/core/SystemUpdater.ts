@@ -28,6 +28,22 @@ export class SystemUpdater {
   private readonly perfUserTimingEnabled =
     (import.meta.env.DEV || import.meta.env.VITE_PERF_HARNESS === '1') && isPerfUserTimingEnabled();
 
+  // Reused per-frame color buffers for forwarding AtmosphereSystem output
+  // into the billboard lighting snapshot. Allocating once here avoids
+  // per-frame GC churn in the Billboards update block.
+  private readonly billboardSunColor = new THREE.Color(1, 1, 1);
+  private readonly billboardSkyColor = new THREE.Color(0.7, 0.8, 1.0);
+  private readonly billboardGroundColor = new THREE.Color(0.3, 0.3, 0.25);
+  private readonly billboardLighting = {
+    sunColor: this.billboardSunColor,
+    skyColor: this.billboardSkyColor,
+    groundColor: this.billboardGroundColor,
+  };
+  // Matches HEMISPHERE_GROUND_DARKEN in AtmosphereSystem — keeps the billboard
+  // ground tint aligned with the hemisphere light's groundColor so terrain
+  // and vegetation darken by the same factor each frame.
+  private static readonly BILLBOARD_GROUND_DARKEN = 0.55;
+
   updateSystems(
     refs: SystemKeyToType,
     systems: GameSystem[],
@@ -77,7 +93,23 @@ export class SystemUpdater {
       performanceTelemetry.beginSystem('Billboards');
       if (refs.globalBillboardSystem) {
         const fog = scene?.fog as THREE.FogExp2 | undefined;
-        refs.globalBillboardSystem.update(deltaTime, fog);
+        // Snapshot the atmosphere's current sun + hemisphere colors into the
+        // reusable billboard lighting struct. Terrain picks these up through
+        // MeshStandardMaterial + the renderer's moonLight/hemisphereLight;
+        // vegetation is a RawShaderMaterial with no lighting pipeline, so we
+        // forward the same colors as uniforms to keep the two in parity
+        // across TOD, weather, and underwater transitions.
+        let lighting: typeof this.billboardLighting | undefined;
+        if (refs.atmosphereSystem) {
+          refs.atmosphereSystem.getSunColor(this.billboardSunColor);
+          refs.atmosphereSystem.getZenithColor(this.billboardSkyColor);
+          refs.atmosphereSystem.getHorizonColor(this.billboardGroundColor);
+          this.billboardGroundColor.multiplyScalar(
+            SystemUpdater.BILLBOARD_GROUND_DARKEN,
+          );
+          lighting = this.billboardLighting;
+        }
+        refs.globalBillboardSystem.update(deltaTime, fog, lighting);
       }
       performanceTelemetry.endSystem('Billboards');
     });
