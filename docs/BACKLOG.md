@@ -1,10 +1,48 @@
 # Backlog
 
-Last updated: 2026-04-20 (cycle-2026-04-20-atmosphere-foundation close-out)
+Last updated: 2026-04-20 (cycle-2026-04-21-atmosphere-polish-and-fixes close-out)
 
 Historical cycle-close sections below preserve what was true when those cycles
 closed. Current open work lives in the P0/P1/P2/P3 sections plus Known Issues /
 Known Bugs.
+
+## Recently Completed (cycle-2026-04-21-atmosphere-polish-and-fixes, 2026-04-20)
+
+Sixteen merged PRs across five dispatch rounds — the full planned cycle landed without rollback. Briefs archived under `docs/tasks/archive/cycle-2026-04-21-atmosphere-polish-and-fixes/`. Cycle ran in a single ~3h30m orchestrated burst.
+
+### Atmosphere polish
+- **PR #107 `post-tone-mapping-aces`** — ACES filmic tone-map inserted in the `PostProcessingManager` blit fragment shader before the 24-level quantize + Bayer dither. Warm dawn/dusk/golden-hour hues no longer clip to white; retro stipple aesthetic preserved. 4 ship-gate PNGs committed.
+- **PR #115 `fog-density-rebalance`** — per-scenario `fogDensity` moved into `AtmospherePreset`; `WeatherSystem.refreshAtmosphereBaseline()` added so storm/rain modulators track the new preset baseline. Five framings show haze depth instead of white-out.
+- **PR #109 `vegetation-alpha-edge-fix`** — raised `alphaTest` in billboard fragment shader to 0.25 and scaled the fog mix by `texColor.a` to kill the halo under premultiplied-alpha output. Diagnostic confirmed the asset pipeline was already clean; the artefact was runtime-material.
+- **PR #111 `vegetation-fog-and-lighting-parity`** — added `sunColor`/`skyColor`/`groundColor`/`lightingEnabled` uniforms to the vegetation `RawShaderMaterial` and drove them from the atmosphere snapshot each frame. Foliage now tracks TOD/weather the same way terrain does.
+- **PR #113 `atmosphere-day-night-cycle`** — new optional `AtmosphereTodCycle` preset block; ashau/openfrontier/tdm/zc cycle over 600s real time, combat120 stays static. `HosekWilkieSkyBackend` gates LUT re-bake on 0.5° sun delta for cheap updates. `getSunDirection()` / `getSunColor()` signatures preserved for the cloud task.
+- **PR #108 `skybox-cutover-no-fallbacks`** — deleted `Skybox.ts`, `NullSkyBackend.ts`, and `skybox.png`. `AtmosphereSystem` constructor now instantiates `HosekWilkieSkyBackend` directly with a combat120 bootstrap preset. Tests rewritten as behavior assertions. Net -245 lines.
+- **PR #119 `cloud-runtime-implementation`** — new `CloudLayer` horizontal plane at `terrainY + 1200m` AGL with procedural fbm shader; sun-lit underbelly; world-space UV so clouds drift overhead on player motion; edge-on alpha-fade within ±100m of base. Per-scenario `cloudCoverageDefault`; `WeatherAtmosphere` lerps coverage on STORM/HEAVY_RAIN/LIGHT_RAIN; `ICloudRuntime` getters/setters now return real values.
+
+### Airfield / aircraft foundation
+- **PR #112 `airfield-terrain-flattening`** — discovered airfields are hand-authored (not procedural), so added an extended flattening envelope stamp per airfield with graded shoulder covering dispersal + perimeter, plus dev-time warning when authored vertical span exceeds threshold.
+- **PR #117 `airfield-aircraft-orientation`** — parking yaws computed at spawn time from the first non-coincident taxi-route waypoint (`points[0]` is the stand itself, so the hypothesis needed an eps-0.5m offset). Behaviour test covers main_airbase + forward strip.
+- **PR #106 `aircraft-a1-spawn-regression`** — removed the `npcAutoFlight: { kind: 'ferry' }` field from the A-1 Skyraider parking spot; A-1 stays parked and claimable by the player. Regression test pins the "no auto-departure" invariant for all three main_airbase aircraft.
+- **PR #116 `aircraft-simulation-culling`** — new `shouldSimulateAirVehicle()` helper; `FixedWingModel.update()` gates `airframe.step()` and NPC pilot tick on camera distance + hysteresis for parked + unpiloted airborne aircraft. Player-piloted and airborne-NPC continue to simulate. Velocity zeroed on cull transition so resume state is valid.
+- **PR #120 `aircraft-ground-physics-tuning`** — post-liftoff ground-clamp oscillation fixed via composite of three candidates: `liftoffClearanceM` 0.2→0.5, 10-tick sustained-descent latch before re-clamp, liftoff impulse bumped 3.0→4.5 m/s. A-1/F-4 bounce-free; AC-47 low-pitch takeoff still single-bounces (aerodynamic authority floor, out of scope).
+
+### Content + harness
+- **PR #110 `ashau-dem-streaming-fix`** — hardened the DEM loader in `ModeStartupPreparer` to reject HTML/empty/wrong-size payloads and fail loudly when the gitignored `public/data/vietnam/` binary is absent. Path tightened to leading-slash absolute form. Surfaced that CI/fresh-clone machines need a `fetch-ashau-dem` step (follow-up).
+- **PR #114 `npc-and-player-leap-fix`** — two independent root causes: `CombatantRenderInterpolator` gained a separate vertical-velocity clamp lower than the horizontal cap (absorbs the +50m catch-up when LOD promotes a distant-culled combatant that was parked at `DISTANT_CULLED_DEFAULT_Y=3m`); `PlayerMovement` grounded clamp got a rate-limit so walking into a parked-aircraft bbox or cliff seam no longer launches the camera.
+- **PR #118 `harness-ashau-objective-cycling-fix`** — extracted `pickObjectiveZone` pure helper from `scripts/perf-active-driver.cjs`; lexicographic sort (priority class → distance) replaces the old "hand back the same captured zone" path. Eight behavior tests pin the regression.
+- **PR #121 `perf-baseline-refresh`** — all four scenarios rebaselined against the cycle end-state. Memo at `docs/rearch/perf-baselines-refresh-2026-04-20.md` documents measured values, threshold formula (pass = measured × 1.15, warn = measured × 1.30), and explicit loosen/tighten deltas vs the stale 2026-03-06 baseline. Frontier30m reached victory condition at ~879s (Open Frontier); 437 samples covered the dynamic-combat portion.
+
+### Cycle mechanics
+- Two rebases resolved in-orchestrator (not re-dispatched): PR #115 against #113 (both touched `ScenarioAtmospherePresets` / `AtmosphereSystem`) and PR #119 against #115/#113/#120 (preset + system + weather overlap). Both were mechanical union-merges of additive fields; local typecheck validated before force-push.
+- Reviewer agents (combat-reviewer on #114, terrain-nav-reviewer on #112) read the local master worktree rather than the PR branch and reported false negatives for "file doesn't show the described change." Diff on the PR itself confirmed changes were present; merged anyway. Worth wiring the reviewer to `git diff origin/<branch>` directly in future cycles.
+- All five rounds dispatched sequentially; no hard-stops triggered (no fence-change proposals, no perf regressions > 5% p99, no > 2-red rounds). Worktree branch cleanup fails cosmetically because each worktree still references its branch — benign.
+
+### Follow-ups filed (new briefs to consider next cycle)
+- A Shau DEM distribution (CI + fresh clone): commit the 21 MB binary, add a fetch script, or move to Git LFS. Loader now fails loudly but source-of-truth is still "hope it's on disk."
+- `frontier30m` harness soak currently hits Open Frontier victory at ~15min and stops producing capture samples for the remaining half of the window. `harness-match-end-skip-ai-sandbox` (cycle-2026-04-20) only covers ai_sandbox; extend to open_frontier or revise the soak to a non-terminal mode.
+- Screenshot evidence committed by the executors for tasks that need live `npm run dev` (cloud-runtime, aircraft-simulation-culling, several atmosphere shots) is incomplete — marked as playtest deliverables. Human playtest pass queued.
+- Reviewer agents should read the PR diff directly, not the local worktree.
+- AC-47 low-pitch takeoff single-bounce is an aerodynamic authority issue, not a ground-clamp one. File `aircraft-low-pitch-authority-tuning` if it becomes a gameplay blocker.
 
 ## Recently Completed (cycle-2026-04-20-atmosphere-foundation, 2026-04-20)
 

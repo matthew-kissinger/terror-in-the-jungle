@@ -70,147 +70,53 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: `cycle-2026-04-21-atmosphere-polish-and-fixes` *(draft — confirm at kickoff)*
+## Current cycle: *(empty — next cycle to be seeded)*
 
 ### Cycle ID
 
-`cycle-2026-04-21-atmosphere-polish-and-fixes`
+`cycle-YYYY-MM-DD-<slug>`
 
 ### Why this cycle exists
 
-`cycle-2026-04-20-atmosphere-foundation` shipped the sky/sun/fog stack but exposed a tail of visual + content + harness issues that were either pre-existing or surfaced by the new analytic sky:
-
-- Post-process clips warm hues to white (no tone-mapping); fog reads too white at distance; vegetation has alpha-edge fringes; vegetation responds to lighting differently than terrain.
-- Ashau DEM not loading (terrain renders flat); ashau bot loops between captured zones.
-- NPCs and harness player visibly leap into the air.
-- Aircraft systemic regressions (multi-cycle): A-1 missing on runway, all aircraft only take off via hill-launch, runway has bumps, taxi orientations off, foundations over cliffs.
-- User wants day/night cycle + clouds (with helicopter flight envelope clearance).
-- User wants legacy fallbacks deleted (Skybox.ts / NullSkyBackend / skybox.png).
-- `perf-baseline-refresh` carries forward (deferred from prior cycle).
-
-This cycle is the polish + fix pass that makes the atmosphere foundation actually look right and gets the airfield/flight content working.
+*(1-3 sentence motivation: what prompted this cycle, user directives, observed issues from last playtest, etc.)*
 
 ### Tasks in this cycle
 
-Atmosphere polish (visual completion of the prior cycle):
-
-- **`post-tone-mapping-aces`** (P0) — ACES tone-map before quantize. Brief: `docs/tasks/post-tone-mapping-aces.md`.
-- **`fog-density-rebalance`** (P1) — distant terrain reads white; rebalance per-scenario fog density. Brief: `docs/tasks/fog-density-rebalance.md`.
-- **`vegetation-alpha-edge-fix`** (P1) — white/blue alpha-fringe on vegetation. Brief: `docs/tasks/vegetation-alpha-edge-fix.md`.
-- **`vegetation-fog-and-lighting-parity`** (P1) — vegetation reacts differently to fog/lighting than terrain. Brief: `docs/tasks/vegetation-fog-and-lighting-parity.md`.
-- **`atmosphere-day-night-cycle`** (P1) — animate sun direction over time. Brief: `docs/tasks/atmosphere-day-night-cycle.md`.
-- **`skybox-cutover-no-fallbacks`** (P1) — delete legacy Skybox.ts / NullSkyBackend / skybox.png. Brief: `docs/tasks/skybox-cutover-no-fallbacks.md`.
-- **`cloud-runtime-implementation`** (P2) — implement ICloudRuntime stub with high-altitude cloud band (helicopter-aware). Brief: `docs/tasks/cloud-runtime-implementation.md`.
-
-Aircraft / airfield foundation (multi-system fix):
-
-- **`airfield-terrain-flattening`** (P0) — flatten airfield footprint properly; reject cliff-edge candidate sites. Brief: `docs/tasks/airfield-terrain-flattening.md`.
-- **`airfield-aircraft-orientation`** (P1) — parking yaws must align with taxi-route entry. Brief: `docs/tasks/airfield-aircraft-orientation.md`.
-- **`aircraft-ground-physics-tuning`** (P0) — fix takeoff porpoising / bouncing on ground-clamp oscillation in `Airframe.ts:522-540` post-liftoff fallback. Brief: `docs/tasks/aircraft-ground-physics-tuning.md`. *(Repurposed 2026-04-20 after recon — original "throttle/lift/friction tuning" hypothesis was wrong; root cause is airborne ground-clamp.)*
-- **`aircraft-a1-spawn-regression`** (P1) — keep A-1 Skyraider parked at main_airbase by removing its NPC ferry mission. Brief: `docs/tasks/aircraft-a1-spawn-regression.md`. *(Repurposed 2026-04-20 — A-1 isn't missing; it auto-ferries off at boot.)*
-- **`aircraft-simulation-culling`** (P2) — skip `airframe.step()` for unpiloted, off-screen aircraft beyond render-cull distance; no LOD mesh. Brief: `docs/tasks/aircraft-simulation-culling.md`.
-
-Content + harness fixes:
-
-- **`ashau-dem-streaming-fix`** (P0) — A Shau Valley DEM file present but loader fails. Brief: `docs/tasks/ashau-dem-streaming-fix.md`.
-- **`harness-ashau-objective-cycling-fix`** (P1) — bot loops between captured zone and itself. Brief: `docs/tasks/harness-ashau-objective-cycling-fix.md`.
-- **`npc-and-player-leap-fix`** (P0) — NPCs + harness player visibly leap into the air. Brief: `docs/tasks/npc-and-player-leap-fix.md`.
-
-Carry-forward:
-
-- **`perf-baseline-refresh`** (P0) — rebaseline all 4 scenarios after the above land. Brief: `docs/tasks/perf-baseline-refresh.md`.
+*(list of task slugs with one-line descriptions; group by theme if useful)*
 
 ### Round schedule
 
-15 tasks across 5 rounds, 5-parallel cap.
-
-- **Round 1 (5 parallel — independent):**
-  - `post-tone-mapping-aces`
-  - `vegetation-alpha-edge-fix`
-  - `skybox-cutover-no-fallbacks`
-  - `ashau-dem-streaming-fix`
-  - `aircraft-a1-spawn-regression` *(repurposed; small config-only diff)*
-- **Round 2 (5 parallel — fan out from Round 1):**
-  - `fog-density-rebalance` (after `post-tone-mapping-aces`)
-  - `vegetation-fog-and-lighting-parity` (after `post-tone-mapping-aces`)
-  - `airfield-terrain-flattening`
-  - `npc-and-player-leap-fix`
-  - `atmosphere-day-night-cycle`
-- **Round 3 (4 parallel):**
-  - `airfield-aircraft-orientation` (after `airfield-terrain-flattening`)
-  - `harness-ashau-objective-cycling-fix` (after `ashau-dem-streaming-fix`)
-  - `cloud-runtime-implementation` (after `post-tone-mapping-aces` + `fog-density-rebalance` + `atmosphere-day-night-cycle` — needs live sun direction)
-  - `aircraft-simulation-culling` *(independent; new task added 2026-04-20)*
-- **Round 4 (1):**
-  - `aircraft-ground-physics-tuning` (after `airfield-terrain-flattening` so testable on a real flat runway)
-- **Round 5 (1):**
-  - `perf-baseline-refresh` (after `harness-ashau-objective-cycling-fix` + `npc-and-player-leap-fix` so baselines are stable)
+*(round-by-round dispatch plan respecting the concurrency cap)*
 
 ### Concurrency cap
 
-Default 5. No override.
+Default 5. Override here if needed.
 
 ### Dependencies
 
 ```
-post-tone-mapping-aces                (blocks: fog-density-rebalance, vegetation-fog-and-lighting-parity, cloud-runtime-implementation)
-fog-density-rebalance                 (blocked by: post-tone-mapping-aces; blocks: cloud-runtime-implementation)
-vegetation-alpha-edge-fix             (independent)
-vegetation-fog-and-lighting-parity    (blocked by: post-tone-mapping-aces)
-atmosphere-day-night-cycle            (blocks: cloud-runtime-implementation — must merge first so cloud reads live sun direction)
-skybox-cutover-no-fallbacks           (independent)
-cloud-runtime-implementation          (blocked by: post-tone-mapping-aces, fog-density-rebalance, atmosphere-day-night-cycle)
-airfield-terrain-flattening           (blocks: airfield-aircraft-orientation, aircraft-ground-physics-tuning)
-airfield-aircraft-orientation         (blocked by: airfield-terrain-flattening)
-aircraft-ground-physics-tuning        (blocked by: airfield-terrain-flattening) [repurposed: takeoff bounce fix]
-aircraft-a1-spawn-regression          (independent) [repurposed: keep A-1 parked]
-aircraft-simulation-culling           (independent) [NEW 2026-04-20]
-ashau-dem-streaming-fix               (blocks: harness-ashau-objective-cycling-fix)
-harness-ashau-objective-cycling-fix   (blocked by: ashau-dem-streaming-fix; blocks: perf-baseline-refresh)
-npc-and-player-leap-fix               (blocks: perf-baseline-refresh)
-perf-baseline-refresh                 (blocked by: harness-ashau-objective-cycling-fix, npc-and-player-leap-fix)
+*(DAG: slug -> blocks / blocked by other slugs)*
 ```
 
 ### Playtest policy
 
-- `post-tone-mapping-aces`, `fog-density-rebalance`, `vegetation-alpha-edge-fix`, `vegetation-fog-and-lighting-parity`, `atmosphere-day-night-cycle`, `cloud-runtime-implementation`: **required** (visual observables).
-- `airfield-*`, `aircraft-*`, `ashau-dem-streaming-fix`, `harness-ashau-objective-cycling-fix`, `npc-and-player-leap-fix`: **required** (behavioral).
-- `skybox-cutover-no-fallbacks`: required (visual smoke that all 5 scenarios still boot to a sky).
-- `perf-baseline-refresh`: not required (measurement only).
+*(which tasks require playtest; which are measurement-only)*
 
 ### Perf policy
 
-- `combat120` smoke on every PR before merge.
-- After Round 4 merges, `perf-baseline-refresh` produces fresh baselines reflecting the cycle end-state. Don't loosen thresholds.
-- `cloud-runtime-implementation` perf-watch: cloud render must stay within `World` group budget.
-- `aircraft-ground-physics-tuning` perf-watch: airframe physics changes shouldn't move combat120 (no aircraft active in that scenario).
+*(combat120 smoke, per-task perf-watch notes)*
 
 ### Failure handling
 
-- Fence-change escalation per `docs/INTERFACE_FENCE.md`. None expected this cycle.
-- `airfield-terrain-flattening` slope-rejection rejects 100% of candidates → STOP, lower threshold.
-- Sun-below-horizon math (day-night) produces NaN → clamp.
-- Cloud layer intersects helicopter envelope → raise cloud base.
-- `post-tone-mapping-aces` makes the retro look softer → STOP, reconsider curve.
+*(cycle-specific hard stops beyond the durable defaults)*
 
 ### Visual checkpoints (orchestrator-gated)
 
-Same screenshot-gate flow as cycle-2026-04-20: per-task PNGs in `docs/cycles/cycle-2026-04-21-atmosphere-polish-and-fixes/screenshots/<slug>/`; orchestrator reviews via Read tool before merge.
-
-Combo captures by orchestrator into `_orchestrator/<checkpoint>/`:
-
-- **Pre-cycle:** capture all 5 scenarios at the cycle-2026-04-20 ship-gate framings as the baseline (in fact reuse `cycle-2026-04-20-atmosphere-foundation/screenshots/_orchestrator/after-round-3/`).
-- **After Round 1:** confirm tone-map fixes warm hues, alpha-edge fringe gone, ashau DEM loads.
-- **After Round 2:** confirm fog density tuned, vegetation parity, airfield flat, no leaps, day-night cycle visible.
-- **After Round 3:** confirm taxi orientation, ashau bot mobile, clouds rendering at flight envelope.
-- **After Round 4:** aircraft takeoff from flat runway demonstrably working.
-- **After Round 5:** perf-baselines refreshed.
+*(screenshot gate flow if the cycle has visible observables)*
 
 ### Cycle-specific notes
 
-- User explicitly noted aircraft + helicopter content → cloud-runtime-implementation must keep cloud base above helicopter cruise altitude.
-- User explicitly asked for "no fallbacks if possible" → `skybox-cutover-no-fallbacks` is the cycle's commitment to that.
-- Recommendation: deploy current master to prod (`gh workflow run deploy.yml`) BEFORE running the overnight cycle so user observations are against the same code the executors will be building from.
+*(anything that affects dispatch ordering, e.g. user directives, prod deploy recommendation, etc.)*
 
 ## Dispatch protocol
 
