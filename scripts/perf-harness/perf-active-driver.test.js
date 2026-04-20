@@ -41,6 +41,11 @@ const {
   createIdleBotIntent,
   profileForMode,
   botConfigForProfile,
+  // bot-pathing-pit-and-steep-uphill exports — waypoint/replan/pit heuristics.
+  shouldAdvanceWaypoint,
+  isSteepClimbWaypoint,
+  shouldFastReplan,
+  detectPitTrap,
 } = driver;
 
 function makeBotCtx(overrides = {}) {
@@ -770,5 +775,169 @@ describe('PlayerBot driver mirror — idle intent shape', () => {
   it('has an aimLerpRate of 1 (snap) by default', () => {
     const intent = createIdleBotIntent();
     expect(intent.aimLerpRate).toBe(1);
+  });
+});
+
+// ── bot-pathing-pit-and-steep-uphill: waypoint/replan/pit-trap heuristics. ──
+//
+// Behavior tests, not implementation-mirror. The numeric defaults (4m
+// horizontal, 2.5m vertical, etc.) are tuning constants that may move; the
+// tests pin the BEHAVIORS the brief specifies:
+//   - waypoint advance must require both horizontal AND vertical proximity
+//     so a steep-uphill waypoint is not falsely "passed" mid-climb
+//   - the 750ms fast re-plan must NOT fire while the bot is still climbing
+//     to a waypoint above it (the path is fine; the bot just needs time)
+//   - a "pit trap" (long stuck + next waypoint above) must be detected so
+//     the driver can invalidate and re-plan instead of looping in the pit
+
+describe('shouldAdvanceWaypoint — 3D proximity (steep-uphill regression)', () => {
+  it('advances when player is at the same altitude and within horizontal tolerance', () => {
+    const advanced = shouldAdvanceWaypoint({
+      playerPos: { x: 0, y: 10, z: 0 },
+      waypoint: { x: 1, y: 10, z: 1 },
+    });
+    expect(advanced).toBe(true);
+  });
+
+  it('does NOT advance when waypoint is horizontally close but vertically still above', () => {
+    // Steep uphill bug shape: bot is 2m below the waypoint with horizontal
+    // distance 1m. Old horizontal-only rule advanced; new rule must not.
+    const advanced = shouldAdvanceWaypoint({
+      playerPos: { x: 0, y: 0, z: 0 },
+      waypoint: { x: 0, y: 8, z: 1 },
+    });
+    expect(advanced).toBe(false);
+  });
+
+  it('does NOT advance when player is too far horizontally even on flat ground', () => {
+    const advanced = shouldAdvanceWaypoint({
+      playerPos: { x: 0, y: 0, z: 0 },
+      waypoint: { x: 20, y: 0, z: 0 },
+    });
+    expect(advanced).toBe(false);
+  });
+
+  it('treats a waypoint without a y as planar (advances on horizontal alone)', () => {
+    // Backward compat: navmesh queries that drop y still produce a usable
+    // path. Don't deadlock the bot when y is missing.
+    const advanced = shouldAdvanceWaypoint({
+      playerPos: { x: 0, y: 0, z: 0 },
+      waypoint: { x: 1, z: 1 },
+    });
+    expect(advanced).toBe(true);
+  });
+
+  it('refuses to advance with missing player or waypoint inputs', () => {
+    expect(shouldAdvanceWaypoint({ playerPos: null, waypoint: { x: 0, y: 0, z: 0 } })).toBe(false);
+    expect(shouldAdvanceWaypoint({ playerPos: { x: 0, y: 0, z: 0 }, waypoint: null })).toBe(false);
+  });
+});
+
+describe('isSteepClimbWaypoint — detects mid-climb state', () => {
+  it('flags a nearby waypoint that is meaningfully above the bot', () => {
+    expect(isSteepClimbWaypoint({
+      playerPos: { x: 0, y: 0, z: 0 },
+      waypoint: { x: 0, y: 6, z: 4 },
+    })).toBe(true);
+  });
+
+  it('does NOT flag a waypoint at the same altitude', () => {
+    expect(isSteepClimbWaypoint({
+      playerPos: { x: 0, y: 0, z: 0 },
+      waypoint: { x: 0, y: 0, z: 4 },
+    })).toBe(false);
+  });
+
+  it('does NOT flag a far-away waypoint even when much higher', () => {
+    // Beyond ~12m horizontal the slope is averaged out; this isn't a
+    // "still climbing right now" situation, it's just a distant goal.
+    expect(isSteepClimbWaypoint({
+      playerPos: { x: 0, y: 0, z: 0 },
+      waypoint: { x: 0, y: 30, z: 50 },
+    })).toBe(false);
+  });
+
+  it('does NOT flag a waypoint that is below the bot (downhill)', () => {
+    expect(isSteepClimbWaypoint({
+      playerPos: { x: 0, y: 10, z: 0 },
+      waypoint: { x: 0, y: 0, z: 4 },
+    })).toBe(false);
+  });
+});
+
+describe('shouldFastReplan — over-pathing dampener', () => {
+  it('fires a fast re-plan when the path is exhausted and we are not climbing', () => {
+    expect(shouldFastReplan({
+      pathExhausted: true,
+      sinceReplanMs: 1000,
+      steepClimbActive: false,
+    })).toBe(true);
+  });
+
+  it('does NOT fire a fast re-plan while the bot is still climbing to a high waypoint', () => {
+    // Brief: "Dampen re-plan cadence on steep climbs". This is the core
+    // over-pathing fix — the path is still valid; the bot just needs time.
+    expect(shouldFastReplan({
+      pathExhausted: true,
+      sinceReplanMs: 1000,
+      steepClimbActive: true,
+    })).toBe(false);
+  });
+
+  it('does NOT fire a fast re-plan when the path is still active', () => {
+    expect(shouldFastReplan({
+      pathExhausted: false,
+      sinceReplanMs: 1000,
+      steepClimbActive: false,
+    })).toBe(false);
+  });
+
+  it('does NOT fire a fast re-plan inside the cooldown window', () => {
+    // The cooldown prevents queryPath thrash; this is the same invariant
+    // the prior fast-path enforced.
+    expect(shouldFastReplan({
+      pathExhausted: true,
+      sinceReplanMs: 100, // way under the 750ms cooldown
+      steepClimbActive: false,
+    })).toBe(false);
+  });
+});
+
+describe('detectPitTrap — pit-floor escape', () => {
+  it('flags a stuck bot whose next waypoint is meaningfully above', () => {
+    // Brief: "if the current nav path goes 'up and out' (vertical delta > 3m
+    // over the next waypoint), trigger the stuck-recovery teleport earlier".
+    expect(detectPitTrap({
+      stuckMs: 5000,
+      playerPos: { x: 0, y: 0, z: 0 },
+      currentWaypoint: { x: 1, y: 10, z: 1 },
+    })).toBe(true);
+  });
+
+  it('does NOT flag a bot that is stuck against a wall (waypoint at same altitude)', () => {
+    // True pit signature is "up and out". Stuck against geometry at the
+    // same altitude is a different bug; pit-escape is not the right fix.
+    expect(detectPitTrap({
+      stuckMs: 5000,
+      playerPos: { x: 0, y: 5, z: 0 },
+      currentWaypoint: { x: 1, y: 5, z: 1 },
+    })).toBe(false);
+  });
+
+  it('does NOT flag short stuck windows', () => {
+    expect(detectPitTrap({
+      stuckMs: 500,
+      playerPos: { x: 0, y: 0, z: 0 },
+      currentWaypoint: { x: 1, y: 10, z: 1 },
+    })).toBe(false);
+  });
+
+  it('flags a long-stuck bot with no active waypoint (defensive default)', () => {
+    // No path → caller can choose to escape. The predicate stays observational.
+    expect(detectPitTrap({
+      stuckMs: 5000,
+      playerPos: { x: 0, y: 0, z: 0 },
+      currentWaypoint: null,
+    })).toBe(true);
   });
 });
