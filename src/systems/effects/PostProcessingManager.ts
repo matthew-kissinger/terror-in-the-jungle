@@ -52,6 +52,7 @@ export class PostProcessingManager {
       uniforms: {
         tDiffuse: { value: this.renderTarget.texture },
         colorLevels: { value: 24.0 },
+        uExposure: { value: 1.0 },
       },
       vertexShader: `
         varying vec2 vUv;
@@ -63,6 +64,7 @@ export class PostProcessingManager {
       fragmentShader: `
         uniform sampler2D tDiffuse;
         uniform float colorLevels;
+        uniform float uExposure;
         varying vec2 vUv;
         // 4x4 Bayer ordered-dither matrix scaled to [0, 1).
         // Adds a sub-quantization-step offset before the existing 24-level quantize
@@ -74,8 +76,22 @@ export class PostProcessingManager {
           3.0 / 16.0, 11.0 / 16.0,  1.0 / 16.0,  9.0 / 16.0,
          15.0 / 16.0,  7.0 / 16.0, 13.0 / 16.0,  5.0 / 16.0
         );
+        // ACES filmic tone-map (Narkowicz 2015 approximation): compresses
+        // [0, +inf) into [0, 1] with a soft shoulder that preserves warm
+        // tints around the sun direction. Runs BEFORE the Bayer dither +
+        // 24-level quantize so near-1.0 warm hues (dawn / dusk / golden
+        // hour) do not uniformly floor to white. ~5 ALU; no perf concern.
+        vec3 acesFilm(vec3 x) {
+          float a = 2.51;
+          float b = 0.03;
+          float c = 2.43;
+          float d = 0.59;
+          float e = 0.14;
+          return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+        }
         void main() {
           vec4 color = texture2D(tDiffuse, vUv);
+          color.rgb = acesFilm(color.rgb * uExposure);
           ivec2 p = ivec2(mod(gl_FragCoord.xy, 4.0));
           float threshold = bayer4x4[p.x][p.y];
           float dither = (threshold - 0.5) / colorLevels;
