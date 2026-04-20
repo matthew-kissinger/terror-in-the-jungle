@@ -1,6 +1,6 @@
 # Agent Orchestration — Runbook
 
-Last updated: 2026-04-18
+Last updated: 2026-04-20
 
 This file is the master runbook for multi-agent cycles in this repo. It has
 three parts:
@@ -70,39 +70,79 @@ standalone bookkeeping pass):
 
 The stub template under "Current cycle" is what the next cycle fills in.
 
-## Current cycle: `cycle-2026-04-20-atmosphere-foundation` *(draft — confirm at kickoff)*
+## Current cycle: `cycle-2026-04-21-atmosphere-polish-and-fixes` *(draft — confirm at kickoff)*
 
 ### Cycle ID
 
-`cycle-2026-04-20-atmosphere-foundation`
+`cycle-2026-04-21-atmosphere-polish-and-fixes`
 
 ### Why this cycle exists
 
-The sky / sun / fog / ambient stack is a grab-bag of frozen lights, a static equirect skybox, and scalar-multiplier weather. It cannot support the fixed-wing aircraft shipped in B1 (they climb into the 500-unit dome), jungle-mood work (dawn patrols, golden-hour objectives), or the P2-roadmap "day/night cycle". This cycle establishes an `ISkyRuntime` fence + `AtmosphereSystem` with a Hosek-Wilkie sky backend, sky-tinted fog, sun/hemisphere lights driven from the atmosphere model, and a Bayer dither that kills gradient banding in the 24-level post-process. Design: `docs/ATMOSPHERE.md`. Parallel P0/P1 carries from the prior cycle run alongside.
+`cycle-2026-04-20-atmosphere-foundation` shipped the sky/sun/fog stack but exposed a tail of visual + content + harness issues that were either pre-existing or surfaced by the new analytic sky:
+
+- Post-process clips warm hues to white (no tone-mapping); fog reads too white at distance; vegetation has alpha-edge fringes; vegetation responds to lighting differently than terrain.
+- Ashau DEM not loading (terrain renders flat); ashau bot loops between captured zones.
+- NPCs and harness player visibly leap into the air.
+- Aircraft systemic regressions (multi-cycle): A-1 missing on runway, all aircraft only take off via hill-launch, runway has bumps, taxi orientations off, foundations over cliffs.
+- User wants day/night cycle + clouds (with helicopter flight envelope clearance).
+- User wants legacy fallbacks deleted (Skybox.ts / NullSkyBackend / skybox.png).
+- `perf-baseline-refresh` carries forward (deferred from prior cycle).
+
+This cycle is the polish + fix pass that makes the atmosphere foundation actually look right and gets the airfield/flight content working.
 
 ### Tasks in this cycle
 
-Atmosphere v1 foundation (Combo G architecture, Combo A first backend):
+Atmosphere polish (visual completion of the prior cycle):
 
-- **`atmosphere-interface-fence`** — add `ISkyRuntime` + `ICloudRuntime` to `SystemInterfaces.ts`; stand up empty `AtmosphereSystem` shell with `NullSkyBackend`. Brief: `docs/tasks/atmosphere-interface-fence.md`.
-- **`atmosphere-hosek-wilkie-sky`** — first sky backend: analytic dome + CPU-side LUT + per-scenario TOD preset table. Brief: `docs/tasks/atmosphere-hosek-wilkie-sky.md`.
-- **`atmosphere-fog-tinted-by-sky`** — fog color sampled from sky zenith/horizon each frame; horizon seam disappears. Brief: `docs/tasks/atmosphere-fog-tinted-by-sky.md`.
-- **`atmosphere-sun-hemisphere-coupling`** — unfreeze moonLight; drive sun direction + color + hemisphere from atmosphere; rewire WaterSystem sun vector. Brief: `docs/tasks/atmosphere-sun-hemisphere-coupling.md`.
-- **`post-bayer-dither`** — 4×4 Bayer dither before the 24-level quantize in `PostProcessingManager.ts`. Independent of atmosphere stack. Brief: `docs/tasks/post-bayer-dither.md`.
+- **`post-tone-mapping-aces`** (P0) — ACES tone-map before quantize. Brief: `docs/tasks/post-tone-mapping-aces.md`.
+- **`fog-density-rebalance`** (P1) — distant terrain reads white; rebalance per-scenario fog density. Brief: `docs/tasks/fog-density-rebalance.md`.
+- **`vegetation-alpha-edge-fix`** (P1) — white/blue alpha-fringe on vegetation. Brief: `docs/tasks/vegetation-alpha-edge-fix.md`.
+- **`vegetation-fog-and-lighting-parity`** (P1) — vegetation reacts differently to fog/lighting than terrain. Brief: `docs/tasks/vegetation-fog-and-lighting-parity.md`.
+- **`atmosphere-day-night-cycle`** (P1) — animate sun direction over time. Brief: `docs/tasks/atmosphere-day-night-cycle.md`.
+- **`skybox-cutover-no-fallbacks`** (P1) — delete legacy Skybox.ts / NullSkyBackend / skybox.png. Brief: `docs/tasks/skybox-cutover-no-fallbacks.md`.
+- **`cloud-runtime-implementation`** (P2) — implement ICloudRuntime stub with high-altitude cloud band (helicopter-aware). Brief: `docs/tasks/cloud-runtime-implementation.md`.
 
-Parallel carries from prior cycle:
+Aircraft / airfield foundation (multi-system fix):
 
-- **`perf-baseline-refresh`** (P0) — rebaseline all 4 scenarios against the aim-fixed player bot. Brief: `docs/tasks/perf-baseline-refresh.md`.
-- **`harness-lifecycle-halt-on-match-end`** (P1) — halt perf harness at match end. Brief: `docs/tasks/harness-lifecycle-halt-on-match-end.md`.
-- **`bot-pathing-pit-and-steep-uphill`** (P1) — fix over-path on uphill + pit entrapment. Brief: `docs/tasks/bot-pathing-pit-and-steep-uphill.md`.
-- **`harness-stats-accuracy-damage-wiring`** (P2) — wire accuracy + damage into `summary.json`; fix bot-state histogram read. Brief: `docs/tasks/harness-stats-accuracy-damage-wiring.md`.
+- **`airfield-terrain-flattening`** (P0) — flatten airfield footprint properly; reject cliff-edge candidate sites. Brief: `docs/tasks/airfield-terrain-flattening.md`.
+- **`airfield-aircraft-orientation`** (P1) — parking yaws must align with taxi-route entry. Brief: `docs/tasks/airfield-aircraft-orientation.md`.
+- **`aircraft-ground-physics-tuning`** (P0) — flat-runway takeoff must work without hill-launch. Brief: `docs/tasks/aircraft-ground-physics-tuning.md`.
+- **`aircraft-a1-spawn-regression`** (P1) — A-1 Skyraider missing from main_airbase. Brief: `docs/tasks/aircraft-a1-spawn-regression.md`.
+
+Content + harness fixes:
+
+- **`ashau-dem-streaming-fix`** (P0) — A Shau Valley DEM file present but loader fails. Brief: `docs/tasks/ashau-dem-streaming-fix.md`.
+- **`harness-ashau-objective-cycling-fix`** (P1) — bot loops between captured zone and itself. Brief: `docs/tasks/harness-ashau-objective-cycling-fix.md`.
+- **`npc-and-player-leap-fix`** (P0) — NPCs + harness player visibly leap into the air. Brief: `docs/tasks/npc-and-player-leap-fix.md`.
+
+Carry-forward:
+
+- **`perf-baseline-refresh`** (P0) — rebaseline all 4 scenarios after the above land. Brief: `docs/tasks/perf-baseline-refresh.md`.
 
 ### Round schedule
 
-- **Round 1 (5 parallel):** `atmosphere-interface-fence`, `post-bayer-dither`, `harness-lifecycle-halt-on-match-end`, `bot-pathing-pit-and-steep-uphill`, `harness-stats-accuracy-damage-wiring`. These are independent of each other.
-- **Round 2 (1):** `atmosphere-hosek-wilkie-sky` (after Round 1's `atmosphere-interface-fence` merges).
-- **Round 3 (2 parallel):** `atmosphere-fog-tinted-by-sky`, `atmosphere-sun-hemisphere-coupling` (both consume the Hosek-Wilkie backend).
-- **Round 4 (1):** `perf-baseline-refresh` (after harness P1/P2 land — baselines should reflect the improved pathing + stats surfacing).
+14 tasks across 5 rounds, 5-parallel cap.
+
+- **Round 1 (5 parallel — independent):**
+  - `post-tone-mapping-aces`
+  - `vegetation-alpha-edge-fix`
+  - `skybox-cutover-no-fallbacks`
+  - `ashau-dem-streaming-fix`
+  - `aircraft-a1-spawn-regression`
+- **Round 2 (5 parallel — fan out from Round 1):**
+  - `fog-density-rebalance` (after `post-tone-mapping-aces`)
+  - `vegetation-fog-and-lighting-parity` (after `post-tone-mapping-aces`)
+  - `airfield-terrain-flattening`
+  - `npc-and-player-leap-fix`
+  - `atmosphere-day-night-cycle`
+- **Round 3 (3 parallel):**
+  - `airfield-aircraft-orientation` (after `airfield-terrain-flattening`)
+  - `harness-ashau-objective-cycling-fix` (after `ashau-dem-streaming-fix`)
+  - `cloud-runtime-implementation` (after `post-tone-mapping-aces` + `fog-density-rebalance` for color realism)
+- **Round 4 (1):**
+  - `aircraft-ground-physics-tuning` (after `airfield-terrain-flattening` so testable on a real flat runway)
+- **Round 5 (1):**
+  - `perf-baseline-refresh` (after `harness-ashau-objective-cycling-fix` + `npc-and-player-leap-fix` so baselines are stable)
 
 ### Concurrency cap
 
@@ -111,50 +151,63 @@ Default 5. No override.
 ### Dependencies
 
 ```
-atmosphere-interface-fence       (blocks: hosek-wilkie, fog-tinted, sun-hemisphere)
-atmosphere-hosek-wilkie-sky      (blocked by: interface-fence; blocks: fog-tinted, sun-hemisphere)
-atmosphere-fog-tinted-by-sky     (blocked by: hosek-wilkie)
-atmosphere-sun-hemisphere-coupling (blocked by: hosek-wilkie)
-post-bayer-dither                (independent)
-perf-baseline-refresh            (softly blocked by harness P1/P2 — see brief)
-harness-lifecycle-halt-on-match-end (independent)
-bot-pathing-pit-and-steep-uphill (independent)
-harness-stats-accuracy-damage-wiring (independent)
+post-tone-mapping-aces                (blocks: fog-density-rebalance, vegetation-fog-and-lighting-parity, cloud-runtime-implementation)
+fog-density-rebalance                 (blocked by: post-tone-mapping-aces; blocks: cloud-runtime-implementation)
+vegetation-alpha-edge-fix             (independent)
+vegetation-fog-and-lighting-parity    (blocked by: post-tone-mapping-aces)
+atmosphere-day-night-cycle            (independent — touches AtmosphereSystem; coordinate with cloud-runtime-implementation if both land same round, but no hard dep)
+skybox-cutover-no-fallbacks           (independent)
+cloud-runtime-implementation          (blocked by: post-tone-mapping-aces, fog-density-rebalance)
+airfield-terrain-flattening           (blocks: airfield-aircraft-orientation, aircraft-ground-physics-tuning)
+airfield-aircraft-orientation         (blocked by: airfield-terrain-flattening)
+aircraft-ground-physics-tuning        (blocked by: airfield-terrain-flattening)
+aircraft-a1-spawn-regression          (independent)
+ashau-dem-streaming-fix               (blocks: harness-ashau-objective-cycling-fix)
+harness-ashau-objective-cycling-fix   (blocked by: ashau-dem-streaming-fix; blocks: perf-baseline-refresh)
+npc-and-player-leap-fix               (blocks: perf-baseline-refresh)
+perf-baseline-refresh                 (blocked by: harness-ashau-objective-cycling-fix, npc-and-player-leap-fix)
 ```
 
 ### Playtest policy
 
-- `atmosphere-hosek-wilkie-sky`, `atmosphere-fog-tinted-by-sky`, `atmosphere-sun-hemisphere-coupling`, `post-bayer-dither`: **required** — visual observables.
-- `atmosphere-interface-fence`: not required — shell only, no visible change.
-- Harness + perf tasks: per existing briefs.
+- `post-tone-mapping-aces`, `fog-density-rebalance`, `vegetation-alpha-edge-fix`, `vegetation-fog-and-lighting-parity`, `atmosphere-day-night-cycle`, `cloud-runtime-implementation`: **required** (visual observables).
+- `airfield-*`, `aircraft-*`, `ashau-dem-streaming-fix`, `harness-ashau-objective-cycling-fix`, `npc-and-player-leap-fix`: **required** (behavioral).
+- `skybox-cutover-no-fallbacks`: required (visual smoke that all 5 scenarios still boot to a sky).
+- `perf-baseline-refresh`: not required (measurement only).
 
 ### Perf policy
 
-- `combat120` smoke on every atmosphere PR before merge; must stay within current WARN bound.
-- Full `npm run validate:full` (combat120 capture + perf:compare) on the final integration PR before `perf-baseline-refresh` dispatches.
-- Bayer dither PR: no perf expectation change (3–5 shader ops within noise).
+- `combat120` smoke on every PR before merge.
+- After Round 4 merges, `perf-baseline-refresh` produces fresh baselines reflecting the cycle end-state. Don't loosen thresholds.
+- `cloud-runtime-implementation` perf-watch: cloud render must stay within `World` group budget.
+- `aircraft-ground-physics-tuning` perf-watch: airframe physics changes shouldn't move combat120 (no aircraft active in that scenario).
 
 ### Failure handling
 
-- Fence-change escalation: if `atmosphere-interface-fence` becomes an EXISTING-interface modification, STOP and open for human approval per `docs/INTERFACE_FENCE.md`.
-- Sky backend perf overrun (`World` group > 1.0ms): fall back to Three's Preetham `Sky` example as a temporary backend; do not break the budget.
-- Shadow popping on sun-direction animation: fall back to static frustum follow for v1; ship sun animation without shadow-follow.
-- If `atmosphere-fog-tinted-by-sky` requires changing `IGameRenderer.fog` from `THREE.FogExp2` to a subclass, STOP — that's `[interface-change]`.
+- Fence-change escalation per `docs/INTERFACE_FENCE.md`. None expected this cycle.
+- `airfield-terrain-flattening` slope-rejection rejects 100% of candidates → STOP, lower threshold.
+- Sun-below-horizon math (day-night) produces NaN → clamp.
+- Cloud layer intersects helicopter envelope → raise cloud base.
+- `post-tone-mapping-aces` makes the retro look softer → STOP, reconsider curve.
 
 ### Visual checkpoints (orchestrator-gated)
 
-This cycle ships visible-pixel changes. The orchestrator (main session) is the visual reviewer and gates merge of every visible-change PR on screenshot review.
+Same screenshot-gate flow as cycle-2026-04-20: per-task PNGs in `docs/cycles/cycle-2026-04-21-atmosphere-polish-and-fixes/screenshots/<slug>/`; orchestrator reviews via Read tool before merge.
 
-Per-task gate: each visible-change task brief carries a "Screenshot evidence (required for merge)" section listing required PNGs under `docs/cycles/cycle-2026-04-20-atmosphere-foundation/screenshots/<slug>/`. Executors commit the shots in the same PR; the orchestrator reads them via the Read tool (which renders PNG) before `gh pr merge`. If a shot looks wrong, post `gh pr comment` with the specific issue and let the executor iterate.
+Combo captures by orchestrator into `_orchestrator/<checkpoint>/`:
 
-Tuning combos between rounds — orchestrator captures these directly (Playwright MCP or extending `scripts/perf-capture.ts`) into `docs/cycles/cycle-2026-04-20-atmosphere-foundation/screenshots/_orchestrator/<checkpoint>/`:
+- **Pre-cycle:** capture all 5 scenarios at the cycle-2026-04-20 ship-gate framings as the baseline (in fact reuse `cycle-2026-04-20-atmosphere-foundation/screenshots/_orchestrator/after-round-3/`).
+- **After Round 1:** confirm tone-map fixes warm hues, alpha-edge fringe gone, ashau DEM loads.
+- **After Round 2:** confirm fog density tuned, vegetation parity, airfield flat, no leaps, day-night cycle visible.
+- **After Round 3:** confirm taxi orientation, ashau bot mobile, clouds rendering at flight envelope.
+- **After Round 4:** aircraft takeoff from flat runway demonstrably working.
+- **After Round 5:** perf-baselines refreshed.
 
-- **Pre-cycle (master baseline):** capture every per-task required shot from current `master` first, into `_master/`. Executors diff their shots against this baseline.
-- **After Round 2 merges (`atmosphere-hosek-wilkie-sky`):** re-shoot all 5 scenarios at ground level. Expect a visibly bad horizon seam (fog still constant) — confirm the sky gradient itself reads right per scenario.
-- **After Round 3a merges (whichever of `fog-tinted` / `sun-hemisphere` lands first):** capture the same 5 + the storm + underwater overrides. Confirm seam is gone (if fog landed) or sun direction matches shadows (if sun landed).
-- **After Round 3 fully merged (combined ship gate):** final capture of all 5 scenarios + storm + underwater. This is the last visual check before the cycle closes.
+### Cycle-specific notes
 
-Tuning is iterative: if a combo capture reveals a regression that the executors couldn't see in isolation (e.g. fog color blowout when sun goes near the horizon), open a follow-up task brief rather than blocking the round mid-flight.
+- User explicitly noted aircraft + helicopter content → cloud-runtime-implementation must keep cloud base above helicopter cruise altitude.
+- User explicitly asked for "no fallbacks if possible" → `skybox-cutover-no-fallbacks` is the cycle's commitment to that.
+- Recommendation: deploy current master to prod (`gh workflow run deploy.yml`) BEFORE running the overnight cycle so user observations are against the same code the executors will be building from.
 
 ## Dispatch protocol
 

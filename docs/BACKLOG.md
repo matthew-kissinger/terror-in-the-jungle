@@ -1,10 +1,54 @@
 # Backlog
 
-Last updated: 2026-04-19 (repo-state reconciliation)
+Last updated: 2026-04-20 (cycle-2026-04-20-atmosphere-foundation close-out)
 
 Historical cycle-close sections below preserve what was true when those cycles
 closed. Current open work lives in the P0/P1/P2/P3 sections plus Known Issues /
 Known Bugs.
+
+## Recently Completed (cycle-2026-04-20-atmosphere-foundation, 2026-04-20)
+
+Nine merged PRs (atmosphere stack v1 + Round-1 polish + close-out fix). One task deferred. Briefs archived under `docs/tasks/archive/cycle-2026-04-20-atmosphere-foundation/`. Cycle ran in a single ~5-hour orchestrated burst.
+
+- **PR #97 `atmosphere-interface-fence`** — added `ISkyRuntime` + `ICloudRuntime` to `SystemInterfaces.ts`; stood up `AtmosphereSystem` shell with `NullSkyBackend`. Architectural seam for the rest of the atmosphere stack. Fence ADDITION, not modification.
+- **PR #98 `bot-pathing-pit-and-steep-uphill`** — driver-only heuristics: `shouldAdvanceWaypoint` (3D proximity), `isSteepClimbWaypoint`, `shouldFastReplan` (suppress fast re-plan during climb), `detectPitTrap`. 21 new behavior tests. **Playtest recommended** — fix follows hypothesis exactly but couldn't be live-tested from worktree.
+- **PR #99 `harness-lifecycle-halt-on-match-end`** — perf capture finalizes ~2s after engine reports match end. Used `TicketSystem.getGameState()` instead of adding to fenced interface. Introduced regression: `detectMatchEnded` fired immediately for `ai_sandbox` mode (no win condition); fixed in PR #105.
+- **PR #100 `harness-stats-accuracy-damage-wiring`** — accuracy / damage-dealt / damage-taken / kills / state histogram now in `summary.json` under `harnessDriverFinal`. Bot-state snapshot field name aliased for backward compat. Budget overshoot (+261 LOC vs ≤150) accepted: most was type defs + behavior tests.
+- **PR #101 `post-bayer-dither`** — 4×4 Bayer ordered-dither offset before the 24-level color quantize in `PostProcessingManager`. Banding visibly broken into retro stipple pattern; aesthetic preserved. Screenshots committed.
+- **PR #102 `atmosphere-hosek-wilkie-sky`** — analytic Hosek-Wilkie-shaped sky dome (Preetham fallback per brief allowance). `HosekWilkieSkyBackend` with CPU LUT + per-scenario `ScenarioAtmospherePresets`. Replaces the legacy `Skybox` PNG load gated behind `AtmosphereSystem.ownsSkyDome()`. Budget overshoot (657 vs ≤500 LOC) accepted (CPU LUT + Preetham math required).
+- **PR #103 `atmosphere-fog-tinted-by-sky`** — `AtmosphereSystem.applyFogColor` writes per-frame sky-driven fog color into `THREE.FogExp2`. New `FogTintIntentReceiver` interface for `WeatherAtmosphere` to forward storm-darken + underwater-override intent. Horizon seam visibly gone in `combat120-noon` ship-gate capture.
+- **PR #104 `atmosphere-sun-hemisphere-coupling`** — `moonLight` no longer `freezeTransform`'d; per-frame position + color from `AtmosphereSystem.getSunDirection/getSunColor`. Hemisphere sky/ground colors track zenith/horizon. `WaterSystem.sun` finally has a real source. Shadow frustum follows player when target set.
+- **PR #105 `harness-match-end-skip-ai-sandbox`** — close-out fix: gate `detectMatchEnded` on mode (skip `ai_sandbox`); emit `matchEndedAtMs` undefined when unset (latent perf-capture.ts `Number(null) === 0` bug masked). Live combat120 capture validation now passes.
+
+### Deferred to cycle-2026-04-21
+
+- **`perf-baseline-refresh`** — first attempt hard-stopped on PR #99's match-end regression (fixed by #105). Second attempt hard-stopped on two grounds: (a) `ashau:short` capture had `movementTransitions=0`, `waypointReplanFailures=200`, `harness_min_shots_fired=0` (bot dormant — DEM didn't load + objective-cycling loop), (b) measured `combat120 p95` was +41.8% and `openfrontier:short p95` was +132.6% over stale baseline (mostly because the new harness actually drives combat vs. the dormant baseline; needs disentangling, not a blind re-bake). Carries forward.
+
+### Cycle-specific harness additions
+
+- New per-task screenshot-evidence gate: every visible-change task brief includes a "Screenshot evidence (required for merge)" section; orchestrator (main session) reviews PNGs via Read-tool before merge. Tracked in `docs/cycles/cycle-2026-04-20-atmosphere-foundation/screenshots/<slug>/` with `_master/` (pre-cycle baselines) and `_orchestrator/<checkpoint>/` (between-round combo captures).
+
+### Visible state at cycle close (orchestrator playtest 2026-04-20)
+
+- ✅ Sky-fog seam gone in `combat120-noon` ship-gate.
+- ✅ Per-scenario sky gradient differentiation visible at zenith.
+- ❌ Per-preset TOD warmth (dawn / dusk) does NOT visually read — post-process clips bright sun-direction in-scattering to white. Math correct, visual blocked by 24-level quantize without tone-mapping. Brief `post-tone-mapping-aces` queued.
+- ❌ Distant terrain reads near-white through fog (fog density was tuned for the old constant fog color). Brief `fog-density-rebalance` queued.
+- ❌ Vegetation has white/blue alpha-edge outlines (was hidden by old dark fog). Brief `vegetation-alpha-edge-fix` queued.
+- ❌ Vegetation lights/fogs differently from terrain (likely separate material path). Brief `vegetation-fog-and-lighting-parity` queued.
+- ❌ NPCs and harness-driven player visibly "leap into the air." `CombatantRenderInterpolator` exists but symptom persists — root cause may be upstream (terrain-not-streamed Y jumps) or interpolator vertical clamp too permissive. Brief `npc-and-player-leap-fix` queued.
+- ❌ `ashau:short` terrain renders flat — DEM file is present at `public/data/vietnam/big-map/a-shau-z14-9x9.f32` but loader fails (`RangeError: byte length should be a multiple of 4`). Brief `ashau-dem-streaming-fix` queued.
+- ❌ Ashau bot loops between captured zone and itself (stuck-recovery teleports onto already-owned zone). Brief `harness-ashau-objective-cycling-fix` queued.
+- ❌ Aircraft systemic regressions (multi-cycle): A-1 missing on runway, all aircraft only take off via hill-launch, runway has random bumps, taxiways orientation off, foundations over cliffs. Split into 4 briefs: `airfield-terrain-flattening`, `airfield-aircraft-orientation`, `aircraft-ground-physics-tuning`, `aircraft-a1-spawn-regression`.
+- 📋 Day/night cycle requested (currently static per-scenario per design). Brief `atmosphere-day-night-cycle` queued.
+- 📋 No clouds (ICloudRuntime is a stub). User wants clouds with flight-aware cloud base. Brief `cloud-runtime-implementation` queued.
+- 📋 Legacy fallbacks still present: `Skybox.ts`, `NullSkyBackend.ts`, `skybox.png`. User preference: no fallbacks. Brief `skybox-cutover-no-fallbacks` queued.
+
+### Lessons (codified)
+
+- Append-only multi-PR conflict resolution within the orchestrator (instead of round-tripping to executors) is workable when the diffs are mechanical. Used 3× in this cycle.
+- Pre-cycle prod deploy stale. Recommend deploying current master before user playtest so observations are against the same code the executors built on.
+- Static-preset atmosphere model exposed the post-process clamp problem — visible only AFTER the upstream stack landed. Tone-mapping should have shipped alongside the analytic sky, not behind it.
 
 ## Recently Completed (cycle-2026-04-18-harness-flight-combat, 2026-04-18 → 2026-04-19)
 
@@ -53,38 +97,59 @@ the runbook for the end-of-cycle ritual.
 
 ## P0 - Performance Blockers
 
-- [ ] `perf-baseline-refresh` — rebaseline all 4 scenarios against the aim-fixed player bot (PR #96). Carried from `cycle-2026-04-18-harness-flight-combat` after three failed attempts. Stale since 2026-03-06. Brief: `docs/tasks/perf-baseline-refresh.md`.
-- [ ] Reduce initial JS bundle (current production build emits roughly `three ~727kB`, `index ~866kB`, `ui ~450kB`). Recast WASM dedupe (C2) trimmed shipped WASM ~half; remaining wins are still in runtime chunking and load-path deferral.
+- [ ] `perf-baseline-refresh` — carried from `cycle-2026-04-20-atmosphere-foundation` (2 hard-stop attempts). Needs `harness-ashau-objective-cycling-fix` + `npc-and-player-leap-fix` + `ashau-dem-streaming-fix` to stabilize first. Brief: `docs/tasks/perf-baseline-refresh.md`.
+- [ ] Reduce initial JS bundle (current production build emits roughly `three ~727kB`, `index ~866kB`, `ui ~450kB`).
 
-## P1 - Perf harness
+## P0 - Atmosphere visual completeness (queued for cycle-2026-04-21)
 
-- [ ] `harness-lifecycle-halt-on-match-end` — stop perf capture when match ends (bot kept running past victory screen in PR #96 playtest). Blocks reliable `frontier30m`. Brief: `docs/tasks/harness-lifecycle-halt-on-match-end.md`.
-- [ ] `bot-pathing-pit-and-steep-uphill` — bot over-paths on direct-uphill-to-objective and gets stuck in pit geometry. Brief: `docs/tasks/bot-pathing-pit-and-steep-uphill.md`.
+- [ ] `post-tone-mapping-aces` — ACES tone-map before quantize so warm dawn/dusk/golden-hour read instead of clipping to white. Brief: `docs/tasks/post-tone-mapping-aces.md`.
+- [ ] `ashau-dem-streaming-fix` — A Shau Valley DEM file present but loader fails; terrain renders flat. Brief: `docs/tasks/ashau-dem-streaming-fix.md`.
 
-## P1 - Gameplay
+## P0 - Aircraft / airfield foundation (queued for cycle-2026-04-21)
 
-- [ ] Repair `scripts/fixed-wing-runtime-probe.ts` after the Airframe API cutover. Current master still calls `model.getPhysics()` inside the probe, so the documented fixed-wing browser validation path is not trustworthy.
-- [ ] Expand and validate live NPC fixed-wing missions beyond the current `FixedWingModel.attachNPCPilot()` / world-feature / air-support path
-- [ ] NPC helicopter transport missions (takeoff, fly to LZ, deploy, RTB)
-- [ ] Ground vehicles (M151 jeep first - GLB exists, need driving runtime)
-- [ ] Fixed-wing role split follow-up: A-1 rough-field tuning, AC-47 orbit workflow, F-4 assist/HUD/weapons
-- [ ] Weapon sound variants (2-3 per weapon type) + impact/body/headshot sounds
-- [ ] Stationary weapons (M2 .50 cal emplacements, NPC manning)
-- [ ] Faction AI doctrines - D2 landed the first observable differentiation (VC panics sooner than NVA); keep expanding the `FACTION_COMBAT_TUNING` lookup with stance/engagement/retreat parameters.
+- [ ] `airfield-terrain-flattening` — root cause of multi-cycle takeoff failures. Airfield placement needs slope rejection + extended flattening footprint covering runway/apron/taxiway/structures. Brief: `docs/tasks/airfield-terrain-flattening.md`.
+- [ ] `aircraft-ground-physics-tuning` — flat-runway takeoff currently impossible (works only via hill-launch). Blocks on `airfield-terrain-flattening`. Brief: `docs/tasks/aircraft-ground-physics-tuning.md`.
+- [ ] `npc-and-player-leap-fix` — NPCs + harness player visibly leap into the air. `CombatantRenderInterpolator` exists; root cause may be upstream Y jumps or vertical clamp too permissive. Brief: `docs/tasks/npc-and-player-leap-fix.md`.
 
-## P2 - Observability
+## P1 - Atmosphere polish (queued for cycle-2026-04-21)
 
-- [ ] `harness-stats-accuracy-damage-wiring` — accuracy, damage-dealt, damage-taken, kills not surfaced in `summary.json`; state histogram disconnect between bot snapshot and capture reader. Brief: `docs/tasks/harness-stats-accuracy-damage-wiring.md`.
+- [ ] `fog-density-rebalance` — distant terrain reads white because fog density was tuned for old constant fog color. Brief: `docs/tasks/fog-density-rebalance.md`.
+- [ ] `vegetation-alpha-edge-fix` — white/blue outlines on vegetation edge pixels (alpha-test fringe). Brief: `docs/tasks/vegetation-alpha-edge-fix.md`.
+- [ ] `vegetation-fog-and-lighting-parity` — vegetation responds to fog/lighting differently than terrain (different material path). Brief: `docs/tasks/vegetation-fog-and-lighting-parity.md`.
+- [ ] `atmosphere-day-night-cycle` — animate sun direction over time. Brief: `docs/tasks/atmosphere-day-night-cycle.md`.
+- [ ] `skybox-cutover-no-fallbacks` — delete `Skybox.ts`, `NullSkyBackend.ts`, `skybox.png`. Brief: `docs/tasks/skybox-cutover-no-fallbacks.md`.
 
-## P2 - Content & Polish
+## P1 - Aircraft / airfield (queued for cycle-2026-04-21)
 
-- [ ] Vegetation billboard remakes
-- [ ] Terrain texture improvements
-- [ ] Road network generation (splines, intersections, pathfinding)
-- [ ] Wire additional DEM maps as game modes (Ia Drang, Khe Sanh)
-- [ ] Day/night cycle — v1 foundation queued for `cycle-2026-04-20-atmosphere-foundation` (per-scenario static TOD presets; live cycling deferred). Design: `docs/ATMOSPHERE.md`.
-- [ ] Music/soundtrack
-- [ ] Re-capture `openfrontier:short` after the 2026-04-02 air-vehicle batching + visibility pass and decide whether aircraft/helicopter far-LOD meshes are still needed
+- [ ] `airfield-aircraft-orientation` — parking yaws don't align with taxi-route entry; planes need to U-turn to taxi. Brief: `docs/tasks/airfield-aircraft-orientation.md`.
+- [ ] `aircraft-a1-spawn-regression` — A-1 Skyraider missing from main_airbase runway. Narrow scope, orthogonal to physics. Brief: `docs/tasks/aircraft-a1-spawn-regression.md`.
+
+## P1 - Harness (queued for cycle-2026-04-21)
+
+- [ ] `harness-ashau-objective-cycling-fix` — bot loops between already-captured zone and itself in ashau. Stuck-recovery doesn't filter owned zones. Blocks on `ashau-dem-streaming-fix`. Brief: `docs/tasks/harness-ashau-objective-cycling-fix.md`.
+
+## P1 - Gameplay (carry-forward)
+
+- [ ] Repair `scripts/fixed-wing-runtime-probe.ts` after the Airframe API cutover. Current master still calls `model.getPhysics()` inside the probe.
+- [ ] Expand and validate live NPC fixed-wing missions beyond the current `FixedWingModel.attachNPCPilot()` / world-feature / air-support path.
+- [ ] NPC helicopter transport missions (takeoff, fly to LZ, deploy, RTB).
+- [ ] Ground vehicles (M151 jeep first - GLB exists, need driving runtime).
+- [ ] Weapon sound variants (2-3 per weapon type) + impact/body/headshot sounds.
+- [ ] Stationary weapons (M2 .50 cal emplacements, NPC manning).
+- [ ] Faction AI doctrines - keep expanding the `FACTION_COMBAT_TUNING` lookup with stance/engagement/retreat parameters.
+
+## P2 - Atmosphere (queued for cycle-2026-04-21)
+
+- [ ] `cloud-runtime-implementation` — implement the `ICloudRuntime` stub with a high-altitude cloud band (≥800m AGL to clear helicopter envelope). Brief: `docs/tasks/cloud-runtime-implementation.md`.
+
+## P2 - Content & Polish (carry-forward)
+
+- [ ] Vegetation billboard remakes.
+- [ ] Terrain texture improvements.
+- [ ] Road network generation (splines, intersections, pathfinding).
+- [ ] Wire additional DEM maps as game modes (Ia Drang, Khe Sanh).
+- [ ] Music/soundtrack.
+- [ ] Re-capture `openfrontier:short` after the 2026-04-02 air-vehicle batching + visibility pass and decide whether aircraft/helicopter far-LOD meshes are still needed.
 
 ## P3 - Architecture
 
